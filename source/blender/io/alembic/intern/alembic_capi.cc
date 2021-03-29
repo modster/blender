@@ -469,6 +469,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   cache_file->default_radius = data->settings.default_radius;
   cache_file->is_sequence = data->settings.is_sequence;
   cache_file->scale = data->settings.scale;
+  cache_file->frame_rate = data->settings.frame_rate;
   STRNCPY(cache_file->filepath, data->filename);
 
   data->archive = archive;
@@ -534,8 +535,8 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
       CFRA = SFRA;
     }
     else if (min_time < max_time) {
-      SFRA = static_cast<int>(round(min_time * FPS));
-      EFRA = static_cast<int>(round(max_time * FPS));
+      SFRA = static_cast<int>(round(min_time * cache_file->frame_rate));
+      EFRA = static_cast<int>(round(max_time * cache_file->frame_rate));
       CFRA = SFRA;
     }
   }
@@ -663,6 +664,7 @@ bool ABC_import(bContext *C,
                 const char *filepath,
                 float scale,
                 bool is_sequence,
+                float frame_rate,
                 bool set_frame_range,
                 int sequence_len,
                 int offset,
@@ -682,6 +684,7 @@ bool ABC_import(bContext *C,
   BLI_strncpy(job->filename, filepath, 1024);
 
   job->settings.scale = scale;
+  job->settings.frame_rate = frame_rate;
   job->settings.is_sequence = is_sequence;
   job->settings.set_frame_range = set_frame_range;
   job->settings.sequence_len = sequence_len;

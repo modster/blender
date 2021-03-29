@@ -501,7 +501,7 @@ void BlenderSync::sync_procedural(BL::Object &b_ob, BL::MeshSequenceCacheModifie
 
   procedural->set_frame(current_frame);
 
-  procedural->set_frame_rate(b_scene.render().fps() / b_scene.render().fps_base());
+  procedural->set_frame_rate(cache_file.frame_rate());
   procedural->set_default_radius(cache_file.default_radius());
   procedural->set_frame_offset(cache_file.frame_offset());
 

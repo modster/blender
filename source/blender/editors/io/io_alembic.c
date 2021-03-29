@@ -588,6 +588,7 @@ static void ui_alembic_import_settings(uiLayout *layout, PointerRNA *imfptr)
 
   uiLayout *col = uiLayoutColumn(box, false);
   uiItemR(col, imfptr, "relative_path", 0, NULL, ICON_NONE);
+  uiItemR(box, imfptr, "frame_rate", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "set_frame_range", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "is_sequence", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "validate_meshes", 0, NULL, ICON_NONE);
@@ -623,6 +624,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
   RNA_string_get(op->ptr, "filepath", filename);
 
   const float scale = RNA_float_get(op->ptr, "scale");
+  const float frame_rate = RNA_float_get(op->ptr, "frame_rate");
   const bool is_sequence = RNA_boolean_get(op->ptr, "is_sequence");
   const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
   const bool validate_meshes = RNA_boolean_get(op->ptr, "validate_meshes");
@@ -651,6 +653,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
                        filename,
                        scale,
                        is_sequence,
+                       frame_rate,
                        set_frame_range,
                        sequence_len,
                        offset,
@@ -690,6 +693,17 @@ void WM_OT_alembic_import(wmOperatorType *ot)
       1000.0f,
       "Scale",
       "Value by which to enlarge or shrink the objects with respect to the world's origin",
+      0.0001f,
+      1000.0f);
+
+  RNA_def_float(
+      ot->srna,
+      "frame_rate",
+      24.0f,
+      0.0001f,
+      1000.0f,
+      "Frame Rate",
+      "Frequency in frames per second at which the data in the cache file is sampled",
       0.0001f,
       1000.0f);
 

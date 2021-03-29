@@ -109,6 +109,14 @@ typedef struct CacheFile {
   char _pad;
   int cache_frame_count;
 
+  /** The frequency in frame per seconds at which the data in the cache file should evaluated.
+   * This is necessary to have here as the data may have been generated based on a different
+   * FPS than the one used for the scene (e.g. some asset was produced at 60 FPS and used in
+   * a project rendered/animated at 120 FPS).
+   */
+  float frame_rate;
+  char _pad2[4];
+
   /* Runtime */
   struct AbcArchiveHandle *handle;
   char handle_filepath[1024];

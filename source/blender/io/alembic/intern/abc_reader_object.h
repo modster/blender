@@ -40,6 +40,7 @@ struct ImportSettings {
   int from_up;
   int from_forward;
   float scale;
+  float frame_rate;
   bool is_sequence;
   bool set_frame_range;
 
@@ -62,6 +63,7 @@ struct ImportSettings {
         from_up(0),
         from_forward(0),
         scale(1.0f),
+        frame_rate(24.0f),
         is_sequence(false),
         set_frame_range(false),
         sequence_len(1),

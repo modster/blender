@@ -44,6 +44,7 @@
     .cache_frame_count = 10, \
     .use_prefetching = 0, \
     .ignore_subdivision = 0, \
+    .frame_rate = 24.0f, \
   }
 
 /** \} */

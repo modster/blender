@@ -7284,6 +7284,9 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiLayoutSetActive(sub, RNA_enum_get(&fileptr, "cache_method") == CACHEFILE_CACHE_FRAME_COUNT);
   uiItemR(sub, &fileptr, "use_prefetching", 0, NULL, ICON_NONE);
 
+  row = uiLayoutRow(layout, false);
+  uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);
+
   row = uiLayoutRowWithHeading(layout, true, IFACE_("Override Frame"));
   sub = uiLayoutRow(row, true);
   uiLayoutSetPropDecorate(sub, false);
