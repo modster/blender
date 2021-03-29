@@ -21,6 +21,8 @@
 #include "COM_defines.h"
 #include <cstdio>
 
+namespace blender::compositor {
+
 WriteBufferOperation::WriteBufferOperation(DataType datatype)
 {
   this->addInputSocket(datatype);
@@ -97,7 +99,7 @@ void WriteBufferOperation::executeRegion(rcti *rect, unsigned int /*tileNumber*/
     for (y = y1; y < y2 && (!breaked); y++) {
       int offset4 = (y * memoryBuffer->getWidth() + x1) * num_channels;
       for (x = x1; x < x2; x++) {
-        this->m_input->readSampled(&(buffer[offset4]), x, y, COM_PS_NEAREST);
+        this->m_input->readSampled(&(buffer[offset4]), x, y, PixelSampler::Nearest);
         offset4 += num_channels;
       }
       if (isBraked()) {
@@ -225,3 +227,5 @@ void WriteBufferOperation::readResolutionFromInputSocket()
   this->setWidth(inputOperation->getWidth());
   this->setHeight(inputOperation->getHeight());
 }
+
+}  // namespace blender::compositor

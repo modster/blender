@@ -22,6 +22,8 @@
 
 #include "RE_pipeline.h"
 
+namespace blender::compositor {
+
 BlurBaseOperation::BlurBaseOperation(DataType data_type)
 {
   /* data_type is almost always DataType::Color except for alpha-blur */
@@ -167,7 +169,7 @@ void BlurBaseOperation::updateSize()
 {
   if (!this->m_sizeavailable) {
     float result[4];
-    this->getInputSocketReader(1)->readSampled(result, 0, 0, COM_PS_NEAREST);
+    this->getInputSocketReader(1)->readSampled(result, 0, 0, PixelSampler::Nearest);
     this->m_size = result[0];
     this->m_sizeavailable = true;
   }
@@ -182,3 +184,5 @@ void BlurBaseOperation::determineResolution(unsigned int resolution[2],
     resolution[1] += 2 * this->m_size * m_data.sizey;
   }
 }
+
+}  // namespace blender::compositor
