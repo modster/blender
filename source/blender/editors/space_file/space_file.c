@@ -886,6 +886,9 @@ static int /*eContextResult*/ file_context(const bContext *C,
   }
   if (CTX_data_equals(member, "asset_library")) {
     FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
+    if (!asset_params) {
+      return CTX_RESULT_NO_DATA;
+    }
 
     BLI_STATIC_ASSERT(offsetof(FileSelectAssetLibraryUID, type) ==
                           offsetof(AssetLibraryReference, type),
