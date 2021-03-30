@@ -37,6 +37,7 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_deform.h"
+#include "BKE_gpencil_geom.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_lib_query.h"
 #include "BKE_modifier.h"
@@ -89,6 +90,22 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
   tgmd->curve_thickness = BKE_curvemapping_copy(gmd->curve_thickness);
 }
 
+static bool do_modifier(Object *ob, ThickGpencilModifierData *mmd, bGPDlayer *gpl, bGPDstroke *gps)
+{
+  return is_stroke_affected_by_modifier(ob,
+                                        mmd->layername,
+                                        mmd->material,
+                                        mmd->pass_index,
+                                        mmd->layer_pass,
+                                        1,
+                                        gpl,
+                                        gps,
+                                        mmd->flag & GP_THICK_INVERT_LAYER,
+                                        mmd->flag & GP_THICK_INVERT_PASS,
+                                        mmd->flag & GP_THICK_INVERT_LAYERPASS,
+                                        mmd->flag & GP_THICK_INVERT_MATERIAL);
+}
+
 /* change stroke thickness */
 static void deformPolyline(GpencilModifierData *md,
                            Depsgraph *UNUSED(depsgraph),
@@ -100,18 +117,7 @@ static void deformPolyline(GpencilModifierData *md,
   ThickGpencilModifierData *mmd = (ThickGpencilModifierData *)md;
   const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
 
-  if (!is_stroke_affected_by_modifier(ob,
-                                      mmd->layername,
-                                      mmd->material,
-                                      mmd->pass_index,
-                                      mmd->layer_pass,
-                                      1,
-                                      gpl,
-                                      gps,
-                                      mmd->flag & GP_THICK_INVERT_LAYER,
-                                      mmd->flag & GP_THICK_INVERT_PASS,
-                                      mmd->flag & GP_THICK_INVERT_LAYERPASS,
-                                      mmd->flag & GP_THICK_INVERT_MATERIAL)) {
+  if (!do_modifier(ob, mmd, gpl, gps)) {
     return;
   }
 
@@ -147,6 +153,60 @@ static void deformPolyline(GpencilModifierData *md,
     pt->pressure = interpf(target, pt->pressure, weight);
 
     CLAMP_MIN(pt->pressure, 0.0f);
+  }
+}
+
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *UNUSED(depsgraph),
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *UNUSED(gpf),
+                         bGPDstroke *gps)
+{
+  ThickGpencilModifierData *mmd = (ThickGpencilModifierData *)md;
+  const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
+
+  if (!do_modifier(ob, mmd, gpl, gps)) {
+    return;
+  }
+  float stroke_thickness_inv = 1.0f / max_ii(gps->thickness, 1);
+
+  bGPDcurve *gpc = gps->editcurve;
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *pt = &gpc->curve_points[i];
+    MDeformVert *dvert = gpc->dvert != NULL ? &gpc->dvert[i] : NULL;
+
+    /* Verify point is part of vertex group. */
+    float weight = get_modifier_point_weight(
+        dvert, (mmd->flag & GP_THICK_INVERT_VGROUP) != 0, def_nr);
+    if (weight < 0.0f) {
+      continue;
+    }
+
+    float curvef = 1.0f;
+    if ((mmd->flag & GP_THICK_CUSTOM_CURVE) && (mmd->curve_thickness)) {
+      /* Normalize value to evaluate curve. */
+      float value = (float)i / (gpc->tot_curve_points - 1);
+      curvef = BKE_curvemapping_evaluateF(mmd->curve_thickness, 0, value);
+    }
+
+    float target;
+    if (mmd->flag & GP_THICK_NORMALIZE) {
+      target = mmd->thickness * stroke_thickness_inv;
+      target *= curvef;
+    }
+    else {
+      target = pt->pressure * mmd->thickness_fac;
+      weight *= curvef;
+    }
+
+    pt->pressure = interpf(target, pt->pressure, weight);
+
+    CLAMP_MIN(pt->pressure, 0.0f);
+    /* Calc geometry data. */
+    bGPdata *gpd = ob->data;
+    gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+    BKE_gpencil_stroke_geometry_update(gpd, gps);
   }
 }
 
@@ -222,7 +282,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Thick = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
