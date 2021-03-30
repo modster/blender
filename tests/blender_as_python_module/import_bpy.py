@@ -13,29 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
 # ***** END GPL LICENSE BLOCK *****
 
-#-----------------------------------------------------------------------------
-include_directories(${ZLIB_INCLUDE_DIRS})
-
-set(SRC
-  src/BlenderThumb.cpp
-  src/BlendThumb.def
-  src/BlendThumb.rc
-  src/Dll.cpp
-)
-
-string(APPEND CMAKE_SHARED_LINKER_FLAGS_DEBUG " /nodefaultlib:MSVCRT.lib")
-
-add_library(BlendThumb SHARED ${SRC})
-setup_platform_linker_flags(BlendThumb)
-target_link_libraries(BlendThumb ${ZLIB_LIBRARIES})
-
-install(
-  FILES $<TARGET_FILE:BlendThumb>
-  COMPONENT Blender
-  DESTINATION "."
-)
+# Just import bpy and see if there are any dynamic loader errors.
+import bpy

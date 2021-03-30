@@ -14,28 +14,20 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# The Original Code is Copyright (C) 2006, Blender Foundation
+# The Original Code is Copyright (C) 2021, Blender Foundation
 # All rights reserved.
+#
 # ***** END GPL LICENSE BLOCK *****
 
-#-----------------------------------------------------------------------------
-include_directories(${ZLIB_INCLUDE_DIRS})
+function(add_blender_as_python_module_test testname testscript)
+  if(NOT TEST_PYTHON_EXE)
+    message(FATAL_ERROR "No Python configured for running tests, set TEST_PYTHON_EXE.")
+  endif()
 
-set(SRC
-  src/BlenderThumb.cpp
-  src/BlendThumb.def
-  src/BlendThumb.rc
-  src/Dll.cpp
-)
+  add_test(
+    NAME ${testname}
+    COMMAND ${TEST_PYTHON_EXE} ${testscript} ${ARGN}
+  )
+endfunction()
 
-string(APPEND CMAKE_SHARED_LINKER_FLAGS_DEBUG " /nodefaultlib:MSVCRT.lib")
-
-add_library(BlendThumb SHARED ${SRC})
-setup_platform_linker_flags(BlendThumb)
-target_link_libraries(BlendThumb ${ZLIB_LIBRARIES})
-
-install(
-  FILES $<TARGET_FILE:BlendThumb>
-  COMPONENT Blender
-  DESTINATION "."
-)
+add_blender_as_python_module_test(import_bpy ${CMAKE_CURRENT_LIST_DIR}/import_bpy.py)
