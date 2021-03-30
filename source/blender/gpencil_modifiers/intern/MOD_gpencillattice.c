@@ -75,6 +75,25 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
   BKE_gpencil_modifier_copydata_generic(md, target);
 }
 
+static bool do_modifier(Object *ob,
+                        LatticeGpencilModifierData *mmd,
+                        bGPDlayer *gpl,
+                        bGPDstroke *gps)
+{
+  return is_stroke_affected_by_modifier(ob,
+                                        mmd->layername,
+                                        mmd->material,
+                                        mmd->pass_index,
+                                        mmd->layer_pass,
+                                        1,
+                                        gpl,
+                                        gps,
+                                        mmd->flag & GP_LATTICE_INVERT_LAYER,
+                                        mmd->flag & GP_LATTICE_INVERT_PASS,
+                                        mmd->flag & GP_LATTICE_INVERT_LAYERPASS,
+                                        mmd->flag & GP_LATTICE_INVERT_MATERIAL);
+}
+
 static void deformPolyline(GpencilModifierData *md,
                            Depsgraph *UNUSED(depsgraph),
                            Object *ob,
@@ -86,18 +105,7 @@ static void deformPolyline(GpencilModifierData *md,
   LatticeGpencilModifierData *mmd = (LatticeGpencilModifierData *)md;
   const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
 
-  if (!is_stroke_affected_by_modifier(ob,
-                                      mmd->layername,
-                                      mmd->material,
-                                      mmd->pass_index,
-                                      mmd->layer_pass,
-                                      1,
-                                      gpl,
-                                      gps,
-                                      mmd->flag & GP_LATTICE_INVERT_LAYER,
-                                      mmd->flag & GP_LATTICE_INVERT_PASS,
-                                      mmd->flag & GP_LATTICE_INVERT_LAYERPASS,
-                                      mmd->flag & GP_LATTICE_INVERT_MATERIAL)) {
+  if (!do_modifier(ob, mmd, gpl, gps)) {
     return;
   }
 
@@ -119,6 +127,47 @@ static void deformPolyline(GpencilModifierData *md,
         (struct LatticeDeformData *)mmd->cache_data, &pt->x, mmd->strength * weight);
   }
   /* Calc geometry data. */
+  BKE_gpencil_stroke_geometry_update(gpd, gps);
+}
+
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *UNUSED(depsgraph),
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *UNUSED(gpf),
+                         bGPDstroke *gps)
+{
+  bGPdata *gpd = ob->data;
+  LatticeGpencilModifierData *mmd = (LatticeGpencilModifierData *)md;
+  const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
+
+  if (!do_modifier(ob, mmd, gpl, gps)) {
+    return;
+  }
+
+  if (mmd->cache_data == NULL) {
+    return;
+  }
+
+  bGPDcurve *gpc = gps->editcurve;
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *pt = &gpc->curve_points[i];
+    BezTriple *bezt = &pt->bezt;
+    MDeformVert *dvert = gpc->dvert != NULL ? &gpc->dvert[i] : NULL;
+
+    /* verify vertex group */
+    const float weight = get_modifier_point_weight(
+        dvert, (mmd->flag & GP_LATTICE_INVERT_VGROUP) != 0, def_nr);
+    if (weight < 0.0f) {
+      continue;
+    }
+    for (int j = 0; j < 3; j++) {
+      BKE_lattice_deform_data_eval_co(
+          (struct LatticeDeformData *)mmd->cache_data, bezt->vec[j], mmd->strength * weight);
+    }
+  }
+  /* Calc geometry data. */
+  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE; /* Calc geometry data. */
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
 
@@ -272,7 +321,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Lattice = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
