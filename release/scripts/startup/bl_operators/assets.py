@@ -81,6 +81,8 @@ class ASSET_OT_open_containing_blend_file(Operator):
     bl_label = "Open Blend File"
     bl_options = {'REGISTER'}
 
+    _process = None  # Optional[subprocess.Popen]
+
     @classmethod
     def poll(cls, context):
         if not SpaceAssetInfo.is_asset_browser_poll(context):
@@ -94,11 +96,40 @@ class ASSET_OT_open_containing_blend_file(Operator):
             self.report({'WARNING'}, "This asset is stored in the current blend file")
             return {'CANCELLED'}
 
-        file_and_datablock_name: str = context.space_data.params.filename
-        filename, _id_type, _id_name = file_and_datablock_name.split("/", 2)
-        filepath = self.active_asset_library_path(context) / filename
+        filepath = self.path_of_active_asset(context)
+        self.open_in_new_blender(filepath)
 
-        return self.open_in_new_blender(filepath)
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, window=context.window)
+        wm.modal_handler_add(self)
+
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+
+        if self._process is None:
+            self.report({'ERROR'}, "Unable to find any running process")
+            self.cancel(context)
+            return {'CANCELLED'}
+
+        returncode = self._process.poll()
+        if returncode is None:
+            # Process is still running.
+            return {'RUNNING_MODAL'}
+
+        if returncode:
+            self.report({'WARNING'}, "Blender subprocess exited with error code %d" % returncode)
+
+        bpy.ops.file.refresh()
+
+        self.cancel(context)
+        return {'FINISHED'}
+
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
 
     @staticmethod
     def active_asset_library_path(context):
@@ -107,17 +138,17 @@ class ASSET_OT_open_containing_blend_file(Operator):
         asset_lib = paths.asset_libraries[asset_library_name]
         return Path(asset_lib.path)
 
-    @staticmethod
-    def open_in_new_blender(filepath):
+    def path_of_active_asset(self, context):
+        file_and_datablock_name: str = context.space_data.params.filename
+        filename, _id_type, _id_name = file_and_datablock_name.split("/", 2)
+        filepath: Path = self.active_asset_library_path(context) / filename
+        return filepath
+
+    def open_in_new_blender(self, filepath):
         import subprocess
 
         cli_args = [bpy.app.binary_path, str(filepath)]
-        subprocess.run(cli_args)
-
-        # TODO(Sybren): make this a modal operator, and monitor the subprocess.
-        # Refresh the asset browser when it quits, and report any errors.
-
-        return {'FINISHED'}
+        self._process = subprocess.Popen(cli_args)
 
 
 classes = (
