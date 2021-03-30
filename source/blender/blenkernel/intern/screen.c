@@ -1350,6 +1350,7 @@ static void write_area(BlendWriter *writer, ScrArea *area)
     }
     else if (sl->spacetype == SPACE_SPREADSHEET) {
       BLO_write_struct(writer, SpaceSpreadsheet, sl);
+      /* TODO: Write rules. */
     }
   }
 }
@@ -1703,7 +1704,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
     }
     else if (sl->spacetype == SPACE_SPREADSHEET) {
       SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
-
+      /* TODO: Read rules. */
       sspreadsheet->runtime = NULL;
     }
   }

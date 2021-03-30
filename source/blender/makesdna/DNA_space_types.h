@@ -1873,19 +1873,66 @@ typedef struct SpaceSpreadsheet {
 
   char _pad1[4];
 
+  /* SpreadSheetRowFilter. */
+  ListBase row_filters;
+
   SpaceSpreadsheet_Runtime *runtime;
 } SpaceSpreadsheet;
 
-/** \} */
-
 typedef enum eSpaceSpreadsheet_FilterFlag {
-  SPREADSHEET_FILTER_SELECTED_ONLY = (1 << 0),
+  SPREADSHEET_FILTER_ENABLE = (1 << 0),
+  SPREADSHEET_FILTER_SELECTED_ONLY = (1 << 1),
 } eSpaceSpreadsheet_FilterFlag;
+
+typedef struct SpreadSheetRowFilter {
+  struct SpreadSheetRowFilter *next, *prev;
+
+  char *column_name;
+  /* eSpaceSpreadsheet_RowFilterOperation. */
+  uint8_t operation;
+  /* eSpaceSpreadsheet_RowFilterDataType. */
+  uint8_t data_type;
+  /* eSpaceSpreadsheet_RowFilterFlag. */
+  uint8_t flag;
+
+  char _pad0[1];
+
+  // IDProperty *value;
+  int value_int;
+  float value_vector[3];
+  float value_color[4];
+  float value_float;
+  float value_vector_2d[2];
+} SpreadSheetRowFilter;
+
+typedef enum eSpaceSpreadsheet_RowFilterFlag {
+  SPREADSHEET_ROW_FILTER_BOOL_VALUE = (1 << 0),
+  SPREADSHEET_ROW_FILTER_UI_EXPAND = (1 << 1),
+  SPREADSHEET_ROW_FILTER_ENABLED = (1 << 2),
+} eSpaceSpreadsheet_RowFilterFlag;
 
 typedef enum eSpaceSpreadsheet_ObjectEvalState {
   SPREADSHEET_OBJECT_EVAL_STATE_FINAL = 0,
   SPREADSHEET_OBJECT_EVAL_STATE_ORIGINAL = 1,
 } eSpaceSpreadsheet_Context;
+
+typedef enum eSpaceSpreadsheet_RowFilterOperation {
+  SPREADSHEET_ROW_FILTER_EQUAL = 0,
+  SPREADSHEET_ROW_FILTER_GREATER = 1,
+  SPREADSHEET_ROW_FILTER_LESS = 2,
+} eSpaceSpreadsheet_RowFilterOperation;
+
+typedef enum eSpaceSpreadsheet_RowFilterDataType {
+  SPREADSHEET_ROW_FILTER_FLOAT = 0,
+  SPREADSHEET_ROW_FILTER_INT32 = 1,
+  SPREADSHEET_ROW_FILTER_FLOAT3 = 2,
+  SPREADSHEET_ROW_FILTER_COLOR = 3,
+  SPREADSHEET_ROW_FILTER_STRING = 4,
+  SPREADSHEET_ROW_FILTER_BOOL = 5,
+  SPREADSHEET_ROW_FILTER_FLOAT2 = 6,
+} eSpaceSpreadsheet_RowFilterDataType;
+
+/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Space Defines (eSpace_Type)

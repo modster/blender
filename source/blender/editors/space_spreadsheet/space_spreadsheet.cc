@@ -55,6 +55,8 @@ static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *U
                                                                         "spreadsheet space");
   spreadsheet_space->spacetype = SPACE_SPREADSHEET;
 
+  spreadsheet_space->filter_flag = SPREADSHEET_FILTER_ENABLE;
+
   {
     /* Header. */
     ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), "spreadsheet header");
@@ -84,6 +86,11 @@ static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *U
 static void spreadsheet_free(SpaceLink *sl)
 {
   SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
+
+  LISTBASE_FOREACH_MUTABLE (SpreadSheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
+    MEM_freeN(row_filter);
+  }
+
   MEM_SAFE_FREE(sspreadsheet->runtime);
 }
 
@@ -101,6 +108,11 @@ static SpaceLink *spreadsheet_duplicate(SpaceLink *sl)
   const SpaceSpreadsheet *sspreadsheet_old = (SpaceSpreadsheet *)sl;
   SpaceSpreadsheet *sspreadsheet_new = (SpaceSpreadsheet *)MEM_dupallocN(sspreadsheet_old);
   sspreadsheet_new->runtime = (SpaceSpreadsheet_Runtime *)MEM_dupallocN(sspreadsheet_old->runtime);
+
+  BLI_listbase_clear(&sspreadsheet_new->row_filters);
+  LISTBASE_FOREACH (const SpreadSheetRowFilter *, row_filter, &sspreadsheet_old->row_filters) {
+    BLI_addtail(&sspreadsheet_new->row_filters, MEM_dupallocN(row_filter));
+  }
 
   return (SpaceLink *)sspreadsheet_new;
 }

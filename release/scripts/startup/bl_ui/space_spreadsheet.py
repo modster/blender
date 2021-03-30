@@ -18,6 +18,77 @@
 
 import bpy
 
+def draw_filter(layout, filter, index):
+    box = layout.box()
+
+    row = box.row(align=True)
+    row.emboss = 'NONE'
+    row.prop(filter, "show_expanded", text="")
+    row.prop(filter, "enabled", text="")
+    row.label(text=filter.column_name if len(filter.column_name) > 0 else "Rule")
+    sub = row.row()
+    sub.alignment = 'RIGHT'
+    sub.emboss = 'NONE'
+    sub.operator("spreadsheet.remove_rule", text="", icon='X').index = index
+
+
+    if filter.show_expanded:
+        box.prop(filter, "column_name", text="")
+        box.prop(filter, "data_type", text="")
+        box.prop(filter, "operation", text="")
+
+        if filter.data_type == 'FLOAT':
+            box.prop(filter, "value_float", text="Value")
+        elif filter.data_type == 'INT':
+            box.prop(filter, "value_int", text="Value")
+        elif filter.data_type == 'FLOAT_VECTOR':
+            box.prop(filter, "value_vector", text="")
+        elif filter.data_type == 'FLOAT_COLOR':
+            box.prop(filter, "value_color", text="")
+        elif filter.data_type == 'BOOLEAN':
+            box.prop(filter, "value_boolean", text="Value")
+        elif filter.data_type == 'BOOLEAN':
+            box.prop(filter, "value_vector_2d", text="Value")
+
+class SPREADSHEET_PT_filter_rules(bpy.types.Panel):
+    bl_space_type = 'SPREADSHEET'
+    bl_region_type = 'HEADER'
+    bl_label = "Filters"
+    bl_parent_id = 'SPREADSHEET_PT_filter'
+
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(text="Filters")
+        sub = layout.row()
+        sub.alignment = 'RIGHT'
+        sub.emboss = 'NONE'
+        sub.operator("spreadsheet.add_rule", text="", icon='ADD')
+
+    def draw(self, context):
+        layout = self.layout
+        space = context.space_data
+
+        index = 0
+        for filter in space.row_filters:
+            draw_filter(layout, filter, index)
+            index += 1
+
+
+class SPREADSHEET_PT_filter(bpy.types.Panel):
+    bl_space_type = 'SPREADSHEET'
+    bl_region_type = 'HEADER'
+    bl_label = "Filter"
+
+    def draw(self, context):
+        layout = self.layout
+        space = context.space_data
+
+        pinned_id = space.pinned_id
+        used_id = pinned_id if pinned_id else context.active_object
+
+        if isinstance(used_id, bpy.types.Object) and used_id.mode == 'EDIT':
+            layout.prop(space, "show_only_selected", text="Selected Only")
+
 
 class SPREADSHEET_HT_header(bpy.types.Header):
     bl_space_type = 'SPREADSHEET'
@@ -44,12 +115,15 @@ class SPREADSHEET_HT_header(bpy.types.Header):
 
         layout.separator_spacer()
 
-        if isinstance(used_id, bpy.types.Object) and used_id.mode == 'EDIT':
-            layout.prop(space, "show_only_selected", text="Selected Only")
+        row = layout.row(align=True)
+        row.prop(space, "use_filter", toggle=True, icon='FILTER', icon_only=True)
+        row.popover("SPREADSHEET_PT_filter", text="")
 
 
 classes = (
     SPREADSHEET_HT_header,
+    SPREADSHEET_PT_filter,
+    SPREADSHEET_PT_filter_rules,
 )
 
 if __name__ == "__main__":  # Only for live edit.
