@@ -18,7 +18,9 @@
 
 # <pep8 compliant>
 from __future__ import annotations
+from pathlib import Path
 
+import bpy
 from bpy.types import Operator
 
 from bpy_extras.asset_utils import (
@@ -72,7 +74,54 @@ class ASSET_OT_tag_remove(Operator):
         return {'FINISHED'}
 
 
+class ASSET_OT_open_containing_blend_file(Operator):
+    """Open the blend file that contains the active asset"""
+
+    bl_idname = "asset.open_containing_blend_file"
+    bl_label = "Open Blend File"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        if not SpaceAssetInfo.is_asset_browser_poll(context):
+            return False
+        active_asset = SpaceAssetInfo.get_active_asset(context)
+        return bool(active_asset)
+
+    def execute(self, context):
+        asset_params = context.space_data.params
+        if asset_params.asset_library == "LOCAL":
+            self.report({'WARNING'}, "This asset is stored in the current blend file")
+            return {'CANCELLED'}
+
+        file_and_datablock_name: str = context.space_data.params.filename
+        filename, _id_type, _id_name = file_and_datablock_name.split("/", 2)
+        filepath = self.active_asset_library_path(context) / filename
+
+        return self.open_in_new_blender(filepath)
+
+    @staticmethod
+    def active_asset_library_path(context):
+        asset_library_name: str = context.space_data.params.asset_library
+        paths = context.preferences.filepaths
+        asset_lib = paths.asset_libraries[asset_library_name]
+        return Path(asset_lib.path)
+
+    @staticmethod
+    def open_in_new_blender(filepath):
+        import subprocess
+
+        cli_args = [bpy.app.binary_path, str(filepath)]
+        subprocess.run(cli_args)
+
+        # TODO(Sybren): make this a modal operator, and monitor the subprocess.
+        # Refresh the asset browser when it quits, and report any errors.
+
+        return {'FINISHED'}
+
+
 classes = (
     ASSET_OT_tag_add,
     ASSET_OT_tag_remove,
+    ASSET_OT_open_containing_blend_file,
 )
