@@ -489,6 +489,9 @@ static void poselib_blend_cleanup(bContext *C, wmOperator *op)
     case POSE_BLEND_CONFIRM: {
       Scene *scene = pbd->scene;
       poselib_keytag_pose(C, scene, pbd);
+
+      /* Ensure the redo panel has the actually-used value, instead of the initial value. */
+      RNA_float_set(op->ptr, "blend_factor", pbd->blend_factor);
       break;
     }
 
