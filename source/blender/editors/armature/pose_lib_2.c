@@ -249,7 +249,8 @@ static void poselib_blend_apply(bContext *C, wmOperator *op)
                  pbd->blend_factor * 100);
     ED_area_status_text(pbd->area, pbd->headerstr);
 
-    ED_workspace_status_text(C, TIP_("Tab: show original pose; Wheel: change blend percentage"));
+    ED_workspace_status_text(
+        C, TIP_("Tab: show original pose; Horizontal mouse movement: change blend percentage"));
   }
   else {
     ED_area_status_text(pbd->area, TIP_("PoseLib showing original pose"));
