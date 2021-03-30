@@ -39,6 +39,7 @@
 
 #include "BKE_context.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_geom.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
@@ -79,8 +80,20 @@ static void update_mirror_local(bGPDstroke *gps, int axis)
   float factor[3] = {1.0f, 1.0f, 1.0f};
   factor[axis] = -1.0f;
 
-  for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-    mul_v3_v3(&pt->x, factor);
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    bGPDcurve *gpc = gps->editcurve;
+    for (int i = 0; i < gpc->tot_curve_points; i++) {
+      bGPDcurve_point *pt = &gpc->curve_points[i];
+      BezTriple *bezt = &pt->bezt;
+      for (int j = 0; j < 3; j++) {
+        mul_v3_v3(bezt->vec[j], factor);
+      }
+    }
+  }
+  else {
+    for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+      mul_v3_v3(&pt->x, factor);
+    }
   }
 }
 
@@ -101,8 +114,20 @@ static void update_mirror_object(Object *ob,
   invert_m4_m4(itmp, tmp);
   mul_m4_series(mtx, itmp, mtx, tmp);
 
-  for (int i = 0; i < gps->totpoints; i++) {
-    mul_m4_v3(mtx, &gps->points[i].x);
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    bGPDcurve *gpc = gps->editcurve;
+    for (int i = 0; i < gpc->tot_curve_points; i++) {
+      bGPDcurve_point *pt = &gpc->curve_points[i];
+      BezTriple *bezt = &pt->bezt;
+      for (int j = 0; j < 3; j++) {
+        mul_m4_v3(mtx, bezt->vec[j]);
+      }
+    }
+  }
+  else {
+    for (int i = 0; i < gps->totpoints; i++) {
+      mul_m4_v3(mtx, &gps->points[i].x);
+    }
   }
 }
 
@@ -120,6 +145,7 @@ static void generate_geometry(GpencilModifierData *md, Object *ob, bGPDlayer *gp
 {
   MirrorGpencilModifierData *mmd = (MirrorGpencilModifierData *)md;
   bGPDstroke *gps, *gps_new = NULL;
+  bGPdata *gpd = ob->data;
   int tot_strokes;
   int i;
 
@@ -145,6 +171,10 @@ static void generate_geometry(GpencilModifierData *md, Object *ob, bGPDlayer *gp
                                            mmd->flag & GP_MIRROR_INVERT_MATERIAL)) {
           gps_new = BKE_gpencil_stroke_duplicate(gps, true, true);
           update_position(ob, mmd, gps_new, xi);
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps_new)) {
+            gps_new->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+            BKE_gpencil_stroke_geometry_update(gpd, gps_new);
+          }
           BLI_addtail(&gpf->strokes, gps_new);
         }
       }
