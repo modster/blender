@@ -224,29 +224,13 @@ static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pbd)
       continue;
     }
 
-    if (autokey) {
-      /* Add data-source override for the PoseChannel, to be used later. */
-      ANIM_relative_keyingset_add_source(&dsources, &pbd->ob->id, &RNA_PoseBone, pchan);
-
-      /* clear any unkeyed tags */
-      if (pchan->bone) {
-        pchan->bone->flag &= ~BONE_UNKEYED;
-      }
-    }
-    else {
-      /* add unkeyed tags */
-      if (pchan->bone) {
-        pchan->bone->flag |= BONE_UNKEYED;
-      }
-    }
+    /* Add data-source override for the PoseChannel, to be used later. */
+    ANIM_relative_keyingset_add_source(&dsources, &pbd->ob->id, &RNA_PoseBone, pchan);
   }
 
-  /* perform actual auto-keying now */
-  if (autokey) {
-    /* insert keyframes for all relevant bones in one go */
-    ANIM_apply_keyingset(C, &dsources, NULL, ks, MODIFYKEY_MODE_INSERT, (float)CFRA);
-    BLI_freelistN(&dsources);
-  }
+  /* Perform actual auto-keying. */
+  ANIM_apply_keyingset(C, &dsources, NULL, ks, MODIFYKEY_MODE_INSERT, (float)CFRA);
+  BLI_freelistN(&dsources);
 
   /* send notifiers for this */
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
