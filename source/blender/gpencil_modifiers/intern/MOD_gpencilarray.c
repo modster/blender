@@ -280,7 +280,7 @@ static void generate_geometry(GpencilModifierData *md,
               add_v3_v3(bezt->vec[j], current_offset[3]);
             }
           }
-          gps_dst->flag |= GP_STROKE_NEEDS_CURVE_UPDATE; /* Calc geometry data. */
+          gps_dst->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
           BKE_gpencil_stroke_geometry_update(gpd, gps_dst);
         }
         else {

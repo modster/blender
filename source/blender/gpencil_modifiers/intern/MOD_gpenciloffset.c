@@ -171,7 +171,7 @@ static void deformBezier(GpencilModifierData *md,
       mul_m4_v3(mat, bezt->vec[j]);
     }
   }
-  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE; /* Calc geometry data. */
+  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
 
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
