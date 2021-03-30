@@ -1543,7 +1543,6 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   Object *orig_ob;
   int CanFindFreestyle = 0;
   int i;
-  Mesh *use_mesh;
   float use_crease = 0;
 
   int usage = obi->override_usage;
@@ -1743,7 +1742,7 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
 {
   LineartRenderBuffer *rb = olti->rb;
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
-    lineart_geometry_object_load(obi, olti->rb);
+    lineart_geometry_object_load(obi, rb);
   }
 }
 
@@ -1939,7 +1938,7 @@ static void lineart_main_load_geometries(
     copy_m4d_m4(obi->normal, imat);
 
     obi->original_bm = bm;
-    obi->original_ob = (Object *)(ob->id.orig_id ? ob->id.orig_id : ob);
+    obi->original_ob = (ob->id.orig_id ? (Object *)ob->id.orig_id : (Object *)ob);
     obi->next = olti[to_thread].pending;
     olti[to_thread].pending = obi;
 
