@@ -39,6 +39,7 @@ struct Mesh;
 struct Object;
 struct PointCloud;
 struct Volume;
+struct DCurve;
 
 enum class GeometryOwnershipType {
   /* The geometry is owned. This implies that it can be changed. */
@@ -324,17 +325,23 @@ struct GeometrySet {
   bool has_pointcloud() const;
   bool has_instances() const;
   bool has_volume() const;
+  bool has_curve() const;
+
   const Mesh *get_mesh_for_read() const;
   const PointCloud *get_pointcloud_for_read() const;
   const Volume *get_volume_for_read() const;
+  const DCurve *get_curve_for_read() const;
+
   Mesh *get_mesh_for_write();
   PointCloud *get_pointcloud_for_write();
   Volume *get_volume_for_write();
+  DCurve *get_curve_for_write();
 
   /* Utility methods for replacement. */
   void replace_mesh(Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   void replace_pointcloud(PointCloud *pointcloud,
                           GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+  void replace_curve(DCurve *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
 };
 
 /** A geometry component that can store a mesh. */
@@ -403,6 +410,34 @@ class PointCloudComponent : public GeometryComponent {
   bool is_empty() const final;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_POINT_CLOUD;
+
+ private:
+  const blender::bke::ComponentAttributeProviders *get_attribute_providers() const final;
+};
+
+class CurveComponent : public GeometryComponent {
+ private:
+  DCurve *curve_ = nullptr;
+  GeometryOwnershipType ownership_ = GeometryOwnershipType::Owned;
+
+ public:
+  CurveComponent();
+  ~CurveComponent();
+  GeometryComponent *copy() const override;
+
+  void clear();
+  bool has_curve() const;
+  void replace(DCurve *pointcloud, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+  DCurve *release();
+
+  const DCurve *get_for_read() const;
+  DCurve *get_for_write();
+
+  int attribute_domain_size(const AttributeDomain domain) const final;
+
+  bool is_empty() const final;
+
+  static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_CURVE;
 
  private:
   const blender::bke::ComponentAttributeProviders *get_attribute_providers() const final;

@@ -117,6 +117,7 @@ set(SRC
   intern/customdata_file.c
   intern/data_transfer.c
   intern/deform.c
+  intern/derived_curve.cc
   intern/displist.c
   intern/displist_tangent.c
   intern/dynamicpaint.c
@@ -133,6 +134,7 @@ set(SRC
   intern/fmodifier.c
   intern/font.c
   intern/freestyle.c
+  intern/geometry_component_curve.cc
   intern/geometry_component_instances.cc
   intern/geometry_component_mesh.cc
   intern/geometry_component_pointcloud.cc
@@ -321,6 +323,7 @@ set(SRC
   BKE_customdata_file.h
   BKE_data_transfer.h
   BKE_deform.h
+  BKE_derived_curve.hh
   BKE_displist.h
   BKE_displist_tangent.h
   BKE_duplilist.h

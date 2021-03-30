@@ -18,6 +18,7 @@
 
 #include "BKE_attribute.h"
 #include "BKE_attribute_access.hh"
+#include "BKE_derived_curve.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_lib_id.h"
 #include "BKE_mesh.h"
@@ -64,6 +65,8 @@ GeometryComponent *GeometryComponent::create(GeometryComponentType component_typ
       return new InstancesComponent();
     case GEO_COMPONENT_TYPE_VOLUME:
       return new VolumeComponent();
+    case GEO_COMPONENT_TYPE_CURVE:
+      return new CurveComponent();
   }
   BLI_assert_unreachable();
   return nullptr;
@@ -182,6 +185,7 @@ void GeometrySet::compute_boundbox_without_instances(float3 *r_min, float3 *r_ma
   if (mesh != nullptr) {
     BKE_mesh_wrapper_minmax(mesh, *r_min, *r_max);
   }
+  /* TODO: Curve boundbox. */
 }
 
 std::ostream &operator<<(std::ostream &stream, const GeometrySet &geometry_set)
@@ -219,6 +223,13 @@ bool GeometrySet::has_mesh() const
   return component != nullptr && component->has_mesh();
 }
 
+/* Returns a read-only mesh or null. */
+const DCurve *GeometrySet::get_curve_for_read() const
+{
+  const CurveComponent *component = this->get_component_for_read<CurveComponent>();
+  return (component == nullptr) ? nullptr : component->get_for_read();
+}
+
 /* Returns a read-only point cloud of null. */
 const PointCloud *GeometrySet::get_pointcloud_for_read() const
 {
@@ -254,6 +265,13 @@ bool GeometrySet::has_volume() const
   return component != nullptr && component->has_volume();
 }
 
+/* Returns true when the geometry set has a curve component that has a curve. */
+bool GeometrySet::has_curve() const
+{
+  const CurveComponent *component = this->get_component_for_read<CurveComponent>();
+  return component != nullptr && component->has_curve();
+}
+
 /* Create a new geometry set that only contains the given mesh. */
 GeometrySet GeometrySet::create_with_mesh(Mesh *mesh, GeometryOwnershipType ownership)
 {
@@ -278,6 +296,13 @@ void GeometrySet::replace_mesh(Mesh *mesh, GeometryOwnershipType ownership)
 {
   MeshComponent &component = this->get_component_for_write<MeshComponent>();
   component.replace(mesh, ownership);
+}
+
+/* Clear the existing curve and replace it with the given one. */
+void GeometrySet::replace_curve(DCurve *curve, GeometryOwnershipType ownership)
+{
+  CurveComponent &component = this->get_component_for_write<CurveComponent>();
+  component.replace(curve, ownership);
 }
 
 /* Clear the existing point cloud and replace with the given one. */
@@ -305,6 +330,13 @@ PointCloud *GeometrySet::get_pointcloud_for_write()
 Volume *GeometrySet::get_volume_for_write()
 {
   VolumeComponent &component = this->get_component_for_write<VolumeComponent>();
+  return component.get_for_write();
+}
+
+/* Returns a mutable curve or null. No ownership is transferred. */
+DCurve *GeometrySet::get_curve_for_write()
+{
+  CurveComponent &component = this->get_component_for_write<CurveComponent>();
   return component.get_for_write();
 }
 

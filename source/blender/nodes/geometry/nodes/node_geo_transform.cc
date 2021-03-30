@@ -23,6 +23,7 @@
 #include "DNA_pointcloud_types.h"
 #include "DNA_volume_types.h"
 
+#include "BKE_derived_curve.hh"
 #include "BKE_mesh.h"
 #include "BKE_volume.h"
 
@@ -152,6 +153,25 @@ static void transform_volume(Volume *volume,
 #endif
 }
 
+static void transform_curve(DCurve &curve,
+                            const float3 translation,
+                            const float3 rotation,
+                            const float3 scale)
+{
+  const float4x4 matrix = float4x4::from_loc_eul_scale(translation, rotation, scale);
+
+  for (Spline &spline : curve.splines) {
+    if (spline.type == SplineType::Bezier) {
+      SplineBezier &spline_bezier = reinterpret_cast<SplineBezier &>(spline);
+      for (ControlPointBezier &point : spline_bezier.control_points) {
+        point.handle_position_a = matrix * point.handle_position_a;
+        point.position = matrix * point.position;
+        point.handle_position_b = matrix * point.handle_position_b;
+      }
+    }
+  }
+}
+
 static void geo_node_transform_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -177,6 +197,11 @@ static void geo_node_transform_exec(GeoNodeExecParams params)
   if (geometry_set.has_volume()) {
     Volume *volume = geometry_set.get_volume_for_write();
     transform_volume(volume, translation, rotation, scale, params);
+  }
+
+  if (geometry_set.has_curve()) {
+    DCurve *curve = geometry_set.get_curve_for_write();
+    transform_curve(*curve, translation, rotation, scale);
   }
 
   params.set_output("Geometry", std::move(geometry_set));
