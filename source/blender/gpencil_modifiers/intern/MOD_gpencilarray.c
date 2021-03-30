@@ -260,20 +260,47 @@ static void generate_geometry(GpencilModifierData *md,
         /* Duplicate stroke */
         bGPDstroke *gps_dst = BKE_gpencil_stroke_duplicate(iter->gps, true, true);
 
-        /* Move points */
-        for (int i = 0; i < iter->gps->totpoints; i++) {
-          bGPDspoint *pt = &gps_dst->points[i];
-          /* Apply randomness matrix. */
-          mul_m4_v3(mat_rnd, &pt->x);
+        /* Bezier type. */
+        if (GPENCIL_STROKE_TYPE_BEZIER(gps_dst)) {
+          bGPDcurve *gpc = gps_dst->editcurve;
+          for (int i = 0; i < gpc->tot_curve_points; i++) {
+            bGPDcurve_point *pt = &gpc->curve_points[i];
+            BezTriple *bezt = &pt->bezt;
 
-          /* Apply object local transform (Rot/Scale). */
-          if ((mmd->flag & GP_ARRAY_USE_OB_OFFSET) && (mmd->object)) {
-            mul_m4_v3(mat, &pt->x);
+            for (int j = 0; j < 3; j++) {
+              /* Apply randomness matrix. */
+              mul_m4_v3(mat_rnd, bezt->vec[j]);
+              /* Apply object local transform (Rot/Scale). */
+              if ((mmd->flag & GP_ARRAY_USE_OB_OFFSET) && (mmd->object)) {
+                mul_m4_v3(mat, bezt->vec[j]);
+              }
+              /* Global Rotate and scale. */
+              mul_mat3_m4_v3(current_offset, bezt->vec[j]);
+              /* Global translate. */
+              add_v3_v3(bezt->vec[j], current_offset[3]);
+            }
           }
-          /* Global Rotate and scale. */
-          mul_mat3_m4_v3(current_offset, &pt->x);
-          /* Global translate. */
-          add_v3_v3(&pt->x, current_offset[3]);
+          gps_dst->flag |= GP_STROKE_NEEDS_CURVE_UPDATE; /* Calc geometry data. */
+          BKE_gpencil_stroke_geometry_update(gpd, gps_dst);
+        }
+        else {
+          /* Polygon type. */
+          for (int i = 0; i < iter->gps->totpoints; i++) {
+            bGPDspoint *pt = &gps_dst->points[i];
+            /* Apply randomness matrix. */
+            mul_m4_v3(mat_rnd, &pt->x);
+
+            /* Apply object local transform (Rot/Scale). */
+            if ((mmd->flag & GP_ARRAY_USE_OB_OFFSET) && (mmd->object)) {
+              mul_m4_v3(mat, &pt->x);
+            }
+            /* Global Rotate and scale. */
+            mul_mat3_m4_v3(current_offset, &pt->x);
+            /* Global translate. */
+            add_v3_v3(&pt->x, current_offset[3]);
+          }
+          /* Calc bounding box. */
+          BKE_gpencil_stroke_boundingbox_calc(gps_dst);
         }
 
         /* If replace material, use new one. */
@@ -283,8 +310,6 @@ static void generate_geometry(GpencilModifierData *md,
 
         /* Add new stroke. */
         BLI_addhead(&iter->gpf->strokes, gps_dst);
-        /* Calc bounding box. */
-        BKE_gpencil_stroke_boundingbox_calc(gps_dst);
       }
     }
 
