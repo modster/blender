@@ -163,7 +163,7 @@ static float gpencil_hook_falloff(const struct GPHookData_cb *tData, const float
 }
 
 /* apply point deformation */
-static void gpencil_hook_co_apply(struct GPHookData_cb *tData, float weight, bGPDspoint *pt)
+static void gpencil_hook_co_apply(struct GPHookData_cb *tData, float weight, float co[3])
 {
   float fac;
 
@@ -172,11 +172,11 @@ static void gpencil_hook_co_apply(struct GPHookData_cb *tData, float weight, bGP
 
     if (tData->use_uniform) {
       float co_uniform[3];
-      mul_v3_m3v3(co_uniform, tData->mat_uniform, &pt->x);
+      mul_v3_m3v3(co_uniform, tData->mat_uniform, co);
       len_sq = len_squared_v3v3(tData->cent, co_uniform);
     }
     else {
-      len_sq = len_squared_v3v3(tData->cent, &pt->x);
+      len_sq = len_squared_v3v3(tData->cent, co);
     }
 
     fac = gpencil_hook_falloff(tData, len_sq);
@@ -187,9 +187,61 @@ static void gpencil_hook_co_apply(struct GPHookData_cb *tData, float weight, bGP
 
   if (fac) {
     float co_tmp[3];
-    mul_v3_m4v3(co_tmp, tData->mat, &pt->x);
-    interp_v3_v3v3(&pt->x, &pt->x, co_tmp, fac * weight);
+    mul_v3_m4v3(co_tmp, tData->mat, co);
+    interp_v3_v3v3(co, co, co_tmp, fac * weight);
   }
+}
+
+static bool do_modifier(Object *ob, HookGpencilModifierData *mmd, bGPDlayer *gpl, bGPDstroke *gps)
+{
+  return is_stroke_affected_by_modifier(ob,
+                                        mmd->layername,
+                                        mmd->material,
+                                        mmd->pass_index,
+                                        mmd->layer_pass,
+                                        1,
+                                        gpl,
+                                        gps,
+                                        mmd->flag & GP_HOOK_INVERT_LAYER,
+                                        mmd->flag & GP_HOOK_INVERT_PASS,
+                                        mmd->flag & GP_HOOK_INVERT_LAYERPASS,
+                                        mmd->flag & GP_HOOK_INVERT_MATERIAL);
+}
+
+static void calc_hook_data(HookGpencilModifierData *mmd, Object *ob, struct GPHookData_cb *tData)
+{
+  bPoseChannel *pchan = BKE_pose_channel_find_name(mmd->object->pose, mmd->subtarget);
+  float dmat[4][4];
+
+  /* init struct */
+  tData->curfalloff = mmd->curfalloff;
+  tData->falloff_type = mmd->falloff_type;
+  tData->falloff = (mmd->falloff_type == eHook_Falloff_None) ? 0.0f : mmd->falloff;
+  tData->falloff_sq = square_f(tData->falloff);
+  tData->fac_orig = mmd->force;
+  tData->use_falloff = (tData->falloff_sq != 0.0f);
+  tData->use_uniform = (mmd->flag & GP_HOOK_UNIFORM_SPACE) != 0;
+
+  if (tData->use_uniform) {
+    copy_m3_m4(tData->mat_uniform, mmd->parentinv);
+    mul_v3_m3v3(tData->cent, tData->mat_uniform, mmd->cent);
+  }
+  else {
+    unit_m3(tData->mat_uniform);
+    copy_v3_v3(tData->cent, mmd->cent);
+  }
+
+  /* get world-space matrix of target, corrected for the space the verts are in */
+  if (mmd->subtarget[0] && pchan) {
+    /* bone target if there's a matching pose-channel */
+    mul_m4_m4m4(dmat, mmd->object->obmat, pchan->pose_mat);
+  }
+  else {
+    /* just object target */
+    copy_m4_m4(dmat, mmd->object->obmat);
+  }
+  invert_m4_m4(ob->imat, ob->obmat);
+  mul_m4_series(tData->mat, ob->imat, dmat, mmd->parentinv);
 }
 
 /* deform stroke */
@@ -207,55 +259,13 @@ static void deformPolyline(GpencilModifierData *md,
 
   const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
 
-  bPoseChannel *pchan = BKE_pose_channel_find_name(mmd->object->pose, mmd->subtarget);
-  float dmat[4][4];
-  struct GPHookData_cb tData;
-
-  if (!is_stroke_affected_by_modifier(ob,
-                                      mmd->layername,
-                                      mmd->material,
-                                      mmd->pass_index,
-                                      mmd->layer_pass,
-                                      1,
-                                      gpl,
-                                      gps,
-                                      mmd->flag & GP_HOOK_INVERT_LAYER,
-                                      mmd->flag & GP_HOOK_INVERT_PASS,
-                                      mmd->flag & GP_HOOK_INVERT_LAYERPASS,
-                                      mmd->flag & GP_HOOK_INVERT_MATERIAL)) {
+  if (!do_modifier(ob, mmd, gpl, gps)) {
     return;
   }
   bGPdata *gpd = ob->data;
 
-  /* init struct */
-  tData.curfalloff = mmd->curfalloff;
-  tData.falloff_type = mmd->falloff_type;
-  tData.falloff = (mmd->falloff_type == eHook_Falloff_None) ? 0.0f : mmd->falloff;
-  tData.falloff_sq = square_f(tData.falloff);
-  tData.fac_orig = mmd->force;
-  tData.use_falloff = (tData.falloff_sq != 0.0f);
-  tData.use_uniform = (mmd->flag & GP_HOOK_UNIFORM_SPACE) != 0;
-
-  if (tData.use_uniform) {
-    copy_m3_m4(tData.mat_uniform, mmd->parentinv);
-    mul_v3_m3v3(tData.cent, tData.mat_uniform, mmd->cent);
-  }
-  else {
-    unit_m3(tData.mat_uniform);
-    copy_v3_v3(tData.cent, mmd->cent);
-  }
-
-  /* get world-space matrix of target, corrected for the space the verts are in */
-  if (mmd->subtarget[0] && pchan) {
-    /* bone target if there's a matching pose-channel */
-    mul_m4_m4m4(dmat, mmd->object->obmat, pchan->pose_mat);
-  }
-  else {
-    /* just object target */
-    copy_m4_m4(dmat, mmd->object->obmat);
-  }
-  invert_m4_m4(ob->imat, ob->obmat);
-  mul_m4_series(tData.mat, ob->imat, dmat, mmd->parentinv);
+  struct GPHookData_cb tData;
+  calc_hook_data(mmd, ob, &tData);
 
   /* loop points and apply deform */
   for (int i = 0; i < gps->totpoints; i++) {
@@ -268,9 +278,53 @@ static void deformPolyline(GpencilModifierData *md,
     if (weight < 0.0f) {
       continue;
     }
-    gpencil_hook_co_apply(&tData, weight, pt);
+    gpencil_hook_co_apply(&tData, weight, &pt->x);
   }
   /* Calc geometry data. */
+  BKE_gpencil_stroke_geometry_update(gpd, gps);
+}
+
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *UNUSED(depsgraph),
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *UNUSED(gpf),
+                         bGPDstroke *gps)
+{
+  HookGpencilModifierData *mmd = (HookGpencilModifierData *)md;
+  if (!mmd->object) {
+    return;
+  }
+
+  const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
+
+  if (!do_modifier(ob, mmd, gpl, gps)) {
+    return;
+  }
+  bGPdata *gpd = ob->data;
+
+  struct GPHookData_cb tData;
+  calc_hook_data(mmd, ob, &tData);
+
+  /* Loop points and apply deform. */
+  bGPDcurve *gpc = gps->editcurve;
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *pt = &gpc->curve_points[i];
+    BezTriple *bezt = &pt->bezt;
+    MDeformVert *dvert = gpc->dvert != NULL ? &gpc->dvert[i] : NULL;
+
+    /* verify vertex group */
+    const float weight = get_modifier_point_weight(
+        dvert, (mmd->flag & GP_HOOK_INVERT_VGROUP) != 0, def_nr);
+    if (weight < 0.0f) {
+      continue;
+    }
+    for (int j = 0; j < 3; j++) {
+      gpencil_hook_co_apply(&tData, weight, bezt->vec[j]);
+    }
+  }
+  /* Calc geometry data. */
+  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
 
@@ -430,7 +484,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Hook = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
