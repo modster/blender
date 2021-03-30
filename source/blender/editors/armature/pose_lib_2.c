@@ -542,6 +542,8 @@ static int poselib_blend_exit(bContext *C, wmOperator *op)
 /* Cancel previewing operation (called when exiting Blender) */
 static void poselib_blend_cancel(bContext *C, wmOperator *op)
 {
+  PoseBlendData *pbd = op->customdata;
+  pbd->state = POSE_BLEND_CANCEL;
   poselib_blend_exit(C, op);
 }
 
