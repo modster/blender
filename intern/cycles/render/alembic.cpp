@@ -64,10 +64,6 @@ void CachedData::clear()
   }
 
   attributes.clear();
-
-  frame_start = -1;
-  frame_end = -1;
-  frame_offset = 0;
 }
 
 CachedData::CachedAttribute &CachedData::add_attribute(const ustring &name,
@@ -81,7 +77,7 @@ CachedData::CachedAttribute &CachedData::add_attribute(const ustring &name,
 
   CachedAttribute &attr = attributes.emplace_back();
   attr.name = name;
-  attr.data.set_time_sampling(time_sampling, frame_offset);
+  attr.data.set_time_sampling(time_sampling);
   return attr;
 }
 
@@ -156,32 +152,28 @@ void CachedData::invalidate_last_loaded_time(bool attributes_only)
 
 void CachedData::set_time_sampling(TimeSampling time_sampling)
 {
-  /* Transforms are always stored for the entire animation so no offset should be applied
-   * for the lookup. This is because the transforms are flattened from the hierarchy when
-   * loading the objects, and they are cheap to store, so there is no need to complicate
-   * the logic to retrieve and compute/flatten them. */
-  transforms.set_time_sampling(time_sampling, 0);
-  curve_first_key.set_time_sampling(time_sampling, frame_offset);
-  curve_keys.set_time_sampling(time_sampling, frame_offset);
-  curve_radius.set_time_sampling(time_sampling, frame_offset);
-  curve_shader.set_time_sampling(time_sampling, frame_offset);
-  num_ngons.set_time_sampling(time_sampling, frame_offset);
-  shader.set_time_sampling(time_sampling, frame_offset);
-  subd_creases_edge.set_time_sampling(time_sampling, frame_offset);
-  subd_creases_weight.set_time_sampling(time_sampling, frame_offset);
-  subd_face_corners.set_time_sampling(time_sampling, frame_offset);
-  subd_num_corners.set_time_sampling(time_sampling, frame_offset);
-  subd_ptex_offset.set_time_sampling(time_sampling, frame_offset);
-  subd_smooth.set_time_sampling(time_sampling, frame_offset);
-  subd_start_corner.set_time_sampling(time_sampling, frame_offset);
-  triangles.set_time_sampling(time_sampling, frame_offset);
-  triangles_loops.set_time_sampling(time_sampling, frame_offset);
-  vertices.set_time_sampling(time_sampling, frame_offset);
-  min_delta.set_time_sampling(time_sampling, frame_offset);
-  max_delta.set_time_sampling(time_sampling, frame_offset);
+  transforms.set_time_sampling(time_sampling);
+  curve_first_key.set_time_sampling(time_sampling);
+  curve_keys.set_time_sampling(time_sampling);
+  curve_radius.set_time_sampling(time_sampling);
+  curve_shader.set_time_sampling(time_sampling);
+  num_ngons.set_time_sampling(time_sampling);
+  shader.set_time_sampling(time_sampling);
+  subd_creases_edge.set_time_sampling(time_sampling);
+  subd_creases_weight.set_time_sampling(time_sampling);
+  subd_face_corners.set_time_sampling(time_sampling);
+  subd_num_corners.set_time_sampling(time_sampling);
+  subd_ptex_offset.set_time_sampling(time_sampling);
+  subd_smooth.set_time_sampling(time_sampling);
+  subd_start_corner.set_time_sampling(time_sampling);
+  triangles.set_time_sampling(time_sampling);
+  triangles_loops.set_time_sampling(time_sampling);
+  vertices.set_time_sampling(time_sampling);
+  min_delta.set_time_sampling(time_sampling);
+  max_delta.set_time_sampling(time_sampling);
 
   for (CachedAttribute &attr : attributes) {
-    attr.data.set_time_sampling(time_sampling, frame_offset);
+    attr.data.set_time_sampling(time_sampling);
   }
 }
 
@@ -216,87 +208,20 @@ size_t CachedData::memory_used() const
   return mem_used;
 }
 
-void CachedData::swap(CachedData &other)
-{
-  if (this == &other) {
-    return;
-  }
-
-  curve_first_key.swap(other.curve_first_key);
-  curve_keys.swap(other.curve_keys);
-  curve_radius.swap(other.curve_radius);
-  curve_shader.swap(other.curve_shader);
-  num_ngons.swap(other.num_ngons);
-  shader.swap(other.shader);
-  subd_creases_edge.swap(other.subd_creases_edge);
-  subd_creases_weight.swap(other.subd_creases_weight);
-  subd_face_corners.swap(other.subd_face_corners);
-  subd_num_corners.swap(other.subd_num_corners);
-  subd_ptex_offset.swap(other.subd_ptex_offset);
-  subd_smooth.swap(other.subd_smooth);
-  subd_start_corner.swap(other.subd_start_corner);
-  transforms.swap(other.transforms);
-  triangles.swap(other.triangles);
-  triangles_loops.swap(other.triangles_loops);
-  vertices.swap(other.vertices);
-  min_delta.swap(other.min_delta);
-  max_delta.swap(other.max_delta);
-
-  std::swap(frame_start, other.frame_start);
-  std::swap(frame_end, other.frame_end);
-  std::swap(frame_offset, other.frame_offset);
-
-  for (size_t i = 0; i < attributes.size(); ++i) {
-    attributes[i].data.swap(other.attributes[i].data);
-  }
-}
-
 /* get the sample times to load data for the given the start and end frame of the procedural */
 static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
-                                               CachedData &cached_data,
-                                               const int frame,
                                                const TimeSampling &time_sampling,
                                                size_t num_samples)
 {
   set<chrono_t> result;
 
   if (num_samples < 2) {
-    cached_data.frame_start = static_cast<int>(proc->get_start_frame());
-    cached_data.frame_end = static_cast<int>(proc->get_end_frame());
-    cached_data.frame_offset = 0;
     result.insert(0.0);
     return result;
   }
 
-  double start_frame_index = 0;
-  double end_frame_index = 0;
-
-  if (proc->get_cache_method() == AlembicProcedural::CACHE_ALL_DATA) {
-    start_frame_index = (double)(proc->get_start_frame());
-    end_frame_index = (double)(proc->get_end_frame());
-  }
-  else if (proc->get_cache_method() == AlembicProcedural::CACHE_FRAME_COUNT) {
-    start_frame_index = (double)(proc->get_start_frame());
-
-    while (start_frame_index + proc->get_cache_frame_count() < static_cast<double>(frame)) {
-      start_frame_index += proc->get_cache_frame_count();
-    }
-
-    /* -1 as the last frame will be included below */
-    end_frame_index = start_frame_index + proc->get_cache_frame_count() - 1;
-  }
-  else {
-    /* NO_CACHE, only load the current frame */
-    start_frame_index = (double)(proc->get_frame());
-    end_frame_index = start_frame_index;
-  }
-
-  cached_data.frame_start = static_cast<int>(start_frame_index);
-  cached_data.frame_end = static_cast<int>(end_frame_index);
-  cached_data.frame_offset = cached_data.frame_start - (int)(proc->get_start_frame());
-
-  double start_frame = start_frame_index / (double)(proc->get_frame_rate());
-  double end_frame = (end_frame_index + 1) / (double)(proc->get_frame_rate());
+  double start_frame = (double)(proc->get_start_frame() / proc->get_frame_rate());
+  double end_frame = (double)((proc->get_end_frame() + 1) / proc->get_frame_rate());
 
   size_t start_index = time_sampling.getFloorIndex(start_frame, num_samples).first;
   size_t end_index = time_sampling.getCeilIndex(end_frame, num_samples).first;
@@ -481,10 +406,9 @@ static Transform make_transform(const M44d &a, float scale)
 }
 
 static void add_uvs(AlembicProcedural *proc,
-                    const int frame,
                     const IV2fGeomParam &uvs,
                     CachedData &cached_data,
-                    CacheBuildingProgress &progress)
+                    Progress &progress)
 {
   if (uvs.getScope() != kFacevaryingScope) {
     return;
@@ -510,7 +434,7 @@ static void add_uvs(AlembicProcedural *proc,
   attr.std = ATTR_STD_UV;
 
   ccl::set<chrono_t> times = get_relevant_sample_times(
-      proc, cached_data, frame, time_sampling, uvs.getNumSamples());
+      proc, time_sampling, uvs.getNumSamples());
 
   /* Keys used to determine if the UVs do actually change over time. */
   ArraySample::Key previous_indices_key;
@@ -743,12 +667,10 @@ NODE_DEFINE(AlembicObject)
 AlembicObject::AlembicObject() : Node(get_node_type())
 {
   schema_type = INVALID;
-  prefetched_cache_pointer = nullptr;
 }
 
 AlembicObject::~AlembicObject()
 {
-  delete prefetched_cache_pointer;
 }
 
 void AlembicObject::set_object(Object *object_)
@@ -761,14 +683,14 @@ Object *AlembicObject::get_object()
   return object;
 }
 
-bool AlembicObject::has_data_loaded(int frame) const
+bool AlembicObject::has_data_loaded() const
 {
-  return data_loaded && cached_data_.frame_start <= frame && frame <= cached_data_.frame_end;
+  return data_loaded;
 }
 
 void AlembicObject::update_shader_attributes(CachedData &cached_data,
                                              const ICompoundProperty &arb_geom_params,
-                                             CacheBuildingProgress &progress)
+                                             Progress &progress)
 {
   AttributeRequestSet requested_attributes = get_requested_attributes();
 
@@ -853,7 +775,7 @@ void AlembicObject::read_face_sets(SchemaType &schema,
 
 static void compute_vertex_deltas(CachedData &cached_data,
                                   const ccl::set<chrono_t> &times,
-                                  CacheBuildingProgress &progress)
+                                  Progress &progress)
 {
   if (cached_data.vertices.size() == 0 || cached_data.vertices.size() == 1) {
     return;
@@ -974,7 +896,7 @@ static void compute_vertex_deltas(CachedData &cached_data,
 
 static void compute_curve_deltas(CachedData &cached_data,
                                  const ccl::set<chrono_t> &times,
-                                 CacheBuildingProgress &progress)
+                                 Progress &progress)
 {
   if (cached_data.curve_keys.size() == 0 || cached_data.curve_keys.size() == 1) {
     return;
@@ -1074,40 +996,14 @@ static void compute_curve_deltas(CachedData &cached_data,
   }
 }
 
-bool AlembicObject::load_data_from_prefetched_cache(AlembicProcedural *proc, const int frame)
-{
-  if (prefetched_cache_pointer) {
-    if (prefetched_cache_pointer->has_frame(frame)) {
-      /* Wait until current prefetching is done. */
-      proc->wait_for_prefetching();
-      swap_prefetched_cache();
-      return true;
-    }
-
-    proc->cancel_prefetching();
-    /* Reset all caches, the frame is neither the main cache, nor in the prefetched cache. */
-    clear_all_caches();
-  }
-
-  return false;
-}
-
-bool AlembicObject::load_data_in_cache(CachedData &cached_data,
+void AlembicObject::load_data_in_cache(CachedData &cached_data,
                                        AlembicProcedural *proc,
-                                       const int frame,
                                        IPolyMeshSchema &schema,
-                                       CacheBuildingProgress &progress,
-                                       bool load_data_for_prefetch)
+                                       Progress &progress)
 {
   /* Only load data for the original Geometry. */
   if (instance_of) {
-    return false;
-  }
-
-  if (!load_data_for_prefetch) {
-    if (load_data_from_prefetched_cache(proc, frame)) {
-      return true;
-    }
+    return;
   }
 
   cached_data.clear();
@@ -1117,9 +1013,8 @@ bool AlembicObject::load_data_in_cache(CachedData &cached_data,
   const IN3fGeomParam &normals = schema.getNormalsParam();
 
   ccl::set<chrono_t> times = get_relevant_sample_times(
-      proc, cached_data, frame, *time_sampling, schema.getNumSamples());
+      proc, *time_sampling, schema.getNumSamples());
 
-  /* this should be done after get_relevant_sample_times or frame_offset will be invalid! */
   cached_data.set_time_sampling(*time_sampling);
 
   /* Key used to determine if the triangles change over time, if the key is the same as the
@@ -1130,7 +1025,7 @@ bool AlembicObject::load_data_in_cache(CachedData &cached_data,
   /* read topology */
   foreach (chrono_t time, times) {
     if (progress.get_cancel()) {
-      return false;
+      return;
     }
 
     const ISampleSelector iss = ISampleSelector(time);
@@ -1167,43 +1062,34 @@ bool AlembicObject::load_data_in_cache(CachedData &cached_data,
   }
 
   if (progress.get_cancel()) {
-    return false;
+    return;
   }
 
   update_shader_attributes(cached_data, schema.getArbGeomParams(), progress);
 
   if (progress.get_cancel()) {
-    return false;
+    return;
   }
 
   const IV2fGeomParam &uvs = schema.getUVsParam();
 
   if (uvs.valid()) {
-    add_uvs(proc, frame, uvs, cached_data, progress);
+    add_uvs(proc, uvs, cached_data, progress);
   }
 
   compute_vertex_deltas(cached_data, times, progress);
 
   data_loaded = true;
-  return true;
 }
 
-bool AlembicObject::load_data_in_cache(CachedData &cached_data,
+void AlembicObject::load_data_in_cache(CachedData &cached_data,
                                        AlembicProcedural *proc,
-                                       const int frame,
                                        ISubDSchema &schema,
-                                       CacheBuildingProgress &progress,
-                                       bool load_data_for_prefetch)
+                                       Progress &progress)
 {
   /* Only load data for the original Geometry. */
   if (instance_of) {
-    return false;
-  }
-
-  if (!load_data_for_prefetch) {
-    if (load_data_from_prefetched_cache(proc, frame)) {
-      return true;
-    }
+    return;
   }
 
   cached_data.clear();
@@ -1213,15 +1099,14 @@ bool AlembicObject::load_data_in_cache(CachedData &cached_data,
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
 
   ccl::set<chrono_t> times = get_relevant_sample_times(
-      proc, cached_data, frame, *time_sampling, schema.getNumSamples());
+      proc, *time_sampling, schema.getNumSamples());
 
-  /* this should be done after get_relevant_sample_times or frame_offset will be invalid! */
   cached_data.set_time_sampling(*time_sampling);
 
   /* read topology */
   foreach (chrono_t time, times) {
     if (progress.get_cancel()) {
-      return false;
+      return;
     }
 
     const ISampleSelector iss = ISampleSelector(time);
@@ -1340,26 +1225,17 @@ bool AlembicObject::load_data_in_cache(CachedData &cached_data,
   /* TODO(@kevindietrich) : attributes, need test files */
 
   data_loaded = true;
-  return true;
 }
 
-bool AlembicObject::load_data_in_cache(CachedData &cached_data,
+void AlembicObject::load_data_in_cache(CachedData &cached_data,
                                        AlembicProcedural *proc,
-                                       const int frame,
                                        const ICurvesSchema &schema,
-                                       CacheBuildingProgress &progress,
-                                       float default_radius,
-                                       bool load_data_for_prefetch)
+                                       Progress &progress,
+                                       float default_radius)
 {
   /* Only load data for the original Geometry. */
   if (instance_of) {
-    return false;
-  }
-
-  if (!load_data_for_prefetch) {
-    if (load_data_from_prefetched_cache(proc, frame)) {
-      return true;
-    }
+    return;
   }
 
   cached_data.clear();
@@ -1367,14 +1243,13 @@ bool AlembicObject::load_data_in_cache(CachedData &cached_data,
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
 
   ccl::set<chrono_t> times = get_relevant_sample_times(
-      proc, cached_data, frame, *time_sampling, schema.getNumSamples());
+      proc, *time_sampling, schema.getNumSamples());
 
-  /* this should be done after get_relevant_sample_times or frame_offset will be invalid! */
   cached_data.set_time_sampling(*time_sampling);
 
   foreach (chrono_t time, times) {
     if (progress.get_cancel()) {
-      return false;
+      return;
     }
 
     const ISampleSelector iss = ISampleSelector(time);
@@ -1444,7 +1319,6 @@ bool AlembicObject::load_data_in_cache(CachedData &cached_data,
   compute_curve_deltas(cached_data, times, progress);
 
   data_loaded = true;
-  return true;
 }
 
 void AlembicObject::setup_transform_cache(CachedData &cached_data, float scale)
@@ -1457,7 +1331,7 @@ void AlembicObject::setup_transform_cache(CachedData &cached_data, float scale)
   }
 
   if (xform_time_sampling) {
-    cached_data.transforms.set_time_sampling(*xform_time_sampling, 0);
+    cached_data.transforms.set_time_sampling(*xform_time_sampling);
   }
 
   if (xform_samples.size() == 0) {
@@ -1510,18 +1384,10 @@ AttributeRequestSet AlembicObject::get_requested_attributes()
   return requested_attributes;
 }
 
-void AlembicObject::swap_prefetched_cache()
-{
-  if (prefetched_cache_pointer) {
-    cached_data_.swap(*prefetched_cache_pointer);
-    prefetched_cache_pointer->clear();
-  }
-}
-
 void AlembicObject::read_attribute(CachedData &cached_data,
                                    const ICompoundProperty &arb_geom_params,
                                    const ustring &attr_name,
-                                   CacheBuildingProgress &progress)
+                                   Progress &progress)
 {
   const PropertyHeader *prop = arb_geom_params.getPropertyHeader(attr_name.c_str());
 
@@ -1580,7 +1446,7 @@ void AlembicObject::read_attribute(CachedData &cached_data,
           data_float2 += 3;
         }
 
-        attribute.data.set_time_sampling(*param.getTimeSampling(), cached_data.frame_offset);
+        attribute.data.set_time_sampling(*param.getTimeSampling());
         attribute.data.add_data(data, time);
       }
     }
@@ -1637,7 +1503,7 @@ void AlembicObject::read_attribute(CachedData &cached_data,
           offset += 3;
         }
 
-        attribute.data.set_time_sampling(*param.getTimeSampling(), cached_data.frame_offset);
+        attribute.data.set_time_sampling(*param.getTimeSampling());
         attribute.data.add_data(data, time);
       }
     }
@@ -1694,7 +1560,7 @@ void AlembicObject::read_attribute(CachedData &cached_data,
           offset += 3;
         }
 
-        attribute.data.set_time_sampling(*param.getTimeSampling(), cached_data.frame_offset);
+        attribute.data.set_time_sampling(*param.getTimeSampling());
         attribute.data.add_data(data, time);
       }
     }
@@ -1775,13 +1641,6 @@ NODE_DEFINE(AlembicProcedural)
 
   SOCKET_NODE_ARRAY(objects, "Objects", AlembicObject::get_node_type());
 
-  static NodeEnum cache_method_enum;
-  cache_method_enum.insert("combined", CACHE_ALL_DATA);
-  cache_method_enum.insert("depth", CACHE_FRAME_COUNT);
-  SOCKET_ENUM(cache_method, "Cache Method", cache_method_enum, CACHE_ALL_DATA);
-  SOCKET_INT(cache_frame_count, "Cache Frame Count", 10);
-  SOCKET_BOOLEAN(use_prefetching, "Use Prefetching", false);
-
   SOCKET_BOOLEAN(ignore_subdivision, "Ignore Subdivision", false);
 
   return type;
@@ -1795,8 +1654,6 @@ AlembicProcedural::AlembicProcedural() : Procedural(get_node_type())
 
 AlembicProcedural::~AlembicProcedural()
 {
-  prefetch_pool.cancel();
-
   ccl::set<Geometry *> geometries_set;
   ccl::set<Object *> objects_set;
   ccl::set<AlembicObject *> abc_objects_set;
@@ -1890,13 +1747,6 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
 
   const chrono_t frame_time = (chrono_t)((frame - frame_offset) / frame_rate);
 
-  if (cache_method_is_modified() || cache_frame_count_is_modified()) {
-    for (Node *node : objects) {
-      AlembicObject *object = static_cast<AlembicObject *>(node);
-      object->clear_all_caches();
-    }
-  }
-
   /* Clear the subdivision caches as the data is stored differently. */
   if (ignore_subdivision_is_modified()) {
     for (Node *node : objects) {
@@ -1906,7 +1756,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
         continue;
       }
 
-      object->clear_all_caches();
+      object->clear_cache();
     }
   }
 
@@ -1968,18 +1818,6 @@ AlembicObject *AlembicProcedural::get_or_create_object(const ustring &path)
   add_object(object);
 
   return object;
-}
-
-void AlembicProcedural::wait_for_prefetching()
-{
-  prefetch_pool.wait();
-}
-
-void AlembicProcedural::cancel_prefetching()
-{
-  cache_building_progress.set_cancel(true);
-  prefetch_pool.cancel();
-  cache_building_progress.set_cancel(false);
 }
 
 void AlembicProcedural::load_objects(Progress &progress)
@@ -2438,66 +2276,57 @@ void AlembicProcedural::build_caches(Progress &progress)
 {
   size_t memory_used = 0;
 
-  bool need_prefetch = false;
-  cache_building_progress.set_progress(progress);
-
   for (Node *node : objects) {
     AlembicObject *object = static_cast<AlembicObject *>(node);
 
-    if (cache_building_progress.get_cancel()) {
+    if (progress.get_cancel()) {
       return;
     }
 
     const int current_frame = (int)get_frame();
 
     if (object->schema_type == AlembicObject::POLY_MESH) {
-      if (!object->has_data_loaded(current_frame)) {
+      if (!object->has_data_loaded()) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
-        need_prefetch |= object->load_data_in_cache(object->get_cached_data(),
-                                                    this,
-                                                    current_frame,
-                                                    schema,
-                                                    cache_building_progress,
-                                                    false);
+        object->load_data_in_cache(object->get_cached_data(),
+                                   this,
+                                   schema,
+                                   progress);
       }
       else if (object->need_shader_update) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
         object->update_shader_attributes(
-            object->get_cached_data(), schema.getArbGeomParams(), cache_building_progress);
+              object->get_cached_data(), schema.getArbGeomParams(), progress);
       }
     }
     else if (object->schema_type == AlembicObject::CURVES) {
-      if (!object->has_data_loaded(current_frame) || default_radius_is_modified() ||
+      if (!object->has_data_loaded() || default_radius_is_modified() ||
           object->radius_scale_is_modified()) {
         ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
         ICurvesSchema schema = curves.getSchema();
-        need_prefetch |= object->load_data_in_cache(object->get_cached_data(),
-                                                    this,
-                                                    current_frame,
-                                                    schema,
-                                                    cache_building_progress,
-                                                    default_radius,
-                                                    false);
+        object->load_data_in_cache(object->get_cached_data(),
+                                   this,
+                                   schema,
+                                   progress,
+                                   default_radius);
       }
     }
     else if (object->schema_type == AlembicObject::SUBD) {
-      if (!object->has_data_loaded(current_frame)) {
+      if (!object->has_data_loaded()) {
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
-        need_prefetch |= object->load_data_in_cache(object->get_cached_data(),
-                                                    this,
-                                                    current_frame,
-                                                    schema,
-                                                    cache_building_progress,
-                                                    false);
+        object->load_data_in_cache(object->get_cached_data(),
+                                   this,
+                                   schema,
+                                   progress);
       }
       else if (object->need_shader_update) {
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
         object->update_shader_attributes(
-            object->get_cached_data(), schema.getArbGeomParams(), cache_building_progress);
+              object->get_cached_data(), schema.getArbGeomParams(), progress);
       }
     }
 
@@ -2508,96 +2337,8 @@ void AlembicProcedural::build_caches(Progress &progress)
     memory_used += object->get_cached_data().memory_used();
   }
 
-  if (need_prefetch && get_cache_method() == CACHE_FRAME_COUNT && get_use_prefetching()) {
-    prefetch_pool.push([&]() {
-      const int prefetch_frame = static_cast<int>(get_frame()) + get_cache_frame_count() + 1;
-
-      if (prefetch_frame > get_end_frame()) {
-        std::cerr << "No more data to prefetch\n";
-        return;
-      }
-
-      std::cerr << "Prefetching data for frame : " << prefetch_frame << '\n';
-
-      for (Node *node : objects) {
-        AlembicObject *object = static_cast<AlembicObject *>(node);
-
-        if (cache_building_progress.get_cancel()) {
-          return;
-        }
-
-        if (object->schema_type == AlembicObject::POLY_MESH) {
-          if (!object->has_data_loaded(prefetch_frame)) {
-            if (!object->prefetched_cache_pointer) {
-              object->prefetched_cache_pointer = new CachedData;
-            }
-            IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
-            IPolyMeshSchema schema = polymesh.getSchema();
-            object->load_data_in_cache(*object->prefetched_cache_pointer,
-                                       this,
-                                       prefetch_frame,
-                                       schema,
-                                       cache_building_progress,
-                                       true);
-          }
-        }
-        else if (object->schema_type == AlembicObject::CURVES) {
-          if (!object->has_data_loaded(prefetch_frame) || default_radius_is_modified() ||
-              object->radius_scale_is_modified()) {
-            if (!object->prefetched_cache_pointer) {
-              object->prefetched_cache_pointer = new CachedData;
-            }
-            ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
-            ICurvesSchema schema = curves.getSchema();
-            object->load_data_in_cache(*object->prefetched_cache_pointer,
-                                       this,
-                                       prefetch_frame,
-                                       schema,
-                                       cache_building_progress,
-                                       default_radius,
-                                       true);
-          }
-        }
-        else if (object->schema_type == AlembicObject::SUBD) {
-          if (!object->has_data_loaded(prefetch_frame)) {
-            if (!object->prefetched_cache_pointer) {
-              object->prefetched_cache_pointer = new CachedData;
-            }
-            ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
-            ISubDSchema schema = subd_mesh.getSchema();
-            object->load_data_in_cache(*object->prefetched_cache_pointer,
-                                       this,
-                                       prefetch_frame,
-                                       schema,
-                                       cache_building_progress,
-                                       true);
-          }
-        }
-
-        if (scale_is_modified() || object->get_cached_data().transforms.size() == 0) {
-          object->setup_transform_cache(object->get_cached_data(), scale);
-        }
-      }
-    });
-  }
-
   std::cerr << "AlembicProcedural memory usage : " << string_human_readable_size(memory_used)
             << '\n';
-}
-
-void CacheBuildingProgress::set_progress(Progress &progress)
-{
-  progress_ = &progress;
-}
-
-bool CacheBuildingProgress::get_cancel() const
-{
-  return (progress_ && progress_->get_cancel()) || building_was_canceled;
-}
-
-void CacheBuildingProgress::set_cancel(bool yesno)
-{
-  building_was_canceled = yesno;
 }
 
 CCL_NAMESPACE_END

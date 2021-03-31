@@ -151,13 +151,11 @@ template<typename T> class DataStore {
   Alembic::AbcCoreAbstract::TimeSampling time_sampling{};
 
   double last_loaded_time = std::numeric_limits<double>::max();
-  int frame_offset = 0;
 
  public:
-  void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_, int frame_offset_)
+  void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_)
   {
     time_sampling = time_sampling_;
-    frame_offset = frame_offset_;
   }
 
   Alembic::AbcCoreAbstract::TimeSampling get_time_sampling() const
@@ -286,35 +284,12 @@ template<typename T> class DataStore {
     return data.size() * sizeof(T);
   }
 
-  void swap(DataStore<T> &other)
-  {
-    if (this == &other) {
-      return;
-    }
-
-    index_data_map.swap(other.index_data_map);
-    data.swap(other.data);
-    std::swap(frame_offset, other.frame_offset);
-  }
-
  private:
   const TimeIndexPair &get_index_for_time(double time) const
   {
-    /* TimeSampling works by matching a frame time to an index, however it expects
-     * frame time 0 == index 0, but since we may load data by chunks of frames,
-     * index 0 may not be frame time 0, so we need to offset the size to pretend
-     * we have the required amount of frame data. This offset should only be applied
-     * if we have more than one frame worth of data (for now we it is guaranteed that
-     * we either have dat for one single frame, or for all the frames of the animation,
-     * this may change in the future). */
-    size_t size_offset = 0;
-    if (size() != 1) {
-      size_offset = frame_offset;
-    }
-
     std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
-    index_pair = time_sampling.getNearIndex(time, index_data_map.size() + size_offset);
-    return index_data_map[index_pair.first - size_offset];
+    index_pair = time_sampling.getNearIndex(time, index_data_map.size());
+    return index_data_map[index_pair.first];
   }
 };
 
@@ -363,10 +338,6 @@ struct CachedData {
 
   vector<CachedAttribute> attributes{};
 
-  int frame_start = -1;
-  int frame_end = -1;
-  int frame_offset = 0;
-
   void clear();
 
   CachedAttribute &add_attribute(const ustring &name,
@@ -379,26 +350,6 @@ struct CachedData {
   void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling);
 
   size_t memory_used() const;
-
-  void swap(CachedData &other);
-
-  bool has_frame(int frame) const
-  {
-    return frame_start <= frame && frame <= frame_end;
-  }
-};
-
-/* Used to query if the cache building was cancelled, either from an external cause,
- * the render was cancelled, queried through Progress, or by an internal cause, the current
- * prefetching should be cancelled as the requested frame is not inside of the prefetched cache. */
-class CacheBuildingProgress {
-  Progress *progress_ = nullptr;
-  bool building_was_canceled = false;
-
- public:
-  void set_progress(Progress &progress);
-  bool get_cancel() const;
-  void set_cancel(bool yesno);
 };
 
 /* Representation of an Alembic object for the AlembicProcedural.
@@ -438,27 +389,21 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  bool load_data_in_cache(CachedData &cached_data,
+  void load_data_in_cache(CachedData &cached_data,
                           AlembicProcedural *proc,
-                          const int frame,
                           Alembic::AbcGeom::IPolyMeshSchema &schema,
-                          CacheBuildingProgress &progress,
-                          bool load_data_for_prefetch);
-  bool load_data_in_cache(CachedData &cached_data,
+                          Progress &progress);
+  void load_data_in_cache(CachedData &cached_data,
                           AlembicProcedural *proc,
-                          const int frame,
                           Alembic::AbcGeom::ISubDSchema &schema,
-                          CacheBuildingProgress &progress,
-                          bool load_data_for_prefetch);
-  bool load_data_in_cache(CachedData &cached_data,
+                          Progress &progress);
+  void load_data_in_cache(CachedData &cached_data,
                           AlembicProcedural *proc,
-                          const int frame,
                           const Alembic::AbcGeom::ICurvesSchema &schema,
-                          CacheBuildingProgress &progress,
-                          float default_radius,
-                          bool load_data_for_prefetch);
+                          Progress &progress,
+                          float default_radius);
 
-  bool has_data_loaded(int frame) const;
+  bool has_data_loaded() const;
 
   /* Enumeration used to speed up the discrimination of an IObject as IObject::matches() methods
    * are too expensive and show up in profiles. */
@@ -487,17 +432,9 @@ class AlembicObject : public Node {
     return cached_data_.is_constant();
   }
 
-  void clear_all_caches()
+  void clear_cache()
   {
     cached_data_.clear();
-
-    if (prefetched_cache_pointer) {
-      prefetched_cache_pointer->clear();
-      delete prefetched_cache_pointer;
-      prefetched_cache_pointer = nullptr;
-    }
-
-    data_loaded = false;
   }
 
   Object *object = nullptr;
@@ -508,17 +445,15 @@ class AlembicObject : public Node {
   AbcSchemaType schema_type;
 
   CachedData cached_data_;
-  /* cache used to prefetch the next N frames during rendering */
-  CachedData *prefetched_cache_pointer;
 
   void update_shader_attributes(CachedData &cached_data,
                                 const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
-                                CacheBuildingProgress &progress);
+                                Progress &progress);
 
   void read_attribute(CachedData &cached_data,
                       const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                       const ustring &attr_name,
-                      CacheBuildingProgress &progress);
+                      Progress &progress);
 
   template<typename SchemaType>
   void read_face_sets(SchemaType &schema,
@@ -528,10 +463,6 @@ class AlembicObject : public Node {
   void setup_transform_cache(CachedData &cached_data, float scale);
 
   AttributeRequestSet get_requested_attributes();
-
-  void swap_prefetched_cache();
-
-  bool load_data_from_prefetched_cache(AlembicProcedural *proc, const int frame);
 };
 
 /* Procedural to render objects from a single Alembic archive.
@@ -547,9 +478,6 @@ class AlembicProcedural : public Procedural {
   Alembic::AbcGeom::IArchive archive;
   bool objects_loaded;
   Scene *scene_;
-
-  CacheBuildingProgress cache_building_progress;
-  DedicatedTaskPool prefetch_pool;
 
  public:
   NODE_DECLARE
@@ -583,23 +511,6 @@ class AlembicProcedural : public Procedural {
    * software. */
   NODE_SOCKET_API(float, scale)
 
-  /* Cache control. */
-
-  enum CacheMethod {
-    NO_CACHE,
-    CACHE_FRAME_COUNT,
-    CACHE_ALL_DATA,
-  };
-
-  NODE_SOCKET_API(int, cache_method)
-
-  /* Maximum number of frames to hold in cache. */
-  NODE_SOCKET_API(int, cache_frame_count)
-
-  /* Whether to preload data in a secondary cache, only valid if cache method is CACHE_FRAME_COUNT.
-   */
-  NODE_SOCKET_API(bool, use_prefetching)
-
   /* Treat subdivision objects as regular polygon meshes. */
   NODE_SOCKET_API(bool, ignore_subdivision)
 
@@ -622,10 +533,6 @@ class AlembicProcedural : public Procedural {
    *
    * Returns a pointer to an existing, or a newly created, AlembicObject for the given path. */
   AlembicObject *get_or_create_object(const ustring &path);
-
-  void wait_for_prefetching();
-
-  void cancel_prefetching();
 
  private:
   /* Add an object to our list of objects, and tag the socket as modified. */

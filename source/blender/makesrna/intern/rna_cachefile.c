@@ -233,33 +233,6 @@ static void rna_def_cachefile(BlenderRNA *brna)
                            "specified in the file");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
-  static const EnumPropertyItem cache_method_items[] = {
-      {CACHEFILE_NO_CACHE, "NO_CACHE", 0, "No Cache", ""},
-      {CACHEFILE_CACHE_ALL_DATA, "ALL_DATA", 0, "All Data", ""},
-      {CACHEFILE_CACHE_FRAME_COUNT, "FRAME_COUNT", 0, "Frame Count", ""},
-      {0, NULL, 0, NULL, NULL},
-  };
-
-  prop = RNA_def_property(srna, "cache_method", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "cache_method");
-  RNA_def_property_enum_items(prop, cache_method_items);
-  RNA_def_property_ui_text(
-      prop, "Cache Method", "Define whether data should be cached, and for what period of time");
-  RNA_def_property_update(prop, 0, "rna_CacheFile_update");
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-
-  prop = RNA_def_property(srna, "cache_frame_count", PROP_INT, PROP_NONE);
-  RNA_def_property_int_sdna(prop, NULL, "cache_frame_count");
-  RNA_def_property_range(prop, 0, INT_MAX);
-  RNA_def_property_ui_text(prop, "Frame Count", "Maximum number of frames to hold in memory");
-  RNA_def_property_update(prop, 0, "rna_CacheFile_update");
-
-  prop = RNA_def_property(srna, "use_prefetching", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(prop,
-                           "Use prefetching",
-                           "Use a secondary cache to preload data in the background for the next Frame Count frames");
-  RNA_def_property_update(prop, 0, "rna_CacheFile_update");
-
   prop = RNA_def_property(srna, "ignore_subdivision", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_ui_text(prop,
                            "Ignore Subdivision",

@@ -59,14 +59,6 @@ enum {
   CACHEFILE_VELOCITY_UNIT_SECOND,
 };
 
-/* CacheFile::cache_method
- * Determines what scheme is used to cache data. */
-enum {
-  CACHEFILE_NO_CACHE,
-  CACHEFILE_CACHE_ALL_DATA,
-  CACHEFILE_CACHE_FRAME_COUNT,
-};
-
 typedef struct CacheFile {
   ID id;
   struct AnimData *adt;
@@ -103,11 +95,8 @@ typedef struct CacheFile {
   /* Name of the velocity property in the Alembic file. */
   char velocity_name[64];
 
-  char cache_method;
-  char use_prefetching;
   char ignore_subdivision;
-  char _pad;
-  int cache_frame_count;
+  char _pad[3];
 
   /** The frequency in frame per seconds at which the data in the cache file should evaluated.
    * This is necessary to have here as the data may have been generated based on a different
@@ -115,7 +104,6 @@ typedef struct CacheFile {
    * a project rendered/animated at 120 FPS).
    */
   float frame_rate;
-  char _pad2[4];
 
   /* Runtime */
   struct AbcArchiveHandle *handle;

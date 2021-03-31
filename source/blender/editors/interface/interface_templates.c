@@ -7276,15 +7276,6 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(row, &fileptr, "use_proxies", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, false);
-  uiItemR(row, &fileptr, "cache_method", 0, NULL, ICON_NONE);
-  sub = uiLayoutRow(layout, true);
-  uiLayoutSetActive(sub, RNA_enum_get(&fileptr, "cache_method") == CACHEFILE_CACHE_FRAME_COUNT);
-  uiItemR(sub, &fileptr, "cache_frame_count", 0, NULL, ICON_NONE);
-  sub = uiLayoutRow(layout, true);
-  uiLayoutSetActive(sub, RNA_enum_get(&fileptr, "cache_method") == CACHEFILE_CACHE_FRAME_COUNT);
-  uiItemR(sub, &fileptr, "use_prefetching", 0, NULL, ICON_NONE);
-
-  row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);
 
   row = uiLayoutRowWithHeading(layout, true, IFACE_("Override Frame"));
