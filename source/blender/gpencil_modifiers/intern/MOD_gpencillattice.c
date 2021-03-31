@@ -205,7 +205,12 @@ static void bakeModifier(Main *UNUSED(bmain),
 
       /* Compute lattice effects on this frame. */
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+        if (!GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+          deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+        }
+        else {
+          deformBezier(md, depsgraph, ob, gpl, gpf, gps);
+        }
       }
     }
   }

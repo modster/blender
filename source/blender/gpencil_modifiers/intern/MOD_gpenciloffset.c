@@ -186,7 +186,12 @@ static void bakeModifier(struct Main *UNUSED(bmain),
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+        if (!GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+          deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+        }
+        else {
+          deformBezier(md, depsgraph, ob, gpl, gpf, gps);
+        }
       }
     }
   }
