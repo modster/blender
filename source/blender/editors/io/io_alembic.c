@@ -696,16 +696,15 @@ void WM_OT_alembic_import(wmOperatorType *ot)
       0.0001f,
       1000.0f);
 
-  RNA_def_float(
-      ot->srna,
-      "frame_rate",
-      24.0f,
-      0.0001f,
-      1000.0f,
-      "Frame Rate",
-      "Frequency in frames per second at which the data in the cache file is sampled",
-      0.0001f,
-      1000.0f);
+  RNA_def_float(ot->srna,
+                "frame_rate",
+                24.0f,
+                0.0001f,
+                1000.0f,
+                "Frame Rate",
+                "Frequency in frames per second at which the data in the cache file is sampled",
+                0.0001f,
+                1000.0f);
 
   RNA_def_boolean(
       ot->srna,

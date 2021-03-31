@@ -838,14 +838,12 @@ void Mesh::pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort
   const size_t offset = deltas_chunk.offset();
   const size_t size = deltas_chunk.size();
   device->apply_delta_compression(
-        dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
+      dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
 }
 
 /* Pack the topology of the Mesh, or only the vertices if pack_all is false.
  * This is only called if no deltas are present on the Mesh. */
-void Mesh::pack_topology(DeviceScene *dscene, int object,
-                         uint visibility,
-                         bool pack_all)
+void Mesh::pack_topology(DeviceScene *dscene, int object, uint visibility, bool pack_all)
 {
   current_delta_frames_count = 0;
 
@@ -909,7 +907,8 @@ void Mesh::pack_primitives(Device *device,
   if (triangles.empty())
     return;
 
-  const bool do_deltas = !pack_all && attributes.find(ATTR_STD_DELTAS) != nullptr && current_delta_frames_count < max_delta_compression_frames;
+  const bool do_deltas = !pack_all && attributes.find(ATTR_STD_DELTAS) != nullptr &&
+                         current_delta_frames_count < max_delta_compression_frames;
 
   if (do_deltas) {
     pack_deltas(device, dscene, verts_deltas);

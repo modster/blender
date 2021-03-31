@@ -127,9 +127,10 @@ static void rna_def_cachefile(BlenderRNA *brna)
   prop = RNA_def_property(srna, "frame_rate", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "frame_rate");
   RNA_def_property_range(prop, -MAXFRAME, MAXFRAME);
-  RNA_def_property_ui_text(prop,
-                           "Frame Rate",
-                           "The frequency in frames per second used to lookup data in the cache file");
+  RNA_def_property_ui_text(
+      prop,
+      "Frame Rate",
+      "The frequency in frames per second used to lookup data in the cache file");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   prop = RNA_def_property(srna, "override_frame", PROP_BOOLEAN, PROP_NONE);
@@ -161,15 +162,14 @@ static void rna_def_cachefile(BlenderRNA *brna)
   /* ----------------- Cache controls ----------------- */
 
   prop = RNA_def_property(srna, "enable_caching", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(prop,
-                           "Enable Caching",
-                           "Preload data for faster updates");
+  RNA_def_property_ui_text(prop, "Enable Caching", "Preload data for faster updates");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   prop = RNA_def_property(srna, "max_cache_size", PROP_INT, PROP_UNSIGNED);
   RNA_def_property_ui_text(prop,
                            "Maximum Cache Size",
-                           "Memory usage limit in megabytes for the cache, if the data does not fit within the limit, rendering is aborted");
+                           "Memory usage limit in megabytes for the cache, if the data does not "
+                           "fit within the limit, rendering is aborted");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   /* ----------------- Axis Conversion ----------------- */
@@ -248,11 +248,11 @@ static void rna_def_cachefile(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   prop = RNA_def_property(srna, "ignore_subdivision", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(prop,
-                           "Ignore Subdivision",
-                           "Treat subdivision objects in the Alembic archive as regular polygon meshes");
+  RNA_def_property_ui_text(
+      prop,
+      "Ignore Subdivision",
+      "Treat subdivision objects in the Alembic archive as regular polygon meshes");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
-
 
   RNA_define_lib_overridable(false);
 

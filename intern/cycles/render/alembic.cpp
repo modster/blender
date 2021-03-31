@@ -448,8 +448,7 @@ static void add_uvs(AlembicProcedural *proc,
   CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(name), time_sampling);
   attr.std = ATTR_STD_UV;
 
-  ccl::set<chrono_t> times = get_relevant_sample_times(
-      proc, time_sampling, uvs.getNumSamples());
+  ccl::set<chrono_t> times = get_relevant_sample_times(proc, time_sampling, uvs.getNumSamples());
 
   /* Keys used to determine if the UVs do actually change over time. */
   ArraySample::Key previous_indices_key;
@@ -704,7 +703,7 @@ bool AlembicObject::has_data_loaded() const
 }
 
 void AlembicObject::update_shader_attributes(AlembicProcedural *proc,
-    CachedData &cached_data,
+                                             CachedData &cached_data,
                                              const ICompoundProperty &arb_geom_params,
                                              Progress &progress)
 {
@@ -1415,7 +1414,8 @@ void AlembicObject::read_attribute(AlembicProcedural *proc,
   if (IV2fProperty::matches(prop->getMetaData()) && Alembic::AbcGeom::isUV(*prop)) {
     const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop->getName());
 
-    const std::set<chrono_t> times = get_relevant_sample_times(proc, *param.getTimeSampling(), param.getNumSamples());
+    const std::set<chrono_t> times = get_relevant_sample_times(
+        proc, *param.getTimeSampling(), param.getNumSamples());
 
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
@@ -1471,7 +1471,8 @@ void AlembicObject::read_attribute(AlembicProcedural *proc,
   else if (IC3fProperty::matches(prop->getMetaData())) {
     const IC3fGeomParam &param = IC3fGeomParam(arb_geom_params, prop->getName());
 
-    const std::set<chrono_t> times = get_relevant_sample_times(proc, *param.getTimeSampling(), param.getNumSamples());
+    const std::set<chrono_t> times = get_relevant_sample_times(
+        proc, *param.getTimeSampling(), param.getNumSamples());
 
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
@@ -1528,7 +1529,8 @@ void AlembicObject::read_attribute(AlembicProcedural *proc,
   else if (IC4fProperty::matches(prop->getMetaData())) {
     const IC4fGeomParam &param = IC4fGeomParam(arb_geom_params, prop->getName());
 
-    const std::set<chrono_t> times = get_relevant_sample_times(proc, *param.getTimeSampling(), param.getNumSamples());
+    const std::set<chrono_t> times = get_relevant_sample_times(
+        proc, *param.getTimeSampling(), param.getNumSamples());
 
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
@@ -2331,16 +2333,13 @@ void AlembicProcedural::build_caches(Progress &progress)
       if (!object->has_data_loaded()) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
-        object->load_data_in_cache(object->get_cached_data(),
-                                   this,
-                                   schema,
-                                   progress);
+        object->load_data_in_cache(object->get_cached_data(), this, schema, progress);
       }
       else if (object->need_shader_update) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
         object->update_shader_attributes(
-              this, object->get_cached_data(), schema.getArbGeomParams(), progress);
+            this, object->get_cached_data(), schema.getArbGeomParams(), progress);
       }
     }
     else if (object->schema_type == AlembicObject::CURVES) {
@@ -2348,27 +2347,21 @@ void AlembicProcedural::build_caches(Progress &progress)
           object->radius_scale_is_modified()) {
         ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
         ICurvesSchema schema = curves.getSchema();
-        object->load_data_in_cache(object->get_cached_data(),
-                                   this,
-                                   schema,
-                                   progress,
-                                   default_radius);
+        object->load_data_in_cache(
+            object->get_cached_data(), this, schema, progress, default_radius);
       }
     }
     else if (object->schema_type == AlembicObject::SUBD) {
       if (!object->has_data_loaded()) {
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
-        object->load_data_in_cache(object->get_cached_data(),
-                                   this,
-                                   schema,
-                                   progress);
+        object->load_data_in_cache(object->get_cached_data(), this, schema, progress);
       }
       else if (object->need_shader_update) {
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
         object->update_shader_attributes(
-              this, object->get_cached_data(), schema.getArbGeomParams(), progress);
+            this, object->get_cached_data(), schema.getArbGeomParams(), progress);
       }
     }
 

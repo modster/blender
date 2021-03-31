@@ -519,7 +519,8 @@ class AlembicProcedural : public Procedural {
   /* Cache controls */
   NODE_SOCKET_API(bool, enable_caching)
 
-  /* Memory limit for the cache, if the data does not fit within this limit, rendering is aborted. */
+  /* Memory limit for the cache, if the data does not fit within this limit, rendering is aborted.
+   */
   NODE_SOCKET_API(int, max_cache_size)
 
   AlembicProcedural();
