@@ -531,7 +531,7 @@ class AlembicProcedural : public Procedural {
    * in the archive. If no objects with such path if found in the archive during the next call
    * to `generate`, it will be ignored.
    *
-   * Returns a pointer to an existing, or a newly created, AlembicObject for the given path. */
+   * Returns a pointer to an existing or a newly created AlembicObject for the given path. */
   AlembicObject *get_or_create_object(const ustring &path);
 
  private:
