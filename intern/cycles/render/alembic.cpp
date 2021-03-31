@@ -2283,8 +2283,6 @@ void AlembicProcedural::build_caches(Progress &progress)
       return;
     }
 
-    const int current_frame = (int)get_frame();
-
     if (object->schema_type == AlembicObject::POLY_MESH) {
       if (!object->has_data_loaded()) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
