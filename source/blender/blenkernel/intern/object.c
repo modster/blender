@@ -1756,6 +1756,10 @@ void BKE_object_free_derived_caches(Object *ob)
     BKE_geometry_set_free(ob->runtime.geometry_set_eval);
     ob->runtime.geometry_set_eval = NULL;
   }
+  if (ob->runtime.geometry_set_preview != NULL) {
+    BKE_geometry_set_free(ob->runtime.geometry_set_preview);
+    ob->runtime.geometry_set_preview = NULL;
+  }
 }
 
 void BKE_object_free_caches(Object *object)

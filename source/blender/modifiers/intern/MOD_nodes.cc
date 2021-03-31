@@ -252,21 +252,6 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
   return false;
 }
 
-static std::optional<GeometrySet> &get_cached_geometry_set()
-{
-  static std::optional<GeometrySet> geometry;
-  return geometry;
-}
-
-GeometrySet *get_cached_geometry_set_ptr();
-GeometrySet *get_cached_geometry_set_ptr()
-{
-  if (get_cached_geometry_set().has_value()) {
-    return &*get_cached_geometry_set();
-  }
-  return nullptr;
-}
-
 class GeometryNodesEvaluator {
  private:
   blender::LinearAllocator<> allocator_;
@@ -421,7 +406,11 @@ class GeometryNodesEvaluator {
         if (output_socket->is_available() && output_socket->bsocket()->type == SOCK_GEOMETRY) {
           GeometrySet value = node_outputs_map.lookup<GeometrySet>(output_socket->identifier());
           value.ensure_own_non_instances();
-          get_cached_geometry_set() = std::move(value);
+          static std::mutex mutex;
+          std::lock_guard lock{mutex};
+          delete self_object_->runtime.geometry_set_preview;
+          const_cast<Object *>(self_object_)->runtime.geometry_set_preview = new GeometrySet(
+              std::move(value));
         }
       }
     }

@@ -167,6 +167,7 @@ typedef struct Object_Runtime {
    * the data.
    */
   struct GeometrySet *geometry_set_eval;
+  struct GeometrySet *geometry_set_preview;
 
   /**
    * Mesh structure created during object evaluation.
