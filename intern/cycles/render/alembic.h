@@ -514,6 +514,12 @@ class AlembicProcedural : public Procedural {
   /* Treat subdivision objects as regular polygon meshes. */
   NODE_SOCKET_API(bool, ignore_subdivision)
 
+  /* Cache controls */
+  NODE_SOCKET_API(bool, enable_caching)
+
+  /* Memory limit for the cache, if the data does not fit within this limit, rendering is aborted. */
+  NODE_SOCKET_API(int, max_cache_size)
+
   AlembicProcedural();
   ~AlembicProcedural();
 
@@ -563,6 +569,12 @@ class AlembicProcedural : public Procedural {
   void read_subd(AlembicObject *abc_object, Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   void build_caches(Progress &progress);
+
+  size_t get_max_cache_size_in_bytes() const
+  {
+    /* max_cache_size is in megabytes, convert to bytes */
+    return static_cast<size_t>(max_cache_size) * 1024 * 1024;
+  }
 };
 
 CCL_NAMESPACE_END

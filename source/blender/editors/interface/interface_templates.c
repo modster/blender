@@ -7278,6 +7278,13 @@ void uiTemplateCacheFile(uiLayout *layout,
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);
 
+  row = uiLayoutRow(layout, false);
+  uiItemR(row, &fileptr, "enable_caching", 0, NULL, ICON_NONE);
+
+  sub = uiLayoutRow(layout, false);
+  uiLayoutSetEnabled(sub, RNA_boolean_get(&fileptr, "enable_caching"));
+  uiItemR(sub, &fileptr, "max_cache_size", 0, NULL, ICON_NONE);
+
   row = uiLayoutRowWithHeading(layout, true, IFACE_("Override Frame"));
   sub = uiLayoutRow(row, true);
   uiLayoutSetPropDecorate(sub, false);

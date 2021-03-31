@@ -98,6 +98,10 @@ typedef struct CacheFile {
   char ignore_subdivision;
   char _pad[3];
 
+  char enable_caching;
+  char _pad2[3];
+  int max_cache_size;
+
   /** The frequency in frame per seconds at which the data in the cache file should evaluated.
    * This is necessary to have here as the data may have been generated based on a different
    * FPS than the one used for the scene (e.g. some asset was produced at 60 FPS and used in

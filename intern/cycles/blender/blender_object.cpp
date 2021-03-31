@@ -512,6 +512,9 @@ void BlenderSync::sync_procedural(BL::Object &b_ob, BL::MeshSequenceCacheModifie
 
   procedural->set_ignore_subdivision(cache_file.ignore_subdivision());
 
+  procedural->set_enable_caching(cache_file.enable_caching());
+  procedural->set_max_cache_size(cache_file.max_cache_size());
+
   /* create or update existing AlembicObjects */
   ustring object_path = ustring(b_mesh_cache.object_path());
 

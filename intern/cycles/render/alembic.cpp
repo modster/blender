@@ -220,11 +220,26 @@ static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
     return result;
   }
 
-  double start_frame = (double)(proc->get_start_frame() / proc->get_frame_rate());
-  double end_frame = (double)((proc->get_end_frame() + 1) / proc->get_frame_rate());
+  double start_frame;
+  double end_frame;
 
-  size_t start_index = time_sampling.getFloorIndex(start_frame, num_samples).first;
-  size_t end_index = time_sampling.getCeilIndex(end_frame, num_samples).first;
+  if (proc->get_enable_caching()) {
+    // load the data for the entire animation
+    start_frame = static_cast<double>(proc->get_start_frame());
+    end_frame = static_cast<double>(proc->get_end_frame());
+  }
+  else {
+    // load the data for the current frame
+    start_frame = static_cast<double>(proc->get_frame());
+    end_frame = start_frame;
+  }
+
+  const double frame_rate = static_cast<double>(proc->get_frame_rate());
+  const double start_time = start_frame / frame_rate;
+  const double end_time = (end_frame + 1) / frame_rate;
+
+  const size_t start_index = time_sampling.getFloorIndex(start_time, num_samples).first;
+  const size_t end_index = time_sampling.getCeilIndex(end_time, num_samples).first;
 
   for (size_t i = start_index; i < end_index; ++i) {
     result.insert(time_sampling.getSampleTime(i));
@@ -1643,6 +1658,9 @@ NODE_DEFINE(AlembicProcedural)
 
   SOCKET_BOOLEAN(ignore_subdivision, "Ignore Subdivision", false);
 
+  SOCKET_BOOLEAN(enable_caching, "Enable Caching", true);
+  SOCKET_INT(max_cache_size, "Maximum Cache Size", 1024);
+
   return type;
 }
 
@@ -1757,6 +1775,30 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
       }
 
       object->clear_cache();
+    }
+  }
+
+  if (enable_caching_is_modified()) {
+    if (!enable_caching) {
+      for (Node *node : objects) {
+        AlembicObject *object = static_cast<AlembicObject *>(node);
+        object->clear_cache();
+      }
+    }
+  }
+
+  if (max_cache_size_is_modified()) {
+    // Check if the current memory usage fits in the new requested size,
+    // if it is higher abort the render
+    size_t memory_used = 0ul;
+    for (Node *node : objects) {
+      AlembicObject *object = static_cast<AlembicObject *>(node);
+      memory_used += object->get_cached_data().memory_used();
+    }
+
+    if (memory_used > get_max_cache_size_in_bytes()) {
+      progress.set_error("Error: Alembic Procedural memory limit reached");
+      return;
     }
   }
 
@@ -2333,6 +2375,13 @@ void AlembicProcedural::build_caches(Progress &progress)
     }
 
     memory_used += object->get_cached_data().memory_used();
+
+    if (enable_caching) {
+      if (memory_used > get_max_cache_size_in_bytes()) {
+        progress.set_error("Error: Alembic Procedural memory limit reached");
+        return;
+      }
+    }
   }
 
   std::cerr << "AlembicProcedural memory usage : " << string_human_readable_size(memory_used)

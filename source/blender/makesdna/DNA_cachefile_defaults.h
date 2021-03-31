@@ -42,6 +42,8 @@
     .default_radius = 0.01f, \
     .ignore_subdivision = 0, \
     .frame_rate = 24.0f, \
+    .enable_caching = 1, \
+    .max_cache_size = 1024, \
   }
 
 /** \} */
