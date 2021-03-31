@@ -205,10 +205,15 @@ void uiTemplateAssetView(uiLayout *layout,
 
   PropertyRNA *asset_library_prop = RNA_struct_find_property(asset_library_dataptr,
                                                              asset_library_propname);
-  uiItemFullR(col, asset_library_dataptr, asset_library_prop, RNA_NO_INDEX, 0, 0, "", 0);
-
   AssetLibraryReference asset_library = ED_asset_library_reference_from_enum_value(
       RNA_property_enum_get(asset_library_dataptr, asset_library_prop));
+
+  uiLayout *row = uiLayoutRow(col, true);
+  uiItemFullR(row, asset_library_dataptr, asset_library_prop, RNA_NO_INDEX, 0, 0, "", 0);
+  if (asset_library.type != ASSET_LIBRARY_LOCAL) {
+    uiItemO(row, "", ICON_FILE_REFRESH, "ASSET_OT_list_refresh");
+  }
+
   ED_assetlist_storage_fetch(&asset_library, filter_settings, C);
   ED_assetlist_ensure_previews_job(&asset_library, C);
 

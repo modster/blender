@@ -58,6 +58,8 @@ void ED_assetlist_storage_fetch(const struct AssetLibraryReference *library_refe
                                 const struct bContext *C);
 void ED_assetlist_ensure_previews_job(const struct AssetLibraryReference *library_reference,
                                       struct bContext *C);
+void ED_assetlist_clear(const struct AssetLibraryReference *library_reference, struct bContext *C);
+bool ED_assetlist_storage_has_list_for_library(const AssetLibraryReference *library_reference);
 void ED_assetlist_storage_tag_main_data_dirty(void);
 void ED_assetlist_storage_id_remap(struct ID *id_old, struct ID *id_new);
 void ED_assetlist_storage_exit(void);

@@ -167,6 +167,7 @@ class AssetList : NonCopyable {
   void setup(const AssetFilterSettings *filter_settings = nullptr);
   void fetch(const bContext &C);
   void ensurePreviewsJob(bContext *C);
+  void clear(bContext *C);
 
   bool needsRefetch() const;
   void iterate(AssetListIterFn fn) const;
@@ -250,7 +251,7 @@ void AssetList::fetch(const bContext &C)
 
 bool AssetList::needsRefetch() const
 {
-  return filelist_needs_force_reset(filelist_);
+  return filelist_needs_force_reset(filelist_) || filelist_needs_reading(filelist_);
 }
 
 void AssetList::iterate(AssetListIterFn fn) const
@@ -290,6 +291,18 @@ void AssetList::ensurePreviewsJob(bContext *C)
   }
 }
 
+void AssetList::clear(bContext *C)
+{
+  /* Based on #ED_fileselect_clear() */
+
+  FileList *files = filelist_;
+  filelist_readjob_stop(files, CTX_wm_manager(C));
+  filelist_freelib(files);
+  filelist_clear(files);
+
+  WM_main_add_notifier(NC_ASSET | ND_ASSET_LIST, NULL);
+}
+
 /**
  * \return True if the asset-list needs a UI redraw.
  */
@@ -297,7 +310,7 @@ bool AssetList::listen(const wmNotifier &notifier) const
 {
   switch (notifier.category) {
     case NC_ASSET:
-      if (ELEM(notifier.data, ND_ASSET_LIST_READING, ND_ASSET_LIST_PREVIEW)) {
+      if (ELEM(notifier.data, ND_ASSET_LIST, ND_ASSET_LIST_READING, ND_ASSET_LIST_PREVIEW)) {
         return true;
       }
       if (ELEM(notifier.action, NA_ADDED, NA_REMOVED)) {
@@ -465,6 +478,19 @@ void ED_assetlist_ensure_previews_job(const AssetLibraryReference *library_refer
   if (list) {
     list->ensurePreviewsJob(C);
   }
+}
+
+void ED_assetlist_clear(const AssetLibraryReference *library_reference, bContext *C)
+{
+  AssetList *list = AssetListStorage::lookup_list(*library_reference);
+  if (list) {
+    list->clear(C);
+  }
+}
+
+bool ED_assetlist_storage_has_list_for_library(const AssetLibraryReference *library_reference)
+{
+  return AssetListStorage::lookup_list(*library_reference) != nullptr;
 }
 
 /* TODO expose AssetList with an iterator? */
