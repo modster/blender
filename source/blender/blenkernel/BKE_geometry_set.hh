@@ -141,6 +141,8 @@ class GeometryComponent {
   /* The returned component should be of the same type as the type this is called on. */
   virtual GeometryComponent *copy() const = 0;
 
+  /* TODO: Make pure virtual. */
+  virtual bool owns_non_instance_data() const;
   virtual void ensure_own_non_instances();
 
   void user_add() const;
@@ -378,6 +380,7 @@ class MeshComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
+  bool owns_non_instance_data() const override;
   void ensure_own_non_instances() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_MESH;
