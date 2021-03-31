@@ -703,7 +703,8 @@ bool AlembicObject::has_data_loaded() const
   return data_loaded;
 }
 
-void AlembicObject::update_shader_attributes(CachedData &cached_data,
+void AlembicObject::update_shader_attributes(AlembicProcedural *proc,
+    CachedData &cached_data,
                                              const ICompoundProperty &arb_geom_params,
                                              Progress &progress)
 {
@@ -726,7 +727,7 @@ void AlembicObject::update_shader_attributes(CachedData &cached_data,
       continue;
     }
 
-    read_attribute(cached_data, arb_geom_params, attr.name, progress);
+    read_attribute(proc, cached_data, arb_geom_params, attr.name, progress);
   }
 
   cached_data.invalidate_last_loaded_time(true);
@@ -1080,7 +1081,7 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
     return;
   }
 
-  update_shader_attributes(cached_data, schema.getArbGeomParams(), progress);
+  update_shader_attributes(proc, cached_data, schema.getArbGeomParams(), progress);
 
   if (progress.get_cancel()) {
     return;
@@ -1399,7 +1400,8 @@ AttributeRequestSet AlembicObject::get_requested_attributes()
   return requested_attributes;
 }
 
-void AlembicObject::read_attribute(CachedData &cached_data,
+void AlembicObject::read_attribute(AlembicProcedural *proc,
+                                   CachedData &cached_data,
                                    const ICompoundProperty &arb_geom_params,
                                    const ustring &attr_name,
                                    Progress &progress)
@@ -1413,20 +1415,20 @@ void AlembicObject::read_attribute(CachedData &cached_data,
   if (IV2fProperty::matches(prop->getMetaData()) && Alembic::AbcGeom::isUV(*prop)) {
     const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop->getName());
 
+    const std::set<chrono_t> times = get_relevant_sample_times(proc, *param.getTimeSampling(), param.getNumSamples());
+
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
 
-    for (size_t i = 0; i < param.getNumSamples(); ++i) {
+    for (const chrono_t time : times) {
       if (progress.get_cancel()) {
         return;
       }
 
-      ISampleSelector iss = ISampleSelector(index_t(i));
+      ISampleSelector iss = ISampleSelector(time);
 
       IV2fGeomParam::Sample sample;
       param.getIndexed(sample, iss);
-
-      const chrono_t time = param.getTimeSampling()->getSampleTime(index_t(i));
 
       if (param.getScope() == kFacevaryingScope) {
         V2fArraySamplePtr values = sample.getVals();
@@ -1469,20 +1471,20 @@ void AlembicObject::read_attribute(CachedData &cached_data,
   else if (IC3fProperty::matches(prop->getMetaData())) {
     const IC3fGeomParam &param = IC3fGeomParam(arb_geom_params, prop->getName());
 
+    const std::set<chrono_t> times = get_relevant_sample_times(proc, *param.getTimeSampling(), param.getNumSamples());
+
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
 
-    for (size_t i = 0; i < param.getNumSamples(); ++i) {
+    for (const chrono_t time : times) {
       if (progress.get_cancel()) {
         return;
       }
 
-      ISampleSelector iss = ISampleSelector(index_t(i));
+      ISampleSelector iss = ISampleSelector(time);
 
       IC3fGeomParam::Sample sample;
       param.getIndexed(sample, iss);
-
-      const chrono_t time = param.getTimeSampling()->getSampleTime(index_t(i));
 
       C3fArraySamplePtr values = sample.getVals();
 
@@ -1526,20 +1528,20 @@ void AlembicObject::read_attribute(CachedData &cached_data,
   else if (IC4fProperty::matches(prop->getMetaData())) {
     const IC4fGeomParam &param = IC4fGeomParam(arb_geom_params, prop->getName());
 
+    const std::set<chrono_t> times = get_relevant_sample_times(proc, *param.getTimeSampling(), param.getNumSamples());
+
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
 
-    for (size_t i = 0; i < param.getNumSamples(); ++i) {
+    for (const chrono_t time : times) {
       if (progress.get_cancel()) {
         return;
       }
 
-      ISampleSelector iss = ISampleSelector(index_t(i));
+      ISampleSelector iss = ISampleSelector(time);
 
       IC4fGeomParam::Sample sample;
       param.getIndexed(sample, iss);
-
-      const chrono_t time = param.getTimeSampling()->getSampleTime(index_t(i));
 
       C4fArraySamplePtr values = sample.getVals();
 
@@ -2338,7 +2340,7 @@ void AlembicProcedural::build_caches(Progress &progress)
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
         object->update_shader_attributes(
-              object->get_cached_data(), schema.getArbGeomParams(), progress);
+              this, object->get_cached_data(), schema.getArbGeomParams(), progress);
       }
     }
     else if (object->schema_type == AlembicObject::CURVES) {
@@ -2366,7 +2368,7 @@ void AlembicProcedural::build_caches(Progress &progress)
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
         object->update_shader_attributes(
-              object->get_cached_data(), schema.getArbGeomParams(), progress);
+              this, object->get_cached_data(), schema.getArbGeomParams(), progress);
       }
     }
 
