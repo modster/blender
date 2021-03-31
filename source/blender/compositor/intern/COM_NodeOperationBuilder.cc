@@ -38,6 +38,8 @@
 
 #include "COM_NodeOperationBuilder.h" /* own include */
 
+namespace blender::compositor {
+
 NodeOperationBuilder::NodeOperationBuilder(const CompositorContext *context, bNodeTree *b_nodetree)
     : m_context(context), m_current_node(nullptr), m_active_viewer(nullptr)
 {
@@ -53,9 +55,7 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
   /* interface handle for nodes */
   NodeConverter converter(this);
 
-  for (int index = 0; index < m_graph.nodes().size(); index++) {
-    Node *node = (Node *)m_graph.nodes()[index];
-
+  for (Node *node : m_graph.nodes()) {
     m_current_node = node;
 
     DebugInfo::node_to_operations(node);
@@ -256,7 +256,8 @@ void NodeOperationBuilder::add_datatype_conversions()
     /* proxy operations can skip data type conversion */
     NodeOperation *from_op = &link.from()->getOperation();
     NodeOperation *to_op = &link.to()->getOperation();
-    if (!(from_op->useDatatypeConversion() || to_op->useDatatypeConversion())) {
+    if (!(from_op->get_flags().use_datatype_conversion ||
+          to_op->get_flags().use_datatype_conversion)) {
       continue;
     }
 
@@ -352,8 +353,8 @@ void NodeOperationBuilder::resolve_proxies()
   blender::Vector<Link> proxy_links;
   for (const Link &link : m_links) {
     /* don't replace links from proxy to proxy, since we may need them for replacing others! */
-    if (link.from()->getOperation().isProxyOperation() &&
-        !link.to()->getOperation().isProxyOperation()) {
+    if (link.from()->getOperation().get_flags().is_proxy_operation &&
+        !link.to()->getOperation().get_flags().is_proxy_operation) {
       proxy_links.append(link);
     }
   }
@@ -364,7 +365,7 @@ void NodeOperationBuilder::resolve_proxies()
     do {
       /* walk upstream bypassing the proxy operation */
       from = from->getOperation().getInputSocket(0)->getLink();
-    } while (from && from->getOperation().isProxyOperation());
+    } while (from && from->getOperation().get_flags().is_proxy_operation);
 
     removeInputLink(to);
     /* we may not have a final proxy input link,
@@ -380,7 +381,7 @@ void NodeOperationBuilder::determineResolutions()
 {
   /* determine all resolutions of the operations (Width/Height) */
   for (NodeOperation *op : m_operations) {
-    if (op->isOutputOperation(m_context->isRendering()) && !op->isPreviewOperation()) {
+    if (op->isOutputOperation(m_context->isRendering()) && !op->get_flags().is_preview_operation) {
       unsigned int resolution[2] = {0, 0};
       unsigned int preferredResolution[2] = {0, 0};
       op->determineResolution(resolution, preferredResolution);
@@ -389,7 +390,7 @@ void NodeOperationBuilder::determineResolutions()
   }
 
   for (NodeOperation *op : m_operations) {
-    if (op->isOutputOperation(m_context->isRendering()) && op->isPreviewOperation()) {
+    if (op->isOutputOperation(m_context->isRendering()) && op->get_flags().is_preview_operation) {
       unsigned int resolution[2] = {0, 0};
       unsigned int preferredResolution[2] = {0, 0};
       op->determineResolution(resolution, preferredResolution);
@@ -401,7 +402,7 @@ void NodeOperationBuilder::determineResolutions()
   {
     blender::Vector<Link> convert_links;
     for (const Link &link : m_links) {
-      if (link.to()->getResizeMode() != COM_SC_NO_RESIZE) {
+      if (link.to()->getResizeMode() != ResizeMode::None) {
         NodeOperation &from_op = link.from()->getOperation();
         NodeOperation &to_op = link.to()->getOperation();
         if (from_op.getWidth() != to_op.getWidth() || from_op.getHeight() != to_op.getHeight()) {
@@ -433,7 +434,7 @@ WriteBufferOperation *NodeOperationBuilder::find_attached_write_buffer_operation
   for (const Link &link : m_links) {
     if (link.from() == output) {
       NodeOperation &op = link.to()->getOperation();
-      if (op.isWriteBufferOperation()) {
+      if (op.get_flags().is_write_buffer_operation) {
         return (WriteBufferOperation *)(&op);
       }
     }
@@ -449,7 +450,7 @@ void NodeOperationBuilder::add_input_buffers(NodeOperation * /*operation*/,
   }
 
   NodeOperationOutput *output = input->getLink();
-  if (output->getOperation().isReadBufferOperation()) {
+  if (output->getOperation().get_flags().is_read_buffer_operation) {
     /* input is already buffered, no need to add another */
     return;
   }
@@ -491,7 +492,7 @@ void NodeOperationBuilder::add_output_buffers(NodeOperation *operation,
   WriteBufferOperation *writeOperation = nullptr;
   for (NodeOperationInput *target : targets) {
     /* try to find existing write buffer operation */
-    if (target->getOperation().isWriteBufferOperation()) {
+    if (target->getOperation().get_flags().is_write_buffer_operation) {
       BLI_assert(writeOperation == nullptr); /* there should only be one write op connected */
       writeOperation = (WriteBufferOperation *)(&target->getOperation());
     }
@@ -536,7 +537,7 @@ void NodeOperationBuilder::add_complex_operation_buffers()
    */
   blender::Vector<NodeOperation *> complex_ops;
   for (NodeOperation *operation : m_operations) {
-    if (operation->isComplex()) {
+    if (operation->get_flags().complex) {
       complex_ops.append(operation);
     }
   }
@@ -571,7 +572,7 @@ static void find_reachable_operations_recursive(Tags &reachable, NodeOperation *
   }
 
   /* associated write-buffer operations are executed as well */
-  if (op->isReadBufferOperation()) {
+  if (op->get_flags().is_read_buffer_operation) {
     ReadBufferOperation *read_op = (ReadBufferOperation *)op;
     MemoryProxy *memproxy = read_op->getMemoryProxy();
     find_reachable_operations_recursive(reachable, memproxy->getWriteBufferOperation());
@@ -675,7 +676,7 @@ void NodeOperationBuilder::group_operations()
     }
 
     /* add new groups for associated memory proxies where needed */
-    if (op->isReadBufferOperation()) {
+    if (op->get_flags().is_read_buffer_operation) {
       ReadBufferOperation *read_op = (ReadBufferOperation *)op;
       MemoryProxy *memproxy = read_op->getMemoryProxy();
 
@@ -686,3 +687,5 @@ void NodeOperationBuilder::group_operations()
     }
   }
 }
+
+}  // namespace blender::compositor

@@ -414,7 +414,9 @@ class GeometryNodesEvaluator {
   {
     const bNode &bnode = params.node();
 
-    this->store_ui_hints(node, params);
+    if (DEG_is_active(depsgraph_)) {
+      this->store_ui_hints(node, params);
+    }
 
     /* Use the geometry-node-execute callback if it exists. */
     if (bnode.typeinfo->geometry_node_execute != nullptr) {
@@ -720,10 +722,17 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
           [](const bNodeSocket &socket) {
             return (PropertyType)((bNodeSocketValueFloat *)socket.default_value)->subtype;
           },
-          [](const IDProperty &property) { return property.type == IDP_FLOAT; },
+          [](const IDProperty &property) { return ELEM(property.type, IDP_FLOAT, IDP_DOUBLE); },
           [](const IDProperty &property,
              const PersistentDataHandleMap &UNUSED(handles),
-             void *r_value) { *(float *)r_value = IDP_Float(&property); },
+             void *r_value) {
+            if (property.type == IDP_FLOAT) {
+              *(float *)r_value = IDP_Float(&property);
+            }
+            else if (property.type == IDP_DOUBLE) {
+              *(float *)r_value = (float)IDP_Double(&property);
+            }
+          },
       };
       return &float_type;
     }
@@ -1048,7 +1057,7 @@ static void reset_tree_ui_storage(Span<const blender::nodes::NodeTreeRef *> tree
  * often than necessary. It's going to be replaced soon.
  */
 static GeometrySet compute_geometry(const DerivedNodeTree &tree,
-                                    Span<const OutputSocketRef *> group_input_sockets,
+                                    Span<const NodeRef *> group_input_nodes,
                                     const InputSocketRef &socket_to_compute,
                                     GeometrySet input_geometry_set,
                                     NodesModifierData *nmd,
@@ -1064,7 +1073,12 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   Map<DOutputSocket, GMutablePointer> group_inputs;
 
   const DTreeContext *root_context = &tree.root_context();
-  if (group_input_sockets.size() > 0) {
+  for (const NodeRef *group_input_node : group_input_nodes) {
+    Span<const OutputSocketRef *> group_input_sockets = group_input_node->outputs().drop_back(1);
+    if (group_input_sockets.is_empty()) {
+      continue;
+    }
+
     Span<const OutputSocketRef *> remaining_input_sockets = group_input_sockets;
 
     /* If the group expects a geometry as first input, use the geometry that has been passed to
@@ -1072,7 +1086,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
     const OutputSocketRef *first_input_socket = group_input_sockets[0];
     if (first_input_socket->bsocket()->type == SOCK_GEOMETRY) {
       GeometrySet *geometry_set_in =
-          allocator.construct<GeometrySet>(std::move(input_geometry_set)).release();
+          allocator.construct<GeometrySet>(input_geometry_set).release();
       group_inputs.add_new({root_context, first_input_socket}, geometry_set_in);
       remaining_input_sockets = remaining_input_sockets.drop_front(1);
     }
@@ -1085,6 +1099,9 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
       group_inputs.add_new({root_context, socket}, {cpp_type, value_in});
     }
   }
+
+  /* Don't keep a reference to the input geometry components to avoid copies during evaluation. */
+  input_geometry_set.clear();
 
   Vector<DInputSocket> group_outputs;
   group_outputs.append({root_context, &socket_to_compute});
@@ -1174,16 +1191,8 @@ static void modifyGeometry(ModifierData *md,
   Span<const NodeRef *> input_nodes = root_tree_ref.nodes_by_type("NodeGroupInput");
   Span<const NodeRef *> output_nodes = root_tree_ref.nodes_by_type("NodeGroupOutput");
 
-  if (input_nodes.size() > 1) {
-    return;
-  }
   if (output_nodes.size() != 1) {
     return;
-  }
-
-  Span<const OutputSocketRef *> group_inputs;
-  if (input_nodes.size() == 1) {
-    group_inputs = input_nodes[0]->outputs().drop_back(1);
   }
 
   Span<const InputSocketRef *> group_outputs = output_nodes[0]->inputs().drop_back(1);
@@ -1197,10 +1206,12 @@ static void modifyGeometry(ModifierData *md,
     return;
   }
 
-  reset_tree_ui_storage(tree.used_node_tree_refs(), *ctx->object, *md);
+  if (DEG_is_active(ctx->depsgraph)) {
+    reset_tree_ui_storage(tree.used_node_tree_refs(), *ctx->object, *md);
+  }
 
   geometry_set = compute_geometry(
-      tree, group_inputs, *group_outputs[0], std::move(geometry_set), nmd, ctx);
+      tree, input_nodes, *group_outputs[0], std::move(geometry_set), nmd, ctx);
 }
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
@@ -1359,6 +1370,7 @@ static void requiredDataMask(Object *UNUSED(ob),
   /* We don't know what the node tree will need. If there are vertex groups, it is likely that the
    * node tree wants to access them. */
   r_cddata_masks->vmask |= CD_MASK_MDEFORMVERT;
+  r_cddata_masks->vmask |= CD_MASK_PROP_ALL;
 }
 
 ModifierTypeInfo modifierType_Nodes = {

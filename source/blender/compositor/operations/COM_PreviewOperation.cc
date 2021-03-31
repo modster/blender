@@ -33,13 +33,15 @@
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
+namespace blender::compositor {
+
 PreviewOperation::PreviewOperation(const ColorManagedViewSettings *viewSettings,
                                    const ColorManagedDisplaySettings *displaySettings,
                                    const unsigned int defaultWidth,
                                    const unsigned int defaultHeight)
 
 {
-  this->addInputSocket(DataType::Color, COM_SC_NO_RESIZE);
+  this->addInputSocket(DataType::Color, ResizeMode::None);
   this->m_preview = nullptr;
   this->m_outputBuffer = nullptr;
   this->m_input = nullptr;
@@ -48,6 +50,8 @@ PreviewOperation::PreviewOperation(const ColorManagedViewSettings *viewSettings,
   this->m_displaySettings = displaySettings;
   this->m_defaultWidth = defaultWidth;
   this->m_defaultHeight = defaultHeight;
+  flags.use_viewer_border = true;
+  flags.is_preview_operation = true;
 }
 
 void PreviewOperation::verifyPreview(bNodeInstanceHash *previews, bNodeInstanceKey key)
@@ -104,7 +108,7 @@ void PreviewOperation::executeRegion(rcti *rect, unsigned int /*tileNumber*/)
       color[1] = 0.0f;
       color[2] = 0.0f;
       color[3] = 1.0f;
-      this->m_input->readSampled(color, rx, ry, COM_PS_NEAREST);
+      this->m_input->readSampled(color, rx, ry, PixelSampler::Nearest);
       IMB_colormanagement_processor_apply_v4(cm_processor, color);
       rgba_float_to_uchar(this->m_outputBuffer + offset, color);
       offset += 4;
@@ -166,3 +170,5 @@ CompositorPriority PreviewOperation::getRenderPriority() const
 {
   return CompositorPriority::Low;
 }
+
+}  // namespace blender::compositor

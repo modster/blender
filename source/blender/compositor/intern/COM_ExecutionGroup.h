@@ -31,30 +31,46 @@
 #include "COM_MemoryProxy.h"
 #include "COM_Node.h"
 #include "COM_NodeOperation.h"
+#include "COM_WorkPackage.h"
 #include <vector>
+
+namespace blender::compositor {
 
 class ExecutionSystem;
 class MemoryProxy;
+class MemoryBuffer;
 class ReadBufferOperation;
 class Device;
 
-/**
- * \brief the execution state of a chunk in an ExecutionGroup
- * \ingroup Execution
- */
-enum class eChunkExecutionState {
+struct ExecutionGroupFlags {
+  bool initialized : 1;
   /**
-   * \brief chunk is not yet scheduled
+   * Is this ExecutionGroup an output ExecutionGroup
+   * An OutputExecution group are groups containing a
+   * ViewerOperation, CompositeOperation, PreviewOperation.
    */
-  NOT_SCHEDULED = 0,
+  bool is_output : 1;
+  bool complex : 1;
+
   /**
-   * \brief chunk is scheduled, but not yet executed
+   * Can this ExecutionGroup be scheduled on an OpenCLDevice.
    */
-  SCHEDULED = 1,
+  bool open_cl : 1;
+
   /**
-   * \brief chunk is executed.
+   * Schedule this execution group as a single chunk. This
+   * chunk will be executed by a single thread.
    */
-  EXECUTED = 2,
+  bool single_threaded : 1;
+
+  ExecutionGroupFlags()
+  {
+    initialized = false;
+    is_output = false;
+    complex = false;
+    open_cl = false;
+    single_threaded = false;
+  }
 };
 
 /**
@@ -72,12 +88,7 @@ class ExecutionGroup {
    */
   blender::Vector<NodeOperation *> m_operations;
 
-  /**
-   * \brief is this ExecutionGroup an input ExecutionGroup
-   * an input execution group is a group that is at the end of the calculation
-   * (the output is important for the user).
-   */
-  bool m_is_output;
+  ExecutionGroupFlags m_flags;
 
   /**
    * \brief Width of the output
@@ -111,21 +122,6 @@ class ExecutionGroup {
   unsigned int m_chunks_len;
 
   /**
-   * \brief contains this ExecutionGroup a complex NodeOperation.
-   */
-  bool m_complex;
-
-  /**
-   * \brief can this ExecutionGroup be scheduled on an OpenCLDevice
-   */
-  bool m_openCL;
-
-  /**
-   * \brief Is this Execution group SingleThreaded
-   */
-  bool m_singleThreaded;
-
-  /**
    * \brief what is the maximum number field of all ReadBufferOperation in this ExecutionGroup.
    * \note this is used to construct the MemoryBuffers that will be passed during execution.
    */
@@ -149,24 +145,9 @@ class ExecutionGroup {
   unsigned int m_chunks_finished;
 
   /**
-   * \brief m_chunk_execution_states holds per chunk the execution state. this state can be
-   *   - eChunkExecutionState::NOT_SCHEDULED: not scheduled
-   *   - eChunkExecutionState::SCHEDULED: scheduled
-   *   - eChunkExecutionState::EXECUTED: executed
+   * \brief m_work_packages holds all unit of work.
    */
-  blender::Vector<eChunkExecutionState> m_chunk_execution_states;
-
-  /**
-   * \brief indicator when this ExecutionGroup has valid Operations in its vector for Execution
-   * \note When building the ExecutionGroup Operations are added via recursion.
-   * First a WriteBufferOperations is added, then the.
-   * \note Operation containing the settings that is important for the ExecutiongGroup is added,
-   * \note When this occurs, these settings are copied over from the node to the ExecutionGroup
-   * \note and the Initialized flag is set to true.
-   * \see complex
-   * \see openCL
-   */
-  bool m_initialized;
+  blender::Vector<WorkPackage> m_work_packages;
 
   /**
    * \brief denotes boundary for border compositing
@@ -187,19 +168,11 @@ class ExecutionGroup {
   bool can_contain(NodeOperation &operation);
 
   /**
-   * \brief calculate the actual chunk size of this execution group.
-   * \note A chunk size is an unsigned int that is both the height and width of a chunk.
-   * \note The chunk size will not be stored in the chunkSize field. This needs to be done
-   * \note by the calling method.
-   */
-  unsigned int determineChunkSize();
-
-  /**
    * \brief Determine the rect (minx, maxx, miny, maxy) of a chunk at a position.
-   * \note Only gives useful results after the determination of the chunksize
-   * \see determineChunkSize()
    */
-  void determineChunkRect(rcti *rect, const unsigned int xChunk, const unsigned int yChunk) const;
+  void determineChunkRect(rcti *r_rect,
+                          const unsigned int xChunk,
+                          const unsigned int yChunk) const;
 
   /**
    * \brief determine the number of chunks, based on the chunkSize, width and height.
@@ -258,6 +231,11 @@ class ExecutionGroup {
   // constructors
   ExecutionGroup();
 
+  const ExecutionGroupFlags get_flags() const
+  {
+    return m_flags;
+  }
+
   // methods
   /**
    * \brief add an operation to this ExecutionGroup
@@ -270,23 +248,12 @@ class ExecutionGroup {
   bool addOperation(NodeOperation *operation);
 
   /**
-   * \brief is this ExecutionGroup an output ExecutionGroup
-   * \note An OutputExecution group are groups containing a
-   * \note ViewerOperation, CompositeOperation, PreviewOperation.
-   * \see NodeOperation.isOutputOperation
-   */
-  bool isOutputExecutionGroup() const
-  {
-    return this->m_is_output;
-  }
-
-  /**
    * \brief set whether this ExecutionGroup is an output
    * \param isOutput:
    */
   void setOutputExecutionGroup(bool is_output)
   {
-    this->m_is_output = is_output;
+    this->m_flags.is_output = is_output;
   }
 
   /**
@@ -319,14 +286,6 @@ class ExecutionGroup {
   unsigned int getHeight() const
   {
     return m_height;
-  }
-
-  /**
-   * \brief does this ExecutionGroup contains a complex NodeOperation
-   */
-  bool isComplex() const
-  {
-    return m_complex;
   }
 
   /**
@@ -404,16 +363,8 @@ class ExecutionGroup {
 
   /**
    * \brief Determine the rect (minx, maxx, miny, maxy) of a chunk.
-   * \note Only gives useful results after the determination of the chunksize
-   * \see determineChunkSize()
    */
-  void determineChunkRect(rcti *rect, const unsigned int chunkNumber) const;
-
-  /**
-   * \brief can this ExecutionGroup be scheduled on an OpenCLDevice
-   * \see WorkScheduler.schedule
-   */
-  bool isOpenCL();
+  void determineChunkRect(rcti *r_rect, const unsigned int chunkNumber) const;
 
   void setChunksize(int chunksize)
   {
@@ -424,7 +375,7 @@ class ExecutionGroup {
    * \brief get the Render priority of this ExecutionGroup
    * \see ExecutionSystem.execute
    */
-  CompositorPriority getRenderPriotrity();
+  CompositorPriority getRenderPriority();
 
   /**
    * \brief set border for viewer operation
@@ -441,3 +392,5 @@ class ExecutionGroup {
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:ExecutionGroup")
 #endif
 };
+
+}  // namespace blender::compositor

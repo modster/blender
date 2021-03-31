@@ -1038,7 +1038,6 @@ static bool ui_but_is_rna_undo(const uiBut *but)
     if (ID_CHECK_UNDO(id) == false) {
       return false;
     }
-    return true;
   }
   if (but->rnapoin.type && !RNA_struct_undo_check(but->rnapoin.type)) {
     return false;
@@ -1817,9 +1816,9 @@ static void ui_but_validate(const uiBut *but)
 #endif
 
 /**
- * Check if the operator \a ot poll is successfull with the context given by \a but (optionally).
+ * Check if the operator \a ot poll is successful with the context given by \a but (optionally).
  * \param but: The button that might store context. Can be NULL for convenience (e.g. if there is
- *             no button to take context from, but we still want to poll the operator).
+ * no button to take context from, but we still want to poll the operator).
  */
 bool ui_but_context_poll_operator(bContext *C, wmOperatorType *ot, const uiBut *but)
 {

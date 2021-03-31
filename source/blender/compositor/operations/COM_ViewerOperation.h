@@ -23,6 +23,8 @@
 #include "COM_NodeOperation.h"
 #include "DNA_image_types.h"
 
+namespace blender::compositor {
+
 class ViewerOperation : public NodeOperation {
  private:
   float *m_outputBuffer;
@@ -48,11 +50,12 @@ class ViewerOperation : public NodeOperation {
 
  public:
   ViewerOperation();
-  void initExecution();
-  void deinitExecution();
-  void executeRegion(rcti *rect, unsigned int tileNumber);
-  void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
-  bool isOutputOperation(bool /*rendering*/) const
+  void initExecution() override;
+  void deinitExecution() override;
+  void executeRegion(rcti *rect, unsigned int tileNumber) override;
+  void determineResolution(unsigned int resolution[2],
+                           unsigned int preferredResolution[2]) override;
+  bool isOutputOperation(bool /*rendering*/) const override
   {
     if (G.background) {
       return false;
@@ -67,7 +70,7 @@ class ViewerOperation : public NodeOperation {
   {
     this->m_imageUser = imageUser;
   }
-  bool isActiveViewerOutput() const
+  bool isActiveViewerOutput() const override
   {
     return this->m_active;
   }
@@ -99,11 +102,7 @@ class ViewerOperation : public NodeOperation {
   {
     return this->m_chunkOrder;
   }
-  CompositorPriority getRenderPriority() const;
-  bool isViewerOperation() const
-  {
-    return true;
-  }
+  CompositorPriority getRenderPriority() const override;
   void setUseAlphaInput(bool value)
   {
     this->m_useAlphaInput = value;
@@ -130,3 +129,5 @@ class ViewerOperation : public NodeOperation {
   void updateImage(rcti *rect);
   void initImage();
 };
+
+}  // namespace blender::compositor
