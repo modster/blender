@@ -118,7 +118,7 @@ set(SRC
   intern/data_transfer.c
   intern/deform.c
   intern/derived_curve.cc
-  intern/displist.c
+  intern/displist.cc
   intern/displist_tangent.c
   intern/dynamicpaint.c
   intern/editlattice.c
