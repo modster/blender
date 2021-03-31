@@ -327,7 +327,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
       }
     }
 
-    if (fix_normal) {
+    if (fix_normal && !is_zero_v3(mv->co)) {
       PRINT_ERR("\tVertex %u: has zero normal, assuming Z-up normal", i);
       if (do_fixes) {
         mv->no[2] = SHRT_MAX;

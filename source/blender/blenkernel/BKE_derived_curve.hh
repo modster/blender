@@ -86,6 +86,8 @@ struct SplineBezier : Spline {
   {
     return control_points.size();
   }
+
+  ~SplineBezier() = default;
 };
 
 struct SplineNURBS : Spline {
@@ -117,5 +119,15 @@ struct DCurve {
 
   void ensure_evaluation_cache();
 
-  DCurve from_dna_curve(const Curve &curve);
+  ~DCurve()
+  {
+    for (Spline *spline : splines) {
+      if (spline->type == SplineType::Bezier) {
+        SplineBezier *spline_bezier = reinterpret_cast<SplineBezier *>(spline);
+        delete spline_bezier;
+      }
+    }
+  }
 };
+
+DCurve *dcurve_from_dna_curve(const Curve &curve);

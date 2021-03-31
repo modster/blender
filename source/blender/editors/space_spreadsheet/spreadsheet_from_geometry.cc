@@ -220,7 +220,7 @@ static GeometrySet get_display_geometry_set(SpaceSpreadsheet *sspreadsheet,
   }
   else {
     Object *object_orig = DEG_get_original_object(object_eval);
-    if (object_orig->type == OB_MESH) {
+    if (ELEM(object_orig->type, OB_MESH, OB_CURVE, OB_POINTCLOUD)) {
       MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
       if (object_orig->mode == OB_MODE_EDIT) {
         Mesh *mesh = (Mesh *)object_orig->data;

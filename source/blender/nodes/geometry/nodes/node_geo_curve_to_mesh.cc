@@ -46,18 +46,30 @@ static Mesh *curve_to_mesh_calculate(DCurve &curve)
   }
 
   Mesh *mesh = BKE_mesh_new_nomain(
-      curve.evaluated_spline_cache.size(), curve.evaluated_spline_cache.size(), 0, 0, 0);
+      curve.evaluated_spline_cache.size(), curve.evaluated_spline_cache.size() - 2, 0, 0, 0);
+  MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
+  MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
 
-  for (const int i : curve.evaluated_spline_cache.index_range()) {
+  for (const int i : verts.index_range()) {
     copy_v3_v3(mesh->mvert[i].co, curve.evaluated_spline_cache[i]);
   }
+
+  for (const int i : edges.index_range()) {
+    MEdge &edge = mesh->medge[i];
+    edge.v1 = i;
+    edge.v2 = i + 1;
+    edge.flag = ME_LOOSEEDGE;
+  }
+
+  BKE_mesh_calc_normals(mesh);
+  BLI_assert(BKE_mesh_is_valid(mesh));
 
   return mesh;
 }
 
 static void geo_node_curve_to_mesh_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set_in = params.extract_input<GeometrySet>("Geometry");
+  GeometrySet geometry_set_in = params.extract_input<GeometrySet>("Curve");
   GeometrySet geometry_set_out;
 
   if (geometry_set_in.has_curve()) {
@@ -65,7 +77,7 @@ static void geo_node_curve_to_mesh_exec(GeoNodeExecParams params)
     geometry_set_in.replace_mesh(mesh);
   }
 
-  params.set_output("Geometry", std::move(geometry_set_out));
+  params.set_output("Mesh", std::move(geometry_set_out));
 }
 
 }  // namespace blender::nodes
