@@ -51,6 +51,7 @@
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_node_ui_storage.hh"
+#include "BKE_object.h"
 #include "BKE_pointcloud.h"
 #include "BKE_screen.h"
 #include "BKE_simulation.h"
@@ -406,11 +407,8 @@ class GeometryNodesEvaluator {
         if (output_socket->is_available() && output_socket->bsocket()->type == SOCK_GEOMETRY) {
           GeometrySet value = node_outputs_map.lookup<GeometrySet>(output_socket->identifier());
           value.ensure_own_non_instances();
-          static std::mutex mutex;
-          std::lock_guard lock{mutex};
-          delete self_object_->runtime.geometry_set_preview;
-          const_cast<Object *>(self_object_)->runtime.geometry_set_preview = new GeometrySet(
-              std::move(value));
+          BKE_object_preview_geometry_set(const_cast<Object *>(self_object_),
+                                          new GeometrySet(std::move(value)));
         }
       }
     }

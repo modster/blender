@@ -1810,6 +1810,18 @@ void BKE_object_free_caches(Object *object)
   }
 }
 
+/* Can be called from multiple threads. */
+void BKE_object_preview_geometry_set(Object *ob, struct GeometrySet *geometry_set)
+{
+  static ThreadMutex mutex = BLI_MUTEX_INITIALIZER;
+  BLI_mutex_lock(&mutex);
+  if (ob->runtime.geometry_set_preview != NULL) {
+    BKE_geometry_set_free(ob->runtime.geometry_set_preview);
+  }
+  ob->runtime.geometry_set_preview = geometry_set;
+  BLI_mutex_unlock(&mutex);
+}
+
 /**
  * Actual check for internal data, not context or flags.
  */
