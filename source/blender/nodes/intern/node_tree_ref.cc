@@ -105,8 +105,6 @@ NodeTreeRef::NodeTreeRef(bNodeTree *btree) : btree_(btree)
     }
   }
 
-  this->create_linked_socket_caches();
-
   for (NodeRef *node : nodes_by_id_) {
     const bNodeType *nodetype = node->bnode_->typeinfo;
     nodes_by_type_.add(nodetype, node);
@@ -120,6 +118,8 @@ NodeTreeRef::NodeTreeRef(bNodeTree *btree) : btree_(btree)
       portal_out_nodes_by_id_.add(storage->portal_id, node);
     }
   }
+
+  this->create_linked_socket_caches();
 }
 
 NodeTreeRef::~NodeTreeRef()
@@ -232,6 +232,12 @@ void NodeTreeRef::foreach_logical_origin(InputSocketRef &socket,
     if (origin_node->is_reroute_node()) {
       this->foreach_logical_origin(*origin_node->inputs_[0], callback, false);
     }
+    else if (origin_node->is_portal_out()) {
+      NodePortalOut *storage = origin_node->storage<NodePortalOut>();
+      for (NodeRef *input_node : portal_in_nodes_by_id_.lookup(storage->portal_id)) {
+        this->foreach_logical_origin(*input_node->inputs_[0], callback);
+      }
+    }
     else if (origin_node->is_muted()) {
       for (InternalLinkRef *internal_link : origin_node->internal_links_) {
         if (internal_link->to_ == origin) {
@@ -257,6 +263,12 @@ void NodeTreeRef::foreach_logical_target(OutputSocketRef &socket,
     NodeRef *target_node = target->node_;
     if (target_node->is_reroute_node()) {
       this->foreach_logical_target(*target_node->outputs_[0], callback);
+    }
+    else if (target_node->is_portal_in()) {
+      NodePortalIn *storage = target_node->storage<NodePortalIn>();
+      for (NodeRef *output_node : portal_out_nodes_by_id_.lookup(storage->portal_id)) {
+        this->foreach_logical_target(*output_node->outputs_[0], callback);
+      }
     }
     else if (target_node->is_muted()) {
       for (InternalLinkRef *internal_link : target_node->internal_links_) {
