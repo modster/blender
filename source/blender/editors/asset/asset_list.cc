@@ -278,7 +278,8 @@ void AssetList::ensurePreviewsJob(bContext *C)
   filelist_cache_previews_update(files);
 
   {
-    const bool previews_running = filelist_cache_previews_running(files);
+    const bool previews_running = filelist_cache_previews_running(files) &&
+                                  !filelist_cache_previews_done(files);
     if (previews_running) {
       previews_timer_.ensureRunning(C);
     }
