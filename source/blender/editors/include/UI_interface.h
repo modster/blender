@@ -2235,7 +2235,16 @@ void uiTemplateAssetView(struct uiLayout *layout,
                          const char *active_propname,
                          const struct AssetFilterSettings *filter_settings,
                          const char *activate_opname,
-                         const char *drag_opname);
+                         struct PointerRNA *r_activate_op_properties,
+                         const char *drag_opname,
+                         struct PointerRNA *r_drag_op_properties);
+
+struct PointerRNA *UI_list_custom_activate_operator_set(struct uiList *ui_list,
+                                                        const char *opname,
+                                                        bool create_properties);
+struct PointerRNA *UI_list_custom_drag_operator_set(struct uiList *ui_list,
+                                                    const char *opname,
+                                                    bool create_properties);
 
 /* items */
 void uiItemO(uiLayout *layout, const char *name, int icon, const char *opname);

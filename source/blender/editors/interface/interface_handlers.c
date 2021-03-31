@@ -717,34 +717,31 @@ static uiAfterFunc *ui_afterfunc_new(void)
  * \param context_but: A button from which to get the context from (`uiBut.context`) for the
  *                     operator execution.
  *
+ * \note Ownership over \a properties is moved here. The after-func owns it now.
  * \note Can only call while handling buttons.
  */
-static PointerRNA *ui_handle_afterfunc_add_operator_ex(wmOperatorType *ot,
-                                                       int opcontext,
-                                                       bool create_props,
-                                                       const uiBut *context_but)
+static void ui_handle_afterfunc_add_operator_ex(wmOperatorType *ot,
+                                                PointerRNA **properties,
+                                                int opcontext,
+                                                const uiBut *context_but)
 {
-  PointerRNA *ptr = NULL;
   uiAfterFunc *after = ui_afterfunc_new();
 
   after->optype = ot;
   after->opcontext = opcontext;
+  if (properties) {
+    after->opptr = *properties;
+    *properties = NULL;
+  }
+
   if (context_but && context_but->context) {
     after->context = CTX_store_copy(context_but->context);
   }
-
-  if (create_props) {
-    ptr = MEM_callocN(sizeof(PointerRNA), __func__);
-    WM_operator_properties_create_ptr(ptr, ot);
-    after->opptr = ptr;
-  }
-
-  return ptr;
 }
 
-PointerRNA *ui_handle_afterfunc_add_operator(wmOperatorType *ot, int opcontext, bool create_props)
+void ui_handle_afterfunc_add_operator(wmOperatorType *ot, int opcontext)
 {
-  return ui_handle_afterfunc_add_operator_ex(ot, opcontext, create_props, NULL);
+  ui_handle_afterfunc_add_operator_ex(ot, NULL, opcontext, NULL);
 }
 
 static void popup_check(bContext *C, wmOperator *op)
@@ -1072,23 +1069,25 @@ static void ui_apply_but_ROW(bContext *C, uiBlock *block, uiBut *but, uiHandleBu
 }
 
 /**
+ * \note Ownership of \a properties is moved here. The after-func owns it now.
+ *
  * \returns true if the operator was executed, otherwise false.
  */
 static bool ui_list_invoke_item_operator(bContext *C,
                                          const ARegion *region,
                                          const wmEvent *event,
-                                         const char *name)
+                                         wmOperatorType *ot,
+                                         PointerRNA **properties)
 {
-  wmOperatorType *drag_ot = WM_operatortype_find(name, false);
   const uiBut *hovered_but = ui_but_find_mouse_over(region, event);
 
-  if (!ui_but_context_poll_operator(C, drag_ot, hovered_but)) {
+  if (!ui_but_context_poll_operator(C, ot, hovered_but)) {
     return false;
   }
 
   /* Allow the context to be set from the hovered button, so the list item draw callback can set
    * context for the operators. */
-  ui_handle_afterfunc_add_operator_ex(drag_ot, WM_OP_INVOKE_DEFAULT, false, hovered_but);
+  ui_handle_afterfunc_add_operator_ex(ot, properties, WM_OP_INVOKE_DEFAULT, hovered_but);
   return true;
 }
 
@@ -1099,9 +1098,12 @@ static void ui_apply_but_LISTROW(bContext *C, uiBlock *block, uiBut *but, uiHand
   uiBut *listbox = ui_list_find_mouse_over(data->region, window->eventstate);
   if (listbox) {
     uiList *list = listbox->custom_data;
-    if (list && list->custom_activate_opname) {
-      ui_list_invoke_item_operator(
-          C, data->region, window->eventstate, list->custom_activate_opname);
+    if (list && list->dyn_data->custom_activate_optype) {
+      ui_list_invoke_item_operator(C,
+                                   data->region,
+                                   window->eventstate,
+                                   list->dyn_data->custom_activate_optype,
+                                   &list->dyn_data->custom_activate_opptr);
     }
   }
 
@@ -4717,7 +4719,7 @@ static int ui_do_but_EXIT(bContext *C, uiBut *but, uiHandleButtonData *data, con
       const uiBut *listbox = ui_list_find_mouse_over(data->region, event);
       if (listbox) {
         const uiList *ui_list = listbox->custom_data;
-        if (ui_list && ui_list->custom_drag_opname) {
+        if (ui_list && ui_list->dyn_data->custom_drag_optype) {
           ret = WM_UI_HANDLER_CONTINUE;
         }
       }
@@ -9097,10 +9099,14 @@ static int ui_list_activate_hovered_row(bContext *C,
                                         const wmEvent *event,
                                         bool activate_dragging)
 {
-  const bool do_drag = activate_dragging && ui_list->custom_drag_opname;
+  const bool do_drag = activate_dragging && ui_list->dyn_data->custom_drag_optype;
 
   if (do_drag) {
-    if (!ui_list_invoke_item_operator(C, region, event, ui_list->custom_drag_opname)) {
+    if (!ui_list_invoke_item_operator(C,
+                                      region,
+                                      event,
+                                      ui_list->dyn_data->custom_drag_optype,
+                                      &ui_list->dyn_data->custom_drag_opptr)) {
       return WM_UI_HANDLER_CONTINUE;
     }
   }
@@ -9109,19 +9115,19 @@ static int ui_list_activate_hovered_row(bContext *C,
   uiBut *listrow = ui_but_find_mouse_over_ex(
       region, mouse_xy[0], mouse_xy[1], false, ui_but_is_listrow);
   if (listrow) {
-    const char *custom_activate_opname = ui_list->custom_activate_opname;
+    wmOperatorType *custom_activate_optype = ui_list->dyn_data->custom_activate_optype;
 
-    /* Hacky: Ensure the custom activate operator is not called when the custom drag operator was.
-     * Only one should run! */
+    /* Hacky: Ensure the custom activate operator is not called when the custom drag operator
+     * was. Only one should run! */
     if (activate_dragging && do_drag) {
-      ((uiList *)ui_list)->custom_activate_opname = NULL;
+      ((uiList *)ui_list)->dyn_data->custom_activate_optype = NULL;
     }
 
     /* Simulate click on listrow button itself (which may be overlapped by another button). Also
      * calls the custom activate operator (ui_list->custom_activate_opname). */
     UI_but_execute(C, region, listrow);
 
-    ((uiList *)ui_list)->custom_activate_opname = custom_activate_opname;
+    ((uiList *)ui_list)->dyn_data->custom_activate_optype = custom_activate_optype;
   }
 
   return WM_UI_HANDLER_BREAK;
@@ -9137,9 +9143,8 @@ static bool ui_list_is_hovering_draggable_but(bContext *C,
   const uiBut *hovered_but = ui_but_find_mouse_over_ex(
       region, mouse_xy[0], mouse_xy[1], false, NULL);
 
-  if (list->custom_drag_opname) {
-    wmOperatorType *drag_ot = WM_operatortype_find(list->custom_drag_opname, false);
-    if (ui_but_context_poll_operator(C, drag_ot, hovered_but)) {
+  if (list->dyn_data->custom_drag_optype) {
+    if (ui_but_context_poll_operator(C, list->dyn_data->custom_drag_optype, hovered_but)) {
       return true;
     }
   }

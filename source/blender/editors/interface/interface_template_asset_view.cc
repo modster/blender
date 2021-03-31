@@ -115,7 +115,7 @@ static void asset_view_draw_item(uiList *ui_list,
                   asset_handle->file_data->preview_icon_id,
                   /* NOLINTNEXTLINE: bugprone-suspicious-enum-usage */
                   UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
-  if (!ui_list->custom_drag_opname) {
+  if (!ui_list->dyn_data->custom_drag_optype) {
     asset_view_item_but_drag_set(but, list_data, asset_handle);
   }
 }
@@ -192,7 +192,9 @@ void uiTemplateAssetView(uiLayout *layout,
                          const char *active_propname,
                          const AssetFilterSettings *filter_settings,
                          const char *activate_opname,
-                         const char *drag_opname)
+                         PointerRNA *r_activate_op_properties,
+                         const char *drag_opname,
+                         PointerRNA *r_drag_op_properties)
 {
   if (!list_id || !list_id[0]) {
     RNA_warning("Asset view needs a valid identifier");
@@ -235,12 +237,23 @@ void uiTemplateAssetView(uiLayout *layout,
                                    false,
                                    false,
                                    list_data);
-
-  list->custom_activate_opname = activate_opname;
-  list->custom_drag_opname = drag_opname;
-
   if (!list) {
     /* List creation failed. */
     MEM_freeN(list_data);
+  }
+
+  if (activate_opname) {
+    PointerRNA *ptr = UI_list_custom_activate_operator_set(
+        list, activate_opname, r_activate_op_properties != NULL);
+    if (r_activate_op_properties && ptr) {
+      *r_activate_op_properties = *ptr;
+    }
+  }
+  if (drag_opname) {
+    PointerRNA *ptr = UI_list_custom_drag_operator_set(
+        list, drag_opname, r_drag_op_properties != NULL);
+    if (r_drag_op_properties && ptr) {
+      *r_drag_op_properties = *ptr;
+    }
   }
 }

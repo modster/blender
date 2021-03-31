@@ -5827,6 +5827,28 @@ static void uilist_filter_items_default(struct uiList *ui_list,
   }
 }
 
+static void uilist_free_dyn_data(uiList *ui_list)
+{
+  uiListDyn *dyn_data = ui_list->dyn_data;
+  if (!dyn_data) {
+    return;
+  }
+
+  if (dyn_data->custom_activate_opptr) {
+    WM_operator_properties_free(dyn_data->custom_activate_opptr);
+    MEM_freeN(dyn_data->custom_activate_opptr);
+  }
+  if (dyn_data->custom_drag_opptr) {
+    WM_operator_properties_free(dyn_data->custom_drag_opptr);
+    MEM_freeN(dyn_data->custom_drag_opptr);
+  }
+
+  MEM_SAFE_FREE(dyn_data->items_filter_flags);
+  MEM_SAFE_FREE(dyn_data->items_filter_neworder);
+  MEM_SAFE_FREE(dyn_data->customdata);
+  MEM_freeN(dyn_data);
+}
+
 /**
  * The validated data that was passed to #uiTemplateList (typically through Python).
  * Populated through #ui_template_list_data_retrieve().
@@ -6220,12 +6242,22 @@ static uiList *ui_list_ensure(bContext *C,
 
   /* Because we can't actually pass type across save&load... */
   ui_list->type = ui_list_type;
+  /* Touching the type here is not nice, but this is just a stupid callback to free UI data from
+   * BKE. It's always the same for any type visible in fact. */
+  ui_list->type->free_runtime_data_fn = uilist_free_dyn_data;
   ui_list->layout_type = layout_type;
 
   /* Reset filtering data. */
   MEM_SAFE_FREE(dyn_data->items_filter_flags);
   MEM_SAFE_FREE(dyn_data->items_filter_neworder);
   dyn_data->items_len = dyn_data->items_shown = -1;
+
+  if (dyn_data->custom_activate_opptr) {
+    WM_operator_properties_free(dyn_data->custom_activate_opptr);
+  }
+  if (dyn_data->custom_drag_opptr) {
+    WM_operator_properties_free(dyn_data->custom_drag_opptr);
+  }
 
   return ui_list;
 }
@@ -6820,6 +6852,46 @@ void uiTemplateList(uiLayout *layout,
                     sort_reverse,
                     sort_lock,
                     NULL);
+}
+
+/**
+ * \return: A RNA pointer for the operator properties.
+ */
+PointerRNA *UI_list_custom_activate_operator_set(uiList *ui_list,
+                                                 const char *opname,
+                                                 bool create_properties)
+{
+  uiListDyn *dyn_data = ui_list->dyn_data;
+  dyn_data->custom_activate_optype = WM_operatortype_find(opname, false);
+  if (!dyn_data->custom_activate_optype) {
+    return NULL;
+  }
+
+  if (create_properties) {
+    WM_operator_properties_alloc(&dyn_data->custom_activate_opptr, NULL, opname);
+  }
+
+  return dyn_data->custom_activate_opptr;
+}
+
+/**
+ * \return: A RNA pointer for the operator properties.
+ */
+PointerRNA *UI_list_custom_drag_operator_set(uiList *ui_list,
+                                             const char *opname,
+                                             bool create_properties)
+{
+  uiListDyn *dyn_data = ui_list->dyn_data;
+  dyn_data->custom_drag_optype = WM_operatortype_find(opname, false);
+  if (!dyn_data->custom_drag_optype) {
+    return NULL;
+  }
+
+  if (create_properties) {
+    WM_operator_properties_alloc(&dyn_data->custom_drag_opptr, NULL, opname);
+  }
+
+  return dyn_data->custom_drag_opptr;
 }
 
 /** \} */

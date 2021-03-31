@@ -908,9 +908,7 @@ const char *ui_textedit_undo(struct uiUndoStack_Text *undo_stack,
                              int *r_cursor_index);
 
 /* interface_handlers.c */
-PointerRNA *ui_handle_afterfunc_add_operator(struct wmOperatorType *ot,
-                                             int opcontext,
-                                             bool create_props);
+extern void ui_handle_afterfunc_add_operator(struct wmOperatorType *ot, int opcontext);
 extern void ui_pan_to_scroll(const struct wmEvent *event, int *type, int *val);
 extern void ui_but_activate_event(struct bContext *C, struct ARegion *region, uiBut *but);
 extern void ui_but_activate_over(struct bContext *C, struct ARegion *region, uiBut *but);

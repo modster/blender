@@ -581,7 +581,9 @@ static void rna_uiTemplateAssetView(uiLayout *layout,
                                     const char *active_propname,
                                     int filter_id_types,
                                     const char *activate_opname,
-                                    const char *drag_opname)
+                                    PointerRNA *r_activate_op_properties,
+                                    const char *drag_opname,
+                                    PointerRNA *r_drag_op_properties)
 {
   AssetFilterSettings filter_settings = {
       .id_types = filter_id_types ? filter_id_types : FILTER_ID_ALL,
@@ -597,7 +599,9 @@ static void rna_uiTemplateAssetView(uiLayout *layout,
                       active_propname,
                       &filter_settings,
                       activate_opname,
-                      drag_opname);
+                      r_activate_op_properties,
+                      drag_opname,
+                      r_drag_op_properties);
 }
 
 /**
@@ -1789,6 +1793,14 @@ void RNA_api_ui_layout(StructRNA *srna)
                  0,
                  "",
                  "Name of a custom operator to invoke when activating an item");
+  parm = RNA_def_pointer(
+      func,
+      "activate_operator_properties",
+      "OperatorProperties",
+      "",
+      "Operator properties to fill in for the custom activate operator passed above");
+  RNA_def_parameter_flags(parm, 0, PARM_RNAPTR);
+  RNA_def_function_output(func, parm);
   RNA_def_string(func,
                  "drag_operator",
                  NULL,
@@ -1797,6 +1809,14 @@ void RNA_api_ui_layout(StructRNA *srna)
                  "Name of a custom operator to invoke when starting to drag an item. Never "
                  "invoked together with the `active_operator` (if set), it's either the drag or "
                  "the activate one");
+  parm = RNA_def_pointer(
+      func,
+      "drag_operator_properties",
+      "OperatorProperties",
+      "",
+      "Operator properties to fill in for the custom drag operator passed above");
+  RNA_def_parameter_flags(parm, 0, PARM_RNAPTR);
+  RNA_def_function_output(func, parm);
 }
 
 #endif
