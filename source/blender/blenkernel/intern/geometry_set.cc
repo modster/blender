@@ -65,7 +65,7 @@ GeometryComponent *GeometryComponent::create(GeometryComponentType component_typ
     case GEO_COMPONENT_TYPE_VOLUME:
       return new VolumeComponent();
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return nullptr;
 }
 
@@ -203,6 +203,12 @@ bool operator==(const GeometrySet &UNUSED(a), const GeometrySet &UNUSED(b))
 uint64_t GeometrySet::hash() const
 {
   return reinterpret_cast<uint64_t>(this);
+}
+
+/* Remove all geometry components from the geometry set. */
+void GeometrySet::clear()
+{
+  components_.clear();
 }
 
 /* Returns a read-only mesh or null. */

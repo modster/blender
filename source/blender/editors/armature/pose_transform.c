@@ -172,9 +172,6 @@ static void applyarmature_transfer_properties(EditBone *curbone,
   unit_qt(pchan->quat);
   unit_axis_angle(pchan->rotAxis, &pchan->rotAngle);
   pchan->size[0] = pchan->size[1] = pchan->size[2] = 1.0f;
-
-  /* Set anim lock. */
-  curbone->flag |= BONE_UNKEYED;
 }
 
 /* Adjust the current edit position of the bone using the pose space matrix. */
@@ -512,37 +509,60 @@ static int pose_visual_transform_apply_exec(bContext *C, wmOperator *UNUSED(op))
 {
   ViewLayer *view_layer = CTX_data_view_layer(C);
   View3D *v3d = CTX_wm_view3d(C);
-  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+
+  /* Needed to ensure #bPoseChannel.pose_mat are up to date. */
+  CTX_data_ensure_evaluated_depsgraph(C);
 
   FOREACH_OBJECT_IN_MODE_BEGIN (view_layer, v3d, OB_ARMATURE, OB_MODE_POSE, ob) {
-    /* Loop over all selected pchan's.
-     *
-     * TODO, loop over children before parents if multiple bones
-     * at once are to be predictable*/
-    FOREACH_PCHAN_SELECTED_IN_OBJECT_BEGIN (ob, pchan) {
-      const Object *ob_eval = DEG_get_evaluated_object(depsgraph, ob);
-      bPoseChannel *pchan_eval = BKE_pose_channel_find_name(ob_eval->pose, pchan->name);
-      float delta_mat[4][4];
+    const bArmature *arm = ob->data;
 
-      /* chan_mat already contains the delta transform from rest pose to pose-mode pose
+    int chanbase_len = BLI_listbase_count(&ob->pose->chanbase);
+    /* Storage for the calculated matrices to prevent reading from modified values.
+     * NOTE: this could be avoided if children were always calculated before parents
+     * however ensuring this is involved and doesn't give any significant advantage. */
+    struct {
+      float matrix[4][4];
+      bool is_set;
+    } *pchan_xform_array = MEM_mallocN(sizeof(*pchan_xform_array) * chanbase_len, __func__);
+    bool changed = false;
+
+    int i;
+    LISTBASE_FOREACH_INDEX (bPoseChannel *, pchan, &ob->pose->chanbase, i) {
+      if (!((pchan->bone->flag & BONE_SELECTED) && PBONE_VISIBLE(arm, pchan->bone))) {
+        pchan_xform_array[i].is_set = false;
+        continue;
+      }
+
+      /* `chan_mat` already contains the delta transform from rest pose to pose-mode pose
        * as that is baked into there so that B-Bones will work. Once we've set this as the
-       * new raw-transform components, don't recalc the poses yet, otherwise IK result will
-       * change, thus changing the result we may be trying to record.
-       */
-      /* XXX For some reason, we can't use pchan->chan_mat here, gives odd rotation/offset
-       * (see T38251).
-       * Using pchan->pose_mat and bringing it back in bone space seems to work as expected!
-       */
-      BKE_armature_mat_pose_to_bone(pchan_eval, pchan_eval->pose_mat, delta_mat);
+       * new raw-transform components, don't recalculate the poses yet, otherwise IK result will
+       * change, thus changing the result we may be trying to record. */
 
-      BKE_pchan_apply_mat4(pchan, delta_mat, true);
+      /* NOTE: For some reason `pchan->chan_mat` can't be used here as it gives odd
+       * rotation/offset, see T38251.
+       * Using `pchan->pose_mat` and bringing it back in bone space seems to work as expected!
+       * This matches how visual key-framing works. */
+      BKE_armature_mat_pose_to_bone(pchan, pchan->pose_mat, pchan_xform_array[i].matrix);
+      pchan_xform_array[i].is_set = true;
+      changed = true;
     }
-    FOREACH_PCHAN_SELECTED_IN_OBJECT_END;
 
-    DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
+    if (changed) {
+      /* Perform separately to prevent feedback loop. */
+      LISTBASE_FOREACH_INDEX (bPoseChannel *, pchan, &ob->pose->chanbase, i) {
+        if (!pchan_xform_array[i].is_set) {
+          continue;
+        }
+        BKE_pchan_apply_mat4(pchan, pchan_xform_array[i].matrix, true);
+      }
 
-    /* note, notifier might evolve */
-    WM_event_add_notifier(C, NC_OBJECT | ND_POSE, ob);
+      DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
+
+      /* note, notifier might evolve */
+      WM_event_add_notifier(C, NC_OBJECT | ND_POSE, ob);
+    }
+
+    MEM_freeN(pchan_xform_array);
   }
   FOREACH_OBJECT_IN_MODE_END;
 
@@ -1177,10 +1197,6 @@ static int pose_clear_transform_generic_exec(bContext *C,
 
       /* do auto-keyframing as appropriate */
       if (autokeyframe_cfra_can_key(scene, &ob_iter->id)) {
-        /* clear any unkeyed tags */
-        if (pchan->bone) {
-          pchan->bone->flag &= ~BONE_UNKEYED;
-        }
         /* tag for autokeying later */
         ANIM_relative_keyingset_add_source(&dsources, &ob_iter->id, &RNA_PoseBone, pchan);
 
@@ -1188,12 +1204,6 @@ static int pose_clear_transform_generic_exec(bContext *C,
         bPoseChannel *pchan_eval = BKE_pose_channel_find_name(ob_eval->pose, pchan->name);
         clear_func(ob_iter->pose, pchan_eval);
 #endif
-      }
-      else {
-        /* add unkeyed tags */
-        if (pchan->bone) {
-          pchan->bone->flag |= BONE_UNKEYED;
-        }
       }
     }
     FOREACH_PCHAN_SELECTED_IN_OBJECT_END;
