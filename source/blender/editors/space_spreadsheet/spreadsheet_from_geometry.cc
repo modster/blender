@@ -201,8 +201,11 @@ static GeometrySet get_display_geometry_set(SpaceSpreadsheet *sspreadsheet,
                                             Object *object_eval,
                                             const GeometryComponentType used_component_type)
 {
-  if (get_cached_geometry_set_ptr() != nullptr) {
-    return *get_cached_geometry_set_ptr();
+  if (sspreadsheet->object_eval_state == SPREADSHEET_OBJECT_EVAL_STATE_NODE) {
+    if (get_cached_geometry_set_ptr() != nullptr) {
+      return *get_cached_geometry_set_ptr();
+    }
+    return {};
   }
 
   GeometrySet geometry_set;
@@ -383,7 +386,7 @@ static Span<int64_t> filter_mesh_elements_by_selection(const bContext *C,
 static GeometryComponentType get_display_component_type(const bContext *C, Object *object_eval)
 {
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
-  if (sspreadsheet->object_eval_state == SPREADSHEET_OBJECT_EVAL_STATE_FINAL) {
+  if (sspreadsheet->object_eval_state != SPREADSHEET_OBJECT_EVAL_STATE_ORIGINAL) {
     return (GeometryComponentType)sspreadsheet->geometry_component_type;
   }
   if (object_eval->type == OB_POINTCLOUD) {

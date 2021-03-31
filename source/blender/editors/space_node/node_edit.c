@@ -675,8 +675,10 @@ void ED_node_set_active(Main *bmain, bNodeTree *ntree, bNode *node, bool *r_acti
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       if (area->spacetype == SPACE_SPREADSHEET) {
         SpaceSpreadsheet *sspreadsheet = area->spacedata.first;
-        DEG_id_tag_update(&ntree->id, ID_RECALC_COPY_ON_WRITE);
-        ED_area_tag_redraw(area);
+        if (sspreadsheet->object_eval_state == SPREADSHEET_OBJECT_EVAL_STATE_NODE) {
+          DEG_id_tag_update(&ntree->id, ID_RECALC_COPY_ON_WRITE);
+          ED_area_tag_redraw(area);
+        }
       }
     }
   }
