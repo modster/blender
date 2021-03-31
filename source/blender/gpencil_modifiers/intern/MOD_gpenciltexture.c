@@ -130,6 +130,18 @@ static void deformPolyline(GpencilModifierData *md,
   }
 }
 
+/* Deform Bezier. */
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *depsgraph,
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *gpf,
+                         bGPDstroke *gps)
+{
+  /* Reuse deformPolyline because the UV values of curve are not used yet. */
+  deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+}
+
 static void bakeModifier(struct Main *UNUSED(bmain),
                          Depsgraph *depsgraph,
                          GpencilModifierData *md,
@@ -211,7 +223,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Texture = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
