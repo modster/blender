@@ -89,6 +89,10 @@ bool GeometryComponent::is_mutable() const
   return users_ <= 1;
 }
 
+void GeometryComponent::ensure_own_non_instances()
+{
+}
+
 GeometryComponentType GeometryComponent::type() const
 {
   return type_;
@@ -209,6 +213,14 @@ uint64_t GeometrySet::hash() const
 void GeometrySet::clear()
 {
   components_.clear();
+}
+
+void GeometrySet::ensure_own_non_instances()
+{
+  for (GeometryComponentType type : components_.keys()) {
+    GeometryComponent &component = this->get_component_for_write(type);
+    component.ensure_own_non_instances();
+  }
 }
 
 /* Returns a read-only mesh or null. */

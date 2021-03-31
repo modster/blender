@@ -41,6 +41,7 @@
 #include "BKE_node.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_workspace.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
@@ -669,6 +670,16 @@ void ED_node_set_active(Main *bmain, bNodeTree *ntree, bNode *node, bool *r_acti
   }
 
   nodeSetActive(ntree, node);
+  LISTBASE_FOREACH (wmWindow *, window, &((wmWindowManager *)bmain->wm.first)->windows) {
+    bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      if (area->spacetype == SPACE_SPREADSHEET) {
+        SpaceSpreadsheet *sspreadsheet = area->spacedata.first;
+        DEG_id_tag_update(&ntree->id, ID_RECALC_COPY_ON_WRITE);
+        ED_area_tag_redraw(area);
+      }
+    }
+  }
 
   if (node->type != NODE_GROUP) {
     const bool was_output = (node->flag & NODE_DO_OUTPUT) != 0;

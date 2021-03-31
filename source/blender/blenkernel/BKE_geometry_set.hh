@@ -141,6 +141,8 @@ class GeometryComponent {
   /* The returned component should be of the same type as the type this is called on. */
   virtual GeometryComponent *copy() const = 0;
 
+  virtual void ensure_own_non_instances();
+
   void user_add() const;
   void user_remove() const;
   bool is_mutable() const;
@@ -315,6 +317,8 @@ struct GeometrySet {
 
   void clear();
 
+  void ensure_own_non_instances();
+
   /* Utility methods for creation. */
   static GeometrySet create_with_mesh(
       Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
@@ -374,6 +378,8 @@ class MeshComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
+  void ensure_own_non_instances() override;
+
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_MESH;
 
  private:
@@ -403,6 +409,8 @@ class PointCloudComponent : public GeometryComponent {
   int attribute_domain_size(const AttributeDomain domain) const final;
 
   bool is_empty() const final;
+
+  void ensure_own_non_instances() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_POINT_CLOUD;
 

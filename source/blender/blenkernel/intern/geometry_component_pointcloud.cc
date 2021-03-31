@@ -107,6 +107,15 @@ bool PointCloudComponent::is_empty() const
   return pointcloud_ == nullptr;
 }
 
+void PointCloudComponent::ensure_own_non_instances()
+{
+  BLI_assert(this->is_mutable());
+  if (ownership_ != GeometryOwnershipType::Owned) {
+    pointcloud_ = BKE_pointcloud_copy_for_eval(pointcloud_, false);
+    ownership_ = GeometryOwnershipType::Owned;
+  }
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

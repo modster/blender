@@ -34,6 +34,8 @@
 #include "spreadsheet_from_geometry.hh"
 #include "spreadsheet_intern.hh"
 
+GeometrySet *get_cached_geometry_set_ptr();
+
 namespace blender::ed::spreadsheet {
 
 using blender::bke::ReadAttribute;
@@ -199,6 +201,10 @@ static GeometrySet get_display_geometry_set(SpaceSpreadsheet *sspreadsheet,
                                             Object *object_eval,
                                             const GeometryComponentType used_component_type)
 {
+  if (get_cached_geometry_set_ptr() != nullptr) {
+    return *get_cached_geometry_set_ptr();
+  }
+
   GeometrySet geometry_set;
   if (sspreadsheet->object_eval_state == SPREADSHEET_OBJECT_EVAL_STATE_FINAL) {
     if (used_component_type == GEO_COMPONENT_TYPE_MESH && object_eval->mode == OB_MODE_EDIT) {

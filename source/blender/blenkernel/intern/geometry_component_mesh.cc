@@ -157,6 +157,15 @@ bool MeshComponent::is_empty() const
   return mesh_ == nullptr;
 }
 
+void MeshComponent::ensure_own_non_instances()
+{
+  BLI_assert(this->is_mutable());
+  if (ownership_ != GeometryOwnershipType::Owned) {
+    mesh_ = BKE_mesh_copy_for_eval(mesh_, false);
+    ownership_ = GeometryOwnershipType::Owned;
+  }
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
