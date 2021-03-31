@@ -57,7 +57,7 @@ using namespace blender;
  * Wrapper to add logic to the AssetLibraryReference DNA struct.
  */
 class AssetLibraryReferenceWrapper {
-  const AssetLibraryReference &reference_;
+  const AssetLibraryReference reference_;
 
  public:
   /* Intentionally not `explicit`, allow implicit conversion for convienience. Might have to be
