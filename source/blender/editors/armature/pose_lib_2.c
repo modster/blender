@@ -83,6 +83,14 @@ typedef struct PoseBlendData {
   bool needs_redraw;
   bool is_bone_selection_relevant;
 
+  struct {
+    bool use_release_confirm;
+    int drag_start_xy[2];
+    int init_event_type;
+
+    bool cursor_wrap_enabled;
+  } release_confirm_info;
+
   /* For temp-loading the Action from the pose library. */
   AssetTempIDConsumer *temp_id_consumer;
 
@@ -292,8 +300,17 @@ static void poselib_blend_set_factor(PoseBlendData *pbd, const float new_factor)
 #ifdef BLEND_FACTOR_BY_WAVING_MOUSE_AROUND
 static void poselib_slide_mouse_update_blendfactor(PoseBlendData *pbd, const wmEvent *event)
 {
-  const float new_factor = (event->x - pbd->area->v1->vec.x) / ((float)pbd->area->winx);
-  poselib_blend_set_factor(pbd, new_factor);
+  if (pbd->release_confirm_info.use_release_confirm) {
+    /* Release confirm calculates factor based on where the dragging was started from. */
+    const float range = 300 * U.pixelsize;
+    const float new_factor = ((event->x - pbd->release_confirm_info.drag_start_xy[0]) / range) +
+                             0.5f;
+    poselib_blend_set_factor(pbd, new_factor);
+  }
+  else {
+    const float new_factor = (event->x - pbd->area->v1->vec.x) / ((float)pbd->area->winx);
+    poselib_blend_set_factor(pbd, new_factor);
+  }
 }
 #else
 static void poselib_blend_step_factor(PoseBlendData *pbd,
@@ -317,6 +334,13 @@ static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const
     return OPERATOR_RUNNING_MODAL;
   }
 #endif
+
+  /* Handle the release confirm event directly, it has priority over others. */
+  if (pbd->release_confirm_info.use_release_confirm &&
+      (event->type == pbd->release_confirm_info.init_event_type) && (event->val == KM_RELEASE)) {
+    pbd->state = POSE_BLEND_CONFIRM;
+    return OPERATOR_RUNNING_MODAL;
+  }
 
   /* only accept 'press' event, and ignore 'release', so that we don't get double actions */
   if (ELEM(event->val, KM_PRESS, KM_NOTHING) == 0) {
@@ -382,6 +406,18 @@ static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const
   return OPERATOR_RUNNING_MODAL;
 }
 
+static void poselib_blend_cursor_update(bContext *C, wmOperator *op)
+{
+  PoseBlendData *pbd = op->customdata;
+
+  /* Ensure cursor-grab (continuous grabbing) is enabled when using release-confirm. */
+  if (pbd->release_confirm_info.use_release_confirm &&
+      !pbd->release_confirm_info.cursor_wrap_enabled) {
+    WM_cursor_grab_enable(CTX_wm_window(C), WM_CURSOR_WRAP_XY, true, NULL);
+    pbd->release_confirm_info.cursor_wrap_enabled = true;
+  }
+}
+
 /* ---------------------------- */
 
 /* Get object that Pose Lib should be found on */
@@ -424,7 +460,7 @@ static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
 }
 
 /* Return true on success, false if the context isn't suitable. */
-static bool poselib_blend_init_data(bContext *C, wmOperator *op)
+static bool poselib_blend_init_data(bContext *C, wmOperator *op, const wmEvent *event)
 {
   op->customdata = NULL;
 
@@ -463,6 +499,24 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
   pbd->state = POSE_BLEND_INIT;
   pbd->needs_redraw = true;
   pbd->blend_factor = RNA_float_get(op->ptr, "blend_factor");
+  /* Just to avoid a clang-analyzer warning (false positive), it's set properly below. */
+  pbd->release_confirm_info.use_release_confirm = false;
+
+  /* Release confirm data. Only available if there's an event to work with. */
+  if (event != NULL) {
+    PropertyRNA *release_confirm_prop = RNA_struct_find_property(op->ptr, "release_confirm");
+    pbd->release_confirm_info.use_release_confirm = (release_confirm_prop != NULL) &&
+                                                    RNA_property_boolean_get(op->ptr,
+                                                                             release_confirm_prop);
+  }
+
+  if (pbd->release_confirm_info.use_release_confirm) {
+    BLI_assert(event != NULL);
+    pbd->release_confirm_info.drag_start_xy[0] = event->x;
+    pbd->release_confirm_info.drag_start_xy[1] = event->y;
+    pbd->release_confirm_info.init_event_type = WM_userdef_event_type_from_keymap_type(
+        event->type);
+  }
 
   /* Make backups for blending and restoring the pose. */
   poselib_backup_posecopy(pbd);
@@ -477,6 +531,7 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
 static void poselib_blend_cleanup(bContext *C, wmOperator *op)
 {
   PoseBlendData *pbd = op->customdata;
+  wmWindow *win = CTX_wm_window(C);
 
   /* Redraw the header so that it doesn't show any of our stuff anymore. */
   ED_area_status_text(pbd->area, NULL);
@@ -508,8 +563,15 @@ static void poselib_blend_cleanup(bContext *C, wmOperator *op)
       break;
   }
 
+  if (pbd->release_confirm_info.cursor_wrap_enabled) {
+    WM_cursor_grab_disable(win, pbd->release_confirm_info.drag_start_xy);
+    pbd->release_confirm_info.cursor_wrap_enabled = false;
+  }
+
   DEG_id_tag_update(&pbd->ob->id, ID_RECALC_GEOMETRY);
   WM_event_add_notifier(C, NC_OBJECT | ND_POSE, pbd->ob);
+  /* Update mouse-hover highlights. */
+  WM_event_add_mousemove(win);
 }
 
 static void poselib_blend_free(wmOperator *op)
@@ -523,6 +585,8 @@ static void poselib_blend_free(wmOperator *op)
   if (pbd->free_action) {
     BKE_id_free(NULL, pbd->act);
   }
+  /* Must have been dealt with before! */
+  BLI_assert(pbd->release_confirm_info.cursor_wrap_enabled == false);
 
   /* Free temp data for operator */
   poselib_backup_free_data(pbd);
@@ -556,6 +620,8 @@ static int poselib_blend_modal(bContext *C, wmOperator *op, const wmEvent *event
 {
   const int operator_result = poselib_blend_handle_event(C, op, event);
 
+  poselib_blend_cursor_update(C, op);
+
   const PoseBlendData *pbd = op->customdata;
   if (ELEM(pbd->state, POSE_BLEND_CONFIRM, POSE_BLEND_CANCEL)) {
     return poselib_blend_exit(C, op);
@@ -569,9 +635,9 @@ static int poselib_blend_modal(bContext *C, wmOperator *op, const wmEvent *event
 }
 
 /* Modal Operator init. */
-static int poselib_blend_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int poselib_blend_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (!poselib_blend_init_data(C, op)) {
+  if (!poselib_blend_init_data(C, op, event)) {
     poselib_blend_free(op);
     return OPERATOR_CANCELLED;
   }
@@ -586,7 +652,7 @@ static int poselib_blend_invoke(bContext *C, wmOperator *op, const wmEvent *UNUS
 /* Single-shot apply. */
 static int poselib_blend_exec(bContext *C, wmOperator *op)
 {
-  if (!poselib_blend_init_data(C, op)) {
+  if (!poselib_blend_init_data(C, op, NULL)) {
     poselib_blend_free(op);
     return OPERATOR_CANCELLED;
   }
@@ -653,6 +719,8 @@ void POSELIB_OT_apply_pose_asset(wmOperatorType *ot)
 
 void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
 {
+  PropertyRNA *prop;
+
   /* Identifiers: */
   ot->name = "Blend Pose Library Pose";
   ot->idname = "POSELIB_OT_blend_pose_asset";
@@ -683,4 +751,10 @@ void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
                   false,
                   "Apply Flipped",
                   "When enabled, applies the pose flipped over the X-axis");
+  prop = RNA_def_boolean(ot->srna,
+                         "release_confirm",
+                         false,
+                         "Confirm on Release",
+                         "Always confirm operation when releasing button");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }

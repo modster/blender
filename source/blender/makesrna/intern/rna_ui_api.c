@@ -1798,7 +1798,7 @@ void RNA_api_ui_layout(StructRNA *srna)
       "activate_operator_properties",
       "OperatorProperties",
       "",
-      "Operator properties to fill in for the custom activate operator passed above");
+      "Operator properties to fill in for the custom activate operator passed to the template");
   RNA_def_parameter_flags(parm, 0, PARM_RNAPTR);
   RNA_def_function_output(func, parm);
   RNA_def_string(func,
@@ -1814,7 +1814,7 @@ void RNA_api_ui_layout(StructRNA *srna)
       "drag_operator_properties",
       "OperatorProperties",
       "",
-      "Operator properties to fill in for the custom drag operator passed above");
+      "Operator properties to fill in for the custom drag operator passed to the template");
   RNA_def_parameter_flags(parm, 0, PARM_RNAPTR);
   RNA_def_function_output(func, parm);
 }
