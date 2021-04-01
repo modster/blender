@@ -89,15 +89,6 @@ bool GeometryComponent::is_mutable() const
   return users_ <= 1;
 }
 
-bool GeometryComponent::owns_non_instance_data() const
-{
-  return false;
-}
-
-void GeometryComponent::ensure_own_non_instances()
-{
-}
-
 GeometryComponentType GeometryComponent::type() const
 {
   return type_;
@@ -220,13 +211,15 @@ void GeometrySet::clear()
   components_.clear();
 }
 
-void GeometrySet::ensure_own_non_instances()
+/* Make sure that the geometry can be cached. This does not ensure ownership of object/collection
+ * instances. */
+void GeometrySet::ensure_owns_direct_data()
 {
   for (GeometryComponentType type : components_.keys()) {
     const GeometryComponent *component = this->get_component_for_read(type);
-    if (!component->owns_non_instance_data()) {
+    if (!component->owns_direct_data()) {
       GeometryComponent &component_for_write = this->get_component_for_write(type);
-      component_for_write.ensure_own_non_instances();
+      component_for_write.ensure_owns_direct_data();
     }
   }
 }

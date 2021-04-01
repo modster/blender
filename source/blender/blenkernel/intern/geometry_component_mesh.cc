@@ -157,12 +157,12 @@ bool MeshComponent::is_empty() const
   return mesh_ == nullptr;
 }
 
-bool MeshComponent::owns_non_instance_data() const
+bool MeshComponent::owns_direct_data() const
 {
   return ownership_ == GeometryOwnershipType::Owned;
 }
 
-void MeshComponent::ensure_own_non_instances()
+void MeshComponent::ensure_owns_direct_data()
 {
   BLI_assert(this->is_mutable());
   if (ownership_ != GeometryOwnershipType::Owned) {

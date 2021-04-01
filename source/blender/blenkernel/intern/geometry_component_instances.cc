@@ -108,6 +108,16 @@ bool InstancesComponent::is_empty() const
   return transforms_.size() == 0;
 }
 
+bool InstancesComponent::owns_direct_data() const
+{
+  return true;
+}
+
+void InstancesComponent::ensure_owns_direct_data()
+{
+  BLI_assert(this->is_mutable());
+}
+
 static blender::Array<int> generate_unique_instance_ids(Span<int> original_ids)
 {
   using namespace blender;

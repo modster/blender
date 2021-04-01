@@ -141,9 +141,11 @@ class GeometryComponent {
   /* The returned component should be of the same type as the type this is called on. */
   virtual GeometryComponent *copy() const = 0;
 
-  /* TODO: Make pure virtual. */
-  virtual bool owns_non_instance_data() const;
-  virtual void ensure_own_non_instances();
+  /* Direct data is everything except for instances of objects/collections.
+   * If this returns true, the geometry set can be cached and is still valid after e.g. modifier
+   * evaluation ends. Instances can only be valid as long as the data they instance is valid. */
+  virtual bool owns_direct_data() const = 0;
+  virtual void ensure_owns_direct_data() = 0;
 
   void user_add() const;
   void user_remove() const;
@@ -319,7 +321,7 @@ struct GeometrySet {
 
   void clear();
 
-  void ensure_own_non_instances();
+  void ensure_owns_direct_data();
 
   /* Utility methods for creation. */
   static GeometrySet create_with_mesh(
@@ -380,8 +382,8 @@ class MeshComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
-  bool owns_non_instance_data() const override;
-  void ensure_own_non_instances() override;
+  virtual bool owns_direct_data() const override;
+  virtual void ensure_owns_direct_data() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_MESH;
 
@@ -413,7 +415,8 @@ class PointCloudComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
-  void ensure_own_non_instances() override;
+  virtual bool owns_direct_data() const override;
+  virtual void ensure_owns_direct_data() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_POINT_CLOUD;
 
@@ -455,6 +458,9 @@ class InstancesComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
+  virtual bool owns_direct_data() const override;
+  virtual void ensure_owns_direct_data() override;
+
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_INSTANCES;
 };
 
@@ -476,6 +482,9 @@ class VolumeComponent : public GeometryComponent {
 
   const Volume *get_for_read() const;
   Volume *get_for_write();
+
+  virtual bool owns_direct_data() const override;
+  virtual void ensure_owns_direct_data() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_VOLUME;
 };

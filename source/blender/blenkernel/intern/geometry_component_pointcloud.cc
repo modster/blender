@@ -107,7 +107,12 @@ bool PointCloudComponent::is_empty() const
   return pointcloud_ == nullptr;
 }
 
-void PointCloudComponent::ensure_own_non_instances()
+bool PointCloudComponent::owns_direct_data() const
+{
+  return ownership_ == GeometryOwnershipType::Owned;
+}
+
+void PointCloudComponent::ensure_owns_direct_data()
 {
   BLI_assert(this->is_mutable());
   if (ownership_ != GeometryOwnershipType::Owned) {
