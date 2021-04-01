@@ -301,7 +301,7 @@ static DNode find_active_node_instance(const SpaceNode &snode, const DerivedNode
 
 class GeometryNodesEvaluator {
  public:
-  using SocketValueFn = std::function<void(DSocket, blender::fn::GPointer)>;
+  using SocketValueFn = std::function<void(DSocket, Span<GPointer>)>;
 
  private:
   blender::LinearAllocator<> allocator_;
@@ -437,7 +437,9 @@ class GeometryNodesEvaluator {
     GValueMap<StringRef> node_inputs_map{allocator_};
     for (const InputSocketRef *input_socket : node->inputs()) {
       if (input_socket->is_available()) {
-        Vector<GMutablePointer> values = this->get_input_values({node.context(), input_socket});
+        DInputSocket dsocket{node.context(), input_socket};
+        Vector<GMutablePointer> values = this->get_input_values(dsocket);
+        this->handle_socket_value(dsocket, values);
         for (int i = 0; i < values.size(); ++i) {
           /* Values from Multi Input Sockets are stored in input map with the format
            * <identifier>[<index>]. */
@@ -492,11 +494,21 @@ class GeometryNodesEvaluator {
     }
   }
 
-  void handle_socket_value(const DSocket socket, blender::fn::GPointer value)
+  void handle_socket_value(const DSocket socket, Span<GPointer> values)
   {
     if (socket_value_fn_) {
-      socket_value_fn_(socket, value);
+      socket_value_fn_(socket, values);
     }
+  }
+
+  void handle_socket_value(const DSocket socket, Span<GMutablePointer> values)
+  {
+    this->handle_socket_value(socket, values.cast<GPointer>());
+  }
+
+  void handle_socket_value(const DSocket socket, GPointer value)
+  {
+    this->handle_socket_value(socket, Span<GPointer>(&value, 1));
   }
 
   void execute_node(const DNode node, GeoNodeExecParams params)
@@ -1195,10 +1207,12 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   Vector<DInputSocket> group_outputs;
   group_outputs.append({root_context, &socket_to_compute});
 
-  auto handle_socket_value = [&](const DSocket socket, const GPointer value) {
-    std::stringstream ss;
-    value.type()->debug_print(value.get(), ss);
-    std::cout << socket->name() << ": " << ss.str() << "\n";
+  auto handle_socket_value = [&](const DSocket socket, const Span<GPointer> values) {
+    for (GPointer value : values) {
+      std::stringstream ss;
+      value.type()->debug_print(value.get(), ss);
+      std::cout << socket->name() << ": " << ss.str() << "\n";
+    }
   };
 
   GeometryNodesEvaluator evaluator{group_inputs,
