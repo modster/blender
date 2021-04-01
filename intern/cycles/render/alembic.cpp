@@ -1245,6 +1245,24 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
 
   if (proc->get_ignore_subdivision()) {
     compute_vertex_deltas(cached_data, times, progress);
+
+    if (progress.get_cancel()) {
+      return;
+    }
+
+    update_shader_attributes(proc, cached_data, schema.getArbGeomParams(), progress);
+
+    if (progress.get_cancel()) {
+      return;
+    }
+
+    const IV2fGeomParam &uvs = schema.getUVsParam();
+    if (uvs.valid()) {
+      add_uvs(proc, uvs, cached_data, progress);
+    }
+  }
+  else {
+    // todo(@kevindietrich) compute UVs
   }
 
   /* TODO(@kevindietrich) : attributes, need test files */
