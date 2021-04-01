@@ -29,6 +29,7 @@
 #include "DNA_anim_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_cachefile_types.h"
+#include "DNA_camera_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_fluid_types.h"
@@ -1921,6 +1922,18 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
       LISTBASE_FOREACH (Light *, light, &bmain->lights) {
         light->diff_fac = 1.0f;
         light->volume_fac = 1.0f;
+      }
+    }
+
+    if (!DNA_struct_elem_find(fd->filesdna, "Camera", "float", "fisheye_fov")) {
+      LISTBASE_FOREACH (Camera *, camera, &bmain->cameras) {
+        camera->panorama_type = CAM_PANO_FISHEYE_EQUISOLID;
+        camera->fisheye_fov = DEG2RADF(180.0f);
+        camera->fisheye_lens = 10.5f;
+        camera->latitude_min = DEG2RADF(-90.0f);
+        camera->latitude_max = DEG2RADF(90.0f);
+        camera->longitude_min = DEG2RADF(-180.0f);
+        camera->longitude_max = DEG2RADF(180.0f);
       }
     }
   }

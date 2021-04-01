@@ -52,6 +52,13 @@
     .drawsize = 1.0f, \
     .ortho_scale = 6.0, \
     .flag = CAM_SHOWPASSEPARTOUT, \
+    .panorama_type = CAM_PANO_FISHEYE_EQUISOLID, \
+    .fisheye_fov = DEG2RADF(180.0f), \
+    .fisheye_lens = 10.5f, \
+    .latitude_min = DEG2RADF(-90.0f), \
+    .latitude_max = DEG2RADF(90.0f), \
+    .longitude_min = DEG2RADF(-180.0f), \
+    .longitude_max = DEG2RADF(180.0f), \
     .passepartalpha = 0.5f, \
  \
     .dof = _DNA_DEFAULT_CameraDOFSettings, \

@@ -110,7 +110,21 @@ class DATA_PT_lens(CameraButtonsPanel, Panel):
                     sub = col.column(align=True)
                     sub.prop(ccam, "longitude_min", text="Longitude Min")
                     sub.prop(ccam, "longitude_max", text="Max")
-            elif engine in {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}:
+            elif engine == 'BLENDER_EEVEE':
+                col.prop(cam, "panorama_type")
+                if cam.panorama_type == 'FISHEYE_EQUIDISTANT':
+                    col.prop(cam, "fisheye_fov")
+                elif cam.panorama_type == 'FISHEYE_EQUISOLID':
+                    col.prop(cam, "fisheye_lens", text="Lens")
+                    col.prop(cam, "fisheye_fov")
+                elif cam.panorama_type == 'EQUIRECTANGULAR':
+                    sub = col.column(align=True)
+                    sub.prop(cam, "latitude_min", text="Latitude Min")
+                    sub.prop(cam, "latitude_max", text="Max")
+                    sub = col.column(align=True)
+                    sub.prop(cam, "longitude_min", text="Longitude Min")
+                    sub.prop(cam, "longitude_max", text="Max")
+            elif engine in {'BLENDER_RENDER', 'BLENDER_WORKBENCH'}:
                 if cam.lens_unit == 'MILLIMETERS':
                     col.prop(cam, "lens")
                 elif cam.lens_unit == 'FOV':

@@ -513,6 +513,25 @@ void RNA_def_camera(BlenderRNA *brna)
       {CAMERA_SENSOR_FIT_VERT, "VERTICAL", 0, "Vertical", "Fit to the sensor height"},
       {0, NULL, 0, NULL, NULL},
   };
+  static const EnumPropertyItem panorama_type_items[] = {
+      {CAM_PANO_EQUIRECTANGULAR,
+       "EQUIRECTANGULAR",
+       0,
+       "Equirectangular",
+       "Render the scene with a spherical camera, also known as Lat Long panorama"},
+      {CAM_PANO_FISHEYE_EQUIDISTANT,
+       "FISHEYE_EQUIDISTANT",
+       0,
+       "Fisheye Equidistant",
+       "Ideal for fulldomes, ignore the sensor dimensions"},
+      {CAM_PANO_FISHEYE_EQUISOLID,
+       "FISHEYE_EQUISOLID",
+       0,
+       "Fisheye Equisolid",
+       "Similar to most fisheye modern lens, takes sensor dimensions into consideration"},
+      {CAM_PANO_MIRRORBALL, "MIRRORBALL", 0, "Mirror Ball", "Uses the mirror ball mapping"},
+      {0, NULL, 0, NULL, NULL},
+  };
 
   srna = RNA_def_struct(brna, "Camera", "ID");
   RNA_def_struct_ui_text(srna, "Camera", "Camera data-block for storing camera settings");
@@ -524,6 +543,11 @@ void RNA_def_camera(BlenderRNA *brna)
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, prop_type_items);
   RNA_def_property_ui_text(prop, "Type", "Camera types");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
+
+  prop = RNA_def_property(srna, "panorama_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, panorama_type_items);
+  RNA_def_property_ui_text(prop, "Panorama Type", "Distortion to use for the calculation");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
 
   prop = RNA_def_property(srna, "sensor_fit", PROP_ENUM, PROP_NONE);
@@ -579,6 +603,42 @@ void RNA_def_camera(BlenderRNA *brna)
   RNA_def_property_range(prop, 1.0f, FLT_MAX);
   RNA_def_property_ui_range(prop, 1.0f, 5000.0f, 100, 4);
   RNA_def_property_ui_text(prop, "Focal Length", "Perspective Camera lens value in millimeters");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
+
+  prop = RNA_def_property(srna, "fisheye_fov", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_range(prop, 0.1745f, DEG2RAD(360.0f));
+  RNA_def_property_ui_range(prop, 0.1745f, DEG2RAD(360.0f * 5.0f), 10, 3);
+  RNA_def_property_ui_text(prop, "Field of View", "Field of view for the fisheye lens");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
+
+  prop = RNA_def_property(srna, "fisheye_lens", PROP_FLOAT, PROP_DISTANCE_CAMERA);
+  RNA_def_property_range(prop, 0.01f, 100.0f);
+  RNA_def_property_ui_range(prop, 0.01f, 15.0f, 100, 4);
+  RNA_def_property_ui_text(prop, "Fisheye Lens", "Lens focal length (mm)");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
+
+  prop = RNA_def_property(srna, "latitude_min", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_range(prop, DEG2RAD(-90.0f), DEG2RAD(90.0f));
+  RNA_def_property_ui_text(
+      prop, "Min Latitude", "Minimum latitude (vertical angle) for the equirectangular lens");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
+
+  prop = RNA_def_property(srna, "latitude_max", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_range(prop, DEG2RAD(-90.0f), DEG2RAD(90.0f));
+  RNA_def_property_ui_text(
+      prop, "Max Latitude", "Maximum latitude (vertical angle) for the equirectangular lens");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
+
+  prop = RNA_def_property(srna, "longitude_min", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_range(prop, DEG2RAD(-180.0f), DEG2RAD(180.0f));
+  RNA_def_property_ui_text(
+      prop, "Min Longitude", "Minimum longitude (horizontal angle) for the equirectangular lens");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
+
+  prop = RNA_def_property(srna, "longitude_max", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_range(prop, DEG2RAD(-180.0f), DEG2RAD(180.0f));
+  RNA_def_property_ui_text(
+      prop, "Max Longitude", "Maximum longitude (horizontal angle) for the equirectangular lens");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Camera_update");
 
   prop = RNA_def_property(srna, "sensor_width", PROP_FLOAT, PROP_DISTANCE_CAMERA);

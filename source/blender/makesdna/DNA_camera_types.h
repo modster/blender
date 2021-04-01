@@ -116,7 +116,15 @@ typedef struct Camera {
   struct ListBase bg_images;
 
   char sensor_fit;
-  char _pad[7];
+  char panorama_type;
+  char _pad[6];
+  /** Panoramic properties. */
+  float fisheye_fov;
+  float fisheye_lens;
+  float latitude_min;
+  float latitude_max;
+  float longitude_min;
+  float longitude_max;
 
   /* Stereo settings */
   struct CameraStereoSettings stereo;
@@ -132,6 +140,14 @@ enum {
   CAM_PERSP = 0,
   CAM_ORTHO = 1,
   CAM_PANO = 2,
+};
+
+/* panorama_type */
+enum {
+  CAM_PANO_EQUIRECTANGULAR = 0,
+  CAM_PANO_FISHEYE_EQUIDISTANT = 1,
+  CAM_PANO_FISHEYE_EQUISOLID = 2,
+  CAM_PANO_MIRRORBALL = 3,
 };
 
 /* dtx */
