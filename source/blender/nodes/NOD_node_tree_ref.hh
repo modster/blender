@@ -85,6 +85,8 @@ class SocketRef : NonCopyable, NonMovable {
   /* These sockets are linked when reroutes, muted links and muted nodes have been taken into
    * account. */
   MutableSpan<const SocketRef *> logically_linked_sockets_;
+  /* These are the sockets that have been skipped when searching for logicaly linked sockets. That
+   * includes for example the input and output socket of an intermediate reroute node. */
   MutableSpan<const SocketRef *> logically_linked_skipped_sockets_;
 
   friend NodeTreeRef;
@@ -136,6 +138,7 @@ class InputSocketRef final : public SocketRef {
   bool is_multi_input_socket() const;
 
   void foreach_logical_origin(FunctionRef<void(const OutputSocketRef &)> callback,
+                              FunctionRef<void(const SocketRef &)> skipped_callback,
                               bool only_follow_first_input_link = false) const;
 };
 
