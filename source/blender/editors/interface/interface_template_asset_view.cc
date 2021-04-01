@@ -140,6 +140,7 @@ static uiListType *UI_UL_asset_view()
   return list_type;
 }
 
+/* TODO move to a proper place. */
 void ED_uilisttypes_ui()
 {
   WM_uilisttype_add(UI_UL_asset_view());

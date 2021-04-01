@@ -550,6 +550,8 @@ bool UI_block_is_empty_ex(const uiBlock *block, const bool skip_title);
 bool UI_block_is_empty(const uiBlock *block);
 bool UI_block_can_add_separator(const uiBlock *block);
 
+struct uiList *UI_list_find_mouse_over(struct ARegion *region, const struct wmEvent *event);
+
 /* interface_region_menu_popup.c */
 /**
  * Popup Menus

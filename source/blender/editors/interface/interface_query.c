@@ -265,11 +265,8 @@ bool ui_but_contains_point_px_icon(const uiBut *but, ARegion *region, const wmEv
 }
 
 /* x and y are only used in case event is NULL... */
-uiBut *ui_but_find_mouse_over_ex(const ARegion *region,
-                                 const int x,
-                                 const int y,
-                                 const bool labeledit,
-                                 uiButFindPoll find_poll)
+uiBut *ui_but_find_mouse_over_ex(
+    const ARegion *region, const int x, const int y, const bool labeledit, uiButFindPoll find_poll)
 {
   uiBut *butover = NULL;
 
@@ -374,6 +371,26 @@ uiBut *ui_list_find_mouse_over_ex(ARegion *region, int x, int y)
 uiBut *ui_list_find_mouse_over(ARegion *region, const wmEvent *event)
 {
   return ui_list_find_mouse_over_ex(region, event->x, event->y);
+}
+
+uiList *UI_list_find_mouse_over(ARegion *region, const wmEvent *event)
+{
+  uiBut *list_but = ui_list_find_mouse_over(region, event);
+  if (!list_but) {
+    return NULL;
+  }
+
+  return list_but->custom_data;
+}
+
+static bool ui_but_is_listrow(const uiBut *but)
+{
+  return but->type == UI_BTYPE_LISTROW;
+}
+
+uiBut *ui_list_row_find_mouse_over(const ARegion *region, const int x, const int y)
+{
+  return ui_but_find_mouse_over_ex(region, x, y, false, ui_but_is_listrow);
 }
 
 /** \} */

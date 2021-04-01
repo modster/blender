@@ -6214,17 +6214,16 @@ static uiList *ui_list_ensure(bContext *C,
     region = CTX_wm_region(C);
   }
 
-  char ui_list_id[UI_MAX_NAME_STR];
   /* Find or add the uiList to the current Region. */
-  /* We tag the list id with the list type... */
-  BLI_snprintf(
-      ui_list_id, sizeof(ui_list_id), "%s_%s", ui_list_type->idname, list_id ? list_id : "");
 
-  uiList *ui_list = BLI_findstring(&region->ui_lists, ui_list_id, offsetof(uiList, list_id));
+  char full_list_id[UI_MAX_NAME_STR];
+  WM_uilisttype_to_full_list_id(ui_list_type, list_id, full_list_id);
+
+  uiList *ui_list = BLI_findstring(&region->ui_lists, full_list_id, offsetof(uiList, list_id));
 
   if (!ui_list) {
     ui_list = MEM_callocN(sizeof(uiList), "uiList");
-    BLI_strncpy(ui_list->list_id, ui_list_id, sizeof(ui_list->list_id));
+    BLI_strncpy(ui_list->list_id, full_list_id, sizeof(ui_list->list_id));
     BLI_addtail(&region->ui_lists, ui_list);
     ui_list->list_grip = -UI_LIST_AUTO_SIZE_THRESHOLD; /* Force auto size by default. */
     if (sort_reverse) {

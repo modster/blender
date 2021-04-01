@@ -1117,6 +1117,9 @@ bool ui_but_contains_point_px(const uiBut *but, const struct ARegion *region, in
 
 uiBut *ui_list_find_mouse_over(struct ARegion *region,
                                const struct wmEvent *event) ATTR_WARN_UNUSED_RESULT;
+uiBut *ui_list_row_find_mouse_over(const struct ARegion *region,
+                                   int x,
+                                   int y) ATTR_WARN_UNUSED_RESULT;
 
 typedef bool (*uiButFindPoll)(const uiBut *but);
 uiBut *ui_but_find_mouse_over_ex(const struct ARegion *region,
@@ -1168,7 +1171,7 @@ struct ARegion *ui_screen_region_find_mouse_over(struct bScreen *screen,
                                                  const struct wmEvent *event);
 
 /* interface_context_menu.c */
-bool ui_popup_context_menu_for_button(struct bContext *C, uiBut *but);
+bool ui_popup_context_menu_for_button(struct bContext *C, uiBut *but, const struct wmEvent *event);
 void ui_popup_context_menu_for_panel(struct bContext *C,
                                      struct ARegion *region,
                                      struct Panel *panel);

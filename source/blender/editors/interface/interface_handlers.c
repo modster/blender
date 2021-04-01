@@ -7668,7 +7668,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
     if ((event->type == RIGHTMOUSE) && !IS_EVENT_MOD(event, shift, ctrl, alt, oskey) &&
         (event->val == KM_PRESS)) {
       /* RMB has two options now */
-      if (ui_popup_context_menu_for_button(C, but)) {
+      if (ui_popup_context_menu_for_button(C, but, event)) {
         return WM_UI_HANDLER_BREAK;
       }
     }
@@ -9082,11 +9082,6 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
   return retval;
 }
 
-static bool ui_but_is_listrow(const uiBut *but)
-{
-  return but->type == UI_BTYPE_LISTROW;
-}
-
 /**
  * Activate the underlying list-row button, so the row is highlighted.
  * Early exits if \a activate_dragging is true, but the custom drag operator fails to execute.
@@ -9112,8 +9107,7 @@ static int ui_list_activate_hovered_row(bContext *C,
   }
 
   const int *mouse_xy = ISTWEAK(event->type) ? &event->prevclickx : &event->x;
-  uiBut *listrow = ui_but_find_mouse_over_ex(
-      region, mouse_xy[0], mouse_xy[1], false, ui_but_is_listrow);
+  uiBut *listrow = ui_list_row_find_mouse_over(region, mouse_xy[0], mouse_xy[1]);
   if (listrow) {
     wmOperatorType *custom_activate_optype = ui_list->dyn_data->custom_activate_optype;
 
