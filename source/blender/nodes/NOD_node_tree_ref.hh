@@ -81,10 +81,10 @@ class SocketRef : NonCopyable, NonMovable {
   Vector<LinkRef *> directly_linked_links_;
 
   /* These sockets are linked directly, i.e. with a single link in between. */
-  MutableSpan<SocketRef *> directly_linked_sockets_;
+  MutableSpan<const SocketRef *> directly_linked_sockets_;
   /* These sockets are linked when reroutes, muted links and muted nodes have been taken into
    * account. */
-  MutableSpan<SocketRef *> logically_linked_sockets_;
+  MutableSpan<const SocketRef *> logically_linked_sockets_;
 
   friend NodeTreeRef;
 
@@ -132,12 +132,19 @@ class InputSocketRef final : public SocketRef {
   Span<const OutputSocketRef *> directly_linked_sockets() const;
 
   bool is_multi_input_socket() const;
+
+  void foreach_logical_origin(const InputSocketRef &socket,
+                              FunctionRef<void(const OutputSocketRef &)> callback,
+                              bool only_follow_first_input_link = false) const;
 };
 
 class OutputSocketRef final : public SocketRef {
  public:
   Span<const InputSocketRef *> logically_linked_sockets() const;
   Span<const InputSocketRef *> directly_linked_sockets() const;
+
+  void foreach_logical_target(const OutputSocketRef &socket,
+                              FunctionRef<void(const InputSocketRef &)> callback) const;
 };
 
 class NodeRef : NonCopyable, NonMovable {
@@ -257,12 +264,6 @@ class NodeTreeRef : NonCopyable, NonMovable {
                                       bNodeSocket *bsocket);
 
   void create_linked_socket_caches();
-
-  void foreach_logical_origin(InputSocketRef &socket,
-                              FunctionRef<void(OutputSocketRef &)> callback,
-                              bool only_follow_first_input_link = false);
-  void foreach_logical_target(OutputSocketRef &socket,
-                              FunctionRef<void(InputSocketRef &)> callback);
 };
 
 using NodeTreeRefMap = Map<bNodeTree *, std::unique_ptr<const NodeTreeRef>>;
