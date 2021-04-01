@@ -141,7 +141,13 @@ template<typename Ret, typename... Params> class FunctionRef<Ret(Params...)> {
   }
 
   using OptionalReturnValue = std::conditional_t<std::is_void_v<Ret>, void, std::optional<Ret>>;
-  OptionalReturnValue call_if_available(Params... params) const
+
+  /**
+   * Calls the referenced function if it is available.
+   * The return value is of type `std::optional<Ret>` if `Ret` is not `void`.
+   * Otherwise the function returns void.
+   */
+  OptionalReturnValue call_safe(Params... params) const
   {
     if constexpr (std::is_void_v<Ret>) {
       if (callback_ == nullptr) {

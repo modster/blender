@@ -231,16 +231,16 @@ void InputSocketRef::foreach_logical_origin(FunctionRef<void(const OutputSocketR
     if (origin_node.is_reroute_node()) {
       const InputSocketRef &reroute_input = origin_node.input(0);
       const OutputSocketRef &reroute_output = origin_node.output(0);
-      skipped_callback.call_if_available(reroute_input);
-      skipped_callback.call_if_available(reroute_output);
+      skipped_callback.call_safe(reroute_input);
+      skipped_callback.call_safe(reroute_output);
       reroute_input.foreach_logical_origin(callback, skipped_callback, false);
     }
     else if (origin_node.is_muted()) {
       for (const InternalLinkRef *internal_link : origin_node.internal_links()) {
         if (&internal_link->to() == &origin) {
           const InputSocketRef &mute_input = internal_link->from();
-          skipped_callback.call_if_available(origin);
-          skipped_callback.call_if_available(mute_input);
+          skipped_callback.call_safe(origin);
+          skipped_callback.call_safe(mute_input);
           mute_input.foreach_logical_origin(callback, skipped_callback, true);
           break;
         }
@@ -264,17 +264,17 @@ void OutputSocketRef::foreach_logical_target(
     const NodeRef &target_node = target.node();
     if (target_node.is_reroute_node()) {
       const OutputSocketRef &reroute_output = target_node.output(0);
-      skipped_callback.call_if_available(target);
-      skipped_callback.call_if_available(reroute_output);
+      skipped_callback.call_safe(target);
+      skipped_callback.call_safe(reroute_output);
       reroute_output.foreach_logical_target(callback, skipped_callback);
     }
     else if (target_node.is_muted()) {
-      skipped_callback.call_if_available(target);
+      skipped_callback.call_safe(target);
       for (const InternalLinkRef *internal_link : target_node.internal_links()) {
         if (&internal_link->from() == &target) {
           const OutputSocketRef &mute_output = internal_link->to();
-          skipped_callback.call_if_available(target);
-          skipped_callback.call_if_available(mute_output);
+          skipped_callback.call_safe(target);
+          skipped_callback.call_safe(mute_output);
           mute_output.foreach_logical_target(callback, skipped_callback);
         }
       }
