@@ -886,6 +886,11 @@ typedef enum eGP_DrawMode {
 /* True if the stroke is of type POLY */
 #define GPENCIL_STROKE_TYPE_POLY(gps) ((gps) && ((gps)->editcurve == NULL))
 
+/* True if the stroke type of gps_a and gps_b is equal. */
+#define GPENCIL_STROKE_TYPE_EQ(gps_a, gps_b) \
+  ((GPENCIL_STROKE_TYPE_BEZIER(gps_a) && GPENCIL_STROKE_TYPE_BEZIER(gps_b)) || \
+   (GPENCIL_STROKE_TYPE_POLY(gps_a) && GPENCIL_STROKE_TYPE_POLY(gps_b)))
+
 #ifdef __cplusplus
 }
 #endif

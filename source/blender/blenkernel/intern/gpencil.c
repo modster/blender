@@ -186,6 +186,7 @@ static void greasepencil_blend_write(BlendWriter *writer, ID *id, const void *id
             BLO_write_struct(writer, bGPDcurve, gpc);
             BLO_write_struct_array(
                 writer, bGPDcurve_point, gpc->tot_curve_points, gpc->curve_points);
+            BKE_defvert_blend_write(writer, gpc->tot_curve_points, gpc->dvert);
           }
         }
       }
@@ -259,6 +260,11 @@ void BKE_gpencil_blend_read_data(BlendDataReader *reader, bGPdata *gpd)
         if (gps->editcurve != NULL) {
           /* relink curve point array */
           BLO_read_data_address(reader, &gps->editcurve->curve_points);
+          if (gps->editcurve->dvert != NULL) {
+            BLO_read_data_address(reader, &gps->editcurve->dvert);
+            BKE_defvert_blend_read(
+                reader, gps->editcurve->tot_curve_points, gps->editcurve->dvert);
+          }
         }
 
         /* relink weight data */
@@ -373,6 +379,16 @@ void BKE_gpencil_free_stroke_weights(bGPDstroke *gps)
     return;
   }
 
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    bGPDcurve *gpc = gps->editcurve;
+    if (gpc->dvert != NULL) {
+      for (int i = 0; i < gpc->tot_curve_points; i++) {
+        MDeformVert *dvert = &gpc->dvert[i];
+        BKE_gpencil_free_point_weights(dvert);
+      }
+    }
+  }
+
   if (gps->dvert == NULL) {
     return;
   }
@@ -407,8 +423,9 @@ void BKE_gpencil_free_stroke(bGPDstroke *gps)
   if (gps->points) {
     MEM_freeN(gps->points);
   }
+
+  BKE_gpencil_free_stroke_weights(gps);
   if (gps->dvert) {
-    BKE_gpencil_free_stroke_weights(gps);
     MEM_freeN(gps->dvert);
   }
   if (gps->triangles) {
@@ -934,6 +951,16 @@ void BKE_gpencil_stroke_weights_duplicate(bGPDstroke *gps_src, bGPDstroke *gps_d
   BKE_defvert_array_copy(gps_dst->dvert, gps_src->dvert, gps_src->totpoints);
 }
 
+void BKE_gpencil_editcurve_weights_duplicate(bGPDcurve *gpc_src, bGPDcurve *gpc_dst)
+{
+  if (gpc_src == NULL) {
+    return;
+  }
+  BLI_assert(gpc_src->tot_curve_points == gpc_dst->tot_curve_points);
+
+  BKE_defvert_array_copy(gpc_dst->dvert, gpc_src->dvert, gpc_src->tot_curve_points);
+}
+
 /* Make a copy of a given gpencil stroke editcurve */
 bGPDcurve *BKE_gpencil_stroke_curve_duplicate(bGPDcurve *gpc_src)
 {
@@ -941,6 +968,14 @@ bGPDcurve *BKE_gpencil_stroke_curve_duplicate(bGPDcurve *gpc_src)
 
   if (gpc_src->curve_points != NULL) {
     gpc_dst->curve_points = MEM_dupallocN(gpc_src->curve_points);
+  }
+
+  if (gpc_src->dvert != NULL) {
+    gpc_dst->dvert = MEM_dupallocN(gpc_src->dvert);
+    BKE_gpencil_editcurve_weights_duplicate(gpc_src, gpc_dst);
+  }
+  else {
+    gpc_dst->dvert = NULL;
   }
 
   return gpc_dst;
@@ -1228,14 +1263,7 @@ void BKE_gpencil_frame_delete_laststroke(bGPDlayer *gpl, bGPDframe *gpf)
   }
 
   /* free the stroke and its data */
-  if (gps->points) {
-    MEM_freeN(gps->points);
-  }
-  if (gps->dvert) {
-    BKE_gpencil_free_stroke_weights(gps);
-    MEM_freeN(gps->dvert);
-  }
-  MEM_freeN(gps->triangles);
+  BKE_gpencil_free_stroke(gps);
   BLI_freelinkN(&gpf->strokes, gps);
 
   /* if frame has no strokes after this, delete it */
@@ -2013,6 +2041,26 @@ bool BKE_gpencil_stroke_select_check(const bGPDstroke *gps)
 /* ************************************************** */
 /* GP Object - Vertex Groups */
 
+/* Helper to remove a dvert from a group. */
+static void gpencil_remove_dvert_ex(MDeformVert *dvert, const int def_nr, const int tot_groups)
+{
+  if (dvert == NULL) {
+    return;
+  }
+
+  MDeformWeight *dw = BKE_defvert_find_index(dvert, def_nr);
+  if (dw != NULL) {
+    BKE_defvert_remove_group(dvert, dw);
+  }
+  /* Reorganize weights for other groups after deleted one. */
+  for (int g = 0; g < tot_groups; g++) {
+    dw = BKE_defvert_find_index(dvert, g);
+    if ((dw != NULL) && (dw->def_nr > def_nr)) {
+      dw->def_nr--;
+    }
+  }
+}
+
 /**
  * Remove a vertex group.
  * \param ob: Grease pencil object
@@ -2021,7 +2069,6 @@ bool BKE_gpencil_stroke_select_check(const bGPDstroke *gps)
 void BKE_gpencil_vgroup_remove(Object *ob, bDeformGroup *defgroup)
 {
   bGPdata *gpd = ob->data;
-  MDeformVert *dvert = NULL;
   const int def_nr = BLI_findindex(&ob->defbase, defgroup);
   const int totgrp = BLI_listbase_count(&ob->defbase);
 
@@ -2030,20 +2077,17 @@ void BKE_gpencil_vgroup_remove(Object *ob, bDeformGroup *defgroup)
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
       LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
         LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-          if (gps->dvert != NULL) {
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+            bGPDcurve *gpc = gps->editcurve;
+            for (int i = 0; i < gpc->tot_curve_points; i++) {
+              MDeformVert *dvert = &gpc->dvert[i];
+              gpencil_remove_dvert_ex(dvert, def_nr, totgrp);
+            }
+          }
+          else if (gps->dvert != NULL) {
             for (int i = 0; i < gps->totpoints; i++) {
-              dvert = &gps->dvert[i];
-              MDeformWeight *dw = BKE_defvert_find_index(dvert, def_nr);
-              if (dw != NULL) {
-                BKE_defvert_remove_group(dvert, dw);
-              }
-              /* Reorganize weights for other groups after deleted one. */
-              for (int g = 0; g < totgrp; g++) {
-                dw = BKE_defvert_find_index(dvert, g);
-                if ((dw != NULL) && (dw->def_nr > def_nr)) {
-                  dw->def_nr--;
-                }
-              }
+              MDeformVert *dvert = &gps->dvert[i];
+              gpencil_remove_dvert_ex(dvert, def_nr, totgrp);
             }
           }
         }
@@ -2062,8 +2106,12 @@ void BKE_gpencil_vgroup_remove(Object *ob, bDeformGroup *defgroup)
  */
 void BKE_gpencil_dvert_ensure(bGPDstroke *gps)
 {
-  if (gps->dvert == NULL) {
-    gps->dvert = MEM_callocN(sizeof(MDeformVert) * gps->totpoints, "gp_stroke_weights");
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps) && gps->editcurve->dvert == NULL) {
+    bGPDcurve *gpc = gps->editcurve;
+    gpc->dvert = MEM_callocN(sizeof(MDeformVert) * gpc->tot_curve_points, __func__);
+  }
+  else if (gps->dvert == NULL) {
+    gps->dvert = MEM_callocN(sizeof(MDeformVert) * gps->totpoints, __func__);
   }
 }
 

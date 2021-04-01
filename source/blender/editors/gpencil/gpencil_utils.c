@@ -1586,7 +1586,21 @@ void ED_gpencil_vgroup_assign(bContext *C, Object *ob, float weight)
             continue;
           }
 
-          if (gps->flag & GP_STROKE_SELECT) {
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps) && (gps->editcurve->flag & GP_CURVE_SELECT)) {
+            BKE_gpencil_dvert_ensure(gps);
+            bGPDcurve *gpc = gps->editcurve;
+            for (int i = 0; i < gpc->tot_curve_points; i++) {
+              bGPDcurve_point *cpt = &gpc->curve_points[i];
+              MDeformVert *dvert = &gpc->dvert[i];
+              if (cpt->flag & GP_CURVE_POINT_SELECT) {
+                MDeformWeight *dw = BKE_defvert_ensure_index(dvert, def_nr);
+                if (dw != NULL) {
+                  dw->weight = weight;
+                }
+              }
+            }
+          }
+          else if (gps->flag & GP_STROKE_SELECT) {
             /* verify the weight array is created */
             BKE_gpencil_dvert_ensure(gps);
 
@@ -1640,17 +1654,36 @@ void ED_gpencil_vgroup_remove(bContext *C, Object *ob)
             continue;
           }
 
-          for (int i = 0; i < gps->totpoints; i++) {
-            bGPDspoint *pt = &gps->points[i];
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps) && (gps->editcurve->flag & GP_CURVE_SELECT)) {
+            bGPDcurve *gpc = gps->editcurve;
+            if (gpc->dvert == NULL) {
+              continue;
+            }
+
+            for (int i = 0; i < gpc->tot_curve_points; i++) {
+              bGPDcurve_point *cpt = &gpc->curve_points[i];
+              MDeformVert *dvert = &gpc->dvert[i];
+              if ((cpt->flag & GP_CURVE_POINT_SELECT) && (dvert->totweight > 0)) {
+                MDeformWeight *dw = BKE_defvert_find_index(dvert, def_nr);
+                if (dw != NULL) {
+                  BKE_defvert_remove_group(dvert, dw);
+                }
+              }
+            }
+          }
+          else if ((gps->flag & GP_STROKE_SELECT)) {
             if (gps->dvert == NULL) {
               continue;
             }
-            MDeformVert *dvert = &gps->dvert[i];
 
-            if ((pt->flag & GP_SPOINT_SELECT) && (dvert->totweight > 0)) {
-              MDeformWeight *dw = BKE_defvert_find_index(dvert, def_nr);
-              if (dw != NULL) {
-                BKE_defvert_remove_group(dvert, dw);
+            for (int i = 0; i < gps->totpoints; i++) {
+              bGPDspoint *pt = &gps->points[i];
+              MDeformVert *dvert = &gps->dvert[i];
+              if ((pt->flag & GP_SPOINT_SELECT) && (dvert->totweight > 0)) {
+                MDeformWeight *dw = BKE_defvert_find_index(dvert, def_nr);
+                if (dw != NULL) {
+                  BKE_defvert_remove_group(dvert, dw);
+                }
               }
             }
           }
@@ -1693,20 +1726,39 @@ void ED_gpencil_vgroup_select(bContext *C, Object *ob)
             continue;
           }
 
-          for (int i = 0; i < gps->totpoints; i++) {
-            bGPDspoint *pt = &gps->points[i];
-            if (gps->dvert == NULL) {
+          bool selected = false;
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+            bGPDcurve *gpc = gps->editcurve;
+            if (gpc->dvert == NULL) {
               continue;
             }
-            MDeformVert *dvert = &gps->dvert[i];
 
-            if (BKE_defvert_find_index(dvert, def_nr) != NULL) {
-              pt->flag |= GP_SPOINT_SELECT;
-              gps->flag |= GP_STROKE_SELECT;
+            for (int i = 0; i < gpc->tot_curve_points; i++) {
+              bGPDcurve_point *cpt = &gpc->curve_points[i];
+              MDeformVert *dvert = &gpc->dvert[i];
+              if (BKE_defvert_find_index(dvert, def_nr) != NULL) {
+                cpt->flag |= GP_CURVE_POINT_SELECT;
+                BEZT_SEL_ALL(&cpt->bezt);
+                gpc->flag |= GP_CURVE_SELECT;
+                selected = true;
+              }
+            }
+          }
+          else if (gps->dvert != NULL) {
+
+            for (int i = 0; i < gps->totpoints; i++) {
+              bGPDspoint *pt = &gps->points[i];
+              MDeformVert *dvert = &gps->dvert[i];
+
+              if (BKE_defvert_find_index(dvert, def_nr) != NULL) {
+                pt->flag |= GP_SPOINT_SELECT;
+                gps->flag |= GP_STROKE_SELECT;
+                selected = true;
+              }
             }
           }
 
-          if (gps->flag & GP_STROKE_SELECT) {
+          if (selected) {
             BKE_gpencil_stroke_select_index_set(gpd, gps);
           }
         }
@@ -1747,17 +1799,57 @@ void ED_gpencil_vgroup_deselect(bContext *C, Object *ob)
           if (ED_gpencil_stroke_can_use(C, gps) == false) {
             continue;
           }
+          bool deselected = false;
 
-          for (int i = 0; i < gps->totpoints; i++) {
-            bGPDspoint *pt = &gps->points[i];
-            if (gps->dvert == NULL) {
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+            bGPDcurve *gpc = gps->editcurve;
+            if (gpc->dvert == NULL) {
               continue;
             }
-            MDeformVert *dvert = &gps->dvert[i];
+            int desel_count = 0;
+            for (int i = 0; i < gpc->tot_curve_points; i++) {
+              bGPDcurve_point *cpt = &gpc->curve_points[i];
+              MDeformVert *dvert = &gpc->dvert[i];
+              if (BKE_defvert_find_index(dvert, def_nr) != NULL) {
+                cpt->flag &= ~GP_CURVE_POINT_SELECT;
+                BEZT_DESEL_ALL(&cpt->bezt);
+                desel_count++;
+              }
 
-            if (BKE_defvert_find_index(dvert, def_nr) != NULL) {
-              pt->flag &= ~GP_SPOINT_SELECT;
+              if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
+                desel_count++;
+              }
             }
+
+            if (desel_count == gpc->tot_curve_points) {
+              deselected = true;
+              gpc->flag &= ~GP_CURVE_SELECT;
+            }
+          }
+          else if (gps->dvert != NULL) {
+            int desel_count = 0;
+            for (int i = 0; i < gps->totpoints; i++) {
+              bGPDspoint *pt = &gps->points[i];
+              MDeformVert *dvert = &gps->dvert[i];
+
+              if (BKE_defvert_find_index(dvert, def_nr) != NULL) {
+                pt->flag &= ~GP_SPOINT_SELECT;
+                desel_count++;
+              }
+
+              if ((pt->flag & GP_SPOINT_SELECT) == 0) {
+                desel_count++;
+              }
+            }
+
+            if (desel_count == gps->totpoints) {
+              deselected = true;
+              gps->flag &= ~GP_STROKE_SELECT;
+            }
+          }
+
+          if (deselected) {
+            BKE_gpencil_stroke_select_index_reset(gps);
           }
         }
       }

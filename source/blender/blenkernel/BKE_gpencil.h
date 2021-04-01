@@ -258,6 +258,7 @@ bool BKE_gpencil_stroke_select_check(const struct bGPDstroke *gps);
 void BKE_gpencil_dvert_ensure(struct bGPDstroke *gps);
 void BKE_gpencil_vgroup_remove(struct Object *ob, struct bDeformGroup *defgroup);
 void BKE_gpencil_stroke_weights_duplicate(struct bGPDstroke *gps_src, struct bGPDstroke *gps_dst);
+void BKE_gpencil_editcurve_weights_duplicate(struct bGPDcurve *gpc_src, struct bGPDcurve *gpc_dst);
 
 /* Set active frame by layer. */
 void BKE_gpencil_frame_active_set(struct Depsgraph *depsgraph, struct bGPdata *gpd);
