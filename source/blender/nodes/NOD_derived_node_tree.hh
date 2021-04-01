@@ -59,6 +59,7 @@ class DTreeContext {
   const NodeTreeRef *tree_;
   /* All the children contexts of this context. */
   Map<const NodeRef *, DTreeContext *> children_;
+  DerivedNodeTree *derived_tree_;
 
   friend DerivedNodeTree;
 
@@ -67,6 +68,7 @@ class DTreeContext {
   const DTreeContext *parent_context() const;
   const NodeRef *parent_node() const;
   const DTreeContext *child_context(const NodeRef &node) const;
+  const DerivedNodeTree &derived_tree() const;
   bool is_root() const;
 };
 
@@ -212,6 +214,11 @@ inline const NodeRef *DTreeContext::parent_node() const
 inline const DTreeContext *DTreeContext::child_context(const NodeRef &node) const
 {
   return children_.lookup_default(&node, nullptr);
+}
+
+inline const DerivedNodeTree &DTreeContext::derived_tree() const
+{
+  return *derived_tree_;
 }
 
 inline bool DTreeContext::is_root() const

@@ -40,6 +40,7 @@ DTreeContext &DerivedNodeTree::construct_context_recursively(DTreeContext *paren
   DTreeContext &context = *allocator_.construct<DTreeContext>().release();
   context.parent_context_ = parent_context;
   context.parent_node_ = parent_node;
+  context.derived_tree_ = this;
   context.tree_ = &get_tree_ref_from_map(node_tree_refs, btree);
   used_node_tree_refs_.add(context.tree_);
 

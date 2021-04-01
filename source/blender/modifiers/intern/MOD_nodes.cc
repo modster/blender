@@ -43,11 +43,14 @@
 #include "DNA_pointcloud_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
+#include "DNA_space_types.h"
+#include "DNA_windowmanager_types.h"
 
 #include "BKE_customdata.h"
 #include "BKE_global.h"
 #include "BKE_idprop.h"
 #include "BKE_lib_query.h"
+#include "BKE_main.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_node_ui_storage.hh"
@@ -55,6 +58,7 @@
 #include "BKE_pointcloud.h"
 #include "BKE_screen.h"
 #include "BKE_simulation.h"
+#include "BKE_workspace.h"
 
 #include "BLO_read_write.h"
 
@@ -253,6 +257,47 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
   return false;
 }
 
+static DNode find_active_node_instance(const SpaceNode &snode, const DerivedNodeTree &dtree)
+{
+  const DTreeContext &root_context = dtree.root_context();
+  if ((ID *)snode.nodetree != DEG_get_original_id(&root_context.tree().btree()->id)) {
+    return {};
+  }
+
+  const DTreeContext *current_context = &root_context;
+  bool is_first = true;
+  LISTBASE_FOREACH (const bNodeTreePath *, path, &snode.treepath) {
+    if (is_first) {
+      is_first = false;
+      continue;
+    }
+    StringRef parent_node_name = path->node_name;
+    const NodeTreeRef &tree_ref = current_context->tree();
+    const NodeRef *parent_node_ref = nullptr;
+    for (const NodeRef *node_ref : tree_ref.nodes()) {
+      if (node_ref->name() == parent_node_name) {
+        parent_node_ref = node_ref;
+        break;
+      }
+    }
+    if (parent_node_ref == nullptr) {
+      return {};
+    }
+    current_context = current_context->child_context(*parent_node_ref);
+    if (current_context == nullptr) {
+      return {};
+    }
+  }
+
+  const NodeTreeRef &tree_ref = current_context->tree();
+  for (const NodeRef *node_ref : tree_ref.nodes()) {
+    if (node_ref->bnode()->flag & NODE_ACTIVE) {
+      return {current_context, node_ref};
+    }
+  }
+  return {};
+}
+
 class GeometryNodesEvaluator {
  private:
   blender::LinearAllocator<> allocator_;
@@ -403,12 +448,28 @@ class GeometryNodesEvaluator {
     this->execute_node(node, params);
 
     if (node->bnode()->flag & NODE_ACTIVE) {
-      for (const OutputSocketRef *output_socket : node->outputs()) {
-        if (output_socket->is_available() && output_socket->bsocket()->type == SOCK_GEOMETRY) {
-          GeometrySet value = node_outputs_map.lookup<GeometrySet>(output_socket->identifier());
-          value.ensure_own_non_instances();
-          BKE_object_preview_geometry_set(const_cast<Object *>(self_object_),
-                                          new GeometrySet(std::move(value)));
+      Main *bmain = DEG_get_bmain(depsgraph_);
+      wmWindowManager *wm = (wmWindowManager *)bmain->wm.first;
+      LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
+        bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          SpaceLink *sl = (SpaceLink *)area->spacedata.first;
+          if (sl->spacetype == SPACE_NODE) {
+            SpaceNode *snode = (SpaceNode *)sl;
+            DNode active_dnode = find_active_node_instance(*snode, node.context()->derived_tree());
+            if (active_dnode == node) {
+              for (const OutputSocketRef *output_socket : node->outputs()) {
+                if (output_socket->is_available() &&
+                    output_socket->bsocket()->type == SOCK_GEOMETRY) {
+                  GeometrySet value = node_outputs_map.lookup<GeometrySet>(
+                      output_socket->identifier());
+                  value.ensure_own_non_instances();
+                  BKE_object_preview_geometry_set(const_cast<Object *>(self_object_),
+                                                  new GeometrySet(std::move(value)));
+                }
+              }
+            }
+          }
         }
       }
     }
