@@ -1688,7 +1688,7 @@ NODE_DEFINE(AlembicProcedural)
 
   SOCKET_NODE_ARRAY(objects, "Objects", AlembicObject::get_node_type());
 
-  SOCKET_BOOLEAN(ignore_subdivision, "Ignore Subdivision", false);
+  SOCKET_BOOLEAN(ignore_subdivision, "Ignore Subdivision", true);
 
   SOCKET_BOOLEAN(enable_caching, "Enable Caching", true);
   SOCKET_INT(max_cache_size, "Maximum Cache Size", 1024);
