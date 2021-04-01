@@ -258,47 +258,6 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
   return false;
 }
 
-static DNode find_active_node_instance(const SpaceNode &snode, const DerivedNodeTree &dtree)
-{
-  const DTreeContext &root_context = dtree.root_context();
-  if ((ID *)snode.nodetree != DEG_get_original_id(&root_context.tree().btree()->id)) {
-    return {};
-  }
-
-  const DTreeContext *current_context = &root_context;
-  bool is_first = true;
-  LISTBASE_FOREACH (const bNodeTreePath *, path, &snode.treepath) {
-    if (is_first) {
-      is_first = false;
-      continue;
-    }
-    StringRef parent_node_name = path->node_name;
-    const NodeTreeRef &tree_ref = current_context->tree();
-    const NodeRef *parent_node_ref = nullptr;
-    for (const NodeRef *node_ref : tree_ref.nodes()) {
-      if (node_ref->name() == parent_node_name) {
-        parent_node_ref = node_ref;
-        break;
-      }
-    }
-    if (parent_node_ref == nullptr) {
-      return {};
-    }
-    current_context = current_context->child_context(*parent_node_ref);
-    if (current_context == nullptr) {
-      return {};
-    }
-  }
-
-  const NodeTreeRef &tree_ref = current_context->tree();
-  for (const NodeRef *node_ref : tree_ref.nodes()) {
-    if (node_ref->bnode()->flag & NODE_ACTIVE) {
-      return {current_context, node_ref};
-    }
-  }
-  return {};
-}
-
 class GeometryNodesEvaluator {
  public:
   using SocketValueFn = std::function<void(DSocket, Span<GPointer>)>;
@@ -1134,6 +1093,71 @@ static void reset_tree_ui_storage(Span<const blender::nodes::NodeTreeRef *> tree
   }
 }
 
+static DNode find_matching_active_derived_node(const SpaceNode &snode, const DerivedNodeTree &tree)
+{
+  const DTreeContext &root_context = tree.root_context();
+  bNodeTree *root_tree_eval = root_context.tree().btree();
+  bNodeTree *root_tree_orig = (bNodeTree *)DEG_get_original_id(&root_tree_eval->id);
+  if (snode.nodetree != root_tree_orig) {
+    return {};
+  }
+
+  const DTreeContext *current_context = &root_context;
+  bool is_first = true;
+  LISTBASE_FOREACH (const bNodeTreePath *, path, &snode.treepath) {
+    if (is_first) {
+      is_first = false;
+      continue;
+    }
+    StringRef parent_node_name = path->node_name;
+    const NodeTreeRef &tree_ref = current_context->tree();
+    const NodeRef *parent_node_ref = nullptr;
+    for (const NodeRef *node_ref : tree_ref.nodes()) {
+      if (node_ref->name() == parent_node_name) {
+        parent_node_ref = node_ref;
+        break;
+      }
+    }
+    if (parent_node_ref == nullptr) {
+      return {};
+    }
+    current_context = current_context->child_context(*parent_node_ref);
+    if (current_context == nullptr) {
+      return {};
+    }
+  }
+
+  const NodeTreeRef &tree_ref = current_context->tree();
+  for (const NodeRef *node_ref : tree_ref.nodes()) {
+    if (node_ref->bnode()->flag & NODE_ACTIVE) {
+      return {current_context, node_ref};
+    }
+  }
+  return {};
+}
+
+static DNode find_matching_active_derived_node(Depsgraph *depsgraph, const DerivedNodeTree &tree)
+{
+  Main *bmain = DEG_get_bmain(depsgraph);
+  wmWindowManager *wm = (wmWindowManager *)bmain->wm.first;
+  LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
+    bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      SpaceLink *sl = (SpaceLink *)area->spacedata.first;
+      if (sl->spacetype != SPACE_NODE) {
+        continue;
+      }
+      SpaceNode *snode = (SpaceNode *)sl;
+      DNode active_node = find_matching_active_derived_node(*snode, tree);
+      if (!active_node) {
+        continue;
+      }
+      return active_node;
+    }
+  }
+  return {};
+}
+
 /**
  * Evaluate a node group to compute the output geometry.
  * Currently, this uses a fairly basic and inefficient algorithm that might compute things more
@@ -1189,23 +1213,11 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   Vector<DInputSocket> group_outputs;
   group_outputs.append({root_context, &socket_to_compute});
 
-  Main *bmain = DEG_get_bmain(ctx->depsgraph);
-  wmWindowManager *wm = (wmWindowManager *)bmain->wm.first;
-  DNode active_dnode;
-  LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
-    bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
-    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-      SpaceLink *sl = (SpaceLink *)area->spacedata.first;
-      if (sl->spacetype == SPACE_NODE) {
-        SpaceNode *snode = (SpaceNode *)sl;
-        active_dnode = find_active_node_instance(*snode, tree);
-      }
-    }
-  }
+  const DNode active_node = find_matching_active_derived_node(ctx->depsgraph, tree);
 
   auto handle_socket_value = [&](const DSocket socket, const Span<GPointer> values) {
     const DNode node = socket.node();
-    if (node != active_dnode) {
+    if (node != active_node) {
       return;
     }
     if (socket->is_input() && !node->outputs().is_empty()) {
