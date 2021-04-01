@@ -54,7 +54,15 @@
 
 #include "ED_gpencil.h"
 #include "ED_screen.h"
+#include "ED_space_api.h"
 #include "ED_view3d.h"
+
+#include "GPU_immediate.h"
+#include "GPU_matrix.h"
+#include "GPU_shader.h"
+#include "GPU_state.h"
+
+#include "UI_interface.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -99,6 +107,9 @@ typedef struct tGPDcurve_draw {
 
   bool is_cyclic;
   float prev_pressure;
+
+  /* Callback for viewport drawing. */
+  void *draw_handle;
 
   eGPDcurve_draw_state state;
 } tGPDcurve_draw;
@@ -158,9 +169,6 @@ static void gpencil_push_curve_point(bContext *C, tGPDcurve_draw *tcd)
   memcpy(new_last, old_last, sizeof(bGPDcurve_point));
 
   new_last->bezt.h1 = new_last->bezt.h2 = HD_VECT;
-
-  old_last->flag &= ~GP_CURVE_POINT_SELECT;
-  BEZT_DESEL_ALL(&old_last->bezt);
 
   BKE_gpencil_stroke_update_geometry_from_editcurve(
       tcd->gps, tcd->gpd->curve_edit_resolution, false);
@@ -227,6 +235,74 @@ static void gpencil_set_alpha_last_segment(tGPDcurve_draw *tcd, float alpha)
   }
 }
 
+static void gpencil_curve_draw_ui_callback(const struct bContext *UNUSED(C),
+                                           struct ARegion *UNUSED(region),
+                                           void *customdata)
+{
+  const tGPDcurve_draw *tcd = customdata;
+  GPU_depth_test(GPU_DEPTH_NONE);
+
+  GPU_matrix_push_projection();
+  GPU_polygon_offset(1.0f, 1.0f);
+
+  GPU_matrix_push();
+  GPU_matrix_mul(tcd->ob->obmat);
+
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+
+  /* Draw overlays. */
+
+  immUnbindProgram();
+
+  GPU_matrix_pop();
+  GPU_matrix_pop_projection();
+
+  /* Reset default */
+  GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Main drawing functions */
+/*
+static void knife_update_header(bContext *C, wmOperator *op, const tGPDcurve_draw *tcd)
+{
+  char header[UI_MAX_DRAW_STR];
+  char buf[UI_MAX_DRAW_STR];
+
+  char *p = buf;
+  int available_len = sizeof(buf);
+
+#define WM_MODALKEY(_id) \
+  WM_modalkeymap_operator_items_to_string_buf( \
+      op->type, (_id), true, UI_MAX_SHORTCUT_STR, &available_len, &p)
+
+  BLI_snprintf(header,
+               sizeof(header),
+               TIP_("%s: confirm, %s: cancel, "
+                    "%s: start/define cut, %s: close cut, %s: new cut, "
+                    "%s: midpoint snap (%s), %s: ignore snap (%s), "
+                    "%s: angle constraint (%s), %s: cut through (%s), "
+                    "%s: panning"),
+               WM_MODALKEY(KNF_MODAL_CONFIRM),
+               WM_MODALKEY(KNF_MODAL_CANCEL),
+               WM_MODALKEY(KNF_MODAL_ADD_CUT),
+               WM_MODALKEY(KNF_MODAL_ADD_CUT_CLOSED),
+               WM_MODALKEY(KNF_MODAL_NEW_CUT),
+               WM_MODALKEY(KNF_MODAL_MIDPOINT_ON),
+               WM_bool_as_string(kcd->snap_midpoints),
+               WM_MODALKEY(KNF_MODAL_IGNORE_SNAP_ON),
+               WM_bool_as_string(kcd->ignore_edge_snapping),
+               WM_MODALKEY(KNF_MODAL_ANGLE_SNAP_TOGGLE),
+               WM_bool_as_string(kcd->angle_snapping),
+               WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
+               WM_bool_as_string(kcd->cut_through),
+               WM_MODALKEY(KNF_MODAL_PANNING));
+
+#undef WM_MODALKEY
+
+  ED_workspace_status_text(C, header);
+}
+*/
 /* ------------------------------------------------------------------------- */
 /* Main drawing functions */
 
@@ -318,8 +394,7 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
   copy_v3_v3(cpt->bezt.vec[2], first_pt);
   cpt->pressure = 1.0f;
   cpt->strength = 1.0f;
-  cpt->flag |= GP_CURVE_POINT_SELECT;
-  BEZT_SEL_ALL(&cpt->bezt);
+
   gps->editcurve = gpc;
   tcd->gpc = gpc;
 
@@ -328,6 +403,9 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
 
   /* Initialize space conversion. */
   gpencil_point_conversion_init(C, &tcd->gsc);
+
+  tcd->draw_handle = ED_region_draw_cb_activate(
+      tcd->region->type, gpencil_curve_draw_ui_callback, tcd, REGION_DRAW_POST_VIEW);
 
   gpencil_curve_draw_update(C, tcd);
   op->customdata = tcd;
@@ -415,7 +493,15 @@ static void gpencil_curve_draw_exit(bContext *C, wmOperator *op)
   if (G.debug & G_DEBUG) {
     printf("Exit curve draw\n");
   }
+
+  wmWindow *win = CTX_wm_window(C);
   tGPDcurve_draw *tcd = op->customdata;
+
+  ED_workspace_status_text(C, NULL);
+  WM_cursor_modal_restore(win);
+
+  ED_region_draw_cb_exit(tcd->region->type, tcd->draw_handle);
+
   bGPdata *gpd = tcd->gpd;
 
   MEM_SAFE_FREE(tcd);
@@ -484,9 +570,6 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
     }
     case RIGHTMOUSE: /* cancel */
     case EVT_ESCKEY: {
-      ED_workspace_status_text(C, NULL);
-      WM_cursor_modal_restore(win);
-
       /* Delete the stroke. */
       BLI_remlink(&tcd->gpf->strokes, tcd->gps);
       BKE_gpencil_free_stroke(tcd->gps);
@@ -497,9 +580,7 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
     case MIDDLEMOUSE:
     case EVT_PADENTER:
     case EVT_RETKEY: {
-      ED_workspace_status_text(C, NULL);
-      WM_cursor_modal_restore(win);
-
+      /* Delete the 'preview' point. */
       if (tcd->state == IN_MOVE) {
         gpencil_pop_curve_point(C, tcd);
       }
@@ -532,7 +613,7 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
       break;
     }
     case EVT_CKEY: {
-      if (event->val == KM_PRESS) {
+      if (event->val == KM_RELEASE) {
         if (tcd->is_cyclic) {
           tcd->gps->flag &= ~GP_STROKE_CYCLIC;
         }
@@ -545,7 +626,7 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
       break;
     }
     case EVT_FKEY: {
-      if (event->val == KM_PRESS && tcd->state != IN_SET_THICKNESS) {
+      if (event->val == KM_RELEASE && tcd->state != IN_SET_THICKNESS) {
         tcd->state = IN_SET_THICKNESS;
         WM_cursor_modal_set(win, WM_CURSOR_EW_SCROLL);
 
@@ -558,12 +639,10 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
       break;
     }
     case EVT_XKEY: {
-      if (event->val == KM_PRESS) {
+      /* Delte the last */
+      if (event->val == KM_RELEASE) {
         if (tcd->state == IN_MOVE) {
           gpencil_pop_curve_point(C, tcd);
-          bGPDcurve_point *cpt_last = &tcd->gpc->curve_points[tcd->gpc->tot_curve_points - 1];
-          cpt_last->flag |= GP_CURVE_POINT_SELECT;
-          BEZT_SEL_ALL(&cpt_last->bezt);
         }
         else if (ELEM(tcd->state, IN_DRAG_ALIGNED_HANDLE, IN_DRAG_FREE_HANDLE)) {
           tcd->state = IN_MOVE;
