@@ -1908,7 +1908,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 293, 14)) {
-    if (!DNA_struct_elem_find(fd->filesdna, "Light", "float", "diff_fac")) {
+    if (!DNA_struct_elem_find(fd->filesdna, "Lamp", "float", "diff_fac")) {
       LISTBASE_FOREACH (Light *, light, &bmain->lights) {
         light->diff_fac = 1.0f;
         light->volume_fac = 1.0f;
@@ -1961,6 +1961,13 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
       /* Convert the axes draw position to its old default (tip of bone). */
       LISTBASE_FOREACH (struct bArmature *, arm, &bmain->armatures) {
         arm->axes_position = 1.0;
+      }
+    }
+
+    /* Initialize the spread parameter for area lights*/
+    if (!DNA_struct_elem_find(fd->filesdna, "Lamp", "float", "area_spread")) {
+      LISTBASE_FOREACH (Light *, la, &bmain->lights) {
+        la->area_spread = DEG2RADF(180.0f);
       }
     }
 
