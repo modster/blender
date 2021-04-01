@@ -167,6 +167,10 @@ typedef struct Object_Runtime {
    * the data.
    */
   struct GeometrySet *geometry_set_eval;
+
+  /**
+   * Data from this geometry set is previewed in the spreadsheet editor.
+   */
   struct GeometrySet *geometry_set_preview;
 
   /**

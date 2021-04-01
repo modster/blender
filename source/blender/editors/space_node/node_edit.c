@@ -670,6 +670,9 @@ void ED_node_set_active(Main *bmain, bNodeTree *ntree, bNode *node, bool *r_acti
   }
 
   nodeSetActive(ntree, node);
+
+  /* Tag for update, so that dependend objects are reevaluated. This is necessary when a
+   * spreadsheet editor displays data from a node. */
   LISTBASE_FOREACH (wmWindow *, window, &((wmWindowManager *)bmain->wm.first)->windows) {
     bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
