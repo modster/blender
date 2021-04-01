@@ -456,33 +456,6 @@ class GeometryNodesEvaluator {
         node, node_inputs_map, node_outputs_map, handle_map_, self_object_, modifier_, depsgraph_};
     this->execute_node(node, params);
 
-    if (node->bnode()->flag & NODE_ACTIVE) {
-      Main *bmain = DEG_get_bmain(depsgraph_);
-      wmWindowManager *wm = (wmWindowManager *)bmain->wm.first;
-      LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
-        bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
-        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-          SpaceLink *sl = (SpaceLink *)area->spacedata.first;
-          if (sl->spacetype == SPACE_NODE) {
-            SpaceNode *snode = (SpaceNode *)sl;
-            DNode active_dnode = find_active_node_instance(*snode, node.context()->derived_tree());
-            if (active_dnode == node) {
-              for (const OutputSocketRef *output_socket : node->outputs()) {
-                if (output_socket->is_available() &&
-                    output_socket->bsocket()->type == SOCK_GEOMETRY) {
-                  GeometrySet value = node_outputs_map.lookup<GeometrySet>(
-                      output_socket->identifier());
-                  value.ensure_own_non_instances();
-                  BKE_object_preview_geometry_set(const_cast<Object *>(self_object_),
-                                                  new GeometrySet(std::move(value)));
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
     /* Forward computed outputs to linked input sockets. */
     for (const OutputSocketRef *output_socket : node->outputs()) {
       if (output_socket->is_available()) {
@@ -1214,12 +1187,38 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   Vector<DInputSocket> group_outputs;
   group_outputs.append({root_context, &socket_to_compute});
 
-  auto handle_socket_value = [&](const DSocket socket, const Span<GPointer> values) {
-    for (GPointer value : values) {
-      std::stringstream ss;
-      value.type()->debug_print(value.get(), ss);
-      std::cout << socket->name() << ": " << ss.str() << "\n";
+  Main *bmain = DEG_get_bmain(ctx->depsgraph);
+  wmWindowManager *wm = (wmWindowManager *)bmain->wm.first;
+  DNode active_dnode;
+  LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
+    bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      SpaceLink *sl = (SpaceLink *)area->spacedata.first;
+      if (sl->spacetype == SPACE_NODE) {
+        SpaceNode *snode = (SpaceNode *)sl;
+        active_dnode = find_active_node_instance(*snode, tree);
+      }
     }
+  }
+
+  auto handle_socket_value = [&](const DSocket socket, const Span<GPointer> values) {
+    const DNode node = socket.node();
+    if (node != active_dnode) {
+      return;
+    }
+    if (socket->is_input()) {
+      return;
+    }
+    if (values.size() != 1) {
+      return;
+    }
+    const GPointer value = values[0];
+    if (*value.type() != CPPType::get<GeometrySet>()) {
+      return;
+    }
+    GeometrySet geometry_set = *(const GeometrySet *)value.get();
+    geometry_set.ensure_own_non_instances();
+    BKE_object_preview_geometry_set(ctx->object, new GeometrySet(std::move(geometry_set)));
   };
 
   GeometryNodesEvaluator evaluator{group_inputs,

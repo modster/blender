@@ -119,6 +119,8 @@ class DSocket {
   operator bool() const;
 
   uint64_t hash() const;
+
+  DNode node() const;
 };
 
 /* A (nullable) reference to an input socket and the context it is in. */
@@ -325,6 +327,12 @@ inline const SocketRef *DSocket::operator->() const
 inline uint64_t DSocket::hash() const
 {
   return get_default_hash_2(context_, socket_ref_);
+}
+
+inline DNode DSocket::node() const
+{
+  BLI_assert(socket_ref_ != nullptr);
+  return {context_, &socket_ref_->node()};
 }
 
 /* --------------------------------------------------------------------
