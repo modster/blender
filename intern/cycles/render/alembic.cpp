@@ -482,32 +482,40 @@ static void add_uvs(AlembicProcedural *proc,
 
     float2 *data_float2 = reinterpret_cast<float2 *>(data.data());
 
-    const ArraySample::Key indices_key = uvsample.getIndices()->getKey();
-    const ArraySample::Key values_key = uvsample.getVals()->getKey();
+    if (!uvs.isConstant()) {
+      const ArraySample::Key indices_key = uvsample.getIndices()->getKey();
+      const ArraySample::Key values_key = uvsample.getVals()->getKey();
 
-    if (indices_key == previous_indices_key && values_key == previous_values_key) {
-      attr.data.reuse_data_for_last_time(time);
-    }
-    else {
-      const unsigned int *indices = uvsample.getIndices()->get();
-      const V2f *values = uvsample.getVals()->get();
+      const bool is_same_as_last_time = (indices_key == previous_indices_key && values_key == previous_values_key);
 
-      for (const int3 &loop : *triangles_loops) {
-        unsigned int v0 = indices[loop.x];
-        unsigned int v1 = indices[loop.y];
-        unsigned int v2 = indices[loop.z];
+      previous_indices_key = indices_key;
+      previous_values_key = values_key;
 
-        data_float2[0] = make_float2(values[v0][0], values[v0][1]);
-        data_float2[1] = make_float2(values[v1][0], values[v1][1]);
-        data_float2[2] = make_float2(values[v2][0], values[v2][1]);
-        data_float2 += 3;
+      if (is_same_as_last_time) {
+        attr.data.reuse_data_for_last_time(time);
+        continue;
       }
-
-      attr.data.add_data(data, time);
     }
 
-    previous_indices_key = indices_key;
-    previous_values_key = values_key;
+    const unsigned int *indices = uvsample.getIndices()->get();
+    const V2f *values = uvsample.getVals()->get();
+
+    for (const int3 &loop : *triangles_loops) {
+      unsigned int v0 = indices[loop.x];
+      unsigned int v1 = indices[loop.y];
+      unsigned int v2 = indices[loop.z];
+
+      data_float2[0] = make_float2(values[v0][0], values[v0][1]);
+      data_float2[1] = make_float2(values[v1][0], values[v1][1]);
+      data_float2[2] = make_float2(values[v2][0], values[v2][1]);
+      data_float2 += 3;
+    }
+
+    attr.data.add_data(data, time);
+
+    if (uvs.isConstant()) {
+      break;
+    }
   }
 }
 
