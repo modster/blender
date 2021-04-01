@@ -616,8 +616,7 @@ void AttributeSet::remove(AttributeStandard std)
 
     for (it = attributes.begin(); it != attributes.end(); it++) {
       if (&*it == attr) {
-        modified = true;
-        attributes.erase(it);
+        remove(it);
         return;
       }
     }
@@ -640,6 +639,30 @@ void AttributeSet::remove(Attribute *attribute)
   else {
     remove(attribute->std);
   }
+}
+
+void AttributeSet::remove(list<Attribute>::iterator it)
+{
+  const bool modifies_device_array = (it->std != ATTR_STD_DELTAS && it->std != ATTR_STD_FACE_NORMAL && it->std != ATTR_STD_VERTEX_NORMAL);
+
+  if (it->element == ATTR_ELEMENT_CORNER) {
+    attr_uchar4_modified |= modifies_device_array;
+  }
+  else if (it->type == TypeDesc::TypeFloat) {
+    attr_float_modified |= modifies_device_array;
+  }
+  else if (it->type == TypeFloat2) {
+    attr_float2_modified |= modifies_device_array;
+  }
+  else if (it->type == TypeDesc::TypeMatrix) {
+    attr_float3_modified |= modifies_device_array;
+  }
+  else if (it->element != ATTR_ELEMENT_VOXEL) {
+    attr_float3_modified |= modifies_device_array;
+  }
+
+  modified |= modifies_device_array;
+  attributes.erase(it);
 }
 
 void AttributeSet::resize(bool reserve_only)
@@ -705,6 +728,10 @@ void AttributeSet::clear_modified()
     attr.modified = false;
   }
   modified = false;
+  attr_float_modified = false;
+  attr_float2_modified = false;
+  attr_float3_modified = false;
+  attr_uchar4_modified = false;
 }
 
 /* AttributeRequest */

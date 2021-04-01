@@ -824,10 +824,28 @@ void GeometryManager::device_update_attributes(Device *device,
   dscene->attributes_float3.alloc(attr_float3_size);
   dscene->attributes_uchar4.alloc(attr_uchar4_size);
 
-  const bool copy_all_data = dscene->attributes_float.need_realloc() ||
-                             dscene->attributes_float2.need_realloc() ||
-                             dscene->attributes_float3.need_realloc() ||
-                             dscene->attributes_uchar4.need_realloc();
+  const bool attributes_need_realloc[4] = {
+    dscene->attributes_float.need_realloc(),
+    dscene->attributes_float2.need_realloc(),
+    dscene->attributes_float3.need_realloc(),
+    dscene->attributes_uchar4.need_realloc(),
+  };
+
+  auto get_slot_for_attribute_type = [](Attribute *attr) {
+    if (attr->element == ATTR_ELEMENT_CORNER) {
+      return 3;
+    }
+
+    if (attr->type == TypeDesc::TypeFloat) {
+      return 0;
+    }
+
+    if (attr->type == TypeFloat2) {
+      return 1;
+    }
+
+    return 2;
+  };
 
   /* Fill in attributes. */
   for (size_t i = 0; i < scene->geometry.size(); i++) {
@@ -841,7 +859,7 @@ void GeometryManager::device_update_attributes(Device *device,
 
       if (attr) {
         /* force a copy if we need to reallocate all the data */
-        attr->modified |= copy_all_data;
+        attr->modified |= attributes_need_realloc[get_slot_for_attribute_type(attr)];
       }
 
       update_attribute_element_offset(geom,
@@ -860,7 +878,7 @@ void GeometryManager::device_update_attributes(Device *device,
 
         if (subd_attr) {
           /* force a copy if we need to reallocate all the data */
-          subd_attr->modified |= copy_all_data;
+          subd_attr->modified |= attributes_need_realloc[get_slot_for_attribute_type(attr)];
         }
 
         update_attribute_element_offset(mesh,
@@ -886,6 +904,10 @@ void GeometryManager::device_update_attributes(Device *device,
 
     foreach (AttributeRequest &req, attributes.requests) {
       Attribute *attr = values.find(req);
+
+      if (attr) {
+        attr->modified |= attributes_need_realloc[get_slot_for_attribute_type(attr)];
+      }
 
       update_attribute_element_offset(object->geometry,
                                       dscene->attributes_float,
@@ -918,10 +940,10 @@ void GeometryManager::device_update_attributes(Device *device,
   /* copy to device */
   progress.set_status("Updating Mesh", "Copying Attributes to device");
 
-  dscene->attributes_float.copy_to_device();
-  dscene->attributes_float2.copy_to_device();
-  dscene->attributes_float3.copy_to_device();
-  dscene->attributes_uchar4.copy_to_device();
+  dscene->attributes_float.copy_to_device_if_modified();
+  dscene->attributes_float2.copy_to_device_if_modified();
+  dscene->attributes_float3.copy_to_device_if_modified();
+  dscene->attributes_uchar4.copy_to_device_if_modified();
 
   if (progress.get_cancel())
     return;
@@ -1512,8 +1534,17 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
   foreach (Geometry *geom, scene->geometry) {
     geom->has_volume = false;
 
-    if (geom->attributes.modified) {
-      device_update_flags |= ATTRS_NEED_REALLOC;
+    if (geom->attributes.attr_float_modified) {
+      device_update_flags |= ATTR_FLOAT_NEEDS_REALLOC;
+    }
+    if (geom->attributes.attr_float2_modified) {
+      device_update_flags |= ATTR_FLOAT2_NEEDS_REALLOC;
+    }
+    if (geom->attributes.attr_float3_modified) {
+      device_update_flags |= ATTR_FLOAT3_NEEDS_REALLOC;
+    }
+    if (geom->attributes.attr_uchar4_modified) {
+      device_update_flags |= ATTR_UCHAR4_NEEDS_REALLOC;
     }
 
     if (geom->is_mesh()) {

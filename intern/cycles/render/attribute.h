@@ -184,6 +184,10 @@ class AttributeSet {
   AttributePrimitive prim;
   list<Attribute> attributes;
   bool modified = true;
+  bool attr_float2_modified = true;
+  bool attr_float3_modified = true;
+  bool attr_float_modified = true;
+  bool attr_uchar4_modified = true;
 
   AttributeSet(Geometry *geometry, AttributePrimitive prim);
   AttributeSet(AttributeSet &&) = default;
@@ -200,6 +204,8 @@ class AttributeSet {
   Attribute *find(AttributeRequest &req);
 
   void remove(Attribute *attribute);
+
+  void remove(list<Attribute>::iterator it);
 
   void resize(bool reserve_only = false);
   void clear(bool preserve_voxel_data = false);

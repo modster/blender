@@ -1663,9 +1663,14 @@ static void update_attributes(AttributeSet &attributes, CachedData &cached_data,
   /* remove any attributes not in cached_attributes */
   list<Attribute>::iterator it;
   for (it = attributes.attributes.begin(); it != attributes.attributes.end();) {
+    /* Do not remove generated attribute, it will be updated in the data reading function */
+    if (it->std == ATTR_STD_GENERATED) {
+      ++it;
+      continue;
+    }
+
     if (cached_attributes.find(&(*it)) == cached_attributes.end()) {
-      attributes.attributes.erase(it++);
-      attributes.modified = true;
+      attributes.remove(it++);
       continue;
     }
 
