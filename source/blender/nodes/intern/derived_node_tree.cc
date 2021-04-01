@@ -220,8 +220,12 @@ void DInputSocket::foreach_origin_socket(FunctionRef<void(DSocket)> callback) co
 /* Calls the given callback for every "real" target socket. "Real" means that reroutes, muted nodes
  * and node groups are handled by this function. Target sockets are on the nodes that use the value
  * from this socket.   */
-void DOutputSocket::foreach_target_socket(FunctionRef<void(DInputSocket)> callback) const
+void DOutputSocket::foreach_target_socket(FunctionRef<void(DInputSocket)> callback,
+                                          FunctionRef<void(DSocket)> skipped_callback) const
 {
+  for (const SocketRef *skipped_socket : socket_ref_->logically_linked_skipped_sockets()) {
+    skipped_callback.call_if_available({context_, skipped_socket});
+  }
   for (const InputSocketRef *linked_socket : socket_ref_->as_output().logically_linked_sockets()) {
     const NodeRef &linked_node = linked_socket->node();
     DInputSocket linked_dsocket{context_, linked_socket};
@@ -235,15 +239,19 @@ void DOutputSocket::foreach_target_socket(FunctionRef<void(DInputSocket)> callba
         /* Follow the links going out of the group node in the parent node group. */
         DOutputSocket socket_in_parent_group =
             linked_dsocket.get_corresponding_group_node_output();
-        socket_in_parent_group.foreach_target_socket(callback);
+        skipped_callback.call_if_available(linked_dsocket);
+        skipped_callback.call_if_available(socket_in_parent_group);
+        socket_in_parent_group.foreach_target_socket(callback, skipped_callback);
       }
     }
     else if (linked_node.is_group_node()) {
       /* Follow the links within the nested node group. */
       Vector<DOutputSocket> sockets_in_group =
           linked_dsocket.get_corresponding_group_input_sockets();
+      skipped_callback.call_if_available(linked_dsocket);
       for (DOutputSocket socket_in_group : sockets_in_group) {
-        socket_in_group.foreach_target_socket(callback);
+        skipped_callback.call_if_available(socket_in_group);
+        socket_in_group.foreach_target_socket(callback, skipped_callback);
       }
     }
     else {

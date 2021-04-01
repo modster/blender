@@ -173,7 +173,7 @@ void NodeTreeRef::create_linked_socket_caches()
     /* Find logically linked sockets. */
     Vector<const SocketRef *> logically_linked_sockets;
     socket->foreach_logical_origin(
-        *socket, [&](const OutputSocketRef &origin) { logically_linked_sockets.append(&origin); });
+        [&](const OutputSocketRef &origin) { logically_linked_sockets.append(&origin); }, {});
     if (logically_linked_sockets == directly_linked_sockets) {
       socket->logically_linked_sockets_ = socket->directly_linked_sockets_;
     }
@@ -194,8 +194,10 @@ void NodeTreeRef::create_linked_socket_caches()
 
     /* Find logically linked sockets. */
     Vector<const SocketRef *> logically_linked_sockets;
+    Vector<const SocketRef *> logically_linked_skipped_sockets;
     socket->foreach_logical_target(
-        *socket, [&](const InputSocketRef &target) { logically_linked_sockets.append(&target); });
+        [&](const InputSocketRef &target) { logically_linked_sockets.append(&target); },
+        [&](const SocketRef &socket) { logically_linked_skipped_sockets.append(&socket); });
     if (logically_linked_sockets == directly_linked_sockets) {
       socket->logically_linked_sockets_ = socket->directly_linked_sockets_;
     }
@@ -203,14 +205,15 @@ void NodeTreeRef::create_linked_socket_caches()
       socket->logically_linked_sockets_ = allocator_.construct_array_copy(
           logically_linked_sockets.as_span());
     }
+    socket->logically_linked_skipped_sockets_ = allocator_.construct_array_copy(
+        logically_linked_skipped_sockets.as_span());
   }
 }
 
-void InputSocketRef::foreach_logical_origin(const InputSocketRef &socket,
-                                            FunctionRef<void(const OutputSocketRef &)> callback,
+void InputSocketRef::foreach_logical_origin(FunctionRef<void(const OutputSocketRef &)> callback,
                                             bool only_follow_first_input_link) const
 {
-  Span<const LinkRef *> links_to_check = socket.directly_linked_links();
+  Span<const LinkRef *> links_to_check = this->directly_linked_links();
   if (only_follow_first_input_link) {
     links_to_check = links_to_check.take_front(1);
   }
@@ -221,12 +224,12 @@ void InputSocketRef::foreach_logical_origin(const InputSocketRef &socket,
     const OutputSocketRef &origin = link->from();
     const NodeRef &origin_node = origin.node();
     if (origin_node.is_reroute_node()) {
-      this->foreach_logical_origin(origin_node.input(0), callback, false);
+      origin_node.input(0).foreach_logical_origin(callback, false);
     }
     else if (origin_node.is_muted()) {
       for (const InternalLinkRef *internal_link : origin_node.internal_links()) {
         if (&internal_link->to() == &origin) {
-          this->foreach_logical_origin(internal_link->from(), callback, true);
+          internal_link->from().foreach_logical_origin(callback, true);
           break;
         }
       }
@@ -238,21 +241,29 @@ void InputSocketRef::foreach_logical_origin(const InputSocketRef &socket,
 }
 
 void OutputSocketRef::foreach_logical_target(
-    const OutputSocketRef &socket, FunctionRef<void(const InputSocketRef &)> callback) const
+    FunctionRef<void(const InputSocketRef &)> callback,
+    FunctionRef<void(const SocketRef &)> skipped_callback) const
 {
-  for (const LinkRef *link : socket.directly_linked_links()) {
+  for (const LinkRef *link : this->directly_linked_links()) {
     if (link->is_muted()) {
       continue;
     }
     const InputSocketRef &target = link->to();
     const NodeRef &target_node = target.node();
     if (target_node.is_reroute_node()) {
-      this->foreach_logical_target(target_node.output(0), callback);
+      const OutputSocketRef &reroute_output = target_node.output(0);
+      skipped_callback.call_if_available(target);
+      skipped_callback.call_if_available(reroute_output);
+      reroute_output.foreach_logical_target(callback, skipped_callback);
     }
     else if (target_node.is_muted()) {
+      skipped_callback.call_if_available(target);
       for (const InternalLinkRef *internal_link : target_node.internal_links()) {
         if (&internal_link->from() == &target) {
-          this->foreach_logical_target(internal_link->to(), callback);
+          const OutputSocketRef &mute_output = internal_link->to();
+          skipped_callback.call_if_available(target);
+          skipped_callback.call_if_available(mute_output);
+          mute_output.foreach_logical_target(callback, skipped_callback);
         }
       }
     }

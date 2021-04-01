@@ -85,11 +85,13 @@ class SocketRef : NonCopyable, NonMovable {
   /* These sockets are linked when reroutes, muted links and muted nodes have been taken into
    * account. */
   MutableSpan<const SocketRef *> logically_linked_sockets_;
+  MutableSpan<const SocketRef *> logically_linked_skipped_sockets_;
 
   friend NodeTreeRef;
 
  public:
   Span<const SocketRef *> logically_linked_sockets() const;
+  Span<const SocketRef *> logically_linked_skipped_sockets() const;
   Span<const SocketRef *> directly_linked_sockets() const;
   Span<const LinkRef *> directly_linked_links() const;
 
@@ -133,8 +135,7 @@ class InputSocketRef final : public SocketRef {
 
   bool is_multi_input_socket() const;
 
-  void foreach_logical_origin(const InputSocketRef &socket,
-                              FunctionRef<void(const OutputSocketRef &)> callback,
+  void foreach_logical_origin(FunctionRef<void(const OutputSocketRef &)> callback,
                               bool only_follow_first_input_link = false) const;
 };
 
@@ -143,8 +144,8 @@ class OutputSocketRef final : public SocketRef {
   Span<const InputSocketRef *> logically_linked_sockets() const;
   Span<const InputSocketRef *> directly_linked_sockets() const;
 
-  void foreach_logical_target(const OutputSocketRef &socket,
-                              FunctionRef<void(const InputSocketRef &)> callback) const;
+  void foreach_logical_target(FunctionRef<void(const InputSocketRef &)> callback,
+                              FunctionRef<void(const SocketRef &)> skipped_callback) const;
 };
 
 class NodeRef : NonCopyable, NonMovable {
@@ -286,6 +287,11 @@ using nodes::SocketRef;
 inline Span<const SocketRef *> SocketRef::logically_linked_sockets() const
 {
   return logically_linked_sockets_;
+}
+
+inline Span<const SocketRef *> SocketRef::logically_linked_skipped_sockets() const
+{
+  return logically_linked_skipped_sockets_;
 }
 
 inline Span<const SocketRef *> SocketRef::directly_linked_sockets() const

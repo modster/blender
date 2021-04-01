@@ -150,7 +150,8 @@ class DOutputSocket : public DSocket {
   DInputSocket get_corresponding_group_node_input() const;
   DInputSocket get_active_corresponding_group_output_socket() const;
 
-  void foreach_target_socket(FunctionRef<void(DInputSocket)> callback) const;
+  void foreach_target_socket(FunctionRef<void(DInputSocket)> callback,
+                             FunctionRef<void(DSocket)> skipped_callback) const;
 };
 
 class DerivedNodeTree {

@@ -624,8 +624,15 @@ class GeometryNodesEvaluator {
   {
     /* For all sockets that are linked with the from_socket push the value to their node. */
     Vector<DInputSocket> to_sockets_all;
-    from_socket.foreach_target_socket(
-        [&](DInputSocket to_socket) { to_sockets_all.append_non_duplicates(to_socket); });
+
+    auto handle_target_socket_fn = [&](DInputSocket to_socket) {
+      to_sockets_all.append_non_duplicates(to_socket);
+    };
+    auto handle_skipped_socket_fn = [&, this](DSocket socket) {
+      this->handle_socket_value(socket, value_to_forward);
+    };
+
+    from_socket.foreach_target_socket(handle_target_socket_fn, handle_skipped_socket_fn);
 
     const CPPType &from_type = *value_to_forward.type();
     Vector<DInputSocket> to_sockets_same_type;

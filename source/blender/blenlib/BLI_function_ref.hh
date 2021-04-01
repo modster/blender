@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -137,6 +138,23 @@ template<typename Ret, typename... Params> class FunctionRef<Ret(Params...)> {
   {
     BLI_assert(callback_ != nullptr);
     return callback_(callable_, std::forward<Params>(params)...);
+  }
+
+  using OptionalReturnValue = std::conditional_t<std::is_void_v<Ret>, void, std::optional<Ret>>;
+  OptionalReturnValue call_if_available(Params... params) const
+  {
+    if constexpr (std::is_void_v<Ret>) {
+      if (callback_ == nullptr) {
+        return;
+      }
+      callback_(callable_, std::forward<Params>(params)...);
+    }
+    else {
+      if (callback_ == nullptr) {
+        return {};
+      }
+      return callback_(callable_, std::forward<Params>(params)...);
+    }
   }
 
   /**
