@@ -334,6 +334,7 @@ class GeometryNodesEvaluator {
         socket_value_fn_(std::move(socket_value_fn))
   {
     for (auto item : group_input_data.items()) {
+      this->handle_socket_value(item.key, item.value);
       this->forward_to_inputs(item.key, item.value);
     }
   }
@@ -343,6 +344,7 @@ class GeometryNodesEvaluator {
     Vector<GMutablePointer> results;
     for (const DInputSocket &group_output : group_outputs_) {
       Vector<GMutablePointer> result = this->get_input_values(group_output);
+      this->handle_socket_value(group_output, result);
       results.append(result[0]);
     }
     for (GMutablePointer value : value_by_input_.values()) {
@@ -1206,7 +1208,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
     if (node != active_dnode) {
       return;
     }
-    if (socket->is_input()) {
+    if (socket->is_input() && !node->outputs().is_empty()) {
       return;
     }
     if (values.size() != 1) {
