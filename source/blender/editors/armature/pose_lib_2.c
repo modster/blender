@@ -481,7 +481,7 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op, const wmEvent *
   }
 
   /* Maybe flip the Action. */
-  const bool apply_flipped = RNA_boolean_get(op->ptr, "apply_flipped");
+  const bool apply_flipped = RNA_boolean_get(op->ptr, "flipped");
   if (apply_flipped) {
     action = (bAction *)BKE_id_copy_ex(NULL, &action->id, NULL, LIB_ID_COPY_LOCALIZE);
     BKE_action_flip_with_pose(action, ob);
@@ -712,7 +712,7 @@ void POSELIB_OT_apply_pose_asset(wmOperatorType *ot)
                        0.0f,
                        1.0f);
   RNA_def_boolean(ot->srna,
-                  "apply_flipped",
+                  "flipped",
                   false,
                   "Apply Flipped",
                   "When enabled, applies the pose flipped over the X-axis");
@@ -748,7 +748,7 @@ void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
                        0.0f,
                        1.0f);
   RNA_def_boolean(ot->srna,
-                  "apply_flipped",
+                  "flipped",
                   false,
                   "Apply Flipped",
                   "When enabled, applies the pose flipped over the X-axis");
