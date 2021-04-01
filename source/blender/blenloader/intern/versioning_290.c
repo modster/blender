@@ -1956,5 +1956,18 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         arm->axes_position = 1.0;
       }
     }
+
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_NODE) {
+            SpaceNode *snode = (SpaceNode *)sl;
+            LISTBASE_FOREACH (bNodeTreePath *, path, &snode->treepath) {
+              STRNCPY(path->display_name, path->node_name);
+            }
+          }
+        }
+      }
+    }
   }
 }
