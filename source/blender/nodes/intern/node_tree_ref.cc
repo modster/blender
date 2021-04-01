@@ -214,8 +214,8 @@ void NodeTreeRef::create_linked_socket_caches()
   }
 }
 
-void InputSocketRef::foreach_logical_origin(FunctionRef<void(const OutputSocketRef &)> callback,
-                                            FunctionRef<void(const SocketRef &)> skipped_callback,
+void InputSocketRef::foreach_logical_origin(FunctionRef<void(const OutputSocketRef &)> origin_fn,
+                                            FunctionRef<void(const SocketRef &)> skipped_fn,
                                             bool only_follow_first_input_link) const
 {
   Span<const LinkRef *> links_to_check = this->directly_linked_links();
@@ -231,30 +231,29 @@ void InputSocketRef::foreach_logical_origin(FunctionRef<void(const OutputSocketR
     if (origin_node.is_reroute_node()) {
       const InputSocketRef &reroute_input = origin_node.input(0);
       const OutputSocketRef &reroute_output = origin_node.output(0);
-      skipped_callback.call_safe(reroute_input);
-      skipped_callback.call_safe(reroute_output);
-      reroute_input.foreach_logical_origin(callback, skipped_callback, false);
+      skipped_fn.call_safe(reroute_input);
+      skipped_fn.call_safe(reroute_output);
+      reroute_input.foreach_logical_origin(origin_fn, skipped_fn, false);
     }
     else if (origin_node.is_muted()) {
       for (const InternalLinkRef *internal_link : origin_node.internal_links()) {
         if (&internal_link->to() == &origin) {
           const InputSocketRef &mute_input = internal_link->from();
-          skipped_callback.call_safe(origin);
-          skipped_callback.call_safe(mute_input);
-          mute_input.foreach_logical_origin(callback, skipped_callback, true);
+          skipped_fn.call_safe(origin);
+          skipped_fn.call_safe(mute_input);
+          mute_input.foreach_logical_origin(origin_fn, skipped_fn, true);
           break;
         }
       }
     }
     else {
-      callback(origin);
+      origin_fn(origin);
     }
   }
 }
 
-void OutputSocketRef::foreach_logical_target(
-    FunctionRef<void(const InputSocketRef &)> callback,
-    FunctionRef<void(const SocketRef &)> skipped_callback) const
+void OutputSocketRef::foreach_logical_target(FunctionRef<void(const InputSocketRef &)> target_fn,
+                                             FunctionRef<void(const SocketRef &)> skipped_fn) const
 {
   for (const LinkRef *link : this->directly_linked_links()) {
     if (link->is_muted()) {
@@ -264,23 +263,23 @@ void OutputSocketRef::foreach_logical_target(
     const NodeRef &target_node = target.node();
     if (target_node.is_reroute_node()) {
       const OutputSocketRef &reroute_output = target_node.output(0);
-      skipped_callback.call_safe(target);
-      skipped_callback.call_safe(reroute_output);
-      reroute_output.foreach_logical_target(callback, skipped_callback);
+      skipped_fn.call_safe(target);
+      skipped_fn.call_safe(reroute_output);
+      reroute_output.foreach_logical_target(target_fn, skipped_fn);
     }
     else if (target_node.is_muted()) {
-      skipped_callback.call_safe(target);
+      skipped_fn.call_safe(target);
       for (const InternalLinkRef *internal_link : target_node.internal_links()) {
         if (&internal_link->from() == &target) {
           const OutputSocketRef &mute_output = internal_link->to();
-          skipped_callback.call_safe(target);
-          skipped_callback.call_safe(mute_output);
-          mute_output.foreach_logical_target(callback, skipped_callback);
+          skipped_fn.call_safe(target);
+          skipped_fn.call_safe(mute_output);
+          mute_output.foreach_logical_target(target_fn, skipped_fn);
         }
       }
     }
     else {
-      callback(target);
+      target_fn(target);
     }
   }
 }

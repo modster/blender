@@ -137,8 +137,8 @@ class InputSocketRef final : public SocketRef {
 
   bool is_multi_input_socket() const;
 
-  void foreach_logical_origin(FunctionRef<void(const OutputSocketRef &)> callback,
-                              FunctionRef<void(const SocketRef &)> skipped_callback,
+  void foreach_logical_origin(FunctionRef<void(const OutputSocketRef &)> origin_fn,
+                              FunctionRef<void(const SocketRef &)> skipped_fn,
                               bool only_follow_first_input_link = false) const;
 };
 
@@ -147,8 +147,8 @@ class OutputSocketRef final : public SocketRef {
   Span<const InputSocketRef *> logically_linked_sockets() const;
   Span<const InputSocketRef *> directly_linked_sockets() const;
 
-  void foreach_logical_target(FunctionRef<void(const InputSocketRef &)> callback,
-                              FunctionRef<void(const SocketRef &)> skipped_callback) const;
+  void foreach_logical_target(FunctionRef<void(const InputSocketRef &)> target_fn,
+                              FunctionRef<void(const SocketRef &)> skipped_fn) const;
 };
 
 class NodeRef : NonCopyable, NonMovable {

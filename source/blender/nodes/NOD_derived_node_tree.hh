@@ -136,7 +136,7 @@ class DInputSocket : public DSocket {
   DOutputSocket get_corresponding_group_node_output() const;
   Vector<DOutputSocket, 4> get_corresponding_group_input_sockets() const;
 
-  void foreach_origin_socket(FunctionRef<void(DSocket)> callback) const;
+  void foreach_origin_socket(FunctionRef<void(DSocket)> origin_fn) const;
 };
 
 /* A (nullable) reference to an output socket and the context it is in. */
@@ -152,8 +152,8 @@ class DOutputSocket : public DSocket {
   DInputSocket get_corresponding_group_node_input() const;
   DInputSocket get_active_corresponding_group_output_socket() const;
 
-  void foreach_target_socket(FunctionRef<void(DInputSocket)> callback,
-                             FunctionRef<void(DSocket)> skipped_callback) const;
+  void foreach_target_socket(FunctionRef<void(DInputSocket)> target_fn,
+                             FunctionRef<void(DSocket)> skipped_fn) const;
 };
 
 class DerivedNodeTree {
