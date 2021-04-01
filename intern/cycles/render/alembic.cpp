@@ -447,6 +447,8 @@ static void add_uvs(AlembicProcedural *proc,
 
   CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(name), time_sampling);
   attr.std = ATTR_STD_UV;
+  attr.element = ATTR_ELEMENT_CORNER;
+  attr.type_desc = TypeFloat2;
 
   ccl::set<chrono_t> times = get_relevant_sample_times(proc, time_sampling, uvs.getNumSamples());
 
