@@ -94,6 +94,7 @@ using blender::bke::PersistentCollectionHandle;
 using blender::bke::PersistentDataHandleMap;
 using blender::bke::PersistentObjectHandle;
 using blender::fn::GMutablePointer;
+using blender::fn::GPointer;
 using blender::fn::GValueMap;
 using blender::nodes::GeoNodeExecParams;
 using namespace blender::fn::multi_function_types;
@@ -299,6 +300,9 @@ static DNode find_active_node_instance(const SpaceNode &snode, const DerivedNode
 }
 
 class GeometryNodesEvaluator {
+ public:
+  using SocketValueFn = std::function<void(DSocket, blender::fn::GPointer)>;
+
  private:
   blender::LinearAllocator<> allocator_;
   Map<std::pair<DInputSocket, DOutputSocket>, GMutablePointer> value_by_input_;
@@ -309,6 +313,7 @@ class GeometryNodesEvaluator {
   const Object *self_object_;
   const ModifierData *modifier_;
   Depsgraph *depsgraph_;
+  SocketValueFn socket_value_fn_;
 
  public:
   GeometryNodesEvaluator(const Map<DOutputSocket, GMutablePointer> &group_input_data,
@@ -317,14 +322,16 @@ class GeometryNodesEvaluator {
                          const PersistentDataHandleMap &handle_map,
                          const Object *self_object,
                          const ModifierData *modifier,
-                         Depsgraph *depsgraph)
+                         Depsgraph *depsgraph,
+                         SocketValueFn socket_value_fn)
       : group_outputs_(std::move(group_outputs)),
         mf_by_node_(mf_by_node),
         conversions_(blender::nodes::get_implicit_type_conversions()),
         handle_map_(handle_map),
         self_object_(self_object),
         modifier_(modifier),
-        depsgraph_(depsgraph)
+        depsgraph_(depsgraph),
+        socket_value_fn_(std::move(socket_value_fn))
   {
     for (auto item : group_input_data.items()) {
       this->forward_to_inputs(item.key, item.value);
@@ -477,9 +484,18 @@ class GeometryNodesEvaluator {
     /* Forward computed outputs to linked input sockets. */
     for (const OutputSocketRef *output_socket : node->outputs()) {
       if (output_socket->is_available()) {
+        const DOutputSocket dsocket{node.context(), output_socket};
         GMutablePointer value = node_outputs_map.extract(output_socket->identifier());
-        this->forward_to_inputs({node.context(), output_socket}, value);
+        this->handle_socket_value(dsocket, value);
+        this->forward_to_inputs(dsocket, value);
       }
+    }
+  }
+
+  void handle_socket_value(const DSocket socket, blender::fn::GPointer value)
+  {
+    if (socket_value_fn_) {
+      socket_value_fn_(socket, value);
     }
   }
 
@@ -1179,13 +1195,20 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   Vector<DInputSocket> group_outputs;
   group_outputs.append({root_context, &socket_to_compute});
 
+  auto handle_socket_value = [&](const DSocket socket, const GPointer value) {
+    std::stringstream ss;
+    value.type()->debug_print(value.get(), ss);
+    std::cout << socket->name() << ": " << ss.str() << "\n";
+  };
+
   GeometryNodesEvaluator evaluator{group_inputs,
                                    group_outputs,
                                    mf_by_node,
                                    handle_map,
                                    ctx->object,
                                    (ModifierData *)nmd,
-                                   ctx->depsgraph};
+                                   ctx->depsgraph,
+                                   handle_socket_value};
 
   Vector<GMutablePointer> results = evaluator.execute();
   BLI_assert(results.size() == 1);
