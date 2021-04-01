@@ -1165,8 +1165,10 @@ class OptiXDevice : public CUDADevice {
     }
     else {
       // Prefer fast updates in viewport
-      options.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_BUILD | OPTIX_BUILD_FLAG_ALLOW_UPDATE;
+      options.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_BUILD;
     }
+
+    options.buildFlags |= OPTIX_BUILD_FLAG_ALLOW_UPDATE;
 
     options.motionOptions.numKeys = num_motion_steps;
     options.motionOptions.flags = OPTIX_MOTION_FLAG_START_VANISH | OPTIX_MOTION_FLAG_END_VANISH;
@@ -1277,7 +1279,7 @@ class OptiXDevice : public CUDADevice {
       // Refit is only possible in viewport for now (because AS is built with
       // OPTIX_BUILD_FLAG_ALLOW_UPDATE only there, see above)
       OptixBuildOperation operation = OPTIX_BUILD_OPERATION_BUILD;
-      if (refit && !background) {
+      if (refit) {
         assert(bvh_optix->traversable_handle != 0);
         operation = OPTIX_BUILD_OPERATION_UPDATE;
       }
