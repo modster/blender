@@ -1231,7 +1231,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
       return;
     }
     GeometrySet geometry_set = *(const GeometrySet *)value.get();
-    geometry_set.ensure_own_non_instances();
+    geometry_set.ensure_owns_direct_data();
     BKE_object_preview_geometry_set(ctx->object, new GeometrySet(std::move(geometry_set)));
   };
 
