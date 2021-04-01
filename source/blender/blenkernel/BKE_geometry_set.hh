@@ -382,8 +382,8 @@ class MeshComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
-  virtual bool owns_direct_data() const override;
-  virtual void ensure_owns_direct_data() override;
+  bool owns_direct_data() const override;
+  void ensure_owns_direct_data() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_MESH;
 
@@ -415,8 +415,8 @@ class PointCloudComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
-  virtual bool owns_direct_data() const override;
-  virtual void ensure_owns_direct_data() override;
+  bool owns_direct_data() const override;
+  void ensure_owns_direct_data() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_POINT_CLOUD;
 
@@ -458,8 +458,8 @@ class InstancesComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
-  virtual bool owns_direct_data() const override;
-  virtual void ensure_owns_direct_data() override;
+  bool owns_direct_data() const override;
+  void ensure_owns_direct_data() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_INSTANCES;
 };
@@ -483,8 +483,8 @@ class VolumeComponent : public GeometryComponent {
   const Volume *get_for_read() const;
   Volume *get_for_write();
 
-  virtual bool owns_direct_data() const override;
-  virtual void ensure_owns_direct_data() override;
+  bool owns_direct_data() const override;
+  void ensure_owns_direct_data() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_VOLUME;
 };
