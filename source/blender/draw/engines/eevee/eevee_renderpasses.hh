@@ -18,90 +18,84 @@
 
 #pragma once
 
-#include "eevee_accumulator.hh"
+#include "eevee_film.hh"
 
-using namespace blender;
+namespace blender::eevee {
 
-enum eEEVEERenderPassBit {
-  NONE = 0,
-  COMBINED = (1 << 0),
-  DEPTH = (1 << 1),
-  NORMAL = (1 << 2),
+enum eRenderPassBit {
+  RENDERPASS_NONE = 0,
+  RENDERPASS_COMBINED = (1 << 0),
+  RENDERPASS_DEPTH = (1 << 1),
+  RENDERPASS_NORMAL = (1 << 2),
 };
 
-ENUM_OPERATORS(eEEVEERenderPassBit, NORMAL)
+ENUM_OPERATORS(eRenderPassBit, RENDERPASS_NORMAL)
 
-typedef struct EEVEE_RenderPasses {
+typedef struct RenderPasses {
  public:
-  EEVEE_Accumulator *combined = nullptr;
-  EEVEE_Accumulator *depth = nullptr;
-  EEVEE_Accumulator *normal = nullptr;
-  Vector<EEVEE_Accumulator *> aovs;
+  Film *combined = nullptr;
+  Film *depth = nullptr;
+  Film *normal = nullptr;
+  Vector<Film *> aovs;
 
  private:
-  EEVEE_Shaders &shaders_;
-  eEEVEERenderPassBit enabled_passes_ = NONE;
+  ShaderModule &shaders_;
+  Camera &camera_;
+  eRenderPassBit enabled_passes_ = RENDERPASS_NONE;
+
+  int extent_[2];
 
  public:
-  EEVEE_RenderPasses(EEVEE_Shaders &shaders) : shaders_(shaders){};
+  RenderPasses(ShaderModule &shaders, Camera &camera) : shaders_(shaders), camera_(camera){};
 
-  ~EEVEE_RenderPasses()
+  ~RenderPasses()
   {
     delete combined;
     delete depth;
     delete normal;
   }
 
-  void configure(eEEVEERenderPassBit passes, EEVEE_AccumulatorParameters &accum_params)
+  void configure(eRenderPassBit passes, const int extent[2])
   {
-#define PASS_CONFIGURE(pass_, enum_, format_) \
-  this->pass_configure(accum_params, pass_, (passes & enum_) != 0, STRINGIFY(pass_), format_)
-
-    PASS_CONFIGURE(combined, COMBINED, GPU_RGBA16F);
-    PASS_CONFIGURE(depth, DEPTH, GPU_R16F);
-    PASS_CONFIGURE(normal, NORMAL, GPU_RGBA16F);
-
-#undef PASS_CONFIGURE
-
+    copy_v2_v2_int(extent_, extent);
     enabled_passes_ = passes;
+
+    pass_configure(passes, RENDERPASS_COMBINED, combined, FILM_DATA_COLOR, "Combined");
+    pass_configure(passes, RENDERPASS_DEPTH, depth, FILM_DATA_DEPTH, "Depth");
+    pass_configure(passes, RENDERPASS_NORMAL, normal, FILM_DATA_NORMAL, "Normal");
   }
 
   void init(void)
   {
     if (combined) {
-      combined->init();
+      combined->init(extent_);
     }
     if (depth) {
-      depth->init();
+      depth->init(extent_);
     }
     if (normal) {
-      normal->init();
+      normal->init(extent_);
     }
-    for (EEVEE_Accumulator *aov : aovs) {
-      aov->init();
+    for (Film *aov : aovs) {
+      aov->init(extent_);
     }
   }
 
-  eEEVEERenderPassBit enabled_passes_get(void)
+  eRenderPassBit enabled_passes_get(void)
   {
     return enabled_passes_;
   }
 
  private:
-  void pass_configure(EEVEE_AccumulatorParameters &accum_params,
-                      EEVEE_Accumulator *&pass,
-                      bool enable,
-                      const char *name,
-                      eGPUTextureFormat format)
+  inline void pass_configure(eRenderPassBit passes,
+                             eRenderPassBit pass_bit,
+                             Film *&pass,
+                             eFilmDataType type,
+                             const char *name)
   {
-    if (enable && pass && pass->parameters != accum_params) {
-      /* Parameters have changed, need to reconstruct the accumulator. */
-      delete pass;
-      pass = nullptr;
-    }
-
+    bool enable = (passes & pass_bit) != 0;
     if (enable && pass == nullptr) {
-      pass = new EEVEE_Accumulator(shaders_, name, format, accum_params);
+      pass = new Film(shaders_, camera_, type, name);
     }
     else if (!enable && pass != nullptr) {
       /* Delete unused passes. */
@@ -110,4 +104,6 @@ typedef struct EEVEE_RenderPasses {
     }
   }
 
-} EEVEE_RenderPasses;
+} RenderPasses;
+
+}  // namespace blender::eevee

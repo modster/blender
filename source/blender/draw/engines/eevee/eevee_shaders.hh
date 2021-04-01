@@ -30,32 +30,36 @@
 #include "DRW_render.h"
 #include "GPU_shader.h"
 
-using namespace blender;
-
 extern char datatoc_common_fullscreen_vert_glsl[];
 extern char datatoc_common_hair_lib_glsl[];
 extern char datatoc_common_math_geom_lib_glsl[];
 extern char datatoc_common_math_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
 
-extern char datatoc_accumulator_accumulate_frag_glsl[];
-extern char datatoc_accumulator_resolve_frag_glsl[];
-extern char datatoc_mesh_frag_glsl[];
-extern char datatoc_mesh_lib_glsl[];
-extern char datatoc_mesh_vert_glsl[];
+extern char datatoc_camera_lib_glsl[];
+extern char datatoc_film_filter_frag_glsl[];
+extern char datatoc_film_lib_glsl[];
+extern char datatoc_film_resolve_frag_glsl[];
+extern char datatoc_object_forward_frag_glsl[];
+extern char datatoc_object_lib_glsl[];
+extern char datatoc_object_mesh_vert_glsl[];
+
+extern char datatoc_eevee_shared_hh[];
+
+namespace blender::eevee {
 
 /* Keep alphabetical order and clean prefix. */
-enum eEEVEEShaderType {
-  ACCUMULATOR_ACCUMULATE = 0,
-  ACCUMULATOR_RESOLVE,
+enum eShaderType {
+  FILM_FILTER = 0,
+  FILM_RESOLVE,
   MESH, /* TEST */
 
   MAX_SHADER_TYPE,
 };
 
-typedef struct EEVEE_Shaders {
+typedef struct ShaderModule {
  private:
-  struct EEVEE_ShaderDescription {
+  struct ShaderDescription {
     const char *name;
     const char *vertex_shader_code;
     const char *geometry_shader_code;
@@ -64,10 +68,10 @@ typedef struct EEVEE_Shaders {
 
   DRWShaderLibrary *shader_lib_ = nullptr;
   Vector<GPUShader *> shaders_;
-  Vector<EEVEE_ShaderDescription> shader_descriptions_;
+  Vector<ShaderDescription> shader_descriptions_;
 
  public:
-  EEVEE_Shaders()
+  ShaderModule()
   {
     shaders_.resize(MAX_SHADER_TYPE);
     shader_descriptions_.resize(MAX_SHADER_TYPE);
@@ -78,11 +82,14 @@ typedef struct EEVEE_Shaders {
 
     shader_lib_ = DRW_shader_library_create();
     /* NOTE: These need to be ordered by dependencies. */
+    DRW_shader_library_add_file(shader_lib_, datatoc_eevee_shared_hh, "eevee_shared.hh");
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, mesh_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, camera_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, film_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, object_lib);
 
     /* Meh ¯\_(ツ)_/¯. */
     char *datatoc_nullptr_glsl = nullptr;
@@ -95,16 +102,16 @@ typedef struct EEVEE_Shaders {
 
 #define SHADER_FULLSCREEN(enum_, frag_) SHADER(enum_, common_fullscreen_vert, nullptr, frag_)
 
-    SHADER_FULLSCREEN(ACCUMULATOR_ACCUMULATE, accumulator_accumulate_frag);
-    SHADER_FULLSCREEN(ACCUMULATOR_RESOLVE, accumulator_resolve_frag);
-    SHADER(MESH, mesh_vert, nullptr, mesh_frag);
+    SHADER_FULLSCREEN(FILM_FILTER, film_filter_frag);
+    SHADER_FULLSCREEN(FILM_RESOLVE, film_resolve_frag);
+    SHADER(MESH, object_mesh_vert, nullptr, object_forward_frag);
 
 #undef SHADER
 #undef SHADER_FULLSCREEN
 
 #ifdef DEBUG
     /* Ensure all shader are described. */
-    for (EEVEE_ShaderDescription &desc : shader_descriptions_) {
+    for (ShaderDescription &desc : shader_descriptions_) {
       BLI_assert(desc.name != nullptr);
       BLI_assert(desc.vertex_shader_code != nullptr);
       BLI_assert(desc.fragment_shader_code != nullptr);
@@ -112,7 +119,7 @@ typedef struct EEVEE_Shaders {
 #endif
   }
 
-  ~EEVEE_Shaders()
+  ~ShaderModule()
   {
     for (GPUShader *&shader : shaders_) {
       DRW_SHADER_FREE_SAFE(shader);
@@ -120,10 +127,10 @@ typedef struct EEVEE_Shaders {
     DRW_SHADER_LIB_FREE_SAFE(shader_lib_);
   }
 
-  GPUShader *static_shader_get(eEEVEEShaderType shader_type)
+  GPUShader *static_shader_get(eShaderType shader_type)
   {
     if (shaders_[shader_type] == nullptr) {
-      EEVEE_ShaderDescription &desc = shader_descriptions_[shader_type];
+      ShaderDescription &desc = shader_descriptions_[shader_type];
       shaders_[shader_type] = DRW_shader_create_with_shaderlib_ex(desc.vertex_shader_code,
                                                                   desc.geometry_shader_code,
                                                                   desc.fragment_shader_code,
@@ -131,10 +138,12 @@ typedef struct EEVEE_Shaders {
                                                                   nullptr,
                                                                   desc.name);
       if (shaders_[shader_type] == nullptr) {
-        fprintf(stderr, "EEVEE: error: Could not compile static shader \"%s\".", desc.name);
+        fprintf(stderr, "EEVEE: error: Could not compile static shader \"%s\"\n", desc.name);
       }
       BLI_assert(shaders_[shader_type] != nullptr);
     }
     return shaders_[shader_type];
   }
-} EEVEE_Shaders;
+} ShaderModule;
+
+}  // namespace blender::eevee

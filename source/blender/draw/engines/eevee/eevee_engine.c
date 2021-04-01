@@ -79,6 +79,14 @@ static void eevee_instance_free(void *instance_data)
   EEVEE_instance_free((struct EEVEE_Instance *)instance_data);
 }
 
+static void eevee_render_to_image(void *vedata,
+                                  struct RenderEngine *engine,
+                                  struct RenderLayer *layer,
+                                  const struct rcti *rect)
+{
+  UNUSED_VARS(vedata, engine, layer, rect);
+}
+
 static const DrawEngineDataSize eevee_data_size = DRW_VIEWPORT_DATA_SIZE(EEVEE_Data);
 
 DrawEngineType draw_engine_eevee_type = {
@@ -95,7 +103,7 @@ DrawEngineType draw_engine_eevee_type = {
     &eevee_draw_scene,
     NULL,
     NULL,
-    NULL,
+    &eevee_render_to_image,
     NULL,
 };
 

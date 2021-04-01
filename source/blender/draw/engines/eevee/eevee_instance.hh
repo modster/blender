@@ -26,32 +26,32 @@
 
 #include "BLI_vector.hh"
 
-#include "eevee_accumulator.hh"
-#include "eevee_random.hh"
+#include "eevee_film.hh"
 #include "eevee_renderpasses.hh"
+#include "eevee_sampling.hh"
 #include "eevee_shaders.hh"
 #include "eevee_view.hh"
 
-using namespace blender;
+namespace blender::eevee {
 
-typedef struct EEVEE_Instance {
+typedef struct Instance {
  public:
   /** Outputs passes. */
-  EEVEE_RenderPasses render_passes;
+  RenderPasses render_passes;
   /** Shading passes. Shared between views. Objects will subscribe to one of them. */
-  EEVEE_ShadingPasses shading_passes;
+  ShadingPasses shading_passes;
   /** Shader module. shared between instances. */
-  EEVEE_Shaders &shaders;
+  ShaderModule &shaders;
   /** Lookdev own lightweight instance. May not be allocated. */
-  // EEVEE_Lookdev *lookdev = nullptr;
+  // Lookdev *lookdev = nullptr;
 
  private:
   /** Random number generator, this is its persistent state. */
-  EEVEE_Random random_;
+  Sampling sampling_;
   /** Shaded view for the main output. */
-  Vector<EEVEE_ShadingView> shading_views_;
+  Vector<ShadingView> shading_views_;
   /** Point of view in the scene. Can be init from viewport. */
-  EEVEE_Camera camera_;
+  Camera camera_;
 
   Scene *scene_ = nullptr;
   ViewLayer *view_layer_ = nullptr;
@@ -60,18 +60,20 @@ typedef struct EEVEE_Instance {
   const DRWView *viewport_drw_view_ = nullptr;
 
  public:
-  EEVEE_Instance(EEVEE_Shaders &shared_shaders)
-      : render_passes(shared_shaders), shaders(shared_shaders){};
-  ~EEVEE_Instance(void){};
+  Instance(ShaderModule &shared_shaders)
+      : render_passes(shared_shaders, camera_), shaders(shared_shaders), camera_(sampling_){};
+  ~Instance(){};
 
   /* Init funcion that needs to be called once at the start of a frame.
-   * Active camera, render resolution and enabled render passes are set in stone after this. */
-  void init(int output_res[2],
+   * Active camera, render extent and enabled render passes are immutable until next init.
+   * This takes care of resizing output buffers and view in case a parameter changed. */
+  void init(const int output_res[2],
             Scene *scene,
             ViewLayer *view_layer,
             Depsgraph *depsgraph,
             Object *camera_object = nullptr,
-            const DRWView *drw_view = nullptr)
+            const DRWView *drw_view = nullptr,
+            const RegionView3D *rv3d = nullptr)
   {
     BLI_assert(camera_object || drw_view);
 
@@ -80,21 +82,11 @@ typedef struct EEVEE_Instance {
     depsgraph_ = depsgraph;
     viewport_drw_view_ = drw_view;
 
-    if (camera_object) {
-      camera_.init(camera_object);
-    }
-    else if (drw_view) {
-      camera_.init(drw_view);
-    }
+    sampling_.init(scene);
+    camera_.init(camera_object, drw_view, rv3d, scene->r.gauss);
 
-    EEVEE_AccumulatorParameters accum_params;
-    accum_params.res[0] = output_res[0];
-    accum_params.res[1] = output_res[1];
-    accum_params.filter_size = scene->r.gauss;
-    accum_params.projection = camera_.projection;
-
-    eEEVEERenderPassBit render_passes_bits = COMBINED;
-    render_passes.configure(render_passes_bits, accum_params);
+    eRenderPassBit render_passes_bits = RENDERPASS_COMBINED | RENDERPASS_DEPTH;
+    render_passes.configure(render_passes_bits, output_res);
 
     /* Init internal render view(s). */
     float resolution_scale = 1.0f; /* TODO(fclem) parameter. */
@@ -103,15 +95,28 @@ typedef struct EEVEE_Instance {
       render_res[i] = max_ii(1, roundf(output_res[i] * resolution_scale));
     }
 
-    if (ELEM(camera_.projection, ORTHO, PERSP) || true) {
-      if (shading_views_.size() != 1) {
-        shading_views_.resize(1);
+    int view_count = camera_.view_count_get();
+    if (shading_views_.size() != view_count) {
+      /* FIXME(fclem) Strange, seems like resizing half-clears the objects? */
+      shading_views_.clear();
+      shading_views_.resize(view_count);
+    }
+
+    if (camera_.is_panoramic()) {
+      int64_t render_pixel_count = render_res[0] * (int64_t)render_res[0];
+      /* Divide pixel count between the 6 views. Rendering to a square target. */
+      render_res[0] = render_res[1] = ceilf(sqrtf(1 + (render_pixel_count / 6)));
+
+      static const char *view_names[6] = {
+          "posX_view", "negX_view", "posY_view", "negY_view", "posZ_view", "negZ_view"};
+      for (int i = 0; i < view_count; i++) {
+        shading_views_[i].configure(
+            view_names[i], render_passes, shading_passes, sampling_, camera_, i, render_res);
       }
-      shading_views_[0].configure(
-          "main_view", render_passes, shading_passes, random_, camera_, render_res);
     }
     else {
-      /* TODO(fclem) Panoramic projection. */
+      shading_views_[0].configure(
+          "main_view", render_passes, shading_passes, sampling_, camera_, 0, render_res);
     }
   }
 
@@ -120,7 +125,7 @@ typedef struct EEVEE_Instance {
     render_passes.init();
     shading_passes.init(shaders);
 
-    for (EEVEE_ShadingView &view : shading_views_) {
+    for (ShadingView &view : shading_views_) {
       view.init();
     }
   }
@@ -131,34 +136,41 @@ typedef struct EEVEE_Instance {
 
   void object_sync(Object *ob)
   {
-    if (ob->type == OB_MESH) {
-      shading_passes.opaque.surface_add(ob, nullptr, 0);
+    switch (ob->type) {
+      case OB_MESH:
+        shading_passes.opaque.surface_add(ob, nullptr, 0);
+        break;
+
+      default:
+        break;
     }
   }
 
   void end_sync(void)
   {
+    camera_.end_sync();
   }
 
-  /* Return false if accumulation has finished. */
-  bool render_sample()
+  void render_sample()
   {
-    /* For testing */
-    random_.reset();
-
-    bool do_sample = random_.step();
-
-    if (!do_sample) {
-      return false;
+    if (sampling_.finished()) {
+      return;
     }
 
     /* TODO update shadowmaps, planars, etc... */
 
-    for (EEVEE_ShadingView &view : shading_views_) {
+    for (ShadingView &view : shading_views_) {
       view.render();
     }
 
-    return true;
+    sampling_.step();
   }
 
-} EEVEE_Instance;
+  bool finished(void) const
+  {
+    return sampling_.finished();
+  }
+
+} Instance;
+
+}  // namespace blender::eevee

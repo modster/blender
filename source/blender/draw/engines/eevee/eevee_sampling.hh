@@ -24,29 +24,64 @@
 
 #pragma once
 
+#include "BLI_rand.h"
+#include "DNA_scene_types.h"
 #include "GPU_framebuffer.h"
 #include "GPU_texture.h"
 
 #include "DRW_render.h"
 
-typedef struct EEVEE_Random {
+namespace blender::eevee {
+
+typedef struct Sampling {
+ private:
   /** 1 based current sample. */
-  uint64_t sample = 1;
+  uint64_t sample_ = 1;
   /** Target sample count. */
-  uint64_t sample_count = 1;
+  uint64_t sample_count_ = 64;
+
+ public:
+  void init(const Scene *scene)
+  {
+    sample_count_ = DRW_state_is_image_render() ? scene->eevee.taa_render_samples :
+                                                  scene->eevee.taa_samples;
+
+    if (sample_count_ == 0) {
+      BLI_assert(!DRW_state_is_image_render());
+      sample_count_ = 999999;
+    }
+  }
 
   void reset(void)
   {
-    sample = 1;
+    sample_ = 1;
   }
 
-  /* Return true if a new iteration is needed. */
-  bool step(void)
+  void step(void)
   {
-    if (sample <= sample_count) {
-      sample++;
-      return true;
-    }
-    return false;
+    sample_++;
   }
-} EEVEE_Random;
+
+  uint64_t sample_get(void) const
+  {
+    return sample_;
+  }
+
+  void camera_lds_get(float r_vec[2])
+  {
+    /* TODO(fclem) we could use some persistent states to speedup the computation. */
+    double r[2], offset[2];
+    uint32_t primes[2] = {2, 3};
+    BLI_halton_2d(primes, offset, sample_, r);
+    r_vec[0] = r[0];
+    r_vec[1] = r[1];
+  }
+
+  bool finished(void) const
+  {
+    return (sample_ > sample_count_);
+  }
+
+} Sampling;
+
+}  // namespace blender::eevee

@@ -36,11 +36,13 @@
 #include "eevee_renderpasses.hh"
 #include "eevee_shaders.hh"
 
-typedef struct EEVEE_DeferredPass {
-  DRWPass *test_ps_ = nullptr;
-  EEVEE_Shaders *shaders_ = nullptr;
+namespace blender::eevee {
 
-  void init(EEVEE_Shaders &shaders)
+typedef struct DeferredPass {
+  DRWPass *test_ps_ = nullptr;
+  ShaderModule *shaders_ = nullptr;
+
+  void init(ShaderModule &shaders)
   {
     shaders_ = &shaders;
 
@@ -62,58 +64,61 @@ typedef struct EEVEE_DeferredPass {
   {
     DRW_draw_pass(test_ps_);
   }
-} EEVEE_DeferredPass;
+} DeferredPass;
 
-typedef struct EEVEE_ShadingPasses {
-  // EEVEE_BackgroundShadingPass background;
-  EEVEE_DeferredPass opaque;
+typedef struct ShadingPasses {
+  // BackgroundShadingPass background;
+  DeferredPass opaque;
 
-  void init(EEVEE_Shaders &shaders)
+  void init(ShaderModule &shaders)
   {
     opaque.init(shaders);
   }
-} EEVEE_ShadingPasses;
+} ShadingPasses;
 
-typedef struct EEVEE_ShadingView {
+typedef struct ShadingView {
  private:
   /** Owned resources. */
   GPUFrameBuffer *view_fb_ = nullptr;
   /** Output render passes to accumulate to. */
-  EEVEE_RenderPasses *render_passes_ = nullptr;
+  RenderPasses *render_passes_ = nullptr;
   /** Shading passes to render using this view. */
-  EEVEE_ShadingPasses *shading_passes_ = nullptr;
-  EEVEE_Camera *camera_ = nullptr;
-  EEVEE_Random *random_ = nullptr;
+  ShadingPasses *shading_passes_ = nullptr;
+  Camera *camera_ = nullptr;
+  Sampling *sampling_ = nullptr;
   /** Draw resources. */
   GPUTexture *combined_tx_ = nullptr;
   GPUTexture *depth_tx_ = nullptr;
-  DRWView *drw_view_ = nullptr;
-  /** View render target resolution. */
-  int res_[2] = {-1, -1};
+  /** View render target extent. */
+  int extent_[2] = {-1, -1};
+  /** View ID when rendering in panoramic projection mode. */
+  int view_id_ = 0;
 
   const char *name_;
 
  public:
-  EEVEE_ShadingView(void){};
+  ShadingView(void){};
 
-  ~EEVEE_ShadingView(void)
+  ~ShadingView()
   {
     GPU_framebuffer_free(view_fb_);
   }
 
   void configure(const char *name,
-                 EEVEE_RenderPasses &render_passes,
-                 EEVEE_ShadingPasses &shading_passes,
-                 EEVEE_Random &random,
-                 EEVEE_Camera &camera,
-                 const int resolution[2])
+                 RenderPasses &render_passes,
+                 ShadingPasses &shading_passes,
+                 Sampling &sampling,
+                 Camera &camera,
+                 int view_id,
+                 const int extent[2])
   {
     name_ = name;
     render_passes_ = &render_passes;
     shading_passes_ = &shading_passes;
-    random_ = &random;
+    sampling_ = &sampling;
     camera_ = &camera;
-    copy_v2_v2_int(res_, resolution);
+    view_id_ = view_id;
+    copy_v2_v2_int(extent_, extent);
   }
 
   void init(void)
@@ -122,35 +127,41 @@ typedef struct EEVEE_ShadingView {
      * With this, we can reuse the same texture across views. */
     DrawEngineType *owner = (DrawEngineType *)name_;
 
-    // eEEVEERenderPassBit enabled_passes = render_passes_->enabled_passes_get();
+    // eRenderPassBit enabled_passes = render_passes_->enabled_passes_get();
 
-    depth_tx_ = DRW_texture_pool_query_2d(UNPACK2(res_), GPU_DEPTH24_STENCIL8, owner);
-    combined_tx_ = DRW_texture_pool_query_2d(UNPACK2(res_), GPU_RGBA16F, owner);
+    depth_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_DEPTH24_STENCIL8, owner);
+    combined_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
 
     GPU_framebuffer_ensure_config(&view_fb_,
                                   {
                                       GPU_ATTACHMENT_TEXTURE(depth_tx_),
                                       GPU_ATTACHMENT_TEXTURE(combined_tx_),
                                   });
-
-    // drw_view_ = DRW_view_create();
   }
 
   void render(void)
   {
-    float color[4] = {0.5f, 1.0f, 0.1f, 1.0f};
-    // DRW_view_update(drw_view_, );
+    float color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    DRW_stats_group_start(name_);
+
+    DRWView *drw_view = camera_->update_view(view_id_, extent_);
+    DRW_view_set_active(drw_view);
 
     GPU_framebuffer_bind(view_fb_);
     GPU_framebuffer_clear_color_depth(view_fb_, color, 1.0f);
     shading_passes_->opaque.render();
 
     if (render_passes_->combined) {
-      render_passes_->combined->accumulate(combined_tx_, drw_view_);
+      render_passes_->combined->accumulate(combined_tx_, drw_view);
     }
 
     if (render_passes_->depth) {
-      render_passes_->depth->accumulate(depth_tx_, drw_view_);
+      render_passes_->depth->accumulate(depth_tx_, drw_view);
     }
+
+    DRW_stats_group_end();
   }
-} EEVEE_ShadingView;
+} ShadingView;
+
+}  // namespace blender::eevee
