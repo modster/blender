@@ -229,13 +229,6 @@ bool GeometrySet::has_mesh() const
   return component != nullptr && component->has_mesh();
 }
 
-/* Returns a read-only mesh or null. */
-const DCurve *GeometrySet::get_curve_for_read() const
-{
-  const CurveComponent *component = this->get_component_for_read<CurveComponent>();
-  return (component == nullptr) ? nullptr : component->get_for_read();
-}
-
 /* Returns a read-only point cloud of null. */
 const PointCloud *GeometrySet::get_pointcloud_for_read() const
 {
@@ -247,6 +240,13 @@ const PointCloud *GeometrySet::get_pointcloud_for_read() const
 const Volume *GeometrySet::get_volume_for_read() const
 {
   const VolumeComponent *component = this->get_component_for_read<VolumeComponent>();
+  return (component == nullptr) ? nullptr : component->get_for_read();
+}
+
+/* Returns a read-only curve or null. */
+const DCurve *GeometrySet::get_curve_for_read() const
+{
+  const CurveComponent *component = this->get_component_for_read<CurveComponent>();
   return (component == nullptr) ? nullptr : component->get_for_read();
 }
 
