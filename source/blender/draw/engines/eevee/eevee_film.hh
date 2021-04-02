@@ -28,12 +28,15 @@
 
 #pragma once
 
+#include "BLI_rect.h"
+
 #include "GPU_framebuffer.h"
 #include "GPU_texture.h"
 
 #include "DRW_render.h"
 
 #include "eevee_camera.hh"
+#include "eevee_sampling.hh"
 #include "eevee_shader.hh"
 
 namespace blender::eevee {
@@ -59,6 +62,7 @@ static eGPUTextureFormat to_gpu_texture_format(eFilmDataType film_type)
 typedef struct Film {
  private:
   /** Owned resources. */
+  GPUFrameBuffer *read_result_fb_ = nullptr;
   GPUFrameBuffer *accumulation_fb_[2] = {nullptr};
   GPUTexture *data_tx_[2] = {nullptr};
   GPUTexture *weight_tx_[2] = {nullptr};
@@ -79,15 +83,23 @@ typedef struct Film {
 
   ShaderModule &shaders_;
   Camera &camera_;
+  Sampling &sampling_;
+
+  /** True if offset or size changed. */
+  bool has_changed_ = true;
 
   /** Debug static name. */
   const char *name_;
 
  public:
   /* NOTE: name needs to be static. */
-  Film(ShaderModule &shaders, Camera &camera, eFilmDataType data_type, const char *name)
+  Film(ShaderModule &shaders,
+       Camera &camera,
+       Sampling &sampling,
+       eFilmDataType data_type,
+       const char *name)
 
-      : shaders_(shaders), camera_(camera), name_(name)
+      : shaders_(shaders), camera_(camera), sampling_(sampling), name_(name)
   {
     data_.extent[0] = data_.extent[1] = -1;
     data_.data_type = data_type;
@@ -103,6 +115,7 @@ typedef struct Film {
 
   void clear(void)
   {
+    GPU_FRAMEBUFFER_FREE_SAFE(read_result_fb_);
     for (int i = 0; i < 2; i++) {
       GPU_FRAMEBUFFER_FREE_SAFE(accumulation_fb_[i]);
       GPU_TEXTURE_FREE_SAFE(data_tx_[i]);
@@ -111,18 +124,36 @@ typedef struct Film {
     data_.use_history = 0;
   }
 
-  void init(const int extent[2])
+  void init(const int full_extent[2], const rcti *output_rect)
   {
-    char full_name[32];
+    int extent[2] = {BLI_rcti_size_x(output_rect), BLI_rcti_size_y(output_rect)};
+    int offset[2] = {output_rect->xmin, output_rect->ymin};
 
-    /* TODO reprojection. */
-    data_.use_history = camera_.has_changed() ? 0 : 1;
+    has_changed_ = false;
 
     if (!equals_v2v2_int(data_.extent, extent)) {
       copy_v2_v2_int(data_.extent, extent);
       this->clear();
+      has_changed_ = true;
     }
 
+    if (!equals_v2v2_int(data_.offset, offset)) {
+      copy_v2_v2_int(data_.offset, offset);
+      has_changed_ = true;
+    }
+
+    /* TODO reprojection. */
+    if (camera_.has_changed()) {
+      has_changed_ = true;
+    }
+
+    for (int i = 0; i < 2; i++) {
+      data_.uv_scale[i] = 1.0f / full_extent[i];
+      data_.uv_scale_inv[i] = full_extent[i];
+      data_.uv_bias[i] = offset[i] / (float)full_extent[i];
+    }
+
+    char full_name[32];
     for (int i = 0; i < 2; i++) {
       if (data_tx_[i] == nullptr) {
         eGPUTextureFormat tex_format = to_gpu_texture_format(data_.data_type);
@@ -140,11 +171,16 @@ typedef struct Film {
                                       });
       }
     }
+  }
 
-    if (data_.use_history == 0) {
-      GPU_uniformbuf_update(ubo_, &data_);
+  void sync(void)
+  {
+    if (has_changed_) {
+      sampling_.reset();
+      data_.use_history = 0;
     }
 
+    char full_name[32];
     eGPUSamplerState no_filter = GPU_SAMPLER_DEFAULT;
     {
       SNPRINTF(full_name, "Film.%s.Accumulate", name_);
@@ -169,6 +205,10 @@ typedef struct Film {
       DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
       DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
     }
+
+    if (data_.use_history == 0) {
+      GPU_uniformbuf_update(ubo_, &data_);
+    }
   }
 
   void accumulate(GPUTexture *input, DRWView *view)
@@ -191,17 +231,52 @@ typedef struct Film {
     }
   }
 
-  void resolve_onto(GPUFrameBuffer *target)
+  void resolve_viewport(GPUFrameBuffer *target)
   {
+    int viewport[4];
+
     GPU_framebuffer_bind(target);
+    GPU_framebuffer_viewport_get(target, viewport);
+
+    const bool use_render_border = (data_.offset[0] > 0) || (data_.offset[1] > 0) ||
+                                   (data_.extent[0] < viewport[2]) ||
+                                   (data_.extent[1] < viewport[3]);
+    if (use_render_border) {
+      if (has_changed_) {
+        /* Film is cropped and does not fill the view completely. Clear the background. */
+        if (data_.data_type == FILM_DATA_DEPTH) {
+          GPU_framebuffer_clear_depth(target, 1.0f);
+        }
+        else {
+          float color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+          GPU_framebuffer_clear_color(target, color);
+        }
+      }
+      GPU_framebuffer_viewport_set(target, UNPACK2(data_.offset), UNPACK2(data_.extent));
+    }
 
     DRW_draw_pass(resolve_ps_);
+
+    if (use_render_border) {
+      GPU_framebuffer_viewport_reset(target);
+    }
   }
 
-  void read_to_memory(float *data)
+  void read_result(float *data)
   {
-    /* TODO(fclem) implement. */
-    (void)data;
+    /* Resolve onto the next data texture. */
+    GPU_framebuffer_ensure_config(&read_result_fb_,
+                                  {
+                                      GPU_ATTACHMENT_NONE,
+                                      GPU_ATTACHMENT_TEXTURE(data_tx_[1]),
+                                  });
+    GPU_framebuffer_bind(read_result_fb_);
+    DRW_draw_pass(resolve_ps_);
+
+    eGPUTextureFormat format = to_gpu_texture_format(data_.data_type);
+    int channel_count = GPU_texture_component_len(format);
+    GPU_framebuffer_read_color(
+        read_result_fb_, 0, 0, UNPACK2(data_.extent), channel_count, 0, GPU_DATA_FLOAT, data);
   }
 } Film;
 

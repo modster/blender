@@ -26,6 +26,8 @@
 
 #include "BKE_camera.h"
 
+#include "RE_pipeline.h"
+
 #include "DNA_camera_types.h"
 #include "DNA_object_types.h"
 #include "DNA_view3d_types.h"
@@ -126,9 +128,9 @@ typedef struct Camera {
  private:
   eCameraType type_;
   /** Main views are created from the camera (or is from the viewport). They are not jittered. */
-  Vector<const DRWView *> main_views_;
+  Vector<DRWView *, 6> main_views_;
   /** Sub views are jittered versions or the main views. */
-  Vector<DRWView *> sub_views_;
+  Vector<DRWView *, 6> sub_views_;
   /** Random module to know what jitter to apply to the view. */
   Sampling &sampling_;
   /** Double buffered to detect changes and have history for re-projection. */
@@ -137,7 +139,9 @@ typedef struct Camera {
     GPUUniformBuf *ubo_;
   } current, previous;
   /** True if camera matrix has change since last init. */
-  bool has_changed_;
+  bool has_changed_ = true;
+  /** Reset by init(). Makes sure only first sync detects changes. */
+  bool is_init_ = false;
 
  public:
   Camera(Sampling &sampling) : sampling_(sampling)
@@ -147,6 +151,10 @@ typedef struct Camera {
 
     previous.data_ = (CameraData *)MEM_callocN(sizeof(CameraData), "CameraData");
     previous.ubo_ = GPU_uniformbuf_create_ex(sizeof(CameraData), nullptr, "CameraData");
+
+    /* Alloc at least 6 view for panoramic projections. */
+    main_views_.resize(6);
+    sub_views_.resize(6);
   };
 
   ~Camera()
@@ -157,82 +165,24 @@ typedef struct Camera {
     DRW_UBO_FREE_SAFE(previous.ubo_);
   };
 
-  void init(const Object *camera_object,
-            const DRWView *drw_view,
-            const RegionView3D *rv3d,
-            float filter_size)
+  void init(const Object *camera_object_eval, const DRWView *drw_view)
   {
     SWAP(CameraData *, current.data_, previous.data_);
     SWAP(GPUUniformBuf *, current.ubo_, previous.ubo_);
 
     CameraData &data = *current.data_;
 
-    this->sync(camera_object, drw_view, rv3d, filter_size);
-
-    has_changed_ = data != *previous.data_;
-
-    if (has_changed_) {
-      sampling_.reset();
-    }
-
-    int view_count = view_count_get();
-    if (main_views_.size() != view_count) {
-      main_views_.resize(view_count);
-      sub_views_.resize(view_count);
-    }
-
-    if (this->is_panoramic()) {
-      float winmat[4][4], near = data.near_clip, far = data.far_clip;
-      /* TODO(fclem) Overscans. */
-      perspective_m4(winmat, -near, near, -near, near, near, far);
-
-      for (int i = 0; i < view_count; i++) {
-        float viewmat[4][4];
-        mul_m4_m4m4(viewmat, cubeface_matrix[i], data.viewmat);
-
-        main_views_[i] = DRW_view_create(viewmat, winmat, nullptr, nullptr, nullptr);
-        sub_views_[i] = DRW_view_create_sub(main_views_[i], viewmat, winmat);
-      }
-    }
-    else {
-      float(*winmat)[4] = data.winmat;
-      float(*viewmat)[4] = data.viewmat;
-      main_views_[0] = DRW_view_create(viewmat, winmat, nullptr, nullptr, nullptr);
-      sub_views_[0] = DRW_view_create_sub(main_views_[0], viewmat, winmat);
-    }
-  }
-
-  void sync(const Object *camera_object,
-            const DRWView *drw_view,
-            const RegionView3D *rv3d,
-            float filter_size)
-  {
-    CameraData &data = *current.data_;
-
-    data.filter_size = filter_size;
-
     if (drw_view) {
-      DRW_view_viewmat_get(drw_view, data.viewmat, false);
-      DRW_view_viewmat_get(drw_view, data.viewinv, true);
-      DRW_view_winmat_get(drw_view, data.winmat, false);
-      DRW_view_winmat_get(drw_view, data.wininv, true);
-      DRW_view_persmat_get(drw_view, data.persmat, false);
-      DRW_view_persmat_get(drw_view, data.persinv, true);
+      DRW_view_camtexco_get(drw_view, &data.uv_scale[0]);
     }
     else {
-      /* TODO(fclem) Render */
+      copy_v2_fl(data.uv_scale, 1.0f);
+      copy_v2_fl(data.uv_bias, 0.0f);
     }
-
-    if (camera_object) {
-      if (rv3d) {
-        copy_v2_v2(data.uv_scale, &rv3d->viewcamtexcofac[0]);
-        copy_v2_v2(data.uv_bias, &rv3d->viewcamtexcofac[2]);
-      }
-      else {
-        copy_v2_fl(data.uv_scale, 1.0f);
-        copy_v2_fl(data.uv_bias, 0.0f);
-      }
-      const ::Camera *cam = reinterpret_cast<const ::Camera *>(camera_object->data);
+    /* These settings need to be set early and are immutable for the entire frame.
+     * This means no motion blur animation support for these. */
+    if (camera_object_eval) {
+      const ::Camera *cam = reinterpret_cast<const ::Camera *>(camera_object_eval->data);
       data.type = from_camera(cam);
       data.near_clip = cam->clip_start;
       data.far_clip = cam->clip_end;
@@ -253,8 +203,84 @@ typedef struct Camera {
       data.type = DRW_view_is_persp_get(drw_view) ? CAMERA_PERSP : CAMERA_ORTHO;
       data.near_clip = DRW_view_near_distance_get(drw_view);
       data.far_clip = DRW_view_far_distance_get(drw_view);
-      copy_v2_fl(data.uv_scale, 1.0f);
-      copy_v2_fl(data.uv_bias, 0.0f);
+      data.fisheye_fov = data.fisheye_lens = -1.0f;
+      copy_v2_fl(data.equirect_bias, 0.0f);
+      copy_v2_fl(data.equirect_scale, 0.0f);
+    }
+
+    is_init_ = false;
+  }
+
+  void sync(const RenderEngine *engine,
+            const Object *camera_object_eval,
+            const DRWView *drw_view,
+            float filter_size,
+            float overscan)
+  {
+    CameraData &data = *current.data_;
+
+    data.filter_size = filter_size;
+
+    if (drw_view) {
+      DRW_view_viewmat_get(drw_view, data.viewmat, false);
+      DRW_view_viewmat_get(drw_view, data.viewinv, true);
+      DRW_view_winmat_get(drw_view, data.winmat, false);
+      DRW_view_winmat_get(drw_view, data.wininv, true);
+      DRW_view_persmat_get(drw_view, data.persmat, false);
+      DRW_view_persmat_get(drw_view, data.persinv, true);
+    }
+    else {
+      /* TODO(fclem) Overscan */
+      (void)overscan;
+      // RE_GetCameraWindowWithOverscan(engine->re, g_data->overscan, data.winmat);
+      RE_GetCameraWindow(engine->re, camera_object_eval, data.winmat);
+      RE_GetCameraModelMatrix(engine->re, camera_object_eval, data.viewinv);
+      invert_m4_m4(data.viewmat, data.viewinv);
+      invert_m4_m4(data.wininv, data.winmat);
+      mul_m4_m4m4(data.persmat, data.winmat, data.viewmat);
+      invert_m4_m4(data.persinv, data.persmat);
+    }
+
+    memset(main_views_.data(), 0, sizeof(main_views_[0]) * main_views_.size());
+    memset(sub_views_.data(), 0, sizeof(sub_views_[0]) * sub_views_.size());
+
+    if (this->is_panoramic()) {
+      float winmat[4][4], near = data.near_clip, far = data.far_clip;
+      /* TODO(fclem) Overscans. */
+      perspective_m4(winmat, -near, near, -near, near, near, far);
+
+      for (int i = view_count_get() - 1; i >= 0; i--) {
+        float viewmat[4][4];
+        mul_m4_m4m4(viewmat, cubeface_matrix[i], data.viewmat);
+
+        if (main_views_[i] == nullptr) {
+          main_views_[i] = DRW_view_create(viewmat, winmat, nullptr, nullptr, nullptr);
+          sub_views_[i] = DRW_view_create_sub(main_views_[i], viewmat, winmat);
+        }
+        else {
+          DRW_view_update(main_views_[i], viewmat, winmat, nullptr, nullptr);
+          DRW_view_update_sub(sub_views_[i], viewmat, winmat);
+        }
+      }
+    }
+    else {
+      if (main_views_[0] == nullptr) {
+        main_views_[0] = DRW_view_create(data.viewmat, data.winmat, nullptr, nullptr, nullptr);
+        sub_views_[0] = DRW_view_create_sub(main_views_[0], data.viewmat, data.winmat);
+      }
+      else {
+        DRW_view_update(main_views_[0], data.viewmat, data.winmat, nullptr, nullptr);
+        DRW_view_update_sub(main_views_[0], data.viewmat, data.winmat);
+      }
+    }
+
+    /* Detect changes in parameters. */
+    if (!is_init_) {
+      is_init_ = true;
+      has_changed_ = *current.data_ != *previous.data_;
+      if (has_changed_) {
+        sampling_.reset();
+      }
     }
   }
 
@@ -263,6 +289,7 @@ typedef struct Camera {
     GPU_uniformbuf_update(current.ubo_, current.data_);
   }
 
+  /* Apply jittering to the view and returns it. */
   DRWView *update_view(int view_id, int target_res[2])
   {
     const DRWView *main_view = main_views_[view_id];

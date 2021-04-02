@@ -42,7 +42,7 @@ typedef struct DeferredPass {
   DRWPass *test_ps_ = nullptr;
   ShaderModule *shaders_ = nullptr;
 
-  void init(ShaderModule &shaders)
+  void sync(ShaderModule &shaders)
   {
     shaders_ = &shaders;
 
@@ -70,9 +70,9 @@ typedef struct ShadingPasses {
   // BackgroundShadingPass background;
   DeferredPass opaque;
 
-  void init(ShaderModule &shaders)
+  void sync(ShaderModule &shaders)
   {
-    opaque.init(shaders);
+    opaque.sync(shaders);
   }
 } ShadingPasses;
 
@@ -104,13 +104,13 @@ typedef struct ShadingView {
     GPU_framebuffer_free(view_fb_);
   }
 
-  void configure(const char *name,
-                 RenderPasses &render_passes,
-                 ShadingPasses &shading_passes,
-                 Sampling &sampling,
-                 Camera &camera,
-                 int view_id,
-                 const int extent[2])
+  void init(const char *name,
+            RenderPasses &render_passes,
+            ShadingPasses &shading_passes,
+            Sampling &sampling,
+            Camera &camera,
+            int view_id,
+            const int extent[2])
   {
     name_ = name;
     render_passes_ = &render_passes;
@@ -119,15 +119,10 @@ typedef struct ShadingView {
     camera_ = &camera;
     view_id_ = view_id;
     copy_v2_v2_int(extent_, extent);
-  }
 
-  void init(void)
-  {
     /* HACK: View name should be unique and static.
      * With this, we can reuse the same texture across views. */
     DrawEngineType *owner = (DrawEngineType *)name_;
-
-    // eRenderPassBit enabled_passes = render_passes_->enabled_passes_get();
 
     depth_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_DEPTH24_STENCIL8, owner);
     combined_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);

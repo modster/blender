@@ -35,6 +35,9 @@ void EEVEE_instance_cache_populate(struct EEVEE_Instance *instance, struct Objec
 void EEVEE_instance_cache_finish(struct EEVEE_Instance *instance);
 
 void EEVEE_instance_draw_viewport(struct EEVEE_Instance *instance_data_);
+void EEVEE_instance_render_frame(struct EEVEE_Instance *instance_data_,
+                                 struct RenderEngine *engine,
+                                 struct RenderLayer *layer);
 
 void EEVEE_shared_data_free(void);
 

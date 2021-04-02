@@ -18,21 +18,77 @@
 
 #pragma once
 
+#include "RE_pipeline.h"
+
 #include "eevee_film.hh"
 
 namespace blender::eevee {
+
+/* -------------------------------------------------------------------- */
+/** \name eRenderPassBit
+ *
+ * This enum might seems redundant but there is an opportunity to use it for internal debug passes.
+ * \{ */
 
 enum eRenderPassBit {
   RENDERPASS_NONE = 0,
   RENDERPASS_COMBINED = (1 << 0),
   RENDERPASS_DEPTH = (1 << 1),
   RENDERPASS_NORMAL = (1 << 2),
+  /** Used for iterator. */
+  RENDERPASS_MAX,
 };
 
 ENUM_OPERATORS(eRenderPassBit, RENDERPASS_NORMAL)
 
+static eRenderPassBit to_render_passes_bits(int i_rpasses)
+{
+  eRenderPassBit rpasses = RENDERPASS_NONE;
+  SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_COMBINED, RENDERPASS_COMBINED);
+  SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_Z, RENDERPASS_DEPTH);
+  SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_NORMAL, RENDERPASS_NORMAL);
+  return rpasses;
+}
+
+static const char *to_render_passes_name(eRenderPassBit rpass)
+{
+  switch (rpass) {
+    case RENDERPASS_COMBINED:
+      return RE_PASSNAME_COMBINED;
+    case RENDERPASS_DEPTH:
+      return RE_PASSNAME_Z;
+    case RENDERPASS_NORMAL:
+      return RE_PASSNAME_NORMAL;
+    default:
+      BLI_assert(0);
+      return "";
+  }
+}
+
+static eFilmDataType to_render_passes_data_type(eRenderPassBit rpass)
+{
+  switch (rpass) {
+    case RENDERPASS_COMBINED:
+      return FILM_DATA_COLOR;
+    case RENDERPASS_DEPTH:
+      return FILM_DATA_DEPTH;
+    case RENDERPASS_NORMAL:
+      return FILM_DATA_NORMAL;
+    default:
+      BLI_assert(0);
+      return FILM_DATA_COLOR;
+  }
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name RenderPasses
+ * \{ */
+
 typedef struct RenderPasses {
  public:
+  /** Film for each render pass. A nullptr means the pass is not needed. */
   Film *combined = nullptr;
   Film *depth = nullptr;
   Film *normal = nullptr;
@@ -41,12 +97,12 @@ typedef struct RenderPasses {
  private:
   ShaderModule &shaders_;
   Camera &camera_;
+  Sampling &sampling_;
   eRenderPassBit enabled_passes_ = RENDERPASS_NONE;
 
-  int extent_[2];
-
  public:
-  RenderPasses(ShaderModule &shaders, Camera &camera) : shaders_(shaders), camera_(camera){};
+  RenderPasses(ShaderModule &shaders, Camera &camera, Sampling &sampling)
+      : shaders_(shaders), camera_(camera), sampling_(sampling){};
 
   ~RenderPasses()
   {
@@ -55,55 +111,117 @@ typedef struct RenderPasses {
     delete normal;
   }
 
-  void configure(eRenderPassBit passes, const int extent[2])
+  void init(const RenderLayer *render_layer,
+            const View3D *v3d,
+            const int extent[2],
+            const rcti *output_rect)
   {
-    copy_v2_v2_int(extent_, extent);
-    enabled_passes_ = passes;
+    if (render_layer) {
+      enabled_passes_ = to_render_passes_bits(render_layer->passflag);
+    }
+    else {
+      BLI_assert(v3d);
+      enabled_passes_ = to_render_passes_bits(v3d->shading.render_pass);
+      /* We need the depth pass for compositing overlays or GPencil. */
+      if (!DRW_state_is_scene_render()) {
+        enabled_passes_ |= RENDERPASS_DEPTH;
+      }
+    }
 
-    pass_configure(passes, RENDERPASS_COMBINED, combined, FILM_DATA_COLOR, "Combined");
-    pass_configure(passes, RENDERPASS_DEPTH, depth, FILM_DATA_DEPTH, "Depth");
-    pass_configure(passes, RENDERPASS_NORMAL, normal, FILM_DATA_NORMAL, "Normal");
+    rcti fallback_rect;
+    if (BLI_rcti_is_empty(output_rect)) {
+      BLI_rcti_init(&fallback_rect, 0, extent[0], 0, extent[1]);
+      output_rect = &fallback_rect;
+    }
+
+    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
+      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
+      Film *&film = this->render_pass_bit_to_film_p(render_pass);
+
+      bool enable = (enabled_passes_ & render_pass) != 0;
+      if (enable && film == nullptr) {
+        film = new Film(shaders_,
+                        camera_,
+                        sampling_,
+                        to_render_passes_data_type(render_pass),
+                        to_render_passes_name(render_pass));
+      }
+      else if (!enable && film != nullptr) {
+        /* Delete unused passes. */
+        delete film;
+        film = nullptr;
+      }
+
+      if (film) {
+        film->init(extent, output_rect);
+      }
+    }
   }
 
-  void init(void)
+  void sync(void)
   {
-    if (combined) {
-      combined->init(extent_);
-    }
-    if (depth) {
-      depth->init(extent_);
-    }
-    if (normal) {
-      normal->init(extent_);
-    }
-    for (Film *aov : aovs) {
-      aov->init(extent_);
+    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
+      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
+      Film *film = this->render_pass_bit_to_film_p(render_pass);
+
+      if (film) {
+        film->sync();
+      }
     }
   }
 
-  eRenderPassBit enabled_passes_get(void)
+  void resolve_viewport(DefaultFramebufferList *dfbl)
   {
-    return enabled_passes_;
+    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
+      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
+      Film *film = this->render_pass_bit_to_film_p(render_pass);
+
+      if (film) {
+        if (render_pass == RENDERPASS_DEPTH) {
+          film->resolve_viewport(dfbl->depth_only_fb);
+        }
+        else {
+          /* Ensures only one color render pass is enabled. */
+          BLI_assert((enabled_passes_ & ~RENDERPASS_DEPTH) == render_pass);
+          film->resolve_viewport(dfbl->color_only_fb);
+        }
+      }
+    }
+  }
+
+  void read_result(RenderLayer *render_layer, const char *view_name)
+  {
+    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
+      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
+      Film *film = this->render_pass_bit_to_film_p(render_pass);
+
+      if (film) {
+        const char *pass_name = to_render_passes_name(render_pass);
+        RenderPass *rp = RE_pass_find_by_name(render_layer, pass_name, view_name);
+        if (rp) {
+          film->read_result(rp->rect);
+        }
+      }
+    }
   }
 
  private:
-  inline void pass_configure(eRenderPassBit passes,
-                             eRenderPassBit pass_bit,
-                             Film *&pass,
-                             eFilmDataType type,
-                             const char *name)
+  Film *&render_pass_bit_to_film_p(eRenderPassBit rpass)
   {
-    bool enable = (passes & pass_bit) != 0;
-    if (enable && pass == nullptr) {
-      pass = new Film(shaders_, camera_, type, name);
-    }
-    else if (!enable && pass != nullptr) {
-      /* Delete unused passes. */
-      delete pass;
-      pass = nullptr;
+    switch (rpass) {
+      case RENDERPASS_COMBINED:
+        return combined;
+      case RENDERPASS_DEPTH:
+        return depth;
+      case RENDERPASS_NORMAL:
+        return normal;
+      default:
+        BLI_assert(0);
+        return combined;
     }
   }
-
 } RenderPasses;
+
+/** \} */
 
 }  // namespace blender::eevee

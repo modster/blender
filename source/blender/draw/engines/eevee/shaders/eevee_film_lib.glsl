@@ -59,6 +59,17 @@ float film_filter_weight(CameraData camera, vec2 offset)
   return max(weight, 1e-6);
 }
 
+/* Camera UV is the full-frame UV. Film uv is after cropping from render border. */
+vec2 film_sample_from_camera_uv(FilmData film, vec2 sample_uv)
+{
+  return (sample_uv - film.uv_bias) * film.uv_scale_inv;
+}
+
+vec2 film_sample_to_camera_uv(FilmData film, vec2 sample_co)
+{
+  return sample_co * film.uv_scale + film.uv_bias;
+}
+
 void film_process_sample(CameraData camera,
                          FilmData film,
                          mat4 input_persmat,
@@ -70,7 +81,8 @@ void film_process_sample(CameraData camera,
 {
   /* Project sample from destrination space to source texture. */
   vec2 sample_center = gl_FragCoord.xy;
-  vec3 V_dst = camera_world_from_uv(camera, (sample_center + sample_offset) / vec2(film.extent));
+  vec2 sample_uv = film_sample_to_camera_uv(film, sample_center + sample_offset);
+  vec3 V_dst = camera_world_from_uv(camera, sample_uv);
   /* Pixels outside of projection range. */
   if (V_dst == vec3(0.0)) {
     return;
@@ -89,15 +101,17 @@ void film_process_sample(CameraData camera,
 
   /* Reproject sample location in destination space to have correct distance metric. */
   vec3 V_src = camera_world_from_uv(input_persinv, uv_src);
-  vec2 uv_dst = camera_uv_from_world(camera, V_src);
-  vec2 sample_dst = uv_dst * vec2(film.extent);
+  vec2 uv_cam = camera_uv_from_world(camera, V_src);
+  vec2 sample_dst = film_sample_from_camera_uv(film, uv_cam);
 
   /* Equirectangular projection might wrap and have more than one point mapping to the same
    * original coordinate. We need to get the closest pixel center.
    * NOTE: This is wrong for projection outside the main frame. */
   if (camera.type == CAMERA_PANO_EQUIRECT) {
-    vec3 V_center = camera_world_from_uv(camera, sample_center / vec2(film.extent));
-    sample_center = camera_uv_from_world(camera, V_center) * vec2(film.extent);
+    sample_center = film_sample_to_camera_uv(film, sample_center);
+    vec3 V_center = camera_world_from_uv(camera, sample_center);
+    sample_center = camera_uv_from_world(camera, V_center);
+    sample_center = film_sample_from_camera_uv(film, sample_center);
   }
   /* Compute filter weight and add to weighted sum. */
   vec2 offset = sample_dst - sample_center;

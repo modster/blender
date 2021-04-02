@@ -26,6 +26,8 @@
 
 #include "BLI_vector.hh"
 
+#include "DEG_depsgraph_query.h"
+
 #include "eevee_film.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_sampling.hh"
@@ -56,37 +58,62 @@ typedef struct Instance {
   Scene *scene_ = nullptr;
   ViewLayer *view_layer_ = nullptr;
   Depsgraph *depsgraph_ = nullptr;
-  /** Main view if used in a viewport without a camera object. */
-  const DRWView *viewport_drw_view_ = nullptr;
+  /** Only available when rendering for final render. */
+  const RenderLayer *render_layer_ = nullptr;
+  /** Only available when rendering for viewport. */
+  const DRWView *drw_view_ = nullptr;
+  const View3D *v3d_ = nullptr;
+  const RegionView3D *rv3d_ = nullptr;
+  /** Original object of the camera. */
+  Object *camera_original_ = nullptr;
 
  public:
   Instance(ShaderModule &shared_shaders)
-      : render_passes(shared_shaders, camera_), shaders(shared_shaders), camera_(sampling_){};
+      : render_passes(shared_shaders, camera_, sampling_),
+        shaders(shared_shaders),
+        camera_(sampling_){};
   ~Instance(){};
 
   /* Init funcion that needs to be called once at the start of a frame.
    * Active camera, render extent and enabled render passes are immutable until next init.
    * This takes care of resizing output buffers and view in case a parameter changed. */
   void init(const int output_res[2],
-            Scene *scene,
-            ViewLayer *view_layer,
+            const rcti *output_rect,
             Depsgraph *depsgraph,
             Object *camera_object = nullptr,
+            const RenderLayer *render_layer = nullptr,
             const DRWView *drw_view = nullptr,
+            const View3D *v3d = nullptr,
             const RegionView3D *rv3d = nullptr)
   {
     BLI_assert(camera_object || drw_view);
 
-    scene_ = scene;
-    view_layer_ = view_layer;
+    scene_ = DEG_get_evaluated_scene(depsgraph);
+    view_layer_ = DEG_get_evaluated_view_layer(depsgraph);
     depsgraph_ = depsgraph;
-    viewport_drw_view_ = drw_view;
+    camera_original_ = camera_object;
+    render_layer_ = render_layer;
+    drw_view_ = drw_view;
+    v3d_ = v3d;
+    rv3d_ = rv3d;
 
-    sampling_.init(scene);
-    camera_.init(camera_object, drw_view, rv3d, scene->r.gauss);
+    rcti rect;
+    {
+      rcti rect_full;
+      BLI_rcti_init(&rect_full, 0, output_res[0], 0, output_res[1]);
+      /* Clip the render border to region bounds. */
+      BLI_rcti_isect(output_rect, &rect_full, &rect);
+      if (BLI_rcti_is_empty(&rect)) {
+        BLI_rcti_init(&rect, 0, output_res[0], 0, output_res[1]);
+      }
+      output_rect = &rect;
+    }
 
-    eRenderPassBit render_passes_bits = RENDERPASS_COMBINED | RENDERPASS_DEPTH;
-    render_passes.configure(render_passes_bits, output_res);
+    const Object *camera_eval = DEG_get_evaluated_object(depsgraph_, camera_original_);
+
+    sampling_.init(scene_);
+    camera_.init(camera_eval, drw_view_);
+    render_passes.init(render_layer, v3d_, output_res, output_rect);
 
     /* Init internal render view(s). */
     float resolution_scale = 1.0f; /* TODO(fclem) parameter. */
@@ -110,28 +137,23 @@ typedef struct Instance {
       static const char *view_names[6] = {
           "posX_view", "negX_view", "posY_view", "negY_view", "posZ_view", "negZ_view"};
       for (int i = 0; i < view_count; i++) {
-        shading_views_[i].configure(
+        shading_views_[i].init(
             view_names[i], render_passes, shading_passes, sampling_, camera_, i, render_res);
       }
     }
     else {
-      shading_views_[0].configure(
+      shading_views_[0].init(
           "main_view", render_passes, shading_passes, sampling_, camera_, 0, render_res);
     }
   }
 
-  void begin_sync(void)
+  void begin_sync(RenderEngine *render)
   {
-    render_passes.init();
-    shading_passes.init(shaders);
+    const Object *camera_eval = DEG_get_evaluated_object(depsgraph_, camera_original_);
 
-    for (ShadingView &view : shading_views_) {
-      view.init();
-    }
-  }
-
-  void camera_sync(void)
-  {
+    camera_.sync(render, camera_eval, drw_view_, scene_->r.gauss, scene_->eevee.overscan);
+    render_passes.sync();
+    shading_passes.sync(shaders);
   }
 
   void object_sync(Object *ob)
@@ -146,12 +168,19 @@ typedef struct Instance {
     }
   }
 
+  /* Wrapper to use with DRW_render_object_iter. */
+  static void object_sync(void *instance_, Object *ob, RenderEngine *engine, Depsgraph *depsgraph)
+  {
+    UNUSED_VARS(engine, depsgraph);
+    reinterpret_cast<Instance *>(instance_)->object_sync(ob);
+  }
+
   void end_sync(void)
   {
     camera_.end_sync();
   }
 
-  void render_sample()
+  void render_sample(void)
   {
     if (sampling_.finished()) {
       return;
@@ -164,6 +193,41 @@ typedef struct Instance {
     }
 
     sampling_.step();
+  }
+
+  void render_frame(RenderEngine *engine, RenderLayer *render_layer, const char *view_name)
+  {
+    this->begin_sync(engine);
+    DRW_render_object_iter(this, engine, depsgraph_, object_sync);
+    this->end_sync();
+
+    DRW_render_instance_buffer_finish();
+
+    /* Also we weed to have a correct fbo bound for DRW_hair_update */
+    // GPU_framebuffer_bind();
+    // DRW_hair_update();
+
+    while (!sampling_.finished()) {
+      this->render_sample();
+      /* TODO(fclem) print progression. */
+    }
+
+    this->render_passes.read_result(render_layer, view_name);
+  }
+
+  void draw_viewport(DefaultFramebufferList *dfbl)
+  {
+    this->render_sample();
+
+    this->render_passes.resolve_viewport(dfbl);
+
+    // if (this->lookdev) {
+    // this->lookdev->resolve_onto(dfbl->default_fb);
+    // }
+
+    if (!sampling_.finished()) {
+      DRW_viewport_request_redraw();
+    }
   }
 
   bool finished(void) const

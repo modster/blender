@@ -79,12 +79,66 @@ static void eevee_instance_free(void *instance_data)
   EEVEE_instance_free((struct EEVEE_Instance *)instance_data);
 }
 
-static void eevee_render_to_image(void *vedata,
+static void eevee_render_to_image(void *UNUSED(vedata),
                                   struct RenderEngine *engine,
                                   struct RenderLayer *layer,
-                                  const struct rcti *rect)
+                                  const struct rcti *UNUSED(rect))
 {
-  UNUSED_VARS(vedata, engine, layer, rect);
+  struct EEVEE_Instance *instance = EEVEE_instance_alloc();
+  EEVEE_instance_render_frame(instance, engine, layer);
+  EEVEE_instance_free(instance);
+}
+
+static void eevee_render_update_passes(RenderEngine *engine, Scene *scene, ViewLayer *view_layer)
+{
+  RE_engine_register_pass(engine, scene, view_layer, RE_PASSNAME_COMBINED, 4, "RGBA", SOCK_RGBA);
+
+#define CHECK_PASS_LEGACY(name, type, channels, chanid) \
+  if (view_layer->passflag & (SCE_PASS_##name)) { \
+    RE_engine_register_pass( \
+        engine, scene, view_layer, RE_PASSNAME_##name, channels, chanid, type); \
+  } \
+  ((void)0)
+#define CHECK_PASS_EEVEE(name, type, channels, chanid) \
+  if (view_layer->eevee.render_passes & (EEVEE_RENDER_PASS_##name)) { \
+    RE_engine_register_pass( \
+        engine, scene, view_layer, RE_PASSNAME_##name, channels, chanid, type); \
+  } \
+  ((void)0)
+
+  CHECK_PASS_LEGACY(Z, SOCK_FLOAT, 1, "Z");
+  CHECK_PASS_LEGACY(MIST, SOCK_FLOAT, 1, "Z");
+  CHECK_PASS_LEGACY(NORMAL, SOCK_VECTOR, 3, "XYZ");
+  CHECK_PASS_LEGACY(SHADOW, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(AO, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(DIFFUSE_COLOR, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(DIFFUSE_DIRECT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(GLOSSY_COLOR, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(GLOSSY_DIRECT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(EMIT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_LEGACY(ENVIRONMENT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_EEVEE(VOLUME_LIGHT, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_EEVEE(BLOOM, SOCK_RGBA, 3, "RGB");
+
+  LISTBASE_FOREACH (ViewLayerAOV *, aov, &view_layer->aovs) {
+    if ((aov->flag & AOV_CONFLICT) != 0) {
+      continue;
+    }
+    switch (aov->type) {
+      case AOV_TYPE_COLOR:
+        RE_engine_register_pass(engine, scene, view_layer, aov->name, 4, "RGBA", SOCK_RGBA);
+        break;
+      case AOV_TYPE_VALUE:
+        RE_engine_register_pass(engine, scene, view_layer, aov->name, 1, "X", SOCK_FLOAT);
+        break;
+      default:
+        break;
+    }
+  }
+  // EEVEE_cryptomatte_update_passes(engine, scene, view_layer);
+
+#undef CHECK_PASS_LEGACY
+#undef CHECK_PASS_EEVEE
 }
 
 static const DrawEngineDataSize eevee_data_size = DRW_VIEWPORT_DATA_SIZE(EEVEE_Data);
@@ -121,7 +175,7 @@ RenderEngineType DRW_engine_viewport_eevee_type = {
     NULL,
     NULL,
     NULL,
-    NULL,
+    &eevee_render_update_passes,
     &draw_engine_eevee_type,
     {NULL, NULL, NULL},
 };

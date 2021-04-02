@@ -106,8 +106,14 @@ ENUM_TYPE_END
 
 STRUCT_TYPE_START(FilmData)
 {
-  /** Size of the render target. */
+  /** Size of the render target in pixels. */
   IVEC2(extent);
+  /** Offset of the render target in the full-res frame, in pixels. */
+  IVEC2(offset);
+  /** Scale and bias to filter only a region of the render (aka. render_border). */
+  VEC2(uv_bias);
+  VEC2(uv_scale);
+  VEC2(uv_scale_inv);
   /** Data type stored by this film. */
   ENUM(eFilmDataType, data_type);
   /** Is true if history is valid and can be sampled. Bypassing history to resets accumulation. */
