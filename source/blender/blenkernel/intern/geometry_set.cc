@@ -297,6 +297,15 @@ GeometrySet GeometrySet::create_with_pointcloud(PointCloud *pointcloud,
   return geometry_set;
 }
 
+/* Create a new geometry set that only contains the given curve. */
+GeometrySet GeometrySet::create_with_curve(DCurve *curve, GeometryOwnershipType ownership)
+{
+  GeometrySet geometry_set;
+  CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
+  component.replace(curve, ownership);
+  return geometry_set;
+}
+
 /* Clear the existing mesh and replace it with the given one. */
 void GeometrySet::replace_mesh(Mesh *mesh, GeometryOwnershipType ownership)
 {
