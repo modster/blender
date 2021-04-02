@@ -522,6 +522,7 @@ void GPENCIL_OT_primitive_polyline(struct wmOperatorType *ot);
 void GPENCIL_OT_primitive_circle(struct wmOperatorType *ot);
 void GPENCIL_OT_primitive_curve(struct wmOperatorType *ot);
 
+wmKeyMap *gpencil_curve_draw_modal_keymap(wmKeyConfig *keyconf);
 void GPENCIL_OT_draw_curve(struct wmOperatorType *ot);
 
 /* vertex groups ------------ */

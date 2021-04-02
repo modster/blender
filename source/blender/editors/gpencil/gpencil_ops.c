@@ -491,6 +491,7 @@ void ED_keymap_gpencil(wmKeyConfig *keyconf)
 #if 0
   ed_keymap_gpencil_painting_curve(keyconf);
 #endif
+  gpencil_curve_draw_modal_keymap(keyconf);
   ed_keymap_gpencil_sculpting(keyconf);
   ed_keymap_gpencil_sculptpainting_smooth(keyconf);
   ed_keymap_gpencil_sculptpainting_thickness(keyconf);

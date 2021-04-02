@@ -27,6 +27,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_math.h"
+#include "BLI_string.h"
 
 #include "BLT_translation.h"
 
@@ -34,6 +35,7 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_space_types.h"
+#include "DNA_userdef_types.h"
 #include "DNA_windowmanager_types.h"
 
 #include "BKE_brush.h"
@@ -63,6 +65,7 @@
 #include "GPU_state.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -113,6 +116,16 @@ typedef struct tGPDcurve_draw {
 
   eGPDcurve_draw_state state;
 } tGPDcurve_draw;
+
+enum {
+  CD_MODAL_CANCEL = 1,
+  CD_MODAL_CONFIRM,
+  CD_MODAL_FREE_HANDLE_ON,
+  CD_MODAL_FREE_HANDLE_OFF,
+  CD_MODAL_CYCLIC_TOGGLE,
+  CD_MODAL_DELETE_LAST,
+  CD_MODAL_SET_THICKNESS,
+};
 
 /* Forward declaration */
 static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *event);
@@ -248,9 +261,56 @@ static void gpencil_curve_draw_ui_callback(const struct bContext *UNUSED(C),
   GPU_matrix_push();
   GPU_matrix_mul(tcd->ob->obmat);
 
+  GPUVertFormat *format = immVertexFormat();
+  uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+
   immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
   /* Draw overlays. */
+  if (ELEM(tcd->state, IN_DRAG_ALIGNED_HANDLE, IN_DRAG_FREE_HANDLE)) {
+    bGPDcurve *gpc = tcd->gpc;
+    bGPDcurve_point *cpt_last = &gpc->curve_points[gpc->tot_curve_points - 1];
+    BezTriple *bezt = &cpt_last->bezt;
+
+    float viewport[4];
+    GPU_viewport_size_get_f(viewport);
+    immUniform2fv("viewportSize", &viewport[2]);
+
+    float color[4] = {0, 0, 0, 1.0f};
+    UI_GetThemeColorType3fv(TH_GP_VERTEX_SELECT, SPACE_VIEW3D, color);
+
+    /* TODO: Use the GPU_SHADER_3D_POLYLINE_* shader instead. GPU_line_smooth will be deprecated.
+     */
+    GPU_line_smooth(true);
+    GPU_blend(GPU_BLEND_ALPHA);
+
+    // immUniform1f("lineWidth", U.pixelsize * 2.0f);
+    // immUniform1i("lineSmooth", 1);
+
+    immUniformColor4fv(color);
+
+    /* Handle lines. */
+    immBegin(GPU_PRIM_LINES, 4);
+    immVertex3fv(pos, bezt->vec[0]);
+    immVertex3fv(pos, bezt->vec[1]);
+    immVertex3fv(pos, bezt->vec[1]);
+    immVertex3fv(pos, bezt->vec[2]);
+    immEnd();
+
+    // immUniform1f("size", U.pixelsize * UI_GetThemeValuef(TH_GP_VERTEX_SIZE) * 2.0f);
+
+    // immUniformColor4fv(color);
+
+    /* Handle points. */
+    immBegin(GPU_PRIM_POINTS, 3);
+    immVertex3fv(pos, bezt->vec[0]);
+    immVertex3fv(pos, bezt->vec[1]);
+    immVertex3fv(pos, bezt->vec[2]);
+    immEnd();
+
+    GPU_line_smooth(false);
+    GPU_blend(GPU_BLEND_NONE);
+  }
 
   immUnbindProgram();
 
@@ -263,8 +323,10 @@ static void gpencil_curve_draw_ui_callback(const struct bContext *UNUSED(C),
 
 /* ------------------------------------------------------------------------- */
 /* Main drawing functions */
-/*
-static void knife_update_header(bContext *C, wmOperator *op, const tGPDcurve_draw *tcd)
+
+static void gpencil_curve_draw_update_header(bContext *C,
+                                             wmOperator *op,
+                                             const tGPDcurve_draw *tcd)
 {
   char header[UI_MAX_DRAW_STR];
   char buf[UI_MAX_DRAW_STR];
@@ -276,33 +338,57 @@ static void knife_update_header(bContext *C, wmOperator *op, const tGPDcurve_dra
   WM_modalkeymap_operator_items_to_string_buf( \
       op->type, (_id), true, UI_MAX_SHORTCUT_STR, &available_len, &p)
 
-  BLI_snprintf(header,
-               sizeof(header),
-               TIP_("%s: confirm, %s: cancel, "
-                    "%s: start/define cut, %s: close cut, %s: new cut, "
-                    "%s: midpoint snap (%s), %s: ignore snap (%s), "
-                    "%s: angle constraint (%s), %s: cut through (%s), "
-                    "%s: panning"),
-               WM_MODALKEY(KNF_MODAL_CONFIRM),
-               WM_MODALKEY(KNF_MODAL_CANCEL),
-               WM_MODALKEY(KNF_MODAL_ADD_CUT),
-               WM_MODALKEY(KNF_MODAL_ADD_CUT_CLOSED),
-               WM_MODALKEY(KNF_MODAL_NEW_CUT),
-               WM_MODALKEY(KNF_MODAL_MIDPOINT_ON),
-               WM_bool_as_string(kcd->snap_midpoints),
-               WM_MODALKEY(KNF_MODAL_IGNORE_SNAP_ON),
-               WM_bool_as_string(kcd->ignore_edge_snapping),
-               WM_MODALKEY(KNF_MODAL_ANGLE_SNAP_TOGGLE),
-               WM_bool_as_string(kcd->angle_snapping),
-               WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
-               WM_bool_as_string(kcd->cut_through),
-               WM_MODALKEY(KNF_MODAL_PANNING));
-
-#undef WM_MODALKEY
+  switch (tcd->state) {
+    case IN_MOVE:
+    case IN_SET_VECTOR:
+      BLI_snprintf(header,
+                   sizeof(header),
+                   TIP_("%s: confirm, %s: cancel, "
+                        "%s: toggle cyclic (%s), "
+                        "%s: delete last, %s: set thickness"),
+                   WM_MODALKEY(CD_MODAL_CONFIRM),
+                   WM_MODALKEY(CD_MODAL_CANCEL),
+                   WM_MODALKEY(CD_MODAL_CYCLIC_TOGGLE),
+                   WM_bool_as_string(tcd->is_cyclic),
+                   WM_MODALKEY(CD_MODAL_DELETE_LAST),
+                   WM_MODALKEY(CD_MODAL_SET_THICKNESS));
+      break;
+    case IN_DRAG_FREE_HANDLE:
+    case IN_DRAG_ALIGNED_HANDLE:
+      BLI_snprintf(header,
+                   sizeof(header),
+                   TIP_("%s: confirm, %s: cancel, "
+                        "%s: toggle cyclic (%s), "
+                        "%s: free handle (%s), "
+                        "%s: delete last, %s: set thickness"),
+                   WM_MODALKEY(CD_MODAL_CONFIRM),
+                   WM_MODALKEY(CD_MODAL_CANCEL),
+                   WM_MODALKEY(CD_MODAL_CYCLIC_TOGGLE),
+                   WM_bool_as_string(tcd->is_cyclic),
+                   WM_MODALKEY(CD_MODAL_FREE_HANDLE_ON),
+                   WM_bool_as_string(tcd->state == IN_DRAG_FREE_HANDLE),
+                   WM_MODALKEY(CD_MODAL_DELETE_LAST),
+                   WM_MODALKEY(CD_MODAL_SET_THICKNESS));
+      break;
+    case IN_SET_THICKNESS:
+      BLI_snprintf(header,
+                   sizeof(header),
+                   TIP_("%s: confirm, %s: cancel, "
+                        "%s: toggle cyclic (%s), "
+                        "%s: delete last"),
+                   WM_MODALKEY(CD_MODAL_CONFIRM),
+                   WM_MODALKEY(CD_MODAL_CANCEL),
+                   WM_MODALKEY(CD_MODAL_CYCLIC_TOGGLE),
+                   WM_bool_as_string(tcd->is_cyclic),
+                   WM_MODALKEY(CD_MODAL_DELETE_LAST));
+      break;
+  }
 
   ED_workspace_status_text(C, header);
+
+#undef WM_MODALKEY
 }
-*/
+
 /* ------------------------------------------------------------------------- */
 /* Main drawing functions */
 
@@ -541,79 +627,43 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
 
   copy_v2_v2_int(tcd->imval, event->mval);
 
-  switch (event->type) {
-    case LEFTMOUSE: {
-      if (event->val == KM_PRESS) {
-        copy_v2_v2_int(tcd->imval_start, tcd->imval);
-        tcd->is_mouse_down = true;
-        /* Set state to vector. */
+  /* Modal keymap event. */
+  if (event->type == EVT_MODAL_MAP) {
+    switch (event->val) {
+      case CD_MODAL_CONFIRM: {
+        /* Delete the 'preview' point. */
         if (tcd->state == IN_MOVE) {
-          tcd->state = IN_SET_VECTOR;
+          gpencil_pop_curve_point(C, tcd);
         }
+        /* Create curve */
+        gpencil_curve_draw_confirm(C, op, tcd);
+        gpencil_curve_draw_exit(C, op);
+        return OPERATOR_FINISHED;
       }
-      else if (event->val == KM_RELEASE) {
-        copy_v2_v2_int(tcd->imval_end, tcd->imval);
-        tcd->is_mouse_down = false;
-        /* Reset state to move. */
-        if (ELEM(tcd->state, IN_SET_VECTOR, IN_DRAG_ALIGNED_HANDLE, IN_DRAG_FREE_HANDLE)) {
-          tcd->state = IN_MOVE;
-          gpencil_push_curve_point(C, tcd);
+      case CD_MODAL_CANCEL: {
+        /* Delete the stroke. */
+        BLI_remlink(&tcd->gpf->strokes, tcd->gps);
+        BKE_gpencil_free_stroke(tcd->gps);
+        gpencil_curve_draw_exit(C, op);
+        return OPERATOR_CANCELLED;
+      }
+      case CD_MODAL_FREE_HANDLE_ON: {
+        if (tcd->state == IN_DRAG_ALIGNED_HANDLE) {
+          tcd->state = IN_DRAG_FREE_HANDLE;
+          gpencil_set_handle_type_last_point(tcd, HD_FREE);
+          gpencil_curve_draw_update(C, tcd);
         }
-        else if (tcd->state == IN_SET_THICKNESS) {
-          tcd->state = IN_MOVE;
-          WM_cursor_modal_set(win, WM_CURSOR_DOT);
+        break;
+      }
+      case CD_MODAL_FREE_HANDLE_OFF: {
+        if (tcd->state == IN_DRAG_FREE_HANDLE) {
+          tcd->state = IN_DRAG_ALIGNED_HANDLE;
+          gpencil_set_handle_type_last_point(tcd, HD_ALIGN);
+          gpencil_curve_draw_update(C, tcd);
         }
-
-        gpencil_curve_draw_update(C, tcd);
+        break;
       }
-      break;
-    }
-    case RIGHTMOUSE: /* cancel */
-    case EVT_ESCKEY: {
-      /* Delete the stroke. */
-      BLI_remlink(&tcd->gpf->strokes, tcd->gps);
-      BKE_gpencil_free_stroke(tcd->gps);
-      gpencil_curve_draw_exit(C, op);
-      return OPERATOR_CANCELLED;
-    }
-    case EVT_SPACEKEY: /* confirm */
-    case MIDDLEMOUSE:
-    case EVT_PADENTER:
-    case EVT_RETKEY: {
-      /* Delete the 'preview' point. */
-      if (tcd->state == IN_MOVE) {
-        gpencil_pop_curve_point(C, tcd);
-      }
-
-      /* Create curve */
-      gpencil_curve_draw_confirm(C, op, tcd);
-      gpencil_curve_draw_exit(C, op);
-      return OPERATOR_FINISHED;
-    }
-    case MOUSEMOVE: {
-      if (tcd->state == IN_SET_VECTOR &&
-          len_v2v2_int(tcd->imval, tcd->imval_start) > drag_threshold) {
-        tcd->state = IN_DRAG_ALIGNED_HANDLE;
-        gpencil_set_handle_type_last_point(tcd, HD_ALIGN);
-      }
-      gpencil_curve_draw_update(C, tcd);
-      break;
-    }
-    case EVT_LEFTALTKEY:
-    case EVT_RIGHTALTKEY: {
-      if (event->val == KM_PRESS && tcd->state == IN_DRAG_ALIGNED_HANDLE) {
-        tcd->state = IN_DRAG_FREE_HANDLE;
-        gpencil_set_handle_type_last_point(tcd, HD_FREE);
-      }
-      else if (event->val == KM_RELEASE && tcd->state == IN_DRAG_FREE_HANDLE) {
-        tcd->state = IN_DRAG_ALIGNED_HANDLE;
-        gpencil_set_handle_type_last_point(tcd, HD_ALIGN);
-      }
-      gpencil_curve_draw_update(C, tcd);
-      break;
-    }
-    case EVT_CKEY: {
-      if (event->val == KM_RELEASE) {
+      case CD_MODAL_CYCLIC_TOGGLE: {
         if (tcd->is_cyclic) {
           tcd->gps->flag &= ~GP_STROKE_CYCLIC;
         }
@@ -622,25 +672,9 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
         }
         tcd->is_cyclic = !tcd->is_cyclic;
         gpencil_curve_draw_update(C, tcd);
+        break;
       }
-      break;
-    }
-    case EVT_FKEY: {
-      if (event->val == KM_RELEASE && tcd->state != IN_SET_THICKNESS) {
-        tcd->state = IN_SET_THICKNESS;
-        WM_cursor_modal_set(win, WM_CURSOR_EW_SCROLL);
-
-        bGPDcurve_point *cpt_last = &tcd->gpc->curve_points[tcd->gpc->tot_curve_points - 1];
-        tcd->prev_pressure = cpt_last->pressure;
-        copy_v2_v2_int(tcd->imval_start, tcd->imval);
-
-        gpencil_curve_draw_update(C, tcd);
-      }
-      break;
-    }
-    case EVT_XKEY: {
-      /* Delte the last */
-      if (event->val == KM_RELEASE) {
+      case CD_MODAL_DELETE_LAST: {
         if (tcd->state == IN_MOVE) {
           gpencil_pop_curve_point(C, tcd);
         }
@@ -648,14 +682,70 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
           tcd->state = IN_MOVE;
         }
         gpencil_curve_draw_update(C, tcd);
+        break;
       }
-      break;
-    }
-    default: {
-      copy_v2_v2_int(tcd->imval_prev, tcd->imval);
-      return OPERATOR_RUNNING_MODAL | OPERATOR_PASS_THROUGH;
+      case CD_MODAL_SET_THICKNESS: {
+        if (tcd->state != IN_SET_THICKNESS) {
+          tcd->state = IN_SET_THICKNESS;
+          WM_cursor_modal_set(win, WM_CURSOR_EW_SCROLL);
+
+          bGPDcurve_point *cpt_last = &tcd->gpc->curve_points[tcd->gpc->tot_curve_points - 1];
+          tcd->prev_pressure = cpt_last->pressure;
+          copy_v2_v2_int(tcd->imval_start, tcd->imval);
+
+          gpencil_curve_draw_update(C, tcd);
+        }
+        break;
+      }
     }
   }
+  /* Event not in keymap. */
+  else {
+    switch (event->type) {
+      case LEFTMOUSE: {
+        if (event->val == KM_PRESS) {
+          copy_v2_v2_int(tcd->imval_start, tcd->imval);
+          tcd->is_mouse_down = true;
+          /* Set state to vector. */
+          if (tcd->state == IN_MOVE) {
+            tcd->state = IN_SET_VECTOR;
+          }
+          /* Reset state to move. */
+          else if (tcd->state == IN_SET_THICKNESS) {
+            tcd->state = IN_MOVE;
+            WM_cursor_modal_set(win, WM_CURSOR_DOT);
+          }
+        }
+        else if (event->val == KM_RELEASE) {
+          copy_v2_v2_int(tcd->imval_end, tcd->imval);
+          tcd->is_mouse_down = false;
+          /* Reset state to move. */
+          if (ELEM(tcd->state, IN_SET_VECTOR, IN_DRAG_ALIGNED_HANDLE, IN_DRAG_FREE_HANDLE)) {
+            tcd->state = IN_MOVE;
+            gpencil_push_curve_point(C, tcd);
+          }
+
+          gpencil_curve_draw_update(C, tcd);
+        }
+        break;
+      }
+      case MOUSEMOVE: {
+        if (tcd->state == IN_SET_VECTOR &&
+            len_v2v2_int(tcd->imval, tcd->imval_start) > drag_threshold) {
+          tcd->state = IN_DRAG_ALIGNED_HANDLE;
+          gpencil_set_handle_type_last_point(tcd, HD_ALIGN);
+        }
+        gpencil_curve_draw_update(C, tcd);
+        break;
+      }
+      default: {
+        copy_v2_v2_int(tcd->imval_prev, tcd->imval);
+        return OPERATOR_RUNNING_MODAL | OPERATOR_PASS_THROUGH;
+      }
+    }
+  }
+
+  gpencil_curve_draw_update_header(C, op, tcd);
 
   if (G.debug & G_DEBUG) {
     debug_print_state(tcd);
@@ -697,6 +787,33 @@ static bool gpencil_curve_draw_poll(bContext *C)
   }
 
   return true;
+}
+
+wmKeyMap *gpencil_curve_draw_modal_keymap(wmKeyConfig *keyconf)
+{
+  static const EnumPropertyItem modal_items[] = {
+      {CD_MODAL_CANCEL, "CANCEL", 0, "Cancel", ""},
+      {CD_MODAL_CONFIRM, "CONFIRM", 0, "Confirm", ""},
+      {CD_MODAL_FREE_HANDLE_ON, "FREE_HANDLE_ON", 0, "Free Handle On", ""},
+      {CD_MODAL_FREE_HANDLE_OFF, "FREE_HANDLE_OFF", 0, "Free Handle Off", ""},
+      {CD_MODAL_CYCLIC_TOGGLE, "CYCLIC_TOGGLE", 0, "Toggle Stroke Cyclic", ""},
+      {CD_MODAL_DELETE_LAST, "DELETE_LAST", 0, "Delete the Last Confirmed Point", ""},
+      {CD_MODAL_SET_THICKNESS, "SET_THICKNESS", 0, "Set the Thickness", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  wmKeyMap *keymap = WM_modalkeymap_find(keyconf, "Curve Draw Tool Modal Map");
+
+  /* this function is called for each spacetype, only needs to add map once */
+  if (keymap && keymap->modal_items) {
+    return NULL;
+  }
+
+  keymap = WM_modalkeymap_ensure(keyconf, "Curve Draw Tool Modal Map", modal_items);
+
+  WM_modalkeymap_assign(keymap, "GPENCIL_OT_draw_curve");
+
+  return keymap;
 }
 
 void GPENCIL_OT_draw_curve(wmOperatorType *ot)

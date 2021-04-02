@@ -5675,6 +5675,33 @@ def km_generic_gizmo_tweak_modal_map(_params):
     return keymap
 
 
+def km_gpencil_curve_draw_modal_map(_params):
+    items = []
+    keymap = (
+        "Curve Draw Tool Modal Map",
+        {"space_type": 'EMPTY', "region_type": 'WINDOW', "modal": True},
+        {"items": items},
+    )
+
+    items.extend([
+        ("CANCEL", {"type": 'ESC', "value": 'PRESS', "any": True}, None),
+        ("CANCEL", {"type": 'RIGHTMOUSE', "value": 'PRESS', "any": True}, None),
+        ("CONFIRM", {"type": 'SPACE', "value": 'PRESS', "any": True}, None),
+        ("CONFIRM", {"type": 'RET', "value": 'PRESS', "any": True}, None),
+        ("CONFIRM", {"type": 'NUMPAD_ENTER', "value": 'PRESS', "any": True}, None),
+        ("CONFIRM", {"type": 'MIDDLEMOUSE', "value": 'PRESS', "any": True}, None),
+        ("FREE_HANDLE_ON", {"type": 'RIGHT_ALT', "value": 'PRESS', "any": True}, None),
+        ("FREE_HANDLE_OFF", {"type": 'RIGHT_ALT', "value": 'RELEASE', "any": True}, None),
+        ("FREE_HANDLE_ON", {"type": 'LEFT_ALT', "value": 'PRESS', "any": True}, None),
+        ("FREE_HANDLE_OFF", {"type": 'LEFT_ALT', "value": 'RELEASE', "any": True}, None),
+        ("CYCLIC_TOGGLE", {"type": 'C', "value": 'PRESS', "any": True}, None),
+        ("DELETE_LAST", {"type": 'X', "value": 'PRESS', "any": True}, None),
+        ("SET_THICKNESS", {"type": 'F', "value": 'PRESS', "any": True}, None),
+    ])
+
+    return keymap
+    
+
 # ------------------------------------------------------------------------------
 # Popup Keymaps
 
@@ -7120,6 +7147,7 @@ def generate_keymaps(params=None):
         km_view3d_dolly_modal(params),
         km_paint_stroke_modal(params),
         km_sculpt_expand_modal(params),
+        km_gpencil_curve_draw_modal_map(params),
 
         # Gizmos.
         km_generic_gizmo(params),
