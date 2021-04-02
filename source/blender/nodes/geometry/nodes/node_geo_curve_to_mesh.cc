@@ -37,7 +37,7 @@ static bNodeSocketTemplate geo_node_point_translate_out[] = {
 
 namespace blender::nodes {
 
-static Mesh *curve_to_mesh_calculate(DCurve &curve)
+static Mesh *curve_to_mesh_calculate(const DCurve &curve)
 {
   curve.ensure_evaluation_cache();
 
@@ -69,15 +69,14 @@ static Mesh *curve_to_mesh_calculate(DCurve &curve)
 
 static void geo_node_curve_to_mesh_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set_in = params.extract_input<GeometrySet>("Curve");
-  GeometrySet geometry_set_out;
+  GeometrySet set_in = params.extract_input<GeometrySet>("Curve");
 
-  if (geometry_set_in.has_curve()) {
-    Mesh *mesh = curve_to_mesh_calculate(*geometry_set_in.get_curve_for_write());
-    geometry_set_in.replace_mesh(mesh);
+  if (!set_in.has_curve()) {
+    params.set_output("Mesh", GeometrySet());
   }
 
-  params.set_output("Mesh", std::move(geometry_set_out));
+  Mesh *mesh = curve_to_mesh_calculate(*set_in.get_curve_for_read());
+  params.set_output("Mesh", GeometrySet::create_with_mesh(mesh));
 }
 
 }  // namespace blender::nodes
