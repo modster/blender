@@ -105,29 +105,19 @@ struct SplineNURBS : Spline {
 
 /* Proposed name to be different from DNA type. */
 struct DCurve {
-  blender::Vector<Spline *> splines;
-  //   AttributeStorage attributes;
+  blender::Vector<SplineBezier> splines_bezier;
   int32_t flag; /* 2D. */
 
   /* Attributes. */
+  //   AttributeStorage attributes;
   //   CustomData *control_point_data;
   //   CustomData *spline_data;
 
   /* Then maybe whatever caches are necessary, etc. */
-  //   std::mutex cache_mutex;
+  std::mutex cache_mutex;
   blender::Vector<blender::float3> evaluated_spline_cache;
 
-  void ensure_evaluation_cache();
-
-  ~DCurve()
-  {
-    for (Spline *spline : splines) {
-      if (spline->type == SplineType::Bezier) {
-        SplineBezier *spline_bezier = reinterpret_cast<SplineBezier *>(spline);
-        delete spline_bezier;
-      }
-    }
-  }
+  void ensure_evaluation_cache() const;
 };
 
 DCurve *dcurve_from_dna_curve(const Curve &curve);

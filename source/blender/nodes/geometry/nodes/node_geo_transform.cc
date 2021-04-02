@@ -160,14 +160,11 @@ static void transform_curve(DCurve &curve,
 {
   const float4x4 matrix = float4x4::from_loc_eul_scale(translation, rotation, scale);
 
-  for (Spline *spline : curve.splines) {
-    if (spline->type == SplineType::Bezier) {
-      SplineBezier &spline_bezier = *reinterpret_cast<SplineBezier *>(spline);
-      for (ControlPointBezier &point : spline_bezier.control_points) {
-        point.handle_position_a = matrix * point.handle_position_a;
-        point.position = matrix * point.position;
-        point.handle_position_b = matrix * point.handle_position_b;
-      }
+  for (SplineBezier &spline : curve.splines_bezier) {
+    for (ControlPointBezier &point : spline.control_points) {
+      point.handle_position_a = matrix * point.handle_position_a;
+      point.position = matrix * point.position;
+      point.handle_position_b = matrix * point.handle_position_b;
     }
   }
 }

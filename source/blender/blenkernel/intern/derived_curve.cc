@@ -53,11 +53,11 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
 {
   DCurve *curve = new DCurve();
 
-  curve->splines.reserve(BLI_listbase_count(&dna_curve.nurb));
+  curve->splines_bezier.reserve(BLI_listbase_count(&dna_curve.nurb));
 
   LISTBASE_FOREACH (const Nurb *, nurb, &dna_curve.nurb) {
     if (nurb->type == CU_BEZIER) {
-      SplineBezier *spline = new SplineBezier();
+      SplineBezier spline;
       for (const BezTriple &bezt : Span(nurb->bezt, nurb->pntsu)) {
         ControlPointBezier point;
         point.handle_position_a = bezt.vec[0];
@@ -67,14 +67,14 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
         point.tilt = bezt.tilt;
         point.handle_type_a = handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h1);
         point.handle_type_b = handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h2);
-        spline->control_points.append(std::move(point));
+        spline.control_points.append(std::move(point));
       }
 
-      spline->resolution_u = nurb->resolu;
-      spline->resolution_v = nurb->resolv;
-      spline->type = SplineType::Bezier;
+      spline.resolution_u = nurb->resolu;
+      spline.resolution_v = nurb->resolv;
+      spline.type = SplineType::Bezier;
 
-      curve->splines.append(spline);
+      curve->splines_bezier.append(spline);
     }
     else if (nurb->type == CU_NURBS) {
     }
@@ -103,53 +103,51 @@ static void evaluate_bezier_part_3d(const float3 point_0,
   }
 }
 
-void DCurve::ensure_evaluation_cache()
+void DCurve::ensure_evaluation_cache() const
 {
-  this->evaluated_spline_cache.clear();
+  DCurve *mutable_self = const_cast<DCurve *>(this);
+
+  std::lock_guard<std::mutex>(mutable_self->cache_mutex);
+
+  mutable_self->evaluated_spline_cache.clear();
 
   int total_len = 1;
-  for (Spline *spline : this->splines) {
-    if (spline->type == SplineType::Bezier) {
-      SplineBezier &spline_bezier = *reinterpret_cast<SplineBezier *>(spline);
-      for (const int i : IndexRange(1, spline_bezier.control_points.size() - 1)) {
-        const ControlPointBezier &point_prev = spline_bezier.control_points[i - 1];
-        const ControlPointBezier &point = spline_bezier.control_points[i];
-        if (point_prev.handle_type_b == BezierHandleType::Vector &&
-            point.handle_type_a == BezierHandleType::Vector) {
-          total_len += 1;
-        }
-        else {
-          total_len += spline_bezier.resolution_u;
-        }
+  for (const SplineBezier &spline : this->splines_bezier) {
+    for (const int i : IndexRange(1, spline.control_points.size() - 1)) {
+      const ControlPointBezier &point_prev = spline.control_points[i - 1];
+      const ControlPointBezier &point = spline.control_points[i];
+      if (point_prev.handle_type_b == BezierHandleType::Vector &&
+          point.handle_type_a == BezierHandleType::Vector) {
+        total_len += 1;
+      }
+      else {
+        total_len += spline.resolution_u;
       }
     }
   }
 
-  this->evaluated_spline_cache.resize(total_len);
+  mutable_self->evaluated_spline_cache.resize(total_len);
 
-  MutableSpan<float3> positions(this->evaluated_spline_cache);
+  MutableSpan<float3> positions(mutable_self->evaluated_spline_cache);
 
   int offset = 0;
-  for (Spline *spline : this->splines) {
-    if (spline->type == SplineType::Bezier) {
-      SplineBezier &spline_bezier = *reinterpret_cast<SplineBezier *>(spline);
-      for (const int i : IndexRange(1, spline_bezier.control_points.size() - 1)) {
-        const ControlPointBezier &point_prev = spline_bezier.control_points[i - 1];
-        const ControlPointBezier &point = spline_bezier.control_points[i];
+  for (const SplineBezier &spline : this->splines_bezier) {
+    for (const int i : IndexRange(1, spline.control_points.size() - 1)) {
+      const ControlPointBezier &point_prev = spline.control_points[i - 1];
+      const ControlPointBezier &point = spline.control_points[i];
 
-        if (point_prev.handle_type_b == BezierHandleType::Vector &&
-            point.handle_type_a == BezierHandleType::Vector) {
-          offset++;
-        }
-        else {
-          const int resolution = spline_bezier.resolution_u;
-          evaluate_bezier_part_3d(point_prev.position,
-                                  point_prev.handle_position_b,
-                                  point.handle_position_a,
-                                  point.position,
-                                  positions.slice(offset, resolution));
-          offset += resolution;
-        }
+      if (point_prev.handle_type_b == BezierHandleType::Vector &&
+          point.handle_type_a == BezierHandleType::Vector) {
+        offset++;
+      }
+      else {
+        const int resolution = spline.resolution_u;
+        evaluate_bezier_part_3d(point_prev.position,
+                                point_prev.handle_position_b,
+                                point.handle_position_a,
+                                point.position,
+                                positions.slice(offset, resolution));
+        offset += resolution;
       }
     }
   }

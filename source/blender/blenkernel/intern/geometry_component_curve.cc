@@ -110,13 +110,13 @@ int CurveComponent::attribute_domain_size(const AttributeDomain domain) const
   }
   if (domain == ATTR_DOMAIN_POINT) {
     int total = 0;
-    for (const Spline *spline : curve_->splines) {
-      total += spline->size();
+    for (const SplineBezier &spline : curve_->splines_bezier) {
+      total += spline.size();
     }
     return total;
   }
   if (domain == ATTR_DOMAIN_CURVE) {
-    return curve_->splines.size();
+    return curve_->splines_bezier.size();
   }
   return 0;
 }
