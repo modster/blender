@@ -75,8 +75,6 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
 /* Mirror is using current object as origin. */
 static void update_mirror_local(bGPDstroke *gps, int axis)
 {
-  int i;
-  bGPDspoint *pt;
   float factor[3] = {1.0f, 1.0f, 1.0f};
   factor[axis] = -1.0f;
 
@@ -91,6 +89,8 @@ static void update_mirror_local(bGPDstroke *gps, int axis)
     }
   }
   else {
+    int i;
+    bGPDspoint *pt;
     for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
       mul_v3_v3(&pt->x, factor);
     }
