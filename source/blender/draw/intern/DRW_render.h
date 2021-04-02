@@ -628,7 +628,8 @@ void DRW_view_reset(void);
 void DRW_view_set_active(DRWView *view);
 
 void DRW_view_clip_planes_set(DRWView *view, float (*planes)[4], int plane_len);
-void DRW_view_camtexco_set(DRWView *view, float texco[4]);
+void DRW_view_camtexco_set(DRWView *view, const float texco[4]);
+void DRW_view_camtexco_get(const DRWView *view, float r_texco[4]);
 
 /* For all getters, if view is NULL, default view is assumed. */
 void DRW_view_winmat_get(const DRWView *view, float mat[4][4], bool inverse);
@@ -782,7 +783,6 @@ typedef struct DRWContextState {
 } DRWContextState;
 
 const DRWContextState *DRW_context_state_get(void);
-
 
 #ifdef __cplusplus
 }
