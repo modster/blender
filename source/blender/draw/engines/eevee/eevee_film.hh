@@ -34,7 +34,7 @@
 #include "DRW_render.h"
 
 #include "eevee_camera.hh"
-#include "eevee_shaders.hh"
+#include "eevee_shader.hh"
 
 namespace blender::eevee {
 

@@ -31,7 +31,7 @@
 #include "DNA_view3d_types.h"
 
 #include "eevee_sampling.hh"
-#include "eevee_shared.hh"
+#include "eevee_shader_shared.hh"
 
 namespace blender::eevee {
 

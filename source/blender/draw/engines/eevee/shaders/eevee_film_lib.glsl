@@ -3,8 +3,8 @@
  * Film accumulation utils functions.
  **/
 
-#pragma BLENDER_REQUIRE(eevee_shared.hh)
-#pragma BLENDER_REQUIRE(camera_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
+#pragma BLENDER_REQUIRE(eevee_camera_lib.glsl)
 
 vec4 film_data_encode(FilmData film, vec4 data, float weight)
 {

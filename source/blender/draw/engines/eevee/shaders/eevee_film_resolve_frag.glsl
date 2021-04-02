@@ -1,5 +1,5 @@
 
-#pragma BLENDER_REQUIRE(film_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_film_lib.glsl)
 
 layout(std140) uniform film_block
 {

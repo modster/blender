@@ -1,6 +1,6 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(object_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_object_lib.glsl)
 
 in vec3 pos;
 in vec3 nor;

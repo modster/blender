@@ -11,7 +11,7 @@
  **/
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(film_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_film_lib.glsl)
 
 layout(std140) uniform camera_block
 {

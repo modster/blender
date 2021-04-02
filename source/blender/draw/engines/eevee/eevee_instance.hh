@@ -29,7 +29,7 @@
 #include "eevee_film.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_sampling.hh"
-#include "eevee_shaders.hh"
+#include "eevee_shader.hh"
 #include "eevee_view.hh"
 
 namespace blender::eevee {

@@ -1,7 +1,7 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(object_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_object_lib.glsl)
 
 layout(location = 0, index = 0) out vec4 outRadiance;
 layout(location = 0, index = 1) out vec4 outTransmittance;

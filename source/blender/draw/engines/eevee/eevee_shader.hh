@@ -36,15 +36,15 @@ extern char datatoc_common_math_geom_lib_glsl[];
 extern char datatoc_common_math_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
 
-extern char datatoc_camera_lib_glsl[];
-extern char datatoc_film_filter_frag_glsl[];
-extern char datatoc_film_lib_glsl[];
-extern char datatoc_film_resolve_frag_glsl[];
-extern char datatoc_object_forward_frag_glsl[];
-extern char datatoc_object_lib_glsl[];
-extern char datatoc_object_mesh_vert_glsl[];
+extern char datatoc_eevee_camera_lib_glsl[];
+extern char datatoc_eevee_film_filter_frag_glsl[];
+extern char datatoc_eevee_film_lib_glsl[];
+extern char datatoc_eevee_film_resolve_frag_glsl[];
+extern char datatoc_eevee_object_forward_frag_glsl[];
+extern char datatoc_eevee_object_lib_glsl[];
+extern char datatoc_eevee_object_mesh_vert_glsl[];
 
-extern char datatoc_eevee_shared_hh[];
+extern char datatoc_eevee_shader_shared_hh[];
 
 namespace blender::eevee {
 
@@ -82,14 +82,15 @@ typedef struct ShaderModule {
 
     shader_lib_ = DRW_shader_library_create();
     /* NOTE: These need to be ordered by dependencies. */
-    DRW_shader_library_add_file(shader_lib_, datatoc_eevee_shared_hh, "eevee_shared.hh");
+    DRW_shader_library_add_file(
+        shader_lib_, datatoc_eevee_shader_shared_hh, "eevee_shader_shared.hh");
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, camera_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, film_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, object_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_film_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_object_lib);
 
     /* Meh ¯\_(ツ)_/¯. */
     char *datatoc_nullptr_glsl = nullptr;
@@ -102,9 +103,9 @@ typedef struct ShaderModule {
 
 #define SHADER_FULLSCREEN(enum_, frag_) SHADER(enum_, common_fullscreen_vert, nullptr, frag_)
 
-    SHADER_FULLSCREEN(FILM_FILTER, film_filter_frag);
-    SHADER_FULLSCREEN(FILM_RESOLVE, film_resolve_frag);
-    SHADER(MESH, object_mesh_vert, nullptr, object_forward_frag);
+    SHADER_FULLSCREEN(FILM_FILTER, eevee_film_filter_frag);
+    SHADER_FULLSCREEN(FILM_RESOLVE, eevee_film_resolve_frag);
+    SHADER(MESH, eevee_object_mesh_vert, nullptr, eevee_object_forward_frag);
 
 #undef SHADER
 #undef SHADER_FULLSCREEN
