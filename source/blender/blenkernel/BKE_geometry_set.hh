@@ -34,6 +34,7 @@
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.h"
 
+struct DCurve;
 struct Collection;
 struct Mesh;
 struct Object;
@@ -321,7 +322,7 @@ struct GeometrySet {
       Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   static GeometrySet create_with_pointcloud(
       PointCloud *pointcloud, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
-  static GeometrySet GeometrySet::create_with_curve(
+  static GeometrySet create_with_curve(
       DCurve *curve, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
 
   /* Utility methods for access. */

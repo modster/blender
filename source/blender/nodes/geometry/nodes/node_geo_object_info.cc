@@ -14,17 +14,17 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "node_geometry_util.hh"
+#include "DNA_curve_types.h"
+#include "DNA_object_types.h"
 
-#include "BKE_mesh.h"
-#include "BKE_mesh_wrapper.h"
-#include "BKE_modifier.h"
-#include "BKE_volume.h"
+#include "BKE_derived_curve.hh"
 
 #include "BLI_math_matrix.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_object_info_in[] = {
     {SOCK_OBJECT, N_("Object")},
@@ -64,28 +64,33 @@ static void geo_node_object_info_exec(GeoNodeExecParams params)
   const Object *self_object = params.self_object();
 
   if (object != nullptr) {
-    float transform[4][4];
-    mul_m4_m4m4(transform, self_object->imat, object->obmat);
-
-    float quaternion[4];
-    if (transform_space_relative) {
-      mat4_decompose(location, quaternion, scale, transform);
+    if (object->type == OB_CURVE) {
+      geometry_set = GeometrySet::create_with_curve(dcurve_from_dna_curve(*(Curve *)object->data));
     }
     else {
-      mat4_decompose(location, quaternion, scale, object->obmat);
-    }
-    quat_to_eul(rotation, quaternion);
+      float transform[4][4];
+      mul_m4_m4m4(transform, self_object->imat, object->obmat);
 
-    if (object != self_object) {
-      InstancesComponent &instances = geometry_set.get_component_for_write<InstancesComponent>();
-
+      float quaternion[4];
       if (transform_space_relative) {
-        instances.add_instance(object, transform);
+        mat4_decompose(location, quaternion, scale, transform);
       }
       else {
-        float unit_transform[4][4];
-        unit_m4(unit_transform);
-        instances.add_instance(object, unit_transform);
+        mat4_decompose(location, quaternion, scale, object->obmat);
+      }
+      quat_to_eul(rotation, quaternion);
+
+      if (object != self_object) {
+        InstancesComponent &instances = geometry_set.get_component_for_write<InstancesComponent>();
+
+        if (transform_space_relative) {
+          instances.add_instance(object, transform);
+        }
+        else {
+          float unit_transform[4][4];
+          unit_m4(unit_transform);
+          instances.add_instance(object, unit_transform);
+        }
       }
     }
   }

@@ -897,7 +897,7 @@ static void displist_vert_coords_apply(ListBase *dispbase, const float (*allvert
 
 static Mesh *modifier_modify_mesh_and_geometry_set(ModifierData *md,
                                                    const ModifierEvalContext &mectx,
-                                                   Curve *curve,
+                                                   const Curve *curve,
                                                    Object *ob,
                                                    Mesh *input_mesh,
                                                    GeometrySet &geometry_set)
