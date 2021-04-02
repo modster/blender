@@ -25,6 +25,7 @@
 
 #include "DNA_asset_types.h"
 #include "DNA_defs.h"
+#include "DNA_space_types.h"
 
 #include "rna_internal.h"
 
@@ -134,7 +135,25 @@ static void rna_AssetMetaData_active_tag_range(
 static PointerRNA rna_AssetHandle_file_data_get(PointerRNA *ptr)
 {
   AssetHandle *asset_handle = ptr->data;
-  return rna_pointer_inherit_refine(ptr, &RNA_AssetHandle, asset_handle->file_data);
+  return rna_pointer_inherit_refine(ptr, &RNA_FileSelectEntry, asset_handle->file_data);
+}
+
+static void rna_AssetHandle_get_full_library_path(
+    // AssetHandle *asset,
+    bContext *C,
+    FileDirEntry *asset_file,
+    AssetLibraryReference *library,
+    char r_result[FILE_MAX_LIBEXTRA])
+{
+  AssetHandle asset = {.file_data = asset_file};
+  ED_asset_handle_get_full_library_path(C, library, &asset, r_result);
+}
+
+static PointerRNA rna_AssetHandle_local_id_get(PointerRNA *ptr)
+{
+  const AssetHandle *asset = ptr->data;
+  ID *id = ED_assetlist_asset_local_id_get(asset);
+  return rna_pointer_inherit_refine(ptr, &RNA_ID, id);
 }
 
 static void rna_AssetHandle_file_data_set(PointerRNA *ptr,
@@ -325,6 +344,30 @@ static void rna_def_asset_data(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Active Tag", "Index of the tag set for editing");
 }
 
+static void rna_def_asset_handle_api(StructRNA *srna)
+{
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  func = RNA_def_function(srna, "get_full_library_path", "rna_AssetHandle_get_full_library_path");
+  RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+  /* TODO temporarily static function, for until .py can receive the asset handle from context
+   * properly. `asset_file_handle` should go away too then. */
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "asset_file_handle", "FileSelectEntry", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func,
+                         "asset_library",
+                         "AssetLibraryReference",
+                         "",
+                         "The asset library containing the given asset, only valid if the asset "
+                         "library is external (i.e. not the \"Current File\" one");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_string(func, "result", NULL, FILE_MAX_LIBEXTRA, "result", "");
+  RNA_def_parameter_flags(parm, PROP_THICK_WRAP, 0);
+  RNA_def_function_output(func, parm);
+}
+
 static void rna_def_asset_handle(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -333,12 +376,24 @@ static void rna_def_asset_handle(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "AssetHandle", "PropertyGroup");
   RNA_def_struct_ui_text(srna, "Asset Handle", "Reference to some asset");
 
+  /* TODO why is this editable? There probably shouldn't be a setter. */
   prop = RNA_def_property(srna, "file_data", PROP_POINTER, PROP_NONE);
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_struct_type(prop, "FileSelectEntry");
   RNA_def_property_pointer_funcs(
       prop, "rna_AssetHandle_file_data_get", "rna_AssetHandle_file_data_set", NULL, NULL);
   RNA_def_property_ui_text(prop, "File Entry", "File data used to refer to the asset");
+
+  prop = RNA_def_property(srna, "local_id", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "ID");
+  RNA_def_property_pointer_funcs(prop, "rna_AssetHandle_local_id_get", NULL, NULL, NULL);
+  RNA_def_property_ui_text(prop,
+                           "",
+                           "The local data-block this asset represents; only valid if that is a "
+                           "data-block in this file");
+  RNA_def_property_flag(prop, PROP_HIDDEN);
+
+  rna_def_asset_handle_api(srna);
 }
 
 static void rna_def_asset_library_reference(BlenderRNA *brna)

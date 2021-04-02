@@ -141,6 +141,26 @@ AssetLibraryReference ED_asset_library_reference_from_enum_value(int value)
   return library;
 }
 
+const char *ED_asset_handle_get_name(const AssetHandle *asset)
+{
+  return asset->file_data->name;
+}
+
+void ED_asset_handle_get_full_library_path(const bContext *C,
+                                           const AssetLibraryReference *asset_library,
+                                           const AssetHandle *asset,
+                                           char r_full_lib_path[FILE_MAX_LIBEXTRA])
+{
+  *r_full_lib_path = '\0';
+
+  std::string asset_path = ED_assetlist_asset_filepath_get(C, *asset_library, *asset);
+  if (asset_path.empty()) {
+    return;
+  }
+
+  BLO_library_path_explode(asset_path.c_str(), r_full_lib_path, nullptr, nullptr);
+}
+
 class AssetTemporaryIDConsumer : NonCopyable, NonMovable {
   const AssetHandle &handle_;
   TempLibraryContext *temp_lib_context_ = nullptr;
@@ -167,15 +187,9 @@ class AssetTemporaryIDConsumer : NonCopyable, NonMovable {
                 Main &bmain,
                 ReportList &reports)
   {
-    std::string asset_path = ED_assetlist_asset_filepath_get(C, asset_library, handle_);
-    if (asset_path.empty()) {
-      return nullptr;
-    }
-
+    const char *asset_name = ED_asset_handle_get_name(&handle_);
     char blend_file_path[FILE_MAX_LIBEXTRA];
-    char *group = NULL;
-    char *asset_name = NULL;
-    BLO_library_path_explode(asset_path.c_str(), blend_file_path, &group, &asset_name);
+    ED_asset_handle_get_full_library_path(C, &asset_library, &handle_, blend_file_path);
 
     temp_lib_context_ = BLO_library_temp_load_id(
         &bmain, blend_file_path, id_type, asset_name, &reports);

@@ -44,6 +44,12 @@ bool ED_asset_can_make_single_from_context(const struct bContext *C);
 int ED_asset_library_reference_to_enum_value(const struct AssetLibraryReference *library);
 struct AssetLibraryReference ED_asset_library_reference_from_enum_value(int value);
 
+const char *ED_asset_handle_get_name(const AssetHandle *asset);
+void ED_asset_handle_get_full_library_path(const struct bContext *C,
+                                           const AssetLibraryReference *asset_library,
+                                           const AssetHandle *asset,
+                                           char r_full_lib_path[]);
+
 AssetTempIDConsumer *ED_asset_temp_id_consumer_create(const AssetHandle *handle);
 void ED_asset_temp_id_consumer_free(AssetTempIDConsumer **consumer);
 struct ID *ED_asset_temp_id_consumer_ensure_local_id(AssetTempIDConsumer *consumer,

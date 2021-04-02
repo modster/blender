@@ -512,6 +512,8 @@ static const EnumPropertyItem rna_enum_curve_display_handle_items[] = {
 #  include "BLI_path_util.h"
 #  include "BLI_string.h"
 
+#  include "BLO_readfile.h"
+
 #  include "BKE_anim_data.h"
 #  include "BKE_brush.h"
 #  include "BKE_colortools.h"
@@ -2673,6 +2675,18 @@ static int rna_FileBrowser_FileSelectEntry_name_length(PointerRNA *ptr)
 {
   const FileDirEntry *entry = ptr->data;
   return (int)strlen(entry->name);
+}
+
+static int rna_FileBrowser_FileSelectEntry_id_type_get(PointerRNA *ptr)
+{
+  const FileDirEntry *entry = ptr->data;
+  return entry->blentype;
+}
+
+static PointerRNA rna_FileBrowser_FileSelectEntry_local_id_get(PointerRNA *ptr)
+{
+  const FileDirEntry *entry = ptr->data;
+  return rna_pointer_inherit_refine(ptr, &RNA_ID, entry->id);
 }
 
 static int rna_FileBrowser_FileSelectEntry_preview_icon_id_get(PointerRNA *ptr)
@@ -6116,6 +6130,24 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Name", "");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_struct_name_property(srna, prop);
+
+  prop = RNA_def_property(srna, "id_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_id_type_items);
+  RNA_def_property_enum_funcs(prop, "rna_FileBrowser_FileSelectEntry_id_type_get", NULL, NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop,
+                           "Data-block Type",
+                           "The type of the data-block, if the file represents one (0 otherwise)");
+
+  prop = RNA_def_property(srna, "local_id", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "ID");
+  RNA_def_property_pointer_funcs(
+      prop, "rna_FileBrowser_FileSelectEntry_local_id_get", NULL, NULL, NULL);
+  RNA_def_property_ui_text(prop,
+                           "",
+                           "The local data-block this file represents; only valid if that is a "
+                           "data-block in this file");
+  RNA_def_property_flag(prop, PROP_HIDDEN);
 
   prop = RNA_def_int(
       srna,
