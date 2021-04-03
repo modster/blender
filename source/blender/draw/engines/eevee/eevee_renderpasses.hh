@@ -88,7 +88,7 @@ static eFilmDataType to_render_passes_data_type(eRenderPassBit rpass, const bool
 /** \name RenderPasses
  * \{ */
 
-typedef struct RenderPasses {
+class RenderPasses {
  public:
   /** Film for each render pass. A nullptr means the pass is not needed. */
   Film *combined = nullptr;
@@ -225,7 +225,7 @@ typedef struct RenderPasses {
         return combined;
     }
   }
-} RenderPasses;
+};
 
 /** \} */
 

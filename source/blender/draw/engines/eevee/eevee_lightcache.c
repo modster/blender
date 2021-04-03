@@ -61,6 +61,7 @@ extern void DRW_gpu_render_context_enable(void *re_gpu_context);
 extern void DRW_gpu_render_context_disable(void *re_gpu_context);
 
 typedef struct EEVEE_LightBake {
+  int pad;
 } EEVEE_LightBake;
 
 /* -------------------------------------------------------------------- */

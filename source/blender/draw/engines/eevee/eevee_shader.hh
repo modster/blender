@@ -57,7 +57,7 @@ enum eShaderType {
   MAX_SHADER_TYPE,
 };
 
-typedef struct ShaderModule {
+class ShaderModule {
  private:
   struct ShaderDescription {
     const char *name;
@@ -142,6 +142,6 @@ typedef struct ShaderModule {
     }
     return shaders_[shader_type];
   }
-} ShaderModule;
+};
 
 }  // namespace blender::eevee

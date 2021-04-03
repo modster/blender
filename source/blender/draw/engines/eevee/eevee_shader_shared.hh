@@ -9,8 +9,6 @@
  * IMPORTANT: Don't forget to align mat4 and vec4 to 16 bytes.
  **/
 #ifndef __cplusplus /* GLSL */
-#  define STRUCT_TYPE_START(type_) struct type_
-#  define STRUCT_TYPE_END(type_) ;
 #  define MAT4(member_) mat4 member_
 #  define VEC4(member_) vec4 member_
 #  define VEC2(member_) vec2 member_
@@ -21,13 +19,10 @@
 #  define ENUM_TYPE_START(type_)
 #  define ENUM_VAL(name_, value_) const int name_ = value_;
 #  define ENUM_TYPE_END
+#  define BLI_STATIC_ASSERT_ALIGN(type_, align_)
 
 #else /* C++ */
 #  pragma once
-#  define STRUCT_TYPE_START(type_) typedef struct type_
-#  define STRUCT_TYPE_END(type_) \
-    type_; \
-    BLI_STATIC_ASSERT_ALIGN(type_, 16);
 #  define MAT4(member_) float member_[4][4]
 #  define VEC4(member_) float member_[4]
 #  define VEC2(member_) float member_[2]
@@ -59,8 +54,7 @@ ENUM_VAL(CAMERA_PANO_EQUIDISTANT, 4)
 ENUM_VAL(CAMERA_PANO_MIRROR, 5)
 ENUM_TYPE_END
 
-STRUCT_TYPE_START(CameraData)
-{
+struct CameraData {
   /* View Matrices of the camera, not from any view! */
   MAT4(persmat);
   MAT4(persinv);
@@ -83,8 +77,8 @@ STRUCT_TYPE_START(CameraData)
   /** Film pixel filter radius. */
   float filter_size;
   ENUM(eCameraType, type);
-}
-STRUCT_TYPE_END(CameraData)
+};
+BLI_STATIC_ASSERT_ALIGN(CameraData, 16)
 
 /** \} */
 
@@ -106,8 +100,7 @@ ENUM_VAL(FILM_DATA_NORMAL, 5)
 ENUM_VAL(FILM_DATA_DEPTH, 6)
 ENUM_TYPE_END
 
-STRUCT_TYPE_START(FilmData)
-{
+struct FilmData {
   /** Size of the render target in pixels. */
   IVEC2(extent);
   /** Offset of the render target in the full-res frame, in pixels. */
@@ -120,8 +113,8 @@ STRUCT_TYPE_START(FilmData)
   ENUM(eFilmDataType, data_type);
   /** Is true if history is valid and can be sampled. Bypassing history to resets accumulation. */
   BOOL(use_history);
-}
-STRUCT_TYPE_END(FilmData)
+};
+BLI_STATIC_ASSERT_ALIGN(FilmData, 16)
 
 /** \} */
 

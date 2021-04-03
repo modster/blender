@@ -80,7 +80,7 @@ inline bool operator!=(const FilmData &a, const FilmData &b)
 /** \name Film
  * \{ */
 
-typedef struct Film {
+class Film {
  private:
   /** Owned resources. */
   GPUFrameBuffer *read_result_fb_ = nullptr;
@@ -293,7 +293,7 @@ typedef struct Film {
     GPU_framebuffer_read_color(
         read_result_fb_, 0, 0, UNPACK2(data_.extent), channel_count, 0, GPU_DATA_FLOAT, data);
   }
-} Film;
+};
 
 /** \} */
 

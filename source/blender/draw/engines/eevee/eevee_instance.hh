@@ -34,7 +34,7 @@
 
 namespace blender::eevee {
 
-typedef struct Instance {
+class Instance {
  private:
   /** Random number generator, this is its persistent state. */
   Sampling sampling_;
@@ -215,7 +215,6 @@ typedef struct Instance {
   {
     return sampling_.finished();
   }
-
-} Instance;
+};
 
 }  // namespace blender::eevee

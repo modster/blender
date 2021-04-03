@@ -132,8 +132,8 @@ inline bool operator!=(const CameraData &a, const CameraData &b)
 /** \name Camera
  * \{ */
 
-typedef struct CameraView {
-  friend struct Camera;
+class CameraView {
+  friend class Camera;
 
  private:
   /** Main views is created from the camera (or is from the viewport). It is not jittered. */
@@ -221,9 +221,9 @@ typedef struct CameraView {
   {
     main_view_ = nullptr;
   }
-} CameraView;
+};
 
-typedef struct Camera {
+class Camera {
   friend CameraView;
 
  private:
@@ -437,8 +437,7 @@ typedef struct Camera {
   {
     return eevee::is_panoramic(current.data_->type);
   }
-
-} Camera;
+};
 
 /** \} */
 

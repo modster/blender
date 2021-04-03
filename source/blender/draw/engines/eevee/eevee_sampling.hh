@@ -33,7 +33,7 @@
 
 namespace blender::eevee {
 
-typedef struct Sampling {
+class Sampling {
  private:
   /** 1 based current sample. */
   uint64_t sample_ = 1;
@@ -90,7 +90,6 @@ typedef struct Sampling {
   {
     return (sample_ > sample_count_);
   }
-
-} Sampling;
+};
 
 }  // namespace blender::eevee

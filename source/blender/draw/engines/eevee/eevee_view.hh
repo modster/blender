@@ -45,7 +45,7 @@ namespace blender::eevee {
 /** \name Passes
  * \{ */
 
-typedef struct DeferredPass {
+class DeferredPass {
  private:
   ShaderModule &shaders_;
 
@@ -74,9 +74,9 @@ typedef struct DeferredPass {
   {
     DRW_draw_pass(test_ps_);
   }
-} DeferredPass;
+};
 
-typedef struct ShadingPasses {
+class ShadingPasses {
  public:
   // BackgroundShadingPass background;
   DeferredPass opaque;
@@ -88,7 +88,7 @@ typedef struct ShadingPasses {
   {
     opaque.sync();
   }
-} ShadingPasses;
+};
 
 /** \} */
 
@@ -98,7 +98,7 @@ typedef struct ShadingPasses {
  * Render the scene and fill all render passes data.
  * \{ */
 
-typedef struct ShadingView {
+class ShadingView {
  private:
   /** Shading passes to render using this view. Shared with other views. */
   ShadingPasses &shading_passes_;
@@ -175,7 +175,7 @@ typedef struct ShadingView {
 
     DRW_stats_group_end();
   }
-} ShadingView;
+};
 
 /** \} */
 
@@ -186,7 +186,7 @@ typedef struct ShadingView {
  * We might need up to 6 views for panoramic cameras.
  * \{ */
 
-typedef struct MainView {
+class MainView {
  private:
   std::array<ShadingView, 6> shading_views_;
 
@@ -216,7 +216,7 @@ typedef struct MainView {
       view.render();
     }
   }
-} MainView;
+};
 
 /** \} */
 
