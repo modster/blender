@@ -45,6 +45,7 @@ static eGPUTextureFormat to_gpu_texture_format(eFilmDataType film_type)
 {
   switch (film_type) {
     default:
+    case FILM_DATA_COLOR_LOG:
     case FILM_DATA_COLOR:
     case FILM_DATA_VEC4:
       return GPU_RGBA16F;

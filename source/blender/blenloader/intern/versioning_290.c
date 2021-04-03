@@ -1926,6 +1926,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
 
     if (!DNA_struct_elem_find(fd->filesdna, "Camera", "float", "fisheye_fov")) {
+      /* EEVEE Panoramic Camera support. */
       LISTBASE_FOREACH (Camera *, camera, &bmain->cameras) {
         camera->panorama_type = CAM_PANO_FISHEYE_EQUISOLID;
         camera->fisheye_fov = DEG2RADF(180.0f);
@@ -1934,6 +1935,10 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         camera->latitude_max = DEG2RADF(90.0f);
         camera->longitude_min = DEG2RADF(-180.0f);
         camera->longitude_max = DEG2RADF(180.0f);
+      }
+
+      LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+        scene->eevee.flag |= SCE_EEVEE_FILM_LOG_ENCODING;
       }
     }
   }

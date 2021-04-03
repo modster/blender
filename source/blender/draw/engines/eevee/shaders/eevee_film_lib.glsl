@@ -6,12 +6,27 @@
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 #pragma BLENDER_REQUIRE(eevee_camera_lib.glsl)
 
+bool film_is_color_data(FilmData film)
+{
+  return film.data_type < FILM_DATA_FLOAT;
+}
+
 vec4 film_data_encode(FilmData film, vec4 data, float weight)
 {
-  /* TODO(fclem) Depth should be converted to radial depth in panoramic projection. */
-  if (film.data_type == FILM_DATA_COLOR) {
+  if (film_is_color_data(film)) {
+    /* Could we assume safe color from earlier pass? */
     data = safe_color(data);
+  }
+
+  if (film.data_type == FILM_DATA_COLOR_LOG) {
+    /* TODO(fclem) Pre-expose. */
     data.rgb = log2(1.0 + data.rgb);
+  }
+  else if (film.data_type == FILM_DATA_DEPTH) {
+    /* TODO(fclem) Depth should be converted to radial depth in panoramic projection. */
+  }
+
+  if (film_is_color_data(film)) {
     data *= weight;
   }
   return data;
@@ -19,8 +34,12 @@ vec4 film_data_encode(FilmData film, vec4 data, float weight)
 
 vec4 film_data_decode(FilmData film, vec4 data, float weight)
 {
-  if (film.data_type == FILM_DATA_COLOR) {
+  if (film_is_color_data(film)) {
     data *= safe_rcp(weight);
+  }
+
+  if (film.data_type == FILM_DATA_COLOR_LOG) {
+    /* TODO(fclem) undo Pre-expose. */
     data.rgb = exp2(data.rgb) - 1.0;
   }
   return data;

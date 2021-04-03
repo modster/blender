@@ -113,7 +113,7 @@ typedef struct Instance {
 
     sampling_.init(scene_);
     camera_.init(camera_eval, drw_view_);
-    render_passes.init(render_layer, v3d_, output_res, output_rect);
+    render_passes.init(scene_, render_layer, v3d_, output_res, output_rect);
 
     /* Init internal render view(s). */
     float resolution_scale = 1.0f; /* TODO(fclem) parameter. */

@@ -93,15 +93,17 @@ STRUCT_TYPE_END(CameraData)
  * \{ */
 
 ENUM_TYPE_START(eFilmDataType)
-/** Color is accumulated using the pixel filter and pre-exposed. No negative values. */
+/** Color is accumulated using the pixel filter. No negative values. */
 ENUM_VAL(FILM_DATA_COLOR, 0)
+/** Variant where we accumulate using pre-exposed values and log space. */
+ENUM_VAL(FILM_DATA_COLOR_LOG, 1)
 /** Non-Color will be accumulated using nearest filter. All values are allowed. */
-ENUM_VAL(FILM_DATA_FLOAT, 1)
-ENUM_VAL(FILM_DATA_VEC2, 2)
+ENUM_VAL(FILM_DATA_FLOAT, 2)
+ENUM_VAL(FILM_DATA_VEC2, 3)
 /** No VEC3 because GPU_RGB16F is not a renderable format. */
-ENUM_VAL(FILM_DATA_VEC4, 3)
-ENUM_VAL(FILM_DATA_NORMAL, 4)
-ENUM_VAL(FILM_DATA_DEPTH, 5)
+ENUM_VAL(FILM_DATA_VEC4, 4)
+ENUM_VAL(FILM_DATA_NORMAL, 5)
+ENUM_VAL(FILM_DATA_DEPTH, 6)
 ENUM_TYPE_END
 
 STRUCT_TYPE_START(FilmData)

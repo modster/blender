@@ -491,6 +491,7 @@ class RENDER_PT_eevee_film(RenderButtonsPanel, Panel):
         col = layout.column()
         col.prop(rd, "filter_size")
         col.prop(rd, "film_transparent", text="Transparent")
+        col.prop(props, "use_log_space")
 
         col = layout.column(align=False, heading="Overscan")
         row = col.row(align=True)

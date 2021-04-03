@@ -65,11 +65,11 @@ static const char *to_render_passes_name(eRenderPassBit rpass)
   }
 }
 
-static eFilmDataType to_render_passes_data_type(eRenderPassBit rpass)
+static eFilmDataType to_render_passes_data_type(eRenderPassBit rpass, const bool use_log_encoding)
 {
   switch (rpass) {
     case RENDERPASS_COMBINED:
-      return FILM_DATA_COLOR;
+      return (use_log_encoding) ? FILM_DATA_COLOR_LOG : FILM_DATA_COLOR;
     case RENDERPASS_DEPTH:
       return FILM_DATA_DEPTH;
     case RENDERPASS_NORMAL:
@@ -111,7 +111,8 @@ typedef struct RenderPasses {
     delete normal;
   }
 
-  void init(const RenderLayer *render_layer,
+  void init(const Scene *scene,
+            const RenderLayer *render_layer,
             const View3D *v3d,
             const int extent[2],
             const rcti *output_rect)
@@ -128,6 +129,8 @@ typedef struct RenderPasses {
       }
     }
 
+    const bool use_log_encoding = scene->eevee.flag & SCE_EEVEE_FILM_LOG_ENCODING;
+
     rcti fallback_rect;
     if (BLI_rcti_is_empty(output_rect)) {
       BLI_rcti_init(&fallback_rect, 0, extent[0], 0, extent[1]);
@@ -143,7 +146,7 @@ typedef struct RenderPasses {
         film = new Film(shaders_,
                         camera_,
                         sampling_,
-                        to_render_passes_data_type(render_pass),
+                        to_render_passes_data_type(render_pass, use_log_encoding),
                         to_render_passes_name(render_pass));
       }
       else if (!enable && film != nullptr) {

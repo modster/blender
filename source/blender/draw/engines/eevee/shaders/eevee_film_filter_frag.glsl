@@ -43,7 +43,7 @@ void main(void)
   out_weight = 0.0;
 
   /* TODO(fclem) Split into multiple shaders? Measure benefits. */
-  if (camera.filter_size < 1.0 || film.data_type != FILM_DATA_COLOR) {
+  if (camera.filter_size < 1.0 || !film_is_color_data(film)) {
     film_process_sample(camera,
                         film,
                         ViewProjectionMatrix,
@@ -99,7 +99,7 @@ void main(void)
     vec4 history_data = textureLod(data_tx, uv_history, 0.0);
     float history_weight = textureLod(weight_tx, uv_history, 0.0).r;
 
-    if (film.data_type == FILM_DATA_COLOR) {
+    if (film_is_color_data(film)) {
       out_data += history_data;
       out_weight += history_weight;
     }
