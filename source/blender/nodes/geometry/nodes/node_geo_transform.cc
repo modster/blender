@@ -158,13 +158,32 @@ static void transform_curve(DCurve &curve,
                             const float3 rotation,
                             const float3 scale)
 {
-  const float4x4 matrix = float4x4::from_loc_eul_scale(translation, rotation, scale);
 
-  for (SplineBezier &spline : curve.splines_bezier) {
-    for (ControlPointBezier &point : spline.control_points) {
-      point.handle_position_a = matrix * point.handle_position_a;
-      point.position = matrix * point.position;
-      point.handle_position_b = matrix * point.handle_position_b;
+  if (use_translate(rotation, scale)) {
+    for (Spline *spline : curve.splines) {
+      if (spline->type == Spline::Type::Bezier) {
+        BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
+        for (ControlPointBezier &point : bezier_spline.control_points) {
+          point.handle_position_a = point.handle_position_a += translation;
+          point.position = point.position += translation;
+          point.handle_position_b = point.handle_position_b += translation;
+        }
+      }
+      spline->mark_cache_invalid();
+    }
+  }
+  else {
+    const float4x4 matrix = float4x4::from_loc_eul_scale(translation, rotation, scale);
+    for (Spline *spline : curve.splines) {
+      if (spline->type == Spline::Type::Bezier) {
+        BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
+        for (ControlPointBezier &point : bezier_spline.control_points) {
+          point.handle_position_a = matrix * point.handle_position_a;
+          point.position = matrix * point.position;
+          point.handle_position_b = matrix * point.handle_position_b;
+        }
+      }
+      spline->mark_cache_invalid();
     }
   }
 }

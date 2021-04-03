@@ -56,68 +56,117 @@ struct ControlPointNURBS : ControlPoint {
   float weight;
 };
 
-enum class SplineType {
-  Bezier,
-  Poly,
-  NURBS,
-};
-
-struct Spline {
-  SplineType type;
+class Spline {
+ public:
+  enum Type {
+    Bezier,
+    NURBS,
+    Poly,
+  };
+  Type type;
 
   virtual int size() const = 0;
+  virtual int resolution() const = 0;
+  virtual void set_resolution(const int value) = 0;
+  virtual void mark_cache_invalid() = 0;
+
+  virtual int evaluated_points_size() const = 0;
+  virtual void ensure_evaluation_cache() const = 0;
+  virtual blender::Span<blender::float3> evaluated_positions() const = 0;
 };
 
-struct SplineBezier : Spline {
+class BezierSpline : public Spline {
+ public:
+  /* TODO: Figure out if I want to store this as a few separate vectors directly in the spline. */
   blender::Vector<ControlPointBezier> control_points;
+  int resolution_u;
 
-  blender::Vector<blender::float3> handle_positions_a;
-  blender::Vector<blender::float3> positions;
-  blender::Vector<blender::float3> handle_positions_b;
+  static constexpr inline Type static_type = Spline::Type::Bezier;
 
-  blender::Vector<BezierHandleType> handle_type_a;
-  blender::Vector<BezierHandleType> handle_type_b;
+ private:
+  bool cache_dirty;
 
   int32_t flag; /* Cyclic, smooth. */
-  int32_t resolution_u;
-  int32_t resolution_v;
 
+  std::mutex cache_mutex;
+  blender::Vector<blender::float3> evaluated_spline_cache;
+
+ public:
   int size() const final
   {
     return control_points.size();
   }
 
-  ~SplineBezier() = default;
+  int resolution() const final
+  {
+    return resolution_u;
+  }
+  void set_resolution(const int value) final
+  {
+    resolution_u = value;
+  }
+
+  void mark_cache_invalid() final
+  {
+    cache_dirty = true;
+  }
+
+  int evaluated_points_size() const final;
+  void ensure_evaluation_cache() const final;
+
+  blender::Span<blender::float3> evaluated_positions() const final
+  {
+    this->ensure_evaluation_cache();
+    return evaluated_spline_cache;
+  }
+
+  ~BezierSpline() = default;
 };
 
-struct SplineNURBS : Spline {
+class SplineNURBS : public Spline {
+ public:
   blender::Vector<ControlPointNURBS> control_points;
   int32_t flag; /* Cyclic, smooth. */
-  int32_t resolution_u;
-  int32_t resolution_v;
+  int resolution_u;
   uint8_t order;
 
   int size() const final
   {
     return control_points.size();
   }
+
+  int resolution() const final
+  {
+    return resolution_u;
+  }
+  void set_resolution(const int value) final
+  {
+    resolution_u = value;
+  }
+
+  int evaluated_points_size() const final
+  {
+    return 0;
+  }
+  void ensure_evaluation_cache() const final
+  {
+  }
+
+  blender::Span<blender::float3> evaluated_positions() const final
+  {
+    return {};
+  }
 };
 
 /* Proposed name to be different from DNA type. */
 struct DCurve {
-  blender::Vector<SplineBezier> splines_bezier;
+  blender::Vector<Spline *> splines;
   int32_t flag; /* 2D. */
 
   /* Attributes. */
   //   AttributeStorage attributes;
   //   CustomData *control_point_data;
   //   CustomData *spline_data;
-
-  /* Then maybe whatever caches are necessary, etc. */
-  std::mutex cache_mutex;
-  blender::Vector<blender::float3> evaluated_spline_cache;
-
-  void ensure_evaluation_cache() const;
 };
 
 DCurve *dcurve_from_dna_curve(const Curve &curve);

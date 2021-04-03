@@ -110,24 +110,45 @@ int CurveComponent::attribute_domain_size(const AttributeDomain domain) const
   }
   if (domain == ATTR_DOMAIN_POINT) {
     int total = 0;
-    for (const SplineBezier &spline : curve_->splines_bezier) {
-      total += spline.size();
+    for (const Spline *spline : curve_->splines) {
+      total += spline->size();
     }
     return total;
   }
   if (domain == ATTR_DOMAIN_CURVE) {
-    return curve_->splines_bezier.size();
+    return curve_->splines.size();
   }
   return 0;
 }
 
 namespace blender::bke {
 
-class CurveAttributeProvider final : public BuiltinAttributeProvider {
+class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
+  using AsReadAttribute = ReadAttributePtr (*)(const DCurve &data);
+  using AsWriteAttribute = WriteAttributePtr (*)(DCurve &data);
+  using UpdateOnWrite = void (*)(Spline &spline);
+  const AsReadAttribute as_read_attribute_;
+  const AsWriteAttribute as_write_attribute_;
+  const UpdateOnWrite update_on_write_;
+
  public:
-  CurveAttributeProvider()
-      : BuiltinAttributeProvider(
-            "position", ATTR_DOMAIN_POINT, CD_PROP_FLOAT3, NonCreatable, Writable, NonDeletable)
+  BuiltinSplineAttributeProvider(std::string attribute_name,
+                                 const CustomDataType attribute_type,
+                                 const CreatableEnum creatable,
+                                 const WritableEnum writable,
+                                 const DeletableEnum deletable,
+                                 const AsReadAttribute as_read_attribute,
+                                 const AsWriteAttribute as_write_attribute,
+                                 const UpdateOnWrite update_on_write)
+      : BuiltinAttributeProvider(std::move(attribute_name),
+                                 ATTR_DOMAIN_CURVE,
+                                 attribute_type,
+                                 creatable,
+                                 writable,
+                                 deletable),
+        as_read_attribute_(as_read_attribute),
+        as_write_attribute_(as_write_attribute),
+        update_on_write_(update_on_write)
   {
   }
 
@@ -139,12 +160,27 @@ class CurveAttributeProvider final : public BuiltinAttributeProvider {
       return {};
     }
 
-    return {};
+    return as_read_attribute_(*curve);
   }
 
-  WriteAttributePtr try_get_for_write(GeometryComponent &UNUSED(component)) const final
+  WriteAttributePtr try_get_for_write(GeometryComponent &component) const final
   {
-    return {};
+    if (writable_ != Writable) {
+      return {};
+    }
+    CurveComponent &curve_component = static_cast<CurveComponent &>(component);
+    DCurve *curve = curve_component.get_for_write();
+    if (curve == nullptr) {
+      return {};
+    }
+
+    if (update_on_write_ != nullptr) {
+      for (Spline *spline : curve->splines) {
+        update_on_write_(*spline);
+      }
+    }
+
+    return as_write_attribute_(*curve);
   }
 
   bool try_delete(GeometryComponent &UNUSED(component)) const final
@@ -159,9 +195,58 @@ class CurveAttributeProvider final : public BuiltinAttributeProvider {
 
   bool exists(const GeometryComponent &component) const final
   {
-    return component.attribute_domain_size(ATTR_DOMAIN_FACE) != 0;
+    return component.attribute_domain_size(ATTR_DOMAIN_CURVE) != 0;
   }
 };
+
+static int get_spline_resolution(Spline *const &spline)
+{
+  return spline->resolution();
+}
+
+static void set_spline_resolution(Spline *&spline, const int &resolution)
+{
+  spline->set_resolution(resolution);
+}
+
+static ReadAttributePtr make_resolution_read_attribute(const DCurve &curve)
+{
+  return std::make_unique<DerivedArrayReadAttribute<Spline *, int, get_spline_resolution>>(
+      ATTR_DOMAIN_CURVE, curve.splines.as_span());
+}
+
+static WriteAttributePtr make_resolution_write_attribute(DCurve &curve)
+{
+  return std::make_unique<
+      DerivedArrayWriteAttribute<Spline *, int, get_spline_resolution, set_spline_resolution>>(
+      ATTR_DOMAIN_CURVE, curve.splines.as_mutable_span());
+}
+
+static void mark_spline_curve_cache_invalid(Spline &spline)
+{
+  spline.mark_cache_invalid();
+}
+
+static float get_spline_length(Spline *const &spline)
+{
+  Span<float3> positions = spline->evaluated_positions();
+  if (positions.is_empty()) {
+    return 0.0f;
+  }
+
+  float length = 0.0f;
+  for (const int i : IndexRange(1, positions.size() - 1)) {
+    length += float3::distance(positions[i], positions[i - 1]);
+  }
+
+  return length;
+}
+
+static ReadAttributePtr make_length_attribute(const DCurve &curve)
+{
+  return std::make_unique<DerivedArrayReadAttribute<Spline *, float, get_spline_length>>(
+      ATTR_DOMAIN_CURVE, curve.splines.as_span());
+}
 
 /**
  * In this function all the attribute providers for a curve component are created. Most data
@@ -169,8 +254,25 @@ class CurveAttributeProvider final : public BuiltinAttributeProvider {
  */
 static ComponentAttributeProviders create_attribute_providers_for_curve()
 {
-  static CurveAttributeProvider normal;
-  return ComponentAttributeProviders({}, {});
+  static BuiltinSplineAttributeProvider resolution("resolution",
+                                                   CD_PROP_INT32,
+                                                   BuiltinAttributeProvider::NonCreatable,
+                                                   BuiltinAttributeProvider::Writable,
+                                                   BuiltinAttributeProvider::NonDeletable,
+                                                   make_resolution_read_attribute,
+                                                   make_resolution_write_attribute,
+                                                   mark_spline_curve_cache_invalid);
+
+  static BuiltinSplineAttributeProvider length("length",
+                                               CD_PROP_FLOAT,
+                                               BuiltinAttributeProvider::NonCreatable,
+                                               BuiltinAttributeProvider::Readonly,
+                                               BuiltinAttributeProvider::NonDeletable,
+                                               make_length_attribute,
+                                               nullptr,
+                                               nullptr);
+
+  return ComponentAttributeProviders({&resolution, &length}, {});
 }
 
 }  // namespace blender::bke

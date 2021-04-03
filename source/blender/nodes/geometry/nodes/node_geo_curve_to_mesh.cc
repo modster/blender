@@ -37,32 +37,41 @@ static bNodeSocketTemplate geo_node_point_translate_out[] = {
 
 namespace blender::nodes {
 
+// static void spline_to_mesh_data(const Spline &spline)
+// {
+// Span<float3> positions = spline.evaluated_positions();
+
+// for (const int i : verts.index_range()) {
+//   copy_v3_v3(mesh->mvert[i].co, positions[i]);
+// }
+
+// for (const int i : edges.index_range()) {
+//   MEdge &edge = mesh->medge[i];
+//   edge.v1 = i;
+//   edge.v2 = i + 1;
+//   edge.flag = ME_LOOSEEDGE;
+// }
+// }
+
 static Mesh *curve_to_mesh_calculate(const DCurve &curve)
 {
-  curve.ensure_evaluation_cache();
+  const int profile_verts_len = 1;
 
-  if (curve.evaluated_spline_cache.size() < 1) {
-    return nullptr;
+  int verts_total = 0;
+  for (const Spline *spline : curve.splines) {
+    verts_total += spline->evaluated_points_size() * profile_verts_len;
   }
 
-  Mesh *mesh = BKE_mesh_new_nomain(
-      curve.evaluated_spline_cache.size(), curve.evaluated_spline_cache.size() - 2, 0, 0, 0);
+  Mesh *mesh = BKE_mesh_new_nomain(verts_total, verts_total - 2, 0, 0, 0);
   MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
 
-  for (const int i : verts.index_range()) {
-    copy_v3_v3(mesh->mvert[i].co, curve.evaluated_spline_cache[i]);
-  }
-
-  for (const int i : edges.index_range()) {
-    MEdge &edge = mesh->medge[i];
-    edge.v1 = i;
-    edge.v2 = i + 1;
-    edge.flag = ME_LOOSEEDGE;
+  for (const Spline *spline : curve.splines) {
+    // spline_to_mesh_data(*spline);
   }
 
   BKE_mesh_calc_normals(mesh);
-  BLI_assert(BKE_mesh_is_valid(mesh));
+  // BLI_assert(BKE_mesh_is_valid(mesh));
 
   return mesh;
 }
