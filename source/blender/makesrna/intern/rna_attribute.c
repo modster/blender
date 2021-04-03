@@ -58,7 +58,7 @@ const EnumPropertyItem rna_enum_attribute_domain_items[] = {
     {ATTR_DOMAIN_CORNER, "CORNER", 0, "Face Corner", "Attribute on mesh face corner"},
     /* Not implement yet */
     // {ATTR_DOMAIN_GRIDS, "GRIDS", 0, "Grids", "Attribute on mesh multires grids"},
-    {ATTR_DOMAIN_CURVE, "CURVE", 0, "Curve", "Attribute on hair curve"},
+    {ATTR_DOMAIN_CURVE, "CURVE", 0, "Spline", "Attribute on spline"},
     {0, NULL, 0, NULL, NULL},
 };
 
