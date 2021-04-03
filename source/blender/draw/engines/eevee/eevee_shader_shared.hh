@@ -78,8 +78,8 @@ STRUCT_TYPE_START(CameraData)
   float fisheye_fov;
   float fisheye_lens;
   /** Clipping distances. */
-  float near_clip;
-  float far_clip;
+  float clip_near;
+  float clip_far;
   /** Film pixel filter radius. */
   float filter_size;
   ENUM(eCameraType, type);

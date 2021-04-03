@@ -39,6 +39,8 @@ typedef struct Sampling {
   uint64_t sample_ = 1;
   /** Target sample count. */
   uint64_t sample_count_ = 64;
+  /** Safeguard against illegal reset. */
+  bool sync_ = false;
 
  public:
   void init(const Scene *scene)
@@ -50,10 +52,17 @@ typedef struct Sampling {
       BLI_assert(!DRW_state_is_image_render());
       sample_count_ = 999999;
     }
+    sync_ = false;
+  }
+
+  void sync(void)
+  {
+    sync_ = true;
   }
 
   void reset(void)
   {
+    BLI_assert(!sync_ && "Attempted to reset sampling after init().");
     sample_ = 1;
   }
 

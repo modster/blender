@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "BLI_vector.hh"
+
 #include "RE_pipeline.h"
 
 #include "eevee_film.hh"

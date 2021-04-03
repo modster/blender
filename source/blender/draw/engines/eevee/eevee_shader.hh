@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "BLI_vector.hh"
+#include <array>
 
 #include "DRW_render.h"
 #include "GPU_shader.h"
@@ -67,15 +67,12 @@ typedef struct ShaderModule {
   };
 
   DRWShaderLibrary *shader_lib_ = nullptr;
-  Vector<GPUShader *> shaders_;
-  Vector<ShaderDescription> shader_descriptions_;
+  std::array<GPUShader *, MAX_SHADER_TYPE> shaders_;
+  std::array<ShaderDescription, MAX_SHADER_TYPE> shader_descriptions_;
 
  public:
   ShaderModule()
   {
-    shaders_.resize(MAX_SHADER_TYPE);
-    shader_descriptions_.resize(MAX_SHADER_TYPE);
-
     for (GPUShader *&shader : shaders_) {
       shader = nullptr;
     }

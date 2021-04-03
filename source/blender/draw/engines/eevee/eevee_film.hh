@@ -41,6 +41,10 @@
 
 namespace blender::eevee {
 
+/* -------------------------------------------------------------------- */
+/** \name FilmData
+ * \{ */
+
 static eGPUTextureFormat to_gpu_texture_format(eFilmDataType film_type)
 {
   switch (film_type) {
@@ -59,6 +63,22 @@ static eGPUTextureFormat to_gpu_texture_format(eFilmDataType film_type)
       return GPU_R32F;
   }
 }
+
+inline bool operator==(const FilmData &a, const FilmData &b)
+{
+  return equals_v2v2_int(a.extent, b.extent) && equals_v2v2_int(a.offset, b.offset);
+}
+
+inline bool operator!=(const FilmData &a, const FilmData &b)
+{
+  return !(a == b);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Film
+ * \{ */
 
 typedef struct Film {
  private:
@@ -127,37 +147,40 @@ typedef struct Film {
 
   void init(const int full_extent[2], const rcti *output_rect)
   {
-    int extent[2] = {BLI_rcti_size_x(output_rect), BLI_rcti_size_y(output_rect)};
-    int offset[2] = {output_rect->xmin, output_rect->ymin};
+    FilmData data = data_;
+    data.extent[0] = BLI_rcti_size_x(output_rect);
+    data.extent[1] = BLI_rcti_size_y(output_rect);
+    data.offset[0] = output_rect->xmin;
+    data.offset[1] = output_rect->ymin;
 
-    has_changed_ = false;
+    has_changed_ = data_ != data;
 
-    if (!equals_v2v2_int(data_.extent, extent)) {
-      copy_v2_v2_int(data_.extent, extent);
+    if (has_changed_) {
+      data_ = data;
+      sampling_.reset();
       this->clear();
-      has_changed_ = true;
-    }
-
-    if (!equals_v2v2_int(data_.offset, offset)) {
-      copy_v2_v2_int(data_.offset, offset);
-      has_changed_ = true;
-    }
-
-    /* TODO reprojection. */
-    if (camera_.has_changed()) {
-      has_changed_ = true;
     }
 
     for (int i = 0; i < 2; i++) {
       data_.uv_scale[i] = 1.0f / full_extent[i];
       data_.uv_scale_inv[i] = full_extent[i];
-      data_.uv_bias[i] = offset[i] / (float)full_extent[i];
+      data_.uv_bias[i] = data_.offset[i] / (float)full_extent[i];
+    }
+  }
+
+  void sync(void)
+  {
+    /* TODO reprojection. */
+    if (camera_.has_changed()) {
+      has_changed_ = true;
+      data_.use_history = 0;
     }
 
     char full_name[32];
     for (int i = 0; i < 2; i++) {
       if (data_tx_[i] == nullptr) {
         eGPUTextureFormat tex_format = to_gpu_texture_format(data_.data_type);
+        int *extent = data_.extent;
         SNPRINTF(full_name, "Film.%s.data", name_);
         data_tx_[i] = GPU_texture_create_2d(full_name, UNPACK2(extent), 1, tex_format, nullptr);
         /* TODO(fclem) The weight texture could be shared between all similar accumulators. */
@@ -172,16 +195,7 @@ typedef struct Film {
                                       });
       }
     }
-  }
 
-  void sync(void)
-  {
-    if (has_changed_) {
-      sampling_.reset();
-      data_.use_history = 0;
-    }
-
-    char full_name[32];
     eGPUSamplerState no_filter = GPU_SAMPLER_DEFAULT;
     {
       SNPRINTF(full_name, "Film.%s.Accumulate", name_);
@@ -212,7 +226,7 @@ typedef struct Film {
     }
   }
 
-  void accumulate(GPUTexture *input, DRWView *view)
+  void accumulate(GPUTexture *input, const DRWView *view)
   {
     input_tx_ = input;
 
@@ -280,5 +294,7 @@ typedef struct Film {
         read_result_fb_, 0, 0, UNPACK2(data_.extent), channel_count, 0, GPU_DATA_FLOAT, data);
   }
 } Film;
+
+/** \} */
 
 }  // namespace blender::eevee
