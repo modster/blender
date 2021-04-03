@@ -379,16 +379,6 @@ void BKE_gpencil_free_stroke_weights(bGPDstroke *gps)
     return;
   }
 
-  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
-    bGPDcurve *gpc = gps->editcurve;
-    if (gpc->dvert != NULL) {
-      for (int i = 0; i < gpc->tot_curve_points; i++) {
-        MDeformVert *dvert = &gpc->dvert[i];
-        BKE_gpencil_free_point_weights(dvert);
-      }
-    }
-  }
-
   if (gps->dvert == NULL) {
     return;
   }
@@ -404,12 +394,19 @@ void BKE_gpencil_free_stroke_editcurve(bGPDstroke *gps)
   if (gps == NULL) {
     return;
   }
-  bGPDcurve *editcurve = gps->editcurve;
-  if (editcurve == NULL) {
+  bGPDcurve *gpc = gps->editcurve;
+  if (gpc == NULL) {
     return;
   }
-  MEM_freeN(editcurve->curve_points);
-  MEM_freeN(editcurve);
+  MEM_freeN(gpc->curve_points);
+  if (gpc->dvert != NULL) {
+    for (int i = 0; i < gpc->tot_curve_points; i++) {
+      MDeformVert *dvert = &gpc->dvert[i];
+      BKE_gpencil_free_point_weights(dvert);
+    }
+    MEM_freeN(gpc->dvert);
+  }
+  MEM_freeN(gpc);
   gps->editcurve = NULL;
 }
 
