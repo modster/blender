@@ -361,9 +361,10 @@ static bool draw_call_is_culled(const DRWResourceHandle *handle, DRWView *view)
 }
 
 /* Set active view for rendering. */
-void DRW_view_set_active(DRWView *view)
+void DRW_view_set_active(const DRWView *view)
 {
-  DST.view_active = (view) ? view : DST.view_default;
+  /* TODO(fclem) DST.view_active should be const too. */
+  DST.view_active = (view) ? (DRWView *)view : DST.view_default;
 }
 
 /* Return True if the given BoundSphere intersect the current view frustum */
