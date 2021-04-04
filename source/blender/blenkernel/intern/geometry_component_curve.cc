@@ -206,7 +206,7 @@ static int get_spline_resolution(Spline *const &spline)
 
 static void set_spline_resolution(Spline *&spline, const int &resolution)
 {
-  spline->set_resolution(resolution);
+  spline->set_resolution(std::max(resolution, 1));
 }
 
 static ReadAttributePtr make_resolution_read_attribute(const DCurve &curve)
