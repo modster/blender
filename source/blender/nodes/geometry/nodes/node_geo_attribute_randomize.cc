@@ -291,21 +291,9 @@ static void geo_node_random_attribute_exec(GeoNodeExecParams params)
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
-  if (geometry_set.has<MeshComponent>()) {
-    randomize_attribute_on_component(geometry_set.get_component_for_write<MeshComponent>(),
-                                     params,
-                                     attribute_name,
-                                     data_type,
-                                     operation,
-                                     seed);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    randomize_attribute_on_component(geometry_set.get_component_for_write<PointCloudComponent>(),
-                                     params,
-                                     attribute_name,
-                                     data_type,
-                                     operation,
-                                     seed);
+  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
+    randomize_attribute_on_component(
+        *component, params, attribute_name, data_type, operation, seed);
   }
 
   params.set_output("Geometry", geometry_set);

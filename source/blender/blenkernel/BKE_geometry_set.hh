@@ -308,6 +308,7 @@ struct GeometrySet {
   void add(const GeometryComponent &component);
 
   blender::Vector<const GeometryComponent *> get_components_for_read() const;
+  blender::Vector<GeometryComponent *> get_components_for_write();
 
   void compute_boundbox_without_instances(blender::float3 *r_min, blender::float3 *r_max) const;
 

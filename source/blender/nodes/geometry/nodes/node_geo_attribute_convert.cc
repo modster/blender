@@ -124,21 +124,8 @@ static void geo_node_attribute_convert_exec(GeoNodeExecParams params)
     return;
   }
 
-  if (geometry_set.has<MeshComponent>()) {
-    attribute_convert_calc(geometry_set.get_component_for_write<MeshComponent>(),
-                           params,
-                           source_name,
-                           result_name,
-                           data_type,
-                           domain);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    attribute_convert_calc(geometry_set.get_component_for_write<PointCloudComponent>(),
-                           params,
-                           source_name,
-                           result_name,
-                           data_type,
-                           domain);
+  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
+    attribute_convert_calc(*component, params, source_name, result_name, data_type, domain);
   }
 
   params.set_output("Geometry", geometry_set);

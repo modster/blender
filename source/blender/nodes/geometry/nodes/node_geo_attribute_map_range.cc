@@ -387,11 +387,8 @@ static void geo_node_attribute_map_range_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  if (geometry_set.has<MeshComponent>()) {
-    map_range_attribute(geometry_set.get_component_for_write<MeshComponent>(), params);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    map_range_attribute(geometry_set.get_component_for_write<PointCloudComponent>(), params);
+  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
+    map_range_attribute(*component, params);
   }
 
   params.set_output("Geometry", geometry_set);

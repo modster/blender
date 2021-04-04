@@ -147,11 +147,8 @@ static void geo_node_attribute_fill_exec(GeoNodeExecParams params)
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
-  if (geometry_set.has<MeshComponent>()) {
-    fill_attribute(geometry_set.get_component_for_write<MeshComponent>(), params);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    fill_attribute(geometry_set.get_component_for_write<PointCloudComponent>(), params);
+  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
+    fill_attribute(*component, params);
   }
 
   params.set_output("Geometry", geometry_set);
