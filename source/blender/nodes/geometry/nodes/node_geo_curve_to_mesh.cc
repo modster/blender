@@ -27,6 +27,7 @@
 
 static bNodeSocketTemplate geo_node_curve_to_mesh_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
+    {SOCK_GEOMETRY, N_("Profile Curve")},
     {-1, ""},
 };
 
@@ -37,54 +38,186 @@ static bNodeSocketTemplate geo_node_point_translate_out[] = {
 
 namespace blender::nodes {
 
-// static void spline_to_mesh_data(const Spline &spline)
-// {
-// Span<float3> positions = spline.evaluated_positions();
-
-// for (const int i : verts.index_range()) {
-//   copy_v3_v3(mesh->mvert[i].co, positions[i]);
-// }
-
-// for (const int i : edges.index_range()) {
-//   MEdge &edge = mesh->medge[i];
-//   edge.v1 = i;
-//   edge.v2 = i + 1;
-//   edge.flag = ME_LOOSEEDGE;
-// }
-// }
-
-static Mesh *curve_to_mesh_calculate(const DCurve &curve)
+static void vert_extrude_to_mesh_data(const Spline &spline,
+                                      const float3 profile_vert,
+                                      MutableSpan<MVert> verts,
+                                      MutableSpan<MEdge> edges,
+                                      int &vert_offset,
+                                      int &edge_offset)
 {
-  const int profile_verts_len = 1;
+  Span<float3> positions = spline.evaluated_positions();
 
-  int verts_total = 0;
-  for (const Spline *spline : curve.splines) {
-    verts_total += spline->evaluated_points_size() * profile_verts_len;
+  for (const int i : IndexRange(positions.size() - 1)) {
+    MEdge &edge = edges[i];
+    edge.v1 = vert_offset + i;
+    edge.v2 = vert_offset + i + 1;
+    edge.flag = ME_LOOSEEDGE;
   }
 
-  Mesh *mesh = BKE_mesh_new_nomain(verts_total, verts_total - 2, 0, 0, 0);
+  float3 co = profile_vert;
+  for (const int i : IndexRange(positions.size() - 1)) {
+    const float3 delta = positions[i + 1] - positions[i];
+    MVert &vert = verts[vert_offset++];
+    copy_v3_v3(vert.co, co);
+    co += delta;
+  }
+  MVert &last_vert = verts[vert_offset++];
+  if (spline.type == Spline::Bezier) {
+    const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(spline);
+    const float3 offset = profile_vert - bezier_spline.control_points.begin()->position;
+    copy_v3_v3(last_vert.co, bezier_spline.control_points.last().position + offset);
+  }
+}
+
+static void spline_extrude_to_mesh_data(const Spline &spline,
+                                        Span<float3> profile_spline,
+                                        MutableSpan<MVert> verts,
+                                        MutableSpan<MEdge> edges,
+                                        MutableSpan<MLoop> loops,
+                                        MutableSpan<MPoly> polys,
+                                        int &vert_offset,
+                                        int &edge_offset,
+                                        int &loop_offset,
+                                        int &poly_offset)
+{
+  Span<float3> positions = spline.evaluated_positions();
+
+  if (positions.size() == 0) {
+    return;
+  }
+
+  if (profile_spline.size() == 1) {
+    vert_extrude_to_mesh_data(spline, profile_spline[0], verts, edges, vert_offset, edge_offset);
+    return;
+  }
+
+  /* TODO: This code path isn't finished, crashes, and needs more thought. */
+
+  Array<float3> profile(profile_spline);
+
+  // const bool is_cyclic = profile_spline.last() == profile_spline.first();
+  const int vert_offset_start = vert_offset;
+
+  for (const int i : IndexRange(positions.size() - 1)) {
+    const float3 delta = positions[i + 1] - positions[i];
+    for (float3 &profile_co : profile) {
+      MVert &vert = verts[vert_offset++];
+      copy_v3_v3(vert.co, profile_co);
+      profile_co += delta;
+    }
+  }
+
+  const int profile_len = profile.size();
+  for (const int i : IndexRange(positions.size() - 1)) {
+    const int ring_offset = vert_offset_start + profile_len * i;
+    const int next_ring_offset = vert_offset_start + profile_len * (i + 1);
+    for (const int UNUSED(i_profile) : profile.index_range()) {
+      MEdge &edge_v = edges[edge_offset++];
+      edge_v.v1 = ring_offset + i;
+      edge_v.v2 = next_ring_offset + i;
+      edge_v.flag = ME_LOOSEEDGE | ME_EDGEDRAW | ME_EDGERENDER;
+
+      if (profile_len > 1) {
+        MEdge &edge_u = edges[edge_offset++];
+        edge_u.v1 = ring_offset + i;
+        edge_u.v2 = ring_offset + (i + 1) % profile_len;
+        edge_u.flag = ME_LOOSEEDGE | ME_EDGEDRAW | ME_EDGERENDER;
+      }
+    }
+  }
+}
+
+static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_curve)
+{
+  int profile_vert_total = 0;
+  int profile_edge_total = 0;
+  Vector<Span<float3>> profile_splines;
+  for (const Spline *spline : profile_curve.splines) {
+    Span<float3> positions = spline->evaluated_positions();
+    profile_vert_total += positions.size();
+    profile_edge_total += std::max(positions.size() - 2, 0L);
+    profile_splines.append(spline->evaluated_positions());
+  }
+
+  int vert_total = 0;
+  int edge_total = 0;
+  int poly_total = 0;
+  for (const int i : curve.splines.index_range()) {
+    const Spline &spline = *curve.splines[i];
+    const int spline_len = spline.evaluated_points_size();
+    vert_total += spline_len * profile_vert_total;
+    /* An edge for every point for every curve segment, and edges for for the original profile's
+     * edges. */
+    edge_total += (spline_len - 1) * profile_vert_total + spline_len * profile_edge_total;
+    poly_total += spline_len * profile_edge_total;
+  }
+  const int corner_total = poly_total * 4;
+
+  if (vert_total == 0) {
+    return nullptr;
+  }
+
+  // Mesh *mesh = BKE_mesh_new_nomain(vert_total, edge_total, 0, corner_total, poly_total);
+  Mesh *mesh = BKE_mesh_new_nomain(vert_total, edge_total, 0, 0, 0);
   MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
+  MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
+  MutableSpan<MPoly> polys{mesh->mpoly, mesh->totpoly};
 
+  int vert_offset = 0;
+  int edge_offset = 0;
+  int loop_offset = 0;
+  int poly_offset = 0;
   for (const Spline *spline : curve.splines) {
-    // spline_to_mesh_data(*spline);
+    for (Span<float3> profile_spline : profile_splines) {
+      spline_extrude_to_mesh_data(*spline,
+                                  profile_spline,
+                                  verts,
+                                  edges,
+                                  loops,
+                                  polys,
+                                  vert_offset,
+                                  edge_offset,
+                                  loop_offset,
+                                  poly_offset);
+    }
   }
 
   BKE_mesh_calc_normals(mesh);
-  // BLI_assert(BKE_mesh_is_valid(mesh));
+  BLI_assert(BKE_mesh_is_valid(mesh));
 
   return mesh;
 }
 
+static DCurve get_curve_single_vert()
+{
+  DCurve curve;
+  BezierSpline *spline = new BezierSpline();
+  ControlPointBezier control_point;
+  control_point.position = float3(0);
+  control_point.handle_position_a = float3(0);
+  control_point.handle_position_b = float3(0);
+  spline->control_points.append(control_point);
+  curve.splines.append(static_cast<Spline *>(spline));
+
+  return curve;
+}
+
 static void geo_node_curve_to_mesh_exec(GeoNodeExecParams params)
 {
-  GeometrySet set_in = params.extract_input<GeometrySet>("Curve");
+  GeometrySet curve_set = params.extract_input<GeometrySet>("Curve");
+  GeometrySet profile_set = params.extract_input<GeometrySet>("Profile Curve");
 
-  if (!set_in.has_curve()) {
+  if (!curve_set.has_curve()) {
     params.set_output("Mesh", GeometrySet());
   }
 
-  Mesh *mesh = curve_to_mesh_calculate(*set_in.get_curve_for_read());
+  const DCurve *profile_curve = profile_set.get_curve_for_read();
+
+  const DCurve vert_curve = get_curve_single_vert();
+
+  Mesh *mesh = curve_to_mesh_calculate(*curve_set.get_curve_for_read(),
+                                       (profile_curve == nullptr) ? vert_curve : *profile_curve);
   params.set_output("Mesh", GeometrySet::create_with_mesh(mesh));
 }
 

@@ -107,6 +107,8 @@ static void evaluate_bezier_part_3d(const float3 point_0,
 
 int BezierSpline::evaluated_points_size() const
 {
+  BLI_assert(control_points.size() > 0);
+
   int total_len = 1;
   for (const int i : IndexRange(1, this->control_points.size() - 1)) {
     const ControlPointBezier &point_prev = this->control_points[i - 1];
@@ -156,6 +158,8 @@ void BezierSpline::ensure_evaluation_cache() const
       offset += resolution;
     }
   }
+
+  positions.last() = control_points.last().position;
 
   mutable_self->cache_dirty = false;
 }

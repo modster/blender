@@ -84,7 +84,7 @@ class BezierSpline : public Spline {
   static constexpr inline Type static_type = Spline::Type::Bezier;
 
  private:
-  bool cache_dirty;
+  bool cache_dirty = true;
 
   int32_t flag; /* Cyclic, smooth. */
 
