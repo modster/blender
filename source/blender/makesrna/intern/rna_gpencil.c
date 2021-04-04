@@ -2471,8 +2471,8 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
   RNA_def_parameter_clear_flags(prop, PROP_ANIMATABLE, 0);
   RNA_def_property_ui_text(
       prop,
-      "Curve Resolution",
-      "Number of segments generated between control points when editing strokes in curve mode");
+      "Bézier Curve Resolution",
+      "Number of segments generated between control points");
   RNA_def_property_update(
       prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_update");
 
