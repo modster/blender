@@ -53,9 +53,11 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
 {
   DCurve *curve = new DCurve();
 
-  curve->splines.reserve(BLI_listbase_count(&dna_curve.nurb));
+  const ListBase *nurbs = BKE_curve_nurbs_get(&const_cast<Curve &>(dna_curve));
 
-  LISTBASE_FOREACH (const Nurb *, nurb, &dna_curve.nurb) {
+  curve->splines.reserve(BLI_listbase_count(nurbs));
+
+  LISTBASE_FOREACH (const Nurb *, nurb, nurbs) {
     if (nurb->type == CU_BEZIER) {
       BezierSpline *spline = new BezierSpline();
       for (const BezTriple &bezt : Span(nurb->bezt, nurb->pntsu)) {
