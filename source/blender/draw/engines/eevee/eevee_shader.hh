@@ -26,7 +26,9 @@
 #pragma once
 
 #include <array>
+#include <string>
 
+#include "BLI_string_ref.hh"
 #include "DRW_render.h"
 #include "GPU_shader.h"
 
@@ -69,6 +71,7 @@ class ShaderModule {
   DRWShaderLibrary *shader_lib_ = nullptr;
   std::array<GPUShader *, MAX_SHADER_TYPE> shaders_;
   std::array<ShaderDescription, MAX_SHADER_TYPE> shader_descriptions_;
+  std::string shared_lib_;
 
  public:
   ShaderModule()
@@ -77,10 +80,11 @@ class ShaderModule {
       shader = nullptr;
     }
 
+    shared_lib_ = enum_preprocess(datatoc_eevee_shader_shared_hh);
+
     shader_lib_ = DRW_shader_library_create();
     /* NOTE: These need to be ordered by dependencies. */
-    DRW_shader_library_add_file(
-        shader_lib_, datatoc_eevee_shader_shared_hh, "eevee_shader_shared.hh");
+    DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
@@ -141,6 +145,43 @@ class ShaderModule {
       BLI_assert(shaders_[shader_type] != nullptr);
     }
     return shaders_[shader_type];
+  }
+
+ private:
+  /* Run some custom preprocessor shader rewrite and returns a new string. */
+  std::string enum_preprocess(const char *input)
+  {
+    std::string output = "";
+    /* Not failure safe but this is only ran on static data. */
+    const char *cursor = input;
+    while ((cursor = strstr(cursor, "enum "))) {
+      output += StringRef(input, cursor - input);
+
+      /* Skip "enum" keyword. */
+      cursor = strstr(cursor, " ");
+
+      const char *enum_name = cursor;
+      cursor = strstr(cursor, " :");
+
+      output += "#define " + StringRef(enum_name, cursor - enum_name) + " uint\n";
+      output += "const uint ";
+
+      const char *enum_values = strstr(cursor, "{") + 1;
+      cursor = strstr(cursor, "}");
+      output += StringRef(enum_values, cursor - enum_values);
+
+      if (cursor != nullptr) {
+        /* Skip the curly bracket but not the semicolon. */
+        input = cursor + 1;
+      }
+      else {
+        input = nullptr;
+      }
+    }
+    if (input != nullptr) {
+      output += input;
+    }
+    return output;
   }
 };
 
