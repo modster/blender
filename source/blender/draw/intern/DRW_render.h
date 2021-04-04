@@ -296,7 +296,9 @@ void DRW_shader_free(struct GPUShader *shader);
 DRWShaderLibrary *DRW_shader_library_create(void);
 
 /* Warning: Each library must be added after all its dependencies. */
-void DRW_shader_library_add_file(DRWShaderLibrary *lib, char *lib_code, const char *lib_name);
+void DRW_shader_library_add_file(DRWShaderLibrary *lib,
+                                 const char *lib_code,
+                                 const char *lib_name);
 #define DRW_SHADER_LIB_ADD(lib, lib_name) \
   DRW_shader_library_add_file(lib, datatoc_##lib_name##_glsl, STRINGIFY(lib_name) ".glsl")
 
