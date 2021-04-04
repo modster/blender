@@ -142,6 +142,27 @@ typedef struct tGP_BrushWeightpaintData {
   int pbuffer_size;
 } tGP_BrushWeightpaintData;
 
+/* TODO: This function is duplicated in other places and should not be here. */
+static bool gpencil_3d_point_to_screen_space(
+    ARegion *region, const rcti *rect, const float diff_mat[4][4], const float co[3], int r_co[2])
+{
+  float parent_co[3];
+  mul_v3_m4v3(parent_co, diff_mat, co);
+  int screen_co[2];
+  if (ED_view3d_project_int_global(
+          region, parent_co, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
+      V3D_PROJ_RET_OK) {
+    if (!ELEM(V2D_IS_CLIPPED, screen_co[0], screen_co[1]) &&
+        BLI_rcti_isect_pt(rect, screen_co[0], screen_co[1])) {
+      copy_v2_v2_int(r_co, screen_co);
+      return true;
+    }
+  }
+  r_co[0] = V2D_IS_CLIPPED;
+  r_co[1] = V2D_IS_CLIPPED;
+  return false;
+}
+
 /* Ensure the buffer to hold temp selected point size is enough to save all points selected. */
 static tGP_Selected *gpencil_select_buffer_ensure(tGP_Selected *buffer_array,
                                                   int *buffer_size,
@@ -237,8 +258,15 @@ static bool brush_draw_apply(tGP_BrushWeightpaintData *gso,
   /* create dvert */
   BKE_gpencil_dvert_ensure(gps);
 
-  MDeformVert *dvert = gps->dvert + pt_index;
+  MDeformVert *dvert;
   float inf;
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    bGPDcurve *gpc = gps->editcurve;
+    dvert = gpc->dvert + pt_index;
+  }
+  else {
+    dvert = gps->dvert + pt_index;
+  }
 
   /* Compute strength of effect */
   inf = brush_influence_calc(gso, radius, co);
@@ -365,7 +393,14 @@ static void gpencil_save_selected_point(tGP_BrushWeightpaintData *gso,
                                         int pc[2])
 {
   tGP_Selected *selected;
-  bGPDspoint *pt = &gps->points[index];
+  bGPDspoint *pt = NULL;
+  bGPDcurve_point *cpt = NULL;
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    cpt = &gps->editcurve->curve_points[index];
+  }
+  else {
+    pt = &gps->points[index];
+  }
 
   /* Ensure the array to save the list of selected points is big enough. */
   gso->pbuffer = gpencil_select_buffer_ensure(
@@ -375,9 +410,69 @@ static void gpencil_save_selected_point(tGP_BrushWeightpaintData *gso,
   selected->gps = gps;
   selected->pt_index = index;
   copy_v2_v2_int(selected->pc, pc);
-  copy_v4_v4(selected->color, pt->vert_color);
+  copy_v4_v4(selected->color, (cpt != NULL) ? cpt->vert_color : pt->vert_color);
 
   gso->pbuffer_used++;
+}
+
+static void gpencil_weightpaint_select_curve(tGP_BrushWeightpaintData *gso,
+                                             bGPDstroke *gps,
+                                             const float diff_mat[4][4],
+                                             const float bound_mat[4][4])
+{
+  ARegion *region = gso->region;
+  GP_SpaceConversion *gsc = &gso->gsc;
+  rcti *rect = &gso->brush_rect;
+  Brush *brush = gso->brush;
+  const int radius = (brush->flag & GP_BRUSH_USE_PRESSURE) ? gso->brush->size * gso->pressure :
+                                                             gso->brush->size;
+  bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
+  bGPDcurve *gpc = gps->editcurve;
+
+  /* Check if the stroke collide with brush. */
+  if (!ED_gpencil_stroke_check_collision(gsc, gps, gso->mval, radius, bound_mat)) {
+    return;
+  }
+
+  if (gpc->tot_curve_points == 1) {
+    return;
+  }
+
+  /* If the curve has more than one control point... */
+  for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
+    bGPDcurve_point *cpt = &gpc->curve_points[i];
+    bGPDcurve_point *cpt_next = &gpc->curve_points[i + 1];
+    BezTriple *bezt = &cpt->bezt;
+    BezTriple *bezt_next = &cpt_next->bezt;
+
+    int screen_co[2];
+    int screen_co2[2];
+
+    /* Test if points can be projected. */
+    if (!(gpencil_3d_point_to_screen_space(region, rect, diff_mat, &bezt->vec[1], &screen_co) ||
+          gpencil_3d_point_to_screen_space(
+              region, rect, diff_mat, &bezt_next->vec[1], &screen_co2))) {
+      continue;
+    }
+
+    /* Test if the segment is in the circle. */
+    if (!gpencil_stroke_inside_circle(
+            gso->mval, radius, screen_co[0], screen_co[1], screen_co2[0], screen_co2[1])) {
+      continue;
+    }
+
+    bGPDcurve_point *cpt_active = NULL;
+    int index = -1;
+    if (cpt->runtime.gpc_pt_orig) {
+      cpt_active = cpt->runtime.gpc_pt_orig;
+      index = cpt->runtime.idx_orig;
+    }
+    else {
+      cpt_active = cpt;
+      index = i;
+    }
+    gpencil_save_selected_point(gso, gps_active, index, screen_co);
+  }
 }
 
 /* Select points in this stroke and add to an array to be used later. */
@@ -531,9 +626,13 @@ static bool gpencil_weightpaint_brush_do_frame(bContext *C,
     if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
       continue;
     }
-
-    /* Check points below the brush. */
-    gpencil_weightpaint_select_stroke(gso, gps, diff_mat, bound_mat);
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      gpencil_weightpaint_select_curve(gso, gps, diff_mat, bound_mat);
+    }
+    else {
+      /* Check points below the brush. */
+      gpencil_weightpaint_select_stroke(gso, gps, diff_mat, bound_mat);
+    }
   }
 
   /*---------------------------------------------------------------------
