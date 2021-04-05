@@ -4867,7 +4867,7 @@ void perspective_m4_fov(float mat[4][4],
 
 /* translate a matrix created by orthographic_m4 or perspective_m4 in XY coords
  * (used to jitter the view) */
-void window_translate_m4(float winmat[4][4], float perspmat[4][4], const float x, const float y)
+void window_translate_m4(float winmat[4][4], const float perspmat[4][4], const float x, const float y)
 {
   if (winmat[2][3] == -1.0f) {
     /* in the case of a win-matrix, this means perspective always */

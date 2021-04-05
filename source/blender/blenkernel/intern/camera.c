@@ -224,9 +224,9 @@ void *BKE_camera_add(Main *bmain, const char *name)
 }
 
 /* get the camera's dof value, takes the dof object into account */
-float BKE_camera_object_dof_distance(Object *ob)
+float BKE_camera_object_dof_distance(const Object *ob)
 {
-  Camera *cam = (Camera *)ob->data;
+  const Camera *cam = (const Camera *)ob->data;
   if (ob->type != OB_CAMERA) {
     return 0.0f;
   }
