@@ -129,7 +129,6 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
   using UpdateOnWrite = void (*)(Spline &spline);
   const AsReadAttribute as_read_attribute_;
   const AsWriteAttribute as_write_attribute_;
-  const UpdateOnWrite update_on_write_;
 
  public:
   BuiltinSplineAttributeProvider(std::string attribute_name,
@@ -138,8 +137,7 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
                                  const WritableEnum writable,
                                  const DeletableEnum deletable,
                                  const AsReadAttribute as_read_attribute,
-                                 const AsWriteAttribute as_write_attribute,
-                                 const UpdateOnWrite update_on_write)
+                                 const AsWriteAttribute as_write_attribute)
       : BuiltinAttributeProvider(std::move(attribute_name),
                                  ATTR_DOMAIN_CURVE,
                                  attribute_type,
@@ -147,8 +145,7 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
                                  writable,
                                  deletable),
         as_read_attribute_(as_read_attribute),
-        as_write_attribute_(as_write_attribute),
-        update_on_write_(update_on_write)
+        as_write_attribute_(as_write_attribute)
   {
   }
 
@@ -172,12 +169,6 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
     DCurve *curve = curve_component.get_for_write();
     if (curve == nullptr) {
       return {};
-    }
-
-    if (update_on_write_ != nullptr) {
-      for (Spline *spline : curve->splines) {
-        update_on_write_(*spline);
-      }
     }
 
     return as_write_attribute_(*curve);
@@ -207,6 +198,7 @@ static int get_spline_resolution(Spline *const &spline)
 static void set_spline_resolution(Spline *&spline, const int &resolution)
 {
   spline->set_resolution(std::max(resolution, 1));
+  spline->mark_cache_invalid();
 }
 
 static ReadAttributePtr make_resolution_read_attribute(const DCurve &curve)
@@ -220,11 +212,6 @@ static WriteAttributePtr make_resolution_write_attribute(DCurve &curve)
   return std::make_unique<
       DerivedArrayWriteAttribute<Spline *, int, get_spline_resolution, set_spline_resolution>>(
       ATTR_DOMAIN_CURVE, curve.splines.as_mutable_span());
-}
-
-static void mark_spline_curve_cache_invalid(Spline &spline)
-{
-  spline.mark_cache_invalid();
 }
 
 static float get_spline_length(Spline *const &spline)
@@ -248,6 +235,17 @@ static ReadAttributePtr make_length_attribute(const DCurve &curve)
       ATTR_DOMAIN_CURVE, curve.splines.as_span());
 }
 
+static bool get_cyclic_value(Spline *const &spline)
+{
+  return spline->is_cyclic;
+}
+
+static ReadAttributePtr make_cyclic_attribute(const DCurve &curve)
+{
+  return std::make_unique<DerivedArrayReadAttribute<Spline *, bool, get_cyclic_value>>(
+      ATTR_DOMAIN_CURVE, curve.splines.as_span());
+}
+
 /**
  * In this function all the attribute providers for a curve component are created. Most data
  * in this function is statically allocated, because it does not change over time.
@@ -260,8 +258,7 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
                                                    BuiltinAttributeProvider::Writable,
                                                    BuiltinAttributeProvider::NonDeletable,
                                                    make_resolution_read_attribute,
-                                                   make_resolution_write_attribute,
-                                                   mark_spline_curve_cache_invalid);
+                                                   make_resolution_write_attribute);
 
   static BuiltinSplineAttributeProvider length("length",
                                                CD_PROP_FLOAT,
@@ -269,10 +266,17 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
                                                BuiltinAttributeProvider::Readonly,
                                                BuiltinAttributeProvider::NonDeletable,
                                                make_length_attribute,
-                                               nullptr,
                                                nullptr);
 
-  return ComponentAttributeProviders({&resolution, &length}, {});
+  static BuiltinSplineAttributeProvider cyclic("cyclic",
+                                               CD_PROP_BOOL,
+                                               BuiltinAttributeProvider::NonCreatable,
+                                               BuiltinAttributeProvider::Writable,
+                                               BuiltinAttributeProvider::NonDeletable,
+                                               make_cyclic_attribute,
+                                               nullptr);
+
+  return ComponentAttributeProviders({&resolution, &length, &cyclic}, {});
 }
 
 }  // namespace blender::bke

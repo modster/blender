@@ -54,6 +54,7 @@ class Spline {
     Poly,
   };
   Type type;
+  bool is_cyclic = false;
 
   virtual int size() const = 0;
   virtual int resolution() const = 0;
@@ -76,13 +77,11 @@ class BezierSpline : public Spline {
   static constexpr inline Type static_type = Spline::Type::Bezier;
 
  private:
-  bool is_cyclic = false;
-
-  mutable std::mutex cache_mutex;
-  mutable bool cache_dirty = true;
-  mutable blender::Vector<blender::float3> evaluated_positions_cache;
-  mutable blender::Vector<blender::float3> evaluated_tangents_cache;
-  mutable blender::Vector<blender::float3> evaluated_normals_cache;
+  mutable std::mutex cache_mutex_;
+  mutable bool cache_dirty_ = true;
+  mutable blender::Vector<blender::float3> evaluated_positions_cache_;
+  mutable blender::Vector<blender::float3> evaluated_tangents_cache_;
+  mutable blender::Vector<blender::float3> evaluated_normals_cache_;
 
  public:
   int size() const final
@@ -101,7 +100,7 @@ class BezierSpline : public Spline {
 
   void mark_cache_invalid() final
   {
-    cache_dirty = true;
+    cache_dirty_ = true;
   }
 
   int evaluated_points_size() const final;
@@ -110,19 +109,19 @@ class BezierSpline : public Spline {
   blender::Span<blender::float3> evaluated_positions() const final
   {
     this->ensure_evaluation_cache();
-    return evaluated_positions_cache;
+    return evaluated_positions_cache_;
   }
 
   blender::Span<blender::float3> evaluated_tangents() const final
   {
     this->ensure_evaluation_cache();
-    return evaluated_tangents_cache;
+    return evaluated_tangents_cache_;
   }
 
   blender::Span<blender::float3> evaluated_normals() const final
   {
     this->ensure_evaluation_cache();
-    return evaluated_normals_cache;
+    return evaluated_normals_cache_;
   }
 
   ~BezierSpline() = default;

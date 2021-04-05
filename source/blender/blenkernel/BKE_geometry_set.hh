@@ -433,7 +433,7 @@ class CurveComponent : public GeometryComponent {
 
   void clear();
   bool has_curve() const;
-  void replace(DCurve *pointcloud, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+  void replace(DCurve *curve, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   DCurve *release();
 
   const DCurve *get_for_read() const;

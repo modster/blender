@@ -82,6 +82,8 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
       // spline.resolution_v = nurb->resolv;
       spline->type = Spline::Type::Bezier;
 
+      spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
+
       curve->splines.append(spline);
     }
     else if (nurb->type == CU_NURBS) {
@@ -107,7 +109,7 @@ int BezierSpline::evaluated_points_size() const
 {
   BLI_assert(control_points.size() > 0);
 
-  int total_len = 1;
+  int total_len = 0;
   for (const int i : IndexRange(1, this->control_points.size() - 1)) {
     const BezierPoint &point_prev = this->control_points[i - 1];
     const BezierPoint &point = this->control_points[i];
@@ -119,7 +121,17 @@ int BezierSpline::evaluated_points_size() const
     }
   }
 
-  if (!this->is_cyclic) {
+  if (this->is_cyclic) {
+    if (segment_is_vector(this->control_points.last(), this->control_points.first())) {
+      total_len++;
+    }
+    else {
+      total_len += this->resolution_u;
+    }
+  }
+  else {
+    /* Since evaulating the bezier doesn't add the final point's position,
+     * it must be added manually in the non-cyclic case. */
     total_len++;
   }
 
@@ -160,7 +172,7 @@ static void evaluate_segment_positions(const BezierPoint &point,
                             point.handle_position_b,
                             next.handle_position_a,
                             next.position,
-                            positions.slice(offset, resolution));
+                            positions.slice(offset, resolution - 1));
     offset += resolution;
   }
 }
@@ -205,6 +217,11 @@ static void calculate_tangents(Span<BezierPoint> control_points,
                                const bool is_cyclic,
                                MutableSpan<float3> tangents)
 {
+  if (positions.size() == 1) {
+    tangents.first() = float3(0.0f, 0.0f, 0.0f);
+    return;
+  }
+
   for (const int i : IndexRange(1, positions.size() - 2)) {
     tangents[i] = direction_bisect(positions[i - 1], positions[i], positions[i + 1]);
   }
@@ -231,63 +248,204 @@ static void calculate_tangents(Span<BezierPoint> control_points,
     }
 
     const BezierPoint &last_point = control_points.last();
-    if (LIKELY(first_point.handle_position_a != first_point.position)) {
-      tangents.last() = (first_point.position - first_point.handle_position_a).normalized();
+    if (LIKELY(last_point.handle_position_a != first_point.position)) {
+      tangents.last() = (last_point.handle_position_b - last_point.position).normalized();
     }
     else {
       tangents.last() = (positions.last() - positions[positions.size() - 1]).normalized();
     }
   }
+
+  for (const float3 &tangent : tangents) {
+    BLI_ASSERT_UNIT_V3(tangent);
+  }
 }
 
-// static void evaluate_normals(Span<BezierPoint> control_points,
-//                              Span<float3> positions,
-//                              Span<float3> tangents,
-//                              const bool is_cyclic,
-//                              MutableSpan<Quat> normals)
-// {
+static float3 initial_normal(const float3 first_tangent)
+{
+  /* TODO: Should be is "almost" zero. */
+  if (first_tangent.is_zero()) {
+    return float3(0.0f, 0.0f, 1.0f);
+  }
 
-//   /* Start by calculating a simple normal for the the first two points. */
-//   for (const int i : normals.take_front(2).index_range()) {
-//     normals[i] = float3::cross(tangents[i], float3(0.0f, 0.0f, 1.0f));
-//   }
+  const float3 normal = float3::cross(first_tangent, float3(0.0f, 0.0f, 1.0f));
+  if (!normal.is_zero()) {
+    return normal.normalized();
+  }
 
-//   for (const int i : normals.drop_front(2).index_range()) {
-//   }
-// }
+  return float3::cross(first_tangent, float3(0.0f, 1.0f, 0.0f)).normalized();
+}
+
+static float3 rotate_around_axis(const float3 dir, const float3 axis, const float angle)
+{
+  // cdef void rotateAroundAxisVec3(Vector3 *target, Vector3 *v, Vector3 *axis, float angle):
+  //   cdef Vector3 n
+  //   normalizeVec3(&n, axis)
+  //   cdef Vector3 d
+  //   scaleVec3(&d, &n, dotVec3(&n, v))
+  //   cdef Vector3 r
+  //   subVec3(&r, v, &d)
+  //   cdef Vector3 g
+  //   crossVec3(&g, &n, &r)
+  //   cdef float ca = cos(angle)
+  //   cdef float sa = sin(angle)
+  //   target.x = d.x + r.x * ca + g.x * sa
+  //   target.y = d.y + r.y * ca + g.y * sa
+  //   target.z = d.z + r.z * ca + g.z * sa
+  BLI_ASSERT_UNIT_V3(axis);
+  const float3 scaled_axis = axis * float3::dot(dir, axis);
+  const float3 sub = dir - scaled_axis;
+  const float3 cross = float3::cross(sub, sub);
+  const float sin = std::sin(angle);
+  const float cos = std::cos(angle);
+  return (scaled_axis + sub * cos + cross * sin).normalized();
+}
+
+static float3 project_on_center_plane(const float3 vector, const float3 plane_normal)
+{
+  // cdef void projectOnCenterPlaneVec3(Vector3 *result, Vector3 *v, Vector3 *planeNormal):
+  //   cdef Vector3 unitNormal, projVector
+  //   normalizeVec3(&unitNormal, planeNormal)
+  //   cdef float distance = dotVec3(v, &unitNormal)
+  //   scaleVec3(&projVector, &unitNormal, -distance)
+  //   addVec3(result, v, &projVector)
+  BLI_ASSERT_UNIT_V3(plane_normal);
+  const float distance = float3::dot(vector, plane_normal);
+  const float3 projection_vector = plane_normal * -distance;
+  return vector + projection_vector;
+}
+
+static float3 propagate_normal(const float3 last_normal,
+                               const float3 last_tangent,
+                               const float3 current_tangent)
+{
+  const float angle = angle_normalized_v3v3(last_tangent, current_tangent);
+
+  if (angle == 0.0f) {
+    return last_normal;
+  }
+
+  const float3 axis = float3::cross(last_tangent, current_tangent).normalized();
+
+  // rotateAroundAxisVec3(&newNormal, lastNormal, &axis, angle)
+  // projectOnCenterPlaneVec3(target, &newNormal, currentTangent)
+  const float3 new_normal = rotate_around_axis(last_normal, axis, angle);
+
+  return project_on_center_plane(new_normal, current_tangent).normalized();
+}
+
+static void apply_rotation_gradient(Span<float3> tangents,
+                                    MutableSpan<float3> normals,
+                                    const float full_angle)
+{
+  // cdef applyRotationGradient(Vector3DList tangents, Vector3DList normals, float fullAngle):
+  //   cdef Py_ssize_t i
+  //   cdef Vector3 normal
+  //   cdef float angle
+  //   cdef float remainingRotation = fullAngle
+  //   cdef float doneRotation = 0
+
+  //   for i in range(1, normals.length):
+  //       if angleVec3(tangents.data + i, tangents.data + i - 1) < 0.001:
+  //           rotateAroundAxisVec3(normals.data + i, &normal, tangents.data + i, doneRotation)
+  //       else:
+  //           angle = remainingRotation / (normals.length - i)
+  //           normal = normals.data[i]
+  //           rotateAroundAxisVec3(normals.data + i, &normal, tangents.data + i, angle +
+  //               doneRotation)
+  //           remainingRotation -= angle
+  //           doneRotation += angle
+
+  float remaining_rotation = full_angle;
+  float done_rotation = 0.0f;
+  for (const int i : IndexRange(1, normals.size() - 1)) {
+    if (angle_v3v3(tangents[i], tangents[i - 1]) < 0.001f) {
+      normals[i] = rotate_around_axis(normals[i], tangents[i], done_rotation);
+    }
+    else {
+      const float angle = remaining_rotation / (normals.size() - i);
+      normals[i] = rotate_around_axis(normals[i], tangents[i], angle + done_rotation);
+      remaining_rotation -= angle;
+      done_rotation += angle;
+    }
+  }
+}
+
+static void make_normals_cyclic(Span<float3> tangents, MutableSpan<float3> normals)
+{
+  const float3 last_normal = propagate_normal(normals.last(), tangents.last(), tangents.first());
+
+  float angle = angle_normalized_v3v3(normals.first(), last_normal);
+
+  const float3 cross = float3::cross(normals.first(), last_normal);
+  if (float3::dot(cross, tangents.first()) <= 0.0f) {
+    angle = -angle;
+  }
+
+  apply_rotation_gradient(tangents, normals, -angle);
+}
+
+/* This algorithm is a copy from animation nodes bezier normal calculation.
+ * TODO: Explore different methods. */
+static void evaluate_normals(Span<float3> tangents,
+                             const bool is_cyclic,
+                             MutableSpan<float3> normals)
+{
+  if (normals.size() == 1) {
+    normals.first() = float3(1.0f, 0.0f, 0.0f);
+    return;
+  }
+
+  /* Start by calculating a simple normal for the first point. */
+  normals[0] = initial_normal(tangents[0]);
+
+  /* Then propogate that normal along the spline. */
+  for (const int i : IndexRange(1, normals.size() - 1)) {
+    normals[i] = propagate_normal(normals[i - 1], tangents[i - 1], tangents[i]);
+  }
+
+  for (const float3 &normal : normals) {
+    BLI_ASSERT_UNIT_V3(normal);
+  }
+
+  if (is_cyclic) {
+    make_normals_cyclic(tangents, normals);
+  }
+
+  for (const float3 &normal : normals) {
+    BLI_ASSERT_UNIT_V3(normal);
+  }
+}
 
 void BezierSpline::ensure_evaluation_cache() const
 {
   /* TODO: Consider separating a tangent dirty tag from the position and tangent cache. */
-  if (!this->cache_dirty) {
+  if (!this->cache_dirty_) {
     return;
   }
 
-  std::lock_guard<std::mutex> lock(this->cache_mutex);
-  if (!this->cache_dirty) {
+  std::lock_guard<std::mutex> lock(this->cache_mutex_);
+  if (!this->cache_dirty_) {
     return;
   }
 
   const int points_len = this->evaluated_points_size();
-  this->evaluated_positions_cache.resize(points_len);
-  this->evaluated_tangents_cache.resize(points_len);
-  this->evaluated_normals_cache.resize(points_len);
+  this->evaluated_positions_cache_.resize(points_len);
+  this->evaluated_tangents_cache_.resize(points_len);
+  this->evaluated_normals_cache_.resize(points_len);
 
   evaluate_positions(
-      this->control_points, this->resolution_u, this->is_cyclic, this->evaluated_positions_cache);
+      this->control_points, this->resolution_u, this->is_cyclic, this->evaluated_positions_cache_);
 
   calculate_tangents(this->control_points,
-                     this->evaluated_positions_cache,
+                     this->evaluated_positions_cache_,
                      this->is_cyclic,
-                     this->evaluated_tangents_cache);
+                     this->evaluated_tangents_cache_);
 
-  // evaluate_normals(this->control_points,
-  //                  this->evaluated_positions_cache,
-  //                  this->evaluated_tangents_cache,
-  //                  this->is_cyclic,
-  //                  this->evaluated_normals_cache);
+  evaluate_normals(
+      this->evaluated_tangents_cache_, this->is_cyclic, this->evaluated_normals_cache_);
 
-  this->cache_dirty = false;
+  this->cache_dirty_ = false;
 }
 
 /** \} */

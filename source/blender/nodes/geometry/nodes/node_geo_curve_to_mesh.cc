@@ -48,24 +48,22 @@ static void vert_extrude_to_mesh_data(const Spline &spline,
   Span<float3> positions = spline.evaluated_positions();
 
   for (const int i : IndexRange(positions.size() - 1)) {
-    MEdge &edge = edges[i];
+    MEdge &edge = edges[edge_offset++];
     edge.v1 = vert_offset + i;
     edge.v2 = vert_offset + i + 1;
     edge.flag = ME_LOOSEEDGE;
   }
 
-  float3 co = profile_vert;
-  for (const int i : IndexRange(positions.size() - 1)) {
-    const float3 delta = positions[i + 1] - positions[i];
-    MVert &vert = verts[vert_offset++];
-    copy_v3_v3(vert.co, co);
-    co += delta;
+  if (spline.is_cyclic) {
+    MEdge &edge = edges[edge_offset++];
+    edge.v1 = vert_offset;
+    edge.v2 = vert_offset + positions.size() - 1;
+    edge.flag = ME_LOOSEEDGE;
   }
-  MVert &last_vert = verts[vert_offset++];
-  if (spline.type == Spline::Bezier) {
-    const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(spline);
-    const float3 offset = profile_vert - bezier_spline.control_points.begin()->position;
-    copy_v3_v3(last_vert.co, bezier_spline.control_points.last().position + offset);
+
+  for (const int i : positions.index_range()) {
+    MVert &vert = verts[vert_offset++];
+    copy_v3_v3(vert.co, positions[i] + profile_vert);
   }
 }
 
@@ -144,12 +142,13 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   int poly_total = 0;
   for (const int i : curve.splines.index_range()) {
     const Spline &spline = *curve.splines[i];
-    const int spline_len = spline.evaluated_points_size();
-    vert_total += spline_len * profile_vert_total;
+    const int spline_vert_len = spline.evaluated_points_size();
+    const int spline_edge_len = spline.is_cyclic ? spline_vert_len : spline_edge_len - 1;
     /* An edge for every point for every curve segment, and edges for for the original profile's
      * edges. */
-    edge_total += (spline_len - 1) * profile_vert_total + spline_len * profile_edge_total;
-    poly_total += spline_len * profile_edge_total;
+    vert_total += spline_vert_len * profile_vert_total;
+    edge_total += spline_edge_len * profile_vert_total + spline_vert_len * profile_edge_total;
+    poly_total += spline_edge_len * profile_edge_total;
   }
   const int corner_total = poly_total * 4;
 
