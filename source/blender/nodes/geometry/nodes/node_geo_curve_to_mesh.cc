@@ -14,6 +14,8 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_float4x4.hh"
+
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
@@ -78,50 +80,58 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
                                         int &loop_offset,
                                         int &poly_offset)
 {
-  Span<float3> positions = spline.evaluated_positions();
-  Span<float3> profile_positions = profile_spline.evaluated_positions();
-
-  if (positions.size() == 0) {
+  const int spline_vert_len = spline.evaluated_points_size();
+  const int spline_edge_len = spline.is_cyclic ? spline_vert_len : spline_vert_len - 1;
+  const int profile_vert_len = profile_spline.evaluated_points_size();
+  const int profile_edge_len = profile_spline.is_cyclic ? profile_vert_len : profile_vert_len - 1;
+  if (spline_vert_len == 0) {
     return;
   }
 
-  if (profile_spline.size() == 1) {
+  if (profile_vert_len == 1) {
     vert_extrude_to_mesh_data(
-        spline, profile_positions[0], verts, edges, vert_offset, edge_offset);
+        spline, profile_spline.evaluated_positions()[0], verts, edges, vert_offset, edge_offset);
     return;
   }
 
-  /* TODO: This code path isn't finished, crashes, and needs more thought. */
+  /* TODO: Decide whether to unroll the is_cyclic checks instead of using the mod operator on every
+   * iteration. */
 
-  Array<float3> profile(profile_positions);
-
-  const int vert_offset_start = vert_offset;
-
-  for (const int i : IndexRange(positions.size() - 1)) {
-    const float3 delta = positions[i + 1] - positions[i];
-    for (float3 &profile_co : profile) {
-      MVert &vert = verts[vert_offset++];
-      copy_v3_v3(vert.co, profile_co);
-      profile_co += delta;
+  /* Add the edges running along the length of the curve, starting at each profile vertex. */
+  for (const int i_ring : IndexRange(spline_edge_len)) {
+    const int ring_offset = vert_offset + profile_vert_len * i_ring;
+    const int next_ring_offset = vert_offset + profile_vert_len * ((i_ring + 1) % spline_vert_len);
+    for (const int i_profile : IndexRange(profile_vert_len)) {
+      MEdge &edge = edges[edge_offset++];
+      edge.v1 = ring_offset + i_profile;
+      edge.v2 = next_ring_offset + i_profile;
+      edge.flag = ME_LOOSEEDGE | ME_EDGEDRAW | ME_EDGERENDER;
     }
   }
 
-  const int profile_len = profile.size();
-  for (const int i : IndexRange(positions.size() - 1)) {
-    const int ring_offset = vert_offset_start + profile_len * i;
-    const int next_ring_offset = vert_offset_start + profile_len * (i + 1);
-    for (const int UNUSED(i_profile) : profile.index_range()) {
-      MEdge &edge_v = edges[edge_offset++];
-      edge_v.v1 = ring_offset + i;
-      edge_v.v2 = next_ring_offset + i;
-      edge_v.flag = ME_LOOSEEDGE | ME_EDGEDRAW | ME_EDGERENDER;
+  /* Add the edges running along each profile ring. */
+  for (const int i_ring : IndexRange(spline_vert_len)) {
+    const int ring_offset = vert_offset + profile_vert_len * i_ring;
+    for (const int i_profile : IndexRange(profile_edge_len)) {
+      MEdge &edge = edges[edge_offset++];
+      edge.v1 = ring_offset + i_profile;
+      edge.v2 = ring_offset + (i_profile + 1) % profile_vert_len;
+      edge.flag = ME_LOOSEEDGE | ME_EDGEDRAW | ME_EDGERENDER;
+    }
+  }
 
-      if (profile_len > 1) {
-        MEdge &edge_u = edges[edge_offset++];
-        edge_u.v1 = ring_offset + i;
-        edge_u.v2 = ring_offset + (i + 1) % profile_len;
-        edge_u.flag = ME_LOOSEEDGE | ME_EDGEDRAW | ME_EDGERENDER;
-      }
+  /* Calculate the positions of each profile ring profile along the spline. */
+  Span<float3> positions = spline.evaluated_positions();
+  Span<float3> tangents = spline.evaluated_tangents();
+  Span<float3> normals = spline.evaluated_normals();
+  Span<float3> profile_positions = profile_spline.evaluated_positions();
+  for (const int i_ring : IndexRange(spline_vert_len)) {
+    const float4x4 point_matrix = float4x4::from_normalized_axis_data(
+        positions[i_ring], tangents[i_ring], normals[i_ring]);
+
+    for (const int i_profile : IndexRange(profile_vert_len)) {
+      MVert &vert = verts[vert_offset++];
+      copy_v3_v3(vert.co, point_matrix * profile_positions[i_profile]);
     }
   }
 }
@@ -130,10 +140,11 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
 {
   int profile_vert_total = 0;
   int profile_edge_total = 0;
-  for (const Spline *spline : profile_curve.splines) {
-    Span<float3> positions = spline->evaluated_positions();
-    profile_vert_total += positions.size();
-    profile_edge_total += std::max(positions.size() - 2, 0L);
+  for (const Spline *profile_spline : profile_curve.splines) {
+    const int points_len = profile_spline->evaluated_points_size();
+    profile_vert_total += points_len;
+    /* When the profile is cyclic, one more edge is necessary to complete the ring. */
+    profile_edge_total += profile_spline->is_cyclic ? points_len : points_len - 1;
   }
 
   int vert_total = 0;
@@ -142,12 +153,15 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   for (const int i : curve.splines.index_range()) {
     const Spline &spline = *curve.splines[i];
     const int spline_vert_len = spline.evaluated_points_size();
+    /* When the spline is cyclic, one more ring of the profile completes the loop. */
     const int spline_edge_len = spline.is_cyclic ? spline_vert_len : (spline_vert_len - 1);
-    /* An edge for every point for every curve segment, and edges for for the original profile's
-     * edges. */
     vert_total += spline_vert_len * profile_vert_total;
-    edge_total += spline_edge_len * profile_vert_total + spline_vert_len * profile_edge_total;
     poly_total += spline_edge_len * profile_edge_total;
+
+    /* Add the ring edges, with one ring for every curve vertex. */
+    edge_total += profile_edge_total * spline_vert_len;
+    /* Add the edge loops that run along the length of the curve, starting on the first profile. */
+    edge_total += profile_vert_total * spline_edge_len;
   }
   const int corner_total = poly_total * 4;
 
