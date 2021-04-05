@@ -140,22 +140,6 @@ class Hair : public Geometry {
     return curve_keys.size() - curve_first_key.size();
   }
 
-  template<typename T> typename device_vector<T>::chunk get_keys_chunk(device_vector<T> &dvector)
-  {
-    return dvector.get_chunk(curvekey_offset, get_curve_keys().size());
-  }
-
-  template<typename T>
-  typename device_vector<T>::chunk get_segments_chunk(device_vector<T> &dvector)
-  {
-    return dvector.get_chunk(prim_offset, num_curves());
-  }
-
-  template<typename T> typename device_vector<T>::chunk get_optix_chunk(device_vector<T> &dvector)
-  {
-    return dvector.get_chunk(optix_prim_offset, num_segments());
-  }
-
   /* UDIM */
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
@@ -164,7 +148,7 @@ class Hair : public Geometry {
                        device_vector<float4> &curve_key_co,
                        device_vector<ushort4> &curve_keys_deltas,
                        int max_delta_compression_frames);
-  void pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_data);
+  void pack_curve_segments(Scene *scene, float4 *curve_data);
 
   void pack_primitives(Device *device,
                        DeviceScene *dscene,

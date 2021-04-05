@@ -471,39 +471,39 @@ void Hair::pack_curve_keys(Device *device,
     return;
   }
 
-  const float3 *keys_ptr = curve_keys.data();
-  const float *radius_ptr = curve_radius.data();
-  const bool do_deltas = curve_keys_deltas.size() != 0;
-  const Attribute *attr_delta = attributes.find(ATTR_STD_DELTAS);
+//  const float3 *keys_ptr = curve_keys.data();
+//  const float *radius_ptr = curve_radius.data();
+//  const bool do_deltas = curve_keys_deltas.size() != 0;
+//  const Attribute *attr_delta = attributes.find(ATTR_STD_DELTAS);
 
-  if (do_deltas && attr_delta && current_delta_frames_count < max_delta_compression_frames) {
-    current_delta_frames_count += 1;
+//  if (do_deltas && attr_delta && current_delta_frames_count < max_delta_compression_frames) {
+//    current_delta_frames_count += 1;
 
-    device_vector<ushort4>::chunk deltas_chunk = get_keys_chunk(curve_keys_deltas);
-    memcpy(deltas_chunk.data(), attr_delta->data(), curve_keys_size * sizeof(ushort4));
-    deltas_chunk.copy_to_device();
+//    device_vector<ushort4>::chunk deltas_chunk = get_keys_chunk(curve_keys_deltas);
+//    memcpy(deltas_chunk.data(), attr_delta->data(), curve_keys_size * sizeof(ushort4));
+//    deltas_chunk.copy_to_device();
 
-    /* Offset and size should be the same for the delta chunk and the original chunk in terms of
-     * elements, they should only differ in terms of bytes. */
-    const size_t offset = deltas_chunk.offset();
-    const size_t size = deltas_chunk.size();
-    device->apply_delta_compression(
-        curve_key_co, curve_keys_deltas, offset, size, min_delta, max_delta);
-  }
-  else {
-    current_delta_frames_count = 0;
-    device_vector<ccl::float4>::chunk keys_chunk = get_keys_chunk(curve_key_co);
+//    /* Offset and size should be the same for the delta chunk and the original chunk in terms of
+//     * elements, they should only differ in terms of bytes. */
+//    const size_t offset = deltas_chunk.offset();
+//    const size_t size = deltas_chunk.size();
+//    device->apply_delta_compression(
+//        curve_key_co, curve_keys_deltas, offset, size, min_delta, max_delta);
+//  }
+//  else {
+//    current_delta_frames_count = 0;
+//    device_vector<ccl::float4>::chunk keys_chunk = get_keys_chunk(curve_key_co);
 
-    for (size_t i = 0; i < curve_keys_size; i++) {
-      keys_chunk.data()[i] = make_float4(
-          keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
-    }
+//    for (size_t i = 0; i < curve_keys_size; i++) {
+//      keys_chunk.data()[i] = make_float4(
+//          keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
+//    }
 
-    keys_chunk.copy_to_device();
-  }
+//    keys_chunk.copy_to_device();
+//  }
 }
 
-void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_data)
+void Hair::pack_curve_segments(Scene *scene, float4 *curve_data)
 {
   size_t curve_num = num_curves();
 
@@ -519,13 +519,11 @@ void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_
                          scene->default_surface;
     shader_id = scene->shader_manager->get_shader_id(shader, false);
 
-    curve_data.data()[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
+    curve_data[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
                                        __int_as_float(curve.num_keys),
                                        __int_as_float(shader_id),
                                        0.0f);
   }
-
-  curve_data.copy_to_device();
 }
 
 void Hair::pack_primitives(Device * /*device*/,
@@ -544,18 +542,11 @@ void Hair::pack_primitives(Device * /*device*/,
     return;
   }
 
-  device_vector<unsigned int>::chunk prim_tri_index_chunk = get_optix_chunk(
-      dscene->prim_tri_index);
-  unsigned int *prim_tri_index = prim_tri_index_chunk.data();
-  device_vector<int>::chunk prim_type_chunk = get_optix_chunk(dscene->prim_type);
-  int *prim_type = prim_type_chunk.data();
-  device_vector<unsigned int>::chunk prim_visibility_chunk = get_optix_chunk(
-      dscene->prim_visibility);
-  unsigned int *prim_visibility = prim_visibility_chunk.data();
-  device_vector<int>::chunk prim_index_chunk = get_optix_chunk(dscene->prim_index);
-  int *prim_index = prim_index_chunk.data();
-  device_vector<int>::chunk prim_object_chunk = get_optix_chunk(dscene->prim_object);
-  int *prim_object = prim_object_chunk.data();
+  unsigned int *prim_tri_index = &dscene->prim_tri_index[optix_prim_offset];
+  int *prim_type = &dscene->prim_type[optix_prim_offset];
+  unsigned int *prim_visibility = &dscene->prim_visibility[optix_prim_offset];
+  int *prim_index = &dscene->prim_index[optix_prim_offset];
+  int *prim_object = &dscene->prim_object[optix_prim_offset];
   // 'dscene->prim_time' is unused by Embree and OptiX
 
   uint type = has_motion_blur() ?
@@ -575,12 +566,6 @@ void Hair::pack_primitives(Device * /*device*/,
       prim_object[index] = object;
     }
   }
-
-  prim_tri_index_chunk.copy_to_device();
-  prim_type_chunk.copy_to_device();
-  prim_visibility_chunk.copy_to_device();
-  prim_index_chunk.copy_to_device();
-  prim_object_chunk.copy_to_device();
 }
 
 CCL_NAMESPACE_END

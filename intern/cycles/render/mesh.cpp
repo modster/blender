@@ -684,7 +684,7 @@ void Mesh::add_undisplaced()
   }
 }
 
-void Mesh::pack_shaders(Scene *scene, device_vector<uint>::chunk tri_shader)
+void Mesh::pack_shaders(Scene *scene, uint *tri_shader)
 {
   uint shader_id = 0;
   uint last_shader = -1;
@@ -703,13 +703,11 @@ void Mesh::pack_shaders(Scene *scene, device_vector<uint>::chunk tri_shader)
       shader_id = scene->shader_manager->get_shader_id(shader, last_smooth);
     }
 
-    tri_shader.data()[i] = shader_id;
+    tri_shader[i] = shader_id;
   }
-
-  tri_shader.copy_to_device();
 }
 
-void Mesh::pack_normals(device_vector<float4>::chunk vnormal)
+void Mesh::pack_normals(float4 *vnormal)
 {
   Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
   if (attr_vN == NULL) {
@@ -729,16 +727,14 @@ void Mesh::pack_normals(device_vector<float4>::chunk vnormal)
     if (do_transform)
       vNi = safe_normalize(transform_direction(&ntfm, vNi));
 
-    vnormal.data()[i] = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
+    vnormal[i] = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
   }
-
-  vnormal.copy_to_device();
 }
 
 void Mesh::pack_verts(const vector<uint> &tri_prim_index,
-                      device_vector<uint4>::chunk tri_vindex,
-                      device_vector<uint>::chunk tri_patch,
-                      device_vector<float2>::chunk tri_patch_uv,
+                      uint4 *tri_vindex,
+                      uint *tri_patch,
+                      float2 *tri_patch_uv,
                       size_t vert_offset,
                       size_t tri_offset)
 {
@@ -748,26 +744,21 @@ void Mesh::pack_verts(const vector<uint> &tri_prim_index,
     float2 *vert_patch_uv_ptr = vert_patch_uv.data();
 
     for (size_t i = 0; i < verts_size; i++) {
-      tri_patch_uv.data()[i] = vert_patch_uv_ptr[i];
+      tri_patch_uv[i] = vert_patch_uv_ptr[i];
     }
-
-    tri_patch_uv.copy_to_device();
   }
 
   size_t triangles_size = num_triangles();
 
   for (size_t i = 0; i < triangles_size; i++) {
     Triangle t = get_triangle(i);
-    tri_vindex.data()[i] = make_uint4(t.v[0] + vert_offset,
+    tri_vindex[i] = make_uint4(t.v[0] + vert_offset,
                                       t.v[1] + vert_offset,
                                       t.v[2] + vert_offset,
                                       tri_prim_index[i + tri_offset]);
 
-    tri_patch.data()[i] = (!get_num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
+    tri_patch[i] = (!get_num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
   }
-
-  tri_vindex.copy_to_device();
-  tri_patch.copy_to_device();
 }
 
 void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset)
@@ -821,6 +812,7 @@ void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, ui
  * and we do not have to repack the device data for the entire Scene. */
 void Mesh::pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort4> *verts_deltas)
 {
+#if 0
   const size_t num_prims = num_triangles();
   device_vector<ushort4>::chunk deltas_chunk = get_tris_chunk(*verts_deltas, 3);
   assert(deltas_chunk.valid());
@@ -831,7 +823,7 @@ void Mesh::pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort
 
   ushort4 *chunk_data = deltas_chunk.data();
   memcpy(chunk_data, attr_deltas->data(), num_prims * sizeof(ushort4) * 3);
-  deltas_chunk.copy_to_device();
+ // deltas_chunk.copy_to_device();
 
   /* Offset and size should be the same for the delta chunk and the original chunk in terms of
    * elements, they should only differ in terms of bytes. */
@@ -839,6 +831,7 @@ void Mesh::pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort
   const size_t size = deltas_chunk.size();
   device->apply_delta_compression(
       dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
+#endif
 }
 
 /* Pack the topology of the Mesh, or only the vertices if pack_all is false.
@@ -853,18 +846,11 @@ void Mesh::pack_topology(DeviceScene *dscene, int object, uint visibility, bool 
 
   if (pack_all) {
     /* Use optix_prim_offset for indexing as those arrays also contain data for Hair geometries. */
-    device_vector<unsigned int>::chunk prim_tri_index_chunk = get_optix_chunk(
-        dscene->prim_tri_index);
-    unsigned int *prim_tri_index = prim_tri_index_chunk.data();
-    device_vector<int>::chunk prim_type_chunk = get_optix_chunk(dscene->prim_type);
-    int *prim_type = prim_type_chunk.data();
-    device_vector<unsigned int>::chunk prim_visibility_chunk = get_optix_chunk(
-        dscene->prim_visibility);
-    unsigned int *prim_visibility = prim_visibility_chunk.data();
-    device_vector<int>::chunk prim_index_chunk = get_optix_chunk(dscene->prim_index);
-    int *prim_index = prim_index_chunk.data();
-    device_vector<int>::chunk prim_object_chunk = get_optix_chunk(dscene->prim_object);
-    int *prim_object = prim_object_chunk.data();
+    unsigned int *prim_tri_index = &dscene->prim_tri_index[optix_prim_offset];
+    int *prim_type = &dscene->prim_type[optix_prim_offset];
+    unsigned int *prim_visibility = &dscene->prim_visibility[optix_prim_offset];
+    int *prim_index = &dscene->prim_index[optix_prim_offset];
+    int *prim_object = &dscene->prim_object[optix_prim_offset];
     // 'dscene->prim_time' is unused by Embree and OptiX
 
     for (size_t k = 0; k < num_prims; ++k) {
@@ -874,16 +860,9 @@ void Mesh::pack_topology(DeviceScene *dscene, int object, uint visibility, bool 
       prim_object[k] = object;
       prim_visibility[k] = visibility;
     }
-
-    prim_tri_index_chunk.copy_to_device();
-    prim_type_chunk.copy_to_device();
-    prim_visibility_chunk.copy_to_device();
-    prim_index_chunk.copy_to_device();
-    prim_object_chunk.copy_to_device();
   }
 
-  device_vector<float4>::chunk verts_chunk = get_tris_chunk(dscene->prim_tri_verts, 3);
-  float4 *prim_tri_verts = verts_chunk.data();
+  float4 *prim_tri_verts = &dscene->prim_tri_verts[prim_offset * 3];
 
   for (size_t k = 0; k < num_prims; ++k) {
     const Mesh::Triangle t = get_triangle(k);
@@ -892,8 +871,6 @@ void Mesh::pack_topology(DeviceScene *dscene, int object, uint visibility, bool 
       prim_tri_verts[k * 3 + i] = float3_to_float4(verts[t.v[i]]);
     }
   }
-
-  verts_chunk.copy_to_device();
 }
 
 void Mesh::pack_primitives(Device *device,

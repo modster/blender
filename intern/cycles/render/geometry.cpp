@@ -1090,11 +1090,11 @@ void GeometryManager::device_update_mesh(
     /* normals */
     progress.set_status("Updating Mesh", "Computing normals");
 
-    dscene->tri_shader.alloc_chunks(tri_size);
-    dscene->tri_vnormal.alloc_chunks(vert_size);
-    dscene->tri_vindex.alloc_chunks(tri_size);
-    dscene->tri_patch.alloc_chunks(tri_size);
-    dscene->tri_patch_uv.alloc_chunks(vert_size);
+    dscene->tri_shader.alloc(tri_size);
+    dscene->tri_vnormal.alloc(vert_size);
+    dscene->tri_vindex.alloc(tri_size);
+    dscene->tri_patch.alloc(tri_size);
+    dscene->tri_patch_uv.alloc(vert_size);
 
     const bool copy_all_data = dscene->tri_shader.need_realloc() ||
                                dscene->tri_vindex.need_realloc() ||
@@ -1108,18 +1108,18 @@ void GeometryManager::device_update_mesh(
 
         if (mesh->shader_is_modified() || mesh->smooth_is_modified() ||
             mesh->triangles_is_modified() || copy_all_data) {
-          mesh->pack_shaders(scene, mesh->get_tris_chunk(dscene->tri_shader));
+          mesh->pack_shaders(scene, &dscene->tri_shader[mesh->prim_offset]);
         }
 
         if (mesh->verts_is_modified() || copy_all_data) {
-          mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
+          mesh->pack_normals(&dscene->tri_vnormal[mesh->vert_offset]);
         }
 
         if (mesh->triangles_is_modified() || mesh->vert_patch_uv_is_modified() || copy_all_data) {
           mesh->pack_verts(tri_prim_index,
-                           mesh->get_tris_chunk(dscene->tri_vindex),
-                           mesh->get_tris_chunk(dscene->tri_patch),
-                           mesh->get_verts_chunk(dscene->tri_patch_uv),
+                           &dscene->tri_vindex[mesh->prim_offset],
+                           &dscene->tri_patch[mesh->prim_offset],
+                           &dscene->tri_patch_uv[mesh->vert_offset],
                            mesh->vert_offset,
                            mesh->prim_offset);
         }
@@ -1143,8 +1143,8 @@ void GeometryManager::device_update_mesh(
   if (curve_size != 0) {
     progress.set_status("Updating Mesh", "Copying Strands to device");
 
-    dscene->curve_keys.alloc_chunks(curve_key_size);
-    dscene->curves.alloc_chunks(curve_size);
+    dscene->curve_keys.alloc(curve_key_size);
+    dscene->curves.alloc(curve_size);
 
     const bool copy_all_data = dscene->curve_keys.need_realloc() || dscene->curves.need_realloc();
 
@@ -1153,7 +1153,7 @@ void GeometryManager::device_update_mesh(
 
     if (!copy_all_data && scene->device->supports_delta_compression()) {
       /* We can do partial updates, so compute deltas from last update. */
-      curve_keys_deltas.alloc_chunks(curve_key_size);
+      curve_keys_deltas.alloc(curve_key_size);
       /* Since we use chunks and not all of them may be copied, make sure data between copied
        * chunks is not garbage. */
       curve_keys_deltas.zero_to_device();
@@ -1175,7 +1175,7 @@ void GeometryManager::device_update_mesh(
         const bool curve_data_modified = hair->curve_shader_is_modified() ||
                                          hair->curve_first_key_is_modified();
         if (curve_data_modified || copy_all_data) {
-          hair->pack_curve_segments(scene, hair->get_segments_chunk(dscene->curves));
+          hair->pack_curve_segments(scene, &dscene->curves[hair->prim_offset]);
         }
 
         if (progress.get_cancel())
@@ -1262,9 +1262,9 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
 
     if (!pack_all) {
       /* need to always call this, otherwise chunks are not detected */
-      dscene->prim_tri_verts.alloc_chunks(num_tri_verts);
+      dscene->prim_tri_verts.alloc(num_tri_verts);
       if (scene->device->supports_delta_compression()) {
-        verts_deltas.alloc_chunks(dscene->prim_tri_verts.size());
+        verts_deltas.alloc(dscene->prim_tri_verts.size());
         /* Since we use chunks and not all of them may be copied, make sure data between copied
          * chunks is not garbage. */
         verts_deltas.zero_to_device();
@@ -1273,12 +1273,12 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
     else {
       /* It is not strictly necessary to skip those allocations we if do not have to repack,
        * however it does help catching bugs. */
-      dscene->prim_tri_index.alloc_chunks(num_prims);
-      dscene->prim_tri_verts.alloc_chunks(num_tri_verts);
-      dscene->prim_type.alloc_chunks(num_prims);
-      dscene->prim_index.alloc_chunks(num_prims);
-      dscene->prim_object.alloc_chunks(num_prims);
-      dscene->prim_visibility.alloc_chunks(num_prims);
+      dscene->prim_tri_index.alloc(num_prims);
+      dscene->prim_tri_verts.alloc(num_tri_verts);
+      dscene->prim_type.alloc(num_prims);
+      dscene->prim_index.alloc(num_prims);
+      dscene->prim_object.alloc(num_prims);
+      dscene->prim_visibility.alloc(num_prims);
     }
 
     // Merge visibility flags of all objects and find object index for non-instanced geometry
