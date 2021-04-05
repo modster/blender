@@ -878,7 +878,7 @@ void GeometryManager::device_update_attributes(Device *device,
 
         if (subd_attr) {
           /* force a copy if we need to reallocate all the data */
-          subd_attr->modified |= attributes_need_realloc[get_slot_for_attribute_type(attr)];
+          subd_attr->modified |= attributes_need_realloc[get_slot_for_attribute_type(subd_attr)];
         }
 
         update_attribute_element_offset(mesh,
