@@ -164,9 +164,9 @@ static void transform_curve(DCurve &curve,
       if (spline->type == Spline::Type::Bezier) {
         BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
         for (BezierPoint &point : bezier_spline.control_points) {
-          point.handle_position_a = point.handle_position_a += translation;
-          point.position = point.position += translation;
-          point.handle_position_b = point.handle_position_b += translation;
+          point.handle_position_a += translation;
+          point.position += translation;
+          point.handle_position_b += translation;
         }
       }
       spline->mark_cache_invalid();
