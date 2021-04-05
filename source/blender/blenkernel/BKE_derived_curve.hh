@@ -56,6 +56,8 @@ class Spline {
   Type type;
   bool is_cyclic = false;
 
+  virtual ~Spline() = default;
+
   virtual int size() const = 0;
   virtual int resolution() const = 0;
   virtual void set_resolution(const int value) = 0;
@@ -190,6 +192,13 @@ struct DCurve {
   //   AttributeStorage attributes;
   //   CustomData *control_point_data;
   //   CustomData *spline_data;
+
+  ~DCurve()
+  {
+    for (Spline *spline : splines) {
+      delete spline;
+    }
+  }
 };
 
 DCurve *dcurve_from_dna_curve(const Curve &curve);
