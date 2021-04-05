@@ -677,8 +677,6 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
                                              int totpoly,
                                              std::map<pxr::SdfPath, int> &r_mat_map)
 {
-  pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(prim_);
-
   /* Find the geom subsets that have bound materials.
    * We don't call pxr::UsdShadeMaterialBindingAPI::GetMaterialBindSubsets()
    * because this function returns only those subsets that are in the 'materialBind'
@@ -691,20 +689,26 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
   int current_mat = 0;
   if (subsets.size() > 0) {
     for (const pxr::UsdGeomSubset &subset : subsets) {
-      pxr::UsdShadeMaterialBindingAPI subsetAPI = pxr::UsdShadeMaterialBindingAPI(
+      pxr::UsdShadeMaterialBindingAPI subset_api = pxr::UsdShadeMaterialBindingAPI(
           subset.GetPrim());
 
-      pxr::SdfPath materialPath = subsetAPI.GetDirectBinding().GetMaterialPath();
+      pxr::UsdShadeMaterial subset_mtl = subset_api.ComputeBoundMaterial();
 
-      if (materialPath.IsEmpty()) {
+      if (!subset_mtl) {
         continue;
       }
 
-      if (r_mat_map.find(materialPath) == r_mat_map.end()) {
-        r_mat_map[materialPath] = 1 + current_mat++;
+      pxr::SdfPath subset_mtl_path = subset_mtl.GetPath();
+
+      if (subset_mtl_path.IsEmpty()) {
+        continue;
       }
 
-      const int mat_idx = r_mat_map[materialPath] - 1;
+      if (r_mat_map.find(subset_mtl_path) == r_mat_map.end()) {
+        r_mat_map[subset_mtl_path] = 1 + current_mat++;
+      }
+
+      const int mat_idx = r_mat_map[subset_mtl_path] - 1;
 
       pxr::UsdAttribute indicesAttribute = subset.GetIndicesAttr();
       pxr::VtIntArray indices;
@@ -716,10 +720,17 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
       }
     }
   }
-  else {
-    pxr::SdfPath materialPath = api.GetDirectBinding().GetMaterialPath();
-    if (!materialPath.IsEmpty()) {
-      r_mat_map[materialPath] = 1;
+
+  if (r_mat_map.empty()) {
+    pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(prim_);
+
+    if (pxr::UsdShadeMaterial mtl = api.ComputeBoundMaterial()) {
+
+      pxr::SdfPath mtl_path = mtl.GetPath();
+
+      if (!mtl_path.IsEmpty()) {
+        r_mat_map.insert(std::make_pair(mtl.GetPath(), 1));
+      }
     }
   }
 }
