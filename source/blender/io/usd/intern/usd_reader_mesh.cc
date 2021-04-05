@@ -335,7 +335,6 @@ void USDMeshReader::read_uvs(Mesh *mesh,
 
   struct UVSample {
     pxr::VtVec2fArray uvs;
-    pxr::VtIntArray indices;  // Non-empty for indexed UVs
     pxr::TfToken interpolation;
   };
 
@@ -375,8 +374,7 @@ void USDMeshReader::read_uvs(Mesh *mesh,
       }
 
       if (pxr::UsdGeomPrimvar uv_primvar = mesh_prim_.GetPrimvar(uv_token)) {
-        uv_primvar.Get<pxr::VtVec2fArray>(&uv_primvars[layer_idx].uvs, motionSampleTime);
-        uv_primvar.GetIndices(&uv_primvars[layer_idx].indices, motionSampleTime);
+        uv_primvar.ComputeFlattened(&uv_primvars[layer_idx].uvs, motionSampleTime);
         uv_primvars[layer_idx].interpolation = uv_primvar.GetInterpolation();
       }
     }
@@ -407,15 +405,22 @@ void USDMeshReader::read_uvs(Mesh *mesh,
 
         const UVSample &sample = uv_primvars[layer_idx];
 
+        if (!(sample.interpolation == pxr::UsdGeomTokens->faceVarying ||
+              sample.interpolation == pxr::UsdGeomTokens->vertex)) {
+          /* Shouldn't happen. */
+          std::cerr << "WARNING: unexpected interpolation type " << sample.interpolation << " for uv "
+            << layer->name << std::endl;
+          continue;
+        }
+
         // For Vertex interpolation, use the vertex index.
         int usd_uv_index = sample.interpolation == pxr::UsdGeomTokens->vertex ?
                                mesh->mloop[loop_index].v :
                                loop_index;
 
-        // Handle indexed UVs.
-        usd_uv_index = sample.indices.empty() ? usd_uv_index : sample.indices[usd_uv_index];
-
         if (usd_uv_index >= sample.uvs.size()) {
+          std::cerr << "WARNING: out of bounds uv index " << usd_uv_index << " for uv "
+                    << layer->name << " of size " << sample.uvs.size() << std::endl;
           continue;
         }
 
@@ -767,6 +772,14 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
     }
 
     if (is_uv) {
+
+      pxr::TfToken interp = p.GetInterpolation();
+
+      if (!(interp == pxr::UsdGeomTokens->faceVarying ||
+            interp == pxr::UsdGeomTokens->vertex)) {
+        continue;
+      }
+
       uv_tokens.push_back(p.GetBaseName());
       has_uvs_ = true;
 
