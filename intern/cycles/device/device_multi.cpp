@@ -455,6 +455,9 @@ class MultiDevice : public Device {
       owner_sub->device->mem_copy_chunk_to(mem, chunk_offset, chunk_size);
       owner_sub->ptr_map[key] = mem.device_pointer;
     }
+
+    mem.device = this;
+    mem.device_pointer = key;
   }
 
   void mem_copy_from(device_memory &mem, int y, int w, int h, int elem) override
