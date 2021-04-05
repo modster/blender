@@ -108,6 +108,14 @@ static bool segment_is_vector(const BezierPoint &point_a, const BezierPoint &poi
 int BezierSpline::evaluated_points_size() const
 {
   BLI_assert(control_points.size() > 0);
+#ifndef DEBUG
+  if (!this->cache_dirty_) {
+    /* In a non-debug build, assume that the cache's size has not changed, and that any operation
+     * that would cause the cache to change its length would also mark the cache dirty. This is
+     * checked at the end of this function in a debug build. */
+    return this->evaluated_positions_cache_.size();
+  }
+#endif
 
   int total_len = 0;
   for (const int i : IndexRange(1, this->control_points.size() - 1)) {
@@ -133,6 +141,11 @@ int BezierSpline::evaluated_points_size() const
     /* Since evaulating the bezier doesn't add the final point's position,
      * it must be added manually in the non-cyclic case. */
     total_len++;
+  }
+
+  /* Assert that the cache has the correct length in debug mode. */
+  if (!this->cache_dirty_) {
+    BLI_assert(this->evaluated_positions_cache_.size() == total_len);
   }
 
   return total_len;
