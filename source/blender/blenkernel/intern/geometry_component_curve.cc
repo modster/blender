@@ -240,10 +240,23 @@ static bool get_cyclic_value(Spline *const &spline)
   return spline->is_cyclic;
 }
 
-static ReadAttributePtr make_cyclic_attribute(const DCurve &curve)
+static void set_cyclic_value(Spline *&spline, const bool &value)
+{
+  spline->is_cyclic = value;
+  spline->mark_cache_invalid();
+}
+
+static ReadAttributePtr make_cyclic_read_attribute(const DCurve &curve)
 {
   return std::make_unique<DerivedArrayReadAttribute<Spline *, bool, get_cyclic_value>>(
       ATTR_DOMAIN_CURVE, curve.splines.as_span());
+}
+
+static WriteAttributePtr make_cyclic_write_attribute(DCurve &curve)
+{
+  return std::make_unique<
+      DerivedArrayWriteAttribute<Spline *, bool, get_cyclic_value, set_cyclic_value>>(
+      ATTR_DOMAIN_CURVE, curve.splines.as_mutable_span());
 }
 
 /**
@@ -273,8 +286,8 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
                                                BuiltinAttributeProvider::NonCreatable,
                                                BuiltinAttributeProvider::Writable,
                                                BuiltinAttributeProvider::NonDeletable,
-                                               make_cyclic_attribute,
-                                               nullptr);
+                                               make_cyclic_read_attribute,
+                                               make_cyclic_write_attribute);
 
   return ComponentAttributeProviders({&resolution, &length, &cyclic}, {});
 }
