@@ -68,7 +68,7 @@ static void vert_extrude_to_mesh_data(const Spline &spline,
 }
 
 static void spline_extrude_to_mesh_data(const Spline &spline,
-                                        Span<float3> profile_spline,
+                                        const Spline &profile_spline,
                                         MutableSpan<MVert> verts,
                                         MutableSpan<MEdge> edges,
                                         MutableSpan<MLoop> loops,
@@ -79,21 +79,22 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
                                         int &poly_offset)
 {
   Span<float3> positions = spline.evaluated_positions();
+  Span<float3> profile_positions = profile_spline.evaluated_positions();
 
   if (positions.size() == 0) {
     return;
   }
 
   if (profile_spline.size() == 1) {
-    vert_extrude_to_mesh_data(spline, profile_spline[0], verts, edges, vert_offset, edge_offset);
+    vert_extrude_to_mesh_data(
+        spline, profile_positions[0], verts, edges, vert_offset, edge_offset);
     return;
   }
 
   /* TODO: This code path isn't finished, crashes, and needs more thought. */
 
-  Array<float3> profile(profile_spline);
+  Array<float3> profile(profile_positions);
 
-  // const bool is_cyclic = profile_spline.last() == profile_spline.first();
   const int vert_offset_start = vert_offset;
 
   for (const int i : IndexRange(positions.size() - 1)) {
@@ -129,12 +130,10 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
 {
   int profile_vert_total = 0;
   int profile_edge_total = 0;
-  Vector<Span<float3>> profile_splines;
   for (const Spline *spline : profile_curve.splines) {
     Span<float3> positions = spline->evaluated_positions();
     profile_vert_total += positions.size();
     profile_edge_total += std::max(positions.size() - 2, 0L);
-    profile_splines.append(spline->evaluated_positions());
   }
 
   int vert_total = 0;
@@ -168,9 +167,9 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   int loop_offset = 0;
   int poly_offset = 0;
   for (const Spline *spline : curve.splines) {
-    for (Span<float3> profile_spline : profile_splines) {
+    for (const Spline *profile_spline : profile_curve.splines) {
       spline_extrude_to_mesh_data(*spline,
-                                  profile_spline,
+                                  *profile_spline,
                                   verts,
                                   edges,
                                   loops,
