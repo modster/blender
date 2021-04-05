@@ -138,12 +138,13 @@ int BezierSpline::evaluated_points_size() const
   return total_len;
 }
 
-static void evaluate_bezier_part_3d(const float3 &point_0,
-                                    const float3 &point_1,
-                                    const float3 &point_2,
-                                    const float3 &point_3,
-                                    MutableSpan<float3> result)
+static void evaluate_bezier_section_3d(const float3 &point_0,
+                                       const float3 &point_1,
+                                       const float3 &point_2,
+                                       const float3 &point_3,
+                                       MutableSpan<float3> result)
 {
+  BLI_assert(result.size() > 0);
   /* TODO: This can probably be vectorized... no one has done this already? */
   float *data = (float *)result.data();
   for (const int axis : {0, 1, 2}) {
@@ -163,16 +164,16 @@ static void evaluate_segment_positions(const BezierPoint &point,
                                        int &offset,
                                        MutableSpan<float3> positions)
 {
-  if (segment_is_vector(point, next)) {
+  if (segment_is_vector(point, next) || resolution == 1) {
     positions[offset] = point.position;
     offset++;
   }
   else {
-    evaluate_bezier_part_3d(point.position,
-                            point.handle_position_b,
-                            next.handle_position_a,
-                            next.position,
-                            positions.slice(offset, resolution - 1));
+    evaluate_bezier_section_3d(point.position,
+                               point.handle_position_b,
+                               next.handle_position_a,
+                               next.position,
+                               positions.slice(offset, resolution - 1));
     offset += resolution;
   }
 }
