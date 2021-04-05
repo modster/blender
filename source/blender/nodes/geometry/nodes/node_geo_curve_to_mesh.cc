@@ -142,7 +142,7 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   for (const int i : curve.splines.index_range()) {
     const Spline &spline = *curve.splines[i];
     const int spline_vert_len = spline.evaluated_points_size();
-    const int spline_edge_len = spline.is_cyclic ? spline_vert_len : spline_edge_len - 1;
+    const int spline_edge_len = spline.is_cyclic ? spline_vert_len : (spline_vert_len - 1);
     /* An edge for every point for every curve segment, and edges for for the original profile's
      * edges. */
     vert_total += spline_vert_len * profile_vert_total;
