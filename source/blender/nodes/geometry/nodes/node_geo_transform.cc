@@ -163,7 +163,7 @@ static void transform_curve(DCurve &curve,
     for (Spline *spline : curve.splines) {
       if (spline->type == Spline::Type::Bezier) {
         BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
-        for (ControlPointBezier &point : bezier_spline.control_points) {
+        for (BezierPoint &point : bezier_spline.control_points) {
           point.handle_position_a = point.handle_position_a += translation;
           point.position = point.position += translation;
           point.handle_position_b = point.handle_position_b += translation;
@@ -177,7 +177,7 @@ static void transform_curve(DCurve &curve,
     for (Spline *spline : curve.splines) {
       if (spline->type == Spline::Type::Bezier) {
         BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
-        for (ControlPointBezier &point : bezier_spline.control_points) {
+        for (BezierPoint &point : bezier_spline.control_points) {
           point.handle_position_a = matrix * point.handle_position_a;
           point.position = matrix * point.position;
           point.handle_position_b = matrix * point.handle_position_b;

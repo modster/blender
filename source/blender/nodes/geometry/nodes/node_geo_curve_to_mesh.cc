@@ -193,7 +193,7 @@ static DCurve get_curve_single_vert()
 {
   DCurve curve;
   BezierSpline *spline = new BezierSpline();
-  ControlPointBezier control_point;
+  BezierPoint control_point;
   control_point.position = float3(0);
   control_point.handle_position_a = float3(0);
   control_point.handle_position_b = float3(0);

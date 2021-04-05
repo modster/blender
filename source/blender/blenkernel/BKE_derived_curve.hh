@@ -29,31 +29,21 @@
 
 struct Curve;
 
-enum class BezierHandleType {
-  Free,
-  Auto,
-  Vector,
-  Align,
-};
-
-struct ControlPoint {
+struct BezierPoint {
+  enum HandleType {
+    Free,
+    Auto,
+    Vector,
+    Align,
+  };
+  blender::float3 handle_position_a;
   blender::float3 position;
+  blender::float3 handle_position_b;
+  HandleType handle_type_a;
+  HandleType handle_type_b;
   float radius;
   /* User defined tilt in radians, added on top of the auto-calculated tilt. */
   float tilt;
-};
-
-struct ControlPointBezier : ControlPoint {
-  blender::float3 handle_position_a;
-  blender::float3 handle_position_b;
-  BezierHandleType handle_type_a;
-  BezierHandleType handle_type_b;
-};
-
-struct ControlPointNURBS : ControlPoint {
-  blender::float3 position;
-  float radius;
-  float weight;
 };
 
 class Spline {
@@ -73,23 +63,26 @@ class Spline {
   virtual int evaluated_points_size() const = 0;
   virtual void ensure_evaluation_cache() const = 0;
   virtual blender::Span<blender::float3> evaluated_positions() const = 0;
+  virtual blender::Span<blender::float3> evaluated_tangents() const = 0;
+  virtual blender::Span<blender::float3> evaluated_normals() const = 0;
 };
 
 class BezierSpline : public Spline {
  public:
   /* TODO: Figure out if I want to store this as a few separate vectors directly in the spline. */
-  blender::Vector<ControlPointBezier> control_points;
+  blender::Vector<BezierPoint> control_points;
   int resolution_u;
 
   static constexpr inline Type static_type = Spline::Type::Bezier;
 
  private:
-  bool cache_dirty = true;
+  bool is_cyclic = false;
 
-  int32_t flag; /* Cyclic, smooth. */
-
-  std::mutex cache_mutex;
-  blender::Vector<blender::float3> evaluated_spline_cache;
+  mutable std::mutex cache_mutex;
+  mutable bool cache_dirty = true;
+  mutable blender::Vector<blender::float3> evaluated_positions_cache;
+  mutable blender::Vector<blender::float3> evaluated_tangents_cache;
+  mutable blender::Vector<blender::float3> evaluated_normals_cache;
 
  public:
   int size() const final
@@ -117,15 +110,36 @@ class BezierSpline : public Spline {
   blender::Span<blender::float3> evaluated_positions() const final
   {
     this->ensure_evaluation_cache();
-    return evaluated_spline_cache;
+    return evaluated_positions_cache;
+  }
+
+  blender::Span<blender::float3> evaluated_tangents() const final
+  {
+    this->ensure_evaluation_cache();
+    return evaluated_tangents_cache;
+  }
+
+  blender::Span<blender::float3> evaluated_normals() const final
+  {
+    this->ensure_evaluation_cache();
+    return evaluated_normals_cache;
   }
 
   ~BezierSpline() = default;
 };
 
+struct NURBSPoint {
+  blender::float3 position;
+  float radius;
+  float weight;
+
+  /* User defined tilt in radians, added on top of the auto-calculated tilt. */
+  float tilt;
+};
+
 class SplineNURBS : public Spline {
  public:
-  blender::Vector<ControlPointNURBS> control_points;
+  blender::Vector<NURBSPoint> control_points;
   int32_t flag; /* Cyclic, smooth. */
   int resolution_u;
   uint8_t order;
@@ -153,6 +167,16 @@ class SplineNURBS : public Spline {
   }
 
   blender::Span<blender::float3> evaluated_positions() const final
+  {
+    return {};
+  }
+
+  blender::Span<blender::float3> evaluated_tangents() const final
+  {
+    return {};
+  }
+
+  blender::Span<blender::float3> evaluated_normals() const final
   {
     return {};
   }
