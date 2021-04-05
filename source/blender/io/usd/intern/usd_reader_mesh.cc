@@ -408,8 +408,8 @@ void USDMeshReader::read_uvs(Mesh *mesh,
         if (!(sample.interpolation == pxr::UsdGeomTokens->faceVarying ||
               sample.interpolation == pxr::UsdGeomTokens->vertex)) {
           /* Shouldn't happen. */
-          std::cerr << "WARNING: unexpected interpolation type " << sample.interpolation << " for uv "
-            << layer->name << std::endl;
+          std::cerr << "WARNING: unexpected interpolation type " << sample.interpolation
+                    << " for uv " << layer->name << std::endl;
           continue;
         }
 
@@ -775,8 +775,7 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
 
       pxr::TfToken interp = p.GetInterpolation();
 
-      if (!(interp == pxr::UsdGeomTokens->faceVarying ||
-            interp == pxr::UsdGeomTokens->vertex)) {
+      if (!(interp == pxr::UsdGeomTokens->faceVarying || interp == pxr::UsdGeomTokens->vertex)) {
         continue;
       }
 
