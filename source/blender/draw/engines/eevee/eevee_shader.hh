@@ -84,8 +84,8 @@ class ShaderModule {
 
     shader_lib_ = DRW_shader_library_create();
     /* NOTE: These need to be ordered by dependencies. */
-    DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
+    DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);

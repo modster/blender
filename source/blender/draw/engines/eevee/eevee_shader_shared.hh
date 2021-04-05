@@ -1,6 +1,8 @@
 
 /**
  * Shared structures, enums & defines between C++ and GLSL.
+ * Can also include some math functions but they need to be simple enough to be valid in both
+ * language.
  */
 
 /**
@@ -15,8 +17,20 @@
  *
  * IMPORTANT: Don't forget to align mat4 and vec4 to 16 bytes.
  **/
+
+#pragma BLI_STATIC_ASSERT_ALIGN(type_, align_)
+
 #ifndef __cplusplus /* GLSL */
+#  pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #  define BLI_STATIC_ASSERT_ALIGN(type_, align_)
+#  define static
+#  define cosf cos
+#  define sinf sin
+#  define tanf tan
+#  define acosf acos
+#  define asinf asin
+#  define atanf atan
+#  define floorf floor
 
 #else /* C++ */
 #  pragma once
@@ -109,6 +123,78 @@ struct FilmData {
   bool use_history;
 };
 BLI_STATIC_ASSERT_ALIGN(FilmData, 16)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Depth of field
+ * \{ */
+
+struct DepthOfFieldData {
+  /** Size of the render targets for gather & scatter passes. */
+  ivec2 extent;
+  /** Size of a pixel in uv space (1.0 / extent). */
+  vec2 texel_size;
+  /** Bokeh Scale factor. */
+  vec2 bokeh_anisotropic_scale;
+  vec2 bokeh_anisotropic_scale_inv;
+  /* Correction factor to align main target pixels with the filtered mipmap chain texture. */
+  vec2 gather_uv_fac;
+  /** Scatter parameters. */
+  float scatter_coc_threshold;
+  float scatter_color_threshold;
+  float scatter_neighbor_max_color;
+  int scatter_sprite_per_row;
+  /** Downsampling paramters. */
+  float denoise_factor;
+  /** Bokeh Shape parameters. */
+  float bokeh_blades;
+  float bokeh_rotation;
+  /** Circle of confusion (CoC) parameters. */
+  float coc_mul;
+  float coc_bias;
+  float coc_abs_max;
+};
+BLI_STATIC_ASSERT_ALIGN(DepthOfFieldData, 16)
+
+static float regular_polygon_side_length(float sides_count)
+{
+  return 2.0 * sinf(M_PI / sides_count);
+}
+
+/* Returns intersection ratio between the radius edge at theta and the regular polygon edge.
+ * Start first corners at theta == 0. */
+static float circle_to_polygon_radius(float sides_count, float theta)
+{
+  /* From Graphics Gems from CryENGINE 3 (Siggraph 2013) by Tiago Sousa (slide
+   * 36). */
+  float side_angle = (2.0f * M_PI) / sides_count;
+  return cosf(side_angle * 0.5f) /
+         cosf(theta - side_angle * floorf((sides_count * theta + M_PI) / (2.0f * M_PI)));
+}
+
+/* Remap input angle to have homogenous spacing of points along a polygon edge.
+ * Expects theta to be in [0..2pi] range. */
+static float circle_to_polygon_angle(float sides_count, float theta)
+{
+  float side_angle = (2.0f * M_PI) / sides_count;
+  float halfside_angle = side_angle * 0.5f;
+  float side = floorf(theta / side_angle);
+  /* Length of segment from center to the middle of polygon side. */
+  float adjacent = circle_to_polygon_radius(sides_count, 0.0f);
+
+  /* This is the relative position of the sample on the polygon half side. */
+  float local_theta = theta - side * side_angle;
+  float ratio = (local_theta - halfside_angle) / halfside_angle;
+
+  float halfside_len = regular_polygon_side_length(sides_count) * 0.5f;
+  float opposite = ratio * halfside_len;
+
+  /* NOTE: atan(y_over_x) has output range [-M_PI_2..M_PI_2]. */
+  float final_local_theta = atanf(opposite / adjacent);
+
+  return side * side_angle + final_local_theta;
+}
 
 /** \} */
 

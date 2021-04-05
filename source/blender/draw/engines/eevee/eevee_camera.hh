@@ -35,6 +35,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_view3d_types.h"
 
+#include "eevee_depth_of_field.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader_shared.hh"
 
@@ -129,7 +130,7 @@ inline bool operator!=(const CameraData &a, const CameraData &b)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Camera
+/** \name Camera View
  * \{ */
 
 class CameraView {
@@ -141,6 +142,8 @@ class CameraView {
   /** Sub views is jittered versions or the main views. This allows jitter updates without trashing
    * the visibility culling cache. */
   DRWView *sub_view_ = nullptr;
+  /** Same as sub_view_ but has Depth Of Field jitter applied. */
+  DRWView *render_view_ = nullptr;
   /** Render size of the view. Can change between scene sample eval. */
   int extent_[2] = {-1, -1};
   /** Static srting pointer. Used as debug name and as UUID for texture pool. */
@@ -153,10 +156,15 @@ class CameraView {
   {
     return main_view_ != nullptr;
   }
-  const DRWView *drw_view_get(void) const
+  const DRWView *drw_view_film_get(void) const
   {
     BLI_assert(this->is_enabled());
     return sub_view_;
+  }
+  const DRWView *drw_view_render_get(void) const
+  {
+    BLI_assert(this->is_enabled());
+    return render_view_;
   }
   const char *name_get(void) const
   {
@@ -192,9 +200,10 @@ class CameraView {
 
     main_view_ = DRW_view_create(viewmat_p, winmat_p, nullptr, nullptr, nullptr);
     sub_view_ = DRW_view_create_sub(main_view_, viewmat_p, winmat_p);
+    render_view_ = DRW_view_create_sub(main_view_, viewmat_p, winmat_p);
   }
 
-  void update(Sampling &sampling)
+  void update(Sampling &sampling, DepthOfField &dof)
   {
     if (!this->is_enabled()) {
       return;
@@ -205,16 +214,22 @@ class CameraView {
     DRW_view_winmat_get(main_view_, winmat, false);
     DRW_view_persmat_get(main_view_, persmat, false);
 
-    /* Apply jitter. */
+    /* Anti-Aliasing / Super-Sampling jitter. */
     float jitter[2];
-    sampling.camera_lds_get(jitter);
-    for (int i = 0; i < 2; i++) {
-      jitter[i] = 2.0f * (jitter[i] - 0.5f) / extent_[i];
-    }
+    sampling.camera_aa_jitter_get(extent_, jitter);
 
     window_translate_m4(winmat, persmat, UNPACK2(jitter));
-
     DRW_view_update_sub(sub_view_, viewmat, winmat);
+
+    if (dof.do_jitter()) {
+      /* FIXME(fclem): The offset may be is noticeably large and the culling might make object pop
+       * out of the blurring radius. To fix this, use custom enlarged culling matrix. */
+      dof.jitter_apply(winmat, viewmat);
+      DRW_view_update_sub(render_view_, viewmat, winmat);
+    }
+    else {
+      render_view_ = sub_view_;
+    }
   }
 
   void disable(void)
@@ -222,6 +237,12 @@ class CameraView {
     main_view_ = nullptr;
   }
 };
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Camera
+ * \{ */
 
 class Camera {
   friend CameraView;
@@ -242,6 +263,8 @@ class Camera {
     CameraData *data_;
     GPUUniformBuf *ubo_;
   } current, previous;
+  /** Depth of field module. */
+  DepthOfField dof_;
   /** Render size of the whole image. */
   int full_extent_[2];
   /** Internal render size. */
@@ -254,7 +277,7 @@ class Camera {
   uint64_t last_sample_ = 0;
 
  public:
-  Camera(Sampling &sampling) : sampling_(sampling)
+  Camera(Sampling &sampling) : sampling_(sampling), dof_(sampling)
   {
     current.data_ = (CameraData *)MEM_callocN(sizeof(CameraData), "CameraData");
     current.ubo_ = GPU_uniformbuf_create_ex(sizeof(CameraData), nullptr, "CameraData");
@@ -288,9 +311,11 @@ class Camera {
     if (camera_object_eval) {
       const ::Camera *cam = reinterpret_cast<const ::Camera *>(camera_object_eval->data);
       data.type = from_camera(cam);
+      dof_.init(cam, scene);
     }
     else {
       data.type = DRW_view_is_persp_get(drw_view) ? CAMERA_PERSP : CAMERA_ORTHO;
+      dof_.init(nullptr, scene);
     }
 
     /* Sync early to detect changes. This is ok since we avoid double sync later. */
@@ -362,6 +387,8 @@ class Camera {
 
       copy_v2_v2(data.equirect_scale_inv, data.equirect_scale);
       invert_v2(data.equirect_scale_inv);
+
+      dof_.sync(camera_object_eval, scene);
     }
     else {
       data.clip_near = DRW_view_near_distance_get(drw_view);
@@ -408,7 +435,7 @@ class Camera {
   {
     BLI_assert(synced_);
     for (CameraView &view : views_) {
-      view.update(sampling_);
+      view.update(sampling_, dof_);
     }
   }
 

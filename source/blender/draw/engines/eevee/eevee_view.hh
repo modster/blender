@@ -158,19 +158,21 @@ class ShadingView {
 
     DRW_stats_group_start(camera_view_.name_get());
 
-    const DRWView *drw_view = camera_view_.drw_view_get();
-    DRW_view_set_active(drw_view);
+    const DRWView *drw_view_film = camera_view_.drw_view_film_get();
+    const DRWView *drw_view_render = camera_view_.drw_view_render_get();
+
+    DRW_view_set_active(drw_view_render);
 
     GPU_framebuffer_bind(view_fb_);
     GPU_framebuffer_clear_color_depth(view_fb_, color, 1.0f);
     shading_passes_.opaque.render();
 
     if (render_passes_.combined) {
-      render_passes_.combined->accumulate(combined_tx_, drw_view);
+      render_passes_.combined->accumulate(combined_tx_, drw_view_film);
     }
 
     if (render_passes_.depth) {
-      render_passes_.depth->accumulate(depth_tx_, drw_view);
+      render_passes_.depth->accumulate(depth_tx_, drw_view_film);
     }
 
     DRW_stats_group_end();
