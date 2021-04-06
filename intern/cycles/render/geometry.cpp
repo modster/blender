@@ -217,7 +217,7 @@ void Geometry::compute_bvh(
     vector<Object *> objects;
     objects.push_back(&object);
 
-    if (bvh && !need_update_rebuild && bvh->num_refits < params->max_bvh_refits) {
+    if (bvh && !need_update_rebuild && params->enable_bvh_refit && (!params->enable_max_bvh_refits || bvh->num_refits < params->max_bvh_refits)) {
       progress->set_status(msg, "Refitting BVH");
 
       bvh->geometry = geometry;
@@ -1153,7 +1153,7 @@ void GeometryManager::device_update_mesh(
     device_vector<ushort4> curve_keys_deltas(
         scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_ONLY);
 
-    if (!copy_all_data && scene->device->supports_delta_compression()) {
+    if (!copy_all_data && scene->params.enable_delta_compression && scene->device->supports_delta_compression()) {
       /* We can do partial updates, so compute deltas from last update. */
       curve_keys_deltas.alloc(curve_key_size);
       /* Since we use chunks and not all of them may be copied, make sure data between copied
@@ -1265,7 +1265,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
     if (!pack_all) {
       /* need to always call this, otherwise chunks are not detected */
       dscene->prim_tri_verts.alloc(num_tri_verts);
-      if (scene->device->supports_delta_compression()) {
+      if (scene->params.enable_delta_compression && scene->device->supports_delta_compression()) {
         verts_deltas.alloc(dscene->prim_tri_verts.size());
         /* Since we use chunks and not all of them may be copied, make sure data between copied
          * chunks is not garbage. */

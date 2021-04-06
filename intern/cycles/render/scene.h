@@ -181,7 +181,11 @@ class SceneParams {
   int hair_subdivisions;
   CurveShapeType hair_shape;
   int texture_limit;
+  bool enable_bvh_refit;
+  bool enable_max_bvh_refits;
   int max_bvh_refits;
+
+  bool enable_delta_compression;
   int max_delta_compression_frames;
 
   bool background;
@@ -198,7 +202,10 @@ class SceneParams {
     hair_shape = CURVE_RIBBON;
     texture_limit = 0;
     background = true;
+    enable_bvh_refit = true;
+    enable_max_bvh_refits = false;
     max_bvh_refits = 10;
+    enable_delta_compression = false;
     max_delta_compression_frames = 10;
   }
 

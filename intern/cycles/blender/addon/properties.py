@@ -678,11 +678,26 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         items=enum_bvh_types,
         default='DYNAMIC_BVH',
     )
+    enable_bvh_refitting: BoolProperty(
+        name="Enable BVH refitting",
+        description="Allow updating BVHs when the topology does not change",
+        default=True,
+    )
+    enable_max_bvh_refitting: BoolProperty(
+        name="Enable Max BVH Refitting",
+        description="Use a maximum number of consecutive BVH refits",
+        default=False,
+    )
     max_bvh_refits: IntProperty(
         name="Max BVH Refits",
         description="Maximum number of times a BVH is refitted",
         default=10,
         min=1,
+    )
+    enable_delta_compression: BoolProperty(
+        name="Enable Delta Compression",
+        description="Allow compressing data changes between frames to speed up data transfers",
+        default=False,
     )
     max_delta_compression_frames: IntProperty(
         name="Max Delta Compression Frames",
