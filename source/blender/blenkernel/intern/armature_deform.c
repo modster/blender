@@ -484,7 +484,7 @@ static void armature_deform_coords_impl(const Object *ob_arm,
   bool use_dverts = false;
   int armature_def_nr;
   int cd_dvert_offset = -1;
-  MDeformVert *temp_dvert = NULL;
+  MDeformVert *temp_dverts = NULL;
 
   /* in editmode, or not an armature */
   if (arm->edbo || (ob_arm->pose == NULL)) {
@@ -526,8 +526,13 @@ static void armature_deform_coords_impl(const Object *ob_arm,
         dverts = gpc->dvert;
         if (dverts) {
           dverts_len = gpc->tot_curve_points * 3;
-          temp_dvert = MEM_mallocN(sizeof(MDeformVert) * dverts_len, __func__);
-          // TODO: Here we need copy the weights
+          temp_dverts = MEM_mallocN(sizeof(MDeformVert) * dverts_len, __func__);
+          for (int i = 0; i < gpc->tot_curve_points; i++) {
+            int idx = i * 3;
+            MDeformVert *dvert = &gpc->dvert[i];
+            MDeformVert *temp_dvert = &temp_dverts[idx];
+            // TODO: Here copy the weights
+          }
         }
       }
       else {
@@ -625,10 +630,10 @@ static void armature_deform_coords_impl(const Object *ob_arm,
     MEM_freeN(pchan_from_defbase);
   }
 
-  if (temp_dvert) {
+  if (temp_dverts) {
     bGPDcurve *gpc = gps_target->editcurve;
     for (int i = 0; i < gpc->tot_curve_points * 3; i++) {
-      MDeformVert *dvert = &temp_dvert[i];
+      MDeformVert *dvert = &temp_dverts[i];
       BKE_gpencil_free_point_weights(dvert);
     }
   }
