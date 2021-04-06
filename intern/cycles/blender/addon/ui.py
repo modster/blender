@@ -766,11 +766,11 @@ class CYCLES_RENDER_PT_performance_acceleration_structure(CyclesButtonsPanel, Pa
         sub = col.column()
         sub.active = cscene.enable_max_bvh_refitting and cscene.enable_bvh_refitting
         sub.prop(cscene, "max_bvh_refits")
-        sub = col.column()
-        sub.prop(cscene, "enable_delta_compression")
-        sub = col.column()
-        sub.active = cscene.enable_delta_compression
-        sub.prop(cscene, "max_delta_compression_frames")
+#        sub = col.column()
+#        sub.prop(cscene, "enable_delta_compression")
+#        sub = col.column()
+#        sub.active = cscene.enable_delta_compression
+#        sub.prop(cscene, "max_delta_compression_frames")
 
 
 class CYCLES_RENDER_PT_performance_final_render(CyclesButtonsPanel, Panel):

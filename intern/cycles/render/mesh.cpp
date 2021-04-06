@@ -812,6 +812,9 @@ void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, ui
  * and we do not have to repack the device data for the entire Scene. */
 void Mesh::pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort4> *verts_deltas)
 {
+  static_cast<void>(device);
+  static_cast<void>(verts_deltas);
+  static_cast<void>(dscene);
 #if 0
   const size_t num_prims = num_triangles();
   device_vector<ushort4>::chunk deltas_chunk = get_tris_chunk(*verts_deltas, 3);
@@ -884,13 +887,19 @@ void Mesh::pack_primitives(Device *device,
   if (triangles.empty())
     return;
 
+#if 0
   const bool do_deltas = !pack_all && attributes.find(ATTR_STD_DELTAS) != nullptr &&
-                         current_delta_frames_count < max_delta_compression_frames;
+                         current_delta_frames_count < max_delta_compression_frames && verts_deltas->size() != 0;
 
   if (do_deltas) {
     pack_deltas(device, dscene, verts_deltas);
   }
-  else {
+  else
+#endif
+  {
+    static_cast<void>(device);
+    static_cast<void>(verts_deltas);
+    static_cast<void>(max_delta_compression_frames);
     pack_topology(dscene, object, visibility, pack_all);
   }
 }

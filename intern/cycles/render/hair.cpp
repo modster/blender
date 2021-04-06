@@ -471,36 +471,41 @@ void Hair::pack_curve_keys(Device *device,
     return;
   }
 
-//  const float3 *keys_ptr = curve_keys.data();
-//  const float *radius_ptr = curve_radius.data();
-//  const bool do_deltas = curve_keys_deltas.size() != 0;
-//  const Attribute *attr_delta = attributes.find(ATTR_STD_DELTAS);
+  const float3 *keys_ptr = curve_keys.data();
+  const float *radius_ptr = curve_radius.data();
 
-//  if (do_deltas && attr_delta && current_delta_frames_count < max_delta_compression_frames) {
-//    current_delta_frames_count += 1;
+#if 0
+  const bool do_deltas = curve_keys_deltas.size() != 0;
+  const Attribute *attr_delta = attributes.find(ATTR_STD_DELTAS);
 
-//    device_vector<ushort4>::chunk deltas_chunk = get_keys_chunk(curve_keys_deltas);
-//    memcpy(deltas_chunk.data(), attr_delta->data(), curve_keys_size * sizeof(ushort4));
-//    deltas_chunk.copy_to_device();
+  if (do_deltas && attr_delta && current_delta_frames_count < max_delta_compression_frames) {
+    current_delta_frames_count += 1;
 
-//    /* Offset and size should be the same for the delta chunk and the original chunk in terms of
-//     * elements, they should only differ in terms of bytes. */
-//    const size_t offset = deltas_chunk.offset();
-//    const size_t size = deltas_chunk.size();
-//    device->apply_delta_compression(
-//        curve_key_co, curve_keys_deltas, offset, size, min_delta, max_delta);
-//  }
-//  else {
-//    current_delta_frames_count = 0;
-//    device_vector<ccl::float4>::chunk keys_chunk = get_keys_chunk(curve_key_co);
+    device_vector<ushort4>::chunk deltas_chunk = get_keys_chunk(curve_keys_deltas);
+    memcpy(deltas_chunk.data(), attr_delta->data(), curve_keys_size * sizeof(ushort4));
+    deltas_chunk.copy_to_device();
 
-//    for (size_t i = 0; i < curve_keys_size; i++) {
-//      keys_chunk.data()[i] = make_float4(
-//          keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
-//    }
+    /* Offset and size should be the same for the delta chunk and the original chunk in terms of
+     * elements, they should only differ in terms of bytes. */
+    const size_t offset = deltas_chunk.offset();
+    const size_t size = deltas_chunk.size();
+    device->apply_delta_compression(
+        curve_key_co, curve_keys_deltas, offset, size, min_delta, max_delta);
+  }
+  else
+#endif
+    static_cast<void>(device);
+    static_cast<void>(curve_keys_deltas);
+    static_cast<void>(max_delta_compression_frames);
+   {
+    current_delta_frames_count = 0;
+    float4 *keys_chunk = &curve_key_co[prim_offset];
 
-//    keys_chunk.copy_to_device();
-//  }
+    for (size_t i = 0; i < curve_keys_size; i++) {
+      keys_chunk[i] = make_float4(
+          keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
+    }
+  }
 }
 
 void Hair::pack_curve_segments(Scene *scene, float4 *curve_data)
