@@ -94,29 +94,76 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
     return;
   }
 
-  /* TODO: Decide whether to unroll the is_cyclic checks instead of using the mod operator on every
-   * iteration. */
+  /* TODO: Decide whether to unroll the is_cyclic checks instead of using the mod operator for
+   * every iteration. */
+  /* TODO: All of this could probably be generalized to something like:
+   * GEO_mesh_grid_topology(vert_offset,
+   *                        spline_vert_len,
+   *                        profile_vert_len,
+   *                        spline.is_cyclic,
+   *                        profile_spline.is_cyclic,
+   *                        edges,
+   *                        loops,
+   *                        polys,
+   *                        edge_offset,
+   *                        poly_offset);
+   */
 
   /* Add the edges running along the length of the curve, starting at each profile vertex. */
+  const int spline_edges_start = edge_offset;
   for (const int i_ring : IndexRange(spline_edge_len)) {
-    const int ring_offset = vert_offset + profile_vert_len * i_ring;
-    const int next_ring_offset = vert_offset + profile_vert_len * ((i_ring + 1) % spline_vert_len);
+    const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
+    const int next_ring_vert_offset = vert_offset +
+                                      profile_vert_len * ((i_ring + 1) % spline_vert_len);
     for (const int i_profile : IndexRange(profile_vert_len)) {
       MEdge &edge = edges[edge_offset++];
-      edge.v1 = ring_offset + i_profile;
-      edge.v2 = next_ring_offset + i_profile;
-      edge.flag = ME_LOOSEEDGE | ME_EDGEDRAW | ME_EDGERENDER;
+      edge.v1 = ring_vert_offset + i_profile;
+      edge.v2 = next_ring_vert_offset + i_profile;
+      edge.flag = ME_EDGEDRAW | ME_EDGERENDER;
     }
   }
 
   /* Add the edges running along each profile ring. */
+  const int profile_edges_start = edge_offset;
   for (const int i_ring : IndexRange(spline_vert_len)) {
-    const int ring_offset = vert_offset + profile_vert_len * i_ring;
+    const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
     for (const int i_profile : IndexRange(profile_edge_len)) {
       MEdge &edge = edges[edge_offset++];
-      edge.v1 = ring_offset + i_profile;
-      edge.v2 = ring_offset + (i_profile + 1) % profile_vert_len;
-      edge.flag = ME_LOOSEEDGE | ME_EDGEDRAW | ME_EDGERENDER;
+      edge.v1 = ring_vert_offset + i_profile;
+      edge.v2 = ring_vert_offset + (i_profile + 1) % profile_vert_len;
+      edge.flag = ME_EDGEDRAW | ME_EDGERENDER;
+    }
+  }
+
+  /* Calculate poly and face indices. */
+  for (const int i_ring : IndexRange(spline_edge_len)) {
+    const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
+    const int next_ring_vert_offset = vert_offset +
+                                      profile_vert_len * ((i_ring + 1) % spline_vert_len);
+    const int ring_edge_start = profile_edges_start + profile_edge_len * i_ring;
+    const int next_ring_edge_offset = profile_edges_start +
+                                      profile_edge_len * ((i_ring + 1) % spline_vert_len);
+    for (const int i_profile : IndexRange(profile_edge_len)) {
+      const int spline_edge_offset = spline_edges_start + profile_vert_len * i_ring;
+      MPoly &poly = polys[poly_offset++];
+      poly.loopstart = loop_offset;
+      poly.totloop = 4;
+
+      MLoop &loop_a = loops[loop_offset++];
+      loop_a.v = ring_vert_offset + i_profile;
+      loop_a.e = ring_edge_start + i_profile;
+      MLoop &loop_b = loops[loop_offset++];
+      loop_b.v = ring_vert_offset + (i_profile + 1) % profile_vert_len;
+      loop_b.e = spline_edge_offset + (i_profile + 1) % profile_vert_len;
+      MLoop &loop_c = loops[loop_offset++];
+      loop_c.v = next_ring_vert_offset + (i_profile + 1) % profile_vert_len;
+      loop_c.e = next_ring_edge_offset + i_profile;
+      MLoop &loop_d = loops[loop_offset++];
+      loop_d.v = next_ring_vert_offset + i_profile;
+      loop_d.e = spline_edge_offset + i_profile;
+
+      int dummy = i_profile + 1;
+      dummy++;
     }
   }
 
@@ -169,8 +216,7 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
     return nullptr;
   }
 
-  // Mesh *mesh = BKE_mesh_new_nomain(vert_total, edge_total, 0, corner_total, poly_total);
-  Mesh *mesh = BKE_mesh_new_nomain(vert_total, edge_total, 0, 0, 0);
+  Mesh *mesh = BKE_mesh_new_nomain(vert_total, edge_total, 0, corner_total, poly_total);
   MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
   MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
