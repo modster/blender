@@ -77,7 +77,9 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
   BKE_gpencil_modifier_copydata_generic(md, target);
 }
 
-static void gpencil_deform_verts(ArmatureGpencilModifierData *mmd, Object *target, bGPDstroke *gps)
+static void gpencil_deform_polyline_verts(ArmatureGpencilModifierData *mmd,
+                                          Object *target,
+                                          bGPDstroke *gps)
 {
   bGPDspoint *pt = gps->points;
   float(*vert_coords)[3] = MEM_mallocN(sizeof(float[3]) * gps->totpoints, __func__);
@@ -110,6 +112,51 @@ static void gpencil_deform_verts(ArmatureGpencilModifierData *mmd, Object *targe
   MEM_freeN(vert_coords);
 }
 
+static void gpencil_deform_bezier_verts(ArmatureGpencilModifierData *mmd,
+                                        Object *target,
+                                        bGPDstroke *gps)
+{
+  bGPDcurve *gpc = gps->editcurve;
+  bGPDcurve_point *pt = gpc->curve_points;
+  const int totpoints = gpc->tot_curve_points * 3;
+  float(*vert_coords)[3] = MEM_mallocN(sizeof(float[3]) * totpoints, __func__);
+  int i;
+
+  BKE_gpencil_dvert_ensure(gps);
+
+  /* prepare array of points */
+  for (i = 0; i < gpc->tot_curve_points; i++, pt++) {
+    BezTriple *bezt = &pt->bezt;
+    int idx = i * 3;
+    copy_v3_v3(vert_coords[idx], bezt->vec[0]);
+    copy_v3_v3(vert_coords[idx + 1], bezt->vec[1]);
+    copy_v3_v3(vert_coords[idx + 2], bezt->vec[2]);
+  }
+
+  /* deform verts */
+  BKE_armature_deform_coords_with_gpencil_stroke(mmd->object,
+                                                 target,
+                                                 vert_coords,
+                                                 NULL,
+                                                 totpoints,
+                                                 mmd->deformflag,
+                                                 mmd->vert_coords_prev,
+                                                 mmd->vgname,
+                                                 gps);
+
+  /* Apply deformed coordinates */
+  pt = gpc->curve_points;
+  for (i = 0; i < gpc->tot_curve_points; i++, pt++) {
+    BezTriple *bezt = &pt->bezt;
+    int idx = i * 3;
+    copy_v3_v3(bezt->vec[0], vert_coords[idx]);
+    copy_v3_v3(bezt->vec[1], vert_coords[idx + 1]);
+    copy_v3_v3(bezt->vec[2], vert_coords[idx + 2]);
+  }
+
+  MEM_freeN(vert_coords);
+}
+
 /* deform stroke */
 static void deformPolyline(GpencilModifierData *md,
                            Depsgraph *UNUSED(depsgraph),
@@ -124,8 +171,27 @@ static void deformPolyline(GpencilModifierData *md,
   }
   bGPdata *gpd = ob->data;
 
-  gpencil_deform_verts(mmd, ob, gps);
+  gpencil_deform_polyline_verts(mmd, ob, gps);
   /* Calc geometry data. */
+  BKE_gpencil_stroke_geometry_update(gpd, gps);
+}
+
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *UNUSED(depsgraph),
+                         Object *ob,
+                         bGPDlayer *UNUSED(gpl),
+                         bGPDframe *UNUSED(gpf),
+                         bGPDstroke *gps)
+{
+  ArmatureGpencilModifierData *mmd = (ArmatureGpencilModifierData *)md;
+  if (!mmd->object) {
+    return;
+  }
+  bGPdata *gpd = ob->data;
+
+  gpencil_deform_bezier_verts(mmd, ob, gps);
+  /* Calc geometry data. */
+  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
 
@@ -237,7 +303,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Armature = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
