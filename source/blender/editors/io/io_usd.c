@@ -611,7 +611,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
 
   RNA_def_boolean(ot->srna,
                   "convert_to_z_up",
-                  false,
+                  true,
                   "Convert to Z Up",
                   "When checked and if the USD stage up-axis is Y, apply a rotation "
                   "to the imported objects to convert their orientation to Z up ");
