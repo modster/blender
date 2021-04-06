@@ -527,15 +527,17 @@ static void armature_deform_coords_impl(const Object *ob_arm,
         if (dverts) {
           dverts_len = gpc->tot_curve_points * 3;
           temp_dverts = MEM_mallocN(sizeof(MDeformVert) * dverts_len, __func__);
+          dverts = temp_dverts;
           for (i = 0; i < gpc->tot_curve_points; i++) {
+            MDeformVert *dvert_src = &gpc->dvert[i];
             int idx = i * 3;
             for (int w = 0; w < 3; w++) {
-              MDeformVert *dvert = &gpc->dvert[i];
-              MDeformVert *temp_dvert = &temp_dverts[idx + w];
-              memcpy(temp_dvert, dvert, sizeof(MDeformVert));
-              if (dvert->dw) {
-                temp_dvert->dw = MEM_mallocN(sizeof(MDeformWeight) * dvert->totweight, __func__);
-                memcpy(temp_dvert->dw, dvert->dw, sizeof(MDeformWeight) * dvert->totweight);
+              MDeformVert *dvert_dst = &temp_dverts[idx + w];
+              memcpy(dvert_dst, dvert_src, sizeof(MDeformVert));
+              if (dvert_src->dw) {
+                dvert_dst->dw = MEM_mallocN(sizeof(MDeformWeight) * dvert_src->totweight,
+                                            __func__);
+                memcpy(dvert_dst->dw, dvert_src->dw, sizeof(MDeformWeight) * dvert_src->totweight);
               }
             }
           }
