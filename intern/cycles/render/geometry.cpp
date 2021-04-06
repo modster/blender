@@ -224,6 +224,8 @@ void Geometry::compute_bvh(
       bvh->objects = objects;
 
       device->build_bvh(bvh, *progress, true);
+
+      bvh->num_refits += 1;
     }
     else {
       progress->set_status(msg, "Building BVH");
