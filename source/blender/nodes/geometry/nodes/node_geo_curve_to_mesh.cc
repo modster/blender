@@ -94,8 +94,6 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
     return;
   }
 
-  /* TODO: Decide whether to unroll the is_cyclic checks instead of using the mod operator for
-   * every iteration. */
   /* TODO: All of this could probably be generalized to something like:
    * GEO_mesh_grid_topology(vert_offset,
    *                        spline_vert_len,
@@ -137,12 +135,14 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
 
   /* Calculate poly and face indices. */
   for (const int i_ring : IndexRange(spline_edge_len)) {
+    const int i_next_ring = (i_ring + 1) % spline_vert_len;
+
     const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
-    const int next_ring_vert_offset = vert_offset +
-                                      profile_vert_len * ((i_ring + 1) % spline_vert_len);
+    const int next_ring_vert_offset = vert_offset + profile_vert_len * i_next_ring;
+
     const int ring_edge_start = profile_edges_start + profile_edge_len * i_ring;
-    const int next_ring_edge_offset = profile_edges_start +
-                                      profile_edge_len * ((i_ring + 1) % spline_vert_len);
+    const int next_ring_edge_offset = profile_edges_start + profile_edge_len * i_next_ring;
+
     for (const int i_profile : IndexRange(profile_edge_len)) {
       const int spline_edge_offset = spline_edges_start + profile_vert_len * i_ring;
       MPoly &poly = polys[poly_offset++];
@@ -161,9 +161,6 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
       MLoop &loop_d = loops[loop_offset++];
       loop_d.v = next_ring_vert_offset + i_profile;
       loop_d.e = spline_edge_offset + i_profile;
-
-      int dummy = i_profile + 1;
-      dummy++;
     }
   }
 
