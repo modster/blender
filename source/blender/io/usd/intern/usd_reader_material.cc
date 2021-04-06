@@ -63,6 +63,7 @@ static const pxr::TfToken result("result", pxr::TfToken::Immortal);
 static const pxr::TfToken rgb("rgb", pxr::TfToken::Immortal);
 static const pxr::TfToken rgba("rgba", pxr::TfToken::Immortal);
 static const pxr::TfToken roughness("roughness", pxr::TfToken::Immortal);
+static const pxr::TfToken sourceColorSpace("sourceColorSpace", pxr::TfToken::Immortal);
 static const pxr::TfToken specularColor("specularColor", pxr::TfToken::Immortal);
 static const pxr::TfToken st("st", pxr::TfToken::Immortal);
 static const pxr::TfToken varname("varname", pxr::TfToken::Immortal);
@@ -161,6 +162,26 @@ static bool needs_blend(const pxr::UsdShadeShader &usd_shader, float &r_opacity_
   }
 
   return needs_blend;
+}
+
+static pxr::TfToken get_source_color_space(const pxr::UsdShadeShader &usd_shader)
+{
+  if (!usd_shader) {
+    return pxr::TfToken();
+  }
+
+  pxr::UsdShadeInput color_space_input = usd_shader.GetInput(usdtokens::sourceColorSpace);
+
+  if (!color_space_input) {
+    return pxr::TfToken();
+  }
+
+  pxr::VtValue color_space_val;
+  if (color_space_input.Get(&color_space_val) && color_space_val.IsHolding<pxr::TfToken>()) {
+    return color_space_val.Get<pxr::TfToken>();
+  }
+
+  return pxr::TfToken();
 }
 
 namespace blender::io::usd {
@@ -498,8 +519,14 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
           // TODO(makowalski): For now, just checking for RAW color space,
           // assuming sRGB otherwise, but more complex logic might be
           // required if the color space is "auto".
-          pxr::TfToken colorSpace = file_input.GetAttr().GetColorSpace();
-          if (colorSpace == usdtokens::RAW || colorSpace == usdtokens::raw) {
+
+          pxr::TfToken color_space = get_source_color_space(usd_shader);
+
+          if (color_space.IsEmpty()) {
+            color_space = file_input.GetAttr().GetColorSpace();
+          }
+
+          if (color_space == usdtokens::RAW || color_space == usdtokens::raw) {
             STRNCPY(image->colorspace_settings.name, "Raw");
           }
         }
