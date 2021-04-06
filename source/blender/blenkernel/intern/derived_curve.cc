@@ -158,16 +158,25 @@ static void evaluate_bezier_section_3d(const float3 &point_0,
                                        MutableSpan<float3> result)
 {
   BLI_assert(result.size() > 0);
-  /* TODO: This can probably be vectorized... no one has done this already? */
-  float *data = (float *)result.data();
-  for (const int axis : {0, 1, 2}) {
-    BKE_curve_forward_diff_bezier(point_0[axis],
-                                  point_1[axis],
-                                  point_2[axis],
-                                  point_3[axis],
-                                  data + axis,
-                                  result.size(),
-                                  sizeof(float3));
+
+  float f = static_cast<float>(result.size());
+  float3 rt0 = point_0;
+  float3 rt1 = 3.0f * (point_1 - point_0) / f;
+  f *= f;
+  float3 rt2 = 3.0f * (point_0 - 2.0f * point_1 + point_2) / f;
+  f *= result.size();
+  float3 rt3 = (point_3 - point_0 + 3.0f * (point_1 - point_2)) / f;
+
+  float3 q0 = rt0;
+  float3 q1 = rt1 + rt2 + rt3;
+  float3 q2 = 2.0f * rt2 + 6.0f * rt3;
+  float3 q3 = 6.0f * rt3;
+
+  for (const int i : result.index_range()) {
+    result[i] = q0;
+    q0 += q1;
+    q1 += q2;
+    q2 += q3;
   }
 }
 
@@ -186,7 +195,7 @@ static void evaluate_segment_positions(const BezierPoint &point,
                                point.handle_position_b,
                                next.handle_position_a,
                                next.position,
-                               positions.slice(offset, resolution - 1));
+                               positions.slice(offset, resolution));
     offset += resolution;
   }
 }
