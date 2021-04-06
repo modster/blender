@@ -157,21 +157,19 @@ static void evaluate_bezier_section_3d(const float3 &point_0,
                                        const float3 &point_3,
                                        MutableSpan<float3> result)
 {
-  BLI_assert(result.size() > 0);
+  const float len = static_cast<float>(result.size());
+  const float len_squared = len * len;
+  const float len_cubed = len_squared * len;
+  BLI_assert(len > 0.0f);
 
-  float f = static_cast<float>(result.size());
-  float3 rt0 = point_0;
-  float3 rt1 = 3.0f * (point_1 - point_0) / f;
-  f *= f;
-  float3 rt2 = 3.0f * (point_0 - 2.0f * point_1 + point_2) / f;
-  f *= result.size();
-  float3 rt3 = (point_3 - point_0 + 3.0f * (point_1 - point_2)) / f;
+  const float3 rt1 = 3.0f * (point_1 - point_0) / len;
+  const float3 rt2 = 3.0f * (point_0 - 2.0f * point_1 + point_2) / len_squared;
+  const float3 rt3 = (point_3 - point_0 + 3.0f * (point_1 - point_2)) / len_cubed;
 
-  float3 q0 = rt0;
+  float3 q0 = point_0;
   float3 q1 = rt1 + rt2 + rt3;
   float3 q2 = 2.0f * rt2 + 6.0f * rt3;
   float3 q3 = 6.0f * rt3;
-
   for (const int i : result.index_range()) {
     result[i] = q0;
     q0 += q1;
