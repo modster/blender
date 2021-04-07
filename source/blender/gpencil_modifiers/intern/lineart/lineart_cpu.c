@@ -40,6 +40,7 @@
 #include "BKE_gpencil_modifier.h"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
+#include "BKE_pointcache.h"
 #include "BKE_scene.h"
 #include "DEG_depsgraph_query.h"
 #include "DNA_camera_types.h"
@@ -2627,6 +2628,7 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
   lineart_mem_destroy(&rb->render_data_pool);
+  lineart_mem_destroy(&rb->chain_data_pool);
 }
 
 void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)

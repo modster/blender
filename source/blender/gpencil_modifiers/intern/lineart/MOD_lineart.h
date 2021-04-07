@@ -232,6 +232,10 @@ typedef struct LineartRenderBuffer {
   ListBase wasted_cuts;
   SpinLock lock_cuts;
 
+  /** Separate memory pool for chain data, this goes to the cache, so when we free the main pool,
+   * chains will still be available. */
+  LineartStaticMemPool chain_data_pool;
+
   /*  Render status */
   double view_vector[3];
 
