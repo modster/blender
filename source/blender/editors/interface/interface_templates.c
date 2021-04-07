@@ -7270,6 +7270,9 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemO(sub, "", ICON_FILE_REFRESH, "cachefile.reload");
 
   row = uiLayoutRow(layout, false);
+  uiItemO(row, "Set Frame Range", 0, "cachefile.set_frame_range");
+
+  row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "is_sequence", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, false);

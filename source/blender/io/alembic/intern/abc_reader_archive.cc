@@ -38,6 +38,9 @@ using Alembic::Abc::ErrorHandler;
 using Alembic::Abc::Exception;
 using Alembic::Abc::IArchive;
 using Alembic::Abc::kWrapExisting;
+using Alembic::Abc::TimeSamplingPtr;
+using Alembic::Abc::TimeSamplingType;
+using Alembic::Abc::chrono_t;
 
 namespace blender::io::alembic {
 
@@ -104,6 +107,39 @@ bool ArchiveReader::valid() const
 Alembic::Abc::IObject ArchiveReader::getTop()
 {
   return m_archive.getTop();
+}
+
+TimeInfo ArchiveReader::getTimeInfo()
+{
+  const uint32_t num_time_sampling_ptrs = m_archive.getNumTimeSamplings();
+
+  chrono_t min_time =  std::numeric_limits<chrono_t>::max();
+  chrono_t max_time = -std::numeric_limits<chrono_t>::max();
+
+  for (uint32_t i = 0; i < num_time_sampling_ptrs; ++i) {
+    const Alembic::Abc::index_t max_samples = m_archive.getMaxNumSamplesForTimeSamplingIndex(i);
+
+    /* This can only happen in very old files, predating the original Blender Alembic support,
+     * however let's make sure this case is handled. */
+    if (max_samples == INDEX_UNKNOWN) {
+      continue;
+    }
+
+    const TimeSamplingPtr time_sampling_ptr = m_archive.getTimeSampling(i);
+    assert(time_sampling_ptr);
+
+    const TimeSamplingType &time_sampling_type = time_sampling_ptr->getTimeSamplingType();
+
+    /* Avoid the default time sampling, it should be at index 0, but we never know. */
+    if (time_sampling_ptr->getNumStoredTimes() == 1 && time_sampling_ptr->getStoredTimes()[0] == 0.0 && time_sampling_type.getTimePerCycle() == 1.0) {
+      continue;
+    }
+
+    min_time = std::min(min_time, time_sampling_ptr->getSampleTime(0));
+    max_time = std::max(max_time, time_sampling_ptr->getSampleTime(max_samples - 1));
+  }
+
+  return {min_time, max_time};
 }
 
 }  // namespace blender::io::alembic

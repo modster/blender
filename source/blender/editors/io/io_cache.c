@@ -38,11 +38,14 @@
 #include "RNA_access.h"
 
 #include "DEG_depsgraph.h"
+#include "DEG_depsgraph_query.h"
 
 #include "UI_interface.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "ABC_alembic.h"
 
 #include "io_cache.h"
 
@@ -160,6 +163,52 @@ void CACHEFILE_OT_reload(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = cachefile_reload_exec;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/* ***************************** Frame Range Operator **************************** */
+
+static int cachefile_set_frame_range_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  CacheFile *cache_file = CTX_data_edit_cachefile(C);
+
+  if (!cache_file) {
+    return OPERATOR_CANCELLED;
+  }
+
+#ifdef WITH_ALEMBIC
+  if (!cache_file->handle) {
+    cache_file->handle = ABC_create_handle(CTX_data_main(C), cache_file->filepath, NULL);
+  }
+
+  double min_time = 0.0;
+  double max_time = 0.0;
+
+  // TODO: what about file sequences?
+  if (ABC_get_min_max_time(cache_file->handle, &min_time, &max_time)) {
+    Scene *scene = CTX_data_scene(C);
+    scene->r.sfra = min_time * FPS;
+    scene->r.efra = max_time * FPS;
+    WM_event_add_notifier(C, NC_SCENE | ND_FRAME_RANGE, scene);
+  }
+  else {
+    WM_report(RPT_ERROR, "Could not determine the time range of the Alembic archive.");
+  }
+#endif
+
+  return OPERATOR_FINISHED;
+}
+
+void CACHEFILE_OT_set_frame_range(wmOperatorType *ot)
+{
+  ot->name = "Set Frame Range";
+  ot->description = "Update Scene frame range based on time information from the archive";
+  ot->idname = "CACHEFILE_OT_set_frame_range";
+
+  /* api callbacks */
+  ot->exec = cachefile_set_frame_range_exec;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

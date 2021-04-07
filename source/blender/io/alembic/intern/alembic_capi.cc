@@ -178,6 +178,31 @@ AbcArchiveHandle *ABC_create_handle(struct Main *bmain,
   return handle_from_archive(archive);
 }
 
+bool ABC_get_min_max_time(AbcArchiveHandle *handle, double *r_min_time, double *r_max_time)
+{
+  ArchiveReader *archive = archive_from_handle(handle);
+
+  if (!archive) {
+    return false;
+  }
+
+  if (!archive->valid()) {
+    return false;
+  }
+
+  const TimeInfo time_info = archive->getTimeInfo();
+
+  if (r_min_time) {
+    *r_min_time = time_info.min_time;
+  }
+
+  if (r_max_time) {
+    *r_max_time = time_info.max_time;
+  }
+
+  return true;
+}
+
 void ABC_free_handle(AbcArchiveHandle *handle)
 {
   delete archive_from_handle(handle);

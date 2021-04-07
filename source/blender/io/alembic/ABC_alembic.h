@@ -104,6 +104,8 @@ AbcArchiveHandle *ABC_create_handle(struct Main *bmain,
                                     const char *filename,
                                     struct ListBase *object_paths);
 
+bool ABC_get_min_max_time(AbcArchiveHandle *handle, double *r_min_time, double *r_max_time);
+
 void ABC_free_handle(AbcArchiveHandle *handle);
 
 void ABC_get_transform(struct CacheReader *reader,
