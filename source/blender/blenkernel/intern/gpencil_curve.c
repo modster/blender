@@ -1169,10 +1169,14 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
     return;
   }
 
+  /* Assign pointer. This makes the stroke a bezier stroke. */
   gps->editcurve = editcurve;
   if (prev_flag) {
     gps->editcurve->flag = prev_flag;
   }
+
+  /* Free the poly weights (if not null). Should no longer be used. */
+  BKE_gpencil_free_stroke_weights(gps);
 
   if (do_partial_update) {
     BKE_gpencil_editcurve_recalculate_handles(gps);
