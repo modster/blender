@@ -174,7 +174,7 @@ static void deformStroke(GpencilModifierData *md,
       }
 
       float factor_depth = give_opacity_fading_factor(mmd, ob, &pt->x, true);
-      factor_curve = interpf(mmd->factor, mmd->fading_end_factor, factor_depth);
+      factor_curve = interpf(factor_curve, mmd->fading_end_factor, factor_depth);
 
       if (def_nr < 0) {
         if (mmd->flag & GP_OPACITY_NORMALIZE) {
