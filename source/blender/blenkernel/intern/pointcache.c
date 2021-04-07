@@ -127,6 +127,7 @@ static int ptcache_data_size[] = {
     sizeof(float),        /* BPHYS_DATA_SIZE */
     sizeof(float[3]),     /* BPHYS_DATA_TIMES */
     sizeof(BoidData),     /* case BPHYS_DATA_BOIDS */
+    sizeof(void *),       /* BPHYS_DATA_LINEART */
 };
 
 static int ptcache_extra_datasize[] = {
@@ -872,6 +873,29 @@ static void ptcache_rigidbody_error(const struct ID *UNUSED(owner_id),
   /* ignored for now */
 }
 
+/* Line Art functions */
+static int ptcache_lineart_write(int index, void *la_rb, void **data, int UNUSED(cfra))
+{
+  /* data is output */
+  return 1;
+}
+static void ptcache_lineart_read(
+    int index, void *la_rb, void **data, float UNUSED(cfra), const float *old_data)
+{
+}
+static int ptcache_lineart_totpoint(void *la_rb, int UNUSED(cfra))
+{
+  /* The cache is one whole block, so we always return 1. */
+  return 1;
+}
+
+static void ptcache_lineart_error(const struct ID *UNUSED(owner_id),
+                                  void *UNUSED(la_v),
+                                  const char *UNUSED(message))
+{
+  /* ignored for now */
+}
+
 /* Creating ID's */
 void BKE_ptcache_id_from_softbody(PTCacheID *pid, Object *ob, SoftBody *sb)
 {
@@ -1104,6 +1128,45 @@ void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, Object *ob, RigidBodyWorld *r
   pid->file_type = PTCACHE_FILE_PTCACHE;
 }
 
+void BKE_ptcache_id_from_lineart(PTCacheID *pid, Scene *scene, void *lineart_renderbuffer)
+{
+
+  memset(pid, 0, sizeof(PTCacheID));
+
+  pid->owner_id = scene;
+  pid->calldata = lineart_renderbuffer;
+  pid->type = PTCACHE_TYPE_RIGIDBODY;
+  pid->cache = scene->grease_pencil_settings.lineart_cache;
+  pid->cache_ptr = &scene->grease_pencil_settings.lineart_cache;
+  pid->ptcaches = &scene->grease_pencil_settings.lineart_caches;
+
+  pid->totpoint = pid->totwrite = ptcache_lineart_totpoint;
+  pid->error = ptcache_rigidbody_error;
+
+  pid->write_point = ptcache_lineart_write;  // ptcache_rigidbody_write;
+  pid->read_point = ptcache_lineart_read;    // ptcache_rigidbody_read;
+  pid->interpolate_point = NULL;
+
+  pid->write_stream = NULL;
+  pid->read_stream = NULL;
+
+  pid->write_extra_data = NULL;
+  pid->read_extra_data = NULL;
+  pid->interpolate_extra_data = NULL;
+
+  pid->write_header = NULL;  // ptcache_basic_header_write;
+  pid->read_header = NULL;   // ptcache_basic_header_read;
+
+  pid->data_types = (1 << BPHYS_DATA_LINEART);
+  pid->info_types = 0;
+
+  pid->stack_index = 0;
+
+  pid->default_step = 1;
+  pid->max_step = 1;
+  pid->file_type = PTCACHE_FILE_PTCACHE;
+}
+
 /**
  * \param ob: Optional, may be NULL.
  * \param scene: Optional may be NULL.
@@ -1246,6 +1309,13 @@ static bool foreach_object_ptcache(
   if (scene != NULL && (object == NULL || object->rigidbody_object != NULL) &&
       scene->rigidbody_world != NULL) {
     BKE_ptcache_id_from_rigidbody(&pid, object, scene->rigidbody_world);
+    if (!callback(&pid, callback_user_data)) {
+      return false;
+    }
+  }
+  /* Line art. */
+  if (scene != NULL && (scene->grease_pencil_settings.lineart_cache != NULL)) {
+    BKE_ptcache_id_from_lineart(&pid, scene, NULL);
     if (!callback(&pid, callback_user_data)) {
       return false;
     }

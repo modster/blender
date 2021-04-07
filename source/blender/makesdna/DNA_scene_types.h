@@ -1658,9 +1658,13 @@ typedef struct SceneEEVEE {
   float light_threshold;
 } SceneEEVEE;
 
+struct PointCache;
+
 typedef struct SceneGpencil {
   float smaa_threshold;
   char _pad[4];
+  struct PointCache *lineart_cache;
+  struct ListBase lineart_caches;
 } SceneGpencil;
 
 /* *************************************************************** */

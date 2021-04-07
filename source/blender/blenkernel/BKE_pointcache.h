@@ -63,6 +63,7 @@ extern "C" {
 #define PTCACHE_TYPE_DYNAMICPAINT 5
 #define PTCACHE_TYPE_RIGIDBODY 6
 #define PTCACHE_TYPE_SIM_PARTICLES 7
+#define PTCACHE_TYPE_LINEART 8
 
 /* high bits reserved for flags that need to be stored in file */
 #define PTCACHE_TYPEFLAG_COMPRESS (1 << 16)
@@ -285,6 +286,7 @@ void BKE_ptcache_id_from_dynamicpaint(PTCacheID *pid,
                                       struct Object *ob,
                                       struct DynamicPaintSurface *surface);
 void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, struct Object *ob, struct RigidBodyWorld *rbw);
+void BKE_ptcache_id_from_lineart(PTCacheID *pid, struct Scene *scene, void *lineart_renderbuffer);
 
 PTCacheID BKE_ptcache_id_find(struct Object *ob, struct Scene *scene, struct PointCache *cache);
 void BKE_ptcache_ids_from_object(struct ListBase *lb,

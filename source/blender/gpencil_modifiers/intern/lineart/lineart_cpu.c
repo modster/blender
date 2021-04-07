@@ -3861,6 +3861,16 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModif
     lineart_count_and_print_render_buffer_memory(rb);
   }
 
+  Scene *use_scene = scene->id.orig_id ? (Scene *)scene->id.orig_id : scene;
+  if (!use_scene->grease_pencil_settings.lineart_cache) {
+    use_scene->grease_pencil_settings.lineart_cache = BKE_ptcache_add(
+        &use_scene->grease_pencil_settings.lineart_caches);
+  }
+  PTCacheID pid;
+  BKE_ptcache_id_from_lineart(&pid, use_scene, rb);
+  BKE_ptcache_id_time(&pid, use_scene, use_scene->r.cfra, NULL, NULL, NULL);
+  BKE_ptcache_write(&pid, use_scene->r.cfra);
+
   return true;
 }
 
