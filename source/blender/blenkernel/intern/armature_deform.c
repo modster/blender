@@ -524,10 +524,9 @@ static void armature_deform_coords_impl(const Object *ob_arm,
       if (GPENCIL_STROKE_TYPE_BEZIER(gps_target)) {
         bGPDcurve *gpc = gps_target->editcurve;
         dverts = gpc->dvert;
-        if (dverts) {
+        if (dverts != NULL) {
           dverts_len = gpc->tot_curve_points * 3;
           temp_dverts = MEM_mallocN(sizeof(MDeformVert) * dverts_len, __func__);
-          dverts = temp_dverts;
           for (i = 0; i < gpc->tot_curve_points; i++) {
             MDeformVert *dvert_src = &gpc->dvert[i];
             int idx = i * 3;
@@ -541,6 +540,7 @@ static void armature_deform_coords_impl(const Object *ob_arm,
               }
             }
           }
+          dverts = temp_dverts;
         }
       }
       else {
@@ -638,7 +638,7 @@ static void armature_deform_coords_impl(const Object *ob_arm,
     MEM_freeN(pchan_from_defbase);
   }
 
-  if (temp_dverts) {
+  if (temp_dverts != NULL) {
     bGPDcurve *gpc = gps_target->editcurve;
     for (int i = 0; i < gpc->tot_curve_points * 3; i++) {
       MDeformVert *dvert = &temp_dverts[i];

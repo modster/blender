@@ -41,6 +41,7 @@
 #include "BKE_armature.h"
 #include "BKE_context.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_lib_query.h"
@@ -117,15 +118,14 @@ static void gpencil_deform_bezier_verts(ArmatureGpencilModifierData *mmd,
                                         bGPDstroke *gps)
 {
   bGPDcurve *gpc = gps->editcurve;
-  bGPDcurve_point *pt = gpc->curve_points;
   const int totpoints = gpc->tot_curve_points * 3;
   float(*vert_coords)[3] = MEM_mallocN(sizeof(float[3]) * totpoints, __func__);
-  int i;
 
   BKE_gpencil_dvert_ensure(gps);
 
   /* prepare array of points */
-  for (i = 0; i < gpc->tot_curve_points; i++, pt++) {
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *pt = &gpc->curve_points[i];
     BezTriple *bezt = &pt->bezt;
     int idx = i * 3;
     copy_v3_v3(vert_coords[idx], bezt->vec[0]);
@@ -145,14 +145,17 @@ static void gpencil_deform_bezier_verts(ArmatureGpencilModifierData *mmd,
                                                  gps);
 
   /* Apply deformed coordinates */
-  pt = gpc->curve_points;
-  for (i = 0; i < gpc->tot_curve_points; i++, pt++) {
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *pt = &gpc->curve_points[i];
     BezTriple *bezt = &pt->bezt;
     int idx = i * 3;
     copy_v3_v3(bezt->vec[0], vert_coords[idx]);
     copy_v3_v3(bezt->vec[1], vert_coords[idx + 1]);
     copy_v3_v3(bezt->vec[2], vert_coords[idx + 2]);
   }
+
+  /* Recalculate the handles. */
+  BKE_gpencil_editcurve_recalculate_handles(gps);
 
   MEM_freeN(vert_coords);
 }
