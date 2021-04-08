@@ -97,6 +97,20 @@ bool CurveComponent::is_empty() const
   return curve_ == nullptr;
 }
 
+bool CurveComponent::owns_direct_data() const
+{
+  return ownership_ == GeometryOwnershipType::Owned;
+}
+
+void CurveComponent::ensure_owns_direct_data()
+{
+  BLI_assert(this->is_mutable());
+  if (ownership_ != GeometryOwnershipType::Owned) {
+    // curve_ = BKE_curve_copy_for_eval(curve_, false);
+    ownership_ = GeometryOwnershipType::Owned;
+  }
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

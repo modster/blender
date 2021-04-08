@@ -457,6 +457,9 @@ class CurveComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
+  bool owns_direct_data() const override;
+  void ensure_owns_direct_data() override;
+
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_CURVE;
 
  private:
