@@ -69,7 +69,7 @@ class Instance {
       : render_passes_(shared_shaders, camera_, sampling_),
         shaders_(shared_shaders),
         shading_passes_(shared_shaders),
-        main_view_(render_passes_, shading_passes_, camera_),
+        main_view_(shared_shaders, shading_passes_, camera_, sampling_),
         camera_(sampling_){};
   ~Instance(){};
 
@@ -117,8 +117,9 @@ class Instance {
     const Object *camera_eval = DEG_get_evaluated_object(depsgraph_, camera_original_);
 
     sampling_.init(scene_);
-    camera_.init(render_, camera_eval, drw_view_, scene_, output_res);
+    camera_.init(render_, camera_eval, drw_view_, scene_);
     render_passes_.init(scene_, render_layer, v3d_, output_res, output_rect);
+    main_view_.init(scene_, output_res);
   }
 
   /**
@@ -166,12 +167,10 @@ class Instance {
       return;
     }
 
-    camera_.update_views();
-
     /* TODO update shadowmaps, planars, etc... */
     // shadow_view_.render();
 
-    main_view_.render();
+    main_view_.render(render_passes_);
 
     sampling_.step();
   }

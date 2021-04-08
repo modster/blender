@@ -110,7 +110,7 @@ class Film {
   bool has_changed_ = true;
 
   /** Debug static name. */
-  const char *name_;
+  StringRefNull name_;
 
  public:
   /* NOTE: name needs to be static. */
@@ -181,10 +181,10 @@ class Film {
       if (data_tx_[i] == nullptr) {
         eGPUTextureFormat tex_format = to_gpu_texture_format(data_.data_type);
         int *extent = data_.extent;
-        SNPRINTF(full_name, "Film.%s.data", name_);
+        SNPRINTF(full_name, "Film.%s.data", name_.c_str());
         data_tx_[i] = GPU_texture_create_2d(full_name, UNPACK2(extent), 1, tex_format, nullptr);
         /* TODO(fclem) The weight texture could be shared between all similar accumulators. */
-        SNPRINTF(full_name, "Film.%s.weight", name_);
+        SNPRINTF(full_name, "Film.%s.weight", name_.c_str());
         weight_tx_[i] = GPU_texture_create_2d(full_name, UNPACK2(extent), 1, GPU_R16F, nullptr);
 
         GPU_framebuffer_ensure_config(&accumulation_fb_[i],
@@ -198,7 +198,7 @@ class Film {
 
     eGPUSamplerState no_filter = GPU_SAMPLER_DEFAULT;
     {
-      SNPRINTF(full_name, "Film.%s.Accumulate", name_);
+      SNPRINTF(full_name, "Film.%s.Accumulate", name_.c_str());
       accumulate_ps_ = DRW_pass_create(full_name, DRW_STATE_WRITE_COLOR);
       GPUShader *sh = shaders_.static_shader_get(FILM_FILTER);
       DRWShadingGroup *grp = DRW_shgroup_create(sh, accumulate_ps_);
@@ -210,7 +210,7 @@ class Film {
       DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
     }
     {
-      SNPRINTF(full_name, "Film.%s.Resolve", name_);
+      SNPRINTF(full_name, "Film.%s.Resolve", name_.c_str());
       DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_ALWAYS;
       resolve_ps_ = DRW_pass_create(full_name, state);
       GPUShader *sh = shaders_.static_shader_get(FILM_RESOLVE);

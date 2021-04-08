@@ -9,8 +9,13 @@
  * NOTE: Enum support is not part of GLSL. It is handled by our own pre-processor pass in
  * EEVEE's shader module.
  *
- * IMPORTANT: Don't add trailing comma at the end of the enum. Always use `u` suffix for values.
- * Define all values. Always use uint32_t as underlying type.
+ * IMPORTANT:
+ * - Don't add trailing comma at the end of the enum. Our custom pre-processor will noy trim it
+ *   for GLSL.
+ * - Always use `u` suffix for values. GLSL do not support implicit cast.
+ * - Define all values. This is in order to simplify custom pre-processor code.
+ * - Always use uint32_t as underlying type.
+ * - Use float suffix by default for float literals to avoid double promotion in C++.
  *
  * NOTE: Due to alignment restriction and buggy drivers, do not try to use vec3 or mat3 inside
  * structs. Use vec4 and pack an extra float at the end.
@@ -61,6 +66,11 @@ enum eCameraType : uint32_t {
   CAMERA_PANO_EQUIDISTANT = 4u,
   CAMERA_PANO_MIRROR = 5u
 };
+
+static bool is_panoramic(eCameraType type)
+{
+  return type > CAMERA_ORTHO;
+}
 
 struct CameraData {
   /* View Matrices of the camera, not from any view! */
@@ -130,6 +140,13 @@ BLI_STATIC_ASSERT_ALIGN(FilmData, 16)
 /** \name Depth of field
  * \{ */
 
+/* 5% error threshold. */
+#define DOF_FAST_GATHER_COC_ERROR 0.05
+#define DOF_GATHER_RING_COUNT 5
+#define DOF_DILATE_RING_COUNT 3
+#define DOF_TILE_DIVISOR 16
+#define DOF_BOKEH_LUT_SIZE 32
+
 struct DepthOfFieldData {
   /** Size of the render targets for gather & scatter passes. */
   ivec2 extent;
@@ -154,12 +171,21 @@ struct DepthOfFieldData {
   float coc_mul;
   float coc_bias;
   float coc_abs_max;
+  /** Copy of camera type. */
+  eCameraType camera_type;
+  int pad0, pad1, pad2;
 };
 BLI_STATIC_ASSERT_ALIGN(DepthOfFieldData, 16)
 
+static float coc_radius_from_camera_depth(DepthOfFieldData dof, float depth)
+{
+  depth = (dof.camera_type != CAMERA_ORTHO) ? 1.0f / depth : depth;
+  return dof.coc_mul * depth + dof.coc_bias;
+}
+
 static float regular_polygon_side_length(float sides_count)
 {
-  return 2.0 * sinf(M_PI / sides_count);
+  return 2.0f * sinf(M_PI / sides_count);
 }
 
 /* Returns intersection ratio between the radius edge at theta and the regular polygon edge.
