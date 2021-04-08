@@ -150,15 +150,27 @@ bool _prune_by_visibility(const pxr::UsdGeomImageable &imageable, const USDImpor
  * the import_guide parameter is toggled off. */
 bool _prune_by_purpose(const pxr::UsdGeomImageable &imageable, const USDImportParams &params)
 {
-  if (imageable && !(params.import_guide && params.import_proxy && params.import_render)) {
-    if (pxr::UsdAttribute purpose_attr = imageable.GetPurposeAttr()) {
-      pxr::TfToken purpose;
-      purpose_attr.Get(&purpose);
-      if ((!params.import_guide && purpose == pxr::UsdGeomTokens->guide) ||
-          (!params.import_proxy && purpose == pxr::UsdGeomTokens->proxy) ||
-          (!params.import_render && purpose == pxr::UsdGeomTokens->render)) {
-        return true;
-      }
+  if (!imageable) {
+    return false;
+  }
+
+  if (params.import_guide && params.import_proxy && params.import_render) {
+    return false;
+  }
+
+  if (pxr::UsdAttribute purpose_attr = imageable.GetPurposeAttr()) {
+    pxr::TfToken purpose;
+    if (!purpose_attr.Get(&purpose)) {
+      return false;
+    }
+    if (purpose == pxr::UsdGeomTokens->guide && !params.import_guide) {
+      return true;
+    }
+    if (purpose == pxr::UsdGeomTokens->proxy && !params.import_proxy) {
+      return true;
+    }
+    if (purpose == pxr::UsdGeomTokens->render && !params.import_render) {
+      return true;
     }
   }
 
