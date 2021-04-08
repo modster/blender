@@ -148,6 +148,7 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
       MPoly &poly = polys[poly_offset++];
       poly.loopstart = loop_offset;
       poly.totloop = 4;
+      poly.flag = ME_SMOOTH;
 
       MLoop &loop_a = loops[loop_offset++];
       loop_a.v = ring_vert_offset + i_profile;
@@ -174,13 +175,19 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
         positions[i_ring], tangents[i_ring], normals[i_ring]);
 
     const float radius = spline.get_evaluated_point_radius(i_ring);
-    point_matrix.set_scale(radius);
+    point_matrix.apply_scale(radius);
 
     for (const int i_profile : IndexRange(profile_vert_len)) {
       MVert &vert = verts[vert_offset++];
       copy_v3_v3(vert.co, point_matrix * profile_positions[i_profile]);
     }
   }
+
+  /* Mark edge loops from sharp vector control points sharp. */
+  // if (profile_spline.type == Spline::Bezier) {
+  //   const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(profile_spline);
+  //   for (const int i : bezier_spline.ev)
+  // }
 }
 
 static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_curve)
