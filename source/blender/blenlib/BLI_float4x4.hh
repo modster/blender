@@ -147,6 +147,11 @@ struct float4x4 {
     return scale;
   }
 
+  void set_scale(const float scale)
+  {
+    values[0][0] = values[1][1] = values[2][2] = scale;
+  }
+
   float4x4 inverted() const
   {
     float4x4 result;

@@ -29,8 +29,6 @@ using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
 
-/** \} */
-
 /* -------------------------------------------------------------------- */
 /** \name General Curve Functions
  * \{ */
@@ -66,6 +64,10 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
   LISTBASE_FOREACH (const Nurb *, nurb, nurbs) {
     if (nurb->type == CU_BEZIER) {
       BezierSpline *spline = new BezierSpline();
+      spline->set_resolution(nurb->resolu);
+      spline->type = Spline::Type::Bezier;
+      spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
+
       for (const BezTriple &bezt : Span(nurb->bezt, nurb->pntsu)) {
         BezierPoint point;
         point.handle_position_a = bezt.vec[0];
@@ -78,12 +80,6 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
         spline->control_points.append(std::move(point));
       }
 
-      spline->resolution_u = nurb->resolu;
-      // spline.resolution_v = nurb->resolv;
-      spline->type = Spline::Type::Bezier;
-
-      spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
-
       curve->splines.append(spline);
     }
     else if (nurb->type == CU_NURBS) {
@@ -95,191 +91,40 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
   return curve;
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
-/** \name Bezier Spline
+/** \name Spline
  * \{ */
 
-static bool segment_is_vector(const BezierPoint &point_a, const BezierPoint &point_b)
+static void accumulate_lengths(Span<float3> positions, MutableSpan<float> r_lengths)
 {
-  return point_a.handle_type_b == BezierPoint::HandleType::Vector &&
-         point_b.handle_type_a == BezierPoint::HandleType::Vector;
-}
-
-int BezierSpline::evaluated_points_size() const
-{
-  BLI_assert(control_points.size() > 0);
-#ifndef DEBUG
-  if (!this->cache_dirty_) {
-    /* In a non-debug build, assume that the cache's size has not changed, and that any operation
-     * that would cause the cache to change its length would also mark the cache dirty. This is
-     * checked at the end of this function in a debug build. */
-    return this->evaluated_positions_cache_.size();
-  }
-#endif
-
-  int total_len = 0;
-  for (const int i : IndexRange(1, this->control_points.size() - 1)) {
-    const BezierPoint &point_prev = this->control_points[i - 1];
-    const BezierPoint &point = this->control_points[i];
-    if (segment_is_vector(point_prev, point)) {
-      total_len += 1;
-    }
-    else {
-      total_len += this->resolution_u;
-    }
-  }
-
-  if (this->is_cyclic) {
-    if (segment_is_vector(this->control_points.last(), this->control_points.first())) {
-      total_len++;
-    }
-    else {
-      total_len += this->resolution_u;
-    }
-  }
-  else {
-    /* Since evaulating the bezier doesn't add the final point's position,
-     * it must be added manually in the non-cyclic case. */
-    total_len++;
-  }
-
-  /* Assert that the cache has the correct length in debug mode. */
-  if (!this->cache_dirty_) {
-    BLI_assert(this->evaluated_positions_cache_.size() == total_len);
-  }
-
-  return total_len;
-}
-
-static void evaluate_bezier_section_3d(const float3 &point_0,
-                                       const float3 &point_1,
-                                       const float3 &point_2,
-                                       const float3 &point_3,
-                                       MutableSpan<float3> result)
-{
-  const float len = static_cast<float>(result.size());
-  const float len_squared = len * len;
-  const float len_cubed = len_squared * len;
-  BLI_assert(len > 0.0f);
-
-  const float3 rt1 = 3.0f * (point_1 - point_0) / len;
-  const float3 rt2 = 3.0f * (point_0 - 2.0f * point_1 + point_2) / len_squared;
-  const float3 rt3 = (point_3 - point_0 + 3.0f * (point_1 - point_2)) / len_cubed;
-
-  float3 q0 = point_0;
-  float3 q1 = rt1 + rt2 + rt3;
-  float3 q2 = 2.0f * rt2 + 6.0f * rt3;
-  float3 q3 = 6.0f * rt3;
-  for (const int i : result.index_range()) {
-    result[i] = q0;
-    q0 += q1;
-    q1 += q2;
-    q2 += q3;
+  float length = 0.0f;
+  r_lengths[0] = length;
+  for (const int i : IndexRange(1, positions.size() - 1)) {
+    r_lengths[i] = length;
+    length += float3::distance(positions[i - 1], positions[i]);
   }
 }
 
-static void evaluate_segment_positions(const BezierPoint &point,
-                                       const BezierPoint &next,
-                                       const int resolution,
-                                       int &offset,
-                                       MutableSpan<float3> positions)
+void Spline::ensure_length_cache() const
 {
-  if (segment_is_vector(point, next) || resolution == 1) {
-    positions[offset] = point.position;
-    offset++;
-  }
-  else {
-    evaluate_bezier_section_3d(point.position,
-                               point.handle_position_b,
-                               next.handle_position_a,
-                               next.position,
-                               positions.slice(offset, resolution));
-    offset += resolution;
-  }
-}
-
-static void evaluate_positions(Span<BezierPoint> control_points,
-                               const int resolution,
-                               const bool is_cyclic,
-                               MutableSpan<float3> positions)
-{
-  int offset = 0;
-  for (const int i : IndexRange(1, control_points.size() - 1)) {
-    const BezierPoint &point_prev = control_points[i - 1];
-    const BezierPoint &point = control_points[i];
-    evaluate_segment_positions(point_prev, point, resolution, offset, positions);
-  }
-
-  if (is_cyclic) {
-    const BezierPoint &last_point = control_points.last();
-    const BezierPoint &first_point = control_points.first();
-    evaluate_segment_positions(last_point, first_point, resolution, offset, positions);
-  }
-  else {
-    /* Since evaulating the bezier doesn't add the final point's position,
-     * it must be added manually in the non-cyclic case. */
-    positions[offset] = control_points.last().position;
-    offset++;
-  }
-
-  BLI_assert(offset == positions.size());
-}
-
-static float3 direction_bisect(const float3 &prev, const float3 &middle, const float3 &next)
-{
-  const float3 dir_prev = (middle - prev).normalized();
-  const float3 dir_next = (next - middle).normalized();
-
-  return (dir_prev + dir_next).normalized();
-}
-
-static void calculate_tangents(Span<BezierPoint> control_points,
-                               Span<float3> positions,
-                               const bool is_cyclic,
-                               MutableSpan<float3> tangents)
-{
-  if (positions.size() == 1) {
-    tangents.first() = float3(0.0f, 0.0f, 0.0f);
+  if (!this->length_cache_dirty_) {
     return;
   }
 
-  for (const int i : IndexRange(1, positions.size() - 2)) {
-    tangents[i] = direction_bisect(positions[i - 1], positions[i], positions[i + 1]);
+  std::lock_guard<std::mutex> lock(this->length_cache_mutex_);
+  if (!this->length_cache_dirty_) {
+    return;
   }
 
-  if (is_cyclic) {
-    const float3 &second_to_last = positions[positions.size() - 2];
-    const float3 &last = positions.last();
-    const float3 &first = positions.first();
-    const float3 &second = positions[1];
-    tangents.first() = direction_bisect(last, first, second);
-    tangents.last() = direction_bisect(second_to_last, last, first);
-  }
-  else {
-    /* If the spline is not cyclic, the direction for the first and last points is just the
-     * direction formed by the corresponding handles and control points. In the unlikely situation
-     * that the handles define a zero direction, fallback to using the direction defined by the
-     * first and last evaluated segments. */
-    const BezierPoint &first_point = control_points.first();
-    if (LIKELY(first_point.handle_position_a != first_point.position)) {
-      tangents.first() = (first_point.position - first_point.handle_position_a).normalized();
-    }
-    else {
-      tangents.first() = (positions[1] - positions[0]).normalized();
-    }
+  const int total = this->evaluated_points_size();
+  this->evaluated_length_cache_.resize(total);
 
-    const BezierPoint &last_point = control_points.last();
-    if (LIKELY(last_point.handle_position_a != first_point.position)) {
-      tangents.last() = (last_point.handle_position_b - last_point.position).normalized();
-    }
-    else {
-      tangents.last() = (positions.last() - positions[positions.size() - 1]).normalized();
-    }
-  }
+  Span<float3> positions = this->evaluated_positions();
+  accumulate_lengths(positions, this->evaluated_length_cache_);
 
-  for (const float3 &tangent : tangents) {
-    BLI_ASSERT_UNIT_V3(tangent);
-  }
+  this->length_cache_dirty_ = false;
 }
 
 static float3 initial_normal(const float3 first_tangent)
@@ -425,48 +270,336 @@ static void evaluate_normals(Span<float3> tangents,
     normals[i] = propagate_normal(normals[i - 1], tangents[i - 1], tangents[i]);
   }
 
-  for (const float3 &normal : normals) {
-    BLI_ASSERT_UNIT_V3(normal);
-  }
-
   if (is_cyclic) {
     make_normals_cyclic(tangents, normals);
   }
+}
 
-  for (const float3 &normal : normals) {
-    BLI_ASSERT_UNIT_V3(normal);
+void Spline::ensure_normal_cache() const
+{
+  if (!this->normal_cache_dirty_) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(this->normal_cache_mutex_);
+  if (!this->normal_cache_dirty_) {
+    return;
+  }
+
+  const int total = this->evaluated_points_size();
+  this->evaluated_normals_cache_.resize(total);
+
+  Span<float3> tangents = this->evaluated_tangents();
+  evaluate_normals(tangents, is_cyclic, this->evaluated_normals_cache_);
+
+  this->normal_cache_dirty_ = false;
+}
+
+void Spline::mark_cache_invalid()
+{
+  base_cache_dirty_ = true;
+  tangent_cache_dirty_ = true;
+  normal_cache_dirty_ = true;
+  length_cache_dirty_ = true;
+}
+
+float Spline::get_evaluated_point_radius(const int evaluated_index) const
+{
+  this->ensure_base_cache();
+  Span<PointMapping> mappings = this->evaluated_mapping_cache_;
+
+  const PointMapping &mapping = mappings[evaluated_index];
+  const int index = mapping.control_point_index;
+  const float factor = mapping.factor;
+
+  const float radius = this->control_point_radius(index);
+  if (index == this->size() - 1) {
+    return radius;
+  }
+  const float next_radius = this->control_point_radius(index + 1);
+
+  return interpf(next_radius, radius, factor);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Bezier Spline
+ * \{ */
+
+int BezierSpline::size() const
+{
+  return this->control_points.size();
+}
+
+int BezierSpline::resolution() const
+{
+  return this->resolution_u;
+}
+
+void BezierSpline::set_resolution(const int value)
+{
+  this->resolution_u = value;
+  this->mark_cache_invalid();
+}
+
+static bool segment_is_vector(const BezierPoint &point_a, const BezierPoint &point_b)
+{
+  return point_a.handle_type_b == BezierPoint::HandleType::Vector &&
+         point_b.handle_type_a == BezierPoint::HandleType::Vector;
+}
+
+int BezierSpline::evaluated_points_size() const
+{
+  BLI_assert(control_points.size() > 0);
+#ifndef DEBUG
+  if (!this->base_cache_dirty_) {
+    /* In a non-debug build, assume that the cache's size has not changed, and that any operation
+     * that would cause the cache to change its length would also mark the cache dirty. This is
+     * checked at the end of this function in a debug build. */
+    return this->evaluated_positions_cache_.size();
+  }
+#endif
+
+  int total_len = 0;
+  for (const int i : IndexRange(1, this->control_points.size() - 1)) {
+    const BezierPoint &point_prev = this->control_points[i - 1];
+    const BezierPoint &point = this->control_points[i];
+    if (segment_is_vector(point_prev, point)) {
+      total_len += 1;
+    }
+    else {
+      total_len += this->resolution_u;
+    }
+  }
+
+  if (this->is_cyclic) {
+    if (segment_is_vector(this->control_points.last(), this->control_points.first())) {
+      total_len++;
+    }
+    else {
+      total_len += this->resolution_u;
+    }
+  }
+  else {
+    /* Since evaulating the bezier doesn't add the final point's position,
+     * it must be added manually in the non-cyclic case. */
+    total_len++;
+  }
+
+  /* Assert that the cache has the correct length in debug mode. */
+  if (!this->base_cache_dirty_) {
+    BLI_assert(this->evaluated_positions_cache_.size() == total_len);
+  }
+
+  return total_len;
+}
+
+static void bezier_forward_difference_3d(const float3 &point_0,
+                                         const float3 &point_1,
+                                         const float3 &point_2,
+                                         const float3 &point_3,
+                                         MutableSpan<float3> result)
+{
+  const float len = static_cast<float>(result.size());
+  const float len_squared = len * len;
+  const float len_cubed = len_squared * len;
+  BLI_assert(len > 0.0f);
+
+  const float3 rt1 = 3.0f * (point_1 - point_0) / len;
+  const float3 rt2 = 3.0f * (point_0 - 2.0f * point_1 + point_2) / len_squared;
+  const float3 rt3 = (point_3 - point_0 + 3.0f * (point_1 - point_2)) / len_cubed;
+
+  float3 q0 = point_0;
+  float3 q1 = rt1 + rt2 + rt3;
+  float3 q2 = 2.0f * rt2 + 6.0f * rt3;
+  float3 q3 = 6.0f * rt3;
+  for (const int i : result.index_range()) {
+    result[i] = q0;
+    q0 += q1;
+    q1 += q2;
+    q2 += q3;
   }
 }
 
-void BezierSpline::ensure_evaluation_cache() const
+static void evaluate_segment_mapping(Span<float3> evaluated_positions,
+                                     MutableSpan<PointMapping> mappings,
+                                     const int index)
 {
-  /* TODO: Consider separating a tangent dirty tag from the position and tangent cache. */
-  if (!this->cache_dirty_) {
+  float length = 0.0f;
+  mappings[0] = PointMapping{index, 0.0f};
+  for (const int i : IndexRange(1, mappings.size() - 1)) {
+    length += float3::distance(evaluated_positions[i - 1], evaluated_positions[i]);
+    mappings[i] = PointMapping{index, length};
+  }
+
+  /* To get the factors instead of the accumulated lengths, divide the mapping factors by the
+   * accumulated length. */
+  if (length != 0.0f) {
+    for (PointMapping &mapping : mappings) {
+      mapping.factor /= length;
+    }
+  }
+}
+
+static void evaluate_bezier_segment(const BezierPoint &point,
+                                    const BezierPoint &next,
+                                    const int index,
+                                    const int resolution,
+                                    int &offset,
+                                    MutableSpan<float3> positions,
+                                    MutableSpan<PointMapping> mappings)
+{
+  if (segment_is_vector(point, next)) {
+    positions[offset] = point.position;
+    mappings[offset] = PointMapping{index, 0.0f};
+    offset++;
+  }
+  else {
+    bezier_forward_difference_3d(point.position,
+                                 point.handle_position_b,
+                                 next.handle_position_a,
+                                 next.position,
+                                 positions.slice(offset, resolution));
+    evaluate_segment_mapping(
+        positions.slice(offset, resolution), mappings.slice(offset, resolution), index);
+    offset += resolution;
+  }
+}
+
+static void evaluate_bezier_positions_and_mapping(Span<BezierPoint> control_points,
+                                                  const int resolution,
+                                                  const bool is_cyclic,
+                                                  MutableSpan<float3> positions,
+                                                  MutableSpan<PointMapping> mappings)
+{
+  int offset = 0;
+  for (const int i : IndexRange(1, control_points.size() - 1)) {
+    const BezierPoint &point_prev = control_points[i - 1];
+    const BezierPoint &point = control_points[i];
+    evaluate_bezier_segment(point_prev, point, i, resolution, offset, positions, mappings);
+  }
+
+  const int i_last = control_points.size() - 1;
+  if (is_cyclic) {
+    const BezierPoint &last_point = control_points.last();
+    const BezierPoint &first_point = control_points.first();
+    evaluate_bezier_segment(
+        last_point, first_point, i_last, resolution, offset, positions, mappings);
+  }
+  else {
+    /* Since evaulating the bezier doesn't add the final point's position,
+     * it must be added manually in the non-cyclic case. */
+    positions[offset] = control_points.last().position;
+    mappings[offset] = PointMapping{i_last, 0.0f};
+    offset++;
+  }
+
+  BLI_assert(offset == positions.size());
+}
+
+static float3 direction_bisect(const float3 &prev, const float3 &middle, const float3 &next)
+{
+  const float3 dir_prev = (middle - prev).normalized();
+  const float3 dir_next = (next - middle).normalized();
+
+  return (dir_prev + dir_next).normalized();
+}
+
+static void calculate_tangents(Span<BezierPoint> control_points,
+                               Span<float3> positions,
+                               const bool is_cyclic,
+                               MutableSpan<float3> tangents)
+{
+  if (positions.size() == 1) {
+    tangents.first() = float3(0.0f, 0.0f, 0.0f);
     return;
   }
 
-  std::lock_guard<std::mutex> lock(this->cache_mutex_);
-  if (!this->cache_dirty_) {
+  for (const int i : IndexRange(1, positions.size() - 2)) {
+    tangents[i] = direction_bisect(positions[i - 1], positions[i], positions[i + 1]);
+  }
+
+  if (is_cyclic) {
+    const float3 &second_to_last = positions[positions.size() - 2];
+    const float3 &last = positions.last();
+    const float3 &first = positions.first();
+    const float3 &second = positions[1];
+    tangents.first() = direction_bisect(last, first, second);
+    tangents.last() = direction_bisect(second_to_last, last, first);
+  }
+  else {
+    /* If the spline is not cyclic, the direction for the first and last points is just the
+     * direction formed by the corresponding handles and control points. In the unlikely situation
+     * that the handles define a zero direction, fallback to using the direction defined by the
+     * first and last evaluated segments. */
+    const BezierPoint &first_point = control_points.first();
+    if (LIKELY(first_point.handle_position_a != first_point.position)) {
+      tangents.first() = (first_point.position - first_point.handle_position_a).normalized();
+    }
+    else {
+      tangents.first() = (positions[1] - positions[0]).normalized();
+    }
+
+    const BezierPoint &last_point = control_points.last();
+    if (LIKELY(last_point.handle_position_a != first_point.position)) {
+      tangents.last() = (last_point.handle_position_b - last_point.position).normalized();
+    }
+    else {
+      tangents.last() = (positions.last() - positions[positions.size() - 1]).normalized();
+    }
+  }
+}
+
+void BezierSpline::ensure_tangent_cache() const
+{
+  if (!this->tangent_cache_dirty_) {
     return;
   }
 
-  const int points_len = this->evaluated_points_size();
-  this->evaluated_positions_cache_.resize(points_len);
-  this->evaluated_tangents_cache_.resize(points_len);
-  this->evaluated_normals_cache_.resize(points_len);
+  std::lock_guard<std::mutex> lock(this->tangent_cache_mutex_);
+  if (!this->tangent_cache_dirty_) {
+    return;
+  }
 
-  evaluate_positions(
-      this->control_points, this->resolution_u, this->is_cyclic, this->evaluated_positions_cache_);
+  const int total = this->evaluated_points_size();
+  this->evaluated_tangents_cache_.resize(total);
 
-  calculate_tangents(this->control_points,
-                     this->evaluated_positions_cache_,
-                     this->is_cyclic,
-                     this->evaluated_tangents_cache_);
+  Span<float3> positions = this->evaluated_positions();
 
-  evaluate_normals(
-      this->evaluated_tangents_cache_, this->is_cyclic, this->evaluated_normals_cache_);
+  calculate_tangents(
+      this->control_points, positions, this->is_cyclic, this->evaluated_tangents_cache_);
 
-  this->cache_dirty_ = false;
+  this->tangent_cache_dirty_ = false;
+}
+
+void BezierSpline::ensure_base_cache() const
+{
+  if (!this->base_cache_dirty_) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(this->base_cache_mutex_);
+  if (!this->base_cache_dirty_) {
+    return;
+  }
+
+  const int total = this->evaluated_points_size();
+  this->evaluated_positions_cache_.resize(total);
+  this->evaluated_mapping_cache_.resize(total);
+
+  evaluate_bezier_positions_and_mapping(this->control_points,
+                                        this->resolution_u,
+                                        this->is_cyclic,
+                                        this->evaluated_positions_cache_,
+                                        this->evaluated_mapping_cache_);
+
+  this->base_cache_dirty_ = false;
+}
+
+float BezierSpline::control_point_radius(const int index) const
+{
+  return this->control_points[index].radius;
 }
 
 /** \} */
@@ -474,6 +607,40 @@ void BezierSpline::ensure_evaluation_cache() const
 /* -------------------------------------------------------------------- */
 /** \name NURBS Spline
  * \{ */
+
+int NURBSPline::size() const
+{
+  return this->control_points.size();
+}
+
+int NURBSPline::resolution() const
+{
+  return this->resolution_u;
+}
+
+void NURBSPline::set_resolution(const int value)
+{
+  this->resolution_u = value;
+  this->mark_cache_invalid();
+}
+
+int NURBSPline::evaluated_points_size() const
+{
+  return 0;
+}
+
+void NURBSPline::ensure_base_cache() const
+{
+}
+
+void NURBSPline::ensure_tangent_cache() const
+{
+}
+
+float NURBSPline::control_point_radius(const int index) const
+{
+  return this->control_points[index].radius;
+}
 
 /** \} */
 

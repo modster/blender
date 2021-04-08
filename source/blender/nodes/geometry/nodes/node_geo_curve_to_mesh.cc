@@ -170,8 +170,10 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   Span<float3> normals = spline.evaluated_normals();
   Span<float3> profile_positions = profile_spline.evaluated_positions();
   for (const int i_ring : IndexRange(spline_vert_len)) {
-    const float4x4 point_matrix = float4x4::from_normalized_axis_data(
+    float4x4 point_matrix = float4x4::from_normalized_axis_data(
         positions[i_ring], tangents[i_ring], normals[i_ring]);
+
+    point_matrix.set_scale(spline.get_evaluated_point_radius(i_ring));
 
     for (const int i_profile : IndexRange(profile_vert_len)) {
       MVert &vert = verts[vert_offset++];

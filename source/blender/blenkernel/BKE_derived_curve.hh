@@ -29,6 +29,13 @@
 
 struct Curve;
 
+struct PointMapping {
+  int control_point_index;
+  /* Linear interpolation factor starting at this control point with the index in
+   * `control_point_index`, and ending with the next control point. */
+  float factor;
+};
+
 struct BezierPoint {
   enum HandleType {
     Free,
@@ -36,16 +43,23 @@ struct BezierPoint {
     Vector,
     Align,
   };
-  blender::float3 handle_position_a;
-  blender::float3 position;
-  blender::float3 handle_position_b;
+
+  /* The first handle. */
   HandleType handle_type_a;
+  blender::float3 handle_position_a;
+
+  blender::float3 position;
+
+  /* The second handle. */
   HandleType handle_type_b;
+  blender::float3 handle_position_b;
+
   float radius;
   /* User defined tilt in radians, added on top of the auto-calculated tilt. */
   float tilt;
 };
 
+/* TODO: Think about storing each data type from each control point separately. */
 class Spline {
  public:
   enum Type {
@@ -56,77 +70,88 @@ class Spline {
   Type type;
   bool is_cyclic = false;
 
+ protected:
+  mutable bool base_cache_dirty_ = true;
+  mutable std::mutex base_cache_mutex_;
+  mutable blender::Vector<blender::float3> evaluated_positions_cache_;
+  mutable blender::Vector<PointMapping> evaluated_mapping_cache_;
+
+  mutable bool tangent_cache_dirty_ = true;
+  mutable std::mutex tangent_cache_mutex_;
+  mutable blender::Vector<blender::float3> evaluated_tangents_cache_;
+
+  mutable bool normal_cache_dirty_ = true;
+  mutable std::mutex normal_cache_mutex_;
+  mutable blender::Vector<blender::float3> evaluated_normals_cache_;
+
+  mutable bool length_cache_dirty_ = true;
+  mutable std::mutex length_cache_mutex_;
+  mutable blender::Vector<float> evaluated_length_cache_;
+
+ public:
   virtual ~Spline() = default;
 
   virtual int size() const = 0;
   virtual int resolution() const = 0;
   virtual void set_resolution(const int value) = 0;
-  virtual void mark_cache_invalid() = 0;
 
+  virtual void mark_cache_invalid();
   virtual int evaluated_points_size() const = 0;
-  virtual void ensure_evaluation_cache() const = 0;
-  virtual blender::Span<blender::float3> evaluated_positions() const = 0;
-  virtual blender::Span<blender::float3> evaluated_tangents() const = 0;
-  virtual blender::Span<blender::float3> evaluated_normals() const = 0;
+
+  blender::Span<blender::float3> evaluated_positions() const
+  {
+    this->ensure_base_cache();
+    return evaluated_positions_cache_;
+  }
+  blender::Span<float> evaluated_length() const
+  {
+    this->ensure_length_cache();
+    return evaluated_length_cache_;
+  }
+  blender::Span<blender::float3> evaluated_tangents() const
+  {
+    this->ensure_tangent_cache();
+    return evaluated_tangents_cache_;
+  }
+  blender::Span<blender::float3> evaluated_normals() const
+  {
+    this->ensure_normal_cache();
+    return evaluated_normals_cache_;
+  }
+
+  /* TODO: I'm not sure this is the best abstraction here. Indeed, all of the `PointMapping`
+   * stuff might be a bit suspect. */
+  float get_evaluated_point_radius(const int index) const;
+
+ protected:
+  virtual void ensure_base_cache() const = 0;
+  virtual void ensure_tangent_cache() const = 0;
+  void ensure_normal_cache() const;
+  void ensure_length_cache() const;
+
+  virtual float control_point_radius(const int index) const = 0;
 };
 
 class BezierSpline : public Spline {
  public:
-  /* TODO: Figure out if I want to store this as a few separate vectors directly in the spline. */
   blender::Vector<BezierPoint> control_points;
-  int resolution_u;
-
-  static constexpr inline Type static_type = Spline::Type::Bezier;
 
  private:
-  mutable std::mutex cache_mutex_;
-  mutable bool cache_dirty_ = true;
-  mutable blender::Vector<blender::float3> evaluated_positions_cache_;
-  mutable blender::Vector<blender::float3> evaluated_tangents_cache_;
-  mutable blender::Vector<blender::float3> evaluated_normals_cache_;
+  int resolution_u;
 
  public:
-  int size() const final
-  {
-    return control_points.size();
-  }
-
-  int resolution() const final
-  {
-    return resolution_u;
-  }
-  void set_resolution(const int value) final
-  {
-    resolution_u = value;
-  }
-
-  void mark_cache_invalid() final
-  {
-    cache_dirty_ = true;
-  }
-
-  int evaluated_points_size() const final;
-  void ensure_evaluation_cache() const final;
-
-  blender::Span<blender::float3> evaluated_positions() const final
-  {
-    this->ensure_evaluation_cache();
-    return evaluated_positions_cache_;
-  }
-
-  blender::Span<blender::float3> evaluated_tangents() const final
-  {
-    this->ensure_evaluation_cache();
-    return evaluated_tangents_cache_;
-  }
-
-  blender::Span<blender::float3> evaluated_normals() const final
-  {
-    this->ensure_evaluation_cache();
-    return evaluated_normals_cache_;
-  }
-
   ~BezierSpline() = default;
+
+  int size() const final;
+  int resolution() const final;
+  void set_resolution(const int value) final;
+  int evaluated_points_size() const final;
+
+ private:
+  void ensure_base_cache() const final;
+  void ensure_tangent_cache() const final;
+
+  float control_point_radius(const int index) const final;
 };
 
 struct NURBSPoint {
@@ -138,60 +163,39 @@ struct NURBSPoint {
   float tilt;
 };
 
-class SplineNURBS : public Spline {
+class NURBSPline : public Spline {
  public:
   blender::Vector<NURBSPoint> control_points;
+
+ private:
   int32_t flag; /* Cyclic, smooth. */
   int resolution_u;
   uint8_t order;
 
-  int size() const final
-  {
-    return control_points.size();
-  }
+ public:
+  int size() const final;
+  int resolution() const final;
+  void set_resolution(const int value) final;
+  int evaluated_points_size() const final;
 
-  int resolution() const final
-  {
-    return resolution_u;
-  }
-  void set_resolution(const int value) final
-  {
-    resolution_u = value;
-  }
+ protected:
+  void ensure_base_cache() const final;
+  void ensure_tangent_cache() const final;
 
-  int evaluated_points_size() const final
-  {
-    return 0;
-  }
-  void ensure_evaluation_cache() const final
-  {
-  }
-
-  blender::Span<blender::float3> evaluated_positions() const final
-  {
-    return {};
-  }
-
-  blender::Span<blender::float3> evaluated_tangents() const final
-  {
-    return {};
-  }
-
-  blender::Span<blender::float3> evaluated_normals() const final
-  {
-    return {};
-  }
+  float control_point_radius(const int index) const final;
 };
 
 /* Proposed name to be different from DNA type. */
 struct DCurve {
   blender::Vector<Spline *> splines;
-  int32_t flag; /* 2D. */
 
-  /* Attributes. */
-  //   AttributeStorage attributes;
-  //   CustomData *control_point_data;
-  //   CustomData *spline_data;
+  // enum TangentMethod {
+  //   ZUp,
+  //   Minimum,
+  //   Tangent,
+  // };
+
+  // bool is_2d;
 
   ~DCurve()
   {
