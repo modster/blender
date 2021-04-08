@@ -121,14 +121,14 @@ void USDCurvesReader::read_curve_sample(Curve *cu, double motionSampleTime)
   pxr::VtVec3fArray usdNormals;
   curve_prim_.GetNormalsAttr().Get(&usdNormals, motionSampleTime);
 
-  // If normals, extrude, else bevel
-  // Perhaps to be replaced by Blender/USD Schema
+  /* If normals, extrude, else bevel.
+   * Perhaps to be replaced by Blender/USD Schema. */
   if (usdNormals.size() > 0) {
-    // Set extrusion to 1.0f;
+    // Set extrusion to 1.0f.
     curve_->ext1 = 1.0f;
   }
   else {
-    // Set bevel depth to 1.0f;
+    /* Set bevel depth to 1.0f. */
     curve_->ext2 = 1.0f;
   }
 
@@ -142,7 +142,7 @@ void USDCurvesReader::read_curve_sample(Curve *cu, double motionSampleTime)
       nu->type = CU_NURBS;
     }
     else if (basis == pxr::UsdGeomTokens->bezier) {
-      // TODO: Beziers are not properly imported as beziers...
+      /* TODO(makowalski): Beziers are not properly imported as beziers. */
       nu->type = CU_NURBS;
       nu->flag |= CU_SMOOTH;
       nu->flagu |= CU_NURB_ENDPOINT;
