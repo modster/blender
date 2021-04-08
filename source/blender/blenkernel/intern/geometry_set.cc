@@ -50,10 +50,6 @@ GeometryComponent::GeometryComponent(GeometryComponentType type) : type_(type)
 {
 }
 
-GeometryComponent ::~GeometryComponent()
-{
-}
-
 GeometryComponent *GeometryComponent::create(GeometryComponentType component_type)
 {
   switch (component_type) {
@@ -197,6 +193,10 @@ void GeometrySet::compute_boundbox_without_instances(float3 *r_min, float3 *r_ma
   if (mesh != nullptr) {
     BKE_mesh_wrapper_minmax(mesh, *r_min, *r_max);
   }
+  const Volume *volume = this->get_volume_for_read();
+  if (volume != nullptr) {
+    BKE_volume_min_max(volume, *r_min, *r_max);
+  }
   /* TODO: Curve boundbox. */
 }
 
@@ -225,6 +225,19 @@ uint64_t GeometrySet::hash() const
 void GeometrySet::clear()
 {
   components_.clear();
+}
+
+/* Make sure that the geometry can be cached. This does not ensure ownership of object/collection
+ * instances. */
+void GeometrySet::ensure_owns_direct_data()
+{
+  for (GeometryComponentType type : components_.keys()) {
+    const GeometryComponent *component = this->get_component_for_read(type);
+    if (!component->owns_direct_data()) {
+      GeometryComponent &component_for_write = this->get_component_for_write(type);
+      component_for_write.ensure_owns_direct_data();
+    }
+  }
 }
 
 /* Returns a read-only mesh or null. */
