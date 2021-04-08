@@ -136,8 +136,7 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
         blight->area_size = width.Get<float>();
         blight->area_sizey = height.Get<float>();
       }
-
-      if (blight->area_shape == LA_AREA_DISK && prim_.IsA<pxr::UsdLuxDiskLight>()) {
+      else if (blight->area_shape == LA_AREA_DISK && prim_.IsA<pxr::UsdLuxDiskLight>()) {
 
         pxr::UsdLuxDiskLight disk_light(prim_);
 
