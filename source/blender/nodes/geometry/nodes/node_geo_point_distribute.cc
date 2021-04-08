@@ -44,7 +44,7 @@ using blender::bke::GeometryInstanceGroup;
 
 static bNodeSocketTemplate geo_node_point_distribute_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Distance Min"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
+    {SOCK_FLOAT, N_("Distance Min"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_DISTANCE},
     {SOCK_FLOAT, N_("Density Max"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
     {SOCK_STRING, N_("Density Attribute")},
     {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000},
@@ -716,8 +716,8 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       geometry_set_out.get_component_for_write<PointCloudComponent>();
 
   Map<std::string, AttributeKind> attributes;
-  bke::gather_attribute_info(
-      attributes, {GEO_COMPONENT_TYPE_MESH}, set_groups, {"position", "normal", "id"});
+  bke::geometry_set_gather_instances_attribute_info(
+      set_groups, {GEO_COMPONENT_TYPE_MESH}, {"position", "normal", "id"}, attributes);
   add_remaining_point_attributes(set_groups,
                                  instance_start_offsets,
                                  attributes,

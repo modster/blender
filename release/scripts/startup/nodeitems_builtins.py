@@ -508,6 +508,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveToMesh"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
+        NodeItem("GeometryNodeBoundBox"),
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeJoinGeometry"),
     ]),
