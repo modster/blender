@@ -224,7 +224,12 @@ static void bakeModifier(Main *UNUSED(bmain),
 
       /* compute armature effects on this frame */
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformPolyline(md_eval, depsgraph, object_eval, gpl, gpf, gps);
+        if (!GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+          deformPolyline(md_eval, depsgraph, object_eval, gpl, gpf, gps);
+        }
+        else {
+          deformBezier(md_eval, depsgraph, object_eval, gpl, gpf, gps);
+        }
       }
     }
   }
