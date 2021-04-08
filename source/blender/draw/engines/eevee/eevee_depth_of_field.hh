@@ -213,7 +213,7 @@ class DepthOfField {
 
     if (cam->type == CAM_ORTHO) {
       /* FIXME: Why is this needed? Some kind of implicit unit conversion? */
-      aperture *= 0.015f;
+      aperture *= 0.04f;
       /* Really strange behavior from Cycles but replicating. */
       focus_distance_ += cam->clip_start;
     }
