@@ -11,6 +11,11 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_accumulator_lib.glsl)
 
+layout(std140) uniform sampling_block
+{
+  SamplingData sampling;
+};
+
 layout(std140) uniform dof_block
 {
   DepthOfFieldData dof;
@@ -51,7 +56,8 @@ void main()
   }
   else if (do_fast_gather) {
     vec2 unused_occlusion;
-    dof_gather_accumulator(dof,
+    dof_gather_accumulator(sampling,
+                           dof,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,
@@ -66,7 +72,8 @@ void main()
   }
   else {
     vec2 unused_occlusion;
-    dof_gather_accumulator(dof,
+    dof_gather_accumulator(sampling,
+                           dof,
                            color_tx,
                            color_bilinear_tx,
                            coc_tx,

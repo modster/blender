@@ -206,7 +206,7 @@ data_to_c_simple(engines/eevee/shaders/eevee_object_gpencil_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_hair_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_mesh_vert.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_random_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_sampling_lib.glsl SRC)
 
 data_to_c_simple(engines/eevee/eevee_shader_shared.hh SRC)
 

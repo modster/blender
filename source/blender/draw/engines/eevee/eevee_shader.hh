@@ -62,7 +62,7 @@ extern char datatoc_eevee_film_resolve_frag_glsl[];
 extern char datatoc_eevee_object_forward_frag_glsl[];
 extern char datatoc_eevee_object_lib_glsl[];
 extern char datatoc_eevee_object_mesh_vert_glsl[];
-extern char datatoc_eevee_random_lib_glsl[];
+extern char datatoc_eevee_sampling_lib_glsl[];
 
 extern char datatoc_eevee_shader_shared_hh[];
 
@@ -132,7 +132,7 @@ class ShaderModule {
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, eevee_random_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_accumulator_lib);

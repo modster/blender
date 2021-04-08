@@ -183,9 +183,11 @@ class ShadingView {
     const float(*viewmat_p)[4] = viewmat, (*winmat_p)[4] = winmat;
     if (camera_.is_panoramic()) {
       /* TODO(fclem) Overscans. */
+      /* For now a mandatory 5% overscan for DoF. */
+      float side = data.clip_near * 1.05f;
       float near = data.clip_near;
       float far = data.clip_far;
-      perspective_m4(winmat, -near, near, -near, near, near, far);
+      perspective_m4(winmat, -side, side, -side, side, near, far);
       mul_m4_m4m4(viewmat, face_matrix_, data.viewmat);
     }
     else {
@@ -259,16 +261,15 @@ class ShadingView {
  private:
   void update_view(void)
   {
-    float viewmat[4][4], winmat[4][4], persmat[4][4];
+    float viewmat[4][4], winmat[4][4];
     DRW_view_viewmat_get(main_view_, viewmat, false);
     DRW_view_winmat_get(main_view_, winmat, false);
-    DRW_view_persmat_get(main_view_, persmat, false);
 
     /* Anti-Aliasing / Super-Sampling jitter. */
-    float jitter[2];
-    sampling_.camera_aa_jitter_get(extent_, jitter);
+    float jitter_u = 2.0f * (sampling_.rng_get(SAMPLING_FILTER_U) - 0.5f) / extent_[0];
+    float jitter_v = 2.0f * (sampling_.rng_get(SAMPLING_FILTER_V) - 0.5f) / extent_[1];
 
-    window_translate_m4(winmat, persmat, UNPACK2(jitter));
+    window_translate_m4(winmat, winmat, jitter_u, jitter_v);
     DRW_view_update_sub(sub_view_, viewmat, winmat);
 
     /* FIXME(fclem): The offset may be is noticeably large and the culling might make object pop

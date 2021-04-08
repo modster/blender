@@ -31,6 +31,8 @@
 
 #include "DRW_render.h"
 
+#include "eevee_shader_shared.hh"
+
 namespace blender::eevee {
 
 class Sampling {
@@ -51,7 +53,20 @@ class Sampling {
   /** Safeguard against illegal reset. */
   bool sync_ = false;
 
+  SamplingData data_;
+  GPUUniformBuf *ubo_ = nullptr;
+
  public:
+  Sampling()
+  {
+    ubo_ = GPU_uniformbuf_create_ex(sizeof(SamplingData), nullptr, "SamplingData");
+  }
+
+  ~Sampling()
+  {
+    DRW_UBO_FREE_SAFE(ubo_);
+  }
+
   void init(const Scene *scene)
   {
     sample_count_ = DRW_state_is_image_render() ? scene->eevee.taa_render_samples :
@@ -96,6 +111,24 @@ class Sampling {
 
   void step(void)
   {
+    {
+      /* TODO(fclem) we could use some persistent states to speedup the computation. */
+      double r[2], offset[2];
+      /* Using 2,3 primes as per UE4 Temporal AA presentation.
+       * advances.realtimerendering.com/s2014/epic/TemporalAA.pptx (slide 14) */
+      uint32_t primes[2] = {2, 3};
+      BLI_halton_2d(primes, offset, sample_, r);
+      data_.dimensions[SAMPLING_FILTER_U][0] = r[0];
+      data_.dimensions[SAMPLING_FILTER_V][0] = r[1];
+    }
+    {
+      double r[2], offset[2];
+      uint32_t primes[2] = {5, 7};
+      BLI_halton_2d(primes, offset, sample_, r);
+      data_.dimensions[SAMPLING_LENS_U][0] = r[0];
+      data_.dimensions[SAMPLING_LENS_V][0] = r[1];
+    }
+    GPU_uniformbuf_update(ubo_, &data_);
     sample_++;
   }
 
@@ -117,23 +150,19 @@ class Sampling {
   {
     return dof_sample_count_;
   }
+  const GPUUniformBuf *ubo_get(void) const
+  {
+    return ubo_;
+  }
+  /* Returns a num. */
+  float rng_get(eSamplingDimension dimension) const
+  {
+    return data_.dimensions[dimension][0];
+  }
   /* Returns true if rendering has finished. */
   bool finished(void) const
   {
     return (sample_ > sample_count_);
-  }
-
-  void camera_aa_jitter_get(const int pixel_count[2], float r_vec[2])
-  {
-    /* TODO(fclem) we could use some persistent states to speedup the computation. */
-    double r[2], offset[2];
-    /* Using 2,3 primes as per UE4 Temporal AA presentation.
-     * advances.realtimerendering.com/s2014/epic/TemporalAA.pptx (slide 14) */
-    uint32_t primes[2] = {2, 3};
-    BLI_halton_2d(primes, offset, sample_, r);
-    /* Jitter sample position inside the pixel region. */
-    r_vec[0] = 2.0f * ((float)r[0] - 0.5f) / pixel_count[0];
-    r_vec[1] = 2.0f * ((float)r[1] - 0.5f) / pixel_count[1];
   }
 
   void dof_disk_sample_get(float *r_radius, float *r_theta)
@@ -169,23 +198,6 @@ class Sampling {
 
     *r_radius = ring / (float)dof_ring_count_;
     *r_theta = 2.0f * M_PI * ring_sample / (float)ring_sample_count;
-  }
-
- private:
-  /* Returns total sample count in a web pattern of the given size. */
-  static uint64_t web_sample_count_get(uint64_t web_density, uint64_t ring_count)
-  {
-    return ((ring_count * ring_count + ring_count) / 2) * web_density + 1;
-  }
-
-  /* Returns lowest possible ring count that contains at least sample_count samples. */
-  static uint64_t web_ring_count_get(uint64_t web_density, uint64_t sample_count)
-  {
-    /* Inversion of dof_jitter_sample_count_get(). */
-    float x = 2.0f * (sample_count - 1.0f) / web_density;
-    /* Solving polynomial. We only search positive solution. */
-    float discriminant = 1.0f + 4.0f * x;
-    return ceilf(0.5f * (sqrt(discriminant) - 1.0f));
   }
 };
 

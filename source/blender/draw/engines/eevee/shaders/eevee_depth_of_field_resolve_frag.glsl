@@ -10,6 +10,11 @@
 
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_accumulator_lib.glsl)
 
+layout(std140) uniform sampling_block
+{
+  SamplingData sampling;
+};
+
 layout(std140) uniform dof_block
 {
   DepthOfFieldData dof;
@@ -67,7 +72,8 @@ void main(void)
   }
 
   if (!no_slight_focus_pass && prediction.do_slight_focus) {
-    dof_slight_focus_gather(dof,
+    dof_slight_focus_gather(sampling,
+                            dof,
                             depth_tx,
                             color_tx,
                             bokeh_lut_tx,

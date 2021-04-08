@@ -686,6 +686,7 @@ class DepthOfField {
       DRW_shgroup_uniform_texture(grp, "tiles_bg_tx", tiles_dilated_bg_tx_);
       DRW_shgroup_uniform_texture(grp, "tiles_fg_tx", tiles_dilated_fg_tx_);
       DRW_shgroup_uniform_block(grp, "dof_block", ubo_);
+      DRW_shgroup_uniform_block(grp, "sampling_block", sampling_.ubo_get());
       DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
       /* Reuse textures from the setup pass. */
@@ -715,6 +716,7 @@ class DepthOfField {
         DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_gather_lut_tx_);
       }
       DRW_shgroup_uniform_block(grp, "dof_block", ubo_);
+      DRW_shgroup_uniform_block(grp, "sampling_block", sampling_.ubo_get());
       DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
       color_fg_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -734,6 +736,7 @@ class DepthOfField {
         DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_gather_lut_tx_);
       }
       DRW_shgroup_uniform_block(grp, "dof_block", ubo_);
+      DRW_shgroup_uniform_block(grp, "sampling_block", sampling_.ubo_get());
       DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
       color_bg_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -884,6 +887,7 @@ class DepthOfField {
     DRW_shgroup_uniform_texture_ex(grp, "weight_fg_tx", weight_fg_tx_, with_filter);
     DRW_shgroup_uniform_texture_ex(grp, "weight_holefill_tx", weight_holefill_tx_, with_filter);
     DRW_shgroup_uniform_block(grp, "dof_block", ubo_);
+    DRW_shgroup_uniform_block(grp, "sampling_block", sampling_.ubo_get());
     if (bokeh_resolve_lut_tx_) {
       DRW_shgroup_uniform_texture_ref(grp, "bokeh_lut_tx", &bokeh_resolve_lut_tx_);
     }

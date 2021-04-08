@@ -19,6 +19,7 @@
  *
  * NOTE: Due to alignment restriction and buggy drivers, do not try to use vec3 or mat3 inside
  * structs. Use vec4 and pack an extra float at the end.
+ * Do not use arrays of float. They are padded to arrays of vec4 and are not worth it.
  *
  * IMPORTANT: Don't forget to align mat4 and vec4 to 16 bytes.
  **/
@@ -36,6 +37,8 @@
 #  define asinf asin
 #  define atanf atan
 #  define floorf floor
+#  define ceilf ceil
+#  define sqrtf sqrt
 
 #else /* C++ */
 #  pragma once
@@ -53,6 +56,45 @@ typedef int bvec2[2];
 namespace blender::eevee {
 
 #endif
+
+/* -------------------------------------------------------------------- */
+/** \name Sampling
+ * \{ */
+
+enum eSamplingDimension : uint32_t {
+  SAMPLING_FILTER_U = 0u,
+  SAMPLING_FILTER_V = 1u,
+  SAMPLING_LENS_U = 2u,
+  SAMPLING_LENS_V = 3u,
+  SAMPLING_TIME = 4u
+};
+
+struct SamplingData {
+  /** Array containing random values from Low Discrepency Sequence in [0..1) range. */
+  /** IMPORTANT: Make sure the array can contain all sampling dimensions. */
+  /** HACK: float arrays are padded to vec4 in GLSL. Using vec4 for now to get the same alignment
+   * but this is wasteful. */
+  vec4 dimensions[8];
+};
+BLI_STATIC_ASSERT_ALIGN(SamplingData, 16)
+
+/* Returns total sample count in a web pattern of the given size. */
+static int web_sample_count_get(int web_density, int ring_count)
+{
+  return ((ring_count * ring_count + ring_count) / 2) * web_density + 1;
+}
+
+/* Returns lowest possible ring count that contains at least sample_count samples. */
+static int web_ring_count_get(int web_density, int sample_count)
+{
+  /* Inversion of web_sample_count_get(). */
+  float x = 2.0f * (float(sample_count) - 1.0f) / float(web_density);
+  /* Solving polynomial. We only search positive solution. */
+  float discriminant = 1.0f + 4.0f * x;
+  return int(ceilf(0.5f * (sqrtf(discriminant) - 1.0f)));
+}
+
+/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Camera

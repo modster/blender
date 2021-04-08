@@ -6,7 +6,7 @@
  **/
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_random_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_depth_of_field_lib.glsl)
 
 /* -------------------------------------------------------------------- */
@@ -240,6 +240,7 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
 
 /* FIXME(fclem) Seems to be wrong since it needs ringcount+1 as input for
  * slightfocus gather. */
+/* This should be replaced by web_sample_count_get() but doing so is breaking other things. */
 int dof_gather_total_sample_count(const int ring_count, const int ring_density)
 {
   return (ring_count * ring_count - ring_count) * ring_density + 1;
@@ -398,7 +399,8 @@ void dof_gather_init(DepthOfFieldData dof,
   intersection_multiplier = pow(0.5, lod);
 }
 
-void dof_gather_accumulator(DepthOfFieldData dof,
+void dof_gather_accumulator(SamplingData sampling,
+                            DepthOfFieldData dof,
                             sampler2D color_tx,
                             sampler2D color_bilinear_tx,
                             sampler2D coc_tx,
@@ -411,11 +413,11 @@ void dof_gather_accumulator(DepthOfFieldData dof,
                             out float out_weight,
                             out vec2 out_occlusion)
 {
-  float noise_offset = 0.0; /* TODO */
+  vec2 noise_offset = sampling_rng_2D_get(sampling, SAMPLING_LENS_U);
   vec2 noise = no_gather_random ?
                    vec2(0.0, 0.0) :
-                   vec2(interlieved_gradient_noise(gl_FragCoord.xy, 0, noise_offset),
-                        interlieved_gradient_noise(gl_FragCoord.xy, 1, noise_offset));
+                   vec2(interlieved_gradient_noise(gl_FragCoord.xy, 0, noise_offset.x),
+                        interlieved_gradient_noise(gl_FragCoord.xy, 1, noise_offset.y));
 
   if (!do_fast_gather) {
     /* Jitter the radius to reduce noticeable density changes. */
@@ -568,7 +570,8 @@ void dof_gather_accumulator(DepthOfFieldData dof,
  * The full pixel neighborhood is gathered.
  * \{ */
 
-void dof_slight_focus_gather(DepthOfFieldData dof,
+void dof_slight_focus_gather(SamplingData sampling,
+                             DepthOfFieldData dof,
                              sampler2D depth_tx,
                              sampler2D color_tx,
                              sampler2D bokeh_lut_tx,
@@ -576,7 +579,7 @@ void dof_slight_focus_gather(DepthOfFieldData dof,
                              out vec4 out_color,
                              out float out_weight)
 {
-  float noise_offset = 0.0; /* TODO */
+  float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_LENS_U);
   float noise = no_gather_random ? 0.0 :
                                    interlieved_gradient_noise(gl_FragCoord.xy, 3, noise_offset);
 
