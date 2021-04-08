@@ -313,10 +313,8 @@ float Spline::get_evaluated_point_radius(const int evaluated_index) const
   const float factor = mapping.factor;
 
   const float radius = this->control_point_radius(index);
-  if (index == this->size() - 1) {
-    return radius;
-  }
-  const float next_radius = this->control_point_radius(index + 1);
+  const int next_index = (index == this->size() - 1) ? 0 : index + 1;
+  const float next_radius = this->control_point_radius(next_index);
 
   return interpf(next_radius, radius, factor);
 }
@@ -477,7 +475,7 @@ static void evaluate_bezier_positions_and_mapping(Span<BezierPoint> control_poin
   for (const int i : IndexRange(1, control_points.size() - 1)) {
     const BezierPoint &point_prev = control_points[i - 1];
     const BezierPoint &point = control_points[i];
-    evaluate_bezier_segment(point_prev, point, i, resolution, offset, positions, mappings);
+    evaluate_bezier_segment(point_prev, point, i - 1, resolution, offset, positions, mappings);
   }
 
   const int i_last = control_points.size() - 1;
