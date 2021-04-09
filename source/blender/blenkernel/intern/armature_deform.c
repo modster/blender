@@ -640,7 +640,7 @@ static void armature_deform_coords_impl(const Object *ob_arm,
 
   if (temp_dverts != NULL) {
     bGPDcurve *gpc = gps_target->editcurve;
-    for (int i = 0; i < gpc->tot_curve_points * 3; i++) {
+    for (i = 0; i < gpc->tot_curve_points * 3; i++) {
       MDeformVert *dvert = &temp_dverts[i];
       MEM_SAFE_FREE(dvert->dw);
     }
