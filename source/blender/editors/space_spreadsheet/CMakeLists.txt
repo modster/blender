@@ -39,6 +39,7 @@ set(SRC
   spreadsheet_draw.cc
   spreadsheet_layout.cc
   spreadsheet_ops.cc
+  spreadsheet_row_filter.cc
 
   spreadsheet_cell_value.hh
   spreadsheet_column.hh
@@ -48,6 +49,7 @@ set(SRC
   spreadsheet_draw.hh
   spreadsheet_intern.hh
   spreadsheet_layout.hh
+  spreadsheet_row_filter.hh
 )
 
 set(LIB

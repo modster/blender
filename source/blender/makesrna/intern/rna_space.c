@@ -7342,25 +7342,6 @@ static void rna_def_spreadsheet_row_filter(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  static const EnumPropertyItem rule_data_type_items[] = {
-      {SPREADSHEET_ROW_FILTER_FLOAT, "FLOAT", 0, "Float", "Floating-point value"},
-      {SPREADSHEET_ROW_FILTER_INT32, "INT", 0, "Integer", "32-bit integer"},
-      {SPREADSHEET_ROW_FILTER_FLOAT3,
-       "FLOAT_VECTOR",
-       0,
-       "Vector",
-       "3D vector with floating-point values"},
-      {CD_PROP_COLOR, "FLOAT_COLOR", 0, "Color", "RGBA color with floating-point precisions"},
-      // {SPREADSHEET_ROW_FILTER_STRING, "STRING", 0, "String", "Text string"},
-      {SPREADSHEET_ROW_FILTER_BOOL, "BOOLEAN", 0, "Boolean", "True or false"},
-      {SPREADSHEET_ROW_FILTER_FLOAT2,
-       "FLOAT2",
-       0,
-       "2D Vector",
-       "2D vector with floating-point values"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   srna = RNA_def_struct(brna, "SpreadSheetRowFilter", NULL);
   RNA_def_struct_sdna(srna, "SpreadSheetRowFilter");
   RNA_def_struct_ui_text(srna, "SpreadSheet Row Filter", "");
@@ -7385,11 +7366,6 @@ static void rna_def_spreadsheet_row_filter(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Operation", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 
-  prop = RNA_def_property(srna, "data_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, rule_data_type_items);
-  RNA_def_property_ui_text(prop, "Data Type", "");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
-
   prop = RNA_def_property(srna, "value_float", PROP_FLOAT, PROP_NONE);
   RNA_def_property_ui_text(prop, "Float Value", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
@@ -7397,11 +7373,6 @@ static void rna_def_spreadsheet_row_filter(BlenderRNA *brna)
   prop = RNA_def_property(srna, "value_int", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "value_int");
   RNA_def_property_ui_text(prop, "Integer Value", "");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
-
-  prop = RNA_def_property(srna, "value_vector", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_array(prop, 3);
-  RNA_def_property_ui_text(prop, "Vector Value", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 
   prop = RNA_def_property(srna, "value_color", PROP_FLOAT, PROP_COLOR);
@@ -7412,12 +7383,6 @@ static void rna_def_spreadsheet_row_filter(BlenderRNA *brna)
   prop = RNA_def_property(srna, "value_boolean", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SPREADSHEET_ROW_FILTER_BOOL_VALUE);
   RNA_def_property_ui_text(prop, "Boolean Value", "");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
-
-  prop = RNA_def_property(srna, "value_vector_2d", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_array(prop, 2);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop, "2D Vector Value", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 }
 

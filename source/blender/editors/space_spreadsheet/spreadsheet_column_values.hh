@@ -22,23 +22,37 @@
 
 namespace blender::ed::spreadsheet {
 
+enum class ColumnValueType {
+  Int32,
+  Float,
+  Bool,
+  Instances,
+};
+
 /**
  * This represents a column in a spreadsheet. It has a name and provides a value for all the cells
  * in the column.
  */
 class ColumnValues {
  protected:
+  ColumnValueType type_;
   std::string name_;
   int size_;
 
  public:
-  ColumnValues(std::string name, const int size) : name_(std::move(name)), size_(size)
+  ColumnValues(const ColumnValueType type, std::string name, const int size)
+      : type_(type), name_(std::move(name)), size_(size)
   {
   }
 
   virtual ~ColumnValues() = default;
 
   virtual void get_value(int index, CellValue &r_cell_value) const = 0;
+
+  ColumnValueType type() const
+  {
+    return type_;
+  }
 
   StringRefNull name() const
   {
@@ -60,8 +74,8 @@ template<typename GetValueF> class LambdaColumnValues : public ColumnValues {
   GetValueF get_value_;
 
  public:
-  LambdaColumnValues(std::string name, int size, GetValueF get_value)
-      : ColumnValues(std::move(name), size), get_value_(std::move(get_value))
+  LambdaColumnValues(const ColumnValueType type, std::string name, int size, GetValueF get_value)
+      : ColumnValues(type, std::move(name), size), get_value_(std::move(get_value))
   {
   }
 
@@ -73,12 +87,13 @@ template<typename GetValueF> class LambdaColumnValues : public ColumnValues {
 
 /* Utility function that simplifies creating a spreadsheet column from a lambda function. */
 template<typename GetValueF>
-std::unique_ptr<ColumnValues> column_values_from_function(std::string name,
+std::unique_ptr<ColumnValues> column_values_from_function(const ColumnValueType type,
+                                                          std::string name,
                                                           int size,
                                                           GetValueF get_value)
 {
   return std::make_unique<LambdaColumnValues<GetValueF>>(
-      std::move(name), size, std::move(get_value));
+      type, std::move(name), size, std::move(get_value));
 }
 
 }  // namespace blender::ed::spreadsheet

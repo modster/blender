@@ -47,6 +47,7 @@
 #include "spreadsheet_data_source_geometry.hh"
 #include "spreadsheet_intern.hh"
 #include "spreadsheet_layout.hh"
+#include "spreadsheet_row_filter.hh"
 
 using namespace blender;
 using namespace blender::ed::spreadsheet;
@@ -89,11 +90,12 @@ static void spreadsheet_free(SpaceLink *sl)
 {
   SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
 
+  MEM_SAFE_FREE(sspreadsheet->runtime);
+
   LISTBASE_FOREACH_MUTABLE (SpreadSheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
+    MEM_SAFE_FREE(row_filter->column_name);
     MEM_freeN(row_filter);
   }
-
-  MEM_SAFE_FREE(sspreadsheet->runtime);
 
   LISTBASE_FOREACH_MUTABLE (SpreadsheetColumn *, column, &sspreadsheet->columns) {
     spreadsheet_column_free(column);
@@ -121,7 +123,9 @@ static SpaceLink *spreadsheet_duplicate(SpaceLink *sl)
 
   BLI_listbase_clear(&sspreadsheet_new->row_filters);
   LISTBASE_FOREACH (const SpreadSheetRowFilter *, row_filter, &sspreadsheet_old->row_filters) {
-    BLI_addtail(&sspreadsheet_new->row_filters, MEM_dupallocN(row_filter));
+    SpreadSheetRowFilter *new_filter = (SpreadSheetRowFilter *)MEM_dupallocN(row_filter);
+    new_filter->column_name = (char *)MEM_dupallocN(row_filter->column_name);
+    BLI_addtail(&sspreadsheet_new->row_filters, new_filter);
   }
   BLI_listbase_clear(&sspreadsheet_new->columns);
   LISTBASE_FOREACH (SpreadsheetColumn *, src_column, &sspreadsheet_old->columns) {
@@ -256,20 +260,8 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 
   const int tot_rows = data_source->tot_rows();
   spreadsheet_layout.index_column_width = get_index_column_width(tot_rows);
-  spreadsheet_layout.row_indices = IndexRange(tot_rows).as_span();
-
-  if (const GeometryDataSource *geometry_data_source = dynamic_cast<const GeometryDataSource *>(
-          data_source.get())) {
-    Object *object_eval = geometry_data_source->object_eval();
-    Object *object_orig = DEG_get_original_object(object_eval);
-    if (object_orig->type == OB_MESH) {
-      if (object_orig->mode == OB_MODE_EDIT) {
-        if (sspreadsheet->filter_flag & SPREADSHEET_FILTER_SELECTED_ONLY) {
-          spreadsheet_layout.row_indices = geometry_data_source->get_selected_element_indices();
-        }
-      }
-    }
-  }
+  spreadsheet_layout.row_indices = spreadsheet_filter_rows(
+      *sspreadsheet, spreadsheet_layout, *data_source.get(), scope);
 
   sspreadsheet->runtime->tot_columns = spreadsheet_layout.columns.size();
   sspreadsheet->runtime->tot_rows = tot_rows;

@@ -34,21 +34,13 @@ def draw_filter(layout, filter, index):
 
     if filter.show_expanded:
         box.prop(filter, "column_name", text="")
-        box.prop(filter, "data_type", text="")
         box.prop(filter, "operation", text="")
 
-        if filter.data_type == 'FLOAT':
-            box.prop(filter, "value_float", text="Value")
-        elif filter.data_type == 'INT':
-            box.prop(filter, "value_int", text="Value")
-        elif filter.data_type == 'FLOAT_VECTOR':
-            box.prop(filter, "value_vector", text="")
-        elif filter.data_type == 'FLOAT_COLOR':
-            box.prop(filter, "value_color", text="")
-        elif filter.data_type == 'BOOLEAN':
-            box.prop(filter, "value_boolean", text="Value")
-        elif filter.data_type == 'BOOLEAN':
-            box.prop(filter, "value_vector_2d", text="Value")
+        box.prop(filter, "value_float", text="Value")
+        box.prop(filter, "value_int", text="Value")
+        box.prop(filter, "value_color", text="")
+        box.prop(filter, "value_boolean", text="Value")
+
 
 class SPREADSHEET_PT_filter_rules(bpy.types.Panel):
     bl_space_type = 'SPREADSHEET'

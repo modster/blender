@@ -1913,19 +1913,14 @@ typedef struct SpreadSheetRowFilter {
   char *column_name;
   /* eSpaceSpreadsheet_RowFilterOperation. */
   uint8_t operation;
-  /* eSpaceSpreadsheet_RowFilterDataType. */
-  uint8_t data_type;
   /* eSpaceSpreadsheet_RowFilterFlag. */
   uint8_t flag;
 
-  char _pad0[1];
+  char _pad0[6];
 
-  // IDProperty *value;
   int value_int;
-  float value_vector[3];
-  float value_color[4];
   float value_float;
-  float value_vector_2d[2];
+  float value_color[4];
 } SpreadSheetRowFilter;
 
 typedef enum eSpaceSpreadsheet_RowFilterFlag {
@@ -1939,16 +1934,6 @@ typedef enum eSpaceSpreadsheet_ObjectEvalState {
   SPREADSHEET_OBJECT_EVAL_STATE_ORIGINAL = 1,
   SPREADSHEET_OBJECT_EVAL_STATE_NODE = 2,
 } eSpaceSpreadsheet_Context;
-
-typedef enum eSpaceSpreadsheet_RowFilterDataType {
-  SPREADSHEET_ROW_FILTER_FLOAT = 0,
-  SPREADSHEET_ROW_FILTER_INT32 = 1,
-  SPREADSHEET_ROW_FILTER_FLOAT3 = 2,
-  SPREADSHEET_ROW_FILTER_COLOR = 3,
-  SPREADSHEET_ROW_FILTER_STRING = 4,
-  SPREADSHEET_ROW_FILTER_BOOL = 5,
-  SPREADSHEET_ROW_FILTER_FLOAT2 = 6,
-} eSpaceSpreadsheet_RowFilterDataType;
 
 typedef enum eSpaceSpreadsheet_RowFilterOperation {
   SPREADSHEET_ROW_FILTER_EQUAL = 0,

@@ -87,26 +87,32 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
   int domain_size = attribute->size();
   switch (attribute->custom_data_type()) {
     case CD_PROP_FLOAT:
-      return column_values_from_function(
-          column_id.name, domain_size, [attribute](int index, CellValue &r_cell_value) {
-            float value;
-            attribute->get(index, &value);
-            r_cell_value.value_float = value;
-          });
+      return column_values_from_function(ColumnValueType::Float,
+                                         column_id.name,
+                                         domain_size,
+                                         [attribute](int index, CellValue &r_cell_value) {
+                                           float value;
+                                           attribute->get(index, &value);
+                                           r_cell_value.value_float = value;
+                                         });
     case CD_PROP_INT32:
-      return column_values_from_function(
-          column_id.name, domain_size, [attribute](int index, CellValue &r_cell_value) {
-            int value;
-            attribute->get(index, &value);
-            r_cell_value.value_int = value;
-          });
+      return column_values_from_function(ColumnValueType::Int32,
+                                         column_id.name,
+                                         domain_size,
+                                         [attribute](int index, CellValue &r_cell_value) {
+                                           int value;
+                                           attribute->get(index, &value);
+                                           r_cell_value.value_int = value;
+                                         });
     case CD_PROP_BOOL:
-      return column_values_from_function(
-          column_id.name, domain_size, [attribute](int index, CellValue &r_cell_value) {
-            bool value;
-            attribute->get(index, &value);
-            r_cell_value.value_bool = value;
-          });
+      return column_values_from_function(ColumnValueType::Bool,
+                                         column_id.name,
+                                         domain_size,
+                                         [attribute](int index, CellValue &r_cell_value) {
+                                           bool value;
+                                           attribute->get(index, &value);
+                                           r_cell_value.value_bool = value;
+                                         });
     case CD_PROP_FLOAT2: {
       if (column_id.index < 0 || column_id.index > 1) {
         return {};
@@ -114,6 +120,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
       const std::array<const char *, 2> suffixes = {" X", " Y"};
       const std::string name = StringRef(column_id.name) + suffixes[column_id.index];
       return column_values_from_function(
+          ColumnValueType::Float,
           name,
           domain_size,
           [attribute, axis = column_id.index](int index, CellValue &r_cell_value) {
@@ -129,6 +136,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
       const std::array<const char *, 3> suffixes = {" X", " Y", " Z"};
       const std::string name = StringRef(column_id.name) + suffixes[column_id.index];
       return column_values_from_function(
+          ColumnValueType::Float,
           name,
           domain_size,
           [attribute, axis = column_id.index](int index, CellValue &r_cell_value) {
@@ -144,6 +152,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
       const std::array<const char *, 4> suffixes = {" R", " G", " B", " A"};
       const std::string name = StringRef(column_id.name) + suffixes[column_id.index];
       return column_values_from_function(
+          ColumnValueType::Float,
           name,
           domain_size,
           [attribute, axis = column_id.index](int index, CellValue &r_cell_value) {
@@ -167,55 +176,63 @@ using IsVertexSelectedFn = FunctionRef<bool(int vertex_index)>;
 
 static void get_selected_vertex_indices(const Mesh &mesh,
                                         const IsVertexSelectedFn is_vertex_selected_fn,
-                                        Vector<int64_t> &r_vertex_indices)
+                                        MutableSpan<bool> &selection)
 {
   for (const int i : IndexRange(mesh.totvert)) {
-    if (is_vertex_selected_fn(i)) {
-      r_vertex_indices.append(i);
+    if (!selection[i]) {
+      continue;
+    }
+    if (!is_vertex_selected_fn(i)) {
+      selection[i] = false;
     }
   }
 }
 
 static void get_selected_corner_indices(const Mesh &mesh,
                                         const IsVertexSelectedFn is_vertex_selected_fn,
-                                        Vector<int64_t> &r_corner_indices)
+                                        MutableSpan<bool> &selection)
 {
   for (const int i : IndexRange(mesh.totloop)) {
     const MLoop &loop = mesh.mloop[i];
-    if (is_vertex_selected_fn(loop.v)) {
-      r_corner_indices.append(i);
+    if (!selection[i]) {
+      continue;
+    }
+    if (!is_vertex_selected_fn(loop.v)) {
+      selection[i] = false;
     }
   }
 }
 
 static void get_selected_face_indices(const Mesh &mesh,
                                       const IsVertexSelectedFn is_vertex_selected_fn,
-                                      Vector<int64_t> &r_face_indices)
+                                      MutableSpan<bool> &selection)
 {
   for (const int poly_index : IndexRange(mesh.totpoly)) {
+    if (!selection[poly_index]) {
+      continue;
+    }
     const MPoly &poly = mesh.mpoly[poly_index];
-    bool is_selected = true;
     for (const int loop_index : IndexRange(poly.loopstart, poly.totloop)) {
       const MLoop &loop = mesh.mloop[loop_index];
       if (!is_vertex_selected_fn(loop.v)) {
-        is_selected = false;
+        selection[poly_index] = false;
         break;
       }
-    }
-    if (is_selected) {
-      r_face_indices.append(poly_index);
     }
   }
 }
 
 static void get_selected_edge_indices(const Mesh &mesh,
                                       const IsVertexSelectedFn is_vertex_selected_fn,
-                                      Vector<int64_t> &r_edge_indices)
+                                      MutableSpan<bool> &selection)
 {
   for (const int i : IndexRange(mesh.totedge)) {
+    if (!selection[i]) {
+      continue;
+    }
     const MEdge &edge = mesh.medge[i];
-    if (is_vertex_selected_fn(edge.v1) && is_vertex_selected_fn(edge.v2)) {
-      r_edge_indices.append(i);
+    if (!is_vertex_selected_fn(edge.v1) || !is_vertex_selected_fn(edge.v2)) {
+      selection[i] = false;
     }
   }
 }
@@ -223,30 +240,29 @@ static void get_selected_edge_indices(const Mesh &mesh,
 static void get_selected_indices_on_domain(const Mesh &mesh,
                                            const AttributeDomain domain,
                                            const IsVertexSelectedFn is_vertex_selected_fn,
-                                           Vector<int64_t> &r_indices)
+                                           MutableSpan<bool> &selection)
 {
   switch (domain) {
     case ATTR_DOMAIN_POINT:
-      return get_selected_vertex_indices(mesh, is_vertex_selected_fn, r_indices);
+      return get_selected_vertex_indices(mesh, is_vertex_selected_fn, selection);
     case ATTR_DOMAIN_FACE:
-      return get_selected_face_indices(mesh, is_vertex_selected_fn, r_indices);
+      return get_selected_face_indices(mesh, is_vertex_selected_fn, selection);
     case ATTR_DOMAIN_CORNER:
-      return get_selected_corner_indices(mesh, is_vertex_selected_fn, r_indices);
+      return get_selected_corner_indices(mesh, is_vertex_selected_fn, selection);
     case ATTR_DOMAIN_EDGE:
-      return get_selected_edge_indices(mesh, is_vertex_selected_fn, r_indices);
+      return get_selected_edge_indices(mesh, is_vertex_selected_fn, selection);
     default:
       return;
   }
 }
 
-Span<int64_t> GeometryDataSource::get_selected_element_indices() const
+void GeometryDataSource::apply_selection_filter(MutableSpan<bool> rows_included) const
 {
   std::lock_guard lock{mutex_};
 
   BLI_assert(object_eval_->mode == OB_MODE_EDIT);
   BLI_assert(component_->type() == GEO_COMPONENT_TYPE_MESH);
   Object *object_orig = DEG_get_original_object(object_eval_);
-  Vector<int64_t> &indices = scope_.construct<Vector<int64_t>>(__func__);
   const MeshComponent *mesh_component = static_cast<const MeshComponent *>(component_);
   const Mesh *mesh_eval = mesh_component->get_for_read();
   Mesh *mesh_orig = (Mesh *)object_orig->data;
@@ -267,7 +283,7 @@ Span<int64_t> GeometryDataSource::get_selected_element_indices() const
       BMVert *vert = bm->vtable[i_orig];
       return BM_elem_flag_test(vert, BM_ELEM_SELECT);
     };
-    get_selected_indices_on_domain(*mesh_eval, domain_, is_vertex_selected, indices);
+    get_selected_indices_on_domain(*mesh_eval, domain_, is_vertex_selected, rows_included);
   }
   else if (mesh_eval->totvert == bm->totvert) {
     /* Use a simple heuristic to match original vertices to evaluated ones. */
@@ -275,10 +291,8 @@ Span<int64_t> GeometryDataSource::get_selected_element_indices() const
       BMVert *vert = bm->vtable[vertex_index];
       return BM_elem_flag_test(vert, BM_ELEM_SELECT);
     };
-    get_selected_indices_on_domain(*mesh_eval, domain_, is_vertex_selected, indices);
+    get_selected_indices_on_domain(*mesh_eval, domain_, is_vertex_selected, rows_included);
   }
-
-  return indices;
 }
 
 void InstancesDataSource::foreach_default_column_ids(
@@ -305,7 +319,10 @@ std::unique_ptr<ColumnValues> InstancesDataSource::get_column_values(
   if (STREQ(column_id.name, "Name")) {
     Span<InstancedData> instance_data = component_->instanced_data();
     std::unique_ptr<ColumnValues> values = column_values_from_function(
-        "Name", size, [instance_data](int index, CellValue &r_cell_value) {
+        ColumnValueType::Instances,
+        "Name",
+        size,
+        [instance_data](int index, CellValue &r_cell_value) {
           const InstancedData &data = instance_data[index];
           if (data.type == INSTANCE_DATA_TYPE_OBJECT) {
             if (data.data.object != nullptr) {
@@ -328,21 +345,30 @@ std::unique_ptr<ColumnValues> InstancesDataSource::get_column_values(
   if (STREQ(column_id.name, "Position")) {
     std::string name = StringRef("Position") + suffixes[column_id.index];
     return column_values_from_function(
-        name, size, [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {
+        ColumnValueType::Float,
+        name,
+        size,
+        [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {
           r_cell_value.value_float = transforms[index].translation()[axis];
         });
   }
   if (STREQ(column_id.name, "Rotation")) {
     std::string name = StringRef("Rotation") + suffixes[column_id.index];
     return column_values_from_function(
-        name, size, [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {
+        ColumnValueType::Float,
+        name,
+        size,
+        [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {
           r_cell_value.value_float = transforms[index].to_euler()[axis];
         });
   }
   if (STREQ(column_id.name, "Scale")) {
     std::string name = StringRef("Scale") + suffixes[column_id.index];
     return column_values_from_function(
-        name, size, [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {
+        ColumnValueType::Float,
+        name,
+        size,
+        [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {
           r_cell_value.value_float = transforms[index].scale()[axis];
         });
   }
