@@ -27,6 +27,7 @@
 #include "DEG_depsgraph_query.h"
 
 #include "eevee_film.hh"
+#include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
@@ -48,6 +49,8 @@ class Instance {
   MainView main_view_;
   /** Point of view in the scene. Can be init from viewport or camera object. */
   Camera camera_;
+  /** Motion blur data. */
+  MotionBlur motion_blur_;
   /** Original object of the camera. */
   Object *camera_original_ = nullptr;
   /** Lookdev own lightweight instance. May not be allocated. */
@@ -70,7 +73,8 @@ class Instance {
         shaders_(shared_shaders),
         shading_passes_(shared_shaders),
         main_view_(shared_shaders, shading_passes_, camera_, sampling_),
-        camera_(sampling_){};
+        camera_(sampling_),
+        motion_blur_(sampling_){};
   ~Instance(){};
 
   /**
@@ -114,9 +118,10 @@ class Instance {
       output_rect = &rect;
     }
 
-    const Object *camera_eval = DEG_get_evaluated_object(depsgraph_, camera_original_);
-
     sampling_.init(scene_);
+    motion_blur_.init(scene_, render, depsgraph_);
+    /* Need to get eval camera after motion_blur_.init since it can re-evaluate the scene. */
+    const Object *camera_eval = DEG_get_evaluated_object(depsgraph_, camera_original_);
     camera_.init(render_, camera_eval, drw_view_, scene_);
     render_passes_.init(scene_, render_layer, v3d_, output_res, output_rect);
     main_view_.init(scene_, output_res);
@@ -131,7 +136,6 @@ class Instance {
   void begin_sync()
   {
     const Object *camera_eval = DEG_get_evaluated_object(depsgraph_, camera_original_);
-
     camera_.sync(render_, camera_eval, drw_view_, scene_);
     render_passes_.sync();
     shading_passes_.sync();
@@ -159,6 +163,21 @@ class Instance {
 
   void end_sync(void)
   {
+    motion_blur_.end_sync();
+  }
+
+  void render_sync(void)
+  {
+    DRW_cache_restart();
+
+    this->begin_sync();
+    DRW_render_object_iter(this, render_, depsgraph_, object_sync);
+    this->end_sync();
+
+    DRW_render_instance_buffer_finish();
+    /* Also we weed to have a correct fbo bound for DRW_hair_update */
+    // GPU_framebuffer_bind();
+    // DRW_hair_update();
   }
 
   void render_sample(void)
@@ -167,26 +186,21 @@ class Instance {
       return;
     }
 
+    if (sampling_.do_render_sync()) {
+      this->render_sync();
+    }
+
     /* TODO update shadowmaps, planars, etc... */
     // shadow_view_.render();
 
     main_view_.render(render_passes_);
 
     sampling_.step();
+    motion_blur_.step();
   }
 
   void render_frame(RenderLayer *render_layer, const char *view_name)
   {
-    this->begin_sync();
-    DRW_render_object_iter(this, render_, depsgraph_, object_sync);
-    this->end_sync();
-
-    DRW_render_instance_buffer_finish();
-
-    /* Also we weed to have a correct fbo bound for DRW_hair_update */
-    // GPU_framebuffer_bind();
-    // DRW_hair_update();
-
     while (!sampling_.finished()) {
       this->render_sample();
       /* TODO(fclem) print progression. */

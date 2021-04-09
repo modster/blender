@@ -171,6 +171,7 @@ class Film {
   void sync(void)
   {
     /* TODO reprojection. */
+
     if (camera_.has_changed()) {
       has_changed_ = true;
       data_.use_history = 0;

@@ -289,7 +289,8 @@ class Camera {
   bool has_changed(void) const
   {
     BLI_assert(synced_);
-    return has_changed_;
+    /* TODO(fclem) This whole has_changed logic is a bit weak. To revisit. */
+    return !DRW_state_is_scene_render() && has_changed_;
   }
   bool is_panoramic(void) const
   {

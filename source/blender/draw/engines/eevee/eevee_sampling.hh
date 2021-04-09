@@ -24,12 +24,13 @@
 
 #pragma once
 
+#include "BKE_colortools.h"
 #include "BLI_rand.h"
+#include "BLI_vector.hh"
 #include "DNA_scene_types.h"
+#include "DRW_render.h"
 #include "GPU_framebuffer.h"
 #include "GPU_texture.h"
-
-#include "DRW_render.h"
 
 #include "eevee_shader_shared.hh"
 
@@ -50,6 +51,8 @@ class Sampling {
   uint64_t dof_ring_count_ = 0;
   /** Number of samples in the web pattern of the jittered Depth of Field. */
   uint64_t dof_sample_count_ = 1;
+  /** Motion blur steps. */
+  uint64_t motion_blur_steps_ = 1;
   /** Safeguard against illegal reset. */
   bool sync_ = false;
 
@@ -77,6 +80,9 @@ class Sampling {
       sample_count_ = infinite_sample_count_;
     }
 
+    motion_blur_steps_ = DRW_state_is_image_render() ? scene->eevee.motion_blur_steps : 1;
+    sample_count_ = divide_ceil_u(sample_count_, motion_blur_steps_);
+
     if (scene->eevee.flag & SCE_EEVEE_DOF_JITTER) {
       if (sample_count_ == infinite_sample_count_) {
         /* Special case for viewport continuous rendering. We clamp to a max sample
@@ -94,6 +100,9 @@ class Sampling {
       dof_ring_count_ = 0;
       dof_sample_count_ = 1;
     }
+
+    /* Only multiply after to have full the full DoF web pattern for each time steps. */
+    sample_count_ *= motion_blur_steps_;
 
     sync_ = false;
   }
@@ -164,6 +173,13 @@ class Sampling {
   {
     return (sample_ > sample_count_);
   }
+  /* Return true if we are starting a new motion blur step. We need to run sync agains since
+   * depsgraph was updated by MotionBlur::step(). */
+  bool do_render_sync(void) const
+  {
+    return DRW_state_is_image_render() &&
+           (((sample_ - 1) % (sample_count_ / motion_blur_steps_)) == 0);
+  }
 
   void dof_disk_sample_get(float *r_radius, float *r_theta)
   {
@@ -198,6 +214,46 @@ class Sampling {
 
     *r_radius = ring / (float)dof_ring_count_;
     *r_theta = 2.0f * M_PI * ring_sample / (float)ring_sample_count;
+  }
+
+  /* Creates a discrete cumulative distribution function table from a given curvemapping.
+   * Output cdf vector is expected to already be sized according to the wanted resolution. */
+  static void cdf_from_curvemapping(const CurveMapping &curve, Vector<float> &cdf)
+  {
+    BLI_assert(cdf.size() > 1);
+    cdf[0] = 0.0f;
+    /* Actual CDF evaluation. */
+    for (int u = 0; u < cdf.size() - 1; u++) {
+      float x = (float)(u + 1) / (float)(cdf.size() - 1);
+      cdf[u + 1] = cdf[u] + BKE_curvemapping_evaluateF(&curve, 0, x);
+    }
+    /* Normalize the CDF. */
+    for (int u = 0; u < cdf.size() - 1; u++) {
+      cdf[u] /= cdf[cdf.size() - 1];
+    }
+    /* Just to make sure. */
+    cdf[cdf.size() - 1] = 1.0f;
+  }
+
+  /* Inverts a cumulative distribution function.
+   * Output vector is expected to already be sized according to the wanted resolution. */
+  static void cdf_invert(Vector<float> &cdf, Vector<float> &inverted_cdf)
+  {
+    for (int u = 0; u < inverted_cdf.size(); u++) {
+      float x = (float)u / (float)(inverted_cdf.size() - 1);
+      for (int i = 0; i < cdf.size(); i++) {
+        if (cdf[i] >= x) {
+          if (i == cdf.size() - 1) {
+            inverted_cdf[u] = 1.0f;
+          }
+          else {
+            float t = (x - cdf[i]) / (cdf[i + 1] - cdf[i]);
+            inverted_cdf[u] = ((float)i + t) / (float)(cdf.size() - 1);
+          }
+          break;
+        }
+      }
+    }
   }
 };
 
