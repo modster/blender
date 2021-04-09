@@ -51,8 +51,6 @@ class Instance {
   Camera camera_;
   /** Motion blur data. */
   MotionBlur motion_blur_;
-  /** Original object of the camera. */
-  Object *camera_original_ = nullptr;
   /** Lookdev own lightweight instance. May not be allocated. */
   // Lookdev *lookdev_ = nullptr;
 
@@ -100,7 +98,6 @@ class Instance {
     scene_ = DEG_get_evaluated_scene(depsgraph);
     view_layer_ = DEG_get_evaluated_view_layer(depsgraph);
     depsgraph_ = depsgraph;
-    camera_original_ = camera_object;
     render_layer_ = render_layer;
     drw_view_ = drw_view;
     v3d_ = v3d;
@@ -120,9 +117,7 @@ class Instance {
 
     sampling_.init(scene_);
     motion_blur_.init(scene_, render, depsgraph_);
-    /* Need to get eval camera after motion_blur_.init since it can re-evaluate the scene. */
-    const Object *camera_eval = DEG_get_evaluated_object(depsgraph_, camera_original_);
-    camera_.init(render_, camera_eval, drw_view_, scene_);
+    camera_.init(render_, depsgraph_, camera_object, drw_view_);
     render_passes_.init(scene_, render_layer, v3d_, output_res, output_rect);
     main_view_.init(scene_, output_res);
   }
@@ -135,8 +130,7 @@ class Instance {
    **/
   void begin_sync()
   {
-    const Object *camera_eval = DEG_get_evaluated_object(depsgraph_, camera_original_);
-    camera_.sync(render_, camera_eval, drw_view_, scene_);
+    camera_.sync(drw_view_);
     render_passes_.sync();
     shading_passes_.sync();
     main_view_.sync();

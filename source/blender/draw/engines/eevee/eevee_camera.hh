@@ -143,8 +143,14 @@ class Camera {
   bool synced_ = false;
   /** Last sample we synced with. Avoid double sync. */
   uint64_t last_sample_ = 0;
+  /** Original object of the camera. */
+  Object *camera_original_ = nullptr;
   /** Evaluated camera object. Only valid after sync. */
   const Object *object_eval_ = nullptr;
+  /** Depsgraph to query evaluated camera. */
+  const Depsgraph *depsgraph_ = nullptr;
+  /** Copy of instance.render_. */
+  const RenderEngine *engine_ = nullptr;
 
  public:
   Camera(Sampling &sampling) : sampling_(sampling)
@@ -165,10 +171,14 @@ class Camera {
   };
 
   void init(const RenderEngine *engine,
-            const Object *camera_object_eval,
-            const DRWView *drw_view,
-            const Scene *scene)
+            const Depsgraph *depsgraph,
+            Object *camera_original,
+            const DRWView *drw_view)
   {
+    engine_ = engine;
+    const Object *camera_eval = DEG_get_evaluated_object(depsgraph, camera_original);
+    camera_original_ = camera_original;
+    depsgraph_ = depsgraph;
     synced_ = false;
 
     SWAP(CameraData *, current.data_, previous.data_);
@@ -176,8 +186,8 @@ class Camera {
 
     CameraData &data = *current.data_;
 
-    if (camera_object_eval) {
-      const ::Camera *cam = reinterpret_cast<const ::Camera *>(camera_object_eval->data);
+    if (camera_eval) {
+      const ::Camera *cam = reinterpret_cast<const ::Camera *>(camera_eval->data);
       data.type = from_camera(cam);
     }
     else {
@@ -185,7 +195,7 @@ class Camera {
     }
 
     /* Sync early to detect changes. This is ok since we avoid double sync later. */
-    this->sync(engine, camera_object_eval, drw_view, scene);
+    this->sync(drw_view);
 
     /* Detect changes in parameters. */
     has_changed_ = *current.data_ != *previous.data_;
@@ -194,12 +204,10 @@ class Camera {
     }
   }
 
-  void sync(const RenderEngine *engine,
-            const Object *camera_object_eval,
-            const DRWView *drw_view,
-            const Scene *scene)
+  void sync(const DRWView *drw_view)
   {
-    object_eval_ = camera_object_eval;
+    const Scene *scene = DEG_get_evaluated_scene(depsgraph_);
+    object_eval_ = DEG_get_evaluated_object(depsgraph_, camera_original_);
 
     uint64_t sample = sampling_.sample_get();
     if (last_sample_ != sample || !synced_) {
@@ -223,11 +231,11 @@ class Camera {
       DRW_view_persmat_get(drw_view, data.persinv, true);
       DRW_view_camtexco_get(drw_view, &data.uv_scale[0]);
     }
-    else if (engine) {
+    else if (engine_) {
       /* TODO(fclem) Overscan */
-      // RE_GetCameraWindowWithOverscan(engine->re, g_data->overscan, data.winmat);
-      RE_GetCameraWindow(engine->re, object_eval_, data.winmat);
-      RE_GetCameraModelMatrix(engine->re, object_eval_, data.viewinv);
+      // RE_GetCameraWindowWithOverscan(engine_->re, g_data->overscan, data.winmat);
+      RE_GetCameraWindow(engine_->re, object_eval_, data.winmat);
+      RE_GetCameraModelMatrix(engine_->re, object_eval_, data.viewinv);
       invert_m4_m4(data.viewmat, data.viewinv);
       invert_m4_m4(data.wininv, data.winmat);
       mul_m4_m4m4(data.persmat, data.winmat, data.viewmat);
