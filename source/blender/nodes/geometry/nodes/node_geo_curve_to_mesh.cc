@@ -69,6 +69,13 @@ static void vert_extrude_to_mesh_data(const Spline &spline,
   }
 }
 
+static void mark_edges_sharp(MutableSpan<MEdge> edges)
+{
+  for (MEdge &edge : edges) {
+    edge.flag |= ME_SHARP;
+  }
+}
+
 static void spline_extrude_to_mesh_data(const Spline &spline,
                                         const Spline &profile_spline,
                                         MutableSpan<MVert> verts,
@@ -109,11 +116,11 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
 
   /* Add the edges running along the length of the curve, starting at each profile vertex. */
   const int spline_edges_start = edge_offset;
-  for (const int i_ring : IndexRange(spline_edge_len)) {
-    const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
-    const int next_ring_vert_offset = vert_offset +
-                                      profile_vert_len * ((i_ring + 1) % spline_vert_len);
-    for (const int i_profile : IndexRange(profile_vert_len)) {
+  for (const int i_profile : IndexRange(profile_vert_len)) {
+    for (const int i_ring : IndexRange(spline_edge_len)) {
+      const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
+      const int next_ring_vert_offset = vert_offset +
+                                        profile_vert_len * ((i_ring + 1) % spline_vert_len);
       MEdge &edge = edges[edge_offset++];
       edge.v1 = ring_vert_offset + i_profile;
       edge.v2 = next_ring_vert_offset + i_profile;
@@ -144,7 +151,9 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
     const int next_ring_edge_offset = profile_edges_start + profile_edge_len * i_next_ring;
 
     for (const int i_profile : IndexRange(profile_edge_len)) {
-      const int spline_edge_offset = spline_edges_start + profile_vert_len * i_ring;
+      const int spline_edge_start = spline_edges_start + spline_edge_len * i_profile;
+      const int next_spline_edge_start = spline_edges_start +
+                                         spline_edge_len * ((i_profile + 1) % profile_vert_len);
       MPoly &poly = polys[poly_offset++];
       poly.loopstart = loop_offset;
       poly.totloop = 4;
@@ -155,13 +164,13 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
       loop_a.e = ring_edge_start + i_profile;
       MLoop &loop_b = loops[loop_offset++];
       loop_b.v = ring_vert_offset + (i_profile + 1) % profile_vert_len;
-      loop_b.e = spline_edge_offset + (i_profile + 1) % profile_vert_len;
+      loop_b.e = next_spline_edge_start + i_ring;
       MLoop &loop_c = loops[loop_offset++];
       loop_c.v = next_ring_vert_offset + (i_profile + 1) % profile_vert_len;
       loop_c.e = next_ring_edge_offset + i_profile;
       MLoop &loop_d = loops[loop_offset++];
       loop_d.v = next_ring_vert_offset + i_profile;
-      loop_d.e = spline_edge_offset + i_profile;
+      loop_d.e = spline_edge_start + i_ring;
     }
   }
 
@@ -186,7 +195,14 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   /* Mark edge loops from sharp vector control points sharp. */
   // if (profile_spline.type == Spline::Bezier) {
   //   const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(profile_spline);
-  //   for (const int i : bezier_spline.ev)
+  //   Span<PointMapping> mappings = bezier_spline.evaluated_mappings();
+  //   for (const int i_profile : mappings.index_range()) {
+  //     const int control_point_index = mappings[i_profile].control_point_index;
+  //     if (bezier_spline.control_points[control_point_index].is_sharp()) {
+  //       mark_edges_sharp(
+  //           edges.slice(spline_edges_start + spline_edge_len * i_profile, spline_edge_len));
+  //     }
+  //   }
   // }
 }
 
@@ -228,6 +244,8 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
   MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
   MutableSpan<MPoly> polys{mesh->mpoly, mesh->totpoly};
+  // mesh->flag |= ME_AUTOSMOOTH;
+  // mesh->smoothresh = DEG2RADF(180.0f);
 
   int vert_offset = 0;
   int edge_offset = 0;
