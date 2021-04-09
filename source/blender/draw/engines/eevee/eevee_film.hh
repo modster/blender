@@ -38,6 +38,7 @@
 #include "eevee_camera.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
+#include "eevee_wrapper.hh"
 
 namespace blender::eevee {
 
@@ -99,8 +100,7 @@ class Film {
   /** ViewProjection matrix Inverse used to render the input. */
   float src_persinv_[4][4];
 
-  FilmData data_;
-  GPUUniformBuf *ubo_ = nullptr;
+  StructBuffer<FilmData> data_;
 
   ShaderModule &shaders_;
   Camera &camera_;
@@ -125,13 +125,11 @@ class Film {
     data_.extent[0] = data_.extent[1] = -1;
     data_.data_type = data_type;
     data_.use_history = 0;
-    ubo_ = GPU_uniformbuf_create_ex(sizeof(FilmData), nullptr, "FilmData");
   }
 
   ~Film()
   {
     this->clear();
-    DRW_UBO_FREE_SAFE(ubo_);
   }
 
   void clear(void)
@@ -203,7 +201,7 @@ class Film {
       accumulate_ps_ = DRW_pass_create(full_name, DRW_STATE_WRITE_COLOR);
       GPUShader *sh = shaders_.static_shader_get(FILM_FILTER);
       DRWShadingGroup *grp = DRW_shgroup_create(sh, accumulate_ps_);
-      DRW_shgroup_uniform_block(grp, "film_block", ubo_);
+      DRW_shgroup_uniform_block(grp, "film_block", data_.ubo_get());
       DRW_shgroup_uniform_block(grp, "camera_block", camera_.ubo_get());
       DRW_shgroup_uniform_texture_ref_ex(grp, "input_tx", &input_tx_, no_filter);
       DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
@@ -216,14 +214,14 @@ class Film {
       resolve_ps_ = DRW_pass_create(full_name, state);
       GPUShader *sh = shaders_.static_shader_get(FILM_RESOLVE);
       DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_ps_);
-      DRW_shgroup_uniform_block(grp, "film_block", ubo_);
+      DRW_shgroup_uniform_block(grp, "film_block", data_.ubo_get());
       DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
       DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
       DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
     }
 
     if (data_.use_history == 0) {
-      GPU_uniformbuf_update(ubo_, &data_);
+      data_.push_update();
     }
   }
 
@@ -243,7 +241,7 @@ class Film {
     /* Use history after first sample. */
     if (data_.use_history == 0) {
       data_.use_history = 1;
-      GPU_uniformbuf_update(ubo_, &data_);
+      data_.push_update();
     }
   }
 

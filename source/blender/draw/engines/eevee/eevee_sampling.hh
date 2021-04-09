@@ -33,6 +33,7 @@
 #include "GPU_texture.h"
 
 #include "eevee_shader_shared.hh"
+#include "eevee_wrapper.hh"
 
 namespace blender::eevee {
 
@@ -56,19 +57,11 @@ class Sampling {
   /** Safeguard against illegal reset. */
   bool sync_ = false;
 
-  SamplingData data_;
-  GPUUniformBuf *ubo_ = nullptr;
+  StructBuffer<SamplingData> data_;
 
  public:
-  Sampling()
-  {
-    ubo_ = GPU_uniformbuf_create_ex(sizeof(SamplingData), nullptr, "SamplingData");
-  }
-
-  ~Sampling()
-  {
-    DRW_UBO_FREE_SAFE(ubo_);
-  }
+  Sampling(){};
+  ~Sampling(){};
 
   void init(const Scene *scene)
   {
@@ -137,7 +130,7 @@ class Sampling {
       data_.dimensions[SAMPLING_LENS_U][0] = r[0];
       data_.dimensions[SAMPLING_LENS_V][0] = r[1];
     }
-    GPU_uniformbuf_update(ubo_, &data_);
+    data_.push_update();
     sample_++;
   }
 
@@ -161,7 +154,7 @@ class Sampling {
   }
   const GPUUniformBuf *ubo_get(void) const
   {
-    return ubo_;
+    return data_.ubo_get();
   }
   /* Returns a num. */
   float rng_get(eSamplingDimension dimension) const

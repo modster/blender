@@ -37,6 +37,7 @@
 
 #include "eevee_sampling.hh"
 #include "eevee_shader_shared.hh"
+#include "eevee_wrapper.hh"
 
 namespace blender::eevee {
 
@@ -133,10 +134,9 @@ class Camera {
   /** Random module to know what jitter to apply to the view. */
   Sampling &sampling_;
   /** Double buffered to detect changes and have history for re-projection. */
-  struct {
-    CameraData *data_;
-    GPUUniformBuf *ubo_;
-  } current, previous;
+  StructBuffer<CameraData> data_[2];
+  /** Active data index in data_. */
+  int data_id_ = 0;
   /** True if camera matrix has change since last init. */
   bool has_changed_ = true;
   /** Detects wrong usage. */
@@ -153,22 +153,9 @@ class Camera {
   const RenderEngine *engine_ = nullptr;
 
  public:
-  Camera(Sampling &sampling) : sampling_(sampling)
-  {
-    current.data_ = (CameraData *)MEM_callocN(sizeof(CameraData), "CameraData");
-    current.ubo_ = GPU_uniformbuf_create_ex(sizeof(CameraData), nullptr, "CameraData");
+  Camera(Sampling &sampling) : sampling_(sampling){};
 
-    previous.data_ = (CameraData *)MEM_callocN(sizeof(CameraData), "CameraData");
-    previous.ubo_ = GPU_uniformbuf_create_ex(sizeof(CameraData), nullptr, "CameraData");
-  };
-
-  ~Camera()
-  {
-    MEM_SAFE_FREE(current.data_);
-    MEM_SAFE_FREE(previous.data_);
-    DRW_UBO_FREE_SAFE(current.ubo_);
-    DRW_UBO_FREE_SAFE(previous.ubo_);
-  };
+  ~Camera(){};
 
   void init(const RenderEngine *engine,
             const Depsgraph *depsgraph,
@@ -180,11 +167,10 @@ class Camera {
     camera_original_ = camera_original;
     depsgraph_ = depsgraph;
     synced_ = false;
+    /* Swap! */
+    data_id_ = !data_id_;
 
-    SWAP(CameraData *, current.data_, previous.data_);
-    SWAP(GPUUniformBuf *, current.ubo_, previous.ubo_);
-
-    CameraData &data = *current.data_;
+    CameraData &data = data_[data_id_];
 
     if (camera_eval) {
       const ::Camera *cam = reinterpret_cast<const ::Camera *>(camera_eval->data);
@@ -198,7 +184,7 @@ class Camera {
     this->sync(drw_view);
 
     /* Detect changes in parameters. */
-    has_changed_ = *current.data_ != *previous.data_;
+    has_changed_ = data_[data_id_] != data_[!data_id_];
     if (has_changed_) {
       sampling_.reset();
     }
@@ -218,7 +204,7 @@ class Camera {
       return;
     }
 
-    CameraData &data = *current.data_;
+    CameraData &data = data_[data_id_];
 
     data.filter_size = scene->r.gauss;
 
@@ -272,7 +258,7 @@ class Camera {
       copy_v2_fl(data.equirect_scale, 0.0f);
     }
 
-    GPU_uniformbuf_update(current.ubo_, current.data_);
+    data_[data_id_].push_update();
 
     synced_ = true;
   }
@@ -288,11 +274,11 @@ class Camera {
   const CameraData &data_get(void) const
   {
     BLI_assert(synced_);
-    return *current.data_;
+    return data_[data_id_];
   }
   const GPUUniformBuf *ubo_get(void) const
   {
-    return current.ubo_;
+    return data_[data_id_].ubo_get();
   }
   bool has_changed(void) const
   {
@@ -302,7 +288,7 @@ class Camera {
   }
   bool is_panoramic(void) const
   {
-    return eevee::is_panoramic(current.data_->type);
+    return eevee::is_panoramic(data_[data_id_].type);
   }
 };
 
