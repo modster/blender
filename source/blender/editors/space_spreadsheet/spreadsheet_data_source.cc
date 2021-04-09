@@ -12,29 +12,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
  */
 
-#pragma once
+#include "spreadsheet_data_source.hh"
 
-/** \file
- * \ingroup bke
- */
+namespace blender::ed::spreadsheet {
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* Provide a "key function" for the linker. */
+DataSource::~DataSource() = default;
 
-Mesh *BKE_mesh_boolean(const Mesh **meshes,
-                       const float (*obmats[])[4][4],
-                       const short **material_remaps,
-                       const int meshes_len,
-                       const bool use_self,
-                       const bool hole_tolerant,
-                       const int boolean_mode);
-
-#ifdef __cplusplus
-}
-#endif
+}  // namespace blender::ed::spreadsheet

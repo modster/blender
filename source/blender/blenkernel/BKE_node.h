@@ -1067,7 +1067,6 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree,
 
 struct bNodeTreeExec *ntreeShaderBeginExecTree(struct bNodeTree *ntree);
 void ntreeShaderEndExecTree(struct bNodeTreeExec *exec);
-bool ntreeShaderExecTree(struct bNodeTree *ntree, int thread);
 struct bNode *ntreeShaderOutputNode(struct bNodeTree *ntree, int target);
 
 void ntreeGPUMaterialNodes(struct bNodeTree *localtree,
@@ -1399,6 +1398,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_MESH_PRIMITIVE_GRID 1039
 #define GEO_NODE_ATTRIBUTE_MAP_RANGE 1040
 #define GEO_NODE_ATTRIBUTE_CLAMP 1041
+#define GEO_NODE_BOUNDING_BOX 1042
 
 /** \} */
 
