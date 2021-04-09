@@ -85,19 +85,24 @@ class ASSET_OT_open_containing_blend_file(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not SpaceAssetInfo.is_asset_browser_poll(context):
+        asset_file_handle = getattr(context, 'asset_file_handle', None)
+        asset_library = getattr(context, 'asset_library', None)
+
+        if not asset_file_handle or not asset_library:
             return False
-        active_asset = SpaceAssetInfo.get_active_asset(context)
-        return bool(active_asset)
+
+        return not asset_file_handle.local_id
 
     def execute(self, context):
-        asset_params = context.space_data.params
-        if asset_params.asset_library == "LOCAL":
+        asset_file_handle = context.asset_file_handle
+        asset_library = context.asset_library
+
+        if asset_file_handle.local_id:
             self.report({'WARNING'}, "This asset is stored in the current blend file")
             return {'CANCELLED'}
 
-        filepath = self.path_of_active_asset(context)
-        self.open_in_new_blender(filepath)
+        asset_lib_path = bpy.types.AssetHandle.get_full_library_path(asset_file_handle, asset_library)
+        self.open_in_new_blender(asset_lib_path)
 
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.1, window=context.window)
@@ -122,7 +127,10 @@ class ASSET_OT_open_containing_blend_file(Operator):
         if returncode:
             self.report({'WARNING'}, "Blender subprocess exited with error code %d" % returncode)
 
-        bpy.ops.file.refresh()
+        # TODO(Sybren): Replace this with a generic "reload assets" operator
+        # that can run outside of the Asset Browser context.
+        if bpy.ops.file.refresh.poll():
+            bpy.ops.file.refresh()
 
         self.cancel(context)
         return {'FINISHED'}
