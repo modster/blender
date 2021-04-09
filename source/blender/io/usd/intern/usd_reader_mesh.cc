@@ -109,49 +109,58 @@ static void assign_materials(Main *bmain,
     }
   }
 
+  if (!can_assign) {
+    return;
+  }
+
   /* TODO(kevin): use global map? */
   std::map<std::string, Material *> mat_map;
   build_mat_map(bmain, mat_map);
 
-  std::map<std::string, Material *>::iterator mat_iter;
+  blender::io::usd::USDMaterialReader mat_reader(params, bmain);
 
-  if (can_assign) {
-    it = mat_index_map.begin();
+  for (it = mat_index_map.begin(); it != mat_index_map.end(); ++it) {
+    std::string mat_name = it->first.GetName();
 
-    blender::io::usd::USDMaterialReader mat_reader(params, bmain);
+    std::map<std::string, Material *>::iterator mat_iter = mat_map.find(mat_name);
 
-    for (; it != mat_index_map.end(); ++it) {
-      std::string mat_name = it->first.GetName();
-      mat_iter = mat_map.find(mat_name.c_str());
+    Material *assigned_mat = nullptr;
 
-      Material *assigned_mat = nullptr;
+    if (mat_iter == mat_map.end()) {
+      /* Blender material doesn't exist, so create it now. */
 
-      if (mat_iter == mat_map.end()) {
+      /* Look up the USD material. */
+      pxr::UsdPrim prim = stage->GetPrimAtPath(it->first);
+      pxr::UsdShadeMaterial usd_mat(prim);
 
-        // Look up the USD material.
-        pxr::UsdPrim prim = stage->GetPrimAtPath(it->first);
-        pxr::UsdShadeMaterial usd_mat(prim);
-
-        if (usd_mat) {
-          assigned_mat = mat_reader.add_material(usd_mat);
-          if (assigned_mat) {
-            mat_map[mat_name] = assigned_mat;
-          }
-        }
-        else {
-          std::cout << "WARNING: Couldn't get USD material " << it->first << std::endl;
-        }
-      }
-      else {
-        assigned_mat = mat_iter->second;
+      if (!usd_mat) {
+        std::cout << "WARNING: Couldn't construct USD material from prim " << it->first
+                  << std::endl;
+        continue;
       }
 
-      if (assigned_mat) {
-        BKE_object_material_assign(bmain, ob, assigned_mat, it->second, BKE_MAT_ASSIGN_OBDATA);
+      /* Add the Blender material. */
+      assigned_mat = mat_reader.add_material(usd_mat);
+
+      if (!assigned_mat) {
+        std::cout << "WARNING: Couldn't create Blender material from USD material " << it->first
+                  << std::endl;
+        continue;
       }
-      else {
-        std::cout << "WARNING: Couldn't assign material " << mat_name << std::endl;
-      }
+
+      mat_map[mat_name] = assigned_mat;
+    }
+    else {
+      /* We found an existing Blender material. */
+      assigned_mat = mat_iter->second;
+    }
+
+    if (assigned_mat) {
+      BKE_object_material_assign(bmain, ob, assigned_mat, it->second, BKE_MAT_ASSIGN_OBDATA);
+    }
+    else {
+      /* This shouldn't happen. */
+      std::cout << "WARNING: Couldn't assign material " << mat_name << std::endl;
     }
   }
 }
