@@ -193,17 +193,19 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   }
 
   /* Mark edge loops from sharp vector control points sharp. */
-  // if (profile_spline.type == Spline::Bezier) {
-  //   const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(profile_spline);
-  //   Span<PointMapping> mappings = bezier_spline.evaluated_mappings();
-  //   for (const int i_profile : mappings.index_range()) {
-  //     const int control_point_index = mappings[i_profile].control_point_index;
-  //     if (bezier_spline.control_points[control_point_index].is_sharp()) {
-  //       mark_edges_sharp(
-  //           edges.slice(spline_edges_start + spline_edge_len * i_profile, spline_edge_len));
-  //     }
-  //   }
-  // }
+  if (profile_spline.type == Spline::Bezier) {
+    const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(profile_spline);
+    Span<PointMapping> mappings = bezier_spline.evaluated_mappings();
+    for (const int i_profile : mappings.index_range()) {
+      const PointMapping &mapping = mappings[i_profile];
+      if (mapping.factor == 0.0f) {
+        if (bezier_spline.control_points[mapping.control_point_index].is_sharp()) {
+          mark_edges_sharp(
+              edges.slice(spline_edges_start + spline_edge_len * i_profile, spline_edge_len));
+        }
+      }
+    }
+  }
 }
 
 static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_curve)
@@ -244,8 +246,8 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
   MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
   MutableSpan<MPoly> polys{mesh->mpoly, mesh->totpoly};
-  // mesh->flag |= ME_AUTOSMOOTH;
-  // mesh->smoothresh = DEG2RADF(180.0f);
+  mesh->flag |= ME_AUTOSMOOTH;
+  mesh->smoothresh = DEG2RADF(180.0f);
 
   int vert_offset = 0;
   int edge_offset = 0;

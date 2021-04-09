@@ -57,6 +57,12 @@ struct BezierPoint {
   float radius;
   /* User defined tilt in radians, added on top of the auto-calculated tilt. */
   float tilt;
+
+  bool is_sharp() const
+  {
+    return ELEM(handle_type_a, HandleType::Vector, HandleType::Free) ||
+           ELEM(handle_type_b, HandleType::Vector, HandleType::Free);
+  }
 };
 
 /* TODO: Think about storing each data type from each control point separately. */
@@ -102,6 +108,11 @@ class Spline {
   {
     this->ensure_base_cache();
     return evaluated_positions_cache_;
+  }
+  blender::Span<PointMapping> evaluated_mappings() const
+  {
+    this->ensure_base_cache();
+    return evaluated_mapping_cache_;
   }
   blender::Span<float> evaluated_length() const
   {
