@@ -6813,7 +6813,7 @@ def km_3d_view_tool_paint_gpencil_eyedropper(params):
 
 def km_3d_view_tool_paint_gpencil_curve_pen(params):
     return (
-        "3D View Tool: Paint Gpencil, Curve Pen",
+        "3D View Tool: Paint Gpencil, Bézier Pen",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             ("gpencil.draw_curve", {"type": params.tool_mouse, "value": 'PRESS'}, {"properties":[]}),

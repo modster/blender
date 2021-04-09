@@ -2042,8 +2042,8 @@ class _defs_gpencil_paint:
 
         return dict(
             idname="builtin.curve_pen",
-            label="Curve Pen",
-            icon="none",
+            label="Bézier Pen",
+            icon="ops.curve.draw",
             cursor='DOT',
             widget=None,
             keymap=(),
