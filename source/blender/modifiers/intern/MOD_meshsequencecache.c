@@ -212,7 +212,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
         STRNCPY(mcmd->reader_object_path, mcmd->object_path);
         BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
         if (!mcmd->reader) {
-          printf("Could not create usd reader\n");
           BKE_modifier_set_error(
               ctx->object, md, "Could not create USD reader for file %s", cache_file->filepath);
           return mesh;
@@ -223,7 +222,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
        * we must return the mesh as-is instead of deforming it. */
       if (ctx->flag & MOD_APPLY_ORCO &&
           !USD_mesh_topology_changed(mcmd->reader, ctx->object, mesh, time * FPS, &err_str)) {
-        printf("ORCO and no topology changed\n");
         return mesh;
       }
 

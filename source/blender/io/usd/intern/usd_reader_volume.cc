@@ -16,7 +16,6 @@
 
 #include "usd_reader_volume.h"
 
-extern "C" {
 #include "DNA_cachefile_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_constraint_types.h"
@@ -46,7 +45,6 @@ extern "C" {
 
 #include "WM_api.h"
 #include "WM_types.h"
-}
 
 #include <pxr/pxr.h>
 #include <pxr/usd/usdVol/openVDBAsset.h>
@@ -76,7 +74,7 @@ void USDVolumeReader::read_object_data(Main *bmain, double motionSampleTime)
   std::string filepath;
 
   Volume *volume = (Volume *)object_->data;
-  VolumeGrid *defaultGrid = BKE_volume_grid_active_get(volume);
+  VolumeGrid *defaultGrid = BKE_volume_grid_get_for_write(volume, 0);
 
   for (auto it = fields.begin(); it != fields.end(); ++it) {
 
