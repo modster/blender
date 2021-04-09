@@ -53,12 +53,7 @@ void workbench_engine_init(void *ved)
 
   workbench_shader_library_ensure();
 
-  if (!stl->wpd) {
-    stl->wpd = MEM_callocN(sizeof(*stl->wpd), __func__);
-    stl->wpd->taa_sample_len_previous = -1;
-    stl->wpd->view_updated = true;
-  }
-
+  workbench_private_data_alloc(stl);
   WORKBENCH_PrivateData *wpd = stl->wpd;
   workbench_private_data_init(wpd);
   workbench_update_world_ubo(wpd);
@@ -73,7 +68,7 @@ void workbench_engine_init(void *ved)
     wpd->object_id_tx = DRW_texture_pool_query_fullscreen(GPU_R16UI, &draw_engine_workbench);
   }
   else {
-    /* Dont free because it's a pool texture. */
+    /* Don't free because it's a pool texture. */
     wpd->object_id_tx = NULL;
   }
 

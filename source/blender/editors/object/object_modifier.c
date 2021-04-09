@@ -535,7 +535,7 @@ void ED_object_modifier_copy_to_object(bContext *C,
                                        Object *ob_src,
                                        ModifierData *md)
 {
-  BKE_object_copy_modifier(ob_dst, ob_src, md);
+  BKE_object_copy_modifier(CTX_data_main(C), CTX_data_scene(C), ob_dst, ob_src, md);
   WM_main_add_notifier(NC_OBJECT | ND_MODIFIER, ob_dst);
   DEG_id_tag_update(&ob_dst->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
 
@@ -1115,6 +1115,40 @@ bool edit_modifier_invoke_properties(bContext *C, wmOperator *op)
   return false;
 }
 
+/**
+ * If the "modifier" property is not set,fill the modifier property with the name of the modifier
+ * with a UI panel below the mouse cursor, without checking the context pointer. Used in order to
+ * apply modifier operators on hover over their panels. If this checked the context pointer then it
+ * would always use the active modifier, which isn't desired.
+ */
+bool edit_modifier_invoke_properties_with_hover_no_active(bContext *C,
+                                                          wmOperator *op,
+                                                          const wmEvent *event,
+                                                          int *r_retval)
+{
+  if (RNA_struct_property_is_set(op->ptr, "modifier")) {
+    return true;
+  }
+
+  PointerRNA *panel_ptr = UI_region_panel_custom_data_under_cursor(C, event);
+  if (panel_ptr == NULL || RNA_pointer_is_null(panel_ptr)) {
+    *r_retval = OPERATOR_CANCELLED;
+    return false;
+  }
+
+  if (!RNA_struct_is_a(panel_ptr->type, &RNA_Modifier)) {
+    /* Work around multiple operators using the same shortcut. The operators for the other
+     * stacks in the property editor use the same key, and will not run after these return
+     * OPERATOR_CANCELLED. */
+    *r_retval = (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
+    return false;
+  }
+
+  const ModifierData *md = panel_ptr->data;
+  RNA_string_set(op->ptr, "modifier", md->name);
+  return true;
+}
+
 ModifierData *edit_modifier_property_get(wmOperator *op, Object *ob, int type)
 {
   char modifier_name[MAX_NAME];
@@ -1174,14 +1208,13 @@ static int modifier_remove_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static int modifier_remove_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int modifier_remove_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (edit_modifier_invoke_properties(C, op)) {
+  int retval;
+  if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
     return modifier_remove_exec(C, op);
   }
-
-  /* Work around multiple operators using the same shortcut. */
-  return (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
+  return retval;
 }
 
 void OBJECT_OT_modifier_remove(wmOperatorType *ot)
@@ -1221,13 +1254,13 @@ static int modifier_move_up_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static int modifier_move_up_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int modifier_move_up_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (edit_modifier_invoke_properties(C, op)) {
+  int retval;
+  if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
     return modifier_move_up_exec(C, op);
   }
-  /* Work around multiple operators using the same shortcut. */
-  return (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
+  return retval;
 }
 
 void OBJECT_OT_modifier_move_up(wmOperatorType *ot)
@@ -1266,13 +1299,13 @@ static int modifier_move_down_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static int modifier_move_down_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int modifier_move_down_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (edit_modifier_invoke_properties(C, op)) {
+  int retval;
+  if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
     return modifier_move_down_exec(C, op);
   }
-  /* Work around multiple operators using the same shortcut. */
-  return (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
+  return retval;
 }
 
 void OBJECT_OT_modifier_move_down(wmOperatorType *ot)
@@ -1309,12 +1342,13 @@ static int modifier_move_to_index_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static int modifier_move_to_index_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int modifier_move_to_index_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (edit_modifier_invoke_properties(C, op)) {
+  int retval;
+  if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
     return modifier_move_to_index_exec(C, op);
   }
-  return OPERATOR_CANCELLED;
+  return retval;
 }
 
 void OBJECT_OT_modifier_move_to_index(wmOperatorType *ot)
@@ -1383,14 +1417,18 @@ static int modifier_apply_exec_ex(bContext *C, wmOperator *op, int apply_as, boo
   Scene *scene = CTX_data_scene(C);
   Object *ob = ED_object_active_context(C);
   ModifierData *md = edit_modifier_property_get(op, ob, 0);
+  const bool do_report = RNA_boolean_get(op->ptr, "report");
 
   if (md == NULL) {
     return OPERATOR_CANCELLED;
   }
 
-  /* Store name temporarily for report. */
+  int reports_len;
   char name[MAX_NAME];
-  strcpy(name, md->name);
+  if (do_report) {
+    reports_len = BLI_listbase_count(&op->reports->list);
+    strcpy(name, md->name); /* Store name temporarily since the modifier is removed. */
+  }
 
   if (!ED_object_modifier_apply(
           bmain, op->reports, depsgraph, scene, ob, md, apply_as, keep_modifier)) {
@@ -1401,8 +1439,12 @@ static int modifier_apply_exec_ex(bContext *C, wmOperator *op, int apply_as, boo
   DEG_relations_tag_update(bmain);
   WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
 
-  if (RNA_boolean_get(op->ptr, "report")) {
-    BKE_reportf(op->reports, RPT_INFO, "Applied modifier: %s", name);
+  if (do_report) {
+    /* Only add this report if the operator didn't cause another one. The purpose here is
+     * to alert that something happened, and the previous report will do that anyway. */
+    if (BLI_listbase_count(&op->reports->list) == reports_len) {
+      BKE_reportf(op->reports, RPT_INFO, "Applied modifier: %s", name);
+    }
   }
 
   return OPERATOR_FINISHED;
@@ -1413,13 +1455,13 @@ static int modifier_apply_exec(bContext *C, wmOperator *op)
   return modifier_apply_exec_ex(C, op, MODIFIER_APPLY_DATA, false);
 }
 
-static int modifier_apply_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int modifier_apply_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (edit_modifier_invoke_properties(C, op)) {
+  int retval;
+  if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
     return modifier_apply_exec(C, op);
   }
-  /* Work around multiple operators using the same shortcut. */
-  return (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
+  return retval;
 }
 
 void OBJECT_OT_modifier_apply(wmOperatorType *ot)
@@ -1457,15 +1499,13 @@ static int modifier_apply_as_shapekey_exec(bContext *C, wmOperator *op)
   return modifier_apply_exec_ex(C, op, MODIFIER_APPLY_SHAPE, keep);
 }
 
-static int modifier_apply_as_shapekey_invoke(bContext *C,
-                                             wmOperator *op,
-                                             const wmEvent *UNUSED(event))
+static int modifier_apply_as_shapekey_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (edit_modifier_invoke_properties(C, op)) {
+  int retval;
+  if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
     return modifier_apply_as_shapekey_exec(C, op);
   }
-  /* Work around multiple operators using the same shortcut. */
-  return (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
+  return retval;
 }
 
 static char *modifier_apply_as_shapekey_get_description(struct bContext *UNUSED(C),
@@ -1571,13 +1611,13 @@ static int modifier_copy_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static int modifier_copy_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int modifier_copy_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (edit_modifier_invoke_properties(C, op)) {
+  int retval;
+  if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
     return modifier_copy_exec(C, op);
   }
-  /* Work around multiple operators using the same shortcut. */
-  return (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
+  return retval;
 }
 
 void OBJECT_OT_modifier_copy(wmOperatorType *ot)
@@ -1614,54 +1654,12 @@ static int modifier_set_active_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-/**
- * Get the modifier below the mouse cursor modifier without checking the context pointer.
- * Used in order to set the active modifier on mouse click. If this checked the context
- * pointer then it would always set the active modifier to the already active modifier.
- *
- * \param event: If this isn't NULL, the operator will also look for panels underneath
- * the cursor with custom-data set to a modifier.
- * \param r_retval: This should be used if #event is used in order to return
- * #OPERATOR_PASS_THROUGH to check other operators with the same key set.
- */
-bool edit_modifier_invoke_properties_with_hover_no_active(bContext *C,
-                                                          wmOperator *op,
-                                                          const wmEvent *event,
-                                                          int *r_retval)
-{
-  if (RNA_struct_property_is_set(op->ptr, "modifier")) {
-    return true;
-  }
-
-  PointerRNA *panel_ptr = UI_region_panel_custom_data_under_cursor(C, event);
-
-  if (!(panel_ptr == NULL || RNA_pointer_is_null(panel_ptr))) {
-    if (RNA_struct_is_a(panel_ptr->type, &RNA_Modifier)) {
-      ModifierData *md = panel_ptr->data;
-      RNA_string_set(op->ptr, "modifier", md->name);
-      return true;
-    }
-    BLI_assert(r_retval != NULL); /* We need the return value in this case. */
-    if (r_retval != NULL) {
-      *r_retval = (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
-    }
-    return false;
-  }
-
-  if (r_retval != NULL) {
-    *r_retval = OPERATOR_CANCELLED;
-  }
-
-  return false;
-}
-
 static int modifier_set_active_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   int retval;
   if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
     return modifier_set_active_exec(C, op);
   }
-
   return retval;
 }
 
@@ -1683,74 +1681,6 @@ void OBJECT_OT_modifier_set_active(wmOperatorType *ot)
 /** \} */
 /** \name Copy Modifier To Selected Operator
  * \{ */
-
-/* If the modifier uses particles, copy particle system to destination object
- * or reuse existing if it has the same ParticleSettings */
-static void copy_or_reuse_particle_system(bContext *C, Object *ob, ModifierData *md)
-{
-  ParticleSystem *psys_on_modifier = NULL;
-
-  if (md->type == eModifierType_DynamicPaint) {
-    DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
-    if (pmd->brush && pmd->brush->psys) {
-      psys_on_modifier = pmd->brush->psys;
-    }
-  }
-  else if (md->type == eModifierType_Fluid) {
-    FluidModifierData *fmd = (FluidModifierData *)md;
-    if (fmd->type == MOD_FLUID_TYPE_FLOW) {
-      if (fmd->flow && fmd->flow->psys) {
-        psys_on_modifier = fmd->flow->psys;
-      }
-    }
-  }
-
-  if (!psys_on_modifier) {
-    return;
-  }
-
-  ParticleSystem *psys_on_new_modifier = NULL;
-
-  /* Check if a particle system with the same particle settings
-   * already exists on the destination object. */
-  LISTBASE_FOREACH (ParticleSystem *, psys, &ob->particlesystem) {
-    if (psys_on_modifier->part == psys->part) {
-      psys_on_new_modifier = psys;
-      break;
-    }
-  }
-
-  /* If it does not exist, copy the particle system to the destination object. */
-  if (!psys_on_new_modifier) {
-    Main *bmain = CTX_data_main(C);
-    Scene *scene = CTX_data_scene(C);
-    object_copy_particle_system(bmain, scene, ob, psys_on_modifier);
-
-    LISTBASE_FOREACH (ParticleSystem *, psys, &ob->particlesystem) {
-      if (psys_on_modifier->part == psys->part) {
-        psys_on_new_modifier = psys;
-      }
-    }
-  }
-
-  /* Update the modifier to point to the new/existing particle system. */
-  LISTBASE_FOREACH (ModifierData *, new_md, &ob->modifiers) {
-    if (new_md->type == eModifierType_DynamicPaint) {
-      DynamicPaintModifierData *new_pmd = (DynamicPaintModifierData *)new_md;
-
-      if (psys_on_modifier == new_pmd->brush->psys) {
-        new_pmd->brush->psys = psys_on_new_modifier;
-      }
-    }
-    else if (new_md->type == eModifierType_Fluid) {
-      FluidModifierData *new_fmd = (FluidModifierData *)new_md;
-
-      if (psys_on_modifier == new_fmd->flow->psys) {
-        new_fmd->flow->psys = psys_on_new_modifier;
-      }
-    }
-  }
-}
 
 static int modifier_copy_to_selected_exec(bContext *C, wmOperator *op)
 {
@@ -1791,22 +1721,12 @@ static int modifier_copy_to_selected_exec(bContext *C, wmOperator *op)
       }
     }
 
-    if (md->type == eModifierType_ParticleSystem) {
-      ParticleSystemModifierData *psmd = (ParticleSystemModifierData *)md;
-      object_copy_particle_system(bmain, scene, ob, psmd->psys);
-    }
-    else {
-      if (!BKE_object_copy_modifier(ob, obact, md)) {
-        BKE_reportf(op->reports,
-                    RPT_ERROR,
-                    "Copying modifier '%s' to object '%s' failed",
-                    md->name,
-                    ob->id.name + 2);
-      }
-    }
-
-    if (ELEM(md->type, eModifierType_DynamicPaint, eModifierType_Fluid)) {
-      copy_or_reuse_particle_system(C, ob, md);
+    if (!BKE_object_copy_modifier(bmain, scene, ob, obact, md)) {
+      BKE_reportf(op->reports,
+                  RPT_ERROR,
+                  "Copying modifier '%s' to object '%s' failed",
+                  md->name,
+                  ob->id.name + 2);
     }
 
     num_copied++;
@@ -1826,15 +1746,13 @@ static int modifier_copy_to_selected_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static int modifier_copy_to_selected_invoke(bContext *C,
-                                            wmOperator *op,
-                                            const wmEvent *UNUSED(event))
+static int modifier_copy_to_selected_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (edit_modifier_invoke_properties(C, op)) {
-    return modifier_copy_to_selected_exec(C, op);
+  int retval;
+  if (edit_modifier_invoke_properties_with_hover_no_active(C, op, event, &retval)) {
+    return modifier_set_active_exec(C, op);
   }
-  /* Work around multiple operators using the same shortcut. */
-  return (OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED);
+  return retval;
 }
 
 static bool modifier_copy_to_selected_poll(bContext *C)
@@ -3102,7 +3020,7 @@ static int ocean_bake_exec(bContext *C, wmOperator *op)
     i++;
   }
 
-  /* make a copy of ocean to use for baking - threadsafety */
+  /* Make a copy of ocean to use for baking - thread-safety. */
   struct Ocean *ocean = BKE_ocean_add();
   BKE_ocean_init_from_modifier(ocean, omd, omd->resolution);
 

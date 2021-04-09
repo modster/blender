@@ -26,10 +26,8 @@
 #include "BLI_listbase.h"
 #include "BLI_utildefines.h"
 
-#include "BLI_ghash.h"
 #include "BLI_hash.h"
 #include "BLI_math_vector.h"
-#include "BLI_rand.h"
 
 #include "BLT_translation.h"
 
@@ -40,7 +38,6 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
-#include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
 #include "BKE_colortools.h"
@@ -51,7 +48,6 @@
 #include "BKE_gpencil_modifier.h"
 #include "BKE_lib_query.h"
 #include "BKE_modifier.h"
-#include "BKE_object.h"
 #include "BKE_screen.h"
 
 #include "DEG_depsgraph.h"
@@ -124,7 +120,9 @@ BLI_INLINE float table_sample(float *table, float x)
   return interpf(table[(int)ceilf(x)], table[(int)floor(x)], fractf(x));
 }
 
-/* aply noise effect based on stroke direction */
+/**
+ * Apply noise effect based on stroke direction.
+ */
 static void deformStroke(GpencilModifierData *md,
                          Depsgraph *depsgraph,
                          Object *ob,

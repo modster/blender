@@ -936,7 +936,7 @@ static void update_velocities(FluidEffectorSettings *fes,
     }
     else {
       /* Should never reach this block. */
-      BLI_assert(false);
+      BLI_assert_unreachable();
     }
   }
   else {
@@ -2310,7 +2310,7 @@ static void adaptive_domain_adjust(
                                 z - fds->res_min[2]);
         max_den = (fuel) ? MAX2(density[index], fuel[index]) : density[index];
 
-        /* check high resolution bounds if max density isnt already high enough */
+        /* Check high resolution bounds if max density isn't already high enough. */
         if (max_den < fds->adapt_threshold && fds->flags & FLUID_DOMAIN_USE_NOISE && fds->fluid) {
           int i, j, k;
           /* high res grid index */
@@ -3225,7 +3225,7 @@ static void update_effectors(
   ListBase *effectors;
   /* make sure smoke flow influence is 0.0f */
   fds->effector_weights->weight[PFIELD_FLUIDFLOW] = 0.0f;
-  effectors = BKE_effectors_create(depsgraph, ob, NULL, fds->effector_weights);
+  effectors = BKE_effectors_create(depsgraph, ob, NULL, fds->effector_weights, false);
 
   if (effectors) {
     /* Precalculate wind forces. */
@@ -4001,8 +4001,11 @@ static void BKE_fluid_modifier_processDomain(FluidModifierData *fmd,
         has_config = manta_read_config(fds->fluid, fmd, mesh_frame);
       }
 
-      /* Update mesh data from file is faster than via Python (manta_read_mesh()). */
-      has_mesh = manta_read_mesh(fds->fluid, fmd, mesh_frame);
+      /* Only load the mesh at the resolution it ways originally simulated at.
+       * The mesh files don't have a header, i.e. the don't store the grid resolution. */
+      if (!manta_needs_realloc(fds->fluid, fmd)) {
+        has_mesh = manta_read_mesh(fds->fluid, fmd, mesh_frame);
+      }
     }
 
     /* Read particles cache. */
@@ -5136,6 +5139,9 @@ void BKE_fluid_modifier_copy(const struct FluidModifierData *fmd,
     FluidFlowSettings *tffs = tfmd->flow;
     FluidFlowSettings *ffs = fmd->flow;
 
+    /* NOTE: This is dangerous, as it will generate invalid data in case we are copying between
+     * different objects. Extra external code has to be called then to ensure proper remapping of
+     * that pointer. See e.g. `BKE_object_copy_particlesystems` or `BKE_object_copy_modifier`. */
     tffs->psys = ffs->psys;
     tffs->noise_texture = ffs->noise_texture;
 

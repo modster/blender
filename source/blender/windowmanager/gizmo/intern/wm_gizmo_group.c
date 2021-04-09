@@ -61,7 +61,6 @@
 
 /* -------------------------------------------------------------------- */
 /** \name wmGizmoGroup
- *
  * \{ */
 
 /**
@@ -325,7 +324,7 @@ bool wm_gizmogroup_is_visible_in_drawstep(const wmGizmoGroup *gzgroup,
     case WM_GIZMOMAP_DRAWSTEP_3D:
       return (gzgroup->type->flag & WM_GIZMOGROUPTYPE_3D);
     default:
-      BLI_assert(0);
+      BLI_assert_unreachable();
       return false;
   }
 }
@@ -394,7 +393,7 @@ static int gizmo_select_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSE
     return OPERATOR_FINISHED;
   }
 
-  BLI_assert(0);
+  BLI_assert_unreachable();
   return (OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH);
 }
 
@@ -499,7 +498,7 @@ static int gizmo_tweak_modal(bContext *C, wmOperator *op, const wmEvent *event)
   bool clear_modal = true;
 
   if (gz == NULL) {
-    BLI_assert(0);
+    BLI_assert_unreachable();
     return (OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH);
   }
 
@@ -586,7 +585,7 @@ static int gizmo_tweak_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   if (!gz) {
     /* wm_handlers_do_intern shouldn't let this happen */
-    BLI_assert(0);
+    BLI_assert_unreachable();
     return (OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH);
   }
 
@@ -697,7 +696,6 @@ wmKeyMap *wm_gizmogroup_tweak_modal_keymap(wmKeyConfig *keyconf)
 
 /* -------------------------------------------------------------------- */
 /** \name wmGizmoGroup (Key-map callbacks)
- *
  * \{ */
 
 wmKeyMap *WM_gizmogroup_setup_keymap_generic(const wmGizmoGroupType *UNUSED(gzgt), wmKeyConfig *kc)
@@ -837,7 +835,6 @@ struct wmKeyMap *WM_gizmo_keymap_generic_maybe_drag(wmWindowManager *wm)
 
 /* -------------------------------------------------------------------- */
 /** \name wmGizmoGroupType
- *
  * \{ */
 
 struct wmGizmoGroupTypeRef *WM_gizmomaptype_group_find_ptr(struct wmGizmoMapType *gzmap_type,
@@ -1142,7 +1139,6 @@ void WM_gizmo_group_unlink_delayed_ptr_from_space(wmGizmoGroupType *gzgt,
 
 /* -------------------------------------------------------------------- */
 /** \name Gizmo Group Type Callback Wrappers
- *
  * \{ */
 
 bool WM_gizmo_group_type_poll(const bContext *C, const wmGizmoGroupType *gzgt)

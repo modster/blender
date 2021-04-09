@@ -520,11 +520,18 @@ static bool mesh_needs_keyindex(Main *bmain, const Mesh *me)
 }
 
 /**
- * Load EditMode data back into the object,
- * optionally freeing the editmode data.
+ * Load edit-mode data back into the object.
+ *
+ * \param load_data: Flush the edit-mode data back to the object.
+ * \param free_data: Free the edit-mode data.
  */
-static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool freedata)
+static bool ED_object_editmode_load_free_ex(Main *bmain,
+                                            Object *obedit,
+                                            const bool load_data,
+                                            const bool free_data)
 {
+  BLI_assert(load_data || free_data);
+
   if (obedit == NULL) {
     return false;
   }
@@ -544,9 +551,11 @@ static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool f
       return false;
     }
 
-    EDBM_mesh_load_ex(bmain, obedit, freedata);
+    if (load_data) {
+      EDBM_mesh_load_ex(bmain, obedit, free_data);
+    }
 
-    if (freedata) {
+    if (free_data) {
       EDBM_mesh_free(me->edit_mesh);
       MEM_freeN(me->edit_mesh);
       me->edit_mesh = NULL;
@@ -562,8 +571,12 @@ static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool f
     if (arm->edbo == NULL) {
       return false;
     }
-    ED_armature_from_edit(bmain, obedit->data);
-    if (freedata) {
+
+    if (load_data) {
+      ED_armature_from_edit(bmain, obedit->data);
+    }
+
+    if (free_data) {
       ED_armature_edit_free(obedit->data);
     }
     /* TODO(sergey): Pose channels might have been changed, so need
@@ -577,8 +590,12 @@ static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool f
     if (cu->editnurb == NULL) {
       return false;
     }
-    ED_curve_editnurb_load(bmain, obedit);
-    if (freedata) {
+
+    if (load_data) {
+      ED_curve_editnurb_load(bmain, obedit);
+    }
+
+    if (free_data) {
       ED_curve_editnurb_free(obedit);
     }
   }
@@ -587,8 +604,12 @@ static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool f
     if (cu->editfont == NULL) {
       return false;
     }
-    ED_curve_editfont_load(obedit);
-    if (freedata) {
+
+    if (load_data) {
+      ED_curve_editfont_load(obedit);
+    }
+
+    if (free_data) {
       ED_curve_editfont_free(obedit);
     }
   }
@@ -597,8 +618,12 @@ static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool f
     if (lt->editlatt == NULL) {
       return false;
     }
-    BKE_editlattice_load(obedit);
-    if (freedata) {
+
+    if (load_data) {
+      BKE_editlattice_load(obedit);
+    }
+
+    if (free_data) {
       BKE_editlattice_free(obedit);
     }
   }
@@ -607,8 +632,12 @@ static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool f
     if (mb->editelems == NULL) {
       return false;
     }
-    ED_mball_editmball_load(obedit);
-    if (freedata) {
+
+    if (load_data) {
+      ED_mball_editmball_load(obedit);
+    }
+
+    if (free_data) {
       ED_mball_editmball_free(obedit);
     }
   }
@@ -616,9 +645,11 @@ static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool f
     return false;
   }
 
-  char *needs_flush_ptr = BKE_object_data_editmode_flush_ptr_get(obedit->data);
-  if (needs_flush_ptr) {
-    *needs_flush_ptr = false;
+  if (load_data) {
+    char *needs_flush_ptr = BKE_object_data_editmode_flush_ptr_get(obedit->data);
+    if (needs_flush_ptr) {
+      *needs_flush_ptr = false;
+    }
   }
 
   return true;
@@ -626,7 +657,7 @@ static bool ED_object_editmode_load_ex(Main *bmain, Object *obedit, const bool f
 
 bool ED_object_editmode_load(Main *bmain, Object *obedit)
 {
-  return ED_object_editmode_load_ex(bmain, obedit, false);
+  return ED_object_editmode_load_free_ex(bmain, obedit, true, false);
 }
 
 /**
@@ -635,9 +666,9 @@ bool ED_object_editmode_load(Main *bmain, Object *obedit)
  */
 bool ED_object_editmode_exit_ex(Main *bmain, Scene *scene, Object *obedit, int flag)
 {
-  const bool freedata = (flag & EM_FREEDATA) != 0;
+  const bool free_data = (flag & EM_FREEDATA) != 0;
 
-  if (ED_object_editmode_load_ex(bmain, obedit, freedata) == false) {
+  if (ED_object_editmode_load_free_ex(bmain, obedit, true, free_data) == false) {
     /* in rare cases (background mode) its possible active object
      * is flagged for editmode, without 'obedit' being set T35489. */
     if (UNLIKELY(obedit && obedit->mode & OB_MODE_EDIT)) {
@@ -648,8 +679,8 @@ bool ED_object_editmode_exit_ex(Main *bmain, Scene *scene, Object *obedit, int f
     return true;
   }
 
-  /* freedata only 0 now on file saves and render */
-  if (freedata) {
+  /* `free_data` only false now on file saves and render. */
+  if (free_data) {
     /* flag object caches as outdated */
     ListBase pidlist;
     BKE_ptcache_ids_from_object(&pidlist, obedit, scene, 0);
@@ -683,6 +714,42 @@ bool ED_object_editmode_exit(bContext *C, int flag)
   return ED_object_editmode_exit_ex(bmain, scene, obedit, flag);
 }
 
+/**
+ * Support freeing edit-mode data without flushing it back to the object.
+ *
+ * \return true if data was freed.
+ */
+bool ED_object_editmode_free_ex(Main *bmain, Object *obedit)
+{
+  return ED_object_editmode_load_free_ex(bmain, obedit, false, true);
+}
+
+bool ED_object_editmode_exit_multi_ex(Main *bmain, Scene *scene, ViewLayer *view_layer, int flag)
+{
+  Object *obedit = OBEDIT_FROM_VIEW_LAYER(view_layer);
+  if (obedit == NULL) {
+    return false;
+  }
+  bool changed = false;
+  const short obedit_type = obedit->type;
+
+  LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
+    Object *ob = base->object;
+    if ((ob->type == obedit_type) && (ob->mode & OB_MODE_EDIT)) {
+      changed |= ED_object_editmode_exit_ex(bmain, scene, base->object, flag);
+    }
+  }
+  return changed;
+}
+
+bool ED_object_editmode_exit_multi(bContext *C, int flag)
+{
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  return ED_object_editmode_exit_multi_ex(bmain, scene, view_layer, flag);
+}
+
 bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag)
 {
   bool ok = false;
@@ -692,7 +759,9 @@ bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag
     return false;
   }
 
-  /* this checks actual object->data, for cases when other scenes have it in editmode context */
+  /* This checks actual `ob->data`, for cases when other scenes have it in edit-mode context.
+   * Currently multiple objects sharing a mesh being in edit-mode at once isn't supported,
+   * see: T86767. */
   if (BKE_object_is_in_editmode(ob)) {
     return true;
   }
@@ -1298,9 +1367,9 @@ static int object_clear_paths_exec(bContext *C, wmOperator *op)
 }
 
 /* operator callback/wrapper */
-static int object_clear_paths_invoke(bContext *C, wmOperator *op, const wmEvent *evt)
+static int object_clear_paths_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if ((evt->shift) && !RNA_struct_property_is_set(op->ptr, "only_selected")) {
+  if ((event->shift) && !RNA_struct_property_is_set(op->ptr, "only_selected")) {
     RNA_boolean_set(op->ptr, "only_selected", true);
   }
   return object_clear_paths_exec(C, op);
