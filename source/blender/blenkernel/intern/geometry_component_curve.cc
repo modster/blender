@@ -14,6 +14,8 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "FN_generic_virtual_array.hh"
+
 #include "BKE_derived_curve.hh"
 
 #include "BKE_attribute_access.hh"
@@ -147,17 +149,15 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
  public:
   BuiltinSplineAttributeProvider(std::string attribute_name,
                                  const CustomDataType attribute_type,
-                                 const CreatableEnum creatable,
                                  const WritableEnum writable,
-                                 const DeletableEnum deletable,
                                  const AsReadAttribute as_read_attribute,
                                  const AsWriteAttribute as_write_attribute)
       : BuiltinAttributeProvider(std::move(attribute_name),
                                  ATTR_DOMAIN_CURVE,
                                  attribute_type,
-                                 creatable,
+                                 BuiltinAttributeProvider::NonCreatable,
                                  writable,
-                                 deletable),
+                                 BuiltinAttributeProvider::NonDeletable),
         as_read_attribute_(as_read_attribute),
         as_write_attribute_(as_write_attribute)
   {
@@ -273,6 +273,71 @@ static WriteAttributePtr make_cyclic_write_attribute(DCurve &curve)
       ATTR_DOMAIN_CURVE, curve.splines.as_mutable_span());
 }
 
+class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
+  using GetSplineWriteSpan = fn::GVArray (*)(const DCurve &data);
+  using AsWriteAttribute = WriteAttributePtr (*)(DCurve &data);
+  using UpdateOnWrite = void (*)(Spline &spline);
+  const GetSplineWriteSpan as_read_attribute_;
+  const AsWriteAttribute as_write_attribute_;
+
+ public:
+  BuiltinPointAttributeProvider(std::string attribute_name,
+                                const CustomDataType attribute_type,
+                                const WritableEnum writable,
+                                const AsReadAttribute as_read_attribute,
+                                const AsWriteAttribute as_write_attribute)
+      : BuiltinAttributeProvider(std::move(attribute_name),
+                                 ATTR_DOMAIN_POINT,
+                                 attribute_type,
+                                 BuiltinAttributeProvider::NonCreatable,
+                                 writable,
+                                 BuiltinAttributeProvider::NonDeletable),
+        as_read_attribute_(as_read_attribute),
+        as_write_attribute_(as_write_attribute)
+  {
+  }
+
+  ReadAttributePtr try_get_for_read(const GeometryComponent &component) const final
+  {
+    const CurveComponent &curve_component = static_cast<const CurveComponent &>(component);
+    const DCurve *curve = curve_component.get_for_read();
+    if (curve == nullptr) {
+      return {};
+    }
+
+    return as_read_attribute_(*curve);
+  }
+
+  WriteAttributePtr try_get_for_write(GeometryComponent &component) const final
+  {
+    if (writable_ != Writable) {
+      return {};
+    }
+    CurveComponent &curve_component = static_cast<CurveComponent &>(component);
+    DCurve *curve = curve_component.get_for_write();
+    if (curve == nullptr) {
+      return {};
+    }
+
+    return as_write_attribute_(*curve);
+  }
+
+  bool try_delete(GeometryComponent &UNUSED(component)) const final
+  {
+    return false;
+  }
+
+  bool try_create(GeometryComponent &UNUSED(component)) const final
+  {
+    return false;
+  }
+
+  bool exists(const GeometryComponent &component) const final
+  {
+    return component.attribute_domain_size(ATTR_DOMAIN_POINT) != 0;
+  }
+};
+
 /**
  * In this function all the attribute providers for a curve component are created. Most data
  * in this function is statically allocated, because it does not change over time.
@@ -281,27 +346,24 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
 {
   static BuiltinSplineAttributeProvider resolution("resolution",
                                                    CD_PROP_INT32,
-                                                   BuiltinAttributeProvider::NonCreatable,
                                                    BuiltinAttributeProvider::Writable,
-                                                   BuiltinAttributeProvider::NonDeletable,
                                                    make_resolution_read_attribute,
                                                    make_resolution_write_attribute);
 
-  static BuiltinSplineAttributeProvider length("length",
-                                               CD_PROP_FLOAT,
-                                               BuiltinAttributeProvider::NonCreatable,
-                                               BuiltinAttributeProvider::Readonly,
-                                               BuiltinAttributeProvider::NonDeletable,
-                                               make_length_attribute,
-                                               nullptr);
+  static BuiltinSplineAttributeProvider length(
+      "length", CD_PROP_FLOAT, BuiltinAttributeProvider::Readonly, make_length_attribute, nullptr);
 
   static BuiltinSplineAttributeProvider cyclic("cyclic",
                                                CD_PROP_BOOL,
-                                               BuiltinAttributeProvider::NonCreatable,
                                                BuiltinAttributeProvider::Writable,
-                                               BuiltinAttributeProvider::NonDeletable,
                                                make_cyclic_read_attribute,
                                                make_cyclic_write_attribute);
+
+  static BuiltinPointAttributeProvider radius("radius",
+                                              CD_PROP_FLOAT,
+                                              BuiltinAttributeProvider::Writable,
+                                              get_spline_radius_span,
+                                              set_spline_radius_span);
 
   return ComponentAttributeProviders({&resolution, &length, &cyclic}, {});
 }
