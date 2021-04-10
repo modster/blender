@@ -97,6 +97,18 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
 /** \name Spline
  * \{ */
 
+Span<float3> Spline::evaluated_positions() const
+{
+  this->ensure_base_cache();
+  return evaluated_positions_cache_;
+}
+
+Span<PointMapping> Spline::evaluated_mappings() const
+{
+  this->ensure_base_cache();
+  return evaluated_mapping_cache_;
+}
+
 static void accumulate_lengths(Span<float3> positions, MutableSpan<float> r_lengths)
 {
   float length = 0.0f;
@@ -107,24 +119,84 @@ static void accumulate_lengths(Span<float3> positions, MutableSpan<float> r_leng
   }
 }
 
-void Spline::ensure_length_cache() const
+Span<float> Spline::evaluated_lengths() const
 {
   if (!this->length_cache_dirty_) {
-    return;
+    return evaluated_lengths_cache_;
   }
 
-  std::lock_guard<std::mutex> lock(this->length_cache_mutex_);
+  std::lock_guard lock{this->length_cache_mutex_};
   if (!this->length_cache_dirty_) {
-    return;
+    return evaluated_lengths_cache_;
   }
 
   const int total = this->evaluated_points_size();
-  this->evaluated_length_cache_.resize(total);
+  this->evaluated_lengths_cache_.resize(total);
 
   Span<float3> positions = this->evaluated_positions();
-  accumulate_lengths(positions, this->evaluated_length_cache_);
+  accumulate_lengths(positions, this->evaluated_lengths_cache_);
 
   this->length_cache_dirty_ = false;
+  return evaluated_lengths_cache_;
+}
+
+/* TODO: Optimize this along with the function below. */
+static float3 direction_bisect(const float3 &prev, const float3 &middle, const float3 &next)
+{
+  const float3 dir_prev = (middle - prev).normalized();
+  const float3 dir_next = (next - middle).normalized();
+
+  return (dir_prev + dir_next).normalized();
+}
+
+static void calculate_tangents(Span<float3> positions,
+                               const bool is_cyclic,
+                               MutableSpan<float3> tangents)
+{
+  if (positions.size() == 1) {
+    return;
+  }
+
+  for (const int i : IndexRange(1, positions.size() - 2)) {
+    tangents[i] = direction_bisect(positions[i - 1], positions[i], positions[i + 1]);
+  }
+
+  if (is_cyclic) {
+    const float3 &second_to_last = positions[positions.size() - 2];
+    const float3 &last = positions.last();
+    const float3 &first = positions.first();
+    const float3 &second = positions[1];
+    tangents.first() = direction_bisect(last, first, second);
+    tangents.last() = direction_bisect(second_to_last, last, first);
+  }
+  else {
+    tangents.first() = (positions[1] - positions[0]).normalized();
+    tangents.last() = (positions.last() - positions[positions.size() - 1]).normalized();
+  }
+}
+
+Span<float3> Spline::evaluated_tangents() const
+{
+  if (!this->tangent_cache_dirty_) {
+    return evaluated_tangents_cache_;
+  }
+
+  std::lock_guard lock{this->tangent_cache_mutex_};
+  if (!this->tangent_cache_dirty_) {
+    return evaluated_tangents_cache_;
+  }
+
+  const int total = this->evaluated_points_size();
+  this->evaluated_tangents_cache_.resize(total);
+
+  Span<float3> positions = this->evaluated_positions();
+
+  calculate_tangents(positions, this->is_cyclic, this->evaluated_tangents_cache_);
+
+  this->correct_end_tangents();
+
+  this->tangent_cache_dirty_ = false;
+  return evaluated_tangents_cache_;
 }
 
 static float3 initial_normal(const float3 first_tangent)
@@ -275,15 +347,15 @@ static void evaluate_normals(Span<float3> tangents,
   }
 }
 
-void Spline::ensure_normal_cache() const
+Span<float3> Spline::evaluated_normals() const
 {
   if (!this->normal_cache_dirty_) {
-    return;
+    return evaluated_normals_cache_;
   }
 
-  std::lock_guard<std::mutex> lock(this->normal_cache_mutex_);
+  std::lock_guard lock{this->normal_cache_mutex_};
   if (!this->normal_cache_dirty_) {
-    return;
+    return evaluated_normals_cache_;
   }
 
   const int total = this->evaluated_points_size();
@@ -293,6 +365,7 @@ void Spline::ensure_normal_cache() const
   evaluate_normals(tangents, is_cyclic, this->evaluated_normals_cache_);
 
   this->normal_cache_dirty_ = false;
+  return evaluated_normals_cache_;
 }
 
 void Spline::mark_cache_invalid()
@@ -391,6 +464,26 @@ int BezierSpline::evaluated_points_size() const
   }
 
   return total_len;
+}
+
+void BezierSpline::correct_end_tangents() const
+{
+  /* If the spline is not cyclic, the direction for the first and last points is just the
+   * direction formed by the corresponding handles and control points. In the unlikely situation
+   * that the handles define a zero direction, fallback to using the direction defined by the
+   * first and last evaluated segments already calculated in #Spline::evaluated_tangents(). */
+
+  MutableSpan<float3> tangents(this->evaluated_tangents_cache_);
+
+  const BezierPoint &first_point = control_points.first();
+  if (LIKELY(first_point.handle_position_a != first_point.position)) {
+    tangents.first() = (first_point.position - first_point.handle_position_a).normalized();
+  }
+
+  const BezierPoint &last_point = control_points.last();
+  if (LIKELY(last_point.handle_position_a != first_point.position)) {
+    tangents.last() = (last_point.handle_position_b - last_point.position).normalized();
+  }
 }
 
 static void bezier_forward_difference_3d(const float3 &point_0,
@@ -496,88 +589,13 @@ static void evaluate_bezier_positions_and_mapping(Span<BezierPoint> control_poin
   BLI_assert(offset == positions.size());
 }
 
-static float3 direction_bisect(const float3 &prev, const float3 &middle, const float3 &next)
-{
-  const float3 dir_prev = (middle - prev).normalized();
-  const float3 dir_next = (next - middle).normalized();
-
-  return (dir_prev + dir_next).normalized();
-}
-
-static void calculate_tangents(Span<BezierPoint> control_points,
-                               Span<float3> positions,
-                               const bool is_cyclic,
-                               MutableSpan<float3> tangents)
-{
-  if (positions.size() == 1) {
-    tangents.first() = float3(0.0f, 0.0f, 0.0f);
-    return;
-  }
-
-  for (const int i : IndexRange(1, positions.size() - 2)) {
-    tangents[i] = direction_bisect(positions[i - 1], positions[i], positions[i + 1]);
-  }
-
-  if (is_cyclic) {
-    const float3 &second_to_last = positions[positions.size() - 2];
-    const float3 &last = positions.last();
-    const float3 &first = positions.first();
-    const float3 &second = positions[1];
-    tangents.first() = direction_bisect(last, first, second);
-    tangents.last() = direction_bisect(second_to_last, last, first);
-  }
-  else {
-    /* If the spline is not cyclic, the direction for the first and last points is just the
-     * direction formed by the corresponding handles and control points. In the unlikely situation
-     * that the handles define a zero direction, fallback to using the direction defined by the
-     * first and last evaluated segments. */
-    const BezierPoint &first_point = control_points.first();
-    if (LIKELY(first_point.handle_position_a != first_point.position)) {
-      tangents.first() = (first_point.position - first_point.handle_position_a).normalized();
-    }
-    else {
-      tangents.first() = (positions[1] - positions[0]).normalized();
-    }
-
-    const BezierPoint &last_point = control_points.last();
-    if (LIKELY(last_point.handle_position_a != first_point.position)) {
-      tangents.last() = (last_point.handle_position_b - last_point.position).normalized();
-    }
-    else {
-      tangents.last() = (positions.last() - positions[positions.size() - 1]).normalized();
-    }
-  }
-}
-
-void BezierSpline::ensure_tangent_cache() const
-{
-  if (!this->tangent_cache_dirty_) {
-    return;
-  }
-
-  std::lock_guard<std::mutex> lock(this->tangent_cache_mutex_);
-  if (!this->tangent_cache_dirty_) {
-    return;
-  }
-
-  const int total = this->evaluated_points_size();
-  this->evaluated_tangents_cache_.resize(total);
-
-  Span<float3> positions = this->evaluated_positions();
-
-  calculate_tangents(
-      this->control_points, positions, this->is_cyclic, this->evaluated_tangents_cache_);
-
-  this->tangent_cache_dirty_ = false;
-}
-
 void BezierSpline::ensure_base_cache() const
 {
   if (!this->base_cache_dirty_) {
     return;
   }
 
-  std::lock_guard<std::mutex> lock(this->base_cache_mutex_);
+  std::lock_guard lock{this->base_cache_mutex_};
   if (!this->base_cache_dirty_) {
     return;
   }
@@ -627,11 +645,11 @@ int NURBSPline::evaluated_points_size() const
   return 0;
 }
 
-void NURBSPline::ensure_base_cache() const
+void NURBSPline::correct_end_tangents() const
 {
 }
 
-void NURBSPline::ensure_tangent_cache() const
+void NURBSPline::ensure_base_cache() const
 {
 }
 

@@ -92,7 +92,7 @@ class Spline {
 
   mutable bool length_cache_dirty_ = true;
   mutable std::mutex length_cache_mutex_;
-  mutable blender::Vector<float> evaluated_length_cache_;
+  mutable blender::Vector<float> evaluated_lengths_cache_;
 
  public:
   virtual ~Spline() = default;
@@ -104,41 +104,19 @@ class Spline {
   virtual void mark_cache_invalid();
   virtual int evaluated_points_size() const = 0;
 
-  blender::Span<blender::float3> evaluated_positions() const
-  {
-    this->ensure_base_cache();
-    return evaluated_positions_cache_;
-  }
-  blender::Span<PointMapping> evaluated_mappings() const
-  {
-    this->ensure_base_cache();
-    return evaluated_mapping_cache_;
-  }
-  blender::Span<float> evaluated_length() const
-  {
-    this->ensure_length_cache();
-    return evaluated_length_cache_;
-  }
-  blender::Span<blender::float3> evaluated_tangents() const
-  {
-    this->ensure_tangent_cache();
-    return evaluated_tangents_cache_;
-  }
-  blender::Span<blender::float3> evaluated_normals() const
-  {
-    this->ensure_normal_cache();
-    return evaluated_normals_cache_;
-  }
+  blender::Span<blender::float3> evaluated_positions() const;
+  blender::Span<PointMapping> evaluated_mappings() const;
+  blender::Span<float> evaluated_lengths() const;
+  blender::Span<blender::float3> evaluated_tangents() const;
+  blender::Span<blender::float3> evaluated_normals() const;
 
   /* TODO: I'm not sure this is the best abstraction here. Indeed, all of the `PointMapping`
    * stuff might be a bit suspect. */
   float get_evaluated_point_radius(const int index) const;
 
  protected:
+  virtual void correct_end_tangents() const = 0;
   virtual void ensure_base_cache() const = 0;
-  virtual void ensure_tangent_cache() const = 0;
-  void ensure_normal_cache() const;
-  void ensure_length_cache() const;
 
   virtual float control_point_radius(const int index) const = 0;
 };
@@ -158,9 +136,12 @@ class BezierSpline : public Spline {
   void set_resolution(const int value) final;
   int evaluated_points_size() const final;
 
+ protected:
+  void correct_final_tangents() const;
+
  private:
+  void correct_end_tangents() const final;
   void ensure_base_cache() const final;
-  void ensure_tangent_cache() const final;
 
   float control_point_radius(const int index) const final;
 };
@@ -190,8 +171,8 @@ class NURBSPline : public Spline {
   int evaluated_points_size() const final;
 
  protected:
+  void correct_end_tangents() const final;
   void ensure_base_cache() const final;
-  void ensure_tangent_cache() const final;
 
   float control_point_radius(const int index) const final;
 };
