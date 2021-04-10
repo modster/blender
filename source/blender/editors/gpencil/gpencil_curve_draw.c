@@ -111,6 +111,9 @@ typedef struct tGPDcurve_draw {
   bool is_cyclic;
   float prev_pressure;
 
+  /* Curve resolution */
+  int resolution;
+
   /* Callback for viewport drawing. */
   void *draw_handle;
 
@@ -410,6 +413,8 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
   tcd->region = region;
   tcd->gpd = gpd;
   tcd->ob = ob;
+  /* Fixed resolution. */
+  tcd->resolution = 32;
 
   /* Initialize mouse state */
   copy_v2_v2_int(tcd->imval, event->mval);
@@ -514,7 +519,7 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
       copy_v3_v3(bezt->vec[1], co);
       copy_v3_v3(bezt->vec[2], co);
 
-      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
       gpencil_set_alpha_last_segment(tcd, 0.1f);
       break;
     }
@@ -526,14 +531,14 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
       copy_v3_v3(bezt->vec[0], vec);
       copy_v3_v3(bezt->vec[2], co);
 
-      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
       break;
     }
     case IN_DRAG_FREE_HANDLE: {
       gpencil_project_mval_to_v3(tcd->scene, tcd->region, tcd->ob, tcd->imval, co);
       copy_v3_v3(bezt->vec[2], co);
 
-      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
       break;
     }
     case IN_SET_THICKNESS: {
@@ -546,7 +551,7 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
       cpt->pressure = tcd->prev_pressure + dr;
       CLAMP_MIN(cpt->pressure, 0.0f);
 
-      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
       break;
     }
     default:
