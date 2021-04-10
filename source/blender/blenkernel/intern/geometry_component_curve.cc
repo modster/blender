@@ -14,11 +14,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "FN_generic_virtual_array.hh"
+#include "FN_generic_span.hh"
 
 #include "BKE_derived_curve.hh"
 
 #include "BKE_attribute_access.hh"
+#include "BKE_attribute_math.hh"
 #include "BKE_geometry_set.hh"
 
 #include "attribute_access_intern.hh"
@@ -274,26 +275,25 @@ static WriteAttributePtr make_cyclic_write_attribute(DCurve &curve)
 }
 
 class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
-  using GetSplineWriteSpan = fn::GVArray (*)(const DCurve &data);
-  using AsWriteAttribute = WriteAttributePtr (*)(DCurve &data);
-  using UpdateOnWrite = void (*)(Spline &spline);
-  const GetSplineWriteSpan as_read_attribute_;
-  const AsWriteAttribute as_write_attribute_;
+  using GetSplineData = void (*)(const Spline &spline, fn::GMutableSpan r_data);
+  using SetSplineData = void (*)(Spline &spline, fn::GSpan data);
+  const GetSplineData get_spline_data_;
+  const SetSplineData set_spline_data_;
 
  public:
   BuiltinPointAttributeProvider(std::string attribute_name,
                                 const CustomDataType attribute_type,
                                 const WritableEnum writable,
-                                const AsReadAttribute as_read_attribute,
-                                const AsWriteAttribute as_write_attribute)
+                                const GetSplineData get_spline_data,
+                                const SetSplineData set_spline_data)
       : BuiltinAttributeProvider(std::move(attribute_name),
                                  ATTR_DOMAIN_POINT,
                                  attribute_type,
                                  BuiltinAttributeProvider::NonCreatable,
                                  writable,
                                  BuiltinAttributeProvider::NonDeletable),
-        as_read_attribute_(as_read_attribute),
-        as_write_attribute_(as_write_attribute)
+        get_spline_data_(get_spline_data),
+        set_spline_data_(set_spline_data)
   {
   }
 
@@ -305,21 +305,30 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
       return {};
     }
 
-    return as_read_attribute_(*curve);
+    ReadAttributePtr new_attribute;
+    attribute_math::convert_to_static_type(data_type_, [&](auto dummy) {
+      using T = decltype(dummy);
+      Array<T> values(curve_component.attribute_domain_size(ATTR_DOMAIN_POINT));
+
+      int offset = 0;
+      for (const Spline *spline : curve->splines) {
+        const int spline_total = spline->evaluated_points_size();
+        MutableSpan<T> spline_data = values.as_mutable_span().slice(offset, spline_total);
+        fn::GMutableSpan generic_spline_data(spline_data);
+        get_spline_data_(*spline, generic_spline_data);
+        offset += spline_total;
+      }
+
+      new_attribute = std::make_unique<OwnedArrayReadAttribute<T>>(ATTR_DOMAIN_POINT,
+                                                                   std::move(values));
+    });
+
+    return new_attribute;
   }
 
-  WriteAttributePtr try_get_for_write(GeometryComponent &component) const final
+  WriteAttributePtr try_get_for_write(GeometryComponent &UNUSED(component)) const final
   {
-    if (writable_ != Writable) {
-      return {};
-    }
-    CurveComponent &curve_component = static_cast<CurveComponent &>(component);
-    DCurve *curve = curve_component.get_for_write();
-    if (curve == nullptr) {
-      return {};
-    }
-
-    return as_write_attribute_(*curve);
+    return {};
   }
 
   bool try_delete(GeometryComponent &UNUSED(component)) const final
@@ -337,6 +346,26 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
     return component.attribute_domain_size(ATTR_DOMAIN_POINT) != 0;
   }
 };
+
+static void get_spline_radius_data(const Spline &spline, fn::GMutableSpan r_data)
+{
+  MutableSpan<float> r_span = r_data.typed<float>();
+  if (const BezierSpline *bezier_spline = dynamic_cast<const BezierSpline *>(&spline)) {
+    for (const int i : IndexRange(bezier_spline->size())) {
+      r_span[i] = bezier_spline->control_points[i].radius;
+    }
+  }
+}
+
+static void get_spline_position_data(const Spline &spline, fn::GMutableSpan r_data)
+{
+  MutableSpan<float3> r_span = r_data.typed<float3>();
+  if (const BezierSpline *bezier_spline = dynamic_cast<const BezierSpline *>(&spline)) {
+    for (const int i : IndexRange(bezier_spline->size())) {
+      r_span[i] = bezier_spline->control_points[i].position;
+    }
+  }
+}
 
 /**
  * In this function all the attribute providers for a curve component are created. Most data
@@ -359,13 +388,19 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
                                                make_cyclic_read_attribute,
                                                make_cyclic_write_attribute);
 
+  static BuiltinPointAttributeProvider position("position",
+                                                CD_PROP_FLOAT3,
+                                                BuiltinAttributeProvider::Readonly,
+                                                get_spline_position_data,
+                                                nullptr);
+
   static BuiltinPointAttributeProvider radius("radius",
                                               CD_PROP_FLOAT,
-                                              BuiltinAttributeProvider::Writable,
-                                              get_spline_radius_span,
-                                              set_spline_radius_span);
+                                              BuiltinAttributeProvider::Readonly,
+                                              get_spline_radius_data,
+                                              nullptr);
 
-  return ComponentAttributeProviders({&resolution, &length, &cyclic}, {});
+  return ComponentAttributeProviders({&resolution, &length, &cyclic, &position, &radius}, {});
 }
 
 }  // namespace blender::bke

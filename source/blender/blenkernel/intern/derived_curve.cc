@@ -50,7 +50,7 @@ static BezierPoint::HandleType handle_type_from_dna_bezt(const eBezTriple_Handle
       return BezierPoint::Align;
   }
   BLI_assert_unreachable();
-  return BezierPoint::Free;
+  return BezierPoint::Auto;
 }
 
 DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
