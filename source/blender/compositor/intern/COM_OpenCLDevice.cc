@@ -19,6 +19,8 @@
 #include "COM_OpenCLDevice.h"
 #include "COM_WorkScheduler.h"
 
+namespace blender::compositor {
+
 enum COM_VendorID { NVIDIA = 0x10DE, AMD = 0x1002 };
 const cl_image_format IMAGE_FORMAT_COLOR = {
     CL_RGBA,
@@ -43,34 +45,28 @@ OpenCLDevice::OpenCLDevice(cl_context context,
   this->m_program = program;
   this->m_queue = nullptr;
   this->m_vendorID = vendorId;
-}
 
-bool OpenCLDevice::initialize()
-{
   cl_int error;
   this->m_queue = clCreateCommandQueue(this->m_context, this->m_device, 0, &error);
-  return false;
 }
 
-void OpenCLDevice::deinitialize()
+OpenCLDevice::~OpenCLDevice()
 {
   if (this->m_queue) {
     clReleaseCommandQueue(this->m_queue);
   }
 }
 
-void OpenCLDevice::execute(WorkPackage *work)
+void OpenCLDevice::execute(WorkPackage *work_package)
 {
-  const unsigned int chunkNumber = work->chunk_number;
-  ExecutionGroup *executionGroup = work->execution_group;
-  rcti rect;
+  const unsigned int chunkNumber = work_package->chunk_number;
+  ExecutionGroup *executionGroup = work_package->execution_group;
 
-  executionGroup->determineChunkRect(&rect, chunkNumber);
   MemoryBuffer **inputBuffers = executionGroup->getInputBuffersOpenCL(chunkNumber);
-  MemoryBuffer *outputBuffer = executionGroup->allocateOutputBuffer(rect);
+  MemoryBuffer *outputBuffer = executionGroup->allocateOutputBuffer(work_package->rect);
 
   executionGroup->getOutputOperation()->executeOpenCLRegion(
-      this, &rect, chunkNumber, inputBuffers, outputBuffer);
+      this, &work_package->rect, chunkNumber, inputBuffers, outputBuffer);
 
   delete outputBuffer;
 
@@ -274,3 +270,5 @@ cl_kernel OpenCLDevice::COM_clCreateKernel(const char *kernelname,
   }
   return kernel;
 }
+
+}  // namespace blender::compositor

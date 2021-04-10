@@ -778,7 +778,6 @@ static void rna_Scene_objects_begin(CollectionPropertyIterator *iter, PointerRNA
   Scene *scene = (Scene *)ptr->data;
   iter->internal.custom = MEM_callocN(sizeof(BLI_Iterator), __func__);
 
-  ((BLI_Iterator *)iter->internal.custom)->valid = true;
   BKE_scene_objects_iterator_begin(iter->internal.custom, (void *)scene);
   iter->valid = ((BLI_Iterator *)iter->internal.custom)->valid;
 }
@@ -1896,10 +1895,10 @@ static void rna_Scene_use_persistent_data_update(Main *UNUSED(bmain),
                                                  Scene *UNUSED(scene),
                                                  PointerRNA *ptr)
 {
-  Scene *sce = (Scene *)ptr->owner_id;
+  Scene *scene = (Scene *)ptr->owner_id;
 
-  if (!(sce->r.mode & R_PERSISTENT_DATA)) {
-    RE_FreePersistentData();
+  if (!(scene->r.mode & R_PERSISTENT_DATA)) {
+    RE_FreePersistentData(scene);
   }
 }
 
@@ -2685,6 +2684,7 @@ static void rna_def_view3d_cursor(BlenderRNA *brna)
   RNA_def_struct_path_func(srna, "rna_View3DCursor_path");
   RNA_def_struct_ui_text(srna, "3D Cursor", "");
   RNA_def_struct_ui_icon(srna, ICON_CURSOR);
+  RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
 
   prop = RNA_def_property(srna, "location", PROP_FLOAT, PROP_XYZ_LENGTH);
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
@@ -2855,7 +2855,7 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
   RNA_def_property_boolean_sdna(prop, NULL, "auto_normalize", 1);
   RNA_def_property_ui_text(prop,
-                           "WPaint Auto-Normalize",
+                           "Weight Paint Auto-Normalize",
                            "Ensure all bone-deforming vertex groups add up "
                            "to 1.0 while weight painting");
   RNA_def_property_update(prop, 0, "rna_Scene_update_active_object_data");
@@ -2864,7 +2864,7 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
   RNA_def_property_boolean_sdna(prop, NULL, "wpaint_lock_relative", 1);
   RNA_def_property_ui_text(prop,
-                           "WPaint Lock-Relative",
+                           "Weight Paint Lock-Relative",
                            "Display bone-deforming groups as if all locked deform groups "
                            "were deleted, and the remaining ones were re-normalized");
   RNA_def_property_update(prop, 0, "rna_Scene_update_active_object_data");
@@ -2873,7 +2873,7 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
   RNA_def_property_boolean_sdna(prop, NULL, "multipaint", 1);
   RNA_def_property_ui_text(prop,
-                           "WPaint Multi-Paint",
+                           "Weight Paint Multi-Paint",
                            "Paint across the weights of all selected bones, "
                            "maintaining their relative influence");
   RNA_def_property_update(prop, 0, "rna_Scene_update_active_object_data");
@@ -6605,8 +6605,10 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
   /* persistent data */
   prop = RNA_def_property(srna, "use_persistent_data", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "mode", R_PERSISTENT_DATA);
-  RNA_def_property_ui_text(
-      prop, "Persistent Data", "Keep render data around for faster re-renders");
+  RNA_def_property_ui_text(prop,
+                           "Persistent Data",
+                           "Keep render data around for faster re-renders and animation renders, "
+                           "at the cost of increased memory usage");
   RNA_def_property_update(prop, 0, "rna_Scene_use_persistent_data_update");
 
   /* Freestyle line thickness options */

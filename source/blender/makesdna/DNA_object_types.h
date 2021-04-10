@@ -169,6 +169,11 @@ typedef struct Object_Runtime {
   struct GeometrySet *geometry_set_eval;
 
   /**
+   * Data from this geometry set is previewed in the spreadsheet editor.
+   */
+  struct GeometrySet *geometry_set_preview;
+
+  /**
    * Mesh structure created during object evaluation.
    * It has deformation only modifiers applied on it.
    */
@@ -213,8 +218,11 @@ typedef struct ObjectLineArt {
   float crease_threshold;
 } ObjectLineArt;
 
-enum ObjectFeatureLine_Usage {
-  OBJECT_LRT_INHERENT = 0,
+/**
+ * \warning while the values seem to be flags, they aren't treated as flags.
+ */
+enum eObjectLineArt_Usage {
+  OBJECT_LRT_INHERIT = 0,
   OBJECT_LRT_INCLUDE = (1 << 0),
   OBJECT_LRT_OCCLUSION_ONLY = (1 << 1),
   OBJECT_LRT_EXCLUDE = (1 << 2),
@@ -222,7 +230,7 @@ enum ObjectFeatureLine_Usage {
   OBJECT_LRT_NO_INTERSECTION = (1 << 4),
 };
 
-enum ObjectFeatureLine_Flags {
+enum eObjectLineArt_Flags {
   OBJECT_LRT_OWN_CREASE = (1 << 0),
 };
 

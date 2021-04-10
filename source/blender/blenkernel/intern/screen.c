@@ -1350,6 +1350,13 @@ static void write_area(BlendWriter *writer, ScrArea *area)
     }
     else if (sl->spacetype == SPACE_SPREADSHEET) {
       BLO_write_struct(writer, SpaceSpreadsheet, sl);
+
+      SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
+      LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
+        BLO_write_struct(writer, SpreadsheetColumn, column);
+        BLO_write_struct(writer, SpreadsheetColumnID, column->id);
+        BLO_write_string(writer, column->id->name);
+      }
     }
   }
 }
@@ -1527,9 +1534,6 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
 
     if (sl->spacetype == SPACE_VIEW3D) {
       View3D *v3d = (View3D *)sl;
-
-      v3d->flag |= V3D_INVALID_BACKBUF;
-
       if (v3d->gpd) {
         BLO_read_data_address(reader, &v3d->gpd);
         BKE_gpencil_blend_read_data(reader, v3d->gpd);
@@ -1705,6 +1709,12 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
 
       sspreadsheet->runtime = NULL;
+
+      BLO_read_list(reader, &sspreadsheet->columns);
+      LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
+        BLO_read_data_address(reader, &column->id);
+        BLO_read_data_address(reader, &column->id->name);
+      }
     }
   }
 

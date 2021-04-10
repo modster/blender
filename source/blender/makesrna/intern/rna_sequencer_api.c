@@ -81,15 +81,16 @@ static void rna_Sequence_swap_internal(Sequence *seq_self,
   }
 }
 
-static void rna_Sequences_move_strip_to_meta(ID *id,
-                                             Sequence *seq_self,
-                                             Main *bmain,
-                                             Sequence *meta_dst)
+static void rna_Sequences_move_strip_to_meta(
+    ID *id, Sequence *seq_self, Main *bmain, ReportList *reports, Sequence *meta_dst)
 {
   Scene *scene = (Scene *)id;
+  const char *error_msg;
 
   /* Move strip to meta. */
-  SEQ_edit_move_strip_to_meta(scene, seq_self, meta_dst);
+  if (!SEQ_edit_move_strip_to_meta(scene, seq_self, meta_dst, &error_msg)) {
+    BKE_report(reports, RPT_ERROR, error_msg);
+  }
 
   /* Update depsgraph. */
   DEG_relations_tag_update(bmain);
@@ -223,13 +224,15 @@ static Sequence *rna_Sequences_new_image(ID *id,
                                          const char *name,
                                          const char *file,
                                          int channel,
-                                         int frame_start)
+                                         int frame_start,
+                                         int fit_method)
 {
   Scene *scene = (Scene *)id;
 
   SeqLoadData load_data;
   SEQ_add_load_data_init(&load_data, name, file, frame_start, channel);
   load_data.image.len = 1;
+  load_data.fit_method = fit_method;
   Sequence *seq = SEQ_add_image_strip(bmain, scene, seqbase, &load_data);
 
   char dir[FILE_MAX], filename[FILE_MAX];
@@ -252,10 +255,11 @@ static Sequence *rna_Sequences_editing_new_image(ID *id,
                                                  const char *name,
                                                  const char *file,
                                                  int channel,
-                                                 int frame_start)
+                                                 int frame_start,
+                                                 int fit_method)
 {
   return rna_Sequences_new_image(
-      id, &ed->seqbase, bmain, reports, name, file, channel, frame_start);
+      id, &ed->seqbase, bmain, reports, name, file, channel, frame_start, fit_method);
 }
 
 static Sequence *rna_Sequences_meta_new_image(ID *id,
@@ -265,10 +269,11 @@ static Sequence *rna_Sequences_meta_new_image(ID *id,
                                               const char *name,
                                               const char *file,
                                               int channel,
-                                              int frame_start)
+                                              int frame_start,
+                                              int fit_method)
 {
   return rna_Sequences_new_image(
-      id, &seq->seqbase, bmain, reports, name, file, channel, frame_start);
+      id, &seq->seqbase, bmain, reports, name, file, channel, frame_start, fit_method);
 }
 
 static Sequence *rna_Sequences_new_movie(ID *id,
@@ -277,11 +282,13 @@ static Sequence *rna_Sequences_new_movie(ID *id,
                                          const char *name,
                                          const char *file,
                                          int channel,
-                                         int frame_start)
+                                         int frame_start,
+                                         int fit_method)
 {
   Scene *scene = (Scene *)id;
   SeqLoadData load_data;
   SEQ_add_load_data_init(&load_data, name, file, frame_start, channel);
+  load_data.fit_method = fit_method;
   load_data.allow_invalid_file = true;
   Sequence *seq = SEQ_add_movie_strip(bmain, scene, seqbase, &load_data);
 
@@ -298,9 +305,11 @@ static Sequence *rna_Sequences_editing_new_movie(ID *id,
                                                  const char *name,
                                                  const char *file,
                                                  int channel,
-                                                 int frame_start)
+                                                 int frame_start,
+                                                 int fit_method)
 {
-  return rna_Sequences_new_movie(id, &ed->seqbase, bmain, name, file, channel, frame_start);
+  return rna_Sequences_new_movie(
+      id, &ed->seqbase, bmain, name, file, channel, frame_start, fit_method);
 }
 
 static Sequence *rna_Sequences_meta_new_movie(ID *id,
@@ -309,9 +318,11 @@ static Sequence *rna_Sequences_meta_new_movie(ID *id,
                                               const char *name,
                                               const char *file,
                                               int channel,
-                                              int frame_start)
+                                              int frame_start,
+                                              int fit_method)
 {
-  return rna_Sequences_new_movie(id, &seq->seqbase, bmain, name, file, channel, frame_start);
+  return rna_Sequences_new_movie(
+      id, &seq->seqbase, bmain, name, file, channel, frame_start, fit_method);
 }
 
 #  ifdef WITH_AUDASPACE
@@ -651,7 +662,7 @@ void RNA_api_sequence_strip(StructRNA *srna)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
 
   func = RNA_def_function(srna, "move_to_meta", "rna_Sequences_move_strip_to_meta");
-  RNA_def_function_flag(func, FUNC_USE_SELF_ID | FUNC_USE_MAIN);
+  RNA_def_function_flag(func, FUNC_USE_REPORTS | FUNC_USE_SELF_ID | FUNC_USE_MAIN);
   parm = RNA_def_pointer(func,
                          "meta_sequence",
                          "Sequence",
@@ -720,6 +731,18 @@ void RNA_api_sequences(BlenderRNA *brna, PropertyRNA *cprop, const bool metastri
       {SEQ_TYPE_GAUSSIAN_BLUR, "GAUSSIAN_BLUR", 0, "Gaussian Blur", ""},
       {SEQ_TYPE_TEXT, "TEXT", 0, "Text", ""},
       {SEQ_TYPE_COLORMIX, "COLORMIX", 0, "Color Mix", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static const EnumPropertyItem scale_fit_methods[] = {
+      {SEQ_SCALE_TO_FIT, "FIT", 0, "Scale to Fit", "Scale image so fits in preview"},
+      {SEQ_SCALE_TO_FILL,
+       "FILL",
+       0,
+       "Scale to Fill",
+       "Scale image so it fills preview completely"},
+      {SEQ_STRETCH_TO_FILL, "STRETCH", 0, "Stretch to Fill", "Stretch image so it fills preview"},
+      {SEQ_USE_ORIGINAL_SIZE, "ORIGINAL", 0, "Use Original Size", "Don't scale the image"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -848,6 +871,9 @@ void RNA_api_sequences(BlenderRNA *brna, PropertyRNA *cprop, const bool metastri
                      -MAXFRAME,
                      MAXFRAME);
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_enum(
+      func, "fit_method", scale_fit_methods, SEQ_USE_ORIGINAL_SIZE, "Image Fit Method", NULL);
+  RNA_def_parameter_flags(parm, 0, PARM_PYFUNC_OPTIONAL);
   /* return type */
   parm = RNA_def_pointer(func, "sequence", "Sequence", "", "New Sequence");
   RNA_def_function_return(func, parm);
@@ -872,6 +898,9 @@ void RNA_api_sequences(BlenderRNA *brna, PropertyRNA *cprop, const bool metastri
                      -MAXFRAME,
                      MAXFRAME);
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_enum(
+      func, "fit_method", scale_fit_methods, SEQ_USE_ORIGINAL_SIZE, "Image Fit Method", NULL);
+  RNA_def_parameter_flags(parm, 0, PARM_PYFUNC_OPTIONAL);
   /* return type */
   parm = RNA_def_pointer(func, "sequence", "Sequence", "", "New Sequence");
   RNA_def_function_return(func, parm);

@@ -1711,7 +1711,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       LineartLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
                                                    sizeof(LineartLineSegment));
       BLI_addtail(&la_e->segments, rls);
-      if (usage == OBJECT_LRT_INHERENT || usage == OBJECT_LRT_INCLUDE ||
+      if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
           usage == OBJECT_LRT_NO_INTERSECTION) {
         lineart_add_edge_to_list(rb, la_e);
       }
@@ -1750,10 +1750,10 @@ static int lineart_usage_check(Collection *c, Object *ob, LineartRenderBuffer *_
 {
 
   if (!c) {
-    return OBJECT_LRT_INHERENT;
+    return OBJECT_LRT_INHERIT;
   }
 
-  int object_has_special_usage = (ob->lineart.usage != OBJECT_LRT_INHERENT);
+  int object_has_special_usage = (ob->lineart.usage != OBJECT_LRT_INHERIT);
 
   if (object_has_special_usage) {
     return ob->lineart.usage;
@@ -1761,7 +1761,7 @@ static int lineart_usage_check(Collection *c, Object *ob, LineartRenderBuffer *_
 
   if (c->children.first == NULL) {
     if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
-      if (ob->lineart.usage == OBJECT_LRT_INHERENT) {
+      if (ob->lineart.usage == OBJECT_LRT_INHERIT) {
         switch (c->lineart_usage) {
           case COLLECTION_LRT_OCCLUSION_ONLY:
             return OBJECT_LRT_OCCLUSION_ONLY;
@@ -1772,16 +1772,16 @@ static int lineart_usage_check(Collection *c, Object *ob, LineartRenderBuffer *_
           case COLLECTION_LRT_NO_INTERSECTION:
             return OBJECT_LRT_NO_INTERSECTION;
         }
-        return OBJECT_LRT_INHERENT;
+        return OBJECT_LRT_INHERIT;
       }
       return ob->lineart.usage;
     }
-    return OBJECT_LRT_INHERENT;
+    return OBJECT_LRT_INHERIT;
   }
 
   LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
     int result = lineart_usage_check(cc->collection, ob, _rb);
-    if (result > OBJECT_LRT_INHERENT) {
+    if (result > OBJECT_LRT_INHERIT) {
       return result;
     }
   }
@@ -1799,7 +1799,7 @@ static int lineart_usage_check(Collection *c, Object *ob, LineartRenderBuffer *_
     }
   }
 
-  return OBJECT_LRT_INHERENT;
+  return OBJECT_LRT_INHERIT;
 }
 
 static void lineart_main_load_geometries(
@@ -3768,7 +3768,6 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
                                      uchar transparency_mask,
                                      short thickness,
                                      float opacity,
-                                     float resample_length,
                                      const char *source_vgname,
                                      const char *vgname,
                                      int modifier_flags)
@@ -3802,7 +3801,6 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
   int enabled_types = lineart_rb_edge_types(rb);
   bool invert_input = modifier_flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP;
   bool match_output = modifier_flags & LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
-  bool preserve_weight = modifier_flags & LRT_GPENCIL_SOFT_SELECTION;
 
   LISTBASE_FOREACH (LineartLineChain *, rlc, &rb->chains) {
 
@@ -3858,7 +3856,7 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
 
     BKE_gpencil_stroke_add_points(gps, stroke_data, count, mat);
     BKE_gpencil_dvert_ensure(gps);
-    gps->mat_nr = material_nr;
+    gps->mat_nr = max_ii(material_nr, 0);
 
     MEM_freeN(stroke_data);
 
@@ -3886,18 +3884,13 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
                   }
                   MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
                   MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
-                  if (preserve_weight) {
-                    float use_weight = mdw->weight;
-                    if (invert_input) {
-                      use_weight = 1 - use_weight;
-                    }
-                    gdw->weight = MAX2(use_weight, gdw->weight);
+
+                  float use_weight = mdw->weight;
+                  if (invert_input) {
+                    use_weight = 1 - use_weight;
                   }
-                  else {
-                    if (mdw->weight > 0.999f) {
-                      gdw->weight = 1.0f;
-                    }
-                  }
+                  gdw->weight = MAX2(use_weight, gdw->weight);
+
                   sindex++;
                 }
               }
@@ -3908,9 +3901,6 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
       }
     }
 
-    if (resample_length > 0.0001) {
-      BKE_gpencil_stroke_sample(gpencil_object->data, gps, resample_length, false);
-    }
     if (G.debug_value == 4000) {
       BKE_gpencil_stroke_set_random_color(gps);
     }
@@ -3941,7 +3931,6 @@ void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
                                   uchar transparency_mask,
                                   short thickness,
                                   float opacity,
-                                  float resample_length,
                                   const char *source_vgname,
                                   const char *vgname,
                                   int modifier_flags)
@@ -3991,7 +3980,6 @@ void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
                            transparency_mask,
                            thickness,
                            opacity,
-                           resample_length,
                            source_vgname,
                            vgname,
                            modifier_flags);

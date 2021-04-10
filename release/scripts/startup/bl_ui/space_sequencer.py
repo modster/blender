@@ -115,16 +115,18 @@ class SEQUENCER_HT_tool_header(Header):
     def draw_tool_settings(self, context):
         pass
 
-        # Currently unused.
-        '''
         layout = self.layout
 
         # Active Tool
         # -----------
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        # Most callers assign the `tool` & `tool_mode`, currently the result is not used.
+        """
         tool = ToolSelectPanelHelper.draw_active_tool_header(context, layout)
         tool_mode = context.mode if tool is None else tool.mode
-        '''
+        """
+        # Only draw the header.
+        ToolSelectPanelHelper.draw_active_tool_header(context, layout)
 
 
 class SEQUENCER_HT_header(Header):
@@ -1280,8 +1282,8 @@ class SEQUENCER_PT_effect_text_style(SequencerButtonsPanel, Panel):
         row = col.row(align=True)
         row.use_property_decorate = False
         row.template_ID(strip, "font", open="font.open", unlink="font.unlink")
-        row.prop(strip, "use_bold", text="", icon="BOLD")
-        row.prop(strip, "use_italic", text="", icon="ITALIC")
+        row.prop(strip, "use_bold", text="", icon='BOLD')
+        row.prop(strip, "use_italic", text="", icon='ITALIC')
 
         col.prop(strip, "font_size")
         col.prop(strip, "color")
@@ -2013,8 +2015,8 @@ class SEQUENCER_PT_view(SequencerButtonsPanel_Output, Panel):
         col.prop(st, "proxy_render_size")
 
         col = layout.column()
-        prop = col.prop(st, "use_proxies")
-        if st.proxy_render_size in ('NONE', 'SCENE'):
+        col.prop(st, "use_proxies")
+        if st.proxy_render_size in {'NONE', 'SCENE'}:
             col.enabled = False
 
         col = layout.column()

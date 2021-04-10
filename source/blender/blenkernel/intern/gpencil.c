@@ -222,7 +222,7 @@ void BKE_gpencil_blend_read_data(BlendDataReader *reader, bGPdata *gpd)
   /* relink palettes (old palettes deprecated, only to convert old files) */
   BLO_read_list(reader, &gpd->palettes);
   if (gpd->palettes.first != NULL) {
-    LISTBASE_FOREACH (Palette *, palette, &gpd->palettes) {
+    LISTBASE_FOREACH (bGPDpalette *, palette, &gpd->palettes) {
       BLO_read_list(reader, &palette->colors);
     }
   }
@@ -1293,7 +1293,8 @@ bGPDframe *BKE_gpencil_layer_frame_find(bGPDlayer *gpl, int cframe)
   return NULL;
 }
 
-/** Get the appropriate gp-frame from a given layer
+/**
+ * Get the appropriate gp-frame from a given layer
  * - this sets the layer's actframe var (if allowed to)
  * - extension beyond range (if first gp-frame is after all frame in interest and cannot add)
  *
@@ -2446,7 +2447,7 @@ int BKE_gpencil_object_material_index_get(Object *ob, Material *ma)
   return -1;
 }
 
-int BKE_gpencil_object_material_get_index_name(Object *ob, char *name)
+int BKE_gpencil_object_material_index_get_by_name(Object *ob, const char *name)
 {
   short *totcol = BKE_object_material_len_p(ob);
   Material *read_ma = NULL;
@@ -2459,6 +2460,19 @@ int BKE_gpencil_object_material_get_index_name(Object *ob, char *name)
   }
 
   return -1;
+}
+
+Material *BKE_gpencil_object_material_ensure_by_name(Main *bmain,
+                                                     Object *ob,
+                                                     const char *name,
+                                                     int *r_index)
+{
+  int index = BKE_gpencil_object_material_index_get_by_name(ob, name);
+  if (index != -1) {
+    *r_index = index;
+    return BKE_object_material_get(ob, index + 1);
+  }
+  return BKE_gpencil_object_material_new(bmain, ob, name, r_index);
 }
 
 /**
