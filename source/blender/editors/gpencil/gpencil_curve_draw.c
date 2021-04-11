@@ -519,6 +519,7 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
       copy_v3_v3(bezt->vec[1], co);
       copy_v3_v3(bezt->vec[2], co);
 
+      BKE_gpencil_editcurve_recalculate_handles(gps);
       BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
       gpencil_set_alpha_last_segment(tcd, 0.1f);
       break;
