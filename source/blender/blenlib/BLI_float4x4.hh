@@ -150,7 +150,13 @@ struct float4x4 {
   void apply_scale(const float scale)
   {
     values[0][0] *= scale;
+    values[0][1] *= scale;
+    values[0][2] *= scale;
+    values[1][0] *= scale;
     values[1][1] *= scale;
+    values[1][2] *= scale;
+    values[2][0] *= scale;
+    values[2][1] *= scale;
     values[2][2] *= scale;
   }
 
