@@ -778,6 +778,13 @@ static void lib_link_node_socket(BlendLibReader *reader, Library *lib, bNodeSock
 {
   IDP_BlendReadLib(reader, sock->prop);
 
+  /* This can happen for all socket types when a file is saved in an older version of Blender than
+   * it was originally created in (T86298). Some socket types still require a default value. The
+   * default value of those sockets will be created in `ntreeSetTypes`. */
+  if (sock->default_value == nullptr) {
+    return;
+  }
+
   switch ((eNodeSocketDatatype)sock->type) {
     case SOCK_OBJECT: {
       bNodeSocketValueObject *default_value = (bNodeSocketValueObject *)sock->default_value;
@@ -1307,8 +1314,8 @@ void nodeUnregisterType(bNodeType *nt)
 bool nodeTypeUndefined(bNode *node)
 {
   return (node->typeinfo == &NodeTypeUndefined) ||
-         (node->type == NODE_GROUP && node->id && ID_IS_LINKED(node->id) &&
-          (node->id->tag & LIB_TAG_MISSING));
+         ((node->type == NODE_GROUP || node->type == NODE_CUSTOM_GROUP) && node->id &&
+          ID_IS_LINKED(node->id) && (node->id->tag & LIB_TAG_MISSING));
 }
 
 GHashIterator *nodeTypeGetIterator(void)
@@ -1364,7 +1371,9 @@ GHashIterator *nodeSocketTypeGetIterator(void)
   return BLI_ghashIterator_new(nodesockettypes_hash);
 }
 
-struct bNodeSocket *nodeFindSocket(const bNode *node, int in_out, const char *identifier)
+struct bNodeSocket *nodeFindSocket(const bNode *node,
+                                   eNodeSocketInOut in_out,
+                                   const char *identifier)
 {
   const ListBase *sockets = (in_out == SOCK_IN) ? &node->inputs : &node->outputs;
   LISTBASE_FOREACH (bNodeSocket *, sock, sockets) {
@@ -1521,7 +1530,7 @@ void nodeModifySocketType(
 
 bNodeSocket *nodeAddSocket(bNodeTree *ntree,
                            bNode *node,
-                           int in_out,
+                           eNodeSocketInOut in_out,
                            const char *idname,
                            const char *identifier,
                            const char *name)
@@ -1543,7 +1552,7 @@ bNodeSocket *nodeAddSocket(bNodeTree *ntree,
 
 bNodeSocket *nodeInsertSocket(bNodeTree *ntree,
                               bNode *node,
-                              int in_out,
+                              eNodeSocketInOut in_out,
                               const char *idname,
                               bNodeSocket *next_sock,
                               const char *identifier,
@@ -1704,7 +1713,7 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype)
 
 bNodeSocket *nodeAddStaticSocket(bNodeTree *ntree,
                                  bNode *node,
-                                 int in_out,
+                                 eNodeSocketInOut in_out,
                                  int type,
                                  int subtype,
                                  const char *identifier,
@@ -1724,7 +1733,7 @@ bNodeSocket *nodeAddStaticSocket(bNodeTree *ntree,
 
 bNodeSocket *nodeInsertStaticSocket(bNodeTree *ntree,
                                     bNode *node,
-                                    int in_out,
+                                    eNodeSocketInOut in_out,
                                     int type,
                                     int subtype,
                                     bNodeSocket *next_sock,
@@ -3087,10 +3096,12 @@ void ntreeSetOutput(bNodeTree *ntree)
    * might be different for editor or for "real" use... */
 }
 
-/** Get address of potential nodetree pointer of given ID.
+/**
+ * Get address of potential node-tree pointer of given ID.
  *
  * \warning Using this function directly is potentially dangerous, if you don't know or are not
- * sure, please use `ntreeFromID()` instead. */
+ * sure, please use `ntreeFromID()` instead.
+ */
 bNodeTree **BKE_ntree_ptr_from_id(ID *id)
 {
   switch (GS(id->name)) {
@@ -3220,7 +3231,7 @@ void ntreeLocalMerge(Main *bmain, bNodeTree *localtree, bNodeTree *ntree)
 /* ************ NODE TREE INTERFACE *************** */
 
 static bNodeSocket *make_socket_interface(bNodeTree *ntree,
-                                          int in_out,
+                                          eNodeSocketInOut in_out,
                                           const char *idname,
                                           const char *name)
 {
@@ -3256,7 +3267,9 @@ static bNodeSocket *make_socket_interface(bNodeTree *ntree,
   return sock;
 }
 
-bNodeSocket *ntreeFindSocketInterface(bNodeTree *ntree, int in_out, const char *identifier)
+bNodeSocket *ntreeFindSocketInterface(bNodeTree *ntree,
+                                      eNodeSocketInOut in_out,
+                                      const char *identifier)
 {
   ListBase *sockets = (in_out == SOCK_IN) ? &ntree->inputs : &ntree->outputs;
   LISTBASE_FOREACH (bNodeSocket *, iosock, sockets) {
@@ -3268,7 +3281,7 @@ bNodeSocket *ntreeFindSocketInterface(bNodeTree *ntree, int in_out, const char *
 }
 
 bNodeSocket *ntreeAddSocketInterface(bNodeTree *ntree,
-                                     int in_out,
+                                     eNodeSocketInOut in_out,
                                      const char *idname,
                                      const char *name)
 {
@@ -3284,8 +3297,11 @@ bNodeSocket *ntreeAddSocketInterface(bNodeTree *ntree,
   return iosock;
 }
 
-bNodeSocket *ntreeInsertSocketInterface(
-    bNodeTree *ntree, int in_out, const char *idname, bNodeSocket *next_sock, const char *name)
+bNodeSocket *ntreeInsertSocketInterface(bNodeTree *ntree,
+                                        eNodeSocketInOut in_out,
+                                        const char *idname,
+                                        bNodeSocket *next_sock,
+                                        const char *name)
 {
   bNodeSocket *iosock = make_socket_interface(ntree, in_out, idname, name);
   if (in_out == SOCK_IN) {
@@ -3304,7 +3320,7 @@ struct bNodeSocket *ntreeAddSocketInterfaceFromSocket(bNodeTree *ntree,
                                                       bNodeSocket *from_sock)
 {
   bNodeSocket *iosock = ntreeAddSocketInterface(
-      ntree, from_sock->in_out, from_sock->idname, from_sock->name);
+      ntree, static_cast<eNodeSocketInOut>(from_sock->in_out), from_sock->idname, from_sock->name);
   if (iosock) {
     if (iosock->typeinfo->interface_from_socket) {
       iosock->typeinfo->interface_from_socket(ntree, iosock, from_node, from_sock);
@@ -3319,7 +3335,11 @@ struct bNodeSocket *ntreeInsertSocketInterfaceFromSocket(bNodeTree *ntree,
                                                          bNodeSocket *from_sock)
 {
   bNodeSocket *iosock = ntreeInsertSocketInterface(
-      ntree, from_sock->in_out, from_sock->idname, next_sock, from_sock->name);
+      ntree,
+      static_cast<eNodeSocketInOut>(from_sock->in_out),
+      from_sock->idname,
+      next_sock,
+      from_sock->name);
   if (iosock) {
     if (iosock->typeinfo->interface_from_socket) {
       iosock->typeinfo->interface_from_socket(ntree, iosock, from_node, from_sock);
@@ -4693,6 +4713,7 @@ static void registerCompositNodes()
   register_node_type_cmp_defocus();
   register_node_type_cmp_sunbeams();
   register_node_type_cmp_denoise();
+  register_node_type_cmp_antialiasing();
 
   register_node_type_cmp_valtorgb();
   register_node_type_cmp_rgbtobw();
@@ -4918,6 +4939,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_vector_math();
   register_node_type_geo_attribute_remove();
   register_node_type_geo_boolean();
+  register_node_type_geo_bounding_box();
   register_node_type_geo_collection_info();
   register_node_type_geo_edge_split();
   register_node_type_geo_is_viewport();
@@ -4926,9 +4948,9 @@ static void registerGeometryNodes()
   register_node_type_geo_mesh_primitive_cone();
   register_node_type_geo_mesh_primitive_cube();
   register_node_type_geo_mesh_primitive_cylinder();
+  register_node_type_geo_mesh_primitive_grid();
   register_node_type_geo_mesh_primitive_ico_sphere();
   register_node_type_geo_mesh_primitive_line();
-  register_node_type_geo_mesh_primitive_plane();
   register_node_type_geo_mesh_primitive_uv_sphere();
   register_node_type_geo_object_info();
   register_node_type_geo_point_distribute();

@@ -2106,6 +2106,81 @@ static void rna_object_lineart_update(Main *UNUSED(bmain), Scene *UNUSED(scene),
   WM_main_add_notifier(NC_OBJECT | ND_MODIFIER, ptr->owner_id);
 }
 
+static bool mesh_symmetry_get_common(PointerRNA *ptr, const eMeshSymmetryType sym)
+{
+  const Object *ob = (Object *)ptr->owner_id;
+  if (ob->type != OB_MESH) {
+    return false;
+  }
+
+  const Mesh *mesh = ob->data;
+  return mesh->symmetry & sym;
+}
+
+static bool rna_Object_mesh_symmetry_x_get(PointerRNA *ptr)
+{
+  return mesh_symmetry_get_common(ptr, ME_SYMMETRY_X);
+}
+
+static bool rna_Object_mesh_symmetry_y_get(PointerRNA *ptr)
+{
+  return mesh_symmetry_get_common(ptr, ME_SYMMETRY_Y);
+}
+
+static bool rna_Object_mesh_symmetry_z_get(PointerRNA *ptr)
+{
+  return mesh_symmetry_get_common(ptr, ME_SYMMETRY_Z);
+}
+
+static void mesh_symmetry_set_common(PointerRNA *ptr,
+                                     const bool value,
+                                     const eMeshSymmetryType sym)
+{
+  Object *ob = (Object *)ptr->owner_id;
+  if (ob->type != OB_MESH) {
+    return;
+  }
+
+  Mesh *mesh = ob->data;
+  if (value) {
+    mesh->symmetry |= sym;
+  }
+  else {
+    mesh->symmetry &= ~sym;
+  }
+}
+
+static void rna_Object_mesh_symmetry_x_set(PointerRNA *ptr, bool value)
+{
+  mesh_symmetry_set_common(ptr, value, ME_SYMMETRY_X);
+}
+
+static void rna_Object_mesh_symmetry_y_set(PointerRNA *ptr, bool value)
+{
+  mesh_symmetry_set_common(ptr, value, ME_SYMMETRY_Y);
+}
+
+static void rna_Object_mesh_symmetry_z_set(PointerRNA *ptr, bool value)
+{
+  mesh_symmetry_set_common(ptr, value, ME_SYMMETRY_Z);
+}
+
+static int rna_Object_mesh_symmetry_yz_editable(PointerRNA *ptr, const char **UNUSED(r_info))
+{
+  const Object *ob = (Object *)ptr->owner_id;
+  if (ob->type != OB_MESH) {
+    return 0;
+  }
+
+  const Mesh *mesh = ob->data;
+  if (ob->mode == OB_MODE_WEIGHT_PAINT && mesh->editflag & ME_EDIT_MIRROR_VERTEX_GROUPS) {
+    /* Only X symmetry is available in weightpaint mode. */
+    return 0;
+  }
+
+  return PROP_EDITABLE;
+}
+
 #else
 
 static void rna_def_vertex_group(BlenderRNA *brna)
@@ -2798,6 +2873,7 @@ static void rna_def_object(BlenderRNA *brna)
   RNA_def_property_multi_array(prop, 2, boundbox_dimsize);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_override_clear_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
+  RNA_def_property_override_flag(prop, PROPOVERRIDE_NO_COMPARISON);
   RNA_def_property_float_funcs(prop, "rna_Object_boundbox_get", NULL, NULL);
   RNA_def_property_ui_text(
       prop,
@@ -2968,12 +3044,11 @@ static void rna_def_object(BlenderRNA *brna)
   RNA_def_property_float_funcs(
       prop, "rna_Object_dimensions_get", "rna_Object_dimensions_set", NULL);
   RNA_def_property_ui_range(prop, 0.0f, FLT_MAX, 1, RNA_TRANSLATION_PREC_DEFAULT);
-  RNA_def_property_ui_text(
-      prop,
-      "Dimensions",
-      "Absolute bounding box dimensions of the object (WARNING: assigning to it or "
-      "its members multiple consecutive times will not work correctly, "
-      "as this needs up-to-date evaluated data)");
+  RNA_def_property_ui_text(prop,
+                           "Dimensions",
+                           "Absolute bounding box dimensions of the object.\n"
+                           "Warning: Assigning to it or its members multiple consecutive times "
+                           "will not work correctly, as this needs up-to-date evaluated data");
   RNA_def_property_update(prop, NC_OBJECT | ND_TRANSFORM, "rna_Object_internal_update");
 
   /* delta transforms */
@@ -3076,8 +3151,8 @@ static void rna_def_object(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop,
       "Local Matrix",
-      "Parent relative transformation matrix - "
-      "WARNING: Only takes into account 'Object' parenting, so e.g. in case of bone parenting "
+      "Parent relative transformation matrix.\n"
+      "Warning: Only takes into account object parenting, so e.g. in case of bone parenting "
       "you get a matrix relative to the Armature object, not to the actual parent bone");
   RNA_def_property_float_funcs(
       prop, "rna_Object_matrix_local_get", "rna_Object_matrix_local_set", NULL);
@@ -3498,6 +3573,28 @@ static void rna_def_object(BlenderRNA *brna)
   prop = RNA_def_property(srna, "lineart", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "ObjectLineArt");
   RNA_def_property_ui_text(prop, "Line Art", "Line art settings for the object");
+
+  /* Mesh Symmetry Settings */
+
+  prop = RNA_def_property(srna, "use_mesh_mirror_x", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_Object_mesh_symmetry_x_get", "rna_Object_mesh_symmetry_x_set");
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "X", "Enable mesh symmetry in the X axis");
+
+  prop = RNA_def_property(srna, "use_mesh_mirror_y", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_Object_mesh_symmetry_y_get", "rna_Object_mesh_symmetry_y_set");
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_editable_func(prop, "rna_Object_mesh_symmetry_yz_editable");
+  RNA_def_property_ui_text(prop, "Y", "Enable mesh symmetry in the Y axis");
+
+  prop = RNA_def_property(srna, "use_mesh_mirror_z", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_Object_mesh_symmetry_z_get", "rna_Object_mesh_symmetry_z_set");
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_editable_func(prop, "rna_Object_mesh_symmetry_yz_editable");
+  RNA_def_property_ui_text(prop, "Z", "Enable mesh symmetry in the Z axis");
 
   RNA_define_lib_overridable(false);
 

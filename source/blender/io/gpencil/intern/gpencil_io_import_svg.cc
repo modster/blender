@@ -36,7 +36,7 @@
 #include "ED_gpencil.h"
 
 #include "gpencil_io.h"
-#include "gpencil_io_import_svg.h"
+#include "gpencil_io_import_svg.hh"
 
 /* Custom flags for NanoSVG. */
 #define NANOSVG_ALL_COLOR_KEYWORDS
@@ -118,14 +118,16 @@ bool GpencilImporterSVG::read()
     }
 
     /* Create_shape materials. */
-    const char *const mat_names[] = {"Stroke", "Fill"};
+    const char *const mat_names[] = {"Stroke", "Fill", "Both"};
     int index = 0;
-    if ((is_stroke) && (is_fill)) {
+    if ((is_stroke) && (!is_fill)) {
       index = 0;
-      is_fill = false;
     }
     else if ((!is_stroke) && (is_fill)) {
       index = 1;
+    }
+    else if ((is_stroke) && (is_fill)) {
+      index = 2;
     }
     int32_t mat_index = create_material(mat_names[index], is_stroke, is_fill);
 

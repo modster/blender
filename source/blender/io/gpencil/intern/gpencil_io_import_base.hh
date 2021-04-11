@@ -12,23 +12,30 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2020 Blender Foundation
+ * All rights reserved.
  */
-
 #pragma once
 
-#include "BKE_geometry_set.hh"
+/** \file
+ * \ingroup bgpencil
+ */
+#include "gpencil_io_base.hh"
 
-#include "BLI_resource_collector.hh"
+namespace blender::io::gpencil {
 
-#include "spreadsheet_column_layout.hh"
+class GpencilImporter : public GpencilIO {
 
-struct bContext;
+ public:
+  GpencilImporter(const struct GpencilIOParams *iparams);
+  virtual bool read() = 0;
 
-namespace blender::ed::spreadsheet {
+ protected:
+  struct Object *create_object();
+  int32_t create_material(const char *name, const bool stroke, const bool fill);
 
-void spreadsheet_columns_from_geometry(const bContext *C,
-                                       Object *object_eval,
-                                       SpreadsheetColumnLayout &column_layout,
-                                       ResourceCollector &resources);
+ private:
+};
 
-}  // namespace blender::ed::spreadsheet
+}  // namespace blender::io::gpencil

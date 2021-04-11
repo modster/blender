@@ -46,6 +46,7 @@ set(INC
 
 set(SRC
   composite/nodes/node_composite_alphaOver.c
+  composite/nodes/node_composite_antialiasing.c
   composite/nodes/node_composite_bilateralblur.c
   composite/nodes/node_composite_blur.c
   composite/nodes/node_composite_bokehblur.c
@@ -155,6 +156,7 @@ set(SRC
   geometry/nodes/node_geo_attribute_separate_xyz.cc
   geometry/nodes/node_geo_attribute_vector_math.cc
   geometry/nodes/node_geo_boolean.cc
+  geometry/nodes/node_geo_bounding_box.cc
   geometry/nodes/node_geo_collection_info.cc
   geometry/nodes/node_geo_common.cc
   geometry/nodes/node_geo_edge_split.cc
@@ -164,9 +166,9 @@ set(SRC
   geometry/nodes/node_geo_mesh_primitive_cone.cc
   geometry/nodes/node_geo_mesh_primitive_cube.cc
   geometry/nodes/node_geo_mesh_primitive_cylinder.cc
+  geometry/nodes/node_geo_mesh_primitive_grid.cc
   geometry/nodes/node_geo_mesh_primitive_ico_sphere.cc
   geometry/nodes/node_geo_mesh_primitive_line.cc
-  geometry/nodes/node_geo_mesh_primitive_plane.cc
   geometry/nodes/node_geo_mesh_primitive_uv_sphere.cc
   geometry/nodes/node_geo_object_info.cc
   geometry/nodes/node_geo_point_distribute.cc
@@ -307,7 +309,7 @@ set(SRC
   intern/derived_node_tree.cc
   intern/math_functions.cc
   intern/node_common.c
-  intern/node_exec.c
+  intern/node_exec.cc
   intern/node_geometry_exec.cc
   intern/node_socket.cc
   intern/node_tree_multi_function.cc

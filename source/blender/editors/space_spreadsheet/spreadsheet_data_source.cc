@@ -12,27 +12,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation
- * All rights reserved.
  */
-#pragma once
 
-/** \file
- * \ingroup bgpencil
- */
-#include "gpencil_io_base.h"
+#include "spreadsheet_data_source.hh"
 
-namespace blender::io::gpencil {
+namespace blender::ed::spreadsheet {
 
-class GpencilExporter : public GpencilIO {
+/* Provide a "key function" for the linker. */
+DataSource::~DataSource() = default;
 
- public:
-  GpencilExporter(const struct GpencilIOParams *iparams) : GpencilIO(iparams){};
-  virtual bool write() = 0;
-
- protected:
- private:
-};
-
-}  // namespace blender::io::gpencil
+}  // namespace blender::ed::spreadsheet

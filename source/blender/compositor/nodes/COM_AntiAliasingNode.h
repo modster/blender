@@ -1,4 +1,6 @@
 /*
+ * Copyright 2017, Blender Foundation.
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -13,29 +15,26 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2020 Blender Foundation
- * All rights reserved.
+ * Contributor: IRIE Shinsuke
  */
+
 #pragma once
 
-/** \file
- * \ingroup bgpencil
+#include "COM_Node.h"
+
+namespace blender::compositor {
+
+/**
+ * @brief AntiAliasingNode
+ * @ingroup Node
  */
-#include "gpencil_io_base.h"
-
-namespace blender::io::gpencil {
-
-class GpencilImporter : public GpencilIO {
-
+class AntiAliasingNode : public Node {
  public:
-  GpencilImporter(const struct GpencilIOParams *iparams);
-  virtual bool read() = 0;
-
- protected:
-  struct Object *create_object();
-  int32_t create_material(const char *name, const bool stroke, const bool fill);
-
- private:
+  AntiAliasingNode(bNode *editorNode) : Node(editorNode)
+  {
+  }
+  void convertToOperations(NodeConverter &converter,
+                           const CompositorContext &context) const override;
 };
 
-}  // namespace blender::io::gpencil
+}  // namespace blender::compositor
