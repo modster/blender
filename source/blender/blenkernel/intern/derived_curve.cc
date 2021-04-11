@@ -53,6 +53,20 @@ static BezierPoint::HandleType handle_type_from_dna_bezt(const eBezTriple_Handle
   return BezierPoint::Auto;
 }
 
+static Spline::NormalCalculationMode normal_mode_from_dna_curve(const int twist_mode)
+{
+  switch (twist_mode) {
+    case CU_TWIST_Z_UP:
+      return Spline::NormalCalculationMode::ZUp;
+    case CU_TWIST_MINIMUM:
+      return Spline::NormalCalculationMode::Minimum;
+    case CU_TWIST_TANGENT:
+      return Spline::NormalCalculationMode::Tangent;
+  }
+  BLI_assert_unreachable();
+  return Spline::NormalCalculationMode::Minimum;
+}
+
 DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
 {
   DCurve *curve = new DCurve();
@@ -86,6 +100,12 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
     }
     else if (nurb->type == CU_POLY) {
     }
+  }
+
+  const Spline::NormalCalculationMode normal_mode = normal_mode_from_dna_curve(
+      dna_curve.twist_mode);
+  for (Spline *spline : curve->splines) {
+    spline->normal_mode = normal_mode;
   }
 
   return curve;
@@ -325,9 +345,9 @@ static void make_normals_cyclic(Span<float3> tangents, MutableSpan<float3> norma
 
 /* This algorithm is a copy from animation nodes bezier normal calculation.
  * TODO: Explore different methods. */
-static void evaluate_normals(Span<float3> tangents,
-                             const bool is_cyclic,
-                             MutableSpan<float3> normals)
+static void calculate_normals_minimum_twist(Span<float3> tangents,
+                                            const bool is_cyclic,
+                                            MutableSpan<float3> normals)
 {
   if (normals.size() == 1) {
     normals.first() = float3(1.0f, 0.0f, 0.0f);
@@ -347,6 +367,13 @@ static void evaluate_normals(Span<float3> tangents,
   }
 }
 
+static void calculate_normals_z_up(Span<float3> tangents, MutableSpan<float3> normals)
+{
+  for (const int i : normals.index_range()) {
+    normals[i] = float3::cross(tangents[i], float3(0.0f, 0.0f, 1.0f)).normalized();
+  }
+}
+
 Span<float3> Spline::evaluated_normals() const
 {
   if (!this->normal_cache_dirty_) {
@@ -362,7 +389,17 @@ Span<float3> Spline::evaluated_normals() const
   this->evaluated_normals_cache_.resize(total);
 
   Span<float3> tangents = this->evaluated_tangents();
-  evaluate_normals(tangents, is_cyclic, this->evaluated_normals_cache_);
+  switch (this->normal_mode) {
+    case NormalCalculationMode::Minimum:
+      calculate_normals_minimum_twist(tangents, is_cyclic, this->evaluated_normals_cache_);
+      break;
+    case NormalCalculationMode::ZUp:
+      calculate_normals_z_up(tangents, this->evaluated_normals_cache_);
+      break;
+    case NormalCalculationMode::Tangent:
+      // calculate_normals_tangent(tangents, this->evaluated_normals_cache_);
+      break;
+  }
 
   this->normal_cache_dirty_ = false;
   return evaluated_normals_cache_;

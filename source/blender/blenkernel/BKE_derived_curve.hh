@@ -76,6 +76,13 @@ class Spline {
   Type type;
   bool is_cyclic = false;
 
+  enum NormalCalculationMode {
+    ZUp,
+    Minimum,
+    Tangent,
+  };
+  NormalCalculationMode normal_mode;
+
  protected:
   mutable bool base_cache_dirty_ = true;
   mutable std::mutex base_cache_mutex_;
@@ -188,6 +195,8 @@ struct DCurve {
   // };
 
   // bool is_2d;
+
+  // DCurve *copy();
 
   ~DCurve()
   {

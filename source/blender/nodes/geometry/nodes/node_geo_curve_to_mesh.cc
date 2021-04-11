@@ -184,7 +184,7 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
         positions[i_ring], tangents[i_ring], normals[i_ring]);
 
     const float radius = spline.get_evaluated_point_radius(i_ring);
-    point_matrix.apply_scale(radius);
+    point_matrix.apply_scale(2.0f * radius);
 
     for (const int i_profile : IndexRange(profile_vert_len)) {
       MVert &vert = verts[vert_offset++];
