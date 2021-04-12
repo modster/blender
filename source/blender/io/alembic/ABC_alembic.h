@@ -23,6 +23,7 @@
 extern "C" {
 #endif
 
+struct CacheArchiveHandle;
 struct CacheReader;
 struct ListBase;
 struct Main;
@@ -30,8 +31,6 @@ struct Mesh;
 struct Object;
 struct Scene;
 struct bContext;
-
-typedef struct CacheArchiveHandle CacheArchiveHandle;
 
 int ABC_get_version(void);
 
@@ -97,11 +96,11 @@ bool ABC_import(struct bContext *C,
                 bool validate_meshes,
                 bool as_background_job);
 
-CacheArchiveHandle *ABC_create_handle(struct Main *bmain,
-                                      const char *filename,
-                                      struct ListBase *object_paths);
+struct CacheArchiveHandle *ABC_create_handle(struct Main *bmain,
+                                             const char *filename,
+                                             struct ListBase *object_paths);
 
-void ABC_free_handle(CacheArchiveHandle *handle);
+void ABC_free_handle(struct CacheArchiveHandle *handle);
 
 void ABC_get_transform(struct CacheReader *reader,
                        float r_mat_world[4][4],

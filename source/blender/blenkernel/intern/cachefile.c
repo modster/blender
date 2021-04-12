@@ -180,8 +180,7 @@ void BKE_cachefile_reader_open(CacheFile *cache_file,
       }
 
       /* Open Alembic cache reader. */
-      *reader = CacheReader_open_alembic_object(
-          (CacheArchiveHandle *)cache_file->handle, *reader, object, object_path);
+      *reader = CacheReader_open_alembic_object(cache_file->handle, *reader, object, object_path);
 
       /* Multiple modifiers and constraints can call this function concurrently. */
       BLI_spin_lock(&spin);
@@ -207,8 +206,7 @@ void BKE_cachefile_reader_open(CacheFile *cache_file,
       }
 
       /* Open USD cache reader. */
-      *reader = CacheReader_open_usd_object(
-          (USDStageHandle *)cache_file->handle, *reader, object, object_path);
+      *reader = CacheReader_open_usd_object(cache_file->handle, *reader, object, object_path);
       /* Multiple modifiers and constraints can call this function concurrently. */
       BLI_spin_lock(&spin);
       if (*reader) {
@@ -302,7 +300,7 @@ static void cachefile_handle_free(CacheFile *cache_file)
 
       /* Free handle. */
       if (cache_file->handle) {
-        ABC_free_handle((CacheArchiveHandle *)cache_file->handle);
+        ABC_free_handle(cache_file->handle);
         cache_file->handle = NULL;
       }
 
@@ -331,7 +329,7 @@ static void cachefile_handle_free(CacheFile *cache_file)
 
       /* Free handle. */
       if (cache_file->handle) {
-        USD_free_handle((USDStageHandle *)cache_file->handle);
+        USD_free_handle(cache_file->handle);
         cache_file->handle = NULL;
       }
 
@@ -383,16 +381,14 @@ void BKE_cachefile_eval(Main *bmain, Depsgraph *depsgraph, CacheFile *cache_file
 #ifdef WITH_ALEMBIC
   if (BLI_path_extension_check_glob(filepath, "*abc")) {
     cache_file->type = CACHEFILE_TYPE_ALEMBIC;
-    cache_file->handle = (CacheArchiveHandle *)ABC_create_handle(
-        bmain, filepath, &cache_file->object_paths);
+    cache_file->handle = ABC_create_handle(bmain, filepath, &cache_file->object_paths);
     BLI_strncpy(cache_file->handle_filepath, filepath, FILE_MAX);
   }
 #endif
 #ifdef WITH_USD
   if (BLI_path_extension_check_glob(filepath, "*.usd;*.usda;*.usdc;*.usdz")) {
     cache_file->type = CACHEFILE_TYPE_USD;
-    cache_file->handle = (CacheArchiveHandle *)USD_create_handle(
-        bmain, filepath, &cache_file->object_paths);
+    cache_file->handle = USD_create_handle(bmain, filepath, &cache_file->object_paths);
     BLI_strncpy(cache_file->handle_filepath, filepath, FILE_MAX);
   }
 #endif

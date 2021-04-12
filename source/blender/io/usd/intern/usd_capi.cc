@@ -17,6 +17,7 @@
  * All rights reserved.
  */
 
+#include "IO_types.h"
 #include "usd.h"
 #include "usd_hierarchy_iterator.h"
 #include "usd_reader_instance.h"
@@ -77,25 +78,16 @@
 
 #include <iostream>
 
-struct USDStageHandle {
-  CacheArchiveHandle base;
-};
-
 namespace blender::io::usd {
 
-USDStageReader *archive_from_handle(USDStageHandle *handle)
+CacheArchiveHandle *handle_from_stage_reader(USDStageReader *reader)
 {
-  return reinterpret_cast<USDStageReader *>(handle);
+  return reinterpret_cast<CacheArchiveHandle *>(reader);
 }
 
-USDStageReader *archive_from_handle(CacheArchiveHandle *handle)
+USDStageReader *stage_reader_from_handle(CacheArchiveHandle *handle)
 {
   return reinterpret_cast<USDStageReader *>(handle);
-}
-
-USDStageHandle *handle_from_archive(USDStageReader *archive)
-{
-  return reinterpret_cast<USDStageHandle *>(archive);
 }
 
 static bool gather_objects_paths(const pxr::UsdPrim &object, ListBase *object_paths)
@@ -866,7 +858,7 @@ void USDCacheReader_incref(CacheReader *reader)
   usd_reader->incref();
 }
 
-CacheReader *CacheReader_open_usd_object(USDStageHandle *handle,
+CacheReader *CacheReader_open_usd_object(CacheArchiveHandle *handle,
                                          CacheReader *reader,
                                          Object *object,
                                          const char *object_path)
@@ -875,7 +867,7 @@ CacheReader *CacheReader_open_usd_object(USDStageHandle *handle,
     return reader;
   }
 
-  USDStageReader *archive = archive_from_handle(handle);
+  USDStageReader *archive = stage_reader_from_handle(handle);
 
   if (!archive || !archive->valid()) {
     return reader;
@@ -910,26 +902,28 @@ void USDCacheReader_free(CacheReader *reader)
   }
 }
 
-USDStageHandle *USD_create_handle(struct Main *bmain, const char *filename, ListBase *object_paths)
+CacheArchiveHandle *USD_create_handle(struct Main *bmain,
+                                      const char *filename,
+                                      ListBase *object_paths)
 {
-  USDStageReader *archive = new USDStageReader(bmain, filename);
+  USDStageReader *stage_reader = new USDStageReader(bmain, filename);
 
-  if (!archive->valid()) {
-    delete archive;
+  if (!stage_reader->valid()) {
+    delete stage_reader;
     return NULL;
   }
 
   if (object_paths) {
-    gather_objects_paths(archive->stage()->GetPseudoRoot(), object_paths);
+    gather_objects_paths(stage_reader->stage()->GetPseudoRoot(), object_paths);
   }
 
-  return handle_from_archive(archive);
+  return handle_from_stage_reader(stage_reader);
 }
 
-void USD_free_handle(USDStageHandle *handle)
+void USD_free_handle(CacheArchiveHandle *handle)
 {
-  USDStageReader *archive = archive_from_handle(handle);
-  delete archive;
+  USDStageReader *stage_reader = stage_reader_from_handle(handle);
+  delete stage_reader;
 }
 
 void USD_get_transform(struct CacheReader *reader,

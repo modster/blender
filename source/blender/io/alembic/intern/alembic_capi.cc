@@ -19,6 +19,7 @@
  */
 
 #include "../ABC_alembic.h"
+#include "IO_types.h"
 
 #include <Alembic/AbcMaterial/IMaterial.h>
 

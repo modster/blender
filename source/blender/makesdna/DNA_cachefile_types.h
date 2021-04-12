@@ -63,10 +63,6 @@ typedef struct CacheObjectPath {
   char path[4096];
 } CacheObjectPath;
 
-typedef struct CacheArchiveHandle {
-  int unused;
-} CacheArchiveHandle;
-
 /* CacheFile::velocity_unit
  * Determines what temporal unit is used to interpret velocity vectors for motion blur effects. */
 enum {
