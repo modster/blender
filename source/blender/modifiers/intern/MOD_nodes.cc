@@ -47,6 +47,7 @@
 #include "DNA_windowmanager_types.h"
 
 #include "BKE_customdata.h"
+#include "BKE_geometry_set_instances.hh"
 #include "BKE_global.h"
 #include "BKE_idprop.h"
 #include "BKE_lib_query.h"
@@ -135,7 +136,7 @@ static void find_used_ids_from_nodes(const bNodeTree &tree, Set<ID *> &ids)
     addIdsUsedBySocket(&node->inputs, ids);
     addIdsUsedBySocket(&node->outputs, ids);
 
-    if (node->type == NODE_GROUP) {
+    if (ELEM(node->type, NODE_GROUP, NODE_CUSTOM_GROUP)) {
       const bNodeTree *group = (bNodeTree *)node->id;
       if (group != nullptr && handled_groups.add(group)) {
         find_used_ids_from_nodes(*group, ids);
@@ -172,7 +173,7 @@ static void add_object_relation(const ModifierUpdateDepsgraphContext *ctx, Objec
         add_collection_object_relations_recursive(ctx, *collection_instance);
       }
     }
-    else {
+    else if (ELEM(object.type, OB_MESH, OB_POINTCLOUD, OB_VOLUME)) {
       DEG_add_object_relation(ctx->node, &object, DEG_OB_COMP_GEOMETRY, "Nodes Modifier");
     }
   }
@@ -489,20 +490,19 @@ class GeometryNodesEvaluator {
       const NodeTreeEvaluationContext context(*self_object_, *modifier_);
 
       const GeometrySet &geometry_set = params.get_input<GeometrySet>(socket_ref->identifier());
-      const Vector<const GeometryComponent *> components = geometry_set.get_components_for_read();
 
-      for (const GeometryComponent *component : components) {
-        component->attribute_foreach(
-            [&](StringRefNull attribute_name, const AttributeMetaData &meta_data) {
-              BKE_nodetree_attribute_hint_add(*btree_original,
-                                              context,
-                                              *node->bnode(),
-                                              attribute_name,
-                                              meta_data.domain,
-                                              meta_data.data_type);
-              return true;
-            });
-      }
+      blender::bke::geometry_set_instances_attribute_foreach(
+          geometry_set,
+          [&](StringRefNull attribute_name, const AttributeMetaData &meta_data) {
+            BKE_nodetree_attribute_hint_add(*btree_original,
+                                            context,
+                                            *node->bnode(),
+                                            attribute_name,
+                                            meta_data.domain,
+                                            meta_data.data_type);
+            return true;
+          },
+          8);
     }
   }
 
