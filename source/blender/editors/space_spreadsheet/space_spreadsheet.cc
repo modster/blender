@@ -92,7 +92,7 @@ static void spreadsheet_free(SpaceLink *sl)
 
   MEM_SAFE_FREE(sspreadsheet->runtime);
 
-  LISTBASE_FOREACH_MUTABLE (SpreadSheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
+  LISTBASE_FOREACH_MUTABLE (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
     MEM_SAFE_FREE(row_filter->column_name);
     MEM_freeN(row_filter);
   }
@@ -122,8 +122,8 @@ static SpaceLink *spreadsheet_duplicate(SpaceLink *sl)
   sspreadsheet_new->runtime = (SpaceSpreadsheet_Runtime *)MEM_dupallocN(sspreadsheet_old->runtime);
 
   BLI_listbase_clear(&sspreadsheet_new->row_filters);
-  LISTBASE_FOREACH (const SpreadSheetRowFilter *, row_filter, &sspreadsheet_old->row_filters) {
-    SpreadSheetRowFilter *new_filter = (SpreadSheetRowFilter *)MEM_dupallocN(row_filter);
+  LISTBASE_FOREACH (const SpreadsheetRowFilter *, row_filter, &sspreadsheet_old->row_filters) {
+    SpreadsheetRowFilter *new_filter = (SpreadsheetRowFilter *)MEM_dupallocN(row_filter);
     new_filter->column_name = (char *)MEM_dupallocN(row_filter->column_name);
     BLI_addtail(&sspreadsheet_new->row_filters, new_filter);
   }
@@ -229,6 +229,10 @@ static void update_visible_columns(ListBase &columns, DataSource &data_source)
       if (used_ids.add(column_id)) {
         SpreadsheetColumnID *new_id = spreadsheet_column_id_copy(&column_id);
         SpreadsheetColumn *new_column = spreadsheet_column_new(new_id);
+
+        /* Copy the current data type to the column storage for convenience. */
+        new_column->data_type = values->type();
+
         BLI_addtail(&columns, new_column);
       }
     }

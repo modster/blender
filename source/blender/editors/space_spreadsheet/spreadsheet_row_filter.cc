@@ -54,7 +54,7 @@ static void apply_filter_operation(const ColumnValues &values,
 }
 
 static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
-                             const SpreadSheetRowFilter &row_filter,
+                             const SpreadsheetRowFilter &row_filter,
                              MutableSpan<bool> rows_included)
 {
   for (const ColumnLayout &column : spreadsheet_layout.columns) {
@@ -64,7 +64,7 @@ static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
     }
 
     switch (values.type()) {
-      case ColumnValueType::Int32: {
+      case SPREADSHEET_VALUE_TYPE_INT32: {
         const int value = row_filter.value_int;
         switch (row_filter.operation) {
           case SPREADSHEET_ROW_FILTER_EQUAL: {
@@ -97,14 +97,15 @@ static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
         }
         break;
       }
-      case ColumnValueType::Float: {
+      case SPREADSHEET_VALUE_TYPE_FLOAT: {
         const float value = row_filter.value_float;
         switch (row_filter.operation) {
           case SPREADSHEET_ROW_FILTER_EQUAL: {
+            const float threshold = row_filter.threshold;
             apply_filter_operation(
                 values,
-                [value](const CellValue &cell_value) -> bool {
-                  return *cell_value.value_float == value;
+                [value, threshold](const CellValue &cell_value) -> bool {
+                  return std::abs(*cell_value.value_float - value) < threshold;
                 },
                 rows_included);
             break;
@@ -130,7 +131,7 @@ static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
         }
         break;
       }
-      case ColumnValueType::Bool: {
+      case SPREADSHEET_VALUE_TYPE_BOOL: {
         const bool value = (row_filter.flag & SPREADSHEET_ROW_FILTER_BOOL_VALUE) != 0;
         apply_filter_operation(
             values,
@@ -167,7 +168,7 @@ static bool use_original_object_selection_filter(const SpaceSpreadsheet &sspread
   return false;
 }
 
-static void indices_vector_from_bools(Span<bool> selection, Vector<int64_t> &indices)
+static void index_vector_from_bools(Span<bool> selection, Vector<int64_t> &indices)
 {
   for (const int i : selection.index_range()) {
     if (selection[i]) {
@@ -195,8 +196,10 @@ Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
 
   Array<bool> rows_included(tot_rows, true);
 
-  LISTBASE_FOREACH (const SpreadSheetRowFilter *, row_filter, &sspreadsheet.row_filters) {
-    apply_row_filter(spreadsheet_layout, *row_filter, rows_included);
+  LISTBASE_FOREACH (const SpreadsheetRowFilter *, row_filter, &sspreadsheet.row_filters) {
+    if (row_filter->flag & SPREADSHEET_ROW_FILTER_ENABLED) {
+      apply_row_filter(spreadsheet_layout, *row_filter, rows_included);
+    }
   }
 
   if (use_selection) {
@@ -207,7 +210,7 @@ Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
   }
 
   Vector<int64_t> &indices = scope.construct<Vector<int64_t>>(__func__);
-  indices_vector_from_bools(rows_included, indices);
+  index_vector_from_bools(rows_included, indices);
 
   return indices;
 }

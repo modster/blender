@@ -87,7 +87,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
   int domain_size = attribute->size();
   switch (attribute->custom_data_type()) {
     case CD_PROP_FLOAT:
-      return column_values_from_function(ColumnValueType::Float,
+      return column_values_from_function(SPREADSHEET_VALUE_TYPE_FLOAT,
                                          column_id.name,
                                          domain_size,
                                          [attribute](int index, CellValue &r_cell_value) {
@@ -96,7 +96,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                            r_cell_value.value_float = value;
                                          });
     case CD_PROP_INT32:
-      return column_values_from_function(ColumnValueType::Int32,
+      return column_values_from_function(SPREADSHEET_VALUE_TYPE_INT32,
                                          column_id.name,
                                          domain_size,
                                          [attribute](int index, CellValue &r_cell_value) {
@@ -105,7 +105,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                            r_cell_value.value_int = value;
                                          });
     case CD_PROP_BOOL:
-      return column_values_from_function(ColumnValueType::Bool,
+      return column_values_from_function(SPREADSHEET_VALUE_TYPE_BOOL,
                                          column_id.name,
                                          domain_size,
                                          [attribute](int index, CellValue &r_cell_value) {
@@ -120,7 +120,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
       const std::array<const char *, 2> suffixes = {" X", " Y"};
       const std::string name = StringRef(column_id.name) + suffixes[column_id.index];
       return column_values_from_function(
-          ColumnValueType::Float,
+          SPREADSHEET_VALUE_TYPE_FLOAT,
           name,
           domain_size,
           [attribute, axis = column_id.index](int index, CellValue &r_cell_value) {
@@ -136,7 +136,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
       const std::array<const char *, 3> suffixes = {" X", " Y", " Z"};
       const std::string name = StringRef(column_id.name) + suffixes[column_id.index];
       return column_values_from_function(
-          ColumnValueType::Float,
+          SPREADSHEET_VALUE_TYPE_FLOAT,
           name,
           domain_size,
           [attribute, axis = column_id.index](int index, CellValue &r_cell_value) {
@@ -152,7 +152,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
       const std::array<const char *, 4> suffixes = {" R", " G", " B", " A"};
       const std::string name = StringRef(column_id.name) + suffixes[column_id.index];
       return column_values_from_function(
-          ColumnValueType::Float,
+          SPREADSHEET_VALUE_TYPE_FLOAT,
           name,
           domain_size,
           [attribute, axis = column_id.index](int index, CellValue &r_cell_value) {
@@ -319,7 +319,7 @@ std::unique_ptr<ColumnValues> InstancesDataSource::get_column_values(
   if (STREQ(column_id.name, "Name")) {
     Span<InstancedData> instance_data = component_->instanced_data();
     std::unique_ptr<ColumnValues> values = column_values_from_function(
-        ColumnValueType::Instances,
+        SPREADSHEET_VALUE_TYPE_INSTANCES,
         "Name",
         size,
         [instance_data](int index, CellValue &r_cell_value) {
@@ -345,7 +345,7 @@ std::unique_ptr<ColumnValues> InstancesDataSource::get_column_values(
   if (STREQ(column_id.name, "Position")) {
     std::string name = StringRef("Position") + suffixes[column_id.index];
     return column_values_from_function(
-        ColumnValueType::Float,
+        SPREADSHEET_VALUE_TYPE_FLOAT,
         name,
         size,
         [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {
@@ -355,7 +355,7 @@ std::unique_ptr<ColumnValues> InstancesDataSource::get_column_values(
   if (STREQ(column_id.name, "Rotation")) {
     std::string name = StringRef("Rotation") + suffixes[column_id.index];
     return column_values_from_function(
-        ColumnValueType::Float,
+        SPREADSHEET_VALUE_TYPE_FLOAT,
         name,
         size,
         [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {
@@ -365,7 +365,7 @@ std::unique_ptr<ColumnValues> InstancesDataSource::get_column_values(
   if (STREQ(column_id.name, "Scale")) {
     std::string name = StringRef("Scale") + suffixes[column_id.index];
     return column_values_from_function(
-        ColumnValueType::Float,
+        SPREADSHEET_VALUE_TYPE_FLOAT,
         name,
         size,
         [transforms, axis = column_id.index](int index, CellValue &r_cell_value) {

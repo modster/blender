@@ -1868,7 +1868,21 @@ typedef struct SpreadsheetColumn {
    * #SpreadsheetColumnID in the future for different kinds of ids.
    */
   SpreadsheetColumnID *id;
+
+  /**
+   * An indicator of the type of values in the column, set at runtime.
+   * #SpreadSheetColumnValueType.
+   */
+  uint8_t data_type;
+  char _pad0[7];
 } SpreadsheetColumn;
+
+typedef enum SpreadSheetColumnValueType {
+  SPREADSHEET_VALUE_TYPE_INT32 = 0,
+  SPREADSHEET_VALUE_TYPE_FLOAT = 1,
+  SPREADSHEET_VALUE_TYPE_BOOL = 2,
+  SPREADSHEET_VALUE_TYPE_INSTANCES = 3,
+} SpreadSheetColumnValueType;
 
 typedef struct SpaceSpreadsheet {
   SpaceLink *next, *prev;
@@ -1881,6 +1895,9 @@ typedef struct SpaceSpreadsheet {
 
   /* List of #SpreadsheetColumn. */
   ListBase columns;
+
+  /* SpreadsheetRowFilter. */
+  ListBase row_filters;
 
   struct ID *pinned_id;
 
@@ -1896,9 +1913,6 @@ typedef struct SpaceSpreadsheet {
 
   char _pad1[4];
 
-  /* SpreadSheetRowFilter. */
-  ListBase row_filters;
-
   SpaceSpreadsheet_Runtime *runtime;
 } SpaceSpreadsheet;
 
@@ -1907,8 +1921,8 @@ typedef enum eSpaceSpreadsheet_FilterFlag {
   SPREADSHEET_FILTER_SELECTED_ONLY = (1 << 1),
 } eSpaceSpreadsheet_FilterFlag;
 
-typedef struct SpreadSheetRowFilter {
-  struct SpreadSheetRowFilter *next, *prev;
+typedef struct SpreadsheetRowFilter {
+  struct SpreadsheetRowFilter *next, *prev;
 
   char *column_name;
   /* eSpaceSpreadsheet_RowFilterOperation. */
@@ -1916,12 +1930,12 @@ typedef struct SpreadSheetRowFilter {
   /* eSpaceSpreadsheet_RowFilterFlag. */
   uint8_t flag;
 
-  char _pad0[6];
+  char _pad0[2];
 
   int value_int;
   float value_float;
-  float value_color[4];
-} SpreadSheetRowFilter;
+  float threshold;
+} SpreadsheetRowFilter;
 
 typedef enum eSpaceSpreadsheet_RowFilterFlag {
   SPREADSHEET_ROW_FILTER_BOOL_VALUE = (1 << 0),

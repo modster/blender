@@ -1352,8 +1352,8 @@ static void write_area(BlendWriter *writer, ScrArea *area)
       BLO_write_struct(writer, SpaceSpreadsheet, sl);
       SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
 
-      LISTBASE_FOREACH (SpreadSheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
-        BLO_write_struct(writer, SpreadSheetRowFilter, row_filter);
+      LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
+        BLO_write_struct(writer, SpreadsheetRowFilter, row_filter);
         BLO_write_string(writer, row_filter->column_name);
       }
 
@@ -1715,7 +1715,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sspreadsheet->runtime = NULL;
 
       BLO_read_list(reader, &sspreadsheet->row_filters);
-      LISTBASE_FOREACH (SpreadSheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
+      LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
         BLO_read_data_address(reader, &row_filter->column_name);
       }
 
