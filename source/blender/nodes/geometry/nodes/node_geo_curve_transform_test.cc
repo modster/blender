@@ -29,7 +29,7 @@ static bNodeSocketTemplate geo_node_transform_test_in[] = {
     {-1, ""},
 };
 
-static bNodeSocketTemplate geo_node_point_translate_out[] = {
+static bNodeSocketTemplate geo_node_transform_test_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };
@@ -67,7 +67,7 @@ void register_node_type_geo_curve_transform_test()
 
   geo_node_type_base(
       &ntype, GEO_NODE_CURVE_TRANSFORM_TEST, "Transform Test", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_transform_test_in, geo_node_point_translate_out);
+  node_type_socket_templates(&ntype, geo_node_transform_test_in, geo_node_transform_test_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_transform_test_exec;
   nodeRegisterType(&ntype);
 }

@@ -231,17 +231,9 @@ static WriteAttributePtr make_resolution_write_attribute(DCurve &curve)
 
 static float get_spline_length(Spline *const &spline)
 {
-  Span<float3> positions = spline->evaluated_positions();
-  if (positions.is_empty()) {
-    return 0.0f;
-  }
+  Span<float> lengths = spline->evaluated_lengths();
 
-  float length = 0.0f;
-  for (const int i : IndexRange(1, positions.size() - 1)) {
-    length += float3::distance(positions[i], positions[i - 1]);
-  }
-
-  return length;
+  return lengths.last();
 }
 
 static ReadAttributePtr make_length_attribute(const DCurve &curve)

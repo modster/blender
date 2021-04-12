@@ -9529,6 +9529,32 @@ static void def_geo_attribute_separate_xyz(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_curve_trim(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_TRIM_FACTOR,
+       "FACTOR",
+       0,
+       "Factor",
+       "Remove a portion of each spline's total length"},
+      {GEO_NODE_CURVE_TRIM_LENGTH,
+       "LENGTH",
+       0,
+       "Length",
+       "Remove the specified length from the beginning and end of the curve"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveTrim", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "How to specify the amount of each spline to remove");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_mesh_circle(StructRNA *srna)
 {
   PropertyRNA *prop;

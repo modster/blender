@@ -33,7 +33,7 @@ static bNodeSocketTemplate geo_node_curve_to_mesh_in[] = {
     {-1, ""},
 };
 
-static bNodeSocketTemplate geo_node_point_translate_out[] = {
+static bNodeSocketTemplate geo_node_curve_to_mesh_out[] = {
     {SOCK_GEOMETRY, N_("Mesh")},
     {-1, ""},
 };
@@ -88,9 +88,9 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
                                         int &poly_offset)
 {
   const int spline_vert_len = spline.evaluated_points_size();
-  const int spline_edge_len = spline.is_cyclic ? spline_vert_len : spline_vert_len - 1;
+  const int spline_edge_len = spline.evaluated_edges_size();
   const int profile_vert_len = profile_spline.evaluated_points_size();
-  const int profile_edge_len = profile_spline.is_cyclic ? profile_vert_len : profile_vert_len - 1;
+  const int profile_edge_len = profile_spline.evaluated_edges_size();
   if (spline_vert_len == 0) {
     return;
   }
@@ -213,27 +213,22 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   int profile_vert_total = 0;
   int profile_edge_total = 0;
   for (const Spline *profile_spline : profile_curve.splines) {
-    const int points_len = profile_spline->evaluated_points_size();
-    profile_vert_total += points_len;
-    /* When the profile is cyclic, one more edge is necessary to complete the ring. */
-    profile_edge_total += profile_spline->is_cyclic ? points_len : points_len - 1;
+    profile_vert_total += profile_spline->evaluated_points_size();
+    profile_edge_total += profile_spline->evaluated_edges_size();
   }
 
   int vert_total = 0;
   int edge_total = 0;
   int poly_total = 0;
-  for (const int i : curve.splines.index_range()) {
-    const Spline &spline = *curve.splines[i];
-    const int spline_vert_len = spline.evaluated_points_size();
-    /* When the spline is cyclic, one more ring of the profile completes the loop. */
-    const int spline_edge_len = spline.is_cyclic ? spline_vert_len : (spline_vert_len - 1);
+  for (const Spline *spline : curve.splines) {
+    const int spline_vert_len = spline->evaluated_points_size();
+    const int spline_edge_len = spline->evaluated_edges_size();
     vert_total += spline_vert_len * profile_vert_total;
     poly_total += spline_edge_len * profile_edge_total;
 
-    /* Add the ring edges, with one ring for every curve vertex. */
-    edge_total += profile_edge_total * spline_vert_len;
-    /* Add the edge loops that run along the length of the curve, starting on the first profile. */
-    edge_total += profile_vert_total * spline_edge_len;
+    /* Add the ring edges, with one ring for every curve vertex, and the edge loops
+     * that run along the length of the curve, starting on the first profile. */
+    edge_total += profile_edge_total * spline_vert_len + profile_vert_total * spline_edge_len;
   }
   const int corner_total = poly_total * 4;
 
@@ -313,7 +308,7 @@ void register_node_type_geo_curve_to_mesh()
   static bNodeType ntype;
 
   geo_node_type_base(&ntype, GEO_NODE_CURVE_TO_MESH, "Curve to Mesh", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_curve_to_mesh_in, geo_node_point_translate_out);
+  node_type_socket_templates(&ntype, geo_node_curve_to_mesh_in, geo_node_curve_to_mesh_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_curve_to_mesh_exec;
   nodeRegisterType(&ntype);
 }

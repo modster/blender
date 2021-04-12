@@ -76,32 +76,42 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
   curve->splines.reserve(BLI_listbase_count(nurbs));
 
   LISTBASE_FOREACH (const Nurb *, nurb, nurbs) {
-    if (nurb->type == CU_BEZIER) {
-      BezierSpline *spline = new BezierSpline();
-      spline->set_resolution(nurb->resolu);
-      spline->type = Spline::Type::Bezier;
-      spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
+    switch (nurb->type) {
+      case CU_BEZIER: {
+        BezierSpline *spline = new BezierSpline();
+        spline->set_resolution(nurb->resolu);
+        spline->type = Spline::Type::Bezier;
+        spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
 
-      for (const BezTriple &bezt : Span(nurb->bezt, nurb->pntsu)) {
-        BezierPoint point;
-        point.handle_position_a = bezt.vec[0];
-        point.position = bezt.vec[1];
-        point.handle_position_b = bezt.vec[2];
-        point.radius = bezt.radius;
-        point.tilt = bezt.tilt;
-        point.handle_type_a = handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h1);
-        point.handle_type_b = handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h2);
-        spline->control_points.append(std::move(point));
+        for (const BezTriple &bezt : Span(nurb->bezt, nurb->pntsu)) {
+          BezierPoint point;
+          point.handle_position_a = bezt.vec[0];
+          point.position = bezt.vec[1];
+          point.handle_position_b = bezt.vec[2];
+          point.radius = bezt.radius;
+          point.tilt = bezt.tilt;
+          point.handle_type_a = handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h1);
+          point.handle_type_b = handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h2);
+          spline->control_points.append(std::move(point));
+        }
+
+        curve->splines.append(spline);
+        break;
       }
-
-      curve->splines.append(spline);
-    }
-    else if (nurb->type == CU_NURBS) {
-    }
-    else if (nurb->type == CU_POLY) {
+      case CU_NURBS: {
+        break;
+      }
+      case CU_POLY: {
+        break;
+      }
+      default: {
+        BLI_assert_unreachable();
+        break;
+      }
     }
   }
 
+  /* TODO: Decide whether to store this in the spline or the curve. */
   const Spline::NormalCalculationMode normal_mode = normal_mode_from_dna_curve(
       dna_curve.twist_mode);
   for (Spline *spline : curve->splines) {
@@ -117,6 +127,13 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
 /** \name Spline
  * \{ */
 
+int Spline::evaluated_edges_size() const
+{
+  const int points_len = this->evaluated_points_size();
+
+  return this->is_cyclic ? points_len : points_len - 1;
+}
+
 Span<float3> Spline::evaluated_positions() const
 {
   this->ensure_base_cache();
@@ -129,16 +146,25 @@ Span<PointMapping> Spline::evaluated_mappings() const
   return evaluated_mapping_cache_;
 }
 
-static void accumulate_lengths(Span<float3> positions, MutableSpan<float> r_lengths)
+static void accumulate_lengths(Span<float3> positions,
+                               const bool is_cyclic,
+                               MutableSpan<float> lengths)
 {
   float length = 0.0f;
-  r_lengths[0] = length;
-  for (const int i : IndexRange(1, positions.size() - 1)) {
-    r_lengths[i] = length;
-    length += float3::distance(positions[i - 1], positions[i]);
+  for (const int i : IndexRange(positions.size() - 1)) {
+    length += float3::distance(positions[i], positions[i + 1]);
+    lengths[i] = length;
+  }
+  if (is_cyclic) {
+    lengths.last() = length + float3::distance(positions.last(), positions.first());
   }
 }
 
+/**
+ * Return non-owning access to the cache of accumulated lengths along the curve. Each item is the
+ * length of the subsequent segment, i.e. the first value is the length of the first segment rather
+ * than 0. This calculation only depends on the spline's evaluated positions.
+ */
 Span<float> Spline::evaluated_lengths() const
 {
   if (!this->length_cache_dirty_) {
@@ -150,11 +176,11 @@ Span<float> Spline::evaluated_lengths() const
     return evaluated_lengths_cache_;
   }
 
-  const int total = this->evaluated_points_size();
+  const int total = this->evaluated_edges_size();
   this->evaluated_lengths_cache_.resize(total);
 
   Span<float3> positions = this->evaluated_positions();
-  accumulate_lengths(positions, this->evaluated_lengths_cache_);
+  accumulate_lengths(positions, this->is_cyclic, this->evaluated_lengths_cache_);
 
   this->length_cache_dirty_ = false;
   return evaluated_lengths_cache_;
@@ -195,6 +221,9 @@ static void calculate_tangents(Span<float3> positions,
   }
 }
 
+/**
+ * Return non-owning access to the direction of the curve at each evaluated point.
+ */
 Span<float3> Spline::evaluated_tangents() const
 {
   if (!this->tangent_cache_dirty_) {
@@ -374,6 +403,10 @@ static void calculate_normals_z_up(Span<float3> tangents, MutableSpan<float3> no
   }
 }
 
+/**
+ * Return non-owning access to the direction vectors perpendicular to the tangents at every
+ * evaluated point. The method used to generate the normal vectors depends on Spline.normal_mode.
+ */
 Span<float3> Spline::evaluated_normals() const
 {
   if (!this->normal_cache_dirty_) {
@@ -405,6 +438,10 @@ Span<float3> Spline::evaluated_normals() const
   return evaluated_normals_cache_;
 }
 
+/**
+ * Mark all caches for recomputation. This must be called after any operation that would
+ * change the generated positions, tangents, normals, mapping, etc. of the evaluated points.
+ */
 void Spline::mark_cache_invalid()
 {
   base_cache_dirty_ = true;
@@ -427,6 +464,25 @@ float Spline::get_evaluated_point_radius(const int evaluated_index) const
   const float next_radius = this->control_point_radius(next_index);
 
   return interpf(next_radius, radius, factor);
+}
+
+void Spline::trim_lengths(const float start_length, const float end_length)
+{
+  Span<float> lengths = this->evaluated_lengths();
+
+  const float *lower = std::lower_bound(lengths.begin(), lengths.end(), start_length);
+  const float *upper = std::lower_bound(lengths.begin(), lengths.end(), end_length);
+
+  const int i_lower = lower - lengths.begin();
+  const int i_upper = upper - lengths.begin();
+
+  Span<PointMapping> mappings = this->evaluated_mappings();
+
+  const int i_control_lower = mappings[i_lower].control_point_index;
+  const int i_control_upper = mappings[i_upper].control_point_index;
+
+  // this->drop_front_control_points(i_control_upper);
+  // this->drop_back_control_points(this->size() - i_control_upper);
 }
 
 /** \} */
@@ -503,12 +559,14 @@ int BezierSpline::evaluated_points_size() const
   return total_len;
 }
 
+/**
+ * If the spline is not cyclic, the direction for the first and last points is just the
+ * direction formed by the corresponding handles and control points. In the unlikely situation
+ * that the handles define a zero direction, fallback to using the direction defined by the
+ * first and last evaluated segments already calculated in #Spline::evaluated_tangents().
+ */
 void BezierSpline::correct_end_tangents() const
 {
-  /* If the spline is not cyclic, the direction for the first and last points is just the
-   * direction formed by the corresponding handles and control points. In the unlikely situation
-   * that the handles define a zero direction, fallback to using the direction defined by the
-   * first and last evaluated segments already calculated in #Spline::evaluated_tangents(). */
 
   MutableSpan<float3> tangents(this->evaluated_tangents_cache_);
 

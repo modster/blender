@@ -1195,6 +1195,11 @@ typedef struct NodeInputString {
   char *string;
 } NodeInputString;
 
+typedef struct NodeGeometryCurveTrim {
+  /* GeometryNodeCurveTrimMode. */
+  uint8_t mode;
+} NodeGeometryCurveTrim;
+
 typedef struct NodeGeometryRotatePoints {
   /* GeometryNodeRotatePointsType */
   uint8_t type;
@@ -1701,6 +1706,11 @@ typedef enum GeometryNodeAttributeProximityTargetType {
   GEO_NODE_ATTRIBUTE_PROXIMITY_TARGET_GEOMETRY_ELEMENT_EDGES = 1,
   GEO_NODE_ATTRIBUTE_PROXIMITY_TARGET_GEOMETRY_ELEMENT_FACES = 2,
 } GeometryNodeAttributeProximityTargetType;
+
+typedef enum GeometryNodeCurveTrimMode {
+  GEO_NODE_CURVE_TRIM_FACTOR = 0,
+  GEO_NODE_CURVE_TRIM_LENGTH = 1,
+} GeometryNodeCurveTrimMode;
 
 /* Boolean Node */
 typedef enum GeometryNodeBooleanOperation {

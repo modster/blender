@@ -36,6 +36,7 @@ struct PointMapping {
   float factor;
 };
 
+/* TODO: Think about storing each data type from each control point separately. */
 struct BezierPoint {
   enum HandleType {
     Free,
@@ -65,7 +66,13 @@ struct BezierPoint {
   }
 };
 
-/* TODO: Think about storing each data type from each control point separately. */
+/**
+ * A spline is an abstraction of a curve section, its evaluation methods, and data.
+ * The spline data itself is just control points and a set of attributes.
+ *
+ * Common evaluated data is stored in caches on the spline itself. This way operations on splines
+ * don't need to worry about taking ownership of evaluated data when they don't need to.
+ */
 class Spline {
  public:
   enum Type {
@@ -110,6 +117,7 @@ class Spline {
 
   virtual void mark_cache_invalid();
   virtual int evaluated_points_size() const = 0;
+  int evaluated_edges_size() const;
 
   blender::Span<blender::float3> evaluated_positions() const;
   blender::Span<PointMapping> evaluated_mappings() const;
@@ -117,9 +125,10 @@ class Spline {
   blender::Span<blender::float3> evaluated_tangents() const;
   blender::Span<blender::float3> evaluated_normals() const;
 
-  /* TODO: I'm not sure this is the best abstraction here. Indeed, all of the `PointMapping`
-   * stuff might be a bit suspect. */
+  /* TODO: I'm not sure this is the best abstraction here, maybe we want another cache. */
   float get_evaluated_point_radius(const int index) const;
+
+  void trim_lengths(const float start_length, const float end_length);
 
  protected:
   virtual void correct_end_tangents() const = 0;
@@ -187,12 +196,6 @@ class NURBSPline : public Spline {
 /* Proposed name to be different from DNA type. */
 struct DCurve {
   blender::Vector<Spline *> splines;
-
-  // enum TangentMethod {
-  //   ZUp,
-  //   Minimum,
-  //   Tangent,
-  // };
 
   // bool is_2d;
 
