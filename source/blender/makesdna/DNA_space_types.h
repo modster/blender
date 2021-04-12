@@ -1943,17 +1943,17 @@ typedef enum eSpaceSpreadsheet_RowFilterFlag {
   SPREADSHEET_ROW_FILTER_ENABLED = (1 << 2),
 } eSpaceSpreadsheet_RowFilterFlag;
 
-typedef enum eSpaceSpreadsheet_ObjectEvalState {
-  SPREADSHEET_OBJECT_EVAL_STATE_FINAL = 0,
-  SPREADSHEET_OBJECT_EVAL_STATE_ORIGINAL = 1,
-  SPREADSHEET_OBJECT_EVAL_STATE_NODE = 2,
-} eSpaceSpreadsheet_Context;
-
 typedef enum eSpaceSpreadsheet_RowFilterOperation {
   SPREADSHEET_ROW_FILTER_EQUAL = 0,
   SPREADSHEET_ROW_FILTER_GREATER = 1,
   SPREADSHEET_ROW_FILTER_LESS = 2,
 } eSpaceSpreadsheet_RowFilterOperation;
+
+typedef enum eSpaceSpreadsheet_ObjectEvalState {
+  SPREADSHEET_OBJECT_EVAL_STATE_FINAL = 0,
+  SPREADSHEET_OBJECT_EVAL_STATE_ORIGINAL = 1,
+  SPREADSHEET_OBJECT_EVAL_STATE_NODE = 2,
+} eSpaceSpreadsheet_Context;
 
 /** \} */
 
