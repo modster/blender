@@ -83,6 +83,11 @@ class MaybeUnsavedWriteAttribute {
     return varray_.get() != nullptr;
   }
 
+  GVMutableArray &operator*()
+  {
+    return *varray_;
+  }
+
   GVMutableArray &varray()
   {
     return *varray_;
