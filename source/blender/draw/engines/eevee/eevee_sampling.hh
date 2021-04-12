@@ -223,11 +223,11 @@ class Sampling {
       cdf[u + 1] = cdf[u] + BKE_curvemapping_evaluateF(&curve, 0, x);
     }
     /* Normalize the CDF. */
-    for (int u = 0; u < cdf.size() - 1; u++) {
-      cdf[u] /= cdf[cdf.size() - 1];
+    for (int u = 0; u < cdf.size() - 2; u++) {
+      cdf[u] /= cdf.last();
     }
     /* Just to make sure. */
-    cdf[cdf.size() - 1] = 1.0f;
+    cdf.last() = 1.0f;
   }
 
   /* Inverts a cumulative distribution function.
@@ -237,14 +237,12 @@ class Sampling {
     for (int u = 0; u < inverted_cdf.size(); u++) {
       float x = (float)u / (float)(inverted_cdf.size() - 1);
       for (int i = 0; i < cdf.size(); i++) {
-        if (cdf[i] >= x) {
-          if (i == cdf.size() - 1) {
-            inverted_cdf[u] = 1.0f;
-          }
-          else {
-            float t = (x - cdf[i]) / (cdf[i + 1] - cdf[i]);
-            inverted_cdf[u] = ((float)i + t) / (float)(cdf.size() - 1);
-          }
+        if (i == cdf.size() - 1) {
+          inverted_cdf[u] = 1.0f;
+        }
+        else if (cdf[i] >= x) {
+          float t = (x - cdf[i]) / (cdf[i + 1] - cdf[i]);
+          inverted_cdf[u] = ((float)i + t) / (float)(cdf.size() - 1);
           break;
         }
       }

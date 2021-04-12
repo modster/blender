@@ -142,7 +142,7 @@ class MotionBlurModule {
 
     if (motion_blur_fx_enabled_) {
       /* A bit weird but we have to sync the first 2 steps here because the step()
-       * function is only called rendering a sample. */
+       * function is only called after rendering a sample. */
       velocity_.step_sync(Velocity::STEP_PREVIOUS, camera_, engine_, depsgraph_, time_steps_[0]);
       velocity_.step_sync(Velocity::STEP_NEXT, camera_, engine_, depsgraph_, time_steps_[2]);
     }
