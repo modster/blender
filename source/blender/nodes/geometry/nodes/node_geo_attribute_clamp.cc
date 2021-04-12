@@ -172,8 +172,6 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
 
   switch (data_type) {
     case CD_PROP_FLOAT3: {
-      GVArray_Typed<float3> inputs{*attribute_input};
-      GVMutableArray_Typed<float3> results{*attribute_result};
       float3 min = params.get_input<float3>("Min");
       float3 max = params.get_input<float3>("Max");
       if (operation == NODE_CLAMP_RANGE) {
@@ -187,38 +185,37 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
           std::swap(min.z, max.z);
         }
       }
-      clamp_attribute<float3>(inputs, results, min, max);
+      clamp_attribute<float3>(
+          attribute_input->typed<float3>(), attribute_result->typed<float3>(), min, max);
       break;
     }
     case CD_PROP_FLOAT: {
-      GVArray_Typed<float> inputs{*attribute_input};
-      GVMutableArray_Typed<float> results{*attribute_result};
       const float min = params.get_input<float>("Min_001");
       const float max = params.get_input<float>("Max_001");
       if (operation == NODE_CLAMP_RANGE && min > max) {
-        clamp_attribute<float>(inputs, results, max, min);
+        clamp_attribute<float>(
+            attribute_input->typed<float>(), attribute_result->typed<float>(), max, min);
       }
       else {
-        clamp_attribute<float>(inputs, results, min, max);
+        clamp_attribute<float>(
+            attribute_input->typed<float>(), attribute_result->typed<float>(), min, max);
       }
       break;
     }
     case CD_PROP_INT32: {
-      GVArray_Typed<int> inputs{*attribute_input};
-      GVMutableArray_Typed<int> results{*attribute_result};
       const int min = params.get_input<int>("Min_002");
       const int max = params.get_input<int>("Max_002");
       if (operation == NODE_CLAMP_RANGE && min > max) {
-        clamp_attribute<int>(inputs, results, max, min);
+        clamp_attribute<int>(
+            attribute_input->typed<int>(), attribute_result->typed<int>(), max, min);
       }
       else {
-        clamp_attribute<int>(inputs, results, min, max);
+        clamp_attribute<int>(
+            attribute_input->typed<int>(), attribute_result->typed<int>(), min, max);
       }
       break;
     }
     case CD_PROP_COLOR: {
-      GVArray_Typed<Color4f> inputs{*attribute_input};
-      GVMutableArray_Typed<Color4f> results{*attribute_result};
       Color4f min = params.get_input<Color4f>("Min_003");
       Color4f max = params.get_input<Color4f>("Max_003");
       if (operation == NODE_CLAMP_RANGE) {
@@ -235,7 +232,8 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
           std::swap(min.a, max.a);
         }
       }
-      clamp_attribute<Color4f>(inputs, results, min, max);
+      clamp_attribute<Color4f>(
+          attribute_input->typed<Color4f>(), attribute_result->typed<Color4f>(), min, max);
       break;
     }
     default: {
