@@ -39,6 +39,7 @@
 #include "eevee_depth_of_field.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_shader.hh"
+#include "eevee_velocity.hh"
 
 namespace blender::eevee {
 
@@ -81,13 +82,16 @@ class ShadingPasses {
  public:
   // BackgroundShadingPass background;
   DeferredPass opaque;
+  VelocityPass velocity;
 
  public:
-  ShadingPasses(ShaderModule &shaders) : opaque(shaders){};
+  ShadingPasses(ShaderModule &shaders, Camera &camera, Velocity &velocity)
+      : opaque(shaders), velocity(shaders, camera, velocity){};
 
   void sync()
   {
     opaque.sync();
+    velocity.sync();
   }
 };
 
@@ -106,15 +110,20 @@ class ShadingView {
   ShadingPasses &shading_passes_;
   /** Associated camera. */
   const Camera &camera_;
-  /** Depth of field module. */
+  /** Post-fx modules. */
   DepthOfField dof_;
+  MotionBlur mb_;
 
   /** Owned resources. */
   GPUFrameBuffer *view_fb_ = nullptr;
+  GPUFrameBuffer *velocity_fb_ = nullptr;
+  GPUFrameBuffer *velocity_only_fb_ = nullptr;
   /** Draw resources. Not owned. */
   GPUTexture *combined_tx_ = nullptr;
   GPUTexture *depth_tx_ = nullptr;
   GPUTexture *postfx_tx_ = nullptr;
+  GPUTexture *velocity_camera_tx_ = nullptr;
+  GPUTexture *velocity_view_tx_ = nullptr;
 
   /** Main views is created from the camera (or is from the viewport). It is not jittered. */
   DRWView *main_view_ = nullptr;
@@ -138,23 +147,28 @@ class ShadingView {
               ShadingPasses &shading_passes,
               Sampling &sampling,
               const Camera &camera,
+              MotionBlurModule &mb_module,
               const char *name,
               const float (*face_matrix)[4])
       : sampling_(sampling),
         shading_passes_(shading_passes),
         camera_(camera),
         dof_(shaders, sampling, name),
+        mb_(shaders, sampling, mb_module, name),
         name_(name),
         face_matrix_(face_matrix){};
 
   ~ShadingView()
   {
-    GPU_framebuffer_free(view_fb_);
+    GPU_FRAMEBUFFER_FREE_SAFE(view_fb_);
+    GPU_FRAMEBUFFER_FREE_SAFE(velocity_fb_);
+    GPU_FRAMEBUFFER_FREE_SAFE(velocity_only_fb_);
   }
 
   void init(const Scene *scene)
   {
     dof_.init(scene);
+    mb_.init(scene);
   }
 
   void sync(int render_extent_[2])
@@ -200,6 +214,7 @@ class ShadingView {
     render_view_ = DRW_view_create_sub(main_view_, viewmat_p, winmat_p);
 
     dof_.sync(camera_, winmat_p, extent_);
+    mb_.sync(extent_);
 
     {
       /* Query temp textures and create framebuffers. */
@@ -211,11 +226,30 @@ class ShadingView {
       combined_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
       /* TODO(fclem) Only allocate if needed. */
       postfx_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
+      /* TODO(fclem) Only allocate if needed. RG16F when only doing reprojection. */
+      velocity_camera_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
+      /* TODO(fclem) Only allocate if needed. RG16F when only doing motion blur post fx in
+       * panoramic camera. */
+      velocity_view_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
 
       GPU_framebuffer_ensure_config(&view_fb_,
                                     {
                                         GPU_ATTACHMENT_TEXTURE(depth_tx_),
                                         GPU_ATTACHMENT_TEXTURE(combined_tx_),
+                                    });
+
+      GPU_framebuffer_ensure_config(&velocity_fb_,
+                                    {
+                                        GPU_ATTACHMENT_TEXTURE(depth_tx_),
+                                        GPU_ATTACHMENT_TEXTURE(velocity_camera_tx_),
+                                        GPU_ATTACHMENT_TEXTURE(velocity_view_tx_),
+                                    });
+
+      GPU_framebuffer_ensure_config(&velocity_only_fb_,
+                                    {
+                                        GPU_ATTACHMENT_NONE,
+                                        GPU_ATTACHMENT_TEXTURE(velocity_camera_tx_),
+                                        GPU_ATTACHMENT_TEXTURE(velocity_view_tx_),
                                     });
     }
   }
@@ -237,6 +271,12 @@ class ShadingView {
     GPU_framebuffer_clear_color_depth(view_fb_, color, 1.0f);
     shading_passes_.opaque.render();
 
+    shading_passes_.velocity.render(depth_tx_, velocity_only_fb_, velocity_fb_);
+
+    if (render_passes.vector) {
+      render_passes.vector->accumulate(velocity_camera_tx_, sub_view_);
+    }
+
     GPUTexture *final_radiance_tx = render_post(combined_tx_);
 
     if (render_passes.combined) {
@@ -252,9 +292,12 @@ class ShadingView {
 
   GPUTexture *render_post(GPUTexture *input_tx)
   {
+    GPUTexture *velocity_tx = (velocity_view_tx_ != nullptr) ? velocity_view_tx_ :
+                                                               velocity_camera_tx_;
     GPUTexture *output_tx = postfx_tx_;
     /* Swapping is done internally. Actual output is set to the next input. */
     dof_.render(depth_tx_, &input_tx, &output_tx);
+    mb_.render(depth_tx_, velocity_tx, &input_tx, &output_tx);
     return input_tx;
   }
 
@@ -295,14 +338,18 @@ class MainView {
   int render_extent_[2];
 
  public:
-  MainView(ShaderModule &shaders, ShadingPasses &shpasses, Camera &cam, Sampling &sampling)
+  MainView(ShaderModule &shaders,
+           ShadingPasses &shpasses,
+           Camera &cam,
+           Sampling &sampling,
+           MotionBlurModule &mb_module)
       : shading_views_({
-            ShadingView(shaders, shpasses, sampling, cam, "posX_view", cubeface_mat[0]),
-            ShadingView(shaders, shpasses, sampling, cam, "negX_view", cubeface_mat[1]),
-            ShadingView(shaders, shpasses, sampling, cam, "posY_view", cubeface_mat[2]),
-            ShadingView(shaders, shpasses, sampling, cam, "negY_view", cubeface_mat[3]),
-            ShadingView(shaders, shpasses, sampling, cam, "posZ_view", cubeface_mat[4]),
-            ShadingView(shaders, shpasses, sampling, cam, "negZ_view", cubeface_mat[5]),
+            ShadingView(shaders, shpasses, sampling, cam, mb_module, "posX_view", cubeface_mat[0]),
+            ShadingView(shaders, shpasses, sampling, cam, mb_module, "negX_view", cubeface_mat[1]),
+            ShadingView(shaders, shpasses, sampling, cam, mb_module, "posY_view", cubeface_mat[2]),
+            ShadingView(shaders, shpasses, sampling, cam, mb_module, "negY_view", cubeface_mat[3]),
+            ShadingView(shaders, shpasses, sampling, cam, mb_module, "posZ_view", cubeface_mat[4]),
+            ShadingView(shaders, shpasses, sampling, cam, mb_module, "negZ_view", cubeface_mat[5]),
         })
   {
   }

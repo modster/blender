@@ -49,8 +49,10 @@ class Instance {
   MainView main_view_;
   /** Point of view in the scene. Can be init from viewport or camera object. */
   Camera camera_;
+  /** Velocity module containing motion data. */
+  Velocity velocity_;
   /** Motion blur data. */
-  MotionBlur motion_blur_;
+  MotionBlurModule motion_blur_;
   /** Lookdev own lightweight instance. May not be allocated. */
   // Lookdev *lookdev_ = nullptr;
 
@@ -69,10 +71,11 @@ class Instance {
   Instance(ShaderModule &shared_shaders)
       : render_passes_(shared_shaders, camera_, sampling_),
         shaders_(shared_shaders),
-        shading_passes_(shared_shaders),
-        main_view_(shared_shaders, shading_passes_, camera_, sampling_),
+        shading_passes_(shared_shaders, camera_, velocity_),
+        main_view_(shared_shaders, shading_passes_, camera_, sampling_, motion_blur_),
         camera_(sampling_),
-        motion_blur_(sampling_){};
+        velocity_(),
+        motion_blur_(camera_, sampling_, velocity_){};
   ~Instance(){};
 
   /**
@@ -116,10 +119,11 @@ class Instance {
     }
 
     sampling_.init(scene_);
-    motion_blur_.init(scene_, render, depsgraph_);
     camera_.init(render_, depsgraph_, camera_object, drw_view_);
+    motion_blur_.init(scene_, render, depsgraph_);
     render_passes_.init(scene_, render_layer, v3d_, output_res, output_rect);
     main_view_.init(scene_, output_res);
+    velocity_.init(camera_, render_, depsgraph_, render_passes_);
   }
 
   /**
@@ -141,6 +145,7 @@ class Instance {
     switch (ob->type) {
       case OB_MESH:
         shading_passes_.opaque.surface_add(ob, nullptr, 0);
+        shading_passes_.velocity.mesh_add(ob);
         break;
 
       default:
@@ -157,7 +162,7 @@ class Instance {
 
   void end_sync(void)
   {
-    motion_blur_.end_sync();
+    velocity_.end_sync();
   }
 
   void render_sync(void)

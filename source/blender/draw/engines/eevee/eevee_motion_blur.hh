@@ -54,61 +54,21 @@
 
 #include "eevee_sampling.hh"
 #include "eevee_shader_shared.hh"
+#include "eevee_velocity.hh"
 
 namespace blender::eevee {
 
-class MotionBlur {
- public:
-  struct ViewStep {
-    CameraData cam_data;
-  };
+/* -------------------------------------------------------------------- */
+/** \name MotionBlur
+ *
+ * Common module. Manages timesteps evaluations and accumulation Motion blur.
+ * \{ */
 
+class MotionBlurModule {
  private:
-  enum eStep {
-    STEP_PREVIOUS = 0,
-    STEP_NEXT = 1,
-    STEP_CURRENT = 2,
-  };
-
-  struct ObjectSteps {
-    mat4 obmats[3];
-  };
-
-  struct HairSteps {
-    /** Boolean used as uniform to disable deformation motion-blur just before drawing. */
-    int use_deform;
-    /** Position buffer for time = t +/- step. */
-    struct GPUVertBuf *hair_pos[2] = {nullptr};
-    /** Buffer Texture of the corresponding VBO. */
-    struct GPUTexture *hair_pos_tx[2] = {nullptr};
-  };
-
-  struct GeometrySteps : public ObjectSteps {
-    /** Boolean used as uniform to disable deformation motion-blur just before drawing. */
-    int use_deform;
-    /** Batch for time = t. */
-    struct GPUBatch *batch = nullptr;
-    /** Vbo for time = t +/- step. */
-    struct GPUVertBuf *vbo[2] = {nullptr};
-    /** Hair motion steps for particle systems. */
-    Vector<HairSteps> psys;
-  };
-
-  /** Unique key to identify each object in the hashmap. */
-  struct ObjectKey {
-    /** Original Object or source object for duplis. */
-    struct Object *ob = nullptr;
-    /** Original Parent object for duplis. */
-    struct Object *parent = nullptr;
-    /** Dupli objects recursive unique identifier */
-    int id[8] = {0}; /* MAX_DUPLI_RECUR */
-  };
-
-  ViewStep camera_steps[3];
-  Map<ObjectKey, GeometrySteps *> geom_steps_;
-  Map<ObjectKey, HairSteps *> hair_steps_;
-
   Sampling &sampling_;
+  Velocity &velocity_;
+  Camera &camera_;
 
   RenderEngine *engine_;
   Depsgraph *depsgraph_;
@@ -127,17 +87,17 @@ class MotionBlur {
   /** Copy of scene settings. */
   int motion_blur_position_;
   float motion_blur_shutter_;
+  float motion_blur_fx_depth_scale_;
 
-  /**  */
-  bool use_fx_motion_blur = false;
   bool enabled_ = false;
+  float motion_blur_fx_enabled_ = false;
 
-  eStep step_type_ = STEP_CURRENT;
   int step_id_ = 0;
 
  public:
-  MotionBlur(Sampling &sampling) : sampling_(sampling){};
-  ~MotionBlur(){};
+  MotionBlurModule(Camera &camera, Sampling &sampling, Velocity &velocity)
+      : sampling_(sampling), velocity_(velocity), camera_(camera){};
+  ~MotionBlurModule(){};
 
   void init(const Scene *scene, RenderEngine *engine, Depsgraph *depsgraph)
   {
@@ -148,6 +108,7 @@ class MotionBlur {
       enabled_ = false;
     }
     if (!enabled_) {
+      motion_blur_fx_enabled_ = false;
       return;
     }
 
@@ -173,28 +134,20 @@ class MotionBlur {
       time = this->shutter_time_to_scene_time(time);
     }
 
-    // use_fx_motion_blur = scene->eevee.motion_blur_max > 0.0f;
-    use_fx_motion_blur = false;
+    motion_blur_fx_enabled_ = scene->eevee.motion_blur_max > 0.5f;
     step_id_ = 1;
 
     engine_ = engine;
     depsgraph_ = depsgraph;
 
-    if (use_fx_motion_blur) {
+    if (motion_blur_fx_enabled_) {
       /* A bit weird but we have to sync the first 2 steps here because the step()
-       * function is only called. */
-      this->step_sync(time_steps_[0], STEP_PREVIOUS);
-      this->step_sync(time_steps_[2], STEP_NEXT);
+       * function is only called rendering a sample. */
+      velocity_.step_sync(Velocity::STEP_PREVIOUS, camera_, engine_, depsgraph_, time_steps_[0]);
+      velocity_.step_sync(Velocity::STEP_NEXT, camera_, engine_, depsgraph_, time_steps_[2]);
     }
-    this->set_time(time_steps_[1]);
-  }
-
-  /* Runs once per center time step. */
-  void end_sync(void)
-  {
-    if (!enabled_) {
-      return;
-    }
+    float frame_time = time_steps_[1];
+    DRW_render_set_time(engine_, depsgraph_, floorf(frame_time), fractf(frame_time));
   }
 
   /* Runs after rendering a sample. */
@@ -212,51 +165,22 @@ class MotionBlur {
       BLI_assert(time_steps_.size() > step_id_ + 2);
       step_id_ += 2;
 
-      if (use_fx_motion_blur) {
-        this->step_swap();
-        this->step_sync(time_steps_[step_id_ + 1], STEP_NEXT);
+      if (motion_blur_fx_enabled_) {
+        velocity_.step_swap();
+        velocity_.step_sync(
+            Velocity::STEP_NEXT, camera_, engine_, depsgraph_, time_steps_[step_id_ + 1]);
       }
-      step_type_ = STEP_CURRENT;
-      this->set_time(time_steps_[step_id_]);
+      float frame_time = time_steps_[step_id_];
+      DRW_render_set_time(engine_, depsgraph_, floorf(frame_time), fractf(frame_time));
     }
+  }
+
+  bool blur_fx_enabled_get(void) const
+  {
+    return motion_blur_fx_enabled_;
   }
 
  private:
-  /* Gather motion data from all objects in the scene. */
-  static void step_object_sync(void *motion_blur_,
-                               Object *ob,
-                               RenderEngine *UNUSED(engine),
-                               Depsgraph *UNUSED(depsgraph))
-  {
-    MotionBlur &mb = *reinterpret_cast<MotionBlur *>(motion_blur_);
-    (void)mb;
-
-    switch (ob->type) {
-      case OB_MESH:
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  void step_sync(float time, eStep step)
-  {
-    step_type_ = step;
-    this->set_time(time);
-    DRW_render_object_iter(this, engine_, depsgraph_, MotionBlur::step_object_sync);
-  }
-
-  /* Swaps next frame data  */
-  void step_swap()
-  {
-  }
-
-  void set_time(float time)
-  {
-    DRW_render_set_time(engine_, depsgraph_, floorf(time), fractf(time));
-  }
-
   float shutter_time_to_scene_time(float time)
   {
     switch (motion_blur_position_) {
@@ -278,5 +202,178 @@ class MotionBlur {
     return time;
   }
 };
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name MotionBlur
+ *
+ * Per view fx module. Perform a motion blur using the result of the velocity pass.
+ * \{ */
+
+class MotionBlur {
+ private:
+  ShaderModule &shaders_;
+  Sampling &sampling_;
+  MotionBlurModule &mb_module_;
+
+  StringRefNull view_name_;
+
+  /** Textures from pool. Not owned. */
+  GPUTexture *tiles_tx_ = nullptr;
+  GPUTexture *tiles_dilated_tx_ = nullptr;
+  /** Input texture. Not owned. */
+  GPUTexture *input_velocity_tx_ = nullptr;
+  GPUTexture *input_color_tx_ = nullptr;
+  GPUTexture *input_depth_tx_ = nullptr;
+  /** Passes. Not owned. */
+  DRWPass *tiles_flatten_ps_ = nullptr;
+  DRWPass *tiles_dilate_ps_ = nullptr;
+  DRWPass *gather_ps_ = nullptr;
+  /** Framebuffers. Owned.  */
+  GPUFrameBuffer *tiles_flatten_fb_ = nullptr;
+  GPUFrameBuffer *tiles_dilate_fb_ = nullptr;
+  GPUFrameBuffer *gather_fb_ = nullptr;
+
+  StructBuffer<MotionBlurData> data_;
+
+  bool enabled_;
+
+ public:
+  MotionBlur(ShaderModule &shaders,
+             Sampling &sampling,
+             MotionBlurModule &mb_module,
+             StringRefNull view_name)
+      : shaders_(shaders), sampling_(sampling), mb_module_(mb_module), view_name_(view_name){};
+
+  ~MotionBlur()
+  {
+    GPU_FRAMEBUFFER_FREE_SAFE(tiles_flatten_fb_);
+    GPU_FRAMEBUFFER_FREE_SAFE(tiles_dilate_fb_);
+    GPU_FRAMEBUFFER_FREE_SAFE(gather_fb_);
+  }
+
+  void init(const Scene *scene)
+  {
+    data_.blur_max = scene->eevee.motion_blur_max;
+    data_.depth_scale = scene->eevee.motion_blur_depth_scale;
+    enabled_ = ((scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED) != 0) &&
+               (data_.blur_max > 0.5f);
+  }
+
+  void sync(int extent[2])
+  {
+    if (!enabled_) {
+      return;
+    }
+
+    DrawEngineType *owner = (DrawEngineType *)view_name_.c_str();
+    eGPUSamplerState no_filter = GPU_SAMPLER_DEFAULT;
+
+    uint res[2] = {divide_ceil_u(extent[0], MB_TILE_DIVISOR),
+                   divide_ceil_u(extent[1], MB_TILE_DIVISOR)};
+
+    {
+      /* Create max velocity tiles in 2 passes. One for X and one for Y */
+      DRW_PASS_CREATE(tiles_flatten_ps_, DRW_STATE_WRITE_COLOR);
+      GPUShader *sh = shaders_.static_shader_get(MOTION_BLUR_TILE_FLATTEN);
+      DRWShadingGroup *grp = DRW_shgroup_create(sh, tiles_flatten_ps_);
+      DRW_shgroup_uniform_texture_ref_ex(grp, "velocity_tx", &input_velocity_tx_, no_filter);
+      DRW_shgroup_uniform_block(grp, "motion_blur_block", data_.ubo_get());
+      DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+
+      tiles_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
+
+      GPU_framebuffer_ensure_config(&tiles_flatten_fb_,
+                                    {
+                                        GPU_ATTACHMENT_NONE,
+                                        GPU_ATTACHMENT_TEXTURE(tiles_tx_),
+                                    });
+    }
+    {
+      /* Expand max tiles by keeping the max tile in each tile neighborhood. */
+      DRW_PASS_CREATE(tiles_dilate_ps_, DRW_STATE_WRITE_COLOR);
+      GPUShader *sh = shaders_.static_shader_get(MOTION_BLUR_TILE_DILATE);
+      DRWShadingGroup *grp = DRW_shgroup_create(sh, tiles_dilate_ps_);
+      DRW_shgroup_uniform_texture_ref_ex(grp, "tiles_tx", &tiles_tx_, no_filter);
+      DRW_shgroup_uniform_block(grp, "motion_blur_block", data_.ubo_get());
+      DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+
+      tiles_dilated_tx_ = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
+
+      GPU_framebuffer_ensure_config(&tiles_dilate_fb_,
+                                    {
+                                        GPU_ATTACHMENT_NONE,
+                                        GPU_ATTACHMENT_TEXTURE(tiles_dilated_tx_),
+                                    });
+    }
+    {
+      data_.target_size_inv[0] = 1.0f / extent[0];
+      data_.target_size_inv[1] = 1.0f / extent[1];
+
+      /* Do the motion blur gather algorithm. */
+      DRW_PASS_CREATE(gather_ps_, DRW_STATE_WRITE_COLOR);
+      GPUShader *sh = shaders_.static_shader_get(MOTION_BLUR_GATHER);
+      DRWShadingGroup *grp = DRW_shgroup_create(sh, gather_ps_);
+      DRW_shgroup_uniform_block(grp, "sampling_block", sampling_.ubo_get());
+      DRW_shgroup_uniform_block(grp, "motion_blur_block", data_.ubo_get());
+      DRW_shgroup_uniform_texture_ref(grp, "color_tx", &input_color_tx_);
+      DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
+      DRW_shgroup_uniform_texture_ref_ex(grp, "velocity_tx", &input_velocity_tx_, no_filter);
+      DRW_shgroup_uniform_texture_ref_ex(grp, "tiles_tx", &tiles_dilated_tx_, no_filter);
+
+      DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    }
+
+    data_.is_viewport = !DRW_state_is_image_render();
+    data_.push_update();
+  }
+
+  void render(GPUTexture *depth_tx,
+              GPUTexture *velocity_tx,
+              GPUTexture **input_tx,
+              GPUTexture **output_tx)
+  {
+    if (!enabled_) {
+      return;
+    }
+
+    input_color_tx_ = *input_tx;
+    input_depth_tx_ = depth_tx;
+    input_velocity_tx_ = velocity_tx;
+
+    DRW_stats_group_start("Motion Blur");
+
+    GPU_framebuffer_bind(tiles_flatten_fb_);
+    DRW_draw_pass(tiles_flatten_ps_);
+
+    for (int max_blur = data_.blur_max; max_blur > 0; max_blur -= MB_TILE_DIVISOR) {
+      GPU_framebuffer_bind(tiles_dilate_fb_);
+      DRW_draw_pass(tiles_dilate_ps_);
+      SWAP(GPUTexture *, tiles_tx_, tiles_dilated_tx_);
+      SWAP(GPUFrameBuffer *, tiles_flatten_fb_, tiles_dilate_fb_);
+    }
+    /* Swap again so result is in tiles_dilated_tx_. */
+    SWAP(GPUTexture *, tiles_tx_, tiles_dilated_tx_);
+    SWAP(GPUFrameBuffer *, tiles_flatten_fb_, tiles_dilate_fb_);
+
+    GPU_framebuffer_ensure_config(&gather_fb_,
+                                  {
+                                      GPU_ATTACHMENT_NONE,
+                                      GPU_ATTACHMENT_TEXTURE(*output_tx),
+                                  });
+
+    GPU_framebuffer_bind(gather_fb_);
+    DRW_draw_pass(gather_ps_);
+
+    DRW_stats_group_end();
+
+    /* Swap buffers so that next effect has the right input. */
+    *input_tx = *output_tx;
+    *output_tx = input_color_tx_;
+  }
+};
+
+/** \} */
 
 }  // namespace blender::eevee

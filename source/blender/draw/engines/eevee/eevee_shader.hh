@@ -39,6 +39,7 @@ extern char datatoc_common_math_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
 
 extern char datatoc_eevee_camera_lib_glsl[];
+extern char datatoc_eevee_camera_velocity_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_accumulator_lib_glsl[];
 extern char datatoc_eevee_depth_of_field_bokeh_lut_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_downsample_frag_glsl[];
@@ -59,10 +60,18 @@ extern char datatoc_eevee_depth_of_field_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_film_filter_frag_glsl[];
 extern char datatoc_eevee_film_lib_glsl[];
 extern char datatoc_eevee_film_resolve_frag_glsl[];
+extern char datatoc_eevee_motion_blur_gather_frag_glsl[];
+extern char datatoc_eevee_motion_blur_lib_glsl[];
+extern char datatoc_eevee_motion_blur_tiles_dilate_frag_glsl[];
+extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_object_forward_frag_glsl[];
 extern char datatoc_eevee_object_lib_glsl[];
 extern char datatoc_eevee_object_mesh_vert_glsl[];
+extern char datatoc_eevee_object_velocity_frag_glsl[];
+extern char datatoc_eevee_object_velocity_lib_glsl[];
+extern char datatoc_eevee_object_velocity_mesh_vert_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
+extern char datatoc_eevee_velocity_lib_glsl[];
 
 extern char datatoc_eevee_shader_shared_hh[];
 
@@ -97,6 +106,13 @@ enum eShaderType {
   FILM_RESOLVE,
 
   MESH, /* TEST */
+
+  MOTION_BLUR_GATHER,
+  MOTION_BLUR_TILE_DILATE,
+  MOTION_BLUR_TILE_FLATTEN,
+
+  VELOCITY_CAMERA,
+  VELOCITY_MESH,
 
   MAX_SHADER_TYPE,
 };
@@ -134,11 +150,14 @@ class ShaderModule {
     DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_velocity_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_accumulator_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_scatter_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_film_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_motion_blur_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_object_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_object_velocity_lib);
 
     /* Meh ¯\_(ツ)_/¯. */
     char *datatoc_nullptr_glsl = nullptr;
@@ -236,6 +255,17 @@ class ShaderModule {
     SHADER_FULLSCREEN(DOF_TILES_FLATTEN, eevee_depth_of_field_tiles_flatten_frag);
     SHADER(MESH, eevee_object_mesh_vert, nullptr, eevee_object_forward_frag, nullptr);
 
+    SHADER_FULLSCREEN(MOTION_BLUR_GATHER, eevee_motion_blur_gather_frag);
+    SHADER_FULLSCREEN(MOTION_BLUR_TILE_DILATE, eevee_motion_blur_tiles_dilate_frag);
+    SHADER_FULLSCREEN(MOTION_BLUR_TILE_FLATTEN, eevee_motion_blur_tiles_flatten_frag);
+
+    SHADER(VELOCITY_MESH,
+           eevee_object_velocity_mesh_vert,
+           nullptr,
+           eevee_object_velocity_frag,
+           nullptr);
+    SHADER_FULLSCREEN(VELOCITY_CAMERA, eevee_camera_velocity_frag);
+
 #undef SHADER
 #undef SHADER_FULLSCREEN
 
@@ -280,7 +310,7 @@ class ShaderModule {
   std::string enum_preprocess(const char *input)
   {
     std::string output = "";
-    /* Not failure safe but this is only ran on static data. */
+    /* Not failure safe but this only runs on static data. */
     const char *cursor = input;
     while ((cursor = strstr(cursor, "enum "))) {
       output += StringRef(input, cursor - input);

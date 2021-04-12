@@ -25,6 +25,10 @@ vec4 film_data_encode(FilmData film, vec4 data, float weight)
   else if (film.data_type == FILM_DATA_DEPTH) {
     /* TODO(fclem) Depth should be converted to radial depth in panoramic projection. */
   }
+  else if (film.data_type == FILM_DATA_MOTION) {
+    /* Motion vectors are in camera uv space. But final motion vectors are in pixel units. */
+    data *= film.uv_scale_inv.xyxy;
+  }
 
   if (film_is_color_data(film)) {
     data *= weight;

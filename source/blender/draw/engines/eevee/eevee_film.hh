@@ -52,6 +52,7 @@ static eGPUTextureFormat to_gpu_texture_format(eFilmDataType film_type)
     default:
     case FILM_DATA_COLOR_LOG:
     case FILM_DATA_COLOR:
+    case FILM_DATA_MOTION:
     case FILM_DATA_VEC4:
       return GPU_RGBA16F;
     case FILM_DATA_FLOAT:

@@ -37,6 +37,7 @@ enum eRenderPassBit {
   RENDERPASS_COMBINED = (1 << 0),
   RENDERPASS_DEPTH = (1 << 1),
   RENDERPASS_NORMAL = (1 << 2),
+  RENDERPASS_VECTOR = (1 << 3),
   /** Used for iterator. */
   RENDERPASS_MAX,
 };
@@ -49,6 +50,7 @@ static eRenderPassBit to_render_passes_bits(int i_rpasses)
   SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_COMBINED, RENDERPASS_COMBINED);
   SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_Z, RENDERPASS_DEPTH);
   SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_NORMAL, RENDERPASS_NORMAL);
+  SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_VECTOR, RENDERPASS_VECTOR);
   return rpasses;
 }
 
@@ -61,6 +63,8 @@ static const char *to_render_passes_name(eRenderPassBit rpass)
       return RE_PASSNAME_Z;
     case RENDERPASS_NORMAL:
       return RE_PASSNAME_NORMAL;
+    case RENDERPASS_VECTOR:
+      return RE_PASSNAME_VECTOR;
     default:
       BLI_assert(0);
       return "";
@@ -76,6 +80,8 @@ static eFilmDataType to_render_passes_data_type(eRenderPassBit rpass, const bool
       return FILM_DATA_DEPTH;
     case RENDERPASS_NORMAL:
       return FILM_DATA_NORMAL;
+    case RENDERPASS_VECTOR:
+      return FILM_DATA_MOTION;
     default:
       BLI_assert(0);
       return FILM_DATA_COLOR;
@@ -94,6 +100,7 @@ class RenderPasses {
   Film *combined = nullptr;
   Film *depth = nullptr;
   Film *normal = nullptr;
+  Film *vector = nullptr;
   Vector<Film *> aovs;
 
  private:
@@ -111,6 +118,7 @@ class RenderPasses {
     delete combined;
     delete depth;
     delete normal;
+    delete vector;
   }
 
   void init(const Scene *scene,
@@ -121,6 +129,10 @@ class RenderPasses {
   {
     if (render_layer) {
       enabled_passes_ = to_render_passes_bits(render_layer->passflag);
+      /* Cannot output motion vectors when using motion blur. */
+      if (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED) {
+        enabled_passes_ &= ~RENDERPASS_VECTOR;
+      }
     }
     else {
       BLI_assert(v3d);
@@ -220,6 +232,8 @@ class RenderPasses {
         return depth;
       case RENDERPASS_NORMAL:
         return normal;
+      case RENDERPASS_VECTOR:
+        return vector;
       default:
         BLI_assert(0);
         return combined;

@@ -42,7 +42,7 @@ class StructArrayBuffer {
  public:
   StructArrayBuffer()
   {
-    ubo_ = GPU_uniformbuf_create_ex(sizeof(data_), nullptr, STRINGIFY(T));
+    ubo_ = GPU_uniformbuf_create_ex(sizeof(data_), nullptr, "StructArrayBuffer");
   }
   ~StructArrayBuffer()
   {
@@ -76,32 +76,53 @@ class StructArrayBuffer {
     BLI_assert(index < len);
     return data_[index];
   }
+
+  /**
+   * Iterator
+   */
+  const T *begin() const
+  {
+    return data_;
+  }
+  const T *end() const
+  {
+    return data_ + len;
+  }
+
+  T *begin()
+  {
+    return data_;
+  }
+  T *end()
+  {
+    return data_ + len;
+  }
 };
 
 /** Simpler version where data is not an array. */
 template<typename T> class StructBuffer : public T {
  private:
-  GPUUniformBuf *ubo;
+  GPUUniformBuf *ubo_;
 
  public:
   StructBuffer()
   {
-    ubo = GPU_uniformbuf_create_ex(sizeof(T), nullptr, STRINGIFY(T));
+    ubo_ = GPU_uniformbuf_create_ex(sizeof(T), nullptr, "StructBuffer");
   }
   ~StructBuffer()
   {
-    GPU_uniformbuf_free(ubo);
+    DRW_UBO_FREE_SAFE(ubo_);
   }
 
   void push_update(void)
   {
     T *data = static_cast<T *>(this);
-    GPU_uniformbuf_update(ubo, data);
+    GPU_uniformbuf_update(ubo_, data);
   }
 
   const GPUUniformBuf *ubo_get(void) const
   {
-    return ubo;
+    return ubo_;
   }
 
   StructBuffer<T> &operator=(const T &other)

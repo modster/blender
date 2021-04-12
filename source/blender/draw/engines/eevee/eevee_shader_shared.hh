@@ -157,7 +157,8 @@ enum eFilmDataType : uint32_t {
   /** No VEC3 because GPU_RGB16F is not a renderable format. */
   FILM_DATA_VEC4 = 4u,
   FILM_DATA_NORMAL = 5u,
-  FILM_DATA_DEPTH = 6u
+  FILM_DATA_DEPTH = 6u,
+  FILM_DATA_MOTION = 7u
 };
 
 struct FilmData {
@@ -263,6 +264,39 @@ static float circle_to_polygon_angle(float sides_count, float theta)
 
   return side * side_angle + final_local_theta;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Velocity
+ * \{ */
+
+struct VelocityObjectData {
+  mat4 next_object_mat;
+  mat4 prev_object_mat;
+};
+BLI_STATIC_ASSERT_ALIGN(VelocityObjectData, 16)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Motion Blur
+ * \{ */
+
+#define MB_TILE_DIVISOR 32
+
+struct MotionBlurData {
+  /** Motion vector lengths are clamped to this maximum. A value of 0 means effect is bypassed. */
+  float blur_max;
+  /** Depth scaling factor. Avoid bluring background behind moving objects. */
+  float depth_scale;
+  /** As the name suggests. Used to avoid a division in the sampling. */
+  vec2 target_size_inv;
+  /** Viewport motion blur only blurs using previous frame vectors. */
+  bool is_viewport;
+  int pad0_, pad1_, pad2_;
+};
+BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
 
 /** \} */
 

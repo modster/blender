@@ -141,8 +141,6 @@ class Camera {
   bool has_changed_ = true;
   /** Detects wrong usage. */
   bool synced_ = false;
-  /** Last sample we synced with. Avoid double sync. */
-  uint64_t last_sample_ = 0;
   /** Original object of the camera. */
   Object *camera_original_ = nullptr;
   /** Evaluated camera object. Only valid after sync. */
@@ -180,7 +178,8 @@ class Camera {
       data.type = DRW_view_is_persp_get(drw_view) ? CAMERA_PERSP : CAMERA_ORTHO;
     }
 
-    /* Sync early to detect changes. This is ok since we avoid double sync later. */
+    /* TODO Avoid double sync in viewport. */
+    /* Sync early to detect changes. */
     this->sync(drw_view);
 
     /* Detect changes in parameters. */
@@ -194,15 +193,6 @@ class Camera {
   {
     const Scene *scene = DEG_get_evaluated_scene(depsgraph_);
     object_eval_ = DEG_get_evaluated_object(depsgraph_, camera_original_);
-
-    uint64_t sample = sampling_.sample_get();
-    if (last_sample_ != sample || !synced_) {
-      last_sample_ = sample;
-    }
-    else {
-      /* Avoid double sync. */
-      return;
-    }
 
     CameraData &data = data_[data_id_];
 

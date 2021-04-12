@@ -122,6 +122,8 @@ class Sampling {
       BLI_halton_2d(primes, offset, sample_, r);
       data_.dimensions[SAMPLING_FILTER_U][0] = r[0];
       data_.dimensions[SAMPLING_FILTER_V][0] = r[1];
+      /* TODO decorelate. */
+      data_.dimensions[SAMPLING_TIME][0] = r[0];
     }
     {
       double r[2], offset[2];
