@@ -32,4 +32,3 @@ struct CacheArchiveHandle {
 struct CacheReader {
   int unused;
 };
-
