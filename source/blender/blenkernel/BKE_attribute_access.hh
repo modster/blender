@@ -90,7 +90,7 @@ class MaybeUnsavedWriteAttribute {
 
   GVMutableArray *operator->()
   {
-    return varray_;
+    return varray_.get();
   }
 
   GVMutableArray &varray()
