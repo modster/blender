@@ -30,6 +30,7 @@
 namespace blender::fn {
 
 template<typename T> class GVArray_Typed;
+template<typename T> class GVMutableArray_Typed;
 
 /* A generically typed version of `VArray<T>`. */
 class GVArray {
@@ -189,6 +190,11 @@ class GVMutableArray : public GVArray {
   {
     BLI_assert(type_->is<T>());
     return (VMutableArray<T> *)this->try_get_internal_mutable_varray_impl();
+  }
+
+  template<typename T> GVMutableArray_Typed<T> typed()
+  {
+    return GVMutableArray_Typed<T>(*this);
   }
 
   void fill(const void *value);

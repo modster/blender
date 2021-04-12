@@ -192,8 +192,8 @@ static float map_smootherstep(const float value,
   return min_to + factor_mapped * (max_to - min_to);
 }
 
-static void map_range_float(FloatReadAttribute attribute_input,
-                            FloatWriteAttribute attribute_result,
+static void map_range_float(const VArray<float> &attribute_input,
+                            VMutableArray<float> &attribute_result,
                             const GeoNodeExecParams &params)
 {
   const bNode &node = params.node();
@@ -204,8 +204,8 @@ static void map_range_float(FloatReadAttribute attribute_input,
   const float min_to = params.get_input<float>("To Min");
   const float max_to = params.get_input<float>("To Max");
 
-  Span<float> span = attribute_input.get_span();
-  MutableSpan<float> result_span = attribute_result.get_span();
+  VArray_Span<float> span{attribute_input};
+  VMutableArray_Span<float> result_span{attribute_result};
 
   switch (interpolation_type) {
     case NODE_MAP_RANGE_LINEAR: {
@@ -241,14 +241,14 @@ static void map_range_float(FloatReadAttribute attribute_input,
     const float clamp_min = min_to < max_to ? min_to : max_to;
     const float clamp_max = min_to < max_to ? max_to : min_to;
 
-    for (int i : result_span.index_range()) {
+    for (int i : IndexRange(result_span.size())) {
       result_span[i] = std::clamp(result_span[i], clamp_min, clamp_max);
     }
   }
 }
 
-static void map_range_float3(Float3ReadAttribute attribute_input,
-                             Float3WriteAttribute attribute_result,
+static void map_range_float3(const VArray<float3> &attribute_input,
+                             VMutableArray<float3> &attribute_result,
                              const GeoNodeExecParams &params)
 {
   const bNode &node = params.node();
@@ -259,8 +259,8 @@ static void map_range_float3(Float3ReadAttribute attribute_input,
   const float3 min_to = params.get_input<float3>("To Min_001");
   const float3 max_to = params.get_input<float3>("To Max_001");
 
-  Span<float3> span = attribute_input.get_span();
-  MutableSpan<float3> result_span = attribute_result.get_span();
+  VArray_Span<float3> span{attribute_input};
+  VMutableArray_Span<float3> result_span{attribute_result};
 
   switch (interpolation_type) {
     case NODE_MAP_RANGE_LINEAR: {
@@ -323,13 +323,13 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
                                          StringRef source_name,
                                          StringRef result_name)
 {
-  ReadAttributePtr result_attribute = component.attribute_try_get_for_read(result_name);
+  ReadAttributeLookup result_attribute = component.attribute_try_get_for_read(result_name);
   if (result_attribute) {
-    return result_attribute->domain();
+    return result_attribute.domain;
   }
-  ReadAttributePtr source_attribute = component.attribute_try_get_for_read(source_name);
+  ReadAttributeLookup source_attribute = component.attribute_try_get_for_read(source_name);
   if (source_attribute) {
-    return source_attribute->domain();
+    return source_attribute.domain;
   }
   return ATTR_DOMAIN_POINT;
 }
@@ -349,7 +349,7 @@ static void map_range_attribute(GeometryComponent &component, const GeoNodeExecP
 
   const AttributeDomain domain = get_result_domain(component, input_name, result_name);
 
-  ReadAttributePtr attribute_input = component.attribute_try_get_for_read(
+  std::unique_ptr<GVArray> attribute_input = component.attribute_try_get_for_read(
       input_name, domain, data_type);
 
   if (!attribute_input) {
@@ -358,7 +358,7 @@ static void map_range_attribute(GeometryComponent &component, const GeoNodeExecP
     return;
   }
 
-  OutputAttributePtr attribute_result = component.attribute_try_get_for_output(
+  MaybeUnsavedWriteAttribute attribute_result = component.attribute_try_get_for_output(
       result_name, domain, data_type);
   if (!attribute_result) {
     params.error_message_add(NodeWarningType::Error,
@@ -369,18 +369,19 @@ static void map_range_attribute(GeometryComponent &component, const GeoNodeExecP
 
   switch (data_type) {
     case CD_PROP_FLOAT: {
-      map_range_float(*attribute_input, *attribute_result, params);
+      map_range_float(attribute_input->typed<float>(), attribute_result->typed<float>(), params);
       break;
     }
     case CD_PROP_FLOAT3: {
-      map_range_float3(*attribute_input, *attribute_result, params);
+      map_range_float3(
+          attribute_input->typed<float3>(), attribute_result->typed<float3>(), params);
       break;
     }
     default:
       BLI_assert_unreachable();
   }
 
-  attribute_result.apply_span_and_save();
+  attribute_result.save_if_necessary();
 }
 
 static void geo_node_attribute_map_range_exec(GeoNodeExecParams params)

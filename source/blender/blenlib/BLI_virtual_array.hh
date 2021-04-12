@@ -407,6 +407,11 @@ template<typename T> class VArray_Span final : public VArray_For_Span<T> {
   {
     return this->get_span();
   }
+
+  IndexRange index_range() const
+  {
+    return IndexRange(this->size());
+  }
 };
 
 template<typename T> class VMutableArray_Span final : public VMutableArray_For_MutableSpan<T> {
@@ -466,6 +471,21 @@ template<typename T> class VMutableArray_Span final : public VMutableArray_For_M
   operator MutableSpan<T>()
   {
     return this->get_span();
+  }
+
+  T &operator[](const int64_t index)
+  {
+    return this->data_[index];
+  }
+
+  int64_t size() const
+  {
+    return this->size();
+  }
+
+  IndexRange index_range() const
+  {
+    return IndexRange(this->size());
   }
 };
 
