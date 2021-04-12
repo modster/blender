@@ -652,6 +652,26 @@ class GVMutableArray_For_DerivedSpan
   }
 };
 
+template<typename T>
+class GVArray_For_Span : public GVArray_For_EmbeddedVArray<T, VArray_For_Span<T>> {
+ public:
+  GVArray_For_Span(const Span<T> data)
+      : GVArray_For_EmbeddedVArray<T, VArray_For_Span<T>>(data.size(), data)
+  {
+  }
+};
+
+template<typename T>
+class GVMutableArray_For_MutableSpan
+    : public GVMutableArray_For_EmbeddedVMutableArray<T, VMutableArray_For_MutableSpan<T>> {
+ public:
+  GVMutableArray_For_MutableSpan(const MutableSpan<T> data)
+      : GVMutableArray_For_EmbeddedVMutableArray<T, VMutableArray_For_MutableSpan<T>>(data.size(),
+                                                                                      data)
+  {
+  }
+};
+
 template<typename T> class GVArray_Typed {
  private:
   const VArray<T> *varray_;

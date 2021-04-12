@@ -56,60 +56,6 @@ class ComponentAttributeProviders;
 class GeometryComponent;
 
 /**
- * An #OutputAttributePtr wraps a #WriteAttributePtr that might not be stored in its final
- * destination yet. Therefore, once the attribute has been filled with data, the #save method has
- * to be called, to store the attribute where it belongs (possibly by replacing an existing
- * attribute with the same name).
- *
- * This is useful for example in the Attribute Color Ramp node, when the same attribute name is
- * used as input and output. Typically the input is a float attribute, and the output is a color.
- * Those two attributes cannot exist at the same time, due to a name collision. To handle this
- * situation well, first the output colors have to be computed before the input floats are deleted.
- * Therefore, the outputs have to be written to a temporary buffer that replaces the existing
- * attribute once all computations are done.
- */
-class OutputAttributePtr {
- private:
-  blender::bke::WriteAttributePtr attribute_;
-
- public:
-  OutputAttributePtr() = default;
-  OutputAttributePtr(blender::bke::WriteAttributePtr attribute);
-  OutputAttributePtr(GeometryComponent &component,
-                     AttributeDomain domain,
-                     std::string name,
-                     CustomDataType data_type);
-
-  ~OutputAttributePtr();
-
-  /* Returns false, when this wrapper is empty. */
-  operator bool() const
-  {
-    return static_cast<bool>(attribute_);
-  }
-
-  /* Get a reference to the underlying #WriteAttribute. */
-  blender::bke::WriteAttribute &get()
-  {
-    BLI_assert(attribute_);
-    return *attribute_;
-  }
-
-  blender::bke::WriteAttribute &operator*()
-  {
-    return *attribute_;
-  }
-
-  blender::bke::WriteAttribute *operator->()
-  {
-    return attribute_.get();
-  }
-
-  void save();
-  void apply_span_and_save();
-};
-
-/**
  * Contains information about an attribute in a geometry component.
  * More information can be added in the future. E.g. whether the attribute is builtin and how it is
  * stored (uv map, vertex group, ...).
@@ -163,19 +109,21 @@ class GeometryComponent {
 
   /* Get read-only access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */
-  blender::bke::ReadAttributePtr attribute_try_get_for_read(
+  blender::bke::ReadAttributeLookup attribute_try_get_for_read(
       const blender::StringRef attribute_name) const;
 
   /* Get read and write access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */
-  blender::bke::WriteAttributePtr attribute_try_get_for_write(
+  blender::bke::WriteAttributeLookup attribute_try_get_for_write(
       const blender::StringRef attribute_name);
 
   /* Get a read-only attribute for the domain based on the given attribute. This can be used to
    * interpolate from one domain to another.
    * Returns null if the interpolation is not implemented. */
-  virtual blender::bke::ReadAttributePtr attribute_try_adapt_domain(
-      blender::bke::ReadAttributePtr attribute, const AttributeDomain new_domain) const;
+  virtual std::unique_ptr<blender::fn::GVArray> attribute_try_adapt_domain(
+      std::unique_ptr<blender::fn::GVArray> varray,
+      const AttributeDomain from_domain,
+      const AttributeDomain to_domain) const;
 
   /* Returns true when the attribute has been deleted. */
   bool attribute_try_delete(const blender::StringRef attribute_name);
@@ -192,57 +140,34 @@ class GeometryComponent {
 
   /* Get a read-only attribute for the given domain and data type.
    * Returns null when it does not exist. */
-  blender::bke::ReadAttributePtr attribute_try_get_for_read(
+  std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
       const blender::StringRef attribute_name,
       const AttributeDomain domain,
       const CustomDataType data_type) const;
 
   /* Get a read-only attribute interpolated to the input domain, leaving the data type unchanged.
    * Returns null when the attribute does not exist. */
-  blender::bke::ReadAttributePtr attribute_try_get_for_read(
+  std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
       const blender::StringRef attribute_name, const AttributeDomain domain) const;
 
   /* Get a read-only attribute for the given domain and data type.
    * Returns a constant attribute based on the default value if the attribute does not exist.
    * Never returns null. */
-  blender::bke::ReadAttributePtr attribute_get_for_read(const blender::StringRef attribute_name,
-                                                        const AttributeDomain domain,
-                                                        const CustomDataType data_type,
-                                                        const void *default_value) const;
+  std::unique_ptr<blender::fn::GVArray> attribute_get_for_read(
+      const blender::StringRef attribute_name,
+      const AttributeDomain domain,
+      const CustomDataType data_type,
+      const void *default_value) const;
 
   /* Get a typed read-only attribute for the given domain and type. */
   template<typename T>
-  blender::bke::TypedReadAttribute<T> attribute_get_for_read(
-      const blender::StringRef attribute_name,
-      const AttributeDomain domain,
-      const T &default_value) const
+  blender::fn::GVArray_Typed<T> attribute_get_for_read(const blender::StringRef attribute_name,
+                                                       const AttributeDomain domain,
+                                                       const T &default_value) const
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
     const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
     return this->attribute_get_for_read(attribute_name, domain, type, &default_value);
-  }
-
-  /* Get a read-only dummy attribute that always returns the same value. */
-  blender::bke::ReadAttributePtr attribute_get_constant_for_read(const AttributeDomain domain,
-                                                                 const CustomDataType data_type,
-                                                                 const void *value) const;
-
-  /* Create a read-only dummy attribute that always returns the same value.
-   * The given value is converted to the correct type if necessary. */
-  blender::bke::ReadAttributePtr attribute_get_constant_for_read_converted(
-      const AttributeDomain domain,
-      const CustomDataType in_data_type,
-      const CustomDataType out_data_type,
-      const void *value) const;
-
-  /* Get a read-only dummy attribute that always returns the same value. */
-  template<typename T>
-  blender::bke::TypedReadAttribute<T> attribute_get_constant_for_read(const AttributeDomain domain,
-                                                                      const T &value) const
-  {
-    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
-    const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
-    return this->attribute_get_constant_for_read(domain, type, &value);
   }
 
   /**
@@ -255,10 +180,11 @@ class GeometryComponent {
    *
    * This might return no attribute when the attribute cannot exist on the component.
    */
-  OutputAttributePtr attribute_try_get_for_output(const blender::StringRef attribute_name,
-                                                  const AttributeDomain domain,
-                                                  const CustomDataType data_type,
-                                                  const void *default_value = nullptr);
+  blender::bke::MaybeUnsavedWriteAttribute attribute_try_get_for_output(
+      const blender::StringRef attribute_name,
+      const AttributeDomain domain,
+      const CustomDataType data_type,
+      const void *default_value = nullptr);
 
  private:
   virtual const blender::bke::ComponentAttributeProviders *get_attribute_providers() const;
@@ -377,8 +303,10 @@ class MeshComponent : public GeometryComponent {
   Mesh *get_for_write();
 
   int attribute_domain_size(const AttributeDomain domain) const final;
-  blender::bke::ReadAttributePtr attribute_try_adapt_domain(
-      blender::bke::ReadAttributePtr attribute, const AttributeDomain new_domain) const final;
+  std::unique_ptr<blender::fn::GVArray> attribute_try_adapt_domain(
+      std::unique_ptr<blender::fn::GVArray> varray,
+      const AttributeDomain from_domain,
+      const AttributeDomain to_domain) const final;
 
   bool is_empty() const final;
 
