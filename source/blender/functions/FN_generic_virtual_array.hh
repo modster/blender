@@ -191,6 +191,8 @@ class GVMutableArray : public GVArray {
     return (VMutableArray<T> *)this->try_get_internal_mutable_varray_impl();
   }
 
+  void fill(const void *value);
+
  protected:
   virtual void set_by_copy_impl(const int64_t index, const void *value);
   virtual void set_by_relocate_impl(const int64_t index, void *value);

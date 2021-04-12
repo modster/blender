@@ -85,6 +85,19 @@ void *GVMutableArray::try_get_internal_mutable_varray_impl()
   return nullptr;
 }
 
+void GVMutableArray::fill(const void *value)
+{
+  if (this->is_span()) {
+    const GMutableSpan span = this->get_span();
+    type_->fill_initialized(value, span.data(), size_);
+  }
+  else {
+    for (int64_t i : IndexRange(size_)) {
+      this->set_by_copy(i, value);
+    }
+  }
+}
+
 /* --------------------------------------------------------------------
  * GVArray_For_GSpan.
  */

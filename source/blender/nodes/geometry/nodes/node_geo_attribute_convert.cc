@@ -55,13 +55,13 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
                                          StringRef source_name,
                                          StringRef result_name)
 {
-  ReadAttributePtr result_attribute = component.attribute_try_get_for_read(result_name);
+  ReadAttributeLookup result_attribute = component.attribute_try_get_for_read(result_name);
   if (result_attribute) {
-    return result_attribute->domain();
+    return result_attribute.domain;
   }
-  ReadAttributePtr source_attribute = component.attribute_try_get_for_read(source_name);
+  ReadAttributeLookup source_attribute = component.attribute_try_get_for_read(source_name);
   if (source_attribute) {
-    return source_attribute->domain();
+    return source_attribute.domain;
   }
   return ATTR_DOMAIN_POINT;
 }
@@ -78,7 +78,7 @@ static void attribute_convert_calc(GeometryComponent &component,
                                                 component, source_name, result_name) :
                                             domain;
 
-  ReadAttributePtr source_attribute = component.attribute_try_get_for_read(
+  std::unique_ptr<GVArray> source_attribute = component.attribute_try_get_for_read(
       source_name, result_domain, result_type);
   if (!source_attribute) {
     params.error_message_add(NodeWarningType::Error,
@@ -86,14 +86,14 @@ static void attribute_convert_calc(GeometryComponent &component,
     return;
   }
 
-  OutputAttributePtr result_attribute = component.attribute_try_get_for_output(
+  MaybeUnsavedWriteAttribute result_attribute = component.attribute_try_get_for_output(
       result_name, result_domain, result_type);
   if (!result_attribute) {
     return;
   }
 
   fn::GSpan source_span = source_attribute->get_span();
-  fn::GMutableSpan result_span = result_attribute->get_span_for_write_only();
+  fn::GVMutableArray_Span result_span{*result_attribute};
   if (source_span.is_empty() || result_span.is_empty()) {
     return;
   }
@@ -102,9 +102,11 @@ static void attribute_convert_calc(GeometryComponent &component,
   const CPPType *cpp_type = bke::custom_data_type_to_cpp_type(result_type);
   BLI_assert(cpp_type != nullptr);
 
-  cpp_type->copy_to_initialized_n(source_span.data(), result_span.data(), result_span.size());
+  cpp_type->copy_to_initialized_n(
+      source_span.data(), result_span.get_span().data(), result_span.size());
 
-  result_attribute.apply_span_and_save();
+  result_span.apply();
+  result_attribute.save_if_necessary();
 }
 
 static void geo_node_attribute_convert_exec(GeoNodeExecParams params)
