@@ -1917,8 +1917,8 @@ typedef struct SpaceSpreadsheet {
 } SpaceSpreadsheet;
 
 typedef enum eSpaceSpreadsheet_FilterFlag {
-  SPREADSHEET_FILTER_ENABLE = (1 << 0),
-  SPREADSHEET_FILTER_SELECTED_ONLY = (1 << 1),
+  SPREADSHEET_FILTER_SELECTED_ONLY = (1 << 0),
+  SPREADSHEET_FILTER_ENABLE = (1 << 1),
 } eSpaceSpreadsheet_FilterFlag;
 
 typedef struct SpreadsheetRowFilter {
