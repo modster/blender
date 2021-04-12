@@ -32,7 +32,7 @@ extern "C" {
 struct GSet;
 
 /* CacheFile::type */
-enum {
+typedef enum {
 #ifdef WITH_ALEMBIC
   CACHEFILE_TYPE_ALEMBIC = 1,
 #endif
@@ -40,7 +40,7 @@ enum {
   CACHEFILE_TYPE_USD = 2,
 #endif
   CACHE_FILE_TYPE_INVALID = 0,
-};
+} eCacheFileType;
 
 /* CacheFile::flag */
 enum {
@@ -95,6 +95,7 @@ typedef struct CacheFile {
   short flag;
   short draw_flag; /* UNUSED */
 
+  /* eCacheFileType enum. */
   char type;
 
   char _pad[2];
