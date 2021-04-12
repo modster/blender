@@ -47,15 +47,15 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
                                          StringRef result_name)
 {
   /* Use the domain of the result attribute if it already exists. */
-  ReadAttributePtr result_attribute = component.attribute_try_get_for_read(result_name);
+  ReadAttributeLookup result_attribute = component.attribute_try_get_for_read(result_name);
   if (result_attribute) {
-    return result_attribute->domain();
+    return result_attribute.domain;
   }
 
   /* Otherwise use the input attribute's domain if it exists. */
-  ReadAttributePtr input_attribute = component.attribute_try_get_for_read(input_name);
+  ReadAttributeLookup input_attribute = component.attribute_try_get_for_read(input_name);
   if (input_attribute) {
-    return input_attribute->domain();
+    return input_attribute.domain;
   }
 
   return ATTR_DOMAIN_POINT;
@@ -74,24 +74,23 @@ static void execute_on_component(const GeoNodeExecParams &params, GeometryCompon
   const CustomDataType result_type = CD_PROP_COLOR;
   const AttributeDomain result_domain = get_result_domain(component, input_name, result_name);
 
-  OutputAttributePtr attribute_result = component.attribute_try_get_for_output(
+  MaybeUnsavedWriteAttribute attribute_result = component.attribute_try_get_for_output(
       result_name, result_domain, result_type);
   if (!attribute_result) {
     return;
   }
 
-  FloatReadAttribute attribute_in = component.attribute_get_for_read<float>(
+  GVArray_Typed<float> attribute_in = component.attribute_get_for_read<float>(
       input_name, result_domain, 0.0f);
 
-  Span<float> data_in = attribute_in.get_span();
-  MutableSpan<Color4f> data_out = attribute_result->get_span_for_write_only<Color4f>();
-
   ColorBand *color_ramp = &node_storage->color_ramp;
-  for (const int i : data_in.index_range()) {
-    BKE_colorband_evaluate(color_ramp, data_in[i], data_out[i]);
+  for (const int i : IndexRange(attribute_in.size())) {
+    Color4f color;
+    BKE_colorband_evaluate(color_ramp, attribute_in[i], color);
+    attribute_result->set_by_copy(i, &color);
   }
 
-  attribute_result.apply_span_and_save();
+  attribute_result.save_if_necessary();
 }
 
 static void geo_node_attribute_color_ramp_exec(GeoNodeExecParams params)

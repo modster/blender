@@ -88,6 +88,11 @@ class MaybeUnsavedWriteAttribute {
     return *varray_;
   }
 
+  GVMutableArray *operator->()
+  {
+    return varray_;
+  }
+
   GVMutableArray &varray()
   {
     return *varray_;

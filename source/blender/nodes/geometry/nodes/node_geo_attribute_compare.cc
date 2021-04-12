@@ -81,8 +81,8 @@ static void geo_node_attribute_compare_update(bNodeTree *UNUSED(ntree), bNode *n
   nodeSetSocketAvailability(socket_threshold, operation_tests_equality(*node_storage));
 }
 
-static void do_math_operation(const FloatReadAttribute &input_a,
-                              const FloatReadAttribute &input_b,
+static void do_math_operation(const VArray<float> &input_a,
+                              const VArray<float> &input_b,
                               const FloatCompareOperation operation,
                               MutableSpan<bool> span_result)
 {
@@ -107,8 +107,8 @@ static void do_math_operation(const FloatReadAttribute &input_a,
   BLI_assert(false);
 }
 
-static void do_equal_operation_float(const FloatReadAttribute &input_a,
-                                     const FloatReadAttribute &input_b,
+static void do_equal_operation_float(const VArray<float> &input_a,
+                                     const VArray<float> &input_b,
                                      const float threshold,
                                      MutableSpan<bool> span_result)
 {
@@ -120,8 +120,8 @@ static void do_equal_operation_float(const FloatReadAttribute &input_a,
   }
 }
 
-static void do_equal_operation_float3(const Float3ReadAttribute &input_a,
-                                      const Float3ReadAttribute &input_b,
+static void do_equal_operation_float3(const VArray<float3> &input_a,
+                                      const VArray<float3> &input_b,
                                       const float threshold,
                                       MutableSpan<bool> span_result)
 {
@@ -134,8 +134,8 @@ static void do_equal_operation_float3(const Float3ReadAttribute &input_a,
   }
 }
 
-static void do_equal_operation_color4f(const Color4fReadAttribute &input_a,
-                                       const Color4fReadAttribute &input_b,
+static void do_equal_operation_color4f(const VArray<Color4f> &input_a,
+                                       const VArray<Color4f> &input_b,
                                        const float threshold,
                                        MutableSpan<bool> span_result)
 {
@@ -148,8 +148,8 @@ static void do_equal_operation_color4f(const Color4fReadAttribute &input_a,
   }
 }
 
-static void do_equal_operation_bool(const BooleanReadAttribute &input_a,
-                                    const BooleanReadAttribute &input_b,
+static void do_equal_operation_bool(const VArray<bool> &input_a,
+                                    const VArray<bool> &input_b,
                                     const float UNUSED(threshold),
                                     MutableSpan<bool> span_result)
 {
@@ -161,8 +161,8 @@ static void do_equal_operation_bool(const BooleanReadAttribute &input_a,
   }
 }
 
-static void do_not_equal_operation_float(const FloatReadAttribute &input_a,
-                                         const FloatReadAttribute &input_b,
+static void do_not_equal_operation_float(const VArray<float> &input_a,
+                                         const VArray<float> &input_b,
                                          const float threshold,
                                          MutableSpan<bool> span_result)
 {
@@ -174,8 +174,8 @@ static void do_not_equal_operation_float(const FloatReadAttribute &input_a,
   }
 }
 
-static void do_not_equal_operation_float3(const Float3ReadAttribute &input_a,
-                                          const Float3ReadAttribute &input_b,
+static void do_not_equal_operation_float3(const VArray<float3> &input_a,
+                                          const VArray<float3> &input_b,
                                           const float threshold,
                                           MutableSpan<bool> span_result)
 {
@@ -188,8 +188,8 @@ static void do_not_equal_operation_float3(const Float3ReadAttribute &input_a,
   }
 }
 
-static void do_not_equal_operation_color4f(const Color4fReadAttribute &input_a,
-                                           const Color4fReadAttribute &input_b,
+static void do_not_equal_operation_color4f(const VArray<Color4f> &input_a,
+                                           const VArray<Color4f> &input_b,
                                            const float threshold,
                                            MutableSpan<bool> span_result)
 {
@@ -202,8 +202,8 @@ static void do_not_equal_operation_color4f(const Color4fReadAttribute &input_a,
   }
 }
 
-static void do_not_equal_operation_bool(const BooleanReadAttribute &input_a,
-                                        const BooleanReadAttribute &input_b,
+static void do_not_equal_operation_bool(const VArray<bool> &input_a,
+                                        const VArray<bool> &input_b,
                                         const float UNUSED(threshold),
                                         MutableSpan<bool> span_result)
 {
@@ -237,9 +237,9 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
                                          StringRef result_name)
 {
   /* Use the domain of the result attribute if it already exists. */
-  ReadAttributePtr result_attribute = component.attribute_try_get_for_read(result_name);
+  ReadAttributeLookup result_attribute = component.attribute_try_get_for_read(result_name);
   if (result_attribute) {
-    return result_attribute->domain();
+    return result_attribute.domain;
   }
 
   /* Otherwise use the highest priority domain from existing input attributes, or the default. */
@@ -257,7 +257,7 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
   const CustomDataType result_type = CD_PROP_BOOL;
   const AttributeDomain result_domain = get_result_domain(component, params, result_name);
 
-  OutputAttributePtr attribute_result = component.attribute_try_get_for_output(
+  MaybeUnsavedWriteAttribute attribute_result = component.attribute_try_get_for_output(
       result_name, result_domain, result_type);
   if (!attribute_result) {
     return;
@@ -265,9 +265,9 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
 
   const CustomDataType input_data_type = get_data_type(component, params, *node_storage);
 
-  ReadAttributePtr attribute_a = params.get_input_attribute(
+  std::unique_ptr<GVArray> attribute_a = params.get_input_attribute(
       "A", component, result_domain, input_data_type, nullptr);
-  ReadAttributePtr attribute_b = params.get_input_attribute(
+  std::unique_ptr<GVArray> attribute_b = params.get_input_attribute(
       "B", component, result_domain, input_data_type, nullptr);
 
   if (!attribute_a || !attribute_b) {
@@ -275,7 +275,8 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
     return;
   }
 
-  MutableSpan<bool> result_span = attribute_result->get_span_for_write_only<bool>();
+  fn::GVMutableArray_Typed<bool> typed_results{*attribute_result};
+  VMutableArray_Span<bool> result_span{*typed_results};
 
   /* Use specific types for correct equality operations, but for other operations we use implicit
    * conversions and float comparison. In other words, the comparison is not element-wise. */
@@ -283,38 +284,47 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
     const float threshold = params.get_input<float>("Threshold");
     if (operation == NODE_FLOAT_COMPARE_EQUAL) {
       if (input_data_type == CD_PROP_FLOAT) {
-        do_equal_operation_float(*attribute_a, *attribute_b, threshold, result_span);
+        do_equal_operation_float(
+            attribute_a->typed<float>(), attribute_b->typed<float>(), threshold, result_span);
       }
       else if (input_data_type == CD_PROP_FLOAT3) {
-        do_equal_operation_float3(*attribute_a, *attribute_b, threshold, result_span);
+        do_equal_operation_float3(
+            attribute_a->typed<float3>(), attribute_b->typed<float3>(), threshold, result_span);
       }
       else if (input_data_type == CD_PROP_COLOR) {
-        do_equal_operation_color4f(*attribute_a, *attribute_b, threshold, result_span);
+        do_equal_operation_color4f(
+            attribute_a->typed<Color4f>(), attribute_b->typed<Color4f>(), threshold, result_span);
       }
       else if (input_data_type == CD_PROP_BOOL) {
-        do_equal_operation_bool(*attribute_a, *attribute_b, threshold, result_span);
+        do_equal_operation_bool(
+            attribute_a->typed<bool>(), attribute_b->typed<bool>(), threshold, result_span);
       }
     }
     else if (operation == NODE_FLOAT_COMPARE_NOT_EQUAL) {
       if (input_data_type == CD_PROP_FLOAT) {
-        do_not_equal_operation_float(*attribute_a, *attribute_b, threshold, result_span);
+        do_not_equal_operation_float(
+            attribute_a->typed<float>(), attribute_b->typed<float>(), threshold, result_span);
       }
       else if (input_data_type == CD_PROP_FLOAT3) {
-        do_not_equal_operation_float3(*attribute_a, *attribute_b, threshold, result_span);
+        do_not_equal_operation_float3(
+            attribute_a->typed<float3>(), attribute_b->typed<float3>(), threshold, result_span);
       }
       else if (input_data_type == CD_PROP_COLOR) {
-        do_not_equal_operation_color4f(*attribute_a, *attribute_b, threshold, result_span);
+        do_not_equal_operation_color4f(
+            attribute_a->typed<Color4f>(), attribute_b->typed<Color4f>(), threshold, result_span);
       }
       else if (input_data_type == CD_PROP_BOOL) {
-        do_not_equal_operation_bool(*attribute_a, *attribute_b, threshold, result_span);
+        do_not_equal_operation_bool(
+            attribute_a->typed<bool>(), attribute_b->typed<bool>(), threshold, result_span);
       }
     }
   }
   else {
-    do_math_operation(*attribute_a, *attribute_b, operation, result_span);
+    do_math_operation(
+        attribute_a->typed<float>(), attribute_b->typed<float>(), operation, result_span);
   }
 
-  attribute_result.apply_span_and_save();
+  attribute_result.save_if_necessary();
 }
 
 static void geo_node_attribute_compare_exec(GeoNodeExecParams params)

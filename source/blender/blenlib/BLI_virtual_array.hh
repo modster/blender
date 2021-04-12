@@ -462,6 +462,11 @@ template<typename T> class VMutableArray_Span final : public VMutableArray_For_M
   {
     return this->get_span();
   }
+
+  operator MutableSpan<T>()
+  {
+    return this->get_span();
+  }
 };
 
 /**

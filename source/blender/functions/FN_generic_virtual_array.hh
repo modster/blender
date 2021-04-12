@@ -29,6 +29,8 @@
 
 namespace blender::fn {
 
+template<typename T> class GVArray_Typed;
+
 /* A generically typed version of `VArray<T>`. */
 class GVArray {
  protected:
@@ -129,6 +131,11 @@ class GVArray {
   {
     BLI_assert(type_->is<T>());
     return (const VArray<T> *)this->try_get_internal_varray_impl();
+  }
+
+  template<typename T> GVArray_Typed<T> typed()
+  {
+    return GVArray_Typed<T>(*this);
   }
 
  protected:
@@ -681,7 +688,7 @@ template<typename T> class GVArray_Typed {
   std::unique_ptr<GVArray> owned_gvarray_;
 
  public:
-  GVArray_Typed(const GVArray &gvarray)
+  explicit GVArray_Typed(const GVArray &gvarray)
   {
     BLI_assert(gvarray.type().is<T>());
     if (gvarray.is_span()) {
@@ -704,7 +711,7 @@ template<typename T> class GVArray_Typed {
     }
   }
 
-  GVArray_Typed(std::unique_ptr<GVArray> gvarray) : GVArray_Typed(*gvarray)
+  explicit GVArray_Typed(std::unique_ptr<GVArray> gvarray) : GVArray_Typed(*gvarray)
   {
     owned_gvarray_ = std::move(gvarray);
   }
@@ -728,6 +735,11 @@ template<typename T> class GVArray_Typed {
   {
     return varray_->get(index);
   }
+
+  int64_t size() const
+  {
+    return varray_->size();
+  }
 };
 
 template<typename T> class GVMutableArray_Typed {
@@ -738,7 +750,7 @@ template<typename T> class GVMutableArray_Typed {
   std::unique_ptr<GVMutableArray> owned_gvarray_;
 
  public:
-  GVMutableArray_Typed(GVMutableArray &gvarray)
+  explicit GVMutableArray_Typed(GVMutableArray &gvarray)
   {
     BLI_assert(gvarray.type().is<T>());
     if (gvarray.is_span()) {
@@ -755,7 +767,8 @@ template<typename T> class GVMutableArray_Typed {
     }
   }
 
-  GVMutableArray_Typed(std::unique_ptr<GVMutableArray> gvarray) : GVMutableArray_Typed(*gvarray)
+  explicit GVMutableArray_Typed(std::unique_ptr<GVMutableArray> gvarray)
+      : GVMutableArray_Typed(*gvarray)
   {
     owned_gvarray_ = std::move(gvarray);
   }
@@ -778,6 +791,11 @@ template<typename T> class GVMutableArray_Typed {
   T operator[](const int64_t index) const
   {
     return varray_->get(index);
+  }
+
+  int64_t size() const
+  {
+    return varray_->size();
   }
 };
 
