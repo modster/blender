@@ -303,8 +303,7 @@ static void poselib_slide_mouse_update_blendfactor(PoseBlendData *pbd, const wmE
   if (pbd->release_confirm_info.use_release_confirm) {
     /* Release confirm calculates factor based on where the dragging was started from. */
     const float range = 300 * U.pixelsize;
-    const float new_factor = ((event->x - pbd->release_confirm_info.drag_start_xy[0]) / range) +
-                             0.5f;
+    const float new_factor = (event->x - pbd->release_confirm_info.drag_start_xy[0]) / range;
     poselib_blend_set_factor(pbd, new_factor);
   }
   else {
@@ -740,7 +739,7 @@ void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
   /* Properties: */
   RNA_def_float_factor(ot->srna,
                        "blend_factor",
-                       0.5f,
+                       0.0f,
                        0.0f,
                        1.0f,
                        "Blend Factor",
