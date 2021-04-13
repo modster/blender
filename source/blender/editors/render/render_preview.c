@@ -54,7 +54,9 @@
 #include "DNA_space_types.h"
 #include "DNA_world_types.h"
 
+#include "BKE_animsys.h"
 #include "BKE_appdir.h"
+#include "BKE_armature.h"
 #include "BKE_brush.h"
 #include "BKE_colortools.h"
 #include "BKE_context.h"
@@ -92,6 +94,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "ED_armature.h"
 #include "ED_datafiles.h"
 #include "ED_render.h"
 #include "ED_screen.h"
@@ -150,6 +153,10 @@ typedef struct IconPreview {
   void *owner;
   ID *id, *id_copy; /* May be NULL! (see ICON_TYPE_PREVIEW case in #ui_icon_ensure_deferred()) */
   ListBase sizes;
+
+  /* May be NULL, is used for rendering IDs that require some other object for it to be applied on
+   * before the ID can be represented as an image, for example when rendering an Action. */
+  struct Object *active_object;
 } IconPreview;
 
 /** \} */
@@ -812,6 +819,45 @@ static void object_preview_render(IconPreview *preview, IconPreviewSize *preview
 /** \name Action Preview
  * \{ */
 
+static PoseBackup *action_preview_render_prepare(IconPreview *preview)
+{
+  Object *object = preview->active_object;
+  if (object == NULL) {
+    WM_report(RPT_WARNING, "No active object, unable to apply the Action before rendering");
+    return NULL;
+  }
+  if (object->pose == NULL) {
+    WM_reportf(RPT_WARNING,
+               "Object %s has no pose, unable to apply the Action before rendering",
+               object->id.name + 2);
+    return NULL;
+  }
+
+  /* Create a backup of the current pose. */
+  struct bAction *action = (struct bAction *)preview->id;
+  PoseBackup *pose_backup = ED_pose_backup_create_all_bones(object, action);
+
+  /* Apply the Action as pose, so that it can be rendered. This assumes the Action represents a
+   * single pose, and that thus the evaluation time doesn't matter. */
+  AnimationEvalContext anim_eval_context = {preview->depsgraph, 0.0f};
+  BKE_pose_apply_action_all_bones(object, action, &anim_eval_context);
+
+  /* Force evaluation of the new pose, before the preview is rendered. */
+  DEG_id_tag_update(&object->id, ID_RECALC_GEOMETRY);
+  DEG_evaluate_on_refresh(preview->depsgraph);
+
+  return pose_backup;
+}
+
+static void action_preview_render_cleanup(PoseBackup *pose_backup)
+{
+  if (pose_backup == NULL) {
+    return;
+  }
+  ED_pose_backup_restore(pose_backup);
+  ED_pose_backup_free(pose_backup);
+}
+
 /* Render a pose. It is assumed that the pose has already been applied and that the scene camera is
  * capturing the pose. In other words, this function just renders from the scene camera without
  * evaluating the Action stored in preview->id. */
@@ -825,6 +871,9 @@ static void action_preview_render(IconPreview *preview, IconPreviewSize *preview
    * but WM_OT_previews_ensure does not. */
   BLI_assert(depsgraph != NULL);
   BLI_assert(preview->scene == DEG_get_input_scene(depsgraph));
+
+  /* Apply the pose before getting the evaluated scene, so that the new pose is evaluated. */
+  PoseBackup *pose_backup = action_preview_render_prepare(preview);
 
   Scene *scene_eval = DEG_get_evaluated_scene(depsgraph);
   Object *camera_eval = scene_eval->camera;
@@ -848,6 +897,8 @@ static void action_preview_render(IconPreview *preview, IconPreviewSize *preview
                                                       NULL,
                                                       NULL,
                                                       err_out);
+
+  action_preview_render_cleanup(pose_backup);
 
   if (err_out[0] != '\0') {
     printf("Error rendering Action %s preview: %s\n", preview->id->name + 2, err_out);
@@ -1624,6 +1675,7 @@ void ED_preview_icon_render(
   /* Control isn't given back to the caller until the preview is done. So we don't need to copy
    * the ID to avoid thread races. */
   ip.id_copy = duplicate_ids(id, true);
+  ip.active_object = CTX_data_active_object(C);
 
   icon_preview_add_size(&ip, rect, sizex, sizey);
 
@@ -1665,6 +1717,7 @@ void ED_preview_icon_job(
   ip->bmain = CTX_data_main(C);
   ip->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ip->scene = DEG_get_input_scene(ip->depsgraph);
+  ip->active_object = CTX_data_active_object(C);
   ip->owner = owner;
   ip->id = id;
   ip->id_copy = duplicate_ids(id, false);
