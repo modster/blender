@@ -913,7 +913,7 @@ static void gpencil_duplicate_points(bGPdata *gpd,
       }
       gpcd->flag |= GP_CURVE_SELECT;
 
-      BKE_gpencil_stroke_geometry_update(gpd, gpsd);
+      BKE_gpencil_stroke_geometry_update(gpd, gpsd, GP_GEO_UPDATE_DEFAULT);
 
       /* add to temp buffer */
       gpsd->next = gpsd->prev = NULL;

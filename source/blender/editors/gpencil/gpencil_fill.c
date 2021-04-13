@@ -1590,7 +1590,7 @@ static void gpencil_stroke_from_buffer(tGPDfill *tgpf)
   }
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(tgpf->gpd, gps);
+  BKE_gpencil_stroke_geometry_update(tgpf->gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 /* ----------------------- */

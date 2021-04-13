@@ -424,7 +424,7 @@ static void gpencil_interpolate_update_strokes(bContext *C, tGPDinterpolate *tgp
       gpencil_interpolate_update_points(gps_from, gps_to, new_stroke, factor);
 
       /* Calc geometry data. */
-      BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+      BKE_gpencil_stroke_geometry_update(gpd, new_stroke, GP_GEO_UPDATE_DEFAULT);
       /* Add to strokes. */
       BLI_addtail(&tgpil->interFrame->strokes, new_stroke);
 
@@ -569,7 +569,7 @@ static void gpencil_interpolate_set_points(bContext *C, tGPDinterpolate *tgpi)
       gpencil_interpolate_smooth_stroke(new_stroke, tgpi->smooth_factor, tgpi->smooth_steps);
 
       /* Calc geometry data. */
-      BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+      BKE_gpencil_stroke_geometry_update(gpd, new_stroke, GP_GEO_UPDATE_DEFAULT);
       /* add to strokes */
       BLI_addtail(&tgpil->interFrame->strokes, new_stroke);
     }
@@ -844,7 +844,7 @@ static int gpencil_interpolate_modal(bContext *C, wmOperator *op, const wmEvent 
           gps_dst->flag &= ~GP_STROKE_TAG;
 
           /* Calc geometry data. */
-          BKE_gpencil_stroke_geometry_update(tgpi->gpd, gps_dst);
+          BKE_gpencil_stroke_geometry_update(tgpi->gpd, gps_dst, GP_GEO_UPDATE_DEFAULT);
 
           BLI_addtail(&gpf_dst->strokes, gps_dst);
         }
@@ -1398,7 +1398,7 @@ static int gpencil_interpolate_seq_exec(bContext *C, wmOperator *op)
         gpencil_interpolate_smooth_stroke(new_stroke, smooth_factor, smooth_steps);
 
         /* Calc geometry data. */
-        BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+        BKE_gpencil_stroke_geometry_update(gpd, new_stroke, GP_GEO_UPDATE_DEFAULT);
 
         /* Add strokes to frame. */
         bGPDframe *interFrame = BKE_gpencil_layer_frame_get(gpl, cframe, GP_GETFRAME_ADD_NEW);

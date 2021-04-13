@@ -2635,7 +2635,7 @@ bool BKE_gpencil_from_image(
         BKE_gpencil_stroke_select_index_set(gpd, gps);
       }
 
-      BKE_gpencil_stroke_geometry_update(gpd, gps);
+      BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
     }
   }
 

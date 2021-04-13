@@ -221,7 +221,7 @@ static void gpencil_pop_curve_point(bContext *C, tGPDcurve_draw *tcd)
   tcd->gpc = new_curve;
 
   BLI_addtail(&tcd->gpf->strokes, new_stroke);
-  BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+  BKE_gpencil_stroke_geometry_update(gpd, new_stroke, GP_GEO_UPDATE_DEFAULT);
 
   DEG_id_tag_update(&gpd->id, ID_RECALC_COPY_ON_WRITE);
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);

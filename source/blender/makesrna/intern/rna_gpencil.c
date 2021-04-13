@@ -203,7 +203,7 @@ static void rna_GPencil_stroke_curve_update(Main *bmain, Scene *scene, PointerRN
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->editcurve != NULL) {
           gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-          BKE_gpencil_stroke_geometry_update(gpd, gps);
+          BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
         }
       }
     }
@@ -229,7 +229,7 @@ static void rna_GPencil_uv_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Poi
   bGPDstroke *gps = (bGPDstroke *)ptr->data;
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
   DEG_id_tag_update(ptr->owner_id, ID_RECALC_GEOMETRY);
   WM_main_add_notifier(NC_GPENCIL | NA_EDITED, NULL);
@@ -703,7 +703,7 @@ static void rna_GPencil_stroke_point_add(
     stroke->totpoints += count;
 
     /* Calc geometry data. */
-    BKE_gpencil_stroke_geometry_update(gpd, stroke);
+    BKE_gpencil_stroke_geometry_update(gpd, stroke, GP_GEO_UPDATE_DEFAULT);
 
     DEG_id_tag_update(&gpd->id,
                       ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_COPY_ON_WRITE);
@@ -764,7 +764,7 @@ static void rna_GPencil_stroke_point_pop(ID *id,
   }
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, stroke);
+  BKE_gpencil_stroke_geometry_update(gpd, stroke, GP_GEO_UPDATE_DEFAULT);
 
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_COPY_ON_WRITE);
 
@@ -777,7 +777,7 @@ static void rna_GPencil_stroke_point_update(ID *id, bGPDstroke *stroke)
 
   /* Calc geometry data. */
   if (stroke) {
-    BKE_gpencil_stroke_geometry_update(gpd, stroke);
+    BKE_gpencil_stroke_geometry_update(gpd, stroke, GP_GEO_UPDATE_DEFAULT);
 
     DEG_id_tag_update(&gpd->id,
                       ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_COPY_ON_WRITE);
@@ -2470,11 +2470,8 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
   RNA_def_property_int_default(prop, GP_DEFAULT_CURVE_RESOLUTION);
   RNA_def_parameter_clear_flags(prop, PROP_ANIMATABLE, 0);
   RNA_def_property_ui_text(
-      prop,
-      "Bézier Curve Resolution",
-      "Number of segments generated between control points");
-  RNA_def_property_update(
-      prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_update");
+      prop, "Bézier Curve Resolution", "Number of segments generated between control points");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_update");
 
   prop = RNA_def_property(srna, "use_adaptive_curve_resolution", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_DATA_CURVE_ADAPTIVE_RESOLUTION);
@@ -2484,8 +2481,7 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
                            "Set the resolution of each editcurve segment dynamically depending on "
                            "the length of the segment. The resolution is the number of points "
                            "generated per unit distance");
-  RNA_def_property_update(
-      prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_update");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_update");
 
   /* Curve editing error threshold. */
   prop = RNA_def_property(srna, "curve_edit_threshold", PROP_FLOAT, PROP_FACTOR);

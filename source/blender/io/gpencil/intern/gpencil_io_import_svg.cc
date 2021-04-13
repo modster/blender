@@ -224,7 +224,7 @@ void GpencilImporterSVG::create_stroke(bGPdata *gpd,
 
   /* Cleanup and recalculate geometry. */
   BKE_gpencil_stroke_merge_distance(gpd, gpf, gps, 0.001f, true);
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 /* Unpack internal NanoSVG color. */

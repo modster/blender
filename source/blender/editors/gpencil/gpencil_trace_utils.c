@@ -366,7 +366,7 @@ void ED_gpencil_trace_data_to_strokes(Main *bmain,
         BKE_gpencil_stroke_sample(gpd, gps, sample, false);
       }
       else {
-        BKE_gpencil_stroke_geometry_update(gpd, gps);
+        BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
       }
     }
     else {

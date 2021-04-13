@@ -93,8 +93,7 @@ static int gpencil_editcurve_set_handle_type_exec(bContext *C, wmOperator *op)
     }
 
     BKE_gpencil_editcurve_recalculate_handles(gps);
-    gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-    BKE_gpencil_stroke_geometry_update(gpd, gps);
+    BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
   }
   GP_EDITABLE_CURVES_END(gps_iter);
 
@@ -176,8 +175,7 @@ static int gpencil_stroke_set_type_exec(bContext *C, wmOperator *op)
           BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, false);
           if (gps->editcurve != NULL) {
             bGPDcurve *gpc = gps->editcurve;
-            gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-            BKE_gpencil_stroke_geometry_update(gpd, gps);
+            BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
             /* Select all curve points. */
             for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
