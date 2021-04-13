@@ -381,6 +381,22 @@ static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
       pbd->temp_id_consumer, C, asset_library, ID_AC, CTX_data_main(C), op->reports);
 }
 
+static bAction *flip_pose(bContext *C, Object *ob, bAction *action)
+{
+  bAction *action_copy = (bAction *)BKE_id_copy_ex(NULL, &action->id, NULL, LIB_ID_COPY_LOCALIZE);
+
+  /* Lock the window manager while flipping the pose. Flipping requires temporarily modifying the
+   * pose, which can cause unwanted visual glitches. */
+  wmWindowManager *wm = CTX_wm_manager(C);
+  const bool interface_was_locked = CTX_wm_interface_locked(C);
+  WM_set_locked_interface(wm, true);
+
+  BKE_action_flip_with_pose(action_copy, ob);
+
+  WM_set_locked_interface(wm, interface_was_locked);
+  return action_copy;
+}
+
 /* Return true on success, false if the context isn't suitable. */
 static bool poselib_blend_init_data(bContext *C, wmOperator *op, const wmEvent *event)
 {
@@ -405,8 +421,7 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op, const wmEvent *
   /* Maybe flip the Action. */
   const bool apply_flipped = RNA_boolean_get(op->ptr, "flipped");
   if (apply_flipped) {
-    action = (bAction *)BKE_id_copy_ex(NULL, &action->id, NULL, LIB_ID_COPY_LOCALIZE);
-    BKE_action_flip_with_pose(action, ob);
+    action = flip_pose(C, ob, action);
     pbd->free_action = true;
   }
   pbd->act = action;
