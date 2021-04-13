@@ -1396,6 +1396,7 @@ static char lineart_identify_feature_line(LineartRenderBuffer *rb,
   double dot_1 = 0, dot_2 = 0;
   double result;
   FreestyleEdge *fe;
+  char edge_flag_result = 0;
 
   if (rb->cam_is_persp) {
     sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
@@ -1408,24 +1409,24 @@ static char lineart_identify_feature_line(LineartRenderBuffer *rb,
   dot_2 = dot_v3v3_db(view_vector, rt2->gn);
 
   if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
-    return LRT_EDGE_FLAG_CONTOUR;
+    edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
   }
 
   if (rb->use_crease && (dot_v3v3_db(rt1->gn, rt2->gn) < crease_threshold)) {
     if (!no_crease) {
-      return LRT_EDGE_FLAG_CREASE;
+      edge_flag_result |= LRT_EDGE_FLAG_CREASE;
     }
   }
   else if (rb->use_material && (ll->f->mat_nr != lr->f->mat_nr)) {
-    return LRT_EDGE_FLAG_MATERIAL;
+    edge_flag_result |= LRT_EDGE_FLAG_MATERIAL;
   }
   else if (count_freestyle && rb->use_edge_marks) {
     fe = CustomData_bmesh_get(&bm_if_freestyle->edata, e->head.data, CD_FREESTYLE_EDGE);
     if (fe->flag & FREESTYLE_EDGE_MARK) {
-      return LRT_EDGE_FLAG_EDGE_MARK;
+      edge_flag_result |= LRT_EDGE_FLAG_EDGE_MARK;
     }
   }
-  return 0;
+  return edge_flag_result;
 }
 
 static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e)
@@ -1522,6 +1523,18 @@ static void lineart_triangle_adjacent_assign(LineartTriangle *rt,
   else if (lineart_edge_match(rt, e, 2, 0)) {
     rta->e[2] = e;
   }
+}
+
+static int lineart_edge_type_duplication_count(char eflag)
+{
+  int count = 0;
+  /* See eLineartEdgeFlag for details. */
+  for (int i = 0; i < LRT_EDGE_FLAG_FLOATING; i++) {
+    if (eflag & (1 << i)) {
+      count++;
+    }
+  }
+  return count;
 }
 
 static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBuffer *rb)
@@ -1629,8 +1642,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     orv[i].index = i;
   }
   /* Register a global index increment. See #lineart_triangle_share_edge() and
-   * #lineart_main_load_geometries() for detailed. It's okay that global_vindex might eventually
-   * overflow, in such large scene it's virtually impossible for two vertex of the same numeric
+   * #lineart_main_load_geometries() for details. It's okay that global_vindex might eventually
+   * overflow, in such large scene it's virtually impossible for two vertices of the same numeric
    * index to come close together. */
   obi->global_i_offset = bm->totvert;
 
@@ -1680,7 +1693,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
         rb, e, ort, orv, use_crease, orig_ob->type == OB_FONT, CanFindFreestyle, bm);
     if (eflag) {
       /* Only allocate for feature lines (instead of all lines) to save memory. */
-      allocate_la_e++;
+      allocate_la_e += lineart_edge_type_duplication_count(eflag);
     }
     /* Here we just use bm's flag for when loading actual lines, then we don't need to call
      * lineart_identify_feature_line() again, e->head.hflag deleted after loading anyway. Always
@@ -1708,30 +1721,46 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
       continue;
     }
 
-    la_e->v1 = &orv[BM_elem_index_get(e->v1)];
-    la_e->v2 = &orv[BM_elem_index_get(e->v2)];
-    la_e->v1_obindex = la_e->v1->index;
-    la_e->v2_obindex = la_e->v2->index;
-    if (e->l) {
-      int findex = BM_elem_index_get(e->l->f);
-      la_e->t1 = lineart_triangle_from_index(rb, ort, findex);
-      lineart_triangle_adjacent_assign(la_e->t1, &orta[findex], la_e);
-      if (e->l->radial_next && e->l->radial_next != e->l) {
-        findex = BM_elem_index_get(e->l->radial_next->f);
-        la_e->t2 = lineart_triangle_from_index(rb, ort, findex);
-        lineart_triangle_adjacent_assign(la_e->t2, &orta[findex], la_e);
-      }
-    }
-    la_e->flags = e->head.hflag;
-    la_e->object_ref = orig_ob;
-    BLI_addtail(&la_e->segments, la_s);
-    if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
-        usage == OBJECT_LRT_NO_INTERSECTION) {
-      lineart_add_edge_to_list_thread(obi, la_e);
-    }
+    bool edge_added = false;
 
-    la_e++;
-    la_s++;
+    /* See eLineartEdgeFlag for details. */
+    for (int flag_bit = 0; flag_bit < LRT_EDGE_FLAG_FLOATING; flag_bit++) {
+      char use_type = 1 << flag_bit;
+      if (!(use_type & e->head.hflag)) {
+        continue;
+      }
+
+      la_e->v1 = &orv[BM_elem_index_get(e->v1)];
+      la_e->v2 = &orv[BM_elem_index_get(e->v2)];
+      la_e->v1_obindex = la_e->v1->index;
+      la_e->v2_obindex = la_e->v2->index;
+      if (e->l) {
+        int findex = BM_elem_index_get(e->l->f);
+        la_e->t1 = lineart_triangle_from_index(rb, ort, findex);
+        if (!edge_added) {
+          lineart_triangle_adjacent_assign(la_e->t1, &orta[findex], la_e);
+        }
+        if (e->l->radial_next && e->l->radial_next != e->l) {
+          findex = BM_elem_index_get(e->l->radial_next->f);
+          la_e->t2 = lineart_triangle_from_index(rb, ort, findex);
+          if (!edge_added) {
+            lineart_triangle_adjacent_assign(la_e->t2, &orta[findex], la_e);
+          }
+        }
+      }
+      la_e->flags = use_type;
+      la_e->object_ref = orig_ob;
+      BLI_addtail(&la_e->segments, la_s);
+      if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
+          usage == OBJECT_LRT_NO_INTERSECTION) {
+        lineart_add_edge_to_list_thread(obi, la_e);
+      }
+
+      edge_added = true;
+
+      la_e++;
+      la_s++;
+    }
   }
 
   /* always free bm as it's a copy from before threading */
@@ -1871,7 +1900,8 @@ static void lineart_main_load_geometries(
 
   int thread_count = rb->thread_count;
 
-  /* This memory is in render buffer memory pool. so we don't need to free those after loading. */
+  /* This memory is in render buffer memory pool. so we don't need to free those after loading.
+   */
   LineartObjectLoadTaskInfo *olti = lineart_mem_aquire(
       &rb->render_data_pool, sizeof(LineartObjectLoadTaskInfo) * thread_count);
 
@@ -1923,8 +1953,8 @@ static void lineart_main_load_geometries(
                          }));
     }
 
-    /* We don't need the plain "mesh" data anymore, only BMesh post-processing is done in threads.
-     * The workers will free obi->bm */
+    /* We don't need the plain "mesh" data anymore, only BMesh post-processing is done in
+     * threads. The workers will free obi->bm */
     if (ob->type != OB_MESH) {
       BKE_mesh_free(use_mesh);
       MEM_freeN(use_mesh);
