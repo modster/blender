@@ -424,7 +424,7 @@ template<typename T> class VMutableArray_For_GVMutableArray : public VMutableArr
     return value;
   }
 
-  void set_impl(const int64_t index, T value) const override
+  void set_impl(const int64_t index, T value) override
   {
     varray_->set_by_relocate(index, &value);
   }
@@ -722,7 +722,7 @@ template<typename T> class GVArray_Typed {
       varray_single_.emplace(single_value, gvarray.size());
       varray_ = &*varray_single_;
     }
-    else if (VArray<T> *internal_varray = gvarray.try_get_internal_varray<T>()) {
+    else if (const VArray<T> *internal_varray = gvarray.try_get_internal_varray<T>()) {
       varray_ = internal_varray;
     }
     else {

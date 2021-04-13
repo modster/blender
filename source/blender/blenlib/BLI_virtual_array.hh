@@ -277,7 +277,7 @@ template<typename T> class VArray_For_Span : public VArray<T> {
   }
 };
 
-template<typename T> class VMutableArray_For_MutableSpan final : public VMutableArray<T> {
+template<typename T> class VMutableArray_For_MutableSpan : public VMutableArray<T> {
  protected:
   T *data_ = nullptr;
 
@@ -292,12 +292,12 @@ template<typename T> class VMutableArray_For_MutableSpan final : public VMutable
   {
   }
 
-  T get_impl(const int64_t index) const override
+  T get_impl(const int64_t index) const final
   {
     return data_[index];
   }
 
-  void set_impl(const int64_t index, T value) override
+  void set_impl(const int64_t index, T value) final
   {
     data_[index] = value;
   }

@@ -222,7 +222,9 @@ class GeoNodeExecParams {
                                            const T &default_value) const
   {
     const CustomDataType type = bke::cpp_type_to_custom_data_type(CPPType::get<T>());
-    return this->get_input_attribute(name, component, domain, type, &default_value);
+    std::unique_ptr<GVArray> varray = this->get_input_attribute(
+        name, component, domain, type, &default_value);
+    return fn::GVArray_Typed<T>(std::move(varray));
   }
 
   /**
