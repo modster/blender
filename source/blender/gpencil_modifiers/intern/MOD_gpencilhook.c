@@ -281,7 +281,7 @@ static void deformPolyline(GpencilModifierData *md,
     gpencil_hook_co_apply(&tData, weight, &pt->x);
   }
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 static void deformBezier(GpencilModifierData *md,
@@ -324,8 +324,7 @@ static void deformBezier(GpencilModifierData *md,
     }
   }
   /* Calc geometry data. */
-  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 /* FIXME: Ideally we be doing this on a copy of the main depsgraph

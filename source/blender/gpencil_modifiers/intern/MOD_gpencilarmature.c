@@ -176,7 +176,7 @@ static void deformPolyline(GpencilModifierData *md,
 
   gpencil_deform_polyline_verts(mmd, ob, gps);
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 static void deformBezier(GpencilModifierData *md,
@@ -194,8 +194,7 @@ static void deformBezier(GpencilModifierData *md,
 
   gpencil_deform_bezier_verts(mmd, ob, gps);
   /* Calc geometry data. */
-  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 static void bakeModifier(Main *UNUSED(bmain),

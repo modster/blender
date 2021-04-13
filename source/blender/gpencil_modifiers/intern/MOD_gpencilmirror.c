@@ -171,10 +171,7 @@ static void generate_geometry(GpencilModifierData *md, Object *ob, bGPDlayer *gp
                                            mmd->flag & GP_MIRROR_INVERT_MATERIAL)) {
           gps_new = BKE_gpencil_stroke_duplicate(gps, true, true);
           update_position(ob, mmd, gps_new, xi);
-          if (GPENCIL_STROKE_TYPE_BEZIER(gps_new)) {
-            gps_new->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-            BKE_gpencil_stroke_geometry_update(gpd, gps_new);
-          }
+          BKE_gpencil_stroke_geometry_update(gpd, gps_new, GP_GEO_UPDATE_DEFAULT);
           BLI_addtail(&gpf->strokes, gps_new);
         }
       }

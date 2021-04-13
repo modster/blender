@@ -100,7 +100,7 @@ static void deformPolyline(GpencilModifierData *md,
     gps->uv_translation[0] += mmd->fill_offset[0];
     gps->uv_translation[1] += mmd->fill_offset[1];
     gps->uv_scale *= mmd->fill_scale;
-    BKE_gpencil_stroke_geometry_update(gpd, gps);
+    BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
   }
 
   if (ELEM(mmd->mode, STROKE, STROKE_AND_FILL)) {

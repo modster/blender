@@ -523,7 +523,7 @@ bool BKE_gpencil_stroke_sample(bGPdata *gpd, bGPDstroke *gps, const float dist, 
   gps->totpoints = i;
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
   return true;
 }
@@ -694,7 +694,7 @@ bool BKE_gpencil_stroke_split(bGPdata *gpd,
    * Keep the end point. */
 
   BKE_gpencil_stroke_trim_points(gps, 0, old_count);
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
   return true;
 }
 
@@ -1470,7 +1470,7 @@ bool BKE_gpencil_stroke_trim(bGPdata *gpd, bGPDstroke *gps)
     MEM_SAFE_FREE(old_dvert);
   }
 
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
   return intersect;
 }
@@ -1647,7 +1647,7 @@ void BKE_gpencil_dissolve_points(bGPdata *gpd, bGPDframe *gpf, bGPDstroke *gps, 
     gps->totpoints = tot;
 
     /* triangles cache needs to be recalculated */
-    BKE_gpencil_stroke_geometry_update(gpd, gps);
+    BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
   }
 }
 
@@ -1795,7 +1795,7 @@ void BKE_gpencil_stroke_simplify_adaptive(bGPdata *gpd, bGPDstroke *gps, float e
   gps->totpoints = j;
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
   MEM_SAFE_FREE(old_points);
   MEM_SAFE_FREE(old_dvert);
@@ -1861,7 +1861,7 @@ void BKE_gpencil_stroke_simplify_fixed(bGPdata *gpd, bGPDstroke *gps)
 
   gps->totpoints = j;
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
   MEM_SAFE_FREE(old_points);
   MEM_SAFE_FREE(old_dvert);
@@ -1983,7 +1983,7 @@ void BKE_gpencil_stroke_subdivide(bGPdata *gpd, bGPDstroke *gps, int level, int 
   }
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 /* Merge by distance ------------------------------------- */
@@ -2068,7 +2068,7 @@ void BKE_gpencil_stroke_merge_distance(bGPdata *gpd,
   }
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 typedef struct GpEdge {
@@ -2283,7 +2283,7 @@ static void gpencil_generate_edgeloops(Object *ob,
       pt->strength = 1.0f;
     }
 
-    BKE_gpencil_stroke_geometry_update(gpd, gps_stroke);
+    BKE_gpencil_stroke_geometry_update(gpd, gps_stroke, GP_GEO_UPDATE_DEFAULT);
   }
 
   /* Free memory. */
@@ -2465,7 +2465,7 @@ bool BKE_gpencil_convert_mesh(Main *bmain,
           BKE_gpencil_stroke_subdivide(gpd, gps_fill, 1, GP_SUBDIV_SIMPLE);
         }
 
-        BKE_gpencil_stroke_geometry_update(gpd, gps_fill);
+        BKE_gpencil_stroke_geometry_update(gpd, gps_fill, GP_GEO_UPDATE_DEFAULT);
       }
     }
   }
@@ -2522,7 +2522,7 @@ void BKE_gpencil_transform(bGPdata *gpd, const float mat[4][4])
         }
 
         /* Distortion may mean we need to re-triangulate. */
-        BKE_gpencil_stroke_geometry_update(gpd, gps);
+        BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
       }
     }
   }
@@ -2614,7 +2614,7 @@ void BKE_gpencil_point_coords_apply(bGPdata *gpd, const GPencilPointCoordinates 
         }
 
         /* Distortion may mean we need to re-triangulate. */
-        BKE_gpencil_stroke_geometry_update(gpd, gps);
+        BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
       }
     }
   }
@@ -2651,7 +2651,7 @@ void BKE_gpencil_point_coords_apply_with_mat4(bGPdata *gpd,
         }
 
         /* Distortion may mean we need to re-triangulate. */
-        BKE_gpencil_stroke_geometry_update(gpd, gps);
+        BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
       }
     }
   }
@@ -2868,7 +2868,7 @@ static void gpencil_stroke_join_islands(bGPdata *gpd,
   /* add new stroke at head */
   BLI_addhead(&gpf->strokes, join_stroke);
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, join_stroke);
+  BKE_gpencil_stroke_geometry_update(gpd, join_stroke, GP_GEO_UPDATE_DEFAULT);
 
   /* remove first stroke */
   BLI_remlink(&gpf->strokes, gps_first);
@@ -3017,7 +3017,7 @@ bGPDstroke *BKE_gpencil_stroke_delete_tagged_points(bGPdata *gpd,
       }
       else {
         /* Calc geometry data. */
-        BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+        BKE_gpencil_stroke_geometry_update(gpd, new_stroke, GP_GEO_UPDATE_DEFAULT);
 
         if (next_stroke) {
           BLI_insertlinkbefore(&gpf->strokes, next_stroke, new_stroke);
@@ -3102,10 +3102,9 @@ void BKE_gpencil_curve_delete_tagged_points(bGPdata *gpd,
 
       BKE_gpencil_editcurve_recalculate_handles(new_stroke);
       BKE_gpencil_curve_sync_selection(gpd, new_stroke);
-      new_stroke->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
 
       /* Calc geometry data. */
-      BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+      BKE_gpencil_stroke_geometry_update(gpd, new_stroke, GP_GEO_UPDATE_DEFAULT);
 
       if (next_stroke) {
         BLI_insertlinkbefore(&gpf->strokes, next_stroke, new_stroke);
@@ -3136,10 +3135,9 @@ void BKE_gpencil_curve_delete_tagged_points(bGPdata *gpd,
 
     BKE_gpencil_editcurve_recalculate_handles(gps_last);
     BKE_gpencil_curve_sync_selection(gpd, gps_last);
-    gps_last->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
 
     /* Calc geometry data. */
-    BKE_gpencil_stroke_geometry_update(gpd, gps_last);
+    BKE_gpencil_stroke_geometry_update(gpd, gps_last, GP_GEO_UPDATE_DEFAULT);
 
     /* remove first one */
     BLI_remlink(&gpf->strokes, gps_first);
@@ -3552,7 +3550,7 @@ void BKE_gpencil_stroke_uniform_subdivide(bGPdata *gpd,
   }
 
   /* Update the geometry of the stroke. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 /**
@@ -4063,7 +4061,7 @@ bGPDstroke *BKE_gpencil_stroke_perimeter_from_view(struct RegionView3D *rv3d,
   MEM_freeN(perimeter_points);
 
   /* Triangles cache needs to be recalculated. */
-  BKE_gpencil_stroke_geometry_update(gpd, perimeter_stroke);
+  BKE_gpencil_stroke_geometry_update(gpd, perimeter_stroke, GP_GEO_UPDATE_DEFAULT);
 
   perimeter_stroke->flag |= GP_STROKE_SELECT | GP_STROKE_CYCLIC;
 

@@ -132,7 +132,7 @@ static void deformPolyline(GpencilModifierData *md,
     mul_m4_v3(mat, &pt->x);
   }
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 static void deformBezier(GpencilModifierData *md,
@@ -171,9 +171,8 @@ static void deformBezier(GpencilModifierData *md,
       mul_m4_v3(mat, bezt->vec[j]);
     }
   }
-  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
 
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 static void bakeModifier(struct Main *UNUSED(bmain),

@@ -180,7 +180,7 @@ static void reduce_stroke_points(bGPdata *gpd,
   gps->totpoints = num_points;
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 /* --------------------------------------------- */

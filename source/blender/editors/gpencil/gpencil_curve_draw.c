@@ -490,7 +490,7 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
   tcd->gpc = gpc;
 
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(tcd->gpd, gps);
+  BKE_gpencil_stroke_geometry_update(tcd->gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
   /* Initialize space conversion. */
   gpencil_point_conversion_init(C, &tcd->gsc);
@@ -559,7 +559,7 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
       break;
   }
 
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
   DEG_id_tag_update(&gpd->id, ID_RECALC_COPY_ON_WRITE);
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);

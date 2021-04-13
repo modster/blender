@@ -3902,7 +3902,7 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
     if (G.debug_value == 4000) {
       BKE_gpencil_stroke_set_random_color(gps);
     }
-    BKE_gpencil_stroke_geometry_update(gpencil_object->data, gps);
+    BKE_gpencil_stroke_geometry_update(gpencil_object->data, gps, GP_GEO_UPDATE_DEFAULT);
     stroke_count++;
   }
 

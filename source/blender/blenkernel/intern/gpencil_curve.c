@@ -461,7 +461,7 @@ static void gpencil_convert_spline(Main *bmain,
   }
 
   /* Recalc fill geometry. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 static void gpencil_editstroke_deselect_all(bGPDcurve *gpc)

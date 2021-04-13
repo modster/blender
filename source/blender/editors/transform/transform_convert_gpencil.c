@@ -612,10 +612,9 @@ void recalcData_gpencil_strokes(TransInfo *t)
       BLI_ghash_insert(strokes, gps, gps);
       if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
         BKE_gpencil_editcurve_recalculate_handles(gps);
-        gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
       }
       /* Calc geometry data. */
-      BKE_gpencil_stroke_geometry_update(gpd, gps);
+      BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
     }
   }
   BLI_ghash_free(strokes, NULL, NULL);

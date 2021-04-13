@@ -185,7 +185,7 @@ static void duplicateStroke(Object *ob,
   }
   /* Calc geometry data. */
   if (new_gps != NULL) {
-    BKE_gpencil_stroke_geometry_update(gpd, new_gps);
+    BKE_gpencil_stroke_geometry_update(gpd, new_gps, GP_GEO_UPDATE_DEFAULT);
   }
   MEM_freeN(t1_array);
   MEM_freeN(t2_array);

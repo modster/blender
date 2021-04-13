@@ -1461,7 +1461,7 @@ void gpencil_subdivide_stroke(bGPdata *gpd, bGPDstroke *gps, const int subdivide
     MEM_SAFE_FREE(temp_points);
   }
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 }
 
 /* Reset parent matrix for all layers. */
@@ -2452,7 +2452,7 @@ static void gpencil_insert_point(bGPdata *gpd,
     i2++;
   }
   /* Calc geometry data. */
-  BKE_gpencil_stroke_geometry_update(gpd, gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
 
   MEM_SAFE_FREE(temp_points);
 }
@@ -2859,9 +2859,7 @@ void ED_gpencil_select_curve_toggle_all(bContext *C, int action)
 
       /* Make sure stroke has an editcurve */
       if (gps->editcurve == NULL) {
-        // BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps);
-        gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-        BKE_gpencil_stroke_geometry_update(gpd, gps);
+        BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
       }
 
       bGPDcurve *gpc = gps->editcurve;
