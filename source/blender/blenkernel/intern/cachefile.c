@@ -225,12 +225,12 @@ void BKE_cachefile_reader_free(CacheFile *cache_file, struct CacheReader **reade
       switch (cache_file->type) {
         case CACHEFILE_TYPE_ALEMBIC:
 #  ifdef WITH_ALEMBIC
-          CacheReader_free(*reader);
+          ABC_CacheReader_free(*reader);
 #  endif
           break;
         case CACHEFILE_TYPE_USD:
 #  ifdef WITH_USD
-          USDCacheReader_free(*reader);
+          USD_CacheReader_free(*reader);
 #  endif
           break;
         case CACHE_FILE_TYPE_INVALID:
@@ -267,12 +267,12 @@ static void cachefile_handle_free(CacheFile *cache_file)
         switch (cache_file->type) {
           case CACHEFILE_TYPE_ALEMBIC:
 #  ifdef WITH_ALEMBIC
-            CacheReader_free(*reader);
+            ABC_CacheReader_free(*reader);
 #  endif
             break;
           case CACHEFILE_TYPE_USD:
 #  ifdef WITH_USD
-            USDCacheReader_free(*reader);
+            USD_CacheReader_free(*reader);
 #  endif
             break;
           case CACHE_FILE_TYPE_INVALID:

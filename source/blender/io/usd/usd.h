@@ -123,8 +123,8 @@ struct CacheReader *CacheReader_open_usd_object(struct CacheArchiveHandle *handl
                                                 struct Object *object,
                                                 const char *object_path);
 
-void USDCacheReader_incref(struct CacheReader *reader);
-void USDCacheReader_free(struct CacheReader *reader);
+void USD_CacheReader_incref(struct CacheReader *reader);
+void USD_CacheReader_free(struct CacheReader *reader);
 
 #ifdef __cplusplus
 }

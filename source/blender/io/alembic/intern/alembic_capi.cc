@@ -809,7 +809,7 @@ bool ABC_mesh_topology_changed(
 
 /* ************************************************************************** */
 
-void CacheReader_free(CacheReader *reader)
+void ABC_CacheReader_free(CacheReader *reader)
 {
   AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
   abc_reader->decref();
@@ -819,7 +819,7 @@ void CacheReader_free(CacheReader *reader)
   }
 }
 
-void CacheReader_incref(CacheReader *reader)
+void ABC_CacheReader_incref(CacheReader *reader)
 {
   AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
   abc_reader->incref();
@@ -844,7 +844,7 @@ CacheReader *CacheReader_open_alembic_object(CacheArchiveHandle *handle,
   find_iobject(archive->getTop(), iobject, object_path);
 
   if (reader) {
-    CacheReader_free(reader);
+    ABC_CacheReader_free(reader);
   }
 
   ImportSettings settings;

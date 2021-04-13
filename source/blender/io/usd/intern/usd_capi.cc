@@ -852,7 +852,7 @@ bool USD_mesh_topology_changed(
   return usd_reader->topology_changed(existing_mesh, time);
 }
 
-void USDCacheReader_incref(CacheReader *reader)
+void USD_CacheReader_incref(CacheReader *reader)
 {
   USDPrimReader *usd_reader = reinterpret_cast<USDPrimReader *>(reader);
   usd_reader->incref();
@@ -876,7 +876,7 @@ CacheReader *CacheReader_open_usd_object(CacheArchiveHandle *handle,
   pxr::UsdPrim prim = archive->stage()->GetPrimAtPath(pxr::SdfPath(object_path));
 
   if (reader) {
-    USDCacheReader_free(reader);
+    USD_CacheReader_free(reader);
   }
 
   // TODO: The handle does not have the proper import params or settings
@@ -892,7 +892,7 @@ CacheReader *CacheReader_open_usd_object(CacheArchiveHandle *handle,
   return reinterpret_cast<CacheReader *>(usd_reader);
 }
 
-void USDCacheReader_free(CacheReader *reader)
+void USD_CacheReader_free(CacheReader *reader)
 {
   USDPrimReader *usd_reader = reinterpret_cast<USDPrimReader *>(reader);
   usd_reader->decref();
