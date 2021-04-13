@@ -167,7 +167,9 @@ class GeometryComponent {
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
     const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
-    return this->attribute_get_for_read(attribute_name, domain, type, &default_value);
+    std::unique_ptr varray = this->attribute_get_for_read(
+        attribute_name, domain, type, &default_value);
+    return varray;
   }
 
   /**
@@ -191,7 +193,7 @@ class GeometryComponent {
       const blender::StringRef attribute_name, const AttributeDomain domain)
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
-    const CustomDataType data_type = blender::bke::custom_data_type_to_cpp_type(cpp_type);
+    const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
     return this->attribute_try_get_for_output(attribute_name, domain, data_type, nullptr);
   }
 

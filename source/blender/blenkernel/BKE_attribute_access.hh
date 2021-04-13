@@ -124,7 +124,7 @@ template<typename T> class OutputAttribute_Typed {
   OutputAttribute_Typed(OutputAttribute attribute) : attribute_(std::move(attribute))
   {
     if (attribute_) {
-      varray_.emplace(attribute_.varray());
+      optional_varray_.emplace(attribute_.varray());
       varray_ = &**optional_varray_;
     }
   }
@@ -144,7 +144,7 @@ template<typename T> class OutputAttribute_Typed {
     return varray_;
   }
 
-  GVMutableArray<T> &varray()
+  VMutableArray<T> &varray()
   {
     return *varray_;
   }
