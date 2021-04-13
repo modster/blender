@@ -112,7 +112,7 @@ typedef struct PoseBlendData {
 /* Makes a copy of the current pose for restoration purposes - doesn't do constraints currently */
 static void poselib_backup_posecopy(PoseBlendData *pbd)
 {
-  pbd->pose_backup = ED_pose_backup_create(pbd->ob, pbd->act);
+  pbd->pose_backup = ED_pose_backup_create_selected_bones(pbd->ob, pbd->act);
 
   if (pbd->state == POSE_BLEND_INIT) {
     /* Ready for blending now. */

@@ -28,6 +28,8 @@
 #include "BLI_fileops.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_animsys.h"
+#include "BKE_armature.h"
 #include "BKE_context.h"
 #include "BKE_icons.h"
 #include "BKE_lib_id.h"
@@ -36,6 +38,7 @@
 
 #include "BLT_translation.h"
 
+#include "ED_armature.h"
 #include "ED_render.h"
 #include "ED_undo.h"
 #include "ED_util.h"
@@ -46,6 +49,8 @@
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "DEG_depsgraph.h"
 
 /* -------------------------------------------------------------------- */
 /** \name ID Previews
@@ -120,7 +125,46 @@ static void ED_OT_lib_id_load_custom_preview(wmOperatorType *ot)
                                  FILE_SORT_DEFAULT);
 }
 
-static int lib_id_generate_preview_exec(bContext *C, wmOperator *UNUSED(op))
+static void render_action(bContext *C, wmOperator *op, ID *id)
+{
+  Object *object = CTX_data_active_object(C);
+
+  if (object == NULL || object->pose == NULL) {
+    if (object == NULL) {
+      BKE_report(op->reports,
+                 RPT_WARNING,
+                 "No active object, unable to apply the Action before rendering");
+    }
+    else {
+      BKE_reportf(op->reports,
+                  RPT_WARNING,
+                  "Object %s has no pose, unable to apply the Action before rendering",
+                  object->id.name + 2);
+    }
+    UI_icon_render_id(C, nullptr, id, ICON_SIZE_PREVIEW, true);
+    return;
+  }
+
+  /* Create a backup of the current pose. */
+  struct bAction *action = (struct bAction *)id;
+  PoseBackup *pose_backup = ED_pose_backup_create_all_bones(object, action);
+
+  /* Apply the Action as pose, so that it can be rendered. This assumes the Action represents a
+   * single pose, and that thus the evaluation time doesn't matter. */
+  struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+  AnimationEvalContext anim_eval_context = {depsgraph, 0.0f};
+  BKE_pose_apply_action_all_bones(object, action, &anim_eval_context);
+  DEG_id_tag_update(&object->id, ID_RECALC_GEOMETRY);
+
+  /* Render the preview icon. */
+  UI_icon_render_id(C, nullptr, id, ICON_SIZE_PREVIEW, true);
+
+  /* Restore the original pose. */
+  ED_pose_backup_restore(pose_backup);
+  ED_pose_backup_free(pose_backup);
+}
+
+static int lib_id_generate_preview_exec(bContext *C, wmOperator *op)
 {
   PointerRNA idptr = CTX_data_pointer_get(C, "id");
   ID *id = (ID *)idptr.data;
@@ -131,7 +175,14 @@ static int lib_id_generate_preview_exec(bContext *C, wmOperator *UNUSED(op))
   if (preview) {
     BKE_previewimg_clear(preview);
   }
-  UI_icon_render_id(C, nullptr, id, ICON_SIZE_PREVIEW, true);
+
+  if (GS(id->name) == ID_AC) {
+    /* Actions cannot be rendered directly, and thus need some extra care. */
+    render_action(C, op, id);
+  }
+  else {
+    UI_icon_render_id(C, nullptr, id, ICON_SIZE_PREVIEW, true);
+  }
 
   WM_event_add_notifier(C, NC_ASSET | NA_EDITED, nullptr);
 

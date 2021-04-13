@@ -55,9 +55,9 @@ void pose_apply(struct Object *ob,
 
 }  // namespace
 
-void BKE_pose_apply_action(struct Object *ob,
-                           struct bAction *action,
-                           struct AnimationEvalContext *anim_eval_context)
+void BKE_pose_apply_action_selected_bones(struct Object *ob,
+                                          struct bAction *action,
+                                          struct AnimationEvalContext *anim_eval_context)
 {
   auto evaluate_and_apply =
       [](PointerRNA *ptr, bAction *act, const AnimationEvalContext *anim_eval_context) {
@@ -65,6 +65,15 @@ void BKE_pose_apply_action(struct Object *ob,
       };
 
   pose_apply(ob, action, anim_eval_context, evaluate_and_apply);
+}
+
+void BKE_pose_apply_action_all_bones(struct Object *ob,
+                                     struct bAction *action,
+                                     struct AnimationEvalContext *anim_eval_context)
+{
+  PointerRNA pose_owner_ptr;
+  RNA_id_pointer_create(&ob->id, &pose_owner_ptr);
+  animsys_evaluate_action(&pose_owner_ptr, action, anim_eval_context, false);
 }
 
 void BKE_pose_apply_action_blend(struct Object *ob,

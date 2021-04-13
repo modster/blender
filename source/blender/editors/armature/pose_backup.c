@@ -44,24 +44,15 @@ typedef struct PoseChannelBackup {
   struct IDProperty *oldprops; /* Backup copy (needs freeing) of pose channel's ID properties. */
 } PoseChannelBackup;
 
-PoseBackup *ED_pose_backup_create(const Object *ob, const bAction *action)
+static PoseBackup *pose_backup_create(const Object *ob,
+                                      const bAction *action,
+                                      const bool is_bone_selection_relevant)
 {
-  /* TODO(Sybren): reuse same approach as in `armature_pose.cc` in this function. */
-
-  /* See if bone selection is relevant. */
-  bool all_bones_selected = true;
-  bool no_bones_selected = true;
-  const bArmature *armature = ob->data;
-  LISTBASE_FOREACH (bPoseChannel *, pchan, &ob->pose->chanbase) {
-    const bool is_selected = PBONE_SELECTED(armature, pchan->bone);
-    all_bones_selected &= is_selected;
-    no_bones_selected &= !is_selected;
-  }
-
-  /* If no bones are selected, act as if all are. */
-  const bool is_bone_selection_relevant = !all_bones_selected && !no_bones_selected;
   ListBase backups = {NULL, NULL};
+  const bArmature *armature = ob->data;
 
+  /* TODO(Sybren): reuse same approach as in `armature_pose.cc` in this function, as that doesn't
+   * have the assumption that action group names are bone names. */
   LISTBASE_FOREACH (bActionGroup *, agrp, &action->groups) {
     bPoseChannel *pchan = BKE_pose_channel_find_name(ob->pose, agrp->name);
     if (pchan == NULL) {
@@ -88,6 +79,28 @@ PoseBackup *ED_pose_backup_create(const Object *ob, const bAction *action)
   pose_backup->is_bone_selection_relevant = is_bone_selection_relevant;
   pose_backup->backups = backups;
   return pose_backup;
+}
+
+PoseBackup *ED_pose_backup_create_all_bones(const Object *ob, const bAction *action)
+{
+  return pose_backup_create(ob, action, false);
+}
+
+PoseBackup *ED_pose_backup_create_selected_bones(const Object *ob, const bAction *action)
+{
+  /* See if bone selection is relevant. */
+  bool all_bones_selected = true;
+  bool no_bones_selected = true;
+  const bArmature *armature = ob->data;
+  LISTBASE_FOREACH (bPoseChannel *, pchan, &ob->pose->chanbase) {
+    const bool is_selected = PBONE_SELECTED(armature, pchan->bone);
+    all_bones_selected &= is_selected;
+    no_bones_selected &= !is_selected;
+  }
+
+  /* If no bones are selected, act as if all are. */
+  const bool is_bone_selection_relevant = !all_bones_selected && !no_bones_selected;
+  return pose_backup_create(ob, action, is_bone_selection_relevant);
 }
 
 void ED_pose_backup_restore(const PoseBackup *pbd)

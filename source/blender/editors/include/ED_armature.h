@@ -253,8 +253,11 @@ typedef struct PoseBackup {
   ListBase /* PoseChannelBackup* */ backups;
 } PoseBackup;
 
-PoseBackup *ED_pose_backup_create(const struct Object *ob,
-                                  const struct bAction *action) ATTR_WARN_UNUSED_RESULT;
+/* Create a backup of those bones that are animated in the given action. */
+PoseBackup *ED_pose_backup_create_selected_bones(
+    const struct Object *ob, const struct bAction *action) ATTR_WARN_UNUSED_RESULT;
+PoseBackup *ED_pose_backup_create_all_bones(const struct Object *ob,
+                                            const struct bAction *action) ATTR_WARN_UNUSED_RESULT;
 void ED_pose_backup_restore(const PoseBackup *pose_backup);
 void ED_pose_backup_free(PoseBackup *pose_backup);
 
