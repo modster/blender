@@ -202,7 +202,6 @@ static void rna_GPencil_stroke_curve_update(Main *bmain, Scene *scene, PointerRN
       bGPDframe *gpf = gpl->actframe;
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->editcurve != NULL) {
-          gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
           BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
         }
       }

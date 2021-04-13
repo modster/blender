@@ -3295,8 +3295,6 @@ void BKE_gpencil_stroke_join(bGPDstroke *gps_a,
       bGPDcurve_point *cpt = &gpc_a->curve_points[i];
       cpt->pressure *= thickness_ratio;
     }
-
-    gps_a->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
   }
   else {
     /* don't visibly link the first and last points? */

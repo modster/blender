@@ -1570,7 +1570,6 @@ void BKE_gpencil_editcurve_recalculate_handles(bGPDstroke *gps)
   if (gpc->tot_curve_points == 1) {
     BKE_nurb_handle_calc(
         &(gpc->curve_points[0].bezt), NULL, &(gpc->curve_points[0].bezt), false, 0);
-    gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
   }
 
   for (int i = 1; i < gpc->tot_curve_points - 1; i++) {
@@ -1610,10 +1609,6 @@ void BKE_gpencil_editcurve_recalculate_handles(bGPDstroke *gps)
     }
 
     changed = true;
-  }
-
-  if (changed) {
-    gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
   }
 }
 

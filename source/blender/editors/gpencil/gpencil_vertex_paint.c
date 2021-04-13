@@ -1031,9 +1031,10 @@ static bool gpencil_vertexpaint_brush_do_frame(bContext *C,
 
     /* If stroke was hit and has an editcurve the curve needs an update. */
     bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-    if (gps_active->editcurve != NULL && hit) {
-      gps_active->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
-    }
+    /* TODO: update curve */
+    // if (gps_active->editcurve != NULL && hit) {
+    //   gps_active->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
+    // }
   }
 
   /* For Average tool, need calculate the average resulting color from all colors

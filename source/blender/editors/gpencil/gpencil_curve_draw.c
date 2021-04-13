@@ -187,7 +187,7 @@ static void gpencil_push_curve_point(bContext *C, tGPDcurve_draw *tcd)
   new_last->bezt.h1 = new_last->bezt.h2 = HD_VECT;
 
   BKE_gpencil_stroke_update_geometry_from_editcurve(
-      tcd->gps, tcd->gpd->curve_edit_resolution, false);
+      tcd->gps, tcd->gpd->curve_edit_resolution, false, GP_GEO_UPDATE_DEFAULT);
 }
 
 /* Helper: Remove the last curve point */
@@ -211,7 +211,8 @@ static void gpencil_pop_curve_point(bContext *C, tGPDcurve_draw *tcd)
   memcpy(new_curve->curve_points, gpc->curve_points, sizeof(bGPDcurve_point) * new_num_points);
   new_stroke->editcurve = new_curve;
 
-  BKE_gpencil_stroke_update_geometry_from_editcurve(new_stroke, gpd->curve_edit_resolution, false);
+  BKE_gpencil_stroke_update_geometry_from_editcurve(
+      new_stroke, gpd->curve_edit_resolution, false, GP_GEO_UPDATE_DEFAULT);
 
   /* Remove and free old stroke and curve */
   BLI_remlink(&tcd->gpf->strokes, gps);
@@ -520,7 +521,8 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
       copy_v3_v3(bezt->vec[2], co);
 
       BKE_gpencil_editcurve_recalculate_handles(gps);
-      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
+      BKE_gpencil_stroke_update_geometry_from_editcurve(
+          gps, tcd->resolution, false, GP_GEO_UPDATE_DEFAULT);
       gpencil_set_alpha_last_segment(tcd, 0.1f);
       break;
     }
@@ -532,14 +534,16 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
       copy_v3_v3(bezt->vec[0], vec);
       copy_v3_v3(bezt->vec[2], co);
 
-      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
+      BKE_gpencil_stroke_update_geometry_from_editcurve(
+          gps, tcd->resolution, false, GP_GEO_UPDATE_DEFAULT);
       break;
     }
     case IN_DRAG_FREE_HANDLE: {
       gpencil_project_mval_to_v3(tcd->scene, tcd->region, tcd->ob, tcd->imval, co);
       copy_v3_v3(bezt->vec[2], co);
 
-      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
+      BKE_gpencil_stroke_update_geometry_from_editcurve(
+          gps, tcd->resolution, false, GP_GEO_UPDATE_DEFAULT);
       break;
     }
     case IN_SET_THICKNESS: {
@@ -552,7 +556,8 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
       cpt->pressure = tcd->prev_pressure + dr;
       CLAMP_MIN(cpt->pressure, 0.0f);
 
-      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, tcd->resolution, false);
+      BKE_gpencil_stroke_update_geometry_from_editcurve(
+          gps, tcd->resolution, false, GP_GEO_UPDATE_DEFAULT);
       break;
     }
     default:
