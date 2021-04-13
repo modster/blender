@@ -61,6 +61,7 @@
 
 #include "UI_interface.h"
 
+#include "ED_armature.h"
 #include "ED_asset.h"
 #include "ED_keyframing.h"
 #include "ED_object.h"
@@ -81,7 +82,6 @@ typedef enum ePoseBlendState {
 typedef struct PoseBlendData {
   ePoseBlendState state;
   bool needs_redraw;
-  bool is_bone_selection_relevant;
 
   struct {
     bool use_release_confirm;
@@ -96,9 +96,7 @@ typedef struct PoseBlendData {
 
   /* Blend factor, interval [0, 1] for interpolating between current and given pose. */
   float blend_factor;
-
-  /** PoseChannelBackup structs for restoring poses. */
-  ListBase backups;
+  PoseBackup *pose_backup;
 
   Object *ob;   /* Object to work on. */
   bAction *act; /* Pose to blend into the current pose. */
@@ -111,89 +109,14 @@ typedef struct PoseBlendData {
   char headerstr[UI_MAX_DRAW_STR];
 } PoseBlendData;
 
-/* simple struct for storing backup info for one pose channel */
-typedef struct PoseChannelBackup {
-  struct PoseChannelBackup *next, *prev;
-
-  bPoseChannel *pchan; /* Pose channel this backup is for. */
-
-  bPoseChannel olddata; /* Backup of pose channel. */
-  IDProperty *oldprops; /* Backup copy (needs freeing) of pose channel's ID properties. */
-} PoseChannelBackup;
-
 /* Makes a copy of the current pose for restoration purposes - doesn't do constraints currently */
 static void poselib_backup_posecopy(PoseBlendData *pbd)
 {
-  /* TODO(Sybren): reuse same approach as in `armature_pose.cc` in this function. */
-
-  /* See if bone selection is relevant. */
-  bool all_bones_selected = true;
-  bool no_bones_selected = true;
-  const bArmature *armature = pbd->ob->data;
-  LISTBASE_FOREACH (bPoseChannel *, pchan, &pbd->ob->pose->chanbase) {
-    const bool is_selected = PBONE_SELECTED(armature, pchan->bone);
-    all_bones_selected &= is_selected;
-    no_bones_selected &= !is_selected;
-  }
-
-  /* If no bones are selected, act as if all are. */
-  pbd->is_bone_selection_relevant = !all_bones_selected && !no_bones_selected;
-
-  LISTBASE_FOREACH (bActionGroup *, agrp, &pbd->act->groups) {
-    bPoseChannel *pchan = BKE_pose_channel_find_name(pbd->ob->pose, agrp->name);
-    if (pchan == NULL) {
-      continue;
-    }
-
-    if (pbd->is_bone_selection_relevant && !PBONE_SELECTED(armature, pchan->bone)) {
-      continue;
-    }
-
-    PoseChannelBackup *chan_bak;
-    chan_bak = MEM_callocN(sizeof(*chan_bak), "PoseChannelBackup");
-    chan_bak->pchan = pchan;
-    memcpy(&chan_bak->olddata, chan_bak->pchan, sizeof(chan_bak->olddata));
-
-    if (pchan->prop) {
-      chan_bak->oldprops = IDP_CopyProperty(pchan->prop);
-    }
-
-    BLI_addtail(&pbd->backups, chan_bak);
-  }
+  pbd->pose_backup = ED_pose_backup_create(pbd->ob, pbd->act);
 
   if (pbd->state == POSE_BLEND_INIT) {
     /* Ready for blending now. */
     pbd->state = POSE_BLEND_BLENDING;
-  }
-}
-
-/* Restores backed-up pose. */
-static void poselib_backup_restore(PoseBlendData *pbd)
-{
-  LISTBASE_FOREACH (PoseChannelBackup *, chan_bak, &pbd->backups) {
-    memcpy(chan_bak->pchan, &chan_bak->olddata, sizeof(chan_bak->olddata));
-
-    if (chan_bak->oldprops) {
-      IDP_SyncGroupValues(chan_bak->pchan->prop, chan_bak->oldprops);
-    }
-
-    /* TODO: constraints settings aren't restored yet,
-     * even though these could change (though not that likely) */
-  }
-}
-
-/* Free list of backups, including any side data it may use. */
-static void poselib_backup_free_data(PoseBlendData *pbd)
-{
-  for (PoseChannelBackup *chan_bak = pbd->backups.first; chan_bak;) {
-    PoseChannelBackup *next = chan_bak->next;
-
-    if (chan_bak->oldprops) {
-      IDP_FreeProperty(chan_bak->oldprops);
-    }
-    BLI_freelinkN(&pbd->backups, chan_bak);
-
-    chan_bak = next;
   }
 }
 
@@ -228,7 +151,7 @@ static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pbd)
       continue;
     }
 
-    if (pbd->is_bone_selection_relevant && !PBONE_SELECTED(armature, pchan->bone)) {
+    if (pbd->pose_backup->is_bone_selection_relevant && !PBONE_SELECTED(armature, pchan->bone)) {
       continue;
     }
 
@@ -270,7 +193,7 @@ static void poselib_blend_apply(bContext *C, wmOperator *op)
   }
   pbd->needs_redraw = false;
 
-  poselib_backup_restore(pbd);
+  ED_pose_backup_restore(pbd->pose_backup);
 
   /* The pose needs updating, whether it's for restoring the original pose or for showing the
    * result of the blend. */
@@ -558,7 +481,7 @@ static void poselib_blend_cleanup(bContext *C, wmOperator *op)
       BKE_report(op->reports, RPT_ERROR, "Internal pose library error, cancelling operator");
       ATTR_FALLTHROUGH;
     case POSE_BLEND_CANCEL:
-      poselib_backup_restore(pbd);
+      ED_pose_backup_restore(pbd->pose_backup);
       break;
   }
 
@@ -588,7 +511,9 @@ static void poselib_blend_free(wmOperator *op)
   BLI_assert(pbd->release_confirm_info.cursor_wrap_enabled == false);
 
   /* Free temp data for operator */
-  poselib_backup_free_data(pbd);
+  ED_pose_backup_free(pbd->pose_backup);
+  pbd->pose_backup = NULL;
+
   MEM_SAFE_FREE(op->customdata);
 }
 
