@@ -56,7 +56,7 @@ set(INC_SYS
 )
 
 set(SRC
-  intern/usd_capi.cc
+  intern/usd_capi_export.cc
   intern/usd_capi_import.cc
   intern/usd_common.cc
   intern/usd_hierarchy_iterator.cc
