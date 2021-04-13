@@ -182,6 +182,16 @@ AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
   return highest_priority_domain;
 }
 
+void OutputAttribute::save()
+{
+  if (optional_span_varray_.has_value()) {
+    optional_span_varray_->apply();
+  }
+  if (save_) {
+    save_(*this);
+  }
+}
+
 std::unique_ptr<GVArray> BuiltinCustomDataLayerProvider::try_get_for_read(
     const GeometryComponent &component) const
 {
@@ -782,5 +792,3 @@ blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output(
   /* TODO */
   return {};
 }
-
-/** \} */

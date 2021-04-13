@@ -227,7 +227,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_corner_to_point(const Mesh &me
       /* We compute all interpolated values at once, because for this interpolation, one has to
        * iterate over all loops anyway. */
       Array<T> values(mesh.totvert);
-      adapt_mesh_domain_corner_to_point_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_corner_to_point_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -259,7 +259,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_point_to_corner(const Mesh &me
      * when an algorithm only accesses very few of the corner values. However, for the algorithms
      * we currently have, precomputing the array is fine. Also, it is easier to implement. */
     Array<T> values(mesh.totloop);
-    adapt_mesh_domain_point_to_corner_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+    adapt_mesh_domain_point_to_corner_impl<T>(mesh, varray->typed<T>(), values);
     new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
   });
   return new_varray;
@@ -272,7 +272,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_point_to_corner(const Mesh &me
  */
 template<typename T>
 static void adapt_mesh_domain_corner_to_face_impl(const Mesh &mesh,
-                                                  Span<T> old_values,
+                                                  const VArray<T> &old_values,
                                                   MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -298,7 +298,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_corner_to_face(const Mesh &mes
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
-      adapt_mesh_domain_corner_to_face_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_corner_to_face_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -307,7 +307,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_corner_to_face(const Mesh &mes
 
 template<typename T>
 static void adapt_mesh_domain_corner_to_edge_impl(const Mesh &mesh,
-                                                  const VArray<T> old_values,
+                                                  const VArray<T> &old_values,
                                                   MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -338,7 +338,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_corner_to_edge(const Mesh &mes
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
-      adapt_mesh_domain_corner_to_edge_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_corner_to_edge_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -347,7 +347,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_corner_to_edge(const Mesh &mes
 
 template<typename T>
 void adapt_mesh_domain_face_to_point_impl(const Mesh &mesh,
-                                          Span<T> old_values,
+                                          const VArray<T> &old_values,
                                           MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
@@ -375,7 +375,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_face_to_point(const Mesh &mesh
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totvert);
-      adapt_mesh_domain_face_to_point_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_face_to_point_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -384,7 +384,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_face_to_point(const Mesh &mesh
 
 template<typename T>
 void adapt_mesh_domain_face_to_corner_impl(const Mesh &mesh,
-                                           const VArray<T> old_values,
+                                           const VArray<T> &old_values,
                                            MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totloop);
@@ -405,7 +405,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_face_to_corner(const Mesh &mes
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totloop);
-      adapt_mesh_domain_face_to_corner_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_face_to_corner_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -414,7 +414,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_face_to_corner(const Mesh &mes
 
 template<typename T>
 void adapt_mesh_domain_face_to_edge_impl(const Mesh &mesh,
-                                         const VArray<T> old_values,
+                                         const VArray<T> &old_values,
                                          MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -440,7 +440,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_face_to_edge(const Mesh &mesh,
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
-      adapt_mesh_domain_face_to_edge_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_face_to_edge_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -454,7 +454,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_face_to_edge(const Mesh &mesh,
  */
 template<typename T>
 static void adapt_mesh_domain_point_to_face_impl(const Mesh &mesh,
-                                                 const VArray<T> old_values,
+                                                 const VArray<T> &old_values,
                                                  MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -480,7 +480,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_point_to_face(const Mesh &mesh
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
-      adapt_mesh_domain_point_to_face_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_point_to_face_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -494,7 +494,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_point_to_face(const Mesh &mesh
  */
 template<typename T>
 static void adapt_mesh_domain_point_to_edge_impl(const Mesh &mesh,
-                                                 const VArray<T> old_values,
+                                                 const VArray<T> &old_values,
                                                  MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -518,7 +518,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_point_to_edge(const Mesh &mesh
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
-      adapt_mesh_domain_point_to_edge_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_point_to_edge_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -527,7 +527,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_point_to_edge(const Mesh &mesh
 
 template<typename T>
 void adapt_mesh_domain_edge_to_corner_impl(const Mesh &mesh,
-                                           const VArray<T> old_values,
+                                           const VArray<T> &old_values,
                                            MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totloop);
@@ -558,7 +558,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_edge_to_corner(const Mesh &mes
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totloop);
-      adapt_mesh_domain_edge_to_corner_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_edge_to_corner_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -567,7 +567,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_edge_to_corner(const Mesh &mes
 
 template<typename T>
 static void adapt_mesh_domain_edge_to_point_impl(const Mesh &mesh,
-                                                 const VArray<T> old_values,
+                                                 const VArray<T> &old_values,
                                                  MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
@@ -592,7 +592,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_edge_to_point(const Mesh &mesh
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totvert);
-      adapt_mesh_domain_edge_to_point_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_edge_to_point_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -606,7 +606,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_edge_to_point(const Mesh &mesh
  */
 template<typename T>
 static void adapt_mesh_domain_edge_to_face_impl(const Mesh &mesh,
-                                                const VArray<T> old_values,
+                                                const VArray<T> &old_values,
                                                 MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -632,7 +632,7 @@ static std::unique_ptr<GVArray> adapt_mesh_domain_edge_to_face(const Mesh &mesh,
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
-      adapt_mesh_domain_edge_to_face_impl<T>(mesh, *fn::GVArray_Typed<T>{varray}, values);
+      adapt_mesh_domain_edge_to_face_impl<T>(mesh, varray->typed<T>(), values);
       new_varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     }
   });
@@ -743,7 +743,7 @@ static std::unique_ptr<GVArray> make_derived_read_attribute(const void *data,
 template<typename StructT,
          typename ElemT,
          ElemT (*GetFunc)(const StructT &),
-         void (*SetFunc)(StructT &, const ElemT &)>
+         void (*SetFunc)(StructT &, ElemT)>
 static std::unique_ptr<GVMutableArray> make_derived_write_attribute(void *data,
                                                                     const int domain_size)
 {
@@ -756,7 +756,7 @@ static float3 get_vertex_position(const MVert &vert)
   return float3(vert.co);
 }
 
-static void set_vertex_position(MVert &vert, const float3 &position)
+static void set_vertex_position(MVert &vert, float3 position)
 {
   copy_v3_v3(vert.co, position);
 }
@@ -774,7 +774,7 @@ static int get_material_index(const MPoly &mpoly)
   return static_cast<int>(mpoly.mat_nr);
 }
 
-static void set_material_index(MPoly &mpoly, const int &index)
+static void set_material_index(MPoly &mpoly, int index)
 {
   mpoly.mat_nr = static_cast<short>(std::clamp(index, 0, SHRT_MAX));
 }
@@ -784,7 +784,7 @@ static bool get_shade_smooth(const MPoly &mpoly)
   return mpoly.flag & ME_SMOOTH;
 }
 
-static void set_shade_smooth(MPoly &mpoly, const bool &value)
+static void set_shade_smooth(MPoly &mpoly, bool value)
 {
   SET_FLAG_FROM_TEST(mpoly.flag, value, ME_SMOOTH);
 }
@@ -794,7 +794,7 @@ static float2 get_loop_uv(const MLoopUV &uv)
   return float2(uv.uv);
 }
 
-static void set_loop_uv(MLoopUV &uv, const float2 &co)
+static void set_loop_uv(MLoopUV &uv, float2 co)
 {
   copy_v2_v2(uv.uv, co);
 }
@@ -808,7 +808,7 @@ static Color4f get_loop_color(const MLoopCol &col)
   return linear_color;
 }
 
-static void set_loop_color(MLoopCol &col, const Color4f &linear_color)
+static void set_loop_color(MLoopCol &col, Color4f linear_color)
 {
   linearrgb_to_srgb_uchar4(&col.r, linear_color);
 }
@@ -818,7 +818,7 @@ static float get_crease(const MEdge &edge)
   return edge.crease / 255.0f;
 }
 
-static void set_crease(MEdge &edge, const float &value)
+static void set_crease(MEdge &edge, float value)
 {
   edge.crease = round_fl_to_uchar_clamp(value * 255.0f);
 }
@@ -836,7 +836,7 @@ class VMutableArray_For_VertexWeights final : public VMutableArray<float> {
 
   float get_impl(const int64_t index) const override
   {
-    get_internal(dverts_, dvert_index_, index);
+    return get_internal(dverts_, dvert_index_, index);
   }
 
   void set_impl(const int64_t index, const float value) override

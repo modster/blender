@@ -462,7 +462,11 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
   {
   }
 
- private:
+ protected:
+  GVMutableArray_For_VMutableArray(const int64_t size) : GVMutableArray(CPPType::get<T>(), size)
+  {
+  }
+
   void get_impl(const int64_t index, void *r_value) const override
   {
     *(T *)r_value = varray_->get(index);
@@ -480,7 +484,8 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
 
   GSpan get_span_impl() const override
   {
-    return GSpan(varray_->get_span());
+    Span<T> span = varray_->get_span();
+    return span;
   }
 
   bool is_single_impl() const override
@@ -502,14 +507,14 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
   void set_by_relocate_impl(const int64_t index, void *value) override
   {
     T &value_ = *(T *)value;
-    varray_->set(index, std::move(value));
+    varray_->set(index, std::move(value_));
     value_.~T();
   }
 
   void set_by_move_impl(const int64_t index, void *value) override
   {
     T &value_ = *(T *)value;
-    this->set(index, std::move(value));
+    varray_->set(index, std::move(value_));
   }
 
   const void *try_get_internal_varray_impl() const override

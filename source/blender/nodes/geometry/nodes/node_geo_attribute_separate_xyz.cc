@@ -107,8 +107,6 @@ static void separate_attribute(GeometryComponent &component, const GeoNodeExecPa
   }
 
   /* The node is only for float3 to float conversions. */
-  const CustomDataType input_type = CD_PROP_FLOAT3;
-  const CustomDataType result_type = CD_PROP_FLOAT;
   const AttributeDomain result_domain = get_result_domain(
       component, params, result_name_x, result_name_y, result_name_z);
 
