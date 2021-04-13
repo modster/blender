@@ -24,14 +24,19 @@
 
 #pragma once
 
+#include "BKE_object.h"
 #include "DEG_depsgraph_query.h"
+#include "DNA_ID.h"
 
 #include "eevee_film.hh"
+#include "eevee_light.hh"
 #include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
 #include "eevee_view.hh"
+
+#include "eevee_engine.h"
 
 namespace blender::eevee {
 
@@ -71,7 +76,7 @@ class Instance {
   Instance(ShaderModule &shared_shaders)
       : render_passes_(shared_shaders, camera_, sampling_),
         shaders_(shared_shaders),
-        shading_passes_(shared_shaders, camera_, velocity_),
+        shading_passes_(shared_shaders, lights_, camera_, velocity_, scene_data_),
         main_view_(shared_shaders, shading_passes_, camera_, sampling_, motion_blur_),
         camera_(sampling_),
         velocity_(),
@@ -129,27 +134,50 @@ class Instance {
   /**
    * Sync with gather data from the scene that can change over a time step.
    * IMPORTANT: xxx.sync() functions area responsible for creating DRW resources (i.e: DRWView) as
-   * well as querying temp texture pool. Ideally, all DRWPass should be setup and filled after
-   * end_sync().
+   * well as querying temp texture pool. All DRWPasses should be ready by the end end_sync().
    **/
   void begin_sync()
   {
-    camera_.sync(drw_view_);
+    camera_.sync();
     render_passes_.sync();
     shading_passes_.sync();
     main_view_.sync();
+
+    velocity_.begin_sync(camera_);
   }
 
   void object_sync(Object *ob)
   {
-    switch (ob->type) {
-      case OB_MESH:
-        shading_passes_.opaque.surface_add(ob, nullptr, 0);
-        shading_passes_.velocity.mesh_add(ob);
-        break;
+    const int ob_visibility = DRW_object_visibility_in_active_context(ob);
+    const bool partsys_is_visible = (ob_visibility & OB_VISIBLE_PARTICLES) != 0;
+    const bool object_is_visible = DRW_object_is_renderable(ob) &&
+                                   (ob_visibility & OB_VISIBLE_SELF) != 0;
 
-      default:
-        break;
+    if (!partsys_is_visible && !object_is_visible) {
+      return;
+    }
+
+    /* Gather recalc flag. */
+    DrawEngineType *owner = (DrawEngineType *)&DRW_engine_viewport_eevee_type;
+    DrawData *dd = DRW_drawdata_ensure((ID *)ob, owner, sizeof(DrawData), nullptr, nullptr);
+    if (dd->recalc != 0) {
+      dd->recalc = 0;
+      sampling_.reset();
+    }
+
+    if (partsys_is_visible) {
+      /* TODO render particle hair. */
+    }
+
+    if (object_is_visible) {
+      switch (ob->type) {
+        case OB_MESH:
+          shading_passes_.opaque.surface_add(ob, nullptr, 0);
+          shading_passes_.velocity.mesh_add(ob);
+          break;
+        default:
+          break;
+      }
     }
   }
 
@@ -163,6 +191,10 @@ class Instance {
   void end_sync(void)
   {
     velocity_.end_sync();
+    sampling_.end_sync();
+    render_passes_.end_sync();
+
+    scene_data_.push_update();
   }
 
   void render_sync(void)
@@ -179,22 +211,28 @@ class Instance {
     // DRW_hair_update();
   }
 
+  /**
+   * Conceptually renders one sample per pixel.
+   * Everything based on random sampling should be done here (i.e: DRWViews jitter)
+   **/
   void render_sample(void)
   {
     if (sampling_.finished()) {
       return;
     }
 
+    /* Motion blur may need to do re-sync after a certain number of sample. */
     if (sampling_.do_render_sync()) {
       this->render_sync();
     }
+
+    sampling_.step();
 
     /* TODO update shadowmaps, planars, etc... */
     // shadow_view_.render();
 
     main_view_.render(render_passes_);
 
-    sampling_.step();
     motion_blur_.step();
   }
 
@@ -221,6 +259,11 @@ class Instance {
     if (!sampling_.finished()) {
       DRW_viewport_request_redraw();
     }
+  }
+
+  void view_update(void)
+  {
+    sampling_.reset();
   }
 
   bool finished(void) const

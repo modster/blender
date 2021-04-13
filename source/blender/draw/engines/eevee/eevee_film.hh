@@ -169,13 +169,6 @@ class Film {
 
   void sync(void)
   {
-    /* TODO reprojection. */
-
-    if (camera_.has_changed()) {
-      has_changed_ = true;
-      data_.use_history = 0;
-    }
-
     char full_name[32];
     for (int i = 0; i < 2; i++) {
       if (data_tx_[i] == nullptr) {
@@ -219,6 +212,14 @@ class Film {
       DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
       DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
       DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+    }
+  }
+
+  void end_sync()
+  {
+    /* TODO reprojection. */
+    if (sampling_.is_reset()) {
+      data_.use_history = 0;
     }
 
     if (data_.use_history == 0) {

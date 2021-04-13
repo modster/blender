@@ -187,6 +187,18 @@ class RenderPasses {
     }
   }
 
+  void end_sync(void)
+  {
+    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
+      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
+      Film *film = this->render_pass_bit_to_film_p(render_pass);
+
+      if (film) {
+        film->end_sync();
+      }
+    }
+  }
+
   void resolve_viewport(DefaultFramebufferList *dfbl)
   {
     for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {

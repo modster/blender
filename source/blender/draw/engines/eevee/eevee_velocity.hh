@@ -173,13 +173,11 @@ class Velocity {
 
     if (is_viewport_) {
       /* For viewport we sync when object is evaluated and we swap at init time.
-       * Note that we sync the camera in init so we need camera to have been synced beforehand.
        * Use next step to store the current position. This one will become the previous step after
        * next swapping. */
       step_ = STEP_NEXT;
       step_swap();
       /* TODO(fclem) we should garbage collect the ids that gets removed. */
-      step_camera_sync(camera);
     }
 
     if (engine && (rpasses.vector != nullptr)) {
@@ -205,8 +203,7 @@ class Velocity {
   void step_camera_sync(Camera &camera)
   {
     if (!is_viewport_) {
-      /* No need to sync since it is already. */
-      camera.sync(nullptr);
+      camera.sync();
     }
 
     if (step_ == STEP_NEXT) {
@@ -249,6 +246,13 @@ class Velocity {
       zero_m4(data->next_object_mat);
     }
     camera_step.prev = static_cast<CameraData>(camera_step.next);
+  }
+
+  void begin_sync(Camera &camera)
+  {
+    if (is_viewport_) {
+      step_camera_sync(camera);
+    }
   }
 
   /* This is the end of the current frame sync. Not the step_sync. */

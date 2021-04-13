@@ -23,7 +23,6 @@
 #include "DRW_render.h"
 
 #include "DRW_engine.h"
-
 #include "GPU_framebuffer.h"
 
 #include "eevee_engine.h"
@@ -77,6 +76,13 @@ static void eevee_engine_free(void)
 static void eevee_instance_free(void *instance_data)
 {
   EEVEE_instance_free((struct EEVEE_Instance *)instance_data);
+}
+
+static void eevee_view_update(void *vedata)
+{
+  if (((EEVEE_Data *)vedata)->instance_data != NULL) {
+    EEVEE_instance_view_update(((EEVEE_Data *)vedata)->instance_data);
+  }
 }
 
 static void eevee_render_to_image(void *UNUSED(vedata),
@@ -156,7 +162,7 @@ DrawEngineType draw_engine_eevee_type = {
     &eevee_cache_populate,
     &eevee_cache_finish,
     &eevee_draw_scene,
-    NULL,
+    &eevee_view_update,
     NULL,
     &eevee_render_to_image,
     NULL,

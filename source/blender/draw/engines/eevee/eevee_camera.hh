@@ -137,8 +137,6 @@ class Camera {
   StructBuffer<CameraData> data_[2];
   /** Active data index in data_. */
   int data_id_ = 0;
-  /** True if camera matrix has change since last init. */
-  bool has_changed_ = true;
   /** Detects wrong usage. */
   bool synced_ = false;
   /** Original object of the camera. */
@@ -149,6 +147,8 @@ class Camera {
   const Depsgraph *depsgraph_ = nullptr;
   /** Copy of instance.render_. */
   const RenderEngine *engine_ = nullptr;
+  /** Only if viewport render. WATCH: Can be freed if doing a DRW cache reset. */
+  const DRWView *drw_view_;
 
  public:
   Camera(Sampling &sampling) : sampling_(sampling){};
@@ -164,6 +164,7 @@ class Camera {
     const Object *camera_eval = DEG_get_evaluated_object(depsgraph, camera_original);
     camera_original_ = camera_original;
     depsgraph_ = depsgraph;
+    drw_view_ = drw_view;
     synced_ = false;
     /* Swap! */
     data_id_ = !data_id_;
@@ -175,21 +176,11 @@ class Camera {
       data.type = from_camera(cam);
     }
     else {
-      data.type = DRW_view_is_persp_get(drw_view) ? CAMERA_PERSP : CAMERA_ORTHO;
-    }
-
-    /* TODO Avoid double sync in viewport. */
-    /* Sync early to detect changes. */
-    this->sync(drw_view);
-
-    /* Detect changes in parameters. */
-    has_changed_ = data_[data_id_] != data_[!data_id_];
-    if (has_changed_) {
-      sampling_.reset();
+      data.type = DRW_view_is_persp_get(drw_view_) ? CAMERA_PERSP : CAMERA_ORTHO;
     }
   }
 
-  void sync(const DRWView *drw_view)
+  void sync(void)
   {
     const Scene *scene = DEG_get_evaluated_scene(depsgraph_);
     object_eval_ = DEG_get_evaluated_object(depsgraph_, camera_original_);
@@ -198,14 +189,14 @@ class Camera {
 
     data.filter_size = scene->r.gauss;
 
-    if (drw_view) {
-      DRW_view_viewmat_get(drw_view, data.viewmat, false);
-      DRW_view_viewmat_get(drw_view, data.viewinv, true);
-      DRW_view_winmat_get(drw_view, data.winmat, false);
-      DRW_view_winmat_get(drw_view, data.wininv, true);
-      DRW_view_persmat_get(drw_view, data.persmat, false);
-      DRW_view_persmat_get(drw_view, data.persinv, true);
-      DRW_view_camtexco_get(drw_view, &data.uv_scale[0]);
+    if (drw_view_) {
+      DRW_view_viewmat_get(drw_view_, data.viewmat, false);
+      DRW_view_viewmat_get(drw_view_, data.viewinv, true);
+      DRW_view_winmat_get(drw_view_, data.winmat, false);
+      DRW_view_winmat_get(drw_view_, data.wininv, true);
+      DRW_view_persmat_get(drw_view_, data.persmat, false);
+      DRW_view_persmat_get(drw_view_, data.persinv, true);
+      DRW_view_camtexco_get(drw_view_, &data.uv_scale[0]);
     }
     else if (engine_) {
       /* TODO(fclem) Overscan */
@@ -241,8 +232,8 @@ class Camera {
       invert_v2(data.equirect_scale_inv);
     }
     else {
-      data.clip_near = DRW_view_near_distance_get(drw_view);
-      data.clip_far = DRW_view_far_distance_get(drw_view);
+      data.clip_near = DRW_view_near_distance_get(drw_view_);
+      data.clip_far = DRW_view_far_distance_get(drw_view_);
       data.fisheye_fov = data.fisheye_lens = -1.0f;
       copy_v2_fl(data.equirect_bias, 0.0f);
       copy_v2_fl(data.equirect_scale, 0.0f);
@@ -251,6 +242,11 @@ class Camera {
     data_[data_id_].push_update();
 
     synced_ = true;
+
+    /* Detect changes in parameters. */
+    if (data_[data_id_] != data_[!data_id_]) {
+      sampling_.reset();
+    }
   }
 
   /**
@@ -269,12 +265,6 @@ class Camera {
   const GPUUniformBuf *ubo_get(void) const
   {
     return data_[data_id_].ubo_get();
-  }
-  bool has_changed(void) const
-  {
-    BLI_assert(synced_);
-    /* TODO(fclem) This whole has_changed logic is a bit weak. To revisit. */
-    return !DRW_state_is_scene_render() && has_changed_;
   }
   bool is_panoramic(void) const
   {

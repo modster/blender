@@ -54,8 +54,8 @@ class Sampling {
   uint64_t dof_sample_count_ = 1;
   /** Motion blur steps. */
   uint64_t motion_blur_steps_ = 1;
-  /** Safeguard against illegal reset. */
-  bool sync_ = false;
+  /** Tag to reset sampling for the next sample. */
+  bool reset_ = false;
 
   StructBuffer<SamplingData> data_;
 
@@ -96,19 +96,13 @@ class Sampling {
 
     /* Only multiply after to have full the full DoF web pattern for each time steps. */
     sample_count_ *= motion_blur_steps_;
-
-    sync_ = false;
   }
 
-  void sync(void)
+  void end_sync(void)
   {
-    sync_ = true;
-  }
-
-  void reset(void)
-  {
-    BLI_assert(!sync_ && "Attempted to reset sampling after init().");
-    sample_ = 1;
+    if (reset_) {
+      sample_ = 1;
+    }
   }
 
   void step(void)
@@ -134,6 +128,8 @@ class Sampling {
     }
     data_.push_update();
     sample_++;
+
+    reset_ = false;
   }
 
   /**
@@ -167,6 +163,17 @@ class Sampling {
   bool finished(void) const
   {
     return (sample_ > sample_count_);
+  }
+  /* Viewport Only: Function to call to notify something in the scene changed.
+   * This will reset accumulation. Do not call after end_sync() or during sample rendering. */
+  void reset(void)
+  {
+    reset_ = true;
+  }
+  /* Viewport Only: true if an update happened in the scene and accumulation needs reset.z*/
+  bool is_reset(void) const
+  {
+    return reset_;
   }
   /* Return true if we are starting a new motion blur step. We need to run sync agains since
    * depsgraph was updated by MotionBlur::step(). */
