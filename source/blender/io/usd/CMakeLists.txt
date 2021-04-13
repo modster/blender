@@ -57,6 +57,8 @@ set(INC_SYS
 
 set(SRC
   intern/usd_capi.cc
+  intern/usd_capi_import.cc
+  intern/usd_common.cc
   intern/usd_hierarchy_iterator.cc
   intern/usd_writer_abstract.cc
   intern/usd_writer_camera.cc
@@ -80,6 +82,8 @@ set(SRC
   intern/usd_reader_volume.cc
 
   usd.h
+
+  intern/usd_common.h
   intern/usd_exporter_context.h
   intern/usd_hierarchy_iterator.h
   intern/usd_writer_abstract.h
