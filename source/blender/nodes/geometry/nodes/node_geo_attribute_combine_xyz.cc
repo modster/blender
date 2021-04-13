@@ -94,8 +94,8 @@ static void combine_attributes(GeometryComponent &component, const GeoNodeExecPa
   }
   const AttributeDomain result_domain = get_result_domain(component, params, result_name);
 
-  OutputAttribute attribute_result = component.attribute_try_get_for_output(
-      result_name, result_domain, CD_PROP_FLOAT3);
+  OutputAttribute_Typed<float3> attribute_result = component.attribute_try_get_for_output<float3>(
+      result_name, result_domain);
   if (!attribute_result) {
     return;
   }
@@ -106,15 +106,12 @@ static void combine_attributes(GeometryComponent &component, const GeoNodeExecPa
   GVArray_Typed<float> attribute_z = params.get_input_attribute<float>(
       "Z", component, result_domain, 0.0f);
 
-  GVMutableArray_Typed<float3> results{*attribute_result};
-
-  for (const int i : IndexRange(results.size())) {
+  for (const int i : IndexRange(attribute_result->size())) {
     const float x = attribute_x[i];
     const float y = attribute_y[i];
     const float z = attribute_z[i];
-    results->set(i, {x, y, z});
+    attribute_result->set(i, {x, y, z});
   }
-  attribute_result.save_if_necessary();
 }
 
 static void geo_node_attribute_combine_xyz_exec(GeoNodeExecParams params)

@@ -186,6 +186,15 @@ class GeometryComponent {
       const CustomDataType data_type,
       const void *default_value = nullptr);
 
+  template<typename T>
+  blender::bke::OutputAttribute_Typed<T> attribute_try_get_for_output(
+      const blender::StringRef attribute_name, const AttributeDomain domain)
+  {
+    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
+    const CustomDataType data_type = blender::bke::custom_data_type_to_cpp_type(cpp_type);
+    return this->attribute_try_get_for_output(attribute_name, domain, data_type, nullptr);
+  }
+
  private:
   virtual const blender::bke::ComponentAttributeProviders *get_attribute_providers() const;
 };

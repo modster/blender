@@ -186,7 +186,7 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
         }
       }
       clamp_attribute<float3>(
-          attribute_input->typed<float3>(), attribute_result->typed<float3>(), min, max);
+          *attribute_input->typed<float3>(), *attribute_result->typed<float3>(), min, max);
       break;
     }
     case CD_PROP_FLOAT: {
@@ -194,11 +194,11 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
       const float max = params.get_input<float>("Max_001");
       if (operation == NODE_CLAMP_RANGE && min > max) {
         clamp_attribute<float>(
-            attribute_input->typed<float>(), attribute_result->typed<float>(), max, min);
+            *attribute_input->typed<float>(), *attribute_result->typed<float>(), max, min);
       }
       else {
         clamp_attribute<float>(
-            attribute_input->typed<float>(), attribute_result->typed<float>(), min, max);
+            *attribute_input->typed<float>(), *attribute_result->typed<float>(), min, max);
       }
       break;
     }
@@ -207,11 +207,11 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
       const int max = params.get_input<int>("Max_002");
       if (operation == NODE_CLAMP_RANGE && min > max) {
         clamp_attribute<int>(
-            attribute_input->typed<int>(), attribute_result->typed<int>(), max, min);
+            *attribute_input->typed<int>(), *attribute_result->typed<int>(), max, min);
       }
       else {
         clamp_attribute<int>(
-            attribute_input->typed<int>(), attribute_result->typed<int>(), min, max);
+            *attribute_input->typed<int>(), *attribute_result->typed<int>(), min, max);
       }
       break;
     }
@@ -233,7 +233,7 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
         }
       }
       clamp_attribute<Color4f>(
-          attribute_input->typed<Color4f>(), attribute_result->typed<Color4f>(), min, max);
+          *attribute_input->typed<Color4f>(), *attribute_result->typed<Color4f>(), min, max);
       break;
     }
     default: {

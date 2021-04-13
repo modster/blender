@@ -71,11 +71,10 @@ static void execute_on_component(const GeoNodeExecParams &params, GeometryCompon
   /* Always output a color attribute for now. We might want to allow users to customize.
    * Using the type of an existing attribute could work, but does not have a real benefit
    * currently. */
-  const CustomDataType result_type = CD_PROP_COLOR;
   const AttributeDomain result_domain = get_result_domain(component, input_name, result_name);
 
-  OutputAttribute attribute_result = component.attribute_try_get_for_output(
-      result_name, result_domain, result_type);
+  OutputAttribute_Typed<Color4f> attribute_result =
+      component.attribute_try_get_for_output<Color4f>(result_name, result_domain);
   if (!attribute_result) {
     return;
   }
@@ -83,8 +82,7 @@ static void execute_on_component(const GeoNodeExecParams &params, GeometryCompon
   GVArray_Typed<float> attribute_in = component.attribute_get_for_read<float>(
       input_name, result_domain, 0.0f);
 
-  GVMutableArray_Typed<Color4f> results_typed{*attribute_result};
-  VMutableArray_Span<Color4f> results{results_typed};
+  VMutableArray_Span<Color4f> results{*attribute_result};
 
   ColorBand *color_ramp = &node_storage->color_ramp;
   for (const int i : IndexRange(attribute_in.size())) {

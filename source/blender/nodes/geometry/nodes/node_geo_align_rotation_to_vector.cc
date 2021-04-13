@@ -89,7 +89,7 @@ static void align_rotations_auto_pivot(const VArray<float3> &vectors,
     float3 new_rotation;
     mat3_to_eul(new_rotation, new_rotation_matrix);
 
-    rotations[i] = new_rotation;
+    rotations.set(i, new_rotation);
   }
 }
 
@@ -133,7 +133,7 @@ static void align_rotations_fixed_pivot(const VArray<float3> &vectors,
     float3 new_rotation;
     mat3_to_eul(new_rotation, new_rotation_matrix);
 
-    rotations[i] = new_rotation;
+    rotations.set(i, new_rotation);
   }
 }
 
@@ -144,13 +144,11 @@ static void align_rotations_on_component(GeometryComponent &component,
   const NodeGeometryAlignRotationToVector &storage = *(const NodeGeometryAlignRotationToVector *)
                                                           node.storage;
 
-  OutputAttribute rotations_attr = component.attribute_try_get_for_output(
-      "rotation", ATTR_DOMAIN_POINT, CD_PROP_FLOAT3);
-  if (!rotations_attr) {
+  OutputAttribute_Typed<float3> rotations = component.attribute_try_get_for_output<float3>(
+      "rotation", ATTR_DOMAIN_POINT);
+  if (!rotations) {
     return;
   }
-
-  GVMutableArray_Typed<float3> rotations{*rotations_attr};
 
   GVArray_Typed<float> factors = params.get_input_attribute<float>(
       "Factor", component, ATTR_DOMAIN_POINT, 1.0f);
@@ -168,7 +166,7 @@ static void align_rotations_on_component(GeometryComponent &component,
     align_rotations_fixed_pivot(vectors, factors, local_main_axis, local_pivot_axis, *rotations);
   }
 
-  rotations_attr.save_if_necessary();
+  rotations.save_if_necessary();
 }
 
 static void geo_node_align_rotation_to_vector_exec(GeoNodeExecParams params)

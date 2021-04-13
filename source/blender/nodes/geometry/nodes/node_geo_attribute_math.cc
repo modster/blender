@@ -228,8 +228,8 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
   const AttributeDomain result_domain = get_result_domain(
       component, params, operation, result_name);
 
-  OutputAttribute attribute_result = component.attribute_try_get_for_output(
-      result_name, result_domain, result_type);
+  OutputAttribute_Typed<float> attribute_result = component.attribute_try_get_for_output<float>(
+      result_name, result_domain);
   if (!attribute_result) {
     return;
   }
@@ -240,8 +240,7 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
     return;
   }
 
-  GVMutableArray_Typed<float> result_typed{*attribute_result};
-  VMutableArray_Span<float> result_span{*result_typed};
+  VMutableArray_Span<float> result_span{*attribute_result};
 
   /* Note that passing the data with `get_span<float>()` works
    * because the attributes were accessed with #CD_PROP_FLOAT. */

@@ -254,11 +254,10 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
       node_storage->operation);
   const std::string result_name = params.get_input<std::string>("Result");
 
-  const CustomDataType result_type = CD_PROP_BOOL;
   const AttributeDomain result_domain = get_result_domain(component, params, result_name);
 
-  OutputAttribute attribute_result = component.attribute_try_get_for_output(
-      result_name, result_domain, result_type);
+  OutputAttribute_Typed<bool> attribute_result = component.attribute_try_get_for_output<bool>(
+      result_name, result_domain);
   if (!attribute_result) {
     return;
   }
@@ -275,8 +274,7 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
     return;
   }
 
-  fn::GVMutableArray_Typed<bool> typed_results{*attribute_result};
-  VMutableArray_Span<bool> result_span{*typed_results};
+  VMutableArray_Span<bool> result_span{*attribute_result};
 
   /* Use specific types for correct equality operations, but for other operations we use implicit
    * conversions and float comparison. In other words, the comparison is not element-wise. */
