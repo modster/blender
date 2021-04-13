@@ -170,176 +170,150 @@ void BKE_cachefile_reader_open(CacheFile *cache_file,
                                Object *object,
                                const char *object_path)
 {
+#if defined(WITH_ALEMBIC) || defined(WITH_USD)
+
+  BLI_assert(cache_file->id.tag & LIB_TAG_COPIED_ON_WRITE);
+
+  if (cache_file->handle == NULL) {
+    return;
+  }
+
   switch (cache_file->type) {
-#ifdef WITH_ALEMBIC
     case CACHEFILE_TYPE_ALEMBIC:
-      BLI_assert(cache_file->id.tag & LIB_TAG_COPIED_ON_WRITE);
-
-      if (cache_file->handle == NULL) {
-        return;
-      }
-
+#  ifdef WITH_ALEMBIC
       /* Open Alembic cache reader. */
       *reader = CacheReader_open_alembic_object(cache_file->handle, *reader, object, object_path);
-
-      /* Multiple modifiers and constraints can call this function concurrently. */
-      BLI_spin_lock(&spin);
-      if (*reader) {
-        /* Register in set so we can free it when the cache file changes. */
-        if (cache_file->handle_readers == NULL) {
-          cache_file->handle_readers = BLI_gset_ptr_new("CacheFile.handle_readers");
-        }
-        BLI_gset_reinsert(cache_file->handle_readers, reader, NULL);
-      }
-      else if (cache_file->handle_readers) {
-        /* Remove in case CacheReader_open_alembic_object free the existing reader. */
-        BLI_gset_remove(cache_file->handle_readers, reader, NULL);
-      }
-      BLI_spin_unlock(&spin);
+#  endif
       break;
-#endif
-#ifdef WITH_USD
     case CACHEFILE_TYPE_USD:
-      BLI_assert(cache_file->id.tag & LIB_TAG_COPIED_ON_WRITE);
-      if (cache_file->handle == NULL) {
-        return;
-      }
-
+#  ifdef WITH_USD
       /* Open USD cache reader. */
       *reader = CacheReader_open_usd_object(cache_file->handle, *reader, object, object_path);
-      /* Multiple modifiers and constraints can call this function concurrently. */
-      BLI_spin_lock(&spin);
-      if (*reader) {
-        /* Register in set so we can free it when the cache file changes. */
-        if (cache_file->handle_readers == NULL) {
-          cache_file->handle_readers = BLI_gset_ptr_new("CacheFile.handle_readers");
-        }
-        BLI_gset_reinsert(cache_file->handle_readers, reader, NULL);
-      }
-      else if (cache_file->handle_readers) {
-        /* Remove in case CacheReader_open_usd_object free the existing reader. */
-        BLI_gset_remove(cache_file->handle_readers, reader, NULL);
-      }
-      BLI_spin_unlock(&spin);
+#  endif
       break;
-#endif
-    default:
-      UNUSED_VARS(cache_file, reader, object, object_path);
+    case CACHE_FILE_TYPE_INVALID:
       break;
   }
+
+  /* Multiple modifiers and constraints can call this function concurrently. */
+  BLI_spin_lock(&spin);
+  if (*reader) {
+    /* Register in set so we can free it when the cache file changes. */
+    if (cache_file->handle_readers == NULL) {
+      cache_file->handle_readers = BLI_gset_ptr_new("CacheFile.handle_readers");
+    }
+    BLI_gset_reinsert(cache_file->handle_readers, reader, NULL);
+  }
+  else if (cache_file->handle_readers) {
+    /* Remove in case CacheReader_open_alembic_object free the existing reader. */
+    BLI_gset_remove(cache_file->handle_readers, reader, NULL);
+  }
+  BLI_spin_unlock(&spin);
+
+#else
+  UNUSED_VARS(cache_file, reader, object, object_path);
+#endif
 }
 
 void BKE_cachefile_reader_free(CacheFile *cache_file, struct CacheReader **reader)
 {
-  switch (cache_file->type) {
-#ifdef WITH_ALEMBIC
-    case CACHEFILE_TYPE_ALEMBIC:
-      if (*reader != NULL) {
-        if (cache_file) {
-          BLI_assert(cache_file->id.tag & LIB_TAG_COPIED_ON_WRITE);
-        }
+#if defined(WITH_ALEMBIC) || defined(WITH_USD)
+  if (*reader != NULL) {
+    if (cache_file) {
+      BLI_assert(cache_file->id.tag & LIB_TAG_COPIED_ON_WRITE);
 
-        CacheReader_free(*reader);
-        *reader = NULL;
-
-        /* Multiple modifiers and constraints can call this function concurrently. */
-        BLI_spin_lock(&spin);
-        if (cache_file && cache_file->handle_readers) {
-          BLI_gset_remove(cache_file->handle_readers, reader, NULL);
-        }
-        BLI_spin_unlock(&spin);
+      switch (cache_file->type) {
+        case CACHEFILE_TYPE_ALEMBIC:
+#  ifdef WITH_ALEMBIC
+          CacheReader_free(*reader);
+#  endif
+          break;
+        case CACHEFILE_TYPE_USD:
+#  ifdef WITH_USD
+          USDCacheReader_free(*reader);
+#  endif
+          break;
+        case CACHE_FILE_TYPE_INVALID:
+          break;
       }
-#endif
-#ifdef WITH_USD
-    case CACHEFILE_TYPE_USD:
-      if (*reader != NULL) {
-        if (cache_file) {
-          BLI_assert(cache_file->id.tag & LIB_TAG_COPIED_ON_WRITE);
-        }
+    }
 
-        USDCacheReader_free(*reader);
-        *reader = NULL;
+    *reader = NULL;
 
-        /* Multiple modifiers and constraints can call this function concurrently. */
-        BLI_spin_lock(&spin);
-        if (cache_file && cache_file->handle_readers) {
-          BLI_gset_remove(cache_file->handle_readers, reader, NULL);
-        }
-        BLI_spin_unlock(&spin);
-      }
-      break;
-#endif
-    default:
-      UNUSED_VARS(cache_file, reader);
-      break;
+    /* Multiple modifiers and constraints can call this function concurrently. */
+    BLI_spin_lock(&spin);
+    if (cache_file && cache_file->handle_readers) {
+      BLI_gset_remove(cache_file->handle_readers, reader, NULL);
+    }
+    BLI_spin_unlock(&spin);
   }
+#else
+  UNUSED_VARS(cache_file, reader);
+#endif
 }
 
 static void cachefile_handle_free(CacheFile *cache_file)
 {
-  switch (cache_file->type) {
-#ifdef WITH_ALEMBIC
-    case CACHEFILE_TYPE_ALEMBIC:
-      /* Free readers in all modifiers and constraints that use the handle, before
-       * we free the handle itself. */
-      BLI_spin_lock(&spin);
-      if (cache_file->handle_readers) {
-        GSetIterator gs_iter;
-        GSET_ITER (gs_iter, cache_file->handle_readers) {
-          struct CacheReader **reader = BLI_gsetIterator_getKey(&gs_iter);
-          if (*reader != NULL) {
+#if defined(WITH_ALEMBIC) || defined(WITH_USD)
+
+  /* Free readers in all modifiers and constraints that use the handle, before
+   * we free the handle itself. */
+  BLI_spin_lock(&spin);
+  if (cache_file->handle_readers) {
+    GSetIterator gs_iter;
+    GSET_ITER (gs_iter, cache_file->handle_readers) {
+      struct CacheReader **reader = BLI_gsetIterator_getKey(&gs_iter);
+      if (*reader != NULL) {
+        switch (cache_file->type) {
+          case CACHEFILE_TYPE_ALEMBIC:
+#  ifdef WITH_ALEMBIC
             CacheReader_free(*reader);
-            *reader = NULL;
-          }
-        }
-
-        BLI_gset_free(cache_file->handle_readers, NULL);
-        cache_file->handle_readers = NULL;
-      }
-      BLI_spin_unlock(&spin);
-
-      /* Free handle. */
-      if (cache_file->handle) {
-        ABC_free_handle(cache_file->handle);
-        cache_file->handle = NULL;
-      }
-
-      cache_file->handle_filepath[0] = '\0';
-      break;
-#endif
-#ifdef WITH_USD
-    case CACHEFILE_TYPE_USD:
-      /* Free readers in all modifiers and constraints that use the handle, before
-       * we free the handle itself. */
-      BLI_spin_lock(&spin);
-      if (cache_file->handle_readers) {
-        GSetIterator gs_iter;
-        GSET_ITER (gs_iter, cache_file->handle_readers) {
-          struct CacheReader **reader = BLI_gsetIterator_getKey(&gs_iter);
-          if (*reader != NULL) {
+#  endif
+            break;
+          case CACHEFILE_TYPE_USD:
+#  ifdef WITH_USD
             USDCacheReader_free(*reader);
-            *reader = NULL;
-          }
+#  endif
+            break;
+          case CACHE_FILE_TYPE_INVALID:
+            break;
         }
 
-        BLI_gset_free(cache_file->handle_readers, NULL);
-        cache_file->handle_readers = NULL;
+        *reader = NULL;
       }
-      BLI_spin_unlock(&spin);
+    }
 
-      /* Free handle. */
-      if (cache_file->handle) {
-        USD_free_handle(cache_file->handle);
-        cache_file->handle = NULL;
-      }
-
-      cache_file->handle_filepath[0] = '\0';
-      break;
-#endif
-    default:
-      UNUSED_VARS(cache_file);
-      break;
+    BLI_gset_free(cache_file->handle_readers, NULL);
+    cache_file->handle_readers = NULL;
   }
+  BLI_spin_unlock(&spin);
+
+  /* Free handle. */
+  if (cache_file->handle) {
+
+    switch (cache_file->type) {
+      case CACHEFILE_TYPE_ALEMBIC:
+#  ifdef WITH_ALEMBIC
+        ABC_free_handle(cache_file->handle);
+#  endif
+        break;
+      case CACHEFILE_TYPE_USD:
+#  ifdef WITH_USD
+        USD_free_handle(cache_file->handle);
+#  endif
+        break;
+      case CACHE_FILE_TYPE_INVALID:
+        break;
+    }
+
+    cache_file->handle = NULL;
+  }
+
+  cache_file->handle_filepath[0] = '\0';
+
+#else
+  UNUSED_VARS(cache_file);
+#endif
 }
 
 void *BKE_cachefile_add(Main *bmain, const char *name)
