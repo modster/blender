@@ -47,6 +47,7 @@ void register_node_type_geo_attribute_remove(void);
 void register_node_type_geo_boolean(void);
 void register_node_type_geo_bounding_box(void);
 void register_node_type_geo_collection_info(void);
+void register_node_type_geo_curve_sample_points(void);
 void register_node_type_geo_curve_to_mesh(void);
 void register_node_type_geo_curve_transform_test(void);
 void register_node_type_geo_curve_trim(void);

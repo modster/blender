@@ -1200,6 +1200,11 @@ typedef struct NodeGeometryCurveTrim {
   uint8_t mode;
 } NodeGeometryCurveTrim;
 
+typedef struct NodeGeometryCurveSamplePoints {
+  /* GeometryNodeCurveSamplePointsMode. */
+  uint8_t mode;
+} NodeGeometryCurveSamplePoints;
+
 typedef struct NodeGeometryRotatePoints {
   /* GeometryNodeRotatePointsType */
   uint8_t type;
@@ -1711,6 +1716,11 @@ typedef enum GeometryNodeCurveTrimMode {
   GEO_NODE_CURVE_TRIM_FACTOR = 0,
   GEO_NODE_CURVE_TRIM_LENGTH = 1,
 } GeometryNodeCurveTrimMode;
+
+typedef enum GeometryNodeCurveSamplePointsMode {
+  GEO_NODE_CURVE_SAMPLE_POINTS_COUNT = 0,
+  GEO_NODE_CURVE_SAMPLE_POINTS_LENGTH = 1,
+} GeometryNodeCurveSamplePointsMode;
 
 /* Boolean Node */
 typedef enum GeometryNodeBooleanOperation {

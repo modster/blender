@@ -1416,6 +1416,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_CURVE_TO_MESH 1043
 #define GEO_NODE_CURVE_TRANSFORM_TEST 1044
 #define GEO_NODE_CURVE_TRIM 1045
+#define GEO_NODE_CURVE_SAMPLE_POINTS 1046
 
 /** \} */
 

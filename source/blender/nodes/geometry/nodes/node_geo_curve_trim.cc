@@ -75,6 +75,8 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
   const NodeGeometryCurveTrim &node_storage = *(const NodeGeometryCurveTrim *)node.storage;
   const GeometryNodeCurveTrimMode mode = (GeometryNodeCurveTrimMode)node_storage.mode;
 
+  params.error_message_add(NodeWarningType::Info, "The node doesn't do anything yet");
+
   if (!geometry_set.has_curve()) {
     params.set_output("Geometry", geometry_set);
   }

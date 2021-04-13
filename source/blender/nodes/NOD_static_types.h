@@ -313,6 +313,7 @@ DefNode(GeometryNode, GEO_NODE_BOUNDING_BOX, 0, "BOUNDING_BOX", BoundBox, "Bound
 DefNode(GeometryNode, GEO_NODE_CURVE_TO_MESH, 0, "CURVE_TO_MESH", CurveToMesh, "Curve to Mesh", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_TRANSFORM_TEST, 0, "TRANSFORM_TEST", TransformTest, "Transform Test", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_TRIM, def_geo_curve_trim, "CURVE_TRIM", CurveTrim, "Curve Trim", "")
+DefNode(GeometryNode, GEO_NODE_CURVE_SAMPLE_POINTS, def_geo_curve_sample_points, "CURVE_SAMPLE_POINTS", CurveSamplePoints, "Curve Sample Points", "")
 
 /* undefine macros */
 #undef DefNode

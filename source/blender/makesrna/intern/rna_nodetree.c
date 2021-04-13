@@ -9575,6 +9575,32 @@ static void def_geo_curve_trim(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_curve_sample_points(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_SAMPLE_POINTS_COUNT,
+       "COUNT",
+       0,
+       "Count",
+       "Distribute the specified number of points along the curve"},
+      {GEO_NODE_CURVE_SAMPLE_POINTS_LENGTH,
+       "LENGTH",
+       0,
+       "Length",
+       "Add points to the curve at the specified distance from each other"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveTrim", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "How to specify the amount of points to sample");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_mesh_circle(StructRNA *srna)
 {
   PropertyRNA *prop;
