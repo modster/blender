@@ -240,7 +240,7 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
     return;
   }
 
-  VMutableArray_Span<float> result_span{*attribute_result};
+  MutableSpan<float> result_span = attribute_result.as_span();
 
   /* Note that passing the data with `get_span<float>()` works
    * because the attributes were accessed with #CD_PROP_FLOAT. */
@@ -271,7 +271,6 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
     do_math_operation(attribute_a->typed<float>(), result_span, operation);
   }
 
-  result_span.apply();
   attribute_result.save();
 }
 
