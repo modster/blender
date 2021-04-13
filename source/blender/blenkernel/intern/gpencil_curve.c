@@ -1469,7 +1469,8 @@ static float *gpencil_stroke_points_from_editcurve_fixed_resolu(bGPDcurve_point 
  */
 void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
                                                        const uint resolution,
-                                                       const bool adaptive)
+                                                       const bool adaptive,
+                                                       const eGPStrokeGeoUpdateFlag flag)
 {
   if (gps == NULL || gps->editcurve == NULL) {
     return;

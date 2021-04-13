@@ -1286,35 +1286,30 @@ void BKE_gpencil_stroke_uv_update(bGPDstroke *gps)
  * \param gpd: Grease pencil data-block
  * \param gps: Grease pencil stroke
  */
-void BKE_gpencil_stroke_geometry_update(bGPdata *gpd, bGPDstroke *gps)
+void BKE_gpencil_stroke_geometry_update(bGPdata *gpd,
+                                        bGPDstroke *gps,
+                                        const eGPStrokeGeoUpdateFlag flag)
 {
   if (gps == NULL) {
     return;
   }
 
-  /* Update stroke points first if it's a bezier stroke. */
+  /* Update curve points first if it's a bezier stroke. */
   if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
-
-    /* If the stroke geometry was updated, refit the curve.
-     * NOTE: Normally the stroke points of a curve should not be updated directly. Only if it is
-     * unavoidable. Sculpting bezier strokes also makes use of this. */
-    if (gps->editcurve->flag & GP_CURVE_NEEDS_STROKE_UPDATE) {
+    if (GP_GEO_UPDATE_CURVE_REFIT_ANY(flag)) {
       /* TODO: Make do-partial-update variable */
-      BKE_gpencil_stroke_editcurve_update(
-          gps, gpd->curve_edit_threshold, gpd->curve_edit_corner_angle, false);
-      gps->editcurve->flag &= ~GP_CURVE_NEEDS_STROKE_UPDATE;
-      gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+      const float threshold = gpd->curve_edit_threshold;
+      const float corner_angle = gpd->curve_edit_corner_angle;
+      BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, false);
     }
 
     /* If curve geometry was updated, stroke points need recalculation. */
-    if (gps->flag & GP_STROKE_NEEDS_CURVE_UPDATE) {
-      bool is_adaptive = gpd->flag & GP_DATA_CURVE_ADAPTIVE_RESOLUTION;
-      BKE_gpencil_stroke_update_geometry_from_editcurve(
-          gps, gpd->curve_edit_resolution, is_adaptive);
-      gps->flag &= ~GP_STROKE_NEEDS_CURVE_UPDATE;
-    }
+    const uint resolution = gpd->curve_edit_resolution;
+    const bool is_adaptive = gpd->flag & GP_DATA_CURVE_ADAPTIVE_RESOLUTION;
+    BKE_gpencil_stroke_update_geometry_from_editcurve(gps, resolution, is_adaptive, flag);
   }
 
+  /* Triangulate the stroke. */
   if (gps->totpoints > 2) {
     BKE_gpencil_stroke_fill_triangulate(gps);
   }
@@ -1323,7 +1318,7 @@ void BKE_gpencil_stroke_geometry_update(bGPdata *gpd, bGPDstroke *gps)
     MEM_SAFE_FREE(gps->triangles);
   }
 
-  /* calc uv data along the stroke */
+  /* Calc UV data along the stroke. */
   BKE_gpencil_stroke_uv_update(gps);
 
   /* Calc stroke bounding box. */

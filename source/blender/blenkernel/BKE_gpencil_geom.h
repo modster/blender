@@ -38,6 +38,37 @@ struct bGPDspoint;
 struct bGPDstroke;
 struct bGPdata;
 
+typedef enum eGPStrokeGeoUpdateFlag {
+  /* Default geometry update. Triangulate the stroke, update UVs and bounding box. If the stroke
+     type is bezier, regenerate the polyline first. */
+  GP_GEO_UPDATE_DEFAULT = 0,
+  /* Refit the curve point positions. */
+  GP_GEO_UPDATE_CURVE_REFIT_POSITION = (1 << 1),
+  /* Refit the curve point pressures. */
+  GP_GEO_UPDATE_CURVE_REFIT_PRESSURE = (1 << 2),
+  /* Refit the curve point strengths. */
+  GP_GEO_UPDATE_CURVE_REFIT_STRENGTH = (1 << 3),
+  /* Refit the curve point vertex colors. */
+  GP_GEO_UPDATE_CURVE_REFIT_COLOR = (1 << 4),
+  /* Refit the curve point weights. */
+  GP_GEO_UPDATE_CURVE_REFIT_WEIGHT = (1 << 5),
+  /* Do a partial refit. Uses the `GP_SPOINT_TAG` point flag to determin what curve segments need
+     to be refitted. */
+  GP_GEO_UPDATE_CURVE_PARTIAL_REFIT = (1 << 6),
+
+  /* Add additional flags here: (1 << 7), (2 << 7), ... */
+  /* GP_GEO_UPDATE_XXX = (1 << 7), */
+} eGPStrokeGeoUpdateFlag;
+
+/* Refit all attributes. */
+#define GP_GEO_UPDATE_CURVE_REFIT_ALL \
+  (GP_GEO_UPDATE_CURVE_REFIT_POSITION | GP_GEO_UPDATE_CURVE_REFIT_PRESSURE | \
+   GP_GEO_UPDATE_CURVE_REFIT_STRENGTH | GP_GEO_UPDATE_CURVE_REFIT_COLOR | \
+   GP_GEO_UPDATE_CURVE_REFIT_WEIGHT)
+
+/* Check if any curve refitting is done. */
+#define GP_GEO_UPDATE_CURVE_REFIT_ANY(flag) (flag & GP_GEO_UPDATE_CURVE_REFIT_ALL)
+
 /* Object boundbox. */
 bool BKE_gpencil_data_minmax(const struct bGPdata *gpd, float r_min[3], float r_max[3]);
 bool BKE_gpencil_stroke_minmax(const struct bGPDstroke *gps,
@@ -78,7 +109,9 @@ void BKE_gpencil_stroke_2d_flat_ref(const struct bGPDspoint *ref_points,
                                     const float scale,
                                     int *r_direction);
 void BKE_gpencil_stroke_fill_triangulate(struct bGPDstroke *gps);
-void BKE_gpencil_stroke_geometry_update(struct bGPdata *gpd, struct bGPDstroke *gps);
+void BKE_gpencil_stroke_geometry_update(struct bGPdata *gpd,
+                                        struct bGPDstroke *gps,
+                                        const eGPStrokeGeoUpdateFlag flag);
 void BKE_gpencil_stroke_uv_update(struct bGPDstroke *gps);
 
 void BKE_gpencil_transform(struct bGPdata *gpd, const float mat[4][4]);
