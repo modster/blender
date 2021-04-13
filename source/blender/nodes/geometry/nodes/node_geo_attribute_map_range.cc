@@ -358,7 +358,7 @@ static void map_range_attribute(GeometryComponent &component, const GeoNodeExecP
     return;
   }
 
-  MaybeUnsavedWriteAttribute attribute_result = component.attribute_try_get_for_output(
+  OutputAttribute attribute_result = component.attribute_try_get_for_output(
       result_name, domain, data_type);
   if (!attribute_result) {
     params.error_message_add(NodeWarningType::Error,

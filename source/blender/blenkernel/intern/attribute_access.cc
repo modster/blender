@@ -768,7 +768,7 @@ std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_get_for_read
   return std::make_unique<blender::fn::GVArray_For_SingleValue>(*type, domain_size, default_value);
 }
 
-blender::bke::MaybeUnsavedWriteAttribute GeometryComponent::attribute_try_get_for_output(
+blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output(
     const StringRef attribute_name,
     const AttributeDomain domain,
     const CustomDataType data_type,

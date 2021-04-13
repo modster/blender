@@ -34,7 +34,7 @@ struct ModifierData;
 namespace blender::nodes {
 
 using bke::geometry_set_realize_instances;
-using bke::MaybeUnsavedWriteAttribute;
+using bke::OutputAttribute;
 using bke::PersistentDataHandleMap;
 using bke::PersistentObjectHandle;
 using bke::ReadAttributeLookup;

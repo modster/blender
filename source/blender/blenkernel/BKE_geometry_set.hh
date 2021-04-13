@@ -180,7 +180,7 @@ class GeometryComponent {
    *
    * This might return no attribute when the attribute cannot exist on the component.
    */
-  blender::bke::MaybeUnsavedWriteAttribute attribute_try_get_for_output(
+  blender::bke::OutputAttribute attribute_try_get_for_output(
       const blender::StringRef attribute_name,
       const AttributeDomain domain,
       const CustomDataType data_type,

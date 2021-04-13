@@ -144,7 +144,7 @@ static void align_rotations_on_component(GeometryComponent &component,
   const NodeGeometryAlignRotationToVector &storage = *(const NodeGeometryAlignRotationToVector *)
                                                           node.storage;
 
-  MaybeUnsavedWriteAttribute rotations_attr = component.attribute_try_get_for_output(
+  OutputAttribute rotations_attr = component.attribute_try_get_for_output(
       "rotation", ATTR_DOMAIN_POINT, CD_PROP_FLOAT3);
   if (!rotations_attr) {
     return;

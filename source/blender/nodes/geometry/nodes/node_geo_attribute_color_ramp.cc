@@ -74,7 +74,7 @@ static void execute_on_component(const GeoNodeExecParams &params, GeometryCompon
   const CustomDataType result_type = CD_PROP_COLOR;
   const AttributeDomain result_domain = get_result_domain(component, input_name, result_name);
 
-  MaybeUnsavedWriteAttribute attribute_result = component.attribute_try_get_for_output(
+  OutputAttribute attribute_result = component.attribute_try_get_for_output(
       result_name, result_domain, result_type);
   if (!attribute_result) {
     return;

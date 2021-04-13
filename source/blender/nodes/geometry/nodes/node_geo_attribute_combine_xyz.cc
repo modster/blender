@@ -94,7 +94,7 @@ static void combine_attributes(GeometryComponent &component, const GeoNodeExecPa
   }
   const AttributeDomain result_domain = get_result_domain(component, params, result_name);
 
-  MaybeUnsavedWriteAttribute attribute_result = component.attribute_try_get_for_output(
+  OutputAttribute attribute_result = component.attribute_try_get_for_output(
       result_name, result_domain, CD_PROP_FLOAT3);
   if (!attribute_result) {
     return;

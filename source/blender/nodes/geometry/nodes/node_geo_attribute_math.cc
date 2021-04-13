@@ -228,7 +228,7 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
   const AttributeDomain result_domain = get_result_domain(
       component, params, operation, result_name);
 
-  MaybeUnsavedWriteAttribute attribute_result = component.attribute_try_get_for_output(
+  OutputAttribute attribute_result = component.attribute_try_get_for_output(
       result_name, result_domain, result_type);
   if (!attribute_result) {
     return;

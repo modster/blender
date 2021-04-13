@@ -59,9 +59,9 @@ struct WriteAttributeLookup {
   }
 };
 
-class MaybeUnsavedWriteAttribute {
+class OutputAttribute {
  public:
-  using SaveF = std::function<void(MaybeUnsavedWriteAttribute &)>;
+  using SaveF = std::function<void(OutputAttribute &)>;
 
  private:
   std::unique_ptr<GVMutableArray> varray_;
@@ -69,11 +69,9 @@ class MaybeUnsavedWriteAttribute {
   SaveF save_;
 
  public:
-  MaybeUnsavedWriteAttribute() = default;
+  OutputAttribute() = default;
 
-  MaybeUnsavedWriteAttribute(std::unique_ptr<GVMutableArray> varray,
-                             AttributeDomain domain,
-                             SaveF save)
+  OutputAttribute(std::unique_ptr<GVMutableArray> varray, AttributeDomain domain, SaveF save)
       : varray_(std::move(varray)), domain_(domain), save_(std::move(save))
   {
   }

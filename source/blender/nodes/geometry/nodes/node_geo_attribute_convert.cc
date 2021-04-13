@@ -86,7 +86,7 @@ static void attribute_convert_calc(GeometryComponent &component,
     return;
   }
 
-  MaybeUnsavedWriteAttribute result_attribute = component.attribute_try_get_for_output(
+  OutputAttribute result_attribute = component.attribute_try_get_for_output(
       result_name, result_domain, result_type);
   if (!result_attribute) {
     return;
