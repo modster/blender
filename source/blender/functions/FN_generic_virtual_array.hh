@@ -534,6 +534,11 @@ class GVArray_Span final : public GVArray_For_GSpan {
 
   GSpan as_span() const;
   operator GSpan() const;
+
+  const void *data() const
+  {
+    return data_;
+  }
 };
 
 class GVMutableArray_Span final : public GVMutableArray_For_GMutableSpan {

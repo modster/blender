@@ -166,7 +166,7 @@ static void align_rotations_on_component(GeometryComponent &component,
     align_rotations_fixed_pivot(vectors, factors, local_main_axis, local_pivot_axis, *rotations);
   }
 
-  rotations.save_if_necessary();
+  rotations.save();
 }
 
 static void geo_node_align_rotation_to_vector_exec(GeoNodeExecParams params)

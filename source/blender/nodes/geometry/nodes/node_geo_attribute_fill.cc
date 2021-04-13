@@ -129,7 +129,7 @@ static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams
       break;
   }
 
-  attribute.save_if_necessary();
+  attribute.save();
 }
 
 static void geo_node_attribute_fill_exec(GeoNodeExecParams params)

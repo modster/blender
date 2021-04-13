@@ -272,7 +272,7 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
   }
 
   result_span.apply();
-  attribute_result.save_if_necessary();
+  attribute_result.save();
 }
 
 static void geo_node_attribute_math_exec(GeoNodeExecParams params)

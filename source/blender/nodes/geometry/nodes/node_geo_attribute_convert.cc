@@ -92,21 +92,16 @@ static void attribute_convert_calc(GeometryComponent &component,
     return;
   }
 
-  fn::GSpan source_span = source_attribute->get_span();
-  fn::GVMutableArray_Span result_span{*result_attribute};
-  if (source_span.is_empty() || result_span.is_empty()) {
-    return;
-  }
+  fn::GVArray_Span source_span{*source_attribute};
+  fn::GMutableSpan result_span = result_attribute.as_span();
+
   BLI_assert(source_span.size() == result_span.size());
 
   const CPPType *cpp_type = bke::custom_data_type_to_cpp_type(result_type);
   BLI_assert(cpp_type != nullptr);
 
-  cpp_type->copy_to_initialized_n(
-      source_span.data(), result_span.get_span().data(), result_span.size());
-
-  result_span.apply();
-  result_attribute.save_if_necessary();
+  cpp_type->copy_to_initialized_n(source_span.data(), result_span.data(), result_span.size());
+  result_attribute.save();
 }
 
 static void geo_node_attribute_convert_exec(GeoNodeExecParams params)

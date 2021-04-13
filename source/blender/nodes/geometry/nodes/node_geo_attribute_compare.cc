@@ -322,7 +322,7 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
         attribute_a->typed<float>(), attribute_b->typed<float>(), operation, result_span);
   }
 
-  attribute_result.save_if_necessary();
+  attribute_result.save();
 }
 
 static void geo_node_attribute_compare_exec(GeoNodeExecParams params)

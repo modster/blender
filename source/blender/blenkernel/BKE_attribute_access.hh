@@ -67,6 +67,7 @@ class OutputAttribute {
   std::unique_ptr<GVMutableArray> varray_;
   AttributeDomain domain_;
   SaveF save_;
+  std::optional<fn::GVMutableArray_Span> optional_span_varray_;
 
  public:
   OutputAttribute() = default;
@@ -111,7 +112,21 @@ class OutputAttribute {
     return cpp_type_to_custom_data_type(this->cpp_type());
   }
 
-  void save_if_necessary();
+  fn::GMutableSpan as_span()
+  {
+    if (!optional_span_varray_.has_value()) {
+      optional_span_varray_.emplace(*varray_);
+    }
+    fn::GVMutableArray_Span &span_varray = *optional_span_varray_;
+    return span_varray.get_span();
+  }
+
+  template<typename T> MutableSpan<T> as_span()
+  {
+    return this->as_span().typed<T>();
+  }
+
+  void save();
 };
 
 template<typename T> class OutputAttribute_Typed {
@@ -164,9 +179,14 @@ template<typename T> class OutputAttribute_Typed {
     return cpp_type_to_custom_data_type(this->cpp_type());
   }
 
-  void save_if_necessary()
+  MutableSpan<T> as_span()
   {
-    attribute_.save_if_necessary();
+    return attribute_.as_span<T>();
+  }
+
+  void save()
+  {
+    attribute_.save();
   }
 };
 

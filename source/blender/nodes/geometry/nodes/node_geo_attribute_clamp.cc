@@ -113,7 +113,7 @@ template<> inline Color4f clamp_value(const Color4f val, const Color4f min, cons
 
 template<typename T>
 static void clamp_attribute(const VArray<T> &inputs,
-                            VMutableArray<T> &outputs,
+                            const MutableSpan<T> &outputs,
                             const T min,
                             const T max)
 {
@@ -185,33 +185,31 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
           std::swap(min.z, max.z);
         }
       }
-      clamp_attribute<float3>(
-          *attribute_input->typed<float3>(), *attribute_result->typed<float3>(), min, max);
+      MutableSpan<float3> results = attribute_result.as_span<float3>();
+      clamp_attribute<float3>(*attribute_input->typed<float3>(), results, min, max);
       break;
     }
     case CD_PROP_FLOAT: {
       const float min = params.get_input<float>("Min_001");
       const float max = params.get_input<float>("Max_001");
+      MutableSpan<float> results = attribute_result.as_span<float>();
       if (operation == NODE_CLAMP_RANGE && min > max) {
-        clamp_attribute<float>(
-            *attribute_input->typed<float>(), *attribute_result->typed<float>(), max, min);
+        clamp_attribute<float>(*attribute_input->typed<float>(), results, max, min);
       }
       else {
-        clamp_attribute<float>(
-            *attribute_input->typed<float>(), *attribute_result->typed<float>(), min, max);
+        clamp_attribute<float>(*attribute_input->typed<float>(), results, min, max);
       }
       break;
     }
     case CD_PROP_INT32: {
       const int min = params.get_input<int>("Min_002");
       const int max = params.get_input<int>("Max_002");
+      MutableSpan<int> results = attribute_result.as_span<int>();
       if (operation == NODE_CLAMP_RANGE && min > max) {
-        clamp_attribute<int>(
-            *attribute_input->typed<int>(), *attribute_result->typed<int>(), max, min);
+        clamp_attribute<int>(*attribute_input->typed<int>(), results, max, min);
       }
       else {
-        clamp_attribute<int>(
-            *attribute_input->typed<int>(), *attribute_result->typed<int>(), min, max);
+        clamp_attribute<int>(*attribute_input->typed<int>(), results, min, max);
       }
       break;
     }
@@ -232,8 +230,8 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
           std::swap(min.a, max.a);
         }
       }
-      clamp_attribute<Color4f>(
-          *attribute_input->typed<Color4f>(), *attribute_result->typed<Color4f>(), min, max);
+      MutableSpan<Color4f> results = attribute_result.as_span<Color4f>();
+      clamp_attribute<Color4f>(*attribute_input->typed<Color4f>(), results, min, max);
       break;
     }
     default: {
@@ -242,7 +240,7 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
     }
   }
 
-  attribute_result.save_if_necessary();
+  attribute_result.save();
 }
 
 static void geo_node_attribute_clamp_exec(GeoNodeExecParams params)

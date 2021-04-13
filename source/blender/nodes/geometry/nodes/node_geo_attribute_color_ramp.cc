@@ -90,7 +90,7 @@ static void execute_on_component(const GeoNodeExecParams &params, GeometryCompon
   }
 
   results.apply();
-  attribute_result.save_if_necessary();
+  attribute_result.save();
 }
 
 static void geo_node_attribute_color_ramp_exec(GeoNodeExecParams params)
