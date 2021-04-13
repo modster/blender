@@ -1117,7 +1117,7 @@ void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
 void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
                                          const float threshold,
                                          const float corner_angle,
-                                         const bool do_partial_update)
+                                         const eGPStrokeGeoUpdateFlag flag)
 {
   if (gps == NULL || gps->totpoints < 0) {
     return;
@@ -1132,7 +1132,7 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
   }
 
   /* Do a partial update by only updating the curve segments that contain tagged points. */
-  if (do_partial_update && gps->editcurve != NULL) {
+  if ((flag & GP_GEO_UPDATE_CURVE_PARTIAL_REFIT) && gps->editcurve != NULL) {
     prev_flag = gps->editcurve->flag;
     /* Find the segments that need an update, then update them. */
     const int tot_num_segments = (gps->flag & GP_STROKE_CYCLIC) ?
@@ -1178,7 +1178,7 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
   /* Free the poly weights (if not null). Should no longer be used. */
   BKE_gpencil_free_stroke_weights(gps);
 
-  if (do_partial_update) {
+  if ((flag & GP_GEO_UPDATE_CURVE_PARTIAL_REFIT)) {
     BKE_gpencil_editcurve_recalculate_handles(gps);
   }
 }

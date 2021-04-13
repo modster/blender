@@ -59,7 +59,7 @@ void BKE_gpencil_stroke_editcurve_regenerate_single(struct bGPDstroke *gps,
 void BKE_gpencil_stroke_editcurve_update(struct bGPDstroke *gps,
                                          const float threshold,
                                          const float corner_angle,
-                                         const bool do_partial_update);
+                                         const enum eGPStrokeGeoUpdateFlag flag);
 void BKE_gpencil_editcurve_stroke_sync_selection(struct bGPdata *gpd,
                                                  struct bGPDstroke *gps,
                                                  struct bGPDcurve *gpc);

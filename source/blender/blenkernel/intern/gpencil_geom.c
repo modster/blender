@@ -1285,6 +1285,7 @@ void BKE_gpencil_stroke_uv_update(bGPDstroke *gps)
  * Recalc all internal geometry data for the stroke
  * \param gpd: Grease pencil data-block
  * \param gps: Grease pencil stroke
+ * \param flag: eGPStrokeGeoUpdateFlag flag (use GP_GEO_UPDATE_DEFAULT=0 for the default)
  */
 void BKE_gpencil_stroke_geometry_update(bGPdata *gpd,
                                         bGPDstroke *gps,
@@ -1300,7 +1301,7 @@ void BKE_gpencil_stroke_geometry_update(bGPdata *gpd,
       /* TODO: Make do-partial-update variable */
       const float threshold = gpd->curve_edit_threshold;
       const float corner_angle = gpd->curve_edit_corner_angle;
-      BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, false);
+      BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, flag);
     }
 
     /* If curve geometry was updated, stroke points need recalculation. */
