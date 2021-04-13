@@ -5311,17 +5311,17 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
   }
 
   switch (cache_file->type) {
-#  ifdef WITH_ALEMBIC
     case CACHEFILE_TYPE_ALEMBIC:
+#  ifdef WITH_ALEMBIC
       ABC_get_transform(data->reader, cob->matrix, time, cache_file->scale);
-      break;
 #  endif
-#  ifdef WITH_USD
+      break;
     case CACHEFILE_TYPE_USD:
+#  ifdef WITH_USD
       USD_get_transform(data->reader, cob->matrix, time * FPS, cache_file->scale);
-      break;
 #  endif
-    default:
+      break;
+    case CACHE_FILE_TYPE_INVALID:
       break;
   }
 #else

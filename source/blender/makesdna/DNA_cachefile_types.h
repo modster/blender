@@ -33,12 +33,8 @@ struct GSet;
 
 /* CacheFile::type */
 typedef enum {
-#ifdef WITH_ALEMBIC
   CACHEFILE_TYPE_ALEMBIC = 1,
-#endif
-#ifdef WITH_USD
   CACHEFILE_TYPE_USD = 2,
-#endif
   CACHE_FILE_TYPE_INVALID = 0,
 } eCacheFileType;
 
