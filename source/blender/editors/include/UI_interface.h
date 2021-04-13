@@ -25,6 +25,7 @@
 
 #include "BLI_compiler_attrs.h"
 #include "BLI_sys_types.h" /* size_t */
+#include "BLI_utildefines.h"
 #include "UI_interface_icons.h"
 
 #ifdef __cplusplus
@@ -2156,7 +2157,11 @@ enum uiTemplateListFlags {
   UI_TEMPLATE_LIST_SORT_LOCK = (1 << 1),
   /* Don't allow resizing the list, i.e. don't add the grip button. */
   UI_TEMPLATE_LIST_NO_GRIP = (1 << 2),
+
+  UI_TEMPLATE_LIST_FLAGS_LAST
 };
+ENUM_OPERATORS(enum uiTemplateListFlags, UI_TEMPLATE_LIST_FLAGS_LAST);
+
 void uiTemplateList(uiLayout *layout,
                     struct bContext *C,
                     const char *listtype_name,
@@ -2186,6 +2191,7 @@ struct uiList *uiTemplateList_ex(uiLayout *layout,
                                  int columns,
                                  enum uiTemplateListFlags flags,
                                  void *customdata);
+
 void uiTemplateNodeLink(uiLayout *layout,
                         struct bContext *C,
                         struct bNodeTree *ntree,
