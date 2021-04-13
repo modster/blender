@@ -134,7 +134,7 @@ class GVArray {
     return (const VArray<T> *)this->try_get_internal_varray_impl();
   }
 
-  template<typename T> GVArray_Typed<T> typed()
+  template<typename T> GVArray_Typed<T> typed() const
   {
     return GVArray_Typed<T>(*this);
   }
@@ -538,6 +538,13 @@ class GVArray_Span final : public GVArray_For_GSpan {
   const void *data() const
   {
     return data_;
+  }
+
+  const void *operator[](const int64_t index)
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < size_);
+    return POINTER_OFFSET(data_, index * element_size_);
   }
 };
 

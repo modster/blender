@@ -72,6 +72,11 @@ template<typename T> class VArray {
     return size_ == 0;
   }
 
+  IndexRange index_range() const
+  {
+    return IndexRange(size_);
+  }
+
   /* Returns true when the virtual array is stored as a span internally. */
   bool is_span() const
   {
