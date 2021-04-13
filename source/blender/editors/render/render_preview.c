@@ -849,13 +849,15 @@ static PoseBackup *action_preview_render_prepare(IconPreview *preview)
   return pose_backup;
 }
 
-static void action_preview_render_cleanup(PoseBackup *pose_backup)
+static void action_preview_render_cleanup(IconPreview *preview, PoseBackup *pose_backup)
 {
   if (pose_backup == NULL) {
     return;
   }
   ED_pose_backup_restore(pose_backup);
   ED_pose_backup_free(pose_backup);
+
+  DEG_id_tag_update(&preview->active_object->id, ID_RECALC_GEOMETRY);
 }
 
 /* Render a pose. It is assumed that the pose has already been applied and that the scene camera is
@@ -898,7 +900,7 @@ static void action_preview_render(IconPreview *preview, IconPreviewSize *preview
                                                       NULL,
                                                       err_out);
 
-  action_preview_render_cleanup(pose_backup);
+  action_preview_render_cleanup(preview, pose_backup);
 
   if (err_out[0] != '\0') {
     printf("Error rendering Action %s preview: %s\n", preview->id->name + 2, err_out);
