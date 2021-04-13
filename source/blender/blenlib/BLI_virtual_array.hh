@@ -422,15 +422,21 @@ template<typename T> class VMutableArray_Span final : public VMutableArray_For_M
   bool show_not_applied_warning_ = true;
 
  public:
-  VMutableArray_Span(VMutableArray<T> &varray) : VMutableArray_For_MutableSpan<T>(varray.size())
+  VMutableArray_Span(VMutableArray<T> &varray, const bool materialize = true)
+      : VMutableArray_For_MutableSpan<T>(varray.size()), varray_(varray)
   {
     if (varray_.is_span()) {
       this->data_ = varray_.get_span().data();
     }
     else {
-      owned_data_.~Array();
-      new (&owned_data_) Array<T>(varray_.size(), NoInitialization{});
-      varray_.materialize_to_uninitialized(owned_data_);
+      if (materialize) {
+        owned_data_.~Array();
+        new (&owned_data_) Array<T>(varray_.size(), NoInitialization{});
+        varray_.materialize_to_uninitialized(owned_data_);
+      }
+      else {
+        owned_data_.reinitialize(varray_.size());
+      }
       this->data_ = owned_data_.data();
     }
   }

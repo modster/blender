@@ -255,7 +255,7 @@ GVArray_Span::operator GSpan() const
  * GVMutableArray_Span.
  */
 
-GVMutableArray_Span::GVMutableArray_Span(GVMutableArray &varray)
+GVMutableArray_Span::GVMutableArray_Span(GVMutableArray &varray, const bool materialize)
     : GVMutableArray_For_GMutableSpan(varray.type(), varray.size()), varray_(varray)
 {
   if (varray_.is_span()) {
@@ -263,7 +263,12 @@ GVMutableArray_Span::GVMutableArray_Span(GVMutableArray &varray)
   }
   else {
     owned_data_ = MEM_mallocN_aligned(type_->size() * size_, type_->alignment(), __func__);
-    varray_.materialize_to_uninitialized(IndexRange(size_), owned_data_);
+    if (materialize) {
+      varray_.materialize_to_uninitialized(IndexRange(size_), owned_data_);
+    }
+    else {
+      type_->construct_default_n(owned_data_, size_);
+    }
     data_ = owned_data_;
   }
 }

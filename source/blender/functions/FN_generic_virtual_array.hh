@@ -544,7 +544,7 @@ class GVMutableArray_Span final : public GVMutableArray_For_GMutableSpan {
   bool show_not_applied_warning_ = true;
 
  public:
-  GVMutableArray_Span(GVMutableArray &varray);
+  GVMutableArray_Span(GVMutableArray &varray, bool materialize = true);
   ~GVMutableArray_Span();
 
   void apply();
