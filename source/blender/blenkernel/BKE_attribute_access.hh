@@ -114,4 +114,60 @@ class OutputAttribute {
   void save_if_necessary();
 };
 
+template<typename T> class OutputAttribute_Typed {
+ private:
+  OutputAttribute attribute_;
+  std::optional<fn::GVMutableArray_Typed<T>> optional_varray_;
+  VMutableArray<T> *varray_ = nullptr;
+
+ public:
+  OutputAttribute_Typed(OutputAttribute attribute) : attribute_(std::move(attribute))
+  {
+    if (attribute_) {
+      varray_.emplace(attribute_.varray());
+      varray_ = &**optional_varray_;
+    }
+  }
+
+  operator bool() const
+  {
+    return varray_ != nullptr;
+  }
+
+  VMutableArray<T> &operator*()
+  {
+    return *varray_;
+  }
+
+  VMutableArray<T> *operator->()
+  {
+    return varray_;
+  }
+
+  GVMutableArray<T> &varray()
+  {
+    return *varray_;
+  }
+
+  AttributeDomain domain() const
+  {
+    return attribute_.domain();
+  }
+
+  const CPPType &cpp_type() const
+  {
+    return CPPType::get<T>();
+  }
+
+  CustomDataType custom_data_type() const
+  {
+    return cpp_type_to_custom_data_type(this->cpp_type());
+  }
+
+  void save_if_necessary()
+  {
+    attribute_.save_if_necessary();
+  }
+};
+
 }  // namespace blender::bke
