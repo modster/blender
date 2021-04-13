@@ -43,9 +43,9 @@ set(SRC
 
   spreadsheet_cell_value.hh
   spreadsheet_column.hh
+  spreadsheet_column_values.hh
   spreadsheet_data_source.hh
   spreadsheet_data_source_geometry.hh
-  spreadsheet_column_values.hh
   spreadsheet_draw.hh
   spreadsheet_intern.hh
   spreadsheet_layout.hh
