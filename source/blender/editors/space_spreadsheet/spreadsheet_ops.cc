@@ -37,7 +37,7 @@ static int row_filter_add_exec(bContext *C, wmOperator *UNUSED(op))
   SpreadsheetRowFilter *row_filter = (SpreadsheetRowFilter *)MEM_callocN(
       sizeof(SpreadsheetRowFilter), __func__);
   row_filter->threshold = 0.01f;
-
+  row_filter->operation = SPREADSHEET_ROW_FILTER_LESS;
   row_filter->flag = (SPREADSHEET_ROW_FILTER_UI_EXPAND | SPREADSHEET_ROW_FILTER_ENABLED);
 
   BLI_addtail(&sspreadsheet->row_filters, row_filter);
@@ -63,10 +63,8 @@ static int row_filter_remove_exec(bContext *C, wmOperator *op)
 {
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
 
-  const int index = RNA_int_get(op->ptr, "index");
-
   SpreadsheetRowFilter *row_filter = (SpreadsheetRowFilter *)BLI_findlink(
-      &sspreadsheet->row_filters, index);
+      &sspreadsheet->row_filters, RNA_int_get(op->ptr, "index"));
   if (row_filter == nullptr) {
     return OPERATOR_CANCELLED;
   }

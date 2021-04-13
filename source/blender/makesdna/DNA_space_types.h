@@ -1871,18 +1871,18 @@ typedef struct SpreadsheetColumn {
 
   /**
    * An indicator of the type of values in the column, set at runtime.
-   * #SpreadSheetColumnValueType.
+   * #SpreadsheetColumnValueType.
    */
   uint8_t data_type;
   char _pad0[7];
 } SpreadsheetColumn;
 
-typedef enum SpreadSheetColumnValueType {
+typedef enum SpreadsheetColumnValueType {
   SPREADSHEET_VALUE_TYPE_INT32 = 0,
   SPREADSHEET_VALUE_TYPE_FLOAT = 1,
   SPREADSHEET_VALUE_TYPE_BOOL = 2,
   SPREADSHEET_VALUE_TYPE_INSTANCES = 3,
-} SpreadSheetColumnValueType;
+} SpreadsheetColumnValueType;
 
 typedef struct SpaceSpreadsheet {
   SpaceLink *next, *prev;

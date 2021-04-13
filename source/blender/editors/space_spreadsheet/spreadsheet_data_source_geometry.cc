@@ -176,7 +176,7 @@ using IsVertexSelectedFn = FunctionRef<bool(int vertex_index)>;
 
 static void get_selected_vertex_indices(const Mesh &mesh,
                                         const IsVertexSelectedFn is_vertex_selected_fn,
-                                        MutableSpan<bool> &selection)
+                                        MutableSpan<bool> selection)
 {
   for (const int i : IndexRange(mesh.totvert)) {
     if (!selection[i]) {
@@ -190,7 +190,7 @@ static void get_selected_vertex_indices(const Mesh &mesh,
 
 static void get_selected_corner_indices(const Mesh &mesh,
                                         const IsVertexSelectedFn is_vertex_selected_fn,
-                                        MutableSpan<bool> &selection)
+                                        MutableSpan<bool> selection)
 {
   for (const int i : IndexRange(mesh.totloop)) {
     const MLoop &loop = mesh.mloop[i];
@@ -205,7 +205,7 @@ static void get_selected_corner_indices(const Mesh &mesh,
 
 static void get_selected_face_indices(const Mesh &mesh,
                                       const IsVertexSelectedFn is_vertex_selected_fn,
-                                      MutableSpan<bool> &selection)
+                                      MutableSpan<bool> selection)
 {
   for (const int poly_index : IndexRange(mesh.totpoly)) {
     if (!selection[poly_index]) {
@@ -224,7 +224,7 @@ static void get_selected_face_indices(const Mesh &mesh,
 
 static void get_selected_edge_indices(const Mesh &mesh,
                                       const IsVertexSelectedFn is_vertex_selected_fn,
-                                      MutableSpan<bool> &selection)
+                                      MutableSpan<bool> selection)
 {
   for (const int i : IndexRange(mesh.totedge)) {
     if (!selection[i]) {
@@ -240,7 +240,7 @@ static void get_selected_edge_indices(const Mesh &mesh,
 static void get_selected_indices_on_domain(const Mesh &mesh,
                                            const AttributeDomain domain,
                                            const IsVertexSelectedFn is_vertex_selected_fn,
-                                           MutableSpan<bool> &selection)
+                                           MutableSpan<bool> selection)
 {
   switch (domain) {
     case ATTR_DOMAIN_POINT:

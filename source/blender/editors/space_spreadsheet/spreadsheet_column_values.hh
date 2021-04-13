@@ -30,12 +30,12 @@ namespace blender::ed::spreadsheet {
  */
 class ColumnValues {
  protected:
-  SpreadSheetColumnValueType type_;
+  SpreadsheetColumnValueType type_;
   std::string name_;
   int size_;
 
  public:
-  ColumnValues(const SpreadSheetColumnValueType type, std::string name, const int size)
+  ColumnValues(const SpreadsheetColumnValueType type, std::string name, const int size)
       : type_(type), name_(std::move(name)), size_(size)
   {
   }
@@ -44,7 +44,7 @@ class ColumnValues {
 
   virtual void get_value(int index, CellValue &r_cell_value) const = 0;
 
-  SpreadSheetColumnValueType type() const
+  SpreadsheetColumnValueType type() const
   {
     return type_;
   }
@@ -69,7 +69,7 @@ template<typename GetValueF> class LambdaColumnValues : public ColumnValues {
   GetValueF get_value_;
 
  public:
-  LambdaColumnValues(const SpreadSheetColumnValueType type,
+  LambdaColumnValues(const SpreadsheetColumnValueType type,
                      std::string name,
                      int size,
                      GetValueF get_value)
@@ -85,7 +85,7 @@ template<typename GetValueF> class LambdaColumnValues : public ColumnValues {
 
 /* Utility function that simplifies creating a spreadsheet column from a lambda function. */
 template<typename GetValueF>
-std::unique_ptr<ColumnValues> column_values_from_function(const SpreadSheetColumnValueType type,
+std::unique_ptr<ColumnValues> column_values_from_function(const SpreadsheetColumnValueType type,
                                                           std::string name,
                                                           int size,
                                                           GetValueF get_value)

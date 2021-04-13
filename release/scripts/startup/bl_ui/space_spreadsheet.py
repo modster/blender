@@ -28,7 +28,7 @@ def get_operation_string(operation):
     if operation == 'EQUAL':
         return "=="
     elif operation == 'GREATER':
-        return  ">"
+        return ">"
     elif operation == 'LESS':
         return "<"
     return ""
