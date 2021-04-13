@@ -76,6 +76,7 @@ const char *ED_assetlist_library_path(const struct AssetLibraryReference *librar
 
 bool ED_assetlist_listen(const struct AssetLibraryReference *library_reference,
                          const struct wmNotifier *notifier);
+int ED_assetlist_size(const struct AssetLibraryReference *library_reference);
 
 void ED_operatortypes_asset(void);
 

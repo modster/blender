@@ -172,6 +172,7 @@ class AssetList : NonCopyable {
   bool needsRefetch() const;
   void iterate(AssetListIterFn fn) const;
   bool listen(const wmNotifier &notifier) const;
+  int size() const;
   void tagMainDataDirty() const;
   void remapID(ID *id_old, ID *id_new) const;
   StringRef filepath() const;
@@ -320,6 +321,14 @@ bool AssetList::listen(const wmNotifier &notifier) const
   }
 
   return false;
+}
+
+/**
+ * \return The number of assets in the list.
+ */
+int AssetList::size() const
+{
+  return filelist_files_ensure(filelist_);
 }
 
 void AssetList::tagMainDataDirty() const
@@ -576,6 +585,19 @@ bool ED_assetlist_listen(const AssetLibraryReference *library_reference,
     return list->listen(*notifier);
   }
   return false;
+}
+
+/**
+ * \return The number of assets stored in the asset list for \a library_reference, or -1 if there
+ *         is no list fetched for it.
+ */
+int ED_assetlist_size(const AssetLibraryReference *library_reference)
+{
+  AssetList *list = AssetListStorage::lookup_list(*library_reference);
+  if (list) {
+    return list->size();
+  }
+  return -1;
 }
 
 /**

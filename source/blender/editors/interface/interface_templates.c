@@ -6266,7 +6266,8 @@ static void ui_template_list_layout_draw(bContext *C,
                                          uiLayout *layout,
                                          TemplateListInputData *input_data,
                                          TemplateListItems *items,
-                                         const TemplateListLayoutDrawData *layout_data)
+                                         const TemplateListLayoutDrawData *layout_data,
+                                         const enum uiTemplateListFlags flags)
 {
   uiListDyn *dyn_data = ui_list->dyn_data;
   const char *active_propname = RNA_property_identifier(input_data->activeprop);
@@ -6637,6 +6638,8 @@ static void ui_template_list_layout_draw(bContext *C,
   }
 
   if (glob) {
+    const bool add_grip_but = (flags & UI_TEMPLATE_LIST_NO_GRIP) == 0;
+
     /* About #UI_BTYPE_GRIP drag-resize:
      * We can't directly use results from a grip button, since we have a
      * rather complex behavior here (sizing by discrete steps and, overall, auto-size feature).
@@ -6675,21 +6678,23 @@ static void ui_template_list_layout_draw(bContext *C,
                              TIP_("Hide filtering options"));
       UI_but_flag_disable(but, UI_BUT_UNDO); /* skip undo on screen buttons */
 
-      but = uiDefIconButI(subblock,
-                          UI_BTYPE_GRIP,
-                          0,
-                          ICON_GRIP,
-                          0,
-                          0,
-                          UI_UNIT_X * 10.0f,
-                          UI_UNIT_Y * 0.5f,
-                          &dyn_data->resize,
-                          0.0,
-                          0.0,
-                          0,
-                          0,
-                          "");
-      UI_but_func_set(but, uilist_resize_update_cb, ui_list, NULL);
+      if (add_grip_but) {
+        but = uiDefIconButI(subblock,
+                            UI_BTYPE_GRIP,
+                            0,
+                            ICON_GRIP,
+                            0,
+                            0,
+                            UI_UNIT_X * 10.0f,
+                            UI_UNIT_Y * 0.5f,
+                            &dyn_data->resize,
+                            0.0,
+                            0.0,
+                            0,
+                            0,
+                            "");
+        UI_but_func_set(but, uilist_resize_update_cb, ui_list, NULL);
+      }
 
       UI_block_emboss_set(subblock, UI_EMBOSS);
 
@@ -6730,21 +6735,23 @@ static void ui_template_list_layout_draw(bContext *C,
                              TIP_("Show filtering options"));
       UI_but_flag_disable(but, UI_BUT_UNDO); /* skip undo on screen buttons */
 
-      but = uiDefIconButI(subblock,
-                          UI_BTYPE_GRIP,
-                          0,
-                          ICON_GRIP,
-                          0,
-                          0,
-                          UI_UNIT_X * 10.0f,
-                          UI_UNIT_Y * 0.5f,
-                          &dyn_data->resize,
-                          0.0,
-                          0.0,
-                          0,
-                          0,
-                          "");
-      UI_but_func_set(but, uilist_resize_update_cb, ui_list, NULL);
+      if (add_grip_but) {
+        but = uiDefIconButI(subblock,
+                            UI_BTYPE_GRIP,
+                            0,
+                            ICON_GRIP,
+                            0,
+                            0,
+                            UI_UNIT_X * 10.0f,
+                            UI_UNIT_Y * 0.5f,
+                            &dyn_data->resize,
+                            0.0,
+                            0.0,
+                            0,
+                            0,
+                            "");
+        UI_but_func_set(but, uilist_resize_update_cb, ui_list, NULL);
+      }
 
       UI_block_emboss_set(subblock, UI_EMBOSS);
     }
@@ -6764,8 +6771,7 @@ uiList *uiTemplateList_ex(uiLayout *layout,
                           int maxrows,
                           int layout_type,
                           int columns,
-                          bool sort_reverse,
-                          bool sort_lock,
+                          enum uiTemplateListFlags flags,
                           void *customdata)
 {
   TemplateListInputData input_data = {0};
@@ -6789,7 +6795,12 @@ uiList *uiTemplateList_ex(uiLayout *layout,
   uiListFilterItemsFunc filter_items = ui_list_type->filter_items ? ui_list_type->filter_items :
                                                                     uilist_filter_items_default;
 
-  uiList *ui_list = ui_list_ensure(C, ui_list_type, list_id, layout_type, sort_reverse, sort_lock);
+  uiList *ui_list = ui_list_ensure(C,
+                                   ui_list_type,
+                                   list_id,
+                                   layout_type,
+                                   flags & UI_TEMPLATE_LIST_SORT_REVERSE,
+                                   flags & UI_TEMPLATE_LIST_SORT_LOCK);
   uiListDyn *dyn_data = ui_list->dyn_data;
 
   MEM_SAFE_FREE(dyn_data->customdata);
@@ -6812,7 +6823,7 @@ uiList *uiTemplateList_ex(uiLayout *layout,
       .columns = columns,
   };
 
-  ui_template_list_layout_draw(C, ui_list, layout, &input_data, &items, &layout_data);
+  ui_template_list_layout_draw(C, ui_list, layout, &input_data, &items, &layout_data, flags);
 
   ui_template_list_free_items(&items);
 
@@ -6832,8 +6843,7 @@ void uiTemplateList(uiLayout *layout,
                     int maxrows,
                     int layout_type,
                     int columns,
-                    bool sort_reverse,
-                    bool sort_lock)
+                    enum uiTemplateListFlags flags)
 {
   uiTemplateList_ex(layout,
                     C,
@@ -6848,8 +6858,7 @@ void uiTemplateList(uiLayout *layout,
                     maxrows,
                     layout_type,
                     columns,
-                    sort_reverse,
-                    sort_lock,
+                    flags,
                     NULL);
 }
 

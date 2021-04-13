@@ -217,6 +217,7 @@ void uiTemplateAssetView(uiLayout *layout,
 
   ED_assetlist_storage_fetch(&asset_library, filter_settings, C);
   ED_assetlist_ensure_previews_job(&asset_library, C);
+  const int tot_items = ED_assetlist_size(&asset_library);
 
   asset_view_template_refresh_asset_collection(asset_library, *assets_dataptr, assets_propname);
 
@@ -236,16 +237,16 @@ void uiTemplateAssetView(uiLayout *layout,
                                    active_dataptr,
                                    active_propname,
                                    nullptr,
-                                   0,
+                                   tot_items,
                                    0,
                                    UILST_LAYOUT_BIG_PREVIEW_GRID,
                                    0,
-                                   false,
-                                   false,
+                                   UI_TEMPLATE_LIST_NO_GRIP,
                                    list_data);
   if (!list) {
     /* List creation failed. */
     MEM_freeN(list_data);
+    return;
   }
 
   if (activate_opname) {

@@ -2150,6 +2150,13 @@ void uiTemplateCacheFile(uiLayout *layout,
 
 /* Default UIList class name, keep in sync with its declaration in bl_ui/__init__.py */
 #define UI_UL_DEFAULT_CLASS_NAME "UI_UL_list"
+enum uiTemplateListFlags {
+  UI_TEMPLATE_LIST_FLAG_NONE = 0,
+  UI_TEMPLATE_LIST_SORT_REVERSE = (1 << 0),
+  UI_TEMPLATE_LIST_SORT_LOCK = (1 << 1),
+  /* Don't allow resizing the list, i.e. don't add the grip button. */
+  UI_TEMPLATE_LIST_NO_GRIP = (1 << 2),
+};
 void uiTemplateList(uiLayout *layout,
                     struct bContext *C,
                     const char *listtype_name,
@@ -2163,8 +2170,7 @@ void uiTemplateList(uiLayout *layout,
                     int maxrows,
                     int layout_type,
                     int columns,
-                    bool sort_reverse,
-                    bool sort_lock);
+                    enum uiTemplateListFlags flags);
 struct uiList *uiTemplateList_ex(uiLayout *layout,
                                  struct bContext *C,
                                  const char *listtype_name,
@@ -2178,8 +2184,7 @@ struct uiList *uiTemplateList_ex(uiLayout *layout,
                                  int maxrows,
                                  int layout_type,
                                  int columns,
-                                 bool sort_reverse,
-                                 bool sort_lock,
+                                 enum uiTemplateListFlags flags,
                                  void *customdata);
 void uiTemplateNodeLink(uiLayout *layout,
                         struct bContext *C,
