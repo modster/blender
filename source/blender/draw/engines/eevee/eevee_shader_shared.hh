@@ -83,13 +83,13 @@ struct SamplingData {
 BLI_STATIC_ASSERT_ALIGN(SamplingData, 16)
 
 /* Returns total sample count in a web pattern of the given size. */
-static int web_sample_count_get(int web_density, int ring_count)
+static inline int web_sample_count_get(int web_density, int ring_count)
 {
   return ((ring_count * ring_count + ring_count) / 2) * web_density + 1;
 }
 
 /* Returns lowest possible ring count that contains at least sample_count samples. */
-static int web_ring_count_get(int web_density, int sample_count)
+static inline int web_ring_count_get(int web_density, int sample_count)
 {
   /* Inversion of web_sample_count_get(). */
   float x = 2.0f * (float(sample_count) - 1.0f) / float(web_density);
@@ -113,7 +113,7 @@ enum eCameraType : uint32_t {
   CAMERA_PANO_MIRROR = 5u
 };
 
-static bool is_panoramic(eCameraType type)
+static inline bool is_panoramic(eCameraType type)
 {
   return type > CAMERA_ORTHO;
 }
@@ -224,20 +224,20 @@ struct DepthOfFieldData {
 };
 BLI_STATIC_ASSERT_ALIGN(DepthOfFieldData, 16)
 
-static float coc_radius_from_camera_depth(DepthOfFieldData dof, float depth)
+static inline float coc_radius_from_camera_depth(DepthOfFieldData dof, float depth)
 {
   depth = (dof.camera_type != CAMERA_ORTHO) ? 1.0f / depth : depth;
   return dof.coc_mul * depth + dof.coc_bias;
 }
 
-static float regular_polygon_side_length(float sides_count)
+static inline float regular_polygon_side_length(float sides_count)
 {
   return 2.0f * sinf(M_PI / sides_count);
 }
 
 /* Returns intersection ratio between the radius edge at theta and the regular polygon edge.
  * Start first corners at theta == 0. */
-static float circle_to_polygon_radius(float sides_count, float theta)
+static inline float circle_to_polygon_radius(float sides_count, float theta)
 {
   /* From Graphics Gems from CryENGINE 3 (Siggraph 2013) by Tiago Sousa (slide
    * 36). */
@@ -248,7 +248,7 @@ static float circle_to_polygon_radius(float sides_count, float theta)
 
 /* Remap input angle to have homogenous spacing of points along a polygon edge.
  * Expects theta to be in [0..2pi] range. */
-static float circle_to_polygon_angle(float sides_count, float theta)
+static inline float circle_to_polygon_angle(float sides_count, float theta)
 {
   float side_angle = (2.0f * M_PI) / sides_count;
   float halfside_angle = side_angle * 0.5f;
@@ -272,7 +272,7 @@ static float circle_to_polygon_angle(float sides_count, float theta)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Velocity
+/** \name VelocityModule
  * \{ */
 
 struct VelocityObjectData {
@@ -319,7 +319,6 @@ enum eLightType : uint32_t {
   LIGHT_ELIPSE = 4u
 };
 
-/* inline just to avoid warning about unused functions. */
 static inline bool is_area_light(eLightType type)
 {
   return type >= LIGHT_RECT;
@@ -376,6 +375,14 @@ struct LightData {
 };
 BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
+struct ClusterData {
+  uint light_count;
+  uint _pad0;
+  uint _pad1;
+  uint _pad2;
+};
+BLI_STATIC_ASSERT_ALIGN(ClusterData, 16)
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -387,26 +394,12 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
 /** \} */
 
-/* -------------------------------------------------------------------- */
-/** \name Scene
- *
- * General purpose structure for scene level properties.
- * \{ */
-
-struct SceneData {
-  uint light_count;
-  uint probe_count;
-  uint _pad0;
-  uint _pad1;
-};
-BLI_STATIC_ASSERT_ALIGN(SceneData, 16)
-
-/** \} */
-
 #ifdef __cplusplus
+using CameraDataBuf = StructBuffer<CameraData>;
+using LightsDataBuf = StructArrayBuffer<LightData, LIGHT_MAX>;
+using ClustersDataBuf = StructBuffer<ClusterData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
-using LightDataBuf = StructArrayBuffer<LightData, LIGHT_MAX>;
-using SceneDataBuf = StructBuffer<SceneData>;
+using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
 
 #  undef bool
 }  // namespace blender::eevee

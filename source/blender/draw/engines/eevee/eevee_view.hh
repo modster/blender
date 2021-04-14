@@ -37,7 +37,6 @@
 #include "DRW_render.h"
 
 #include "eevee_depth_of_field.hh"
-#include "eevee_light.hh"
 #include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_shader.hh"
@@ -45,58 +44,37 @@
 
 namespace blender::eevee {
 
+class Instance;
+
 /* -------------------------------------------------------------------- */
 /** \name Passes
  * \{ */
 
 class ForwardPass {
  private:
-  ShaderModule &shaders_;
-  LightModule &lights_;
-  SceneDataBuf &scene_data_;
+  Instance &inst_;
 
   DRWPass *opaque_ps_ = nullptr;
   DRWPass *light_additional_ps_ = nullptr;
 
  public:
-  ForwardPass(ShaderModule &shaders, LightModule &lights, SceneDataBuf &scene_data)
-      : shaders_(shaders), lights_(lights), scene_data_(scene_data){};
+  ForwardPass(Instance &inst) : inst_(inst){};
 
-  void sync()
-  {
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
-    opaque_ps_ = DRW_pass_create("Forward", state);
-
-    DRWState state_add = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL | DRW_STATE_DEPTH_EQUAL;
-    light_additional_ps_ = DRW_pass_create_instance("ForwardAddLight", opaque_ps_, state_add);
-  }
-
-  void surface_add(Object *ob, Material *mat, int matslot)
-  {
-    (void)mat;
-    (void)matslot;
-    GPUBatch *geom = DRW_cache_object_surface_get(ob);
-    if (geom == nullptr) {
-      return;
-    }
-
-    GPUShader *sh = shaders_.static_shader_get(MESH);
-    DRWShadingGroup *grp = DRW_shgroup_create(sh, opaque_ps_);
-    DRW_shgroup_uniform_block(grp, "lights_block", lights_.ubo_get());
-    DRW_shgroup_uniform_block(grp, "scene_block", scene_data_.ubo_get());
-    DRW_shgroup_call(grp, geom, ob);
-  }
-
-  void render(void)
-  {
-    for (auto index : lights_.index_range()) {
-      lights_.bind_range(index);
-
-      DRW_draw_pass((index == 0) ? opaque_ps_ : light_additional_ps_);
-    }
-  }
+  void sync(void);
+  void surface_add(Object *ob, Material *mat, int matslot);
+  void render(void);
 };
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name ShadingPasses
+ *
+ * \{ */
+
+/**
+ * Shading passes. Shared between views. Objects will subscribe to one of them.
+ */
 class ShadingPasses {
  public:
   // BackgroundShadingPass background;
@@ -105,12 +83,7 @@ class ShadingPasses {
   VelocityPass velocity;
 
  public:
-  ShadingPasses(ShaderModule &shaders,
-                LightModule &lights,
-                Camera &camera,
-                Velocity &velocity,
-                SceneDataBuf &scene_data)
-      : opaque(shaders, lights, scene_data), velocity(shaders, camera, velocity){};
+  ShadingPasses(Instance &inst) : opaque(inst), velocity(inst){};
 
   void sync()
   {
@@ -129,25 +102,19 @@ class ShadingPasses {
 
 class ShadingView {
  private:
-  Sampling &sampling_;
-  /** Shading passes to render using this view. Shared with other views. */
-  ShadingPasses &shading_passes_;
-  /** Associated camera. */
-  const Camera &camera_;
+  Instance &inst_;
+
   /** Post-fx modules. */
   DepthOfField dof_;
   MotionBlur mb_;
+  Velocity velocity_;
 
   /** Owned resources. */
-  GPUFrameBuffer *view_fb_ = nullptr;
-  GPUFrameBuffer *velocity_fb_ = nullptr;
-  GPUFrameBuffer *velocity_only_fb_ = nullptr;
+  eevee::Framebuffer view_fb_;
   /** Draw resources. Not owned. */
   GPUTexture *combined_tx_ = nullptr;
   GPUTexture *depth_tx_ = nullptr;
   GPUTexture *postfx_tx_ = nullptr;
-  GPUTexture *velocity_camera_tx_ = nullptr;
-  GPUTexture *velocity_view_tx_ = nullptr;
 
   /** Main views is created from the camera (or is from the viewport). It is not jittered. */
   DRWView *main_view_ = nullptr;
@@ -167,184 +134,26 @@ class ShadingView {
   bool is_enabled_ = false;
 
  public:
-  ShadingView(ShaderModule &shaders,
-              ShadingPasses &shading_passes,
-              Sampling &sampling,
-              const Camera &camera,
-              MotionBlurModule &mb_module,
-              const char *name,
-              const float (*face_matrix)[4])
-      : sampling_(sampling),
-        shading_passes_(shading_passes),
-        camera_(camera),
-        dof_(shaders, sampling, name),
-        mb_(shaders, sampling, mb_module, name),
+  ShadingView(Instance &inst, const char *name, const float (*face_matrix)[4])
+      : inst_(inst),
+        dof_(inst, name),
+        mb_(inst, name),
+        velocity_(inst, name),
         name_(name),
         face_matrix_(face_matrix){};
 
-  ~ShadingView()
-  {
-    GPU_FRAMEBUFFER_FREE_SAFE(view_fb_);
-    GPU_FRAMEBUFFER_FREE_SAFE(velocity_fb_);
-    GPU_FRAMEBUFFER_FREE_SAFE(velocity_only_fb_);
-  }
+  ~ShadingView(){};
 
-  void init(const Scene *scene)
-  {
-    dof_.init(scene);
-    mb_.init(scene);
-  }
+  void init(void);
 
-  void sync(int render_extent_[2])
-  {
-    if (camera_.is_panoramic()) {
-      int64_t render_pixel_count = render_extent_[0] * (int64_t)render_extent_[1];
-      /* Divide pixel count between the 6 views. Rendering to a square target. */
-      extent_[0] = extent_[1] = ceilf(sqrtf(1 + (render_pixel_count / 6)));
-      /* TODO(fclem) Clip unused views heres. */
-      is_enabled_ = true;
-    }
-    else {
-      copy_v2_v2_int(extent_, render_extent_);
-      /* Only enable -Z view. */
-      is_enabled_ = (StringRefNull(name_) == "negZ_view");
-    }
+  void sync(int render_extent_[2]);
 
-    if (!is_enabled_) {
-      return;
-    }
+  void render(void);
 
-    /* Create views. */
-    const CameraData &data = camera_.data_get();
-
-    float viewmat[4][4], winmat[4][4];
-    const float(*viewmat_p)[4] = viewmat, (*winmat_p)[4] = winmat;
-    if (camera_.is_panoramic()) {
-      /* TODO(fclem) Overscans. */
-      /* For now a mandatory 5% overscan for DoF. */
-      float side = data.clip_near * 1.05f;
-      float near = data.clip_near;
-      float far = data.clip_far;
-      perspective_m4(winmat, -side, side, -side, side, near, far);
-      mul_m4_m4m4(viewmat, face_matrix_, data.viewmat);
-    }
-    else {
-      viewmat_p = data.viewmat;
-      winmat_p = data.winmat;
-    }
-
-    main_view_ = DRW_view_create(viewmat_p, winmat_p, nullptr, nullptr, nullptr);
-    sub_view_ = DRW_view_create_sub(main_view_, viewmat_p, winmat_p);
-    render_view_ = DRW_view_create_sub(main_view_, viewmat_p, winmat_p);
-
-    dof_.sync(camera_, winmat_p, extent_);
-    mb_.sync(extent_);
-
-    {
-      /* Query temp textures and create framebuffers. */
-      /* HACK: View name should be unique and static.
-       * With this, we can reuse the same texture across views. */
-      DrawEngineType *owner = (DrawEngineType *)name_;
-
-      depth_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_DEPTH24_STENCIL8, owner);
-      combined_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
-      /* TODO(fclem) Only allocate if needed. */
-      postfx_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
-      /* TODO(fclem) Only allocate if needed. RG16F when only doing reprojection. */
-      velocity_camera_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
-      /* TODO(fclem) Only allocate if needed. RG16F when only doing motion blur post fx in
-       * panoramic camera. */
-      velocity_view_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
-
-      GPU_framebuffer_ensure_config(&view_fb_,
-                                    {
-                                        GPU_ATTACHMENT_TEXTURE(depth_tx_),
-                                        GPU_ATTACHMENT_TEXTURE(combined_tx_),
-                                    });
-
-      GPU_framebuffer_ensure_config(&velocity_fb_,
-                                    {
-                                        GPU_ATTACHMENT_TEXTURE(depth_tx_),
-                                        GPU_ATTACHMENT_TEXTURE(velocity_camera_tx_),
-                                        GPU_ATTACHMENT_TEXTURE(velocity_view_tx_),
-                                    });
-
-      GPU_framebuffer_ensure_config(&velocity_only_fb_,
-                                    {
-                                        GPU_ATTACHMENT_NONE,
-                                        GPU_ATTACHMENT_TEXTURE(velocity_camera_tx_),
-                                        GPU_ATTACHMENT_TEXTURE(velocity_view_tx_),
-                                    });
-    }
-  }
-
-  void render(RenderPasses &render_passes)
-  {
-    if (!is_enabled_) {
-      return;
-    }
-
-    float color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-
-    update_view();
-
-    DRW_stats_group_start(name_);
-    DRW_view_set_active(render_view_);
-
-    GPU_framebuffer_bind(view_fb_);
-    GPU_framebuffer_clear_color_depth(view_fb_, color, 1.0f);
-
-    shading_passes_.opaque.render();
-
-    shading_passes_.velocity.render(depth_tx_, velocity_only_fb_, velocity_fb_);
-
-    if (render_passes.vector) {
-      render_passes.vector->accumulate(velocity_camera_tx_, sub_view_);
-    }
-
-    GPUTexture *final_radiance_tx = render_post(combined_tx_);
-
-    if (render_passes.combined) {
-      render_passes.combined->accumulate(final_radiance_tx, sub_view_);
-    }
-
-    if (render_passes.depth) {
-      render_passes.depth->accumulate(depth_tx_, sub_view_);
-    }
-
-    DRW_stats_group_end();
-  }
-
-  GPUTexture *render_post(GPUTexture *input_tx)
-  {
-    GPUTexture *velocity_tx = (velocity_view_tx_ != nullptr) ? velocity_view_tx_ :
-                                                               velocity_camera_tx_;
-    GPUTexture *output_tx = postfx_tx_;
-    /* Swapping is done internally. Actual output is set to the next input. */
-    dof_.render(depth_tx_, &input_tx, &output_tx);
-    mb_.render(depth_tx_, velocity_tx, &input_tx, &output_tx);
-    return input_tx;
-  }
+  GPUTexture *render_post(GPUTexture *input_tx);
 
  private:
-  void update_view(void)
-  {
-    float viewmat[4][4], winmat[4][4];
-    DRW_view_viewmat_get(main_view_, viewmat, false);
-    DRW_view_winmat_get(main_view_, winmat, false);
-
-    /* Anti-Aliasing / Super-Sampling jitter. */
-    float jitter_u = 2.0f * (sampling_.rng_get(SAMPLING_FILTER_U) - 0.5f) / extent_[0];
-    float jitter_v = 2.0f * (sampling_.rng_get(SAMPLING_FILTER_V) - 0.5f) / extent_[1];
-
-    window_translate_m4(winmat, winmat, jitter_u, jitter_v);
-    DRW_view_update_sub(sub_view_, viewmat, winmat);
-
-    /* FIXME(fclem): The offset may be is noticeably large and the culling might make object pop
-     * out of the blurring radius. To fix this, use custom enlarged culling matrix. */
-    dof_.jitter_apply(winmat, viewmat);
-    DRW_view_update_sub(render_view_, viewmat, winmat);
-  }
+  void update_view(void);
 };
 
 /** \} */
@@ -352,10 +161,12 @@ class ShadingView {
 /* -------------------------------------------------------------------- */
 /** \name Main View
  *
- * Container for all views needed to render the final image.
- * We might need up to 6 views for panoramic cameras.
  * \{ */
 
+/**
+ * Container for all views needed to render the final image.
+ * We might need up to 6 views for panoramic cameras.
+ */
 class MainView {
  private:
   std::array<ShadingView, 6> shading_views_;
@@ -363,23 +174,19 @@ class MainView {
   int render_extent_[2];
 
  public:
-  MainView(ShaderModule &shaders,
-           ShadingPasses &shpasses,
-           Camera &cam,
-           Sampling &sampling,
-           MotionBlurModule &mb_module)
+  MainView(Instance &inst)
       : shading_views_({
-            ShadingView(shaders, shpasses, sampling, cam, mb_module, "posX_view", cubeface_mat[0]),
-            ShadingView(shaders, shpasses, sampling, cam, mb_module, "negX_view", cubeface_mat[1]),
-            ShadingView(shaders, shpasses, sampling, cam, mb_module, "posY_view", cubeface_mat[2]),
-            ShadingView(shaders, shpasses, sampling, cam, mb_module, "negY_view", cubeface_mat[3]),
-            ShadingView(shaders, shpasses, sampling, cam, mb_module, "posZ_view", cubeface_mat[4]),
-            ShadingView(shaders, shpasses, sampling, cam, mb_module, "negZ_view", cubeface_mat[5]),
+            ShadingView(inst, "posX_view", cubeface_mat[0]),
+            ShadingView(inst, "negX_view", cubeface_mat[1]),
+            ShadingView(inst, "posY_view", cubeface_mat[2]),
+            ShadingView(inst, "negY_view", cubeface_mat[3]),
+            ShadingView(inst, "posZ_view", cubeface_mat[4]),
+            ShadingView(inst, "negZ_view", cubeface_mat[5]),
         })
   {
   }
 
-  void init(const Scene *scene, const int full_extent_[2])
+  void init(const int full_extent_[2])
   {
     /* TODO(fclem) parameter hidden in experimental. We need to figure out mipmap bias to preserve
      * texture crispiness. */
@@ -389,7 +196,7 @@ class MainView {
     }
 
     for (ShadingView &view : shading_views_) {
-      view.init(scene);
+      view.init();
     }
   }
 
@@ -400,10 +207,10 @@ class MainView {
     }
   }
 
-  void render(RenderPasses &render_passes)
+  void render(void)
   {
     for (ShadingView &view : shading_views_) {
-      view.render(render_passes);
+      view.render();
     }
   }
 };

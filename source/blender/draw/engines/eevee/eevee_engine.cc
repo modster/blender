@@ -17,6 +17,7 @@
  */
 
 #include "BKE_global.h"
+#include "BLI_rect.h"
 
 #include "GPU_framebuffer.h"
 

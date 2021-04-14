@@ -37,6 +37,9 @@
 
 namespace blender::eevee {
 
+/**
+ * Random number generator, contains persistent state and sample count logic.
+ */
 class Sampling {
  private:
   /* Number of samples in the first ring of jittered depth of field. */

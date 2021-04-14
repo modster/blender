@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "DRW_render.h"
+
 #include "BLI_hash_tables.hh"
 #include "BLI_vector.hh"
 
@@ -26,6 +28,8 @@
 #include "eevee_film.hh"
 
 namespace blender::eevee {
+
+class Instance;
 
 /* -------------------------------------------------------------------- */
 /** \name eRenderPassBit
@@ -45,7 +49,7 @@ enum eRenderPassBit {
 
 ENUM_OPERATORS(eRenderPassBit, RENDERPASS_NORMAL)
 
-static eRenderPassBit to_render_passes_bits(int i_rpasses)
+static inline eRenderPassBit to_render_passes_bits(int i_rpasses)
 {
   eRenderPassBit rpasses = RENDERPASS_NONE;
   SET_FLAG_FROM_TEST(rpasses, i_rpasses & SCE_PASS_COMBINED, RENDERPASS_COMBINED);
@@ -55,7 +59,7 @@ static eRenderPassBit to_render_passes_bits(int i_rpasses)
   return rpasses;
 }
 
-static const char *to_render_passes_name(eRenderPassBit rpass)
+static inline const char *to_render_passes_name(eRenderPassBit rpass)
 {
   switch (rpass) {
     case RENDERPASS_COMBINED:
@@ -72,7 +76,8 @@ static const char *to_render_passes_name(eRenderPassBit rpass)
   }
 }
 
-static eFilmDataType to_render_passes_data_type(eRenderPassBit rpass, const bool use_log_encoding)
+static inline eFilmDataType to_render_passes_data_type(eRenderPassBit rpass,
+                                                       const bool use_log_encoding)
 {
   switch (rpass) {
     case RENDERPASS_COMBINED:
@@ -95,6 +100,9 @@ static eFilmDataType to_render_passes_data_type(eRenderPassBit rpass, const bool
 /** \name RenderPasses
  * \{ */
 
+/**
+ * Contains and manages each \c Film output for each render pass output.
+ */
 class RenderPasses {
  public:
   /** Film for each render pass. A nullptr means the pass is not needed. */
@@ -105,14 +113,12 @@ class RenderPasses {
   Vector<Film *> aovs;
 
  private:
-  ShaderModule &shaders_;
-  Camera &camera_;
-  Sampling &sampling_;
+  Instance &inst_;
+
   eRenderPassBit enabled_passes_ = RENDERPASS_NONE;
 
  public:
-  RenderPasses(ShaderModule &shaders, Camera &camera, Sampling &sampling)
-      : shaders_(shaders), camera_(camera), sampling_(sampling){};
+  RenderPasses(Instance &inst) : inst_(inst){};
 
   ~RenderPasses()
   {
@@ -122,61 +128,7 @@ class RenderPasses {
     delete vector;
   }
 
-  void init(const Scene *scene,
-            const RenderLayer *render_layer,
-            const View3D *v3d,
-            const int extent[2],
-            const rcti *output_rect)
-  {
-    eRenderPassBit enabled_passes;
-    if (render_layer) {
-      enabled_passes = to_render_passes_bits(render_layer->passflag);
-      /* Cannot output motion vectors when using motion blur. */
-      if (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED) {
-        enabled_passes &= ~RENDERPASS_VECTOR;
-      }
-    }
-    else {
-      BLI_assert(v3d);
-      enabled_passes = to_render_passes_bits(v3d->shading.render_pass);
-      /* We need the depth pass for compositing overlays or GPencil. */
-      if (!DRW_state_is_scene_render()) {
-        enabled_passes |= RENDERPASS_DEPTH;
-      }
-    }
-
-    const bool use_log_encoding = scene->eevee.flag & SCE_EEVEE_FILM_LOG_ENCODING;
-
-    rcti fallback_rect;
-    if (BLI_rcti_is_empty(output_rect)) {
-      BLI_rcti_init(&fallback_rect, 0, extent[0], 0, extent[1]);
-      output_rect = &fallback_rect;
-    }
-
-    /* HACK to iterate over all passes. */
-    enabled_passes_ = static_cast<eRenderPassBit>(0xFFFFFFFF);
-    for (RenderPassItem rpi : *this) {
-      bool enable = (enabled_passes & rpi.pass_bit) != 0;
-      if (enable && rpi.film == nullptr) {
-        rpi.film = new Film(shaders_,
-                            camera_,
-                            sampling_,
-                            to_render_passes_data_type(rpi.pass_bit, use_log_encoding),
-                            to_render_passes_name(rpi.pass_bit));
-      }
-      else if (!enable && rpi.film != nullptr) {
-        /* Delete unused passes. */
-        delete rpi.film;
-        rpi.film = nullptr;
-      }
-
-      if (rpi.film) {
-        rpi.film->init(extent, output_rect);
-      }
-    }
-
-    enabled_passes_ = enabled_passes;
-  }
+  void init(const int extent[2], const rcti *output_rect);
 
   void sync(void)
   {

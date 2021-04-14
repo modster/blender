@@ -118,6 +118,9 @@ enum eShaderType {
   MAX_SHADER_TYPE,
 };
 
+/**
+ * Shader module. shared between instances.
+ */
 class ShaderModule {
  private:
   struct ShaderDescription {

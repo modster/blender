@@ -81,10 +81,19 @@ set(SRC
   engines/basic/basic_engine.c
   engines/image/image_engine.c
   engines/image/image_shader.c
+  engines/eevee/eevee_camera.cc
+  engines/eevee/eevee_depth_of_field.cc
   engines/eevee/eevee_engine.c
   engines/eevee/eevee_engine.cc
+  engines/eevee/eevee_film.cc
+  engines/eevee/eevee_instance.cc
+  engines/eevee/eevee_light.cc
   engines/eevee/eevee_lightcache.c
   engines/eevee/eevee_lut.c
+  engines/eevee/eevee_motion_blur.cc
+  engines/eevee/eevee_renderpasses.cc
+  engines/eevee/eevee_velocity.cc
+  engines/eevee/eevee_view.cc
   engines/workbench/workbench_data.c
   engines/workbench/workbench_effect_antialiasing.c
   engines/workbench/workbench_effect_cavity.c
@@ -157,6 +166,10 @@ set(SRC
   engines/basic/basic_engine.h
   engines/eevee/eevee_engine.h
   engines/eevee/eevee_lightcache.h
+  engines/eevee/eevee_camera.hh
+  engines/eevee/eevee_instance.hh
+  engines/eevee/eevee_light.hh
+  engines/eevee/eevee_depth_of_field.hh
   engines/eevee/eevee_lut.h
   engines/eevee/eevee_private.h
   engines/external/external_engine.h

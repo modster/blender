@@ -25,6 +25,8 @@
 #pragma once
 
 #include "BLI_utildefines.h"
+#include "GPU_framebuffer.h"
+#include "GPU_texture.h"
 #include "GPU_uniform_buffer.h"
 
 namespace blender::eevee {
@@ -141,6 +143,104 @@ template<typename T> class StructBuffer : public T {
   {
     *static_cast<T *>(this) = other;
     return *this;
+  }
+};
+
+class Texture {
+ private:
+  GPUTexture *tx_ = nullptr;
+  const char *name_;
+
+ public:
+  Texture() : name_("eevee::Texture"){};
+  Texture(const char *name) : name_(name){};
+
+  ~Texture()
+  {
+    GPU_TEXTURE_FREE_SAFE(tx_);
+  }
+
+  void ensure(const char *name, int w, int h, int mips, eGPUTextureFormat format)
+  {
+    /* TODO(fclem) In the future, we need to check if mip_count did not change.
+     * For now it's ok as we always define all mip level.*/
+    if (tx_ && (GPU_texture_width(tx_) != w || GPU_texture_height(tx_) != h)) {
+      GPU_texture_free(tx_);
+    }
+    if (tx_ == nullptr) {
+      tx_ = GPU_texture_create_2d(name, w, h, mips, format, nullptr);
+      if (mips > 1) {
+        /* TODO(fclem) Remove once we have immutable storage or when mips are
+         * generated on creation. */
+        GPU_texture_generate_mipmap(tx_);
+      }
+    }
+  }
+
+  void ensure(int w, int h, int mips, eGPUTextureFormat format)
+  {
+    ensure(name_, w, h, mips, format);
+  }
+
+  Texture &operator=(Texture &a)
+  {
+    if (*this != a) {
+      this->tx_ = a.tx_;
+      this->name_ = a.name_;
+      a.tx_ = nullptr;
+    }
+    return *this;
+  }
+  /* To be able to use it with DRW_shgroup_uniform_texture(). */
+  operator GPUTexture *() const
+  {
+    return tx_;
+  }
+  /* To be able to use it with DRW_shgroup_uniform_texture_ref(). */
+  GPUTexture **operator&()
+  {
+    return &tx_;
+  }
+};
+
+class Framebuffer {
+ private:
+  GPUFrameBuffer *fb_ = nullptr;
+  const char *name_;
+
+ public:
+  Framebuffer() : name_(""){};
+  Framebuffer(const char *name) : name_(name){};
+
+  ~Framebuffer()
+  {
+    GPU_FRAMEBUFFER_FREE_SAFE(fb_);
+  }
+
+  void ensure(GPUAttachment depth = GPU_ATTACHMENT_NONE,
+              GPUAttachment color1 = GPU_ATTACHMENT_NONE,
+              GPUAttachment color2 = GPU_ATTACHMENT_NONE,
+              GPUAttachment color3 = GPU_ATTACHMENT_NONE,
+              GPUAttachment color4 = GPU_ATTACHMENT_NONE,
+              GPUAttachment color5 = GPU_ATTACHMENT_NONE,
+              GPUAttachment color6 = GPU_ATTACHMENT_NONE)
+  {
+    GPU_framebuffer_ensure_config(&fb_, {depth, color1, color2, color3, color4, color5, color6});
+  }
+
+  Framebuffer &operator=(Framebuffer &a)
+  {
+    if (*this != a) {
+      this->fb_ = a.fb_;
+      this->name_ = a.name_;
+      a.fb_ = nullptr;
+    }
+    return *this;
+  }
+
+  operator GPUFrameBuffer *() const
+  {
+    return fb_;
   }
 };
 
