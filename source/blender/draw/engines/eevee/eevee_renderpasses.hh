@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "BLI_hash_tables.hh"
 #include "BLI_vector.hh"
 
 #include "RE_pipeline.h"
@@ -127,19 +128,20 @@ class RenderPasses {
             const int extent[2],
             const rcti *output_rect)
   {
+    eRenderPassBit enabled_passes;
     if (render_layer) {
-      enabled_passes_ = to_render_passes_bits(render_layer->passflag);
+      enabled_passes = to_render_passes_bits(render_layer->passflag);
       /* Cannot output motion vectors when using motion blur. */
       if (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED) {
-        enabled_passes_ &= ~RENDERPASS_VECTOR;
+        enabled_passes &= ~RENDERPASS_VECTOR;
       }
     }
     else {
       BLI_assert(v3d);
-      enabled_passes_ = to_render_passes_bits(v3d->shading.render_pass);
+      enabled_passes = to_render_passes_bits(v3d->shading.render_pass);
       /* We need the depth pass for compositing overlays or GPencil. */
       if (!DRW_state_is_scene_render()) {
-        enabled_passes_ |= RENDERPASS_DEPTH;
+        enabled_passes |= RENDERPASS_DEPTH;
       }
     }
 
@@ -151,91 +153,72 @@ class RenderPasses {
       output_rect = &fallback_rect;
     }
 
-    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
-      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
-      Film *&film = this->render_pass_bit_to_film_p(render_pass);
-
-      bool enable = (enabled_passes_ & render_pass) != 0;
-      if (enable && film == nullptr) {
-        film = new Film(shaders_,
-                        camera_,
-                        sampling_,
-                        to_render_passes_data_type(render_pass, use_log_encoding),
-                        to_render_passes_name(render_pass));
+    /* HACK to iterate over all passes. */
+    enabled_passes_ = static_cast<eRenderPassBit>(0xFFFFFFFF);
+    for (RenderPassItem rpi : *this) {
+      bool enable = (enabled_passes & rpi.pass_bit) != 0;
+      if (enable && rpi.film == nullptr) {
+        rpi.film = new Film(shaders_,
+                            camera_,
+                            sampling_,
+                            to_render_passes_data_type(rpi.pass_bit, use_log_encoding),
+                            to_render_passes_name(rpi.pass_bit));
       }
-      else if (!enable && film != nullptr) {
+      else if (!enable && rpi.film != nullptr) {
         /* Delete unused passes. */
-        delete film;
-        film = nullptr;
+        delete rpi.film;
+        rpi.film = nullptr;
       }
 
-      if (film) {
-        film->init(extent, output_rect);
+      if (rpi.film) {
+        rpi.film->init(extent, output_rect);
       }
     }
+
+    enabled_passes_ = enabled_passes;
   }
 
   void sync(void)
   {
-    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
-      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
-      Film *film = this->render_pass_bit_to_film_p(render_pass);
-
-      if (film) {
-        film->sync();
-      }
+    for (RenderPassItem rpi : *this) {
+      rpi.film->sync();
     }
   }
 
   void end_sync(void)
   {
-    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
-      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
-      Film *film = this->render_pass_bit_to_film_p(render_pass);
-
-      if (film) {
-        film->end_sync();
-      }
+    for (RenderPassItem rpi : *this) {
+      rpi.film->end_sync();
     }
   }
 
   void resolve_viewport(DefaultFramebufferList *dfbl)
   {
-    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
-      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
-      Film *film = this->render_pass_bit_to_film_p(render_pass);
-
-      if (film) {
-        if (render_pass == RENDERPASS_DEPTH) {
-          film->resolve_viewport(dfbl->depth_only_fb);
-        }
-        else {
-          /* Ensures only one color render pass is enabled. */
-          BLI_assert((enabled_passes_ & ~RENDERPASS_DEPTH) == render_pass);
-          film->resolve_viewport(dfbl->color_only_fb);
-        }
+    for (RenderPassItem rpi : *this) {
+      if (rpi.pass_bit == RENDERPASS_DEPTH) {
+        rpi.film->resolve_viewport(dfbl->depth_only_fb);
+      }
+      else {
+        /* Ensures only one color render pass is enabled. */
+        BLI_assert((enabled_passes_ & ~RENDERPASS_DEPTH) == rpi.pass_bit);
+        rpi.film->resolve_viewport(dfbl->color_only_fb);
       }
     }
   }
 
   void read_result(RenderLayer *render_layer, const char *view_name)
   {
-    for (int64_t i = 1; i < RENDERPASS_MAX; i <<= 1) {
-      eRenderPassBit render_pass = static_cast<eRenderPassBit>(i);
-      Film *film = this->render_pass_bit_to_film_p(render_pass);
-
-      if (film) {
-        const char *pass_name = to_render_passes_name(render_pass);
-        RenderPass *rp = RE_pass_find_by_name(render_layer, pass_name, view_name);
-        if (rp) {
-          film->read_result(rp->rect);
-        }
+    for (RenderPassItem rpi : *this) {
+      const char *pass_name = to_render_passes_name(rpi.pass_bit);
+      RenderPass *rp = RE_pass_find_by_name(render_layer, pass_name, view_name);
+      if (rp) {
+        rpi.film->read_result(rp->rect);
       }
     }
   }
 
  private:
-  Film *&render_pass_bit_to_film_p(eRenderPassBit rpass)
+  constexpr Film *&render_pass_bit_to_film_p(eRenderPassBit rpass)
   {
     switch (rpass) {
       case RENDERPASS_COMBINED:
@@ -250,6 +233,61 @@ class RenderPasses {
         BLI_assert(0);
         return combined;
     }
+  }
+
+  /**
+   * Iterator
+   **/
+
+  struct RenderPassItem {
+    Film *&film;
+    eRenderPassBit pass_bit;
+
+    constexpr explicit RenderPassItem(Film *&film_, eRenderPassBit pass_bit_)
+        : film(film_), pass_bit(pass_bit_){};
+  };
+
+  class Iterator {
+   private:
+    RenderPasses &render_passes_;
+    int64_t current_;
+
+   public:
+    constexpr explicit Iterator(RenderPasses &rpasses, int64_t current)
+        : render_passes_(rpasses), current_(current){};
+
+    constexpr Iterator &operator++()
+    {
+      while (current_ < RENDERPASS_MAX) {
+        current_ <<= 1;
+        if (current_ & render_passes_.enabled_passes_) {
+          break;
+        }
+      }
+      return *this;
+    }
+
+    constexpr friend bool operator!=(const Iterator &a, const Iterator &b)
+    {
+      return a.current_ != b.current_;
+    }
+
+    constexpr RenderPassItem operator*()
+    {
+      eRenderPassBit pass_bit = static_cast<eRenderPassBit>(current_);
+      return RenderPassItem(render_passes_.render_pass_bit_to_film_p(pass_bit), pass_bit);
+    }
+  };
+
+  /* Iterator over all enabled passes. */
+  constexpr Iterator begin()
+  {
+    return Iterator(*this, 1);
+  }
+
+  constexpr Iterator end()
+  {
+    return Iterator(*this, power_of_2_max_constexpr(RENDERPASS_MAX));
   }
 };
 
