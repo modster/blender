@@ -1871,18 +1871,18 @@ typedef struct SpreadsheetColumn {
 
   /**
    * An indicator of the type of values in the column, set at runtime.
-   * #SpreadsheetColumnValueType.
+   * #eSpreadsheetColumnValueType.
    */
   uint8_t data_type;
   char _pad0[7];
 } SpreadsheetColumn;
 
-typedef enum SpreadsheetColumnValueType {
+typedef enum eSpreadsheetColumnValueType {
   SPREADSHEET_VALUE_TYPE_INT32 = 0,
   SPREADSHEET_VALUE_TYPE_FLOAT = 1,
   SPREADSHEET_VALUE_TYPE_BOOL = 2,
   SPREADSHEET_VALUE_TYPE_INSTANCES = 3,
-} SpreadsheetColumnValueType;
+} eSpreadsheetColumnValueType;
 
 typedef struct SpaceSpreadsheet {
   SpaceLink *next, *prev;
@@ -1924,8 +1924,14 @@ typedef enum eSpaceSpreadsheet_FilterFlag {
 typedef struct SpreadsheetRowFilter {
   struct SpreadsheetRowFilter *next, *prev;
 
-  char *column_name;
-  /* eSpaceSpreadsheet_RowFilterOperation. */
+  /**
+   * Identifies which column this row filter is meant to refer to.
+   * This is a pointer instead of a struct to make it easier if we want to "subclass"
+   * #SpreadsheetColumnID in the future for different kinds of ids.
+   */
+  SpreadsheetColumnID *column_id;
+
+  /* eSpreadsheetFilterOperation. */
   uint8_t operation;
   /* eSpaceSpreadsheet_RowFilterFlag. */
   uint8_t flag;
@@ -1938,16 +1944,16 @@ typedef struct SpreadsheetRowFilter {
 } SpreadsheetRowFilter;
 
 typedef enum eSpaceSpreadsheet_RowFilterFlag {
-  SPREADSHEET_ROW_FILTER_BOOL_VALUE = (1 << 0),
-  SPREADSHEET_ROW_FILTER_UI_EXPAND = (1 << 1),
+  SPREADSHEET_ROW_FILTER_UI_EXPAND = (1 << 0),
+  SPREADSHEET_ROW_FILTER_BOOL_VALUE = (1 << 1),
   SPREADSHEET_ROW_FILTER_ENABLED = (1 << 2),
 } eSpaceSpreadsheet_RowFilterFlag;
 
-typedef enum eSpaceSpreadsheet_RowFilterOperation {
+typedef enum eSpreadsheetFilterOperation {
   SPREADSHEET_ROW_FILTER_EQUAL = 0,
   SPREADSHEET_ROW_FILTER_GREATER = 1,
   SPREADSHEET_ROW_FILTER_LESS = 2,
-} eSpaceSpreadsheet_RowFilterOperation;
+} eSpreadsheetFilterOperation;
 
 typedef enum eSpaceSpreadsheet_ObjectEvalState {
   SPREADSHEET_OBJECT_EVAL_STATE_FINAL = 0,

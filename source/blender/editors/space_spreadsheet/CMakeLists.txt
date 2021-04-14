@@ -20,6 +20,7 @@ set(INC
   ../../blenfont
   ../../blenkernel
   ../../blenlib
+  ../../blentranslation
   ../../bmesh
   ../../depsgraph
   ../../functions
@@ -40,6 +41,7 @@ set(SRC
   spreadsheet_layout.cc
   spreadsheet_ops.cc
   spreadsheet_row_filter.cc
+  spreadsheet_row_filter_ui.cc
 
   spreadsheet_cell_value.hh
   spreadsheet_column.hh
@@ -50,6 +52,7 @@ set(SRC
   spreadsheet_intern.hh
   spreadsheet_layout.hh
   spreadsheet_row_filter.hh
+  spreadsheet_row_filter_ui.hh
 )
 
 set(LIB

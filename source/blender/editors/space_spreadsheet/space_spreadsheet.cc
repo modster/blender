@@ -17,6 +17,7 @@
 #include <cstring>
 
 #include "BLI_listbase.h"
+#include "BLI_resource_scope.hh"
 
 #include "BKE_screen.h"
 
@@ -48,6 +49,7 @@
 #include "spreadsheet_intern.hh"
 #include "spreadsheet_layout.hh"
 #include "spreadsheet_row_filter.hh"
+#include "spreadsheet_row_filter_ui.hh"
 
 using namespace blender;
 using namespace blender::ed::spreadsheet;
@@ -77,6 +79,15 @@ static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *U
   }
 
   {
+    /* Properties region. */
+    ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), "spreadsheet right region");
+    BLI_addtail(&spreadsheet_space->regionbase, region);
+    region->regiontype = RGN_TYPE_UI;
+    region->alignment = RGN_ALIGN_RIGHT;
+    region->flag = RGN_FLAG_HIDDEN;
+  }
+
+  {
     /* Main window. */
     ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), "spreadsheet main region");
     BLI_addtail(&spreadsheet_space->regionbase, region);
@@ -93,10 +104,8 @@ static void spreadsheet_free(SpaceLink *sl)
   MEM_SAFE_FREE(sspreadsheet->runtime);
 
   LISTBASE_FOREACH_MUTABLE (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
-    MEM_SAFE_FREE(row_filter->column_name);
-    MEM_freeN(row_filter);
+    spreadsheet_row_filter_free(row_filter);
   }
-
   LISTBASE_FOREACH_MUTABLE (SpreadsheetColumn *, column, &sspreadsheet->columns) {
     spreadsheet_column_free(column);
   }
@@ -122,9 +131,8 @@ static SpaceLink *spreadsheet_duplicate(SpaceLink *sl)
   sspreadsheet_new->runtime = (SpaceSpreadsheet_Runtime *)MEM_dupallocN(sspreadsheet_old->runtime);
 
   BLI_listbase_clear(&sspreadsheet_new->row_filters);
-  LISTBASE_FOREACH (const SpreadsheetRowFilter *, row_filter, &sspreadsheet_old->row_filters) {
-    SpreadsheetRowFilter *new_filter = (SpreadsheetRowFilter *)MEM_dupallocN(row_filter);
-    new_filter->column_name = (char *)MEM_dupallocN(row_filter->column_name);
+  LISTBASE_FOREACH (const SpreadsheetRowFilter *, src_filter, &sspreadsheet_old->row_filters) {
+    SpreadsheetRowFilter *new_filter = spreadsheet_row_filter_copy(src_filter);
     BLI_addtail(&sspreadsheet_new->row_filters, new_filter);
   }
   BLI_listbase_clear(&sspreadsheet_new->columns);
@@ -136,8 +144,10 @@ static SpaceLink *spreadsheet_duplicate(SpaceLink *sl)
   return (SpaceLink *)sspreadsheet_new;
 }
 
-static void spreadsheet_keymap(wmKeyConfig *UNUSED(keyconf))
+static void spreadsheet_keymap(wmKeyConfig *keyconf)
 {
+  /* Entire editor only. */
+  WM_keymap_ensure(keyconf, "Spreadsheet Generic", SPACE_SPREADSHEET, 0);
 }
 
 static void spreadsheet_main_region_init(wmWindowManager *wm, ARegion *region)
@@ -150,8 +160,15 @@ static void spreadsheet_main_region_init(wmWindowManager *wm, ARegion *region)
 
   UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_LIST, region->winx, region->winy);
 
-  wmKeyMap *keymap = WM_keymap_ensure(wm->defaultconf, "View2D Buttons List", 0, 0);
-  WM_event_add_keymap_handler(&region->handlers, keymap);
+  {
+    wmKeyMap *keymap = WM_keymap_ensure(wm->defaultconf, "View2D Buttons List", 0, 0);
+    WM_event_add_keymap_handler(&region->handlers, keymap);
+  }
+  {
+    wmKeyMap *keymap = WM_keymap_ensure(
+        wm->defaultconf, "Spreadsheet Generic", SPACE_SPREADSHEET, 0);
+    WM_event_add_keymap_handler(&region->handlers, keymap);
+  }
 }
 
 static ID *get_used_id(const bContext *C)
@@ -281,6 +298,12 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
   /* Tag footer for redraw, because the main region updates data for the footer. */
   ARegion *footer = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_FOOTER);
   ED_region_tag_redraw(footer);
+
+  /* Tag the sidebar for redraw, because the main region updates data for it. */
+  ARegion *sidebar = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_UI);
+  ED_region_tag_redraw(sidebar);
+
+  // sspreadsheet->runtime->data_source = *data_source;
 }
 
 static void spreadsheet_main_region_listener(const wmRegionListenerParams *params)
@@ -415,6 +438,24 @@ static void spreadsheet_footer_region_listener(const wmRegionListenerParams *UNU
 {
 }
 
+static void spreadsheet_sidebar_init(wmWindowManager *wm, ARegion *region)
+{
+  UI_panel_category_active_set_default(region, "Filters");
+  ED_region_panels_init(wm, region);
+
+  wmKeyMap *keymap = WM_keymap_ensure(
+      wm->defaultconf, "Spreadsheet Generic", SPACE_SPREADSHEET, 0);
+  WM_event_add_keymap_handler(&region->handlers, keymap);
+}
+
+static void spreadsheet_right_region_free(ARegion *UNUSED(region))
+{
+}
+
+static void spreadsheet_right_region_listener(const wmRegionListenerParams *UNUSED(params))
+{
+}
+
 void ED_spacetype_spreadsheet(void)
 {
   SpaceType *st = (SpaceType *)MEM_callocN(sizeof(SpaceType), "spacetype spreadsheet");
@@ -465,6 +506,21 @@ void ED_spacetype_spreadsheet(void)
   art->free = spreadsheet_footer_region_free;
   art->listener = spreadsheet_footer_region_listener;
   BLI_addhead(&st->regiontypes, art);
+
+  /* regions: right panel buttons */
+  art = (ARegionType *)MEM_callocN(sizeof(ARegionType), "spacetype spreadsheet right region");
+  art->regionid = RGN_TYPE_UI;
+  art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FRAMES;
+
+  art->init = spreadsheet_sidebar_init;
+  art->layout = ED_region_panels_layout;
+  art->draw = ED_region_panels_draw;
+  art->free = spreadsheet_right_region_free;
+  art->listener = spreadsheet_right_region_listener;
+  BLI_addhead(&st->regiontypes, art);
+
+  register_row_filter_panels(*art);
 
   BKE_spacetype_register(st);
 }

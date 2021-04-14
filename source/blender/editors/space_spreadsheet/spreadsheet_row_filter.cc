@@ -59,7 +59,8 @@ static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
 {
   for (const ColumnLayout &column : spreadsheet_layout.columns) {
     const ColumnValues &values = *column.values;
-    if (values.name() != row_filter.column_name) {
+    /* TODO: Compare full column ID here instead of just the name? */
+    if (values.name() != row_filter.column_id->name) {
       continue;
     }
 
@@ -150,21 +151,19 @@ static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
   }
 }
 
-static bool use_original_object_selection_filter(const SpaceSpreadsheet &sspreadsheet,
-                                                 const DataSource &data_source)
+bool spreadsheet_data_source_has_selection_filter(const DataSource &data_source)
 {
-  if (sspreadsheet.filter_flag & SPREADSHEET_FILTER_SELECTED_ONLY) {
-    if (const GeometryDataSource *geometry_data_source = dynamic_cast<const GeometryDataSource *>(
-            &data_source)) {
-      Object *object_eval = geometry_data_source->object_eval();
-      Object *object_orig = DEG_get_original_object(object_eval);
-      if (object_orig->type == OB_MESH) {
-        if (object_orig->mode == OB_MODE_EDIT) {
-          return true;
-        }
+  if (const GeometryDataSource *geometry_data_source = dynamic_cast<const GeometryDataSource *>(
+          &data_source)) {
+    Object *object_eval = geometry_data_source->object_eval();
+    Object *object_orig = DEG_get_original_object(object_eval);
+    if (object_orig->type == OB_MESH) {
+      if (object_orig->mode == OB_MODE_EDIT) {
+        return true;
       }
     }
   }
+
   return false;
 }
 
@@ -188,7 +187,8 @@ Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
     return IndexRange(tot_rows).as_span();
   }
 
-  const bool use_selection = use_original_object_selection_filter(sspreadsheet, data_source);
+  const bool use_selection = (sspreadsheet.filter_flag & SPREADSHEET_FILTER_SELECTED_ONLY) &&
+                             spreadsheet_data_source_has_selection_filter(data_source);
 
   if (BLI_listbase_is_empty(&sspreadsheet.row_filters) && !use_selection) {
     return IndexRange(tot_rows).as_span();
@@ -213,6 +213,31 @@ Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
   index_vector_from_bools(rows_included, indices);
 
   return indices;
+}
+
+SpreadsheetRowFilter *spreadsheet_row_filter_new(SpreadsheetColumnID *column_id)
+{
+  SpreadsheetRowFilter *row_filter = (SpreadsheetRowFilter *)MEM_callocN(
+      sizeof(SpreadsheetRowFilter), __func__);
+  row_filter->threshold = 0.01f;
+  row_filter->operation = SPREADSHEET_ROW_FILTER_LESS;
+  row_filter->flag = (SPREADSHEET_ROW_FILTER_UI_EXPAND | SPREADSHEET_ROW_FILTER_ENABLED);
+  row_filter->column_id = column_id;
+
+  return row_filter;
+}
+
+SpreadsheetRowFilter *spreadsheet_row_filter_copy(const SpreadsheetRowFilter *src_row_filter)
+{
+  SpreadsheetColumnID *new_column_id = spreadsheet_column_id_copy(src_row_filter->column_id);
+  SpreadsheetRowFilter *new_filter = spreadsheet_row_filter_new(new_column_id);
+  return new_filter;
+}
+
+void spreadsheet_row_filter_free(SpreadsheetRowFilter *column)
+{
+  spreadsheet_column_id_free(column->column_id);
+  MEM_freeN(column);
 }
 
 }  // namespace blender::ed::spreadsheet

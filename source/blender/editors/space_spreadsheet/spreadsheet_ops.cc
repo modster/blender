@@ -29,17 +29,16 @@
 #include "WM_types.h"
 
 #include "spreadsheet_intern.hh"
+#include "spreadsheet_row_filter.hh"
+
+using namespace blender::ed::spreadsheet;
 
 static int row_filter_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
 
-  SpreadsheetRowFilter *row_filter = (SpreadsheetRowFilter *)MEM_callocN(
-      sizeof(SpreadsheetRowFilter), __func__);
-  row_filter->threshold = 0.01f;
-  row_filter->operation = SPREADSHEET_ROW_FILTER_LESS;
-  row_filter->flag = (SPREADSHEET_ROW_FILTER_UI_EXPAND | SPREADSHEET_ROW_FILTER_ENABLED);
-
+  SpreadsheetColumnID *column_id = spreadsheet_column_id_new();
+  SpreadsheetRowFilter *row_filter = spreadsheet_row_filter_new(column_id);
   BLI_addtail(&sspreadsheet->row_filters, row_filter);
 
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SPREADSHEET, sspreadsheet);
@@ -70,6 +69,7 @@ static int row_filter_remove_exec(bContext *C, wmOperator *op)
   }
 
   BLI_remlink(&sspreadsheet->row_filters, row_filter);
+  spreadsheet_row_filter_free(row_filter);
 
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SPREADSHEET, sspreadsheet);
 
