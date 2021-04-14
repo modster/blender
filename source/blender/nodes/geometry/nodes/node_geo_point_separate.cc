@@ -76,7 +76,7 @@ static void copy_attributes_based_on_mask(const GeometryComponent &in_component,
       GVArray_Typed<T> attribute_typed{*attribute.varray};
       VArray_Span<T> span{attribute_typed};
       MutableSpan<T> out_span = result_attribute.as_span<T>();
-      copy_data_based_on_mask(span.as_span(), masks, invert, out_span);
+      copy_data_based_on_mask(span, masks, invert, out_span);
     });
 
     result_attribute.save();
@@ -111,16 +111,15 @@ static void separate_points_from_component(const GeometryComponent &in_component
   const GVArray_Typed<bool> mask_attribute = in_component.attribute_get_for_read<bool>(
       mask_name, ATTR_DOMAIN_POINT, false);
   VArray_Span<bool> masks{mask_attribute};
-  Span<bool> masks_span = masks.as_span();
 
-  const int total = masks_span.count(!invert);
+  const int total = masks.count(!invert);
   if (total == 0) {
     return;
   }
 
   create_component_points(out_component, total);
 
-  copy_attributes_based_on_mask(in_component, out_component, masks_span, invert);
+  copy_attributes_based_on_mask(in_component, out_component, masks, invert);
 }
 
 static GeometrySet separate_geometry_set(const GeometrySet &set_in,

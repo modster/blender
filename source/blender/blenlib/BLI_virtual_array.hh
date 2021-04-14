@@ -384,13 +384,13 @@ template<typename T> class VArray_For_Single final : public VArray<T> {
  *    from faster access.
  *  - An API is called, that does not accept virtual arrays, but only spans.
  */
-template<typename T> class VArray_Span final : public VArray_For_Span<T> {
+template<typename T> class VArray_Span final : public Span<T> {
  private:
   const VArray<T> &varray_;
   Array<T> owned_data_;
 
  public:
-  VArray_Span(const VArray<T> &varray) : VArray_For_Span<T>(varray.size()), varray_(varray)
+  VArray_Span(const VArray<T> &varray) : Span<T>(), varray_(varray)
   {
     if (varray_.is_span()) {
       this->data_ = varray_.get_span().data();
@@ -401,25 +401,11 @@ template<typename T> class VArray_Span final : public VArray_For_Span<T> {
       varray_.materialize_to_uninitialized(owned_data_);
       this->data_ = owned_data_.data();
     }
-  }
-
-  Span<T> as_span() const
-  {
-    return this->get_span();
-  }
-
-  operator Span<T>() const
-  {
-    return this->get_span();
-  }
-
-  IndexRange index_range() const
-  {
-    return IndexRange(this->size());
+    this->size_ = varray_.size();
   }
 };
 
-template<typename T> class VMutableArray_Span final : public VMutableArray_For_MutableSpan<T> {
+template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
  private:
   VMutableArray<T> &varray_;
   Array<T> owned_data_;
@@ -428,7 +414,7 @@ template<typename T> class VMutableArray_Span final : public VMutableArray_For_M
 
  public:
   VMutableArray_Span(VMutableArray<T> &varray, const bool materialize = true)
-      : VMutableArray_For_MutableSpan<T>(varray.size()), varray_(varray)
+      : MutableSpan<T>(), varray_(varray)
   {
     if (varray_.is_span()) {
       this->data_ = varray_.get_span().data();
@@ -444,6 +430,7 @@ template<typename T> class VMutableArray_Span final : public VMutableArray_For_M
       }
       this->data_ = owned_data_.data();
     }
+    this->size_ = varray_.size();
   }
 
   ~VMutableArray_Span()
@@ -461,42 +448,12 @@ template<typename T> class VMutableArray_Span final : public VMutableArray_For_M
     if (this->data_ != owned_data_.data()) {
       return;
     }
-    this->set_all(owned_data_);
+    varray_.set_all(owned_data_);
   }
 
   void disable_not_applied_warning()
   {
     show_not_applied_warning_ = false;
-  }
-
-  Span<T> as_span() const
-  {
-    return this->get_span();
-  }
-
-  operator Span<T>() const
-  {
-    return this->get_span();
-  }
-
-  operator MutableSpan<T>()
-  {
-    return this->get_span();
-  }
-
-  T &operator[](const int64_t index)
-  {
-    return this->data_[index];
-  }
-
-  int64_t size() const
-  {
-    return this->size();
-  }
-
-  IndexRange index_range() const
-  {
-    return IndexRange(this->size());
   }
 };
 
