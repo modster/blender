@@ -223,9 +223,9 @@ static void spreadsheet_row_filters_layout(const bContext *C, Panel *panel)
     LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, row_filters) {
 
       /* Move to the next instanced panel corresponding to the next filter. */
-      while ((panel->type == NULL) || !(panel->type->flag & PANEL_TYPE_INSTANCED)) {
+      while ((panel->type == nullptr) || !(panel->type->flag & PANEL_TYPE_INSTANCED)) {
         panel = panel->next;
-        BLI_assert(panel != NULL); /* There shouldn't be fewer panels than filters. */
+        BLI_assert(panel != nullptr); /* There shouldn't be fewer panels than filters. */
       }
 
       PointerRNA *filter_ptr = (PointerRNA *)MEM_mallocN(sizeof(PointerRNA), "panel customdata");
