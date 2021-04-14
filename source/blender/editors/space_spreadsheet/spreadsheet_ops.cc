@@ -37,8 +37,7 @@ static int row_filter_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
 
-  SpreadsheetColumnID *column_id = spreadsheet_column_id_new();
-  SpreadsheetRowFilter *row_filter = spreadsheet_row_filter_new(column_id);
+  SpreadsheetRowFilter *row_filter = spreadsheet_row_filter_new();
   BLI_addtail(&sspreadsheet->row_filters, row_filter);
 
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SPREADSHEET, sspreadsheet);

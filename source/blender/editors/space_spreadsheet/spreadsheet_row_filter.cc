@@ -19,6 +19,7 @@
 #include "BLI_listbase.h"
 
 #include "DNA_screen_types.h"
+#include "DNA_space_types.h"
 
 #include "DEG_depsgraph_query.h"
 
@@ -59,8 +60,7 @@ static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
 {
   for (const ColumnLayout &column : spreadsheet_layout.columns) {
     const ColumnValues &values = *column.values;
-    /* TODO: Compare full column ID here instead of just the name? */
-    if (values.name() != row_filter.column_id->name) {
+    if (values.name() != row_filter.column_name) {
       continue;
     }
 
@@ -215,28 +215,31 @@ Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
   return indices;
 }
 
-SpreadsheetRowFilter *spreadsheet_row_filter_new(SpreadsheetColumnID *column_id)
+SpreadsheetRowFilter *spreadsheet_row_filter_new()
 {
   SpreadsheetRowFilter *row_filter = (SpreadsheetRowFilter *)MEM_callocN(
       sizeof(SpreadsheetRowFilter), __func__);
-  row_filter->threshold = 0.01f;
-  row_filter->operation = SPREADSHEET_ROW_FILTER_LESS;
   row_filter->flag = (SPREADSHEET_ROW_FILTER_UI_EXPAND | SPREADSHEET_ROW_FILTER_ENABLED);
-  row_filter->column_id = column_id;
+  row_filter->operation = SPREADSHEET_ROW_FILTER_LESS;
+  row_filter->threshold = 0.01f;
+  row_filter->column_name[0] = '\0';
 
   return row_filter;
 }
 
 SpreadsheetRowFilter *spreadsheet_row_filter_copy(const SpreadsheetRowFilter *src_row_filter)
 {
-  SpreadsheetColumnID *new_column_id = spreadsheet_column_id_copy(src_row_filter->column_id);
-  SpreadsheetRowFilter *new_filter = spreadsheet_row_filter_new(new_column_id);
+  SpreadsheetRowFilter *new_filter = spreadsheet_row_filter_new();
+
+  memcpy(new_filter, src_row_filter, sizeof(SpreadsheetRowFilter));
+  new_filter->next = nullptr;
+  new_filter->prev = nullptr;
+
   return new_filter;
 }
 
 void spreadsheet_row_filter_free(SpreadsheetRowFilter *column)
 {
-  spreadsheet_column_id_free(column->column_id);
   MEM_freeN(column);
 }
 

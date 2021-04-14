@@ -49,8 +49,13 @@ static void filter_panel_id_fn(void *UNUSED(row_filter_v), char *r_name)
   BLI_snprintf(r_name, BKE_ST_MAXNAME, "SPREADSHEET_PT_filter");
 }
 
-static std::string operation_string(const eSpreadsheetFilterOperation operation)
+static std::string operation_string(const eSpreadsheetColumnValueType data_type,
+                                    const eSpreadsheetFilterOperation operation)
 {
+  if (data_type == SPREADSHEET_VALUE_TYPE_BOOL) {
+    return "==";
+  }
+
   switch (operation) {
     case SPREADSHEET_ROW_FILTER_EQUAL:
       return "==";
@@ -87,10 +92,10 @@ static std::string value_string(const SpreadsheetRowFilter &row_filter,
 }
 
 static eSpreadsheetColumnValueType column_data_type_from_id(const SpaceSpreadsheet &sspreadsheet,
-                                                            const SpreadsheetColumnID &column_id)
+                                                            const StringRef column_name)
 {
   LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet.columns) {
-    if (*column->id == column_id) {
+    if (column->display_name == column_name) {
       return (eSpreadsheetColumnValueType)column->data_type;
     }
   }
@@ -103,12 +108,12 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
   PointerRNA *filter_ptr = UI_panel_custom_data_get(panel);
   SpreadsheetRowFilter *filter = (SpreadsheetRowFilter *)filter_ptr->data;
-  const StringRef column_name = filter->column_id->name;
+  const StringRef column_name = filter->column_name;
   const eSpreadsheetFilterOperation operation = (const eSpreadsheetFilterOperation)
                                                     filter->operation;
 
   const eSpreadsheetColumnValueType data_type = column_data_type_from_id(*sspreadsheet,
-                                                                         *filter->column_id);
+                                                                         column_name);
 
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayoutSetEmboss(row, UI_EMBOSS_NONE);
@@ -121,7 +126,7 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
     std::stringstream ss;
     ss << column_name;
     ss << " ";
-    ss << operation_string(operation);
+    ss << operation_string(data_type, operation);
     ss << " ";
     ss << value_string(*filter, data_type);
     uiItemL(row, ss.str().c_str(), ICON_NONE);
@@ -139,28 +144,21 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
 static void spreadsheet_filter_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *layout = panel->layout;
-  bScreen *screen = CTX_wm_screen(C);
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
   PointerRNA *filter_ptr = UI_panel_custom_data_get(panel);
   SpreadsheetRowFilter *filter = (SpreadsheetRowFilter *)filter_ptr->data;
+  const StringRef column_name = filter->column_name;
   const eSpreadsheetFilterOperation operation = (const eSpreadsheetFilterOperation)
                                                     filter->operation;
 
   const eSpreadsheetColumnValueType data_type = column_data_type_from_id(*sspreadsheet,
-                                                                         *filter->column_id);
+                                                                         column_name);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiLayoutSetActive(layout, filter->flag & SPREADSHEET_ROW_FILTER_ENABLED);
 
-  PointerRNA column_id_ptr;
-  RNA_pointer_create(&screen->id, &RNA_SpreadsheetColumnID, filter->column_id, &column_id_ptr);
-  uiItemR(layout, &column_id_ptr, "name", 0, IFACE_("Column"), ICON_NONE);
-
-  //   PointerRNA sspreadsheet_ptr;
-  //   RNA_pointer_create(&screen->id, &RNA_SpreadsheetRowFilter, sspreadsheet, &sspreadsheet_ptr);
-  //   uiItemPointerR(
-  //       layout, filter_ptr, "column_id", &sspreadsheet_ptr, "available_columns", "", ICON_NONE);
+  uiItemR(layout, filter_ptr, "column_name", 0, IFACE_("Column"), ICON_NONE);
 
   if (data_type != SPREADSHEET_VALUE_TYPE_BOOL) {
     uiItemR(layout, filter_ptr, "operation", 0, nullptr, ICON_NONE);

@@ -1354,14 +1354,16 @@ static void write_area(BlendWriter *writer, ScrArea *area)
 
       LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
         BLO_write_struct(writer, SpreadsheetRowFilter, row_filter);
-        BLO_write_struct(writer, SpreadsheetColumnID, row_filter->column_id);
-        BLO_write_string(writer, row_filter->column_id->name);
       }
 
       LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
         BLO_write_struct(writer, SpreadsheetColumn, column);
         BLO_write_struct(writer, SpreadsheetColumnID, column->id);
         BLO_write_string(writer, column->id->name);
+        /* While the display name is runtime data, we write it here, otherwise the row filters
+         * might not now there type on the first redraw, if the row filter region draws before the
+         * main region. */
+        BLO_write_string(writer, column->display_name);
       }
     }
   }
@@ -1714,17 +1716,15 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
     else if (sl->spacetype == SPACE_SPREADSHEET) {
       SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
       sspreadsheet->runtime = NULL;
-
       BLO_read_list(reader, &sspreadsheet->row_filters);
-      LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
-        BLO_read_data_address(reader, &row_filter->column_id);
-        BLO_read_data_address(reader, &row_filter->column_id->name);
-      }
-
       BLO_read_list(reader, &sspreadsheet->columns);
       LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
         BLO_read_data_address(reader, &column->id);
         BLO_read_data_address(reader, &column->id->name);
+        /* While the display name is runtime data, it is loaded here, otherwise the row filters
+         * might not now there type on the first redraw, if the row filter region draws before the
+         * main region. */
+        BLO_read_data_address(reader, &column->display_name);
       }
     }
   }

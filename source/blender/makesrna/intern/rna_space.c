@@ -3111,14 +3111,6 @@ const EnumPropertyItem *rna_SpaceSpreadsheet_attribute_domain_itemf(bContext *C,
   return item_array;
 }
 
-// static void rna_Spreadsheet_available_columns_next(CollectionPropertyIterator *iter,
-//                                                    PointerRNA *ptr)
-// {
-//                                       "rna_Spreadsheet_available_columns_next",
-//                                     "rna_Spreadsheet_available_columns_end",
-//                                     "rna_Spreadsheet_available_columns_get",
-// }
-
 #else
 
 static const EnumPropertyItem dt_uv_items[] = {
@@ -7423,9 +7415,8 @@ static void rna_def_spreadsheet_row_filter(BlenderRNA *brna)
   RNA_def_property_ui_icon(prop, ICON_DISCLOSURE_TRI_RIGHT, 1);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 
-  prop = RNA_def_property(srna, "column_id", PROP_POINTER, PROP_NONE);
-  RNA_def_property_struct_type(prop, "SpreadsheetColumnID");
-  RNA_def_property_ui_text(prop, "Column ID", "Data used to identify the corresponding column");
+  prop = RNA_def_property(srna, "column_name", PROP_STRING, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Column Name", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 
   prop = RNA_def_property(srna, "operation", PROP_ENUM, PROP_NONE);
@@ -7543,18 +7534,6 @@ static void rna_def_space_spreadsheet(BlenderRNA *brna)
   RNA_def_property_struct_type(prop, "SpreadsheetColumn");
   RNA_def_property_ui_text(prop, "Columns", "Persistent data associated with spreadsheet columns");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
-
-  // prop = RNA_def_property(srna, "available_columns", PROP_COLLECTION, PROP_NONE);
-  // RNA_def_property_struct_type(prop, "SpreadsheetColumnID");
-  // RNA_def_property_collection_funcs(prop,
-  //                                   "rna_Spreadsheet_available_columns_begin",
-  //                                   "rna_Spreadsheet_available_columns_next",
-  //                                   "rna_Spreadsheet_available_columns_end",
-  //                                   "rna_Spreadsheet_available_columns_get",
-  //                                   NULL,
-  //                                   NULL,
-  //                                   NULL,
-  //                                   NULL);
 
   rna_def_spreadsheet_row_filter(brna);
 

@@ -30,7 +30,7 @@ Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
                                       const DataSource &data_source,
                                       ResourceScope &scope);
 
-SpreadsheetRowFilter *spreadsheet_row_filter_new(SpreadsheetColumnID *column_id);
+SpreadsheetRowFilter *spreadsheet_row_filter_new();
 SpreadsheetRowFilter *spreadsheet_row_filter_copy(const SpreadsheetRowFilter *src_row_filter);
 void spreadsheet_row_filter_free(SpreadsheetRowFilter *column);
 

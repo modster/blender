@@ -251,7 +251,7 @@ static void update_visible_columns(ListBase &columns, DataSource &data_source)
         SpreadsheetColumn *new_column = spreadsheet_column_new(new_id);
 
         /* Copy the current data type to the column storage for convenience. */
-        new_column->data_type = values->type();
+        spreadsheet_column_assign_runtime_data(new_column, values->type(), values->name());
 
         BLI_addtail(&columns, new_column);
       }
@@ -298,10 +298,9 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
   ARegion *footer = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_FOOTER);
   ED_region_tag_redraw(footer);
 
-  /* Tag the sidebar for redraw, because the main region updates data for it. */
-  ARegion *sidebar = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_UI);
-  ED_region_tag_redraw(sidebar);
-
+  // /* Tag the sidebar for redraw, because the main region updates data for it. */
+  // ARegion *sidebar = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_UI);
+  // ED_region_tag_redraw(sidebar);
   // sspreadsheet->runtime->data_source = *data_source;
 }
 
