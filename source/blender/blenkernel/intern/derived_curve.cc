@@ -78,7 +78,7 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
   LISTBASE_FOREACH (const Nurb *, nurb, nurbs) {
     switch (nurb->type) {
       case CU_BEZIER: {
-        BezierSpline *spline = new BezierSpline();
+        std::unique_ptr<BezierSpline> spline = std::make_unique<BezierSpline>();
         spline->set_resolution(nurb->resolu);
         spline->type = Spline::Type::Bezier;
         spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
@@ -95,7 +95,7 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
           spline->control_points.append(std::move(point));
         }
 
-        curve->splines.append(spline);
+        curve->splines.append(std::move(spline));
         break;
       }
       case CU_NURBS: {
@@ -114,7 +114,7 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
   /* TODO: Decide whether to store this in the spline or the curve. */
   const Spline::NormalCalculationMode normal_mode = normal_mode_from_dna_curve(
       dna_curve.twist_mode);
-  for (Spline *spline : curve->splines) {
+  for (SplinePtr &spline : curve->splines) {
     spline->normal_mode = normal_mode;
   }
 

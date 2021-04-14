@@ -160,7 +160,7 @@ static void transform_curve(DCurve &curve,
 {
 
   if (use_translate(rotation, scale)) {
-    for (Spline *spline : curve.splines) {
+    for (SplinePtr &spline : curve.splines) {
       if (spline->type == Spline::Type::Bezier) {
         BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
         for (BezierPoint &point : bezier_spline.control_points) {
@@ -174,7 +174,7 @@ static void transform_curve(DCurve &curve,
   }
   else {
     const float4x4 matrix = float4x4::from_loc_eul_scale(translation, rotation, scale);
-    for (Spline *spline : curve.splines) {
+    for (SplinePtr &spline : curve.splines) {
       if (spline->type == Spline::Type::Bezier) {
         BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
         for (BezierPoint &point : bezier_spline.control_points) {

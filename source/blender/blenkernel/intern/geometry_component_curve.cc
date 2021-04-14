@@ -127,7 +127,7 @@ int CurveComponent::attribute_domain_size(const AttributeDomain domain) const
   }
   if (domain == ATTR_DOMAIN_POINT) {
     int total = 0;
-    for (const Spline *spline : curve_->splines) {
+    for (const SplinePtr &spline : curve_->splines) {
       total += spline->size();
     }
     return total;
@@ -205,12 +205,12 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
   }
 };
 
-static int get_spline_resolution(Spline *const &spline)
+static int get_spline_resolution(const SplinePtr &spline)
 {
   return spline->resolution();
 }
 
-static void set_spline_resolution(Spline *&spline, const int &resolution)
+static void set_spline_resolution(SplinePtr &spline, const int &resolution)
 {
   spline->set_resolution(std::max(resolution, 1));
   spline->mark_cache_invalid();
@@ -218,18 +218,18 @@ static void set_spline_resolution(Spline *&spline, const int &resolution)
 
 static ReadAttributePtr make_resolution_read_attribute(const DCurve &curve)
 {
-  return std::make_unique<DerivedArrayReadAttribute<Spline *, int, get_spline_resolution>>(
+  return std::make_unique<DerivedArrayReadAttribute<SplinePtr, int, get_spline_resolution>>(
       ATTR_DOMAIN_CURVE, curve.splines.as_span());
 }
 
 static WriteAttributePtr make_resolution_write_attribute(DCurve &curve)
 {
   return std::make_unique<
-      DerivedArrayWriteAttribute<Spline *, int, get_spline_resolution, set_spline_resolution>>(
+      DerivedArrayWriteAttribute<SplinePtr, int, get_spline_resolution, set_spline_resolution>>(
       ATTR_DOMAIN_CURVE, curve.splines.as_mutable_span());
 }
 
-static float get_spline_length(Spline *const &spline)
+static float get_spline_length(const SplinePtr &spline)
 {
   Span<float> lengths = spline->evaluated_lengths();
 
@@ -238,31 +238,33 @@ static float get_spline_length(Spline *const &spline)
 
 static ReadAttributePtr make_length_attribute(const DCurve &curve)
 {
-  return std::make_unique<DerivedArrayReadAttribute<Spline *, float, get_spline_length>>(
+  return std::make_unique<DerivedArrayReadAttribute<SplinePtr, float, get_spline_length>>(
       ATTR_DOMAIN_CURVE, curve.splines.as_span());
 }
 
-static bool get_cyclic_value(Spline *const &spline)
+static bool get_cyclic_value(const SplinePtr &spline)
 {
   return spline->is_cyclic;
 }
 
-static void set_cyclic_value(Spline *&spline, const bool &value)
+static void set_cyclic_value(SplinePtr &spline, const bool &value)
 {
-  spline->is_cyclic = value;
-  spline->mark_cache_invalid();
+  if (spline->is_cyclic != value) {
+    spline->is_cyclic = value;
+    spline->mark_cache_invalid();
+  }
 }
 
 static ReadAttributePtr make_cyclic_read_attribute(const DCurve &curve)
 {
-  return std::make_unique<DerivedArrayReadAttribute<Spline *, bool, get_cyclic_value>>(
+  return std::make_unique<DerivedArrayReadAttribute<SplinePtr, bool, get_cyclic_value>>(
       ATTR_DOMAIN_CURVE, curve.splines.as_span());
 }
 
 static WriteAttributePtr make_cyclic_write_attribute(DCurve &curve)
 {
   return std::make_unique<
-      DerivedArrayWriteAttribute<Spline *, bool, get_cyclic_value, set_cyclic_value>>(
+      DerivedArrayWriteAttribute<SplinePtr, bool, get_cyclic_value, set_cyclic_value>>(
       ATTR_DOMAIN_CURVE, curve.splines.as_mutable_span());
 }
 
@@ -303,7 +305,7 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
       Array<T> values(curve_component.attribute_domain_size(ATTR_DOMAIN_POINT));
 
       int offset = 0;
-      for (const Spline *spline : curve->splines) {
+      for (const SplinePtr &spline : curve->splines) {
         const int spline_total = spline->evaluated_points_size();
         MutableSpan<T> spline_data = values.as_mutable_span().slice(offset, spline_total);
         fn::GMutableSpan generic_spline_data(spline_data);

@@ -87,7 +87,7 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
     case GEO_NODE_CURVE_TRIM_FACTOR: {
       const float factor_start = params.extract_input<float>("Start");
       const float factor_end = params.extract_input<float>("End");
-      for (Spline *spline : curve.splines) {
+      for (SplinePtr &spline : curve.splines) {
         const float length = spline->evaluated_lengths().last();
         const float length_start = factor_start * length;
         const float length_end = factor_end * length;
@@ -98,7 +98,7 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
     case GEO_NODE_CURVE_TRIM_LENGTH: {
       const float length_start = params.extract_input<float>("Start_001");
       const float length_end = params.extract_input<float>("End_001");
-      for (Spline *spline : curve.splines) {
+      for (SplinePtr &spline : curve.splines) {
         spline->trim_lengths(length_start, length_end);
       }
       break;

@@ -137,6 +137,8 @@ class Spline {
   virtual float control_point_radius(const int index) const = 0;
 };
 
+using SplinePtr = std::unique_ptr<Spline>;
+
 class BezierSpline : public Spline {
  public:
   blender::Vector<BezierPoint> control_points;
@@ -145,8 +147,6 @@ class BezierSpline : public Spline {
   int resolution_u;
 
  public:
-  ~BezierSpline() = default;
-
   int size() const final;
   int resolution() const final;
   void set_resolution(const int value) final;
@@ -195,18 +195,11 @@ class NURBSPline : public Spline {
 
 /* Proposed name to be different from DNA type. */
 struct DCurve {
-  blender::Vector<Spline *> splines;
+  blender::Vector<SplinePtr> splines;
 
   // bool is_2d;
 
   // DCurve *copy();
-
-  ~DCurve()
-  {
-    for (Spline *spline : splines) {
-      delete spline;
-    }
-  }
 };
 
 DCurve *dcurve_from_dna_curve(const Curve &curve);

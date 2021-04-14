@@ -212,7 +212,7 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
 {
   int profile_vert_total = 0;
   int profile_edge_total = 0;
-  for (const Spline *profile_spline : profile_curve.splines) {
+  for (const SplinePtr &profile_spline : profile_curve.splines) {
     profile_vert_total += profile_spline->evaluated_points_size();
     profile_edge_total += profile_spline->evaluated_edges_size();
   }
@@ -220,7 +220,7 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   int vert_total = 0;
   int edge_total = 0;
   int poly_total = 0;
-  for (const Spline *spline : curve.splines) {
+  for (const SplinePtr &spline : curve.splines) {
     const int spline_vert_len = spline->evaluated_points_size();
     const int spline_edge_len = spline->evaluated_edges_size();
     vert_total += spline_vert_len * profile_vert_total;
@@ -248,8 +248,8 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   int edge_offset = 0;
   int loop_offset = 0;
   int poly_offset = 0;
-  for (const Spline *spline : curve.splines) {
-    for (const Spline *profile_spline : profile_curve.splines) {
+  for (const SplinePtr &spline : curve.splines) {
+    for (const SplinePtr &profile_spline : profile_curve.splines) {
       spline_extrude_to_mesh_data(*spline,
                                   *profile_spline,
                                   verts,
@@ -272,13 +272,13 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
 static DCurve get_curve_single_vert()
 {
   DCurve curve;
-  BezierSpline *spline = new BezierSpline();
+  std::unique_ptr<BezierSpline> spline = std::make_unique<BezierSpline>();
   BezierPoint control_point;
   control_point.position = float3(0);
   control_point.handle_position_a = float3(0);
   control_point.handle_position_b = float3(0);
   spline->control_points.append(control_point);
-  curve.splines.append(static_cast<Spline *>(spline));
+  curve.splines.append(std::move(spline));
 
   return curve;
 }
