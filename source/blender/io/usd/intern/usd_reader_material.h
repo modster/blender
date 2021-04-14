@@ -78,9 +78,7 @@ class USDMaterialReader {
 
   Material *add_material(const pxr::UsdShadeMaterial &usd_material) const;
 
-  void import_usd_preview(Material *mtl, const pxr::UsdShadeMaterial &usd_material) const;
-
-  void import_usd_preview(Material *mtl, const pxr::UsdShadeShader &usd_material) const;
+  void import_usd_preview(Material *mtl, const pxr::UsdShadeShader &usd_shader) const;
 
   void set_node_input(const pxr::UsdShadeInput &usd_input,
                       bNode *dest_node,

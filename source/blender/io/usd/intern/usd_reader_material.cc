@@ -184,6 +184,64 @@ static pxr::TfToken get_source_color_space(const pxr::UsdShadeShader &usd_shader
   return pxr::TfToken();
 }
 
+/* Attempts to return in r_preview_surface the UsdPreviewSurface shader source
+ * of the given material.  Returns true if a UsdPreviewSurface source was found
+ * and returns false otherwise. */
+bool get_usd_preview_surface(const pxr::UsdShadeMaterial &usd_material,
+                             pxr::UsdShadeShader &r_preview_surface)
+{
+  if (!usd_material) {
+    return false;
+  }
+
+  if (pxr::UsdShadeShader surf_shader = usd_material.ComputeSurfaceSource()) {
+    /* Check if we have a UsdPreviewSurface shader. */
+    pxr::TfToken shader_id;
+    if (surf_shader.GetShaderId(&shader_id) && shader_id == usdtokens::UsdPreviewSurface) {
+      r_preview_surface = surf_shader;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/* Set the Blender material's viewport display color, metallic and roughness
+ * properties from the given USD preview surface shader's inputs. */
+void set_viewport_material_props(Material *mtl, const pxr::UsdShadeShader &usd_preview)
+{
+  if (!(mtl && usd_preview)) {
+    return;
+  }
+
+  if (pxr::UsdShadeInput diffuse_color_input = usd_preview.GetInput(usdtokens::diffuseColor)) {
+    pxr::VtValue val;
+    if (diffuse_color_input.GetAttr().HasAuthoredValue() &&
+        diffuse_color_input.GetAttr().Get(&val) && val.IsHolding<pxr::GfVec3f>()) {
+      pxr::GfVec3f color = val.Get<pxr::GfVec3f>();
+      mtl->r = color[0];
+      mtl->g = color[1];
+      mtl->b = color[2];
+    }
+  }
+
+  if (pxr::UsdShadeInput metallic_input = usd_preview.GetInput(usdtokens::metallic)) {
+    pxr::VtValue val;
+    if (metallic_input.GetAttr().HasAuthoredValue() && metallic_input.GetAttr().Get(&val) &&
+        val.IsHolding<float>()) {
+      mtl->metallic = val.Get<float>();
+    }
+  }
+
+  if (pxr::UsdShadeInput roughness_input = usd_preview.GetInput(usdtokens::roughness)) {
+    pxr::VtValue val;
+    if (roughness_input.GetAttr().HasAuthoredValue() && roughness_input.GetAttr().Get(&val) &&
+        val.IsHolding<float>()) {
+      mtl->roughness = val.Get<float>();
+    }
+  }
+}
+
 namespace blender::io::usd {
 
 namespace {
@@ -225,34 +283,20 @@ Material *USDMaterialReader::add_material(const pxr::UsdShadeMaterial &usd_mater
   /* Create the material. */
   Material *mtl = BKE_material_add(bmain_, mtl_name.c_str());
 
-  /* Optionally, create shader nodes to represent a UsdPreviewSurface. */
-  if (params_.import_usd_preview) {
-    import_usd_preview(mtl, usd_material);
+  /* Get the UsdPreviewSurface shader source for the material,
+   * if there is one. */
+  pxr::UsdShadeShader usd_preview;
+  if (get_usd_preview_surface(usd_material, usd_preview)) {
+
+    set_viewport_material_props(mtl, usd_preview);
+
+    /* Optionally, create shader nodes to represent a UsdPreviewSurface. */
+    if (params_.import_usd_preview) {
+      import_usd_preview(mtl, usd_preview);
+    }
   }
 
   return mtl;
-}
-
-/* Convert a UsdPreviewSurface shader network to Blender nodes.
- * The logic doesn't yet handle converting arbitrary prim var reader nodes. */
-
-void USDMaterialReader::import_usd_preview(Material *mtl,
-                                           const pxr::UsdShadeMaterial &usd_material) const
-{
-  if (!usd_material) {
-    return;
-  }
-
-  /* Get the surface shader. */
-  pxr::UsdShadeShader surf_shader = usd_material.ComputeSurfaceSource();
-
-  if (surf_shader) {
-    /* Check if we have a UsdPreviewSurface shader. */
-    pxr::TfToken shader_id;
-    if (surf_shader.GetShaderId(&shader_id) && shader_id == usdtokens::UsdPreviewSurface) {
-      import_usd_preview(mtl, surf_shader);
-    }
-  }
 }
 
 /* Create the Principled BSDF shader node network. */
