@@ -114,7 +114,7 @@ static void link_nodes(
 static pxr::UsdShadeShader get_source_shader(const pxr::UsdShadeConnectableAPI &source,
                                              pxr::TfToken in_shader_id)
 {
-  if (source && source.IsShader()) {
+  if (source && source.GetPrim().IsA<pxr::UsdShadeShader>()) {
     pxr::UsdShadeShader source_shader(source.GetPrim());
     if (source_shader) {
       pxr::TfToken shader_id;
@@ -378,7 +378,7 @@ void USDMaterialReader::set_node_input(const pxr::UsdShadeInput &usd_input,
 
     usd_input.GetConnectedSource(&source, &source_name, &source_type);
 
-    if (!(source && source.IsShader())) {
+    if (!(source && source.GetPrim().IsA<pxr::UsdShadeShader>())) {
       return;
     }
 
