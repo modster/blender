@@ -151,7 +151,7 @@ static int wm_usd_export_exec(bContext *C, wmOperator *op)
       evaluation_mode,
   };
 
-  bool ok = USD_export(C, filename, &params, as_background_job);
+  const bool ok = USD_export(C, filename, &params, as_background_job);
 
   return as_background_job || ok ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
@@ -358,7 +358,7 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
                                    convert_to_z_up,
                                    light_intensity_scale};
 
-  bool ok = USD_import(C, filename, &params, as_background_job);
+  const bool ok = USD_import(C, filename, &params, as_background_job);
 
   return as_background_job || ok ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
