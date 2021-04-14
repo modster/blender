@@ -33,6 +33,7 @@
 #include "eevee_renderpasses.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
+#include "eevee_shading.hh"
 #include "eevee_view.hh"
 
 #include "eevee_engine.h"

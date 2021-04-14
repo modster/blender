@@ -92,6 +92,7 @@ set(SRC
   engines/eevee/eevee_lut.c
   engines/eevee/eevee_motion_blur.cc
   engines/eevee/eevee_renderpasses.cc
+  engines/eevee/eevee_shading.cc
   engines/eevee/eevee_velocity.cc
   engines/eevee/eevee_view.cc
   engines/workbench/workbench_data.c

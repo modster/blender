@@ -37,48 +37,6 @@
 
 namespace blender::eevee {
 
-class Instance;
-
-/* -------------------------------------------------------------------- */
-/** \name Passes
- * \{ */
-
-void ForwardPass::sync()
-{
-  DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
-  opaque_ps_ = DRW_pass_create("Forward", state);
-
-  DRWState state_add = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL | DRW_STATE_DEPTH_EQUAL;
-  light_additional_ps_ = DRW_pass_create_instance("ForwardAddLight", opaque_ps_, state_add);
-}
-
-void ForwardPass::surface_add(Object *ob, Material *mat, int matslot)
-{
-  (void)mat;
-  (void)matslot;
-  GPUBatch *geom = DRW_cache_object_surface_get(ob);
-  if (geom == nullptr) {
-    return;
-  }
-
-  GPUShader *sh = inst_.shaders.static_shader_get(MESH);
-  DRWShadingGroup *grp = DRW_shgroup_create(sh, opaque_ps_);
-  DRW_shgroup_uniform_block(grp, "lights_block", inst_.lights.ubo_get());
-  DRW_shgroup_uniform_block(grp, "cluster_block", inst_.lights.cluster_ubo_get());
-  DRW_shgroup_call(grp, geom, ob);
-}
-
-void ForwardPass::render(void)
-{
-  for (auto index : inst_.lights.index_range()) {
-    inst_.lights.bind_range(index);
-
-    DRW_draw_pass((index == 0) ? opaque_ps_ : light_additional_ps_);
-  }
-}
-
-/** \} */
-
 /* -------------------------------------------------------------------- */
 /** \name ShadingView
  * \{ */

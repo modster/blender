@@ -47,54 +47,6 @@ namespace blender::eevee {
 class Instance;
 
 /* -------------------------------------------------------------------- */
-/** \name Passes
- * \{ */
-
-class ForwardPass {
- private:
-  Instance &inst_;
-
-  DRWPass *opaque_ps_ = nullptr;
-  DRWPass *light_additional_ps_ = nullptr;
-
- public:
-  ForwardPass(Instance &inst) : inst_(inst){};
-
-  void sync(void);
-  void surface_add(Object *ob, Material *mat, int matslot);
-  void render(void);
-};
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name ShadingPasses
- *
- * \{ */
-
-/**
- * Shading passes. Shared between views. Objects will subscribe to one of them.
- */
-class ShadingPasses {
- public:
-  // BackgroundShadingPass background;
-  // DeferredPass opaque;
-  ForwardPass opaque;
-  VelocityPass velocity;
-
- public:
-  ShadingPasses(Instance &inst) : opaque(inst), velocity(inst){};
-
-  void sync()
-  {
-    opaque.sync();
-    velocity.sync();
-  }
-};
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name ShadingView
  *
  * Render the scene and fill all render passes data.
