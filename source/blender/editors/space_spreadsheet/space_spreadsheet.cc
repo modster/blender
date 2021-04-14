@@ -17,7 +17,6 @@
 #include <cstring>
 
 #include "BLI_listbase.h"
-#include "BLI_resource_scope.hh"
 
 #include "BKE_screen.h"
 

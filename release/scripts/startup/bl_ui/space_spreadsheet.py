@@ -18,6 +18,7 @@
 
 import bpy
 
+
 class SPREADSHEET_HT_header(bpy.types.Header):
     bl_space_type = 'SPREADSHEET'
 
@@ -43,8 +44,7 @@ class SPREADSHEET_HT_header(bpy.types.Header):
 
         layout.separator_spacer()
 
-        row = layout.row(align=True)
-        row.prop(space, "use_filter", toggle=True, icon='FILTER', icon_only=True)
+        layout.prop(space, "use_filter", toggle=True, icon='FILTER', icon_only=True)
 
 
 classes = (
