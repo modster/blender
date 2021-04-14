@@ -512,7 +512,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   true,
                   "Import Instance Proxies",
                   "If enabled, USD instances will be traversed with instance proxies, "
-                  "creating a unique Blender object for each instance.  Note that "
+                  "creating a unique Blender object for each instance. Note that "
                   "this option is ignored if the Instancing option is also checked");
 
   RNA_def_boolean(ot->srna,
@@ -520,21 +520,21 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   true,
                   "Visible Prims Only",
                   "If enabled, invisible USD prims won't be imported. "
-                  "Only applies to prims with a non-animating visibility attribute.  "
+                  "Only applies to prims with a non-animating visibility attribute. "
                   "Prims with animating visibility will always be imported");
 
   RNA_def_boolean(ot->srna,
                   "create_collection",
                   false,
                   "Create Collection",
-                  "If enabled, all import objects will be added to a new collection");
+                  "If enabled, all imported objects will be added to a new collection");
 
   prop = RNA_def_enum(ot->srna,
                       "global_read_flag",
                       rna_enum_usd_import_read_flags,
                       0,
                       "Flags",
-                      "Set read flag for all usd import mesh sequence cache modifiers");
+                      "Set read flag for all USD import mesh sequence cache modifiers");
 
   RNA_def_property_flag(prop, PROP_ENUM_FLAG);
   RNA_def_property_enum_default(
@@ -559,7 +559,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
       "use_instancing",
       false,
       "Instancing",
-      "When checked, USD scenegraph instances are imported as collection instances in Blender.  "
+      "When checked, USD scenegraph instances are imported as collection instances in Blender. "
       "Note that point instancers are not yet handled by this option");
 
   RNA_def_boolean(
@@ -582,7 +582,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   true,
                   "Convert to Z Up",
                   "When checked and if the USD stage up-axis is Y, apply a rotation "
-                  "to the imported objects to convert their orientation to Z up ");
+                  "to the imported objects to convert their orientation to Z up");
 
   RNA_def_float(ot->srna,
                 "light_intensity_scale",
