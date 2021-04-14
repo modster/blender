@@ -78,6 +78,18 @@ class StructArrayBuffer {
   }
 
   /**
+   * Get a pointer to the beginning of the array.
+   */
+  const T *data() const
+  {
+    return data_;
+  }
+  T *data()
+  {
+    return data_;
+  }
+
+  /**
    * Iterator
    */
   const T *begin() const

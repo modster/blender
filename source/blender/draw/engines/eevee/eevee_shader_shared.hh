@@ -55,6 +55,8 @@ typedef int bvec2[2];
 /* Ugly but it does the job! */
 #  define bool int
 
+#  include "eevee_wrapper.hh"
+
 namespace blender::eevee {
 
 #endif
@@ -218,7 +220,7 @@ struct DepthOfFieldData {
   float coc_abs_max;
   /** Copy of camera type. */
   eCameraType camera_type;
-  int pad0, pad1, pad2;
+  int _pad0, _pad1, _pad2;
 };
 BLI_STATIC_ASSERT_ALIGN(DepthOfFieldData, 16)
 
@@ -296,7 +298,7 @@ struct MotionBlurData {
   vec2 target_size_inv;
   /** Viewport motion blur only blurs using previous frame vectors. */
   bool is_viewport;
-  int pad0_, pad1_, pad2_;
+  int _pad0, _pad1, _pad2;
 };
 BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
 
@@ -306,8 +308,8 @@ BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
 /** \name Lights
  * \{ */
 
-/** Maximum number of lights in the scene. */
-#define LIGHT_MAX 128
+/** Maximum number of lights in one light UBO. */
+#define LIGHT_MAX 512
 
 enum eLightType : uint32_t {
   LIGHT_SUN = 0u,
@@ -335,12 +337,11 @@ struct LightData {
   mat4 object_mat;
   /** Packed data in the last column of the object_mat. */
 #define _area_size_x object_mat[0][3]
-#define _spot_scale_x _area_size_x
 #define _area_size_y object_mat[1][3]
+#define _spot_scale_x _area_size_x
 #define _spot_scale_y _area_size_y
-  /** Influence radius (inversed and squared) adjusted for Surface / Volume power. */
-#define _influence_radius_surface object_mat[2][3]
-#define _influence_radius_volume object_mat[3][3]
+#define _spot_size object_mat[2][3]
+#define _spot_blend object_mat[3][3]
   /** Aliases for axes. */
 #ifdef __cplusplus
 #  define _right object_mat[0]
@@ -359,9 +360,9 @@ struct LightData {
   float diffuse_power;
   float specular_power;
   float volume_power;
-  /** Spot lights parameters. */
-  float spot_size;
-  float spot_blend;
+  /** Influence radius (inversed and squared) adjusted for Surface / Volume power. */
+  float inv_sqr_influence_radius_surface;
+  float inv_sqr_influence_radius_volume;
   /** Sphere radius for point & spot lights, or disk radius for sun. */
   float sphere_radius;
   /** Special radius factor for volumetric lighting. */
@@ -370,6 +371,8 @@ struct LightData {
   uint shadow_id;
   /** Light Type */
   eLightType type;
+  /** There is one vec4 worth of data left to be used until we break the 16KiB min UBO limit. */
+  // vec4 unused;
 };
 BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
@@ -393,14 +396,17 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 struct SceneData {
   uint light_count;
   uint probe_count;
-  uint pad0;
-  uint pad1;
+  uint _pad0;
+  uint _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(SceneData, 16)
 
 /** \} */
 
 #ifdef __cplusplus
+using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
+using LightDataBuf = StructArrayBuffer<LightData, LIGHT_MAX>;
+using SceneDataBuf = StructBuffer<SceneData>;
 
 #  undef bool
 }  // namespace blender::eevee

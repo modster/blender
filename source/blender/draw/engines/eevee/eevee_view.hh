@@ -49,22 +49,26 @@ namespace blender::eevee {
 /** \name Passes
  * \{ */
 
-class DeferredPass {
+class ForwardPass {
  private:
   ShaderModule &shaders_;
   LightModule &lights_;
-  StructBuffer<SceneData> &scene_data_;
+  SceneDataBuf &scene_data_;
 
-  DRWPass *test_ps_ = nullptr;
+  DRWPass *opaque_ps_ = nullptr;
+  DRWPass *light_additional_ps_ = nullptr;
 
  public:
-  DeferredPass(ShaderModule &shaders, LightModule &lights, StructBuffer<SceneData> &scene_data)
+  ForwardPass(ShaderModule &shaders, LightModule &lights, SceneDataBuf &scene_data)
       : shaders_(shaders), lights_(lights), scene_data_(scene_data){};
 
   void sync()
   {
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
-    test_ps_ = DRW_pass_create("Deferred", state);
+    opaque_ps_ = DRW_pass_create("Forward", state);
+
+    DRWState state_add = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL | DRW_STATE_DEPTH_EQUAL;
+    light_additional_ps_ = DRW_pass_create_instance("ForwardAddLight", opaque_ps_, state_add);
   }
 
   void surface_add(Object *ob, Material *mat, int matslot)
@@ -77,7 +81,7 @@ class DeferredPass {
     }
 
     GPUShader *sh = shaders_.static_shader_get(MESH);
-    DRWShadingGroup *grp = DRW_shgroup_create(sh, test_ps_);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, opaque_ps_);
     DRW_shgroup_uniform_block(grp, "lights_block", lights_.ubo_get());
     DRW_shgroup_uniform_block(grp, "scene_block", scene_data_.ubo_get());
     DRW_shgroup_call(grp, geom, ob);
@@ -85,14 +89,19 @@ class DeferredPass {
 
   void render(void)
   {
-    DRW_draw_pass(test_ps_);
+    for (auto index : lights_.index_range()) {
+      lights_.bind_range(index);
+
+      DRW_draw_pass((index == 0) ? opaque_ps_ : light_additional_ps_);
+    }
   }
 };
 
 class ShadingPasses {
  public:
   // BackgroundShadingPass background;
-  DeferredPass opaque;
+  // DeferredPass opaque;
+  ForwardPass opaque;
   VelocityPass velocity;
 
  public:
@@ -100,7 +109,7 @@ class ShadingPasses {
                 LightModule &lights,
                 Camera &camera,
                 Velocity &velocity,
-                StructBuffer<SceneData> &scene_data)
+                SceneDataBuf &scene_data)
       : opaque(shaders, lights, scene_data), velocity(shaders, camera, velocity){};
 
   void sync()
@@ -284,6 +293,7 @@ class ShadingView {
 
     GPU_framebuffer_bind(view_fb_);
     GPU_framebuffer_clear_color_depth(view_fb_, color, 1.0f);
+
     shading_passes_.opaque.render();
 
     shading_passes_.velocity.render(depth_tx_, velocity_only_fb_, velocity_fb_);

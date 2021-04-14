@@ -225,12 +225,12 @@ class Sampling {
     BLI_assert(cdf.size() > 1);
     cdf[0] = 0.0f;
     /* Actual CDF evaluation. */
-    for (int u = 0; u < cdf.size() - 1; u++) {
+    for (int u : cdf.index_range()) {
       float x = (float)(u + 1) / (float)(cdf.size() - 1);
       cdf[u + 1] = cdf[u] + BKE_curvemapping_evaluateF(&curve, 0, x);
     }
     /* Normalize the CDF. */
-    for (int u = 0; u < cdf.size() - 2; u++) {
+    for (int u : cdf.index_range()) {
       cdf[u] /= cdf.last();
     }
     /* Just to make sure. */
@@ -241,9 +241,9 @@ class Sampling {
    * Output vector is expected to already be sized according to the wanted resolution. */
   static void cdf_invert(Vector<float> &cdf, Vector<float> &inverted_cdf)
   {
-    for (int u = 0; u < inverted_cdf.size(); u++) {
+    for (int u : inverted_cdf.index_range()) {
       float x = (float)u / (float)(inverted_cdf.size() - 1);
-      for (int i = 0; i < cdf.size(); i++) {
+      for (int i : cdf.index_range()) {
         if (i == cdf.size() - 1) {
           inverted_cdf[u] = 1.0f;
         }

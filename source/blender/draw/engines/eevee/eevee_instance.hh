@@ -60,7 +60,7 @@ class Instance {
   MotionBlurModule motion_blur_;
   LightModule lights_;
   /** Contains scene general purpose data. Shared by many modules. */
-  StructBuffer<SceneData> scene_data_;
+  SceneDataBuf scene_data_;
   /** Lookdev own lightweight instance. May not be allocated. */
   // Lookdev *lookdev_ = nullptr;
 
@@ -204,8 +204,6 @@ class Instance {
     lights_.end_sync();
     sampling_.end_sync();
     render_passes_.end_sync();
-
-    scene_data_.push_update();
   }
 
   void render_sync(void)

@@ -130,8 +130,6 @@ struct ObjectKey {
  * Container for scene velocity data.
  * \{ */
 
-using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
-
 class Velocity {
  public:
   enum eStep {
