@@ -398,8 +398,7 @@ BLI_NOINLINE static void interpolate_existing_attributes(
       attribute_math::convert_to_static_type(output_data_type, [&](auto dummy) {
         using T = decltype(dummy);
 
-        GVArray_Typed<T> source_attribute_typed{*source_attribute};
-        VArray_Span<T> source_span{source_attribute_typed};
+        fn::GVArray_Span<T> source_span{*source_attribute};
 
         for (const int UNUSED(i_set_instance) : set_group.transforms.index_range()) {
           const int offset = instance_start_offsets[i_instance];

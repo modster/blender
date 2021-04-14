@@ -528,7 +528,7 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
   }
 };
 
-class GVArray_GSpan final : public GSpan {
+class GVArray_GSpan : public GSpan {
  private:
   const GVArray &varray_;
   void *owned_data_ = nullptr;
@@ -538,7 +538,7 @@ class GVArray_GSpan final : public GSpan {
   ~GVArray_GSpan();
 };
 
-class GVMutableArray_GSpan final : public GMutableSpan {
+class GVMutableArray_GSpan : public GMutableSpan {
  private:
   GVMutableArray &varray_;
   void *owned_data_ = nullptr;
@@ -551,6 +551,19 @@ class GVMutableArray_GSpan final : public GMutableSpan {
 
   void apply();
   void disable_not_applied_warning();
+};
+
+template<typename T> class GVArray_Span : public Span<T> {
+ private:
+  GVArray_GSpan varray_gspan_;
+
+ public:
+  GVArray_Span(const GVArray &varray) : varray_gspan_(varray)
+  {
+    BLI_assert(varray.type().is<T>());
+    this->data_ = (const T *)varray_gspan_.data();
+    this->size_ = varray_gspan_.size();
+  }
 };
 
 template<typename T> class GVArray_For_OwnedVArray : public GVArray_For_VArray<T> {
