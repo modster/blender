@@ -2835,6 +2835,13 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->w = scene->r.xsch;
   rb->h = scene->r.ysch;
 
+  if (rb->cam_is_persp) {
+    rb->tile_recursive_level = LRT_TILE_RECURSIVE_PERSPECTIVE;
+  }
+  else {
+    rb->tile_recursive_level = LRT_TILE_RECURSIVE_ORTHO;
+  }
+
   double asp = ((double)rb->w / (double)rb->h);
   rb->shift_x = (asp >= 1) ? c->shiftx : c->shiftx * asp;
   rb->shift_y = (asp <= 1) ? c->shifty : c->shifty * asp;
@@ -3251,7 +3258,8 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
      * Here we use recursive limit. This is especially useful in orthographic render,
      * where a lot of faces could easily line up perfectly in image space,
      * which can not be separated by simply slicing the image tile. */
-    if (root_ba->triangle_count > 200 && recursive && recursive_level < 10) {
+    if (root_ba->triangle_count > LRT_TILE_SPLITTING_TRIANGLE_LIMIT && recursive &&
+        recursive_level < rb->tile_recursive_level) {
       lineart_bounding_area_split(rb, root_ba, recursive_level);
     }
     if (recursive && do_intersection && rb->use_intersections) {
