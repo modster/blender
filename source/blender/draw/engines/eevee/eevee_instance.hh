@@ -56,8 +56,11 @@ class Instance {
   Camera camera_;
   /** Velocity module containing motion data. */
   Velocity velocity_;
-  /** Motion blur data. */
+  /** Own modules. */
   MotionBlurModule motion_blur_;
+  LightModule lights_;
+  /** Contains scene general purpose data. Shared by many modules. */
+  StructBuffer<SceneData> scene_data_;
   /** Lookdev own lightweight instance. May not be allocated. */
   // Lookdev *lookdev_ = nullptr;
 
@@ -80,7 +83,8 @@ class Instance {
         main_view_(shared_shaders, shading_passes_, camera_, sampling_, motion_blur_),
         camera_(sampling_),
         velocity_(),
-        motion_blur_(camera_, sampling_, velocity_){};
+        motion_blur_(camera_, sampling_, velocity_),
+        lights_(shared_shaders, sampling_, scene_data_){};
   ~Instance(){};
 
   /**
@@ -123,7 +127,9 @@ class Instance {
       output_rect = &rect;
     }
 
+    /* Needs to be first. */
     sampling_.init(scene_);
+
     camera_.init(render_, depsgraph_, camera_object, drw_view_);
     motion_blur_.init(scene_, render, depsgraph_);
     render_passes_.init(scene_, render_layer, v3d_, output_res, output_rect);
@@ -144,6 +150,7 @@ class Instance {
     main_view_.sync();
 
     velocity_.begin_sync(camera_);
+    lights_.begin_sync(scene_);
   }
 
   void object_sync(Object *ob)
@@ -171,6 +178,9 @@ class Instance {
 
     if (object_is_visible) {
       switch (ob->type) {
+        case OB_LAMP:
+          lights_.sync_light(ob);
+          break;
         case OB_MESH:
           shading_passes_.opaque.surface_add(ob, nullptr, 0);
           shading_passes_.velocity.mesh_add(ob);
@@ -191,6 +201,7 @@ class Instance {
   void end_sync(void)
   {
     velocity_.end_sync();
+    lights_.end_sync();
     sampling_.end_sync();
     render_passes_.end_sync();
 

@@ -37,6 +37,8 @@
 #include "DRW_render.h"
 
 #include "eevee_depth_of_field.hh"
+#include "eevee_light.hh"
+#include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_shader.hh"
 #include "eevee_velocity.hh"
@@ -50,11 +52,14 @@ namespace blender::eevee {
 class DeferredPass {
  private:
   ShaderModule &shaders_;
+  LightModule &lights_;
+  StructBuffer<SceneData> &scene_data_;
 
   DRWPass *test_ps_ = nullptr;
 
  public:
-  DeferredPass(ShaderModule &shaders) : shaders_(shaders){};
+  DeferredPass(ShaderModule &shaders, LightModule &lights, StructBuffer<SceneData> &scene_data)
+      : shaders_(shaders), lights_(lights), scene_data_(scene_data){};
 
   void sync()
   {
@@ -66,9 +71,15 @@ class DeferredPass {
   {
     (void)mat;
     (void)matslot;
+    GPUBatch *geom = DRW_cache_object_surface_get(ob);
+    if (geom == nullptr) {
+      return;
+    }
+
     GPUShader *sh = shaders_.static_shader_get(MESH);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, test_ps_);
-    GPUBatch *geom = DRW_cache_object_surface_get(ob);
+    DRW_shgroup_uniform_block(grp, "lights_block", lights_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "scene_block", scene_data_.ubo_get());
     DRW_shgroup_call(grp, geom, ob);
   }
 
@@ -85,8 +96,12 @@ class ShadingPasses {
   VelocityPass velocity;
 
  public:
-  ShadingPasses(ShaderModule &shaders, Camera &camera, Velocity &velocity)
-      : opaque(shaders), velocity(shaders, camera, velocity){};
+  ShadingPasses(ShaderModule &shaders,
+                LightModule &lights,
+                Camera &camera,
+                Velocity &velocity,
+                StructBuffer<SceneData> &scene_data)
+      : opaque(shaders, lights, scene_data), velocity(shaders, camera, velocity){};
 
   void sync()
   {

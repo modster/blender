@@ -30,6 +30,7 @@
 #  pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #  define BLI_STATIC_ASSERT_ALIGN(type_, align_)
 #  define static
+#  define inline
 #  define cosf cos
 #  define sinf sin
 #  define tanf tan
@@ -45,6 +46,7 @@
 /* TODO(fclem) Use correct C++ vector classes instead. */
 typedef float mat4[4][4];
 typedef float vec4[4];
+typedef float vec3[3];
 typedef float vec2[2];
 typedef int ivec4[4];
 typedef int ivec2[2];
@@ -300,7 +302,106 @@ BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name Lights
+ * \{ */
+
+/** Maximum number of lights in the scene. */
+#define LIGHT_MAX 128
+
+enum eLightType : uint32_t {
+  LIGHT_SUN = 0u,
+  LIGHT_POINT = 1u,
+  LIGHT_SPOT = 2u,
+  LIGHT_RECT = 3u,
+  LIGHT_ELIPSE = 4u
+};
+
+/* inline just to avoid warning about unused functions. */
+static inline bool is_area_light(eLightType type)
+{
+  return type >= LIGHT_RECT;
+}
+
+struct LightData {
+  /** Normalized obmat. Last column contains data accessible using the following macros.
+   * _area_size_x
+   * _spot_scale_x
+   * _area_size_y
+   * _spot_scale_y
+   * _influence_radius_surface
+   * _influence_radius_volume
+   */
+  mat4 object_mat;
+  /** Packed data in the last column of the object_mat. */
+#define _area_size_x object_mat[0][3]
+#define _spot_scale_x _area_size_x
+#define _area_size_y object_mat[1][3]
+#define _spot_scale_y _area_size_y
+  /** Influence radius (inversed and squared) adjusted for Surface / Volume power. */
+#define _influence_radius_surface object_mat[2][3]
+#define _influence_radius_volume object_mat[3][3]
+  /** Aliases for axes. */
 #ifdef __cplusplus
+#  define _right object_mat[0]
+#  define _up object_mat[1]
+#  define _back object_mat[2]
+#  define _position object_mat[3]
+#else
+#  define _right object_mat[0].xyz
+#  define _up object_mat[1].xyz
+#  define _back object_mat[2].xyz
+#  define _position object_mat[3].xyz
+#endif
+  /** NOTE: It is ok to use vec3 here. A float is declared right after it. */
+  vec3 color;
+  /** Power depending on shader type. */
+  float diffuse_power;
+  float specular_power;
+  float volume_power;
+  /** Spot lights parameters. */
+  float spot_size;
+  float spot_blend;
+  /** Sphere radius for point & spot lights, or disk radius for sun. */
+  float sphere_radius;
+  /** Special radius factor for volumetric lighting. */
+  float volume_radius;
+  /** Offset in the shadow struct table. -1 means no shadow. */
+  uint shadow_id;
+  /** Light Type */
+  eLightType type;
+};
+BLI_STATIC_ASSERT_ALIGN(LightData, 16)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Shadows
+ * \{ */
+
+/** Max cascade count for sun shadows. */
+#define SHADOW_CASCADE_MAX 4
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Scene
+ *
+ * General purpose structure for scene level properties.
+ * \{ */
+
+struct SceneData {
+  uint light_count;
+  uint probe_count;
+  uint pad0;
+  uint pad1;
+};
+BLI_STATIC_ASSERT_ALIGN(SceneData, 16)
+
+/** \} */
+
+#ifdef __cplusplus
+
 #  undef bool
 }  // namespace blender::eevee
 #endif
