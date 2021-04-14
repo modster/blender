@@ -29,6 +29,8 @@
 #include "BLI_task.h"
 #include "BLI_utildefines.h"
 
+#include "PIL_time.h"
+
 #include "BKE_camera.h"
 #include "BKE_collection.h"
 #include "BKE_customdata.h"
@@ -1828,6 +1830,24 @@ static int lineart_usage_check(Collection *c, Object *ob, LineartRenderBuffer *_
   return OBJECT_LRT_INHERIT;
 }
 
+static void lineart_geometry_load_assign_thread(LineartObjectLoadTaskInfo *olti_list,
+                                                LineartObjectInfo *obi,
+                                                int thread_count,
+                                                int this_face_count)
+{
+  LineartObjectLoadTaskInfo *use_olti = olti_list;
+  long unsigned int min_face = use_olti->total_faces;
+  for (int i = 0; i < thread_count; i++) {
+    if (olti_list[i].total_faces < min_face) {
+      min_face = olti_list[i].total_faces;
+      use_olti = &olti_list[i];
+    }
+  }
+  use_olti->total_faces += this_face_count;
+  obi->next = use_olti->pending;
+  use_olti->pending = obi;
+}
+
 static void lineart_main_load_geometries(
     Depsgraph *depsgraph,
     Scene *scene,
@@ -1843,6 +1863,12 @@ static void lineart_main_load_geometries(
   double fov = focallength_to_fov(cam->lens, sensor);
 
   double asp = ((double)rb->w / (double)rb->h);
+
+  double t_start;
+
+  if (G.debug_value == 4000) {
+    t_start = PIL_check_seconds_timer();
+  }
 
   if (cam->type == CAM_PERSP) {
     if (cam->sensor_fit == CAMERA_SENSOR_FIT_AUTO) {
@@ -1894,7 +1920,6 @@ static void lineart_main_load_geometries(
   LineartObjectLoadTaskInfo *olti = lineart_mem_aquire(
       &rb->render_data_pool, sizeof(LineartObjectLoadTaskInfo) * thread_count);
 
-  int to_thread = 0;
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     LineartObjectInfo *obi = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
     obi->override_usage = lineart_usage_check(scene->master_collection, ob, rb);
@@ -1958,14 +1983,8 @@ static void lineart_main_load_geometries(
     copy_m4d_m4(obi->normal, imat);
 
     obi->original_bm = bm;
-    obi->original_ob = (Object *)(ob->id.orig_id ? ob->id.orig_id : ob);
-    obi->next = olti[to_thread].pending;
-    olti[to_thread].pending = obi;
-
-    to_thread++;
-    if (to_thread >= thread_count) {
-      to_thread = 0;
-    }
+    obi->original_ob = (ob->id.orig_id ? (Object *)ob->id.orig_id : (Object *)ob);
+    lineart_geometry_load_assign_thread(olti, obi, thread_count, bm->totface);
   }
   DEG_OBJECT_ITER_END;
 
@@ -1996,6 +2015,11 @@ static void lineart_main_load_geometries(
       global_i += v_count;
       lineart_finalize_object_edge_list(rb, obi);
     }
+  }
+
+  if (G.debug_value == 4000) {
+    double t_elapsed = PIL_check_seconds_timer() - t_start;
+    printf("Line art loading time: %lf\n", t_elapsed);
   }
 }
 
@@ -3784,6 +3808,12 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModif
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   int intersections_only = 0; /* Not used right now, but preserve for future. */
 
+  double t_start;
+
+  if (G.debug_value == 4000) {
+    t_start = PIL_check_seconds_timer();
+  }
+
   if (!scene->camera) {
     return false;
   }
@@ -3877,6 +3907,9 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModif
 
   if (G.debug_value == 4000) {
     lineart_count_and_print_render_buffer_memory(rb);
+
+    double t_elapsed = PIL_check_seconds_timer() - t_start;
+    printf("Line art total time: %lf\n", t_elapsed);
   }
 
   return true;
