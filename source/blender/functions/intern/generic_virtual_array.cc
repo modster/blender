@@ -220,8 +220,7 @@ GVArray_For_SingleValue::~GVArray_For_SingleValue()
  * GVArray_Span.
  */
 
-GVArray_Span::GVArray_Span(const GVArray &varray)
-    : GVArray_For_GSpan(varray.type(), varray.size()), varray_(varray)
+GVArray_Span::GVArray_Span(const GVArray &varray) : GSpan(varray.type()), varray_(varray)
 {
   if (varray_.is_span()) {
     data_ = varray_.get_span().data();
@@ -231,6 +230,7 @@ GVArray_Span::GVArray_Span(const GVArray &varray)
     varray_.materialize_to_uninitialized(IndexRange(size_), owned_data_);
     data_ = owned_data_;
   }
+  size_ = varray_.size();
 }
 
 GVArray_Span::~GVArray_Span()
@@ -241,22 +241,12 @@ GVArray_Span::~GVArray_Span()
   }
 }
 
-GSpan GVArray_Span::as_span() const
-{
-  return this->get_span();
-}
-
-GVArray_Span::operator GSpan() const
-{
-  return this->get_span();
-}
-
 /* --------------------------------------------------------------------
  * GVMutableArray_Span.
  */
 
 GVMutableArray_Span::GVMutableArray_Span(GVMutableArray &varray, const bool materialize)
-    : GVMutableArray_For_GMutableSpan(varray.type(), varray.size()), varray_(varray)
+    : GMutableSpan(varray.type()), varray_(varray)
 {
   if (varray_.is_span()) {
     data_ = varray_.get_span().data();
@@ -271,6 +261,7 @@ GVMutableArray_Span::GVMutableArray_Span(GVMutableArray &varray, const bool mate
     }
     data_ = owned_data_;
   }
+  size_ = varray_.size();
 }
 
 GVMutableArray_Span::~GVMutableArray_Span()
@@ -288,24 +279,15 @@ void GVMutableArray_Span::apply()
   if (data_ != owned_data_) {
     return;
   }
+  const int64_t element_size = type_->size();
   for (int64_t i : IndexRange(size_)) {
-    varray_.set_by_copy(i, POINTER_OFFSET(owned_data_, element_size_ * i));
+    varray_.set_by_copy(i, POINTER_OFFSET(owned_data_, element_size * i));
   }
 }
 
 void GVMutableArray_Span::disable_not_applied_warning()
 {
   show_not_applied_warning_ = false;
-}
-
-GMutableSpan GVMutableArray_Span::as_span()
-{
-  return this->get_span();
-}
-
-GVMutableArray_Span::operator GMutableSpan()
-{
-  return this->get_span();
 }
 
 }  // namespace blender::fn

@@ -528,7 +528,7 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
   }
 };
 
-class GVArray_Span final : public GVArray_For_GSpan {
+class GVArray_Span final : public GSpan {
  private:
   const GVArray &varray_;
   void *owned_data_ = nullptr;
@@ -536,24 +536,9 @@ class GVArray_Span final : public GVArray_For_GSpan {
  public:
   GVArray_Span(const GVArray &varray);
   ~GVArray_Span();
-
-  GSpan as_span() const;
-  operator GSpan() const;
-
-  const void *data() const
-  {
-    return data_;
-  }
-
-  const void *operator[](const int64_t index)
-  {
-    BLI_assert(index >= 0);
-    BLI_assert(index < size_);
-    return POINTER_OFFSET(data_, index * element_size_);
-  }
 };
 
-class GVMutableArray_Span final : public GVMutableArray_For_GMutableSpan {
+class GVMutableArray_Span final : public GMutableSpan {
  private:
   GVMutableArray &varray_;
   void *owned_data_ = nullptr;
@@ -566,9 +551,6 @@ class GVMutableArray_Span final : public GVMutableArray_For_GMutableSpan {
 
   void apply();
   void disable_not_applied_warning();
-
-  GMutableSpan as_span();
-  operator GMutableSpan();
 };
 
 template<typename T> class GVArray_For_OwnedVArray : public GVArray_For_VArray<T> {

@@ -444,8 +444,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
       continue;
     }
 
-    fn::GVMutableArray_Span dst_span_varray{*write_attribute.varray};
-    fn::GMutableSpan dst_span = dst_span_varray.as_span();
+    fn::GVMutableArray_Span dst_span{*write_attribute.varray};
 
     int offset = 0;
     for (const GeometryInstanceGroup &set_group : set_groups) {
@@ -476,7 +475,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
       }
     }
 
-    dst_span_varray.apply();
+    dst_span.apply();
   }
 }
 

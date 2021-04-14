@@ -118,7 +118,7 @@ class OutputAttribute {
       optional_span_varray_.emplace(*varray_);
     }
     fn::GVMutableArray_Span &span_varray = *optional_span_varray_;
-    return span_varray.get_span();
+    return span_varray;
   }
 
   template<typename T> MutableSpan<T> as_span()
