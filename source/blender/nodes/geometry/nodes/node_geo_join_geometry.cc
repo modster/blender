@@ -178,7 +178,7 @@ static void fill_new_attribute(Span<const GeometryComponent *> src_components,
     std::unique_ptr<GVArray> read_attribute = component->attribute_get_for_read(
         attribute_name, domain, data_type, nullptr);
 
-    fn::GVArray_Span src_span{*read_attribute};
+    fn::GVArray_GSpan src_span{*read_attribute};
     const void *src_buffer = src_span.data();
     void *dst_buffer = dst_span[offset];
     cpp_type->copy_to_initialized_n(src_buffer, dst_buffer, domain_size);

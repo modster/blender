@@ -217,10 +217,10 @@ GVArray_For_SingleValue::~GVArray_For_SingleValue()
 }
 
 /* --------------------------------------------------------------------
- * GVArray_Span.
+ * GVArray_GSpan.
  */
 
-GVArray_Span::GVArray_Span(const GVArray &varray) : GSpan(varray.type()), varray_(varray)
+GVArray_GSpan::GVArray_GSpan(const GVArray &varray) : GSpan(varray.type()), varray_(varray)
 {
   if (varray_.is_span()) {
     data_ = varray_.get_span().data();
@@ -233,7 +233,7 @@ GVArray_Span::GVArray_Span(const GVArray &varray) : GSpan(varray.type()), varray
   size_ = varray_.size();
 }
 
-GVArray_Span::~GVArray_Span()
+GVArray_GSpan::~GVArray_GSpan()
 {
   if (owned_data_ != nullptr) {
     type_->destruct_n(owned_data_, size_);
@@ -242,10 +242,10 @@ GVArray_Span::~GVArray_Span()
 }
 
 /* --------------------------------------------------------------------
- * GVMutableArray_Span.
+ * GVMutableArray_GSpan.
  */
 
-GVMutableArray_Span::GVMutableArray_Span(GVMutableArray &varray, const bool materialize)
+GVMutableArray_GSpan::GVMutableArray_GSpan(GVMutableArray &varray, const bool materialize)
     : GMutableSpan(varray.type()), varray_(varray)
 {
   if (varray_.is_span()) {
@@ -264,7 +264,7 @@ GVMutableArray_Span::GVMutableArray_Span(GVMutableArray &varray, const bool mate
   size_ = varray_.size();
 }
 
-GVMutableArray_Span::~GVMutableArray_Span()
+GVMutableArray_GSpan::~GVMutableArray_GSpan()
 {
   if (show_not_applied_warning_) {
     if (!apply_has_been_called_) {
@@ -273,7 +273,7 @@ GVMutableArray_Span::~GVMutableArray_Span()
   }
 }
 
-void GVMutableArray_Span::apply()
+void GVMutableArray_GSpan::apply()
 {
   apply_has_been_called_ = true;
   if (data_ != owned_data_) {
@@ -285,7 +285,7 @@ void GVMutableArray_Span::apply()
   }
 }
 
-void GVMutableArray_Span::disable_not_applied_warning()
+void GVMutableArray_GSpan::disable_not_applied_warning()
 {
   show_not_applied_warning_ = false;
 }

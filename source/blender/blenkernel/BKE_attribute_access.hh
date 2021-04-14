@@ -67,7 +67,7 @@ class OutputAttribute {
   std::unique_ptr<GVMutableArray> varray_;
   AttributeDomain domain_;
   SaveF save_;
-  std::optional<fn::GVMutableArray_Span> optional_span_varray_;
+  std::optional<fn::GVMutableArray_GSpan> optional_span_varray_;
 
  public:
   OutputAttribute() = default;
@@ -117,7 +117,7 @@ class OutputAttribute {
     if (!optional_span_varray_.has_value()) {
       optional_span_varray_.emplace(*varray_);
     }
-    fn::GVMutableArray_Span &span_varray = *optional_span_varray_;
+    fn::GVMutableArray_GSpan &span_varray = *optional_span_varray_;
     return span_varray;
   }
 
