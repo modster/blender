@@ -263,9 +263,10 @@ void WM_OT_usd_export(struct wmOperatorType *ot)
 
 static int wm_usd_import_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (!RNA_struct_property_is_set(op->ptr, "as_background_job")) {
-    RNA_boolean_set(op->ptr, "as_background_job", true);
-  }
+  eUSDOperatorOptions *options = MEM_callocN(sizeof(eUSDOperatorOptions), "eUSDOperatorOptions");
+  options->as_background_job = true;
+  op->customdata = options;
+
   return WM_operator_filesel(C, op, event);
 }
 
@@ -279,11 +280,14 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   char filename[FILE_MAX];
   RNA_string_get(op->ptr, "filepath", filename);
 
+  eUSDOperatorOptions *options = (eUSDOperatorOptions *)op->customdata;
+  const bool as_background_job = (options != NULL && options->as_background_job);
+  MEM_SAFE_FREE(op->customdata);
+
   const float scale = RNA_float_get(op->ptr, "scale");
 
   const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
   const bool validate_meshes = RNA_boolean_get(op->ptr, "validate_meshes");
-  const bool as_background_job = RNA_boolean_get(op->ptr, "as_background_job");
   const char global_read_flag = RNA_enum_get(op->ptr, "global_read_flag");
   const bool import_cameras = RNA_boolean_get(op->ptr, "import_cameras");
   const bool import_curves = RNA_boolean_get(op->ptr, "import_curves");
@@ -476,15 +480,6 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
       true,
       "Set Frame Range",
       "If checked, update scene's start and end frame to match those of the USD archive");
-
-  RNA_def_boolean(
-      ot->srna,
-      "as_background_job",
-      false,
-      "Run as Background Job",
-      "Enable this to run the export in the background, disable to block Blender while exporting. "
-      "This option is deprecated; EXECUTE this operator to run in the foreground, and INVOKE it "
-      "to run as a background job");
 
   RNA_def_boolean(
       ot->srna, "import_cameras", true, "Cameras", "When checked, all cameras will be imported");
