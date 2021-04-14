@@ -385,7 +385,10 @@ typedef struct LineartObjectInfo {
 typedef struct LineartObjectLoadTaskInfo {
   struct LineartRenderBuffer *rb;
   struct Depsgraph *dg;
-  LineartObjectInfo *pending; /* LinkNode styled list */
+  /* LinkNode styled list */
+  LineartObjectInfo *pending;
+  /* Used to spread the load across several threads. This can not overflow. */
+  long unsigned int total_faces;
 } LineartObjectLoadTaskInfo;
 
 /**
