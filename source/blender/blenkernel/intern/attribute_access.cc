@@ -532,6 +532,16 @@ int GeometryComponent::attribute_domain_size(const AttributeDomain UNUSED(domain
   return 0;
 }
 
+bool GeometryComponent::attribute_is_builtin(const blender::StringRef attribute_name) const
+{
+  using namespace blender::bke;
+  const ComponentAttributeProviders *providers = this->get_attribute_providers();
+  if (providers == nullptr) {
+    return false;
+  }
+  return providers->builtin_attribute_providers().contains_as(attribute_name);
+}
+
 blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
     const StringRef attribute_name) const
 {
@@ -814,6 +824,37 @@ class GVMutableAttribute_For_OutputAttribute
   }
 };
 
+static void save_output_attribute(blender::bke::OutputAttribute &output_attribute)
+{
+  using namespace blender;
+  using namespace blender::fn;
+  using namespace blender::bke;
+
+  GVMutableAttribute_For_OutputAttribute &varray =
+      dynamic_cast<GVMutableAttribute_For_OutputAttribute &>(output_attribute.varray());
+
+  GeometryComponent &component = *varray.component;
+  const StringRefNull name = varray.final_name;
+  const AttributeDomain domain = output_attribute.domain();
+  const CustomDataType data_type = output_attribute.custom_data_type();
+  const CPPType &cpp_type = output_attribute.cpp_type();
+
+  component.attribute_try_delete(name);
+  if (!component.attribute_try_create(varray.final_name, domain, data_type)) {
+    CLOG_WARN(&LOG,
+              "Could not create the '%s' attribute with type '%s'.",
+              name.c_str(),
+              cpp_type.name().c_str());
+    return;
+  }
+  WriteAttributeLookup write_attribute = component.attribute_try_get_for_write(name);
+  BUFFER_FOR_CPP_TYPE_VALUE(varray.type(), buffer);
+  for (const int i : IndexRange(varray.size())) {
+    varray.get(i, buffer);
+    write_attribute.varray->set_by_relocate(i, buffer);
+  }
+}
+
 blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_only(
     const blender::StringRef attribute_name,
     const AttributeDomain domain,
@@ -832,8 +873,9 @@ blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_on
         /* Best case, attribute with correct type and domain exists already. */
         return OutputAttribute(std::move(attribute.varray), domain, {}, true);
       }
-      if (!this->attribute_is_deletable(attribute_name)) {
-        /* Can't delete this attribute later on, so adapt the data type. */
+      if (this->attribute_is_builtin(attribute_name)) {
+        /* Builtin types cannot change their data type and domain. Try to adapt the data type for
+         * the caller. */
         const nodes::DataTypeConversions &conversions = nodes::get_implicit_type_conversions();
         std::unique_ptr<GVMutableArray> varray = conversions.try_convert(
             std::move(attribute.varray), *cpp_type);
@@ -841,10 +883,14 @@ blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_on
       }
     }
   }
-  else if (this->attribute_try_create(attribute_name, domain, data_type)) {
-    /* There is no conflicting attribute, so create it and return the new attribute. */
-    attribute = this->attribute_try_get_for_write(attribute_name);
-    return OutputAttribute(std::move(attribute.varray), domain, {}, true);
+  else {
+    if (this->attribute_try_create(attribute_name, domain, data_type)) {
+      /* There is no conflicting attribute, so create it and return the new attribute. */
+      attribute = this->attribute_try_get_for_write(attribute_name);
+      return OutputAttribute(std::move(attribute.varray), domain, {}, true);
+    }
+    /* The attribute does not exist and can't be created. */
+    return {};
   }
 
   const int domain_size = this->attribute_domain_size(domain);
@@ -854,19 +900,6 @@ blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_on
   std::unique_ptr<GVMutableArray> varray =
       std::make_unique<GVMutableAttribute_For_OutputAttribute>(
           GMutableSpan{*cpp_type, data, domain_size}, *this, attribute_name);
-  auto save = [](OutputAttribute &attribute) {
-    GVMutableAttribute_For_OutputAttribute &varray =
-        dynamic_cast<GVMutableAttribute_For_OutputAttribute &>(attribute.varray());
-    varray.component->attribute_try_delete(varray.final_name);
-    varray.component->attribute_try_create(
-        varray.final_name, attribute.domain(), attribute.custom_data_type());
-    WriteAttributeLookup write_attribute = varray.component->attribute_try_get_for_write(
-        varray.final_name);
-    BUFFER_FOR_CPP_TYPE_VALUE(varray.type(), buffer);
-    for (const int i : IndexRange(varray.size())) {
-      varray.get(i, buffer);
-      write_attribute.varray->set_by_relocate(i, buffer);
-    }
-  };
-  return OutputAttribute(std::move(varray), domain, save, true);
+
+  return OutputAttribute(std::move(varray), domain, save_output_attribute, true);
 }

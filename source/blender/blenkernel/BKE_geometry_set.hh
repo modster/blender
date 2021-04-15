@@ -107,7 +107,7 @@ class GeometryComponent {
   /* Can only be used with supported domain types. */
   virtual int attribute_domain_size(const AttributeDomain domain) const;
 
-  bool attribute_is_deletable(const blender::StringRef attribute_name) const;
+  bool attribute_is_builtin(const blender::StringRef attribute_name) const;
 
   /* Get read-only access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */

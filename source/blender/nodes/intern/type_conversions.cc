@@ -280,4 +280,10 @@ std::unique_ptr<fn::GVArray> DataTypeConversions::try_convert(std::unique_ptr<fn
   return std::make_unique<GVArray_For_ConvertedGVArray>(std::move(varray), to_type, *this);
 }
 
+std::unique_ptr<fn::GVMutableArray> DataTypeConversions::try_convert(
+    std::unique_ptr<fn::GVMutableArray> varray, const CPPType &to_type) const
+{
+  return {};
+}
+
 }  // namespace blender::nodes
