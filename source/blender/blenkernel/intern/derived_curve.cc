@@ -113,6 +113,19 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
         break;
       }
       case CU_POLY: {
+        std::unique_ptr<PolySpline> spline = std::make_unique<PolySpline>();
+        spline->type = Spline::Type::Poly;
+        spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
+
+        for (const BPoint &bp : Span(nurb->bp, nurb->pntsu)) {
+          PolyPoint point;
+          point.position = bp.vec;
+          point.radius = bp.radius;
+          point.tilt = bp.tilt;
+          spline->control_points.append(std::move(point));
+        }
+
+        curve->splines.append(std::move(spline));
         break;
       }
       default: {
@@ -787,5 +800,69 @@ float NURBSPline::control_point_radius(const int index) const
 /* -------------------------------------------------------------------- */
 /** \name Poly Spline
  * \{ */
+
+SplinePtr PolySpline::copy() const
+{
+  SplinePtr new_spline = std::make_unique<PolySpline>(*this);
+
+  return new_spline;
+}
+
+int PolySpline::size() const
+{
+  return this->control_points.size();
+}
+
+int PolySpline::resolution() const
+{
+  return 1;
+}
+
+void PolySpline::set_resolution(const int UNUSED(value))
+{
+  /* Poly curve has no resolution, there is just one evaluated point per control point. */
+}
+
+int PolySpline::evaluated_points_size() const
+{
+  return this->control_points.size();
+}
+
+void PolySpline::correct_end_tangents() const
+{
+}
+
+void PolySpline::ensure_base_cache() const
+{
+
+  if (!this->base_cache_dirty_) {
+    return;
+  }
+
+  std::lock_guard lock{this->base_cache_mutex_};
+  if (!this->base_cache_dirty_) {
+    return;
+  }
+
+  const int total = this->evaluated_points_size();
+  this->evaluated_positions_cache_.resize(total);
+  this->evaluated_mapping_cache_.resize(total);
+
+  MutableSpan<float3> positions = this->evaluated_positions_cache_.as_mutable_span();
+  MutableSpan<PointMapping> mappings = this->evaluated_mapping_cache_.as_mutable_span();
+
+  for (const int i : positions.index_range()) {
+    positions[i] = this->control_points[i].position;
+    mappings[i].control_point_index = i;
+    mappings[i].factor = 0.0f;
+  }
+
+  this->base_cache_dirty_ = false;
+}
+
+float PolySpline::control_point_radius(const int index) const
+{
+  return this->control_points[index].radius;
+}
 
 /** \} */

@@ -237,6 +237,39 @@ class NURBSPline : public Spline {
   float control_point_radius(const int index) const final;
 };
 
+struct PolyPoint {
+  blender::float3 position;
+  float radius;
+
+  /* User defined tilt in radians, added on top of the auto-calculated tilt. */
+  float tilt;
+};
+
+class PolySpline : public Spline {
+ public:
+  blender::Vector<PolyPoint> control_points;
+
+ private:
+ public:
+  SplinePtr copy() const final;
+  PolySpline() = default;
+  PolySpline(const PolySpline &other)
+      : Spline((Spline &)other), control_points(other.control_points)
+  {
+  }
+
+  int size() const final;
+  int resolution() const final;
+  void set_resolution(const int value) final;
+  int evaluated_points_size() const final;
+
+ protected:
+  void correct_end_tangents() const final;
+  void ensure_base_cache() const final;
+
+  float control_point_radius(const int index) const final;
+};
+
 /* Proposed name to be different from DNA type. */
 class DCurve {
  public:
