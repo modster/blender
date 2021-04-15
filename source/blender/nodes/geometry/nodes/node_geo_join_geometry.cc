@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BKE_derived_curve.hh"
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
 #include "BKE_pointcloud.h"
@@ -262,6 +263,48 @@ static void join_components(Span<const VolumeComponent *> src_components, Geomet
   UNUSED_VARS(src_components, dst_component);
 }
 
+/**
+ * Curve components are a special case, retrieved with write access as an optimization
+ * to avoid copying unecessarily when possible.
+ */
+static void join_curve_components(MutableSpan<GeometrySet> src_geometry_sets, GeometrySet &result)
+{
+
+  Vector<CurveComponent *> src_components;
+  for (GeometrySet &geometry_set : src_geometry_sets) {
+    if (geometry_set.has_curve()) {
+      /* Getting write access for write access seems counterintuitive at first, but it can actually
+       * allow avoiding a copy in the case where the input spline has no other users, because the
+       * splines can be moved from the source curve rather than copying them from a read-only
+       * source. Retrieving the curve for write will make a copy only when necessary. */
+      CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
+      src_components.append(&component);
+    }
+  }
+
+  if (src_components.size() == 0) {
+    return;
+  }
+  if (src_components.size() == 1) {
+    result.add(*src_components[0]);
+    return;
+  }
+
+  CurveComponent &dst_component = result.get_component_for_write<CurveComponent>();
+  DCurve *dst_curve = new DCurve();
+  for (CurveComponent *component : src_components) {
+
+    DCurve *src_curve = component->get_for_write();
+    for (SplinePtr &spline : src_curve->splines) {
+      dst_curve->splines.append(std::move(spline));
+    }
+  }
+
+  dst_component.replace(dst_curve);
+
+  /* TODO: Make sure generic attributes in different splines have the same type. */
+}
+
 template<typename Component>
 static void join_component_type(Span<GeometrySet> src_geometry_sets, GeometrySet &result)
 {
@@ -292,6 +335,7 @@ static void geo_node_join_geometry_exec(GeoNodeExecParams params)
   join_component_type<PointCloudComponent>(geometry_sets, geometry_set_result);
   join_component_type<InstancesComponent>(geometry_sets, geometry_set_result);
   join_component_type<VolumeComponent>(geometry_sets, geometry_set_result);
+  join_curve_components(geometry_sets, geometry_set_result);
 
   params.set_output("Geometry", std::move(geometry_set_result));
 }
