@@ -73,8 +73,7 @@ void USDVolumeReader::read_object_data(Main *bmain, double motionSampleTime)
 
   std::string filepath;
 
-  Volume *volume = (Volume *)object_->data;
-  VolumeGrid *defaultGrid = BKE_volume_grid_get_for_write(volume, 0);
+  Volume *volume = static_cast<Volume *>(object_->data);
 
   for (auto it = fields.begin(); it != fields.end(); ++it) {
 
@@ -93,7 +92,7 @@ void USDVolumeReader::read_object_data(Main *bmain, double motionSampleTime)
 
         // A Blender volume creates density by default
         if (fieldName != "density") {
-          defaultGrid = BKE_volume_grid_add(volume, fieldName.c_str(), VOLUME_GRID_FLOAT);
+          BKE_volume_grid_add(volume, fieldName.c_str(), VOLUME_GRID_FLOAT);
         }
       }
 
