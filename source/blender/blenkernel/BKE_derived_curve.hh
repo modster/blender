@@ -207,7 +207,7 @@ struct NURBSPoint {
   float tilt;
 };
 
-class NURBSPline : public Spline {
+class NURBSpline : public Spline {
  public:
   blender::Vector<NURBSPoint> control_points;
 
@@ -217,8 +217,8 @@ class NURBSPline : public Spline {
 
  public:
   SplinePtr copy() const final;
-  NURBSPline() = default;
-  NURBSPline(const NURBSPline &other)
+  NURBSpline() = default;
+  NURBSpline(const NURBSpline &other)
       : Spline((Spline &)other),
         control_points(other.control_points),
         resolution_u(other.resolution_u),

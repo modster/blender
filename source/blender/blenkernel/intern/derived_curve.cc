@@ -793,43 +793,43 @@ float BezierSpline::control_point_radius(const int index) const
 /** \name NURBS Spline
  * \{ */
 
-SplinePtr NURBSPline::copy() const
+SplinePtr NURBSpline::copy() const
 {
-  SplinePtr new_spline = std::make_unique<NURBSPline>(*this);
+  SplinePtr new_spline = std::make_unique<NURBSpline>(*this);
 
   return new_spline;
 }
 
-int NURBSPline::size() const
+int NURBSpline::size() const
 {
   return this->control_points.size();
 }
 
-int NURBSPline::resolution() const
+int NURBSpline::resolution() const
 {
   return this->resolution_u;
 }
 
-void NURBSPline::set_resolution(const int value)
+void NURBSpline::set_resolution(const int value)
 {
   this->resolution_u = value;
   this->mark_cache_invalid();
 }
 
-int NURBSPline::evaluated_points_size() const
+int NURBSpline::evaluated_points_size() const
 {
   return 0;
 }
 
-void NURBSPline::correct_end_tangents() const
+void NURBSpline::correct_end_tangents() const
 {
 }
 
-void NURBSPline::ensure_base_cache() const
+void NURBSpline::ensure_base_cache() const
 {
 }
 
-float NURBSPline::control_point_radius(const int index) const
+float NURBSpline::control_point_radius(const int index) const
 {
   return this->control_points[index].radius;
 }
