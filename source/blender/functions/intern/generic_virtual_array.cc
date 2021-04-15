@@ -41,7 +41,7 @@ bool GVArray::is_span_impl() const
   return false;
 }
 
-GSpan GVArray::get_span_impl() const
+GSpan GVArray::get_internal_span_impl() const
 {
   BLI_assert(false);
   return GSpan(*type_);
@@ -88,7 +88,7 @@ void *GVMutableArray::try_get_internal_mutable_varray_impl()
 void GVMutableArray::fill(const void *value)
 {
   if (this->is_span()) {
-    const GMutableSpan span = this->get_span();
+    const GMutableSpan span = this->get_internal_span();
     type_->fill_initialized(value, span.data(), size_);
   }
   else {
@@ -117,7 +117,7 @@ bool GVArray_For_GSpan::is_span_impl() const
   return true;
 }
 
-GSpan GVArray_For_GSpan::get_span_impl() const
+GSpan GVArray_For_GSpan::get_internal_span_impl() const
 {
   return GSpan(*type_, data_, size_);
 }
@@ -157,7 +157,7 @@ bool GVMutableArray_For_GMutableSpan::is_span_impl() const
   return true;
 }
 
-GSpan GVMutableArray_For_GMutableSpan::get_span_impl() const
+GSpan GVMutableArray_For_GMutableSpan::get_internal_span_impl() const
 {
   return GSpan(*type_, data_, size_);
 }
@@ -182,7 +182,7 @@ bool GVArray_For_SingleValueRef::is_span_impl() const
   return size_ == 1;
 }
 
-GSpan GVArray_For_SingleValueRef::get_span_impl() const
+GSpan GVArray_For_SingleValueRef::get_internal_span_impl() const
 {
   return GSpan{*type_, value_, 1};
 }
@@ -224,7 +224,7 @@ GVArray_GSpan::GVArray_GSpan(const GVArray &varray) : GSpan(varray.type()), varr
 {
   size_ = varray_.size();
   if (varray_.is_span()) {
-    data_ = varray_.get_span().data();
+    data_ = varray_.get_internal_span().data();
   }
   else {
     owned_data_ = MEM_mallocN_aligned(type_->size() * size_, type_->alignment(), __func__);
@@ -250,7 +250,7 @@ GVMutableArray_GSpan::GVMutableArray_GSpan(GVMutableArray &varray, const bool ma
 {
   size_ = varray_.size();
   if (varray_.is_span()) {
-    data_ = varray_.get_span().data();
+    data_ = varray_.get_internal_span().data();
   }
   else {
     owned_data_ = MEM_mallocN_aligned(type_->size() * size_, type_->alignment(), __func__);

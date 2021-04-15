@@ -18,7 +18,7 @@ TEST(virtual_array, Span)
   EXPECT_EQ(varray.get(4), 7);
   EXPECT_TRUE(varray.is_span());
   EXPECT_FALSE(varray.is_single());
-  EXPECT_EQ(varray.get_span().data(), data.data());
+  EXPECT_EQ(varray.get_internal_span().data(), data.data());
 }
 
 TEST(virtual_array, Single)

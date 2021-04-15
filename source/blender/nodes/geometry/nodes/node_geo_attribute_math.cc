@@ -242,7 +242,7 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
 
   MutableSpan<float> result_span = attribute_result.as_span();
 
-  /* Note that passing the data with `get_span<float>()` works
+  /* Note that passing the data with `get_internal_span<float>()` works
    * because the attributes were accessed with #CD_PROP_FLOAT. */
   if (operation_use_input_b(operation)) {
     std::unique_ptr<GVArray> attribute_b = params.get_input_attribute(
