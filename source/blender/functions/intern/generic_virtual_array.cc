@@ -271,6 +271,10 @@ GVMutableArray_GSpan::~GVMutableArray_GSpan()
       std::cout << "Warning: Call `apply()` to make sure that changes persist in all cases.\n";
     }
   }
+  if (owned_data_ != nullptr) {
+    type_->destruct_n(owned_data_, size_);
+    MEM_freeN(owned_data_);
+  }
 }
 
 void GVMutableArray_GSpan::apply()

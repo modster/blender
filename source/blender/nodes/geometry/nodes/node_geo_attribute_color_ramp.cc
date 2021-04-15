@@ -82,14 +82,13 @@ static void execute_on_component(const GeoNodeExecParams &params, GeometryCompon
   GVArray_Typed<float> attribute_in = component.attribute_get_for_read<float>(
       input_name, result_domain, 0.0f);
 
-  VMutableArray_Span<Color4f> results{*attribute_result};
+  MutableSpan<Color4f> results = attribute_result.as_span();
 
   ColorBand *color_ramp = &node_storage->color_ramp;
   for (const int i : IndexRange(attribute_in.size())) {
     BKE_colorband_evaluate(color_ramp, attribute_in[i], results[i]);
   }
 
-  results.apply();
   attribute_result.save();
 }
 

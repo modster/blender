@@ -113,7 +113,7 @@ template<> inline Color4f clamp_value(const Color4f val, const Color4f min, cons
 
 template<typename T>
 static void clamp_attribute(const VArray<T> &inputs,
-                            const MutableSpan<T> &outputs,
+                            const MutableSpan<T> outputs,
                             const T min,
                             const T max)
 {
@@ -186,7 +186,7 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
         }
       }
       MutableSpan<float3> results = attribute_result.as_span<float3>();
-      clamp_attribute<float3>(*attribute_input->typed<float3>(), results, min, max);
+      clamp_attribute<float3>(attribute_input->typed<float3>(), results, min, max);
       break;
     }
     case CD_PROP_FLOAT: {
@@ -194,10 +194,10 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
       const float max = params.get_input<float>("Max_001");
       MutableSpan<float> results = attribute_result.as_span<float>();
       if (operation == NODE_CLAMP_RANGE && min > max) {
-        clamp_attribute<float>(*attribute_input->typed<float>(), results, max, min);
+        clamp_attribute<float>(attribute_input->typed<float>(), results, max, min);
       }
       else {
-        clamp_attribute<float>(*attribute_input->typed<float>(), results, min, max);
+        clamp_attribute<float>(attribute_input->typed<float>(), results, min, max);
       }
       break;
     }
@@ -206,10 +206,10 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
       const int max = params.get_input<int>("Max_002");
       MutableSpan<int> results = attribute_result.as_span<int>();
       if (operation == NODE_CLAMP_RANGE && min > max) {
-        clamp_attribute<int>(*attribute_input->typed<int>(), results, max, min);
+        clamp_attribute<int>(attribute_input->typed<int>(), results, max, min);
       }
       else {
-        clamp_attribute<int>(*attribute_input->typed<int>(), results, min, max);
+        clamp_attribute<int>(attribute_input->typed<int>(), results, min, max);
       }
       break;
     }
@@ -231,7 +231,7 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
         }
       }
       MutableSpan<Color4f> results = attribute_result.as_span<Color4f>();
-      clamp_attribute<Color4f>(*attribute_input->typed<Color4f>(), results, min, max);
+      clamp_attribute<Color4f>(attribute_input->typed<Color4f>(), results, min, max);
       break;
     }
     default: {
