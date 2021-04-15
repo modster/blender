@@ -224,7 +224,6 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
   const std::string result_name = params.get_input<std::string>("Result");
 
   /* The result type of this node is always float. */
-  const CustomDataType result_type = CD_PROP_FLOAT;
   const AttributeDomain result_domain = get_result_domain(
       component, params, operation, result_name);
 
@@ -234,41 +233,27 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
     return;
   }
 
-  std::unique_ptr<GVArray> attribute_a = params.get_input_attribute(
-      "A", component, result_domain, result_type, nullptr);
-  if (!attribute_a) {
-    return;
-  }
+  GVArray_Typed<float> attribute_a = params.get_input_attribute<float>(
+      "A", component, result_domain, 0.0f);
 
   MutableSpan<float> result_span = attribute_result.as_span();
 
   /* Note that passing the data with `get_internal_span<float>()` works
    * because the attributes were accessed with #CD_PROP_FLOAT. */
   if (operation_use_input_b(operation)) {
-    std::unique_ptr<GVArray> attribute_b = params.get_input_attribute(
-        "B", component, result_domain, result_type, nullptr);
-    if (!attribute_b) {
-      return;
-    }
+    GVArray_Typed<float> attribute_b = params.get_input_attribute<float>(
+        "B", component, result_domain, 0.0f);
     if (operation_use_input_c(operation)) {
-      std::unique_ptr<GVArray> attribute_c = params.get_input_attribute(
-          "C", component, result_domain, result_type, nullptr);
-      if (!attribute_c) {
-        return;
-      }
-      do_math_operation(attribute_a->typed<float>(),
-                        attribute_b->typed<float>(),
-                        attribute_c->typed<float>(),
-                        result_span,
-                        operation);
+      GVArray_Typed<float> attribute_c = params.get_input_attribute<float>(
+          "C", component, result_domain, 0.0f);
+      do_math_operation(attribute_a, attribute_b, attribute_c, result_span, operation);
     }
     else {
-      do_math_operation(
-          attribute_a->typed<float>(), attribute_b->typed<float>(), result_span, operation);
+      do_math_operation(attribute_a, attribute_b, result_span, operation);
     }
   }
   else {
-    do_math_operation(attribute_a->typed<float>(), result_span, operation);
+    do_math_operation(attribute_a, result_span, operation);
   }
 
   attribute_result.save();

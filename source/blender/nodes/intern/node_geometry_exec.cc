@@ -85,7 +85,6 @@ std::unique_ptr<GVArray> GeoNodeExecParams::get_input_attribute(const StringRef 
     }
     return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, default_value);
   }
-  /* TODO */
   const DataTypeConversions &conversions = get_implicit_type_conversions();
   if (found_socket->type == SOCK_FLOAT) {
     const float value = this->get_input<float>(found_socket->identifier);
