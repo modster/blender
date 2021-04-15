@@ -33,6 +33,17 @@ using blender::Span;
 /** \name General Curve Functions
  * \{ */
 
+DCurve *DCurve::copy()
+{
+  DCurve *new_curve = new DCurve();
+
+  for (SplinePtr &spline : this->splines) {
+    new_curve->splines.append(spline->copy());
+  }
+
+  return new_curve;
+}
+
 static BezierPoint::HandleType handle_type_from_dna_bezt(const eBezTriple_Handle dna_handle_type)
 {
   switch (dna_handle_type) {
@@ -491,6 +502,17 @@ void Spline::trim_lengths(const float start_length, const float end_length)
 /** \name Bezier Spline
  * \{ */
 
+SplinePtr BezierSpline::copy() const
+{
+  SplinePtr new_spline = std::make_unique<BezierSpline>(*this);
+
+  return new_spline;
+}
+
+// BezierSpline(const BezierSpline &other)
+// {
+// }
+
 int BezierSpline::size() const
 {
   return this->control_points.size();
@@ -718,6 +740,13 @@ float BezierSpline::control_point_radius(const int index) const
 /* -------------------------------------------------------------------- */
 /** \name NURBS Spline
  * \{ */
+
+SplinePtr NURBSPline::copy() const
+{
+  SplinePtr new_spline = std::make_unique<NURBSPline>(*this);
+
+  return new_spline;
+}
 
 int NURBSPline::size() const
 {

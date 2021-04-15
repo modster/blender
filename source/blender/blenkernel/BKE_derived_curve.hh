@@ -75,6 +75,8 @@ struct BezierPoint {
  */
 class Spline {
  public:
+  using SplinePtr = std::unique_ptr<Spline>;
+
   enum Type {
     Bezier,
     NURBS,
@@ -110,6 +112,30 @@ class Spline {
 
  public:
   virtual ~Spline() = default;
+  Spline() = default;
+  Spline(Spline &other)
+      : type(other.type), is_cyclic(other.is_cyclic), normal_mode(other.normal_mode)
+  {
+    if (!other.base_cache_dirty_) {
+      evaluated_positions_cache_ = other.evaluated_positions_cache_;
+      evaluated_mapping_cache_ = other.evaluated_mapping_cache_;
+      base_cache_dirty_ = false;
+    }
+    if (!other.tangent_cache_dirty_) {
+      evaluated_tangents_cache_ = other.evaluated_tangents_cache_;
+      tangent_cache_dirty_ = false;
+    }
+    if (!other.normal_cache_dirty_) {
+      evaluated_normals_cache_ = other.evaluated_normals_cache_;
+      normal_cache_dirty_ = false;
+    }
+    if (!other.length_cache_dirty_) {
+      evaluated_lengths_cache_ = other.evaluated_lengths_cache_;
+      length_cache_dirty_ = false;
+    }
+  }
+
+  virtual SplinePtr copy() const = 0;
 
   virtual int size() const = 0;
   virtual int resolution() const = 0;
@@ -147,6 +173,15 @@ class BezierSpline : public Spline {
   int resolution_u;
 
  public:
+  virtual SplinePtr copy() const final;
+  BezierSpline() = default;
+  BezierSpline(const BezierSpline &other)
+      : Spline((Spline &)other),
+        control_points(other.control_points),
+        resolution_u(other.resolution_u)
+  {
+  }
+
   int size() const final;
   int resolution() const final;
   void set_resolution(const int value) final;
@@ -176,11 +211,20 @@ class NURBSPline : public Spline {
   blender::Vector<NURBSPoint> control_points;
 
  private:
-  int32_t flag; /* Cyclic, smooth. */
   int resolution_u;
   uint8_t order;
 
  public:
+  SplinePtr copy() const final;
+  NURBSPline() = default;
+  NURBSPline(const NURBSPline &other)
+      : Spline((Spline &)other),
+        control_points(other.control_points),
+        resolution_u(other.resolution_u),
+        order(other.order)
+  {
+  }
+
   int size() const final;
   int resolution() const final;
   void set_resolution(const int value) final;
@@ -194,10 +238,13 @@ class NURBSPline : public Spline {
 };
 
 /* Proposed name to be different from DNA type. */
-struct DCurve {
+class DCurve {
+ public:
   blender::Vector<SplinePtr> splines;
 
   // bool is_2d;
+
+  DCurve *copy();
 
   // DCurve *copy();
 };

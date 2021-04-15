@@ -41,7 +41,7 @@ GeometryComponent *CurveComponent::copy() const
 {
   CurveComponent *new_component = new CurveComponent();
   if (curve_ != nullptr) {
-    // new_component->curve_ = BKE_curve_copy_for_eval(curve_, false);
+    new_component->curve_ = curve_->copy();
     new_component->ownership_ = GeometryOwnershipType::Owned;
   }
   return new_component;
@@ -89,7 +89,7 @@ DCurve *CurveComponent::get_for_write()
 {
   BLI_assert(this->is_mutable());
   if (ownership_ == GeometryOwnershipType::ReadOnly) {
-    // curve_ = BKE_curve_copy_for_eval(curve_, false);
+    curve_ = curve_->copy();
     ownership_ = GeometryOwnershipType::Owned;
   }
   return curve_;

@@ -290,6 +290,7 @@ static void geo_node_curve_to_mesh_exec(GeoNodeExecParams params)
 
   if (!curve_set.has_curve()) {
     params.set_output("Mesh", GeometrySet());
+    return;
   }
 
   const DCurve *profile_curve = profile_set.get_curve_for_read();
