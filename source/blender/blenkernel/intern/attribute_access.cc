@@ -704,13 +704,9 @@ bool GeometryComponent::attribute_exists(const blender::StringRef attribute_name
 static std::unique_ptr<blender::fn::GVArray> try_adapt_data_type(
     std::unique_ptr<blender::fn::GVArray> varray, const blender::fn::CPPType &to_type)
 {
-  const blender::fn::CPPType &from_type = varray->type();
-  if (from_type == to_type) {
-    return varray;
-  }
-
-  /* TODO: Bring back conversion. */
-  return {};
+  const blender::nodes::DataTypeConversions &conversions =
+      blender::nodes::get_implicit_type_conversions();
+  return conversions.try_convert(std::move(varray), to_type);
 }
 
 std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_read(

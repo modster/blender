@@ -72,6 +72,9 @@ class DataTypeConversions {
                                 const CPPType &to_type,
                                 const void *from_value,
                                 void *to_value) const;
+
+  std::unique_ptr<fn::GVArray> try_convert(std::unique_ptr<fn::GVArray> varray,
+                                           const CPPType &to_type) const;
 };
 
 const DataTypeConversions &get_implicit_type_conversions();
