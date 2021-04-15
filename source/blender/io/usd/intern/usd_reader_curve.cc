@@ -59,7 +59,7 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDCurvesReader::create_object(Main *bmain, double /* motionSampleTime */)
+void USDCurvesReader::create_object(Main *bmain, const double /* motionSampleTime */)
 {
   curve_ = BKE_curve_add(bmain, name_.c_str(), OB_CURVE);
 
@@ -83,7 +83,7 @@ void USDCurvesReader::read_object_data(Main *bmain, double motionSampleTime)
   USDXformReader::read_object_data(bmain, motionSampleTime);
 }
 
-void USDCurvesReader::read_curve_sample(Curve *cu, double motionSampleTime)
+void USDCurvesReader::read_curve_sample(Curve *cu, const double motionSampleTime)
 {
   curve_prim_ = pxr::UsdGeomBasisCurves(prim_);
 
@@ -198,9 +198,9 @@ void USDCurvesReader::read_curve_sample(Curve *cu, double motionSampleTime)
 }
 
 Mesh *USDCurvesReader::read_mesh(struct Mesh *existing_mesh,
-                                 double motionSampleTime,
-                                 int read_flag,
-                                 float vel_scale,
+                                 const double motionSampleTime,
+                                 const int read_flag,
+                                 const float vel_scale,
                                  const char **err_str)
 {
   if (!curve_prim_) {

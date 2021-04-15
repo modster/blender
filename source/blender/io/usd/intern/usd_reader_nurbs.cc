@@ -76,7 +76,7 @@ static bool set_knots(const pxr::VtDoubleArray &knots, float *&nu_knots)
 
 namespace blender::io::usd {
 
-void USDNurbsReader::create_object(Main *bmain, double /* motionSampleTime */)
+void USDNurbsReader::create_object(Main *bmain, const double /* motionSampleTime */)
 {
   curve_ = BKE_curve_add(bmain, name_.c_str(), OB_CURVE);
 
@@ -88,7 +88,7 @@ void USDNurbsReader::create_object(Main *bmain, double /* motionSampleTime */)
   object_->data = curve_;
 }
 
-void USDNurbsReader::read_object_data(Main *bmain, double motionSampleTime)
+void USDNurbsReader::read_object_data(Main *bmain, const double motionSampleTime)
 {
   Curve *cu = (Curve *)object_->data;
   read_curve_sample(cu, motionSampleTime);
@@ -100,7 +100,7 @@ void USDNurbsReader::read_object_data(Main *bmain, double motionSampleTime)
   USDXformReader::read_object_data(bmain, motionSampleTime);
 }
 
-void USDNurbsReader::read_curve_sample(Curve *cu, double motionSampleTime)
+void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
 {
   curve_prim_ = pxr::UsdGeomNurbsCurves(prim_);
 
@@ -199,9 +199,9 @@ void USDNurbsReader::read_curve_sample(Curve *cu, double motionSampleTime)
 }
 
 Mesh *USDNurbsReader::read_mesh(struct Mesh *existing_mesh,
-                                double motionSampleTime,
-                                int /* read_flag */,
-                                float /* vel_scale */,
+                                const double motionSampleTime,
+                                const int /* read_flag */,
+                                const float /* vel_scale */,
                                 const char ** /* err_str */)
 {
   pxr::UsdGeomCurves curve_prim_(prim_);

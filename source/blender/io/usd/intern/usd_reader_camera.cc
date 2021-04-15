@@ -48,7 +48,7 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDCameraReader::create_object(Main *bmain, double /* motionSampleTime */)
+void USDCameraReader::create_object(Main *bmain, const double /* motionSampleTime */)
 {
   Camera *bcam = static_cast<Camera *>(BKE_camera_add(bmain, name_.c_str()));
 
@@ -56,7 +56,7 @@ void USDCameraReader::create_object(Main *bmain, double /* motionSampleTime */)
   object_->data = bcam;
 }
 
-void USDCameraReader::read_object_data(Main *bmain, double motionSampleTime)
+void USDCameraReader::read_object_data(Main *bmain, const double motionSampleTime)
 {
   Camera *bcam = (Camera *)object_->data;
 

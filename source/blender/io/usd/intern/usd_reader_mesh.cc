@@ -167,7 +167,7 @@ static void assign_materials(Main *bmain,
 
 }  // namespace utils
 
-static void *add_customdata_cb(Mesh *mesh, const char *name, int data_type)
+static void *add_customdata_cb(Mesh *mesh, const char *name, const int data_type)
 {
   CustomDataType cd_data_type = static_cast<CustomDataType>(data_type);
   void *cd_ptr;
@@ -207,7 +207,7 @@ USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim,
 {
 }
 
-void USDMeshReader::create_object(Main *bmain, double /* motionSampleTime */)
+void USDMeshReader::create_object(Main *bmain, const double /* motionSampleTime */)
 {
   Mesh *mesh = BKE_mesh_add(bmain, name_.c_str());
 
@@ -259,7 +259,7 @@ bool USDMeshReader::valid() const
   return static_cast<bool>(mesh_prim_);
 }
 
-bool USDMeshReader::topology_changed(Mesh *existing_mesh, double motionSampleTime)
+bool USDMeshReader::topology_changed(Mesh *existing_mesh, const double motionSampleTime)
 {
   pxr::UsdAttribute faceVertCountsAttr = mesh_prim_.GetFaceVertexCountsAttr();
   pxr::UsdAttribute faceVertIndicesAttr = mesh_prim_.GetFaceVertexIndicesAttr();
@@ -289,7 +289,9 @@ bool USDMeshReader::topology_changed(Mesh *existing_mesh, double motionSampleTim
   return false;
 }
 
-void USDMeshReader::read_mpolys(Mesh *mesh, pxr::UsdGeomMesh mesh_prim_, double motionSampleTime)
+void USDMeshReader::read_mpolys(Mesh *mesh,
+                                pxr::UsdGeomMesh mesh_prim_,
+                                const double motionSampleTime)
 {
   MPoly *mpolys = mesh->mpoly;
   MLoop *mloops = mesh->mloop;
@@ -333,8 +335,8 @@ void USDMeshReader::read_mpolys(Mesh *mesh, pxr::UsdGeomMesh mesh_prim_, double 
 
 void USDMeshReader::read_uvs(Mesh *mesh,
                              pxr::UsdGeomMesh mesh_prim_,
-                             double motionSampleTime,
-                             bool load_uvs)
+                             const double motionSampleTime,
+                             const bool load_uvs)
 {
   unsigned int loop_index = 0;
   unsigned int rev_loop_index = 0;
@@ -449,7 +451,7 @@ void USDMeshReader::read_uvs(Mesh *mesh,
 
 void USDMeshReader::read_colors(Mesh *mesh,
                                 const pxr::UsdGeomMesh &mesh_prim_,
-                                double motionSampleTime)
+                                const double motionSampleTime)
 {
   if (!(mesh && mesh_prim_ && mesh->totloop > 0)) {
     return;
@@ -629,8 +631,8 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
                                      ImportSettings *settings,
                                      Mesh *mesh,
                                      const pxr::UsdGeomMesh &mesh_prim_,
-                                     double motionSampleTime,
-                                     bool new_mesh)
+                                     const double motionSampleTime,
+                                     const bool new_mesh)
 {
 
   pxr::UsdAttribute normalsAttr = mesh_prim_.GetNormalsAttr();
@@ -684,7 +686,7 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
 
 void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
                                              MPoly *mpoly,
-                                             int totpoly,
+                                             const int totpoly,
                                              std::map<pxr::SdfPath, int> &r_mat_map)
 {
   /* Find the geom subsets that have bound materials.
@@ -757,9 +759,9 @@ void USDMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, const double mot
 }
 
 Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
-                               double motionSampleTime,
-                               int read_flag,
-                               float vel_scale,
+                               const double motionSampleTime,
+                               const int read_flag,
+                               const float vel_scale,
                                const char ** /* err_str */)
 {
   if (!mesh_prim_) {

@@ -79,7 +79,8 @@ static const pxr::TfToken UsdPrimvarReader_float2("UsdPrimvarReader_float2",
 static const pxr::TfToken UsdUVTexture("UsdUVTexture", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
-static bNode *add_node(const bContext *C, bNodeTree *ntree, int type, float locx, float locy)
+static bNode *add_node(
+    const bContext *C, bNodeTree *ntree, const int type, const float locx, const float locy)
 {
   bNode *new_node = nodeAddStaticNode(C, ntree, type);
 
@@ -112,7 +113,7 @@ static void link_nodes(
 }
 
 static pxr::UsdShadeShader get_source_shader(const pxr::UsdShadeConnectableAPI &source,
-                                             pxr::TfToken in_shader_id)
+                                             const pxr::TfToken in_shader_id)
 {
   if (source && source.GetPrim().IsA<pxr::UsdShadeShader>()) {
     pxr::UsdShadeShader source_shader(source.GetPrim());
@@ -249,8 +250,11 @@ namespace {
 // Compute the x- and y-coordinates for placing a new node in an unoccupied region of
 // the column with the given index.  Returns the coordinates in r_locx and r_locy and
 // updates the column-occupancy information in r_ctx.
-void compute_node_loc(
-    int column, float node_height, float &r_locx, float &r_locy, NodePlacementContext &r_ctx)
+void compute_node_loc(const int column,
+                      const float node_height,
+                      float &r_locx,
+                      float &r_locy,
+                      NodePlacementContext &r_ctx)
 {
   r_locx = r_ctx.origx - column * r_ctx.horizontal_step;
 
@@ -408,7 +412,7 @@ void USDMaterialReader::set_node_input(const pxr::UsdShadeInput &usd_input,
                                        bNode *dest_node,
                                        const char *dest_socket_name,
                                        bNodeTree *ntree,
-                                       int column,
+                                       const int column,
                                        NodePlacementContext &r_ctx) const
 {
   if (!(usd_input && dest_node)) {
@@ -525,7 +529,7 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
                                                bNode *dest_node,
                                                const char *dest_socket_name,
                                                bNodeTree *ntree,
-                                               int column,
+                                               const int column,
                                                NodePlacementContext &r_ctx) const
 {
   if (!usd_shader || !dest_node || !ntree || !dest_socket_name || !bmain_) {
@@ -608,7 +612,7 @@ void USDMaterialReader::convert_usd_primvar_reader_float2(const pxr::UsdShadeSha
                                                           bNode *dest_node,
                                                           const char *dest_socket_name,
                                                           bNodeTree *ntree,
-                                                          int column,
+                                                          const int column,
                                                           NodePlacementContext &r_ctx) const
 {
   if (!usd_shader || !dest_node || !ntree || !dest_socket_name || !bmain_) {
