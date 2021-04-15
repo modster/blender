@@ -349,6 +349,7 @@ static void get_spline_radius_data(const Spline &spline, fn::GMutableSpan r_data
       r_span[i] = bezier_spline->control_points[i].radius;
     }
   }
+  /* TODO: Other spline types. */
 }
 
 static void get_spline_position_data(const Spline &spline, fn::GMutableSpan r_data)
@@ -359,6 +360,7 @@ static void get_spline_position_data(const Spline &spline, fn::GMutableSpan r_da
       r_span[i] = bezier_spline->control_points[i].position;
     }
   }
+  /* TODO: Other spline types. */
 }
 
 /**

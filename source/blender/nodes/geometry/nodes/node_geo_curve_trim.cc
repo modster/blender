@@ -67,6 +67,31 @@ static void geo_node_curve_trim_update(bNodeTree *UNUSED(ntree), bNode *node)
 
 namespace blender::nodes {
 
+static void trim_spline(Spline &spline, const float length_start, const float length_end)
+{
+  BLI_assert(length_start <= length_end);
+
+  std::cout << "\n TRIM SPLINE \n";
+  std::cout << "Start length: " << length_start << "\n";
+  std::cout << "End length: " << length_end << "\n";
+  Span<float> lengths = spline.evaluated_lengths();
+  const float *lower = std::lower_bound(lengths.begin(), lengths.end(), length_start);
+  const float *upper = std::upper_bound(lengths.begin(), lengths.end(), length_end);
+  const int i_lower = lower - lengths.begin();
+  const int i_upper = upper - lengths.begin();
+  std::cout << "i_lower: " << i_lower << "\n";
+  std::cout << "i_upper: " << i_upper << "\n";
+  BLI_assert(i_lower <= i_upper);
+
+  Span<PointMapping> mappings = spline.evaluated_mappings();
+  const int i_control_lower = mappings[i_lower].control_point_index;
+  const int i_control_upper = mappings[i_upper].control_point_index;
+  std::cout << "i_control_lower: " << i_control_lower << "\n";
+  std::cout << "i_control_upper: " << i_control_upper << "\n";
+  BLI_assert(i_control_lower <= i_control_upper);
+
+}
+
 static void geo_node_curve_trim_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -79,6 +104,7 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
 
   if (!geometry_set.has_curve()) {
     params.set_output("Geometry", geometry_set);
+    return;
   }
 
   DCurve &curve = *geometry_set.get_curve_for_write();
@@ -89,17 +115,17 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
       const float factor_end = params.extract_input<float>("End");
       for (SplinePtr &spline : curve.splines) {
         const float length = spline->evaluated_lengths().last();
-        const float length_start = factor_start * length;
-        const float length_end = factor_end * length;
-        spline->trim_lengths(length_start, length_end);
+        const float start = factor_start * length;
+        const float end = factor_end * length;
+        trim_spline(*spline, std::min(start, end), std::max(start, end));
       }
       break;
     }
     case GEO_NODE_CURVE_TRIM_LENGTH: {
-      const float length_start = params.extract_input<float>("Start_001");
-      const float length_end = params.extract_input<float>("End_001");
+      const float start = params.extract_input<float>("Start_001");
+      const float end = params.extract_input<float>("End_001");
       for (SplinePtr &spline : curve.splines) {
-        spline->trim_lengths(length_start, length_end);
+        trim_spline(*spline, std::min(start, end), std::max(start, end));
       }
       break;
     }

@@ -142,6 +142,9 @@ class Spline {
   virtual int resolution() const = 0;
   virtual void set_resolution(const int value) = 0;
 
+  // virtual void drop_front(const int index) = 0;
+  // virtual void drop_back(const int index) = 0;
+
   virtual void mark_cache_invalid();
   virtual int evaluated_points_size() const = 0;
   int evaluated_edges_size() const;
@@ -154,8 +157,6 @@ class Spline {
 
   /* TODO: I'm not sure this is the best abstraction here, maybe we want another cache. */
   float get_evaluated_point_radius(const int index) const;
-
-  void trim_lengths(const float start_length, const float end_length);
 
  protected:
   virtual void correct_end_tangents() const = 0;
@@ -186,6 +187,10 @@ class BezierSpline : public Spline {
   int size() const final;
   int resolution() const final;
   void set_resolution(const int value) final;
+
+  // void drop_front(const int index) final;
+  // void drop_back(const int index) final;
+
   int evaluated_points_size() const final;
 
  protected:
@@ -229,6 +234,10 @@ class NURBSpline : public Spline {
   int size() const final;
   int resolution() const final;
   void set_resolution(const int value) final;
+
+  // void drop_front(const int index) final;
+  // void drop_back(const int index) final;
+
   int evaluated_points_size() const final;
 
  protected:
@@ -262,6 +271,10 @@ class PolySpline : public Spline {
   int size() const final;
   int resolution() const final;
   void set_resolution(const int value) final;
+
+  // void drop_front(const int index) final;
+  // void drop_back(const int index) final;
+
   int evaluated_points_size() const final;
 
  protected:

@@ -529,25 +529,6 @@ float Spline::get_evaluated_point_radius(const int evaluated_index) const
   return interpf(next_radius, radius, factor);
 }
 
-void Spline::trim_lengths(const float start_length, const float end_length)
-{
-  Span<float> lengths = this->evaluated_lengths();
-
-  const float *lower = std::lower_bound(lengths.begin(), lengths.end(), start_length);
-  const float *upper = std::lower_bound(lengths.begin(), lengths.end(), end_length);
-
-  const int i_lower = lower - lengths.begin();
-  const int i_upper = upper - lengths.begin();
-
-  Span<PointMapping> mappings = this->evaluated_mappings();
-
-  const int i_control_lower = mappings[i_lower].control_point_index;
-  const int i_control_upper = mappings[i_upper].control_point_index;
-
-  // this->drop_front_control_points(i_control_upper);
-  // this->drop_back_control_points(this->size() - i_control_upper);
-}
-
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -632,6 +613,17 @@ int BezierSpline::evaluated_points_size() const
 
   return total_len;
 }
+
+// void BezierSpline::drop_front(const int count)
+// {
+
+//   this->mark_cache_invalid();
+// }
+
+// void BezierSpline::drop_back(const int count)
+// {
+//   this->control_points.this->mark_cache_invalid();
+// }
 
 /**
  * If the spline is not cyclic, the direction for the first and last points is just the
