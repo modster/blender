@@ -81,12 +81,12 @@
 
 namespace blender::io::usd {
 
-CacheArchiveHandle *handle_from_stage_reader(USDStageReader *reader)
+static CacheArchiveHandle *handle_from_stage_reader(USDStageReader *reader)
 {
   return reinterpret_cast<CacheArchiveHandle *>(reader);
 }
 
-USDStageReader *stage_reader_from_handle(CacheArchiveHandle *handle)
+static USDStageReader *stage_reader_from_handle(CacheArchiveHandle *handle)
 {
   return reinterpret_cast<USDStageReader *>(handle);
 }
