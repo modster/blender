@@ -112,21 +112,6 @@ static void link_nodes(
   nodeAddLink(ntree, source, source_socket, dest, dest_socket);
 }
 
-static pxr::UsdShadeShader get_source_shader(const pxr::UsdShadeConnectableAPI &source,
-                                             const pxr::TfToken in_shader_id)
-{
-  if (source && source.GetPrim().IsA<pxr::UsdShadeShader>()) {
-    pxr::UsdShadeShader source_shader(source.GetPrim());
-    if (source_shader) {
-      pxr::TfToken shader_id;
-      if (source_shader.GetShaderId(&shader_id) && shader_id == in_shader_id) {
-        return source_shader;
-      }
-    }
-  }
-  return pxr::UsdShadeShader();
-}
-
 // Returns true if the given shader may have opacity < 1.0, based
 // on heuristics.  Also returns the shader's opacityThreshold input
 // in r_opacity_threshold, if this input has an authored value.
@@ -219,7 +204,7 @@ void set_viewport_material_props(Material *mtl, const pxr::UsdShadeShader &usd_p
     pxr::VtValue val;
     if (diffuse_color_input.GetAttr().HasAuthoredValue() &&
         diffuse_color_input.GetAttr().Get(&val) && val.IsHolding<pxr::GfVec3f>()) {
-      pxr::GfVec3f color = val.Get<pxr::GfVec3f>();
+      pxr::GfVec3f color = val.UncheckedGet<pxr::GfVec3f>();
       mtl->r = color[0];
       mtl->g = color[1];
       mtl->b = color[2];
