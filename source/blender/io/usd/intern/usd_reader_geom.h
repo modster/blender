@@ -32,19 +32,19 @@ class USDGeomReader : public USDXformReader {
   {
   }
 
-  virtual void create_object(Main *bmain, double motionSampleTime) override;
-  virtual void read_object_data(Main *bmain, double motionSampleTime) override;
-
   virtual Mesh *read_mesh(struct Mesh *existing_mesh,
                           double motionSampleTime,
                           int read_flag,
                           float vel_scale,
-                          const char **err_str);
+                          const char **err_str) = 0;
+
+  virtual bool topology_changed(Mesh * /* existing_mesh */, double /* motionSampleTime */)
+  {
+    return true;
+  }
 
   void add_cache_modifier();
   void add_subdiv_modifier();
-
-  bool topology_changed(Mesh *existing_mesh, double motionSampleTime);
 };
 
 }  // namespace blender::io::usd

@@ -61,28 +61,6 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDGeomReader::create_object(Main * /* bmain */, double /* motionSampleTime */)
-{
-}
-
-bool USDGeomReader::topology_changed(Mesh * /* existing_mesh */, double /* motionSampleTime */)
-{
-  return true;
-}
-
-void USDGeomReader::read_object_data(Main * /* bmain */, double /* motionSampleTime */)
-{
-}
-
-Mesh *USDGeomReader::read_mesh(struct Mesh * /* existing_mesh */,
-                               double /* motionSampleTime */,
-                               int /* read_flag */,
-                               float /* vel_scale */,
-                               const char ** /* err_str */)
-{
-  return nullptr;
-}
-
 void USDGeomReader::add_cache_modifier()
 {
   ModifierData *md = BKE_modifier_new(eModifierType_MeshSequenceCache);
