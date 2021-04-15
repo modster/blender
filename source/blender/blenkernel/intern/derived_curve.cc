@@ -25,6 +25,7 @@
 
 using blender::Array;
 using blender::float3;
+using blender::float4x4;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
@@ -42,6 +43,44 @@ DCurve *DCurve::copy()
   }
 
   return new_curve;
+}
+
+void DCurve::translate(const float3 translation)
+{
+  for (SplinePtr &spline : this->splines) {
+    if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(spline.get())) {
+      for (BezierPoint &point : bezier_spline->control_points) {
+        point.handle_position_a += translation;
+        point.position += translation;
+        point.handle_position_b += translation;
+      }
+    }
+    else if (PolySpline *poly_spline = dynamic_cast<PolySpline *>(spline.get())) {
+      for (PolyPoint &point : poly_spline->control_points) {
+        point.position += translation;
+      }
+    }
+    spline->mark_cache_invalid();
+  }
+}
+
+void DCurve::transform(const float4x4 &matrix)
+{
+  for (SplinePtr &spline : this->splines) {
+    if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(spline.get())) {
+      for (BezierPoint &point : bezier_spline->control_points) {
+        point.handle_position_a = matrix * point.handle_position_a;
+        point.position = matrix * point.position;
+        point.handle_position_b = matrix * point.handle_position_b;
+      }
+    }
+    else if (PolySpline *poly_spline = dynamic_cast<PolySpline *>(spline.get())) {
+      for (PolyPoint &point : poly_spline->control_points) {
+        point.position = matrix * point.position;
+      }
+    }
+    spline->mark_cache_invalid();
+  }
 }
 
 static BezierPoint::HandleType handle_type_from_dna_bezt(const eBezTriple_Handle dna_handle_type)

@@ -23,6 +23,7 @@
 #include <mutex>
 
 #include "BLI_float3.hh"
+#include "BLI_float4x4.hh"
 #include "BLI_vector.hh"
 
 #include "BKE_curve.h"
@@ -280,6 +281,9 @@ class DCurve {
   DCurve *copy();
 
   // DCurve *copy();
+
+  void translate(const blender::float3 translation);
+  void transform(const blender::float4x4 &transform);
 };
 
 DCurve *dcurve_from_dna_curve(const Curve &curve);

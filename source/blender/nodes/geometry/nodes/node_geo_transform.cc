@@ -160,31 +160,11 @@ static void transform_curve(DCurve &curve,
 {
 
   if (use_translate(rotation, scale)) {
-    for (SplinePtr &spline : curve.splines) {
-      if (spline->type == Spline::Type::Bezier) {
-        BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
-        for (BezierPoint &point : bezier_spline.control_points) {
-          point.handle_position_a += translation;
-          point.position += translation;
-          point.handle_position_b += translation;
-        }
-      }
-      spline->mark_cache_invalid();
-    }
+    curve.translate(translation);
   }
   else {
     const float4x4 matrix = float4x4::from_loc_eul_scale(translation, rotation, scale);
-    for (SplinePtr &spline : curve.splines) {
-      if (spline->type == Spline::Type::Bezier) {
-        BezierSpline &bezier_spline = static_cast<BezierSpline &>(*spline);
-        for (BezierPoint &point : bezier_spline.control_points) {
-          point.handle_position_a = matrix * point.handle_position_a;
-          point.position = matrix * point.position;
-          point.handle_position_b = matrix * point.handle_position_b;
-        }
-      }
-      spline->mark_cache_invalid();
-    }
+    curve.transform(matrix);
   }
 }
 

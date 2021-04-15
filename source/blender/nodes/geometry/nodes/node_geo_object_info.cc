@@ -64,23 +64,27 @@ static void geo_node_object_info_exec(GeoNodeExecParams params)
   const Object *self_object = params.self_object();
 
   if (object != nullptr) {
-    if (object->type == OB_CURVE) {
-      geometry_set = GeometrySet::create_with_curve(dcurve_from_dna_curve(*(Curve *)object->data));
+    float transform[4][4];
+    mul_m4_m4m4(transform, self_object->imat, object->obmat);
+
+    float quaternion[4];
+    if (transform_space_relative) {
+      mat4_decompose(location, quaternion, scale, transform);
     }
     else {
-      float transform[4][4];
-      mul_m4_m4m4(transform, self_object->imat, object->obmat);
+      mat4_decompose(location, quaternion, scale, object->obmat);
+    }
+    quat_to_eul(rotation, quaternion);
 
-      float quaternion[4];
-      if (transform_space_relative) {
-        mat4_decompose(location, quaternion, scale, transform);
+    if (object != self_object) {
+      if (object->type == OB_CURVE) {
+        DCurve *curve = dcurve_from_dna_curve(*(Curve *)object->data);
+        if (transform_space_relative) {
+          curve->transform(float4x4(transform));
+        }
+        geometry_set = GeometrySet::create_with_curve(curve);
       }
       else {
-        mat4_decompose(location, quaternion, scale, object->obmat);
-      }
-      quat_to_eul(rotation, quaternion);
-
-      if (object != self_object) {
         InstancesComponent &instances = geometry_set.get_component_for_write<InstancesComponent>();
 
         if (transform_space_relative) {
