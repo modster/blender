@@ -129,16 +129,17 @@ USDPrimReader *USDStageReader::create_reader(const USDStageReader *archive,
 static bool _prune_by_visibility(const pxr::UsdGeomImageable &imageable,
                                  const USDImportParams &params)
 {
-  if (imageable && params.import_visible_only) {
-    if (pxr::UsdAttribute visibility_attr = imageable.GetVisibilityAttr()) {
+  if (!(imageable && params.import_visible_only)) {
+    return false;
+  }
 
-      // Prune if the prim has a non-animating visibility attribute and is
-      // invisible.
-      if (!visibility_attr.ValueMightBeTimeVarying()) {
-        pxr::TfToken visibility;
-        visibility_attr.Get(&visibility);
-        return visibility == pxr::UsdGeomTokens->invisible;
-      }
+  if (pxr::UsdAttribute visibility_attr = imageable.GetVisibilityAttr()) {
+    // Prune if the prim has a non-animating visibility attribute and is
+    // invisible.
+    if (!visibility_attr.ValueMightBeTimeVarying()) {
+      pxr::TfToken visibility;
+      visibility_attr.Get(&visibility);
+      return visibility == pxr::UsdGeomTokens->invisible;
     }
   }
 
