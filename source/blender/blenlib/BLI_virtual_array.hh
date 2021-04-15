@@ -108,13 +108,13 @@ template<typename T> class VArray {
 
   /* Returns the value that is returned for every index. This invokes undefined behavior if the
    * virtual array would not return the same value for every index. */
-  T get_single() const
+  T get_internal_single() const
   {
     BLI_assert(this->is_single());
     if (size_ == 1) {
       return this->get(0);
     }
-    return this->get_single_impl();
+    return this->get_internal_single_impl();
   }
 
   T operator[](const int64_t index) const
@@ -153,7 +153,7 @@ template<typename T> class VArray {
     return false;
   }
 
-  virtual T get_single_impl() const
+  virtual T get_internal_single_impl() const
   {
     /* Provide a default implementation, so that subclasses don't have to provide it. This method
      * should never be called because `is_single_impl` returns false by default. */
@@ -168,7 +168,7 @@ template<typename T> class VArray {
       initialized_copy_n(span.data(), size_, r_span.data());
     }
     else if (this->is_single()) {
-      const T single = this->get_single();
+      const T single = this->get_internal_single();
       initialized_fill_n(r_span.data(), size_, single);
     }
     else {
@@ -186,7 +186,7 @@ template<typename T> class VArray {
       uninitialized_copy_n(span.data(), size_, r_span.data());
     }
     else if (this->is_single()) {
-      const T single = this->get_single();
+      const T single = this->get_internal_single();
       uninitialized_fill_n(r_span.data(), size_, single);
     }
     else {
@@ -367,7 +367,7 @@ template<typename T> class VArray_For_Single final : public VArray<T> {
     return true;
   }
 
-  T get_single_impl() const override
+  T get_internal_single_impl() const override
   {
     return value_;
   }
@@ -536,7 +536,7 @@ inline void devirtualize_varray(const VArray<T> &varray, const Func &func, bool 
   if (enable) {
     if (varray.is_single()) {
       /* `VArray_For_Single` can be used for devirtualization, because it is declared `final`. */
-      const VArray_For_Single<T> varray_single{varray.get_single(), varray.size()};
+      const VArray_For_Single<T> varray_single{varray.get_internal_single(), varray.size()};
       func(varray_single);
       return;
     }
@@ -575,19 +575,19 @@ inline void devirtualize_varray2(const VArray<T1> &varray1,
     }
     if (is_span1 && is_single2) {
       const VArray_For_Span<T1> varray1_span{varray1.get_internal_span()};
-      const VArray_For_Single<T2> varray2_single{varray2.get_single(), varray2.size()};
+      const VArray_For_Single<T2> varray2_single{varray2.get_internal_single(), varray2.size()};
       func(varray1_span, varray2_single);
       return;
     }
     if (is_single1 && is_span2) {
-      const VArray_For_Single<T1> varray1_single{varray1.get_single(), varray1.size()};
+      const VArray_For_Single<T1> varray1_single{varray1.get_internal_single(), varray1.size()};
       const VArray_For_Span<T2> varray2_span{varray2.get_internal_span()};
       func(varray1_single, varray2_span);
       return;
     }
     if (is_single1 && is_single2) {
-      const VArray_For_Single<T1> varray1_single{varray1.get_single(), varray1.size()};
-      const VArray_For_Single<T2> varray2_single{varray2.get_single(), varray2.size()};
+      const VArray_For_Single<T1> varray1_single{varray1.get_internal_single(), varray1.size()};
+      const VArray_For_Single<T2> varray2_single{varray2.get_internal_single(), varray2.size()};
       func(varray1_single, varray2_single);
       return;
     }

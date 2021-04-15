@@ -52,7 +52,7 @@ bool GVArray::is_single_impl() const
   return false;
 }
 
-void GVArray::get_single_impl(void *UNUSED(r_value)) const
+void GVArray::get_internal_single_impl(void *UNUSED(r_value)) const
 {
   BLI_assert(false);
 }
@@ -192,7 +192,7 @@ bool GVArray_For_SingleValueRef::is_single_impl() const
   return true;
 }
 
-void GVArray_For_SingleValueRef::get_single_impl(void *r_value) const
+void GVArray_For_SingleValueRef::get_internal_single_impl(void *r_value) const
 {
   type_->copy_to_initialized(value_, r_value);
 }
