@@ -59,7 +59,7 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDCurvesReader::create_object(Main *bmain, double motionSampleTime)
+void USDCurvesReader::create_object(Main *bmain, double /* motionSampleTime */)
 {
   curve_ = BKE_curve_add(bmain, name_.c_str(), OB_CURVE);
 

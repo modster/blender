@@ -207,7 +207,7 @@ USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim,
 {
 }
 
-void USDMeshReader::create_object(Main *bmain, double motionSampleTime)
+void USDMeshReader::create_object(Main *bmain, double /* motionSampleTime */)
 {
   Mesh *mesh = BKE_mesh_add(bmain, name_.c_str());
 
@@ -759,7 +759,7 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
                                double motionSampleTime,
                                int read_flag,
                                float vel_scale,
-                               const char **err_str)
+                               const char ** /* err_str */)
 {
   if (!mesh_prim_) {
     return existing_mesh;

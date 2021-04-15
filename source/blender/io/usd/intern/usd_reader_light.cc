@@ -44,7 +44,7 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDLightReader::create_object(Main *bmain, double motionSampleTime)
+void USDLightReader::create_object(Main *bmain, double /* motionSampleTime */)
 {
   Light *blight = static_cast<Light *>(BKE_light_add(bmain, name_.c_str()));
 

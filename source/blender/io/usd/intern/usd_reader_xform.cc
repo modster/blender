@@ -48,14 +48,14 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDXformReader::create_object(Main *bmain, double motionSampleTime)
+void USDXformReader::create_object(Main *bmain, double /* motionSampleTime */)
 {
   object_ = BKE_object_add_only_object(bmain, OB_EMPTY, name_.c_str());
   object_->empty_drawsize = 0.1f;
   object_->data = NULL;
 }
 
-void USDXformReader::read_object_data(Main *bmain, double motionSampleTime)
+void USDXformReader::read_object_data(Main * /* bmain */, double motionSampleTime)
 {
   bool is_constant;
   float transform_from_usd[4][4];
