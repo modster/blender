@@ -228,6 +228,11 @@ void DataTypeConversions::convert_to_uninitialized(const CPPType &from_type,
                                                    const void *from_value,
                                                    void *to_value) const
 {
+  if (from_type == to_type) {
+    from_type.copy_to_uninitialized(from_value, to_value);
+    return;
+  }
+
   const ConversionFunctions *functions = this->get_conversion_functions(
       MFDataType::ForSingle(from_type), MFDataType::ForSingle(to_type));
   BLI_assert(functions != nullptr);

@@ -22,6 +22,7 @@
 
 #include "NOD_geometry_exec.hh"
 #include "NOD_type_callbacks.hh"
+#include "NOD_type_conversions.hh"
 
 #include "node_geometry_util.hh"
 
@@ -85,21 +86,25 @@ std::unique_ptr<GVArray> GeoNodeExecParams::get_input_attribute(const StringRef 
     return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, default_value);
   }
   /* TODO */
-  // if (found_socket->type == SOCK_FLOAT) {
-  //   const float value = this->get_input<float>(found_socket->identifier);
-  //   return component.attribute_get_constant_for_read_converted(
-  //       domain, CD_PROP_FLOAT, type, &value);
-  // }
-  // if (found_socket->type == SOCK_VECTOR) {
-  //   const float3 value = this->get_input<float3>(found_socket->identifier);
-  //   return component.attribute_get_constant_for_read_converted(
-  //       domain, CD_PROP_FLOAT3, type, &value);
-  // }
-  // if (found_socket->type == SOCK_RGBA) {
-  //   const Color4f value = this->get_input<Color4f>(found_socket->identifier);
-  //   return component.attribute_get_constant_for_read_converted(
-  //       domain, CD_PROP_COLOR, type, &value);
-  // }
+  const DataTypeConversions &conversions = get_implicit_type_conversions();
+  if (found_socket->type == SOCK_FLOAT) {
+    const float value = this->get_input<float>(found_socket->identifier);
+    BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
+    conversions.convert_to_uninitialized(CPPType::get<float>(), *cpp_type, &value, buffer);
+    return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, buffer);
+  }
+  if (found_socket->type == SOCK_VECTOR) {
+    const float3 value = this->get_input<float3>(found_socket->identifier);
+    BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
+    conversions.convert_to_uninitialized(CPPType::get<float3>(), *cpp_type, &value, buffer);
+    return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, buffer);
+  }
+  if (found_socket->type == SOCK_RGBA) {
+    const Color4f value = this->get_input<Color4f>(found_socket->identifier);
+    BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
+    conversions.convert_to_uninitialized(CPPType::get<Color4f>(), *cpp_type, &value, buffer);
+    return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, buffer);
+  }
   BLI_assert(false);
   return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, default_value);
 }

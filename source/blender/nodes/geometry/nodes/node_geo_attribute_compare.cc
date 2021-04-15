@@ -88,14 +88,11 @@ static void do_math_operation(const VArray<float> &input_a,
 {
   const int size = input_a.size();
 
-  Span<float> span_a = input_a.get_span();
-  Span<float> span_b = input_b.get_span();
-
   if (try_dispatch_float_math_fl_fl_to_bool(
           operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
             for (const int i : IndexRange(size)) {
-              const float a = span_a[i];
-              const float b = span_b[i];
+              const float a = input_a[i];
+              const float b = input_b[i];
               const bool out = math_function(a, b);
               span_result[i] = out;
             }
@@ -274,7 +271,7 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
     return;
   }
 
-  VMutableArray_Span<bool> result_span{*attribute_result};
+  MutableSpan<bool> result_span = attribute_result.as_span();
 
   /* Use specific types for correct equality operations, but for other operations we use implicit
    * conversions and float comparison. In other words, the comparison is not element-wise. */

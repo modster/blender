@@ -222,6 +222,7 @@ GVArray_For_SingleValue::~GVArray_For_SingleValue()
 
 GVArray_GSpan::GVArray_GSpan(const GVArray &varray) : GSpan(varray.type()), varray_(varray)
 {
+  size_ = varray_.size();
   if (varray_.is_span()) {
     data_ = varray_.get_span().data();
   }
@@ -230,7 +231,6 @@ GVArray_GSpan::GVArray_GSpan(const GVArray &varray) : GSpan(varray.type()), varr
     varray_.materialize_to_uninitialized(IndexRange(size_), owned_data_);
     data_ = owned_data_;
   }
-  size_ = varray_.size();
 }
 
 GVArray_GSpan::~GVArray_GSpan()
@@ -248,6 +248,7 @@ GVArray_GSpan::~GVArray_GSpan()
 GVMutableArray_GSpan::GVMutableArray_GSpan(GVMutableArray &varray, const bool materialize)
     : GMutableSpan(varray.type()), varray_(varray)
 {
+  size_ = varray_.size();
   if (varray_.is_span()) {
     data_ = varray_.get_span().data();
   }
@@ -261,7 +262,6 @@ GVMutableArray_GSpan::GVMutableArray_GSpan(GVMutableArray &varray, const bool ma
     }
     data_ = owned_data_;
   }
-  size_ = varray_.size();
 }
 
 GVMutableArray_GSpan::~GVMutableArray_GSpan()

@@ -460,7 +460,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
               name, domain_output, data_type_output);
 
           if (source_attribute) {
-            fn::GSpan src_span = source_attribute->get_span();
+            fn::GVArray_GSpan src_span{*source_attribute};
             const void *src_buffer = src_span.data();
             for (const int UNUSED(i) : set_group.transforms.index_range()) {
               void *dst_buffer = dst_span[offset];

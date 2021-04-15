@@ -392,6 +392,7 @@ template<typename T> class VArray_Span final : public Span<T> {
  public:
   VArray_Span(const VArray<T> &varray) : Span<T>(), varray_(varray)
   {
+    this->size_ = varray_.size();
     if (varray_.is_span()) {
       this->data_ = varray_.get_span().data();
     }
@@ -401,7 +402,6 @@ template<typename T> class VArray_Span final : public Span<T> {
       varray_.materialize_to_uninitialized(owned_data_);
       this->data_ = owned_data_.data();
     }
-    this->size_ = varray_.size();
   }
 };
 
@@ -416,6 +416,7 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
   VMutableArray_Span(VMutableArray<T> &varray, const bool materialize = true)
       : MutableSpan<T>(), varray_(varray)
   {
+    this->size_ = varray_.size();
     if (varray_.is_span()) {
       this->data_ = varray_.get_span().data();
     }
@@ -430,7 +431,6 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
       }
       this->data_ = owned_data_.data();
     }
-    this->size_ = varray_.size();
   }
 
   ~VMutableArray_Span()
