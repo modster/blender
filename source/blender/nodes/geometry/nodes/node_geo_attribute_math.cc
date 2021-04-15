@@ -228,8 +228,8 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
   const AttributeDomain result_domain = get_result_domain(
       component, params, operation, result_name);
 
-  OutputAttribute_Typed<float> attribute_result = component.attribute_try_get_for_output<float>(
-      result_name, result_domain);
+  OutputAttribute_Typed<float> attribute_result =
+      component.attribute_try_get_for_output_only<float>(result_name, result_domain);
   if (!attribute_result) {
     return;
   }

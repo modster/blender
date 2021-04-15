@@ -114,12 +114,12 @@ static void separate_attribute(GeometryComponent &component, const GeoNodeExecPa
       "Vector", component, result_domain, {0, 0, 0});
   VArray_Span<float3> input_span{*attribute_input};
 
-  OutputAttribute_Typed<float> attribute_result_x = component.attribute_try_get_for_output<float>(
-      result_name_x, result_domain);
-  OutputAttribute_Typed<float> attribute_result_y = component.attribute_try_get_for_output<float>(
-      result_name_y, result_domain);
-  OutputAttribute_Typed<float> attribute_result_z = component.attribute_try_get_for_output<float>(
-      result_name_z, result_domain);
+  OutputAttribute_Typed<float> attribute_result_x =
+      component.attribute_try_get_for_output_only<float>(result_name_x, result_domain);
+  OutputAttribute_Typed<float> attribute_result_y =
+      component.attribute_try_get_for_output_only<float>(result_name_y, result_domain);
+  OutputAttribute_Typed<float> attribute_result_z =
+      component.attribute_try_get_for_output_only<float>(result_name_z, result_domain);
 
   /* Only extract the components for the outputs with a given attribute. */
   if (attribute_result_x) {

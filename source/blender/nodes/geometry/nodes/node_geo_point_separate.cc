@@ -68,7 +68,7 @@ static void copy_attributes_based_on_mask(const GeometryComponent &in_component,
       continue;
     }
 
-    OutputAttribute result_attribute = result_component.attribute_try_get_for_output(
+    OutputAttribute result_attribute = result_component.attribute_try_get_for_output_only(
         name, ATTR_DOMAIN_POINT, data_type);
 
     attribute_math::convert_to_static_type(data_type, [&](auto dummy) {

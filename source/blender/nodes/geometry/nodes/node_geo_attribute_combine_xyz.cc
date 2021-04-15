@@ -94,8 +94,8 @@ static void combine_attributes(GeometryComponent &component, const GeoNodeExecPa
   }
   const AttributeDomain result_domain = get_result_domain(component, params, result_name);
 
-  OutputAttribute_Typed<float3> attribute_result = component.attribute_try_get_for_output<float3>(
-      result_name, result_domain);
+  OutputAttribute_Typed<float3> attribute_result =
+      component.attribute_try_get_for_output_only<float3>(result_name, result_domain);
   if (!attribute_result) {
     return;
   }

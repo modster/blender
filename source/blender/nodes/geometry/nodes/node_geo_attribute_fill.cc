@@ -93,7 +93,7 @@ static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams
                                             get_result_domain(component, attribute_name) :
                                             domain;
 
-  OutputAttribute attribute = component.attribute_try_get_for_output(
+  OutputAttribute attribute = component.attribute_try_get_for_output_only(
       attribute_name, result_domain, data_type);
   if (!attribute) {
     return;

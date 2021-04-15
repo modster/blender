@@ -167,7 +167,7 @@ static void attribute_mix_calc(GeometryComponent &component, const GeoNodeExecPa
 
   const AttributeDomain result_domain = get_result_domain(component, params, result_name);
 
-  OutputAttribute attribute_result = component.attribute_try_get_for_output(
+  OutputAttribute attribute_result = component.attribute_try_get_for_output_only(
       result_name, result_domain, result_type);
   if (!attribute_result) {
     return;

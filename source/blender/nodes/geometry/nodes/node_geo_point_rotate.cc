@@ -128,7 +128,7 @@ static void point_rotate_on_component(GeometryComponent &component,
   const NodeGeometryRotatePoints &storage = *(const NodeGeometryRotatePoints *)node.storage;
 
   OutputAttribute_Typed<float3> rotation_attribute =
-      component.attribute_try_get_for_output<float3>("rotation", ATTR_DOMAIN_POINT);
+      component.attribute_try_get_for_output<float3>("rotation", ATTR_DOMAIN_POINT, {0, 0, 0});
   if (!rotation_attribute) {
     return;
   }

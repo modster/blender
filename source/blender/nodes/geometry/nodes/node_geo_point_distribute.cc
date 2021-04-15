@@ -363,7 +363,7 @@ BLI_NOINLINE static void interpolate_existing_attributes(
     StringRef attribute_name = entry.key;
     const CustomDataType output_data_type = entry.value.data_type;
     /* The output domain is always #ATTR_DOMAIN_POINT, since we are creating a point cloud. */
-    OutputAttribute attribute_out = component.attribute_try_get_for_output(
+    OutputAttribute attribute_out = component.attribute_try_get_for_output_only(
         attribute_name, ATTR_DOMAIN_POINT, output_data_type);
     if (!attribute_out) {
       continue;
@@ -424,12 +424,12 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
                                                     Span<Vector<float3>> bary_coords_array,
                                                     Span<Vector<int>> looptri_indices_array)
 {
-  OutputAttribute_Typed<int> id_attribute = component.attribute_try_get_for_output<int>(
+  OutputAttribute_Typed<int> id_attribute = component.attribute_try_get_for_output_only<int>(
       "id", ATTR_DOMAIN_POINT);
-  OutputAttribute_Typed<float3> normal_attribute = component.attribute_try_get_for_output<float3>(
-      "normal", ATTR_DOMAIN_POINT);
+  OutputAttribute_Typed<float3> normal_attribute =
+      component.attribute_try_get_for_output_only<float3>("normal", ATTR_DOMAIN_POINT);
   OutputAttribute_Typed<float3> rotation_attribute =
-      component.attribute_try_get_for_output<float3>("rotation", ATTR_DOMAIN_POINT);
+      component.attribute_try_get_for_output_only<float3>("rotation", ATTR_DOMAIN_POINT);
 
   MutableSpan<int> result_ids = id_attribute.as_span();
   MutableSpan<float3> result_normals = normal_attribute.as_span();

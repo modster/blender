@@ -427,7 +427,7 @@ static void attribute_vector_math_calc(GeometryComponent &component,
   }
 
   /* Get result attribute first, in case it has to overwrite one of the existing attributes. */
-  OutputAttribute attribute_result = component.attribute_try_get_for_output(
+  OutputAttribute attribute_result = component.attribute_try_get_for_output_only(
       result_name, result_domain, result_type);
   if (!attribute_result) {
     return;

@@ -145,7 +145,7 @@ static void align_rotations_on_component(GeometryComponent &component,
                                                           node.storage;
 
   OutputAttribute_Typed<float3> rotations = component.attribute_try_get_for_output<float3>(
-      "rotation", ATTR_DOMAIN_POINT);
+      "rotation", ATTR_DOMAIN_POINT, {0, 0, 0});
   if (!rotations) {
     return;
   }

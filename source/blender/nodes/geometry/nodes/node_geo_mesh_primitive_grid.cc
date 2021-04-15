@@ -44,8 +44,8 @@ static void calculate_uvs(
 {
   MeshComponent mesh_component;
   mesh_component.replace(mesh, GeometryOwnershipType::Editable);
-  OutputAttribute_Typed<float2> uv_attribute = mesh_component.attribute_try_get_for_output<float2>(
-      "uv_map", ATTR_DOMAIN_CORNER);
+  OutputAttribute_Typed<float2> uv_attribute =
+      mesh_component.attribute_try_get_for_output_only<float2>("uv_map", ATTR_DOMAIN_CORNER);
   MutableSpan<float2> uvs = uv_attribute.as_span();
 
   const float dx = (size_x == 0.0f) ? 0.0f : 1.0f / size_x;

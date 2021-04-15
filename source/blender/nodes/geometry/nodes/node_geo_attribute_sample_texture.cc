@@ -86,8 +86,8 @@ static void execute_on_component(GeometryComponent &component, const GeoNodeExec
   const AttributeDomain result_domain = get_result_domain(
       component, result_attribute_name, mapping_name);
 
-  OutputAttribute_Typed<Color4f> attribute_out = component.attribute_try_get_for_output<Color4f>(
-      result_attribute_name, result_domain);
+  OutputAttribute_Typed<Color4f> attribute_out =
+      component.attribute_try_get_for_output_only<Color4f>(result_attribute_name, result_domain);
   if (!attribute_out) {
     return;
   }

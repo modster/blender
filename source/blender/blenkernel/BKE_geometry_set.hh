@@ -107,6 +107,8 @@ class GeometryComponent {
   /* Can only be used with supported domain types. */
   virtual int attribute_domain_size(const AttributeDomain domain) const;
 
+  bool attribute_is_deletable(const blender::StringRef attribute_name) const;
+
   /* Get read-only access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */
   blender::bke::ReadAttributeLookup attribute_try_get_for_read(
@@ -157,7 +159,7 @@ class GeometryComponent {
       const blender::StringRef attribute_name,
       const AttributeDomain domain,
       const CustomDataType data_type,
-      const void *default_value) const;
+      const void *default_value = nullptr) const;
 
   /* Get a typed read-only attribute for the given domain and type. */
   template<typename T>
@@ -188,13 +190,27 @@ class GeometryComponent {
       const CustomDataType data_type,
       const void *default_value = nullptr);
 
+  blender::bke::OutputAttribute attribute_try_get_for_output_only(
+      const blender::StringRef attribute_name,
+      const AttributeDomain domain,
+      const CustomDataType data_type);
+
   template<typename T>
   blender::bke::OutputAttribute_Typed<T> attribute_try_get_for_output(
+      const blender::StringRef attribute_name, const AttributeDomain domain, const T default_value)
+  {
+    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
+    const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
+    return this->attribute_try_get_for_output(attribute_name, domain, data_type, &default_value);
+  }
+
+  template<typename T>
+  blender::bke::OutputAttribute_Typed<T> attribute_try_get_for_output_only(
       const blender::StringRef attribute_name, const AttributeDomain domain)
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
     const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
-    return this->attribute_try_get_for_output(attribute_name, domain, data_type, nullptr);
+    return this->attribute_try_get_for_output_only(attribute_name, domain, data_type);
   }
 
  private:

@@ -169,12 +169,12 @@ static void attribute_calc_proximity(GeometryComponent &component,
   const AttributeDomain result_domain = ATTR_DOMAIN_POINT;
 
   const std::string distance_attribute_name = params.get_input<std::string>("Distance");
-  OutputAttribute_Typed<float> distance_attribute = component.attribute_try_get_for_output<float>(
-      distance_attribute_name, result_domain);
+  OutputAttribute_Typed<float> distance_attribute =
+      component.attribute_try_get_for_output_only<float>(distance_attribute_name, result_domain);
 
   const std::string location_attribute_name = params.get_input<std::string>("Position");
   OutputAttribute_Typed<float3> location_attribute =
-      component.attribute_try_get_for_output<float3>(location_attribute_name, result_domain);
+      component.attribute_try_get_for_output_only<float3>(location_attribute_name, result_domain);
 
   ReadAttributeLookup position_attribute = component.attribute_try_get_for_read("position");
   if (!position_attribute || (!distance_attribute && !location_attribute)) {

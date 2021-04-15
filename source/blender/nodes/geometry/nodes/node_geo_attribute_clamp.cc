@@ -160,7 +160,7 @@ static void clamp_attribute(GeometryComponent &component, const GeoNodeExecParam
   std::unique_ptr<GVArray> attribute_input = component.attribute_try_get_for_read(
       attribute_name, domain, data_type);
 
-  OutputAttribute attribute_result = component.attribute_try_get_for_output(
+  OutputAttribute attribute_result = component.attribute_try_get_for_output_only(
       result_name, domain, data_type);
 
   if (!attribute_result) {

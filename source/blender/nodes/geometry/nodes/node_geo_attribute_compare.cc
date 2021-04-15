@@ -256,7 +256,7 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
 
   const AttributeDomain result_domain = get_result_domain(component, params, result_name);
 
-  OutputAttribute_Typed<bool> attribute_result = component.attribute_try_get_for_output<bool>(
+  OutputAttribute_Typed<bool> attribute_result = component.attribute_try_get_for_output_only<bool>(
       result_name, result_domain);
   if (!attribute_result) {
     return;

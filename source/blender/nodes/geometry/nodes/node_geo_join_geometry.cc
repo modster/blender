@@ -201,7 +201,7 @@ static void join_attributes(Span<const GeometryComponent *> src_components,
     AttributeDomain domain;
     determine_final_data_type_and_domain(src_components, attribute_name, &data_type, &domain);
 
-    OutputAttribute write_attribute = result.attribute_try_get_for_output(
+    OutputAttribute write_attribute = result.attribute_try_get_for_output_only(
         attribute_name, domain, data_type);
     if (!write_attribute) {
       continue;

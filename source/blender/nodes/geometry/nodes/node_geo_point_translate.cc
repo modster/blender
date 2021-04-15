@@ -43,7 +43,7 @@ namespace blender::nodes {
 static void execute_on_component(GeoNodeExecParams params, GeometryComponent &component)
 {
   OutputAttribute_Typed<float3> position_attribute =
-      component.attribute_try_get_for_output<float3>("position", ATTR_DOMAIN_POINT);
+      component.attribute_try_get_for_output<float3>("position", ATTR_DOMAIN_POINT, {0, 0, 0});
   if (!position_attribute) {
     return;
   }
