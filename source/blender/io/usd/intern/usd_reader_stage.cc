@@ -207,8 +207,10 @@ static USDPrimReader *_handlePrim(Main *bmain,
   // from being added.
   if (!(prim.IsPseudoRoot() || prim.IsMaster())) {
     reader = USDStageReader::create_reader(prim, params, settings);
-    if (reader == NULL)
+
+    if (reader == NULL) {
       return NULL;
+    }
 
     reader->parent(parent_reader);
     reader->create_object(bmain, 0.0);

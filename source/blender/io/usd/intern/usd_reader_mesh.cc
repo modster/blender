@@ -434,11 +434,12 @@ void USDMeshReader::read_uvs(Mesh *mesh,
         }
 
         MLoopUV *mloopuv = static_cast<MLoopUV *>(layer->data);
-        if (is_left_handed_)
+        if (is_left_handed_) {
           uv_index = rev_loop_index;
-        else
+        }
+        else {
           uv_index = loop_index;
-
+        }
         mloopuv[uv_index].uv[0] = sample.uvs[usd_uv_index][0];
         mloopuv[uv_index].uv[1] = sample.uvs[usd_uv_index][1];
       }
@@ -766,8 +767,9 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
   }
 
   mesh_prim_.GetOrientationAttr().Get(&orientation_);
-  if (orientation_ == pxr::UsdGeomTokens->leftHanded)
+  if (orientation_ == pxr::UsdGeomTokens->leftHanded) {
     is_left_handed_ = true;
+  }
 
   std::vector<pxr::TfToken> uv_tokens;
 
