@@ -135,6 +135,8 @@ class GeometryComponent {
                             const AttributeDomain domain,
                             const CustomDataType data_type);
 
+  bool attribute_try_create_builtin(const blender::StringRef attribute_name);
+
   blender::Set<std::string> attribute_names() const;
   bool attribute_foreach(const AttributeForeachCallback callback) const;
 

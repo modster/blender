@@ -651,6 +651,21 @@ bool GeometryComponent::attribute_try_create(const StringRef attribute_name,
   return false;
 }
 
+bool GeometryComponent::attribute_try_create_builtin(const blender::StringRef attribute_name)
+{
+  using namespace blender::bke;
+  if (attribute_name.is_empty()) {
+    return false;
+  }
+  const ComponentAttributeProviders *providers = this->get_attribute_providers();
+  if (providers == nullptr) {
+    return false;
+  }
+  const BuiltinAttributeProvider *builtin_provider =
+      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
+  return builtin_provider->try_create(*this);
+}
+
 Set<std::string> GeometryComponent::attribute_names() const
 {
   Set<std::string> attributes;
@@ -787,21 +802,6 @@ std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_get_for_read
   return std::make_unique<blender::fn::GVArray_For_SingleValue>(*type, domain_size, default_value);
 }
 
-blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output(
-    const StringRef attribute_name,
-    const AttributeDomain domain,
-    const CustomDataType data_type,
-    const void *default_value)
-{
-  const blender::fn::CPPType *cpp_type = blender::bke::custom_data_type_to_cpp_type(data_type);
-  BLI_assert(cpp_type != nullptr);
-
-  blender::bke::WriteAttributeLookup attribute = this->attribute_try_get_for_write(attribute_name);
-  UNUSED_VARS(attribute, cpp_type);
-  /* TODO */
-  return {};
-}
-
 class GVMutableAttribute_For_OutputAttribute
     : public blender::fn::GVMutableArray_For_GMutableSpan {
  public:
@@ -855,51 +855,94 @@ static void save_output_attribute(blender::bke::OutputAttribute &output_attribut
   }
 }
 
-blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_only(
+static blender::bke::OutputAttribute create_output_attribute(
+    GeometryComponent &component,
     const blender::StringRef attribute_name,
     const AttributeDomain domain,
-    const CustomDataType data_type)
+    const CustomDataType data_type,
+    const bool ignore_old_values,
+    const void *default_value)
 {
   using namespace blender;
   using namespace blender::fn;
   using namespace blender::bke;
   const CPPType *cpp_type = custom_data_type_to_cpp_type(data_type);
   BLI_assert(cpp_type != nullptr);
+  const nodes::DataTypeConversions &conversions = nodes::get_implicit_type_conversions();
 
-  WriteAttributeLookup attribute = this->attribute_try_get_for_write(attribute_name);
-  if (attribute) {
-    if (attribute.domain == domain) {
-      if (attribute.varray->type() == *cpp_type) {
-        /* Best case, attribute with correct type and domain exists already. */
-        return OutputAttribute(std::move(attribute.varray), domain, {}, true);
-      }
-      if (this->attribute_is_builtin(attribute_name)) {
-        /* Builtin types cannot change their data type and domain. Try to adapt the data type for
-         * the caller. */
-        const nodes::DataTypeConversions &conversions = nodes::get_implicit_type_conversions();
-        std::unique_ptr<GVMutableArray> varray = conversions.try_convert(
-            std::move(attribute.varray), *cpp_type);
-        return OutputAttribute(std::move(varray), domain, {}, true);
+  if (component.attribute_is_builtin(attribute_name)) {
+    WriteAttributeLookup attribute = component.attribute_try_get_for_write(attribute_name);
+    if (!attribute) {
+      component.attribute_try_create_builtin(attribute_name);
+      attribute = component.attribute_try_get_for_write(attribute_name);
+      if (!attribute) {
+        /* Builtin attribute does not exist and can't be created. */
+        return {};
       }
     }
-  }
-  else {
-    if (this->attribute_try_create(attribute_name, domain, data_type)) {
-      /* There is no conflicting attribute, so create it and return the new attribute. */
-      attribute = this->attribute_try_get_for_write(attribute_name);
-      return OutputAttribute(std::move(attribute.varray), domain, {}, true);
+    if (attribute.domain != domain) {
+      /* Builtin attribute is on different domain. */
+      return {};
     }
-    /* The attribute does not exist and can't be created. */
-    return {};
+    std::unique_ptr<GVMutableArray> varray = std::move(attribute.varray);
+    if (varray->type() == *cpp_type) {
+      /* Builtin attribute matches exactly. */
+      return OutputAttribute(std::move(varray), domain, {}, ignore_old_values);
+    }
+    /* Builtin attribute is on the same domain but has a different data type. */
+    varray = conversions.try_convert(std::move(varray), *cpp_type);
+    return OutputAttribute(std::move(varray), domain, {}, ignore_old_values);
   }
 
-  const int domain_size = this->attribute_domain_size(domain);
+  WriteAttributeLookup attribute = component.attribute_try_get_for_write(attribute_name);
+  if (!attribute) {
+    component.attribute_try_create(attribute_name, domain, data_type);
+    attribute = component.attribute_try_get_for_write(attribute_name);
+    if (!attribute) {
+      /* Can't create the attribute. */
+      return {};
+    }
+  }
+  if (attribute.domain == domain && attribute.varray->type() == *cpp_type) {
+    /* Existing generic attribute matches exactly. */
+    return OutputAttribute(std::move(attribute.varray), domain, {}, ignore_old_values);
+  }
+
+  const int domain_size = component.attribute_domain_size(domain);
+  /* Allocate a new array that lives next to the existing attribute. It will overwrite the existing
+   * attribute after processing is done. */
   void *data = MEM_mallocN_aligned(
       cpp_type->size() * domain_size, cpp_type->alignment(), __func__);
-  cpp_type->construct_default_n(data, domain);
+  if (ignore_old_values) {
+    /* This does nothing for trivially constructible types, but is necessary for correctness. */
+    cpp_type->construct_default_n(data, domain);
+  }
+  else {
+    /* Fill the temporary array with values from the existing attribute. */
+    std::unique_ptr<GVArray> old_varray = component.attribute_get_for_read(
+        attribute_name, domain, data_type, default_value);
+    old_varray->materialize_to_uninitialized(IndexRange(domain_size), data);
+  }
   std::unique_ptr<GVMutableArray> varray =
       std::make_unique<GVMutableAttribute_For_OutputAttribute>(
-          GMutableSpan{*cpp_type, data, domain_size}, *this, attribute_name);
+          GMutableSpan{*cpp_type, data, domain_size}, component, attribute_name);
 
   return OutputAttribute(std::move(varray), domain, save_output_attribute, true);
+}
+
+blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output(
+    const StringRef attribute_name,
+    const AttributeDomain domain,
+    const CustomDataType data_type,
+    const void *default_value)
+{
+  return create_output_attribute(*this, attribute_name, domain, data_type, false, default_value);
+}
+
+blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_only(
+    const blender::StringRef attribute_name,
+    const AttributeDomain domain,
+    const CustomDataType data_type)
+{
+  return create_output_attribute(*this, attribute_name, domain, data_type, true, nullptr);
 }
