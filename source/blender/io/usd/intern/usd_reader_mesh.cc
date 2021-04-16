@@ -261,6 +261,8 @@ bool USDMeshReader::valid() const
 
 bool USDMeshReader::topology_changed(Mesh *existing_mesh, const double motionSampleTime)
 {
+  /* TODO(makowalski): Is it the best strategy to cache the mesh
+   * geometry in this function?  This needs to be revisited. */
   pxr::UsdAttribute faceVertCountsAttr = mesh_prim_.GetFaceVertexCountsAttr();
   pxr::UsdAttribute faceVertIndicesAttr = mesh_prim_.GetFaceVertexIndicesAttr();
   pxr::UsdAttribute pointsAttr = mesh_prim_.GetPointsAttr();
@@ -281,6 +283,9 @@ bool USDMeshReader::topology_changed(Mesh *existing_mesh, const double motionSam
     normal_interpolation_ = mesh_prim_.GetNormalsInterpolation();
   }
 
+  /* TODO(makowalski): Why aren't we comparing positions_.size()
+   * against the number of points of the existing_mesh?
+   * Why keep track of the last_num_positons_ at all? */
   if (last_num_positions_ != positions_.size()) {
     last_num_positions_ = positions_.size();
     return true;
@@ -296,19 +301,11 @@ void USDMeshReader::read_mpolys(Mesh *mesh,
   MPoly *mpolys = mesh->mpoly;
   MLoop *mloops = mesh->mloop;
 
-  pxr::UsdAttribute faceVertCountsAttr = mesh_prim_.GetFaceVertexCountsAttr();
-  pxr::UsdAttribute faceVertIndicesAttr = mesh_prim_.GetFaceVertexIndicesAttr();
+  int loop_index = 0;
+  int rev_loop_index = 0;
 
-  pxr::VtIntArray face_counts;
-  faceVertCountsAttr.Get(&face_counts, motionSampleTime);
-  pxr::VtIntArray face_indices;
-  faceVertIndicesAttr.Get(&face_indices, motionSampleTime);
-
-  unsigned int loop_index = 0;
-  unsigned int rev_loop_index = 0;
-
-  for (int i = 0; i < face_counts.size(); i++) {
-    const int face_size = face_counts[i];
+  for (int i = 0; i < face_counts_.size(); i++) {
+    const int face_size = face_counts_[i];
 
     MPoly &poly = mpolys[i];
     poly.loopstart = loop_index;
@@ -324,9 +321,9 @@ void USDMeshReader::read_mpolys(Mesh *mesh,
     for (int f = 0; f < face_size; f++, loop_index++, rev_loop_index--) {
       MLoop &loop = mloops[loop_index];
       if (is_left_handed_)
-        loop.v = face_indices[rev_loop_index];
+        loop.v = face_indices_[rev_loop_index];
       else
-        loop.v = face_indices[loop_index];
+        loop.v = face_indices_[loop_index];
     }
   }
 
@@ -634,11 +631,6 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
                                      const double motionSampleTime,
                                      const bool new_mesh)
 {
-
-  pxr::UsdAttribute normalsAttr = mesh_prim_.GetNormalsAttr();
-  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim_.GetPrimvars();
-  pxr::UsdAttribute subdivSchemeAttr = mesh_prim_.GetSubdivisionSchemeAttr();
-
   // Note that for new meshes we always want to read verts and polys,
   // regradless of the value of the read_flag, to avoid a crash downstream
   // in code that expect this data to be there.
