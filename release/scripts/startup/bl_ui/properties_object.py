@@ -327,9 +327,11 @@ class OBJECT_PT_lineart(ObjectButtonsPanel, Panel):
         layout.prop(lineart, "usage")
         layout.use_property_split = True
 
-        row = layout.row(heading="Override Crease")
-        row.prop(lineart, "use_crease_override", text="")
-        row.prop(lineart, "crease_threshold", slider=True, text="")
+        row = layout.row()
+        row.prop(lineart, "use_crease_override", text="Override Crease")
+        row = layout.row()
+        row.active = lineart.use_crease_override
+        row.prop(lineart, "crease_threshold", slider=True, text="Threshold")
 
 
 class OBJECT_PT_motion_paths(MotionPathButtonsPanel, Panel):
