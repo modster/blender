@@ -29,6 +29,8 @@
 
 #include "DEG_depsgraph_query.h"
 
+#include "ED_spreadsheet.h"
+
 #include "bmesh.h"
 
 #include "spreadsheet_data_source_geometry.hh"
@@ -87,6 +89,9 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
   int domain_size = attribute->size();
   switch (attribute->custom_data_type()) {
     case CD_PROP_FLOAT:
+      if (column_id.index != -1) {
+        return {};
+      }
       return column_values_from_function(SPREADSHEET_VALUE_TYPE_FLOAT,
                                          column_id.name,
                                          domain_size,
@@ -96,6 +101,9 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                            r_cell_value.value_float = value;
                                          });
     case CD_PROP_INT32:
+      if (column_id.index != -1) {
+        return {};
+      }
       return column_values_from_function(SPREADSHEET_VALUE_TYPE_INT32,
                                          column_id.name,
                                          domain_size,
@@ -105,6 +113,9 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                            r_cell_value.value_int = value;
                                          });
     case CD_PROP_BOOL:
+      if (column_id.index != -1) {
+        return {};
+      }
       return column_values_from_function(SPREADSHEET_VALUE_TYPE_BOOL,
                                          column_id.name,
                                          domain_size,
@@ -422,7 +433,7 @@ static GeometrySet get_display_geometry_set(SpaceSpreadsheet *sspreadsheet,
       pointcloud_component.replace(pointcloud, GeometryOwnershipType::ReadOnly);
     }
   }
-  else {
+  else if (sspreadsheet->object_eval_state == SPREADSHEET_OBJECT_EVAL_STATE_EVALUATED) {
     if (used_component_type == GEO_COMPONENT_TYPE_MESH && object_eval->mode == OB_MODE_EDIT) {
       Mesh *mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(object_eval, false);
       if (mesh == nullptr) {
@@ -434,14 +445,21 @@ static GeometrySet get_display_geometry_set(SpaceSpreadsheet *sspreadsheet,
       mesh_component.copy_vertex_group_names_from_object(*object_eval);
     }
     else {
-      if (sspreadsheet->object_eval_state == SPREADSHEET_OBJECT_EVAL_STATE_NODE) {
-        if (object_eval->runtime.geometry_set_preview != nullptr) {
-          geometry_set = *object_eval->runtime.geometry_set_preview;
-        }
-      }
-      else if (sspreadsheet->object_eval_state == SPREADSHEET_OBJECT_EVAL_STATE_FINAL) {
+      if (BLI_listbase_count(&sspreadsheet->context_path) == 1) {
+        /* Use final evaluated object. */
         if (object_eval->runtime.geometry_set_eval != nullptr) {
           geometry_set = *object_eval->runtime.geometry_set_eval;
+        }
+      }
+      else {
+        if (object_eval->runtime.geometry_set_previews != nullptr) {
+          GHash *ghash = (GHash *)object_eval->runtime.geometry_set_previews;
+          const uint64_t key = ED_spreadsheet_context_path_hash(sspreadsheet);
+          GeometrySet *geometry_set_preview = (GeometrySet *)BLI_ghash_lookup_default(
+              ghash, POINTER_FROM_UINT(key), nullptr);
+          if (geometry_set_preview != nullptr) {
+            geometry_set = *geometry_set_preview;
+          }
         }
       }
     }
