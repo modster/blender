@@ -73,7 +73,7 @@ static void copy_attributes_based_on_mask(const GeometryComponent &in_component,
 
     attribute_math::convert_to_static_type(data_type, [&](auto dummy) {
       using T = decltype(dummy);
-      fn::GVArray_Span<T> span{*attribute.varray};
+      GVArray_Span<T> span{*attribute.varray};
       MutableSpan<T> out_span = result_attribute.as_span<T>();
       copy_data_based_on_mask(span, masks, invert, out_span);
     });

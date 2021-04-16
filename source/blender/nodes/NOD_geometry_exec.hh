@@ -45,8 +45,11 @@ using fn::GMutablePointer;
 using fn::GPointer;
 using fn::GValueMap;
 using fn::GVArray;
+using fn::GVArray_GSpan;
+using fn::GVArray_Span;
 using fn::GVArray_Typed;
 using fn::GVMutableArray;
+using fn::GVMutableArray_GSpan;
 using fn::GVMutableArray_Typed;
 
 class GeoNodeExecParams {

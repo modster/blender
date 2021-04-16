@@ -760,6 +760,11 @@ template<typename T> class GVArray_Typed {
   {
     return varray_->size();
   }
+
+  IndexRange index_range() const
+  {
+    return IndexRange(this->size());
+  }
 };
 
 template<typename T> class GVMutableArray_Typed {

@@ -53,7 +53,7 @@ namespace blender::nodes {
 static void align_rotations_auto_pivot(const VArray<float3> &vectors,
                                        const VArray<float> &factors,
                                        const float3 local_main_axis,
-                                       VMutableArray<float3> &rotations)
+                                       const MutableSpan<float3> rotations)
 {
   for (const int i : IndexRange(vectors.size())) {
     const float3 vector = vectors[i];
@@ -89,7 +89,7 @@ static void align_rotations_auto_pivot(const VArray<float3> &vectors,
     float3 new_rotation;
     mat3_to_eul(new_rotation, new_rotation_matrix);
 
-    rotations.set(i, new_rotation);
+    rotations[i] = new_rotation;
   }
 }
 
@@ -97,7 +97,7 @@ static void align_rotations_fixed_pivot(const VArray<float3> &vectors,
                                         const VArray<float> &factors,
                                         const float3 local_main_axis,
                                         const float3 local_pivot_axis,
-                                        VMutableArray<float3> &rotations)
+                                        const MutableSpan<float3> rotations)
 {
   if (local_main_axis == local_pivot_axis) {
     /* Can't compute any meaningful rotation angle in this case. */
@@ -133,7 +133,7 @@ static void align_rotations_fixed_pivot(const VArray<float3> &vectors,
     float3 new_rotation;
     mat3_to_eul(new_rotation, new_rotation_matrix);
 
-    rotations.set(i, new_rotation);
+    rotations[i] = new_rotation;
   }
 }
 
@@ -158,12 +158,13 @@ static void align_rotations_on_component(GeometryComponent &component,
   float3 local_main_axis{0, 0, 0};
   local_main_axis[storage.axis] = 1;
   if (storage.pivot_axis == GEO_NODE_ALIGN_ROTATION_TO_VECTOR_PIVOT_AXIS_AUTO) {
-    align_rotations_auto_pivot(vectors, factors, local_main_axis, *rotations);
+    align_rotations_auto_pivot(vectors, factors, local_main_axis, rotations.as_span());
   }
   else {
     float3 local_pivot_axis{0, 0, 0};
     local_pivot_axis[storage.pivot_axis - 1] = 1;
-    align_rotations_fixed_pivot(vectors, factors, local_main_axis, local_pivot_axis, *rotations);
+    align_rotations_fixed_pivot(
+        vectors, factors, local_main_axis, local_pivot_axis, rotations.as_span());
   }
 
   rotations.save();
