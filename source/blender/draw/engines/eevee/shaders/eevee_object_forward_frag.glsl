@@ -12,7 +12,7 @@ layout(std140) uniform lights_block
 
 layout(std140) uniform cluster_block
 {
-  ClusterData clusters;
+  ClusterData cluster;
 };
 
 layout(location = 0, index = 0) out vec4 outRadiance;
@@ -56,7 +56,7 @@ void main(void)
   bool check = ((mod(xi, 2) == mod(yi, 2)) == bool(mod(zi, 2)));
 
   vec3 radiance = vec3(0);
-  LIGHT_FOREACH_BEGIN (clusters, lights, light) {
+  LIGHT_FOREACH_BEGIN (cluster, lights, light) {
     vec4 l_vector;
     l_vector.xyz = light._position - g_surf.P;
     l_vector.w = length(l_vector.xyz);

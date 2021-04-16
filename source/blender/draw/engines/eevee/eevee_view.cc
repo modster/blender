@@ -172,6 +172,8 @@ void ShadingView::update_view(void)
    * out of the blurring radius. To fix this, use custom enlarged culling matrix. */
   dof_.jitter_apply(winmat, viewmat);
   DRW_view_update_sub(render_view_, viewmat, winmat);
+
+  inst_.lights.set_view(render_view_, extent_);
 }
 
 /** \} */

@@ -24,8 +24,6 @@
  * IMPORTANT: Don't forget to align mat4 and vec4 to 16 bytes.
  **/
 
-#pragma BLI_STATIC_ASSERT_ALIGN(type_, align_)
-
 #ifndef __cplusplus /* GLSL */
 #  pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #  define BLI_STATIC_ASSERT_ALIGN(type_, align_)
@@ -49,7 +47,11 @@ typedef float vec4[4];
 typedef float vec3[3];
 typedef float vec2[2];
 typedef int ivec4[4];
+typedef int ivec3[3];
 typedef int ivec2[2];
+typedef uint uvec4[4];
+typedef uint uvec3[3];
+typedef uint uvec2[2];
 typedef int bvec4[4];
 typedef int bvec2[2];
 /* Ugly but it does the job! */
@@ -309,7 +311,7 @@ BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
  * \{ */
 
 /** Maximum number of lights in one light UBO. */
-#define LIGHT_MAX 512
+#define LIGHT_MAX 128
 
 enum eLightType : uint32_t {
   LIGHT_SUN = 0u,
@@ -353,33 +355,52 @@ struct LightData {
 #  define _back object_mat[2].xyz
 #  define _position object_mat[3].xyz
 #endif
-  /** NOTE: It is ok to use vec3 here. A float is declared right after it. */
+  /** Influence radius (inversed and squared) adjusted for Surface / Volume power. */
+  float influence_radius_invsqr_surface;
+  float influence_radius_invsqr_volume;
+  /** Maximum influence radius. Used for culling. */
+  float influence_radius_max;
+  /** Offset in the shadow struct table. -1 means no shadow. */
+  uint shadow_id;
+  /** NOTE: It is ok to use vec3 here. A float is declared right after it.
+   * vec3 is also aligned to 16 bytes. */
   vec3 color;
   /** Power depending on shader type. */
   float diffuse_power;
   float specular_power;
   float volume_power;
-  /** Influence radius (inversed and squared) adjusted for Surface / Volume power. */
-  float inv_sqr_influence_radius_surface;
-  float inv_sqr_influence_radius_volume;
   /** Sphere radius for point & spot lights, or disk radius for sun. */
   float sphere_radius;
   /** Special radius factor for volumetric lighting. */
   float volume_radius;
-  /** Offset in the shadow struct table. -1 means no shadow. */
-  uint shadow_id;
   /** Light Type */
   eLightType type;
-  /** There is one vec4 worth of data left to be used until we break the 16KiB min UBO limit. */
-  // vec4 unused;
+  int _pad0, _pad1, _pad2;
 };
 BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Clusters
+ * \{ */
+
+#define CLUSTER_GRID_X_DIM 16
+#define CLUSTER_GRID_Y_DIM 15
+#define CLUSTER_GRID_Z_DIM 16
+#define CLUSTER_MAX 4096
+
+/**
+ * Contains culling grid data.
+ * One cluster is a small view frustum with a flat bit array of all the intersecting entities.
+ */
 struct ClusterData {
-  uint light_count;
-  uint _pad0;
-  uint _pad1;
-  uint _pad2;
+  /* Dimension of the whole cluster grid. */
+  ivec3 grid_extent;
+  /* Extent of one square cluster. */
+  uint extent;
+  /* Flat bit array. One bit for each light in the Light Data buffer. */
+  uvec4 cells[CLUSTER_MAX];
 };
 BLI_STATIC_ASSERT_ALIGN(ClusterData, 16)
 
@@ -396,8 +417,8 @@ BLI_STATIC_ASSERT_ALIGN(ClusterData, 16)
 
 #ifdef __cplusplus
 using CameraDataBuf = StructBuffer<CameraData>;
-using LightsDataBuf = StructArrayBuffer<LightData, LIGHT_MAX>;
-using ClustersDataBuf = StructBuffer<ClusterData>;
+using LightDataBuf = StructArrayBuffer<LightData, LIGHT_MAX>;
+using ClusterDataBuf = StructBuffer<ClusterData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
 

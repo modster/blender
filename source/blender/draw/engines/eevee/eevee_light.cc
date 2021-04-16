@@ -19,7 +19,7 @@
 /** \file
  * \ingroup eevee
  *
- * An instance contains all structures needed to do a complete render.
+ * The light module manages light data buffers and light culling system.
  */
 
 #include "eevee_instance.hh"
@@ -62,10 +62,16 @@ Light::Light(const Object *ob, float threshold)
   float surface_max_power = max_ff(la->diff_fac, la->spec_fac) * max_power;
   float volume_max_power = la->volume_fac * max_power;
 
-  this->inv_sqr_influence_radius_surface = inverse_squared_attenuation_radius_get(
-      la, threshold, surface_max_power);
-  this->inv_sqr_influence_radius_volume = inverse_squared_attenuation_radius_get(
-      la, threshold, volume_max_power);
+  float influence_radius_surface = attenuation_radius_get(la, threshold, surface_max_power);
+  float influence_radius_volume = attenuation_radius_get(la, threshold, volume_max_power);
+
+  this->influence_radius_max = max_ff(influence_radius_surface, influence_radius_volume);
+  this->influence_radius_invsqr_surface = (influence_radius_surface > 1e-8f) ?
+                                              (1.0f / square_f(influence_radius_surface)) :
+                                              0.0f;
+  this->influence_radius_invsqr_volume = (influence_radius_volume > 1e-8f) ?
+                                             (1.0f / square_f(influence_radius_volume)) :
+                                             0.0f;
 
   mul_v3_v3fl(this->color, &la->r, la->energy);
   normalize_m4_m4_ex(this->object_mat, ob->obmat, scale);
@@ -88,9 +94,7 @@ Light::Light(const Object *ob, float threshold)
 }
 
 /* Returns attenuation radius inversed & squared for easy bound checking inside the shader. */
-float Light::inverse_squared_attenuation_radius_get(const ::Light *la,
-                                                    float light_threshold,
-                                                    float light_power)
+float Light::attenuation_radius_get(const ::Light *la, float light_threshold, float light_power)
 {
   if (la->type == LA_SUN) {
     return (light_power > 1e-5f) ? 1e16f : 0.0f;
@@ -102,12 +106,7 @@ float Light::inverse_squared_attenuation_radius_get(const ::Light *la,
   /* Compute the distance (using the inverse square law)
    * at which the light power reaches the light_threshold. */
   /* TODO take area light scale into account. */
-#if 1 /* Optimized. */
-  return (light_power > 1e-5f) ? (light_threshold / light_power) : 0.0f;
-#else
-    float radius = sqrtf(light_power / light_threshold));
-    return 1.0f / max_ff(1e-4f, square_f(radius));
-#endif
+  return sqrtf(light_power / light_threshold);
 }
 
 void Light::shape_parameters_set(const ::Light *la, const float scale[3])
@@ -203,6 +202,12 @@ void LightModule::begin_sync(void)
   light_threshold_ = max_ff(1e-16f, inst_.scene->eevee.light_threshold);
 
   lights_.clear();
+
+  /* TODO(fclem) degrow vector of light batches. */
+  if (datas_.size() == 0) {
+    clusters_.append(new Cluster());
+    datas_.append(new LightDataBuf());
+  }
 }
 
 void LightModule::sync_light(const Object *ob)
@@ -214,17 +219,58 @@ void LightModule::end_sync(void)
 {
 }
 
+/* Compute acceleration structure for the given view. */
+void LightModule::set_view(const DRWView *view, const int extent[2])
+{
+  for (Cluster *cluster : clusters_) {
+    cluster->set_view(view, extent);
+  }
+
+  uint64_t light_id = 0;
+  uint64_t batch_id = 0;
+  Cluster *cluster = clusters_[0];
+  LightDataBuf *batch = datas_[0];
+  for (Light &light : lights_) {
+    /* If we filled a batch, go to the next. */
+    if (light_id == LIGHT_MAX) {
+      batch_id++;
+      light_id = 0;
+      if (clusters_.size() <= batch_id) {
+        datas_.append(new LightDataBuf());
+        clusters_.append(new Cluster());
+      }
+      batch = datas_[batch_id];
+      cluster = clusters_[batch_id];
+      cluster->set_view(view, extent);
+    }
+
+    BoundSphere bsphere;
+    copy_v3_v3(bsphere.center, light._position);
+    bsphere.radius = light.influence_radius_max;
+
+    if (!DRW_culling_sphere_test(view, &bsphere)) {
+      continue;
+    }
+
+    cluster->insert(bsphere, light_id);
+    (*batch)[light_id] = light;
+    light_id++;
+  }
+
+  active_batch_count_ = batch_id + 1;
+
+  for (Cluster *cluster : clusters_) {
+    cluster->push_update();
+  }
+  for (LightDataBuf *lbuf : datas_) {
+    lbuf->push_update();
+  }
+}
+
 void LightModule::bind_range(int range_id)
 {
-  int64_t range_start = range_id * LIGHT_MAX;
-  int64_t range_size = min_ii(this->lights_.size() - range_start, LIGHT_MAX);
-  /* TODO(fclem) Can we avoid this copy in the first iter? */
-  LightData *src = lights_.data() + range_start;
-  LightData *dst = lights_data_.data();
-  memcpy(dst, src, sizeof(LightData) * range_size);
-  lights_data_.push_update();
-  clusters_data_.light_count = range_size;
-  clusters_data_.push_update();
+  active_data_ = datas_[range_id]->ubo_get();
+  active_clusters_ = clusters_[range_id]->ubo_get();
 }
 
 /** \} */

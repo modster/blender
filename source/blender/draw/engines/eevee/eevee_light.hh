@@ -29,6 +29,7 @@
 #include "DNA_light_types.h"
 
 #include "eevee_camera.hh"
+#include "eevee_cluster.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
 #include "eevee_shader_shared.hh"
@@ -47,9 +48,7 @@ class Light : public LightData {
   Light(const Object *ob, float threshold);
 
  private:
-  float inverse_squared_attenuation_radius_get(const ::Light *la,
-                                               float light_threshold,
-                                               float light_power);
+  float attenuation_radius_get(const ::Light *la, float light_threshold, float light_power);
   void shape_parameters_set(const ::Light *la, const float scale[3]);
   float shape_power_get(const ::Light *la);
   float shape_power_volume_get(const ::Light *la);
@@ -70,35 +69,50 @@ class LightModule {
 
   /** Gathered Light data from sync. Not all data will be selected for rendering. */
   Vector<Light> lights_;
+  /** Batches of LIGHT_MAX lights alongside their culling data. */
+  Vector<LightDataBuf *> datas_;
+  Vector<Cluster *> clusters_;
+  /** Active data pointers used for rendering. */
+  const GPUUniformBuf *active_data_;
+  const GPUUniformBuf *active_clusters_;
 
-  LightsDataBuf lights_data_;
-  ClustersDataBuf clusters_data_;
+  uint64_t active_batch_count_;
 
   float light_threshold_;
 
  public:
   LightModule(Instance &inst) : inst_(inst){};
-  ~LightModule(){};
+  ~LightModule()
+  {
+    for (auto item : datas_) {
+      delete item;
+    }
+    for (auto item : clusters_) {
+      delete item;
+    }
+  };
 
   void begin_sync(void);
   void sync_light(const Object *ob);
   void end_sync(void);
 
+  void set_view(const DRWView *view, const int extent[2]);
+
   void bind_range(int range_id);
 
-  const GPUUniformBuf *ubo_get(void) const
+  const GPUUniformBuf **ubo_ref_get(void)
   {
-    return lights_data_.ubo_get();
+    return &active_data_;
   }
-  const GPUUniformBuf *cluster_ubo_get(void) const
+  const GPUUniformBuf **cluster_ubo_ref_get(void)
   {
-    return clusters_data_.ubo_get();
+    return &active_clusters_;
   }
   /* Return a range iterator to loop over all lights.
    * In practice, we render with light in waves of LIGHT_MAX lights at a time. */
   IndexRange index_range(void) const
   {
-    return IndexRange(divide_ceil_u(max_ii(1, this->lights_.size()), LIGHT_MAX));
+    return IndexRange(active_batch_count_);
   }
 };
 
