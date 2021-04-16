@@ -390,13 +390,12 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
   std::unique_ptr<SpreadsheetDrawer> drawer = spreadsheet_drawer_from_layout(spreadsheet_layout);
   draw_spreadsheet_in_region(C, region, *drawer);
 
-  /* Tag footer for redraw, because the main region updates data for the footer. */
+  /* Tag other regions for redraw, because the main region updates data for them. */
   ARegion *footer = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_FOOTER);
   ED_region_tag_redraw(footer);
+  ARegion *sidebar = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_UI);
+  ED_region_tag_redraw(sidebar);
 
-  // /* Tag the sidebar for redraw, because the main region updates data for it. */
-  // ARegion *sidebar = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_UI);
-  // ED_region_tag_redraw(sidebar);
   // sspreadsheet->runtime->data_source = *data_source;
 }
 

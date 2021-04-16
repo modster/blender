@@ -1968,7 +1968,15 @@ typedef struct SpreadsheetRowFilter {
   /* eSpaceSpreadsheet_RowFilterFlag. */
   uint8_t flag;
 
-  char _pad0[2];
+  /**
+   * The data type of the last visible column with a corresponding display name. This is set at
+   * runtime, in order to "remember" the data type so the row filter can display the settings for
+   * the correct data type even if the data source is temporarily gone.
+   * #eSpreadsheetColumnValueType.
+   */
+  uint8_t last_data_type;
+
+  char _pad0[1];
 
   int value_int;
   float value_float;

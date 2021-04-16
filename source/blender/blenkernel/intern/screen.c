@@ -1365,9 +1365,8 @@ static void write_area(BlendWriter *writer, ScrArea *area)
         BLO_write_struct(writer, SpreadsheetColumn, column);
         BLO_write_struct(writer, SpreadsheetColumnID, column->id);
         BLO_write_string(writer, column->id->name);
-        /* While the display name is runtime data, we write it here, otherwise the row filters
-         * might not now there type on the first redraw, if the row filter region draws before the
-         * main region. */
+        /* While the display name is technically runtime data, we write it here, otherwise the row
+         * filters might not now their type if their region draws before the main region. */
         BLO_write_string(writer, column->display_name);
       }
       LISTBASE_FOREACH (SpreadsheetContext *, context, &sspreadsheet->context_path) {
@@ -1747,9 +1746,8 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
         BLO_read_data_address(reader, &column->id);
         BLO_read_data_address(reader, &column->id->name);
-        /* While the display name is runtime data, it is loaded here, otherwise the row filters
-         * might not now there type on the first redraw, if the row filter region draws before the
-         * main region. */
+        /* While the display name is technically runtime data, it is loaded here, otherwise the row
+         * filters might not now their type if their region draws before the main region. */
         BLO_read_data_address(reader, &column->display_name);
       }
 

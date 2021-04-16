@@ -91,15 +91,15 @@ static std::string value_string(const SpreadsheetRowFilter &row_filter,
   return "";
 }
 
-static eSpreadsheetColumnValueType column_data_type_from_id(const SpaceSpreadsheet &sspreadsheet,
-                                                            const StringRef column_name)
+static SpreadsheetColumn *lookup_visible_column_for_filter(const SpaceSpreadsheet &sspreadsheet,
+                                                           const StringRef column_name)
 {
   LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet.columns) {
     if (column->display_name == column_name) {
-      return (eSpreadsheetColumnValueType)column->data_type;
+      return column;
     }
   }
-  return SPREADSHEET_VALUE_TYPE_FLOAT;
+  return nullptr;
 }
 
 static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel)
@@ -112,8 +112,16 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
   const eSpreadsheetFilterOperation operation = (const eSpreadsheetFilterOperation)
                                                     filter->operation;
 
-  const eSpreadsheetColumnValueType data_type = column_data_type_from_id(*sspreadsheet,
-                                                                         column_name);
+  const SpreadsheetColumn *column = lookup_visible_column_for_filter(*sspreadsheet, column_name);
+  uiLayoutSetActive(layout, column != nullptr);
+  if (column != nullptr) {
+    /* Set the cache of the last data type in the row filter. Two notes:
+     *  - Changing data during drawing can be dangerous and should be done with care.
+     *  - We only need to do this once in the header, since it is always drawn. */
+    filter->last_data_type = column->data_type;
+  }
+  const eSpreadsheetColumnValueType data_type = static_cast<eSpreadsheetColumnValueType>(
+      filter->last_data_type);
 
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayoutSetEmboss(row, UI_EMBOSS_NONE);
@@ -151,12 +159,13 @@ static void spreadsheet_filter_panel_draw(const bContext *C, Panel *panel)
   const eSpreadsheetFilterOperation operation = (const eSpreadsheetFilterOperation)
                                                     filter->operation;
 
-  const eSpreadsheetColumnValueType data_type = column_data_type_from_id(*sspreadsheet,
-                                                                         column_name);
+  const SpreadsheetColumn *column = lookup_visible_column_for_filter(*sspreadsheet, column_name);
+  uiLayoutSetActive(layout, column != nullptr && filter->flag & SPREADSHEET_ROW_FILTER_ENABLED);
+  const eSpreadsheetColumnValueType data_type = static_cast<eSpreadsheetColumnValueType>(
+      filter->last_data_type);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
-  uiLayoutSetActive(layout, filter->flag & SPREADSHEET_ROW_FILTER_ENABLED);
 
   uiItemR(layout, filter_ptr, "column_name", 0, IFACE_("Column"), ICON_NONE);
 
