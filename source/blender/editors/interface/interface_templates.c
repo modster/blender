@@ -5846,7 +5846,6 @@ static void uilist_free_dyn_data(uiList *ui_list)
   MEM_SAFE_FREE(dyn_data->items_filter_flags);
   MEM_SAFE_FREE(dyn_data->items_filter_neworder);
   MEM_SAFE_FREE(dyn_data->customdata);
-  MEM_freeN(dyn_data);
 }
 
 /**
@@ -6238,12 +6237,12 @@ static uiList *ui_list_ensure(bContext *C,
     ui_list->dyn_data = MEM_callocN(sizeof(uiListDyn), "uiList.dyn_data");
   }
   uiListDyn *dyn_data = ui_list->dyn_data;
+  /* Note that this isn't a `uiListType` callback, it's stored in the runtime list data. Otherwise
+   * the runtime data could leak when the type is unregistered (e.g. on "Reload Scripts"). */
+  dyn_data->free_runtime_data_fn = uilist_free_dyn_data;
 
   /* Because we can't actually pass type across save&load... */
   ui_list->type = ui_list_type;
-  /* Touching the type here is not nice, but this is just a stupid callback to free UI data from
-   * BKE. It's always the same for any type visible in fact. */
-  ui_list->type->free_runtime_data_fn = uilist_free_dyn_data;
   ui_list->layout_type = layout_type;
 
   /* Reset filtering data. */

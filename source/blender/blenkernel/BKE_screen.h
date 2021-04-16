@@ -335,8 +335,6 @@ typedef void (*uiListFilterItemsFunc)(struct uiList *ui_list,
 /* Listen to notifiers. Only for lists defined in C. */
 typedef void (*uiListListener)(struct uiList *ui_list, wmRegionListenerParams *params);
 
-typedef void (*uiListFreeRuntimeDataFunc)(struct uiList *ui_list);
-
 typedef struct uiListType {
   struct uiListType *next, *prev;
 
@@ -348,9 +346,6 @@ typedef struct uiListType {
 
   /* For lists defined in C only. */
   uiListListener listener;
-
-  /* Not exposed in the API. Only for UI code to free runtime data. */
-  uiListFreeRuntimeDataFunc free_runtime_data_fn;
 
   /* RNA integration */
   ExtensionRNA rna_ext;
