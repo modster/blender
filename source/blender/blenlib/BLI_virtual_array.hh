@@ -30,7 +30,7 @@
  * specific format required for the function. This can be a costly conversion if only few of the
  * elements are accessed in the end.
  *
- * Functions taking a virtual array as input can still optimize for different data layouts. _For_
+ * Functions taking a virtual array as input can still optimize for different data layouts. For
  * example, they can check if the array is stored as an array internally or if it is the same
  * element for all indices. Whether it is worth to optimize for different data layouts in a
  * function has to be decided on a case by case basis. One should always do some benchmarking to
