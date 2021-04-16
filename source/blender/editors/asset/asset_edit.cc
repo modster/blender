@@ -171,16 +171,9 @@ class AssetTemporaryIDConsumer : NonCopyable, NonMovable {
   }
   ~AssetTemporaryIDConsumer()
   {
-    if (!temp_lib_context_) {
-      return;
+    if (temp_lib_context_) {
+      BLO_library_temp_free(temp_lib_context_);
     }
-
-    if (temp_lib_context_->temp_id) {
-      BKE_id_free(temp_lib_context_->temp_main, temp_lib_context_->temp_id);
-      temp_lib_context_->temp_id = nullptr;
-    }
-
-    BLO_library_temp_free(temp_lib_context_);
   }
 
   ID *get_local_id()
