@@ -44,6 +44,13 @@ class NodeOperation;
 typedef NodeOperation SocketReader;
 
 /**
+ * RESOLUTION_INPUT_ANY is a wildcard when any resolution of an input can be used.
+ * This solves the issue that the FileInputNode in a group node cannot find the
+ * correct resolution.
+ */
+static constexpr unsigned int RESOLUTION_INPUT_ANY = 999999;
+
+/**
  * \brief Resize modes of inputsockets
  * How are the input and working resolutions matched
  * \ingroup Model
@@ -251,6 +258,7 @@ struct NodeOperationFlags {
  */
 class NodeOperation {
  private:
+  int m_id;
   std::string m_name;
   Vector<NodeOperationInput> m_inputs;
   Vector<NodeOperationOutput> m_outputs;
@@ -305,6 +313,16 @@ class NodeOperation {
   const std::string get_name() const
   {
     return m_name;
+  }
+
+  void set_id(const int id)
+  {
+    m_id = id;
+  }
+
+  const int get_id() const
+  {
+    return m_id;
   }
 
   const NodeOperationFlags get_flags() const
