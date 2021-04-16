@@ -14,7 +14,9 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_array.hh"
 #include "BLI_float4x4.hh"
+#include "BLI_timeit.hh"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -37,6 +39,8 @@ static bNodeSocketTemplate geo_node_curve_to_mesh_out[] = {
     {SOCK_GEOMETRY, N_("Mesh")},
     {-1, ""},
 };
+
+using blender::Array;
 
 namespace blender::nodes {
 
@@ -179,12 +183,13 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   Span<float3> tangents = spline.evaluated_tangents();
   Span<float3> normals = spline.evaluated_normals();
   Span<float3> profile_positions = profile_spline.evaluated_positions();
+  Array<float> radii(spline_vert_len);
+  spline.interpolate_data_to_evaluated_points<float>(spline.radii(), radii);
   for (const int i_ring : IndexRange(spline_vert_len)) {
     float4x4 point_matrix = float4x4::from_normalized_axis_data(
         positions[i_ring], tangents[i_ring], normals[i_ring]);
 
-    const float radius = spline.get_evaluated_point_radius(i_ring);
-    point_matrix.apply_scale(radius);
+    point_matrix.apply_scale(radii[i_ring]);
 
     for (const int i_profile : IndexRange(profile_vert_len)) {
       MVert &vert = verts[vert_offset++];

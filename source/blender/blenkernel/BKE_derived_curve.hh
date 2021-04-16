@@ -26,6 +26,7 @@
 #include "BLI_float4x4.hh"
 #include "BLI_vector.hh"
 
+#include "BKE_attribute_math.hh"
 #include "BKE_curve.h"
 
 struct Curve;
@@ -132,8 +133,31 @@ class Spline {
   blender::Span<blender::float3> evaluated_tangents() const;
   blender::Span<blender::float3> evaluated_normals() const;
 
-  /* TODO: I'm not sure this is the best abstraction here, maybe we want another cache. */
-  float get_evaluated_point_radius(const int index) const;
+  /* TODO: Check for null default mixer. Use std::enable_if? */
+  template<typename T>
+  void interpolate_data_to_evaluated_points(blender::Span<T> source_data,
+                                            blender::MutableSpan<T> result_data) const
+  {
+    const int control_points_len = this->size();
+    blender::Span<PointMapping> mappings = this->evaluated_mappings();
+
+    blender::attribute_math::DefaultMixer<T> mixer(result_data);
+
+    for (const int evaluated_point_index : mappings.index_range()) {
+      const PointMapping &mapping = mappings[evaluated_point_index];
+      const int index = mapping.control_point_index;
+      const int next_index = (index + 1) % control_points_len;
+      const float factor = mapping.factor;
+
+      const T &value = source_data[index];
+      const T &next_value = source_data[next_index];
+
+      mixer.mix_in(evaluated_point_index, value, 1.0f - factor);
+      mixer.mix_in(evaluated_point_index, next_value, factor);
+    }
+
+    mixer.finalize();
+  }
 
  protected:
   virtual void correct_end_tangents() const = 0;

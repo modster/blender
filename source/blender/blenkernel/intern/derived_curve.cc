@@ -491,22 +491,6 @@ void Spline::mark_cache_invalid()
   length_cache_dirty_ = true;
 }
 
-float Spline::get_evaluated_point_radius(const int evaluated_index) const
-{
-  this->ensure_base_cache();
-  Span<PointMapping> mappings = this->evaluated_mapping_cache_;
-
-  const PointMapping &mapping = mappings[evaluated_index];
-  const int index = mapping.control_point_index;
-  const float factor = mapping.factor;
-
-  const float radius = this->radii()[index];
-  const int next_index = (index == this->size() - 1) ? 0 : index + 1;
-  const float next_radius = this->radii()[next_index];
-
-  return interpf(next_radius, radius, factor);
-}
-
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -620,26 +604,28 @@ void BezierSpline::add_point(const float3 position,
 void BezierSpline::drop_front(const int count)
 {
   BLI_assert(this->size() - count > 0);
-  vector_drop_front(handle_types_start_, count);
-  vector_drop_front(handle_positions_start_, count);
-  vector_drop_front(positions_, count);
-  vector_drop_front(handle_types_end_, count);
-  vector_drop_front(handle_positions_end_, count);
-  vector_drop_front(radii_, count);
-  vector_drop_front(tilts_, count);
+  vector_drop_front(this->handle_types_start_, count);
+  vector_drop_front(this->handle_positions_start_, count);
+  vector_drop_front(this->positions_, count);
+  vector_drop_front(this->handle_types_end_, count);
+  vector_drop_front(this->handle_positions_end_, count);
+  vector_drop_front(this->radii_, count);
+  vector_drop_front(this->tilts_, count);
+  this->mark_cache_invalid();
 }
 
 void BezierSpline::drop_back(const int count)
 {
   const int new_size = this->size() - count;
   BLI_assert(new_size > 0);
-  handle_types_start_.resize(new_size);
-  handle_positions_start_.resize(new_size);
-  positions_.resize(new_size);
-  handle_types_end_.resize(new_size);
-  handle_positions_end_.resize(new_size);
-  radii_.resize(new_size);
-  tilts_.resize(new_size);
+  this->handle_types_start_.resize(new_size);
+  this->handle_positions_start_.resize(new_size);
+  this->positions_.resize(new_size);
+  this->handle_types_end_.resize(new_size);
+  this->handle_positions_end_.resize(new_size);
+  this->radii_.resize(new_size);
+  this->tilts_.resize(new_size);
+  this->mark_cache_invalid();
 }
 
 bool BezierSpline::segment_is_vector(const int index) const
@@ -879,20 +865,22 @@ void NURBSpline::add_point(const float3 position,
 void NURBSpline::drop_front(const int count)
 {
   BLI_assert(this->size() - count > 0);
-  vector_drop_front(positions_, count);
-  vector_drop_front(radii_, count);
-  vector_drop_front(tilts_, count);
-  vector_drop_front(weights_, count);
+  vector_drop_front(this->positions_, count);
+  vector_drop_front(this->radii_, count);
+  vector_drop_front(this->tilts_, count);
+  vector_drop_front(this->weights_, count);
+  this->mark_cache_invalid();
 }
 
 void NURBSpline::drop_back(const int count)
 {
   const int new_size = this->size() - count;
   BLI_assert(new_size > 0);
-  positions_.resize(new_size);
-  radii_.resize(new_size);
-  tilts_.resize(new_size);
-  weights_.resize(new_size);
+  this->positions_.resize(new_size);
+  this->radii_.resize(new_size);
+  this->tilts_.resize(new_size);
+  this->weights_.resize(new_size);
+  this->mark_cache_invalid();
 }
 
 MutableSpan<float3> NURBSpline::positions()
@@ -982,18 +970,20 @@ void PolySpline::add_point(const float3 position, const float radius, const floa
 void PolySpline::drop_front(const int count)
 {
   BLI_assert(this->size() - count > 0);
-  vector_drop_front(positions_, count);
-  vector_drop_front(radii_, count);
-  vector_drop_front(tilts_, count);
+  vector_drop_front(this->positions_, count);
+  vector_drop_front(this->radii_, count);
+  vector_drop_front(this->tilts_, count);
+  this->mark_cache_invalid();
 }
 
 void PolySpline::drop_back(const int count)
 {
   const int new_size = this->size() - count;
   BLI_assert(new_size > 0);
-  positions_.resize(new_size);
-  radii_.resize(new_size);
-  tilts_.resize(new_size);
+  this->positions_.resize(new_size);
+  this->radii_.resize(new_size);
+  this->tilts_.resize(new_size);
+  this->mark_cache_invalid();
 }
 
 MutableSpan<float3> PolySpline::positions()
