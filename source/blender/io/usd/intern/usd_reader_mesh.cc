@@ -215,7 +215,7 @@ void USDMeshReader::create_object(Main *bmain, const double /* motionSampleTime 
   object_->data = mesh;
 }
 
-void USDMeshReader::read_object_data(Main *bmain, double motionSampleTime)
+void USDMeshReader::read_object_data(Main *bmain, const double motionSampleTime)
 {
   Mesh *mesh = (Mesh *)object_->data;
 
