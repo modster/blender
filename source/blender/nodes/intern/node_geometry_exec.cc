@@ -64,6 +64,11 @@ std::unique_ptr<GVArray> GeoNodeExecParams::get_input_attribute(const StringRef 
   BLI_assert(found_socket != nullptr); /* There should always be available socket for the name. */
   const CPPType *cpp_type = bke::custom_data_type_to_cpp_type(type);
   const int64_t domain_size = component.attribute_domain_size(domain);
+
+  if (default_value == nullptr) {
+    default_value = cpp_type->default_value();
+  }
+
   if (found_socket == nullptr) {
     return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, default_value);
   }
