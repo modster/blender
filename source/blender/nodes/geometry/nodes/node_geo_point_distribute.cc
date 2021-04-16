@@ -369,7 +369,7 @@ BLI_NOINLINE static void interpolate_existing_attributes(
       continue;
     }
 
-    fn::GMutableSpan out_span = attribute_out.as_span();
+    GMutableSpan out_span = attribute_out.as_span();
 
     int i_instance = 0;
     for (const GeometryInstanceGroup &set_group : set_groups) {
@@ -398,7 +398,7 @@ BLI_NOINLINE static void interpolate_existing_attributes(
       attribute_math::convert_to_static_type(output_data_type, [&](auto dummy) {
         using T = decltype(dummy);
 
-        fn::GVArray_Span<T> source_span{*source_attribute};
+        GVArray_Span<T> source_span{*source_attribute};
 
         for (const int UNUSED(i_set_instance) : set_group.transforms.index_range()) {
           const int offset = instance_start_offsets[i_instance];

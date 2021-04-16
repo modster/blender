@@ -42,7 +42,9 @@ using bke::ReadAttributeLookup;
 using bke::WriteAttributeLookup;
 using fn::CPPType;
 using fn::GMutablePointer;
+using fn::GMutableSpan;
 using fn::GPointer;
+using fn::GSpan;
 using fn::GValueMap;
 using fn::GVArray;
 using fn::GVArray_GSpan;
@@ -219,15 +221,15 @@ class GeoNodeExecParams {
                                                const void *default_value) const;
 
   template<typename T>
-  fn::GVArray_Typed<T> get_input_attribute(const StringRef name,
-                                           const GeometryComponent &component,
-                                           const AttributeDomain domain,
-                                           const T &default_value) const
+  GVArray_Typed<T> get_input_attribute(const StringRef name,
+                                       const GeometryComponent &component,
+                                       const AttributeDomain domain,
+                                       const T &default_value) const
   {
     const CustomDataType type = bke::cpp_type_to_custom_data_type(CPPType::get<T>());
     std::unique_ptr<GVArray> varray = this->get_input_attribute(
         name, component, domain, type, &default_value);
-    return fn::GVArray_Typed<T>(std::move(varray));
+    return GVArray_Typed<T>(std::move(varray));
   }
 
   /**

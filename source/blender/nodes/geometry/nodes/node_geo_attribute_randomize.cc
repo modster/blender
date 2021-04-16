@@ -178,7 +178,7 @@ Array<uint32_t> get_geometry_element_ids_as_uints(const GeometryComponent &compo
   if (hash_attribute) {
     BLI_assert(hashes.size() == hash_attribute->size());
     const CPPType &cpp_type = hash_attribute->type();
-    fn::GVArray_GSpan items{*hash_attribute};
+    GVArray_GSpan items{*hash_attribute};
     for (const int i : hashes.index_range()) {
       hashes[i] = cpp_type.hash(items[i]);
     }
@@ -234,7 +234,7 @@ static void randomize_attribute_on_component(GeometryComponent &component,
     return;
   }
 
-  fn::GMutableSpan span = attribute.as_span();
+  GMutableSpan span = attribute.as_span();
 
   Array<uint32_t> hashes = get_geometry_element_ids_as_uints(component, domain);
 

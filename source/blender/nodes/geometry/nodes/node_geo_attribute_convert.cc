@@ -92,8 +92,8 @@ static void attribute_convert_calc(GeometryComponent &component,
     return;
   }
 
-  fn::GVArray_GSpan source_span{*source_attribute};
-  fn::GMutableSpan result_span = result_attribute.as_span();
+  GVArray_GSpan source_span{*source_attribute};
+  GMutableSpan result_span = result_attribute.as_span();
 
   BLI_assert(source_span.size() == result_span.size());
 

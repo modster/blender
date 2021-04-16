@@ -164,7 +164,7 @@ static void fill_new_attribute(Span<const GeometryComponent *> src_components,
                                StringRef attribute_name,
                                const CustomDataType data_type,
                                const AttributeDomain domain,
-                               fn::GMutableSpan dst_span)
+                               GMutableSpan dst_span)
 {
   const CPPType *cpp_type = bke::custom_data_type_to_cpp_type(data_type);
   BLI_assert(cpp_type != nullptr);
@@ -178,7 +178,7 @@ static void fill_new_attribute(Span<const GeometryComponent *> src_components,
     std::unique_ptr<GVArray> read_attribute = component->attribute_get_for_read(
         attribute_name, domain, data_type, nullptr);
 
-    fn::GVArray_GSpan src_span{*read_attribute};
+    GVArray_GSpan src_span{*read_attribute};
     const void *src_buffer = src_span.data();
     void *dst_buffer = dst_span[offset];
     cpp_type->copy_to_initialized_n(src_buffer, dst_buffer, domain_size);
@@ -206,7 +206,7 @@ static void join_attributes(Span<const GeometryComponent *> src_components,
     if (!write_attribute) {
       continue;
     }
-    fn::GMutableSpan dst_span = write_attribute.as_span();
+    GMutableSpan dst_span = write_attribute.as_span();
     fill_new_attribute(src_components, attribute_name, data_type, domain, dst_span);
     write_attribute.save();
   }
