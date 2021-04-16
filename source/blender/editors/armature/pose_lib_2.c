@@ -518,10 +518,13 @@ static void poselib_blend_free(wmOperator *op)
     return;
   }
 
-  poselib_tempload_exit(pbd);
   if (pbd->free_action) {
+    /* Run before #poselib_tempload_exit to avoid any problems from indirectly
+     * referenced ID pointers. */
     BKE_id_free(NULL, pbd->act);
   }
+  poselib_tempload_exit(pbd);
+
   /* Must have been dealt with before! */
   BLI_assert(pbd->release_confirm_info.cursor_wrap_enabled == false);
 
