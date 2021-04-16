@@ -1297,17 +1297,19 @@ void BKE_gpencil_stroke_geometry_update(bGPdata *gpd,
 
   /* Update curve points first if it's a bezier stroke. */
   if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    /* Refit the curve to the polyline points. */
     if (GP_GEO_UPDATE_CURVE_REFIT_ANY(flag)) {
-      /* TODO: Make do-partial-update variable */
       const float threshold = gpd->curve_edit_threshold;
       const float corner_angle = gpd->curve_edit_corner_angle;
       BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, flag);
     }
 
-    /* If curve geometry was updated, stroke points need recalculation. */
-    const uint resolution = gpd->curve_edit_resolution;
-    const bool is_adaptive = gpd->flag & GP_DATA_CURVE_ADAPTIVE_RESOLUTION;
-    BKE_gpencil_stroke_update_geometry_from_editcurve(gps, resolution, is_adaptive, flag);
+    /* Regenerate the polyline points from the curve data. */
+    if (GP_GEO_UPDATE_POLYLINE_REGENERATE_ANY(flag)) {
+      const uint resolution = gpd->curve_edit_resolution;
+      const bool is_adaptive = gpd->flag & GP_DATA_CURVE_ADAPTIVE_RESOLUTION;
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, resolution, is_adaptive, flag);
+    }
   }
 
   /* Triangulate the stroke. */

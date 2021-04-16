@@ -40,8 +40,15 @@ struct bGPdata;
 
 typedef enum eGPStrokeGeoUpdateFlag {
   /* Default geometry update. Triangulate the stroke, update UVs and bounding box. If the stroke
-     type is bezier, regenerate the polyline first. */
+     type is bezier, regenerate the polyline first (GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL). */
   GP_GEO_UPDATE_DEFAULT = 0,
+
+  /* == Curve refitting flags == */
+  /* On a stroke geometry update, if the stroke is of type bézier, there is the option to use the
+     points in the polyline to do a curve fitting. This is useful when an operation writes to the
+     polyline and the shape of the curve is out of sync and needs to be refitted. These flags
+     control what attributes the curve should be fitted to. */
+
   /* Refit the curve point positions. */
   GP_GEO_UPDATE_CURVE_REFIT_POSITION = (1 << 1),
   /* Refit the curve point pressures. */
@@ -53,11 +60,27 @@ typedef enum eGPStrokeGeoUpdateFlag {
   /* Refit the curve point weights. */
   GP_GEO_UPDATE_CURVE_REFIT_WEIGHT = (1 << 5),
   /* Do a partial refit. Uses the `GP_SPOINT_TAG` point flag to determin what curve segments need
-     to be refitted. */
+     to be refitted. Only affected curve segments will be updated. */
   GP_GEO_UPDATE_CURVE_PARTIAL_REFIT = (1 << 6),
 
-  /* Add additional flags here: (1 << 7), (2 << 7), ... */
-  /* GP_GEO_UPDATE_XXX = (1 << 7), */
+  /* == Polyline regeneration flags == */
+  /* The polyline is regenerated when the curve geometry is updated. This is because the polyline
+     is used for rendering instead of the actual curve data. These flag control what attributes
+     should be regenerated when the curve was updated. */
+
+  /* Regenerate the polyline positions from the curve data. */
+  GP_GEO_UPDATE_POLYLINE_POSITION = (1 << 7),
+  /* Regenerate the polyline point pressure from the curve data. */
+  GP_GEO_UPDATE_POLYLINE_PRESSURE = (1 << 8),
+  /* Regenerate the polyline point strength from the curve data. */
+  GP_GEO_UPDATE_POLYLINE_STRENGTH = (1 << 9),
+  /* Regenerate the polyline vertex colors from the curve data. */
+  GP_GEO_UPDATE_POLYLINE_COLOR = (1 << 10),
+  /* Regenerate the polyline weights from the curve data. */
+  GP_GEO_UPDATE_POLYLINE_WEIGHT = (1 << 11),
+
+  /* Add additional flags here: (1 << 12), (2 << 12), ... */
+  /* GP_GEO_UPDATE_XXX = (1 << 12), */
 } eGPStrokeGeoUpdateFlag;
 
 /* Refit all attributes. */
@@ -68,6 +91,17 @@ typedef enum eGPStrokeGeoUpdateFlag {
 
 /* Check if any curve refitting is done. */
 #define GP_GEO_UPDATE_CURVE_REFIT_ANY(flag) (flag & GP_GEO_UPDATE_CURVE_REFIT_ALL)
+
+/* Regenerate all attributes of the polyline from the curve data. */
+#define GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL \
+  (GP_GEO_UPDATE_POLYLINE_POSITION | GP_GEO_UPDATE_POLYLINE_PRESSURE | \
+   GP_GEO_UPDATE_POLYLINE_STRENGTH | GP_GEO_UPDATE_POLYLINE_COLOR | \
+   GP_GEO_UPDATE_POLYLINE_WEIGHT)
+
+/* Check if any atttributes of the polyline need to be regenerated. Note that we update all
+ * attributes by default (GP_GEO_UPDATE_DEFAULT). */
+#define GP_GEO_UPDATE_POLYLINE_REGENERATE_ANY(flag) \
+  ((flag & GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL) || flag == GP_GEO_UPDATE_DEFAULT)
 
 /* Object boundbox. */
 bool BKE_gpencil_data_minmax(const struct bGPdata *gpd, float r_min[3], float r_max[3]);
