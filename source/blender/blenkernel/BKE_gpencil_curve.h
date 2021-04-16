@@ -49,9 +49,9 @@ void BKE_gpencil_convert_curve(struct Main *bmain,
 struct bGPDcurve *BKE_gpencil_stroke_editcurve_generate(struct bGPDstroke *gps,
                                                         const float error_threshold,
                                                         const float corner_angle);
-struct bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(struct bGPDstroke *gps,
-                                                          const float error_threshold,
-                                                          const float corner_angle);
+struct bGPDcurve *BKE_gpencil_stroke_editcurve_tagged_segments_update(struct bGPDstroke *gps,
+                                                                      const float error_threshold,
+                                                                      const float corner_angle);
 void BKE_gpencil_stroke_editcurve_regenerate_single(struct bGPDstroke *gps,
                                                     uint32_t start_idx,
                                                     uint32_t end_idx,
