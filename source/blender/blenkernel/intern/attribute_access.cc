@@ -866,6 +866,11 @@ static blender::bke::OutputAttribute create_output_attribute(
   using namespace blender;
   using namespace blender::fn;
   using namespace blender::bke;
+
+  if (attribute_name.is_empty()) {
+    return {};
+  }
+
   const CPPType *cpp_type = custom_data_type_to_cpp_type(data_type);
   BLI_assert(cpp_type != nullptr);
   const nodes::DataTypeConversions &conversions = nodes::get_implicit_type_conversions();
