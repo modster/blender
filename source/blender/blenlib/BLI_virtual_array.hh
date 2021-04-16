@@ -409,8 +409,8 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
  private:
   VMutableArray<T> &varray_;
   Array<T> owned_data_;
-  bool apply_has_been_called_ = false;
-  bool show_not_applied_warning_ = true;
+  bool save_has_been_called_ = false;
+  bool show_not_saved_warning_ = true;
 
  public:
   VMutableArray_Span(VMutableArray<T> &varray, const bool materialize = true)
@@ -435,16 +435,16 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
 
   ~VMutableArray_Span()
   {
-    if (show_not_applied_warning_) {
-      if (!apply_has_been_called_) {
-        std::cout << "Warning: Call `apply()` to make sure that changes persist in all cases.\n";
+    if (show_not_saved_warning_) {
+      if (!save_has_been_called_) {
+        std::cout << "Warning: Call `save()` to make sure that changes persist in all cases.\n";
       }
     }
   }
 
-  void apply()
+  void save()
   {
-    apply_has_been_called_ = true;
+    save_has_been_called_ = true;
     if (this->data_ != owned_data_.data()) {
       return;
     }
@@ -453,7 +453,7 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
 
   void disable_not_applied_warning()
   {
-    show_not_applied_warning_ = false;
+    show_not_saved_warning_ = false;
   }
 };
 

@@ -185,7 +185,7 @@ AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
 void OutputAttribute::save()
 {
   if (optional_span_varray_.has_value()) {
-    optional_span_varray_->apply();
+    optional_span_varray_->save();
   }
   if (save_) {
     save_(*this);

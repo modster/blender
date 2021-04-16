@@ -542,14 +542,14 @@ class GVMutableArray_GSpan : public GMutableSpan {
  private:
   GVMutableArray &varray_;
   void *owned_data_ = nullptr;
-  bool apply_has_been_called_ = false;
-  bool show_not_applied_warning_ = true;
+  bool save_has_been_called_ = false;
+  bool show_not_saved_warning_ = true;
 
  public:
   GVMutableArray_GSpan(GVMutableArray &varray, bool materialize = true);
   ~GVMutableArray_GSpan();
 
-  void apply();
+  void save();
   void disable_not_applied_warning();
 };
 

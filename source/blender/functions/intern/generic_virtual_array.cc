@@ -266,8 +266,8 @@ GVMutableArray_GSpan::GVMutableArray_GSpan(GVMutableArray &varray, const bool ma
 
 GVMutableArray_GSpan::~GVMutableArray_GSpan()
 {
-  if (show_not_applied_warning_) {
-    if (!apply_has_been_called_) {
+  if (show_not_saved_warning_) {
+    if (!save_has_been_called_) {
       std::cout << "Warning: Call `apply()` to make sure that changes persist in all cases.\n";
     }
   }
@@ -277,9 +277,9 @@ GVMutableArray_GSpan::~GVMutableArray_GSpan()
   }
 }
 
-void GVMutableArray_GSpan::apply()
+void GVMutableArray_GSpan::save()
 {
-  apply_has_been_called_ = true;
+  save_has_been_called_ = true;
   if (data_ != owned_data_) {
     return;
   }
@@ -291,7 +291,7 @@ void GVMutableArray_GSpan::apply()
 
 void GVMutableArray_GSpan::disable_not_applied_warning()
 {
-  show_not_applied_warning_ = false;
+  show_not_saved_warning_ = false;
 }
 
 }  // namespace blender::fn

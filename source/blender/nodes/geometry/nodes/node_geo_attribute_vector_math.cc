@@ -189,7 +189,7 @@ static void do_math_operation_fl3_fl3_to_fl3(const VArray<float3> &input_a,
         }
       });
 
-  span_result.apply();
+  span_result.save();
 
   /* The operation is not supported by this node currently. */
   BLI_assert(success);
@@ -220,7 +220,7 @@ static void do_math_operation_fl3_fl3_fl3_to_fl3(const VArray<float3> &input_a,
         }
       });
 
-  span_result.apply();
+  span_result.save();
 
   /* The operation is not supported by this node currently. */
   BLI_assert(success);
@@ -251,7 +251,7 @@ static void do_math_operation_fl3_fl3_fl_to_fl3(const VArray<float3> &input_a,
         }
       });
 
-  span_result.apply();
+  span_result.save();
 
   /* The operation is not supported by this node currently. */
   BLI_assert(success);
@@ -279,7 +279,7 @@ static void do_math_operation_fl3_fl3_to_fl(const VArray<float3> &input_a,
         }
       });
 
-  span_result.apply();
+  span_result.save();
 
   /* The operation is not supported by this node currently. */
   BLI_assert(success);
@@ -307,7 +307,7 @@ static void do_math_operation_fl3_fl_to_fl3(const VArray<float3> &input_a,
         }
       });
 
-  span_result.apply();
+  span_result.save();
 
   /* The operation is not supported by this node currently. */
   BLI_assert(success);
@@ -332,7 +332,7 @@ static void do_math_operation_fl3_to_fl3(const VArray<float3> &input_a,
         }
       });
 
-  span_result.apply();
+  span_result.save();
 
   /* The operation is not supported by this node currently. */
   BLI_assert(success);
@@ -357,7 +357,7 @@ static void do_math_operation_fl3_to_fl(const VArray<float3> &input_a,
         }
       });
 
-  span_result.apply();
+  span_result.save();
 
   /* The operation is not supported by this node currently. */
   BLI_assert(success);

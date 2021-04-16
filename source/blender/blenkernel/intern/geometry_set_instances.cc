@@ -487,7 +487,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
       }
     }
 
-    dst_span.apply();
+    dst_span.save();
   }
 }
 
