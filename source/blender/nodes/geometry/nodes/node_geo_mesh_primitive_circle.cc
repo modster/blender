@@ -65,7 +65,7 @@ static int circle_vert_total(const GeometryNodeMeshCircleFillType fill_type, con
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
       return verts_num + 1;
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return 0;
 }
 
@@ -78,7 +78,7 @@ static int circle_edge_total(const GeometryNodeMeshCircleFillType fill_type, con
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
       return verts_num * 2;
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return 0;
 }
 
@@ -92,7 +92,7 @@ static int circle_corner_total(const GeometryNodeMeshCircleFillType fill_type, c
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
       return verts_num * 3;
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return 0;
 }
 
@@ -106,7 +106,7 @@ static int circle_face_total(const GeometryNodeMeshCircleFillType fill_type, con
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
       return verts_num;
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return 0;
 }
 
@@ -161,6 +161,7 @@ static Mesh *create_circle_mesh(const float radius,
       MEdge &edge = edges[verts_num + i];
       edge.v1 = verts_num;
       edge.v2 = i;
+      edge.flag = ME_EDGEDRAW | ME_EDGERENDER;
     }
   }
 

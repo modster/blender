@@ -779,7 +779,7 @@ static const EnumPropertyItem *rna_userdef_audio_device_itemf(bContext *UNUSED(C
     RNA_enum_item_add(&item, &totitem, &new_item);
   }
 
-#  ifndef NDEBUG
+#  if !defined(NDEBUG) || !defined(WITH_AUDASPACE)
   if (i == 0) {
     EnumPropertyItem new_item = {i, "SOUND_NONE", 0, "No Sound", ""};
     RNA_enum_item_add(&item, &totitem, &new_item);
@@ -6215,7 +6215,8 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Auto Save Temporary Files",
                            "Automatic saving of temporary files in temp directory, "
-                           "uses process ID (sculpt and edit mode data won't be saved)");
+                           "uses process ID.\n"
+                           "Warning: Sculpt and edit mode data won't be saved");
   RNA_def_property_update(prop, 0, "rna_userdef_autosave_update");
 
   prop = RNA_def_property(srna, "auto_save_time", PROP_INT, PROP_NONE);
@@ -6288,11 +6289,6 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "use_sculpt_vertex_colors", 1);
   RNA_def_property_ui_text(prop, "Sculpt Vertex Colors", "Use the new Vertex Painting system");
 
-  prop = RNA_def_property(srna, "use_switch_object_operator", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "use_switch_object_operator", 1);
-  RNA_def_property_ui_text(
-      prop, "Switch Object Operator", "Enable the operator to switch objects by pressing D");
-
   prop = RNA_def_property(srna, "use_sculpt_tools_tilt", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_sculpt_tools_tilt", 1);
   RNA_def_property_ui_text(
@@ -6304,6 +6300,11 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
       prop,
       "Asset Browser",
       "Enable Asset Browser editor and operators to manage data-blocks as asset");
+
+  prop = RNA_def_property(srna, "use_override_templates", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_override_templates", 1);
+  RNA_def_property_ui_text(
+      prop, "Override Templates", "Enable library override template in the python API");
 }
 
 static void rna_def_userdef_addon_collection(BlenderRNA *brna, PropertyRNA *cprop)

@@ -258,11 +258,12 @@ set(SRC
   BLI_rand.h
   BLI_rand.hh
   BLI_rect.h
-  BLI_resource_collector.hh
+  BLI_resource_scope.hh
   BLI_scanfill.h
   BLI_session_uuid.h
   BLI_set.hh
   BLI_set_slots.hh
+  BLI_simd.h
   BLI_smallhash.h
   BLI_sort.h
   BLI_sort_utils.h

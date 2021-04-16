@@ -3951,7 +3951,7 @@ static void gpencil_smooth_stroke(bContext *C, wmOperator *op)
           }
           if (smooth_thickness) {
             /* thickness need to repeat process several times */
-            for (int r2 = 0; r2 < r * 20; r2++) {
+            for (int r2 = 0; r2 < 20; r2++) {
               BKE_gpencil_stroke_smooth_thickness(gps, i, factor);
             }
           }
@@ -3979,6 +3979,11 @@ static int gpencil_count_subdivision_cuts(bGPDstroke *gps)
         }
       }
     }
+  }
+
+  if ((gps->flag & GP_STROKE_CYCLIC) && (gps->points[0].flag & GP_SPOINT_SELECT) &&
+      (gps->points[gps->totpoints - 1].flag & GP_SPOINT_SELECT)) {
+    totnewpoints++;
   }
 
   return totnewpoints;
@@ -4079,6 +4084,47 @@ static void gpencil_stroke_subdivide(bGPDstroke *gps, const int cuts)
         }
       }
     }
+
+    /* Subdivide between last and first point. */
+    if (gps->flag & GP_STROKE_CYCLIC) {
+      bGPDspoint *pt = &temp_points[oldtotpoints - 1];
+      bGPDspoint *next = &temp_points[0];
+      if ((pt->flag & GP_SPOINT_SELECT) && (next->flag & GP_SPOINT_SELECT)) {
+        bGPDspoint *pt_final = &gps->points[i2];
+        if (gps->dvert != NULL) {
+          dvert_final = &gps->dvert[i2];
+        }
+        /* Interpolate all values */
+        interp_v3_v3v3(&pt_final->x, &pt->x, &next->x, 0.5f);
+        pt_final->pressure = interpf(pt->pressure, next->pressure, 0.5f);
+        pt_final->strength = interpf(pt->strength, next->strength, 0.5f);
+        CLAMP(pt_final->strength, GPENCIL_STRENGTH_MIN, 1.0f);
+        interp_v4_v4v4(pt_final->vert_color, pt->vert_color, next->vert_color, 0.5f);
+        pt_final->time = interpf(pt->time, next->time, 0.5f);
+        pt_final->flag |= GP_SPOINT_SELECT;
+
+        /* interpolate weights */
+        if (gps->dvert != NULL) {
+          dvert = &temp_dverts[oldtotpoints - 1];
+          dvert_next = &temp_dverts[0];
+          dvert_final = &gps->dvert[i2];
+
+          dvert_final->totweight = dvert->totweight;
+          dvert_final->dw = MEM_dupallocN(dvert->dw);
+
+          /* interpolate weight values */
+          for (int d = 0; d < dvert->totweight; d++) {
+            MDeformWeight *dw_a = &dvert->dw[d];
+            if (dvert_next->totweight > d) {
+              MDeformWeight *dw_b = &dvert_next->dw[d];
+              MDeformWeight *dw_final = &dvert_final->dw[d];
+              dw_final->weight = interpf(dw_a->weight, dw_b->weight, 0.5f);
+            }
+          }
+        }
+      }
+    }
+
     /* free temp memory */
     MEM_SAFE_FREE(temp_points);
     MEM_SAFE_FREE(temp_dverts);
@@ -4979,17 +5025,27 @@ static int gpencil_cutter_lasso_select(bContext *C,
   /* init space conversion stuff */
   gpencil_point_conversion_init(C, &gsc);
 
-  /* deselect all strokes first */
-  CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    int i;
-    for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-      pt->flag &= ~GP_SPOINT_SELECT;
-    }
+  /* Deselect all strokes. */
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
+    for (bGPDframe *gpf = init_gpf; gpf; gpf = gpf->next) {
+      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        if (gps->flag & GP_STROKE_SELECT) {
+          int i;
+          for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+            pt->flag &= ~GP_SPOINT_SELECT;
+          }
 
-    gps->flag &= ~GP_STROKE_SELECT;
-    BKE_gpencil_stroke_select_index_reset(gps);
+          gps->flag &= ~GP_STROKE_SELECT;
+          BKE_gpencil_stroke_select_index_reset(gps);
+        }
+      }
+      /* if not multiedit, exit loop. */
+      if (!is_multiedit) {
+        break;
+      }
+    }
   }
-  CTX_DATA_END;
 
   /* Select points */
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {

@@ -107,6 +107,20 @@ bool PointCloudComponent::is_empty() const
   return pointcloud_ == nullptr;
 }
 
+bool PointCloudComponent::owns_direct_data() const
+{
+  return ownership_ == GeometryOwnershipType::Owned;
+}
+
+void PointCloudComponent::ensure_owns_direct_data()
+{
+  BLI_assert(this->is_mutable());
+  if (ownership_ != GeometryOwnershipType::Owned) {
+    pointcloud_ = BKE_pointcloud_copy_for_eval(pointcloud_, false);
+    ownership_ = GeometryOwnershipType::Owned;
+  }
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -115,9 +129,10 @@ bool PointCloudComponent::is_empty() const
 
 int PointCloudComponent::attribute_domain_size(const AttributeDomain domain) const
 {
-  BLI_assert(domain == ATTR_DOMAIN_POINT);
-  UNUSED_VARS_NDEBUG(domain);
   if (pointcloud_ == nullptr) {
+    return 0;
+  }
+  if (domain != ATTR_DOMAIN_POINT) {
     return 0;
   }
   return pointcloud_->totpoint;

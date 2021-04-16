@@ -289,10 +289,22 @@ typedef struct bNodeType {
   void (*freefunc_api)(struct PointerRNA *ptr);
   void (*copyfunc_api)(struct PointerRNA *ptr, const struct bNode *src_node);
 
-  /* can this node type be added to a node tree */
-  bool (*poll)(struct bNodeType *ntype, struct bNodeTree *nodetree);
-  /* can this node be added to a node tree */
-  bool (*poll_instance)(struct bNode *node, struct bNodeTree *nodetree);
+  /**
+   * Can this node type be added to a node tree?
+   * \param r_disabled_hint: Optional hint to display in the UI when the poll fails.
+   *                         The callback can set this to a static string without having to
+   *                         null-check it (or without setting it to null if it's not used).
+   *                         The caller must pass a valid `const char **` and null-initialize it
+   *                         when it's not just a dummy, that is, if it actually wants to access
+   *                         the returned disabled-hint (null-check needed!).
+   */
+  bool (*poll)(struct bNodeType *ntype, struct bNodeTree *nodetree, const char **r_disabled_hint);
+  /** Can this node be added to a node tree?
+   * \param r_disabled_hint: See `poll()`.
+   */
+  bool (*poll_instance)(struct bNode *node,
+                        struct bNodeTree *nodetree,
+                        const char **r_disabled_hint);
 
   /* optional handling of link insertion */
   void (*insert_link)(struct bNodeTree *ntree, struct bNode *node, struct bNodeLink *link);
@@ -483,14 +495,14 @@ void ntreeBlendReadExpand(struct BlendExpander *expander, struct bNodeTree *ntre
 /** \name Node Tree Interface
  * \{ */
 struct bNodeSocket *ntreeFindSocketInterface(struct bNodeTree *ntree,
-                                             int in_out,
+                                             eNodeSocketInOut in_out,
                                              const char *identifier);
 struct bNodeSocket *ntreeAddSocketInterface(struct bNodeTree *ntree,
-                                            int in_out,
+                                            eNodeSocketInOut in_out,
                                             const char *idname,
                                             const char *name);
 struct bNodeSocket *ntreeInsertSocketInterface(struct bNodeTree *ntree,
-                                               int in_out,
+                                               eNodeSocketInOut in_out,
                                                const char *idname,
                                                struct bNodeSocket *next_sock,
                                                const char *name);
@@ -556,30 +568,32 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype);
   } \
   ((void)0)
 
-struct bNodeSocket *nodeFindSocket(const struct bNode *node, int in_out, const char *identifier);
+struct bNodeSocket *nodeFindSocket(const struct bNode *node,
+                                   eNodeSocketInOut in_out,
+                                   const char *identifier);
 struct bNodeSocket *nodeAddSocket(struct bNodeTree *ntree,
                                   struct bNode *node,
-                                  int in_out,
+                                  eNodeSocketInOut in_out,
                                   const char *idname,
                                   const char *identifier,
                                   const char *name);
 struct bNodeSocket *nodeInsertSocket(struct bNodeTree *ntree,
                                      struct bNode *node,
-                                     int in_out,
+                                     eNodeSocketInOut in_out,
                                      const char *idname,
                                      struct bNodeSocket *next_sock,
                                      const char *identifier,
                                      const char *name);
 struct bNodeSocket *nodeAddStaticSocket(struct bNodeTree *ntree,
                                         struct bNode *node,
-                                        int in_out,
+                                        eNodeSocketInOut in_out,
                                         int type,
                                         int subtype,
                                         const char *identifier,
                                         const char *name);
 struct bNodeSocket *nodeInsertStaticSocket(struct bNodeTree *ntree,
                                            struct bNode *node,
-                                           int in_out,
+                                           eNodeSocketInOut in_out,
                                            int type,
                                            int subtype,
                                            struct bNodeSocket *next_sock,
@@ -802,7 +816,9 @@ void BKE_node_preview_set_pixel(
 void nodeLabel(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen);
 const char *nodeSocketLabel(const struct bNodeSocket *sock);
 
-int nodeGroupPoll(struct bNodeTree *nodetree, struct bNodeTree *grouptree);
+bool nodeGroupPoll(struct bNodeTree *nodetree,
+                   struct bNodeTree *grouptree,
+                   const char **r_disabled_hint);
 
 /* Init a new node type struct with default values and callbacks */
 void node_type_base(struct bNodeType *ntype, int type, const char *name, short nclass, short flag);
@@ -1065,7 +1081,6 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree,
 
 struct bNodeTreeExec *ntreeShaderBeginExecTree(struct bNodeTree *ntree);
 void ntreeShaderEndExecTree(struct bNodeTreeExec *exec);
-bool ntreeShaderExecTree(struct bNodeTree *ntree, int thread);
 struct bNode *ntreeShaderOutputNode(struct bNodeTree *ntree, int target);
 
 void ntreeGPUMaterialNodes(struct bNodeTree *localtree,
@@ -1188,6 +1203,7 @@ void ntreeGPUMaterialNodes(struct bNodeTree *localtree,
 #define CMP_NODE_TRACKPOS 271
 #define CMP_NODE_INPAINT 272
 #define CMP_NODE_DESPECKLE 273
+#define CMP_NODE_ANTIALIASING 274
 
 #define CMP_NODE_GLARE 301
 #define CMP_NODE_TONEMAP 302
@@ -1393,7 +1409,10 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_MESH_PRIMITIVE_ICO_SPHERE 1036
 #define GEO_NODE_MESH_PRIMITIVE_CONE 1037
 #define GEO_NODE_MESH_PRIMITIVE_LINE 1038
-#define GEO_NODE_MESH_PRIMITIVE_PLANE 1039
+#define GEO_NODE_MESH_PRIMITIVE_GRID 1039
+#define GEO_NODE_ATTRIBUTE_MAP_RANGE 1040
+#define GEO_NODE_ATTRIBUTE_CLAMP 1041
+#define GEO_NODE_BOUNDING_BOX 1042
 
 /** \} */
 

@@ -144,7 +144,7 @@ wmEvent *wm_event_add(wmWindow *win, const wmEvent *event_to_add)
 wmEvent *WM_event_add_simulate(wmWindow *win, const wmEvent *event_to_add)
 {
   if ((G.f & G_FLAG_EVENT_SIMULATE) == 0) {
-    BLI_assert(0);
+    BLI_assert_unreachable();
     return NULL;
   }
   wmEvent *event = wm_event_add(win, event_to_add);
@@ -580,7 +580,7 @@ void wm_event_do_notifiers(bContext *C)
           if ((note->category == NC_SPACE) && note->reference) {
             /* Filter out notifiers sent to other spaces. RNA sets the reference to the owning ID
              * though, the screen, so let notifiers through that reference the entire screen. */
-            if ((note->reference != area->spacedata.first) && (note->reference != screen)) {
+            if (!ELEM(note->reference, area->spacedata.first, screen)) {
               continue;
             }
           }
@@ -1037,7 +1037,7 @@ static void wm_operator_finished(bContext *C, wmOperator *op, const bool repeat,
       ED_area_type_hud_clear(wm, NULL);
     }
     else {
-      BLI_assert(0);
+      BLI_assert_unreachable();
     }
   }
 }
@@ -2885,7 +2885,7 @@ static int wm_handlers_do_intern(bContext *C, wmEvent *event, ListBase *handlers
       }
       else {
         /* Unreachable (handle all types above). */
-        BLI_assert(0);
+        BLI_assert_unreachable();
       }
 
       if (action & WM_HANDLER_BREAK) {

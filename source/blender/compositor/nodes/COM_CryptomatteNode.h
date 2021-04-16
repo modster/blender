@@ -24,6 +24,8 @@
 #include "COM_CryptomatteOperation.h"
 #include "COM_Node.h"
 
+namespace blender::compositor {
+
 /**
  * \brief CryptomatteNode
  * \ingroup Node
@@ -36,7 +38,8 @@ class CryptomatteBaseNode : public Node {
   }
 
  public:
-  void convertToOperations(NodeConverter &converter, const CompositorContext &context) const;
+  void convertToOperations(NodeConverter &converter,
+                           const CompositorContext &context) const override;
 
  protected:
   virtual CryptomatteOperation *create_cryptomatte_operation(
@@ -61,16 +64,14 @@ class CryptomatteNode : public CryptomatteBaseNode {
       const NodeCryptomatte *cryptomatte_settings) const override;
 
  private:
-  static blender::Vector<NodeOperation *> create_input_operations(const CompositorContext &context,
-                                                                  const bNode &node);
-  static void input_operations_from_render_source(
-      const CompositorContext &context,
-      const bNode &node,
-      blender::Vector<NodeOperation *> &r_input_operations);
-  static void input_operations_from_image_source(
-      const CompositorContext &context,
-      const bNode &node,
-      blender::Vector<NodeOperation *> &r_input_operations);
+  static Vector<NodeOperation *> create_input_operations(const CompositorContext &context,
+                                                         const bNode &node);
+  static void input_operations_from_render_source(const CompositorContext &context,
+                                                  const bNode &node,
+                                                  Vector<NodeOperation *> &r_input_operations);
+  static void input_operations_from_image_source(const CompositorContext &context,
+                                                 const bNode &node,
+                                                 Vector<NodeOperation *> &r_input_operations);
 };
 
 class CryptomatteLegacyNode : public CryptomatteBaseNode {
@@ -87,3 +88,5 @@ class CryptomatteLegacyNode : public CryptomatteBaseNode {
       const bNode &node,
       const NodeCryptomatte *cryptomatte_settings) const override;
 };
+
+}  // namespace blender::compositor

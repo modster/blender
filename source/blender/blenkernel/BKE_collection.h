@@ -88,7 +88,7 @@ struct Collection *BKE_collection_object_find(struct Main *bmain,
                                               struct Scene *scene,
                                               struct Collection *collection,
                                               struct Object *ob);
-bool BKE_collection_is_empty(struct Collection *collection);
+bool BKE_collection_is_empty(const struct Collection *collection);
 
 bool BKE_collection_object_add(struct Main *bmain,
                                struct Collection *collection,
@@ -226,6 +226,8 @@ void BKE_scene_collections_iterator_end(struct BLI_Iterator *iter);
 void BKE_scene_objects_iterator_begin(struct BLI_Iterator *iter, void *data_in);
 void BKE_scene_objects_iterator_next(struct BLI_Iterator *iter);
 void BKE_scene_objects_iterator_end(struct BLI_Iterator *iter);
+
+struct GSet *BKE_scene_objects_as_gset(struct Scene *scene, struct GSet *objects_gset);
 
 #define FOREACH_SCENE_COLLECTION_BEGIN(scene, _instance) \
   ITER_BEGIN (BKE_scene_collections_iterator_begin, \

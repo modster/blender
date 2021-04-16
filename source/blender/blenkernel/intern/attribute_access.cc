@@ -34,7 +34,7 @@
 
 #include "CLG_log.h"
 
-#include "NOD_node_tree_multi_function.hh"
+#include "NOD_type_conversions.hh"
 
 #include "attribute_access_intern.hh"
 
@@ -210,23 +210,25 @@ class ConvertedReadAttribute final : public ReadAttribute {
   const CPPType &from_type_;
   const CPPType &to_type_;
   ReadAttributePtr base_attribute_;
-  const nodes::DataTypeConversions &conversions_;
+  void (*convert_)(const void *src, void *dst);
 
  public:
   ConvertedReadAttribute(ReadAttributePtr base_attribute, const CPPType &to_type)
       : ReadAttribute(base_attribute->domain(), to_type, base_attribute->size()),
         from_type_(base_attribute->cpp_type()),
         to_type_(to_type),
-        base_attribute_(std::move(base_attribute)),
-        conversions_(nodes::get_implicit_type_conversions())
+        base_attribute_(std::move(base_attribute))
   {
+    const nodes::DataTypeConversions &conversions = nodes::get_implicit_type_conversions();
+    convert_ = conversions.get_conversion_functions(base_attribute_->cpp_type(), to_type)
+                   ->convert_single_to_uninitialized;
   }
 
   void get_internal(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
     base_attribute_->get(index, buffer);
-    conversions_.convert(from_type_, to_type_, buffer, r_value);
+    convert_(buffer, r_value);
   }
 };
 
@@ -299,7 +301,7 @@ static int attribute_data_type_complexity(const CustomDataType data_type)
 #endif
     default:
       /* Only accept "generic" custom data types used by the attribute system. */
-      BLI_assert(false);
+      BLI_assert_unreachable();
       return 0;
   }
 }
@@ -331,7 +333,7 @@ static int attribute_domain_priority(const AttributeDomain domain)
     case ATTR_DOMAIN_CURVE:
       return 0;
 #endif
-    case ATTR_DOMAIN_POLYGON:
+    case ATTR_DOMAIN_FACE:
       return 1;
     case ATTR_DOMAIN_EDGE:
       return 2;
@@ -341,7 +343,7 @@ static int attribute_domain_priority(const AttributeDomain domain)
       return 4;
     default:
       /* Domain not supported in nodes yet. */
-      BLI_assert(false);
+      BLI_assert_unreachable();
       return 0;
   }
 }
@@ -703,7 +705,6 @@ bool GeometryComponent::attribute_domain_supported(const AttributeDomain domain)
 
 int GeometryComponent::attribute_domain_size(const AttributeDomain UNUSED(domain)) const
 {
-  BLI_assert(false);
   return 0;
 }
 
@@ -823,12 +824,16 @@ Set<std::string> GeometryComponent::attribute_names() const
   return attributes;
 }
 
-void GeometryComponent::attribute_foreach(const AttributeForeachCallback callback) const
+/**
+ * \return False if the callback explicitly returned false at any point, otherwise true,
+ * meaning the callback made it all the way through.
+ */
+bool GeometryComponent::attribute_foreach(const AttributeForeachCallback callback) const
 {
   using namespace blender::bke;
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   if (providers == nullptr) {
-    return;
+    return true;
   }
 
   /* Keep track handled attribute names to make sure that we do not return the same name twice. */
@@ -839,7 +844,7 @@ void GeometryComponent::attribute_foreach(const AttributeForeachCallback callbac
     if (provider->exists(*this)) {
       AttributeMetaData meta_data{provider->domain(), provider->data_type()};
       if (!callback(provider->name(), meta_data)) {
-        return;
+        return false;
       }
       handled_attribute_names.add_new(provider->name());
     }
@@ -853,9 +858,11 @@ void GeometryComponent::attribute_foreach(const AttributeForeachCallback callbac
           return true;
         });
     if (!continue_loop) {
-      return;
+      return false;
     }
   }
+
+  return true;
 }
 
 bool GeometryComponent::attribute_exists(const blender::StringRef attribute_name) const
@@ -894,7 +901,7 @@ ReadAttributePtr GeometryComponent::attribute_try_get_for_read(
     return {};
   }
 
-  if (attribute->domain() != domain) {
+  if (domain != ATTR_DOMAIN_AUTO && attribute->domain() != domain) {
     attribute = this->attribute_try_adapt_domain(std::move(attribute), domain);
     if (!attribute) {
       return {};
@@ -984,7 +991,7 @@ blender::bke::ReadAttributePtr GeometryComponent::attribute_get_constant_for_rea
   BLI_assert(conversions.is_convertible(*in_cpp_type, *out_cpp_type));
 
   void *out_value = alloca(out_cpp_type->size());
-  conversions.convert(*in_cpp_type, *out_cpp_type, value, out_value);
+  conversions.convert_to_uninitialized(*in_cpp_type, *out_cpp_type, value, out_value);
 
   const int domain_size = this->attribute_domain_size(domain);
   blender::bke::ReadAttributePtr attribute = std::make_unique<blender::bke::ConstantReadAttribute>(

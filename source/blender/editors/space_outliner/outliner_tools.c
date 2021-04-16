@@ -598,8 +598,14 @@ static uiBlock *merged_element_search_menu(bContext *C, ARegion *region, void *d
   short menu_width = 10 * UI_UNIT_X;
   but = uiDefSearchBut(
       block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 10, menu_width, UI_UNIT_Y, 0, 0, "");
-  UI_but_func_search_set(
-      but, NULL, merged_element_search_update_fn, data, NULL, merged_element_search_exec_fn, NULL);
+  UI_but_func_search_set(but,
+                         NULL,
+                         merged_element_search_update_fn,
+                         data,
+                         NULL,
+                         false,
+                         merged_element_search_exec_fn,
+                         NULL);
   UI_but_flag_enable(but, UI_BUT_ACTIVATE_ON_INIT);
 
   /* Fake button to hold space for search items */
@@ -699,8 +705,8 @@ static void outliner_object_delete_fn(bContext *C, ReportList *reports, Scene *s
           reports, RPT_WARNING, "Cannot delete indirectly linked object '%s'", ob->id.name + 2);
       return;
     }
-    if (BKE_library_ID_is_indirectly_used(bmain, ob) && ID_REAL_USERS(ob) <= 1 &&
-        ID_EXTRA_USERS(ob) == 0) {
+    if (ID_REAL_USERS(ob) <= 1 && ID_EXTRA_USERS(ob) == 0 &&
+        BKE_library_ID_is_indirectly_used(bmain, ob)) {
       BKE_reportf(reports,
                   RPT_WARNING,
                   "Cannot delete object '%s' from scene '%s', indirectly used objects need at "
@@ -925,7 +931,7 @@ static void id_override_library_resync_fn(bContext *C,
     }
 
     BKE_lib_override_library_resync(
-        bmain, scene, CTX_data_view_layer(C), id_root, NULL, do_hierarchy_enforce);
+        bmain, scene, CTX_data_view_layer(C), id_root, NULL, do_hierarchy_enforce, true);
 
     WM_event_add_notifier(C, NC_WINDOW, NULL);
   }
@@ -1422,8 +1428,8 @@ static Base *outline_batch_delete_hierarchy(
                 base->object->id.name + 2);
     return base_next;
   }
-  if (BKE_library_ID_is_indirectly_used(bmain, object) && ID_REAL_USERS(object) <= 1 &&
-      ID_EXTRA_USERS(object) == 0) {
+  if (ID_REAL_USERS(object) <= 1 && ID_EXTRA_USERS(object) == 0 &&
+      BKE_library_ID_is_indirectly_used(bmain, object)) {
     BKE_reportf(reports,
                 RPT_WARNING,
                 "Cannot delete object '%s' from scene '%s', indirectly used objects need at least "
@@ -1873,7 +1879,7 @@ static bool outliner_id_operation_item_poll(bContext *C,
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESYNC_HIERARCHY:
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESYNC_HIERARCHY_ENFORCE:
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_DELETE_HIERARCHY:
-      if (ID_IS_OVERRIDE_LIBRARY_REAL(tselem->id)) {
+      if (ID_IS_OVERRIDE_LIBRARY_REAL(tselem->id) && !ID_IS_LINKED(tselem->id)) {
         return true;
       }
       return false;
@@ -2263,7 +2269,8 @@ static const EnumPropertyItem outliner_lib_op_type_items[] = {
      "DELETE",
      ICON_X,
      "Delete",
-     "Delete this library and all its item from Blender - WARNING: no undo"},
+     "Delete this library and all its item.\n"
+     "Warning: No undo"},
     {OL_LIB_RELOCATE,
      "RELOCATE",
      0,

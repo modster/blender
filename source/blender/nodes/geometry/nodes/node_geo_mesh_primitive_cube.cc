@@ -35,7 +35,7 @@ static bNodeSocketTemplate geo_node_mesh_primitive_cube_out[] = {
 
 namespace blender::nodes {
 
-static Mesh *create_cube_mesh(const float size)
+Mesh *create_cube_mesh(const float size)
 {
   const float4x4 transform = float4x4::identity();
 
@@ -50,8 +50,10 @@ static Mesh *create_cube_mesh(const float size)
                size,
                true);
 
+  BMeshToMeshParams params{};
+  params.calc_object_remap = false;
   Mesh *mesh = (Mesh *)BKE_id_new_nomain(ID_ME, nullptr);
-  BM_mesh_bm_to_me_for_eval(bm, mesh, nullptr);
+  BM_mesh_bm_to_me(nullptr, bm, mesh, &params);
   BM_mesh_free(bm);
 
   return mesh;

@@ -812,7 +812,7 @@ wmWindow *WM_window_open(bContext *C,
     LISTBASE_FOREACH (wmWindow *, win_iter, &wm->windows) {
       if (WM_window_is_temp_screen(win_iter)) {
         char *wintitle = GHOST_GetTitle(win_iter->ghostwin);
-        if (strcmp(title, wintitle) == 0) {
+        if (STREQ(title, wintitle)) {
           win = win_iter;
         }
         free(wintitle);
@@ -2174,7 +2174,7 @@ void WM_window_screen_rect_calc(const wmWindow *win, rcti *r_rect)
         screen_rect.ymin += height;
         break;
       default:
-        BLI_assert(0);
+        BLI_assert_unreachable();
         break;
     }
   }

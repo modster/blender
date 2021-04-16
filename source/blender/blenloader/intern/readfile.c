@@ -2497,9 +2497,12 @@ static void direct_link_id_common(
   /* Link direct data of overrides. */
   if (id->override_library) {
     BLO_read_data_address(reader, &id->override_library);
-    BLO_read_list_cb(
-        reader, &id->override_library->properties, direct_link_id_override_property_cb);
-    id->override_library->runtime = NULL;
+    /* Work around file corruption on writing, see T86853. */
+    if (id->override_library != NULL) {
+      BLO_read_list_cb(
+          reader, &id->override_library->properties, direct_link_id_override_property_cb);
+      id->override_library->runtime = NULL;
+    }
   }
 
   DrawDataList *drawdata = DRW_drawdatalist_from_id(id);
@@ -3007,8 +3010,13 @@ static void lib_link_workspace_layout_restore(struct IDNameLib_Map *id_map,
         else if (sl->spacetype == SPACE_SPREADSHEET) {
           SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
 
-          sspreadsheet->pinned_id = restore_pointer_by_name(
-              id_map, sspreadsheet->pinned_id, USER_IGNORE);
+          LISTBASE_FOREACH (SpreadsheetContext *, context, &sspreadsheet->context_path) {
+            if (context->type == SPREADSHEET_CONTEXT_OBJECT) {
+              SpreadsheetContextObject *object_context = (SpreadsheetContextObject *)context;
+              object_context->object = restore_pointer_by_name(
+                  id_map, (ID *)object_context->object, USER_IGNORE);
+            }
+          }
         }
       }
     }

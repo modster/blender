@@ -583,7 +583,8 @@ char *WM_prop_pystring_assign(bContext *C, PointerRNA *ptr, PropertyRNA *prop, i
 
 void WM_operator_properties_create_ptr(PointerRNA *ptr, wmOperatorType *ot)
 {
-  RNA_pointer_create(NULL, ot->srna, NULL, ptr);
+  /* Set the ID so the context can be accessed: see #STRUCT_NO_CONTEXT_WITHOUT_OWNER_ID. */
+  RNA_pointer_create(G_MAIN->wm.first, ot->srna, NULL, ptr);
 }
 
 void WM_operator_properties_create(PointerRNA *ptr, const char *opstring)
@@ -594,7 +595,8 @@ void WM_operator_properties_create(PointerRNA *ptr, const char *opstring)
     WM_operator_properties_create_ptr(ptr, ot);
   }
   else {
-    RNA_pointer_create(NULL, &RNA_OperatorProperties, NULL, ptr);
+    /* Set the ID so the context can be accessed: see #STRUCT_NO_CONTEXT_WITHOUT_OWNER_ID. */
+    RNA_pointer_create(G_MAIN->wm.first, &RNA_OperatorProperties, NULL, ptr);
   }
 }
 
@@ -1229,7 +1231,7 @@ ID *WM_operator_drop_load_path(struct bContext *C, wmOperator *op, const short i
       id = (ID *)BKE_image_load_exists_ex(bmain, path, &exists);
     }
     else {
-      BLI_assert(0);
+      BLI_assert_unreachable();
     }
 
     if (!id) {
@@ -1248,7 +1250,7 @@ ID *WM_operator_drop_load_path(struct bContext *C, wmOperator *op, const short i
           BLI_path_rel(((Image *)id)->filepath, BKE_main_blendfile_path(bmain));
         }
         else {
-          BLI_assert(0);
+          BLI_assert_unreachable();
         }
       }
     }
@@ -1687,7 +1689,7 @@ static uiBlock *wm_block_search_menu(bContext *C, ARegion *region, void *userdat
     UI_but_func_menu_search(but);
   }
   else {
-    BLI_assert(0);
+    BLI_assert_unreachable();
   }
 
   UI_but_flag_enable(but, UI_BUT_ACTIVATE_ON_INIT);
