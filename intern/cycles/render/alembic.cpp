@@ -798,6 +798,62 @@ void AlembicObject::read_face_sets(SchemaType &schema,
   }
 }
 
+static void precompute_vertex_normals(CachedData &cache,
+                                const ccl::set<chrono_t> &times,
+                                Progress &progress)
+{
+  if (cache.vertices.size() == 0) {
+    return;
+  }
+
+  auto &attr_normal = cache.add_attribute(ustring("N"),
+                                         cache.vertices.get_time_sampling());
+  attr_normal.std = ATTR_STD_VERTEX_NORMAL;
+  attr_normal.element = ATTR_ELEMENT_VERTEX;
+  attr_normal.type_desc = TypeNormal;
+
+  ccl::set<chrono_t>::iterator begin = times.begin();
+
+  while (begin != times.end()) {
+    if (progress.get_cancel()) {
+      return;
+    }
+
+    const chrono_t current_time = *begin++;
+    const array<float3> *vertices = cache.vertices.data_for_time_no_check(current_time).get_data_or_null();
+    const array<int3> *triangles = cache.triangles.data_for_time_no_check(current_time).get_data_or_null();
+
+    if (!vertices || !triangles) {
+      attr_normal.data.add_no_data(current_time);
+      continue;
+    }
+
+    array<char> attr_data(vertices->size() * sizeof(float3));
+    float3 *attr_ptr = reinterpret_cast<float3 *>(attr_data.data());
+    memset(attr_ptr, 0, vertices->size() * sizeof(float3));
+
+    for (size_t t = 0; t < triangles->size(); ++t) {
+      const int3 tri_int3 = triangles->data()[t];
+      Mesh::Triangle tri{};
+      tri.v[0] = tri_int3[0];
+      tri.v[1] = tri_int3[1];
+      tri.v[2] = tri_int3[2];
+
+      const float3 tri_N = tri.compute_normal(vertices->data());
+
+      for (int v = 0; v < 3; ++v) {
+        attr_ptr[tri_int3[v]] += tri_N;
+      }
+    }
+
+    for (size_t v = 0; v < vertices->size(); ++v) {
+      attr_ptr[v] = normalize(attr_ptr[v]);
+    }
+
+    attr_normal.data.add_data(attr_data, current_time);
+  }
+}
+
 static void compute_vertex_deltas(CachedData &cached_data,
                                   const ccl::set<chrono_t> &times,
                                   Progress &progress)
@@ -1047,6 +1103,8 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
    * frame. */
   ArraySample::Key previous_key;
 
+  const bool has_normals = normals.valid();
+
   /* read topology */
   foreach (chrono_t time, times) {
     if (progress.get_cancel()) {
@@ -1081,9 +1139,17 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
       previous_key = key;
     }
 
-    if (normals.valid()) {
+    if (has_normals) {
       add_normals(sample.getFaceIndices(), normals, time, cached_data);
     }
+  }
+
+  if (progress.get_cancel()) {
+    return;
+  }
+
+  if (!has_normals) {
+    precompute_vertex_normals(cached_data, times, progress);
   }
 
   if (progress.get_cancel()) {
@@ -1244,6 +1310,12 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
   }
 
   if (proc->get_ignore_subdivision()) {
+    precompute_vertex_normals(cached_data, times, progress);
+
+    if (progress.get_cancel()) {
+      return;
+    }
+
     compute_vertex_deltas(cached_data, times, progress);
 
     if (progress.get_cancel()) {
