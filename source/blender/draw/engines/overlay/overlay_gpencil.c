@@ -143,18 +143,20 @@ void OVERLAY_edit_gpencil_cache_init(OVERLAY_Data *vedata)
     DRWState state = DRW_STATE_WRITE_COLOR;
     DRW_PASS_CREATE(psl->edit_gpencil_curve_ps, state | pd->clipping_state);
 
-    sh = OVERLAY_shader_edit_curve_handle();
-    pd->edit_gpencil_curve_handle_grp = grp = DRW_shgroup_create(sh, psl->edit_gpencil_curve_ps);
-    DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
-    DRW_shgroup_uniform_bool_copy(grp, "showCurveHandles", pd->edit_curve.show_handles);
-    DRW_shgroup_uniform_int_copy(grp, "curveHandleDisplay", pd->edit_curve.handle_display);
-    DRW_shgroup_state_enable(grp, DRW_STATE_BLEND_ALPHA);
+    if (show_points && !hide_select) {
+      sh = OVERLAY_shader_edit_curve_handle();
+      pd->edit_gpencil_curve_handle_grp = grp = DRW_shgroup_create(sh, psl->edit_gpencil_curve_ps);
+      DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
+      DRW_shgroup_uniform_bool_copy(grp, "showCurveHandles", pd->edit_curve.show_handles);
+      DRW_shgroup_uniform_int_copy(grp, "curveHandleDisplay", pd->edit_curve.handle_display);
+      DRW_shgroup_state_enable(grp, DRW_STATE_BLEND_ALPHA);
 
-    sh = OVERLAY_shader_edit_curve_point();
-    pd->edit_gpencil_curve_points_grp = grp = DRW_shgroup_create(sh, psl->edit_gpencil_curve_ps);
-    DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
-    DRW_shgroup_uniform_bool_copy(grp, "showCurveHandles", pd->edit_curve.show_handles);
-    DRW_shgroup_uniform_int_copy(grp, "curveHandleDisplay", pd->edit_curve.handle_display);
+      sh = OVERLAY_shader_edit_curve_point();
+      pd->edit_gpencil_curve_points_grp = grp = DRW_shgroup_create(sh, psl->edit_gpencil_curve_ps);
+      DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
+      DRW_shgroup_uniform_bool_copy(grp, "showCurveHandles", pd->edit_curve.show_handles);
+      DRW_shgroup_uniform_int_copy(grp, "curveHandleDisplay", pd->edit_curve.handle_display);
+    }
   }
 
   /* control points for primitives and speed guide */
