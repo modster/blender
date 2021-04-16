@@ -199,7 +199,7 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
     for (const int i_profile : mappings.index_range()) {
       const PointMapping &mapping = mappings[i_profile];
       if (mapping.factor == 0.0f) {
-        if (bezier_spline.control_points[mapping.control_point_index].is_sharp()) {
+        if (bezier_spline.point_is_sharp(mapping.control_point_index)) {
           mark_edges_sharp(
               edges.slice(spline_edges_start + spline_edge_len * i_profile, spline_edge_len));
         }
@@ -272,12 +272,8 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
 static DCurve get_curve_single_vert()
 {
   DCurve curve;
-  std::unique_ptr<BezierSpline> spline = std::make_unique<BezierSpline>();
-  BezierPoint control_point;
-  control_point.position = float3(0);
-  control_point.handle_position_a = float3(0);
-  control_point.handle_position_b = float3(0);
-  spline->control_points.append(control_point);
+  std::unique_ptr<PolySpline> spline = std::make_unique<PolySpline>();
+  spline->add_point(float3(0), 0, 0.0f);
   curve.splines.append(std::move(spline));
 
   return curve;

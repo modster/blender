@@ -37,36 +37,6 @@ struct PointMapping {
   float factor;
 };
 
-/* TODO: Think about storing each data type from each control point separately. */
-struct BezierPoint {
-  enum HandleType {
-    Free,
-    Auto,
-    Vector,
-    Align,
-  };
-
-  /* The first handle. */
-  HandleType handle_type_a;
-  blender::float3 handle_position_a;
-
-  blender::float3 position;
-
-  /* The second handle. */
-  HandleType handle_type_b;
-  blender::float3 handle_position_b;
-
-  float radius;
-  /* User defined tilt in radians, added on top of the auto-calculated tilt. */
-  float tilt;
-
-  bool is_sharp() const
-  {
-    return ELEM(handle_type_a, HandleType::Vector, HandleType::Free) ||
-           ELEM(handle_type_b, HandleType::Vector, HandleType::Free);
-  }
-};
-
 /**
  * A spline is an abstraction of a curve section, its evaluation methods, and data.
  * The spline data itself is just control points and a set of attributes.
@@ -142,8 +112,15 @@ class Spline {
   virtual int resolution() const = 0;
   virtual void set_resolution(const int value) = 0;
 
-  // virtual void drop_front(const int index) = 0;
-  // virtual void drop_back(const int index) = 0;
+  virtual void drop_front(const int count) = 0;
+  virtual void drop_back(const int count) = 0;
+
+  virtual blender::MutableSpan<blender::float3> positions() = 0;
+  virtual blender::Span<blender::float3> positions() const = 0;
+  virtual blender::MutableSpan<float> radii() = 0;
+  virtual blender::Span<float> radii() const = 0;
+  virtual blender::MutableSpan<float> tilts() = 0;
+  virtual blender::Span<float> tilts() const = 0;
 
   virtual void mark_cache_invalid();
   virtual int evaluated_points_size() const = 0;
@@ -161,26 +138,42 @@ class Spline {
  protected:
   virtual void correct_end_tangents() const = 0;
   virtual void ensure_base_cache() const = 0;
-
-  virtual float control_point_radius(const int index) const = 0;
 };
 
 using SplinePtr = std::unique_ptr<Spline>;
 
-class BezierSpline : public Spline {
+class BezierSpline final : public Spline {
  public:
-  blender::Vector<BezierPoint> control_points;
+  enum HandleType {
+    Free,
+    Auto,
+    Vector,
+    Align,
+  };
 
  private:
-  int resolution_u;
+  blender::Vector<HandleType> handle_types_start_;
+  blender::Vector<blender::float3> handle_positions_start_;
+  blender::Vector<blender::float3> positions_;
+  blender::Vector<HandleType> handle_types_end_;
+  blender::Vector<blender::float3> handle_positions_end_;
+  blender::Vector<float> radii_;
+  blender::Vector<float> tilts_;
+  int resolution_u_;
 
  public:
   virtual SplinePtr copy() const final;
   BezierSpline() = default;
   BezierSpline(const BezierSpline &other)
       : Spline((Spline &)other),
-        control_points(other.control_points),
-        resolution_u(other.resolution_u)
+        handle_types_start_(other.handle_types_start_),
+        handle_positions_start_(other.handle_positions_start_),
+        positions_(other.positions_),
+        handle_types_end_(other.handle_types_end_),
+        handle_positions_end_(other.handle_positions_end_),
+        radii_(other.radii_),
+        tilts_(other.tilts_),
+        resolution_u_(other.resolution_u_)
   {
   }
 
@@ -188,10 +181,40 @@ class BezierSpline : public Spline {
   int resolution() const final;
   void set_resolution(const int value) final;
 
-  // void drop_front(const int index) final;
-  // void drop_back(const int index) final;
+  blender::MutableSpan<blender::float3> positions() final;
+  blender::Span<blender::float3> positions() const final;
+  blender::MutableSpan<float> radii() final;
+  blender::Span<float> radii() const final;
+  blender::MutableSpan<float> tilts() final;
+  blender::Span<float> tilts() const final;
+
+  blender::Span<HandleType> handle_types_start() const;
+  blender::MutableSpan<HandleType> handle_types_start();
+  blender::Span<blender::float3> handle_positions_start() const;
+  blender::MutableSpan<blender::float3> handle_positions_start();
+  blender::Span<HandleType> handle_types_end() const;
+  blender::MutableSpan<HandleType> handle_types_end();
+  blender::Span<blender::float3> handle_positions_end() const;
+  blender::MutableSpan<blender::float3> handle_positions_end();
+
+  void add_point(const blender::float3 position,
+                 const HandleType handle_type_start,
+                 const blender::float3 handle_position_start,
+                 const HandleType handle_type_end,
+                 const blender::float3 handle_position_end,
+                 const float radius,
+                 const float tilt);
+
+  void drop_front(const int count) final;
+  void drop_back(const int count) final;
 
   int evaluated_points_size() const final;
+
+  bool point_is_sharp(const int index) const
+  {
+    return ELEM(handle_types_start_[index], HandleType::Vector, HandleType::Free) ||
+           ELEM(handle_types_end_[index], HandleType::Vector, HandleType::Free);
+  }
 
  protected:
   void correct_final_tangents() const;
@@ -199,72 +222,85 @@ class BezierSpline : public Spline {
  private:
   void correct_end_tangents() const final;
   void ensure_base_cache() const final;
-
-  float control_point_radius(const int index) const final;
+  bool segment_is_vector(const int start_index) const;
+  void evaluate_bezier_segment(const int first_index,
+                               const int next_index,
+                               int &offset,
+                               blender::MutableSpan<blender::float3> positions,
+                               blender::MutableSpan<PointMapping> mappings) const;
+  void evaluate_bezier_position_and_mapping(blender::MutableSpan<blender::float3> positions,
+                                            blender::MutableSpan<PointMapping> mappings) const;
 };
 
-struct NURBSPoint {
-  blender::float3 position;
-  float radius;
-  float weight;
-
-  /* User defined tilt in radians, added on top of the auto-calculated tilt. */
-  float tilt;
-};
-
-class NURBSpline : public Spline {
- public:
-  blender::Vector<NURBSPoint> control_points;
-
+class NURBSpline final : public Spline {
  private:
-  int resolution_u;
-  uint8_t order;
+  blender::Vector<blender::float3> positions_;
+  blender::Vector<float> radii_;
+  blender::Vector<float> tilts_;
+  blender::Vector<float> weights_;
+  int resolution_u_;
+  uint8_t order_;
 
  public:
   SplinePtr copy() const final;
   NURBSpline() = default;
   NURBSpline(const NURBSpline &other)
       : Spline((Spline &)other),
-        control_points(other.control_points),
-        resolution_u(other.resolution_u),
-        order(other.order)
+        positions_(other.positions_),
+        radii_(other.radii_),
+        tilts_(other.tilts_),
+        weights_(other.weights_),
+        resolution_u_(other.resolution_u_),
+        order_(other.order_)
   {
   }
 
   int size() const final;
   int resolution() const final;
   void set_resolution(const int value) final;
+  uint8_t order() const;
+  void set_order(const uint8_t value);
 
-  // void drop_front(const int index) final;
-  // void drop_back(const int index) final;
+  blender::MutableSpan<blender::float3> positions() final;
+  blender::Span<blender::float3> positions() const final;
+  blender::MutableSpan<float> radii() final;
+  blender::Span<float> radii() const final;
+  blender::MutableSpan<float> tilts() final;
+  blender::Span<float> tilts() const final;
+
+  blender::MutableSpan<float> weights();
+  blender::Span<float> weights() const;
+
+  void add_point(const blender::float3 position,
+                 const float radius,
+                 const float tilt,
+                 const float weight);
+
+  void drop_front(const int count) final;
+  void drop_back(const int count) final;
 
   int evaluated_points_size() const final;
 
  protected:
   void correct_end_tangents() const final;
   void ensure_base_cache() const final;
-
-  float control_point_radius(const int index) const final;
 };
 
-struct PolyPoint {
-  blender::float3 position;
-  float radius;
-
-  /* User defined tilt in radians, added on top of the auto-calculated tilt. */
-  float tilt;
-};
-
-class PolySpline : public Spline {
+class PolySpline final : public Spline {
  public:
-  blender::Vector<PolyPoint> control_points;
+  blender::Vector<blender::float3> positions_;
+  blender::Vector<float> radii_;
+  blender::Vector<float> tilts_;
 
  private:
  public:
   SplinePtr copy() const final;
   PolySpline() = default;
   PolySpline(const PolySpline &other)
-      : Spline((Spline &)other), control_points(other.control_points)
+      : Spline((Spline &)other),
+        positions_(other.positions_),
+        radii_(other.radii_),
+        tilts_(other.tilts_)
   {
   }
 
@@ -272,16 +308,23 @@ class PolySpline : public Spline {
   int resolution() const final;
   void set_resolution(const int value) final;
 
-  // void drop_front(const int index) final;
-  // void drop_back(const int index) final;
+  blender::MutableSpan<blender::float3> positions() final;
+  blender::Span<blender::float3> positions() const final;
+  blender::MutableSpan<float> radii() final;
+  blender::Span<float> radii() const final;
+  blender::MutableSpan<float> tilts() final;
+  blender::Span<float> tilts() const final;
+
+  void add_point(const blender::float3 position, const float radius, const float tilt);
+
+  void drop_front(const int count) final;
+  void drop_back(const int count) final;
 
   int evaluated_points_size() const final;
 
  protected:
   void correct_end_tangents() const final;
   void ensure_base_cache() const final;
-
-  float control_point_radius(const int index) const final;
 };
 
 /* Proposed name to be different from DNA type. */

@@ -29,6 +29,20 @@ using blender::float4x4;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
+using blender::Vector;
+
+/* -------------------------------------------------------------------- */
+/** \name Utilities
+ * \{ */
+
+/* TODO: This only works for trivial types? */
+template<typename T> static void vector_drop_front(Vector<T> vector, const int count)
+{
+  memcpy(vector.begin(), vector.begin() + count, sizeof(T) * count);
+  vector.resize(vector.size() - count);
+}
+
+/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name General Curve Functions
@@ -49,15 +63,19 @@ void DCurve::translate(const float3 translation)
 {
   for (SplinePtr &spline : this->splines) {
     if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(spline.get())) {
-      for (BezierPoint &point : bezier_spline->control_points) {
-        point.handle_position_a += translation;
-        point.position += translation;
-        point.handle_position_b += translation;
+      for (float3 &position : bezier_spline->positions()) {
+        position += translation;
+      }
+      for (float3 &handle_position : bezier_spline->handle_positions_start()) {
+        handle_position += translation;
+      }
+      for (float3 &handle_position : bezier_spline->handle_positions_end()) {
+        handle_position += translation;
       }
     }
     else if (PolySpline *poly_spline = dynamic_cast<PolySpline *>(spline.get())) {
-      for (PolyPoint &point : poly_spline->control_points) {
-        point.position += translation;
+      for (float3 &position : poly_spline->positions()) {
+        position += translation;
       }
     }
     spline->mark_cache_invalid();
@@ -68,39 +86,43 @@ void DCurve::transform(const float4x4 &matrix)
 {
   for (SplinePtr &spline : this->splines) {
     if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(spline.get())) {
-      for (BezierPoint &point : bezier_spline->control_points) {
-        point.handle_position_a = matrix * point.handle_position_a;
-        point.position = matrix * point.position;
-        point.handle_position_b = matrix * point.handle_position_b;
+      for (float3 &position : bezier_spline->positions()) {
+        position = matrix * position;
+      }
+      for (float3 &handle_position : bezier_spline->handle_positions_start()) {
+        handle_position = matrix * handle_position;
+      }
+      for (float3 &handle_position : bezier_spline->handle_positions_end()) {
+        handle_position = matrix * handle_position;
       }
     }
     else if (PolySpline *poly_spline = dynamic_cast<PolySpline *>(spline.get())) {
-      for (PolyPoint &point : poly_spline->control_points) {
-        point.position = matrix * point.position;
+      for (float3 &position : poly_spline->positions()) {
+        position = matrix * position;
       }
     }
     spline->mark_cache_invalid();
   }
 }
 
-static BezierPoint::HandleType handle_type_from_dna_bezt(const eBezTriple_Handle dna_handle_type)
+static BezierSpline::HandleType handle_type_from_dna_bezt(const eBezTriple_Handle dna_handle_type)
 {
   switch (dna_handle_type) {
     case HD_FREE:
-      return BezierPoint::Free;
+      return BezierSpline::Free;
     case HD_AUTO:
-      return BezierPoint::Auto;
+      return BezierSpline::Auto;
     case HD_VECT:
-      return BezierPoint::Vector;
+      return BezierSpline::Vector;
     case HD_ALIGN:
-      return BezierPoint::Align;
+      return BezierSpline::Align;
     case HD_AUTO_ANIM:
-      return BezierPoint::Auto;
+      return BezierSpline::Auto;
     case HD_ALIGN_DOUBLESIDE:
-      return BezierPoint::Align;
+      return BezierSpline::Align;
   }
   BLI_assert_unreachable();
-  return BezierPoint::Auto;
+  return BezierSpline::Auto;
 }
 
 static Spline::NormalCalculationMode normal_mode_from_dna_curve(const int twist_mode)
@@ -133,16 +155,15 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
         spline->type = Spline::Type::Bezier;
         spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
 
+        /* TODO: Optimize by reserving the correct size. */
         for (const BezTriple &bezt : Span(nurb->bezt, nurb->pntsu)) {
-          BezierPoint point;
-          point.handle_position_a = bezt.vec[0];
-          point.position = bezt.vec[1];
-          point.handle_position_b = bezt.vec[2];
-          point.radius = bezt.radius;
-          point.tilt = bezt.tilt;
-          point.handle_type_a = handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h1);
-          point.handle_type_b = handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h2);
-          spline->control_points.append(std::move(point));
+          spline->add_point(bezt.vec[1],
+                            handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h1),
+                            bezt.vec[0],
+                            handle_type_from_dna_bezt((eBezTriple_Handle)bezt.h2),
+                            bezt.vec[2],
+                            bezt.radius,
+                            bezt.tilt);
         }
 
         curve->splines.append(std::move(spline));
@@ -157,11 +178,7 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
         spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
 
         for (const BPoint &bp : Span(nurb->bp, nurb->pntsu)) {
-          PolyPoint point;
-          point.position = bp.vec;
-          point.radius = bp.radius;
-          point.tilt = bp.tilt;
-          spline->control_points.append(std::move(point));
+          spline->add_point(bp.vec, bp.radius, bp.tilt);
         }
 
         curve->splines.append(std::move(spline));
@@ -328,20 +345,6 @@ static float3 initial_normal(const float3 first_tangent)
 
 static float3 rotate_around_axis(const float3 dir, const float3 axis, const float angle)
 {
-  // cdef void rotateAroundAxisVec3(Vector3 *target, Vector3 *v, Vector3 *axis, float angle):
-  //   cdef Vector3 n
-  //   normalizeVec3(&n, axis)
-  //   cdef Vector3 d
-  //   scaleVec3(&d, &n, dotVec3(&n, v))
-  //   cdef Vector3 r
-  //   subVec3(&r, v, &d)
-  //   cdef Vector3 g
-  //   crossVec3(&g, &n, &r)
-  //   cdef float ca = cos(angle)
-  //   cdef float sa = sin(angle)
-  //   target.x = d.x + r.x * ca + g.x * sa
-  //   target.y = d.y + r.y * ca + g.y * sa
-  //   target.z = d.z + r.z * ca + g.z * sa
   BLI_ASSERT_UNIT_V3(axis);
   const float3 scaled_axis = axis * float3::dot(dir, axis);
   const float3 sub = dir - scaled_axis;
@@ -353,12 +356,6 @@ static float3 rotate_around_axis(const float3 dir, const float3 axis, const floa
 
 static float3 project_on_center_plane(const float3 vector, const float3 plane_normal)
 {
-  // cdef void projectOnCenterPlaneVec3(Vector3 *result, Vector3 *v, Vector3 *planeNormal):
-  //   cdef Vector3 unitNormal, projVector
-  //   normalizeVec3(&unitNormal, planeNormal)
-  //   cdef float distance = dotVec3(v, &unitNormal)
-  //   scaleVec3(&projVector, &unitNormal, -distance)
-  //   addVec3(result, v, &projVector)
   BLI_ASSERT_UNIT_V3(plane_normal);
   const float distance = float3::dot(vector, plane_normal);
   const float3 projection_vector = plane_normal * -distance;
@@ -377,8 +374,6 @@ static float3 propagate_normal(const float3 last_normal,
 
   const float3 axis = float3::cross(last_tangent, current_tangent).normalized();
 
-  // rotateAroundAxisVec3(&newNormal, lastNormal, &axis, angle)
-  // projectOnCenterPlaneVec3(target, &newNormal, currentTangent)
   const float3 new_normal = rotate_around_axis(last_normal, axis, angle);
 
   return project_on_center_plane(new_normal, current_tangent).normalized();
@@ -388,23 +383,6 @@ static void apply_rotation_gradient(Span<float3> tangents,
                                     MutableSpan<float3> normals,
                                     const float full_angle)
 {
-  // cdef applyRotationGradient(Vector3DList tangents, Vector3DList normals, float fullAngle):
-  //   cdef Py_ssize_t i
-  //   cdef Vector3 normal
-  //   cdef float angle
-  //   cdef float remainingRotation = fullAngle
-  //   cdef float doneRotation = 0
-
-  //   for i in range(1, normals.length):
-  //       if angleVec3(tangents.data + i, tangents.data + i - 1) < 0.001:
-  //           rotateAroundAxisVec3(normals.data + i, &normal, tangents.data + i, doneRotation)
-  //       else:
-  //           angle = remainingRotation / (normals.length - i)
-  //           normal = normals.data[i]
-  //           rotateAroundAxisVec3(normals.data + i, &normal, tangents.data + i, angle +
-  //               doneRotation)
-  //           remainingRotation -= angle
-  //           doneRotation += angle
 
   float remaining_rotation = full_angle;
   float done_rotation = 0.0f;
@@ -436,7 +414,7 @@ static void make_normals_cyclic(Span<float3> tangents, MutableSpan<float3> norma
 }
 
 /* This algorithm is a copy from animation nodes bezier normal calculation.
- * TODO: Explore different methods. */
+ * TODO: Explore different methods, this also doesn't work right now. */
 static void calculate_normals_minimum_twist(Span<float3> tangents,
                                             const bool is_cyclic,
                                             MutableSpan<float3> normals)
@@ -522,9 +500,9 @@ float Spline::get_evaluated_point_radius(const int evaluated_index) const
   const int index = mapping.control_point_index;
   const float factor = mapping.factor;
 
-  const float radius = this->control_point_radius(index);
+  const float radius = this->radii()[index];
   const int next_index = (index == this->size() - 1) ? 0 : index + 1;
-  const float next_radius = this->control_point_radius(next_index);
+  const float next_radius = this->radii()[next_index];
 
   return interpf(next_radius, radius, factor);
 }
@@ -542,35 +520,142 @@ SplinePtr BezierSpline::copy() const
   return new_spline;
 }
 
-// BezierSpline(const BezierSpline &other)
-// {
-// }
-
 int BezierSpline::size() const
 {
-  return this->control_points.size();
+  const int size = this->positions_.size();
+  BLI_assert(this->handle_types_start_.size() == size);
+  BLI_assert(this->handle_positions_start_.size() == size);
+  BLI_assert(this->handle_types_end_.size() == size);
+  BLI_assert(this->handle_positions_end_.size() == size);
+  BLI_assert(this->radii_.size() == size);
+  BLI_assert(this->tilts_.size() == size);
+  return size;
 }
 
 int BezierSpline::resolution() const
 {
-  return this->resolution_u;
+  return this->resolution_u_;
 }
 
 void BezierSpline::set_resolution(const int value)
 {
-  this->resolution_u = value;
+  this->resolution_u_ = value;
   this->mark_cache_invalid();
 }
 
-static bool segment_is_vector(const BezierPoint &point_a, const BezierPoint &point_b)
+MutableSpan<float3> BezierSpline::positions()
 {
-  return point_a.handle_type_b == BezierPoint::HandleType::Vector &&
-         point_b.handle_type_a == BezierPoint::HandleType::Vector;
+  return this->positions_;
+}
+Span<float3> BezierSpline::positions() const
+{
+  return this->positions_;
+}
+MutableSpan<float> BezierSpline::radii()
+{
+  return this->radii_;
+}
+Span<float> BezierSpline::radii() const
+{
+  return this->radii_;
+}
+MutableSpan<float> BezierSpline::tilts()
+{
+  return this->tilts_;
+}
+Span<float> BezierSpline::tilts() const
+{
+  return this->tilts_;
+}
+Span<BezierSpline::HandleType> BezierSpline::handle_types_start() const
+{
+  return this->handle_types_start_;
+}
+MutableSpan<BezierSpline::HandleType> BezierSpline::handle_types_start()
+{
+  return this->handle_types_start_;
+}
+Span<float3> BezierSpline::handle_positions_start() const
+{
+  return this->handle_positions_start_;
+}
+MutableSpan<float3> BezierSpline::handle_positions_start()
+{
+  return this->handle_positions_start_;
+}
+Span<BezierSpline::HandleType> BezierSpline::handle_types_end() const
+{
+  return this->handle_types_end_;
+}
+MutableSpan<BezierSpline::HandleType> BezierSpline::handle_types_end()
+{
+  return this->handle_types_end_;
+}
+Span<float3> BezierSpline::handle_positions_end() const
+{
+  return this->handle_positions_end_;
+}
+MutableSpan<float3> BezierSpline::handle_positions_end()
+{
+  return this->handle_positions_end_;
+}
+
+void BezierSpline::add_point(const float3 position,
+                             const HandleType handle_type_start,
+                             const float3 handle_position_start,
+                             const HandleType handle_type_end,
+                             const float3 handle_position_end,
+                             const float radius,
+                             const float tilt)
+{
+  handle_types_start_.append(handle_type_start);
+  handle_positions_start_.append(handle_position_start);
+  positions_.append(position);
+  handle_types_end_.append(handle_type_end);
+  handle_positions_end_.append(handle_position_end);
+  radii_.append(radius);
+  tilts_.append(tilt);
+}
+
+void BezierSpline::drop_front(const int count)
+{
+  BLI_assert(this->size() - count > 0);
+  vector_drop_front(handle_types_start_, count);
+  vector_drop_front(handle_positions_start_, count);
+  vector_drop_front(positions_, count);
+  vector_drop_front(handle_types_end_, count);
+  vector_drop_front(handle_positions_end_, count);
+  vector_drop_front(radii_, count);
+  vector_drop_front(tilts_, count);
+}
+
+void BezierSpline::drop_back(const int count)
+{
+  const int new_size = this->size() - count;
+  BLI_assert(new_size > 0);
+  handle_types_start_.resize(new_size);
+  handle_positions_start_.resize(new_size);
+  positions_.resize(new_size);
+  handle_types_end_.resize(new_size);
+  handle_positions_end_.resize(new_size);
+  radii_.resize(new_size);
+  tilts_.resize(new_size);
+}
+
+bool BezierSpline::segment_is_vector(const int index) const
+{
+  if (index == this->size() - 1) {
+    BLI_assert(this->is_cyclic);
+    return this->handle_types_end_.last() == HandleType::Vector &&
+           this->handle_types_start_.first() == HandleType::Vector;
+  }
+  return this->handle_types_end_[index] == HandleType::Vector &&
+         this->handle_types_start_[index + 1] == HandleType::Vector;
 }
 
 int BezierSpline::evaluated_points_size() const
 {
-  BLI_assert(control_points.size() > 0);
+  BLI_assert(this->size() > 0);
 #ifndef DEBUG
   if (!this->base_cache_dirty_) {
     /* In a non-debug build, assume that the cache's size has not changed, and that any operation
@@ -581,23 +666,21 @@ int BezierSpline::evaluated_points_size() const
 #endif
 
   int total_len = 0;
-  for (const int i : IndexRange(1, this->control_points.size() - 1)) {
-    const BezierPoint &point_prev = this->control_points[i - 1];
-    const BezierPoint &point = this->control_points[i];
-    if (segment_is_vector(point_prev, point)) {
+  for (const int i : IndexRange(this->size() - 1)) {
+    if (this->segment_is_vector(i)) {
       total_len += 1;
     }
     else {
-      total_len += this->resolution_u;
+      total_len += this->resolution_u_;
     }
   }
 
   if (this->is_cyclic) {
-    if (segment_is_vector(this->control_points.last(), this->control_points.first())) {
+    if (segment_is_vector(this->size() - 1)) {
       total_len++;
     }
     else {
-      total_len += this->resolution_u;
+      total_len += this->resolution_u_;
     }
   }
   else {
@@ -614,17 +697,6 @@ int BezierSpline::evaluated_points_size() const
   return total_len;
 }
 
-// void BezierSpline::drop_front(const int count)
-// {
-
-//   this->mark_cache_invalid();
-// }
-
-// void BezierSpline::drop_back(const int count)
-// {
-//   this->control_points.this->mark_cache_invalid();
-// }
-
 /**
  * If the spline is not cyclic, the direction for the first and last points is just the
  * direction formed by the corresponding handles and control points. In the unlikely situation
@@ -633,17 +705,13 @@ int BezierSpline::evaluated_points_size() const
  */
 void BezierSpline::correct_end_tangents() const
 {
-
   MutableSpan<float3> tangents(this->evaluated_tangents_cache_);
 
-  const BezierPoint &first_point = control_points.first();
-  if (LIKELY(first_point.handle_position_a != first_point.position)) {
-    tangents.first() = (first_point.position - first_point.handle_position_a).normalized();
+  if (handle_positions_start_.first() != positions_.first()) {
+    tangents.first() = (positions_.first() - handle_positions_start_.first()).normalized();
   }
-
-  const BezierPoint &last_point = control_points.last();
-  if (LIKELY(last_point.handle_position_a != first_point.position)) {
-    tangents.last() = (last_point.handle_position_b - last_point.position).normalized();
+  if (handle_positions_end_.last() != positions_.last()) {
+    tangents.last() = (handle_positions_end_.last() - positions_.last()).normalized();
   }
 }
 
@@ -694,55 +762,48 @@ static void evaluate_segment_mapping(Span<float3> evaluated_positions,
   }
 }
 
-static void evaluate_bezier_segment(const BezierPoint &point,
-                                    const BezierPoint &next,
-                                    const int index,
-                                    const int resolution,
-                                    int &offset,
-                                    MutableSpan<float3> positions,
-                                    MutableSpan<PointMapping> mappings)
+void BezierSpline::evaluate_bezier_segment(const int first_index,
+                                           const int next_index,
+                                           int &offset,
+                                           MutableSpan<float3> positions,
+                                           MutableSpan<PointMapping> mappings) const
 {
-  if (segment_is_vector(point, next)) {
-    positions[offset] = point.position;
-    mappings[offset] = PointMapping{index, 0.0f};
+  if (this->segment_is_vector(first_index)) {
+    positions[offset] = positions_[first_index];
+    mappings[offset] = PointMapping{first_index, 0.0f};
     offset++;
   }
   else {
-    bezier_forward_difference_3d(point.position,
-                                 point.handle_position_b,
-                                 next.handle_position_a,
-                                 next.position,
-                                 positions.slice(offset, resolution));
-    evaluate_segment_mapping(
-        positions.slice(offset, resolution), mappings.slice(offset, resolution), index);
-    offset += resolution;
+    bezier_forward_difference_3d(this->positions_[first_index],
+                                 this->handle_positions_end_[first_index],
+                                 this->handle_positions_start_[next_index],
+                                 this->positions_[next_index],
+                                 positions.slice(offset, this->resolution_u_));
+    evaluate_segment_mapping(positions.slice(offset, this->resolution_u_),
+                             mappings.slice(offset, this->resolution_u_),
+                             first_index);
+    offset += this->resolution_u_;
   }
 }
 
-static void evaluate_bezier_positions_and_mapping(Span<BezierPoint> control_points,
-                                                  const int resolution,
-                                                  const bool is_cyclic,
-                                                  MutableSpan<float3> positions,
-                                                  MutableSpan<PointMapping> mappings)
+void BezierSpline::evaluate_bezier_position_and_mapping(MutableSpan<float3> positions,
+                                                        MutableSpan<PointMapping> mappings) const
 {
+  /* TODO: It would also be possible to store an array of offsets to facilitate parallelism here,
+   * maybe it is worth it? */
   int offset = 0;
-  for (const int i : IndexRange(1, control_points.size() - 1)) {
-    const BezierPoint &point_prev = control_points[i - 1];
-    const BezierPoint &point = control_points[i];
-    evaluate_bezier_segment(point_prev, point, i - 1, resolution, offset, positions, mappings);
+  for (const int i : IndexRange(this->size() - 1)) {
+    this->evaluate_bezier_segment(i, i + 1, offset, positions, mappings);
   }
 
-  const int i_last = control_points.size() - 1;
-  if (is_cyclic) {
-    const BezierPoint &last_point = control_points.last();
-    const BezierPoint &first_point = control_points.first();
-    evaluate_bezier_segment(
-        last_point, first_point, i_last, resolution, offset, positions, mappings);
+  const int i_last = this->size() - 1;
+  if (this->is_cyclic) {
+    this->evaluate_bezier_segment(i_last, 0, offset, positions, mappings);
   }
   else {
     /* Since evaulating the bezier doesn't add the final point's position,
      * it must be added manually in the non-cyclic case. */
-    positions[offset] = control_points.last().position;
+    positions[offset] = this->positions_.last();
     mappings[offset] = PointMapping{i_last, 0.0f};
     offset++;
   }
@@ -765,18 +826,10 @@ void BezierSpline::ensure_base_cache() const
   this->evaluated_positions_cache_.resize(total);
   this->evaluated_mapping_cache_.resize(total);
 
-  evaluate_bezier_positions_and_mapping(this->control_points,
-                                        this->resolution_u,
-                                        this->is_cyclic,
-                                        this->evaluated_positions_cache_,
-                                        this->evaluated_mapping_cache_);
+  this->evaluate_bezier_position_and_mapping(this->evaluated_positions_cache_,
+                                             this->evaluated_mapping_cache_);
 
   this->base_cache_dirty_ = false;
-}
-
-float BezierSpline::control_point_radius(const int index) const
-{
-  return this->control_points[index].radius;
 }
 
 /** \} */
@@ -794,18 +847,85 @@ SplinePtr NURBSpline::copy() const
 
 int NURBSpline::size() const
 {
-  return this->control_points.size();
+  const int size = this->positions_.size();
+  BLI_assert(this->radii_.size() == size);
+  BLI_assert(this->tilts_.size() == size);
+  BLI_assert(this->weights_.size() == size);
+  return size;
 }
 
 int NURBSpline::resolution() const
 {
-  return this->resolution_u;
+  return this->resolution_u_;
 }
 
 void NURBSpline::set_resolution(const int value)
 {
-  this->resolution_u = value;
+  this->resolution_u_ = value;
   this->mark_cache_invalid();
+}
+
+void NURBSpline::add_point(const float3 position,
+                           const float radius,
+                           const float tilt,
+                           const float weight)
+{
+  this->positions_.append(position);
+  this->radii_.append(radius);
+  this->tilts_.append(tilt);
+  this->weights_.append(weight);
+}
+
+void NURBSpline::drop_front(const int count)
+{
+  BLI_assert(this->size() - count > 0);
+  vector_drop_front(positions_, count);
+  vector_drop_front(radii_, count);
+  vector_drop_front(tilts_, count);
+  vector_drop_front(weights_, count);
+}
+
+void NURBSpline::drop_back(const int count)
+{
+  const int new_size = this->size() - count;
+  BLI_assert(new_size > 0);
+  positions_.resize(new_size);
+  radii_.resize(new_size);
+  tilts_.resize(new_size);
+  weights_.resize(new_size);
+}
+
+MutableSpan<float3> NURBSpline::positions()
+{
+  return this->positions_;
+}
+Span<float3> NURBSpline::positions() const
+{
+  return this->positions_;
+}
+MutableSpan<float> NURBSpline::radii()
+{
+  return this->radii_;
+}
+Span<float> NURBSpline::radii() const
+{
+  return this->radii_;
+}
+MutableSpan<float> NURBSpline::tilts()
+{
+  return this->tilts_;
+}
+Span<float> NURBSpline::tilts() const
+{
+  return this->tilts_;
+}
+MutableSpan<float> NURBSpline::weights()
+{
+  return this->weights_;
+}
+Span<float> NURBSpline::weights() const
+{
+  return this->weights_;
 }
 
 int NURBSpline::evaluated_points_size() const
@@ -819,11 +939,6 @@ void NURBSpline::correct_end_tangents() const
 
 void NURBSpline::ensure_base_cache() const
 {
-}
-
-float NURBSpline::control_point_radius(const int index) const
-{
-  return this->control_points[index].radius;
 }
 
 /** \} */
@@ -841,7 +956,10 @@ SplinePtr PolySpline::copy() const
 
 int PolySpline::size() const
 {
-  return this->control_points.size();
+  const int size = this->positions_.size();
+  BLI_assert(this->radii_.size() == size);
+  BLI_assert(this->tilts_.size() == size);
+  return size;
 }
 
 int PolySpline::resolution() const
@@ -854,9 +972,58 @@ void PolySpline::set_resolution(const int UNUSED(value))
   /* Poly curve has no resolution, there is just one evaluated point per control point. */
 }
 
+void PolySpline::add_point(const float3 position, const float radius, const float tilt)
+{
+  this->positions_.append(position);
+  this->radii_.append(radius);
+  this->tilts_.append(tilt);
+}
+
+void PolySpline::drop_front(const int count)
+{
+  BLI_assert(this->size() - count > 0);
+  vector_drop_front(positions_, count);
+  vector_drop_front(radii_, count);
+  vector_drop_front(tilts_, count);
+}
+
+void PolySpline::drop_back(const int count)
+{
+  const int new_size = this->size() - count;
+  BLI_assert(new_size > 0);
+  positions_.resize(new_size);
+  radii_.resize(new_size);
+  tilts_.resize(new_size);
+}
+
+MutableSpan<float3> PolySpline::positions()
+{
+  return this->positions_;
+}
+Span<float3> PolySpline::positions() const
+{
+  return this->positions_;
+}
+MutableSpan<float> PolySpline::radii()
+{
+  return this->radii_;
+}
+Span<float> PolySpline::radii() const
+{
+  return this->radii_;
+}
+MutableSpan<float> PolySpline::tilts()
+{
+  return this->tilts_;
+}
+Span<float> PolySpline::tilts() const
+{
+  return this->tilts_;
+}
+
 int PolySpline::evaluated_points_size() const
 {
-  return this->control_points.size();
+  return this->size();
 }
 
 void PolySpline::correct_end_tangents() const
@@ -883,17 +1050,12 @@ void PolySpline::ensure_base_cache() const
   MutableSpan<PointMapping> mappings = this->evaluated_mapping_cache_.as_mutable_span();
 
   for (const int i : positions.index_range()) {
-    positions[i] = this->control_points[i].position;
+    positions[i] = this->positions_[i];
     mappings[i].control_point_index = i;
     mappings[i].factor = 0.0f;
   }
 
   this->base_cache_dirty_ = false;
-}
-
-float PolySpline::control_point_radius(const int index) const
-{
-  return this->control_points[index].radius;
 }
 
 /** \} */

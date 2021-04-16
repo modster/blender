@@ -344,23 +344,13 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
 static void get_spline_radius_data(const Spline &spline, fn::GMutableSpan r_data)
 {
   MutableSpan<float> r_span = r_data.typed<float>();
-  if (const BezierSpline *bezier_spline = dynamic_cast<const BezierSpline *>(&spline)) {
-    for (const int i : IndexRange(bezier_spline->size())) {
-      r_span[i] = bezier_spline->control_points[i].radius;
-    }
-  }
-  /* TODO: Other spline types. */
+  r_span.copy_from(spline.radii());
 }
 
 static void get_spline_position_data(const Spline &spline, fn::GMutableSpan r_data)
 {
   MutableSpan<float3> r_span = r_data.typed<float3>();
-  if (const BezierSpline *bezier_spline = dynamic_cast<const BezierSpline *>(&spline)) {
-    for (const int i : IndexRange(bezier_spline->size())) {
-      r_span[i] = bezier_spline->control_points[i].position;
-    }
-  }
-  /* TODO: Other spline types. */
+  r_span.copy_from(spline.positions());
 }
 
 /**
