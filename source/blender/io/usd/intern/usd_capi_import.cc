@@ -127,110 +127,6 @@ static Collection *create_collection(Main *bmain, Collection *parent, const char
   return coll;
 }
 
-/* Set the instance collection on the given instance reader.
- *  The collection is assigned from the given map based on
- *  the prototype (maser) prim path. */
-static void set_instance_collection(
-    USDInstanceReader *instance_reader,
-    const std::map<pxr::SdfPath, Collection *> &proto_collection_map)
-{
-  if (!instance_reader) {
-    return;
-  }
-
-  pxr::SdfPath proto_path = instance_reader->proto_path();
-
-  std::map<pxr::SdfPath, Collection *>::const_iterator it = proto_collection_map.find(proto_path);
-
-  if (it != proto_collection_map.end()) {
-    instance_reader->set_instance_collection(it->second);
-  }
-  else {
-    std::cerr << "WARNING: Couldn't find prototype collection for " << instance_reader->prim_path()
-              << std::endl;
-  }
-}
-
-/* Create instance collections for the USD instance readers. */
-static void create_proto_collections(Main *bmain,
-                                     ViewLayer *view_layer,
-                                     Collection *parent_collection,
-                                     const ProtoReaderMap &proto_readers,
-                                     const std::vector<USDPrimReader *> &readers)
-{
-  Collection *all_protos_collection = create_collection(bmain, parent_collection, "prototypes");
-
-  std::map<pxr::SdfPath, Collection *> proto_collection_map;
-
-  for (const auto &pair : proto_readers) {
-
-    std::string proto_collection_name = pair.first.GetString();
-
-    // TODO(makowalski): Is it acceptable to have slashes in the collection names? Or should we
-    // replace them with another character, like an underscore, as in the following?
-    // std::replace(proto_collection_name.begin(), proto_collection_name.end(), '/', '_');
-
-    Collection *proto_collection = create_collection(
-        bmain, all_protos_collection, proto_collection_name.c_str());
-
-    LayerCollection *proto_lc = BKE_layer_collection_first_from_scene_collection(view_layer,
-                                                                                 proto_collection);
-    if (proto_lc) {
-      proto_lc->flag |= LAYER_COLLECTION_HIDE;
-    }
-
-    proto_collection_map.insert(std::make_pair(pair.first, proto_collection));
-  }
-
-  // Set the instance collections on the readers, including the prototype
-  // readers, as instancing may be recursive.
-
-  for (const auto &pair : proto_readers) {
-    for (USDPrimReader *reader : pair.second) {
-      if (USDInstanceReader *instance_reader = dynamic_cast<USDInstanceReader *>(reader)) {
-        set_instance_collection(instance_reader, proto_collection_map);
-      }
-    }
-  }
-
-  for (USDPrimReader *reader : readers) {
-    if (USDInstanceReader *instance_reader = dynamic_cast<USDInstanceReader *>(reader)) {
-      set_instance_collection(instance_reader, proto_collection_map);
-    }
-  }
-
-  // Add the prototype objects to the collections.
-  for (const auto &pair : proto_readers) {
-
-    std::map<pxr::SdfPath, Collection *>::const_iterator it = proto_collection_map.find(
-        pair.first);
-
-    if (it == proto_collection_map.end()) {
-      std::cerr << "WARNING: Couldn't find collection when adding objects for prototype "
-                << pair.first << std::endl;
-      continue;
-    }
-
-    for (USDPrimReader *reader : pair.second) {
-      Object *ob = reader->object();
-
-      if (!ob) {
-        continue;
-      }
-
-      Collection *coll = it->second;
-
-      BKE_collection_object_add(bmain, coll, ob);
-
-      DEG_id_tag_update(&coll->id, ID_RECALC_COPY_ON_WRITE);
-      DEG_id_tag_update_ex(bmain,
-                           &ob->id,
-                           ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION |
-                               ID_RECALC_BASE_FLAGS);
-    }
-  }
-}
-
 // Update the given import settings with the global rotation matrix to orient
 // imported objects with Z-up, if necessary
 static void set_global_rotation(pxr::UsdStageRefPtr stage, ImportSettings &r_settings)
@@ -373,34 +269,6 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
 
   /* Setup parenthood */
 
-  /* Handle instance prototypes.
-  /* TODO(makowalski): Move this logic inside USDReaderStage? */
-  for (const auto &pair : archive->proto_readers()) {
-
-    for (USDPrimReader *reader : pair.second) {
-
-      if (!reader) {
-        continue;
-      }
-
-      /* TODO(makowalski): Here and below, should we call
-       * read_object_data() with the actual time? */
-      reader->read_object_data(data->bmain, 0.0);
-
-      Object *ob = reader->object();
-
-      if (!ob) {
-        continue;
-      }
-
-      const USDPrimReader *parent_reader = reader->parent();
-
-      ob->parent = parent_reader ? parent_reader->object() : nullptr;
-
-      // TODO(makowalski): Handle progress update.
-    }
-  }
-
   for (USDPrimReader *reader : archive->readers()) {
 
     if (!reader) {
@@ -454,17 +322,6 @@ static void import_endjob(void *customdata)
         BKE_id_free_us(data->bmain, ob);
       }
     }
-
-    for (const auto &pair : data->archive->proto_readers()) {
-      for (USDPrimReader *reader : pair.second) {
-
-        /* It's possible that cancellation occurred between the creation of
-         * the reader and the creation of the Blender object. */
-        if (Object *ob = reader->object()) {
-          BKE_id_free_us(data->bmain, ob);
-        }
-      }
-    }
   }
   else if (data->archive) {
     /* Add object to scene. */
@@ -475,14 +332,6 @@ static void import_endjob(void *customdata)
     BKE_view_layer_base_deselect_all(view_layer);
 
     lc = BKE_layer_collection_get_active(view_layer);
-
-    if (!data->archive->proto_readers().empty()) {
-      create_proto_collections(data->bmain,
-                               view_layer,
-                               lc->collection,
-                               data->archive->proto_readers(),
-                               data->archive->readers());
-    }
 
     for (USDPrimReader *reader : data->archive->readers()) {
 

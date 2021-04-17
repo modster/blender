@@ -310,8 +310,6 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   const bool import_proxy = RNA_boolean_get(op->ptr, "import_proxy");
   const bool import_render = RNA_boolean_get(op->ptr, "import_render");
 
-  const bool use_instancing = RNA_boolean_get(op->ptr, "use_instancing");
-
   const bool import_usd_preview = RNA_boolean_get(op->ptr, "import_usd_preview");
   const bool set_material_blend = RNA_boolean_get(op->ptr, "set_material_blend");
 
@@ -331,6 +329,7 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   }
 
   const bool validate_meshes = false;
+  const bool use_instancing = false;
 
   struct USDImportParams params = {scale,
                                    is_sequence,
@@ -438,7 +437,6 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
   box = uiLayoutBox(layout);
   uiItemL(box, IFACE_("Experimental"), ICON_NONE);
-  uiItemR(box, ptr, "use_instancing", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "import_usd_preview", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "set_material_blend", 0, NULL, ICON_NONE);
 }
@@ -513,8 +511,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   true,
                   "Import Instance Proxies",
                   "If enabled, USD instances will be traversed with instance proxies, "
-                  "creating a unique Blender object for each instance. Note that "
-                  "this option is ignored if the Instancing option is also checked");
+                  "creating a unique Blender object for each instance");
 
   RNA_def_boolean(ot->srna,
                   "import_visible_only",
@@ -554,14 +551,6 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
 
   RNA_def_boolean(
       ot->srna, "import_render", true, "Render", "When checked, import final render geometry");
-
-  RNA_def_boolean(
-      ot->srna,
-      "use_instancing",
-      false,
-      "Instancing",
-      "When checked, USD scenegraph instances are imported as collection instances in Blender. "
-      "Note that point instancers are not yet handled by this option");
 
   RNA_def_boolean(
       ot->srna,
