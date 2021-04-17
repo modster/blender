@@ -135,6 +135,8 @@ class GeometryComponent {
                             const AttributeDomain domain,
                             const CustomDataType data_type);
 
+  /* Try to create the builtin attribute with the given name. No data type or domain has to be
+   * provided, because those are fixed for builtin attributes. */
   bool attribute_try_create_builtin(const blender::StringRef attribute_name);
 
   blender::Set<std::string> attribute_names() const;
@@ -142,28 +144,30 @@ class GeometryComponent {
 
   virtual bool is_empty() const;
 
-  /* Get a read-only attribute for the given domain and data type.
-   * Returns null when it does not exist. */
+  /* Get a virtual array to read the data of an attribute on the given domain and data type.
+   * Returns null when the attribute does not exist or cannot be converted to the requested domain
+   * and data type. */
   std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
       const blender::StringRef attribute_name,
       const AttributeDomain domain,
       const CustomDataType data_type) const;
 
-  /* Get a read-only attribute interpolated to the input domain, leaving the data type unchanged.
-   * Returns null when the attribute does not exist. */
+  /* Get a virtual array to read the data of an attribute on the given domain. The data type is
+   * left unchanged. Returns null when the attribute does not exist or cannot be adapted to the
+   * requested domain. */
   std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
       const blender::StringRef attribute_name, const AttributeDomain domain) const;
 
-  /* Get a read-only attribute for the given domain and data type.
-   * Returns a constant attribute based on the default value if the attribute does not exist.
-   * Never returns null. */
+  /* Get a virtual array to read the data of an attribute. If that is not possible, the returned
+   * virtual array will contain a default value. This never returns null. */
   std::unique_ptr<blender::fn::GVArray> attribute_get_for_read(
       const blender::StringRef attribute_name,
       const AttributeDomain domain,
       const CustomDataType data_type,
       const void *default_value = nullptr) const;
 
-  /* Get a typed read-only attribute for the given domain and type. */
+  /* Should be used instead of the method above when the requested data type is known at compile
+   * time for better type safety. */
   template<typename T>
   blender::fn::GVArray_Typed<T> attribute_get_for_read(const blender::StringRef attribute_name,
                                                        const AttributeDomain domain,
@@ -177,14 +181,14 @@ class GeometryComponent {
   }
 
   /**
-   * If an attribute with the given params exist, it is returned.
-   * If no attribute with the given name exists, create it and
-   * fill it with the default value if it is provided.
-   * If an attribute with the given name but different domain or type exists, a temporary attribute
-   * is created that has to be saved after the output has been computed. This avoids deleting
-   * another attribute, before a computation is finished.
+   * Returns an "output attribute", which is essentially a mutable virtual array with some commonly
+   * used convience features. The returned output attribute might be empty if requested attribute
+   * cannot exist on the geometry.
    *
-   * This might return no attribute when the attribute cannot exist on the component.
+   * The included convenience features are:
+   * - Implicit type conversion when writing to builtin attributes.
+   * - If the attribute name exists already, but has a different type/domain, a temporary attribute
+   *   is created that will overwrite the existing attribute in the end.
    */
   blender::bke::OutputAttribute attribute_try_get_for_output(
       const blender::StringRef attribute_name,
@@ -192,11 +196,15 @@ class GeometryComponent {
       const CustomDataType data_type,
       const void *default_value = nullptr);
 
+  /* Same as attribute_try_get_for_output, but should be used when the original values in the
+   * attributes are not read, i.e. the attribute is used only for output. Since values are not read
+   * from this attribute, no default value is necessary. */
   blender::bke::OutputAttribute attribute_try_get_for_output_only(
       const blender::StringRef attribute_name,
       const AttributeDomain domain,
       const CustomDataType data_type);
 
+  /* Statically typed method corresponding to the equally named generic one. */
   template<typename T>
   blender::bke::OutputAttribute_Typed<T> attribute_try_get_for_output(
       const blender::StringRef attribute_name, const AttributeDomain domain, const T default_value)
@@ -206,6 +214,7 @@ class GeometryComponent {
     return this->attribute_try_get_for_output(attribute_name, domain, data_type, &default_value);
   }
 
+  /* Statically typed method corresponding to the equally named generic one. */
   template<typename T>
   blender::bke::OutputAttribute_Typed<T> attribute_try_get_for_output_only(
       const blender::StringRef attribute_name, const AttributeDomain domain)

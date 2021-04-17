@@ -663,6 +663,9 @@ bool GeometryComponent::attribute_try_create_builtin(const blender::StringRef at
   }
   const BuiltinAttributeProvider *builtin_provider =
       providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
+  if (builtin_provider == nullptr) {
+    return false;
+  }
   return builtin_provider->try_create(*this);
 }
 
