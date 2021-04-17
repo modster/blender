@@ -531,7 +531,7 @@ void DRW_shgroup_uniform_block(DRWShadingGroup *shgroup,
                                const struct GPUUniformBuf *ubo);
 void DRW_shgroup_uniform_block_ref(DRWShadingGroup *shgroup,
                                    const char *name,
-                                   struct GPUUniformBuf **ubo);
+                                   const struct GPUUniformBuf **ubo);
 void DRW_shgroup_uniform_float(DRWShadingGroup *shgroup,
                                const char *name,
                                const float *value,

@@ -291,7 +291,9 @@ void DRW_shgroup_uniform_block(DRWShadingGroup *shgroup,
   drw_shgroup_uniform_create_ex(shgroup, loc, DRW_UNIFORM_BLOCK, ubo, 0, 0, 1);
 }
 
-void DRW_shgroup_uniform_block_ref(DRWShadingGroup *shgroup, const char *name, GPUUniformBuf **ubo)
+void DRW_shgroup_uniform_block_ref(DRWShadingGroup *shgroup,
+                                   const char *name,
+                                   const GPUUniformBuf **ubo)
 {
   BLI_assert(ubo != NULL);
   int loc = GPU_shader_get_uniform_block_binding(shgroup->shader, name);
