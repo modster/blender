@@ -186,8 +186,8 @@ static std::unique_ptr<OBJWriter> init_writer(const OBJExportParams &params,
   }
 }
 
-const char *const temp_file_path =
-    "/Users/ankitkumar/blender-build/build_darwin_lite/Testing/output.OBJ";
+/* The following is relative to the flags_test_release_dir(). */
+const char *const temp_file_path = "Testing/output.OBJ";
 
 static std::string read_temp_file_in_string(const std::string &file_path)
 {
@@ -201,6 +201,7 @@ TEST(obj_exporter_writer, header)
 {
   {
     OBJExportParamsDefault _export;
+    std::string out_file_path = blender::tests::flags_test_release_dir() + "/" + temp_file_path;
     std::unique_ptr<OBJWriter> writer = init_writer(_export.params, temp_file_path);
     if (!writer) {
       ADD_FAILURE();
