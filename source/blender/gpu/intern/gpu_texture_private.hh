@@ -341,12 +341,23 @@ inline eGPUTextureFormatFlag to_format_flag(eGPUTextureFormat format)
     case GPU_DEPTH24_STENCIL8:
     case GPU_DEPTH32F_STENCIL8:
       return GPU_FORMAT_DEPTH_STENCIL;
+    case GPU_R8I:
     case GPU_R8UI:
-    case GPU_RG16I:
     case GPU_R16I:
-    case GPU_RG16UI:
     case GPU_R16UI:
     case GPU_R32UI:
+    case GPU_RG8I:
+    case GPU_RG8UI:
+    case GPU_RG16I:
+    case GPU_RG16UI:
+    case GPU_RG32I:
+    case GPU_RG32UI:
+    case GPU_RGBA8I:
+    case GPU_RGBA8UI:
+    case GPU_RGBA16I:
+    case GPU_RGBA16UI:
+    case GPU_RGBA32I:
+    case GPU_RGBA32UI:
       return GPU_FORMAT_INTEGER;
     case GPU_SRGB8_A8_DXT1:
     case GPU_SRGB8_A8_DXT3:
@@ -425,6 +436,8 @@ inline bool validate_data_format(eGPUTextureFormat tex_format, eGPUDataFormat da
     case GPU_R16UI:
     case GPU_RG16UI:
     case GPU_R32UI:
+    case GPU_RG32UI:
+    case GPU_RGBA32UI:
       return data_format == GPU_DATA_UINT;
     case GPU_RG16I:
     case GPU_R16I:
@@ -459,6 +472,8 @@ inline eGPUDataFormat to_data_format(eGPUTextureFormat tex_format)
     case GPU_R16UI:
     case GPU_RG16UI:
     case GPU_R32UI:
+    case GPU_RG32UI:
+    case GPU_RGBA32UI:
       return GPU_DATA_UINT;
     case GPU_RG16I:
     case GPU_R16I:
