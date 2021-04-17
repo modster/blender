@@ -37,6 +37,8 @@
 #include "BLI_string.h"
 
 #include <pxr/base/gf/vec3f.h>
+#include <pxr/usd/usdShade/material.h>
+#include <pxr/usd/usdShade/shader.h>
 
 #include <iostream>
 #include <vector>
@@ -79,6 +81,7 @@ static const pxr::TfToken UsdPrimvarReader_float2("UsdPrimvarReader_float2",
 static const pxr::TfToken UsdUVTexture("UsdUVTexture", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
+/* Add a node of the given type at the given location coordinates. */
 static bNode *add_node(
     const bContext *C, bNodeTree *ntree, const int type, const float locx, const float locy)
 {
@@ -92,6 +95,7 @@ static bNode *add_node(
   return new_node;
 }
 
+/* Connect the output socket of node 'source' to the input socket of node 'dest'. */
 static void link_nodes(
     bNodeTree *ntree, bNode *source, const char *sock_out, bNode *dest, const char *sock_in)
 {
@@ -235,11 +239,7 @@ namespace {
 // Compute the x- and y-coordinates for placing a new node in an unoccupied region of
 // the column with the given index.  Returns the coordinates in r_locx and r_locy and
 // updates the column-occupancy information in r_ctx.
-void compute_node_loc(const int column,
-                      const float node_height,
-                      float &r_locx,
-                      float &r_locy,
-                      NodePlacementContext &r_ctx)
+void compute_node_loc(const int column, float &r_locx, float &r_locy, NodePlacementContext &r_ctx)
 {
   r_locx = r_ctx.origx - column * r_ctx.horizontal_step;
 
@@ -251,7 +251,7 @@ void compute_node_loc(const int column,
 
   // Record the y-offset of the occupied region in
   // the column, including padding.
-  r_ctx.column_offsets[column] += node_height + 10.0f;
+  r_ctx.column_offsets[column] += r_ctx.vertical_step + 10.0f;
 }
 
 }  // namespace
@@ -296,13 +296,15 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
     return;
   }
 
-  /* Create the Material's node tree containing the principled
-   * and output shader. */
+  /* Create the Material's node tree containing the principled BSDF
+   * and output shaders. */
 
+  /* Add the node tree. */
   bNodeTree *ntree = ntreeAddTree(NULL, "Shader Nodetree", "ShaderNodeTree");
   mtl->nodetree = ntree;
   mtl->use_nodes = true;
 
+  /* Create the Principled BSDF shader node. */
   bNode *principled = add_node(NULL, ntree, SH_NODE_BSDF_PRINCIPLED, 0.0f, 300.0f);
 
   if (!principled) {
@@ -311,6 +313,7 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
     return;
   }
 
+  /* Create the material output node. */
   bNode *output = add_node(NULL, ntree, SH_NODE_OUTPUT_MATERIAL, 300.0f, 300.0f);
 
   if (!output) {
@@ -319,17 +322,43 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
     return;
   }
 
+  /* Connect the Principled BSDF node to the output node. */
   link_nodes(ntree, principled, "BSDF", output, "Surface");
 
-  /* Set up the principled shader inputs. */
+  /* Recursively create the principled shader input networks. */
+  set_principled_node_inputs(principled, ntree, usd_shader);
 
-  /* The following keep track of the locations for adding
+  nodeSetActive(ntree, output);
+
+  /* Optionally, set the material blend mode. */
+
+  if (params_.set_material_blend) {
+    float opacity_threshold = 0.0f;
+    if (needs_blend(usd_shader, opacity_threshold)) {
+      if (opacity_threshold > 0.0f) {
+        mtl->blend_method = MA_BM_CLIP;
+        mtl->alpha_threshold = opacity_threshold;
+      }
+      else {
+        mtl->blend_method = MA_BM_BLEND;
+      }
+    }
+  }
+}
+
+void USDMaterialReader::set_principled_node_inputs(bNode *principled,
+                                                   bNodeTree *ntree,
+                                                   const pxr::UsdShadeShader &usd_shader) const
+{
+  /* The context struct keeps track of the locations for adding
    * input nodes. */
-
   NodePlacementContext context(0.0f, 300.0);
+
+  /* The column index (from right to left relative to the principled
+   * node) where we're adding the nodes. */
   int column = 0;
 
-  /* Set the principled shader inputs. */
+  /* Recursively set the principled shader inputs. */
 
   if (pxr::UsdShadeInput diffuse_input = usd_shader.GetInput(usdtokens::diffuseColor)) {
     set_node_input(diffuse_input, principled, "Base Color", ntree, column, context);
@@ -373,26 +402,9 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
   if (pxr::UsdShadeInput normal_input = usd_shader.GetInput(usdtokens::normal)) {
     set_node_input(normal_input, principled, "Normal", ntree, column, context);
   }
-
-  nodeSetActive(ntree, output);
-
-  // Optionally, set the material blend mode.
-
-  if (params_.set_material_blend) {
-    float opacity_threshold = 0.0f;
-    if (needs_blend(usd_shader, opacity_threshold)) {
-      if (opacity_threshold > 0.0f) {
-        mtl->blend_method = MA_BM_CLIP;
-        mtl->alpha_threshold = opacity_threshold;
-      }
-      else {
-        mtl->blend_method = MA_BM_BLEND;
-      }
-    }
-  }
 }
 
-/* Convert the given USD shader input to an input on the given node. */
+/* Convert the given USD shader input to an input on the given Blender node. */
 void USDMaterialReader::set_node_input(const pxr::UsdShadeInput &usd_input,
                                        bNode *dest_node,
                                        const char *dest_socket_name,
@@ -405,62 +417,13 @@ void USDMaterialReader::set_node_input(const pxr::UsdShadeInput &usd_input,
   }
 
   if (usd_input.HasConnectedSource()) {
-    pxr::UsdShadeConnectableAPI source;
-    pxr::TfToken source_name;
-    pxr::UsdShadeAttributeType source_type;
-
-    usd_input.GetConnectedSource(&source, &source_name, &source_type);
-
-    if (!(source && source.GetPrim().IsA<pxr::UsdShadeShader>())) {
-      return;
-    }
-
-    pxr::UsdShadeShader source_shader(source.GetPrim());
-
-    if (!source_shader) {
-      return;
-    }
-
-    pxr::TfToken shader_id;
-    if (!source_shader.GetShaderId(&shader_id)) {
-      std::cerr << "ERROR: couldn't get shader id for source shader "
-                << source_shader.GetPrim().GetPath() << std::endl;
-      return;
-    }
-
-    /* For now, only convert UsdUVTexture and UsdPrimvarReader_float2 inputs. */
-    if (shader_id == usdtokens::UsdUVTexture) {
-
-      if (strcmp(dest_socket_name, "Normal") == 0) {
-
-        // The normal texture input requires creating a normal map node.
-        float locx = 0.0f;
-        float locy = 0.0f;
-        compute_node_loc(column + 1, 300.0, locx, locy, r_ctx);
-
-        bNode *normal_map = add_node(NULL, ntree, SH_NODE_NORMAL_MAP, locx, locy);
-
-        // Currently, the Normal Map node has Tangent Space as the default,
-        // which is what we need, so we don't need to explicitly set it.
-
-        // Connect the Normal Map to the Normal input.
-        link_nodes(ntree, normal_map, "Normal", dest_node, "Normal");
-
-        // Now, create the Texture Image node input to the Normal Map "Color" input.
-        convert_usd_uv_texture(
-            source_shader, source_name, normal_map, "Color", ntree, column + 2, r_ctx);
-      }
-      else {
-        convert_usd_uv_texture(
-            source_shader, source_name, dest_node, dest_socket_name, ntree, column + 1, r_ctx);
-      }
-    }
-    else if (shader_id == usdtokens::UsdPrimvarReader_float2) {
-      convert_usd_primvar_reader_float2(
-          source_shader, source_name, dest_node, dest_socket_name, ntree, column + 1, r_ctx);
-    }
+    /* The USD shader input has a connected source shader. Follow the connection
+     * and attempt to convert the connected USD shader to a Blender node. */
+    follow_connection(usd_input, dest_node, dest_socket_name, ntree, column, r_ctx);
   }
   else {
+    /* Set the destination node socket value from the USD shader input value. */
+
     bNodeSocket *sock = nodeFindSocket(dest_node, SOCK_IN, dest_socket_name);
     if (!sock) {
       std::cerr << "ERROR: couldn't get destination node socket " << dest_socket_name << std::endl;
@@ -509,6 +472,75 @@ void USDMaterialReader::set_node_input(const pxr::UsdShadeInput &usd_input,
   }
 }
 
+/* Follow the connected source of the USD input to create corresponding inputs
+ * for the given Blender node. */
+void USDMaterialReader::follow_connection(const pxr::UsdShadeInput &usd_input,
+                                          bNode *dest_node,
+                                          const char *dest_socket_name,
+                                          bNodeTree *ntree,
+                                          int column,
+                                          NodePlacementContext &r_ctx) const
+{
+  if (!(usd_input && dest_node && dest_socket_name && ntree)) {
+    return;
+  }
+
+  pxr::UsdShadeConnectableAPI source;
+  pxr::TfToken source_name;
+  pxr::UsdShadeAttributeType source_type;
+
+  usd_input.GetConnectedSource(&source, &source_name, &source_type);
+
+  if (!(source && source.GetPrim().IsA<pxr::UsdShadeShader>())) {
+    return;
+  }
+
+  pxr::UsdShadeShader source_shader(source.GetPrim());
+
+  if (!source_shader) {
+    return;
+  }
+
+  pxr::TfToken shader_id;
+  if (!source_shader.GetShaderId(&shader_id)) {
+    std::cerr << "ERROR: couldn't get shader id for source shader "
+              << source_shader.GetPrim().GetPath() << std::endl;
+    return;
+  }
+
+  /* For now, only convert UsdUVTexture and UsdPrimvarReader_float2 inputs. */
+  if (shader_id == usdtokens::UsdUVTexture) {
+
+    if (strcmp(dest_socket_name, "Normal") == 0) {
+
+      // The normal texture input requires creating a normal map node.
+      float locx = 0.0f;
+      float locy = 0.0f;
+      compute_node_loc(column + 1, locx, locy, r_ctx);
+
+      bNode *normal_map = add_node(NULL, ntree, SH_NODE_NORMAL_MAP, locx, locy);
+
+      // Currently, the Normal Map node has Tangent Space as the default,
+      // which is what we need, so we don't need to explicitly set it.
+
+      // Connect the Normal Map to the Normal input.
+      link_nodes(ntree, normal_map, "Normal", dest_node, "Normal");
+
+      // Now, create the Texture Image node input to the Normal Map "Color" input.
+      convert_usd_uv_texture(
+          source_shader, source_name, normal_map, "Color", ntree, column + 2, r_ctx);
+    }
+    else {
+      convert_usd_uv_texture(
+          source_shader, source_name, dest_node, dest_socket_name, ntree, column + 1, r_ctx);
+    }
+  }
+  else if (shader_id == usdtokens::UsdPrimvarReader_float2) {
+    convert_usd_primvar_reader_float2(
+        source_shader, source_name, dest_node, dest_socket_name, ntree, column + 1, r_ctx);
+  }
+}
+
 void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_shader,
                                                const pxr::TfToken &usd_source_name,
                                                bNode *dest_node,
@@ -523,7 +555,7 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
 
   float locx = 0.0f;
   float locy = 0.0f;
-  compute_node_loc(column, 300.0, locx, locy, r_ctx);
+  compute_node_loc(column, locx, locy, r_ctx);
 
   // Create the Texture Image node.
   bNode *tex_image = add_node(NULL, ntree, SH_NODE_TEX_IMAGE, locx, locy);
@@ -534,46 +566,8 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
     return;
   }
 
-  // Try to load the texture image.
-  pxr::UsdShadeInput file_input = usd_shader.GetInput(usdtokens::file);
-  if (file_input) {
-
-    pxr::VtValue file_val;
-    if (file_input.Get(&file_val) && file_val.IsHolding<pxr::SdfAssetPath>()) {
-      const pxr::SdfAssetPath &asset_path = file_val.Get<pxr::SdfAssetPath>();
-      std::string file_path = asset_path.GetResolvedPath();
-      if (!file_path.empty()) {
-        const char *im_file = file_path.c_str();
-        Image *image = BKE_image_load_exists(bmain_, im_file);
-        if (image) {
-          tex_image->id = &image->id;
-
-          // Set texture color space.
-          // TODO(makowalski): For now, just checking for RAW color space,
-          // assuming sRGB otherwise, but more complex logic might be
-          // required if the color space is "auto".
-
-          pxr::TfToken color_space = get_source_color_space(usd_shader);
-
-          if (color_space.IsEmpty()) {
-            color_space = file_input.GetAttr().GetColorSpace();
-          }
-
-          if (color_space == usdtokens::RAW || color_space == usdtokens::raw) {
-            STRNCPY(image->colorspace_settings.name, "Raw");
-          }
-        }
-        else {
-          std::cerr << "WARNING: Couldn't open image file '" << im_file
-                    << "' for Texture Image node." << std::endl;
-        }
-      }
-      else {
-        std::cerr << "WARNING: Couldn't resolve image asset '" << asset_path
-                  << "' for Texture Image node." << std::endl;
-      }
-    }
-  }
+  // Load the texture image.
+  load_tex_image(usd_shader, tex_image);
 
   // Connect to destination node input.
 
@@ -585,6 +579,65 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
   // Connect the texture image node "Vector" input.
   if (pxr::UsdShadeInput st_input = usd_shader.GetInput(usdtokens::st)) {
     set_node_input(st_input, tex_image, "Vector", ntree, column, r_ctx);
+  }
+}
+
+/* Load the texture image node's texture from the path given by the USD shader's
+ * file input value. */
+void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
+                                       bNode *tex_image) const
+{
+  if (!(usd_shader && tex_image && tex_image->type == SH_NODE_TEX_IMAGE)) {
+    return;
+  }
+
+  // Try to load the texture image.
+  pxr::UsdShadeInput file_input = usd_shader.GetInput(usdtokens::file);
+
+  if (!file_input) {
+    std::cerr << "WARNING: Couldn't get file input for USD shader " << usd_shader.GetPath()
+              << std::endl;
+    return;
+  }
+
+  pxr::VtValue file_val;
+  if (!file_input.Get(&file_val) || !file_val.IsHolding<pxr::SdfAssetPath>()) {
+    std::cerr << "WARNING: Couldn't get file input value for USD shader " << usd_shader.GetPath()
+              << std::endl;
+    return;
+  }
+
+  const pxr::SdfAssetPath &asset_path = file_val.Get<pxr::SdfAssetPath>();
+  std::string file_path = asset_path.GetResolvedPath();
+  if (file_path.empty()) {
+    std::cerr << "WARNING: Couldn't resolve image asset '" << asset_path
+              << "' for Texture Image node." << std::endl;
+    return;
+  }
+
+  const char *im_file = file_path.c_str();
+  Image *image = BKE_image_load_exists(bmain_, im_file);
+  if (!image) {
+    std::cerr << "WARNING: Couldn't open image file '" << im_file << "' for Texture Image node."
+              << std::endl;
+    return;
+  }
+
+  tex_image->id = &image->id;
+
+  // Set texture color space.
+  // TODO(makowalski): For now, just checking for RAW color space,
+  // assuming sRGB otherwise, but more complex logic might be
+  // required if the color space is "auto".
+
+  pxr::TfToken color_space = get_source_color_space(usd_shader);
+
+  if (color_space.IsEmpty()) {
+    color_space = file_input.GetAttr().GetColorSpace();
+  }
+
+  if (color_space == usdtokens::RAW || color_space == usdtokens::raw) {
+    STRNCPY(image->colorspace_settings.name, "Raw");
   }
 }
 
@@ -606,7 +659,7 @@ void USDMaterialReader::convert_usd_primvar_reader_float2(const pxr::UsdShadeSha
 
   float locx = 0.0f;
   float locy = 0.0f;
-  compute_node_loc(column, 300.0f, locx, locy, r_ctx);
+  compute_node_loc(column, locx, locy, r_ctx);
 
   // Create the UV Map node.
   bNode *uv_map = add_node(NULL, ntree, SH_NODE_UVMAP, locx, locy);
