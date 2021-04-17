@@ -287,7 +287,6 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   const float scale = RNA_float_get(op->ptr, "scale");
 
   const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
-  const bool validate_meshes = RNA_boolean_get(op->ptr, "validate_meshes");
   const char global_read_flag = RNA_enum_get(op->ptr, "global_read_flag");
   const bool import_cameras = RNA_boolean_get(op->ptr, "import_cameras");
   const bool import_curves = RNA_boolean_get(op->ptr, "import_curves");
@@ -330,6 +329,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   if (obedit) {
     ED_object_mode_set(C, OB_MODE_EDIT);
   }
+
+  const bool validate_meshes = false;
 
   struct USDImportParams params = {scale,
                                    is_sequence,
