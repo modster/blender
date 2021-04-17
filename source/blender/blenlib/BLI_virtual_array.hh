@@ -117,11 +117,14 @@ template<typename T> class VArray {
     return this->get_internal_single_impl();
   }
 
+  /* Get the element at a specific index. Note that this operator cannot be used to assign values
+   * to an index, because the return value is not a reference. */
   T operator[](const int64_t index) const
   {
     return this->get(index);
   }
 
+  /* Copy the entire virtual array into a span. */
   void materialize(MutableSpan<T> r_span) const
   {
     BLI_assert(size_ == r_span.size());
@@ -199,6 +202,7 @@ template<typename T> class VArray {
   }
 };
 
+/* Similar to VArray, but the elements are mutable. */
 template<typename T> class VMutableArray : public VArray<T> {
  public:
   VMutableArray(const int64_t size) : VArray<T>(size)
@@ -212,6 +216,7 @@ template<typename T> class VMutableArray : public VArray<T> {
     this->set_impl(index, std::move(value));
   }
 
+  /* Copy the values from the source span to all elements in the virtual array. */
   void set_all(Span<T> src)
   {
     BLI_assert(src.size() == this->size_);
@@ -405,6 +410,13 @@ template<typename T> class VArray_Span final : public Span<T> {
   }
 };
 
+/**
+ * Same as VArray_Span, but for a mutable span.
+ * The important thing to note is that when changing this span, the results might not be
+ * immediately reflected in the underlying virtual array (only when the virtual array is a span
+ * internally). The #save method can be used to write all changes to the underlying virtual array,
+ * if necessary.
+ */
 template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
  private:
   VMutableArray<T> &varray_;
@@ -413,7 +425,9 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
   bool show_not_saved_warning_ = true;
 
  public:
-  VMutableArray_Span(VMutableArray<T> &varray, const bool materialize = true)
+  /* Create a span for any virtual array. This is cheap when the virtual array is a span itself. If
+   * not, a new array has to be allocated as a wrapper for the underlying virtual array. */
+  VMutableArray_Span(VMutableArray<T> &varray, const bool copy_values_to_span = true)
       : MutableSpan<T>(), varray_(varray)
   {
     this->size_ = varray_.size();
@@ -421,7 +435,7 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
       this->data_ = varray_.get_internal_span().data();
     }
     else {
-      if (materialize) {
+      if (copy_values_to_span) {
         owned_data_.~Array();
         new (&owned_data_) Array<T>(varray_.size(), NoInitialization{});
         varray_.materialize_to_uninitialized(owned_data_);
@@ -442,6 +456,7 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
     }
   }
 
+  /* Write back all values from a temporary allocated array to the underlying virtual array. */
   void save()
   {
     save_has_been_called_ = true;

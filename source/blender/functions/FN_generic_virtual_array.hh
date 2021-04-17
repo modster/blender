@@ -134,6 +134,7 @@ class GVArray {
     return (const VArray<T> *)this->try_get_internal_varray_impl();
   }
 
+  /* Create a typed virtual array for this generic virtual array. */
   template<typename T> GVArray_Typed<T> typed() const
   {
     return GVArray_Typed<T>(*this);
@@ -152,6 +153,7 @@ class GVArray {
   virtual const void *try_get_internal_varray_impl() const;
 };
 
+/* Similar to GVArray, but supports changing the elements in the virtual array. */
 class GVMutableArray : public GVArray {
  public:
   GVMutableArray(const CPPType &type, const int64_t size) : GVArray(type, size)
@@ -192,6 +194,7 @@ class GVMutableArray : public GVArray {
     return (VMutableArray<T> *)this->try_get_internal_mutable_varray_impl();
   }
 
+  /* Create a typed virtual array for this generic virtual array. */
   template<typename T> GVMutableArray_Typed<T> typed()
   {
     return GVMutableArray_Typed<T>(*this);
@@ -274,6 +277,7 @@ class GVMutableArray_For_GMutableSpan : public GVMutableArray {
   GSpan get_internal_span_impl() const override;
 };
 
+/* Generic virtual array where each element has the same value. The value is not owned. */
 class GVArray_For_SingleValueRef : public GVArray {
  protected:
   const void *value_ = nullptr;
@@ -299,12 +303,14 @@ class GVArray_For_SingleValueRef : public GVArray {
   void get_internal_single_impl(void *r_value) const override;
 };
 
+/* Same as GVArray_For_SingleValueRef, but the value is owned. */
 class GVArray_For_SingleValue : public GVArray_For_SingleValueRef {
  public:
   GVArray_For_SingleValue(const CPPType &type, const int64_t size, const void *value);
   ~GVArray_For_SingleValue();
 };
 
+/* Used to convert a typed virtual array into a generic one. */
 template<typename T> class GVArray_For_VArray : public GVArray {
  protected:
   const VArray<T> *varray_ = nullptr;
@@ -356,6 +362,7 @@ template<typename T> class GVArray_For_VArray : public GVArray {
   }
 };
 
+/* Used to convert any generic virtual array into a typed one. */
 template<typename T> class VArray_For_GVArray : public VArray<T> {
  protected:
   const GVArray *varray_ = nullptr;
@@ -401,6 +408,7 @@ template<typename T> class VArray_For_GVArray : public VArray<T> {
   }
 };
 
+/* Used to convert an generic mutable virtual array into a typed one. */
 template<typename T> class VMutableArray_For_GVMutableArray : public VMutableArray<T> {
  protected:
   GVMutableArray *varray_ = nullptr;
@@ -452,6 +460,7 @@ template<typename T> class VMutableArray_For_GVMutableArray : public VMutableArr
   }
 };
 
+/* Used to convert any typed virtual mutable array into a generic one. */
 template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableArray {
  protected:
   VMutableArray<T> *varray_ = nullptr;
@@ -528,6 +537,7 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
   }
 };
 
+/* A generic version of VArray_Span. */
 class GVArray_GSpan : public GSpan {
  private:
   const GVArray &varray_;
@@ -538,6 +548,7 @@ class GVArray_GSpan : public GSpan {
   ~GVArray_GSpan();
 };
 
+/* A generic version of VMutableArray_Span. */
 class GVMutableArray_GSpan : public GMutableSpan {
  private:
   GVMutableArray &varray_;
@@ -546,13 +557,14 @@ class GVMutableArray_GSpan : public GMutableSpan {
   bool show_not_saved_warning_ = true;
 
  public:
-  GVMutableArray_GSpan(GVMutableArray &varray, bool materialize = true);
+  GVMutableArray_GSpan(GVMutableArray &varray, bool copy_values_to_span = true);
   ~GVMutableArray_GSpan();
 
   void save();
   void disable_not_applied_warning();
 };
 
+/* Similar to GVArray_GSpan, but the resulting span is typed. */
 template<typename T> class GVArray_Span : public Span<T> {
  private:
   GVArray_GSpan varray_gspan_;
@@ -571,6 +583,7 @@ template<typename T> class GVArray_For_OwnedVArray : public GVArray_For_VArray<T
   std::unique_ptr<VArray<T>> owned_varray_;
 
  public:
+  /* Takes ownership of varray and passes a reference to the base class. */
   GVArray_For_OwnedVArray(std::unique_ptr<VArray<T>> varray)
       : GVArray_For_VArray<T>(*varray), owned_varray_(std::move(varray))
   {
@@ -582,6 +595,7 @@ template<typename T> class VArray_For_OwnedGVArray : public VArray_For_GVArray<T
   std::unique_ptr<VArray<T>> owned_varray_;
 
  public:
+  /* Takes ownership of varray and passes a reference to the base class. */
   VArray_For_OwnedGVArray(std::unique_ptr<GVArray> varray)
       : VArray_For_GVArray<T>(*varray), owned_varray_(std::move(varray))
   {
@@ -594,6 +608,7 @@ class GVMutableArray_For_OwnedVMutableArray : public GVMutableArray_For_VMutable
   std::unique_ptr<VMutableArray<T>> owned_varray_;
 
  public:
+  /* Takes ownership of varray and passes a reference to the base class. */
   GVMutableArray_For_OwnedVMutableArray(std::unique_ptr<VMutableArray<T>> varray)
       : GVMutableArray_For_VMutableArray<T>(*varray), owned_varray_(std::move(varray))
   {
@@ -606,12 +621,15 @@ class VMutableArray_For_OwnedGVMutableArray : public VMutableArray_For_GVMutable
   std::unique_ptr<GVMutableArray> owned_varray_;
 
  public:
+  /* Takes ownership of varray and passes a reference to the base class. */
   VMutableArray_For_OwnedGVMutableArray(std::unique_ptr<GVMutableArray> varray)
       : VMutableArray_For_GVMutableArray<T>(*varray), owned_varray_(std::move(varray))
   {
   }
 };
 
+/* Utility to embed a typed virtual array into a generic one. This avoids one allocation and give
+ * the compiler more opportunity to optimize the generic virtual array. */
 template<typename T, typename VArrayT>
 class GVArray_For_EmbeddedVArray : public GVArray_For_VArray<T> {
  private:
@@ -626,6 +644,7 @@ class GVArray_For_EmbeddedVArray : public GVArray_For_VArray<T> {
   }
 };
 
+/* Same as GVArray_For_EmbeddedVArray, but for mutable virtual arrays. */
 template<typename T, typename VMutableArrayT>
 class GVMutableArray_For_EmbeddedVMutableArray : public GVMutableArray_For_VMutableArray<T> {
  private:
@@ -640,6 +659,7 @@ class GVMutableArray_For_EmbeddedVMutableArray : public GVMutableArray_For_VMuta
   }
 };
 
+/* Same as VArray_For_ArrayContainer, but for a generic virtual array. */
 template<typename Container, typename T = typename Container::value_type>
 class GVArray_For_ArrayContainer
     : public GVArray_For_EmbeddedVArray<T, VArray_For_ArrayContainer<Container, T>> {
@@ -651,6 +671,7 @@ class GVArray_For_ArrayContainer
   }
 };
 
+/* Same as VArray_For_DerivedSpan, but for a generic virtual array. */
 template<typename StructT, typename ElemT, ElemT (*GetFunc)(const StructT &)>
 class GVArray_For_DerivedSpan
     : public GVArray_For_EmbeddedVArray<ElemT, VArray_For_DerivedSpan<StructT, ElemT, GetFunc>> {
@@ -662,6 +683,7 @@ class GVArray_For_DerivedSpan
   }
 };
 
+/* Same as VMutableArray_For_DerivedSpan, but for a generic virtual array. */
 template<typename StructT,
          typename ElemT,
          ElemT (*GetFunc)(const StructT &),
@@ -679,6 +701,7 @@ class GVMutableArray_For_DerivedSpan
   }
 };
 
+/* Same as VArray_For_Span, but for a generic virtual array. */
 template<typename T>
 class GVArray_For_Span : public GVArray_For_EmbeddedVArray<T, VArray_For_Span<T>> {
  public:
@@ -688,6 +711,7 @@ class GVArray_For_Span : public GVArray_For_EmbeddedVArray<T, VArray_For_Span<T>
   }
 };
 
+/* Same as VMutableArray_For_MutableSpan, but for a generic virtual array. */
 template<typename T>
 class GVMutableArray_For_MutableSpan
     : public GVMutableArray_For_EmbeddedVMutableArray<T, VMutableArray_For_MutableSpan<T>> {
@@ -699,9 +723,18 @@ class GVMutableArray_For_MutableSpan
   }
 };
 
+/**
+ * Utility class to create the "best" typed virtual array for a given generic virtual array.
+ * In most cases we don't just want to use VArray_For_GVArray, because it adds an additional
+ * indirection on element-access that can be avoided in many cases (e.g. when the virtual array is
+ * just a span or single value).
+ *
+ * This is not a virtual array itself, but is used to get a virtual array.
+ */
 template<typename T> class GVArray_Typed {
  private:
   const VArray<T> *varray_;
+  /* Of these optional virtual arrays, at most one is constructed at any time. */
   std::optional<VArray_For_Span<T>> varray_span_;
   std::optional<VArray_For_Single<T>> varray_single_;
   std::optional<VArray_For_GVArray<T>> varray_any_;
@@ -731,6 +764,7 @@ template<typename T> class GVArray_Typed {
     }
   }
 
+  /* Same as the constructor above, but also takes ownership of the passed in virtual array. */
   explicit GVArray_Typed(std::unique_ptr<GVArray> gvarray) : GVArray_Typed(*gvarray)
   {
     owned_gvarray_ = std::move(gvarray);
@@ -746,6 +780,8 @@ template<typename T> class GVArray_Typed {
     return varray_;
   }
 
+  /* Support implicit cast to the typed virtual array for convenience when `varray->typed<T>()` is
+   * used within an expression.  */
   operator const VArray<T> &() const
   {
     return *varray_;
@@ -767,6 +803,7 @@ template<typename T> class GVArray_Typed {
   }
 };
 
+/* Same as GVArray_Typed, but for mutable virtual arrays. */
 template<typename T> class GVMutableArray_Typed {
  private:
   VMutableArray<T> *varray_;
