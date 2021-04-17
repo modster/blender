@@ -19,56 +19,48 @@
 /** \file
  * \ingroup eevee
  *
- * Shading passes contain drawcalls specific to shading pipelines.
- * They are to be shared across views.
- * This file is only for shading passes. Other passes are declared in their own module.
+ * A culling object is a data structure that contains fine grained culling
+ * of entities against in the whole view frustum. The Culling structure contains the
+ * final entity list since it has to have a special order.
+ *
+ * Follows the principles of Tiled Culling + Z binning from:
+ * "Improved Culling for Tiled and Clustered Rendering"
+ * by Michal Drobot
+ * http://advances.realtimerendering.com/s2017/2017_Sig_Improved_Culling_final.pdf
  */
 
 #include "eevee_instance.hh"
 
-#include "eevee_shading.hh"
+#include "eevee_culling.hh"
 
 namespace blender::eevee {
 
 /* -------------------------------------------------------------------- */
-/** \name Passes
+/** \name CullingDebugPass
  * \{ */
 
-void ForwardPass::sync()
+void CullingDebugPass::sync(void)
 {
-  DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
-  opaque_ps_ = DRW_pass_create("Forward", state);
-
-  DRWState state_add = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL | DRW_STATE_DEPTH_EQUAL;
-  light_additional_ps_ = DRW_pass_create_instance("ForwardAddLight", opaque_ps_, state_add);
-}
-
-void ForwardPass::surface_add(Object *ob, Material *mat, int matslot)
-{
-  (void)mat;
-  (void)matslot;
-  GPUBatch *geom = DRW_cache_object_surface_get(ob);
-  if (geom == nullptr) {
-    return;
-  }
-
   LightModule &lights = inst_.lights;
 
-  GPUShader *sh = inst_.shaders.static_shader_get(MESH);
-  DRWShadingGroup *grp = DRW_shgroup_create(sh, opaque_ps_);
+  debug_ps_ = DRW_pass_create("CullingDebug", DRW_STATE_WRITE_COLOR);
+
+  GPUShader *sh = inst_.shaders.static_shader_get(CULLING_DEBUG);
+  DRWShadingGroup *grp = DRW_shgroup_create(sh, debug_ps_);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.data_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ubo_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
-  DRW_shgroup_call(grp, geom, ob);
+  DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
+  DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 }
 
-void ForwardPass::render(void)
+void CullingDebugPass::render(GPUTexture *input_depth_tx)
 {
-  for (auto index : inst_.lights.index_range()) {
-    inst_.lights.bind_batch(index);
+  input_depth_tx_ = input_depth_tx;
 
-    DRW_draw_pass((index == 0) ? opaque_ps_ : light_additional_ps_);
-  }
+  inst_.lights.bind_batch(0);
+
+  DRW_draw_pass(debug_ps_);
 }
 
 /** \} */

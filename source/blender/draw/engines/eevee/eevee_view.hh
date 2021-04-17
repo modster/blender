@@ -63,6 +63,7 @@ class ShadingView {
 
   /** Owned resources. */
   eevee::Framebuffer view_fb_;
+  eevee::Framebuffer debug_fb_;
   /** Draw resources. Not owned. */
   GPUTexture *combined_tx_ = nullptr;
   GPUTexture *depth_tx_ = nullptr;

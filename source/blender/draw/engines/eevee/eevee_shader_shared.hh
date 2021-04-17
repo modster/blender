@@ -307,11 +307,47 @@ BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Lights
+/** \name Cullings
  * \{ */
 
-/** Maximum number of lights in one light UBO. */
-#define LIGHT_MAX 128
+/* Number of items in a culling batch. Needs to be Power of 2. */
+#define CULLING_ITEM_BATCH 128
+/* Maximum number of 32 bit uint stored per tile. */
+#define CULLING_MAX_WORD ((CULLING_ITEM_BATCH + 1) / 32)
+/* TODO(fclem) Support more than 4 words using layered texture for culling result. */
+#if CULLING_MAX_WORD > 4
+#  error "CULLING_MAX_WORD is greater than supported maximum."
+#endif
+/* Fine grained subdivision in the Z direction. */
+#define CULLING_ZBIN_COUNT 4096
+
+struct CullingData {
+  /* Linearly distributed z-bins with encoded uint16_t min and max index. */
+  /* NOTE: due to alignment restrictions of uint arrays, use uvec4. */
+  uvec4 zbins[CULLING_ZBIN_COUNT / 4];
+  /* Extent of one square tile in pixels. */
+  int tile_size;
+  /* Valid item count in the data array. */
+  uint items_count;
+  /* Scale and bias applied to linear Z to get zbin. */
+  float zbin_scale;
+  float zbin_bias;
+  /* Scale applied to tile pixel coordinates to get target UV coordinate. */
+  vec2 tile_to_uv_fac;
+  vec2 _pad0;
+};
+BLI_STATIC_ASSERT_ALIGN(CullingData, 16)
+
+static inline int culling_z_to_zbin(CullingData data, float z)
+{
+  return int(z * data.zbin_scale + data.zbin_bias);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Lights
+ * \{ */
 
 enum eLightType : uint32_t {
   LIGHT_SUN = 0u,
@@ -382,31 +418,6 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Clusters
- * \{ */
-
-#define CLUSTER_GRID_X_DIM 16
-#define CLUSTER_GRID_Y_DIM 15
-#define CLUSTER_GRID_Z_DIM 16
-#define CLUSTER_MAX 4096
-
-/**
- * Contains culling grid data.
- * One cluster is a small view frustum with a flat bit array of all the intersecting entities.
- */
-struct ClusterData {
-  /* Dimension of the whole cluster grid. */
-  ivec3 grid_extent;
-  /* Extent of one square cluster. */
-  uint extent;
-  /* Flat bit array. One bit for each light in the Light Data buffer. */
-  uvec4 cells[CLUSTER_MAX];
-};
-BLI_STATIC_ASSERT_ALIGN(ClusterData, 16)
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Shadows
  * \{ */
 
@@ -417,8 +428,7 @@ BLI_STATIC_ASSERT_ALIGN(ClusterData, 16)
 
 #ifdef __cplusplus
 using CameraDataBuf = StructBuffer<CameraData>;
-using LightDataBuf = StructArrayBuffer<LightData, LIGHT_MAX>;
-using ClusterDataBuf = StructBuffer<ClusterData>;
+using CullingDataBuf = StructBuffer<CullingData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
 

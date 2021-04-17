@@ -82,6 +82,7 @@ set(SRC
   engines/image/image_engine.c
   engines/image/image_shader.c
   engines/eevee/eevee_camera.cc
+  engines/eevee/eevee_culling.cc
   engines/eevee/eevee_depth_of_field.cc
   engines/eevee/eevee_engine.c
   engines/eevee/eevee_engine.cc
@@ -192,6 +193,10 @@ set(LIB
 
 data_to_c_simple(engines/eevee/shaders/eevee_camera_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_camera_velocity_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_culling_debug_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_culling_iter_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_culling_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_culling_light_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_accumulator_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_bokeh_lut_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_filter_frag.glsl SRC)
@@ -211,7 +216,6 @@ data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_tiles_flatten_frag.g
 data_to_c_simple(engines/eevee/shaders/eevee_film_filter_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_film_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_film_resolve_frag.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_light_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_gather_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_tiles_dilate_frag.glsl SRC)

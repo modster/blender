@@ -29,6 +29,7 @@
  * its type. Passes are shared between views.
  */
 
+#include "BKE_global.h"
 #include "DRW_render.h"
 
 #include "eevee_instance.hh"
@@ -105,6 +106,9 @@ void ShadingView::sync(int render_extent_[2])
     postfx_tx_ = DRW_texture_pool_query_2d(UNPACK2(extent_), GPU_RGBA16F, owner);
 
     view_fb_.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx_), GPU_ATTACHMENT_TEXTURE(combined_tx_));
+
+    /* Reuse postfx_tx_. */
+    debug_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(postfx_tx_));
   }
 }
 
@@ -134,7 +138,15 @@ void ShadingView::render(void)
 
   GPUTexture *final_radiance_tx = render_post(combined_tx_);
 
-  if (inst_.render_passes.combined) {
+  /* TODO(fclem) Have a special renderpass for this. */
+  if (G.debug_value == 3) {
+    GPU_framebuffer_bind(debug_fb_);
+    inst_.shading_passes.debug_culling.render(depth_tx_);
+
+    // inst_.render_passes.debug_culling->accumulate(debug_tx_, sub_view_);
+    inst_.render_passes.combined->accumulate(postfx_tx_, sub_view_);
+  }
+  else if (inst_.render_passes.combined) {
     inst_.render_passes.combined->accumulate(final_radiance_tx, sub_view_);
   }
 

@@ -190,6 +190,13 @@ float Light::shape_power_volume_get(const ::Light *la)
   }
 }
 
+void Light::debug_draw(void)
+{
+  const float color[4] = {0.8, 0.3, 0, 1};
+  DRW_debug_sphere(_position, sphere_radius, color);
+  DRW_debug_sphere(_position, influence_radius_max, color);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -201,13 +208,9 @@ void LightModule::begin_sync(void)
   /* In begin_sync so it can be aninated. */
   light_threshold_ = max_ff(1e-16f, inst_.scene->eevee.light_threshold);
 
-  lights_.clear();
+  inst_.shading_passes.light_culling.sync();
 
-  /* TODO(fclem) degrow vector of light batches. */
-  if (datas_.size() == 0) {
-    clusters_.append(new Cluster());
-    datas_.append(new LightDataBuf());
-  }
+  lights_.clear();
 }
 
 void LightModule::sync_light(const Object *ob)
@@ -222,55 +225,51 @@ void LightModule::end_sync(void)
 /* Compute acceleration structure for the given view. */
 void LightModule::set_view(const DRWView *view, const int extent[2])
 {
-  for (Cluster *cluster : clusters_) {
-    cluster->set_view(view, extent);
-  }
+  culling_.set_view(view, extent);
 
-  uint64_t light_id = 0;
-  uint64_t batch_id = 0;
-  Cluster *cluster = clusters_[0];
-  LightDataBuf *batch = datas_[0];
-  for (Light &light : lights_) {
-    /* If we filled a batch, go to the next. */
-    if (light_id == LIGHT_MAX) {
-      batch_id++;
-      light_id = 0;
-      if (clusters_.size() <= batch_id) {
-        datas_.append(new LightDataBuf());
-        clusters_.append(new Cluster());
-      }
-      batch = datas_[batch_id];
-      cluster = clusters_[batch_id];
-      cluster->set_view(view, extent);
-    }
+  for (auto light_id : lights_.index_range()) {
+    Light &light = lights_[light_id];
 
     BoundSphere bsphere;
     copy_v3_v3(bsphere.center, light._position);
     bsphere.radius = light.influence_radius_max;
 
-    if (!DRW_culling_sphere_test(view, &bsphere)) {
-      continue;
-    }
-
-    cluster->insert(bsphere, light_id);
-    (*batch)[light_id] = light;
-    light_id++;
+    culling_.insert(light_id, bsphere);
   }
 
-  active_batch_count_ = batch_id + 1;
-
-  for (Cluster *cluster : clusters_) {
-    cluster->push_update();
-  }
-  for (LightDataBuf *lbuf : datas_) {
-    lbuf->push_update();
-  }
+  DRW_view_set_active(view);
+  culling_.finalize(inst_.shading_passes.light_culling);
 }
 
-void LightModule::bind_range(int range_id)
+void LightModule::bind_batch(int range_id)
 {
-  active_data_ = datas_[range_id]->ubo_get();
-  active_clusters_ = clusters_[range_id]->ubo_get();
+  active_data_ubo_ = culling_[range_id]->data_ubo_get();
+  active_culling_ubo_ = culling_[range_id]->culling_ubo_get();
+  active_culling_tx_ = culling_[range_id]->culling_texture_get();
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name CullingPass
+ * \{ */
+
+void CullingLightPass::sync(void)
+{
+  culling_ps_ = DRW_pass_create("CullingLight", DRW_STATE_WRITE_COLOR);
+
+  GPUShader *sh = inst_.shaders.static_shader_get(CULLING_LIGHT);
+  DRWShadingGroup *grp = DRW_shgroup_create(sh, culling_ps_);
+  DRW_shgroup_uniform_block_ref(grp, "lights_block", &lights_ubo_);
+  DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", &culling_ubo_);
+  DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+}
+
+void CullingLightPass::render(const GPUUniformBuf *lights_ubo, const GPUUniformBuf *culling_ubo)
+{
+  lights_ubo_ = lights_ubo;
+  culling_ubo_ = culling_ubo;
+  DRW_draw_pass(culling_ps_);
 }
 
 /** \} */

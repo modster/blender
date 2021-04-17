@@ -28,6 +28,7 @@
 
 #include "DRW_render.h"
 
+#include "eevee_culling.hh"
 #include "eevee_velocity.hh"
 
 namespace blender::eevee {
@@ -69,14 +70,20 @@ class ShadingPasses {
   // DeferredPass opaque;
   ForwardPass opaque;
   VelocityPass velocity;
+  CullingLightPass light_culling;
+
+  CullingDebugPass debug_culling;
 
  public:
-  ShadingPasses(Instance &inst) : opaque(inst), velocity(inst){};
+  ShadingPasses(Instance &inst)
+      : opaque(inst), velocity(inst), light_culling(inst), debug_culling(inst){};
 
   void sync()
   {
     opaque.sync();
     velocity.sync();
+
+    debug_culling.sync();
   }
 };
 

@@ -2,18 +2,20 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_object_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 layout(std140) uniform lights_block
 {
-  LightData lights[LIGHT_MAX];
+  LightData lights[CULLING_ITEM_BATCH];
 };
 
-layout(std140) uniform cluster_block
+layout(std140) uniform lights_culling_block
 {
-  ClusterData cluster;
+  CullingData light_culling;
 };
+
+uniform usampler2D lights_culling_tx;
 
 layout(location = 0, index = 0) out vec4 outRadiance;
 layout(location = 0, index = 1) out vec4 outTransmittance;
@@ -55,15 +57,18 @@ void main(void)
   int zi = int(abs(floor(p.z)));
   bool check = ((mod(xi, 2) == mod(yi, 2)) == bool(mod(zi, 2)));
 
+  float vP_z = get_view_z_from_depth(gl_FragCoord.z);
+
   vec3 radiance = vec3(0);
-  LIGHT_FOREACH_BEGIN (cluster, lights, light) {
+  ITEM_FOREACH_BEGIN (light_culling, lights_culling_tx, vP_z, l_idx) {
+    LightData light = lights[l_idx];
     vec4 l_vector;
     l_vector.xyz = light._position - g_surf.P;
     l_vector.w = length(l_vector.xyz);
     radiance += saturate(dot(g_surf.N, l_vector.xyz / l_vector.w)) *
                 light_simple(light, l_vector) * light.volume_power;
   }
-  LIGHT_FOREACH_END
+  ITEM_FOREACH_END
 
   outRadiance = vec4(radiance * mix(0.2, 0.8, check), 1.0);
   outTransmittance = vec4(0.0, 0.0, 0.0, 1.0);

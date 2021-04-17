@@ -40,6 +40,10 @@ extern char datatoc_common_view_lib_glsl[];
 
 extern char datatoc_eevee_camera_lib_glsl[];
 extern char datatoc_eevee_camera_velocity_frag_glsl[];
+extern char datatoc_eevee_culling_debug_frag_glsl[];
+extern char datatoc_eevee_culling_iter_lib_glsl[];
+extern char datatoc_eevee_culling_lib_glsl[];
+extern char datatoc_eevee_culling_light_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_accumulator_lib_glsl[];
 extern char datatoc_eevee_depth_of_field_bokeh_lut_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_downsample_frag_glsl[];
@@ -60,7 +64,6 @@ extern char datatoc_eevee_depth_of_field_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_film_filter_frag_glsl[];
 extern char datatoc_eevee_film_lib_glsl[];
 extern char datatoc_eevee_film_resolve_frag_glsl[];
-extern char datatoc_eevee_light_lib_glsl[];
 extern char datatoc_eevee_motion_blur_gather_frag_glsl[];
 extern char datatoc_eevee_motion_blur_lib_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_dilate_frag_glsl[];
@@ -80,7 +83,10 @@ namespace blender::eevee {
 
 /* Keep alphabetical order and clean prefix. */
 enum eShaderType {
-  DOF_BOKEH_LUT = 0,
+  CULLING_DEBUG = 0,
+  CULLING_LIGHT,
+
+  DOF_BOKEH_LUT,
   DOF_GATHER_BACKGROUND_LUT,
   DOF_GATHER_BACKGROUND,
   DOF_FILTER,
@@ -154,7 +160,8 @@ class ShaderModule {
     DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, eevee_light_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_iter_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_velocity_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_accumulator_lib);
@@ -178,6 +185,8 @@ class ShaderModule {
   SHADER(enum_, common_fullscreen_vert, nullptr, frag_, defs_)
 #define SHADER_FULLSCREEN(enum_, frag_) SHADER_FULLSCREEN_DEFINES(enum_, frag_, nullptr)
 
+    SHADER_FULLSCREEN(CULLING_DEBUG, eevee_culling_debug_frag);
+    SHADER_FULLSCREEN(CULLING_LIGHT, eevee_culling_light_frag);
     SHADER_FULLSCREEN(FILM_FILTER, eevee_film_filter_frag);
     SHADER_FULLSCREEN(FILM_RESOLVE, eevee_film_resolve_frag);
     SHADER_FULLSCREEN(DOF_BOKEH_LUT, eevee_depth_of_field_bokeh_lut_frag);
