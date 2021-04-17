@@ -61,12 +61,12 @@ struct WriteAttributeLookup {
 
 class OutputAttribute {
  public:
-  using SaveF = std::function<void(OutputAttribute &)>;
+  using SaveFn = std::function<void(OutputAttribute &)>;
 
  private:
   std::unique_ptr<GVMutableArray> varray_;
   AttributeDomain domain_;
-  SaveF save_;
+  SaveFn save_;
   std::optional<fn::GVMutableArray_GSpan> optional_span_varray_;
   bool ignore_old_values_ = false;
 
@@ -75,7 +75,7 @@ class OutputAttribute {
 
   OutputAttribute(std::unique_ptr<GVMutableArray> varray,
                   AttributeDomain domain,
-                  SaveF save,
+                  SaveFn save,
                   const bool ignore_old_values)
       : varray_(std::move(varray)),
         domain_(domain),
