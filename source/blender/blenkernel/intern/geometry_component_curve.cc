@@ -14,8 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "FN_generic_span.hh"
-
 #include "BKE_derived_curve.hh"
 
 #include "BKE_attribute_access.hh"
@@ -141,8 +139,8 @@ int CurveComponent::attribute_domain_size(const AttributeDomain domain) const
 namespace blender::bke {
 
 class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
-  using AsReadAttribute = ReadAttributePtr (*)(const DCurve &data);
-  using AsWriteAttribute = WriteAttributePtr (*)(DCurve &data);
+  using AsReadAttribute = GVArrayPtr (*)(const DCurve &data);
+  using AsWriteAttribute = GVMutableArrayPtr (*)(DCurve &data);
   using UpdateOnWrite = void (*)(Spline &spline);
   const AsReadAttribute as_read_attribute_;
   const AsWriteAttribute as_write_attribute_;
@@ -164,7 +162,7 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
   {
   }
 
-  ReadAttributePtr try_get_for_read(const GeometryComponent &component) const final
+  GVArrayPtr try_get_for_read(const GeometryComponent &component) const final
   {
     const CurveComponent &curve_component = static_cast<const CurveComponent &>(component);
     const DCurve *curve = curve_component.get_for_read();
@@ -175,7 +173,7 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
     return as_read_attribute_(*curve);
   }
 
-  WriteAttributePtr try_get_for_write(GeometryComponent &component) const final
+  GVMutableArrayPtr try_get_for_write(GeometryComponent &component) const final
   {
     if (writable_ != Writable) {
       return {};
@@ -210,23 +208,25 @@ static int get_spline_resolution(const SplinePtr &spline)
   return spline->resolution();
 }
 
-static void set_spline_resolution(SplinePtr &spline, const int &resolution)
+static void set_spline_resolution(SplinePtr &spline, const int resolution)
 {
   spline->set_resolution(std::max(resolution, 1));
   spline->mark_cache_invalid();
 }
 
-static ReadAttributePtr make_resolution_read_attribute(const DCurve &curve)
+static GVArrayPtr make_resolution_read_attribute(const DCurve &curve)
 {
-  return std::make_unique<DerivedArrayReadAttribute<SplinePtr, int, get_spline_resolution>>(
-      ATTR_DOMAIN_CURVE, curve.splines.as_span());
+  return std::make_unique<fn::GVArray_For_DerivedSpan<SplinePtr, int, get_spline_resolution>>(
+      curve.splines.as_span());
 }
 
-static WriteAttributePtr make_resolution_write_attribute(DCurve &curve)
+static GVMutableArrayPtr make_resolution_write_attribute(DCurve &curve)
 {
-  return std::make_unique<
-      DerivedArrayWriteAttribute<SplinePtr, int, get_spline_resolution, set_spline_resolution>>(
-      ATTR_DOMAIN_CURVE, curve.splines.as_mutable_span());
+  return std::make_unique<fn::GVMutableArray_For_DerivedSpan<SplinePtr,
+                                                             int,
+                                                             get_spline_resolution,
+                                                             set_spline_resolution>>(
+      curve.splines.as_mutable_span());
 }
 
 static float get_spline_length(const SplinePtr &spline)
@@ -234,10 +234,10 @@ static float get_spline_length(const SplinePtr &spline)
   return spline->length();
 }
 
-static ReadAttributePtr make_length_attribute(const DCurve &curve)
+static GVArrayPtr make_length_attribute(const DCurve &curve)
 {
-  return std::make_unique<DerivedArrayReadAttribute<SplinePtr, float, get_spline_length>>(
-      ATTR_DOMAIN_CURVE, curve.splines.as_span());
+  return std::make_unique<fn::GVArray_For_DerivedSpan<SplinePtr, float, get_spline_length>>(
+      curve.splines.as_span());
 }
 
 static bool get_cyclic_value(const SplinePtr &spline)
@@ -245,7 +245,7 @@ static bool get_cyclic_value(const SplinePtr &spline)
   return spline->is_cyclic;
 }
 
-static void set_cyclic_value(SplinePtr &spline, const bool &value)
+static void set_cyclic_value(SplinePtr &spline, const bool value)
 {
   if (spline->is_cyclic != value) {
     spline->is_cyclic = value;
@@ -253,17 +253,17 @@ static void set_cyclic_value(SplinePtr &spline, const bool &value)
   }
 }
 
-static ReadAttributePtr make_cyclic_read_attribute(const DCurve &curve)
+static GVArrayPtr make_cyclic_read_attribute(const DCurve &curve)
 {
-  return std::make_unique<DerivedArrayReadAttribute<SplinePtr, bool, get_cyclic_value>>(
-      ATTR_DOMAIN_CURVE, curve.splines.as_span());
+  return std::make_unique<fn::GVArray_For_DerivedSpan<SplinePtr, bool, get_cyclic_value>>(
+      curve.splines.as_span());
 }
 
-static WriteAttributePtr make_cyclic_write_attribute(DCurve &curve)
+static GVMutableArrayPtr make_cyclic_write_attribute(DCurve &curve)
 {
   return std::make_unique<
-      DerivedArrayWriteAttribute<SplinePtr, bool, get_cyclic_value, set_cyclic_value>>(
-      ATTR_DOMAIN_CURVE, curve.splines.as_mutable_span());
+      fn::GVMutableArray_For_DerivedSpan<SplinePtr, bool, get_cyclic_value, set_cyclic_value>>(
+      curve.splines.as_mutable_span());
 }
 
 class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
@@ -289,7 +289,7 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
   {
   }
 
-  ReadAttributePtr try_get_for_read(const GeometryComponent &component) const final
+  GVArrayPtr try_get_for_read(const GeometryComponent &component) const final
   {
     const CurveComponent &curve_component = static_cast<const CurveComponent &>(component);
     const DCurve *curve = curve_component.get_for_read();
@@ -297,7 +297,7 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
       return {};
     }
 
-    ReadAttributePtr new_attribute;
+    GVArrayPtr varray;
     attribute_math::convert_to_static_type(data_type_, [&](auto dummy) {
       using T = decltype(dummy);
       Array<T> values(curve_component.attribute_domain_size(ATTR_DOMAIN_POINT));
@@ -311,14 +311,13 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
         offset += points_len;
       }
 
-      new_attribute = std::make_unique<OwnedArrayReadAttribute<T>>(ATTR_DOMAIN_POINT,
-                                                                   std::move(values));
+      varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
     });
 
-    return new_attribute;
+    return varray;
   }
 
-  WriteAttributePtr try_get_for_write(GeometryComponent &UNUSED(component)) const final
+  GVMutableArrayPtr try_get_for_write(GeometryComponent &UNUSED(component)) const final
   {
     return {};
   }

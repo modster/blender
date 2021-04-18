@@ -93,6 +93,8 @@ static Array<int> get_result_point_offsets(const DCurve &curve,
     }
     offsets.last() = offset;
   }
+
+  return offsets;
 }
 
 static void geo_node_curve_sample_points_exec(GeoNodeExecParams params)
@@ -129,7 +131,7 @@ static void geo_node_curve_sample_points_exec(GeoNodeExecParams params)
     const int count = params.extract_input<int>("Count");
     for (const int i : curve.splines.index_range()) {
       Spline &spline = *curve.splines[i];
-      sample_points_from_spline(spline, point_component, offsets[i], spline.length() / count);
+      sample_points_from_spline(spline, offsets[i], spline.length() / count, point_component);
     }
   }
   else {
