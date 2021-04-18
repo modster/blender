@@ -54,6 +54,7 @@ set(SRC
   space_node.c
 
   node_intern.h
+  node_view.h
 )
 
 set(LIB

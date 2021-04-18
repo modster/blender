@@ -25,6 +25,7 @@
 
 #include "BKE_node.h"
 #include "UI_interface.h"
+#include "node_view.h"
 #include <stddef.h> /* for size_t */
 
 /* internal exports only */
@@ -64,6 +65,9 @@ typedef struct bNodeLinkDrag {
   /** Temporarily stores the last hovered socket for multi-input socket operator.
    *  Store it to recalculate sorting after it is no longer hovered. */
   struct bNode *last_node_hovered_while_dragging_a_link;
+
+  /* Data for edge panning */
+  NodeViewPanData pan_data;
 } bNodeLinkDrag;
 
 typedef struct SpaceNode_Runtime {
