@@ -15,6 +15,7 @@
  */
 
 #include "BKE_derived_curve.hh"
+#include "BKE_pointcloud.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -64,50 +65,39 @@ static void geo_node_curve_sample_points_update(bNodeTree *UNUSED(ntree), bNode 
 
 namespace blender::nodes {
 
-// /* Set the location for the first point. */
-// r_samples[0].x = profile->table[0].x;
-// r_samples[0].y = profile->table[0].y;
+static void sample_points_from_spline(const Spline &spline,
+                                      const int offset,
+                                      const float sample_length,
+                                      PointCloudComponent &point_component)
+{
+}
 
-// /* Travel along the path, recording the locations of segments as we pass them. */
-// float segment_left = segment_length;
-// for (int i = 1; i < n_segments; i++) {
-// /* Travel over all of the points that fit inside this segment. */
-// while (distance_to_next_table_point < segment_left) {
-//     length_travelled += distance_to_next_table_point;
-//     segment_left -= distance_to_next_table_point;
-//     i_table++;
-//     distance_to_next_table_point = curveprofile_distance_to_next_table_point(profile, i_table);
-//     distance_to_previous_table_point = 0.0f;
-// }
-// /* We're at the last table point that fits inside the current segment, use interpolation. */
-// float factor = (distance_to_previous_table_point + segment_left) /
-//                 (distance_to_previous_table_point + distance_to_next_table_point);
-// r_samples[i].x = interpf(profile->table[i_table + 1].x, profile->table[i_table].x, factor);
-// r_samples[i].y = interpf(profile->table[i_table + 1].y, profile->table[i_table].y, factor);
-// BLI_assert(factor <= 1.0f && factor >= 0.0f);
-// #ifdef DEBUG_CURVEPROFILE_EVALUATE
-// printf("segment_left: %.3f\n", segment_left);
-// printf("i_table: %d\n", i_table);
-// printf("distance_to_previous_table_point: %.3f\n", distance_to_previous_table_point);
-// printf("distance_to_next_table_point: %.3f\n", distance_to_next_table_point);
-// printf("Interpolating with factor %.3f from (%.3f, %.3f) to (%.3f, %.3f)\n\n",
-//         factor,
-//         profile->table[i_table].x,
-//         profile->table[i_table].y,
-//         profile->table[i_table + 1].x,
-//         profile->table[i_table + 1].y);
-// #endif
+static Array<int> get_result_point_offsets(const DCurve &curve,
+                                           const GeometryNodeCurveSamplePointsMode mode,
+                                           const int count,
+                                           const float length)
+{
+  Array<int> offsets(curve.splines.size() + 1);
 
-// /* We sampled in between this table point and the next, so the next travel step is smaller. */
-// distance_to_next_table_point -= segment_left;
-// distance_to_previous_table_point += segment_left;
-// length_travelled += segment_left;
-// segment_left = segment_length;
-// }
+  if (mode == GEO_NODE_CURVE_SAMPLE_POINTS_COUNT) {
+    for (const int i : curve.splines.index_range()) {
+      offsets[i] = count * i;
+    }
+    offsets.last() = curve.splines.size() * count;
+  }
+  else {
+    int offset = 0;
+    for (const int i : curve.splines.index_range()) {
+      offsets[i] = offset;
+      offset += curve.splines[i]->length() / length;
+    }
+    offsets.last() = offset;
+  }
+}
 
 static void geo_node_curve_sample_points_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
+  const GeometrySet input_geometry_set = params.extract_input<GeometrySet>("Curve");
 
   const bNode &node = params.node();
   const NodeGeometryCurveSamplePoints &node_storage = *(const NodeGeometryCurveSamplePoints *)
@@ -115,27 +105,37 @@ static void geo_node_curve_sample_points_exec(GeoNodeExecParams params)
   const GeometryNodeCurveSamplePointsMode mode = (GeometryNodeCurveSamplePointsMode)
                                                      node_storage.mode;
 
-  params.error_message_add(NodeWarningType::Info, "The node doesn't do anything yet");
-
-  if (!geometry_set.has_curve()) {
-    params.set_output("Points", geometry_set);
+  if (!input_geometry_set.has_curve()) {
+    params.set_output("Points", GeometrySet());
   }
 
-  const DCurve &curve = *geometry_set.get_curve_for_read();
+  const DCurve &curve = *input_geometry_set.get_curve_for_read();
 
-  switch (mode) {
-    case GEO_NODE_CURVE_SAMPLE_POINTS_COUNT: {
-      break;
+  const int count = (mode == GEO_NODE_CURVE_SAMPLE_POINTS_COUNT) ?
+                        params.extract_input<int>("Count") :
+                        0;
+  const float length = (mode == GEO_NODE_CURVE_SAMPLE_POINTS_LENGTH) ?
+                           params.extract_input<float>("Length") :
+                           0.0f;
+
+  Array<int> offsets = get_result_point_offsets(curve, mode, count, length);
+
+  PointCloud *pointcloud = BKE_pointcloud_new_nomain(offsets.last());
+  GeometrySet result_geometry_set = GeometrySet::create_with_pointcloud(pointcloud);
+  PointCloudComponent &point_component =
+      result_geometry_set.get_component_for_write<PointCloudComponent>();
+
+  if (mode == GEO_NODE_CURVE_SAMPLE_POINTS_COUNT) {
+    const int count = params.extract_input<int>("Count");
+    for (const int i : curve.splines.index_range()) {
+      Spline &spline = *curve.splines[i];
+      sample_points_from_spline(spline, point_component, offsets[i], spline.length() / count);
     }
-    case GEO_NODE_CURVE_SAMPLE_POINTS_LENGTH: {
-      break;
-    }
-    default:
-      BLI_assert_unreachable();
-      break;
+  }
+  else {
   }
 
-  params.set_output("Geometry", geometry_set);
+  params.set_output("Geometry", result_geometry_set);
 }
 
 }  // namespace blender::nodes
