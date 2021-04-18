@@ -231,9 +231,7 @@ static WriteAttributePtr make_resolution_write_attribute(DCurve &curve)
 
 static float get_spline_length(const SplinePtr &spline)
 {
-  Span<float> lengths = spline->evaluated_lengths();
-
-  return lengths.last();
+  return spline->length();
 }
 
 static ReadAttributePtr make_length_attribute(const DCurve &curve)
@@ -306,11 +304,11 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
 
       int offset = 0;
       for (const SplinePtr &spline : curve->splines) {
-        const int spline_total = spline->evaluated_points_size();
-        MutableSpan<T> spline_data = values.as_mutable_span().slice(offset, spline_total);
+        const int points_len = spline->size();
+        MutableSpan<T> spline_data = values.as_mutable_span().slice(offset, points_len);
         fn::GMutableSpan generic_spline_data(spline_data);
         get_spline_data_(*spline, generic_spline_data);
-        offset += spline_total;
+        offset += points_len;
       }
 
       new_attribute = std::make_unique<OwnedArrayReadAttribute<T>>(ATTR_DOMAIN_POINT,

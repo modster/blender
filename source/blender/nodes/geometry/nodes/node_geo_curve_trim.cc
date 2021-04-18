@@ -67,29 +67,73 @@ static void geo_node_curve_trim_update(bNodeTree *UNUSED(ntree), bNode *node)
 
 namespace blender::nodes {
 
-static void trim_spline(Spline &spline, const float length_start, const float length_end)
+static void interpolate_control_point(Spline &spline, const Spline::LookupResult lookup)
 {
-  BLI_assert(length_start <= length_end);
+  const int evaluated_index = lookup.evaluated_index;
+  Span<PointMapping> mappings = spline.evaluated_mappings();
+  const PointMapping &mapping = mappings[evaluated_index];
+  const int index = mapping.control_point_index;
 
-  std::cout << "\n TRIM SPLINE \n";
-  std::cout << "Start length: " << length_start << "\n";
-  std::cout << "End length: " << length_end << "\n";
-  Span<float> lengths = spline.evaluated_lengths();
-  const float *lower = std::lower_bound(lengths.begin(), lengths.end(), length_start);
-  const float *upper = std::upper_bound(lengths.begin(), lengths.end(), length_end);
-  const int i_lower = lower - lengths.begin();
-  const int i_upper = upper - lengths.begin();
-  std::cout << "i_lower: " << i_lower << "\n";
-  std::cout << "i_upper: " << i_upper << "\n";
-  BLI_assert(i_lower <= i_upper);
+  Span<float3> evaluated_positions = spline.evaluated_positions();
+
+  const float3 new_position = float3::interpolate(evaluated_positions[evaluated_index],
+                                                  evaluated_positions[evaluated_index + 1],
+                                                  lookup.factor);
+  if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(&spline)) {
+    /* TODO: This could be converted to a virtual function in the Spline class. */
+    bezier_spline->move_control_point(index, new_position);
+  }
+  else {
+    spline.positions()[index] = new_position;
+  }
+
+  /* TODO: Do this interpolation with attributes instead. */
+
+  MutableSpan<float> radii = spline.radii();
+  Array<float, 2> neighboring_radii(2);
+  spline.interpolate_data_to_evaluated_points(
+      radii.as_span(), neighboring_radii.as_mutable_span(), evaluated_index);
+  radii[index] = interpf(neighboring_radii[1], neighboring_radii[0], lookup.factor);
+
+  MutableSpan<float> tilts = spline.tilts();
+  Array<float, 2> neighboring_tilts(2);
+  spline.interpolate_data_to_evaluated_points(
+      tilts.as_span(), neighboring_tilts.as_mutable_span(), evaluated_index);
+  tilts[index] = interpf(neighboring_tilts[1], neighboring_tilts[0], lookup.factor);
+
+  /* Interpolate information specific to different spline types. */
+  if (NURBSpline *poly_spline = dynamic_cast<NURBSpline *>(&spline)) {
+    MutableSpan<float> weights = poly_spline->weights();
+    Array<float, 2> neighboring_weights(2);
+    spline.interpolate_data_to_evaluated_points(
+        weights.as_span(), neighboring_weights.as_mutable_span(), evaluated_index);
+    weights[index] = interpf(neighboring_weights[1], neighboring_weights[0], lookup.factor);
+  }
+}
+
+static void trim_spline(Spline &spline,
+                        const Spline::LookupResult start,
+                        const Spline::LookupResult end)
+{
+  BLI_assert(!spline.is_cyclic);
+  BLI_assert(start.evaluated_index <= end.evaluated_index);
 
   Span<PointMapping> mappings = spline.evaluated_mappings();
-  const int i_control_lower = mappings[i_lower].control_point_index;
-  const int i_control_upper = mappings[i_upper].control_point_index;
-  std::cout << "i_control_lower: " << i_control_lower << "\n";
-  std::cout << "i_control_upper: " << i_control_upper << "\n";
-  BLI_assert(i_control_lower <= i_control_upper);
 
+  const int points_len = spline.size();
+  const int start_index = mappings[start.evaluated_index].control_point_index;
+  const int end_index = std::min(mappings[end.evaluated_index].control_point_index + 1,
+                                 points_len - 1);
+
+  if (!(start.evaluated_index == 0 && start.factor == 0.0f)) {
+    interpolate_control_point(spline, start);
+  }
+  if (end.evaluated_index != spline.evaluated_points_size() - 1) {
+    interpolate_control_point(spline, end);
+  }
+
+  spline.drop_back(std::min(points_len - end_index, points_len));
+  spline.drop_front(std::max(start_index - 1, 0));
 }
 
 static void geo_node_curve_trim_exec(GeoNodeExecParams params)
@@ -99,8 +143,6 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
   const bNode &node = params.node();
   const NodeGeometryCurveTrim &node_storage = *(const NodeGeometryCurveTrim *)node.storage;
   const GeometryNodeCurveTrimMode mode = (GeometryNodeCurveTrimMode)node_storage.mode;
-
-  params.error_message_add(NodeWarningType::Info, "The node doesn't do anything yet");
 
   if (!geometry_set.has_curve()) {
     params.set_output("Geometry", geometry_set);
@@ -114,18 +156,26 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
       const float factor_start = params.extract_input<float>("Start");
       const float factor_end = params.extract_input<float>("End");
       for (SplinePtr &spline : curve.splines) {
-        const float length = spline->evaluated_lengths().last();
-        const float start = factor_start * length;
-        const float end = factor_end * length;
-        trim_spline(*spline, std::min(start, end), std::max(start, end));
+        if (spline->is_cyclic) {
+          continue;
+        }
+        trim_spline(*spline,
+                    spline->lookup_evaluated_factor(std::min(factor_start, factor_end)),
+                    spline->lookup_evaluated_factor(std::max(factor_start, factor_end)));
       }
       break;
     }
     case GEO_NODE_CURVE_TRIM_LENGTH: {
-      const float start = params.extract_input<float>("Start_001");
-      const float end = params.extract_input<float>("End_001");
+      const float length_start = params.extract_input<float>("Start_001");
+      const float length_from_end = params.extract_input<float>("End_001");
       for (SplinePtr &spline : curve.splines) {
-        trim_spline(*spline, std::min(start, end), std::max(start, end));
+        if (spline->is_cyclic) {
+          continue;
+        }
+        const float length_end = spline->length() - length_from_end;
+        trim_spline(*spline,
+                    spline->lookup_evaluated_length(std::min(length_start, length_end)),
+                    spline->lookup_evaluated_length(std::max(length_start, length_end)));
       }
       break;
     }

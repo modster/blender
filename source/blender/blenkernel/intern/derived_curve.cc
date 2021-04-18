@@ -35,13 +35,6 @@ using blender::Vector;
 /** \name Utilities
  * \{ */
 
-/* TODO: This only works for trivial types? */
-template<typename T> static void vector_drop_front(Vector<T> vector, const int count)
-{
-  memcpy(vector.begin(), vector.begin() + count, sizeof(T) * count);
-  vector.resize(vector.size() - count);
-}
-
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -207,11 +200,28 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
 /** \name Spline
  * \{ */
 
+/**
+ * Mark all caches for recomputation. This must be called after any operation that would
+ * change the generated positions, tangents, normals, mapping, etc. of the evaluated points.
+ */
+void Spline::mark_cache_invalid()
+{
+  base_cache_dirty_ = true;
+  tangent_cache_dirty_ = true;
+  normal_cache_dirty_ = true;
+  length_cache_dirty_ = true;
+}
+
 int Spline::evaluated_edges_size() const
 {
   const int points_len = this->evaluated_points_size();
 
   return this->is_cyclic ? points_len : points_len - 1;
+}
+
+float Spline::length() const
+{
+  return this->evaluated_lengths().last();
 }
 
 Span<float3> Spline::evaluated_positions() const
@@ -220,9 +230,19 @@ Span<float3> Spline::evaluated_positions() const
   return evaluated_positions_cache_;
 }
 
+/**
+ * Returns non-owning access to the cache of mappings from the evaluated points to
+ * the corresponing control points. Unless the spline is cyclic, the last control point
+ * index will never be included as an index.
+ */
 Span<PointMapping> Spline::evaluated_mappings() const
 {
   this->ensure_base_cache();
+#ifdef DEBUG
+  if (evaluated_mapping_cache_.last().control_point_index == this->size() - 1) {
+    BLI_assert(this->is_cyclic);
+  }
+#endif
   return evaluated_mapping_cache_;
 }
 
@@ -241,9 +261,10 @@ static void accumulate_lengths(Span<float3> positions,
 }
 
 /**
- * Return non-owning access to the cache of accumulated lengths along the curve. Each item is the
+ * Return non-owning access to the cache of accumulated lengths along the spline. Each item is the
  * length of the subsequent segment, i.e. the first value is the length of the first segment rather
- * than 0. This calculation only depends on the spline's evaluated positions.
+ * than 0. This calculation is rather trivial, and only depends on the evaluated positions.
+ * However, the results are used often, so it makes sense to cache it.
  */
 Span<float> Spline::evaluated_lengths() const
 {
@@ -479,16 +500,26 @@ Span<float3> Spline::evaluated_normals() const
   return evaluated_normals_cache_;
 }
 
-/**
- * Mark all caches for recomputation. This must be called after any operation that would
- * change the generated positions, tangents, normals, mapping, etc. of the evaluated points.
- */
-void Spline::mark_cache_invalid()
+Spline::LookupResult Spline::lookup_evaluated_factor(const float factor) const
 {
-  base_cache_dirty_ = true;
-  tangent_cache_dirty_ = true;
-  normal_cache_dirty_ = true;
-  length_cache_dirty_ = true;
+  return this->lookup_evaluated_length(this->length() * factor);
+}
+
+/* TODO: Support extrapolation somehow. */
+Spline::LookupResult Spline::lookup_evaluated_length(const float length) const
+{
+  BLI_assert(length >= 0.0f && length <= this->length());
+
+  Span<float> lengths = this->evaluated_lengths();
+
+  const float *offset = std::lower_bound(lengths.begin(), lengths.end(), length);
+  const int index = offset - lengths.begin();
+
+  const float segment_length = lengths[index];
+  const float previous_length = (index == 0) ? 0.0f : lengths[index - 1];
+  const float factor = (length - previous_length) / (segment_length - previous_length);
+
+  return LookupResult{index, factor};
 }
 
 /** \} */
@@ -603,19 +634,21 @@ void BezierSpline::add_point(const float3 position,
 
 void BezierSpline::drop_front(const int count)
 {
+  std::cout << __func__ << ": " << count << "\n";
   BLI_assert(this->size() - count > 0);
-  vector_drop_front(this->handle_types_start_, count);
-  vector_drop_front(this->handle_positions_start_, count);
-  vector_drop_front(this->positions_, count);
-  vector_drop_front(this->handle_types_end_, count);
-  vector_drop_front(this->handle_positions_end_, count);
-  vector_drop_front(this->radii_, count);
-  vector_drop_front(this->tilts_, count);
+  this->handle_types_start_.remove(0, count);
+  this->handle_positions_start_.remove(0, count);
+  this->positions_.remove(0, count);
+  this->handle_types_end_.remove(0, count);
+  this->handle_positions_end_.remove(0, count);
+  this->radii_.remove(0, count);
+  this->tilts_.remove(0, count);
   this->mark_cache_invalid();
 }
 
 void BezierSpline::drop_back(const int count)
 {
+  std::cout << __func__ << ": " << count << "\n";
   const int new_size = this->size() - count;
   BLI_assert(new_size > 0);
   this->handle_types_start_.resize(new_size);
@@ -626,6 +659,34 @@ void BezierSpline::drop_back(const int count)
   this->radii_.resize(new_size);
   this->tilts_.resize(new_size);
   this->mark_cache_invalid();
+}
+
+bool BezierSpline::point_is_sharp(const int index) const
+{
+  return ELEM(handle_types_start_[index], HandleType::Vector, HandleType::Free) ||
+         ELEM(handle_types_end_[index], HandleType::Vector, HandleType::Free);
+}
+
+bool BezierSpline::handle_start_is_automatic(const int index) const
+{
+  return ELEM(handle_types_start_[index], HandleType::Free, HandleType::Align);
+}
+
+bool BezierSpline::handle_end_is_automatic(const int index) const
+{
+  return ELEM(handle_types_end_[index], HandleType::Free, HandleType::Align);
+}
+
+void BezierSpline::move_control_point(const int index, const blender::float3 new_position)
+{
+  const float3 position_delta = new_position - positions_[index];
+  if (!this->handle_start_is_automatic(index)) {
+    handle_positions_start_[index] += position_delta;
+  }
+  if (!this->handle_end_is_automatic(index)) {
+    handle_positions_end_[index] += position_delta;
+  }
+  positions_[index] = new_position;
 }
 
 bool BezierSpline::segment_is_vector(const int index) const
@@ -748,26 +809,26 @@ static void evaluate_segment_mapping(Span<float3> evaluated_positions,
   }
 }
 
-void BezierSpline::evaluate_bezier_segment(const int first_index,
+void BezierSpline::evaluate_bezier_segment(const int index,
                                            const int next_index,
                                            int &offset,
                                            MutableSpan<float3> positions,
                                            MutableSpan<PointMapping> mappings) const
 {
-  if (this->segment_is_vector(first_index)) {
-    positions[offset] = positions_[first_index];
-    mappings[offset] = PointMapping{first_index, 0.0f};
+  if (this->segment_is_vector(index)) {
+    positions[offset] = positions_[index];
+    mappings[offset] = PointMapping{index, 0.0f};
     offset++;
   }
   else {
-    bezier_forward_difference_3d(this->positions_[first_index],
-                                 this->handle_positions_end_[first_index],
+    bezier_forward_difference_3d(this->positions_[index],
+                                 this->handle_positions_end_[index],
                                  this->handle_positions_start_[next_index],
                                  this->positions_[next_index],
                                  positions.slice(offset, this->resolution_u_));
     evaluate_segment_mapping(positions.slice(offset, this->resolution_u_),
                              mappings.slice(offset, this->resolution_u_),
-                             first_index);
+                             index);
     offset += this->resolution_u_;
   }
 }
@@ -790,7 +851,7 @@ void BezierSpline::evaluate_bezier_position_and_mapping(MutableSpan<float3> posi
     /* Since evaulating the bezier doesn't add the final point's position,
      * it must be added manually in the non-cyclic case. */
     positions[offset] = this->positions_.last();
-    mappings[offset] = PointMapping{i_last, 0.0f};
+    mappings[offset] = PointMapping{i_last - 1, 1.0f};
     offset++;
   }
 
@@ -865,10 +926,10 @@ void NURBSpline::add_point(const float3 position,
 void NURBSpline::drop_front(const int count)
 {
   BLI_assert(this->size() - count > 0);
-  vector_drop_front(this->positions_, count);
-  vector_drop_front(this->radii_, count);
-  vector_drop_front(this->tilts_, count);
-  vector_drop_front(this->weights_, count);
+  this->positions_.remove(0, count);
+  this->radii_.remove(0, count);
+  this->tilts_.remove(0, count);
+  this->weights_.remove(0, count);
   this->mark_cache_invalid();
 }
 
@@ -970,9 +1031,9 @@ void PolySpline::add_point(const float3 position, const float radius, const floa
 void PolySpline::drop_front(const int count)
 {
   BLI_assert(this->size() - count > 0);
-  vector_drop_front(this->positions_, count);
-  vector_drop_front(this->radii_, count);
-  vector_drop_front(this->tilts_, count);
+  this->positions_.remove(0, count);
+  this->radii_.remove(0, count);
+  this->tilts_.remove(0, count);
   this->mark_cache_invalid();
 }
 
@@ -1020,9 +1081,9 @@ void PolySpline::correct_end_tangents() const
 {
 }
 
+/* TODO: Consider refactoring to avoid copying and "mapping" for poly splines. */
 void PolySpline::ensure_base_cache() const
 {
-
   if (!this->base_cache_dirty_) {
     return;
   }
