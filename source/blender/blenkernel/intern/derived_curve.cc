@@ -515,9 +515,8 @@ Spline::LookupResult Spline::lookup_evaluated_length(const float length) const
   const float *offset = std::lower_bound(lengths.begin(), lengths.end(), length);
   const int index = offset - lengths.begin();
 
-  const float segment_length = lengths[index];
   const float previous_length = (index == 0) ? 0.0f : lengths[index - 1];
-  const float factor = (length - previous_length) / (segment_length - previous_length);
+  const float factor = (length - previous_length) / (lengths[index] - previous_length);
 
   return LookupResult{index, factor};
 }
@@ -634,7 +633,6 @@ void BezierSpline::add_point(const float3 position,
 
 void BezierSpline::drop_front(const int count)
 {
-  std::cout << __func__ << ": " << count << "\n";
   BLI_assert(this->size() - count > 0);
   this->handle_types_start_.remove(0, count);
   this->handle_positions_start_.remove(0, count);
@@ -648,7 +646,6 @@ void BezierSpline::drop_front(const int count)
 
 void BezierSpline::drop_back(const int count)
 {
-  std::cout << __func__ << ": " << count << "\n";
   const int new_size = this->size() - count;
   BLI_assert(new_size > 0);
   this->handle_types_start_.resize(new_size);

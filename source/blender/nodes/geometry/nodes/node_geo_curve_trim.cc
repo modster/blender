@@ -67,25 +67,20 @@ static void geo_node_curve_trim_update(bNodeTree *UNUSED(ntree), bNode *node)
 
 namespace blender::nodes {
 
-static void interpolate_control_point(Spline &spline, const Spline::LookupResult lookup)
+static void interpolate_control_point(Spline &spline,
+                                      const bool adjust_next,
+                                      const Spline::LookupResult lookup)
 {
   const int evaluated_index = lookup.evaluated_index;
   Span<PointMapping> mappings = spline.evaluated_mappings();
   const PointMapping &mapping = mappings[evaluated_index];
-  const int index = mapping.control_point_index;
+  const int index = mapping.control_point_index + (adjust_next ? 1 : 0);
 
   Span<float3> evaluated_positions = spline.evaluated_positions();
 
-  const float3 new_position = float3::interpolate(evaluated_positions[evaluated_index],
+  spline.positions()[index] = float3::interpolate(evaluated_positions[evaluated_index],
                                                   evaluated_positions[evaluated_index + 1],
                                                   lookup.factor);
-  if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(&spline)) {
-    /* TODO: This could be converted to a virtual function in the Spline class. */
-    bezier_spline->move_control_point(index, new_position);
-  }
-  else {
-    spline.positions()[index] = new_position;
-  }
 
   /* TODO: Do this interpolation with attributes instead. */
 
@@ -109,6 +104,25 @@ static void interpolate_control_point(Spline &spline, const Spline::LookupResult
         weights.as_span(), neighboring_weights.as_mutable_span(), evaluated_index);
     weights[index] = interpf(neighboring_weights[1], neighboring_weights[0], lookup.factor);
   }
+  else if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(&spline)) {
+    MutableSpan<float3> handle_positions_start = bezier_spline->handle_positions_start();
+    Array<float3, 2> neighboring_handle_positions_start(2);
+    spline.interpolate_data_to_evaluated_points(
+        handle_positions_start.as_span(),
+        neighboring_handle_positions_start.as_mutable_span(),
+        evaluated_index);
+    handle_positions_start[index] = float3::interpolate(neighboring_handle_positions_start[0],
+                                                        neighboring_handle_positions_start[1],
+                                                        lookup.factor);
+
+    MutableSpan<float3> handle_positions_end = bezier_spline->handle_positions_end();
+    Array<float3, 2> neighboring_handle_positions_end(2);
+    spline.interpolate_data_to_evaluated_points(handle_positions_end.as_span(),
+                                                neighboring_handle_positions_end.as_mutable_span(),
+                                                evaluated_index);
+    handle_positions_end[index] = float3::interpolate(
+        neighboring_handle_positions_end[0], neighboring_handle_positions_end[1], lookup.factor);
+  }
 }
 
 static void trim_spline(Spline &spline,
@@ -122,18 +136,18 @@ static void trim_spline(Spline &spline,
 
   const int points_len = spline.size();
   const int start_index = mappings[start.evaluated_index].control_point_index;
-  const int end_index = std::min(mappings[end.evaluated_index].control_point_index + 1,
-                                 points_len - 1);
+  const int end_index = std::min(mappings[end.evaluated_index].control_point_index + 2,
+                                 points_len);
 
   if (!(start.evaluated_index == 0 && start.factor == 0.0f)) {
-    interpolate_control_point(spline, start);
+    interpolate_control_point(spline, false, start);
   }
   if (end.evaluated_index != spline.evaluated_points_size() - 1) {
-    interpolate_control_point(spline, end);
+    interpolate_control_point(spline, true, end);
   }
 
   spline.drop_back(std::min(points_len - end_index, points_len));
-  spline.drop_front(std::max(start_index - 1, 0));
+  spline.drop_front(std::max(start_index, 0));
 }
 
 static void geo_node_curve_trim_exec(GeoNodeExecParams params)
