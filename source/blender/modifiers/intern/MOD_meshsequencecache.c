@@ -68,8 +68,8 @@
 
 #ifdef WITH_USD
 #  include "BKE_global.h"
-#  include "BKE_library.h"
 #  include "BKE_lib_id.h"
+#  include "BKE_library.h"
 #  include "usd.h"
 #endif
 
