@@ -117,7 +117,11 @@ set(SRC
   intern/customdata_file.c
   intern/data_transfer.c
   intern/deform.c
-  intern/derived_curve.cc
+  intern/derived_curve.cc  
+  intern/derived_curve_spline_base.cc
+  intern/derived_curve_spline_bezier.cc
+  intern/derived_curve_spline_nurbs.cc
+  intern/derived_curve_spline_poly.cc
   intern/displist.cc
   intern/displist_tangent.c
   intern/dynamicpaint.c
