@@ -177,8 +177,9 @@ Vector<const GeometryComponent *> GeometrySet::get_components_for_read() const
 Vector<GeometryComponent *> GeometrySet::get_components_for_write()
 {
   Vector<GeometryComponent *> components;
-  for (GeometryComponentPtr &ptr : components_.values()) {
-    components.append(ptr.get());
+
+  for (const GeometryComponentType component_type : components_.keys()) {
+    components.append(&this->get_component_for_write(component_type));
   }
   return components;
 }
