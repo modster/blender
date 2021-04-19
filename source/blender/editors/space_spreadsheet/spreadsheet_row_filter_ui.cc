@@ -84,7 +84,7 @@ static std::string value_string(const SpreadsheetRowFilter &row_filter,
       return (row_filter.flag & SPREADSHEET_ROW_FILTER_BOOL_VALUE) ? IFACE_("True") :
                                                                      IFACE_("False");
     case SPREADSHEET_VALUE_TYPE_INSTANCES:
-      BLI_assert_unreachable();
+      /* Not supported at the moment. */
       return "";
   }
   BLI_assert_unreachable();
@@ -145,7 +145,7 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
   row = uiLayoutRow(layout, true);
   uiLayoutSetEmboss(row, UI_EMBOSS_NONE);
   const int current_index = BLI_findindex(&sspreadsheet->row_filters, filter);
-  uiItemIntO(row, "", ICON_X, "SPREADSHEET_OT_remove_rule", "index", current_index);
+  uiItemIntO(row, "", ICON_X, "SPREADSHEET_OT_remove_row_filter_rule", "index", current_index);
 
   /* Some padding so the X isn't too close to the drag icon. */
   uiItemS_ex(layout, 0.25f);
@@ -213,7 +213,7 @@ static void spreadsheet_row_filters_layout(const bContext *C, Panel *panel)
   uiItemR(layout, &sspreadsheet_ptr, "show_only_selected", 0, IFACE_("Selected Only"), ICON_NONE);
   //   }
 
-  uiItemO(layout, nullptr, ICON_ADD, "SPREADSHEET_OT_add_rule");
+  uiItemO(layout, nullptr, ICON_ADD, "SPREADSHEET_OT_add_row_filter_rule");
 
   const bool panels_match = UI_panel_list_matches_data(region, row_filters, filter_panel_id_fn);
 
