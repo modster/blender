@@ -344,10 +344,6 @@ static void update_visible_columns(ListBase &columns, DataSource &data_source)
       if (used_ids.add(column_id)) {
         SpreadsheetColumnID *new_id = spreadsheet_column_id_copy(&column_id);
         SpreadsheetColumn *new_column = spreadsheet_column_new(new_id);
-
-        /* Copy the current data type to the column storage for convenience. */
-        spreadsheet_column_assign_runtime_data(new_column, values->type(), values->name());
-
         BLI_addtail(&columns, new_column);
       }
     }
@@ -376,6 +372,9 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
     const ColumnValues *values = scope.add(std::move(values_ptr), __func__);
     const int width = get_column_width_in_pixels(*values);
     spreadsheet_layout.columns.append({values, width});
+
+    /* Copy the current data type to the column storage for convenience. */
+    spreadsheet_column_assign_runtime_data(column, values->type(), values->name());
   }
 
   const int tot_rows = data_source->tot_rows();
