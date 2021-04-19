@@ -177,8 +177,8 @@ static pxr::TfToken get_source_color_space(const pxr::UsdShadeShader &usd_shader
 /* Attempts to return in r_preview_surface the UsdPreviewSurface shader source
  * of the given material.  Returns true if a UsdPreviewSurface source was found
  * and returns false otherwise. */
-bool get_usd_preview_surface(const pxr::UsdShadeMaterial &usd_material,
-                             pxr::UsdShadeShader &r_preview_surface)
+static bool get_usd_preview_surface(const pxr::UsdShadeMaterial &usd_material,
+                                    pxr::UsdShadeShader &r_preview_surface)
 {
   if (!usd_material) {
     return false;
@@ -198,7 +198,7 @@ bool get_usd_preview_surface(const pxr::UsdShadeMaterial &usd_material,
 
 /* Set the Blender material's viewport display color, metallic and roughness
  * properties from the given USD preview surface shader's inputs. */
-void set_viewport_material_props(Material *mtl, const pxr::UsdShadeShader &usd_preview)
+static void set_viewport_material_props(Material *mtl, const pxr::UsdShadeShader &usd_preview)
 {
   if (!(mtl && usd_preview)) {
     return;
@@ -645,13 +645,14 @@ void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
  * UsdPrimvarReader_float2 shaders output UV coordinates.
  * TODO(makowalski): investigate supporting conversion to other Blender node types
  * (e.g., Attribute Nodes) if needed. */
-void USDMaterialReader::convert_usd_primvar_reader_float2(const pxr::UsdShadeShader &usd_shader,
-                                                          const pxr::TfToken &usd_source_name,
-                                                          bNode *dest_node,
-                                                          const char *dest_socket_name,
-                                                          bNodeTree *ntree,
-                                                          const int column,
-                                                          NodePlacementContext &r_ctx) const
+void USDMaterialReader::convert_usd_primvar_reader_float2(
+    const pxr::UsdShadeShader &usd_shader,
+    const pxr::TfToken & /* usd_source_name */,
+    bNode *dest_node,
+    const char *dest_socket_name,
+    bNodeTree *ntree,
+    const int column,
+    NodePlacementContext &r_ctx) const
 {
   if (!usd_shader || !dest_node || !ntree || !dest_socket_name || !bmain_) {
     return;

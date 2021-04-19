@@ -48,7 +48,7 @@ struct NodePlacementContext {
         origy(in_origy),
         column_offsets(64, 0.0f),
         horizontal_step(in_horizontal_step),
-        vertical_step(in_horizontal_step)
+        vertical_step(in_vertical_step)
   {
   }
 };
