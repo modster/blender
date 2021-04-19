@@ -45,11 +45,11 @@ static int row_filter_add_exec(bContext *C, wmOperator *UNUSED(op))
   return OPERATOR_FINISHED;
 }
 
-static void SPREADSHEET_OT_add_rule(wmOperatorType *ot)
+static void SPREADSHEET_OT_add_row_filter_rule(wmOperatorType *ot)
 {
   ot->name = "Add Row Filter";
   ot->description = "Add a filter to remove rows from the displayed data";
-  ot->idname = "SPREADSHEET_OT_add_rule";
+  ot->idname = "SPREADSHEET_OT_add_row_filter_rule";
 
   ot->exec = row_filter_add_exec;
   ot->poll = ED_operator_spreadsheet_active;
@@ -75,11 +75,11 @@ static int row_filter_remove_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static void SPREADSHEET_OT_remove_rule(wmOperatorType *ot)
+static void SPREADSHEET_OT_remove_row_filter_rule(wmOperatorType *ot)
 {
   ot->name = "Remove Row Filter";
   ot->description = "Remove a row filter from the rules";
-  ot->idname = "SPREADSHEET_OT_remove_rule";
+  ot->idname = "SPREADSHEET_OT_remove_row_filter_rule";
 
   ot->exec = row_filter_remove_exec;
   ot->poll = ED_operator_spreadsheet_active;
@@ -91,6 +91,6 @@ static void SPREADSHEET_OT_remove_rule(wmOperatorType *ot)
 
 void spreadsheet_operatortypes()
 {
-  WM_operatortype_append(SPREADSHEET_OT_add_rule);
-  WM_operatortype_append(SPREADSHEET_OT_remove_rule);
+  WM_operatortype_append(SPREADSHEET_OT_add_row_filter_rule);
+  WM_operatortype_append(SPREADSHEET_OT_remove_row_filter_rule);
 }
