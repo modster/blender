@@ -2,6 +2,7 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_object_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
@@ -16,35 +17,13 @@ layout(std140) uniform lights_culling_block
 };
 
 uniform usampler2D lights_culling_tx;
+uniform sampler2DArray utility_tx;
 
 layout(location = 0, index = 0) out vec4 outRadiance;
 layout(location = 0, index = 1) out vec4 outTransmittance;
 
 MeshData g_surf;
 ivec4 g_closure_data[8];
-
-vec3 light_simple(LightData ld, vec4 l_vector)
-{
-  float power = 1.0;
-  if (ld.type != LIGHT_SUN) {
-    /**
-     * Using "Point Light Attenuation Without Singularity" from Cem Yuksel
-     * http://www.cemyuksel.com/research/pointlightattenuation/pointlightattenuation.pdf
-     * http://www.cemyuksel.com/research/pointlightattenuation/
-     **/
-    float d = l_vector.w;
-    float d_sqr = sqr(d);
-    float r_sqr = 0.01;
-    /* Using reformulation that has better numerical percision. */
-    power = 2.0 / (d_sqr + r_sqr + d * sqrt(d_sqr + r_sqr));
-
-    if (is_area_light(ld.type)) {
-      /* Modulate by light plane orientation / solid angle. */
-      power *= saturate(dot(ld._back, l_vector.xyz / l_vector.w));
-    }
-  }
-  return ld.color * power;
-}
 
 void main(void)
 {
@@ -62,11 +41,13 @@ void main(void)
   vec3 radiance = vec3(0);
   ITEM_FOREACH_BEGIN (light_culling, lights_culling_tx, vP_z, l_idx) {
     LightData light = lights[l_idx];
-    vec4 l_vector;
-    l_vector.xyz = light._position - g_surf.P;
-    l_vector.w = length(l_vector.xyz);
-    radiance += saturate(dot(g_surf.N, l_vector.xyz / l_vector.w)) *
-                light_simple(light, l_vector) * light.volume_power;
+    vec3 L;
+    float dist;
+    light_vector_get(light, g_surf.P, L, dist);
+
+    float intensity = light_diffuse(utility_tx, light, g_surf.N, cameraVec(g_surf.P), L, dist) *
+                      light.diffuse_power;
+    radiance += light.color * intensity * light_attenuation(light, L, dist);
   }
   ITEM_FOREACH_END
 

@@ -354,7 +354,7 @@ enum eLightType : uint32_t {
   LIGHT_POINT = 1u,
   LIGHT_SPOT = 2u,
   LIGHT_RECT = 3u,
-  LIGHT_ELIPSE = 4u
+  LIGHT_ELLIPSE = 4u
 };
 
 static inline bool is_area_light(eLightType type)
@@ -363,22 +363,14 @@ static inline bool is_area_light(eLightType type)
 }
 
 struct LightData {
-  /** Normalized obmat. Last column contains data accessible using the following macros.
-   * _area_size_x
-   * _spot_scale_x
-   * _area_size_y
-   * _spot_scale_y
-   * _influence_radius_surface
-   * _influence_radius_volume
-   */
+  /** Normalized obmat. Last column contains data accessible using the following macros. */
   mat4 object_mat;
   /** Packed data in the last column of the object_mat. */
 #define _area_size_x object_mat[0][3]
 #define _area_size_y object_mat[1][3]
-#define _spot_scale_x _area_size_x
-#define _spot_scale_y _area_size_y
-#define _spot_size object_mat[2][3]
-#define _spot_blend object_mat[3][3]
+#define _radius _area_size_x
+#define _spot_mul object_mat[2][3]
+#define _spot_bias object_mat[3][3]
   /** Aliases for axes. */
 #ifdef __cplusplus
 #  define _right object_mat[0]
@@ -405,13 +397,14 @@ struct LightData {
   float diffuse_power;
   float specular_power;
   float volume_power;
-  /** Sphere radius for point & spot lights, or disk radius for sun. */
-  float sphere_radius;
-  /** Special radius factor for volumetric lighting. */
-  float volume_radius;
-  /** Light Type */
+  /** Special radius factor for point lighting. */
+  float radius_squared;
+  /** Light Type. */
   eLightType type;
-  int _pad0, _pad1, _pad2;
+  /** Spot size. Aligned to size of vec2. */
+  vec2 spot_size_inv;
+  float _pad0;
+  float _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
@@ -423,6 +416,27 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
 /** Max cascade count for sun shadows. */
 #define SHADOW_CASCADE_MAX 4
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Utility Texture
+ * \{ */
+
+#define UTIL_TEX_SIZE 64
+#define UTIL_BTDF_LAYER_COUNT 16
+/* Scale and bias to avoid interpolation of the border pixel.
+ * Remap UVs to the border pixels centers. */
+#define UTIL_TEX_UV_SCALE ((UTIL_TEX_SIZE - 1.0f) / UTIL_TEX_SIZE)
+#define UTIL_TEX_UV_BIAS (0.5f / UTIL_TEX_SIZE)
+
+#define UTIL_BLUE_NOISE_LAYER 0
+#define UTIL_LTC_MAT_LAYER 1
+#define UTIL_LTC_MAG_LAYER 2
+#define UTIL_BSDF_LAYER 2
+#define UTIL_BTDF_LAYER 3
+#define UTIL_DISK_INTEGRAL_LAYER 3
+#define UTIL_DISK_INTEGRAL_COMP 2
 
 /** \} */
 

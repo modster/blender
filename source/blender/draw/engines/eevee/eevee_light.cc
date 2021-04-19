@@ -32,7 +32,7 @@ namespace blender::eevee {
 /** \name LightData
  * \{ */
 
-static eLightType to_light_type(short blender_light_type)
+static eLightType to_light_type(short blender_light_type, short blender_area_type)
 {
   switch (blender_light_type) {
     default:
@@ -43,7 +43,7 @@ static eLightType to_light_type(short blender_light_type)
     case LA_SPOT:
       return LIGHT_SPOT;
     case LA_AREA:
-      return ELEM(blender_light_type, LA_AREA_DISK, LA_AREA_ELLIPSE) ? LIGHT_ELIPSE : LIGHT_RECT;
+      return ELEM(blender_area_type, LA_AREA_DISK, LA_AREA_ELLIPSE) ? LIGHT_ELLIPSE : LIGHT_RECT;
   }
 }
 
@@ -88,7 +88,7 @@ Light::Light(const Object *ob, float threshold)
   this->diffuse_power = la->diff_fac * shape_power;
   this->specular_power = la->spec_fac * shape_power;
   this->volume_power = la->volume_fac * shape_power_volume_get(la);
-  this->type = to_light_type(la->type);
+  this->type = to_light_type(la->type, la->area_shape);
   /* No shadow by default */
   this->shadow_id = -1;
 }
@@ -111,27 +111,34 @@ float Light::attenuation_radius_get(const ::Light *la, float light_threshold, fl
 
 void Light::shape_parameters_set(const ::Light *la, const float scale[3])
 {
-  if (la->type == LA_SPOT) {
-    /* Spot size & blend */
-    this->_spot_scale_x = scale[0] / scale[2];
-    this->_spot_scale_y = scale[1] / scale[2];
-    this->_spot_size = cosf(la->spotsize * 0.5f);
-    this->_spot_blend = (1.0f - this->_spot_size) * la->spotblend;
-    sphere_radius = max_ff(0.001f, la->area_size);
-  }
-  else if (la->type == LA_AREA) {
+  if (la->type == LA_AREA) {
     float area_size_y = (ELEM(la->area_shape, LA_AREA_RECT, LA_AREA_ELLIPSE)) ? la->area_sizey :
                                                                                 la->area_size;
-    this->_area_size_x = max_ff(0.003f, la->area_size * scale[0] * 0.5f);
-    this->_area_size_y = max_ff(0.003f, area_size_y * scale[1] * 0.5f);
+    _area_size_x = max_ff(0.003f, la->area_size * scale[0] * 0.5f);
+    _area_size_y = max_ff(0.003f, area_size_y * scale[1] * 0.5f);
     /* For volume point lighting. */
-    sphere_radius = max_ff(0.001f, hypotf(_area_size_x, _area_size_y) * 0.5f);
-  }
-  else if (la->type == LA_SUN) {
-    sphere_radius = max_ff(0.001f, tanf(min_ff(la->sun_angle, DEG2RADF(179.9f)) / 2.0f));
+    radius_squared = max_ff(0.001f, hypotf(_area_size_x, _area_size_y) * 0.5f);
+    radius_squared = square_f(radius_squared);
   }
   else {
-    sphere_radius = max_ff(0.001f, la->area_size);
+    if (la->type == LA_SPOT) {
+      /* Spot size & blend */
+      spot_size_inv[0] = scale[2] / scale[0];
+      spot_size_inv[1] = scale[2] / scale[1];
+      float spot_size = cosf(la->spotsize * 0.5f);
+      float spot_blend = (1.0f - spot_size) * la->spotblend;
+      _spot_mul = 1.0f / max_ff(1e-8f, spot_blend);
+      _spot_bias = -spot_size * _spot_mul;
+    }
+
+    if (la->type == LA_SUN) {
+      _area_size_x = max_ff(0.001f, tanf(min_ff(la->sun_angle, DEG2RADF(179.9f)) / 2.0f));
+      _area_size_y = _area_size_x;
+    }
+    else {
+      _area_size_x = _area_size_y = max_ff(0.001f, la->area_size);
+    }
+    radius_squared = square_f(_area_size_x);
   }
 }
 
@@ -151,10 +158,10 @@ float Light::shape_power_get(const ::Light *la)
     }
   }
   else if (ELEM(la->type, LA_SPOT, LA_LOCAL)) {
-    power = 1.0f / (4.0f * square_f(this->sphere_radius) * float(M_PI * M_PI));
+    power = 1.0f / (4.0f * square_f(_radius) * float(M_PI * M_PI));
   }
   else { /* LA_SUN */
-    power = 1.0f / (square_f(this->sphere_radius) * float(M_PI));
+    power = 1.0f / (square_f(_radius) * float(M_PI));
     /* Make illumination power closer to cycles for bigger radii. Cycles uses a cos^3 term that
      * we cannot reproduce so we account for that by scaling the light power. This function is
      * the result of a rough manual fitting. */
@@ -174,7 +181,7 @@ float Light::shape_power_volume_get(const ::Light *la)
 
     /* This corrects for area light most representative point trick. The fit was found by
      * reducing the average error compared to cycles. */
-    float area = this->_area_size_x * this->_area_size_y;
+    float area = _area_size_x * _area_size_y;
     float tmp = M_PI_2 / (M_PI_2 + sqrtf(area));
     /* Lerp between 1.0 and the limit (1 / pi). */
     power *= tmp + (1.0f - tmp) * M_1_PI;
@@ -193,7 +200,6 @@ float Light::shape_power_volume_get(const ::Light *la)
 void Light::debug_draw(void)
 {
   const float color[4] = {0.8, 0.3, 0, 1};
-  DRW_debug_sphere(_position, sphere_radius, color);
   DRW_debug_sphere(_position, influence_radius_max, color);
 }
 
@@ -231,8 +237,17 @@ void LightModule::set_view(const DRWView *view, const int extent[2])
     Light &light = lights_[light_id];
 
     BoundSphere bsphere;
-    copy_v3_v3(bsphere.center, light._position);
-    bsphere.radius = light.influence_radius_max;
+    if (light.type == LIGHT_SUN) {
+      /* Make sun lights cover the whole frustum. */
+      float viewinv[4][4];
+      DRW_view_viewmat_get(view, viewinv, true);
+      copy_v3_v3(bsphere.center, viewinv[3]);
+      bsphere.radius = fabsf(DRW_view_far_distance_get(view));
+    }
+    else {
+      copy_v3_v3(bsphere.center, light._position);
+      bsphere.radius = light.influence_radius_max;
+    }
 
     culling_.insert(light_id, bsphere);
   }

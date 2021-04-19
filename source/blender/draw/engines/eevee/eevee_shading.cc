@@ -59,6 +59,7 @@ void ForwardPass::surface_add(Object *ob, Material *mat, int matslot)
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.data_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ubo_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
+  DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
   DRW_shgroup_call(grp, geom, ob);
 }
 

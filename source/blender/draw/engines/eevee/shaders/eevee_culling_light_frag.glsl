@@ -34,7 +34,7 @@ void main(void)
       case LIGHT_SPOT:
         /* TODO cone culling. */
       case LIGHT_RECT:
-      case LIGHT_ELIPSE:
+      case LIGHT_ELLIPSE:
       case LIGHT_POINT:
         Sphere sphere = Sphere(light._position, light.influence_radius_max);
         intersect_tile = culling_sphere_tile_isect(sphere, tile);

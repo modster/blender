@@ -155,6 +155,46 @@ class Texture {
   Texture() : name_("eevee::Texture"){};
   Texture(const char *name) : name_(name){};
 
+  Texture(const char *name,
+          int w,
+          int h = 0,
+          int d = 0,
+          int mips = 1,
+          eGPUTextureFormat format = GPU_RGBA8,
+          float *data = nullptr,
+          bool layered = false,
+          bool cubemap = false)
+      : Texture(name)
+  {
+    if (h == 0) {
+      tx_ = GPU_texture_create_1d(name, w, mips, format, data);
+    }
+    else if (d == 0) {
+      if (layered) {
+        tx_ = GPU_texture_create_1d_array(name, w, h, mips, format, data);
+      }
+      else {
+        tx_ = GPU_texture_create_2d(name, w, h, mips, format, data);
+      }
+    }
+    else if (cubemap) {
+      if (layered) {
+        tx_ = GPU_texture_create_cube_array(name, w, d, mips, format, data);
+      }
+      else {
+        tx_ = GPU_texture_create_cube(name, w, mips, format, data);
+      }
+    }
+    else {
+      if (layered) {
+        tx_ = GPU_texture_create_2d_array(name, w, h, d, mips, format, data);
+      }
+      else {
+        tx_ = GPU_texture_create_3d(name, w, h, d, mips, format, GPU_DATA_FLOAT, data);
+      }
+    }
+  }
+
   ~Texture()
   {
     GPU_TEXTURE_FREE_SAFE(tx_);
