@@ -204,14 +204,10 @@ static void spreadsheet_row_filters_layout(const bContext *C, Panel *panel)
   bScreen *screen = CTX_wm_screen(C);
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
   ListBase *row_filters = &sspreadsheet->row_filters;
-  //   const DataSource *data_source = sspreadsheet->runtime->data_source;
 
-  //   if (data_source != nullptr &&
-  //       spreadsheet_data_source_has_selection_filter(*sspreadsheet, *data_source)) {
   PointerRNA sspreadsheet_ptr;
   RNA_pointer_create(&screen->id, &RNA_SpaceSpreadsheet, sspreadsheet, &sspreadsheet_ptr);
   uiItemR(layout, &sspreadsheet_ptr, "show_only_selected", 0, IFACE_("Selected Only"), ICON_NONE);
-  //   }
 
   uiItemO(layout, nullptr, ICON_ADD, "SPREADSHEET_OT_add_row_filter_rule");
 

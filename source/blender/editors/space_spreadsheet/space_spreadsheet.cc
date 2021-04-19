@@ -394,8 +394,6 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
   ED_region_tag_redraw(footer);
   ARegion *sidebar = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_UI);
   ED_region_tag_redraw(sidebar);
-
-  // sspreadsheet->runtime->data_source = *data_source;
 }
 
 static void spreadsheet_main_region_listener(const wmRegionListenerParams *params)

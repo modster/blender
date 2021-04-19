@@ -16,15 +16,10 @@
 
 #pragma once
 
-#include "spreadsheet_data_source.hh"
-
 typedef struct SpaceSpreadsheet_Runtime {
   int visible_rows;
   int tot_rows;
   int tot_columns;
-
-  // /* Cached data source from the main region redraw. */
-  // DataSource &data_source;
 } SpaceSpreadsheet_Runtime;
 
 void spreadsheet_operatortypes(void);
