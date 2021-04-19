@@ -1318,6 +1318,11 @@ typedef struct NodeGeometryMeshLine {
   uint8_t count_mode;
 } NodeGeometryMeshLine;
 
+typedef struct NodeSwitch {
+  /* NodeSwitch. */
+  uint8_t input_type;
+} NodeSwitch;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
