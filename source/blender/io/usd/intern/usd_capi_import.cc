@@ -110,23 +110,6 @@ static bool gather_objects_paths(const pxr::UsdPrim &object, ListBase *object_pa
   return true;
 }
 
-/* Create a collection with the given parent and name. */
-static Collection *create_collection(Main *bmain, Collection *parent, const char *name)
-{
-  if (!bmain) {
-    return nullptr;
-  }
-
-  Collection *coll = BKE_collection_add(bmain, parent, name);
-
-  if (coll) {
-    id_fake_user_set(&coll->id);
-    DEG_id_tag_update(&coll->id, ID_RECALC_COPY_ON_WRITE);
-  }
-
-  return coll;
-}
-
 // Update the given import settings with the global rotation matrix to orient
 // imported objects with Z-up, if necessary
 static void set_global_rotation(pxr::UsdStageRefPtr stage, ImportSettings &r_settings)
@@ -451,7 +434,7 @@ bool USD_import(struct bContext *C,
   return import_ok;
 }
 
-static USDPrimReader *get_usd_reader(CacheReader *reader, Object *ob, const char **err_str)
+static USDPrimReader *get_usd_reader(CacheReader *reader, Object * /* ob */, const char **err_str)
 {
   USDPrimReader *usd_reader = reinterpret_cast<USDPrimReader *>(reader);
   pxr::UsdPrim iobject = usd_reader->prim();
