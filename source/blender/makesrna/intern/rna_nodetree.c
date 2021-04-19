@@ -9680,6 +9680,43 @@ static void def_geo_switch(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_attribute_transfer(StructRNA *srna)
+{
+  static EnumPropertyItem mapping_items[] = {
+      {GEO_NODE_ATTRIBUTE_TRANSFER_MAPPING_NEAREST_INTERPOLATED,
+       "NEAREST_INTERPOLATED",
+       0,
+       "Nearest Interpolated",
+       "Transfer the value from the nearest point on the surface"},
+      {GEO_NODE_ATTRIBUTE_TRANSFER_MAPPING_NEAREST,
+       "NEAREST",
+       0,
+       "Nearest",
+       "Transfer the value from the nearest element on the surface, without interpolation"},
+      {GEO_NODE_ATTRIBUTE_TRANSFER_MAPPING_TOPOLOGY,
+       "TOPOLOGY",
+       0,
+       "Topology",
+       "Transfer the values from a geometry with the same topology"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryAttributeTransfer", "storage");
+
+  prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_attribute_domain_with_auto_items);
+  RNA_def_property_enum_default(prop, ATTR_DOMAIN_AUTO);
+  RNA_def_property_ui_text(prop, "Domain", "The geometry domain to save the result attribute in");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "mapping", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mapping_items);
+  RNA_def_property_ui_text(prop, "Mapping", "Mapping between geometries");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 /* -------------------------------------------------------------------------- */
 
 static void rna_def_shader_node(BlenderRNA *brna)
