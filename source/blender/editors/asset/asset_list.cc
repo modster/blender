@@ -314,7 +314,7 @@ bool AssetList::listen(const wmNotifier &notifier) const
       if (ELEM(notifier.data, ND_ASSET_LIST, ND_ASSET_LIST_READING, ND_ASSET_LIST_PREVIEW)) {
         return true;
       }
-      if (ELEM(notifier.action, NA_ADDED, NA_REMOVED)) {
+      if (ELEM(notifier.action, NA_ADDED, NA_REMOVED, NA_EDITED)) {
         return true;
       }
       break;

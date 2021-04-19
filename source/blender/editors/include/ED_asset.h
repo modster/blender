@@ -86,6 +86,9 @@ void ED_operatortypes_asset(void);
 
 /* TODO move to C++ asset-list header? */
 #ifdef __cplusplus
+
+#  include <string>
+
 std::string ED_assetlist_asset_filepath_get(const bContext *C,
                                             const AssetLibraryReference &library_reference,
                                             const AssetHandle &asset_handle);

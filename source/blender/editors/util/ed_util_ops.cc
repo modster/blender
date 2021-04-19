@@ -39,6 +39,7 @@
 #include "BLT_translation.h"
 
 #include "ED_armature.h"
+#include "ED_asset.h"
 #include "ED_render.h"
 #include "ED_undo.h"
 #include "ED_util.h"
@@ -140,6 +141,7 @@ static int lib_id_generate_preview_exec(bContext *C, wmOperator *UNUSED(op))
   UI_icon_render_id(C, nullptr, id, ICON_SIZE_PREVIEW, true);
 
   WM_event_add_notifier(C, NC_ASSET | NA_EDITED, nullptr);
+  ED_assetlist_storage_tag_main_data_dirty();
 
   return OPERATOR_FINISHED;
 }
