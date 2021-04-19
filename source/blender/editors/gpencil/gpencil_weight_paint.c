@@ -37,6 +37,7 @@
 #include "BKE_context.h"
 #include "BKE_deform.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_geom.h"
 #include "BKE_main.h"
 #include "BKE_object_deform.h"
 #include "BKE_report.h"
@@ -640,7 +641,6 @@ static bool gpencil_weightpaint_brush_do_frame(bContext *C,
    *--------------------------------------------------------------------- */
   bool changed = false;
   for (i = 0; i < gso->pbuffer_used; i++) {
-    changed = true;
     selected = &gso->pbuffer[i];
 
     switch (tool) {
@@ -652,6 +652,10 @@ static bool gpencil_weightpaint_brush_do_frame(bContext *C,
       default:
         printf("ERROR: Unknown type of GPencil Weight Paint brush\n");
         break;
+    }
+
+    if (changed && GPENCIL_STROKE_TYPE_BEZIER(selected->gps)) {
+      BKE_gpencil_stroke_geometry_update(gso->gpd, selected->gps, GP_GEO_UPDATE_DEFAULT);
     }
   }
   /* Clear the selected array, but keep the memory allocation.*/

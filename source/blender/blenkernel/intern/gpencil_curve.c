@@ -45,6 +45,7 @@
 #include "BKE_collection.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_deform.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
@@ -1589,6 +1590,41 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
   }
   gps->flag &= ~GP_STROKE_SELECT;
   BKE_gpencil_stroke_select_index_reset(gps);
+
+  /* Interpolate weights. */
+  if (editcurve->dvert != NULL &&
+      (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_WEIGHT))) {
+    for (int i = 0, idx = 0; i < editcurve->tot_curve_points - 1; i++) {
+      MDeformVert *dv_curr = &editcurve->dvert[i];
+      MDeformVert *dv_next = &editcurve->dvert[i + 1];
+
+      if (dv_curr->totweight == 0 || dv_next->totweight == 0) {
+        continue;
+      }
+
+      int segment_length = (adaptive) ? segment_length_cache[i] : resolution;
+      for (int j = 0; j < segment_length; j++) {
+        MDeformVert *dvert = &gps->dvert[idx + j];
+        BKE_defvert_copy(dvert, dv_curr);
+        float t = (float)j / (float)segment_length;
+        for (int d = 0; d < dv_curr->totweight; d++) {
+          MDeformWeight *dw_a = BKE_defvert_ensure_index(dv_curr, d);
+          MDeformWeight *dw_b = BKE_defvert_ensure_index(dv_next, d);
+          MDeformWeight *dw_final = BKE_defvert_ensure_index(dvert, d);
+
+          if (dw_a->weight == dw_b->weight) {
+            dw_final->weight = dw_a->weight;
+          }
+          else {
+            dw_final->weight = smooth_interpf(dw_b->weight, dw_a->weight, t);
+          }
+        }
+      }
+      idx += segment_length;
+    }
+
+    /* TODO: Deal with cyclic strokes. */
+  }
 
   /* free temp data */
   MEM_freeN(points);
