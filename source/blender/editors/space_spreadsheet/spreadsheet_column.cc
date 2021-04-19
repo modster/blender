@@ -59,10 +59,10 @@ SpreadsheetColumn *spreadsheet_column_new(SpreadsheetColumnID *column_id)
 
 void spreadsheet_column_assign_runtime_data(SpreadsheetColumn *column,
                                             const eSpreadsheetColumnValueType data_type,
-                                            const StringRef display_name)
+                                            const StringRefNull display_name)
 {
   column->data_type = data_type;
-  column->display_name = BLI_strdup(display_name.data());
+  column->display_name = BLI_strdup(display_name.c_str());
 }
 
 SpreadsheetColumn *spreadsheet_column_copy(const SpreadsheetColumn *src_column)
