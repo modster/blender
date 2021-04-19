@@ -113,7 +113,9 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
                                                     filter->operation;
 
   const SpreadsheetColumn *column = lookup_visible_column_for_filter(*sspreadsheet, column_name);
-  uiLayoutSetActive(layout, column != nullptr);
+  if (column == nullptr && !column_name.is_empty()) {
+    uiLayoutSetActive(layout, false);
+  }
   if (column != nullptr) {
     /* Set the cache of the last data type in the row filter. Two notes:
      *  - Changing data during drawing can be dangerous and should be done with care.
@@ -160,7 +162,10 @@ static void spreadsheet_filter_panel_draw(const bContext *C, Panel *panel)
                                                     filter->operation;
 
   const SpreadsheetColumn *column = lookup_visible_column_for_filter(*sspreadsheet, column_name);
-  uiLayoutSetActive(layout, column != nullptr && filter->flag & SPREADSHEET_ROW_FILTER_ENABLED);
+  if (!(filter->flag & SPREADSHEET_ROW_FILTER_ENABLED) ||
+      (column == nullptr && !column_name.is_empty())) {
+    uiLayoutSetActive(layout, false);
+  }
   const eSpreadsheetColumnValueType data_type = static_cast<eSpreadsheetColumnValueType>(
       filter->last_data_type);
 
