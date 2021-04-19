@@ -16,7 +16,8 @@
  * The Original Code is Copyright (C) 2019 Blender Foundation.
  * All rights reserved.
  */
-#pragma once
+
+#include "usd_common.h"
 
 #include <pxr/base/plug/registry.h>
 
