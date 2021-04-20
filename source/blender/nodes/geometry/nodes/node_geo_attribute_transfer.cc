@@ -85,7 +85,8 @@ static CustomDataType get_result_data_type(const GeometrySet &geometry,
 
 static void get_closest_pointcloud_point_indices(const PointCloud &pointcloud,
                                                  const VArray<float3> &positions,
-                                                 const MutableSpan<int> r_indices)
+                                                 const MutableSpan<int> r_indices,
+                                                 const MutableSpan<float> r_distances_sq)
 {
   BLI_assert(positions.size() == r_indices.size());
   BLI_assert(pointcloud.totpoint > 0);
@@ -100,6 +101,7 @@ static void get_closest_pointcloud_point_indices(const PointCloud &pointcloud,
     BLI_bvhtree_find_nearest(
         tree_data.tree, position, &nearest, tree_data.nearest_callback, &tree_data);
     r_indices[i] = nearest.index;
+    r_distances_sq[i] = nearest.dist_sq;
   }
 
   free_bvhtree_from_pointcloud(&tree_data);
@@ -107,7 +109,8 @@ static void get_closest_pointcloud_point_indices(const PointCloud &pointcloud,
 
 static void get_closest_mesh_point_indices(const Mesh &mesh,
                                            const VArray<float3> &positions,
-                                           const MutableSpan<int> r_indices)
+                                           const MutableSpan<int> r_indices,
+                                           const MutableSpan<float> r_distances_sq)
 {
   BLI_assert(positions.size() == r_indices.size());
   BLI_assert(mesh.totvert > 0);
@@ -122,6 +125,7 @@ static void get_closest_mesh_point_indices(const Mesh &mesh,
     BLI_bvhtree_find_nearest(
         tree_data.tree, position, &nearest, tree_data.nearest_callback, &tree_data);
     r_indices[i] = nearest.index;
+    r_distances_sq[i] = nearest.dist_sq;
   }
 
   free_bvhtree_from_mesh(&tree_data);
@@ -130,7 +134,8 @@ static void get_closest_mesh_point_indices(const Mesh &mesh,
 static void get_closest_mesh_surface_samples(const Mesh &mesh,
                                              const VArray<float3> &positions,
                                              const MutableSpan<int> r_looptri_indices,
-                                             const MutableSpan<float3> r_positions)
+                                             const MutableSpan<float3> r_positions,
+                                             const MutableSpan<float> r_distances_sq)
 {
   BLI_assert(positions.size() == r_looptri_indices.size());
   BLI_assert(positions.size() == r_positions.size());
@@ -146,6 +151,7 @@ static void get_closest_mesh_surface_samples(const Mesh &mesh,
         tree_data.tree, position, &nearest, tree_data.nearest_callback, &tree_data);
     r_looptri_indices[i] = nearest.index;
     r_positions[i] = nearest.co;
+    r_distances_sq[i] = nearest.dist_sq;
   }
 
   free_bvhtree_from_mesh(&tree_data);
@@ -172,12 +178,10 @@ static void transfer_attribute(const GeometrySet &src_geometry,
   if (pointcloud->totpoint == 0) {
     return;
   }
-  ReadAttributeLookup src_attribute = src_component.attribute_try_get_for_read(src_name);
+  GVArrayPtr src_attribute = src_component.attribute_try_get_for_read(src_name, data_type);
   if (!src_attribute) {
     return;
   }
-  /* TODO: Possibly convert data type. */
-  BLI_assert(src_attribute.varray->type() == type);
 
   OutputAttribute dst_attribute = dst_component.attribute_try_get_for_output_only(
       dst_name, result_domain, data_type);
@@ -189,13 +193,15 @@ static void transfer_attribute(const GeometrySet &src_geometry,
       "position", result_domain, {0, 0, 0});
 
   Array<int> nearest_point_indices(dst_positions.size());
-  get_closest_pointcloud_point_indices(*pointcloud, dst_positions, nearest_point_indices);
+  Array<float> nearest_point_distances_sq(dst_positions.size());
+  get_closest_pointcloud_point_indices(
+      *pointcloud, dst_positions, nearest_point_indices, nearest_point_distances_sq);
 
   BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
 
   for (const int i : dst_positions.index_range()) {
     const int point_index = nearest_point_indices[i];
-    src_attribute.varray->get(point_index, buffer);
+    src_attribute->get(point_index, buffer);
     dst_attribute->set_by_relocate(i, buffer);
   }
 
