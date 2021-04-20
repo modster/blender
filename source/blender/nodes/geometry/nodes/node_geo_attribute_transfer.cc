@@ -21,6 +21,9 @@
 
 #include "BKE_bvhutils.h"
 
+#include "DNA_mesh_types.h"
+#include "DNA_pointcloud_types.h"
+
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_attribute_transfer_in[] = {
@@ -80,6 +83,74 @@ static CustomDataType get_result_data_type(const GeometrySet &geometry,
   return bke::attribute_data_type_highest_complexity(data_types);
 }
 
+static void get_closest_pointcloud_point_indices(const PointCloud &pointcloud,
+                                                 const VArray<float3> &positions,
+                                                 const MutableSpan<int> r_indices)
+{
+  BLI_assert(positions.size() == r_indices.size());
+  BLI_assert(pointcloud.totpoint > 0);
+
+  BVHTreeFromPointCloud tree_data;
+  BKE_bvhtree_from_pointcloud_get(&tree_data, &pointcloud, 2);
+
+  for (const int i : positions.index_range()) {
+    BVHTreeNearest nearest;
+    nearest.dist_sq = FLT_MAX;
+    const float3 position = positions[i];
+    BLI_bvhtree_find_nearest(
+        tree_data.tree, position, &nearest, tree_data.nearest_callback, &tree_data);
+    r_indices[i] = nearest.index;
+  }
+
+  free_bvhtree_from_pointcloud(&tree_data);
+}
+
+static void get_closest_mesh_point_indices(const Mesh &mesh,
+                                           const VArray<float3> &positions,
+                                           const MutableSpan<int> r_indices)
+{
+  BLI_assert(positions.size() == r_indices.size());
+  BLI_assert(mesh.totvert > 0);
+
+  BVHTreeFromMesh tree_data;
+  BKE_bvhtree_from_mesh_get(&tree_data, const_cast<Mesh *>(&mesh), BVHTREE_FROM_VERTS, 2);
+
+  for (const int i : positions.index_range()) {
+    BVHTreeNearest nearest;
+    nearest.dist_sq = FLT_MAX;
+    const float3 position = positions[i];
+    BLI_bvhtree_find_nearest(
+        tree_data.tree, position, &nearest, tree_data.nearest_callback, &tree_data);
+    r_indices[i] = nearest.index;
+  }
+
+  free_bvhtree_from_mesh(&tree_data);
+}
+
+static void get_closest_mesh_surface_samples(const Mesh &mesh,
+                                             const VArray<float3> &positions,
+                                             const MutableSpan<int> r_looptri_indices,
+                                             const MutableSpan<float3> r_positions)
+{
+  BLI_assert(positions.size() == r_looptri_indices.size());
+  BLI_assert(positions.size() == r_positions.size());
+
+  BVHTreeFromMesh tree_data;
+  BKE_bvhtree_from_mesh_get(&tree_data, const_cast<Mesh *>(&mesh), BVHTREE_FROM_LOOPTRI, 2);
+
+  for (const int i : positions.index_range()) {
+    BVHTreeNearest nearest;
+    nearest.dist_sq = FLT_MAX;
+    const float3 position = positions[i];
+    BLI_bvhtree_find_nearest(
+        tree_data.tree, position, &nearest, tree_data.nearest_callback, &tree_data);
+    r_looptri_indices[i] = nearest.index;
+    r_positions[i] = nearest.co;
+  }
+
+  free_bvhtree_from_mesh(&tree_data);
+}
+
 static void transfer_attribute(const GeometrySet &src_geometry,
                                GeometryComponent &dst_component,
                                const AttributeDomain result_domain,
@@ -94,6 +165,13 @@ static void transfer_attribute(const GeometrySet &src_geometry,
   }
   const PointCloudComponent &src_component =
       *src_geometry.get_component_for_read<PointCloudComponent>();
+  const PointCloud *pointcloud = src_component.get_for_read();
+  if (pointcloud == nullptr) {
+    return;
+  }
+  if (pointcloud->totpoint == 0) {
+    return;
+  }
   ReadAttributeLookup src_attribute = src_component.attribute_try_get_for_read(src_name);
   if (!src_attribute) {
     return;
@@ -110,29 +188,16 @@ static void transfer_attribute(const GeometrySet &src_geometry,
   GVArray_Typed<float3> dst_positions = dst_component.attribute_get_for_read<float3>(
       "position", result_domain, {0, 0, 0});
 
-  BVHTreeFromPointCloud tree_data_pointcloud;
-  BKE_bvhtree_from_pointcloud_get(&tree_data_pointcloud, src_component.get_for_read(), 2);
-  if (tree_data_pointcloud.tree == nullptr) {
-    return;
-  }
+  Array<int> nearest_point_indices(dst_positions.size());
+  get_closest_pointcloud_point_indices(*pointcloud, dst_positions, nearest_point_indices);
 
   BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
 
   for (const int i : dst_positions.index_range()) {
-    BVHTreeNearest nearest;
-    nearest.dist_sq = FLT_MAX;
-    const float3 position = dst_positions[i];
-    BLI_bvhtree_find_nearest(tree_data_pointcloud.tree,
-                             position,
-                             &nearest,
-                             tree_data_pointcloud.nearest_callback,
-                             &tree_data_pointcloud);
-
-    src_attribute.varray->get(nearest.index, buffer);
+    const int point_index = nearest_point_indices[i];
+    src_attribute.varray->get(point_index, buffer);
     dst_attribute->set_by_relocate(i, buffer);
   }
-
-  free_bvhtree_from_pointcloud(&tree_data_pointcloud);
 
   dst_attribute.save();
 }
