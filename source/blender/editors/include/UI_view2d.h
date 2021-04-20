@@ -105,8 +105,12 @@ struct ScrArea;
 struct bContext;
 struct bScreen;
 struct rctf;
+struct rcti;
+struct wmEvent;
 struct wmGizmoGroupType;
 struct wmKeyConfig;
+struct wmOperator;
+struct wmOperatorType;
 
 typedef struct View2DScrollers View2DScrollers;
 
@@ -286,6 +290,53 @@ void UI_view2d_smooth_view(struct bContext *C,
 /* view2d_gizmo_navigate.c */
 /* Caller passes in own idname.  */
 void VIEW2D_GGT_navigate_impl(struct wmGizmoGroupType *gzgt, const char *idname);
+
+/* Edge pan */
+
+/**
+ * Custom-data for view panning operators.
+ */
+typedef struct View2DEdgePanData {
+  /** screen where view pan was initiated */
+  struct bScreen *screen;
+  /** area where view pan was initiated */
+  struct ScrArea *area;
+  /** region where view pan was initiated */
+  struct ARegion *region;
+  /** view2d we're operating in */
+  struct View2D *v2d;
+
+  /** amount to move view relative to zoom */
+  float facx, facy;
+
+  /* timers */
+  double edge_pan_last_time;
+  double edge_pan_start_time_x, edge_pan_start_time_y;
+} View2DEdgePanData;
+
+/* Returns true if context supports edge panning. */
+bool UI_view2d_edge_pan_poll(struct bContext *C);
+
+/* Initialize panning customdata. */
+void UI_view2d_edge_pan_init(struct bContext *C, struct View2DEdgePanData *vpd);
+
+/* Reset timers. */
+void UI_view2d_edge_pan_reset(struct View2DEdgePanData *vpd);
+
+/* Apply transform to view (i.e. adjust 'cur' rect). */
+void UI_view2d_edge_pan_apply(struct bContext *C,
+                              struct View2DEdgePanData *vpd,
+                              float dx,
+                              float dy);
+
+/* Define operator properties needed for view panning. */
+void UI_view2d_edge_pan_operator_properties(struct wmOperatorType *ot);
+
+/* Apply to view using operator properties. */
+void UI_view2d_edge_pan_operator_apply(struct bContext *C,
+                                       struct View2DEdgePanData *vpd,
+                                       struct wmOperator *op,
+                                       const struct wmEvent *event);
 
 #ifdef __cplusplus
 }

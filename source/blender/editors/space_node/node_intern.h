@@ -25,7 +25,7 @@
 
 #include "BKE_node.h"
 #include "UI_interface.h"
-#include "node_view.h"
+#include "UI_view2d.h"
 #include <stddef.h> /* for size_t */
 
 /* internal exports only */
@@ -67,7 +67,7 @@ typedef struct bNodeLinkDrag {
   struct bNode *last_node_hovered_while_dragging_a_link;
 
   /* Data for edge panning */
-  NodeViewPanData pan_data;
+  View2DEdgePanData pan_data;
 } bNodeLinkDrag;
 
 typedef struct SpaceNode_Runtime {

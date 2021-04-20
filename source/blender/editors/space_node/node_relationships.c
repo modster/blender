@@ -958,7 +958,7 @@ static int node_link_modal(bContext *C, wmOperator *op, const wmEvent *event)
   ARegion *region = CTX_wm_region(C);
   float cursor[2];
 
-  node_edge_pan_apply_op(C, &nldrag->pan_data, op, event);
+  UI_view2d_edge_pan_operator_apply(C, &nldrag->pan_data, op, event);
 
   UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &cursor[0], &cursor[1]);
 
@@ -1117,7 +1117,7 @@ static int node_link_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   bNodeLinkDrag *nldrag = node_link_init(bmain, snode, cursor, detach);
 
   if (nldrag) {
-    node_edge_pan_init(C, &nldrag->pan_data);
+    UI_view2d_edge_pan_init(C, &nldrag->pan_data);
 
     op->customdata = nldrag;
     BLI_addtail(&snode->runtime->linkdrag, nldrag);
@@ -1183,7 +1183,7 @@ void NODE_OT_link(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_HIDDEN);
   RNA_def_property_flag(prop, PROP_HIDDEN);
 
-  node_edge_pan_properties(ot);
+  UI_view2d_edge_pan_operator_properties(ot);
 }
 
 /* ********************** Make Link operator ***************** */
