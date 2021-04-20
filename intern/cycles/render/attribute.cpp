@@ -854,9 +854,9 @@ bool AttributeRequestSet::find(ustring name)
   return false;
 }
 
-bool AttributeRequestSet::find(AttributeStandard std)
+bool AttributeRequestSet::find(AttributeStandard std) const
 {
-  foreach (AttributeRequest &req, requests)
+  foreach (const AttributeRequest &req, requests)
     if (req.std == std)
       return true;
 

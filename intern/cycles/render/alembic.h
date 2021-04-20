@@ -153,6 +153,10 @@ template<typename T> class DataStore {
   double last_loaded_time = std::numeric_limits<double>::max();
 
  public:
+  /* Keys used to compare values. */
+  Alembic::AbcCoreAbstract::ArraySample::Key key1;
+  Alembic::AbcCoreAbstract::ArraySample::Key key2;
+
   void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_)
   {
     time_sampling = time_sampling_;
@@ -305,7 +309,7 @@ struct CachedData {
   DataStore<array<int3>> triangles{};
   /* triangle "loops" are the polygons' vertices indices used for indexing face varying attributes
    * (like UVs) */
-  DataStore<array<int3>> triangles_loops{};
+  DataStore<array<int>> uv_loops{};
   DataStore<array<int>> shader{};
 
   /* subd data */
@@ -400,8 +404,7 @@ class AlembicObject : public Node {
   void load_data_in_cache(CachedData &cached_data,
                           AlembicProcedural *proc,
                           const Alembic::AbcGeom::ICurvesSchema &schema,
-                          Progress &progress,
-                          float default_radius);
+                          Progress &progress);
 
   bool has_data_loaded() const;
 
@@ -450,17 +453,6 @@ class AlembicObject : public Node {
                                 CachedData &cached_data,
                                 const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                                 Progress &progress);
-
-  void read_attribute(AlembicProcedural *proc,
-                      CachedData &cached_data,
-                      const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
-                      const ustring &attr_name,
-                      Progress &progress);
-
-  template<typename SchemaType>
-  void read_face_sets(SchemaType &schema,
-                      array<int> &polygon_to_shader,
-                      Alembic::AbcGeom::ISampleSelector sample_sel);
 
   void setup_transform_cache(CachedData &cached_data, float scale);
 
