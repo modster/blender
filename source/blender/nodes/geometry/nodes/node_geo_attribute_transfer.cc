@@ -20,8 +20,11 @@
 #include "BLI_kdopbvh.h"
 
 #include "BKE_bvhutils.h"
+#include "BKE_mesh_runtime.h"
+#include "BKE_mesh_sample.hh"
 
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_pointcloud_types.h"
 
 #include "node_geometry_util.hh"
@@ -157,6 +160,40 @@ static void get_closest_mesh_surface_samples(const Mesh &mesh,
   free_bvhtree_from_mesh(&tree_data);
 }
 
+static Span<MLoopTri> get_mesh_looptris(const Mesh &mesh)
+{
+  /* This only updates a cache and can be considered to be logically const. */
+  const MLoopTri *looptris = BKE_mesh_runtime_looptri_ensure(const_cast<Mesh *>(&mesh));
+  const int looptris_len = BKE_mesh_runtime_looptri_len(&mesh);
+  return {looptris, looptris_len};
+}
+
+static void get_barycentric_coords(const Mesh &mesh,
+                                   const Span<int> looptri_indices,
+                                   const Span<float3> positions,
+                                   const MutableSpan<float3> r_bary_coords)
+{
+  BLI_assert(r_bary_coords.size() == positions.size());
+  BLI_assert(r_bary_coords.size() == looptri_indices.size());
+
+  Span<MLoopTri> looptris = get_mesh_looptris(mesh);
+
+  for (const int i : r_bary_coords.index_range()) {
+    const int looptri_index = looptri_indices[i];
+    const MLoopTri &looptri = looptris[looptri_index];
+
+    const int v0_index = mesh.mloop[looptri.tri[0]].v;
+    const int v1_index = mesh.mloop[looptri.tri[1]].v;
+    const int v2_index = mesh.mloop[looptri.tri[2]].v;
+
+    interp_weights_tri_v3(r_bary_coords[i],
+                          mesh.mvert[v0_index].co,
+                          mesh.mvert[v1_index].co,
+                          mesh.mvert[v2_index].co,
+                          positions[i]);
+  }
+}
+
 static void transfer_attribute(const GeometrySet &src_geometry,
                                GeometryComponent &dst_component,
                                const AttributeDomain result_domain,
@@ -261,17 +298,28 @@ static void transfer_attribute(const GeometrySet &src_geometry,
 
   if (!mesh_sample_indices.is_empty()) {
     const MeshComponent &component = *src_geometry.get_component_for_read<MeshComponent>();
+    const Mesh &mesh = *component.get_for_read();
     ReadAttributeLookup src_attribute = component.attribute_try_get_for_read(src_name, data_type);
     if (src_attribute) {
-      GVArray_GSpan src_span{*src_attribute.varray};
+      GMutableSpan dst_span = dst_attribute.as_span();
+      Array<float3> bary_coords(tot_dst_positions);
+      get_barycentric_coords(mesh, mesh_looptri_indices, mesh_point_positions, bary_coords);
+
+      /* TODO: Take mask into account. */
       switch (src_attribute.domain) {
         case ATTR_DOMAIN_POINT: {
+          bke::mesh_surface_sample::sample_point_attribute(
+              mesh, mesh_looptri_indices, bary_coords, *src_attribute.varray, dst_span);
           break;
         }
         case ATTR_DOMAIN_FACE: {
+          bke::mesh_surface_sample::sample_face_attribute(
+              mesh, mesh_looptri_indices, *src_attribute.varray, dst_span);
           break;
         }
         case ATTR_DOMAIN_CORNER: {
+          bke::mesh_surface_sample::sample_corner_attribute(
+              mesh, mesh_looptri_indices, bary_coords, *src_attribute.varray, dst_span);
           break;
         }
         case ATTR_DOMAIN_EDGE: {
