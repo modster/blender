@@ -8622,9 +8622,10 @@ void UI_context_update_anim_flag(const bContext *C)
     }
   }
 }
+
 /**
- * In some cases we may want to update the view (#View2D) after drawing. E.g. to make sure a button
- * is visible while editing.
+ * In some cases we may want to update the view (#View2D) in-between layout definition and drawing.
+ * E.g. to make sure a button is visible while editing.
  */
 void ui_but_update_view_for_active(const bContext *C, const uiBlock *block)
 {
