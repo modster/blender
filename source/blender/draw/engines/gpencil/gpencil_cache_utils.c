@@ -276,9 +276,9 @@ GPENCIL_tLayer *gpencil_layer_cache_add(GPENCIL_PrivateData *pd,
   bool is_masked = (gpl->flag & GP_LAYER_USE_MASK) && !BLI_listbase_is_empty(&gpl->mask_layers);
 
   float vert_col_opacity = (override_vertcol) ?
-                               (is_vert_col_mode ? pd->vertex_paint_opacity : 0.0f) :
-                               pd->is_render ? gpl->vertex_paint_opacity :
-                                               pd->vertex_paint_opacity;
+                                           (is_vert_col_mode ? pd->vertex_paint_opacity : 0.0f) :
+                           pd->is_render ? gpl->vertex_paint_opacity :
+                                           pd->vertex_paint_opacity;
   /* Negate thickness sign to tag that strokes are in screen space.
    * Convert to world units (by default, 1 meter = 2000 px). */
   float thickness_scale = (is_screenspace) ? -1.0f : (gpd->pixfactor / GPENCIL_PIXEL_FACTOR);
@@ -293,6 +293,7 @@ GPENCIL_tLayer *gpencil_layer_cache_add(GPENCIL_PrivateData *pd,
   tgp_layer->layer_id = BLI_findindex(&gpd->layers, gpl);
   tgp_layer->mask_bits = NULL;
   tgp_layer->mask_invert_bits = NULL;
+  tgp_layer->mask_union_bits = NULL;
   tgp_layer->blend_ps = NULL;
 
   /* Masking: Go through mask list and extract valid masks in a bitmap. */
@@ -302,6 +303,7 @@ GPENCIL_tLayer *gpencil_layer_cache_add(GPENCIL_PrivateData *pd,
      * TODO(fclem): Find a better system without any limitation. */
     tgp_layer->mask_bits = BLI_memblock_alloc(pd->gp_maskbit_pool);
     tgp_layer->mask_invert_bits = BLI_memblock_alloc(pd->gp_maskbit_pool);
+    tgp_layer->mask_union_bits = BLI_memblock_alloc(pd->gp_maskbit_pool);
     BLI_bitmap_set_all(tgp_layer->mask_bits, false, GP_MAX_MASKBITS);
 
     LISTBASE_FOREACH (bGPDlayer_Mask *, mask, &gpl->mask_layers) {
@@ -311,8 +313,10 @@ GPENCIL_tLayer *gpencil_layer_cache_add(GPENCIL_PrivateData *pd,
         int index = BLI_findindex(&gpd->layers, gpl_mask);
         if (index < GP_MAX_MASKBITS) {
           const bool invert = (mask->flag & GP_MASK_INVERT) != 0;
+          const bool intersect = (mask->flag & GP_MASK_INTERSECT) != 0;
           BLI_BITMAP_SET(tgp_layer->mask_bits, index, true);
           BLI_BITMAP_SET(tgp_layer->mask_invert_bits, index, invert);
+          BLI_BITMAP_SET(tgp_layer->mask_union_bits, index, intersect);
           valid_mask = true;
         }
       }

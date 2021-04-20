@@ -1944,6 +1944,13 @@ static void rna_def_gpencil_layer_mask(BlenderRNA *brna)
   RNA_def_property_ui_icon(prop, ICON_CLIPUV_HLT, -1);
   RNA_def_property_ui_text(prop, "Invert", "Invert mask");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
+
+  prop = RNA_def_property(srna, "intersect", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_MASK_INTERSECT);
+  // TODO (antoniov) Better icon
+  RNA_def_property_ui_icon(prop, ICON_RADIOBUT_OFF, 1);
+  RNA_def_property_ui_text(prop, "Intersect", "Intersect mask");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
 }
 
 static void rna_def_gpencil_layer(BlenderRNA *brna)

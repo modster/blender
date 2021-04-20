@@ -769,6 +769,7 @@ class GPENCIL_UL_masks(UIList):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             row = layout.row(align=True)
             row.prop(mask, "name", text="", emboss=False, icon_value=icon)
+            row.prop(mask, "intersect", text="", emboss=False)
             row.prop(mask, "invert", text="", emboss=False)
             row.prop(mask, "hide", text="", emboss=False)
         elif self.layout_type == 'GRID':

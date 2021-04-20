@@ -308,7 +308,15 @@ void GPENCIL_cache_init(void *ved)
     grp = DRW_shgroup_create(sh, psl->mask_invert_ps);
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
   }
+  {
+    // TODO: Fix pass creation
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_LOGIC_INVERT;
+    DRW_PASS_CREATE(psl->mask_intersect_ps, state);
 
+    GPUShader *sh = GPENCIL_shader_mask_invert_get();
+    grp = DRW_shgroup_create(sh, psl->mask_intersect_ps);
+    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+  }
   Camera *cam = (pd->camera != NULL) ? pd->camera->data : NULL;
 
   /* Pseudo DOF setup. */
@@ -752,6 +760,15 @@ void GPENCIL_cache_finish(void *ved)
                                         GPU_ATTACHMENT_TEXTURE(color_tx),
                                         GPU_ATTACHMENT_TEXTURE(pd->mask_tx),
                                     });
+
+      pd->mask_intersect_tx = DRW_texture_pool_query_2d(
+          size[0], size[1], mask_format, &draw_engine_gpencil_type);
+      GPU_framebuffer_ensure_config(&fbl->mask_intersect_fb,
+                                    {
+                                        GPU_ATTACHMENT_TEXTURE(depth_tx),
+                                        GPU_ATTACHMENT_TEXTURE(color_tx),
+                                        GPU_ATTACHMENT_TEXTURE(pd->mask_intersect_tx),
+                                    });
     }
 
     GPENCIL_antialiasing_init(vedata);
@@ -818,10 +835,23 @@ static void gpencil_draw_mask(GPENCIL_Data *vedata, GPENCIL_tObject *ob, GPENCIL
       GPU_framebuffer_clear_color_depth(fbl->mask_fb, clear_col, clear_depth);
     }
 
+    if (!BLI_BITMAP_TEST_BOOL(layer->mask_union_bits, i)) {
+      /* mask_intersect_fb is the same as mask_fb it can even reuse the same color & depth
+      texture.
+       * But it needs a dedicated mask_tx (named mask_intersect_tx). */
+      GPU_framebuffer_bind(fbl->mask_intersect_fb);
+      GPU_framebuffer_clear_color(fbl->mask_intersect_fb, clear_col);
+    }
+
     GPENCIL_tLayer *mask_layer = gpencil_layer_cache_get(ob, i);
     BLI_assert(mask_layer);
 
     DRW_draw_pass(mask_layer->geom_ps);
+
+    if (!BLI_BITMAP_TEST_BOOL(layer->mask_union_bits, i)) {
+      /* Fullscreen quad outputing. 1.0 - mask_intersect_tx in multiply blend mode. */
+      DRW_draw_pass(psl->mask_intersect_ps);
+    }
   }
 
   if (!inverted) {

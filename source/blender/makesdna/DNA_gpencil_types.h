@@ -436,6 +436,8 @@ typedef enum ebGPDlayer_Mask_Flag {
   GP_MASK_HIDE = (1 << 0),
   /* Mask is inverted. */
   GP_MASK_INVERT = (1 << 1),
+  /* Mask is intersecting. */
+  GP_MASK_INTERSECT = (1 << 2),
 } ebGPDlayer_Mask_Flag;
 
 /* Runtime temp data for bGPDlayer */

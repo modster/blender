@@ -167,6 +167,7 @@ typedef struct GPENCIL_tLayer {
   /** Layer id of the mask. */
   BLI_bitmap *mask_bits;
   BLI_bitmap *mask_invert_bits;
+  BLI_bitmap *mask_union_bits;
   /** Index in the layer list. Used as id for masking. */
   int layer_id;
 } GPENCIL_tLayer;
@@ -211,6 +212,8 @@ typedef struct GPENCIL_PassList {
   struct DRWPass *merge_depth_ps;
   /* Invert mask buffer content. */
   struct DRWPass *mask_invert_ps;
+  /* Intersect mask buffer content. */
+  struct DRWPass *mask_intersect_ps;
   /* Anti-Aliasing. */
   struct DRWPass *smaa_edge_ps;
   struct DRWPass *smaa_weight_ps;
@@ -224,6 +227,7 @@ typedef struct GPENCIL_FramebufferList {
   struct GPUFrameBuffer *layer_fb;
   struct GPUFrameBuffer *object_fb;
   struct GPUFrameBuffer *mask_fb;
+  struct GPUFrameBuffer *mask_intersect_fb;
   struct GPUFrameBuffer *smaa_edge_fb;
   struct GPUFrameBuffer *smaa_weight_fb;
 } GPENCIL_FramebufferList;
@@ -283,6 +287,7 @@ typedef struct GPENCIL_PrivateData {
   GPUTexture *reveal_object_tx;
   /* Mask texture */
   GPUTexture *mask_tx;
+  GPUTexture *mask_intersect_tx;
   /* Anti-Aliasing. */
   GPUTexture *smaa_edge_tx;
   GPUTexture *smaa_weight_tx;
