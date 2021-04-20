@@ -575,11 +575,19 @@ typedef struct uiSafetyRct {
 
 void ui_fontscale(short *points, float aspect);
 
+extern void ui_block_to_region_fl(const struct ARegion *region,
+                                  uiBlock *block,
+                                  float *r_x,
+                                  float *r_y);
 extern void ui_block_to_window_fl(const struct ARegion *region,
                                   uiBlock *block,
                                   float *x,
                                   float *y);
 extern void ui_block_to_window(const struct ARegion *region, uiBlock *block, int *x, int *y);
+extern void ui_block_to_region_rctf(const struct ARegion *region,
+                                    uiBlock *block,
+                                    rctf *rct_dst,
+                                    const rctf *rct_src);
 extern void ui_block_to_window_rctf(const struct ARegion *region,
                                     uiBlock *block,
                                     rctf *rct_dst,
@@ -598,6 +606,9 @@ extern void ui_window_to_region(const struct ARegion *region, int *x, int *y);
 extern void ui_window_to_region_rcti(const struct ARegion *region,
                                      rcti *rect_dst,
                                      const rcti *rct_src);
+extern void ui_window_to_region_rctf(const struct ARegion *region,
+                                     rctf *rect_dst,
+                                     const rctf *rct_src);
 extern void ui_region_to_window(const struct ARegion *region, int *x, int *y);
 extern void ui_region_winrct_get_no_margin(const struct ARegion *region, struct rcti *r_rect);
 
@@ -921,6 +932,7 @@ extern void ui_but_execute_end(struct bContext *C,
                                uiBut *but,
                                void *active_back);
 extern void ui_but_active_free(const struct bContext *C, uiBut *but);
+extern void ui_but_update_view_for_active(const struct bContext *C, const uiBlock *block);
 extern int ui_but_menu_direction(uiBut *but);
 extern void ui_but_text_password_hide(char password_str[UI_MAX_DRAW_STR],
                                       uiBut *but,
@@ -1115,7 +1127,7 @@ bool ui_but_contains_point_px_icon(const uiBut *but,
 bool ui_but_contains_point_px(const uiBut *but, const struct ARegion *region, int x, int y)
     ATTR_WARN_UNUSED_RESULT;
 
-uiBut *ui_list_find_mouse_over(struct ARegion *region,
+uiBut *ui_list_find_mouse_over(const struct ARegion *region,
                                const struct wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 uiBut *ui_list_row_find_mouse_over(const struct ARegion *region,
                                    int x,
@@ -1132,7 +1144,9 @@ uiBut *ui_but_find_mouse_over(const struct ARegion *region,
 uiBut *ui_but_find_rect_over(const struct ARegion *region,
                              const rcti *rect_px) ATTR_WARN_UNUSED_RESULT;
 
-uiBut *ui_list_find_mouse_over_ex(struct ARegion *region, int x, int y) ATTR_WARN_UNUSED_RESULT;
+uiBut *ui_list_find_mouse_over_ex(const struct ARegion *region,
+                                  int x,
+                                  int y) ATTR_WARN_UNUSED_RESULT;
 
 bool ui_but_contains_password(const uiBut *but) ATTR_WARN_UNUSED_RESULT;
 
@@ -1144,6 +1158,7 @@ uiBut *ui_but_next(uiBut *but) ATTR_WARN_UNUSED_RESULT;
 uiBut *ui_but_first(uiBlock *block) ATTR_WARN_UNUSED_RESULT;
 uiBut *ui_but_last(uiBlock *block) ATTR_WARN_UNUSED_RESULT;
 
+uiBut *ui_block_active_but_get(const uiBlock *block);
 bool ui_block_is_menu(const uiBlock *block) ATTR_WARN_UNUSED_RESULT;
 bool ui_block_is_popover(const uiBlock *block) ATTR_WARN_UNUSED_RESULT;
 bool ui_block_is_pie_menu(const uiBlock *block) ATTR_WARN_UNUSED_RESULT;
