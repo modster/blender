@@ -786,7 +786,7 @@ std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_try_get_for_
   return std::move(attribute.varray);
 }
 
-std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_read(
+blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
     const blender::StringRef attribute_name, const CustomDataType data_type) const
 {
   blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
@@ -796,11 +796,11 @@ std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_r
   const blender::fn::CPPType *type = blender::bke::custom_data_type_to_cpp_type(data_type);
   BLI_assert(type != nullptr);
   if (attribute.varray->type() == *type) {
-    return std::move(attribute.varray);
+    return attribute;
   }
   const blender::nodes::DataTypeConversions &conversions =
       blender::nodes::get_implicit_type_conversions();
-  return conversions.try_convert(std::move(attribute.varray), *type);
+  return {conversions.try_convert(std::move(attribute.varray), *type), attribute.domain};
 }
 
 std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_get_for_read(

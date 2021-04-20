@@ -166,20 +166,68 @@ static void transfer_attribute(const GeometrySet &src_geometry,
 {
   const CPPType &type = *bke::custom_data_type_to_cpp_type(data_type);
 
-  if (!src_geometry.has<PointCloudComponent>()) {
-    return;
+  GVArray_Typed<float3> dst_positions = dst_component.attribute_get_for_read<float3>(
+      "position", result_domain, {0, 0, 0});
+  const int64_t tot_dst_positions = dst_positions.size();
+
+  bool use_pointcloud = false;
+  Array<int> pointcloud_point_indices;
+  Array<float> pointcloud_point_distances_sq;
+
+  bool use_mesh = false;
+  Array<int> mesh_looptri_indices;
+  Array<float3> mesh_point_positions;
+  Array<float> mesh_point_distances_sq;
+
+  if (src_geometry.has<PointCloudComponent>()) {
+    const PointCloudComponent &component =
+        *src_geometry.get_component_for_read<PointCloudComponent>();
+    const PointCloud *pointcloud = component.get_for_read();
+    if (pointcloud != nullptr && pointcloud->totpoint > 0) {
+      pointcloud_point_indices.reinitialize(tot_dst_positions);
+      pointcloud_point_distances_sq.reinitialize(tot_dst_positions);
+      get_closest_pointcloud_point_indices(
+          *pointcloud, dst_positions, pointcloud_point_indices, pointcloud_point_distances_sq);
+      use_pointcloud = true;
+    }
   }
-  const PointCloudComponent &src_component =
-      *src_geometry.get_component_for_read<PointCloudComponent>();
-  const PointCloud *pointcloud = src_component.get_for_read();
-  if (pointcloud == nullptr) {
-    return;
+  if (src_geometry.has<MeshComponent>()) {
+    const MeshComponent &component = *src_geometry.get_component_for_read<MeshComponent>();
+    const Mesh *mesh = component.get_for_read();
+    if (mesh != nullptr && mesh->totpoly > 0) {
+      mesh_looptri_indices.reinitialize(tot_dst_positions);
+      mesh_point_positions.reinitialize(tot_dst_positions);
+      mesh_point_distances_sq.reinitialize(tot_dst_positions);
+      get_closest_mesh_surface_samples(*mesh,
+                                       dst_positions,
+                                       mesh_looptri_indices,
+                                       mesh_point_positions,
+                                       mesh_point_distances_sq);
+      use_mesh = true;
+    }
   }
-  if (pointcloud->totpoint == 0) {
-    return;
+
+  Vector<int> pointcloud_sample_indices;
+  Vector<int> mesh_sample_indices;
+
+  if (use_mesh && use_pointcloud) {
+    for (const int i : IndexRange(tot_dst_positions)) {
+      if (pointcloud_point_distances_sq[i] < mesh_point_distances_sq[i]) {
+        pointcloud_sample_indices.append(i);
+      }
+      else {
+        mesh_sample_indices.append(i);
+      }
+    }
   }
-  GVArrayPtr src_attribute = src_component.attribute_try_get_for_read(src_name, data_type);
-  if (!src_attribute) {
+  else if (use_mesh) {
+    /* TODO: Optimize. */
+    mesh_sample_indices = IndexRange(tot_dst_positions).as_span();
+  }
+  else if (use_pointcloud) {
+    pointcloud_sample_indices = IndexRange(tot_dst_positions).as_span();
+  }
+  else {
     return;
   }
 
@@ -189,20 +237,54 @@ static void transfer_attribute(const GeometrySet &src_geometry,
     return;
   }
 
-  GVArray_Typed<float3> dst_positions = dst_component.attribute_get_for_read<float3>(
-      "position", result_domain, {0, 0, 0});
-
-  Array<int> nearest_point_indices(dst_positions.size());
-  Array<float> nearest_point_distances_sq(dst_positions.size());
-  get_closest_pointcloud_point_indices(
-      *pointcloud, dst_positions, nearest_point_indices, nearest_point_distances_sq);
-
   BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
 
-  for (const int i : dst_positions.index_range()) {
-    const int point_index = nearest_point_indices[i];
-    src_attribute->get(point_index, buffer);
-    dst_attribute->set_by_relocate(i, buffer);
+  if (!pointcloud_sample_indices.is_empty()) {
+    const PointCloudComponent &component =
+        *src_geometry.get_component_for_read<PointCloudComponent>();
+    ReadAttributeLookup src_attribute = component.attribute_try_get_for_read(src_name, data_type);
+    if (src_attribute) {
+      BLI_assert(src_attribute.domain == ATTR_DOMAIN_POINT);
+      for (const int i : pointcloud_sample_indices) {
+        const int point_index = pointcloud_point_indices[i];
+        src_attribute.varray->get(point_index, buffer);
+        dst_attribute->set_by_relocate(i, buffer);
+      }
+    }
+    else {
+      const void *default_value = type.default_value();
+      for (const int i : pointcloud_point_indices) {
+        dst_attribute->set_by_copy(i, default_value);
+      }
+    }
+  }
+
+  if (!mesh_sample_indices.is_empty()) {
+    const MeshComponent &component = *src_geometry.get_component_for_read<MeshComponent>();
+    ReadAttributeLookup src_attribute = component.attribute_try_get_for_read(src_name, data_type);
+    if (src_attribute) {
+      GVArray_GSpan src_span{*src_attribute.varray};
+      switch (src_attribute.domain) {
+        case ATTR_DOMAIN_POINT: {
+          break;
+        }
+        case ATTR_DOMAIN_FACE: {
+          break;
+        }
+        case ATTR_DOMAIN_CORNER: {
+          break;
+        }
+        case ATTR_DOMAIN_EDGE: {
+          break;
+        }
+      }
+    }
+    else {
+      const void *default_value = type.default_value();
+      for (const int i : mesh_sample_indices) {
+        dst_attribute->set_by_copy(i, default_value);
+      }
+    }
   }
 
   dst_attribute.save();

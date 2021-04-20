@@ -158,7 +158,7 @@ class GeometryComponent {
   std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
       const blender::StringRef attribute_name, const AttributeDomain domain) const;
 
-  std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
+  blender::bke::ReadAttributeLookup attribute_try_get_for_read(
       const blender::StringRef attribute_name, const CustomDataType data_type) const;
 
   /* Get a virtual array to read the data of an attribute. If that is not possible, the returned
