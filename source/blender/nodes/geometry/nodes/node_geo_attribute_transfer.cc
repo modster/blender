@@ -54,6 +54,24 @@ static void geo_node_attribute_transfer_init(bNodeTree *UNUSED(tree), bNode *nod
 static void geo_node_attribute_transfer_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  GeometrySet target_geometry_set = params.extract_input<GeometrySet>("Target");
+  const std::string src_attribute_name = params.extract_input<std::string>("Source");
+  const std::string dst_attribute_name = params.extract_input<std::string>("Destination");
+
+  if (src_attribute_name.empty() || dst_attribute_name.empty()) {
+    params.set_output("Geometry", geometry_set);
+    return;
+  }
+
+  const NodeGeometryAttributeTransfer &storage =
+      *(const NodeGeometryAttributeTransfer *)params.node().storage;
+  const AttributeDomain dst_domain = (AttributeDomain)storage.domain;
+  const GeometryNodeAttributeTransferMappingMode mapping =
+      (GeometryNodeAttributeTransferMappingMode)storage.mapping;
+
+  geometry_set = bke::geometry_set_realize_instances(geometry_set);
+  target_geometry_set = bke::geometry_set_realize_instances(target_geometry_set);
+
   params.set_output("Geometry", geometry_set);
 }
 
