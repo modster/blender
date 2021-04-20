@@ -17,6 +17,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "BLI_kdopbvh.h"
+
+#include "BKE_bvhutils.h"
+
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_attribute_transfer_in[] = {
@@ -51,15 +55,97 @@ static void geo_node_attribute_transfer_init(bNodeTree *UNUSED(tree), bNode *nod
   node->storage = data;
 }
 
+static CustomDataType get_result_data_type(const GeometrySet &geometry,
+                                           const StringRef attribute_name)
+{
+  Vector<CustomDataType> data_types;
+
+  const PointCloudComponent *pointcloud_component =
+      geometry.get_component_for_read<PointCloudComponent>();
+  if (pointcloud_component != nullptr) {
+    ReadAttributeLookup attribute = pointcloud_component->attribute_try_get_for_read(
+        attribute_name);
+    if (attribute) {
+      data_types.append(bke::cpp_type_to_custom_data_type(attribute.varray->type()));
+    }
+  }
+
+  const MeshComponent *mesh_component = geometry.get_component_for_read<MeshComponent>();
+  if (mesh_component != nullptr) {
+    ReadAttributeLookup attribute = mesh_component->attribute_try_get_for_read(attribute_name);
+    if (attribute) {
+      data_types.append(bke::cpp_type_to_custom_data_type(attribute.varray->type()));
+    }
+  }
+  return bke::attribute_data_type_highest_complexity(data_types);
+}
+
+static void transfer_attribute(const GeometrySet &src_geometry,
+                               GeometryComponent &dst_component,
+                               const AttributeDomain result_domain,
+                               const CustomDataType data_type,
+                               const StringRef src_name,
+                               const StringRef dst_name)
+{
+  const CPPType &type = *bke::custom_data_type_to_cpp_type(data_type);
+
+  if (!src_geometry.has<PointCloudComponent>()) {
+    return;
+  }
+  const PointCloudComponent &src_component =
+      *src_geometry.get_component_for_read<PointCloudComponent>();
+  ReadAttributeLookup src_attribute = src_component.attribute_try_get_for_read(src_name);
+  if (!src_attribute) {
+    return;
+  }
+  /* TODO: Possibly convert data type. */
+  BLI_assert(src_attribute.varray->type() == type);
+
+  OutputAttribute dst_attribute = dst_component.attribute_try_get_for_output_only(
+      dst_name, result_domain, data_type);
+  if (!dst_attribute) {
+    return;
+  }
+
+  GVArray_Typed<float3> dst_positions = dst_component.attribute_get_for_read<float3>(
+      "position", result_domain, {0, 0, 0});
+
+  BVHTreeFromPointCloud tree_data_pointcloud;
+  BKE_bvhtree_from_pointcloud_get(&tree_data_pointcloud, src_component.get_for_read(), 2);
+  if (tree_data_pointcloud.tree == nullptr) {
+    return;
+  }
+
+  BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
+
+  for (const int i : dst_positions.index_range()) {
+    BVHTreeNearest nearest;
+    nearest.dist_sq = FLT_MAX;
+    const float3 position = dst_positions[i];
+    BLI_bvhtree_find_nearest(tree_data_pointcloud.tree,
+                             position,
+                             &nearest,
+                             tree_data_pointcloud.nearest_callback,
+                             &tree_data_pointcloud);
+
+    src_attribute.varray->get(nearest.index, buffer);
+    dst_attribute->set_by_relocate(i, buffer);
+  }
+
+  free_bvhtree_from_pointcloud(&tree_data_pointcloud);
+
+  dst_attribute.save();
+}
+
 static void geo_node_attribute_transfer_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  GeometrySet target_geometry_set = params.extract_input<GeometrySet>("Target");
+  GeometrySet dst_geometry_set = params.extract_input<GeometrySet>("Geometry");
+  GeometrySet src_geometry_set = params.extract_input<GeometrySet>("Target");
   const std::string src_attribute_name = params.extract_input<std::string>("Source");
   const std::string dst_attribute_name = params.extract_input<std::string>("Destination");
 
   if (src_attribute_name.empty() || dst_attribute_name.empty()) {
-    params.set_output("Geometry", geometry_set);
+    params.set_output("Geometry", dst_geometry_set);
     return;
   }
 
@@ -69,10 +155,30 @@ static void geo_node_attribute_transfer_exec(GeoNodeExecParams params)
   const GeometryNodeAttributeTransferMappingMode mapping =
       (GeometryNodeAttributeTransferMappingMode)storage.mapping;
 
-  geometry_set = bke::geometry_set_realize_instances(geometry_set);
-  target_geometry_set = bke::geometry_set_realize_instances(target_geometry_set);
+  dst_geometry_set = bke::geometry_set_realize_instances(dst_geometry_set);
+  src_geometry_set = bke::geometry_set_realize_instances(src_geometry_set);
 
-  params.set_output("Geometry", geometry_set);
+  const CustomDataType result_data_type = get_result_data_type(src_geometry_set,
+                                                               src_attribute_name);
+
+  if (dst_geometry_set.has<MeshComponent>()) {
+    transfer_attribute(src_geometry_set,
+                       dst_geometry_set.get_component_for_write<MeshComponent>(),
+                       dst_domain,
+                       result_data_type,
+                       src_attribute_name,
+                       dst_attribute_name);
+  }
+  if (dst_geometry_set.has<PointCloudComponent>()) {
+    transfer_attribute(src_geometry_set,
+                       dst_geometry_set.get_component_for_write<PointCloudComponent>(),
+                       dst_domain,
+                       result_data_type,
+                       src_attribute_name,
+                       dst_attribute_name);
+  }
+
+  params.set_output("Geometry", dst_geometry_set);
 }
 
 }  // namespace blender::nodes
