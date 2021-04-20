@@ -309,7 +309,7 @@ void GPENCIL_cache_init(void *ved)
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
   }
   {
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_LOGIC_INVERT;
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ALPHA_PREMUL;
     DRW_PASS_CREATE(psl->mask_intersect_ps, state);
 
     GPUShader *sh = GPENCIL_shader_mask_intersect_get();
