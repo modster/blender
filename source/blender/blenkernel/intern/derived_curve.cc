@@ -122,6 +122,21 @@ static Spline::NormalCalculationMode normal_mode_from_dna_curve(const int twist_
   return Spline::NormalCalculationMode::Minimum;
 }
 
+static NURBSpline::KnotsMode knots_mode_from_dna_nurb(const short flag)
+{
+  switch (flag & (CU_NURB_ENDPOINT | CU_NURB_BEZIER)) {
+    case CU_NURB_ENDPOINT:
+      return NURBSpline::KnotsMode::EndPoint;
+    case CU_NURB_BEZIER:
+      return NURBSpline::KnotsMode::Bezier;
+    default:
+      return NURBSpline::KnotsMode::Normal;
+  }
+
+  BLI_assert_unreachable();
+  return NURBSpline::KnotsMode::Normal;
+}
+
 DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
 {
   DCurve *curve = new DCurve();
@@ -153,6 +168,18 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
         break;
       }
       case CU_NURBS: {
+        std::unique_ptr<NURBSpline> spline = std::make_unique<NURBSpline>();
+        spline->set_resolution(nurb->resolu);
+        spline->type = Spline::Type::NURBS;
+        spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
+        spline->set_order(nurb->orderu);
+        spline->knots_mode = knots_mode_from_dna_nurb(nurb->flagu);
+
+        for (const BPoint &bp : Span(nurb->bp, nurb->pntsu)) {
+          spline->add_point(bp.vec, bp.radius, bp.tilt, bp.vec[3]);
+        }
+
+        curve->splines.append(std::move(spline));
         break;
       }
       case CU_POLY: {

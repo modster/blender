@@ -18,7 +18,6 @@
 #include "BLI_listbase.h"
 #include "BLI_span.hh"
 
-#include "BKE_curve.h"
 #include "BKE_derived_curve.hh"
 
 using blender::Array;
@@ -56,6 +55,18 @@ void NURBSpline::set_resolution(const int value)
   this->mark_cache_invalid();
 }
 
+uint8_t NURBSpline::order() const
+{
+  return this->order_;
+}
+
+void NURBSpline::set_order(const uint8_t value)
+{
+  /* TODO: Check the spline length. */
+  BLI_assert(value >= 2 && value <= 6);
+  this->order_ = value;
+}
+
 void NURBSpline::add_point(const float3 position,
                            const float radius,
                            const float tilt,
@@ -65,6 +76,7 @@ void NURBSpline::add_point(const float3 position,
   this->radii_.append(radius);
   this->tilts_.append(tilt);
   this->weights_.append(weight);
+  this->knots_dirty_ = true;
 }
 
 void NURBSpline::drop_front(const int count)
@@ -123,13 +135,252 @@ Span<float> NURBSpline::weights() const
 
 int NURBSpline::evaluated_points_size() const
 {
-  return 0;
+  return this->resolution_u_ * this->segments_size();
 }
 
 void NURBSpline::correct_end_tangents() const
 {
 }
 
+bool NURBSpline::check_valid_size_and_order() const
+{
+  if (this->size() < this->order_) {
+    return false;
+  }
+
+  if (!this->is_cyclic && this->knots_mode == KnotsMode::Bezier) {
+    if (this->order_ == 4) {
+      if (this->size() < 5) {
+        return false;
+      }
+    }
+    else if (this->order_ != 3) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+int NURBSpline::knots_size() const
+{
+  const int size = this->size() + this->order_;
+  return this->is_cyclic ? size + this->order_ - 1 : size;
+}
+
+void NURBSpline::calculate_knots() const
+{
+  const KnotsMode mode = this->knots_mode;
+  const int length = this->size();
+  const int order = this->order_;
+
+  this->knots_.resize(this->knots_size());
+
+  MutableSpan<float> knots = this->knots_;
+
+  if (mode == NURBSpline::KnotsMode::Normal || this->is_cyclic) {
+    for (const int i : knots.index_range()) {
+      knots[i] = static_cast<float>(i);
+    }
+  }
+  else if (mode == NURBSpline::KnotsMode::EndPoint) {
+    float k = 0.0f;
+    for (const int i : IndexRange(1, knots.size())) {
+      knots[i - 1] = k;
+      if (i >= order && i <= length) {
+        k += 1.0f;
+      }
+    }
+  }
+  else if (mode == NURBSpline::KnotsMode::Bezier) {
+    BLI_assert(ELEM(order, 3, 4));
+    if (order == 3) {
+      float k = 0.6f;
+      for (const int i : knots.index_range()) {
+        if (i >= order && i <= length) {
+          k += 0.5f;
+        }
+        knots[i] = std::floor(k);
+      }
+    }
+    else {
+      float k = 0.34f;
+      for (const int i : knots.index_range()) {
+        knots[i] = std::floor(k);
+        k += 1.0f / 3.0f;
+      }
+    }
+  }
+
+  if (this->is_cyclic) {
+    const int b = length + order - 1;
+    if (order > 2) {
+      for (const int i : IndexRange(1, order - 2)) {
+        if (knots[b] != knots[b - i]) {
+          if (i == order - 1) {
+            knots[length + order - 2] += 1.0f;
+            break;
+          }
+        }
+      }
+    }
+
+    int c = order;
+    for (int i = b; i < this->knots_size(); i++) {
+      knots[i] = knots[i - 1] + (knots[c] - knots[c - 1]);
+      c--;
+    }
+  }
+}
+
+Span<float> NURBSpline::knots() const
+{
+  if (!this->knots_dirty_) {
+    BLI_assert(this->knots_.size() == this->size() + this->order_);
+    return this->knots_;
+  }
+
+  std::lock_guard lock{this->knots_mutex_};
+  if (!this->knots_dirty_) {
+    BLI_assert(this->knots_.size() == this->size() + this->order_);
+    return this->knots_;
+  }
+
+  this->calculate_knots();
+
+  this->base_cache_dirty_ = false;
+
+  return this->knots_;
+}
+
+/* TODO: Better variables names, simplify logic once it works. */
+static void nurb_basis(const float parameter,
+                       const int points_len,
+                       const int order,
+                       Span<float> knots,
+                       MutableSpan<float> basis,
+                       int &start,
+                       int &end)
+{
+  /* Clamp parameter due to floating point inaccuracy. TODO: Look into using doubles. */
+  const float t = std::clamp(parameter, knots[0], knots[points_len + order - 1]);
+
+  int i1 = 0;
+  int i2 = 0;
+  for (int i = 0; i < points_len + order - 1; i++) {
+    if ((knots[i] != knots[i + 1]) && (t >= knots[i]) && (t <= knots[i + 1])) {
+      basis[i] = 1.0f;
+      i1 = std::max(i - order - 1, 0);
+      i2 = i;
+      i++;
+      while (i < points_len + order - 1) {
+        basis[i] = 0.0f;
+        i++;
+      }
+      break;
+    }
+    basis[i] = 0.0f;
+  }
+  basis[points_len + order - 1] = 0.0f;
+
+  for (int i_order = 2; i_order <= order; i_order++) {
+    if (i2 + i_order >= points_len + order) {
+      i2 = points_len + order - 1 - i_order;
+    }
+    for (int i = i1; i <= i2; i++) {
+      float new_basis = 0.0f;
+      if (basis[i] != 0.0f) {
+        new_basis += ((t - knots[i]) * basis[i]) / (knots[i + i_order - 1] - knots[i]);
+      }
+
+      if (basis[i + 1] != 0.0f) {
+        new_basis += ((knots[i + i_order] - t) * basis[i + 1]) /
+                     (knots[i + i_order] - knots[i + 1]);
+      }
+
+      basis[i] = new_basis;
+    }
+  }
+
+  start = 1000;
+  end = 0;
+
+  for (int i = i1; i <= i2; i++) {
+    if (basis[i] > 0.0f) {
+      end = i;
+      if (start == 1000) {
+        start = i;
+      }
+    }
+  }
+}
+
+void NURBSpline::evaluate_position_and_mapping(MutableSpan<float3> positions,
+                                               MutableSpan<PointMapping> mappings) const
+{
+  const int points_len = this->size();
+  const int order = this->order();
+  Span<float3> control_positions = this->positions();
+  Span<float> knots = this->knots();
+  Span<float> weights = this->weights();
+
+  const float start = knots[order - 1];
+  const float end = this->is_cyclic ? knots[points_len + order - 1] : knots[points_len];
+  const float step = (end - start) / (this->evaluated_points_size() - (this->is_cyclic ? 0 : 1));
+
+  Array<float> sums(points_len);
+  Array<float> basis(this->knots_size());
+
+  float u = start;
+  for (const int i : IndexRange(this->evaluated_points_size())) {
+    int j_start;
+    int j_end;
+    nurb_basis(
+        u, points_len + (this->is_cyclic ? order - 1 : 0), order, knots, basis, j_start, j_end);
+
+    /* Calculate sums. */
+    float sum_total = 0.0f;
+    for (const int j : IndexRange(j_end - j_start + 1)) {
+      const int point_index = (j_start + j) % points_len;
+
+      sums[j] = basis[j_start + j] * weights[point_index];
+      sum_total += sums[j];
+    }
+    if (sum_total != 0.0f) {
+      for (const int j : IndexRange(j_end - j_start + 1)) {
+        sums[j] /= sum_total;
+      }
+    }
+
+    positions[i] = float3(0);
+
+    for (const int j : IndexRange(j_end - j_start + 1)) {
+      const int point_index = (j_start + j) % points_len;
+
+      positions[i] += control_positions[point_index] * sums[j];
+    }
+
+    u += step;
+  }
+}
+
 void NURBSpline::ensure_base_cache() const
 {
+  if (!this->base_cache_dirty_) {
+    return;
+  }
+
+  std::lock_guard lock{this->base_cache_mutex_};
+  if (!this->base_cache_dirty_) {
+    return;
+  }
+
+  const int total = this->evaluated_points_size();
+  this->evaluated_positions_cache_.resize(total);
+  this->evaluated_mapping_cache_.resize(total);
+
+  this->evaluate_position_and_mapping(this->evaluated_positions_cache_,
+                                      this->evaluated_mapping_cache_);
+
+  this->base_cache_dirty_ = false;
 }

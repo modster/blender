@@ -18,7 +18,6 @@
 #include "BLI_listbase.h"
 #include "BLI_span.hh"
 
-#include "BKE_curve.h"
 #include "BKE_derived_curve.hh"
 
 using blender::Array;

@@ -119,6 +119,7 @@ class Spline {
   virtual SplinePtr copy() const = 0;
 
   virtual int size() const = 0;
+  int segments_size() const;
   virtual int resolution() const = 0;
   virtual void set_resolution(const int value) = 0;
 
@@ -290,6 +291,14 @@ class BezierSpline final : public Spline {
 };
 
 class NURBSpline final : public Spline {
+ public:
+  enum KnotsMode {
+    Normal,
+    EndPoint,
+    Bezier,
+  };
+  KnotsMode knots_mode;
+
  private:
   blender::Vector<blender::float3> positions_;
   blender::Vector<float> radii_;
@@ -297,6 +306,10 @@ class NURBSpline final : public Spline {
   blender::Vector<float> weights_;
   int resolution_u_;
   uint8_t order_;
+
+  mutable bool knots_dirty_ = true;
+  mutable std::mutex knots_mutex_;
+  mutable blender::Vector<float> knots_;
 
  public:
   SplinePtr copy() const final;
@@ -318,12 +331,17 @@ class NURBSpline final : public Spline {
   uint8_t order() const;
   void set_order(const uint8_t value);
 
+  bool check_valid_size_and_order() const;
+  int knots_size() const;
+
   blender::MutableSpan<blender::float3> positions() final;
   blender::Span<blender::float3> positions() const final;
   blender::MutableSpan<float> radii() final;
   blender::Span<float> radii() const final;
   blender::MutableSpan<float> tilts() final;
   blender::Span<float> tilts() const final;
+
+  blender::Span<float> knots() const;
 
   blender::MutableSpan<float> weights();
   blender::Span<float> weights() const;
@@ -341,6 +359,9 @@ class NURBSpline final : public Spline {
  protected:
   void correct_end_tangents() const final;
   void ensure_base_cache() const final;
+  void evaluate_position_and_mapping(blender::MutableSpan<blender::float3> positions,
+                                     blender::MutableSpan<PointMapping> mappings) const;
+  void calculate_knots() const;
 };
 
 class PolySpline final : public Spline {

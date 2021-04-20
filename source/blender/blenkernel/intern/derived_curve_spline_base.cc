@@ -20,7 +20,6 @@
 
 #include "DNA_curve_types.h"
 
-#include "BKE_curve.h"
 #include "BKE_derived_curve.hh"
 
 using blender::Array;
@@ -59,6 +58,13 @@ Span<float3> Spline::evaluated_positions() const
 {
   this->ensure_base_cache();
   return evaluated_positions_cache_;
+}
+
+int Spline::segments_size() const
+{
+  const int points_len = this->size();
+
+  return this->is_cyclic ? points_len : points_len - 1;
 }
 
 /**
