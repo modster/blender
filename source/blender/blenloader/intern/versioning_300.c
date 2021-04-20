@@ -20,6 +20,8 @@
 /* allow readfile to use deprecated functionality */
 #define DNA_DEPRECATED_ALLOW
 
+#include "DNA_gpencil_types.h"
+
 #include "BKE_main.h"
 
 #include "BLO_readfile.h"
@@ -27,7 +29,7 @@
 
 void do_versions_after_linking_300(Main *UNUSED(bmain), ReportList *UNUSED(reports))
 {
-  
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -44,9 +46,26 @@ void do_versions_after_linking_300(Main *UNUSED(bmain), ReportList *UNUSED(repor
 }
 
 /* NOLINTNEXTLINE: readability-function-size */
-void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *UNUSED(bmain))
+void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
 {
   UNUSED_VARS(fd);
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 0)) {
+    /* Grease Pencil Masking Intersect. */
+    Scene *scene = bmain->scenes.first;
+    if (scene != NULL) {
+      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+        if (ob->type != OB_GPENCIL) {
+          continue;
+        }
+        bGPdata *gpd = ob->data;
+        LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+          LISTBASE_FOREACH (bGPDlayer_Mask *, mask, &gpl->mask_layers) {
+            mask->flag |= GP_MASK_INTERSECT;
+          }
+        }
+      }
+    }
+  }
 
   /**
    * Versioning code until next subversion bump goes here.

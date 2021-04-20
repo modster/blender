@@ -1526,6 +1526,7 @@ bGPDlayer_Mask *BKE_gpencil_layer_mask_add(bGPDlayer *gpl, const char *name)
   bGPDlayer_Mask *mask = MEM_callocN(sizeof(bGPDlayer_Mask), "bGPDlayer_Mask");
   BLI_addtail(&gpl->mask_layers, mask);
   BLI_strncpy(mask->name, name, sizeof(mask->name));
+  mask->flag |= GP_MASK_INTERSECT;
   gpl->act_mask++;
 
   return mask;
