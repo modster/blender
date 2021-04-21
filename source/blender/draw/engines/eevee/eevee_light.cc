@@ -219,13 +219,37 @@ void LightModule::begin_sync(void)
   lights_.clear();
 }
 
-void LightModule::sync_light(const Object *ob)
+void LightModule::sync_light(const Object *ob, ObjectHandle &handle)
 {
+  int64_t light_index = lights_.size();
+
   lights_.append(eevee::Light(ob, light_threshold_));
+
+  objects_light_.add_overwrite(handle.object_key, light_index);
 }
 
 void LightModule::end_sync(void)
 {
+  Vector<ObjectKey, 1> deleted_keys;
+
+  for (auto item : objects_light_.items()) {
+    if (item.value < 0) {
+      deleted_keys.append(item.key);
+      /* TODO Tag shadow (if any) as unused. */
+    }
+    else {
+      /* Invert shadow map value so we can know which one went unused. */
+      item.value = -item.value - 1;
+    }
+  }
+
+  if (deleted_keys.size() > 0) {
+    inst_.sampling.reset();
+  }
+
+  for (auto key : deleted_keys) {
+    objects_light_.remove(key);
+  }
 }
 
 /* Compute acceleration structure for the given view. */

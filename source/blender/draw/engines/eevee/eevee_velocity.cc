@@ -47,15 +47,12 @@ namespace blender::eevee {
 
 void VelocityModule::init(void)
 {
-  is_viewport_ = !DRW_state_is_image_render() && !DRW_state_is_opengl_render();
-
-  if (is_viewport_) {
+  if (inst_.is_viewport()) {
     /* For viewport we sync when object is evaluated and we swap at init time.
      * Use next step to store the current position. This one will become the previous step after
      * next swapping. */
     step_ = STEP_NEXT;
     step_swap();
-    /* TODO(fclem) we should garbage collect the ids that gets removed. */
   }
 
   if (inst_.render && (inst_.render_passes.vector != nullptr)) {
@@ -68,17 +65,26 @@ void VelocityModule::init(void)
   }
 }
 
+static void step_object_sync_render(void *velocity,
+                                    Object *ob,
+                                    RenderEngine *UNUSED(engine),
+                                    Depsgraph *UNUSED(depsgraph))
+{
+  ObjectKey object_key(ob);
+  reinterpret_cast<VelocityModule *>(velocity)->step_object_sync(ob, object_key);
+}
+
 void VelocityModule::step_sync(eStep step, float time)
 {
   inst_.set_time(time);
   step_ = step;
   step_camera_sync();
-  DRW_render_object_iter(this, inst_.render, inst_.depsgraph, VelocityModule::step_object_sync);
+  DRW_render_object_iter(this, inst_.render, inst_.depsgraph, step_object_sync_render);
 }
 
 void VelocityModule::step_camera_sync()
 {
-  if (!is_viewport_) {
+  if (!inst_.is_viewport()) {
     inst_.camera.sync();
   }
 
@@ -91,24 +97,22 @@ void VelocityModule::step_camera_sync()
 }
 
 /* Gather motion data from all objects in the scene. */
-void VelocityModule::step_object_sync(void *velocity_,
-                                      Object *ob,
-                                      RenderEngine *UNUSED(engine),
-                                      Depsgraph *UNUSED(depsgraph))
+void VelocityModule::step_object_sync(Object *ob, ObjectKey &object_key)
 {
-  VelocityModule &velocity = *reinterpret_cast<VelocityModule *>(velocity_);
-
-  if (!velocity.object_has_velocity(ob) && !velocity.object_is_deform(ob)) {
+  if (!object_has_velocity(ob) && !object_is_deform(ob)) {
     return;
   }
 
-  auto data = velocity.objects_steps.lookup_or_add_cb(ObjectKey(ob),
-                                                      []() { return new VelocityObjectBuf(); });
+  auto add_cb = [&]() {
+    inst_.sampling.reset();
+    return new VelocityObjectBuf();
+  };
+  auto data = objects_steps.lookup_or_add_cb(object_key, add_cb);
 
-  if (velocity.step_ == STEP_NEXT) {
+  if (step_ == STEP_NEXT) {
     copy_m4_m4(data->next_object_mat, ob->obmat);
   }
-  else if (velocity.step_ == STEP_PREVIOUS) {
+  else if (step_ == STEP_PREVIOUS) {
     copy_m4_m4(data->prev_object_mat, ob->obmat);
   }
 }
@@ -126,7 +130,7 @@ void VelocityModule::step_swap(void)
 
 void VelocityModule::begin_sync(void)
 {
-  if (is_viewport_) {
+  if (inst_.is_viewport()) {
     step_camera_sync();
   }
 }
@@ -134,9 +138,27 @@ void VelocityModule::begin_sync(void)
 /* This is the end of the current frame sync. Not the step_sync. */
 void VelocityModule::end_sync(void)
 {
-  for (VelocityObjectBuf *data : objects_steps.values()) {
-    data->push_update();
+  Vector<ObjectKey, 1> deleted_keys;
+
+  for (auto item : objects_steps.items()) {
+    /* Detect object deletion. Only do this on viewport as STEP_NEXT means current step. */
+    if (inst_.is_viewport() && is_zero_m4(item.value->next_object_mat)) {
+      deleted_keys.append(item.key);
+      delete item.value;
+    }
+    else {
+      item.value->push_update();
+    }
   }
+
+  if (deleted_keys.size() > 0) {
+    inst_.sampling.reset();
+  }
+
+  for (auto key : deleted_keys) {
+    objects_steps.remove(key);
+  }
+
   camera_step.prev.push_update();
   camera_step.next.push_update();
 }
@@ -209,9 +231,20 @@ void VelocityPass::sync(void)
   }
 }
 
-void VelocityPass::mesh_add(Object *ob)
+void VelocityPass::mesh_add(Object *ob, ObjectHandle &handle)
 {
-  VelocityObjectBuf **data_ptr = inst_.velocity.objects_steps.lookup_ptr(ObjectKey(ob));
+  if (inst_.is_viewport()) {
+    /* FIXME(fclem) As we are using original objects pointers, there is a chance the previous
+     * object key matches a totally different object if the scene was changed by user or python
+     * callback. In this case, we cannot correctly match objects between updates.
+     * What this means is that there will be incorrect motion vectors for these objects.
+     * We live with that until we have a correct way of identifying new objects. */
+    if (handle.recalc & ID_RECALC_TRANSFORM) {
+      inst_.velocity.step_object_sync(ob, handle.object_key);
+    }
+  }
+
+  VelocityObjectBuf **data_ptr = inst_.velocity.objects_steps.lookup_ptr(handle.object_key);
 
   if (data_ptr == nullptr) {
     return;
@@ -224,24 +257,38 @@ void VelocityPass::mesh_add(Object *ob)
     return;
   }
 
-  /* Fill missing matrices if the object was hidden in previous or next frame. */
-  if (is_zero_m4(data->prev_object_mat)) {
-    copy_m4_m4(data->prev_object_mat, ob->obmat);
-  }
-  if (is_zero_m4(data->next_object_mat)) {
-    copy_m4_m4(data->next_object_mat, ob->obmat);
-  }
+  if (!inst_.is_viewport()) {
+    /* Fill missing matrices if the object was hidden in previous or next frame. */
+    if (is_zero_m4(data->prev_object_mat)) {
+      copy_m4_m4(data->prev_object_mat, ob->obmat);
+    }
 
-  // if (mb_geom->use_deform) {
-  //   /* Keep to modify later (after init). */
-  //   mb_geom->batch = geom;
-  // }
+    /* Avoid drawing object that has no motions since object_moves is always true. */
+    if (/* !mb_geom->use_deform && */ /* Object deformation can happen without transform.  */
+        equals_m4m4(data->prev_object_mat, ob->obmat)) {
+      return;
+    }
+  }
+  else {
+    /* Fill missing matrices if the object was hidden in previous or next frame. */
+    if (is_zero_m4(data->prev_object_mat)) {
+      copy_m4_m4(data->prev_object_mat, ob->obmat);
+    }
+    if (is_zero_m4(data->next_object_mat)) {
+      copy_m4_m4(data->next_object_mat, ob->obmat);
+    }
 
-  /* Avoid drawing object that has no motions since object_moves is always true. */
-  if (/* !mb_geom->use_deform && */ /* Object deformation can happen without transform.  */
-      equals_m4m4(data->prev_object_mat, ob->obmat) &&
-      equals_m4m4(data->next_object_mat, ob->obmat)) {
-    return;
+    // if (mb_geom->use_deform) {
+    //   /* Keep to modify later (after init). */
+    //   mb_geom->batch = geom;
+    // }
+
+    /* Avoid drawing object that has no motions since object_moves is always true. */
+    if (/* !mb_geom->use_deform && */ /* Object deformation can happen without transform.  */
+        equals_m4m4(data->prev_object_mat, ob->obmat) &&
+        equals_m4m4(data->next_object_mat, ob->obmat)) {
+      return;
+    }
   }
 
   /* TODO(fclem) Use the same layout as modelBlock from draw so we can reuse the same offset
@@ -289,7 +336,7 @@ void Velocity::sync(int extent[2])
 
 void Velocity::render(GPUTexture *depth_tx)
 {
-  DRW_stats_group_start("VelocityModule");
+  DRW_stats_group_start("Velocity");
 
   GPU_framebuffer_bind(velocity_only_fb_);
   inst_.shading_passes.velocity.resolve_camera_motion(depth_tx);

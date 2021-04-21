@@ -26,8 +26,10 @@
 
 #include "BKE_object.h"
 #include "DEG_depsgraph.h"
+#include "DRW_render.h"
 
 #include "eevee_film.hh"
+#include "eevee_id_map.hh"
 #include "eevee_light.hh"
 #include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
@@ -59,6 +61,7 @@ class Instance {
   VelocityModule velocity;
   MotionBlurModule motion_blur;
   LightModule lights;
+  SyncModule sync;
   /** Lookdev own lightweight instance. May not be allocated. */
   // Lookdev *lookdev = nullptr;
 
@@ -86,7 +89,8 @@ class Instance {
         camera(*this),
         velocity(*this),
         motion_blur(*this),
-        lights(*this){};
+        lights(*this),
+        sync(*this){};
   ~Instance(){};
 
   void init(const int output_res[2],
@@ -107,9 +111,12 @@ class Instance {
 
   void draw_viewport(DefaultFramebufferList *dfbl);
 
-  void view_update(void);
-
   bool finished(void) const;
+
+  bool is_viewport(void)
+  {
+    return !DRW_state_is_scene_render();
+  }
 
  private:
   void render_sync(void);

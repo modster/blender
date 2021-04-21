@@ -151,12 +151,6 @@ void EEVEE_instance_render_frame(EEVEE_Instance *instance_,
   instance->render_frame(render_layer, viewname);
 }
 
-void EEVEE_instance_view_update(EEVEE_Instance *instance_)
-{
-  Instance *instance = reinterpret_cast<Instance *>(instance_);
-  instance->view_update();
-}
-
 /** \} */
 
 /* -------------------------------------------------------------------- */

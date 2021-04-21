@@ -173,7 +173,7 @@ class Sampling {
   {
     reset_ = true;
   }
-  /* Viewport Only: true if an update happened in the scene and accumulation needs reset.z*/
+  /* Viewport Only: true if an update happened in the scene and accumulation needs reset. */
   bool is_reset(void) const
   {
     return reset_;

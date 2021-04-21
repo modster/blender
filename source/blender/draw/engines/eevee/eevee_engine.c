@@ -78,13 +78,6 @@ static void eevee_instance_free(void *instance_data)
   EEVEE_instance_free((struct EEVEE_Instance *)instance_data);
 }
 
-static void eevee_view_update(void *vedata)
-{
-  if (((EEVEE_Data *)vedata)->instance_data != NULL) {
-    EEVEE_instance_view_update(((EEVEE_Data *)vedata)->instance_data);
-  }
-}
-
 static void eevee_render_to_image(void *UNUSED(vedata),
                                   struct RenderEngine *engine,
                                   struct RenderLayer *layer,
@@ -162,7 +155,7 @@ DrawEngineType draw_engine_eevee_type = {
     &eevee_cache_populate,
     &eevee_cache_finish,
     &eevee_draw_scene,
-    &eevee_view_update,
+    NULL,
     NULL,
     &eevee_render_to_image,
     NULL,

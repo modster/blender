@@ -30,6 +30,7 @@
 
 #include "eevee_camera.hh"
 #include "eevee_culling.hh"
+#include "eevee_id_map.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
 #include "eevee_shader_shared.hh"
@@ -90,6 +91,8 @@ class LightModule {
  private:
   Instance &inst_;
 
+  /** Map an object key to a light data. This is used to track light deletion. */
+  Map<ObjectKey, int64_t> objects_light_;
   /** Gathered Light data from sync. Not all data will be selected for rendering. */
   Vector<Light> lights_;
   /** Batches of lights alongside their culling data. */
@@ -108,7 +111,7 @@ class LightModule {
   ~LightModule(){};
 
   void begin_sync(void);
-  void sync_light(const Object *ob);
+  void sync_light(const Object *ob, ObjectHandle &handle);
   void end_sync(void);
 
   void set_view(const DRWView *view, const int extent[2]);

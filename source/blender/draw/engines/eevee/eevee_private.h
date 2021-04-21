@@ -39,8 +39,6 @@ void EEVEE_instance_render_frame(struct EEVEE_Instance *instance_data_,
                                  struct RenderEngine *engine,
                                  struct RenderLayer *layer);
 
-void EEVEE_instance_view_update(struct EEVEE_Instance *instance);
-
 void EEVEE_shared_data_free(void);
 
 #ifdef __cplusplus

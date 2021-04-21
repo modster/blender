@@ -27,96 +27,13 @@
 
 #pragma once
 
-#include "BKE_duplilist.h"
 #include "BLI_map.hh"
 
+#include "eevee_id_map.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_shader_shared.hh"
 
 namespace blender::eevee {
-
-/* -------------------------------------------------------------------- */
-/** \name ObjectKey
- *
- * Unique key to be able to match object across frame updates.
- * \{ */
-
-/** Unique key to identify each object in the hashmap. */
-struct ObjectKey {
-  /** Original Object or source object for duplis. */
-  Object *ob;
-  /** Original Parent object for duplis. */
-  Object *parent;
-  /** Dupli objects recursive unique identifier */
-  int id[8]; /* MAX_DUPLI_RECUR */
-  /** If object uses particle system hair. */
-  bool use_particle_hair;
-
-  ObjectKey(Object *ob_,
-            Object *parent_,
-            int id_[8], /* MAX_DUPLI_RECUR */
-            bool use_particle_hair_)
-      : ob(ob_), parent(parent_), use_particle_hair(use_particle_hair_)
-  {
-    if (id_) {
-      memcpy(id, id_, sizeof(id));
-    }
-    else {
-      memset(id, 0, sizeof(id));
-    }
-  }
-
-  ObjectKey(Object *ob, DupliObject *dupli, Object *parent)
-      : ObjectKey(ob, parent, dupli ? dupli->persistent_id : nullptr, false){};
-
-  ObjectKey(Object *ob)
-      : ObjectKey(ob, DRW_object_get_dupli(ob), DRW_object_get_dupli_parent(ob)){};
-
-  uint64_t hash(void) const
-  {
-    uint64_t hash = BLI_ghashutil_ptrhash(ob);
-    hash = BLI_ghashutil_combine_hash(hash, BLI_ghashutil_ptrhash(parent));
-    for (int i = 0; i < MAX_DUPLI_RECUR; i++) {
-      if (id[i] != 0) {
-        hash = BLI_ghashutil_combine_hash(hash, BLI_ghashutil_inthash(id[i]));
-      }
-      else {
-        break;
-      }
-    }
-    return hash;
-  }
-
-  bool operator<(const ObjectKey &k) const
-  {
-    if (ob != k.ob) {
-      return (ob < k.ob);
-    }
-    if (parent != k.parent) {
-      return (parent < k.parent);
-    }
-    if (use_particle_hair != k.use_particle_hair) {
-      return (use_particle_hair < k.use_particle_hair);
-    }
-    return memcmp(id, k.id, sizeof(id)) < 0;
-  }
-
-  bool operator==(const ObjectKey &k) const
-  {
-    if (ob != k.ob) {
-      return false;
-    }
-    if (parent != k.parent) {
-      return false;
-    }
-    if (use_particle_hair != k.use_particle_hair) {
-      return false;
-    }
-    return memcmp(id, k.id, sizeof(id)) == 0;
-  }
-};
-
-/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name VelocityModule
@@ -144,9 +61,6 @@ class VelocityModule {
 
   eStep step_;
 
-  /** True if velocity is computed for viewport. */
-  bool is_viewport_;
-
  public:
   VelocityModule(Instance &inst) : inst_(inst){};
 
@@ -163,10 +77,7 @@ class VelocityModule {
   void step_sync(eStep step, float time);
 
   /* Gather motion data from all objects in the scene. */
-  static void step_object_sync(void *velocity,
-                               Object *ob,
-                               RenderEngine *UNUSED(engine),
-                               Depsgraph *UNUSED(depsgraph));
+  void step_object_sync(Object *ob, ObjectKey &ob_key);
 
   /* Moves next frame data to previous frame data. Nullify next frame data. */
   void step_swap(void);
@@ -205,7 +116,7 @@ class VelocityPass {
 
   void sync(void);
 
-  void mesh_add(Object *ob);
+  void mesh_add(Object *ob, ObjectHandle &handle);
 
   void render_objects(void);
   void resolve_camera_motion(GPUTexture *depth_tx);

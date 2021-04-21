@@ -87,6 +87,7 @@ set(SRC
   engines/eevee/eevee_engine.c
   engines/eevee/eevee_engine.cc
   engines/eevee/eevee_film.cc
+  engines/eevee/eevee_id_map.cc
   engines/eevee/eevee_instance.cc
   engines/eevee/eevee_light.cc
   engines/eevee/eevee_lightcache.c

@@ -124,22 +124,17 @@ void Instance::begin_sync()
 
 void Instance::object_sync(Object *ob)
 {
+  const bool is_renderable_type = ELEM(ob->type, OB_MESH, OB_LAMP);
   const int ob_visibility = DRW_object_visibility_in_active_context(ob);
   const bool partsys_is_visible = (ob_visibility & OB_VISIBLE_PARTICLES) != 0;
   const bool object_is_visible = DRW_object_is_renderable(ob) &&
                                  (ob_visibility & OB_VISIBLE_SELF) != 0;
 
-  if (!partsys_is_visible && !object_is_visible) {
+  if (!is_renderable_type || (!partsys_is_visible && !object_is_visible)) {
     return;
   }
 
-  /* Gather recalc flag. */
-  DrawEngineType *owner = (DrawEngineType *)&DRW_engine_viewport_eevee_type;
-  DrawData *dd = DRW_drawdata_ensure((ID *)ob, owner, sizeof(DrawData), nullptr, nullptr);
-  if (dd->recalc != 0) {
-    dd->recalc = 0;
-    sampling.reset();
-  }
+  ObjectHandle &ob_handle = sync.sync_object(ob);
 
   if (partsys_is_visible) {
     /* TODO render particle hair. */
@@ -148,16 +143,20 @@ void Instance::object_sync(Object *ob)
   if (object_is_visible) {
     switch (ob->type) {
       case OB_LAMP:
-        lights.sync_light(ob);
+        lights.sync_light(ob, ob_handle);
         break;
       case OB_MESH:
         shading_passes.opaque.surface_add(ob, nullptr, 0);
-        shading_passes.velocity.mesh_add(ob);
+        shading_passes.velocity.mesh_add(ob, ob_handle);
+
+        // shadows.sync_caster(ob);
         break;
       default:
         break;
     }
   }
+
+  ob_handle.reset_recalc_flag();
 }
 
 /* Wrapper to use with DRW_render_object_iter. */
@@ -252,11 +251,6 @@ void Instance::draw_viewport(DefaultFramebufferList *dfbl)
   if (!sampling.finished()) {
     DRW_viewport_request_redraw();
   }
-}
-
-void Instance::view_update(void)
-{
-  sampling.reset();
 }
 
 bool Instance::finished(void) const
