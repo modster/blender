@@ -314,6 +314,7 @@ void GPENCIL_cache_init(void *ved)
 
     GPUShader *sh = GPENCIL_shader_mask_intersect_get();
     grp = DRW_shgroup_create(sh, psl->mask_intersect_ps);
+    DRW_shgroup_uniform_texture_ref(grp, "maskBuf", &pd->mask_tx);
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
   }
   Camera *cam = (pd->camera != NULL) ? pd->camera->data : NULL;
