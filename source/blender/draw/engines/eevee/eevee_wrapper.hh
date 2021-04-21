@@ -205,7 +205,7 @@ class Texture {
     /* TODO(fclem) In the future, we need to check if mip_count did not change.
      * For now it's ok as we always define all mip level.*/
     if (tx_ && (GPU_texture_width(tx_) != w || GPU_texture_height(tx_) != h)) {
-      GPU_texture_free(tx_);
+      GPU_TEXTURE_FREE_SAFE(tx_);
     }
     if (tx_ == nullptr) {
       tx_ = GPU_texture_create_2d(name, w, h, mips, format, nullptr);
