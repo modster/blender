@@ -324,8 +324,9 @@ static void lineart_bounding_area_triangle_add(LineartRenderBuffer *rb,
   if (ba->triangle_count >= ba->max_triangle_count) {
     LineartTriangle **new_array = lineart_mem_aquire(
         &rb->render_data_pool, sizeof(LineartTriangle *) * ba->max_triangle_count * 2);
-    memcpy(new_array, ba->linked_triangles, ba->max_triangle_count);
+    memcpy(new_array, ba->linked_triangles, sizeof(LineartTriangle *) * ba->max_triangle_count);
     ba->max_triangle_count *= 2;
+    ba->linked_triangles = new_array;
   }
   ba->linked_triangles[ba->triangle_count] = rt;
   ba->triangle_count++;
