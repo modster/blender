@@ -116,6 +116,10 @@ static bool bake_strokes(
     MOD_lineart_compute_feature_lines(dg, lmd, lc);
     MOD_lineart_destroy_render_data(lmd);
   }
+  else {
+    MOD_lineart_chain_clear_picked_flag(gpd->runtime.lineart_cache);
+    lmd->cache = gpd->runtime.lineart_cache;
+  }
 
   MOD_lineart_gpencil_generate(
       lmd->cache,

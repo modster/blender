@@ -889,12 +889,12 @@ int MOD_lineart_chain_count(const LineartLineChain *rlc)
   return count;
 }
 
-void MOD_lineart_chain_clear_picked_flag(LineartRenderBuffer *rb)
+void MOD_lineart_chain_clear_picked_flag(LineartCache *lc)
 {
-  if (rb == NULL) {
+  if (lc == NULL) {
     return;
   }
-  LISTBASE_FOREACH (LineartLineChain *, rlc, &rb->chains) {
+  LISTBASE_FOREACH (LineartLineChain *, rlc, &lc->chains) {
     rlc->picked = 0;
   }
 }
