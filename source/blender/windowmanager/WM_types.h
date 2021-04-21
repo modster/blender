@@ -920,6 +920,8 @@ typedef struct wmDrag {
 
   /** If set, draws operator name. */
   char opname[200];
+  /** If set, draws gizmo group. */
+  char gizmo_group[64];
   unsigned int flags;
 
   /** List of wmDragIDs, all are guaranteed to have the same ID type. */
@@ -950,6 +952,10 @@ typedef struct wmDropBox {
    * Not saved in file, so can be pointer.
    */
   wmOperatorType *ot;
+  /**
+   * If poll succeeds, gizmo is drawn.
+   */
+  char gizmo_group[64];
 
   /** Operator properties, assigned to ptr->data and can be written to a file. */
   struct IDProperty *properties;

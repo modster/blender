@@ -118,6 +118,12 @@ wmDropBox *WM_dropbox_add(ListBase *lb,
   return drop;
 }
 
+void WM_dropbox_gizmogroup_set(wmDropBox *drop, const char gizmo_group[MAX_NAME])
+{
+  BLI_strncpy(drop->gizmo_group, gizmo_group, sizeof(drop->gizmo_group));
+  WM_gizmo_group_type_add(gizmo_group);
+}
+
 void wm_dropbox_free(void)
 {
 
@@ -217,10 +223,19 @@ void WM_drag_free_list(struct ListBase *lb)
   }
 }
 
-static const char *dropbox_active(bContext *C,
-                                  ListBase *handlers,
-                                  wmDrag *drag,
-                                  const wmEvent *event)
+struct wmDropboxActiveInfo {
+  /* Some string the operator sets (operator name or some tooltip). */
+  const char *operator_string;
+  const char *gizmo_group;
+};
+
+/**
+ * \returns Pointer to static `wmDropboxActiveInfo` data.
+ */
+static struct wmDropboxActiveInfo *dropbox_active(bContext *C,
+                                                  ListBase *handlers,
+                                                  wmDrag *drag,
+                                                  const wmEvent *event)
 {
   LISTBASE_FOREACH (wmEventHandler *, handler_base, handlers) {
     if (handler_base->type == WM_HANDLER_TYPE_DROPBOX) {
@@ -230,9 +245,13 @@ static const char *dropbox_active(bContext *C,
           const char *tooltip = NULL;
           if (drop->poll(C, drag, event, &tooltip) &&
               WM_operator_poll_context(C, drop->ot, drop->opcontext)) {
+            static struct wmDropboxActiveInfo active_info;
             /* XXX Doing translation here might not be ideal, but later we have no more
              *     access to ot (and hence op context)... */
-            return (tooltip) ? tooltip : WM_operatortype_name(drop->ot, drop->ptr);
+            active_info.operator_string = (tooltip) ? tooltip :
+                                                      WM_operatortype_name(drop->ot, drop->ptr);
+            active_info.gizmo_group = drop->gizmo_group;
+            return &active_info;
           }
         }
       }
@@ -242,26 +261,32 @@ static const char *dropbox_active(bContext *C,
 }
 
 /* return active operator name when mouse is in box */
-static const char *wm_dropbox_active(bContext *C, wmDrag *drag, const wmEvent *event)
+/**
+ * \returns Pointer to static `wmDropboxActiveInfo` data, when the mouse is in a box with a
+ *          succeeding poll().
+ */
+static struct wmDropboxActiveInfo *wm_dropbox_active(bContext *C,
+                                                     wmDrag *drag,
+                                                     const wmEvent *event)
 {
   wmWindow *win = CTX_wm_window(C);
   ScrArea *area = CTX_wm_area(C);
   ARegion *region = CTX_wm_region(C);
-  const char *name;
+  struct wmDropboxActiveInfo *active_info;
 
-  name = dropbox_active(C, &win->handlers, drag, event);
-  if (name) {
-    return name;
+  active_info = dropbox_active(C, &win->handlers, drag, event);
+  if (active_info) {
+    return active_info;
   }
 
-  name = dropbox_active(C, &area->handlers, drag, event);
-  if (name) {
-    return name;
+  active_info = dropbox_active(C, &area->handlers, drag, event);
+  if (active_info) {
+    return active_info;
   }
 
-  name = dropbox_active(C, &region->handlers, drag, event);
-  if (name) {
-    return name;
+  active_info = dropbox_active(C, &region->handlers, drag, event);
+  if (active_info) {
+    return active_info;
   }
 
   return NULL;
@@ -279,17 +304,21 @@ static void wm_drop_operator_options(bContext *C, wmDrag *drag, const wmEvent *e
   }
 
   drag->opname[0] = 0;
+  drag->gizmo_group[0] = 0;
 
   /* check buttons (XXX todo rna and value) */
   if (UI_but_active_drop_name(C)) {
     BLI_strncpy(drag->opname, IFACE_("Paste name"), sizeof(drag->opname));
   }
   else {
-    const char *opname = wm_dropbox_active(C, drag, event);
+    struct wmDropboxActiveInfo *active_info = wm_dropbox_active(C, drag, event);
 
-    if (opname) {
-      BLI_strncpy(drag->opname, opname, sizeof(drag->opname));
+    if (active_info && active_info->operator_string) {
+      BLI_strncpy(drag->opname, active_info->operator_string, sizeof(drag->opname));
       // WM_cursor_modal_set(win, WM_CURSOR_COPY);
+    }
+    if (active_info && active_info->gizmo_group) {
+      BLI_strncpy(drag->gizmo_group, active_info->gizmo_group, sizeof(drag->gizmo_group));
     }
     // else
     //  WM_cursor_modal_restore(win);
@@ -606,4 +635,17 @@ void wm_drags_draw(bContext *C, wmWindow *win, rcti *rect)
     }
   }
   GPU_blend(GPU_BLEND_NONE);
+}
+
+/* ************** Queries ***************** */
+
+const wmDrag *WM_drag_with_gizmogroup_find(const wmWindowManager *wm, const char name[MAX_NAME])
+{
+  LISTBASE_FOREACH (const wmDrag *, drag, &wm->drags) {
+    if (STREQ(drag->gizmo_group, name)) {
+      return drag;
+    }
+  }
+
+  return NULL;
 }

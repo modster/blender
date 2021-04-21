@@ -688,12 +688,14 @@ static void view3d_lightcache_update(bContext *C)
 static void view3d_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("View3D", SPACE_VIEW3D, RGN_TYPE_WINDOW);
+  wmDropBox *dropbox;
 
-  WM_dropbox_add(lb,
-                 "OBJECT_OT_add_named",
-                 view3d_ob_drop_poll,
-                 view3d_ob_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+  dropbox = WM_dropbox_add(lb,
+                           "OBJECT_OT_add_named",
+                           view3d_ob_drop_poll,
+                           view3d_ob_drop_copy,
+                           WM_drag_free_imported_drag_ID);
+  WM_dropbox_gizmogroup_set(dropbox, "VIEW3D_GGT_placement");
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_material",
                  view3d_mat_drop_poll,
@@ -714,11 +716,12 @@ static void view3d_dropboxes(void)
                  view3d_volume_drop_poll,
                  view3d_id_path_drop_copy,
                  WM_drag_free_imported_drag_ID);
-  WM_dropbox_add(lb,
-                 "OBJECT_OT_collection_instance_add",
-                 view3d_collection_drop_poll,
-                 view3d_collection_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+  dropbox = WM_dropbox_add(lb,
+                           "OBJECT_OT_collection_instance_add",
+                           view3d_collection_drop_poll,
+                           view3d_collection_drop_copy,
+                           WM_drag_free_imported_drag_ID);
+  WM_dropbox_gizmogroup_set(dropbox, "VIEW3D_GGT_placement");
   WM_dropbox_add(lb,
                  "OBJECT_OT_data_instance_add",
                  view3d_object_data_drop_poll,

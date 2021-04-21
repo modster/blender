@@ -769,6 +769,14 @@ void ED_screen_set_active_region(bContext *C, wmWindow *win, const int xy[2])
             if (WM_gizmo_highlight_set(gzmap, NULL)) {
               ED_region_tag_redraw_no_rebuild(region_prev);
             }
+
+            /* TODO deduplicate (wm_handlers_do_gizmo_handler().) */
+            const ListBase *groups = WM_gizmomap_group_list(gzmap);
+            LISTBASE_FOREACH (wmGizmoGroup *, gzgroup, groups) {
+              if (gzgroup->type->flag & WM_GIZMOGROUPTYPE_ATTACHED_TO_CURSOR) {
+                ED_region_tag_redraw_editor_overlays(region_prev);
+              }
+            }
           }
         }
 

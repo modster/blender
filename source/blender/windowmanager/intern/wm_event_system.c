@@ -2767,6 +2767,13 @@ static int wm_handlers_do_gizmo_handler(bContext *C,
     }
   }
 
+  const ListBase *groups = WM_gizmomap_group_list(gzmap);
+  LISTBASE_FOREACH (wmGizmoGroup *, gzgroup, groups) {
+    if (gzgroup->type->flag & WM_GIZMOGROUPTYPE_ATTACHED_TO_CURSOR) {
+      ED_region_tag_redraw_editor_overlays(CTX_wm_region(C));
+    }
+  }
+
   /* restore the area */
   CTX_wm_area_set(C, area);
   CTX_wm_region_set(C, region);
@@ -2874,6 +2881,10 @@ static int wm_handlers_do_intern(bContext *C, wmEvent *event, ListBase *handlers
 
                   action |= WM_HANDLER_BREAK;
 
+                  if (drop->gizmo_group[0]) {
+                    /* Redraw so gizmos disappear visually. */
+                    ED_region_tag_redraw_editor_overlays(CTX_wm_region(C));
+                  }
                   /* Free the drags. */
                   WM_drag_free_list(lb);
                   WM_drag_free_list(&single_lb);
@@ -3180,7 +3191,10 @@ static void wm_paintcursor_test(bContext *C, const wmEvent *event)
   }
 }
 
-static void wm_event_drag_and_drop_test(wmWindowManager *wm, wmWindow *win, wmEvent *event)
+static void wm_event_drag_and_drop_test(bContext *C,
+                                        wmWindowManager *wm,
+                                        wmWindow *win,
+                                        wmEvent *event)
 {
   bScreen *screen = WM_window_get_active_screen(win);
 
@@ -3192,6 +3206,7 @@ static void wm_event_drag_and_drop_test(wmWindowManager *wm, wmWindow *win, wmEv
     screen->do_draw_drag = true;
   }
   else if (event->type == EVT_ESCKEY) {
+    ED_region_tag_redraw_editor_overlays(CTX_wm_region(C));
     WM_drag_free_list(&wm->drags);
 
     screen->do_draw_drag = true;
@@ -3393,7 +3408,7 @@ void wm_event_do_handlers(bContext *C)
       }
 
       /* Check dragging, creates new event or frees, adds draw tag. */
-      wm_event_drag_and_drop_test(wm, win, event);
+      wm_event_drag_and_drop_test(C, wm, win, event);
 
       /* Builtin tweak, if action is break it removes tweak. */
       wm_tweakevent_test(C, event, action);

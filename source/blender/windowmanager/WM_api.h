@@ -692,6 +692,7 @@ struct wmDropBox *WM_dropbox_add(
     bool (*poll)(struct bContext *, struct wmDrag *, const struct wmEvent *event, const char **),
     void (*copy)(struct wmDrag *, struct wmDropBox *),
     void (*cancel)(struct Main *, struct wmDrag *, struct wmDropBox *));
+void WM_dropbox_gizmogroup_set(struct wmDropBox *, const char gizmo_group[MAX_NAME]);
 ListBase *WM_dropboxmap_find(const char *idname, int spaceid, int regionid);
 
 /* ID drag and drop */
@@ -706,6 +707,9 @@ struct ID *WM_drag_get_local_ID_or_import_from_asset(const struct wmDrag *drag, 
 void WM_drag_free_imported_drag_ID(struct Main *bmain,
                                    struct wmDrag *drag,
                                    struct wmDropBox *drop);
+
+const struct wmDrag *WM_drag_with_gizmogroup_find(
+    const struct wmWindowManager *wm, const char name[MAX_NAME]) ATTR_WARN_UNUSED_RESULT;
 
 /* Set OpenGL viewport and scissor */
 void wmViewport(const struct rcti *winrct);

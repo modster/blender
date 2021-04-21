@@ -30,6 +30,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_vfont_types.h"
 
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
@@ -64,7 +65,6 @@
 
 static const char *view3d_gzgt_placement_id = "VIEW3D_GGT_placement";
 
-static void preview_plane_cursor_setup(wmGizmoGroup *gzgroup);
 static void preview_plane_cursor_visible_set(wmGizmoGroup *gzgroup, bool do_draw);
 
 /**
@@ -1762,8 +1762,20 @@ static void WIDGETGROUP_placement_setup(const bContext *UNUSED(C), wmGizmoGroup 
     gizmo->flag |= WM_GIZMO_HIDDEN_KEYMAP;
   }
 
-  /* Sets the gizmos custom-data which has it's own free callback. */
-  preview_plane_cursor_setup(gzgroup);
+  {
+    const wmGizmoType *gzt_plane = WM_gizmotype_find("GIZMO_GT_placement_plane_3d", true);
+    gizmo = WM_gizmo_new_ptr(gzt_plane, gzgroup, NULL);
+
+    WM_gizmo_set_color(gizmo, (float[4]){1.0f, 1.0f, 1.0f, 1.0f});
+
+    /* Don't handle any events, this is for display only. */
+    gizmo->flag |= WM_GIZMO_HIDDEN_KEYMAP;
+  }
+}
+
+static bool WIDGETGROUP_placement_poll(const bContext *C, wmGizmoGroupType *gzgt)
+{
+  return ED_gizmo_poll_from_dropbox(C, gzgt) || ED_gizmo_poll_from_tool(C, gzgt);
 }
 
 void VIEW3D_GGT_placement(wmGizmoGroupType *gzgt)
@@ -1771,12 +1783,13 @@ void VIEW3D_GGT_placement(wmGizmoGroupType *gzgt)
   gzgt->name = "Placement Widget";
   gzgt->idname = view3d_gzgt_placement_id;
 
-  gzgt->flag |= WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_SCALE | WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL;
+  gzgt->flag |= WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_SCALE | WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL |
+                WM_GIZMOGROUPTYPE_ATTACHED_TO_CURSOR;
 
   gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
-  gzgt->poll = ED_gizmo_poll_or_unlink_delayed_from_tool;
+  gzgt->poll = WIDGETGROUP_placement_poll;
   gzgt->setup = WIDGETGROUP_placement_setup;
 }
 
@@ -1972,9 +1985,8 @@ struct PlacementCursor {
   float persmat_prev[4][4];
 };
 
-static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
+static void cursor_plane_draw_ex(const bContext *C, const int mval[2], struct PlacementCursor *plc)
 {
-  struct PlacementCursor *plc = (struct PlacementCursor *)customdata;
   ARegion *region = CTX_wm_region(C);
   const RegionView3D *rv3d = region->regiondata;
 
@@ -1994,6 +2006,9 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
     return;
   }
 
+  GPU_line_smooth(false);
+  GPU_line_width(1.0f);
+
   /* Check this gizmo group is in the region. */
   {
     wmGizmoMap *gzmap = region->gizmo_map;
@@ -2003,8 +2018,6 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
       return;
     }
   }
-
-  const int mval[2] = {x - region->winrct.xmin, y - region->winrct.ymin};
 
   /* Update matrix? */
   if ((plc->mval_prev[0] != mval[0]) || (plc->mval_prev[1] != mval[1]) ||
@@ -2055,7 +2068,10 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
     }
 
     /* Setup viewport & matrix. */
-    wmViewport(&region->winrct);
+    if (plc->paintcursor) {
+      /* Paint cursors are on window level, need to set the viewport. */
+      wmViewport(&region->winrct);
+    }
     GPU_matrix_push_projection();
     GPU_matrix_push();
     GPU_matrix_projection_set(rv3d->winmat);
@@ -2099,6 +2115,14 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
   }
 }
 
+static void cursor_plane_draw_cursor_fn(bContext *C, int x, int y, void *customdata)
+{
+  struct PlacementCursor *plc = (struct PlacementCursor *)customdata;
+  const ARegion *region = CTX_wm_region(C);
+  const int mval[2] = {x - region->winrct.xmin, y - region->winrct.ymin};
+  cursor_plane_draw_ex(C, mval, plc);
+}
+
 static void preview_plane_cursor_free(void *customdata)
 {
   struct PlacementCursor *plc = customdata;
@@ -2111,13 +2135,13 @@ static void preview_plane_cursor_free(void *customdata)
   MEM_freeN(plc);
 }
 
-static void preview_plane_cursor_setup(wmGizmoGroup *gzgroup)
+static void UNUSED_FUNCTION(preview_plane_cursor_setup)(wmGizmoGroup *gzgroup)
 {
   BLI_assert(gzgroup->customdata == NULL);
   struct PlacementCursor *plc = MEM_callocN(sizeof(*plc), __func__);
   plc->gzgroup = gzgroup;
   plc->paintcursor = WM_paint_cursor_activate(
-      SPACE_VIEW3D, RGN_TYPE_WINDOW, NULL, cursor_plane_draw, plc);
+      SPACE_VIEW3D, RGN_TYPE_WINDOW, NULL, cursor_plane_draw_cursor_fn, plc);
   gzgroup->customdata = plc;
   gzgroup->customdata_free = preview_plane_cursor_free;
 
@@ -2128,6 +2152,62 @@ static void preview_plane_cursor_visible_set(wmGizmoGroup *gzgroup, bool do_draw
 {
   struct PlacementCursor *plc = gzgroup->customdata;
   plc->do_draw = do_draw;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Placement Plane Gizmo
+ * \{ */
+
+struct PlacementPlaneGizmo {
+  wmGizmo gizmo;
+  struct PlacementCursor *plc;
+};
+
+static void gizmo_placement_plane_setup(wmGizmo *gz)
+{
+  struct PlacementPlaneGizmo *plane_gz = (struct PlacementPlaneGizmo *)gz;
+  plane_gz->plc = MEM_callocN(sizeof(*plane_gz->plc), __func__);
+  plane_gz->plc->gzgroup = gz->parent_gzgroup;
+}
+
+static void gizmo_placement_plane_free(wmGizmo *gz)
+{
+  struct PlacementPlaneGizmo *plane_gz = (struct PlacementPlaneGizmo *)gz;
+  MEM_SAFE_FREE(plane_gz->plc);
+}
+
+static void gizmo_placement_plane_draw(const bContext *C, wmGizmo *gz)
+{
+  struct PlacementPlaneGizmo *plane_gz = (struct PlacementPlaneGizmo *)gz;
+  const wmWindow *win = CTX_wm_window(C);
+
+  plane_gz->plc->do_draw = true;
+
+  const wmEvent *eventstate = win->eventstate;
+  const ARegion *region = CTX_wm_region(C);
+  const int mval[2] = {eventstate->x - region->winrct.xmin, eventstate->y - region->winrct.ymin};
+
+  cursor_plane_draw_ex(C, mval, plane_gz->plc);
+}
+
+static void GIZMO_GT_placement_plane_3d(wmGizmoType *gzt)
+{
+  /* identifiers */
+  gzt->idname = "GIZMO_GT_placement_plane_3d";
+
+  /* api callbacks */
+  gzt->setup = gizmo_placement_plane_setup;
+  gzt->draw = gizmo_placement_plane_draw;
+  gzt->free = gizmo_placement_plane_free;
+
+  gzt->struct_size = sizeof(struct PlacementPlaneGizmo);
+}
+
+void ED_gizmotypes_placement_3d(void)
+{
+  WM_gizmotype_append(GIZMO_GT_placement_plane_3d);
 }
 
 /** \} */
