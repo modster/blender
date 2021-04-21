@@ -602,7 +602,7 @@ void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float thresh
 void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
 
 int MOD_lineart_chain_count(const LineartLineChain *rlc);
-void MOD_lineart_chain_clear_picked_flag(struct LineartRenderBuffer *rb);
+void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);
 
 bool MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
                                        struct LineartGpencilModifierData *lmd,

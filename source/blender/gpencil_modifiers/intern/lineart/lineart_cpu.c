@@ -3961,12 +3961,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
     /* Then we connect chains based on the _proximity_ of their end points in image space, here's
      * the place threshold value gets involved. */
-
-    /* do_geometry_space = true. */
     MOD_lineart_chain_connect(rb);
-
-    /* After chaining, we need to clear flags so we don't confuse GPencil generation calls. */
-    MOD_lineart_chain_clear_picked_flag(rb);
 
     float *t_image = &lmd->chaining_image_threshold;
     /* This configuration ensures there won't be accidental lost of short unchained segments. */
@@ -3978,6 +3973,9 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
     /* Finally transfer the result list into cache. */
     memcpy(&lc->chains, &rb->chains, sizeof(ListBase));
+
+    /* At last, we need to clear flags so we don't confuse GPencil generation calls. */
+    MOD_lineart_chain_clear_picked_flag(lc);
   }
 
   if (G.debug_value == 4000) {

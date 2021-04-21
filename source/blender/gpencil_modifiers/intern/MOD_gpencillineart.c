@@ -160,6 +160,10 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
     MOD_lineart_destroy_render_data(lmd);
   }
+  else {
+    MOD_lineart_chain_clear_picked_flag(gpd->runtime.lineart_cache);
+    lmd->cache = gpd->runtime.lineart_cache;
+  }
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
