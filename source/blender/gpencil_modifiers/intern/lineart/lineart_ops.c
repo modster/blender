@@ -88,7 +88,8 @@ static void clear_strokes(Object *ob, GpencilModifierData *md, int frame)
   BKE_gpencil_layer_frame_delete(gpl, gpf);
 }
 
-static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int frame)
+static bool bake_strokes(
+    Object *ob, Depsgraph *dg, LineartCache **lc, GpencilModifierData *md, int frame)
 {
   /* Modifier data sanity check. */
   if (lineart_mod_is_disabled(md)) {
@@ -111,11 +112,13 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
     /* No greasepencil frame created or found. */
     return false;
   }
-
-  MOD_lineart_compute_feature_lines(dg, lmd);
+  if (!(*lc)) {
+    MOD_lineart_compute_feature_lines(dg, lmd, lc);
+    MOD_lineart_destroy_render_data(lmd);
+  }
 
   MOD_lineart_gpencil_generate(
-      lmd->render_buffer,
+      lmd->cache,
       dg,
       ob,
       gpl,
@@ -134,8 +137,6 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
       lmd->source_vertex_group,
       lmd->vgname,
       lmd->flags);
-
-  MOD_lineart_destroy_render_data(lmd);
 
   return true;
 }
@@ -174,14 +175,16 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
     }
   }
 
+  LineartCache *lc;
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
     if (md->type != eGpencilModifierType_Lineart) {
       continue;
     }
-    if (bake_strokes(ob, bj->dg, md, frame)) {
+    if (bake_strokes(ob, bj->dg, &lc, md, frame)) {
       touched = true;
     }
   }
+  MOD_lineart_clear_cache(lc);
 
   return touched;
 }

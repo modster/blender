@@ -55,6 +55,7 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
+#include "MOD_gpencil_lineart.h"
 #include "MOD_gpencil_modifiertypes.h"
 
 #include "BLO_read_write.h"
@@ -159,6 +160,21 @@ bool BKE_gpencil_has_geometry_modifiers(Object *ob)
     const GpencilModifierTypeInfo *mti = BKE_gpencil_modifier_get_info(md->type);
 
     if (mti && mti->generateStrokes) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if object has grease pencil Geometry modifiers.
+ * \param ob: Grease pencil object
+ * \return True if exist
+ */
+bool BKE_gpencil_has_lineart_modifiers(Object *ob)
+{
+  LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+    if (md->type == eGpencilModifierType_Lineart) {
       return true;
     }
   }
@@ -771,6 +787,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
   BKE_gpencil_lattice_init(ob);
 
   const bool time_remap = BKE_gpencil_has_time_modifiers(ob);
+  const bool has_lineart = BKE_gpencil_has_lineart_modifiers(ob);
 
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
 
@@ -806,6 +823,11 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
 
   /* Clear any lattice data. */
   BKE_gpencil_lattice_clear(ob);
+
+  if (has_lineart) {
+    MOD_lineart_clear_cache(gpd->runtime.lineart_cache);
+    gpd->runtime.lineart_cache = NULL;
+  }
 }
 
 void BKE_gpencil_modifier_blend_write(BlendWriter *writer, ListBase *modbase)

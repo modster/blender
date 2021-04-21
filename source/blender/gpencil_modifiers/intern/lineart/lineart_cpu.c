@@ -21,6 +21,7 @@
  * \ingroup editors
  */
 
+#include "MOD_gpencil_lineart.h"
 #include "MOD_lineart.h"
 
 #include "BLI_linklist.h"
@@ -107,6 +108,8 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
                                                         double *to);
 
 static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e);
+
+static LineartCache *lineart_init_cache(void);
 
 static void lineart_discard_segment(LineartRenderBuffer *rb, LineartLineSegment *rls)
 {
@@ -2628,18 +2631,17 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
   lineart_mem_destroy(&rb->render_data_pool);
-  lineart_mem_destroy(&rb->chain_data_pool);
 }
 
 void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
 {
-  LineartRenderBuffer *rb = lmd->render_buffer;
+  LineartRenderBuffer *rb = lmd->render_buffer_onetime;
 
   lineart_destroy_render_data(rb);
 
   if (rb) {
     MEM_freeN(rb);
-    lmd->render_buffer = NULL;
+    lmd->render_buffer_onetime = NULL;
   }
 
   if (G.debug_value == 4000) {
@@ -2647,14 +2649,32 @@ void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
   }
 }
 
+static LineartCache *lineart_init_cache()
+{
+  LineartCache *lc = MEM_callocN(sizeof(LineartCache *), "Lineart Cache");
+  return lc;
+}
+
+void MOD_lineart_clear_cache(struct LineartCache *lc)
+{
+  if (!lc) {
+    return;
+  }
+  lineart_mem_destroy(&lc->chain_data_pool);
+  MEM_freeN(lc);
+}
+
 static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
-                                                         LineartGpencilModifierData *lmd)
+                                                         LineartGpencilModifierData *lmd,
+                                                         LineartCache *lc)
 {
   LineartRenderBuffer *rb = MEM_callocN(sizeof(LineartRenderBuffer), "Line Art render buffer");
 
-  lmd->render_buffer = rb;
+  lmd->cache = lc;
+  lmd->render_buffer_onetime = rb;
+  lc->rb_edge_types = LRT_EDGE_FLAG_ALL_TYPE;
 
-  if (!scene || !scene->camera) {
+  if (!scene || !scene->camera || !lc) {
     return NULL;
   }
   Camera *c = scene->camera->data;
@@ -2694,6 +2714,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->use_material = (lmd->edge_types & LRT_EDGE_FLAG_MATERIAL) != 0;
   rb->use_edge_marks = (lmd->edge_types & LRT_EDGE_FLAG_EDGE_MARK) != 0;
   rb->use_intersections = (lmd->edge_types & LRT_EDGE_FLAG_INTERSECTION) != 0;
+
+  rb->chain_data_pool = &lc->chain_data_pool;
 
   BLI_spin_init(&rb->lock_task);
   BLI_spin_init(&rb->lock_cuts);
@@ -3652,7 +3674,9 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
  *
  * \return True when a change is made.
  */
-bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifierData *lmd)
+bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
+                                       LineartGpencilModifierData *lmd,
+                                       LineartCache **cached_result)
 {
   LineartRenderBuffer *rb;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
@@ -3662,7 +3686,10 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModif
     return false;
   }
 
-  rb = lineart_create_render_buffer(scene, lmd);
+  LineartCache *lc = lineart_init_cache();
+  (*cached_result) = lc;
+
+  rb = lineart_create_render_buffer(scene, lmd, lc);
 
   /* Triangle thread testing data size varies depending on the thread count.
    * See definition of LineartTriangleThread for details. */
@@ -3747,6 +3774,9 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModif
     if (rb->angle_splitting_threshold > FLT_EPSILON) {
       MOD_lineart_chain_split_angle(rb, rb->angle_splitting_threshold);
     }
+
+    /* Finally transfer the result list into cache. */
+    memcpy(&lc->chains, &rb->chains, sizeof(ListBase));
   }
 
   if (G.debug_value == 4000) {
@@ -3767,7 +3797,7 @@ static int lineart_rb_edge_types(LineartRenderBuffer *rb)
   return types;
 }
 
-static void lineart_gpencil_generate(LineartRenderBuffer *rb,
+static void lineart_gpencil_generate(LineartCache *cache,
                                      Depsgraph *depsgraph,
                                      Object *gpencil_object,
                                      float (*gp_obmat_inverse)[4],
@@ -3787,9 +3817,9 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
                                      const char *vgname,
                                      int modifier_flags)
 {
-  if (rb == NULL) {
+  if (cache == NULL) {
     if (G.debug_value == 4000) {
-      printf("NULL Lineart rb!\n");
+      printf("NULL Lineart cache!\n");
     }
     return;
   }
@@ -3813,11 +3843,11 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
   float mat[4][4];
   unit_m4(mat);
 
-  int enabled_types = lineart_rb_edge_types(rb);
+  int enabled_types = cache->rb_edge_types;
   bool invert_input = modifier_flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP;
   bool match_output = modifier_flags & LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
 
-  LISTBASE_FOREACH (LineartLineChain *, rlc, &rb->chains) {
+  LISTBASE_FOREACH (LineartLineChain *, rlc, &cache->chains) {
 
     if (rlc->picked) {
       continue;
@@ -3931,7 +3961,7 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
 /**
  * Wrapper for external calls.
  */
-void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
+void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   Depsgraph *depsgraph,
                                   Object *ob,
                                   bGPDlayer *gpl,
@@ -3979,7 +4009,7 @@ void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
   }
   float gp_obmat_inverse[4][4];
   invert_m4_m4(gp_obmat_inverse, ob->obmat);
-  lineart_gpencil_generate(rb,
+  lineart_gpencil_generate(cache,
                            depsgraph,
                            ob,
                            gp_obmat_inverse,

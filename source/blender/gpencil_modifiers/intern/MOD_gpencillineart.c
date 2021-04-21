@@ -88,7 +88,7 @@ static void generate_strokes_actual(
   }
 
   MOD_lineart_gpencil_generate(
-      lmd->render_buffer,
+      lmd->cache,
       depsgraph,
       ob,
       gpl,
@@ -156,11 +156,12 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     return;
   }
 
-  MOD_lineart_compute_feature_lines(depsgraph, lmd);
+  if (!gpd->runtime.lineart_cache) {
+    MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
+    MOD_lineart_destroy_render_data(lmd);
+  }
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
-
-  MOD_lineart_destroy_render_data(lmd);
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
 }
@@ -182,11 +183,12 @@ static void bakeModifier(Main *UNUSED(bmain),
     return;
   }
 
-  MOD_lineart_compute_feature_lines(depsgraph, lmd);
+  if (!gpd->runtime.lineart_cache) {
+    MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
+    MOD_lineart_destroy_render_data(lmd);
+  }
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
-
-  MOD_lineart_destroy_render_data(lmd);
 }
 
 static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))

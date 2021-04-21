@@ -852,6 +852,8 @@ typedef enum eLineartGpencilTransparencyFlags {
   LRT_GPENCIL_TRANSPARENCY_MATCH = (1 << 1),
 } eLineartGpencilTransparencyFlags;
 
+struct LineartCache;
+
 typedef struct LineartGpencilModifierData {
   GpencilModifierData modifier;
 
@@ -899,8 +901,9 @@ typedef struct LineartGpencilModifierData {
   /* Additional Switches. */
   int flags;
 
-  /* Runtime only. */
-  void *render_buffer;
+  struct LineartCache *cache;
+  /* Keep render buffer so we can call destroy from ModifierData. */
+  struct LineartRenderBuffer *render_buffer_onetime;
 
 } LineartGpencilModifierData;
 
