@@ -440,25 +440,19 @@ static void gpencil_weightpaint_select_curve(tGP_BrushWeightpaintData *gso,
   }
 
   /* If the curve has more than one control point... */
-  for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
     bGPDcurve_point *cpt = &gpc->curve_points[i];
-    bGPDcurve_point *cpt_next = &gpc->curve_points[i + 1];
     BezTriple *bezt = &cpt->bezt;
-    BezTriple *bezt_next = &cpt_next->bezt;
 
     int screen_co[2];
-    int screen_co2[2];
-
     /* Test if points can be projected. */
-    if (!(gpencil_3d_point_to_screen_space(region, rect, diff_mat, &bezt->vec[1], &screen_co) ||
-          gpencil_3d_point_to_screen_space(
-              region, rect, diff_mat, &bezt_next->vec[1], &screen_co2))) {
+    if (!gpencil_3d_point_to_screen_space(region, rect, diff_mat, bezt->vec[1], screen_co)) {
       continue;
     }
 
-    /* Test if the segment is in the circle. */
-    if (!gpencil_stroke_inside_circle(
-            gso->mval, radius, screen_co[0], screen_co[1], screen_co2[0], screen_co2[1])) {
+    float co[2] = {(float)screen_co[0], (float)screen_co[1]};
+    /* Test if the point is in the circle. */
+    if (len_v2v2(gso->mval, co) > radius) {
       continue;
     }
 
