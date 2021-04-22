@@ -267,27 +267,26 @@ static void calculate_basis_for_point(const float parameter,
 
   int start = 0;
   int end = 0;
-  for (int i = 0; i < points_len + order - 1; i++) {
-    if ((knots[i] != knots[i + 1]) && (t >= knots[i]) && (t <= knots[i + 1])) {
-      basis_buffer[i] = 1.0f;
-      start = std::max(i - order - 1, 0);
-      end = i;
-      i++;
-      while (i < points_len + order - 1) {
-        basis_buffer[i] = 0.0f;
-        i++;
-      }
-      break;
+  for (const int i : IndexRange(points_len + order - 1)) {
+    const bool knots_equal = knots[i] == knots[i + 1];
+    if (knots_equal || t < knots[i] || t > knots[i + 1]) {
+      basis_buffer[i] = 0.0f;
+      continue;
     }
-    basis_buffer[i] = 0.0f;
+
+    basis_buffer[i] = 1.0f;
+    start = std::max(i - order - 1, 0);
+    end = i;
+    basis_buffer.slice(i + 1, points_len + order - 1 - i).fill(0.0f);
+    break;
   }
   basis_buffer[points_len + order - 1] = 0.0f;
 
-  for (int i_order = 2; i_order <= order; i_order++) {
+  for (const int i_order : IndexRange(2, order - 1)) {
     if (end + i_order >= points_len + order) {
       end = points_len + order - 1 - i_order;
     }
-    for (int i = start; i <= end; i++) {
+    for (const int i : IndexRange(start, end - start + 1)) {
       float new_basis = 0.0f;
       if (basis_buffer[i] != 0.0f) {
         new_basis += ((t - knots[i]) * basis_buffer[i]) / (knots[i + i_order - 1] - knots[i]);
