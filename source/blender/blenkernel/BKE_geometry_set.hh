@@ -102,6 +102,10 @@ class GeometryComponent {
   /* Return true when any attribute with this name exists, including built in attributes. */
   bool attribute_exists(const blender::StringRef attribute_name) const;
 
+  /* Return the data type and domain of an attribute with the given name if it exists. */
+  std::optional<AttributeMetaData> attribute_get_meta_data(
+      const blender::StringRef attribute_name) const;
+
   /* Returns true when the geometry component supports this attribute domain. */
   bool attribute_domain_supported(const AttributeDomain domain) const;
   /* Can only be used with supported domain types. */
@@ -157,6 +161,12 @@ class GeometryComponent {
    * requested domain. */
   std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
       const blender::StringRef attribute_name, const AttributeDomain domain) const;
+
+  /* Get a virtual array to read data of an attribute with the given data type. The domain is
+   * left unchanged. Returns null when the attribute does not exist or cannot be converted to the
+   * requested data type. */
+  blender::bke::ReadAttributeLookup attribute_try_get_for_read(
+      const blender::StringRef attribute_name, const CustomDataType data_type) const;
 
   /* Get a virtual array to read the data of an attribute. If that is not possible, the returned
    * virtual array will contain a default value. This never returns null. */
