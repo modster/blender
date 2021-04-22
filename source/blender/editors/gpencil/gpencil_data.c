@@ -1575,11 +1575,7 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
                                         (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
                                         (bool)(gps->flag & GP_STROKE_SELECT);
           /* only if selected */
-          if (gps->flag & GP_STROKE_SELECT) {
-            /* skip strokes that are invalid for current view */
-            if (ED_gpencil_stroke_can_use(C, gps) == false) {
-              continue;
-            }
+          if (is_stroke_selected) {
             /* check if the color is editable */
             if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
               continue;
@@ -1610,6 +1606,7 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
         int prev_index = target_index;
         /* Now do the movement of the stroke */
         switch (direction) {
+          bGPDstroke *gps = NULL;
           /* Bring to Front */
           case GP_STROKE_MOVE_TOP:
             LISTBASE_FOREACH (LinkData *, link, &selected) {
