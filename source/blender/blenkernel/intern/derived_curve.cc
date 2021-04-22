@@ -150,7 +150,6 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
       case CU_BEZIER: {
         std::unique_ptr<BezierSpline> spline = std::make_unique<BezierSpline>();
         spline->set_resolution(nurb->resolu);
-        spline->type = Spline::Type::Bezier;
         spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
 
         /* TODO: Optimize by reserving the correct size. */
@@ -170,7 +169,6 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
       case CU_NURBS: {
         std::unique_ptr<NURBSpline> spline = std::make_unique<NURBSpline>();
         spline->set_resolution(nurb->resolu);
-        spline->type = Spline::Type::NURBS;
         spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
         spline->set_order(nurb->orderu);
         spline->knots_mode = knots_mode_from_dna_nurb(nurb->flagu);
@@ -184,7 +182,6 @@ DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
       }
       case CU_POLY: {
         std::unique_ptr<PolySpline> spline = std::make_unique<PolySpline>();
-        spline->type = Spline::Type::Poly;
         spline->is_cyclic = nurb->flagu & CU_NURB_CYCLIC;
 
         for (const BPoint &bp : Span(nurb->bp, nurb->pntsu)) {

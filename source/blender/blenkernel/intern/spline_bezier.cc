@@ -331,9 +331,24 @@ void BezierSpline::evaluate_bezier_segment(const int index,
   }
 }
 
-void BezierSpline::evaluate_bezier_position_and_mapping(MutableSpan<float3> positions,
-                                                        MutableSpan<PointMapping> mappings) const
+void BezierSpline::evaluate_bezier_position_and_mapping() const
 {
+  if (!this->base_cache_dirty_) {
+    return;
+  }
+
+  std::lock_guard lock{this->base_cache_mutex_};
+  if (!this->base_cache_dirty_) {
+    return;
+  }
+
+  const int total = this->evaluated_points_size();
+  this->evaluated_positions_cache_.resize(total);
+  this->evaluated_mappings_cache_.resize(total);
+
+  MutableSpan<float3> positions = this->evaluated_positions_cache_;
+  MutableSpan<PointMapping> mappings = this->evaluated_mappings_cache_;
+
   /* TODO: It would also be possible to store an array of offsets to facilitate parallelism here,
    * maybe it is worth it? */
   int offset = 0;
@@ -354,25 +369,72 @@ void BezierSpline::evaluate_bezier_position_and_mapping(MutableSpan<float3> posi
   }
 
   BLI_assert(offset == positions.size());
-}
-
-void BezierSpline::ensure_base_cache() const
-{
-  if (!this->base_cache_dirty_) {
-    return;
-  }
-
-  std::lock_guard lock{this->base_cache_mutex_};
-  if (!this->base_cache_dirty_) {
-    return;
-  }
-
-  const int total = this->evaluated_points_size();
-  this->evaluated_positions_cache_.resize(total);
-  this->evaluated_mapping_cache_.resize(total);
-
-  this->evaluate_bezier_position_and_mapping(this->evaluated_positions_cache_,
-                                             this->evaluated_mapping_cache_);
 
   this->base_cache_dirty_ = false;
+}
+
+/**
+ * Returns non-owning access to the cache of mappings from the evaluated points to
+ * the corresponing control points. Unless the spline is cyclic, the last control point
+ * index will never be included as an index.
+ */
+Span<PointMapping> BezierSpline::evaluated_mappings() const
+{
+  this->evaluate_bezier_position_and_mapping();
+#ifdef DEBUG
+  if (evaluated_mappings_cache_.last().control_point_index == this->size() - 1) {
+    BLI_assert(this->is_cyclic);
+  }
+#endif
+  return this->evaluated_mappings_cache_;
+}
+
+Span<float3> BezierSpline::evaluated_positions() const
+{
+  this->evaluate_bezier_position_and_mapping();
+
+  return this->evaluated_positions_cache_;
+}
+
+template<typename T>
+static void interpolate_to_evaluated_points_impl(Span<PointMapping> mappings,
+                                                 const blender::VArray<T> &source_data,
+                                                 MutableSpan<T> result_data)
+{
+  blender::attribute_math::DefaultMixer<T> mixer(result_data);
+
+  for (const int i : result_data.index_range()) {
+    const PointMapping &mapping = mappings[i];
+    const int index = mapping.control_point_index;
+    const int next_index = (index + 1) % source_data.size();
+    const float factor = mapping.factor;
+
+    const T &value = source_data[index];
+    const T &next_value = source_data[next_index];
+
+    mixer.mix_in(i, value, 1.0f - factor);
+    mixer.mix_in(i, next_value, factor);
+  }
+
+  mixer.finalize();
+}
+
+blender::fn::GVArrayPtr BezierSpline::interpolate_to_evaluated_points(
+    const blender::fn::GVArray &source_data) const
+{
+  BLI_assert(source_data.size() == this->size());
+  Span<PointMapping> mappings = this->evaluated_mappings();
+
+  blender::fn::GVArrayPtr new_varray;
+  blender::attribute_math::convert_to_static_type(source_data.type(), [&](auto dummy) {
+    using T = decltype(dummy);
+    if constexpr (!std::is_void_v<blender::attribute_math::DefaultMixer<T>>) {
+      Array<T> values(this->evaluated_points_size());
+      interpolate_to_evaluated_points_impl<T>(mappings, source_data.typed<T>(), values);
+      new_varray = std::make_unique<blender::fn::GVArray_For_ArrayContainer<Array<T>>>(
+          std::move(values));
+    }
+  });
+
+  return new_varray;
 }

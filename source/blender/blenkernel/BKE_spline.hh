@@ -49,6 +49,9 @@ struct PointMapping {
   float factor;
 };
 
+class Spline;
+using SplinePtr = std::unique_ptr<Spline>;
+
 /**
  * A spline is an abstraction of a curve section, its evaluation methods, and data.
  * The spline data itself is just control points and a set of attributes.
@@ -58,14 +61,16 @@ struct PointMapping {
  */
 class Spline {
  public:
-  using SplinePtr = std::unique_ptr<Spline>;
-
   enum Type {
     Bezier,
     NURBS,
     Poly,
   };
-  Type type;
+
+ private:
+  Type type_;
+
+ public:
   bool is_cyclic = false;
 
   enum NormalCalculationMode {
@@ -76,11 +81,6 @@ class Spline {
   NormalCalculationMode normal_mode;
 
  protected:
-  mutable bool base_cache_dirty_ = true;
-  mutable std::mutex base_cache_mutex_;
-  mutable blender::Vector<blender::float3> evaluated_positions_cache_;
-  mutable blender::Vector<PointMapping> evaluated_mapping_cache_;
-
   mutable bool tangent_cache_dirty_ = true;
   mutable std::mutex tangent_cache_mutex_;
   mutable blender::Vector<blender::float3> evaluated_tangents_cache_;
@@ -95,15 +95,10 @@ class Spline {
 
  public:
   virtual ~Spline() = default;
-  Spline() = default;
+  Spline(const Type type) : type_(type){};
   Spline(Spline &other)
-      : type(other.type), is_cyclic(other.is_cyclic), normal_mode(other.normal_mode)
+      : type_(other.type_), is_cyclic(other.is_cyclic), normal_mode(other.normal_mode)
   {
-    if (!other.base_cache_dirty_) {
-      evaluated_positions_cache_ = other.evaluated_positions_cache_;
-      evaluated_mapping_cache_ = other.evaluated_mapping_cache_;
-      base_cache_dirty_ = false;
-    }
     if (!other.tangent_cache_dirty_) {
       evaluated_tangents_cache_ = other.evaluated_tangents_cache_;
       tangent_cache_dirty_ = false;
@@ -119,6 +114,8 @@ class Spline {
   }
 
   virtual SplinePtr copy() const = 0;
+
+  Spline::Type type() const;
 
   virtual int size() const = 0;
   int segments_size() const;
@@ -141,8 +138,7 @@ class Spline {
 
   float length() const;
 
-  blender::Span<blender::float3> evaluated_positions() const;
-  blender::Span<PointMapping> evaluated_mappings() const;
+  virtual blender::Span<blender::float3> evaluated_positions() const = 0;
   blender::Span<float> evaluated_lengths() const;
   blender::Span<blender::float3> evaluated_tangents() const;
   blender::Span<blender::float3> evaluated_normals() const;
@@ -161,46 +157,12 @@ class Spline {
   LookupResult lookup_evaluated_factor(const float factor) const;
   LookupResult lookup_evaluated_length(const float length) const;
 
-  /**
-   * Interpolate data from the original control points to the corresponding ealuated points.
-   * \param source_data: Should have the same size as the number of control points.
-   * \param result_data: ...
-   */
-  template<typename T>
-  void interpolate_data_to_evaluated_points(blender::Span<T> source_data,
-                                            blender::MutableSpan<T> result_data,
-                                            const int offset = 0) const
-  {
-    /* TODO: Onstead of "offset", it may be better to split a function that returns a single value.
-     * TODO: Check for null default mixer, possibly using std::enable_if? */
-    const int control_points_len = this->size();
-    blender::Span<PointMapping> mappings = this->evaluated_mappings();
-
-    blender::attribute_math::DefaultMixer<T> mixer(result_data);
-
-    for (const int i : result_data.index_range()) {
-      const int evaluated_point_index = offset + i;
-      const PointMapping &mapping = mappings[evaluated_point_index];
-      const int index = mapping.control_point_index;
-      const int next_index = (index + 1) % control_points_len;
-      const float factor = mapping.factor;
-
-      const T &value = source_data[index];
-      const T &next_value = source_data[next_index];
-
-      mixer.mix_in(i, value, 1.0f - factor);
-      mixer.mix_in(i, next_value, factor);
-    }
-
-    mixer.finalize();
-  }
+  virtual blender::fn::GVArrayPtr interpolate_to_evaluated_points(
+      const blender::fn::GVArray &source_data) const = 0;
 
  protected:
   virtual void correct_end_tangents() const = 0;
-  virtual void ensure_base_cache() const = 0;
 };
-
-using SplinePtr = std::unique_ptr<Spline>;
 
 class BezierSpline final : public Spline {
  public:
@@ -221,9 +183,14 @@ class BezierSpline final : public Spline {
   blender::Vector<float> tilts_;
   int resolution_u_;
 
+  mutable bool base_cache_dirty_ = true;
+  mutable std::mutex base_cache_mutex_;
+  mutable blender::Vector<blender::float3> evaluated_positions_cache_;
+  mutable blender::Vector<PointMapping> evaluated_mappings_cache_;
+
  public:
   virtual SplinePtr copy() const final;
-  BezierSpline() = default;
+  BezierSpline() : Spline(Type::Bezier){};
   BezierSpline(const BezierSpline &other)
       : Spline((Spline &)other),
         handle_types_start_(other.handle_types_start_),
@@ -235,11 +202,27 @@ class BezierSpline final : public Spline {
         tilts_(other.tilts_),
         resolution_u_(other.resolution_u_)
   {
+    if (!other.base_cache_dirty_) {
+      evaluated_positions_cache_ = other.evaluated_positions_cache_;
+      evaluated_mappings_cache_ = other.evaluated_mappings_cache_;
+      base_cache_dirty_ = false;
+    }
   }
 
   int size() const final;
   int resolution() const final;
   void set_resolution(const int value) final;
+
+  void add_point(const blender::float3 position,
+                 const HandleType handle_type_start,
+                 const blender::float3 handle_position_start,
+                 const HandleType handle_type_end,
+                 const blender::float3 handle_position_end,
+                 const float radius,
+                 const float tilt);
+
+  void drop_front(const int count) final;
+  void drop_back(const int count) final;
 
   blender::MutableSpan<blender::float3> positions() final;
   blender::Span<blender::float3> positions() const final;
@@ -257,39 +240,32 @@ class BezierSpline final : public Spline {
   blender::Span<blender::float3> handle_positions_end() const;
   blender::MutableSpan<blender::float3> handle_positions_end();
 
-  void add_point(const blender::float3 position,
-                 const HandleType handle_type_start,
-                 const blender::float3 handle_position_start,
-                 const HandleType handle_type_end,
-                 const blender::float3 handle_position_end,
-                 const float radius,
-                 const float tilt);
-
-  void drop_front(const int count) final;
-  void drop_back(const int count) final;
-
-  int evaluated_points_size() const final;
-
   bool point_is_sharp(const int index) const;
   bool handle_start_is_automatic(const int index) const;
   bool handle_end_is_automatic(const int index) const;
 
   void move_control_point(const int index, const blender::float3 new_position);
 
+  int evaluated_points_size() const final;
+
+  blender::Span<PointMapping> evaluated_mappings() const;
+  blender::Span<blender::float3> evaluated_positions() const final;
+
+  virtual blender::fn::GVArrayPtr interpolate_to_evaluated_points(
+      const blender::fn::GVArray &source_data) const;
+
  protected:
   void correct_final_tangents() const;
 
  private:
   void correct_end_tangents() const final;
-  void ensure_base_cache() const final;
   bool segment_is_vector(const int start_index) const;
   void evaluate_bezier_segment(const int index,
                                const int next_index,
                                int &offset,
                                blender::MutableSpan<blender::float3> positions,
                                blender::MutableSpan<PointMapping> mappings) const;
-  void evaluate_bezier_position_and_mapping(blender::MutableSpan<blender::float3> positions,
-                                            blender::MutableSpan<PointMapping> mappings) const;
+  void evaluate_bezier_position_and_mapping() const;
 };
 
 class NURBSpline final : public Spline {
@@ -318,13 +294,17 @@ class NURBSpline final : public Spline {
   mutable std::mutex knots_mutex_;
   mutable blender::Vector<float> knots_;
 
+  mutable bool position_cache_dirty_ = true;
+  mutable std::mutex position_cache_mutex_;
+  mutable blender::Vector<blender::float3> evaluated_positions_cache_;
+
   mutable bool basis_cache_dirty_ = true;
   mutable std::mutex basis_cache_mutex_;
-  mutable blender::Vector<BasisCache> weight_cache_;
+  mutable blender::Vector<BasisCache> basis_cache_;
 
  public:
   SplinePtr copy() const final;
-  NURBSpline() = default;
+  NURBSpline() : Spline(Type::NURBS){};
   NURBSpline(const NURBSpline &other)
       : Spline((Spline &)other),
         positions_(other.positions_),
@@ -342,6 +322,14 @@ class NURBSpline final : public Spline {
   uint8_t order() const;
   void set_order(const uint8_t value);
 
+  void add_point(const blender::float3 position,
+                 const float radius,
+                 const float tilt,
+                 const float weight);
+
+  void drop_front(const int count) final;
+  void drop_back(const int count) final;
+
   bool check_valid_size_and_order() const;
   int knots_size() const;
 
@@ -357,22 +345,15 @@ class NURBSpline final : public Spline {
   blender::MutableSpan<float> weights();
   blender::Span<float> weights() const;
 
-  void add_point(const blender::float3 position,
-                 const float radius,
-                 const float tilt,
-                 const float weight);
-
-  void drop_front(const int count) final;
-  void drop_back(const int count) final;
-
   int evaluated_points_size() const final;
 
+  blender::Span<blender::float3> evaluated_positions() const final;
+
   blender::fn::GVArrayPtr interpolate_to_evaluated_points(
-      const blender::fn::GVArray &source_data) const;
+      const blender::fn::GVArray &source_data) const final;
 
  protected:
   void correct_end_tangents() const final;
-  void ensure_base_cache() const final;
   void calculate_knots() const;
   void calculate_basis_cache() const;
 };
@@ -386,7 +367,7 @@ class PolySpline final : public Spline {
  private:
  public:
   SplinePtr copy() const final;
-  PolySpline() = default;
+  PolySpline() : Spline(Type::Bezier){};
   PolySpline(const PolySpline &other)
       : Spline((Spline &)other),
         positions_(other.positions_),
@@ -399,6 +380,11 @@ class PolySpline final : public Spline {
   int resolution() const final;
   void set_resolution(const int value) final;
 
+  void add_point(const blender::float3 position, const float radius, const float tilt);
+
+  void drop_front(const int count) final;
+  void drop_back(const int count) final;
+
   blender::MutableSpan<blender::float3> positions() final;
   blender::Span<blender::float3> positions() const final;
   blender::MutableSpan<float> radii() final;
@@ -406,16 +392,15 @@ class PolySpline final : public Spline {
   blender::MutableSpan<float> tilts() final;
   blender::Span<float> tilts() const final;
 
-  void add_point(const blender::float3 position, const float radius, const float tilt);
-
-  void drop_front(const int count) final;
-  void drop_back(const int count) final;
-
   int evaluated_points_size() const final;
+
+  blender::Span<blender::float3> evaluated_positions() const final;
+
+  blender::fn::GVArrayPtr interpolate_to_evaluated_points(
+      const blender::fn::GVArray &source_data) const final;
 
  protected:
   void correct_end_tangents() const final;
-  void ensure_base_cache() const final;
 };
 
 /* Proposed name to be different from DNA type. */

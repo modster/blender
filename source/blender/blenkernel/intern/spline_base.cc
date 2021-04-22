@@ -36,10 +36,14 @@ using blender::Vector;
  */
 void Spline::mark_cache_invalid()
 {
-  base_cache_dirty_ = true;
   tangent_cache_dirty_ = true;
   normal_cache_dirty_ = true;
   length_cache_dirty_ = true;
+}
+
+Spline::Type Spline::type() const
+{
+  return this->type_;
 }
 
 int Spline::evaluated_edges_size() const
@@ -54,33 +58,11 @@ float Spline::length() const
   return this->evaluated_lengths().last();
 }
 
-Span<float3> Spline::evaluated_positions() const
-{
-  this->ensure_base_cache();
-  return evaluated_positions_cache_;
-}
-
 int Spline::segments_size() const
 {
   const int points_len = this->size();
 
   return this->is_cyclic ? points_len : points_len - 1;
-}
-
-/**
- * Returns non-owning access to the cache of mappings from the evaluated points to
- * the corresponing control points. Unless the spline is cyclic, the last control point
- * index will never be included as an index.
- */
-Span<PointMapping> Spline::evaluated_mappings() const
-{
-  this->ensure_base_cache();
-#ifdef DEBUG
-  if (evaluated_mapping_cache_.last().control_point_index == this->size() - 1) {
-    BLI_assert(this->is_cyclic);
-  }
-#endif
-  return evaluated_mapping_cache_;
 }
 
 static void accumulate_lengths(Span<float3> positions,

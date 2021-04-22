@@ -67,65 +67,66 @@ static void geo_node_curve_trim_update(bNodeTree *UNUSED(ntree), bNode *node)
 
 namespace blender::nodes {
 
-static void interpolate_control_point(Spline &spline,
+static void interpolate_control_point(BezierSpline &spline,
                                       const bool adjust_next,
                                       const Spline::LookupResult lookup)
 {
-  const int evaluated_index = lookup.evaluated_index;
+  using namespace ::blender::fn;
+
+  const int eval_index = lookup.evaluated_index;
   Span<PointMapping> mappings = spline.evaluated_mappings();
-  const PointMapping &mapping = mappings[evaluated_index];
+  const PointMapping &mapping = mappings[eval_index];
   const int index = mapping.control_point_index + (adjust_next ? 1 : 0);
 
   Span<float3> evaluated_positions = spline.evaluated_positions();
 
-  spline.positions()[index] = float3::interpolate(evaluated_positions[evaluated_index],
-                                                  evaluated_positions[evaluated_index + 1],
-                                                  lookup.factor);
+  spline.positions()[index] = float3::interpolate(
+      evaluated_positions[eval_index], evaluated_positions[eval_index + 1], lookup.factor);
 
   /* TODO: Do this interpolation with attributes instead. */
 
-  MutableSpan<float> radii = spline.radii();
-  Array<float, 2> neighboring_radii(2);
-  spline.interpolate_data_to_evaluated_points(
-      radii.as_span(), neighboring_radii.as_mutable_span(), evaluated_index);
-  radii[index] = interpf(neighboring_radii[1], neighboring_radii[0], lookup.factor);
+  {
+    MutableSpan<float> radii = spline.radii();
+    GVArrayPtr radii_varray = spline.interpolate_to_evaluated_points(GVArray_For_Span(radii));
+    GVArray_Typed<float> radii_eval = radii_varray->typed<float>();
 
-  MutableSpan<float> tilts = spline.tilts();
-  Array<float, 2> neighboring_tilts(2);
-  spline.interpolate_data_to_evaluated_points(
-      tilts.as_span(), neighboring_tilts.as_mutable_span(), evaluated_index);
-  tilts[index] = interpf(neighboring_tilts[1], neighboring_tilts[0], lookup.factor);
-
-  /* Interpolate information specific to different spline types. */
-  if (NURBSpline *poly_spline = dynamic_cast<NURBSpline *>(&spline)) {
-    MutableSpan<float> weights = poly_spline->weights();
-    Array<float, 2> neighboring_weights(2);
-    spline.interpolate_data_to_evaluated_points(
-        weights.as_span(), neighboring_weights.as_mutable_span(), evaluated_index);
-    weights[index] = interpf(neighboring_weights[1], neighboring_weights[0], lookup.factor);
+    radii[index] = interpf(radii_eval[eval_index + 1], radii_eval[eval_index], lookup.factor);
   }
-  else if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(&spline)) {
-    MutableSpan<float3> handle_positions_start = bezier_spline->handle_positions_start();
-    Array<float3, 2> neighboring_handle_positions_start(2);
-    spline.interpolate_data_to_evaluated_points(
-        handle_positions_start.as_span(),
-        neighboring_handle_positions_start.as_mutable_span(),
-        evaluated_index);
-    handle_positions_start[index] = float3::interpolate(neighboring_handle_positions_start[0],
-                                                        neighboring_handle_positions_start[1],
-                                                        lookup.factor);
 
-    MutableSpan<float3> handle_positions_end = bezier_spline->handle_positions_end();
-    Array<float3, 2> neighboring_handle_positions_end(2);
-    spline.interpolate_data_to_evaluated_points(handle_positions_end.as_span(),
-                                                neighboring_handle_positions_end.as_mutable_span(),
-                                                evaluated_index);
-    handle_positions_end[index] = float3::interpolate(
-        neighboring_handle_positions_end[0], neighboring_handle_positions_end[1], lookup.factor);
+  {
+    MutableSpan<float> tilts = spline.radii();
+    GVArrayPtr tilt_varray = spline.interpolate_to_evaluated_points(GVArray_For_Span(tilts));
+    GVArray_Typed<float> tilts_eval = tilt_varray->typed<float>();
+
+    tilts[index] = interpf(tilts_eval[eval_index + 1], tilts_eval[eval_index], lookup.factor);
+  }
+
+  {
+    MutableSpan<float3> handle_positions_start = spline.handle_positions_start();
+    GVArrayPtr handle_positions_start_varray = spline.interpolate_to_evaluated_points(
+        GVArray_For_Span(handle_positions_start));
+    GVArray_Typed<float3> handle_positions_start_eval =
+        handle_positions_start_varray->typed<float3>();
+
+    handle_positions_start[index] = float3::interpolate(
+        handle_positions_start_eval[eval_index],
+        handle_positions_start_eval[eval_index + 1],
+        lookup.factor);
+  }
+
+  {
+    MutableSpan<float3> handle_positions_end = spline.handle_positions_end();
+    GVArrayPtr handle_positions_end_varray = spline.interpolate_to_evaluated_points(
+        GVArray_For_Span(handle_positions_end));
+    GVArray_Typed<float3> handle_positions_end_eval = handle_positions_end_varray->typed<float3>();
+
+    handle_positions_end[index] = float3::interpolate(handle_positions_end_eval[eval_index],
+                                                      handle_positions_end_eval[eval_index + 1],
+                                                      lookup.factor);
   }
 }
 
-static void trim_spline(Spline &spline,
+static void trim_spline(BezierSpline &spline,
                         const Spline::LookupResult start,
                         const Spline::LookupResult end)
 {
@@ -170,10 +171,13 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
       const float factor_start = params.extract_input<float>("Start");
       const float factor_end = params.extract_input<float>("End");
       for (SplinePtr &spline : curve.splines) {
+        if (spline->type() != Spline::Type::Bezier) {
+          continue;
+        }
         if (spline->is_cyclic) {
           continue;
         }
-        trim_spline(*spline,
+        trim_spline(static_cast<BezierSpline &>(*spline),
                     spline->lookup_evaluated_factor(std::min(factor_start, factor_end)),
                     spline->lookup_evaluated_factor(std::max(factor_start, factor_end)));
       }
@@ -183,11 +187,14 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
       const float length_start = params.extract_input<float>("Start_001");
       const float length_from_end = params.extract_input<float>("End_001");
       for (SplinePtr &spline : curve.splines) {
+        if (spline->type() != Spline::Type::Bezier) {
+          continue;
+        }
         if (spline->is_cyclic) {
           continue;
         }
         const float length_end = spline->length() - length_from_end;
-        trim_spline(*spline,
+        trim_spline(static_cast<BezierSpline &>(*spline),
                     spline->lookup_evaluated_length(std::min(length_start, length_end)),
                     spline->lookup_evaluated_length(std::max(length_start, length_end)));
       }

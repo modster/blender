@@ -183,8 +183,10 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   Span<float3> tangents = spline.evaluated_tangents();
   Span<float3> normals = spline.evaluated_normals();
   Span<float3> profile_positions = profile_spline.evaluated_positions();
-  Array<float> radii(spline_vert_len);
-  spline.interpolate_data_to_evaluated_points<float>(spline.radii(), radii);
+
+  GVArrayPtr radii_varray = spline.interpolate_to_evaluated_points(
+      blender::fn::GVArray_For_Span(spline.radii()));
+  GVArray_Typed<float> radii = radii_varray->typed<float>();
   for (const int i_ring : IndexRange(spline_vert_len)) {
     float4x4 point_matrix = float4x4::from_normalized_axis_data(
         positions[i_ring], tangents[i_ring], normals[i_ring]);
@@ -198,7 +200,7 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   }
 
   /* Mark edge loops from sharp vector control points sharp. */
-  if (profile_spline.type == Spline::Bezier) {
+  if (profile_spline.type() == Spline::Bezier) {
     const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(profile_spline);
     Span<PointMapping> mappings = bezier_spline.evaluated_mappings();
     for (const int i_profile : mappings.index_range()) {

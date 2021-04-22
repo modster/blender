@@ -17,6 +17,7 @@
 #include "BLI_array.hh"
 #include "BLI_listbase.h"
 #include "BLI_span.hh"
+#include "BLI_virtual_array.hh"
 
 #include "BKE_curve.h"
 #include "BKE_spline.hh"
@@ -114,30 +115,30 @@ void PolySpline::correct_end_tangents() const
 {
 }
 
-/* TODO: Consider refactoring to avoid copying and "mapping" for poly splines. */
-void PolySpline::ensure_base_cache() const
+Span<float3> PolySpline::evaluated_positions() const
 {
-  if (!this->base_cache_dirty_) {
-    return;
+  return this->positions();
+}
+
+// static blender::fn::GVArrayPtr bad_hack_copy_varray(const blender::fn::GVArray &source_data)
+// {
+// }
+
+/* TODO: This function is hacky.. how to deal with poly spline interpolation? */
+blender::fn::GVArrayPtr PolySpline::interpolate_to_evaluated_points(
+    const blender::fn::GVArray &source_data) const
+{
+  BLI_assert(source_data.size() == this->size());
+
+  if (source_data.is_span()) {
+    return std::make_unique<blender::fn::GVArray_For_GSpan>(source_data.get_internal_span());
   }
+  // if (source_data.is_single()) {
+  //   BUFFER_FOR_CPP_TYPE_VALUE(source_data.type(), value);
+  //   source_data.get_internal_single(value);
+  //   return std::make_unique<blender::fn::GVArray_For_SingleValue>(
+  //       source_data.type(), source_data.size(), value);
+  // }
 
-  std::lock_guard lock{this->base_cache_mutex_};
-  if (!this->base_cache_dirty_) {
-    return;
-  }
-
-  const int total = this->evaluated_points_size();
-  this->evaluated_positions_cache_.resize(total);
-  this->evaluated_mapping_cache_.resize(total);
-
-  MutableSpan<float3> positions = this->evaluated_positions_cache_.as_mutable_span();
-  MutableSpan<PointMapping> mappings = this->evaluated_mapping_cache_.as_mutable_span();
-
-  for (const int i : positions.index_range()) {
-    positions[i] = this->positions_[i];
-    mappings[i].control_point_index = i;
-    mappings[i].factor = 0.0f;
-  }
-
-  this->base_cache_dirty_ = false;
+  return {};
 }
