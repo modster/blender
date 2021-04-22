@@ -62,6 +62,7 @@ void spreadsheet_column_assign_runtime_data(SpreadsheetColumn *column,
                                             const StringRefNull display_name)
 {
   column->data_type = data_type;
+  MEM_SAFE_FREE(column->display_name);
   column->display_name = BLI_strdup(display_name.c_str());
 }
 
