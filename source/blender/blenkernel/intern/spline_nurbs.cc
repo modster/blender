@@ -135,6 +135,15 @@ Span<float> NURBSpline::weights() const
   return this->weights_;
 }
 
+void NURBSpline::mark_cache_invalid()
+{
+  this->basis_cache_dirty_ = true;
+  this->position_cache_dirty_ = true;
+  this->tangent_cache_dirty_ = true;
+  this->normal_cache_dirty_ = true;
+  this->length_cache_dirty_ = true;
+}
+
 int NURBSpline::evaluated_points_size() const
 {
   return this->resolution_u_ * this->segments_size();

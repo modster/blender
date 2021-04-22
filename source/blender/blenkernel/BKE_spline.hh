@@ -132,7 +132,11 @@ class Spline {
   virtual blender::MutableSpan<float> tilts() = 0;
   virtual blender::Span<float> tilts() const = 0;
 
-  virtual void mark_cache_invalid();
+  /**
+   * Mark all caches for recomputation. This must be called after any operation that would
+   * change the generated positions, tangents, normals, mapping, etc. of the evaluated points.
+   */
+  virtual void mark_cache_invalid() = 0;
   virtual int evaluated_points_size() const = 0;
   int evaluated_edges_size() const;
 
@@ -246,6 +250,7 @@ class BezierSpline final : public Spline {
 
   void move_control_point(const int index, const blender::float3 new_position);
 
+  void mark_cache_invalid() final;
   int evaluated_points_size() const final;
 
   blender::Span<PointMapping> evaluated_mappings() const;
@@ -345,6 +350,7 @@ class NURBSpline final : public Spline {
   blender::MutableSpan<float> weights();
   blender::Span<float> weights() const;
 
+  void mark_cache_invalid() final;
   int evaluated_points_size() const final;
 
   blender::Span<blender::float3> evaluated_positions() const final;
@@ -392,6 +398,7 @@ class PolySpline final : public Spline {
   blender::MutableSpan<float> tilts() final;
   blender::Span<float> tilts() const final;
 
+  void mark_cache_invalid() final;
   int evaluated_points_size() const final;
 
   blender::Span<blender::float3> evaluated_positions() const final;

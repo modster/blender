@@ -198,6 +198,14 @@ bool BezierSpline::segment_is_vector(const int index) const
          this->handle_types_start_[index + 1] == HandleType::Vector;
 }
 
+void BezierSpline::mark_cache_invalid()
+{
+  this->base_cache_dirty_ = true;
+  this->tangent_cache_dirty_ = true;
+  this->normal_cache_dirty_ = true;
+  this->length_cache_dirty_ = true;
+}
+
 int BezierSpline::evaluated_points_size() const
 {
   BLI_assert(this->size() > 0);

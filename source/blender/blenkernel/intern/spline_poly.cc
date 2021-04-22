@@ -106,6 +106,13 @@ Span<float> PolySpline::tilts() const
   return this->tilts_;
 }
 
+void PolySpline::mark_cache_invalid()
+{
+  this->tangent_cache_dirty_ = true;
+  this->normal_cache_dirty_ = true;
+  this->length_cache_dirty_ = true;
+}
+
 int PolySpline::evaluated_points_size() const
 {
   return this->size();

@@ -30,17 +30,6 @@ using blender::MutableSpan;
 using blender::Span;
 using blender::Vector;
 
-/**
- * Mark all caches for recomputation. This must be called after any operation that would
- * change the generated positions, tangents, normals, mapping, etc. of the evaluated points.
- */
-void Spline::mark_cache_invalid()
-{
-  tangent_cache_dirty_ = true;
-  normal_cache_dirty_ = true;
-  length_cache_dirty_ = true;
-}
-
 Spline::Type Spline::type() const
 {
   return this->type_;
