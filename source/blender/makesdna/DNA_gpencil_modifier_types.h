@@ -893,13 +893,19 @@ typedef struct LineartGpencilModifierData {
   /* CPU mode */
   float chaining_image_threshold;
 
-  int _pad;
-
   /* Ported from SceneLineArt flags. */
   int calculation_flags;
 
   /* Additional Switches. */
   int flags;
+
+  /* Runtime data. */
+
+  /* Because we only do calculation once per modifier stack, so we need global override values for
+   * line art to compute as much data as possible. */
+  char level_start_override;
+  char level_end_override;
+  short edge_types_override;
 
   struct LineartCache *cache;
   /* Keep render buffer so we can call destroy from ModifierData. */

@@ -167,21 +167,6 @@ bool BKE_gpencil_has_geometry_modifiers(Object *ob)
 }
 
 /**
- * Check if object has grease pencil Geometry modifiers.
- * \param ob: Grease pencil object
- * \return True if exist
- */
-bool BKE_gpencil_has_lineart_modifiers(Object *ob)
-{
-  LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-    if (md->type == eGpencilModifierType_Lineart) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
  * Check if object has grease pencil Time modifiers.
  * \param ob: Grease pencil object
  * \return True if exist
@@ -216,6 +201,28 @@ bool BKE_gpencil_has_transform_modifiers(Object *ob)
     }
   }
   return false;
+}
+
+void BKE_gpencil_get_lineart_global_limits(Object *ob, struct GpencilLineartLimitInfo *info)
+{
+  LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+    if (md->type == eGpencilModifierType_Lineart) {
+      LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+      info->min_level = MIN2(info->min_level, lmd->level_start);
+      info->max_level = MAX2(info->max_level,
+                             (lmd->use_multiple_levels ? lmd->level_end : lmd->level_start));
+      info->edge_types |= lmd->edge_types;
+    }
+  }
+}
+
+void BKE_gpencil_assign_lineart_global_limits(GpencilModifierData *md,
+                                              struct GpencilLineartLimitInfo *info)
+{
+  LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+  lmd->level_start_override = info->min_level;
+  lmd->level_end_override = info->max_level;
+  lmd->edge_types_override = info->edge_types;
 }
 
 /* apply time modifiers */
@@ -787,7 +794,8 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
   BKE_gpencil_lattice_init(ob);
 
   const bool time_remap = BKE_gpencil_has_time_modifiers(ob);
-  const bool has_lineart = BKE_gpencil_has_lineart_modifiers(ob);
+  GpencilLineartLimitInfo info = {0};
+  BKE_gpencil_get_lineart_global_limits(ob, &info);
 
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
 
@@ -796,6 +804,10 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
 
       if ((GPENCIL_MODIFIER_EDIT(md, is_edit)) && (!is_render)) {
         continue;
+      }
+
+      if (md->type == eGpencilModifierType_Lineart) {
+        BKE_gpencil_assign_lineart_global_limits(md, &info);
       }
 
       /* Apply geometry modifiers (add new geometry). */
@@ -824,10 +836,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
   /* Clear any lattice data. */
   BKE_gpencil_lattice_clear(ob);
 
-  // if (has_lineart) {
-  MOD_lineart_clear_cache(gpd->runtime.lineart_cache);
-  gpd->runtime.lineart_cache = NULL;
-  //}
+  MOD_lineart_clear_cache(&gpd->runtime.lineart_cache);
 }
 
 void BKE_gpencil_modifier_blend_write(BlendWriter *writer, ListBase *modbase)
