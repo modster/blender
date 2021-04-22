@@ -7394,7 +7394,7 @@ static void rna_def_spreadsheet_column_id(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "SpreadsheetColumnID", NULL);
   RNA_def_struct_sdna(srna, "SpreadsheetColumnID");
   RNA_def_struct_ui_text(
-      srna, "SpreadSheet Column ID", "Data used to identify a spreadsheet column");
+      srna, "Spreadsheet Column ID", "Data used to identify a spreadsheet column");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
   RNA_def_property_ui_text(prop, "Column Name", "");
@@ -7417,7 +7417,7 @@ static void rna_def_spreadsheet_column(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "SpreadsheetColumn", NULL);
   RNA_def_struct_sdna(srna, "SpreadsheetColumn");
   RNA_def_struct_ui_text(
-      srna, "SpreadSheet Column", "Persistent data associated with a spreadsheet column");
+      srna, "Spreadsheet Column", "Persistent data associated with a spreadsheet column");
 
   prop = RNA_def_property(srna, "data_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "data_type");
@@ -7449,7 +7449,7 @@ static void rna_def_spreadsheet_row_filter(BlenderRNA *brna)
 
   srna = RNA_def_struct(brna, "SpreadsheetRowFilter", NULL);
   RNA_def_struct_sdna(srna, "SpreadsheetRowFilter");
-  RNA_def_struct_ui_text(srna, "SpreadSheet Row Filter", "");
+  RNA_def_struct_ui_text(srna, "Spreadsheet Row Filter", "");
 
   prop = RNA_def_property(srna, "enabled", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SPREADSHEET_ROW_FILTER_ENABLED);
