@@ -734,6 +734,13 @@ void ED_view3d_buttons_region_layout_ex(const struct bContext *C,
 bool ED_view3d_local_collections_set(struct Main *bmain, struct View3D *v3d);
 void ED_view3d_local_collections_reset(struct bContext *C, const bool reset_all);
 
+/* view3d_placement.c */
+
+void ED_view3d_placement_plane_calc(struct bContext *C,
+                                    const int mval[2],
+                                    float r_co_src[3],
+                                    float r_mat_orient[3][3]);
+
 #ifdef WITH_XR_OPENXR
 void ED_view3d_xr_mirror_update(const struct ScrArea *area,
                                 const struct View3D *v3d,

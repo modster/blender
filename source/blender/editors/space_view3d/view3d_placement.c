@@ -377,6 +377,25 @@ static wmGizmoGroup *idp_gizmogroup_from_region(ARegion *region)
   return gzmap ? WM_gizmomap_group_find(gzmap, view3d_gzgt_placement_id) : NULL;
 }
 
+static wmGizmo *idp_snap_gizmo_from_region(ARegion *region)
+{
+  /* Assign snap gizmo which is may be used as part of the tool. */
+  wmGizmoGroup *gzgroup = idp_gizmogroup_from_region(region);
+  if ((gzgroup == NULL) || (gzgroup->gizmos.first == NULL)) {
+    return NULL;
+  }
+
+  return gzgroup->gizmos.first;
+}
+
+static void idp_paintcursor_from_gizmo_visible_set(wmGizmo *gz, bool visible)
+{
+  /* Can be NULL when gizmos are disabled. */
+  if (gz->parent_gzgroup->customdata != NULL) {
+    preview_plane_cursor_visible_set(gz->parent_gzgroup, visible);
+  }
+}
+
 /**
  * Calculate 3D view incremental (grid) snapping.
  *
@@ -1007,6 +1026,39 @@ static void view3d_interactive_add_calc_plane(bContext *C,
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Public Placement Plane Functionality
+ * \{ */
+
+void ED_view3d_placement_plane_calc(bContext *C,
+                                    const int mval[2],
+                                    float r_co_src[3],
+                                    float r_mat_orient[3][3])
+{
+  Scene *scene = CTX_data_scene(C);
+  ARegion *region = CTX_wm_region(C);
+  View3D *v3d = CTX_wm_view3d(C);
+
+  wmGizmo *snap_gizmo = idp_snap_gizmo_from_region(region);
+  const float mval_fl[] = {mval[0], mval[1]};
+
+  view3d_interactive_add_calc_plane(C,
+                                    scene,
+                                    v3d,
+                                    region,
+                                    mval_fl,
+                                    snap_gizmo,
+                                    PLACE_SNAP_TO_GEOMETRY,
+                                    PLACE_DEPTH_SURFACE,
+                                    PLACE_ORIENT_SURFACE,
+                                    2,
+                                    false,
+                                    r_co_src,
+                                    r_mat_orient);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Add Object Modal Operator
  * \{ */
 
@@ -1032,19 +1084,8 @@ static void view3d_interactive_add_begin(bContext *C, wmOperator *op, const wmEv
   struct InteractivePlaceData *ipd = op->customdata;
 
   /* Assign snap gizmo which is may be used as part of the tool. */
-  {
-    wmGizmoGroup *gzgroup = idp_gizmogroup_from_region(ipd->region);
-    if (gzgroup != NULL) {
-      if (gzgroup->gizmos.first) {
-        ipd->snap_gizmo = gzgroup->gizmos.first;
-      }
-
-      /* Can be NULL when gizmos are disabled. */
-      if (gzgroup->customdata != NULL) {
-        preview_plane_cursor_visible_set(gzgroup, false);
-      }
-    }
-  }
+  ipd->snap_gizmo = idp_snap_gizmo_from_region(ipd->region);
+  idp_paintcursor_from_gizmo_visible_set(ipd->snap_gizmo, false);
 
   /* For tweak events the snap target may have changed since dragging,
    * update the snap target at the cursor location where tweak began.
@@ -1243,12 +1284,8 @@ static void view3d_interactive_add_exit(bContext *C, wmOperator *op)
   ED_region_tag_redraw(ipd->region);
 
   {
-    wmGizmoGroup *gzgroup = idp_gizmogroup_from_region(ipd->region);
-    if (gzgroup != NULL) {
-      if (gzgroup->customdata != NULL) {
-        preview_plane_cursor_visible_set(gzgroup, true);
-      }
-    }
+    wmGizmo *snap_gz = idp_snap_gizmo_from_region(ipd->region);
+    idp_paintcursor_from_gizmo_visible_set(snap_gz, true);
   }
 
   MEM_freeN(ipd);
@@ -1832,13 +1869,7 @@ static void gizmo_plane_update_cursor(const bContext *C,
   View3D *v3d = CTX_wm_view3d(C);
 
   /* Assign snap gizmo which is may be used as part of the tool. */
-  wmGizmo *snap_gizmo = NULL;
-  {
-    wmGizmoGroup *gzgroup = idp_gizmogroup_from_region(region);
-    if ((gzgroup != NULL) && gzgroup->gizmos.first) {
-      snap_gizmo = gzgroup->gizmos.first;
-    }
-  }
+  wmGizmo *snap_gizmo = idp_snap_gizmo_from_region(region);
 
   /* This ensures the snap gizmo has settings from this tool.
    * This function call could be moved a more appropriate place,
