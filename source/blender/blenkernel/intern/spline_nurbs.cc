@@ -301,6 +301,7 @@ static void calculate_basis_for_point(const float parameter,
     }
   }
 
+  /* Shrink the range of calculated values to avoid storing unecessary zeros. */
   while (basis_buffer[start] == 0.0f && start < end) {
     start++;
   }
@@ -334,6 +335,8 @@ void NURBSpline::calculate_basis_cache() const
 
   MutableSpan<BasisCache> basis_cache = this->weight_cache_;
 
+  /* This buffer is reused by each basis calculation to store temporary values.
+   * Theoretically it could likely be optimized away in the future. */
   Array<float> basis_buffer(this->knots_size());
 
   const float start = knots[order - 1];
