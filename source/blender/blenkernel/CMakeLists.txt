@@ -118,10 +118,6 @@ set(SRC
   intern/data_transfer.c
   intern/deform.c
   intern/derived_curve.cc  
-  intern/derived_curve_spline_base.cc
-  intern/derived_curve_spline_bezier.cc
-  intern/derived_curve_spline_nurbs.cc
-  intern/derived_curve_spline_poly.cc
   intern/displist.cc
   intern/displist_tangent.c
   intern/dynamicpaint.c
@@ -247,6 +243,10 @@ set(SRC
   intern/softbody.c
   intern/sound.c
   intern/speaker.c
+  intern/spline_base.cc
+  intern/spline_bezier.cc
+  intern/spline_nurbs.cc
+  intern/spline_poly.cc
   intern/studiolight.c
   intern/subdiv.c
   intern/subdiv_ccg.c
@@ -328,7 +328,7 @@ set(SRC
   BKE_customdata_file.h
   BKE_data_transfer.h
   BKE_deform.h
-  BKE_derived_curve.hh
+  BKE_spline.hh
   BKE_displist.h
   BKE_displist_tangent.h
   BKE_duplilist.h

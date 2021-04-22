@@ -17,7 +17,7 @@
 #include "DNA_curve_types.h"
 #include "DNA_object_types.h"
 
-#include "BKE_derived_curve.hh"
+#include "BKE_spline.hh"
 
 #include "BLI_math_matrix.h"
 

@@ -19,7 +19,7 @@
 #include "BLI_span.hh"
 
 #include "BKE_curve.h"
-#include "BKE_derived_curve.hh"
+#include "BKE_spline.hh"
 
 using blender::Array;
 using blender::float3;

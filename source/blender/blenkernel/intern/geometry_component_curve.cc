@@ -14,7 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BKE_derived_curve.hh"
+#include "BKE_spline.hh"
 
 #include "BKE_attribute_access.hh"
 #include "BKE_attribute_math.hh"
@@ -192,7 +192,8 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
     return false;
   }
 
-  bool try_create(GeometryComponent &UNUSED(component)) const final
+  bool try_create(GeometryComponent &UNUSED(component),
+                  const AttributeInit &UNUSED(initializer)) const final
   {
     return false;
   }
@@ -327,7 +328,8 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
     return false;
   }
 
-  bool try_create(GeometryComponent &UNUSED(component)) const final
+  bool try_create(GeometryComponent &UNUSED(component),
+                  const AttributeInit &UNUSED(initializer)) const final
   {
     return false;
   }

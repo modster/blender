@@ -14,7 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BKE_derived_curve.hh"
+#include "BKE_spline.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"

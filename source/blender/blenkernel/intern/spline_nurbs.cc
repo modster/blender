@@ -20,7 +20,7 @@
 #include "BLI_virtual_array.hh"
 
 #include "BKE_attribute_math.hh"
-#include "BKE_derived_curve.hh"
+#include "BKE_spline.hh"
 
 using blender::Array;
 using blender::float3;

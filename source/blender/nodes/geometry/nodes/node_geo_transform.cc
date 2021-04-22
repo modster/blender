@@ -23,8 +23,8 @@
 #include "DNA_pointcloud_types.h"
 #include "DNA_volume_types.h"
 
-#include "BKE_derived_curve.hh"
 #include "BKE_mesh.h"
+#include "BKE_spline.hh"
 #include "BKE_volume.h"
 
 #include "DEG_depsgraph_query.h"

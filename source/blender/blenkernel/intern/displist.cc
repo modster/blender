@@ -44,7 +44,6 @@
 
 #include "BKE_anim_path.h"
 #include "BKE_curve.h"
-#include "BKE_derived_curve.hh"
 #include "BKE_displist.h"
 #include "BKE_font.h"
 #include "BKE_geometry_set.hh"
@@ -56,6 +55,7 @@
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_object.h"
+#include "BKE_spline.hh"
 
 #include "BLI_sys_types.h"  // for intptr_t support
 
