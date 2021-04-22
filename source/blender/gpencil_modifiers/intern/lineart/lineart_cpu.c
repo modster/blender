@@ -2830,13 +2830,14 @@ static LineartCache *lineart_init_cache()
   return lc;
 }
 
-void MOD_lineart_clear_cache(struct LineartCache *lc)
+void MOD_lineart_clear_cache(struct LineartCache **lc)
 {
-  if (!lc) {
+  if (!(*lc)) {
     return;
   }
-  lineart_mem_destroy(&lc->chain_data_pool);
-  MEM_freeN(lc);
+  lineart_mem_destroy(&((*lc)->chain_data_pool));
+  MEM_freeN(*lc);
+  (*lc) = NULL;
 }
 
 static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
@@ -2891,11 +2892,11 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   /* See lineart_edge_from_triangle() for how this option may impact performance. */
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
 
-  rb->use_contour = (lmd->edge_types & LRT_EDGE_FLAG_CONTOUR) != 0;
-  rb->use_crease = (lmd->edge_types & LRT_EDGE_FLAG_CREASE) != 0;
-  rb->use_material = (lmd->edge_types & LRT_EDGE_FLAG_MATERIAL) != 0;
-  rb->use_edge_marks = (lmd->edge_types & LRT_EDGE_FLAG_EDGE_MARK) != 0;
-  rb->use_intersections = (lmd->edge_types & LRT_EDGE_FLAG_INTERSECTION) != 0;
+  rb->use_contour = (lmd->edge_types_override & LRT_EDGE_FLAG_CONTOUR) != 0;
+  rb->use_crease = (lmd->edge_types_override & LRT_EDGE_FLAG_CREASE) != 0;
+  rb->use_material = (lmd->edge_types_override & LRT_EDGE_FLAG_MATERIAL) != 0;
+  rb->use_edge_marks = (lmd->edge_types_override & LRT_EDGE_FLAG_EDGE_MARK) != 0;
+  rb->use_intersections = (lmd->edge_types_override & LRT_EDGE_FLAG_INTERSECTION) != 0;
 
   rb->chain_data_pool = &lc->chain_data_pool;
 
@@ -3898,7 +3899,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
   /* This is used to limit calculation to a certain level to save time, lines who have higher
    * occlusion levels will get ignored. */
-  rb->max_occlusion_level = MAX2(lmd->level_start, lmd->level_end);
+  rb->max_occlusion_level = lmd->level_end_override;
 
   /* FIXME(Yiming): See definition of int #LineartRenderBuffer::_source_type for detailed. */
   rb->_source_type = lmd->source_type;

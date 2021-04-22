@@ -32,4 +32,4 @@ void WM_operatortypes_lineart(void);
 
 struct LineartCache;
 
-void MOD_lineart_clear_cache(struct LineartCache *lc);
+void MOD_lineart_clear_cache(struct LineartCache **lc);

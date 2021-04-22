@@ -179,16 +179,20 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
     }
   }
 
+  GpencilLineartLimitInfo info = {0};
+  BKE_gpencil_get_lineart_global_limits(ob, &info);
+
   LineartCache *lc;
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
     if (md->type != eGpencilModifierType_Lineart) {
       continue;
     }
+    BKE_gpencil_assign_lineart_global_limits(md, &info);
     if (bake_strokes(ob, bj->dg, &lc, md, frame)) {
       touched = true;
     }
   }
-  MOD_lineart_clear_cache(lc);
+  MOD_lineart_clear_cache(&lc);
 
   return touched;
 }

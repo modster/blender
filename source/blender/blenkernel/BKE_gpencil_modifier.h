@@ -294,6 +294,18 @@ bool BKE_gpencil_has_geometry_modifiers(struct Object *ob);
 bool BKE_gpencil_has_time_modifiers(struct Object *ob);
 bool BKE_gpencil_has_transform_modifiers(struct Object *ob);
 
+typedef struct GpencilLineartLimitInfo {
+  char min_level;
+  char max_level;
+  short edge_types;
+} GpencilLineartLimitInfo;
+
+void BKE_gpencil_get_lineart_global_limits(struct Object *ob,
+                                           struct GpencilLineartLimitInfo *info);
+
+void BKE_gpencil_assign_lineart_global_limits(struct GpencilModifierData *md,
+                                              struct GpencilLineartLimitInfo *info);
+
 void BKE_gpencil_lattice_init(struct Object *ob);
 void BKE_gpencil_lattice_clear(struct Object *ob);
 
