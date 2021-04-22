@@ -22,6 +22,8 @@
 
 #include <mutex>
 
+#include "FN_generic_virtual_array.hh"
+
 #include "BLI_float3.hh"
 #include "BLI_float4x4.hh"
 #include "BLI_vector.hh"
@@ -299,6 +301,11 @@ class NURBSpline final : public Spline {
   };
   KnotsMode knots_mode;
 
+  struct WeightCache {
+    blender::Vector<float> weights;
+    int start_index;
+  };
+
  private:
   blender::Vector<blender::float3> positions_;
   blender::Vector<float> radii_;
@@ -310,6 +317,10 @@ class NURBSpline final : public Spline {
   mutable bool knots_dirty_ = true;
   mutable std::mutex knots_mutex_;
   mutable blender::Vector<float> knots_;
+
+  mutable bool weights_dirty_ = true;
+  mutable std::mutex weights_mutex_;
+  mutable blender::Vector<WeightCache> weight_cache_;
 
  public:
   SplinePtr copy() const final;
@@ -356,12 +367,14 @@ class NURBSpline final : public Spline {
 
   int evaluated_points_size() const final;
 
+  blender::fn::GVArrayPtr interpolate_to_evaluated_points(
+      const blender::fn::GVArray &source_data) const;
+
  protected:
   void correct_end_tangents() const final;
   void ensure_base_cache() const final;
-  void evaluate_position_and_mapping(blender::MutableSpan<blender::float3> positions,
-                                     blender::MutableSpan<PointMapping> mappings) const;
   void calculate_knots() const;
+  void calculate_weights() const;
 };
 
 class PolySpline final : public Spline {
