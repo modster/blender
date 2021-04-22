@@ -1555,6 +1555,7 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
 
   const int direction = RNA_enum_get(op->ptr, "direction");
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
+  bGPDstroke *gps_target = NULL;
 
   bool changed = false;
   CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
@@ -1568,63 +1569,73 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
         if (gpf == NULL) {
           continue;
         }
-        bool gpf_lock = false;
         /* verify if any selected stroke is in the extreme of the stack and select to move */
         LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
           bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
                                         (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
                                         (bool)(gps->flag & GP_STROKE_SELECT);
           /* only if selected */
-          if (!is_stroke_selected) {
-            continue;
-          }
-          /* skip strokes that are invalid for current view */
-          if (ED_gpencil_stroke_can_use(C, gps) == false) {
-            continue;
-          }
-          /* check if the color is editable */
-          if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
-            continue;
-          }
-          /* some stroke is already at front*/
-          if (ELEM(direction, GP_STROKE_MOVE_TOP, GP_STROKE_MOVE_UP)) {
-            if (gps == gpf->strokes.last) {
-              gpf_lock = true;
+          if (gps->flag & GP_STROKE_SELECT) {
+            /* skip strokes that are invalid for current view */
+            if (ED_gpencil_stroke_can_use(C, gps) == false) {
               continue;
             }
-          }
-          /* Some stroke is already at bottom. */
-          if (ELEM(direction, GP_STROKE_MOVE_BOTTOM, GP_STROKE_MOVE_DOWN)) {
-            if (gps == gpf->strokes.first) {
-              gpf_lock = true;
+            /* check if the color is editable */
+            if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
               continue;
             }
-          }
-          /* add to list (if not locked) */
-          if (!gpf_lock) {
-            BLI_addtail(&selected, BLI_genericNodeN(gps));
+            bool gpf_lock = false;
+            /* some stroke is already at front*/
+            if (ELEM(direction, GP_STROKE_MOVE_TOP, GP_STROKE_MOVE_UP)) {
+              if (gps == gpf->strokes.last) {
+                gpf_lock = true;
+                gps_target = gps;
+              }
+            }
+            /* Some stroke is already at bottom. */
+            if (ELEM(direction, GP_STROKE_MOVE_BOTTOM, GP_STROKE_MOVE_DOWN)) {
+              if (gps == gpf->strokes.first) {
+                gpf_lock = true;
+                gps_target = gps;
+              }
+            }
+            /* add to list (if not locked) */
+            if (!gpf_lock) {
+              BLI_addtail(&selected, BLI_genericNodeN(gps));
+            }
           }
         }
 
-        if (gpf_lock) {
-          continue;
-        }
-
+        const int target_index = (gps_target) ? BLI_findindex(&gpf->strokes, gps_target) : -1;
+        int prev_index = target_index;
         /* Now do the movement of the stroke */
         switch (direction) {
           /* Bring to Front */
           case GP_STROKE_MOVE_TOP:
             LISTBASE_FOREACH (LinkData *, link, &selected) {
-              bGPDstroke *gps = link->data;
+              gps = link->data;
               BLI_remlink(&gpf->strokes, gps);
-              BLI_addtail(&gpf->strokes, gps);
+              if (gps_target) {
+                BLI_insertlinkbefore(&gpf->strokes, gps_target, gps);
+              }
+              else {
+                BLI_addtail(&gpf->strokes, gps);
+              }
               changed = true;
             }
             break;
           /* Bring Forward */
           case GP_STROKE_MOVE_UP:
             LISTBASE_FOREACH_BACKWARD (LinkData *, link, &selected) {
-              bGPDstroke *gps = link->data;
+              gps = link->data;
+              if (gps_target) {
+                int gps_index = BLI_findindex(&gpf->strokes, gps);
+                if (gps_index + 1 >= prev_index) {
+                  prev_index = gps_index;
+                  continue;
+                }
+                prev_index = gps_index;
+              }
               BLI_listbase_link_move(&gpf->strokes, gps, 1);
               changed = true;
             }
@@ -1632,7 +1643,15 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
           /* Send Backward */
           case GP_STROKE_MOVE_DOWN:
             LISTBASE_FOREACH (LinkData *, link, &selected) {
-              bGPDstroke *gps = link->data;
+              gps = link->data;
+              if (gps_target) {
+                int gps_index = BLI_findindex(&gpf->strokes, gps);
+                if (gps_index - 1 <= prev_index) {
+                  prev_index = gps_index;
+                  continue;
+                }
+                prev_index = gps_index;
+              }
               BLI_listbase_link_move(&gpf->strokes, gps, -1);
               changed = true;
             }
@@ -1640,9 +1659,14 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
           /* Send to Back */
           case GP_STROKE_MOVE_BOTTOM:
             LISTBASE_FOREACH_BACKWARD (LinkData *, link, &selected) {
-              bGPDstroke *gps = link->data;
+              gps = link->data;
               BLI_remlink(&gpf->strokes, gps);
-              BLI_addhead(&gpf->strokes, gps);
+              if (gps_target) {
+                BLI_insertlinkafter(&gpf->strokes, gps_target, gps);
+              }
+              else {
+                BLI_addhead(&gpf->strokes, gps);
+              }
               changed = true;
             }
             break;
@@ -3727,4 +3751,52 @@ void GPENCIL_OT_layer_mask_remove(wmOperatorType *ot)
   /* callbacks */
   ot->exec = gpencil_layer_mask_remove_exec;
   ot->poll = gpencil_active_layer_poll;
+}
+
+static int gpencil_layer_mask_move_exec(bContext *C, wmOperator *op)
+{
+  bGPdata *gpd = ED_gpencil_data_get_active(C);
+  bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
+  const int direction = RNA_enum_get(op->ptr, "type");
+
+  /* sanity checks */
+  if (ELEM(NULL, gpd, gpl)) {
+    return OPERATOR_CANCELLED;
+  }
+  if (gpl->act_mask > 0) {
+    bGPDlayer_Mask *mask = BLI_findlink(&gpl->mask_layers, gpl->act_mask - 1);
+    if (mask != NULL) {
+      BLI_assert(ELEM(direction, -1, 0, 1)); /* we use value below */
+      if (BLI_listbase_link_move(&gpl->mask_layers, mask, direction)) {
+        gpl->act_mask += direction;
+        DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+        WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+      }
+    }
+  }
+
+  return OPERATOR_FINISHED;
+}
+
+void GPENCIL_OT_layer_mask_move(wmOperatorType *ot)
+{
+  static const EnumPropertyItem slot_move[] = {
+      {GP_LAYER_MOVE_UP, "UP", 0, "Up", ""},
+      {GP_LAYER_MOVE_DOWN, "DOWN", 0, "Down", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  /* identifiers */
+  ot->name = "Move Grease Pencil Layer Mask";
+  ot->idname = "GPENCIL_OT_layer_mask_move";
+  ot->description = "Move the active Grease Pencil mask layer up/down in the list";
+
+  /* api callbacks */
+  ot->exec = gpencil_layer_mask_move_exec;
+  ot->poll = gpencil_active_layer_poll;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  ot->prop = RNA_def_enum(ot->srna, "type", slot_move, 0, "Type", "");
 }

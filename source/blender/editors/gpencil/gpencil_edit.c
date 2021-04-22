@@ -4080,6 +4080,8 @@ static int gpencil_strokes_reproject_exec(bContext *C, wmOperator *op)
   int oldframe = (int)DEG_get_ctime(depsgraph);
   const eGP_ReprojectModes mode = RNA_enum_get(op->ptr, "type");
   const bool keep_original = RNA_boolean_get(op->ptr, "keep_original");
+  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
+  const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
 
   /* Init snap context for geometry projection. */
   SnapObjectContext *sctx = NULL;
@@ -4092,32 +4094,55 @@ static int gpencil_strokes_reproject_exec(bContext *C, wmOperator *op)
   int cfra_prv = INT_MIN;
 
   /* Go through each editable + selected stroke, adjusting each of its points one by one... */
-  GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-    bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
-                                  (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
-                                  (bool)(gps->flag & GP_STROKE_SELECT);
+  CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
+    bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
 
-    if (!is_stroke_selected) {
-      continue;
+    for (bGPDframe *gpf = init_gpf; gpf; gpf = gpf->next) {
+      if ((gpf == gpl->actframe) || ((gpf->flag & GP_FRAME_SELECT) && (is_multiedit))) {
+        if (gpf == NULL) {
+          continue;
+        }
+        for (bGPDstroke *gps = gpf->strokes.first; gps; gps = gps->next) {
+          /* skip strokes that are invalid for current view */
+          if (ED_gpencil_stroke_can_use(C, gps) == false) {
+            continue;
+          }
+          bool curve_select = false;
+          if (is_curve_edit && gps->editcurve != NULL) {
+            curve_select = gps->editcurve->flag & GP_CURVE_SELECT;
+          }
+
+          if (gps->flag & GP_STROKE_SELECT || curve_select) {
+
+            /* update frame to get the new location of objects */
+            if ((mode == GP_REPROJECT_SURFACE) && (cfra_prv != gpf->framenum)) {
+              cfra_prv = gpf->framenum;
+              CFRA = gpf->framenum;
+              BKE_scene_graph_update_for_newframe(depsgraph);
+            }
+
+            ED_gpencil_stroke_reproject(depsgraph, &gsc, sctx, gpl, gpf, gps, mode, keep_original);
+
+            if (is_curve_edit && gps->editcurve != NULL) {
+              BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps);
+              /* Update the selection from the stroke to the curve. */
+              BKE_gpencil_editcurve_stroke_sync_selection(gpd, gps, gps->editcurve);
+
+              gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+              BKE_gpencil_stroke_geometry_update(gpd, gps);
+            }
+
+            changed = true;
+            /* If not multi-edit, exit loop. */
+            if (!is_multiedit) {
+              break;
+            }
+          }
+        }
+      }
     }
-
-    /* update frame to get the new location of objects */
-    if ((mode == GP_REPROJECT_SURFACE) && (cfra_prv != gpf_->framenum)) {
-      cfra_prv = gpf_->framenum;
-      CFRA = gpf_->framenum;
-      BKE_scene_graph_update_for_newframe(depsgraph);
-    }
-
-    ED_gpencil_stroke_reproject(depsgraph, &gsc, sctx, gpl, gpf_, gps, mode, keep_original);
-
-    /* TODO: Reproject curve data and regenerate stroke.
-     * Right now we are using the projected points to regenerate the curve. This will most likely
-     * change the handles which is usually not wanted.*/
-    BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_CURVE_REFIT_ALL);
-
-    changed = true;
   }
-  GP_EDITABLE_STROKES_END(gpstroke_iter);
+  CTX_DATA_END;
 
   /* return frame state and DB to original state */
   CFRA = oldframe;
@@ -4146,7 +4171,8 @@ void GPENCIL_OT_reproject(wmOperatorType *ot)
        "VIEW",
        0,
        "View",
-       "Reproject the strokes to end up on the same plane, as if drawn from the current viewpoint "
+       "Reproject the strokes to end up on the same plane, as if drawn from the current "
+       "viewpoint "
        "using 'Cursor' Stroke Placement"},
       {GP_REPROJECT_SURFACE,
        "SURFACE",
@@ -4165,7 +4191,8 @@ void GPENCIL_OT_reproject(wmOperatorType *ot)
   ot->name = "Reproject Strokes";
   ot->idname = "GPENCIL_OT_reproject";
   ot->description =
-      "Reproject the selected strokes from the current viewpoint as if they had been newly drawn "
+      "Reproject the selected strokes from the current viewpoint as if they had been newly "
+      "drawn "
       "(e.g. to fix problems from accidental 3D cursor movement or accidental viewport changes, "
       "or for matching deforming geometry)";
 
@@ -4502,7 +4529,8 @@ void GPENCIL_OT_stroke_subdivide(wmOperatorType *ot)
   ot->name = "Subdivide Stroke";
   ot->idname = "GPENCIL_OT_stroke_subdivide";
   ot->description =
-      "Subdivide between continuous selected points of the stroke adding a point half way between "
+      "Subdivide between continuous selected points of the stroke adding a point half way "
+      "between "
       "them";
 
   /* api callbacks */
