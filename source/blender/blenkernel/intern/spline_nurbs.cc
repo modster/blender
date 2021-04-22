@@ -261,8 +261,7 @@ static void nurb_basis(const float parameter,
                        const int order,
                        Span<float> knots,
                        MutableSpan<float> basis,
-                       int &start,
-                       int &end)
+                       NURBSpline::WeightCache &basis_cache)
 {
   /* Clamp parameter due to floating point inaccuracy. TODO: Look into using doubles. */
   const float t = std::clamp(parameter, knots[0], knots[points_len + order - 1]);
@@ -304,8 +303,8 @@ static void nurb_basis(const float parameter,
     }
   }
 
-  start = 1000;
-  end = 0;
+  int start = 1000;
+  int end = 0;
 
   for (int i = i1; i <= i2; i++) {
     if (basis[i] > 0.0f) {
@@ -315,6 +314,10 @@ static void nurb_basis(const float parameter,
       }
     }
   }
+
+  basis_cache.weights.clear();
+  basis_cache.weights.extend(basis.slice(start, end - start + 1));
+  basis_cache.start_index = start;
 }
 
 void NURBSpline::calculate_weights() const
@@ -347,30 +350,14 @@ void NURBSpline::calculate_weights() const
 
   float u = start;
   for (const int i : IndexRange(evaluated_len)) {
-    int j_start;
-    int j_end;
+    WeightCache &basis_cache = weights[i];
     nurb_basis(
-        u, points_len + (this->is_cyclic ? order - 1 : 0), order, knots, basis, j_start, j_end);
-    BLI_assert(j_end - j_start < order);
+        u, points_len + (this->is_cyclic ? order - 1 : 0), order, knots, basis, basis_cache);
+    BLI_assert(basis_cache.weights.size() <= order);
 
-    /* Calculate sums. */
-    float sum_total = 0.0f;
-    for (const int j : IndexRange(j_end - j_start + 1)) {
-      const int point_index = (j_start + j) % points_len;
-
-      sums[j] = basis[j_start + j] * control_weights[point_index];
-      sum_total += sums[j];
-    }
-    if (sum_total != 0.0f) {
-      for (const int j : IndexRange(j_end - j_start + 1)) {
-        sums[j] /= sum_total;
-      }
-    }
-
-    weights[i].start_index = j_start;
-    weights[i].weights.clear();
-    for (const int j : IndexRange(j_end - j_start + 1)) {
-      weights[i].weights.append(sums[j]);
+    for (const int j : basis_cache.weights.index_range()) {
+      const int point_index = (basis_cache.start_index + j) % points_len;
+      basis_cache.weights[j] *= control_weights[point_index];
     }
 
     u += step;
