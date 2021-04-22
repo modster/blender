@@ -1594,7 +1594,8 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
   /* Interpolate weights. */
   if (editcurve->dvert != NULL &&
       (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_WEIGHT))) {
-    for (int i = 0, idx = 0; i < editcurve->tot_curve_points - 1; i++) {
+    int idx = 0;
+    for (int i = 0; i < editcurve->tot_curve_points; i++) {
       MDeformVert *dv_curr = &editcurve->dvert[i];
       MDeformVert *dv_next = &editcurve->dvert[i + 1];
 
@@ -1623,7 +1624,40 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
       idx += segment_length;
     }
 
-    /* TODO: Deal with cyclic strokes. */
+    if (is_cyclic) {
+      /* Interpolate weights between last and first curve point. */
+      MDeformVert *dv_curr = &editcurve->dvert[editcurve->tot_curve_points - 1];
+      MDeformVert *dv_next = &editcurve->dvert[0];
+
+      if (dv_curr->totweight && dv_next->totweight) {
+        int segment_length = (adaptive) ? segment_length_cache[editcurve->tot_curve_points - 1] :
+                                          resolution;
+        for (int j = 0; j < segment_length; j++) {
+          MDeformVert *dvert = &gps->dvert[idx + j];
+          BKE_defvert_copy(dvert, dv_curr);
+          float t = (float)j / (float)segment_length;
+          for (int d = 0; d < dv_curr->totweight; d++) {
+            MDeformWeight *dw_a = BKE_defvert_ensure_index(dv_curr, d);
+            MDeformWeight *dw_b = BKE_defvert_ensure_index(dv_next, d);
+            MDeformWeight *dw_final = BKE_defvert_ensure_index(dvert, d);
+
+            if (dw_a->weight == dw_b->weight) {
+              dw_final->weight = dw_a->weight;
+            }
+            else {
+              dw_final->weight = smooth_interpf(dw_b->weight, dw_a->weight, t);
+            }
+          }
+        }
+      }
+    }
+    else {
+      /* Copy the weights of the last curve point. */
+      MDeformVert *dv_last = &editcurve->dvert[editcurve->tot_curve_points - 1];
+      MDeformVert *dvert = &gps->dvert[gps->totpoints - 1];
+      BKE_defvert_copy(dvert, dv_last);
+      BKE_defvert_sync(dvert, dv_last, true);
+    }
   }
 
   /* free temp data */
