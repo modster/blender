@@ -2684,6 +2684,20 @@ static int rna_FileBrowser_FileSelectEntry_name_length(PointerRNA *ptr)
   return (int)strlen(entry->name);
 }
 
+static const EnumPropertyItem *rna_FileBrowser_FileSelectEntry_id_type_itemf(
+    bContext *UNUSED(C), PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *UNUSED(r_free))
+{
+  const FileDirEntry *entry = ptr->data;
+  if (entry->blentype == 0) {
+    const static EnumPropertyItem none_items[] = {
+        {0, "NONE", 0, "None", ""},
+    };
+    return none_items;
+  }
+
+  return rna_enum_id_type_items;
+}
+
 static int rna_FileBrowser_FileSelectEntry_id_type_get(PointerRNA *ptr)
 {
   const FileDirEntry *entry = ptr->data;
@@ -6210,11 +6224,15 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "id_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_id_type_items);
-  RNA_def_property_enum_funcs(prop, "rna_FileBrowser_FileSelectEntry_id_type_get", NULL, NULL);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_FileBrowser_FileSelectEntry_id_type_get",
+                              NULL,
+                              "rna_FileBrowser_FileSelectEntry_id_type_itemf");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Data-block Type",
-                           "The type of the data-block, if the file represents one (0 otherwise)");
+  RNA_def_property_ui_text(
+      prop,
+      "Data-block Type",
+      "The type of the data-block, if the file represents one ('NONE' otherwise)");
 
   prop = RNA_def_property(srna, "local_id", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "ID");
