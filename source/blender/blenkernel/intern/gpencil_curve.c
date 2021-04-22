@@ -1498,9 +1498,9 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
   }
   const bool update_all_attributes = (flag == GP_GEO_UPDATE_DEFAULT);
 
-  bGPDcurve *editcurve = gps->editcurve;
-  bGPDcurve_point *curve_point_array = editcurve->curve_points;
-  int curve_point_array_len = editcurve->tot_curve_points;
+  bGPDcurve *gpc = gps->editcurve;
+  bGPDcurve_point *curve_point_array = gpc->curve_points;
+  int curve_point_array_len = gpc->tot_curve_points;
   if (curve_point_array_len == 0) {
     return;
   }
@@ -1510,9 +1510,6 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
     /* resize stroke point array */
     gps->totpoints = 1;
     gps->points = MEM_recallocN(gps->points, sizeof(bGPDspoint) * gps->totpoints);
-    if (gps->dvert != NULL) {
-      gps->dvert = MEM_recallocN(gps->dvert, sizeof(MDeformVert) * gps->totpoints);
-    }
 
     bGPDspoint *pt = &gps->points[0];
     if (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_POSITION)) {
@@ -1526,6 +1523,16 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
     }
     if (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_COLOR)) {
       copy_v4_v4(pt->vert_color, cpt->vert_color);
+    }
+
+    if (gpc->dvert != NULL && (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_WEIGHT))) {
+      gps->dvert = MEM_recallocN(gps->dvert, sizeof(MDeformVert) * gps->totpoints);
+
+      /* Copy the weights of the curve point. */
+      MDeformVert *dv_first = &gpc->dvert[0];
+      MDeformVert *dvert = &gps->dvert[0];
+      BKE_defvert_copy(dvert, dv_first);
+      BKE_defvert_sync(dvert, dv_first, true);
     }
 
     /* deselect */
@@ -1565,9 +1572,6 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
   /* resize stroke point array */
   gps->totpoints = points_len;
   gps->points = MEM_recallocN(gps->points, sizeof(bGPDspoint) * gps->totpoints);
-  if (editcurve->dvert != NULL) {
-    gps->dvert = MEM_recallocN(gps->dvert, sizeof(MDeformVert) * gps->totpoints);
-  }
 
   /* write new data to stroke point array */
   for (int i = 0; i < points_len; i++) {
@@ -1592,23 +1596,26 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
   BKE_gpencil_stroke_select_index_reset(gps);
 
   /* Interpolate weights. */
-  if (editcurve->dvert != NULL &&
-      (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_WEIGHT))) {
-    int idx = 0;
-    for (int i = 0; i < editcurve->tot_curve_points; i++) {
-      MDeformVert *dv_curr = &editcurve->dvert[i];
-      MDeformVert *dv_next = &editcurve->dvert[i + 1];
+  if (gpc->dvert != NULL && (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_WEIGHT))) {
+    gps->dvert = MEM_recallocN(gps->dvert, sizeof(MDeformVert) * gps->totpoints);
 
-      if (dv_curr->totweight == 0 || dv_next->totweight == 0) {
+    int idx = 0;
+    for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
+      MDeformVert *dv_curr = &gpc->dvert[i];
+      MDeformVert *dv_next = &gpc->dvert[i + 1];
+      int segment_length = (adaptive) ? segment_length_cache[i] : resolution;
+      int totweight = max_ii(dv_curr->totweight, dv_next->totweight);
+
+      if (totweight == 0) {
+        idx += segment_length;
         continue;
       }
 
-      int segment_length = (adaptive) ? segment_length_cache[i] : resolution;
       for (int j = 0; j < segment_length; j++) {
         MDeformVert *dvert = &gps->dvert[idx + j];
         BKE_defvert_copy(dvert, dv_curr);
         float t = (float)j / (float)segment_length;
-        for (int d = 0; d < dv_curr->totweight; d++) {
+        for (int d = 0; d < totweight; d++) {
           MDeformWeight *dw_a = BKE_defvert_ensure_index(dv_curr, d);
           MDeformWeight *dw_b = BKE_defvert_ensure_index(dv_next, d);
           MDeformWeight *dw_final = BKE_defvert_ensure_index(dvert, d);
@@ -1621,22 +1628,24 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
           }
         }
       }
+
       idx += segment_length;
     }
 
     if (is_cyclic) {
       /* Interpolate weights between last and first curve point. */
-      MDeformVert *dv_curr = &editcurve->dvert[editcurve->tot_curve_points - 1];
-      MDeformVert *dv_next = &editcurve->dvert[0];
+      MDeformVert *dv_curr = &gpc->dvert[gpc->tot_curve_points - 1];
+      MDeformVert *dv_next = &gpc->dvert[0];
+      int segment_length = (adaptive) ? segment_length_cache[gpc->tot_curve_points - 1] :
+                                        resolution;
+      int totweight = max_ii(dv_curr->totweight, dv_next->totweight);
 
-      if (dv_curr->totweight && dv_next->totweight) {
-        int segment_length = (adaptive) ? segment_length_cache[editcurve->tot_curve_points - 1] :
-                                          resolution;
+      if (totweight) {
         for (int j = 0; j < segment_length; j++) {
           MDeformVert *dvert = &gps->dvert[idx + j];
           BKE_defvert_copy(dvert, dv_curr);
           float t = (float)j / (float)segment_length;
-          for (int d = 0; d < dv_curr->totweight; d++) {
+          for (int d = 0; d < totweight; d++) {
             MDeformWeight *dw_a = BKE_defvert_ensure_index(dv_curr, d);
             MDeformWeight *dw_b = BKE_defvert_ensure_index(dv_next, d);
             MDeformWeight *dw_final = BKE_defvert_ensure_index(dvert, d);
@@ -1653,7 +1662,7 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
     }
     else {
       /* Copy the weights of the last curve point. */
-      MDeformVert *dv_last = &editcurve->dvert[editcurve->tot_curve_points - 1];
+      MDeformVert *dv_last = &gpc->dvert[gpc->tot_curve_points - 1];
       MDeformVert *dvert = &gps->dvert[gps->totpoints - 1];
       BKE_defvert_copy(dvert, dv_last);
       BKE_defvert_sync(dvert, dv_last, true);
