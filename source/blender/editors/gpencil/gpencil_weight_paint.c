@@ -649,7 +649,7 @@ static bool gpencil_weightpaint_brush_do_frame(bContext *C,
     }
 
     if (changed && GPENCIL_STROKE_TYPE_BEZIER(selected->gps)) {
-      BKE_gpencil_stroke_geometry_update(gso->gpd, selected->gps, GP_GEO_UPDATE_DEFAULT);
+      BKE_gpencil_stroke_geometry_update(gso->gpd, selected->gps, GP_GEO_UPDATE_POLYLINE_WEIGHT);
     }
   }
   /* Clear the selected array, but keep the memory allocation.*/
