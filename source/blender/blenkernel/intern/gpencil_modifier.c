@@ -824,10 +824,10 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
   /* Clear any lattice data. */
   BKE_gpencil_lattice_clear(ob);
 
-  if (has_lineart) {
-    MOD_lineart_clear_cache(gpd->runtime.lineart_cache);
-    gpd->runtime.lineart_cache = NULL;
-  }
+  // if (has_lineart) {
+  MOD_lineart_clear_cache(gpd->runtime.lineart_cache);
+  gpd->runtime.lineart_cache = NULL;
+  //}
 }
 
 void BKE_gpencil_modifier_blend_write(BlendWriter *writer, ListBase *modbase)

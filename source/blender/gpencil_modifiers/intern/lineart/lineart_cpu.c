@@ -2651,7 +2651,7 @@ void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
 
 static LineartCache *lineart_init_cache()
 {
-  LineartCache *lc = MEM_callocN(sizeof(LineartCache *), "Lineart Cache");
+  LineartCache *lc = MEM_callocN(sizeof(LineartCache), "Lineart Cache");
   return lc;
 }
 
