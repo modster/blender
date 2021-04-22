@@ -301,7 +301,7 @@ class NURBSpline final : public Spline {
   };
   KnotsMode knots_mode;
 
-  struct WeightCache {
+  struct BasisCache {
     blender::Vector<float> weights;
     int start_index;
   };
@@ -318,9 +318,9 @@ class NURBSpline final : public Spline {
   mutable std::mutex knots_mutex_;
   mutable blender::Vector<float> knots_;
 
-  mutable bool weights_dirty_ = true;
-  mutable std::mutex weights_mutex_;
-  mutable blender::Vector<WeightCache> weight_cache_;
+  mutable bool basis_cache_dirty_ = true;
+  mutable std::mutex basis_cache_mutex_;
+  mutable blender::Vector<BasisCache> weight_cache_;
 
  public:
   SplinePtr copy() const final;
@@ -374,7 +374,7 @@ class NURBSpline final : public Spline {
   void correct_end_tangents() const final;
   void ensure_base_cache() const final;
   void calculate_knots() const;
-  void calculate_weights() const;
+  void calculate_basis_cache() const;
 };
 
 class PolySpline final : public Spline {

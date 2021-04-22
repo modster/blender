@@ -256,12 +256,12 @@ Span<float> NURBSpline::knots() const
 }
 
 /* TODO: Better variables names, simplify logic once it works. */
-static void nurb_basis(const float parameter,
-                       const int points_len,
-                       const int order,
-                       Span<float> knots,
-                       MutableSpan<float> basis,
-                       NURBSpline::WeightCache &basis_cache)
+static void calculate_basis_for_point(const float parameter,
+                                      const int points_len,
+                                      const int order,
+                                      Span<float> knots,
+                                      MutableSpan<float> basis_buffer,
+                                      NURBSpline::BasisCache &basis_cache)
 {
   /* Clamp parameter due to floating point inaccuracy. TODO: Look into using doubles. */
   const float t = std::clamp(parameter, knots[0], knots[points_len + order - 1]);
@@ -270,19 +270,19 @@ static void nurb_basis(const float parameter,
   int i2 = 0;
   for (int i = 0; i < points_len + order - 1; i++) {
     if ((knots[i] != knots[i + 1]) && (t >= knots[i]) && (t <= knots[i + 1])) {
-      basis[i] = 1.0f;
+      basis_buffer[i] = 1.0f;
       i1 = std::max(i - order - 1, 0);
       i2 = i;
       i++;
       while (i < points_len + order - 1) {
-        basis[i] = 0.0f;
+        basis_buffer[i] = 0.0f;
         i++;
       }
       break;
     }
-    basis[i] = 0.0f;
+    basis_buffer[i] = 0.0f;
   }
-  basis[points_len + order - 1] = 0.0f;
+  basis_buffer[points_len + order - 1] = 0.0f;
 
   for (int i_order = 2; i_order <= order; i_order++) {
     if (i2 + i_order >= points_len + order) {
@@ -290,16 +290,16 @@ static void nurb_basis(const float parameter,
     }
     for (int i = i1; i <= i2; i++) {
       float new_basis = 0.0f;
-      if (basis[i] != 0.0f) {
-        new_basis += ((t - knots[i]) * basis[i]) / (knots[i + i_order - 1] - knots[i]);
+      if (basis_buffer[i] != 0.0f) {
+        new_basis += ((t - knots[i]) * basis_buffer[i]) / (knots[i + i_order - 1] - knots[i]);
       }
 
-      if (basis[i + 1] != 0.0f) {
-        new_basis += ((knots[i + i_order] - t) * basis[i + 1]) /
+      if (basis_buffer[i + 1] != 0.0f) {
+        new_basis += ((knots[i + i_order] - t) * basis_buffer[i + 1]) /
                      (knots[i + i_order] - knots[i + 1]);
       }
 
-      basis[i] = new_basis;
+      basis_buffer[i] = new_basis;
     }
   }
 
@@ -307,7 +307,7 @@ static void nurb_basis(const float parameter,
   int end = 0;
 
   for (int i = i1; i <= i2; i++) {
-    if (basis[i] > 0.0f) {
+    if (basis_buffer[i] > 0.0f) {
       end = i;
       if (start == 1000) {
         start = i;
@@ -316,58 +316,60 @@ static void nurb_basis(const float parameter,
   }
 
   basis_cache.weights.clear();
-  basis_cache.weights.extend(basis.slice(start, end - start + 1));
+  basis_cache.weights.extend(basis_buffer.slice(start, end - start + 1));
   basis_cache.start_index = start;
 }
 
-void NURBSpline::calculate_weights() const
+void NURBSpline::calculate_basis_cache() const
 {
-  if (!this->weights_dirty_) {
+  if (!this->basis_cache_dirty_) {
     return;
   }
 
-  std::lock_guard lock{this->weights_mutex_};
-  if (!this->weights_dirty_) {
+  std::lock_guard lock{this->basis_cache_mutex_};
+  if (!this->basis_cache_dirty_) {
     return;
   }
 
+  const int points_len = this->size();
   const int evaluated_len = this->evaluated_points_size();
   this->weight_cache_.resize(evaluated_len);
 
-  const int points_len = this->size();
   const int order = this->order();
   Span<float> control_weights = this->weights();
   Span<float> knots = this->knots();
 
-  MutableSpan<NURBSpline::WeightCache> weights = this->weight_cache_;
+  MutableSpan<BasisCache> basis_cache = this->weight_cache_;
+
+  Array<float> basis_buffer(this->knots_size());
 
   const float start = knots[order - 1];
   const float end = this->is_cyclic ? knots[points_len + order - 1] : knots[points_len];
   const float step = (end - start) / (evaluated_len - (this->is_cyclic ? 0 : 1));
-
-  Array<float> sums(points_len);
-  Array<float> basis(this->knots_size());
-
-  float u = start;
+  float parameter = start;
   for (const int i : IndexRange(evaluated_len)) {
-    WeightCache &basis_cache = weights[i];
-    nurb_basis(
-        u, points_len + (this->is_cyclic ? order - 1 : 0), order, knots, basis, basis_cache);
-    BLI_assert(basis_cache.weights.size() <= order);
+    BasisCache &basis = basis_cache[i];
+    calculate_basis_for_point(parameter,
+                              points_len + (this->is_cyclic ? order - 1 : 0),
+                              order,
+                              knots,
+                              basis_buffer,
+                              basis);
+    BLI_assert(basis.weights.size() <= order);
 
-    for (const int j : basis_cache.weights.index_range()) {
-      const int point_index = (basis_cache.start_index + j) % points_len;
-      basis_cache.weights[j] *= control_weights[point_index];
+    for (const int j : basis.weights.index_range()) {
+      const int point_index = (basis.start_index + j) % points_len;
+      basis.weights[j] *= control_weights[point_index];
     }
 
-    u += step;
+    parameter += step;
   }
 
-  this->weights_dirty_ = false;
+  this->basis_cache_dirty_ = false;
 }
 
 template<typename T>
-void interpolate_to_evaluated_points_impl(Span<NURBSpline::WeightCache> weights,
+void interpolate_to_evaluated_points_impl(Span<NURBSpline::BasisCache> weights,
                                           const blender::VArray<T> &old_values,
                                           MutableSpan<T> r_values)
 {
@@ -379,7 +381,7 @@ void interpolate_to_evaluated_points_impl(Span<NURBSpline::WeightCache> weights,
     Span<float> point_weights = weights[i].weights;
     const int start_index = weights[i].start_index;
 
-    for (const int j : IndexRange(point_weights.size())) {
+    for (const int j : point_weights.index_range()) {
       const int point_index = (start_index + j) % points_len;
       mixer.mix_in(i, old_values[point_index], point_weights[j]);
     }
@@ -391,8 +393,8 @@ void interpolate_to_evaluated_points_impl(Span<NURBSpline::WeightCache> weights,
 blender::fn::GVArrayPtr NURBSpline::interpolate_to_evaluated_points(
     const blender::fn::GVArray &source_data) const
 {
-  this->calculate_weights();
-  Span<WeightCache> weights = this->weight_cache_;
+  this->calculate_basis_cache();
+  Span<BasisCache> weights = this->weight_cache_;
 
   blender::fn::GVArrayPtr new_varray;
   blender::attribute_math::convert_to_static_type(source_data.type(), [&](auto dummy) {
