@@ -255,7 +255,6 @@ Span<float> NURBSpline::knots() const
   return this->knots_;
 }
 
-/* TODO: Better variables names, simplify logic once it works. */
 static void calculate_basis_for_point(const float parameter,
                                       const int points_len,
                                       const int order,
@@ -266,13 +265,13 @@ static void calculate_basis_for_point(const float parameter,
   /* Clamp parameter due to floating point inaccuracy. TODO: Look into using doubles. */
   const float t = std::clamp(parameter, knots[0], knots[points_len + order - 1]);
 
-  int i1 = 0;
-  int i2 = 0;
+  int start = 0;
+  int end = 0;
   for (int i = 0; i < points_len + order - 1; i++) {
     if ((knots[i] != knots[i + 1]) && (t >= knots[i]) && (t <= knots[i + 1])) {
       basis_buffer[i] = 1.0f;
-      i1 = std::max(i - order - 1, 0);
-      i2 = i;
+      start = std::max(i - order - 1, 0);
+      end = i;
       i++;
       while (i < points_len + order - 1) {
         basis_buffer[i] = 0.0f;
@@ -285,10 +284,10 @@ static void calculate_basis_for_point(const float parameter,
   basis_buffer[points_len + order - 1] = 0.0f;
 
   for (int i_order = 2; i_order <= order; i_order++) {
-    if (i2 + i_order >= points_len + order) {
-      i2 = points_len + order - 1 - i_order;
+    if (end + i_order >= points_len + order) {
+      end = points_len + order - 1 - i_order;
     }
-    for (int i = i1; i <= i2; i++) {
+    for (int i = start; i <= end; i++) {
       float new_basis = 0.0f;
       if (basis_buffer[i] != 0.0f) {
         new_basis += ((t - knots[i]) * basis_buffer[i]) / (knots[i + i_order - 1] - knots[i]);
@@ -303,16 +302,11 @@ static void calculate_basis_for_point(const float parameter,
     }
   }
 
-  int start = 1000;
-  int end = 0;
-
-  for (int i = i1; i <= i2; i++) {
-    if (basis_buffer[i] > 0.0f) {
-      end = i;
-      if (start == 1000) {
-        start = i;
-      }
-    }
+  while (basis_buffer[start] == 0.0f && start < end) {
+    start++;
+  }
+  while (basis_buffer[end] == 0.0f && end > start) {
+    end--;
   }
 
   basis_cache.weights.clear();
