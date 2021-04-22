@@ -373,7 +373,6 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
     const int width = get_column_width_in_pixels(*values);
     spreadsheet_layout.columns.append({values, width});
 
-    /* Copy the current data type to the column storage for convenience. */
     spreadsheet_column_assign_runtime_data(column, values->type(), values->name());
   }
 
