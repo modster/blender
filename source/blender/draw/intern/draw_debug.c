@@ -123,6 +123,17 @@ void DRW_debug_m4_as_bbox(const float m[4][4], const float color[4], const bool 
   DRW_debug_bbox(&bb, color);
 }
 
+void DRW_debug_view(const DRWView *view, const float color[4])
+{
+  float persinv[4][4], viewinv[4][4];
+  DRW_view_persmat_get(view, persinv, true);
+  DRW_view_viewmat_get(view, viewinv, true);
+
+  DRW_debug_modelmat_reset();
+  DRW_debug_m4_as_bbox(persinv, color, false);
+  DRW_debug_m4(viewinv);
+}
+
 void DRW_debug_sphere(const float center[3], const float radius, const float color[4])
 {
   float size_mat[4][4];
