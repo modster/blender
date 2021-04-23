@@ -306,11 +306,18 @@ typedef struct View2DEdgePanData {
   /** view2d we're operating in */
   struct View2D *v2d;
 
-  /** Distance from the edge of the region within which to start panning. */
-  float region_pad;
-  /** Speed factor in pixels per second per pixel of distance from edge pan zone beginning. */
-  float speed_per_pixel;
-  /** Delay before drag panning in seconds. */
+  /** Inside distance in UI units from the edge of the region within which to start panning. */
+  float inside_pad;
+  /** Outside distance in UI units from the edge of the region at which to stop panning. */
+  float outside_pad;
+  /**
+   * Width of the zone in UI units where speed increases with distance from the edge.
+   * At the end of this zone max speed is reached.
+   */
+  float speed_ramp;
+  /** Maximum speed in UI units per second. */
+  float max_speed;
+  /** Delay in seconds before maximum speed is reached. */
   float delay;
 
   /** amount to move view relative to zoom */
@@ -324,15 +331,14 @@ typedef struct View2DEdgePanData {
 /* Returns true if context supports edge panning. */
 bool UI_view2d_edge_pan_poll(struct bContext *C);
 
-/* Initialize panning data with default pan settings. */
-void UI_view2d_edge_pan_init(struct bContext *C, struct View2DEdgePanData *vpd);
-
 /* Initialize panning data. */
-void UI_view2d_edge_pan_init_ex(struct bContext *C,
-                                struct View2DEdgePanData *vpd,
-                                float region_pad,
-                                float speed_per_pixel,
-                                float delay);
+void UI_view2d_edge_pan_init(struct bContext *C,
+                             struct View2DEdgePanData *vpd,
+                             float inside_pad,
+                             float outside_pad,
+                             float speed_ramp,
+                             float max_speed,
+                             float delay);
 
 /* Reset timers. */
 void UI_view2d_edge_pan_reset(struct View2DEdgePanData *vpd);
@@ -345,6 +351,11 @@ void UI_view2d_edge_pan_apply(struct bContext *C,
 
 /* Define operator properties needed for view panning. */
 void UI_view2d_edge_pan_operator_properties(struct wmOperatorType *ot);
+
+/* Initialize panning data with operator settings. */
+void UI_view2d_edge_pan_operator_init(struct bContext *C,
+                                      struct View2DEdgePanData *vpd,
+                                      struct wmOperator *op);
 
 /* Apply to view using operator properties. */
 void UI_view2d_edge_pan_operator_apply(struct bContext *C,

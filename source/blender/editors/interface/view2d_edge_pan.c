@@ -25,6 +25,7 @@
 
 #include "BLI_math.h"
 #include "BLI_rect.h"
+#include "BlI_utildefines.h"
 
 #include "ED_screen.h"
 
@@ -65,14 +66,13 @@ bool UI_view2d_edge_pan_poll(bContext *C)
   return true;
 }
 
-void UI_view2d_edge_pan_init(struct bContext *C, struct View2DEdgePanData *vpd)
-{
-  UI_view2d_edge_pan_init_ex(
-      C, vpd, /*region_pad=*/1.0f, /*speed_per_pixel=*/25.0f, /*delay=*/1.0f);
-}
-
-void UI_view2d_edge_pan_init_ex(
-    bContext *C, View2DEdgePanData *vpd, float region_pad, float speed_per_pixel, float delay)
+void UI_view2d_edge_pan_init(bContext *C,
+                             View2DEdgePanData *vpd,
+                             float inside_pad,
+                             float outside_pad,
+                             float speed_ramp,
+                             float max_speed,
+                             float delay)
 {
   if (!UI_view2d_edge_pan_poll(C)) {
     return;
@@ -84,8 +84,11 @@ void UI_view2d_edge_pan_init_ex(
   vpd->region = CTX_wm_region(C);
   vpd->v2d = &vpd->region->v2d;
 
-  vpd->region_pad = region_pad;
-  vpd->speed_per_pixel = speed_per_pixel;
+  BLI_assert(speed_ramp > 0.0f);
+  vpd->inside_pad = inside_pad;
+  vpd->outside_pad = outside_pad;
+  vpd->speed_ramp = speed_ramp;
+  vpd->max_speed = max_speed;
   vpd->delay = delay;
 
   /* calculate translation factor - based on size of view */
@@ -139,16 +142,67 @@ void UI_view2d_edge_pan_apply(bContext *C, View2DEdgePanData *vpd, float dx, flo
 
 void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)
 {
-  RNA_def_int(ot->srna,
-              "outside_padding",
-              0,
-              0,
-              100,
-              "Outside Padding",
-              "Padding around the region in UI units within which panning is activated (0 to "
-              "disable boundary)",
-              0,
-              100);
+  RNA_def_float(
+      ot->srna,
+      "inside_padding",
+      1.0f,
+      0.0f,
+      100.0f,
+      "Inside Padding",
+      "Inside distance in UI units from the edge of the region within which to start panning",
+      0.0f,
+      100.0f);
+  RNA_def_float(
+      ot->srna,
+      "outside_padding",
+      0.0f,
+      0.0f,
+      100.0f,
+      "Outside Padding",
+      "Outside distance in UI units from the edge of the region at which to stop panning",
+      0.0f,
+      100.0f);
+  RNA_def_float(
+      ot->srna,
+      "speed_ramp",
+      1.0f,
+      0.0f,
+      100.0f,
+      "Speed Ramp",
+      "Width of the zone in UI units where speed increases with distance from the edge",
+      0.0f,
+      100.0f);
+  RNA_def_float(
+      ot->srna,
+      "max_speed",
+      500.0f,
+      0.0f,
+      10000.0f,
+      "Max Speed",
+      "Maximum speed in UI units per second",
+      0.0f,
+      10000.0f);
+  RNA_def_float(
+      ot->srna,
+      "delay",
+      1.0f,
+      0.0f,
+      10.0f,
+      "Delay",
+      "Delay in seconds before maximum speed is reached",
+      0.0f,
+      10.0f);
+}
+
+void UI_view2d_edge_pan_operator_init(bContext *C, View2DEdgePanData *vpd, wmOperator *op)
+{
+  UI_view2d_edge_pan_init(C,
+                          vpd,
+                          RNA_float_get(op->ptr, "inside_padding"),
+                          RNA_float_get(op->ptr, "outside_padding"),
+                          RNA_float_get(op->ptr, "speed_ramp"),
+                          RNA_float_get(op->ptr, "max_speed"),
+                          RNA_float_get(op->ptr, "delay"));
 }
 
 /**
@@ -194,7 +248,7 @@ static float edge_pan_speed(View2DEdgePanData *vpd,
   ARegion *region = vpd->region;
 
   /* Find the distance from the start of the drag zone. */
-  const int pad = vpd->region_pad * U.widget_unit;
+  const int pad = vpd->inside_pad * U.widget_unit;
   const int min = (x_dir ? region->winrct.xmin : region->winrct.ymin) + pad;
   const int max = (x_dir ? region->winrct.xmax : region->winrct.ymax) - pad;
   int distance = 0.0;
@@ -208,12 +262,14 @@ static float edge_pan_speed(View2DEdgePanData *vpd,
     BLI_assert(!"Calculating speed outside of pan zones");
     return 0.0f;
   }
+  float distance_factor = distance / (vpd->speed_ramp * U.widget_unit);
+  CLAMP(distance_factor, 0.0f, 1.0f);
 
   /* Apply a fade in to the speed based on a start time delay. */
   const double start_time = x_dir ? vpd->edge_pan_start_time_x : vpd->edge_pan_start_time_y;
   const float delay_factor = smootherstep(vpd->delay, (float)(current_time - start_time));
 
-  return distance * delay_factor * vpd->speed_per_pixel * (float)U.dpi_fac;
+  return distance_factor * delay_factor * vpd->max_speed * U.widget_unit * (float)U.dpi_fac;
 }
 
 void UI_view2d_edge_pan_operator_apply(bContext *C,
@@ -228,28 +284,26 @@ void UI_view2d_edge_pan_operator_apply(bContext *C,
     return;
   }
 
-  const int outside_padding = RNA_int_get(op->ptr, "outside_padding") * UI_UNIT_X;
-  rcti padding_rect;
-  if (outside_padding != 0) {
-    padding_rect = region->winrct;
-    BLI_rcti_pad(&padding_rect, outside_padding, outside_padding);
-  }
+  rcti inside_rect, outside_rect;
+  inside_rect = region->winrct;
+  outside_rect = region->winrct;
+  BLI_rcti_pad(&inside_rect, -vpd->inside_pad * U.widget_unit, -vpd->inside_pad * U.widget_unit);
+  BLI_rcti_pad(&outside_rect, vpd->outside_pad * U.widget_unit, vpd->outside_pad * U.widget_unit);
 
   int pan_dir_x = 0;
   int pan_dir_y = 0;
-  if ((outside_padding == 0) || BLI_rcti_isect_pt(&padding_rect, event->x, event->y)) {
-    const int pad = vpd->region_pad * U.widget_unit;
+  if ((vpd->outside_pad == 0) || BLI_rcti_isect_pt(&outside_rect, event->x, event->y)) {
     /* Find whether the mouse is beyond X and Y edges. */
-    if (event->x > region->winrct.xmax - pad) {
+    if (event->x > inside_rect.xmax) {
       pan_dir_x = 1;
     }
-    else if (event->x < region->winrct.xmin + pad) {
+    else if (event->x < inside_rect.xmin) {
       pan_dir_x = -1;
     }
-    if (event->y > region->winrct.ymax - pad) {
+    if (event->y > inside_rect.ymax) {
       pan_dir_y = 1;
     }
-    else if (event->y < region->winrct.ymin + pad) {
+    else if (event->y < inside_rect.ymin) {
       pan_dir_y = -1;
     }
   }

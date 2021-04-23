@@ -346,7 +346,7 @@ static int view_edge_pan_invoke(bContext *C, wmOperator *op, const wmEvent *UNUS
 {
   op->customdata = MEM_callocN(sizeof(View2DEdgePanData), "View2DEdgePanData");
   View2DEdgePanData *vpd = op->customdata;
-  UI_view2d_edge_pan_init(C, vpd);
+  UI_view2d_edge_pan_operator_init(C, vpd, op);
 
   WM_event_add_modal_handler(C, op);
 

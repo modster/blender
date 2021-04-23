@@ -55,6 +55,9 @@
 
 #include "node_intern.h" /* own include */
 
+#define NODE_EDGE_PAN_OUTSIDE_PAD 0 /* Disable clamping for node panning, use whole screen */
+#define NODE_EDGE_PAN_MAX_SPEED 50 /* In UI units per second */
+
 /* ****************** Relations helpers *********************** */
 
 static bool ntree_has_drivers(bNodeTree *ntree)
@@ -1117,7 +1120,9 @@ static int node_link_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   bNodeLinkDrag *nldrag = node_link_init(bmain, snode, cursor, detach);
 
   if (nldrag) {
-    UI_view2d_edge_pan_init(C, &nldrag->pan_data);
+    RNA_float_set(op->ptr, "outside_padding", NODE_EDGE_PAN_OUTSIDE_PAD);
+    RNA_float_set(op->ptr, "max_speed", NODE_EDGE_PAN_MAX_SPEED);
+    UI_view2d_edge_pan_operator_init(C, &nldrag->pan_data, op);
 
     op->customdata = nldrag;
     BLI_addtail(&snode->runtime->linkdrag, nldrag);
