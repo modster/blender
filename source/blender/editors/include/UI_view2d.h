@@ -306,6 +306,13 @@ typedef struct View2DEdgePanData {
   /** view2d we're operating in */
   struct View2D *v2d;
 
+  /** Distance from the edge of the region within which to start panning. */
+  float region_pad;
+  /** Speed factor in pixels per second per pixel of distance from edge pan zone beginning. */
+  float speed_per_pixel;
+  /** Delay before drag panning in seconds. */
+  float delay;
+
   /** amount to move view relative to zoom */
   float facx, facy;
 
@@ -317,8 +324,15 @@ typedef struct View2DEdgePanData {
 /* Returns true if context supports edge panning. */
 bool UI_view2d_edge_pan_poll(struct bContext *C);
 
-/* Initialize panning customdata. */
+/* Initialize panning data with default pan settings. */
 void UI_view2d_edge_pan_init(struct bContext *C, struct View2DEdgePanData *vpd);
+
+/* Initialize panning data. */
+void UI_view2d_edge_pan_init_ex(struct bContext *C,
+                                struct View2DEdgePanData *vpd,
+                                float region_pad,
+                                float speed_per_pixel,
+                                float delay);
 
 /* Reset timers. */
 void UI_view2d_edge_pan_reset(struct View2DEdgePanData *vpd);

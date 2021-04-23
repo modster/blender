@@ -45,13 +45,6 @@
 /** \name Edge Pan Operator Utilties
  * \{ */
 
-/** Distance from the edge of the region within which to start panning. */
-#define EDGE_PAN_REGION_PAD (U.widget_unit)
-/** Speed factor in pixels per second per pixel of distance from edge pan zone beginning. */
-#define EDGE_PAN_SPEED_PER_PIXEL (10.0f * (float)U.dpi_fac)
-/** Delay before drag panning in seconds. */
-#define EDGE_PAN_DELAY 1.0f
-
 bool UI_view2d_edge_pan_poll(bContext *C)
 {
   ARegion *region = CTX_wm_region(C);
@@ -72,7 +65,14 @@ bool UI_view2d_edge_pan_poll(bContext *C)
   return true;
 }
 
-void UI_view2d_edge_pan_init(bContext *C, View2DEdgePanData *vpd)
+void UI_view2d_edge_pan_init(struct bContext *C, struct View2DEdgePanData *vpd)
+{
+  UI_view2d_edge_pan_init_ex(
+      C, vpd, /*region_pad=*/1.0f, /*speed_per_pixel=*/10.0f, /*delay=*/1.0f);
+}
+
+void UI_view2d_edge_pan_init_ex(
+    bContext *C, View2DEdgePanData *vpd, float region_pad, float speed_per_pixel, float delay)
 {
   if (!UI_view2d_edge_pan_poll(C)) {
     return;
@@ -83,6 +83,10 @@ void UI_view2d_edge_pan_init(bContext *C, View2DEdgePanData *vpd)
   vpd->area = CTX_wm_area(C);
   vpd->region = CTX_wm_region(C);
   vpd->v2d = &vpd->region->v2d;
+
+  vpd->region_pad = region_pad;
+  vpd->speed_per_pixel = speed_per_pixel;
+  vpd->delay = delay;
 
   /* calculate translation factor - based on size of view */
   const float winx = (float)(BLI_rcti_size_x(&vpd->region->winrct) + 1);
@@ -190,8 +194,9 @@ static float edge_pan_speed(View2DEdgePanData *vpd,
   ARegion *region = vpd->region;
 
   /* Find the distance from the start of the drag zone. */
-  const int min = (x_dir ? region->winrct.xmin : region->winrct.ymin) + EDGE_PAN_REGION_PAD;
-  const int max = (x_dir ? region->winrct.xmax : region->winrct.ymax) - EDGE_PAN_REGION_PAD;
+  const int pad = vpd->region_pad * U.widget_unit;
+  const int min = (x_dir ? region->winrct.xmin : region->winrct.ymin) + pad;
+  const int max = (x_dir ? region->winrct.xmax : region->winrct.ymax) - pad;
   int distance = 0.0;
   if (event_loc > max) {
     distance = event_loc - max;
@@ -206,9 +211,9 @@ static float edge_pan_speed(View2DEdgePanData *vpd,
 
   /* Apply a fade in to the speed based on a start time delay. */
   const double start_time = x_dir ? vpd->edge_pan_start_time_x : vpd->edge_pan_start_time_y;
-  const float delay_factor = smootherstep(EDGE_PAN_DELAY, (float)(current_time - start_time));
+  const float delay_factor = smootherstep(vpd->delay, (float)(current_time - start_time));
 
-  return distance * EDGE_PAN_SPEED_PER_PIXEL * delay_factor;
+  return distance * delay_factor * vpd->speed_per_pixel * (float)U.dpi_fac;
 }
 
 void UI_view2d_edge_pan_operator_apply(bContext *C,
@@ -233,17 +238,18 @@ void UI_view2d_edge_pan_operator_apply(bContext *C,
   int pan_dir_x = 0;
   int pan_dir_y = 0;
   if ((outside_padding == 0) || BLI_rcti_isect_pt(&padding_rect, event->x, event->y)) {
+    const int pad = vpd->region_pad * U.widget_unit;
     /* Find whether the mouse is beyond X and Y edges. */
-    if (event->x > region->winrct.xmax - EDGE_PAN_REGION_PAD) {
+    if (event->x > region->winrct.xmax - pad) {
       pan_dir_x = 1;
     }
-    else if (event->x < region->winrct.xmin + EDGE_PAN_REGION_PAD) {
+    else if (event->x < region->winrct.xmin + pad) {
       pan_dir_x = -1;
     }
-    if (event->y > region->winrct.ymax - EDGE_PAN_REGION_PAD) {
+    if (event->y > region->winrct.ymax - pad) {
       pan_dir_y = 1;
     }
-    else if (event->y < region->winrct.ymin + EDGE_PAN_REGION_PAD) {
+    else if (event->y < region->winrct.ymin + pad) {
       pan_dir_y = -1;
     }
   }
@@ -267,9 +273,5 @@ void UI_view2d_edge_pan_operator_apply(bContext *C,
   /* Pan, clamping inside the regions's total bounds. */
   UI_view2d_edge_pan_apply(C, vpd, dx, dy);
 }
-
-#undef EDGE_PAN_REGION_PAD
-#undef EDGE_PAN_SPEED_PER_PIXEL
-#undef EDGE_PAN_DELAY
 
 /** \} */
