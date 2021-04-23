@@ -68,7 +68,7 @@ bool UI_view2d_edge_pan_poll(bContext *C)
 void UI_view2d_edge_pan_init(struct bContext *C, struct View2DEdgePanData *vpd)
 {
   UI_view2d_edge_pan_init_ex(
-      C, vpd, /*region_pad=*/1.0f, /*speed_per_pixel=*/10.0f, /*delay=*/1.0f);
+      C, vpd, /*region_pad=*/1.0f, /*speed_per_pixel=*/25.0f, /*delay=*/1.0f);
 }
 
 void UI_view2d_edge_pan_init_ex(
