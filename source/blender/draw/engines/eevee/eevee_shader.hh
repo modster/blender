@@ -44,6 +44,7 @@ extern char datatoc_eevee_culling_debug_frag_glsl[];
 extern char datatoc_eevee_culling_iter_lib_glsl[];
 extern char datatoc_eevee_culling_lib_glsl[];
 extern char datatoc_eevee_culling_light_frag_glsl[];
+extern char datatoc_eevee_depth_clear_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_accumulator_lib_glsl[];
 extern char datatoc_eevee_depth_of_field_bokeh_lut_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_downsample_frag_glsl[];
@@ -70,6 +71,7 @@ extern char datatoc_eevee_motion_blur_gather_frag_glsl[];
 extern char datatoc_eevee_motion_blur_lib_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
+extern char datatoc_eevee_object_depth_simple_frag_glsl[];
 extern char datatoc_eevee_object_forward_frag_glsl[];
 extern char datatoc_eevee_object_lib_glsl[];
 extern char datatoc_eevee_object_mesh_vert_glsl[];
@@ -77,6 +79,7 @@ extern char datatoc_eevee_object_velocity_frag_glsl[];
 extern char datatoc_eevee_object_velocity_lib_glsl[];
 extern char datatoc_eevee_object_velocity_mesh_vert_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
+extern char datatoc_eevee_shadow_lib_glsl[];
 extern char datatoc_eevee_velocity_lib_glsl[];
 
 extern char datatoc_eevee_shader_shared_hh[];
@@ -87,6 +90,8 @@ namespace blender::eevee {
 enum eShaderType {
   CULLING_DEBUG = 0,
   CULLING_LIGHT,
+
+  DEPTH_SIMPLE_MESH,
 
   DOF_BOKEH_LUT,
   DOF_GATHER_BACKGROUND_LUT,
@@ -119,6 +124,8 @@ enum eShaderType {
   MOTION_BLUR_GATHER,
   MOTION_BLUR_TILE_DILATE,
   MOTION_BLUR_TILE_FLATTEN,
+
+  SHADOW_CLEAR,
 
   VELOCITY_CAMERA,
   VELOCITY_MESH,
@@ -163,6 +170,7 @@ class ShaderModule {
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_ltc_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_light_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_iter_lib);
@@ -193,6 +201,11 @@ class ShaderModule {
     SHADER_FULLSCREEN(CULLING_LIGHT, eevee_culling_light_frag);
     SHADER_FULLSCREEN(FILM_FILTER, eevee_film_filter_frag);
     SHADER_FULLSCREEN(FILM_RESOLVE, eevee_film_resolve_frag);
+    SHADER(DEPTH_SIMPLE_MESH,
+           eevee_object_mesh_vert,
+           nullptr,
+           eevee_object_depth_simple_frag,
+           nullptr);
     SHADER_FULLSCREEN(DOF_BOKEH_LUT, eevee_depth_of_field_bokeh_lut_frag);
     SHADER_FULLSCREEN(DOF_FILTER, eevee_depth_of_field_filter_frag);
     SHADER_FULLSCREEN_DEFINES(DOF_GATHER_BACKGROUND_LUT,
@@ -276,6 +289,8 @@ class ShaderModule {
     SHADER_FULLSCREEN(MOTION_BLUR_GATHER, eevee_motion_blur_gather_frag);
     SHADER_FULLSCREEN(MOTION_BLUR_TILE_DILATE, eevee_motion_blur_tiles_dilate_frag);
     SHADER_FULLSCREEN(MOTION_BLUR_TILE_FLATTEN, eevee_motion_blur_tiles_flatten_frag);
+
+    SHADER_FULLSCREEN(SHADOW_CLEAR, eevee_depth_clear_frag);
 
     SHADER(VELOCITY_MESH,
            eevee_object_velocity_mesh_vert,

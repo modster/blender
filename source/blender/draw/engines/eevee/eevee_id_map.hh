@@ -136,7 +136,6 @@ struct ObjectHandle : public DrawData {
   {
     if (recalc != 0) {
       recalc = 0;
-      //   sampling.reset();
     }
   }
 };

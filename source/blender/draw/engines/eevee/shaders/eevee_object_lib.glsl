@@ -1,4 +1,6 @@
 
+#pragma BLENDER_REQUIRE(common_math_lib.glsl)
+
 IN_OUT MeshDataInterface
 {
   vec3 P;

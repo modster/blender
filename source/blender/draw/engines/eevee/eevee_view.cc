@@ -186,6 +186,7 @@ void ShadingView::update_view(void)
   DRW_view_update_sub(render_view_, viewmat, winmat);
 
   inst_.lights.set_view(render_view_, extent_);
+  inst_.shadows.set_view(render_view_);
 }
 
 /** \} */

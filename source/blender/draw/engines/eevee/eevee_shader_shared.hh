@@ -27,6 +27,7 @@
 #ifndef __cplusplus /* GLSL */
 #  pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #  define BLI_STATIC_ASSERT_ALIGN(type_, align_)
+#  define BLI_STATIC_ASSERT_SIZE(type_, size_)
 #  define static
 #  define inline
 #  define cosf cos
@@ -62,6 +63,8 @@ typedef int bvec2[2];
 namespace blender::eevee {
 
 #endif
+
+#define UBO_MIN_MAX_SUPPORTED_SIZE 1 << 14
 
 /* -------------------------------------------------------------------- */
 /** \name Sampling
@@ -216,13 +219,14 @@ struct DepthOfFieldData {
   /** Bokeh Shape parameters. */
   float bokeh_blades;
   float bokeh_rotation;
+  float bokeh_aperture_ratio;
   /** Circle of confusion (CoC) parameters. */
   float coc_mul;
   float coc_bias;
   float coc_abs_max;
   /** Copy of camera type. */
   eCameraType camera_type;
-  int _pad0, _pad1, _pad2;
+  int _pad0, _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(DepthOfFieldData, 16)
 
@@ -319,7 +323,7 @@ BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
 #  error "CULLING_MAX_WORD is greater than supported maximum."
 #endif
 /* Fine grained subdivision in the Z direction. */
-#define CULLING_ZBIN_COUNT 4096
+#define CULLING_ZBIN_COUNT 4088
 
 struct CullingData {
   /* Linearly distributed z-bins with encoded uint16_t min and max index. */
@@ -337,6 +341,7 @@ struct CullingData {
   vec2 _pad0;
 };
 BLI_STATIC_ASSERT_ALIGN(CullingData, 16)
+BLI_STATIC_ASSERT_SIZE(CullingData, UBO_MIN_MAX_SUPPORTED_SIZE)
 
 static inline int culling_z_to_zbin(CullingData data, float z)
 {
@@ -348,6 +353,8 @@ static inline int culling_z_to_zbin(CullingData data, float z)
 /* -------------------------------------------------------------------- */
 /** \name Lights
  * \{ */
+
+#define LIGHT_NO_SHADOW -1
 
 enum eLightType : uint32_t {
   LIGHT_SUN = 0u,
@@ -389,7 +396,7 @@ struct LightData {
   /** Maximum influence radius. Used for culling. */
   float influence_radius_max;
   /** Offset in the shadow struct table. -1 means no shadow. */
-  uint shadow_id;
+  int shadow_id;
   /** NOTE: It is ok to use vec3 here. A float is declared right after it.
    * vec3 is also aligned to 16 bytes. */
   vec3 color;
@@ -403,8 +410,9 @@ struct LightData {
   eLightType type;
   /** Spot size. Aligned to size of vec2. */
   vec2 spot_size_inv;
+  /** Shadow bias in world space. */
+  float shadow_bias;
   float _pad0;
-  float _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
@@ -414,8 +422,23 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 /** \name Shadows
  * \{ */
 
-/** Max cascade count for sun shadows. */
-#define SHADOW_CASCADE_MAX 4
+#define SHADOW_REGION_MAX 256
+
+/**
+ * Represents a shadow region in the shadow atlas.
+ * - A point light shadow is composed of 1, 5 or 6 shadow regions.
+ *   shadow_id point to the first shadow region used.
+ *   Regions are sorted in this order -Z, +X, -X, +Y, -Y, +Z.
+ *   Face index is computed from light's object space coordinates.
+ * - A sun light shadow is composed of an arbitrary array of regions.
+ *   The square shadow view is divided into tiles that are classified by distance to the
+ *   camera. Each tile then refers to a shadow map region. A single shadow region can
+ *   be addressed by multiple tiles.
+ */
+struct ShadowRegionData {
+  /** Object space position to shadow atlas UV. */
+  mat4 shadow_mat;
+};
 
 /** \} */
 
@@ -445,6 +468,7 @@ using CameraDataBuf = StructBuffer<CameraData>;
 using CullingDataBuf = StructBuffer<CullingData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
+using ShadowRegionDataBuf = StructArrayBuffer<ShadowRegionData, SHADOW_REGION_MAX>;
 
 #  undef bool
 }  // namespace blender::eevee

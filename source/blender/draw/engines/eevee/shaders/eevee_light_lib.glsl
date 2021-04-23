@@ -21,6 +21,18 @@ void light_vector_get(LightData ld, vec3 P, out vec3 L, out float dist)
   }
 }
 
+/* Rotate vector to light's local space. Does not translate. */
+vec3 light_world_to_local(LightData ld, vec3 L)
+{
+  /* Avoid relying on compiler to optimize this.
+   * vec3 lL = transpose(mat3(ld.object_mat)) * L; */
+  vec3 lL;
+  lL.x = dot(ld.object_mat[0].xyz, L);
+  lL.y = dot(ld.object_mat[1].xyz, L);
+  lL.z = dot(ld.object_mat[2].xyz, L);
+  return lL;
+}
+
 /* From Frostbite PBR Course
  * Distance based attenuation
  * http://www.frostbite.com/wp-content/uploads/2014/11/course_notes_moving_frostbite_to_pbr.pdf */
@@ -33,12 +45,7 @@ float light_influence_attenuation(float dist, float inv_sqr_influence)
 
 float light_spot_attenuation(LightData ld, vec3 L)
 {
-  /* Avoid relying on compiler to optimize this.
-   * vec3 lL = transpose(mat3(ld.object_mat)) * L; */
-  vec3 lL;
-  lL.x = dot(ld.object_mat[0].xyz, L);
-  lL.y = dot(ld.object_mat[1].xyz, L);
-  lL.z = dot(ld.object_mat[2].xyz, L);
+  vec3 lL = light_world_to_local(ld, L);
   float ellipse = inversesqrt(1.0 + len_squared(lL.xy * ld.spot_size_inv / lL.z));
   float spotmask = smoothstep(0.0, 1.0, ellipse * ld._spot_mul + ld._spot_bias);
   return spotmask;

@@ -120,6 +120,7 @@ void Instance::begin_sync()
 
   velocity.begin_sync();
   lights.begin_sync();
+  shadows.begin_sync();
 }
 
 void Instance::object_sync(Object *ob)
@@ -147,6 +148,7 @@ void Instance::object_sync(Object *ob)
         break;
       case OB_MESH:
         shading_passes.opaque.surface_add(ob, nullptr, 0);
+        shading_passes.shadow.surface_add(ob, nullptr, 0);
         shading_passes.velocity.mesh_add(ob, ob_handle);
 
         // shadows.sync_caster(ob);
@@ -173,6 +175,7 @@ void Instance::end_sync(void)
 {
   velocity.end_sync();
   lights.end_sync();
+  shadows.end_sync();
   sampling.end_sync();
   render_passes.end_sync();
 }

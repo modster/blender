@@ -57,9 +57,11 @@ void ForwardPass::surface_add(Object *ob, Material *mat, int matslot)
   GPUShader *sh = inst_.shaders.static_shader_get(MESH);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, opaque_ps_);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.data_ubo_ref_get());
-  DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
+  DRW_shgroup_uniform_block(grp, "shadow_regions_block", inst_.shadows.regions_ubo_get());
   DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+  DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
   DRW_shgroup_call(grp, geom, ob);
 }
 

@@ -34,6 +34,7 @@
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
 #include "eevee_shader_shared.hh"
+#include "eevee_shadow.hh"
 #include "eevee_wrapper.hh"
 
 namespace blender::eevee {
@@ -46,7 +47,10 @@ class Instance;
 
 class Light : public LightData {
  public:
-  Light(const Object *ob, float threshold);
+  Light(const Object *ob,
+        const ObjectHandle &object_handle,
+        float threshold,
+        ShadowModule &shadows);
 
   void debug_draw(void);
 
@@ -91,8 +95,8 @@ class LightModule {
  private:
   Instance &inst_;
 
-  /** Map an object key to a light data. This is used to track light deletion. */
-  Map<ObjectKey, int64_t> objects_light_;
+  /** Map of light objects. This is used to track light deletion. */
+  Map<ObjectKey, bool> objects_light_;
   /** Gathered Light data from sync. Not all data will be selected for rendering. */
   Vector<Light> lights_;
   /** Batches of lights alongside their culling data. */
@@ -125,7 +129,7 @@ class LightModule {
   {
     return &active_data_ubo_;
   }
-  const GPUUniformBuf **culling_ubo_ubo_ref_get(void)
+  const GPUUniformBuf **culling_ubo_ref_get(void)
   {
     return &active_culling_ubo_;
   }

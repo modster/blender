@@ -36,6 +36,7 @@
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
 #include "eevee_shading.hh"
+#include "eevee_shadow.hh"
 #include "eevee_view.hh"
 
 #include "eevee_engine.h"
@@ -61,6 +62,8 @@ class Instance {
   VelocityModule velocity;
   MotionBlurModule motion_blur;
   LightModule lights;
+  /* TODO(fclem) Move it to scene layer data. */
+  ShadowModule shadows;
   SyncModule sync;
   /** Lookdev own lightweight instance. May not be allocated. */
   // Lookdev *lookdev = nullptr;
@@ -90,6 +93,7 @@ class Instance {
         velocity(*this),
         motion_blur(*this),
         lights(*this),
+        shadows(*this),
         sync(*this){};
   ~Instance(){};
 

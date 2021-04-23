@@ -31,6 +31,7 @@
 #include "eevee_lut.h"
 
 #include "eevee_culling.hh"
+#include "eevee_shadow.hh"
 #include "eevee_velocity.hh"
 
 namespace blender::eevee {
@@ -138,11 +139,10 @@ class UtilityTexture : public Texture {
  */
 class ShadingPasses {
  public:
-  // BackgroundShadingPass background;
-  // DeferredPass opaque;
-  ForwardPass opaque;
-  VelocityPass velocity;
   CullingLightPass light_culling;
+  ForwardPass opaque;
+  ShadowPass shadow;
+  VelocityPass velocity;
 
   CullingDebugPass debug_culling;
 
@@ -150,11 +150,13 @@ class ShadingPasses {
 
  public:
   ShadingPasses(Instance &inst)
-      : opaque(inst), velocity(inst), light_culling(inst), debug_culling(inst){};
+      : light_culling(inst), opaque(inst), shadow(inst), velocity(inst), debug_culling(inst){};
 
   void sync()
   {
+    light_culling.sync();
     opaque.sync();
+    shadow.sync();
     velocity.sync();
 
     debug_culling.sync();

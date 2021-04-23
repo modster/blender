@@ -88,6 +88,9 @@ void _BLI_assert_abort(void);
 #define BLI_STATIC_ASSERT_ALIGN(st, align) \
   BLI_STATIC_ASSERT((sizeof(st) % (align) == 0), "Structure must be strictly aligned")
 
+#define BLI_STATIC_ASSERT_SIZE(st, max_size) \
+  BLI_STATIC_ASSERT(sizeof(CullingData) <= max_size, "Structure is too big")
+
 #ifdef __cplusplus
 }
 #endif

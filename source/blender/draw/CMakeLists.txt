@@ -95,6 +95,7 @@ set(SRC
   engines/eevee/eevee_motion_blur.cc
   engines/eevee/eevee_renderpasses.cc
   engines/eevee/eevee_shading.cc
+  engines/eevee/eevee_shadow.cc
   engines/eevee/eevee_velocity.cc
   engines/eevee/eevee_view.cc
   engines/workbench/workbench_data.c
@@ -198,6 +199,7 @@ data_to_c_simple(engines/eevee/shaders/eevee_culling_debug_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_culling_iter_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_culling_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_culling_light_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_depth_clear_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_accumulator_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_bokeh_lut_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_filter_frag.glsl SRC)
@@ -223,20 +225,15 @@ data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_gather_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_tiles_dilate_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_tiles_flatten_frag.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_object_deferred_frag.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_object_depth_colored_frag.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_object_depth_peeled_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_depth_simple_frag.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_object_depth_transparent_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_forward_frag.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_object_gpencil_vert.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_object_hair_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_mesh_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_velocity_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_velocity_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_object_velocity_mesh_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_sampling_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_shadow_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_velocity_lib.glsl SRC)
 
 data_to_c_simple(engines/eevee/eevee_shader_shared.hh SRC)

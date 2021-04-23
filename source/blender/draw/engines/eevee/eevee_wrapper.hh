@@ -241,6 +241,15 @@ class Texture {
   {
     return &tx_;
   }
+
+  int width(void) const
+  {
+    return GPU_texture_width(tx_);
+  }
+  int height(void) const
+  {
+    return GPU_texture_height(tx_);
+  }
 };
 
 class Framebuffer {

@@ -53,7 +53,10 @@ static eLightType to_light_type(short blender_light_type, short blender_area_typ
 /** \name Light Object
  * \{ */
 
-Light::Light(const Object *ob, float threshold)
+Light::Light(const Object *ob,
+             const ObjectHandle &object_handle,
+             float threshold,
+             ShadowModule &shadows)
 {
   const ::Light *la = (const ::Light *)ob->data;
   float scale[3];
@@ -77,7 +80,7 @@ Light::Light(const Object *ob, float threshold)
   normalize_m4_m4_ex(this->object_mat, ob->obmat, scale);
   /* Make sure we have consistent handedness (in case of negatively scaled Z axis). */
   float cross[3];
-  cross_v3_v3v3(cross, this->_right, this->_back);
+  cross_v3_v3v3(cross, this->_back, this->_right);
   if (dot_v3v3(cross, this->_up) < 0.0f) {
     negate_v3(this->_up);
   }
@@ -89,8 +92,27 @@ Light::Light(const Object *ob, float threshold)
   this->specular_power = la->spec_fac * shape_power;
   this->volume_power = la->volume_fac * shape_power_volume_get(la);
   this->type = to_light_type(la->type, la->area_shape);
-  /* No shadow by default */
-  this->shadow_id = -1;
+  this->shadow_id = LIGHT_NO_SHADOW;
+  this->shadow_bias = la->bias * 0.05f;
+
+  if (la->mode & LA_SHADOW) {
+    if (la->type == LA_SUN) {
+      /* TODO */
+      // shadows.sync_directional_shadow(object_handle, )
+    }
+    else {
+      float cone_aperture = DEG2RAD(360.0);
+      if (la->type == LA_SPOT) {
+        cone_aperture = min_ff(DEG2RAD(179.9), la->spotsize);
+      }
+      else if (la->type != LA_LOCAL) {
+        cone_aperture = DEG2RAD(179.9);
+      }
+
+      this->shadow_id = shadows.sync_punctual_shadow(
+          object_handle, object_mat, influence_radius_max, cone_aperture, la->clipsta);
+    }
+  }
 }
 
 /* Returns attenuation radius inversed & squared for easy bound checking inside the shader. */
@@ -214,32 +236,29 @@ void LightModule::begin_sync(void)
   /* In begin_sync so it can be aninated. */
   light_threshold_ = max_ff(1e-16f, inst_.scene->eevee.light_threshold);
 
-  inst_.shading_passes.light_culling.sync();
-
   lights_.clear();
 }
 
 void LightModule::sync_light(const Object *ob, ObjectHandle &handle)
 {
-  int64_t light_index = lights_.size();
+  lights_.append(eevee::Light(ob, handle, light_threshold_, inst_.shadows));
 
-  lights_.append(eevee::Light(ob, light_threshold_));
-
-  objects_light_.add_overwrite(handle.object_key, light_index);
+  objects_light_.add_overwrite(handle.object_key, true);
 }
 
 void LightModule::end_sync(void)
 {
   Vector<ObjectKey, 1> deleted_keys;
 
+  /* Detect light deletion. */
   for (auto item : objects_light_.items()) {
-    if (item.value < 0) {
+    if (item.value == false) {
+      /* Light has not been tagged as alive. Deleting. */
       deleted_keys.append(item.key);
-      /* TODO Tag shadow (if any) as unused. */
     }
     else {
       /* Invert shadow map value so we can know which one went unused. */
-      item.value = -item.value - 1;
+      item.value = false;
     }
   }
 
