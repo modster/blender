@@ -107,104 +107,6 @@ void UI_view2d_edge_pan_reset(View2DEdgePanData *vpd)
   vpd->edge_pan_last_time = PIL_check_seconds_timer();
 }
 
-void UI_view2d_edge_pan_apply(bContext *C, View2DEdgePanData *vpd, float dx, float dy)
-{
-  View2D *v2d = vpd->v2d;
-  if (!v2d) {
-    return;
-  }
-
-  /* calculate amount to move view by */
-  dx *= vpd->facx;
-  dy *= vpd->facy;
-
-  /* only move view on an axis if change is allowed */
-  if ((v2d->keepofs & V2D_LOCKOFS_X) == 0) {
-    v2d->cur.xmin += dx;
-    v2d->cur.xmax += dx;
-  }
-  if ((v2d->keepofs & V2D_LOCKOFS_Y) == 0) {
-    v2d->cur.ymin += dy;
-    v2d->cur.ymax += dy;
-  }
-
-  /* Inform v2d about changes after this operation. */
-  UI_view2d_curRect_changed(C, v2d);
-
-  /* don't rebuild full tree in outliner, since we're just changing our view */
-  ED_region_tag_redraw_no_rebuild(vpd->region);
-
-  /* request updates to be done... */
-  WM_event_add_mousemove(CTX_wm_window(C));
-
-  UI_view2d_sync(vpd->screen, vpd->area, v2d, V2D_LOCK_COPY);
-}
-
-void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)
-{
-  RNA_def_float(
-      ot->srna,
-      "inside_padding",
-      1.0f,
-      0.0f,
-      100.0f,
-      "Inside Padding",
-      "Inside distance in UI units from the edge of the region within which to start panning",
-      0.0f,
-      100.0f);
-  RNA_def_float(
-      ot->srna,
-      "outside_padding",
-      0.0f,
-      0.0f,
-      100.0f,
-      "Outside Padding",
-      "Outside distance in UI units from the edge of the region at which to stop panning",
-      0.0f,
-      100.0f);
-  RNA_def_float(
-      ot->srna,
-      "speed_ramp",
-      1.0f,
-      0.0f,
-      100.0f,
-      "Speed Ramp",
-      "Width of the zone in UI units where speed increases with distance from the edge",
-      0.0f,
-      100.0f);
-  RNA_def_float(
-      ot->srna,
-      "max_speed",
-      500.0f,
-      0.0f,
-      10000.0f,
-      "Max Speed",
-      "Maximum speed in UI units per second",
-      0.0f,
-      10000.0f);
-  RNA_def_float(
-      ot->srna,
-      "delay",
-      1.0f,
-      0.0f,
-      10.0f,
-      "Delay",
-      "Delay in seconds before maximum speed is reached",
-      0.0f,
-      10.0f);
-}
-
-void UI_view2d_edge_pan_operator_init(bContext *C, View2DEdgePanData *vpd, wmOperator *op)
-{
-  UI_view2d_edge_pan_init(C,
-                          vpd,
-                          RNA_float_get(op->ptr, "inside_padding"),
-                          RNA_float_get(op->ptr, "outside_padding"),
-                          RNA_float_get(op->ptr, "speed_ramp"),
-                          RNA_float_get(op->ptr, "max_speed"),
-                          RNA_float_get(op->ptr, "delay"));
-}
-
 /**
  * Reset the edge pan timers if the mouse isn't in the scroll zone and
  * start the timers when the mouse enters a scroll zone.
@@ -272,10 +174,40 @@ static float edge_pan_speed(View2DEdgePanData *vpd,
   return distance_factor * delay_factor * vpd->max_speed * U.widget_unit * (float)U.dpi_fac;
 }
 
-void UI_view2d_edge_pan_operator_apply(bContext *C,
-                                       View2DEdgePanData *vpd,
-                                       wmOperator *op,
-                                       const wmEvent *event)
+static void edge_pan_apply_delta(bContext *C, View2DEdgePanData *vpd, float dx, float dy)
+{
+  View2D *v2d = vpd->v2d;
+  if (!v2d) {
+    return;
+  }
+
+  /* calculate amount to move view by */
+  dx *= vpd->facx;
+  dy *= vpd->facy;
+
+  /* only move view on an axis if change is allowed */
+  if ((v2d->keepofs & V2D_LOCKOFS_X) == 0) {
+    v2d->cur.xmin += dx;
+    v2d->cur.xmax += dx;
+  }
+  if ((v2d->keepofs & V2D_LOCKOFS_Y) == 0) {
+    v2d->cur.ymin += dy;
+    v2d->cur.ymax += dy;
+  }
+
+  /* Inform v2d about changes after this operation. */
+  UI_view2d_curRect_changed(C, v2d);
+
+  /* don't rebuild full tree in outliner, since we're just changing our view */
+  ED_region_tag_redraw_no_rebuild(vpd->region);
+
+  /* request updates to be done... */
+  WM_event_add_mousemove(CTX_wm_window(C));
+
+  UI_view2d_sync(vpd->screen, vpd->area, v2d, V2D_LOCK_COPY);
+}
+
+void UI_view2d_edge_pan_apply(bContext *C, View2DEdgePanData *vpd, const wmEvent *event)
 {
   ARegion *region = vpd->region;
 
@@ -325,7 +257,69 @@ void UI_view2d_edge_pan_operator_apply(bContext *C,
   vpd->edge_pan_last_time = current_time;
 
   /* Pan, clamping inside the regions's total bounds. */
-  UI_view2d_edge_pan_apply(C, vpd, dx, dy);
+  edge_pan_apply_delta(C, vpd, dx, dy);
+}
+
+void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)
+{
+  RNA_def_float(
+      ot->srna,
+      "inside_padding",
+      1.0f,
+      0.0f,
+      100.0f,
+      "Inside Padding",
+      "Inside distance in UI units from the edge of the region within which to start panning",
+      0.0f,
+      100.0f);
+  RNA_def_float(
+      ot->srna,
+      "outside_padding",
+      0.0f,
+      0.0f,
+      100.0f,
+      "Outside Padding",
+      "Outside distance in UI units from the edge of the region at which to stop panning",
+      0.0f,
+      100.0f);
+  RNA_def_float(ot->srna,
+                "speed_ramp",
+                1.0f,
+                0.0f,
+                100.0f,
+                "Speed Ramp",
+                "Width of the zone in UI units where speed increases with distance from the edge",
+                0.0f,
+                100.0f);
+  RNA_def_float(ot->srna,
+                "max_speed",
+                500.0f,
+                0.0f,
+                10000.0f,
+                "Max Speed",
+                "Maximum speed in UI units per second",
+                0.0f,
+                10000.0f);
+  RNA_def_float(ot->srna,
+                "delay",
+                1.0f,
+                0.0f,
+                10.0f,
+                "Delay",
+                "Delay in seconds before maximum speed is reached",
+                0.0f,
+                10.0f);
+}
+
+void UI_view2d_edge_pan_operator_init(bContext *C, View2DEdgePanData *vpd, wmOperator *op)
+{
+  UI_view2d_edge_pan_init(C,
+                          vpd,
+                          RNA_float_get(op->ptr, "inside_padding"),
+                          RNA_float_get(op->ptr, "outside_padding"),
+                          RNA_float_get(op->ptr, "speed_ramp"),
+                          RNA_float_get(op->ptr, "max_speed"),
+                          RNA_float_get(op->ptr, "delay"));
 }
 
 /** \} */

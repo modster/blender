@@ -346,8 +346,7 @@ void UI_view2d_edge_pan_reset(struct View2DEdgePanData *vpd);
 /* Apply transform to view (i.e. adjust 'cur' rect). */
 void UI_view2d_edge_pan_apply(struct bContext *C,
                               struct View2DEdgePanData *vpd,
-                              float dx,
-                              float dy);
+                              const struct wmEvent *event);
 
 /* Define operator properties needed for view panning. */
 void UI_view2d_edge_pan_operator_properties(struct wmOperatorType *ot);
@@ -356,12 +355,6 @@ void UI_view2d_edge_pan_operator_properties(struct wmOperatorType *ot);
 void UI_view2d_edge_pan_operator_init(struct bContext *C,
                                       struct View2DEdgePanData *vpd,
                                       struct wmOperator *op);
-
-/* Apply to view using operator properties. */
-void UI_view2d_edge_pan_operator_apply(struct bContext *C,
-                                       struct View2DEdgePanData *vpd,
-                                       struct wmOperator *op,
-                                       const struct wmEvent *event);
 
 #ifdef __cplusplus
 }

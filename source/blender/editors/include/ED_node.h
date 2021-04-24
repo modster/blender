@@ -49,6 +49,8 @@ typedef enum {
 } NodeBorder;
 
 #define NODE_GRID_STEPS 5
+#define NODE_EDGE_PAN_OUTSIDE_PAD 0 /* Disable clamping for node panning, use whole screen */
+#define NODE_EDGE_PAN_MAX_SPEED 50 /* In UI units per second, slower than default */
 
 /* space_node.c */
 
