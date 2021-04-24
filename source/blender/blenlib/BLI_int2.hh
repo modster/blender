@@ -51,6 +51,11 @@ struct int2 {
     return &x;
   }
 
+  operator float2() const
+  {
+    return float2(x, y);
+  }
+
   operator const int32_t *() const
   {
     return &x;

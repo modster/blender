@@ -52,6 +52,11 @@ struct int3 {
     return &x;
   }
 
+  operator float3() const
+  {
+    return float3(x, y, z);
+  }
+
   operator const int *() const
   {
     return &x;

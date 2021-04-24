@@ -84,6 +84,20 @@ struct float2 {
     return *this;
   }
 
+  float2 &operator*=(const float2 &other)
+  {
+    x *= other.x;
+    y *= other.y;
+    return *this;
+  }
+
+  float2 &operator/=(const float2 &other)
+  {
+    x *= other.x;
+    y *= other.y;
+    return *this;
+  }
+
   float2 &operator*=(float factor)
   {
     x *= factor;
@@ -115,6 +129,17 @@ struct float2 {
     return {a.x - b.x, a.y - b.y};
   }
 
+  friend float2 operator*(const float2 &a, const float2 &b)
+  {
+    return {a.x * b.x, a.y * b.y};
+  }
+
+  friend float2 operator/(const float2 &a, const float2 &b)
+  {
+    BLI_assert(b.x != 0.0f && b.y != 0.0f);
+    return {a.x / b.y, a.y / b.y};
+  }
+
   friend float2 operator*(const float2 &a, float b)
   {
     return {a.x * b, a.y * b};
@@ -129,6 +154,12 @@ struct float2 {
   friend float2 operator*(float a, const float2 &b)
   {
     return b * a;
+  }
+
+  friend float2 operator/(float a, const float2 &b)
+  {
+    BLI_assert(b.x != 0.0f && b.y != 0.0f);
+    return {a / b.x, a / b.y};
   }
 
   friend std::ostream &operator<<(std::ostream &stream, const float2 &v)
