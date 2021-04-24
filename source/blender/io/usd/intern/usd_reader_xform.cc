@@ -66,7 +66,11 @@ void USDXformReader::read_object_data(Main * /* bmain */, const double motionSam
     bConstraint *con = BKE_constraint_add_for_object(
         object_, NULL, CONSTRAINT_TYPE_TRANSFORM_CACHE);
     bTransformCacheConstraint *data = static_cast<bTransformCacheConstraint *>(con->data);
-    BLI_strncpy(data->object_path, prim_.GetPath().GetText(), FILE_MAX);
+
+    std::string prim_path = use_parent_xform_ ? prim_.GetParent().GetPath().GetAsString() :
+                                                prim_path_;
+
+    BLI_strncpy(data->object_path, prim_path.c_str(), FILE_MAX);
 
     data->cache_file = settings_->cache_file;
     id_us_plus(&data->cache_file->id);
@@ -83,7 +87,14 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
   is_constant = true;
   unit_m4(r_mat);
 
-  pxr::UsdGeomXformable xformable(prim_);
+  pxr::UsdGeomXformable xformable;
+
+  if (use_parent_xform_) {
+    xformable = pxr::UsdGeomXformable(prim_.GetParent());
+  }
+  else {
+    xformable = pxr::UsdGeomXformable(prim_);
+  }
 
   if (!xformable) {
     // This might happen if the prim is a Scope.
@@ -114,6 +125,20 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
       mul_m4_m4m4(r_mat, settings_->conversion_mat, r_mat);
     }
   }
+}
+
+bool USDXformReader::prim_has_xform_ops() const
+{
+  pxr::UsdGeomXformable xformable(prim_);
+
+  if (!xformable) {
+    // This might happen if the prim is a Scope.
+    return false;
+  }
+
+  bool reset_xform_stack = false;
+
+  return !xformable.GetOrderedXformOps(&reset_xform_stack).empty();
 }
 
 bool USDXformReader::is_root_xform_object() const
