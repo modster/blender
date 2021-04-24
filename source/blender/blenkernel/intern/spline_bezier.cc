@@ -296,21 +296,21 @@ static void bezier_forward_difference_3d(const float3 &point_0,
 }
 
 static void evaluate_segment_mapping(Span<float3> evaluated_positions,
-                                     MutableSpan<PointMapping> mappings,
+                                     MutableSpan<float> mappings,
                                      const int index)
 {
   float length = 0.0f;
-  mappings[0] = PointMapping{index, 0.0f};
+  mappings[0] = index;
   for (const int i : IndexRange(1, mappings.size() - 1)) {
     length += float3::distance(evaluated_positions[i - 1], evaluated_positions[i]);
-    mappings[i] = PointMapping{index, length};
+    mappings[i] = length;
   }
 
   /* To get the factors instead of the accumulated lengths, divide the mapping factors by the
    * accumulated length. */
   if (length != 0.0f) {
-    for (PointMapping &mapping : mappings) {
-      mapping.factor /= length;
+    for (float &mapping : mappings) {
+      mapping = mapping / length + index;
     }
   }
 }
@@ -319,11 +319,11 @@ void BezierSpline::evaluate_bezier_segment(const int index,
                                            const int next_index,
                                            int &offset,
                                            MutableSpan<float3> positions,
-                                           MutableSpan<PointMapping> mappings) const
+                                           MutableSpan<float> mappings) const
 {
   if (this->segment_is_vector(index)) {
     positions[offset] = positions_[index];
-    mappings[offset] = PointMapping{index, 0.0f};
+    mappings[offset] = index;
     offset++;
   }
   else {
@@ -355,7 +355,7 @@ void BezierSpline::evaluate_bezier_position_and_mapping() const
   this->evaluated_mappings_cache_.resize(total);
 
   MutableSpan<float3> positions = this->evaluated_positions_cache_;
-  MutableSpan<PointMapping> mappings = this->evaluated_mappings_cache_;
+  MutableSpan<float> mappings = this->evaluated_mappings_cache_;
 
   /* TODO: It would also be possible to store an array of offsets to facilitate parallelism here,
    * maybe it is worth it? */
@@ -372,8 +372,14 @@ void BezierSpline::evaluate_bezier_position_and_mapping() const
     /* Since evaulating the bezier doesn't add the final point's position,
      * it must be added manually in the non-cyclic case. */
     positions[offset] = this->positions_.last();
-    mappings[offset] = PointMapping{i_last - 1, 1.0f};
+    mappings[offset] = i_last;
     offset++;
+  }
+
+  if (this->is_cyclic) {
+    if (mappings.last() >= this->size()) {
+      mappings.last() = 0.0f;
+    }
   }
 
   BLI_assert(offset == positions.size());
@@ -382,40 +388,35 @@ void BezierSpline::evaluate_bezier_position_and_mapping() const
 }
 
 /**
- * Returns non-owning access to the cache of mappings from the evaluated points to
- * the corresponing control points. Unless the spline is cyclic, the last control point
- * index will never be included as an index.
+ * Returns non-owning access to an array of values ontains the information necessary to
+ * interpolate values from the original control points to evaluated points. The control point
+ * index is the integer part of each value, and the factor used for interpolating to the next
+ * control point is the remaining factional part.
  */
-Span<PointMapping> BezierSpline::evaluated_mappings() const
+Span<float> BezierSpline::evaluated_mappings() const
 {
   this->evaluate_bezier_position_and_mapping();
-#ifdef DEBUG
-  if (evaluated_mappings_cache_.last().control_point_index == this->size() - 1) {
-    BLI_assert(this->is_cyclic);
-  }
-#endif
   return this->evaluated_mappings_cache_;
 }
 
 Span<float3> BezierSpline::evaluated_positions() const
 {
   this->evaluate_bezier_position_and_mapping();
-
   return this->evaluated_positions_cache_;
 }
 
 template<typename T>
-static void interpolate_to_evaluated_points_impl(Span<PointMapping> mappings,
+static void interpolate_to_evaluated_points_impl(Span<float> mappings,
                                                  const blender::VArray<T> &source_data,
                                                  MutableSpan<T> result_data)
 {
+  const int points_len = source_data.size();
   blender::attribute_math::DefaultMixer<T> mixer(result_data);
 
   for (const int i : result_data.index_range()) {
-    const PointMapping &mapping = mappings[i];
-    const int index = mapping.control_point_index;
-    const int next_index = (index + 1) % source_data.size();
-    const float factor = mapping.factor;
+    const int index = std::floor(mappings[i]);
+    const int next_index = (index == points_len - 1) ? 0 : index + 1;
+    const float factor = mappings[i] - index;
 
     const T &value = source_data[index];
     const T &next_value = source_data[next_index];
@@ -431,7 +432,7 @@ blender::fn::GVArrayPtr BezierSpline::interpolate_to_evaluated_points(
     const blender::fn::GVArray &source_data) const
 {
   BLI_assert(source_data.size() == this->size());
-  Span<PointMapping> mappings = this->evaluated_mappings();
+  Span<float> mappings = this->evaluated_mappings();
 
   blender::fn::GVArrayPtr new_varray;
   blender::attribute_math::convert_to_static_type(source_data.type(), [&](auto dummy) {

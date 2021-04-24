@@ -74,9 +74,9 @@ static void interpolate_control_point(BezierSpline &spline,
   using namespace ::blender::fn;
 
   const int eval_index = lookup.evaluated_index;
-  Span<PointMapping> mappings = spline.evaluated_mappings();
-  const PointMapping &mapping = mappings[eval_index];
-  const int index = mapping.control_point_index + (adjust_next ? 1 : 0);
+  Span<float> mappings = spline.evaluated_mappings();
+
+  const int index = std::floor(mappings[eval_index]) + (adjust_next ? 1 : 0);
 
   Span<float3> evaluated_positions = spline.evaluated_positions();
 
@@ -133,12 +133,11 @@ static void trim_spline(BezierSpline &spline,
   BLI_assert(!spline.is_cyclic);
   BLI_assert(start.evaluated_index <= end.evaluated_index);
 
-  Span<PointMapping> mappings = spline.evaluated_mappings();
+  Span<float> mappings = spline.evaluated_mappings();
 
   const int points_len = spline.size();
-  const int start_index = mappings[start.evaluated_index].control_point_index;
-  const int end_index = std::min(mappings[end.evaluated_index].control_point_index + 2,
-                                 points_len);
+  const int start_index = std::floor(mappings[start.evaluated_index]);
+  const int end_index = std::min((int)std::floor(mappings[end.evaluated_index]) + 2, points_len);
 
   if (!(start.evaluated_index == 0 && start.factor == 0.0f)) {
     interpolate_control_point(spline, false, start);

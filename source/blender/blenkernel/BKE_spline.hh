@@ -32,23 +32,6 @@
 
 struct Curve;
 
-/**
- * Contains the information necessary to interpolate values from the original control points to
- * evaluated points.
- */
-struct PointMapping {
-  /**
-   * The index of the control point preceding the evaluated point at this index.
-   * For resolutions higher than 1, many evaluated points can share the same value.
-   */
-  int control_point_index;
-  /**
-   * This evaluated point's portion of the total length between the `control_point_index` value
-   * and the next.
-   */
-  float factor;
-};
-
 class Spline;
 using SplinePtr = std::unique_ptr<Spline>;
 
@@ -190,7 +173,7 @@ class BezierSpline final : public Spline {
   mutable bool base_cache_dirty_ = true;
   mutable std::mutex base_cache_mutex_;
   mutable blender::Vector<blender::float3> evaluated_positions_cache_;
-  mutable blender::Vector<PointMapping> evaluated_mappings_cache_;
+  mutable blender::Vector<float> evaluated_mappings_cache_;
 
  public:
   virtual SplinePtr copy() const final;
@@ -253,7 +236,7 @@ class BezierSpline final : public Spline {
   void mark_cache_invalid() final;
   int evaluated_points_size() const final;
 
-  blender::Span<PointMapping> evaluated_mappings() const;
+  blender::Span<float> evaluated_mappings() const;
   blender::Span<blender::float3> evaluated_positions() const final;
 
   virtual blender::fn::GVArrayPtr interpolate_to_evaluated_points(
@@ -269,7 +252,7 @@ class BezierSpline final : public Spline {
                                const int next_index,
                                int &offset,
                                blender::MutableSpan<blender::float3> positions,
-                               blender::MutableSpan<PointMapping> mappings) const;
+                               blender::MutableSpan<float> mappings) const;
   void evaluate_bezier_position_and_mapping() const;
 };
 

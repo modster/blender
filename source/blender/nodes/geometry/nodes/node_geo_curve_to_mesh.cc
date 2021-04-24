@@ -59,6 +59,22 @@ static void vert_extrude_to_mesh_data(const Spline &spline,
     edge.v2 = vert_offset + i + 1;
     edge.flag = ME_LOOSEEDGE;
   }
+  // for (const int i : IndexRange(positions.size() - 1)) {
+  //   MEdge &edge = edges[edge_offset++];
+  //   edge.v1 = vert_offset + i * 3;
+  //   edge.v2 = vert_offset + i * 3 + 3;
+  //   edge.flag = ME_LOOSEEDGE;
+
+  //   MEdge &tangent_edge = edges[edge_offset++];
+  //   tangent_edge.v1 = vert_offset + i * 3;
+  //   tangent_edge.v2 = vert_offset + i * 3 + 1;
+  //   tangent_edge.flag = ME_LOOSEEDGE;
+
+  //   MEdge &normal_edge = edges[edge_offset++];
+  //   normal_edge.v1 = vert_offset + i * 3;
+  //   normal_edge.v2 = vert_offset + i * 3 + 2;
+  //   normal_edge.flag = ME_LOOSEEDGE;
+  // }
 
   if (spline.is_cyclic) {
     MEdge &edge = edges[edge_offset++];
@@ -71,6 +87,18 @@ static void vert_extrude_to_mesh_data(const Spline &spline,
     MVert &vert = verts[vert_offset++];
     copy_v3_v3(vert.co, positions[i] + profile_vert);
   }
+  // Span<float3> tangents = spline.evaluated_tangents();
+  // Span<float3> normals = spline.evaluated_normals();
+  // for (const int i : positions.index_range()) {
+  //   MVert &vert = verts[vert_offset++];
+  //   copy_v3_v3(vert.co, positions[i] + profile_vert);
+
+  //   MVert &tangent_vert = verts[vert_offset++];
+  //   copy_v3_v3(tangent_vert.co, tangents[i] + vert.co);
+
+  //   MVert &normal_vert = verts[vert_offset++];
+  //   copy_v3_v3(normal_vert.co, normals[i] + vert.co);
+  // }
 }
 
 static void mark_edges_sharp(MutableSpan<MEdge> edges)
@@ -202,11 +230,11 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   /* Mark edge loops from sharp vector control points sharp. */
   if (profile_spline.type() == Spline::Bezier) {
     const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(profile_spline);
-    Span<PointMapping> mappings = bezier_spline.evaluated_mappings();
+    Span<float> mappings = bezier_spline.evaluated_mappings();
     for (const int i_profile : mappings.index_range()) {
-      const PointMapping &mapping = mappings[i_profile];
-      if (mapping.factor == 0.0f) {
-        if (bezier_spline.point_is_sharp(mapping.control_point_index)) {
+      const float index = std::floor(mappings[i_profile]);
+      if ((mappings[i_profile] - index) == 0.0f) {
+        if (bezier_spline.point_is_sharp(index)) {
           mark_edges_sharp(
               edges.slice(spline_edges_start + spline_edge_len * i_profile, spline_edge_len));
         }
@@ -220,6 +248,7 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   int profile_vert_total = 0;
   int profile_edge_total = 0;
   for (const SplinePtr &profile_spline : profile_curve.splines) {
+    // profile_vert_total += profile_spline->evaluated_points_size() + 2;
     profile_vert_total += profile_spline->evaluated_points_size();
     profile_edge_total += profile_spline->evaluated_edges_size();
   }
@@ -228,6 +257,7 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   int edge_total = 0;
   int poly_total = 0;
   for (const SplinePtr &spline : curve.splines) {
+    // const int spline_vert_len = spline->evaluated_points_size() * 3;
     const int spline_vert_len = spline->evaluated_points_size();
     const int spline_edge_len = spline->evaluated_edges_size();
     vert_total += spline_vert_len * profile_vert_total;
@@ -271,7 +301,7 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   }
 
   BKE_mesh_calc_normals(mesh);
-  BLI_assert(BKE_mesh_is_valid(mesh));
+  // BLI_assert(BKE_mesh_is_valid(mesh));
 
   return mesh;
 }
