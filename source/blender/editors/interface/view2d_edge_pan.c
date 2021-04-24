@@ -207,14 +207,9 @@ static void edge_pan_apply_delta(bContext *C, View2DEdgePanData *vpd, float dx, 
   UI_view2d_sync(vpd->screen, vpd->area, v2d, V2D_LOCK_COPY);
 }
 
-void UI_view2d_edge_pan_apply(bContext *C, View2DEdgePanData *vpd, const wmEvent *event)
+void UI_view2d_edge_pan_apply(bContext *C, View2DEdgePanData *vpd, int x, int y)
 {
   ARegion *region = vpd->region;
-
-  /* Only mousemove events matter here, ignore others. */
-  if (event->type != MOUSEMOVE) {
-    return;
-  }
 
   rcti inside_rect, outside_rect;
   inside_rect = region->winrct;
@@ -224,18 +219,18 @@ void UI_view2d_edge_pan_apply(bContext *C, View2DEdgePanData *vpd, const wmEvent
 
   int pan_dir_x = 0;
   int pan_dir_y = 0;
-  if ((vpd->outside_pad == 0) || BLI_rcti_isect_pt(&outside_rect, event->x, event->y)) {
+  if ((vpd->outside_pad == 0) || BLI_rcti_isect_pt(&outside_rect, x, y)) {
     /* Find whether the mouse is beyond X and Y edges. */
-    if (event->x > inside_rect.xmax) {
+    if (x > inside_rect.xmax) {
       pan_dir_x = 1;
     }
-    else if (event->x < inside_rect.xmin) {
+    else if (x < inside_rect.xmin) {
       pan_dir_x = -1;
     }
-    if (event->y > inside_rect.ymax) {
+    if (y > inside_rect.ymax) {
       pan_dir_y = 1;
     }
-    else if (event->y < inside_rect.ymin) {
+    else if (y < inside_rect.ymin) {
       pan_dir_y = -1;
     }
   }
@@ -247,17 +242,27 @@ void UI_view2d_edge_pan_apply(bContext *C, View2DEdgePanData *vpd, const wmEvent
   const float dtime = (float)(current_time - vpd->edge_pan_last_time);
   float dx = 0.0f, dy = 0.0f;
   if (pan_dir_x != 0) {
-    const float speed = edge_pan_speed(vpd, event->x, true, current_time);
+    const float speed = edge_pan_speed(vpd, x, true, current_time);
     dx = dtime * speed * (float)pan_dir_x;
   }
   if (pan_dir_y != 0) {
-    const float speed = edge_pan_speed(vpd, event->y, false, current_time);
+    const float speed = edge_pan_speed(vpd, y, false, current_time);
     dy = dtime * speed * (float)pan_dir_y;
   }
   vpd->edge_pan_last_time = current_time;
 
   /* Pan, clamping inside the regions's total bounds. */
   edge_pan_apply_delta(C, vpd, dx, dy);
+}
+
+void UI_view2d_edge_pan_apply_event(bContext *C, View2DEdgePanData *vpd, const wmEvent *event)
+{
+  /* Only mousemove events matter here, ignore others. */
+  if (event->type != MOUSEMOVE) {
+    return;
+  }
+
+  UI_view2d_edge_pan_apply(C, vpd, event->x, event->y);
 }
 
 void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)

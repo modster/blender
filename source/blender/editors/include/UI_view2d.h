@@ -344,9 +344,12 @@ void UI_view2d_edge_pan_init(struct bContext *C,
 void UI_view2d_edge_pan_reset(struct View2DEdgePanData *vpd);
 
 /* Apply transform to view (i.e. adjust 'cur' rect). */
-void UI_view2d_edge_pan_apply(struct bContext *C,
-                              struct View2DEdgePanData *vpd,
-                              const struct wmEvent *event);
+void UI_view2d_edge_pan_apply(struct bContext *C, struct View2DEdgePanData *vpd, int x, int y);
+
+/* Apply transform to view using mouse events. */
+void UI_view2d_edge_pan_apply_event(struct bContext *C,
+                                    struct View2DEdgePanData *vpd,
+                                    const struct wmEvent *event);
 
 /* Define operator properties needed for view panning. */
 void UI_view2d_edge_pan_operator_properties(struct wmOperatorType *ot);

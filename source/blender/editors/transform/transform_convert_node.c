@@ -35,6 +35,7 @@
 #include "ED_node.h"
 
 #include "UI_interface.h"
+#include "UI_view2d.h"
 
 #include "transform.h"
 #include "transform_convert.h"
@@ -107,6 +108,18 @@ void createTransNodeData(TransInfo *t)
   const float dpi_fac = UI_DPI_FAC;
   SpaceNode *snode = t->area->spacedata.first;
 
+  /* Custom data to enable edge panning during the node transform */
+  View2DEdgePanData *edge_pan = MEM_callocN(sizeof(*edge_pan), __func__);
+  UI_view2d_edge_pan_init(t->context,
+                          edge_pan,
+                          NODE_EDGE_PAN_INSIDE_PAD,
+                          NODE_EDGE_PAN_OUTSIDE_PAD,
+                          NODE_EDGE_PAN_SPEED_RAMP,
+                          NODE_EDGE_PAN_MAX_SPEED,
+                          NODE_EDGE_PAN_DELAY);
+  t->custom.type.data = edge_pan;
+  t->custom.type.use_free = true;
+
   TransDataContainer *tc = TRANS_DATA_CONTAINER_FIRST_SINGLE(t);
 
   tc->data_len = 0;
@@ -149,6 +162,9 @@ void createTransNodeData(TransInfo *t)
 void flushTransNodes(TransInfo *t)
 {
   const float dpi_fac = UI_DPI_FAC;
+
+  View2DEdgePanData *edge_pan = (View2DEdgePanData *)t->custom.type.data;
+  UI_view2d_edge_pan_apply(t->context, edge_pan, t->mval[0], t->mval[1]);
 
   FOREACH_TRANS_DATA_CONTAINER (t, tc) {
     applyGridAbsolute(t);

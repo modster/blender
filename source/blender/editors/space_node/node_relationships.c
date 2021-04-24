@@ -958,7 +958,7 @@ static int node_link_modal(bContext *C, wmOperator *op, const wmEvent *event)
   ARegion *region = CTX_wm_region(C);
   float cursor[2];
 
-  UI_view2d_edge_pan_apply(C, &nldrag->pan_data, event);
+  UI_view2d_edge_pan_apply_event(C, &nldrag->pan_data, event);
 
   UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &cursor[0], &cursor[1]);
 

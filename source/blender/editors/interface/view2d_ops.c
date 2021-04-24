@@ -362,7 +362,7 @@ static int view_edge_pan_modal(bContext *C, wmOperator *op, const wmEvent *event
     return (OPERATOR_FINISHED | OPERATOR_PASS_THROUGH);
   }
 
-  UI_view2d_edge_pan_apply(C, vpd, event);
+  UI_view2d_edge_pan_apply_event(C, vpd, event);
 
   /* This operator is supposed to run together with some drag action.
    * On successful handling, always pass events on to other handlers. */
