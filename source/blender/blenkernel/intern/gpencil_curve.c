@@ -821,7 +821,8 @@ static tGPCurveSegment *gpencil_fit_curve_to_points_ex(bGPDstroke *gps,
                                                        const float error_threshold,
                                                        const float corner_angle,
                                                        const uint32_t start_idx,
-                                                       const uint32_t end_idx)
+                                                       const uint32_t end_idx,
+                                                       const bool is_cyclic)
 {
   const uint32_t length = end_idx - start_idx + 1;
 
@@ -845,6 +846,9 @@ static tGPCurveSegment *gpencil_fit_curve_to_points_ex(bGPDstroke *gps,
   }
 
   int calc_flag = CURVE_FIT_CALC_HIGH_QUALIY;
+  if (is_cyclic) {
+    calc_flag |= CURVE_FIT_CALC_CYCLIC;
+  }
   int r = curve_fit_cubic_to_points_refit_fl(tcs->point_array,
                                              length,
                                              CURVE_FIT_POINT_DIM,
@@ -926,10 +930,10 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_generate(bGPDstroke *gps,
   if (gps->totpoints < 3) {
     return gpencil_stroke_editcurve_generate_edgecases(gps);
   }
-
+  const bool is_cyclic = (gps->flag & GP_STROKE_CYCLIC);
   const float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
   tGPCurveSegment *tcs = gpencil_fit_curve_to_points_ex(
-      gps, diag_length, error_threshold, corner_angle, 0, gps->totpoints - 1);
+      gps, diag_length, error_threshold, corner_angle, 0, gps->totpoints - 1, is_cyclic);
 
   bGPDcurve *editcurve = BKE_gpencil_stroke_editcurve_new(tcs->cubic_array_len);
   memcpy(
@@ -987,7 +991,7 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_tagged_segments_update(bGPDstroke *gps,
     if (is_tagged) {
       /* Regenerate this segment. */
       tcs = gpencil_fit_curve_to_points_ex(
-          gps, diag_length, error_threshold, corner_angle, start_idx, end_idx);
+          gps, diag_length, error_threshold, corner_angle, start_idx, end_idx, false);
     }
     else {
       /* Save this segment. */
