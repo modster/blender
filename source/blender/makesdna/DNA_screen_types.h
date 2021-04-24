@@ -263,6 +263,9 @@ typedef struct uiListDyn {
   /** Minimal visual height of the list (in rows). */
   int visual_height_min;
 
+  /** Number of columns drawn for grid layouts. */
+  int columns;
+
   /** Number of items in collection. */
   int items_len;
   /** Number of items actually visible after filtering. */

@@ -6129,6 +6129,8 @@ static void uilist_prepare(uiList *ui_list,
     activei_row = items->active_item_idx;
   }
 
+  dyn_data->columns = columns;
+
   if (!use_auto_size) {
     /* No auto-size, yet we clamp at min size! */
     actual_rows = max_ii(ui_list->list_grip, actual_rows);
