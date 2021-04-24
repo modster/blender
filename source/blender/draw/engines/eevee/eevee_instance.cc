@@ -41,7 +41,7 @@ namespace blender::eevee {
  * Any attempt to do so will likely produce use after free situations.
  * \{ */
 
-void Instance::init(const int output_res[2],
+void Instance::init(const ivec2 &output_res,
                     const rcti *output_rect,
                     RenderEngine *render_,
                     Depsgraph *depsgraph_,

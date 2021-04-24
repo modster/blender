@@ -118,7 +118,7 @@ class LightModule {
   void sync_light(const Object *ob, ObjectHandle &handle);
   void end_sync(void);
 
-  void set_view(const DRWView *view, const int extent[2]);
+  void set_view(const DRWView *view, const ivec2 extent);
 
   void bind_batch(int range_id);
 

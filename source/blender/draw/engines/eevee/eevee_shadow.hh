@@ -36,8 +36,8 @@ class Instance;
 
 struct ShadowRegion {
   /** Position and size in the shadow atlas. */
-  int offset[2];
-  int extent[2];
+  ivec2 offset;
+  ivec2 extent;
   /** View used for rendering the region. */
   DRWView *view = nullptr;
   /** Update tag. */

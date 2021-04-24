@@ -80,7 +80,7 @@ void ShadowModule::end_sync(void)
       offset[0] += region.extent[0];
       offset[1] = 0;
     }
-    copy_v2_v2_int(region.offset, offset);
+    region.offset = offset;
     offset[1] += region.extent[1];
 
     /* Init view pointer to avoid reusing after free. */

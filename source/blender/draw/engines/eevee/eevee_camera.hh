@@ -73,9 +73,9 @@ static const float cubeface_mat[6][4][4] = {
 
 inline bool operator==(const CameraData &a, const CameraData &b)
 {
-  return compare_m4m4(a.persmat, b.persmat, FLT_MIN) && equals_v2v2(a.uv_scale, b.uv_scale) &&
-         equals_v2v2(a.uv_bias, b.uv_bias) && equals_v2v2(a.equirect_scale, b.equirect_scale) &&
-         equals_v2v2(a.equirect_bias, b.equirect_bias) && (a.fisheye_fov == b.fisheye_fov) &&
+  return compare_m4m4(a.persmat, b.persmat, FLT_MIN) && (a.uv_scale == b.uv_scale) &&
+         (a.uv_bias == b.uv_bias) && (a.equirect_scale == b.equirect_scale) &&
+         (a.equirect_bias == b.equirect_bias) && (a.fisheye_fov == b.fisheye_fov) &&
          (a.fisheye_lens == b.fisheye_lens) && (a.filter_size == b.filter_size) &&
          (a.type == b.type);
 }

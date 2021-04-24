@@ -122,7 +122,7 @@ class DepthOfField {
   /** Focus distance in view space. */
   float focus_distance_;
   /** Extent of the input buffer. */
-  int extent_[2];
+  ivec2 extent_;
 
   /** Tile dilation uniforms. */
   int tiles_dilate_slight_focus_;
@@ -141,10 +141,10 @@ class DepthOfField {
 
   void init();
 
-  void sync(const float winmat[4][4], int input_extent[2]);
+  void sync(const mat4 winmat, ivec2 input_extent);
 
   /** Apply Depth Of Field jittering to the view and projection matrices.. */
-  void jitter_apply(float winmat[4][4], float viewmat[4][4]);
+  void jitter_apply(mat4 winmat, mat4 viewmat);
 
   /** Will swap input and output texture if rendering happens. The actual output of this function
    * is in intput_tx. */

@@ -42,14 +42,19 @@
 
 #else /* C++ */
 #  pragma once
-/* TODO(fclem) Use correct C++ vector classes instead. */
+
+#  include "BLI_float2.hh"
+#  include "BLI_float3.hh"
+#  include "BLI_float4x4.hh"
+#  include "BLI_int2.hh"
+#  include "BLI_int3.hh"
+
 typedef float mat4[4][4];
 typedef float vec4[4];
-typedef float vec3[3];
-typedef float vec2[2];
-typedef int ivec4[4];
-typedef int ivec3[3];
-typedef int ivec2[2];
+using vec3 = blender::float3;
+using vec2 = blender::float2;
+using ivec3 = blender::int3;
+using ivec2 = blender::int2;
 typedef uint uvec4[4];
 typedef uint uvec3[3];
 typedef uint uvec2[2];

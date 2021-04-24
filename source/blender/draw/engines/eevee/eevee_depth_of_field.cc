@@ -68,7 +68,7 @@ void DepthOfField::init(void)
   jitter_radius_ = 0.0f;
 }
 
-void DepthOfField::sync(const float winmat[4][4], int input_extent[2])
+void DepthOfField::sync(const mat4 winmat, ivec2 input_extent)
 {
   const Object *camera_object_eval = inst_.camera_eval_object;
   const ::Camera *cam = (camera_object_eval) ?
@@ -81,14 +81,13 @@ void DepthOfField::sync(const float winmat[4][4], int input_extent[2])
     return;
   }
 
-  copy_v2_v2_int(extent_, input_extent);
+  extent_ = input_extent;
 
   data_.bokeh_blades = cam->dof.aperture_blades;
   data_.bokeh_rotation = cam->dof.aperture_rotation;
-  data_.bokeh_anisotropic_scale[0] = clamp_f(1.0f / cam->dof.aperture_ratio, 0.00001f, 1.0f);
-  data_.bokeh_anisotropic_scale[1] = clamp_f(cam->dof.aperture_ratio, 0.00001f, 1.0f);
-  copy_v2_v2(data_.bokeh_anisotropic_scale_inv, data_.bokeh_anisotropic_scale);
-  invert_v2(data_.bokeh_anisotropic_scale_inv);
+  data_.bokeh_anisotropic_scale.x = clamp_f(1.0f / cam->dof.aperture_ratio, 0.00001f, 1.0f);
+  data_.bokeh_anisotropic_scale.y = clamp_f(cam->dof.aperture_ratio, 0.00001f, 1.0f);
+  data_.bokeh_anisotropic_scale_inv = 1.0f / data_.bokeh_anisotropic_scale;
 
   focus_distance_ = BKE_camera_object_dof_distance(camera_object_eval);
   float fstop = max_ff(cam->dof.aperture_fstop, 1e-5f);
@@ -169,7 +168,7 @@ void DepthOfField::sync(const float winmat[4][4], int input_extent[2])
   }
 }
 
-void DepthOfField::jitter_apply(float winmat[4][4], float viewmat[4][4])
+void DepthOfField::jitter_apply(mat4 winmat, mat4 viewmat)
 {
   if (jitter_radius_ == 0.0f) {
     return;
@@ -185,23 +184,22 @@ void DepthOfField::jitter_apply(float winmat[4][4], float viewmat[4][4])
   theta += data_.bokeh_rotation;
 
   /* Sample in View Space. */
-  float sample[2] = {radius * cosf(theta), radius * sinf(theta)};
-  mul_v2_v2(sample, data_.bokeh_anisotropic_scale);
+  vec2 sample = vec2(radius * cosf(theta), radius * sinf(theta));
+  sample *= data_.bokeh_anisotropic_scale;
   /* Convert to NDC Space. */
-  float jitter[3] = {UNPACK2(sample), -focus_distance_};
-  float center[3] = {0.0f, 0.0f, -focus_distance_};
+  vec3 jitter = vec3(UNPACK2(sample), -focus_distance_);
+  vec3 center = vec3(0.0f, 0.0f, -focus_distance_);
   mul_project_m4_v3(winmat, jitter);
   mul_project_m4_v3(winmat, center);
 
   const bool is_ortho = (winmat[2][3] != -1.0f);
   if (is_ortho) {
-    mul_v2_fl(sample, focus_distance_);
+    sample *= focus_distance_;
   }
   /* Translate origin. */
   sub_v2_v2(viewmat[3], sample);
   /* Skew winmat Z axis. */
-  sub_v2_v2v2(jitter, center, jitter);
-  add_v2_v2(winmat[2], jitter);
+  add_v2_v2(winmat[2], center - jitter);
 }
 
 /** Will swap input and output texture if rendering happens. The actual output of this function
@@ -237,8 +235,7 @@ void DepthOfField::render(GPUTexture *depth_tx, GPUTexture **input_tx, GPUTextur
  **/
 void DepthOfField::bokeh_lut_pass_sync(void)
 {
-  const bool has_anisotropy = equals_v2v2(data_.bokeh_anisotropic_scale,
-                                          data_.bokeh_anisotropic_scale_inv);
+  const bool has_anisotropy = data_.bokeh_anisotropic_scale != vec2(1.0f);
   if (has_anisotropy && (data_.bokeh_blades == 0.0)) {
     bokeh_gather_lut_tx_ = nullptr;
     bokeh_scatter_lut_tx_ = nullptr;

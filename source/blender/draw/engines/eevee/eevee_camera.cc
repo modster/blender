@@ -101,7 +101,7 @@ void Camera::sync(void)
     DRW_view_winmat_get(inst_.drw_view, data.wininv, true);
     DRW_view_persmat_get(inst_.drw_view, data.persmat, false);
     DRW_view_persmat_get(inst_.drw_view, data.persinv, true);
-    DRW_view_camtexco_get(inst_.drw_view, &data.uv_scale[0]);
+    DRW_view_camtexco_get(inst_.drw_view, data.uv_scale);
   }
   else if (inst_.render) {
     /* TODO(fclem) Overscan */
@@ -112,8 +112,8 @@ void Camera::sync(void)
     invert_m4_m4(data.wininv, data.winmat);
     mul_m4_m4m4(data.persmat, data.winmat, data.viewmat);
     invert_m4_m4(data.persinv, data.persmat);
-    copy_v2_fl(data.uv_scale, 1.0f);
-    copy_v2_fl(data.uv_bias, 0.0f);
+    data.uv_scale = vec2(1.0f);
+    data.uv_bias = vec2(0.0f);
   }
   else {
     BLI_assert(0);
@@ -125,23 +125,22 @@ void Camera::sync(void)
     data.clip_far = cam->clip_end;
     data.fisheye_fov = cam->fisheye_fov;
     data.fisheye_lens = cam->fisheye_lens;
-    data.equirect_bias[0] = -cam->longitude_min + M_PI_2;
-    data.equirect_bias[1] = -cam->latitude_min + M_PI_2;
-    data.equirect_scale[0] = cam->longitude_min - cam->longitude_max;
-    data.equirect_scale[1] = cam->latitude_min - cam->latitude_max;
+    data.equirect_bias.x = -cam->longitude_min + M_PI_2;
+    data.equirect_bias.y = -cam->latitude_min + M_PI_2;
+    data.equirect_scale.x = cam->longitude_min - cam->longitude_max;
+    data.equirect_scale.y = cam->latitude_min - cam->latitude_max;
     /* Combine with uv_scale/bias to avoid doing extra computation. */
-    madd_v2_v2v2(data.equirect_bias, data.uv_bias, data.equirect_scale);
-    mul_v2_v2(data.equirect_scale, data.uv_scale);
+    data.equirect_bias += data.uv_bias * data.equirect_scale;
+    data.equirect_scale *= data.uv_scale;
 
-    copy_v2_v2(data.equirect_scale_inv, data.equirect_scale);
-    invert_v2(data.equirect_scale_inv);
+    data.equirect_scale_inv = 1.0f / data.equirect_scale;
   }
   else {
     data.clip_near = DRW_view_near_distance_get(inst_.drw_view);
     data.clip_far = DRW_view_far_distance_get(inst_.drw_view);
     data.fisheye_fov = data.fisheye_lens = -1.0f;
-    copy_v2_fl(data.equirect_bias, 0.0f);
-    copy_v2_fl(data.equirect_scale, 0.0f);
+    data.equirect_bias = vec2(0.0f);
+    data.equirect_scale = vec2(0.0f);
   }
 
   data_[data_id_].push_update();

@@ -64,7 +64,7 @@ static eGPUTextureFormat to_gpu_texture_format(eFilmDataType film_type)
 
 inline bool operator==(const FilmData &a, const FilmData &b)
 {
-  return equals_v2v2_int(a.extent, b.extent) && equals_v2v2_int(a.offset, b.offset);
+  return (a.extent == b.extent) && (a.offset == b.offset);
 }
 
 inline bool operator!=(const FilmData &a, const FilmData &b)
@@ -78,13 +78,11 @@ inline bool operator!=(const FilmData &a, const FilmData &b)
 /** \name Film
  * \{ */
 
-void Film::init(const int full_extent[2], const rcti *output_rect)
+void Film::init(const ivec2 &full_extent, const rcti *output_rect)
 {
   FilmData data = data_;
-  data.extent[0] = BLI_rcti_size_x(output_rect);
-  data.extent[1] = BLI_rcti_size_y(output_rect);
-  data.offset[0] = output_rect->xmin;
-  data.offset[1] = output_rect->ymin;
+  data.extent = ivec2(BLI_rcti_size_x(output_rect), BLI_rcti_size_y(output_rect));
+  data.offset = ivec2(output_rect->xmin, output_rect->ymin);
 
   has_changed_ = data_ != data;
 
@@ -93,11 +91,9 @@ void Film::init(const int full_extent[2], const rcti *output_rect)
     inst_.sampling.reset();
   }
 
-  for (int i = 0; i < 2; i++) {
-    data_.uv_scale[i] = 1.0f / full_extent[i];
-    data_.uv_scale_inv[i] = full_extent[i];
-    data_.uv_bias[i] = data_.offset[i] / (float)full_extent[i];
-  }
+  data_.uv_scale = 1.0f / vec2(full_extent);
+  data_.uv_scale_inv = full_extent;
+  data_.uv_bias = data_.offset / vec2(full_extent);
 }
 
 void Film::sync(void)
@@ -106,12 +102,11 @@ void Film::sync(void)
   for (int i = 0; i < 2; i++) {
     if (data_tx_[i] == nullptr) {
       eGPUTextureFormat tex_format = to_gpu_texture_format(data_.data_type);
-      int *extent = data_.extent;
       SNPRINTF(full_name, "Film.%s.data", name_.c_str());
-      data_tx_[i].ensure(full_name, UNPACK2(extent), 1, tex_format);
+      data_tx_[i].ensure(full_name, UNPACK2(data_.extent), 1, tex_format);
       /* TODO(fclem) The weight texture could be shared between all similar accumulators. */
       SNPRINTF(full_name, "Film.%s.weight", name_.c_str());
-      weight_tx_[i].ensure(full_name, UNPACK2(extent), 1, GPU_R16F);
+      weight_tx_[i].ensure(full_name, UNPACK2(data_.extent), 1, GPU_R16F);
 
       accumulation_fb_[i].ensure(GPU_ATTACHMENT_NONE,
                                  GPU_ATTACHMENT_TEXTURE(data_tx_[i]),

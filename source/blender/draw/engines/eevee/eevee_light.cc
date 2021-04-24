@@ -76,12 +76,11 @@ Light::Light(const Object *ob,
                                              (1.0f / square_f(influence_radius_volume)) :
                                              0.0f;
 
-  mul_v3_v3fl(this->color, &la->r, la->energy);
+  this->color = vec3(&la->r) * la->energy;
   normalize_m4_m4_ex(this->object_mat, ob->obmat, scale);
   /* Make sure we have consistent handedness (in case of negatively scaled Z axis). */
-  float cross[3];
-  cross_v3_v3v3(cross, this->_back, this->_right);
-  if (dot_v3v3(cross, this->_up) < 0.0f) {
+  vec3 cross = vec3::cross(this->_back, this->_right);
+  if (vec3::dot(cross, this->_up) < 0.0f) {
     negate_v3(this->_up);
   }
 
@@ -272,7 +271,7 @@ void LightModule::end_sync(void)
 }
 
 /* Compute acceleration structure for the given view. */
-void LightModule::set_view(const DRWView *view, const int extent[2])
+void LightModule::set_view(const DRWView *view, const ivec2 extent)
 {
   culling_.set_view(view, extent);
 

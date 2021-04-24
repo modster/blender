@@ -78,7 +78,7 @@ class ShadingView {
   DRWView *render_view_ = nullptr;
 
   /** Render size of the view. Can change between scene sample eval. */
-  int extent_[2] = {-1, -1};
+  ivec2 extent_ = {-1, -1};
   /** Static srting pointer. Used as debug name and as UUID for texture pool. */
   const char *name_;
   /** Matrix to apply to the viewmat. */
@@ -99,7 +99,7 @@ class ShadingView {
 
   void init(void);
 
-  void sync(int render_extent_[2]);
+  void sync(ivec2 render_extent_);
 
   void render(void);
 
@@ -139,7 +139,7 @@ class MainView {
   {
   }
 
-  void init(const int full_extent_[2])
+  void init(const ivec2 full_extent_)
   {
     /* TODO(fclem) parameter hidden in experimental. We need to figure out mipmap bias to preserve
      * texture crispiness. */

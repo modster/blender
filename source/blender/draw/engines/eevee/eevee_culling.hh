@@ -81,13 +81,13 @@ class CullingBatch {
   CullingBatch(){};
   ~CullingBatch(){};
 
-  void init(const int extent[2])
+  void init(const ivec2 &extent)
   {
     item_handles_.clear();
 
     uint tile_size = 8;
 
-    uint res[2] = {divide_ceil_u(extent[0], tile_size), divide_ceil_u(extent[1], tile_size)};
+    uint res[2] = {divide_ceil_u(extent.x, tile_size), divide_ceil_u(extent.y, tile_size)};
 
     tiles_tx_.ensure(UNPACK2(res), 1, GPU_RGBA32UI);
 
@@ -204,12 +204,12 @@ class Culling {
   /** Vector to source the item from. */
   const Vector<T> &item_source_;
   /** Used to get Z distance. */
-  float camera_z_axis_[3];
+  vec3 camera_z_axis_;
   float camera_z_offset_;
   /** View for which the culling is computed. */
   const DRWView *view_;
   /** View resolution. */
-  int extent_[2];
+  ivec2 extent_;
 
  public:
   Culling(const Vector<T> &items_source) : item_source_(items_source){};
@@ -220,16 +220,16 @@ class Culling {
     }
   }
 
-  void set_view(const DRWView *view, const int extent[2])
+  void set_view(const DRWView *view, const ivec2 extent)
   {
     view_ = view;
-    copy_v2_v2_int(extent_, extent);
+    extent_ = extent;
 
     float viewinv[4][4];
     DRW_view_viewmat_get(view, viewinv, true);
 
-    copy_v3_v3(camera_z_axis_, viewinv[2]);
-    camera_z_offset_ = -dot_v3v3(camera_z_axis_, viewinv[3]);
+    camera_z_axis_ = viewinv[2];
+    camera_z_offset_ = -vec3::dot(camera_z_axis_, viewinv[3]);
 
     if (batches_.size() == 0) {
       batches_.append(new CullingBatchType());
@@ -259,7 +259,7 @@ class Culling {
       used_batch_count_++;
     }
 
-    float z_dist = dot_v3v3(bsphere.center, camera_z_axis_) + camera_z_offset_;
+    float z_dist = vec3::dot(bsphere.center, camera_z_axis_) + camera_z_offset_;
     active_batch_->insert(index, z_dist, bsphere.radius);
 
     return active_batch_->is_full();

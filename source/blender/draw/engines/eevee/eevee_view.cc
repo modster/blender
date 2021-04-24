@@ -48,17 +48,17 @@ void ShadingView::init()
   mb_.init();
 }
 
-void ShadingView::sync(int render_extent_[2])
+void ShadingView::sync(ivec2 render_extent_)
 {
   if (inst_.camera.is_panoramic()) {
-    int64_t render_pixel_count = render_extent_[0] * (int64_t)render_extent_[1];
+    int64_t render_pixel_count = render_extent_.x * (int64_t)render_extent_.y;
     /* Divide pixel count between the 6 views. Rendering to a square target. */
     extent_[0] = extent_[1] = ceilf(sqrtf(1 + (render_pixel_count / 6)));
     /* TODO(fclem) Clip unused views heres. */
     is_enabled_ = true;
   }
   else {
-    copy_v2_v2_int(extent_, render_extent_);
+    extent_ = render_extent_;
     /* Only enable -Z view. */
     is_enabled_ = (StringRefNull(name_) == "negZ_view");
   }

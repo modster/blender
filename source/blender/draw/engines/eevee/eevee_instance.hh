@@ -97,7 +97,7 @@ class Instance {
         sync(*this){};
   ~Instance(){};
 
-  void init(const int output_res[2],
+  void init(const ivec2 &output_res,
             const rcti *output_rect,
             RenderEngine *render,
             Depsgraph *depsgraph,
