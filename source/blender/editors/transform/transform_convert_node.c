@@ -172,7 +172,11 @@ void flushTransNodes(TransInfo *t)
   const float dpi_fac = UI_DPI_FAC;
 
   NodeTransCustomData *customdata = (NodeTransCustomData *)t->custom.type.data;
-  UI_view2d_edge_pan_apply(t->context, &customdata->edge_pan, t->mval[0], t->mval[1]);
+
+  /* Edge panning functions expect window coordinates, mval is relative to region */
+  const float x = t->region->winrct.xmin + t->mval[0];
+  const float y = t->region->winrct.ymin + t->mval[1];
+  UI_view2d_edge_pan_apply(t->context, &customdata->edge_pan, x, y);
 
   /* Initial and current view2D rects for additional transform due to view panning and zooming */
   const rctf *rect_src = &customdata->initial_v2d_cur;
