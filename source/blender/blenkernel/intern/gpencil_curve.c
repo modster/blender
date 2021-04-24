@@ -599,6 +599,55 @@ typedef struct tGPCurveSegment {
 
 } tGPCurveSegment;
 
+/**
+ * Find the stationary points of a cubic bezier curve.
+ * Calcualtes the t-values (factor along curve) of the stationary points of a cubic bezier curve by
+ * finding the roots of the first derivative. If no roots where found the function returns false.
+ * Otherwise if one of the roots was found, one of r_t1 or r_t2 will be NaN and the other will
+ * contain the t-value of the root found. If both roots were found, both r_t1 and r_t2 will contain
+ * a value.
+ * \param p1, p2, p3, p4: Points of the cubic bezier curve.
+ * \param r_t1, r_t2: Return t-values (factor along curve).
+ */
+static bool find_cubic_bezier_stationary_points(
+    const float p1, const float p2, const float p3, const float p4, float *r_t1, float *r_t2)
+{
+  float a = 6.0f * (-p1 + 3.0f * p2 - 3.0f * p3 + p4);
+  if (IS_EQF(a, 0.0f)) {
+    /* Special edge-case that we have to handle seperately.*/
+    if ((p1 == p4) && (p2 == p3)) {
+      if (p1 == p2) {
+        *r_t1 = NAN;
+        *r_t2 = NAN;
+        return false;
+      }
+      *r_t1 = 0.5f;
+      *r_t2 = NAN;
+      return true;
+    }
+    /* Denominator is zero. No roots. */
+    return false;
+  }
+
+  float x = p4 * (p1 - p2) - p3 * (p1 + p2) + p2 * p2 + p3 * p3;
+  if (x < 0.0f) {
+    /* Negative number under square root. No real roots. */
+    return false;
+  }
+
+  float s = 6.0f * sqrtf(x);
+  float b = 6.0f * (p1 - 2.0f * p2 + p3);
+
+  float t1 = (s - b) / a;
+  float t2 = -(s + b) / a;
+
+  /* Discard root outside of limits. */
+  *r_t1 = IN_RANGE_INCL(t1, 0.0f, 1.0f) ? t1 : NAN;
+  *r_t2 = IN_RANGE_INCL(t2, 0.0f, 1.0f) ? t2 : NAN;
+
+  return !(*r_t1 == NAN) || !(*r_t2 == NAN);
+}
+
 static void gpencil_free_curve_segment(tGPCurveSegment *tcs)
 {
   if (tcs == NULL) {
