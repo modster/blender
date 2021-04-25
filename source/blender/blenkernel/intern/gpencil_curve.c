@@ -1730,16 +1730,16 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
 /**
  * Recalculate the handles of the edit curve of a grease pencil stroke
  */
-void BKE_gpencil_editcurve_recalculate_handles(bGPDstroke *gps)
+bool BKE_gpencil_editcurve_recalculate_handles(bGPDstroke *gps)
 {
   if (gps == NULL || gps->editcurve == NULL) {
-    return;
+    return false;
   }
 
   bool changed = false;
   bGPDcurve *gpc = gps->editcurve;
   if (gpc->tot_curve_points < 2) {
-    return;
+    return false;
   }
 
   if (gpc->tot_curve_points == 1) {
@@ -1785,6 +1785,8 @@ void BKE_gpencil_editcurve_recalculate_handles(bGPDstroke *gps)
 
     changed = true;
   }
+
+  return changed;
 }
 
 /* Helper: count how many new curve points must be generated. */
