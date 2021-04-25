@@ -98,8 +98,14 @@ static void geo_node_attribute_color_ramp_exec(GeoNodeExecParams params)
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
-  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
-    execute_on_component(params, *component);
+  if (geometry_set.has<MeshComponent>()) {
+    execute_on_component(params, geometry_set.get_component_for_write<MeshComponent>());
+  }
+  if (geometry_set.has<PointCloudComponent>()) {
+    execute_on_component(params, geometry_set.get_component_for_write<PointCloudComponent>());
+  }
+  if (geometry_set.has<CurveComponent>()) {
+    execute_on_component(params, geometry_set.get_component_for_write<CurveComponent>());
   }
 
   params.set_output("Geometry", std::move(geometry_set));

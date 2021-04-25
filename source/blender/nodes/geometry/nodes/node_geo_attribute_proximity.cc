@@ -245,8 +245,17 @@ static void geo_node_attribute_proximity_exec(GeoNodeExecParams params)
    * for the target geometry set. However, the generic BVH API complicates this. */
   geometry_set_target = geometry_set_realize_instances(geometry_set_target);
 
-  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
-    attribute_calc_proximity(*component, geometry_set_target, params);
+  if (geometry_set.has<MeshComponent>()) {
+    attribute_calc_proximity(
+        geometry_set.get_component_for_write<MeshComponent>(), geometry_set_target, params);
+  }
+  if (geometry_set.has<PointCloudComponent>()) {
+    attribute_calc_proximity(
+        geometry_set.get_component_for_write<PointCloudComponent>(), geometry_set_target, params);
+  }
+  if (geometry_set.has<CurveComponent>()) {
+    attribute_calc_proximity(
+        geometry_set.get_component_for_write<CurveComponent>(), geometry_set_target, params);
   }
 
   params.set_output("Geometry", geometry_set);

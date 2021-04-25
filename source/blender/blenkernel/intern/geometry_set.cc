@@ -171,19 +171,6 @@ Vector<const GeometryComponent *> GeometrySet::get_components_for_read() const
   return components;
 }
 
-/**
- * Get all geometry components in this geometry set.
- */
-Vector<GeometryComponent *> GeometrySet::get_components_for_write()
-{
-  Vector<GeometryComponent *> components;
-
-  for (const GeometryComponentType component_type : components_.keys()) {
-    components.append(&this->get_component_for_write(component_type));
-  }
-  return components;
-}
-
 void GeometrySet::compute_boundbox_without_instances(float3 *r_min, float3 *r_max) const
 {
   const PointCloud *pointcloud = this->get_pointcloud_for_read();

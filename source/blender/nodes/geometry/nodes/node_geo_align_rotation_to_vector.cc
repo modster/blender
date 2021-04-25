@@ -176,8 +176,15 @@ static void geo_node_align_rotation_to_vector_exec(GeoNodeExecParams params)
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
-  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
-    align_rotations_on_component(*component, params);
+  if (geometry_set.has<MeshComponent>()) {
+    align_rotations_on_component(geometry_set.get_component_for_write<MeshComponent>(), params);
+  }
+  if (geometry_set.has<PointCloudComponent>()) {
+    align_rotations_on_component(geometry_set.get_component_for_write<PointCloudComponent>(),
+                                 params);
+  }
+  if (geometry_set.has<CurveComponent>()) {
+    align_rotations_on_component(geometry_set.get_component_for_write<CurveComponent>(), params);
   }
 
   params.set_output("Geometry", geometry_set);

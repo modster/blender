@@ -62,8 +62,17 @@ static void geo_node_attribute_remove_exec(GeoNodeExecParams params)
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
-  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
-    remove_attribute(*component, params, attribute_names);
+  if (geometry_set.has<MeshComponent>()) {
+    remove_attribute(
+        geometry_set.get_component_for_write<MeshComponent>(), params, attribute_names);
+  }
+  if (geometry_set.has<PointCloudComponent>()) {
+    remove_attribute(
+        geometry_set.get_component_for_write<PointCloudComponent>(), params, attribute_names);
+  }
+  if (geometry_set.has<CurveComponent>()) {
+    remove_attribute(
+        geometry_set.get_component_for_write<CurveComponent>(), params, attribute_names);
   }
 
   params.set_output("Geometry", geometry_set);

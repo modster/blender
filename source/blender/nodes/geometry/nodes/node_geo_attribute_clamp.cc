@@ -249,8 +249,14 @@ static void geo_node_attribute_clamp_exec(GeoNodeExecParams params)
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
-  for (GeometryComponent *component : geometry_set.get_components_for_write()) {
-    clamp_attribute(*component, params);
+  if (geometry_set.has<MeshComponent>()) {
+    clamp_attribute(geometry_set.get_component_for_write<MeshComponent>(), params);
+  }
+  if (geometry_set.has<PointCloudComponent>()) {
+    clamp_attribute(geometry_set.get_component_for_write<PointCloudComponent>(), params);
+  }
+  if (geometry_set.has<CurveComponent>()) {
+    clamp_attribute(geometry_set.get_component_for_write<CurveComponent>(), params);
   }
 
   params.set_output("Geometry", geometry_set);

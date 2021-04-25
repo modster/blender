@@ -262,8 +262,9 @@ static void join_components(Span<const VolumeComponent *> src_components, Geomet
 }
 
 /**
- * Curve components are a special case, retrieved with write access as an optimization
- * to avoid copying unecessarily when possible.
+ * Curve components are a special case. It's possibly to exploit the fact that they simply store
+ * splines by retrieved with write access is an optimization to avoid copying unecessarily when
+ * possible.
  */
 static void join_curve_components(MutableSpan<GeometrySet> src_geometry_sets, GeometrySet &result)
 {
@@ -271,10 +272,10 @@ static void join_curve_components(MutableSpan<GeometrySet> src_geometry_sets, Ge
   Vector<CurveComponent *> src_components;
   for (GeometrySet &geometry_set : src_geometry_sets) {
     if (geometry_set.has_curve()) {
-      /* Getting write access for write access seems counterintuitive at first, but it can actually
-       * allow avoiding a copy in the case where the input spline has no other users, because the
-       * splines can be moved from the source curve rather than copying them from a read-only
-       * source. Retrieving the curve for write will make a copy only when necessary. */
+      /* Getting write access for write access seems counterintuitive, but it can actually allow
+       * avoiding a copy in the case where the input spline has no other users, because the splines
+       * can be moved from the source curve rather than copying them from a read-only source.
+       * Retrieving the curve for write will make a copy only when it has a user elsewhere. */
       CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
       src_components.append(&component);
     }
@@ -291,7 +292,6 @@ static void join_curve_components(MutableSpan<GeometrySet> src_geometry_sets, Ge
   CurveComponent &dst_component = result.get_component_for_write<CurveComponent>();
   DCurve *dst_curve = new DCurve();
   for (CurveComponent *component : src_components) {
-
     DCurve *src_curve = component->get_for_write();
     for (SplinePtr &spline : src_curve->splines) {
       dst_curve->splines.append(std::move(spline));
