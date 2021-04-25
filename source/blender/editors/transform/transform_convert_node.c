@@ -115,6 +115,9 @@ void createTransNodeData(TransInfo *t)
   const float dpi_fac = UI_DPI_FAC;
   SpaceNode *snode = t->area->spacedata.first;
 
+  /* Disable cursor wrapping in the node editor */
+  t->flag |= T_NO_CURSOR_WRAP;
+
   /* Custom data to enable edge panning during the node transform */
   NodeTransCustomData *customdata = MEM_callocN(sizeof(*customdata), __func__);
   UI_view2d_edge_pan_init(t->context,
