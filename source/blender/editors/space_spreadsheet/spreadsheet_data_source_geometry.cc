@@ -375,7 +375,7 @@ static GeometrySet get_display_geometry_set(SpaceSpreadsheet *sspreadsheet,
   GeometrySet geometry_set;
   if (sspreadsheet->object_eval_state == SPREADSHEET_OBJECT_EVAL_STATE_ORIGINAL) {
     Object *object_orig = DEG_get_original_object(object_eval);
-    if (ELEM(object_orig->type, OB_MESH, OB_CURVE, OB_POINTCLOUD)) {
+    if (object_orig->type == OB_MESH) {
       MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
       if (object_orig->mode == OB_MODE_EDIT) {
         Mesh *mesh = (Mesh *)object_orig->data;
