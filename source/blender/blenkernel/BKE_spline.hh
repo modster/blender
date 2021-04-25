@@ -136,8 +136,13 @@ class Spline {
      * In other words, the index of the edge that the result lies on.
      */
     int evaluated_index;
+    /*
+     * The index of the evaluated point after the result location,
+     * accounting for wrapping when the spline is cyclic.
+     */
+    int next_evaluated_index;
     /**
-     * The portion of the way from the evaluated point at #index to the next point.
+     * The portion of the way from the evaluated point at #evaluated_index to the next point.
      */
     float factor;
   };
@@ -238,6 +243,12 @@ class BezierSpline final : public Spline {
 
   blender::Span<float> evaluated_mappings() const;
   blender::Span<blender::float3> evaluated_positions() const final;
+  struct InterpolationData {
+    int control_point_index;
+    int next_control_point_index;
+    float factor;
+  };
+  InterpolationData interpolation_data_from_map(const float map) const;
 
   virtual blender::fn::GVArrayPtr interpolate_to_evaluated_points(
       const blender::fn::GVArray &source_data) const;

@@ -74,14 +74,18 @@ static void interpolate_control_point(BezierSpline &spline,
   using namespace ::blender::fn;
 
   const int eval_index = lookup.evaluated_index;
+  const int next_eval_index = lookup.next_evaluated_index;
   Span<float> mappings = spline.evaluated_mappings();
 
-  const int index = std::floor(mappings[eval_index]) + (adjust_next ? 1 : 0);
+  BezierSpline::InterpolationData interp_data = spline.interpolation_data_from_map(
+      mappings[eval_index]);
+
+  const int index = interp_data.control_point_index + (adjust_next ? 1 : 0);
 
   Span<float3> evaluated_positions = spline.evaluated_positions();
 
   spline.positions()[index] = float3::interpolate(
-      evaluated_positions[eval_index], evaluated_positions[eval_index + 1], lookup.factor);
+      evaluated_positions[eval_index], evaluated_positions[next_eval_index], lookup.factor);
 
   /* TODO: Do this interpolation with attributes instead. */
 
@@ -90,7 +94,7 @@ static void interpolate_control_point(BezierSpline &spline,
     GVArrayPtr radii_varray = spline.interpolate_to_evaluated_points(GVArray_For_Span(radii));
     GVArray_Typed<float> radii_eval = radii_varray->typed<float>();
 
-    radii[index] = interpf(radii_eval[eval_index + 1], radii_eval[eval_index], lookup.factor);
+    radii[index] = interpf(radii_eval[next_eval_index], radii_eval[eval_index], lookup.factor);
   }
 
   {
@@ -98,7 +102,7 @@ static void interpolate_control_point(BezierSpline &spline,
     GVArrayPtr tilt_varray = spline.interpolate_to_evaluated_points(GVArray_For_Span(tilts));
     GVArray_Typed<float> tilts_eval = tilt_varray->typed<float>();
 
-    tilts[index] = interpf(tilts_eval[eval_index + 1], tilts_eval[eval_index], lookup.factor);
+    tilts[index] = interpf(tilts_eval[next_eval_index], tilts_eval[eval_index], lookup.factor);
   }
 
   {
@@ -110,7 +114,7 @@ static void interpolate_control_point(BezierSpline &spline,
 
     handle_positions_start[index] = float3::interpolate(
         handle_positions_start_eval[eval_index],
-        handle_positions_start_eval[eval_index + 1],
+        handle_positions_start_eval[next_eval_index],
         lookup.factor);
   }
 
@@ -121,7 +125,7 @@ static void interpolate_control_point(BezierSpline &spline,
     GVArray_Typed<float3> handle_positions_end_eval = handle_positions_end_varray->typed<float3>();
 
     handle_positions_end[index] = float3::interpolate(handle_positions_end_eval[eval_index],
-                                                      handle_positions_end_eval[eval_index + 1],
+                                                      handle_positions_end_eval[next_eval_index],
                                                       lookup.factor);
   }
 }

@@ -405,6 +405,20 @@ Span<float3> BezierSpline::evaluated_positions() const
   return this->evaluated_positions_cache_;
 }
 
+BezierSpline::InterpolationData BezierSpline::interpolation_data_from_map(const float map) const
+{
+  const int points_len = this->size();
+  const int index = std::floor(map);
+  if (index == points_len) {
+    BLI_assert(this->is_cyclic);
+    return InterpolationData{points_len - 1, 0, 1.0f};
+  }
+  if (index == points_len - 1) {
+    return InterpolationData{points_len - 2, points_len - 1, 1.0f};
+  }
+  return InterpolationData{index, index + 1, map - index};
+}
+
 template<typename T>
 static void interpolate_to_evaluated_points_impl(Span<float> mappings,
                                                  const blender::VArray<T> &source_data,
