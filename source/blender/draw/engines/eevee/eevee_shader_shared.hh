@@ -415,9 +415,9 @@ struct LightData {
   eLightType type;
   /** Spot size. Aligned to size of vec2. */
   vec2 spot_size_inv;
-  /** Shadow bias in world space. */
-  float shadow_bias;
+  /** Padding to sizeof(vec4). */
   float _pad0;
+  float _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
@@ -427,23 +427,24 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 /** \name Shadows
  * \{ */
 
-#define SHADOW_REGION_MAX 256
-
 /**
- * Represents a shadow region in the shadow atlas.
- * - A point light shadow is composed of 1, 5 or 6 shadow regions.
- *   shadow_id point to the first shadow region used.
- *   Regions are sorted in this order -Z, +X, -X, +Y, -Y, +Z.
- *   Face index is computed from light's object space coordinates.
- * - A sun light shadow is composed of an arbitrary array of regions.
- *   The square shadow view is divided into tiles that are classified by distance to the
- *   camera. Each tile then refers to a shadow map region. A single shadow region can
- *   be addressed by multiple tiles.
+ * A point light shadow is composed of 1, 5 or 6 shadow regions.
+ * Regions are sorted in this order -Z, +X, -X, +Y, -Y, +Z.
+ * Face index is computed from light's object space coordinates.
  */
-struct ShadowRegionData {
-  /** Object space position to shadow atlas UV. */
+struct ShadowPunctualData {
+  /** Shadow matrix to convert Local face coordinates to UV space [0..1]. */
   mat4 shadow_mat;
+  /** Shadow bias in world space. */
+  float shadow_bias;
+  /** Offset from the first region to the second one. All regions are stored vertically. */
+  float region_offset;
+  /** True if shadow is omnidirectional and there is 6 fullsized shadow regions.  */
+  bool is_omni;
+  /** Padding to sizeof(vec4). */
+  int _pad0;
 };
+BLI_STATIC_ASSERT_ALIGN(ShadowPunctualData, 16)
 
 /** \} */
 
@@ -471,9 +472,10 @@ struct ShadowRegionData {
 #ifdef __cplusplus
 using CameraDataBuf = StructBuffer<CameraData>;
 using CullingDataBuf = StructBuffer<CullingData>;
-using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
-using ShadowRegionDataBuf = StructArrayBuffer<ShadowRegionData, SHADOW_REGION_MAX>;
+using LightDataBuf = StructArrayBuffer<LightData, CULLING_ITEM_BATCH>;
+using ShadowPunctualDataBuf = StructArrayBuffer<ShadowPunctualData, CULLING_ITEM_BATCH>;
+using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 
 #  undef bool
 }  // namespace blender::eevee

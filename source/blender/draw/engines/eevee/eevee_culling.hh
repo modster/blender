@@ -49,13 +49,13 @@ class Instance;
  * Do not use directly. Use Culling object instead.
  */
 template<
-    /* The type of items to cull */
-    typename T,
-    /* The type of data contained in T we need to send to GPU. */
-    typename Tdata,
-    /* Culling pass type for 2D culling. Should have a render() method. */
-    typename Tculling_pass>
+    /* Type of data contained per culling batch. */
+    typename Tdata>
 class CullingBatch {
+ public:
+  /** Z ordered items. */
+  Tdata item_data;
+
  private:
   /* Items to order in Z. */
   struct ItemHandle {
@@ -69,8 +69,6 @@ class CullingBatch {
 
   /** Compact handle list to order without moving source. */
   Vector<ItemHandle, CULLING_ITEM_BATCH> item_handles_;
-  /** Z ordered items. */
-  StructArrayBuffer<Tdata, CULLING_ITEM_BATCH> item_data_;
   /** Z bins. */
   CullingDataBuf culling_data_;
   /** Tile texture and framebuffer handling the 2D culling. */
@@ -109,18 +107,18 @@ class CullingBatch {
     item_handles_.append(handle);
   }
 
-  void finalize(Tculling_pass &culling_pass,
-                const Vector<T> &item_source,
-                float near_z,
-                float far_z)
+  template<typename DataAppendF, typename CullingF>
+  void finalize(float near_z,
+                float far_z,
+                const DataAppendF &data_append,
+                const CullingF &draw_culling)
   {
     culling_data_.zbin_scale = -CULLING_ZBIN_COUNT / fabsf(far_z - near_z);
     culling_data_.zbin_bias = -near_z * culling_data_.zbin_scale;
 
     /* Order items by Z distance to the camera. */
-    std::sort(item_handles_.begin(),
-              item_handles_.end(),
-              [](const ItemHandle &a, const ItemHandle &b) { return a.z_dist > b.z_dist; });
+    auto sort = [](const ItemHandle &a, const ItemHandle &b) { return a.z_dist > b.z_dist; };
+    std::sort(item_handles_.begin(), item_handles_.end(), sort);
     /* Init min-max for each bin. */
     for (auto i : IndexRange(CULLING_ZBIN_COUNT)) {
       uint16_t *zbin_minmax = (uint16_t *)culling_data_.zbins;
@@ -130,7 +128,7 @@ class CullingBatch {
     /* Fill the GPU data buffer. */
     for (auto item_idx : item_handles_.index_range()) {
       ItemHandle &handle = item_handles_[item_idx];
-      item_data_[item_idx] = item_source[handle.source_index];
+      data_append(item_data, item_idx, handle.source_index);
       /* Register to Z bins. */
       int z_min = max_ii(culling_z_to_zbin(culling_data_, handle.z_dist + handle.radius), 0);
       int z_max = min_ii(culling_z_to_zbin(culling_data_, handle.z_dist - handle.radius),
@@ -149,11 +147,11 @@ class CullingBatch {
     /* Set item count for no-cull iterator. */
     culling_data_.items_count = item_handles_.size();
     /* Upload data to GPU. */
-    item_data_.push_update();
     culling_data_.push_update();
 
     GPU_framebuffer_bind(tiles_fb_);
-    culling_pass.render(item_data_.ubo_get(), culling_data_.ubo_get());
+
+    draw_culling(item_data, culling_data_);
   }
 
   /**
@@ -162,10 +160,6 @@ class CullingBatch {
   bool is_full(void)
   {
     return item_handles_.size() == CULLING_ITEM_BATCH;
-  }
-  const GPUUniformBuf *data_ubo_get(void)
-  {
-    return item_data_.ubo_get();
   }
   const GPUUniformBuf *culling_ubo_get(void)
   {
@@ -183,26 +177,19 @@ class CullingBatch {
 /** \name Culling
  * \{ */
 
-template<
-    /* The type of items to cull */
-    typename T,
-    /* The type of data contained in T we need to send to GPU. */
-    typename Tdata,
-    /* Culling pass type for 2D culling. Should have a render() method. */
-    typename Tculling_pass,
-    /* True if items can be added in multiple batches. */
-    bool is_extendable = false>
+template</* Type of data contained per culling batch. */
+         typename Tdata,
+         /* True if items can be added in multiple batches. */
+         bool is_extendable = false>
 class Culling {
  private:
-  using CullingBatchType = CullingBatch<T, Tdata, Tculling_pass>;
+  using CullingBatchType = CullingBatch<Tdata>;
   /** Multiple culling batches containing at most CULLING_ITEM_BATCH items worth of data. */
   Vector<CullingBatchType *> batches_;
   /** Number of active batches. Allocated count may be higher. */
   int used_batch_count_;
   /** Pointer to the active batch being filled. */
   CullingBatchType *active_batch_;
-  /** Vector to source the item from. */
-  const Vector<T> &item_source_;
   /** Used to get Z distance. */
   vec3 camera_z_axis_;
   float camera_z_offset_;
@@ -212,7 +199,7 @@ class Culling {
   ivec2 extent_;
 
  public:
-  Culling(const Vector<T> &items_source) : item_source_(items_source){};
+  Culling(){};
   ~Culling()
   {
     for (CullingBatchType *batch : batches_) {
@@ -265,13 +252,14 @@ class Culling {
     return active_batch_->is_full();
   }
 
-  void finalize(Tculling_pass &culling_pass)
+  template<typename DataAppendF, typename CullingF>
+  void finalize(const DataAppendF &data_append, const CullingF &draw_culling)
   {
     float near_z = DRW_view_near_distance_get(view_);
     float far_z = DRW_view_far_distance_get(view_);
 
     for (auto i : IndexRange(used_batch_count_)) {
-      batches_[i]->finalize(culling_pass, item_source_, near_z, far_z);
+      batches_[i]->finalize(near_z, far_z, data_append, draw_culling);
     }
   }
 

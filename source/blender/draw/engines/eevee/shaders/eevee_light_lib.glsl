@@ -102,8 +102,8 @@ float light_diffuse(sampler2DArray utility_tx, LightData ld, vec3 N, vec3 V, vec
   }
   else if (ld.type == LIGHT_RECT) {
     vec3 corners[4];
-    corners[0] = ld._right * -ld._area_size_x + ld._up * -ld._area_size_y;
-    corners[1] = ld._right * -ld._area_size_x + ld._up * ld._area_size_y;
+    corners[0] = ld._right * ld._area_size_x + ld._up * -ld._area_size_y;
+    corners[1] = ld._right * ld._area_size_x + ld._up * ld._area_size_y;
     corners[2] = -corners[0];
     corners[3] = -corners[1];
 
@@ -133,8 +133,8 @@ float light_ltc(
 {
   if (ld.type == LIGHT_RECT) {
     vec3 corners[4];
-    corners[0] = ld._right * -ld._area_size_x + ld._up * -ld._area_size_y;
-    corners[1] = ld._right * -ld._area_size_x + ld._up * ld._area_size_y;
+    corners[0] = ld._right * ld._area_size_x + ld._up * -ld._area_size_y;
+    corners[1] = ld._right * ld._area_size_x + ld._up * ld._area_size_y;
     corners[2] = -corners[0];
     corners[3] = -corners[1];
 

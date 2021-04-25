@@ -17,9 +17,9 @@ layout(std140) uniform lights_culling_block
   CullingData light_culling;
 };
 
-layout(std140) uniform shadow_regions_block
+layout(std140) uniform shadows_punctual_block
 {
-  ShadowRegionData shadow_regions[SHADOW_REGION_MAX];
+  ShadowPunctualData shadows_punctual[CULLING_ITEM_BATCH];
 };
 
 uniform usampler2D lights_culling_tx;
@@ -56,9 +56,8 @@ void main(void)
                       light.diffuse_power;
 
     if (light.shadow_id != LIGHT_NO_SHADOW && intensity > 0.0) {
-      vec3 lL = light_world_to_local(light, -L) * max(0.0, dist - light.shadow_bias);
-      int region_id = light.shadow_id + shadow_punctual_region_get(lL);
-      vec3 shadow_co = project_point(shadow_regions[region_id].shadow_mat, lL);
+      vec3 lL = light_world_to_local(light, -L) * dist;
+      vec3 shadow_co = shadow_punctual_coordinates_get(shadows_punctual[l_idx], lL);
       intensity *= texture(shadow_atlas_tx, shadow_co);
     }
 

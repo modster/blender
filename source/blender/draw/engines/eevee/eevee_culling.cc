@@ -47,7 +47,7 @@ void CullingDebugPass::sync(void)
 
   GPUShader *sh = inst_.shaders.static_shader_get(CULLING_DEBUG);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, debug_ps_);
-  DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.data_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);

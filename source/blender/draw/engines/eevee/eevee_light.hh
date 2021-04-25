@@ -45,12 +45,20 @@ class Instance;
 /** \name Light Object
  * \{ */
 
-class Light : public LightData {
+struct Light : public LightData {
  public:
-  Light(const Object *ob,
-        const ObjectHandle &object_handle,
-        float threshold,
-        ShadowModule &shadows);
+  bool initialized = false;
+  bool used = false;
+
+ public:
+  Light()
+  {
+    shadow_id = LIGHT_NO_SHADOW;
+  }
+
+  void sync(ShadowModule &shadows, const Object *ob, float threshold);
+
+  void shadow_discard_safe(ShadowModule &shadows);
 
   void debug_draw(void);
 
@@ -96,13 +104,18 @@ class LightModule {
   Instance &inst_;
 
   /** Map of light objects. This is used to track light deletion. */
-  Map<ObjectKey, bool> objects_light_;
-  /** Gathered Light data from sync. Not all data will be selected for rendering. */
-  Vector<Light> lights_;
+  Map<ObjectKey, Light> lights_;
+  /** References to data in lights_ for easy indexing. */
+  Vector<Light *> lights_refs_;
   /** Batches of lights alongside their culling data. */
-  Culling<Light, LightData, CullingLightPass, true> culling_;
+  struct LightBatch {
+    LightDataBuf lights_data;
+    ShadowPunctualDataBuf shadows_data;
+  };
+  Culling<LightBatch, true> culling_;
   /** Active data pointers used for rendering. */
-  const GPUUniformBuf *active_data_ubo_;
+  const GPUUniformBuf *active_lights_ubo_;
+  const GPUUniformBuf *active_shadows_ubo_;
   const GPUUniformBuf *active_culling_ubo_;
   GPUTexture *active_culling_tx_;
 
@@ -111,7 +124,7 @@ class LightModule {
   float light_threshold_;
 
  public:
-  LightModule(Instance &inst) : inst_(inst), culling_(lights_){};
+  LightModule(Instance &inst) : inst_(inst), culling_(){};
   ~LightModule(){};
 
   void begin_sync(void);
@@ -125,9 +138,13 @@ class LightModule {
   /**
    * Getters
    **/
-  const GPUUniformBuf **data_ubo_ref_get(void)
+  const GPUUniformBuf **lights_ubo_ref_get(void)
   {
-    return &active_data_ubo_;
+    return &active_lights_ubo_;
+  }
+  const GPUUniformBuf **shadows_ubo_ref_get(void)
+  {
+    return &active_shadows_ubo_;
   }
   const GPUUniformBuf **culling_ubo_ref_get(void)
   {

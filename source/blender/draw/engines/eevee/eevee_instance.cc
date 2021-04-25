@@ -73,6 +73,7 @@ void Instance::init(const ivec2 &output_res,
   render_passes.init(output_res, &render_border);
   main_view.init(output_res);
   velocity.init();
+  shadows.init();
 }
 
 rcti Instance::output_crop(const int res[2], const rcti *crop)
@@ -120,12 +121,12 @@ void Instance::begin_sync()
 
   velocity.begin_sync();
   lights.begin_sync();
-  shadows.begin_sync();
 }
 
 void Instance::object_sync(Object *ob)
 {
-  const bool is_renderable_type = ELEM(ob->type, OB_MESH, OB_LAMP);
+  const bool is_renderable_type = ELEM(
+      ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LAMP);
   const int ob_visibility = DRW_object_visibility_in_active_context(ob);
   const bool partsys_is_visible = (ob_visibility & OB_VISIBLE_PARTICLES) != 0;
   const bool object_is_visible = DRW_object_is_renderable(ob) &&
@@ -147,6 +148,10 @@ void Instance::object_sync(Object *ob)
         lights.sync_light(ob, ob_handle);
         break;
       case OB_MESH:
+      case OB_CURVE:
+      case OB_SURF:
+      case OB_FONT:
+      case OB_MBALL:
         shading_passes.opaque.surface_add(ob, nullptr, 0);
         shading_passes.shadow.surface_add(ob, nullptr, 0);
         shading_passes.velocity.mesh_add(ob, ob_handle);
@@ -175,7 +180,6 @@ void Instance::end_sync(void)
 {
   velocity.end_sync();
   lights.end_sync();
-  shadows.end_sync();
   sampling.end_sync();
   render_passes.end_sync();
 }

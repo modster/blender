@@ -53,10 +53,7 @@ static eLightType to_light_type(short blender_light_type, short blender_area_typ
 /** \name Light Object
  * \{ */
 
-Light::Light(const Object *ob,
-             const ObjectHandle &object_handle,
-             float threshold,
-             ShadowModule &shadows)
+void Light::sync(ShadowModule &shadows, const Object *ob, float threshold)
 {
   const ::Light *la = (const ::Light *)ob->data;
   float scale[3];
@@ -79,8 +76,8 @@ Light::Light(const Object *ob,
   this->color = vec3(&la->r) * la->energy;
   normalize_m4_m4_ex(this->object_mat, ob->obmat, scale);
   /* Make sure we have consistent handedness (in case of negatively scaled Z axis). */
-  vec3 cross = vec3::cross(this->_back, this->_right);
-  if (vec3::dot(cross, this->_up) < 0.0f) {
+  vec3 cross = vec3::cross(this->_right, this->_up);
+  if (vec3::dot(cross, this->_back) < 0.0f) {
     negate_v3(this->_up);
   }
 
@@ -90,27 +87,49 @@ Light::Light(const Object *ob,
   this->diffuse_power = la->diff_fac * shape_power;
   this->specular_power = la->spec_fac * shape_power;
   this->volume_power = la->volume_fac * shape_power_volume_get(la);
-  this->type = to_light_type(la->type, la->area_shape);
-  this->shadow_id = LIGHT_NO_SHADOW;
-  this->shadow_bias = la->bias * 0.05f;
+
+  eLightType new_type = to_light_type(la->type, la->area_shape);
+  if (this->type != new_type) {
+    shadow_discard_safe(shadows);
+    this->type = new_type;
+  }
 
   if (la->mode & LA_SHADOW) {
     if (la->type == LA_SUN) {
       /* TODO */
-      // shadows.sync_directional_shadow(object_handle, )
+      // shadows.sync_directional_shadow()
     }
     else {
       float cone_aperture = DEG2RAD(360.0);
       if (la->type == LA_SPOT) {
         cone_aperture = min_ff(DEG2RAD(179.9), la->spotsize);
       }
-      else if (la->type != LA_LOCAL) {
+      else if (la->type == LA_AREA) {
         cone_aperture = DEG2RAD(179.9);
       }
 
-      this->shadow_id = shadows.sync_punctual_shadow(
-          object_handle, object_mat, influence_radius_max, cone_aperture, la->clipsta);
+      if (this->shadow_id == LIGHT_NO_SHADOW) {
+        this->shadow_id = shadows.punctual_new();
+      }
+
+      ShadowPunctual &shadow = shadows.punctual_get(this->shadow_id);
+      shadow.sync(object_mat, cone_aperture, la->clipsta, influence_radius_max, la->bias * 0.05f);
     }
+  }
+  else {
+    shadow_discard_safe(shadows);
+  }
+
+  this->initialized = true;
+}
+
+void Light::shadow_discard_safe(ShadowModule &shadows)
+{
+  if (shadow_id != LIGHT_NO_SHADOW) {
+    if (this->type != LIGHT_SUN) {
+      shadows.punctual_discard(shadow_id);
+    }
+    shadow_id = LIGHT_NO_SHADOW;
   }
 }
 
@@ -234,40 +253,45 @@ void LightModule::begin_sync(void)
 {
   /* In begin_sync so it can be aninated. */
   light_threshold_ = max_ff(1e-16f, inst_.scene->eevee.light_threshold);
-
-  lights_.clear();
 }
 
 void LightModule::sync_light(const Object *ob, ObjectHandle &handle)
 {
-  lights_.append(eevee::Light(ob, handle, light_threshold_, inst_.shadows));
-
-  objects_light_.add_overwrite(handle.object_key, true);
+  Light &light = lights_.lookup_or_add_default(handle.object_key);
+  light.used = true;
+  if (handle.recalc != 0 || !light.initialized) {
+    light.sync(inst_.shadows, ob, light_threshold_);
+  }
 }
 
 void LightModule::end_sync(void)
 {
-  Vector<ObjectKey, 1> deleted_keys;
+  lights_refs_.clear();
+
+  Vector<ObjectKey, 0> deleted_keys;
 
   /* Detect light deletion. */
-  for (auto item : objects_light_.items()) {
-    if (item.value == false) {
-      /* Light has not been tagged as alive. Deleting. */
+  for (auto item : lights_.items()) {
+    Light &light = item.value;
+    if (!light.used) {
       deleted_keys.append(item.key);
+      light.shadow_discard_safe(inst_.shadows);
     }
     else {
-      /* Invert shadow map value so we can know which one went unused. */
-      item.value = false;
+      light.used = false;
+      lights_refs_.append(&light);
     }
   }
 
   if (deleted_keys.size() > 0) {
     inst_.sampling.reset();
   }
-
   for (auto key : deleted_keys) {
-    objects_light_.remove(key);
+    lights_.remove(key);
   }
+
+  /* Call shadows.end_sync after light pruning to avoid packing deleted shadows. */
+  inst_.shadows.end_sync();
 }
 
 /* Compute acceleration structure for the given view. */
@@ -275,8 +299,8 @@ void LightModule::set_view(const DRWView *view, const ivec2 extent)
 {
   culling_.set_view(view, extent);
 
-  for (auto light_id : lights_.index_range()) {
-    Light &light = lights_[light_id];
+  for (auto light_id : lights_refs_.index_range()) {
+    Light &light = *lights_refs_[light_id];
 
     BoundSphere bsphere;
     if (light.type == LIGHT_SUN) {
@@ -287,6 +311,7 @@ void LightModule::set_view(const DRWView *view, const ivec2 extent)
       bsphere.radius = fabsf(DRW_view_far_distance_get(view));
     }
     else {
+      /* TODO(fclem) fit cones better. */
       copy_v3_v3(bsphere.center, light._position);
       bsphere.radius = light.influence_radius_max;
     }
@@ -295,12 +320,39 @@ void LightModule::set_view(const DRWView *view, const ivec2 extent)
   }
 
   DRW_view_set_active(view);
-  culling_.finalize(inst_.shading_passes.light_culling);
+
+  /* This is only called if the light is visible under this view. */
+  auto data_copy = [&](LightBatch &light_batch, uint32_t dst_index, uint32_t src_index) {
+    Light &light = *this->lights_refs_[src_index];
+
+    light_batch.lights_data[dst_index] = light;
+
+    if (light.shadow_id != LIGHT_NO_SHADOW) {
+      ShadowPunctual &shadow = this->inst_.shadows.punctual_get(light.shadow_id);
+      shadow.is_visible = true;
+      light_batch.shadows_data[dst_index] = shadow;
+    }
+  };
+
+  /* Called for each batch. Do 2D gpu culling. */
+  auto culling_func = [&](LightBatch &light_batch, CullingDataBuf &culling_data) {
+    LightDataBuf &lights_data = light_batch.lights_data;
+    ShadowPunctualDataBuf &shadow_data = light_batch.shadows_data;
+    lights_data.push_update();
+    shadow_data.push_update();
+
+    this->inst_.shading_passes.light_culling.render(lights_data.ubo_get(), culling_data.ubo_get());
+  };
+
+  culling_.finalize(data_copy, culling_func);
+
+  inst_.shadows.update_visible(view);
 }
 
 void LightModule::bind_batch(int range_id)
 {
-  active_data_ubo_ = culling_[range_id]->data_ubo_get();
+  active_lights_ubo_ = culling_[range_id]->item_data.lights_data.ubo_get();
+  active_shadows_ubo_ = culling_[range_id]->item_data.shadows_data.ubo_get();
   active_culling_ubo_ = culling_[range_id]->culling_ubo_get();
   active_culling_tx_ = culling_[range_id]->culling_texture_get();
 }
