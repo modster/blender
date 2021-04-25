@@ -88,6 +88,13 @@ void DCurve::transform(const float4x4 &matrix)
   }
 }
 
+void DCurve::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) const
+{
+  for (const SplinePtr &spline : this->splines) {
+    spline->bounds_min_max(min, max, use_evaluated);
+  }
+}
+
 static BezierSpline::HandleType handle_type_from_dna_bezt(const eBezTriple_Handle dna_handle_type)
 {
   switch (dna_handle_type) {

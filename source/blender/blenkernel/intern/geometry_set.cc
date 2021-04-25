@@ -185,7 +185,13 @@ void GeometrySet::compute_boundbox_without_instances(float3 *r_min, float3 *r_ma
   if (volume != nullptr) {
     BKE_volume_min_max(volume, *r_min, *r_max);
   }
-  /* TODO: Curve boundbox. */
+  const DCurve *curve = this->get_curve_for_read();
+  if (curve != nullptr) {
+    /* Note the the choice of using the evaluated positions is somewhat arbitrary, and may counter
+     * the idea that the curve is the reduced set of control point information, but it may also be
+     * the expected result. */
+    curve->bounds_min_max(*r_min, *r_max, true);
+  }
 }
 
 std::ostream &operator<<(std::ostream &stream, const GeometrySet &geometry_set)

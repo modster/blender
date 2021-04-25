@@ -130,6 +130,8 @@ class Spline {
   blender::Span<blender::float3> evaluated_tangents() const;
   blender::Span<blender::float3> evaluated_normals() const;
 
+  void bounds_min_max(blender::float3 &min, blender::float3 &max, const bool use_evaluated) const;
+
   struct LookupResult {
     /*
      * The index of the evaluated point before the result location.
@@ -409,14 +411,11 @@ class DCurve {
  public:
   blender::Vector<SplinePtr> splines;
 
-  // bool is_2d;
-
   DCurve *copy();
-
-  // DCurve *copy();
 
   void translate(const blender::float3 translation);
   void transform(const blender::float4x4 &matrix);
+  void bounds_min_max(blender::float3 &min, blender::float3 &max, const bool use_evaluated) const;
 };
 
 DCurve *dcurve_from_dna_curve(const Curve &curve);

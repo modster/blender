@@ -329,3 +329,11 @@ Spline::LookupResult Spline::lookup_evaluated_length(const float length) const
 
   return LookupResult{index, next_index, factor};
 }
+
+void Spline::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) const
+{
+  Span<float3> positions = use_evaluated ? this->evaluated_positions() : this->positions();
+  for (const float3 &position : positions) {
+    minmax_v3v3_v3(min, max, position);
+  }
+}
