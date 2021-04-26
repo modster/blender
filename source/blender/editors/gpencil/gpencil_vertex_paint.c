@@ -37,6 +37,7 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_geom.h"
 #include "BKE_material.h"
 #include "BKE_report.h"
 
@@ -159,6 +160,27 @@ typedef struct tGP_BrushVertexpaintData {
   bool grid_ready;
 
 } tGP_BrushVertexpaintData;
+
+/* TODO: This function is duplicated in other places and should not be here. */
+static bool gpencil_3d_point_to_screen_space(
+    ARegion *region, const rcti *rect, const float diff_mat[4][4], const float co[3], int r_co[2])
+{
+  float parent_co[3];
+  mul_v3_m4v3(parent_co, diff_mat, co);
+  int screen_co[2];
+  if (ED_view3d_project_int_global(
+          region, parent_co, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
+      V3D_PROJ_RET_OK) {
+    if (!ELEM(V2D_IS_CLIPPED, screen_co[0], screen_co[1]) &&
+        BLI_rcti_isect_pt(rect, screen_co[0], screen_co[1])) {
+      copy_v2_v2_int(r_co, screen_co);
+      return true;
+    }
+  }
+  r_co[0] = V2D_IS_CLIPPED;
+  r_co[1] = V2D_IS_CLIPPED;
+  return false;
+}
 
 /* Ensure the buffer to hold temp selected point size is enough to save all points selected. */
 static tGP_Selected *gpencil_select_buffer_ensure(tGP_Selected *buffer_array,
@@ -435,20 +457,40 @@ static bool brush_tint_apply(tGP_BrushVertexpaintData *gso,
 
   /* Apply color to Stroke point. */
   if (GPENCIL_TINT_VERTEX_COLOR_STROKE(brush) && (pt_index > -1)) {
-    bGPDspoint *pt = &gps->points[pt_index];
-    if (brush_invert_check(gso)) {
-      pt->vert_color[3] -= inf;
-      CLAMP_MIN(pt->vert_color[3], 0.0f);
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      bGPDcurve_point *pt = &gps->editcurve->curve_points[pt_index];
+      if (brush_invert_check(gso)) {
+        pt->vert_color[3] -= inf;
+        CLAMP_MIN(pt->vert_color[3], 0.0f);
+      }
+      else {
+        /* Premult. */
+        mul_v3_fl(pt->vert_color, pt->vert_color[3]);
+        /* "Alpha over" blending. */
+        interp_v3_v3v3(pt->vert_color, pt->vert_color, gso->linear_color, inf);
+        pt->vert_color[3] = pt->vert_color[3] * (1.0 - inf) + inf;
+        /* Un-premult. */
+        if (pt->vert_color[3] > 0.0f) {
+          mul_v3_fl(pt->vert_color, 1.0f / pt->vert_color[3]);
+        }
+      }
     }
     else {
-      /* Premult. */
-      mul_v3_fl(pt->vert_color, pt->vert_color[3]);
-      /* "Alpha over" blending. */
-      interp_v3_v3v3(pt->vert_color, pt->vert_color, gso->linear_color, inf);
-      pt->vert_color[3] = pt->vert_color[3] * (1.0 - inf) + inf;
-      /* Un-premult. */
-      if (pt->vert_color[3] > 0.0f) {
-        mul_v3_fl(pt->vert_color, 1.0f / pt->vert_color[3]);
+      bGPDspoint *pt = &gps->points[pt_index];
+      if (brush_invert_check(gso)) {
+        pt->vert_color[3] -= inf;
+        CLAMP_MIN(pt->vert_color[3], 0.0f);
+      }
+      else {
+        /* Premult. */
+        mul_v3_fl(pt->vert_color, pt->vert_color[3]);
+        /* "Alpha over" blending. */
+        interp_v3_v3v3(pt->vert_color, pt->vert_color, gso->linear_color, inf);
+        pt->vert_color[3] = pt->vert_color[3] * (1.0 - inf) + inf;
+        /* Un-premult. */
+        if (pt->vert_color[3] > 0.0f) {
+          mul_v3_fl(pt->vert_color, 1.0f / pt->vert_color[3]);
+        }
       }
     }
   }
@@ -820,9 +862,71 @@ static void gpencil_save_selected_point(tGP_BrushVertexpaintData *gso,
   gso->pbuffer_used++;
 }
 
+static void gpencil_vertexpaint_select_curve(tGP_BrushVertexpaintData *gso,
+                                             bGPDstroke *gps,
+                                             const char tool,
+                                             const float diff_mat[4][4],
+                                             const float bound_mat[4][4])
+{
+  ARegion *region = gso->region;
+  GP_SpaceConversion *gsc = &gso->gsc;
+  rcti *rect = &gso->brush_rect;
+  Brush *brush = gso->brush;
+  const int radius = (brush->flag & GP_BRUSH_USE_PRESSURE) ? gso->brush->size * gso->pressure :
+                                                             gso->brush->size;
+  bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
+  bGPDcurve *gpc = gps->editcurve;
+
+  /* Check stroke masking. */
+  if (GPENCIL_ANY_VERTEX_MASK(gso->mask)) {
+    if ((gpc->flag & GP_CURVE_SELECT) == 0) {
+      return;
+    }
+  }
+
+  /* Check if the stroke collide with brush. */
+  if (!ED_gpencil_stroke_check_collision(gsc, gps, gso->mval, radius, bound_mat)) {
+    return;
+  }
+
+  if (gpc->tot_curve_points == 1) {
+    return;
+  }
+
+  /* If the curve has more than one control point... */
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *cpt = &gpc->curve_points[i];
+    BezTriple *bezt = &cpt->bezt;
+
+    int screen_co[2];
+    /* Test if points can be projected. */
+    if (!gpencil_3d_point_to_screen_space(region, rect, diff_mat, bezt->vec[1], screen_co)) {
+      continue;
+    }
+
+    float co[2] = {(float)screen_co[0], (float)screen_co[1]};
+    /* Test if the point is in the circle. */
+    if (len_v2v2(gso->mval, co) > radius) {
+      continue;
+    }
+
+    bGPDcurve_point *cpt_active = NULL;
+    int index = -1;
+    if (cpt->runtime.gpc_pt_orig) {
+      cpt_active = cpt->runtime.gpc_pt_orig;
+      index = cpt->runtime.idx_orig;
+    }
+    else {
+      cpt_active = cpt;
+      index = i;
+    }
+    gpencil_save_selected_point(gso, gps_active, index, screen_co);
+  }
+}
+
 /* Select points in this stroke and add to an array to be used later.
  * Returns true if any point was hit and got saved */
-static bool gpencil_vertexpaint_select_stroke(tGP_BrushVertexpaintData *gso,
+static void gpencil_vertexpaint_select_stroke(tGP_BrushVertexpaintData *gso,
                                               bGPDstroke *gps,
                                               const char tool,
                                               const float diff_mat[4][4],
@@ -849,13 +953,13 @@ static bool gpencil_vertexpaint_select_stroke(tGP_BrushVertexpaintData *gso,
   /* Check stroke masking. */
   if (GPENCIL_ANY_VERTEX_MASK(gso->mask)) {
     if ((gps->flag & GP_STROKE_SELECT) == 0) {
-      return false;
+      return;
     }
   }
 
   /* Check if the stroke collide with brush. */
   if (!ED_gpencil_stroke_check_collision(gsc, gps, gso->mval, radius, bound_mat)) {
-    return false;
+    return;
   }
 
   if (gps->totpoints == 1) {
@@ -990,8 +1094,6 @@ static bool gpencil_vertexpaint_select_stroke(tGP_BrushVertexpaintData *gso,
       }
     }
   }
-
-  return saved;
 }
 
 /* Apply vertex paint brushes to strokes in the given frame. */
@@ -1027,14 +1129,12 @@ static bool gpencil_vertexpaint_brush_do_frame(bContext *C,
     }
 
     /* Check points below the brush. */
-    bool hit = gpencil_vertexpaint_select_stroke(gso, gps, tool, diff_mat, bound_mat);
-
-    /* If stroke was hit and has an editcurve the curve needs an update. */
-    bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-    /* TODO: update curve */
-    // if (gps_active->editcurve != NULL && hit) {
-    //   gps_active->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
-    // }
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      gpencil_vertexpaint_select_curve(gso, gps, tool, diff_mat, bound_mat);
+    }
+    else {
+      gpencil_vertexpaint_select_stroke(gso, gps, tool, diff_mat, bound_mat);
+    }
   }
 
   /* For Average tool, need calculate the average resulting color from all colors
@@ -1106,6 +1206,10 @@ static bool gpencil_vertexpaint_brush_do_frame(bContext *C,
       default:
         printf("ERROR: Unknown type of GPencil Vertex Paint brush\n");
         break;
+    }
+
+    if (changed && GPENCIL_STROKE_TYPE_BEZIER(selected->gps)) {
+      BKE_gpencil_stroke_geometry_update(gso->gpd, selected->gps, GP_GEO_UPDATE_POLYLINE_COLOR);
     }
   }
   /* Clear the selected array, but keep the memory allocation.*/
