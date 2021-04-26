@@ -680,15 +680,15 @@ void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;
 
   /* Properties: */
-  RNA_def_float_factor(ot->srna,
-                       "blend_factor",
-                       0.0f,
-                       0.0f,
-                       1.0f,
-                       "Blend Factor",
-                       "Amount that the pose is applied on top of the existing poses",
-                       0.0f,
-                       1.0f);
+  prop = RNA_def_float_factor(ot->srna,
+                              "blend_factor",
+                              0.0f,
+                              0.0f,
+                              1.0f,
+                              "Blend Factor",
+                              "Amount that the pose is applied on top of the existing poses",
+                              0.0f,
+                              1.0f);
   /* Blending should always start at 0%, and not at whatever percentage was last used. This RNA
    * property just exists for symmetry with the Apply operator (and thus simplicity of the rest of
    * the code, which can assume this property exists). */
