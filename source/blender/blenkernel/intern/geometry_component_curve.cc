@@ -107,7 +107,7 @@ void CurveComponent::ensure_owns_direct_data()
 {
   BLI_assert(this->is_mutable());
   if (ownership_ != GeometryOwnershipType::Owned) {
-    // curve_ = BKE_curve_copy_for_eval(curve_, false);
+    curve_ = curve_->copy();
     ownership_ = GeometryOwnershipType::Owned;
   }
 }
@@ -212,7 +212,6 @@ static int get_spline_resolution(const SplinePtr &spline)
 static void set_spline_resolution(SplinePtr &spline, const int resolution)
 {
   spline->set_resolution(std::max(resolution, 1));
-  spline->mark_cache_invalid();
 }
 
 static GVArrayPtr make_resolution_read_attribute(const SplineGroup &curve)
@@ -267,6 +266,10 @@ static GVMutableArrayPtr make_cyclic_write_attribute(SplineGroup &curve)
       curve.splines.as_mutable_span());
 }
 
+/**
+ * \note Currently this uses an inefficient method, copying data from each spline into a single
+ * array and then passing that as the attribute. Also, currently attributes are only read-only.
+ */
 class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
   using GetSplineData = void (*)(const Spline &spline, fn::GMutableSpan r_data);
   using SetSplineData = void (*)(Spline &spline, fn::GSpan data);
