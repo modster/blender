@@ -68,12 +68,20 @@ struct ShadowPunctual : public AtlasRegion {
   bool is_omni_;
   /** Clip distances. */
   float near_, far_;
+  /** Area light size. */
+  float size_x_, size_y_;
+  /** Shape type. */
+  eLightType light_type_;
+  /** Random position on the light. In world space. */
+  vec3 random_offset_;
+  /** Random offset on the cube face for AA. In pixel. */
+  vec2 aa_offset_;
   /** View space offset to apply to the shadow. */
   float bias_;
   /** Shadow size in pixels. */
   int cube_res_;
   /** Copy of normalized object matrix. Used to create DRWView. */
-  mat4 object_mat_;
+  float4x4 object_mat_;
   /** Full atlas size. Only updated after end_sync(). */
   ShadowModule &shadows_;
 
@@ -103,11 +111,17 @@ struct ShadowPunctual : public AtlasRegion {
  public:
   ShadowPunctual(ShadowModule &shadows, int cube_res) : cube_res_(cube_res), shadows_(shadows){};
 
-  void sync(
-      const mat4 &object_mat, float cone_aperture, float near_clip, float far_clip, float bias);
+  void sync(eLightType light_type,
+            const mat4 &object_mat,
+            float cone_aperture,
+            float near_clip,
+            float far_clip,
+            float bias);
   void render(Instance &inst, MutableSpan<DRWView *> views);
 
   void update_extent(int cube_res);
+
+  void random_position_on_shape_set(Instance &inst);
 
   operator ShadowPunctualData();
 

@@ -113,7 +113,12 @@ void Light::sync(ShadowModule &shadows, const Object *ob, float threshold)
       }
 
       ShadowPunctual &shadow = shadows.punctual_get(this->shadow_id);
-      shadow.sync(object_mat, cone_aperture, la->clipsta, influence_radius_max, la->bias * 0.05f);
+      shadow.sync(this->type,
+                  this->object_mat,
+                  cone_aperture,
+                  la->clipsta,
+                  this->influence_radius_max,
+                  la->bias * 0.05f);
     }
   }
   else {
@@ -252,7 +257,11 @@ void Light::debug_draw(void)
 void LightModule::begin_sync(void)
 {
   /* In begin_sync so it can be aninated. */
-  light_threshold_ = max_ff(1e-16f, inst_.scene->eevee.light_threshold);
+  float light_threshold = max_ff(1e-16f, inst_.scene->eevee.light_threshold);
+  if (light_threshold != light_threshold_) {
+    light_threshold_ = light_threshold;
+    inst_.sampling.reset();
+  }
 }
 
 void LightModule::sync_light(const Object *ob, ObjectHandle &handle)
@@ -330,6 +339,7 @@ void LightModule::set_view(const DRWView *view, const ivec2 extent)
     if (light.shadow_id != LIGHT_NO_SHADOW) {
       ShadowPunctual &shadow = this->inst_.shadows.punctual_get(light.shadow_id);
       shadow.is_visible = true;
+      shadow.random_position_on_shape_set(this->inst_);
       light_batch.shadows_data[dst_index] = shadow;
     }
   };

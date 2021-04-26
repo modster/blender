@@ -32,8 +32,12 @@ namespace blender::eevee {
  *
  * \{ */
 
-void ShadowPunctual::sync(
-    const mat4 &object_mat, float cone_aperture, float near_clip, float far_clip, float bias)
+void ShadowPunctual::sync(eLightType light_type,
+                          const mat4 &object_mat,
+                          float cone_aperture,
+                          float near_clip,
+                          float far_clip,
+                          float bias)
 {
   bool is_wide_cone = cone_aperture > DEG2RAD(90);
   bool is_omni = cone_aperture > DEG2RAD(180);
@@ -49,13 +53,19 @@ void ShadowPunctual::sync(
 
   update_extent(cube_res_);
 
-  copy_m4_m4(object_mat_, object_mat);
+  light_type_ = light_type;
+
+  /* Keep custom data. */
+  size_x_ = _area_size_x;
+  size_y_ = _area_size_y;
+
+  copy_m4_m4(object_mat_.values, object_mat);
   /* Clear custom data. */
-  object_mat_[0][3] = object_mat_[1][3] = object_mat_[2][3] = 0.0f;
-  object_mat_[3][3] = 1.0f;
+  object_mat_.values[0][3] = object_mat_.values[1][3] = object_mat_.values[2][3] = 0.0f;
+  object_mat_.values[3][3] = 1.0f;
 
   /* TODO(fclem) Tighter bounds for cones. */
-  copy_v3_v3(bsphere.center, object_mat_[3]);
+  copy_v3_v3(bsphere.center, object_mat_.translation());
   bsphere.radius = far_clip;
 
   do_update_tag = true;
@@ -84,8 +94,11 @@ void ShadowPunctual::update_extent(int cube_res)
 void ShadowPunctual::render(Instance &inst, MutableSpan<DRWView *> views)
 {
   mat4 viewmat;
-  /* TODO(fclem) jitter. */
-  copy_m4_m4(viewmat, object_mat_);
+  copy_m4_m4(viewmat, object_mat_.values);
+
+  if (inst.shadows.soft_shadows_enabled_) {
+    *reinterpret_cast<vec3 *>(viewmat[3]) += object_mat_.ref_3x3() * random_offset_;
+  }
 
   /* The viewmat is garanteed to be normalized by Light::Light(), so transpose is also the
    * inverse. Transpose is equivalent to inverse only if matrix is symmetrical. */
@@ -111,6 +124,8 @@ void ShadowPunctual::render(Instance &inst, MutableSpan<DRWView *> views)
     view_update(views[Z_POS], viewmat, winmat, Z_POS);
   }
 
+  /* TODO(fclem): Optimization: only update faces that are intersecting the active view. */
+
   view_render(inst, views[Z_NEG], Z_NEG);
   if (is_wide_cone_) {
     view_render(inst, views[X_POS], X_POS);
@@ -126,11 +141,74 @@ void ShadowPunctual::render(Instance &inst, MutableSpan<DRWView *> views)
   is_visible = false;
 }
 
+/* Sets random offset for soft shadows. This needs to be called before rendering and before
+ * converting the data to ShadowPunctualData, whichever comes first. If it is not the case,
+ * rendering and shadow map sampling won't match. */
+void ShadowPunctual::random_position_on_shape_set(Instance &inst)
+{
+  if (inst.shadows.soft_shadows_enabled_ == false) {
+    random_offset_ = vec3(0.0f);
+    aa_offset_ = vec2(0.0f);
+    return;
+  }
+
+  float random[3];
+  random[0] = inst.sampling.rng_get(SAMPLING_SHADOW_U);
+  random[1] = inst.sampling.rng_get(SAMPLING_SHADOW_V);
+  random[2] = inst.sampling.rng_get(SAMPLING_SHADOW_W);
+
+  aa_offset_.x = inst.sampling.rng_get(SAMPLING_SHADOW_X);
+  aa_offset_.y = inst.sampling.rng_get(SAMPLING_SHADOW_Y);
+
+  /* TODO(fclem) Decorellate per shadow. */
+
+  switch (light_type_) {
+    case LIGHT_RECT: {
+      random_offset_ = vec3((random[0] > 0.5f ? random[0] - 1.0f : random[0]) * 2.0f * size_x_,
+                            (random[1] > 0.5f ? random[1] - 1.0f : random[1]) * 2.0f * size_y_,
+                            0.0f);
+      break;
+    }
+    case LIGHT_ELLIPSE: {
+      vec2 disk = inst.sampling.sample_disk(random);
+      random_offset_ = vec3(disk.x * size_x_, disk.y * size_y_, 0.0f);
+      break;
+    }
+    default: {
+      random_offset_ = inst.sampling.sample_ball(random) * size_x_;
+      break;
+    }
+  }
+}
+
 void ShadowPunctual::cubeface_winmat_get(mat4 &winmat, bool half_opened)
 {
-  /* Open the frustum a bit more to align border pixels with the different views. */
-  float side = near_ * (cube_res_ / float(cube_res_ - 1));
-  perspective_m4(winmat, -side, side, -side, (half_opened) ? 0.0f : side, near_, far_);
+  /**
+   *             o < Shadow source
+   *            / \
+   *           /   \
+   *          /     \ < Face projection border
+   *         /       \
+   *        /         \
+   *       /           \
+   * | x | x | x | x | x | x |
+   *
+   * Here x's denote the samples location and cube_res_ is 6.
+   * To match samples at the border of each projector, we need a half pixel offset on each side of
+   * the projection. We add 2 more pixels to allow for AA jittering. Note that jittering this
+   * matrix directly exhibit the seam at face borders if the samples don't line up with the
+   * face projection border.
+   **/
+  float padding = 1.5f * 2.0f;
+  float side = near_ * (cube_res_ + padding) / cube_res_;
+  vec2 aa_jitter = aa_offset_ * (side * 2.0f / cube_res_);
+  perspective_m4(winmat,
+                 -side + aa_jitter.x,
+                 side + aa_jitter.x,
+                 -side + aa_jitter.y,
+                 ((half_opened) ? 0.0f : side) + aa_jitter.y,
+                 near_,
+                 far_);
 }
 
 void ShadowPunctual::view_update(DRWView *&view,
@@ -189,6 +267,7 @@ ShadowPunctual::operator ShadowPunctualData()
   coord_mat[3][3] = 1.0f;
   mul_m4_m4m4(data.shadow_mat, coord_mat, data.shadow_mat);
 
+  data.shadow_offset = random_offset_;
   data.is_omni = is_omni_;
   data.shadow_bias = bias_;
   data.region_offset = (is_omni_ ? cube_res_ : (cube_res_ / 2)) / float(shadows_.atlas_extent_.y);
@@ -222,7 +301,14 @@ void ShadowModule::init(void)
     inst_.sampling.reset();
   }
 
-  soft_shadows_enabled_ = (inst_.scene->eevee.flag & SCE_EEVEE_SHADOW_SOFT) != 0;
+  const bool soft_shadow_enabled = (inst_.scene->eevee.flag & SCE_EEVEE_SHADOW_SOFT) != 0;
+  if (soft_shadows_enabled_ != soft_shadow_enabled) {
+    soft_shadows_enabled_ = soft_shadow_enabled;
+    for (ShadowPunctual &shadow : punctuals_) {
+      shadow.do_update_persist = true;
+    }
+    inst_.sampling.reset();
+  }
 }
 
 void ShadowModule::sync_caster(Object *ob, const ObjectHandle &handle)
@@ -371,6 +457,7 @@ void ShadowModule::update_visible(const DRWView *UNUSED(view))
 {
   bool force_update = false;
   if (soft_shadows_enabled_ && (inst_.sampling.sample_get() != last_sample_)) {
+    force_update = true;
     last_sample_ = inst_.sampling.sample_get();
   }
   else {

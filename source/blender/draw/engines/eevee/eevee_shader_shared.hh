@@ -80,15 +80,22 @@ enum eSamplingDimension : uint32_t {
   SAMPLING_FILTER_V = 1u,
   SAMPLING_LENS_U = 2u,
   SAMPLING_LENS_V = 3u,
-  SAMPLING_TIME = 4u
+  SAMPLING_TIME = 4u,
+  SAMPLING_SHADOW_U = 5u,
+  SAMPLING_SHADOW_V = 6u,
+  SAMPLING_SHADOW_W = 7u,
+  SAMPLING_SHADOW_X = 8u,
+  SAMPLING_SHADOW_Y = 9u
 };
+
+#define SAMPLING_DIMENSION_COUNT 10
 
 struct SamplingData {
   /** Array containing random values from Low Discrepency Sequence in [0..1) range. */
   /** IMPORTANT: Make sure the array can contain all sampling dimensions. */
   /** HACK: float arrays are padded to vec4 in GLSL. Using vec4 for now to get the same alignment
    * but this is wasteful. */
-  vec4 dimensions[8];
+  vec4 dimensions[SAMPLING_DIMENSION_COUNT];
 };
 BLI_STATIC_ASSERT_ALIGN(SamplingData, 16)
 
@@ -435,6 +442,10 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 struct ShadowPunctualData {
   /** Shadow matrix to convert Local face coordinates to UV space [0..1]. */
   mat4 shadow_mat;
+  /** NOTE: It is ok to use vec3 here. A float is declared right after it.
+   * vec3 is also aligned to 16 bytes. */
+  /** Shadow offset caused by jittering projection origin (for soft shadows). */
+  vec3 shadow_offset;
   /** Shadow bias in world space. */
   float shadow_bias;
   /** Offset from the first region to the second one. All regions are stored vertically. */
@@ -443,6 +454,7 @@ struct ShadowPunctualData {
   bool is_omni;
   /** Padding to sizeof(vec4). */
   int _pad0;
+  int _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowPunctualData, 16)
 

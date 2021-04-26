@@ -45,6 +45,7 @@ vec3 shadow_punctual_local_position_to_face_local(int face_id, vec3 lL)
 
 vec3 shadow_punctual_coordinates_get(ShadowPunctualData data, vec3 lL)
 {
+  lL -= data.shadow_offset;
   int face_id = shadow_punctual_face_index_get(lL);
   lL = shadow_punctual_local_position_to_face_local(face_id, lL);
   lL *= min(0.0, lL.z + data.shadow_bias) / lL.z;
