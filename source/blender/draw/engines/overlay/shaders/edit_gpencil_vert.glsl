@@ -81,7 +81,7 @@ void main()
     finalColor.rgb = clamp(colorUnselect.rgb + vec3(0.3), 0.0, 1.0);
   }
   if (is_point_hidden) {
-    discard_vert();
+    gl_PointSize = sizeVertexGpencil * 0.8;
   }
 
   if (doStrokeEndpoints && !doWeightColor) {
