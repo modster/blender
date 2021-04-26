@@ -955,3 +955,18 @@ void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshol
     }
   }
 }
+
+void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb, float dist)
+{
+  float dir[3];
+  float cam[3];
+  copy_v3fl_v3db(cam, rb->camera_pos);
+
+  LISTBASE_FOREACH (LineartLineChain *, rlc, &rb->chains) {
+    LISTBASE_FOREACH (LineartLineChainItem *, rlci, &rlc->chain) {
+      sub_v3_v3v3(dir, cam, rlci->gpos);
+      normalize_v3_length(dir, dist);
+      add_v3_v3(rlci->gpos, dir);
+    }
+  }
+}

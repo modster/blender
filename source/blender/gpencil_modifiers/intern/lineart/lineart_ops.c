@@ -113,7 +113,7 @@ static bool bake_strokes(
     return false;
   }
   if (!(*lc)) {
-    MOD_lineart_compute_feature_lines(dg, lmd, lc);
+    MOD_lineart_compute_feature_lines(dg, lmd, lc, (!(ob->dtx & OB_DRAW_IN_FRONT)));
     MOD_lineart_destroy_render_data(lmd);
   }
   else {

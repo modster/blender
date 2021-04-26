@@ -3872,7 +3872,8 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
  */
 bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
                                        LineartGpencilModifierData *lmd,
-                                       LineartCache **cached_result)
+                                       LineartCache **cached_result,
+                                       bool enable_stroke_offset)
 {
   LineartRenderBuffer *rb;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
@@ -3970,6 +3971,10 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
     if (rb->angle_splitting_threshold > FLT_EPSILON) {
       MOD_lineart_chain_split_angle(rb, rb->angle_splitting_threshold);
+    }
+
+    if (enable_stroke_offset && lmd->stroke_offset > FLT_EPSILON) {
+      MOD_lineart_chain_offset_towards_camera(rb, lmd->stroke_offset);
     }
 
     /* Finally transfer the result list into cache. */

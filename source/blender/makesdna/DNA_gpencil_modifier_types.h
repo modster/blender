@@ -890,6 +890,11 @@ typedef struct LineartGpencilModifierData {
   /* Additional Switches. */
   int flags;
 
+  /* Move strokes towards camera to avoid clipping while preserve depth for the viewport. */
+  float stroke_offset;
+
+  int _pad;
+
   /* Runtime data. */
 
   /* Because we only do calculation once per modifier stack, so we need global override values for

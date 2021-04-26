@@ -157,7 +157,8 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
   }
 
   if (!gpd->runtime.lineart_cache) {
-    MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
+    MOD_lineart_compute_feature_lines(
+        depsgraph, lmd, &gpd->runtime.lineart_cache, (!(ob->dtx & OB_DRAW_IN_FRONT)));
     MOD_lineart_destroy_render_data(lmd);
   }
   else {
@@ -188,7 +189,8 @@ static void bakeModifier(Main *UNUSED(bmain),
   }
 
   if (!gpd->runtime.lineart_cache) {
-    MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
+    MOD_lineart_compute_feature_lines(
+        depsgraph, lmd, &gpd->runtime.lineart_cache, (!(ob->dtx & OB_DRAW_IN_FRONT)));
     MOD_lineart_destroy_render_data(lmd);
   }
 
@@ -461,6 +463,25 @@ static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemO(col, NULL, ICON_NONE, "OBJECT_OT_lineart_clear_all");
 }
 
+static void composition_panel_draw(const bContext *C, Panel *panel)
+{
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  uiLayout *layout = panel->layout;
+
+  const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, &ob_ptr, "show_in_front", 0, NULL, ICON_NONE);
+
+  uiLayout *row = uiLayoutRow(layout, false);
+  uiLayoutSetActive(row, !show_in_front);
+
+  uiItemR(row, ptr, "stroke_offset", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+}
+
 static void panelRegister(ARegionType *region_type)
 {
   PanelType *panel_type = gpencil_modifier_panel_register(
@@ -480,6 +501,8 @@ static void panelRegister(ARegionType *region_type)
       region_type, "chaining", "Chaining", NULL, chaining_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "vgroup", "Vertex Weight Transfer", NULL, vgroup_panel_draw, panel_type);
+  gpencil_modifier_subpanel_register(
+      region_type, "composition", "Composition", NULL, composition_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "baking", "Baking", NULL, baking_panel_draw, panel_type);
 }

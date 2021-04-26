@@ -1419,9 +1419,6 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
       if (md->target_material) {
         id_us_plus(&md->target_material->id);
       }
-
-      /* Stroke object is drawn in front of meshes by default. */
-      ob->dtx |= OB_DRAW_IN_FRONT;
     }
     case GP_EMPTY:
       /* do nothing */
