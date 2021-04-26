@@ -34,13 +34,13 @@
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.h"
 
-struct DCurve;
+struct SplineGroup;
 struct Collection;
 struct Mesh;
 struct Object;
 struct PointCloud;
 struct Volume;
-struct DCurve;
+struct SplineGroup;
 
 enum class GeometryOwnershipType {
   /* The geometry is owned. This implies that it can be changed. */
@@ -366,7 +366,7 @@ struct GeometrySet {
   static GeometrySet create_with_pointcloud(
       PointCloud *pointcloud, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   static GeometrySet create_with_curve(
-      DCurve *curve, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+      SplineGroup *curve, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
 
   /* Utility methods for access. */
   bool has_mesh() const;
@@ -378,18 +378,19 @@ struct GeometrySet {
   const Mesh *get_mesh_for_read() const;
   const PointCloud *get_pointcloud_for_read() const;
   const Volume *get_volume_for_read() const;
-  const DCurve *get_curve_for_read() const;
+  const SplineGroup *get_curve_for_read() const;
 
   Mesh *get_mesh_for_write();
   PointCloud *get_pointcloud_for_write();
   Volume *get_volume_for_write();
-  DCurve *get_curve_for_write();
+  SplineGroup *get_curve_for_write();
 
   /* Utility methods for replacement. */
   void replace_mesh(Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   void replace_pointcloud(PointCloud *pointcloud,
                           GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
-  void replace_curve(DCurve *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+  void replace_curve(SplineGroup *mesh,
+                     GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
 };
 
 /** A geometry component that can store a mesh. */
@@ -473,7 +474,7 @@ class PointCloudComponent : public GeometryComponent {
 
 class CurveComponent : public GeometryComponent {
  private:
-  DCurve *curve_ = nullptr;
+  SplineGroup *curve_ = nullptr;
   GeometryOwnershipType ownership_ = GeometryOwnershipType::Owned;
 
  public:
@@ -483,11 +484,11 @@ class CurveComponent : public GeometryComponent {
 
   void clear();
   bool has_curve() const;
-  void replace(DCurve *curve, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
-  DCurve *release();
+  void replace(SplineGroup *curve, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+  SplineGroup *release();
 
-  const DCurve *get_for_read() const;
-  DCurve *get_for_write();
+  const SplineGroup *get_for_read() const;
+  SplineGroup *get_for_write();
 
   int attribute_domain_size(const AttributeDomain domain) const final;
 

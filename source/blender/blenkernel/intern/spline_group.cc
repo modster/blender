@@ -31,9 +31,9 @@ using blender::MutableSpan;
 using blender::Span;
 using blender::Vector;
 
-DCurve *DCurve::copy()
+SplineGroup *SplineGroup::copy()
 {
-  DCurve *new_curve = new DCurve();
+  SplineGroup *new_curve = new SplineGroup();
 
   for (SplinePtr &spline : this->splines) {
     new_curve->splines.append(spline->copy());
@@ -42,7 +42,7 @@ DCurve *DCurve::copy()
   return new_curve;
 }
 
-void DCurve::translate(const float3 translation)
+void SplineGroup::translate(const float3 translation)
 {
   for (SplinePtr &spline : this->splines) {
     if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(spline.get())) {
@@ -65,7 +65,7 @@ void DCurve::translate(const float3 translation)
   }
 }
 
-void DCurve::transform(const float4x4 &matrix)
+void SplineGroup::transform(const float4x4 &matrix)
 {
   for (SplinePtr &spline : this->splines) {
     if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(spline.get())) {
@@ -88,7 +88,7 @@ void DCurve::transform(const float4x4 &matrix)
   }
 }
 
-void DCurve::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) const
+void SplineGroup::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) const
 {
   for (const SplinePtr &spline : this->splines) {
     spline->bounds_min_max(min, max, use_evaluated);
@@ -144,9 +144,9 @@ static NURBSpline::KnotsMode knots_mode_from_dna_nurb(const short flag)
   return NURBSpline::KnotsMode::Normal;
 }
 
-DCurve *dcurve_from_dna_curve(const Curve &dna_curve)
+SplineGroup *dcurve_from_dna_curve(const Curve &dna_curve)
 {
-  DCurve *curve = new DCurve();
+  SplineGroup *curve = new SplineGroup();
 
   const ListBase *nurbs = BKE_curve_nurbs_get(&const_cast<Curve &>(dna_curve));
 

@@ -78,7 +78,7 @@ static void geo_node_object_info_exec(GeoNodeExecParams params)
 
     if (object != self_object) {
       if (object->type == OB_CURVE) {
-        DCurve *curve = dcurve_from_dna_curve(*(Curve *)object->data);
+        SplineGroup *curve = dcurve_from_dna_curve(*(Curve *)object->data);
         if (transform_space_relative) {
           curve->transform(float4x4(transform));
         }

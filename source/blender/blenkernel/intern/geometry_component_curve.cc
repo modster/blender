@@ -62,7 +62,7 @@ bool CurveComponent::has_curve() const
 }
 
 /* Clear the component and replace it with the new curve. */
-void CurveComponent::replace(DCurve *curve, GeometryOwnershipType ownership)
+void CurveComponent::replace(SplineGroup *curve, GeometryOwnershipType ownership)
 {
   BLI_assert(this->is_mutable());
   this->clear();
@@ -70,20 +70,20 @@ void CurveComponent::replace(DCurve *curve, GeometryOwnershipType ownership)
   ownership_ = ownership;
 }
 
-DCurve *CurveComponent::release()
+SplineGroup *CurveComponent::release()
 {
   BLI_assert(this->is_mutable());
-  DCurve *curve = curve_;
+  SplineGroup *curve = curve_;
   curve_ = nullptr;
   return curve;
 }
 
-const DCurve *CurveComponent::get_for_read() const
+const SplineGroup *CurveComponent::get_for_read() const
 {
   return curve_;
 }
 
-DCurve *CurveComponent::get_for_write()
+SplineGroup *CurveComponent::get_for_write()
 {
   BLI_assert(this->is_mutable());
   if (ownership_ == GeometryOwnershipType::ReadOnly) {
@@ -139,8 +139,8 @@ int CurveComponent::attribute_domain_size(const AttributeDomain domain) const
 namespace blender::bke {
 
 class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
-  using AsReadAttribute = GVArrayPtr (*)(const DCurve &data);
-  using AsWriteAttribute = GVMutableArrayPtr (*)(DCurve &data);
+  using AsReadAttribute = GVArrayPtr (*)(const SplineGroup &data);
+  using AsWriteAttribute = GVMutableArrayPtr (*)(SplineGroup &data);
   using UpdateOnWrite = void (*)(Spline &spline);
   const AsReadAttribute as_read_attribute_;
   const AsWriteAttribute as_write_attribute_;
@@ -165,7 +165,7 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
   GVArrayPtr try_get_for_read(const GeometryComponent &component) const final
   {
     const CurveComponent &curve_component = static_cast<const CurveComponent &>(component);
-    const DCurve *curve = curve_component.get_for_read();
+    const SplineGroup *curve = curve_component.get_for_read();
     if (curve == nullptr) {
       return {};
     }
@@ -179,7 +179,7 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
       return {};
     }
     CurveComponent &curve_component = static_cast<CurveComponent &>(component);
-    DCurve *curve = curve_component.get_for_write();
+    SplineGroup *curve = curve_component.get_for_write();
     if (curve == nullptr) {
       return {};
     }
@@ -215,13 +215,13 @@ static void set_spline_resolution(SplinePtr &spline, const int resolution)
   spline->mark_cache_invalid();
 }
 
-static GVArrayPtr make_resolution_read_attribute(const DCurve &curve)
+static GVArrayPtr make_resolution_read_attribute(const SplineGroup &curve)
 {
   return std::make_unique<fn::GVArray_For_DerivedSpan<SplinePtr, int, get_spline_resolution>>(
       curve.splines.as_span());
 }
 
-static GVMutableArrayPtr make_resolution_write_attribute(DCurve &curve)
+static GVMutableArrayPtr make_resolution_write_attribute(SplineGroup &curve)
 {
   return std::make_unique<fn::GVMutableArray_For_DerivedSpan<SplinePtr,
                                                              int,
@@ -235,7 +235,7 @@ static float get_spline_length(const SplinePtr &spline)
   return spline->length();
 }
 
-static GVArrayPtr make_length_attribute(const DCurve &curve)
+static GVArrayPtr make_length_attribute(const SplineGroup &curve)
 {
   return std::make_unique<fn::GVArray_For_DerivedSpan<SplinePtr, float, get_spline_length>>(
       curve.splines.as_span());
@@ -254,13 +254,13 @@ static void set_cyclic_value(SplinePtr &spline, const bool value)
   }
 }
 
-static GVArrayPtr make_cyclic_read_attribute(const DCurve &curve)
+static GVArrayPtr make_cyclic_read_attribute(const SplineGroup &curve)
 {
   return std::make_unique<fn::GVArray_For_DerivedSpan<SplinePtr, bool, get_cyclic_value>>(
       curve.splines.as_span());
 }
 
-static GVMutableArrayPtr make_cyclic_write_attribute(DCurve &curve)
+static GVMutableArrayPtr make_cyclic_write_attribute(SplineGroup &curve)
 {
   return std::make_unique<
       fn::GVMutableArray_For_DerivedSpan<SplinePtr, bool, get_cyclic_value, set_cyclic_value>>(
@@ -293,7 +293,7 @@ class BuiltinPointAttributeProvider final : public BuiltinAttributeProvider {
   GVArrayPtr try_get_for_read(const GeometryComponent &component) const final
   {
     const CurveComponent &curve_component = static_cast<const CurveComponent &>(component);
-    const DCurve *curve = curve_component.get_for_read();
+    const SplineGroup *curve = curve_component.get_for_read();
     if (curve == nullptr) {
       return {};
     }

@@ -243,7 +243,7 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   }
 }
 
-static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_curve)
+static Mesh *curve_to_mesh_calculate(const SplineGroup &curve, const SplineGroup &profile_curve)
 {
   int profile_vert_total = 0;
   int profile_edge_total = 0;
@@ -306,9 +306,9 @@ static Mesh *curve_to_mesh_calculate(const DCurve &curve, const DCurve &profile_
   return mesh;
 }
 
-static DCurve get_curve_single_vert()
+static SplineGroup get_curve_single_vert()
 {
-  DCurve curve;
+  SplineGroup curve;
   std::unique_ptr<PolySpline> spline = std::make_unique<PolySpline>();
   spline->add_point(float3(0), 0, 0.0f);
   curve.splines.append(std::move(spline));
@@ -326,9 +326,9 @@ static void geo_node_curve_to_mesh_exec(GeoNodeExecParams params)
     return;
   }
 
-  const DCurve *profile_curve = profile_set.get_curve_for_read();
+  const SplineGroup *profile_curve = profile_set.get_curve_for_read();
 
-  const DCurve vert_curve = get_curve_single_vert();
+  const SplineGroup vert_curve = get_curve_single_vert();
 
   Mesh *mesh = curve_to_mesh_calculate(*curve_set.get_curve_for_read(),
                                        (profile_curve == nullptr) ? vert_curve : *profile_curve);

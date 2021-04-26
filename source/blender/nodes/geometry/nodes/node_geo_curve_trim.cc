@@ -167,7 +167,7 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
     return;
   }
 
-  DCurve &curve = *geometry_set.get_curve_for_write();
+  SplineGroup &curve = *geometry_set.get_curve_for_write();
 
   switch (mode) {
     case GEO_NODE_CURVE_TRIM_FACTOR: {

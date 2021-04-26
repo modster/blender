@@ -185,7 +185,7 @@ void GeometrySet::compute_boundbox_without_instances(float3 *r_min, float3 *r_ma
   if (volume != nullptr) {
     BKE_volume_min_max(volume, *r_min, *r_max);
   }
-  const DCurve *curve = this->get_curve_for_read();
+  const SplineGroup *curve = this->get_curve_for_read();
   if (curve != nullptr) {
     /* Note the the choice of using the evaluated positions is somewhat arbitrary, and may counter
      * the idea that the curve is the reduced set of control point information, but it may also be
@@ -263,7 +263,7 @@ const Volume *GeometrySet::get_volume_for_read() const
 }
 
 /* Returns a read-only curve or null. */
-const DCurve *GeometrySet::get_curve_for_read() const
+const SplineGroup *GeometrySet::get_curve_for_read() const
 {
   const CurveComponent *component = this->get_component_for_read<CurveComponent>();
   return (component == nullptr) ? nullptr : component->get_for_read();
@@ -317,7 +317,7 @@ GeometrySet GeometrySet::create_with_pointcloud(PointCloud *pointcloud,
 }
 
 /* Create a new geometry set that only contains the given curve. */
-GeometrySet GeometrySet::create_with_curve(DCurve *curve, GeometryOwnershipType ownership)
+GeometrySet GeometrySet::create_with_curve(SplineGroup *curve, GeometryOwnershipType ownership)
 {
   GeometrySet geometry_set;
   CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
@@ -333,7 +333,7 @@ void GeometrySet::replace_mesh(Mesh *mesh, GeometryOwnershipType ownership)
 }
 
 /* Clear the existing curve and replace it with the given one. */
-void GeometrySet::replace_curve(DCurve *curve, GeometryOwnershipType ownership)
+void GeometrySet::replace_curve(SplineGroup *curve, GeometryOwnershipType ownership)
 {
   CurveComponent &component = this->get_component_for_write<CurveComponent>();
   component.replace(curve, ownership);
@@ -368,7 +368,7 @@ Volume *GeometrySet::get_volume_for_write()
 }
 
 /* Returns a mutable curve or null. No ownership is transferred. */
-DCurve *GeometrySet::get_curve_for_write()
+SplineGroup *GeometrySet::get_curve_for_write()
 {
   CurveComponent &component = this->get_component_for_write<CurveComponent>();
   return component.get_for_write();

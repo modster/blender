@@ -153,7 +153,7 @@ static void transform_volume(Volume *volume,
 #endif
 }
 
-static void transform_curve(DCurve &curve,
+static void transform_curve(SplineGroup &curve,
                             const float3 translation,
                             const float3 rotation,
                             const float3 scale)
@@ -196,7 +196,7 @@ static void geo_node_transform_exec(GeoNodeExecParams params)
   }
 
   if (geometry_set.has_curve()) {
-    DCurve *curve = geometry_set.get_curve_for_write();
+    SplineGroup *curve = geometry_set.get_curve_for_write();
     transform_curve(*curve, translation, rotation, scale);
   }
 

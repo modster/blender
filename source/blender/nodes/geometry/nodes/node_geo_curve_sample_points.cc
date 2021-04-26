@@ -72,7 +72,7 @@ static void sample_points_from_spline(const Spline &spline,
 {
 }
 
-static Array<int> get_result_point_offsets(const DCurve &curve,
+static Array<int> get_result_point_offsets(const SplineGroup &curve,
                                            const GeometryNodeCurveSamplePointsMode mode,
                                            const int count,
                                            const float length)
@@ -111,7 +111,7 @@ static void geo_node_curve_sample_points_exec(GeoNodeExecParams params)
     params.set_output("Points", GeometrySet());
   }
 
-  const DCurve &curve = *input_geometry_set.get_curve_for_read();
+  const SplineGroup &curve = *input_geometry_set.get_curve_for_read();
 
   const int count = (mode == GEO_NODE_CURVE_SAMPLE_POINTS_COUNT) ?
                         params.extract_input<int>("Count") :

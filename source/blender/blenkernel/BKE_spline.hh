@@ -407,15 +407,15 @@ class PolySpline final : public Spline {
 };
 
 /* Proposed name to be different from DNA type. */
-class DCurve {
+class SplineGroup {
  public:
   blender::Vector<SplinePtr> splines;
 
-  DCurve *copy();
+  SplineGroup *copy();
 
   void translate(const blender::float3 translation);
   void transform(const blender::float4x4 &matrix);
   void bounds_min_max(blender::float3 &min, blender::float3 &max, const bool use_evaluated) const;
 };
 
-DCurve *dcurve_from_dna_curve(const Curve &curve);
+SplineGroup *dcurve_from_dna_curve(const Curve &curve);
