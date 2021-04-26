@@ -21,12 +21,13 @@ void discard_vert()
   gl_Position = vec4(0.0, 0.0, -3e36, 0.0);
 }
 
-#define GP_EDIT_POINT_SELECTED 1u  /* 1 << 0 */
+#define GP_EDIT_POINT_SELECTED 1u /* 1 << 0 */
 #define GP_EDIT_STROKE_SELECTED 2u /* 1 << 1 */
-#define GP_EDIT_MULTIFRAME 4u      /* 1 << 2 */
-#define GP_EDIT_STROKE_START 8u    /* 1 << 3 */
-#define GP_EDIT_STROKE_END 16u     /* 1 << 4 */
-#define GP_EDIT_POINT_DIMMED 32u   /* 1 << 5 */
+#define GP_EDIT_MULTIFRAME 4u /* 1 << 2 */
+#define GP_EDIT_STROKE_START 8u /* 1 << 3 */
+#define GP_EDIT_STROKE_END 16u /* 1 << 4 */
+#define GP_EDIT_POINT_DIMMED 32u /* 1 << 5 */
+#define GP_EDIT_POINT_HIDDEN 64u /* 1 << 6 */
 
 #ifdef USE_POINTS
 #  define colorUnselect colorGpencilVertex
@@ -62,6 +63,7 @@ void main()
   bool is_stroke_sel = (vflag & GP_EDIT_STROKE_SELECTED) != 0u;
   bool is_point_sel = (vflag & GP_EDIT_POINT_SELECTED) != 0u;
   bool is_point_dimmed = (vflag & GP_EDIT_POINT_DIMMED) != 0u;
+  bool is_point_hidden = (vflag & GP_EDIT_POINT_HIDDEN) != 0u;
 
   if (doWeightColor) {
     finalColor.rgb = weight_to_rgb(weight);
@@ -77,6 +79,9 @@ void main()
 
   if (is_point_dimmed) {
     finalColor.rgb = clamp(colorUnselect.rgb + vec3(0.3), 0.0, 1.0);
+  }
+  if (is_point_hidden) {
+    finalColor.a = 0.0;
   }
 
   if (doStrokeEndpoints && !doWeightColor) {

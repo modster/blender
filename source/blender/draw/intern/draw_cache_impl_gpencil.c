@@ -685,6 +685,7 @@ void DRW_cache_gpencil_sbuffer_clear(Object *ob)
 #define GP_EDIT_STROKE_START (1 << 3)
 #define GP_EDIT_STROKE_END (1 << 4)
 #define GP_EDIT_POINT_DIMMED (1 << 5)
+#define GP_EDIT_POINT_HIDDEN (1 << 6)
 
 typedef struct gpEditIterData {
   gpEditVert *verts;
@@ -705,6 +706,9 @@ static uint32_t gpencil_point_edit_flag(
   SET_FLAG_FROM_TEST(sflag, v == (v_len - 1), GP_EDIT_STROKE_END);
   if (!is_bezier) {
     SET_FLAG_FROM_TEST(sflag, pt->runtime.pt_orig == NULL, GP_EDIT_POINT_DIMMED);
+  }
+  else {
+    SET_FLAG_FROM_TEST(sflag, ((pt->flag & GP_SPOINT_IS_BEZT_CONTROL) == 0), GP_EDIT_POINT_HIDDEN);
   }
   return sflag;
 }
