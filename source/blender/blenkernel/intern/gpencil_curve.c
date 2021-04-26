@@ -1814,6 +1814,46 @@ static int gpencil_editcurve_subdivide_count(bGPDcurve *gpc, bool is_cyclic)
   return count;
 }
 
+/* Helper: Divide the curve segment at t, where t is a value between 0 and 1. */
+static void gpencil_editcurve_subdivide_curve_segment_factor(bGPDcurve_point *cpt_start,
+                                                             bGPDcurve_point *cpt_end,
+                                                             bGPDcurve_point *cpt_new,
+                                                             const float t)
+{
+  BLI_assert(t >= 0.0f && t <= 1.0f);
+
+  BezTriple *bezt_start = &cpt_start->bezt;
+  BezTriple *bezt_end = &cpt_end->bezt;
+  BezTriple *bezt_new = &cpt_new->bezt;
+  const float z = 1 - t, tt = t * t, zz = z * z, ttt = t * t * t, zzz = z * z * z;
+
+  for (int axis = 0; axis < 3; axis++) {
+    float p0, p1, p2, p3, m0, m1, q0, q1, b;
+    p0 = bezt_start->vec[1][axis];
+    p1 = bezt_start->vec[2][axis];
+    p2 = bezt_end->vec[0][axis];
+    p3 = bezt_end->vec[1][axis];
+
+    m0 = (t * p1) + (z * p0);
+    q0 = (tt * p2) + 2 * (t * z * p1) + (zz * p0);
+    b = (ttt * p3) + 3 * (tt * z * p2) + 3 * (t * zz * p1) + (zzz * p0);
+    q1 = (tt * p3) + 2 * (t * z * p2) + (zz * p1);
+    m1 = (t * p3) + (z * p2);
+
+    bezt_new->vec[0][axis] = q0;
+    bezt_new->vec[1][axis] = b;
+    bezt_new->vec[2][axis] = q1;
+
+    bezt_start->vec[2][axis] = m0;
+    bezt_end->vec[0][axis] = m1;
+  }
+
+  cpt_new->pressure = interpf(cpt_end->pressure, cpt_start->pressure, t);
+  cpt_new->strength = interpf(cpt_end->strength, cpt_start->strength, t);
+  interp_v4_v4v4(cpt_new->vert_color, cpt_start->vert_color, cpt_end->vert_color, t);
+  /* TODO: interpolate weights */
+}
+
 static void gpencil_editcurve_subdivide_curve_segment(bGPDcurve_point *cpt_start,
                                                       bGPDcurve_point *cpt_end,
                                                       bGPDcurve_point *cpt_new)
