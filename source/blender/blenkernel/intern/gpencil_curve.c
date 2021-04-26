@@ -1626,6 +1626,7 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
   gps->totpoints = points_len;
   gps->points = MEM_recallocN(gps->points, sizeof(bGPDspoint) * gps->totpoints);
 
+  bGPDcurve_point *gpc_pt = &curve_point_array[0];
   /* write new data to stroke point array */
   for (int i = 0; i < points_len; i++) {
     bGPDspoint *pt = &gps->points[i];
@@ -1644,6 +1645,11 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
 
     /* deselect points */
     pt->flag &= ~GP_SPOINT_SELECT;
+
+    if (gpc_pt->point_index == i) {
+      pt->flag |= GP_SPOINT_IS_BEZT_CONTROL;
+      gpc_pt++;
+    }
   }
   gps->flag &= ~GP_STROKE_SELECT;
   BKE_gpencil_stroke_select_index_reset(gps);
