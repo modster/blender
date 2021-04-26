@@ -90,18 +90,6 @@ class Spline {
   Spline(Spline &other)
       : type_(other.type_), is_cyclic(other.is_cyclic), normal_mode(other.normal_mode)
   {
-    if (!other.tangent_cache_dirty_) {
-      evaluated_tangents_cache_ = other.evaluated_tangents_cache_;
-      tangent_cache_dirty_ = false;
-    }
-    if (!other.normal_cache_dirty_) {
-      evaluated_normals_cache_ = other.evaluated_normals_cache_;
-      normal_cache_dirty_ = false;
-    }
-    if (!other.length_cache_dirty_) {
-      evaluated_lengths_cache_ = other.evaluated_lengths_cache_;
-      length_cache_dirty_ = false;
-    }
   }
 
   virtual SplinePtr copy() const = 0;
@@ -188,12 +176,19 @@ class BezierSpline final : public Spline {
   blender::Vector<blender::float3> handle_positions_end_;
   blender::Vector<float> radii_;
   blender::Vector<float> tilts_;
-  int resolution_u_;
+  int resolution_;
 
-  mutable bool base_cache_dirty_ = true;
-  mutable std::mutex base_cache_mutex_;
-  mutable blender::Vector<blender::float3> evaluated_positions_cache_;
-  mutable blender::Vector<float> evaluated_mappings_cache_;
+  mutable bool offset_cache_dirty_ = true;
+  mutable std::mutex offset_cache_mutex_;
+  mutable blender::Vector<int> offset_cache_;
+
+  mutable bool position_cache_dirty_ = true;
+  mutable std::mutex position_cache_mutex_;
+  mutable blender::Vector<blender::float3> evaluated_position_cache_;
+
+  mutable bool mapping_cache_dirty_ = true;
+  mutable std::mutex mapping_cache_mutex_;
+  mutable blender::Vector<float> evaluated_mapping_cache_;
 
  public:
   virtual SplinePtr copy() const final;
@@ -207,13 +202,8 @@ class BezierSpline final : public Spline {
         handle_positions_end_(other.handle_positions_end_),
         radii_(other.radii_),
         tilts_(other.tilts_),
-        resolution_u_(other.resolution_u_)
+        resolution_(other.resolution_)
   {
-    if (!other.base_cache_dirty_) {
-      evaluated_positions_cache_ = other.evaluated_positions_cache_;
-      evaluated_mappings_cache_ = other.evaluated_mappings_cache_;
-      base_cache_dirty_ = false;
-    }
   }
 
   int size() const final;
@@ -256,6 +246,7 @@ class BezierSpline final : public Spline {
   void mark_cache_invalid() final;
   int evaluated_points_size() const final;
 
+  blender::Span<int> control_point_offsets() const;
   blender::Span<float> evaluated_mappings() const;
   blender::Span<blender::float3> evaluated_positions() const final;
   struct InterpolationData {
@@ -268,18 +259,13 @@ class BezierSpline final : public Spline {
   virtual blender::fn::GVArrayPtr interpolate_to_evaluated_points(
       const blender::fn::GVArray &source_data) const;
 
- protected:
-  void correct_final_tangents() const;
-
  private:
   void correct_end_tangents() const final;
   bool segment_is_vector(const int start_index) const;
   void evaluate_bezier_segment(const int index,
                                const int next_index,
-                               int &offset,
-                               blender::MutableSpan<blender::float3> positions,
-                               blender::MutableSpan<float> mappings) const;
-  void evaluate_bezier_position_and_mapping() const;
+                               blender::MutableSpan<blender::float3> positions) const;
+  blender::Array<int> evaluated_point_offsets() const;
 };
 
 /**
@@ -307,7 +293,7 @@ class NURBSpline final : public Spline {
   blender::Vector<float> radii_;
   blender::Vector<float> tilts_;
   blender::Vector<float> weights_;
-  int resolution_u_;
+  int resolution_;
   uint8_t order_;
 
   mutable bool knots_dirty_ = true;
@@ -316,7 +302,7 @@ class NURBSpline final : public Spline {
 
   mutable bool position_cache_dirty_ = true;
   mutable std::mutex position_cache_mutex_;
-  mutable blender::Vector<blender::float3> evaluated_positions_cache_;
+  mutable blender::Vector<blender::float3> evaluated_position_cache_;
 
   mutable bool basis_cache_dirty_ = true;
   mutable std::mutex basis_cache_mutex_;
@@ -331,7 +317,7 @@ class NURBSpline final : public Spline {
         radii_(other.radii_),
         tilts_(other.tilts_),
         weights_(other.weights_),
-        resolution_u_(other.resolution_u_),
+        resolution_(other.resolution_),
         order_(other.order_)
   {
   }

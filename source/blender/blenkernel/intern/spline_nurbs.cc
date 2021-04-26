@@ -45,12 +45,12 @@ int NURBSpline::size() const
 
 int NURBSpline::resolution() const
 {
-  return this->resolution_u_;
+  return this->resolution_;
 }
 
 void NURBSpline::set_resolution(const int value)
 {
-  this->resolution_u_ = value;
+  this->resolution_ = value;
   this->mark_cache_invalid();
 }
 
@@ -143,7 +143,7 @@ void NURBSpline::mark_cache_invalid()
 
 int NURBSpline::evaluated_points_size() const
 {
-  return this->resolution_u_ * this->segments_size();
+  return this->resolution_ * this->segments_size();
 }
 
 void NURBSpline::correct_end_tangents() const
@@ -417,16 +417,16 @@ blender::fn::GVArrayPtr NURBSpline::interpolate_to_evaluated_points(
 Span<float3> NURBSpline::evaluated_positions() const
 {
   if (!this->position_cache_dirty_) {
-    return this->evaluated_positions_cache_;
+    return this->evaluated_position_cache_;
   }
 
   std::lock_guard lock{this->position_cache_mutex_};
   if (!this->position_cache_dirty_) {
-    return this->evaluated_positions_cache_;
+    return this->evaluated_position_cache_;
   }
 
   const int total = this->evaluated_points_size();
-  this->evaluated_positions_cache_.resize(total);
+  this->evaluated_position_cache_.resize(total);
 
   blender::fn::GVArray_For_Span<float3> positions_varray(this->positions_.as_span());
   blender::fn::GVArrayPtr evaluated_positions_varray = this->interpolate_to_evaluated_points(
@@ -436,10 +436,9 @@ Span<float3> NURBSpline::evaluated_positions() const
   Span<float3> evaluated_positions =
       evaluated_positions_varray->typed<float3>()->get_internal_span();
   for (const int i : IndexRange(total)) {
-    this->evaluated_positions_cache_[i] = evaluated_positions[i];
+    this->evaluated_position_cache_[i] = evaluated_positions[i];
   }
 
   this->position_cache_dirty_ = false;
-
-  return this->evaluated_positions_cache_;
+  return this->evaluated_position_cache_;
 }

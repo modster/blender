@@ -16,6 +16,7 @@
 
 #include "BLI_array.hh"
 #include "BLI_span.hh"
+#include "BLI_task.hh"
 
 #include "BKE_spline.hh"
 
@@ -46,12 +47,12 @@ int BezierSpline::size() const
 
 int BezierSpline::resolution() const
 {
-  return this->resolution_u_;
+  return this->resolution_;
 }
 
 void BezierSpline::set_resolution(const int value)
 {
-  this->resolution_u_ = value;
+  this->resolution_ = value;
   this->mark_cache_invalid();
 }
 
@@ -197,7 +198,9 @@ bool BezierSpline::segment_is_vector(const int index) const
 
 void BezierSpline::mark_cache_invalid()
 {
-  this->base_cache_dirty_ = true;
+  this->offset_cache_dirty_ = true;
+  this->position_cache_dirty_ = true;
+  this->mapping_cache_dirty_ = true;
   this->tangent_cache_dirty_ = true;
   this->normal_cache_dirty_ = true;
   this->length_cache_dirty_ = true;
@@ -205,45 +208,15 @@ void BezierSpline::mark_cache_invalid()
 
 int BezierSpline::evaluated_points_size() const
 {
-  BLI_assert(this->size() > 0);
-#ifndef DEBUG
-  if (!this->base_cache_dirty_) {
-    /* In a non-debug build, assume that the cache size has not changed, and that any operation
-     * that would cause the cache to change its length would also mark the cache dirty. This
-     * assumption is checked at the end of this function in a debug build. */
-    return this->evaluated_positions_cache_.size();
-  }
-#endif
+  const int points_len = this->size();
+  BLI_assert(points_len > 0);
 
-  int total_len = 0;
-  for (const int i : IndexRange(this->size() - 1)) {
-    if (this->segment_is_vector(i)) {
-      total_len += 1;
-    }
-    else {
-      total_len += this->resolution_u_;
-    }
-  }
-
+  const int last_offset = this->control_point_offsets().last();
   if (this->is_cyclic) {
-    if (segment_is_vector(this->size() - 1)) {
-      total_len++;
-    }
-    else {
-      total_len += this->resolution_u_;
-    }
-  }
-  else {
-    /* Since evaulating the bezier doesn't add the final point's position,
-     * it must be added manually in the non-cyclic case. */
-    total_len++;
+    return last_offset + (this->segment_is_vector(points_len - 1) ? 0 : this->resolution_);
   }
 
-  if (!this->base_cache_dirty_) {
-    BLI_assert(this->evaluated_positions_cache_.size() == total_len);
-  }
-
-  return total_len;
+  return last_offset + 1;
 }
 
 /**
@@ -291,95 +264,52 @@ static void bezier_forward_difference_3d(const float3 &point_0,
   }
 }
 
-static void evaluate_segment_mapping(Span<float3> evaluated_positions,
-                                     MutableSpan<float> mappings,
-                                     const int index)
-{
-  float length = 0.0f;
-  mappings[0] = index;
-  for (const int i : IndexRange(1, mappings.size() - 1)) {
-    length += float3::distance(evaluated_positions[i - 1], evaluated_positions[i]);
-    mappings[i] = length;
-  }
-
-  /* To get the factors instead of the accumulated lengths, divide the mapping factors by the
-   * accumulated length. */
-  if (length != 0.0f) {
-    for (float &mapping : mappings) {
-      mapping = mapping / length + index;
-    }
-  }
-}
-
 void BezierSpline::evaluate_bezier_segment(const int index,
                                            const int next_index,
-                                           int &offset,
-                                           MutableSpan<float3> positions,
-                                           MutableSpan<float> mappings) const
+                                           MutableSpan<float3> positions) const
 {
   if (this->segment_is_vector(index)) {
-    positions[offset] = positions_[index];
-    mappings[offset] = index;
-    offset++;
+    positions.first() = this->positions_[index];
   }
   else {
     bezier_forward_difference_3d(this->positions_[index],
                                  this->handle_positions_end_[index],
                                  this->handle_positions_start_[next_index],
                                  this->positions_[next_index],
-                                 positions.slice(offset, this->resolution_u_));
-    evaluate_segment_mapping(positions.slice(offset, this->resolution_u_),
-                             mappings.slice(offset, this->resolution_u_),
-                             index);
-    offset += this->resolution_u_;
+                                 positions);
   }
 }
 
-void BezierSpline::evaluate_bezier_position_and_mapping() const
+/**
+ * Returns access to a cache of offsets into the evaluated point array for each control point.
+ * This is important because while most control point edges generate the number of edges specified
+ * by the resolution, vector segments only generate one edge.
+ */
+Span<int> BezierSpline::control_point_offsets() const
 {
-  if (!this->base_cache_dirty_) {
-    return;
+  if (!this->offset_cache_dirty_) {
+    return this->offset_cache_;
   }
 
-  std::lock_guard lock{this->base_cache_mutex_};
-  if (!this->base_cache_dirty_) {
-    return;
+  std::lock_guard lock{this->offset_cache_mutex_};
+  if (!this->offset_cache_dirty_) {
+    return this->offset_cache_;
   }
 
-  const int total = this->evaluated_points_size();
-  this->evaluated_positions_cache_.resize(total);
-  this->evaluated_mappings_cache_.resize(total);
+  const int points_len = this->size();
+  this->offset_cache_.resize(points_len);
 
-  MutableSpan<float3> positions = this->evaluated_positions_cache_;
-  MutableSpan<float> mappings = this->evaluated_mappings_cache_;
+  MutableSpan<int> offsets = this->offset_cache_;
 
-  /* Note: It would also be possible to store an array of offsets to facilitate parallelism. */
   int offset = 0;
-  for (const int i : IndexRange(this->size() - 1)) {
-    this->evaluate_bezier_segment(i, i + 1, offset, positions, mappings);
+  for (const int i : IndexRange(points_len - 1)) {
+    offsets[i] = offset;
+    offset += this->segment_is_vector(i) ? 1 : this->resolution_;
   }
+  offsets.last() = offset;
 
-  const int i_last = this->size() - 1;
-  if (this->is_cyclic) {
-    this->evaluate_bezier_segment(i_last, 0, offset, positions, mappings);
-  }
-  else {
-    /* Since evaulating the bezier doesn't add the final point's position,
-     * it must be added manually in the non-cyclic case. */
-    positions[offset] = this->positions_.last();
-    mappings[offset] = i_last;
-    offset++;
-  }
-
-  if (this->is_cyclic) {
-    if (mappings.last() >= this->size()) {
-      mappings.last() = 0.0f;
-    }
-  }
-
-  BLI_assert(offset == positions.size());
-
-  this->base_cache_dirty_ = false;
+  this->offset_cache_dirty_ = false;
+  return offsets;
 }
 
 /**
@@ -390,14 +320,108 @@ void BezierSpline::evaluate_bezier_position_and_mapping() const
  */
 Span<float> BezierSpline::evaluated_mappings() const
 {
-  this->evaluate_bezier_position_and_mapping();
-  return this->evaluated_mappings_cache_;
+  if (!this->mapping_cache_dirty_) {
+    return this->evaluated_mapping_cache_;
+  }
+
+  std::lock_guard lock{this->mapping_cache_mutex_};
+  if (!this->mapping_cache_dirty_) {
+    return this->evaluated_mapping_cache_;
+  }
+
+  const int size = this->size();
+  const int eval_size = this->evaluated_points_size();
+  this->evaluated_mapping_cache_.resize(eval_size);
+  MutableSpan<float> mappings = this->evaluated_mapping_cache_;
+
+  Span<int> offsets = this->control_point_offsets();
+  Span<float> lengths = this->evaluated_lengths();
+
+  /* Subtract one from the index into the lengths array to get the length
+   * at the start point rather than the length at the end of the edge. */
+
+  const float first_segment_len = lengths[offsets[1] - 1];
+  for (const int eval_index : IndexRange(0, offsets[1])) {
+    const float point_len = eval_index == 0 ? 0.0f : lengths[eval_index - 1];
+    const float length_factor = (first_segment_len == 0.0f) ? 0.0f : 1.0f / first_segment_len;
+
+    mappings[eval_index] = point_len * length_factor;
+  }
+
+  const int grain_size = std::max(512 / this->resolution_, 1);
+  blender::parallel_for(IndexRange(1, size - 2), grain_size, [&](IndexRange range) {
+    for (const int i : range) {
+      const float segment_start_len = lengths[offsets[i] - 1];
+      const float segment_end_len = lengths[offsets[i + 1] - 1];
+      const float segment_len = segment_end_len - segment_start_len;
+      const float length_factor = (segment_len == 0.0f) ? 0.0f : 1.0f / segment_len;
+
+      for (const int eval_index : IndexRange(offsets[i], offsets[i + 1] - offsets[i])) {
+        const float factor = (lengths[eval_index - 1] - segment_start_len) * length_factor;
+        mappings[eval_index] = i + factor;
+      }
+    }
+  });
+
+  if (this->is_cyclic) {
+    const float segment_start_len = lengths[offsets.last() - 1];
+    const float segment_end_len = this->length();
+    const float segment_len = segment_end_len - segment_start_len;
+    const float length_factor = (segment_len == 0.0f) ? 0.0f : 1.0f / segment_len;
+
+    for (const int eval_index : IndexRange(offsets.last(), eval_size - offsets.last())) {
+      const float factor = (lengths[eval_index - 1] - segment_start_len) * length_factor;
+      mappings[eval_index] = size - 1 + factor;
+    }
+    mappings.last() = 0.0f;
+  }
+  else {
+    mappings.last() = size - 1;
+  }
+
+  this->mapping_cache_dirty_ = false;
+  return this->evaluated_mapping_cache_;
 }
 
 Span<float3> BezierSpline::evaluated_positions() const
 {
-  this->evaluate_bezier_position_and_mapping();
-  return this->evaluated_positions_cache_;
+  if (!this->position_cache_dirty_) {
+    return this->evaluated_position_cache_;
+  }
+
+  std::lock_guard lock{this->position_cache_mutex_};
+  if (!this->position_cache_dirty_) {
+    return this->evaluated_position_cache_;
+  }
+
+  const int eval_total = this->evaluated_points_size();
+  this->evaluated_position_cache_.resize(eval_total);
+
+  MutableSpan<float3> positions = this->evaluated_position_cache_;
+
+  Span<int> offsets = this->control_point_offsets();
+  BLI_assert(offsets.last() <= eval_total);
+
+  const int grain_size = std::max(512 / this->resolution_, 1);
+  blender::parallel_for(IndexRange(this->size() - 1), grain_size, [&](IndexRange range) {
+    for (const int i : range) {
+      this->evaluate_bezier_segment(
+          i, i + 1, positions.slice(offsets[i], offsets[i + 1] - offsets[i]));
+    }
+  });
+
+  const int i_last = this->size() - 1;
+  if (this->is_cyclic) {
+    this->evaluate_bezier_segment(i_last, 0, positions.slice(offsets.last(), this->resolution_));
+  }
+  else {
+    /* Since evaulating the bezier segment doesn't add the final point,
+     * it must be added manually in the non-cyclic case. */
+    positions.last() = this->positions_.last();
+  }
+
+  this->position_cache_dirty_ = false;
+  return this->evaluated_position_cache_;
 }
 
 BezierSpline::InterpolationData BezierSpline::interpolation_data_from_map(const float map) const
