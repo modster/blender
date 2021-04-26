@@ -183,7 +183,7 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   GVArray_Typed<float> radii = radii_varray->typed<float>();
   for (const int i_ring : IndexRange(spline_vert_len)) {
     float4x4 point_matrix = float4x4::from_normalized_axis_data(
-        positions[i_ring], tangents[i_ring], normals[i_ring]);
+        positions[i_ring], normals[i_ring], tangents[i_ring]);
 
     point_matrix.apply_scale(radii[i_ring]);
 
@@ -196,14 +196,11 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   /* Mark edge loops from sharp vector control points sharp. */
   if (profile_spline.type() == Spline::Bezier) {
     const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(profile_spline);
-    Span<float> mappings = bezier_spline.evaluated_mappings();
-    for (const int i_profile : mappings.index_range()) {
-      const float index = std::floor(mappings[i_profile]);
-      if ((mappings[i_profile] - index) == 0.0f) {
-        if (bezier_spline.point_is_sharp(index)) {
-          mark_edges_sharp(
-              edges.slice(spline_edges_start + spline_edge_len * i_profile, spline_edge_len));
-        }
+    Span<int> control_point_offsets = bezier_spline.control_point_offsets();
+    for (const int i : control_point_offsets.index_range()) {
+      if (bezier_spline.point_is_sharp(i)) {
+        mark_edges_sharp(edges.slice(
+            spline_edges_start + spline_edge_len * control_point_offsets[i], spline_edge_len));
       }
     }
   }
