@@ -23,13 +23,9 @@
 #include "BKE_curve.h"
 #include "BKE_spline.hh"
 
-using blender::Array;
 using blender::float3;
 using blender::float4x4;
-using blender::IndexRange;
-using blender::MutableSpan;
 using blender::Span;
-using blender::Vector;
 
 SplineGroup *SplineGroup::copy()
 {
@@ -45,20 +41,15 @@ SplineGroup *SplineGroup::copy()
 void SplineGroup::translate(const float3 translation)
 {
   for (SplinePtr &spline : this->splines) {
+    for (float3 &position : spline->positions()) {
+      position += translation;
+    }
     if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(spline.get())) {
-      for (float3 &position : bezier_spline->positions()) {
-        position += translation;
-      }
       for (float3 &handle_position : bezier_spline->handle_positions_start()) {
         handle_position += translation;
       }
       for (float3 &handle_position : bezier_spline->handle_positions_end()) {
         handle_position += translation;
-      }
-    }
-    else if (PolySpline *poly_spline = dynamic_cast<PolySpline *>(spline.get())) {
-      for (float3 &position : poly_spline->positions()) {
-        position += translation;
       }
     }
     spline->mark_cache_invalid();
@@ -68,20 +59,15 @@ void SplineGroup::translate(const float3 translation)
 void SplineGroup::transform(const float4x4 &matrix)
 {
   for (SplinePtr &spline : this->splines) {
+    for (float3 &position : spline->positions()) {
+      position = matrix * position;
+    }
     if (BezierSpline *bezier_spline = dynamic_cast<BezierSpline *>(spline.get())) {
-      for (float3 &position : bezier_spline->positions()) {
-        position = matrix * position;
-      }
       for (float3 &handle_position : bezier_spline->handle_positions_start()) {
         handle_position = matrix * handle_position;
       }
       for (float3 &handle_position : bezier_spline->handle_positions_end()) {
         handle_position = matrix * handle_position;
-      }
-    }
-    else if (PolySpline *poly_spline = dynamic_cast<PolySpline *>(spline.get())) {
-      for (float3 &position : poly_spline->positions()) {
-        position = matrix * position;
       }
     }
     spline->mark_cache_invalid();
@@ -205,7 +191,8 @@ SplineGroup *dcurve_from_dna_curve(const Curve &dna_curve)
     }
   }
 
-  /* TODO: Decide whether to store this in the spline or the curve. */
+  /* Note: Normal mode is stored separately in each spline to facilitate combining splines
+   * from multiple curve objects, where the value may be different. */
   const Spline::NormalCalculationMode normal_mode = normal_mode_from_dna_curve(
       dna_curve.twist_mode);
   for (SplinePtr &spline : curve->splines) {

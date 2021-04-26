@@ -59,22 +59,6 @@ static void vert_extrude_to_mesh_data(const Spline &spline,
     edge.v2 = vert_offset + i + 1;
     edge.flag = ME_LOOSEEDGE;
   }
-  // for (const int i : IndexRange(positions.size() - 1)) {
-  //   MEdge &edge = edges[edge_offset++];
-  //   edge.v1 = vert_offset + i * 3;
-  //   edge.v2 = vert_offset + i * 3 + 3;
-  //   edge.flag = ME_LOOSEEDGE;
-
-  //   MEdge &tangent_edge = edges[edge_offset++];
-  //   tangent_edge.v1 = vert_offset + i * 3;
-  //   tangent_edge.v2 = vert_offset + i * 3 + 1;
-  //   tangent_edge.flag = ME_LOOSEEDGE;
-
-  //   MEdge &normal_edge = edges[edge_offset++];
-  //   normal_edge.v1 = vert_offset + i * 3;
-  //   normal_edge.v2 = vert_offset + i * 3 + 2;
-  //   normal_edge.flag = ME_LOOSEEDGE;
-  // }
 
   if (spline.is_cyclic) {
     MEdge &edge = edges[edge_offset++];
@@ -87,18 +71,6 @@ static void vert_extrude_to_mesh_data(const Spline &spline,
     MVert &vert = verts[vert_offset++];
     copy_v3_v3(vert.co, positions[i] + profile_vert);
   }
-  // Span<float3> tangents = spline.evaluated_tangents();
-  // Span<float3> normals = spline.evaluated_normals();
-  // for (const int i : positions.index_range()) {
-  //   MVert &vert = verts[vert_offset++];
-  //   copy_v3_v3(vert.co, positions[i] + profile_vert);
-
-  //   MVert &tangent_vert = verts[vert_offset++];
-  //   copy_v3_v3(tangent_vert.co, tangents[i] + vert.co);
-
-  //   MVert &normal_vert = verts[vert_offset++];
-  //   copy_v3_v3(normal_vert.co, normals[i] + vert.co);
-  // }
 }
 
 static void mark_edges_sharp(MutableSpan<MEdge> edges)
@@ -133,26 +105,15 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
     return;
   }
 
-  /* TODO: All of this could probably be generalized to something like:
-   * GEO_mesh_grid_topology(vert_offset,
-   *                        spline_vert_len,
-   *                        profile_vert_len,
-   *                        spline.is_cyclic,
-   *                        profile_spline.is_cyclic,
-   *                        edges,
-   *                        loops,
-   *                        polys,
-   *                        edge_offset,
-   *                        poly_offset);
-   */
-
   /* Add the edges running along the length of the curve, starting at each profile vertex. */
   const int spline_edges_start = edge_offset;
   for (const int i_profile : IndexRange(profile_vert_len)) {
     for (const int i_ring : IndexRange(spline_edge_len)) {
+      const int i_next_ring = (i_ring == spline_vert_len - 1) ? 0 : i_ring + 1;
+
       const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
-      const int next_ring_vert_offset = vert_offset +
-                                        profile_vert_len * ((i_ring + 1) % spline_vert_len);
+      const int next_ring_vert_offset = vert_offset + profile_vert_len * i_next_ring;
+
       MEdge &edge = edges[edge_offset++];
       edge.v1 = ring_vert_offset + i_profile;
       edge.v2 = next_ring_vert_offset + i_profile;
@@ -164,17 +125,20 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
   const int profile_edges_start = edge_offset;
   for (const int i_ring : IndexRange(spline_vert_len)) {
     const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
+
     for (const int i_profile : IndexRange(profile_edge_len)) {
+      const int i_next_profile = (i_profile == profile_vert_len - 1) ? 0 : i_profile + 1;
+
       MEdge &edge = edges[edge_offset++];
       edge.v1 = ring_vert_offset + i_profile;
-      edge.v2 = ring_vert_offset + (i_profile + 1) % profile_vert_len;
+      edge.v2 = ring_vert_offset + i_next_profile;
       edge.flag = ME_EDGEDRAW | ME_EDGERENDER;
     }
   }
 
   /* Calculate poly and face indices. */
   for (const int i_ring : IndexRange(spline_edge_len)) {
-    const int i_next_ring = (i_ring + 1) % spline_vert_len;
+    const int i_next_ring = (i_ring == spline_vert_len - 1) ? 0 : i_ring + 1;
 
     const int ring_vert_offset = vert_offset + profile_vert_len * i_ring;
     const int next_ring_vert_offset = vert_offset + profile_vert_len * i_next_ring;
@@ -183,9 +147,11 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
     const int next_ring_edge_offset = profile_edges_start + profile_edge_len * i_next_ring;
 
     for (const int i_profile : IndexRange(profile_edge_len)) {
+      const int i_next_profile = (i_profile == profile_vert_len - 1) ? 0 : i_profile + 1;
+
       const int spline_edge_start = spline_edges_start + spline_edge_len * i_profile;
-      const int next_spline_edge_start = spline_edges_start +
-                                         spline_edge_len * ((i_profile + 1) % profile_vert_len);
+      const int next_spline_edge_start = spline_edges_start + spline_edge_len * i_next_profile;
+
       MPoly &poly = polys[poly_offset++];
       poly.loopstart = loop_offset;
       poly.totloop = 4;
@@ -195,10 +161,10 @@ static void spline_extrude_to_mesh_data(const Spline &spline,
       loop_a.v = ring_vert_offset + i_profile;
       loop_a.e = ring_edge_start + i_profile;
       MLoop &loop_b = loops[loop_offset++];
-      loop_b.v = ring_vert_offset + (i_profile + 1) % profile_vert_len;
+      loop_b.v = ring_vert_offset + i_next_profile;
       loop_b.e = next_spline_edge_start + i_ring;
       MLoop &loop_c = loops[loop_offset++];
-      loop_c.v = next_ring_vert_offset + (i_profile + 1) % profile_vert_len;
+      loop_c.v = next_ring_vert_offset + i_next_profile;
       loop_c.e = next_ring_edge_offset + i_profile;
       MLoop &loop_d = loops[loop_offset++];
       loop_d.v = next_ring_vert_offset + i_profile;
@@ -248,7 +214,6 @@ static Mesh *curve_to_mesh_calculate(const SplineGroup &curve, const SplineGroup
   int profile_vert_total = 0;
   int profile_edge_total = 0;
   for (const SplinePtr &profile_spline : profile_curve.splines) {
-    // profile_vert_total += profile_spline->evaluated_points_size() + 2;
     profile_vert_total += profile_spline->evaluated_points_size();
     profile_edge_total += profile_spline->evaluated_edges_size();
   }
@@ -257,7 +222,6 @@ static Mesh *curve_to_mesh_calculate(const SplineGroup &curve, const SplineGroup
   int edge_total = 0;
   int poly_total = 0;
   for (const SplinePtr &spline : curve.splines) {
-    // const int spline_vert_len = spline->evaluated_points_size() * 3;
     const int spline_vert_len = spline->evaluated_points_size();
     const int spline_edge_len = spline->evaluated_edges_size();
     vert_total += spline_vert_len * profile_vert_total;
@@ -301,7 +265,7 @@ static Mesh *curve_to_mesh_calculate(const SplineGroup &curve, const SplineGroup
   }
 
   BKE_mesh_calc_normals(mesh);
-  // BLI_assert(BKE_mesh_is_valid(mesh));
+  BLI_assert(BKE_mesh_is_valid(mesh));
 
   return mesh;
 }

@@ -15,18 +15,15 @@
  */
 
 #include "BLI_array.hh"
-#include "BLI_listbase.h"
 #include "BLI_span.hh"
 
 #include "BKE_spline.hh"
 
 using blender::Array;
 using blender::float3;
-using blender::float4x4;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
-using blender::Vector;
 
 SplinePtr BezierSpline::copy() const
 {
@@ -175,7 +172,7 @@ bool BezierSpline::handle_end_is_automatic(const int index) const
   return ELEM(handle_types_end_[index], HandleType::Free, HandleType::Align);
 }
 
-void BezierSpline::move_control_point(const int index, const blender::float3 new_position)
+void BezierSpline::move_control_point(const int index, const float3 new_position)
 {
   const float3 position_delta = new_position - positions_[index];
   if (!this->handle_start_is_automatic(index)) {
@@ -211,9 +208,9 @@ int BezierSpline::evaluated_points_size() const
   BLI_assert(this->size() > 0);
 #ifndef DEBUG
   if (!this->base_cache_dirty_) {
-    /* In a non-debug build, assume that the cache's size has not changed, and that any operation
-     * that would cause the cache to change its length would also mark the cache dirty. This is
-     * checked at the end of this function in a debug build. */
+    /* In a non-debug build, assume that the cache size has not changed, and that any operation
+     * that would cause the cache to change its length would also mark the cache dirty. This
+     * assumption is checked at the end of this function in a debug build. */
     return this->evaluated_positions_cache_.size();
   }
 #endif
@@ -242,7 +239,6 @@ int BezierSpline::evaluated_points_size() const
     total_len++;
   }
 
-  /* Assert that the cache has the correct length in debug mode. */
   if (!this->base_cache_dirty_) {
     BLI_assert(this->evaluated_positions_cache_.size() == total_len);
   }
@@ -357,8 +353,7 @@ void BezierSpline::evaluate_bezier_position_and_mapping() const
   MutableSpan<float3> positions = this->evaluated_positions_cache_;
   MutableSpan<float> mappings = this->evaluated_mappings_cache_;
 
-  /* TODO: It would also be possible to store an array of offsets to facilitate parallelism here,
-   * maybe it is worth it? */
+  /* Note: It would also be possible to store an array of offsets to facilitate parallelism. */
   int offset = 0;
   for (const int i : IndexRange(this->size() - 1)) {
     this->evaluate_bezier_segment(i, i + 1, offset, positions, mappings);
@@ -425,6 +420,7 @@ static void interpolate_to_evaluated_points_impl(Span<float> mappings,
                                                  MutableSpan<T> result_data)
 {
   const int points_len = source_data.size();
+  /* TODO: Use a set of functions mix2 in attribute_math instead of DefaultMixer. */
   blender::attribute_math::DefaultMixer<T> mixer(result_data);
 
   for (const int i : result_data.index_range()) {

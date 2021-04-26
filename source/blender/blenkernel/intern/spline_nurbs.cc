@@ -15,7 +15,6 @@
  */
 
 #include "BLI_array.hh"
-#include "BLI_listbase.h"
 #include "BLI_span.hh"
 #include "BLI_virtual_array.hh"
 
@@ -24,11 +23,9 @@
 
 using blender::Array;
 using blender::float3;
-using blender::float4x4;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
-using blender::Vector;
 
 SplinePtr NURBSpline::copy() const
 {
@@ -64,9 +61,9 @@ uint8_t NURBSpline::order() const
 
 void NURBSpline::set_order(const uint8_t value)
 {
-  /* TODO: Check the spline length. */
   BLI_assert(value >= 2 && value <= 6);
   this->order_ = value;
+  this->mark_cache_invalid();
 }
 
 void NURBSpline::add_point(const float3 position,
@@ -345,7 +342,7 @@ void NURBSpline::calculate_basis_cache() const
   MutableSpan<BasisCache> basis_cache(this->basis_cache_);
 
   /* This buffer is reused by each basis calculation to store temporary values.
-   * Theoretically it could likely be optimized away in the future. */
+   * Theoretically it could be optimized away in the future. */
   Array<float> basis_buffer(this->knots_size());
 
   const float start = knots[order - 1];

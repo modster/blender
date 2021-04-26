@@ -472,6 +472,7 @@ class PointCloudComponent : public GeometryComponent {
   const blender::bke::ComponentAttributeProviders *get_attribute_providers() const final;
 };
 
+/** A geometry component that stores curve data, in other words, a group of splines. */
 class CurveComponent : public GeometryComponent {
  private:
   SplineGroup *curve_ = nullptr;

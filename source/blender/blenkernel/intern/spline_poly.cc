@@ -14,21 +14,14 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BLI_array.hh"
-#include "BLI_listbase.h"
 #include "BLI_span.hh"
 #include "BLI_virtual_array.hh"
 
-#include "BKE_curve.h"
 #include "BKE_spline.hh"
 
-using blender::Array;
 using blender::float3;
-using blender::float4x4;
-using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
-using blender::Vector;
 
 SplinePtr PolySpline::copy() const
 {
@@ -127,16 +120,16 @@ Span<float3> PolySpline::evaluated_positions() const
   return this->positions();
 }
 
-// static blender::fn::GVArrayPtr bad_hack_copy_varray(const blender::fn::GVArray &source_data)
-// {
-// }
-
-/* TODO: This function is hacky.. how to deal with poly spline interpolation? */
+/**
+ * Poly spline interpolation from control points to evaluated points is a special case, since the
+ * result data is the same as the input data.
+ */
 blender::fn::GVArrayPtr PolySpline::interpolate_to_evaluated_points(
     const blender::fn::GVArray &source_data) const
 {
   BLI_assert(source_data.size() == this->size());
 
+  /* TODO: Must make sure this ownership idea works. */
   if (source_data.is_span()) {
     return std::make_unique<blender::fn::GVArray_For_GSpan>(source_data.get_internal_span());
   }

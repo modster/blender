@@ -15,20 +15,14 @@
  */
 
 #include "BLI_array.hh"
-#include "BLI_listbase.h"
 #include "BLI_span.hh"
-
-#include "DNA_curve_types.h"
 
 #include "BKE_spline.hh"
 
-using blender::Array;
 using blender::float3;
-using blender::float4x4;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
-using blender::Vector;
 
 Spline::Type Spline::type() const
 {
@@ -95,7 +89,6 @@ Span<float> Spline::evaluated_lengths() const
   return evaluated_lengths_cache_;
 }
 
-/* TODO: Optimize this along with the function below. */
 static float3 direction_bisect(const float3 &prev, const float3 &middle, const float3 &next)
 {
   const float3 dir_prev = (middle - prev).normalized();
@@ -157,6 +150,7 @@ Span<float3> Spline::evaluated_tangents() const
   return evaluated_tangents_cache_;
 }
 
+#if 0 /* Not supported yet, has errors. */
 static float3 initial_normal(const float3 first_tangent)
 {
   /* TODO: Should be is "almost" zero. */
@@ -265,6 +259,7 @@ static void calculate_normals_minimum_twist(Span<float3> tangents,
     make_normals_cyclic(tangents, normals);
   }
 }
+#endif
 
 static void calculate_normals_z_up(Span<float3> tangents, MutableSpan<float3> normals)
 {
@@ -292,17 +287,20 @@ Span<float3> Spline::evaluated_normals() const
   this->evaluated_normals_cache_.resize(total);
 
   Span<float3> tangents = this->evaluated_tangents();
+
+#if 0 /* Not supported yet, has errors. */
   switch (this->normal_mode) {
     case NormalCalculationMode::Minimum:
       calculate_normals_minimum_twist(tangents, is_cyclic, this->evaluated_normals_cache_);
       break;
     case NormalCalculationMode::ZUp:
-      calculate_normals_z_up(tangents, this->evaluated_normals_cache_);
       break;
     case NormalCalculationMode::Tangent:
-      // calculate_normals_tangent(tangents, this->evaluated_normals_cache_);
+      calculate_normals_tangent(tangents, this->evaluated_normals_cache_);
       break;
   }
+#endif
+  calculate_normals_z_up(tangents, this->evaluated_normals_cache_);
 
   this->normal_cache_dirty_ = false;
   return evaluated_normals_cache_;
@@ -313,7 +311,9 @@ Spline::LookupResult Spline::lookup_evaluated_factor(const float factor) const
   return this->lookup_evaluated_length(this->length() * factor);
 }
 
-/* TODO: Support extrapolation somehow. */
+/**
+ * \note This does not support extrapolation currently.
+ */
 Spline::LookupResult Spline::lookup_evaluated_length(const float length) const
 {
   BLI_assert(length >= 0.0f && length <= this->length());
