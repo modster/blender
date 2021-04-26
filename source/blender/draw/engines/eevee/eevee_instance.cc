@@ -156,7 +156,7 @@ void Instance::object_sync(Object *ob)
         shading_passes.shadow.surface_add(ob, nullptr, 0);
         shading_passes.velocity.mesh_add(ob, ob_handle);
 
-        // shadows.sync_caster(ob);
+        shadows.sync_caster(ob, ob_handle);
         break;
       default:
         break;

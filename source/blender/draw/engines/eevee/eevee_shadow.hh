@@ -47,8 +47,15 @@ struct AtlasRegion {
 
 struct ShadowPunctual : public AtlasRegion {
  public:
-  /** Update flag. */
-  bool do_update = true;
+  /** Bounds to update during sync. Used to detect updates from shadow caster updates. */
+  BoundSphere bsphere;
+  /**
+   * Update tag to signal the shadow has changed. This is only the result of light changes.
+   * This flag is clear after sync.
+   **/
+  bool do_update_tag = true;
+  /** Persistent update tag until shadow map have been updated. */
+  bool do_update_persist = true;
   /** The light module tag each shadow intersecting the current view. */
   bool is_visible = false;
   /** False if the object is only allocated, waiting to be reused. */
@@ -113,6 +120,84 @@ struct ShadowPunctual : public AtlasRegion {
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name ShadowCaster
+ *
+ * \{ */
+
+/* TODO(fclem) Replace with a bitmap structure when we have one. */
+class ShadowBitmap : public Vector<bool> {
+ public:
+  void set_bit(int64_t index, bool set)
+  {
+    (*this)[index] = set;
+  }
+};
+
+struct AABB {
+  vec3 center, halfdim;
+
+  void debug_draw(void)
+  {
+    BoundBox bb;
+    copy_v3_v3(bb.vec[0], center + halfdim * vec3(1, 1, 1));
+    copy_v3_v3(bb.vec[1], center + halfdim * vec3(-1, 1, 1));
+    copy_v3_v3(bb.vec[2], center + halfdim * vec3(-1, -1, 1));
+    copy_v3_v3(bb.vec[3], center + halfdim * vec3(1, -1, 1));
+    copy_v3_v3(bb.vec[4], center + halfdim * vec3(1, 1, -1));
+    copy_v3_v3(bb.vec[5], center + halfdim * vec3(-1, 1, -1));
+    copy_v3_v3(bb.vec[6], center + halfdim * vec3(-1, -1, -1));
+    copy_v3_v3(bb.vec[7], center + halfdim * vec3(1, -1, -1));
+    vec4 color = {1, 0, 0, 1};
+    DRW_debug_bbox(&bb, color);
+  }
+};
+
+struct ShadowCaster {
+  /** Bitmap of all shadows intersecting with this caster. Used to make update tagging faster. */
+  ShadowBitmap intersected_shadows_bits;
+  /** World space axis aligned bounding box. */
+  AABB aabb;
+
+  bool initialized = false;
+  bool used;
+  bool updated;
+
+  void sync(Object *ob)
+  {
+    BoundBox *bb = BKE_object_boundbox_get(ob);
+    vec3 min, max;
+    INIT_MINMAX(min, max);
+    for (int i = 0; i < 8; i++) {
+      float vec[3];
+      copy_v3_v3(vec, bb->vec[i]);
+      mul_m4_v3(ob->obmat, vec);
+      minmax_v3v3_v3(min, max, vec);
+    }
+
+    aabb.center = (min + max) * 0.5;
+    aabb.halfdim = vec3::abs(aabb.center - max);
+
+    initialized = true;
+    updated = true;
+  }
+
+  static bool intersect(ShadowCaster &caster, ShadowPunctual &shadow)
+  {
+    /* We are testing using a rougher AABB vs AABB test instead of full AABB vs Sphere. */
+    /* TODO test speed with AABB vs Sphere. */
+    for (int i = 0; i < 3; i++) {
+      if (fabsf(caster.aabb.center[i] - shadow.bsphere.center[i]) >
+          (caster.aabb.halfdim[i] + shadow.bsphere.radius)) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name ShadowModule
  *
  * Manages shadow atlas and shadow region datas.
@@ -124,17 +209,27 @@ class ShadowModule {
  private:
   Instance &inst_;
 
+  /** Map of shadow casters to track deletion & update of intersected shadows. */
+  Map<ObjectKey, ShadowCaster> casters_;
+  /** Global bounds that contains all shadow casters. */
+  // AABB casters_global_bounds_;
+
+  ShadowBitmap punctuals_used_bits_;
+  ShadowBitmap punctuals_updated_bits_;
   Vector<ShadowPunctual> punctuals_;
   /** First unused item in the vector for fast reallocating. */
   int punctual_unused_first_ = INT_MAX;
   /** Unused item count in the vector for fast reallocating. */
   int punctual_unused_count_ = 0;
+
   /** True if a shadow was deleted or allocated and we need to repack the data. */
   bool packing_changed_ = true;
   /** True if a shadow type was changed and all shadows need update. */
   bool format_changed_ = true;
   /** Full atlas size. Only updated after end_sync(). */
   ivec2 atlas_extent_;
+  /** Used to detect sample change for soft shadows. */
+  uint64_t last_sample_ = 0;
 
   /**
    * TODO(fclem) These should be stored inside the Shadow objects instead.
@@ -162,6 +257,8 @@ class ShadowModule {
   ~ShadowModule(){};
 
   void init(void);
+
+  void sync_caster(Object *ob, const ObjectHandle &handle);
   void end_sync(void);
 
   void update_visible(const DRWView *view);

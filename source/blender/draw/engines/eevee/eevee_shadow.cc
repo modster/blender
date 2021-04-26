@@ -53,11 +53,17 @@ void ShadowPunctual::sync(
   /* Clear custom data. */
   object_mat_[0][3] = object_mat_[1][3] = object_mat_[2][3] = 0.0f;
   object_mat_[3][3] = 1.0f;
+
+  /* TODO(fclem) Tighter bounds for cones. */
+  copy_v3_v3(bsphere.center, object_mat_[3]);
+  bsphere.radius = far_clip;
+
+  do_update_tag = true;
 }
 
 void ShadowPunctual::update_extent(int cube_res)
 {
-  do_update = true;
+  do_update_persist = true;
   is_visible = false;
   cube_res_ = cube_res;
 
@@ -116,7 +122,8 @@ void ShadowPunctual::render(Instance &inst, MutableSpan<DRWView *> views)
     view_render(inst, views[Z_POS], Z_POS);
   }
 
-  do_update = false;
+  do_update_persist = false;
+  is_visible = false;
 }
 
 void ShadowPunctual::cubeface_winmat_get(mat4 &winmat, bool half_opened)
@@ -218,10 +225,89 @@ void ShadowModule::init(void)
   soft_shadows_enabled_ = (inst_.scene->eevee.flag & SCE_EEVEE_SHADOW_SOFT) != 0;
 }
 
-/* Packs all shadow regions into a shadow atlas. */
+void ShadowModule::sync_caster(Object *ob, const ObjectHandle &handle)
+{
+  ShadowCaster &caster = casters_.lookup_or_add_default(handle.object_key);
+  caster.used = true;
+  if (handle.recalc != 0 || !caster.initialized) {
+    caster.sync(ob);
+  }
+}
+
+/* Packs all shadow regions into a shadow atlas and update shadow casters linking / updates. */
 void ShadowModule::end_sync(void)
 {
-  if (!packing_changed_ && !format_changed_) {
+  const bool do_global_update = packing_changed_ || format_changed_;
+
+  Vector<ObjectKey, 0> deleted_keys;
+
+  /* Collect updated shadows bits. */
+  punctuals_used_bits_.resize(punctuals_.size());
+  punctuals_updated_bits_.resize(punctuals_.size());
+  for (auto shadow_index : punctuals_.index_range()) {
+    ShadowPunctual &shpoint = punctuals_[shadow_index];
+    punctuals_used_bits_.set_bit(shadow_index, shpoint.used);
+    punctuals_updated_bits_.set_bit(shadow_index, shpoint.do_update_tag);
+    shpoint.do_update_tag = false;
+  }
+
+  /* Search for deleted shadow casters or if shadow caster WAS in shadow radius. */
+  for (auto item : casters_.items()) {
+    ShadowCaster &caster = item.value;
+    if (!caster.used) {
+      deleted_keys.append(item.key);
+      caster.updated = true;
+    }
+
+    if (!do_global_update && caster.updated) {
+      /* If the shadow-caster has been deleted or updated, update previously intersect shadows. */
+      /* TODO(fclem): Bitmap iterator. */
+      for (auto shadow_index : caster.intersected_shadows_bits.index_range()) {
+        if (caster.intersected_shadows_bits[shadow_index] == false) {
+          continue;
+        }
+        punctuals_[shadow_index].do_update_persist = true;
+      }
+    }
+
+    if (caster.used) {
+      /* If the shadow-caster has been updated, update all shadow intersection bits and
+       * tag the shadows for update. If the shadow-caster has NOT been updated, only update shadow
+       * intersection bits for updated shadows. */
+      ShadowBitmap &shadow_bits = (caster.updated) ? punctuals_used_bits_ :
+                                                     punctuals_updated_bits_;
+
+      caster.intersected_shadows_bits.resize(punctuals_.size());
+      /* If the shadow-caster has been updated, update intersected shadows and their bits. */
+      /* TODO(fclem): This part can be slow (max O(N²), min O(N)), optimize it with an acceleration
+       * structure. */
+      /* TODO(fclem): Bitmap iterator. */
+      for (auto shadow_index : shadow_bits.index_range()) {
+        if (shadow_bits[shadow_index] == false) {
+          continue;
+        }
+        ShadowPunctual &shadow = punctuals_[shadow_index];
+        const bool isect = ShadowCaster::intersect(caster, shadow);
+        caster.intersected_shadows_bits.set_bit(shadow_index, isect);
+        if (isect) {
+          punctuals_[shadow_index].do_update_persist = true;
+        }
+      }
+
+      /* TODO(fclem) Gather global bounds. */
+    }
+    caster.updated = false;
+    caster.used = false;
+  }
+
+  if (deleted_keys.size() > 0) {
+    inst_.sampling.reset();
+  }
+  for (auto key : deleted_keys) {
+    casters_.remove(key);
+  }
+
+  if (!do_global_update) {
     return;
   }
 
@@ -242,7 +328,7 @@ void ShadowModule::end_sync(void)
     if (shpoint.used) {
       /* TODO(fclem): Ideally, we could de-fragment the atlas using compute passes to move regions.
        * For now, we update all shadows inside the atlas. */
-      shpoint.do_update = true;
+      shpoint.do_update_persist = true;
       shpoint.is_visible = false;
       regions.append(&shpoint);
     }
@@ -283,12 +369,23 @@ void ShadowModule::end_sync(void)
 /* Update all shadow regions visible inside the view. */
 void ShadowModule::update_visible(const DRWView *UNUSED(view))
 {
+  bool force_update = false;
+  if (soft_shadows_enabled_ && (inst_.sampling.sample_get() != last_sample_)) {
+    last_sample_ = inst_.sampling.sample_get();
+  }
+  else {
+    last_sample_ = 0;
+  }
+
   DRW_stats_group_start("ShadowUpdate");
 
   GPU_framebuffer_bind(atlas_fb_);
 
   for (ShadowPunctual &shpoint : punctuals_) {
-    if (shpoint.used && (shpoint.do_update || soft_shadows_enabled_) && shpoint.is_visible) {
+    if (force_update) {
+      shpoint.do_update_persist = true;
+    }
+    if (shpoint.used && shpoint.do_update_persist && shpoint.is_visible) {
       shpoint.render(inst_, MutableSpan(views_, 6));
     }
   }
