@@ -2108,7 +2108,7 @@ static void cursor_plane_draw_ex(const bContext *C, const int mval[2], struct Pl
     GPU_matrix_projection_set(rv3d->winmat);
     GPU_matrix_set(rv3d->viewmat);
 
-    const float scale_mod = U.gizmo_size * 2 * U.dpi_fac;
+    const float scale_mod = U.gizmo_size * 2 * U.dpi_fac / U.pixelsize;
 
     float final_scale = (scale_mod * pixel_size);
 
