@@ -11,7 +11,8 @@ uniform sampler2D weight_tx;
 
 in vec4 uvcoordsvar;
 
-layout(location = 0) out vec4 out_color;
+layout(location = 0, index = 0) out vec4 out_color;
+layout(location = 0, index = 1) out vec4 out_mul;
 
 void main(void)
 {
@@ -22,4 +23,7 @@ void main(void)
 
   out_color = film_data_decode(film, color, weight);
   gl_FragDepth = out_color.r;
+
+  out_color *= film.opacity;
+  out_mul = vec4(1.0 - film.opacity);
 }

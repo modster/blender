@@ -57,6 +57,11 @@ class Sampling {
   uint64_t dof_sample_count_ = 1;
   /** Motion blur steps. */
   uint64_t motion_blur_steps_ = 1;
+  /** Used for viewport smooth transition. */
+  int64_t sample_viewport_ = 1;
+  int64_t sample_count_viewport_ = 64;
+  int64_t viewport_smoothing_start = 0;
+  int64_t viewport_smoothing_duration = 0;
   /** Tag to reset sampling for the next sample. */
   bool reset_ = false;
 
@@ -99,12 +104,27 @@ class Sampling {
 
     /* Only multiply after to have full the full DoF web pattern for each time steps. */
     sample_count_ *= motion_blur_steps_;
+
+    if (!DRW_state_is_image_render()) {
+      /* TODO(fclem) UI. */
+      viewport_smoothing_start = 16;
+      viewport_smoothing_duration = 32;
+      /* At minima start when rendering has finished. */
+      viewport_smoothing_start = min_ii(viewport_smoothing_start, sample_count_);
+      /* Basically counts the number of redraw. */
+      sample_viewport_ += 1;
+    }
+    else {
+      viewport_smoothing_start = 0;
+      viewport_smoothing_duration = 0;
+    }
   }
 
   void end_sync(void)
   {
     if (reset_) {
       sample_ = 1;
+      sample_viewport_ = 1;
     }
   }
 
@@ -163,6 +183,17 @@ class Sampling {
   {
     return sample_;
   }
+  /* Returns blend factor to apply to film to have a smooth transition instead of flickering
+   * for the first samples of random shadows. */
+  float viewport_smoothing_opacity_factor_get(void) const
+  {
+    return (sample_ == 1 || viewport_smoothing_duration == 0) ?
+               1.0f :
+               square_f(clamp_f((sample_viewport_ - viewport_smoothing_start) /
+                                    float(viewport_smoothing_duration),
+                                0.0f,
+                                1.0f));
+  }
   /* Returns sample count inside the jittered depth of field web pattern. */
   uint64_t dof_ring_count_get(void) const
   {
@@ -186,6 +217,12 @@ class Sampling {
   bool finished(void) const
   {
     return (sample_ > sample_count_);
+  }
+  /* Returns true if viewport smoothing and sampling has finished. */
+  bool finished_viewport(void) const
+  {
+    return finished() &&
+           (sample_viewport_ > (viewport_smoothing_start + viewport_smoothing_duration));
   }
   /* Viewport Only: Function to call to notify something in the scene changed.
    * This will reset accumulation. Do not call after end_sync() or during sample rendering. */

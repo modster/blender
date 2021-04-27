@@ -91,6 +91,7 @@ void Film::init(const ivec2 &full_extent, const rcti *output_rect)
     inst_.sampling.reset();
   }
 
+  data_.opacity = 1.0f;
   data_.uv_scale = 1.0f / vec2(full_extent);
   data_.uv_scale_inv = full_extent;
   data_.uv_bias = data_.offset / vec2(full_extent);
@@ -130,6 +131,9 @@ void Film::sync(void)
   {
     SNPRINTF(full_name, "Film.%s.Resolve", name_.c_str());
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_ALWAYS;
+    if (do_smooth_viewport_smooth_transition()) {
+      state |= DRW_STATE_BLEND_CUSTOM;
+    }
     resolve_ps_ = DRW_pass_create(full_name, state);
     GPUShader *sh = inst_.shaders.static_shader_get(FILM_RESOLVE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_ps_);
@@ -147,7 +151,11 @@ void Film::end_sync()
     data_.use_history = 0;
   }
 
-  if (data_.use_history == 0) {
+  if (inst_.is_viewport()) {
+    data_.opacity = inst_.sampling.viewport_smoothing_opacity_factor_get();
+  }
+
+  if (data_.use_history == 0 || inst_.is_viewport()) {
     data_.push_update();
   }
 }
@@ -174,6 +182,10 @@ void Film::accumulate(GPUTexture *input, const DRWView *view)
 
 void Film::resolve_viewport(GPUFrameBuffer *target)
 {
+  if (do_smooth_viewport_smooth_transition() && data_.opacity == 0.0f) {
+    return;
+  }
+
   int viewport[4];
 
   GPU_framebuffer_bind(target);

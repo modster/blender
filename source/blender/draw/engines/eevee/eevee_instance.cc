@@ -255,7 +255,7 @@ void Instance::draw_viewport(DefaultFramebufferList *dfbl)
   // lookdev_->resolve_onto(dfbl->default_fb);
   // }
 
-  if (!sampling.finished()) {
+  if (!sampling.finished_viewport()) {
     DRW_viewport_request_redraw();
   }
 }

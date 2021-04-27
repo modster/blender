@@ -195,6 +195,10 @@ struct FilmData {
   eFilmDataType data_type;
   /** Is true if history is valid and can be sampled. Bypassing history to resets accumulation. */
   bool use_history;
+  /** Used for fade-in effect. */
+  float opacity;
+  /** Padding to sizeof(vec4). */
+  int _pad0, _pad1, _pad2;
 };
 BLI_STATIC_ASSERT_ALIGN(FilmData, 16)
 

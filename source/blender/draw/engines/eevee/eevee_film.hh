@@ -93,6 +93,12 @@ class Film {
   void resolve_viewport(GPUFrameBuffer *target);
 
   void read_result(float *data);
+
+ private:
+  bool do_smooth_viewport_smooth_transition(void)
+  {
+    return ELEM(data_.data_type, FILM_DATA_COLOR, FILM_DATA_COLOR_LOG);
+  }
 };
 
 /** \} */
