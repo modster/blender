@@ -132,27 +132,6 @@ static bool gpencil_select_poll(bContext *C)
   return false;
 }
 
-static bool gpencil_3d_point_to_screen_space(ARegion *region,
-                                             const float diff_mat[4][4],
-                                             const float co[3],
-                                             int r_co[2])
-{
-  float parent_co[3];
-  mul_v3_m4v3(parent_co, diff_mat, co);
-  int screen_co[2];
-  if (ED_view3d_project_int_global(
-          region, parent_co, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-      V3D_PROJ_RET_OK) {
-    if (!ELEM(V2D_IS_CLIPPED, screen_co[0], screen_co[1])) {
-      copy_v2_v2_int(r_co, screen_co);
-      return true;
-    }
-  }
-  r_co[0] = V2D_IS_CLIPPED;
-  r_co[1] = V2D_IS_CLIPPED;
-  return false;
-}
-
 /* helper to deselect all selected strokes/points */
 static void deselect_all_selected(bContext *C)
 {
@@ -1571,7 +1550,7 @@ static bool gpencil_stroke_fill_isect_rect(ARegion *region,
     int *pt2d = points2d[i];
 
     int screen_co[2];
-    gpencil_3d_point_to_screen_space(region, diff_mat, &pt->x, screen_co);
+    ED_gpencil_3d_point_to_screen_space(region, NULL, diff_mat, &pt->x, screen_co);
     DO_MINMAX2(screen_co, min, max);
 
     copy_v2_v2_int(pt2d, screen_co);
@@ -1990,7 +1969,7 @@ static bool gpencil_test_box(ARegion *region,
                              GP_SelectUserData *user_data)
 {
   int co[2] = {0};
-  if (gpencil_3d_point_to_screen_space(region, diff_mat, pt, co)) {
+  if (ED_gpencil_3d_point_to_screen_space(region, NULL, diff_mat, pt, co)) {
     return BLI_rcti_isect_pt(&user_data->rect, co[0], co[1]);
   }
   return false;
@@ -2039,7 +2018,7 @@ static bool gpencil_test_lasso(ARegion *region,
                                GP_SelectUserData *user_data)
 {
   int co[2] = {0};
-  if (gpencil_3d_point_to_screen_space(region, diff_mat, pt, co)) {
+  if (ED_gpencil_3d_point_to_screen_space(region, NULL, diff_mat, pt, co)) {
     /* test if in lasso boundbox + within the lasso noose */
     return (BLI_rcti_isect_pt(&user_data->rect, co[0], co[1]) &&
             BLI_lasso_is_point_inside(
@@ -2130,7 +2109,8 @@ static bool gpencil_select_curve_point_closest(bContext *C,
 
     for (int j = from; j < to; j++) {
       int screen_co[2];
-      if (gpencil_3d_point_to_screen_space(region, gps_iter->diff_mat, bezt->vec[j], screen_co)) {
+      if (ED_gpencil_3d_point_to_screen_space(
+              region, NULL, gps_iter->diff_mat, bezt->vec[j], screen_co)) {
         const int pt_distance = len_manhattan_v2v2_int(mval, screen_co);
 
         if (pt_distance <= radius_squared && pt_distance < *hit_distance) {

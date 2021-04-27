@@ -3487,3 +3487,34 @@ void ED_gpencil_stroke_close_by_distance(bGPDstroke *gps, const float threshold)
     BKE_gpencil_stroke_close(gps);
   }
 }
+
+/* Convert 3D point to 2D point in screen space. */
+bool ED_gpencil_3d_point_to_screen_space(struct ARegion *region,
+                                         const struct rcti *rect,
+                                         const float diff_mat[4][4],
+                                         const float co[3],
+                                         int r_co[2])
+{
+  float parent_co[3];
+  mul_v3_m4v3(parent_co, diff_mat, co);
+  int screen_co[2];
+  if (ED_view3d_project_int_global(
+          region, parent_co, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
+      V3D_PROJ_RET_OK) {
+    if (!ELEM(V2D_IS_CLIPPED, screen_co[0], screen_co[1])) {
+      if (rect == NULL) {
+        copy_v2_v2_int(r_co, screen_co);
+        return true;
+      }
+      else {
+        if (BLI_rcti_isect_pt(rect, screen_co[0], screen_co[1])) {
+          copy_v2_v2_int(r_co, screen_co);
+          return true;
+        }
+      }
+    }
+  }
+  r_co[0] = V2D_IS_CLIPPED;
+  r_co[1] = V2D_IS_CLIPPED;
+  return false;
+}

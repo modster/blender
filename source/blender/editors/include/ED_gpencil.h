@@ -52,6 +52,7 @@ struct SnapObjectContext;
 struct ToolSettings;
 struct View3D;
 struct bContext;
+struct rcti;
 
 struct Material;
 struct Object;
@@ -292,6 +293,11 @@ void ED_gpencil_stroke_reproject(struct Depsgraph *depsgraph,
                                  struct bGPDstroke *gps,
                                  const eGP_ReprojectModes mode,
                                  const bool keep_original);
+bool ED_gpencil_3d_point_to_screen_space(struct ARegion *region,
+                                         const struct rcti *rect,
+                                         const float diff_mat[4][4],
+                                         const float co[3],
+                                         int r_co[2]);
 
 /* set sculpt cursor */
 void ED_gpencil_toggle_brush_cursor(struct bContext *C, bool enable, void *customdata);

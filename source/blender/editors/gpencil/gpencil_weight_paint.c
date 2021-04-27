@@ -143,27 +143,6 @@ typedef struct tGP_BrushWeightpaintData {
   int pbuffer_size;
 } tGP_BrushWeightpaintData;
 
-/* TODO: This function is duplicated in other places and should not be here. */
-static bool gpencil_3d_point_to_screen_space(
-    ARegion *region, const rcti *rect, const float diff_mat[4][4], const float co[3], int r_co[2])
-{
-  float parent_co[3];
-  mul_v3_m4v3(parent_co, diff_mat, co);
-  int screen_co[2];
-  if (ED_view3d_project_int_global(
-          region, parent_co, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-      V3D_PROJ_RET_OK) {
-    if (!ELEM(V2D_IS_CLIPPED, screen_co[0], screen_co[1]) &&
-        BLI_rcti_isect_pt(rect, screen_co[0], screen_co[1])) {
-      copy_v2_v2_int(r_co, screen_co);
-      return true;
-    }
-  }
-  r_co[0] = V2D_IS_CLIPPED;
-  r_co[1] = V2D_IS_CLIPPED;
-  return false;
-}
-
 /* Ensure the buffer to hold temp selected point size is enough to save all points selected. */
 static tGP_Selected *gpencil_select_buffer_ensure(tGP_Selected *buffer_array,
                                                   int *buffer_size,
@@ -446,7 +425,7 @@ static void gpencil_weightpaint_select_curve(tGP_BrushWeightpaintData *gso,
 
     int screen_co[2];
     /* Test if points can be projected. */
-    if (!gpencil_3d_point_to_screen_space(region, rect, diff_mat, bezt->vec[1], screen_co)) {
+    if (!ED_gpencil_3d_point_to_screen_space(region, rect, diff_mat, bezt->vec[1], screen_co)) {
       continue;
     }
 
