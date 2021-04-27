@@ -1914,8 +1914,23 @@ static void lineart_main_load_geometries(
   }
 
   if (cam->type == CAM_PERSP) {
-    if (asp < 1) {
-      fov /= asp;
+    if (cam->sensor_fit == CAMERA_SENSOR_FIT_AUTO) {
+      if (asp < 1) {
+        fov /= asp;
+      }
+      else {
+        fov *= asp;
+      }
+    }
+    else if (cam->sensor_fit == CAMERA_SENSOR_FIT_HOR) {
+      if (asp < 1) {
+        fov /= asp;
+      }
+    }
+    else if (cam->sensor_fit == CAMERA_SENSOR_FIT_VERT) {
+      if (asp > 1) {
+        fov *= asp;
+      }
     }
     lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
   }
