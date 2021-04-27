@@ -34,6 +34,7 @@ extern "C" {
 struct AnimData;
 struct Curve;
 struct MDeformVert;
+struct Curve;
 
 #define GP_DEFAULT_PIX_FACTOR 1.0f
 #define GP_DEFAULT_GRID_LINES 4
@@ -46,7 +47,7 @@ struct MDeformVert;
 #define GP_DEFAULT_CURVE_EDIT_CORNER_ANGLE M_PI_2
 
 #define GPENCIL_MIN_FILL_FAC 0.05f
-#define GPENCIL_MAX_FILL_FAC 5.0f
+#define GPENCIL_MAX_FILL_FAC 8.0f
 
 /* ***************************************** */
 /* GP Stroke Points */
@@ -412,6 +413,8 @@ typedef enum eGPDframe_Flag {
   GP_FRAME_PAINT = (1 << 0),
   /* for editing in Action Editor */
   GP_FRAME_SELECT = (1 << 1),
+  /* Line Art generation */
+  GP_FRAME_LRT_CLEARED = (1 << 2),
 } eGPDframe_Flag;
 
 /* ***************************************** */

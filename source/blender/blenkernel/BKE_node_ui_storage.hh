@@ -24,8 +24,11 @@
 #include "BLI_set.hh"
 
 #include "DNA_ID.h"
+#include "DNA_customdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_session_uuid_types.h"
+
+#include "BKE_attribute.h"
 
 struct ModifierData;
 struct Object;
@@ -54,15 +57,13 @@ class NodeTreeEvaluationContext {
 
   uint64_t hash() const
   {
-    const uint64_t hash1 = blender::DefaultHash<std::string>{}(object_name_);
-    const uint64_t hash2 = BLI_session_uuid_hash_uint64(&modifier_session_uuid_);
-    return hash1 ^ (hash2 * 33); /* Copied from DefaultHash for std::pair. */
+    return blender::get_default_hash_2(object_name_, modifier_session_uuid_);
   }
 
-  bool operator==(const NodeTreeEvaluationContext &other) const
+  friend bool operator==(const NodeTreeEvaluationContext &a, const NodeTreeEvaluationContext &b)
   {
-    return other.object_name_ == object_name_ &&
-           BLI_session_uuid_is_equal(&other.modifier_session_uuid_, &modifier_session_uuid_);
+    return a.object_name_ == b.object_name_ &&
+           BLI_session_uuid_is_equal(&a.modifier_session_uuid_, &b.modifier_session_uuid_);
   }
 };
 
@@ -77,14 +78,38 @@ struct NodeWarning {
   std::string message;
 };
 
+struct AvailableAttributeInfo {
+  std::string name;
+  AttributeDomain domain;
+  CustomDataType data_type;
+
+  uint64_t hash() const
+  {
+    return blender::get_default_hash(name);
+  }
+
+  friend bool operator==(const AvailableAttributeInfo &a, const AvailableAttributeInfo &b)
+  {
+    return a.name == b.name;
+  }
+};
+
 struct NodeUIStorage {
   blender::Vector<NodeWarning> warnings;
-  blender::Set<std::string> attribute_name_hints;
+  blender::Set<AvailableAttributeInfo> attribute_hints;
 };
 
 struct NodeTreeUIStorage {
   blender::Map<NodeTreeEvaluationContext, blender::Map<std::string, NodeUIStorage>> context_map;
   std::mutex context_map_mutex;
+
+  /**
+   * Attribute search uses this to store the fake info for the string typed into a node, in order
+   * to pass the info to the execute callback that sets node socket values. This is mutable since
+   * we can count on only one attribute search being open at a time, and there is no real data
+   * stored here.
+   */
+  mutable AvailableAttributeInfo dummy_info_for_search;
 };
 
 const NodeUIStorage *BKE_node_tree_ui_storage_get_from_context(const bContext *C,
@@ -103,4 +128,6 @@ void BKE_nodetree_error_message_add(bNodeTree &ntree,
 void BKE_nodetree_attribute_hint_add(bNodeTree &ntree,
                                      const NodeTreeEvaluationContext &context,
                                      const bNode &node,
-                                     const blender::StringRef attribute_name);
+                                     const blender::StringRef attribute_name,
+                                     const AttributeDomain domain,
+                                     const CustomDataType data_type);

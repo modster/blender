@@ -869,6 +869,8 @@ static const char arg_handle_log_set_doc[] =
     "\tEnable logging categories, taking a single comma separated argument.\n"
     "\tMultiple categories can be matched using a '.*' suffix,\n"
     "\tso '--log \"wm.*\"' logs every kind of window-manager message.\n"
+    "\tSub-string can be matched using a '*' prefix and suffix,\n"
+    "\tso '--log \"*undo*\"' logs every kind of undo-related message.\n"
     "\tUse \"^\" prefix to ignore, so '--log \"*,^wm.operator.*\"' logs all except for "
     "'wm.operators.*'\n"
     "\tUse \"*\" to log everything.";
@@ -1320,7 +1322,7 @@ static int arg_handle_audio_disable(int UNUSED(argc),
                                     const char **UNUSED(argv),
                                     void *UNUSED(data))
 {
-  BKE_sound_force_device("Null");
+  BKE_sound_force_device("None");
   return 0;
 }
 
@@ -1328,7 +1330,7 @@ static const char arg_handle_audio_set_doc[] =
     "\n\t"
     "Force sound system to a specific device."
     "\n\t"
-    "'NULL' 'SDL' 'OPENAL' 'JACK'.";
+    "'None' 'SDL' 'OpenAL' 'CoreAudio' 'JACK' 'PulseAudio' 'WASAPI'.";
 static int arg_handle_audio_set(int argc, const char **argv, void *UNUSED(data))
 {
   if (argc < 1) {
@@ -2039,6 +2041,15 @@ void main_args_setup(bContext *C, bArgs *ba)
 
   BLI_args_add(ba, "-t", "--threads", CB(arg_handle_threads_set), NULL);
 
+  /* Include in the environment pass so it's possible display errors initializing subsystems,
+   * especially `bpy.appdir` since it's useful to show errors finding paths on startup. */
+  BLI_args_add(ba, NULL, "--log", CB(arg_handle_log_set), ba);
+  BLI_args_add(ba, NULL, "--log-level", CB(arg_handle_log_level_set), ba);
+  BLI_args_add(ba, NULL, "--log-show-basename", CB(arg_handle_log_show_basename_set), ba);
+  BLI_args_add(ba, NULL, "--log-show-backtrace", CB(arg_handle_log_show_backtrace_set), ba);
+  BLI_args_add(ba, NULL, "--log-show-timestamp", CB(arg_handle_log_show_timestamp_set), ba);
+  BLI_args_add(ba, NULL, "--log-file", CB(arg_handle_log_file_set), ba);
+
   /* Pass: Background Mode & Settings
    *
    * Also and commands that exit after usage. */
@@ -2059,13 +2070,6 @@ void main_args_setup(bContext *C, bArgs *ba)
   BLI_args_add(ba, "-b", "--background", CB(arg_handle_background_mode_set), NULL);
 
   BLI_args_add(ba, "-a", NULL, CB(arg_handle_playback_mode), NULL);
-
-  BLI_args_add(ba, NULL, "--log", CB(arg_handle_log_set), ba);
-  BLI_args_add(ba, NULL, "--log-level", CB(arg_handle_log_level_set), ba);
-  BLI_args_add(ba, NULL, "--log-show-basename", CB(arg_handle_log_show_basename_set), ba);
-  BLI_args_add(ba, NULL, "--log-show-backtrace", CB(arg_handle_log_show_backtrace_set), ba);
-  BLI_args_add(ba, NULL, "--log-show-timestamp", CB(arg_handle_log_show_timestamp_set), ba);
-  BLI_args_add(ba, NULL, "--log-file", CB(arg_handle_log_file_set), ba);
 
   BLI_args_add(ba, "-d", "--debug", CB(arg_handle_debug_mode_set), ba);
 

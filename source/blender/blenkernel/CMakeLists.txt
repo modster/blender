@@ -69,6 +69,7 @@ set(SRC
   intern/CCGSubSurf_util.c
   intern/DerivedMesh.cc
   intern/action.c
+  intern/action_mirror.c
   intern/addon.c
   intern/anim_data.c
   intern/anim_path.c
@@ -116,7 +117,7 @@ set(SRC
   intern/customdata_file.c
   intern/data_transfer.c
   intern/deform.c
-  intern/displist.c
+  intern/displist.cc
   intern/displist_tangent.c
   intern/dynamicpaint.c
   intern/editlattice.c
@@ -126,6 +127,7 @@ set(SRC
   intern/editmesh_tangent.c
   intern/effect.c
   intern/fcurve.c
+  intern/fcurve_cache.c
   intern/fcurve_driver.c
   intern/fluid.c
   intern/fmodifier.c
@@ -188,6 +190,7 @@ set(SRC
   intern/mesh_remap.c
   intern/mesh_remesh_voxel.c
   intern/mesh_runtime.c
+  intern/mesh_sample.cc
   intern/mesh_tangent.c
   intern/mesh_validate.c
   intern/mesh_validate.cc
@@ -210,7 +213,7 @@ set(SRC
   intern/node_ui_storage.cc
   intern/object.c
   intern/object_deform.c
-  intern/object_dupli.c
+  intern/object_dupli.cc
   intern/object_facemap.c
   intern/object_update.c
   intern/ocean.c
@@ -369,7 +372,7 @@ set(SRC
   BKE_mball.h
   BKE_mball_tessellate.h
   BKE_mesh.h
-  BKE_mesh_boolean_convert.h
+  BKE_mesh_boolean_convert.hh
   BKE_mesh_fair.h
   BKE_mesh_iterators.h
   BKE_mesh_mapping.h
@@ -377,6 +380,7 @@ set(SRC
   BKE_mesh_remap.h
   BKE_mesh_remesh_voxel.h
   BKE_mesh_runtime.h
+  BKE_mesh_sample.hh
   BKE_mesh_tangent.h
   BKE_mesh_types.h
   BKE_mesh_wrapper.h
@@ -385,6 +389,7 @@ set(SRC
   BKE_multires.h
   BKE_nla.h
   BKE_node.h
+  BKE_node_ui_storage.hh
   BKE_object.h
   BKE_object_deform.h
   BKE_object_facemap.h
@@ -434,10 +439,10 @@ set(SRC
   nla_private.h
   particle_private.h
   tracking_private.h
-  intern/attribute_access_intern.hh
   intern/CCGSubSurf.h
   intern/CCGSubSurf_inline.h
   intern/CCGSubSurf_intern.h
+  intern/attribute_access_intern.hh
   intern/data_transfer_intern.h
   intern/lib_intern.h
   intern/multires_inline.h
@@ -742,7 +747,7 @@ if(WITH_GMP)
   list(APPEND INC_SYS
     ${GMP_INCLUDE_DIRS}
   )
- endif()
+endif()
 
 # # Warnings as errors, this is too strict!
 # if(MSVC)

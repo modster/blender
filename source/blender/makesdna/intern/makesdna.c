@@ -84,6 +84,7 @@ static const char *includefiles[] = {
     "DNA_mesh_types.h",
     "DNA_meshdata_types.h",
     "DNA_modifier_types.h",
+    "DNA_lineart_types.h",
     "DNA_lattice_types.h",
     "DNA_object_types.h",
     "DNA_object_force_types.h",
@@ -1221,6 +1222,7 @@ static int make_structDNA(const char *base_directory,
   add_type("int64_t", 8);  /* SDNA_TYPE_INT64 */
   add_type("uint64_t", 8); /* SDNA_TYPE_UINT64 */
   add_type("void", 0);     /* SDNA_TYPE_VOID */
+  add_type("int8_t", 1);   /* SDNA_TYPE_INT8 */
 
   /* the defines above shouldn't be output in the padding file... */
   const int firststruct = types_len;
@@ -1515,16 +1517,12 @@ int main(int argc, char **argv)
  *
  * - 'long': even though DNA supports, 'long' shouldn't be used since it can be either 32 or 64bit,
  *   use int, int32_t or int64_t instead.
- * - 'int8_t': as DNA doesn't yet support 'signed char' types,
- *   all char types are assumed to be unsigned.
- *   We should be able to support this, it's just not something which has been added yet.
  *
  * Only valid use would be as a runtime variable if an API expected a long,
  * but so far we don't have this happening.
  */
 #ifdef __GNUC__
 #  pragma GCC poison long
-#  pragma GCC poison int8_t
 #endif
 
 #include "DNA_ID.h"
@@ -1558,6 +1556,7 @@ int main(int argc, char **argv)
 #include "DNA_layer_types.h"
 #include "DNA_light_types.h"
 #include "DNA_lightprobe_types.h"
+#include "DNA_lineart_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_listBase.h"
 #include "DNA_mask_types.h"

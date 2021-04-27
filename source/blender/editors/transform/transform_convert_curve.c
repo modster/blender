@@ -441,7 +441,6 @@ void createTransCurveVerts(TransInfo *t)
 void recalcData_curve(TransInfo *t)
 {
   if (t->state != TRANS_CANCEL) {
-    clipMirrorModifier(t);
     applyProject(t);
   }
 
@@ -460,12 +459,11 @@ void recalcData_curve(TransInfo *t)
       }
     }
     else {
-      /* Normal updating */
-      while (nu) {
-        BKE_nurb_test_2d(nu);
-        BKE_nurb_handles_calc(nu);
-        nu = nu->next;
-      }
+      /* Apply clipping after so we never project past the clip plane T25423. */
+      transform_convert_clip_mirror_modifier_apply(tc);
+
+      /* Normal updating. */
+      BKE_curve_dimension_update(cu);
     }
   }
 }

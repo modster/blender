@@ -137,7 +137,7 @@ static char *blender_version_decimal(const int version)
 {
   static char version_str[5];
   BLI_assert(version < 1000);
-  BLI_snprintf(version_str, sizeof(version_str), "%d.%02d", version / 100, version % 100);
+  BLI_snprintf(version_str, sizeof(version_str), "%d.%d", version / 100, version % 100);
   return version_str;
 }
 
@@ -664,7 +664,7 @@ bool BKE_appdir_folder_id_ex(const int folder_id,
       return false;
 
     default:
-      BLI_assert(0);
+      BLI_assert_unreachable();
       break;
   }
 
@@ -719,7 +719,7 @@ const char *BKE_appdir_folder_id_user_notest(const int folder_id, const char *su
       get_path_user_ex(path, sizeof(path), "scripts", subfolder, version, check_is_dir);
       break;
     default:
-      BLI_assert(0);
+      BLI_assert_unreachable();
       break;
   }
 

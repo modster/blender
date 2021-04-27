@@ -149,8 +149,6 @@ void EEVEE_effects_init(EEVEE_ViewLayerData *sldata,
    */
   common_data->hiz_uv_scale[0] = viewport_size[0] / effects->hiz_size[0];
   common_data->hiz_uv_scale[1] = viewport_size[1] / effects->hiz_size[1];
-  common_data->hiz_uv_scale[2] = 1.0f / effects->hiz_size[0];
-  common_data->hiz_uv_scale[3] = 1.0f / effects->hiz_size[1];
 
   /* Compute pixel size. Size is multiplied by 2 because it is applied in NDC [-1..1] range. */
   sldata->common_data.ssr_pixelsize[0] = 2.0f / size_fs[0];
@@ -173,7 +171,8 @@ void EEVEE_effects_init(EEVEE_ViewLayerData *sldata,
                                   });
   }
   else {
-    txl->filtered_radiance = NULL;
+    DRW_TEXTURE_FREE_SAFE(txl->filtered_radiance);
+    GPU_FRAMEBUFFER_FREE_SAFE(fbl->radiance_filtered_fb);
   }
 
   /**

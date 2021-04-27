@@ -330,6 +330,12 @@ static void ui_node_link_items(NodeLinkArg *arg,
     int i;
 
     for (ngroup = arg->bmain->nodetrees.first; ngroup; ngroup = ngroup->id.next) {
+      const char *disabled_hint;
+      if ((ngroup->type != arg->ntree->type) ||
+          !nodeGroupPoll(arg->ntree, ngroup, &disabled_hint)) {
+        continue;
+      }
+
       ListBase *lb = ((in_out == SOCK_IN) ? &ngroup->inputs : &ngroup->outputs);
       totitems += BLI_listbase_count(lb);
     }
@@ -339,6 +345,12 @@ static void ui_node_link_items(NodeLinkArg *arg,
 
       i = 0;
       for (ngroup = arg->bmain->nodetrees.first; ngroup; ngroup = ngroup->id.next) {
+        const char *disabled_hint;
+        if ((ngroup->type != arg->ntree->type) ||
+            !nodeGroupPoll(arg->ntree, ngroup, &disabled_hint)) {
+          continue;
+        }
+
         ListBase *lb = (in_out == SOCK_IN ? &ngroup->inputs : &ngroup->outputs);
         bNodeSocket *stemp;
         int index;
@@ -473,7 +485,8 @@ static void ui_node_menu_column(NodeLinkArg *arg, int nclass, const char *cname)
   BLI_array_declare(sorted_ntypes);
 
   NODE_TYPES_BEGIN (ntype) {
-    if (!(ntype->poll && ntype->poll(ntype, ntree))) {
+    const char *disabled_hint;
+    if (!(ntype->poll && ntype->poll(ntype, ntree, &disabled_hint))) {
       continue;
     }
 
@@ -833,7 +846,7 @@ static void ui_node_draw_input(
         case SOCK_STRING: {
           const bNodeTree *node_tree = (const bNodeTree *)nodeptr.owner_id;
           if (node_tree->type == NTREE_GEOMETRY) {
-            node_geometry_add_attribute_search_button(node_tree, node, &inputptr, row);
+            node_geometry_add_attribute_search_button(C, node_tree, node, &inputptr, row);
           }
           else {
             uiItemR(sub, &inputptr, "default_value", 0, "", ICON_NONE);

@@ -41,6 +41,7 @@
 #include "BKE_node.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_workspace.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
@@ -107,14 +108,15 @@ float node_socket_calculate_height(const bNodeSocket *socket)
   return sock_height;
 }
 
-void node_link_calculate_multi_input_position(const bNodeLink *link, float r[2])
+void node_link_calculate_multi_input_position(const float socket_x,
+                                              const float socket_y,
+                                              const int index,
+                                              const int total_inputs,
+                                              float r[2])
 {
-  float offset = (link->tosock->total_inputs * NODE_MULTI_INPUT_LINK_GAP -
-                  NODE_MULTI_INPUT_LINK_GAP) *
-                 0.5;
-  r[0] = link->tosock->locx - NODE_SOCKSIZE * 0.5f;
-  r[1] = link->tosock->locy - offset +
-         (link->multi_input_socket_index * NODE_MULTI_INPUT_LINK_GAP);
+  float offset = (total_inputs * NODE_MULTI_INPUT_LINK_GAP - NODE_MULTI_INPUT_LINK_GAP) * 0.5;
+  r[0] = socket_x - NODE_SOCKSIZE * 0.5f;
+  r[1] = socket_y - offset + (index * NODE_MULTI_INPUT_LINK_GAP);
 }
 
 static void compo_tag_output_nodes(bNodeTree *nodetree, int recalc_flags)
@@ -1127,10 +1129,15 @@ static bool cursor_isect_multi_input_socket(const float cursor[2], const bNodeSo
 {
   const float node_socket_height = node_socket_calculate_height(socket);
   const rctf multi_socket_rect = {
-      .xmin = socket->locx - NODE_SOCKSIZE * 4,
-      .xmax = socket->locx + NODE_SOCKSIZE,
-      .ymin = socket->locy - node_socket_height * 0.5 - NODE_SOCKSIZE * 2.0f,
-      .ymax = socket->locy + node_socket_height * 0.5 + NODE_SOCKSIZE * 2.0f,
+      .xmin = socket->locx - NODE_SOCKSIZE * 4.0f,
+      .xmax = socket->locx + NODE_SOCKSIZE * 2.0f,
+      /*.xmax = socket->locx + NODE_SOCKSIZE * 5.5f
+       * would be the same behavior as for regular sockets.
+       * But keep it smaller because for multi-input socket you
+       * sometimes want to drag the link to the other side, if you may
+       * accidentally pick the wrong link otherwise. */
+      .ymin = socket->locy - node_socket_height,
+      .ymax = socket->locy + node_socket_height,
   };
   if (BLI_rctf_isect_pt(&multi_socket_rect, cursor[0], cursor[1])) {
     return true;
@@ -1140,7 +1147,7 @@ static bool cursor_isect_multi_input_socket(const float cursor[2], const bNodeSo
 
 /* type is SOCK_IN and/or SOCK_OUT */
 int node_find_indicated_socket(
-    SpaceNode *snode, bNode **nodep, bNodeSocket **sockp, float cursor[2], int in_out)
+    SpaceNode *snode, bNode **nodep, bNodeSocket **sockp, const float cursor[2], int in_out)
 {
   rctf rect;
 
@@ -1310,6 +1317,7 @@ static int node_duplicate_exec(bContext *C, wmOperator *op)
       nodeSetSelected(node, false);
       node->flag &= ~(NODE_ACTIVE | NODE_ACTIVE_TEXTURE);
       nodeSetSelected(newnode, true);
+      newnode->flag &= ~NODE_ACTIVE_PREVIEW;
 
       do_tag_update |= (do_tag_update || node_connected_to_output(bmain, ntree, newnode));
     }
@@ -1403,8 +1411,12 @@ static int node_read_viewlayers_exec(bContext *C, wmOperator *UNUSED(op))
   }
 
   LISTBASE_FOREACH (bNode *, node, &snode->edittree->nodes) {
-    if (node->type == CMP_NODE_R_LAYERS) {
+    if ((node->type == CMP_NODE_R_LAYERS) ||
+        (node->type == CMP_NODE_CRYPTOMATTE && node->custom1 == CMP_CRYPTOMATTE_SRC_RENDER)) {
       ID *id = node->id;
+      if (id == NULL) {
+        continue;
+      }
       if (id->tag & LIB_TAG_DOIT) {
         RE_ReadRenderResult(curscene, (Scene *)id);
         ntreeCompositTagRender((Scene *)id);
@@ -2180,13 +2192,25 @@ static int node_clipboard_paste_exec(bContext *C, wmOperator *op)
   /* make sure all clipboard nodes would be valid in the target tree */
   bool all_nodes_valid = true;
   LISTBASE_FOREACH (bNode *, node, clipboard_nodes_lb) {
-    if (!node->typeinfo->poll_instance || !node->typeinfo->poll_instance(node, ntree)) {
+    const char *disabled_hint = NULL;
+    if (!node->typeinfo->poll_instance ||
+        !node->typeinfo->poll_instance(node, ntree, &disabled_hint)) {
       all_nodes_valid = false;
-      BKE_reportf(op->reports,
-                  RPT_ERROR,
-                  "Cannot add node %s into node tree %s",
-                  node->name,
-                  ntree->id.name + 2);
+      if (disabled_hint) {
+        BKE_reportf(op->reports,
+                    RPT_ERROR,
+                    "Cannot add node %s into node tree %s:\n  %s",
+                    node->name,
+                    ntree->id.name + 2,
+                    disabled_hint);
+      }
+      else {
+        BKE_reportf(op->reports,
+                    RPT_ERROR,
+                    "Cannot add node %s into node tree %s",
+                    node->name,
+                    ntree->id.name + 2);
+      }
     }
   }
   if (!all_nodes_valid) {
@@ -2741,7 +2765,7 @@ static int node_cryptomatte_add_socket_exec(bContext *C, wmOperator *UNUSED(op))
     node = nodeGetActive(snode->edittree);
   }
 
-  if (!node || node->type != CMP_NODE_CRYPTOMATTE) {
+  if (!node || node->type != CMP_NODE_CRYPTOMATTE_LEGACY) {
     return OPERATOR_CANCELLED;
   }
 
@@ -2785,7 +2809,7 @@ static int node_cryptomatte_remove_socket_exec(bContext *C, wmOperator *UNUSED(o
     node = nodeGetActive(snode->edittree);
   }
 
-  if (!node || node->type != CMP_NODE_CRYPTOMATTE) {
+  if (!node || node->type != CMP_NODE_CRYPTOMATTE_LEGACY) {
     return OPERATOR_CANCELLED;
   }
 

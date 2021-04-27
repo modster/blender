@@ -1345,7 +1345,7 @@ BLI_bitmap *pyrna_set_to_enum_bitmap(const EnumPropertyItem *items,
         index = (int)ret_convert.as_unsigned;
       }
       else {
-        BLI_assert(0);
+        BLI_assert_unreachable();
       }
     }
     BLI_assert(index < bitmap_size);
@@ -2546,7 +2546,7 @@ static int pyrna_prop_collection_subscript_str_lib_pair_ptr(BPy_PropertyRNA *sel
     if (lib == NULL) {
       if (err_not_found) {
         PyErr_Format(PyExc_KeyError,
-                     "%s: lib name '%.240s' "
+                     "%s: lib filepath '%.1024s' "
                      "does not reference a valid library",
                      err_prefix,
                      keylib_str);
@@ -4207,6 +4207,10 @@ static void pyrna_dir_members_rna(PyObject *list, PointerRNA *ptr)
     iterprop = RNA_struct_iterator_property(ptr->type);
 
     RNA_PROP_BEGIN (ptr, itemptr, iterprop) {
+      /* Custom-properties are exposed using `__getitem__`, exclude from `__dir__`. */
+      if (RNA_property_is_idprop(itemptr.data)) {
+        continue;
+      }
       nameptr = RNA_struct_name_get_alloc(&itemptr, name, sizeof(name), &namelen);
 
       if (nameptr) {
@@ -5550,7 +5554,7 @@ static PyObject *pyprop_array_foreach_getset(BPy_PropertyArrayRNA *self,
       case PROP_POINTER:
       case PROP_COLLECTION:
         /* Should never happen. */
-        BLI_assert(false);
+        BLI_assert_unreachable();
         break;
     }
 
@@ -5595,7 +5599,7 @@ static PyObject *pyprop_array_foreach_getset(BPy_PropertyArrayRNA *self,
       case PROP_POINTER:
       case PROP_COLLECTION:
         /* Should never happen. */
-        BLI_assert(false);
+        BLI_assert_unreachable();
         break;
     }
 
@@ -7078,13 +7082,9 @@ static PyTypeObject pyrna_prop_collection_iter_Type = {
     NULL, /* ternaryfunc tp_call; */
     NULL, /* reprfunc tp_str; */
 
-/* will only use these if this is a subtype of a py class */
-#  if defined(_MSC_VER)
-    NULL, /* defer assignment */
-#  else
+    /* will only use these if this is a subtype of a py class */
     PyObject_GenericGetAttr, /* getattrofunc tp_getattro; */
-#  endif
-    NULL, /* setattrofunc tp_setattro; */
+    NULL,                    /* setattrofunc tp_setattro; */
 
     /* Functions to access object as input/output buffer */
     NULL, /* PyBufferProcs *tp_as_buffer; */
@@ -7110,13 +7110,9 @@ static PyTypeObject pyrna_prop_collection_iter_Type = {
 #  else
     0,
 #  endif
-/*** Added in release 2.2 ***/
-/*   Iterators */
-#  if defined(_MSC_VER)
-    NULL, /* defer assignment */
-#  else
-    PyObject_SelfIter, /* getiterfunc tp_iter; */
-#  endif
+    /*** Added in release 2.2 ***/
+    /*   Iterators */
+    PyObject_SelfIter,                             /* getiterfunc tp_iter; */
     (iternextfunc)pyrna_prop_collection_iter_next, /* iternextfunc tp_iternext; */
 
     /*** Attribute descriptor and subclassing stuff ***/
@@ -7640,9 +7636,6 @@ void BPY_rna_init(void)
   /* For some reason MSVC complains of these. */
 #if defined(_MSC_VER)
   pyrna_struct_meta_idprop_Type.tp_base = &PyType_Type;
-
-  pyrna_prop_collection_iter_Type.tp_iter = PyObject_SelfIter;
-  pyrna_prop_collection_iter_Type.tp_getattro = PyObject_GenericGetAttr;
 #endif
 
   /* metaclass */

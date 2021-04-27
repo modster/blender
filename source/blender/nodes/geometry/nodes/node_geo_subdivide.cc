@@ -14,7 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "MEM_guardedalloc.h"
+// #include "MEM_guardedalloc.h"
 
 #include "BKE_mesh.h"
 #include "BKE_subdiv.h"
@@ -41,6 +41,7 @@ namespace blender::nodes {
 static void geo_node_subdivide_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (!geometry_set.has_mesh()) {
     params.set_output("Geometry", geometry_set);
@@ -49,7 +50,7 @@ static void geo_node_subdivide_exec(GeoNodeExecParams params)
 
 #ifndef WITH_OPENSUBDIV
   params.error_message_add(NodeWarningType::Error,
-                           TIP_("Disabled, Blender was built without OpenSubdiv"));
+                           TIP_("Disabled, Blender was compiled without OpenSubdiv"));
   params.set_output("Geometry", std::move(geometry_set));
   return;
 #endif
@@ -91,12 +92,14 @@ static void geo_node_subdivide_exec(GeoNodeExecParams params)
   Mesh *mesh_out = BKE_subdiv_to_mesh(subdiv, &mesh_settings, mesh_in);
   BKE_mesh_calc_normals(mesh_out);
 
-  geometry_set.replace_mesh(mesh_out);
+  MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+  mesh_component.replace_mesh_but_keep_vertex_group_names(mesh_out);
 
   BKE_subdiv_free(subdiv);
 
   params.set_output("Geometry", std::move(geometry_set));
 }
+
 }  // namespace blender::nodes
 
 void register_node_type_geo_subdivide()

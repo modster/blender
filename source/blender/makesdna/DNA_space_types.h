@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -68,6 +68,9 @@ typedef struct SpaceNode_Runtime SpaceNode_Runtime;
 
 /* Defined in `file_intern.h`. */
 typedef struct SpaceFile_Runtime SpaceFile_Runtime;
+
+/* Defined in `spreadsheet_intern.hh`. */
+typedef struct SpaceSpreadsheet_Runtime SpaceSpreadsheet_Runtime;
 
 /* -------------------------------------------------------------------- */
 /** \name SpaceLink (Base)
@@ -225,6 +228,7 @@ typedef enum eSpaceButtons_Context {
   BCONTEXT_TOOL = 14,
   BCONTEXT_SHADERFX = 15,
   BCONTEXT_OUTPUT = 16,
+  BCONTEXT_COLLECTION = 17,
 
   /* Keep last. */
   BCONTEXT_TOT,
@@ -319,6 +323,8 @@ typedef enum eSpaceOutliner_Filter {
   SO_FILTER_NO_CHILDREN = (1 << 4),
 
   SO_FILTER_UNUSED_5 = (1 << 5), /* cleared */
+  /** Show overrides that are defined/controlled by Blender. */
+  SO_FILTER_SHOW_SYSTEM_OVERRIDES = SO_FILTER_UNUSED_5, /* re-use */
   SO_FILTER_NO_OB_MESH = (1 << 6),
   SO_FILTER_NO_OB_ARMATURE = (1 << 7),
   SO_FILTER_NO_OB_EMPTY = (1 << 8),
@@ -387,6 +393,7 @@ typedef enum eSpaceOutliner_Mode {
   /* SO_KEYMAP         = 13, */ /* deprecated! */
   SO_ID_ORPHANS = 14,
   SO_VIEW_LAYER = 15,
+  SO_OVERRIDES_LIBRARY = 16,
 } eSpaceOutliner_Mode;
 
 /* SpaceOutliner.storeflag */
@@ -622,6 +629,7 @@ typedef enum eSpaceSeq_RegionType {
 typedef enum eSpaceSeq_DrawFlag {
   SEQ_DRAW_BACKDROP = (1 << 0),
   SEQ_DRAW_OFFSET_EXT = (1 << 1),
+  SEQ_DRAW_TRANSFORM_PREVIEW = (1 << 2),
 } eSpaceSeq_DrawFlag;
 
 /* SpaceSeq.flag */
@@ -643,6 +651,7 @@ typedef enum eSpaceSeq_Flag {
   SEQ_SHOW_STRIP_NAME = (1 << 14),
   SEQ_SHOW_STRIP_SOURCE = (1 << 15),
   SEQ_SHOW_STRIP_DURATION = (1 << 16),
+  SEQ_USE_PROXIES = (1 << 17),
 } eSpaceSeq_Flag;
 
 /* SpaceSeq.view */
@@ -694,7 +703,7 @@ typedef enum eSpaceSeq_OverlayType {
  * custom library. Otherwise idname is not used.
  */
 typedef struct FileSelectAssetLibraryUID {
-  short type;
+  short type; /* eFileAssetLibrary_Type */
   char _pad[2];
   /**
    * If showing a custom asset library (#FILE_ASSET_LIBRARY_CUSTOM), this is the index of the
@@ -1514,6 +1523,7 @@ typedef struct bNodeTreePath {
 
   /** MAX_NAME. */
   char node_name[64];
+  char display_name[64];
 } bNodeTreePath;
 
 typedef struct SpaceNode {
@@ -1844,6 +1854,46 @@ typedef struct SpaceStatusBar {
 /** \name Spreadsheet
  * \{ */
 
+typedef struct SpreadsheetColumnID {
+  char *name;
+} SpreadsheetColumnID;
+
+typedef struct SpreadsheetColumn {
+  struct SpreadsheetColumn *next, *prev;
+  /**
+   * Identifies the data in the column.
+   * This is a pointer instead of a struct to make it easier if we want to "subclass"
+   * #SpreadsheetColumnID in the future for different kinds of ids.
+   */
+  SpreadsheetColumnID *id;
+} SpreadsheetColumn;
+
+/**
+ * An item in SpaceSpreadsheet.context_path.
+ * This is a bases struct for the structs below.
+ */
+typedef struct SpreadsheetContext {
+  struct SpreadsheetContext *next, *prev;
+  /* eSpaceSpreadsheet_ContextType. */
+  int type;
+  char _pad[4];
+} SpreadsheetContext;
+
+typedef struct SpreadsheetContextObject {
+  SpreadsheetContext base;
+  struct Object *object;
+} SpreadsheetContextObject;
+
+typedef struct SpreadsheetContextModifier {
+  SpreadsheetContext base;
+  char *modifier_name;
+} SpreadsheetContextModifier;
+
+typedef struct SpreadsheetContextNode {
+  SpreadsheetContext base;
+  char *node_name;
+} SpreadsheetContextNode;
+
 typedef struct SpaceSpreadsheet {
   SpaceLink *next, *prev;
   /** Storage of regions for inactive spaces. */
@@ -1852,7 +1902,60 @@ typedef struct SpaceSpreadsheet {
   char link_flag;
   char _pad0[6];
   /* End 'SpaceLink' header. */
+
+  /* List of #SpreadsheetColumn. */
+  ListBase columns;
+
+  /**
+   * List of #SpreadsheetContext.
+   * This is a path to the data that is displayed in the spreadsheet.
+   * It can be set explicitly by an action of the user (e.g. clicking the preview icon in a
+   * geometry node) or it can be derived from context automatically based on some heuristic.
+   */
+  ListBase context_path;
+
+  /* eSpaceSpreadsheet_FilterFlag. */
+  uint8_t filter_flag;
+
+  /* #GeometryComponentType. */
+  uint8_t geometry_component_type;
+  /* #AttributeDomain. */
+  uint8_t attribute_domain;
+  /* eSpaceSpreadsheet_ObjectContext. */
+  uint8_t object_eval_state;
+
+  /* eSpaceSpreadsheet_Flag. */
+  uint32_t flag;
+
+  SpaceSpreadsheet_Runtime *runtime;
 } SpaceSpreadsheet;
+
+typedef enum eSpaceSpreadsheet_Flag {
+  SPREADSHEET_FLAG_PINNED = (1 << 0),
+  SPREADSHEET_FLAG_CONTEXT_PATH_COLLAPSED = (1 << 1),
+} eSpaceSpreadsheet_Flag;
+
+typedef enum eSpaceSpreadsheet_FilterFlag {
+  SPREADSHEET_FILTER_SELECTED_ONLY = (1 << 0),
+} eSpaceSpreadsheet_FilterFlag;
+
+typedef enum eSpaceSpreadsheet_ObjectEvalState {
+  SPREADSHEET_OBJECT_EVAL_STATE_EVALUATED = 0,
+  SPREADSHEET_OBJECT_EVAL_STATE_ORIGINAL = 1,
+} eSpaceSpreadsheet_Context;
+
+typedef enum eSpaceSpreadsheet_ContextType {
+  SPREADSHEET_CONTEXT_OBJECT = 0,
+  SPREADSHEET_CONTEXT_MODIFIER = 1,
+  SPREADSHEET_CONTEXT_NODE = 2,
+} eSpaceSpreadsheet_ContextType;
+
+/**
+ * We can't just use UI_UNIT_X, because it does not take `widget.points` into account, which
+ * modifies the width of text as well.
+ */
+#define SPREADSHEET_WIDTH_UNIT \
+  (UI_UNIT_X * UI_style_get_dpi()->widget.points / (float)UI_DEFAULT_TEXT_POINTS)
 
 /** \} */
 

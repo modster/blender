@@ -2226,6 +2226,14 @@ static void rna_def_modifier_mirror(BlenderRNA *brna)
       prop, "Merge Distance", "Distance within which mirrored vertices are merged");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
+  prop = RNA_def_property(srna, "bisect_threshold", PROP_FLOAT, PROP_DISTANCE);
+  RNA_def_property_float_sdna(prop, NULL, "bisect_threshold");
+  RNA_def_property_range(prop, 0, FLT_MAX);
+  RNA_def_property_ui_range(prop, 0, 1, 0.01, 6);
+  RNA_def_property_ui_text(
+      prop, "Bisect Distance", "Distance from the bisect plane within which vertices are removed");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
   prop = RNA_def_property(srna, "mirror_object", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "mirror_ob");
   RNA_def_property_ui_text(prop, "Mirror Object", "Object to use as mirror");
@@ -5920,8 +5928,9 @@ static void rna_def_modifier_triangulate(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop,
       "Keep Normals",
-      "Try to preserve custom normals (WARNING: depending on chosen triangulation method, "
-      "shading may not be fully preserved, 'Fixed' method usually gives the best result here)");
+      "Try to preserve custom normals.\n"
+      "Warning: Depending on chosen triangulation method, "
+      "shading may not be fully preserved, \"Fixed\" method usually gives the best result here");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   RNA_define_lib_overridable(false);

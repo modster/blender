@@ -605,6 +605,13 @@ ccl_device_noinline
     if (hit) {
       t = ray->t;
     }
+    else if (bounce == 0) {
+      /* Restore original position if nothing was hit after the first bounce.
+       * Otherwise if the ray_offset() to avoid self-intersection is relatively
+       * large compared to the scattering radius, we go never backup high enough
+       * to exit the surface. */
+      ray->P = sd->P;
+    }
 
     /* Advance to new scatter location. */
     ray->P += t * ray->D;
@@ -638,6 +645,12 @@ ccl_device_noinline
 
     if (hit) {
       /* If we hit the surface, we are done. */
+      break;
+    }
+    else if (throughput.x < VOLUME_THROUGHPUT_EPSILON &&
+             throughput.y < VOLUME_THROUGHPUT_EPSILON &&
+             throughput.z < VOLUME_THROUGHPUT_EPSILON) {
+      /* Avoid unnecessary work and precision issue when throughput gets really small. */
       break;
     }
   }

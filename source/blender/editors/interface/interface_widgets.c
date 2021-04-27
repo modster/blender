@@ -1225,12 +1225,6 @@ static bool draw_widgetbase_batch_skip_draw_cache(void)
     return true;
   }
 
-  /* There are also reports that some AMD and Mesa driver configuration suffer from the
-   * same issue, T78803. */
-  if (GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_UNIX, GPU_DRIVER_OPENSOURCE)) {
-    return true;
-  }
-
   return false;
 }
 
@@ -1819,7 +1813,7 @@ static void ui_text_clip_right_label(const uiFontStyle *fstyle, uiBut *but, cons
   but->strwidth = BLF_width(fstyle->uifont_id, but->drawstr, sizeof(but->drawstr));
   but->ofs = 0;
 
-  /* First shorten num-buttons eg,
+  /* First shorten number-buttons eg,
    *   Translucency: 0.000
    * becomes
    *   Trans: 0.000
@@ -2422,11 +2416,12 @@ static void widget_draw_text_icon(const uiFontStyle *fstyle,
     but->block->aspect = aspect_orig;
 #endif
 
-    rect->xmin += icon_size + icon_padding;
+    rect->xmin += round_fl_to_int(icon_size + icon_padding);
   }
 
   if (!no_text_padding) {
-    const int text_padding = (UI_TEXT_MARGIN_X * U.widget_unit) / but->block->aspect;
+    const int text_padding = round_fl_to_int((UI_TEXT_MARGIN_X * U.widget_unit) /
+                                             but->block->aspect);
     if (but->editstr) {
       rect->xmin += text_padding;
     }
@@ -3801,7 +3796,7 @@ static void widget_numslider(
   wtb.draw_inner = false;
   widgetbase_draw(&wtb, wcol);
 
-  /* Add space at either side of the button so text aligns with numbuttons
+  /* Add space at either side of the button so text aligns with number-buttons
    * (which have arrow icons). */
   if (!(state & UI_STATE_TEXT_INPUT)) {
     rect->xmax -= toffs;

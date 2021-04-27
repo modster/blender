@@ -186,17 +186,17 @@ enum {
   UI_RETURN_POPUP_OK = 1 << 5,
 };
 
-/* but->flag - general state flags. */
+/** #uiBut.flag general state flags. */
 enum {
-  /** Warning, the first 6 flags are internal. */
-  UI_BUT_ICON_SUBMENU = 1 << 6,
-  UI_BUT_ICON_PREVIEW = 1 << 7,
+  /* WARNING: the first 7 flags are internal (see #UI_SELECT definition). */
+  UI_BUT_ICON_SUBMENU = 1 << 7,
+  UI_BUT_ICON_PREVIEW = 1 << 8,
 
-  UI_BUT_NODE_LINK = 1 << 8,
-  UI_BUT_NODE_ACTIVE = 1 << 9,
-  UI_BUT_DRAG_LOCK = 1 << 10,
+  UI_BUT_NODE_LINK = 1 << 9,
+  UI_BUT_NODE_ACTIVE = 1 << 10,
+  UI_BUT_DRAG_LOCK = 1 << 11,
   /** Grayed out and un-editable. */
-  UI_BUT_DISABLED = 1 << 11,
+  UI_BUT_DISABLED = 1 << 12,
 
   UI_BUT_ANIMATED = 1 << 13,
   UI_BUT_ANIMATED_KEY = 1 << 14,
@@ -1574,10 +1574,10 @@ uiBut *uiDefAutoButR(uiBlock *block,
                      int index,
                      const char *name,
                      int icon,
-                     int x1,
-                     int y1,
-                     int x2,
-                     int y2);
+                     int x,
+                     int y,
+                     int width,
+                     int height);
 eAutoPropButsReturn uiDefAutoButsRNA(uiLayout *layout,
                                      struct PointerRNA *ptr,
                                      bool (*check_prop)(struct PointerRNA *ptr,
@@ -1600,6 +1600,7 @@ void UI_but_func_search_set(uiBut *but,
                             uiButSearchCreateFn search_create_fn,
                             uiButSearchUpdateFn search_update_fn,
                             void *arg,
+                            const bool free_arg,
                             uiButSearchArgFreeFn search_arg_free_fn,
                             uiButHandleFunc search_exec_fn,
                             void *active);
@@ -1728,7 +1729,7 @@ struct Panel *UI_panel_add_instanced(const struct bContext *C,
                                      struct PointerRNA *custom_data);
 void UI_panels_free_instanced(const struct bContext *C, struct ARegion *region);
 
-#define INSTANCED_PANEL_UNIQUE_STR_LEN 4
+#define INSTANCED_PANEL_UNIQUE_STR_LEN 16
 void UI_list_panel_unique_str(struct Panel *panel, char *r_name);
 
 typedef void (*uiListPanelIDFromDataFunc)(void *data_link, char *r_idname);
@@ -2078,7 +2079,10 @@ void uiTemplatePalette(uiLayout *layout,
                        struct PointerRNA *ptr,
                        const char *propname,
                        bool colors);
-void uiTemplateCryptoPicker(uiLayout *layout, struct PointerRNA *ptr, const char *propname);
+void uiTemplateCryptoPicker(uiLayout *layout,
+                            struct PointerRNA *ptr,
+                            const char *propname,
+                            int icon);
 void uiTemplateLayers(uiLayout *layout,
                       struct PointerRNA *ptr,
                       const char *propname,

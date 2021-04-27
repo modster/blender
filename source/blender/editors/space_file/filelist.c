@@ -2543,7 +2543,7 @@ int ED_path_extension_type(const char *path)
   if (BLI_path_extension_check(path, ".zip")) {
     return FILE_TYPE_ARCHIVE;
   }
-  if (BLI_path_extension_check_n(path, ".obj", ".3ds", ".fbx", ".glb", ".gltf", NULL)) {
+  if (BLI_path_extension_check_n(path, ".obj", ".3ds", ".fbx", ".glb", ".gltf", ".svg", NULL)) {
     return FILE_TYPE_OBJECT_IO;
   }
   if (BLI_path_extension_check_array(path, imb_ext_image)) {
@@ -3017,8 +3017,7 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
       }
     }
 
-    /* XXX TODO: if databrowse F4 or append/link
-     * filelist->flags & FLF_HIDE_PARENT has to be set */
+    /* XXX TODO: if data-browse or append/link #FLF_HIDE_PARENT has to be set. */
     if (!(filelist->filter_data.flags & FLF_HIDE_PARENT)) {
       filelist->filelist.nbr_entries++;
     }

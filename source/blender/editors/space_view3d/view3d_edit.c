@@ -3628,9 +3628,8 @@ static int view3d_zoom_border_exec(bContext *C, wmOperator *op)
 
   ED_view3d_dist_range_get(v3d, dist_range);
 
-  /* Get Z Depths, needed for perspective, nice for ortho */
-  ED_view3d_draw_depth(CTX_data_ensure_evaluated_depsgraph(C), region, v3d, true);
-
+  ED_view3d_depth_override(
+      CTX_data_ensure_evaluated_depsgraph(C), region, v3d, NULL, V3D_DEPTH_NO_GPENCIL, false);
   {
     /* avoid allocating the whole depth buffer */
     ViewDepths depth_temp = {0};
@@ -5066,7 +5065,7 @@ void ED_view3d_cursor3d_position_rotation(bContext *C,
                                                    SCE_SNAP_MODE_FACE,
                                                    &(const struct SnapObjectParams){
                                                        .snap_select = SNAP_ALL,
-                                                       .use_object_edit_cage = false,
+                                                       .edit_mode_type = SNAP_GEOM_FINAL,
                                                        .use_occlusion_test = true,
                                                    },
                                                    mval_fl,

@@ -14,15 +14,10 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "node_geometry_util.hh"
-
-#include "BLI_rand.hh"
-
-#include "DNA_mesh_types.h"
-#include "DNA_pointcloud_types.h"
-
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_attribute_fill_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
@@ -44,13 +39,14 @@ static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *UNUSED(C)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "domain", 0, "", ICON_NONE);
   uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
-  // uiItemR(layout, ptr, "domain", 0, "", ICON_NONE);
 }
 
 static void geo_node_attribute_fill_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   node->custom1 = CD_PROP_FLOAT;
+  node->custom2 = ATTR_DOMAIN_AUTO;
 }
 
 static void geo_node_attribute_fill_update(bNodeTree *UNUSED(ntree), bNode *node)
@@ -72,19 +68,14 @@ static void geo_node_attribute_fill_update(bNodeTree *UNUSED(ntree), bNode *node
 
 namespace blender::nodes {
 
-static AttributeDomain get_result_domain(const GeometryComponent &component,
-                                         const GeoNodeExecParams &params,
-                                         StringRef attribute_name)
+static AttributeDomain get_result_domain(const GeometryComponent &component, const StringRef name)
 {
   /* Use the domain of the result attribute if it already exists. */
-  ReadAttributePtr result_attribute = component.attribute_try_get_for_read(attribute_name);
-  if (result_attribute) {
-    return result_attribute->domain();
+  std::optional<AttributeMetaData> result_info = component.attribute_get_meta_data(name);
+  if (result_info) {
+    return result_info->domain;
   }
-
-  /* Otherwise use the input domain chosen in the interface. */
-  const bNode &node = params.node();
-  return static_cast<AttributeDomain>(node.custom2);
+  return ATTR_DOMAIN_POINT;
 }
 
 static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams &params)
@@ -96,10 +87,13 @@ static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams
 
   const bNode &node = params.node();
   const CustomDataType data_type = static_cast<CustomDataType>(node.custom1);
-  const AttributeDomain domain = get_result_domain(component, params, attribute_name);
+  const AttributeDomain domain = static_cast<AttributeDomain>(node.custom2);
+  const AttributeDomain result_domain = (domain == ATTR_DOMAIN_AUTO) ?
+                                            get_result_domain(component, attribute_name) :
+                                            domain;
 
-  OutputAttributePtr attribute = component.attribute_try_get_for_output(
-      attribute_name, domain, data_type);
+  OutputAttribute attribute = component.attribute_try_get_for_output_only(
+      attribute_name, result_domain, data_type);
   if (!attribute) {
     return;
   }
@@ -107,38 +101,34 @@ static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams
   switch (data_type) {
     case CD_PROP_FLOAT: {
       const float value = params.get_input<float>("Value_001");
-      MutableSpan<float> attribute_span = attribute->get_span_for_write_only<float>();
-      attribute_span.fill(value);
+      attribute->fill(&value);
       break;
     }
     case CD_PROP_FLOAT3: {
       const float3 value = params.get_input<float3>("Value");
-      MutableSpan<float3> attribute_span = attribute->get_span_for_write_only<float3>();
-      attribute_span.fill(value);
+      attribute->fill(&value);
       break;
     }
     case CD_PROP_COLOR: {
       const Color4f value = params.get_input<Color4f>("Value_002");
-      MutableSpan<Color4f> attribute_span = attribute->get_span_for_write_only<Color4f>();
-      attribute_span.fill(value);
+      attribute->fill(&value);
       break;
     }
     case CD_PROP_BOOL: {
       const bool value = params.get_input<bool>("Value_003");
-      MutableSpan<bool> attribute_span = attribute->get_span_for_write_only<bool>();
-      attribute_span.fill(value);
+      attribute->fill(&value);
       break;
     }
     case CD_PROP_INT32: {
       const int value = params.get_input<int>("Value_004");
-      MutableSpan<int> attribute_span = attribute->get_span_for_write_only<int>();
-      attribute_span.fill(value);
+      attribute->fill(&value);
+      break;
     }
     default:
       break;
   }
 
-  attribute.apply_span_and_save();
+  attribute.save();
 }
 
 static void geo_node_attribute_fill_exec(GeoNodeExecParams params)

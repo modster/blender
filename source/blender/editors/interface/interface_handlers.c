@@ -1114,6 +1114,13 @@ static void ui_apply_but_TAB(bContext *C, uiBut *but, uiHandleButtonData *data)
 static void ui_apply_but_NUM(bContext *C, uiBut *but, uiHandleButtonData *data)
 {
   if (data->str) {
+    double value;
+    /* Check if the string value is a number and cancel if it's equal to the startvalue. */
+    if (ui_but_string_eval_number(C, but, data->str, &value) && (value == data->startvalue)) {
+      data->cancel = true;
+      return;
+    }
+
     if (ui_but_string_set(C, but, data->str)) {
       data->value = ui_but_value_get(but);
     }
@@ -1594,7 +1601,7 @@ static int ui_handler_region_drag_toggle(bContext *C, const wmEvent *event, void
 
   if (done) {
     wmWindow *win = CTX_wm_window(C);
-    ARegion *region = CTX_wm_region(C);
+    const ARegion *region = CTX_wm_region(C);
     uiBut *but = ui_but_find_mouse_over_ex(
         region, drag_info->xy_init[0], drag_info->xy_init[1], true);
 
@@ -2097,7 +2104,7 @@ static void ui_apply_but(
       }
     }
     if (data->select_others.elems_len == 0) {
-      /* dont check again */
+      /* Don't check again. */
       data->select_others.elems_len = -1;
     }
 #endif
@@ -4894,7 +4901,7 @@ static bool ui_numedit_but_NUM(uiButNumber *number_but,
     else {
       /* only scale large int buttons */
       non_linear_range_limit = 129.0f;
-      /* larger for ints, we dont need to fine tune them */
+      /* Larger for ints, we don't need to fine tune them. */
       non_linear_pixel_map = 250.0f;
 
       /* prevent large ranges from getting too out of control */
@@ -7779,7 +7786,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
         else if (data->multi_data.init == BUTTON_MULTI_INIT_SETUP) {
           /* --> (BUTTON_MULTI_INIT_ENABLE) */
           const float margin_x = DRAG_MULTINUM_THRESHOLD_DRAG_X / sqrtf(block->aspect);
-          /* check if we're dont setting buttons */
+          /* Check if we're don't setting buttons. */
           if ((data->str &&
                ELEM(data->state, BUTTON_STATE_TEXT_EDITING, BUTTON_STATE_NUM_EDITING)) ||
               ((abs(data->multi_data.drag_lock_x - event->x) > margin_x) &&
