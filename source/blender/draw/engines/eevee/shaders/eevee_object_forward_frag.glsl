@@ -55,6 +55,16 @@ void main(void)
     float intensity = light_diffuse(utility_tx, light, g_surf.N, cameraVec(g_surf.P), L, dist) *
                       light.diffuse_power;
 
+    float roughness = 0.25;
+    float cos_theta = dot(g_surf.N, cameraVec(g_surf.P));
+    vec2 uv = vec2(roughness, sqrt(1.0 - cos_theta));
+    uv = uv * UTIL_TEX_UV_SCALE + UTIL_TEX_UV_BIAS;
+    vec4 ltc_mat = texture(utility_tx, vec3(uv, UTIL_LTC_MAT_LAYER));
+    float ltc_mag = texture(utility_tx, vec3(uv, UTIL_LTC_MAG_LAYER)).x;
+
+    intensity += light_ltc(utility_tx, light, g_surf.N, cameraVec(g_surf.P), L, dist, ltc_mat) *
+                 (light.specular_power * ltc_mag);
+
     if (light.shadow_id != LIGHT_NO_SHADOW && intensity > 0.0) {
       vec3 lL = light_world_to_local(light, -L) * dist;
       vec3 shadow_co = shadow_punctual_coordinates_get(shadows_punctual[l_idx], lL);
