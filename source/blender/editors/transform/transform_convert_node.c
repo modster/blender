@@ -115,8 +115,10 @@ void createTransNodeData(TransInfo *t)
   const float dpi_fac = UI_DPI_FAC;
   SpaceNode *snode = t->area->spacedata.first;
 
-  /* Disable cursor wrapping in the node editor */
-  t->flag |= T_NO_CURSOR_WRAP;
+  if (t->mode == TFM_TRANSLATION) {
+    /* Disable cursor wrapping in the node editor for edge pan */
+    t->flag |= T_NO_CURSOR_WRAP;
+  }
 
   /* Custom data to enable edge panning during the node transform */
   NodeTransCustomData *customdata = MEM_callocN(sizeof(*customdata), __func__);
@@ -176,10 +178,12 @@ void flushTransNodes(TransInfo *t)
 
   NodeTransCustomData *customdata = (NodeTransCustomData *)t->custom.type.data;
 
-  /* Edge panning functions expect window coordinates, mval is relative to region */
-  const float x = t->region->winrct.xmin + t->mval[0];
-  const float y = t->region->winrct.ymin + t->mval[1];
-  UI_view2d_edge_pan_apply(t->context, &customdata->edge_pan, x, y);
+  if (t->mode == TFM_TRANSLATION) {
+    /* Edge panning functions expect window coordinates, mval is relative to region */
+    const float x = t->region->winrct.xmin + t->mval[0];
+    const float y = t->region->winrct.ymin + t->mval[1];
+    UI_view2d_edge_pan_apply(t->context, &customdata->edge_pan, x, y);
+  }
 
   /* Initial and current view2D rects for additional transform due to view panning and zooming */
   const rctf *rect_src = &customdata->initial_v2d_cur;
