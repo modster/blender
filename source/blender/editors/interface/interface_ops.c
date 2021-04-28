@@ -92,7 +92,9 @@
 static void ui_region_redraw_immediately(bContext *C, ARegion *region)
 {
   ED_region_do_layout(C, region);
+  WM_draw_region_viewport_bind(region);
   ED_region_do_draw(C, region);
+  WM_draw_region_viewport_unbind(region);
   region->do_draw = false;
 }
 
