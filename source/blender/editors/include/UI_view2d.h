@@ -297,13 +297,13 @@ void VIEW2D_GGT_navigate_impl(struct wmGizmoGroupType *gzgt, const char *idname)
  * Custom-data for view panning operators.
  */
 typedef struct View2DEdgePanData {
-  /** screen where view pan was initiated */
+  /** Screen where view pan was initiated. */
   struct bScreen *screen;
-  /** area where view pan was initiated */
+  /** Area where view pan was initiated. */
   struct ScrArea *area;
-  /** region where view pan was initiated */
+  /** Region where view pan was initiated. */
   struct ARegion *region;
-  /** view2d we're operating in */
+  /** View2d we're operating in. */
   struct View2D *v2d;
 
   /** Inside distance in UI units from the edge of the region within which to start panning. */
@@ -320,18 +320,16 @@ typedef struct View2DEdgePanData {
   /** Delay in seconds before maximum speed is reached. */
   float delay;
 
-  /** amount to move view relative to zoom */
+  /** Amount to move view relative to zoom. */
   float facx, facy;
 
-  /* timers */
+  /* Timers. */
   double edge_pan_last_time;
   double edge_pan_start_time_x, edge_pan_start_time_y;
 } View2DEdgePanData;
 
-/* Returns true if context supports edge panning. */
 bool UI_view2d_edge_pan_poll(struct bContext *C);
 
-/* Initialize panning data. */
 void UI_view2d_edge_pan_init(struct bContext *C,
                              struct View2DEdgePanData *vpd,
                              float inside_pad,
@@ -340,7 +338,6 @@ void UI_view2d_edge_pan_init(struct bContext *C,
                              float max_speed,
                              float delay);
 
-/* Reset timers. */
 void UI_view2d_edge_pan_reset(struct View2DEdgePanData *vpd);
 
 /* Apply transform to view (i.e. adjust 'cur' rect). */
@@ -351,10 +348,8 @@ void UI_view2d_edge_pan_apply_event(struct bContext *C,
                                     struct View2DEdgePanData *vpd,
                                     const struct wmEvent *event);
 
-/* Define operator properties needed for view panning. */
 void UI_view2d_edge_pan_operator_properties(struct wmOperatorType *ot);
 
-/* Define operator properties needed for view panning. */
 void UI_view2d_edge_pan_operator_properties_ex(struct wmOperatorType *ot,
                                                float inside_pad,
                                                float outside_pad,
