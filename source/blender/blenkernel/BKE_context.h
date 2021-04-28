@@ -23,6 +23,9 @@
  * \ingroup bke
  */
 
+/* XXX temporary, until AssetHandle is designed properly and queries can return a pointer to it. */
+#include "DNA_asset_types.h"
+
 #include "DNA_listBase.h"
 #include "DNA_object_enums.h"
 #include "RNA_types.h"
