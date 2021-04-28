@@ -92,13 +92,21 @@ void COM_execute(RenderData *render_data,
 
   /* Initialize workscheduler. */
   const bool use_opencl = (node_tree->flag & NTREE_COM_OPENCL) != 0;
-  blender::compositor::WorkScheduler::initialize(use_opencl, BKE_render_num_threads(render_data));
+  int num_cpu_threads = BKE_render_num_threads(render_data);
+  blender::compositor::WorkScheduler::initialize(use_opencl, num_cpu_threads);
 
   /* Execute. */
   const bool twopass = (node_tree->flag & NTREE_TWO_PASS) && !rendering;
   if (twopass) {
-    blender::compositor::ExecutionSystem fast_pass(
-        render_data, scene, node_tree, rendering, true, viewSettings, displaySettings, viewName);
+    blender::compositor::ExecutionSystem fast_pass(render_data,
+                                                   scene,
+                                                   node_tree,
+                                                   rendering,
+                                                   true,
+                                                   viewSettings,
+                                                   displaySettings,
+                                                   viewName,
+                                                   num_cpu_threads);
     fast_pass.execute();
 
     if (node_tree->test_break(node_tree->tbh)) {
@@ -107,8 +115,15 @@ void COM_execute(RenderData *render_data,
     }
   }
 
-  blender::compositor::ExecutionSystem system(
-      render_data, scene, node_tree, rendering, false, viewSettings, displaySettings, viewName);
+  blender::compositor::ExecutionSystem system(render_data,
+                                              scene,
+                                              node_tree,
+                                              rendering,
+                                              false,
+                                              viewSettings,
+                                              displaySettings,
+                                              viewName,
+                                              num_cpu_threads);
   system.execute();
 
   BLI_mutex_unlock(&g_compositor.mutex);

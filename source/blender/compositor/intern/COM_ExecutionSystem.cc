@@ -30,6 +30,7 @@
 #include "COM_ExecutionGroup.h"
 #include "COM_NodeOperation.h"
 #include "COM_NodeOperationBuilder.h"
+#include "COM_OutputManager.h"
 #include "COM_ReadBufferOperation.h"
 #include "COM_WorkScheduler.h"
 
@@ -46,7 +47,8 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
                                  bool fastcalculation,
                                  const ColorManagedViewSettings *viewSettings,
                                  const ColorManagedDisplaySettings *displaySettings,
-                                 const char *viewName)
+                                 const char *viewName,
+                                 int num_cpu_threads)
 {
   this->m_context.setViewName(viewName);
   this->m_context.setScene(scene);
@@ -102,6 +104,23 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
           viewer_border->xmin, viewer_border->xmax, viewer_border->ymin, viewer_border->ymax);
     }
   }
+
+  m_num_operations_finished = 0;
+  m_num_cpu_threads = num_cpu_threads;
+
+  const rctf &render_border = rd->border;
+  m_border_info.use_viewer_border = use_viewer_border;
+  m_border_info.use_render_border = rendering && (rd->mode & R_BORDER) && !(rd->mode & R_CROP);
+  BLI_rcti_init(&m_border_info.viewer_border,
+                viewer_border->xmin,
+                viewer_border->xmax,
+                viewer_border->ymin,
+                viewer_border->ymax);
+  BLI_rcti_init(&m_border_info.render_border,
+                render_border.xmin,
+                render_border.xmax,
+                render_border.ymin,
+                render_border.ymax);
 
   //  DebugInfo::graphviz(this);
 }
@@ -182,33 +201,38 @@ static void init_execution_groups_for_execution(Vector<ExecutionGroup *> &groups
 void ExecutionSystem::execute()
 {
   const bNodeTree *editingtree = this->m_context.getbNodeTree();
-  editingtree->stats_draw(editingtree->sdh, TIP_("Compositing | Initializing execution"));
-
   DebugInfo::execute_started(this);
-  update_read_buffer_offset(m_operations);
+  if (COM_EXECUTION_MODEL == ExecutionModel::Tiled) {
+    editingtree->stats_draw(editingtree->sdh, TIP_("Compositing | Initializing execution"));
 
-  init_write_operations_for_execution(m_operations, m_context.getbNodeTree());
-  link_write_buffers(m_operations);
-  init_non_write_operations_for_execution(m_operations, m_context.getbNodeTree());
-  init_execution_groups_for_execution(m_groups, m_context.getChunksize());
+    update_read_buffer_offset(m_operations);
 
-  WorkScheduler::start(this->m_context);
-  execute_groups(eCompositorPriority::High);
-  if (!this->getContext().isFastCalculation()) {
-    execute_groups(eCompositorPriority::Medium);
-    execute_groups(eCompositorPriority::Low);
+    init_write_operations_for_execution(m_operations, m_context.getbNodeTree());
+    link_write_buffers(m_operations);
+    init_non_write_operations_for_execution(m_operations, m_context.getbNodeTree());
+    init_execution_groups_for_execution(m_groups, m_context.getChunksize());
+
+    WorkScheduler::start(this->m_context);
+    execute_groups(eCompositorPriority::High);
+    if (!this->getContext().isFastCalculation()) {
+      execute_groups(eCompositorPriority::Medium);
+      execute_groups(eCompositorPriority::Low);
+    }
+    WorkScheduler::finish();
+    WorkScheduler::stop();
+
+    editingtree->stats_draw(editingtree->sdh, TIP_("Compositing | De-initializing execution"));
+
+    for (NodeOperation *operation : m_operations) {
+      operation->deinitExecution();
+    }
+
+    for (ExecutionGroup *execution_group : m_groups) {
+      execution_group->deinitExecution();
+    }
   }
-  WorkScheduler::finish();
-  WorkScheduler::stop();
-
-  editingtree->stats_draw(editingtree->sdh, TIP_("Compositing | De-initializing execution"));
-
-  for (NodeOperation *operation : m_operations) {
-    operation->deinitExecution();
-  }
-
-  for (ExecutionGroup *execution_group : m_groups) {
-    execution_group->deinitExecution();
+  else {
+    execute_full_frame();
   }
 }
 
@@ -220,6 +244,142 @@ void ExecutionSystem::execute_groups(eCompositorPriority priority)
       execution_group->execute(this);
     }
   }
+}
+
+void ExecutionSystem::execute_full_frame()
+{
+  /* set output operations priorities in order */
+  blender::Vector<eCompositorPriority> priorities;
+  priorities.append(eCompositorPriority::High);
+  if (!this->getContext().isFastCalculation()) {
+    priorities.append(eCompositorPriority::Medium);
+    priorities.append(eCompositorPriority::Low);
+  }
+
+  /* setup operations */
+  bool is_rendering = m_context.isRendering();
+  rcti render_rect;
+  const bNodeTree *bNodeTree = m_context.getbNodeTree();
+  for (eCompositorPriority priority : priorities) {
+    for (NodeOperation *op : m_operations) {
+      op->setbNodeTree(bNodeTree);
+      if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
+        get_render_rect(op, render_rect);
+        op->determine_rects_to_render(render_rect, m_output_manager);
+        op->determine_reads(m_output_manager);
+      }
+    }
+  }
+
+  /* execute operations */
+  WorkScheduler::start(this->m_context);
+  for (eCompositorPriority priority : priorities) {
+    for (NodeOperation *op : m_operations) {
+      if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
+        op->render(*this);
+      }
+    }
+  }
+  WorkScheduler::stop();
+}
+
+void ExecutionSystem::get_render_rect(NodeOperation *output_op, rcti &r_rect)
+{
+  BLI_assert(output_op->isOutputOperation(m_context.isRendering()));
+
+  const NodeOperationFlags &op_flags = output_op->get_flags();
+  BLI_rcti_init(&r_rect, 0, output_op->getWidth(), 0, output_op->getHeight());
+
+  bool has_viewer_border = m_border_info.use_viewer_border &&
+                           (op_flags.is_viewer_operation || op_flags.is_preview_operation);
+  bool has_render_border = m_border_info.use_render_border;
+  if (has_viewer_border || has_render_border) {
+    rcti &border = has_viewer_border ? m_border_info.viewer_border : m_border_info.render_border;
+    r_rect.xmin = border.xmin > r_rect.xmin ? border.xmin : r_rect.xmin;
+    r_rect.xmax = border.xmax < r_rect.xmax ? border.xmax : r_rect.xmax;
+    r_rect.ymin = border.ymin > r_rect.ymin ? border.ymin : r_rect.ymin;
+    r_rect.ymax = border.ymax < r_rect.ymax ? border.ymax : r_rect.ymax;
+  }
+}
+
+void ExecutionSystem::execute_work(const rcti &work_rect,
+                                   std::function<void(const rcti &split_rect)> work_func)
+{
+  /* split work vertically and execute multi-threadedly */
+  if (!is_breaked()) {
+    int work_height = BLI_rcti_size_y(&work_rect);
+    int n_works = m_num_cpu_threads < work_height ? m_num_cpu_threads : work_height;
+    int std_split_height = n_works == 0 ? 0 : work_height / n_works;
+    int remaining = work_height - std_split_height * n_works;
+    Vector<WorkPackage> works(n_works);
+    int split_y = work_rect.ymin;
+    for (int i = 0; i < n_works; i++) {
+      WorkPackage &work = works[i];
+      int split_height = std_split_height;
+      if (remaining > 0) {
+        split_height++;
+        remaining--;
+      }
+      work.work_func = [=, &work_func, &work_rect]() {
+        if (!is_breaked()) {
+          rcti split_rect;
+          BLI_rcti_init(
+              &split_rect, work_rect.xmin, work_rect.xmax, split_y, split_y + split_height);
+          work_func(split_rect);
+        }
+      };
+      work.execution_group = nullptr;
+      WorkScheduler::schedule(&work);
+
+      split_y += split_height;
+    }
+    BLI_assert(split_y == work_rect.ymax);
+
+    WorkScheduler::finish();
+
+    /* WorkScheduler::ThreadingModel::Queue needs this code */
+    // bool works_finished = false;
+    // while (!works_finished) {
+    //  works_finished = true;
+    //  for (WorkPackage &work : works) {
+    //    if (!work.finished) {
+    //      works_finished = false;
+    //      WorkScheduler::finish();
+    //      break;
+    //    }
+    //  }
+    //}
+  }
+}
+
+void ExecutionSystem::operation_finished()
+{
+  m_num_operations_finished++;
+  update_progress_bar();
+}
+
+void ExecutionSystem::update_progress_bar()
+{
+  const bNodeTree *tree = m_context.getbNodeTree();
+  if (tree) {
+    int num_operations = m_operations.size();
+    float progress = m_num_operations_finished / static_cast<float>(m_operations.size());
+    tree->progress(tree->prh, progress);
+
+    char buf[128];
+    BLI_snprintf(buf,
+                 sizeof(buf),
+                 TIP_("Compositing | Operation %u-%u"),
+                 m_num_operations_finished + 1,
+                 num_operations);
+    tree->stats_draw(tree->sdh, buf);
+  }
+}
+
+bool ExecutionSystem::is_breaked() const
+{
+  const bNodeTree *btree = m_context.getbNodeTree();
+  return btree->test_break(btree->tbh);
 }
 
 }  // namespace blender::compositor

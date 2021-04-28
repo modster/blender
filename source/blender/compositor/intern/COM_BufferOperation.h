@@ -13,34 +13,25 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2011, Blender Foundation.
+ * Copyright 2021, Blender Foundation.
  */
 
-#include "COM_CPUDevice.h"
+#pragma once
 
-#include "COM_ExecutionGroup.h"
-
-#include "BLI_rect.h"
+#include "COM_NodeOperation.h"
 
 namespace blender::compositor {
 
-CPUDevice::CPUDevice(int thread_id) : m_thread_id(thread_id)
-{
-}
+class BufferOperation : public NodeOperation {
+ private:
+  MemoryBuffer *m_buffer;
 
-void CPUDevice::execute(WorkPackage *work_package)
-{
-  if (work_package->execution_group) {
-    const unsigned int chunkNumber = work_package->chunk_number;
-    ExecutionGroup *executionGroup = work_package->execution_group;
+ public:
+  BufferOperation(MemoryBuffer *buffer, DataType data_type);
 
-    executionGroup->getOutputOperation()->executeRegion(&work_package->rect, chunkNumber);
-    executionGroup->finalizeChunkExecution(chunkNumber, nullptr);
-  }
-  else {
-    work_package->work_func();
-  }
-  work_package->finished = true;
-}
+  void *initializeTileData(rcti *rect) override;
+  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+  void executePixelFiltered(float output[4], float x, float y, float dx[2], float dy[2]) override;
+};
 
 }  // namespace blender::compositor

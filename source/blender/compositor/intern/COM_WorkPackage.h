@@ -22,6 +22,7 @@
 
 #include "BLI_rect.h"
 
+#include <functional>
 #include <ostream>
 
 namespace blender::compositor {
@@ -49,6 +50,13 @@ struct WorkPackage {
    * Area of the execution group that the work package calculates.
    */
   rcti rect;
+
+  /**
+   * Custom work function to execute when there is no execution group.
+   */
+  std::function<void()> work_func;
+
+  bool finished = false;
 
 #ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:WorkPackage")

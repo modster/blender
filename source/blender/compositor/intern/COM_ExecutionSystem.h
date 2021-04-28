@@ -25,6 +25,7 @@ class ExecutionGroup;
 #include "COM_ExecutionGroup.h"
 #include "COM_Node.h"
 #include "COM_NodeOperation.h"
+#include "COM_OutputManager.h"
 
 #include "DNA_color_types.h"
 #include "DNA_node_types.h"
@@ -122,6 +123,32 @@ class ExecutionSystem {
 
  private:
   /**
+   * Render and viewer border info
+   */
+  struct {
+    bool use_render_border;
+    rcti render_border;
+    bool use_viewer_border;
+    rcti viewer_border;
+  } m_border_info;
+
+  /**
+   * Manages operations output data/buffers and delete them once dependent operations are
+   * finished.
+   **/
+  OutputManager m_output_manager;
+
+  /**
+   * Number of available cpu threads for work splitting.
+   */
+  int m_num_cpu_threads;
+
+  /**
+   * Number of operations finished. Only used in full-frame mode.
+   */
+  int m_num_operations_finished;
+
+  /**
    * \brief the context used during execution
    */
   CompositorContext m_context;
@@ -152,7 +179,8 @@ class ExecutionSystem {
                   bool fastcalculation,
                   const ColorManagedViewSettings *viewSettings,
                   const ColorManagedDisplaySettings *displaySettings,
-                  const char *viewName);
+                  const char *viewName,
+                  int num_cpu_threads);
 
   /**
    * Destructor
@@ -178,8 +206,30 @@ class ExecutionSystem {
     return this->m_context;
   }
 
+  /*** full-frame methods ***/
+  OutputManager &get_output_manager()
+  {
+    return m_output_manager;
+  }
+
+  /**
+   * Multi-threadedly execute given work function passing work_rect splits as argument.
+   */
+  void execute_work(const rcti &work_rect, std::function<void(const rcti &split_rect)> work_func);
+
+  /**
+   * Reports an operation rendering has finished and updates progress bar.
+   */
+  void operation_finished();
+
  private:
   void execute_groups(eCompositorPriority priority);
+
+  /*** full-frame methods ***/
+  void execute_full_frame();
+  void get_render_rect(NodeOperation *output_op, rcti &r_rect);
+  void update_progress_bar();
+  bool is_breaked() const;
 
   /* allow the DebugInfo class to look at internals */
   friend class DebugInfo;
