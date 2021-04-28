@@ -25,7 +25,6 @@
 
 #include "BLI_math.h"
 #include "BLI_rect.h"
-#include "BlI_utildefines.h"
 
 #include "ED_screen.h"
 
