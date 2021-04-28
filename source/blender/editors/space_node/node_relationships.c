@@ -1117,11 +1117,6 @@ static int node_link_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   bNodeLinkDrag *nldrag = node_link_init(bmain, snode, cursor, detach);
 
   if (nldrag) {
-    RNA_float_set(op->ptr, "inside_padding", NODE_EDGE_PAN_INSIDE_PAD);
-    RNA_float_set(op->ptr, "outside_padding", NODE_EDGE_PAN_OUTSIDE_PAD);
-    RNA_float_set(op->ptr, "speed_ramp", NODE_EDGE_PAN_SPEED_RAMP);
-    RNA_float_set(op->ptr, "max_speed", NODE_EDGE_PAN_MAX_SPEED);
-    RNA_float_set(op->ptr, "delay", NODE_EDGE_PAN_DELAY);
     UI_view2d_edge_pan_operator_init(C, &nldrag->pan_data, op);
 
     op->customdata = nldrag;
@@ -1188,7 +1183,12 @@ void NODE_OT_link(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_HIDDEN);
   RNA_def_property_flag(prop, PROP_HIDDEN);
 
-  UI_view2d_edge_pan_operator_properties(ot);
+  UI_view2d_edge_pan_operator_properties_ex(ot,
+                                            NODE_EDGE_PAN_INSIDE_PAD,
+                                            NODE_EDGE_PAN_OUTSIDE_PAD,
+                                            NODE_EDGE_PAN_SPEED_RAMP,
+                                            NODE_EDGE_PAN_MAX_SPEED,
+                                            NODE_EDGE_PAN_DELAY);
 }
 
 /* ********************** Make Link operator ***************** */

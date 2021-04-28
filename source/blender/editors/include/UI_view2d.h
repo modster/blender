@@ -354,6 +354,14 @@ void UI_view2d_edge_pan_apply_event(struct bContext *C,
 /* Define operator properties needed for view panning. */
 void UI_view2d_edge_pan_operator_properties(struct wmOperatorType *ot);
 
+/* Define operator properties needed for view panning. */
+void UI_view2d_edge_pan_operator_properties_ex(struct wmOperatorType *ot,
+                                               float inside_pad,
+                                               float outside_pad,
+                                               float speed_ramp,
+                                               float max_speed,
+                                               float delay);
+
 /* Initialize panning data with operator settings. */
 void UI_view2d_edge_pan_operator_init(struct bContext *C,
                                       struct View2DEdgePanData *vpd,

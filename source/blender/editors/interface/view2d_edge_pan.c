@@ -267,10 +267,26 @@ void UI_view2d_edge_pan_apply_event(bContext *C, View2DEdgePanData *vpd, const w
 
 void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)
 {
+  /* Default values for */
+  UI_view2d_edge_pan_operator_properties_ex(ot,
+                                            /*inside_pad*/ 1.0f,
+                                            /*outside_pad*/ 0.0f,
+                                            /*speed_ramp*/ 1.0f,
+                                            /*max_speed*/ 500.0f,
+                                            /*delay*/ 1.0f);
+}
+
+void UI_view2d_edge_pan_operator_properties_ex(struct wmOperatorType *ot,
+                                               float inside_pad,
+                                               float outside_pad,
+                                               float speed_ramp,
+                                               float max_speed,
+                                               float delay)
+{
   RNA_def_float(
       ot->srna,
       "inside_padding",
-      1.0f,
+      inside_pad,
       0.0f,
       100.0f,
       "Inside Padding",
@@ -280,7 +296,7 @@ void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)
   RNA_def_float(
       ot->srna,
       "outside_padding",
-      0.0f,
+      outside_pad,
       0.0f,
       100.0f,
       "Outside Padding",
@@ -289,7 +305,7 @@ void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)
       100.0f);
   RNA_def_float(ot->srna,
                 "speed_ramp",
-                1.0f,
+                speed_ramp,
                 0.0f,
                 100.0f,
                 "Speed Ramp",
@@ -298,7 +314,7 @@ void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)
                 100.0f);
   RNA_def_float(ot->srna,
                 "max_speed",
-                500.0f,
+                max_speed,
                 0.0f,
                 10000.0f,
                 "Max Speed",
@@ -307,7 +323,7 @@ void UI_view2d_edge_pan_operator_properties(wmOperatorType *ot)
                 10000.0f);
   RNA_def_float(ot->srna,
                 "delay",
-                1.0f,
+                delay,
                 0.0f,
                 10.0f,
                 "Delay",
