@@ -2050,21 +2050,35 @@ FileDirEntry *filelist_file(struct FileList *filelist, int index)
   return filelist_file_ex(filelist, index, true);
 }
 
-int filelist_file_findpath(struct FileList *filelist, const char *filename)
+int filelist_file_find_path(struct FileList *filelist, const char *filename)
 {
-  int fidx = -1;
-
   if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
-    return fidx;
+    return -1;
   }
 
   /* XXX TODO Cache could probably use a ghash on paths too? Not really urgent though.
    *          This is only used to find again renamed entry,
    *          annoying but looks hairy to get rid of it currently. */
 
-  for (fidx = 0; fidx < filelist->filelist.nbr_entries_filtered; fidx++) {
+  for (int fidx = 0; fidx < filelist->filelist.nbr_entries_filtered; fidx++) {
     FileListInternEntry *entry = filelist->filelist_intern.filtered[fidx];
     if (STREQ(entry->relpath, filename)) {
+      return fidx;
+    }
+  }
+
+  return -1;
+}
+
+int filelist_file_find_uuid(struct FileList *filelist, const uint32_t uuid[4])
+{
+  if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
+    return -1;
+  }
+
+  for (int fidx = 0; fidx < filelist->filelist.nbr_entries_filtered; fidx++) {
+    FileListInternEntry *entry = filelist->filelist_intern.filtered[fidx];
+    if (memcmp(entry->uuid, uuid, sizeof(entry->uuid)) == 0) {
       return fidx;
     }
   }
@@ -2080,31 +2094,30 @@ ID *filelist_file_get_id(const FileDirEntry *file)
   return file->id;
 }
 
-FileDirEntry *filelist_entry_find_uuid(struct FileList *filelist, const int uuid[4])
+static void filelist_uuid_from_uint(const uint32_t value, uint32_t r_uuid[4])
 {
-  if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
-    return NULL;
-  }
+  /* Ugly uint32 to uuid (uint32[4]) abuse. */
+  r_uuid[0] = value;
+}
 
-  if (filelist->filelist_cache.uuids) {
-    FileDirEntry *entry = BLI_ghash_lookup(filelist->filelist_cache.uuids, uuid);
-    if (entry) {
-      return entry;
-    }
-  }
+bool filelist_uuid_is_set(const uint32_t uuid[4])
+{
+  uint32_t unset_uuid[4];
+  filelist_uuid_unset(unset_uuid);
+  return memcmp(uuid, unset_uuid, sizeof(unset_uuid)) != 0;
+}
 
-  {
-    int fidx;
+void filelist_uuid_unset(uint32_t r_uuid[4])
+{
+  filelist_uuid_from_uint(FILE_UUID_UNSET, r_uuid);
+}
 
-    for (fidx = 0; fidx < filelist->filelist.nbr_entries_filtered; fidx++) {
-      FileListInternEntry *entry = filelist->filelist_intern.filtered[fidx];
-      if (memcmp(entry->uuid, uuid, sizeof(entry->uuid)) == 0) {
-        return filelist_file(filelist, fidx);
-      }
-    }
-  }
-
-  return NULL;
+/**
+ * \warning: The UUID will only be valid for the current session. Use as runtime data only!
+ */
+void filelist_uuid_from_id(const ID *id, uint32_t r_uuid[4])
+{
+  filelist_uuid_from_uint(id->session_uuid, r_uuid);
 }
 
 void filelist_file_cache_slidingwindow_set(FileList *filelist, size_t window_size)
@@ -3204,8 +3217,9 @@ static void filelist_readjob_do(const bool do_lib,
        * Note that we do not really need this here currently,
        * since there is a single listing thread, but better
        * remain consistent about threading! */
-      *((uint32_t *)entry->uuid) = atomic_add_and_fetch_uint32(
-          (uint32_t *)filelist->filelist_intern.curr_uuid, 1);
+      filelist_uuid_from_uint(
+          atomic_add_and_fetch_uint32((uint32_t *)filelist->filelist_intern.curr_uuid, 1),
+          (uint32_t *)entry->uuid);
 
       /* Only thing we change in direntry here, so we need to free it first. */
       MEM_freeN(entry->relpath);
@@ -3330,8 +3344,7 @@ static void filelist_readjob_main_assets(Main *current_main,
     entry->free_name = false;
     entry->typeflag |= FILE_TYPE_BLENDERLIB | FILE_TYPE_ASSET;
     entry->blentype = GS(id_iter->name);
-    *((uint32_t *)entry->uuid) = atomic_add_and_fetch_uint32(
-        (uint32_t *)filelist->filelist_intern.curr_uuid, 1);
+    filelist_uuid_from_id(id_iter, (uint32_t *)entry->uuid);
     entry->local_data.preview_image = BKE_asset_metadata_preview_get_from_id(id_iter->asset_data,
                                                                              id_iter);
     entry->local_data.id = id_iter;

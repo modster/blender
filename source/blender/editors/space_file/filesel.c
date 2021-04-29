@@ -1243,6 +1243,25 @@ void ED_fileselect_exit(wmWindowManager *wm, SpaceFile *sfile)
 }
 
 /**
+ * Set the renaming-state to #FILE_PARAMS_RENAME_POSTSCROLL_PENDING and trigger the smooth-scroll
+ * timer. To be used right after a file was renamed.
+ * Note that the caller is responsible for setting the correct rename-file info
+ * (#FileSelectParams.renamefile or #FileSelectParams.renamefile_uuid).
+ */
+void file_params_invoke_rename_postscroll(wmWindowManager *wm, wmWindow *win, SpaceFile *sfile)
+{
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+
+  params->rename_flag = FILE_PARAMS_RENAME_POSTSCROLL_PENDING;
+
+  if (sfile->smoothscroll_timer != NULL) {
+    WM_event_remove_timer(wm, win, sfile->smoothscroll_timer);
+  }
+  sfile->smoothscroll_timer = WM_event_add_timer(wm, win, TIMER1, 1.0 / 1000.0);
+  sfile->scroll_offset = 0;
+}
+
+/**
  * Helper used by both main update code, and smooth-scroll timer,
  * to try to enable rename editing from #FileSelectParams.renamefile name.
  */
@@ -1255,12 +1274,18 @@ void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
     return;
   }
 
-  BLI_assert(params->renamefile[0] != '\0');
+  BLI_assert(params->renamefile[0] != '\0' || filelist_uuid_is_set(params->renamefile_uuid));
 
-  const int idx = filelist_file_findpath(sfile->files, params->renamefile);
+  /* Find the file either by UUID (preferred) or its relative path. */
+  int idx = (filelist_uuid_is_set(params->renamefile_uuid)) ?
+                filelist_file_find_uuid(sfile->files, params->renamefile_uuid) :
+                filelist_file_find_path(sfile->files, params->renamefile);
   if (idx >= 0) {
     FileDirEntry *file = filelist_file(sfile->files, idx);
     BLI_assert(file != NULL);
+
+    params->active_file = idx;
+    filelist_entry_select_set(sfile->files, file, FILE_SEL_ADD, FILE_SEL_SELECTED, CHECK_ALL);
 
     if ((params->rename_flag & FILE_PARAMS_RENAME_PENDING) != 0) {
       filelist_entry_select_set(sfile->files, file, FILE_SEL_ADD, FILE_SEL_EDITING, CHECK_ALL);
@@ -1268,7 +1293,9 @@ void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
     }
     else if ((params->rename_flag & FILE_PARAMS_RENAME_POSTSCROLL_PENDING) != 0) {
       filelist_entry_select_set(sfile->files, file, FILE_SEL_ADD, FILE_SEL_HIGHLIGHTED, CHECK_ALL);
+      params->highlight_file = -1;
       params->renamefile[0] = '\0';
+      filelist_uuid_unset(params->renamefile_uuid);
       params->rename_flag = FILE_PARAMS_RENAME_POSTSCROLL_ACTIVE;
     }
   }
@@ -1276,6 +1303,7 @@ void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
    * when file listing is not done. */
   else if (filelist_is_ready(sfile->files)) {
     params->renamefile[0] = '\0';
+    filelist_uuid_unset(params->renamefile_uuid);
     params->rename_flag = 0;
   }
 }
