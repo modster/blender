@@ -1622,7 +1622,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   orig_ob = obi->original_ob;
 
   BLI_spin_lock(&rb->lock_task);
-  reln = lineart_list_append_pointer_pool_sized(
+  reln = lineart_list_append_pointer_pool_sized_thread(
       &rb->vertex_buffer_pointers, &rb->render_data_pool, orv, sizeof(LineartElementLinkNode));
   BLI_spin_unlock(&rb->lock_task);
 
@@ -1644,9 +1644,10 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   }
 
   BLI_spin_lock(&rb->lock_task);
-  reln = lineart_list_append_pointer_pool_sized(
+  reln = lineart_list_append_pointer_pool_sized_thread(
       &rb->triangle_buffer_pointers, &rb->render_data_pool, ort, sizeof(LineartElementLinkNode));
   BLI_spin_unlock(&rb->lock_task);
+
   reln->element_count = bm->totface;
   reln->object_ref = orig_ob;
   reln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
@@ -1654,7 +1655,10 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   /* Note this memory is not from pool, will be deleted after culling. */
   orta = MEM_callocN(sizeof(LineartTriangleAdjacent) * bm->totface, "LineartTriangleAdjacent");
   /* Link is minimal so we use pool anyway. */
-  lineart_list_append_pointer_pool(&rb->triangle_adjacent_pointers, &rb->render_data_pool, orta);
+  BLI_spin_lock(&rb->lock_task);
+  lineart_list_append_pointer_pool_thread(
+      &rb->triangle_adjacent_pointers, &rb->render_data_pool, orta);
+  BLI_spin_unlock(&rb->lock_task);
 
   for (i = 0; i < bm->totvert; i++) {
     v = BM_vert_at_index(bm, i);
@@ -1725,7 +1729,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   o_la_s = lineart_mem_aquire_thread(&rb->render_data_pool,
                                      sizeof(LineartLineSegment) * allocate_la_e);
   BLI_spin_lock(&rb->lock_task);
-  reln = lineart_list_append_pointer_pool_sized(
+  reln = lineart_list_append_pointer_pool_sized_thread(
       &rb->line_buffer_pointers, &rb->render_data_pool, o_la_e, sizeof(LineartElementLinkNode));
   BLI_spin_unlock(&rb->lock_task);
   reln->element_count = allocate_la_e;
