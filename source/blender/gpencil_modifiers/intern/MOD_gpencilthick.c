@@ -131,7 +131,7 @@ static void deformStroke(GpencilModifierData *md,
 
     float curvef = 1.0f;
 
-    float factor_depth = 1;
+    float factor_depth = 1.0f;
 
     if (mmd->flag & GP_THICK_FADING) {
       if (mmd->object) {
@@ -143,13 +143,13 @@ static void deformStroke(GpencilModifierData *md,
 
         /* Better with ratiof() function from line art. */
         if (dist > fading_max) {
-          factor_depth = 0;
+          factor_depth = 0.0f;
         }
         else if (dist <= fading_max && dist > fading_min) {
           factor_depth = (fading_max - dist) / (fading_max - fading_min);
         }
         else {
-          factor_depth = 1;
+          factor_depth = 1.0f;
         }
       }
     }
@@ -203,7 +203,9 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&mmd->object, IDWALK_CB_NOP);
 }
 
-static void updateDepsgraph(GpencilModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
+static void updateDepsgraph(GpencilModifierData *md,
+                            const ModifierUpdateDepsgraphContext *ctx,
+                            const int UNUSED(mode))
 {
   ThickGpencilModifierData *mmd = (ThickGpencilModifierData *)md;
   if (mmd->object != NULL) {
@@ -255,7 +257,7 @@ static void panelRegister(ARegionType *region_type)
 {
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Thick, panel_draw);
-  PanelType *fading_panel_type = gpencil_modifier_subpanel_register(
+  gpencil_modifier_subpanel_register(
       region_type, "fading", "", fading_header_draw, fading_panel_draw, panel_type);
   PanelType *mask_panel_type = gpencil_modifier_subpanel_register(
       region_type, "mask", "Influence", NULL, mask_panel_draw, panel_type);

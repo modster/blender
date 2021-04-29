@@ -91,7 +91,7 @@ static float give_opacity_fading_factor(OpacityGpencilModifierData *mmd,
                                         float *pos,
                                         bool apply_obmat)
 {
-  float factor_depth = 1;
+  float factor_depth = 1.0f;
 
   if (((mmd->flag & GP_OPACITY_FADING) == 0) || ((mmd->object) == NULL)) {
     return factor_depth;
@@ -107,13 +107,13 @@ static float give_opacity_fading_factor(OpacityGpencilModifierData *mmd,
 
   /* Better with ratiof() function from line art. */
   if (dist > fading_max) {
-    factor_depth = 0;
+    factor_depth = 0.0f;
   }
   else if (dist <= fading_max && dist > fading_min) {
     factor_depth = (fading_max - dist) / (fading_max - fading_min);
   }
   else {
-    factor_depth = 1;
+    factor_depth = 1.0f;
   }
 
   return factor_depth;
@@ -246,7 +246,9 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&mmd->object, IDWALK_CB_NOP);
 }
 
-static void updateDepsgraph(GpencilModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
+static void updateDepsgraph(GpencilModifierData *md,
+                            const ModifierUpdateDepsgraphContext *ctx,
+                            const int UNUSED(mode))
 {
   OpacityGpencilModifierData *mmd = (OpacityGpencilModifierData *)md;
   if (mmd->object != NULL) {
@@ -332,6 +334,9 @@ static void panelRegister(ARegionType *region_type)
 {
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Opacity, panel_draw);
+
+  gpencil_modifier_subpanel_register(
+      region_type, "fading", "", fading_header_draw, fading_panel_draw, panel_type);
   PanelType *mask_panel_type = gpencil_modifier_subpanel_register(
       region_type, "mask", "Influence", NULL, mask_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
