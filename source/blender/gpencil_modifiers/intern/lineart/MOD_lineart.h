@@ -313,7 +313,7 @@ typedef struct LineartRenderBuffer {
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
 
-#define LRT_MEMORY_POOL_64MB (1 << 26)
+#define LRT_MEMORY_POOL_1MB (1 << 20)
 
 typedef enum eLineartTriangleFlags {
   LRT_CULL_DONT_CARE = 0,
