@@ -377,7 +377,7 @@ eAutoPropButsReturn uiDefAutoButsRNA(uiLayout *layout,
       continue;
     }
     if (check_prop && check_prop(ptr, prop, user_data) == 0) {
-      return_info |= UI_PROP_BUTS_ANY_FAILED_CHECK;
+      return_info = (eAutoPropButsReturn)(int(return_info) | int(UI_PROP_BUTS_ANY_FAILED_CHECK));
       continue;
     }
 
@@ -421,7 +421,7 @@ eAutoPropButsReturn uiDefAutoButsRNA(uiLayout *layout,
     }
 
     uiItemFullR(col, ptr, prop, -1, 0, compact ? UI_ITEM_R_COMPACT : 0, name, ICON_NONE);
-    return_info &= ~UI_PROP_BUTS_NONE_ADDED;
+    return_info = (eAutoPropButsReturn)(int(return_info) | int(~UI_PROP_BUTS_NONE_ADDED));
 
     if (use_activate_init) {
       uiLayoutSetActivateInit(col, false);
@@ -456,10 +456,11 @@ static bool add_collection_search_item(CollItemSearch *cis,
    * name prefix for showing the library status. */
   int name_prefix_offset = cis->name_prefix_offset;
   if (!has_id_icon && cis->is_id && !requires_exact_data_name) {
-    cis->iconid = UI_icon_from_library(cis->data);
+    cis->iconid = UI_icon_from_library((ID *)cis->data);
     /* No need to re-allocate, string should be shorter than before (lib status prefix is
      * removed). */
-    BKE_id_full_name_ui_prefix_get(name_buf, cis->data, false, UI_SEP_CHAR, &name_prefix_offset);
+    BKE_id_full_name_ui_prefix_get(
+        name_buf, (ID *)cis->data, false, UI_SEP_CHAR, &name_prefix_offset);
     BLI_assert(strlen(name_buf) <= MEM_allocN_len(cis->name));
     strcpy(cis->name, name_buf);
   }
@@ -478,9 +479,9 @@ void ui_rna_collection_search_update_fn(const struct bContext *C,
                                         uiSearchItems *items,
                                         const bool is_first)
 {
-  uiRNACollectionSearch *data = arg;
+  uiRNACollectionSearch *data = (uiRNACollectionSearch *)arg;
   const int flag = RNA_property_flag(data->target_prop);
-  ListBase *items_list = MEM_callocN(sizeof(ListBase), "items_list");
+  ListBase *items_list = (ListBase *)MEM_callocN(sizeof(ListBase), "items_list");
   const bool is_ptr_target = (RNA_property_type(data->target_prop) == PROP_POINTER);
   /* For non-pointer properties, UI code acts entirely based on the item's name. So the name has to
    * match the RNA name exactly. So only for pointer properties, the name can be modified to add
@@ -516,7 +517,7 @@ void ui_rna_collection_search_update_fn(const struct bContext *C,
     const bool is_id = itemptr.type && RNA_struct_is_ID(itemptr.type);
 
     if (is_id) {
-      iconid = ui_id_icon_get(C, itemptr.data, false);
+      iconid = ui_id_icon_get(C, (ID *)itemptr.data, false);
       if (!ELEM(iconid, 0, ICON_BLANK1)) {
         has_id_icon = true;
       }
@@ -525,9 +526,9 @@ void ui_rna_collection_search_update_fn(const struct bContext *C,
         name = RNA_struct_name_get_alloc(&itemptr, name_buf, sizeof(name_buf), NULL);
       }
       else {
-        const ID *id = itemptr.data;
+        const ID *id = (const ID *)itemptr.data;
         BKE_id_full_name_ui_prefix_get(
-            name_buf, itemptr.data, true, UI_SEP_CHAR, &name_prefix_offset);
+            name_buf, (const ID *)itemptr.data, true, UI_SEP_CHAR, &name_prefix_offset);
         BLI_STATIC_ASSERT(sizeof(name_buf) >= MAX_ID_FULL_NAME_UI,
                           "Name string buffer should be big enough to hold full UI ID name");
         name = name_buf;
@@ -539,7 +540,7 @@ void ui_rna_collection_search_update_fn(const struct bContext *C,
     }
 
     if (name) {
-      CollItemSearch *cis = MEM_callocN(sizeof(CollItemSearch), "CollectionItemSearch");
+      CollItemSearch *cis = (CollItemSearch *)MEM_callocN(sizeof(CollItemSearch), __func__);
       cis->data = itemptr.data;
       cis->name = BLI_strdup(name);
       cis->index = item_index;
@@ -603,7 +604,7 @@ int UI_icon_from_id(const ID *id)
     if (ob->type == OB_EMPTY) {
       return ICON_EMPTY_DATA;
     }
-    return UI_icon_from_id(ob->data);
+    return UI_icon_from_id((const ID *)ob->data);
   }
 
   /* otherwise get it through RNA, creating the pointer
@@ -801,7 +802,7 @@ struct uiButStoreElem {
  */
 uiButStore *UI_butstore_create(uiBlock *block)
 {
-  uiButStore *bs_handle = MEM_callocN(sizeof(uiButStore), __func__);
+  uiButStore *bs_handle = (uiButStore *)MEM_callocN(sizeof(uiButStore), __func__);
 
   bs_handle->block = block;
   BLI_addtail(&block->butstore, bs_handle);
@@ -851,7 +852,7 @@ bool UI_butstore_is_registered(uiBlock *block, uiBut *but)
 
 void UI_butstore_register(uiButStore *bs_handle, uiBut **but_p)
 {
-  uiButStoreElem *bs_elem = MEM_callocN(sizeof(uiButStoreElem), __func__);
+  uiButStoreElem *bs_elem = (uiButStoreElem *)MEM_callocN(sizeof(uiButStoreElem), __func__);
   BLI_assert(*but_p);
   bs_elem->but_p = but_p;
 

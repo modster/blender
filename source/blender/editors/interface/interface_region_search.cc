@@ -167,7 +167,7 @@ bool UI_search_item_add(uiSearchItems *items,
   if (name_prefix_offset != 0) {
     /* Lazy initialize, as this isn't used often. */
     if (items->name_prefix_offsets == NULL) {
-      items->name_prefix_offsets = MEM_callocN(
+      items->name_prefix_offsets = (uint8_t *)MEM_callocN(
           items->maxitem * sizeof(*items->name_prefix_offsets), "search name prefix offsets");
     }
     items->name_prefix_offsets[items->totitem] = name_prefix_offset;
@@ -218,7 +218,7 @@ int UI_search_items_find_index(uiSearchItems *items, const char *name)
 /* region is the search box itself */
 static void ui_searchbox_select(bContext *C, ARegion *region, uiBut *but, int step)
 {
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
 
   /* apply step */
   data->active += step;
@@ -285,14 +285,14 @@ static void ui_searchbox_butrect(rcti *r_rect, uiSearchboxData *data, int itemnr
 
 int ui_searchbox_find_index(ARegion *region, const char *name)
 {
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
   return UI_search_items_find_index(&data->items, name);
 }
 
 /* x and y in screen-coords. */
 bool ui_searchbox_inside(ARegion *region, int x, int y)
 {
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
 
   return BLI_rcti_isect_pt(&data->bbox, x - region->winrct.xmin, y - region->winrct.ymin);
 }
@@ -300,7 +300,7 @@ bool ui_searchbox_inside(ARegion *region, int x, int y)
 /* string validated to be of correct length (but->hardmax) */
 bool ui_searchbox_apply(uiBut *but, ARegion *region)
 {
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
   uiButSearch *search_but = (uiButSearch *)but;
 
   BLI_assert(but->type == UI_BTYPE_SEARCH_MENU);
@@ -352,7 +352,7 @@ static struct ARegion *wm_searchbox_tooltip_init(struct bContext *C,
       }
 
       ARegion *searchbox_region = UI_region_searchbox_region_get(region);
-      uiSearchboxData *data = searchbox_region->regiondata;
+      uiSearchboxData *data = (uiSearchboxData *)searchbox_region->regiondata;
 
       BLI_assert(data->items.pointers[data->active] == search_but->item_active);
 
@@ -369,7 +369,7 @@ static struct ARegion *wm_searchbox_tooltip_init(struct bContext *C,
 bool ui_searchbox_event(
     bContext *C, ARegion *region, uiBut *but, ARegion *butregion, const wmEvent *event)
 {
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
   uiButSearch *search_but = (uiButSearch *)but;
   int type = event->type, val = event->val;
   bool handled = false;
@@ -476,7 +476,7 @@ static void ui_searchbox_update_fn(bContext *C,
 void ui_searchbox_update(bContext *C, ARegion *region, uiBut *but, const bool reset)
 {
   uiButSearch *search_but = (uiButSearch *)but;
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
 
   BLI_assert(but->type == UI_BTYPE_SEARCH_MENU);
 
@@ -555,7 +555,7 @@ void ui_searchbox_update(bContext *C, ARegion *region, uiBut *but, const bool re
 int ui_searchbox_autocomplete(bContext *C, ARegion *region, uiBut *but, char *str)
 {
   uiButSearch *search_but = (uiButSearch *)but;
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
   int match = AUTOCOMPLETE_NO_MATCH;
 
   BLI_assert(but->type == UI_BTYPE_SEARCH_MENU);
@@ -574,7 +574,7 @@ int ui_searchbox_autocomplete(bContext *C, ARegion *region, uiBut *but, char *st
 
 static void ui_searchbox_region_draw_cb(const bContext *C, ARegion *region)
 {
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
 
   /* pixel space */
   wmOrtho2_region_pixelspace(region);
@@ -699,7 +699,7 @@ static void ui_searchbox_region_draw_cb(const bContext *C, ARegion *region)
 
 static void ui_searchbox_region_free_cb(ARegion *region)
 {
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
   int a;
 
   /* free search data */
@@ -738,7 +738,8 @@ ARegion *ui_searchbox_create_generic(bContext *C, ARegion *butregion, uiButSearc
   region->type = &type;
 
   /* create searchbox data */
-  uiSearchboxData *data = MEM_callocN(sizeof(uiSearchboxData), "uiSearchboxData");
+  uiSearchboxData *data = (uiSearchboxData *)MEM_callocN(sizeof(uiSearchboxData),
+                                                         "uiSearchboxData");
 
   /* set font, get bb */
   data->fstyle = style->widget; /* copy struct */
@@ -876,13 +877,14 @@ ARegion *ui_searchbox_create_generic(bContext *C, ARegion *butregion, uiButSearc
   }
   data->items.maxstrlen = but->hardmax;
   data->items.totitem = 0;
-  data->items.names = MEM_callocN(data->items.maxitem * sizeof(void *), "search names");
-  data->items.pointers = MEM_callocN(data->items.maxitem * sizeof(void *), "search pointers");
-  data->items.icons = MEM_callocN(data->items.maxitem * sizeof(int), "search icons");
-  data->items.states = MEM_callocN(data->items.maxitem * sizeof(int), "search flags");
+  data->items.names = (char **)MEM_callocN(data->items.maxitem * sizeof(void *), "search names");
+  data->items.pointers = (void **)MEM_callocN(data->items.maxitem * sizeof(void *),
+                                              "search pointers");
+  data->items.icons = (int *)MEM_callocN(data->items.maxitem * sizeof(int), "search icons");
+  data->items.states = (int *)MEM_callocN(data->items.maxitem * sizeof(int), "search flags");
   data->items.name_prefix_offsets = NULL; /* Lazy initialized as needed. */
   for (int i = 0; i < data->items.maxitem; i++) {
-    data->items.names[i] = MEM_callocN(but->hardmax + 1, "search pointers");
+    data->items.names[i] = (char *)MEM_callocN(but->hardmax + 1, "search pointers");
   }
 
   return region;
@@ -915,7 +917,7 @@ static void str_tolower_titlecaps_ascii(char *str, const size_t len)
 
 static void ui_searchbox_region_draw_cb__operator(const bContext *UNUSED(C), ARegion *region)
 {
-  uiSearchboxData *data = region->regiondata;
+  uiSearchboxData *data = (uiSearchboxData *)region->regiondata;
 
   /* pixel space */
   wmOrtho2_region_pixelspace(region);
@@ -944,9 +946,9 @@ static void ui_searchbox_region_draw_cb__operator(const bContext *UNUSED(C), ARe
       {
         const int state = ((a == data->active) ? UI_ACTIVE : 0) | data->items.states[a];
 
-        wmOperatorType *ot = data->items.pointers[a];
+        wmOperatorType *ot = (wmOperatorType *)data->items.pointers[a];
         char text_pre[128];
-        char *text_pre_p = strstr(ot->idname, "_OT_");
+        char *text_pre_p = const_cast<char *>(strstr(ot->idname, "_OT_"));
         if (text_pre_p == NULL) {
           text_pre[0] = '\0';
         }
@@ -1040,17 +1042,17 @@ void ui_but_search_refresh(uiButSearch *search_but)
     return;
   }
 
-  items = MEM_callocN(sizeof(uiSearchItems), "search items");
+  items = (uiSearchItems *)MEM_callocN(sizeof(uiSearchItems), "search items");
 
   /* setup search struct */
   items->maxitem = 10;
   items->maxstrlen = 256;
-  items->names = MEM_callocN(items->maxitem * sizeof(void *), "search names");
+  items->names = (char **)MEM_callocN(items->maxitem * sizeof(void *), "search names");
   for (x1 = 0; x1 < items->maxitem; x1++) {
-    items->names[x1] = MEM_callocN(but->hardmax + 1, "search names");
+    items->names[x1] = (char *)MEM_callocN(but->hardmax + 1, "search names");
   }
 
-  ui_searchbox_update_fn(but->block->evil_C, search_but, but->drawstr, items);
+  ui_searchbox_update_fn((bContext *)but->block->evil_C, search_but, but->drawstr, items);
 
   if (!search_but->results_are_suggestions) {
     /* Only red-alert when we are sure of it, this can miss cases when >10 matches. */

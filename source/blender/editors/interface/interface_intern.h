@@ -111,7 +111,7 @@ typedef enum RadialDirection {
   UI_RADIAL_NW = 7,
 } RadialDirection;
 
-extern const char ui_radial_dir_order[8];
+extern const RadialDirection ui_radial_dir_order[8];
 extern const char ui_radial_dir_to_numpad[8];
 extern const short ui_radial_dir_to_angle[8];
 
@@ -1068,7 +1068,7 @@ void ui_item_menutype_func(struct bContext *C, struct uiLayout *layout, void *ar
 void ui_item_paneltype_func(struct bContext *C, struct uiLayout *layout, void *arg_pt);
 
 /* interface_button_group.c */
-void ui_block_new_button_group(uiBlock *block, uiButtonGroupFlag flag);
+struct uiButtonGroup *ui_block_new_button_group(uiBlock *block);
 void ui_button_group_add_but(uiBlock *block, uiBut *but);
 void ui_button_group_replace_but_ptr(uiBlock *block, const void *old_but_ptr, uiBut *new_but);
 void ui_block_free_button_groups(uiBlock *block);

@@ -1041,9 +1041,9 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
 void UI_theme_init_default(void)
 {
   /* we search for the theme with name Default */
-  bTheme *btheme = BLI_findstring(&U.themes, "Default", offsetof(bTheme, name));
+  bTheme *btheme = (bTheme *)BLI_findstring(&U.themes, "Default", offsetof(bTheme, name));
   if (btheme == NULL) {
-    btheme = MEM_callocN(sizeof(bTheme), __func__);
+    btheme = (bTheme *)MEM_callocN(sizeof(bTheme), __func__);
     BLI_addtail(&U.themes, btheme);
   }
 
@@ -1065,27 +1065,27 @@ void UI_SetTheme(int spacetype, int regionid)
 {
   if (spacetype) {
     /* later on, a local theme can be found too */
-    theme_active = U.themes.first;
+    theme_active = (bTheme *)U.themes.first;
     theme_spacetype = spacetype;
     theme_regionid = regionid;
   }
   else if (regionid) {
     /* popups */
-    theme_active = U.themes.first;
+    theme_active = (bTheme *)U.themes.first;
     theme_spacetype = SPACE_PROPERTIES;
     theme_regionid = regionid;
   }
   else {
     /* for safety, when theme was deleted */
-    theme_active = U.themes.first;
+    theme_active = (bTheme *)U.themes.first;
     theme_spacetype = SPACE_VIEW3D;
     theme_regionid = RGN_TYPE_WINDOW;
   }
 }
 
-bTheme *UI_GetTheme(void)
+bTheme *UI_GetTheme()
 {
-  return U.themes.first;
+  return (bTheme *)U.themes.first;
 }
 
 /**

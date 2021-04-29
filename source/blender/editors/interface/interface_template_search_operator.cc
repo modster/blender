@@ -49,7 +49,7 @@
 
 static void operator_search_exec_fn(bContext *C, void *UNUSED(arg1), void *arg2)
 {
-  wmOperatorType *ot = arg2;
+  wmOperatorType *ot = (wmOperatorType *)arg2;
 
   if (ot) {
     WM_operator_name_call_ptr(C, ot, WM_OP_INVOKE_DEFAULT, NULL);
@@ -72,7 +72,7 @@ static void operator_search_update_fn(const bContext *C,
 
   for (WM_operatortype_iter(&iter); !BLI_ghashIterator_done(&iter);
        BLI_ghashIterator_step(&iter)) {
-    wmOperatorType *ot = BLI_ghashIterator_getValue(&iter);
+    wmOperatorType *ot = (wmOperatorType *)BLI_ghashIterator_getValue(&iter);
     const char *ot_ui_name = CTX_IFACE_(ot->translation_context, ot->name);
 
     if ((ot->flag & OPTYPE_INTERNAL) && (G.debug & G_DEBUG_WM) == 0) {

@@ -119,10 +119,10 @@ void icon_draw_rect_input(float x,
   UI_draw_roundbox_corner_set(UI_CNR_ALL);
   UI_draw_roundbox_aa(
       &(const rctf){
-          .xmin = (int)x - U.pixelsize,
-          .xmax = (int)(x + w),
-          .ymin = (int)y,
-          .ymax = (int)(y + h),
+          (int)x - U.pixelsize,
+          (int)(x + w),
+          (int)y,
+          (int)(y + h),
       },
       false,
       3.0f * U.pixelsize,
@@ -144,10 +144,10 @@ void icon_draw_rect_input(float x,
       ;
 
   const rctf rect = {
-      .xmin = x,
-      .ymin = y,
-      .xmax = x + w,
-      .ymax = y + h,
+      x,
+      x + w,
+      y,
+      y + h,
   };
 
   if ((event_type >= EVT_AKEY) && (event_type <= EVT_ZKEY)) {

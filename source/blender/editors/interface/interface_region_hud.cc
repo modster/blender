@@ -106,7 +106,7 @@ static bool hud_panel_operator_redo_poll(const bContext *C, PanelType *UNUSED(pt
   ScrArea *area = CTX_wm_area(C);
   ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_HUD);
   if (region != NULL) {
-    struct HudRegionData *hrd = region->regiondata;
+    HudRegionData *hrd = (HudRegionData *)region->regiondata;
     if (hrd != NULL) {
       return last_redo_poll(C, hrd->regionid);
     }
@@ -135,9 +135,7 @@ static void hud_panel_operator_redo_draw(const bContext *C, Panel *panel)
 
 static void hud_panels_register(ARegionType *art, int space_type, int region_type)
 {
-  PanelType *pt;
-
-  pt = MEM_callocN(sizeof(PanelType), __func__);
+  PanelType *pt = (PanelType *)MEM_callocN(sizeof(PanelType), __func__);
   strcpy(pt->idname, "OPERATOR_PT_redo");
   strcpy(pt->label, N_("Redo"));
   strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
@@ -170,7 +168,7 @@ static void hud_region_free(ARegion *region)
 
 static void hud_region_layout(const bContext *C, ARegion *region)
 {
-  struct HudRegionData *hrd = region->regiondata;
+  HudRegionData *hrd = (HudRegionData *)region->regiondata;
   if (hrd == NULL || !last_redo_poll(C, hrd->regionid)) {
     ED_region_tag_redraw(region);
     hud_region_hide(region);
@@ -220,19 +218,20 @@ static void hud_region_draw(const bContext *C, ARegion *region)
   GPU_clear_color(0.0f, 0.0f, 0.0f, 0.0f);
 
   if ((region->flag & RGN_FLAG_HIDDEN) == 0) {
-    ui_draw_menu_back(NULL,
-                      NULL,
-                      &(rcti){
-                          .xmax = region->winx,
-                          .ymax = region->winy,
-                      });
+    rcti rect{
+        0,
+        region->winx,
+        0,
+        region->winy,
+    };
+    ui_draw_menu_back(NULL, NULL, &rect);
     ED_region_panels_draw(C, region);
   }
 }
 
 ARegionType *ED_area_type_hud(int space_type)
 {
-  ARegionType *art = MEM_callocN(sizeof(ARegionType), __func__);
+  ARegionType *art = (ARegionType *)MEM_callocN(sizeof(ARegionType), __func__);
   art->regionid = RGN_TYPE_HUD;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D;
   art->layout = hud_region_layout;
@@ -253,7 +252,7 @@ ARegionType *ED_area_type_hud(int space_type)
 
 static ARegion *hud_region_add(ScrArea *area)
 {
-  ARegion *region = MEM_callocN(sizeof(ARegion), "area region");
+  ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), "area region");
   ARegion *region_win = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
   if (region_win) {
     BLI_insertlinkbefore(&area->regionbase, region_win, region);
@@ -347,9 +346,9 @@ void ED_area_type_hud_ensure(bContext *C, ScrArea *area)
   }
 
   {
-    struct HudRegionData *hrd = region->regiondata;
+    HudRegionData *hrd = (HudRegionData *)region->regiondata;
     if (hrd == NULL) {
-      hrd = MEM_callocN(sizeof(*hrd), __func__);
+      hrd = (HudRegionData *)MEM_callocN(sizeof(*hrd), __func__);
       region->regiondata = hrd;
     }
     if (region_op) {
@@ -371,8 +370,10 @@ void ED_area_type_hud_ensure(bContext *C, ScrArea *area)
 
   /* Reset zoom level (not well supported). */
   region->v2d.cur = region->v2d.tot = (rctf){
-      .xmax = region->winx,
-      .ymax = region->winy,
+      0.0f,
+      region->winx,
+      0.0f,
+      region->winy,
   };
   region->v2d.minzoom = 1.0f;
   region->v2d.maxzoom = 1.0f;
@@ -389,8 +390,10 @@ void ED_area_type_hud_ensure(bContext *C, ScrArea *area)
       region->winx = region->v2d.winx;
       region->winy = region->v2d.winy;
       region->v2d.cur = region->v2d.tot = (rctf){
-          .xmax = region->winx,
-          .ymax = region->winy,
+          0.0f,
+          region->winx,
+          0.0f,
+          region->winy,
       };
     }
     CTX_wm_region_set((bContext *)C, region_prev);

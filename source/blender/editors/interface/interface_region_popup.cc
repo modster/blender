@@ -354,7 +354,7 @@ static void ui_popup_block_position(wmWindow *window,
   }
 
   /* Keep a list of these, needed for pull-down menus. */
-  uiSafetyRct *saferct = MEM_callocN(sizeof(uiSafetyRct), "uiSafetyRct");
+  uiSafetyRct *saferct = (uiSafetyRct *)MEM_callocN(sizeof(uiSafetyRct), "uiSafetyRct");
   saferct->parent = butrct;
   saferct->safety = block->safety;
   BLI_freelistN(&block->saferct);
@@ -570,7 +570,7 @@ uiBlock *ui_popup_block_refresh(bContext *C,
   const uiBlockHandleCreateFunc handle_create_func = handle->popup_create_vars.handle_create_func;
   void *arg = handle->popup_create_vars.arg;
 
-  uiBlock *block_old = region->uiblocks.first;
+  uiBlock *block_old = (uiBlock *)region->uiblocks.first;
   uiBlock *block;
 
   handle->refresh = (block_old != NULL);
@@ -633,7 +633,7 @@ uiBlock *ui_popup_block_refresh(bContext *C,
   else {
     uiSafetyRct *saferct;
     /* Keep a list of these, needed for pull-down menus. */
-    saferct = MEM_callocN(sizeof(uiSafetyRct), "uiSafetyRct");
+    saferct = (uiSafetyRct *)MEM_callocN(sizeof(uiSafetyRct), "uiSafetyRct");
     saferct->safety = block->safety;
     BLI_addhead(&block->saferct, saferct);
   }
@@ -780,7 +780,6 @@ uiPopupBlockHandle *ui_popup_block_create(bContext *C,
   static ARegionType type;
   ARegion *region;
   uiBlock *block;
-  uiPopupBlockHandle *handle;
 
   /* disable tooltips from buttons below */
   if (activebut) {
@@ -790,7 +789,8 @@ uiPopupBlockHandle *ui_popup_block_create(bContext *C,
   WM_cursor_set(window, WM_CURSOR_DEFAULT);
 
   /* create handle */
-  handle = MEM_callocN(sizeof(uiPopupBlockHandle), "uiPopupBlockHandle");
+  uiPopupBlockHandle *handle = (uiPopupBlockHandle *)MEM_callocN(sizeof(uiPopupBlockHandle),
+                                                                 "uiPopupBlockHandle");
 
   /* store context for operator */
   handle->ctx_area = CTX_wm_area(C);

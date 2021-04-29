@@ -199,7 +199,7 @@ static bool ui_but_isect_pie_seg(const uiBlock *block, const uiBut *but)
     return false;
   }
 
-  ui_but_pie_dir(but->pie_dir, vec);
+  ui_but_pie_dir((RadialDirection)but->pie_dir, vec);
 
   if (saacos(dot_v2v2(vec, block->pie_data.pie_dir)) < angle_range) {
     return true;
@@ -412,9 +412,7 @@ uiBut *ui_but_first(uiBlock *block)
 
 uiBut *ui_but_last(uiBlock *block)
 {
-  uiBut *but;
-
-  but = block->buttons.last;
+  uiBut *but = (uiBut *)block->buttons.last;
   while (but) {
     if (ui_but_is_editable(but)) {
       return but;
@@ -517,7 +515,7 @@ static const uiBut *ui_but_next_non_separator(const uiBut *but)
 
 bool UI_block_is_empty_ex(const uiBlock *block, const bool skip_title)
 {
-  const uiBut *but = block->buttons.first;
+  const uiBut *but = (const uiBut *)block->buttons.first;
   if (skip_title) {
     /* Skip the first label, since popups often have a title,
      * we may want to consider the block empty in this case. */
@@ -537,7 +535,7 @@ bool UI_block_is_empty(const uiBlock *block)
 bool UI_block_can_add_separator(const uiBlock *block)
 {
   if (ui_block_is_menu(block) && !ui_block_is_pie_menu(block)) {
-    const uiBut *but = block->buttons.last;
+    const uiBut *but = (const uiBut *)block->buttons.last;
     return (but && !ELEM(but->type, UI_BTYPE_SEPR_LINE, UI_BTYPE_SEPR));
   }
   return true;

@@ -88,16 +88,16 @@ struct MenuSearch_Context {
 };
 
 struct MenuSearch_Parent {
-  struct MenuSearch_Parent *parent;
+  MenuSearch_Parent *parent;
   MenuType *parent_mt;
   const char *drawstr;
 
   /** Set while writing menu items only. */
-  struct MenuSearch_Parent *temp_child;
+  MenuSearch_Parent *temp_child;
 };
 
 struct MenuSearch_Item {
-  struct MenuSearch_Item *next, *prev;
+  MenuSearch_Item *next, *prev;
   const char *drawstr;
   const char *drawwstr_full;
   /** Support a single level sub-menu nesting (for operator buttons that expand). */
@@ -105,7 +105,7 @@ struct MenuSearch_Item {
   int icon;
   int state;
 
-  struct MenuSearch_Parent *menu_parent;
+  MenuSearch_Parent *menu_parent;
   MenuType *mt;
 
   enum {
@@ -133,7 +133,7 @@ struct MenuSearch_Item {
   };
 
   /** Set when we need each menu item to be able to set its own context. may be NULL. */
-  struct MenuSearch_Context *wm_context;
+  MenuSearch_Context *wm_context;
 };
 
 struct MenuSearch_Data {
@@ -151,15 +151,15 @@ struct MenuSearch_Data {
 
 static int menu_item_sort_by_drawstr_full(const void *menu_item_a_v, const void *menu_item_b_v)
 {
-  const struct MenuSearch_Item *menu_item_a = menu_item_a_v;
-  const struct MenuSearch_Item *menu_item_b = menu_item_b_v;
+  const MenuSearch_Item *menu_item_a = (MenuSearch_Item *)menu_item_a_v;
+  const MenuSearch_Item *menu_item_b = (MenuSearch_Item *)menu_item_b_v;
   return strcmp(menu_item_a->drawwstr_full, menu_item_b->drawwstr_full);
 }
 
 static const char *strdup_memarena(MemArena *memarena, const char *str)
 {
   const uint str_size = strlen(str) + 1;
-  char *str_dst = BLI_memarena_alloc(memarena, str_size);
+  char *str_dst = (char *)BLI_memarena_alloc(memarena, str_size);
   memcpy(str_dst, str, str_size);
   return str_dst;
 }
@@ -167,19 +167,19 @@ static const char *strdup_memarena(MemArena *memarena, const char *str)
 static const char *strdup_memarena_from_dynstr(MemArena *memarena, DynStr *dyn_str)
 {
   const uint str_size = BLI_dynstr_get_len(dyn_str) + 1;
-  char *str_dst = BLI_memarena_alloc(memarena, str_size);
+  char *str_dst = (char *)BLI_memarena_alloc(memarena, str_size);
   BLI_dynstr_get_cstring_ex(dyn_str, str_dst);
   return str_dst;
 }
 
-static bool menu_items_from_ui_create_item_from_button(struct MenuSearch_Data *data,
+static bool menu_items_from_ui_create_item_from_button(MenuSearch_Data *data,
                                                        MemArena *memarena,
                                                        struct MenuType *mt,
                                                        const char *drawstr_submenu,
                                                        uiBut *but,
-                                                       struct MenuSearch_Context *wm_context)
+                                                       MenuSearch_Context *wm_context)
 {
-  struct MenuSearch_Item *item = NULL;
+  MenuSearch_Item *item = NULL;
 
   /* Use override if the name is empty, this can happen with popovers. */
   const char *drawstr_override = NULL;
@@ -193,8 +193,8 @@ static bool menu_items_from_ui_create_item_from_button(struct MenuSearch_Data *d
       drawstr_override = WM_operatortype_name(but->optype, but->opptr);
     }
 
-    item = BLI_memarena_calloc(memarena, sizeof(*item));
-    item->type = MENU_SEARCH_TYPE_OP;
+    item = (MenuSearch_Item *)BLI_memarena_calloc(memarena, sizeof(*item));
+    item->type = MenuSearch_Item::MENU_SEARCH_TYPE_OP;
 
     item->op.type = but->optype;
     item->op.opcontext = but->opcontext;
@@ -209,8 +209,11 @@ static bool menu_items_from_ui_create_item_from_button(struct MenuSearch_Data *d
       if (prop_type == PROP_ENUM) {
         const int value_enum = (int)but->hardmax;
         EnumPropertyItem enum_item;
-        if (RNA_property_enum_item_from_value_gettexted(
-                but->block->evil_C, &but->rnapoin, but->rnaprop, value_enum, &enum_item)) {
+        if (RNA_property_enum_item_from_value_gettexted((bContext *)but->block->evil_C,
+                                                        &but->rnapoin,
+                                                        but->rnaprop,
+                                                        value_enum,
+                                                        &enum_item)) {
           drawstr_override = enum_item.name;
         }
         else {
@@ -232,8 +235,8 @@ static bool menu_items_from_ui_create_item_from_button(struct MenuSearch_Data *d
              prop_type);
     }
     else {
-      item = BLI_memarena_calloc(memarena, sizeof(*item));
-      item->type = MENU_SEARCH_TYPE_RNA;
+      MenuSearch_Item *item = (MenuSearch_Item *)BLI_memarena_calloc(memarena, sizeof(*item));
+      item->type = MenuSearch_Item::MENU_SEARCH_TYPE_RNA;
 
       item->rna.ptr = but->rnapoin;
       item->rna.prop = but->rnaprop;
@@ -275,11 +278,11 @@ static bool menu_items_from_ui_create_item_from_button(struct MenuSearch_Data *d
 /**
  * Populate a fake button from a menu item (use for context menu).
  */
-static bool menu_items_to_ui_button(struct MenuSearch_Item *item, uiBut *but)
+static bool menu_items_to_ui_button(MenuSearch_Item *item, uiBut *but)
 {
   bool changed = false;
   switch (item->type) {
-    case MENU_SEARCH_TYPE_OP: {
+    case MenuSearch_Item::MENU_SEARCH_TYPE_OP: {
       but->optype = item->op.type;
       but->opcontext = item->op.opcontext;
       but->context = item->op.context;
@@ -287,7 +290,7 @@ static bool menu_items_to_ui_button(struct MenuSearch_Item *item, uiBut *but)
       changed = true;
       break;
     }
-    case MENU_SEARCH_TYPE_RNA: {
+    case MenuSearch_Item::MENU_SEARCH_TYPE_RNA: {
       const int prop_type = RNA_property_type(item->rna.prop);
 
       but->rnapoin = item->rna.ptr;
@@ -310,7 +313,7 @@ static bool menu_items_to_ui_button(struct MenuSearch_Item *item, uiBut *but)
       *drawstr_sep = '\0';
     }
 
-    but->icon = item->icon;
+    but->icon = (BIFIconID)item->icon;
     but->str = but->strdata;
   }
 
@@ -381,7 +384,7 @@ static void menu_types_add_from_keymap_items(bContext *C,
 /**
  * Display all operators (last). Developer-only convenience feature.
  */
-static void menu_items_from_all_operators(bContext *C, struct MenuSearch_Data *data)
+static void menu_items_from_all_operators(bContext *C, MenuSearch_Data *data)
 {
   /* Add to temporary list so we can sort them separately. */
   ListBase operator_items = {NULL, NULL};
@@ -390,7 +393,7 @@ static void menu_items_from_all_operators(bContext *C, struct MenuSearch_Data *d
   GHashIterator iter;
   for (WM_operatortype_iter(&iter); !BLI_ghashIterator_done(&iter);
        BLI_ghashIterator_step(&iter)) {
-    wmOperatorType *ot = BLI_ghashIterator_getValue(&iter);
+    wmOperatorType *ot = (wmOperatorType *)BLI_ghashIterator_getValue(&iter);
 
     if ((ot->flag & OPTYPE_INTERNAL) && (G.debug & G_DEBUG_WM) == 0) {
       continue;
@@ -399,9 +402,8 @@ static void menu_items_from_all_operators(bContext *C, struct MenuSearch_Data *d
     if (WM_operator_poll((bContext *)C, ot)) {
       const char *ot_ui_name = CTX_IFACE_(ot->translation_context, ot->name);
 
-      struct MenuSearch_Item *item = NULL;
-      item = BLI_memarena_calloc(memarena, sizeof(*item));
-      item->type = MENU_SEARCH_TYPE_OP;
+      MenuSearch_Item *item = (MenuSearch_Item *)BLI_memarena_calloc(memarena, sizeof(*item));
+      item->type = MenuSearch_Item::MENU_SEARCH_TYPE_OP;
 
       item->op.type = ot;
       item->op.opcontext = WM_OP_INVOKE_DEFAULT;
@@ -433,7 +435,7 @@ static void menu_items_from_all_operators(bContext *C, struct MenuSearch_Data *d
  * - Look up predefined editor-menus.
  * - Look up key-map items which call menus.
  */
-static struct MenuSearch_Data *menu_items_from_ui_create(
+static MenuSearch_Data *menu_items_from_ui_create(
     bContext *C, wmWindow *win, ScrArea *area_init, ARegion *region_init, bool include_all_areas)
 {
   MemArena *memarena = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
@@ -443,7 +445,7 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
   const uiStyle *style = UI_style_get_dpi();
 
   /* Convert into non-ui structure. */
-  struct MenuSearch_Data *data = MEM_callocN(sizeof(*data), __func__);
+  MenuSearch_Data *data = (MenuSearch_Data *)MEM_callocN(sizeof(*data), __func__);
 
   DynStr *dyn_str = BLI_dynstr_new_memarena();
 
@@ -482,7 +484,7 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
 
     for (WM_menutype_iter(&iter); (!BLI_ghashIterator_done(&iter));
          (BLI_ghashIterator_step(&iter))) {
-      MenuType *mt = BLI_ghashIterator_getValue(&iter);
+      MenuType *mt = (MenuType *)BLI_ghashIterator_getValue(&iter);
       if (BLI_str_endswith(mt->idname, "_context_menu")) {
         BLI_gset_add(menu_tagged, mt);
       }
@@ -500,7 +502,7 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
   }
 
   /* Collect contexts, one for each 'ui_type'. */
-  struct MenuSearch_Context *wm_contexts = NULL;
+  MenuSearch_Context *wm_contexts = NULL;
 
   const EnumPropertyItem *space_type_ui_items = NULL;
   int space_type_ui_items_len = 0;
@@ -531,7 +533,8 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
                               &space_type_ui_items_len,
                               &space_type_ui_items_free);
 
-      wm_contexts = BLI_memarena_calloc(memarena, sizeof(*wm_contexts) * space_type_ui_items_len);
+      wm_contexts = (MenuSearch_Context *)BLI_memarena_calloc(
+          memarena, sizeof(*wm_contexts) * space_type_ui_items_len);
       for (int i = 0; i < space_type_ui_items_len; i++) {
         wm_contexts[i].space_type_ui_index = -1;
       }
@@ -574,7 +577,7 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
 
     ScrArea *area = NULL;
     ARegion *region = NULL;
-    struct MenuSearch_Context *wm_context = NULL;
+    MenuSearch_Context *wm_context = NULL;
 
     if (include_all_areas) {
       if (space_type_ui_index == -1) {
@@ -623,7 +626,7 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
     break
 
       if (area != NULL) {
-        SpaceLink *sl = area->spacedata.first;
+        SpaceLink *sl = (SpaceLink *)area->spacedata.first;
         switch ((eSpace_Type)area->spacetype) {
           SPACE_MENU_MAP(SPACE_VIEW3D, "VIEW3D_MT_editor_menus");
           SPACE_MENU_MAP(SPACE_GRAPH, "GRAPH_MT_editor_menus");
@@ -669,7 +672,7 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
     bool has_keymap_menu_items = false;
 
     while (menu_stack != NULL) {
-      MenuType *mt = BLI_linklist_pop(&menu_stack);
+      MenuType *mt = (MenuType *)BLI_linklist_pop(&menu_stack);
       if (!WM_menutype_poll(C, mt)) {
         continue;
       }
@@ -713,8 +716,8 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
           }
 
           if (!BLI_ghash_haskey(menu_parent_map, mt_from_but)) {
-            struct MenuSearch_Parent *menu_parent = BLI_memarena_calloc(memarena,
-                                                                        sizeof(*menu_parent));
+            MenuSearch_Parent *menu_parent = (MenuSearch_Parent *)BLI_memarena_calloc(
+                memarena, sizeof(*menu_parent));
             /* Use brackets for menu key shortcuts,
              * converting "Text|Some-Shortcut" to "Text (Some-Shortcut)".
              * This is needed so we don't right align sub-menu contents
@@ -804,20 +807,21 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
     }
   }
 
-  LISTBASE_FOREACH (struct MenuSearch_Item *, item, &data->items) {
-    item->menu_parent = BLI_ghash_lookup(menu_parent_map, item->mt);
+  LISTBASE_FOREACH (MenuSearch_Item *, item, &data->items) {
+    item->menu_parent = (MenuSearch_Parent *)BLI_ghash_lookup(menu_parent_map, item->mt);
   }
 
   GHASH_ITER (iter, menu_parent_map) {
-    struct MenuSearch_Parent *menu_parent = BLI_ghashIterator_getValue(&iter);
-    menu_parent->parent = BLI_ghash_lookup(menu_parent_map, menu_parent->parent_mt);
+    MenuSearch_Parent *menu_parent = (MenuSearch_Parent *)BLI_ghashIterator_getValue(&iter);
+    menu_parent->parent = (MenuSearch_Parent *)BLI_ghash_lookup(menu_parent_map,
+                                                                menu_parent->parent_mt);
   }
 
   /* NOTE: currently this builds the full path for each menu item,
    * that could be moved into the parent menu. */
 
   /* Set names as full paths. */
-  LISTBASE_FOREACH (struct MenuSearch_Item *, item, &data->items) {
+  LISTBASE_FOREACH (MenuSearch_Item *, item, &data->items) {
     BLI_assert(BLI_dynstr_get_len(dyn_str) == 0);
 
     if (include_all_areas) {
@@ -829,7 +833,7 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
     }
 
     if (item->menu_parent != NULL) {
-      struct MenuSearch_Parent *menu_parent = item->menu_parent;
+      MenuSearch_Parent *menu_parent = item->menu_parent;
       menu_parent->temp_child = NULL;
       while (menu_parent && menu_parent->parent) {
         menu_parent->parent->temp_child = menu_parent;
@@ -842,13 +846,13 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
       }
     }
     else {
-      const char *drawstr = BLI_ghash_lookup(menu_display_name_map, item->mt);
+      const char *drawstr = (const char *)BLI_ghash_lookup(menu_display_name_map, item->mt);
       if (drawstr == NULL) {
         drawstr = CTX_IFACE_(item->mt->translation_context, item->mt->label);
       }
       BLI_dynstr_append(dyn_str, drawstr);
 
-      wmKeyMapItem *kmi = BLI_ghash_lookup(menu_to_kmi, item->mt);
+      wmKeyMapItem *kmi = (wmKeyMapItem *)BLI_ghash_lookup(menu_to_kmi, item->mt);
       if (kmi != NULL) {
         char kmi_str[128];
         WM_keymap_item_to_string(kmi, false, kmi_str, sizeof(kmi_str));
@@ -914,16 +918,16 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
 
 static void menu_search_arg_free_fn(void *data_v)
 {
-  struct MenuSearch_Data *data = data_v;
-  LISTBASE_FOREACH (struct MenuSearch_Item *, item, &data->items) {
+  MenuSearch_Data *data = (MenuSearch_Data *)data_v;
+  LISTBASE_FOREACH (MenuSearch_Item *, item, &data->items) {
     switch (item->type) {
-      case MENU_SEARCH_TYPE_OP: {
+      case MenuSearch_Item::MENU_SEARCH_TYPE_OP: {
         if (item->op.opptr != NULL) {
           WM_operator_properties_free(item->op.opptr);
           MEM_freeN(item->op.opptr);
         }
       }
-      case MENU_SEARCH_TYPE_RNA: {
+      case MenuSearch_Item::MENU_SEARCH_TYPE_RNA: {
         break;
       }
     }
@@ -936,7 +940,8 @@ static void menu_search_arg_free_fn(void *data_v)
 
 static void menu_search_exec_fn(bContext *C, void *UNUSED(arg1), void *arg2)
 {
-  struct MenuSearch_Item *item = arg2;
+  MenuSearch_Item *item = (MenuSearch_Item *)arg2;
+
   if (item == NULL) {
     return;
   }
@@ -953,13 +958,13 @@ static void menu_search_exec_fn(bContext *C, void *UNUSED(arg1), void *arg2)
   }
 
   switch (item->type) {
-    case MENU_SEARCH_TYPE_OP: {
+    case MenuSearch_Item::MENU_SEARCH_TYPE_OP: {
       CTX_store_set(C, item->op.context);
       WM_operator_name_call_ptr(C, item->op.type, item->op.opcontext, item->op.opptr);
       CTX_store_set(C, NULL);
       break;
     }
-    case MENU_SEARCH_TYPE_RNA: {
+    case MenuSearch_Item::MENU_SEARCH_TYPE_RNA: {
       PointerRNA *ptr = &item->rna.ptr;
       PropertyRNA *prop = item->rna.prop;
       const int index = item->rna.index;
@@ -1002,19 +1007,19 @@ static void menu_search_update_fn(const bContext *UNUSED(C),
                                   uiSearchItems *items,
                                   const bool UNUSED(is_first))
 {
-  struct MenuSearch_Data *data = arg;
+  MenuSearch_Data *data = (MenuSearch_Data *)arg;
 
   StringSearch *search = BLI_string_search_new();
 
-  LISTBASE_FOREACH (struct MenuSearch_Item *, item, &data->items) {
+  LISTBASE_FOREACH (MenuSearch_Item *, item, &data->items) {
     BLI_string_search_add(search, item->drawwstr_full, item);
   }
 
-  struct MenuSearch_Item **filtered_items;
+  MenuSearch_Item **filtered_items;
   const int filtered_amount = BLI_string_search_query(search, str, (void ***)&filtered_items);
 
   for (int i = 0; i < filtered_amount; i++) {
-    struct MenuSearch_Item *item = filtered_items[i];
+    MenuSearch_Item *item = filtered_items[i];
     if (!UI_search_item_add(items, item->drawwstr_full, item, item->icon, item->state, 0)) {
       break;
     }
@@ -1039,8 +1044,8 @@ static bool ui_search_menu_create_context_menu(struct bContext *C,
                                                void *active,
                                                const struct wmEvent *UNUSED(event))
 {
-  struct MenuSearch_Data *data = arg;
-  struct MenuSearch_Item *item = active;
+  MenuSearch_Data *data = (MenuSearch_Data *)arg;
+  MenuSearch_Item *item = (MenuSearch_Item *)active;
   bool has_menu = false;
 
   memset(&data->context_menu_data, 0x0, sizeof(data->context_menu_data));
@@ -1083,8 +1088,8 @@ static struct ARegion *ui_search_menu_create_tooltip(struct bContext *C,
                                                      void *arg,
                                                      void *active)
 {
-  struct MenuSearch_Data *data = arg;
-  struct MenuSearch_Item *item = active;
+  MenuSearch_Data *data = (MenuSearch_Data *)arg;
+  MenuSearch_Item *item = (MenuSearch_Item *)active;
 
   memset(&data->context_menu_data, 0x0, sizeof(data->context_menu_data));
   uiBut *but = &data->context_menu_data.but;
@@ -1135,14 +1140,13 @@ static struct ARegion *ui_search_menu_create_tooltip(struct bContext *C,
 
 void UI_but_func_menu_search(uiBut *but)
 {
-  bContext *C = but->block->evil_C;
+  bContext *C = (bContext *)but->block->evil_C;
   wmWindow *win = CTX_wm_window(C);
   ScrArea *area = CTX_wm_area(C);
   ARegion *region = CTX_wm_region(C);
   /* When run from top-bar scan all areas in the current window. */
   const bool include_all_areas = (area && (area->spacetype == SPACE_TOPBAR));
-  struct MenuSearch_Data *data = menu_items_from_ui_create(
-      C, win, area, region, include_all_areas);
+  MenuSearch_Data *data = menu_items_from_ui_create(C, win, area, region, include_all_areas);
   UI_but_func_search_set(but,
                          /* Generic callback. */
                          ui_searchbox_create_menu,

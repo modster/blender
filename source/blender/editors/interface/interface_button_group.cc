@@ -32,29 +32,29 @@
  * Every function that adds a set of buttons must create another group,
  * then #ui_def_but adds buttons to the current group (the last).
  */
-void ui_block_new_button_group(uiBlock *block, uiButtonGroupFlag flag)
+uiButtonGroup *ui_block_new_button_group(uiBlock *block)
 {
   /* Don't create a new group if there is a "lock" on new groups. */
   if (!BLI_listbase_is_empty(&block->button_groups)) {
-    uiButtonGroup *last_button_group = block->button_groups.last;
+    uiButtonGroup *last_button_group = (uiButtonGroup *)block->button_groups.last;
     if (last_button_group->flag & UI_BUTTON_GROUP_LOCK) {
-      return;
+      return last_button_group;
     }
   }
 
-  uiButtonGroup *new_group = MEM_mallocN(sizeof(uiButtonGroup), __func__);
+  uiButtonGroup *new_group = (uiButtonGroup *)MEM_mallocN(sizeof(uiButtonGroup), __func__);
   BLI_listbase_clear(&new_group->buttons);
-  new_group->flag = flag;
   BLI_addtail(&block->button_groups, new_group);
+  return new_group;
 }
 
 void ui_button_group_add_but(uiBlock *block, uiBut *but)
 {
   if (BLI_listbase_is_empty(&block->button_groups)) {
-    ui_block_new_button_group(block, 0);
+    ui_block_new_button_group(block);
   }
 
-  uiButtonGroup *current_button_group = block->button_groups.last;
+  uiButtonGroup *current_button_group = (uiButtonGroup *)block->button_groups.last;
 
   /* We can't use the button directly because adding it to
    * this list would mess with its prev and next pointers. */

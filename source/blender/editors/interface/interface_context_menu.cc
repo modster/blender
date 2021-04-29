@@ -104,7 +104,9 @@ static const char *shortcut_get_operator_property(bContext *C, uiBut *but, IDPro
 {
   if (but->optype) {
     /* Operator */
-    *r_prop = (but->opptr && but->opptr->data) ? IDP_CopyProperty(but->opptr->data) : NULL;
+    *r_prop = (but->opptr && but->opptr->data) ?
+                  IDP_CopyProperty((const IDProperty *)but->opptr->data) :
+                  NULL;
     return but->optype->idname;
   }
 
@@ -205,8 +207,8 @@ static uiBlock *menu_change_shortcut(bContext *C, ARegion *region, void *arg)
   uiItemL(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Change Shortcut"), ICON_HAND);
   uiItemR(layout, &ptr, "type", UI_ITEM_R_FULL_EVENT | UI_ITEM_R_IMMEDIATE, "", ICON_NONE);
 
-  UI_block_bounds_set_popup(
-      block, 6 * U.dpi_fac, (const int[2]){-100 * U.dpi_fac, 36 * U.dpi_fac});
+  const int bounds_offset[2] = {int(-100 * U.dpi_fac), int(36 * U.dpi_fac)};
+  UI_block_bounds_set_popup(block, 6 * U.dpi_fac, bounds_offset);
 
   shortcut_free_operator_property(prop);
 
@@ -338,7 +340,7 @@ static bool ui_but_is_user_menu_compatible(bContext *C, uiBut *but)
 static bUserMenuItem *ui_but_user_menu_find(bContext *C, uiBut *but, bUserMenu *um)
 {
   if (but->optype) {
-    IDProperty *prop = (but->opptr) ? but->opptr->data : NULL;
+    IDProperty *prop = (but->opptr) ? (IDProperty *)but->opptr->data : NULL;
     return (bUserMenuItem *)ED_screen_user_menu_item_find_operator(
         &um->items, but->optype, prop, but->opcontext);
   }
@@ -413,8 +415,11 @@ static void ui_but_user_menu_add(bContext *C, uiBut *but, bUserMenu *um)
 #endif
       }
     }
-    ED_screen_user_menu_item_add_operator(
-        &um->items, drawstr, but->optype, but->opptr ? but->opptr->data : NULL, but->opcontext);
+    ED_screen_user_menu_item_add_operator(&um->items,
+                                          drawstr,
+                                          but->optype,
+                                          but->opptr ? (const IDProperty *)but->opptr->data : NULL,
+                                          but->opcontext);
   }
   else if (but->rnaprop) {
     /* Note: 'member_id' may be a path. */
@@ -441,7 +446,7 @@ static void ui_but_user_menu_add(bContext *C, uiBut *but, bUserMenu *um)
 
 static void popup_user_menu_add_or_replace_func(bContext *C, void *arg1, void *UNUSED(arg2))
 {
-  uiBut *but = arg1;
+  uiBut *but = (uiBut *)arg1;
   bUserMenu *um = ED_screen_user_menu_ensure(C);
   U.runtime.is_dirty = true;
   ui_but_user_menu_add(C, but, um);
@@ -449,8 +454,8 @@ static void popup_user_menu_add_or_replace_func(bContext *C, void *arg1, void *U
 
 static void popup_user_menu_remove_func(bContext *UNUSED(C), void *arg1, void *arg2)
 {
-  bUserMenu *um = arg1;
-  bUserMenuItem *umi = arg2;
+  bUserMenu *um = (bUserMenu *)arg1;
+  bUserMenuItem *umi = (bUserMenuItem *)arg2;
   U.runtime.is_dirty = true;
   ED_screen_user_menu_item_remove(&um->items, umi);
 }
@@ -953,7 +958,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 
   /* If the button represents an id, it can set the "id" context pointer. */
   if (U.experimental.use_asset_browser && ED_asset_can_make_single_from_context(C)) {
-    ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
+    ID *id = (ID *)CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
 
     /* Gray out items depending on if data-block is an asset. Preferably this could be done via
      * operator poll, but that doesn't work since the operator also works with "selected_ids",
@@ -1278,7 +1283,7 @@ void ui_popup_context_menu_for_panel(bContext *C, ARegion *region, Panel *panel)
     /* evil, force shortcut flag */
     {
       uiBlock *block = uiLayoutGetBlock(layout);
-      uiBut *but = block->buttons.last;
+      uiBut *but = (uiBut *)block->buttons.last;
       but->flag |= UI_BUT_HAS_SEP_CHAR;
       but->drawflag |= UI_BUT_HAS_SHORTCUT;
     }

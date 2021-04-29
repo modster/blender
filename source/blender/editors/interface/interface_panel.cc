@@ -171,7 +171,7 @@ static bool panel_active_animation_changed(ListBase *lb,
 
     /* Detect animation. */
     if (panel->activedata) {
-      uiHandlePanelData *data = panel->activedata;
+      uiHandlePanelData *data = (uiHandlePanelData *)panel->activedata;
       if (data->state == PANEL_STATE_ANIMATION) {
         *r_panel_animation = panel;
       }
@@ -194,7 +194,7 @@ static bool panel_active_animation_changed(ListBase *lb,
 static bool properties_space_needs_realign(const ScrArea *area, const ARegion *region)
 {
   if (area->spacetype == SPACE_PROPERTIES && region->regiontype == RGN_TYPE_WINDOW) {
-    SpaceProperties *sbuts = area->spacedata.first;
+    SpaceProperties *sbuts = (SpaceProperties *)area->spacedata.first;
 
     if (sbuts->mainbo != sbuts->mainb) {
       return true;
@@ -241,7 +241,7 @@ static Panel *panel_add_instanced(ARegion *region,
                                   PanelType *panel_type,
                                   PointerRNA *custom_data)
 {
-  Panel *panel = MEM_callocN(sizeof(Panel), __func__);
+  Panel *panel = (Panel *)MEM_callocN(sizeof(Panel), __func__);
   panel->type = panel_type;
   BLI_strncpy(panel->panelname, panel_type->idname, sizeof(panel->panelname));
 
@@ -251,7 +251,7 @@ static Panel *panel_add_instanced(ARegion *region,
   /* Add the panel's children too. Although they aren't instanced panels, we can still use this
    * function to create them, as UI_panel_begin does other things we don't need to do. */
   LISTBASE_FOREACH (LinkData *, child, &panel_type->children) {
-    PanelType *child_type = child->data;
+    PanelType *child_type = (PanelType *)child->data;
     panel_add_instanced(region, &panel->children, child_type, custom_data);
   }
 
@@ -285,7 +285,7 @@ Panel *UI_panel_add_instanced(const bContext *C,
 {
   ARegionType *region_type = region->type;
 
-  PanelType *panel_type = BLI_findstring(
+  PanelType *panel_type = (PanelType *)BLI_findstring(
       &region_type->paneltypes, panel_idname, offsetof(PanelType, idname));
 
   if (panel_type == NULL) {
@@ -383,7 +383,7 @@ bool UI_panel_list_matches_data(ARegion *region,
   }
   else {
     data_len = BLI_listbase_count(data);
-    data_link = data->first;
+    data_link = (Link *)data->first;
   }
 
   int i = 0;
@@ -454,7 +454,8 @@ static void reorder_instanced_panel_list(bContext *C, ARegion *region, Panel *dr
   BLI_assert(start_index != -1); /* The drag panel should definitely be in the list. */
 
   /* Sort the matching instanced panels by their display order. */
-  PanelSort *panel_sort = MEM_callocN(list_panels_len * sizeof(*panel_sort), __func__);
+  PanelSort *panel_sort = (PanelSort *)MEM_callocN(list_panels_len * sizeof(*panel_sort),
+                                                   __func__);
   PanelSort *sort_index = panel_sort;
   LISTBASE_FOREACH (Panel *, panel, &region->panels) {
     if (panel->type) {
@@ -709,7 +710,7 @@ Panel *UI_panel_begin(
   const bool newpanel = (panel == NULL);
 
   if (newpanel) {
-    panel = MEM_callocN(sizeof(Panel), __func__);
+    panel = (Panel *)MEM_callocN(sizeof(Panel), __func__);
     panel->type = pt;
     BLI_strncpy(panel->panelname, idname, sizeof(panel->panelname));
 
@@ -739,7 +740,7 @@ Panel *UI_panel_begin(
 
   /* If a new panel is added, we insert it right after the panel that was last added.
    * This way new panels are inserted in the right place between versions. */
-  for (panel_last = lb->first; panel_last; panel_last = panel_last->next) {
+  for (panel_last = (Panel *)lb->first; panel_last; panel_last = panel_last->next) {
     if (panel_last->runtime_flag & PANEL_LAST_ADDED) {
       BLI_remlink(lb, panel);
       BLI_insertlinkafter(lb, panel_last, panel);
@@ -788,7 +789,8 @@ void UI_panel_header_buttons_begin(Panel *panel)
 {
   uiBlock *block = panel->runtime.block;
 
-  ui_block_new_button_group(block, UI_BUTTON_GROUP_LOCK | UI_BUTTON_GROUP_PANEL_HEADER);
+  uiButtonGroup *new_group = ui_block_new_button_group(block);
+  new_group->flag = (UI_BUTTON_GROUP_LOCK | UI_BUTTON_GROUP_PANEL_HEADER);
 }
 
 /**
@@ -801,7 +803,7 @@ void UI_panel_header_buttons_end(Panel *panel)
   /* A button group should always be created in #UI_panel_header_buttons_begin. */
   BLI_assert(!BLI_listbase_is_empty(&block->button_groups));
 
-  uiButtonGroup *button_group = block->button_groups.last;
+  uiButtonGroup *button_group = (uiButtonGroup *)block->button_groups.last;
 
   button_group->flag &= ~UI_BUTTON_GROUP_LOCK;
 
@@ -816,7 +818,7 @@ void UI_panel_header_buttons_end(Panel *panel)
     /* Always add a new button group. Although this may result in many empty groups, without it,
      * new buttons in the panel body not protected with a #ui_block_new_button_group call would
      * end up in the panel header group. */
-    ui_block_new_button_group(block, 0);
+    ui_block_new_button_group(block);
   }
 }
 
@@ -994,7 +996,7 @@ static void panel_remove_invisible_layouts_recursive(Panel *panel, const Panel *
         continue;
       }
       LISTBASE_FOREACH (LinkData *, link, &button_group->buttons) {
-        uiBut *but = link->data;
+        uiBut *but = (uiBut *)link->data;
         but->flag |= UI_HIDDEN;
       }
     }
@@ -1561,26 +1563,28 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
     {
       /* Draw filled rectangle and outline for tab. */
       UI_draw_roundbox_corner_set(roundboxtype);
-      UI_draw_roundbox_4fv(
-          &(const rctf){
-              .xmin = rct->xmin,
-              .xmax = rct->xmax,
-              .ymin = rct->ymin,
-              .ymax = rct->ymax,
-          },
-          true,
-          tab_curve_radius,
-          is_active ? theme_col_tab_active : theme_col_tab_inactive);
-      UI_draw_roundbox_4fv(
-          &(const rctf){
-              .xmin = rct->xmin,
-              .xmax = rct->xmax,
-              .ymin = rct->ymin,
-              .ymax = rct->ymax,
-          },
-          false,
-          tab_curve_radius,
-          theme_col_tab_outline);
+      {
+        const rctf box_rect{
+            rct->xmin,
+            rct->xmax,
+            rct->ymin,
+            rct->ymax,
+        };
+        UI_draw_roundbox_4fv(&box_rect,
+                             true,
+                             tab_curve_radius,
+                             is_active ? theme_col_tab_active : theme_col_tab_inactive);
+      }
+
+      {
+        const rctf box_rect{
+            rct->xmin,
+            rct->xmax,
+            rct->ymin,
+            rct->ymax,
+        };
+        UI_draw_roundbox_4fv(&box_rect, false, tab_curve_radius, theme_col_tab_outline);
+      }
 
       /* Disguise the outline on one side to join the tab to the panel. */
       pos = GPU_vertformat_attr_add(
@@ -1771,7 +1775,8 @@ static bool uiAlignPanelStep(ARegion *region, const float factor, const bool dra
   }
 
   /* Sort panels. */
-  PanelSort *panel_sort = MEM_mallocN(sizeof(PanelSort) * active_panels_len, __func__);
+  PanelSort *panel_sort = (PanelSort *)MEM_mallocN(sizeof(PanelSort) * active_panels_len,
+                                                   __func__);
   {
     PanelSort *ps = panel_sort;
     LISTBASE_FOREACH (Panel *, panel, &region->panels) {
@@ -1882,7 +1887,7 @@ static void ui_panels_size(ARegion *region, int *r_x, int *r_y)
 
 static void ui_do_animate(bContext *C, Panel *panel)
 {
-  uiHandlePanelData *data = panel->activedata;
+  uiHandlePanelData *data = (uiHandlePanelData *)panel->activedata;
   ARegion *region = CTX_wm_region(C);
 
   float fac = (PIL_check_seconds_timer() - data->starttime) / ANIMATION_TIME;
@@ -1983,7 +1988,7 @@ void UI_panels_end(const bContext *C, ARegion *region, int *r_x, int *r_y)
 #define DRAG_REGION_PAD (PNL_HEADER * 0.5)
 static void ui_do_drag(const bContext *C, const wmEvent *event, Panel *panel)
 {
-  uiHandlePanelData *data = panel->activedata;
+  uiHandlePanelData *data = (uiHandlePanelData *)panel->activedata;
   ARegion *region = CTX_wm_region(C);
 
   /* Keep the drag position in the region with a small pad to keep the panel visible. */
@@ -2040,7 +2045,7 @@ typedef struct uiPanelDragCollapseHandle {
 
 static void ui_panel_drag_collapse_handler_remove(bContext *UNUSED(C), void *userdata)
 {
-  uiPanelDragCollapseHandle *dragcol_data = userdata;
+  uiPanelDragCollapseHandle *dragcol_data = (uiPanelDragCollapseHandle *)userdata;
   MEM_freeN(dragcol_data);
 }
 
@@ -2097,7 +2102,7 @@ static void ui_panel_drag_collapse(const bContext *C,
 static int ui_panel_drag_collapse_handler(bContext *C, const wmEvent *event, void *userdata)
 {
   wmWindow *win = CTX_wm_window(C);
-  uiPanelDragCollapseHandle *dragcol_data = userdata;
+  uiPanelDragCollapseHandle *dragcol_data = (uiPanelDragCollapseHandle *)userdata;
   short retval = WM_UI_HANDLER_CONTINUE;
 
   switch (event->type) {
@@ -2128,7 +2133,8 @@ static void ui_panel_drag_collapse_handler_add(const bContext *C, const bool was
 {
   wmWindow *win = CTX_wm_window(C);
   const wmEvent *event = win->eventstate;
-  uiPanelDragCollapseHandle *dragcol_data = MEM_mallocN(sizeof(*dragcol_data), __func__);
+  uiPanelDragCollapseHandle *dragcol_data = (uiPanelDragCollapseHandle *)MEM_mallocN(
+      sizeof(*dragcol_data), __func__);
 
   dragcol_data->was_first_open = was_open;
   copy_v2_v2_int(dragcol_data->xy_init, &event->x);
@@ -2193,7 +2199,7 @@ static void ui_handle_panel_header(const bContext *C,
       else {
         /* If a panel has sub-panels and it's open, toggle the expansion
          * of the sub-panels (based on the expansion of the first sub-panel). */
-        Panel *first_child = panel->children.first;
+        Panel *first_child = (Panel *)panel->children.first;
         BLI_assert(first_child != NULL);
         panel_set_flag_recursive(panel, PNL_CLOSED, !UI_panel_is_closed(first_child));
         panel->flag |= PNL_CLOSED;
@@ -2248,12 +2254,13 @@ bool UI_panel_category_is_visible(const ARegion *region)
 
 PanelCategoryDyn *UI_panel_category_find(const ARegion *region, const char *idname)
 {
-  return BLI_findstring(&region->panels_category, idname, offsetof(PanelCategoryDyn, idname));
+  return (PanelCategoryDyn *)BLI_findstring(
+      &region->panels_category, idname, offsetof(PanelCategoryDyn, idname));
 }
 
 PanelCategoryStack *UI_panel_category_active_find(ARegion *region, const char *idname)
 {
-  return BLI_findstring(
+  return (PanelCategoryStack *)BLI_findstring(
       &region->panels_category_active, idname, offsetof(PanelCategoryStack, idname));
 }
 
@@ -2266,7 +2273,7 @@ static void ui_panel_category_active_set(ARegion *region, const char *idname, bo
     BLI_remlink(lb, pc_act);
   }
   else {
-    pc_act = MEM_callocN(sizeof(PanelCategoryStack), __func__);
+    pc_act = (PanelCategoryStack *)MEM_callocN(sizeof(PanelCategoryStack), __func__);
     BLI_strncpy(pc_act->idname, idname, sizeof(pc_act->idname));
   }
 
@@ -2317,7 +2324,7 @@ const char *UI_panel_category_active_get(ARegion *region, bool set_fallback)
   }
 
   if (set_fallback) {
-    PanelCategoryDyn *pc_dyn = region->panels_category.first;
+    PanelCategoryDyn *pc_dyn = (PanelCategoryDyn *)region->panels_category.first;
     if (pc_dyn) {
       ui_panel_category_active_set(region, pc_dyn->idname, true);
       return pc_dyn->idname;
@@ -2340,7 +2347,7 @@ static PanelCategoryDyn *panel_categories_find_mouse_over(ARegion *region, const
 
 void UI_panel_category_add(ARegion *region, const char *name)
 {
-  PanelCategoryDyn *pc_dyn = MEM_callocN(sizeof(*pc_dyn), __func__);
+  PanelCategoryDyn *pc_dyn = (PanelCategoryDyn *)MEM_callocN(sizeof(*pc_dyn), __func__);
   BLI_addtail(&region->panels_category, pc_dyn);
 
   BLI_strncpy(pc_dyn->idname, name, sizeof(pc_dyn->idname));
@@ -2385,7 +2392,8 @@ static int ui_handle_panel_category_cycling(const wmEvent *event,
           pc_dyn = backwards ? pc_dyn->prev : pc_dyn->next;
           if (!pc_dyn) {
             /* Proper cyclic behavior, back to first/last category (only used for ctrl+tab). */
-            pc_dyn = backwards ? region->panels_category.last : region->panels_category.first;
+            pc_dyn = backwards ? (PanelCategoryDyn *)region->panels_category.last :
+                                 (PanelCategoryDyn *)region->panels_category.first;
           }
         }
 
@@ -2567,8 +2575,8 @@ PointerRNA *UI_region_panel_custom_data_under_cursor(const bContext *C, const wm
 /* Note, this is modal handler and should not swallow events for animation. */
 static int ui_handler_panel(bContext *C, const wmEvent *event, void *userdata)
 {
-  Panel *panel = userdata;
-  uiHandlePanelData *data = panel->activedata;
+  Panel *panel = (Panel *)userdata;
+  uiHandlePanelData *data = (uiHandlePanelData *)panel->activedata;
 
   /* Verify if we can stop. */
   if (event->type == LEFTMOUSE && event->val == KM_RELEASE) {
@@ -2588,7 +2596,7 @@ static int ui_handler_panel(bContext *C, const wmEvent *event, void *userdata)
     }
   }
 
-  data = panel->activedata;
+  data = (uiHandlePanelData *)panel->activedata;
 
   if (data && data->state == PANEL_STATE_ANIMATION) {
     return WM_UI_HANDLER_CONTINUE;
@@ -2598,7 +2606,7 @@ static int ui_handler_panel(bContext *C, const wmEvent *event, void *userdata)
 
 static void ui_handler_remove_panel(bContext *C, void *userdata)
 {
-  Panel *panel = userdata;
+  Panel *panel = (Panel *)userdata;
 
   panel_activate_state(C, panel, PANEL_STATE_EXIT);
 }
@@ -2615,7 +2623,7 @@ static void panel_handle_data_ensure(const bContext *C,
         C, &win->modalhandlers, ui_handler_panel, ui_handler_remove_panel, panel, 0);
   }
 
-  uiHandlePanelData *data = panel->activedata;
+  uiHandlePanelData *data = (uiHandlePanelData *)panel->activedata;
 
   data->animtimer = WM_event_add_timer(CTX_wm_manager(C), win, TIMER, ANIMATION_INTERVAL);
 
@@ -2636,7 +2644,7 @@ static void panel_handle_data_ensure(const bContext *C,
  */
 static void panel_activate_state(const bContext *C, Panel *panel, const uiHandlePanelState state)
 {
-  uiHandlePanelData *data = panel->activedata;
+  uiHandlePanelData *data = (uiHandlePanelData *)panel->activedata;
   wmWindow *win = CTX_wm_window(C);
   ARegion *region = CTX_wm_region(C);
 

@@ -41,7 +41,7 @@
 
 ARegion *ui_region_temp_add(bScreen *screen)
 {
-  ARegion *region = MEM_callocN(sizeof(ARegion), __func__);
+  ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), __func__);
   BLI_addtail(&screen->regionbase, region);
 
   region->regiontype = RGN_TYPE_TEMPORARY;

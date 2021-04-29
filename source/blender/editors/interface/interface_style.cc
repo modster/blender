@@ -74,7 +74,7 @@
 
 static uiStyle *ui_style_new(ListBase *styles, const char *name, short uifont_id)
 {
-  uiStyle *style = MEM_callocN(sizeof(uiStyle), "new style");
+  uiStyle *style = (uiStyle *)MEM_callocN(sizeof(uiStyle), "new style");
 
   BLI_addtail(styles, style);
   BLI_strncpy(style->name, name, MAX_STYLE_NAME);
@@ -129,14 +129,14 @@ static uiStyle *ui_style_new(ListBase *styles, const char *name, short uifont_id
 
 static uiFont *uifont_to_blfont(int id)
 {
-  uiFont *font = U.uifonts.first;
+  uiFont *font = (uiFont *)U.uifonts.first;
 
   for (; font; font = font->next) {
     if (font->uifont_id == id) {
       return font;
     }
   }
-  return U.uifonts.first;
+  return (uiFont *)U.uifonts.first;
 }
 
 /* *************** draw ************************ */
@@ -373,7 +373,7 @@ const uiStyle *UI_style_get(void)
   style = BLI_findstring(&U.uistyles, "Unifont Style", sizeof(style) * 2);
   return (style != NULL) ? style : U.uistyles.first;
 #else
-  return U.uistyles.first;
+  return (uiStyle *)U.uistyles.first;
 #endif
 }
 
@@ -432,9 +432,9 @@ int UI_fontstyle_height_max(const uiFontStyle *fs)
 
 /* called on each startup.blend read */
 /* reading without uifont will create one */
-void uiStyleInit(void)
+void uiStyleInit()
 {
-  uiStyle *style = U.uistyles.first;
+  uiStyle *style = (uiStyle *)U.uistyles.first;
 
   /* recover from uninitialized dpi */
   if (U.dpi == 0) {
@@ -456,11 +456,11 @@ void uiStyleInit(void)
     blf_mono_font_render = -1;
   }
 
-  uiFont *font_first = U.uifonts.first;
+  uiFont *font_first = (uiFont *)U.uifonts.first;
 
   /* default builtin */
   if (font_first == NULL) {
-    font_first = MEM_callocN(sizeof(uiFont), "ui font");
+    font_first = (uiFont *)MEM_callocN(sizeof(uiFont), "ui font");
     BLI_addtail(&U.uifonts, font_first);
   }
 

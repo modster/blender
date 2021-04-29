@@ -109,7 +109,8 @@ void ui_textedit_undo_push(uiUndoStack_Text *stack, const char *text, int cursor
 
   /* Create the new state  */
   const int text_size = strlen(text) + 1;
-  stack->current = MEM_mallocN(sizeof(uiUndoStack_Text_State) + text_size, __func__);
+  stack->current = (uiUndoStack_Text_State *)MEM_mallocN(
+      sizeof(uiUndoStack_Text_State) + text_size, __func__);
   stack->current->cursor_index = cursor_index;
   memcpy(stack->current->text, text, text_size);
   BLI_addtail(&stack->states, stack->current);
@@ -119,9 +120,9 @@ void ui_textedit_undo_push(uiUndoStack_Text *stack, const char *text, int cursor
  *
  * \note The current state should be pushed immediately after calling this.
  */
-uiUndoStack_Text *ui_textedit_undo_stack_create(void)
+uiUndoStack_Text *ui_textedit_undo_stack_create()
 {
-  uiUndoStack_Text *stack = MEM_mallocN(sizeof(uiUndoStack_Text), __func__);
+  uiUndoStack_Text *stack = (uiUndoStack_Text *)MEM_mallocN(sizeof(uiUndoStack_Text), __func__);
   stack->current = NULL;
   BLI_listbase_clear(&stack->states);
 
