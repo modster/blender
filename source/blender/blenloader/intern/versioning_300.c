@@ -26,6 +26,7 @@
 
 #include "DNA_brush_types.h"
 #include "DNA_genfile.h"
+#include "DNA_gpencil_modifier_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
 
@@ -128,6 +129,19 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
         LISTBASE_FOREACH (bPoseChannel *, pchan, &ob->pose->chanbase) {
           copy_v3_fl(pchan->custom_scale_xyz, pchan->custom_scale);
+        }
+      }
+    }
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "LineartGpencilModifierData", "bool", "use_cached_result")) {
+      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+        if (ob->type == OB_GPENCIL) {
+          LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+            if (md->type == eGpencilModifierType_Lineart) {
+              LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+              lmd->flags |= LRT_GPENCIL_USE_CACHE;
+            }
+          }
         }
       }
     }

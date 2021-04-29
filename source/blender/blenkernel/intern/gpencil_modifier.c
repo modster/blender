@@ -225,6 +225,24 @@ void BKE_gpencil_assign_lineart_global_limits(GpencilModifierData *md,
   lmd->edge_types_override = info->edge_types;
 }
 
+bool BKE_gpencil_lineart_is_first_run(Object *ob, GpencilModifierData *md)
+{
+  if (md->type != eGpencilModifierType_Lineart) {
+    return false;
+  }
+  LISTBASE_FOREACH (GpencilModifierData *, gmd, &ob->greasepencil_modifiers) {
+    if (gmd->type == eGpencilModifierType_Lineart) {
+      if (gmd == md) {
+        return true;
+      }
+      else {
+        return false;
+      }
+    }
+  }
+  return false; /* Unlikely. */
+}
+
 /* apply time modifiers */
 static int gpencil_time_modifier(
     Depsgraph *depsgraph, Scene *scene, Object *ob, bGPDlayer *gpl, int cfra, bool is_render)
