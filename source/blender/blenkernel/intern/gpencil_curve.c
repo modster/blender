@@ -1626,9 +1626,10 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
   gps->totpoints = points_len;
   gps->points = MEM_recallocN(gps->points, sizeof(bGPDspoint) * gps->totpoints);
 
-  bGPDcurve_point *gpc_pt = &curve_point_array[0];
+  int idx = 0;
   /* write new data to stroke point array */
   for (int i = 0; i < points_len; i++) {
+    bGPDcurve_point *gpc_pt = &curve_point_array[idx % curve_point_array_len];
     bGPDspoint *pt = &gps->points[i];
     if (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_POSITION)) {
       copy_v3_v3(&pt->x, &points[i][0]);
@@ -1648,7 +1649,7 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
 
     if (gpc_pt->point_index == i) {
       pt->flag |= GP_SPOINT_IS_BEZT_CONTROL;
-      gpc_pt++;
+      idx++;
     }
   }
   gps->flag &= ~GP_STROKE_SELECT;
@@ -1658,7 +1659,7 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
   if (gpc->dvert != NULL && (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_WEIGHT))) {
     gps->dvert = MEM_recallocN(gps->dvert, sizeof(MDeformVert) * gps->totpoints);
 
-    int idx = 0;
+    idx = 0;
     for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
       MDeformVert *dv_curr = &gpc->dvert[i];
       MDeformVert *dv_next = &gpc->dvert[i + 1];
