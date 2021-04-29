@@ -6,6 +6,7 @@ namespace blender::compositor {
 MultiThreadedOperation::MultiThreadedOperation()
 {
   m_num_passes = 1;
+  flags.is_fullframe_operation = true;
 }
 
 void MultiThreadedOperation::update_memory_buffer(MemoryBuffer *output,
