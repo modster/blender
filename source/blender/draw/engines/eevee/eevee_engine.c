@@ -69,7 +69,7 @@ static void eevee_engine_init(void *ved)
   stl->g_data->render_timesteps = 1;
 
   /* Main Buffer */
-  DRW_texture_ensure_fullscreen_2d(&txl->color, GPU_RGBA16F, DRW_TEX_FILTER | DRW_TEX_MIPMAP);
+  DRW_texture_ensure_fullscreen_2d(&txl->color, GPU_RGBA16F, DRW_TEX_FILTER);
 
   GPU_framebuffer_ensure_config(&fbl->main_fb,
                                 {GPU_ATTACHMENT_TEXTURE(dtxl->depth),
@@ -286,7 +286,7 @@ static void eevee_draw_scene(void *vedata)
     EEVEE_create_minmax_buffer(vedata, dtxl->depth, -1);
     DRW_stats_group_end();
 
-    EEVEE_occlusion_compute(sldata, vedata, dtxl->depth, -1);
+    EEVEE_occlusion_compute(sldata, vedata);
     EEVEE_volumes_compute(sldata, vedata);
 
     /* Shading pass */
@@ -494,12 +494,7 @@ static void eevee_render_to_image(void *vedata,
 
     /* Previous motion step. */
     if (do_motion_blur_fx) {
-      if (i > 0) {
-        /* The previous step of this iteration N is exactly the next step of iteration N - 1.
-         * So we just swap the resources to avoid too much re-evaluation. */
-        EEVEE_motion_blur_swap_data(vedata);
-      }
-      else {
+      if (i == 0) {
         EEVEE_motion_blur_step_set(ved, MB_PREV);
         DRW_render_set_time(engine, depsgraph, floorf(time_prev), fractf(time_prev));
         EEVEE_render_modules_init(vedata, engine, depsgraph);
@@ -569,6 +564,14 @@ static void eevee_render_to_image(void *vedata,
          * might need some DRWPasses. */
         DRW_cache_restart();
       }
+    }
+
+    if (do_motion_blur_fx) {
+      /* The previous step of next iteration N is exactly the next step of this iteration N - 1.
+       * So we just swap the resources to avoid too much re-evaluation.
+       * Note that this also clears the VBO references from the GPUBatches of deformed
+       * geometries. */
+      EEVEE_motion_blur_swap_data(vedata);
     }
   }
 

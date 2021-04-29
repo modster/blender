@@ -2093,7 +2093,7 @@ void RNA_def_property_string_default(PropertyRNA *prop, const char *value)
 
       if (value == NULL) {
         CLOG_ERROR(&LOG,
-                   "\"%s.%s\", NULL string passed (dont call in this case).",
+                   "\"%s.%s\", NULL string passed (don't call in this case).",
                    srna->identifier,
                    prop->identifier);
         DefRNA.error = true;
@@ -2102,7 +2102,7 @@ void RNA_def_property_string_default(PropertyRNA *prop, const char *value)
 
       if (!value[0]) {
         CLOG_ERROR(&LOG,
-                   "\"%s.%s\", empty string passed (dont call in this case).",
+                   "\"%s.%s\", empty string passed (don't call in this case).",
                    srna->identifier,
                    prop->identifier);
         DefRNA.error = true;
@@ -2409,6 +2409,10 @@ void RNA_def_property_int_sdna(PropertyRNA *prop, const char *structname, const 
 
       iprop->softmin = -10000; /* rather arbitrary .. */
       iprop->softmax = 10000;
+    }
+    else if (dp->dnatype && STREQ(dp->dnatype, "int8_t")) {
+      iprop->hardmin = iprop->softmin = INT8_MIN;
+      iprop->hardmax = iprop->softmax = INT8_MAX;
     }
 
     if (prop->subtype == PROP_UNSIGNED || prop->subtype == PROP_PERCENTAGE ||
@@ -3303,12 +3307,6 @@ void RNA_def_property_enum_funcs_runtime(PropertyRNA *prop,
       prop->flag &= ~PROP_EDITABLE;
     }
   }
-}
-
-void RNA_def_property_enum_py_data(PropertyRNA *prop, void *py_data)
-{
-  EnumPropertyRNA *eprop = (EnumPropertyRNA *)prop;
-  eprop->py_data = py_data;
 }
 
 void RNA_def_property_string_funcs(PropertyRNA *prop,
@@ -4632,10 +4630,27 @@ void RNA_def_property_duplicate_pointers(StructOrFunctionRNA *cont_, PropertyRNA
   prop->flag_internal |= PROP_INTERN_FREE_POINTERS;
 }
 
+static void (*g_py_data_clear_fn)(PropertyRNA *prop) = NULL;
+
+/**
+ * Set the callback used to decrement the user count of a property.
+ *
+ * This function is called when freeing each dynamically defined property.
+ */
+void RNA_def_property_free_pointers_set_py_data_callback(
+    void (*py_data_clear_fn)(PropertyRNA *prop))
+{
+  g_py_data_clear_fn = py_data_clear_fn;
+}
+
 void RNA_def_property_free_pointers(PropertyRNA *prop)
 {
   if (prop->flag_internal & PROP_INTERN_FREE_POINTERS) {
     int a;
+
+    if (g_py_data_clear_fn) {
+      g_py_data_clear_fn(prop);
+    }
 
     if (prop->identifier) {
       MEM_freeN((void *)prop->identifier);

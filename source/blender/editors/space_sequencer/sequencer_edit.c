@@ -312,8 +312,7 @@ static int sequencer_snap_exec(bContext *C, wmOperator *op)
     }
   }
 
-  /* Test for effects and overlap.
-   * Don't use SEQ_CURRENT_BEGIN since that would be recursive. */
+  /* Test for effects and overlap. */
   for (seq = ed->seqbasep->first; seq; seq = seq->next) {
     if (seq->flag & SELECT && !(seq->depth == 0 && seq->flag & SEQ_LOCK)) {
       seq->flag &= ~SEQ_OVERLAP;
@@ -1411,28 +1410,25 @@ static int sequencer_split_exec(bContext *C, wmOperator *op)
   }
 
   if (changed) { /* Got new strips? */
-    Sequence *seq;
     if (ignore_selection) {
       if (use_cursor_position) {
-        SEQ_CURRENT_BEGIN (ed, seq) {
+        LISTBASE_FOREACH (Sequence *, seq, SEQ_active_seqbase_get(ed)) {
           if (seq->enddisp == split_frame && seq->machine == split_channel) {
             seq_selected = seq->flag & SEQ_ALLSEL;
           }
         }
-        SEQ_CURRENT_END;
         if (!seq_selected) {
-          SEQ_CURRENT_BEGIN (ed, seq) {
+          LISTBASE_FOREACH (Sequence *, seq, SEQ_active_seqbase_get(ed)) {
             if (seq->startdisp == split_frame && seq->machine == split_channel) {
               seq->flag &= ~SEQ_ALLSEL;
             }
           }
-          SEQ_CURRENT_END;
         }
       }
     }
     else {
       if (split_side != SEQ_SIDE_BOTH) {
-        SEQ_CURRENT_BEGIN (ed, seq) {
+        LISTBASE_FOREACH (Sequence *, seq, SEQ_active_seqbase_get(ed)) {
           if (split_side == SEQ_SIDE_LEFT) {
             if (seq->startdisp >= split_frame) {
               seq->flag &= ~SEQ_ALLSEL;
@@ -1444,7 +1440,6 @@ static int sequencer_split_exec(bContext *C, wmOperator *op)
             }
           }
         }
-        SEQ_CURRENT_END;
       }
     }
 
@@ -1496,19 +1491,16 @@ static void sequencer_split_ui(bContext *UNUSED(C), wmOperator *op)
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
 
-  PointerRNA ptr;
-  RNA_pointer_create(NULL, op->type->srna, op->properties, &ptr);
-
   uiLayout *row = uiLayoutRow(layout, false);
-  uiItemR(row, &ptr, "type", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
-  uiItemR(layout, &ptr, "frame", 0, NULL, ICON_NONE);
-  uiItemR(layout, &ptr, "side", 0, NULL, ICON_NONE);
+  uiItemR(row, op->ptr, "type", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "frame", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "side", 0, NULL, ICON_NONE);
 
   uiItemS(layout);
 
-  uiItemR(layout, &ptr, "use_cursor_position", 0, NULL, ICON_NONE);
-  if (RNA_boolean_get(&ptr, "use_cursor_position")) {
-    uiItemR(layout, &ptr, "channel", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "use_cursor_position", 0, NULL, ICON_NONE);
+  if (RNA_boolean_get(op->ptr, "use_cursor_position")) {
+    uiItemR(layout, op->ptr, "channel", 0, NULL, ICON_NONE);
   }
 }
 
@@ -1652,16 +1644,14 @@ static int sequencer_delete_exec(bContext *C, wmOperator *UNUSED(op))
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   Editing *ed = SEQ_editing_get(scene, false);
-  Sequence *seq;
 
   SEQ_prefetch_stop(scene);
 
-  SEQ_CURRENT_BEGIN (scene->ed, seq) {
+  LISTBASE_FOREACH (Sequence *, seq, SEQ_active_seqbase_get(ed)) {
     if (seq->flag & SELECT) {
       SEQ_edit_flag_for_removal(scene, ed->seqbasep, seq);
     }
   }
-  SEQ_CURRENT_END;
   SEQ_edit_remove_flagged_sequences(scene, ed->seqbasep);
 
   DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
@@ -2284,43 +2274,45 @@ void SEQUENCER_OT_swap(wmOperatorType *ot)
 
 static int sequencer_rendersize_exec(bContext *C, wmOperator *UNUSED(op))
 {
-  int retval = OPERATOR_CANCELLED;
   Scene *scene = CTX_data_scene(C);
   Sequence *active_seq = SEQ_select_active_get(scene);
   StripElem *se = NULL;
 
-  if (active_seq == NULL) {
+  if (active_seq == NULL || active_seq->strip == NULL) {
     return OPERATOR_CANCELLED;
   }
 
-  if (active_seq->strip) {
-    switch (active_seq->type) {
-      case SEQ_TYPE_IMAGE:
-        se = SEQ_render_give_stripelem(active_seq, scene->r.cfra);
-        break;
-      case SEQ_TYPE_MOVIE:
-        se = active_seq->strip->stripdata;
-        break;
-      case SEQ_TYPE_SCENE:
-      case SEQ_TYPE_META:
-      case SEQ_TYPE_SOUND_RAM:
-      case SEQ_TYPE_SOUND_HD:
-      default:
-        break;
-    }
+  switch (active_seq->type) {
+    case SEQ_TYPE_IMAGE:
+      se = SEQ_render_give_stripelem(active_seq, scene->r.cfra);
+      break;
+    case SEQ_TYPE_MOVIE:
+      se = active_seq->strip->stripdata;
+      break;
+    default:
+      return OPERATOR_CANCELLED;
   }
 
-  if (se) {
-    /* Prevent setting the render size if sequence values aren't initialized. */
-    if ((se->orig_width > 0) && (se->orig_height > 0)) {
-      scene->r.xsch = se->orig_width;
-      scene->r.ysch = se->orig_height;
-      WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
-      retval = OPERATOR_FINISHED;
-    }
+  if (se == NULL) {
+    return OPERATOR_CANCELLED;
   }
 
-  return retval;
+  /* Prevent setting the render size if sequence values aren't initialized. */
+  if (se->orig_width <= 0 || se->orig_height <= 0) {
+    return OPERATOR_CANCELLED;
+  }
+
+  scene->r.xsch = se->orig_width;
+  scene->r.ysch = se->orig_height;
+
+  active_seq->strip->transform->scale_x = active_seq->strip->transform->scale_y = 1.0f;
+  active_seq->strip->transform->xofs = active_seq->strip->transform->yofs = 0.0f;
+
+  SEQ_relations_invalidate_cache_preprocessed(scene, active_seq);
+  WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  return OPERATOR_FINISHED;
 }
 
 void SEQUENCER_OT_rendersize(wmOperatorType *ot)
@@ -2418,17 +2410,15 @@ void SEQUENCER_OT_copy(wmOperatorType *ot)
 
 void ED_sequencer_deselect_all(Scene *scene)
 {
-  Sequence *seq;
   Editing *ed = SEQ_editing_get(scene, false);
 
   if (ed == NULL) {
     return;
   }
 
-  SEQ_CURRENT_BEGIN (ed, seq) {
+  LISTBASE_FOREACH (Sequence *, seq, SEQ_active_seqbase_get(ed)) {
     seq->flag &= ~SEQ_ALLSEL;
   }
-  SEQ_CURRENT_END;
 }
 
 static int sequencer_paste_exec(bContext *C, wmOperator *op)

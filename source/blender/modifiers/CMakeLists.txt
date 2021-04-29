@@ -50,7 +50,7 @@ set(SRC
   intern/MOD_armature.c
   intern/MOD_array.c
   intern/MOD_bevel.c
-  intern/MOD_boolean.c
+  intern/MOD_boolean.cc
   intern/MOD_build.c
   intern/MOD_cast.c
   intern/MOD_cloth.c
@@ -79,6 +79,7 @@ set(SRC
   intern/MOD_mirror.c
   intern/MOD_multires.c
   intern/MOD_nodes.cc
+  intern/MOD_nodes_evaluator.cc
   intern/MOD_none.c
   intern/MOD_normal_edit.c
   intern/MOD_ocean.c
@@ -118,6 +119,7 @@ set(SRC
   MOD_modifiertypes.h
   MOD_nodes.h
   intern/MOD_meshcache_util.h
+  intern/MOD_nodes_evaluator.hh
   intern/MOD_solidify_util.h
   intern/MOD_ui_common.h
   intern/MOD_util.h
@@ -181,6 +183,14 @@ endif()
 
 if(WITH_GMP)
   add_definitions(-DWITH_GMP)
+
+  list(APPEND INC_SYS
+    ${GMP_INCLUDE_DIRS}
+  )
+
+  list(APPEND LIB
+    ${GMP_LIBRARIES}
+  )
 endif()
 
 if(WITH_OPENVDB)

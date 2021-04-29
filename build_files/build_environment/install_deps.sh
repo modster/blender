@@ -51,7 +51,7 @@ ARGS=$( \
 getopt \
 -o s:i:t:h \
 --long source:,install:,tmp:,info:,threads:,help,show-deps,no-sudo,no-build,no-confirm,\
-with-all,with-opencollada,with-jack,with-embree,with-oidn,with-nanovdb,\
+with-all,with-opencollada,with-jack,with-pulseaudio,with-embree,with-oidn,with-nanovdb,\
 ver-ocio:,ver-oiio:,ver-llvm:,ver-osl:,ver-osd:,ver-openvdb:,ver-xr-openxr:,\
 force-all,force-python,force-boost,force-tbb,\
 force-ocio,force-openexr,force-oiio,force-llvm,force-osl,force-osd,force-openvdb,\
@@ -156,6 +156,9 @@ ARGUMENTS_INFO="\"COMMAND LINE ARGUMENTS:
 
     --with-jack
         Install the jack libraries.
+
+    --with-pulseaudio
+        Install the pulseaudio libraries.
 
     --ver-ocio=<ver>
         Force version of OCIO library.
@@ -721,6 +724,9 @@ while true; do
     --with-jack)
       WITH_JACK=true; shift; continue;
     ;;
+    --with-pulseaudio)
+      WITH_PULSEAUDIO=true; shift; continue;
+    ;;
     --ver-ocio)
       OCIO_VERSION="$2"
       OCIO_VERSION_MIN=$OCIO_VERSION
@@ -985,6 +991,7 @@ fi
 if [ "$WITH_ALL" = true ]; then
   WITH_JACK=true
   WITH_NANOVDB=true
+  WITH_PULSEAUDIO=true
 fi
 
 if [ "$WITH_NANOVDB" = true ]; then
@@ -1790,6 +1797,10 @@ compile_OCIO() {
     cmake_d="$cmake_d -D OCIO_BUILD_PYTHON=OFF"
     cmake_d="$cmake_d -D OCIO_BUILD_GPU_TESTS=OFF"
 
+    if [ $(uname -m) == "aarch64" ]; then
+      cmake_d="$cmake_d -D OCIO_USE_SSE=OFF"
+    fi
+
     if file /bin/cp | grep -q '32-bit'; then
       cflags="-fPIC -m32 -march=i686"
     else
@@ -2052,7 +2063,10 @@ compile_OIIO() {
     cmake_d="$cmake_d -D CMAKE_INSTALL_PREFIX=$_inst"
     cmake_d="$cmake_d -D STOP_ON_WARNING=OFF"
     cmake_d="$cmake_d -D LINKSTATIC=OFF"
-    cmake_d="$cmake_d -D USE_SIMD=sse2"
+
+    if [ $(uname -m) != "aarch64" ]; then
+      cmake_d="$cmake_d -D USE_SIMD=sse2"
+    fi
 
     cmake_d="$cmake_d -D OPENEXR_VERSION=$OPENEXR_VERSION"
 
@@ -2072,7 +2086,7 @@ compile_OIIO() {
     cmake_d="$cmake_d -D USE_OPENCV=OFF"
     cmake_d="$cmake_d -D BUILD_TESTING=OFF"
     cmake_d="$cmake_d -D OIIO_BUILD_TESTS=OFF"
-    cmake_d="$cmake_d -D OIIO_BUILD_TOOLS=ON"
+    cmake_d="$cmake_d -D OIIO_BUILD_TOOLS=OFF"
     cmake_d="$cmake_d -D TXT2MAN="
     #cmake_d="$cmake_d -D CMAKE_EXPORT_COMPILE_COMMANDS=ON"
     #cmake_d="$cmake_d -D CMAKE_VERBOSE_MAKEFILE=ON"
@@ -2202,10 +2216,15 @@ compile_LLVM() {
     mkdir build
     cd build
 
+    LLVM_TARGETS="X86"
+    if [ $(uname -m) == "aarch64" ]; then
+      LLVM_TARGETS="AArch64"
+    fi
+
     cmake_d="-D CMAKE_BUILD_TYPE=Release"
     cmake_d="$cmake_d -D CMAKE_INSTALL_PREFIX=$_inst"
     cmake_d="$cmake_d -D LLVM_ENABLE_FFI=ON"
-    cmake_d="$cmake_d -D LLVM_TARGETS_TO_BUILD=X86"
+    cmake_d="$cmake_d -D LLVM_TARGETS_TO_BUILD=$LLVM_TARGETS"
     cmake_d="$cmake_d -D LLVM_ENABLE_TERMINFO=OFF"
 
     if [ -d $_FFI_INCLUDE_DIR ]; then
@@ -2322,12 +2341,15 @@ compile_OSL() {
     cmake_d="$cmake_d -D STOP_ON_WARNING=OFF"
     cmake_d="$cmake_d -D OSL_BUILD_PLUGINS=OFF"
     cmake_d="$cmake_d -D OSL_BUILD_TESTS=OFF"
-    cmake_d="$cmake_d -D USE_SIMD=sse2"
     cmake_d="$cmake_d -D USE_LLVM_BITCODE=OFF"
     cmake_d="$cmake_d -D USE_PARTIO=OFF"
     cmake_d="$cmake_d -D OSL_BUILD_MATERIALX=OFF"
     cmake_d="$cmake_d -D USE_QT=OFF"
     cmake_d="$cmake_d -D USE_PYTHON=OFF"
+
+    if [ $(uname -m) != "aarch64" ]; then
+      cmake_d="$cmake_d -D USE_SIMD=sse2"
+    fi
 
     cmake_d="$cmake_d -D CMAKE_CXX_STANDARD=14"
 
@@ -3877,6 +3899,10 @@ install_DEB() {
     fi
   fi
 
+  if [ "$WITH_PULSEAUDIO" = true ]; then
+    _packages="$_packages libpulse-dev"
+  fi
+
   PRINT ""
   install_packages_DEB $_packages
 
@@ -4499,6 +4525,10 @@ install_RPM() {
       _packages="$_packages jack-audio-connection-kit-devel"
     fi
 
+    if [ "$WITH_PULSEAUDIO" = true ]; then
+      _packages="$_packages pulseaudio-libs-devel"
+    fi
+
     PRINT ""
     install_packages_RPM $_packages
 
@@ -4540,6 +4570,10 @@ install_RPM() {
     if [ $? -eq 0 ]; then
       install_packages_RPM $X264_DEV
       X264_USE=true
+    fi
+
+    if [ "$WITH_PULSEAUDIO" = true ]; then
+      _packages="$_packages libpulse-devel"
     fi
 
     if [ "$WITH_ALL" = true ]; then
@@ -5071,6 +5105,10 @@ install_ARCH() {
 
   if [ "$WITH_JACK" = true ]; then
     _packages="$_packages jack2"
+  fi
+
+  if [ "$WITH_PULSEAUDIO" = true ]; then
+    _packages="$_packages libpulse"
   fi
 
   PRINT ""
@@ -5883,6 +5921,14 @@ print_info() {
   if [ "$WITH_JACK" = true ]; then
     _1="-D WITH_JACK=ON"
     _2="-D WITH_JACK_DYNLOAD=ON"
+    PRINT "  $_1"
+    PRINT "  $_2"
+    _buildargs="$_buildargs $_1 $_2"
+  fi
+
+  if [ "$WITH_PULSEAUDIO" = true ]; then
+    _1="-D WITH_PULSEAUDIO=ON"
+    _2="-D WITH_PULSEAUDIO_DYNLOAD=ON"
     PRINT "  $_1"
     PRINT "  $_2"
     _buildargs="$_buildargs $_1 $_2"

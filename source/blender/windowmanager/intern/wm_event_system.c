@@ -144,7 +144,7 @@ wmEvent *wm_event_add(wmWindow *win, const wmEvent *event_to_add)
 wmEvent *WM_event_add_simulate(wmWindow *win, const wmEvent *event_to_add)
 {
   if ((G.f & G_FLAG_EVENT_SIMULATE) == 0) {
-    BLI_assert(0);
+    BLI_assert_unreachable();
     return NULL;
   }
   wmEvent *event = wm_event_add(win, event_to_add);
@@ -580,7 +580,7 @@ void wm_event_do_notifiers(bContext *C)
           if ((note->category == NC_SPACE) && note->reference) {
             /* Filter out notifiers sent to other spaces. RNA sets the reference to the owning ID
              * though, the screen, so let notifiers through that reference the entire screen. */
-            if ((note->reference != area->spacedata.first) && (note->reference != screen)) {
+            if (!ELEM(note->reference, area->spacedata.first, screen)) {
               continue;
             }
           }
@@ -1037,7 +1037,7 @@ static void wm_operator_finished(bContext *C, wmOperator *op, const bool repeat,
       ED_area_type_hud_clear(wm, NULL);
     }
     else {
-      BLI_assert(0);
+      BLI_assert_unreachable();
     }
   }
 }
@@ -1048,7 +1048,7 @@ static int wm_operator_exec(bContext *C, wmOperator *op, const bool repeat, cons
   wmWindowManager *wm = CTX_wm_manager(C);
   int retval = OPERATOR_CANCELLED;
 
-  CTX_wm_operator_poll_msg_set(C, NULL);
+  CTX_wm_operator_poll_msg_clear(C);
 
   if (op == NULL || op->type == NULL) {
     return retval;
@@ -1469,7 +1469,7 @@ static int wm_operator_call_internal(bContext *C,
 {
   int retval;
 
-  CTX_wm_operator_poll_msg_set(C, NULL);
+  CTX_wm_operator_poll_msg_clear(C);
 
   /* Dummy test. */
   if (ot) {
@@ -1621,7 +1621,7 @@ int WM_operator_name_call_with_properties(struct bContext *C,
 {
   PointerRNA props_ptr;
   wmOperatorType *ot = WM_operatortype_find(opstring, false);
-  RNA_pointer_create(NULL, ot->srna, properties, &props_ptr);
+  RNA_pointer_create(G_MAIN->wm.first, ot->srna, properties, &props_ptr);
   return WM_operator_name_call_ptr(C, ot, context, &props_ptr);
 }
 
@@ -1653,36 +1653,8 @@ int WM_operator_call_py(bContext *C,
                         const bool is_undo)
 {
   int retval = OPERATOR_CANCELLED;
-
-#if 0
-  wmOperator *op;
-  op = wm_operator_create(wm, ot, properties, reports);
-
-  if (op->type->exec) {
-    if (is_undo && op->type->flag & OPTYPE_UNDO) {
-      wm->op_undo_depth++;
-    }
-
-    retval = op->type->exec(C, op);
-    OPERATOR_RETVAL_CHECK(retval);
-
-    if (is_undo && op->type->flag & OPTYPE_UNDO && CTX_wm_manager(C) == wm) {
-      wm->op_undo_depth--;
-    }
-  }
-  else {
-    CLOG_WARN(WM_LOG_OPERATORS,
-              "\"%s\" operator has no exec function, Python cannot call it",
-              op->type->name);
-  }
-
-#endif
-
   /* Not especially nice using undo depth here. It's used so Python never
-   * triggers undo or stores an operator's last used state.
-   *
-   * We could have some more obvious way of doing this like passing a flag.
-   */
+   * triggers undo or stores an operator's last used state. */
   wmWindowManager *wm = CTX_wm_manager(C);
   if (!is_undo && wm) {
     wm->op_undo_depth++;
@@ -2091,6 +2063,7 @@ static int wm_handler_operator_call(bContext *C,
     else if (ot->modal) {
       /* We set context to where modal handler came from. */
       wmWindowManager *wm = CTX_wm_manager(C);
+      wmWindow *win = CTX_wm_window(C);
       ScrArea *area = CTX_wm_area(C);
       ARegion *region = CTX_wm_region(C);
 
@@ -2108,22 +2081,21 @@ static int wm_handler_operator_call(bContext *C,
       retval = ot->modal(C, op, event);
       OPERATOR_RETVAL_CHECK(retval);
 
-      /* When this is _not_ the case the modal modifier may have loaded
-       * a new blend file (demo mode does this), so we have to assume
-       * the event, operator etc have all been freed. - campbell */
-      if (CTX_wm_manager(C) == wm) {
+      if (ot->flag & OPTYPE_UNDO && CTX_wm_manager(C) == wm) {
+        wm->op_undo_depth--;
+      }
+
+      /* When the window changes the the modal modifier may have loaded a new blend file
+       * (the `system_demo_mode` add-on does this), so we have to assume the event,
+       * operator, area, region etc have all been freed. */
+      if ((CTX_wm_window(C) == win)) {
 
         wm_event_modalkeymap_end(event, &event_backup);
-
-        if (ot->flag & OPTYPE_UNDO) {
-          wm->op_undo_depth--;
-        }
 
         if (retval & (OPERATOR_CANCELLED | OPERATOR_FINISHED)) {
           wm_operator_reports(C, op, retval, false);
 
           if (op->type->modalkeymap) {
-            wmWindow *win = CTX_wm_window(C);
             WM_window_status_area_tag_redraw(win);
           }
         }
@@ -2623,6 +2595,15 @@ static int wm_handlers_do_gizmo_handler(bContext *C,
                                         ListBase *handlers,
                                         const bool do_debug_handler)
 {
+  /* Drag events use the previous click location to highlight the gizmos,
+   * Get the highlight again in case the user dragged off the gizmo. */
+  const bool is_event_drag = ISTWEAK(event->type) || (event->val == KM_CLICK_DRAG);
+  const bool is_event_modifier = ISKEYMODIFIER(event->type);
+  /* Only keep the highlight if the gizmo becomes modal as result of event handling.
+   * Without this check, even un-handled drag events will set the highlight if the drag
+   * was initiated over a gizmo. */
+  const bool restore_highlight_unless_activated = is_event_drag;
+
   int action = WM_HANDLER_CONTINUE;
   ScrArea *area = CTX_wm_area(C);
   ARegion *region = CTX_wm_region(C);
@@ -2636,12 +2617,24 @@ static int wm_handlers_do_gizmo_handler(bContext *C,
   if (region->type->clip_gizmo_events_by_ui) {
     if (UI_region_block_find_mouse_over(region, &event->x, true)) {
       if (gz != NULL && event->type != EVT_GIZMO_UPDATE) {
-        WM_tooltip_clear(C, CTX_wm_window(C));
-        wm_gizmomap_highlight_set(gzmap, C, NULL, 0);
+        if (restore_highlight_unless_activated == false) {
+          WM_tooltip_clear(C, CTX_wm_window(C));
+          wm_gizmomap_highlight_set(gzmap, C, NULL, 0);
+        }
       }
       return action;
     }
   }
+
+  struct {
+    wmGizmo *gz_modal;
+    wmGizmo *gz;
+    int part;
+  } prev = {
+      .gz_modal = wm_gizmomap_modal_get(gzmap),
+      .gz = gz,
+      .part = gz ? gz->highlight_part : 0,
+  };
 
   if (region->gizmo_map != handler->gizmo_map) {
     WM_gizmomap_tag_refresh(handler->gizmo_map);
@@ -2650,16 +2643,11 @@ static int wm_handlers_do_gizmo_handler(bContext *C,
   wm_gizmomap_handler_context_gizmo(C, handler);
   wm_region_mouse_co(C, event);
 
-  /* Drag events use the previous click location to highlight the gizmos,
-   * Get the highlight again in case the user dragged off the gizmo. */
-  const bool is_event_drag = ISTWEAK(event->type) || (event->val == KM_CLICK_DRAG);
-  const bool is_event_modifier = ISKEYMODIFIER(event->type);
-
   bool handle_highlight = false;
   bool handle_keymap = false;
 
   /* Handle gizmo highlighting. */
-  if (!wm_gizmomap_modal_get(gzmap) &&
+  if ((prev.gz_modal == NULL) &&
       ((event->type == MOUSEMOVE) || is_event_modifier || is_event_drag)) {
     handle_highlight = true;
     if (is_event_modifier || is_event_drag) {
@@ -2670,14 +2658,15 @@ static int wm_handlers_do_gizmo_handler(bContext *C,
     handle_keymap = true;
   }
 
+  /* There is no need to handle this event when the key-map isn't being applied
+   * since any change to the highlight will be restored to the previous value. */
+  if (restore_highlight_unless_activated) {
+    if ((handle_highlight == true) && (handle_keymap == false)) {
+      return action;
+    }
+  }
+
   if (handle_highlight) {
-    struct {
-      wmGizmo *gz;
-      int part;
-    } prev = {
-        .gz = gz,
-        .part = gz ? gz->highlight_part : 0,
-    };
     int part = -1;
     gz = wm_gizmomap_highlight_find(gzmap, C, event, &part);
 
@@ -2758,6 +2747,16 @@ static int wm_handlers_do_gizmo_handler(bContext *C,
             }
           }
         }
+      }
+    }
+  }
+
+  if (handle_highlight) {
+    if (restore_highlight_unless_activated) {
+      /* Check handling the key-map didn't activate a gizmo. */
+      wmGizmo *gz_modal = wm_gizmomap_modal_get(gzmap);
+      if (!(gz_modal && (gz_modal != prev.gz_modal))) {
+        wm_gizmomap_highlight_set(gzmap, C, prev.gz, prev.part);
       }
     }
   }
@@ -2913,7 +2912,7 @@ static int wm_handlers_do_intern(bContext *C, wmEvent *event, ListBase *handlers
       }
       else {
         /* Unreachable (handle all types above). */
-        BLI_assert(0);
+        BLI_assert_unreachable();
       }
 
       if (action & WM_HANDLER_BREAK) {
@@ -2969,6 +2968,8 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
     if (wm_action_not_handled(action)) {
       if (win->event_queue_check_drag) {
         if (WM_event_drag_test(event, &event->prevclickx)) {
+          win->event_queue_check_drag_handled = true;
+
           int x = event->x;
           int y = event->y;
           short val = event->val;
@@ -3012,6 +3013,7 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
         if (event->is_repeat == false) {
           win->event_queue_check_click = true;
           win->event_queue_check_drag = true;
+          win->event_queue_check_drag_handled = false;
         }
       }
       else if (event->val == KM_RELEASE) {
@@ -3496,6 +3498,13 @@ void wm_event_do_handlers(bContext *C)
       if (ISMOUSE_BUTTON(event->type) && event->val == KM_PRESS &&
           !wm_action_not_handled(action)) {
         win->event_queue_check_click = false;
+      }
+
+      /* If the drag even was handled, don't attempt to keep re-handing the same
+       * drag event on every cursor motion, see: T87511. */
+      if (win->event_queue_check_drag_handled) {
+        win->event_queue_check_drag = false;
+        win->event_queue_check_drag_handled = false;
       }
 
       /* Update previous mouse position for following events to use. */
@@ -4469,16 +4478,21 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
   event.prevtype = event.type;
   event.prevval = event.val;
 
-  /* Ensure the event state is correct, any deviation from this may cause bugs. */
+  /* Ensure the event state is correct, any deviation from this may cause bugs.
+   *
+   * NOTE: #EVENT_NONE is set when unknown keys are pressed,
+   * while not common, avoid a false alarm. */
 #ifndef NDEBUG
   if ((event_state->type || event_state->val) && /* Ignore cleared event state. */
-      !(ISMOUSE_BUTTON(event_state->type) || ISKEYBOARD(event_state->type))) {
+      !(ISMOUSE_BUTTON(event_state->type) || ISKEYBOARD(event_state->type) ||
+        (event_state->type == EVENT_NONE))) {
     CLOG_WARN(WM_LOG_HANDLERS,
               "Non-keyboard/mouse button found in 'win->eventstate->type = %d'",
               event_state->type);
   }
   if ((event_state->prevtype || event_state->prevval) && /* Ignore cleared event state. */
-      !(ISMOUSE_BUTTON(event_state->prevtype) || ISKEYBOARD(event_state->prevtype))) {
+      !(ISMOUSE_BUTTON(event_state->prevtype) || ISKEYBOARD(event_state->prevtype) ||
+        (event_state->type == EVENT_NONE))) {
     CLOG_WARN(WM_LOG_HANDLERS,
               "Non-keyboard/mouse button found in 'win->eventstate->prevtype = %d'",
               event_state->prevtype);

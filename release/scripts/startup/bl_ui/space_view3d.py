@@ -161,9 +161,9 @@ class VIEW3D_HT_tool_header(Header):
         elif mode_string in {'EDIT_MESH', 'PAINT_WEIGHT', 'SCULPT', 'PAINT_VERTEX', 'PAINT_TEXTURE'}:
             # Mesh Modes, Use Mesh Symmetry
             row, sub = row_for_mirror()
-            sub.prop(context.object.data, "use_mirror_x", text="X", toggle=True)
-            sub.prop(context.object.data, "use_mirror_y", text="Y", toggle=True)
-            sub.prop(context.object.data, "use_mirror_z", text="Z", toggle=True)
+            sub.prop(context.object, "use_mesh_mirror_x", text="X", toggle=True)
+            sub.prop(context.object, "use_mesh_mirror_y", text="Y", toggle=True)
+            sub.prop(context.object, "use_mesh_mirror_z", text="Z", toggle=True)
             if mode_string == 'EDIT_MESH':
                 tool_settings = context.tool_settings
                 layout.prop(tool_settings, "use_mesh_automerge", text="")
@@ -654,11 +654,11 @@ class VIEW3D_HT_header(Header):
                 sub = row.row(align=True)
                 sub.prop(tool_settings, "use_gpencil_draw_onback", text="", icon='MOD_OPACITY')
                 sub.separator(factor=0.4)
+                sub.prop(tool_settings, "use_gpencil_automerge_strokes", text="")
+                sub.separator(factor=0.4)
                 sub.prop(tool_settings, "use_gpencil_weight_data_add", text="", icon='WPAINT_HLT')
                 sub.separator(factor=0.4)
                 sub.prop(tool_settings, "use_gpencil_draw_additive", text="", icon='FREEZE')
-                sub.separator(factor=0.4)
-                sub.prop(tool_settings, "use_gpencil_automerge_strokes", text="")
 
             # Select mode for Editing
             if gpd.use_stroke_edit_mode:
@@ -1366,7 +1366,7 @@ class VIEW3D_MT_select_object(Menu):
 
         layout.operator_menu_enum("object.select_by_type", "type", text="Select All by Type")
         layout.operator("object.select_camera", text="Select Active Camera")
-        layout.operator("object.select_mirror", text="Mirror Selection")
+        layout.operator("object.select_mirror")
         layout.operator("object.select_random", text="Select Random")
 
         layout.separator()
@@ -1424,7 +1424,7 @@ class VIEW3D_MT_select_pose(Menu):
 
         layout.separator()
 
-        layout.operator("pose.select_mirror", text="Flip Active")
+        layout.operator("pose.select_mirror")
 
         layout.separator()
 
@@ -1597,7 +1597,7 @@ class VIEW3D_MT_select_edit_mesh(Menu):
         layout.separator()
 
         layout.operator("mesh.select_axis", text="Side of Active")
-        layout.operator("mesh.select_mirror", text="Mirror Selection")
+        layout.operator("mesh.select_mirror")
 
 
 class VIEW3D_MT_select_edit_curve(Menu):
@@ -1784,7 +1784,7 @@ class VIEW3D_MT_select_edit_armature(Menu):
 
         layout.separator()
 
-        layout.operator("armature.select_mirror", text="Mirror").extend = False
+        layout.operator("armature.select_mirror")
 
         layout.separator()
 
@@ -3038,6 +3038,11 @@ class VIEW3D_MT_sculpt(Menu):
 
         layout.operator("sculpt.optimize")
 
+        layout.separator()
+
+        props = layout.operator("object.transfer_mode", text="Transfer Sculpt Mode")
+        props.use_eyedropper = True
+
 
 class VIEW3D_MT_mask(Menu):
     bl_label = "Mask"
@@ -3090,19 +3095,15 @@ class VIEW3D_MT_mask(Menu):
 
         layout.separator()
 
-        props = layout.operator("sculpt.mask_expand", text="Expand Mask by Topology")
-        props.use_normals = False
-        props.keep_previous_mask = False
+        props = layout.operator("sculpt.expand", text="Expand Mask by Topology")
+        props.target = 'MASK'
+        props.falloff_type = 'GEODESIC'
         props.invert = True
-        props.smooth_iterations = 2
-        props.create_face_set = False
 
-        props = layout.operator("sculpt.mask_expand", text="Expand Mask by Curvature")
-        props.use_normals = True
-        props.keep_previous_mask = True
+        props = layout.operator("sculpt.expand", text="Expand Mask by Normals")
+        props.target = 'MASK'
+        props.falloff_type = 'NORMALS'
         props.invert = False
-        props.smooth_iterations = 0
-        props.create_face_set = False
 
         layout.separator()
 
@@ -3144,7 +3145,7 @@ class VIEW3D_MT_face_sets(Menu):
 
         layout.separator()
 
-        layout.menu("VIEW3D_MT_face_sets_init", text="Init Face Sets")
+        layout.menu("VIEW3D_MT_face_sets_init", text="Initialize Face Sets")
 
         layout.separator()
 
@@ -3153,6 +3154,20 @@ class VIEW3D_MT_face_sets(Menu):
 
         op = layout.operator("sculpt.face_set_edit", text='Shrink Face Set')
         op.mode = 'SHRINK'
+
+        layout.separator()
+
+        props = layout.operator("sculpt.expand", text="Expand Face Set by Topology")
+        props.target = 'FACE_SETS'
+        props.falloff_type = 'GEODESIC'
+        props.invert = False
+        props.use_modify_active = False
+
+        props = layout.operator("sculpt.expand", text="Expand Active Face Set")
+        props.target = 'FACE_SETS'
+        props.falloff_type = 'BOUNDARY_FACE_SET'
+        props.invert = False
+        props.use_modify_active = True
 
         layout.separator()
 
@@ -3775,8 +3790,6 @@ class VIEW3D_MT_edit_mesh_context_menu(Menu):
             col.operator("mesh.delete", text="Delete Vertices").type = 'VERT'
 
         if is_edge_mode:
-            render = context.scene.render
-
             col = row.column(align=True)
             col.label(text="Edge Context Menu", icon='EDGESEL')
             col.separator()
@@ -3829,11 +3842,10 @@ class VIEW3D_MT_edit_mesh_context_menu(Menu):
             col.operator("mesh.mark_sharp")
             col.operator("mesh.mark_sharp", text="Clear Sharp").clear = True
 
-            if render.use_freestyle:
-                col.separator()
+            col.separator()
 
-                col.operator("mesh.mark_freestyle_edge").clear = False
-                col.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge").clear = True
+            col.operator("mesh.mark_freestyle_edge").clear = False
+            col.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge").clear = True
 
             col.separator()
 
@@ -4006,8 +4018,6 @@ class VIEW3D_MT_edit_mesh_edges_data(Menu):
     def draw(self, context):
         layout = self.layout
 
-        render = context.scene.render
-
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         layout.operator("transform.edge_crease")
@@ -4028,11 +4038,10 @@ class VIEW3D_MT_edit_mesh_edges_data(Menu):
         props.use_verts = True
         props.clear = True
 
-        if render.use_freestyle:
-            layout.separator()
+        layout.separator()
 
-            layout.operator("mesh.mark_freestyle_edge").clear = False
-            layout.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge").clear = True
+        layout.operator("mesh.mark_freestyle_edge").clear = False
+        layout.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge").clear = True
 
 
 class VIEW3D_MT_edit_mesh_edges(Menu):
@@ -5004,7 +5013,7 @@ class VIEW3D_MT_edit_gpencil(Menu):
 
         layout.menu("VIEW3D_MT_edit_gpencil_showhide")
 
-        layout.operator_menu_enum("gpencil.stroke_separate", "mode")
+        layout.operator_menu_enum("gpencil.stroke_separate", "mode", text="Separate")
         layout.menu("GPENCIL_MT_cleanup")
 
         layout.separator()

@@ -38,6 +38,9 @@
 namespace blender {
 
 template<typename Key, typename Value> class MultiValueMap {
+ public:
+  using size_type = int64_t;
+
  private:
   using MapType = Map<Key, Vector<Value>>;
   MapType map_;
@@ -68,6 +71,12 @@ template<typename Key, typename Value> class MultiValueMap {
   {
     Vector<Value> &vector = map_.lookup_or_add_default_as(std::forward<ForwardKey>(key));
     vector.append(std::forward<ForwardValue>(value));
+  }
+
+  void add_non_duplicates(const Key &key, const Value &value)
+  {
+    Vector<Value> &vector = map_.lookup_or_add_default_as(key);
+    vector.append_non_duplicates(value);
   }
 
   /**

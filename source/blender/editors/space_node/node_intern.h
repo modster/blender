@@ -58,8 +58,12 @@ typedef struct bNodeLinkDrag {
   bool from_multi_input_socket;
   int in_out;
 
-  /** Temporarily stores the last picked link from multi input socket operator. */
+  /** Temporarily stores the last picked link from multi-input socket operator. */
   struct bNodeLink *last_picked_multi_input_socket_link;
+
+  /** Temporarily stores the last hovered socket for multi-input socket operator.
+   *  Store it to recalculate sorting after it is no longer hovered. */
+  struct bNode *last_node_hovered_while_dragging_a_link;
 } bNodeLinkDrag;
 
 typedef struct SpaceNode_Runtime {
@@ -77,7 +81,6 @@ typedef struct SpaceNode_Runtime {
   /* XXX hack for translate_attach op-macros to pass data from transform op to insert_offset op */
   /** Temporary data for node insert offset (in UI called Auto-offset). */
   struct NodeInsertOfsData *iofsd;
-  struct bNode *last_node_hovered_while_dragging_a_link;
 } SpaceNode_Runtime;
 
 /* space_node.c */
@@ -207,6 +210,9 @@ bNode *node_add_node(
     const struct bContext *C, const char *idname, int type, float locx, float locy);
 void NODE_OT_add_reroute(struct wmOperatorType *ot);
 void NODE_OT_add_group(struct wmOperatorType *ot);
+void NODE_OT_add_object(struct wmOperatorType *ot);
+void NODE_OT_add_collection(struct wmOperatorType *ot);
+void NODE_OT_add_texture(struct wmOperatorType *ot);
 void NODE_OT_add_file(struct wmOperatorType *ot);
 void NODE_OT_add_mask(struct wmOperatorType *ot);
 void NODE_OT_new_node_tree(struct wmOperatorType *ot);
@@ -230,6 +236,7 @@ void NODE_OT_link(struct wmOperatorType *ot);
 void NODE_OT_link_make(struct wmOperatorType *ot);
 void NODE_OT_links_cut(struct wmOperatorType *ot);
 void NODE_OT_links_detach(struct wmOperatorType *ot);
+void NODE_OT_links_mute(struct wmOperatorType *ot);
 
 void NODE_OT_parent_set(struct wmOperatorType *ot);
 void NODE_OT_join(struct wmOperatorType *ot);
@@ -255,7 +262,7 @@ int node_render_changed_exec(bContext *, struct wmOperator *);
 int node_find_indicated_socket(struct SpaceNode *snode,
                                struct bNode **nodep,
                                struct bNodeSocket **sockp,
-                               float cursor[2],
+                               const float cursor[2],
                                int in_out);
 
 void NODE_OT_duplicate(struct wmOperatorType *ot);
@@ -268,6 +275,7 @@ void NODE_OT_hide_toggle(struct wmOperatorType *ot);
 void NODE_OT_hide_socket_toggle(struct wmOperatorType *ot);
 void NODE_OT_preview_toggle(struct wmOperatorType *ot);
 void NODE_OT_options_toggle(struct wmOperatorType *ot);
+void NODE_OT_active_preview_toggle(struct wmOperatorType *ot);
 void NODE_OT_node_copy_color(struct wmOperatorType *ot);
 
 void NODE_OT_read_viewlayers(struct wmOperatorType *ot);
@@ -302,7 +310,8 @@ void NODE_OT_cryptomatte_layer_add(struct wmOperatorType *ot);
 void NODE_OT_cryptomatte_layer_remove(struct wmOperatorType *ot);
 
 /* node_geometry_attribute_search.cc */
-void node_geometry_add_attribute_search_button(const struct bNodeTree *node_tree,
+void node_geometry_add_attribute_search_button(const struct bContext *C,
+                                               const struct bNodeTree *node_tree,
                                                const struct bNode *node,
                                                struct PointerRNA *socket_ptr,
                                                struct uiLayout *layout);

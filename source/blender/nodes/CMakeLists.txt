@@ -46,6 +46,7 @@ set(INC
 
 set(SRC
   composite/nodes/node_composite_alphaOver.c
+  composite/nodes/node_composite_antialiasing.c
   composite/nodes/node_composite_bilateralblur.c
   composite/nodes/node_composite_blur.c
   composite/nodes/node_composite_bokehblur.c
@@ -132,35 +133,44 @@ set(SRC
   composite/node_composite_util.c
 
   function/nodes/node_fn_boolean_math.cc
-  function/nodes/node_fn_combine_strings.cc
   function/nodes/node_fn_float_compare.cc
-  function/nodes/node_fn_group_instance_id.cc
   function/nodes/node_fn_input_string.cc
   function/nodes/node_fn_input_vector.cc
-  function/nodes/node_fn_object_transforms.cc
   function/nodes/node_fn_random_float.cc
-  function/nodes/node_fn_switch.cc
   function/node_function_util.cc
 
   geometry/nodes/node_geo_align_rotation_to_vector.cc
+  geometry/nodes/node_geo_attribute_clamp.cc
   geometry/nodes/node_geo_attribute_color_ramp.cc
   geometry/nodes/node_geo_attribute_combine_xyz.cc
   geometry/nodes/node_geo_attribute_compare.cc
+  geometry/nodes/node_geo_attribute_convert.cc
   geometry/nodes/node_geo_attribute_fill.cc
+  geometry/nodes/node_geo_attribute_map_range.cc
   geometry/nodes/node_geo_attribute_math.cc
   geometry/nodes/node_geo_attribute_mix.cc
   geometry/nodes/node_geo_attribute_proximity.cc
   geometry/nodes/node_geo_attribute_randomize.cc
+  geometry/nodes/node_geo_attribute_remove.cc
   geometry/nodes/node_geo_attribute_sample_texture.cc
   geometry/nodes/node_geo_attribute_separate_xyz.cc
+  geometry/nodes/node_geo_attribute_transfer.cc
   geometry/nodes/node_geo_attribute_vector_math.cc
-  geometry/nodes/node_geo_attribute_remove.cc
   geometry/nodes/node_geo_boolean.cc
+  geometry/nodes/node_geo_bounding_box.cc
   geometry/nodes/node_geo_collection_info.cc
   geometry/nodes/node_geo_common.cc
   geometry/nodes/node_geo_edge_split.cc
   geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
+  geometry/nodes/node_geo_mesh_primitive_circle.cc
+  geometry/nodes/node_geo_mesh_primitive_cone.cc
+  geometry/nodes/node_geo_mesh_primitive_cube.cc
+  geometry/nodes/node_geo_mesh_primitive_cylinder.cc
+  geometry/nodes/node_geo_mesh_primitive_grid.cc
+  geometry/nodes/node_geo_mesh_primitive_ico_sphere.cc
+  geometry/nodes/node_geo_mesh_primitive_line.cc
+  geometry/nodes/node_geo_mesh_primitive_uv_sphere.cc
   geometry/nodes/node_geo_object_info.cc
   geometry/nodes/node_geo_point_distribute.cc
   geometry/nodes/node_geo_point_instance.cc
@@ -169,8 +179,9 @@ set(SRC
   geometry/nodes/node_geo_point_separate.cc
   geometry/nodes/node_geo_point_translate.cc
   geometry/nodes/node_geo_points_to_volume.cc
-  geometry/nodes/node_geo_subdivide_smooth.cc
   geometry/nodes/node_geo_subdivide.cc
+  geometry/nodes/node_geo_subdivision_surface.cc
+  geometry/nodes/node_geo_switch.cc
   geometry/nodes/node_geo_transform.cc
   geometry/nodes/node_geo_triangulate.cc
   geometry/nodes/node_geo_volume_to_mesh.cc
@@ -300,13 +311,14 @@ set(SRC
   intern/derived_node_tree.cc
   intern/math_functions.cc
   intern/node_common.c
-  intern/node_exec.c
+  intern/node_exec.cc
   intern/node_geometry_exec.cc
   intern/node_socket.cc
   intern/node_tree_multi_function.cc
   intern/node_tree_ref.cc
   intern/node_util.c
   intern/type_callbacks.cc
+  intern/type_conversions.cc
 
   composite/node_composite_util.h
   function/node_function_util.hh
@@ -328,6 +340,7 @@ set(SRC
   NOD_static_types.h
   NOD_texture.h
   NOD_type_callbacks.hh
+  NOD_type_conversions.hh
   intern/node_common.h
   intern/node_exec.h
   intern/node_util.h
@@ -381,6 +394,18 @@ endif()
 
 if(WITH_OPENSUBDIV)
   add_definitions(-DWITH_OPENSUBDIV)
+endif()
+
+if(WITH_GMP)
+  add_definitions(-DWITH_GMP)
+
+  list(APPEND INC_SYS
+    ${GMP_INCLUDE_DIRS}
+  )
+
+  list(APPEND LIB
+    ${GMP_LIBRARIES}
+  )
 endif()
 
 if(WITH_OPENVDB)

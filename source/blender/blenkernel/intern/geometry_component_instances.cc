@@ -44,6 +44,7 @@ GeometryComponent *InstancesComponent::copy() const
   InstancesComponent *new_component = new InstancesComponent();
   new_component->transforms_ = transforms_;
   new_component->instanced_data_ = instanced_data_;
+  new_component->ids_ = ids_;
   return new_component;
 }
 
@@ -51,6 +52,7 @@ void InstancesComponent::clear()
 {
   instanced_data_.clear();
   transforms_.clear();
+  ids_.clear();
 }
 
 void InstancesComponent::add_instance(Object *object, float4x4 transform, const int id)
@@ -106,6 +108,18 @@ int InstancesComponent::instances_amount() const
 bool InstancesComponent::is_empty() const
 {
   return transforms_.size() == 0;
+}
+
+bool InstancesComponent::owns_direct_data() const
+{
+  /* The object and collection instances are not direct data. Instance transforms are direct data
+   * and are always owned. Therefore, instance components always own all their direct data. */
+  return true;
+}
+
+void InstancesComponent::ensure_owns_direct_data()
+{
+  BLI_assert(this->is_mutable());
 }
 
 static blender::Array<int> generate_unique_instance_ids(Span<int> original_ids)

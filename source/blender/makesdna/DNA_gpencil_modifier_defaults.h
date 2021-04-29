@@ -184,6 +184,8 @@
     .layer_pass = 0, \
     .hardeness = 1.0f, \
     .curve_intensity = NULL, \
+    .fading_end = 10.0f, \
+    .fading_end_factor = 0.2f, \
   }
 
 #define _DNA_DEFAULT_SimplifyGpencilModifierData \
@@ -251,6 +253,8 @@
     .thickness_fac = 1.0f, \
     .thickness = 30, \
     .layer_pass = 0, \
+    .fading_end = 10.0f, \
+    .fading_end_factor = 0.2f, \
   }
 
 #define _DNA_DEFAULT_TimeGpencilModifierData \
@@ -281,6 +285,18 @@
     .type = 0, \
     .curve_intensity = NULL, \
     .colorband = NULL, \
+  }
+
+#define _DNA_DEFAULT_LineartGpencilModifierData \
+  { \
+    .edge_types = LRT_EDGE_FLAG_ALL_TYPE, \
+    .thickness = 25, \
+    .opacity = 1.0f, \
+    .flags = LRT_GPENCIL_MATCH_OUTPUT_VGROUP, \
+    .crease_threshold = DEG2RAD(140.0f), \
+    .calculation_flags = LRT_ALLOW_DUPLI_OBJECTS | LRT_ALLOW_CLIPPING_BOUNDARIES, \
+    .angle_splitting_threshold = DEG2RAD(60.0f), \
+    .chaining_image_threshold = 0.001f, \
   }
 
 /* clang-format off */

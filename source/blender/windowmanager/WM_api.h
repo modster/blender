@@ -727,7 +727,7 @@ enum {
 };
 
 /**
- * Identifying jobs by owner alone is unreliable, this isnt saved,
+ * Identifying jobs by owner alone is unreliable, this isn't saved,
  * order can change (keep 0 for 'any').
  */
 enum {
@@ -755,6 +755,7 @@ enum {
   WM_JOB_TYPE_FSMENU_BOOKMARK_VALIDATE,
   WM_JOB_TYPE_QUADRIFLOW_REMESH,
   WM_JOB_TYPE_TRACE_IMAGE,
+  WM_JOB_TYPE_LINEART,
   /* add as needed, bake, seq proxy build
    * if having hard coded values is a problem */
 };
@@ -860,6 +861,7 @@ int WM_event_modifier_flag(const struct wmEvent *event);
 
 bool WM_event_is_modal_tweak_exit(const struct wmEvent *event, int tweak_event);
 bool WM_event_is_last_mousemove(const struct wmEvent *event);
+bool WM_event_is_mouse_drag(const struct wmEvent *event);
 
 int WM_event_drag_threshold(const struct wmEvent *event);
 bool WM_event_drag_test(const struct wmEvent *event, const int prev_xy[2]);

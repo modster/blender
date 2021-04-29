@@ -31,14 +31,14 @@
 static bNodeSocketTemplate geo_node_points_to_volume_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Density"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
-    {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX},
+    {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
     {SOCK_FLOAT, N_("Voxel Amount"), 64.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
     {SOCK_STRING, N_("Radius")},
     {SOCK_FLOAT, N_("Radius"), 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
     {-1, ""},
 };
 
-static bNodeSocketTemplate geo_node_point_translate_out[] = {
+static bNodeSocketTemplate geo_node_points_to_volume_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };
@@ -147,13 +147,15 @@ static void gather_point_data_from_component(const GeoNodeExecParams &params,
                                              Vector<float3> &r_positions,
                                              Vector<float> &r_radii)
 {
-  Float3ReadAttribute positions = component.attribute_get_for_read<float3>(
+  GVArray_Typed<float3> positions = component.attribute_get_for_read<float3>(
       "position", ATTR_DOMAIN_POINT, {0, 0, 0});
-  FloatReadAttribute radii = params.get_input_attribute<float>(
+  GVArray_Typed<float> radii = params.get_input_attribute<float>(
       "Radius", component, ATTR_DOMAIN_POINT, 0.0f);
 
-  r_positions.extend(positions.get_span());
-  r_radii.extend(radii.get_span());
+  for (const int i : IndexRange(positions.size())) {
+    r_positions.append(positions[i]);
+    r_radii.append(radii[i]);
+  }
 }
 
 static void convert_to_grid_index_space(const float voxel_size,
@@ -262,7 +264,7 @@ void register_node_type_geo_points_to_volume()
 
   geo_node_type_base(
       &ntype, GEO_NODE_POINTS_TO_VOLUME, "Points to Volume", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_points_to_volume_in, geo_node_point_translate_out);
+  node_type_socket_templates(&ntype, geo_node_points_to_volume_in, geo_node_points_to_volume_out);
   node_type_storage(&ntype,
                     "NodeGeometryPointsToVolume",
                     node_free_standard_storage,

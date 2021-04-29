@@ -47,6 +47,7 @@ include(ExternalProject)
 include(cmake/check_software.cmake)
 include(cmake/options.cmake)
 include(cmake/versions.cmake)
+include(cmake/download.cmake)
 
 if(ENABLE_MINGW64)
   include(cmake/setup_mingw64.cmake)
@@ -112,7 +113,7 @@ include(cmake/expat.cmake)
 include(cmake/yamlcpp.cmake)
 include(cmake/opencolorio.cmake)
 
-if(APPLE AND ("${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64"))
+if(BLENDER_PLATFORM_ARM)
   include(cmake/sse2neon.cmake)
 endif()
 

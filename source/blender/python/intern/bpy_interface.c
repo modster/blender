@@ -45,6 +45,7 @@
 #include "bpy_capi_utils.h"
 #include "bpy_intern_string.h"
 #include "bpy_path.h"
+#include "bpy_props.h"
 #include "bpy_rna.h"
 #include "bpy_traceback.h"
 
@@ -164,6 +165,14 @@ void bpy_context_clear(bContext *UNUSED(C), const PyGILState_STATE *gilstate)
     bpy_timer_count++;
 #endif
   }
+}
+
+static void bpy_context_end(bContext *C)
+{
+  if (UNLIKELY(C == NULL)) {
+    return;
+  }
+  CTX_wm_operator_poll_msg_clear(C);
 }
 
 /**
@@ -522,6 +531,12 @@ void BPY_python_end(void)
 
   /* finalizing, no need to grab the state, except when we are a module */
   gilstate = PyGILState_Ensure();
+
+  /* Clear Python values in the context so freeing the context after Python exits doesn't crash. */
+  bpy_context_end(BPY_context_get());
+
+  /* Decrement user counts of all callback functions. */
+  BPY_rna_props_clear_all();
 
   /* free other python data. */
   pyrna_free_types();

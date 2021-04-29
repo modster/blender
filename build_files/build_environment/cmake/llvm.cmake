@@ -16,7 +16,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-if(APPLE AND "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64")
+if(BLENDER_PLATFORM_ARM)
   set(LLVM_TARGETS AArch64$<SEMICOLON>ARM)
 else()
   set(LLVM_TARGETS X86)
@@ -52,9 +52,9 @@ endif()
 
 # short project name due to long filename issues on windows
 ExternalProject_Add(ll
-  URL ${LLVM_URI}
+  URL file://${PACKAGE_DIR}/${LLVM_FILE}
   DOWNLOAD_DIR ${DOWNLOAD_DIR}
-  URL_HASH MD5=${LLVM_HASH}
+  URL_HASH ${LLVM_HASH_TYPE}=${LLVM_HASH}
   CMAKE_GENERATOR ${LLVM_GENERATOR}
   LIST_SEPARATOR ^^
   PREFIX ${BUILD_DIR}/ll

@@ -77,17 +77,20 @@ struct wmTimer;
 /* popover width (multiplied by 'U.widget_unit') */
 #define UI_POPOVER_WIDTH_UNITS 10
 
-/* uiBut->flag */
+/** #uiBut.flag */
 enum {
-  UI_SELECT = (1 << 0),   /* use when the button is pressed */
-  UI_SCROLLED = (1 << 1), /* temp hidden, scrolled away */
+  /** Use when the button is pressed. */
+  UI_SELECT = (1 << 0),
+  /** Temporarily hidden (scrolled out of the view). */
+  UI_SCROLLED = (1 << 1),
   UI_ACTIVE = (1 << 2),
   UI_HAS_ICON = (1 << 3),
   UI_HIDDEN = (1 << 4),
-  UI_SELECT_DRAW = (1 << 5), /* Display selected, doesn't impact interaction. */
+  /** Display selected, doesn't impact interaction. */
+  UI_SELECT_DRAW = (1 << 5),
   /** Property search filter is active and the button does not match. */
-  UI_SEARCH_FILTER_NO_MATCH = (1 << 12),
-  /* warn: rest of uiBut->flag in UI_interface.h */
+  UI_SEARCH_FILTER_NO_MATCH = (1 << 6),
+  /* WARNING: rest of #uiBut.flag in UI_interface.h */
 };
 
 /* uiBut->dragflag */
@@ -647,6 +650,8 @@ extern bool ui_but_menu_draw_as_popover(const uiBut *but);
 void ui_but_range_set_hard(uiBut *but);
 void ui_but_range_set_soft(uiBut *but);
 
+bool ui_but_context_poll_operator(struct bContext *C, struct wmOperatorType *ot, const uiBut *but);
+
 extern void ui_but_update(uiBut *but);
 extern void ui_but_update_edited(uiBut *but);
 extern bool ui_but_is_float(const uiBut *but) ATTR_WARN_UNUSED_RESULT;
@@ -1108,11 +1113,11 @@ bool ui_but_contains_point_px(const uiBut *but, const struct ARegion *region, in
 uiBut *ui_list_find_mouse_over(struct ARegion *region,
                                const struct wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 
-uiBut *ui_but_find_mouse_over_ex(struct ARegion *region,
+uiBut *ui_but_find_mouse_over_ex(const struct ARegion *region,
                                  const int x,
                                  const int y,
                                  const bool labeledit) ATTR_WARN_UNUSED_RESULT;
-uiBut *ui_but_find_mouse_over(struct ARegion *region,
+uiBut *ui_but_find_mouse_over(const struct ARegion *region,
                               const struct wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 uiBut *ui_but_find_rect_over(const struct ARegion *region,
                              const rcti *rect_px) ATTR_WARN_UNUSED_RESULT;

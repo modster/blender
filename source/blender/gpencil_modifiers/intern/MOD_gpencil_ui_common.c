@@ -25,14 +25,10 @@
 #include "BKE_context.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_material.h"
-#include "BKE_object.h"
 #include "BKE_screen.h"
 
 #include "DNA_material_types.h"
-#include "DNA_object_force_types.h"
 #include "DNA_object_types.h"
-#include "DNA_particle_types.h"
-#include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
 #include "ED_object.h"
@@ -205,6 +201,21 @@ void gpencil_modifier_curve_panel_draw(const bContext *UNUSED(C), Panel *panel)
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
   uiTemplateCurveMapping(layout, ptr, "curve", 0, false, false, false, false);
+}
+
+void gpencil_modifier_fading_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayout *layout = panel->layout;
+  uiLayoutSetPropSep(layout, true);
+
+  bool fading_enabled = RNA_boolean_get(ptr, "use_fading");
+  uiItemR(layout, ptr, "object", 0, NULL, ICON_CUBE);
+  uiLayout *sub = uiLayoutColumn(layout, true);
+  uiItemR(sub, ptr, "fading_start", 0, NULL, ICON_NONE);
+  uiItemR(sub, ptr, "fading_end", 0, IFACE_("End"), ICON_NONE);
+  uiItemR(layout, ptr, "fading_end_factor", 0, NULL, ICON_NONE);
 }
 
 /**
