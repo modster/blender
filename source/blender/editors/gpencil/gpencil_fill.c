@@ -1241,6 +1241,7 @@ static bool dilate_shape(ImBuf *ibuf)
 static void gpencil_get_outline_points(tGPDfill *tgpf, const bool dilate)
 {
   ImBuf *ibuf;
+  Brush *brush = tgpf->brush;
   float rgba[4];
   void *lock;
   int v[2];
@@ -1273,8 +1274,9 @@ static void gpencil_get_outline_points(tGPDfill *tgpf, const bool dilate)
 
   /* Dilate. */
   if (dilate) {
-    dilate_shape(ibuf);
-    dilate_shape(ibuf);
+    for (int i = 0; i < brush->gpencil_settings->dilate_pixels; i++) {
+      dilate_shape(ibuf);
+    }
   }
 
   for (int idx = imagesize - 1; idx != 0; idx--) {
