@@ -828,7 +828,7 @@ bool GHOST_XrSession::createActionSpaces(const char *action_set_name,
                    .c_str());
 
       std::map<std::string, XrSpace> &spaces = action->spaces;
-      if (spaces.find(info.action_name) == spaces.end()) {
+      if (spaces.find(subaction_path) == spaces.end()) {
         spaces.insert({subaction_path, std::move(space)});
       }
       else {

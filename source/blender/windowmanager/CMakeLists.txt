@@ -27,7 +27,6 @@ set(INC
   ../blenlib
   ../blenloader
   ../blentranslation
-  ../bmesh
   ../compositor
   ../depsgraph
   ../editors/include
@@ -200,15 +199,17 @@ if(WITH_XR_OPENXR)
 
   list(APPEND INC
     xr
+    # for wm_xr_operators.c: BKE_editmesh.h
+    ../bmesh
   )
 
   list(APPEND SRC
     xr/intern/wm_xr.c
-    xr/intern/wm_xr_draw.c
-    xr/intern/wm_xr_session.c
-    xr/intern/wm_xr_actions.c
     xr/intern/wm_xr_actionmap.c
+    xr/intern/wm_xr_actions.c
+    xr/intern/wm_xr_draw.c
     xr/intern/wm_xr_operators.c
+    xr/intern/wm_xr_session.c
 
     xr/wm_xr.h
     xr/intern/wm_xr_intern.h
