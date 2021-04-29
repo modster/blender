@@ -95,9 +95,12 @@ int filelist_needs_reading(struct FileList *filelist);
 FileDirEntry *filelist_file(struct FileList *filelist, int index);
 FileDirEntry *filelist_file_ex(struct FileList *filelist, int index, bool use_request);
 
-int filelist_file_findpath(struct FileList *filelist, const char *file);
+int filelist_file_find_path(struct FileList *filelist, const char *file);
+int filelist_file_find_uuid(struct FileList *filelist, const uint32_t uuid[4]);
 struct ID *filelist_file_get_id(const struct FileDirEntry *file);
-FileDirEntry *filelist_entry_find_uuid(struct FileList *filelist, const int uuid[4]);
+bool filelist_uuid_is_set(const uint32_t uuid[4]);
+void filelist_uuid_unset(uint32_t r_uuid[4]);
+void filelist_uuid_from_id(const ID *id, uint32_t r_uuid[4]);
 void filelist_file_cache_slidingwindow_set(struct FileList *filelist, size_t window_size);
 bool filelist_file_cache_block(struct FileList *filelist, const int index);
 

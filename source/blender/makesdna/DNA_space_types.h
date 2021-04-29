@@ -726,6 +726,11 @@ typedef struct FileSelectParams {
 
   char renamefile[256];
   short rename_flag;
+  /**
+   * The UUID of the renamed file. If set, it will be used instead of `renamefile`.
+   * Runtime only.
+   */
+  uint32_t renamefile_uuid[4];
 
   /** List of filetypes to filter (FILE_MAXFILE). */
   char filter_glob[256];
@@ -862,6 +867,8 @@ typedef struct SpaceFile {
 
   SpaceFile_Runtime *runtime;
 } SpaceFile;
+
+#define FILE_UUID_UNSET -1
 
 /* SpaceFile.browse_mode (File Space Browsing Mode) */
 typedef enum eFileBrowse_Mode {

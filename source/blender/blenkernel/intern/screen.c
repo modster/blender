@@ -1723,6 +1723,14 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sfile->runtime = NULL;
       BLO_read_data_address(reader, &sfile->params);
       BLO_read_data_address(reader, &sfile->asset_params);
+      /* XXX No access to filelist_uuid_unset() here. Should be used once direct-linking happens
+       * via a space-type callback. */
+      if (sfile->params) {
+        sfile->params->renamefile_uuid[0] = FILE_UUID_UNSET;
+      }
+      if (sfile->asset_params) {
+        sfile->asset_params->base_params.renamefile_uuid[0] = FILE_UUID_UNSET;
+      }
     }
     else if (sl->spacetype == SPACE_CLIP) {
       SpaceClip *sclip = (SpaceClip *)sl;

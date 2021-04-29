@@ -2057,11 +2057,7 @@ static int file_smoothscroll_invoke(bContext *C, wmOperator *UNUSED(op), const w
       sfile->layout, (int)region->v2d.cur.xmin, (int)-region->v2d.cur.ymax);
   const int last_visible_item = first_visible_item + numfiles_layout + 1;
 
-  /* Note: the special case for vertical layout is because filename is at the bottom of items then,
-   * so we artificially move current row back one step, to ensure we show bottom of
-   * active item rather than its top (important in case visible height is low). */
-  const int middle_offset = max_ii(
-      0, (first_visible_item + last_visible_item) / 2 - (is_horizontal ? 0 : items_block_size));
+  const int middle_offset = max_ii(0, (first_visible_item + last_visible_item) / 2);
 
   const int min_middle_offset = numfiles_layout / 2;
   const int max_middle_offset = ((numfiles / items_block_size) * items_block_size +
@@ -2101,6 +2097,7 @@ static int file_smoothscroll_invoke(bContext *C, wmOperator *UNUSED(op), const w
      * rename process is totally finished, cleanup. */
     if ((params->rename_flag & FILE_PARAMS_RENAME_POSTSCROLL_ACTIVE) != 0) {
       params->renamefile[0] = '\0';
+      filelist_uuid_unset(params->renamefile_uuid);
       params->rename_flag = 0;
     }
     return OPERATOR_FINISHED;
@@ -2311,6 +2308,7 @@ static int file_directory_new_exec(bContext *C, wmOperator *op)
 
   /* If we don't enter the directory directly, remember file to jump into editing. */
   if (do_diropen == false) {
+    BLI_assert(filelist_uuid_is_set(params->renamefile_uuid) == false);
     BLI_strncpy(params->renamefile, name, FILE_MAXFILE);
     params->rename_flag = FILE_PARAMS_RENAME_PENDING;
   }
@@ -2687,6 +2685,8 @@ static void file_rename_state_activate(SpaceFile *sfile, int file_idx, bool requ
 
   if ((file_idx >= 0) && (file_idx < numfiles)) {
     FileDirEntry *file = filelist_file(sfile->files, file_idx);
+    /* Renaming assets is not supported here. Caller should check. */
+    BLI_assert((file->typeflag & FILE_TYPE_ASSET) == 0);
 
     if ((require_selected == false) ||
         (filelist_entry_select_get(sfile->files, file, CHECK_ALL) & FILE_SEL_SELECTED)) {
@@ -2730,6 +2730,11 @@ static int file_rename_exec(bContext *C, wmOperator *UNUSED(op))
   return OPERATOR_FINISHED;
 }
 
+static bool file_rename_poll(bContext *C)
+{
+  return ED_operator_file_active(C) && !ED_fileselect_is_asset_browser(CTX_wm_space_file(C));
+}
+
 void FILE_OT_rename(struct wmOperatorType *ot)
 {
   /* identifiers */
@@ -2740,7 +2745,7 @@ void FILE_OT_rename(struct wmOperatorType *ot)
   /* api callbacks */
   ot->invoke = file_rename_invoke;
   ot->exec = file_rename_exec;
-  ot->poll = ED_operator_file_active;
+  ot->poll = file_rename_poll;
 }
 
 /** \} */
