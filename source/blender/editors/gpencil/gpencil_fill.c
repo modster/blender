@@ -1274,6 +1274,7 @@ static void gpencil_get_outline_points(tGPDfill *tgpf, const bool dilate)
   /* Dilate. */
   if (dilate) {
     dilate_shape(ibuf);
+    dilate_shape(ibuf);
   }
 
   for (int idx = imagesize - 1; idx != 0; idx--) {
