@@ -54,7 +54,7 @@ struct WorkPackage {
   /**
    * Custom work function to execute when there is no execution group.
    */
-  std::function<void()> work_func;
+  std::function<void()> custom_func;
 
   bool finished = false;
 

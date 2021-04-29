@@ -320,7 +320,7 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
         split_height++;
         remaining--;
       }
-      work.work_func = [=, &work_func, &work_rect]() {
+      work.custom_func = [=, &work_func, &work_rect]() {
         if (!is_breaked()) {
           rcti split_rect;
           BLI_rcti_init(
@@ -362,7 +362,6 @@ void ExecutionSystem::update_progress_bar()
 {
   const bNodeTree *tree = m_context.getbNodeTree();
   if (tree) {
-    int num_operations = m_operations.size();
     float progress = m_num_operations_finished / static_cast<float>(m_operations.size());
     tree->progress(tree->prh, progress);
 
@@ -371,7 +370,7 @@ void ExecutionSystem::update_progress_bar()
                  sizeof(buf),
                  TIP_("Compositing | Operation %u-%u"),
                  m_num_operations_finished + 1,
-                 num_operations);
+                 m_operations.size());
     tree->stats_draw(tree->sdh, buf);
   }
 }

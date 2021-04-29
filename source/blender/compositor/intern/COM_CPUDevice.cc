@@ -38,7 +38,7 @@ void CPUDevice::execute(WorkPackage *work_package)
     executionGroup->finalizeChunkExecution(chunkNumber, nullptr);
   }
   else {
-    work_package->work_func();
+    work_package->custom_func();
   }
   work_package->finished = true;
 }
