@@ -265,170 +265,161 @@ static bool logging_enabled(const ModifierEvalContext *ctx)
   return true;
 }
 
-struct SocketPropertyType {
-  IDProperty *(*create_prop)(const bNodeSocket &socket, const char *name);
-  bool (*is_correct_type)(const IDProperty &property);
-  void (*init_cpp_value)(const IDProperty &property,
-                         const PersistentDataHandleMap &handles,
-                         void *r_value);
-};
-
-static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bsocket)
+static IDProperty *id_property_create_from_socket(const bNodeSocket &socket)
 {
-  switch (bsocket.type) {
+  switch (socket.type) {
     case SOCK_FLOAT: {
-      static const SocketPropertyType float_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.f = value->value;
-            IDProperty *prop = IDP_New(IDP_FLOAT, &idprop, name);
-            IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(prop);
-            ui_data->generic_ui_data.rna_subtype = value->subtype;
-            ui_data->min = ui_data->soft_min = (double)value->min;
-            ui_data->max = ui_data->soft_max = (double)value->max;
-            ui_data->default_value = value->value;
-            return prop;
-          },
-          [](const IDProperty &property) { return ELEM(property.type, IDP_FLOAT, IDP_DOUBLE); },
-          [](const IDProperty &property,
-             const PersistentDataHandleMap &UNUSED(handles),
-             void *r_value) {
-            if (property.type == IDP_FLOAT) {
-              *(float *)r_value = IDP_Float(&property);
-            }
-            else if (property.type == IDP_DOUBLE) {
-              *(float *)r_value = (float)IDP_Double(&property);
-            }
-          },
-      };
-      return &float_type;
+      bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.f = value->value;
+      IDProperty *property = IDP_New(IDP_FLOAT, &idprop, socket.identifier);
+      IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(property);
+      ui_data->generic_ui_data.rna_subtype = value->subtype;
+      ui_data->min = ui_data->soft_min = (double)value->min;
+      ui_data->max = ui_data->soft_max = (double)value->max;
+      ui_data->default_value = value->value;
+      return property;
     }
     case SOCK_INT: {
-      static const SocketPropertyType int_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.i = value->value;
-            IDProperty *prop = IDP_New(IDP_INT, &idprop, name);
-            IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(prop);
-            ui_data->generic_ui_data.rna_subtype = value->subtype;
-            ui_data->min = ui_data->soft_min = value->min;
-            ui_data->max = ui_data->soft_max = value->max;
-            ui_data->default_value = value->value;
-            return prop;
-          },
-          [](const IDProperty &property) { return property.type == IDP_INT; },
-          [](const IDProperty &property,
-             const PersistentDataHandleMap &UNUSED(handles),
-             void *r_value) { *(int *)r_value = IDP_Int(&property); },
-      };
-      return &int_type;
+      bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.i = value->value;
+      IDProperty *property = IDP_New(IDP_INT, &idprop, socket.identifier);
+      IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(property);
+      ui_data->generic_ui_data.rna_subtype = value->subtype;
+      ui_data->min = ui_data->soft_min = value->min;
+      ui_data->max = ui_data->soft_max = value->max;
+      ui_data->default_value = value->value;
+      return property;
     }
     case SOCK_VECTOR: {
-      static const SocketPropertyType vector_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.array.len = 3;
-            idprop.array.type = IDP_FLOAT;
-            IDProperty *property = IDP_New(IDP_ARRAY, &idprop, name);
-            copy_v3_v3((float *)IDP_Array(property), value->value);
-            IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(property);
-            ui_data->generic_ui_data.rna_subtype = value->subtype;
-            ui_data->min = ui_data->soft_min = (double)value->min;
-            ui_data->max = ui_data->soft_max = (double)value->max;
-            ui_data->default_array = (double *)MEM_mallocN(sizeof(double[3]), "mod_prop_default");
-            ui_data->default_array_len = 3;
-            for (int i = 3; i < 3; i++) {
-              ui_data->default_array[i] = (double)value->value[i];
-            }
-            return property;
-          },
-          [](const IDProperty &property) {
-            return property.type == IDP_ARRAY && property.subtype == IDP_FLOAT &&
-                   property.len == 3;
-          },
-          [](const IDProperty &property,
-             const PersistentDataHandleMap &UNUSED(handles),
-             void *r_value) { copy_v3_v3((float *)r_value, (const float *)IDP_Array(&property)); },
-      };
-      return &vector_type;
+      bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.array.len = 3;
+      idprop.array.type = IDP_FLOAT;
+      IDProperty *property = IDP_New(IDP_ARRAY, &idprop, socket.identifier);
+      copy_v3_v3((float *)IDP_Array(property), value->value);
+      IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(property);
+      ui_data->generic_ui_data.rna_subtype = value->subtype;
+      ui_data->min = ui_data->soft_min = (double)value->min;
+      ui_data->max = ui_data->soft_max = (double)value->max;
+      ui_data->default_array = (double *)MEM_mallocN(sizeof(double[3]), "mod_prop_default");
+      ui_data->default_array_len = 3;
+      for (int i = 3; i < 3; i++) {
+        ui_data->default_array[i] = (double)value->value[i];
+      }
+      return property;
     }
     case SOCK_BOOLEAN: {
-      static const SocketPropertyType boolean_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueBoolean *value = (bNodeSocketValueBoolean *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.i = value->value != 0;
-            IDProperty *prop = IDP_New(IDP_INT, &idprop, name);
-            IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(prop);
-            ui_data->min = ui_data->soft_min = 0;
-            ui_data->max = ui_data->soft_max = 1;
-            ui_data->default_value = value->value != 0;
-            return prop;
-          },
-          [](const IDProperty &property) { return property.type == IDP_INT; },
-          [](const IDProperty &property,
-             const PersistentDataHandleMap &UNUSED(handles),
-             void *r_value) { *(bool *)r_value = IDP_Int(&property) != 0; },
-      };
-      return &boolean_type;
+      bNodeSocketValueBoolean *value = (bNodeSocketValueBoolean *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.i = value->value != 0;
+      IDProperty *property = IDP_New(IDP_INT, &idprop, socket.identifier);
+      IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(property);
+      ui_data->min = ui_data->soft_min = 0;
+      ui_data->max = ui_data->soft_max = 1;
+      ui_data->default_value = value->value != 0;
+      return property;
     }
     case SOCK_STRING: {
-      static const SocketPropertyType string_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueString *value = (bNodeSocketValueString *)socket.default_value;
-            IDProperty *prop = IDP_NewString(
-                value->value, name, BLI_strnlen(value->value, sizeof(value->value)) + 1);
-            IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)IDP_ui_data_ensure(prop);
-            ui_data->default_value = BLI_strdup(value->value);
-            return prop;
-          },
-          [](const IDProperty &property) { return property.type == IDP_STRING; },
-          [](const IDProperty &property,
-             const PersistentDataHandleMap &UNUSED(handles),
-             void *r_value) { new (r_value) std::string(IDP_String(&property)); },
-      };
-      return &string_type;
+      bNodeSocketValueString *value = (bNodeSocketValueString *)socket.default_value;
+      IDProperty *property = IDP_NewString(
+          value->value, socket.identifier, BLI_strnlen(value->value, sizeof(value->value)) + 1);
+      IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)IDP_ui_data_ensure(property);
+      ui_data->default_value = BLI_strdup(value->value);
+      return property;
     }
     case SOCK_OBJECT: {
-      static const SocketPropertyType object_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueObject *value = (bNodeSocketValueObject *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.id = (ID *)value->value;
-            return IDP_New(IDP_ID, &idprop, name);
-          },
-          [](const IDProperty &property) { return property.type == IDP_ID; },
-          [](const IDProperty &property, const PersistentDataHandleMap &handles, void *r_value) {
-            ID *id = IDP_Id(&property);
-            Object *object = (id && GS(id->name) == ID_OB) ? (Object *)id : nullptr;
-            new (r_value) PersistentObjectHandle(handles.lookup(object));
-          },
-      };
-      return &object_type;
+      bNodeSocketValueObject *value = (bNodeSocketValueObject *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.id = (ID *)value->value;
+      return IDP_New(IDP_ID, &idprop, socket.identifier);
     }
     case SOCK_COLLECTION: {
-      static const SocketPropertyType collection_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueCollection *value = (bNodeSocketValueCollection *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.id = (ID *)value->value;
-            return IDP_New(IDP_ID, &idprop, name);
-          },
-          [](const IDProperty &property) { return property.type == IDP_ID; },
-          [](const IDProperty &property, const PersistentDataHandleMap &handles, void *r_value) {
-            ID *id = IDP_Id(&property);
-            Collection *collection = (id && GS(id->name) == ID_GR) ? (Collection *)id : nullptr;
-            new (r_value) PersistentCollectionHandle(handles.lookup(collection));
-          },
-      };
-      return &collection_type;
+      bNodeSocketValueCollection *value = (bNodeSocketValueCollection *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.id = (ID *)value->value;
+      return IDP_New(IDP_ID, &idprop, socket.identifier);
     }
-    default: {
-      return nullptr;
+  }
+  return nullptr;
+}
+
+static bool id_property_type_matches_socket(const bNodeSocket &socket, const IDProperty &property)
+{
+  switch (socket.type) {
+    case SOCK_FLOAT: {
+      return ELEM(property.type, IDP_FLOAT, IDP_DOUBLE);
     }
+    case SOCK_INT: {
+      return property.type == IDP_INT;
+    }
+    case SOCK_VECTOR: {
+      return property.type == IDP_ARRAY && property.subtype == IDP_FLOAT && property.len == 3;
+    }
+    case SOCK_BOOLEAN: {
+      return property.type == IDP_INT;
+    }
+    case SOCK_STRING: {
+      return property.type == IDP_STRING;
+    }
+    case SOCK_OBJECT: {
+      return property.type == IDP_ID;
+    }
+    case SOCK_COLLECTION: {
+      return property.type == IDP_ID;
+    }
+  }
+  BLI_assert_unreachable();
+  return false;
+}
+
+static void init_socket_cpp_value_from_property(const IDProperty &property,
+                                                const eNodeSocketDatatype socket_value_type,
+                                                const PersistentDataHandleMap &handles,
+                                                void *r_value)
+{
+  switch (socket_value_type) {
+    case SOCK_FLOAT: {
+      if (property.type == IDP_FLOAT) {
+        *(float *)r_value = IDP_Float(&property);
+      }
+      else if (property.type == IDP_DOUBLE) {
+        *(float *)r_value = (float)IDP_Double(&property);
+      }
+      break;
+    }
+    case SOCK_INT: {
+      *(int *)r_value = IDP_Int(&property);
+      break;
+    }
+    case SOCK_VECTOR: {
+      copy_v3_v3((float *)r_value, (const float *)IDP_Array(&property));
+      break;
+    }
+    case SOCK_BOOLEAN: {
+      *(bool *)r_value = IDP_Int(&property) != 0;
+      break;
+    }
+    case SOCK_STRING: {
+      new (r_value) std::string(IDP_String(&property));
+      break;
+    }
+    case SOCK_OBJECT: {
+      ID *id = IDP_Id(&property);
+      Object *object = (id && GS(id->name) == ID_OB) ? (Object *)id : nullptr;
+      new (r_value) PersistentObjectHandle(handles.lookup(object));
+      break;
+    }
+    case SOCK_COLLECTION: {
+      ID *id = IDP_Id(&property);
+      Collection *collection = (id && GS(id->name) == ID_GR) ? (Collection *)id : nullptr;
+      new (r_value) PersistentCollectionHandle(handles.lookup(collection));
+      break;
+    }
+    default:
+      BLI_assert_unreachable();
+      break;
   }
 }
 
@@ -450,21 +441,30 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
   }
 
   LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->inputs) {
-    const SocketPropertyType *property_type = get_socket_property_type(*socket);
-    if (property_type == nullptr) {
+    IDProperty *new_prop = id_property_create_from_socket(*socket);
+    if (new_prop == nullptr) {
+      /* Out of the set of supported input sockets, only
+       * geometry sockets aren't added to the modifier. */
+      BLI_assert(socket->type == SOCK_GEOMETRY);
       continue;
     }
 
-    IDProperty *new_prop = property_type->create_prop(*socket, socket->identifier);
     new_prop->flag |= IDP_FLAG_OVERRIDABLE_LIBRARY;
-    new_prop->ui_data->description = socket->description ? BLI_strdup(socket->description) :
-                                                           nullptr;
+    if (socket->description[0] != '\0') {
+      IDPropertyUIData *ui_data = IDP_ui_data_ensure(new_prop);
+      ui_data->description = BLI_strdup(socket->description);
+    }
     IDP_AddToGroup(nmd->settings.properties, new_prop);
 
     if (old_properties != nullptr) {
       IDProperty *old_prop = IDP_GetPropertyFromGroup(old_properties, socket->identifier);
-      if (old_prop != nullptr && property_type->is_correct_type(*old_prop)) {
+      if (old_prop != nullptr && id_property_type_matches_socket(*socket, *old_prop)) {
+        /* #IDP_CopyPropertyContent replaces the UI data as well, which we don't (we only
+         * want to replace the values). So release it temporarily and replace it after. */
+        IDPropertyUIData *ui_data = new_prop->ui_data;
+        new_prop->ui_data = nullptr;
         IDP_CopyPropertyContent(new_prop, old_prop);
+        new_prop->ui_data = ui_data;
       }
     }
   }
@@ -506,14 +506,8 @@ void MOD_nodes_init(Main *bmain, NodesModifierData *nmd)
 static void initialize_group_input(NodesModifierData &nmd,
                                    const PersistentDataHandleMap &handle_map,
                                    const bNodeSocket &socket,
-                                   const CPPType &cpp_type,
                                    void *r_value)
 {
-  const SocketPropertyType *property_type = get_socket_property_type(socket);
-  if (property_type == nullptr) {
-    cpp_type.copy_to_uninitialized(cpp_type.default_value(), r_value);
-    return;
-  }
   if (nmd.settings.properties == nullptr) {
     blender::nodes::socket_cpp_value_get(socket, r_value);
     return;
@@ -524,11 +518,12 @@ static void initialize_group_input(NodesModifierData &nmd,
     blender::nodes::socket_cpp_value_get(socket, r_value);
     return;
   }
-  if (!property_type->is_correct_type(*property)) {
+  if (!id_property_type_matches_socket(socket, *property)) {
     blender::nodes::socket_cpp_value_get(socket, r_value);
     return;
   }
-  property_type->init_cpp_value(*property, handle_map, r_value);
+  init_socket_cpp_value_from_property(
+      *property, static_cast<eNodeSocketDatatype>(socket.type), handle_map, r_value);
 }
 
 static void fill_data_handle_map(const NodesModifierSettings &settings,
@@ -759,7 +754,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
     for (const OutputSocketRef *socket : remaining_input_sockets) {
       const CPPType &cpp_type = *blender::nodes::socket_cpp_type_get(*socket->typeinfo());
       void *value_in = allocator.allocate(cpp_type.size(), cpp_type.alignment());
-      initialize_group_input(*nmd, handle_map, *socket->bsocket(), cpp_type, value_in);
+      initialize_group_input(*nmd, handle_map, *socket->bsocket(), value_in);
       group_inputs.add_new({root_context, socket}, {cpp_type, value_in});
     }
   }
@@ -826,8 +821,7 @@ static void check_property_socket_sync(const Object *ob, ModifierData *md)
       continue;
     }
 
-    const SocketPropertyType *property_type = get_socket_property_type(*socket);
-    if (!property_type->is_correct_type(*property)) {
+    if (!id_property_type_matches_socket(*socket, *property)) {
       BKE_modifier_set_error(
           ob, md, "Property type does not match input socket \"(%s)\"", socket->name);
       continue;
@@ -926,17 +920,12 @@ static void draw_property_for_socket(uiLayout *layout,
                                      const IDProperty *modifier_props,
                                      const bNodeSocket &socket)
 {
-  const SocketPropertyType *property_type = get_socket_property_type(socket);
-  if (property_type == nullptr) {
-    return;
-  }
-
   /* The property should be created in #MOD_nodes_update_interface with the correct type. */
   IDProperty *property = IDP_GetPropertyFromGroup(modifier_props, socket.identifier);
 
   /* IDProperties can be removed with python, so there could be a situation where
    * there isn't a property for a socket or it doesn't have the correct type. */
-  if (property == nullptr || !property_type->is_correct_type(*property)) {
+  if (property == nullptr || !id_property_type_matches_socket(socket, *property)) {
     return;
   }
 
