@@ -213,10 +213,13 @@ int DebugInfo::graphviz_legend_group(
 
 int DebugInfo::graphviz_legend(char *str, int maxlen)
 {
+  bool has_execution_groups = COM_EXECUTION_MODEL == ExecutionModel::Tiled;
   int len = 0;
 
   len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "{\r\n");
-  len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "rank = sink;\r\n");
+  if (has_execution_groups) {
+    len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "rank = sink;\r\n");
+  }
   len += snprintf(
       str + len, maxlen > len ? maxlen - len : 0, "Legend [shape=none, margin=0, label=<\r\n");
 
@@ -236,21 +239,24 @@ int DebugInfo::graphviz_legend(char *str, int maxlen)
       "Viewer", "lightskyblue3", str + len, maxlen > len ? maxlen - len : 0);
   len += graphviz_legend_color(
       "Active Viewer", "lightskyblue1", str + len, maxlen > len ? maxlen - len : 0);
-  len += graphviz_legend_color(
-      "Write Buffer", "darkorange", str + len, maxlen > len ? maxlen - len : 0);
-  len += graphviz_legend_color(
-      "Read Buffer", "darkolivegreen3", str + len, maxlen > len ? maxlen - len : 0);
+  if (has_execution_groups) {
+    len += graphviz_legend_color(
+        "Write Buffer", "darkorange", str + len, maxlen > len ? maxlen - len : 0);
+    len += graphviz_legend_color(
+        "Read Buffer", "darkolivegreen3", str + len, maxlen > len ? maxlen - len : 0);
+  }
   len += graphviz_legend_color(
       "Input Value", "khaki1", str + len, maxlen > len ? maxlen - len : 0);
 
-  len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "<TR><TD></TD></TR>\r\n");
-
-  len += graphviz_legend_group(
-      "Group Waiting", "white", "dashed", str + len, maxlen > len ? maxlen - len : 0);
-  len += graphviz_legend_group(
-      "Group Running", "firebrick1", "solid", str + len, maxlen > len ? maxlen - len : 0);
-  len += graphviz_legend_group(
-      "Group Finished", "chartreuse4", "solid", str + len, maxlen > len ? maxlen - len : 0);
+  if (has_execution_groups) {
+    len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "<TR><TD></TD></TR>\r\n");
+    len += graphviz_legend_group(
+        "Group Waiting", "white", "dashed", str + len, maxlen > len ? maxlen - len : 0);
+    len += graphviz_legend_group(
+        "Group Running", "firebrick1", "solid", str + len, maxlen > len ? maxlen - len : 0);
+    len += graphviz_legend_group(
+        "Group Finished", "chartreuse4", "solid", str + len, maxlen > len ? maxlen - len : 0);
+  }
 
   len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "</TABLE>\r\n");
   len += snprintf(str + len, maxlen > len ? maxlen - len : 0, ">];\r\n");

@@ -122,7 +122,9 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
                 render_border.ymin,
                 render_border.ymax);
 
-  //  DebugInfo::graphviz(this);
+  if (COM_EXECUTION_MODEL == ExecutionModel::FullFrame) {
+    DebugInfo::graphviz(this);
+  }
 }
 
 ExecutionSystem::~ExecutionSystem()
