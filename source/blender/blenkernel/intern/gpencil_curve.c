@@ -1622,6 +1622,9 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
     return;
   }
 
+  /* We have to free all of the old weight data and replace it completely. */
+  BKE_gpencil_free_stroke_weights(gps);
+
   /* resize stroke point array */
   gps->totpoints = points_len;
   gps->points = MEM_recallocN(gps->points, sizeof(bGPDspoint) * gps->totpoints);
@@ -1657,7 +1660,7 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(bGPDstroke *gps,
 
   /* Interpolate weights. */
   if (gpc->dvert != NULL && (update_all_attributes || (flag & GP_GEO_UPDATE_POLYLINE_WEIGHT))) {
-    gps->dvert = MEM_recallocN(gps->dvert, sizeof(MDeformVert) * gps->totpoints);
+    gps->dvert = MEM_callocN(sizeof(MDeformVert) * gps->totpoints, __func__);
 
     idx = 0;
     for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
