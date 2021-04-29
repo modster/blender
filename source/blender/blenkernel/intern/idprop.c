@@ -1093,6 +1093,9 @@ void IDP_free_ui_data(IDProperty *prop)
       MEM_SAFE_FREE(ui_data->default_value);
       break;
     }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
     case IDP_UI_DATA_TYPE_INT: {
       IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)prop->ui_data;
       MEM_SAFE_FREE(ui_data->default_array);
@@ -1235,6 +1238,9 @@ static void write_ui_data(const IDProperty *prop, BlendWriter *writer)
       BLO_write_struct(writer, IDPropertyUIDataString, ui_data);
       break;
     }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
     case IDP_UI_DATA_TYPE_INT: {
       IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
       if (prop->type == IDP_ARRAY) {
@@ -1343,6 +1349,9 @@ static void read_ui_data(IDProperty *prop, BlendDataReader *reader)
     case IDP_UI_DATA_TYPE_STRING: {
       IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)prop->ui_data;
       BLO_read_data_address(reader, &ui_data_string->default_value);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
       break;
     }
     case IDP_UI_DATA_TYPE_INT: {
@@ -1560,6 +1569,9 @@ IDPropertyUIDataType IDP_ui_data_type(const IDProperty *prop)
   if (prop->type == IDP_STRING) {
     return IDP_UI_DATA_TYPE_STRING;
   }
+  if (prop->type == IDP_ID) {
+    return IDP_UI_DATA_TYPE_ID;
+  }
   if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
     return IDP_UI_DATA_TYPE_INT;
   }
@@ -1584,6 +1596,11 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
   switch (IDP_ui_data_type(prop)) {
     case IDP_UI_DATA_TYPE_STRING: {
       prop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataString), __func__);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      IDPropertyUIDataID *ui_data = MEM_callocN(sizeof(IDPropertyUIDataID), __func__);
+      prop->ui_data = (IDPropertyUIData *)ui_data;
       break;
     }
     case IDP_UI_DATA_TYPE_INT: {

@@ -106,6 +106,11 @@ typedef struct IDPropertyUIDataString {
   char *default_value;
 } IDPropertyUIDataString;
 
+/* IDP_UI_DATA_TYPE_ID */
+typedef struct IDPropertyUIDataID {
+  IDPropertyUIData generic_ui_data;
+} IDPropertyUIDataID;
+
 typedef struct IDPropertyData {
   void *pointer;
   ListBase group;

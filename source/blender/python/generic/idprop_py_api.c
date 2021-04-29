@@ -1415,6 +1415,8 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
     case IDP_UI_DATA_TYPE_STRING:
       idprop_update_rna_ui_data_string(idprop, default_value);
       break;
+    case IDP_UI_DATA_TYPE_ID:
+      break;
     case IDP_UI_DATA_TYPE_INT:
       idprop_update_rna_ui_data_int(idprop, min, max, soft_min, soft_max, step, default_value);
       break;
@@ -1548,6 +1550,8 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
   switch (IDP_ui_data_type(idprop)) {
     case IDP_UI_DATA_TYPE_STRING:
       idprop_ui_data_to_dict_string(idprop, dict);
+      break;
+    case IDP_UI_DATA_TYPE_ID:
       break;
     case IDP_UI_DATA_TYPE_INT:
       idprop_ui_data_to_dict_int(idprop, dict);

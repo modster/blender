@@ -183,6 +183,8 @@ static void version_idproperty_ui_data(IDProperty *idprop_group)
       case IDP_UI_DATA_TYPE_STRING:
         version_idproperty_move_data_string((IDPropertyUIDataString *)ui_data, prop_ui_data);
         break;
+      case IDP_UI_DATA_TYPE_ID:
+        break;
       case IDP_UI_DATA_TYPE_INT:
         version_idproperty_move_data_int((IDPropertyUIDataInt *)ui_data, prop_ui_data);
         break;

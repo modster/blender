@@ -224,6 +224,8 @@ typedef enum IDPropertyUIDataType {
   IDP_UI_DATA_TYPE_FLOAT = 1,
   /** IDP_STRING properties. */
   IDP_UI_DATA_TYPE_STRING = 2,
+  /** IDP_ID. */
+  IDP_UI_DATA_TYPE_ID = 3,
 } IDPropertyUIDataType;
 
 bool IDP_supports_ui_data(const struct IDProperty *prop);
