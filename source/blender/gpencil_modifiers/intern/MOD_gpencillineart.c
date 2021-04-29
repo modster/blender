@@ -257,6 +257,10 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
+  if (!BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)) {
+    uiItemR(layout, ptr, "use_cached_result", 0, NULL, ICON_NONE);
+  }
+
   uiItemR(layout, ptr, "source_type", 0, NULL, ICON_NONE);
 
   if (source_type == LRT_SOURCE_OBJECT) {
@@ -276,10 +280,11 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_edge_mark", 0, IFACE_("Edge Marks"), ICON_NONE);
   uiItemR(col, ptr, "use_intersection", 0, IFACE_("Intersections"), ICON_NONE);
   uiItemR(col, ptr, "use_crease", 0, IFACE_("Crease"), ICON_NONE);
-  uiLayout *sub = uiLayoutRow(col, true);
-  uiLayoutSetActive(sub, RNA_boolean_get(ptr, "use_crease"));
-  uiLayoutSetPropSep(sub, true);
 
+  uiLayout *sub = uiLayoutRow(col, true);
+  uiLayoutSetActive(
+      sub, RNA_boolean_get(ptr, "use_crease") && (!RNA_boolean_get(ptr, "use_cached_result")));
+  uiLayoutSetPropSep(sub, true);
   uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
 
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
@@ -303,12 +308,24 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
                  NULL,
                  material_valid ? ICON_SHADING_TEXTURE : ICON_ERROR);
 
+  gpencil_modifier_panel_end(layout, ptr);
+}
+
+static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetEnabled(layout, !is_baked && !use_cache);
+
   uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
   uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
-
-  gpencil_modifier_panel_end(layout, ptr);
 }
 
 static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -395,9 +412,10 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *layout = panel->layout;
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout, !is_baked);
+  uiLayoutSetEnabled(layout, !is_baked && !use_cache);
 
   uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
   uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
@@ -416,9 +434,10 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *layout = panel->layout;
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout, !is_baked);
+  uiLayoutSetEnabled(layout, !is_baked && !use_cache);
 
   uiLayout *col = uiLayoutColumn(layout, true);
 
@@ -474,8 +493,6 @@ static void composition_panel_draw(const bContext *C, Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  uiItemR(layout, &ob_ptr, "show_in_front", 0, NULL, ICON_NONE);
-
   uiLayout *row = uiLayoutRow(layout, false);
   uiLayoutSetActive(row, !show_in_front);
 
@@ -487,6 +504,8 @@ static void panelRegister(ARegionType *region_type)
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Lineart, panel_draw);
 
+  gpencil_modifier_subpanel_register(
+      region_type, "options", "Options", NULL, options_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "style", "Style", NULL, style_panel_draw, panel_type);
   PanelType *occlusion_panel = gpencil_modifier_subpanel_register(

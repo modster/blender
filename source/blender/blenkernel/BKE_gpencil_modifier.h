@@ -305,6 +305,7 @@ void BKE_gpencil_get_lineart_global_limits(struct Object *ob,
 
 void BKE_gpencil_assign_lineart_global_limits(struct GpencilModifierData *md,
                                               struct GpencilLineartLimitInfo *info);
+bool BKE_gpencil_lineart_is_first_run(struct Object *ob, struct GpencilModifierData *md);
 
 void BKE_gpencil_lattice_init(struct Object *ob);
 void BKE_gpencil_lattice_clear(struct Object *ob);
