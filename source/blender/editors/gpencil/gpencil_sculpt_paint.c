@@ -305,7 +305,8 @@ static void gpencil_update_geometry(bGPdata *gpd)
 
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->flag & GP_STROKE_TAG) {
-          BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_CURVE_REFIT_ALL);
+          BKE_gpencil_stroke_geometry_update(
+              gpd, gps, GP_GEO_UPDATE_CURVE_REFIT_ALL | GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL);
           gps->flag &= ~GP_STROKE_TAG;
         }
       }
