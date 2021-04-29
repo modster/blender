@@ -58,6 +58,7 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
+#include "MOD_gpencil_lineart.h"
 #include "MOD_gpencil_modifiertypes.h"
 #include "MOD_gpencil_ui_common.h"
 
@@ -156,17 +157,31 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     return;
   }
 
+  LineartCache *local_lc = gpd->runtime.lineart_cache;
   if (!gpd->runtime.lineart_cache) {
     MOD_lineart_compute_feature_lines(
         depsgraph, lmd, &gpd->runtime.lineart_cache, (!(ob->dtx & OB_DRAW_IN_FRONT)));
     MOD_lineart_destroy_render_data(lmd);
   }
   else {
-    MOD_lineart_chain_clear_picked_flag(gpd->runtime.lineart_cache);
-    lmd->cache = gpd->runtime.lineart_cache;
+    if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+      MOD_lineart_compute_feature_lines(
+          depsgraph, lmd, &local_lc, (!(ob->dtx & OB_DRAW_IN_FRONT)));
+      MOD_lineart_destroy_render_data(lmd);
+    }
+    MOD_lineart_chain_clear_picked_flag(local_lc);
+    lmd->cache = local_lc;
   }
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
+
+  if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+    /* Clear local cache. */
+    MOD_lineart_clear_cache(&local_lc);
+    /* Restore the original cache pointer so the modifiers below still have access to the "global"
+     * cache. */
+    lmd->cache = gpd->runtime.lineart_cache;
+  }
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
 }
@@ -482,7 +497,7 @@ static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemO(col, NULL, ICON_NONE, "OBJECT_OT_lineart_clear_all");
 }
 
-static void composition_panel_draw(const bContext *C, Panel *panel)
+static void composition_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   PointerRNA ob_ptr;
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
