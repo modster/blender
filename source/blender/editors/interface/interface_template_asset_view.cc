@@ -39,6 +39,7 @@
 #include "UI_interface.h"
 
 #include "WM_api.h"
+#include "WM_types.h"
 
 #include "interface_intern.h"
 
@@ -123,6 +124,16 @@ static void asset_view_draw_item(uiList *ui_list,
 static void asset_view_listener(uiList *ui_list, wmRegionListenerParams *params)
 {
   AssetViewListData *list_data = (AssetViewListData *)ui_list->dyn_data->customdata;
+  const wmNotifier *notifier = params->notifier;
+
+  switch (notifier->category) {
+    case NC_ID: {
+      if (ELEM(notifier->action, NA_RENAME)) {
+        ED_assetlist_storage_tag_main_data_dirty();
+      }
+      break;
+    }
+  }
 
   if (ED_assetlist_listen(&list_data->asset_library, params->notifier)) {
     ED_region_tag_redraw(params->region);

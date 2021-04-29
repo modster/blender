@@ -310,6 +310,12 @@ void AssetList::clear(bContext *C)
 bool AssetList::listen(const wmNotifier &notifier) const
 {
   switch (notifier.category) {
+    case NC_ID: {
+      if (ELEM(notifier.action, NA_RENAME)) {
+        return true;
+      }
+      break;
+    }
     case NC_ASSET:
       if (ELEM(notifier.data, ND_ASSET_LIST, ND_ASSET_LIST_READING, ND_ASSET_LIST_PREVIEW)) {
         return true;
