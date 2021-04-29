@@ -108,7 +108,7 @@ static void deformPolyline(GpencilModifierData *md,
                            Depsgraph *UNUSED(depsgraph),
                            Object *ob,
                            bGPDlayer *gpl,
-                           bGPDframe *UNUSED(gpf),
+                           bGPDframe *gpf,
                            bGPDstroke *gps)
 {
   OffsetGpencilModifierData *mmd = (OffsetGpencilModifierData *)md;
@@ -164,7 +164,6 @@ static void deformPolyline(GpencilModifierData *md,
   loc_eul_size_to_mat4(mat_rnd, rnd_loc, rnd_rot, rnd_scale);
 
   bGPdata *gpd = ob->data;
-
   for (int i = 0; i < gps->totpoints; i++) {
     bGPDspoint *pt = &gps->points[i];
     MDeformVert *dvert = gps->dvert != NULL ? &gps->dvert[i] : NULL;
@@ -179,13 +178,6 @@ static void deformPolyline(GpencilModifierData *md,
     mul_m4_v3(mat_rnd, &pt->x);
 
     /* Calculate matrix. */
-    mul_v3_v3fl(loc, mmd->loc, weight);
-    mul_v3_v3fl(rot, mmd->rot, weight);
-    mul_v3_v3fl(scale, mmd->scale, weight);
-    add_v3_fl(scale, 1.0);
-    loc_eul_size_to_mat4(mat, loc, rot, scale);
-
-    /* Apply scale to thickness. */
     float mat[4][4];
     float unit_scale = prepare_matrix(mmd, weight, mat);
     pt->pressure *= unit_scale;
