@@ -112,13 +112,18 @@ static bool bake_strokes(
     /* No greasepencil frame created or found. */
     return false;
   }
+  LineartCache *local_lc = *lc;
   if (!(*lc)) {
     MOD_lineart_compute_feature_lines(dg, lmd, lc, (!(ob->dtx & OB_DRAW_IN_FRONT)));
     MOD_lineart_destroy_render_data(lmd);
   }
   else {
-    MOD_lineart_chain_clear_picked_flag(gpd->runtime.lineart_cache);
-    lmd->cache = gpd->runtime.lineart_cache;
+    if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+      MOD_lineart_compute_feature_lines(dg, lmd, &local_lc, (!(ob->dtx & OB_DRAW_IN_FRONT)));
+      MOD_lineart_destroy_render_data(lmd);
+    }
+    MOD_lineart_chain_clear_picked_flag(local_lc);
+    lmd->cache = local_lc;
   }
 
   MOD_lineart_gpencil_generate(
@@ -141,6 +146,14 @@ static bool bake_strokes(
       lmd->source_vertex_group,
       lmd->vgname,
       lmd->flags);
+
+  if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+    /* Clear local cache. */
+    MOD_lineart_clear_cache(&local_lc);
+    /* Restore the original cache pointer so the modifiers below still have access to the "global"
+     * cache. */
+    lmd->cache = gpd->runtime.lineart_cache;
+  }
 
   return true;
 }
