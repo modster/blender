@@ -172,7 +172,7 @@ static int gpencil_stroke_set_type_exec(bContext *C, wmOperator *op)
             continue;
           }
 
-          BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, GP_GEO_UPDATE_DEFAULT);
+          BKE_gpencil_stroke_refit_curve(gps, threshold, corner_angle, GP_GEO_UPDATE_DEFAULT);
           if (gps->editcurve != NULL) {
             bGPDcurve *gpc = gps->editcurve;
             BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL);

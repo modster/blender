@@ -56,10 +56,10 @@ void BKE_gpencil_stroke_editcurve_regenerate_single(struct bGPDstroke *gps,
                                                     uint32_t start_idx,
                                                     uint32_t end_idx,
                                                     const float error_threshold);
-void BKE_gpencil_stroke_editcurve_update(struct bGPDstroke *gps,
-                                         const float threshold,
-                                         const float corner_angle,
-                                         const enum eGPStrokeGeoUpdateFlag flag);
+void BKE_gpencil_stroke_refit_curve(struct bGPDstroke *gps,
+                                    const float threshold,
+                                    const float corner_angle,
+                                    const enum eGPStrokeGeoUpdateFlag flag);
 void BKE_gpencil_editcurve_stroke_sync_selection(struct bGPdata *gpd,
                                                  struct bGPDstroke *gps,
                                                  struct bGPDcurve *gpc);

@@ -54,6 +54,7 @@
 #include "BKE_context.h"
 #include "BKE_deform.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_main.h"
@@ -95,6 +96,8 @@ typedef struct tGP_BrushEditData {
 
   ScrArea *area;
   ARegion *region;
+
+  ToolSettings *ts;
 
   /* Current GPencil datablock */
   bGPdata *gpd;
@@ -291,7 +294,7 @@ static void gpencil_recalc_geometry_tag(bGPDstroke *gps)
 }
 
 /* Recalc any stroke tagged. */
-static void gpencil_update_geometry(bGPdata *gpd)
+static void gpencil_update_geometry(bGPdata *gpd, ToolSettings *ts)
 {
   if (gpd == NULL) {
     return;
@@ -305,8 +308,11 @@ static void gpencil_update_geometry(bGPdata *gpd)
 
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->flag & GP_STROKE_TAG) {
-          BKE_gpencil_stroke_geometry_update(
-              gpd, gps, GP_GEO_UPDATE_CURVE_REFIT_ALL | GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL);
+          BKE_gpencil_stroke_refit_curve(gps,
+                                              ts->gpencil_curve_fit_threshold,
+                                              ts->gpencil_curve_fit_corner_angle,
+                                              GP_GEO_UPDATE_CURVE_REFIT_ALL);
+          BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL);
           gps->flag &= ~GP_STROKE_TAG;
         }
       }
@@ -1162,6 +1168,7 @@ static bool gpencil_sculpt_brush_init(bContext *C, wmOperator *op)
   gso->bmain = CTX_data_main(C);
   /* store state */
   gso->settings = gpencil_sculpt_get_settings(scene);
+  gso->ts = ts;
 
   /* Random generator, only init once. */
   uint rng_seed = (uint)(PIL_check_seconds_timer_i() & UINT_MAX);
@@ -1305,7 +1312,7 @@ static void gpencil_sculpt_brush_exit(bContext *C, wmOperator *op)
   gso->brush->gpencil_settings->sculpt_flag &= ~GP_SCULPT_FLAG_TMP_INVERT;
 
   /* Update geometry data for tagged strokes. */
-  gpencil_update_geometry(gso->gpd);
+  gpencil_update_geometry(gso->gpd, gso->ts);
 
   /* free operator data */
   MEM_freeN(gso);

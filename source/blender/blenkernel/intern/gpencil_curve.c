@@ -1165,7 +1165,7 @@ void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
  * be sharp (non-aligned handles).
  * \param flag: Flag for refitting options (see eGPStrokeGeoUpdateFlag).
  */
-void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
+void BKE_gpencil_stroke_refit_curve(bGPDstroke *gps,
                                          const float threshold,
                                          const float corner_angle,
                                          const eGPStrokeGeoUpdateFlag flag)
