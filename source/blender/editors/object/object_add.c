@@ -1311,6 +1311,8 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
   bGPdata *gpd = (ob && (ob->type == OB_GPENCIL)) ? ob->data : NULL;
 
   const int type = RNA_enum_get(op->ptr, "type");
+  const bool use_in_front = RNA_boolean_get(op->ptr, "use_in_front");
+  const bool use_3d_strokes = RNA_boolean_get(op->ptr, "use_3d_strokes");
 
   ushort local_view_bits;
   float loc[3], rot[3];
@@ -1429,6 +1431,14 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
         id_us_plus(&md->target_material->id);
       }
 
+      /* Stroke object is drawn in front of meshes by default. */
+      if (use_in_front) {
+        ob->dtx |= OB_DRAW_IN_FRONT;
+      }
+      if (use_3d_strokes) {
+        gpd->draw_mode = GP_DRAWMODE_3D;
+      }
+
       break;
     }
     default:
@@ -1467,6 +1477,16 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
   ED_object_add_generic_props(ot, false);
 
   ot->prop = RNA_def_enum(ot->srna, "type", rna_enum_object_gpencil_type_items, 0, "Type", "");
+  RNA_def_boolean(ot->srna,
+                  "use_in_front",
+                  false,
+                  "Show In Front",
+                  "Show line art grease pencil in front of everything.");
+  RNA_def_boolean(ot->srna,
+                  "use_3d_strokes",
+                  true,
+                  "Order Strokes By Depth",
+                  "Order strokes by depth instead of by layer order.");
 }
 
 /** \} */
