@@ -309,9 +309,9 @@ static void gpencil_update_geometry(bGPdata *gpd, ToolSettings *ts)
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->flag & GP_STROKE_TAG) {
           BKE_gpencil_stroke_refit_curve(gps,
-                                              ts->gpencil_curve_fit_threshold,
-                                              ts->gpencil_curve_fit_corner_angle,
-                                              GP_GEO_UPDATE_CURVE_REFIT_ALL);
+                                         ts->gpencil_curve_fit_threshold,
+                                         ts->gpencil_curve_fit_corner_angle,
+                                         GP_GEO_UPDATE_CURVE_REFIT_ALL);
           BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL);
           gps->flag &= ~GP_STROKE_TAG;
         }
