@@ -117,6 +117,7 @@
 #include "ED_physics.h"
 #include "ED_render.h"
 #include "ED_screen.h"
+#include "ED_select_utils.h"
 #include "ED_transform.h"
 #include "ED_view3d.h"
 
@@ -482,9 +483,7 @@ bool ED_object_add_generic_get_opts(bContext *C,
 
   if (local_view_bits) {
     View3D *v3d = CTX_wm_view3d(C);
-    if (v3d && v3d->localvd) {
-      *local_view_bits = v3d->local_view_uuid;
-    }
+    *local_view_bits = (v3d && v3d->localvd) ? v3d->local_view_uuid : 0;
   }
 
   /* Location! */
@@ -3434,7 +3433,7 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
 
   /* object_add_duplicate_internal() doesn't deselect other objects, unlike object_add_common() or
    * BKE_view_layer_base_deselect_all(). */
-  ED_object_base_deselect_all(view_layer, NULL, BA_DESELECT);
+  ED_object_base_deselect_all(view_layer, NULL, SEL_DESELECT);
   ED_object_base_select(basen, BA_SELECT);
   ED_object_base_activate(C, basen);
 
