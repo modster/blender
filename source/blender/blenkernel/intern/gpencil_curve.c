@@ -2092,4 +2092,140 @@ void BKE_gpencil_editcurve_simplify_fixed(bGPDstroke *gps, const int count)
   }
 }
 
+/**
+ * Smooth curve
+ */
+void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
+                                  const float factor,
+                                  const uint step_size,
+                                  const uint repeat,
+                                  const bool only_selected,
+                                  const bool affect_endpoints,
+                                  const bool do_positions,
+                                  const bool do_pressure,
+                                  const bool do_strength)
+{
+  bGPDcurve *gpc = gps->editcurve;
+  if (gpc == NULL || gpc->tot_curve_points < 2 || factor == 0.0f || repeat < 1) {
+    return;
+  }
+
+  if (!(do_positions || do_pressure || do_strength)) {
+    return;
+  }
+
+  const bool is_cyclic = gps->flag & GP_STROKE_CYCLIC;
+  /* Total number of cubic points. */
+  const uint tot_points = gpc->tot_curve_points * 3;
+  for (uint r = 0; r < repeat; r++) {
+    /**/
+    uint start_idx = (affect_endpoints || is_cyclic) ? 0 : 2;
+    uint end_idx = (affect_endpoints || is_cyclic) ? tot_points : tot_points - 2;
+
+    for (uint i = start_idx; i < end_idx; i++) {
+      /* bGPDcurve_point index */
+      uint pt_idx = i / 3;
+      /* BezTriple handle index */
+      uint hd_idx = i % 3;
+
+      bGPDcurve_point *gpc_pt = &gpc->curve_points[pt_idx];
+      if ((gpc_pt->flag & GP_CURVE_POINT_SELECT) == 0 && only_selected) {
+        continue;
+      }
+      BezTriple *bezt = &gpc_pt->bezt;
+      float sco[3] = {0.0f};
+      float smoothed_pressure = 0.0f;
+      float smoothed_strength = 0.0f;
+
+      const float average_fac = 1.0f / (float)(step_size * 2 + 1);
+
+      if (do_positions) {
+        /* Include the current point. */
+        madd_v3_v3fl(sco, bezt->vec[hd_idx], average_fac);
+
+        for (uint step = 1; step <= step_size; step++) {
+          int prev_idx = i - step;
+          int next_idx = i + step;
+
+          if (is_cyclic) {
+            prev_idx = mod_i(prev_idx, tot_points);
+            next_idx = next_idx % tot_points;
+          }
+          else {
+            CLAMP_MIN(prev_idx, 0);
+            CLAMP_MAX(next_idx, tot_points - 1);
+          }
+
+          uint prev_pt_idx = prev_idx / 3;
+          uint prev_hd_idx = prev_idx % 3;
+          uint next_pt_idx = next_idx / 3;
+          uint next_hd_idx = next_idx % 3;
+
+          bGPDcurve_point *gpc_prev_pt = &gpc->curve_points[prev_pt_idx];
+          bGPDcurve_point *gpc_next_pt = &gpc->curve_points[next_pt_idx];
+          BezTriple *prev_bezt = &gpc_prev_pt->bezt;
+          BezTriple *next_bezt = &gpc_next_pt->bezt;
+
+          madd_v3_v3fl(sco, prev_bezt->vec[prev_hd_idx], average_fac);
+          madd_v3_v3fl(sco, next_bezt->vec[next_hd_idx], average_fac);
+        }
+
+        interp_v3_v3v3(bezt->vec[hd_idx], bezt->vec[hd_idx], sco, factor);
+      }
+
+      if (do_pressure && hd_idx == 1) {
+        /* Include the current point. */
+        smoothed_pressure += gpc_pt->pressure * average_fac;
+
+        for (uint step = 1; step <= step_size; step++) {
+          int prev_idx = pt_idx - step;
+          int next_idx = pt_idx + step;
+
+          if (is_cyclic) {
+            prev_idx = mod_i(prev_idx, gpc->tot_curve_points);
+            next_idx = next_idx % gpc->tot_curve_points;
+          }
+          else {
+            CLAMP_MIN(prev_idx, 0);
+            CLAMP_MAX(next_idx, gpc->tot_curve_points - 1);
+          }
+
+          bGPDcurve_point *gpc_prev_pt = &gpc->curve_points[prev_idx];
+          bGPDcurve_point *gpc_next_pt = &gpc->curve_points[next_idx];
+          smoothed_pressure += gpc_prev_pt->pressure * average_fac;
+          smoothed_pressure += gpc_next_pt->pressure * average_fac;
+        }
+
+        gpc_pt->pressure = interpf(smoothed_pressure, gpc_pt->pressure, factor);
+      }
+
+      if (do_strength && hd_idx == 1) {
+        /* Include the current point. */
+        smoothed_strength += gpc_pt->strength * average_fac;
+
+        for (uint step = 1; step <= step_size; step++) {
+          int prev_idx = pt_idx - step;
+          int next_idx = pt_idx + step;
+
+          if (is_cyclic) {
+            prev_idx = mod_i(prev_idx, gpc->tot_curve_points);
+            next_idx = next_idx % gpc->tot_curve_points;
+          }
+          else {
+            CLAMP_MIN(prev_idx, 0);
+            CLAMP_MAX(next_idx, gpc->tot_curve_points - 1);
+          }
+
+          bGPDcurve_point *gpc_prev_pt = &gpc->curve_points[prev_idx];
+          bGPDcurve_point *gpc_next_pt = &gpc->curve_points[next_idx];
+          smoothed_strength += gpc_prev_pt->strength * average_fac;
+          smoothed_strength += gpc_next_pt->strength * average_fac;
+        }
+
+        gpc_pt->strength = interpf(smoothed_strength, gpc_pt->strength, factor);
+      }
+    }
+  }
+}
+
 /** \} */

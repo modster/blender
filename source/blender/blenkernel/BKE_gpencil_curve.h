@@ -74,7 +74,15 @@ bool BKE_gpencil_editcurve_recalculate_handles(struct bGPDstroke *gps);
 void BKE_gpencil_editcurve_subdivide(struct bGPDstroke *gps, const int cuts);
 void BKE_gpencil_editcurve_simplify_adaptive(struct bGPDstroke *gps, const float threshold);
 void BKE_gpencil_editcurve_simplify_fixed(struct bGPDstroke *gps, const int count);
-
+void BKE_gpencil_editcurve_smooth(struct bGPDstroke *gps,
+                                  const float factor,
+                                  const uint step_size,
+                                  const uint repeat,
+                                  const bool only_selected,
+                                  const bool affect_endpoints,
+                                  const bool do_positions,
+                                  const bool do_pressure,
+                                  const bool do_strength);
 #ifdef __cplusplus
 }
 #endif

@@ -1935,8 +1935,8 @@ static int gpencil_move_to_layer_exec(bContext *C, wmOperator *op)
           }
 
           bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
-                                    gps->editcurve->flag & GP_CURVE_SELECT :
-                                    gps->flag & GP_STROKE_SELECT;
+                                        gps->editcurve->flag & GP_CURVE_SELECT :
+                                        gps->flag & GP_STROKE_SELECT;
 
           /* TODO: Don't just move entire strokes - instead, only copy the selected portions... */
           if (is_stroke_selected) {
@@ -4295,6 +4295,22 @@ static void gpencil_smooth_stroke(bContext *C, wmOperator *op)
         }
       }
     }
+    else if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
+      if (gpc->flag & GP_CURVE_SELECT) {
+        BKE_gpencil_editcurve_smooth(gps,
+                                     factor,
+                                     2,
+                                     repeat,
+                                     only_selected,
+                                     false,
+                                     smooth_position,
+                                     smooth_thickness,
+                                     smooth_strength);
+        BKE_gpencil_editcurve_recalculate_handles(gps);
+        BKE_gpencil_stroke_geometry_update(gpd_, gps, GP_GEO_UPDATE_DEFAULT);
+      }
+    }
   }
   GP_EDITABLE_STROKES_END(gpstroke_iter);
 }
@@ -5390,7 +5406,7 @@ void GPENCIL_OT_stroke_smooth(wmOperatorType *ot)
   prop = RNA_def_int(ot->srna, "repeat", 1, 1, 50, "Repeat", "", 1, 20);
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
-  RNA_def_float(ot->srna, "factor", 0.5f, 0.0f, 2.0f, "Factor", "", 0.0f, 2.0f);
+  RNA_def_float(ot->srna, "factor", 0.5f, 0.0f, 2.0f, "Factor", "", 0.0f, 1.0f);
   RNA_def_boolean(ot->srna,
                   "only_selected",
                   true,
