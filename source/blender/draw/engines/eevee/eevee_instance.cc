@@ -152,7 +152,7 @@ void Instance::object_sync(Object *ob)
       case OB_SURF:
       case OB_FONT:
       case OB_MBALL:
-        shading_passes.opaque.surface_add(ob, nullptr, 0);
+        shading_passes.deferred.surface_add(ob);
         shading_passes.shadow.surface_add(ob, nullptr, 0);
         shading_passes.velocity.mesh_add(ob, ob_handle);
 

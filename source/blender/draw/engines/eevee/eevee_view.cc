@@ -110,6 +110,8 @@ void ShadingView::sync(ivec2 render_extent_)
     /* Reuse postfx_tx_. */
     debug_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(postfx_tx_));
   }
+
+  gbuffer_.sync(depth_tx_);
 }
 
 void ShadingView::render(void)
@@ -128,7 +130,9 @@ void ShadingView::render(void)
   GPU_framebuffer_bind(view_fb_);
   GPU_framebuffer_clear_color_depth(view_fb_, color, 1.0f);
 
-  inst_.shading_passes.opaque.render();
+  inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
+
+  // inst_.shading_passes.forward.render();
 
   velocity_.render(depth_tx_);
 

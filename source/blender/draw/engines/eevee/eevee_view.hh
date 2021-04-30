@@ -61,6 +61,8 @@ class ShadingView {
   MotionBlur mb_;
   Velocity velocity_;
 
+  GBuffer gbuffer_;
+
   /** Owned resources. */
   eevee::Framebuffer view_fb_;
   eevee::Framebuffer debug_fb_;

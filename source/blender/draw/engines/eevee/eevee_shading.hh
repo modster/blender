@@ -60,6 +60,122 @@ class ForwardPass {
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Deferred lighting.
+ * \{ */
+
+enum eClosureBits {
+  CLOSURE_DIFFUSE = 1 << 0,
+  CLOSURE_SSS = 1 << 1,
+  CLOSURE_REFLECTION = 1 << 2,
+  CLOSURE_REFRACTION = 1 << 3,
+  CLOSURE_VOLUME = 1 << 4,
+  CLOSURE_EMISSION = 1 << 5,
+  CLOSURE_TRANSPARENCY = 1 << 6,
+};
+
+struct GBuffer {
+  Texture diffuse_tx = Texture("GbufferDiffuse");
+  Texture reflection_tx = Texture("GbufferReflection");
+  Texture refraction_tx = Texture("GbufferRefraction");
+  Texture volume_tx = Texture("GbufferVolume");
+  Texture emission_tx = Texture("GbufferEmission");
+  Texture transparency_tx = Texture("GbufferTransparency");
+
+  Framebuffer framebuffer = Framebuffer("Gbuffer");
+  /* Pointer to the view's depth buffer. */
+  GPUTexture *depth_tx = nullptr;
+
+  void sync(GPUTexture *depth_tx_)
+  {
+    depth_tx = depth_tx_;
+    diffuse_tx.sync_tmp();
+    reflection_tx.sync_tmp();
+    refraction_tx.sync_tmp();
+    volume_tx.sync_tmp();
+    emission_tx.sync_tmp();
+    transparency_tx.sync_tmp();
+  }
+
+  void bind(eClosureBits closures_used)
+  {
+    UNUSED_VARS(closures_used);
+    ivec2 extent = {GPU_texture_width(depth_tx), GPU_texture_height(depth_tx)};
+
+    /* TODO Allocate only the one we need. */
+    /* TODO Reuse for different config. */
+    /* TODO Allocate only GPU_RG32UI for diffuse if no sss is needed. */
+    diffuse_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, this);
+    reflection_tx.acquire_tmp(UNPACK2(extent), GPU_RG32UI, this);
+    // refraction_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, this);
+    // volume_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, this);
+    // emission_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, this);
+    // transparency_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, this);
+
+    framebuffer.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx),
+                       GPU_ATTACHMENT_TEXTURE(diffuse_tx),
+                       GPU_ATTACHMENT_TEXTURE(reflection_tx));
+    GPU_framebuffer_bind(framebuffer);
+  }
+
+  void render_end(void)
+  {
+    diffuse_tx.release_tmp();
+    reflection_tx.release_tmp();
+    refraction_tx.release_tmp();
+    volume_tx.release_tmp();
+    emission_tx.release_tmp();
+    transparency_tx.release_tmp();
+  }
+};
+
+class DeferredLayer {
+ private:
+  Instance &inst_;
+
+  GPUTexture *input_diffuse_data_tx_ = nullptr;
+  GPUTexture *input_depth_tx_ = nullptr;
+
+  DRWPass *gbuffer_ps_ = nullptr;
+
+ public:
+  DeferredLayer(Instance &inst) : inst_(inst){};
+
+  void sync(void);
+  void surface_add(Object *ob);
+  void render(GBuffer &gbuffer, GPUFrameBuffer *view_fb);
+};
+
+class DeferredPass {
+  friend DeferredLayer;
+
+ private:
+  Instance &inst_;
+
+  /* Gbuffer filling passes. We could have an arbitrary number of them but for now we just have
+   * a harcoded number of them. */
+  DeferredLayer opaque_ps_;
+  DeferredLayer refraction_ps_;
+  DeferredLayer volumetric_ps_;
+
+  DRWPass *eval_diffuse_ps_ = nullptr;
+
+  /* References only. */
+  GPUTexture *input_diffuse_data_tx_ = nullptr;
+  GPUTexture *input_reflection_data_tx_ = nullptr;
+  GPUTexture *input_depth_tx_ = nullptr;
+
+ public:
+  DeferredPass(Instance &inst)
+      : inst_(inst), opaque_ps_(inst), refraction_ps_(inst), volumetric_ps_(inst){};
+
+  void sync(void);
+  void surface_add(Object *ob);
+  void render(GBuffer &gbuffer, GPUFrameBuffer *view_fb);
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Utility texture
  *
  * 64x64 2D array texture containing LUT tables and blue noises.
@@ -140,7 +256,9 @@ class UtilityTexture : public Texture {
 class ShadingPasses {
  public:
   CullingLightPass light_culling;
-  ForwardPass opaque;
+
+  DeferredPass deferred;
+  ForwardPass forward;
   ShadowPass shadow;
   VelocityPass velocity;
 
@@ -150,12 +268,19 @@ class ShadingPasses {
 
  public:
   ShadingPasses(Instance &inst)
-      : light_culling(inst), opaque(inst), shadow(inst), velocity(inst), debug_culling(inst){};
+      : light_culling(inst),
+        deferred(inst),
+        forward(inst),
+        shadow(inst),
+        velocity(inst),
+        debug_culling(inst){};
 
   void sync()
   {
     light_culling.sync();
-    opaque.sync();
+
+    deferred.sync();
+    forward.sync();
     shadow.sync();
     velocity.sync();
 

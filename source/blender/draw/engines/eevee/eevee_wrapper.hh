@@ -149,6 +149,7 @@ template<typename T> class StructBuffer : public T {
 class Texture {
  private:
   GPUTexture *tx_ = nullptr;
+  GPUTexture *tx_tmp_saved_ = nullptr;
   const char *name_;
 
  public:
@@ -198,6 +199,31 @@ class Texture {
   ~Texture()
   {
     GPU_TEXTURE_FREE_SAFE(tx_);
+  }
+
+  /* Use release_tmp after rendering or else mayhem will ensue. */
+  void acquire_tmp(int w, int h, eGPUTextureFormat format, void *owner_)
+  {
+    if (tx_ == nullptr) {
+      if (tx_tmp_saved_ != nullptr) {
+        tx_ = tx_tmp_saved_;
+        return;
+      }
+      DrawEngineType *owner = (DrawEngineType *)owner_;
+      tx_ = DRW_texture_pool_query_2d(w, h, format, owner);
+    }
+  }
+
+  /* Clears any reference. Workaround for pool texture not being releasable on demand. */
+  void sync_tmp(void)
+  {
+    tx_tmp_saved_ = nullptr;
+  }
+
+  void release_tmp(void)
+  {
+    tx_tmp_saved_ = tx_;
+    tx_ = nullptr;
   }
 
   void ensure(const char *name, int w, int h, int mips, eGPUTextureFormat format)
