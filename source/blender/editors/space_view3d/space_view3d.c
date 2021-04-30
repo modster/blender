@@ -636,7 +636,9 @@ static void view3d_ob_drop_copy(wmDrag *drag, wmDropBox *drop)
 static void view3d_ob_drag_gizmo_copy_local(wmDropBox *drop, Object *ob)
 {
   BoundBox *boundbox = BKE_object_boundbox_get(ob);
-  RNA_float_set_array(drop->gizmo_group_ptr, "bound_box", (float *)boundbox->vec);
+  if (boundbox) {
+    RNA_float_set_array(drop->gizmo_group_ptr, "bound_box", (float *)boundbox->vec);
+  }
   float matrix_basis[4][4];
   BKE_object_to_mat4(ob, matrix_basis);
   RNA_float_set_array(drop->gizmo_group_ptr, "matrix_basis", (float *)matrix_basis);
