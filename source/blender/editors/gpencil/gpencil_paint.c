@@ -54,6 +54,7 @@
 #include "BKE_deform.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
@@ -944,6 +945,7 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
   const bool is_depth = (bool)(align_flag & (GP_PROJECT_DEPTH_VIEW | GP_PROJECT_DEPTH_STROKE));
   const bool is_lock_axis_view = (bool)(ts->gp_sculpt.lock_axis == 0);
   const bool is_camera = is_lock_axis_view && (rv3d->persp == RV3D_CAMOB) && (!is_depth);
+  const bool is_bezier_mode = ts->gpencil_flags & GP_TOOL_FLAG_CURVE_FIT;
   int totelem;
 
   /* For very low pressure at the end, truncate stroke. */
@@ -951,7 +953,7 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
     int last_i = gpd->runtime.sbuffer_used - 1;
     while (last_i > 0) {
       ptc = (tGPspoint *)gpd->runtime.sbuffer + last_i;
-      if (ptc->pressure > 0.001f) {
+      if (ptc->pressure > 0.0f) {
         break;
       }
       gpd->runtime.sbuffer_used = last_i - 1;
@@ -1197,8 +1199,21 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
       }
     }
 
+    /* Convert to bezier stroke when we are in bezier mode. */
+    if (is_bezier_mode) {
+      /* The refitting algorithm assumes that we have a bounding box calculated. */
+      BKE_gpencil_stroke_boundingbox_calc(gps);
+      BKE_gpencil_stroke_refit_curve(gps,
+                                     ts->gpencil_curve_fit_threshold,
+                                     ts->gpencil_curve_fit_corner_angle,
+                                     GP_GEO_UPDATE_CURVE_REFIT_ALL);
+    }
+
     /* subdivide and smooth the stroke */
-    if ((brush->gpencil_settings->flag & GP_BRUSH_GROUP_SETTINGS) && (subdivide > 0)) {
+    if ((brush->gpencil_settings->flag & GP_BRUSH_GROUP_SETTINGS) &&
+        (subdivide > 0)
+        /* XXX: For now, don't subdivide in bezier mode. */
+        && !(is_bezier_mode)) {
       gpencil_subdivide_stroke(gpd, gps, subdivide);
     }
 
@@ -1207,6 +1222,17 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
      * without changing too much the original stroke. */
     if ((brush->gpencil_settings->flag & GP_BRUSH_GROUP_SETTINGS) &&
         (brush->gpencil_settings->draw_smoothfac > 0.0f)) {
+      if (is_bezier_mode) {
+        BKE_gpencil_editcurve_smooth(gps,
+                                     brush->gpencil_settings->draw_smoothfac,
+                                     2,
+                                     brush->gpencil_settings->draw_smoothlvl,
+                                     false,
+                                     true,
+                                     true,
+                                     false,
+                                     true);
+      }
       float reduce = 0.0f;
       for (int r = 0; r < brush->gpencil_settings->draw_smoothlvl; r++) {
         for (i = 0; i < gps->totpoints - 1; i++) {
@@ -1230,15 +1256,24 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
     /* Simplify adaptive */
     if ((brush->gpencil_settings->flag & GP_BRUSH_GROUP_SETTINGS) &&
         (brush->gpencil_settings->simplify_f > 0.0f)) {
-      BKE_gpencil_stroke_simplify_adaptive(gpd, gps, brush->gpencil_settings->simplify_f);
+      if (is_bezier_mode) {
+        BKE_gpencil_editcurve_simplify_adaptive(gps, brush->gpencil_settings->simplify_f);
+      }
+      else {
+        BKE_gpencil_stroke_simplify_adaptive(gpd, gps, brush->gpencil_settings->simplify_f);
+      }
     }
 
-    /* reproject to plane (only in 3d space) */
-    gpencil_reproject_toplane(p, gps);
+    if (!is_bezier_mode) {
+      /* reproject to plane (only in 3d space) */
+      gpencil_reproject_toplane(p, gps);
+    }
+
     /* change position relative to parent object */
     gpencil_apply_parent(depsgraph, obact, gpl, gps);
     /* If camera view or view projection, reproject flat to view to avoid perspective effect. */
-    if ((!is_depth) && (((align_flag & GP_PROJECT_VIEWSPACE) && is_lock_axis_view) || is_camera)) {
+    if ((!is_bezier_mode) && (!is_depth) &&
+        (((align_flag & GP_PROJECT_VIEWSPACE) && is_lock_axis_view) || is_camera)) {
       ED_gpencil_project_stroke_to_view(p->C, p->gpl, gps);
     }
 
@@ -1282,12 +1317,12 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
 
   /* post process stroke */
   if ((p->brush->gpencil_settings->flag & GP_BRUSH_GROUP_SETTINGS) &&
-      p->brush->gpencil_settings->flag & GP_BRUSH_TRIM_STROKE) {
+      (p->brush->gpencil_settings->flag & GP_BRUSH_TRIM_STROKE) && (!is_bezier_mode)) {
     BKE_gpencil_stroke_trim(gpd, gps);
   }
 
   /* Join with existing strokes. */
-  if (ts->gpencil_flags & GP_TOOL_FLAG_AUTOMERGE_STROKE) {
+  if ((ts->gpencil_flags & GP_TOOL_FLAG_AUTOMERGE_STROKE) && (!is_bezier_mode)) {
     if (gps->prev != NULL) {
       int pt_index = 0;
       bool doit = true;

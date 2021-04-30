@@ -681,9 +681,6 @@ void gpencil_point_to_parent_space(const bGPDspoint *pt,
  */
 void gpencil_apply_parent(Depsgraph *depsgraph, Object *obact, bGPDlayer *gpl, bGPDstroke *gps)
 {
-  bGPDspoint *pt;
-  int i;
-
   /* undo matrix */
   float diff_mat[4][4];
   float inverse_diff_mat[4][4];
@@ -692,8 +689,20 @@ void gpencil_apply_parent(Depsgraph *depsgraph, Object *obact, bGPDlayer *gpl, b
   BKE_gpencil_layer_transform_matrix_get(depsgraph, obact, gpl, diff_mat);
   invert_m4_m4(inverse_diff_mat, diff_mat);
 
-  for (i = 0; i < gps->totpoints; i++) {
-    pt = &gps->points[i];
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    bGPDcurve *gpc = gps->editcurve;
+    for (int i = 0; i < gpc->tot_curve_points; i++) {
+      bGPDcurve_point *pt = &gpc->curve_points[i];
+      BezTriple *bezt = &pt->bezt;
+      for (int j = 0; j < 3; j++) {
+        mul_v3_m4v3(fpt, inverse_diff_mat, bezt->vec[j]);
+        copy_v3_v3(bezt->vec[j], fpt);
+      }
+    }
+  }
+
+  for (int i = 0; i < gps->totpoints; i++) {
+    bGPDspoint *pt = &gps->points[i];
     mul_v3_m4v3(fpt, inverse_diff_mat, &pt->x);
     copy_v3_v3(&pt->x, fpt);
   }
