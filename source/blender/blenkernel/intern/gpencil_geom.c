@@ -1316,11 +1316,12 @@ void BKE_gpencil_stroke_geometry_update(bGPdata *gpd,
   /* Update curve points first if it's a bezier stroke. */
   if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
     /* Refit the curve to the polyline points. */
-    if (GP_GEO_UPDATE_CURVE_REFIT_ANY(flag)) {
-      const float threshold = gpd->curve_edit_threshold;
-      const float corner_angle = gpd->curve_edit_corner_angle;
-      BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, flag);
-    }
+    // TODO GPXX (These lines must be removed and moved to new function)
+    // if (GP_GEO_UPDATE_CURVE_REFIT_ANY(flag)) {
+    //  const float threshold = gpd->curve_edit_threshold;
+    //  const float corner_angle = gpd->curve_edit_corner_angle;
+    //  BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, flag);
+    //}
 
     /* Regenerate the polyline points from the curve data. */
     if (GP_GEO_UPDATE_POLYLINE_REGENERATE_ANY(flag)) {

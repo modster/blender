@@ -21,9 +21,11 @@
 #define DNA_DEPRECATED_ALLOW
 
 #include "BLI_listbase.h"
+#include "BLI_math.h"
 #include "BLI_utildefines.h"
 
 #include "DNA_genfile.h"
+#include "DNA_gpencil_types.h"
 #include "DNA_modifier_types.h"
 
 #include "BKE_main.h"
@@ -73,6 +75,17 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
             /* This was the previous hard-coded value. */
             mmd->bisect_threshold = 0.001f;
           }
+        }
+      }
+    }
+
+    /* Init grease pencil curve editing error threshold. */
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "ToolSettings", "float", "gpencil_curve_fit_threshold")) {
+      LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+        if (scene->toolsettings->sequencer_tool_settings == NULL) {
+          scene->toolsettings->gpencil_curve_fit_threshold = GP_DEFAULT_CURVE_ERROR;
+          scene->toolsettings->gpencil_curve_fit_corner_angle = GP_DEFAULT_CURVE_EDIT_CORNER_ANGLE;
         }
       }
     }

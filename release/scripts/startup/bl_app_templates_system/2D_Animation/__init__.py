@@ -59,6 +59,8 @@ def load_handler(dummy):
     scene = bpy.data.scenes[0]
     if scene:
         scene.tool_settings.use_keyframe_insert_auto = True
+        scene.tool_settings.gpencil_curve_fit_threshold = 0.1
+        scene.tool_settings.gpencil_curve_fit_corner_angle = 1.57079632679489661923 
         for ob in scene.objects:
             if ob.type == 'GPENCIL':
                 gpd = ob.data

@@ -664,10 +664,6 @@ typedef struct bGPdata {
   int flag;
   /** Default resolution for generated curves using curve editing method. */
   int curve_edit_resolution;
-  /** Curve Editing error threshold. */
-  float curve_edit_threshold;
-  /** Curve Editing corner angle (less or equal is treated as corner). */
-  float curve_edit_corner_angle;
 
   /* Palettes */
   /** List of bGPDpalette's   - Deprecated (2.78 - 2.79 only). */

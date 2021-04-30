@@ -660,6 +660,17 @@ class VIEW3D_HT_header(Header):
                 sub.separator(factor=0.4)
                 sub.prop(tool_settings, "use_gpencil_draw_additive", text="", icon='FREEZE')
 
+                # Curve fit
+                row = layout.row(align=True)
+                row.prop(tool_settings, "use_gpencil_curve_fit", text="",
+                         icon='IPO_BEZIER')
+                sub = row.row(align=True)
+                sub.active = tool_settings.use_gpencil_curve_fit
+                sub.popover(
+                    panel="VIEW3D_PT_gpencil_curve_fit",
+                    text="Curve Fit",
+                )
+
             # Select mode for Editing
             if gpd.use_stroke_edit_mode:
                 row = layout.row(align=True)
@@ -7021,6 +7032,21 @@ class VIEW3D_PT_gpencil_multi_frame(Panel):
             layout.template_curve_mapping(settings, "multiframe_falloff_curve", brush=True)
 
 
+# Grease Pencil Object - Curve Editing settings
+class VIEW3D_PT_gpencil_curve_fit(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_label = "Curve Fit"
+
+    def draw(self, context):
+        layout = self.layout
+
+        tool_settings = context.tool_settings
+        col = layout.column(align=True)
+        col.prop(tool_settings, "gpencil_curve_fit_threshold")
+        col.prop(tool_settings, "gpencil_curve_fit_corner_angle")
+
+
 class VIEW3D_MT_gpencil_edit_context_menu(Menu):
     bl_label = ""
 
@@ -7620,6 +7646,7 @@ classes = (
     VIEW3D_MT_gpencil_simplify,
     VIEW3D_MT_gpencil_copy_layer,
     VIEW3D_MT_gpencil_autoweights,
+    VIEW3D_PT_gpencil_curve_fit,
     VIEW3D_MT_gpencil_edit_context_menu,
     VIEW3D_MT_edit_curve,
     VIEW3D_MT_edit_curve_ctrlpoints,

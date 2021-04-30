@@ -94,6 +94,7 @@
 #include "DNA_curve_types.h"
 #include "DNA_fluid_types.h"
 #include "DNA_gpencil_modifier_types.h"
+#include "DNA_gpencil_types.h"
 #include "DNA_hair_types.h"
 #include "DNA_image_types.h"
 #include "DNA_key_types.h"

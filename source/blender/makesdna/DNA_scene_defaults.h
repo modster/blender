@@ -376,6 +376,9 @@
     .gpencil_v2d_align = GP_PROJECT_VIEWSPACE, \
     .gpencil_seq_align = GP_PROJECT_VIEWSPACE, \
     .gpencil_ima_align = GP_PROJECT_VIEWSPACE, \
+    /* GP Curve Fitting */ \
+    .gpencil_curve_fit_threshold = GP_DEFAULT_CURVE_ERROR, \
+    .gpencil_curve_fit_corner_angle = GP_DEFAULT_CURVE_EDIT_CORNER_ANGLE,\
   }
 
 /* clang-format off */

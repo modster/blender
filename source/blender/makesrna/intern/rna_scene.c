@@ -3036,6 +3036,21 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.0, 1.0);
   RNA_def_property_ui_range(prop, 0.0, 0.1, 0.01, 6);
 
+  /* Grease Pencil Curve fitting error threshold. */
+  prop = RNA_def_property(srna, "gpencil_curve_fit_threshold", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_sdna(prop, NULL, "gpencil_curve_fit_threshold");
+  RNA_def_property_range(prop, FLT_MIN, 10.0);
+  RNA_def_property_ui_text(prop, "Threshold", "Curve conversion error threshold");
+  RNA_def_property_ui_range(prop, FLT_MIN, 10.0, 2, 5);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+
+  /* Grease Pencil Curve fitting corner angle. */
+  prop = RNA_def_property(srna, "gpencil_curve_fit_corner_angle", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_float_sdna(prop, NULL, "gpencil_curve_fit_corner_angle");
+  RNA_def_property_range(prop, 0.0f, DEG2RADF(180.0f));
+  RNA_def_property_ui_text(prop, "Corner Angle", "Angle threshold to be treated as corners");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+
   /* Pivot Point */
   prop = RNA_def_property(srna, "transform_pivot_point", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "transform_pivot_point");
@@ -3225,6 +3240,12 @@ static void rna_def_tool_settings(BlenderRNA *brna)
       prop,
       "Automerge",
       "Join by distance last drawn stroke with previous strokes in the active layer");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+
+  prop = RNA_def_property(srna, "use_gpencil_curve_fit", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "gpencil_flags", GP_TOOL_FLAG_CURVE_FIT);
+  RNA_def_property_boolean_default(prop, false);
+  RNA_def_property_ui_text(prop, "Curve", "Convert all strokes to Bezier curves");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
   prop = RNA_def_property(srna, "gpencil_sculpt", PROP_POINTER, PROP_NONE);
