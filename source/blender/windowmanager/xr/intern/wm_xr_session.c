@@ -20,12 +20,12 @@
 
 #include "BKE_callbacks.h"
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
 
-#include "BLI_ghash.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 
@@ -77,12 +77,13 @@ static void wm_xr_session_object_pose_set(const GHOST_XrPose *pose, Object *ob)
   DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
 }
 
-static void wm_xr_session_create_cb(void *customdata)
+static void wm_xr_session_create_cb()
 {
-  wmXrData *xr_data = customdata;
+  Main *bmain = G_MAIN;
+  wmWindowManager *wm = bmain->wm.first;
+  wmXrData *xr_data = &wm->xr;
   XrSessionSettings *settings = &xr_data->session_settings;
   wmXrSessionState *state = &xr_data->runtime->session_state;
-  Main *bmain = CTX_data_main(xr_data->runtime->bcontext);
 
   /* Get action set data from Python. */
   BKE_callback_exec_null(bmain, BKE_CB_EVT_XR_SESSION_START_PRE);
@@ -124,8 +125,6 @@ static void wm_xr_session_exit_cb(void *customdata)
                                   settings->controller1_object);
   }
 
-  wm_xr_session_actions_uninit(xr_data);
-
   if (xr_data->runtime->exit_fn) {
     xr_data->runtime->exit_fn(xr_data);
   }
@@ -140,7 +139,6 @@ static void wm_xr_session_begin_info_create(wmXrData *xr_data,
   /* Callback for when the session is created. This is needed to create and bind OpenXR actions
    * after the session is created but before it is started. */
   r_begin_info->create_fn = wm_xr_session_create_cb;
-  r_begin_info->create_customdata = xr_data;
 
   /* WM-XR exit function, does some own stuff and calls callback passed to wm_xr_session_toggle(),
    * to allow external code to execute its own session-exit logic. */
@@ -148,8 +146,7 @@ static void wm_xr_session_begin_info_create(wmXrData *xr_data,
   r_begin_info->exit_customdata = xr_data;
 }
 
-void wm_xr_session_toggle(bContext *C,
-                          wmWindowManager *wm,
+void wm_xr_session_toggle(wmWindowManager *wm,
                           wmWindow *session_root_win,
                           wmXrSessionExitFn session_exit_fn)
 {
@@ -161,7 +158,6 @@ void wm_xr_session_toggle(bContext *C,
   else {
     GHOST_XrSessionBeginInfo begin_info;
 
-    xr_data->runtime->bcontext = C;
     xr_data->runtime->session_root_win = session_root_win;
     xr_data->runtime->session_state.is_started = true;
     xr_data->runtime->exit_fn = session_exit_fn;
@@ -573,40 +569,22 @@ void wm_xr_session_actions_init(wmXrData *xr)
     return;
   }
 
-  GHash *action_sets = xr->runtime->session_state.action_sets;
-  bool attach_actions = false;
-
-  /* Check if there are any created actions. */
-  if (action_sets && BLI_ghash_len(action_sets) > 0) {
-    GHashIterator *ghi = BLI_ghashIterator_new(action_sets);
-    GHASH_ITER (*ghi, action_sets) {
-      wmXrActionSet *action_set = BLI_ghashIterator_getValue(ghi);
-      if (action_set && action_set->actions && BLI_ghash_len(action_set->actions) > 0) {
-        attach_actions = true;
-        break;
-      }
-    }
-    BLI_ghashIterator_free(ghi);
-  }
-
-  if (attach_actions) {
-    GHOST_XrAttachActionSets(xr->runtime->context);
-  }
+  GHOST_XrAttachActionSets(xr->runtime->context);
 }
 
 static void wm_xr_session_controller_mats_update(const XrSessionSettings *settings,
                                                  const wmXrAction *controller_pose_action,
-                                                 bContext *C,
                                                  wmXrSessionState *state,
                                                  wmWindow *win)
 {
   const unsigned int count = (unsigned int)min_ii(
       (int)controller_pose_action->count_subaction_paths, (int)ARRAY_SIZE(state->controllers));
 
-  Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
-  wmWindowManager *wm = CTX_wm_manager(C);
-  bScreen *screen_anim = ED_screen_animation_playing(wm);
+  /* TODO_XR */
+  // Scene *scene = CTX_data_scene(C);
+  // ViewLayer *view_layer = CTX_data_view_layer(C);
+  // wmWindowManager *wm = CTX_wm_manager(C);
+  // bScreen *screen_anim = ED_screen_animation_playing(wm);
   Object *ob_constraint = NULL;
   char ob_flag;
   float view_ofs[3];
@@ -658,11 +636,12 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
     if (ob_constraint && ((ob_flag & XR_OBJECT_ENABLE) != 0)) {
       wm_xr_session_object_pose_set(&controller->pose, ob_constraint);
 
-      if (((ob_flag & XR_OBJECT_AUTOKEY) != 0) && screen_anim &&
-          autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
-        wm_xr_session_object_autokey(
-            C, scene, view_layer, win, ob_constraint, (i == 0) ? true : false);
-      }
+      /* TODO_XR */
+      // if (((ob_flag & XR_OBJECT_AUTOKEY) != 0) && screen_anim &&
+      //    autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
+      //  wm_xr_session_object_autokey(
+      //      C, scene, view_layer, win, ob_constraint, (i == 0) ? true : false);
+      //}
     }
   }
 }
@@ -681,19 +660,28 @@ static const GHOST_XrPose *wm_xr_session_controller_pose_find(const wmXrSessionS
 
 /* Dispatch events to XR surface / window queues. */
 static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
+                                          GHOST_XrContextHandle xr_context,
                                           wmXrActionSet *action_set,
                                           wmXrSessionState *session_state,
                                           wmSurface *surface,
                                           wmWindow *win)
 {
-  const wmXrEyeData *eye_data = &session_state->eyes[settings->selection_eye];
   const char *action_set_name = action_set->name;
-  GHash *actions = action_set->actions;
+
+  const unsigned int count = GHOST_XrGetActionCount(xr_context, action_set_name);
+  if (count < 1) {
+    return;
+  }
+
+  const wmXrEyeData *eye_data = &session_state->eyes[settings->selection_eye];
   wmXrAction *active_modal_action = action_set->active_modal_action;
 
-  GHashIterator *ghi = BLI_ghashIterator_new(actions);
-  GHASH_ITER (*ghi, actions) {
-    wmXrAction *action = BLI_ghashIterator_getValue(ghi);
+  wmXrAction **actions = MEM_calloc_arrayN(count, sizeof(wmXrAction *), __func__);
+
+  GHOST_XrGetActionCustomdatas(xr_context, action_set_name, actions);
+
+  for (unsigned int i = 0; i < count; ++i) {
+    wmXrAction *action = actions[i];
     if (action && action->ot) {
       bool modal = (action->ot->modal || action->ot->modal_3d) ? true : false;
 
@@ -825,61 +813,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
     }
   }
 
-  BLI_ghashIterator_free(ghi);
-}
-
-static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
-                                            GHOST_XrContextHandle xr_context,
-                                            bContext *C,
-                                            wmXrSessionState *state,
-                                            wmXrActionSet *action_set,
-                                            wmSurface *surface,
-                                            wmWindow *win)
-{
-  GHash *actions = action_set->actions;
-  if (!actions) {
-    return;
-  }
-
-  const unsigned int count = BLI_ghash_len(actions);
-  if (count < 1) {
-    return;
-  }
-
-  {
-    GHOST_XrActionInfo *infos = MEM_calloc_arrayN(count, sizeof(GHOST_XrActionInfo), __func__);
-
-    GHashIterator *ghi = BLI_ghashIterator_new(actions);
-    GHOST_XrActionInfo *info = infos;
-    GHASH_ITER (*ghi, actions) {
-      wmXrAction *action = BLI_ghashIterator_getValue(ghi);
-      info->name = (const char *)action->name;
-      info->type = action->type;
-      info->count_subaction_paths = action->count_subaction_paths;
-      info->subaction_paths = (const char **)action->subaction_paths;
-      info->states = action->states;
-      ++info;
-    }
-    BLI_ghashIterator_free(ghi);
-
-    int ret = GHOST_XrGetActionStates(xr_context, action_set->name, count, infos);
-    MEM_freeN(infos);
-    if (!ret) {
-      return;
-    }
-  }
-
-  /* Only dispatch events for active action set. */
-  if (action_set == state->active_action_set) {
-    if (action_set->controller_pose_action) {
-      wm_xr_session_controller_mats_update(
-          settings, action_set->controller_pose_action, C, state, win);
-    }
-
-    if (surface && win) {
-      wm_xr_session_events_dispatch(settings, action_set, state, surface, win);
-    }
-  }
+  MEM_freeN(actions);
 }
 
 void wm_xr_session_actions_update(wmXrData *xr)
@@ -889,10 +823,12 @@ void wm_xr_session_actions_update(wmXrData *xr)
   }
 
   const XrSessionSettings *settings = &xr->session_settings;
-  bContext *C = xr->runtime->bcontext;
-  wmWindowManager *wm = CTX_wm_manager(C);
+  Main *bmain = G_MAIN;
+  wmWindowManager *wm = bmain->wm.first;
   wmWindow *win = wm_xr_session_root_window_or_fallback_get(wm, xr->runtime);
+  GHOST_XrContextHandle xr_context = xr->runtime->context;
   wmXrSessionState *state = &xr->runtime->session_state;
+  wmXrActionSet *active_action_set = state->active_action_set;
 
   /* Update headset constraint object (if any). */
   Object *ob_constraint = settings->headset_object;
@@ -904,22 +840,15 @@ void wm_xr_session_actions_update(wmXrData *xr)
     if ((ob_flag & XR_OBJECT_AUTOKEY) != 0) {
       bScreen *screen_anim = ED_screen_animation_playing(wm);
       if (screen_anim) {
-        Scene *scene = CTX_data_scene(C);
-        if (autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
-          ViewLayer *view_layer = CTX_data_view_layer(C);
-          wm_xr_session_object_autokey(C, scene, view_layer, win, ob_constraint, true);
-        }
+        /* TODO_XR */
+        // Scene *scene = CTX_data_scene(C);
+        // if (autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
+        //  ViewLayer *view_layer = CTX_data_view_layer(C);
+        //  wm_xr_session_object_autokey(C, scene, view_layer, win, ob_constraint, true);
+        //}
       }
     }
   }
-
-  GHash *action_sets = state->action_sets;
-  if (!action_sets) {
-    return;
-  }
-
-  GHOST_XrContextHandle xr_context = xr->runtime->context;
-  wmXrActionSet *active_action_set = state->active_action_set;
 
   int ret = GHOST_XrSyncActions(xr_context, active_action_set ? active_action_set->name : NULL);
   if (!ret) {
@@ -928,36 +857,16 @@ void wm_xr_session_actions_update(wmXrData *xr)
 
   wmSurface *surface = (g_xr_surface && g_xr_surface->customdata) ? g_xr_surface : NULL;
 
+  /* Only update controller mats and dispatch events for active action set. */
   if (active_action_set) {
-    wm_xr_session_action_set_update(
-        settings, xr_context, C, state, active_action_set, surface, win);
-  }
-  else {
-    GHashIterator *ghi_set = BLI_ghashIterator_new(action_sets);
-    GHASH_ITER (*ghi_set, action_sets) {
-      wmXrActionSet *action_set = BLI_ghashIterator_getValue(ghi_set);
-      if (action_set) {
-        wm_xr_session_action_set_update(settings, xr_context, C, state, action_set, surface, win);
-      }
+    if (active_action_set->controller_pose_action) {
+      wm_xr_session_controller_mats_update(
+          &xr->session_settings, active_action_set->controller_pose_action, state, win);
     }
 
-    BLI_ghashIterator_free(ghi_set);
-  }
-}
-
-void wm_xr_session_actions_uninit(wmXrData *xr)
-{
-  GHash *action_sets = xr->runtime->session_state.action_sets;
-
-  if (action_sets) {
-    GHashIterator *ghi = BLI_ghashIterator_new(action_sets);
-    GHASH_ITER (*ghi, action_sets) {
-      wmXrActionSet *action_set = BLI_ghashIterator_getValue(ghi);
-      WM_xr_action_set_destroy(xr, action_set->name, false);
+    if (surface && win) {
+      wm_xr_session_events_dispatch(settings, xr_context, active_action_set, state, surface, win);
     }
-    BLI_ghashIterator_free(ghi);
-
-    BLI_ghash_free(action_sets, NULL, NULL);
   }
 }
 

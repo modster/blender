@@ -954,11 +954,12 @@ int GHOST_XrSessionNeedsUpsideDownDrawing(const GHOST_XrContextHandle xr_context
   return 0; /* Only reached if exception is thrown. */
 }
 
-int GHOST_XrCreateActionSet(GHOST_XrContextHandle xr_contexthandle, const char *action_set_name)
+int GHOST_XrCreateActionSet(GHOST_XrContextHandle xr_contexthandle,
+                            const GHOST_XrActionSetInfo *info)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL_RET(xr_session->createActionSet(action_set_name), xr_context);
+  GHOST_XR_CAPI_CALL_RET(xr_session->createActionSet(*info), xr_context);
   return 0;
 }
 
@@ -966,7 +967,7 @@ void GHOST_XrDestroyActionSet(GHOST_XrContextHandle xr_contexthandle, const char
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL(xr_session->destroyActionSet(action_set_name, true), xr_context);
+  GHOST_XR_CAPI_CALL(xr_session->destroyActionSet(action_set_name), xr_context);
 }
 
 int GHOST_XrCreateActions(GHOST_XrContextHandle xr_contexthandle,
@@ -1015,7 +1016,7 @@ void GHOST_XrDestroyActionSpaces(GHOST_XrContextHandle xr_contexthandle,
 int GHOST_XrCreateActionBindings(GHOST_XrContextHandle xr_contexthandle,
                                  const char *action_set_name,
                                  GHOST_TUns32 count,
-                                 const GHOST_XrActionBindingsInfo *infos)
+                                 const GHOST_XrActionProfileInfo *infos)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
@@ -1027,7 +1028,7 @@ int GHOST_XrCreateActionBindings(GHOST_XrContextHandle xr_contexthandle,
 void GHOST_XrDestroyActionBindings(GHOST_XrContextHandle xr_contexthandle,
                                    const char *action_set_name,
                                    GHOST_TUns32 count,
-                                   const GHOST_XrActionBindingsInfo *infos)
+                                   const GHOST_XrActionProfileInfo *infos)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
@@ -1050,46 +1051,66 @@ int GHOST_XrSyncActions(GHOST_XrContextHandle xr_contexthandle, const char *acti
   return 0;
 }
 
-int GHOST_XrGetActionStates(GHOST_XrContextHandle xr_contexthandle,
-                            const char *action_set_name,
-                            GHOST_TUns32 count,
-                            GHOST_XrActionInfo *r_infos)
-{
-  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
-  GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL_RET(xr_session->getActionStates(action_set_name, count, r_infos), xr_context);
-  return 0;
-}
-
 int GHOST_XrApplyHapticAction(GHOST_XrContextHandle xr_contexthandle,
                               const char *action_set_name,
                               const char *action_name,
-                              GHOST_TUns32 count,
-                              const char *const *subaction_paths,
                               const GHOST_TInt64 *duration,
                               const float *frequency,
                               const float *amplitude)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL_RET(
-      xr_session->applyHapticAction(
-          action_set_name, action_name, count, subaction_paths, duration, frequency, amplitude),
-      xr_context);
+  GHOST_XR_CAPI_CALL_RET(xr_session->applyHapticAction(
+                             action_set_name, action_name, *duration, *frequency, *amplitude),
+                         xr_context);
   return 0;
 }
 
 void GHOST_XrStopHapticAction(GHOST_XrContextHandle xr_contexthandle,
                               const char *action_set_name,
-                              const char *action_name,
-                              GHOST_TUns32 count,
-                              const char *const *subaction_paths)
+                              const char *action_name)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL(
-      xr_session->stopHapticAction(action_set_name, action_name, count, subaction_paths),
-      xr_context);
+  GHOST_XR_CAPI_CALL(xr_session->stopHapticAction(action_set_name, action_name), xr_context);
 }
 
-#endif
+void *GHOST_XrGetActionSetCustomdata(GHOST_XrContextHandle xr_contexthandle,
+                                     const char *action_set_name)
+{
+  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
+  GHOST_XrSession *xr_session = xr_context->getSession();
+  GHOST_XR_CAPI_CALL_RET(xr_session->getActionSetCustomdata(action_set_name), xr_context);
+  return 0;
+}
+
+void *GHOST_XrGetActionCustomdata(GHOST_XrContextHandle xr_contexthandle,
+                                  const char *action_set_name,
+                                  const char *action_name)
+{
+  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
+  GHOST_XrSession *xr_session = xr_context->getSession();
+  GHOST_XR_CAPI_CALL_RET(xr_session->getActionCustomdata(action_set_name, action_name),
+                         xr_context);
+  return 0;
+}
+
+unsigned int GHOST_XrGetActionCount(GHOST_XrContextHandle xr_contexthandle,
+                                    const char *action_set_name)
+{
+  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
+  GHOST_XrSession *xr_session = xr_context->getSession();
+  GHOST_XR_CAPI_CALL_RET(xr_session->getActionCount(action_set_name), xr_context);
+  return 0;
+}
+
+void GHOST_XrGetActionCustomdatas(GHOST_XrContextHandle xr_contexthandle,
+                                  const char *action_set_name,
+                                  void **r_customdatas)
+{
+  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
+  GHOST_XrSession *xr_session = xr_context->getSession();
+  GHOST_XR_CAPI_CALL(xr_session->getActionCustomdatas(action_set_name, r_customdatas), xr_context);
+}
+
+#endif /* WITH_XR_OPENXR */

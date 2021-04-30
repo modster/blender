@@ -36,7 +36,6 @@ struct GHOST_XrCustomFuncs {
   GHOST_XrGraphicsContextUnbindFn gpu_ctx_unbind_fn = nullptr;
 
   GHOST_XrSessionCreateFn session_create_fn = nullptr;
-  void *session_create_customdata = nullptr;
   GHOST_XrSessionExitFn session_exit_fn = nullptr;
   void *session_exit_customdata = nullptr;
 

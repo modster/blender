@@ -980,7 +980,7 @@ struct ARegionType *WM_xr_surface_controller_region_type_get(void);
 /* XR action functions to be called pre-XR session start.
  * Note: The "destroy" functions can also be called post-session start. */
 bool WM_xr_action_set_create(wmXrData *xr, const char *action_set_name);
-void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name, bool remove_reference);
+void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name);
 bool WM_xr_action_create(wmXrData *xr,
                          const char *action_set_name,
                          const char *action_name,
@@ -1005,13 +1005,13 @@ void WM_xr_action_space_destroy(wmXrData *xr,
                                 const char **subaction_paths);
 bool WM_xr_action_binding_create(wmXrData *xr,
                                  const char *action_set_name,
-                                 const char *interaction_profile_path,
+                                 const char *profile_path,
                                  const char *action_name,
                                  unsigned int count_interaction_paths,
                                  const char **interaction_paths);
 void WM_xr_action_binding_destroy(wmXrData *xr,
                                   const char *action_set_name,
-                                  const char *interaction_profile_path,
+                                  const char *profile_path,
                                   const char *action_name,
                                   unsigned int count_interaction_paths,
                                   const char **interaction_paths);
@@ -1033,16 +1033,10 @@ bool WM_xr_action_state_get(const wmXrData *xr,
 bool WM_xr_haptic_action_apply(wmXrData *xr,
                                const char *action_set_name,
                                const char *action_name,
-                               unsigned int count,
-                               const char *const *subaction_paths,
                                const long long *duration,
                                const float *frequency,
                                const float *amplitude);
-void WM_xr_haptic_action_stop(wmXrData *xr,
-                              const char *action_set_name,
-                              const char *action_name,
-                              unsigned int count,
-                              const char *const *subaction_paths);
+void WM_xr_haptic_action_stop(wmXrData *xr, const char *action_set_name, const char *action_name);
 
 /* wm_xr_actionmap.c */
 void WM_xr_actionconfig_init(struct bContext *C);
@@ -1072,7 +1066,7 @@ XrActionMapItem *WM_xr_actionmap_item_add_copy(XrActionMap *actionmap, XrActionM
 bool WM_xr_actionmap_item_remove(XrActionMap *actionmap, XrActionMapItem *ami);
 XrActionMapItem *WM_xr_actionmap_item_list_find(ListBase *lb, const char *idname);
 void WM_xr_actionmap_item_properties_update_ot(XrActionMapItem *ami);
-#endif
+#endif /* WITH_XR_OPENXR */
 
 /* wm.c */
 /* These need to be accessible even when WITH_XR_OPENXR is not defined since actionmaps can be

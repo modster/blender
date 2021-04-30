@@ -25,7 +25,6 @@
 #include "wm_xr.h"
 
 struct wmXrActionSet;
-struct GHash;
 
 typedef struct wmXrEyeData {
   float viewmat[4][4];
@@ -70,11 +69,9 @@ typedef struct wmXrSessionState {
   /** Last known controller data. */
   wmXrControllerData controllers[2];
 
-  /** Action sets. */
-  struct GHash *action_sets; /* wmXrActionSet */
-  /** Shared pointer with the GHash. The currently active action set that will be updated
-   * on calls to wm_xr_session_actions_update().
-   * If NULL, all action sets will be treated as active and updated. */
+  /** The currently active action set that will be updated on calls to
+   * wm_xr_session_actions_update(). If NULL, all action sets will be treated as active and
+   * updated. */
   struct wmXrActionSet *active_action_set;
 
   /** Constraint object original poses. */
@@ -152,14 +149,13 @@ typedef struct wmXrAction {
 
 typedef struct wmXrActionSet {
   char *name;
-  struct GHash *actions; /* wmXrAction */
 
-  /** Shared pointer with the GHash. The XR pose action that determines the controller
+  /** The XR pose action that determines the controller
    * transforms. This is usually identified by the OpenXR path "/grip/pose" or "/aim/pose",
    * although it could differ depending on the specification and hardware. */
   wmXrAction *controller_pose_action;
 
-  /** Shared pointer with the GHash. The currently active modal action (if any). */
+  /** The currently active modal action (if any). */
   wmXrAction *active_modal_action;
 } wmXrActionSet;
 
@@ -184,7 +180,6 @@ void wm_xr_session_gpu_binding_context_destroy(GHOST_ContextHandle context);
 
 void wm_xr_session_actions_init(wmXrData *xr);
 void wm_xr_session_actions_update(wmXrData *xr);
-void wm_xr_session_actions_uninit(wmXrData *xr);
 void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
                                             wmXrData *xr);
 void wm_xr_session_controller_data_clear(wmXrSessionState *state);

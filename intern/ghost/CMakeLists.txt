@@ -438,6 +438,7 @@ endif()
 if(WITH_XR_OPENXR)
   list(APPEND SRC
     intern/GHOST_Xr.cpp
+    intern/GHOST_XrAction.cpp
     intern/GHOST_XrContext.cpp
     intern/GHOST_XrEvent.cpp
     intern/GHOST_XrGraphicsBinding.cpp
@@ -446,6 +447,7 @@ if(WITH_XR_OPENXR)
 
     GHOST_IXrContext.h
     intern/GHOST_IXrGraphicsBinding.h
+    intern/GHOST_XrAction.h
     intern/GHOST_XrContext.h
     intern/GHOST_XrException.h
     intern/GHOST_XrSession.h

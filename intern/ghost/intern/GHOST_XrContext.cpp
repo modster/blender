@@ -489,7 +489,6 @@ GHOST_TXrGraphicsBinding GHOST_XrContext::determineGraphicsBindingTypeToUse(
 void GHOST_XrContext::startSession(const GHOST_XrSessionBeginInfo *begin_info)
 {
   m_custom_funcs.session_create_fn = begin_info->create_fn;
-  m_custom_funcs.session_create_customdata = begin_info->create_customdata;
   m_custom_funcs.session_exit_fn = begin_info->exit_fn;
   m_custom_funcs.session_exit_customdata = begin_info->exit_customdata;
 

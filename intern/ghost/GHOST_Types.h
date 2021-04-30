@@ -631,8 +631,9 @@ typedef enum GHOST_TXrGraphicsBinding {
 
 typedef void (*GHOST_XrErrorHandlerFn)(const struct GHOST_XrError *);
 
-typedef void (*GHOST_XrSessionCreateFn)(void *customdata);
+typedef void (*GHOST_XrSessionCreateFn)();
 typedef void (*GHOST_XrSessionExitFn)(void *customdata);
+typedef void (*GHOST_XrCustomdataFreeFn)(void *customdata);
 
 typedef void *(*GHOST_XrGraphicsContextBindFn)(void);
 typedef void (*GHOST_XrGraphicsContextUnbindFn)(GHOST_ContextHandle graphics_context);
@@ -664,7 +665,6 @@ typedef struct {
   GHOST_XrPose base_pose;
 
   GHOST_XrSessionCreateFn create_fn;
-  void *create_customdata;
   GHOST_XrSessionExitFn exit_fn;
   void *exit_customdata;
 } GHOST_XrSessionBeginInfo;
@@ -694,6 +694,13 @@ typedef struct GHOST_XrError {
   void *customdata;
 } GHOST_XrError;
 
+typedef struct GHOST_XrActionSetInfo {
+  const char *name;
+
+  GHOST_XrCustomdataFreeFn customdata_free_fn;
+  void *customdata; /* wmXrActionSet */
+} GHOST_XrActionSetInfo;
+
 /** XR action type. Enum values match those in OpenXR's
  * XrActionType enum for consistency. */
 typedef enum GHOST_XrActionType {
@@ -711,6 +718,9 @@ typedef struct GHOST_XrActionInfo {
   const char **subaction_paths;
   /** States for each subaction path. */
   void *states;
+
+  GHOST_XrCustomdataFreeFn customdata_free_fn;
+  void *customdata; /* wmXrAction */
 } GHOST_XrActionInfo;
 
 typedef struct GHOST_XrActionSpaceInfo {
@@ -721,17 +731,17 @@ typedef struct GHOST_XrActionSpaceInfo {
   const GHOST_XrPose *poses;
 } GHOST_XrActionSpaceInfo;
 
-typedef struct GHOST_XrActionBinding {
+typedef struct GHOST_XrActionBindingInfo {
   const char *action_name;
   GHOST_TUns32 count_interaction_paths;
   /** Interaction path: User (subaction) path + component path. */
   const char **interaction_paths;
-} GHOST_XrActionBinding;
+} GHOST_XrActionBindingInfo;
 
-typedef struct GHOST_XrActionBindingsInfo {
-  const char *interaction_profile_path;
+typedef struct GHOST_XrActionProfileInfo {
+  const char *profile_path;
   GHOST_TUns32 count_bindings;
-  const GHOST_XrActionBinding *bindings;
-} GHOST_XrActionBindingsInfo;
+  const GHOST_XrActionBindingInfo *bindings;
+} GHOST_XrActionProfileInfo;
 
-#endif
+#endif /* WITH_XR_OPENXR */

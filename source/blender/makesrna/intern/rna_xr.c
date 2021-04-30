@@ -619,49 +619,18 @@ void rna_XrSessionState_pose_action_state_get(bContext *C,
 bool rna_XrSessionState_haptic_action_apply(bContext *C,
                                             const char *action_set_name,
                                             const char *action_name,
-                                            const char *user_path0,
-                                            const char *user_path1,
                                             float duration,
                                             float frequency,
                                             float amplitude)
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-
-  const char *subaction_paths[2];
-  unsigned int count = 0;
-  if (user_path0 && !STREQ(user_path0, "")) {
-    subaction_paths[0] = user_path0;
-    ++count;
-
-    if (user_path1 && !STREQ(user_path1, "")) {
-      subaction_paths[1] = user_path1;
-      ++count;
-    }
-  }
-  else {
-    if (user_path1 && !STREQ(user_path1, "")) {
-      subaction_paths[0] = user_path1;
-      ++count;
-    }
-    else {
-      return false;
-    }
-  }
-
   long long duration_msec = (long long)(duration * 1000.0f);
 
-  return WM_xr_haptic_action_apply(&wm->xr,
-                                   action_set_name,
-                                   action_name,
-                                   count,
-                                   subaction_paths,
-                                   &duration_msec,
-                                   &frequency,
-                                   &amplitude);
+  return WM_xr_haptic_action_apply(
+      &wm->xr, action_set_name, action_name, &duration_msec, &frequency, &amplitude);
 #  else
-  UNUSED_VARS(
-      C, action_set_name, action_name, user_path0, user_path1, duration, frequency, amplitude);
+  UNUSED_VARS(C, action_set_name, action_name, duration, frequency, amplitude);
   return false;
 #  endif
 }
@@ -1802,10 +1771,6 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "user_path0", NULL, 64, "User Path 0", "OpenXR user path 0");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "OpenXR user path 1");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_float(func,
                        "duration",
