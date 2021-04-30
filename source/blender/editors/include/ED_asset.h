@@ -24,8 +24,12 @@
 extern "C" {
 #endif
 
+struct bMain;
+
 bool ED_asset_mark_id(const struct bContext *C, struct ID *id);
 bool ED_asset_clear_id(struct ID *id);
+
+void ED_assets_pre_save(struct Main *bmain);
 
 bool ED_asset_can_make_single_from_context(const struct bContext *C);
 

@@ -249,8 +249,9 @@ struct wmEventHandler_Keymap *WM_event_add_keymap_handler_priority(ListBase *han
                                                                    wmKeyMap *keymap,
                                                                    int priority);
 
-typedef struct wmKeyMap *(wmEventHandler_KeymapDynamicFn)(
-    wmWindowManager *wm, struct wmEventHandler_Keymap *handler)ATTR_WARN_UNUSED_RESULT;
+typedef struct wmKeyMap *(wmEventHandler_KeymapDynamicFn)(wmWindowManager *wm,
+                                                          struct wmEventHandler_Keymap *handler)
+    ATTR_WARN_UNUSED_RESULT;
 
 struct wmKeyMap *WM_event_get_keymap_from_toolsystem_fallback(
     struct wmWindowManager *wm, struct wmEventHandler_Keymap *handler);
@@ -692,7 +693,9 @@ struct wmDropBox *WM_dropbox_add(
     bool (*poll)(struct bContext *, struct wmDrag *, const struct wmEvent *event, const char **),
     void (*copy)(struct wmDrag *, struct wmDropBox *),
     void (*cancel)(struct Main *, struct wmDrag *, struct wmDropBox *));
-void WM_dropbox_gizmogroup_set(struct wmDropBox *, const char gizmo_group[MAX_NAME]);
+void WM_dropbox_gizmogroup_set(struct wmDropBox *,
+                               const char gizmo_group[MAX_NAME],
+                               void (*copy_gizmo_group)(struct wmDrag *, struct wmDropBox *));
 ListBase *WM_dropboxmap_find(const char *idname, int spaceid, int regionid);
 
 /* ID drag and drop */
@@ -702,6 +705,7 @@ struct ID *WM_drag_get_local_ID_from_event(const struct wmEvent *event, short id
 bool WM_drag_is_ID_type(const struct wmDrag *drag, int idcode);
 
 struct wmDragAsset *WM_drag_get_asset_data(const struct wmDrag *drag, int idcode);
+struct AssetMetaData *WM_drag_get_asset_meta_data(const struct wmDrag *drag, int idcode);
 struct ID *WM_drag_get_local_ID_or_import_from_asset(const struct wmDrag *drag, int idcode);
 
 void WM_drag_free_imported_drag_ID(struct Main *bmain,

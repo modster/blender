@@ -38,6 +38,7 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_idprop.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 
@@ -118,9 +119,12 @@ wmDropBox *WM_dropbox_add(ListBase *lb,
   return drop;
 }
 
-void WM_dropbox_gizmogroup_set(wmDropBox *drop, const char gizmo_group[MAX_NAME])
+void WM_dropbox_gizmogroup_set(wmDropBox *drop,
+                               const char gizmo_group[MAX_NAME],
+                               wmDropBoxCopyFn copy_gizmo_group)
 {
   BLI_strncpy(drop->gizmo_group, gizmo_group, sizeof(drop->gizmo_group));
+  drop->copy_gizmo_group = copy_gizmo_group;
   WM_gizmo_group_type_add(gizmo_group);
 }
 
@@ -229,6 +233,34 @@ struct wmDropboxActiveInfo {
   const char *gizmo_group;
 };
 
+static void wm_gizmogroup_properties_create(PointerRNA *ptr, const char *gz_group_name)
+{
+  const wmGizmoGroupType *gz_grouptype = WM_gizmogrouptype_find(gz_group_name, false);
+
+  if (gz_grouptype) {
+    RNA_pointer_create(NULL, gz_grouptype->srna, NULL, ptr);
+  }
+  else {
+    RNA_pointer_create(NULL, &RNA_GizmoGroupProperties, NULL, ptr);
+  }
+}
+
+static void wm_gizmogroup_properties_alloc(PointerRNA **ptr,
+                                           IDProperty **properties,
+                                           const char *gz_group_name)
+{
+  if (*properties == NULL) {
+    IDPropertyTemplate val = {0};
+    *properties = IDP_New(IDP_GROUP, &val, "wmGizmoGroupProp");
+  }
+  if (*ptr == NULL) {
+    *ptr = MEM_callocN(sizeof(PointerRNA), "wmGizmoGroupPtr");
+    wm_gizmogroup_properties_create(*ptr, gz_group_name);
+  }
+
+  (*ptr)->data = *properties;
+}
+
 /**
  * \returns Pointer to static `wmDropboxActiveInfo` data.
  */
@@ -250,6 +282,21 @@ static struct wmDropboxActiveInfo *dropbox_active(bContext *C,
              *     access to ot (and hence op context)... */
             active_info.operator_string = (tooltip) ? tooltip :
                                                       WM_operatortype_name(drop->ot, drop->ptr);
+            if (!STREQ(drag->gizmo_group, drop->gizmo_group)) {
+              if (drop->gizmo_group[0]) {
+                ARegion *region = CTX_wm_region(C);
+                wmGizmoGroup *gzgroup = WM_gizmomap_group_find(region->gizmo_map,
+                                                               drop->gizmo_group);
+                if (gzgroup) {
+                  wm_gizmogroup_properties_alloc(
+                      &gzgroup->ptr, &gzgroup->properties, drop->gizmo_group);
+                  WM_gizmo_properties_sanitize(gzgroup->ptr, 0);
+                  drop->gizmo_group_ptr = gzgroup->ptr;
+
+                  drop->copy_gizmo_group(drag, drop);
+                }
+              }
+            }
             active_info.gizmo_group = drop->gizmo_group;
             return &active_info;
           }
@@ -304,14 +351,15 @@ static void wm_drop_operator_options(bContext *C, wmDrag *drag, const wmEvent *e
   }
 
   drag->opname[0] = 0;
-  drag->gizmo_group[0] = 0;
 
   /* check buttons (XXX todo rna and value) */
   if (UI_but_active_drop_name(C)) {
     BLI_strncpy(drag->opname, IFACE_("Paste name"), sizeof(drag->opname));
+    drag->gizmo_group[0] = 0;
   }
   else {
     struct wmDropboxActiveInfo *active_info = wm_dropbox_active(C, drag, event);
+    drag->gizmo_group[0] = 0;
 
     if (active_info && active_info->operator_string) {
       BLI_strncpy(drag->opname, active_info->operator_string, sizeof(drag->opname));
@@ -402,6 +450,21 @@ wmDragAsset *WM_drag_get_asset_data(const wmDrag *drag, int idcode)
 
   wmDragAsset *asset_drag = drag->poin;
   return (ELEM(idcode, 0, asset_drag->id_type)) ? asset_drag : NULL;
+}
+
+struct AssetMetaData *WM_drag_get_asset_meta_data(const wmDrag *drag, int idcode)
+{
+  wmDragAsset *drag_asset = WM_drag_get_asset_data(drag, idcode);
+  if (drag_asset) {
+    return drag_asset->metadata;
+  }
+
+  ID *local_id = WM_drag_get_local_ID(drag, idcode);
+  if (local_id) {
+    return local_id->asset_data;
+  }
+
+  return NULL;
 }
 
 static ID *wm_drag_asset_id_import(wmDragAsset *asset_drag)
@@ -547,7 +610,10 @@ void wm_drags_draw(bContext *C, wmWindow *win, rcti *rect)
 
     /* image or icon */
     int x, y;
-    if (drag->imb) {
+    if (drag->no_preview) {
+      /* Pass. */
+    }
+    else if (drag->imb) {
       x = cursorx - drag->sx / 2;
       y = cursory - drag->sy / 2;
 

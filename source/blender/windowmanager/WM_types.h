@@ -111,6 +111,7 @@
 struct ID;
 struct ImBuf;
 struct bContext;
+struct wmDropBox;
 struct wmEvent;
 struct wmOperator;
 struct wmWindowManager;
@@ -901,6 +902,7 @@ typedef struct wmDragAsset {
   /* Always freed. */
   const char *path;
   int id_type;
+  struct AssetMetaData *metadata;
 } wmDragAsset;
 
 typedef struct wmDrag {
@@ -918,15 +920,22 @@ typedef struct wmDrag {
   float scale;
   int sx, sy;
 
+  /** Don't draw the icon or image (`imb`). */
+  bool no_preview;
+
   /** If set, draws operator name. */
   char opname[200];
   /** If set, draws gizmo group. */
   char gizmo_group[64];
+  struct IDProperty *gizmo_group_prop;
+
   unsigned int flags;
 
   /** List of wmDragIDs, all are guaranteed to have the same ID type. */
   ListBase ids;
 } wmDrag;
+
+typedef void (*wmDropBoxCopyFn)(struct wmDrag *, struct wmDropBox *);
 
 /**
  * Dropboxes are like keymaps, part of the screen/area/region definition.
@@ -939,7 +948,9 @@ typedef struct wmDropBox {
   bool (*poll)(struct bContext *, struct wmDrag *, const wmEvent *, const char **);
 
   /** Before exec, this copies drag info to #wmDrop properties. */
-  void (*copy)(struct wmDrag *, struct wmDropBox *);
+  wmDropBoxCopyFn copy;
+  /** Before `gizmo_group` is enabled, this copies drag info to #wmDrop gizmo-group properties. */
+  wmDropBoxCopyFn copy_gizmo_group;
 
   /**
    * If the operator is cancelled (returns `OPERATOR_CANCELLED`), this can be used for cleanup of
@@ -952,19 +963,18 @@ typedef struct wmDropBox {
    * Not saved in file, so can be pointer.
    */
   wmOperatorType *ot;
-  /**
-   * If poll succeeds, gizmo is drawn.
-   */
-  char gizmo_group[64];
-
   /** Operator properties, assigned to ptr->data and can be written to a file. */
   struct IDProperty *properties;
   /** RNA pointer to access properties. */
   struct PointerRNA *ptr;
-
   /** Default invoke. */
   short opcontext;
 
+  /**
+   * If poll succeeds, gizmo is drawn.
+   */
+  char gizmo_group[64];
+  struct PointerRNA *gizmo_group_ptr;
 } wmDropBox;
 
 /**

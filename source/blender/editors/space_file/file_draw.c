@@ -181,6 +181,7 @@ static void file_draw_icon(uiBlock *block,
                               file->name,
                               BLI_strdup(blend_path),
                               file->blentype,
+                              file->asset_data,
                               icon,
                               preview_image,
                               UI_DPI_FAC);
@@ -484,8 +485,14 @@ static void file_draw_preview(uiBlock *block,
     else if (file->typeflag & FILE_TYPE_ASSET) {
       char blend_path[FILE_MAX_LIBEXTRA];
       if (BLO_library_path_explode(path, blend_path, NULL, NULL)) {
-        UI_but_drag_set_asset(
-            but, file->name, BLI_strdup(blend_path), file->blentype, icon, imb, scale);
+        UI_but_drag_set_asset(but,
+                              file->name,
+                              BLI_strdup(blend_path),
+                              file->blentype,
+                              file->asset_data,
+                              icon,
+                              imb,
+                              scale);
       }
     }
     else {

@@ -34,6 +34,7 @@ extern "C" {
 /* Struct Declarations */
 
 struct ARegion;
+struct AssetMetaData;
 struct AutoComplete;
 struct EnumPropertyItem;
 struct FileSelectParams;
@@ -723,6 +724,7 @@ void UI_but_drag_set_asset(uiBut *but,
                            const char *name,
                            const char *path,
                            int id_type,
+                           struct AssetMetaData *metadata,
                            int icon,
                            struct ImBuf *imb,
                            float scale);

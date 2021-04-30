@@ -37,6 +37,7 @@
 #include "BLI_string.h"
 
 #include "BKE_context.h"
+#include "BKE_idprop.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
 #include "BKE_workspace.h"
@@ -120,6 +121,14 @@ void wm_gizmogroup_free(bContext *C, wmGizmoGroup *gzgroup)
   if (gzgroup->reports && (gzgroup->reports->flag & RPT_FREE)) {
     BKE_reports_clear(gzgroup->reports);
     MEM_freeN(gzgroup->reports);
+  }
+
+  if (gzgroup->ptr) {
+    gzgroup->properties = gzgroup->ptr->data;
+    MEM_freeN(gzgroup->ptr);
+  }
+  if (gzgroup->properties) {
+    IDP_FreeProperty(gzgroup->properties);
   }
 
   if (gzgroup->customdata_free) {

@@ -37,6 +37,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
+#include "BKE_object.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -473,7 +474,7 @@ static void draw_line_loop(const float coords[][3], int coords_len, const float 
   float viewport[4];
   GPU_viewport_size_get_f(viewport);
   GPU_batch_uniform_2fv(batch, "viewportSize", &viewport[2]);
-  GPU_batch_uniform_1f(batch, "lineWidth", U.pixelsize);
+  GPU_batch_uniform_1f(batch, "lineWidth", GPU_line_width_get());
 
   GPU_batch_draw(batch);
 
@@ -506,7 +507,7 @@ static void draw_line_pairs(const float coords_a[][3],
   float viewport[4];
   GPU_viewport_size_get_f(viewport);
   GPU_batch_uniform_2fv(batch, "viewportSize", &viewport[2]);
-  GPU_batch_uniform_1f(batch, "lineWidth", U.pixelsize);
+  GPU_batch_uniform_1f(batch, "lineWidth", GPU_line_width_get());
 
   GPU_batch_draw(batch);
 
@@ -554,7 +555,7 @@ static void draw_line_bounds(const BoundBox *bounds, const float color[4])
   float viewport[4];
   GPU_viewport_size_get_f(viewport);
   GPU_batch_uniform_2fv(batch, "viewportSize", &viewport[2]);
-  GPU_batch_uniform_1f(batch, "lineWidth", U.pixelsize);
+  GPU_batch_uniform_1f(batch, "lineWidth", GPU_line_width_get());
 
   GPU_batch_draw(batch);
 
@@ -1810,6 +1811,30 @@ static void WIDGETGROUP_placement_setup(const bContext *UNUSED(C), wmGizmoGroup 
   }
 }
 
+static void WIDGETGROUP_placement_draw_prepare(const bContext *UNUSED(C), wmGizmoGroup *gzgroup)
+{
+  /* TODO only set for drag & drop. */
+  if (!gzgroup->ptr) {
+    return;
+  }
+
+  wmGizmo *gizmo_plane = ((wmGizmo *)gzgroup->gizmos.first)->next;
+
+  PropertyRNA *boundbox_prop = RNA_struct_find_property(gzgroup->ptr, "bound_box");
+  if (boundbox_prop && RNA_property_is_set(gzgroup->ptr, boundbox_prop)) {
+    float array[8][3];
+    RNA_property_float_get_array(gzgroup->ptr, boundbox_prop, (float *)array);
+    RNA_float_set_array(gizmo_plane->ptr, "bound_box", (float *)array);
+  }
+
+  PropertyRNA *matrix_basis_prop = RNA_struct_find_property(gzgroup->ptr, "matrix_basis");
+  if (matrix_basis_prop && RNA_property_is_set(gzgroup->ptr, matrix_basis_prop)) {
+    float array[4][4];
+    RNA_property_float_get_array(gzgroup->ptr, matrix_basis_prop, (float *)array);
+    RNA_float_set_array(gizmo_plane->ptr, "matrix_basis", (float *)array);
+  }
+}
+
 static bool WIDGETGROUP_placement_poll(const bContext *C, wmGizmoGroupType *gzgt)
 {
   return ED_gizmo_poll_from_dropbox(C, gzgt) || ED_gizmo_poll_from_tool(C, gzgt);
@@ -1817,6 +1842,8 @@ static bool WIDGETGROUP_placement_poll(const bContext *C, wmGizmoGroupType *gzgt
 
 void VIEW3D_GGT_placement(wmGizmoGroupType *gzgt)
 {
+  PropertyRNA *prop;
+
   gzgt->name = "Placement Widget";
   gzgt->idname = view3d_gzgt_placement_id;
 
@@ -1828,6 +1855,17 @@ void VIEW3D_GGT_placement(wmGizmoGroupType *gzgt)
 
   gzgt->poll = WIDGETGROUP_placement_poll;
   gzgt->setup = WIDGETGROUP_placement_setup;
+  gzgt->draw_prepare = WIDGETGROUP_placement_draw_prepare;
+
+  const int boundbox_dimsize[] = {8, 3};
+  prop = RNA_def_property(gzgt->srna, "bound_box", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_multi_array(prop, 2, boundbox_dimsize);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
+  const int matrix_dimsize[] = {4, 4};
+  prop = RNA_def_property(gzgt->srna, "matrix_basis", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_multi_array(prop, 2, matrix_dimsize);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -2008,6 +2046,11 @@ struct PlacementCursor {
 
   void *paintcursor;
 
+  float boundbox[8][3];
+  bool draw_boundbox;
+
+  float scale[3];
+
   int plane_axis;
   float matrix[4][4];
 
@@ -2108,11 +2151,20 @@ static void cursor_plane_draw_ex(const bContext *C, const int mval[2], struct Pl
     GPU_matrix_projection_set(rv3d->winmat);
     GPU_matrix_set(rv3d->viewmat);
 
-    const float scale_mod = U.gizmo_size * 2 * U.dpi_fac / U.pixelsize;
+    float final_scale;
+    if (plc->draw_boundbox) {
+      /* Take diagonal of lower face to make the size based on the boundbox. */
+      float lower_min[3], lower_max[3];
+      mul_v3_v3v3(lower_min, plc->boundbox[0], plc->scale);
+      mul_v3_v3v3(lower_max, plc->boundbox[6], plc->scale);
+      final_scale = len_v3v3(lower_min, lower_max);
+    }
+    else {
+      const float scale_mod = U.gizmo_size * 2 * U.dpi_fac / U.pixelsize;
+      final_scale = (scale_mod * pixel_size);
+    }
 
-    float final_scale = (scale_mod * pixel_size);
-
-    const int lines_subdiv = 10;
+    const int lines_subdiv = 10.0f;
     int lines = lines_subdiv;
 
     float final_scale_fade = final_scale;
@@ -2139,6 +2191,32 @@ static void cursor_plane_draw_ex(const bContext *C, const int mval[2], struct Pl
     }
     gizmo_plane_draw_grid(
         lines, final_scale, final_scale_fade, plc->matrix, plc->plane_axis, color);
+
+    /* TODO support different plane axis (assumes Z right now). */
+    if (plc->draw_boundbox) {
+      float box_col[4] = {0.4f, 0.8f, 1.0f, 0.75f};
+      BoundBox bounds;
+      memcpy(bounds.vec, plc->boundbox, sizeof(bounds.vec));
+
+      float size[3];
+      BKE_boundbox_calc_size_aabb(&bounds, size);
+
+      float min[3] = {-size[0], -size[1], 0.0f};
+      float max[3] = {size[0], size[1], size[2] * 2};
+      mul_v3_v3(min, plc->scale);
+      mul_v3_v3(max, plc->scale);
+      BKE_boundbox_init_from_minmax(&bounds, min, max);
+
+      GPU_matrix_mul(plc->matrix);
+      /* Ensure the bounding-box points up. Matches how it will be placed eventualy. */
+      const bool negative_up = bounds.vec[1][2] < 0;
+      if (negative_up) {
+        GPU_matrix_scale_1f(-1.0f);
+      }
+
+      GPU_line_width(2.0f);
+      draw_line_bounds(&bounds, box_col);
+    }
 
     /* Restore matrix. */
     GPU_matrix_pop();
@@ -2212,19 +2290,41 @@ static void gizmo_placement_plane_free(wmGizmo *gz)
 static void gizmo_placement_plane_draw(const bContext *C, wmGizmo *gz)
 {
   struct PlacementPlaneGizmo *plane_gz = (struct PlacementPlaneGizmo *)gz;
+  struct PlacementCursor *plc = plane_gz->plc;
   const wmWindow *win = CTX_wm_window(C);
 
-  plane_gz->plc->do_draw = true;
+  plc->do_draw = true;
+
+  PropertyRNA *boundbox_prop = RNA_struct_find_property(gz->ptr, "bound_box");
+  if (RNA_property_is_set(gz->ptr, boundbox_prop)) {
+    RNA_property_float_get_array(gz->ptr, boundbox_prop, (float *)plc->boundbox);
+    plc->draw_boundbox = true;
+  }
+  else {
+    plc->draw_boundbox = false;
+  }
+
+  PropertyRNA *matrix_basis_prop = RNA_struct_find_property(gz->ptr, "matrix_basis");
+  if (RNA_property_is_set(gz->ptr, matrix_basis_prop)) {
+    float mat[4][4];
+    RNA_property_float_get_array(gz->ptr, matrix_basis_prop, (float *)mat);
+    mat4_to_size(plc->scale, mat);
+  }
+  else {
+    copy_v3_fl(plc->scale, 1.0f);
+  }
 
   const wmEvent *eventstate = win->eventstate;
   const ARegion *region = CTX_wm_region(C);
   const int mval[2] = {eventstate->x - region->winrct.xmin, eventstate->y - region->winrct.ymin};
 
-  cursor_plane_draw_ex(C, mval, plane_gz->plc);
+  cursor_plane_draw_ex(C, mval, plc);
 }
 
 static void GIZMO_GT_placement_plane_3d(wmGizmoType *gzt)
 {
+  PropertyRNA *prop;
+
   /* identifiers */
   gzt->idname = "GIZMO_GT_placement_plane_3d";
 
@@ -2234,6 +2334,16 @@ static void GIZMO_GT_placement_plane_3d(wmGizmoType *gzt)
   gzt->free = gizmo_placement_plane_free;
 
   gzt->struct_size = sizeof(struct PlacementPlaneGizmo);
+
+  const int boundbox_dimsize[] = {8, 3};
+  prop = RNA_def_property(gzt->srna, "bound_box", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_multi_array(prop, 2, boundbox_dimsize);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
+  const int matrix_dimsize[] = {4, 4};
+  prop = RNA_def_property(gzt->srna, "matrix_basis", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_multi_array(prop, 2, matrix_dimsize);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 void ED_gizmotypes_placement_3d(void)

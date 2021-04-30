@@ -82,6 +82,7 @@
 #include "BKE_anim_visualization.h"
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
+#include "BKE_asset.h"
 #include "BKE_camera.h"
 #include "BKE_collection.h"
 #include "BKE_constraint.h"
@@ -1132,6 +1133,57 @@ static void object_lib_override_apply_post(ID *id_dst, ID *UNUSED(id_src))
   BLI_freelistN(&pidlist);
 }
 
+static IDProperty *object_asset_boundbox_hint_property(Object *ob)
+{
+  BoundBox *boundbox = BKE_object_boundbox_get(ob);
+  if (!boundbox) {
+    return NULL;
+  }
+
+  IDPropertyTemplate idprop = {0};
+  idprop.array.len = sizeof(boundbox->vec) / sizeof(**boundbox->vec);
+  idprop.array.type = IDP_FLOAT;
+
+  IDProperty *property = IDP_New(IDP_ARRAY, &idprop, "boundbox_hint");
+  memcpy(IDP_Array(property), boundbox->vec, sizeof(boundbox->vec));
+
+  return property;
+}
+
+static IDProperty *object_asset_matrix_basis_property(Object *ob)
+{
+  float mat[4][4];
+  IDPropertyTemplate idprop = {0};
+  idprop.array.len = sizeof(mat) / sizeof(**mat);
+  idprop.array.type = IDP_FLOAT;
+
+  IDProperty *property = IDP_New(IDP_ARRAY, &idprop, "matrix_basis");
+  BKE_object_to_mat4(ob, (float(*)[])IDP_Array(property));
+
+  return property;
+}
+
+static void object_asset_pre_save(void *asset_ptr, struct AssetMetaData *asset_data)
+{
+  Object *ob = asset_ptr;
+  BLI_assert(GS(ob->id.name) == ID_OB);
+
+  /* Update bounding-box hint for the asset. */
+  IDProperty *boundbox_prop = object_asset_boundbox_hint_property(ob);
+  if (boundbox_prop) {
+    BKE_asset_metadata_idprop_ensure(asset_data, boundbox_prop);
+  }
+  /* Base matrix (object matrix without parent or constraint transforms). */
+  IDProperty *base_matrix_prop = object_asset_matrix_basis_property(ob);
+  if (base_matrix_prop) {
+    BKE_asset_metadata_idprop_ensure(asset_data, base_matrix_prop);
+  }
+}
+
+AssetTypeInfo AssetType_OB = {
+    .pre_save_fn = object_asset_pre_save,
+};
+
 IDTypeInfo IDType_ID_OB = {
     .id_code = ID_OB,
     .id_filter = FILTER_ID_OB,
@@ -1158,6 +1210,8 @@ IDTypeInfo IDType_ID_OB = {
     .blend_read_undo_preserve = NULL,
 
     .lib_override_apply_post = object_lib_override_apply_post,
+
+    .asset_type_info = &AssetType_OB,
 };
 
 void BKE_object_workob_clear(Object *workob)

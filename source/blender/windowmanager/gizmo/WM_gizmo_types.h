@@ -481,6 +481,9 @@ typedef struct wmGizmoGroup {
   struct wmGizmoGroupType *type;
   ListBase gizmos;
 
+  struct PointerRNA *ptr;
+  struct IDProperty *properties;
+
   struct wmGizmoMap *parent_gzmap;
 
   /** Python stores the class instance here. */
