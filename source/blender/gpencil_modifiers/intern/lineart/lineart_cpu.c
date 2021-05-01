@@ -359,7 +359,11 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
       rt = (LineartTriangleThread *)nba->linked_triangles[i];
       /* If we are already testing the line in this thread, then don't do it. */
       if (rt->testing_e[thread_id] == e || (rt->base.flags & LRT_TRIANGLE_INTERSECTION_ONLY) ||
-          lineart_occlusion_is_adjacent_intersection(e, (LineartTriangle *)rt)) {
+          /* Ignore this triangle if an intersection line directly comes from it, */
+          lineart_occlusion_is_adjacent_intersection(e, (LineartTriangle *)rt) ||
+          /* Or if this triangle isn't effectively occluding anything nor it's providing a
+            transparency flag. */
+          (!rt->base.transparency_mask)) {
         continue;
       }
       rt->testing_e[thread_id] = e;
