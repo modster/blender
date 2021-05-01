@@ -146,14 +146,31 @@ typedef enum eMaterialGPencilStyle_Mode {
 } eMaterialGPencilStyle_Mode;
 
 typedef struct MaterialLineArt {
-  int flags; /* eMaterialLineArtFlags */
+  /* eMaterialLineArtFlags */
+  int flags;
+
+  /** transparency_mask is for determining lines behind a glass window material. Only the lower 6
+   * bits are used in this variable which allows 6 materials for "transparent mask", because the
+   * other two bits when running line art is used to register occlusion effectiveness value so we
+   * save 1 byte for each triangle during run time. When loading line art, these bits were shifted
+   * to higher 6 bits and reserved 2 bits of space for occlusion_effectiveness.
+   */
   unsigned char transparency_mask;
-  unsigned char _pad[3];
+
+  /** bits 1<<0 and 1<<1 are for occlusion effectiveness value (which means 0-3 layers). */
+  unsigned char occlusion_effectiveness;
+
+  unsigned char _pad[2];
 } MaterialLineArt;
 
 typedef enum eMaterialLineArtFlags {
   LRT_MATERIAL_TRANSPARENCY_ENABLED = (1 << 0),
+  LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS = (1 << 1),
 } eMaterialLineArtFlags;
+
+#define LRT_TRANSPARENCY_BITS_DNA 0x3f    /* Bits 1<<0 to 1<<6. */
+#define LRT_TRANSPARENCY_BITS 0xfc        /* Bits 1<<2 to 1<<7. */
+#define LRT_OCCLUSION_EFFECTIVE_BITS 0x03 /* Bits 1<<0 to 1<<1. */
 
 typedef struct Material {
   ID id;

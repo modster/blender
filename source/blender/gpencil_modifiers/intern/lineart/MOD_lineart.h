@@ -103,9 +103,8 @@ typedef struct LineartLineSegment {
 
   /**
    * For determining lines behind a glass window material.
-   * the size of this variable should also be dynamically decided, 1 byte to 8 byte,
-   * allows 8 to 64 materials for "transparent mask". 1 byte (8 materials) should be
-   * enough for most cases.
+   * allows 6 materials for "transparent mask", from bits 1<<2 to 1<<7.
+   * bits 1<<0 and 1<<1 are for occlusion effectiveness value.
    */
   unsigned char transparency_mask;
 } LineartLineSegment;

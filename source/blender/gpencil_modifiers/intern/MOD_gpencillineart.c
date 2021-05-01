@@ -411,7 +411,7 @@ static void transparency_panel_draw(const bContext *UNUSED(C), Panel *panel)
   char text[2] = "0";
 
   PropertyRNA *prop = RNA_struct_find_property(ptr, "use_transparency_mask");
-  for (int i = 0; i < 8; i++, text[0]++) {
+  for (int i = 0; i < 6; i++, text[0]++) {
     uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, text, ICON_NONE);
   }
   uiItemL(row, "", ICON_BLANK1); /* Space for decorator. */

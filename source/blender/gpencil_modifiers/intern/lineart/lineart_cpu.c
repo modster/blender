@@ -283,8 +283,8 @@ static void lineart_edge_cut(
 
   /* Register 1 level of occlusion for all touched segments. */
   for (rls = ns; rls && rls != ns2; rls = rls->next) {
-    rls->occlusion++;
-    rls->transparency_mask |= transparency_mask;
+    rls->occlusion += (transparency_mask & LRT_OCCLUSION_EFFECTIVE_BITS);
+    rls->transparency_mask |= (transparency_mask & LRT_TRANSPARENCY_BITS);
   }
 
   /* Reduce adjacent cutting points of the same level, which saves memory. */
@@ -1682,11 +1682,16 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     loop = loop->next;
     rt->v[2] = &orv[BM_elem_index_get(loop->v)];
 
-    /* Transparency bit assignment. */
+    /* Transparency bits and occlusion effectiveness assignment, */
+    /* bits are shifted to higher 6 bits. See MaterialLineArt::transparency_mask for details. */
     Material *mat = BKE_object_material_get(orig_ob, f->mat_nr + 1);
-    rt->transparency_mask = ((mat && (mat->lineart.flags & LRT_MATERIAL_TRANSPARENCY_ENABLED)) ?
-                                 mat->lineart.transparency_mask :
-                                 0);
+    rt->transparency_mask |= ((mat && (mat->lineart.flags & LRT_MATERIAL_TRANSPARENCY_ENABLED)) ?
+                                  (mat->lineart.transparency_mask << 2) :
+                                  0);
+    rt->transparency_mask |=
+        ((mat && (mat->lineart.flags & LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) ?
+             mat->lineart.occlusion_effectiveness & LRT_OCCLUSION_EFFECTIVE_BITS :
+             1);
 
     double gn[3];
     copy_v3db_v3fl(gn, f->no);
@@ -4073,6 +4078,9 @@ static void lineart_gpencil_generate(LineartCache *cache,
   int enabled_types = cache->rb_edge_types;
   bool invert_input = modifier_flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP;
   bool match_output = modifier_flags & LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
+
+  /* Bits are shifted to higher 6 bits. See MaterialLineArt::transparency_mask for details. */
+  transparency_mask <<= 2;
 
   LISTBASE_FOREACH (LineartLineChain *, rlc, &cache->chains) {
 

@@ -698,8 +698,25 @@ static void rna_def_material_lineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_transparency_mask", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_default(prop, 0);
   RNA_def_property_boolean_sdna(prop, NULL, "transparency_mask", 1);
-  RNA_def_property_array(prop, 8);
+  RNA_def_property_array(prop, 6);
   RNA_def_property_ui_text(prop, "Mask", "");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
+
+  prop = RNA_def_property(srna, "use_occlusion_effectiveness", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_default(prop, 0);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS);
+  RNA_def_property_ui_text(prop,
+                           "Custom Occlusion Effectiveness",
+                           "Use custom occlusion effectiveness for this material");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
+
+  prop = RNA_def_property(srna, "occlusion_effectiveness", PROP_INT, PROP_NONE);
+  RNA_def_property_int_default(prop, 1);
+  RNA_def_property_range(prop, 0.0f, 3.0f);
+  RNA_def_property_ui_text(
+      prop,
+      "Effectiveness",
+      "Faces with this material will behave as if it has set number of layers in occlusion");
   RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
 }
 
