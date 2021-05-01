@@ -1457,6 +1457,25 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+static void object_add_ui(bContext *UNUSED(C), wmOperator *op)
+{
+  uiLayout *layout = op->layout;
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, op->ptr, "radius", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "align", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "location", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "rotation", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "type", 0, NULL, ICON_NONE);
+
+  int type = RNA_enum_get(op->ptr, "type");
+  if (type == GP_LRT_COLLECTION || type == GP_LRT_OBJECT || type == GP_LRT_SCENE) {
+    uiItemR(layout, op->ptr, "use_in_front", 0, NULL, ICON_NONE);
+    uiItemR(layout, op->ptr, "use_3d_strokes", 0, NULL, ICON_NONE);
+  }
+}
+
 void OBJECT_OT_gpencil_add(wmOperatorType *ot)
 {
   /* identifiers */
@@ -1481,12 +1500,12 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
                   "use_in_front",
                   false,
                   "Show In Front",
-                  "Show line art grease pencil in front of everything.");
+                  "Show line art grease pencil in front of everything");
   RNA_def_boolean(ot->srna,
                   "use_3d_strokes",
                   true,
                   "Order Strokes By Depth",
-                  "Order strokes by depth instead of by layer order.");
+                  "Order strokes by depth instead of by layer order");
 }
 
 /** \} */
