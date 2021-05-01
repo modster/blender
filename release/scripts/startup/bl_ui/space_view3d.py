@@ -662,10 +662,10 @@ class VIEW3D_HT_header(Header):
 
                 # Curve fit
                 row = layout.row(align=True)
-                row.prop(tool_settings, "use_gpencil_curve_fit", text="",
+                row.prop(tool_settings, "use_gpencil_bezier_mode", text="",
                          icon='IPO_BEZIER')
                 sub = row.row(align=True)
-                sub.active = tool_settings.use_gpencil_curve_fit
+                sub.active = tool_settings.use_gpencil_bezier_mode
                 sub.popover(
                     panel="VIEW3D_PT_gpencil_curve_fit",
                     text="Curve Fit",

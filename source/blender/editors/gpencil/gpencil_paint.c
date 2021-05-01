@@ -945,7 +945,7 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
   const bool is_depth = (bool)(align_flag & (GP_PROJECT_DEPTH_VIEW | GP_PROJECT_DEPTH_STROKE));
   const bool is_lock_axis_view = (bool)(ts->gp_sculpt.lock_axis == 0);
   const bool is_camera = is_lock_axis_view && (rv3d->persp == RV3D_CAMOB) && (!is_depth);
-  const bool is_bezier_mode = ts->gpencil_flags & GP_TOOL_FLAG_CURVE_FIT;
+  const bool is_bezier_mode = ts->gpencil_flags & GP_TOOL_FLAG_BEZIER_MODE;
   int totelem;
 
   /* For very low pressure at the end, truncate stroke. */

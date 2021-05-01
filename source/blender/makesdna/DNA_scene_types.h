@@ -2289,7 +2289,7 @@ typedef enum eGPencil_Flags {
   /* Automerge with last stroke */
   GP_TOOL_FLAG_AUTOMERGE_STROKE = (1 << 5),
   /* Convert all strokes to Bezier */
-  GP_TOOL_FLAG_CURVE_FIT = (1 << 6),
+  GP_TOOL_FLAG_BEZIER_MODE = (1 << 6),
 } eGPencil_Flags;
 
 /** #Scene.r.simplify_gpencil */

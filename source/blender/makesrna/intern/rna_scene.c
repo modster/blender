@@ -3242,10 +3242,10 @@ static void rna_def_tool_settings(BlenderRNA *brna)
       "Join by distance last drawn stroke with previous strokes in the active layer");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
-  prop = RNA_def_property(srna, "use_gpencil_curve_fit", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "gpencil_flags", GP_TOOL_FLAG_CURVE_FIT);
+  prop = RNA_def_property(srna, "use_gpencil_bezier_mode", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "gpencil_flags", GP_TOOL_FLAG_BEZIER_MODE);
   RNA_def_property_boolean_default(prop, false);
-  RNA_def_property_ui_text(prop, "Curve", "Convert all strokes to Bezier curves");
+  RNA_def_property_ui_text(prop, "Bezier Mode", "Convert all strokes to Bezier curves");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
   prop = RNA_def_property(srna, "gpencil_sculpt", PROP_POINTER, PROP_NONE);
