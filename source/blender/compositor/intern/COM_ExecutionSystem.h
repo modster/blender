@@ -123,7 +123,7 @@ class ExecutionSystem {
 
  private:
   /**
-   * Render and viewer border info
+   * Render and viewer border info.
    */
   struct {
     bool use_render_border;
@@ -144,7 +144,7 @@ class ExecutionSystem {
   int m_num_cpu_threads;
 
   /**
-   * Number of operations finished. Only used in full-frame mode.
+   * Number of operations finished. Only used in FullFrame execution model.
    */
   int m_num_operations_finished;
 
@@ -206,26 +206,18 @@ class ExecutionSystem {
     return this->m_context;
   }
 
-  /*** full-frame methods ***/
   OutputManager &get_output_manager()
   {
     return m_output_manager;
   }
 
-  /**
-   * Multi-threadedly execute given work function passing work_rect splits as argument.
-   */
   void execute_work(const rcti &work_rect, std::function<void(const rcti &split_rect)> work_func);
 
-  /**
-   * Reports an operation rendering has finished and updates progress bar.
-   */
   void operation_finished();
 
  private:
   void execute_groups(eCompositorPriority priority);
 
-  /*** full-frame methods ***/
   void execute_full_frame();
   void get_render_rect(NodeOperation *output_op, rcti &r_rect);
   void update_progress_bar();

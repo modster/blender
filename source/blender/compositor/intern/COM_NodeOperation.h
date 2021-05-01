@@ -545,26 +545,11 @@ class NodeOperation {
     return std::unique_ptr<MetaData>();
   }
 
-  /*** Full-frame methods ***/
-  /**
-   * Determines the areas this operation and its inputs need to render. Results are saved in the
-   * output manager.
-   */
   void determine_rects_to_render(const rcti &render_rect, OutputManager &output_man);
-  /**
-   * Determines the reads received by this operation and its inputs. Results are saved in the
-   * output manager.
-   */
   void determine_reads(OutputManager &output_man);
-  /**
-   * Renders this operation and its inputs. Rendered buffers are saved in the output manager.
-   */
   void render(ExecutionSystem &exec_system);
 
  private:
-  /**
-   * Renders this operation using the tiled implementation.
-   */
   void render_non_fullframe(MemoryBuffer *output_buf,
                             Span<rcti> render_rects,
                             blender::Span<MemoryBuffer *> inputs,
@@ -573,7 +558,6 @@ class NodeOperation {
  protected:
   NodeOperation();
 
-  /*** Full-frame methods ***/
   /**
    * Executes operation updating output memory buffer. Single-threaded calls.
    */
@@ -583,12 +567,6 @@ class NodeOperation {
                                     ExecutionSystem &UNUSED(exec_system))
   {
   }
-  /**
-   * Get input area being read by this operation.
-   *
-   * Implementation don't need to ensure r_input_rect is within operation bounds. The caller must
-   * clamp it.
-   */
   virtual void get_input_area_of_interest(int input_idx,
                                           const rcti &output_rect,
                                           rcti &r_input_rect);

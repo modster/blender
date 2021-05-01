@@ -250,7 +250,7 @@ void ExecutionSystem::execute_groups(eCompositorPriority priority)
 
 void ExecutionSystem::execute_full_frame()
 {
-  /* set output operations priorities in order */
+  /* Set output operations priorities in order. */
   blender::Vector<eCompositorPriority> priorities;
   priorities.append(eCompositorPriority::High);
   if (!this->getContext().isFastCalculation()) {
@@ -258,7 +258,7 @@ void ExecutionSystem::execute_full_frame()
     priorities.append(eCompositorPriority::Low);
   }
 
-  /* setup operations */
+  /* Setup operations. */
   bool is_rendering = m_context.isRendering();
   rcti render_rect;
   const bNodeTree *bNodeTree = m_context.getbNodeTree();
@@ -273,7 +273,7 @@ void ExecutionSystem::execute_full_frame()
     }
   }
 
-  /* execute operations */
+  /* Execute operations. */
   WorkScheduler::start(this->m_context);
   for (eCompositorPriority priority : priorities) {
     for (NodeOperation *op : m_operations) {
@@ -304,10 +304,13 @@ void ExecutionSystem::get_render_rect(NodeOperation *output_op, rcti &r_rect)
   }
 }
 
+/**
+ * Multi-threadedly execute given work function passing work_rect splits as argument.
+ */
 void ExecutionSystem::execute_work(const rcti &work_rect,
                                    std::function<void(const rcti &split_rect)> work_func)
 {
-  /* split work vertically and execute multi-threadedly */
+  /* Split work vertically. */
   if (!is_breaked()) {
     int work_height = BLI_rcti_size_y(&work_rect);
     int n_works = m_num_cpu_threads < work_height ? m_num_cpu_threads : work_height;
@@ -339,7 +342,7 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
 
     WorkScheduler::finish();
 
-    /* WorkScheduler::ThreadingModel::Queue needs this code */
+    /* WorkScheduler::ThreadingModel::Queue needs this code. */
     // bool works_finished = false;
     // while (!works_finished) {
     //  works_finished = true;
