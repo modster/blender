@@ -52,7 +52,7 @@ class OutputManager {
   blender::Span<rcti> get_rects_to_render(NodeOperation *op);
   bool is_output_rendered(NodeOperation *op);
   void set_rendered_output(NodeOperation *op, std::unique_ptr<MemoryBuffer> output_buffer);
-  MemoryBuffer *get_output(NodeOperation *op);
+  MemoryBuffer *get_rendered_output(NodeOperation *op);
 
   void read_finished(NodeOperation *read_op);
 

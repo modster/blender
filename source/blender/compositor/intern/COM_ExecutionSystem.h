@@ -130,7 +130,7 @@ class ExecutionSystem {
     rcti render_border;
     bool use_viewer_border;
     rcti viewer_border;
-  } m_border_info;
+  } m_border;
 
   /**
    * Manages operations output data/buffers and delete them once dependent operations are

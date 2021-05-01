@@ -79,7 +79,7 @@ void OutputManager::set_rendered_output(NodeOperation *op,
   BLI_assert(output.received_reads == 0);
 }
 
-MemoryBuffer *OutputManager::get_output(NodeOperation *op)
+MemoryBuffer *OutputManager::get_rendered_output(NodeOperation *op)
 {
   BLI_assert(is_output_rendered(op));
   return get_output_data(op).buffer.get();

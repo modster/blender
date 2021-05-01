@@ -237,7 +237,7 @@ void NodeOperation::render(ExecutionSystem &exec_system)
     /* Get input buffers. */
     blender::Vector<MemoryBuffer *> inputs_bufs;
     for (NodeOperation *input_op : inputs_ops) {
-      inputs_bufs.append(output_man.get_output(input_op));
+      inputs_bufs.append(output_man.get_rendered_output(input_op));
     }
 
     /* Create output buffer if needed. */

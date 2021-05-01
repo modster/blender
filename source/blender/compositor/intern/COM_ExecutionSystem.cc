@@ -109,14 +109,14 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
   m_num_cpu_threads = num_cpu_threads;
 
   const rctf &render_border = rd->border;
-  m_border_info.use_viewer_border = use_viewer_border;
-  m_border_info.use_render_border = rendering && (rd->mode & R_BORDER) && !(rd->mode & R_CROP);
-  BLI_rcti_init(&m_border_info.viewer_border,
+  m_border.use_viewer_border = use_viewer_border;
+  m_border.use_render_border = rendering && (rd->mode & R_BORDER) && !(rd->mode & R_CROP);
+  BLI_rcti_init(&m_border.viewer_border,
                 viewer_border->xmin,
                 viewer_border->xmax,
                 viewer_border->ymin,
                 viewer_border->ymax);
-  BLI_rcti_init(&m_border_info.render_border,
+  BLI_rcti_init(&m_border.render_border,
                 render_border.xmin,
                 render_border.xmax,
                 render_border.ymin,
@@ -292,11 +292,11 @@ void ExecutionSystem::get_render_rect(NodeOperation *output_op, rcti &r_rect)
   const NodeOperationFlags &op_flags = output_op->get_flags();
   BLI_rcti_init(&r_rect, 0, output_op->getWidth(), 0, output_op->getHeight());
 
-  bool has_viewer_border = m_border_info.use_viewer_border &&
+  bool has_viewer_border = m_border.use_viewer_border &&
                            (op_flags.is_viewer_operation || op_flags.is_preview_operation);
-  bool has_render_border = m_border_info.use_render_border;
+  bool has_render_border = m_border.use_render_border;
   if (has_viewer_border || has_render_border) {
-    rcti &border = has_viewer_border ? m_border_info.viewer_border : m_border_info.render_border;
+    rcti &border = has_viewer_border ? m_border.viewer_border : m_border.render_border;
     r_rect.xmin = border.xmin > r_rect.xmin ? border.xmin : r_rect.xmin;
     r_rect.xmax = border.xmax < r_rect.xmax ? border.xmax : r_rect.xmax;
     r_rect.ymin = border.ymin > r_rect.ymin ? border.ymin : r_rect.ymin;
