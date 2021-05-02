@@ -72,6 +72,10 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(struct bGPDstroke *gps,
                                                        const enum eGPStrokeGeoUpdateFlag flag);
 bool BKE_gpencil_editcurve_recalculate_handles(struct bGPDstroke *gps);
 void BKE_gpencil_editcurve_subdivide(struct bGPDstroke *gps, const int cuts);
+int BKE_gpencil_editcurve_dissolve(struct bGPDstroke *gps,
+                                   const uint flag,
+                                   const bool refit_segments,
+                                   const float error_threshold);
 void BKE_gpencil_editcurve_simplify_adaptive(struct bGPDstroke *gps, const float threshold);
 void BKE_gpencil_editcurve_simplify_fixed(struct bGPDstroke *gps, const int count);
 void BKE_gpencil_editcurve_smooth(struct bGPDstroke *gps,

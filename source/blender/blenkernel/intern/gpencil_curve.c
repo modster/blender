@@ -1166,9 +1166,9 @@ void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
  * \param flag: Flag for refitting options (see eGPStrokeGeoUpdateFlag).
  */
 void BKE_gpencil_stroke_refit_curve(bGPDstroke *gps,
-                                         const float threshold,
-                                         const float corner_angle,
-                                         const eGPStrokeGeoUpdateFlag flag)
+                                    const float threshold,
+                                    const float corner_angle,
+                                    const eGPStrokeGeoUpdateFlag flag)
 {
   if (gps == NULL || gps->totpoints < 0) {
     return;
@@ -1906,6 +1906,9 @@ void BKE_gpencil_editcurve_subdivide(bGPDstroke *gps, const int cuts)
   bool is_cyclic = gps->flag & GP_STROKE_CYCLIC;
 
   /* repeat for number of cuts */
+  /* TODO: Ideally the subdivisions should match how it works in the rest of Blender. Here we get
+   * 1->1, 2->3, 3->7 etc. because we keep supdividing already subdivided segments. But it would be
+   * better to get the exact number of cuts per segment.*/
   for (int s = 0; s < cuts; s++) {
     int old_tot_curve_points = gpc->tot_curve_points;
     int new_num_curve_points = gpencil_editcurve_subdivide_count(gpc, is_cyclic);
@@ -1976,6 +1979,116 @@ void BKE_gpencil_editcurve_subdivide(bGPDstroke *gps, const int cuts)
     gpc->curve_points = temp_curve_points;
     gpc->tot_curve_points = new_tot_curve_points;
   }
+}
+
+static void gpencil_refit_single_from_to(bGPDstroke *gps,
+                                         bGPDcurve *gpc,
+                                         bGPDcurve_point *new_points,
+                                         int from_start,
+                                         int from_end,
+                                         int to_start,
+                                         int to_end,
+                                         float error_threshold)
+{
+  bGPDcurve_point *cpt_start = &gpc->curve_points[from_start];
+  bGPDcurve_point *cpt_end = &gpc->curve_points[from_end];
+  bGPDcurve_point *new_cpt_start = &new_points[to_start];
+  bGPDcurve_point *new_cpt_end = &new_points[to_end];
+
+  BKE_gpencil_stroke_editcurve_regenerate_single(gps, from_start, from_end, error_threshold);
+
+  memcpy(new_cpt_start, cpt_start, sizeof(bGPDcurve_point));
+  memcpy(new_cpt_end, cpt_end, sizeof(bGPDcurve_point));
+}
+
+/**
+ * Dissolves the curve points tagged with `flag`.
+ * \param gps: The stroke.
+ * \param flag: flag (see eGPDcurve_point_Flag).
+ * \param refit_segments: Do a refit of the segments where points have been dissolved.
+ * \param error_threshold: Refit threshold when refitting.
+ *
+ * \returns The number of points that remain after dissolving. Can be 0 in which case the caller
+ * should delete the stroke.
+ */
+int BKE_gpencil_editcurve_dissolve(bGPDstroke *gps,
+                                   const uint flag,
+                                   const bool refit_segments,
+                                   const float error_threshold)
+{
+  bGPDcurve *gpc = gps->editcurve;
+  if (gpc == NULL || gpc->tot_curve_points < 2) {
+    return gpc->tot_curve_points;
+  }
+  const bool is_cyclic = (gps->flag & GP_STROKE_CYCLIC);
+
+  int first = -1, last = 0;
+  int num_points_remaining = gpc->tot_curve_points;
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *cpt = &gpc->curve_points[i];
+    if ((cpt->flag & flag)) {
+      num_points_remaining--;
+    }
+    else {
+      if (first < 0) {
+        first = i;
+      }
+      last = i;
+    }
+  }
+
+  /* All points will be deleted. */
+  if (num_points_remaining < 1) {
+    return 0;
+  }
+  /* All points remain. */
+  else if (num_points_remaining == gpc->tot_curve_points) {
+    return gpc->tot_curve_points;
+  }
+
+  bGPDcurve_point *new_points = MEM_callocN(sizeof(bGPDcurve_point) * num_points_remaining,
+                                            __func__);
+
+  int new_idx = 0, start = first, end = first;
+  for (int i = first; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *cpt = &gpc->curve_points[i];
+    bGPDcurve_point *new_cpt = &new_points[new_idx];
+    if ((cpt->flag & flag) == 0) {
+      memcpy(new_cpt, cpt, sizeof(bGPDcurve_point));
+      /* Check that the indices are in bounds. */
+      if (refit_segments && (start > 0) && IN_RANGE(end, start, gpc->tot_curve_points)) {
+        /* Refit this segment. */
+        gpencil_refit_single_from_to(
+            gps, gpc, new_points, start - 1, end, new_idx - 1, new_idx, error_threshold);
+        start = end = i;
+      }
+      new_idx++;
+      start++;
+    }
+    end++;
+  }
+
+  if (is_cyclic && refit_segments) {
+    /* Make sure that there is at least one segment that needs updating. */
+    if (last != first && first >= 0 && last >= 0 &&
+        !(first == 0 && last == (gpc->tot_curve_points - 1))) {
+
+      /* Refit this segment. */
+      gpencil_refit_single_from_to(
+          gps, gpc, new_points, last, first, num_points_remaining - 1, 0, error_threshold);
+    }
+  }
+
+  /* Recreate array. */
+  if (gpc->curve_points != NULL) {
+    MEM_freeN(gpc->curve_points);
+  }
+
+  gpc->curve_points = new_points;
+  gpc->tot_curve_points = num_points_remaining;
+  BKE_gpencil_editcurve_recalculate_handles(gps);
+
+  return num_points_remaining;
 }
 
 /* Helper: Dissolve the curve point with the lowest re-fit error. Dissolve only if error is under
