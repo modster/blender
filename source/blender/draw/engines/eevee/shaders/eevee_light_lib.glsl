@@ -1,6 +1,7 @@
 
 #pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_ltc_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 /* ---------------------------------------------------------------------- */
@@ -167,5 +168,49 @@ float light_ltc(
     return ltc_evaluate_disk(utility_tx, N, V, ltc_matrix(ltc_mat), points);
   }
 }
+
+/** \} */
+
+/* ---------------------------------------------------------------------- */
+/** \name Light Eval Iterators
+ * \{ */
+
+/* Unfortunately, it has to be a define because a lot of compilers do not optimize array of structs
+ * references. */
+/* Multi-lines defines causes issues on some older compiles. */
+/* clang-format off */
+#define LIGHTS_EVAL(_lights, _shadow_atlas_tx, _shadows_punctual, _utility_tx, _light_culling, _lights_culling_tx, _z, _P, _V, _diffuse, _specular, _specular_mat, _out_diffuse, _out_specular) \
+  /* clang-format on */ \
+  ITEM_FOREACH_BEGIN (_light_culling, _lights_culling_tx, _z, l_idx) { \
+    LightData light = _lights[l_idx]; \
+    vec3 L; \
+    float dist; \
+    light_vector_get(light, _P, L, dist); \
+\
+    float visibility = light_attenuation(light, L, dist); \
+\
+    if (light.shadow_id != LIGHT_NO_SHADOW && (light.diffuse_power > 0.0 || visibility > 0.0)) { \
+      vec3 lL = light_world_to_local(light, -L) * dist; \
+      vec3 shadow_co = shadow_punctual_coordinates_get(_shadows_punctual[l_idx], lL); \
+      visibility *= texture(_shadow_atlas_tx, shadow_co); \
+    } \
+\
+    if (visibility < 1e-6) { \
+      continue; \
+    } \
+\
+    if (light.diffuse_power > 0.0) { \
+      float intensity = visibility * light.diffuse_power * \
+                        light_diffuse(_utility_tx, light, _diffuse.N, _V, L, dist); \
+      _out_diffuse += light.color * intensity; \
+    } \
+\
+    if (light.specular_power > 0.0) { \
+      float intensity = visibility * light.specular_power * \
+                        light_ltc(_utility_tx, light, _specular.N, _V, L, dist, _specular_mat); \
+      _out_specular += light.color * intensity; \
+    } \
+  } \
+  ITEM_FOREACH_END
 
 /** \} */

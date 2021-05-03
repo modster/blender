@@ -16,6 +16,8 @@ vec4 film_data_encode(FilmData film, vec4 data, float weight)
   if (film_is_color_data(film)) {
     /* Could we assume safe color from earlier pass? */
     data = safe_color(data);
+    /* Convert transmittance to opacity. */
+    data.a = saturate(1.0 - data.a);
   }
 
   if (film.data_type == FILM_DATA_COLOR_LOG) {

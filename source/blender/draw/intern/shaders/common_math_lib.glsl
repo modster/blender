@@ -84,6 +84,7 @@ float avg(vec4 v) { return dot(vec4(1.0 / 4.0), v); }
 
 float safe_rcp(float a) { return (a != 0.0) ? (1.0 / a) : 0.0; }
 vec2 safe_rcp(vec2 a) { return mix(vec2(0.0), (1.0 / a), notEqual(a, vec2(0.0))); }
+vec3 safe_rcp(vec3 a) { return mix(vec3(0.0), (1.0 / a), notEqual(a, vec3(0.0))); }
 vec4 safe_rcp(vec4 a) { return mix(vec4(0.0), (1.0 / a), notEqual(a, vec4(0.0))); }
 
 float safe_sqrt(float a) { return (a < 0.0) ? 0.0 : sqrt(a); }

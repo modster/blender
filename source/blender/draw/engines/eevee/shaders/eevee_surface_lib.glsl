@@ -1,14 +1,14 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
-IN_OUT MeshDataInterface
+IN_OUT SurfaceInterface
 {
   vec3 P;
   vec3 N;
 }
 interp;
 
-struct MeshData {
+struct SurfaceData {
   /** World position. */
   vec3 P;
   /** Surface Normal. */
@@ -20,9 +20,9 @@ struct MeshData {
 };
 
 #ifdef GPU_FRAGMENT_SHADER
-MeshData init_from_interp(void)
+SurfaceData init_from_interp(void)
 {
-  MeshData surf;
+  SurfaceData surf;
   surf.P = interp.P;
   surf.N = normalize(interp.N);
   surf.Ng = safe_normalize(cross(dFdx(surf.P), dFdy(surf.P)));

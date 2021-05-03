@@ -9,7 +9,7 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_velocity_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_object_velocity_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_surface_velocity_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
 layout(std140) uniform camera_prev_block

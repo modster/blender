@@ -81,19 +81,35 @@ struct GBuffer {
   Texture emission_tx = Texture("GbufferEmission");
   Texture transparency_tx = Texture("GbufferTransparency");
 
-  Framebuffer framebuffer = Framebuffer("Gbuffer");
-  /* Pointer to the view's depth buffer. */
-  GPUTexture *depth_tx = nullptr;
+  Framebuffer gbuffer_fb = Framebuffer("Gbuffer");
+  Framebuffer volume_fb = Framebuffer("VolumeHeterogeneous");
 
-  void sync(GPUTexture *depth_tx_)
+  Texture holdout_tx = Texture("HoldoutRadiance");
+
+  Framebuffer holdout_fb = Framebuffer("Holdout");
+
+  Texture depth_behind_tx = Texture("DepthBehind");
+
+  /* Owner of this GBuffer. Used to query temp textures. */
+  void *owner;
+
+  /* Pointer to the view's buffers. */
+  GPUTexture *depth_tx = nullptr;
+  GPUTexture *combined_tx = nullptr;
+
+  void sync(GPUTexture *depth_tx_, GPUTexture *combined_tx_, void *owner_)
   {
+    owner = owner_;
     depth_tx = depth_tx_;
+    combined_tx = combined_tx_;
     diffuse_tx.sync_tmp();
     reflection_tx.sync_tmp();
     refraction_tx.sync_tmp();
     volume_tx.sync_tmp();
     emission_tx.sync_tmp();
     transparency_tx.sync_tmp();
+    holdout_tx.sync_tmp();
+    depth_behind_tx.sync_tmp();
   }
 
   void bind(eClosureBits closures_used)
@@ -104,17 +120,44 @@ struct GBuffer {
     /* TODO Allocate only the one we need. */
     /* TODO Reuse for different config. */
     /* TODO Allocate only GPU_RG32UI for diffuse if no sss is needed. */
-    diffuse_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, this);
-    reflection_tx.acquire_tmp(UNPACK2(extent), GPU_RG32UI, this);
-    // refraction_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, this);
-    // volume_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, this);
-    // emission_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, this);
-    // transparency_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, this);
+    diffuse_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, owner);
+    reflection_tx.acquire_tmp(UNPACK2(extent), GPU_RG32UI, owner);
+    refraction_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, owner);
+    volume_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, owner);
+    emission_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
+    transparency_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, owner);
 
-    framebuffer.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx),
-                       GPU_ATTACHMENT_TEXTURE(diffuse_tx),
-                       GPU_ATTACHMENT_TEXTURE(reflection_tx));
-    GPU_framebuffer_bind(framebuffer);
+    holdout_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
+    depth_behind_tx.acquire_tmp(UNPACK2(extent), GPU_DEPTH24_STENCIL8, owner);
+
+    gbuffer_fb.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx),
+                      GPU_ATTACHMENT_TEXTURE(diffuse_tx),
+                      GPU_ATTACHMENT_TEXTURE(reflection_tx),
+                      GPU_ATTACHMENT_TEXTURE(refraction_tx),
+                      GPU_ATTACHMENT_TEXTURE(volume_tx),
+                      GPU_ATTACHMENT_TEXTURE(emission_tx),
+                      GPU_ATTACHMENT_TEXTURE(transparency_tx));
+    GPU_framebuffer_bind(gbuffer_fb);
+    GPU_framebuffer_clear_stencil(gbuffer_fb, 0x0);
+  }
+
+  void bind_volume(void)
+  {
+    volume_fb.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx),
+                     GPU_ATTACHMENT_TEXTURE(volume_tx),
+                     GPU_ATTACHMENT_TEXTURE(transparency_tx));
+    GPU_framebuffer_bind(volume_fb);
+  }
+
+  void bind_holdout(void)
+  {
+    holdout_fb.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(holdout_tx));
+    GPU_framebuffer_bind(holdout_fb);
+  }
+
+  void copy_depth_behind(void)
+  {
+    GPU_texture_copy(depth_behind_tx, depth_tx);
   }
 
   void render_end(void)
@@ -125,6 +168,8 @@ struct GBuffer {
     volume_tx.release_tmp();
     emission_tx.release_tmp();
     transparency_tx.release_tmp();
+    holdout_tx.release_tmp();
+    depth_behind_tx.release_tmp();
   }
 };
 
@@ -136,12 +181,14 @@ class DeferredLayer {
   GPUTexture *input_depth_tx_ = nullptr;
 
   DRWPass *gbuffer_ps_ = nullptr;
+  DRWPass *volume_ps_ = nullptr;
 
  public:
   DeferredLayer(Instance &inst) : inst_(inst){};
 
   void sync(void);
   void surface_add(Object *ob);
+  void volume_add(Object *ob);
   void render(GBuffer &gbuffer, GPUFrameBuffer *view_fb);
 };
 
@@ -153,23 +200,34 @@ class DeferredPass {
 
   /* Gbuffer filling passes. We could have an arbitrary number of them but for now we just have
    * a harcoded number of them. */
-  DeferredLayer opaque_ps_;
-  DeferredLayer refraction_ps_;
-  DeferredLayer volumetric_ps_;
+  DeferredLayer opaque_layer_;
+  DeferredLayer refraction_layer_;
+  DeferredLayer volumetric_layer_;
 
   DRWPass *eval_diffuse_ps_ = nullptr;
+  DRWPass *eval_transparency_ps_ = nullptr;
+  DRWPass *eval_holdout_ps_ = nullptr;
+  DRWPass *eval_volume_heterogeneous_ps_ = nullptr;
+  DRWPass *eval_volume_homogeneous_ps_ = nullptr;
 
   /* References only. */
+  GPUTexture *input_combined_tx = nullptr;
+  GPUTexture *input_depth_behind_tx_ = nullptr;
+  GPUTexture *input_depth_tx_ = nullptr;
   GPUTexture *input_diffuse_data_tx_ = nullptr;
   GPUTexture *input_reflection_data_tx_ = nullptr;
-  GPUTexture *input_depth_tx_ = nullptr;
+  GPUTexture *input_transparency_data_tx_ = nullptr;
+  GPUTexture *input_volume_data_tx_ = nullptr;
+  GPUTexture *input_volume_radiance_tx_ = nullptr;
+  GPUTexture *input_volume_transmittance_tx_ = nullptr;
 
  public:
   DeferredPass(Instance &inst)
-      : inst_(inst), opaque_ps_(inst), refraction_ps_(inst), volumetric_ps_(inst){};
+      : inst_(inst), opaque_layer_(inst), refraction_layer_(inst), volumetric_layer_(inst){};
 
   void sync(void);
   void surface_add(Object *ob);
+  void volume_add(Object *ob);
   void render(GBuffer &gbuffer, GPUFrameBuffer *view_fb);
 };
 

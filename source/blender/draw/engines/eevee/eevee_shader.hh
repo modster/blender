@@ -40,6 +40,7 @@ extern char datatoc_common_view_lib_glsl[];
 
 extern char datatoc_eevee_camera_lib_glsl[];
 extern char datatoc_eevee_camera_velocity_frag_glsl[];
+extern char datatoc_eevee_closure_lib_glsl[];
 extern char datatoc_eevee_culling_debug_frag_glsl[];
 extern char datatoc_eevee_culling_iter_lib_glsl[];
 extern char datatoc_eevee_culling_lib_glsl[];
@@ -62,28 +63,36 @@ extern char datatoc_eevee_depth_of_field_scatter_vert_glsl[];
 extern char datatoc_eevee_depth_of_field_setup_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_tiles_flatten_frag_glsl[];
-extern char datatoc_eevee_eval_direct_frag_glsl[];
-extern char datatoc_eevee_gbuffer_lib_glsl[];
+extern char datatoc_eevee_deferred_direct_frag_glsl[];
+extern char datatoc_eevee_deferred_holdout_frag_glsl[];
+extern char datatoc_eevee_deferred_transparent_frag_glsl[];
+extern char datatoc_eevee_deferred_volume_frag_glsl[];
 extern char datatoc_eevee_film_filter_frag_glsl[];
 extern char datatoc_eevee_film_lib_glsl[];
 extern char datatoc_eevee_film_resolve_frag_glsl[];
+extern char datatoc_eevee_gbuffer_lib_glsl[];
 extern char datatoc_eevee_light_lib_glsl[];
 extern char datatoc_eevee_ltc_lib_glsl[];
 extern char datatoc_eevee_motion_blur_gather_frag_glsl[];
 extern char datatoc_eevee_motion_blur_lib_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
-extern char datatoc_eevee_object_deferred_frag_glsl[];
-extern char datatoc_eevee_object_depth_simple_frag_glsl[];
-extern char datatoc_eevee_object_forward_frag_glsl[];
-extern char datatoc_eevee_object_lib_glsl[];
-extern char datatoc_eevee_object_mesh_vert_glsl[];
-extern char datatoc_eevee_object_velocity_frag_glsl[];
-extern char datatoc_eevee_object_velocity_lib_glsl[];
-extern char datatoc_eevee_object_velocity_mesh_vert_glsl[];
+extern char datatoc_eevee_nodetree_eval_lib_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
 extern char datatoc_eevee_shadow_lib_glsl[];
+extern char datatoc_eevee_surface_deferred_frag_glsl[];
+extern char datatoc_eevee_surface_depth_simple_frag_glsl[];
+extern char datatoc_eevee_surface_forward_frag_glsl[];
+extern char datatoc_eevee_surface_lib_glsl[];
+extern char datatoc_eevee_surface_mesh_vert_glsl[];
+extern char datatoc_eevee_surface_velocity_frag_glsl[];
+extern char datatoc_eevee_surface_velocity_lib_glsl[];
+extern char datatoc_eevee_surface_velocity_mesh_vert_glsl[];
 extern char datatoc_eevee_velocity_lib_glsl[];
+extern char datatoc_eevee_volume_deferred_frag_glsl[];
+extern char datatoc_eevee_volume_eval_lib_glsl[];
+extern char datatoc_eevee_volume_lib_glsl[];
+extern char datatoc_eevee_volume_vert_glsl[];
 
 extern char datatoc_eevee_shader_shared_hh[];
 
@@ -95,8 +104,12 @@ enum eShaderType {
   CULLING_LIGHT,
 
   DEFERRED_EVAL_DIRECT,
+  DEFERRED_EVAL_HOLDOUT,
+  DEFERRED_EVAL_TRANSPARENT,
+  DEFERRED_EVAL_VOLUME,
 
   DEFERRED_MESH,
+  DEFERRED_VOLUME,
 
   DEPTH_SIMPLE_MESH,
 
@@ -174,22 +187,26 @@ class ShaderModule {
     DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_closure_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_gbuffer_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_nodetree_eval_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_ltc_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, eevee_light_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_iter_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_light_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_volume_eval_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_volume_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_velocity_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_accumulator_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_scatter_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_film_lib);
     DRW_SHADER_LIB_ADD(shader_lib_, eevee_motion_blur_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, eevee_object_lib);
-    DRW_SHADER_LIB_ADD(shader_lib_, eevee_object_velocity_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_lib);
+    DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_velocity_lib);
 
     /* Meh ¯\_(ツ)_/¯. */
     char *datatoc_nullptr_glsl = nullptr;
@@ -209,12 +226,16 @@ class ShaderModule {
     SHADER_FULLSCREEN(CULLING_LIGHT, eevee_culling_light_frag);
     SHADER_FULLSCREEN(FILM_FILTER, eevee_film_filter_frag);
     SHADER_FULLSCREEN(FILM_RESOLVE, eevee_film_resolve_frag);
-    SHADER_FULLSCREEN(DEFERRED_EVAL_DIRECT, eevee_eval_direct_frag);
-    SHADER(DEFERRED_MESH, eevee_object_mesh_vert, nullptr, eevee_object_deferred_frag, nullptr);
+    SHADER_FULLSCREEN(DEFERRED_EVAL_DIRECT, eevee_deferred_direct_frag);
+    SHADER_FULLSCREEN(DEFERRED_EVAL_HOLDOUT, eevee_deferred_holdout_frag);
+    SHADER_FULLSCREEN(DEFERRED_EVAL_TRANSPARENT, eevee_deferred_transparent_frag);
+    SHADER_FULLSCREEN(DEFERRED_EVAL_VOLUME, eevee_deferred_volume_frag);
+    SHADER(DEFERRED_MESH, eevee_surface_mesh_vert, nullptr, eevee_surface_deferred_frag, nullptr);
+    SHADER(DEFERRED_VOLUME, eevee_volume_vert, nullptr, eevee_volume_deferred_frag, nullptr);
     SHADER(DEPTH_SIMPLE_MESH,
-           eevee_object_mesh_vert,
+           eevee_surface_mesh_vert,
            nullptr,
-           eevee_object_depth_simple_frag,
+           eevee_surface_depth_simple_frag,
            nullptr);
     SHADER_FULLSCREEN(DOF_BOKEH_LUT, eevee_depth_of_field_bokeh_lut_frag);
     SHADER_FULLSCREEN(DOF_FILTER, eevee_depth_of_field_filter_frag);
@@ -294,7 +315,7 @@ class ShaderModule {
                               eevee_depth_of_field_tiles_dilate_frag,
                               "#define DILATE_MODE_MIN_MAX true\n");
     SHADER_FULLSCREEN(DOF_TILES_FLATTEN, eevee_depth_of_field_tiles_flatten_frag);
-    SHADER(MESH, eevee_object_mesh_vert, nullptr, eevee_object_forward_frag, nullptr);
+    SHADER(MESH, eevee_surface_mesh_vert, nullptr, eevee_surface_forward_frag, nullptr);
 
     SHADER_FULLSCREEN(MOTION_BLUR_GATHER, eevee_motion_blur_gather_frag);
     SHADER_FULLSCREEN(MOTION_BLUR_TILE_DILATE, eevee_motion_blur_tiles_dilate_frag);
@@ -303,9 +324,9 @@ class ShaderModule {
     SHADER_FULLSCREEN(SHADOW_CLEAR, eevee_depth_clear_frag);
 
     SHADER(VELOCITY_MESH,
-           eevee_object_velocity_mesh_vert,
+           eevee_surface_velocity_mesh_vert,
            nullptr,
-           eevee_object_velocity_frag,
+           eevee_surface_velocity_frag,
            nullptr);
     SHADER_FULLSCREEN(VELOCITY_CAMERA, eevee_camera_velocity_frag);
 

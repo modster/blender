@@ -1,5 +1,5 @@
 
-#pragma BLENDER_REQUIRE(eevee_object_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
 
 void main(void)
 {

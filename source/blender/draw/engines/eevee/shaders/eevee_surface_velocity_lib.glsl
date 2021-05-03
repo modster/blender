@@ -1,5 +1,5 @@
 
-IN_OUT MeshDataInterface
+IN_OUT VelocityInterface
 {
   vec3 P;
   vec3 P_next;

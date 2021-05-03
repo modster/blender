@@ -109,9 +109,9 @@ void ShadingView::sync(ivec2 render_extent_)
 
     /* Reuse postfx_tx_. */
     debug_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(postfx_tx_));
-  }
 
-  gbuffer_.sync(depth_tx_);
+    gbuffer_.sync(depth_tx_, combined_tx_, owner);
+  }
 }
 
 void ShadingView::render(void)
@@ -120,7 +120,7 @@ void ShadingView::render(void)
     return;
   }
 
-  float color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  float color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 
   update_view();
 
@@ -132,7 +132,7 @@ void ShadingView::render(void)
 
   inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
 
-  // inst_.shading_passes.forward.render();
+  inst_.shading_passes.forward.render();
 
   velocity_.render(depth_tx_);
 
