@@ -54,7 +54,8 @@ class GHOST_XrActionProfile {
                         const GHOST_XrActionBindingInfo &info);
   ~GHOST_XrActionProfile();
 
-  void getBindings(XrAction action, std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
+  void getBindings(XrAction action,
+                   std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
 
  private:
   XrPath m_profile;

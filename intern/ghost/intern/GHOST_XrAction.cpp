@@ -107,7 +107,8 @@ GHOST_XrActionProfile::GHOST_XrActionProfile(XrInstance instance,
                .c_str());
 
   /* Create bindings. */
-  XrInteractionProfileSuggestedBinding bindings_info{ XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
+  XrInteractionProfileSuggestedBinding bindings_info{
+      XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
   bindings_info.interactionProfile = m_profile;
   bindings_info.countSuggestedBindings = 1;
 
@@ -115,7 +116,7 @@ GHOST_XrActionProfile::GHOST_XrActionProfile(XrInstance instance,
        ++interaction_idx) {
     const char *interaction_path = info.interaction_paths[interaction_idx];
     if (m_bindings.find(interaction_path) != m_bindings.end()) {
-        continue;
+      continue;
     }
 
     XrActionSuggestedBinding sbinding;
@@ -134,7 +135,7 @@ GHOST_XrActionProfile::GHOST_XrActionProfile(XrInstance instance,
                             "\". Are the profile and action paths correct?")
                  .c_str());
 
-    m_bindings.insert({ interaction_path, sbinding.binding });
+    m_bindings.insert({interaction_path, sbinding.binding});
   }
 }
 
@@ -143,11 +144,14 @@ GHOST_XrActionProfile::~GHOST_XrActionProfile()
   m_bindings.clear();
 }
 
-void GHOST_XrActionProfile::getBindings(XrAction action, std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const
+void GHOST_XrActionProfile::getBindings(
+    XrAction action, std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const
 {
   auto profile = r_bindings.find(m_profile);
   if (profile == r_bindings.end()) {
-    profile = r_bindings.emplace(std::piecewise_construct, std::make_tuple(m_profile), std::make_tuple()).first;
+    profile = r_bindings
+                  .emplace(std::piecewise_construct, std::make_tuple(m_profile), std::make_tuple())
+                  .first;
   }
 
   std::vector<XrActionSuggestedBinding> &sbindings = profile->second;
@@ -250,12 +254,14 @@ bool GHOST_XrAction::createSpace(XrInstance instance,
   uint32_t subaction_idx = 0;
   for (; subaction_idx < info.count_subaction_paths; ++subaction_idx) {
     if (m_spaces.find(info.subaction_paths[subaction_idx]) != m_spaces.end()) {
-        return false;
+      return false;
     }
   }
 
   for (subaction_idx = 0; subaction_idx < info.count_subaction_paths; ++subaction_idx) {
-    m_spaces.emplace(std::piecewise_construct, std::make_tuple(info.subaction_paths[subaction_idx]), std::make_tuple(instance, session, m_action, info, subaction_idx));
+    m_spaces.emplace(std::piecewise_construct,
+                     std::make_tuple(info.subaction_paths[subaction_idx]),
+                     std::make_tuple(instance, session, m_action, info, subaction_idx));
   }
 
   return true;
@@ -276,7 +282,9 @@ bool GHOST_XrAction::createBinding(XrInstance instance,
     return false;
   }
 
-  m_profiles.emplace(std::piecewise_construct, std::make_tuple(profile_path), std::make_tuple(instance, m_action, profile_path, info));
+  m_profiles.emplace(std::piecewise_construct,
+                     std::make_tuple(profile_path),
+                     std::make_tuple(instance, m_action, profile_path, info));
 
   return true;
 }
@@ -469,7 +477,9 @@ bool GHOST_XrActionSet::createAction(XrInstance instance, const GHOST_XrActionIn
     return false;
   }
 
-  m_actions.emplace(std::piecewise_construct, std::make_tuple(info.name), std::make_tuple(instance, m_action_set, info));
+  m_actions.emplace(std::piecewise_construct,
+                    std::make_tuple(info.name),
+                    std::make_tuple(instance, m_action_set, info));
 
   return true;
 }
