@@ -572,7 +572,8 @@ void wm_xr_session_actions_init(wmXrData *xr)
   GHOST_XrAttachActionSets(xr->runtime->context);
 }
 
-static void wm_xr_session_controller_mats_update(const XrSessionSettings *settings,
+static void wm_xr_session_controller_mats_update(const bContext *C,
+                                                 const XrSessionSettings *settings,
                                                  const wmXrAction *controller_pose_action,
                                                  wmXrSessionState *state,
                                                  wmWindow *win)
@@ -580,11 +581,10 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
   const unsigned int count = (unsigned int)min_ii(
       (int)controller_pose_action->count_subaction_paths, (int)ARRAY_SIZE(state->controllers));
 
-  /* TODO_XR */
-  // Scene *scene = CTX_data_scene(C);
-  // ViewLayer *view_layer = CTX_data_view_layer(C);
-  // wmWindowManager *wm = CTX_wm_manager(C);
-  // bScreen *screen_anim = ED_screen_animation_playing(wm);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  wmWindowManager *wm = CTX_wm_manager(C);
+  bScreen *screen_anim = ED_screen_animation_playing(wm);
   Object *ob_constraint = NULL;
   char ob_flag;
   float view_ofs[3];
@@ -636,12 +636,11 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
     if (ob_constraint && ((ob_flag & XR_OBJECT_ENABLE) != 0)) {
       wm_xr_session_object_pose_set(&controller->pose, ob_constraint);
 
-      /* TODO_XR */
-      // if (((ob_flag & XR_OBJECT_AUTOKEY) != 0) && screen_anim &&
-      //    autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
-      //  wm_xr_session_object_autokey(
-      //      C, scene, view_layer, win, ob_constraint, (i == 0) ? true : false);
-      //}
+      if (((ob_flag & XR_OBJECT_AUTOKEY) != 0) && screen_anim &&
+          autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
+        wm_xr_session_object_autokey(
+            (bContext *)C, scene, view_layer, win, ob_constraint, (i == 0) ? true : false);
+      }
     }
   }
 }
@@ -816,15 +815,15 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
   MEM_freeN(actions);
 }
 
-void wm_xr_session_actions_update(wmXrData *xr)
+void wm_xr_session_actions_update(const bContext *C)
 {
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmXrData *xr = &wm->xr;
   if (!xr->runtime) {
     return;
   }
 
   const XrSessionSettings *settings = &xr->session_settings;
-  Main *bmain = G_MAIN;
-  wmWindowManager *wm = bmain->wm.first;
   wmWindow *win = wm_xr_session_root_window_or_fallback_get(wm, xr->runtime);
   GHOST_XrContextHandle xr_context = xr->runtime->context;
   wmXrSessionState *state = &xr->runtime->session_state;
@@ -840,12 +839,11 @@ void wm_xr_session_actions_update(wmXrData *xr)
     if ((ob_flag & XR_OBJECT_AUTOKEY) != 0) {
       bScreen *screen_anim = ED_screen_animation_playing(wm);
       if (screen_anim) {
-        /* TODO_XR */
-        // Scene *scene = CTX_data_scene(C);
-        // if (autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
-        //  ViewLayer *view_layer = CTX_data_view_layer(C);
-        //  wm_xr_session_object_autokey(C, scene, view_layer, win, ob_constraint, true);
-        //}
+        Scene *scene = CTX_data_scene(C);
+        if (autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
+          ViewLayer *view_layer = CTX_data_view_layer(C);
+          wm_xr_session_object_autokey((bContext *)C, scene, view_layer, win, ob_constraint, true);
+        }
       }
     }
   }
@@ -861,7 +859,7 @@ void wm_xr_session_actions_update(wmXrData *xr)
   if (active_action_set) {
     if (active_action_set->controller_pose_action) {
       wm_xr_session_controller_mats_update(
-          &xr->session_settings, active_action_set->controller_pose_action, state, win);
+          C, &xr->session_settings, active_action_set->controller_pose_action, state, win);
     }
 
     if (surface && win) {

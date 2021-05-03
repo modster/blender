@@ -22,6 +22,7 @@
  * representation of the OpenXR runtime connection within the application.
  */
 
+#include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_idprop.h"
 #include "BKE_report.h"
@@ -124,14 +125,16 @@ void wm_xr_exit(wmWindowManager *wm)
   }
 }
 
-bool wm_xr_events_handle(wmWindowManager *wm)
+bool wm_xr_events_handle(const bContext *C)
 {
+  wmWindowManager *wm = CTX_wm_manager(C);
+
   if (wm->xr.runtime && wm->xr.runtime->context) {
     GHOST_XrEventsHandle(wm->xr.runtime->context);
 
     /* Process OpenXR action events and dispatch to XR surface / window queues. */
     if (WM_xr_session_is_ready(&wm->xr)) {
-      wm_xr_session_actions_update(&wm->xr);
+      wm_xr_session_actions_update(C);
     }
 
     /* wm_window_process_events() uses the return value to determine if it can put the main thread
