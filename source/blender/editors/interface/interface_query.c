@@ -390,6 +390,10 @@ uiBut *ui_list_find_mouse_over_ex(const ARegion *region, int x, int y)
 
 uiBut *ui_list_find_mouse_over(const ARegion *region, const wmEvent *event)
 {
+  if (event == NULL) {
+    /* If there is no info about the mouse, just act as if there is nothing underneath it. */
+    return NULL;
+  }
   return ui_list_find_mouse_over_ex(region, event->x, event->y);
 }
 
