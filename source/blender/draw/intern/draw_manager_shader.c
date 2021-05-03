@@ -597,7 +597,9 @@ static int drw_shader_library_search(const DRWShaderLibrary *lib, const char *na
 }
 
 /* Return bitmap of dependencies. */
-static uint32_t drw_shader_dependencies_get(const DRWShaderLibrary *lib, const char *lib_code)
+static uint32_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
+                                            const char *lib_code,
+                                            const char *lib_name)
 {
   /* Search dependencies. */
   uint32_t deps = 0;
@@ -616,9 +618,10 @@ static uint32_t drw_shader_dependencies_get(const DRWShaderLibrary *lib, const c
       dbg_name[i + 1] = '\0';
 
       printf(
-          "Error: Dependency not found: %s\n"
+          "Error: Dependency %s not found for %s.\n"
           "This might be due to bad lib ordering.\n",
-          dbg_name);
+          dbg_name,
+          lib_name);
       BLI_assert(0);
     }
     else {
@@ -641,7 +644,7 @@ void DRW_shader_library_add_file(DRWShaderLibrary *lib, const char *lib_code, co
   if (index > -1) {
     lib->libs[index] = lib_code;
     BLI_strncpy(lib->libs_name[index], lib_name, MAX_LIB_NAME);
-    lib->libs_deps[index] = drw_shader_dependencies_get(lib, lib_code);
+    lib->libs_deps[index] = drw_shader_dependencies_get(lib, lib_code, lib_name);
   }
   else {
     printf("Error: Too many libraries. Cannot add %s.\n", lib_name);
@@ -653,7 +656,7 @@ void DRW_shader_library_add_file(DRWShaderLibrary *lib, const char *lib_code, co
  * Caller must free the string with MEM_freeN after use. */
 char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const char *shader_code)
 {
-  uint32_t deps = drw_shader_dependencies_get(lib, shader_code);
+  uint32_t deps = drw_shader_dependencies_get(lib, shader_code, "shader code");
 
   DynStr *ds = BLI_dynstr_new();
   /* Add all dependencies recursively. */
