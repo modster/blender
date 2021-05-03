@@ -456,37 +456,6 @@ bool AlembicObject::has_data_loaded() const
   return data_loaded;
 }
 
-void AlembicObject::update_shader_attributes(AlembicProcedural *proc,
-                                             CachedData &cached_data,
-                                             const ICompoundProperty &arb_geom_params,
-                                             Progress &progress)
-{
-  AttributeRequestSet requested_attributes = get_requested_attributes();
-
-  foreach (const AttributeRequest &attr, requested_attributes.requests) {
-    if (progress.get_cancel()) {
-      return;
-    }
-
-    bool attr_exists = false;
-    foreach (CachedData::CachedAttribute &cached_attr, cached_data.attributes) {
-      if (cached_attr.name == attr.name) {
-        attr_exists = true;
-        break;
-      }
-    }
-
-    if (attr_exists) {
-      continue;
-    }
-
-    // read_attribute(proc, cached_data, arb_geom_params, attr.name, progress);
-  }
-
-  cached_data.invalidate_last_loaded_time(true);
-  need_shader_update = false;
-}
-
 static void compute_vertex_deltas(CachedData &cached_data,
                                   const ccl::set<chrono_t> &times,
                                   Progress &progress)
@@ -1196,6 +1165,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
       read_subd(object, frame_time);
     }
 
+    object->need_shader_update = false;
     object->clear_modified();
   }
 
@@ -1703,8 +1673,7 @@ void AlembicProcedural::build_caches(Progress &progress)
       else if (object->need_shader_update) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
-        object->update_shader_attributes(
-            this, object->get_cached_data(), schema.getArbGeomParams(), progress);
+        read_attributes(this, object->get_cached_data(), schema, schema.getUVsParam(), object->get_requested_attributes(), progress);
       }
     }
     else if (object->schema_type == AlembicObject::CURVES) {
@@ -1724,8 +1693,7 @@ void AlembicProcedural::build_caches(Progress &progress)
       else if (object->need_shader_update) {
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
-        object->update_shader_attributes(
-            this, object->get_cached_data(), schema.getArbGeomParams(), progress);
+        read_attributes(this, object->get_cached_data(), schema, schema.getUVsParam(), object->get_requested_attributes(), progress);
       }
     }
 

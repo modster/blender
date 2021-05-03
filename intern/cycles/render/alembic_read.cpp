@@ -917,10 +917,7 @@ static void parse_requested_attributes_recursive(
       continue;
     }
 
-    if (property_header->isArray()) {
-      // TODO(kevindietrich) : for now only arrays are supported
-      requested_properties.push_back({property_header, arb_geom_params});
-    }
+    requested_properties.push_back({property_header, arb_geom_params});
   }
 
   /* Look into children compound properties. */
@@ -1013,6 +1010,8 @@ void read_attributes(AlembicProcedural *proc,
       read_attribute_loop(proc, cache, param, process_attribute<C4fTPTraits>, progress);
     }
   }
+
+  cache.invalidate_last_loaded_time(true);
 }
 
 CCL_NAMESPACE_END

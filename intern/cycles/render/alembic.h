@@ -449,11 +449,6 @@ class AlembicObject : public Node {
 
   CachedData cached_data_;
 
-  void update_shader_attributes(AlembicProcedural *proc,
-                                CachedData &cached_data,
-                                const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
-                                Progress &progress);
-
   void setup_transform_cache(CachedData &cached_data, float scale);
 
   AttributeRequestSet get_requested_attributes();
