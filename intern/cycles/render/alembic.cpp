@@ -691,17 +691,17 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
 
   cached_data.clear();
 
-  auto params = MeshGeometryParams();
-  params.topology_variance = schema.getTopologyVariance();
-  params.time_sampling = schema.getTimeSampling();
-  params.positions = schema.getPositionsProperty();
-  params.face_counts = schema.getFaceCountsProperty();
-  params.face_indices = schema.getFaceIndicesProperty();
-  params.normals = schema.getNormalsParam();
-  params.num_samples = schema.getNumSamples();
-  params.shader_face_sets = parse_face_sets_for_shader_assignment(schema, get_used_shaders());
+  PolyMeshSchemaData data;
+  data.topology_variance = schema.getTopologyVariance();
+  data.time_sampling = schema.getTimeSampling();
+  data.positions = schema.getPositionsProperty();
+  data.face_counts = schema.getFaceCountsProperty();
+  data.face_indices = schema.getFaceIndicesProperty();
+  data.normals = schema.getNormalsParam();
+  data.num_samples = schema.getNumSamples();
+  data.shader_face_sets = parse_face_sets_for_shader_assignment(schema, get_used_shaders());
 
-  read_geometry_data(proc, cached_data, params, progress);
+  read_geometry_data(proc, cached_data, data, progress);
 
   if (progress.get_cancel()) {
     return;
@@ -735,17 +735,17 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
   cached_data.clear();
 
   if (proc->get_ignore_subdivision()) {
-    MeshGeometryParams params;
-    params.topology_variance = schema.getTopologyVariance();
-    params.time_sampling = schema.getTimeSampling();
-    params.positions = schema.getPositionsProperty();
-    params.face_counts = schema.getFaceCountsProperty();
-    params.face_indices = schema.getFaceIndicesProperty();
-    params.num_samples = schema.getNumSamples();
-    params.velocities = schema.getVelocitiesProperty();
-    params.shader_face_sets = parse_face_sets_for_shader_assignment(schema, get_used_shaders());
+    PolyMeshSchemaData data;
+    data.topology_variance = schema.getTopologyVariance();
+    data.time_sampling = schema.getTimeSampling();
+    data.positions = schema.getPositionsProperty();
+    data.face_counts = schema.getFaceCountsProperty();
+    data.face_indices = schema.getFaceIndicesProperty();
+    data.num_samples = schema.getNumSamples();
+    data.velocities = schema.getVelocitiesProperty();
+    data.shader_face_sets = parse_face_sets_for_shader_assignment(schema, get_used_shaders());
 
-    read_geometry_data(proc, cached_data, params, progress);
+    read_geometry_data(proc, cached_data, data, progress);
 
     if (progress.get_cancel()) {
       return;
@@ -761,27 +761,27 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
     return;
   }
 
-  SubDGeometryParams params;
-  params.time_sampling = schema.getTimeSampling();
-  params.num_samples = schema.getNumSamples();
-  params.topology_variance = schema.getTopologyVariance();
-  params.face_counts = schema.getFaceCountsProperty();
-  params.face_indices = schema.getFaceIndicesProperty();
-  params.positions = schema.getPositionsProperty();
-  params.face_varying_interpolate_boundary = schema.getFaceVaryingInterpolateBoundaryProperty();
-  params.face_varying_propagate_corners = schema.getFaceVaryingPropagateCornersProperty();
-  params.interpolate_boundary = schema.getInterpolateBoundaryProperty();
-  params.crease_indices = schema.getCreaseIndicesProperty();
-  params.crease_lengths = schema.getCreaseLengthsProperty();
-  params.crease_sharpnesses = schema.getCreaseSharpnessesProperty();
-  params.corner_indices = schema.getCornerIndicesProperty();
-  params.corner_sharpnesses = schema.getCornerSharpnessesProperty();
-  params.holes = schema.getHolesProperty();
-  params.subdivision_scheme = schema.getSubdivisionSchemeProperty();
-  params.velocities = schema.getVelocitiesProperty();
-  params.shader_face_sets = parse_face_sets_for_shader_assignment(schema, get_used_shaders());
+  SubDSchemaData data;
+  data.time_sampling = schema.getTimeSampling();
+  data.num_samples = schema.getNumSamples();
+  data.topology_variance = schema.getTopologyVariance();
+  data.face_counts = schema.getFaceCountsProperty();
+  data.face_indices = schema.getFaceIndicesProperty();
+  data.positions = schema.getPositionsProperty();
+  data.face_varying_interpolate_boundary = schema.getFaceVaryingInterpolateBoundaryProperty();
+  data.face_varying_propagate_corners = schema.getFaceVaryingPropagateCornersProperty();
+  data.interpolate_boundary = schema.getInterpolateBoundaryProperty();
+  data.crease_indices = schema.getCreaseIndicesProperty();
+  data.crease_lengths = schema.getCreaseLengthsProperty();
+  data.crease_sharpnesses = schema.getCreaseSharpnessesProperty();
+  data.corner_indices = schema.getCornerIndicesProperty();
+  data.corner_sharpnesses = schema.getCornerSharpnessesProperty();
+  data.holes = schema.getHolesProperty();
+  data.subdivision_scheme = schema.getSubdivisionSchemeProperty();
+  data.velocities = schema.getVelocitiesProperty();
+  data.shader_face_sets = parse_face_sets_for_shader_assignment(schema, get_used_shaders());
 
-  read_geometry_data(proc, cached_data, params, progress);
+  read_geometry_data(proc, cached_data, data, progress);
 
   if (progress.get_cancel()) {
     return;
@@ -812,22 +812,22 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
 
   cached_data.clear();
 
-  CurvesParams params;
-  params.positions = schema.getPositionsProperty();
-  params.position_weights = schema.getPositionWeightsProperty();
-  params.normals = schema.getNormalsParam();
-  params.knots = schema.getKnotsProperty();
-  params.orders = schema.getOrdersProperty();
-  params.widths = schema.getWidthsParam();
-  params.velocities = schema.getVelocitiesProperty();
-  params.time_sampling = schema.getTimeSampling();
-  params.topology_variance = schema.getTopologyVariance();
-  params.num_samples = schema.getNumSamples();
-  params.num_vertices = schema.getNumVerticesProperty();
-  params.default_radius = proc->get_default_radius();
-  params.radius_scale = get_radius_scale();
+  CurvesSchemaData data;
+  data.positions = schema.getPositionsProperty();
+  data.position_weights = schema.getPositionWeightsProperty();
+  data.normals = schema.getNormalsParam();
+  data.knots = schema.getKnotsProperty();
+  data.orders = schema.getOrdersProperty();
+  data.widths = schema.getWidthsParam();
+  data.velocities = schema.getVelocitiesProperty();
+  data.time_sampling = schema.getTimeSampling();
+  data.topology_variance = schema.getTopologyVariance();
+  data.num_samples = schema.getNumSamples();
+  data.num_vertices = schema.getNumVerticesProperty();
+  data.default_radius = proc->get_default_radius();
+  data.radius_scale = get_radius_scale();
 
-  read_geometry_data(proc, cached_data, params, progress);
+  read_geometry_data(proc, cached_data, data, progress);
 
   if (progress.get_cancel()) {
     return;

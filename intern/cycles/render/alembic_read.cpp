@@ -21,11 +21,6 @@
 
 #include "util/util_progress.h"
 
-/* TODOs:
- * - update attributes when editing shaders
- * - deltas
- */
-
 using namespace Alembic::AbcGeom;
 
 CCL_NAMESPACE_BEGIN
@@ -75,7 +70,9 @@ static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
   return result;
 }
 
-/* Main function to read data. */
+/* Main function to read data, this will iterate over all the relevant sample times for the
+ * duration of the requested animation, and call the DataReadingFunc for each of those sample time.
+ */
 template<typename Params, typename DataReadingFunc>
 static void read_data_loop(AlembicProcedural *proc,
                            CachedData &cached_data,
@@ -97,7 +94,7 @@ static void read_data_loop(AlembicProcedural *proc,
   }
 }
 
-/* Polygon Meshes Geometries. */
+/* Polygon Mesh Geometries. */
 
 /* Compute the vertex normals in case none are present in the IPolyMeshSchema, this is mostly used
  * to avoid computing them in the GeometryManager in order to speed up data updates. */
@@ -107,7 +104,8 @@ static void compute_vertex_normals(CachedData &cache, double current_time)
     return;
   }
 
-  auto &attr_normal = cache.add_attribute(ustring("N"), cache.vertices.get_time_sampling());
+  CachedData::CachedAttribute &attr_normal = cache.add_attribute(
+      ustring("N"), cache.vertices.get_time_sampling());
   attr_normal.std = ATTR_STD_VERTEX_NORMAL;
   attr_normal.element = ATTR_ELEMENT_VERTEX;
   attr_normal.type_desc = TypeNormal;
@@ -343,18 +341,18 @@ static array<int> compute_polygon_to_shader_map(
 }
 
 static void read_poly_mesh_geometry(CachedData &cached_data,
-                                    const MeshGeometryParams &params,
+                                    const PolyMeshSchemaData &data,
                                     chrono_t time)
 {
   const ISampleSelector iss = ISampleSelector(time);
 
-  add_positions(params.positions.getValue(iss), time, cached_data);
+  add_positions(data.positions.getValue(iss), time, cached_data);
 
-  const Int32ArraySamplePtr face_counts = params.face_counts.getValue(iss);
-  const Int32ArraySamplePtr face_indices = params.face_indices.getValue(iss);
+  const Int32ArraySamplePtr face_counts = data.face_counts.getValue(iss);
+  const Int32ArraySamplePtr face_indices = data.face_indices.getValue(iss);
 
   /* Only copy triangles for other frames if the topology is changing over time as well. */
-  if (params.topology_variance != kHomogeneousTopology || cached_data.triangles.size() == 0) {
+  if (data.topology_variance != kHomogeneousTopology || cached_data.triangles.size() == 0) {
     bool do_triangles = true;
 
     /* Compare key with last one to check whether the topology changed. */
@@ -370,7 +368,7 @@ static void read_poly_mesh_geometry(CachedData &cached_data,
 
     if (do_triangles) {
       const array<int> polygon_to_shader = compute_polygon_to_shader_map(
-          face_counts, params.shader_face_sets, iss);
+          face_counts, data.shader_face_sets, iss);
       add_triangles(face_counts, face_indices, time, cached_data, polygon_to_shader);
     }
     else {
@@ -380,13 +378,13 @@ static void read_poly_mesh_geometry(CachedData &cached_data,
     }
 
     /* Initialize the first key. */
-    if (params.topology_variance != kHomogeneousTopology && cached_data.triangles.size() == 1) {
+    if (data.topology_variance != kHomogeneousTopology && cached_data.triangles.size() == 1) {
       cached_data.triangles.key1 = face_indices->getKey();
     }
   }
 
-  if (params.normals.valid()) {
-    add_normals(face_indices, params.normals, time, cached_data);
+  if (data.normals.valid()) {
+    add_normals(face_indices, data.normals, time, cached_data);
   }
   else {
     compute_vertex_normals(cached_data, time);
@@ -395,22 +393,20 @@ static void read_poly_mesh_geometry(CachedData &cached_data,
 
 void read_geometry_data(AlembicProcedural *proc,
                         CachedData &cached_data,
-                        const MeshGeometryParams &params,
+                        const PolyMeshSchemaData &data,
                         Progress &progress)
 {
-  read_data_loop(proc, cached_data, params, read_poly_mesh_geometry, progress);
+  read_data_loop(proc, cached_data, data, read_poly_mesh_geometry, progress);
 }
 
 /* Subdivision Geometries */
 
-static void add_subd_polygons(CachedData &cached_data,
-                              const SubDGeometryParams &params,
-                              chrono_t time)
+static void add_subd_polygons(CachedData &cached_data, const SubDSchemaData &data, chrono_t time)
 {
   const ISampleSelector iss = ISampleSelector(time);
 
-  const Int32ArraySamplePtr face_counts = params.face_counts.getValue(iss);
-  const Int32ArraySamplePtr face_indices = params.face_indices.getValue(iss);
+  const Int32ArraySamplePtr face_counts = data.face_counts.getValue(iss);
+  const Int32ArraySamplePtr face_indices = data.face_indices.getValue(iss);
 
   array<int> subd_start_corner;
   array<int> shader;
@@ -444,7 +440,7 @@ static void add_subd_polygons(CachedData &cached_data,
   int ptex_offset = 0;
 
   const array<int> polygon_to_shader = compute_polygon_to_shader_map(
-      face_counts, params.shader_face_sets, iss);
+      face_counts, data.shader_face_sets, iss);
 
   for (size_t i = 0; i < face_counts->size(); i++) {
     num_corners = face_counts_array[i];
@@ -480,20 +476,18 @@ static void add_subd_polygons(CachedData &cached_data,
   cached_data.uv_loops.add_data(uv_loops, time);
 }
 
-static void add_subd_creases(CachedData &cached_data,
-                             const SubDGeometryParams &params,
-                             chrono_t time)
+static void add_subd_creases(CachedData &cached_data, const SubDSchemaData &data, chrono_t time)
 {
-  if (!(params.crease_indices.valid() && params.crease_indices.valid() &&
-        params.crease_sharpnesses.valid())) {
+  if (!(data.crease_indices.valid() && data.crease_indices.valid() &&
+        data.crease_sharpnesses.valid())) {
     return;
   }
 
   const ISampleSelector iss = ISampleSelector(time);
 
-  const Int32ArraySamplePtr creases_length = params.crease_lengths.getValue(iss);
-  const Int32ArraySamplePtr creases_indices = params.crease_indices.getValue(iss);
-  const FloatArraySamplePtr creases_sharpnesses = params.crease_sharpnesses.getValue(iss);
+  const Int32ArraySamplePtr creases_length = data.crease_lengths.getValue(iss);
+  const Int32ArraySamplePtr creases_indices = data.crease_indices.getValue(iss);
+  const FloatArraySamplePtr creases_sharpnesses = data.crease_sharpnesses.getValue(iss);
 
   if (creases_length && creases_indices && creases_sharpnesses) {
     array<int> creases_edge;
@@ -521,53 +515,51 @@ static void add_subd_creases(CachedData &cached_data,
   }
 }
 
-static void read_subd_geometry(CachedData &cached_data,
-                               const SubDGeometryParams &params,
-                               chrono_t time)
+static void read_subd_geometry(CachedData &cached_data, const SubDSchemaData &data, chrono_t time)
 {
   const ISampleSelector iss = ISampleSelector(time);
 
-  add_positions(params.positions.getValue(iss), time, cached_data);
+  add_positions(data.positions.getValue(iss), time, cached_data);
 
-  if (params.topology_variance != kHomogenousTopology || cached_data.shader.size() == 0) {
-    add_subd_polygons(cached_data, params, time);
-    add_subd_creases(cached_data, params, time);
+  if (data.topology_variance != kHomogenousTopology || cached_data.shader.size() == 0) {
+    add_subd_polygons(cached_data, data, time);
+    add_subd_creases(cached_data, data, time);
   }
 }
 
 void read_geometry_data(AlembicProcedural *proc,
                         CachedData &cached_data,
-                        const SubDGeometryParams &params,
+                        const SubDSchemaData &data,
                         Progress &progress)
 {
-  read_data_loop(proc, cached_data, params, read_subd_geometry, progress);
+  read_data_loop(proc, cached_data, data, read_subd_geometry, progress);
 }
 
 /* Curve Geometries. */
 
-static void read_curves_data(CachedData &cached_data, const CurvesParams &params, chrono_t time)
+static void read_curves_data(CachedData &cached_data, const CurvesSchemaData &data, chrono_t time)
 {
   const ISampleSelector iss = ISampleSelector(time);
 
-  const Int32ArraySamplePtr curves_num_vertices = params.num_vertices.getValue(iss);
-  const P3fArraySamplePtr position = params.positions.getValue(iss);
+  const Int32ArraySamplePtr curves_num_vertices = data.num_vertices.getValue(iss);
+  const P3fArraySamplePtr position = data.positions.getValue(iss);
 
   FloatArraySamplePtr radiuses;
 
-  if (params.widths.valid()) {
-    IFloatGeomParam::Sample wsample = params.widths.getExpandedValue(iss);
+  if (data.widths.valid()) {
+    IFloatGeomParam::Sample wsample = data.widths.getExpandedValue(iss);
     radiuses = wsample.getVals();
   }
 
   const bool do_radius = (radiuses != nullptr) && (radiuses->size() > 1);
-  float radius = (radiuses && radiuses->size() == 1) ? (*radiuses)[0] : params.default_radius;
+  float radius = (radiuses && radiuses->size() == 1) ? (*radiuses)[0] : data.default_radius;
 
   array<float3> curve_keys;
   array<float> curve_radius;
   array<int> curve_first_key;
   array<int> curve_shader;
 
-  const bool is_homogenous = params.topology_variance == kHomogenousTopology;
+  const bool is_homogenous = data.topology_variance == kHomogenousTopology;
 
   curve_keys.reserve(position->size());
   curve_radius.reserve(position->size());
@@ -587,7 +579,7 @@ static void read_curves_data(CachedData &cached_data, const CurvesParams &params
         radius = (*radiuses)[offset + j];
       }
 
-      curve_radius.push_back_slow(radius * params.radius_scale);
+      curve_radius.push_back_slow(radius * data.radius_scale);
     }
 
     if (!is_homogenous || cached_data.curve_first_key.size() == 0) {
@@ -609,15 +601,15 @@ static void read_curves_data(CachedData &cached_data, const CurvesParams &params
 
 void read_geometry_data(AlembicProcedural *proc,
                         CachedData &cached_data,
-                        const CurvesParams &params,
+                        const CurvesSchemaData &data,
                         Progress &progress)
 {
-  read_data_loop(proc, cached_data, params, read_curves_data, progress);
+  read_data_loop(proc, cached_data, data, read_curves_data, progress);
 }
 
 /* Attributes conversions. */
 
-/* Type traits for converting between Alembic and Cycles types
+/* Type traits for converting between Alembic and Cycles types.
  */
 
 template<typename T> struct value_type_converter {
@@ -799,7 +791,8 @@ using process_callback_type = void (*)(CachedData &,
                                        double);
 
 /* Main loop to process the attributes, this will look at the given param's TimeSampling and
- * extract data based on which frame time is requested by the procedural. */
+ * extract data based on which frame time is requested by the procedural and execute the callback
+ * for each of those requested time. */
 template<typename TRAIT>
 static void read_attribute_loop(AlembicProcedural *proc,
                                 CachedData &cache,
