@@ -34,13 +34,13 @@
 
 #include <fstream>
 
+using Alembic::Abc::chrono_t;
 using Alembic::Abc::ErrorHandler;
 using Alembic::Abc::Exception;
 using Alembic::Abc::IArchive;
 using Alembic::Abc::kWrapExisting;
 using Alembic::Abc::TimeSamplingPtr;
 using Alembic::Abc::TimeSamplingType;
-using Alembic::Abc::chrono_t;
 
 namespace blender::io::alembic {
 
@@ -113,7 +113,7 @@ TimeInfo ArchiveReader::getTimeInfo()
 {
   const uint32_t num_time_sampling_ptrs = m_archive.getNumTimeSamplings();
 
-  chrono_t min_time =  std::numeric_limits<chrono_t>::max();
+  chrono_t min_time = std::numeric_limits<chrono_t>::max();
   chrono_t max_time = -std::numeric_limits<chrono_t>::max();
 
   for (uint32_t i = 0; i < num_time_sampling_ptrs; ++i) {
@@ -131,7 +131,9 @@ TimeInfo ArchiveReader::getTimeInfo()
     const TimeSamplingType &time_sampling_type = time_sampling_ptr->getTimeSamplingType();
 
     /* Avoid the default time sampling, it should be at index 0, but we never know. */
-    if (time_sampling_ptr->getNumStoredTimes() == 1 && time_sampling_ptr->getStoredTimes()[0] == 0.0 && time_sampling_type.getTimePerCycle() == 1.0) {
+    if (time_sampling_ptr->getNumStoredTimes() == 1 &&
+        time_sampling_ptr->getStoredTimes()[0] == 0.0 &&
+        time_sampling_type.getTimePerCycle() == 1.0) {
       continue;
     }
 

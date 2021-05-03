@@ -707,13 +707,10 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
     return;
   }
 
-  /* Use the schema as the base compound property to also be able to look for top level properties. */
-  read_attributes(proc,
-                  cached_data,
-                  schema,
-                  schema.getUVsParam(),
-                  get_requested_attributes(),
-                  progress);
+  /* Use the schema as the base compound property to also be able to look for top level properties.
+   */
+  read_attributes(
+      proc, cached_data, schema, schema.getUVsParam(), get_requested_attributes(), progress);
 
   if (progress.get_cancel()) {
     return;
@@ -754,13 +751,10 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
       return;
     }
 
-    /* Use the schema as the base compound property to also be able to look for top level properties. */
-    read_attributes(proc,
-                    cached_data,
-                    schema,
-                    schema.getUVsParam(),
-                    get_requested_attributes(),
-                    progress);
+    /* Use the schema as the base compound property to also be able to look for top level
+     * properties. */
+    read_attributes(
+        proc, cached_data, schema, schema.getUVsParam(), get_requested_attributes(), progress);
 
     cached_data.invalidate_last_loaded_time(true);
     data_loaded = true;
@@ -793,7 +787,8 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
     return;
   }
 
-  /* Use the schema as the base compound property to also be able to look for top level properties. */
+  /* Use the schema as the base compound property to also be able to look for top level properties.
+   */
   read_attributes(proc,
                   cached_data,
                   schema.getArbGeomParams(),
@@ -838,13 +833,10 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
     return;
   }
 
-  /* Use the schema as the base compound property to also be able to look for top level properties. */
-  read_attributes(proc,
-                  cached_data,
-                  schema,
-                  schema.getUVsParam(),
-                  get_requested_attributes(),
-                  progress);
+  /* Use the schema as the base compound property to also be able to look for top level properties.
+   */
+  read_attributes(
+      proc, cached_data, schema, schema.getUVsParam(), get_requested_attributes(), progress);
 
   // compute_curve_deltas(cached_data, times, progress);
 
@@ -1673,7 +1665,12 @@ void AlembicProcedural::build_caches(Progress &progress)
       else if (object->need_shader_update) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
-        read_attributes(this, object->get_cached_data(), schema, schema.getUVsParam(), object->get_requested_attributes(), progress);
+        read_attributes(this,
+                        object->get_cached_data(),
+                        schema,
+                        schema.getUVsParam(),
+                        object->get_requested_attributes(),
+                        progress);
       }
     }
     else if (object->schema_type == AlembicObject::CURVES) {
@@ -1693,7 +1690,12 @@ void AlembicProcedural::build_caches(Progress &progress)
       else if (object->need_shader_update) {
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
-        read_attributes(this, object->get_cached_data(), schema, schema.getUVsParam(), object->get_requested_attributes(), progress);
+        read_attributes(this,
+                        object->get_cached_data(),
+                        schema,
+                        schema.getUVsParam(),
+                        object->get_requested_attributes(),
+                        progress);
       }
     }
 

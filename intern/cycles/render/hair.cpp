@@ -494,16 +494,15 @@ void Hair::pack_curve_keys(Device *device,
   }
   else
 #endif
-    static_cast<void>(device);
-    static_cast<void>(curve_keys_deltas);
-    static_cast<void>(max_delta_compression_frames);
-   {
+  static_cast<void>(device);
+  static_cast<void>(curve_keys_deltas);
+  static_cast<void>(max_delta_compression_frames);
+  {
     current_delta_frames_count = 0;
     float4 *keys_chunk = &curve_key_co[prim_offset];
 
     for (size_t i = 0; i < curve_keys_size; i++) {
-      keys_chunk[i] = make_float4(
-          keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
+      keys_chunk[i] = make_float4(keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
     }
   }
 }
@@ -525,9 +524,9 @@ void Hair::pack_curve_segments(Scene *scene, float4 *curve_data)
     shader_id = scene->shader_manager->get_shader_id(shader, false);
 
     curve_data[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
-                                       __int_as_float(curve.num_keys),
-                                       __int_as_float(shader_id),
-                                       0.0f);
+                                __int_as_float(curve.num_keys),
+                                __int_as_float(shader_id),
+                                0.0f);
   }
 }
 

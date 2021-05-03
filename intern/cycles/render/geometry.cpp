@@ -218,7 +218,8 @@ void Geometry::compute_bvh(
     vector<Object *> objects;
     objects.push_back(&object);
 
-    if (bvh && !need_update_rebuild && params->enable_bvh_refit && (!params->enable_max_bvh_refits || bvh->num_refits < params->max_bvh_refits)) {
+    if (bvh && !need_update_rebuild && params->enable_bvh_refit &&
+        (!params->enable_max_bvh_refits || bvh->num_refits < params->max_bvh_refits)) {
       progress->set_status(msg, "Refitting BVH");
 
       bvh->geometry = geometry;
@@ -828,10 +829,10 @@ void GeometryManager::device_update_attributes(Device *device,
   dscene->attributes_uchar4.alloc(attr_uchar4_size);
 
   const bool attributes_need_realloc[4] = {
-    dscene->attributes_float.need_realloc(),
-    dscene->attributes_float2.need_realloc(),
-    dscene->attributes_float3.need_realloc(),
-    dscene->attributes_uchar4.need_realloc(),
+      dscene->attributes_float.need_realloc(),
+      dscene->attributes_float2.need_realloc(),
+      dscene->attributes_float3.need_realloc(),
+      dscene->attributes_uchar4.need_realloc(),
   };
 
   auto get_slot_for_attribute_type = [](Attribute *attr) {
@@ -1154,7 +1155,8 @@ void GeometryManager::device_update_mesh(
     device_vector<ushort4> curve_keys_deltas(
         scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_ONLY);
 
-    if (!copy_all_data && scene->params.enable_delta_compression && scene->device->supports_delta_compression()) {
+    if (!copy_all_data && scene->params.enable_delta_compression &&
+        scene->device->supports_delta_compression()) {
       /* We can do partial updates, so compute deltas from last update. */
       curve_keys_deltas.alloc(curve_key_size);
       /* Since we use chunks and not all of them may be copied, make sure data between copied

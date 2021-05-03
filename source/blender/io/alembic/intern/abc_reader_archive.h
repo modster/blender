@@ -32,8 +32,8 @@ struct Main;
 namespace blender::io::alembic {
 
 struct TimeInfo {
-   Alembic::Abc::chrono_t min_time;
-   Alembic::Abc::chrono_t max_time;
+  Alembic::Abc::chrono_t min_time;
+  Alembic::Abc::chrono_t max_time;
 };
 
 /* Wrappers around input and output archives. The goal is to be able to use

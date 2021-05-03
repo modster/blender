@@ -894,21 +894,20 @@ static void read_attribute_loop(AlembicProcedural *proc,
 
 /* Attributes requests. */
 
-/* This structure is used to tell which ICoumpoundProperty the PropertyHeader comes from, as we need
- * the parent when downcasting to the proper type. */
+/* This structure is used to tell which ICoumpoundProperty the PropertyHeader comes from, as we
+ * need the parent when downcasting to the proper type. */
 struct PropHeaderAndParent {
-    const PropertyHeader *prop;
-    ICompoundProperty parent;
+  const PropertyHeader *prop;
+  ICompoundProperty parent;
 };
 
-/* Parse the ICompoundProperty to look for properties whose names appear in the AttributeRequestSet.
- * This also looks into any child ICompoundProperty of the given ICompoundProperty.
- * If no property of the given name is found, let it be that way, Cycles will use a zero value for
- * the missing attribute. */
-static void parse_requested_attributes_recursive(
-    const AttributeRequestSet &requested_attributes,
-    const ICompoundProperty &arb_geom_params,
-    vector<PropHeaderAndParent> &requested_properties)
+/* Parse the ICompoundProperty to look for properties whose names appear in the
+ * AttributeRequestSet. This also looks into any child ICompoundProperty of the given
+ * ICompoundProperty. If no property of the given name is found, let it be that way, Cycles will
+ * use a zero value for the missing attribute. */
+static void parse_requested_attributes_recursive(const AttributeRequestSet &requested_attributes,
+                                                 const ICompoundProperty &arb_geom_params,
+                                                 vector<PropHeaderAndParent> &requested_properties)
 {
   for (const AttributeRequest &req : requested_attributes.requests) {
     const PropertyHeader *property_header = arb_geom_params.getPropertyHeader(req.name.c_str());

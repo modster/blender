@@ -643,7 +643,9 @@ void AttributeSet::remove(Attribute *attribute)
 
 void AttributeSet::remove(list<Attribute>::iterator it)
 {
-  const bool modifies_device_array = (it->std != ATTR_STD_DELTAS && it->std != ATTR_STD_FACE_NORMAL && it->std != ATTR_STD_VERTEX_NORMAL);
+  const bool modifies_device_array = (it->std != ATTR_STD_DELTAS &&
+                                      it->std != ATTR_STD_FACE_NORMAL &&
+                                      it->std != ATTR_STD_VERTEX_NORMAL);
 
   if (it->element == ATTR_ELEMENT_CORNER) {
     attr_uchar4_modified |= modifies_device_array;
