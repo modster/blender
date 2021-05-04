@@ -3589,6 +3589,89 @@ void GPENCIL_OT_set_active_material(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+/* ********************* Append Materials in a new object ************************** */
+static bool gpencil_materials_append_to_object_poll(bContext *C)
+{
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  Object *ob = CTX_data_active_object(C);
+  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+    return false;
+  }
+
+  bGPdata *gpd = (bGPdata *)ob->data;
+  bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
+
+  if (gpl == NULL) {
+    return false;
+  }
+
+  /* check there are more grease pencil objects */
+  LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
+    if ((base->object != ob) && (base->object->type == OB_GPENCIL)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static int gpencil_materials_append_to_object_exec(bContext *C, wmOperator *op)
+{
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  char name[MAX_ID_NAME - 2];
+  RNA_string_get(op->ptr, "object", name);
+
+  if (name[0] == '\0') {
+    return OPERATOR_CANCELLED;
+  }
+
+  Object *ob_dst = (Object *)BKE_scene_object_find_by_name(scene, name);
+  Object *ob_src = CTX_data_active_object(C);
+
+  /* Sanity checks. */
+  if (ELEM(NULL, ob_src, ob_dst)) {
+    return OPERATOR_CANCELLED;
+  }
+  /* Cannot copy itself and check destination type. */
+  if ((ob_src == ob_dst) || (ob_dst->type != OB_GPENCIL)) {
+    return OPERATOR_CANCELLED;
+  }
+
+  /* Duplicate materials. */
+  for (short i = 0; i < ob_src->totcol; i++) {
+    Material *ma_src = BKE_object_material_get(ob_src, i + 1);
+    if (ma_src != NULL) {
+      int idx = BKE_gpencil_object_material_ensure(bmain, ob_dst, ma_src);
+    }
+  }
+
+  /* notifiers */
+  DEG_id_tag_update(&ob_dst->id, ID_RECALC_COPY_ON_WRITE);
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+
+  return OPERATOR_FINISHED;
+}
+
+void GPENCIL_OT_materials_append_to_object(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Append Matewrials to New Object";
+  ot->idname = "GPENCIL_OT_materials_append_to_object";
+  ot->description = "Append Materials of the active Grease Pencil to other object";
+
+  /* callbacks */
+  ot->exec = gpencil_materials_append_to_object_exec;
+  ot->poll = gpencil_materials_append_to_object_poll;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  ot->prop = RNA_def_string(
+      ot->srna, "object", NULL, MAX_ID_NAME - 2, "Object", "Name of the destination object");
+  RNA_def_property_flag(ot->prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+}
+
 /* Parent GPencil object to Lattice */
 bool ED_gpencil_add_lattice_modifier(const bContext *C,
                                      ReportList *reports,

@@ -4957,7 +4957,7 @@ class VIEW3D_MT_assign_material(Menu):
 
 
 class VIEW3D_MT_gpencil_copy_layer(Menu):
-    bl_label = "Copy Layer to Object"
+    bl_label = "Append Layer to Object"
 
     def draw(self, context):
         layout = self.layout
@@ -4976,6 +4976,24 @@ class VIEW3D_MT_gpencil_copy_layer(Menu):
                 layout.label(text="No destination object", icon='ERROR')
         else:
             layout.label(text="No layer to copy", icon='ERROR')
+
+
+class VIEW3D_MT_gpencil_append_materials(Menu):
+    bl_label = "Append Materials to Object"
+
+    def draw(self, context):
+        layout = self.layout
+        view_layer = context.view_layer
+        obact = context.active_object
+
+        done = False
+        for ob in view_layer.objects:
+            if ob.type == 'GPENCIL' and ob != obact:
+                layout.operator("gpencil.materials_append_to_object", text=ob.name).object = ob.name
+                done = True
+
+        if done is False:
+            layout.label(text="No destination object", icon='ERROR')
 
 
 class VIEW3D_MT_edit_gpencil(Menu):
@@ -7646,6 +7664,7 @@ classes = (
     VIEW3D_MT_gpencil_animation,
     VIEW3D_MT_gpencil_simplify,
     VIEW3D_MT_gpencil_copy_layer,
+    VIEW3D_MT_gpencil_append_materials,
     VIEW3D_MT_gpencil_autoweights,
     VIEW3D_MT_gpencil_edit_context_menu,
     VIEW3D_MT_edit_curve,
