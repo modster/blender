@@ -194,7 +194,6 @@ void CachedData::invalidate_last_loaded_time(bool attributes_only)
 
 void CachedData::set_time_sampling(TimeSampling time_sampling)
 {
-  transforms.set_time_sampling(time_sampling);
   curve_first_key.set_time_sampling(time_sampling);
   curve_keys.set_time_sampling(time_sampling);
   curve_radius.set_time_sampling(time_sampling);
@@ -208,6 +207,7 @@ void CachedData::set_time_sampling(TimeSampling time_sampling)
   subd_ptex_offset.set_time_sampling(time_sampling);
   subd_smooth.set_time_sampling(time_sampling);
   subd_start_corner.set_time_sampling(time_sampling);
+  transforms.set_time_sampling(time_sampling);
   triangles.set_time_sampling(time_sampling);
   uv_loops.set_time_sampling(time_sampling);
   vertices.set_time_sampling(time_sampling);
@@ -717,14 +717,6 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
   }
 
   //  compute_vertex_deltas(cached_data, times, progress);
-  /* Use the schema as the base compound property to also be able to look for top level properties.
-   */
-  read_attributes(proc,
-                  cached_data,
-                  schema.getArbGeomParams(),
-                  schema.getUVsParam(),
-                  get_requested_attributes(),
-                  progress);
 
   cached_data.invalidate_last_loaded_time(true);
   data_loaded = true;
@@ -1306,7 +1298,6 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
       triangles.push_back_reserved(tri.x);
       triangles.push_back_reserved(tri.y);
       triangles.push_back_reserved(tri.z);
-
       smooth.push_back_reserved(1);
     }
 
@@ -1344,11 +1335,6 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame
 
   CachedData &cached_data = abc_object->get_cached_data();
 
-  if (abc_object->subd_max_level_is_modified() || abc_object->subd_dicing_rate_is_modified()) {
-    /* need to reset the current data is something changed */
-    cached_data.invalidate_last_loaded_time();
-  }
-
   /* Update sockets. */
 
   Object *object = abc_object->get_object();
@@ -1358,6 +1344,7 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame
     object->tag_update(scene_);
   }
 
+  /* Only update sockets for the original Geometry. */
   if (abc_object->instance_of) {
     return;
   }

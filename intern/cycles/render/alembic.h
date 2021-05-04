@@ -425,6 +425,9 @@ class AlembicObject : public Node {
   MatrixSampleMap xform_samples;
   Alembic::AbcGeom::IObject iobject;
 
+  /* Set if the path points to a valid IObject whose type is supported. */
+  AbcSchemaType schema_type;
+
   CachedData &get_cached_data()
   {
     return cached_data_;
@@ -443,9 +446,6 @@ class AlembicObject : public Node {
   Object *object = nullptr;
 
   bool data_loaded = false;
-
-  /* Set on construction. */
-  AbcSchemaType schema_type;
 
   CachedData cached_data_;
 
