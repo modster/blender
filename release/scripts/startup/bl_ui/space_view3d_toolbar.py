@@ -1468,7 +1468,7 @@ class VIEW3D_PT_tools_grease_pencil_brush_advanced(View3DPanel, Panel):
                 row.prop(gp_settings, "show_fill_extend", text="", icon='GRID')
 
                 col.separator()
-                col.prop(gp_settings, "dilate_pixels")
+                col.prop(gp_settings, "fill_leak", text="Leak Size")
 
                 col.separator()
                 col.prop(gp_settings, "fill_simplify_level", text="Simplify")
