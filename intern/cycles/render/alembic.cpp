@@ -35,7 +35,7 @@ using namespace Alembic::AbcGeom;
 
 CCL_NAMESPACE_BEGIN
 
-/* TODO(@kevindietrich): motion blur support */
+/* TODO(kevindietrich): motion blur support. */
 
 template<typename SchemaType>
 static vector<FaceSetShaderIndexPair> parse_face_sets_for_shader_assignment(
@@ -717,6 +717,14 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
   }
 
   //  compute_vertex_deltas(cached_data, times, progress);
+  /* Use the schema as the base compound property to also be able to look for top level properties.
+   */
+  read_attributes(proc,
+                  cached_data,
+                  schema.getArbGeomParams(),
+                  schema.getUVsParam(),
+                  get_requested_attributes(),
+                  progress);
 
   cached_data.invalidate_last_loaded_time(true);
   data_loaded = true;
@@ -937,7 +945,6 @@ static void update_attributes(AttributeSet &attributes, CachedData &cached_data,
     cached_attributes.insert(attr);
 
     if (!result.has_new_data()) {
-      /* no new data */
       continue;
     }
 
