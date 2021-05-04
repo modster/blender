@@ -52,7 +52,7 @@ struct ImportSettings {
   int read_flag;
 
   bool validate_meshes;
-  bool always_add_modifier;
+  bool always_add_cache_reader;
 
   float default_radius;
 
@@ -70,7 +70,7 @@ struct ImportSettings {
         sequence_offset(0),
         read_flag(0),
         validate_meshes(false),
-        always_add_modifier(false),
+        always_add_cache_reader(false),
         default_radius(0.01f),
         cache_file(NULL)
   {

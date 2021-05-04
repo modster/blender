@@ -599,7 +599,7 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
        * data being loaded at once for all the frames. */
       if (experimental && b_v3d) {
         b_mesh_cache = object_mesh_cache_find(b_ob, false);
-        use_procedural = b_mesh_cache && b_mesh_cache.cache_file().use_proxies();
+        use_procedural = b_mesh_cache && b_mesh_cache.cache_file().use_cycles_procedural();
       }
 
       if (use_procedural) {

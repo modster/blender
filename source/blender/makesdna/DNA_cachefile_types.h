@@ -86,10 +86,11 @@ typedef struct CacheFile {
   /** Animation flag. */
   short flag;
 
-  /** Do not load data from the cache file and display objects in the scene as boxes.
-   * Render engines which can load Alembic data directly can take care of rendering it themselves.
+  /** Do not load data from the cache file and display objects in the scene as boxes, Cycles will
+   * load objects directly from the CacheFile. Other render engines which can load Alembic data
+   * directly can take care of rendering it themselves.
    */
-  char use_proxies;
+  char use_cycles_procedural;
 
   char velocity_unit;
   /* Name of the velocity property in the Alembic file. */

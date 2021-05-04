@@ -694,7 +694,7 @@ bool ABC_import(bContext *C,
                 int sequence_len,
                 int offset,
                 bool validate_meshes,
-                bool always_add_modifier,
+                bool always_add_cache_reader,
                 float default_radius,
                 bool as_background_job)
 {
@@ -715,7 +715,7 @@ bool ABC_import(bContext *C,
   job->settings.sequence_len = sequence_len;
   job->settings.sequence_offset = offset;
   job->settings.validate_meshes = validate_meshes;
-  job->settings.always_add_modifier = always_add_modifier;
+  job->settings.always_add_cache_reader = always_add_cache_reader;
   job->settings.default_radius = default_radius;
   job->error_code = ABC_NO_ERROR;
   job->was_cancelled = false;

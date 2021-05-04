@@ -96,7 +96,7 @@ bool ABC_import(struct bContext *C,
                 int sequence_len,
                 int offset,
                 bool validate_meshes,
-                bool always_add_modifier,
+                bool always_add_cache_reader,
                 float default_radius,
                 bool as_background_job);
 

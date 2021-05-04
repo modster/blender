@@ -173,8 +173,9 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     }
   }
 
-  /* Do not process data if using proxies, return a box instead for displaying in the viewport. */
-  if (BKE_cache_file_use_proxies(cache_file, (const int)DEG_get_mode(ctx->depsgraph))) {
+  /* Do not process data if using the Cycles procedural, return a box instead for displaying in the
+   * viewport. */
+  if (BKE_cache_file_uses_cycles_procedural(cache_file, (const int)DEG_get_mode(ctx->depsgraph))) {
     return generate_bounding_box_mesh(ctx->object, org_mesh);
   }
 
@@ -231,13 +232,13 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 #endif
 }
 
-static bool dependsOnTime(ModifierData *md, const int dag_eval_mode)
+static bool dependsOnTime(ModifierData *md, int dag_eval_mode)
 {
 #ifdef WITH_ALEMBIC
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
-  /* Do not evaluate animations if using proxies. */
+  /* Do not evaluate animations if using the Cycles procedural. */
   return (mcmd->cache_file != NULL) &&
-         !BKE_cache_file_use_proxies(mcmd->cache_file, dag_eval_mode);
+         !BKE_cache_file_uses_cycles_procedural(mcmd->cache_file, dag_eval_mode);
 #else
   UNUSED_VARS(md);
   return false;

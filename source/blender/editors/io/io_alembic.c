@@ -588,7 +588,7 @@ static void ui_alembic_import_settings(uiLayout *layout, PointerRNA *imfptr)
   uiItemR(col, imfptr, "set_frame_range", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "is_sequence", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "validate_meshes", 0, NULL, ICON_NONE);
-  uiItemR(col, imfptr, "always_add_modifier", 0, NULL, ICON_NONE);
+  uiItemR(col, imfptr, "always_add_cache_reader", 0, NULL, ICON_NONE);
   uiItemR(box, imfptr, "default_radius", 0, NULL, ICON_NONE);
 }
 
@@ -621,7 +621,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
   const bool is_sequence = RNA_boolean_get(op->ptr, "is_sequence");
   const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
   const bool validate_meshes = RNA_boolean_get(op->ptr, "validate_meshes");
-  const bool always_add_modifier = RNA_boolean_get(op->ptr, "always_add_modifier");
+  const bool always_add_cache_reader = RNA_boolean_get(op->ptr, "always_add_cache_reader");
   const bool as_background_job = RNA_boolean_get(op->ptr, "as_background_job");
   const float default_radius = RNA_float_get(op->ptr, "default_radius");
 
@@ -651,7 +651,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
                        sequence_len,
                        offset,
                        validate_meshes,
-                       always_add_modifier,
+                       always_add_cache_reader,
                        default_radius,
                        as_background_job);
 
@@ -713,11 +713,11 @@ void WM_OT_alembic_import(wmOperatorType *ot)
                   "Check imported mesh objects for invalid data (slow)");
 
   RNA_def_boolean(ot->srna,
-                  "always_add_modifier",
+                  "always_add_cache_reader",
                   false,
-                  "Always Add Modifier",
-                  "Add a cache modifier for every object in the Alembic archive, even if they are "
-                  "not animated");
+                  "Always Add Cache Reader",
+                  "Add cache modifiers and constraints to imported objects even if they are not "
+                  "animated so that they can be updated when reloading the Alembic archive");
 
   RNA_def_boolean(ot->srna,
                   "is_sequence",

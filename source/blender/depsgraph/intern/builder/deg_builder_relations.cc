@@ -2609,13 +2609,6 @@ void DepsgraphRelationBuilder::build_cachefile(CacheFile *cache_file)
   if (built_map_.checkIsBuiltAndTag(cache_file)) {
     return;
   }
-  /* Do not build relations for this cache_file if set to use proxies so dependant modifiers are
-   * not evaluated.
-   * Evaluating the data from the CacheFile is therefore left to the render engines supporting it.
-   */
-  if (cache_file->use_proxies) {
-    return;
-  }
   build_idproperties(cache_file->id.properties);
   /* Animation. */
   build_animdata(&cache_file->id);
@@ -2630,7 +2623,6 @@ void DepsgraphRelationBuilder::build_cachefile(CacheFile *cache_file)
     ComponentKey datablock_key(&cache_file->id, NodeType::CACHE);
     add_relation(animation_key, datablock_key, "Drivers -> Cache Eval");
   }
-
   /* Cache file updates */
   if (cache_file->is_sequence) {
     OperationKey cache_update_key(
