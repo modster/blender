@@ -3598,13 +3598,6 @@ static bool gpencil_materials_append_to_object_poll(bContext *C)
     return false;
   }
 
-  bGPdata *gpd = (bGPdata *)ob->data;
-  bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
-
-  if (gpl == NULL) {
-    return false;
-  }
-
   /* check there are more grease pencil objects */
   LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
     if ((base->object != ob) && (base->object->type == OB_GPENCIL)) {
@@ -3642,7 +3635,7 @@ static int gpencil_materials_append_to_object_exec(bContext *C, wmOperator *op)
   for (short i = 0; i < ob_src->totcol; i++) {
     Material *ma_src = BKE_object_material_get(ob_src, i + 1);
     if (ma_src != NULL) {
-      int idx = BKE_gpencil_object_material_ensure(bmain, ob_dst, ma_src);
+      BKE_gpencil_object_material_ensure(bmain, ob_dst, ma_src);
     }
   }
 
