@@ -5624,24 +5624,31 @@ static int gpencil_merge_by_distance_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
-
-  if (is_curve_edit) {
-    /* TODO: merge curve points by distance */
-  }
-  else {
-    /* Go through each editable selected stroke */
-    GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-      if (gps->flag & GP_STROKE_SELECT) {
-        BKE_gpencil_stroke_merge_distance(gpd, gpf_, gps, threshold, unselected);
+  bool changed = false;
+  /* Go through each editable selected stroke */
+  GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
+      if (gpc->flag & GP_CURVE_SELECT) {
+        /* TODO: don't hardcode the refit and threshold. Figure out how to set these. */
+        if (BKE_gpencil_editcurve_merge_distance(gps, threshold, unselected, false, 0.0f)) {
+          BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
+          changed = true;
+        }
       }
     }
-    GP_EDITABLE_STROKES_END(gpstroke_iter);
+    else if (gps->flag & GP_STROKE_SELECT) {
+      BKE_gpencil_stroke_merge_distance(gpd, gpf_, gps, threshold, unselected);
+      changed = true;
+    }
   }
+  GP_EDITABLE_STROKES_END(gpstroke_iter);
 
-  /* notifiers */
-  DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  if (changed) {
+    /* notifiers */
+    DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+    WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  }
 
   return OPERATOR_FINISHED;
 }

@@ -2341,4 +2341,70 @@ void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
   }
 }
 
+/**
+ * Curve Merge by Distance
+ * Merge the control points by distance. Merging will always occur on the first point.
+ * The first and last point are never merged. Note: The caller is resposible for the geometry
+ * update of the stroke.
+ * \param gps: Grease Pencil stroke.
+ * \param threshold: Distance between points.
+ * \param use_unselected: Set to true to analyze all stroke and not only selected points.
+ * \param refit_segments: Set to refit segments where points were dissolved.
+ * \param error_threshold: Error threshold for refitting (only used when refit_segments = true).
+ * \returns True if any point was merged and the geometry changed.
+ */
+bool BKE_gpencil_editcurve_merge_distance(bGPDstroke *gps,
+                                          const float threshold,
+                                          const bool use_unselected,
+                                          const bool refit_segments,
+                                          const float error_threshold)
+{
+  bGPDcurve *gpc = gps->editcurve;
+  if (gpc == NULL || gpc->tot_curve_points < 2 || threshold == 0.0f) {
+    return false;
+  }
+  const float th_square = threshold * threshold;
+
+  bool tagged = false;
+  int i = 0, step = 1;
+  while ((i < gpc->tot_curve_points - 1) && (i + step < gpc->tot_curve_points)) {
+    bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+    bGPDcurve_point *gpc_pt_next = &gpc->curve_points[i + step];
+    if ((!use_unselected && ((gpc_pt->flag & GP_CURVE_POINT_SELECT) == 0 ||
+                             (gpc_pt_next->flag & GP_CURVE_POINT_SELECT) == 0)) ||
+        (gpc_pt->flag & GP_CURVE_POINT_TAG)) {
+      i++;
+      step = 1;
+      continue;
+    }
+    if (gpc_pt_next->flag & GP_CURVE_POINT_TAG) {
+      step++;
+      continue;
+    }
+    BezTriple *bezt = &gpc_pt->bezt;
+    BezTriple *bezt_next = &gpc_pt_next->bezt;
+
+    float len_square = len_squared_v3v3(bezt->vec[1], bezt_next->vec[1]);
+    if (len_square <= th_square) {
+      gpc_pt_next->flag |= GP_CURVE_POINT_TAG;
+      tagged = true;
+      step++;
+    }
+    else {
+      i++;
+      step = 1;
+    }
+  }
+
+  gpc->curve_points[0].flag &= ~GP_CURVE_POINT_TAG;
+  gpc->curve_points[gpc->tot_curve_points - 1].flag &= ~GP_CURVE_POINT_TAG;
+
+  int old_num_points = gpc->tot_curve_points;
+  if (tagged) {
+    return BKE_gpencil_editcurve_dissolve(
+               gps, GP_CURVE_POINT_TAG, refit_segments, error_threshold) != old_num_points;
+  }
+  return false;
+}
+
 /** \} */

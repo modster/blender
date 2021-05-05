@@ -87,6 +87,11 @@ void BKE_gpencil_editcurve_smooth(struct bGPDstroke *gps,
                                   const bool do_positions,
                                   const bool do_pressure,
                                   const bool do_strength);
+bool BKE_gpencil_editcurve_merge_distance(struct bGPDstroke *gps,
+                                          const float threshold,
+                                          const bool use_unselected,
+                                          const bool refit_segments,
+                                          const float error_threshold);
 #ifdef __cplusplus
 }
 #endif
