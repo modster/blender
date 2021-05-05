@@ -3597,6 +3597,10 @@ static bool gpencil_materials_append_to_object_poll(bContext *C)
   if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
     return false;
   }
+  short *totcolp = BKE_object_material_len_p(ob);
+  if (*totcolp == 0) {
+    return false;
+  }
 
   /* check there are more grease pencil objects */
   LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
