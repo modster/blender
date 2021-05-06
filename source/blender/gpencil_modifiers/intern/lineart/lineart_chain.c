@@ -899,6 +899,35 @@ void MOD_lineart_chain_clear_picked_flag(LineartCache *lc)
   }
 }
 
+void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance)
+{
+  LISTBASE_FOREACH (LineartLineChain *, rlc, &rb->chains) {
+    LineartLineChainItem *next_rlci;
+    for (LineartLineChainItem *rlci = rlc->chain.first; rlci; rlci = next_rlci) {
+      next_rlci = rlci->next;
+      LineartLineChainItem *rlci2, *rlci3, *rlci4;
+
+      /* Not enough point to do simplify. */
+      if ((!(rlci2 = rlci->next)) || (!(rlci3 = rlci2->next))) {
+        continue;
+      }
+
+      /* No need to care for different line types/occlusion and so on, because at this stage they
+       * are all the same within a chain. */
+
+      /* If p3 is within the p1-p2 segment of a width of "tolerance"  */
+      if (dist_to_line_segment_v2(rlci3->pos, rlci->pos, rlci2->pos) < tolerance) {
+        /* And if p4 is on the extension of p1-p2 , we remove p3. */
+        if ((rlci4 = rlci3->next) &&
+            (dist_to_line_v2(rlci4->pos, rlci->pos, rlci2->pos) < tolerance)) {
+          BLI_remlink(&rlc->chain, rlci3);
+          next_rlci = rlci;
+        }
+      }
+    }
+  }
+}
+
 /**
  * This should always be the last stage!, see the end of
  * #MOD_lineart_chain_split_for_fixed_occlusion().

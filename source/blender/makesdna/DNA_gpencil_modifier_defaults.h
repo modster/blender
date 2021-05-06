@@ -298,6 +298,7 @@
     .angle_splitting_threshold = DEG2RAD(60.0f), \
     .chaining_image_threshold = 0.001f, \
     .stroke_offset = 0.05,\
+    .chain_smooth_tolerance = 0.2f,\
   }
 
 /* clang-format off */

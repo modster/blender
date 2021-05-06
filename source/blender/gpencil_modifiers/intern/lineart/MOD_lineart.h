@@ -600,6 +600,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb);
 void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
 void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
 void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb, float dist);
+void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance);
 
 int MOD_lineart_chain_count(const LineartLineChain *rlc);
 void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);

@@ -891,6 +891,9 @@ typedef struct LineartGpencilModifierData {
   /** `0..PI` angle, for splitting strokes at sharp points. */
   float angle_splitting_threshold;
 
+  /** Strength for smoothing jagged chains */
+  float chain_smooth_tolerance;
+
   /* CPU mode */
   float chaining_image_threshold;
 
@@ -902,8 +905,6 @@ typedef struct LineartGpencilModifierData {
 
   /* Move strokes towards camera to avoid clipping while preserve depth for the viewport. */
   float stroke_offset;
-
-  int _pad;
 
   /* Runtime data. */
 
