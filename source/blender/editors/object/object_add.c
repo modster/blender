@@ -1490,6 +1490,9 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
+  /* ui */
+  ot->ui = object_add_ui;
+
   /* properties */
   ED_object_add_unit_props_radius(ot);
   ED_object_add_generic_props(ot, false);

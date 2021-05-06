@@ -341,8 +341,6 @@ static void panelRegister(ARegionType *region_type)
       region_type, "mask", "Influence", NULL, mask_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "curve", "", curve_header_draw, curve_panel_draw, mask_panel_type);
-  PanelType *fading_panel_type = gpencil_modifier_subpanel_register(
-      region_type, "fading", "", fading_header_draw, fading_panel_draw, panel_type);
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Opacity = {
