@@ -291,6 +291,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Edge Types"));
 
   uiItemR(col, ptr, "use_contour", 0, IFACE_("Contour"), ICON_NONE);
+  uiItemR(col, ptr, "use_floating", 0, IFACE_("Floating"), ICON_NONE);
   uiItemR(col, ptr, "use_material", 0, IFACE_("Material Borders"), ICON_NONE);
   uiItemR(col, ptr, "use_edge_mark", 0, IFACE_("Edge Marks"), ICON_NONE);
   uiItemR(col, ptr, "use_intersection", 0, IFACE_("Intersections"), ICON_NONE);
@@ -341,6 +342,7 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
   uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "floating_as_contour", 0, NULL, ICON_NONE);
 }
 
 static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)

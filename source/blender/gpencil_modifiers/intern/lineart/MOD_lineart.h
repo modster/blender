@@ -188,7 +188,7 @@ typedef struct LineartLineChainItem {
   /** For restoring position to 3d space */
   float gpos[3];
   float normal[3];
-  char line_type;
+  unsigned char line_type;
   char occlusion;
   unsigned char transparency_mask;
   size_t index;
@@ -257,31 +257,24 @@ typedef struct LineartRenderBuffer {
 
   int triangle_size;
 
-  unsigned int contour_count;
-  unsigned int contour_processed;
   LineartEdge *contour_managed;
   /** A single linked list (cast to #LinkNode). */
   LineartEdge *contours;
 
-  unsigned int intersection_count;
-  unsigned int intersection_processed;
   LineartEdge *intersection_managed;
   LineartEdge *intersection_lines;
 
-  unsigned int crease_count;
-  unsigned int crease_processed;
   LineartEdge *crease_managed;
   LineartEdge *crease_lines;
 
-  unsigned int material_line_count;
-  unsigned int material_processed;
   LineartEdge *material_managed;
   LineartEdge *material_lines;
 
-  unsigned int edge_mark_count;
-  unsigned int edge_mark_processed;
   LineartEdge *edge_mark_managed;
   LineartEdge *edge_marks;
+
+  LineartEdge *floating_managed;
+  LineartEdge *floating_lines;
 
   ListBase chains;
 
@@ -302,11 +295,13 @@ typedef struct LineartRenderBuffer {
   bool use_material;
   bool use_edge_marks;
   bool use_intersections;
+  bool use_floating;
   bool fuzzy_intersections;
   bool fuzzy_everything;
   bool allow_boundaries;
   bool allow_overlapping_edges;
   bool remove_doubles;
+  bool floating_as_contour;
 
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
@@ -381,6 +376,9 @@ typedef struct LineartRenderTaskInfo {
   LineartEdge *edge_mark;
   LineartEdge *edge_mark_end;
 
+  LineartEdge *floating;
+  LineartEdge *floating_end;
+
 } LineartRenderTaskInfo;
 
 struct BMesh;
@@ -408,6 +406,8 @@ typedef struct LineartObjectInfo {
   LineartEdge *edge_mark_last;
   LineartEdge *intersection;
   LineartEdge *intersection_last;
+  LineartEdge *floating;
+  LineartEdge *floating_last;
 } LineartObjectInfo;
 
 typedef struct LineartObjectLoadTaskInfo {

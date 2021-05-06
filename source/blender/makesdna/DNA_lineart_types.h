@@ -46,6 +46,7 @@ typedef enum eLineartMainFlags {
   LRT_ALLOW_OVERLAPPING_EDGES = (1 << 3),
   LRT_ALLOW_CLIPPING_BOUNDARIES = (1 << 4),
   LRT_REMOVE_DOUBLES = (1 << 5),
+  LRT_FLOATING_AS_CONTOUR = (1 << 6),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {

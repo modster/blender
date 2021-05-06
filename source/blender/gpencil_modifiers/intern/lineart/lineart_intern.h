@@ -102,6 +102,9 @@ void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb
     else if (current_list == &rb->edge_marks) { \
       current_list = &rb->intersection_lines; \
     } \
+    else if (current_list == &rb->intersection_lines) { \
+      current_list = &rb->floating_lines; \
+    } \
     else { \
       break; \
     } \

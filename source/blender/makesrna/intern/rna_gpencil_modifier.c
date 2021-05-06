@@ -2749,6 +2749,11 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       prop, "Remove Doubles", "Remove doubles from the source geometry before generating stokes");
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "floating_as_contour", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_FLOATING_AS_CONTOUR);
+  RNA_def_property_ui_text(prop, "Floating As Contour", "Floating edges will have contour type");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "chaining_image_threshold", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_ui_text(
       prop,
@@ -2792,6 +2797,11 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_contour", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "edge_types", LRT_EDGE_FLAG_CONTOUR);
   RNA_def_property_ui_text(prop, "Use Contour", "Generate strokes from contours lines");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "use_floating", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "edge_types", LRT_EDGE_FLAG_FLOATING);
+  RNA_def_property_ui_text(prop, "Use Floating", "Generate strokes from floating edges");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_crease", PROP_BOOLEAN, PROP_NONE);

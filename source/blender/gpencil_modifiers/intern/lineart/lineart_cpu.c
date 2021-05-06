@@ -420,6 +420,7 @@ static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRend
   LRT_ASSIGN_OCCLUSION_TASK(crease);
   LRT_ASSIGN_OCCLUSION_TASK(material);
   LRT_ASSIGN_OCCLUSION_TASK(edge_mark);
+  LRT_ASSIGN_OCCLUSION_TASK(floating);
 
 #undef LRT_ASSIGN_OCCLUSION_TASK
 
@@ -454,6 +455,10 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
     for (eip = rti->edge_mark; eip && eip != rti->edge_mark_end; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
+
+    for (eip = rti->floating; eip && eip != rti->floating_end; eip = eip->next) {
+      lineart_occlusion_single_line(rb, eip, rti->thread_id);
+    }
   }
 }
 
@@ -474,6 +479,7 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   rb->intersection_managed = rb->intersection_lines;
   rb->material_managed = rb->material_lines;
   rb->edge_mark_managed = rb->edge_marks;
+  rb->floating_managed = rb->floating_lines;
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
@@ -1402,6 +1408,12 @@ static char lineart_identify_feature_line(LineartRenderBuffer *rb,
     lr = e->l->radial_next;
   }
 
+  if (!ll && !lr) {
+    if (!rb->floating_as_contour) {
+      return LRT_EDGE_FLAG_FLOATING;
+    }
+  }
+
   if (ll == lr || !lr) {
     return LRT_EDGE_FLAG_CONTOUR;
   }
@@ -1471,6 +1483,9 @@ static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e)
     case LRT_EDGE_FLAG_INTERSECTION:
       lineart_prepend_edge_direct(&rb->intersection_lines, e);
       break;
+    case LRT_EDGE_FLAG_FLOATING:
+      lineart_prepend_edge_direct(&rb->floating_lines, e);
+      break;
   }
 }
 
@@ -1507,6 +1522,12 @@ static void lineart_add_edge_to_list_thread(LineartObjectInfo *obi, LineartEdge 
         obi->intersection_last = e;
       }
       break;
+    case LRT_EDGE_FLAG_FLOATING:
+      lineart_prepend_edge_direct(&obi->floating, e);
+      if (!obi->floating_last) {
+        obi->floating_last = e;
+      }
+      break;
   }
 }
 
@@ -1531,6 +1552,10 @@ static void lineart_finalize_object_edge_list(LineartRenderBuffer *rb, LineartOb
   if (obi->intersection_last) {
     obi->intersection_last->next = rb->intersection_lines;
     rb->intersection_lines = obi->intersection;
+  }
+  if (obi->floating_last) {
+    obi->floating_last->next = rb->floating_lines;
+    rb->floating_lines = obi->floating;
   }
 }
 
@@ -2717,8 +2742,6 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
     }
   }
 
-  rb->intersection_count++;
-
   return result;
 }
 
@@ -2805,16 +2828,12 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
     return;
   }
 
-  rb->contour_count = 0;
   rb->contour_managed = NULL;
-  rb->intersection_count = 0;
   rb->intersection_managed = NULL;
-  rb->material_line_count = 0;
   rb->material_managed = NULL;
-  rb->crease_count = 0;
   rb->crease_managed = NULL;
-  rb->edge_mark_count = 0;
   rb->edge_mark_managed = NULL;
+  rb->floating_managed = NULL;
 
   rb->contours = NULL;
   rb->intersection_lines = NULL;
@@ -2916,6 +2935,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->fuzzy_everything = (lmd->calculation_flags & LRT_EVERYTHING_AS_CONTOUR) != 0;
   rb->allow_boundaries = (lmd->calculation_flags & LRT_ALLOW_CLIPPING_BOUNDARIES) != 0;
   rb->remove_doubles = (lmd->calculation_flags & LRT_REMOVE_DOUBLES) != 0;
+  rb->floating_as_contour = (lmd->calculation_flags & LRT_FLOATING_AS_CONTOUR) != 0;
 
   /* See lineart_edge_from_triangle() for how this option may impact performance. */
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
@@ -2925,6 +2945,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->use_material = (lmd->edge_types_override & LRT_EDGE_FLAG_MATERIAL) != 0;
   rb->use_edge_marks = (lmd->edge_types_override & LRT_EDGE_FLAG_EDGE_MARK) != 0;
   rb->use_intersections = (lmd->edge_types_override & LRT_EDGE_FLAG_INTERSECTION) != 0;
+  rb->use_floating = (lmd->edge_types_override & LRT_EDGE_FLAG_FLOATING) != 0;
 
   rb->chain_data_pool = &lc->chain_data_pool;
 
@@ -4030,6 +4051,7 @@ static int lineart_rb_edge_types(LineartRenderBuffer *rb)
   types |= rb->use_material ? LRT_EDGE_FLAG_MATERIAL : 0;
   types |= rb->use_edge_marks ? LRT_EDGE_FLAG_EDGE_MARK : 0;
   types |= rb->use_intersections ? LRT_EDGE_FLAG_INTERSECTION : 0;
+  types |= rb->use_floating ? LRT_EDGE_FLAG_FLOATING : 0;
   return types;
 }
 
