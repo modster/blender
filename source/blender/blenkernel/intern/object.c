@@ -3082,10 +3082,15 @@ void BKE_object_obdata_size_init(struct Object *ob, const float size)
 /** \name Object Matrix Get/Set API
  * \{ */
 
+void BKE_object_scale_to_vec3(const Object *ob, float r_scale[3])
+{
+  mul_v3_v3v3(r_scale, ob->scale, ob->dscale);
+}
+
 void BKE_object_scale_to_mat3(Object *ob, float mat[3][3])
 {
   float vec[3];
-  mul_v3_v3v3(vec, ob->scale, ob->dscale);
+  BKE_object_scale_to_vec3(ob, vec);
   size_to_mat3(mat, vec);
 }
 

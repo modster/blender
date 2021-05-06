@@ -1032,6 +1032,7 @@ static void view3d_interactive_add_calc_plane(bContext *C,
 
 void ED_view3d_placement_plane_calc(bContext *C,
                                     const int mval[2],
+                                    const int plane_axis,
                                     float r_co_src[3],
                                     float r_mat_orient[3][3])
 {
@@ -1039,9 +1040,11 @@ void ED_view3d_placement_plane_calc(bContext *C,
   ARegion *region = CTX_wm_region(C);
   View3D *v3d = CTX_wm_view3d(C);
 
+  /* TODO what if there is no snap gizmo? */
   wmGizmo *snap_gizmo = idp_snap_gizmo_from_region(region);
   const float mval_fl[] = {mval[0], mval[1]};
 
+  /* TODO Options here should be input parameters. */
   view3d_interactive_add_calc_plane(C,
                                     scene,
                                     v3d,
@@ -1051,10 +1054,58 @@ void ED_view3d_placement_plane_calc(bContext *C,
                                     PLACE_SNAP_TO_GEOMETRY,
                                     PLACE_DEPTH_SURFACE,
                                     PLACE_ORIENT_SURFACE,
-                                    2,
+                                    plane_axis,
                                     false,
                                     r_co_src,
                                     r_mat_orient);
+}
+
+static void placement_plane_adjust_to_boundbox(const BoundBox *boundbox,
+                                               const enum ePlaceDirection direction,
+                                               const float scale[3],
+                                               const int plane_axis,
+                                               const float plane_mat_orient[3][3],
+                                               float r_co_src[3])
+{
+  BLI_assert(ELEM(direction, PLACE_DIRECTION_NEG, PLACE_DIRECTION_POS));
+
+  const bool is_negative_up = scale[plane_axis] < 0;
+  /* Calculate the offset for all axes. */
+  float offset_vec[3] = {0};
+  {
+    /* Move the offset to put the return coordinate to the center of the bounding box. */
+    BKE_boundbox_calc_center_aabb(boundbox, offset_vec);
+
+    /* Push offset at the plane axis so the bounding box surface is where the snapping point is. */
+    float size[3];
+    BKE_boundbox_calc_size_aabb(boundbox, size);
+    offset_vec[plane_axis] -= size[plane_axis] * (is_negative_up ? -1 : 1);
+
+    /* Scale offset with the object scale. */
+    mul_v3_v3(offset_vec, scale);
+    if (direction == PLACE_DIRECTION_NEG) {
+      mul_v3_fl(offset_vec, -1);
+    }
+  }
+
+  /* Rotate the offset vector to the plane rotation. */
+  mul_v3_m3v3(offset_vec, plane_mat_orient, offset_vec);
+  /* Finally, add the rotated offset to the returned position. */
+  add_v3_v3(r_co_src, offset_vec);
+}
+
+void ED_view3d_placement_plane_boundbox_calc(bContext *C,
+                                             const int mval[2],
+                                             const BoundBox *boundbox,
+                                             const enum ePlaceDirection direction,
+                                             const float scale[3],
+                                             float r_co_src[3],
+                                             float r_mat_orient[3][3])
+{
+  const int plane_axis = 2;
+  ED_view3d_placement_plane_calc(C, mval, plane_axis, r_co_src, r_mat_orient);
+  placement_plane_adjust_to_boundbox(
+      boundbox, direction, scale, plane_axis, r_mat_orient, r_co_src);
 }
 
 /** \} */

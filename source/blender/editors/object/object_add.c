@@ -3415,6 +3415,7 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
   }
 
   /* prepare dupli */
+  /* TODO don't copy for assets! */
   basen = object_add_duplicate_internal(bmain, scene, view_layer, ob, dupflag, 0);
 
   if (basen == NULL) {
@@ -3423,14 +3424,6 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
   }
 
   basen->object->restrictflag &= ~OB_RESTRICT_VIEWPORT;
-
-  int mval[2];
-  if (object_add_drop_xy_get(C, op, &mval)) {
-    float rotmat[3][3];
-    ED_view3d_placement_plane_calc(C, mval, basen->object->loc, rotmat);
-    BLI_assert(basen->object->rotmode == ROT_MODE_XYZ);
-    mat3_to_eul(basen->object->rot, rotmat);
-  }
 
   /* object_add_duplicate_internal() doesn't deselect other objects, unlike object_add_common() or
    * BKE_view_layer_base_deselect_all(). */
@@ -3448,6 +3441,25 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
   WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
   WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
   ED_outliner_select_sync_from_object_tag(C);
+
+  /* For the placement based on the bounding box to work, the object/object-data has to be
+   * evaulated first. */
+  int mval[2];
+  if (object_add_drop_xy_get(C, op, &mval)) {
+    Object *ob_eval = DEG_get_evaluated_object(CTX_data_ensure_evaluated_depsgraph(C),
+                                               basen->object);
+    BoundBox *boundbox = BKE_object_boundbox_get(ob_eval);
+
+    float rotmat[3][3];
+    float scale[3];
+    BKE_object_scale_to_vec3(basen->object, scale);
+    ED_view3d_placement_plane_boundbox_calc(
+        C, mval, boundbox, PLACE_DIRECTION_NEG, scale, basen->object->loc, rotmat);
+
+    BLI_assert(basen->object->rotmode == ROT_MODE_XYZ);
+    mat3_to_eul(basen->object->rot, rotmat);
+    DEG_id_tag_update(&basen->object->id, ID_RECALC_TRANSFORM);
+  }
 
   return OPERATOR_FINISHED;
 }
