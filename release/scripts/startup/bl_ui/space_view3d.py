@@ -4978,24 +4978,28 @@ class VIEW3D_MT_gpencil_copy_layer(Menu):
             layout.label(text="No layer to copy", icon='ERROR')
 
 
+def gpencil_material_menu_items(context, layout, only_selected):
+    done = False
+    view_layer = context.view_layer
+    obact = context.active_object
+
+    for ob in view_layer.objects:
+        if ob.type == 'GPENCIL' and ob != obact:
+            op = layout.operator("gpencil.materials_append_to_object", text=ob.name)
+            op.object = ob.name
+            op.only_selected = only_selected
+            done = True
+
+    if done is False:
+        layout.label(text="No destination object", icon='ERROR')
+
+
 class VIEW3D_MT_gpencil_append_active_material(Menu):
     bl_label = "Append Active Material to Object"
 
     def draw(self, context):
         layout = self.layout
-        view_layer = context.view_layer
-        obact = context.active_object
-
-        done = False
-        for ob in view_layer.objects:
-            if ob.type == 'GPENCIL' and ob != obact:
-                op = layout.operator("gpencil.materials_append_to_object", text=ob.name)
-                op.object = ob.name
-                op.only_selected = True
-                done = True
-
-        if done is False:
-            layout.label(text="No destination object", icon='ERROR')
+        gpencil_material_menu_items(context, layout, True)
 
 
 class VIEW3D_MT_gpencil_append_all_materials(Menu):
@@ -5003,19 +5007,7 @@ class VIEW3D_MT_gpencil_append_all_materials(Menu):
 
     def draw(self, context):
         layout = self.layout
-        view_layer = context.view_layer
-        obact = context.active_object
-
-        done = False
-        for ob in view_layer.objects:
-            if ob.type == 'GPENCIL' and ob != obact:
-                op = layout.operator("gpencil.materials_append_to_object", text=ob.name)
-                op.object = ob.name
-                op.only_selected = False
-                done = True
-
-        if done is False:
-            layout.label(text="No destination object", icon='ERROR')
+        gpencil_material_menu_items(context, layout, False)
 
 
 class VIEW3D_MT_edit_gpencil(Menu):
