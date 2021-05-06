@@ -363,14 +363,23 @@ static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
 static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
-  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+
+  const bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
+  const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  const bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
+  if (!show_in_front) {
+    uiItemL(layout, IFACE_("Object is not in front"), ICON_INFO);
+  }
+
+  layout = uiLayoutColumn(layout, false);
+  uiLayoutSetActive(layout, show_in_front);
 
   uiItemR(layout, ptr, "use_multiple_levels", 0, IFACE_("Range"), ICON_NONE);
 
@@ -387,10 +396,14 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
 static void transparency_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
-  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
+
   uiLayoutSetEnabled(layout, !is_baked);
+  uiLayoutSetActive(layout, show_in_front);
 
   uiItemR(layout, ptr, "use_transparency", 0, IFACE_("Transparency"), ICON_NONE);
 }
@@ -509,6 +522,10 @@ static void composition_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
 
   uiLayoutSetPropSep(layout, true);
+
+  if (show_in_front) {
+    uiItemL(layout, IFACE_("Object is shown in front"), ICON_ERROR);
+  }
 
   uiLayout *row = uiLayoutRow(layout, false);
   uiLayoutSetActive(row, !show_in_front);
