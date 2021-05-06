@@ -4956,26 +4956,41 @@ class VIEW3D_MT_assign_material(Menu):
                                 icon='LAYER_ACTIVE' if mat == mat_active else 'BLANK1').material = mat.name
 
 
-class VIEW3D_MT_gpencil_copy_layer(Menu):
-    bl_label = "Append Layer to Object"
+def gpencil_layer_append_menu_items(context, layout, only_active):
+    done = False
+    view_layer = context.view_layer
+    obact = context.active_object
+    gpl = context.active_gpencil_layer
+
+    done = False
+    if gpl is not None:
+        for ob in view_layer.objects:
+            if ob.type == 'GPENCIL' and ob != obact:
+                op = layout.operator("gpencil.layer_duplicate_object", text=ob.name)
+                op.object = ob.name
+                op.only_active = only_active
+                done = True
+
+        if done is False:
+            layout.label(text="No destination object", icon='ERROR')
+    else:
+        layout.label(text="No layer to copy", icon='ERROR')
+
+
+class VIEW3D_MT_gpencil_append_active_layer(Menu):
+    bl_label = "Append Active Layer to Object"
 
     def draw(self, context):
         layout = self.layout
-        view_layer = context.view_layer
-        obact = context.active_object
-        gpl = context.active_gpencil_layer
+        gpencil_layer_append_menu_items(context, layout, True)
 
-        done = False
-        if gpl is not None:
-            for ob in view_layer.objects:
-                if ob.type == 'GPENCIL' and ob != obact:
-                    layout.operator("gpencil.layer_duplicate_object", text=ob.name).object = ob.name
-                    done = True
 
-            if done is False:
-                layout.label(text="No destination object", icon='ERROR')
-        else:
-            layout.label(text="No layer to copy", icon='ERROR')
+class VIEW3D_MT_gpencil_append_all_layers(Menu):
+    bl_label = "Append All Layers to Object"
+
+    def draw(self, context):
+        layout = self.layout
+        gpencil_layer_append_menu_items(context, layout, False)
 
 
 def gpencil_material_menu_items(context, layout, only_selected):
@@ -7677,7 +7692,8 @@ classes = (
     VIEW3D_MT_weight_gpencil,
     VIEW3D_MT_gpencil_animation,
     VIEW3D_MT_gpencil_simplify,
-    VIEW3D_MT_gpencil_copy_layer,
+    VIEW3D_MT_gpencil_append_active_layer,
+    VIEW3D_MT_gpencil_append_all_layers,
     VIEW3D_MT_gpencil_append_active_material,
     VIEW3D_MT_gpencil_append_all_materials,
     VIEW3D_MT_gpencil_autoweights,
