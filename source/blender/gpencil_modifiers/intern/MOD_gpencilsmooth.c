@@ -39,6 +39,7 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_deform.h"
+#include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_lib_query.h"
@@ -151,6 +152,51 @@ static void deformPolyline(GpencilModifierData *md,
   }
 }
 
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *UNUSED(depsgraph),
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *UNUSED(gpf),
+                         bGPDstroke *gps)
+{
+  SmoothGpencilModifierData *mmd = (SmoothGpencilModifierData *)md;
+
+  if (!is_stroke_affected_by_modifier(ob,
+                                      mmd->layername,
+                                      mmd->material,
+                                      mmd->pass_index,
+                                      mmd->layer_pass,
+                                      3,
+                                      gpl,
+                                      gps,
+                                      mmd->flag & GP_SMOOTH_INVERT_LAYER,
+                                      mmd->flag & GP_SMOOTH_INVERT_PASS,
+                                      mmd->flag & GP_SMOOTH_INVERT_LAYERPASS,
+                                      mmd->flag & GP_SMOOTH_INVERT_MATERIAL)) {
+    return;
+  }
+
+  if (mmd->factor <= 0.0f) {
+    return;
+  }
+  bGPdata *gpd = ob->data;
+  const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
+  const bool use_curve = (mmd->flag & GP_SMOOTH_CUSTOM_CURVE) != 0 && mmd->curve_intensity;
+
+  BKE_gpencil_editcurve_smooth(gps,
+                               mmd->factor,
+                               2,
+                               mmd->step,
+                               false,
+                               false,
+                               mmd->flag & GP_SMOOTH_MOD_LOCATION,
+                               mmd->flag & GP_SMOOTH_MOD_THICKNESS,
+                               mmd->flag & GP_SMOOTH_MOD_STRENGTH);
+
+  BKE_gpencil_editcurve_recalculate_handles(gps);
+  BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL);
+}
+
 static void bakeModifier(struct Main *UNUSED(bmain),
                          Depsgraph *depsgraph,
                          GpencilModifierData *md,
@@ -161,7 +207,12 @@ static void bakeModifier(struct Main *UNUSED(bmain),
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+        if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+          deformBezier(md, depsgraph, ob, gpl, gpf, gps);
+        }
+        else {
+          deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+        }
       }
     }
   }
@@ -233,7 +284,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Smooth = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

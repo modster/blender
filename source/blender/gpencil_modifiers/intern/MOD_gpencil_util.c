@@ -34,6 +34,7 @@
 #include "DNA_object_types.h"
 
 #include "BKE_deform.h"
+#include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_material.h"
 
@@ -136,8 +137,15 @@ bool is_stroke_affected_by_modifier(Object *ob,
     }
   }
   /* need to have a minimum number of points */
-  if ((minpoints > 0) && (gps->totpoints < minpoints)) {
-    return false;
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    if ((minpoints > 0) && (gps->editcurve->tot_curve_points < minpoints)) {
+      return false;
+    }
+  }
+  else {
+    if ((minpoints > 0) && (gps->totpoints < minpoints)) {
+      return false;
+    }
   }
 
   return true;
