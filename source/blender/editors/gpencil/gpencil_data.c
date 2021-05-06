@@ -3661,7 +3661,7 @@ void GPENCIL_OT_materials_append_to_object(wmOperatorType *ot)
   PropertyRNA *prop;
 
   /* identifiers */
-  ot->name = "Append Matewrials to New Object";
+  ot->name = "Append Materials to New Object";
   ot->idname = "GPENCIL_OT_materials_append_to_object";
   ot->description = "Append Materials of the active Grease Pencil to other object";
 
