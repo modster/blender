@@ -664,7 +664,7 @@ void GPENCIL_OT_layer_duplicate_object(wmOperatorType *ot)
                          true,
                          "Only Active",
                          "Append only active Layer, uncheck to append all layers");
-  RNA_def_property_flag(ot->prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 /* ********************* Duplicate Frame ************************** */
@@ -3695,7 +3695,7 @@ void GPENCIL_OT_materials_append_to_object(wmOperatorType *ot)
                          true,
                          "Only Selected",
                          "Append only selected material, uncheck to append all materials");
-  RNA_def_property_flag(ot->prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 /* Parent GPencil object to Lattice */
