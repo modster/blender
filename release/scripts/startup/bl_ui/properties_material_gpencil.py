@@ -54,7 +54,8 @@ class GPENCIL_MT_material_context_menu(Menu):
         layout.operator("gpencil.extract_palette_vertex", text="Extract Palette from Vertex Color")
 
         layout.separator()
-        layout.menu("VIEW3D_MT_gpencil_append_materials")
+        layout.menu("VIEW3D_MT_gpencil_append_active_material")
+        layout.menu("VIEW3D_MT_gpencil_append_all_materials")
 
 
 class GPENCIL_UL_matslots(UIList):

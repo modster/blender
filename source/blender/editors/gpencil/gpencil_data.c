@@ -3622,9 +3622,11 @@ static int gpencil_materials_append_to_object_exec(bContext *C, wmOperator *op)
   if (name[0] == '\0') {
     return OPERATOR_CANCELLED;
   }
+  const bool only_selected = RNA_boolean_get(op->ptr, "only_selected");
 
   Object *ob_dst = (Object *)BKE_scene_object_find_by_name(scene, name);
   Object *ob_src = CTX_data_active_object(C);
+  Material *ma_active = BKE_gpencil_material(ob_src, ob_src->actcol);
 
   /* Sanity checks. */
   if (ELEM(NULL, ob_src, ob_dst)) {
@@ -3638,6 +3640,10 @@ static int gpencil_materials_append_to_object_exec(bContext *C, wmOperator *op)
   /* Duplicate materials. */
   for (short i = 0; i < ob_src->totcol; i++) {
     Material *ma_src = BKE_object_material_get(ob_src, i + 1);
+    if (only_selected && ma_src != ma_active) {
+      continue;
+    }
+
     if (ma_src != NULL) {
       BKE_gpencil_object_material_ensure(bmain, ob_dst, ma_src);
     }
@@ -3652,6 +3658,8 @@ static int gpencil_materials_append_to_object_exec(bContext *C, wmOperator *op)
 
 void GPENCIL_OT_materials_append_to_object(wmOperatorType *ot)
 {
+  PropertyRNA *prop;
+
   /* identifiers */
   ot->name = "Append Matewrials to New Object";
   ot->idname = "GPENCIL_OT_materials_append_to_object";
@@ -3666,6 +3674,13 @@ void GPENCIL_OT_materials_append_to_object(wmOperatorType *ot)
 
   ot->prop = RNA_def_string(
       ot->srna, "object", NULL, MAX_ID_NAME - 2, "Object", "Name of the destination object");
+  RNA_def_property_flag(ot->prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
+  prop = RNA_def_boolean(ot->srna,
+                         "only_selected",
+                         true,
+                         "Only Selected",
+                         "Append only selected material, uncheck to append all materials");
   RNA_def_property_flag(ot->prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
