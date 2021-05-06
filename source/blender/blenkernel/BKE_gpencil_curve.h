@@ -78,6 +78,19 @@ int BKE_gpencil_editcurve_dissolve(struct bGPDstroke *gps,
                                    const float error_threshold);
 void BKE_gpencil_editcurve_simplify_adaptive(struct bGPDstroke *gps, const float threshold);
 void BKE_gpencil_editcurve_simplify_fixed(struct bGPDstroke *gps, const int count);
+void BKE_gpencil_editcurve_smooth_ex(struct bGPDstroke *gps,
+                                     const float factor,
+                                     const uint step_size,
+                                     const uint repeat,
+                                     const bool only_selected,
+                                     const bool affect_endpoints,
+                                     const bool use_vertex_groups,
+                                     const bool invert_weights,
+                                     const int deform_group,
+                                     const CurveMapping *curve_mapping,
+                                     const bool do_positions,
+                                     const bool do_pressure,
+                                     const bool do_strength);
 void BKE_gpencil_editcurve_smooth(struct bGPDstroke *gps,
                                   const float factor,
                                   const uint step_size,

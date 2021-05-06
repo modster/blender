@@ -183,15 +183,19 @@ static void deformBezier(GpencilModifierData *md,
   const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
   const bool use_curve = (mmd->flag & GP_SMOOTH_CUSTOM_CURVE) != 0 && mmd->curve_intensity;
 
-  BKE_gpencil_editcurve_smooth(gps,
-                               mmd->factor,
-                               2,
-                               mmd->step,
-                               false,
-                               false,
-                               mmd->flag & GP_SMOOTH_MOD_LOCATION,
-                               mmd->flag & GP_SMOOTH_MOD_THICKNESS,
-                               mmd->flag & GP_SMOOTH_MOD_STRENGTH);
+  BKE_gpencil_editcurve_smooth_ex(gps,
+                                  mmd->factor,
+                                  2,
+                                  mmd->step,
+                                  false,
+                                  false,
+                                  true,
+                                  (mmd->flag & GP_SMOOTH_INVERT_VGROUP) != 0,
+                                  def_nr,
+                                  use_curve ? mmd->curve_intensity : NULL,
+                                  mmd->flag & GP_SMOOTH_MOD_LOCATION,
+                                  mmd->flag & GP_SMOOTH_MOD_THICKNESS,
+                                  mmd->flag & GP_SMOOTH_MOD_STRENGTH);
 
   BKE_gpencil_editcurve_recalculate_handles(gps);
   BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_POLYLINE_REGENERATE_ALL);

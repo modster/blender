@@ -37,12 +37,14 @@
 #include "BLT_translation.h"
 
 #include "DNA_collection_types.h"
+#include "DNA_color_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_scene_types.h"
 
 #include "BKE_collection.h"
+#include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
 #include "BKE_deform.h"
@@ -918,6 +920,39 @@ static tGPCurveSegment *gpencil_fit_curve_to_points_ex(bGPDstroke *gps,
   }
 
   return tcs;
+}
+
+static float get_point_weight(MDeformVert *dvert, bool inverse, int def_nr)
+{
+  float weight = 1.0f;
+
+  if ((dvert != NULL) && (def_nr != -1)) {
+    MDeformWeight *dw = BKE_defvert_find_index(dvert, def_nr);
+    weight = dw ? dw->weight : -1.0f;
+    if ((weight >= 0.0f) && (inverse == 1)) {
+      return -1.0f;
+    }
+
+    if ((weight < 0.0f) && (inverse == 0)) {
+      return -1.0f;
+    }
+
+    /* if inverse, weight is always 1 */
+    if ((weight < 0.0f) && (inverse == 1)) {
+      return 1.0f;
+    }
+  }
+
+  /* handle special empty groups */
+  if ((dvert == NULL) && (def_nr != -1)) {
+    if (inverse == 1) {
+      return 1.0f;
+    }
+
+    return -1.0f;
+  }
+
+  return weight;
 }
 
 /**
@@ -2206,17 +2241,36 @@ void BKE_gpencil_editcurve_simplify_fixed(bGPDstroke *gps, const int count)
 }
 
 /**
- * Smooth curve
+ * Smooth curve extra
+ * \param gps: The grease pencil stroke.
+ * \param factor: Smoothing factor.
+ * \param step_size: Number of adjacent points to consider when smoothing.
+ * \param repeat: Number of times to repeat the smoothing process.
+ * \param only_selected: Only smooth selected points.
+ * \param affect_endpoints: Include end-points when smoothing (only used when stroke is
+ * non-cyclic).
+ * \param use_vertex_groups: Use vertex group to mask the smoothing effect.
+ * \param invert_weights: Invert the effect when using vertex groups.
+ * \param deform_group: The vertex group.
+ * \param curve_mapping: If not NULL use the curve mapping along the stroke to weigh the influence
+ * of the smoothing effect.
+ * \param do_positions: Smooth positions.
+ * \param do_pressure: Smooth pressure.
+ * \param do_strength: Smooth strength.
  */
-void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
-                                  const float factor,
-                                  const uint step_size,
-                                  const uint repeat,
-                                  const bool only_selected,
-                                  const bool affect_endpoints,
-                                  const bool do_positions,
-                                  const bool do_pressure,
-                                  const bool do_strength)
+void BKE_gpencil_editcurve_smooth_ex(bGPDstroke *gps,
+                                     const float factor,
+                                     const uint step_size,
+                                     const uint repeat,
+                                     const bool only_selected,
+                                     const bool affect_endpoints,
+                                     const bool use_vertex_groups,
+                                     const bool invert_weights,
+                                     const int deform_group,
+                                     const CurveMapping *curve_mapping,
+                                     const bool do_positions,
+                                     const bool do_pressure,
+                                     const bool do_strength)
 {
   bGPDcurve *gpc = gps->editcurve;
   if (gpc == NULL || gpc->tot_curve_points < 2 || factor == 0.0f || repeat < 1) {
@@ -2228,10 +2282,11 @@ void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
   }
 
   const bool is_cyclic = gps->flag & GP_STROKE_CYCLIC;
+  const bool use_curve_mapping = (curve_mapping != NULL);
+
   /* Total number of cubic points. */
   const uint tot_points = gpc->tot_curve_points * 3;
   for (uint r = 0; r < repeat; r++) {
-    /**/
     uint start_idx = (affect_endpoints || is_cyclic) ? 0 : 2;
     uint end_idx = (affect_endpoints || is_cyclic) ? tot_points : tot_points - 2;
 
@@ -2242,15 +2297,37 @@ void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
       uint hd_idx = i % 3;
 
       bGPDcurve_point *gpc_pt = &gpc->curve_points[pt_idx];
+      MDeformVert *dvert = &gpc->dvert[pt_idx];
       if ((gpc_pt->flag & GP_CURVE_POINT_SELECT) == 0 && only_selected) {
         continue;
       }
+
+      float weight = 1.0f;
+      if (use_vertex_groups) {
+        weight = get_point_weight(dvert, invert_weights, deform_group);
+        if (weight < 0.0f) {
+          continue;
+        }
+      }
+
+      if (curve_mapping != NULL) {
+        float value = (float)i / (float)(tot_points - 1);
+        weight *= BKE_curvemapping_evaluateF(curve_mapping, 0, value);
+        if (weight < 0.0f) {
+          continue;
+        }
+      }
+
       BezTriple *bezt = &gpc_pt->bezt;
       float sco[3] = {0.0f};
       float smoothed_pressure = 0.0f;
       float smoothed_strength = 0.0f;
 
-      const float average_fac = 1.0f / (float)(step_size * 2 + 1);
+      float average_fac = 1.0f / (float)(step_size * 2 + 1);
+      float weighted_factor = factor;
+      if (use_vertex_groups || use_curve_mapping) {
+        weighted_factor *= weight;
+      }
 
       if (do_positions) {
         /* Include the current point. */
@@ -2283,7 +2360,7 @@ void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
           madd_v3_v3fl(sco, next_bezt->vec[next_hd_idx], average_fac);
         }
 
-        interp_v3_v3v3(bezt->vec[hd_idx], bezt->vec[hd_idx], sco, factor);
+        interp_v3_v3v3(bezt->vec[hd_idx], bezt->vec[hd_idx], sco, weighted_factor);
       }
 
       if (do_pressure && hd_idx == 1) {
@@ -2309,7 +2386,7 @@ void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
           smoothed_pressure += gpc_next_pt->pressure * average_fac;
         }
 
-        gpc_pt->pressure = interpf(smoothed_pressure, gpc_pt->pressure, factor);
+        gpc_pt->pressure = interpf(smoothed_pressure, gpc_pt->pressure, weighted_factor);
       }
 
       if (do_strength && hd_idx == 1) {
@@ -2335,10 +2412,48 @@ void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
           smoothed_strength += gpc_next_pt->strength * average_fac;
         }
 
-        gpc_pt->strength = interpf(smoothed_strength, gpc_pt->strength, factor);
+        gpc_pt->strength = interpf(smoothed_strength, gpc_pt->strength, weighted_factor);
       }
     }
   }
+}
+
+/**
+ * Smooth curve
+ * \param gps: The grease pencil stroke.
+ * \param factor: Smoothing factor.
+ * \param step_size: Number of adjacent points to consider when smoothing.
+ * \param repeat: Number of times to repeat the smoothing process.
+ * \param only_selected: Only smooth selected points.
+ * \param affect_endpoints: Include end-points when smoothing (only used when stroke is
+ * non-cyclic).
+ * \param do_positions: Smooth positions.
+ * \param do_pressure: Smooth pressure.
+ * \param do_strength: Smooth strength.
+ */
+void BKE_gpencil_editcurve_smooth(bGPDstroke *gps,
+                                  const float factor,
+                                  const uint step_size,
+                                  const uint repeat,
+                                  const bool only_selected,
+                                  const bool affect_endpoints,
+                                  const bool do_positions,
+                                  const bool do_pressure,
+                                  const bool do_strength)
+{
+  BKE_gpencil_editcurve_smooth_ex(gps,
+                                  factor,
+                                  step_size,
+                                  repeat,
+                                  only_selected,
+                                  affect_endpoints,
+                                  false,
+                                  false,
+                                  0,
+                                  NULL,
+                                  do_positions,
+                                  do_pressure,
+                                  do_strength);
 }
 
 /**
