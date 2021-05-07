@@ -6280,7 +6280,7 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "use_fullframe_compositor", 1);
   RNA_def_property_ui_text(
       prop,
-      "Full-frame compositor",
+      "Full Frame Compositor",
       "Enable compositor full-frame mode (no tiling). All nodes are buffered. "
       "Improves CPU performance/memory usage");
 
