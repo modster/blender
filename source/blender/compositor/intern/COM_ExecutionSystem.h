@@ -25,7 +25,7 @@ class ExecutionGroup;
 #include "COM_ExecutionGroup.h"
 #include "COM_Node.h"
 #include "COM_NodeOperation.h"
-#include "COM_OutputManager.h"
+#include "COM_OutputStore.h"
 
 #include "DNA_color_types.h"
 #include "DNA_node_types.h"
@@ -133,10 +133,10 @@ class ExecutionSystem {
   } m_border;
 
   /**
-   * Manages operations output data/buffers and delete them once dependent operations are
+   * Stores operations output data/buffers and deletes them once reader operations are
    * finished.
-   **/
-  OutputManager m_output_manager;
+   */
+  OutputStore m_output_store;
 
   /**
    * Number of available cpu threads for work splitting.
@@ -206,9 +206,9 @@ class ExecutionSystem {
     return this->m_context;
   }
 
-  OutputManager &get_output_manager()
+  OutputStore &get_output_store()
   {
-    return m_output_manager;
+    return m_output_store;
   }
 
   void execute_work(const rcti &work_rect, std::function<void(const rcti &split_rect)> work_func);

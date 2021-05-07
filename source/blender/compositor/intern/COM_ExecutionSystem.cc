@@ -30,7 +30,7 @@
 #include "COM_ExecutionGroup.h"
 #include "COM_NodeOperation.h"
 #include "COM_NodeOperationBuilder.h"
-#include "COM_OutputManager.h"
+#include "COM_OutputStore.h"
 #include "COM_ReadBufferOperation.h"
 #include "COM_WorkScheduler.h"
 
@@ -267,8 +267,8 @@ void ExecutionSystem::execute_full_frame()
       op->setbNodeTree(bNodeTree);
       if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
         get_render_rect(op, render_rect);
-        op->determine_rects_to_render(render_rect, m_output_manager);
-        op->determine_reads(m_output_manager);
+        op->determine_rects_to_render(render_rect, m_output_store);
+        op->determine_reads(m_output_store);
       }
     }
   }

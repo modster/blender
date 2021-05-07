@@ -29,7 +29,11 @@
 
 namespace blender::compositor {
 
-class OutputManager {
+/**
+ * Stores operations output data including rendered buffers. It's responsible for deleting output
+ * buffers when all their readers have finished.
+ */
+class OutputStore {
  private:
   typedef struct OutputData {
    public:
@@ -42,7 +46,7 @@ class OutputManager {
   blender::Map<NodeOperation *, OutputData> m_outputs;
 
  public:
-  OutputManager();
+  OutputStore();
   bool is_render_registered(NodeOperation *op, const rcti &render_rect);
   void register_render(NodeOperation *op, const rcti &render_rect);
 
@@ -60,7 +64,7 @@ class OutputManager {
   OutputData &get_output_data(NodeOperation *op);
 
 #ifdef WITH_CXX_GUARDEDALLOC
-  MEM_CXX_CLASS_ALLOC_FUNCS("COM:OutputManager")
+  MEM_CXX_CLASS_ALLOC_FUNCS("COM:OutputStore")
 #endif
 };
 

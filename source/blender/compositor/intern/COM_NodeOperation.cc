@@ -181,10 +181,10 @@ bool NodeOperation::determineDependingAreaOfInterest(rcti *input,
  * Determines the areas this operation and its inputs need to render. Results are saved in the
  * output manager.
  */
-void NodeOperation::determine_rects_to_render(const rcti &render_rect, OutputManager &output_man)
+void NodeOperation::determine_rects_to_render(const rcti &render_rect, OutputStore &output_store)
 {
-  if (!output_man.is_render_registered(this, render_rect)) {
-    output_man.register_render(this, render_rect);
+  if (!output_store.is_render_registered(this, render_rect)) {
+    output_store.register_render(this, render_rect);
 
     int n_inputs = getNumberOfInputSockets();
     for (int i = 0; i < n_inputs; i++) {
@@ -197,7 +197,7 @@ void NodeOperation::determine_rects_to_render(const rcti &render_rect, OutputMan
       int dummy_offset[2];
       BLI_rcti_clamp(&input_area, &op_rect, dummy_offset);
 
-      op->determine_rects_to_render(input_area, output_man);
+      op->determine_rects_to_render(input_area, output_store);
     }
   }
 }
@@ -206,14 +206,14 @@ void NodeOperation::determine_rects_to_render(const rcti &render_rect, OutputMan
  * Determines the reads received by this operation and its inputs. Results are saved in the
  * output manager.
  */
-void NodeOperation::determine_reads(OutputManager &output_man)
+void NodeOperation::determine_reads(OutputStore &output_store)
 {
-  if (!output_man.has_registered_reads(this)) {
+  if (!output_store.has_registered_reads(this)) {
     int n_inputs = getNumberOfInputSockets();
     for (int i = 0; i < n_inputs; i++) {
       NodeOperation *input_op = getInputOperation(i);
-      input_op->determine_reads(output_man);
-      output_man.register_read(input_op);
+      input_op->determine_reads(output_store);
+      output_store.register_read(input_op);
     }
   }
 }
@@ -223,8 +223,8 @@ void NodeOperation::determine_reads(OutputManager &output_man)
  */
 void NodeOperation::render(ExecutionSystem &exec_system)
 {
-  OutputManager &output_man = exec_system.get_output_manager();
-  if (!output_man.is_output_rendered(this)) {
+  OutputStore &output_store = exec_system.get_output_store();
+  if (!output_store.is_output_rendered(this)) {
     /* Ensure inputs are rendered. */
     int n_inputs = getNumberOfInputSockets();
     blender::Vector<NodeOperation *> inputs_ops;
@@ -237,7 +237,7 @@ void NodeOperation::render(ExecutionSystem &exec_system)
     /* Get input buffers. */
     blender::Vector<MemoryBuffer *> inputs_bufs;
     for (NodeOperation *input_op : inputs_ops) {
-      inputs_bufs.append(output_man.get_rendered_output(input_op));
+      inputs_bufs.append(output_store.get_rendered_output(input_op));
     }
 
     /* Create output buffer if needed. */
@@ -253,7 +253,7 @@ void NodeOperation::render(ExecutionSystem &exec_system)
     }
 
     /* Render. */
-    blender::Span<rcti> render_rects = output_man.get_rects_to_render(this);
+    blender::Span<rcti> render_rects = output_store.get_rects_to_render(this);
     if (get_flags().is_fullframe_operation) {
       initExecution();
       for (const rcti &render_rect : render_rects) {
@@ -264,12 +264,12 @@ void NodeOperation::render(ExecutionSystem &exec_system)
     else {
       render_non_fullframe(output_buf, render_rects, inputs_bufs.as_span(), exec_system);
     }
-    output_man.set_rendered_output(this, std::unique_ptr<MemoryBuffer>(output_buf));
+    output_store.set_rendered_output(this, std::unique_ptr<MemoryBuffer>(output_buf));
 
     /* Report inputs reads so that buffers may be freed when all their readers
      * have finished. */
     for (NodeOperation *input_op : inputs_ops) {
-      output_man.read_finished(input_op);
+      output_store.read_finished(input_op);
     }
 
     exec_system.operation_finished();

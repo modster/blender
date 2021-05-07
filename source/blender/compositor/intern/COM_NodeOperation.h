@@ -39,7 +39,7 @@ namespace blender::compositor {
 class OpenCLDevice;
 class ReadBufferOperation;
 class WriteBufferOperation;
-class OutputManager;
+class OutputStore;
 class ExecutionSystem;
 
 class NodeOperation;
@@ -545,8 +545,8 @@ class NodeOperation {
     return std::unique_ptr<MetaData>();
   }
 
-  void determine_rects_to_render(const rcti &render_rect, OutputManager &output_man);
-  void determine_reads(OutputManager &output_man);
+  void determine_rects_to_render(const rcti &render_rect, OutputStore &output_store);
+  void determine_reads(OutputStore &output_store);
   void render(ExecutionSystem &exec_system);
 
  private:

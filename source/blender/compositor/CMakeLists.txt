@@ -88,8 +88,8 @@ set(SRC
   intern/COM_NodeOperation.h
   intern/COM_NodeOperationBuilder.cc
   intern/COM_NodeOperationBuilder.h
-  intern/COM_OutputManager.cc
-  intern/COM_OutputManager.h
+  intern/COM_OutputStore.cc
+  intern/COM_OutputStore.h
   intern/COM_OpenCLDevice.cc
   intern/COM_OpenCLDevice.h
   intern/COM_SingleThreadedOperation.cc
