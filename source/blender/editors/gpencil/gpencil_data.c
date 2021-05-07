@@ -577,6 +577,10 @@ static int gpencil_layer_duplicate_object_exec(bContext *C, wmOperator *op)
   }
 
   bGPdata *gpd_dst = (bGPdata *)ob_dst->data;
+  /* Disable destination active layer to keep order. */
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_dst->layers) {
+    gpl->flag &= ~GP_LAYER_ACTIVE;
+  }
 
   LISTBASE_FOREACH (bGPDlayer *, gpl_src, &gpd_src->layers) {
     if ((only_active) && (gpl_src != gpl_active)) {
