@@ -567,6 +567,40 @@ class DATA_PT_custom_props_mesh(MeshButtonsPanel, PropertyPanel, Panel):
     _property_type = bpy.types.Mesh
 
 
+
+class MESH_UL_attributes(UIList):
+    def draw_item(self, _context, layout, _data, attribute, _icon, _active_data, _active_propname, _index):
+        data_type = attribute.bl_rna.properties['data_type'].enum_items[attribute.data_type]
+
+        split = layout.split(factor=0.75)
+        split.emboss = 'NONE'
+        split.prop(attribute, "name", text="")
+        sub = split.row()
+        sub.alignment = 'RIGHT'
+        sub.active = False
+        sub.label(text=data_type.name)
+
+
+class DATA_PT_mesh_attributes(MeshButtonsPanel, Panel):
+    bl_label = "Attributes"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    def draw(self, context):
+        mesh = context.mesh
+        layout = self.layout
+
+        layout.template_list(
+            "MESH_UL_attributes",
+            "attributes",
+            mesh,
+            "attributes",
+            mesh.attributes,
+            "active_index",
+            rows=3,
+        )
+
+
 classes = (
     MESH_MT_vertex_group_context_menu,
     MESH_MT_shape_key_context_menu,
@@ -575,6 +609,7 @@ classes = (
     MESH_UL_shape_keys,
     MESH_UL_uvmaps,
     MESH_UL_vcols,
+    MESH_UL_attributes,
     DATA_PT_context_mesh,
     DATA_PT_vertex_groups,
     DATA_PT_shape_keys,
@@ -587,6 +622,7 @@ classes = (
     DATA_PT_remesh,
     DATA_PT_customdata,
     DATA_PT_custom_props_mesh,
+    DATA_PT_mesh_attributes,
 )
 
 if __name__ == "__main__":  # only for live edit.
