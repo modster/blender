@@ -99,7 +99,7 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
 
   determineResolutions();
 
-  if (m_context->get_execution_model() == ExecutionModel::Tiled) {
+  if (m_context->get_execution_model() == eExecutionModel::Tiled) {
     /* surround complex ops with read/write buffer */
     add_complex_operation_buffers();
   }
@@ -113,7 +113,7 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
   /* ensure topological (link-based) order of nodes */
   /*sort_operations();*/ /* not needed yet */
 
-  if (m_context->get_execution_model() == ExecutionModel::Tiled) {
+  if (m_context->get_execution_model() == eExecutionModel::Tiled) {
     /* create execution groups */
     group_operations();
   }

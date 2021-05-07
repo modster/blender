@@ -20,7 +20,7 @@
 
 namespace blender::compositor {
 
-enum class ExecutionModel {
+enum class eExecutionModel {
   /* Operations are executed from outputs to inputs grouped in execution groups and rendered
    * in tiles.
    */

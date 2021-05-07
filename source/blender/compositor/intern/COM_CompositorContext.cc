@@ -34,8 +34,8 @@ CompositorContext::CompositorContext()
   this->m_fastCalculation = false;
   this->m_viewSettings = nullptr;
   this->m_displaySettings = nullptr;
-  this->m_execution_model = U.experimental.use_fullframe_compositor ? ExecutionModel::FullFrame :
-                                                                      ExecutionModel::Tiled;
+  this->m_execution_model = U.experimental.use_fullframe_compositor ? eExecutionModel::FullFrame :
+                                                                      eExecutionModel::Tiled;
 }
 
 int CompositorContext::getFramenumber() const

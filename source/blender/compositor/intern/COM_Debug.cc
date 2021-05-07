@@ -393,7 +393,7 @@ bool DebugInfo::graphviz_system(const ExecutionSystem *system, char *str, int ma
   }
 
   const bool has_execution_groups = system->getContext().get_execution_model() ==
-                                    ExecutionModel::Tiled;
+                                    eExecutionModel::Tiled;
   len += graphviz_legend(str + len, maxlen > len ? maxlen - len : 0, has_execution_groups);
 
   len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "}\r\n");
