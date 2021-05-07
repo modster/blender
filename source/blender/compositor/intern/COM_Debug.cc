@@ -211,9 +211,8 @@ int DebugInfo::graphviz_legend_group(
   return len;
 }
 
-int DebugInfo::graphviz_legend(char *str, int maxlen)
+int DebugInfo::graphviz_legend(char *str, int maxlen, const bool has_execution_groups)
 {
-  bool has_execution_groups = COM_EXECUTION_MODEL == ExecutionModel::Tiled;
   int len = 0;
 
   len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "{\r\n");
@@ -393,7 +392,9 @@ bool DebugInfo::graphviz_system(const ExecutionSystem *system, char *str, int ma
     }
   }
 
-  len += graphviz_legend(str + len, maxlen > len ? maxlen - len : 0);
+  const bool has_execution_groups = system->getContext().get_execution_model() ==
+                                    ExecutionModel::Tiled;
+  len += graphviz_legend(str + len, maxlen > len ? maxlen - len : 0, has_execution_groups);
 
   len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "}\r\n");
 

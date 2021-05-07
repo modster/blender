@@ -59,7 +59,7 @@ void TranslateNode::convertToOperations(NodeConverter &converter,
   /* FullFrame does not support using WriteBufferOperation.
    * TODO: Implement TranslateOperation with wrap support in FullFrame.
    */
-  if (data->wrap_axis && COM_EXECUTION_MODEL != ExecutionModel::FullFrame) {
+  if (data->wrap_axis && context.get_execution_model() != ExecutionModel::FullFrame) {
     WriteBufferOperation *writeOperation = new WriteBufferOperation(DataType::Color);
     WrapOperation *wrapOperation = new WrapOperation(DataType::Color);
     wrapOperation->setMemoryProxy(writeOperation->getMemoryProxy());

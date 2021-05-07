@@ -122,7 +122,7 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
                 render_border.ymin,
                 render_border.ymax);
 
-  if (COM_EXECUTION_MODEL == ExecutionModel::FullFrame) {
+  if (m_context.get_execution_model() == ExecutionModel::FullFrame) {
     DebugInfo::graphviz(this);
   }
 }
@@ -204,7 +204,7 @@ void ExecutionSystem::execute()
 {
   const bNodeTree *editingtree = this->m_context.getbNodeTree();
   DebugInfo::execute_started(this);
-  if (COM_EXECUTION_MODEL == ExecutionModel::Tiled) {
+  if (m_context.get_execution_model() == ExecutionModel::Tiled) {
     editingtree->stats_draw(editingtree->sdh, TIP_("Compositing | Initializing execution"));
 
     update_read_buffer_offset(m_operations);

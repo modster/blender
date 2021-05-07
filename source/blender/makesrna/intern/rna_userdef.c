@@ -6276,6 +6276,14 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "New Point Cloud Type", "Enable the new point cloud type in the ui");
 
+  prop = RNA_def_property(srna, "use_fullframe_compositor", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_fullframe_compositor", 1);
+  RNA_def_property_ui_text(
+      prop,
+      "Full-frame compositor",
+      "Enable compositor full-frame mode (no tiling). All nodes are buffered. "
+      "Improves CPU performance/memory usage");
+
   prop = RNA_def_property(srna, "use_new_hair_type", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_new_hair_type", 1);
   RNA_def_property_ui_text(prop, "New Hair Type", "Enable the new hair type in the ui");

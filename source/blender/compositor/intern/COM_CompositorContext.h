@@ -91,6 +91,11 @@ class CompositorContext {
    */
   const char *m_viewName;
 
+  /**
+   * Active execution model
+   */
+  ExecutionModel m_execution_model;
+
  public:
   /**
    * \brief constructor initializes the context with default values.
@@ -280,6 +285,11 @@ class CompositorContext {
   float getRenderPercentageAsFactor() const
   {
     return m_rd->size * 0.01f;
+  }
+
+  ExecutionModel get_execution_model() const
+  {
+    return m_execution_model;
   }
 };
 

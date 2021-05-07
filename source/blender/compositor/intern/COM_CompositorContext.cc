@@ -21,6 +21,7 @@
 #include <cstdio>
 
 #include "BLI_assert.h"
+#include "DNA_userdef_types.h"
 
 namespace blender::compositor {
 
@@ -33,6 +34,8 @@ CompositorContext::CompositorContext()
   this->m_fastCalculation = false;
   this->m_viewSettings = nullptr;
   this->m_displaySettings = nullptr;
+  this->m_execution_model = U.experimental.use_fullframe_compositor ? ExecutionModel::FullFrame :
+                                                                      ExecutionModel::Tiled;
 }
 
 int CompositorContext::getFramenumber() const

@@ -30,11 +30,6 @@ enum class ExecutionModel {
 };
 
 /**
- * Active execution model.
- */
-constexpr ExecutionModel COM_EXECUTION_MODEL = ExecutionModel::FullFrame;
-
-/**
  * \brief possible data types for sockets
  * \ingroup Model
  */
