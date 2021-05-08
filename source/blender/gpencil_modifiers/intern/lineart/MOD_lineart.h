@@ -52,8 +52,8 @@ typedef struct LineartTriangle {
   /* first culled in line list to use adjacent triangle info, then go through triangle list. */
   double gn[3];
 
-  /* Material flag is removed to save space. */
   unsigned char transparency_mask;
+  unsigned char intersection_mask;
   unsigned char flags; /* #eLineartTriangleFlags */
 
   /**
@@ -177,6 +177,7 @@ typedef struct LineartLineChain {
   /** Chain now only contains one type of segments */
   int type;
   unsigned char transparency_mask;
+  unsigned char intersection_mask;
 
   struct Object *object_ref;
 } LineartLineChain;
@@ -191,6 +192,7 @@ typedef struct LineartLineChainItem {
   unsigned char line_type;
   char occlusion;
   unsigned char transparency_mask;
+  unsigned char intersection_mask;
   size_t index;
 } LineartLineChainItem;
 
@@ -312,6 +314,7 @@ typedef struct LineartRenderBuffer {
   float crease_threshold;
   float chaining_image_threshold;
   float angle_splitting_threshold;
+  float chain_smooth_tolerance;
 
   /* FIXME(Yiming): Temporary solution for speeding up calculation by not including lines that
    * are not in the selected source. This will not be needed after we have a proper scene-wise
@@ -599,8 +602,8 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
 void MOD_lineart_chain_connect(LineartRenderBuffer *rb);
 void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
 void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
-void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb, float dist);
 void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance);
+void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb, float dist);
 
 int MOD_lineart_chain_count(const LineartLineChain *rlc);
 void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);
