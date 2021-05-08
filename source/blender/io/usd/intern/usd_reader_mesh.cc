@@ -294,9 +294,7 @@ bool USDMeshReader::topology_changed(Mesh * /* existing_mesh */, const double mo
   return false;
 }
 
-void USDMeshReader::read_mpolys(Mesh *mesh,
-                                pxr::UsdGeomMesh /* mesh_prim */,
-                                const double /* motionSampleTime */)
+void USDMeshReader::read_mpolys(Mesh *mesh)
 {
   MPoly *mpolys = mesh->mpoly;
   MLoop *mloops = mesh->mloop;
@@ -330,10 +328,7 @@ void USDMeshReader::read_mpolys(Mesh *mesh,
   BKE_mesh_calc_edges(mesh, false, false);
 }
 
-void USDMeshReader::read_uvs(Mesh *mesh,
-                             pxr::UsdGeomMesh mesh_prim_,
-                             const double motionSampleTime,
-                             const bool load_uvs)
+void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bool load_uvs)
 {
   unsigned int loop_index = 0;
   unsigned int rev_loop_index = 0;
@@ -446,9 +441,7 @@ void USDMeshReader::read_uvs(Mesh *mesh,
   }
 }
 
-void USDMeshReader::read_colors(Mesh *mesh,
-                                const pxr::UsdGeomMesh &mesh_prim_,
-                                const double /* motionSampleTime */)
+void USDMeshReader::read_colors(Mesh *mesh, const double /* motionSampleTime */)
 {
   if (!(mesh && mesh_prim_ && mesh->totloop > 0)) {
     return;
@@ -624,10 +617,8 @@ void USDMeshReader::process_normals_uniform(Mesh *mesh)
   MEM_freeN(lnors);
 }
 
-void USDMeshReader::read_mesh_sample(const std::string & /* iobject_full_name */,
-                                     ImportSettings *settings,
+void USDMeshReader::read_mesh_sample(ImportSettings *settings,
                                      Mesh *mesh,
-                                     const pxr::UsdGeomMesh &mesh_prim_,
                                      const double motionSampleTime,
                                      const bool new_mesh)
 {
@@ -645,7 +636,7 @@ void USDMeshReader::read_mesh_sample(const std::string & /* iobject_full_name */
   }
 
   if (new_mesh || (settings->read_flag & MOD_MESHSEQ_READ_POLY) != 0) {
-    read_mpolys(mesh, mesh_prim_, motionSampleTime);
+    read_mpolys(mesh);
     if (normal_interpolation_ == pxr::UsdGeomTokens->faceVarying) {
       process_normals_face_varying(mesh);
     }
@@ -668,11 +659,11 @@ void USDMeshReader::read_mesh_sample(const std::string & /* iobject_full_name */
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_UV) != 0) {
-    read_uvs(mesh, mesh_prim_, motionSampleTime, new_mesh);
+    read_uvs(mesh, motionSampleTime, new_mesh);
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_COLOR) != 0) {
-    read_colors(mesh, mesh_prim_, motionSampleTime);
+    read_colors(mesh, motionSampleTime);
   }
 }
 
@@ -828,12 +819,7 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
     }
   }
 
-  read_mesh_sample(prim_.GetPath().GetString().c_str(),
-                   &settings,
-                   active_mesh,
-                   mesh_prim_,
-                   motionSampleTime,
-                   new_mesh || is_initial_load_);
+  read_mesh_sample(&settings, active_mesh, motionSampleTime, new_mesh || is_initial_load_);
 
   if (new_mesh) {
     /* Here we assume that the number of materials doesn't change, i.e. that

@@ -78,17 +78,12 @@ class USDMeshReader : public USDGeomReader {
                                 int totpoly,
                                 std::map<pxr::SdfPath, int> &r_mat_map);
 
-  void read_mpolys(Mesh *mesh, pxr::UsdGeomMesh mesh_prim, double motionSampleTime);
-  void read_uvs(Mesh *mesh,
-                pxr::UsdGeomMesh mesh_prim_,
-                double motionSampleTime,
-                bool load_uvs = false);
-  void read_colors(Mesh *mesh, const pxr::UsdGeomMesh &mesh_prim, double motionSampleTime);
+  void read_mpolys(Mesh *mesh);
+  void read_uvs(Mesh *mesh, double motionSampleTime, bool load_uvs = false);
+  void read_colors(Mesh *mesh, double motionSampleTime);
 
-  void read_mesh_sample(const std::string &iobject_full_name,
-                        ImportSettings *settings,
+  void read_mesh_sample(ImportSettings *settings,
                         Mesh *mesh,
-                        const pxr::UsdGeomMesh &mesh_prim,
                         double motionSampleTime,
                         bool new_mesh);
 };
