@@ -93,9 +93,6 @@ using blender::Span;
 using blender::StringRef;
 using blender::StringRefNull;
 using blender::Vector;
-using blender::bke::PersistentCollectionHandle;
-using blender::bke::PersistentDataHandleMap;
-using blender::bke::PersistentObjectHandle;
 using blender::fn::GMutablePointer;
 using blender::fn::GPointer;
 using blender::nodes::GeoNodeExecParams;
@@ -182,7 +179,7 @@ static void add_object_relation(const ModifierUpdateDepsgraphContext *ctx, Objec
     if (object.type == OB_EMPTY && object.instance_collection != nullptr) {
       add_collection_relation(ctx, *object.instance_collection);
     }
-    else if (ELEM(object.type, OB_MESH, OB_POINTCLOUD, OB_VOLUME)) {
+    else if (ELEM(object.type, OB_MESH, OB_POINTCLOUD, OB_VOLUME, OB_CURVE)) {
       DEG_add_object_relation(ctx->node, &object, DEG_OB_COMP_GEOMETRY, "Nodes Modifier");
       DEG_add_customdata_mask(ctx->node, &object, &dependency_data_mask);
     }
@@ -376,7 +373,6 @@ static bool id_property_type_matches_socket(const bNodeSocket &socket, const IDP
 
 static void init_socket_cpp_value_from_property(const IDProperty &property,
                                                 const eNodeSocketDatatype socket_value_type,
-                                                const PersistentDataHandleMap &handles,
                                                 void *r_value)
 {
   switch (socket_value_type) {
@@ -408,13 +404,13 @@ static void init_socket_cpp_value_from_property(const IDProperty &property,
     case SOCK_OBJECT: {
       ID *id = IDP_Id(&property);
       Object *object = (id && GS(id->name) == ID_OB) ? (Object *)id : nullptr;
-      new (r_value) PersistentObjectHandle(handles.lookup(object));
+      *(Object **)r_value = object;
       break;
     }
     case SOCK_COLLECTION: {
       ID *id = IDP_Id(&property);
       Collection *collection = (id && GS(id->name) == ID_GR) ? (Collection *)id : nullptr;
-      new (r_value) PersistentCollectionHandle(handles.lookup(collection));
+      *(Collection **)r_value = collection;
       break;
     }
     default:
@@ -507,7 +503,6 @@ void MOD_nodes_init(Main *bmain, NodesModifierData *nmd)
 }
 
 static void initialize_group_input(NodesModifierData &nmd,
-                                   const PersistentDataHandleMap &handle_map,
                                    const bNodeSocket &socket,
                                    void *r_value)
 {
@@ -525,23 +520,9 @@ static void initialize_group_input(NodesModifierData &nmd,
     blender::nodes::socket_cpp_value_get(socket, r_value);
     return;
   }
+
   init_socket_cpp_value_from_property(
-      *property, static_cast<eNodeSocketDatatype>(socket.type), handle_map, r_value);
-}
-
-static void fill_data_handle_map(const NodesModifierSettings &settings,
-                                 const DerivedNodeTree &tree,
-                                 PersistentDataHandleMap &handle_map)
-{
-  Set<ID *> used_ids;
-  find_used_ids_from_settings(settings, used_ids);
-  find_used_ids_from_nodes(*tree.root_context().tree().btree(), used_ids);
-
-  int current_handle = 0;
-  for (ID *id : used_ids) {
-    handle_map.add(current_handle, *id);
-    current_handle++;
-  }
+      *property, static_cast<eNodeSocketDatatype>(socket.type), r_value);
 }
 
 static void reset_tree_ui_storage(Span<const blender::nodes::NodeTreeRef *> trees,
@@ -729,9 +710,6 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   blender::LinearAllocator<> &allocator = scope.linear_allocator();
   blender::nodes::MultiFunctionByNode mf_by_node = get_multi_function_per_node(tree, scope);
 
-  PersistentDataHandleMap handle_map;
-  fill_data_handle_map(nmd->settings, tree, handle_map);
-
   Map<DOutputSocket, GMutablePointer> group_inputs;
 
   const DTreeContext *root_context = &tree.root_context();
@@ -757,7 +735,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
     for (const OutputSocketRef *socket : remaining_input_sockets) {
       const CPPType &cpp_type = *blender::nodes::socket_cpp_type_get(*socket->typeinfo());
       void *value_in = allocator.allocate(cpp_type.size(), cpp_type.alignment());
-      initialize_group_input(*nmd, handle_map, *socket->bsocket(), value_in);
+      initialize_group_input(*nmd, *socket->bsocket(), value_in);
       group_inputs.add_new({root_context, socket}, {cpp_type, value_in});
     }
   }
@@ -786,7 +764,6 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   eval_params.input_values = group_inputs;
   eval_params.output_sockets = group_outputs;
   eval_params.mf_by_node = &mf_by_node;
-  eval_params.handle_map = &handle_map;
   eval_params.modifier_ = nmd;
   eval_params.depsgraph = ctx->depsgraph;
   eval_params.self_object = ctx->object;
