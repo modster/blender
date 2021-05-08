@@ -488,6 +488,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeClamp"),
         NodeItem("GeometryNodeAttributeCompare"),
         NodeItem("GeometryNodeAttributeConvert"),
+        NodeItem("GeometryNodeAttributeCurveMap"),
         NodeItem("GeometryNodeAttributeFill"),
         NodeItem("GeometryNodeAttributeMix"),
         NodeItem("GeometryNodeAttributeProximity"),
@@ -507,6 +508,7 @@ geometry_node_categories = [
     ]),
     GeometryNodeCategory("GEO_CURVE", "Curve", items=[
         NodeItem("GeometryNodeCurveToMesh"),
+        NodeItem("GeometryNodeCurveResample"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
         NodeItem("GeometryNodeBoundBox"),
