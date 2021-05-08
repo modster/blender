@@ -255,6 +255,17 @@ static void do_versions_idproperty_ui_data(Main *bmain)
     }
   }
 
+  /* The UI data from exposed node modifier properties is just copied from the corresponding node
+   * group, but the copying only runs when necessary, so we still need to version UI data here. */
+  LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+    LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
+      if (md->type == eModifierType_Nodes) {
+        NodesModifierData *nmd = (NodesModifierData *)md;
+        version_idproperty_ui_data(nmd->settings.properties);
+      }
+    }
+  }
+
   /* Sequences. */
   LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
     if (scene->ed != NULL) {
