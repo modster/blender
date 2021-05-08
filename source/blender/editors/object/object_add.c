@@ -1312,7 +1312,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
 
   const int type = RNA_enum_get(op->ptr, "type");
   const bool use_in_front = RNA_boolean_get(op->ptr, "use_in_front");
-  const bool use_3d_strokes = RNA_boolean_get(op->ptr, "use_3d_strokes");
+  const int stroke_depth_order = RNA_enum_get(op->ptr, "stroke_depth_order");
 
   ushort local_view_bits;
   float loc[3], rot[3];
@@ -1435,8 +1435,10 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
       if (use_in_front) {
         ob->dtx |= OB_DRAW_IN_FRONT;
       }
-      if (use_3d_strokes) {
-        gpd->draw_mode = GP_DRAWMODE_3D;
+      else {
+        if (stroke_depth_order == GP_DRAWMODE_3D) {
+          gpd->draw_mode = GP_DRAWMODE_3D;
+        }
       }
 
       break;
@@ -1472,9 +1474,22 @@ static void object_add_ui(bContext *UNUSED(C), wmOperator *op)
   int type = RNA_enum_get(op->ptr, "type");
   if (type == GP_LRT_COLLECTION || type == GP_LRT_OBJECT || type == GP_LRT_SCENE) {
     uiItemR(layout, op->ptr, "use_in_front", 0, NULL, ICON_NONE);
-    uiItemR(layout, op->ptr, "use_3d_strokes", 0, NULL, ICON_NONE);
+    bool in_front = RNA_boolean_get(op->ptr, "use_in_front");
+    uiLayout *row = uiLayoutRow(layout, false);
+    uiLayoutSetActive(row, !in_front);
+    uiItemR(row, op->ptr, "stroke_depth_order", 0, NULL, ICON_NONE);
   }
 }
+
+static EnumPropertyItem rna_enum_gpencil_add_stroke_depth_order_items[] = {
+    {GP_DRAWMODE_2D,
+     "2D",
+     0,
+     "2D Layers",
+     "Display strokes using grease pencil layers to define order"},
+    {GP_DRAWMODE_3D, "3D", 0, "3D Location", "Display strokes using real 3D position in 3D space"},
+    {0, NULL, 0, NULL, NULL},
+};
 
 void OBJECT_OT_gpencil_add(wmOperatorType *ot)
 {
@@ -1504,11 +1519,13 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
                   false,
                   "Show In Front",
                   "Show line art grease pencil in front of everything");
-  RNA_def_boolean(ot->srna,
-                  "use_3d_strokes",
-                  true,
-                  "Order Strokes By Depth",
-                  "Order strokes by depth instead of by layer order");
+  RNA_def_enum(
+      ot->srna,
+      "stroke_depth_order",
+      rna_enum_gpencil_add_stroke_depth_order_items,
+      GP_DRAWMODE_3D,
+      "Stroke Depth Order",
+      "Defines how the strokes are ordered in 3D space for objects not displayed 'In Front')");
 }
 
 /** \} */
