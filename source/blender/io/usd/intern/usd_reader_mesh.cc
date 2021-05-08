@@ -295,7 +295,7 @@ bool USDMeshReader::topology_changed(Mesh * /* existing_mesh */, const double mo
 }
 
 void USDMeshReader::read_mpolys(Mesh *mesh,
-                                pxr::UsdGeomMesh mesh_prim_,
+                                pxr::UsdGeomMesh /* mesh_prim */,
                                 const double /* motionSampleTime */)
 {
   MPoly *mpolys = mesh->mpoly;
