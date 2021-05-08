@@ -259,7 +259,7 @@ bool USDMeshReader::valid() const
   return static_cast<bool>(mesh_prim_);
 }
 
-bool USDMeshReader::topology_changed(Mesh *existing_mesh, const double motionSampleTime)
+bool USDMeshReader::topology_changed(Mesh * /* existing_mesh */, const double motionSampleTime)
 {
   /* TODO(makowalski): Is it the best strategy to cache the mesh
    * geometry in this function?  This needs to be revisited. */
@@ -296,7 +296,7 @@ bool USDMeshReader::topology_changed(Mesh *existing_mesh, const double motionSam
 
 void USDMeshReader::read_mpolys(Mesh *mesh,
                                 pxr::UsdGeomMesh mesh_prim_,
-                                const double motionSampleTime)
+                                const double /* motionSampleTime */)
 {
   MPoly *mpolys = mesh->mpoly;
   MLoop *mloops = mesh->mloop;
@@ -448,7 +448,7 @@ void USDMeshReader::read_uvs(Mesh *mesh,
 
 void USDMeshReader::read_colors(Mesh *mesh,
                                 const pxr::UsdGeomMesh &mesh_prim_,
-                                const double motionSampleTime)
+                                const double /* motionSampleTime */)
 {
   if (!(mesh && mesh_prim_ && mesh->totloop > 0)) {
     return;
@@ -624,7 +624,7 @@ void USDMeshReader::process_normals_uniform(Mesh *mesh)
   MEM_freeN(lnors);
 }
 
-void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
+void USDMeshReader::read_mesh_sample(const std::string & /* iobject_full_name */,
                                      ImportSettings *settings,
                                      Mesh *mesh,
                                      const pxr::UsdGeomMesh &mesh_prim_,
@@ -678,7 +678,7 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
 
 void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
                                              MPoly *mpoly,
-                                             const int totpoly,
+                                             const int /* totpoly */,
                                              std::map<pxr::SdfPath, int> &r_mat_map)
 {
   /* Find the geom subsets that have bound materials.
