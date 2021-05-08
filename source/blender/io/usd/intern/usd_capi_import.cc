@@ -188,7 +188,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
   }
 
   BLI_path_abs(data->filename, BKE_main_blendfile_path_from_global());
-  USDStageReader *archive = new USDStageReader(data->bmain, data->filename);
+  USDStageReader *archive = new USDStageReader(data->filename);
 
   archive->params(data->params);
   archive->settings(data->settings);
@@ -526,11 +526,11 @@ void USD_CacheReader_free(CacheReader *reader)
   }
 }
 
-CacheArchiveHandle *USD_create_handle(struct Main *bmain,
+CacheArchiveHandle *USD_create_handle(struct Main * /*bmain*/,
                                       const char *filename,
                                       ListBase *object_paths)
 {
-  USDStageReader *stage_reader = new USDStageReader(bmain, filename);
+  USDStageReader *stage_reader = new USDStageReader(filename);
 
   if (!stage_reader->valid()) {
     delete stage_reader;

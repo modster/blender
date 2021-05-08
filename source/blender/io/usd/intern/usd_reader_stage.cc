@@ -40,7 +40,7 @@
 
 namespace blender::io::usd {
 
-USDStageReader::USDStageReader(struct Main *bmain, const char *filename)
+USDStageReader::USDStageReader(const char *filename)
 {
   stage_ = pxr::UsdStage::Open(filename);
 }

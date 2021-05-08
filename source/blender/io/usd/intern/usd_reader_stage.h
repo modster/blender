@@ -46,7 +46,7 @@ class USDStageReader {
   std::vector<USDPrimReader *> readers_;
 
  public:
-  USDStageReader(struct Main *bmain, const char *filename);
+  USDStageReader(const char *filename);
   ~USDStageReader();
 
   static USDPrimReader *create_reader(const pxr::UsdPrim &prim,
