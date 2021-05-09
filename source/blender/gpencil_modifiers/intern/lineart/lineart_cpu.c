@@ -1738,6 +1738,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
              mat->lineart.occlusion_effectiveness & LRT_OCCLUSION_EFFECTIVE_BITS :
              1);
 
+    rt->intersection_mask = obi->override_intersection_mask;
+
     double gn[3];
     copy_v3db_v3fl(gn, f->no);
     mul_v3_mat3_m4v3_db(rt->gn, normal, gn);
@@ -1868,13 +1870,8 @@ static bool _lineart_object_not_in_source_collection(Collection *source, Object 
 /**
  * See if this object in such collection is used for generating line art,
  * Disabling a collection for line art will doable all objects inside.
- * `_rb` is used to provide source selection info.
- * See the definition of `rb->_source_type` for details.
  */
-static int lineart_usage_check(Collection *c,
-                               Object *ob,
-                               unsigned char *r_intersection_mask,
-                               LineartRenderBuffer *_rb)
+static int lineart_usage_check(Collection *c, Object *ob, unsigned char *r_intersection_mask)
 {
 
   if (!c) {
@@ -1889,6 +1886,7 @@ static int lineart_usage_check(Collection *c,
 
   if (c->children.first == NULL) {
     if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
+      (*r_intersection_mask) = c->lineart_intersection_mask;
       if (ob->lineart.usage == OBJECT_LRT_INHERIT) {
         switch (c->lineart_usage) {
           case COLLECTION_LRT_OCCLUSION_ONLY:
@@ -1908,22 +1906,11 @@ static int lineart_usage_check(Collection *c,
   }
 
   LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
-    int result = lineart_usage_check(cc->collection, ob, _rb);
+    unsigned char temp_intersection_mask = 0;
+    int result = lineart_usage_check(cc->collection, ob, &temp_intersection_mask);
     if (result > OBJECT_LRT_INHERIT) {
+      (*r_intersection_mask) = temp_intersection_mask;
       return result;
-    }
-  }
-
-  /* Temp solution to speed up calculation in the modifier without cache. See the definition of
-   * rb->_source_type for details. */
-  if (_rb->_source_type == LRT_SOURCE_OBJECT) {
-    if (ob != _rb->_source_object && ob->id.orig_id != (ID *)_rb->_source_object) {
-      return OBJECT_LRT_OCCLUSION_ONLY;
-    }
-  }
-  else if (_rb->_source_type == LRT_SOURCE_COLLECTION) {
-    if (_lineart_object_not_in_source_collection(_rb->_source_collection, ob)) {
-      return OBJECT_LRT_OCCLUSION_ONLY;
     }
   }
 
@@ -2023,7 +2010,8 @@ static void lineart_main_load_geometries(
 
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     LineartObjectInfo *obi = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
-    obi->override_usage = lineart_usage_check(scene->master_collection, ob, rb);
+    obi->override_usage = lineart_usage_check(
+        scene->master_collection, ob, &obi->override_intersection_mask);
 
     /* TODO: We better make it so we can extract BMesh in parallel or at least for those objects
      * who doesn't have instances or just simply have transformation channel set. */
@@ -2750,6 +2738,8 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
   BLI_addtail(&result->segments, rls);
   /* Don't need to OR flags right now, just a type mark. */
   result->flags = LRT_EDGE_FLAG_INTERSECTION;
+  result->intersection_mask = (rt->intersection_mask | testing->intersection_mask);
+
   lineart_prepend_edge_direct(&rb->intersection_lines, result);
   int r1, r2, c1, c2, row, col;
   if (lineart_get_edge_bounding_areas(rb, result, &r1, &r2, &c1, &c2)) {
@@ -4096,6 +4086,7 @@ static void lineart_gpencil_generate(LineartCache *cache,
                                      int types,
                                      uchar mask_switches,
                                      uchar transparency_mask,
+                                     uchar intersection_mask,
                                      short thickness,
                                      float opacity,
                                      const char *source_vgname,
@@ -4162,6 +4153,18 @@ static void lineart_gpencil_generate(LineartCache *cache,
       }
       else {
         if (!(rlc->transparency_mask & transparency_mask)) {
+          continue;
+        }
+      }
+    }
+    if (types & LRT_EDGE_FLAG_INTERSECTION) {
+      if (mask_switches & LRT_GPENCIL_INTERSECTION_MATCH) {
+        if (rlc->intersection_mask != intersection_mask) {
+          continue;
+        }
+      }
+      else {
+        if (!(rlc->intersection_mask & intersection_mask)) {
           continue;
         }
       }
@@ -4262,6 +4265,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   short edge_types,
                                   uchar mask_switches,
                                   uchar transparency_mask,
+                                  uchar intersection_mask,
                                   short thickness,
                                   float opacity,
                                   const char *source_vgname,
@@ -4311,6 +4315,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                            use_types,
                            mask_switches,
                            transparency_mask,
+                           intersection_mask,
                            thickness,
                            opacity,
                            source_vgname,

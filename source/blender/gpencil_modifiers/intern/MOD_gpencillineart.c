@@ -103,6 +103,7 @@ static void generate_strokes_actual(
       lmd->edge_types,
       lmd->mask_switches,
       lmd->transparency_mask,
+      lmd->intersection_mask,
       lmd->thickness,
       lmd->opacity,
       lmd->source_vertex_group,
@@ -440,6 +441,33 @@ static void transparency_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_transparency_match", 0, IFACE_("Match All Masks"), ICON_NONE);
 }
 
+static void intersection_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  uiLayoutSetEnabled(layout, !is_baked);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayoutSetActive(layout, RNA_boolean_get(ptr, "use_intersection"));
+
+  uiLayout *row = uiLayoutRow(layout, true);
+  uiLayoutSetPropDecorate(row, false);
+  uiLayout *sub = uiLayoutRowWithHeading(row, true, IFACE_("Masks"));
+  char text[2] = "0";
+
+  PropertyRNA *prop = RNA_struct_find_property(ptr, "use_intersection_mask");
+  for (int i = 0; i < 8; i++, text[0]++) {
+    uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, text, ICON_NONE);
+  }
+  uiItemL(row, "", ICON_BLANK1); /* Space for decorator. */
+
+  uiLayout *col = uiLayoutColumn(layout, true);
+  uiItemR(col, ptr, "use_intersection_match", 0, IFACE_("Match All Masks"), ICON_NONE);
+}
+
 static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   PointerRNA ob_ptr;
@@ -561,6 +589,8 @@ static void panelRegister(ARegionType *region_type)
                                      transparency_panel_draw_header,
                                      transparency_panel_draw,
                                      occlusion_panel);
+  gpencil_modifier_subpanel_register(
+      region_type, "intersection", "Intersection", NULL, intersection_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "chaining", "Chaining", NULL, chaining_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(

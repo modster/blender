@@ -2930,8 +2930,20 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_transparency_mask", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "transparency_mask", 1);
+  RNA_def_property_array(prop, 6);
+  RNA_def_property_ui_text(prop, "Masks", "");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "use_intersection_match", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "mask_switches", LRT_GPENCIL_TRANSPARENCY_MATCH);
+  RNA_def_property_ui_text(
+      prop, "Match Intersection", "Require matching all intersection masks instead of just one");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "use_intersection_mask", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "intersection_mask", 1);
   RNA_def_property_array(prop, 8);
-  RNA_def_property_ui_text(prop, "Mask", "");
+  RNA_def_property_ui_text(prop, "Masks", "");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 }
 

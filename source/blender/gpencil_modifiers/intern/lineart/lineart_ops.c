@@ -141,6 +141,7 @@ static bool bake_strokes(
       lmd->edge_types,
       lmd->mask_switches,
       lmd->transparency_mask,
+      lmd->intersection_mask,
       lmd->thickness,
       lmd->opacity,
       lmd->source_vertex_group,

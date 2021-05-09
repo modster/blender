@@ -152,6 +152,7 @@ typedef struct LineartEdge {
 
   /** Also for line type determination on chaining. */
   unsigned char flags;
+  unsigned char intersection_mask;
 
   /**
    * Still need this entry because culled lines will not add to object
@@ -192,7 +193,6 @@ typedef struct LineartLineChainItem {
   unsigned char line_type;
   char occlusion;
   unsigned char transparency_mask;
-  unsigned char intersection_mask;
   size_t index;
 } LineartLineChainItem;
 
@@ -395,6 +395,7 @@ typedef struct LineartObjectInfo {
   double normal[4][4];
   LineartElementLinkNode *v_reln;
   int override_usage;
+  unsigned char override_intersection_mask;
   int global_i_offset;
 
   /* Threads will add lines inside here, when all threads are done, we combine those into the ones
@@ -637,6 +638,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   short edge_types,
                                   unsigned char mask_switches,
                                   unsigned char transparency_mask,
+                                  unsigned char intersection_mask,
                                   short thickness,
                                   float opacity,
                                   const char *source_vgname,
