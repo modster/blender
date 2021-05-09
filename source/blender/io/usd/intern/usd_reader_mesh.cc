@@ -441,9 +441,15 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
   }
 }
 
-void USDMeshReader::read_colors(Mesh *mesh, const double /* motionSampleTime */)
+void USDMeshReader::read_colors(Mesh *mesh, const double motionSampleTime)
 {
   if (!(mesh && mesh_prim_ && mesh->totloop > 0)) {
+    return;
+  }
+
+  /* Early out if we read the display color before and if this attribute isn't animated. */
+  if (primvar_varying_map_.find(usdtokens::displayColor) != primvar_varying_map_.end() &&
+      !primvar_varying_map_.at(usdtokens::displayColor)) {
     return;
   }
 
@@ -460,9 +466,17 @@ void USDMeshReader::read_colors(Mesh *mesh, const double /* motionSampleTime */)
     return;
   }
 
+  if (primvar_varying_map_.find(usdtokens::displayColor) == primvar_varying_map_.end()) {
+    bool might_be_time_varying = color_primvar.ValueMightBeTimeVarying();
+    primvar_varying_map_.insert(std::make_pair(usdtokens::displayColor, might_be_time_varying));
+    if (might_be_time_varying) {
+      is_time_varying_ = true;
+    }
+  }
+
   pxr::VtArray<pxr::GfVec3f> display_colors;
 
-  if (!color_primvar.ComputeFlattened(&display_colors)) {
+  if (!color_primvar.ComputeFlattened(&display_colors, motionSampleTime)) {
     std::cerr << "WARNING: Couldn't compute display colors\n" << std::endl;
     return;
   }
