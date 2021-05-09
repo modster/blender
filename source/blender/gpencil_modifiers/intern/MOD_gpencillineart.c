@@ -298,8 +298,10 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_crease", 0, IFACE_("Crease"), ICON_NONE);
 
   uiLayout *sub = uiLayoutRow(col, true);
-  uiLayoutSetActive(
-      sub, RNA_boolean_get(ptr, "use_crease") && (!RNA_boolean_get(ptr, "use_cached_result")));
+  uiLayoutSetActive(sub,
+                    RNA_boolean_get(ptr, "use_crease") &&
+                        (!RNA_boolean_get(ptr, "use_cached_result") ||
+                         BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
   uiLayoutSetPropSep(sub, true);
   uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
 
@@ -330,13 +332,16 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
-  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout, !is_baked && !use_cache);
+  uiLayoutSetEnabled(layout,
+                     !is_baked &&
+                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
 
   uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
@@ -437,7 +442,8 @@ static void transparency_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
 static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
-  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   uiLayout *layout = panel->layout;
 
@@ -445,7 +451,9 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout, !is_baked && !use_cache);
+  uiLayoutSetEnabled(layout,
+                     !is_baked &&
+                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
 
   uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
   uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
@@ -468,7 +476,9 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout, !is_baked && !use_cache);
+  uiLayoutSetEnabled(layout,
+                     !is_baked &&
+                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
 
   uiLayout *col = uiLayoutColumn(layout, true);
 
