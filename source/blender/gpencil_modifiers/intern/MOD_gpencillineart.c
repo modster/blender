@@ -101,7 +101,7 @@ static void generate_strokes_actual(
       lmd->use_multiple_levels ? lmd->level_end : lmd->level_start,
       lmd->target_material ? BKE_gpencil_object_material_index_get(ob, lmd->target_material) : 0,
       lmd->edge_types,
-      lmd->transparency_flags,
+      lmd->mask_switches,
       lmd->transparency_mask,
       lmd->thickness,
       lmd->opacity,

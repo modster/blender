@@ -1871,7 +1871,10 @@ static bool _lineart_object_not_in_source_collection(Collection *source, Object 
  * `_rb` is used to provide source selection info.
  * See the definition of `rb->_source_type` for details.
  */
-static int lineart_usage_check(Collection *c, Object *ob, LineartRenderBuffer *_rb)
+static int lineart_usage_check(Collection *c,
+                               Object *ob,
+                               unsigned char *r_intersection_mask,
+                               LineartRenderBuffer *_rb)
 {
 
   if (!c) {
@@ -4091,7 +4094,7 @@ static void lineart_gpencil_generate(LineartCache *cache,
                                      Object *source_object,
                                      Collection *source_collection,
                                      int types,
-                                     uchar transparency_flags,
+                                     uchar mask_switches,
                                      uchar transparency_mask,
                                      short thickness,
                                      float opacity,
@@ -4151,8 +4154,8 @@ static void lineart_gpencil_generate(LineartCache *cache,
         continue;
       }
     }
-    if (transparency_flags & LRT_GPENCIL_TRANSPARENCY_ENABLE) {
-      if (transparency_flags & LRT_GPENCIL_TRANSPARENCY_MATCH) {
+    if (mask_switches & LRT_GPENCIL_TRANSPARENCY_ENABLE) {
+      if (mask_switches & LRT_GPENCIL_TRANSPARENCY_MATCH) {
         if (rlc->transparency_mask != transparency_mask) {
           continue;
         }
@@ -4257,7 +4260,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   int level_end,
                                   int mat_nr,
                                   short edge_types,
-                                  uchar transparency_flags,
+                                  uchar mask_switches,
                                   uchar transparency_mask,
                                   short thickness,
                                   float opacity,
@@ -4306,7 +4309,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                            source_object,
                            source_collection,
                            use_types,
-                           transparency_flags,
+                           mask_switches,
                            transparency_mask,
                            thickness,
                            opacity,

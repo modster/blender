@@ -847,11 +847,11 @@ typedef enum eLineArtGPencilModifierFlags {
   LRT_GPENCIL_USE_CACHE = (1 << 4),
 } eLineArtGPencilModifierFlags;
 
-typedef enum eLineartGpencilTransparencyFlags {
+typedef enum eLineartGpencilMaskSwitches {
   LRT_GPENCIL_TRANSPARENCY_ENABLE = (1 << 0),
   /** Set to true means using "and" instead of "or" logic on mask bits. */
   LRT_GPENCIL_TRANSPARENCY_MATCH = (1 << 1),
-} eLineartGpencilTransparencyFlags;
+} eLineartGpencilMaskSwitches;
 
 struct LineartCache;
 
@@ -882,8 +882,11 @@ typedef struct LineartGpencilModifierData {
   float opacity;
   short thickness;
 
-  unsigned char transparency_flags; /* eLineartGpencilTransparencyFlags */
+  unsigned char mask_switches; /* eLineartGpencilMaskSwitches */
   unsigned char transparency_mask;
+  unsigned char intersection_mask;
+
+  char _pad[7];
 
   /** `0..1` range for cosine angle */
   float crease_threshold;
@@ -897,10 +900,10 @@ typedef struct LineartGpencilModifierData {
   /* CPU mode */
   float chaining_image_threshold;
 
-  /* Ported from SceneLineArt flags. */
+  /* eLineartMainFlags, for one time calculation. */
   int calculation_flags;
 
-  /* Additional Switches. */
+  /* eLineArtGPencilModifierFlags, for stroke selection in each modifier. */
   int flags;
 
   /* Move strokes towards camera to avoid clipping while preserve depth for the viewport. */
