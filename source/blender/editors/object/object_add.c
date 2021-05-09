@@ -1518,7 +1518,7 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
   RNA_def_boolean(ot->srna,
                   "use_in_front",
                   false,
-                  "Show In Front",
+                  "In Front",
                   "Show line art grease pencil in front of everything");
   RNA_def_enum(
       ot->srna,
@@ -1526,7 +1526,7 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
       rna_enum_gpencil_add_stroke_depth_order_items,
       GP_DRAWMODE_3D,
       "Stroke Depth Order",
-      "Defines how the strokes are ordered in 3D space for objects not displayed 'In Front')");
+      "Defines how the strokes are ordered in 3D space for objects not displayed 'In Front'");
 }
 
 /** \} */
