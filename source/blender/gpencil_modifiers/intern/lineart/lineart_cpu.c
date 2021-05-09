@@ -714,6 +714,8 @@ static void lineart_triangle_post(LineartTriangle *rt, LineartTriangle *orig)
   /* Just re-assign normal and set cull flag. */
   copy_v3_v3_db(rt->gn, orig->gn);
   rt->flags = LRT_CULL_GENERATED;
+  rt->intersection_mask = orig->intersection_mask;
+  rt->transparency_mask = orig->transparency_mask;
 }
 
 static void lineart_triangle_set_cull_flag(LineartTriangle *rt, uchar flag)
@@ -727,6 +729,16 @@ static bool lineart_edge_match(LineartTriangle *rt, LineartEdge *e, int v1, int 
 {
   return ((rt->v[v1] == e->v1 && rt->v[v2] == e->v2) ||
           (rt->v[v2] == e->v1 && rt->v[v1] == e->v2));
+}
+
+static void lineart_discard_duplicated_edges(LineartEdge *old_e, int v1id, int v2id)
+{
+  LineartEdge *e = old_e;
+  e++;
+  while (e->v1_obindex == v1id && e->v2_obindex == v2id) {
+    e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
+    e++;
+  }
 }
 
 /**
@@ -794,6 +806,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
     old_e = rta->e[e_num]; \
     new_flag = old_e->flags; \
     old_e->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
+    lineart_discard_duplicated_edges(old_e, old_e->v1_obindex, old_e->v2_obindex); \
     INCREASE_RL \
     e->v1 = (v1_link); \
     e->v2 = (v2_link); \
@@ -814,12 +827,15 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
 #define REMOVE_TRIANGLE_RL \
   if (rta->e[0]) { \
     rta->e[0]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
+    lineart_discard_duplicated_edges(rta->e[0], rta->e[0]->v1_obindex, rta->e[0]->v2_obindex); \
   } \
   if (rta->e[1]) { \
     rta->e[1]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
+    lineart_discard_duplicated_edges(rta->e[1], rta->e[1]->v1_obindex, rta->e[1]->v2_obindex); \
   } \
   if (rta->e[2]) { \
     rta->e[2]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
+    lineart_discard_duplicated_edges(rta->e[2], rta->e[2]->v1_obindex, rta->e[2]->v2_obindex); \
   }
 
   switch (in0 + in1 + in2) {
