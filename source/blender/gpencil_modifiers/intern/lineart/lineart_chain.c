@@ -199,9 +199,10 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
 
     rlc = lineart_chain_create(rb);
 
-    /* One chain can only have one object_ref,
-     * so we assign it based on the first segment we found. */
+    /* One chain can only have one object_ref and intersection_mask,
+     * so we assign them based on the first segment we found. */
     rlc->object_ref = e->object_ref;
+    rlc->intersection_mask = e->intersection_mask;
 
     LineartEdge *new_e = e;
     LineartVert *new_rv;
@@ -236,7 +237,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                 rls->transparency_mask,
                                 e->v1_obindex);
     while (ba && (new_e = lineart_line_get_connected(
-                      ba, new_rv, &new_rv, e->flags, e->intersection_mask))) {
+                      ba, new_rv, &new_rv, e->flags, rlc->intersection_mask))) {
       new_e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
       if (new_e->t1 || new_e->t2) {
@@ -367,7 +368,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     ba = MOD_lineart_get_bounding_area(rb, e->v2->fbcoord[0], e->v2->fbcoord[1]);
     new_rv = e->v2;
     while (ba && (new_e = lineart_line_get_connected(
-                      ba, new_rv, &new_rv, e->flags, e->intersection_mask))) {
+                      ba, new_rv, &new_rv, e->flags, rlc->intersection_mask))) {
       new_e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
       if (new_e->t1 || new_e->t2) {
@@ -619,6 +620,7 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
                                    rlci->index);
         new_rlc->object_ref = rlc->object_ref;
         new_rlc->type = rlc->type;
+        new_rlc->intersection_mask = rlc->intersection_mask;
         rlc = new_rlc;
         fixed_occ = rlci->occlusion;
         fixed_trans_mask = rlci->transparency_mask;

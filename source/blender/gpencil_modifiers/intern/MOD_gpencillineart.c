@@ -300,9 +300,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *sub = uiLayoutRow(col, true);
   uiLayoutSetActive(sub,
-                    RNA_boolean_get(ptr, "use_crease") &&
-                        (!RNA_boolean_get(ptr, "use_cached_result") ||
-                         BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+                    RNA_boolean_get(ptr, "use_crease") ||
+                        BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data));
   uiLayoutSetPropSep(sub, true);
   uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
 
@@ -441,17 +440,33 @@ static void transparency_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_transparency_match", 0, IFACE_("Match All Masks"), ICON_NONE);
 }
 
+static void intersection_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_isec = RNA_boolean_get(ptr, "use_intersection");
+
+  uiLayoutSetEnabled(layout, !is_baked);
+  uiLayoutSetActive(layout, use_isec);
+
+  uiItemR(layout, ptr, "use_intersection_filter", 0, IFACE_("Filter Intersection"), ICON_NONE);
+}
+
 static void intersection_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_isec = RNA_boolean_get(ptr, "use_intersection");
+  const bool use_isec_filter = RNA_boolean_get(ptr, "use_intersection_filter");
   uiLayoutSetEnabled(layout, !is_baked);
 
   uiLayoutSetPropSep(layout, true);
 
-  uiLayoutSetActive(layout, RNA_boolean_get(ptr, "use_intersection"));
+  uiLayoutSetActive(layout, use_isec && use_isec_filter);
 
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayoutSetPropDecorate(row, false);
@@ -589,8 +604,12 @@ static void panelRegister(ARegionType *region_type)
                                      transparency_panel_draw_header,
                                      transparency_panel_draw,
                                      occlusion_panel);
-  gpencil_modifier_subpanel_register(
-      region_type, "intersection", "Intersection", NULL, intersection_panel_draw, panel_type);
+  gpencil_modifier_subpanel_register(region_type,
+                                     "intersection",
+                                     "",
+                                     intersection_panel_draw_header,
+                                     intersection_panel_draw,
+                                     panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "chaining", "Chaining", NULL, chaining_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(

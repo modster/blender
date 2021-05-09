@@ -1867,11 +1867,30 @@ static bool _lineart_object_not_in_source_collection(Collection *source, Object 
   return true;
 }
 
+static uchar lineart_intersection_mask_check(Collection *c, Object *ob)
+{
+  LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
+    uchar result = lineart_intersection_mask_check(cc->collection, ob);
+    if (result) {
+      return result;
+    }
+  }
+
+  if (c->children.first == NULL) {
+    if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
+      if (c->lineart_flags & COLLECTION_LRT_USE_INTERSECTION_MASK) {
+        return c->lineart_intersection_mask;
+      }
+    }
+  }
+  return 0;
+}
+
 /**
  * See if this object in such collection is used for generating line art,
  * Disabling a collection for line art will doable all objects inside.
  */
-static int lineart_usage_check(Collection *c, Object *ob, unsigned char *r_intersection_mask)
+static int lineart_usage_check(Collection *c, Object *ob)
 {
 
   if (!c) {
@@ -1886,7 +1905,6 @@ static int lineart_usage_check(Collection *c, Object *ob, unsigned char *r_inter
 
   if (c->children.first == NULL) {
     if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
-      (*r_intersection_mask) = c->lineart_intersection_mask;
       if (ob->lineart.usage == OBJECT_LRT_INHERIT) {
         switch (c->lineart_usage) {
           case COLLECTION_LRT_OCCLUSION_ONLY:
@@ -1902,14 +1920,11 @@ static int lineart_usage_check(Collection *c, Object *ob, unsigned char *r_inter
       }
       return ob->lineart.usage;
     }
-    return OBJECT_LRT_INHERIT;
   }
 
   LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
-    unsigned char temp_intersection_mask = 0;
-    int result = lineart_usage_check(cc->collection, ob, &temp_intersection_mask);
+    int result = lineart_usage_check(cc->collection, ob);
     if (result > OBJECT_LRT_INHERIT) {
-      (*r_intersection_mask) = temp_intersection_mask;
       return result;
     }
   }
@@ -2010,9 +2025,9 @@ static void lineart_main_load_geometries(
 
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     LineartObjectInfo *obi = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
-    obi->override_usage = lineart_usage_check(
-        scene->master_collection, ob, &obi->override_intersection_mask);
-
+    obi->override_usage = lineart_usage_check(scene->master_collection, ob);
+    obi->override_intersection_mask = lineart_intersection_mask_check(scene->master_collection,
+                                                                      ob);
     /* TODO: We better make it so we can extract BMesh in parallel or at least for those objects
      * who doesn't have instances or just simply have transformation channel set. */
     Object *use_ob = DEG_get_evaluated_object(depsgraph, ob);
@@ -4030,8 +4045,8 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
     if (rb->chain_smooth_tolerance > FLT_EPSILON) {
       /* Keeping UI range of 0-1 for ease of read while scaling down the actual value for best
-       * effective range in image-space (Coordinate only goes from -1 to 1). This value is somewhat
-       * arbitrary, but works best for the moment.  */
+       * effective range in image-space (Coordinate only goes from -1 to 1). This value is
+       * somewhat arbitrary, but works best for the moment.  */
       MOD_lineart_smooth_chains(rb, rb->chain_smooth_tolerance / 50);
     }
 
@@ -4157,7 +4172,8 @@ static void lineart_gpencil_generate(LineartCache *cache,
         }
       }
     }
-    if (types & LRT_EDGE_FLAG_INTERSECTION) {
+    if (rlc->type == LRT_EDGE_FLAG_INTERSECTION &&
+        (mask_switches & LRT_GPENCIL_INTERSECTION_FILTER)) {
       if (mask_switches & LRT_GPENCIL_INTERSECTION_MATCH) {
         if (rlc->intersection_mask != intersection_mask) {
           continue;

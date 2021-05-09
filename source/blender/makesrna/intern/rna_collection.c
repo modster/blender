@@ -551,7 +551,7 @@ void RNA_def_collections(BlenderRNA *brna)
   prop = RNA_def_property(srna, "lineart_use_intersection_mask", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "lineart_flags", 1);
   RNA_def_property_ui_text(
-      prop, "Usage", "Use custom intersection mask for faces in this collection");
+      prop, "Use Intersection Masks", "Use custom intersection mask for faces in this collection");
   RNA_def_property_update(prop, NC_SCENE, NULL);
 
   prop = RNA_def_property(srna, "lineart_intersection_mask", PROP_BOOLEAN, PROP_NONE);
