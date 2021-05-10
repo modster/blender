@@ -61,7 +61,8 @@ int Spline::evaluated_edges_size() const
 
 float Spline::length() const
 {
-  return this->evaluated_lengths().last();
+  Span<float> lengths = this->evaluated_lengths();
+  return (lengths.size() == 0) ? 0 : this->evaluated_lengths().last();
 }
 
 int Spline::segments_size() const
@@ -285,7 +286,7 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
   }
 
   const float total_length = this->length();
-  const float sample_length = total_length / (samples_size - 1);
+  const float sample_length = total_length / (samples_size - (is_cyclic_ ? 0 : 1));
 
   /* Store the length at the previous evaluated point in a variable so it can
    * start out at zero (the lengths array doesn't contain 0 for the first point). */
@@ -304,7 +305,10 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
     prev_length = length;
   }
 
-  samples.last() = lengths.size();
+  if (!is_cyclic_) {
+    /* In rare cases this can prevent overflow of the stored index. */
+    samples.last() = lengths.size();
+  }
 
   return samples;
 }
