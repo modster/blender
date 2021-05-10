@@ -549,18 +549,7 @@ class NodeOperation {
     return std::unique_ptr<MetaData>();
   }
 
-  void determine_rects_to_render(const rcti &render_rect, OutputStore &output_store);
-  void determine_reads(OutputStore &output_store);
-  void render(ExecutionSystem &exec_system);
-
- private:
-  void render_non_fullframe(MemoryBuffer *output_buf,
-                            Span<rcti> render_rects,
-                            blender::Span<MemoryBuffer *> inputs,
-                            ExecutionSystem &exec_system);
-
- protected:
-  NodeOperation();
+  /*** FullFrame methods ***/
 
   /**
    * Executes operation updating output memory buffer. Single-threaded calls.
@@ -574,6 +563,9 @@ class NodeOperation {
   virtual void get_input_area_of_interest(int input_idx,
                                           const rcti &output_rect,
                                           rcti &r_input_rect);
+
+ protected:
+  NodeOperation();
 
   void addInputSocket(DataType datatype, ResizeMode resize_mode = ResizeMode::Center);
   void addOutputSocket(DataType datatype);
