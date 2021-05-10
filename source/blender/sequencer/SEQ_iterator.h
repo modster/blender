@@ -40,14 +40,16 @@ struct GSetIterator;
 
 #define SEQ_ALL_BEGIN(ed, var) \
   { \
-    SeqCollection *all_strips = SEQ_query_all_strips_recursive(&ed->seqbase); \
-    GSetIterator gsi; \
-    GSET_ITER (gsi, all_strips->set) { \
-      var = (Sequence *)(BLI_gsetIterator_getKey(&gsi));
+    if (ed != NULL) { \
+      SeqCollection *all_strips = SEQ_query_all_strips_recursive(&ed->seqbase); \
+      GSetIterator gsi; \
+      GSET_ITER (gsi, all_strips->set) { \
+        var = (Sequence *)(BLI_gsetIterator_getKey(&gsi));
 
 #define SEQ_ALL_END \
   } \
   SEQ_collection_free(all_strips); \
+  } \
   } \
   ((void)0)
 
@@ -69,7 +71,7 @@ struct Sequence *SEQ_iterator_yield(SeqIterator *iterator);
 
 SeqCollection *SEQ_collection_create(void);
 bool SEQ_collection_append_strip(struct Sequence *seq, SeqCollection *data);
-void SEQ_collection_free(SeqCollection *data);
+void SEQ_collection_free(SeqCollection *collection);
 void SEQ_collection_merge(SeqCollection *collection_dst, SeqCollection *collection_src);
 void SEQ_collection_expand(struct ListBase *seqbase,
                            SeqCollection *collection,
