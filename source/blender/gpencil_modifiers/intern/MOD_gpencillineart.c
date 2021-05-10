@@ -269,6 +269,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   const int source_type = RNA_enum_get(ptr, "source_type");
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
@@ -300,7 +301,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *sub = uiLayoutRow(col, true);
   uiLayoutSetActive(sub,
-                    RNA_boolean_get(ptr, "use_crease") ||
+                    (RNA_boolean_get(ptr, "use_crease") && !use_cache) ||
                         BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data));
   uiLayoutSetPropSep(sub, true);
   uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
