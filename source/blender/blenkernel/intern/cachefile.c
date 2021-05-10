@@ -209,7 +209,6 @@ void BKE_cachefile_reader_open(CacheFile *cache_file,
     BLI_gset_remove(cache_file->handle_readers, reader, NULL);
   }
   BLI_spin_unlock(&spin);
-
 #else
   UNUSED_VARS(cache_file, reader, object, object_path);
 #endif
@@ -310,7 +309,6 @@ static void cachefile_handle_free(CacheFile *cache_file)
   }
 
   cache_file->handle_filepath[0] = '\0';
-
 #else
   UNUSED_VARS(cache_file);
 #endif
