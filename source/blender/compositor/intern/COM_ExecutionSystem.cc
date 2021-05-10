@@ -317,9 +317,8 @@ void ExecutionSystem::render_operation(NodeOperation *operation)
       DataType data_type = operation->getOutputSocket(0)->getDataType();
       rcti rect;
       BLI_rcti_init(&rect, 0, operation->getWidth(), 0, operation->getHeight());
-      /* TODO: Check if this operation is a set operation to create a single elem buffer. Need
-       * MemoryBuffer constructor for such case yet. */
-      output_buf = new MemoryBuffer(data_type, rect);
+      bool is_a_single_elem = operation->get_flags().is_set_operation;
+      output_buf = new MemoryBuffer(data_type, rect, is_a_single_elem);
     }
 
     /* Render. */
@@ -366,40 +365,43 @@ void ExecutionSystem::render_operation_tiled(NodeOperation *operation,
   /* Execute operation tiled implementation. */
   operation->initExecution();
   bool is_output_operation = operation->getNumberOfOutputSockets() == 0;
-  bool is_complex = operation->get_flags().complex;
-  for (const rcti &rect : render_rects) {
-    execute_work(rect, [=](const rcti &split_rect) {
-      if (is_output_operation) {
-        rcti region = split_rect;
-        operation->executeRegion(&region, 0);
-      }
-      else {
-        rcti tile_rect = split_rect;
-        void *tile_data = operation->initializeTileData(&tile_rect);
-        int num_channels = output_buf->get_num_channels();
-        /* TODO: Take into account single elem buffers */
-        for (int y = split_rect.ymin; y < split_rect.ymax; y++) {
-          float *output_elem = output_buf->getBuffer() +
-                               y * output_buf->getWidth() * num_channels +
-                               split_rect.xmin * num_channels;
-          if (is_complex) {
-            for (int x = split_rect.xmin; x < split_rect.xmax; x++) {
-              operation->read(output_elem, x, y, tile_data);
-              output_elem += num_channels;
+  if (!is_output_operation && output_buf->is_a_single_elem()) {
+    float *output = output_buf->get_elem(0, 0);
+    operation->readSampled(output, 0, 0, PixelSampler::Nearest);
+  }
+  else {
+    bool is_complex = operation->get_flags().complex;
+    for (const rcti &rect : render_rects) {
+      execute_work(rect, [=](const rcti &split_rect) {
+        if (is_output_operation) {
+          rcti region = split_rect;
+          operation->executeRegion(&region, 0);
+        }
+        else {
+          rcti tile_rect = split_rect;
+          void *tile_data = operation->initializeTileData(&tile_rect);
+          int elem_stride = output_buf->elem_stride;
+          for (int y = split_rect.ymin; y < split_rect.ymax; y++) {
+            float *output_elem = output_buf->get_elem(split_rect.xmin, y);
+            if (is_complex) {
+              for (int x = split_rect.xmin; x < split_rect.xmax; x++) {
+                operation->read(output_elem, x, y, tile_data);
+                output_elem += elem_stride;
+              }
+            }
+            else {
+              for (int x = split_rect.xmin; x < split_rect.xmax; x++) {
+                operation->readSampled(output_elem, x, y, PixelSampler::Nearest);
+                output_elem += elem_stride;
+              }
             }
           }
-          else {
-            for (int x = split_rect.xmin; x < split_rect.xmax; x++) {
-              operation->readSampled(output_elem, x, y, PixelSampler::Nearest);
-              output_elem += num_channels;
-            }
+          if (tile_data) {
+            operation->deinitializeTileData(&tile_rect, tile_data);
           }
         }
-        if (tile_data) {
-          operation->deinitializeTileData(&tile_rect, tile_data);
-        }
-      }
-    });
+      });
+    }
   }
   operation->deinitExecution();
 
