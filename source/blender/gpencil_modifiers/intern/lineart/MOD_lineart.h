@@ -304,6 +304,7 @@ typedef struct LineartRenderBuffer {
   bool allow_overlapping_edges;
   bool remove_doubles;
   bool floating_as_contour;
+  bool chain_floating_edges;
 
   bool filter_face_mark;
   bool filter_face_mark_invert;

@@ -811,6 +811,10 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
     }
     BLI_addtail(&rb->chains, rlc);
 
+    if (rlc->type == LRT_EDGE_FLAG_FLOATING && (!rb->chain_floating_edges)) {
+      continue;
+    }
+
     occlusion = rlc->level;
     trans_mask = rlc->transparency_mask;
     isec_mask = rlc->intersection_mask;

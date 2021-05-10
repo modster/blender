@@ -2798,6 +2798,12 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.0f, 0.3f);
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "chain_floating_edges", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_CHAIN_FLOATING_EDGES);
+  RNA_def_property_ui_text(
+      prop, "Chain Floating Edges", "Allow floating edges to be chained together");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "stroke_offset", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_ui_text(prop,
                            "Stroke Offset",
