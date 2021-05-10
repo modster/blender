@@ -135,7 +135,7 @@ void USDCurvesReader::read_curve_sample(Curve *cu, const double motionSampleTime
   size_t idx = 0;
   for (size_t i = 0; i < num_subcurves; i++) {
     const int num_verts = usdCounts[i];
-    Nurb *nu = static_cast<Nurb *>(MEM_callocN(sizeof(Nurb), "usd_getnurb"));
+    Nurb *nu = static_cast<Nurb *>(MEM_callocN(sizeof(Nurb), __func__));
 
     if (basis == pxr::UsdGeomTokens->bspline) {
       nu->flag = CU_SMOOTH;
@@ -172,7 +172,7 @@ void USDCurvesReader::read_curve_sample(Curve *cu, const double motionSampleTime
 
     float weight = 1.0f;
 
-    nu->bp = static_cast<BPoint *>(MEM_callocN(sizeof(BPoint) * nu->pntsu, "usd_getnurb"));
+    nu->bp = static_cast<BPoint *>(MEM_callocN(sizeof(BPoint) * nu->pntsu, __func__));
     BPoint *bp = nu->bp;
 
     for (int j = 0; j < nu->pntsu; j++, bp++, idx++) {
