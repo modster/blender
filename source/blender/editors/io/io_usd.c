@@ -151,7 +151,7 @@ static int wm_usd_export_exec(bContext *C, wmOperator *op)
       evaluation_mode,
   };
 
-  const bool ok = USD_export(C, filename, &params, as_background_job);
+  bool ok = USD_export(C, filename, &params, as_background_job);
 
   return as_background_job || ok ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
