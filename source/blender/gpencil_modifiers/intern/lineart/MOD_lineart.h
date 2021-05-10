@@ -305,6 +305,10 @@ typedef struct LineartRenderBuffer {
   bool remove_doubles;
   bool floating_as_contour;
 
+  bool filter_face_mark;
+  bool filter_face_mark_invert;
+  bool filter_face_mark_boundaries;
+
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
   float cam_obmat[4][4];

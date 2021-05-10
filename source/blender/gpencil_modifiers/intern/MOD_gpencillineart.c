@@ -483,6 +483,44 @@ static void intersection_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_intersection_match", 0, IFACE_("Match All Masks"), ICON_NONE);
 }
 
+static void face_mark_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+
+  uiLayoutSetEnabled(layout,
+                     !is_baked &&
+                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+
+  uiItemR(layout, ptr, "use_face_mark", 0, IFACE_("Filter Face Mark"), ICON_NONE);
+}
+
+static void face_mark_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_mark = RNA_boolean_get(ptr, "use_face_mark");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+
+  uiLayoutSetEnabled(layout,
+                     !is_baked &&
+                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayoutSetActive(layout, use_mark);
+
+  uiItemR(layout, ptr, "use_face_mark_invert", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "use_face_mark_boundaries", 0, NULL, ICON_NONE);
+}
+
 static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   PointerRNA ob_ptr;
@@ -610,6 +648,8 @@ static void panelRegister(ARegionType *region_type)
                                      intersection_panel_draw_header,
                                      intersection_panel_draw,
                                      panel_type);
+  gpencil_modifier_subpanel_register(
+      region_type, "face_mark", "", face_mark_panel_draw_header, face_mark_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "chaining", "Chaining", NULL, chaining_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
