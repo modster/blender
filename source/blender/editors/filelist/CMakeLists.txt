@@ -15,15 +15,11 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 # ***** END GPL LICENSE BLOCK *****
 
+
 set(INC
     ../include
-    ../filelist
-    ../../blenkernel
     ../../blenlib
-    ../../blenloader
     ../../makesdna
-    ../../makesrna
-    ../../windowmanager
     ../../../../intern/guardedalloc
 )
 
@@ -31,17 +27,17 @@ set(INC_SYS
 )
 
 set(SRC
-  asset_edit.cc
-  asset_list.cc
-  asset_ops.cc
+  file_list.cc
+  file_list_entry.cc
+  file_list_reader.cc
+
+  file_list.hh
+  file_list_entry.hh
+  file_list_reader.hh
 )
 
 set(LIB
-  bf_blenloader
-  bf_blenkernel
-
-  bf_editor_filelist
 )
 
-blender_add_lib(bf_editor_asset "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
-
+blender_add_lib(bf_editor_filelist "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+set_target_properties(bf_editor_filelist PROPERTIES LINKER_LANGUAGE CXX)

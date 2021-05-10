@@ -257,6 +257,45 @@ unsigned int BLI_filelist_dir_contents(const char *dirname, struct direntry **r_
 }
 
 /**
+ * Iterate over files in a directory, doing minimal work. The callback \a
+ * peek_fn gets invoked for each file and gets basic file information.
+ * \note The file name string passed to the call back will be destroyed right after the callback
+ *       returns.
+ */
+void BLI_filelist_dir_contents_iterate_peek(const char *dirname,
+                                            FileListPeekFn peek_fn,
+                                            void *customdata)
+{
+  DIR *dir;
+  if ((dir = opendir(dirname)) != NULL) {
+    const struct dirent *fname;
+
+    while ((fname = readdir(dir)) != NULL) {
+      BLI_stat_t stat = {0};
+      char fullname[PATH_MAX];
+      BLI_join_dirfile(fullname, sizeof(fullname), dirname, fname->d_name);
+
+      if (BLI_stat(fullname, &stat) != -1) {
+        /* Pass. */
+      }
+      else if (FILENAME_IS_CURRPAR(fname->d_name)) {
+        /* Hack around for UNC paths on windows:
+         * does not support stat on '\\SERVER\foo\..', sigh... */
+        stat.st_mode |= S_IFDIR;
+      }
+
+      if (!peek_fn(fullname, fname->d_name, &stat, customdata)) {
+        break;
+      }
+    }
+    closedir(dir);
+  }
+  else {
+    printf("failed to open %s\n", dirname);
+  }
+}
+
+/**
  * Convert given entry's size into human-readable strings.
  */
 void BLI_filelist_entry_size_to_string(const struct stat *st,

@@ -94,7 +94,10 @@ typedef enum eFileAttributes {
   FILE_ATTR_JUNCTION_POINT = 1 << 13, /* Folder Symbolic-link. */
   FILE_ATTR_MOUNT_POINT = 1 << 14,    /* Volume mounted as a folder. */
   FILE_ATTR_HARDLINK = 1 << 15,       /* Duplicated directory entry. */
+
+  FILE_ATTR_LAST
 } eFileAttributes;
+ENUM_OPERATORS(eFileAttributes, FILE_ATTR_LAST);
 
 #define FILE_ATTR_ANY_LINK \
   (FILE_ATTR_ALIAS | FILE_ATTR_REPARSE_POINT | FILE_ATTR_SYMLINK | FILE_ATTR_JUNCTION_POINT | \
@@ -114,7 +117,15 @@ eFileAttributes BLI_file_attributes(const char *path);
 
 /* Filelist */
 
+typedef bool (*FileListPeekFn)(const char *filepath,
+                               const char *filename,
+                               const BLI_stat_t *stat,
+                               void *customdata);
+
 unsigned int BLI_filelist_dir_contents(const char *dir, struct direntry **r_filelist);
+void BLI_filelist_dir_contents_iterate_peek(const char *dirname,
+                                            FileListPeekFn peek_fn,
+                                            void *customdata);
 void BLI_filelist_entry_duplicate(struct direntry *dst, const struct direntry *src);
 void BLI_filelist_duplicate(struct direntry **dest_filelist,
                             struct direntry *const src_filelist,

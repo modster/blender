@@ -23,6 +23,7 @@
  * contains most necessary logic already and there's not much time for a more long-term solution.
  */
 
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -47,6 +48,9 @@
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "../filelist/file_list.hh"
+#include "../filelist/file_list_entry.hh"
 
 /* XXX uses private header of file-space. */
 #include "../space_file/filelist.h"
@@ -158,6 +162,8 @@ class AssetList : NonCopyable {
   AssetLibraryReference library_ref_;
   PreviewTimer previews_timer_;
 
+  std::unique_ptr<ed::filelist::AbstractFileList> cpp_filelist_ = nullptr;
+
  public:
   AssetList() = delete;
   AssetList(eFileSelectType filesel_type, const AssetLibraryReference &asset_library_ref);
@@ -230,11 +236,18 @@ void AssetList::setup(const AssetFilterSettings *filter_settings)
   else {
     filelist_setdir(files, path);
   }
+
+  /* -------------------------------------------------------------------- */
+
+  ed::filelist::FileListReadParams read_params(path);
+  cpp_filelist_ = std::make_unique<ed::filelist::FileList>(read_params);
 }
 
 void AssetList::fetch(const bContext &C)
 {
   FileList *files = filelist_;
+
+  cpp_filelist_->fetch();
 
   if (filelist_needs_force_reset(files)) {
     filelist_readjob_stop(files, CTX_wm_manager(&C));
