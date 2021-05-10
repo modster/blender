@@ -452,8 +452,7 @@ Mesh *USD_read_mesh(CacheReader *reader,
                     Mesh *existing_mesh,
                     const float time,
                     const char **err_str,
-                    int read_flag,
-                    float vel_fac)
+                    int read_flag)
 {
   USDGeomReader *usd_reader = dynamic_cast<USDGeomReader *>(get_usd_reader(reader, ob, err_str));
 
@@ -461,7 +460,7 @@ Mesh *USD_read_mesh(CacheReader *reader,
     return NULL;
   }
 
-  return usd_reader->read_mesh(existing_mesh, time, read_flag, vel_fac, err_str);
+  return usd_reader->read_mesh(existing_mesh, time, read_flag, err_str);
 }
 
 bool USD_mesh_topology_changed(

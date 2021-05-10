@@ -35,7 +35,6 @@ class USDGeomReader : public USDXformReader {
   virtual Mesh *read_mesh(struct Mesh *existing_mesh,
                           double motionSampleTime,
                           int read_flag,
-                          float vel_scale,
                           const char **err_str) = 0;
 
   virtual bool topology_changed(Mesh * /* existing_mesh */, double /* motionSampleTime */)

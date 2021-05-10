@@ -50,7 +50,6 @@ class USDCurvesReader : public USDGeomReader {
   Mesh *read_mesh(struct Mesh *existing_mesh,
                   double motionSampleTime,
                   int read_flag,
-                  float vel_scale,
                   const char **err_str) override;
 };
 

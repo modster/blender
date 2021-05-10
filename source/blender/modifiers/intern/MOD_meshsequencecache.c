@@ -81,7 +81,6 @@ static void initData(ModifierData *md)
 
   mcmd->cache_file = NULL;
   mcmd->object_path[0] = '\0';
-  mcmd->vel_fac = 1.0f;
   mcmd->read_flag = MOD_MESHSEQ_READ_ALL;
 
   MEMCPY_STRUCT_AFTER(mcmd, DNA_struct_default_get(MeshSeqCacheModifierData), modifier);
@@ -200,7 +199,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     case CACHEFILE_TYPE_USD:
 #  ifdef WITH_USD
       result = USD_read_mesh(
-          mcmd->reader, ctx->object, mesh, time * FPS, &err_str, mcmd->read_flag, mcmd->vel_fac);
+          mcmd->reader, ctx->object, mesh, time * FPS, &err_str, mcmd->read_flag);
 #  endif
       break;
     case CACHE_FILE_TYPE_INVALID:

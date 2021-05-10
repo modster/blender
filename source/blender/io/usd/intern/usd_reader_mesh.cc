@@ -221,7 +221,7 @@ void USDMeshReader::read_object_data(Main *bmain, const double motionSampleTime)
 
   is_initial_load_ = true;
   Mesh *read_mesh = this->read_mesh(
-      mesh, motionSampleTime, import_params_.global_read_flag, 1.0f, NULL);
+      mesh, motionSampleTime, import_params_.global_read_flag, NULL);
 
   is_initial_load_ = false;
   if (read_mesh != mesh) {
@@ -758,7 +758,6 @@ void USDMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, const double mot
 Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
                                const double motionSampleTime,
                                const int read_flag,
-                               const float vel_scale,
                                const char ** /* err_str */)
 {
   if (!mesh_prim_) {
@@ -820,7 +819,6 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
   /* Only read point data when streaming meshes, unless we need to create new ones. */
   ImportSettings settings;
   settings.read_flag |= read_flag;
-  settings.vel_scale = vel_scale;
 
   if (topology_changed(existing_mesh, motionSampleTime)) {
     new_mesh = true;
