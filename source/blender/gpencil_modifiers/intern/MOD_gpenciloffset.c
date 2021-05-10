@@ -103,20 +103,11 @@ static float prepare_matrix(OffsetGpencilModifierData *mmd, float weight, float 
   return (scale[0] + scale[1] + scale[2]) / 3.0f;
 }
 
-/* change stroke offsetness */
-static void deformPolyline(GpencilModifierData *md,
-                           Depsgraph *UNUSED(depsgraph),
-                           Object *ob,
-                           bGPDlayer *gpl,
-                           bGPDframe *gpf,
-                           bGPDstroke *gps)
+/* Calculate random transform matrix. */
+static void prepare_random_matrix(
+    GpencilModifierData *md, Object *ob, bGPDframe *gpf, bGPDstroke *gps, float mat_rnd[4][4])
 {
   OffsetGpencilModifierData *mmd = (OffsetGpencilModifierData *)md;
-  const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
-
-  if (!do_modifier(ob, mmd, gpl, gps)) {
-    return;
-  }
 
   int seed = mmd->seed;
   /* Make sure different modifiers get different seeds. */
@@ -148,14 +139,32 @@ static void deformPolyline(GpencilModifierData *md,
       }
     }
   }
-  /* Calculate Random matrix. */
-  float mat_rnd[4][4];
   float rnd_loc[3], rnd_rot[3];
   float rnd_scale[3] = {1.0f, 1.0f, 1.0f};
   mul_v3_v3v3(rnd_loc, mmd->rnd_offset, rand[0]);
   mul_v3_v3v3(rnd_rot, mmd->rnd_rot, rand[1]);
   madd_v3_v3v3(rnd_scale, mmd->rnd_scale, rand[2]);
   loc_eul_size_to_mat4(mat_rnd, rnd_loc, rnd_rot, rnd_scale);
+}
+
+/* change stroke offsetness */
+static void deformPolyline(GpencilModifierData *md,
+                           Depsgraph *UNUSED(depsgraph),
+                           Object *ob,
+                           bGPDlayer *gpl,
+                           bGPDframe *gpf,
+                           bGPDstroke *gps)
+{
+  OffsetGpencilModifierData *mmd = (OffsetGpencilModifierData *)md;
+  const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
+
+  if (!do_modifier(ob, mmd, gpl, gps)) {
+    return;
+  }
+
+  /* Calculate Random matrix. */
+  float mat_rnd[4][4];
+  prepare_random_matrix(md, ob, gpf, gps, mat_rnd);
 
   bGPdata *gpd = ob->data;
   for (int i = 0; i < gps->totpoints; i++) {
@@ -186,7 +195,7 @@ static void deformBezier(GpencilModifierData *md,
                          Depsgraph *UNUSED(depsgraph),
                          Object *ob,
                          bGPDlayer *gpl,
-                         bGPDframe *UNUSED(gpf),
+                         bGPDframe *gpf,
                          bGPDstroke *gps)
 {
   OffsetGpencilModifierData *mmd = (OffsetGpencilModifierData *)md;
@@ -195,6 +204,10 @@ static void deformBezier(GpencilModifierData *md,
   if (!do_modifier(ob, mmd, gpl, gps)) {
     return;
   }
+
+  /* Calculate Random matrix. */
+  float mat_rnd[4][4];
+  prepare_random_matrix(md, ob, gpf, gps, mat_rnd);
 
   bGPdata *gpd = ob->data;
   bGPDcurve *gpc = gps->editcurve;
@@ -210,6 +223,11 @@ static void deformBezier(GpencilModifierData *md,
     if (weight < 0.0f) {
       continue;
     }
+    /* Apply randomness matrix. */
+    for (int j = 0; j < 3; j++) {
+      mul_m4_v3(mat_rnd, bezt->vec[j]);
+    }
+
     float mat[4][4];
     float unit_scale = prepare_matrix(mmd, weight, mat);
     pt->pressure *= unit_scale;
