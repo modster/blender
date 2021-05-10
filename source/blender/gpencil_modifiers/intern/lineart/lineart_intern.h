@@ -85,6 +85,21 @@ void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb
 #define LRT_ITER_ALL_LINES_BEGIN \
   LineartEdge *e, *next_e, **current_list; \
   e = rb->contours; \
+  if (!e) { \
+    e = rb->crease_lines; \
+  } \
+  if (!e) { \
+    e = rb->material_lines; \
+  } \
+  if (!e) { \
+    e = rb->edge_marks; \
+  } \
+  if (!e) { \
+    e = rb->intersection_lines; \
+  } \
+  if (!e) { \
+    e = rb->floating_lines; \
+  } \
   for (current_list = &rb->contours; e; e = next_e) { \
     next_e = e->next;
 
