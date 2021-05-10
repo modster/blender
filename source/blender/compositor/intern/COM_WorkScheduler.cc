@@ -55,7 +55,7 @@ enum class ThreadingModel {
  */
 constexpr ThreadingModel COM_threading_model()
 {
-  return ThreadingModel::Task;
+  return ThreadingModel::Queue;
 }
 
 /**

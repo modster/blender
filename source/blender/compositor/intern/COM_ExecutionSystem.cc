@@ -511,18 +511,19 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
 
     WorkScheduler::finish();
 
-    /* WorkScheduler::ThreadingModel::Queue needs this code. */
-    // bool works_finished = false;
-    // while (!works_finished) {
-    //  works_finished = true;
-    //  for (WorkPackage &work : works) {
-    //    if (!work.finished) {
-    //      works_finished = false;
-    //      WorkScheduler::finish();
-    //      break;
-    //    }
-    //  }
-    //}
+    /* WorkScheduler::ThreadingModel::Queue needs this code because last work is still running even
+     * after calling WorkScheduler::finish(). May be an issue specific to windows. */
+    bool works_finished = false;
+    while (!works_finished) {
+      works_finished = true;
+      for (WorkPackage &work : works) {
+        if (!work.finished) {
+          works_finished = false;
+          WorkScheduler::finish();
+          break;
+        }
+      }
+    }
   }
 }
 
