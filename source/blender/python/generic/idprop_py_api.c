@@ -1396,7 +1396,9 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
     if (PyUnicode_Check(rna_subtype)) {
       const char *subtype_string = _PyUnicode_AsString(rna_subtype);
       int result = PROP_NONE;
-      RNA_enum_value_from_id(rna_enum_property_subtype_items, subtype_string, &result);
+      if (!RNA_enum_value_from_id(rna_enum_property_subtype_items, subtype_string, &result)) {
+        PyErr_SetString(PyExc_KeyError, "RNA subtype not found");
+      }
       idprop->ui_data->rna_subtype = result;
     }
     else if (rna_subtype != Py_None) {
