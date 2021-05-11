@@ -1364,7 +1364,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
 
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
-                                   "s|OOOOOOOOO:update_rna",
+                                   "s|$OOOOOOOOO:update_rna",
                                    (char **)kwlist,
                                    &key,
                                    &rna_subtype,
