@@ -368,7 +368,7 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiLayout *layout = op->layout;
   struct PointerRNA *ptr = op->ptr;
 
-  uiLayoutSetPropSep(layout, false);
+  uiLayoutSetPropSep(layout, true);
 
   uiLayout *box = uiLayoutBox(layout);
   uiLayout *row = uiLayoutRow(box, false);
