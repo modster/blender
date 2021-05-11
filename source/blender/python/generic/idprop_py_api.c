@@ -1322,7 +1322,7 @@ static void idprop_update_rna_ui_data_string(IDProperty *idprop, PyObject *py_de
 }
 
 PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
-             ".. method:: update_rna(key, "
+             ".. method:: rna_ui_data_update(key, "
              "                       subtype=None "
              "                       min=None, "
              "                       max=None, "
@@ -1364,7 +1364,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
 
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
-                                   "s|$OOOOOOOOO:update_rna",
+                                   "s|$OOOOOOOOO:rna_ui_data_update",
                                    (char **)kwlist,
                                    &key,
                                    &rna_subtype,
@@ -1507,7 +1507,7 @@ static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
 }
 
 PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_doc,
-             ".. method:: rna_data(key)\n"
+             ".. method:: rna_ui_data(key)\n"
              "\n"
              "   Return a dictionary of the property's RNA UI data. The fields in the\n"
              "   returned dictionary and their types will depend on the property's type.\n");
@@ -1515,7 +1515,7 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
 {
   const char *key;
 
-  if (!PyArg_ParseTuple(args, "s:rna_data", &key)) {
+  if (!PyArg_ParseTuple(args, "s:rna_ui_data", &key)) {
     return NULL;
   }
 
@@ -1573,7 +1573,7 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
 }
 
 PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_clear_doc,
-             ".. method:: clear_rna(key)\n"
+             ".. method:: rna_ui_data_clear(key)\n"
              "\n"
              "   Remove the RNA UI data from this IDProperty.\n"
              "\n"
@@ -1582,7 +1582,7 @@ static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *a
 {
   const char *key;
 
-  if (!PyArg_ParseTuple(args, "s:clear_rna", &key)) {
+  if (!PyArg_ParseTuple(args, "s:rna_ui_data_clear", &key)) {
     return NULL;
   }
 
@@ -1601,7 +1601,7 @@ static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *a
 
 PyDoc_STRVAR(
     BPy_IDGroup_rna_ui_data_copy_doc,
-    ".. method:: copy_rna(source_group, key_source, key_destination)\n"
+    ".. method:: rna_ui_data_copy(source_group, key_source, key_destination)\n"
     "\n"
     "   Copy UI data from an IDProperty in the source group to a property in this group.\n "
     "   If the source property has no UI data, the target UI data will be reset if it exists.\n"
@@ -1615,7 +1615,7 @@ static PyObject *BPy_IDGroup_rna_ui_data_copy(BPy_IDProperty *self, PyObject *ar
   const char *key_dest;
 
   if (!PyArg_ParseTuple(
-          args, "O!ss:copy_rna", &BPy_IDGroup_Type, &group_src, &key_src, &key_dest)) {
+          args, "O!ss:rna_ui_data_copy", &BPy_IDGroup_Type, &group_src, &key_src, &key_dest)) {
     return NULL;
   }
 
@@ -1657,16 +1657,19 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
     {"get", (PyCFunction)BPy_IDGroup_get, METH_VARARGS, BPy_IDGroup_get_doc},
     {"to_dict", (PyCFunction)BPy_IDGroup_to_dict, METH_NOARGS, BPy_IDGroup_to_dict_doc},
     {"clear", (PyCFunction)BPy_IDGroup_clear, METH_NOARGS, BPy_IDGroup_clear_doc},
-    {"update_rna",
+    {"rna_ui_data_update",
      (PyCFunction)BPy_IDGroup_update_rna,
      METH_VARARGS | METH_KEYWORDS,
      BPy_IDGroup_update_rna_doc},
-    {"rna_data", (PyCFunction)BPy_IDGroup_rna_ui_data, METH_VARARGS, BPy_IDGroup_rna_ui_data_doc},
-    {"clear_rna",
+    {"rna_ui_data",
+     (PyCFunction)BPy_IDGroup_rna_ui_data,
+     METH_VARARGS,
+     BPy_IDGroup_rna_ui_data_doc},
+    {"rna_ui_data_clear",
      (PyCFunction)BPy_IDGroup_rna_ui_data_clear,
      METH_VARARGS,
      BPy_IDGroup_rna_ui_data_clear_doc},
-    {"copy_rna",
+    {"rna_ui_data_copy",
      (PyCFunction)BPy_IDGroup_rna_ui_data_copy,
      METH_VARARGS,
      BPy_IDGroup_rna_ui_data_copy_doc},
@@ -2221,6 +2224,7 @@ static int BPy_IDGroup_Iter_clear(BPy_IDGroup_Iter *self)
 
 static PyObject *BPy_Group_Iter_Next(BPy_IDGroup_Iter *self)
 {
+
   if (self->cur) {
     PyObject *ret;
     IDProperty *cur;

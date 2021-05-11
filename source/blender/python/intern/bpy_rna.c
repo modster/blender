@@ -4267,7 +4267,7 @@ static PyObject *pyrna_struct_dir(BPy_StructRNA *self)
 }
 
 PyDoc_STRVAR(pyrna_struct_custom_properties_doc,
-             ".. method:: custom_properties()\n"
+             ".. method:: id_properties_create()\n"
              "   :return: the parent group for an RNA struct's custom IDProperties.\n"
              "   :rtype: :class:`bpy.types.IDProperty`\n");
 static PyObject *pyrna_struct_custom_properties(BPy_StructRNA *self)
@@ -5772,7 +5772,7 @@ static struct PyMethodDef pyrna_struct_methods[] = {
      METH_VARARGS | METH_CLASS,
      pyrna_struct_bl_rna_get_subclass_doc},
     {"__dir__", (PyCFunction)pyrna_struct_dir, METH_NOARGS, NULL},
-    {"custom_properties",
+    {"id_properties_create",
      (PyCFunction)pyrna_struct_custom_properties,
      METH_NOARGS,
      pyrna_struct_custom_properties_doc},
