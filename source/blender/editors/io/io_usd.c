@@ -481,51 +481,50 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
       "If checked, update scene's start and end frame to match those of the USD archive");
 
   RNA_def_boolean(
-      ot->srna, "import_cameras", true, "Cameras", "When checked, all cameras will be imported");
+      ot->srna, "import_cameras", true, "Import Cameras", "");
   RNA_def_boolean(
-      ot->srna, "import_curves", true, "Curves", "When checked, all curves will be imported");
+      ot->srna, "import_curves", true, "Import Curves", "");
   RNA_def_boolean(
-      ot->srna, "import_lights", true, "Lights", "When checked, all lights will be imported");
+      ot->srna, "import_lights", true, "Import Lights", "");
   RNA_def_boolean(ot->srna,
                   "import_materials",
                   true,
-                  "Materials",
-                  "When checked, all materials will be imported");
+                  "Import Materials",
+                  "");
   RNA_def_boolean(
-      ot->srna, "import_meshes", true, "Meshes", "When checked, all meshes will be imported");
+      ot->srna, "import_meshes", true, "Import Meshes", "");
   RNA_def_boolean(ot->srna,
                   "import_volumes",
                   true,
-                  "Volumes",
-                  "(Tangent Specific) When checked, all volumes will be imported");
+                  "Import Volumes",
+                  "");
 
   RNA_def_boolean(ot->srna,
                   "import_subdiv",
                   false,
                   "Import Subdiv Scheme",
-                  "If enabled, subdiv surface modifiers will be created based on USD "
+                  "Subdiv surface modifiers will be created based on USD "
                   "SubdivisionScheme attribute");
 
   RNA_def_boolean(ot->srna,
                   "import_instance_proxies",
                   true,
                   "Import Instance Proxies",
-                  "If enabled, USD instances will be traversed with instance proxies, "
-                  "creating a unique Blender object for each instance");
+                  "Create unique Blender objects for USD instances");
 
   RNA_def_boolean(ot->srna,
                   "import_visible_only",
                   true,
-                  "Visible Prims Only",
-                  "If enabled, invisible USD prims won't be imported. "
-                  "Only applies to prims with a non-animating visibility attribute. "
-                  "Prims with animating visibility will always be imported");
+                  "Visible Primitives Only",
+                  "Do not import invisible USD primitives. "
+                  "Only applies to primitives with a non-animating visibility attribute. "
+                  "Primitives with animating visibility will always be imported");
 
   RNA_def_boolean(ot->srna,
                   "create_collection",
                   false,
                   "Create Collection",
-                  "If enabled, all imported objects will be added to a new collection");
+                  "Add all imported objects to a new collection");
 
   prop = RNA_def_enum(ot->srna,
                       "global_read_flag",
@@ -545,25 +544,25 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                  "",
                  "If set, this will specify a specific primitive from the usd stage");
 
-  RNA_def_boolean(ot->srna, "import_guide", false, "Guide", "When checked, import guide geometry");
+  RNA_def_boolean(ot->srna, "import_guide", false, "Guide", "Import guide geometry");
 
-  RNA_def_boolean(ot->srna, "import_proxy", true, "Proxy", "When checked, import proxy geometry");
+  RNA_def_boolean(ot->srna, "import_proxy", true, "Proxy", "Import proxy geometry");
 
   RNA_def_boolean(
-      ot->srna, "import_render", true, "Render", "When checked, import final render geometry");
+      ot->srna, "import_render", true, "Render", "Import final render geometry");
 
   RNA_def_boolean(
       ot->srna,
       "import_usd_preview",
       false,
       "Import USD Preview",
-      "When checked, convert UsdPreviewSurface shaders to Principled BSD shader networks.");
+      "Convert UsdPreviewSurface shaders to Principled BSD shader networks");
 
   RNA_def_boolean(ot->srna,
                   "set_material_blend",
                   false,
                   "Set Material Blend",
-                  "When checked and if the Import Usd Preview option is enabled, "
+                  "If the Import USD Preview option is enabled, "
                   "the material blend method will automatically be set based on the "
                   "shader's opacity and opacityThreshold inputs");
 
@@ -571,7 +570,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "convert_to_z_up",
                   true,
                   "Convert to Z Up",
-                  "When checked and if the USD stage up-axis is Y, apply a rotation "
+                  "If the USD stage up-axis is Y, apply a rotation "
                   "to the imported objects to convert their orientation to Z up");
 
   RNA_def_float(ot->srna,
