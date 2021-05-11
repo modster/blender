@@ -117,13 +117,14 @@ def rna_idprop_ui_create(
 
     # Update the UI settings
     props = item.custom_properties()
-    props.update_rna(prop, subtype=subtype, 
-                           min=min, 
-                           max=max, 
-                           soft_min=soft_min, 
-                           soft_max=soft_max,
-                           description=description,
-                           default=default)
+    props.update_rna(prop, 
+                     subtype=subtype, 
+                     min=min, 
+                     max=max, 
+                     soft_min=soft_min, 
+                     soft_max=soft_max,
+                     description=description,
+                     default=default)
 
     prop_path = rna_idprop_quote_path(prop)
 

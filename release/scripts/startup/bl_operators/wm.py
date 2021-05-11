@@ -1431,12 +1431,13 @@ class WM_OT_properties_edit(Operator):
 
         if prop_type in {float, int}:
             props = item.custom_properties()
-            props.update_rna(prop, subtype=self.subtype, 
-                                  min=self.min, 
-                                  max=self.max, 
-                                  soft_min=self.soft_min, 
-                                  soft_max=self.soft_max,
-                                  description=self.description)
+            props.update_rna(prop, 
+                             subtype=self.subtype, 
+                             min=self.min, 
+                             max=self.max, 
+                             soft_min=self.soft_min, 
+                             soft_max=self.soft_max,
+                             description=self.description)
         if prop_type in {float, int, str}:
             props = item.custom_properties()
             props.update_rna(prop, default=default_eval)
