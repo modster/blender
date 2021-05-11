@@ -457,7 +457,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
   WM_operator_properties_filesel(ot,
                                  FILE_TYPE_FOLDER | FILE_TYPE_USD,
                                  FILE_BLENDER,
-                                 FILE_SAVE,
+                                 FILE_OPENFILE,
                                  WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH | WM_FILESEL_SHOW_PROPS,
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA);
