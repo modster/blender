@@ -330,6 +330,8 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
 
   nodeSetActive(ntree, output);
 
+  ntreeUpdateTree(bmain_, ntree);
+
   /* Optionally, set the material blend mode. */
 
   if (params_.set_material_blend) {
