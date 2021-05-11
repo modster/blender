@@ -1516,7 +1516,7 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
   const char *key;
 
   if (!PyArg_ParseTuple(args, "s:rna_data", &key)) {
-    Py_RETURN_NONE;
+    return NULL;
   }
 
   IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
@@ -1583,7 +1583,7 @@ static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *a
   const char *key;
 
   if (!PyArg_ParseTuple(args, "s:clear_rna", &key)) {
-    Py_RETURN_NONE;
+    return NULL;
   }
 
   IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
@@ -1616,7 +1616,7 @@ static PyObject *BPy_IDGroup_rna_ui_data_copy(BPy_IDProperty *self, PyObject *ar
 
   if (!PyArg_ParseTuple(
           args, "O!ss:copy_rna", &BPy_IDGroup_Type, &group_src, &key_src, &key_dest)) {
-    Py_RETURN_NONE;
+    return NULL;
   }
 
   const IDProperty *idprop_src = IDP_GetPropertyFromGroup(group_src->prop, key_src);
