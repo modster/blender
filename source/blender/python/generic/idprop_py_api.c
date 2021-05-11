@@ -1195,18 +1195,22 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
   if (pyobject_can_convert_to_number(py_min)) {
     ui_data->min = pyobject_convert_to_int(py_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+    ui_data->max = MAX2(ui_data->min, ui_data->max);
   }
   if (pyobject_can_convert_to_number(py_max)) {
     ui_data->max = pyobject_convert_to_int(py_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
+    ui_data->min = MIN2(ui_data->min, ui_data->max);
   }
   if (pyobject_can_convert_to_number(py_soft_min)) {
     ui_data->soft_min = pyobject_convert_to_int(py_soft_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+    ui_data->soft_max = MAX2(ui_data->soft_min, ui_data->soft_max);
   }
   if (pyobject_can_convert_to_number(py_soft_max)) {
     ui_data->soft_max = pyobject_convert_to_int(py_soft_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
+    ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->soft_max);
   }
   if (pyobject_can_convert_to_number(py_step)) {
     ui_data->step = pyobject_convert_to_int(py_step);
@@ -1269,18 +1273,22 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
   if (pyobject_can_convert_to_number(py_min)) {
     ui_data->min = pyobject_convert_to_double(py_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+    ui_data->max = MAX2(ui_data->min, ui_data->max);
   }
   if (pyobject_can_convert_to_number(py_max)) {
     ui_data->max = pyobject_convert_to_double(py_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
+    ui_data->min = MIN2(ui_data->min, ui_data->max);
   }
   if (pyobject_can_convert_to_number(py_soft_min)) {
     ui_data->soft_min = pyobject_convert_to_double(py_soft_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+    ui_data->soft_max = MAX2(ui_data->soft_min, ui_data->soft_max);
   }
   if (pyobject_can_convert_to_number(py_soft_max)) {
     ui_data->soft_max = pyobject_convert_to_double(py_soft_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
+    ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->soft_max);
   }
   if (pyobject_can_convert_to_number(py_step)) {
     ui_data->step = (float)pyobject_convert_to_double(py_step);
