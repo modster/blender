@@ -484,24 +484,12 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
       "Set Frame Range",
       "If checked, update scene's start and end frame to match those of the USD archive");
 
-  RNA_def_boolean(
-      ot->srna, "import_cameras", true, "Import Cameras", "");
-  RNA_def_boolean(
-      ot->srna, "import_curves", true, "Import Curves", "");
-  RNA_def_boolean(
-      ot->srna, "import_lights", true, "Import Lights", "");
-  RNA_def_boolean(ot->srna,
-                  "import_materials",
-                  true,
-                  "Import Materials",
-                  "");
-  RNA_def_boolean(
-      ot->srna, "import_meshes", true, "Import Meshes", "");
-  RNA_def_boolean(ot->srna,
-                  "import_volumes",
-                  true,
-                  "Import Volumes",
-                  "");
+  RNA_def_boolean(ot->srna, "import_cameras", true, "Import Cameras", "");
+  RNA_def_boolean(ot->srna, "import_curves", true, "Import Curves", "");
+  RNA_def_boolean(ot->srna, "import_lights", true, "Import Lights", "");
+  RNA_def_boolean(ot->srna, "import_materials", true, "Import Materials", "");
+  RNA_def_boolean(ot->srna, "import_meshes", true, "Import Meshes", "");
+  RNA_def_boolean(ot->srna, "import_volumes", true, "Import Volumes", "");
 
   RNA_def_boolean(ot->srna,
                   "import_subdiv",
@@ -552,15 +540,13 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
 
   RNA_def_boolean(ot->srna, "import_proxy", true, "Proxy", "Import proxy geometry");
 
-  RNA_def_boolean(
-      ot->srna, "import_render", true, "Render", "Import final render geometry");
+  RNA_def_boolean(ot->srna, "import_render", true, "Render", "Import final render geometry");
 
-  RNA_def_boolean(
-      ot->srna,
-      "import_usd_preview",
-      false,
-      "Import USD Preview",
-      "Convert UsdPreviewSurface shaders to Principled BSD shader networks");
+  RNA_def_boolean(ot->srna,
+                  "import_usd_preview",
+                  false,
+                  "Import USD Preview",
+                  "Convert UsdPreviewSurface shaders to Principled BSD shader networks");
 
   RNA_def_boolean(ot->srna,
                   "set_material_blend",
