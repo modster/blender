@@ -228,10 +228,10 @@ typedef enum IDPropertyUIDataType {
   IDP_UI_DATA_TYPE_ID = 3,
 } IDPropertyUIDataType;
 
-bool IDP_supports_ui_data(const struct IDProperty *prop);
+bool IDP_ui_data_supported(const struct IDProperty *prop);
 IDPropertyUIDataType IDP_ui_data_type(const struct IDProperty *prop);
 struct IDPropertyUIData *IDP_ui_data_ensure(struct IDProperty *prop);
-struct IDPropertyUIData *IDP_copy_ui_data(const struct IDProperty *prop);
+struct IDPropertyUIData *IDP_ui_data_copy(const struct IDProperty *prop);
 
 #ifdef __cplusplus
 }

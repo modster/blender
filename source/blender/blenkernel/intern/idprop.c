@@ -275,7 +275,7 @@ void IDP_FreeArray(IDProperty *prop)
   }
 }
 
-IDPropertyUIData *IDP_copy_ui_data(const IDProperty *prop)
+IDPropertyUIData *IDP_ui_data_copy(const IDProperty *prop)
 {
   IDPropertyUIData *data_new = MEM_dupallocN(prop->ui_data);
 
@@ -312,7 +312,7 @@ static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(fla
   newp->data.val2 = prop->data.val2;
 
   if (prop->ui_data != NULL) {
-    newp->ui_data = IDP_copy_ui_data(prop);
+    newp->ui_data = IDP_ui_data_copy(prop);
   }
 
   return newp;
@@ -1582,7 +1582,7 @@ IDPropertyUIDataType IDP_ui_data_type(const IDProperty *prop)
   return IDP_UI_DATA_TYPE_UNSUPPORTED;
 }
 
-bool IDP_supports_ui_data(const IDProperty *prop)
+bool IDP_ui_data_supported(const IDProperty *prop)
 {
   return IDP_ui_data_type(prop) != IDP_UI_DATA_TYPE_UNSUPPORTED;
 }

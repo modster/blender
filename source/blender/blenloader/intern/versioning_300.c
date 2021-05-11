@@ -163,7 +163,7 @@ static void version_idproperty_ui_data(IDProperty *idprop_group)
       continue;
     }
 
-    if (!IDP_supports_ui_data(prop)) {
+    if (!IDP_ui_data_supported(prop)) {
       continue;
     }
 

@@ -1385,7 +1385,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
     return NULL;
   }
 
-  if (!IDP_supports_ui_data(idprop)) {
+  if (!IDP_ui_data_supported(idprop)) {
     PyErr_Format(PyExc_KeyError, "IDProperty \"%s\" does not support RNA data", idprop->name);
     return NULL;
   }
@@ -1526,7 +1526,7 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
   IDPropertyUIData *ui_data = IDP_ui_data_ensure(idprop);
   BLI_assert(ui_data != NULL);
 
-  if (!IDP_supports_ui_data(idprop)) {
+  if (!IDP_ui_data_supported(idprop)) {
     PyErr_Format(PyExc_KeyError, "IDProperty \"%s\" does not support RNA data", idprop->name);
     Py_RETURN_NONE;
   }
@@ -1640,7 +1640,7 @@ static PyObject *BPy_IDGroup_rna_ui_data_copy(BPy_IDProperty *self, PyObject *ar
     IDP_free_ui_data(idprop_dest);
   }
 
-  idprop_dest->ui_data = IDP_copy_ui_data(idprop_src);
+  idprop_dest->ui_data = IDP_ui_data_copy(idprop_src);
 
   Py_RETURN_NONE;
 }
