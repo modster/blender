@@ -1166,18 +1166,21 @@ static bool pyobject_can_convert_to_number(PyObject *py_object)
 
 static int pyobject_convert_to_int(PyObject *py_object)
 {
+  int value = 0;
   if (PyLong_Check(py_object)) {
-    return PyC_Long_AsI32(py_object);
+    value = PyC_Long_AsI32(py_object);
   }
-  if (PyFloat_Check(py_object)) {
-    return (int)PyFloat_AsDouble(py_object);
+  else if (PyFloat_Check(py_object)) {
+    value = (int)PyFloat_AsDouble(py_object);
   }
-  if (PyBool_Check(py_object)) {
-    return PyObject_IsTrue(py_object);
+  else if (PyBool_Check(py_object)) {
+    value = PyObject_IsTrue(py_object);
   }
 
-  BLI_assert(false);
-  return 0;
+  if ((value == -1) && PyErr_Occurred()) {
+    PyErr_SetString(PyExc_ValueError, "Error converting object to integer for UI data");
+  }
+  return value;
 }
 
 static void idprop_update_rna_ui_data_int(IDProperty *idprop,
@@ -1236,18 +1239,21 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
 
 static double pyobject_convert_to_double(PyObject *py_object)
 {
+  double value = 0.0;
   if (PyLong_Check(py_object)) {
-    return (double)PyC_Long_AsI32(py_object);
+    value = (double)PyC_Long_AsI32(py_object);
   }
-  if (PyFloat_Check(py_object)) {
-    return PyFloat_AsDouble(py_object);
+  else if (PyFloat_Check(py_object)) {
+    value = PyFloat_AsDouble(py_object);
   }
-  if (PyBool_Check(py_object)) {
-    return (double)PyObject_IsTrue(py_object);
+  else if (PyBool_Check(py_object)) {
+    value = (double)PyObject_IsTrue(py_object);
   }
 
-  BLI_assert(false);
-  return 0.0;
+  if ((value == -1.0) && PyErr_Occurred()) {
+    PyErr_SetString(PyExc_ValueError, "Error converting object to double for UI data");
+  }
+  return value;
 }
 
 static void idprop_update_rna_ui_data_float(IDProperty *idprop,
