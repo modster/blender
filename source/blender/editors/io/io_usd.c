@@ -449,12 +449,11 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
       0.0001f,
       1000.0f);
 
-  RNA_def_boolean(
-      ot->srna,
-      "set_frame_range",
-      true,
-      "Set Frame Range",
-      "Update scene's start and end frame to match those of the USD archive");
+  RNA_def_boolean(ot->srna,
+                  "set_frame_range",
+                  true,
+                  "Set Frame Range",
+                  "Update scene's start and end frame to match those of the USD archive");
 
   RNA_def_boolean(ot->srna, "import_cameras", true, "Import Cameras", "");
   RNA_def_boolean(ot->srna, "import_curves", true, "Import Curves", "");
