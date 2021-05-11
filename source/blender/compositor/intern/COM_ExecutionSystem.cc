@@ -543,7 +543,7 @@ void ExecutionSystem::update_progress_bar()
     char buf[128];
     BLI_snprintf(buf,
                  sizeof(buf),
-                 TIP_("Compositing | Operation %u-%u"),
+                 TIP_("Compositing | Operation %i-%li"),
                  m_num_operations_finished + 1,
                  m_operations.size());
     tree->stats_draw(tree->sdh, buf);
