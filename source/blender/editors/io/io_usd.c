@@ -435,10 +435,14 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(box, ptr, "import_proxy", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "import_render", 0, NULL, ICON_NONE);
 
-  box = uiLayoutBox(layout);
-  uiItemL(box, IFACE_("Experimental"), ICON_NONE);
-  uiItemR(box, ptr, "import_usd_preview", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "set_material_blend", 0, NULL, ICON_NONE);
+  if (RNA_boolean_get(ptr, "import_materials")) {
+    box = uiLayoutBox(layout);
+    uiItemL(box, IFACE_("Experimental"), ICON_NONE);
+    uiItemR(box, ptr, "import_usd_preview", 0, NULL, ICON_NONE);
+    if (RNA_boolean_get(ptr, "import_usd_preview")) {
+      uiItemR(box, ptr, "set_material_blend", 0, NULL, ICON_NONE);
+    }
+  }
 }
 
 void WM_OT_usd_import(struct wmOperatorType *ot)
@@ -560,7 +564,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
 
   RNA_def_boolean(ot->srna,
                   "set_material_blend",
-                  false,
+                  true,
                   "Set Material Blend",
                   "If the Import USD Preview option is enabled, "
                   "the material blend method will automatically be set based on the "
