@@ -371,54 +371,26 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiLayoutSetPropSep(layout, true);
 
   uiLayout *box = uiLayoutBox(layout);
-  uiLayout *row = uiLayoutRow(box, false);
-
   uiItemL(box, IFACE_("USD Import"), ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemL(row, IFACE_("Global Read Flag:"), ICON_NONE);
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "global_read_flag", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemL(row, IFACE_("Manual Transform:"), ICON_NONE);
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "scale", 0, NULL, ICON_NONE);
+  uiItemL(box, IFACE_("Global Read Flag:"), ICON_NONE);
+  uiItemR(box, ptr, "global_read_flag", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+  uiItemL(box, IFACE_("Manual Transform:"), ICON_NONE);
+  uiItemR(box, ptr, "scale", 0, NULL, ICON_NONE);
 
   box = uiLayoutBox(layout);
-  row = uiLayoutRow(box, false);
-  uiItemL(row, IFACE_("Options:"), ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "relative_path", 0, NULL, ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "set_frame_range", 0, NULL, ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "import_subdiv", 0, NULL, ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "import_visible_only", 0, NULL, ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "create_collection", 0, NULL, ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "convert_to_z_up", 0, NULL, ICON_NONE);
-
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "light_intensity_scale", 0, NULL, ICON_NONE);
+  uiItemL(box, IFACE_("Options:"), ICON_NONE);
+  uiItemR(box, ptr, "relative_path", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "set_frame_range", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "import_subdiv", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "import_visible_only", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "create_collection", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "convert_to_z_up", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "light_intensity_scale", 0, NULL, ICON_NONE);
 
   uiLayout *prim_path_mask_box = uiLayoutBox(box);
-  row = uiLayoutRow(prim_path_mask_box, false);
-  uiItemL(row, IFACE_("Prim Path Mask:"), ICON_NONE);
-
-  row = uiLayoutRow(prim_path_mask_box, false);
-  uiItemR(row, ptr, "prim_path_mask", 0, NULL, ICON_NONE);
+  uiItemL(prim_path_mask_box, IFACE_("Prim Path Mask:"), ICON_NONE);
+  uiItemR(prim_path_mask_box, ptr, "prim_path_mask", 0, NULL, ICON_NONE);
 
   box = uiLayoutBox(layout);
   uiItemL(box, IFACE_("Primitive Types:"), ICON_OBJECT_DATA);
