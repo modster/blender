@@ -173,7 +173,7 @@ bool RecursiveFileListReader::shouldContinueRecursion() const
 
 bool RecursiveFileListReader::ShouldRecurseIntoFile(const AbstractFileListEntry &entry)
 {
-  /* TODO */
+  /* TODO "recurse into blends" option isn't implemented at all. */
   const bool recurse_into_blends = false;
   /* Only recurse into blends if requested by the file-list type. */
   if (dynamic_cast<const BlendEntry *>(&entry)) {
