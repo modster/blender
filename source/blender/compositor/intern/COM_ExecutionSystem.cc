@@ -488,12 +488,13 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
     Vector<WorkPackage> works(n_works);
     int split_y = work_rect.ymin;
     for (int i = 0; i < n_works; i++) {
-      WorkPackage &work = works[i];
       int split_height = std_split_height;
       if (remaining > 0) {
         split_height++;
         remaining--;
       }
+      WorkPackage &work = works[i];
+      work.type = eWorkPackageType::CustomFunction;
       work.custom_func = [=, &work_func, &work_rect]() {
         if (!is_breaked()) {
           rcti split_rect;
@@ -502,7 +503,7 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
           work_func(split_rect);
         }
       };
-      work.execution_group = nullptr;
+
       WorkScheduler::schedule(&work);
 
       split_y += split_height;

@@ -34,6 +34,8 @@ class ExecutionGroup;
  * \see WorkScheduler
  */
 struct WorkPackage {
+  eWorkPackageType type;
+
   eWorkPackageState state = eWorkPackageState::NotScheduled;
 
   /**
@@ -52,7 +54,7 @@ struct WorkPackage {
   rcti rect;
 
   /**
-   * Custom work function to execute when there is no execution group.
+   * Custom function to execute when work package type is CustomFunction.
    */
   std::function<void()> custom_func;
 
