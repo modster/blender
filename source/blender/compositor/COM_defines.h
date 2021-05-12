@@ -21,11 +21,11 @@
 namespace blender::compositor {
 
 enum class eExecutionModel {
-  /* Operations are executed from outputs to inputs grouped in execution groups and rendered
+  /** Operations are executed from outputs to inputs grouped in execution groups and rendered
    * in tiles.
    */
   Tiled,
-  /* Operations are fully rendered in order from inputs to outputs. */
+  /** Operations are fully rendered in order from inputs to outputs. */
   FullFrame
 };
 

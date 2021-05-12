@@ -92,7 +92,7 @@ class CompositorContext {
   const char *m_viewName;
 
   /**
-   * Active execution model
+   * Active execution model.
    */
   eExecutionModel m_execution_model;
 

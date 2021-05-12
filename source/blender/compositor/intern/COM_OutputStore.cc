@@ -91,7 +91,7 @@ void OutputStore::read_finished(NodeOperation *read_op)
   output.received_reads++;
   BLI_assert(output.received_reads > 0 && output.received_reads <= output.registered_reads);
   if (output.received_reads == output.registered_reads) {
-    /* delete buffer */
+    /* Delete buffer. */
     output.buffer = nullptr;
   }
 }
