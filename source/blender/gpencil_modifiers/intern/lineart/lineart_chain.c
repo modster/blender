@@ -740,7 +740,8 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
       }
     }
 
-    float new_len = len_v2v2(cre->rlci->pos, rlci->pos);
+    float new_len = rb->chain_geometry_space ? len_v3v3(cre->rlci->gpos, rlci->gpos) :
+                                               len_v2v2(cre->rlci->pos, rlci->pos);
     if (new_len < dist) {
       closest_cre = cre;
       dist = new_len;

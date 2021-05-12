@@ -3012,6 +3012,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->remove_doubles = (lmd->calculation_flags & LRT_REMOVE_DOUBLES) != 0;
   rb->floating_as_contour = (lmd->calculation_flags & LRT_FLOATING_AS_CONTOUR) != 0;
   rb->chain_floating_edges = (lmd->calculation_flags & LRT_CHAIN_FLOATING_EDGES) != 0;
+  rb->chain_geometry_space = (lmd->calculation_flags & LRT_CHAIN_GEOMETRY_SPACE) != 0;
 
   /* See lineart_edge_from_triangle() for how this option may impact performance. */
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;

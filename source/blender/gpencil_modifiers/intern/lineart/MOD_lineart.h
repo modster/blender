@@ -305,6 +305,7 @@ typedef struct LineartRenderBuffer {
   bool remove_doubles;
   bool floating_as_contour;
   bool chain_floating_edges;
+  bool chain_geometry_space;
 
   bool filter_face_mark;
   bool filter_face_mark_invert;

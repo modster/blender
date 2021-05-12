@@ -541,6 +541,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "use_fuzzy_all", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "chain_floating_edges", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "chain_geometry_space", 0, NULL, ICON_NONE);
 
   uiItemR(layout, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
 
