@@ -456,7 +456,9 @@ static void node_draw_frame(const bContext *C,
   }
 
   /* label */
-  node_draw_frame_label(ntree, node, snode->runtime->aspect);
+  if (node->label[0] != '\0') {
+    node_draw_frame_label(ntree, node, snode->runtime->aspect);
+  }
 
   UI_block_end(C, node->block);
   UI_block_draw(C, node->block);
@@ -3338,6 +3340,8 @@ static const float std_node_socket_colors[][4] = {
     {0.89, 0.76, 0.43, 1.0}, /* SOCK_IMAGE */
     {0.00, 0.84, 0.64, 1.0}, /* SOCK_GEOMETRY */
     {0.96, 0.96, 0.96, 1.0}, /* SOCK_COLLECTION */
+    {0.50, 0.00, 0.00, 1.0}, /* SOCK_TEXTURE, TODO: Choose color. */
+    {0.00, 0.50, 0.00, 1.0}, /* SOCK_MATERIAL, TODO: Choose color. */
 };
 
 /* common color callbacks for standard types */
@@ -3475,6 +3479,14 @@ static void std_node_socket_draw(
       break;
     }
     case SOCK_COLLECTION: {
+      uiItemR(layout, ptr, "default_value", DEFAULT_FLAGS, text, 0);
+      break;
+    }
+    case SOCK_TEXTURE: {
+      uiTemplateID(layout, C, ptr, "default_value", "texture.new", NULL, NULL, 0, ICON_NONE, NULL);
+      break;
+    }
+    case SOCK_MATERIAL: {
       uiItemR(layout, ptr, "default_value", DEFAULT_FLAGS, text, 0);
       break;
     }
