@@ -55,6 +55,7 @@ typedef enum eLineartMainFlags {
   LRT_FILTER_FACE_MARK_BOUNDARIES = (1 << 11),
   LRT_CHAIN_FLOATING_EDGES = (1 << 11),
   LRT_CHAIN_GEOMETRY_SPACE = (1 << 12),
+  LRT_ALLOW_MULTIPLE_EDGE_TYPES = (1 << 13),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {

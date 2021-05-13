@@ -1818,8 +1818,9 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
                                                can_find_freestyle_face,
                                                bm);
     if (eflag) {
-      /* Only allocate for feature lines (instead of all lines) to save memory. */
-      allocate_la_e += lineart_edge_type_duplication_count(eflag);
+      /* Only allocate for feature lines (instead of all lines) to save memory.
+       * If allow duplicated edges, one edge gets added multiple times if it has multiple types. */
+      allocate_la_e += rb->allow_duplicated_types ? lineart_edge_type_duplication_count(eflag) : 1;
     }
     /* Here we just use bm's flag for when loading actual lines, then we don't need to call
      * lineart_identify_feature_line() again, e->head.hflag deleted after loading anyway. Always
@@ -1886,6 +1887,10 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 
       la_e++;
       la_s++;
+
+      if (!rb->allow_duplicated_types) {
+        break;
+      }
     }
   }
 
@@ -3017,6 +3022,9 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   /* See lineart_edge_from_triangle() for how this option may impact performance. */
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
 
+  rb->allow_duplicated_types = (lmd->calculation_flags & LRT_ALLOW_MULTIPLE_EDGE_TYPES) != 0;
+
+  /* lmd->edge_types_override contains all used flags in the modifier stack. */
   rb->use_contour = (lmd->edge_types_override & LRT_EDGE_FLAG_CONTOUR) != 0;
   rb->use_crease = (lmd->edge_types_override & LRT_EDGE_FLAG_CREASE) != 0;
   rb->use_material = (lmd->edge_types_override & LRT_EDGE_FLAG_MATERIAL) != 0;

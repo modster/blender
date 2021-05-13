@@ -2810,6 +2810,12 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       prop, "Use Geometry Space", "Use geometry distance for chaining instead of image space.");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "use_multiple_edge_types", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_ALLOW_MULTIPLE_EDGE_TYPES);
+  RNA_def_property_ui_text(
+      prop, "Multiple Edge Types", "Allow edges with muliple types be added for every type");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "stroke_offset", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_ui_text(prop,
                            "Stroke Offset",

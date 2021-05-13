@@ -302,6 +302,7 @@ typedef struct LineartRenderBuffer {
   bool fuzzy_everything;
   bool allow_boundaries;
   bool allow_overlapping_edges;
+  bool allow_duplicated_types;
   bool remove_doubles;
   bool floating_as_contour;
   bool chain_floating_edges;
