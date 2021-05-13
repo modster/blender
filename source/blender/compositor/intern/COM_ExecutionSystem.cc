@@ -279,136 +279,11 @@ void ExecutionSystem::execute_full_frame()
   for (eCompositorPriority priority : priorities) {
     for (NodeOperation *op : m_operations) {
       if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
-        render_operation(op);
+        op->render(*this);
       }
     }
   }
   WorkScheduler::stop();
-}
-
-/**
- * Renders given operation and its inputs. Rendered buffers are saved in the output store.
- */
-void ExecutionSystem::render_operation(NodeOperation *operation)
-{
-  OutputStore &output_store = get_output_store();
-  if (!output_store.is_output_rendered(operation)) {
-    /* Ensure inputs are rendered. */
-    int n_inputs = operation->getNumberOfInputSockets();
-    blender::Vector<NodeOperation *> inputs_ops;
-    for (int i = 0; i < n_inputs; i++) {
-      NodeOperation *input_op = &operation->getInputSocket(i)->getLink()->getOperation();
-      render_operation(input_op);
-      inputs_ops.append(input_op);
-    }
-
-    /* Get input buffers. */
-    blender::Vector<MemoryBuffer *> inputs_bufs;
-    for (NodeOperation *input_op : inputs_ops) {
-      inputs_bufs.append(output_store.get_rendered_output(input_op));
-    }
-
-    /* Create output buffer if needed. */
-    bool has_output_buffer = operation->getNumberOfOutputSockets() > 0;
-    MemoryBuffer *output_buf = nullptr;
-    if (has_output_buffer) {
-      DataType data_type = operation->getOutputSocket(0)->getDataType();
-      rcti rect;
-      BLI_rcti_init(&rect, 0, operation->getWidth(), 0, operation->getHeight());
-      bool is_a_single_elem = operation->get_flags().is_set_operation;
-      output_buf = new MemoryBuffer(data_type, rect, is_a_single_elem);
-    }
-
-    /* Render. */
-    blender::Span<rcti> render_rects = output_store.get_rects_to_render(operation);
-    if (operation->get_flags().is_fullframe_operation) {
-      operation->initExecution();
-      for (const rcti &render_rect : render_rects) {
-        operation->update_memory_buffer(output_buf, render_rect, inputs_bufs.as_span(), *this);
-      }
-      operation->deinitExecution();
-    }
-    else {
-      render_operation_tiled(operation, output_buf, render_rects, inputs_bufs.as_span());
-    }
-    output_store.set_rendered_output(operation, std::unique_ptr<MemoryBuffer>(output_buf));
-
-    /* Report inputs reads so that buffers may be freed when all their readers
-     * have finished. */
-    for (NodeOperation *input_op : inputs_ops) {
-      output_store.read_finished(input_op);
-    }
-
-    operation_finished();
-  }
-}
-
-/**
- * Renders given operation using the tiled implementation.
- */
-void ExecutionSystem::render_operation_tiled(NodeOperation *operation,
-                                             MemoryBuffer *output_buf,
-                                             Span<rcti> render_rects,
-                                             blender::Span<MemoryBuffer *> inputs)
-{
-  /* Set input buffers as input operations. */
-  Vector<NodeOperationOutput *> orig_links;
-  for (int i = 0; i < inputs.size(); i++) {
-    NodeOperationInput *input_socket = operation->getInputSocket(i);
-    BufferOperation *buffer_op = new BufferOperation(inputs[i], input_socket->getDataType());
-    orig_links.append(input_socket->getLink());
-    input_socket->setLink(buffer_op->getOutputSocket());
-  }
-
-  /* Execute operation tiled implementation. */
-  operation->initExecution();
-  bool is_output_operation = operation->getNumberOfOutputSockets() == 0;
-  if (!is_output_operation && output_buf->is_a_single_elem()) {
-    float *output = output_buf->get_elem(0, 0);
-    operation->readSampled(output, 0, 0, PixelSampler::Nearest);
-  }
-  else {
-    bool is_complex = operation->get_flags().complex;
-    for (const rcti &rect : render_rects) {
-      execute_work(rect, [=](const rcti &split_rect) {
-        if (is_output_operation) {
-          rcti region = split_rect;
-          operation->executeRegion(&region, 0);
-        }
-        else {
-          rcti tile_rect = split_rect;
-          void *tile_data = operation->initializeTileData(&tile_rect);
-          int elem_stride = output_buf->elem_stride;
-          for (int y = split_rect.ymin; y < split_rect.ymax; y++) {
-            float *output_elem = output_buf->get_elem(split_rect.xmin, y);
-            if (is_complex) {
-              for (int x = split_rect.xmin; x < split_rect.xmax; x++) {
-                operation->read(output_elem, x, y, tile_data);
-                output_elem += elem_stride;
-              }
-            }
-            else {
-              for (int x = split_rect.xmin; x < split_rect.xmax; x++) {
-                operation->readSampled(output_elem, x, y, PixelSampler::Nearest);
-                output_elem += elem_stride;
-              }
-            }
-          }
-          if (tile_data) {
-            operation->deinitializeTileData(&tile_rect, tile_data);
-          }
-        }
-      });
-    }
-  }
-  operation->deinitExecution();
-
-  /* Delete buffer operations and set original ones. */
-  for (int i = 0; i < inputs.size(); i++) {
-    NodeOperationInput *input_socket = operation->getInputSocket(i);
-    delete &input_socket->getLink()->getOperation();
-    input_socket->setLink(orig_links[i]);
-  }
 }
 
 /**
@@ -533,8 +408,14 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
   }
 }
 
-void ExecutionSystem::operation_finished()
+void ExecutionSystem::operation_finished(NodeOperation *operation)
 {
+  /* Report inputs reads so that buffers may be freed/reused. */
+  int n_inputs = operation->getNumberOfInputSockets();
+  for (int i = 0; i < n_inputs; i++) {
+    m_output_store.read_finished(operation->getInputOperation(i));
+  }
+
   m_num_operations_finished++;
   update_progress_bar();
 }

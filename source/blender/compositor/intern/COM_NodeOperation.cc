@@ -20,6 +20,7 @@
 #include <memory>
 #include <typeinfo>
 
+#include "COM_BufferOperation.h"
 #include "COM_ExecutionSystem.h"
 #include "COM_ReadBufferOperation.h"
 #include "COM_defines.h"
@@ -176,13 +177,17 @@ bool NodeOperation::determineDependingAreaOfInterest(rcti *input,
   return !first;
 }
 
+/* -------------------------------------------------------------------- */
+/** \name Full Frame Methods
+ * \{ */
+
 /**
  * Get input area being read by this operation.
  *
  * Implementation don't need to ensure r_input_rect is within operation bounds. The caller must
  * clamp it.
  */
-void NodeOperation::get_input_area_of_interest(int input_idx,
+void NodeOperation::get_input_area_of_interest(const int input_idx,
                                                const rcti &output_rect,
                                                rcti &r_input_rect)
 {
@@ -193,12 +198,165 @@ void NodeOperation::get_input_area_of_interest(int input_idx,
     /* Non full-frame operations never implement this method. To ensure correctness assume
      * whole area is used. */
     NodeOperation *input_op = getInputOperation(input_idx);
-    r_input_rect.xmin = 0;
-    r_input_rect.ymin = 0;
-    r_input_rect.xmax = input_op->getWidth();
-    r_input_rect.ymax = input_op->getHeight();
+    BLI_rcti_init(&r_input_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
   }
 }
+
+/**
+ * Renders operation and its inputs. Rendered buffers are saved in the output store.
+ */
+void NodeOperation::render(ExecutionSystem &exec_system)
+{
+  OutputStore &output_store = exec_system.get_output_store();
+  if (output_store.is_output_rendered(this)) {
+    return;
+  }
+
+  Vector<MemoryBuffer *> inputs_bufs = get_rendered_inputs_buffers(exec_system);
+
+  const bool has_output = getNumberOfOutputSockets() > 0;
+  MemoryBuffer *output_buf = has_output ? create_output_buffer() : nullptr;
+
+  Span<rcti> render_rects = output_store.get_rects_to_render(this);
+  if (get_flags().is_fullframe_operation) {
+    render_full_frame(output_buf, render_rects, inputs_bufs, exec_system);
+  }
+  else {
+    render_full_frame_fallback(output_buf, render_rects, inputs_bufs, exec_system);
+  }
+  output_store.set_rendered_output(this, std::unique_ptr<MemoryBuffer>(output_buf));
+
+  exec_system.operation_finished(this);
+}
+
+void NodeOperation::render_full_frame(MemoryBuffer *output_buf,
+                                      Span<rcti> render_rects,
+                                      Span<MemoryBuffer *> inputs_bufs,
+                                      ExecutionSystem &exec_system)
+{
+  initExecution();
+  for (const rcti &render_rect : render_rects) {
+    update_memory_buffer(output_buf, render_rect, inputs_bufs, exec_system);
+  }
+  deinitExecution();
+}
+
+Vector<MemoryBuffer *> NodeOperation::get_rendered_inputs_buffers(ExecutionSystem &exec_system)
+{
+  OutputStore &output_store = exec_system.get_output_store();
+
+  const int n_inputs = getNumberOfInputSockets();
+  Vector<MemoryBuffer *> inputs_buffers(n_inputs);
+  for (int i = 0; i < n_inputs; i++) {
+    NodeOperation *input_op = getInputOperation(i);
+    if (!output_store.is_output_rendered(input_op)) {
+      input_op->render(exec_system);
+    }
+    inputs_buffers[i] = output_store.get_rendered_output(input_op);
+  }
+  return inputs_buffers;
+}
+
+MemoryBuffer *NodeOperation::create_output_buffer()
+{
+  rcti op_rect;
+  BLI_rcti_init(&op_rect, 0, getWidth(), 0, getHeight());
+
+  const DataType data_type = getOutputSocket(0)->getDataType();
+  const bool is_a_single_elem = get_flags().is_set_operation;
+  return new MemoryBuffer(data_type, op_rect, is_a_single_elem);
+}
+
+/**
+ * Renders operation using the tiled implementation.
+ */
+void NodeOperation::render_full_frame_fallback(MemoryBuffer *output_buf,
+                                               Span<rcti> render_rects,
+                                               Span<MemoryBuffer *> inputs_bufs,
+                                               ExecutionSystem &exec_system)
+{
+  Vector<NodeOperationOutput *> orig_input_links = replace_inputs_with_buffers(inputs_bufs);
+
+  initExecution();
+  const bool is_output_operation = getNumberOfOutputSockets() == 0;
+  if (!is_output_operation && output_buf->is_a_single_elem()) {
+    float *output_elem = output_buf->get_elem(0, 0);
+    readSampled(output_elem, 0, 0, PixelSampler::Nearest);
+  }
+  else {
+    for (const rcti &rect : render_rects) {
+      exec_system.execute_work(rect, [=](const rcti &split_rect) {
+        rcti tile_rect = split_rect;
+        if (is_output_operation) {
+          executeRegion(&tile_rect, 0);
+        }
+        else {
+          render_tile(output_buf, &tile_rect);
+        }
+      });
+    }
+  }
+  deinitExecution();
+
+  remove_buffers_and_restore_original_inputs(orig_input_links);
+}
+
+void NodeOperation::render_tile(MemoryBuffer *output_buf, rcti *tile_rect)
+{
+  const bool is_complex = get_flags().complex;
+  void *tile_data = is_complex ? initializeTileData(tile_rect) : nullptr;
+  const int elem_stride = output_buf->elem_stride;
+  for (int y = tile_rect->ymin; y < tile_rect->ymax; y++) {
+    float *output_elem = output_buf->get_elem(tile_rect->xmin, y);
+    if (is_complex) {
+      for (int x = tile_rect->xmin; x < tile_rect->xmax; x++) {
+        read(output_elem, x, y, tile_data);
+        output_elem += elem_stride;
+      }
+    }
+    else {
+      for (int x = tile_rect->xmin; x < tile_rect->xmax; x++) {
+        readSampled(output_elem, x, y, PixelSampler::Nearest);
+        output_elem += elem_stride;
+      }
+    }
+  }
+  if (tile_data) {
+    deinitializeTileData(tile_rect, tile_data);
+  }
+}
+
+/**
+ * \return Replaced inputs links.
+ */
+Vector<NodeOperationOutput *> NodeOperation::replace_inputs_with_buffers(
+    Span<MemoryBuffer *> inputs_bufs)
+{
+  BLI_assert(inputs_bufs.size() == getNumberOfInputSockets());
+  Vector<NodeOperationOutput *> orig_links(inputs_bufs.size());
+  for (int i = 0; i < inputs_bufs.size(); i++) {
+    NodeOperationInput *input_socket = getInputSocket(i);
+    BufferOperation *buffer_op = new BufferOperation(inputs_bufs[i], input_socket->getDataType());
+    orig_links[i] = input_socket->getLink();
+    input_socket->setLink(buffer_op->getOutputSocket());
+  }
+  return orig_links;
+}
+
+void NodeOperation::remove_buffers_and_restore_original_inputs(
+    Span<NodeOperationOutput *> original_inputs_links)
+{
+  BLI_assert(original_inputs_links.size() == getNumberOfInputSockets());
+  for (int i = 0; i < original_inputs_links.size(); i++) {
+    BLI_assert(typeid(*getInputOperation(i)) == typeid(BufferOperation));
+
+    NodeOperationInput *input_socket = getInputSocket(i);
+    delete &input_socket->getLink()->getOperation();
+    input_socket->setLink(original_inputs_links[i]);
+  }
+}
+
+/** \} */
 
 /*****************
  **** OpInput ****

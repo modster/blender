@@ -352,6 +352,8 @@ class NodeOperation {
   }
   NodeOperationOutput *getOutputSocket(unsigned int index = 0);
   NodeOperationInput *getInputSocket(unsigned int index);
+  SocketReader *getInputSocketReader(unsigned int inputSocketindex);
+  NodeOperation *getInputOperation(unsigned int inputSocketindex);
 
   /**
    * \brief determine the resolution of this node
@@ -549,20 +551,27 @@ class NodeOperation {
     return std::unique_ptr<MetaData>();
   }
 
-  /*** FullFrame methods ***/
+  /* -------------------------------------------------------------------- */
+  /** \name Full Frame Methods
+   * \{ */
+
+  void render(ExecutionSystem &exec_system);
 
   /**
    * Executes operation updating output memory buffer. Single-threaded calls.
    */
   virtual void update_memory_buffer(MemoryBuffer *UNUSED(output),
                                     const rcti &UNUSED(output_rect),
-                                    blender::Span<MemoryBuffer *> UNUSED(inputs),
+                                    Span<MemoryBuffer *> UNUSED(inputs),
                                     ExecutionSystem &UNUSED(exec_system))
   {
   }
+
   virtual void get_input_area_of_interest(int input_idx,
                                           const rcti &output_rect,
                                           rcti &r_input_rect);
+
+  /** \} */
 
  protected:
   NodeOperation();
@@ -580,8 +589,6 @@ class NodeOperation {
     this->m_height = height;
     this->flags.is_resolution_set = true;
   }
-  SocketReader *getInputSocketReader(unsigned int inputSocketindex);
-  NodeOperation *getInputOperation(unsigned int inputSocketindex);
 
   void deinitMutex();
   void initMutex();
@@ -642,6 +649,29 @@ class NodeOperation {
       float /*output*/[4], float /*x*/, float /*y*/, float /*dx*/[2], float /*dy*/[2])
   {
   }
+
+ private:
+  /* -------------------------------------------------------------------- */
+  /** \name Full Frame Methods
+   * \{ */
+
+  void render_full_frame(MemoryBuffer *output_buf,
+                         Span<rcti> render_rects,
+                         Span<MemoryBuffer *> inputs_bufs,
+                         ExecutionSystem &exec_system);
+  Vector<MemoryBuffer *> get_rendered_inputs_buffers(ExecutionSystem &exec_system);
+  MemoryBuffer *create_output_buffer();
+
+  void render_full_frame_fallback(MemoryBuffer *output_buf,
+                                  Span<rcti> render_rects,
+                                  Span<MemoryBuffer *> inputs,
+                                  ExecutionSystem &exec_system);
+  void render_tile(MemoryBuffer *output_buf, rcti *tile_rect);
+  Vector<NodeOperationOutput *> replace_inputs_with_buffers(Span<MemoryBuffer *> inputs_bufs);
+  void remove_buffers_and_restore_original_inputs(
+      Span<NodeOperationOutput *> original_inputs_links);
+
+  /** \} */
 
   /* allow the DebugInfo class to look at internals */
   friend class DebugInfo;

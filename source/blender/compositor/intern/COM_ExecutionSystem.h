@@ -207,6 +207,8 @@ class ExecutionSystem {
 
   void execute_work(const rcti &work_rect, std::function<void(const rcti &split_rect)> work_func);
 
+  void operation_finished(NodeOperation *operation);
+
  private:
   void execute_groups(eCompositorPriority priority);
 
@@ -216,12 +218,7 @@ class ExecutionSystem {
   void get_output_render_rect(NodeOperation *output_op, rcti &r_rect);
   void determine_rects_to_render(NodeOperation *operation, const rcti &render_rect);
   void determine_reads(NodeOperation *operation);
-  void render_operation(NodeOperation *operation);
-  void render_operation_tiled(NodeOperation *operation,
-                              MemoryBuffer *output_buf,
-                              Span<rcti> render_rects,
-                              blender::Span<MemoryBuffer *> inputs);
-  void operation_finished();
+
   void update_progress_bar();
   bool is_breaked() const;
 
