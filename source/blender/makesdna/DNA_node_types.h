@@ -457,7 +457,6 @@ typedef struct bNodeTree {
   short is_updating;
   /** Generic temporary flag for recursion check (DFS/BFS). */
   short done;
-  char _pad2[4];
 
   /** Specific node type this tree is used for. */
   int nodetype DNA_DEPRECATED;
@@ -468,6 +467,8 @@ typedef struct bNodeTree {
   short render_quality;
   /** Tile size for compositor engine. */
   int chunksize;
+  /** Execution model to use for compositor engine. */
+  int execution_model;
 
   rctf viewer_border;
 
@@ -540,6 +541,12 @@ typedef enum eNodeTreeUpdate {
   /* group has changed (generic flag including all other group flags) */
   NTREE_UPDATE_GROUP = (NTREE_UPDATE_GROUP_IN | NTREE_UPDATE_GROUP_OUT),
 } eNodeTreeUpdate;
+
+/* tree->execution_model */
+typedef enum eNodeTreeExecutionModel {
+  NTREE_EXECUTION_MODEL_TILED = 0,
+  NTREE_EXECUTION_MODEL_FULL_FRAME = 1,
+} NTreeExecutionModel;
 
 /* socket value structs for input buttons
  * DEPRECATED now using ID properties

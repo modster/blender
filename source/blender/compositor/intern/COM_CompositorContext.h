@@ -91,11 +91,6 @@ class CompositorContext {
    */
   const char *m_viewName;
 
-  /**
-   * Active execution model.
-   */
-  eExecutionModel m_execution_model;
-
  public:
   /**
    * \brief constructor initializes the context with default values.
@@ -287,10 +282,10 @@ class CompositorContext {
     return m_rd->size * 0.01f;
   }
 
-  eExecutionModel get_execution_model() const
-  {
-    return m_execution_model;
-  }
+  /**
+   * Get active execution model.
+   */
+  eExecutionModel get_execution_model() const;
 };
 
 }  // namespace blender::compositor
