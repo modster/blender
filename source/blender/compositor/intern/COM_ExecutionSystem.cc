@@ -476,48 +476,55 @@ void ExecutionSystem::get_output_render_rect(NodeOperation *output_op, rcti &r_r
 void ExecutionSystem::execute_work(const rcti &work_rect,
                                    std::function<void(const rcti &split_rect)> work_func)
 {
-  /* Split work vertically. */
+  /* Split work vertically to maximize continuous memory. */
   if (!is_breaked()) {
     int work_height = BLI_rcti_size_y(&work_rect);
     int n_cpu_threads = WorkScheduler::get_num_cpu_threads();
-    int n_works = MIN2(n_cpu_threads, work_height);
-    int std_split_height = n_works == 0 ? 0 : work_height / n_works;
-    int remaining = work_height - std_split_height * n_works;
-    Vector<WorkPackage> works(n_works);
-    int split_y = work_rect.ymin;
-    for (int i = 0; i < n_works; i++) {
-      int split_height = std_split_height;
-      if (remaining > 0) {
-        split_height++;
-        remaining--;
+    int n_sub_works = MIN2(n_cpu_threads, work_height);
+    int split_height = n_sub_works == 0 ? 0 : work_height / n_sub_works;
+    int remaining_height = work_height - split_height * n_sub_works;
+
+    Vector<WorkPackage> sub_works(n_sub_works);
+    int sub_work_y = work_rect.ymin;
+    for (int i = 0; i < n_sub_works; i++) {
+      int sub_work_height = split_height;
+
+      /* Distribute remaining height between sub-works. */
+      if (remaining_height > 0) {
+        sub_work_height++;
+        remaining_height--;
       }
-      WorkPackage &work = works[i];
-      work.type = eWorkPackageType::CustomFunction;
-      work.custom_func = [=, &work_func, &work_rect]() {
+
+      WorkPackage &sub_work = sub_works[i];
+      sub_work.type = eWorkPackageType::CustomFunction;
+      sub_work.custom_func = [=, &work_func, &work_rect]() {
         if (!is_breaked()) {
           rcti split_rect;
-          BLI_rcti_init(
-              &split_rect, work_rect.xmin, work_rect.xmax, split_y, split_y + split_height);
+          BLI_rcti_init(&split_rect,
+                        work_rect.xmin,
+                        work_rect.xmax,
+                        sub_work_y,
+                        sub_work_y + sub_work_height);
           work_func(split_rect);
         }
       };
 
-      WorkScheduler::schedule(&work);
+      WorkScheduler::schedule(&sub_work);
 
-      split_y += split_height;
+      sub_work_y += sub_work_height;
     }
-    BLI_assert(split_y == work_rect.ymax);
+    BLI_assert(sub_work_y == work_rect.ymax);
 
     WorkScheduler::finish();
 
     /* WorkScheduler::ThreadingModel::Queue needs this code because last work is still running even
      * after calling WorkScheduler::finish(). May be an issue specific to windows. */
-    bool works_finished = false;
-    while (!works_finished) {
-      works_finished = true;
-      for (WorkPackage &work : works) {
-        if (!work.finished) {
-          works_finished = false;
+    bool work_finished = false;
+    while (!work_finished) {
+      work_finished = true;
+      for (WorkPackage &sub_work : sub_works) {
+        if (!sub_work.finished) {
+          work_finished = false;
           WorkScheduler::finish();
           break;
         }
