@@ -139,11 +139,6 @@ class ExecutionSystem {
   OutputStore m_output_store;
 
   /**
-   * Number of available cpu threads for work splitting.
-   */
-  int m_num_cpu_threads;
-
-  /**
    * Number of operations finished. Only used in FullFrame execution model.
    */
   int m_num_operations_finished;
@@ -179,8 +174,7 @@ class ExecutionSystem {
                   bool fastcalculation,
                   const ColorManagedViewSettings *viewSettings,
                   const ColorManagedDisplaySettings *displaySettings,
-                  const char *viewName,
-                  int num_cpu_threads);
+                  const char *viewName);
 
   /**
    * Destructor

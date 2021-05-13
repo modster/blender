@@ -48,8 +48,7 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
                                  bool fastcalculation,
                                  const ColorManagedViewSettings *viewSettings,
                                  const ColorManagedDisplaySettings *displaySettings,
-                                 const char *viewName,
-                                 int num_cpu_threads)
+                                 const char *viewName)
 {
   this->m_context.setViewName(viewName);
   this->m_context.setScene(scene);
@@ -107,7 +106,6 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
   }
 
   m_num_operations_finished = 0;
-  m_num_cpu_threads = num_cpu_threads;
 
   const rctf &render_border = rd->border;
   m_border.use_viewer_border = use_viewer_border;
@@ -482,7 +480,8 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
   /* Split work vertically. */
   if (!is_breaked()) {
     int work_height = BLI_rcti_size_y(&work_rect);
-    int n_works = m_num_cpu_threads < work_height ? m_num_cpu_threads : work_height;
+    int n_cpu_threads = WorkScheduler::get_num_cpu_threads();
+    int n_works = n_cpu_threads < work_height ? n_cpu_threads : work_height;
     int std_split_height = n_works == 0 ? 0 : work_height / n_works;
     int remaining = work_height - std_split_height * n_works;
     Vector<WorkPackage> works(n_works);
