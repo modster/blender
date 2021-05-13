@@ -456,18 +456,17 @@ void ExecutionSystem::get_output_render_rect(NodeOperation *output_op, rcti &r_r
 {
   BLI_assert(output_op->isOutputOperation(m_context.isRendering()));
 
-  const NodeOperationFlags &op_flags = output_op->get_flags();
   BLI_rcti_init(&r_rect, 0, output_op->getWidth(), 0, output_op->getHeight());
 
+  const NodeOperationFlags &op_flags = output_op->get_flags();
   bool has_viewer_border = m_border.use_viewer_border &&
                            (op_flags.is_viewer_operation || op_flags.is_preview_operation);
   bool has_render_border = m_border.use_render_border;
   if (has_viewer_border || has_render_border) {
     rcti &border = has_viewer_border ? m_border.viewer_border : m_border.render_border;
-    r_rect.xmin = border.xmin > r_rect.xmin ? border.xmin : r_rect.xmin;
-    r_rect.xmax = border.xmax < r_rect.xmax ? border.xmax : r_rect.xmax;
-    r_rect.ymin = border.ymin > r_rect.ymin ? border.ymin : r_rect.ymin;
-    r_rect.ymax = border.ymax < r_rect.ymax ? border.ymax : r_rect.ymax;
+
+    int dummy_offset[2];
+    BLI_rcti_clamp(&r_rect, &border, dummy_offset);
   }
 }
 
@@ -481,7 +480,7 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
   if (!is_breaked()) {
     int work_height = BLI_rcti_size_y(&work_rect);
     int n_cpu_threads = WorkScheduler::get_num_cpu_threads();
-    int n_works = n_cpu_threads < work_height ? n_cpu_threads : work_height;
+    int n_works = MIN2(n_cpu_threads, work_height);
     int std_split_height = n_works == 0 ? 0 : work_height / n_works;
     int remaining = work_height - std_split_height * n_works;
     Vector<WorkPackage> works(n_works);
