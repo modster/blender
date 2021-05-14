@@ -263,6 +263,8 @@ MemoryBuffer *NodeOperation::create_output_buffer()
   BLI_rcti_init(&op_rect, 0, getWidth(), 0, getHeight());
 
   const DataType data_type = getOutputSocket(0)->getDataType();
+  /* TODO: We should check if the operation is constant instead of is_set_operation. Finding a way
+   * to know if an operation is constant has to be implemented yet. */
   const bool is_a_single_elem = get_flags().is_set_operation;
   return new MemoryBuffer(data_type, op_rect, is_a_single_elem);
 }
