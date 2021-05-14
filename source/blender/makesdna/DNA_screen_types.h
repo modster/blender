@@ -644,7 +644,7 @@ typedef enum eRegionType {
   /* Region representing an XR headset's display (internally, corresponds to an XR surface). */
   RGN_TYPE_XR = 13,
 
-#define RGN_TYPE_LEN (RGN_TYPE_TOOL_HEADER + 1)
+#define RGN_TYPE_LEN (RGN_TYPE_XR + 1)
 } eRegionType;
 
 /* use for function args */
