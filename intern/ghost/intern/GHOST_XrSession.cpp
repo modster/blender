@@ -224,7 +224,7 @@ void GHOST_XrSession::start(const GHOST_XrSessionBeginInfo *begin_info)
     std::ostringstream strstream;
     strstream << "Available graphics context version does not meet the following requirements: "
               << requirement_str;
-    throw GHOST_XrException(strstream.str().c_str());
+    throw GHOST_XrException(strstream.str().data());
   }
   m_gpu_binding->initFromGhostContext(*m_gpu_ctx);
 
@@ -551,11 +551,11 @@ void GHOST_XrSession::unbindGraphicsContext()
 
 static GHOST_XrActionSet *find_action_set(OpenXRSessionData *oxr, const char *action_set_name)
 {
-  auto action_set = oxr->action_sets.find(action_set_name);
-  if (action_set == oxr->action_sets.end()) {
+  std::map<std::string, GHOST_XrActionSet>::iterator it = oxr->action_sets.find(action_set_name);
+  if (it == oxr->action_sets.end()) {
     return nullptr;
   }
-  return &action_set->second;
+  return &it->second;
 }
 
 bool GHOST_XrSession::createActionSet(const GHOST_XrActionSetInfo &info)
@@ -726,8 +726,8 @@ bool GHOST_XrSession::attachActionSets()
 {
   /* Suggest action bindings for all action sets. */
   std::map<XrPath, std::vector<XrActionSuggestedBinding>> profile_bindings;
-  for (auto &action_set : m_oxr->action_sets) {
-    action_set.second.getBindings(profile_bindings);
+  for (auto &[name, action_set] : m_oxr->action_sets) {
+    action_set.getBindings(profile_bindings);
   }
 
   if (profile_bindings.size() < 1) {
@@ -738,10 +738,10 @@ bool GHOST_XrSession::attachActionSets()
       XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
   XrInstance instance = m_context->getInstance();
 
-  for (auto &profile : profile_bindings) {
-    bindings_info.interactionProfile = profile.first;
-    bindings_info.countSuggestedBindings = (uint32_t)profile.second.size();
-    bindings_info.suggestedBindings = profile.second.data();
+  for (auto &[profile, bindings] : profile_bindings) {
+    bindings_info.interactionProfile = profile;
+    bindings_info.countSuggestedBindings = (uint32_t)bindings.size();
+    bindings_info.suggestedBindings = bindings.data();
 
     CHECK_XR(xrSuggestInteractionProfileBindings(instance, &bindings_info),
              "Failed to suggest interaction profile bindings.");
@@ -754,8 +754,8 @@ bool GHOST_XrSession::attachActionSets()
   /* Create an aligned copy of the action sets to pass to xrAttachSessionActionSets(). */
   std::vector<XrActionSet> action_sets(attach_info.countActionSets);
   uint32_t i = 0;
-  for (auto &action_set : m_oxr->action_sets) {
-    action_sets[i++] = action_set.second.getActionSet();
+  for (auto &[name, action_set] : m_oxr->action_sets) {
+    action_sets[i++] = action_set.getActionSet();
   }
   attach_info.actionSets = action_sets.data();
 
@@ -791,9 +791,9 @@ bool GHOST_XrSession::syncActions(const char *action_set_name)
   }
   else {
     uint32_t i = 0;
-    for (auto &set : action_sets) {
+    for (auto &[name, action_set] : action_sets) {
       XrActiveActionSet &active_action_set = active_action_sets[i++];
-      active_action_set.actionSet = set.second.getActionSet();
+      active_action_set.actionSet = action_set.getActionSet();
       active_action_set.subactionPath = XR_NULL_PATH;
     }
   }
@@ -810,8 +810,8 @@ bool GHOST_XrSession::syncActions(const char *action_set_name)
     action_set->updateStates(session, reference_space, predicted_display_time);
   }
   else {
-    for (auto &set : action_sets) {
-      set.second.updateStates(session, reference_space, predicted_display_time);
+    for (auto &[name, action_set] : action_sets) {
+      action_set.updateStates(session, reference_space, predicted_display_time);
     }
   }
 

@@ -652,9 +652,7 @@ static void wm_xr_grab_init(wmOperator *op)
 
 static void wm_xr_grab_uninit(wmOperator *op)
 {
-  if (op->customdata) {
-    MEM_freeN(op->customdata);
-  }
+  MEM_SAFE_FREE(op->customdata);
 }
 
 static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)

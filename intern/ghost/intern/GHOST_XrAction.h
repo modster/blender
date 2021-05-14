@@ -18,6 +18,9 @@
  * \ingroup GHOST
  */
 
+/* Note: Requires OpenXR headers to be included before this one for OpenXR types (XrSpace, XrPath,
+ * etc.). */
+
 #pragma once
 
 #include <map>
@@ -27,7 +30,7 @@
 
 class GHOST_XrActionSpace {
  public:
-  GHOST_XrActionSpace(); /* Default constructor for map storage. */
+  GHOST_XrActionSpace() = delete; /* Default constructor for map storage. */
   GHOST_XrActionSpace(XrInstance instance,
                       XrSession session,
                       XrAction action,
@@ -39,15 +42,15 @@ class GHOST_XrActionSpace {
   const XrPath &getSubactionPath() const;
 
  private:
-  XrSpace m_space;
-  XrPath m_subaction_path;
+  XrSpace m_space = XR_NULL_HANDLE;
+  XrPath m_subaction_path = XR_NULL_PATH;
 };
 
 /* -------------------------------------------------------------------- */
 
 class GHOST_XrActionProfile {
  public:
-  GHOST_XrActionProfile(); /* Default constructor for map storage. */
+  GHOST_XrActionProfile() = delete; /* Default constructor for map storage. */
   GHOST_XrActionProfile(XrInstance instance,
                         XrAction action,
                         const char *profile_path,
@@ -58,7 +61,7 @@ class GHOST_XrActionProfile {
                    std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
 
  private:
-  XrPath m_profile;
+  XrPath m_profile = XR_NULL_PATH;
   /* Bindings identified by interaction (user (subaction) + component) path. */
   std::map<std::string, XrPath> m_bindings;
 };
@@ -67,7 +70,7 @@ class GHOST_XrActionProfile {
 
 class GHOST_XrAction {
  public:
-  GHOST_XrAction(); /* Default constructor for map storage. */
+  GHOST_XrAction() = delete; /* Default constructor for map storage. */
   GHOST_XrAction(XrInstance instance, XrActionSet action_set, const GHOST_XrActionInfo &info);
   ~GHOST_XrAction();
 
@@ -94,7 +97,7 @@ class GHOST_XrAction {
   void getBindings(std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
 
  private:
-  XrAction m_action;
+  XrAction m_action = XR_NULL_HANDLE;
   GHOST_XrActionType m_type;
   std::vector<XrPath> m_subaction_paths;
   /** States for each subaction path. */
@@ -113,7 +116,7 @@ class GHOST_XrAction {
 
 class GHOST_XrActionSet {
  public:
-  GHOST_XrActionSet(); /* Default constructor for map storage. */
+  GHOST_XrActionSet() = delete; /* Default constructor for map storage. */
   GHOST_XrActionSet(XrInstance instance, const GHOST_XrActionSetInfo &info);
   ~GHOST_XrActionSet();
 
@@ -132,7 +135,7 @@ class GHOST_XrActionSet {
   void getBindings(std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
 
  private:
-  XrActionSet m_action_set;
+  XrActionSet m_action_set = XR_NULL_HANDLE;
 
   GHOST_XrCustomdataFreeFn m_customdata_free_fn;
   void *m_customdata; /* wmXrActionSet */

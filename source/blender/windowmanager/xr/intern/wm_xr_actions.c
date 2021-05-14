@@ -43,8 +43,8 @@
 
 static wmXrActionSet *action_set_create(const char *action_set_name)
 {
-  wmXrActionSet *action_set = MEM_callocN(sizeof(wmXrActionSet), __func__);
-  action_set->name = MEM_mallocN(strlen(action_set_name) + 1, __func__);
+  wmXrActionSet *action_set = MEM_callocN(sizeof(*action_set), __func__);
+  action_set->name = MEM_mallocN(strlen(action_set_name) + 1, "XrActionSet_Name");
   strcpy(action_set->name, action_set_name);
 
   return action_set;
@@ -54,9 +54,7 @@ static void action_set_destroy(void *val)
 {
   wmXrActionSet *action_set = val;
 
-  if (action_set->name) {
-    MEM_freeN(action_set->name);
-  }
+  MEM_SAFE_FREE(action_set->name);
 
   MEM_freeN(action_set);
 }
@@ -75,17 +73,19 @@ static wmXrAction *action_create(const char *action_name,
                                  IDProperty *op_properties,
                                  eXrOpFlag op_flag)
 {
-  wmXrAction *action = MEM_callocN(sizeof(wmXrAction), __func__);
-  action->name = MEM_mallocN(strlen(action_name) + 1, __func__);
+  wmXrAction *action = MEM_callocN(sizeof(*action), __func__);
+  action->name = MEM_mallocN(strlen(action_name) + 1, "XrAction_Name");
   strcpy(action->name, action_name);
   action->type = type;
 
   const unsigned int count = count_subaction_paths;
   action->count_subaction_paths = count;
 
-  action->subaction_paths = MEM_mallocN(sizeof(char *) * count, __func__);
+  action->subaction_paths = MEM_mallocN(sizeof(*action->subaction_paths) * count,
+                                        "XrAction_SubactionPaths");
   for (unsigned int i = 0; i < count; ++i) {
-    action->subaction_paths[i] = MEM_mallocN(strlen(subaction_paths[i]) + 1, __func__);
+    action->subaction_paths[i] = MEM_mallocN(strlen(subaction_paths[i]) + 1,
+                                             "XrAction_SubactionPath");
     strcpy(action->subaction_paths[i], subaction_paths[i]);
   }
 
@@ -98,7 +98,7 @@ static wmXrAction *action_create(const char *action_name,
       size = sizeof(float);
       break;
     case XR_VECTOR2F_INPUT:
-      size = sizeof(float[2]);
+      size = sizeof(float) * 2;
       break;
     case XR_POSE_INPUT:
       size = sizeof(GHOST_XrPose);
@@ -106,8 +106,8 @@ static wmXrAction *action_create(const char *action_name,
     case XR_VIBRATION_OUTPUT:
       return action;
   }
-  action->states = MEM_calloc_arrayN(count, size, __func__);
-  action->states_prev = MEM_calloc_arrayN(count, size, __func__);
+  action->states = MEM_calloc_arrayN(count, size, "XrAction_States");
+  action->states_prev = MEM_calloc_arrayN(count, size, "XrAction_StatesPrev");
 
   action->threshold = threshold;
   CLAMP(action->threshold, 0.0f, 1.0f);
@@ -123,27 +123,19 @@ static void action_destroy(void *val)
 {
   wmXrAction *action = val;
 
-  if (action->name) {
-    MEM_freeN(action->name);
-  }
+  MEM_SAFE_FREE(action->name);
 
   const unsigned int count = action->count_subaction_paths;
   char **subaction_paths = action->subaction_paths;
   if (subaction_paths) {
     for (unsigned int i = 0; i < count; ++i) {
-      if (subaction_paths[i]) {
-        MEM_freeN(subaction_paths[i]);
-      }
+      MEM_SAFE_FREE(subaction_paths[i]);
     }
     MEM_freeN(subaction_paths);
   }
 
-  if (action->states) {
-    MEM_freeN(action->states);
-  }
-  if (action->states_prev) {
-    MEM_freeN(action->states_prev);
-  }
+  MEM_SAFE_FREE(action->states);
+  MEM_SAFE_FREE(action->states_prev);
 
   MEM_freeN(action);
 }
@@ -285,7 +277,7 @@ bool WM_xr_action_space_create(wmXrData *xr,
                                const char *action_name,
                                unsigned int count_subaction_paths,
                                const char **subaction_paths,
-                               const float (*poses)[7])
+                               const wmXrPose *poses)
 {
   GHOST_XrActionSpaceInfo info = {
       .action_name = action_name,
@@ -294,12 +286,12 @@ bool WM_xr_action_space_create(wmXrData *xr,
   };
 
   GHOST_XrPose *ghost_poses = MEM_malloc_arrayN(
-      count_subaction_paths, sizeof(GHOST_XrPose), __func__);
+      count_subaction_paths, sizeof(*ghost_poses), __func__);
   for (unsigned int i = 0; i < count_subaction_paths; ++i) {
-    const float(*pose)[7] = &poses[i];
+    const wmXrPose *pose = &poses[i];
     GHOST_XrPose *ghost_pose = &ghost_poses[i];
-    copy_v3_v3(ghost_pose->position, *pose);
-    copy_qt_qt(ghost_pose->orientation_quat, &(*pose)[3]);
+    copy_v3_v3(ghost_pose->position, pose->position);
+    copy_qt_qt(ghost_pose->orientation_quat, pose->orientation_quat);
   }
   info.poses = ghost_poses;
 
@@ -424,38 +416,37 @@ bool WM_xr_controller_pose_action_set(wmXrData *xr,
 bool WM_xr_action_state_get(const wmXrData *xr,
                             const char *action_set_name,
                             const char *action_name,
-                            eXrActionType type,
                             const char *subaction_path,
-                            void *r_state)
+                            wmXrActionState *r_state)
 {
   const wmXrAction *action = action_find((wmXrData *)xr, action_set_name, action_name);
   if (!action) {
     return false;
   }
 
-  BLI_assert(action->type == type);
+  BLI_assert(action->type == (eXrActionType)r_state->type);
 
   /* Find the action state corresponding to the subaction path. */
   for (unsigned int i = 0; i < action->count_subaction_paths; ++i) {
     if (STREQ(subaction_path, action->subaction_paths[i])) {
-      switch (type) {
+      switch ((eXrActionType)r_state->type) {
         case XR_BOOLEAN_INPUT:
-          *(bool *)r_state = ((bool *)action->states)[i];
+          r_state->state_boolean = ((bool *)action->states)[i];
           break;
         case XR_FLOAT_INPUT:
-          *(float *)r_state = ((float *)action->states)[i];
+          r_state->state_float = ((float *)action->states)[i];
           break;
         case XR_VECTOR2F_INPUT:
-          copy_v2_v2(((float(*)[2])r_state)[0], ((float(*)[2])action->states)[i]);
+          copy_v2_v2(r_state->state_vector2f, ((float(*)[2])action->states)[i]);
           break;
         case XR_POSE_INPUT: {
           const GHOST_XrPose *pose = &((GHOST_XrPose *)action->states)[i];
-          float(*r_pose)[7] = (float(*)[7])r_state;
-          copy_v3_v3((*r_pose), pose->position);
-          copy_qt_qt(&(*r_pose)[3], pose->orientation_quat);
+          copy_v3_v3(r_state->state_pose.position, pose->position);
+          copy_qt_qt(r_state->state_pose.orientation_quat, pose->orientation_quat);
           break;
         }
         case XR_VIBRATION_OUTPUT:
+          BLI_assert_unreachable();
           break;
       }
       return true;

@@ -500,11 +500,11 @@ bool rna_XrSessionState_action_space_create(bContext *C,
     }
   }
 
-  float poses[2][7];
-  copy_v3_v3(poses[0], location);
-  eul_to_quat(&poses[0][3], rotation);
-  normalize_qt(&poses[0][3]);
-  memcpy(poses[1], poses[0], sizeof(float[7]));
+  wmXrPose poses[2];
+  copy_v3_v3(poses[0].position, location);
+  eul_to_quat(poses[0].orientation_quat, rotation);
+  normalize_qt(poses[0].orientation_quat);
+  memcpy(&poses[1], &poses[0], sizeof(poses[1]));
 
   return WM_xr_action_space_create(
       &wm->xr, action_set_name, action_name, count_subaction_paths, subaction_paths, poses);
@@ -583,16 +583,18 @@ void rna_XrSessionState_action_state_get(bContext *C,
                                          const char *user_path,
                                          float *r_state)
 {
-  *r_state = 0.0f;
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  if (!WM_xr_action_state_get(
-          &wm->xr, action_set_name, action_name, XR_FLOAT_INPUT, user_path, r_state)) {
-    *r_state = 0.0f;
+  wmXrActionState state = {
+      .type = XR_FLOAT_INPUT,
+  };
+  if (WM_xr_action_state_get(&wm->xr, action_set_name, action_name, user_path, &state)) {
+    *r_state = state.state_float;
   }
 #  else
   UNUSED_VARS(C, action_set_name, action_name, user_path);
 #  endif
+  *r_state = 0.0f;
 }
 
 void rna_XrSessionState_pose_action_state_get(bContext *C,
@@ -603,17 +605,19 @@ void rna_XrSessionState_pose_action_state_get(bContext *C,
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  if (!WM_xr_action_state_get(
-          &wm->xr, action_set_name, action_name, XR_POSE_INPUT, user_path, r_state)) {
-    zero_v3(r_state);
-    unit_qt(&r_state[3]);
+  wmXrActionState state = {
+      .type = XR_POSE_INPUT,
+  };
+  if (WM_xr_action_state_get(&wm->xr, action_set_name, action_name, user_path, &state)) {
+    copy_v3_v3(r_state, state.state_pose.position);
+    copy_qt_qt(&r_state[3], state.state_pose.orientation_quat);
     return;
   }
 #  else
   UNUSED_VARS(C, action_set_name, action_name, user_path);
+#  endif
   zero_v3(r_state);
   unit_qt(&r_state[3]);
-#  endif
 }
 
 bool rna_XrSessionState_haptic_action_apply(bContext *C,

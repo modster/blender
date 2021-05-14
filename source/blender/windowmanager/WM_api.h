@@ -71,6 +71,11 @@ struct wmTabletData;
 struct wmNDOFMotionData;
 #endif
 
+#ifdef WITH_XR_OPENXR
+struct wmXrActionState;
+struct wmXrPose;
+#endif
+
 typedef struct wmGizmo wmGizmo;
 typedef struct wmGizmoMap wmGizmoMap;
 typedef struct wmGizmoMapType wmGizmoMapType;
@@ -997,7 +1002,7 @@ bool WM_xr_action_space_create(wmXrData *xr,
                                const char *action_name,
                                unsigned int count_subaction_paths,
                                const char **subaction_paths,
-                               const float (*poses)[7]);
+                               const struct wmXrPose *poses);
 void WM_xr_action_space_destroy(wmXrData *xr,
                                 const char *action_set_name,
                                 const char *action_name,
@@ -1027,9 +1032,8 @@ bool WM_xr_controller_pose_action_set(wmXrData *xr,
 bool WM_xr_action_state_get(const wmXrData *xr,
                             const char *action_set_name,
                             const char *action_name,
-                            eXrActionType type,
                             const char *subaction_path,
-                            void *r_state);
+                            struct wmXrActionState *r_state);
 bool WM_xr_haptic_action_apply(wmXrData *xr,
                                const char *action_set_name,
                                const char *action_name,

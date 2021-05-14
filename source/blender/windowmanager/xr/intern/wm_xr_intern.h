@@ -32,7 +32,11 @@ typedef struct wmXrEyeData {
 } wmXrEyeData;
 
 typedef struct wmXrControllerData {
-  /** OpenXR path identifier. */
+  /** OpenXR path identifier. Length is dependent on OpenXR's XR_MAX_PATH_LENGTH (256).
+  This subaction path will later be combined with a component path, and that combined path should
+  also have a max of XR_MAX_PATH_LENGTH (e.g. subaction_path = /user/hand/left, component_path =
+  /input/trigger/value, interaction_path = /user/hand/left/input/trigger/value).
+  */
   char subaction_path[64];
   /** Last known controller pose (in world space) stored for queries. */
   GHOST_XrPose pose;
@@ -191,6 +195,5 @@ void wm_xr_session_object_autokey(struct bContext *C,
                                   bool notify);
 
 void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4]);
-void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);
 void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata);
 void wm_xr_draw_controllers(const struct bContext *C, struct ARegion *region, void *customdata);

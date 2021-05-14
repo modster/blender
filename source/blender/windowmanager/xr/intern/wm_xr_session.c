@@ -404,8 +404,8 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                                       DEFAULT_SENSOR_WIDTH);
   copy_m4_m4(eye->viewmat, viewmat);
 
-  memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(GHOST_XrPose));
-  memcpy(&state->prev_local_pose, &draw_view->local_pose, sizeof(GHOST_XrPose));
+  memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(state->prev_base_pose));
+  memcpy(&state->prev_local_pose, &draw_view->local_pose, sizeof(state->prev_local_pose));
   copy_v3_v3(state->prev_eye_position_ofs, draw_data->eye_position_ofs);
 
   state->prev_settings_flag = settings->flag;
@@ -572,6 +572,12 @@ void wm_xr_session_actions_init(wmXrData *xr)
   GHOST_XrAttachActionSets(xr->runtime->context);
 }
 
+static void wm_xr_pose_to_mat(const wmXrPose *pose, float r_mat[4][4])
+{
+  quat_to_mat4(r_mat, pose->orientation_quat);
+  copy_v3_v3(r_mat[3], pose->position);
+}
+
 static void wm_xr_session_controller_mats_update(const bContext *C,
                                                  const XrSessionSettings *settings,
                                                  const wmXrAction *controller_pose_action,
@@ -616,14 +622,13 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
         ob_flag = settings->controller1_flag;
         break;
       default:
-        BLI_assert(false);
         ob_constraint = NULL;
         ob_flag = 0;
         break;
     }
 
     /* Calculate controller matrix in world space. */
-    wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp);
+    wm_xr_pose_to_mat(&((wmXrPose *)controller_pose_action->states)[i], tmp);
 
     /* Apply eye position and base pose offsets. */
     sub_v3_v3(tmp[3], view_ofs);
@@ -675,7 +680,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
   const wmXrEyeData *eye_data = &session_state->eyes[settings->selection_eye];
   wmXrAction *active_modal_action = action_set->active_modal_action;
 
-  wmXrAction **actions = MEM_calloc_arrayN(count, sizeof(wmXrAction *), __func__);
+  wmXrAction **actions = MEM_calloc_arrayN(count, sizeof(*actions), __func__);
 
   GHOST_XrGetActionCustomdatas(xr_context, action_set_name, actions);
 
@@ -796,7 +801,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
           }
           case XR_POSE_INPUT:
           case XR_VIBRATION_OUTPUT:
-            BLI_assert(false);
+            BLI_assert_unreachable();
             break;
         }
 
