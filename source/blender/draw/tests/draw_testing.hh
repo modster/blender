@@ -8,6 +8,7 @@ namespace blender::draw {
 class DrawTest : public blender::gpu::GPUTest {
  public:
   void SetUp() override;
+  void TearDown() override;
 };
 
 }  // namespace blender::draw
