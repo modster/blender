@@ -623,19 +623,6 @@ static void rna_userdef_autosave_update(Main *bmain, Scene *scene, PointerRNA *p
   rna_userdef_update(bmain, scene, ptr);
 }
 
-static void rna_userdef_use_full_frame_compositor_update(Main *bmain,
-                                                         Scene *scene,
-                                                         PointerRNA *ptr)
-{
-  UserDef_Experimental *experimental = (UserDef_Experimental *)ptr->data;
-  for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
-    if (scene->nodetree) {
-      scene->nodetree->execution_mode = experimental->use_full_frame_compositor;
-    }
-  }
-  rna_userdef_update(bmain, scene, ptr);
-}
-
 #  define RNA_USERDEF_EXPERIMENTAL_BOOLEAN_GET(member) \
     static bool rna_userdef_experimental_##member##_get(PointerRNA *ptr) \
     { \
@@ -6293,9 +6280,9 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "use_full_frame_compositor", 1);
   RNA_def_property_ui_text(prop,
                            "Full Frame Compositor",
-                           "Enable compositor full frame execution mode (no tiling, reduces "
-                           "execution time and memory usage)");
-  RNA_def_property_update(prop, 0, "rna_userdef_use_full_frame_compositor_update");
+                           "Enable compositor full frame execution mode option (no tiling, "
+                           "reduces execution time and memory usage)");
+  RNA_def_property_update(prop, 0, "rna_userdef_update");
 
   prop = RNA_def_property(srna, "use_new_hair_type", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_new_hair_type", 1);
