@@ -34,15 +34,18 @@ class ExecutionGroup;
 
 namespace blender::compositor {
 
+/* Forward declarations. */
+class ExecutionModel;
+
 /**
  * \page execution Execution model
- * In order to get to an efficient model for execution, several steps are being done. these steps
- * are explained below.
+ * In order to get to an efficient model for execution, several steps are being done. these
+ * steps are explained below.
  *
  * \section EM_Step1 Step 1: translating blender node system to the new compositor system
- * Blenders node structure is based on C structs (DNA). These structs are not efficient in the new
- * architecture. We want to use classes in order to simplify the system. during this step the
- * blender node_tree is evaluated and converted to a CPP node system.
+ * Blenders node structure is based on C structs (DNA). These structs are not efficient in the
+ * new architecture. We want to use classes in order to simplify the system. during this step
+ * the blender node_tree is evaluated and converted to a CPP node system.
  *
  * \see ExecutionSystem
  * \see Converter.convert
@@ -55,12 +58,13 @@ namespace blender::compositor {
  * \see GroupNode
  * \see ExecutionSystemHelper.ungroup
  *
- * Every node has the ability to convert itself to operations. The node itself is responsible to
- * create a correct NodeOperation setup based on its internal settings. Most Node only need to
- * convert it to its NodeOperation. Like a ColorToBWNode doesn't check anything, but replaces
- * itself with a ConvertColorToBWOperation. More complex nodes can use different NodeOperation
- * based on settings; like MixNode. based on the selected Mixtype a different operation will be
- * used. for more information see the page about creating new Nodes. [@subpage newnode]
+ * Every node has the ability to convert itself to operations. The node itself is responsible
+ * to create a correct NodeOperation setup based on its internal settings. Most Node only need
+ * to convert it to its NodeOperation. Like a ColorToBWNode doesn't check anything, but
+ * replaces itself with a ConvertColorToBWOperation. More complex nodes can use different
+ * NodeOperation based on settings; like MixNode. based on the selected Mixtype a different
+ * operation will be used. for more information see the page about creating new Nodes.
+ * [@subpage newnode]
  *
  * \see ExecutionSystem.convertToOperations
  * \see Node.convertToOperations
@@ -68,11 +72,11 @@ namespace blender::compositor {
  *
  * \section EM_Step3 Step3: add additional conversions to the operation system
  *   - Data type conversions: the system has 3 data types DataType::Value, DataType::Vector,
- * DataType::Color. The user can connect a Value socket to a color socket. As values are ordered
- * differently than colors a conversion happens.
+ * DataType::Color. The user can connect a Value socket to a color socket. As values are
+ * ordered differently than colors a conversion happens.
  *
- *   - Image size conversions: the system can automatically convert when resolutions do not match.
- *     An NodeInput has a resize mode. This can be any of the following settings.
+ *   - Image size conversions: the system can automatically convert when resolutions do not
+ * match. An NodeInput has a resize mode. This can be any of the following settings.
  *     - [@ref InputSocketResizeMode.ResizeMode::Center]:
  *       The center of both images are aligned
  *     - [@ref InputSocketResizeMode.ResizeMode::FitWidth]:
@@ -92,8 +96,9 @@ namespace blender::compositor {
  * \section EM_Step4 Step4: group operations in executions groups
  * ExecutionGroup are groups of operations that are calculated as being one bigger operation.
  * All operations will be part of an ExecutionGroup.
- * Complex nodes will be added to separate groups. Between ExecutionGroup's the data will be stored
- * in MemoryBuffers. ReadBufferOperations and WriteBufferOperations are added where needed.
+ * Complex nodes will be added to separate groups. Between ExecutionGroup's the data will be
+ * stored in MemoryBuffers. ReadBufferOperations and WriteBufferOperations are added where
+ * needed.
  *
  * <pre>
  *
@@ -120,28 +125,12 @@ namespace blender::compositor {
  * \brief the ExecutionSystem contains the whole compositor tree.
  */
 class ExecutionSystem {
-
  private:
   /**
-   * Render and viewer border info.
-   */
-  struct {
-    bool use_render_border;
-    rcti render_border;
-    bool use_viewer_border;
-    rcti viewer_border;
-  } m_border;
-
-  /**
-   * Stores operations output data/buffers and deletes them once reader operations are
+   * Stores operations output data/buffers and dispose them once reader operations are
    * finished.
    */
   OutputStore m_output_store;
-
-  /**
-   * Number of operations finished. Only used in FullFrame execution model.
-   */
-  int m_num_operations_finished;
 
   /**
    * \brief the context used during execution
@@ -157,6 +146,11 @@ class ExecutionSystem {
    * \brief vector of groups
    */
   Vector<ExecutionGroup *> m_groups;
+
+  /**
+   * Active execution model implementation.
+   */
+  ExecutionModel *m_execution_model;
 
  private:  // methods
  public:
@@ -210,18 +204,6 @@ class ExecutionSystem {
   void operation_finished(NodeOperation *operation);
 
  private:
-  void execute_groups(eCompositorPriority priority);
-
-  /*** FullFrame methods ***/
-
-  void execute_full_frame();
-  void get_output_render_rect(NodeOperation *output_op, rcti &r_rect);
-  void determine_rects_to_render(NodeOperation *operation, const rcti &render_rect);
-  void determine_reads(NodeOperation *operation);
-
-  void update_progress_bar();
-  bool is_breaked() const;
-
   /* allow the DebugInfo class to look at internals */
   friend class DebugInfo;
 

@@ -68,8 +68,12 @@ set(SRC
   intern/COM_Enums.cc
   intern/COM_ExecutionGroup.cc
   intern/COM_ExecutionGroup.h
+  intern/COM_ExecutionModel.cc
+  intern/COM_ExecutionModel.h
   intern/COM_ExecutionSystem.cc
   intern/COM_ExecutionSystem.h
+  intern/COM_FullFrameExecutionModel.cc
+  intern/COM_FullFrameExecutionModel.h
   intern/COM_MemoryBuffer.cc
   intern/COM_MemoryBuffer.h
   intern/COM_MemoryProxy.cc
@@ -94,6 +98,8 @@ set(SRC
   intern/COM_OpenCLDevice.h
   intern/COM_SingleThreadedOperation.cc
   intern/COM_SingleThreadedOperation.h
+  intern/COM_TiledExecutionModel.cc
+  intern/COM_TiledExecutionModel.h
   intern/COM_WorkPackage.cc
   intern/COM_WorkPackage.h
   intern/COM_WorkScheduler.cc
