@@ -16,9 +16,11 @@
  * Copyright 2021, Blender Foundation.
  */
 
-#include "COM_FullFrameExecutionModel.h"
+#include "atomic_ops.h"
+
 #include "COM_Debug.h"
 #include "COM_ExecutionGroup.h"
+#include "COM_FullFrameExecutionModel.h"
 #include "COM_ReadBufferOperation.h"
 #include "COM_WorkScheduler.h"
 
@@ -174,6 +176,11 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
     return;
   }
 
+  ThreadMutex mutex;
+  BLI_mutex_init(&mutex);
+  ThreadCondition work_finished_cond;
+  BLI_condition_init(&work_finished_cond);
+
   /* Split work vertically to maximize continuous memory. */
   const int work_height = BLI_rcti_size_y(&work_rect);
   const int n_sub_works = MIN2(WorkScheduler::get_num_cpu_threads(), work_height);
@@ -182,6 +189,7 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
 
   Vector<WorkPackage> sub_works(n_sub_works);
   int sub_work_y = work_rect.ymin;
+  unsigned int n_sub_works_finished = 0;
   for (int i = 0; i < n_sub_works; i++) {
     int sub_work_height = split_height;
 
@@ -202,28 +210,21 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
           &split_rect, work_rect.xmin, work_rect.xmax, sub_work_y, sub_work_y + sub_work_height);
       work_func(split_rect);
     };
-
+    sub_work.finished_callback = [&]() {
+      unsigned int current = atomic_add_and_fetch_u(&n_sub_works_finished, 1);
+      if (current == n_sub_works) {
+        BLI_condition_notify_one(&work_finished_cond);
+      }
+    };
     WorkScheduler::schedule(&sub_work);
-
     sub_work_y += sub_work_height;
   }
   BLI_assert(sub_work_y == work_rect.ymax);
 
-  WorkScheduler::finish();
+  BLI_condition_wait(&work_finished_cond, &mutex);
 
-  /* WorkScheduler::ThreadingModel::Queue needs this code because last work is still running even
-   * after calling WorkScheduler::finish(). May be an issue specific to windows. */
-  bool work_finished = false;
-  while (!work_finished) {
-    work_finished = true;
-    for (const WorkPackage &sub_work : sub_works) {
-      if (!sub_work.finished) {
-        work_finished = false;
-        WorkScheduler::finish();
-        break;
-      }
-    }
-  }
+  BLI_condition_end(&work_finished_cond);
+  BLI_mutex_end(&mutex);
 }
 
 void FullFrameExecutionModel::operation_finished(NodeOperation *operation)

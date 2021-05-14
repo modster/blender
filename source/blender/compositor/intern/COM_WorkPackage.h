@@ -58,7 +58,10 @@ struct WorkPackage {
    */
   std::function<void()> custom_func;
 
-  bool finished = false;
+  /**
+   * Called when work execution is finished.
+   */
+  std::function<void()> finished_callback;
 
 #ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:WorkPackage")

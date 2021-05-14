@@ -44,7 +44,10 @@ void CPUDevice::execute(WorkPackage *work_package)
       break;
     }
   }
-  work_package->finished = true;
+
+  if (work_package->finished_callback) {
+    work_package->finished_callback();
+  }
 }
 
 }  // namespace blender::compositor
