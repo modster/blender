@@ -1715,15 +1715,15 @@ static void idprop_update_rna_ui_data_string(IDProperty *idprop, PyObject *py_de
 
 PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
              ".. method:: rna_ui_data_update(key, "
-             "                       subtype=None, "
-             "                       min=None, "
-             "                       max=None, "
-             "                       soft_min=None, "
-             "                       soft_max=None, "
-             "                       precision=None, "
-             "                       step=None, "
-             "                       default=None, "
-             "                       description=None)\n"
+             "   subtype=None, "
+             "   min=None, "
+             "   max=None, "
+             "   soft_min=None, "
+             "   soft_max=None, "
+             "   precision=None, "
+             "   step=None, "
+             "   default=None, "
+             "   description=None)\n"
              "\n"
              "   Update the RNA type information of the IDProperty used for interaction and\n"
              "   drawing in the user interface. The property specified by the key must be a\n"
@@ -1732,7 +1732,7 @@ PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
 static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
   const char *key;
-  PyObject *rna_subtype = NULL;
+  const char *rna_subtype = NULL;
   PyObject *min = NULL;
   PyObject *max = NULL;
   PyObject *soft_min = NULL;
@@ -1740,23 +1740,25 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
   PyObject *precision = NULL;
   PyObject *step = NULL;
   PyObject *default_value = NULL;
-  PyObject *description = NULL;
+  const char *description = NULL;
 
-  static const char *kwlist[] = {"key",
-                                 "subtype",
-                                 "min",
-                                 "max",
-                                 "soft_min",
-                                 "soft_max",
-                                 "precision",
-                                 "step",
-                                 "default",
-                                 "description",
-                                 NULL};
+  static const char *kwlist[] = {
+      "key",
+      "subtype",
+      "min",
+      "max",
+      "soft_min",
+      "soft_max",
+      "precision",
+      "step",
+      "default",
+      "description",
+      NULL,
+  };
 
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
-                                   "s|$OOOOOOOOO:rna_ui_data_update",
+                                   "s|$zOOOOOOOz:rna_ui_data_update",
                                    (char **)kwlist,
                                    &key,
                                    &rna_subtype,
@@ -1784,27 +1786,16 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
 
   IDP_ui_data_ensure(idprop);
 
-  if (!ELEM(rna_subtype, NULL, Py_None)) {
-    if (PyUnicode_Check(rna_subtype)) {
-      const char *subtype_string = _PyUnicode_AsString(rna_subtype);
-      int result = PROP_NONE;
-      if (!RNA_enum_value_from_id(rna_enum_property_subtype_items, subtype_string, &result)) {
-        PyErr_SetString(PyExc_KeyError, "RNA subtype not found");
-      }
-      idprop->ui_data->rna_subtype = result;
+  if (rna_subtype != NULL) {
+    int result = PROP_NONE;
+    if (!RNA_enum_value_from_id(rna_enum_property_subtype_items, rna_subtype, &result)) {
+      PyErr_SetString(PyExc_KeyError, "RNA subtype not found");
     }
-    else if (rna_subtype != Py_None) {
-      PyErr_SetString(PyExc_TypeError, "RNA subtype must be a string object");
-    }
+    idprop->ui_data->rna_subtype = result;
   }
 
-  if (!ELEM(description, NULL, Py_None)) {
-    if (PyUnicode_Check(description)) {
-      idprop->ui_data->description = BLI_strdup(_PyUnicode_AsString(description));
-    }
-    else if (description != Py_None) {
-      PyErr_SetString(PyExc_TypeError, "Property description must be a string object");
-    }
+  if (description != NULL) {
+    idprop->ui_data->description = BLI_strdup(description);
   }
 
   /* Type specific data. */
