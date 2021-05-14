@@ -745,6 +745,11 @@ static short ok_bezier_channel_circle(KeyframeEditData *ked, BezTriple *bezt)
   return 0;
 }
 
+static short ok_bezier_channel_all_are_valid(KeyframeEditData *ked, BezTriple *bezt)
+{
+  return KEYFRAME_OK_KEY;
+}
+
 KeyframeEditFunc ANIM_editkeyframes_ok(short mode)
 {
   /* eEditKeyframes_Validate */
@@ -779,6 +784,8 @@ KeyframeEditFunc ANIM_editkeyframes_ok(short mode)
     case BEZT_OK_CHANNEL_CIRCLE:
       /* same as BEZT_OK_REGION_CIRCLE, but we're only using the x-value of the points */
       return ok_bezier_channel_circle;
+    case BEZT_OK_ALL_ARE_VALID:
+      return ok_bezier_channel_all_are_valid;
     default: /* nothing was ok */
       return NULL;
   }

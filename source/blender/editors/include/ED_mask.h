@@ -102,16 +102,17 @@ void ED_masklayer_make_cfra_list(struct MaskLayer *mask_layer, ListBase *elems, 
 
 bool ED_masklayer_frame_select_check(struct MaskLayer *mask_layer);
 void ED_masklayer_frame_select_set(struct MaskLayer *mask_layer, short mode);
-void ED_masklayer_frames_select_box(struct MaskLayer *mask_layer,
+bool ED_masklayer_frames_select_box(struct MaskLayer *mask_layer,
                                     float min,
                                     float max,
                                     short select_mode);
-void ED_masklayer_frames_select_region(struct KeyframeEditData *ked,
+bool ED_masklayer_frames_select_region(struct KeyframeEditData *ked,
                                        struct MaskLayer *mask_layer,
                                        short tool,
                                        short select_mode);
-void ED_mask_select_frames(struct MaskLayer *mask_layer, short select_mode);
-void ED_mask_select_frame(struct MaskLayer *mask_layer, int selx, short select_mode);
+bool ED_mask_select_frames(struct MaskLayer *mask_layer, short select_mode);
+bool ED_mask_select_frame(struct MaskLayer *mask_layer, int selx, short select_mode);
+bool ED_mask_select_layer_based_on_frames(struct MaskLayer *mask_layer);
 
 bool ED_masklayer_frames_delete(struct MaskLayer *mask_layer);
 void ED_masklayer_frames_duplicate(struct MaskLayer *mask_layer);

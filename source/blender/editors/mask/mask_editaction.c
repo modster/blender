@@ -151,13 +151,13 @@ static void mask_layer_shape_select(MaskLayerShape *mask_layer_shape, short sele
 }
 
 /* set all/none/invert select (like above, but with SELECT_* modes) */
-void ED_mask_select_frames(MaskLayer *mask_layer, short select_mode)
+bool ED_mask_select_frames(MaskLayer *mask_layer, short select_mode)
 {
   MaskLayerShape *mask_layer_shape;
 
   /* error checking */
   if (mask_layer == NULL) {
-    return;
+    return false;
   }
 
   /* handle according to mode */
@@ -165,6 +165,7 @@ void ED_mask_select_frames(MaskLayer *mask_layer, short select_mode)
        mask_layer_shape = mask_layer_shape->next) {
     mask_layer_shape_select(mask_layer_shape, select_mode);
   }
+  return !BLI_listbase_is_empty(&mask_layer->splines_shapes);
 }
 
 /* set all/none/invert select */
@@ -180,41 +181,65 @@ void ED_masklayer_frame_select_set(MaskLayer *mask_layer, short mode)
 }
 
 /* select the frame in this layer that occurs on this frame (there should only be one at most) */
-void ED_mask_select_frame(MaskLayer *mask_layer, int selx, short select_mode)
+bool ED_mask_select_frame(MaskLayer *mask_layer, int selx, short select_mode)
 {
   MaskLayerShape *mask_layer_shape;
 
   if (mask_layer == NULL) {
-    return;
+    return false;
   }
 
   mask_layer_shape = BKE_mask_layer_shape_find_frame(mask_layer, selx);
 
   if (mask_layer_shape) {
     mask_layer_shape_select(mask_layer_shape, select_mode);
+    return true;
+  }
+
+  return false;
+}
+
+bool ED_mask_select_layer_based_on_frames(struct MaskLayer *mask_layer)
+{
+  if (mask_layer == NULL) {
+    return false;
+  }
+
+  if (ED_masklayer_frame_select_check(mask_layer)) {
+    mask_layer->flag |= MASK_LAYERFLAG_SELECT;
+    return true;
+  }
+  else {
+    mask_layer->flag &= ~MASK_LAYERFLAG_SELECT;
+    return false;
   }
 }
 
 /* select the frames in this layer that occur within the bounds specified */
-void ED_masklayer_frames_select_box(MaskLayer *mask_layer, float min, float max, short select_mode)
+bool ED_masklayer_frames_select_box(MaskLayer *mask_layer, float min, float max, short select_mode)
 {
   MaskLayerShape *mask_layer_shape;
 
   if (mask_layer == NULL) {
-    return;
+    return false;
   }
+
+  bool any_in_region = false;
 
   /* only select those frames which are in bounds */
   for (mask_layer_shape = mask_layer->splines_shapes.first; mask_layer_shape;
        mask_layer_shape = mask_layer_shape->next) {
     if (IN_RANGE(mask_layer_shape->frame, min, max)) {
+      any_in_region = true;
       mask_layer_shape_select(mask_layer_shape, select_mode);
     }
   }
+
+  return any_in_region;
 }
 
 /* select the frames in this layer that occur within the lasso/circle region specified */
-void ED_masklayer_frames_select_region(KeyframeEditData *ked,
+bool ED_masklayer_frames_select_region(KeyframeEditData *ked,
                                        MaskLayer *mask_layer,
                                        short tool,
                                        short select_mode)
@@ -222,8 +247,10 @@ void ED_masklayer_frames_select_region(KeyframeEditData *ked,
   MaskLayerShape *mask_layer_shape;
 
   if (mask_layer == NULL) {
-    return;
+    return false;
   }
+
+  bool any_in_region = false;
 
   /* only select frames which are within the region */
   for (mask_layer_shape = mask_layer->splines_shapes.first; mask_layer_shape;
@@ -238,16 +265,20 @@ void ED_masklayer_frames_select_region(KeyframeEditData *ked,
     if (tool == BEZT_OK_CHANNEL_LASSO) {
       /* Lasso */
       if (keyframe_region_lasso_test(ked->data, pt)) {
+        any_in_region = true;
         mask_layer_shape_select(mask_layer_shape, select_mode);
       }
     }
     else if (tool == BEZT_OK_CHANNEL_CIRCLE) {
       /* Circle */
       if (keyframe_region_circle_test(ked->data, pt)) {
+        any_in_region = true;
         mask_layer_shape_select(mask_layer_shape, select_mode);
       }
     }
   }
+
+  return any_in_region;
 }
 
 /* ***************************************** */

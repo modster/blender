@@ -146,17 +146,19 @@ static void gpencil_frame_select(bGPDframe *gpf, short select_mode)
 }
 
 /* set all/none/invert select (like above, but with SELECT_* modes) */
-void ED_gpencil_select_frames(bGPDlayer *gpl, short select_mode)
+bool ED_gpencil_select_frames(bGPDlayer *gpl, short select_mode)
 {
   /* error checking */
   if (gpl == NULL) {
-    return;
+    return false;
   }
 
   /* handle according to mode */
   LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
     gpencil_frame_select(gpf, select_mode);
   }
+
+  return !BLI_listbase_is_empty(&gpl->frames);
 }
 
 /* set all/none/invert select */
@@ -172,45 +174,55 @@ void ED_gpencil_layer_frame_select_set(bGPDlayer *gpl, short mode)
 }
 
 /* select the frame in this layer that occurs on this frame (there should only be one at most) */
-void ED_gpencil_select_frame(bGPDlayer *gpl, int selx, short select_mode)
+bool ED_gpencil_select_frame(bGPDlayer *gpl, int selx, short select_mode)
 {
   bGPDframe *gpf;
 
   if (gpl == NULL) {
-    return;
+    return false;
   }
 
   gpf = BKE_gpencil_layer_frame_find(gpl, selx);
 
   if (gpf) {
     gpencil_frame_select(gpf, select_mode);
+    return true;
   }
+
+  return false;
 }
 
 /* select the frames in this layer that occur within the bounds specified */
-void ED_gpencil_layer_frames_select_box(bGPDlayer *gpl, float min, float max, short select_mode)
+bool ED_gpencil_layer_frames_select_box(bGPDlayer *gpl, float min, float max, short select_mode)
 {
   if (gpl == NULL) {
-    return;
+    return false;
   }
+
+  bool any_in_region = false;
 
   /* only select those frames which are in bounds */
   LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
     if (IN_RANGE(gpf->framenum, min, max)) {
+      any_in_region = true;
       gpencil_frame_select(gpf, select_mode);
     }
   }
+
+  return any_in_region;
 }
 
 /* select the frames in this layer that occur within the lasso/circle region specified */
-void ED_gpencil_layer_frames_select_region(KeyframeEditData *ked,
+bool ED_gpencil_layer_frames_select_region(KeyframeEditData *ked,
                                            bGPDlayer *gpl,
                                            short tool,
                                            short select_mode)
 {
   if (gpl == NULL) {
-    return;
+    return false;
   }
+
+  bool any_in_region = false;
 
   /* only select frames which are within the region */
   LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
@@ -224,15 +236,35 @@ void ED_gpencil_layer_frames_select_region(KeyframeEditData *ked,
     if (tool == BEZT_OK_CHANNEL_LASSO) {
       /* Lasso */
       if (keyframe_region_lasso_test(ked->data, pt)) {
+        any_in_region = true;
         gpencil_frame_select(gpf, select_mode);
       }
     }
     else if (tool == BEZT_OK_CHANNEL_CIRCLE) {
       /* Circle */
       if (keyframe_region_circle_test(ked->data, pt)) {
+        any_in_region = true;
         gpencil_frame_select(gpf, select_mode);
       }
     }
+  }
+
+  return any_in_region;
+}
+
+bool ED_gpencil_select_layer_based_on_frames(bGPDlayer *layer)
+{
+  if (layer == NULL) {
+    return false;
+  }
+
+  if (ED_gpencil_layer_frame_select_check(layer)) {
+    layer->flag |= GP_LAYER_SELECT;
+    return true;
+  }
+  else {
+    layer->flag &= ~GP_LAYER_SELECT;
+    return false;
   }
 }
 

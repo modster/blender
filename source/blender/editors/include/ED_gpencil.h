@@ -191,16 +191,17 @@ void ED_gpencil_layer_make_cfra_list(struct bGPDlayer *gpl, ListBase *elems, boo
 
 bool ED_gpencil_layer_frame_select_check(struct bGPDlayer *gpl);
 void ED_gpencil_layer_frame_select_set(struct bGPDlayer *gpl, short mode);
-void ED_gpencil_layer_frames_select_box(struct bGPDlayer *gpl,
+bool ED_gpencil_layer_frames_select_box(struct bGPDlayer *gpl,
                                         float min,
                                         float max,
                                         short select_mode);
-void ED_gpencil_layer_frames_select_region(struct KeyframeEditData *ked,
+bool ED_gpencil_layer_frames_select_region(struct KeyframeEditData *ked,
                                            struct bGPDlayer *gpl,
                                            short tool,
                                            short select_mode);
-void ED_gpencil_select_frames(struct bGPDlayer *gpl, short select_mode);
-void ED_gpencil_select_frame(struct bGPDlayer *gpl, int selx, short select_mode);
+bool ED_gpencil_select_frames(struct bGPDlayer *gpl, short select_mode);
+bool ED_gpencil_select_frame(struct bGPDlayer *gpl, int selx, short select_mode);
+bool ED_gpencil_select_layer_based_on_frames(struct bGPDlayer *layer);
 
 bool ED_gpencil_layer_frames_delete(struct bGPDlayer *gpl);
 void ED_gpencil_layer_frames_duplicate(struct bGPDlayer *gpl);

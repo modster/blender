@@ -58,6 +58,7 @@ typedef enum eEditKeyframes_Validate {
   /* Only for keyframes a certain Dopesheet channel */
   BEZT_OK_CHANNEL_LASSO,
   BEZT_OK_CHANNEL_CIRCLE,
+  BEZT_OK_ALL_ARE_VALID,
 } eEditKeyframes_Validate;
 
 /* ------------ */

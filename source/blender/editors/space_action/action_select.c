@@ -66,6 +66,154 @@
 /* ************************************************************************** */
 /* KEYFRAMES STUFF */
 
+static void actkeys_select_channel_based_on_keys(FCurve *fcu, short select_mode)
+{
+  bool any_selected = false;
+  BezTriple *cur_bezt = fcu->bezt;
+  int i = 0;
+  for (; i < fcu->totvert; cur_bezt++, i++) {
+    if (BEZT_ISSEL_ANY(cur_bezt)) {
+      any_selected = true;
+      break;
+    }
+  }
+
+  if (any_selected) {
+    fcu->flag |= FCURVE_SELECTED;
+  }
+  else {
+    fcu->flag &= ~FCURVE_SELECTED;
+  }
+}
+
+static void actkeys_channel_set_active(bAnimListElem *ale)
+{
+  switch (ale->datatype) {
+    case ALE_FCURVE:
+      ((FCurve *)ale->key_data)->flag |= FCURVE_ACTIVE;
+      break;
+    case ALE_GPFRAME:
+      ((bGPDlayer *)ale->data)->flag |= GP_LAYER_ACTIVE;
+      break;
+    case ALE_MASKLAY:
+      /* Mask layers don't have an active flag. Do nothing. */
+      break;
+  }
+}
+static void actkeys_channel_unset_active(bAnimListElem *ale)
+{
+  switch (ale->datatype) {
+    case ALE_FCURVE:
+      ((FCurve *)ale->key_data)->flag &= ~FCURVE_ACTIVE;
+      break;
+    case ALE_GPFRAME:
+      ((bGPDlayer *)ale->data)->flag &= ~GP_LAYER_ACTIVE;
+      ale->update |= ANIM_UPDATE_DEPS;
+      break;
+    case ALE_MASKLAY:
+      /* Mask layers don't have an active flag. Do nothing. */
+      break;
+  }
+}
+
+static void actkeys_channel_select(bAnimListElem *ale, const eEditKeyframes_Select select_mode)
+{
+  // GG:TODO: Is this function necessary when (anim_channels_edit.c) anim_channels_select_set()
+  // exists?
+  switch (select_mode) {
+    case SELECT_SUBTRACT: {
+      switch (ale->datatype) {
+        case ALE_FCURVE:
+          ((FCurve *)ale->key_data)->flag &= ~FCURVE_SELECTED;
+          break;
+        case ALE_GPFRAME:
+          ((bGPDlayer *)ale->data)->flag &= ~GP_LAYER_SELECT;
+          ale->update |= ANIM_UPDATE_DEPS;
+          break;
+        case ALE_MASKLAY:
+          ((MaskLayer *)ale->data)->flag &= ~MASK_LAYERFLAG_SELECT;
+          break;
+      }
+      break;
+    }
+    case SELECT_ADD: {
+      switch (ale->datatype) {
+        case ALE_FCURVE:
+          ((FCurve *)ale->key_data)->flag |= FCURVE_SELECTED;
+          break;
+        case ALE_GPFRAME:
+          ((bGPDlayer *)ale->data)->flag |= GP_LAYER_SELECT;
+          ale->update |= ANIM_UPDATE_DEPS;
+          break;
+        case ALE_MASKLAY:
+          ((MaskLayer *)ale->data)->flag |= MASK_LAYERFLAG_SELECT;
+          break;
+      }
+      break;
+    }
+    case SELECT_INVERT: {
+      switch (ale->datatype) {
+        case ALE_FCURVE:
+          ((FCurve *)ale->key_data)->flag ^= FCURVE_SELECTED;
+          break;
+        case ALE_GPFRAME:
+          ((bGPDlayer *)ale->data)->flag ^= GP_LAYER_SELECT;
+          ale->update |= ANIM_UPDATE_DEPS;
+          break;
+        case ALE_MASKLAY:
+          ((MaskLayer *)ale->data)->flag ^= MASK_LAYERFLAG_SELECT;
+          break;
+      }
+      break;
+    }
+    case SELECT_REPLACE: {
+      /* Caller must handle this manually, as SELECT_REPLACE depends more on the situation. */
+      break;
+    }
+  }
+}
+
+static void actkeys_channel_set_active_selected_and_update(bAnimContext *ac, bAnimListElem *ale)
+{
+
+  if (ale == NULL) {
+    return;
+  }
+
+  actkeys_channel_set_active(ale);
+  actkeys_channel_select(ale, SELECT_ADD);
+
+  ListBase anim_data = {NULL, NULL};
+  BLI_addtail(&anim_data, ale);
+
+  /* GreasePencil Layer might need updated. */
+  ANIM_animdata_update(&ac, &anim_data);
+  ANIM_animdata_freelist(&anim_data);
+}
+
+static void actkeys_keyframes_loop_and_select_channel(const short select_mode,
+                                                      KeyframeEditData *ked,
+                                                      bDopeSheet *ads,
+                                                      bAnimListElem *ale,
+                                                      KeyframeEditFunc key_ok,
+                                                      KeyframeEditFunc key_cb,
+                                                      FcuEditFunc fcu_cb)
+{
+  /* Firstly, check if any keyframes will be hit by this. */
+  if (!ANIM_animchannel_keyframes_loop(ked, ads, ale, NULL, key_ok, fcu_cb)) {
+    return;
+  }
+
+  ANIM_animchannel_keyframes_loop(ked, ads, ale, key_ok, key_cb, fcu_cb);
+
+  if (select_mode != SELECT_ADD) {
+    return;
+  }
+
+  /* For consistency with the Graph Editor, select the fcurve too. */
+  actkeys_channel_select(ale, SELECT_ADD);
+}
+
 static bAnimListElem *actkeys_find_list_element_at_position(bAnimContext *ac,
                                                             int filter,
                                                             float region_x,
@@ -229,6 +377,39 @@ static bool actkeys_is_key_at_position(bAnimContext *ac, float region_x, float r
   return found;
 }
 
+// GG:TODO: exact C+P from graph_utils.c which is from graph_intern.h.....
+/**
+ * Find 'active' F-Curve.
+ * It must be editable, since that's the purpose of these buttons (subject to change).
+ * We return the 'wrapper' since it contains valuable context info (about hierarchy),
+ * which will need to be freed when the caller is done with it.
+ *
+ * \note curve-visible flag isn't included,
+ * otherwise selecting a curve via list to edit is too cumbersome.
+ */
+static bAnimListElem *get_active_channel(bAnimContext *ac)
+{
+  ListBase anim_data = {NULL, NULL};
+  int filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_ACTIVE);
+  size_t items = ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
+
+  /* We take the first channel only, since some other ones may have had 'active' flag set
+   * if they were from linked data.
+   */
+  if (items) {
+    bAnimListElem *ale = (bAnimListElem *)anim_data.first;
+
+    /* remove first item from list, then free the rest of the list and return the stored one */
+    BLI_remlink(&anim_data, ale);
+    ANIM_animdata_freelist(&anim_data);
+
+    return ale;
+  }
+
+  /* no active channel */
+  return NULL;
+}
+
 /* ******************** Deselect All Operator ***************************** */
 /* This operator works in one of three ways:
  * 1) (de)select all (AKEY) - test if select all or deselect all
@@ -242,7 +423,7 @@ static bool actkeys_is_key_at_position(bAnimContext *ac, float region_x, float r
  * - test: check if select or deselect all
  * - sel: how to select keyframes (SELECT_*)
  */
-static void deselect_action_keys(bAnimContext *ac, short test, short sel)
+static void deselect_action_keys(bAnimContext *ac, short test, short sel, const bool do_channels)
 {
   ListBase anim_data = {NULL, NULL};
   bAnimListElem *ale;
@@ -305,6 +486,16 @@ static void deselect_action_keys(bAnimContext *ac, short test, short sel)
     else {
       ANIM_fcurve_keyframes_loop(&ked, ale->key_data, NULL, sel_cb, NULL);
     }
+
+    /* affect channel selection status? */
+    if (do_channels) {
+      /* deactivate the F-Curve, and deselect if deselecting keyframes.
+       * otherwise select the F-Curve too since we've selected all the keyframes
+       */
+      actkeys_channel_select(ale, sel);
+      /* always deactivate all F-Curves if we perform batch ops for selection */
+      actkeys_channel_unset_active(ale);
+    }
   }
 
   /* Cleanup */
@@ -323,25 +514,34 @@ static int actkeys_deselectall_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
+  /* find active F-Curve, and preserve this for later
+   * or else it becomes annoying with the current active
+   * curve keeps fading out even while you're editing it
+   */
+  bAnimListElem *ale_active = get_active_channel(&ac);
   /* 'standard' behavior - check if selected, then apply relevant selection */
   const int action = RNA_enum_get(op->ptr, "action");
   switch (action) {
     case SEL_TOGGLE:
-      deselect_action_keys(&ac, 1, SELECT_ADD);
+      deselect_action_keys(&ac, 1, SELECT_ADD, true);
       break;
     case SEL_SELECT:
-      deselect_action_keys(&ac, 0, SELECT_ADD);
+      deselect_action_keys(&ac, 0, SELECT_ADD, true);
       break;
     case SEL_DESELECT:
-      deselect_action_keys(&ac, 0, SELECT_SUBTRACT);
+      deselect_action_keys(&ac, 0, SELECT_SUBTRACT, true);
       break;
     case SEL_INVERT:
-      deselect_action_keys(&ac, 0, SELECT_INVERT);
+      deselect_action_keys(&ac, 0, SELECT_INVERT, true);
       break;
     default:
       BLI_assert(0);
       break;
   }
+
+  /* Restore active channel selection. */
+  actkeys_channel_set_active_selected_and_update(&ac, ale_active);
+  ale_active = NULL;
 
   /* set notifier that keyframe selection have changed */
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_SELECTED, NULL);
@@ -388,7 +588,8 @@ enum {
 
 typedef struct BoxSelectData {
   bAnimContext *ac;
-  short selectmode;
+  short box_selectmode;
+  short key_selectmode;
 
   KeyframeEditData ked;
   KeyframeEditFunc ok_cb, select_cb;
@@ -405,27 +606,77 @@ static void box_select_elem(
       bGPdata *gpd = ale->data;
       bGPDlayer *gpl;
       for (gpl = gpd->layers.first; gpl; gpl = gpl->next) {
-        ED_gpencil_layer_frames_select_box(gpl, xmin, xmax, data->selectmode);
+        ED_gpencil_layer_frames_select_box(gpl, xmin, xmax, data->key_selectmode);
       }
       ale->update |= ANIM_UPDATE_DEPS;
       break;
     }
 #endif
     case ANIMTYPE_GPLAYER: {
-      ED_gpencil_layer_frames_select_box(ale->data, xmin, xmax, sel_data->selectmode);
+
+      bool any_selected = false;
+      if (ELEM(
+              sel_data->box_selectmode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
+        any_selected = ED_gpencil_layer_frames_select_box(
+            ale->data, xmin, xmax, sel_data->key_selectmode);
+      }
+      else if (ELEM(sel_data->box_selectmode, ACTKEYS_BORDERSEL_CHANNELS)) {
+        any_selected = ED_gpencil_select_frames(ale->data, sel_data->key_selectmode);
+      }
+      else {
+        BLI_assert(!"Unknown Box select mode not implemented");
+      }
+
+      if (any_selected && sel_data->key_selectmode == SELECT_ADD) {
+        ((bGPDlayer *)ale->data)->flag |= GP_LAYER_SELECT;
+      }
+
       ale->update |= ANIM_UPDATE_DEPS;
       break;
     }
     case ANIMTYPE_MASKDATABLOCK: {
       Mask *mask = ale->data;
       MaskLayer *masklay;
+
       for (masklay = mask->masklayers.first; masklay; masklay = masklay->next) {
-        ED_masklayer_frames_select_box(masklay, xmin, xmax, sel_data->selectmode);
+
+        bool any_selected = false;
+        if (ELEM(sel_data->box_selectmode,
+                 ACTKEYS_BORDERSEL_FRAMERANGE,
+                 ACTKEYS_BORDERSEL_ALLKEYS)) {
+          any_selected = ED_masklayer_frames_select_box(
+              masklay, xmin, xmax, sel_data->key_selectmode);
+        }
+        else if (ELEM(sel_data->box_selectmode, ACTKEYS_BORDERSEL_CHANNELS)) {
+          any_selected = ED_mask_select_frames(masklay, sel_data->key_selectmode);
+        }
+        else {
+          BLI_assert(!"Unknown Box select mode not implemented");
+        }
+
+        if (any_selected && sel_data->key_selectmode == SELECT_ADD) {
+          masklay->flag |= MASK_LAYERFLAG_SELECT;
+        }
       }
       break;
     }
     case ANIMTYPE_MASKLAYER: {
-      ED_masklayer_frames_select_box(ale->data, xmin, xmax, sel_data->selectmode);
+      bool any_selected = false;
+      if (ELEM(
+              sel_data->box_selectmode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
+        any_selected = ED_masklayer_frames_select_box(
+            ale->data, xmin, xmax, sel_data->key_selectmode);
+      }
+      else if (ELEM(sel_data->box_selectmode, ACTKEYS_BORDERSEL_CHANNELS)) {
+        any_selected = ED_mask_select_frames(ale->data, sel_data->key_selectmode);
+      }
+      else {
+        BLI_assert(!"Unknown Box select mode not implemented");
+      }
+
+      if (any_selected && sel_data->key_selectmode == SELECT_ADD) {
+        ((MaskLayer *)ale->data)->flag |= MASK_LAYERFLAG_SELECT;
+      }
       break;
     }
     default: {
@@ -445,19 +696,28 @@ static void box_select_elem(
         ANIM_animdata_freelist(&anim_data);
       }
 
-      ANIM_animchannel_keyframes_loop(
-          &sel_data->ked, ac->ads, ale, sel_data->ok_cb, sel_data->select_cb, NULL);
+      actkeys_keyframes_loop_and_select_channel(sel_data->key_selectmode,
+                                                &sel_data->ked,
+                                                ac->ads,
+                                                ale,
+                                                sel_data->ok_cb,
+                                                sel_data->select_cb,
+                                                NULL);
     }
   }
 }
 
-static void box_select_action(bAnimContext *ac, const rcti rect, short mode, short selectmode)
+static void box_select_action(bAnimContext *ac,
+                              const rcti rect,
+                              short box_selectmode,
+                              short key_selectmode)
 {
   ListBase anim_data = {NULL, NULL};
   bAnimListElem *ale;
   int filter;
 
-  BoxSelectData sel_data = {.ac = ac, .selectmode = selectmode};
+  BoxSelectData sel_data = {
+      .ac = ac, .key_selectmode = key_selectmode, .box_selectmode = box_selectmode};
   View2D *v2d = &ac->region->v2d;
   rctf rectf;
 
@@ -471,13 +731,14 @@ static void box_select_action(bAnimContext *ac, const rcti rect, short mode, sho
   ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
   /* get beztriple editing/validation funcs  */
-  sel_data.select_cb = ANIM_editkeyframes_select(selectmode);
+  sel_data.select_cb = ANIM_editkeyframes_select(key_selectmode);
 
-  if (ELEM(mode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
+  if (ELEM(box_selectmode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
     sel_data.ok_cb = ANIM_editkeyframes_ok(BEZT_OK_FRAMERANGE);
   }
   else {
-    sel_data.ok_cb = NULL;
+    /* ACTKEYS_BORDERSEL_CHANNELS */
+    sel_data.ok_cb = ANIM_editkeyframes_ok(BEZT_OK_ALL_ARE_VALID);
   }
 
   /* init editing data */
@@ -493,7 +754,7 @@ static void box_select_action(bAnimContext *ac, const rcti rect, short mode, sho
     float ymin = ymax - ACHANNEL_STEP(ac);
 
     /* set horizontal range (if applicable) */
-    if (ELEM(mode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
+    if (ELEM(box_selectmode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
       /* if channel is mapped in NLA, apply correction */
       if (adt) {
         sel_data.ked.iterflags &= ~(KED_F1_NLA_UNMAP | KED_F2_NLA_UNMAP);
@@ -508,7 +769,8 @@ static void box_select_action(bAnimContext *ac, const rcti rect, short mode, sho
     }
 
     /* perform vertical suitability check (if applicable) */
-    if ((mode == ACTKEYS_BORDERSEL_FRAMERANGE) || !((ymax < rectf.ymin) || (ymin > rectf.ymax))) {
+    if ((box_selectmode == ACTKEYS_BORDERSEL_FRAMERANGE) ||
+        !((ymax < rectf.ymin) || (ymin > rectf.ymax))) {
       box_select_elem(&sel_data, ale, rectf.xmin, rectf.xmax, false);
     }
   }
@@ -546,10 +808,11 @@ static int actkeys_box_select_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
+  bAnimListElem *ale_active = get_active_channel(&ac);
   const eSelectOp sel_op = RNA_enum_get(op->ptr, "mode");
   const int selectmode = (sel_op != SEL_OP_SUB) ? SELECT_ADD : SELECT_SUBTRACT;
   if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
-    deselect_action_keys(&ac, 1, SELECT_SUBTRACT);
+    deselect_action_keys(&ac, 1, SELECT_SUBTRACT, true);
   }
 
   /* get settings from operator */
@@ -577,6 +840,10 @@ static int actkeys_box_select_exec(bContext *C, wmOperator *op)
 
   /* apply box_select action */
   box_select_action(&ac, rect, mode, selectmode);
+
+  /* Restore active channel selection. */
+  actkeys_channel_set_active_selected_and_update(&ac, ale_active);
+  ale_active = NULL;
 
   /* set notifier that keyframe selection have changed */
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_SELECTED, NULL);
@@ -641,14 +908,19 @@ static void region_select_elem(RegionSelectData *sel_data, bAnimListElem *ale, b
       bGPdata *gpd = ale->data;
       bGPDlayer *gpl;
       for (gpl = gpd->layers.first; gpl; gpl = gpl->next) {
-        ED_gpencil_layer_frames_select_region(&rdata->ked, ale->data, rdata->mode, rdata->selectmode);
+        ED_gpencil_layer_frames_select_region(&rdata->ked, ale->data, rdata->mode, rdata->key_selectmode);
       }
       break;
     }
 #endif
     case ANIMTYPE_GPLAYER: {
-      ED_gpencil_layer_frames_select_region(
+      const bool any_selected = ED_gpencil_layer_frames_select_region(
           &sel_data->ked, ale->data, sel_data->mode, sel_data->selectmode);
+
+      if (any_selected && sel_data->selectmode == SELECT_ADD) {
+        ((bGPDlayer *)ale->data)->flag |= GP_LAYER_SELECT;
+      }
+
       ale->update |= ANIM_UPDATE_DEPS;
       break;
     }
@@ -656,14 +928,22 @@ static void region_select_elem(RegionSelectData *sel_data, bAnimListElem *ale, b
       Mask *mask = ale->data;
       MaskLayer *masklay;
       for (masklay = mask->masklayers.first; masklay; masklay = masklay->next) {
-        ED_masklayer_frames_select_region(
+        const bool any_selected = ED_masklayer_frames_select_region(
             &sel_data->ked, masklay, sel_data->mode, sel_data->selectmode);
+
+        if (any_selected && sel_data->selectmode == SELECT_ADD) {
+          masklay->flag |= MASK_LAYERFLAG_SELECT;
+        }
       }
       break;
     }
     case ANIMTYPE_MASKLAYER: {
-      ED_masklayer_frames_select_region(
+      const bool any_selected = ED_masklayer_frames_select_region(
           &sel_data->ked, ale->data, sel_data->mode, sel_data->selectmode);
+
+      if (any_selected && sel_data->selectmode == SELECT_ADD) {
+        ((MaskLayer *)ale->data)->flag |= MASK_LAYERFLAG_SELECT;
+      }
       break;
     }
     default: {
@@ -683,8 +963,13 @@ static void region_select_elem(RegionSelectData *sel_data, bAnimListElem *ale, b
         ANIM_animdata_freelist(&anim_data);
       }
 
-      ANIM_animchannel_keyframes_loop(
-          &sel_data->ked, ac->ads, ale, sel_data->ok_cb, sel_data->select_cb, NULL);
+      actkeys_keyframes_loop_and_select_channel(sel_data->selectmode,
+                                                &sel_data->ked,
+                                                ac->ads,
+                                                ale,
+                                                sel_data->ok_cb,
+                                                sel_data->select_cb,
+                                                NULL);
     }
   }
 }
@@ -798,10 +1083,12 @@ static int actkeys_lassoselect_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
+  bAnimListElem *ale_active = get_active_channel(&ac);
+
   const eSelectOp sel_op = RNA_enum_get(op->ptr, "mode");
   const int selectmode = (sel_op != SEL_OP_SUB) ? SELECT_ADD : SELECT_SUBTRACT;
   if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
-    deselect_action_keys(&ac, 1, SELECT_SUBTRACT);
+    deselect_action_keys(&ac, 1, SELECT_SUBTRACT, true);
   }
 
   /* get settings from operator */
@@ -812,6 +1099,10 @@ static int actkeys_lassoselect_exec(bContext *C, wmOperator *op)
   region_select_action_keys(&ac, &rect_fl, BEZT_OK_CHANNEL_LASSO, selectmode, &data_lasso);
 
   MEM_freeN((void *)data_lasso.mcoords);
+
+  /* Restore active channel selection. */
+  actkeys_channel_set_active_selected_and_update(&ac, ale_active);
+  ale_active = NULL;
 
   /* send notifier that keyframe selection has changed */
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_SELECTED, NULL);
@@ -865,7 +1156,7 @@ static int action_circle_select_exec(bContext *C, wmOperator *op)
                                               WM_gesture_is_modal_first(op->customdata));
   const short selectmode = (sel_op != SEL_OP_SUB) ? SELECT_ADD : SELECT_SUBTRACT;
   if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
-    deselect_action_keys(&ac, 0, SELECT_SUBTRACT);
+    deselect_action_keys(&ac, 0, SELECT_SUBTRACT, true);
   }
 
   data.mval[0] = x;
@@ -1349,7 +1640,7 @@ static void actkeys_select_leftright(bAnimContext *ac, short leftright, short se
     /* - deselect all other keyframes, so that just the newly selected remain
      * - channels aren't deselected, since we don't re-select any as a consequence
      */
-    deselect_action_keys(ac, 0, SELECT_SUBTRACT);
+    deselect_action_keys(ac, 0, SELECT_SUBTRACT, false);
   }
 
   /* set callbacks and editing data */
@@ -1545,10 +1836,12 @@ static void actkeys_mselect_single(bAnimContext *ac,
   /* select the nominated keyframe on the given frame */
   if (ale->type == ANIMTYPE_GPLAYER) {
     ED_gpencil_select_frame(ale->data, selx, select_mode);
+    ED_gpencil_select_layer_based_on_frames(ale->data);
     ale->update |= ANIM_UPDATE_DEPS;
   }
   else if (ale->type == ANIMTYPE_MASKLAYER) {
     ED_mask_select_frame(ale->data, selx, select_mode);
+    ED_mask_select_layer_based_on_frames(ale->data);
   }
   else {
     if (ELEM(ac->datatype, ANIMCONT_GPENCIL, ANIMCONT_MASK) && (ale->type == ANIMTYPE_SUMMARY) &&
@@ -1574,7 +1867,46 @@ static void actkeys_mselect_single(bAnimContext *ac,
       ANIM_animdata_freelist(&anim_data);
     }
     else {
+
+/* Question: Wayde Moss : Which block to use?  */
+#if 1
+      /* This block is inconsistent with how the graph editor does channel selection but feels
+       * better. */
       ANIM_animchannel_keyframes_loop(&ked, ac->ads, ale, ok_cb, select_cb, NULL);
+
+      switch (ale->datatype) {
+        case ALE_FCURVE: /* F-Curve */
+        {
+          FCurve *fcu = (FCurve *)ale->key_data;
+          actkeys_select_channel_based_on_keys(fcu, select_mode);
+          break;
+        }
+      }
+#else
+      /* This block is consistent with how the graph editor does channel selection but feels wrong.
+       */
+      if (!ANIM_animchannel_keyframes_loop(&ked, ac->ads, ale, NULL, ok_cb, NULL)) {
+        return;
+      }
+      const int selected_index = ked.curIndex;
+
+      ANIM_animchannel_keyframes_loop(&ked, ac->ads, ale, ok_cb, select_cb, NULL);
+
+      switch (ale->datatype) {
+        case ALE_FCURVE: /* F-Curve */
+        {
+          FCurve *fcu = (FCurve *)ale->key_data;
+          BezTriple *selected_bezt = fcu->bezt + selected_index;
+
+          if (BEZT_ISSEL_ANY(selected_bezt)) {
+            fcu->flag |= FCURVE_SELECTED;
+          }
+          else {
+            fcu->flag &= ~FCURVE_SELECTED;
+          }
+        }
+      }
+#endif
     }
   }
 }
@@ -1725,7 +2057,7 @@ static int mouse_action_keys(bAnimContext *ac,
     }
     else {
       /* deselect all keyframes */
-      deselect_action_keys(ac, 0, SELECT_SUBTRACT);
+      deselect_action_keys(ac, 0, SELECT_SUBTRACT, true);
 
       /* highlight channel clicked on */
       if (ELEM(ac->datatype, ANIMCONT_ACTION, ANIMCONT_DOPESHEET, ANIMCONT_TIMELINE)) {
