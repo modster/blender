@@ -43,7 +43,7 @@ def rna_idprop_ui_prop_update(item, prop):
 
 def rna_idprop_ui_prop_clear(item, prop):
     props = item.id_properties_create()
-    props.rna_ui_data_clear(prop)
+    props.ui_data_clear(prop)
 
 
 def rna_idprop_context_value(context, context_member, property_type):
@@ -85,7 +85,7 @@ def rna_idprop_value_item_type(value):
 
 
 def rna_idprop_ui_prop_default_set(item, prop, value):
-    item.rna_ui_data_update(prop, default=value)
+    item.ui_data_update(prop, default=value)
 
 
 def rna_idprop_ui_create(
@@ -117,7 +117,7 @@ def rna_idprop_ui_create(
 
     # Update the UI settings
     props = item.id_properties_create()
-    props.rna_ui_data_update(prop, 
+    props.ui_data_update(prop, 
                      subtype=subtype, 
                      min=min, 
                      max=max, 

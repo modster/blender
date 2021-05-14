@@ -255,23 +255,23 @@ class TestRNAData(TestHelper, unittest.TestCase):
 
         # Access default RNA data values
         test_object["test_prop"] = 0.5
-        rna_data = props.rna_ui_data("test_prop")
+        rna_data = props.ui_data("test_prop")
         self.assertTrue("min" in rna_data)
         self.assertLess(rna_data["min"], -10000.0)
         self.assertEqual(rna_data["subtype"], "NONE")
         self.assertGreater(rna_data["soft_max"], 10000.0)
 
         # Change RNA data values
-        props.rna_ui_data_update("test_prop", subtype="TEMPERATURE", min=0, soft_min=0.1)
-        rna_data = props.rna_ui_data("test_prop")
+        props.ui_data_update("test_prop", subtype="TEMPERATURE", min=0, soft_min=0.1)
+        rna_data = props.ui_data("test_prop")
         self.assertEqual(rna_data["min"], 0)
         self.assertEqual(rna_data["soft_min"], 0.1)
         self.assertEqual(rna_data["subtype"], "TEMPERATURE")
 
         # Copy RNA data values from one property to another
         test_object["test_prop_2"] = 11.7
-        props.rna_ui_data_copy(props, "test_prop", "test_prop_2")
-        rna_data = props.rna_ui_data("test_prop_2")
+        props.ui_data_copy(props, "test_prop", "test_prop_2")
+        rna_data = props.ui_data("test_prop_2")
         self.assertEqual(rna_data["min"], 0)
         self.assertEqual(rna_data["soft_min"], 0.1)
         self.assertEqual(rna_data["subtype"], "TEMPERATURE")
@@ -282,8 +282,8 @@ class TestRNAData(TestHelper, unittest.TestCase):
         test_object_2 = bpy.data.objects["test_2"]
         test_object_2["test_prop_3"] = 20.1
         props_2 = test_object_2.id_properties_create()
-        props_2.rna_ui_data_copy(props, "test_prop", "test_prop_3")
-        rna_data = props_2.rna_ui_data("test_prop_3")
+        props_2.ui_data_copy(props, "test_prop", "test_prop_3")
+        rna_data = props_2.ui_data("test_prop_3")
         self.assertEqual(rna_data["min"], 0)
         self.assertEqual(rna_data["soft_min"], 0.1)
         self.assertEqual(rna_data["subtype"], "TEMPERATURE")
@@ -292,15 +292,15 @@ class TestRNAData(TestHelper, unittest.TestCase):
         # Test RNA data for string property
         test_object["test_string_prop"] = "Hello there!"
         props = test_object.id_properties_create()
-        props.rna_ui_data_update("test_string_prop", default="Goodbye where?")
-        rna_data = props.rna_ui_data("test_string_prop")
+        props.ui_data_update("test_string_prop", default="Goodbye where?")
+        rna_data = props.ui_data("test_string_prop")
         self.assertEqual(rna_data["default"], "Goodbye where?")
 
         # Test RNA data for array property
         test_object["test_array_prop"] = [1, 2, 3]
         props = test_object.id_properties_create()
-        props.rna_ui_data_update("test_array_prop", default=[1, 2])
-        rna_data = props.rna_ui_data("test_array_prop")
+        props.ui_data_update("test_array_prop", default=[1, 2])
+        rna_data = props.ui_data("test_array_prop")
         self.assertEqual(rna_data["default"], [1, 2])
 
 

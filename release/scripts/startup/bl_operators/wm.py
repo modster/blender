@@ -1431,7 +1431,7 @@ class WM_OT_properties_edit(Operator):
 
         if prop_type in {float, int}:
             props = item.id_properties_create()
-            props.rna_ui_data_update(prop, 
+            props.ui_data_update(prop, 
                              subtype=self.subtype, 
                              min=self.min, 
                              max=self.max, 
@@ -1440,7 +1440,7 @@ class WM_OT_properties_edit(Operator):
                              description=self.description)
         if prop_type in {float, int, str}:
             props = item.id_properties_create()
-            props.rna_ui_data_update(prop, default=default_eval)
+            props.ui_data_update(prop, default=default_eval)
 
         # If we have changed the type of the property, update its potential anim curves!
         if prop_type_old != prop_type_new:
@@ -1515,7 +1515,7 @@ class WM_OT_properties_edit(Operator):
 
         # setup defaults
         props = item.id_properties_create()
-        rna_data = props.rna_ui_data(prop)
+        rna_data = props.ui_data(prop)
         self.subtype =  rna_data["subtype"]
         if prop_type in {int, float}:
             self.min = rna_data["min"]
