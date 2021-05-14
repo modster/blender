@@ -30,7 +30,7 @@ namespace blender::compositor {
 class ExecutionGroup;
 
 /**
- * Base class for execution models. Contains shared implementation.
+ * Fully renders operations in order from inputs to outputs.
  */
 class FullFrameExecutionModel : public ExecutionModel {
  private:

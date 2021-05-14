@@ -141,7 +141,7 @@ void FullFrameExecutionModel::get_output_render_rect(NodeOperation *output_op, r
 {
   BLI_assert(output_op->isOutputOperation(m_context.isRendering()));
 
-  /* By default return operation bounds (no border) */
+  /* By default return operation bounds (no border). */
   const int op_width = output_op->getWidth();
   const int op_height = output_op->getHeight();
   BLI_rcti_init(&r_rect, 0, op_width, 0, op_height);
@@ -151,10 +151,10 @@ void FullFrameExecutionModel::get_output_render_rect(NodeOperation *output_op, r
                                   output_op->get_flags().is_preview_operation);
   const bool has_render_border = m_border.use_render_border;
   if (has_viewer_border || has_render_border) {
-    /* Get border with normalized coordinates */
+    /* Get border with normalized coordinates. */
     const rctf *norm_border = has_viewer_border ? m_border.viewer_border : m_border.render_border;
 
-    /* De-normalize and clamp operation bounds to border */
+    /* De-normalize and clamp operation bounds to border. */
     rcti border;
     BLI_rcti_init(&border,
                   norm_border->xmin * op_width,

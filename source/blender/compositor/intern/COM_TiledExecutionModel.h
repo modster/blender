@@ -29,7 +29,8 @@ namespace blender::compositor {
 class ExecutionGroup;
 
 /**
- * Base class for execution models. Contains shared implementation.
+ * Operations are executed from outputs to inputs grouped in execution groups and rendered in
+ * tiles.
  */
 class TiledExecutionModel : public ExecutionModel {
  private:
