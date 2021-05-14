@@ -1715,7 +1715,7 @@ static void idprop_update_rna_ui_data_string(IDProperty *idprop, PyObject *py_de
 
 PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
              ".. method:: rna_ui_data_update(key, "
-             "                       subtype=None "
+             "                       subtype=None, "
              "                       min=None, "
              "                       max=None, "
              "                       soft_min=None, "
