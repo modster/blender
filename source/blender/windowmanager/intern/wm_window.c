@@ -1560,7 +1560,7 @@ void wm_window_process_events(const bContext *C)
 #ifdef WITH_XR_OPENXR
   /* XR events don't use the regular window queues. So here we don't only trigger
    * processing/dispatching but also handling. */
-  hasevent |= wm_xr_events_handle(C);
+  has_event |= wm_xr_events_handle(C);
 #endif
 
   /* When there is no event, sleep 5 milliseconds not to use too much CPU when idle.
