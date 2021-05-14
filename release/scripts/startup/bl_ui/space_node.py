@@ -664,7 +664,7 @@ class NODE_PT_quality(bpy.types.Panel):
 
         col = layout.column()
         if prefs.experimental.use_full_frame_compositor:
-            col.prop(tree, "execution_model")
+            col.prop(tree, "execution_mode")
 
         col.prop(tree, "render_quality", text="Render")
         col.prop(tree, "edit_quality", text="Edit")

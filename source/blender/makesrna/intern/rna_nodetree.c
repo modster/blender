@@ -123,13 +123,13 @@ static const EnumPropertyItem node_chunksize_items[] = {
 };
 #endif
 
-static const EnumPropertyItem rna_enum_execution_model_items[] = {
-    {NTREE_EXECUTION_MODEL_TILED,
+static const EnumPropertyItem rna_enum_execution_mode_items[] = {
+    {NTREE_EXECUTION_MODE_TILED,
      "TILED",
      0,
      "Tiled",
      "Compositing is tiled, having as priority to display first tiles as fast as possible"},
-    {NTREE_EXECUTION_MODEL_FULL_FRAME,
+    {NTREE_EXECUTION_MODE_FULL_FRAME,
      "FULL_FRAME",
      0,
      "Full Frame",
@@ -11540,9 +11540,9 @@ static void rna_def_composite_nodetree(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "bNodeTree");
   RNA_def_struct_ui_icon(srna, ICON_RENDERLAYERS);
 
-  prop = RNA_def_property(srna, "execution_model", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "execution_model");
-  RNA_def_property_enum_items(prop, rna_enum_execution_model_items);
+  prop = RNA_def_property(srna, "execution_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "execution_mode");
+  RNA_def_property_enum_items(prop, rna_enum_execution_mode_items);
   RNA_def_property_ui_text(prop, "Execution Mode", "Set how compositing is executed");
   RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, "rna_NodeTree_update");
 

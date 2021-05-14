@@ -467,8 +467,8 @@ typedef struct bNodeTree {
   short render_quality;
   /** Tile size for compositor engine. */
   int chunksize;
-  /** Execution model to use for compositor engine. */
-  int execution_model;
+  /** Execution mode to use for compositor engine. */
+  int execution_mode;
 
   rctf viewer_border;
 
@@ -542,11 +542,11 @@ typedef enum eNodeTreeUpdate {
   NTREE_UPDATE_GROUP = (NTREE_UPDATE_GROUP_IN | NTREE_UPDATE_GROUP_OUT),
 } eNodeTreeUpdate;
 
-/* tree->execution_model */
-typedef enum eNodeTreeExecutionModel {
-  NTREE_EXECUTION_MODEL_TILED = 0,
-  NTREE_EXECUTION_MODEL_FULL_FRAME = 1,
-} NTreeExecutionModel;
+/* tree->execution_mode */
+typedef enum eNodeTreeExecutionMode {
+  NTREE_EXECUTION_MODE_TILED = 0,
+  NTREE_EXECUTION_MODE_FULL_FRAME = 1,
+} NTreeExecutionMode;
 
 /* socket value structs for input buttons
  * DEPRECATED now using ID properties

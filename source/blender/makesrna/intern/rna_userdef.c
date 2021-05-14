@@ -630,7 +630,7 @@ static void rna_userdef_use_full_frame_compositor_update(Main *bmain,
   UserDef_Experimental *experimental = (UserDef_Experimental *)ptr->data;
   for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
     if (scene->nodetree) {
-      scene->nodetree->execution_model = experimental->use_full_frame_compositor;
+      scene->nodetree->execution_mode = experimental->use_full_frame_compositor;
     }
   }
   rna_userdef_update(bmain, scene, ptr);

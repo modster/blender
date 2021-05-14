@@ -45,13 +45,13 @@ int CompositorContext::getFramenumber() const
 eExecutionModel CompositorContext::get_execution_model() const
 {
   BLI_assert(m_bnodetree != nullptr);
-  switch (m_bnodetree->execution_model) {
+  switch (m_bnodetree->execution_mode) {
     case 1:
       return eExecutionModel::FullFrame;
     case 0:
       return eExecutionModel::Tiled;
     default:
-      BLI_assert(!"Invalid execution model");
+      BLI_assert(!"Invalid execution mode");
       return eExecutionModel::Tiled;
   }
 }
