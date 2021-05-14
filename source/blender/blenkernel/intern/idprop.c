@@ -1260,7 +1260,7 @@ static void write_ui_data(const IDProperty *prop, BlendWriter *writer)
       break;
     }
     case IDP_UI_DATA_TYPE_UNSUPPORTED: {
-      BLI_assert(false);
+      BLI_assert_unreachable();
       break;
     }
   }
@@ -1371,7 +1371,7 @@ static void read_ui_data(IDProperty *prop, BlendDataReader *reader)
       break;
     }
     case IDP_UI_DATA_TYPE_UNSUPPORTED: {
-      BLI_assert(false);
+      BLI_assert_unreachable();
       break;
     }
   }

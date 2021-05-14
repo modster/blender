@@ -197,7 +197,7 @@ static void version_idproperty_ui_data(IDProperty *idprop_group)
         version_idproperty_move_data_float((IDPropertyUIDataFloat *)ui_data, prop_ui_data);
         break;
       case IDP_UI_DATA_TYPE_UNSUPPORTED:
-        BLI_assert(false);
+        BLI_assert_unreachable();
         break;
     }
 

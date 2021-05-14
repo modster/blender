@@ -1822,7 +1822,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
           idprop, min, max, soft_min, soft_max, step, precision, default_value);
       break;
     case IDP_UI_DATA_TYPE_UNSUPPORTED:
-      BLI_assert(false);
+      BLI_assert_unreachable();
       break;
   }
 
@@ -1957,7 +1957,7 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
       idprop_ui_data_to_dict_float(idprop, dict);
       break;
     case IDP_UI_DATA_TYPE_UNSUPPORTED:
-      BLI_assert(false);
+      BLI_assert_unreachable();
       break;
   }
 
