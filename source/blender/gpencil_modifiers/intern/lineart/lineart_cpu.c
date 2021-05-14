@@ -335,6 +335,21 @@ static void lineart_bounding_area_triangle_add(LineartRenderBuffer *rb,
   ba->triangle_count++;
 }
 
+static void lineart_bounding_area_line_add(LineartRenderBuffer *rb,
+                                           LineartBoundingArea *ba,
+                                           LineartEdge *rl)
+{
+  if (ba->line_count >= ba->max_line_count) {
+    LineartEdge **new_array = lineart_mem_aquire(&rb->render_data_pool,
+                                                 sizeof(LineartEdge *) * ba->max_line_count * 2);
+    memcpy(new_array, ba->linked_lines, sizeof(LineartEdge *) * ba->max_line_count);
+    ba->max_line_count *= 2;
+    ba->linked_lines = new_array;
+  }
+  ba->linked_lines[ba->line_count] = rl;
+  ba->line_count++;
+}
+
 static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *e, int thread_id)
 {
   double x = e->v1->fbcoord[0], y = e->v1->fbcoord[1];
@@ -3094,8 +3109,11 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
 
       /* Init linked_triangles array. */
       ba->max_triangle_count = LRT_TILE_SPLITTING_TRIANGLE_LIMIT;
+      ba->max_line_count = LRT_TILE_EDGE_COUNT_INITIAL;
       ba->linked_triangles = lineart_mem_aquire(
-          &rb->render_data_pool, sizeof(LineartTriangle *) * LRT_TILE_SPLITTING_TRIANGLE_LIMIT);
+          &rb->render_data_pool, sizeof(LineartTriangle *) * ba->max_triangle_count);
+      ba->linked_lines = lineart_mem_aquire(&rb->render_data_pool,
+                                            sizeof(LineartEdge *) * ba->max_line_count);
 
       /* Link adjacent ones. */
       if (row) {
@@ -3314,8 +3332,11 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
   /* Init linked_triangles array. */
   for (int i = 0; i < 4; i++) {
     ba[i].max_triangle_count = LRT_TILE_SPLITTING_TRIANGLE_LIMIT;
+    ba[i].max_line_count = LRT_TILE_EDGE_COUNT_INITIAL;
     ba[i].linked_triangles = lineart_mem_aquire(
         &rb->render_data_pool, sizeof(LineartTriangle *) * LRT_TILE_SPLITTING_TRIANGLE_LIMIT);
+    ba[i].linked_lines = lineart_mem_aquire(&rb->render_data_pool,
+                                            sizeof(LineartEdge *) * LRT_TILE_EDGE_COUNT_INITIAL);
   }
 
   for (int i = 0; i < root->triangle_count; i++) {
@@ -3340,7 +3361,8 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
     }
   }
 
-  while ((e = lineart_list_pop_pointer_no_free(&root->linked_lines)) != NULL) {
+  for (int i = 0; i < root->line_count; i++) {
+    e = root->linked_lines[i];
     lineart_bounding_area_link_line(rb, root, e);
   }
 
@@ -3488,7 +3510,7 @@ static void lineart_bounding_area_link_line(LineartRenderBuffer *rb,
                                             LineartEdge *e)
 {
   if (root_ba->child == NULL) {
-    lineart_list_append_pointer_pool(&root_ba->linked_lines, &rb->render_data_pool, e);
+    lineart_bounding_area_line_add(rb, root_ba, e);
   }
   else {
     if (lineart_bounding_area_line_intersect(

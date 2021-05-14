@@ -216,6 +216,7 @@ enum eLineArtTileRecursiveLimit {
 };
 
 #define LRT_TILE_SPLITTING_TRIANGLE_LIMIT 100
+#define LRT_TILE_EDGE_COUNT_INITIAL 32
 
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
@@ -470,11 +471,12 @@ typedef struct LineartBoundingArea {
 
   short triangle_count;
   short max_triangle_count;
+  short line_count;
+  short max_line_count;
 
   /* Use array for speeding up multiple accesses. */
   struct LineartTriangle **linked_triangles;
-
-  ListBase linked_lines;
+  struct LineartEdge **linked_lines;
 
   /** Reserved for image space reduction && multi-thread chaining. */
   ListBase linked_chains;
