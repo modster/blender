@@ -572,12 +572,6 @@ void wm_xr_session_actions_init(wmXrData *xr)
   GHOST_XrAttachActionSets(xr->runtime->context);
 }
 
-static void wm_xr_pose_to_mat(const wmXrPose *pose, float r_mat[4][4])
-{
-  quat_to_mat4(r_mat, pose->orientation_quat);
-  copy_v3_v3(r_mat[3], pose->position);
-}
-
 static void wm_xr_session_controller_mats_update(const bContext *C,
                                                  const XrSessionSettings *settings,
                                                  const wmXrAction *controller_pose_action,
@@ -628,7 +622,7 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
     }
 
     /* Calculate controller matrix in world space. */
-    wm_xr_pose_to_mat(&((wmXrPose *)controller_pose_action->states)[i], tmp);
+    wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp);
 
     /* Apply eye position and base pose offsets. */
     sub_v3_v3(tmp[3], view_ofs);
