@@ -214,8 +214,8 @@ void NodeOperation::render(ExecutionSystem &exec_system)
 
   Vector<MemoryBuffer *> inputs_bufs = get_rendered_inputs_buffers(exec_system);
 
-  const bool has_output = getNumberOfOutputSockets() > 0;
-  MemoryBuffer *output_buf = has_output ? create_output_buffer() : nullptr;
+  const bool has_outputs = getNumberOfOutputSockets() > 0;
+  MemoryBuffer *output_buf = has_outputs ? create_output_buffer() : nullptr;
 
   Span<rcti> render_rects = output_store.get_rects_to_render(this);
   if (get_flags().is_fullframe_operation) {
