@@ -47,6 +47,20 @@
   } \
   (void)0
 
+/**
+ * Variation of CHECK_XR() that calls a (cleanup) function before throwing. Especially useful for
+ * constructors, since destructors won't be called when throwing.
+ */
+#define CHECK_XR_CALL(call, error_msg, func) \
+  { \
+    XrResult _res = call; \
+    if (XR_FAILED(_res)) { \
+      func(); \
+      throw GHOST_XrException(error_msg, _res); \
+    } \
+  } \
+  (void)0
+
 inline void copy_ghost_pose_to_openxr_pose(const GHOST_XrPose &ghost_pose, XrPosef &r_oxr_pose)
 {
   /* Set and convert to OpenXR coodinate space. */

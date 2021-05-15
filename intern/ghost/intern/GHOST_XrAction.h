@@ -55,7 +55,7 @@ class GHOST_XrActionProfile {
                         XrAction action,
                         const char *profile_path,
                         const GHOST_XrActionBindingInfo &info);
-  ~GHOST_XrActionProfile();
+  ~GHOST_XrActionProfile() = default;
 
   void getBindings(XrAction action,
                    std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
@@ -110,6 +110,9 @@ class GHOST_XrAction {
   std::map<std::string, GHOST_XrActionSpace> m_spaces;
   /* Profiles identified by interaction profile path. */
   std::map<std::string, GHOST_XrActionProfile> m_profiles;
+
+ private:
+  void freeCustomData();
 };
 
 /* -------------------------------------------------------------------- */
@@ -141,6 +144,9 @@ class GHOST_XrActionSet {
   void *m_customdata; /* wmXrActionSet */
 
   std::map<std::string, GHOST_XrAction> m_actions;
+
+ private:
+  void freeCustomData();
 };
 
 /* -------------------------------------------------------------------- */

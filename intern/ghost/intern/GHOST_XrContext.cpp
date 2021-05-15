@@ -246,7 +246,7 @@ void GHOST_XrContext::dispatchErrorMessage(const GHOST_XrException *exception) c
 {
   GHOST_XrError error;
 
-  error.user_message = exception->m_msg;
+  error.user_message = exception->m_msg.data();
   error.customdata = s_error_handler_customdata;
 
   if (isDebugMode()) {
@@ -374,7 +374,7 @@ void GHOST_XrContext::getAPILayersToEnable(std::vector<const char *> &r_ext_name
 
   for (const std::string &layer : try_layers) {
     if (openxr_layer_is_available(m_oxr->layers, layer)) {
-      r_ext_names.push_back(layer.c_str());
+      r_ext_names.push_back(layer.data());
     }
   }
 }
