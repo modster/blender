@@ -726,8 +726,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
           case XR_FLOAT_INPUT: {
             const float *state = &((float *)action->states)[i];
             float *state_prev = &((float *)action->states_prev)[i];
-            if (fabsf(*state) > action->threshold) {
-              if (fabsf(*state_prev) <= action->threshold) {
+            if (fabsf(*state) > action->float_threshold) {
+              if (fabsf(*state_prev) <= action->float_threshold) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
                   val = KM_PRESS;
                   press_start = true;
@@ -743,7 +743,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                 press_start = false;
               }
             }
-            else if (fabsf(*state_prev) > action->threshold) {
+            else if (fabsf(*state_prev) > action->float_threshold) {
               if (modal || action->op_flag == XR_OP_RELEASE) {
                 val = KM_RELEASE;
                 press_start = false;
@@ -761,8 +761,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
           case XR_VECTOR2F_INPUT: {
             const float(*state)[2] = &((float(*)[2])action->states)[i];
             float(*state_prev)[2] = &((float(*)[2])action->states_prev)[i];
-            if (len_v2(*state) > action->threshold) {
-              if (len_v2(*state_prev) <= action->threshold) {
+            if (len_v2(*state) > action->float_threshold) {
+              if (len_v2(*state_prev) <= action->float_threshold) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
                   val = KM_PRESS;
                   press_start = true;
@@ -778,7 +778,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                 press_start = false;
               }
             }
-            else if (len_v2(*state_prev) > action->threshold) {
+            else if (len_v2(*state_prev) > action->float_threshold) {
               if (modal || action->op_flag == XR_OP_RELEASE) {
                 val = KM_RELEASE;
                 press_start = false;

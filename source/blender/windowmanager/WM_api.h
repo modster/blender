@@ -992,7 +992,7 @@ bool WM_xr_action_create(wmXrData *xr,
                          eXrActionType type,
                          unsigned int count_subaction_paths,
                          const char **subaction_paths,
-                         float threshold,
+                         const float *float_threshold,
                          struct wmOperatorType *ot,
                          struct IDProperty *op_properties,
                          eXrOpFlag op_flag);

@@ -429,10 +429,11 @@ static bool rna_XrSessionState_action_create(bContext *C,
     }
   }
 
+  const bool is_float_action = (type == XR_FLOAT_INPUT || type == XR_VECTOR2F_INPUT);
   wmOperatorType *ot = NULL;
   IDProperty *op_properties = NULL;
 
-  if (op[0] && (type == XR_FLOAT_INPUT || type == XR_VECTOR2F_INPUT)) {
+  if (op[0] && is_float_action) {
     char idname[OP_MAX_TYPENAME];
     WM_operator_bl_idname(idname, op);
     ot = WM_operatortype_find(idname, true);
@@ -457,7 +458,7 @@ static bool rna_XrSessionState_action_create(bContext *C,
                              type,
                              count_subaction_paths,
                              subaction_paths,
-                             threshold,
+                             is_float_action ? &threshold : NULL,
                              ot,
                              op_properties,
                              op_flag);

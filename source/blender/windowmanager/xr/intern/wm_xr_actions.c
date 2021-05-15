@@ -68,7 +68,7 @@ static wmXrAction *action_create(const char *action_name,
                                  eXrActionType type,
                                  unsigned int count_subaction_paths,
                                  const char **subaction_paths,
-                                 float threshold,
+                                 const float *float_threshold,
                                  wmOperatorType *ot,
                                  IDProperty *op_properties,
                                  eXrOpFlag op_flag)
@@ -109,8 +109,11 @@ static wmXrAction *action_create(const char *action_name,
   action->states = MEM_calloc_arrayN(count, size, "XrAction_States");
   action->states_prev = MEM_calloc_arrayN(count, size, "XrAction_StatesPrev");
 
-  action->threshold = threshold;
-  CLAMP(action->threshold, 0.0f, 1.0f);
+  if (float_threshold) {
+    BLI_assert(type == XR_FLOAT_INPUT || type == XR_VECTOR2F_INPUT);
+    action->float_threshold = *float_threshold;
+    CLAMP(action->float_threshold, 0.0f, 1.0f);
+  }
 
   action->ot = ot;
   action->op_properties = op_properties;
@@ -195,7 +198,7 @@ bool WM_xr_action_create(wmXrData *xr,
                          eXrActionType type,
                          unsigned int count_subaction_paths,
                          const char **subaction_paths,
-                         float threshold,
+                         const float *float_threshold,
                          wmOperatorType *ot,
                          IDProperty *op_properties,
                          eXrOpFlag op_flag)
@@ -208,7 +211,7 @@ bool WM_xr_action_create(wmXrData *xr,
                                      type,
                                      count_subaction_paths,
                                      subaction_paths,
-                                     threshold,
+                                     float_threshold,
                                      ot,
                                      op_properties,
                                      op_flag);
