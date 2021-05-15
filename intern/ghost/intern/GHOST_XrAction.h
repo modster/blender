@@ -27,7 +27,7 @@
 #include <memory>
 #include <string>
 
-struct CCustomDataWrapper;
+#include "GHOST_Util.h"
 
 /* -------------------------------------------------------------------- */
 
@@ -106,7 +106,7 @@ class GHOST_XrAction {
   /** States for each subaction path. */
   void *m_states;
 
-  std::unique_ptr<CCustomDataWrapper> m_custom_data_ = nullptr; /* wmXrAction */
+  std::unique_ptr<GHOST_C_CustomDataWrapper> m_custom_data_ = nullptr; /* wmXrAction */
 
   /* Spaces identified by user (subaction) path. */
   std::map<std::string, GHOST_XrActionSpace> m_spaces;
@@ -139,7 +139,7 @@ class GHOST_XrActionSet {
  private:
   XrActionSet m_action_set = XR_NULL_HANDLE;
 
-  std::unique_ptr<CCustomDataWrapper> m_custom_data_ = nullptr; /* wmXrActionSet */
+  std::unique_ptr<GHOST_C_CustomDataWrapper> m_custom_data_ = nullptr; /* wmXrActionSet */
 
   std::map<std::string, GHOST_XrAction> m_actions;
 };

@@ -29,32 +29,6 @@
 #include "GHOST_XrAction.h"
 
 /* -------------------------------------------------------------------- */
-/** \name CCustomDataWrapper
- *
- * RAII wrapper for typical C `void *` custom data.
- * Used for exception safe custom-data handling during constructor calls.
- *
- * \{ */
-
-struct CCustomDataWrapper {
-  void *custom_data_;
-  GHOST_XrCustomdataFreeFn free_fn_;
-
-  CCustomDataWrapper(void *custom_data, GHOST_XrCustomdataFreeFn free_fn)
-      : custom_data_(custom_data), free_fn_(free_fn)
-  {
-  }
-  ~CCustomDataWrapper()
-  {
-    if (free_fn_ != nullptr && custom_data_ != nullptr) {
-      free_fn_(custom_data_);
-    }
-  }
-};
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name GHOST_XrActionSpace
  *
  * \{ */
@@ -179,7 +153,7 @@ GHOST_XrAction::GHOST_XrAction(XrInstance instance,
     : m_type(info.type),
       m_states(info.states),
       m_custom_data_(
-          std::make_unique<CCustomDataWrapper>(info.customdata, info.customdata_free_fn))
+          std::make_unique<GHOST_C_CustomDataWrapper>(info.customdata, info.customdata_free_fn))
 {
   m_subaction_paths.resize(info.count_subaction_paths);
 
@@ -414,7 +388,7 @@ void GHOST_XrAction::getBindings(
 
 GHOST_XrActionSet::GHOST_XrActionSet(XrInstance instance, const GHOST_XrActionSetInfo &info)
     : m_custom_data_(
-          std::make_unique<CCustomDataWrapper>(info.customdata, info.customdata_free_fn))
+          std::make_unique<GHOST_C_CustomDataWrapper>(info.customdata, info.customdata_free_fn))
 {
   XrActionSetCreateInfo action_set_info{XR_TYPE_ACTION_SET_CREATE_INFO};
   strcpy(action_set_info.actionSetName, info.name);

@@ -79,6 +79,7 @@ set(SRC
   intern/GHOST_SystemPaths.h
   intern/GHOST_TimerManager.h
   intern/GHOST_TimerTask.h
+  intern/GHOST_Util.h
   intern/GHOST_Window.h
   intern/GHOST_WindowManager.h
 )
