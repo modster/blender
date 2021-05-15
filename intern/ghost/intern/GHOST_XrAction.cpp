@@ -29,6 +29,32 @@
 #include "GHOST_XrAction.h"
 
 /* -------------------------------------------------------------------- */
+/** \name CCustomDataWrapper
+ *
+ * RAII wrapper for typical C `void *` custom data.
+ * Used for exception safe custom-data handling during constructor calls.
+ *
+ * \{ */
+
+struct CCustomDataWrapper {
+  void *custom_data_;
+  GHOST_XrCustomdataFreeFn free_fn_;
+
+  CCustomDataWrapper(void *custom_data, GHOST_XrCustomdataFreeFn free_fn)
+      : custom_data_(custom_data), free_fn_(free_fn)
+  {
+  }
+  ~CCustomDataWrapper()
+  {
+    if (free_fn_ != nullptr && custom_data_ != nullptr) {
+      free_fn_(custom_data_);
+    }
+  }
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name GHOST_XrActionSpace
  *
  * \{ */
@@ -152,16 +178,14 @@ GHOST_XrAction::GHOST_XrAction(XrInstance instance,
                                const GHOST_XrActionInfo &info)
     : m_type(info.type),
       m_states(info.states),
-      m_customdata_free_fn(info.customdata_free_fn),
-      m_customdata(info.customdata)
+      m_custom_data_(
+          std::make_unique<CCustomDataWrapper>(info.customdata, info.customdata_free_fn))
 {
   m_subaction_paths.resize(info.count_subaction_paths);
 
   for (uint32_t i = 0; i < info.count_subaction_paths; ++i) {
-    CHECK_XR_CALL(
-        xrStringToPath(instance, info.subaction_paths[i], &m_subaction_paths[i]),
-        (std::string("Failed to get user path \"") + info.subaction_paths[i] + "\".").data(),
-        freeCustomData);
+    CHECK_XR(xrStringToPath(instance, info.subaction_paths[i], &m_subaction_paths[i]),
+             (std::string("Failed to get user path \"") + info.subaction_paths[i] + "\".").data());
   }
 
   XrActionCreateInfo action_info{XR_TYPE_ACTION_CREATE_INFO};
@@ -189,27 +213,17 @@ GHOST_XrAction::GHOST_XrAction(XrInstance instance,
   action_info.countSubactionPaths = info.count_subaction_paths;
   action_info.subactionPaths = m_subaction_paths.data();
 
-  CHECK_XR_CALL(xrCreateAction(action_set, &action_info, &m_action),
-                (std::string("Failed to create action \"") + info.name +
-                 "\". Action name and/or paths are invalid. Name must not contain upper "
-                 "case letters or special characters other than '-', '_', or '.'.")
-                    .data(),
-                freeCustomData);
+  CHECK_XR(xrCreateAction(action_set, &action_info, &m_action),
+           (std::string("Failed to create action \"") + info.name +
+            "\". Action name and/or paths are invalid. Name must not contain upper "
+            "case letters or special characters other than '-', '_', or '.'.")
+               .data());
 }
 
 GHOST_XrAction::~GHOST_XrAction()
 {
-  freeCustomData();
-
   if (m_action != XR_NULL_HANDLE) {
     CHECK_XR_ASSERT(xrDestroyAction(m_action));
-  }
-}
-
-void GHOST_XrAction::freeCustomData()
-{
-  if (m_customdata_free_fn != nullptr && m_customdata != nullptr) {
-    m_customdata_free_fn(m_customdata);
   }
 }
 
@@ -377,7 +391,10 @@ void GHOST_XrAction::stopHapticFeedback(XrSession session, const char *action_na
 
 void *GHOST_XrAction::getCustomdata()
 {
-  return m_customdata;
+  if (m_custom_data_ == nullptr) {
+    return nullptr;
+  }
+  return m_custom_data_->custom_data_;
 }
 
 void GHOST_XrAction::getBindings(
@@ -396,7 +413,8 @@ void GHOST_XrAction::getBindings(
  * \{ */
 
 GHOST_XrActionSet::GHOST_XrActionSet(XrInstance instance, const GHOST_XrActionSetInfo &info)
-    : m_customdata_free_fn(info.customdata_free_fn), m_customdata(info.customdata)
+    : m_custom_data_(
+          std::make_unique<CCustomDataWrapper>(info.customdata, info.customdata_free_fn))
 {
   XrActionSetCreateInfo action_set_info{XR_TYPE_ACTION_SET_CREATE_INFO};
   strcpy(action_set_info.actionSetName, info.name);
@@ -405,31 +423,21 @@ GHOST_XrActionSet::GHOST_XrActionSet(XrInstance instance, const GHOST_XrActionSe
                         necessary. */
   action_set_info.priority = 0; /* Use same (default) priority for all action sets. */
 
-  CHECK_XR_CALL(xrCreateActionSet(instance, &action_set_info, &m_action_set),
-                (std::string("Failed to create action set \"") + info.name +
-                 "\". Name must not contain upper case letters or special characters "
-                 "other than '-', '_', or '.'.")
-                    .data(),
-                freeCustomData);
+  CHECK_XR(xrCreateActionSet(instance, &action_set_info, &m_action_set),
+           (std::string("Failed to create action set \"") + info.name +
+            "\". Name must not contain upper case letters or special characters "
+            "other than '-', '_', or '.'.")
+               .data());
 }
 
 GHOST_XrActionSet::~GHOST_XrActionSet()
 {
-  freeCustomData();
-
   /* This needs to be done before xrDestroyActionSet() to avoid an assertion in the GHOST_XrAction
    * destructor (which calls xrDestroyAction()). */
   m_actions.clear();
 
   if (m_action_set != XR_NULL_HANDLE) {
     CHECK_XR_ASSERT(xrDestroyActionSet(m_action_set));
-  }
-}
-
-void GHOST_XrActionSet::freeCustomData()
-{
-  if (m_customdata_free_fn != nullptr && m_customdata != nullptr) {
-    m_customdata_free_fn(m_customdata);
   }
 }
 
@@ -478,7 +486,10 @@ XrActionSet GHOST_XrActionSet::getActionSet() const
 
 void *GHOST_XrActionSet::getCustomdata()
 {
-  return m_customdata;
+  if (m_custom_data_ == nullptr) {
+    return nullptr;
+  }
+  return m_custom_data_->custom_data_;
 }
 
 uint32_t GHOST_XrActionSet::getActionCount() const

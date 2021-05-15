@@ -24,7 +24,10 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
+
+struct CCustomDataWrapper;
 
 /* -------------------------------------------------------------------- */
 
@@ -103,15 +106,12 @@ class GHOST_XrAction {
   /** States for each subaction path. */
   void *m_states;
 
-  GHOST_XrCustomdataFreeFn m_customdata_free_fn;
-  void *m_customdata; /* wmXrAction */
+  std::unique_ptr<CCustomDataWrapper> m_custom_data_ = nullptr; /* wmXrAction */
 
   /* Spaces identified by user (subaction) path. */
   std::map<std::string, GHOST_XrActionSpace> m_spaces;
   /* Profiles identified by interaction profile path. */
   std::map<std::string, GHOST_XrActionProfile> m_profiles;
-
-  void freeCustomData();
 };
 
 /* -------------------------------------------------------------------- */
@@ -139,12 +139,9 @@ class GHOST_XrActionSet {
  private:
   XrActionSet m_action_set = XR_NULL_HANDLE;
 
-  GHOST_XrCustomdataFreeFn m_customdata_free_fn;
-  void *m_customdata; /* wmXrActionSet */
+  std::unique_ptr<CCustomDataWrapper> m_custom_data_ = nullptr; /* wmXrActionSet */
 
   std::map<std::string, GHOST_XrAction> m_actions;
-
-  void freeCustomData();
 };
 
 /* -------------------------------------------------------------------- */
