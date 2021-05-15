@@ -111,7 +111,6 @@ class GHOST_XrAction {
   /* Profiles identified by interaction profile path. */
   std::map<std::string, GHOST_XrActionProfile> m_profiles;
 
- private:
   void freeCustomData();
 };
 
@@ -145,7 +144,6 @@ class GHOST_XrActionSet {
 
   std::map<std::string, GHOST_XrAction> m_actions;
 
- private:
   void freeCustomData();
 };
 

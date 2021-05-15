@@ -77,7 +77,7 @@ static void wm_xr_session_object_pose_set(const GHOST_XrPose *pose, Object *ob)
   DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
 }
 
-static void wm_xr_session_create_cb()
+static void wm_xr_session_create_cb(void)
 {
   Main *bmain = G_MAIN;
   wmWindowManager *wm = bmain->wm.first;

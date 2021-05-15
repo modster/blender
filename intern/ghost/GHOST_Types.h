@@ -634,7 +634,7 @@ typedef enum GHOST_TXrGraphicsBinding {
 
 typedef void (*GHOST_XrErrorHandlerFn)(const struct GHOST_XrError *);
 
-typedef void (*GHOST_XrSessionCreateFn)();
+typedef void (*GHOST_XrSessionCreateFn)(void);
 typedef void (*GHOST_XrSessionExitFn)(void *customdata);
 typedef void (*GHOST_XrCustomdataFreeFn)(void *customdata);
 
