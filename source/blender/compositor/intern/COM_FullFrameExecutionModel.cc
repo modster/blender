@@ -106,7 +106,7 @@ void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation
 
   const int n_inputs = operation->getNumberOfInputSockets();
   for (int i = 0; i < n_inputs; i++) {
-    NodeOperation *input_op = &operation->getInputSocket(i)->getLink()->getOperation();
+    NodeOperation *input_op = operation->getInputOperation(i);
     rcti input_op_rect, input_area;
     BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
     operation->get_input_area_of_interest(i, render_rect, input_area);
@@ -131,7 +131,7 @@ void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
 
   const int n_inputs = operation->getNumberOfInputSockets();
   for (int i = 0; i < n_inputs; i++) {
-    NodeOperation *input_op = &operation->getInputSocket(i)->getLink()->getOperation();
+    NodeOperation *input_op = operation->getInputOperation(i);
     determine_reads(input_op);
     m_output_store.register_read(input_op);
   }
