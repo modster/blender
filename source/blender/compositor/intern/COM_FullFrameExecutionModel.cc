@@ -154,15 +154,12 @@ void FullFrameExecutionModel::get_output_render_rect(NodeOperation *output_op, r
     /* Get border with normalized coordinates. */
     const rctf *norm_border = has_viewer_border ? m_border.viewer_border : m_border.render_border;
 
-    /* De-normalize and clamp operation bounds to border. */
-    rcti border;
-    BLI_rcti_init(&border,
+    /* Return de-normalized border. */
+    BLI_rcti_init(&r_rect,
                   norm_border->xmin * op_width,
                   norm_border->xmax * op_width,
                   norm_border->ymin * op_height,
                   norm_border->ymax * op_height);
-    int dummy_offset[2];
-    BLI_rcti_clamp(&r_rect, &border, dummy_offset);
   }
 }
 
