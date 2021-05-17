@@ -550,7 +550,7 @@ typedef enum eNodeTreeUpdate {
 typedef enum eNodeTreeExecutionMode {
   NTREE_EXECUTION_MODE_TILED = 0,
   NTREE_EXECUTION_MODE_FULL_FRAME = 1,
-} NTreeExecutionMode;
+} eNodeTreeExecutionMode;
 
 /* socket value structs for input buttons
  * DEPRECATED now using ID properties
