@@ -534,6 +534,11 @@ CacheArchiveHandle *USD_create_handle(struct Main * /*bmain*/,
     return NULL;
   }
 
+  blender::io::usd::ImportSettings settings;
+  convert_to_z_up(stage_reader->stage(), settings);
+
+  stage_reader->settings(settings);
+
   if (object_paths) {
     gather_objects_paths(stage_reader->stage()->GetPseudoRoot(), object_paths);
   }
