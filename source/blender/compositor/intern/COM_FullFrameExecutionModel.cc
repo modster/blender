@@ -209,7 +209,7 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
     };
     sub_work.finished_callback = [&]() {
       const unsigned int current = atomic_add_and_fetch_u(&num_sub_works_finished, 1);
-      if (current == static_cast<unsigned int>(num_sub_works)) {
+      if (static_cast<int>(current) == num_sub_works) {
         BLI_mutex_lock(&mutex);
         BLI_condition_notify_one(&work_finished_cond);
         BLI_mutex_unlock(&mutex);
@@ -225,7 +225,7 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
   /* Ensure all sub-works finished. They may still be running even after calling
    * WorkScheduler::finish(). */
   BLI_mutex_lock(&mutex);
-  if (num_sub_works_finished < static_cast<unsigned int>(num_sub_works)) {
+  if (static_cast<int>(num_sub_works_finished) < num_sub_works) {
     BLI_condition_wait(&work_finished_cond, &mutex);
   }
   BLI_mutex_unlock(&mutex);
