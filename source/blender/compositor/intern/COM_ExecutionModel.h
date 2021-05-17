@@ -78,6 +78,9 @@ class ExecutionModel {
     BLI_assert(!"Method not supported by current execution model");
   }
 
+ protected:
+  bool is_breaked() const;
+
 #ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:BaseExecutionModel")
 #endif

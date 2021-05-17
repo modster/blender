@@ -71,7 +71,6 @@ class FullFrameExecutionModel : public ExecutionModel {
   void determine_reads(NodeOperation *operation);
 
   void update_progress_bar();
-  bool is_breaked() const;
 
 #ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:FullFrameExecutionModel")

@@ -39,4 +39,10 @@ ExecutionModel::ExecutionModel(CompositorContext &context, Span<NodeOperation *>
   border_.render_border = &rd->border;
 }
 
+bool ExecutionModel::is_breaked() const
+{
+  const bNodeTree *btree = context_.getbNodeTree();
+  return btree->test_break(btree->tbh);
+}
+
 }  // namespace blender::compositor

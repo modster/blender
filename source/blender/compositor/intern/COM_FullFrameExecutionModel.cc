@@ -263,10 +263,4 @@ void FullFrameExecutionModel::update_progress_bar()
   }
 }
 
-bool FullFrameExecutionModel::is_breaked() const
-{
-  const bNodeTree *btree = context_.getbNodeTree();
-  return btree->test_break(btree->tbh);
-}
-
 }  // namespace blender::compositor
