@@ -351,8 +351,13 @@ class NodeOperation {
   }
   NodeOperationOutput *getOutputSocket(unsigned int index = 0);
   NodeOperationInput *getInputSocket(unsigned int index);
-  SocketReader *getInputSocketReader(unsigned int inputSocketindex);
-  NodeOperation *getInputOperation(unsigned int inputSocketindex);
+
+  NodeOperation *get_input_operation(int index)
+  {
+    /* TODO: Rename protected getInputOperation to get_input_operation and make it public replacing
+     * this method. */
+    return getInputOperation(index);
+  }
 
   /**
    * \brief determine the resolution of this node
@@ -586,6 +591,8 @@ class NodeOperation {
     this->m_height = height;
     this->flags.is_resolution_set = true;
   }
+  SocketReader *getInputSocketReader(unsigned int inputSocketindex);
+  NodeOperation *getInputOperation(unsigned int inputSocketindex);
 
   void deinitMutex();
   void initMutex();
