@@ -236,7 +236,7 @@ class Mesh : public Geometry {
                        DeviceScene *dscene,
                        int object,
                        uint visibility,
-                       bool pack_all,
+                       PackFlags pack_flags,
                        device_vector<ushort4> *verts_deltas,
                        int max_delta_compression_frames) override;
 
@@ -265,7 +265,7 @@ class Mesh : public Geometry {
   void clear(bool preserve_shaders, bool preserve_voxel_data);
 
   void pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort4> *verts_deltas);
-  void pack_topology(DeviceScene *dscene, int object, uint visibility, bool pack_all);
+  void pack_topology(DeviceScene *dscene, int object, uint visibility, PackFlags pack_flags);
 };
 
 CCL_NAMESPACE_END

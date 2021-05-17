@@ -46,6 +46,12 @@ CCL_NAMESPACE_BEGIN
 
 /* Geometry */
 
+PackFlags operator|=(PackFlags &pack_flags, uint32_t value)
+{
+  pack_flags = (PackFlags)((uint32_t)pack_flags | value);
+  return pack_flags;
+}
+
 NODE_ABSTRACT_DEFINE(Geometry)
 {
   NodeType *type = NodeType::add("geometry_base", NULL);
@@ -1239,7 +1245,15 @@ void GeometryManager::device_update_mesh(
 
 void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &progress)
 {
-  const bool pack_all = scene->bvh == nullptr;
+  PackFlags pack_flags = PackFlags::PACK_NONE;
+
+  if (scene->bvh == nullptr) {
+    pack_flags |= PackFlags::PACK_ALL;
+  }
+
+  if (dscene->prim_visibility.is_modified()) {
+    pack_flags |= PackFlags::PACK_VISIBILITY;
+  }
 
   progress.set_status("Updating Scene BVH", "Packing BVH primitives");
   {
@@ -1265,7 +1279,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
 
     device_vector<ushort4> verts_deltas(scene->device, "__prim_tri_verts_deltas", MEM_READ_ONLY);
 
-    if (!pack_all) {
+    if (pack_flags != PackFlags::PACK_ALL) {
       /* need to always call this, otherwise chunks are not detected */
       dscene->prim_tri_verts.alloc(num_tri_verts);
       if (scene->params.enable_delta_compression && scene->device->supports_delta_compression()) {
@@ -1273,6 +1287,10 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
         /* Since we use chunks and not all of them may be copied, make sure data between copied
          * chunks is not garbage. */
         verts_deltas.zero_to_device();
+      }
+
+      if ((pack_flags & PackFlags::PACK_VISIBILITY) != 0) {
+        dscene->prim_visibility.give_data(pack.prim_visibility);
       }
     }
     else {
@@ -1302,7 +1320,15 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
     // Iterate over scene mesh list instead of objects, since 'optix_prim_offset' was calculated
     // based on that list, which may be ordered differently from the object list.
     foreach (Geometry *geom, scene->geometry) {
-      if (!pack_all && !geom->is_modified()) {
+      /* Make a copy of the pack_flags so the current geometry's flags do not pollute the others'.
+       */
+      PackFlags geom_pack_flags = pack_flags;
+
+      if (geom->is_modified()) {
+        geom_pack_flags |= PackFlags::PACK_VERTICES;
+      }
+
+      if (geom_pack_flags == PACK_NONE) {
         continue;
       }
 
@@ -1314,7 +1340,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
                               dscene,
                               info.first,
                               info.second,
-                              pack_all,
+                              geom_pack_flags,
                               &verts_deltas,
                               scene->params.max_delta_compression_frames));
 #else
@@ -1322,7 +1348,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
                             dscene,
                             info.first,
                             info.second,
-                            pack_all,
+                            geom_pack_flags,
                             &verts_deltas,
                             scene->params.max_delta_compression_frames);
 #endif
@@ -1704,6 +1730,10 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
     }
   }
 
+  if ((update_flags & VISIBILITY_MODIFIED) != 0) {
+    dscene->prim_visibility.tag_modified();
+  }
+
   if (device_update_flags & ATTR_FLOAT_NEEDS_REALLOC) {
     dscene->attributes_map.tag_realloc();
     dscene->attributes_float.tag_realloc();
@@ -2033,7 +2063,8 @@ void GeometryManager::device_update(Device *device,
    * Also update the BVH if the transformations change, we cannot rely on tagging the Geometry
    * as modified in this case, as we may accumulate displacement if the vertices do not also
    * change. */
-  bool need_update_scene_bvh = (scene->bvh == nullptr || (update_flags & TRANSFORM_MODIFIED) != 0);
+  bool need_update_scene_bvh = (scene->bvh == nullptr ||
+                                 (update_flags & (TRANSFORM_MODIFIED | VISIBILITY_MODIFIED)) != 0);
 
   if ((need_update_scene_bvh || dscene->prim_tri_verts.is_modified()) &&
       bvh_layout != BVH_LAYOUT_BVH2) {

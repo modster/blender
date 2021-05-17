@@ -839,7 +839,7 @@ void Mesh::pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort
 
 /* Pack the topology of the Mesh, or only the vertices if pack_all is false.
  * This is only called if no deltas are present on the Mesh. */
-void Mesh::pack_topology(DeviceScene *dscene, int object, uint visibility, bool pack_all)
+void Mesh::pack_topology(DeviceScene *dscene, int object, uint visibility, PackFlags pack_flags)
 {
   current_delta_frames_count = 0;
 
@@ -847,31 +847,41 @@ void Mesh::pack_topology(DeviceScene *dscene, int object, uint visibility, bool 
 
   uint type = has_motion_blur() ? PRIMITIVE_MOTION_TRIANGLE : PRIMITIVE_TRIANGLE;
 
-  if (pack_all) {
+  /* Separate loop as other arrays are not initialized if their packing is not required. */
+  if ((pack_flags & PackFlags::PACK_VISIBILITY) != 0) {
+    unsigned int *prim_visibility = &dscene->prim_visibility[optix_prim_offset];
+    for (size_t k = 0; k < num_prims; ++k) {
+      prim_visibility[k] = visibility;
+    }
+  }
+
+  if ((pack_flags & PackFlags::PACK_GEOMETRY) != 0) {
     /* Use optix_prim_offset for indexing as those arrays also contain data for Hair geometries. */
     unsigned int *prim_tri_index = &dscene->prim_tri_index[optix_prim_offset];
     int *prim_type = &dscene->prim_type[optix_prim_offset];
-    unsigned int *prim_visibility = &dscene->prim_visibility[optix_prim_offset];
     int *prim_index = &dscene->prim_index[optix_prim_offset];
     int *prim_object = &dscene->prim_object[optix_prim_offset];
     // 'dscene->prim_time' is unused by Embree and OptiX
 
     for (size_t k = 0; k < num_prims; ++k) {
-      prim_tri_index[k] = (prim_offset + k) * 3;
-      prim_type[k] = type;
-      prim_index[k] = prim_offset + k;
-      prim_object[k] = object;
-      prim_visibility[k] = visibility;
+      if ((pack_flags & PackFlags::PACK_GEOMETRY) != 0) {
+        prim_tri_index[k] = (prim_offset + k) * 3;
+        prim_type[k] = type;
+        prim_index[k] = prim_offset + k;
+        prim_object[k] = object;
+      }
     }
   }
 
-  float4 *prim_tri_verts = &dscene->prim_tri_verts[prim_offset * 3];
+  if ((pack_flags & PackFlags::PACK_VERTICES) != 0) {
+    float4 *prim_tri_verts = &dscene->prim_tri_verts[prim_offset * 3];
 
-  for (size_t k = 0; k < num_prims; ++k) {
-    const Mesh::Triangle t = get_triangle(k);
+    for (size_t k = 0; k < num_prims; ++k) {
+      const Mesh::Triangle t = get_triangle(k);
 
-    for (int i = 0; i < 3; ++i) {
-      prim_tri_verts[k * 3 + i] = float3_to_float4(verts[t.v[i]]);
+      for (int i = 0; i < 3; ++i) {
+        prim_tri_verts[k * 3 + i] = float3_to_float4(verts[t.v[i]]);
+      }
     }
   }
 }
@@ -880,7 +890,7 @@ void Mesh::pack_primitives(Device *device,
                            DeviceScene *dscene,
                            int object,
                            uint visibility,
-                           bool pack_all,
+                           PackFlags pack_flags,
                            device_vector<ushort4> *verts_deltas,
                            int max_delta_compression_frames)
 {
@@ -888,7 +898,7 @@ void Mesh::pack_primitives(Device *device,
     return;
 
 #if 0
-  const bool do_deltas = !pack_all && attributes.find(ATTR_STD_DELTAS) != nullptr &&
+  const bool do_deltas = (pack_flags != PackFlags::PACK_ALL) && attributes.find(ATTR_STD_DELTAS) != nullptr &&
                          current_delta_frames_count < max_delta_compression_frames && verts_deltas->size() != 0;
 
   if (do_deltas) {
@@ -900,7 +910,7 @@ void Mesh::pack_primitives(Device *device,
     static_cast<void>(device);
     static_cast<void>(verts_deltas);
     static_cast<void>(max_delta_compression_frames);
-    pack_topology(dscene, object, visibility, pack_all);
+    pack_topology(dscene, object, visibility, pack_flags);
   }
 }
 

@@ -150,6 +150,7 @@ class BlenderSync {
                       BlenderObjectCulling &culling,
                       bool *use_portal,
                       TaskPool *geom_task_pool);
+  void sync_object_motion_init(BL::Object &b_parent, BL::Object &b_ob, Object *object);
 
   void sync_procedural(BL::Object &b_ob, BL::MeshSequenceCacheModifier &b_mesh_cache);
 

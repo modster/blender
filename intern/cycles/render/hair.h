@@ -154,7 +154,7 @@ class Hair : public Geometry {
                        DeviceScene *dscene,
                        int object,
                        uint visibility,
-                       bool pack_all,
+                       PackFlags pack_flags,
                        device_vector<ushort4> *verts_deltas,
                        int max_delta_compression_frames) override;
 };

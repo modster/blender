@@ -534,40 +534,49 @@ void Hair::pack_primitives(Device * /*device*/,
                            DeviceScene *dscene,
                            int object,
                            uint visibility,
-                           bool pack_all,
+                           PackFlags pack_flags,
                            device_vector<ushort4> * /*verts_deltas*/,
                            int /*max_delta_compression_frames*/)
 {
   if (curve_first_key.empty())
     return;
 
-  /* If the BVH does not have to be recreated, we can bail out. */
-  if (!pack_all) {
-    return;
+  /* Separate loop as other arrays are not initialized if their packing is not required. */
+  if ((pack_flags & PACK_VISIBILITY) != 0) {
+    unsigned int *prim_visibility = &dscene->prim_visibility[optix_prim_offset];
+
+    size_t index = 0;
+    for (size_t j = 0; j < num_curves(); ++j) {
+      Curve curve = get_curve(j);
+      for (size_t k = 0; k < curve.num_segments(); ++k, ++index) {
+        prim_visibility[index] = visibility;
+      }
+    }
   }
 
-  unsigned int *prim_tri_index = &dscene->prim_tri_index[optix_prim_offset];
-  int *prim_type = &dscene->prim_type[optix_prim_offset];
-  unsigned int *prim_visibility = &dscene->prim_visibility[optix_prim_offset];
-  int *prim_index = &dscene->prim_index[optix_prim_offset];
-  int *prim_object = &dscene->prim_object[optix_prim_offset];
-  // 'dscene->prim_time' is unused by Embree and OptiX
+  if ((pack_flags & PACK_GEOMETRY) != 0) {
+    unsigned int *prim_tri_index = &dscene->prim_tri_index[optix_prim_offset];
+    int *prim_type = &dscene->prim_type[optix_prim_offset];
+    int *prim_index = &dscene->prim_index[optix_prim_offset];
+    int *prim_object = &dscene->prim_object[optix_prim_offset];
+    // 'dscene->prim_time' is unused by Embree and OptiX
 
-  uint type = has_motion_blur() ?
-                  ((curve_shape == CURVE_RIBBON) ? PRIMITIVE_MOTION_CURVE_RIBBON :
-                                                   PRIMITIVE_MOTION_CURVE_THICK) :
-                  ((curve_shape == CURVE_RIBBON) ? PRIMITIVE_CURVE_RIBBON : PRIMITIVE_CURVE_THICK);
+    uint type = has_motion_blur() ?
+                    ((curve_shape == CURVE_RIBBON) ? PRIMITIVE_MOTION_CURVE_RIBBON :
+                                                     PRIMITIVE_MOTION_CURVE_THICK) :
+                    ((curve_shape == CURVE_RIBBON) ? PRIMITIVE_CURVE_RIBBON :
+                                                     PRIMITIVE_CURVE_THICK);
 
-  size_t index = 0;
-  for (size_t j = 0; j < num_curves(); ++j) {
-    Curve curve = get_curve(j);
-    for (size_t k = 0; k < curve.num_segments(); ++k, ++index) {
-      prim_tri_index[index] = -1;
-      prim_type[index] = PRIMITIVE_PACK_SEGMENT(type, k);
-      prim_visibility[index] = visibility;
-      // Each curve segment points back to its curve index
-      prim_index[index] = j + prim_offset;
-      prim_object[index] = object;
+    size_t index = 0;
+    for (size_t j = 0; j < num_curves(); ++j) {
+      Curve curve = get_curve(j);
+      for (size_t k = 0; k < curve.num_segments(); ++k, ++index) {
+        prim_tri_index[index] = -1;
+        prim_type[index] = PRIMITIVE_PACK_SEGMENT(type, k);
+        // Each curve segment points back to its curve index
+        prim_index[index] = j + prim_offset;
+        prim_object[index] = object;
+      }
     }
   }
 }

@@ -712,11 +712,13 @@ static float (*get_orco_coords(Object *ob, BMEditMesh *em, int layer, int *free)
     if (!em) {
       ClothModifierData *clmd = (ClothModifierData *)BKE_modifiers_findby_type(
           ob, eModifierType_Cloth);
-      KeyBlock *kb = BKE_keyblock_from_key(BKE_key_from_object(ob),
-                                           clmd->sim_parms->shapekey_rest);
+      if (clmd) {
+        KeyBlock *kb = BKE_keyblock_from_key(BKE_key_from_object(ob),
+                                             clmd->sim_parms->shapekey_rest);
 
-      if (kb && kb->data) {
-        return (float(*)[3])kb->data;
+        if (kb && kb->data) {
+          return (float(*)[3])kb->data;
+        }
       }
     }
 
@@ -1861,7 +1863,7 @@ static void editbmesh_calc_modifiers(struct Depsgraph *depsgraph,
 
   /* Ensure normals calculation below is correct (normal settings have transferred properly).
    * However, nodes modifiers might create meshes from scratch or transfer meshes from other
-   * objects with different settings, and in general it doesn't make sense to guarentee that
+   * objects with different settings, and in general it doesn't make sense to guarantee that
    * the settings are the same as the original mesh. If necessary, this could become a modifier
    * type flag. */
   BLI_assert(mesh_input->smoothresh == mesh_cage->smoothresh);
