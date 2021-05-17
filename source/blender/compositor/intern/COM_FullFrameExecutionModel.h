@@ -35,10 +35,10 @@ class ExecutionGroup;
 class FullFrameExecutionModel : public ExecutionModel {
  private:
   /**
-   * Stores operations output data/buffers and dispose them once reader operations are
+   * Contains operations active buffers data. Buffers will be disposed once reader operations are
    * finished.
    */
-  OutputStore &output_store_;
+  SharedOperationBuffers &active_buffers_;
 
   /**
    * Number of operations finished.
@@ -52,7 +52,7 @@ class FullFrameExecutionModel : public ExecutionModel {
 
  public:
   FullFrameExecutionModel(CompositorContext &context,
-                          OutputStore &output_store,
+                          SharedOperationBuffers &shared_buffers,
                           Span<NodeOperation *> operations);
 
   void execute(ExecutionSystem &exec_system) override;

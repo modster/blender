@@ -25,7 +25,7 @@ class ExecutionGroup;
 #include "COM_ExecutionGroup.h"
 #include "COM_Node.h"
 #include "COM_NodeOperation.h"
-#include "COM_OutputStore.h"
+#include "COM_SharedOperationBuffers.h"
 
 #include "DNA_color_types.h"
 #include "DNA_node_types.h"
@@ -125,10 +125,10 @@ class ExecutionModel;
 class ExecutionSystem {
  private:
   /**
-   * Stores operations output data/buffers and dispose them once reader operations are
+   * Contains operations active buffers data. Buffers will be disposed once reader operations are
    * finished.
    */
-  OutputStore output_store_;
+  SharedOperationBuffers active_buffers_;
 
   /**
    * \brief the context used during execution
@@ -192,9 +192,9 @@ class ExecutionSystem {
     return this->m_context;
   }
 
-  OutputStore &get_output_store()
+  SharedOperationBuffers &get_active_buffers()
   {
-    return output_store_;
+    return active_buffers_;
   }
 
   void execute_work(const rcti &work_rect, std::function<void(const rcti &split_rect)> work_func);

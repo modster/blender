@@ -33,10 +33,10 @@
 namespace blender::compositor {
 
 FullFrameExecutionModel::FullFrameExecutionModel(CompositorContext &context,
-                                                 OutputStore &output_store,
+                                                 SharedOperationBuffers &shared_buffers,
                                                  Span<NodeOperation *> operations)
     : ExecutionModel(context, operations),
-      output_store_(output_store),
+      active_buffers_(shared_buffers),
       num_operations_finished_(0),
       priorities_()
 {
@@ -98,11 +98,11 @@ void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
 void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation,
                                                         const rcti &render_rect)
 {
-  if (output_store_.is_render_registered(operation, render_rect)) {
+  if (active_buffers_.is_render_registered(operation, render_rect)) {
     return;
   }
 
-  output_store_.register_render(operation, render_rect);
+  active_buffers_.register_render(operation, render_rect);
 
   const int n_inputs = operation->getNumberOfInputSockets();
   for (int i = 0; i < n_inputs; i++) {
@@ -125,7 +125,7 @@ void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation
  */
 void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
 {
-  if (output_store_.has_registered_reads(operation)) {
+  if (active_buffers_.has_registered_reads(operation)) {
     return;
   }
 
@@ -133,7 +133,7 @@ void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
   for (int i = 0; i < n_inputs; i++) {
     NodeOperation *input_op = operation->getInputOperation(i);
     determine_reads(input_op);
-    output_store_.register_read(input_op);
+    active_buffers_.register_read(input_op);
   }
 }
 
@@ -239,7 +239,7 @@ void FullFrameExecutionModel::operation_finished(NodeOperation *operation)
   /* Report inputs reads so that buffers may be freed/reused. */
   const int n_inputs = operation->getNumberOfInputSockets();
   for (int i = 0; i < n_inputs; i++) {
-    output_store_.read_finished(operation->getInputOperation(i));
+    active_buffers_.read_finished(operation->getInputOperation(i));
   }
 
   num_operations_finished_++;

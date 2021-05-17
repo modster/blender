@@ -207,8 +207,8 @@ void NodeOperation::get_input_area_of_interest(const int input_idx,
  */
 void NodeOperation::render(ExecutionSystem &exec_system)
 {
-  OutputStore &output_store = exec_system.get_output_store();
-  if (output_store.is_output_rendered(this)) {
+  SharedOperationBuffers &active_buffers = exec_system.get_active_buffers();
+  if (active_buffers.is_operation_rendered(this)) {
     return;
   }
 
@@ -217,14 +217,14 @@ void NodeOperation::render(ExecutionSystem &exec_system)
   const bool has_outputs = getNumberOfOutputSockets() > 0;
   MemoryBuffer *output_buf = has_outputs ? create_output_buffer() : nullptr;
 
-  Span<rcti> render_rects = output_store.get_rects_to_render(this);
+  Span<rcti> render_rects = active_buffers.get_rects_to_render(this);
   if (get_flags().is_fullframe_operation) {
     render_full_frame(output_buf, render_rects, inputs_bufs, exec_system);
   }
   else {
     render_full_frame_fallback(output_buf, render_rects, inputs_bufs, exec_system);
   }
-  output_store.set_rendered_output(this, std::unique_ptr<MemoryBuffer>(output_buf));
+  active_buffers.set_rendered_buffer(this, std::unique_ptr<MemoryBuffer>(output_buf));
 
   exec_system.operation_finished(this);
 }
@@ -243,16 +243,16 @@ void NodeOperation::render_full_frame(MemoryBuffer *output_buf,
 
 Vector<MemoryBuffer *> NodeOperation::get_rendered_inputs_buffers(ExecutionSystem &exec_system)
 {
-  OutputStore &output_store = exec_system.get_output_store();
+  SharedOperationBuffers &active_buffers = exec_system.get_active_buffers();
 
   const int n_inputs = getNumberOfInputSockets();
   Vector<MemoryBuffer *> inputs_buffers(n_inputs);
   for (int i = 0; i < n_inputs; i++) {
     NodeOperation *input_op = getInputOperation(i);
-    if (!output_store.is_output_rendered(input_op)) {
+    if (!active_buffers.is_operation_rendered(input_op)) {
       input_op->render(exec_system);
     }
-    inputs_buffers[i] = output_store.get_rendered_output(input_op);
+    inputs_buffers[i] = active_buffers.get_rendered_buffer(input_op);
   }
   return inputs_buffers;
 }

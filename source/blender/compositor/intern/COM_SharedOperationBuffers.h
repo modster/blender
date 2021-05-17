@@ -30,41 +30,41 @@
 namespace blender::compositor {
 
 /**
- * Stores operations output data including rendered buffers. It's responsible for deleting output
- * buffers when all their readers have finished.
+ * Stores and shares operations rendered buffers including render data. Buffers are
+ * disposed once all dependent operations have finished reading them.
  */
-class OutputStore {
+class SharedOperationBuffers {
  private:
-  typedef struct OutputData {
+  typedef struct BufferData {
    public:
-    OutputData();
+    BufferData();
     std::unique_ptr<MemoryBuffer> buffer;
     blender::Vector<rcti> render_rects;
     int registered_reads;
     int received_reads;
-  } OutputData;
-  blender::Map<NodeOperation *, OutputData> outputs_;
+  } BufferData;
+  blender::Map<NodeOperation *, BufferData> buffers_;
 
  public:
-  OutputStore();
-  bool is_render_registered(NodeOperation *op, const rcti &render_rect);
-  void register_render(NodeOperation *op, const rcti &render_rect);
+  SharedOperationBuffers();
+  bool is_render_registered(NodeOperation *op, const rcti &rect_to_render);
+  void register_render(NodeOperation *op, const rcti &rect_to_render);
 
   bool has_registered_reads(NodeOperation *op);
-  void register_read(NodeOperation *op);
+  void register_read(NodeOperation *read_op);
 
   blender::Span<rcti> get_rects_to_render(NodeOperation *op);
-  bool is_output_rendered(NodeOperation *op);
-  void set_rendered_output(NodeOperation *op, std::unique_ptr<MemoryBuffer> output_buffer);
-  MemoryBuffer *get_rendered_output(NodeOperation *op);
+  bool is_operation_rendered(NodeOperation *op);
+  void set_rendered_buffer(NodeOperation *op, std::unique_ptr<MemoryBuffer> buffer);
+  MemoryBuffer *get_rendered_buffer(NodeOperation *op);
 
   void read_finished(NodeOperation *read_op);
 
  private:
-  OutputData &get_output_data(NodeOperation *op);
+  BufferData &get_buffer_data(NodeOperation *op);
 
 #ifdef WITH_CXX_GUARDEDALLOC
-  MEM_CXX_CLASS_ALLOC_FUNCS("COM:OutputStore")
+  MEM_CXX_CLASS_ALLOC_FUNCS("COM:SharedOperationBuffers")
 #endif
 };
 

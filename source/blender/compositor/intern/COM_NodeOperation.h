@@ -39,7 +39,6 @@ namespace blender::compositor {
 class OpenCLDevice;
 class ReadBufferOperation;
 class WriteBufferOperation;
-class OutputStore;
 class ExecutionSystem;
 
 class NodeOperation;

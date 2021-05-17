@@ -25,7 +25,6 @@
 #include "COM_FullFrameExecutionModel.h"
 #include "COM_NodeOperation.h"
 #include "COM_NodeOperationBuilder.h"
-#include "COM_OutputStore.h"
 #include "COM_TiledExecutionModel.h"
 #include "COM_WorkScheduler.h"
 
@@ -74,7 +73,7 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
       execution_model_ = new TiledExecutionModel(m_context, m_operations, m_groups);
       break;
     case eExecutionModel::FullFrame:
-      execution_model_ = new FullFrameExecutionModel(m_context, output_store_, m_operations);
+      execution_model_ = new FullFrameExecutionModel(m_context, active_buffers_, m_operations);
       break;
     default:
       BLI_assert(!"Non implemented execution model");

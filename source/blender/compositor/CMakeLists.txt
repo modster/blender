@@ -92,10 +92,10 @@ set(SRC
   intern/COM_NodeOperation.h
   intern/COM_NodeOperationBuilder.cc
   intern/COM_NodeOperationBuilder.h
-  intern/COM_OutputStore.cc
-  intern/COM_OutputStore.h
   intern/COM_OpenCLDevice.cc
   intern/COM_OpenCLDevice.h
+  intern/COM_SharedOperationBuffers.cc
+  intern/COM_SharedOperationBuffers.h
   intern/COM_SingleThreadedOperation.cc
   intern/COM_SingleThreadedOperation.h
   intern/COM_TiledExecutionModel.cc
