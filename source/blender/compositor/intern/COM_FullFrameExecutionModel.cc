@@ -251,7 +251,7 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
 
     WorkPackage &sub_work = sub_works[i];
     sub_work.type = eWorkPackageType::CustomFunction;
-    sub_work.custom_func = [=, &work_func, &work_rect]() {
+    sub_work.execute_fn = [=, &work_func, &work_rect]() {
       if (is_breaked()) {
         return;
       }
@@ -260,7 +260,7 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
           &split_rect, work_rect.xmin, work_rect.xmax, sub_work_y, sub_work_y + sub_work_height);
       work_func(split_rect);
     };
-    sub_work.finished_callback = [&]() {
+    sub_work.executed_fn = [&]() {
       const unsigned int current = atomic_add_and_fetch_u(&num_sub_works_finished, 1);
       if (static_cast<int>(current) == num_sub_works) {
         BLI_mutex_lock(&mutex);

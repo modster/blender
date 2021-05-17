@@ -56,12 +56,12 @@ struct WorkPackage {
   /**
    * Custom function to execute when work package type is CustomFunction.
    */
-  std::function<void()> custom_func;
+  std::function<void()> execute_fn;
 
   /**
    * Called when work execution is finished.
    */
-  std::function<void()> finished_callback;
+  std::function<void()> executed_fn;
 
 #ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:WorkPackage")

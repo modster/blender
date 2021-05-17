@@ -40,13 +40,13 @@ void CPUDevice::execute(WorkPackage *work_package)
       break;
     }
     case eWorkPackageType::CustomFunction: {
-      work_package->custom_func();
+      work_package->execute_fn();
       break;
     }
   }
 
-  if (work_package->finished_callback) {
-    work_package->finished_callback();
+  if (work_package->executed_fn) {
+    work_package->executed_fn();
   }
 }
 
