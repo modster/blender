@@ -68,7 +68,6 @@ struct USDImportParams {
   bool use_instancing;
   bool import_usd_preview;
   bool set_material_blend;
-  bool convert_to_z_up;
   float light_intensity_scale;
 };
 

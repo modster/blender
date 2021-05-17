@@ -112,7 +112,7 @@ static bool gather_objects_paths(const pxr::UsdPrim &object, ListBase *object_pa
 
 // Update the given import settings with the global rotation matrix to orient
 // imported objects with Z-up, if necessary
-static void set_global_rotation(pxr::UsdStageRefPtr stage, ImportSettings &r_settings)
+static void convert_to_z_up(pxr::UsdStageRefPtr stage, ImportSettings &r_settings)
 {
   if (!stage || pxr::UsdGeomGetStageUpAxis(stage) == pxr::UsdGeomTokens->z) {
     // Nothing to do.
@@ -231,9 +231,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
     return;
   }
 
-  if (data->params.convert_to_z_up) {
-    set_global_rotation(archive->stage(), data->settings);
-  }
+  convert_to_z_up(archive->stage(), data->settings);
 
   // Set up the stage for animated data.
   if (data->params.set_frame_range) {

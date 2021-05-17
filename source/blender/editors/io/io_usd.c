@@ -313,8 +313,6 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   const bool import_usd_preview = RNA_boolean_get(op->ptr, "import_usd_preview");
   const bool set_material_blend = RNA_boolean_get(op->ptr, "set_material_blend");
 
-  const bool convert_to_z_up = RNA_boolean_get(op->ptr, "convert_to_z_up");
-
   const float light_intensity_scale = RNA_float_get(op->ptr, "light_intensity_scale");
 
   /* TODO(makowalski): Add support for sequences. */
@@ -355,7 +353,6 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
                                    use_instancing,
                                    import_usd_preview,
                                    set_material_blend,
-                                   convert_to_z_up,
                                    light_intensity_scale};
 
   const bool ok = USD_import(C, filename, &params, as_background_job);
@@ -385,7 +382,6 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(box, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "import_visible_only", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "create_collection", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "convert_to_z_up", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "light_intensity_scale", 0, NULL, ICON_NONE);
 
   uiLayout *prim_path_mask_box = uiLayoutBox(box);
@@ -526,13 +522,6 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "If the Import USD Preview option is enabled, "
                   "the material blend method will automatically be set based on the "
                   "shader's opacity and opacityThreshold inputs");
-
-  RNA_def_boolean(ot->srna,
-                  "convert_to_z_up",
-                  true,
-                  "Convert to Z Up",
-                  "If the USD stage up-axis is Y, apply a rotation "
-                  "to the imported objects to convert their orientation to Z up");
 
   RNA_def_float(ot->srna,
                 "light_intensity_scale",
