@@ -113,7 +113,7 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
 
   /* Apply global scaling and rotation only to root objects, parenting
    * will propagate it. */
-  if ((scale != 1.0 || settings_->do_convert_mat) && is_root_xform_object()) {
+  if ((scale != 1.0 || settings_->do_convert_mat) && is_root_xform_) {
 
     if (scale != 1.0f) {
       float scale_mat[4][4];
@@ -141,12 +141,11 @@ bool USDXformReader::prim_has_xform_ops() const
   return !xformable.GetOrderedXformOps(&reset_xform_stack).empty();
 }
 
-bool USDXformReader::is_root_xform_object() const
+bool USDXformReader::is_root_xform_prim() const
 {
-  // It's not sufficient to check for a null parent to determine
-  // if the current object is the root, because the parent could
-  // represent a scope, which is not xformable.  E.g., an Xform
-  // parented to a single Scope would be considered the root.
+  if (!prim_.IsValid()) {
+    return false;
+  }
 
   if (prim_.IsInMaster()) {
     // We don't consider prototypes to be root prims,
@@ -156,22 +155,22 @@ bool USDXformReader::is_root_xform_object() const
   }
 
   if (prim_.IsA<pxr::UsdGeomXformable>()) {
-    // If we don't have an ancestor that also wraps
-    // UsdGeomXformable, then we are the root.
-    const USDPrimReader *cur_parent = parent_reader_;
+    /* If this prim doesn't have an ancestor that's a
+     * UsdGeomXformable, then it's a root prim.  Note
+     * that it's not sufficient to only check the immediate
+     * parent prim, since the immediate parent could be a
+     * UsdGeomScope that has an xformable ancestor. */
+    pxr::UsdPrim cur_parent = prim_.GetParent();
 
     while (cur_parent) {
-      if (cur_parent->prim().IsA<pxr::UsdGeomXformable>()) {
+      if (cur_parent.IsA<pxr::UsdGeomXformable>()) {
         return false;
       }
-      cur_parent = cur_parent->parent();
+      cur_parent = cur_parent.GetParent();
     }
 
-    if (!cur_parent) {
-      // No ancestor prim was an xformable, so we
-      // are the root.
-      return true;
-    }
+    /* We didn't find an xformable ancestor. */
+    return true;
   }
 
   return false;
