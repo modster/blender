@@ -21,7 +21,8 @@
 namespace blender::compositor {
 
 enum class eExecutionModel {
-  /** Operations are executed from outputs to inputs grouped in execution groups and rendered
+  /**
+   * Operations are executed from outputs to inputs grouped in execution groups and rendered
    * in tiles.
    */
   Tiled,
