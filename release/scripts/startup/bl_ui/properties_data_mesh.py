@@ -572,13 +572,13 @@ class MESH_UL_attributes(UIList):
     def draw_item(self, _context, layout, _data, attribute, _icon, _active_data, _active_propname, _index):
         data_type = attribute.bl_rna.properties['data_type'].enum_items[attribute.data_type]
 
-        split = layout.split(factor=0.75)
+        split = layout.split(factor=0.50)
         split.emboss = 'NONE'
         split.prop(attribute, "name", text="")
         sub = split.row()
         sub.alignment = 'RIGHT'
         sub.active = False
-        sub.label(text=data_type.name)
+        sub.label(text="%s ▶ %s" % (attribute.domain.title(), data_type.name))
 
 
 class MESH_MT_add_attribute(Menu):
