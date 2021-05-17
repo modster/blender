@@ -75,8 +75,8 @@ void SharedOperationBuffers::set_rendered_buffer(NodeOperation *op,
                                                  std::unique_ptr<MemoryBuffer> buffer)
 {
   BufferData &buf_data = get_buffer_data(op);
-  buf_data.buffer = std::move(buffer);
   BLI_assert(buf_data.received_reads == 0);
+  buf_data.buffer = std::move(buffer);
 }
 
 MemoryBuffer *SharedOperationBuffers::get_rendered_buffer(NodeOperation *op)
