@@ -71,10 +71,10 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
 
   switch (m_context.get_execution_model()) {
     case eExecutionModel::Tiled:
-      m_execution_model = new TiledExecutionModel(m_context, m_operations, m_groups);
+      execution_model_ = new TiledExecutionModel(m_context, m_operations, m_groups);
       break;
     case eExecutionModel::FullFrame:
-      m_execution_model = new FullFrameExecutionModel(m_context, m_output_store, m_operations);
+      execution_model_ = new FullFrameExecutionModel(m_context, output_store_, m_operations);
       break;
     default:
       BLI_assert(!"Non implemented execution model");
@@ -84,7 +84,7 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
 
 ExecutionSystem::~ExecutionSystem()
 {
-  delete m_execution_model;
+  delete execution_model_;
 
   for (NodeOperation *operation : m_operations) {
     delete operation;
@@ -107,18 +107,18 @@ void ExecutionSystem::set_operations(const Vector<NodeOperation *> &operations,
 void ExecutionSystem::execute()
 {
   DebugInfo::execute_started(this);
-  m_execution_model->execute(*this);
+  execution_model_->execute(*this);
 }
 
 void ExecutionSystem::execute_work(const rcti &work_rect,
                                    std::function<void(const rcti &split_rect)> work_func)
 {
-  m_execution_model->execute_work(work_rect, work_func);
+  execution_model_->execute_work(work_rect, work_func);
 }
 
 void ExecutionSystem::operation_finished(NodeOperation *operation)
 {
-  m_execution_model->operation_finished(operation);
+  execution_model_->operation_finished(operation);
 }
 
 }  // namespace blender::compositor

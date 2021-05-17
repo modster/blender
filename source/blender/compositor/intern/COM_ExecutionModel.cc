@@ -21,22 +21,22 @@
 namespace blender::compositor {
 
 ExecutionModel::ExecutionModel(CompositorContext &context, Span<NodeOperation *> operations)
-    : m_context(context), m_operations(operations)
+    : context_(context), operations_(operations)
 {
-  const bNodeTree *node_tree = m_context.getbNodeTree();
+  const bNodeTree *node_tree = context_.getbNodeTree();
 
   const rctf *viewer_border = &node_tree->viewer_border;
-  m_border.use_viewer_border = (node_tree->flag & NTREE_VIEWER_BORDER) &&
-                               viewer_border->xmin < viewer_border->xmax &&
-                               viewer_border->ymin < viewer_border->ymax;
-  m_border.viewer_border = viewer_border;
+  border_.use_viewer_border = (node_tree->flag & NTREE_VIEWER_BORDER) &&
+                              viewer_border->xmin < viewer_border->xmax &&
+                              viewer_border->ymin < viewer_border->ymax;
+  border_.viewer_border = viewer_border;
 
-  const RenderData *rd = m_context.getRenderData();
+  const RenderData *rd = context_.getRenderData();
   /* Case when cropping to render border happens is handled in
    * compositor output and render layer nodes. */
-  m_border.use_render_border = context.isRendering() && (rd->mode & R_BORDER) &&
-                               !(rd->mode & R_CROP);
-  m_border.render_border = &rd->border;
+  border_.use_render_border = context.isRendering() && (rd->mode & R_BORDER) &&
+                              !(rd->mode & R_CROP);
+  border_.render_border = &rd->border;
 }
 
 }  // namespace blender::compositor

@@ -22,7 +22,7 @@
 
 namespace blender::compositor {
 
-OutputStore::OutputStore() : m_outputs()
+OutputStore::OutputStore() : outputs_()
 {
 }
 OutputStore::OutputData::OutputData()
@@ -32,7 +32,7 @@ OutputStore::OutputData::OutputData()
 
 OutputStore::OutputData &OutputStore::get_output_data(NodeOperation *op)
 {
-  return m_outputs.lookup_or_add_cb(op, []() { return OutputData(); });
+  return outputs_.lookup_or_add_cb(op, []() { return OutputData(); });
 }
 
 bool OutputStore::is_render_registered(NodeOperation *op, const rcti &render_rect)

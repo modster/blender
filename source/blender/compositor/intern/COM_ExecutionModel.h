@@ -46,17 +46,17 @@ class ExecutionModel {
     const rctf *render_border;
     bool use_viewer_border;
     const rctf *viewer_border;
-  } m_border;
+  } border_;
 
   /**
    * Context used during execution.
    */
-  CompositorContext &m_context;
+  CompositorContext &context_;
 
   /**
    * All operations being executed.
    */
-  Span<NodeOperation *> m_operations;
+  Span<NodeOperation *> operations_;
 
  public:
   ExecutionModel(CompositorContext &context, Span<NodeOperation *> operations);

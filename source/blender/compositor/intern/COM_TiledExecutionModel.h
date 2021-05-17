@@ -34,7 +34,7 @@ class ExecutionGroup;
  */
 class TiledExecutionModel : public ExecutionModel {
  private:
-  Span<ExecutionGroup *> m_groups;
+  Span<ExecutionGroup *> groups_;
 
  public:
   TiledExecutionModel(CompositorContext &context,

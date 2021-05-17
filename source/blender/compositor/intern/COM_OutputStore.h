@@ -43,7 +43,7 @@ class OutputStore {
     int registered_reads;
     int received_reads;
   } OutputData;
-  blender::Map<NodeOperation *, OutputData> m_outputs;
+  blender::Map<NodeOperation *, OutputData> outputs_;
 
  public:
   OutputStore();

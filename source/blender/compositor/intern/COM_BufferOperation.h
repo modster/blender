@@ -24,7 +24,7 @@ namespace blender::compositor {
 
 class BufferOperation : public NodeOperation {
  private:
-  MemoryBuffer *m_buffer;
+  MemoryBuffer *buffer_;
 
  public:
   BufferOperation(MemoryBuffer *buffer, DataType data_type);

@@ -36,20 +36,20 @@ FullFrameExecutionModel::FullFrameExecutionModel(CompositorContext &context,
                                                  OutputStore &output_store,
                                                  Span<NodeOperation *> operations)
     : ExecutionModel(context, operations),
-      m_output_store(output_store),
-      m_num_operations_finished(0),
-      m_priorities()
+      output_store_(output_store),
+      num_operations_finished_(0),
+      priorities_()
 {
-  m_priorities.append(eCompositorPriority::High);
+  priorities_.append(eCompositorPriority::High);
   if (!context.isFastCalculation()) {
-    m_priorities.append(eCompositorPriority::Medium);
-    m_priorities.append(eCompositorPriority::Low);
+    priorities_.append(eCompositorPriority::Medium);
+    priorities_.append(eCompositorPriority::Low);
   }
 }
 
 void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
 {
-  const bNodeTree *node_tree = this->m_context.getbNodeTree();
+  const bNodeTree *node_tree = this->context_.getbNodeTree();
   node_tree->stats_draw(node_tree->sdh, TIP_("Compositing | Initializing execution"));
 
   DebugInfo::graphviz(&exec_system);
@@ -60,12 +60,12 @@ void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
 
 void FullFrameExecutionModel::determine_rects_to_render_and_reads()
 {
-  const bool is_rendering = m_context.isRendering();
-  const bNodeTree *node_tree = m_context.getbNodeTree();
+  const bool is_rendering = context_.isRendering();
+  const bNodeTree *node_tree = context_.getbNodeTree();
 
   rcti render_rect;
-  for (eCompositorPriority priority : m_priorities) {
-    for (NodeOperation *op : m_operations) {
+  for (eCompositorPriority priority : priorities_) {
+    for (NodeOperation *op : operations_) {
       op->setbNodeTree(node_tree);
       if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
         get_output_render_rect(op, render_rect);
@@ -78,11 +78,11 @@ void FullFrameExecutionModel::determine_rects_to_render_and_reads()
 
 void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
 {
-  const bool is_rendering = m_context.isRendering();
+  const bool is_rendering = context_.isRendering();
 
-  WorkScheduler::start(this->m_context);
-  for (eCompositorPriority priority : m_priorities) {
-    for (NodeOperation *op : m_operations) {
+  WorkScheduler::start(this->context_);
+  for (eCompositorPriority priority : priorities_) {
+    for (NodeOperation *op : operations_) {
       if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
         op->render(exec_system);
       }
@@ -98,11 +98,11 @@ void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
 void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation,
                                                         const rcti &render_rect)
 {
-  if (m_output_store.is_render_registered(operation, render_rect)) {
+  if (output_store_.is_render_registered(operation, render_rect)) {
     return;
   }
 
-  m_output_store.register_render(operation, render_rect);
+  output_store_.register_render(operation, render_rect);
 
   const int n_inputs = operation->getNumberOfInputSockets();
   for (int i = 0; i < n_inputs; i++) {
@@ -125,7 +125,7 @@ void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation
  */
 void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
 {
-  if (m_output_store.has_registered_reads(operation)) {
+  if (output_store_.has_registered_reads(operation)) {
     return;
   }
 
@@ -133,26 +133,26 @@ void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
   for (int i = 0; i < n_inputs; i++) {
     NodeOperation *input_op = operation->getInputOperation(i);
     determine_reads(input_op);
-    m_output_store.register_read(input_op);
+    output_store_.register_read(input_op);
   }
 }
 
 void FullFrameExecutionModel::get_output_render_rect(NodeOperation *output_op, rcti &r_rect)
 {
-  BLI_assert(output_op->isOutputOperation(m_context.isRendering()));
+  BLI_assert(output_op->isOutputOperation(context_.isRendering()));
 
   /* By default return operation bounds (no border). */
   const int op_width = output_op->getWidth();
   const int op_height = output_op->getHeight();
   BLI_rcti_init(&r_rect, 0, op_width, 0, op_height);
 
-  const bool has_viewer_border = m_border.use_viewer_border &&
+  const bool has_viewer_border = border_.use_viewer_border &&
                                  (output_op->get_flags().is_viewer_operation ||
                                   output_op->get_flags().is_preview_operation);
-  const bool has_render_border = m_border.use_render_border;
+  const bool has_render_border = border_.use_render_border;
   if (has_viewer_border || has_render_border) {
     /* Get border with normalized coordinates. */
-    const rctf *norm_border = has_viewer_border ? m_border.viewer_border : m_border.render_border;
+    const rctf *norm_border = has_viewer_border ? border_.viewer_border : border_.render_border;
 
     /* Return de-normalized border. */
     BLI_rcti_init(&r_rect,
@@ -239,33 +239,33 @@ void FullFrameExecutionModel::operation_finished(NodeOperation *operation)
   /* Report inputs reads so that buffers may be freed/reused. */
   const int n_inputs = operation->getNumberOfInputSockets();
   for (int i = 0; i < n_inputs; i++) {
-    m_output_store.read_finished(operation->getInputOperation(i));
+    output_store_.read_finished(operation->getInputOperation(i));
   }
 
-  m_num_operations_finished++;
+  num_operations_finished_++;
   update_progress_bar();
 }
 
 void FullFrameExecutionModel::update_progress_bar()
 {
-  const bNodeTree *tree = m_context.getbNodeTree();
+  const bNodeTree *tree = context_.getbNodeTree();
   if (tree) {
-    const float progress = m_num_operations_finished / static_cast<float>(m_operations.size());
+    const float progress = num_operations_finished_ / static_cast<float>(operations_.size());
     tree->progress(tree->prh, progress);
 
     char buf[128];
     BLI_snprintf(buf,
                  sizeof(buf),
                  TIP_("Compositing | Operation %i-%li"),
-                 m_num_operations_finished + 1,
-                 m_operations.size());
+                 num_operations_finished_ + 1,
+                 operations_.size());
     tree->stats_draw(tree->sdh, buf);
   }
 }
 
 bool FullFrameExecutionModel::is_breaked() const
 {
-  const bNodeTree *btree = m_context.getbNodeTree();
+  const bNodeTree *btree = context_.getbNodeTree();
   return btree->test_break(btree->tbh);
 }
 

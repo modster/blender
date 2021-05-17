@@ -128,7 +128,7 @@ class ExecutionSystem {
    * Stores operations output data/buffers and dispose them once reader operations are
    * finished.
    */
-  OutputStore m_output_store;
+  OutputStore output_store_;
 
   /**
    * \brief the context used during execution
@@ -148,7 +148,7 @@ class ExecutionSystem {
   /**
    * Active execution model implementation.
    */
-  ExecutionModel *m_execution_model;
+  ExecutionModel *execution_model_;
 
  private:  // methods
  public:
@@ -194,7 +194,7 @@ class ExecutionSystem {
 
   OutputStore &get_output_store()
   {
-    return m_output_store;
+    return output_store_;
   }
 
   void execute_work(const rcti &work_rect, std::function<void(const rcti &split_rect)> work_func);

@@ -38,17 +38,17 @@ class FullFrameExecutionModel : public ExecutionModel {
    * Stores operations output data/buffers and dispose them once reader operations are
    * finished.
    */
-  OutputStore &m_output_store;
+  OutputStore &output_store_;
 
   /**
    * Number of operations finished.
    */
-  int m_num_operations_finished;
+  int num_operations_finished_;
 
   /**
    * Order of priorities for output operations execution.
    */
-  Vector<eCompositorPriority> m_priorities;
+  Vector<eCompositorPriority> priorities_;
 
  public:
   FullFrameExecutionModel(CompositorContext &context,
