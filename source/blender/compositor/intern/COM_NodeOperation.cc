@@ -187,9 +187,9 @@ bool NodeOperation::determineDependingAreaOfInterest(rcti *input,
  * Implementation don't need to ensure r_input_rect is within operation bounds. The caller must
  * clamp it.
  */
-void NodeOperation::get_input_area_of_interest(const int input_idx,
-                                               const rcti &output_rect,
-                                               rcti &r_input_rect)
+void NodeOperation::get_area_of_interest(const int input_idx,
+                                         const rcti &output_rect,
+                                         rcti &r_input_rect)
 {
   if (get_flags().is_fullframe_operation) {
     r_input_rect = output_rect;

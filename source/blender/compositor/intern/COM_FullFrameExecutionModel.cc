@@ -109,7 +109,7 @@ void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation
     NodeOperation *input_op = operation->getInputOperation(i);
     rcti input_op_rect, input_area;
     BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
-    operation->get_input_area_of_interest(i, render_rect, input_area);
+    operation->get_area_of_interest(i, render_rect, input_area);
 
     /* Ensure input area of interest is within operation bounds. */
     int dummy_offset[2];

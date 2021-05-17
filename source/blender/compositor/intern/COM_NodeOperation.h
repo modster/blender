@@ -566,9 +566,7 @@ class NodeOperation {
   {
   }
 
-  virtual void get_input_area_of_interest(int input_idx,
-                                          const rcti &output_rect,
-                                          rcti &r_input_rect);
+  virtual void get_area_of_interest(int input_idx, const rcti &output_rect, rcti &r_input_rect);
 
   /** \} */
 
