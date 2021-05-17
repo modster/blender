@@ -245,9 +245,9 @@ Vector<MemoryBuffer *> NodeOperation::get_rendered_inputs_buffers(ExecutionSyste
 {
   SharedOperationBuffers &active_buffers = exec_system.get_active_buffers();
 
-  const int n_inputs = getNumberOfInputSockets();
-  Vector<MemoryBuffer *> inputs_buffers(n_inputs);
-  for (int i = 0; i < n_inputs; i++) {
+  const int num_inputs = getNumberOfInputSockets();
+  Vector<MemoryBuffer *> inputs_buffers(num_inputs);
+  for (int i = 0; i < num_inputs; i++) {
     NodeOperation *input_op = getInputOperation(i);
     if (!active_buffers.is_operation_rendered(input_op)) {
       input_op->render(exec_system);

@@ -104,8 +104,8 @@ void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation
 
   active_buffers_.register_render(operation, render_rect);
 
-  const int n_inputs = operation->getNumberOfInputSockets();
-  for (int i = 0; i < n_inputs; i++) {
+  const int num_inputs = operation->getNumberOfInputSockets();
+  for (int i = 0; i < num_inputs; i++) {
     NodeOperation *input_op = operation->getInputOperation(i);
     rcti input_op_rect, input_area;
     BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
@@ -129,8 +129,8 @@ void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
     return;
   }
 
-  const int n_inputs = operation->getNumberOfInputSockets();
-  for (int i = 0; i < n_inputs; i++) {
+  const int num_inputs = operation->getNumberOfInputSockets();
+  for (int i = 0; i < num_inputs; i++) {
     NodeOperation *input_op = operation->getInputOperation(i);
     determine_reads(input_op);
     active_buffers_.register_read(input_op);
@@ -180,14 +180,14 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
 
   /* Split work vertically to maximize continuous memory. */
   const int work_height = BLI_rcti_size_y(&work_rect);
-  const int n_sub_works = MIN2(WorkScheduler::get_num_cpu_threads(), work_height);
-  const int split_height = n_sub_works == 0 ? 0 : work_height / n_sub_works;
-  int remaining_height = work_height - split_height * n_sub_works;
+  const int num_sub_works = MIN2(WorkScheduler::get_num_cpu_threads(), work_height);
+  const int split_height = num_sub_works == 0 ? 0 : work_height / num_sub_works;
+  int remaining_height = work_height - split_height * num_sub_works;
 
-  Vector<WorkPackage> sub_works(n_sub_works);
+  Vector<WorkPackage> sub_works(num_sub_works);
   int sub_work_y = work_rect.ymin;
-  unsigned int n_sub_works_finished = 0;
-  for (int i = 0; i < n_sub_works; i++) {
+  unsigned int num_sub_works_finished = 0;
+  for (int i = 0; i < num_sub_works; i++) {
     int sub_work_height = split_height;
 
     /* Distribute remaining height between sub-works. */
@@ -208,8 +208,8 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
       work_func(split_rect);
     };
     sub_work.finished_callback = [&]() {
-      const unsigned int current = atomic_add_and_fetch_u(&n_sub_works_finished, 1);
-      if (current == static_cast<unsigned int>(n_sub_works)) {
+      const unsigned int current = atomic_add_and_fetch_u(&num_sub_works_finished, 1);
+      if (current == static_cast<unsigned int>(num_sub_works)) {
         BLI_mutex_lock(&mutex);
         BLI_condition_notify_one(&work_finished_cond);
         BLI_mutex_unlock(&mutex);
@@ -225,7 +225,7 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
   /* Ensure all sub-works finished. They may still be running even after calling
    * WorkScheduler::finish(). */
   BLI_mutex_lock(&mutex);
-  if (n_sub_works_finished < static_cast<unsigned int>(n_sub_works)) {
+  if (num_sub_works_finished < static_cast<unsigned int>(num_sub_works)) {
     BLI_condition_wait(&work_finished_cond, &mutex);
   }
   BLI_mutex_unlock(&mutex);
@@ -237,8 +237,8 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
 void FullFrameExecutionModel::operation_finished(NodeOperation *operation)
 {
   /* Report inputs reads so that buffers may be freed/reused. */
-  const int n_inputs = operation->getNumberOfInputSockets();
-  for (int i = 0; i < n_inputs; i++) {
+  const int num_inputs = operation->getNumberOfInputSockets();
+  for (int i = 0; i < num_inputs; i++) {
     active_buffers_.read_finished(operation->getInputOperation(i));
   }
 
