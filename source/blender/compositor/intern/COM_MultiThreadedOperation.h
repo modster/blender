@@ -46,11 +46,11 @@ class MultiThreadedOperation : public NodeOperation {
   /**
    * Executes operation updating output memory buffer on output_rect area. Multi-threaded calls.
    */
-  virtual void multi_update_memory_buffer(MemoryBuffer *output,
-                                          const rcti &output_rect,
-                                          blender::Span<MemoryBuffer *> inputs,
-                                          ExecutionSystem &exec_system,
-                                          int current_pass) = 0;
+  virtual void update_memory_buffer_partial(MemoryBuffer *output,
+                                            const rcti &output_rect,
+                                            blender::Span<MemoryBuffer *> inputs,
+                                            ExecutionSystem &exec_system,
+                                            int current_pass) = 0;
 
   /**
    * Called after an update memory buffer pass is executed. Single-threaded calls.
