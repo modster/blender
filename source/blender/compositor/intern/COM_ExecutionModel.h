@@ -73,11 +73,6 @@ class ExecutionModel {
     BLI_assert(!"Method not supported by current execution model");
   }
 
-  virtual void operation_finished(NodeOperation *UNUSED(operation))
-  {
-    BLI_assert(!"Method not supported by current execution model");
-  }
-
  protected:
   bool is_breaked() const;
 

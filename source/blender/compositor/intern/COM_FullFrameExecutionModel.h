@@ -60,11 +60,16 @@ class FullFrameExecutionModel : public ExecutionModel {
   void execute_work(const rcti &work_rect,
                     std::function<void(const rcti &split_rect)> work_func) override;
 
-  void operation_finished(NodeOperation *operation) override;
-
  private:
   void determine_rects_to_render_and_reads();
   void render_operations(ExecutionSystem &exec_system);
+
+  void ensure_inputs_rendered(NodeOperation *op, ExecutionSystem &exec_system);
+  Vector<MemoryBuffer *> get_input_buffers(NodeOperation *op);
+  MemoryBuffer *create_operation_buffer(NodeOperation *op);
+  void render_operation(NodeOperation *op, ExecutionSystem &exec_system);
+
+  void operation_finished(NodeOperation *operation);
 
   void get_output_render_rect(NodeOperation *output_op, rcti &r_rect);
   void determine_rects_to_render(NodeOperation *operation, const rcti &render_rect);

@@ -76,6 +76,59 @@ void FullFrameExecutionModel::determine_rects_to_render_and_reads()
   }
 }
 
+void FullFrameExecutionModel::ensure_inputs_rendered(NodeOperation *op,
+                                                     ExecutionSystem &exec_system)
+{
+  const int num_inputs = op->getNumberOfInputSockets();
+  for (int i = 0; i < num_inputs; i++) {
+    NodeOperation *input_op = op->get_input_operation(i);
+    if (!active_buffers_.is_operation_rendered(input_op)) {
+      render_operation(input_op, exec_system);
+    }
+  }
+}
+
+Vector<MemoryBuffer *> FullFrameExecutionModel::get_input_buffers(NodeOperation *op)
+{
+  const int num_inputs = op->getNumberOfInputSockets();
+  Vector<MemoryBuffer *> inputs_buffers(num_inputs);
+  for (int i = 0; i < num_inputs; i++) {
+    NodeOperation *input_op = op->get_input_operation(i);
+    inputs_buffers[i] = active_buffers_.get_rendered_buffer(input_op);
+  }
+  return inputs_buffers;
+}
+
+MemoryBuffer *FullFrameExecutionModel::create_operation_buffer(NodeOperation *op)
+{
+  rcti op_rect;
+  BLI_rcti_init(&op_rect, 0, op->getWidth(), 0, op->getHeight());
+
+  const DataType data_type = op->getOutputSocket(0)->getDataType();
+  /* TODO: We should check if the operation is constant instead of is_set_operation. Finding a way
+   * to know if an operation is constant has to be implemented yet. */
+  const bool is_a_single_elem = op->get_flags().is_set_operation;
+  return new MemoryBuffer(data_type, op_rect, is_a_single_elem);
+}
+
+void FullFrameExecutionModel::render_operation(NodeOperation *op, ExecutionSystem &exec_system)
+{
+  if (active_buffers_.is_operation_rendered(op)) {
+    return;
+  }
+
+  ensure_inputs_rendered(op, exec_system);
+  Vector<MemoryBuffer *> input_bufs = get_input_buffers(op);
+
+  const bool has_outputs = op->getNumberOfOutputSockets() > 0;
+  MemoryBuffer *op_buf = has_outputs ? create_operation_buffer(op) : nullptr;
+  Span<rcti> rects = active_buffers_.get_rects_to_render(op);
+  op->render(op_buf, rects, input_bufs, exec_system);
+  active_buffers_.set_rendered_buffer(op, std::unique_ptr<MemoryBuffer>(op_buf));
+
+  operation_finished(op);
+}
+
 void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
 {
   const bool is_rendering = context_.isRendering();
@@ -84,7 +137,7 @@ void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
   for (eCompositorPriority priority : priorities_) {
     for (NodeOperation *op : operations_) {
       if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
-        op->render(exec_system);
+        render_operation(op, exec_system);
       }
     }
   }

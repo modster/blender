@@ -205,28 +205,17 @@ void NodeOperation::get_area_of_interest(const int input_idx,
 /**
  * Renders operation and its inputs. Rendered buffers are saved in the output store.
  */
-void NodeOperation::render(ExecutionSystem &exec_system)
+void NodeOperation::render(MemoryBuffer *output_buf,
+                           Span<rcti> rects_to_render,
+                           Span<MemoryBuffer *> inputs_bufs,
+                           ExecutionSystem &exec_system)
 {
-  SharedOperationBuffers &active_buffers = exec_system.get_active_buffers();
-  if (active_buffers.is_operation_rendered(this)) {
-    return;
-  }
-
-  Vector<MemoryBuffer *> inputs_bufs = get_rendered_inputs_buffers(exec_system);
-
-  const bool has_outputs = getNumberOfOutputSockets() > 0;
-  MemoryBuffer *output_buf = has_outputs ? create_output_buffer() : nullptr;
-
-  Span<rcti> render_rects = active_buffers.get_rects_to_render(this);
   if (get_flags().is_fullframe_operation) {
-    render_full_frame(output_buf, render_rects, inputs_bufs, exec_system);
+    render_full_frame(output_buf, rects_to_render, inputs_bufs, exec_system);
   }
   else {
-    render_full_frame_fallback(output_buf, render_rects, inputs_bufs, exec_system);
+    render_full_frame_fallback(output_buf, rects_to_render, inputs_bufs, exec_system);
   }
-  active_buffers.set_rendered_buffer(this, std::unique_ptr<MemoryBuffer>(output_buf));
-
-  exec_system.operation_finished(this);
 }
 
 void NodeOperation::render_full_frame(MemoryBuffer *output_buf,
@@ -239,34 +228,6 @@ void NodeOperation::render_full_frame(MemoryBuffer *output_buf,
     update_memory_buffer(output_buf, render_rect, inputs_bufs, exec_system);
   }
   deinitExecution();
-}
-
-Vector<MemoryBuffer *> NodeOperation::get_rendered_inputs_buffers(ExecutionSystem &exec_system)
-{
-  SharedOperationBuffers &active_buffers = exec_system.get_active_buffers();
-
-  const int num_inputs = getNumberOfInputSockets();
-  Vector<MemoryBuffer *> inputs_buffers(num_inputs);
-  for (int i = 0; i < num_inputs; i++) {
-    NodeOperation *input_op = getInputOperation(i);
-    if (!active_buffers.is_operation_rendered(input_op)) {
-      input_op->render(exec_system);
-    }
-    inputs_buffers[i] = active_buffers.get_rendered_buffer(input_op);
-  }
-  return inputs_buffers;
-}
-
-MemoryBuffer *NodeOperation::create_output_buffer()
-{
-  rcti op_rect;
-  BLI_rcti_init(&op_rect, 0, getWidth(), 0, getHeight());
-
-  const DataType data_type = getOutputSocket(0)->getDataType();
-  /* TODO: We should check if the operation is constant instead of is_set_operation. Finding a way
-   * to know if an operation is constant has to be implemented yet. */
-  const bool is_a_single_elem = get_flags().is_set_operation;
-  return new MemoryBuffer(data_type, op_rect, is_a_single_elem);
 }
 
 /**

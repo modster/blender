@@ -199,8 +199,6 @@ class ExecutionSystem {
 
   void execute_work(const rcti &work_rect, std::function<void(const rcti &split_rect)> work_func);
 
-  void operation_finished(NodeOperation *operation);
-
  private:
   /* allow the DebugInfo class to look at internals */
   friend class DebugInfo;

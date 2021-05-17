@@ -115,9 +115,4 @@ void ExecutionSystem::execute_work(const rcti &work_rect,
   execution_model_->execute_work(work_rect, work_func);
 }
 
-void ExecutionSystem::operation_finished(NodeOperation *operation)
-{
-  execution_model_->operation_finished(operation);
-}
-
 }  // namespace blender::compositor

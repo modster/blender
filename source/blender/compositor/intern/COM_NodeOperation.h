@@ -559,7 +559,10 @@ class NodeOperation {
   /** \name Full Frame Methods
    * \{ */
 
-  void render(ExecutionSystem &exec_system);
+  void render(MemoryBuffer *output_buf,
+              Span<rcti> rects_to_render,
+              Span<MemoryBuffer *> inputs_bufs,
+              ExecutionSystem &exec_system);
 
   /**
    * Executes operation updating output memory buffer. Single-threaded calls.
@@ -663,8 +666,6 @@ class NodeOperation {
                          Span<rcti> render_rects,
                          Span<MemoryBuffer *> inputs_bufs,
                          ExecutionSystem &exec_system);
-  Vector<MemoryBuffer *> get_rendered_inputs_buffers(ExecutionSystem &exec_system);
-  MemoryBuffer *create_output_buffer();
 
   void render_full_frame_fallback(MemoryBuffer *output_buf,
                                   Span<rcti> render_rects,
