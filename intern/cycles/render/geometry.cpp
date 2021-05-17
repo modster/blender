@@ -1290,7 +1290,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
       }
 
       if ((pack_flags & PackFlags::PACK_VISIBILITY) != 0) {
-        dscene->prim_visibility.give_data(pack.prim_visibility);
+        dscene->prim_visibility.alloc(num_prims);
       }
     }
     else {
