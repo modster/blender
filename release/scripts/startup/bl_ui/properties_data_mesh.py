@@ -581,6 +581,34 @@ class MESH_UL_attributes(UIList):
         sub.label(text=data_type.name)
 
 
+class MESH_MT_add_attribute(Menu):
+    bl_label = "Add Attribute"
+
+    @staticmethod
+    def add_standard_attribute(layout, mesh, name, data_type, domain):
+        exists = mesh.attributes.get(name) is not None
+
+        col = layout.column()
+        col.enabled = not exists
+        col.operator_context = 'EXEC_DEFAULT'
+
+        props = col.operator("geometry.attribute_add", text=name)
+        props.name = name
+        props.data_type = data_type
+        props.domain = domain
+
+    def draw(self, context):
+        layout = self.layout
+        mesh = context.mesh
+
+        self.add_standard_attribute(layout, mesh, 'scale', 'FLOAT_VECTOR', 'POINT')
+
+        layout.separator()
+
+        layout.operator_context = 'INVOKE_DEFAULT'
+        layout.operator("geometry.attribute_add", text="Custom...")
+
+
 class DATA_PT_mesh_attributes(MeshButtonsPanel, Panel):
     bl_label = "Attributes"
     bl_options = {'DEFAULT_CLOSED'}
@@ -588,9 +616,12 @@ class DATA_PT_mesh_attributes(MeshButtonsPanel, Panel):
 
     def draw(self, context):
         mesh = context.mesh
-        layout = self.layout
 
-        layout.template_list(
+        layout = self.layout
+        row = layout.row()
+
+        col = row.column()
+        col.template_list(
             "MESH_UL_attributes",
             "attributes",
             mesh,
@@ -599,6 +630,11 @@ class DATA_PT_mesh_attributes(MeshButtonsPanel, Panel):
             "active_index",
             rows=3,
         )
+
+        col = row.column(align=True)
+        col.menu("MESH_MT_add_attribute", icon='ADD', text="")
+        col.operator("geometry.attribute_remove", icon='REMOVE', text="")
+
 
 
 classes = (
@@ -610,6 +646,7 @@ classes = (
     MESH_UL_uvmaps,
     MESH_UL_vcols,
     MESH_UL_attributes,
+    MESH_MT_add_attribute,
     DATA_PT_context_mesh,
     DATA_PT_vertex_groups,
     DATA_PT_shape_keys,
