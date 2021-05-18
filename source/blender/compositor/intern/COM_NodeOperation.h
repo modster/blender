@@ -574,6 +574,7 @@ class NodeOperation {
   {
   }
 
+  /* TODO: See if it's possible to use parameter overloading (input_id for example). */
   virtual void get_area_of_interest(int input_idx, const rcti &output_rect, rcti &r_input_rect);
 
   /** \} */
