@@ -35,6 +35,8 @@ SharedOperationBuffers::BufferData &SharedOperationBuffers::get_buffer_data(Node
   return buffers_.lookup_or_add_cb(op, []() { return BufferData(); });
 }
 
+/* TODO: Possibly refactor to "request_area". Current implementation is incomplete: partial
+overlapping, etc. Leading to more rendering than necessary. */
 bool SharedOperationBuffers::is_render_registered(NodeOperation *op, const rcti &rect_to_render)
 {
   BufferData &buf_data = get_buffer_data(op);
