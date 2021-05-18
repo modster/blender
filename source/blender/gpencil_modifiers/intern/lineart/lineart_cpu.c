@@ -1510,7 +1510,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       use_mesh = DEG_get_evaluated_object(dg, ob)->data;
     }
     else {
-      use_mesh = BKE_mesh_new_from_object(NULL, ob, false);
+      use_mesh = BKE_mesh_new_from_object(NULL, ob, false, false);
     }
 
     /* In case we can not get any mesh geometry data from the object */
@@ -1817,8 +1817,23 @@ static void lineart_main_load_geometries(
   double asp = ((double)rb->w / (double)rb->h);
 
   if (cam->type == CAM_PERSP) {
-    if (asp < 1) {
-      fov /= asp;
+    if (cam->sensor_fit == CAMERA_SENSOR_FIT_AUTO) {
+      if (asp < 1) {
+        fov /= asp;
+      }
+      else {
+        fov *= asp;
+      }
+    }
+    else if (cam->sensor_fit == CAMERA_SENSOR_FIT_HOR) {
+      if (asp < 1) {
+        fov /= asp;
+      }
+    }
+    else if (cam->sensor_fit == CAMERA_SENSOR_FIT_VERT) {
+      if (asp > 1) {
+        fov *= asp;
+      }
     }
     lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
   }
