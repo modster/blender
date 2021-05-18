@@ -273,8 +273,9 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
 
   WorkScheduler::finish();
 
-  /* Ensure all sub-works finished. They may still be running even after calling
-   * WorkScheduler::finish(). */
+  /* Ensure all sub-works finished.
+   * TODO: This a workaround for WorkScheduler::finish() not waiting all works on queue threading
+   * model. Sync code should be removed once it's fixed. */
   BLI_mutex_lock(&mutex);
   if (num_sub_works_finished < num_sub_works) {
     BLI_condition_wait(&work_finished_cond, &mutex);
