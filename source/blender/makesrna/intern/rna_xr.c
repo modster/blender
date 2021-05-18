@@ -1904,6 +1904,8 @@ void RNA_def_xr(BlenderRNA *brna)
   rna_def_xr_actionconfig(brna);
   rna_def_xr_session_settings(brna);
   rna_def_xr_session_state(brna);
+
+  RNA_define_animate_sdna(true);
 }
 
 #endif /* RNA_RUNTIME */
