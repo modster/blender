@@ -29,6 +29,7 @@
 #include "BLI_ghash.h"
 #include "BLI_map.hh"
 #include "DNA_object_types.h"
+#include "GPU_material.h"
 
 #include "eevee_engine.h"
 
@@ -149,6 +150,113 @@ class SyncModule {
   ~SyncModule(){};
 
   ObjectHandle &sync_object(Object *ob);
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name MaterialKey
+ *
+ * \{ */
+
+enum eMaterialDomain {
+  MAT_DOMAIN_SURFACE = 0,
+  MAT_DOMAIN_VOLUME = 1,
+  MAT_DOMAIN_SHADOW = 2,
+};
+
+enum eMaterialPipeline {
+  MAT_PIPE_DEFERRED = 0,
+  MAT_PIPE_FORWARD = 1,
+};
+
+enum eMaterialGeometry {
+  MAT_GEOM_MESH = 0,
+  MAT_GEOM_HAIR = 1,
+  MAT_GEOM_GPENCIL = 2,
+  MAT_GEOM_VOLUME = 3,
+};
+
+static inline eMaterialGeometry to_material_geometry(const Object *ob)
+{
+  switch (ob->type) {
+    case OB_HAIR:
+      return MAT_GEOM_HAIR;
+    case OB_VOLUME:
+      return MAT_GEOM_VOLUME;
+    case OB_GPENCIL:
+      return MAT_GEOM_GPENCIL;
+    default:
+      return MAT_GEOM_MESH;
+  }
+}
+
+/** Unique key to identify each material in the hashmap. */
+struct MaterialKey {
+  Material *mat;
+  uint64_t options;
+
+  MaterialKey(Material *mat_, eMaterialGeometry geometry) : mat(mat_)
+  {
+    /* TODO derive from mat. */
+    eMaterialPipeline pipeline = MAT_PIPE_DEFERRED;
+    options = pipeline | (geometry << 1);
+  }
+
+  uint64_t hash(void) const
+  {
+    BLI_assert(options < sizeof(*mat));
+    return (uint64_t)mat + options;
+  }
+
+  bool operator<(const MaterialKey &k) const
+  {
+    return (mat < k.mat) || (options < k.options);
+  }
+
+  bool operator==(const MaterialKey &k) const
+  {
+    return (mat == k.mat) && (options == k.options);
+  }
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name ShaderKey
+ *
+ * \{ */
+
+struct ShaderKey {
+  GPUShader *shader;
+  uint64_t options;
+
+  ShaderKey(GPUMaterial *gpumat,
+            Material *mat_,
+            eMaterialGeometry geometry,
+            eMaterialDomain domain)
+  {
+    /* TODO derive from mat. */
+    (void)mat_;
+    eMaterialPipeline pipeline = MAT_PIPE_DEFERRED;
+    shader = GPU_material_get_shader(gpumat);
+    options = domain | (pipeline << 2) | (geometry << 3);
+  }
+
+  uint64_t hash(void) const
+  {
+    return (uint64_t)shader + options;
+  }
+
+  bool operator<(const ShaderKey &k) const
+  {
+    return (shader < k.shader) || (options < k.options);
+  }
+
+  bool operator==(const ShaderKey &k) const
+  {
+    return (shader == k.shader) && (options == k.options);
+  }
 };
 
 /** \} */

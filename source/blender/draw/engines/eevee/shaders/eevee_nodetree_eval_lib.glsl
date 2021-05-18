@@ -9,6 +9,17 @@ ClosureVolume g_volume_data;
 ClosureEmission g_emission_data;
 ClosureTransparency g_transparency_data;
 
+struct GlobalData {
+  /** World position. */
+  vec3 P;
+  /** Surface Normal. */
+  vec3 N;
+  /** Geometric Normal. */
+  vec3 Ng;
+  /** Barycentric coordinates. */
+  vec2 barycentrics;
+};
+
 /* Prototype. */
 void nodetree_eval(vec3 N);
 

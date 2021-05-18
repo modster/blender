@@ -6,15 +6,10 @@ IN_OUT VolumeDataInterface
 }
 interp;
 
-struct VolumeData {
-  /** World position. */
-  vec3 P;
-};
-
 #ifdef GPU_FRAGMENT_SHADER
-VolumeData init_from_interp(void)
+GlobalData init_from_interp(void)
 {
-  VolumeData volume;
+  GlobalData volume;
   volume.P = interp.P_start;
   return volume;
 }

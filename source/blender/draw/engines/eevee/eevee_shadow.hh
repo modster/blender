@@ -27,6 +27,7 @@
 #include "BLI_vector.hh"
 
 #include "eevee_id_map.hh"
+#include "eevee_material.hh"
 #include "eevee_shader.hh"
 #include "eevee_shader_shared.hh"
 
@@ -340,15 +341,12 @@ class ShadowPass {
   DRWPass *clear_ps_ = nullptr;
   DRWPass *surface_ps_ = nullptr;
 
-  /** Shading groups from surface_ps_ */
-  DRWShadingGroup *surface_grp_;
-
  public:
   ShadowPass(Instance &inst) : inst_(inst){};
 
   void sync(void);
 
-  void surface_add(Object *ob, Material *mat, int matslot);
+  void surface_add(Object *ob, GPUBatch *geom, Material *material);
 
   void render(void);
 };

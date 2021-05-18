@@ -92,8 +92,10 @@ set(SRC
   engines/eevee/eevee_light.cc
   engines/eevee/eevee_lightcache.c
   engines/eevee/eevee_lut.c
+  engines/eevee/eevee_material.cc
   engines/eevee/eevee_motion_blur.cc
   engines/eevee/eevee_renderpasses.cc
+  engines/eevee/eevee_shader.cc
   engines/eevee/eevee_shading.cc
   engines/eevee/eevee_shadow.cc
   engines/eevee/eevee_velocity.cc

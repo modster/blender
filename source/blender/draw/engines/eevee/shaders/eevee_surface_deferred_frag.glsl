@@ -12,13 +12,13 @@ layout(location = 3) out uvec4 out_volume_data;      /* Volume Emission, Absorpt
 layout(location = 4) out vec4 out_emission_data;     /* Emission. */
 layout(location = 5) out vec4 out_transparency_data; /* Transparent BSDF, Holdout. */
 
-SurfaceData g_surf;
+GlobalData g_data;
 
 void main(void)
 {
-  g_surf = init_from_interp();
+  g_data = init_from_interp();
 
-  nodetree_eval(g_surf.N);
+  nodetree_eval(g_data.N);
 
   out_diffuse_data = gbuffer_store_diffuse_data(g_diffuse_data);
   out_reflection_data = gbuffer_store_reflection_data(g_reflection_data);

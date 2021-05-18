@@ -53,7 +53,7 @@ class ForwardPass {
   ForwardPass(Instance &inst) : inst_(inst){};
 
   void sync(void);
-  void surface_add(Object *ob, Material *mat, int matslot);
+  void surface_add(Object *ob, GPUBatch *geom, Material *mat);
   void render(void);
 };
 
@@ -187,7 +187,7 @@ class DeferredLayer {
   DeferredLayer(Instance &inst) : inst_(inst){};
 
   void sync(void);
-  void surface_add(Object *ob);
+  void surface_add(Object *ob, GPUBatch *geom, Material *material);
   void volume_add(Object *ob);
   void render(GBuffer &gbuffer, GPUFrameBuffer *view_fb);
 };
@@ -226,7 +226,7 @@ class DeferredPass {
       : inst_(inst), opaque_layer_(inst), refraction_layer_(inst), volumetric_layer_(inst){};
 
   void sync(void);
-  void surface_add(Object *ob);
+  void surface_add(Object *ob, GPUBatch *geom, Material *material);
   void volume_add(Object *ob);
   void render(GBuffer &gbuffer, GPUFrameBuffer *view_fb);
 };

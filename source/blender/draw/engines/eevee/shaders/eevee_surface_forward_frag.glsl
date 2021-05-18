@@ -30,16 +30,16 @@ uniform sampler2DShadow shadow_atlas_tx;
 layout(location = 0, index = 0) out vec4 out_radiance;
 layout(location = 0, index = 1) out vec4 out_transmittance;
 
-SurfaceData g_surf;
+GlobalData g_data;
 
 void main(void)
 {
-  g_surf = init_from_interp();
+  g_data = init_from_interp();
 
-  nodetree_eval(g_surf.N);
+  nodetree_eval(g_data.N);
 
   float vP_z = get_view_z_from_depth(gl_FragCoord.z);
-  vec3 V = cameraVec(g_surf.P);
+  vec3 V = cameraVec(g_data.P);
 
   vec2 uv = vec2(g_reflection_data.roughness, safe_sqrt(1.0 - dot(g_reflection_data.N, V)));
   uv = uv * UTIL_TEX_UV_SCALE + UTIL_TEX_UV_BIAS;
@@ -58,7 +58,7 @@ void main(void)
               light_culling,
               lights_culling_tx,
               vP_z,
-              g_surf.P,
+              g_data.P,
               V,
               g_diffuse_data,
               g_reflection_data,

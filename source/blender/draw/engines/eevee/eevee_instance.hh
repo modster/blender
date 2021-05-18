@@ -31,6 +31,7 @@
 #include "eevee_film.hh"
 #include "eevee_id_map.hh"
 #include "eevee_light.hh"
+#include "eevee_material.hh"
 #include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_sampling.hh"
@@ -65,6 +66,7 @@ class Instance {
   /* TODO(fclem) Move it to scene layer data. */
   ShadowModule shadows;
   SyncModule sync;
+  MaterialModule materials;
   /** Lookdev own lightweight instance. May not be allocated. */
   // Lookdev *lookdev = nullptr;
 
@@ -94,7 +96,8 @@ class Instance {
         motion_blur(*this),
         lights(*this),
         shadows(*this),
-        sync(*this){};
+        sync(*this),
+        materials(*this){};
   ~Instance(){};
 
   void init(const ivec2 &output_res,

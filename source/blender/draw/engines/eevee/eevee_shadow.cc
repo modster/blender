@@ -508,22 +508,17 @@ void ShadowPass::sync(void)
   {
     DRWState state = DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS | DRW_STATE_SHADOW_OFFSET;
     surface_ps_ = DRW_pass_create("ShadowSurface", state);
-
-    GPUShader *sh = inst_.shaders.static_shader_get(DEPTH_SIMPLE_MESH);
-    surface_grp_ = DRW_shgroup_create(sh, surface_ps_);
   }
 }
 
-void ShadowPass::surface_add(Object *ob, Material *mat, int matslot)
+void ShadowPass::surface_add(Object *ob, GPUBatch *geom, Material *material)
 {
-  (void)mat;
-  (void)matslot;
-  GPUBatch *geom = DRW_cache_object_surface_get(ob);
-  if (geom == nullptr) {
-    return;
+  MaterialPass &matpass = material->shadow;
+  DRWShadingGroup *&grp = *matpass.shgrp;
+  if (grp == nullptr) {
+    grp = DRW_shgroup_material_create(matpass.gpumat, surface_ps_);
   }
-
-  DRW_shgroup_call(surface_grp_, geom, ob);
+  DRW_shgroup_call(grp, geom, ob);
 }
 
 void ShadowPass::render(void)

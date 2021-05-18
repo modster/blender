@@ -119,6 +119,7 @@ void Instance::begin_sync()
   shading_passes.sync();
   main_view.sync();
 
+  materials.begin_sync();
   velocity.begin_sync();
   lights.begin_sync();
 }
@@ -151,14 +152,31 @@ void Instance::object_sync(Object *ob)
       case OB_CURVE:
       case OB_SURF:
       case OB_FONT:
-      case OB_MBALL:
-        shading_passes.forward.surface_add(ob, nullptr, 0);
-        shading_passes.deferred.surface_add(ob);
-        shading_passes.shadow.surface_add(ob, nullptr, 0);
+      case OB_MBALL: {
+        MaterialArray &material_array = materials.surface_materials_get(ob);
+
+        GPUBatch **mat_geom = DRW_cache_object_surface_material_get(
+            ob, material_array.gpu_materials.data(), material_array.gpu_materials.size());
+
+        for (auto i : IndexRange(ob->totcol)) {
+          if (mat_geom[i] == nullptr) {
+            continue;
+          }
+          GPUBatch *geom = mat_geom[i];
+          Material *material = material_array.materials[i];
+          if (false) {
+            shading_passes.forward.surface_add(ob, geom, material);
+          }
+          else {
+            shading_passes.deferred.surface_add(ob, geom, material);
+          }
+          shading_passes.shadow.surface_add(ob, geom, material);
+        }
         shading_passes.velocity.mesh_add(ob, ob_handle);
 
         shadows.sync_caster(ob, ob_handle);
         break;
+      }
       case OB_VOLUME:
         shading_passes.deferred.volume_add(ob);
         break;

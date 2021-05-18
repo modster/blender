@@ -1,6 +1,3 @@
-#ifndef VOLUMETRICS
-
-CLOSURE_EVAL_FUNCTION_DECLARE_1(node_subsurface_scattering, Diffuse)
 
 void node_subsurface_scattering(vec4 color,
                                 float scale,
@@ -33,8 +30,3 @@ void node_subsurface_scattering(vec4 color,
   /* TODO(fclem) Try to not use this. */
   closure_load_ssr_data(vec3(0.0), 0.0, in_Diffuse_0.N, -1.0, result);
 }
-
-#else
-/* Stub subsurface scattering because it is not compatible with volumetrics. */
-#  define node_subsurface_scattering(a, b, c, d, e, f, g, h) (h = CLOSURE_DEFAULT)
-#endif

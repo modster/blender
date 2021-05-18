@@ -598,6 +598,7 @@ static char *code_generate_fragment(GPUMaterial *material,
   codegen_declare_tmps(ds, graph);
   codegen_call_functions(ds, graph);
 
+#if 0
   BLI_dynstr_append(ds, "  #ifndef VOLUMETRICS\n");
   BLI_dynstr_append(ds, "  if (renderPassAOV) {\n");
   BLI_dynstr_append(ds, "    switch (render_pass_aov_hash()) {\n");
@@ -623,8 +624,10 @@ static char *code_generate_fragment(GPUMaterial *material,
   BLI_dynstr_append(ds, "  #else /* VOLUMETRICS */\n");
   BLI_dynstr_append(ds, "  {\n");
   BLI_dynstr_append(ds, "  #endif /* VOLUMETRICS */\n    ");
-  codegen_final_output(ds, graph->outlink->output);
   BLI_dynstr_append(ds, "  }\n");
+#endif
+
+  codegen_final_output(ds, graph->outlink->output);
 
   BLI_dynstr_append(ds, "}\n");
 
