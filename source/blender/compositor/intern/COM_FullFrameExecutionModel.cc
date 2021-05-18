@@ -16,11 +16,9 @@
  * Copyright 2021, Blender Foundation.
  */
 
-#include "atomic_ops.h"
-
+#include "COM_FullFrameExecutionModel.h"
 #include "COM_Debug.h"
 #include "COM_ExecutionGroup.h"
-#include "COM_FullFrameExecutionModel.h"
 #include "COM_ReadBufferOperation.h"
 #include "COM_WorkScheduler.h"
 
@@ -239,7 +237,7 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
 
   Vector<WorkPackage> sub_works(num_sub_works);
   int sub_work_y = work_rect.ymin;
-  unsigned int num_sub_works_finished = 0;
+  int num_sub_works_finished = 0;
   for (int i = 0; i < num_sub_works; i++) {
     int sub_work_height = split_height;
 
@@ -261,12 +259,12 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
       work_func(split_rect);
     };
     sub_work.executed_fn = [&]() {
-      const unsigned int current = atomic_add_and_fetch_u(&num_sub_works_finished, 1);
-      if (static_cast<int>(current) == num_sub_works) {
-        BLI_mutex_lock(&mutex);
+      BLI_mutex_lock(&mutex);
+      num_sub_works_finished++;
+      if (num_sub_works_finished == num_sub_works) {
         BLI_condition_notify_one(&work_finished_cond);
-        BLI_mutex_unlock(&mutex);
       }
+      BLI_mutex_unlock(&mutex);
     };
     WorkScheduler::schedule(&sub_work);
     sub_work_y += sub_work_height;
@@ -278,7 +276,7 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
   /* Ensure all sub-works finished. They may still be running even after calling
    * WorkScheduler::finish(). */
   BLI_mutex_lock(&mutex);
-  if (static_cast<int>(num_sub_works_finished) < num_sub_works) {
+  if (num_sub_works_finished < num_sub_works) {
     BLI_condition_wait(&work_finished_cond, &mutex);
   }
   BLI_mutex_unlock(&mutex);
