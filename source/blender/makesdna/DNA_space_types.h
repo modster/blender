@@ -1977,8 +1977,14 @@ typedef struct SpreadsheetRowFilter {
   char _pad0[1];
 
   int value_int;
+  char *value_string;
   float value_float;
   float threshold;
+  float value_float2[2];
+  float value_float3[3];
+  float value_color[4];
+
+  char _pad1[4];
 } SpreadsheetRowFilter;
 
 typedef enum eSpaceSpreadsheet_RowFilterFlag {
@@ -2005,10 +2011,13 @@ typedef enum eSpaceSpreadsheet_ContextType {
 } eSpaceSpreadsheet_ContextType;
 
 typedef enum eSpreadsheetColumnValueType {
-  SPREADSHEET_VALUE_TYPE_INT32 = 0,
-  SPREADSHEET_VALUE_TYPE_FLOAT = 1,
-  SPREADSHEET_VALUE_TYPE_BOOL = 2,
-  SPREADSHEET_VALUE_TYPE_INSTANCES = 3,
+  SPREADSHEET_VALUE_TYPE_BOOL = 0,
+  SPREADSHEET_VALUE_TYPE_INT32 = 1,
+  SPREADSHEET_VALUE_TYPE_FLOAT = 2,
+  SPREADSHEET_VALUE_TYPE_FLOAT2 = 3,
+  SPREADSHEET_VALUE_TYPE_FLOAT3 = 4,
+  SPREADSHEET_VALUE_TYPE_COLOR = 5,
+  SPREADSHEET_VALUE_TYPE_INSTANCES = 6,
 } eSpreadsheetColumnValueType;
 
 /**

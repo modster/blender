@@ -1359,6 +1359,7 @@ static void write_area(BlendWriter *writer, ScrArea *area)
 
       LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
         BLO_write_struct(writer, SpreadsheetRowFilter, row_filter);
+        BLO_write_string(writer, row_filter->value_string);
       }
 
       LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
@@ -1740,8 +1741,12 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
     }
     else if (sl->spacetype == SPACE_SPREADSHEET) {
       SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
+
       sspreadsheet->runtime = NULL;
       BLO_read_list(reader, &sspreadsheet->row_filters);
+      LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
+        BLO_read_data_address(reader, &row_filter->value_string);
+      }
       BLO_read_list(reader, &sspreadsheet->columns);
       LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
         BLO_read_data_address(reader, &column->id);

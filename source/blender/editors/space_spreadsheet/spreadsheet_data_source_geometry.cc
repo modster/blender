@@ -121,7 +121,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
     }
     case CD_PROP_COLOR: {
       return column_values_from_function(
-          SPREADSHEET_VALUE_TYPE_COLOR4F,
+          SPREADSHEET_VALUE_TYPE_COLOR,
           column_id.name,
           domain_size,
           [varray](int index, CellValue &r_cell_value) {

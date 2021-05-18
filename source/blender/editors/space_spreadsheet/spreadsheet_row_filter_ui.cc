@@ -52,7 +52,10 @@ static void filter_panel_id_fn(void *UNUSED(row_filter_v), char *r_name)
 static std::string operation_string(const eSpreadsheetColumnValueType data_type,
                                     const eSpreadsheetFilterOperation operation)
 {
-  if (data_type == SPREADSHEET_VALUE_TYPE_BOOL) {
+  if (ELEM(data_type,
+           SPREADSHEET_VALUE_TYPE_BOOL,
+           SPREADSHEET_VALUE_TYPE_INSTANCES,
+           SPREADSHEET_VALUE_TYPE_COLOR)) {
     return "==";
   }
 
@@ -80,12 +83,34 @@ static std::string value_string(const SpreadsheetRowFilter &row_filter,
       result << std::fixed << row_filter.value_float;
       return result.str();
     }
+    case SPREADSHEET_VALUE_TYPE_FLOAT2: {
+      std::ostringstream result;
+      result.precision(3);
+      result << std::fixed << "(" << row_filter.value_float2[0] << ", "
+             << row_filter.value_float2[1] << ")";
+      return result.str();
+    }
+    case SPREADSHEET_VALUE_TYPE_FLOAT3: {
+      std::ostringstream result;
+      result.precision(3);
+      result << std::fixed << "(" << row_filter.value_float3[0] << ", "
+             << row_filter.value_float3[1] << ", " << row_filter.value_float3[2] << ")";
+      return result.str();
+    }
     case SPREADSHEET_VALUE_TYPE_BOOL:
       return (row_filter.flag & SPREADSHEET_ROW_FILTER_BOOL_VALUE) ? IFACE_("True") :
                                                                      IFACE_("False");
     case SPREADSHEET_VALUE_TYPE_INSTANCES:
-      /* Not supported at the moment. */
+      if (row_filter.value_string != nullptr) {
+        return row_filter.value_string;
+      }
       return "";
+    case SPREADSHEET_VALUE_TYPE_COLOR:
+      std::ostringstream result;
+      result.precision(3);
+      result << std::fixed << "(" << row_filter.value_color[0] << ", " << row_filter.value_color[1]
+             << ", " << row_filter.value_color[2] << ", " << row_filter.value_color[3] << ")";
+      return result.str();
   }
   BLI_assert_unreachable();
   return "";
@@ -174,16 +199,28 @@ static void spreadsheet_filter_panel_draw(const bContext *C, Panel *panel)
 
   uiItemR(layout, filter_ptr, "column_name", 0, IFACE_("Column"), ICON_NONE);
 
-  if (data_type != SPREADSHEET_VALUE_TYPE_BOOL) {
-    uiItemR(layout, filter_ptr, "operation", 0, nullptr, ICON_NONE);
-  }
-
   switch (data_type) {
     case SPREADSHEET_VALUE_TYPE_INT32:
+      uiItemR(layout, filter_ptr, "operation", 0, nullptr, ICON_NONE);
       uiItemR(layout, filter_ptr, "value_int", 0, IFACE_("Value"), ICON_NONE);
       break;
     case SPREADSHEET_VALUE_TYPE_FLOAT:
+      uiItemR(layout, filter_ptr, "operation", 0, nullptr, ICON_NONE);
       uiItemR(layout, filter_ptr, "value_float", 0, IFACE_("Value"), ICON_NONE);
+      if (operation == SPREADSHEET_ROW_FILTER_EQUAL) {
+        uiItemR(layout, filter_ptr, "threshold", 0, nullptr, ICON_NONE);
+      }
+      break;
+    case SPREADSHEET_VALUE_TYPE_FLOAT2:
+      uiItemR(layout, filter_ptr, "operation", 0, nullptr, ICON_NONE);
+      uiItemR(layout, filter_ptr, "value_float2", 0, IFACE_("Value"), ICON_NONE);
+      if (operation == SPREADSHEET_ROW_FILTER_EQUAL) {
+        uiItemR(layout, filter_ptr, "threshold", 0, nullptr, ICON_NONE);
+      }
+      break;
+    case SPREADSHEET_VALUE_TYPE_FLOAT3:
+      uiItemR(layout, filter_ptr, "operation", 0, nullptr, ICON_NONE);
+      uiItemR(layout, filter_ptr, "value_float3", 0, IFACE_("Value"), ICON_NONE);
       if (operation == SPREADSHEET_ROW_FILTER_EQUAL) {
         uiItemR(layout, filter_ptr, "threshold", 0, nullptr, ICON_NONE);
       }
@@ -192,7 +229,11 @@ static void spreadsheet_filter_panel_draw(const bContext *C, Panel *panel)
       uiItemR(layout, filter_ptr, "value_boolean", 0, IFACE_("Value"), ICON_NONE);
       break;
     case SPREADSHEET_VALUE_TYPE_INSTANCES:
-      BLI_assert_unreachable();
+      uiItemR(layout, filter_ptr, "value_string", 0, IFACE_("Value"), ICON_NONE);
+      break;
+    case SPREADSHEET_VALUE_TYPE_COLOR:
+      uiItemR(layout, filter_ptr, "value_color", 0, IFACE_("Value"), ICON_NONE);
+      uiItemR(layout, filter_ptr, "threshold", 0, nullptr, ICON_NONE);
       break;
   }
 }
