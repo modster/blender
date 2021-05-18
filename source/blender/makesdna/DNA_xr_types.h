@@ -28,6 +28,8 @@ extern "C" {
 
 struct XrActionConfig;
 
+/* -------------------------------------------------------------------- */
+
 typedef struct XrSessionSettings {
   /** Shading settings, struct shared with 3D-View so settings are the same. */
   struct View3DShading shading;
@@ -73,6 +75,49 @@ typedef struct XrSessionSettings {
   char controller1_flag;
   char _pad3[5];
 } XrSessionSettings;
+
+/** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
+typedef enum eXrActionType {
+  XR_BOOLEAN_INPUT = 1,
+  XR_FLOAT_INPUT = 2,
+  XR_VECTOR2F_INPUT = 3,
+  XR_POSE_INPUT = 4,
+  XR_VIBRATION_OUTPUT = 100,
+} eXrActionType;
+
+typedef enum eXrOpFlag {
+  XR_OP_PRESS = 0,
+  XR_OP_RELEASE = 1,
+  XR_OP_MODAL = 2,
+} eXrOpFlag;
+
+typedef enum eXrSessionFlag {
+  XR_SESSION_USE_POSITION_TRACKING = (1 << 0),
+  XR_SESSION_USE_ABSOLUTE_TRACKING = (1 << 1),
+} eXrSessionFlag;
+
+typedef enum eXRSessionBasePoseType {
+  XR_BASE_POSE_SCENE_CAMERA = 0,
+  XR_BASE_POSE_OBJECT = 1,
+  XR_BASE_POSE_CUSTOM = 2,
+} eXRSessionBasePoseType;
+
+typedef enum eXrSessionControllerDrawStyle {
+  XR_CONTROLLER_DRAW_AXES = 0,
+  XR_CONTROLLER_DRAW_RAY = 1,
+} eXrSessionControllerDrawStyle;
+
+typedef enum eXrSessionEye {
+  XR_EYE_LEFT = 0,
+  XR_EYE_RIGHT = 1,
+} eXrSessionEye;
+
+typedef enum eXrSessionObjectFlag {
+  XR_OBJECT_ENABLE = (1 << 0),
+  XR_OBJECT_AUTOKEY = (1 << 1),
+} eXrSessionObjectFlag;
+
+/* -------------------------------------------------------------------- */
 
 typedef struct XrActionMapItem {
   struct XrActionMapItem *next, *prev;
@@ -120,6 +165,10 @@ enum {
   XR_AMI_UPDATE = (1 << 0),
 };
 
+#define XR_AMI_MAX_NAME 64
+
+/* -------------------------------------------------------------------- */
+
 typedef struct XrActionMap {
   struct XrActionMap *next, *prev;
 
@@ -138,6 +187,10 @@ typedef struct XrActionMap {
 enum {
   XR_ACTIONMAP_UPDATE = (1 << 0),
 };
+
+#define XR_ACTIONMAP_MAX_NAME 64
+
+/* -------------------------------------------------------------------- */
 
 typedef struct XrActionConfig {
   struct XrActionConfig *next, *prev;
@@ -158,49 +211,8 @@ enum {
 };
 
 #define XR_ACTIONCONF_MAX_NAME 64
-#define XR_ACTIONMAP_MAX_NAME 64
-#define XR_AMI_MAX_NAME 64
 
-/** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
-typedef enum eXrActionType {
-  XR_BOOLEAN_INPUT = 1,
-  XR_FLOAT_INPUT = 2,
-  XR_VECTOR2F_INPUT = 3,
-  XR_POSE_INPUT = 4,
-  XR_VIBRATION_OUTPUT = 100,
-} eXrActionType;
-
-typedef enum eXrOpFlag {
-  XR_OP_PRESS = 0,
-  XR_OP_RELEASE = 1,
-  XR_OP_MODAL = 2,
-} eXrOpFlag;
-
-typedef enum eXrSessionFlag {
-  XR_SESSION_USE_POSITION_TRACKING = (1 << 0),
-  XR_SESSION_USE_ABSOLUTE_TRACKING = (1 << 1),
-} eXrSessionFlag;
-
-typedef enum eXRSessionBasePoseType {
-  XR_BASE_POSE_SCENE_CAMERA = 0,
-  XR_BASE_POSE_OBJECT = 1,
-  XR_BASE_POSE_CUSTOM = 2,
-} eXRSessionBasePoseType;
-
-typedef enum eXrSessionControllerDrawStyle {
-  XR_CONTROLLER_DRAW_AXES = 0,
-  XR_CONTROLLER_DRAW_RAY = 1,
-} eXrSessionControllerDrawStyle;
-
-typedef enum eXrSessionEye {
-  XR_EYE_LEFT = 0,
-  XR_EYE_RIGHT = 1,
-} eXrSessionEye;
-
-typedef enum eXrSessionObjectFlag {
-  XR_OBJECT_ENABLE = (1 << 0),
-  XR_OBJECT_AUTOKEY = (1 << 1),
-} eXrSessionObjectFlag;
+/* -------------------------------------------------------------------- */
 
 #ifdef __cplusplus
 }

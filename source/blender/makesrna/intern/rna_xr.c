@@ -37,8 +37,280 @@
 
 #  include "WM_api.h"
 
-#  ifdef WITH_XR_OPENXR
+/* -------------------------------------------------------------------- */
+/** \name XR Action Configuration
+ * \{ */
 
+static XrActionMapItem *rna_XrActionMapItem_new(XrActionMap *am,
+                                                const char *idname,
+                                                bool replace_existing)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_item_new(am, idname, replace_existing);
+#  else
+  UNUSED_VARS(am, idname, replace_existing);
+  return NULL;
+#  endif
+}
+
+static XrActionMapItem *rna_XrActionMapItem_new_from_item(XrActionMap *am,
+                                                          XrActionMapItem *ami_src)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_item_add_copy(am, ami_src);
+#  else
+  UNUSED_VARS(am, ami_src);
+  return NULL;
+#  endif
+}
+
+static void rna_XrActionMapItem_remove(XrActionMap *am, ReportList *reports, PointerRNA *ami_ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ami_ptr->data;
+  if (WM_xr_actionmap_item_remove(am, ami) == false) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "ActionMapItem '%s' cannot be removed from '%s'",
+                ami->idname,
+                am->idname);
+    return;
+  }
+  RNA_POINTER_INVALIDATE(ami_ptr);
+#  else
+  UNUSED_VARS(am, reports, ami_ptr);
+#  endif
+}
+
+static XrActionMapItem *rna_XrActionMapItem_find(XrActionMap *am, const char *idname)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_item_list_find(&am->items, idname);
+#  else
+  UNUSED_VARS(am, idname);
+  return NULL;
+#  endif
+}
+
+static void rna_XrActionMapItem_op_name_get(PointerRNA *ptr, char *value)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (ami->op[0]) {
+    if (ami->op_properties_ptr) {
+      wmOperatorType *ot = WM_operatortype_find(ami->op, 1);
+      if (ot) {
+        strcpy(value, WM_operatortype_name(ot, ami->op_properties_ptr));
+        return;
+      }
+    }
+    strcpy(value, ami->op);
+    return;
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  value[0] = '\0';
+}
+
+static int rna_XrActionMapItem_op_name_length(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (ami->op[0]) {
+    if (ami->op_properties_ptr) {
+      wmOperatorType *ot = WM_operatortype_find(ami->op, 1);
+      if (ot) {
+        return strlen(WM_operatortype_name(ot, ami->op_properties_ptr));
+      }
+    }
+    return strlen(ami->op);
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  return 0;
+}
+
+static PointerRNA rna_XrActionMapItem_op_properties_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (ami->op_properties_ptr) {
+    return *(ami->op_properties_ptr);
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  return PointerRNA_NULL;
+}
+
+static void rna_XrActionMapItem_name_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  wmWindowManager *wm = bmain->wm.first;
+  if (wm) {
+    XrSessionSettings *settings = &wm->xr.session_settings;
+    XrActionConfig *actionconf = WM_xr_actionconfig_active_get(settings);
+    if (actionconf) {
+      XrActionMap *actionmap = BLI_findlink(&actionconf->actionmaps, actionconf->selactionmap);
+      if (actionmap) {
+        XrActionMapItem *ami = ptr->data;
+        WM_xr_actionmap_item_ensure_unique(actionmap, ami);
+      }
+    }
+  }
+#  else
+  UNUSED_VARS(bmain, ptr);
+#  endif
+}
+
+static void rna_XrActionMapItem_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  WM_xr_actionmap_item_properties_update_ot(ami);
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+}
+
+static XrActionMap *rna_XrActionMap_new(XrActionConfig *actionconf,
+                                        const char *idname,
+                                        bool replace_existing)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_new(actionconf, idname, replace_existing);
+#  else
+  UNUSED_VARS(actionconf, idname, replace_existing);
+  return NULL;
+#  endif
+}
+
+static XrActionMap *rna_XrActionMap_new_from_actionmap(XrActionConfig *actionconf,
+                                                       XrActionMap *am_src)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_add_copy(actionconf, am_src);
+#  else
+  UNUSED_VARS(actionconf, am_src);
+  return NULL;
+#  endif
+}
+
+static void rna_XrActionMap_remove(XrActionConfig *actionconf,
+                                   ReportList *reports,
+                                   PointerRNA *actionmap_ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMap *actionmap = actionmap_ptr->data;
+  if (WM_xr_actionmap_remove(actionconf, actionmap) == false) {
+    BKE_reportf(reports, RPT_ERROR, "ActionMap '%s' cannot be removed", actionmap->idname);
+    return;
+  }
+  RNA_POINTER_INVALIDATE(actionmap_ptr);
+#  else
+  UNUSED_VARS(actionconf, reports, actionmap_ptr);
+#  endif
+}
+
+static XrActionMap *rna_XrActionMap_find(XrActionConfig *actionconf, const char *idname)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_list_find(&actionconf->actionmaps, idname);
+#  else
+  UNUSED_VARS(actionconf, idname);
+  return NULL;
+#  endif
+}
+
+static void rna_XrActionMap_name_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  wmWindowManager *wm = bmain->wm.first;
+  if (wm) {
+    XrSessionSettings *settings = &wm->xr.session_settings;
+    XrActionConfig *actionconf = WM_xr_actionconfig_active_get(settings);
+    if (actionconf) {
+      XrActionMap *actionmap = ptr->data;
+      WM_xr_actionmap_ensure_unique(actionconf, actionmap);
+    }
+  }
+#  else
+  UNUSED_VARS(bmain, ptr);
+#  endif
+}
+
+static XrActionConfig *rna_XrActionConfig_new(XrSessionSettings *settings, const char *name)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionconfig_new(settings, name, true);
+#  else
+  UNUSED_VARS(settings, name);
+  return NULL;
+#  endif
+}
+
+static void rna_XrActionConfig_remove(XrSessionSettings *settings,
+                                      ReportList *reports,
+                                      PointerRNA *actionconf_ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionConfig *actionconf = actionconf_ptr->data;
+  if (WM_xr_actionconfig_remove(settings, actionconf) == false) {
+    BKE_reportf(reports, RPT_ERROR, "ActionConfig '%s' cannot be removed", actionconf->idname);
+    return;
+  }
+  RNA_POINTER_INVALIDATE(actionconf_ptr);
+#  else
+  UNUSED_VARS(settings, reports, actionconf_ptr);
+#  endif
+}
+
+static void rna_XrActionConfig_update(XrSessionSettings *settings)
+{
+#  ifdef WITH_XR_OPENXR
+  WM_xr_actionconfig_update(settings);
+#  else
+  UNUSED_VARS(settings);
+#  endif
+}
+
+static PointerRNA rna_XrSessionSettings_actionconfig_active_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrSessionSettings *settings = ptr->data;
+  XrActionConfig *ac = WM_xr_actionconfig_active_get(settings);
+  if (!ac) {
+    ac = settings->defaultconf;
+  }
+  return rna_pointer_inherit_refine(ptr, &RNA_XrActionConfig, ac);
+#  else
+  UNUSED_VARS(ptr);
+  return PointerRNA_NULL;
+#  endif
+}
+
+static void rna_XrSessionSettings_actionconfig_active_set(PointerRNA *ptr,
+                                                          PointerRNA value,
+                                                          struct ReportList *UNUSED(reports))
+{
+#  ifdef WITH_XR_OPENXR
+  XrSessionSettings *settings = ptr->data;
+  XrActionConfig *ac = value.data;
+  if (ac) {
+    WM_xr_actionconfig_active_set(settings, ac->idname);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+
+#  ifdef WITH_XR_OPENXR
 static wmXrData *rna_XrSession_wm_xr_data_get(PointerRNA *ptr)
 {
   /* Callers could also get XrSessionState pointer through ptr->data, but prefer if we just
@@ -52,6 +324,10 @@ static wmXrData *rna_XrSession_wm_xr_data_get(PointerRNA *ptr)
   return &wm->xr;
 }
 #  endif
+
+/* -------------------------------------------------------------------- */
+/** \name XR Session Settings
+ * \{ */
 
 static bool rna_XrSessionSettings_use_positional_tracking_get(PointerRNA *ptr)
 {
@@ -362,6 +638,12 @@ static void rna_XrSessionSettings_controller1_object_autokey_set(PointerRNA *ptr
   UNUSED_VARS(ptr, value);
 #  endif
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name XR Session State
+ * \{ */
 
 static bool rna_XrSessionState_is_running(bContext *C)
 {
@@ -706,272 +988,11 @@ static void rna_XrSessionState_controller_pose1_rotation_get(PointerRNA *ptr, fl
 #  endif
 }
 
-static XrActionMapItem *rna_XrActionMapItem_new(XrActionMap *am,
-                                                const char *idname,
-                                                bool replace_existing)
-{
-#  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_item_new(am, idname, replace_existing);
-#  else
-  UNUSED_VARS(am, idname, replace_existing);
-  return NULL;
-#  endif
-}
-
-static XrActionMapItem *rna_XrActionMapItem_new_from_item(XrActionMap *am,
-                                                          XrActionMapItem *ami_src)
-{
-#  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_item_add_copy(am, ami_src);
-#  else
-  UNUSED_VARS(am, ami_src);
-  return NULL;
-#  endif
-}
-
-static void rna_XrActionMapItem_remove(XrActionMap *am, ReportList *reports, PointerRNA *ami_ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionMapItem *ami = ami_ptr->data;
-  if (WM_xr_actionmap_item_remove(am, ami) == false) {
-    BKE_reportf(reports,
-                RPT_ERROR,
-                "ActionMapItem '%s' cannot be removed from '%s'",
-                ami->idname,
-                am->idname);
-    return;
-  }
-  RNA_POINTER_INVALIDATE(ami_ptr);
-#  else
-  UNUSED_VARS(am, reports, ami_ptr);
-#  endif
-}
-
-static XrActionMapItem *rna_XrActionMapItem_find(XrActionMap *am, const char *idname)
-{
-#  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_item_list_find(&am->items, idname);
-#  else
-  UNUSED_VARS(am, idname);
-  return NULL;
-#  endif
-}
-
-static void rna_XrActionMapItem_op_name_get(PointerRNA *ptr, char *value)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionMapItem *ami = ptr->data;
-  if (ami->op[0]) {
-    if (ami->op_properties_ptr) {
-      wmOperatorType *ot = WM_operatortype_find(ami->op, 1);
-      if (ot) {
-        strcpy(value, WM_operatortype_name(ot, ami->op_properties_ptr));
-        return;
-      }
-    }
-    strcpy(value, ami->op);
-    return;
-  }
-#  else
-  UNUSED_VARS(ptr);
-#  endif
-  value[0] = '\0';
-}
-
-static int rna_XrActionMapItem_op_name_length(PointerRNA *ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionMapItem *ami = ptr->data;
-  if (ami->op[0]) {
-    if (ami->op_properties_ptr) {
-      wmOperatorType *ot = WM_operatortype_find(ami->op, 1);
-      if (ot) {
-        return strlen(WM_operatortype_name(ot, ami->op_properties_ptr));
-      }
-    }
-    return strlen(ami->op);
-  }
-#  else
-  UNUSED_VARS(ptr);
-#  endif
-  return 0;
-}
-
-static PointerRNA rna_XrActionMapItem_op_properties_get(PointerRNA *ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionMapItem *ami = ptr->data;
-  if (ami->op_properties_ptr) {
-    return *(ami->op_properties_ptr);
-  }
-#  else
-  UNUSED_VARS(ptr);
-#  endif
-  return PointerRNA_NULL;
-}
-
-static void rna_XrActionMapItem_name_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  wmWindowManager *wm = bmain->wm.first;
-  if (wm) {
-    XrSessionSettings *settings = &wm->xr.session_settings;
-    XrActionConfig *actionconf = WM_xr_actionconfig_active_get(settings);
-    if (actionconf) {
-      XrActionMap *actionmap = BLI_findlink(&actionconf->actionmaps, actionconf->selactionmap);
-      if (actionmap) {
-        XrActionMapItem *ami = ptr->data;
-        WM_xr_actionmap_item_ensure_unique(actionmap, ami);
-      }
-    }
-  }
-#  else
-  UNUSED_VARS(bmain, ptr);
-#  endif
-}
-
-static void rna_XrActionMapItem_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionMapItem *ami = ptr->data;
-  WM_xr_actionmap_item_properties_update_ot(ami);
-#  else
-  UNUSED_VARS(ptr);
-#  endif
-}
-
-static XrActionMap *rna_XrActionMap_new(XrActionConfig *actionconf,
-                                        const char *idname,
-                                        bool replace_existing)
-{
-#  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_new(actionconf, idname, replace_existing);
-#  else
-  UNUSED_VARS(actionconf, idname, replace_existing);
-  return NULL;
-#  endif
-}
-
-static XrActionMap *rna_XrActionMap_new_from_actionmap(XrActionConfig *actionconf,
-                                                       XrActionMap *am_src)
-{
-#  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_add_copy(actionconf, am_src);
-#  else
-  UNUSED_VARS(actionconf, am_src);
-  return NULL;
-#  endif
-}
-
-static void rna_XrActionMap_remove(XrActionConfig *actionconf,
-                                   ReportList *reports,
-                                   PointerRNA *actionmap_ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionMap *actionmap = actionmap_ptr->data;
-  if (WM_xr_actionmap_remove(actionconf, actionmap) == false) {
-    BKE_reportf(reports, RPT_ERROR, "ActionMap '%s' cannot be removed", actionmap->idname);
-    return;
-  }
-  RNA_POINTER_INVALIDATE(actionmap_ptr);
-#  else
-  UNUSED_VARS(actionconf, reports, actionmap_ptr);
-#  endif
-}
-
-static XrActionMap *rna_XrActionMap_find(XrActionConfig *actionconf, const char *idname)
-{
-#  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_list_find(&actionconf->actionmaps, idname);
-#  else
-  UNUSED_VARS(actionconf, idname);
-  return NULL;
-#  endif
-}
-
-static void rna_XrActionMap_name_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  wmWindowManager *wm = bmain->wm.first;
-  if (wm) {
-    XrSessionSettings *settings = &wm->xr.session_settings;
-    XrActionConfig *actionconf = WM_xr_actionconfig_active_get(settings);
-    if (actionconf) {
-      XrActionMap *actionmap = ptr->data;
-      WM_xr_actionmap_ensure_unique(actionconf, actionmap);
-    }
-  }
-#  else
-  UNUSED_VARS(bmain, ptr);
-#  endif
-}
-
-static XrActionConfig *rna_XrActionConfig_new(XrSessionSettings *settings, const char *name)
-{
-#  ifdef WITH_XR_OPENXR
-  return WM_xr_actionconfig_new(settings, name, true);
-#  else
-  UNUSED_VARS(settings, name);
-  return NULL;
-#  endif
-}
-
-static void rna_XrActionConfig_remove(XrSessionSettings *settings,
-                                      ReportList *reports,
-                                      PointerRNA *actionconf_ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionConfig *actionconf = actionconf_ptr->data;
-  if (WM_xr_actionconfig_remove(settings, actionconf) == false) {
-    BKE_reportf(reports, RPT_ERROR, "ActionConfig '%s' cannot be removed", actionconf->idname);
-    return;
-  }
-  RNA_POINTER_INVALIDATE(actionconf_ptr);
-#  else
-  UNUSED_VARS(settings, reports, actionconf_ptr);
-#  endif
-}
-
-static void rna_XrActionConfig_update(XrSessionSettings *settings)
-{
-#  ifdef WITH_XR_OPENXR
-  WM_xr_actionconfig_update(settings);
-#  else
-  UNUSED_VARS(settings);
-#  endif
-}
-
-static PointerRNA rna_XrSessionSettings_actionconfig_active_get(PointerRNA *ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  XrSessionSettings *settings = ptr->data;
-  XrActionConfig *ac = WM_xr_actionconfig_active_get(settings);
-  if (!ac) {
-    ac = settings->defaultconf;
-  }
-  return rna_pointer_inherit_refine(ptr, &RNA_XrActionConfig, ac);
-#  else
-  UNUSED_VARS(ptr);
-  return PointerRNA_NULL;
-#  endif
-}
-
-static void rna_XrSessionSettings_actionconfig_active_set(PointerRNA *ptr,
-                                                          PointerRNA value,
-                                                          struct ReportList *UNUSED(reports))
-{
-#  ifdef WITH_XR_OPENXR
-  XrSessionSettings *settings = ptr->data;
-  XrActionConfig *ac = value.data;
-  if (ac) {
-    WM_xr_actionconfig_active_set(settings, ac->idname);
-  }
-#  else
-  UNUSED_VARS(ptr, value);
-#  endif
-}
+/** \} */
 
 #else /* RNA_RUNTIME */
+
+/* -------------------------------------------------------------------- */
 
 static const EnumPropertyItem rna_enum_xr_action_types[] = {
     {XR_FLOAT_INPUT, "BUTTON", 0, "Button", "Button action"},
@@ -995,6 +1016,10 @@ static const EnumPropertyItem rna_enum_xr_op_flags[] = {
     {XR_OP_MODAL, "MODAL", 0, "Modal", "Use modal execution (modal operators only)"},
     {0, NULL, 0, NULL, NULL},
 };
+
+/* -------------------------------------------------------------------- */
+/** \name XR Action Configuration
+ * \{ */
 
 static void rna_def_xr_actionmap_items(BlenderRNA *brna, PropertyRNA *cprop)
 {
@@ -1311,6 +1336,12 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Haptic Amplitude", "Haptic amplitude (0 ~ 1)");
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name XR Session Settings
+ * \{ */
+
 static void rna_def_xr_session_settings(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -1547,6 +1578,12 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
       "Auto-insert keyframes for the second controlller object on animation playback");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name XR Session State
+ * \{ */
 
 static void rna_def_xr_session_state(BlenderRNA *brna)
 {
@@ -1858,6 +1895,8 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                            "Last known rotation of the second controller pose in world space");
 }
 
+/** \} */
+
 void RNA_def_xr(BlenderRNA *brna)
 {
   RNA_define_animate_sdna(false);
@@ -1865,8 +1904,6 @@ void RNA_def_xr(BlenderRNA *brna)
   rna_def_xr_actionconfig(brna);
   rna_def_xr_session_settings(brna);
   rna_def_xr_session_state(brna);
-
-  RNA_define_animate_sdna(true);
 }
 
 #endif /* RNA_RUNTIME */
