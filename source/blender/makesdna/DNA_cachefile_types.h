@@ -96,12 +96,11 @@ typedef struct CacheFile {
   /* Name of the velocity property in the Alembic file. */
   char velocity_name[64];
 
-  char ignore_subdivision;
+  /** Enable data prefetching when using the Cycles Procedural. */
+  char use_prefetch;
   char _pad[3];
 
-  char enable_caching;
-  char _pad2[3];
-  int max_cache_size;
+  int prefetch_cache_size;
 
   /** The frequency in frame per seconds at which the data in the cache file should evaluated.
    * This is necessary to have here as the data may have been generated based on a different
@@ -109,6 +108,7 @@ typedef struct CacheFile {
    * a project rendered/animated at 120 FPS).
    */
   float frame_rate;
+  char _pad2[4];
 
   /* Runtime */
   struct AbcArchiveHandle *handle;

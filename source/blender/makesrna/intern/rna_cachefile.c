@@ -161,15 +161,19 @@ static void rna_def_cachefile(BlenderRNA *brna)
 
   /* ----------------- Cache controls ----------------- */
 
-  prop = RNA_def_property(srna, "enable_caching", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Enable Caching", "Preload data for faster updates");
+  prop = RNA_def_property(srna, "use_prefetch", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_ui_text(
+      prop,
+      "Use Prefetch",
+      "When enabled, the Cycles Procedural will preload animation data for faster updates");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
-  prop = RNA_def_property(srna, "max_cache_size", PROP_INT, PROP_UNSIGNED);
-  RNA_def_property_ui_text(prop,
-                           "Maximum Cache Size",
-                           "Memory usage limit in megabytes for the cache, if the data does not "
-                           "fit within the limit, rendering is aborted");
+  prop = RNA_def_property(srna, "prefetch_cache_size", PROP_INT, PROP_UNSIGNED);
+  RNA_def_property_ui_text(
+      prop,
+      "Prefetch Cache Size",
+      "Memory usage limit in megabytes for the Cycles Procedural cache, if the data does not "
+      "fit within the limit, rendering is aborted");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   /* ----------------- Axis Conversion ----------------- */
@@ -245,13 +249,6 @@ static void rna_def_cachefile(BlenderRNA *brna)
                            "Default Radius",
                            "Value to use for the radius of curves and points when none is "
                            "specified in the file");
-  RNA_def_property_update(prop, 0, "rna_CacheFile_update");
-
-  prop = RNA_def_property(srna, "ignore_subdivision", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(
-      prop,
-      "Ignore Subdivision",
-      "Treat subdivision objects in the Alembic archive as regular polygon meshes");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   RNA_define_lib_overridable(false);

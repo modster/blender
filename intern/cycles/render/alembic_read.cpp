@@ -47,7 +47,7 @@ static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
   double start_frame;
   double end_frame;
 
-  if (proc->get_enable_caching()) {
+  if (proc->get_use_prefetch()) {
     // load the data for the entire animation
     start_frame = static_cast<double>(proc->get_start_frame());
     end_frame = static_cast<double>(proc->get_end_frame());

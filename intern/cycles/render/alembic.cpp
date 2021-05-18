@@ -25,6 +25,7 @@
 #include "render/shader.h"
 
 #include "util/util_foreach.h"
+#include "util/util_logging.h"
 #include "util/util_progress.h"
 #include "util/util_transform.h"
 #include "util/util_vector.h"
@@ -424,6 +425,8 @@ NODE_DEFINE(AlembicObject)
   SOCKET_STRING(path, "Alembic Path", ustring());
   SOCKET_NODE_ARRAY(used_shaders, "Used Shaders", Shader::get_node_type());
 
+  SOCKET_BOOLEAN(ignore_subdivision, "Ignore Subdivision", true);
+
   SOCKET_INT(subd_max_level, "Max Subdivision Level", 1);
   SOCKET_FLOAT(subd_dicing_rate, "Subdivision Dicing Rate", 1.0f);
 
@@ -734,7 +737,7 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
 
   cached_data.clear();
 
-  if (proc->get_ignore_subdivision()) {
+  if (this->get_ignore_subdivision()) {
     PolyMeshSchemaData data;
     data.topology_variance = schema.getTopologyVariance();
     data.time_sampling = schema.getTimeSampling();
@@ -985,10 +988,8 @@ NODE_DEFINE(AlembicProcedural)
 
   SOCKET_NODE_ARRAY(objects, "Objects", AlembicObject::get_node_type());
 
-  SOCKET_BOOLEAN(ignore_subdivision, "Ignore Subdivision", true);
-
-  SOCKET_BOOLEAN(enable_caching, "Enable Caching", true);
-  SOCKET_INT(max_cache_size, "Maximum Cache Size", 1024);
+  SOCKET_BOOLEAN(use_prefetch, "Use Prefetch", true);
+  SOCKET_INT(prefetch_cache_size, "Prefetch Cache Size", 4096);
 
   return type;
 }
@@ -1095,20 +1096,20 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
   const chrono_t frame_time = (chrono_t)((frame - frame_offset) / frame_rate);
 
   /* Clear the subdivision caches as the data is stored differently. */
-  if (ignore_subdivision_is_modified()) {
-    for (Node *node : objects) {
-      AlembicObject *object = static_cast<AlembicObject *>(node);
+  for (Node *node : objects) {
+    AlembicObject *object = static_cast<AlembicObject *>(node);
 
-      if (object->schema_type != AlembicObject::SUBD) {
-        continue;
-      }
+    if (object->schema_type != AlembicObject::SUBD) {
+      continue;
+    }
 
+    if (object->ignore_subdivision_is_modified()) {
       object->clear_cache();
     }
   }
 
-  if (enable_caching_is_modified()) {
-    if (!enable_caching) {
+  if (use_prefetch_is_modified()) {
+    if (!use_prefetch) {
       for (Node *node : objects) {
         AlembicObject *object = static_cast<AlembicObject *>(node);
         object->clear_cache();
@@ -1116,16 +1117,16 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     }
   }
 
-  if (max_cache_size_is_modified()) {
-    // Check if the current memory usage fits in the new requested size,
-    // if it is higher abort the render
+  if (prefetch_cache_size_is_modified()) {
+    /* Check whether the current memory usage fits in the new requested size,
+     * abort the render if it is any higher. */
     size_t memory_used = 0ul;
     for (Node *node : objects) {
       AlembicObject *object = static_cast<AlembicObject *>(node);
       memory_used += object->get_cached_data().memory_used();
     }
 
-    if (memory_used > get_max_cache_size_in_bytes()) {
+    if (memory_used > get_prefetch_cache_size_in_bytes()) {
       progress.set_error("Error: Alembic Procedural memory limit reached");
       return;
     }
@@ -1328,7 +1329,7 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
 
 void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
-  if (ignore_subdivision) {
+  if (abc_object->get_ignore_subdivision()) {
     read_mesh(abc_object, frame_time);
     return;
   }
@@ -1699,16 +1700,15 @@ void AlembicProcedural::build_caches(Progress &progress)
 
     memory_used += object->get_cached_data().memory_used();
 
-    if (enable_caching) {
-      if (memory_used > get_max_cache_size_in_bytes()) {
+    if (use_prefetch) {
+      if (memory_used > get_prefetch_cache_size_in_bytes()) {
         progress.set_error("Error: Alembic Procedural memory limit reached");
         return;
       }
     }
   }
 
-  std::cerr << "AlembicProcedural memory usage : " << string_human_readable_size(memory_used)
-            << '\n';
+  VLOG(1) << "AlembicProcedural memory usage : " << string_human_readable_size(memory_used);
 }
 
 CCL_NAMESPACE_END

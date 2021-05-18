@@ -375,6 +375,9 @@ class AlembicObject : public Node {
   /* Shaders used for rendering. */
   NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
 
+  /* Treat this subdivision object as a regular polygon mesh, so no subdivision will be performed. */
+  NODE_SOCKET_API(bool, ignore_subdivision)
+
   /* Maximum number of subdivisions for ISubD objects. */
   NODE_SOCKET_API(int, subd_max_level)
 
@@ -500,15 +503,12 @@ class AlembicProcedural : public Procedural {
    * software. */
   NODE_SOCKET_API(float, scale)
 
-  /* Treat subdivision objects as regular polygon meshes. */
-  NODE_SOCKET_API(bool, ignore_subdivision)
-
   /* Cache controls */
-  NODE_SOCKET_API(bool, enable_caching)
+  NODE_SOCKET_API(bool, use_prefetch)
 
   /* Memory limit for the cache, if the data does not fit within this limit, rendering is aborted.
    */
-  NODE_SOCKET_API(int, max_cache_size)
+  NODE_SOCKET_API(int, prefetch_cache_size)
 
   AlembicProcedural();
   ~AlembicProcedural();
@@ -560,10 +560,10 @@ class AlembicProcedural : public Procedural {
 
   void build_caches(Progress &progress);
 
-  size_t get_max_cache_size_in_bytes() const
+  size_t get_prefetch_cache_size_in_bytes() const
   {
-    /* max_cache_size is in megabytes, convert to bytes */
-    return static_cast<size_t>(max_cache_size) * 1024 * 1024;
+    /* prefetch_cache_size is in megabytes, so convert to bytes. */
+    return static_cast<size_t>(prefetch_cache_size) * 1024 * 1024;
   }
 };
 

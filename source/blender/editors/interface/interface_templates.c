@@ -7285,12 +7285,14 @@ void uiTemplateCacheFile(uiLayout *layout,
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);
 
-  row = uiLayoutRow(layout, false);
-  uiItemR(row, &fileptr, "enable_caching", 0, NULL, ICON_NONE);
+  if (RNA_boolean_get(&fileptr, "use_cycles_procedural")) {
+    row = uiLayoutRow(layout, false);
+    uiItemR(row, &fileptr, "use_prefetch", 0, NULL, ICON_NONE);
 
-  sub = uiLayoutRow(layout, false);
-  uiLayoutSetEnabled(sub, RNA_boolean_get(&fileptr, "enable_caching"));
-  uiItemR(sub, &fileptr, "max_cache_size", 0, NULL, ICON_NONE);
+    sub = uiLayoutRow(layout, false);
+    uiLayoutSetEnabled(sub, RNA_boolean_get(&fileptr, "use_prefetch"));
+    uiItemR(sub, &fileptr, "prefetch_cache_size", 0, NULL, ICON_NONE);
+  }
 
   row = uiLayoutRowWithHeading(layout, true, IFACE_("Override Frame"));
   sub = uiLayoutRow(row, true);
@@ -7314,8 +7316,6 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(layout, &fileptr, "velocity_unit", 0, NULL, ICON_NONE);
 
   uiItemR(layout, &fileptr, "default_radius", 0, NULL, ICON_NONE);
-
-  uiItemR(layout, &fileptr, "ignore_subdivision", 0, NULL, ICON_NONE);
 
   /* TODO: unused for now, so no need to expose. */
 #if 0
