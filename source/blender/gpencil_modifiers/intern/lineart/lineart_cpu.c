@@ -2116,7 +2116,7 @@ static void lineart_main_load_geometries(
       use_mesh = use_ob->data;
     }
     else {
-      use_mesh = BKE_mesh_new_from_object(depsgraph, use_ob, true);
+      use_mesh = BKE_mesh_new_from_object(depsgraph, use_ob, true, true);
     }
 
     /* In case we still can not get any mesh geometry data from the object */
