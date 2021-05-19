@@ -105,6 +105,12 @@ struct Material *BKE_id_material_pop(struct Main *bmain,
                                      /* index is an int because of RNA. */
                                      int index);
 void BKE_id_material_clear(struct Main *bmain, struct ID *id);
+
+/* eval api */
+struct Material *BKE_object_material_get_eval(struct Object *ob, short act);
+int BKE_object_material_count_eval(struct Object *ob);
+void BKE_id_material_eval_assign(struct ID *id, int slot, struct Material *material);
+
 /* rendering */
 
 void ramp_blend(int type, float r_col[3], const float fac, const float col[3]);
