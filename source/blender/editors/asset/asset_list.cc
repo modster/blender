@@ -103,7 +103,7 @@ uint64_t AssetLibraryReferenceWrapper::hash() const
 /**
  * RAII wrapper for `FileList`
  */
-class FileListWrapper : NonCopyable {
+class FileListWrapper {
   static void filelist_free_fn(FileList *list)
   {
     filelist_free(list);
@@ -131,7 +131,7 @@ class FileListWrapper : NonCopyable {
   }
 };
 
-class PreviewTimer : NonCopyable {
+class PreviewTimer {
   /* Non-owning! The Window-Manager registers and owns this. */
   wmTimer *timer_ = nullptr;
 
