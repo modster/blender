@@ -1931,8 +1931,7 @@ static void node_composit_buts_file_output_ex(uiLayout *layout, bContext *C, Poi
                    0,
                    0,
                    0,
-                   false,
-                   false);
+                   UI_TEMPLATE_LIST_FLAG_NONE);
     RNA_property_collection_lookup_int(
         ptr, RNA_struct_find_property(ptr, "layer_slots"), active_index, &active_input_ptr);
   }
@@ -1950,8 +1949,7 @@ static void node_composit_buts_file_output_ex(uiLayout *layout, bContext *C, Poi
                    0,
                    0,
                    0,
-                   false,
-                   false);
+                   UI_TEMPLATE_LIST_FLAG_NONE);
     RNA_property_collection_lookup_int(
         ptr, RNA_struct_find_property(ptr, "file_slots"), active_index, &active_input_ptr);
   }
@@ -3453,7 +3451,15 @@ static void std_node_socket_draw(
     case SOCK_RGBA: {
       uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
       uiItemL(row, text, 0);
-      uiItemR(row, ptr, "default_value", DEFAULT_FLAGS, "", 0);
+
+      const bNodeTree *node_tree = (const bNodeTree *)node_ptr->owner_id;
+      if (node_tree->type == NTREE_GEOMETRY) {
+        node_geometry_add_attribute_search_button(C, node_tree, node, ptr, row);
+      }
+      else {
+        uiItemR(row, ptr, "default_value", DEFAULT_FLAGS, "", 0);
+      }
+
       break;
     }
     case SOCK_STRING: {

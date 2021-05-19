@@ -18,7 +18,9 @@
 
 # <pep8 compliant>
 from __future__ import annotations
+from pathlib import Path
 
+import bpy
 from bpy.types import Operator
 
 from bpy_extras.asset_utils import (
@@ -72,7 +74,95 @@ class ASSET_OT_tag_remove(Operator):
         return {'FINISHED'}
 
 
+class ASSET_OT_open_containing_blend_file(Operator):
+    """Open the blend file that contains the active asset"""
+
+    bl_idname = "asset.open_containing_blend_file"
+    bl_label = "Open Blend File"
+    bl_options = {'REGISTER'}
+
+    _process = None  # Optional[subprocess.Popen]
+
+    @classmethod
+    def poll(cls, context):
+        asset_file_handle = getattr(context, 'asset_file_handle', None)
+        asset_library = getattr(context, 'asset_library', None)
+
+        if not asset_file_handle or not asset_library:
+            return False
+
+        return not asset_file_handle.local_id
+
+    def execute(self, context):
+        asset_file_handle = context.asset_file_handle
+        asset_library = context.asset_library
+
+        if asset_file_handle.local_id:
+            self.report({'WARNING'}, "This asset is stored in the current blend file")
+            return {'CANCELLED'}
+
+        asset_lib_path = bpy.types.AssetHandle.get_full_library_path(asset_file_handle, asset_library)
+        self.open_in_new_blender(asset_lib_path)
+
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, window=context.window)
+        wm.modal_handler_add(self)
+
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+
+        if self._process is None:
+            self.report({'ERROR'}, "Unable to find any running process")
+            self.cancel(context)
+            return {'CANCELLED'}
+
+        returncode = self._process.poll()
+        if returncode is None:
+            # Process is still running.
+            return {'RUNNING_MODAL'}
+
+        if returncode:
+            self.report({'WARNING'}, "Blender subprocess exited with error code %d" % returncode)
+
+        # TODO(Sybren): Replace this with a generic "reload assets" operator
+        # that can run outside of the Asset Browser context.
+        if bpy.ops.file.refresh.poll():
+            bpy.ops.file.refresh()
+        if bpy.ops.asset.list_refresh.poll():
+            bpy.ops.asset.list_refresh()
+
+        self.cancel(context)
+        return {'FINISHED'}
+
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+
+    @staticmethod
+    def active_asset_library_path(context):
+        asset_library_name: str = context.space_data.params.asset_library
+        paths = context.preferences.filepaths
+        asset_lib = paths.asset_libraries[asset_library_name]
+        return Path(asset_lib.path)
+
+    def path_of_active_asset(self, context):
+        file_and_datablock_name: str = context.space_data.params.filename
+        filename, _id_type, _id_name = file_and_datablock_name.split("/", 2)
+        filepath: Path = self.active_asset_library_path(context) / filename
+        return filepath
+
+    def open_in_new_blender(self, filepath):
+        import subprocess
+
+        cli_args = [bpy.app.binary_path, str(filepath)]
+        self._process = subprocess.Popen(cli_args)
+
+
 classes = (
     ASSET_OT_tag_add,
     ASSET_OT_tag_remove,
+    ASSET_OT_open_containing_blend_file,
 )

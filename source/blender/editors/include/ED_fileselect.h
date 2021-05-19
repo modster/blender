@@ -137,15 +137,12 @@ void ED_fileselect_layout_tilepos(FileLayout *layout, int tile, int *x, int *y);
 
 void ED_operatormacros_file(void);
 
-void ED_fileselect_clear(struct wmWindowManager *wm,
-                         struct Scene *owner_scene,
-                         struct SpaceFile *sfile);
+void ED_fileselect_clear(struct wmWindowManager *wm, struct SpaceFile *sfile);
 
-void ED_fileselect_exit(struct wmWindowManager *wm,
-                        struct Scene *owner_scene,
-                        struct SpaceFile *sfile);
+void ED_fileselect_exit(struct wmWindowManager *wm, struct SpaceFile *sfile);
 
 bool ED_fileselect_is_asset_browser(const struct SpaceFile *sfile);
+bool ED_fileselect_has_active_asset(const struct SpaceFile *sfile);
 struct ID *ED_fileselect_active_asset_get(const struct SpaceFile *sfile);
 
 /* Activate the file that corresponds to the given ID.
@@ -167,7 +164,7 @@ int ED_file_icon(const struct FileDirEntry *file);
 
 void ED_file_read_bookmarks(void);
 
-void ED_file_change_dir_ex(struct bContext *C, struct bScreen *screen, struct ScrArea *area);
+void ED_file_change_dir_ex(struct bContext *C, struct ScrArea *area);
 void ED_file_change_dir(struct bContext *C);
 
 void ED_file_path_button(struct bScreen *screen,

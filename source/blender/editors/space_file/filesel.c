@@ -39,6 +39,7 @@
 #  include <unistd.h>
 #endif
 
+#include "DNA_asset_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_userdef_types.h"
@@ -118,7 +119,7 @@ static void fileselect_ensure_updated_asset_params(SpaceFile *sfile)
     asset_params = sfile->asset_params = MEM_callocN(sizeof(*asset_params),
                                                      "FileAssetSelectParams");
     asset_params->base_params.details_flags = U_default.file_space_data.details_flags;
-    asset_params->asset_library.type = FILE_ASSET_LIBRARY_LOCAL;
+    asset_params->asset_library.type = ASSET_LIBRARY_LOCAL;
     asset_params->asset_library.custom_library_index = -1;
   }
 
@@ -419,26 +420,26 @@ static void fileselect_refresh_asset_params(FileAssetSelectParams *asset_params)
   bUserAssetLibrary *user_library = NULL;
 
   /* Ensure valid repository, or fall-back to local one. */
-  if (library->type == FILE_ASSET_LIBRARY_CUSTOM) {
+  if (library->type == ASSET_LIBRARY_CUSTOM) {
     BLI_assert(library->custom_library_index >= 0);
 
     user_library = BKE_preferences_asset_library_find_from_index(&U,
                                                                  library->custom_library_index);
     if (!user_library) {
-      library->type = FILE_ASSET_LIBRARY_LOCAL;
+      library->type = ASSET_LIBRARY_LOCAL;
     }
   }
 
   switch (library->type) {
-    case FILE_ASSET_LIBRARY_LOCAL:
+    case ASSET_LIBRARY_LOCAL:
       base_params->dir[0] = '\0';
       break;
-    case FILE_ASSET_LIBRARY_CUSTOM:
+    case ASSET_LIBRARY_CUSTOM:
       BLI_assert(user_library);
       BLI_strncpy(base_params->dir, user_library->path, sizeof(base_params->dir));
       break;
   }
-  base_params->type = (library->type == FILE_ASSET_LIBRARY_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
+  base_params->type = (library->type == ASSET_LIBRARY_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
 }
 
 void fileselect_refresh_params(SpaceFile *sfile)
@@ -452,6 +453,21 @@ void fileselect_refresh_params(SpaceFile *sfile)
 bool ED_fileselect_is_asset_browser(const SpaceFile *sfile)
 {
   return (sfile->browse_mode == FILE_BROWSE_MODE_ASSETS);
+}
+
+bool ED_fileselect_has_active_asset(const struct SpaceFile *sfile)
+{
+  if (!ED_fileselect_is_asset_browser(sfile)) {
+    return false;
+  }
+
+  if (sfile->files == NULL) {
+    return false;
+  }
+
+  const FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  const FileDirEntry *file = filelist_file_ex(sfile->files, params->active_file, false);
+  return file != NULL;
 }
 
 struct ID *ED_fileselect_active_asset_get(const SpaceFile *sfile)
@@ -1046,7 +1062,7 @@ FileLayout *ED_fileselect_get_layout(struct SpaceFile *sfile, ARegion *region)
  * Support updating the directory even when this isn't the active space
  * needed so RNA properties update function isn't context sensitive, see T70255.
  */
-void ED_file_change_dir_ex(bContext *C, bScreen *screen, ScrArea *area)
+void ED_file_change_dir_ex(bContext *C, ScrArea *area)
 {
   /* May happen when manipulating non-active spaces. */
   if (UNLIKELY(area->spacetype != SPACE_FILE)) {
@@ -1056,10 +1072,7 @@ void ED_file_change_dir_ex(bContext *C, bScreen *screen, ScrArea *area)
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
   if (params) {
     wmWindowManager *wm = CTX_wm_manager(C);
-    Scene *scene = WM_windows_scene_get_from_screen(wm, screen);
-    if (LIKELY(scene != NULL)) {
-      ED_fileselect_clear(wm, scene, sfile);
-    }
+    ED_fileselect_clear(wm, sfile);
 
     /* Clear search string, it is very rare to want to keep that filter while changing dir,
      * and usually very annoying to keep it actually! */
@@ -1084,9 +1097,8 @@ void ED_file_change_dir_ex(bContext *C, bScreen *screen, ScrArea *area)
 
 void ED_file_change_dir(bContext *C)
 {
-  bScreen *screen = CTX_wm_screen(C);
   ScrArea *area = CTX_wm_area(C);
-  ED_file_change_dir_ex(C, screen, area);
+  ED_file_change_dir_ex(C, area);
 }
 
 int file_select_match(struct SpaceFile *sfile, const char *pattern, char *matched_file)
@@ -1182,11 +1194,11 @@ int autocomplete_file(struct bContext *C, char *str, void *UNUSED(arg_v))
   return match;
 }
 
-void ED_fileselect_clear(wmWindowManager *wm, Scene *owner_scene, SpaceFile *sfile)
+void ED_fileselect_clear(wmWindowManager *wm, SpaceFile *sfile)
 {
   /* only NULL in rare cases - T29734. */
   if (sfile->files) {
-    filelist_readjob_stop(wm, owner_scene);
+    filelist_readjob_stop(sfile->files, wm);
     filelist_freelib(sfile->files);
     filelist_clear(sfile->files);
   }
@@ -1196,7 +1208,7 @@ void ED_fileselect_clear(wmWindowManager *wm, Scene *owner_scene, SpaceFile *sfi
   WM_main_add_notifier(NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 }
 
-void ED_fileselect_exit(wmWindowManager *wm, Scene *owner_scene, SpaceFile *sfile)
+void ED_fileselect_exit(wmWindowManager *wm, SpaceFile *sfile)
 {
   if (!sfile) {
     return;
@@ -1223,11 +1235,30 @@ void ED_fileselect_exit(wmWindowManager *wm, Scene *owner_scene, SpaceFile *sfil
   folder_history_list_free(sfile);
 
   if (sfile->files) {
-    ED_fileselect_clear(wm, owner_scene, sfile);
+    ED_fileselect_clear(wm, sfile);
     filelist_free(sfile->files);
     MEM_freeN(sfile->files);
     sfile->files = NULL;
   }
+}
+
+/**
+ * Set the renaming-state to #FILE_PARAMS_RENAME_POSTSCROLL_PENDING and trigger the smooth-scroll
+ * timer. To be used right after a file was renamed.
+ * Note that the caller is responsible for setting the correct rename-file info
+ * (#FileSelectParams.renamefile or #FileSelectParams.renamefile_uuid).
+ */
+void file_params_invoke_rename_postscroll(wmWindowManager *wm, wmWindow *win, SpaceFile *sfile)
+{
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+
+  params->rename_flag = FILE_PARAMS_RENAME_POSTSCROLL_PENDING;
+
+  if (sfile->smoothscroll_timer != NULL) {
+    WM_event_remove_timer(wm, win, sfile->smoothscroll_timer);
+  }
+  sfile->smoothscroll_timer = WM_event_add_timer(wm, win, TIMER1, 1.0 / 1000.0);
+  sfile->scroll_offset = 0;
 }
 
 /**
@@ -1243,12 +1274,18 @@ void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
     return;
   }
 
-  BLI_assert(params->renamefile[0] != '\0');
+  BLI_assert(params->renamefile[0] != '\0' || filelist_uuid_is_set(params->renamefile_uuid));
 
-  const int idx = filelist_file_findpath(sfile->files, params->renamefile);
+  /* Find the file either by UUID (preferred) or its relative path. */
+  int idx = (filelist_uuid_is_set(params->renamefile_uuid)) ?
+                filelist_file_find_uuid(sfile->files, params->renamefile_uuid) :
+                filelist_file_find_path(sfile->files, params->renamefile);
   if (idx >= 0) {
     FileDirEntry *file = filelist_file(sfile->files, idx);
     BLI_assert(file != NULL);
+
+    params->active_file = idx;
+    filelist_entry_select_set(sfile->files, file, FILE_SEL_ADD, FILE_SEL_SELECTED, CHECK_ALL);
 
     if ((params->rename_flag & FILE_PARAMS_RENAME_PENDING) != 0) {
       filelist_entry_select_set(sfile->files, file, FILE_SEL_ADD, FILE_SEL_EDITING, CHECK_ALL);
@@ -1256,7 +1293,9 @@ void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
     }
     else if ((params->rename_flag & FILE_PARAMS_RENAME_POSTSCROLL_PENDING) != 0) {
       filelist_entry_select_set(sfile->files, file, FILE_SEL_ADD, FILE_SEL_HIGHLIGHTED, CHECK_ALL);
+      params->highlight_file = -1;
       params->renamefile[0] = '\0';
+      filelist_uuid_unset(params->renamefile_uuid);
       params->rename_flag = FILE_PARAMS_RENAME_POSTSCROLL_ACTIVE;
     }
   }
@@ -1264,6 +1303,7 @@ void file_params_renamefile_activate(SpaceFile *sfile, FileSelectParams *params)
    * when file listing is not done. */
   else if (filelist_is_ready(sfile->files)) {
     params->renamefile[0] = '\0';
+    filelist_uuid_unset(params->renamefile_uuid);
     params->rename_flag = 0;
   }
 }

@@ -1,7 +1,8 @@
 [submodule "release/scripts/addons"]
 	path = release/scripts/addons
 	url = ../blender-addons.git
-	branch = master
+        # TODO change back before merge into master!!!
+	branch = asset-browser-poselib
 	ignore = all
 [submodule "release/scripts/addons_contrib"]
 	path = release/scripts/addons_contrib

@@ -28,6 +28,8 @@
 #include "BLI_fileops.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_animsys.h"
+#include "BKE_armature.h"
 #include "BKE_context.h"
 #include "BKE_icons.h"
 #include "BKE_lib_id.h"
@@ -36,6 +38,8 @@
 
 #include "BLT_translation.h"
 
+#include "ED_armature.h"
+#include "ED_asset.h"
 #include "ED_render.h"
 #include "ED_undo.h"
 #include "ED_util.h"
@@ -46,6 +50,8 @@
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "DEG_depsgraph.h"
 
 /* -------------------------------------------------------------------- */
 /** \name ID Previews
@@ -131,9 +137,11 @@ static int lib_id_generate_preview_exec(bContext *C, wmOperator *UNUSED(op))
   if (preview) {
     BKE_previewimg_clear(preview);
   }
+
   UI_icon_render_id(C, nullptr, id, ICON_SIZE_PREVIEW, true);
 
   WM_event_add_notifier(C, NC_ASSET | NA_EDITED, nullptr);
+  ED_assetlist_storage_tag_main_data_dirty();
 
   return OPERATOR_FINISHED;
 }

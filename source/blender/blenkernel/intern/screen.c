@@ -680,19 +680,13 @@ void BKE_area_region_free(SpaceType *st, ARegion *region)
   BKE_area_region_panels_free(&region->panels);
 
   LISTBASE_FOREACH (uiList *, uilst, &region->ui_lists) {
-    if (uilst->dyn_data) {
-      uiListDyn *dyn_data = uilst->dyn_data;
-      if (dyn_data->items_filter_flags) {
-        MEM_freeN(dyn_data->items_filter_flags);
-      }
-      if (dyn_data->items_filter_neworder) {
-        MEM_freeN(dyn_data->items_filter_neworder);
-      }
-      MEM_freeN(dyn_data);
+    if (uilst->dyn_data && uilst->dyn_data->free_runtime_data_fn) {
+      uilst->dyn_data->free_runtime_data_fn(uilst);
     }
     if (uilst->properties) {
       IDP_FreeProperty(uilst->properties);
     }
+    MEM_SAFE_FREE(uilst->dyn_data);
   }
 
   if (region->gizmo_map != NULL) {
@@ -1723,6 +1717,14 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sfile->runtime = NULL;
       BLO_read_data_address(reader, &sfile->params);
       BLO_read_data_address(reader, &sfile->asset_params);
+      /* XXX No access to filelist_uuid_unset() here. Should be used once direct-linking happens
+       * via a space-type callback. */
+      if (sfile->params) {
+        sfile->params->renamefile_uuid[0] = FILE_UUID_UNSET;
+      }
+      if (sfile->asset_params) {
+        sfile->asset_params->base_params.renamefile_uuid[0] = FILE_UUID_UNSET;
+      }
     }
     else if (sl->spacetype == SPACE_CLIP) {
       SpaceClip *sclip = (SpaceClip *)sl;

@@ -699,14 +699,14 @@ typedef enum eSpaceSeq_OverlayType {
  * Information to identify a asset library. May be either one of the predefined types (current
  * 'Main', builtin library, project library), or a custom type as defined in the Preferences.
  *
- * If the type is set to #FILE_ASSET_LIBRARY_CUSTOM, idname must have the name to identify the
+ * If the type is set to #ASSET_LIBRARY_CUSTOM, idname must have the name to identify the
  * custom library. Otherwise idname is not used.
  */
 typedef struct FileSelectAssetLibraryUID {
   short type; /* eFileAssetLibrary_Type */
   char _pad[2];
   /**
-   * If showing a custom asset library (#FILE_ASSET_LIBRARY_CUSTOM), this is the index of the
+   * If showing a custom asset library (#ASSET_LIBRARY_CUSTOM), this is the index of the
    * #bUserAssetLibrary within #UserDef.asset_libraries.
    * Should be ignored otherwise (but better set to -1 then, for sanity and debugging).
    */
@@ -726,6 +726,11 @@ typedef struct FileSelectParams {
 
   char renamefile[256];
   short rename_flag;
+  /**
+   * The UUID of the renamed file. If set, it will be used instead of `renamefile`.
+   * Runtime only.
+   */
+  uint32_t renamefile_uuid[4];
 
   /** List of filetypes to filter (FILE_MAXFILE). */
   char filter_glob[256];
@@ -863,6 +868,8 @@ typedef struct SpaceFile {
   SpaceFile_Runtime *runtime;
 } SpaceFile;
 
+#define FILE_UUID_UNSET -1
+
 /* SpaceFile.browse_mode (File Space Browsing Mode) */
 typedef enum eFileBrowse_Mode {
   /* Regular Blender File Browser */
@@ -870,22 +877,6 @@ typedef enum eFileBrowse_Mode {
   /* Asset Browser */
   FILE_BROWSE_MODE_ASSETS = 1,
 } eFileBrowse_Mode;
-
-typedef enum eFileAssetLibrary_Type {
-  /* For the future. Display assets bundled with Blender by default. */
-  // FILE_ASSET_LIBRARY_BUNDLED = 0,
-  /** Display assets from the current session (current "Main"). */
-  FILE_ASSET_LIBRARY_LOCAL = 1,
-  /* For the future. Display assets for the current project. */
-  // FILE_ASSET_LIBRARY_PROJECT = 2,
-
-  /** Display assets from custom asset libraries, as defined in the preferences
-   * (#bUserAssetLibrary). The name will be taken from #FileSelectParams.asset_library.idname
-   * then.
-   * In RNA, we add the index of the custom library to this to identify it by index. So keep
-   * this last! */
-  FILE_ASSET_LIBRARY_CUSTOM = 100,
-} eFileAssetLibrary_Type;
 
 /* FileSelectParams.display */
 enum eFileDisplayType {

@@ -126,8 +126,7 @@ static void draw_socket_list(const bContext *C,
                  0,
                  0,
                  0,
-                 false,
-                 false);
+                 UI_TEMPLATE_LIST_FLAG_NONE);
   PointerRNA opptr;
   uiLayout *ops_col = uiLayoutColumn(split, false);
   uiLayout *add_remove_col = uiLayoutColumn(ops_col, true);

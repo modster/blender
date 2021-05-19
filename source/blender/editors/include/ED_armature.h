@@ -23,10 +23,15 @@
 
 #pragma once
 
+#include <stdbool.h>
+
+#include "BLI_listbase.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+struct bAction;
 struct Base;
 struct Bone;
 struct Depsgraph;
@@ -241,6 +246,20 @@ void ED_mesh_deform_bind_callback(struct MeshDeformModifierData *mmd,
                                   float *vertexcos,
                                   int totvert,
                                   float cagemat[4][4]);
+
+/* Pose backups, pose_backup.c */
+typedef struct PoseBackup {
+  bool is_bone_selection_relevant;
+  ListBase /* PoseChannelBackup* */ backups;
+} PoseBackup;
+
+/* Create a backup of those bones that are animated in the given action. */
+PoseBackup *ED_pose_backup_create_selected_bones(
+    const struct Object *ob, const struct bAction *action) ATTR_WARN_UNUSED_RESULT;
+PoseBackup *ED_pose_backup_create_all_bones(const struct Object *ob,
+                                            const struct bAction *action) ATTR_WARN_UNUSED_RESULT;
+void ED_pose_backup_restore(const PoseBackup *pose_backup);
+void ED_pose_backup_free(PoseBackup *pose_backup);
 
 #ifdef __cplusplus
 }

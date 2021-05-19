@@ -54,6 +54,7 @@
 
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
+#include "BKE_asset.h"
 #include "BKE_attribute.h"
 #include "BKE_collection.h"
 #include "BKE_colortools.h"
@@ -2080,5 +2081,14 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+  }
+
+  {
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "WorkSpace", "AssetLibraryReference", "active_asset_library")) {
+      LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
+        BKE_asset_library_reference_init_default(&workspace->active_asset_library);
+      }
+    }
   }
 }

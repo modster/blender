@@ -548,6 +548,10 @@ class FILEBROWSER_MT_context_menu(Menu):
         sub.operator_context = 'EXEC_DEFAULT'
         sub.operator("file.delete", text="Delete")
 
+        active_asset = asset_utils.SpaceAssetInfo.get_active_asset(context)
+        if active_asset:
+            layout.operator("asset.open_containing_blend_file")
+
         layout.separator()
 
         sub = layout.row()

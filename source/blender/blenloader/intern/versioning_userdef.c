@@ -885,9 +885,7 @@ void blo_do_versions_userdef(UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
-    if (BLI_listbase_is_empty(&userdef->asset_libraries)) {
-      BKE_preferences_asset_library_default_add(userdef);
-    }
+    BKE_addon_ensure(&userdef->addons, "pose_library");
   }
 
   LISTBASE_FOREACH (bTheme *, btheme, &userdef->themes) {
