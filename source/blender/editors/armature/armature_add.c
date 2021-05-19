@@ -122,9 +122,6 @@ EditBone *ED_armature_ebone_add_primitive(Object *obedit_arm, float length, bool
   return bone;
 }
 
-/* previously addvert_armature */
-/* the ctrl-click method */
-
 /**
  * Note this is already ported to multi-objects as it is.
  * Since only the active bone is extruded even for single objects,
@@ -306,8 +303,7 @@ static EditBone *get_named_editbone(ListBase *edbo, const char *name)
   return NULL;
 }
 
-/* Call this before doing any duplications
- * */
+/* Call this before doing any duplications. */
 void preEditBoneDuplicate(ListBase *editbones)
 {
   /* clear temp */
@@ -343,7 +339,7 @@ void postEditBoneDuplicate(struct ListBase *editbones, Object *ob)
   }
 
   BKE_pose_channels_hash_free(ob->pose);
-  BKE_pose_channels_hash_make(ob->pose);
+  BKE_pose_channels_hash_ensure(ob->pose);
 
   GHash *name_map = BLI_ghash_str_new(__func__);
 
@@ -394,7 +390,7 @@ static void updateDuplicateSubtarget(EditBone *dup_bone,
   bConstraint *curcon;
   ListBase *conlist;
 
-  if ((pchan = BKE_pose_channel_verify(ob->pose, dup_bone->name))) {
+  if ((pchan = BKE_pose_channel_ensure(ob->pose, dup_bone->name))) {
     if ((conlist = &pchan->constraints)) {
       for (curcon = conlist->first; curcon; curcon = curcon->next) {
         /* does this constraint have a subtarget in
@@ -518,7 +514,8 @@ static void updateDuplicateActionConstraintSettings(EditBone *dup_bone,
   /* See if there is any channels that uses this bone */
   ListBase ani_curves;
   BLI_listbase_clear(&ani_curves);
-  if (BKE_fcurves_filter(&ani_curves, &act->curves, "pose.bones[", orig_bone->name)) {
+  if ((act != NULL) &&
+      BKE_fcurves_filter(&ani_curves, &act->curves, "pose.bones[", orig_bone->name)) {
     /* Create a copy and mirror the animation */
     for (LinkData *ld = ani_curves.first; ld; ld = ld->next) {
       FCurve *old_curve = ld->data;
@@ -828,7 +825,7 @@ static void updateDuplicateConstraintSettings(EditBone *dup_bone, EditBone *orig
   bConstraint *curcon;
   ListBase *conlist;
 
-  if ((pchan = BKE_pose_channel_verify(ob->pose, dup_bone->name)) == NULL ||
+  if ((pchan = BKE_pose_channel_ensure(ob->pose, dup_bone->name)) == NULL ||
       (conlist = &pchan->constraints) == NULL) {
     return;
   }
@@ -858,7 +855,7 @@ static void updateDuplicateCustomBoneShapes(bContext *C, EditBone *dup_bone, Obj
     return;
   }
   bPoseChannel *pchan;
-  pchan = BKE_pose_channel_verify(ob->pose, dup_bone->name);
+  pchan = BKE_pose_channel_ensure(ob->pose, dup_bone->name);
 
   if (pchan->custom != NULL) {
     Main *bmain = CTX_data_main(C);
@@ -888,12 +885,12 @@ static void copy_pchan(EditBone *src_bone, EditBone *dst_bone, Object *src_ob, O
   if (src_ob->pose) {
     bPoseChannel *chanold, *channew;
 
-    chanold = BKE_pose_channel_verify(src_ob->pose, src_bone->name);
+    chanold = BKE_pose_channel_ensure(src_ob->pose, src_bone->name);
     if (chanold) {
       /* WARNING: this creates a new posechannel, but there will not be an attached bone
        * yet as the new bones created here are still 'EditBones' not 'Bones'.
        */
-      channew = BKE_pose_channel_verify(dst_ob->pose, dst_bone->name);
+      channew = BKE_pose_channel_ensure(dst_ob->pose, dst_bone->name);
 
       if (channew) {
         BKE_pose_channel_copy_data(channew, chanold);
@@ -1196,7 +1193,7 @@ static int armature_symmetrize_exec(bContext *C, wmOperator *op)
            * is synchronized. */
           bPoseChannel *pchan;
           /* Make sure we clean up the old data before overwriting it */
-          pchan = BKE_pose_channel_verify(obedit->pose, ebone_iter->temp.ebone->name);
+          pchan = BKE_pose_channel_ensure(obedit->pose, ebone_iter->temp.ebone->name);
           BKE_pose_channel_free(pchan);
           /* Sync pchan data */
           copy_pchan(ebone_iter, ebone_iter->temp.ebone, obedit, obedit);
@@ -1617,7 +1614,7 @@ void ARMATURE_OT_bone_primitive_add(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Add Bone";
   ot->idname = "ARMATURE_OT_bone_primitive_add";
-  ot->description = "Add a new bone located at the 3D-Cursor";
+  ot->description = "Add a new bone located at the 3D cursor";
 
   /* api callbacks */
   ot->exec = armature_bone_primitive_add_exec;

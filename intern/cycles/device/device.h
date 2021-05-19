@@ -78,7 +78,9 @@ class DeviceInfo {
   int num;
   bool display_device;               /* GPU is used as a display device. */
   bool has_half_images;              /* Support half-float textures. */
+  bool has_nanovdb;                  /* Support NanoVDB volumes. */
   bool has_volume_decoupled;         /* Decoupled volume shading. */
+  bool has_branched_path;            /* Supports branched path tracing. */
   bool has_adaptive_stop_per_sample; /* Per-sample adaptive sampling stopping. */
   bool has_osl;                      /* Support Open Shading Language. */
   bool use_split_kernel;             /* Use split or mega kernel. */
@@ -98,7 +100,9 @@ class DeviceInfo {
     cpu_threads = 0;
     display_device = false;
     has_half_images = false;
+    has_nanovdb = false;
     has_volume_decoupled = false;
+    has_branched_path = true;
     has_adaptive_stop_per_sample = false;
     has_osl = false;
     use_split_kernel = false;
@@ -373,12 +377,6 @@ class Device {
     return NULL;
   }
 
-  /* Device specific pointer for BVH creation. Currently only used by Embree. */
-  virtual void *bvh_device() const
-  {
-    return NULL;
-  }
-
   /* load/compile kernels, must be called before adding tasks */
   virtual bool load_kernels(const DeviceRequestedFeatures & /*requested_features*/)
   {
@@ -427,10 +425,7 @@ class Device {
                            const DeviceDrawParams &draw_params);
 
   /* acceleration structure building */
-  virtual bool build_optix_bvh(BVH *)
-  {
-    return false;
-  }
+  virtual void build_bvh(BVH *bvh, Progress &progress, bool refit);
 
 #ifdef WITH_NETWORK
   /* networking */

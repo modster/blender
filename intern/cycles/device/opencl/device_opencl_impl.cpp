@@ -569,6 +569,11 @@ class OpenCLSplitKernel : public DeviceSplitKernel {
     size_t num_elements = max_elements_for_max_buffer_size(kg, data, max_buffer_size);
     int2 global_size = make_int2(max(round_down((int)sqrt(num_elements), 64), 64),
                                  (int)sqrt(num_elements));
+
+    if (device->info.description.find("Intel") != string::npos) {
+      global_size = make_int2(min(512, global_size.x), min(512, global_size.y));
+    }
+
     VLOG(1) << "Global size: " << global_size << ".";
     return global_size;
   }
@@ -2036,7 +2041,9 @@ string OpenCLDevice::kernel_build_options(const string *debug_src)
 #  endif
 
 #  ifdef WITH_NANOVDB
-  build_options += "-DWITH_NANOVDB ";
+  if (info.has_nanovdb) {
+    build_options += "-DWITH_NANOVDB ";
+  }
 #  endif
 
   return build_options;
@@ -2151,7 +2158,7 @@ void OpenCLDevice::release_program_safe(cl_program program)
   }
 }
 
-/* ** Those guys are for workign around some compiler-specific bugs ** */
+/* ** Those guys are for working around some compiler-specific bugs ** */
 
 cl_program OpenCLDevice::load_cached_kernel(ustring key, thread_scoped_lock &cache_locker)
 {

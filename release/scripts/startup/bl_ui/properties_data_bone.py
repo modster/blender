@@ -255,17 +255,11 @@ class BONE_PT_display(BoneButtonsPanel, Panel):
         layout = self.layout
         layout.use_property_split = True
 
-        ob = context.object
         bone = context.bone
-        pchan = None
-
-        if ob and bone:
-            pchan = ob.pose.bones[bone.name]
-        elif bone is None:
+        if bone is None:
             bone = context.edit_bone
 
         if bone:
-
             col = layout.column()
             col.prop(bone, "hide", text="Hide", toggle=False)
 
@@ -298,10 +292,15 @@ class BONE_PT_display_custom_shape(BoneButtonsPanel, Panel):
             sub = col.column()
             sub.active = bool(pchan and pchan.custom_shape)
             sub.separator()
-            sub.prop(pchan, "custom_shape_scale", text="Scale")
+
+            sub.prop(pchan, "custom_shape_scale_xyz", text="Scale")
+            sub.prop(pchan, "custom_shape_translation", text="Translation")
+            sub.prop(pchan, "custom_shape_rotation_euler", text="Rotation")
+
             sub.prop_search(pchan, "custom_shape_transform",
                             ob.pose, "bones", text="Override Transform")
             sub.prop(pchan, "use_custom_shape_bone_size")
+
             sub.separator()
             sub.prop(bone, "show_wire", text="Wireframe")
 

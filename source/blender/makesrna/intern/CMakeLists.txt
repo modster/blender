@@ -30,6 +30,7 @@ set(DEFSRC
   rna_animation.c
   rna_animviz.c
   rna_armature.c
+  rna_asset.c
   rna_attribute.c
   rna_asset.c
   rna_boid.c
@@ -100,6 +101,7 @@ set(DEFSRC
 
 if(WITH_EXPERIMENTAL_FEATURES)
   add_definitions(-DWITH_GEOMETRY_NODES)
+  add_definitions(-DWITH_POINT_CLOUD)
   add_definitions(-DWITH_HAIR_NODES)
   list(APPEND DEFSRC
     rna_hair.c
@@ -188,7 +190,6 @@ set(SRC
   ../../../../intern/guardedalloc/intern/mallocn.c
   ../../../../intern/guardedalloc/intern/mallocn_guarded_impl.c
   ../../../../intern/guardedalloc/intern/mallocn_lockfree_impl.c
-  ../../../../intern/guardedalloc/intern/mmap_win.c
 
   # Needed for defaults.
   ../../../../release/datafiles/userdef/userdef_default.c
@@ -298,8 +299,20 @@ if(WITH_OPENAL)
   add_definitions(-DWITH_OPENAL)
 endif()
 
+if(WITH_COREAUDIO)
+  add_definitions(-DWITH_COREAUDIO)
+endif()
+
 if(WITH_JACK)
   add_definitions(-DWITH_JACK)
+endif()
+
+if(WITH_PULSEAUDIO)
+  add_definitions(-DWITH_PULSEAUDIO)
+endif()
+
+if(WITH_WASAPI)
+  add_definitions(-DWITH_WASAPI)
 endif()
 
 if(WITH_OPENCOLLADA)
@@ -443,6 +456,7 @@ set(LIB
   bf_editor_undo
 )
 
+add_definitions(${GL_DEFINITIONS})
 
 blender_add_lib(bf_rna "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 

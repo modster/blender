@@ -634,8 +634,7 @@ ModifierTypeInfo modifierType_LaplacianSmooth = {
     /* deformMatricesEM */ NULL,
     /* modifyMesh */ NULL,
     /* modifyHair */ NULL,
-    /* modifyPointCloud */ NULL,
-    /* modifyVolume */ NULL,
+    /* modifyGeometrySet */ NULL,
 
     /* initData */ init_data,
     /* requiredDataMask */ required_data_mask,

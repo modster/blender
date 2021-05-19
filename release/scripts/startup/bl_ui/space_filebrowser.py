@@ -40,7 +40,7 @@ class FILEBROWSER_HT_header(Header):
         row.prop(params, "asset_library", text="")
         # External libraries don't auto-refresh, add refresh button.
         if params.asset_library != 'LOCAL':
-            row.operator("file.refresh", text="", icon="FILE_REFRESH")
+            row.operator("file.refresh", text="", icon='FILE_REFRESH')
 
         layout.separator_spacer()
 
@@ -197,7 +197,8 @@ class FILEBROWSER_PT_filter(Panel):
 
                 sub = row.column(align=True)
 
-                sub.prop(params, "use_filter_asset_only")
+                if context.preferences.experimental.use_asset_browser:
+                    sub.prop(params, "use_filter_asset_only")
 
                 filter_id = params.filter_id
                 for identifier in dir(filter_id):
@@ -267,7 +268,11 @@ class FILEBROWSER_PT_bookmarks_system(Panel):
 
     @classmethod
     def poll(cls, context):
-        return not context.preferences.filepaths.hide_system_bookmarks and panel_poll_is_upper_region(context.region) and not panel_poll_is_asset_browsing(context)
+        return (
+            not context.preferences.filepaths.hide_system_bookmarks and
+            panel_poll_is_upper_region(context.region) and
+            not panel_poll_is_asset_browsing(context)
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -301,7 +306,10 @@ class FILEBROWSER_PT_bookmarks_favorites(Panel):
 
     @classmethod
     def poll(cls, context):
-        return panel_poll_is_upper_region(context.region) and not panel_poll_is_asset_browsing(context)
+        return (
+            panel_poll_is_upper_region(context.region) and
+            not panel_poll_is_asset_browsing(context)
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -338,7 +346,11 @@ class FILEBROWSER_PT_bookmarks_recents(Panel):
 
     @classmethod
     def poll(cls, context):
-        return not context.preferences.filepaths.hide_recent_locations and panel_poll_is_upper_region(context.region) and not panel_poll_is_asset_browsing(context)
+        return (
+            not context.preferences.filepaths.hide_recent_locations and
+            panel_poll_is_upper_region(context.region) and
+            not panel_poll_is_asset_browsing(context)
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -362,7 +374,11 @@ class FILEBROWSER_PT_advanced_filter(Panel):
     @classmethod
     def poll(cls, context):
         # only useful in append/link (library) context currently...
-        return context.space_data.params.use_library_browsing and panel_poll_is_upper_region(context.region) and not panel_poll_is_asset_browsing(context)
+        return (
+            context.space_data.params.use_library_browsing and
+            panel_poll_is_upper_region(context.region) and
+            not panel_poll_is_asset_browsing(context)
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -375,7 +391,8 @@ class FILEBROWSER_PT_advanced_filter(Panel):
                 layout.separator()
                 col = layout.column(align=True)
 
-                col.prop(params, "use_filter_asset_only")
+                if context.preferences.experimental.use_asset_browser:
+                    col.prop(params, "use_filter_asset_only")
 
                 filter_id = params.filter_id
                 for identifier in dir(filter_id):
@@ -477,6 +494,7 @@ class FILEBROWSER_MT_view(Menu):
 
         layout.prop(st, "show_region_toolbar", text="Source List")
         layout.prop(st, "show_region_ui", text="File Path")
+        layout.operator("file.view_selected")
 
         layout.separator()
 
@@ -573,23 +591,33 @@ class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
         active_file = context.active_file
         active_asset = asset_utils.SpaceAssetInfo.get_active_asset(context)
 
-        layout.use_property_split = True
-
         if not active_file or not active_asset:
-            layout.label(text="No asset selected.")
+            layout.label(text="No asset selected", icon='INFO')
             return
 
-        box = layout.box()
+        # If the active file is an ID, use its name directly so renaming is possible from right here.
+        layout.prop(context.id if context.id is not None else active_file, "name", text="")
+
+
+class ASSETBROWSER_PT_metadata_preview(asset_utils.AssetMetaDataPanel, Panel):
+    bl_label = "Preview"
+
+    def draw(self, context):
+        layout = self.layout
+        active_file = context.active_file
+
+        row = layout.row()
+        box = row.box()
         box.template_icon(icon_value=active_file.preview_icon_id, scale=5.0)
         if bpy.ops.ed.lib_id_load_custom_preview.poll():
-            box.operator("ed.lib_id_load_custom_preview", icon='FILEBROWSER', text="Load Custom")
-        layout.prop(active_file, "name")
+            col = row.column(align=True)
+            col.operator("ed.lib_id_load_custom_preview", icon='FILEBROWSER', text="")
+            col.separator()
+            col.operator("ed.lib_id_generate_preview", icon='FILE_REFRESH', text="")
 
 
-class ASSETBROWSER_PT_metadata_details(asset_utils.AssetBrowserPanel, Panel):
-    bl_region_type = 'TOOL_PROPS'
+class ASSETBROWSER_PT_metadata_details(asset_utils.AssetMetaDataPanel, Panel):
     bl_label = "Details"
-    bl_parent_id = "ASSETBROWSER_PT_metadata"
 
     def draw(self, context):
         layout = self.layout
@@ -647,6 +675,7 @@ classes = (
     FILEBROWSER_MT_context_menu,
     ASSETBROWSER_PT_navigation_bar,
     ASSETBROWSER_PT_metadata,
+    ASSETBROWSER_PT_metadata_preview,
     ASSETBROWSER_PT_metadata_details,
     ASSETBROWSER_PT_metadata_tags,
     ASSETBROWSER_UL_metadata_tags,

@@ -895,6 +895,8 @@ enum ShaderDataFlag {
   SD_HAS_CONSTANT_EMISSION = (1 << 27),
   /* Needs to access attributes for volume rendering */
   SD_NEED_VOLUME_ATTRIBUTES = (1 << 28),
+  /* Shader has emission */
+  SD_HAS_EMISSION = (1 << 29),
 
   SD_SHADER_FLAGS = (SD_USE_MIS | SD_HAS_TRANSPARENT_SHADOW | SD_HAS_VOLUME | SD_HAS_ONLY_VOLUME |
                      SD_HETEROGENEOUS_VOLUME | SD_HAS_BSSRDF_BUMP | SD_VOLUME_EQUIANGULAR |
@@ -1397,10 +1399,12 @@ typedef enum KernelBVHLayout {
   BVH_LAYOUT_BVH2 = (1 << 0),
   BVH_LAYOUT_EMBREE = (1 << 1),
   BVH_LAYOUT_OPTIX = (1 << 2),
+  BVH_LAYOUT_MULTI_OPTIX = (1 << 3),
+  BVH_LAYOUT_MULTI_OPTIX_EMBREE = (1 << 4),
 
   /* Default BVH layout to use for CPU. */
   BVH_LAYOUT_AUTO = BVH_LAYOUT_EMBREE,
-  BVH_LAYOUT_ALL = (unsigned int)(~0u),
+  BVH_LAYOUT_ALL = BVH_LAYOUT_BVH2 | BVH_LAYOUT_EMBREE | BVH_LAYOUT_OPTIX,
 } KernelBVHLayout;
 
 typedef struct KernelBVH {
@@ -1459,7 +1463,7 @@ typedef struct KernelObject {
   Transform tfm;
   Transform itfm;
 
-  float surface_area;
+  float volume_density;
   float pass_id;
   float random_number;
   float color[3];
@@ -1499,9 +1503,9 @@ typedef struct KernelAreaLight {
   float axisu[3];
   float invarea;
   float axisv[3];
-  float pad1;
+  float tan_spread;
   float dir[3];
-  float pad2;
+  float normalize_spread;
 } KernelAreaLight;
 
 typedef struct KernelDistantLight {
@@ -1639,7 +1643,7 @@ enum RayState {
   RAY_UPDATE_BUFFER,
   /* Denotes ray needs to skip most surface shader work. */
   RAY_HAS_ONLY_VOLUME,
-  /* Donotes ray has hit background */
+  /* Denotes ray has hit background */
   RAY_HIT_BACKGROUND,
   /* Denotes ray has to be regenerated */
   RAY_TO_REGENERATE,
@@ -1697,8 +1701,8 @@ typedef struct WorkTile {
   ccl_global float *buffer;
 } WorkTile;
 
-/* Precoumputed sample table sizes for PMJ02 sampler. */
-#define NUM_PMJ_SAMPLES 64 * 64
+/* Pre-computed sample table sizes for PMJ02 sampler. */
+#define NUM_PMJ_SAMPLES (64 * 64)
 #define NUM_PMJ_PATTERNS 48
 
 CCL_NAMESPACE_END

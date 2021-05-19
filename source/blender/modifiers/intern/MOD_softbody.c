@@ -119,8 +119,7 @@ ModifierTypeInfo modifierType_Softbody = {
     /* deformMatricesEM */ NULL,
     /* modifyMesh */ NULL,
     /* modifyHair */ NULL,
-    /* modifyPointCloud */ NULL,
-    /* modifyVolume */ NULL,
+    /* modifyGeometrySet */ NULL,
 
     /* initData */ NULL,
     /* requiredDataMask */ NULL,

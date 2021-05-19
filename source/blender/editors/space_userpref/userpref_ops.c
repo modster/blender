@@ -28,18 +28,14 @@
 #include "BLI_listbase.h"
 
 #include "BKE_context.h"
-#include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_preferences.h"
-#include "BKE_report.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_types.h"
 
 #include "UI_interface.h"
-
-#include "../interface/interface_intern.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -93,7 +89,7 @@ static int preferences_autoexec_add_exec(bContext *UNUSED(C), wmOperator *UNUSED
 
 static void PREFERENCES_OT_autoexec_path_add(wmOperatorType *ot)
 {
-  ot->name = "Add Autoexec Path";
+  ot->name = "Add Auto-Execution Path";
   ot->idname = "PREFERENCES_OT_autoexec_path_add";
   ot->description = "Add path to exclude from auto-execution";
 
@@ -121,7 +117,7 @@ static int preferences_autoexec_remove_exec(bContext *UNUSED(C), wmOperator *op)
 
 static void PREFERENCES_OT_autoexec_path_remove(wmOperatorType *ot)
 {
-  ot->name = "Remove Autoexec Path";
+  ot->name = "Remove Auto-Execution Path";
   ot->idname = "PREFERENCES_OT_autoexec_path_remove";
   ot->description = "Remove path to exclude from auto-execution";
 
@@ -170,6 +166,8 @@ static int preferences_asset_library_remove_exec(bContext *UNUSED(C), wmOperator
   if (library) {
     BKE_preferences_asset_library_remove(&U, library);
     U.runtime.is_dirty = true;
+    /* Trigger refresh for the Asset Browser. */
+    WM_main_add_notifier(NC_SPACE | ND_SPACE_ASSET_PARAMS, NULL);
   }
   return OPERATOR_FINISHED;
 }

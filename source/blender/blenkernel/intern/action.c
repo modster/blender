@@ -54,6 +54,7 @@
 #include "BKE_constraint.h"
 #include "BKE_deform.h"
 #include "BKE_fcurve.h"
+#include "BKE_icons.h"
 #include "BKE_idprop.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
@@ -101,10 +102,7 @@ static CLG_LogRef LOG = {"bke.action"};
  *
  * \param flag: Copying options (see BKE_lib_id.h's LIB_ID_COPY_... flags for more).
  */
-static void action_copy_data(Main *UNUSED(bmain),
-                             ID *id_dst,
-                             const ID *id_src,
-                             const int UNUSED(flag))
+static void action_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_src, const int flag)
 {
   bAction *action_dst = (bAction *)id_dst;
   const bAction *action_src = (const bAction *)id_src;
@@ -145,6 +143,13 @@ static void action_copy_data(Main *UNUSED(bmain),
       }
     }
   }
+
+  if (flag & LIB_ID_COPY_NO_PREVIEW) {
+    action_dst->preview = NULL;
+  }
+  else {
+    BKE_previewimg_id_copy(&action_dst->id, &action_src->id);
+  }
 }
 
 /** Free (or release) any data used by this action (does not free the action itself). */
@@ -161,6 +166,8 @@ static void action_free_data(struct ID *id)
 
   /* Free pose-references (aka local markers). */
   BLI_freelistN(&action->markers);
+
+  BKE_previewimg_free(&action->preview);
 }
 
 static void action_foreach_id(ID *id, LibraryForeachIDData *data)
@@ -192,6 +199,8 @@ static void action_blend_write(BlendWriter *writer, ID *id, const void *id_addre
     LISTBASE_FOREACH (TimeMarker *, marker, &act->markers) {
       BLO_write_struct(writer, TimeMarker, marker);
     }
+
+    BKE_previewimg_blend_write(writer, act->preview);
   }
 }
 
@@ -218,6 +227,9 @@ static void action_blend_read_data(BlendDataReader *reader, ID *id)
     BLO_read_data_address(reader, &agrp->channels.first);
     BLO_read_data_address(reader, &agrp->channels.last);
   }
+
+  BLO_read_data_address(reader, &act->preview);
+  BKE_previewimg_blend_read(reader, act->preview);
 }
 
 static void blend_read_lib_constraint_channels(BlendLibReader *reader, ID *id, ListBase *chanbase)
@@ -291,6 +303,7 @@ IDTypeInfo IDType_ID_AC = {
     .make_local = NULL,
     .foreach_id = action_foreach_id,
     .foreach_cache = NULL,
+    .owner_get = NULL,
 
     .blend_write = action_blend_write,
     .blend_read_data = action_blend_read_data,
@@ -298,6 +311,8 @@ IDTypeInfo IDType_ID_AC = {
     .blend_read_expand = action_blend_read_expand,
 
     .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 /* ***************** Library data level operations on action ************** */
@@ -620,7 +635,7 @@ bPoseChannel *BKE_pose_channel_find_name(const bPose *pose, const char *name)
  * \note Use with care, not on Armature poses but for temporal ones.
  * \note (currently used for action constraints and in rebuild_pose).
  */
-bPoseChannel *BKE_pose_channel_verify(bPose *pose, const char *name)
+bPoseChannel *BKE_pose_channel_ensure(bPose *pose, const char *name)
 {
   bPoseChannel *chan;
 
@@ -641,7 +656,9 @@ bPoseChannel *BKE_pose_channel_verify(bPose *pose, const char *name)
 
   BLI_strncpy(chan->name, name, sizeof(chan->name));
 
-  chan->custom_scale = 1.0f;
+  copy_v3_fl(chan->custom_scale_xyz, 1.0f);
+  zero_v3(chan->custom_translation);
+  zero_v3(chan->custom_rotation_euler);
 
   /* init vars to prevent math errors */
   unit_qt(chan->quat);
@@ -800,7 +817,7 @@ void BKE_pose_copy_data_ex(bPose **dst,
    */
   if (outPose->chanbase.first != outPose->chanbase.last) {
     outPose->chanhash = NULL;
-    BKE_pose_channels_hash_make(outPose);
+    BKE_pose_channels_hash_ensure(outPose);
   }
 
   outPose->iksolver = src->iksolver;
@@ -930,7 +947,7 @@ bool BKE_pose_channel_in_IK_chain(Object *ob, bPoseChannel *pchan)
  * Removes the hash for quick lookup of channels, must
  * be done when adding/removing channels.
  */
-void BKE_pose_channels_hash_make(bPose *pose)
+void BKE_pose_channels_hash_ensure(bPose *pose)
 {
   if (!pose->chanhash) {
     bPoseChannel *pchan;
@@ -1176,7 +1193,7 @@ void BKE_pose_free(bPose *pose)
  * and ID-Props, used when duplicating bones in editmode.
  * (unlike copy_pose_channel_data which only does posing-related stuff).
  *
- * \note use when copying bones in editmode (on returned value from #BKE_pose_channel_verify)
+ * \note use when copying bones in editmode (on returned value from #BKE_pose_channel_ensure)
  */
 void BKE_pose_channel_copy_data(bPoseChannel *pchan, const bPoseChannel *pchan_from)
 {
@@ -1220,8 +1237,10 @@ void BKE_pose_channel_copy_data(bPoseChannel *pchan, const bPoseChannel *pchan_f
   if (pchan->custom) {
     id_us_plus(&pchan->custom->id);
   }
+  copy_v3_v3(pchan->custom_scale_xyz, pchan_from->custom_scale_xyz);
+  copy_v3_v3(pchan->custom_translation, pchan_from->custom_translation);
+  copy_v3_v3(pchan->custom_rotation_euler, pchan_from->custom_rotation_euler);
 
-  pchan->custom_scale = pchan_from->custom_scale;
   pchan->drawflag = pchan_from->drawflag;
 }
 
@@ -1299,30 +1318,6 @@ void BKE_pose_update_constraint_flags(bPose *pose)
 void BKE_pose_tag_update_constraint_flags(bPose *pose)
 {
   pose->flag |= POSE_CONSTRAINTS_NEED_UPDATE_FLAGS;
-}
-
-/* Clears all BONE_UNKEYED flags for every pose channel in every pose
- * This should only be called on frame changing, when it is acceptable to
- * do this. Otherwise, these flags should not get cleared as poses may get lost.
- */
-void framechange_poses_clear_unkeyed(Main *bmain)
-{
-  Object *ob;
-  bPose *pose;
-  bPoseChannel *pchan;
-
-  /* This needs to be done for each object that has a pose */
-  /* TODO: proxies may/may not be correctly handled here... (this needs checking) */
-  for (ob = bmain->objects.first; ob; ob = ob->id.next) {
-    /* we only need to do this on objects with a pose */
-    if ((pose = ob->pose)) {
-      for (pchan = pose->chanbase.first; pchan; pchan = pchan->next) {
-        if (pchan->bone) {
-          pchan->bone->flag &= ~BONE_UNKEYED;
-        }
-      }
-    }
-  }
 }
 
 /* ************************** Bone Groups ************************** */
@@ -1783,7 +1778,7 @@ void what_does_obaction(Object *ob,
      * allocation and also will make lookup slower.
      */
     if (pose->chanbase.first != pose->chanbase.last) {
-      BKE_pose_channels_hash_make(pose);
+      BKE_pose_channels_hash_ensure(pose);
     }
     if (pose->flag & POSE_CONSTRAINTS_NEED_UPDATE_FLAGS) {
       BKE_pose_update_constraint_flags(pose);
@@ -1987,7 +1982,7 @@ void BKE_pose_blend_read_lib(BlendLibReader *reader, Object *ob, bPose *pose)
 
     IDP_BlendReadLib(reader, pchan->prop);
 
-    BLO_read_id_address(reader, arm->id.lib, &pchan->custom);
+    BLO_read_id_address(reader, ob->id.lib, &pchan->custom);
     if (UNLIKELY(pchan->bone == NULL)) {
       rebuild = true;
     }

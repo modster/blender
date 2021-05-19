@@ -448,6 +448,7 @@ void BCAnimationSampler::initialize_curves(BCAnimationCurveMap &curves, Object *
         char *boneName = BLI_str_quoted_substrN(fcu->rna_path, "pose.bones[");
         if (boneName) {
           object_type = BC_ANIMATION_TYPE_BONE;
+          MEM_freeN(boneName);
         }
       }
 
@@ -535,7 +536,7 @@ const BCMatrix *BCSampleFrame::get_sample_matrix(Object *ob) const
   return &sample->get_matrix();
 }
 
-/* Get the matrix for the given Bone, returns Unity when the Objewct is not sampled */
+/* Get the matrix for the given Bone, returns Unity when the Object is not sampled. */
 const BCMatrix *BCSampleFrame::get_sample_matrix(Object *ob, Bone *bone) const
 {
   BCSampleMap::const_iterator it = sampleMap.find(ob);

@@ -126,7 +126,7 @@ static void rna_AssetMetaData_active_tag_range(
 {
   const AssetMetaData *asset_data = ptr->data;
   *min = *softmin = 0;
-  *max = *softmax = BLI_listbase_count(&asset_data->tags) - 1;
+  *max = *softmax = MAX2(asset_data->tot_tags - 1, 0);
 }
 
 #else

@@ -80,12 +80,12 @@ static EnumPropertyItem prop_mask_filter_types[] = {
     {MASK_FILTER_CONTRAST_INCREASE,
      "CONTRAST_INCREASE",
      0,
-     "Increase contrast",
+     "Increase Contrast",
      "Increase the contrast of the paint mask"},
     {MASK_FILTER_CONTRAST_DECREASE,
      "CONTRAST_DECREASE",
      0,
-     "Decrease contrast",
+     "Decrease Contrast",
      "Decrease the contrast of the paint mask"},
     {0, NULL, 0, NULL, NULL},
 };
@@ -112,8 +112,7 @@ static void mask_filter_task_cb(void *__restrict userdata,
     contrast = -0.1f;
   }
 
-  BKE_pbvh_vertex_iter_begin(ss->pbvh, node, vd, PBVH_ITER_UNIQUE)
-  {
+  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
     float delta, gain, offset, max, min;
     float prev_val = *vd.mask;
     SculptVertexNeighborIter ni;
@@ -363,8 +362,7 @@ static void dirty_mask_compute_range_task_cb(void *__restrict userdata,
   DirtyMaskRangeData *range = tls->userdata_chunk;
   PBVHVertexIter vd;
 
-  BKE_pbvh_vertex_iter_begin(ss->pbvh, node, vd, PBVH_ITER_UNIQUE)
-  {
+  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
     float dirty_mask = neighbor_dirty_mask(ss, &vd);
     range->min = min_ff(dirty_mask, range->min);
     range->max = max_ff(dirty_mask, range->max);
@@ -403,8 +401,7 @@ static void dirty_mask_apply_task_cb(void *__restrict userdata,
     range = 1.0f / range;
   }
 
-  BKE_pbvh_vertex_iter_begin(ss->pbvh, node, vd, PBVH_ITER_UNIQUE)
-  {
+  BKE_pbvh_vertex_iter_begin (ss->pbvh, node, vd, PBVH_ITER_UNIQUE) {
     float dirty_mask = neighbor_dirty_mask(ss, &vd);
     float mask = *vd.mask + (1.0f - ((dirty_mask - min) * range));
     if (dirty_only) {

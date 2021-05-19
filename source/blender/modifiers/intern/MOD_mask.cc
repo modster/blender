@@ -462,8 +462,7 @@ ModifierTypeInfo modifierType_Mask = {
     /* deformMatricesEM */ nullptr,
     /* modifyMesh */ modifyMesh,
     /* modifyHair */ nullptr,
-    /* modifyPointCloud */ nullptr,
-    /* modifyVolume */ nullptr,
+    /* modifyGeometrySet */ nullptr,
 
     /* initData */ initData,
     /* requiredDataMask */ requiredDataMask,
