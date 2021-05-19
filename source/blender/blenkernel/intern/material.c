@@ -77,6 +77,7 @@
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
+#include "DEG_depsgraph_query.h"
 
 #include "GPU_material.h"
 
@@ -698,6 +699,98 @@ Material *BKE_object_material_get(Object *ob, short act)
 {
   Material **ma_p = BKE_object_material_get_p(ob, act);
   return ma_p ? *ma_p : NULL;
+}
+
+static ID *get_evaluated_object_data_with_materials(Object *ob)
+{
+  ID *data = ob->data;
+  /* Meshes in edit mode need special handling. */
+  if (ob->type == OB_MESH && ob->mode == OB_MODE_EDIT) {
+    Mesh *mesh = ob->data;
+    if (mesh->edit_mesh && mesh->edit_mesh->mesh_eval_final) {
+      data = &mesh->edit_mesh->mesh_eval_final->id;
+    }
+  }
+  return data;
+}
+
+/**
+ * On evaluated objects the number of materials on an object and its data might go out of sync.
+ * This is because during evaluation materials can be added/removed on the object data.
+ *
+ * For rendering or exporting we generally use the materials on the object data. However, some
+ * material indices might be overwritten by the object.
+ */
+Material *BKE_object_material_get_eval(Object *ob, short act)
+{
+  BLI_assert(DEG_is_evaluated_object(ob));
+  const int slot_index = act - 1;
+
+  if (slot_index < 0) {
+    return NULL;
+  }
+  ID *data = get_evaluated_object_data_with_materials(ob);
+  const short *tot_slots_data_ptr = BKE_id_material_len_p(data);
+  const int tot_slots_data = tot_slots_data_ptr ? *tot_slots_data_ptr : 0;
+  if (slot_index >= tot_slots_data) {
+    return NULL;
+  }
+  const int tot_slots_object = ob->totcol;
+
+  Material ***materials_data_ptr = BKE_id_material_array_p(data);
+  Material **materials_data = materials_data_ptr ? *materials_data_ptr : NULL;
+  Material **materials_object = ob->mat;
+
+  /* Check if slot is overwritten by object. */
+  if (slot_index < tot_slots_object) {
+    if (ob->matbits) {
+      if (ob->matbits[slot_index]) {
+        Material *material = materials_object[slot_index];
+        if (material != NULL) {
+          return material;
+        }
+      }
+    }
+  }
+  /* Otherwise use data from object-data. */
+  if (slot_index < tot_slots_data) {
+    Material *material = materials_data[slot_index];
+    return material;
+  }
+  return NULL;
+}
+
+int BKE_object_material_count_eval(Object *ob)
+{
+  BLI_assert(DEG_is_evaluated_object(ob));
+  ID *id = get_evaluated_object_data_with_materials(ob);
+  const short *len_p = BKE_id_material_len_p(id);
+  return len_p ? *len_p : 0;
+}
+
+void BKE_id_material_eval_assign(ID *id, int slot, Material *material)
+{
+  Material ***materials_ptr = BKE_id_material_array_p(id);
+  short *len_ptr = BKE_id_material_len_p(id);
+  if (ELEM(NULL, materials_ptr, len_ptr)) {
+    BLI_assert_unreachable();
+    return;
+  }
+
+  const int slot_index = slot - 1;
+  const int old_length = *len_ptr;
+
+  if (slot_index >= old_length) {
+    /* Need to grow slots array. */
+    const int new_length = slot_index + 1;
+    *materials_ptr = MEM_reallocN(*materials_ptr, sizeof(void *) * new_length);
+    *len_ptr = new_length;
+    for (int i = old_length; i < new_length; i++) {
+      (*materials_ptr)[i] = NULL;
+    }
+  }
+
+  (*materials_ptr)[slot_index] = material;
 }
 
 Material *BKE_gpencil_material(Object *ob, short act)
