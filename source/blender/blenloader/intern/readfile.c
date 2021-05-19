@@ -999,15 +999,6 @@ AssetMetaData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *
              NULL;
 }
 
-/* Warning! Caller's responsibility to ensure given bhead **is** an ID one! */
-AssetMetaData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead)
-{
-  BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));
-  return (fd->id_asset_data_offs >= 0) ?
-             *(AssetMetaData **)POINTER_OFFSET(bhead, sizeof(*bhead) + fd->id_asset_data_offs) :
-             NULL;
-}
-
 static void decode_blender_header(FileData *fd)
 {
   char header[SIZEOFBLENDERHEADER], num[4];

@@ -389,12 +389,6 @@ PreviewImage *BKE_previewimg_id_get(const ID *id)
   return prv_p ? *prv_p : nullptr;
 }
 
-PreviewImage *BKE_previewimg_id_get(const ID *id)
-{
-  PreviewImage **prv_p = BKE_previewimg_id_get_p(id);
-  return prv_p ? *prv_p : NULL;
-}
-
 void BKE_previewimg_id_free(ID *id)
 {
   PreviewImage **prv_p = BKE_previewimg_id_get_p(id);
@@ -415,47 +409,6 @@ PreviewImage *BKE_previewimg_id_ensure(ID *id)
   }
 
   return nullptr;
-}
-
-void BKE_previewimg_id_custom_set(ID *id, const char *path)
-{
-  PreviewImage **prv = BKE_previewimg_id_get_p(id);
-
-  /* Thumbnail previews must use the deferred pipeline. But we force them to be immediately
-   * generated here still. */
-
-  if (*prv) {
-    BKE_previewimg_deferred_release(*prv);
-  }
-  *prv = previewimg_deferred_create(path, THB_SOURCE_IMAGE);
-
-  /* Can't lazy-render the preview on access. ID previews are saved to files and we want them to be
-   * there in time. Not only if something happened to have accessed it meanwhile. */
-  for (int i = 0; i < NUM_ICON_SIZES; i++) {
-    BKE_previewimg_ensure(*prv, i);
-    /* Prevent auto-updates. */
-    (*prv)->flag[i] |= PRV_USER_EDITED;
-  }
-}
-
-bool BKE_previewimg_id_supports_jobs(const ID *id)
-{
-  return ELEM(GS(id->name), ID_OB, ID_MA, ID_TE, ID_LA, ID_WO, ID_IM, ID_BR);
-}
-
-void BKE_previewimg_deferred_release(PreviewImage *prv)
-{
-  if (prv) {
-    if (prv->tag & PRV_TAG_DEFFERED_RENDERING) {
-      /* We cannot delete the preview while it is being loaded in another thread... */
-      prv->tag |= PRV_TAG_DEFFERED_DELETE;
-      return;
-    }
-    if (prv->icon_id) {
-      BKE_icon_delete(prv->icon_id);
-    }
-    BKE_previewimg_freefunc(prv);
-  }
 }
 
 void BKE_previewimg_id_custom_set(ID *id, const char *path)

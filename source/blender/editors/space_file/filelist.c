@@ -296,23 +296,6 @@ typedef struct FileListInternEntry {
    * Owning pointer. */
   AssetMetaData *imported_asset_data;
 
-  /**
-   * This is data from the current main, represented by this file. It's crucial that this is
-   * updated correctly on undo, redo and file reading (without UI). That's job of the space to do.
-   */
-  struct {
-    /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), the ID this file entry represents. */
-    ID *id;
-
-    /* For the few file types that have the preview already in memory. For others, there's delayed
-     * preview reading from disk. Non-owning pointer. */
-    PreviewImage *preview_image;
-  } local_data;
-
-  /** When the file represents an asset read from another file, it is stored here.
-   * Owning pointer. */
-  AssetMetaData *imported_asset_data;
-
   /** Defined in BLI_fileops.h */
   eFileAttributes attributes;
   BLI_stat_t st;
