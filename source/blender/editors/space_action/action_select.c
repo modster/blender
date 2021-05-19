@@ -206,12 +206,14 @@ static void actkeys_keyframes_loop_and_select_channel(const short select_mode,
 
   ANIM_animchannel_keyframes_loop(ked, ads, ale, key_ok, key_cb, fcu_cb);
 
-  if (select_mode != SELECT_ADD) {
-    return;
+  switch (ale->datatype) {
+    case ALE_FCURVE: /* F-Curve */
+    {
+      FCurve *fcu = (FCurve *)ale->key_data;
+      actkeys_select_channel_based_on_keys(fcu, select_mode);
+      break;
+    }
   }
-
-  /* For consistency with the Graph Editor, select the fcurve too. */
-  actkeys_channel_select(ale, SELECT_ADD);
 }
 
 static bAnimListElem *actkeys_find_list_element_at_position(bAnimContext *ac,
@@ -614,68 +616,57 @@ static void box_select_elem(
 #endif
     case ANIMTYPE_GPLAYER: {
 
-      bool any_selected = false;
       if (ELEM(
               sel_data->box_selectmode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
-        any_selected = ED_gpencil_layer_frames_select_box(
-            ale->data, xmin, xmax, sel_data->key_selectmode);
+        ED_gpencil_layer_frames_select_box(ale->data, xmin, xmax, sel_data->key_selectmode);
       }
       else if (ELEM(sel_data->box_selectmode, ACTKEYS_BORDERSEL_CHANNELS)) {
-        any_selected = ED_gpencil_select_frames(ale->data, sel_data->key_selectmode);
+        ED_gpencil_select_frames(ale->data, sel_data->key_selectmode);
       }
       else {
         BLI_assert(!"Unknown Box select mode not implemented");
       }
-
-      if (any_selected && sel_data->key_selectmode == SELECT_ADD) {
-        ((bGPDlayer *)ale->data)->flag |= GP_LAYER_SELECT;
+      if (!summary) {
+        ED_gpencil_select_layer_based_on_frames(ale->data);
       }
-
       ale->update |= ANIM_UPDATE_DEPS;
       break;
     }
     case ANIMTYPE_MASKDATABLOCK: {
       Mask *mask = ale->data;
       MaskLayer *masklay;
-
       for (masklay = mask->masklayers.first; masklay; masklay = masklay->next) {
 
-        bool any_selected = false;
         if (ELEM(sel_data->box_selectmode,
                  ACTKEYS_BORDERSEL_FRAMERANGE,
                  ACTKEYS_BORDERSEL_ALLKEYS)) {
-          any_selected = ED_masklayer_frames_select_box(
-              masklay, xmin, xmax, sel_data->key_selectmode);
+          ED_masklayer_frames_select_box(masklay, xmin, xmax, sel_data->key_selectmode);
         }
         else if (ELEM(sel_data->box_selectmode, ACTKEYS_BORDERSEL_CHANNELS)) {
-          any_selected = ED_mask_select_frames(masklay, sel_data->key_selectmode);
+          ED_mask_select_frames(masklay, sel_data->key_selectmode);
         }
         else {
           BLI_assert(!"Unknown Box select mode not implemented");
         }
-
-        if (any_selected && sel_data->key_selectmode == SELECT_ADD) {
-          masklay->flag |= MASK_LAYERFLAG_SELECT;
+        if (!summary) {
+          ED_mask_select_layer_based_on_frames(masklay);
         }
       }
       break;
     }
     case ANIMTYPE_MASKLAYER: {
-      bool any_selected = false;
       if (ELEM(
               sel_data->box_selectmode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
-        any_selected = ED_masklayer_frames_select_box(
-            ale->data, xmin, xmax, sel_data->key_selectmode);
+        ED_masklayer_frames_select_box(ale->data, xmin, xmax, sel_data->key_selectmode);
       }
       else if (ELEM(sel_data->box_selectmode, ACTKEYS_BORDERSEL_CHANNELS)) {
-        any_selected = ED_mask_select_frames(ale->data, sel_data->key_selectmode);
+        ED_mask_select_frames(ale->data, sel_data->key_selectmode);
       }
       else {
         BLI_assert(!"Unknown Box select mode not implemented");
       }
-
-      if (any_selected && sel_data->key_selectmode == SELECT_ADD) {
-        ((MaskLayer *)ale->data)->flag |= MASK_LAYERFLAG_SELECT;
+      if (!summary) {
+        ED_mask_select_layer_based_on_frames(ale->data);
       }
       break;
     }
@@ -914,11 +905,11 @@ static void region_select_elem(RegionSelectData *sel_data, bAnimListElem *ale, b
     }
 #endif
     case ANIMTYPE_GPLAYER: {
-      const bool any_selected = ED_gpencil_layer_frames_select_region(
+      ED_gpencil_layer_frames_select_region(
           &sel_data->ked, ale->data, sel_data->mode, sel_data->selectmode);
 
-      if (any_selected && sel_data->selectmode == SELECT_ADD) {
-        ((bGPDlayer *)ale->data)->flag |= GP_LAYER_SELECT;
+      if (!summary) {
+        ED_gpencil_select_layer_based_on_frames(ale->data);
       }
 
       ale->update |= ANIM_UPDATE_DEPS;
@@ -928,21 +919,19 @@ static void region_select_elem(RegionSelectData *sel_data, bAnimListElem *ale, b
       Mask *mask = ale->data;
       MaskLayer *masklay;
       for (masklay = mask->masklayers.first; masklay; masklay = masklay->next) {
-        const bool any_selected = ED_masklayer_frames_select_region(
+        ED_masklayer_frames_select_region(
             &sel_data->ked, masklay, sel_data->mode, sel_data->selectmode);
-
-        if (any_selected && sel_data->selectmode == SELECT_ADD) {
-          masklay->flag |= MASK_LAYERFLAG_SELECT;
+        if (!summary) {
+          ED_mask_select_layer_based_on_frames(masklay);
         }
       }
       break;
     }
     case ANIMTYPE_MASKLAYER: {
-      const bool any_selected = ED_masklayer_frames_select_region(
+      ED_masklayer_frames_select_region(
           &sel_data->ked, ale->data, sel_data->mode, sel_data->selectmode);
-
-      if (any_selected && sel_data->selectmode == SELECT_ADD) {
-        ((MaskLayer *)ale->data)->flag |= MASK_LAYERFLAG_SELECT;
+      if (!summary) {
+        ED_mask_select_layer_based_on_frames(ale->data);
       }
       break;
     }
@@ -1868,10 +1857,10 @@ static void actkeys_mselect_single(bAnimContext *ac,
     }
     else {
 
-/* Question: Wayde Moss : Which block to use?  */
+// Question: Wayde Moss : Which block to use?
 #if 1
-      /* This block is inconsistent with how the graph editor does channel selection but feels
-       * better. */
+      // This block is inconsistent with how the graph editor does channel selection but feels
+      // better.
       ANIM_animchannel_keyframes_loop(&ked, ac->ads, ale, ok_cb, select_cb, NULL);
 
       switch (ale->datatype) {
@@ -1883,8 +1872,8 @@ static void actkeys_mselect_single(bAnimContext *ac,
         }
       }
 #else
-      /* This block is consistent with how the graph editor does channel selection but feels wrong.
-       */
+      // This block is consistent with how the graph editor does channel selection but feels wrong.
+
       if (!ANIM_animchannel_keyframes_loop(&ked, ac->ads, ale, NULL, ok_cb, NULL)) {
         return;
       }
