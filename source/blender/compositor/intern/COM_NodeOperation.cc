@@ -182,23 +182,30 @@ bool NodeOperation::determineDependingAreaOfInterest(rcti *input,
  * \{ */
 
 /**
- * Get input area being read by this operation.
+ * \brief Get input operation area being read by this operation on rendering given output area.
  *
- * Implementation don't need to ensure r_input_rect is within operation bounds. The caller must
- * clamp it.
+ * Implementation don't need to ensure r_input_area is within input operation bounds. The
+ * caller must clamp it.
+ * TODO: See if it's possible to use parameter overloading (input_id for example).
+ *
+ * \param input_op_idx: Input operation index for which we want to calculate the area being read on
+ * rendering output area.
+ * \param output_area: Output area being rendered by current operation.
+ * \param r_input_area: Returned input operation area that needs to be read in order to render
+ * given output area.
  */
-void NodeOperation::get_area_of_interest(const int input_idx,
-                                         const rcti &output_rect,
-                                         rcti &r_input_rect)
+void NodeOperation::get_area_of_interest(const int input_op_idx,
+                                         const rcti &output_area,
+                                         rcti &r_input_area)
 {
   if (get_flags().is_fullframe_operation) {
-    r_input_rect = output_rect;
+    r_input_area = output_area;
   }
   else {
     /* Non full-frame operations never implement this method. To ensure correctness assume
      * whole area is used. */
-    NodeOperation *input_op = getInputOperation(input_idx);
-    BLI_rcti_init(&r_input_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
+    NodeOperation *input_op = getInputOperation(input_op_idx);
+    BLI_rcti_init(&r_input_area, 0, input_op->getWidth(), 0, input_op->getHeight());
   }
 }
 

@@ -167,11 +167,11 @@ void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation
   active_buffers_.register_render(operation, render_rect);
 
   const int num_inputs = operation->getNumberOfInputSockets();
-  for (int i = 0; i < num_inputs; i++) {
-    NodeOperation *input_op = operation->get_input_operation(i);
+  for (int input_idx = 0; input_idx < num_inputs; input_idx++) {
+    NodeOperation *input_op = operation->get_input_operation(input_idx);
     rcti input_op_rect, input_area;
     BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
-    operation->get_area_of_interest(i, render_rect, input_area);
+    operation->get_area_of_interest(input_idx, render_rect, input_area);
 
     /* Ensure input area of interest is within operation bounds. */
     int dummy_offset[2];
