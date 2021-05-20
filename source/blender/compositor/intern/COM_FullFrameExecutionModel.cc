@@ -36,13 +36,24 @@ FullFrameExecutionModel::FullFrameExecutionModel(CompositorContext &context,
     : ExecutionModel(context, operations),
       active_buffers_(shared_buffers),
       num_operations_finished_(0),
-      priorities_()
+      priorities_(),
+      work_mutex_(),
+      work_finished_cond_()
 {
   priorities_.append(eCompositorPriority::High);
   if (!context.isFastCalculation()) {
     priorities_.append(eCompositorPriority::Medium);
     priorities_.append(eCompositorPriority::Low);
   }
+
+  BLI_mutex_init(&work_mutex_);
+  BLI_condition_init(&work_finished_cond_);
+}
+
+FullFrameExecutionModel::~FullFrameExecutionModel()
+{
+  BLI_condition_end(&work_finished_cond_);
+  BLI_mutex_end(&work_mutex_);
 }
 
 void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
@@ -224,11 +235,6 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
     return;
   }
 
-  ThreadMutex mutex;
-  BLI_mutex_init(&mutex);
-  ThreadCondition work_finished_cond;
-  BLI_condition_init(&work_finished_cond);
-
   /* Split work vertically to maximize continuous memory. */
   const int work_height = BLI_rcti_size_y(&work_rect);
   const int num_sub_works = MIN2(WorkScheduler::get_num_cpu_threads(), work_height);
@@ -259,12 +265,12 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
       work_func(split_rect);
     };
     sub_work.executed_fn = [&]() {
-      BLI_mutex_lock(&mutex);
+      BLI_mutex_lock(&work_mutex_);
       num_sub_works_finished++;
       if (num_sub_works_finished == num_sub_works) {
-        BLI_condition_notify_one(&work_finished_cond);
+        BLI_condition_notify_one(&work_finished_cond_);
       }
-      BLI_mutex_unlock(&mutex);
+      BLI_mutex_unlock(&work_mutex_);
     };
     WorkScheduler::schedule(&sub_work);
     sub_work_y += sub_work_height;
@@ -276,14 +282,11 @@ void FullFrameExecutionModel::execute_work(const rcti &work_rect,
   /* Ensure all sub-works finished.
    * TODO: This a workaround for WorkScheduler::finish() not waiting all works on queue threading
    * model. Sync code should be removed once it's fixed. */
-  BLI_mutex_lock(&mutex);
+  BLI_mutex_lock(&work_mutex_);
   if (num_sub_works_finished < num_sub_works) {
-    BLI_condition_wait(&work_finished_cond, &mutex);
+    BLI_condition_wait(&work_finished_cond_, &work_mutex_);
   }
-  BLI_mutex_unlock(&mutex);
-
-  BLI_condition_end(&work_finished_cond);
-  BLI_mutex_end(&mutex);
+  BLI_mutex_unlock(&work_mutex_);
 }
 
 void FullFrameExecutionModel::operation_finished(NodeOperation *operation)

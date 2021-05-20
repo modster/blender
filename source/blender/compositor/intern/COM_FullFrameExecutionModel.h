@@ -50,10 +50,14 @@ class FullFrameExecutionModel : public ExecutionModel {
    */
   Vector<eCompositorPriority> priorities_;
 
+  ThreadMutex work_mutex_;
+  ThreadCondition work_finished_cond_;
+
  public:
   FullFrameExecutionModel(CompositorContext &context,
                           SharedOperationBuffers &shared_buffers,
                           Span<NodeOperation *> operations);
+  ~FullFrameExecutionModel();
 
   void execute(ExecutionSystem &exec_system) override;
 
