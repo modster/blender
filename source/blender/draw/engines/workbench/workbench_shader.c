@@ -73,7 +73,7 @@ extern char datatoc_workbench_shader_interface_lib_glsl[];
 extern char datatoc_workbench_world_light_lib_glsl[];
 
 extern char datatoc_gpu_shader_depth_only_frag_glsl[];
-extern char datatoc_gpu_shader_common_obinfos_lib_glsl[];
+extern char datatoc_common_obinfos_lib_glsl[];
 
 /* Maximum number of variations. */
 #define MAX_LIGHTING 3
@@ -126,7 +126,7 @@ void workbench_shader_library_ensure(void)
     DRW_SHADER_LIB_ADD(e_data.lib, common_hair_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, common_view_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, common_pointcloud_lib);
-    DRW_SHADER_LIB_ADD(e_data.lib, gpu_shader_common_obinfos_lib);
+    DRW_SHADER_LIB_ADD(e_data.lib, common_obinfos_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, workbench_shader_interface_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, workbench_common_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, workbench_image_lib);

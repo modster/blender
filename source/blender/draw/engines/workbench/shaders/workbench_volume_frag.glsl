@@ -1,7 +1,7 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(gpu_shader_common_obinfos_lib.glsl)
+#pragma BLENDER_REQUIRE(common_obinfos_lib.glsl)
 #pragma BLENDER_REQUIRE(workbench_data_lib.glsl)
 #pragma BLENDER_REQUIRE(workbench_common_lib.glsl)
 

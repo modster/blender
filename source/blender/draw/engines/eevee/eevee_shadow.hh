@@ -64,9 +64,9 @@ struct ShadowPunctual : public AtlasRegion {
 
  private:
   /** A wide cone has an aperture larger than 90° and covers more than 1 cubeface. */
-  bool is_wide_cone_;
+  bool is_wide_cone_ = false;
   /** The shadow covers the whole sphere and all faces needs to be rendered. */
-  bool is_omni_;
+  bool is_omni_ = false;
   /** Clip distances. */
   float near_, far_;
   /** Area light size. */
@@ -263,7 +263,8 @@ class ShadowModule {
   /** Scene immutable parameter. */
   int cube_shadow_res_ = 64;
   bool soft_shadows_enabled_ = false;
-  eGPUTextureFormat shadow_format_;
+  /** Default to invalid texture type. */
+  eGPUTextureFormat shadow_format_ = GPU_RGBA8;
 
   GPUTexture *atlas_tx_ptr_;
 

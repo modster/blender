@@ -39,6 +39,14 @@ typedef enum eGPUShaderTFBType {
   GPU_SHADER_TFB_TRIANGLES = 3,
 } eGPUShaderTFBType;
 
+/* TODO(fclem) Only used by GPUPass but could be used by GPU_shader_create too. */
+typedef struct GPUShaderSource {
+  char *vertex;
+  char *geometry;
+  char *fragment;
+  char *defines;
+} GPUShaderSource;
+
 GPUShader *GPU_shader_create(const char *vertcode,
                              const char *fragcode,
                              const char *geomcode,

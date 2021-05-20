@@ -877,10 +877,7 @@ void ntree_shader_tag_nodes(bNodeTree *ntree, bNode *output_node, nTreeTags *tag
 }
 
 /* This one needs to work on a local tree. */
-void ntreeGPUMaterialNodes(bNodeTree *localtree,
-                           GPUMaterial *mat,
-                           bool *has_surface_output,
-                           bool *has_volume_output)
+void ntreeGPUMaterialNodes(bNodeTree *localtree, GPUMaterial *mat)
 {
   bNodeTreeExec *exec;
 
@@ -929,23 +926,6 @@ void ntreeGPUMaterialNodes(bNodeTree *localtree,
     }
   }
   ntreeShaderEndExecTree(exec);
-
-  /* EEVEE: Find which material domain was used (volume, surface ...). */
-  *has_surface_output = false;
-  *has_volume_output = false;
-
-  if (output != NULL) {
-    bNodeSocket *surface_sock = ntree_shader_node_find_input(output, "Surface");
-    bNodeSocket *volume_sock = ntree_shader_node_find_input(output, "Volume");
-
-    if (surface_sock != NULL) {
-      *has_surface_output = (nodeCountSocketLinks(localtree, surface_sock) > 0);
-    }
-
-    if (volume_sock != NULL) {
-      *has_volume_output = (nodeCountSocketLinks(localtree, volume_sock) > 0);
-    }
-  }
 }
 
 bNodeTreeExec *ntreeShaderBeginExecTree_internal(bNodeExecContext *context,

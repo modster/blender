@@ -27,6 +27,7 @@ layout(std140) uniform shadows_punctual_block
 };
 
 uniform sampler2D depth_tx;
+uniform sampler2D emission_data_tx;
 uniform usampler2D diffuse_data_tx;
 uniform usampler2D reflection_data_tx;
 uniform usampler2D lights_culling_tx;
@@ -46,6 +47,7 @@ void main(void)
   vec3 P = point_view_to_world(vP);
   vec3 V = cameraVec(P);
 
+  ClosureEmission emission = gbuffer_load_emission_data(emission_data_tx, uvcoordsvar.xy);
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(diffuse_data_tx, uvcoordsvar.xy);
   ClosureReflection reflection = gbuffer_load_reflection_data(reflection_data_tx, uvcoordsvar.xy);
 
@@ -74,5 +76,5 @@ void main(void)
 
   out_diffuse = radiance_diffuse * diffuse.color;
   out_specular = radiance_reflection * reflection.color;
-  out_combined = vec4(out_diffuse + out_specular, 0.0);
+  out_combined = vec4(out_diffuse + out_specular + emission.emission, 0.0);
 }

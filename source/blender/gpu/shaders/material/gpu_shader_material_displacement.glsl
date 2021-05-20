@@ -1,9 +1,8 @@
-void node_displacement_object(
-    float height, float midlevel, float scale, vec3 N, mat4 obmat, out vec3 result)
+void node_displacement_object(float height, float midlevel, float scale, vec3 N, out vec3 result)
 {
-  N = (vec4(N, 0.0) * obmat).xyz;
+  N = normal_world_to_object(N);
   result = (height - midlevel) * scale * normalize(N);
-  result = (obmat * vec4(result, 0.0)).xyz;
+  result = normal_object_to_world(result);
 }
 
 void node_displacement_world(float height, float midlevel, float scale, vec3 N, out vec3 result)

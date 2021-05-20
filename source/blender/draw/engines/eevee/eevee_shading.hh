@@ -177,6 +177,7 @@ class DeferredLayer {
  private:
   Instance &inst_;
 
+  GPUTexture *input_emission_data_tx_ = nullptr;
   GPUTexture *input_diffuse_data_tx_ = nullptr;
   GPUTexture *input_depth_tx_ = nullptr;
 
@@ -214,6 +215,7 @@ class DeferredPass {
   GPUTexture *input_combined_tx = nullptr;
   GPUTexture *input_depth_behind_tx_ = nullptr;
   GPUTexture *input_depth_tx_ = nullptr;
+  GPUTexture *input_emission_data_tx_ = nullptr;
   GPUTexture *input_diffuse_data_tx_ = nullptr;
   GPUTexture *input_reflection_data_tx_ = nullptr;
   GPUTexture *input_transparency_data_tx_ = nullptr;

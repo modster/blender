@@ -38,7 +38,8 @@ static int node_shader_gpu_emission(GPUMaterial *mat,
                                     GPUNodeStack *in,
                                     GPUNodeStack *out)
 {
-  return GPU_stack_link(mat, node, "node_emission", in, out, GPU_builtin(GPU_VIEW_NORMAL));
+  GPU_material_flag_set(mat, GPU_MATFLAG_EMISSION);
+  return GPU_stack_link(mat, node, "node_emission", in, out);
 }
 
 /* node type definition */

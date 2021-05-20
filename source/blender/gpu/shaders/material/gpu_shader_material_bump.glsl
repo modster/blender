@@ -14,15 +14,14 @@ void node_bump(float strength,
                float height_dx,
                float height_dy,
                vec3 N,
-               vec3 surf_pos,
                float invert,
                out vec3 result)
 {
   N = mat3(ViewMatrix) * normalize(N);
-  dist *= gl_FrontFacing ? invert : -invert;
+  dist *= FrontFacing ? invert : -invert;
 
-  vec3 dPdx = dFdx(surf_pos);
-  vec3 dPdy = dFdy(surf_pos);
+  vec3 dPdx = dFdx(g_data.P);
+  vec3 dPdy = dFdy(g_data.P);
 
   /* Get surface tangents from normal. */
   vec3 Rx = cross(dPdy, N);
@@ -39,6 +38,4 @@ void node_bump(float strength,
 
   result = normalize(abs(det) * N - dist * sign(det) * surfgrad);
   result = normalize(mix(N, result, strength));
-
-  result = mat3(ViewMatrixInverse) * result;
 }

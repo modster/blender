@@ -26,10 +26,13 @@
 #include "eevee_shader.hh"
 #include "eevee_material.hh"
 
+extern char datatoc_common_attribute_lib_glsl[];
 extern char datatoc_common_fullscreen_vert_glsl[];
 extern char datatoc_common_hair_lib_glsl[];
 extern char datatoc_common_math_geom_lib_glsl[];
 extern char datatoc_common_math_lib_glsl[];
+extern char datatoc_common_obinfos_lib_glsl[];
+extern char datatoc_common_uniform_attribute_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
 
 extern char datatoc_eevee_camera_lib_glsl[];
@@ -90,6 +93,8 @@ extern char datatoc_eevee_volume_vert_glsl[];
 
 extern char datatoc_eevee_shader_shared_hh[];
 
+extern char datatoc_gpu_shader_codegen_lib_glsl[];
+
 namespace blender::eevee {
 
 /** \} */
@@ -114,6 +119,8 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, common_attribute_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, gpu_shader_codegen_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_closure_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_gbuffer_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_nodetree_eval_lib);
@@ -339,7 +346,7 @@ std::string ShaderModule::enum_preprocess(const char *input)
  *
  * \{ */
 
-std::string ShaderModule::material_shader_code_defs_get(eMaterialDomain domain_type)
+char *ShaderModule::material_shader_code_defs_get(eMaterialDomain domain_type)
 {
   std::string output = "";
 
@@ -353,101 +360,219 @@ std::string ShaderModule::material_shader_code_defs_get(eMaterialDomain domain_t
       output += "#define MESH_SHADER\n";
       break;
   }
-  return output;
+  return BLI_strdup(output.c_str());
 }
 
-char *ShaderModule::material_shader_code_vert_get(eMaterialGeometry geometry_type)
+char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codegen,
+                                                  GPUMaterial *mat,
+                                                  eMaterialGeometry geometry_type)
 {
-  switch (geometry_type) {
-    case MAT_GEOM_VOLUME:
-      return DRW_shader_library_create_shader_string(shader_lib_, datatoc_eevee_volume_vert_glsl);
-    default:
-      return DRW_shader_library_create_shader_string(shader_lib_,
-                                                     datatoc_eevee_surface_mesh_vert_glsl);
-  }
-}
+  std::string output = "\n\n";
 
-char *ShaderModule::material_shader_code_frag_get(eMaterialGeometry geometry_type,
-                                                  eMaterialPipeline pipeline_type)
-{
-  char const *frag_code;
-
-  switch (geometry_type) {
-    case MAT_GEOM_VOLUME:
-      frag_code = (pipeline_type == MAT_PIPE_DEFERRED) ? datatoc_eevee_volume_deferred_frag_glsl :
-                                                         nullptr; /* TODO */
-      break;
-    default:
-      frag_code = (pipeline_type == MAT_PIPE_DEFERRED) ? datatoc_eevee_surface_deferred_frag_glsl :
-                                                         datatoc_eevee_surface_forward_frag_glsl;
-      break;
+  /* Might be needed by attr_load_orco. */
+  if (GPU_material_flag_get(mat, GPU_MATFLAG_OBJECT_INFO)) {
+    output += datatoc_common_obinfos_lib_glsl;
   }
 
-  return DRW_shader_library_create_shader_string(shader_lib_, frag_code);
+  if (codegen->attribs_interface) {
+    /* Declare inputs. */
+    std::string delimiter = ";\n";
+    std::string sub(codegen->attribs_declare);
+    size_t pos = 0;
+    while ((pos = sub.find(delimiter)) != std::string::npos) {
+      switch (geometry_type) {
+        case MAT_GEOM_MESH:
+          /* Example print:
+           * in vec2 u015684; */
+          output += "in ";
+          output += sub.substr(0, pos + delimiter.length());
+          break;
+        case MAT_GEOM_HAIR:
+          /* Example print:
+           * uniform samplerBuffer u015684; */
+          output += "uniform samplerBuffer ";
+          output += sub.substr(sub.find(" ") + 1, pos + delimiter.length());
+          break;
+        case MAT_GEOM_GPENCIL:
+        case MAT_GEOM_VOLUME:
+          /* Not supported. */
+          break;
+      }
+      sub.erase(0, pos + delimiter.length());
+    }
+    output += "\n";
+
+    output += "IN_OUT AttributesInterface\n";
+    output += "{\n";
+    output += codegen->attribs_interface;
+    output += "};\n\n";
+  }
+
+  output += "void attrib_load(void)\n";
+  output += "{\n";
+  if (codegen->attribs_load) {
+    output += codegen->attribs_load;
+  }
+  output += "}\n\n";
+
+  if (codegen->displacement) {
+    if (GPU_material_flag_get(mat, GPU_MATFLAG_UNIFORMS_ATTRIB)) {
+      output += datatoc_common_uniform_attribute_lib_glsl;
+    }
+    output += codegen->uniforms;
+    output += "\n";
+    output += codegen->library;
+    output += "\n";
+  }
+
+  output += "vec3 nodetree_displacement(void)\n";
+  output += "{\n";
+  if (codegen->displacement) {
+    output += codegen->displacement;
+  }
+  else {
+    output += "return vec3(0);\n";
+  }
+  output += "}\n\n";
+
+  switch (geometry_type) {
+    case MAT_GEOM_VOLUME:
+      output += datatoc_eevee_volume_vert_glsl;
+      break;
+    default:
+      output += datatoc_eevee_surface_mesh_vert_glsl;
+      break;
+  }
+
+  return DRW_shader_library_create_shader_string(shader_lib_, output.c_str());
 }
 
-static void material_post_eval(GPUMaterial *mat,
-                               int options,
-                               const char **UNUSED(vert_code),
-                               const char **geom_code,
-                               const char **UNUSED(frag_lib),
-                               const char **UNUSED(defines))
+char *ShaderModule::material_shader_code_geom_get(const GPUCodegenOutput *UNUSED(codegen),
+                                                  GPUMaterial *mat,
+                                                  eMaterialGeometry geometry_type,
+                                                  eMaterialDomain domain_type)
 {
-  const bool is_hair = (options & MAT_GEOM_HAIR) != 0;
-  const bool is_surface = (options & MAT_DOMAIN_SURFACE) != 0;
-
   /* Force geometry usage if GPU_BARYCENTRIC_DIST or GPU_BARYCENTRIC_TEXCO are used.
    * Note: GPU_BARYCENTRIC_TEXCO only requires it if the shader is not drawing hairs. */
-  if (!is_hair && is_surface && GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC) &&
-      *geom_code == NULL) {
+  if ((geometry_type != MAT_GEOM_HAIR) && (domain_type == MAT_DOMAIN_SURFACE) &&
+      GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC)) {
     /* TODO. */
     BLI_assert(0);
   }
+  return nullptr;
 }
 
-GPUMaterial *ShaderModule::material_shader_get(Scene *scene,
-                                               ::Material *blender_mat,
+char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codegen,
+                                                  GPUMaterial *mat,
+                                                  eMaterialGeometry geometry_type,
+                                                  eMaterialPipeline pipeline_type)
+{
+  std::string output = "\n\n";
+
+  if (codegen->attribs_interface) {
+    output += "IN_OUT AttributesInterface\n";
+    output += "{\n";
+    output += codegen->attribs_interface;
+    output += "};\n\n";
+  }
+
+  if (codegen->surface || codegen->volume) {
+    if (GPU_material_flag_get(mat, GPU_MATFLAG_UNIFORMS_ATTRIB)) {
+      output += datatoc_common_uniform_attribute_lib_glsl;
+    }
+    if (GPU_material_flag_get(mat, GPU_MATFLAG_OBJECT_INFO)) {
+      output += datatoc_common_obinfos_lib_glsl;
+    }
+    output += codegen->uniforms;
+    output += "\n";
+    output += codegen->library;
+    output += "\n";
+  }
+
+  output += "Closure nodetree_surface(void)\n";
+  output += "{\n";
+  if (codegen->surface) {
+    output += codegen->surface;
+  }
+  else {
+    output += "return CLOSURE_DEFAULT;\n";
+  }
+  output += "}\n\n";
+
+  output += "Closure nodetree_volume(void)\n";
+  output += "{\n";
+  if (codegen->volume) {
+    output += codegen->volume;
+  }
+  else {
+    output += "return CLOSURE_DEFAULT;\n";
+  }
+  output += "}\n\n";
+
+  switch (geometry_type) {
+    case MAT_GEOM_VOLUME:
+      if (pipeline_type == MAT_PIPE_DEFERRED) {
+        output += datatoc_eevee_volume_deferred_frag_glsl;
+      }
+      else {
+        output += nullptr; /* TODO */
+      }
+      break;
+    default:
+      if (pipeline_type == MAT_PIPE_DEFERRED) {
+        output += datatoc_eevee_surface_deferred_frag_glsl;
+      }
+      else {
+        output += datatoc_eevee_surface_forward_frag_glsl;
+      }
+      break;
+  }
+
+  return DRW_shader_library_create_shader_string(shader_lib_, output.c_str());
+}
+
+/* WATCH: This can be called from another thread! Needs to not touch the shader module in any
+ * thread unsafe manner. */
+GPUShaderSource ShaderModule::material_shader_code_generate(GPUMaterial *mat,
+                                                            const GPUCodegenOutput *codegen)
+{
+  uint64_t shader_uuid = GPU_material_uuid_get(mat);
+
+  eMaterialPipeline pipeline_type;
+  eMaterialGeometry geometry_type;
+  eMaterialDomain domain_type;
+  material_type_from_shader_uuid(shader_uuid, pipeline_type, geometry_type, domain_type);
+
+  GPUShaderSource source;
+  source.vertex = material_shader_code_vert_get(codegen, mat, geometry_type);
+  source.fragment = material_shader_code_frag_get(codegen, mat, geometry_type, pipeline_type);
+  source.geometry = material_shader_code_geom_get(codegen, mat, geometry_type, domain_type);
+  source.defines = material_shader_code_defs_get(domain_type);
+  return source;
+}
+
+static GPUShaderSource codegen_callback(void *thunk,
+                                        GPUMaterial *mat,
+                                        const GPUCodegenOutput *codegen)
+{
+  return ((ShaderModule *)thunk)->material_shader_code_generate(mat, codegen);
+}
+
+GPUMaterial *ShaderModule::material_shader_get(::Material *blender_mat,
+                                               struct bNodeTree *nodetree,
                                                eMaterialGeometry geometry_type,
                                                eMaterialDomain domain_type,
                                                bool deferred_compilation)
 {
-  /* This work for now as we share the material module with all instance. */
-  void *engine_id = (void *)&DRW_engine_viewport_eevee_type;
-
   /* TODO derive from mat. */
   eMaterialPipeline pipeline_type = MAT_PIPE_DEFERRED;
 
-  int options = geometry_type | (domain_type << 2) | (pipeline_type << 3);
-
-  GPUMaterial *gpumat = GPU_material_from_nodetree_find(
-      &blender_mat->gpumaterial, engine_id, options);
-  if (gpumat) {
-    return gpumat;
-  }
+  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type, domain_type);
 
   bool is_volume = (domain_type == MAT_DOMAIN_SURFACE);
 
-  char *vert_code = material_shader_code_vert_get(geometry_type);
-  char *frag_code = material_shader_code_frag_get(geometry_type, pipeline_type);
-  std::string defines_code = material_shader_code_defs_get(domain_type);
-
-  gpumat = DRW_shader_create_from_material(scene,
-                                           blender_mat,
-                                           blender_mat->nodetree,
-                                           engine_id,
-                                           options,
-                                           is_volume,
-                                           vert_code,
-                                           nullptr,
-                                           frag_code,
-                                           defines_code.c_str(),
-                                           deferred_compilation,
-                                           material_post_eval);
-
-  MEM_SAFE_FREE(vert_code);
-  MEM_SAFE_FREE(frag_code);
-
-  return gpumat;
+  return DRW_shader_from_material(
+      blender_mat, nodetree, shader_uuid, is_volume, deferred_compilation, codegen_callback, this);
 }
 
 /** \} */

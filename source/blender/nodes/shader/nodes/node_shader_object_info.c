@@ -38,15 +38,8 @@ static int node_shader_gpu_object_info(GPUMaterial *mat,
 {
   Material *ma = GPU_material_get_material(mat);
   float index = ma ? ma->index : 0.0f;
-  return GPU_stack_link(mat,
-                        node,
-                        "node_object_info",
-                        in,
-                        out,
-                        GPU_builtin(GPU_OBJECT_MATRIX),
-                        GPU_builtin(GPU_OBJECT_COLOR),
-                        GPU_builtin(GPU_OBJECT_INFO),
-                        GPU_constant(&index));
+  GPU_material_flag_set(mat, GPU_MATFLAG_OBJECT_INFO);
+  return GPU_stack_link(mat, node, "node_object_info", in, out, GPU_constant(&index));
 }
 
 void register_node_type_sh_object_info(void)

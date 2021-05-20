@@ -42,23 +42,22 @@ static int node_shader_gpu_tex_coord(GPUMaterial *mat,
 {
   Object *ob = (Object *)node->id;
 
+  /* Use special matrix to let the shader branch to using the render object's matrix. */
+  float nan_matrix[4][4];
+  nan_matrix[3][3] = 0.0f;
   GPUNodeLink *inv_obmat = (ob != NULL) ? GPU_uniform(&ob->imat[0][0]) :
-                                          GPU_builtin(GPU_INVERSE_OBJECT_MATRIX);
+                                          GPU_uniform(&nan_matrix[0][0]);
 
   /* Opti: don't request orco if not needed. */
   GPUNodeLink *orco = (!out[0].hasoutput) ? GPU_constant((float[4]){0.0f, 0.0f, 0.0f, 0.0f}) :
                                             GPU_attribute(mat, CD_ORCO, "");
   GPUNodeLink *mtface = GPU_attribute(mat, CD_MTFACE, "");
-  GPUNodeLink *viewpos = GPU_builtin(GPU_VIEW_POSITION);
-  GPUNodeLink *worldnor = GPU_builtin(GPU_WORLD_NORMAL);
-  GPUNodeLink *texcofacs = GPU_builtin(GPU_CAMERA_TEXCO_FACTORS);
 
   if (out[0].hasoutput) {
     GPU_link(mat, "generated_from_orco", orco, &orco);
   }
 
-  GPU_stack_link(
-      mat, node, "node_tex_coord", in, out, viewpos, worldnor, inv_obmat, texcofacs, orco, mtface);
+  GPU_stack_link(mat, node, "node_tex_coord", in, out, inv_obmat, orco, mtface);
 
   /* for each output. */
   for (int i = 0; sh_node_tex_coord_out[i].type != -1; i++) {

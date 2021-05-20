@@ -87,8 +87,6 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
                                            GPUNodeStack *in,
                                            GPUNodeStack *out)
 {
-  GPUNodeLink *sss_scale;
-
   /* Normals */
   if (!in[20].link) {
     GPU_link(mat, "world_normals_get", &in[20].link);
@@ -104,12 +102,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
   if (!in[22].link) {
     GPUNodeLink *orco = GPU_attribute(CD_ORCO, "");
     GPU_link(mat, "tangent_orco_z", orco, &in[22].link);
-    GPU_link(mat,
-             "node_tangent",
-             GPU_builtin(GPU_WORLD_NORMAL),
-             in[22].link,
-             GPU_builtin(GPU_OBJECT_MATRIX),
-             &in[22].link);
+    GPU_link(mat, "node_tangent", in[22].link, &in[22].link);
   }
 #endif
 
@@ -117,22 +110,6 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
   bool use_subsurf = socket_not_zero(1) && use_diffuse && node->sss_id > 0;
   bool use_refract = socket_not_one(4) && socket_not_zero(15);
   bool use_clear = socket_not_zero(12);
-
-  /* SSS Profile */
-  if (use_subsurf) {
-    static short profile = SHD_SUBSURFACE_BURLEY;
-    bNodeSocket *socket = BLI_findlink(&node->original->inputs, 2);
-    bNodeSocketValueRGBA *socket_data = socket->default_value;
-    /* For some reason it seems that the socket value is in ARGB format. */
-    GPU_material_sss_profile_create(mat, &socket_data->value[1], &profile, NULL);
-  }
-
-  if (in[2].link) {
-    sss_scale = in[2].link;
-  }
-  else {
-    GPU_link(mat, "set_rgb_one", &sss_scale);
-  }
 
   uint flag = GPU_MATFLAG_GLOSSY;
   if (use_diffuse) {
@@ -142,7 +119,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
     flag |= GPU_MATFLAG_REFRACT;
   }
   if (use_subsurf) {
-    flag |= GPU_MATFLAG_SSS;
+    flag |= GPU_MATFLAG_SUBSURFACE;
   }
 
   float f_use_diffuse = use_diffuse ? 1.0f : 0.0f;
@@ -162,8 +139,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
                         GPU_constant(&f_use_refraction),
                         GPU_constant(&use_multi_scatter),
                         GPU_constant(&node->ssr_id),
-                        GPU_constant(&node->sss_id),
-                        sss_scale);
+                        GPU_constant(&node->sss_id));
 }
 
 static void node_shader_update_principled(bNodeTree *UNUSED(ntree), bNode *node)

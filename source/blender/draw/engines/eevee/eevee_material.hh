@@ -83,8 +83,8 @@ class MaterialModule {
  private:
   Instance &inst_;
 
-  Map<MaterialKey, Material> material_map_;
-  Map<ShaderKey, DRWShadingGroup *> shader_map_;
+  Map<MaterialKey, Material *> material_map_;
+  Map<ShaderKey, DRWShadingGroup **> shader_map_;
 
   MaterialArray material_array_;
 

@@ -1,13 +1,9 @@
 
 void node_bsdf_translucent(vec4 color, vec3 N, out Closure result)
 {
-  CLOSURE_VARS_DECLARE_1(Translucent);
-
-  in_Translucent_0.N = -N; /* Normalized during eval. */
-
-  CLOSURE_EVAL_FUNCTION_1(node_bsdf_translucent, Translucent);
-
-  result = CLOSURE_DEFAULT;
-  closure_load_ssr_data(vec3(0.0), 0.0, -in_Translucent_0.N, -1.0, result);
-  result.radiance = render_pass_diffuse_mask(color.rgb, out_Translucent_0.radiance * color.rgb);
+  g_diffuse_data.color = color.rgb;
+  g_diffuse_data.N = -N;
+  g_diffuse_data.thickness = 0.0;
+  g_diffuse_data.sss_radius = vec3(0);
+  g_diffuse_data.sss_id = 0u;
 }

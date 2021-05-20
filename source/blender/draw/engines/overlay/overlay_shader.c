@@ -129,7 +129,6 @@ extern char datatoc_gpu_shader_2D_smooth_color_frag_glsl[];
 extern char datatoc_gpu_shader_uniform_color_frag_glsl[];
 extern char datatoc_gpu_shader_flat_color_frag_glsl[];
 extern char datatoc_gpu_shader_point_varying_color_varying_outline_aa_frag_glsl[];
-extern char datatoc_gpu_shader_common_obinfos_lib_glsl[];
 
 extern char datatoc_gpencil_common_lib_glsl[];
 
@@ -141,6 +140,7 @@ extern char datatoc_common_smaa_lib_glsl[];
 extern char datatoc_common_globals_lib_glsl[];
 extern char datatoc_common_pointcloud_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
+extern char datatoc_common_obinfos_lib_glsl[];
 
 typedef struct OVERLAY_Shaders {
   GPUShader *antialiasing;
@@ -893,7 +893,7 @@ GPUShader *OVERLAY_shader_extra_grid(void)
         .vert = (const char *[]){sh_cfg->lib,
                                  datatoc_common_view_lib_glsl,
                                  datatoc_common_globals_lib_glsl,
-                                 datatoc_gpu_shader_common_obinfos_lib_glsl,
+                                 datatoc_common_obinfos_lib_glsl,
                                  datatoc_extra_lightprobe_grid_vert_glsl,
                                  NULL},
         .frag = (const char *[]){datatoc_gpu_shader_point_varying_color_frag_glsl, NULL},
@@ -1163,7 +1163,7 @@ GPUShader *OVERLAY_shader_outline_prepass(bool use_wire)
     sh_data->outline_prepass_wire = GPU_shader_create_from_arrays({
         .vert = (const char *[]){sh_cfg->lib,
                                  datatoc_common_view_lib_glsl,
-                                 datatoc_gpu_shader_common_obinfos_lib_glsl,
+                                 datatoc_common_obinfos_lib_glsl,
                                  datatoc_outline_prepass_vert_glsl,
                                  NULL},
         .geom = (const char *[]){sh_cfg->lib,
@@ -1178,7 +1178,7 @@ GPUShader *OVERLAY_shader_outline_prepass(bool use_wire)
     sh_data->outline_prepass = GPU_shader_create_from_arrays({
         .vert = (const char *[]){sh_cfg->lib,
                                  datatoc_common_view_lib_glsl,
-                                 datatoc_gpu_shader_common_obinfos_lib_glsl,
+                                 datatoc_common_obinfos_lib_glsl,
                                  datatoc_outline_prepass_vert_glsl,
                                  NULL},
         .frag = (const char *[]){datatoc_outline_prepass_frag_glsl, NULL},
@@ -1198,7 +1198,7 @@ GPUShader *OVERLAY_shader_outline_prepass_gpencil(void)
         .vert = (const char *[]){sh_cfg->lib,
                                  datatoc_common_view_lib_glsl,
                                  datatoc_gpencil_common_lib_glsl,
-                                 datatoc_gpu_shader_common_obinfos_lib_glsl,
+                                 datatoc_common_obinfos_lib_glsl,
                                  datatoc_outline_prepass_vert_glsl,
                                  NULL},
         .frag = (const char *[]){datatoc_common_view_lib_glsl,
@@ -1224,7 +1224,7 @@ GPUShader *OVERLAY_shader_outline_prepass_pointcloud(void)
         .vert = (const char *[]){sh_cfg->lib,
                                  datatoc_common_view_lib_glsl,
                                  datatoc_common_pointcloud_lib_glsl,
-                                 datatoc_gpu_shader_common_obinfos_lib_glsl,
+                                 datatoc_common_obinfos_lib_glsl,
                                  datatoc_outline_prepass_vert_glsl,
                                  NULL},
         .frag = (const char *[]){datatoc_common_view_lib_glsl,
@@ -1537,7 +1537,7 @@ GPUShader *OVERLAY_shader_wireframe_select(void)
         .vert = (const char *[]){sh_cfg->lib,
                                  datatoc_common_view_lib_glsl,
                                  datatoc_common_globals_lib_glsl,
-                                 datatoc_gpu_shader_common_obinfos_lib_glsl,
+                                 datatoc_common_obinfos_lib_glsl,
                                  datatoc_wireframe_vert_glsl,
                                  NULL},
         .frag = (const char *[]){datatoc_wireframe_frag_glsl, NULL},
@@ -1557,7 +1557,7 @@ GPUShader *OVERLAY_shader_wireframe(bool custom_bias)
         .vert = (const char *[]){sh_cfg->lib,
                                  datatoc_common_view_lib_glsl,
                                  datatoc_common_globals_lib_glsl,
-                                 datatoc_gpu_shader_common_obinfos_lib_glsl,
+                                 datatoc_common_obinfos_lib_glsl,
                                  datatoc_wireframe_vert_glsl,
                                  NULL},
         .frag = (const char *[]){datatoc_common_view_lib_glsl,

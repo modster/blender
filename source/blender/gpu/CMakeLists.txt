@@ -61,7 +61,7 @@ set(SRC
   intern/gpu_batch_utils.c
   intern/gpu_buffers.c
   intern/gpu_capabilities.cc
-  intern/gpu_codegen.c
+  intern/gpu_codegen.cc
   intern/gpu_context.cc
   intern/gpu_debug.cc
   intern/gpu_drawlist.cc
@@ -365,9 +365,6 @@ data_to_c_simple(shaders/gpu_shader_gpencil_stroke_geom.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_cfg_world_clip_lib.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_colorspace_lib.glsl SRC)
-
-data_to_c_simple(shaders/gpu_shader_common_obinfos_lib.glsl SRC)
-
 
 if(WITH_MOD_FLUID)
   add_definitions(-DWITH_FLUID)

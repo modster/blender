@@ -26,6 +26,10 @@
 
 #include "GPU_material.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MAX_FUNCTION_NAME 64
 #define MAX_PARAMETER 32
 
@@ -58,9 +62,13 @@ void gpu_material_library_exit(void);
 /* Code Generation */
 
 GPUFunction *gpu_material_library_use_function(struct GSet *used_libraries, const char *name);
-char *gpu_material_library_generate_code(struct GSet *used_libraries, const char *frag_lib);
+char *gpu_material_library_generate_code(struct GSet *used_libraries);
 
 /* Code Parsing */
 
 char *gpu_str_skip_token(char *str, char *token, int max);
 const char *gpu_data_type_to_string(const eGPUType type);
+
+#ifdef __cplusplus
+}
+#endif

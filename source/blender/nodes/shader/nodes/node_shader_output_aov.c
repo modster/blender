@@ -39,15 +39,12 @@ static int node_shader_gpu_output_aov(GPUMaterial *mat,
                                       bNode *node,
                                       bNodeExecData *UNUSED(execdata),
                                       GPUNodeStack *in,
-                                      GPUNodeStack *out)
+                                      GPUNodeStack *UNUSED(out))
 {
-  GPUNodeLink *outlink;
   NodeShaderOutputAOV *aov = (NodeShaderOutputAOV *)node->storage;
   /* Keep in sync with `renderpass_lib.glsl#render_pass_aov_hash`. */
   unsigned int hash = BLI_hash_string(aov->name) & ~1;
-  GPU_stack_link(mat, node, "node_output_aov", in, out, &outlink);
-  GPU_material_add_output_link_aov(mat, outlink, hash);
-
+  GPU_material_add_output_link_aov(mat, in[0].link, hash);
   return true;
 }
 

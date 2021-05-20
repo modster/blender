@@ -7,7 +7,7 @@ IN_OUT VolumeDataInterface
 interp;
 
 #ifdef GPU_FRAGMENT_SHADER
-GlobalData init_from_interp(void)
+GlobalData init_globals(void)
 {
   GlobalData volume;
   volume.P = interp.P_start;

@@ -158,7 +158,7 @@ void Instance::object_sync(Object *ob)
         GPUBatch **mat_geom = DRW_cache_object_surface_material_get(
             ob, material_array.gpu_materials.data(), material_array.gpu_materials.size());
 
-        for (auto i : IndexRange(ob->totcol)) {
+        for (auto i : material_array.gpu_materials.index_range()) {
           if (mat_geom[i] == nullptr) {
             continue;
           }

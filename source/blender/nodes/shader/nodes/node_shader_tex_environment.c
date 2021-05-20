@@ -69,7 +69,7 @@ static int node_shader_gpu_tex_environment(GPUMaterial *mat,
   }
 
   if (!in[0].link) {
-    GPU_link(mat, "node_tex_environment_texco", GPU_builtin(GPU_VIEW_POSITION), &in[0].link);
+    GPU_link(mat, "node_tex_environment_texco", &in[0].link);
     node_shader_gpu_bump_tex_coord(mat, node, &in[0].link);
   }
 

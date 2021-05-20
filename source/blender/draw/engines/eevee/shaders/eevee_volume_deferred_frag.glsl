@@ -16,7 +16,7 @@ layout(location = 1) out vec4 out_transparency_data; /* Transparent BSDF, Holdou
 
 void main(void)
 {
-  // g_volume = init_from_interp();
+  // g_volume = init_globals();
 
   vec2 uv = gl_FragCoord.xy / vec2(textureSize(depth_max_tx, 0).xy);
 

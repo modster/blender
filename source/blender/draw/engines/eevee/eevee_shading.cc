@@ -97,8 +97,8 @@ void DeferredLayer::surface_add(Object *ob, GPUBatch *geom, Material *material)
   DRWShadingGroup *&grp = *matpass.shgrp;
 
   if (grp == nullptr) {
-    uint stencil_mask = CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_TRANSPARENCY;
-
+    uint stencil_mask = CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_TRANSPARENCY |
+                        CLOSURE_EMISSION;
     grp = DRW_shgroup_material_create(matpass.gpumat, gbuffer_ps_);
     DRW_shgroup_stencil_set(grp, stencil_mask, 0xFF, 0xFF);
   }
@@ -138,6 +138,7 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
 
   DeferredPass &deferred_pass = inst_.shading_passes.deferred;
 
+  deferred_pass.input_emission_data_tx_ = gbuffer.emission_tx;
   deferred_pass.input_diffuse_data_tx_ = gbuffer.diffuse_tx;
   deferred_pass.input_reflection_data_tx_ = gbuffer.reflection_tx;
 
@@ -203,10 +204,12 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
     DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
     DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
+    DRW_shgroup_uniform_texture_ref(grp, "emission_data_tx", &input_emission_data_tx_);
     DRW_shgroup_uniform_texture_ref(grp, "diffuse_data_tx", &input_diffuse_data_tx_);
     DRW_shgroup_uniform_texture_ref(grp, "reflection_data_tx", &input_reflection_data_tx_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
-    DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_DIFFUSE | CLOSURE_REFLECTION);
+    DRW_shgroup_stencil_set(
+        grp, 0x0, 0x0, CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_EMISSION);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {
@@ -267,6 +270,7 @@ void DeferredPass::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
   /* TODO. Remove. */
   gbuffer.bind(CLOSURE_DIFFUSE);
 
+  input_emission_data_tx_ = gbuffer.emission_tx;
   input_diffuse_data_tx_ = gbuffer.diffuse_tx;
   input_reflection_data_tx_ = gbuffer.reflection_tx;
   input_transparency_data_tx_ = gbuffer.transparency_tx;

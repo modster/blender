@@ -40,36 +40,25 @@ static bNodeSocketTemplate sh_node_output_material_in[] = {
 };
 
 static int node_shader_gpu_output_material(GPUMaterial *mat,
-                                           bNode *node,
+                                           bNode *UNUSED(node),
                                            bNodeExecData *UNUSED(execdata),
                                            GPUNodeStack *in,
-                                           GPUNodeStack *out)
+                                           GPUNodeStack *UNUSED(out))
 {
-  GPUNodeLink *outlink, *alpha_threshold_link, *shadow_threshold_link;
-  Material *ma = GPU_material_get_material(mat);
-
-  static float no_alpha_threshold = -1.0f;
-  if (ma) {
-    alpha_threshold_link = GPU_uniform((ma->blend_method == MA_BM_CLIP) ? &ma->alpha_threshold :
-                                                                          &no_alpha_threshold);
-    shadow_threshold_link = GPU_uniform((ma->blend_shadow == MA_BS_CLIP) ? &ma->alpha_threshold :
-                                                                           &no_alpha_threshold);
+  GPUNodeLink *outlink_surface, *outlink_volume, *outlink_displacement;
+  /* Passthrough node in order to do the right socket conversions (important for displacement). */
+  if (in[0].link) {
+    GPU_link(mat, "node_output_material_surface", in[0].link, &outlink_surface);
+    GPU_material_output_surface(mat, outlink_surface);
   }
-  else {
-    alpha_threshold_link = GPU_uniform(&no_alpha_threshold);
-    shadow_threshold_link = GPU_uniform(&no_alpha_threshold);
+  if (in[1].link) {
+    GPU_link(mat, "node_output_material_volume", in[1].link, &outlink_volume);
+    GPU_material_output_volume(mat, outlink_volume);
   }
-
-  GPU_stack_link(mat,
-                 node,
-                 "node_output_material",
-                 in,
-                 out,
-                 alpha_threshold_link,
-                 shadow_threshold_link,
-                 &outlink);
-  GPU_material_output_link(mat, outlink);
-
+  if (in[2].link) {
+    GPU_link(mat, "node_output_material_displacement", in[2].link, &outlink_displacement);
+    GPU_material_output_displacement(mat, outlink_displacement);
+  }
   return true;
 }
 

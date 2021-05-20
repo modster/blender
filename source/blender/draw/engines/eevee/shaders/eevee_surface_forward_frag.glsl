@@ -30,13 +30,13 @@ uniform sampler2DShadow shadow_atlas_tx;
 layout(location = 0, index = 0) out vec4 out_radiance;
 layout(location = 0, index = 1) out vec4 out_transmittance;
 
-GlobalData g_data;
-
 void main(void)
 {
-  g_data = init_from_interp();
+  g_data = init_globals();
 
-  nodetree_eval(g_data.N);
+  ntree_eval_set_defaults();
+
+  nodetree_surface();
 
   float vP_z = get_view_z_from_depth(gl_FragCoord.z);
   vec3 V = cameraVec(g_data.P);

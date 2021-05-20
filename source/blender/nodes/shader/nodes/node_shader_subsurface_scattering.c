@@ -51,22 +51,9 @@ static int node_shader_gpu_subsurface_scattering(GPUMaterial *mat,
     GPU_link(mat, "world_normals_get", &in[5].link);
   }
 
-  if (node->sss_id > 0) {
-    bNodeSocket *socket = BLI_findlink(&node->original->inputs, 2);
-    bNodeSocketValueRGBA *socket_data = socket->default_value;
-    bNodeSocket *socket_sharp = BLI_findlink(&node->original->inputs, 3);
-    bNodeSocketValueFloat *socket_data_sharp = socket_sharp->default_value;
-    /* For some reason it seems that the socket value is in ARGB format. */
-    GPU_material_sss_profile_create(
-        mat, &socket_data->value[1], &node->original->custom1, &socket_data_sharp->value);
+  GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE | GPU_MATFLAG_SUBSURFACE);
 
-    /* sss_id is 0 only the node is not connected to any output.
-     * In this case flagging the material would trigger a bug (see T68736). */
-    GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE | GPU_MATFLAG_SSS);
-  }
-
-  return GPU_stack_link(
-      mat, node, "node_subsurface_scattering", in, out, GPU_constant(&node->sss_id));
+  return GPU_stack_link(mat, node, "node_subsurface_scattering", in, out);
 }
 
 static void node_shader_update_subsurface_scattering(bNodeTree *UNUSED(ntree), bNode *node)

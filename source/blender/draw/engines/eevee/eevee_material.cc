@@ -156,6 +156,14 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
 
 MaterialModule::~MaterialModule()
 {
+  for (Material *mat : material_map_.values()) {
+    delete mat;
+    mat = nullptr;
+  }
+  for (DRWShadingGroup **shgroup : shader_map_.values()) {
+    delete shgroup;
+    shgroup = nullptr;
+  }
   BKE_id_free(NULL, glossy_mat_);
   BKE_id_free(NULL, diffuse_mat_);
   BKE_id_free(NULL, error_mat_);
@@ -165,12 +173,12 @@ void MaterialModule::begin_sync(void)
 {
   queued_shaders_count_ = 0;
 
-  for (Material &mat : material_map_.values()) {
-    mat.shading.shgrp = nullptr;
-    mat.shadow.shgrp = nullptr;
+  for (Material *mat : material_map_.values()) {
+    mat->shading.shgrp = nullptr;
+    mat->shadow.shgrp = nullptr;
   }
-  for (DRWShadingGroup *&shgroup : shader_map_.values()) {
-    shgroup = nullptr;
+  for (DRWShadingGroup **shgroup : shader_map_.values()) {
+    *shgroup = nullptr;
   }
 }
 
@@ -178,7 +186,9 @@ Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeomet
 {
   MaterialKey material_key(blender_mat, geometry_type);
 
-  Material &mat = material_map_.lookup_or_add_default(material_key);
+  /* TODO allocate in blocks to avoid memory fragmentation. */
+  auto add_cb = [&]() { return new Material(); };
+  Material &mat = *material_map_.lookup_or_add_cb(material_key, add_cb);
 
   if (mat.shading.shgrp == nullptr) {
     mat.shading = material_pass_get(blender_mat, geometry_type, MAT_DOMAIN_SURFACE);
@@ -192,7 +202,7 @@ MaterialArray &MaterialModule::surface_materials_get(Object *ob)
   material_array_.materials.clear();
   material_array_.gpu_materials.clear();
 
-  for (auto i : IndexRange(ob->totcol)) {
+  for (auto i : IndexRange(max_ii(1, ob->totcol))) {
     ::Material *blender_mat = material_from_slot(ob, i);
     Material &mat = material_sync(blender_mat, to_material_geometry(ob));
     material_array_.materials.append(&mat);
@@ -208,12 +218,12 @@ MaterialArray &MaterialModule::surface_materials_get(Object *ob)
     return BKE_material_default_holdout();
   }
   ::Material *ma = BKE_object_material_get(ob, slot + 1);
-  if (ma == nullptr || !ma->use_nodes || ma->nodetree == nullptr) {
+  if (ma == nullptr) {
     if (ob->type == OB_VOLUME) {
-      ma = BKE_material_default_volume();
+      return BKE_material_default_volume();
     }
     else {
-      ma = BKE_material_default_surface();
+      return BKE_material_default_surface();
     }
   }
   return ma;
@@ -223,9 +233,13 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
                                                eMaterialGeometry geometry_type,
                                                eMaterialDomain domain_type)
 {
+  bNodeTree *ntree = (blender_mat->use_nodes && blender_mat->nodetree != nullptr) ?
+                         blender_mat->nodetree :
+                         default_surface_ntree_.nodetree_get(blender_mat);
+
   MaterialPass matpass;
   matpass.gpumat = inst_.shaders.material_shader_get(
-      inst_.scene, blender_mat, geometry_type, domain_type, true);
+      blender_mat, ntree, geometry_type, domain_type, true);
 
   ShaderKey shader_key(matpass.gpumat, blender_mat, geometry_type, domain_type);
 
@@ -234,24 +248,23 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
       break;
     case GPU_MAT_QUEUED:
       queued_shaders_count_++;
-      matpass.gpumat = inst_.shaders.material_shader_get(inst_.scene,
-                                                         (geometry_type == MAT_GEOM_VOLUME) ?
-                                                             BKE_material_default_volume() :
-                                                             BKE_material_default_surface(),
-                                                         geometry_type,
-                                                         domain_type,
-                                                         false);
+      blender_mat = (geometry_type == MAT_GEOM_VOLUME) ? BKE_material_default_volume() :
+                                                         BKE_material_default_surface();
+      matpass.gpumat = inst_.shaders.material_shader_get(
+          blender_mat, blender_mat->nodetree, geometry_type, domain_type, false);
       break;
     case GPU_MAT_FAILED:
     default:
       matpass.gpumat = inst_.shaders.material_shader_get(
-          inst_.scene, error_mat_, geometry_type, domain_type, false);
+          error_mat_, error_mat_->nodetree, geometry_type, domain_type, false);
       break;
   }
   /* Returned material should be ready to be drawn. */
   BLI_assert(GPU_material_status(matpass.gpumat) == GPU_MAT_SUCCESS);
 
-  matpass.shgrp = &shader_map_.lookup_or_add_default(shader_key);
+  /* TODO allocate in blocks to avoid memory fragmentation. */
+  auto add_cb = [&]() { return new DRWShadingGroup *(); };
+  matpass.shgrp = shader_map_.lookup_or_add_cb(shader_key, add_cb);
 
   if (*matpass.shgrp != nullptr) {
     /* Shading group for this shader already exists. Create a sub one for this material. */

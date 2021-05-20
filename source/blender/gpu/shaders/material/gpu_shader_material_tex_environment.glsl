@@ -1,16 +1,14 @@
-void node_tex_environment_texco(vec3 viewvec, out vec3 worldvec)
+void node_tex_environment_texco(out vec3 worldvec)
 {
 #ifdef MESH_SHADER
-  worldvec = worldPosition;
+  worldvec = g_data.P;
 #else
-  vec4 v = (ProjectionMatrix[3][3] == 0.0) ? vec4(viewvec, 1.0) : vec4(0.0, 0.0, 1.0, 1.0);
-  vec4 co_homogenous = (ProjectionMatrixInverse * v);
+  vec3 V = cameraVec(g_data.P);
 
-  vec3 co = co_homogenous.xyz / co_homogenous.w;
 #  if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
-  worldvec = mat3(ViewMatrixInverse) * co;
+  worldvec = V;
 #  else
-  worldvec = mat3(ModelMatrixInverse) * (mat3(ViewMatrixInverse) * co);
+  worldvec = mat3(ModelMatrixInverse) * V;
 #  endif
 #endif
 }

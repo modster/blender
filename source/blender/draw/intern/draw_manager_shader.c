@@ -425,119 +425,64 @@ GPUShader *DRW_shader_create_fullscreen_with_shaderlib_ex(const char *frag,
   return sh;
 }
 
-GPUMaterial *DRW_shader_find_from_world(World *wo,
-                                        const void *engine_type,
-                                        const int options,
-                                        bool deferred)
+GPUMaterial *DRW_shader_from_world(World *wo,
+                                   struct bNodeTree *ntree,
+                                   const uint64_t shader_id,
+                                   const bool is_volume_shader,
+                                   bool deferred,
+                                   GPUCodegenCallbackFn callback,
+                                   void *thunk)
 {
-  GPUMaterial *mat = GPU_material_from_nodetree_find(&wo->gpumaterial, engine_type, options);
-  if (DRW_state_is_image_render() || !deferred) {
-    if (mat != NULL && GPU_material_status(mat) == GPU_MAT_QUEUED) {
-      /* XXX Hack : we return NULL so that the engine will call DRW_shader_create_from_XXX
-       * with the shader code and we will resume the compilation from there. */
-      return NULL;
-    }
-  }
-  return mat;
-}
-
-GPUMaterial *DRW_shader_find_from_material(Material *ma,
-                                           const void *engine_type,
-                                           const int options,
-                                           bool deferred)
-{
-  GPUMaterial *mat = GPU_material_from_nodetree_find(&ma->gpumaterial, engine_type, options);
-  if (DRW_state_is_image_render() || !deferred) {
-    if (mat != NULL && GPU_material_status(mat) == GPU_MAT_QUEUED) {
-      /* XXX Hack : we return NULL so that the engine will call DRW_shader_create_from_XXX
-       * with the shader code and we will resume the compilation from there. */
-      return NULL;
-    }
-  }
-  return mat;
-}
-
-GPUMaterial *DRW_shader_create_from_world(struct Scene *scene,
-                                          World *wo,
-                                          struct bNodeTree *ntree,
-                                          const void *engine_type,
-                                          const int options,
-                                          const bool is_volume_shader,
-                                          const char *vert,
-                                          const char *geom,
-                                          const char *frag_lib,
-                                          const char *defines,
-                                          bool deferred,
-                                          GPUMaterialEvalCallbackFn callback)
-{
-  GPUMaterial *mat = NULL;
-  if (DRW_state_is_image_render() || !deferred) {
-    mat = GPU_material_from_nodetree_find(&wo->gpumaterial, engine_type, options);
+  Scene *scene = (Scene *)DEG_get_original_id(&DST.draw_ctx.scene->id);
+  GPUMaterial *mat = GPU_material_from_nodetree(scene,
+                                                NULL,
+                                                ntree,
+                                                &wo->gpumaterial,
+                                                wo->id.name,
+                                                shader_id,
+                                                is_volume_shader,
+                                                callback,
+                                                thunk);
+  if (!DRW_state_is_image_render() && deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
+    /* Shader has been already queued. */
+    return mat;
   }
 
-  if (mat == NULL) {
-    scene = (Scene *)DEG_get_original_id(&DST.draw_ctx.scene->id);
-    mat = GPU_material_from_nodetree(scene,
-                                     NULL,
-                                     ntree,
-                                     &wo->gpumaterial,
-                                     engine_type,
-                                     options,
-                                     is_volume_shader,
-                                     vert,
-                                     geom,
-                                     frag_lib,
-                                     defines,
-                                     wo->id.name,
-                                     callback);
-  }
-
-  if (GPU_material_status(mat) == GPU_MAT_QUEUED) {
+  if (GPU_material_status(mat) == GPU_MAT_CREATED) {
+    GPU_material_status_set(mat, GPU_MAT_QUEUED);
     drw_deferred_shader_add(mat, deferred);
   }
-
   return mat;
 }
 
-GPUMaterial *DRW_shader_create_from_material(struct Scene *scene,
-                                             Material *ma,
-                                             struct bNodeTree *ntree,
-                                             const void *engine_type,
-                                             const int options,
-                                             const bool is_volume_shader,
-                                             const char *vert,
-                                             const char *geom,
-                                             const char *frag_lib,
-                                             const char *defines,
-                                             bool deferred,
-                                             GPUMaterialEvalCallbackFn callback)
+GPUMaterial *DRW_shader_from_material(Material *ma,
+                                      struct bNodeTree *ntree,
+                                      const uint64_t shader_id,
+                                      const bool is_volume_shader,
+                                      bool deferred,
+                                      GPUCodegenCallbackFn callback,
+                                      void *thunk)
 {
-  GPUMaterial *mat = NULL;
-  if (DRW_state_is_image_render() || !deferred) {
-    mat = GPU_material_from_nodetree_find(&ma->gpumaterial, engine_type, options);
+  Scene *scene = (Scene *)DEG_get_original_id(&DST.draw_ctx.scene->id);
+  GPUMaterial *mat = GPU_material_from_nodetree(scene,
+                                                ma,
+                                                ntree,
+                                                &ma->gpumaterial,
+                                                ma->id.name,
+                                                shader_id,
+                                                is_volume_shader,
+                                                callback,
+                                                thunk);
+
+  if (!DRW_state_is_image_render() && deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
+    /* Shader has been already queued. */
+    return mat;
   }
 
-  if (mat == NULL) {
-    scene = (Scene *)DEG_get_original_id(&DST.draw_ctx.scene->id);
-    mat = GPU_material_from_nodetree(scene,
-                                     ma,
-                                     ntree,
-                                     &ma->gpumaterial,
-                                     engine_type,
-                                     options,
-                                     is_volume_shader,
-                                     vert,
-                                     geom,
-                                     frag_lib,
-                                     defines,
-                                     ma->id.name,
-                                     callback);
-  }
-
-  if (GPU_material_status(mat) == GPU_MAT_QUEUED) {
+  if (GPU_material_status(mat) == GPU_MAT_CREATED) {
+    GPU_material_status_set(mat, GPU_MAT_QUEUED);
     drw_deferred_shader_add(mat, deferred);
   }
-
   return mat;
 }
 

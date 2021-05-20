@@ -735,7 +735,7 @@ static const char *GPU_DATATYPE_STR[17] = {
 
 const char *gpu_data_type_to_string(const eGPUType type)
 {
-  return GPU_DATATYPE_STR[type];
+  return (type == GPU_CLOSURE) ? "Closure" : GPU_DATATYPE_STR[type];
 }
 
 static void gpu_parse_material_library(GHash *hash, GPUMaterialLibrary *library)
@@ -871,13 +871,9 @@ GPUFunction *gpu_material_library_use_function(GSet *used_libraries, const char 
   return function;
 }
 
-char *gpu_material_library_generate_code(GSet *used_libraries, const char *frag_lib)
+char *gpu_material_library_generate_code(GSet *used_libraries)
 {
   DynStr *ds = BLI_dynstr_new();
-
-  if (frag_lib) {
-    BLI_dynstr_append(ds, frag_lib);
-  }
 
   /* Always include those because they may be needed by the execution function. */
   gpu_material_use_library_with_dependencies(used_libraries,

@@ -77,7 +77,7 @@ void volume_eval(vec3 P, vec3 V, float max_time, out vec3 out_radiance, out vec3
 /* Simple version that compute transmittance only. */
 void volume_eval_homogenous(Ray ray, inout vec3 out_transmittance, out vec3 out_depth_time)
 {
-  nodetree_eval(vec3(0));
+  // nodetree_eval();
 
   float step_len = length(ray.direction);
 
