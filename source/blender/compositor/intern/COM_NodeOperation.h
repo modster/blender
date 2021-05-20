@@ -560,7 +560,7 @@ class NodeOperation {
    * \{ */
 
   void render(MemoryBuffer *output_buf,
-              Span<rcti> rects_to_render,
+              Span<rcti> areas,
               Span<MemoryBuffer *> inputs_bufs,
               ExecutionSystem &exec_system);
 
@@ -568,7 +568,7 @@ class NodeOperation {
    * Executes operation updating output memory buffer. Single-threaded calls.
    */
   virtual void update_memory_buffer(MemoryBuffer *UNUSED(output),
-                                    const rcti &UNUSED(output_rect),
+                                    const rcti &UNUSED(output_area),
                                     Span<MemoryBuffer *> UNUSED(inputs),
                                     ExecutionSystem &UNUSED(exec_system))
   {
@@ -666,12 +666,12 @@ class NodeOperation {
    * \{ */
 
   void render_full_frame(MemoryBuffer *output_buf,
-                         Span<rcti> render_rects,
+                         Span<rcti> areas,
                          Span<MemoryBuffer *> inputs_bufs,
                          ExecutionSystem &exec_system);
 
   void render_full_frame_fallback(MemoryBuffer *output_buf,
-                                  Span<rcti> render_rects,
+                                  Span<rcti> areas,
                                   Span<MemoryBuffer *> inputs,
                                   ExecutionSystem &exec_system);
   void render_tile(MemoryBuffer *output_buf, rcti *tile_rect);

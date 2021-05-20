@@ -188,9 +188,8 @@ bool NodeOperation::determineDependingAreaOfInterest(rcti *input,
  * caller must clamp it.
  * TODO: See if it's possible to use parameter overloading (input_id for example).
  *
- * \param input_op_idx: Input operation index for which we want to calculate the area being read on
- * rendering output area.
- * \param output_area: Output area being rendered by current operation.
+ * \param input_op_idx: Input operation index for which we want to calculate the area being read.
+ * \param output_area: Area being rendered by this operation.
  * \param r_input_area: Returned input operation area that needs to be read in order to render
  * given output area.
  */
@@ -210,38 +209,45 @@ void NodeOperation::get_area_of_interest(const int input_op_idx,
 }
 
 /**
- * Renders operation and its inputs. Rendered buffers are saved in the output store.
+ * Executes operation image manipulation algorithm rendering given areas.
+ * \param output_buf: Buffer to write result to.
+ * \param areas: Areas within this operation bounds to render.
+ * \param inputs_bufs: Inputs operations buffers.
+ * \param exec_system: Execution system.
  */
 void NodeOperation::render(MemoryBuffer *output_buf,
-                           Span<rcti> rects_to_render,
+                           Span<rcti> areas,
                            Span<MemoryBuffer *> inputs_bufs,
                            ExecutionSystem &exec_system)
 {
   if (get_flags().is_fullframe_operation) {
-    render_full_frame(output_buf, rects_to_render, inputs_bufs, exec_system);
+    render_full_frame(output_buf, areas, inputs_bufs, exec_system);
   }
   else {
-    render_full_frame_fallback(output_buf, rects_to_render, inputs_bufs, exec_system);
+    render_full_frame_fallback(output_buf, areas, inputs_bufs, exec_system);
   }
 }
 
+/**
+ * Renders given areas using operations full frame implementation.
+ */
 void NodeOperation::render_full_frame(MemoryBuffer *output_buf,
-                                      Span<rcti> render_rects,
+                                      Span<rcti> areas,
                                       Span<MemoryBuffer *> inputs_bufs,
                                       ExecutionSystem &exec_system)
 {
   initExecution();
-  for (const rcti &render_rect : render_rects) {
-    update_memory_buffer(output_buf, render_rect, inputs_bufs, exec_system);
+  for (const rcti &area : areas) {
+    update_memory_buffer(output_buf, area, inputs_bufs, exec_system);
   }
   deinitExecution();
 }
 
 /**
- * Renders operation using the tiled implementation.
+ * Renders given areas using operations tiled implementation.
  */
 void NodeOperation::render_full_frame_fallback(MemoryBuffer *output_buf,
-                                               Span<rcti> render_rects,
+                                               Span<rcti> areas,
                                                Span<MemoryBuffer *> inputs_bufs,
                                                ExecutionSystem &exec_system)
 {
@@ -254,7 +260,7 @@ void NodeOperation::render_full_frame_fallback(MemoryBuffer *output_buf,
     readSampled(output_elem, 0, 0, PixelSampler::Nearest);
   }
   else {
-    for (const rcti &rect : render_rects) {
+    for (const rcti &rect : areas) {
       exec_system.execute_work(rect, [=](const rcti &split_rect) {
         rcti tile_rect = split_rect;
         if (is_output_operation) {

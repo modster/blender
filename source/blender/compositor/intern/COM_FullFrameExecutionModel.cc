@@ -63,22 +63,22 @@ void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
 
   DebugInfo::graphviz(&exec_system);
 
-  determine_rects_to_render_and_reads();
+  determine_areas_to_render_and_reads();
   render_operations(exec_system);
 }
 
-void FullFrameExecutionModel::determine_rects_to_render_and_reads()
+void FullFrameExecutionModel::determine_areas_to_render_and_reads()
 {
   const bool is_rendering = context_.isRendering();
   const bNodeTree *node_tree = context_.getbNodeTree();
 
-  rcti render_rect;
+  rcti area;
   for (eCompositorPriority priority : priorities_) {
     for (NodeOperation *op : operations_) {
       op->setbNodeTree(node_tree);
       if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
-        get_output_render_rect(op, render_rect);
-        determine_rects_to_render(op, render_rect);
+        get_output_render_area(op, area);
+        determine_areas_to_render(op, area);
         determine_reads(op);
       }
     }
@@ -131,13 +131,16 @@ void FullFrameExecutionModel::render_operation(NodeOperation *op, ExecutionSyste
 
   const bool has_outputs = op->getNumberOfOutputSockets() > 0;
   MemoryBuffer *op_buf = has_outputs ? create_operation_buffer(op) : nullptr;
-  Span<rcti> rects = active_buffers_.get_areas_to_render(op);
-  op->render(op_buf, rects, input_bufs, exec_system);
+  Span<rcti> areas = active_buffers_.get_areas_to_render(op);
+  op->render(op_buf, areas, input_bufs, exec_system);
   active_buffers_.set_rendered_buffer(op, std::unique_ptr<MemoryBuffer>(op_buf));
 
   operation_finished(op);
 }
 
+/**
+ * Render output operations in order of priority.
+ */
 void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
 {
   const bool is_rendering = context_.isRendering();
@@ -154,36 +157,37 @@ void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
 }
 
 /**
- * Determines the areas given operation and its inputs need to render. Results are saved in output
- * store.
+ * Determines all input operations areas needed to render given operation area.
+ * \param operation: Renderer operation.
+ * \param render_area: Area within given operation bounds to render.
  */
-void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation,
-                                                        const rcti &render_rect)
+void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *operation,
+                                                        const rcti &render_area)
 {
-  if (active_buffers_.is_area_registered(operation, render_rect)) {
+  if (active_buffers_.is_area_registered(operation, render_area)) {
     return;
   }
 
-  active_buffers_.register_area(operation, render_rect);
+  active_buffers_.register_area(operation, render_area);
 
   const int num_inputs = operation->getNumberOfInputSockets();
   for (int input_idx = 0; input_idx < num_inputs; input_idx++) {
     NodeOperation *input_op = operation->get_input_operation(input_idx);
     rcti input_op_rect, input_area;
     BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
-    operation->get_area_of_interest(input_idx, render_rect, input_area);
+    operation->get_area_of_interest(input_idx, render_area, input_area);
 
-    /* Ensure input area of interest is within operation bounds. */
+    /* Ensure area of interest is within operation bounds. */
     int dummy_offset[2];
     BLI_rcti_clamp(&input_area, &input_op_rect, dummy_offset);
 
-    determine_rects_to_render(input_op, input_area);
+    determine_areas_to_render(input_op, input_area);
   }
 }
 
 /**
- * Determines the reads given operation and its inputs will receive. Results are saved in output
- * store.
+ * Determines the reads given operation and its inputs will receive (i.e: Number of dependent
+ * operations each operation has).
  */
 void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
 {
@@ -199,14 +203,18 @@ void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
   }
 }
 
-void FullFrameExecutionModel::get_output_render_rect(NodeOperation *output_op, rcti &r_rect)
+/**
+ * Calculates given output operation area to be rendered taking into account viewer and render
+ * borders.
+ */
+void FullFrameExecutionModel::get_output_render_area(NodeOperation *output_op, rcti &r_area)
 {
   BLI_assert(output_op->isOutputOperation(context_.isRendering()));
 
   /* By default return operation bounds (no border). */
   const int op_width = output_op->getWidth();
   const int op_height = output_op->getHeight();
-  BLI_rcti_init(&r_rect, 0, op_width, 0, op_height);
+  BLI_rcti_init(&r_area, 0, op_width, 0, op_height);
 
   const bool has_viewer_border = border_.use_viewer_border &&
                                  (output_op->get_flags().is_viewer_operation ||
@@ -217,7 +225,7 @@ void FullFrameExecutionModel::get_output_render_rect(NodeOperation *output_op, r
     const rctf *norm_border = has_viewer_border ? border_.viewer_border : border_.render_border;
 
     /* Return de-normalized border. */
-    BLI_rcti_init(&r_rect,
+    BLI_rcti_init(&r_area,
                   norm_border->xmin * op_width,
                   norm_border->xmax * op_width,
                   norm_border->ymin * op_height,
