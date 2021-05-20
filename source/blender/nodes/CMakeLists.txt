@@ -163,7 +163,7 @@ set(SRC
   geometry/nodes/node_geo_collection_info.cc
   geometry/nodes/node_geo_common.cc
   geometry/nodes/node_geo_convex_hull.cc
-  geometry/nodes/node_geo_curve_length.cc  
+  geometry/nodes/node_geo_curve_length.cc
   geometry/nodes/node_geo_curve_to_mesh.cc
   geometry/nodes/node_geo_curve_resample.cc
   geometry/nodes/node_geo_delete_geometry.cc
@@ -191,6 +191,7 @@ set(SRC
   geometry/nodes/node_geo_point_translate.cc
   geometry/nodes/node_geo_points_to_volume.cc
   geometry/nodes/node_geo_select_by_material.cc
+  geometry/nodes/node_geo_solidify.cc
   geometry/nodes/node_geo_subdivide.cc
   geometry/nodes/node_geo_subdivision_surface.cc
   geometry/nodes/node_geo_switch.cc
