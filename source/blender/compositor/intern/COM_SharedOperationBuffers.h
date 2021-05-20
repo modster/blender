@@ -39,7 +39,7 @@ class SharedOperationBuffers {
    public:
     BufferData();
     std::unique_ptr<MemoryBuffer> buffer;
-    blender::Vector<rcti> render_rects;
+    blender::Vector<rcti> render_areas;
     int registered_reads;
     int received_reads;
   } BufferData;
@@ -47,13 +47,13 @@ class SharedOperationBuffers {
 
  public:
   SharedOperationBuffers();
-  bool is_render_registered(NodeOperation *op, const rcti &rect_to_render);
-  void register_render(NodeOperation *op, const rcti &rect_to_render);
+  bool is_area_registered(NodeOperation *op, const rcti &area_to_render);
+  void register_area(NodeOperation *op, const rcti &area_to_render);
 
   bool has_registered_reads(NodeOperation *op);
   void register_read(NodeOperation *read_op);
 
-  blender::Span<rcti> get_rects_to_render(NodeOperation *op);
+  blender::Span<rcti> get_areas_to_render(NodeOperation *op);
   bool is_operation_rendered(NodeOperation *op);
   void set_rendered_buffer(NodeOperation *op, std::unique_ptr<MemoryBuffer> buffer);
   MemoryBuffer *get_rendered_buffer(NodeOperation *op);

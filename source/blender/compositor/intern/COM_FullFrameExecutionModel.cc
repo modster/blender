@@ -131,7 +131,7 @@ void FullFrameExecutionModel::render_operation(NodeOperation *op, ExecutionSyste
 
   const bool has_outputs = op->getNumberOfOutputSockets() > 0;
   MemoryBuffer *op_buf = has_outputs ? create_operation_buffer(op) : nullptr;
-  Span<rcti> rects = active_buffers_.get_rects_to_render(op);
+  Span<rcti> rects = active_buffers_.get_areas_to_render(op);
   op->render(op_buf, rects, input_bufs, exec_system);
   active_buffers_.set_rendered_buffer(op, std::unique_ptr<MemoryBuffer>(op_buf));
 
@@ -160,11 +160,11 @@ void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
 void FullFrameExecutionModel::determine_rects_to_render(NodeOperation *operation,
                                                         const rcti &render_rect)
 {
-  if (active_buffers_.is_render_registered(operation, render_rect)) {
+  if (active_buffers_.is_area_registered(operation, render_rect)) {
     return;
   }
 
-  active_buffers_.register_render(operation, render_rect);
+  active_buffers_.register_area(operation, render_rect);
 
   const int num_inputs = operation->getNumberOfInputSockets();
   for (int input_idx = 0; input_idx < num_inputs; input_idx++) {

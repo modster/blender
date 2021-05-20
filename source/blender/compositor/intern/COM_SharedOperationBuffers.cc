@@ -26,7 +26,7 @@ SharedOperationBuffers::SharedOperationBuffers() : buffers_()
 {
 }
 SharedOperationBuffers::BufferData::BufferData()
-    : buffer(nullptr), render_rects(), registered_reads(0), received_reads(0)
+    : buffer(nullptr), render_areas(), registered_reads(0), received_reads(0)
 {
 }
 
@@ -35,58 +35,88 @@ SharedOperationBuffers::BufferData &SharedOperationBuffers::get_buffer_data(Node
   return buffers_.lookup_or_add_cb(op, []() { return BufferData(); });
 }
 
-/* TODO: Possibly refactor to "request_area". Current implementation is incomplete: partial
-overlapping, etc. Leading to more rendering than necessary. */
-bool SharedOperationBuffers::is_render_registered(NodeOperation *op, const rcti &rect_to_render)
+/**
+ * Whether given operation area to render is already registered.
+ * TODO: Possibly refactor to "request_area". Current implementation is incomplete: partial
+ * overlapping, etc. Leading to more rendering than necessary.
+ */
+bool SharedOperationBuffers::is_area_registered(NodeOperation *op, const rcti &area_to_render)
 {
   BufferData &buf_data = get_buffer_data(op);
-  for (rcti &reg_rect : buf_data.render_rects) {
-    if (BLI_rcti_inside_rcti(&reg_rect, &rect_to_render)) {
+  for (rcti &reg_rect : buf_data.render_areas) {
+    if (BLI_rcti_inside_rcti(&reg_rect, &area_to_render)) {
       return true;
     }
   }
   return false;
 }
 
-void SharedOperationBuffers::register_render(NodeOperation *op, const rcti &rect_to_render)
+/**
+ * Registers an operation area to render.
+ */
+void SharedOperationBuffers::register_area(NodeOperation *op, const rcti &area_to_render)
 {
-  get_buffer_data(op).render_rects.append(rect_to_render);
+  get_buffer_data(op).render_areas.append(area_to_render);
 }
 
+/**
+ * Whether given operation has any registered reads (other operation registered it depends on given
+ * operation).
+ */
 bool SharedOperationBuffers::has_registered_reads(NodeOperation *op)
 {
   return get_buffer_data(op).registered_reads > 0;
 }
 
+/**
+ * Registers an operation read (other operation depends on given operation).
+ */
 void SharedOperationBuffers::register_read(NodeOperation *read_op)
 {
   get_buffer_data(read_op).registered_reads++;
 }
 
-blender::Span<rcti> SharedOperationBuffers::get_rects_to_render(NodeOperation *op)
+/**
+ * Get registered areas given operation needs to render.
+ */
+blender::Span<rcti> SharedOperationBuffers::get_areas_to_render(NodeOperation *op)
 {
-  return get_buffer_data(op).render_rects.as_span();
+  return get_buffer_data(op).render_areas.as_span();
 }
 
+/**
+ * Whether this operation buffer has already been rendered.
+ */
 bool SharedOperationBuffers::is_operation_rendered(NodeOperation *op)
 {
   return get_buffer_data(op).buffer != nullptr;
 }
 
+/**
+ * Stores given operation rendered buffer.
+ */
 void SharedOperationBuffers::set_rendered_buffer(NodeOperation *op,
                                                  std::unique_ptr<MemoryBuffer> buffer)
 {
   BufferData &buf_data = get_buffer_data(op);
   BLI_assert(buf_data.received_reads == 0);
+  BLI_assert(buf_data.buffer == nullptr);
   buf_data.buffer = std::move(buffer);
 }
 
+/**
+ * Get given operation rendered buffer.
+ */
 MemoryBuffer *SharedOperationBuffers::get_rendered_buffer(NodeOperation *op)
 {
   BLI_assert(is_operation_rendered(op));
   return get_buffer_data(op).buffer.get();
 }
 
+/**
+ * Reports an operation has finished reading given operation. If all given operation dependencies
+ * have finished its buffer will be disposed.
+ */
 void SharedOperationBuffers::read_finished(NodeOperation *read_op)
 {
   BufferData &buf_data = get_buffer_data(read_op);
