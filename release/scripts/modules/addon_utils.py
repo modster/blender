@@ -349,6 +349,10 @@ def enable(module_name, *, default_set=False, persistent=False, handle_error=Non
         # 1) try import
         try:
             mod = __import__(module_name)
+            if mod.__file__ is None:
+                # This can happen when the addon has been removed but there are
+                # residual `.pyc` files left behind.
+                raise ImportError(name=module_name)
             mod.__time__ = os.path.getmtime(mod.__file__)
             mod.__addon_enabled__ = False
         except Exception as ex:
@@ -538,22 +542,6 @@ def module_bl_info(mod, info_basis=None):
 
     if not addon_info["name"]:
         addon_info["name"] = mod.__name__
-
-    # Replace 'wiki_url' with 'doc_url'.
-    doc_url = addon_info.pop("wiki_url", None)
-    if doc_url is not None:
-        # Unlikely, but possible that both are set.
-        if not addon_info["doc_url"]:
-            addon_info["doc_url"] = doc_url
-        if _bpy.app.debug:
-            print(
-                "Warning: add-on \"%s\": 'wiki_url' in 'bl_info' "
-                "is deprecated please use 'doc_url' instead!\n"
-                "         %s" % (
-                    addon_info['name'],
-                    getattr(mod, "__file__", None),
-                )
-            )
 
     doc_url = addon_info["doc_url"]
     if doc_url:

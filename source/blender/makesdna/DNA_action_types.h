@@ -265,9 +265,10 @@ typedef struct bPoseChannel {
    * since the alternative is highly complicated - campbell
    */
   struct bPoseChannel *custom_tx;
-  float custom_scale;
-
-  char _pad1[4];
+  float custom_scale; /* Deprecated */
+  float custom_scale_xyz[3];
+  float custom_translation[3];
+  float custom_rotation_euler[3];
 
   /** Transforms - written in by actions or transform. */
   float loc[3];
@@ -287,16 +288,19 @@ typedef struct bPoseChannel {
   short rotmode;
   char _pad[2];
 
-  /** Matrix result of loc/quat/size, and where we put deform in, see next line */
+  /**
+   * Matrix result of location/rotation/scale components & constraints.
+   * This is the dynamic component of `pose_mat` (without #Bone.arm_mat).
+   */
   float chan_mat[4][4];
   /**
-   * Constraints accumulate here. in the end, pose_mat = bone->arm_mat * chan_mat
+   * Constraints accumulate here. in the end, `pose_mat = bone->arm_mat * chan_mat`
    * this matrix is object space.
    */
   float pose_mat[4][4];
   /** For display, pose_mat with bone length applied. */
   float disp_mat[4][4];
-  /** For display, pose_mat with bone length applied and translated to tai.l*/
+  /** For display, pose_mat with bone length applied and translated to tail. */
   float disp_tail_mat[4][4];
   /**
    * Inverse result of constraints.
@@ -414,9 +418,9 @@ typedef enum ePchan_DrawFlag {
   PCHAN_DRAW_NO_CUSTOM_BONE_SIZE = (1 << 0),
 } ePchan_DrawFlag;
 
-#define PCHAN_CUSTOM_DRAW_SIZE(pchan) \
-  (pchan)->custom_scale *( \
-      ((pchan)->drawflag & PCHAN_DRAW_NO_CUSTOM_BONE_SIZE) ? 1.0f : (pchan)->bone->length)
+/* Note: It doesn't take custom_scale_xyz into account */
+#define PCHAN_CUSTOM_BONE_LENGTH(pchan) \
+  (((pchan)->drawflag & PCHAN_DRAW_NO_CUSTOM_BONE_SIZE) ? 1.0f : (pchan)->bone->length)
 
 #ifdef DNA_DEPRECATED_ALLOW
 /* PoseChannel->bboneflag */
@@ -653,7 +657,7 @@ typedef enum eActionGroup_Flag {
  * that affects a group of related settings (as defined by the user).
  */
 typedef struct bAction {
-  /** ID-serialisation for relinking. */
+  /** ID-serialization for relinking. */
   ID id;
 
   /** Function-curves (FCurve). */
@@ -676,6 +680,8 @@ typedef struct bAction {
    */
   int idroot;
   char _pad[4];
+
+  PreviewImage *preview;
 } bAction;
 
 /* Flags for the action */

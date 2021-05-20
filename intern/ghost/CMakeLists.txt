@@ -79,6 +79,7 @@ set(SRC
   intern/GHOST_SystemPaths.h
   intern/GHOST_TimerManager.h
   intern/GHOST_TimerTask.h
+  intern/GHOST_Util.h
   intern/GHOST_Window.h
   intern/GHOST_WindowManager.h
 )
@@ -187,6 +188,11 @@ elseif(WITH_GHOST_X11 OR WITH_GHOST_WAYLAND)
       ${X11_X11_INCLUDE_PATH}
     )
 
+    list(APPEND LIB
+      ${X11_X11_LIB}
+      ${X11_Xrender_LIB}
+    )
+
     list(APPEND SRC
       intern/GHOST_DisplayManagerX11.cpp
       intern/GHOST_SystemX11.cpp
@@ -238,12 +244,18 @@ elseif(WITH_GHOST_X11 OR WITH_GHOST_WAYLAND)
       list(APPEND INC_SYS
         ${X11_xf86vmode_INCLUDE_PATH}
       )
+      list(APPEND LIB
+        ${X11_Xf86vmode_LIB}
+      )
     endif()
 
     if(WITH_X11_XFIXES)
       add_definitions(-DWITH_X11_XFIXES)
       list(APPEND INC_SYS
         ${X11_Xfixes_INCLUDE_PATH}
+      )
+      list(APPEND LIB
+        ${X11_Xfixes_LIB}
       )
     endif()
 
@@ -255,6 +267,9 @@ elseif(WITH_GHOST_X11 OR WITH_GHOST_WAYLAND)
       add_definitions(-DWITH_X11_XINPUT)
       list(APPEND INC_SYS
         ${X11_Xinput_INCLUDE_PATH}
+      )
+      list(APPEND LIB
+        ${X11_Xinput_LIB}
       )
     endif()
 
@@ -424,6 +439,7 @@ endif()
 if(WITH_XR_OPENXR)
   list(APPEND SRC
     intern/GHOST_Xr.cpp
+    intern/GHOST_XrAction.cpp
     intern/GHOST_XrContext.cpp
     intern/GHOST_XrEvent.cpp
     intern/GHOST_XrGraphicsBinding.cpp
@@ -432,6 +448,7 @@ if(WITH_XR_OPENXR)
 
     GHOST_IXrContext.h
     intern/GHOST_IXrGraphicsBinding.h
+    intern/GHOST_XrAction.h
     intern/GHOST_XrContext.h
     intern/GHOST_XrException.h
     intern/GHOST_XrSession.h

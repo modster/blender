@@ -33,9 +33,8 @@
 #include "DNA_color_types.h"
 #include "DNA_defs.h"
 #include "DNA_listBase.h"
-#include "DNA_session_uuid_types.h"
-#include "DNA_vec_types.h"
-#include "DNA_vfont_types.h"
+#include "DNA_session_uuid_types.h" /* for #SessionUUID */
+#include "DNA_vec_types.h"          /* for #rctf */
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +43,7 @@ extern "C" {
 struct Ipo;
 struct MovieClip;
 struct Scene;
+struct VFont;
 struct bSound;
 
 /* strlens; 256= FILE_MAXFILE, 768= FILE_MAXDIR */
@@ -55,6 +55,7 @@ typedef struct StripAnim {
 
 typedef struct StripElem {
   char name[256];
+  /** Ignore when zeroed. */
   int orig_width, orig_height;
 } StripElem;
 
@@ -278,12 +279,12 @@ typedef struct Editing {
   struct SeqCache *cache;
 
   /* Cache control */
-  float recycle_max_cost;
+  float recycle_max_cost; /* UNUSED only for versioning. */
   int cache_flag;
 
   struct PrefetchJob *prefetch_job;
 
-  /* Must be initialized only by BKE_sequencer_cache_create() */
+  /* Must be initialized only by seq_cache_create() */
   int64_t disk_cache_timestamp;
 } Editing;
 
@@ -338,7 +339,7 @@ typedef struct GaussianBlurVars {
 
 typedef struct TextVars {
   char text[512];
-  VFont *text_font;
+  struct VFont *text_font;
   int text_blf_id;
   int text_size;
   float color[4], shadow_color[4], box_color[4];
@@ -354,6 +355,8 @@ typedef struct TextVars {
 enum {
   SEQ_TEXT_SHADOW = (1 << 0),
   SEQ_TEXT_BOX = (1 << 1),
+  SEQ_TEXT_BOLD = (1 << 2),
+  SEQ_TEXT_ITALIC = (1 << 3),
 };
 
 /* TextVars.align */
@@ -518,7 +521,7 @@ enum {
   SEQ_SCENE_NO_GPENCIL = (1 << 28),
   SEQ_USE_VIEWS = (1 << 29),
 
-  /* access scene strips directly (like a metastrip) */
+  /* Access scene strips directly (like a meta-strip). */
   SEQ_SCENE_STRIPS = (1 << 30),
 
   SEQ_INVALID_EFFECT = (1u << 31),

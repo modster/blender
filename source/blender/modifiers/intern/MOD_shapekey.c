@@ -27,6 +27,7 @@
 
 #include "DNA_key_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_object_types.h"
 
 #include "BKE_key.h"
 #include "BKE_particle.h"
@@ -140,7 +141,6 @@ ModifierTypeInfo modifierType_ShapeKey = {
     /* modifyMesh */ NULL,
     /* modifyHair */ NULL,
     /* modifyGeometrySet */ NULL,
-    /* modifyVolume */ NULL,
 
     /* initData */ NULL,
     /* requiredDataMask */ NULL,

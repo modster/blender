@@ -19,7 +19,6 @@
 # <pep8-80 compliant>
 
 from _bpy import types as bpy_types
-import _bpy
 
 StructRNA = bpy_types.bpy_struct
 StructMetaPropGroup = bpy_types.bpy_struct_meta_idprop
@@ -658,16 +657,14 @@ class Gizmo(StructRNA):
             use_blend = color[3] < 1.0
 
         if use_blend:
-            # TODO: wrap GPU_blend from GPU state.
-            from bgl import glEnable, glDisable, GL_BLEND
-            glEnable(GL_BLEND)
+            gpu.state.blend_set('ALPHA')
 
         with gpu.matrix.push_pop():
             gpu.matrix.multiply_matrix(matrix)
             batch.draw()
 
         if use_blend:
-            glDisable(GL_BLEND)
+            gpu.state.blend_set('NONE')
 
     @staticmethod
     def new_custom_shape(type, verts):
@@ -900,6 +897,7 @@ class Menu(StructRNA, _GenericUI, metaclass=RNAMeta):
         layout = self.layout
 
         import os
+        import re
         import bpy.utils
 
         layout = self.layout
@@ -920,7 +918,11 @@ class Menu(StructRNA, _GenericUI, metaclass=RNAMeta):
                     (filter_path(f)))
             ])
 
-        files.sort()
+        # Perform a "natural sort", so 20 comes after 3 (for example).
+        files.sort(
+            key=lambda file_path:
+            tuple(int(t) if t.isdigit() else t for t in re.split(r"(\d+)", file_path[0].lower())),
+        )
 
         col = layout.column(align=True)
 
@@ -982,6 +984,7 @@ class Menu(StructRNA, _GenericUI, metaclass=RNAMeta):
             props_default=props_default,
             filter_ext=lambda ext: ext.lower() in ext_valid,
             add_operator=add_operator,
+            display_name=lambda name: bpy.path.display_name(name, title_case=False)
         )
 
     @classmethod
