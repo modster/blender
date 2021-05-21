@@ -39,6 +39,7 @@
 
 #include "BLT_translation.h"
 
+#include "BKE_asset.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
 #include "BKE_global.h"
@@ -512,7 +513,12 @@ static bool view3d_ob_drop_poll(bContext *C,
                                 const wmEvent *event,
                                 const char **UNUSED(r_tooltip))
 {
-  return view3d_drop_id_in_main_region_poll(C, drag, event, ID_OB);
+  if (view3d_drop_id_in_main_region_poll(C, drag, event, ID_OB)) {
+    drag->no_preview = true;
+    return true;
+  }
+
+  return false;
 }
 
 static bool view3d_collection_drop_poll(bContext *C,
@@ -627,6 +633,45 @@ static void view3d_ob_drop_copy(wmDrag *drag, wmDropBox *drop)
   RNA_string_set(drop->ptr, "name", id->name + 2);
 }
 
+static void view3d_ob_drag_gizmo_copy_local(wmDropBox *drop, Object *ob)
+{
+  BoundBox *boundbox = BKE_object_boundbox_get(ob);
+  if (boundbox) {
+    RNA_float_set_array(drop->gizmo_group_ptr, "bound_box", (float *)boundbox->vec);
+  }
+  float matrix_basis[4][4];
+  BKE_object_to_mat4(ob, matrix_basis);
+  RNA_float_set_array(drop->gizmo_group_ptr, "matrix_basis", (float *)matrix_basis);
+}
+
+static void view3d_ob_drag_gizmo_copy_external(wmDrag *drag, wmDropBox *drop)
+{
+  const struct AssetMetaData *meta_data = WM_drag_get_asset_meta_data(drag, ID_OB);
+
+  const IDProperty *boundbox_prop = BKE_asset_metadata_idprop_find(meta_data, "boundbox_hint");
+  if (boundbox_prop) {
+    BLI_assert(boundbox_prop->len == sizeof(((BoundBox *)NULL)->vec) / sizeof(float));
+    RNA_float_set_array(drop->gizmo_group_ptr, "bound_box", IDP_Array(boundbox_prop));
+  }
+
+  const IDProperty *matrix_basis_prop = BKE_asset_metadata_idprop_find(meta_data, "matrix_basis");
+  if (matrix_basis_prop) {
+    BLI_assert(matrix_basis_prop->len == sizeof(((Object *)NULL)->obmat) / sizeof(float));
+    RNA_float_set_array(drop->gizmo_group_ptr, "matrix_basis", IDP_Array(matrix_basis_prop));
+  }
+}
+
+static void view3d_ob_drag_gizmo_copy(wmDrag *drag, wmDropBox *drop)
+{
+  ID *id = WM_drag_get_local_ID(drag, ID_OB);
+  if (id) {
+    view3d_ob_drag_gizmo_copy_local(drop, (Object *)id);
+  }
+  else {
+    view3d_ob_drag_gizmo_copy_external(drag, drop);
+  }
+}
+
 static void view3d_collection_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
   ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, ID_GR);
@@ -688,12 +733,14 @@ static void view3d_lightcache_update(bContext *C)
 static void view3d_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("View3D", SPACE_VIEW3D, RGN_TYPE_WINDOW);
+  wmDropBox *dropbox;
 
-  WM_dropbox_add(lb,
-                 "OBJECT_OT_add_named",
-                 view3d_ob_drop_poll,
-                 view3d_ob_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+  dropbox = WM_dropbox_add(lb,
+                           "OBJECT_OT_add_named",
+                           view3d_ob_drop_poll,
+                           view3d_ob_drop_copy,
+                           WM_drag_free_imported_drag_ID);
+  WM_dropbox_gizmogroup_set(dropbox, "VIEW3D_GGT_placement", view3d_ob_drag_gizmo_copy);
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_material",
                  view3d_mat_drop_poll,
@@ -714,11 +761,12 @@ static void view3d_dropboxes(void)
                  view3d_volume_drop_poll,
                  view3d_id_path_drop_copy,
                  WM_drag_free_imported_drag_ID);
-  WM_dropbox_add(lb,
-                 "OBJECT_OT_collection_instance_add",
-                 view3d_collection_drop_poll,
-                 view3d_collection_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+  dropbox = WM_dropbox_add(lb,
+                           "OBJECT_OT_collection_instance_add",
+                           view3d_collection_drop_poll,
+                           view3d_collection_drop_copy,
+                           WM_drag_free_imported_drag_ID);
+  WM_dropbox_gizmogroup_set(dropbox, "VIEW3D_GGT_placement", NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_data_instance_add",
                  view3d_object_data_drop_poll,

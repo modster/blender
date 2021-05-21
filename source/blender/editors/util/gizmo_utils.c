@@ -75,3 +75,27 @@ bool ED_gizmo_poll_or_unlink_delayed_from_tool(const bContext *C, wmGizmoGroupTy
 {
   return ED_gizmo_poll_or_unlink_delayed_from_tool_ex(C, gzgt, gzgt->idname);
 }
+
+bool ED_gizmo_poll_from_tool_ex(const bContext *C, const char *gzgt_idname)
+{
+  bToolRef_Runtime *tref_rt = WM_toolsystem_runtime_from_context((bContext *)C);
+  if ((tref_rt == NULL) || !STREQ(gzgt_idname, tref_rt->gizmo_group)) {
+    return false;
+  }
+  return true;
+}
+
+bool ED_gizmo_poll_from_tool(const bContext *C, const wmGizmoGroupType *gzgt)
+{
+  return ED_gizmo_poll_from_tool_ex(C, gzgt->idname);
+}
+
+bool ED_gizmo_poll_from_dropbox_ex(const bContext *C, const char *gzgt_idname)
+{
+  return WM_drag_with_gizmogroup_find(CTX_wm_manager(C), gzgt_idname) != NULL;
+}
+
+bool ED_gizmo_poll_from_dropbox(const bContext *C, const wmGizmoGroupType *gzgt)
+{
+  return ED_gizmo_poll_from_dropbox_ex(C, gzgt->idname);
+}

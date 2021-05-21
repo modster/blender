@@ -42,6 +42,12 @@ bool ED_gizmo_poll_or_unlink_delayed_from_tool_ex(const struct bContext *C,
 bool ED_gizmo_poll_or_unlink_delayed_from_tool(const struct bContext *C,
                                                struct wmGizmoGroupType *gzgt);
 
+bool ED_gizmo_poll_from_tool_ex(const struct bContext *C, const char *gzgt_idname);
+bool ED_gizmo_poll_from_tool(const struct bContext *C, const struct wmGizmoGroupType *gzgt);
+
+bool ED_gizmo_poll_from_dropbox_ex(const struct bContext *C, const char *gzgt_idname);
+bool ED_gizmo_poll_from_dropbox(const struct bContext *C, const struct wmGizmoGroupType *gzgt);
+
 #ifdef __cplusplus
 }
 #endif

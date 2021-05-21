@@ -68,6 +68,7 @@ static void asset_view_item_but_drag_set(uiBut *but,
                             asset_handle->file_data->name,
                             BLI_strdup(blend_path),
                             asset_handle->file_data->blentype,
+                            asset_handle->file_data->asset_data,
                             asset_handle->file_data->preview_icon_id,
                             imbuf,
                             1.0f);

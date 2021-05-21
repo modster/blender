@@ -39,6 +39,8 @@ typedef struct AssetTempIDConsumer AssetTempIDConsumer;
 bool ED_asset_mark_id(const struct bContext *C, struct ID *id);
 bool ED_asset_clear_id(struct ID *id);
 
+void ED_assets_pre_save(struct Main *bmain);
+
 bool ED_asset_can_make_single_from_context(const struct bContext *C);
 
 int ED_asset_library_reference_to_enum_value(const struct AssetLibraryReference *library);

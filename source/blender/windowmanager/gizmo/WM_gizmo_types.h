@@ -149,11 +149,16 @@ typedef enum eWM_GizmoFlagGroupTypeFlag {
   WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK = (1 << 8),
 
   /**
+   * Redraw the region's gizmos on mouse moves.
+   */
+  WM_GIZMOGROUPTYPE_ATTACHED_TO_CURSOR = (1 << 9),
+
+  /**
    * Cause continuous redraws, i.e. set the region redraw flag on every main loop iteration. This
    * should really be avoided by using proper region redraw tagging, notifiers and the message-bus,
    * however for VR it's sometimes needed.
    */
-  WM_GIZMOGROUPTYPE_VR_REDRAWS = (1 << 9),
+  WM_GIZMOGROUPTYPE_VR_REDRAWS = (1 << 10),
 } eWM_GizmoFlagGroupTypeFlag;
 
 /**
@@ -475,6 +480,9 @@ typedef struct wmGizmoGroup {
 
   struct wmGizmoGroupType *type;
   ListBase gizmos;
+
+  struct PointerRNA *ptr;
+  struct IDProperty *properties;
 
   struct wmGizmoMap *parent_gzmap;
 

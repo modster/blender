@@ -30,12 +30,14 @@
 #include "DNA_scene_types.h"
 #include "DNA_vfont_types.h"
 
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
+#include "BKE_object.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -64,7 +66,6 @@
 
 static const char *view3d_gzgt_placement_id = "VIEW3D_GGT_placement";
 
-static void preview_plane_cursor_setup(wmGizmoGroup *gzgroup);
 static void preview_plane_cursor_visible_set(wmGizmoGroup *gzgroup, bool do_draw);
 
 /**
@@ -377,6 +378,25 @@ static wmGizmoGroup *idp_gizmogroup_from_region(ARegion *region)
   return gzmap ? WM_gizmomap_group_find(gzmap, view3d_gzgt_placement_id) : NULL;
 }
 
+static wmGizmo *idp_snap_gizmo_from_region(ARegion *region)
+{
+  /* Assign snap gizmo which is may be used as part of the tool. */
+  wmGizmoGroup *gzgroup = idp_gizmogroup_from_region(region);
+  if ((gzgroup == NULL) || (gzgroup->gizmos.first == NULL)) {
+    return NULL;
+  }
+
+  return gzgroup->gizmos.first;
+}
+
+static void idp_paintcursor_from_gizmo_visible_set(wmGizmo *gz, bool visible)
+{
+  /* Can be NULL when gizmos are disabled. */
+  if (gz->parent_gzgroup->customdata != NULL) {
+    preview_plane_cursor_visible_set(gz->parent_gzgroup, visible);
+  }
+}
+
 /**
  * Calculate 3D view incremental (grid) snapping.
  *
@@ -454,7 +474,7 @@ static void draw_line_loop(const float coords[][3], int coords_len, const float 
   float viewport[4];
   GPU_viewport_size_get_f(viewport);
   GPU_batch_uniform_2fv(batch, "viewportSize", &viewport[2]);
-  GPU_batch_uniform_1f(batch, "lineWidth", U.pixelsize);
+  GPU_batch_uniform_1f(batch, "lineWidth", GPU_line_width_get());
 
   GPU_batch_draw(batch);
 
@@ -487,7 +507,7 @@ static void draw_line_pairs(const float coords_a[][3],
   float viewport[4];
   GPU_viewport_size_get_f(viewport);
   GPU_batch_uniform_2fv(batch, "viewportSize", &viewport[2]);
-  GPU_batch_uniform_1f(batch, "lineWidth", U.pixelsize);
+  GPU_batch_uniform_1f(batch, "lineWidth", GPU_line_width_get());
 
   GPU_batch_draw(batch);
 
@@ -535,7 +555,7 @@ static void draw_line_bounds(const BoundBox *bounds, const float color[4])
   float viewport[4];
   GPU_viewport_size_get_f(viewport);
   GPU_batch_uniform_2fv(batch, "viewportSize", &viewport[2]);
-  GPU_batch_uniform_1f(batch, "lineWidth", U.pixelsize);
+  GPU_batch_uniform_1f(batch, "lineWidth", GPU_line_width_get());
 
   GPU_batch_draw(batch);
 
@@ -1007,6 +1027,90 @@ static void view3d_interactive_add_calc_plane(bContext *C,
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Public Placement Plane Functionality
+ * \{ */
+
+void ED_view3d_placement_plane_calc(bContext *C,
+                                    const int mval[2],
+                                    const int plane_axis,
+                                    float r_co_src[3],
+                                    float r_mat_orient[3][3])
+{
+  Scene *scene = CTX_data_scene(C);
+  ARegion *region = CTX_wm_region(C);
+  View3D *v3d = CTX_wm_view3d(C);
+
+  /* TODO what if there is no snap gizmo? */
+  wmGizmo *snap_gizmo = idp_snap_gizmo_from_region(region);
+  const float mval_fl[] = {mval[0], mval[1]};
+
+  /* TODO Options here should be input parameters. */
+  view3d_interactive_add_calc_plane(C,
+                                    scene,
+                                    v3d,
+                                    region,
+                                    mval_fl,
+                                    snap_gizmo,
+                                    PLACE_SNAP_TO_GEOMETRY,
+                                    PLACE_DEPTH_SURFACE,
+                                    PLACE_ORIENT_SURFACE,
+                                    plane_axis,
+                                    false,
+                                    r_co_src,
+                                    r_mat_orient);
+}
+
+static void placement_plane_adjust_to_boundbox(const BoundBox *boundbox,
+                                               const enum ePlaceDirection direction,
+                                               const float scale[3],
+                                               const int plane_axis,
+                                               const float plane_mat_orient[3][3],
+                                               float r_co_src[3])
+{
+  BLI_assert(ELEM(direction, PLACE_DIRECTION_NEG, PLACE_DIRECTION_POS));
+
+  const bool is_negative_up = scale[plane_axis] < 0;
+  /* Calculate the offset for all axes. */
+  float offset_vec[3] = {0};
+  {
+    /* Move the offset to put the return coordinate to the center of the bounding box. */
+    BKE_boundbox_calc_center_aabb(boundbox, offset_vec);
+
+    /* Push offset at the plane axis so the bounding box surface is where the snapping point is. */
+    float size[3];
+    BKE_boundbox_calc_size_aabb(boundbox, size);
+    offset_vec[plane_axis] -= size[plane_axis] * (is_negative_up ? -1 : 1);
+
+    /* Scale offset with the object scale. */
+    mul_v3_v3(offset_vec, scale);
+    if (direction == PLACE_DIRECTION_NEG) {
+      mul_v3_fl(offset_vec, -1);
+    }
+  }
+
+  /* Rotate the offset vector to the plane rotation. */
+  mul_v3_m3v3(offset_vec, plane_mat_orient, offset_vec);
+  /* Finally, add the rotated offset to the returned position. */
+  add_v3_v3(r_co_src, offset_vec);
+}
+
+void ED_view3d_placement_plane_boundbox_calc(bContext *C,
+                                             const int mval[2],
+                                             const BoundBox *boundbox,
+                                             const enum ePlaceDirection direction,
+                                             const float scale[3],
+                                             float r_co_src[3],
+                                             float r_mat_orient[3][3])
+{
+  const int plane_axis = 2;
+  ED_view3d_placement_plane_calc(C, mval, plane_axis, r_co_src, r_mat_orient);
+  placement_plane_adjust_to_boundbox(
+      boundbox, direction, scale, plane_axis, r_mat_orient, r_co_src);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Add Object Modal Operator
  * \{ */
 
@@ -1032,19 +1136,8 @@ static void view3d_interactive_add_begin(bContext *C, wmOperator *op, const wmEv
   struct InteractivePlaceData *ipd = op->customdata;
 
   /* Assign snap gizmo which is may be used as part of the tool. */
-  {
-    wmGizmoGroup *gzgroup = idp_gizmogroup_from_region(ipd->region);
-    if (gzgroup != NULL) {
-      if (gzgroup->gizmos.first) {
-        ipd->snap_gizmo = gzgroup->gizmos.first;
-      }
-
-      /* Can be NULL when gizmos are disabled. */
-      if (gzgroup->customdata != NULL) {
-        preview_plane_cursor_visible_set(gzgroup, false);
-      }
-    }
-  }
+  ipd->snap_gizmo = idp_snap_gizmo_from_region(ipd->region);
+  idp_paintcursor_from_gizmo_visible_set(ipd->snap_gizmo, false);
 
   /* For tweak events the snap target may have changed since dragging,
    * update the snap target at the cursor location where tweak began.
@@ -1243,12 +1336,8 @@ static void view3d_interactive_add_exit(bContext *C, wmOperator *op)
   ED_region_tag_redraw(ipd->region);
 
   {
-    wmGizmoGroup *gzgroup = idp_gizmogroup_from_region(ipd->region);
-    if (gzgroup != NULL) {
-      if (gzgroup->customdata != NULL) {
-        preview_plane_cursor_visible_set(gzgroup, true);
-      }
-    }
+    wmGizmo *snap_gz = idp_snap_gizmo_from_region(ipd->region);
+    idp_paintcursor_from_gizmo_visible_set(snap_gz, true);
   }
 
   MEM_freeN(ipd);
@@ -1762,22 +1851,72 @@ static void WIDGETGROUP_placement_setup(const bContext *UNUSED(C), wmGizmoGroup 
     gizmo->flag |= WM_GIZMO_HIDDEN_KEYMAP;
   }
 
-  /* Sets the gizmos custom-data which has it's own free callback. */
-  preview_plane_cursor_setup(gzgroup);
+  {
+    const wmGizmoType *gzt_plane = WM_gizmotype_find("GIZMO_GT_placement_plane_3d", true);
+    gizmo = WM_gizmo_new_ptr(gzt_plane, gzgroup, NULL);
+
+    WM_gizmo_set_color(gizmo, (float[4]){1.0f, 1.0f, 1.0f, 1.0f});
+
+    /* Don't handle any events, this is for display only. */
+    gizmo->flag |= WM_GIZMO_HIDDEN_KEYMAP;
+  }
+}
+
+static void WIDGETGROUP_placement_draw_prepare(const bContext *UNUSED(C), wmGizmoGroup *gzgroup)
+{
+  /* TODO only set for drag & drop. */
+  if (!gzgroup->ptr) {
+    return;
+  }
+
+  wmGizmo *gizmo_plane = ((wmGizmo *)gzgroup->gizmos.first)->next;
+
+  PropertyRNA *boundbox_prop = RNA_struct_find_property(gzgroup->ptr, "bound_box");
+  if (boundbox_prop && RNA_property_is_set(gzgroup->ptr, boundbox_prop)) {
+    float array[8][3];
+    RNA_property_float_get_array(gzgroup->ptr, boundbox_prop, (float *)array);
+    RNA_float_set_array(gizmo_plane->ptr, "bound_box", (float *)array);
+  }
+
+  PropertyRNA *matrix_basis_prop = RNA_struct_find_property(gzgroup->ptr, "matrix_basis");
+  if (matrix_basis_prop && RNA_property_is_set(gzgroup->ptr, matrix_basis_prop)) {
+    float array[4][4];
+    RNA_property_float_get_array(gzgroup->ptr, matrix_basis_prop, (float *)array);
+    RNA_float_set_array(gizmo_plane->ptr, "matrix_basis", (float *)array);
+  }
+}
+
+static bool WIDGETGROUP_placement_poll(const bContext *C, wmGizmoGroupType *gzgt)
+{
+  return ED_gizmo_poll_from_dropbox(C, gzgt) || ED_gizmo_poll_from_tool(C, gzgt);
 }
 
 void VIEW3D_GGT_placement(wmGizmoGroupType *gzgt)
 {
+  PropertyRNA *prop;
+
   gzgt->name = "Placement Widget";
   gzgt->idname = view3d_gzgt_placement_id;
 
-  gzgt->flag |= WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_SCALE | WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL;
+  gzgt->flag |= WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_SCALE | WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL |
+                WM_GIZMOGROUPTYPE_ATTACHED_TO_CURSOR;
 
   gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
-  gzgt->poll = ED_gizmo_poll_or_unlink_delayed_from_tool;
+  gzgt->poll = WIDGETGROUP_placement_poll;
   gzgt->setup = WIDGETGROUP_placement_setup;
+  gzgt->draw_prepare = WIDGETGROUP_placement_draw_prepare;
+
+  const int boundbox_dimsize[] = {8, 3};
+  prop = RNA_def_property(gzgt->srna, "bound_box", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_multi_array(prop, 2, boundbox_dimsize);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
+  const int matrix_dimsize[] = {4, 4};
+  prop = RNA_def_property(gzgt->srna, "matrix_basis", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_multi_array(prop, 2, matrix_dimsize);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -1819,13 +1958,7 @@ static void gizmo_plane_update_cursor(const bContext *C,
   View3D *v3d = CTX_wm_view3d(C);
 
   /* Assign snap gizmo which is may be used as part of the tool. */
-  wmGizmo *snap_gizmo = NULL;
-  {
-    wmGizmoGroup *gzgroup = idp_gizmogroup_from_region(region);
-    if ((gzgroup != NULL) && gzgroup->gizmos.first) {
-      snap_gizmo = gzgroup->gizmos.first;
-    }
-  }
+  wmGizmo *snap_gizmo = idp_snap_gizmo_from_region(region);
 
   /* This ensures the snap gizmo has settings from this tool.
    * This function call could be moved a more appropriate place,
@@ -1964,6 +2097,11 @@ struct PlacementCursor {
 
   void *paintcursor;
 
+  float boundbox[8][3];
+  bool draw_boundbox;
+
+  float scale[3];
+
   int plane_axis;
   float matrix[4][4];
 
@@ -1972,9 +2110,8 @@ struct PlacementCursor {
   float persmat_prev[4][4];
 };
 
-static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
+static void cursor_plane_draw_ex(const bContext *C, const int mval[2], struct PlacementCursor *plc)
 {
-  struct PlacementCursor *plc = (struct PlacementCursor *)customdata;
   ARegion *region = CTX_wm_region(C);
   const RegionView3D *rv3d = region->regiondata;
 
@@ -1994,6 +2131,9 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
     return;
   }
 
+  GPU_line_smooth(false);
+  GPU_line_width(1.0f);
+
   /* Check this gizmo group is in the region. */
   {
     wmGizmoMap *gzmap = region->gizmo_map;
@@ -2003,8 +2143,6 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
       return;
     }
   }
-
-  const int mval[2] = {x - region->winrct.xmin, y - region->winrct.ymin};
 
   /* Update matrix? */
   if ((plc->mval_prev[0] != mval[0]) || (plc->mval_prev[1] != mval[1]) ||
@@ -2055,17 +2193,29 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
     }
 
     /* Setup viewport & matrix. */
-    wmViewport(&region->winrct);
+    if (plc->paintcursor) {
+      /* Paint cursors are on window level, need to set the viewport. */
+      wmViewport(&region->winrct);
+    }
     GPU_matrix_push_projection();
     GPU_matrix_push();
     GPU_matrix_projection_set(rv3d->winmat);
     GPU_matrix_set(rv3d->viewmat);
 
-    const float scale_mod = U.gizmo_size * 2 * U.dpi_fac / U.pixelsize;
+    float final_scale;
+    if (plc->draw_boundbox) {
+      /* Take diagonal of lower face to make the size based on the boundbox. */
+      float lower_min[3], lower_max[3];
+      mul_v3_v3v3(lower_min, plc->boundbox[0], plc->scale);
+      mul_v3_v3v3(lower_max, plc->boundbox[6], plc->scale);
+      final_scale = len_v3v3(lower_min, lower_max);
+    }
+    else {
+      const float scale_mod = U.gizmo_size * 2 * U.dpi_fac / U.pixelsize;
+      final_scale = (scale_mod * pixel_size);
+    }
 
-    float final_scale = (scale_mod * pixel_size);
-
-    const int lines_subdiv = 10;
+    const int lines_subdiv = 10.0f;
     int lines = lines_subdiv;
 
     float final_scale_fade = final_scale;
@@ -2093,10 +2243,44 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
     gizmo_plane_draw_grid(
         lines, final_scale, final_scale_fade, plc->matrix, plc->plane_axis, color);
 
+    /* TODO support different plane axis (assumes Z right now). */
+    if (plc->draw_boundbox) {
+      float box_col[4] = {0.4f, 0.8f, 1.0f, 0.75f};
+      BoundBox bounds;
+      memcpy(bounds.vec, plc->boundbox, sizeof(bounds.vec));
+
+      float size[3];
+      BKE_boundbox_calc_size_aabb(&bounds, size);
+
+      float min[3] = {-size[0], -size[1], 0.0f};
+      float max[3] = {size[0], size[1], size[2] * 2};
+      mul_v3_v3(min, plc->scale);
+      mul_v3_v3(max, plc->scale);
+      BKE_boundbox_init_from_minmax(&bounds, min, max);
+
+      GPU_matrix_mul(plc->matrix);
+      /* Ensure the bounding-box points up. Matches how it will be placed eventualy. */
+      const bool negative_up = bounds.vec[1][2] < 0;
+      if (negative_up) {
+        GPU_matrix_scale_1f(-1.0f);
+      }
+
+      GPU_line_width(2.0f);
+      draw_line_bounds(&bounds, box_col);
+    }
+
     /* Restore matrix. */
     GPU_matrix_pop();
     GPU_matrix_pop_projection();
   }
+}
+
+static void cursor_plane_draw_cursor_fn(bContext *C, int x, int y, void *customdata)
+{
+  struct PlacementCursor *plc = (struct PlacementCursor *)customdata;
+  const ARegion *region = CTX_wm_region(C);
+  const int mval[2] = {x - region->winrct.xmin, y - region->winrct.ymin};
+  cursor_plane_draw_ex(C, mval, plc);
 }
 
 static void preview_plane_cursor_free(void *customdata)
@@ -2111,13 +2295,13 @@ static void preview_plane_cursor_free(void *customdata)
   MEM_freeN(plc);
 }
 
-static void preview_plane_cursor_setup(wmGizmoGroup *gzgroup)
+static void UNUSED_FUNCTION(preview_plane_cursor_setup)(wmGizmoGroup *gzgroup)
 {
   BLI_assert(gzgroup->customdata == NULL);
   struct PlacementCursor *plc = MEM_callocN(sizeof(*plc), __func__);
   plc->gzgroup = gzgroup;
   plc->paintcursor = WM_paint_cursor_activate(
-      SPACE_VIEW3D, RGN_TYPE_WINDOW, NULL, cursor_plane_draw, plc);
+      SPACE_VIEW3D, RGN_TYPE_WINDOW, NULL, cursor_plane_draw_cursor_fn, plc);
   gzgroup->customdata = plc;
   gzgroup->customdata_free = preview_plane_cursor_free;
 
@@ -2128,6 +2312,94 @@ static void preview_plane_cursor_visible_set(wmGizmoGroup *gzgroup, bool do_draw
 {
   struct PlacementCursor *plc = gzgroup->customdata;
   plc->do_draw = do_draw;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Placement Plane Gizmo
+ * \{ */
+
+struct PlacementPlaneGizmo {
+  wmGizmo gizmo;
+  struct PlacementCursor *plc;
+};
+
+static void gizmo_placement_plane_setup(wmGizmo *gz)
+{
+  struct PlacementPlaneGizmo *plane_gz = (struct PlacementPlaneGizmo *)gz;
+  plane_gz->plc = MEM_callocN(sizeof(*plane_gz->plc), __func__);
+  plane_gz->plc->gzgroup = gz->parent_gzgroup;
+}
+
+static void gizmo_placement_plane_free(wmGizmo *gz)
+{
+  struct PlacementPlaneGizmo *plane_gz = (struct PlacementPlaneGizmo *)gz;
+  MEM_SAFE_FREE(plane_gz->plc);
+}
+
+static void gizmo_placement_plane_draw(const bContext *C, wmGizmo *gz)
+{
+  struct PlacementPlaneGizmo *plane_gz = (struct PlacementPlaneGizmo *)gz;
+  struct PlacementCursor *plc = plane_gz->plc;
+  const wmWindow *win = CTX_wm_window(C);
+
+  plc->do_draw = true;
+
+  PropertyRNA *boundbox_prop = RNA_struct_find_property(gz->ptr, "bound_box");
+  if (RNA_property_is_set(gz->ptr, boundbox_prop)) {
+    RNA_property_float_get_array(gz->ptr, boundbox_prop, (float *)plc->boundbox);
+    plc->draw_boundbox = true;
+  }
+  else {
+    plc->draw_boundbox = false;
+  }
+
+  PropertyRNA *matrix_basis_prop = RNA_struct_find_property(gz->ptr, "matrix_basis");
+  if (RNA_property_is_set(gz->ptr, matrix_basis_prop)) {
+    float mat[4][4];
+    RNA_property_float_get_array(gz->ptr, matrix_basis_prop, (float *)mat);
+    mat4_to_size(plc->scale, mat);
+  }
+  else {
+    copy_v3_fl(plc->scale, 1.0f);
+  }
+
+  const wmEvent *eventstate = win->eventstate;
+  const ARegion *region = CTX_wm_region(C);
+  const int mval[2] = {eventstate->x - region->winrct.xmin, eventstate->y - region->winrct.ymin};
+
+  cursor_plane_draw_ex(C, mval, plc);
+}
+
+static void GIZMO_GT_placement_plane_3d(wmGizmoType *gzt)
+{
+  PropertyRNA *prop;
+
+  /* identifiers */
+  gzt->idname = "GIZMO_GT_placement_plane_3d";
+
+  /* api callbacks */
+  gzt->setup = gizmo_placement_plane_setup;
+  gzt->draw = gizmo_placement_plane_draw;
+  gzt->free = gizmo_placement_plane_free;
+
+  gzt->struct_size = sizeof(struct PlacementPlaneGizmo);
+
+  const int boundbox_dimsize[] = {8, 3};
+  prop = RNA_def_property(gzt->srna, "bound_box", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_multi_array(prop, 2, boundbox_dimsize);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
+  const int matrix_dimsize[] = {4, 4};
+  prop = RNA_def_property(gzt->srna, "matrix_basis", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_multi_array(prop, 2, matrix_dimsize);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+}
+
+void ED_gizmotypes_placement_3d(void)
+{
+  WM_gizmotype_append(GIZMO_GT_placement_plane_3d);
 }
 
 /** \} */

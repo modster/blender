@@ -6176,6 +6176,7 @@ void UI_but_drag_set_asset(uiBut *but,
                            const char *name,
                            const char *path,
                            int id_type,
+                           struct AssetMetaData *metadata,
                            int icon,
                            struct ImBuf *imb,
                            float scale)
@@ -6183,6 +6184,7 @@ void UI_but_drag_set_asset(uiBut *but,
   wmDragAsset *asset_drag = MEM_mallocN(sizeof(*asset_drag), "wmDragAsset");
 
   BLI_strncpy(asset_drag->name, name, sizeof(asset_drag->name));
+  asset_drag->metadata = metadata;
   asset_drag->path = path;
   asset_drag->id_type = id_type;
 

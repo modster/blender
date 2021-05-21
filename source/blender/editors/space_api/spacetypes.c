@@ -142,6 +142,7 @@ void ED_spacetypes_init(void)
   ED_gizmotypes_cage_2d();
   ED_gizmotypes_cage_3d();
   ED_gizmotypes_snap_3d();
+  ED_gizmotypes_placement_3d();
 
   /* Register types for operators and gizmos. */
   const ListBase *spacetypes = BKE_spacetypes_list();
