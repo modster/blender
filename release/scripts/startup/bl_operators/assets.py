@@ -91,6 +91,7 @@ class ASSET_OT_open_containing_blend_file(Operator):
         if not asset_file_handle or not asset_library:
             return False
 
+        # TODO add tooltip disabled hint (to explain why the operator isn't available).
         return not asset_file_handle.local_id
 
     def execute(self, context):
