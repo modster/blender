@@ -9,7 +9,6 @@ void node_eevee_specular(vec4 diffuse,
                          float clearcoat_roughness,
                          vec3 clearcoat_normal,
                          float occlusion,
-                         float ssr_id,
                          out Closure result)
 {
   g_diffuse_data.color = diffuse.rgb;

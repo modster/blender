@@ -295,17 +295,6 @@ typedef struct bNode {
   char iter_flag;
   /** Runtime during drawing. */
   struct uiBlock *block;
-
-  /**
-   * XXX: eevee only, id of screen space reflection layer,
-   * needs to be a float to feed GPU_uniform.
-   */
-  float ssr_id;
-  /**
-   * XXX: eevee only, id of screen subsurface scatter layer,
-   * needs to be a float to feed GPU_uniform.
-   */
-  float sss_id;
 } bNode;
 
 /* node->flag */

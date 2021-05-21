@@ -4,7 +4,6 @@ void node_bsdf_glass(vec4 color,
                      float ior,
                      vec3 N,
                      const float do_multiscatter,
-                     const float ssr_id,
                      out Closure result)
 {
   g_reflection_data.color = color.rgb;

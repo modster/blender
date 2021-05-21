@@ -59,12 +59,6 @@
 #include "node_shader_util.h"
 #include "node_util.h"
 
-typedef struct nTreeTags {
-  float ssr_id, sss_id;
-} nTreeTags;
-
-static void ntree_shader_tag_nodes(bNodeTree *ntree, bNode *output_node, nTreeTags *tags);
-
 static bool shader_tree_poll(const bContext *C, bNodeTreeType *UNUSED(treetype))
 {
   Scene *scene = CTX_data_scene(C);
@@ -832,50 +826,6 @@ static bool ntree_shader_bump_branches(bNode *fromnode, bNode *UNUSED(tonode), v
   return true;
 }
 
-static bool ntree_tag_bsdf_cb(bNode *fromnode, bNode *UNUSED(tonode), void *userdata)
-{
-  switch (fromnode->type) {
-    case SH_NODE_BSDF_ANISOTROPIC:
-    case SH_NODE_EEVEE_SPECULAR:
-    case SH_NODE_BSDF_GLOSSY:
-    case SH_NODE_BSDF_GLASS:
-      fromnode->ssr_id = ((nTreeTags *)userdata)->ssr_id;
-      ((nTreeTags *)userdata)->ssr_id += 1;
-      break;
-    case SH_NODE_SUBSURFACE_SCATTERING:
-      fromnode->sss_id = ((nTreeTags *)userdata)->sss_id;
-      ((nTreeTags *)userdata)->sss_id += 1;
-      break;
-    case SH_NODE_BSDF_PRINCIPLED:
-      fromnode->ssr_id = ((nTreeTags *)userdata)->ssr_id;
-      fromnode->sss_id = ((nTreeTags *)userdata)->sss_id;
-      ((nTreeTags *)userdata)->sss_id += 1;
-      ((nTreeTags *)userdata)->ssr_id += 1;
-      break;
-    default:
-      /* We could return false here but since we
-       * allow the use of Closure as RGBA, we can have
-       * Bsdf nodes linked to other Bsdf nodes. */
-      break;
-  }
-
-  return true;
-}
-
-/* EEVEE: Scan the ntree to set the Screen Space Reflection
- * layer id of every specular node AND the Subsurface Scattering id of every SSS node.
- */
-void ntree_shader_tag_nodes(bNodeTree *ntree, bNode *output_node, nTreeTags *tags)
-{
-  if (output_node == NULL) {
-    return;
-  }
-  /* Make sure sockets links pointers are correct. */
-  ntreeUpdateTree(G.main, ntree);
-
-  nodeChainIterBackwards(ntree, output_node, ntree_tag_bsdf_cb, tags, 0);
-}
-
 /* This one needs to work on a local tree. */
 void ntreeGPUMaterialNodes(bNodeTree *localtree, GPUMaterial *mat)
 {
@@ -903,20 +853,8 @@ void ntreeGPUMaterialNodes(bNodeTree *localtree, GPUMaterial *mat)
   LISTBASE_FOREACH (bNode *, node, &localtree->nodes) {
     if (node->type == SH_NODE_OUTPUT_AOV) {
       nodeChainIterBackwards(localtree, node, ntree_shader_bump_branches, localtree, 0);
-      nTreeTags tags = {
-          .ssr_id = 1.0,
-          .sss_id = 1.0,
-      };
-      ntree_shader_tag_nodes(localtree, node, &tags);
     }
   }
-
-  /* TODO(fclem): consider moving this to the gpu shader tree evaluation. */
-  nTreeTags tags = {
-      .ssr_id = 1.0,
-      .sss_id = 1.0,
-  };
-  ntree_shader_tag_nodes(localtree, output, &tags);
 
   exec = ntreeShaderBeginExecTree(localtree);
   ntreeExecGPUNodes(exec, mat, output);

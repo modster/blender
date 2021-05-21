@@ -107,7 +107,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
 #endif
 
   bool use_diffuse = socket_not_one(4) && socket_not_one(15);
-  bool use_subsurf = socket_not_zero(1) && use_diffuse && node->sss_id > 0;
+  bool use_subsurf = socket_not_zero(1) && use_diffuse;
   bool use_refract = socket_not_one(4) && socket_not_zero(15);
   bool use_clear = socket_not_zero(12);
 
@@ -137,9 +137,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
                         GPU_constant(&f_use_diffuse),
                         GPU_constant(&f_use_clearcoat),
                         GPU_constant(&f_use_refraction),
-                        GPU_constant(&use_multi_scatter),
-                        GPU_constant(&node->ssr_id),
-                        GPU_constant(&node->sss_id));
+                        GPU_constant(&use_multi_scatter));
 }
 
 static void node_shader_update_principled(bNodeTree *UNUSED(ntree), bNode *node)

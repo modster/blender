@@ -60,8 +60,7 @@ static int node_shader_gpu_bsdf_anisotropic(GPUMaterial *mat,
                         "node_bsdf_anisotropic",
                         in,
                         out,
-                        GPU_constant(&use_multi_scatter),
-                        GPU_constant(&node->ssr_id));
+                        GPU_constant(&use_multi_scatter));
 }
 
 /* node type definition */
