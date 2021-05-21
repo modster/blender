@@ -826,6 +826,27 @@ static bool ntree_shader_bump_branches(bNode *fromnode, bNode *UNUSED(tonode), v
   return true;
 }
 
+/* Generate emission node to convert regular data to closure sockets.
+ */
+static void ntree_shader_implicit_closure_cast(bNodeTree *ntree)
+{
+  bool modified = false;
+  LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &ntree->links) {
+    if ((link->fromsock->type != SOCK_SHADER) && (link->tosock->type == SOCK_SHADER)) {
+      bNode *emission_node = nodeAddStaticNode(NULL, ntree, SH_NODE_EMISSION);
+      bNodeSocket *in_sock = ntree_shader_node_find_input(emission_node, "Color");
+      bNodeSocket *out_sock = ntree_shader_node_find_output(emission_node, "Emission");
+      nodeAddLink(ntree, link->fromnode, link->fromsock, emission_node, in_sock);
+      nodeAddLink(ntree, emission_node, out_sock, link->tonode, link->tosock);
+      nodeRemLink(ntree, link);
+      modified = true;
+    }
+  }
+  if (modified) {
+    ntreeUpdateTree(G.main, ntree);
+  }
+}
+
 /* This one needs to work on a local tree. */
 void ntreeGPUMaterialNodes(bNodeTree *localtree, GPUMaterial *mat)
 {
@@ -841,6 +862,8 @@ void ntreeGPUMaterialNodes(bNodeTree *localtree, GPUMaterial *mat)
     /* Search again, now including flattened nodes. */
     output = ntreeShaderOutputNode(localtree, SHD_OUTPUT_EEVEE);
   }
+
+  ntree_shader_implicit_closure_cast(localtree);
 
   /* Perform all needed modifications on the tree in order to support
    * displacement/bump mapping.
