@@ -1027,11 +1027,15 @@ static Object *object_for_curve_to_mesh_create(Object *object)
    *
    * Note that there are extra fields in there like bevel and path, but those are not needed during
    * conversion, so they are not copied to save unnecessary allocations. */
-  if (object->runtime.curve_cache != NULL) {
+  if (temp_object->runtime.curve_cache == NULL) {
     temp_object->runtime.curve_cache = MEM_callocN(sizeof(CurveCache),
                                                    "CurveCache for curve types");
+  }
+
+  if (object->runtime.curve_cache != NULL) {
     BKE_displist_copy(&temp_object->runtime.curve_cache->disp, &object->runtime.curve_cache->disp);
   }
+
   /* Constructive modifiers will use mesh to store result. */
   if (object->runtime.data_eval != NULL) {
     BKE_id_copy_ex(
@@ -1057,16 +1061,24 @@ static Object *object_for_curve_to_mesh_create(Object *object)
   return temp_object;
 }
 
+/**
+ * Populate `object->runtime.curve_cache` which is then used to create the mesh.
+ */
 static void curve_to_mesh_eval_ensure(Object *object)
 {
-  if (object->runtime.curve_cache == NULL) {
-    object->runtime.curve_cache = MEM_callocN(sizeof(CurveCache), "CurveCache for Curve");
-  }
   Curve *curve = (Curve *)object->data;
   Curve remapped_curve = *curve;
   Object remapped_object = *object;
-  remapped_object.runtime.bb = NULL;
+  BKE_object_runtime_reset(&remapped_object);
+
   remapped_object.data = &remapped_curve;
+
+  if (object->runtime.curve_cache == NULL) {
+    object->runtime.curve_cache = MEM_callocN(sizeof(CurveCache), "CurveCache for Curve");
+  }
+
+  /* Temporarily share the curve-cache with the temporary object, owned by `object`. */
+  remapped_object.runtime.curve_cache = object->runtime.curve_cache;
 
   /* Clear all modifiers for the bevel object.
    *
@@ -1078,8 +1090,8 @@ static void curve_to_mesh_eval_ensure(Object *object)
   Object bevel_object = {{NULL}};
   if (remapped_curve.bevobj != NULL) {
     bevel_object = *remapped_curve.bevobj;
-    bevel_object.runtime.bb = NULL;
     BLI_listbase_clear(&bevel_object.modifiers);
+    BKE_object_runtime_reset(&bevel_object);
     remapped_curve.bevobj = &bevel_object;
   }
 
@@ -1087,8 +1099,8 @@ static void curve_to_mesh_eval_ensure(Object *object)
   Object taper_object = {{NULL}};
   if (remapped_curve.taperobj != NULL) {
     taper_object = *remapped_curve.taperobj;
-    taper_object.runtime.bb = NULL;
     BLI_listbase_clear(&taper_object.modifiers);
+    BKE_object_runtime_reset(&taper_object);
     remapped_curve.taperobj = &taper_object;
   }
 
@@ -1110,12 +1122,12 @@ static void curve_to_mesh_eval_ensure(Object *object)
     BKE_object_eval_assign_data(&remapped_object, &mesh_eval->id, true);
   }
 
-  MEM_SAFE_FREE(remapped_object.runtime.bb);
-  MEM_SAFE_FREE(taper_object.runtime.bb);
-  MEM_SAFE_FREE(bevel_object.runtime.bb);
+  /* Owned by `object` & needed by the caller to create the mesh. */
+  remapped_object.runtime.curve_cache = NULL;
 
-  BKE_object_free_curve_cache(&bevel_object);
-  BKE_object_free_curve_cache(&taper_object);
+  BKE_object_runtime_free_data(&remapped_object);
+  BKE_object_runtime_free_data(&taper_object);
+  BKE_object_runtime_free_data(&taper_object);
 }
 
 static Mesh *mesh_new_from_curve_type_object(Object *object)
@@ -1199,7 +1211,9 @@ static Mesh *mesh_new_from_mesh(Object *object, Mesh *mesh)
   return mesh_result;
 }
 
-static Mesh *mesh_new_from_mesh_object_with_layers(Depsgraph *depsgraph, Object *object)
+static Mesh *mesh_new_from_mesh_object_with_layers(Depsgraph *depsgraph,
+                                                   Object *object,
+                                                   const bool preserve_origindex)
 {
   if (DEG_is_original_id(&object->id)) {
     return mesh_new_from_mesh(object, (Mesh *)object->data);
@@ -1216,16 +1230,23 @@ static Mesh *mesh_new_from_mesh_object_with_layers(Depsgraph *depsgraph, Object 
 
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   CustomData_MeshMasks mask = CD_MASK_MESH;
+  if (preserve_origindex) {
+    mask.vmask |= CD_MASK_ORIGINDEX;
+    mask.emask |= CD_MASK_ORIGINDEX;
+    mask.lmask |= CD_MASK_ORIGINDEX;
+    mask.pmask |= CD_MASK_ORIGINDEX;
+  }
   Mesh *result = mesh_create_eval_final(depsgraph, scene, &object_for_eval, &mask);
   return result;
 }
 
 static Mesh *mesh_new_from_mesh_object(Depsgraph *depsgraph,
                                        Object *object,
-                                       bool preserve_all_data_layers)
+                                       const bool preserve_all_data_layers,
+                                       const bool preserve_origindex)
 {
-  if (preserve_all_data_layers) {
-    return mesh_new_from_mesh_object_with_layers(depsgraph, object);
+  if (preserve_all_data_layers || preserve_origindex) {
+    return mesh_new_from_mesh_object_with_layers(depsgraph, object, preserve_origindex);
   }
   Mesh *mesh_input = object->data;
   /* If we are in edit mode, use evaluated mesh from edit structure, matching to what
@@ -1236,7 +1257,10 @@ static Mesh *mesh_new_from_mesh_object(Depsgraph *depsgraph,
   return mesh_new_from_mesh(object, mesh_input);
 }
 
-Mesh *BKE_mesh_new_from_object(Depsgraph *depsgraph, Object *object, bool preserve_all_data_layers)
+Mesh *BKE_mesh_new_from_object(Depsgraph *depsgraph,
+                               Object *object,
+                               const bool preserve_all_data_layers,
+                               const bool preserve_origindex)
 {
   Mesh *new_mesh = NULL;
   switch (object->type) {
@@ -1249,7 +1273,8 @@ Mesh *BKE_mesh_new_from_object(Depsgraph *depsgraph, Object *object, bool preser
       new_mesh = mesh_new_from_mball_object(object);
       break;
     case OB_MESH:
-      new_mesh = mesh_new_from_mesh_object(depsgraph, object, preserve_all_data_layers);
+      new_mesh = mesh_new_from_mesh_object(
+          depsgraph, object, preserve_all_data_layers, preserve_origindex);
       break;
     default:
       /* Object does not have geometry data. */
@@ -1314,7 +1339,7 @@ Mesh *BKE_mesh_new_from_object_to_bmain(Main *bmain,
 {
   BLI_assert(ELEM(object->type, OB_FONT, OB_CURVE, OB_SURF, OB_MBALL, OB_MESH));
 
-  Mesh *mesh = BKE_mesh_new_from_object(depsgraph, object, preserve_all_data_layers);
+  Mesh *mesh = BKE_mesh_new_from_object(depsgraph, object, preserve_all_data_layers, false);
   if (mesh == NULL) {
     /* Unable to convert the object to a mesh, return an empty one. */
     Mesh *mesh_in_bmain = BKE_mesh_add(bmain, ((ID *)object->data)->name + 2);
