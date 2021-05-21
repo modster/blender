@@ -592,15 +592,29 @@ class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        active_file = context.active_file
-        active_asset = asset_utils.SpaceAssetInfo.get_active_asset(context)
+        asset_file_handle = context.asset_file_handle
 
-        if not active_file or not active_asset:
+        if asset_file_handle is None:
             layout.label(text="No asset selected", icon='INFO')
             return
 
+        asset_library = context.asset_library
+        asset_lib_path = bpy.types.AssetHandle.get_full_library_path(asset_file_handle, asset_library)
+        is_local = asset_file_handle.local_id is not None
+
         # If the active file is an ID, use its name directly so renaming is possible from right here.
-        layout.prop(context.id if context.id is not None else active_file, "name", text="")
+        layout.prop(asset_file_handle.local_id if is_local else asset_file_handle, "name", text="")
+
+        if is_local:
+            row = layout.row()
+            row.label(text="Source: Current File")
+        else:
+            col = layout.column(align=True)  # Just to reduce margin.
+            col.label(text="Source:")
+            row = col.row()
+            row.label(text=asset_lib_path)
+
+        row.operator("asset.open_containing_blend_file", text="", icon='TOOL_SETTINGS')
 
 
 class ASSETBROWSER_PT_metadata_preview(asset_utils.AssetMetaDataPanel, Panel):
