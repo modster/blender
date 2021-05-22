@@ -28,6 +28,7 @@ static bNodeSocketTemplate sh_node_bsdf_anisotropic_in[] = {
     {SOCK_FLOAT, N_("Rotation"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
     {SOCK_VECTOR, N_("Normal"), 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
     {SOCK_VECTOR, N_("Tangent"), 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
+    {SOCK_FLOAT, N_("Weight"), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_NONE, SOCK_UNAVAIL},
     {-1, ""},
 };
 
@@ -55,12 +56,8 @@ static int node_shader_gpu_bsdf_anisotropic(GPUMaterial *mat,
 
   float use_multi_scatter = (node->custom1 == SHD_GLOSSY_MULTI_GGX) ? 1.0f : 0.0f;
 
-  return GPU_stack_link(mat,
-                        node,
-                        "node_bsdf_anisotropic",
-                        in,
-                        out,
-                        GPU_constant(&use_multi_scatter));
+  return GPU_stack_link(
+      mat, node, "node_bsdf_anisotropic", in, out, GPU_constant(&use_multi_scatter));
 }
 
 /* node type definition */

@@ -3,6 +3,7 @@ void node_bsdf_glass(vec4 color,
                      float roughness,
                      float ior,
                      vec3 N,
+                     float weight,
                      const float do_multiscatter,
                      out Closure result)
 {

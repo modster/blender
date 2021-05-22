@@ -24,6 +24,7 @@
 static bNodeSocketTemplate sh_node_background_in[] = {
     {SOCK_RGBA, N_("Color"), 0.8f, 0.8f, 0.8f, 1.0f, 0.0f, 1.0f},
     {SOCK_FLOAT, N_("Strength"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1000000.0f},
+    {SOCK_FLOAT, N_("Weight"), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_NONE, SOCK_UNAVAIL},
     {-1, ""},
 };
 

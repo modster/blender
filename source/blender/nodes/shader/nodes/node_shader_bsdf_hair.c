@@ -27,6 +27,7 @@ static bNodeSocketTemplate sh_node_bsdf_hair_in[] = {
     {SOCK_FLOAT, N_("RoughnessU"), 0.1f, 0.1f, 0.1f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
     {SOCK_FLOAT, N_("RoughnessV"), 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
     {SOCK_VECTOR, N_("Tangent"), 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
+    {SOCK_FLOAT, N_("Weight"), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_NONE, SOCK_UNAVAIL},
     {-1, ""},
 };
 

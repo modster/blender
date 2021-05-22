@@ -36,6 +36,7 @@ void node_bsdf_principled(vec4 base_color,
                           vec3 N,
                           vec3 CN,
                           vec3 T,
+                          float weight,
                           const float do_diffuse,
                           const float do_clearcoat,
                           const float do_refraction,
@@ -126,7 +127,7 @@ void node_bsdf_principled(vec4 base_color,
     g_refraction_data.roughness = do_multiscatter != 0.0 ? roughness : transmission_roughness;
   }
 
-  g_emission_data.emission = emission.rgb * emission_strength;
+  g_emission_data.emission += emission.rgb * emission_strength * weight;
 
   g_diffuse_data.color *= alpha;
   g_reflection_data.color *= alpha;

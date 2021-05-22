@@ -50,6 +50,7 @@ static bNodeSocketTemplate sh_node_eevee_specular_in[] = {
      1.0f,
      PROP_NONE,
      SOCK_HIDE_VALUE},
+    {SOCK_FLOAT, N_("Weight"), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_NONE, SOCK_UNAVAIL},
     {-1, ""},
 };
 

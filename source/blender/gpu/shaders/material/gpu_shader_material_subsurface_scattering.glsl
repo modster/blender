@@ -5,6 +5,7 @@ void node_subsurface_scattering(vec4 color,
                                 float sharpen,
                                 float texture_blur,
                                 vec3 N,
+                                float weight,
                                 out Closure result)
 {
   g_diffuse_data.color = color.rgb;

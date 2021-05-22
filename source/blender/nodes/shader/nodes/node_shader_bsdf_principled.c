@@ -63,6 +63,7 @@ static bNodeSocketTemplate sh_node_bsdf_principled_in[] = {
      PROP_NONE,
      SOCK_HIDE_VALUE},
     {SOCK_VECTOR, N_("Tangent"), 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
+    {SOCK_FLOAT, N_("Weight"), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_NONE, SOCK_UNAVAIL},
     {-1, ""},
 };
 
