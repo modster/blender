@@ -578,6 +578,7 @@ class NodeOperation {
    * Get input operation area being read by this operation on rendering given output area.
    */
   virtual void get_area_of_interest(int input_op_idx, const rcti &output_area, rcti &r_input_area);
+  void get_area_of_interest(NodeOperation *input_op, const rcti &output_area, rcti &r_input_area);
 
   /** \} */
 

@@ -208,6 +208,19 @@ void NodeOperation::get_area_of_interest(const int input_op_idx,
   }
 }
 
+void NodeOperation::get_area_of_interest(NodeOperation *input_op,
+                                         const rcti &output_area,
+                                         rcti &r_input_area)
+{
+  for (int i = 0; i < getNumberOfInputSockets(); i++) {
+    if (input_op == getInputOperation(i)) {
+      get_area_of_interest(i, output_area, r_input_area);
+      return;
+    }
+  }
+  BLI_assert(!"input_op is not an input operation.");
+}
+
 /**
  * Executes operation image manipulation algorithm rendering given areas.
  * \param output_buf: Buffer to write result to.
