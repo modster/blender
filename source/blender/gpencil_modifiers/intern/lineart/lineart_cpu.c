@@ -65,6 +65,8 @@
 
 #include "lineart_intern.h"
 
+// #define LINEART_WITH_BVH
+
 static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer *rb,
                                                              LineartEdge *e);
 
@@ -3484,9 +3486,11 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
         recursive_level < rb->tile_recursive_level) {
       lineart_bounding_area_split(rb, root_ba, recursive_level);
     }
+#ifndef LINEART_WITH_BVH
     if (recursive && do_intersection && rb->use_intersections) {
-      /* lineart_triangle_intersect_in_bounding_area(rb, rt, root_ba); */
+      lineart_triangle_intersect_in_bounding_area(rb, rt, root_ba);
     }
+#endif
   }
   else {
     LineartBoundingArea *ba = root_ba->child;
@@ -3755,30 +3759,37 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
   int r, co;
   int i_indexer = 0, i_triangle = 0;
 
+#ifdef LINEART_WITH_BVH
   if (rb->use_intersections) {
     rb->bvh_main = BLI_bvhtree_new(rb->bvh_face_count, 0, 8, 6);
     rb->bvh_triangle_indexer = lineart_mem_acquire(
         &rb->render_data_pool, sizeof(LineartTriangleBufferIndexer) * rb->bvh_inderxer_count);
   }
+#endif
 
   LISTBASE_FOREACH (LineartElementLinkNode *, reln, &rb->triangle_buffer_pointers) {
     rt = reln->pointer;
     lim = reln->element_count;
+#ifdef LINEART_WITH_BVH
     if (rb->use_intersections) {
       rb->bvh_triangle_indexer[i_indexer].eln = reln;
       rb->bvh_triangle_indexer[i_indexer].start_index = i_triangle;
       rb->bvh_triangle_indexer[i_indexer].end_index = i_triangle + lim;
     }
     i_indexer++;
+#endif
     for (i = 0; i < lim; i++) {
       if ((rt->flags & LRT_CULL_USED) || (rt->flags & LRT_CULL_DISCARD)) {
         rt = (void *)(((uchar *)rt) + rb->triangle_size);
         continue;
       }
 
+#ifdef LINEART_WITH_BVH
       float bounding[6];
       lineart_triangle_bbox(rt, bounding);
       BLI_bvhtree_insert(rb->bvh_main, i_triangle + i, bounding, 2);
+#endif
+
       if (lineart_get_triangle_bounding_areas(rb, rt, &y1, &y2, &x1, &x2)) {
         for (co = x1; co <= x2; co++) {
           for (r = y1; r <= y2; r++) {
@@ -4192,7 +4203,9 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
    * can do its job. */
   lineart_main_add_triangles(rb);
 
+#ifdef LINEART_WITH_BVH
   lineart_do_intersections(rb);
+#endif
 
   /* Link lines to acceleration structure, this can only be done after perspective division, if
    * we do it after triangles being added, the acceleration structure has already been
