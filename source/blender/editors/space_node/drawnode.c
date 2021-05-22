@@ -3457,8 +3457,7 @@ static void std_node_socket_draw(
       uiItemR(row, ptr, "default_value", DEFAULT_FLAGS, "", 0);
       break;
     }
-    case SOCK_STRING:
-    case SOCK_ATTRIBUTE: {
+    case SOCK_STRING: {
       uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
       uiItemL(row, text, 0);
 

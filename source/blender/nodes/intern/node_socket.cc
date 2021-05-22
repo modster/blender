@@ -310,15 +310,6 @@ void node_socket_init_default_value(bNodeSocket *sock)
       sock->default_value = dval;
       break;
     }
-    case SOCK_ATTRIBUTE: {
-      bNodeSocketValueString *dval = (bNodeSocketValueString *)MEM_callocN(
-          sizeof(bNodeSocketValueString), "node socket value string");
-      dval->subtype = subtype;
-      dval->value[0] = '\0';
-
-      sock->default_value = dval;
-      break;
-    }
   }
 }
 
@@ -403,12 +394,6 @@ void node_socket_copy_default_value(bNodeSocket *to, const bNodeSocket *from)
       bNodeSocketValueTexture *fromval = (bNodeSocketValueTexture *)from->default_value;
       *toval = *fromval;
       id_us_plus(&toval->value->id);
-      break;
-    }
-    case SOCK_ATTRIBUTE: {
-      bNodeSocketValueString *toval = (bNodeSocketValueString *)to->default_value;
-      bNodeSocketValueString *fromval = (bNodeSocketValueString *)from->default_value;
-      *toval = *fromval;
       break;
     }
   }
@@ -669,16 +654,6 @@ static bNodeSocketType *make_socket_type_string()
   return socktype;
 }
 
-static bNodeSocketType *make_socket_type_attribute()
-{
-  bNodeSocketType *socktype = make_standard_socket_type(SOCK_ATTRIBUTE, PROP_NONE);
-  socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<std::string>(); };
-  socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
-    new (r_value) std::string(((bNodeSocketValueString *)socket.default_value)->value);
-  };
-  return socktype;
-}
-
 MAKE_CPP_TYPE(Object, Object *)
 MAKE_CPP_TYPE(Collection, Collection *)
 MAKE_CPP_TYPE(Texture, Tex *)
@@ -765,8 +740,6 @@ void register_standard_node_socket_types(void)
 
   nodeRegisterSocketType(make_socket_type_string());
 
-  nodeRegisterSocketType(make_socket_type_attribute());
-
   nodeRegisterSocketType(make_standard_socket_type(SOCK_SHADER, PROP_NONE));
 
   nodeRegisterSocketType(make_socket_type_object());
@@ -780,6 +753,8 @@ void register_standard_node_socket_types(void)
   nodeRegisterSocketType(make_socket_type_texture());
 
   nodeRegisterSocketType(make_socket_type_material());
+
+  nodeRegisterSocketType(make_standard_socket_type(SOCK_ATTRIBUTE, PROP_NONE));
 
   nodeRegisterSocketType(make_socket_type_virtual());
 }
