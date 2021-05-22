@@ -4046,6 +4046,8 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
     t_start = PIL_check_seconds_timer();
   }
 
+  BKE_scene_camera_switch_update(scene);
+
   if (!scene->camera) {
     return false;
   }
