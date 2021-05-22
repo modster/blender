@@ -10,7 +10,27 @@ ClosureVolume g_volume_data;
 ClosureEmission g_emission_data;
 ClosureTransparency g_transparency_data;
 
-void ntree_eval_set_defaults()
+struct GlobalData {
+  /** World position. */
+  vec3 P;
+  /** Surface Normal. */
+  vec3 N;
+  /** Geometric Normal. */
+  vec3 Ng;
+  /** Barycentric coordinates. */
+  vec2 barycentric_coords;
+  vec3 barycentric_dists;
+  /** Ray properties (approximation). */
+  int ray_type;
+  float ray_depth;
+  float ray_length;
+  /** Random number to sample a closure. */
+  float closure_rand;
+};
+
+GlobalData g_data;
+
+void ntree_eval_init()
 {
   g_diffuse_data.color = vec3(0.0);
   g_diffuse_data.N = vec3(1.0, 0.0, 0.0);
@@ -37,20 +57,9 @@ void ntree_eval_set_defaults()
   g_transparency_data.holdout = 0.0;
 }
 
-struct GlobalData {
-  /** World position. */
-  vec3 P;
-  /** Surface Normal. */
-  vec3 N;
-  /** Geometric Normal. */
-  vec3 Ng;
-  /** Barycentric coordinates. */
-  vec2 barycentric_coords;
-  vec3 barycentric_dists;
-  /** Ray properties (approximation). */
-  int ray_type;
-  float ray_depth;
-  float ray_length;
-};
-
-GlobalData g_data;
+void ntree_eval_weights()
+{
+  closure_weight_randomize(g_diffuse_data, g_data.closure_rand);
+  closure_weight_randomize(g_reflection_data, g_data.closure_rand);
+  closure_weight_randomize(g_refraction_data, g_data.closure_rand);
+}

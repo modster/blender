@@ -54,7 +54,8 @@ static int node_shader_gpu_subsurface_scattering(GPUMaterial *mat,
 
   GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE | GPU_MATFLAG_SUBSURFACE);
 
-  return GPU_stack_link(mat, node, "node_subsurface_scattering", in, out);
+  GPU_stack_link(mat, node, "node_subsurface_scattering", in, out);
+  return GPU_stack_eval_link(mat, node, "node_subsurface_scattering_eval", in, out);
 }
 
 static void node_shader_update_subsurface_scattering(bNodeTree *UNUSED(ntree), bNode *node)

@@ -75,6 +75,7 @@ typedef enum {
   GPU_NODE_TAG_VOLUME = (1 << 1),
   GPU_NODE_TAG_DISPLACEMENT = (1 << 2),
   GPU_NODE_TAG_AOV = (1 << 3),
+  GPU_NODE_TAG_EVAL = (1 << 4),
 } eGPUNodeTag;
 
 struct GPUNode {
@@ -153,6 +154,12 @@ typedef struct GPUNodeGraphOutputLink {
   GPUNodeLink *outlink;
 } GPUNodeGraphOutputLink;
 
+typedef struct GPUNodeGraphEvalNode {
+  struct GPUNodeGraphEvalNode *next, *prev;
+  GPUNode *weight_node;
+  GPUNode *eval_node;
+} GPUNodeGraphEvalNode;
+
 typedef struct GPUNodeGraph {
   /* Nodes */
   ListBase nodes;
@@ -163,6 +170,8 @@ typedef struct GPUNodeGraph {
   GPUNodeLink *outlink_displacement;
   /* List of GPUNodeGraphOutputLink */
   ListBase outlink_aovs;
+  /* List of GPUNodeGraphEvalNode. */
+  ListBase eval_nodes;
 
   /* Requested attributes and textures. */
   ListBase attributes;

@@ -46,7 +46,8 @@ static int node_shader_gpu_bsdf_velvet(GPUMaterial *mat,
 
   GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE);
 
-  return GPU_stack_link(mat, node, "node_bsdf_velvet", in, out);
+  GPU_stack_link(mat, node, "node_bsdf_velvet", in, out);
+  return GPU_stack_link(mat, node, "node_bsdf_velvet_eval", in, out);
 }
 
 /* node type definition */

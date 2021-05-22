@@ -141,6 +141,7 @@ class Sampling {
       data_.dimensions[SAMPLING_FILTER_V][0] = r[1];
       /* TODO decorelate. */
       data_.dimensions[SAMPLING_TIME][0] = r[0];
+      data_.dimensions[SAMPLING_CLOSURE][0] = r[1];
     }
     {
       double r[2], offset[2] = {0, 0};

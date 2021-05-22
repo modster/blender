@@ -85,10 +85,11 @@ enum eSamplingDimension : uint32_t {
   SAMPLING_SHADOW_V = 6u,
   SAMPLING_SHADOW_W = 7u,
   SAMPLING_SHADOW_X = 8u,
-  SAMPLING_SHADOW_Y = 9u
+  SAMPLING_SHADOW_Y = 9u,
+  SAMPLING_CLOSURE = 10u
 };
 
-#define SAMPLING_DIMENSION_COUNT 10
+#define SAMPLING_DIMENSION_COUNT 11
 
 struct SamplingData {
   /** Array containing random values from Low Discrepency Sequence in [0..1) range. */

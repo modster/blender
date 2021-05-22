@@ -5,8 +5,16 @@ void node_bsdf_anisotropic(vec4 color,
                            vec3 N,
                            vec3 T,
                            float weight,
-                           const float use_multiscatter,
                            out Closure result)
 {
-  node_bsdf_glossy(color, roughness, N, weight, use_multiscatter, result);
+  closure_weight_add(g_reflection_data, weight);
+}
+
+void node_bsdf_anisotropic_eval(
+    vec4 color, float roughness, vec3 N, float weight, float use_multiscatter, out Closure result)
+{
+  if (closure_weight_threshold(g_reflection_data, weight)) {
+    g_reflection_data.color = color.rgb * weight;
+    g_reflection_data.N = N;
+  }
 }

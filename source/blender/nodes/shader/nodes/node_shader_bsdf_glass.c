@@ -58,7 +58,26 @@ static int node_shader_gpu_bsdf_glass(GPUMaterial *mat,
 
   float use_multi_scatter = (node->custom1 == SHD_GLOSSY_MULTI_GGX) ? 1.0f : 0.0f;
 
-  return GPU_stack_link(mat, node, "node_bsdf_glass", in, out, GPU_constant(&use_multi_scatter));
+  GPUNodeLink *reflection_weight;
+  GPUNodeLink *refraction_weight;
+
+  GPU_stack_link(mat,
+                 node,
+                 "node_bsdf_glass",
+                 in,
+                 out,
+                 GPU_constant(&use_multi_scatter),
+                 &reflection_weight,
+                 &refraction_weight);
+
+  return GPU_stack_eval_link(mat,
+                             node,
+                             "node_bsdf_glass_eval",
+                             in,
+                             out,
+                             GPU_constant(&use_multi_scatter),
+                             reflection_weight,
+                             refraction_weight);
 }
 
 /* node type definition */

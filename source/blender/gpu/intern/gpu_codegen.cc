@@ -251,6 +251,7 @@ class GPUCodegen {
  private:
   void set_unique_ids();
 
+  void node_serialize(std::stringstream &eval_ss, const GPUNode *node);
   char *graph_serialize(eGPUNodeTag tree_tag, GPUNodeLink *output_link);
 
   static char *extract_c_str(std::stringstream &stream)
@@ -390,6 +391,70 @@ void GPUCodegen::generate_library()
   output.library = gpu_material_library_generate_code(graph.used_libraries);
 }
 
+void GPUCodegen::node_serialize(std::stringstream &eval_ss, const GPUNode *node)
+{
+  /* Declare constants. */
+  LISTBASE_FOREACH (GPUInput *, input, &node->inputs) {
+    switch (input->source) {
+      case GPU_SOURCE_STRUCT:
+        eval_ss << input->type << " " << input << " = CLOSURE_DEFAULT;\n";
+        break;
+      case GPU_SOURCE_CONSTANT:
+        eval_ss << input->type << " " << input << " = " << (GPUConstant *)input << ";\n";
+        break;
+      default:
+        break;
+    }
+  }
+  /* Declare temporary variables for node output storage. */
+  LISTBASE_FOREACH (GPUOutput *, output, &node->outputs) {
+    eval_ss << output->type << " " << output << ";\n";
+  }
+
+  /* Function call. */
+  eval_ss << node->name << "(";
+  /* Input arguments. */
+  LISTBASE_FOREACH (GPUInput *, input, &node->inputs) {
+    switch (input->source) {
+      case GPU_SOURCE_OUTPUT:
+      case GPU_SOURCE_ATTR: {
+        /* These inputs can have non matching types. Do conversion. */
+        eGPUType to = input->type;
+        eGPUType from = (input->source == GPU_SOURCE_ATTR) ? input->attr->gputype :
+                                                             input->link->output->type;
+        if (from != to) {
+          /* Use defines declared inside codegen_lib (i.e: vec4_from_float). */
+          eval_ss << to << "_from_" << from << "(";
+        }
+
+        if (input->source == GPU_SOURCE_ATTR) {
+          eval_ss << input;
+        }
+        else {
+          eval_ss << input->link->output;
+        }
+
+        if (from != to) {
+          eval_ss << ")";
+        }
+        break;
+      }
+      default:
+        eval_ss << input;
+        break;
+    }
+    eval_ss << ", ";
+  }
+  /* Output arguments. */
+  LISTBASE_FOREACH (GPUOutput *, output, &node->outputs) {
+    eval_ss << output;
+    if (output->next) {
+      eval_ss << ", ";
+    }
+  }
+  eval_ss << ");\n\n";
+}
+
 char *GPUCodegen::graph_serialize(eGPUNodeTag tree_tag, GPUNodeLink *output_link)
 {
   if (output_link == nullptr) {
@@ -397,72 +462,24 @@ char *GPUCodegen::graph_serialize(eGPUNodeTag tree_tag, GPUNodeLink *output_link
   }
 
   std::stringstream eval_ss;
+  /* Render engine implement this function if needed. */
+  eval_ss << "ntree_eval_init();\n\n";
   /* NOTE: The node order is already top to bottom (or left to right in node editor)
    * because of the evaluation order inside ntreeExecGPUNodes(). */
   LISTBASE_FOREACH (GPUNode *, node, &graph.nodes) {
-    if ((node->tag & tree_tag) == 0) {
+    if ((node->tag & tree_tag) == 0 || (node->tag & GPU_NODE_TAG_EVAL) != 0) {
       continue;
     }
-    /* Declare constants. */
-    LISTBASE_FOREACH (GPUInput *, input, &node->inputs) {
-      switch (input->source) {
-        case GPU_SOURCE_STRUCT:
-          eval_ss << input->type << " " << input << " = CLOSURE_DEFAULT;\n";
-          break;
-        case GPU_SOURCE_CONSTANT:
-          eval_ss << input->type << " " << input << " = " << (GPUConstant *)input << ";\n";
-          break;
-        default:
-          break;
-      }
+    node_serialize(eval_ss, node);
+  }
+  /* Render engine implement this function if needed. */
+  eval_ss << "ntree_eval_weights();\n\n";
+  /* Output eval function at the end. */
+  LISTBASE_FOREACH (GPUNode *, node, &graph.nodes) {
+    if ((node->tag & tree_tag) == 0 || (node->tag & GPU_NODE_TAG_EVAL) == 0) {
+      continue;
     }
-    /* Declare temporary variables for node output storage. */
-    LISTBASE_FOREACH (GPUOutput *, output, &node->outputs) {
-      eval_ss << output->type << " " << output << ";\n";
-    }
-
-    /* Function call. */
-    eval_ss << node->name << "(";
-    /* Input arguments. */
-    LISTBASE_FOREACH (GPUInput *, input, &node->inputs) {
-      switch (input->source) {
-        case GPU_SOURCE_OUTPUT:
-        case GPU_SOURCE_ATTR: {
-          /* These inputs can have non matching types. Do conversion. */
-          eGPUType to = input->type;
-          eGPUType from = (input->source == GPU_SOURCE_ATTR) ? input->attr->gputype :
-                                                               input->link->output->type;
-          if (from != to) {
-            /* Use defines declared inside codegen_lib (i.e: vec4_from_float). */
-            eval_ss << to << "_from_" << from << "(";
-          }
-
-          if (input->source == GPU_SOURCE_ATTR) {
-            eval_ss << input;
-          }
-          else {
-            eval_ss << input->link->output;
-          }
-
-          if (from != to) {
-            eval_ss << ")";
-          }
-          break;
-        }
-        default:
-          eval_ss << input;
-          break;
-      }
-      eval_ss << ", ";
-    }
-    /* Output arguments. */
-    LISTBASE_FOREACH (GPUOutput *, output, &node->outputs) {
-      eval_ss << output;
-      if (output->next) {
-        eval_ss << ", ";
-      }
-    }
-    eval_ss << ");\n\n";
+    node_serialize(eval_ss, node);
   }
   eval_ss << "return " << output_link->output << ";\n";
 

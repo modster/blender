@@ -34,8 +34,6 @@ void main(void)
 {
   g_data = init_globals();
 
-  ntree_eval_set_defaults();
-
   nodetree_surface();
 
   float vP_z = get_view_z_from_depth(gl_FragCoord.z);

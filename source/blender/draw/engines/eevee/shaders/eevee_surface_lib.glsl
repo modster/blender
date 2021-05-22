@@ -53,6 +53,7 @@ GlobalData init_globals(void)
   surf.ray_type = RAY_TYPE_CAMERA;
   surf.ray_depth = 0.0;
   surf.ray_length = distance(surf.P, cameraPos);
+  surf.closure_rand = 0.5;
   return surf;
 }
 #endif

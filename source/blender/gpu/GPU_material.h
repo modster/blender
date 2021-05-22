@@ -167,6 +167,12 @@ bool GPU_stack_link(GPUMaterial *mat,
                     GPUNodeStack *in,
                     GPUNodeStack *out,
                     ...);
+bool GPU_stack_eval_link(GPUMaterial *material,
+                         struct bNode *bnode,
+                         const char *name,
+                         GPUNodeStack *in,
+                         GPUNodeStack *out,
+                         ...);
 GPUNodeLink *GPU_uniformbuf_link_out(struct GPUMaterial *mat,
                                      struct bNode *node,
                                      struct GPUNodeStack *stack,
@@ -177,6 +183,10 @@ void GPU_material_output_volume(GPUMaterial *material, GPUNodeLink *link);
 void GPU_material_output_displacement(GPUMaterial *material, GPUNodeLink *link);
 
 void GPU_material_add_output_link_aov(GPUMaterial *material, GPUNodeLink *link, int hash);
+
+void GPU_material_add_closure_eval(GPUMaterial *material,
+                                   const GPUNodeLink *weight_link,
+                                   const GPUNodeLink *eval_link);
 
 void GPU_material_sss_profile_create(GPUMaterial *material,
                                      float radii[3],

@@ -110,7 +110,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
   bool use_diffuse = socket_not_one(4) && socket_not_one(15);
   bool use_subsurf = socket_not_zero(1) && use_diffuse;
   bool use_refract = socket_not_one(4) && socket_not_zero(15);
-  bool use_clear = socket_not_zero(12);
+  // bool use_clear = socket_not_zero(12);
 
   uint flag = GPU_MATFLAG_GLOSSY;
   if (use_diffuse) {
@@ -123,22 +123,36 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
     flag |= GPU_MATFLAG_SUBSURFACE;
   }
 
-  float f_use_diffuse = use_diffuse ? 1.0f : 0.0f;
-  float f_use_clearcoat = use_clear ? 1.0f : 0.0f;
-  float f_use_refraction = use_refract ? 1.0f : 0.0f;
   float use_multi_scatter = (node->custom1 == SHD_GLOSSY_MULTI_GGX) ? 1.0f : 0.0f;
 
   GPU_material_flag_set(mat, flag);
 
-  return GPU_stack_link(mat,
-                        node,
-                        "node_bsdf_principled",
-                        in,
-                        out,
-                        GPU_constant(&f_use_diffuse),
-                        GPU_constant(&f_use_clearcoat),
-                        GPU_constant(&f_use_refraction),
-                        GPU_constant(&use_multi_scatter));
+  GPUNodeLink *diffuse_weight, *specular_weight, *glass_reflection_weight,
+      *glass_transmission_weight, *clearcoat_weight;
+
+  GPU_stack_link(mat,
+                 node,
+                 "node_bsdf_principled",
+                 in,
+                 out,
+                 GPU_constant(&use_multi_scatter),
+                 &diffuse_weight,
+                 &specular_weight,
+                 &glass_reflection_weight,
+                 &glass_transmission_weight,
+                 &clearcoat_weight);
+
+  return GPU_stack_eval_link(mat,
+                             node,
+                             "node_bsdf_principled_eval",
+                             in,
+                             out,
+                             GPU_constant(&use_multi_scatter),
+                             diffuse_weight,
+                             specular_weight,
+                             glass_reflection_weight,
+                             glass_transmission_weight,
+                             clearcoat_weight);
 }
 
 static void node_shader_update_principled(bNodeTree *UNUSED(ntree), bNode *node)
