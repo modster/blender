@@ -62,29 +62,30 @@ typedef struct GPUColorBandBuilder {
 } GPUColorBandBuilder;
 
 struct GPUMaterial {
-  /** DEPRECATED Currently only used for deferred compilation. */
-  Scene *scene;
-  /** Source material, might be null. */
-  Material *ma;
-  /** Compilation status. Do not use if shader is not GPU_MAT_SUCCESS. */
-  eGPUMaterialStatus status;
-  /* Identify shader variations (shadow, probe, world background...).
-   * Should be unique even across render engines. */
-  uint64_t uuid;
-  /* Low level node graph(s). Also contains resources needed by the material. */
-  GPUNodeGraph graph;
   /* Contains GPUShader and source code for deferred compilation.
    * Can be shared between similar material (i.e: sharing same nodetree topology). */
   GPUPass *pass;
   /** UBOs for this material parameters. */
   GPUUniformBuf *ubo;
-  /** Object type for attribute fetching. */
-  bool is_volume_shader;
+  /** Compilation status. Do not use if shader is not GPU_MAT_SUCCESS. */
+  eGPUMaterialStatus status;
   /** Some flags about the nodetree & the needed resources. */
   eGPUMaterialFlag flag;
+  /* Identify shader variations (shadow, probe, world background...).
+   * Should be unique even across render engines. */
+  uint64_t uuid;
+  /** Object type for attribute fetching. */
+  bool is_volume_shader;
+
+  /** DEPRECATED Currently only used for deferred compilation. */
+  Scene *scene;
+  /** Source material, might be null. */
+  Material *ma;
   /** 1D Texture array containing all color bands. */
   GPUTexture *coba_tex;
   GPUColorBandBuilder *coba_builder;
+  /* Low level node graph(s). Also contains resources needed by the material. */
+  GPUNodeGraph graph;
 
 #ifndef NDEBUG
   char name[64];
@@ -295,6 +296,14 @@ bool GPU_material_flag_get(const GPUMaterial *mat, eGPUMaterialFlag flag)
   return (mat->flag & flag) != 0;
 }
 
+/* Note: Consumes the flags. */
+bool GPU_material_recalc_flag_get(GPUMaterial *mat)
+{
+  bool updated = (mat->flag & GPU_MATFLAG_UPDATED) != 0;
+  mat->flag &= ~GPU_MATFLAG_UPDATED;
+  return updated;
+}
+
 uint64_t GPU_material_uuid_get(GPUMaterial *mat)
 {
   return mat->uuid;
@@ -322,6 +331,7 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
   mat->ma = ma;
   mat->scene = scene;
   mat->uuid = shader_uuid;
+  mat->flag = GPU_MATFLAG_UPDATED;
   mat->is_volume_shader = is_volume_shader;
   mat->graph.used_libraries = BLI_gset_new(
       BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "GPUNodeGraph.used_libraries");
@@ -391,6 +401,8 @@ void GPU_material_compile(GPUMaterial *mat)
 #else
   success = GPU_pass_compile(mat->pass, __func__);
 #endif
+
+  mat->flag |= GPU_MATFLAG_UPDATED;
 
   if (success) {
     GPUShader *sh = GPU_pass_shader_get(mat->pass);

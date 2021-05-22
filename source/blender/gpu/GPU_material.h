@@ -97,6 +97,9 @@ typedef enum eGPUMaterialFlag {
   GPU_MATFLAG_UNIFORMS_ATTRIB = (1 << 9),
 
   GPU_MATFLAG_BARYCENTRIC = (1 << 10),
+
+  /* Tells the render engine the material was just compiled or updated. */
+  GPU_MATFLAG_UPDATED = (1 << 11),
 } eGPUMaterialFlag;
 
 typedef struct GPUNodeStack {
@@ -214,6 +217,7 @@ bool GPU_material_is_volume_shader(GPUMaterial *mat);
 
 void GPU_material_flag_set(GPUMaterial *mat, eGPUMaterialFlag flag);
 bool GPU_material_flag_get(const GPUMaterial *mat, eGPUMaterialFlag flag);
+bool GPU_material_recalc_flag_get(GPUMaterial *mat);
 uint64_t GPU_material_uuid_get(GPUMaterial *mat);
 
 void GPU_pass_cache_init(void);
