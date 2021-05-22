@@ -218,6 +218,14 @@ enum eLineArtTileRecursiveLimit {
 #define LRT_TILE_SPLITTING_TRIANGLE_LIMIT 100
 #define LRT_TILE_EDGE_COUNT_INITIAL 32
 
+struct BVHTree;
+
+typedef struct LineartTriangleBufferIndexer {
+  int start_index; /* The first one. */
+  int end_index;   /* Not include the last one. */
+  LineartElementLinkNode *eln;
+} LineartTriangleBufferIndexer;
+
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
 
@@ -233,9 +241,15 @@ typedef struct LineartRenderBuffer {
   struct LineartBoundingArea *initial_bounding_areas;
   unsigned int bounding_area_count;
 
-  /* When splitting bounding areas, if there's an ortho camera placed at a straight angle, there
-   * will be a lot of triangles aligned in line which can not be separated by continue subdividing
-   * the tile. So we set a strict limit when using ortho camera. See eLineArtTileRecursiveLimit. */
+  struct BVHTree *bvh_main;
+  int bvh_face_count;
+  struct LineartTriangleBufferIndexer *bvh_triangle_indexer;
+  int bvh_inderxer_count;
+
+  /* When splitting bounding areas, if there's an ortho camera placed at a straight angle,
+   * there will be a lot of triangles aligned in line which can not be separated by continue
+   * subdividing the tile. So we set a strict limit when using ortho camera. See
+   * eLineArtTileRecursiveLimit. */
   int tile_recursive_level;
 
   ListBase vertex_buffer_pointers;
