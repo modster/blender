@@ -301,4 +301,14 @@
     .chain_smooth_tolerance = 0.2f,\
   }
 
+#define _DNA_DEFAULT_LengthGpencilModifierData \
+  { \
+    .start_fac = 0.1f,\
+    .end_fac = 0.1f,\
+    .overshoot_fac = 0.01f,\
+    .pass_index = 0,\
+    .material = NULL,\
+  }
+
+
 /* clang-format off */

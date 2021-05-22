@@ -140,8 +140,8 @@ static LineartLineSegment *lineart_give_segment(LineartRenderBuffer *rb)
   BLI_spin_unlock(&rb->lock_cuts);
 
   /* Otherwise allocate some new memory. */
-  return (LineartLineSegment *)lineart_mem_aquire_thread(&rb->render_data_pool,
-                                                         sizeof(LineartLineSegment));
+  return (LineartLineSegment *)lineart_mem_acquire_thread(&rb->render_data_pool,
+                                                          sizeof(LineartLineSegment));
 }
 
 /**
@@ -677,8 +677,8 @@ static LineartElementLinkNode *lineart_memory_get_triangle_space(LineartRenderBu
 
   /* We don't need to allocate a whole bunch of triangles because the amount of clipped triangles
    * are relatively small. */
-  LineartTriangle *render_triangles = lineart_mem_aquire(&rb->render_data_pool,
-                                                         64 * rb->triangle_size);
+  LineartTriangle *render_triangles = lineart_mem_acquire(&rb->render_data_pool,
+                                                          64 * rb->triangle_size);
 
   reln = lineart_list_append_pointer_pool_sized(&rb->triangle_buffer_pointers,
                                                 &rb->render_data_pool,
@@ -694,8 +694,8 @@ static LineartElementLinkNode *lineart_memory_get_vert_space(LineartRenderBuffer
 {
   LineartElementLinkNode *reln;
 
-  LineartVert *render_vertices = lineart_mem_aquire(&rb->render_data_pool,
-                                                    sizeof(LineartVert) * 64);
+  LineartVert *render_vertices = lineart_mem_acquire(&rb->render_data_pool,
+                                                     sizeof(LineartVert) * 64);
 
   reln = lineart_list_append_pointer_pool_sized(&rb->vertex_buffer_pointers,
                                                 &rb->render_data_pool,
@@ -711,7 +711,7 @@ static LineartElementLinkNode *lineart_memory_get_edge_space(LineartRenderBuffer
 {
   LineartElementLinkNode *reln;
 
-  LineartEdge *render_edges = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartEdge) * 64);
+  LineartEdge *render_edges = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdge) * 64);
 
   reln = lineart_list_append_pointer_pool_sized(&rb->line_buffer_pointers,
                                                 &rb->render_data_pool,
@@ -813,7 +813,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
   e = new_e; \
   e->v1_obindex = v1_obi; \
   e->v2_obindex = v2_obi; \
-  rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartLineSegment)); \
+  rls = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartLineSegment)); \
   BLI_addtail(&e->segments, rls);
 
 #define SELECT_RL(e_num, v1_link, v2_link, newrt) \
@@ -2670,7 +2670,7 @@ static LineartVert *lineart_triangle_2v_intersection_test(LineartRenderBuffer *r
 
   /* This is an intersection vert, the size is bigger than LineartVert,
    * allocated separately. */
-  result = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartVertIntersection));
+  result = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartVertIntersection));
 
   /* Indicate the data structure difference. */
   result->flag = LRT_VERT_HAS_INTERSECTION_DATA;
@@ -2714,7 +2714,7 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
     LineartVert *new_share;
     lineart_triangle_get_other_verts(rt, share, &sv1, &sv2);
 
-    v1 = new_share = lineart_mem_aquire(&rb->render_data_pool, (sizeof(LineartVertIntersection)));
+    v1 = new_share = lineart_mem_acquire(&rb->render_data_pool, (sizeof(LineartVertIntersection)));
 
     new_share->flag = LRT_VERT_HAS_INTERSECTION_DATA;
 
@@ -2813,13 +2813,13 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
   ((LineartVertIntersection *)v1)->intersecting_with = rt;
   ((LineartVertIntersection *)v2)->intersecting_with = testing;
 
-  result = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartEdge));
+  result = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdge));
   result->v1 = v1;
   result->v2 = v2;
   result->t1 = rt;
   result->t2 = testing;
 
-  LineartLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartLineSegment));
+  LineartLineSegment *rls = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartLineSegment));
   BLI_addtail(&result->segments, rls);
   /* Don't need to OR flags right now, just a type mark. */
   result->flags = LRT_EDGE_FLAG_INTERSECTION;
@@ -3090,7 +3090,7 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
   rb->height_per_tile = span_h;
 
   rb->bounding_area_count = sp_w * sp_h;
-  rb->initial_bounding_areas = lineart_mem_aquire(
+  rb->initial_bounding_areas = lineart_mem_acquire(
       &rb->render_data_pool, sizeof(LineartBoundingArea) * rb->bounding_area_count);
 
   /* Initialize tiles. */
@@ -3292,8 +3292,8 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
                                         LineartBoundingArea *root,
                                         int recursive_level)
 {
-  LineartBoundingArea *ba = lineart_mem_aquire(&rb->render_data_pool,
-                                               sizeof(LineartBoundingArea) * 4);
+  LineartBoundingArea *ba = lineart_mem_acquire(&rb->render_data_pool,
+                                                sizeof(LineartBoundingArea) * 4);
   LineartTriangle *rt;
   LineartEdge *e;
 
