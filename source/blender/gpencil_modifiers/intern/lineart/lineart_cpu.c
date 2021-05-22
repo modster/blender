@@ -3811,9 +3811,18 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
 
 static LineartTriangle *lineart_get_triangle_from_index(LineartRenderBuffer *rb, int index)
 {
-  for (int i = 0; i < rb->bvh_inderxer_count; i++) {
-    LineartTriangleBufferIndexer *tbi = &rb->bvh_triangle_indexer[i];
-    if (index >= tbi->start_index && index < tbi->end_index) {
+  int left = 0;
+  int right = rb->bvh_inderxer_count - 1;
+  while (left <= right) {
+    int mid = (left + right) / 2;
+    LineartTriangleBufferIndexer *tbi = &rb->bvh_triangle_indexer[mid];
+    if (tbi->end_index <= index) {
+      left = mid + 1;
+    }
+    else if (tbi->start_index > index) {
+      right = mid - 1;
+    }
+    else {
       return (LineartTriangle *)(((uint8_t *)tbi->eln->pointer) +
                                  (rb->triangle_size * (index - tbi->start_index)));
     }
