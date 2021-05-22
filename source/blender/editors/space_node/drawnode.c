@@ -3342,6 +3342,7 @@ static const float std_node_socket_colors[][4] = {
     {0.96, 0.96, 0.96, 1.0}, /* SOCK_COLLECTION */
     {0.62, 0.31, 0.64, 1.0}, /* SOCK_TEXTURE */
     {0.92, 0.46, 0.51, 1.0}, /* SOCK_MATERIAL */
+    {0.8, 0.0, 0.3, 1.0}, /* SOCK_ATTRIBUTE */
 };
 
 /* common color callbacks for standard types */
@@ -3456,7 +3457,8 @@ static void std_node_socket_draw(
       uiItemR(row, ptr, "default_value", DEFAULT_FLAGS, "", 0);
       break;
     }
-    case SOCK_STRING: {
+    case SOCK_STRING:
+    case SOCK_ATTRIBUTE: {
       uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
       uiItemL(row, text, 0);
 

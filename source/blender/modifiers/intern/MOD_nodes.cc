@@ -560,6 +560,28 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
       };
       return &collection_type;
     }
+    case SOCK_ATTRIBUTE: {
+      static const SocketPropertyType attribute_type = {
+          [](const bNodeSocket &socket, const char *name) {
+            bNodeSocketValueString *value = (bNodeSocketValueString *)socket.default_value;
+            return IDP_NewString(
+                value->value, name, BLI_strnlen(value->value, sizeof(value->value)) + 1);
+          },
+          nullptr,
+          nullptr,
+          [](const bNodeSocket &socket, const char *name) {
+            bNodeSocketValueString *value = (bNodeSocketValueString *)socket.default_value;
+            return IDP_NewString(
+                value->value, name, BLI_strnlen(value->value, sizeof(value->value)) + 1);
+          },
+          nullptr,
+          [](const IDProperty &property) { return property.type == IDP_STRING; },
+          [](const IDProperty &property, void *r_value) {
+            new (r_value) std::string(IDP_String(&property));
+          },
+      };
+      return &attribute_type;
+    }
     default: {
       return nullptr;
     }

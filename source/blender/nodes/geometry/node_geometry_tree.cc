@@ -109,7 +109,8 @@ static bool geometry_node_tree_socket_type_valid(eNodeSocketDatatype socket_type
               SOCK_GEOMETRY,
               SOCK_COLLECTION,
               SOCK_TEXTURE,
-              SOCK_MATERIAL);
+              SOCK_MATERIAL,
+              SOCK_ATTRIBUTE);
 }
 
 void register_node_tree_type_geo(void)

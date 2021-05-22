@@ -323,6 +323,7 @@ static void library_foreach_node_socket(LibraryForeachIDData *data, bNodeSocket 
     case SOCK_CUSTOM:
     case SOCK_SHADER:
     case SOCK_GEOMETRY:
+    case SOCK_ATTRIBUTE:
       break;
   }
 }
@@ -433,6 +434,9 @@ static void write_node_socket_default_value(BlendWriter *writer, bNodeSocket *so
       BLO_write_struct(writer, bNodeSocketValueInt, sock->default_value);
       break;
     case SOCK_STRING:
+      BLO_write_struct(writer, bNodeSocketValueString, sock->default_value);
+      break;
+    case SOCK_ATTRIBUTE:
       BLO_write_struct(writer, bNodeSocketValueString, sock->default_value);
       break;
     case SOCK_OBJECT:
@@ -856,6 +860,7 @@ static void lib_link_node_socket(BlendLibReader *reader, Library *lib, bNodeSock
     case SOCK_CUSTOM:
     case SOCK_SHADER:
     case SOCK_GEOMETRY:
+    case SOCK_ATTRIBUTE:
       break;
   }
 }
@@ -951,6 +956,7 @@ static void expand_node_socket(BlendExpander *expander, bNodeSocket *sock)
       case SOCK_CUSTOM:
       case SOCK_SHADER:
       case SOCK_GEOMETRY:
+      case SOCK_ATTRIBUTE:
         break;
     }
   }
@@ -1528,6 +1534,7 @@ static void socket_id_user_increment(bNodeSocket *sock)
     case SOCK_CUSTOM:
     case SOCK_SHADER:
     case SOCK_GEOMETRY:
+    case SOCK_ATTRIBUTE:
       break;
   }
 }
@@ -1581,6 +1588,7 @@ static void socket_id_user_decrement(bNodeSocket *sock)
     case SOCK_CUSTOM:
     case SOCK_SHADER:
     case SOCK_GEOMETRY:
+    case SOCK_ATTRIBUTE:
       break;
   }
 }
@@ -1718,6 +1726,8 @@ const char *nodeStaticSocketType(int type, int subtype)
       return "NodeSocketTexture";
     case SOCK_MATERIAL:
       return "NodeSocketMaterial";
+    case SOCK_ATTRIBUTE:
+      return "NodeSocketAttribute";
   }
   return nullptr;
 }
@@ -1793,6 +1803,8 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype)
       return "NodeSocketInterfaceTexture";
     case SOCK_MATERIAL:
       return "NodeSocketInterfaceMaterial";
+    case SOCK_ATTRIBUTE:
+      return "NodeSocketInterfaceAttribute";
   }
   return nullptr;
 }
