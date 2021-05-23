@@ -1531,7 +1531,6 @@ class OptiXDevice : public CUDADevice {
 
         vector<device_ptr> vertex_ptrs;
         vertex_ptrs.reserve(num_motion_steps);
-
         for (size_t step = 0; step < num_motion_steps; ++step) {
           vertex_ptrs.push_back(vertex_data.device_pointer + num_verts * step * sizeof(float3));
         }

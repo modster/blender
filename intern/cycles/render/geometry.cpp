@@ -579,7 +579,7 @@ static void update_attribute_element_size(Geometry *geom,
     }
     else if (mattr->type == TypeDesc::TypeMatrix) {
       mattr->device_offset = *attr_float3_size;
-      *attr_float3_size += size * 3;
+      *attr_float3_size += size * 4;
     }
     else {
       mattr->device_offset = *attr_float3_size;
