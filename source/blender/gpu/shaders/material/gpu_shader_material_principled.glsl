@@ -69,8 +69,7 @@ void node_bsdf_principled(vec4 base_color,
   transmission *= alpha;
   clearcoat *= alpha;
 
-  // float fresnel = (do_multiscatter != 0.0) ? btdf_lut(NV, roughness, ior).y : F_eta(ior, NV);
-  float fresnel = 0.0;
+  float fresnel = (do_multiscatter != 0.0) ? btdf_lut(NV, roughness, ior).y : F_eta(ior, NV);
   glass_reflection_weight = fresnel * transmission;
   glass_transmission_weight = (1.0 - fresnel) * transmission;
 
@@ -116,9 +115,10 @@ void node_bsdf_principled_eval(vec4 base_color,
   vec3 base_color_tint = tint_from_color(base_color.rgb);
 
   N = safe_normalize(N);
-  float NV = dot(N, cameraVec(g_data.P));
+  vec3 V = cameraVec(g_data.P);
+  float NV = dot(N, V);
 
-  // vec2 split_sum = brdf_lut(NV, roughness);
+  vec2 split_sum = brdf_lut(NV, roughness);
 
   /* Diffuse. */
   if (closure_weight_threshold(g_diffuse_data, diffuse_weight)) {
@@ -137,9 +137,8 @@ void node_bsdf_principled_eval(vec4 base_color,
     vec3 f0 = mix(vec3(1.0), base_color.rgb, specular_tint);
     vec3 f90 = vec3(1);
 
-    // vec3 brdf = (do_multiscatter != 0.0) ? F_brdf_multi_scatter(f0, f90, split_sum) :
-    //                                        F_brdf_single_scatter(f0, f90, split_sum);
-    vec3 brdf = f0;
+    vec3 brdf = (do_multiscatter != 0.0) ? F_brdf_multi_scatter(f0, f90, split_sum) :
+                                           F_brdf_single_scatter(f0, f90, split_sum);
 
     g_reflection_data.color = brdf * glass_reflection_weight;
     g_reflection_data.N = N;
@@ -153,9 +152,8 @@ void node_bsdf_principled_eval(vec4 base_color,
      * changing the f90 color directly in a non linear fashion. */
     vec3 f90 = mix(f0, vec3(1.0), fast_sqrt(specular));
 
-    // vec3 brdf = (do_multiscatter != 0.0) ? F_brdf_multi_scatter(f0, f90, split_sum) :
-    //                                        F_brdf_single_scatter(f0, f90, split_sum);
-    vec3 brdf = f0;
+    vec3 brdf = (do_multiscatter != 0.0) ? F_brdf_multi_scatter(f0, f90, split_sum) :
+                                           F_brdf_single_scatter(f0, f90, split_sum);
 
     g_reflection_data.color = brdf * specular_weight;
     g_reflection_data.N = N;
@@ -163,10 +161,9 @@ void node_bsdf_principled_eval(vec4 base_color,
   }
   else if (closure_weight_threshold(g_reflection_data, clearcoat_weight)) {
     N = safe_normalize(CN);
-    // float NV = dot(CN, V);
-    // vec2 split_sum = brdf_lut(NV, roughness);
-    // vec3 brdf = F_brdf_single_scatter(vec3(0.04), vec3(1.0), split_sum);
-    vec3 brdf = vec3(0.04);
+    float NV = dot(CN, V);
+    vec2 split_sum = brdf_lut(NV, roughness);
+    vec3 brdf = F_brdf_single_scatter(vec3(0.04), vec3(1.0), split_sum);
 
     g_reflection_data.color = brdf * clearcoat_weight;
     g_reflection_data.N = CN;
@@ -175,10 +172,7 @@ void node_bsdf_principled_eval(vec4 base_color,
 
   /* Refraction. */
   if (closure_weight_threshold(g_refraction_data, glass_transmission_weight)) {
-    // float btdf = (do_multiscatter != 0.0) ?
-    //                  1.0 :
-    //                  btdf_lut(NV, in_Refraction_3.roughness, in_Refraction_3.ior).x;
-    float btdf = 1.0;
+    float btdf = (do_multiscatter != 0.0) ? 1.0 : btdf_lut(NV, roughness, ior).x;
 
     g_refraction_data.color = base_color.rgb * (btdf * glass_transmission_weight);
     g_refraction_data.N = N;

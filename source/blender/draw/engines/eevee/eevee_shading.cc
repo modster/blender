@@ -101,6 +101,7 @@ void DeferredLayer::surface_add(Object *ob, GPUBatch *geom, Material *material)
                         CLOSURE_EMISSION;
     grp = DRW_shgroup_material_create(matpass.gpumat, gbuffer_ps_);
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
     DRW_shgroup_stencil_set(grp, stencil_mask, 0xFF, 0xFF);
   }
   DRW_shgroup_call(grp, geom, ob);

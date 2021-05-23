@@ -52,6 +52,7 @@ vec3 gbuffer_decode_normal(uint packed_normal)
 /* Note: does not handle negative colors. */
 uint gbuffer_encode_color(vec3 color)
 {
+  color *= 0.5; /* Test */
   float intensity = length(color);
   /* Normalize to store it like a normal vector. */
   // color *= safe_rcp(intensity);
@@ -78,6 +79,7 @@ vec3 gbuffer_decode_color(uint packed_data)
   color.x = gbuffer_decode_unit_float_from_uint(packed_data, 10u);
   color.y = gbuffer_decode_unit_float_from_uint(packed_data >> 10u, 10u);
   color.z = gbuffer_decode_unit_float_from_uint(packed_data >> 20u, 10u);
+  color *= 2.0; /* Test */
   return color;
 }
 

@@ -195,6 +195,7 @@ set(LIB
   bf_windowmanager
 )
 
+data_to_c_simple(engines/eevee/shaders/eevee_bsdf_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_camera_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_camera_velocity_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_closure_lib.glsl SRC)

@@ -8,6 +8,7 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_bsdf_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_light_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
@@ -35,6 +36,9 @@ uniform usampler2D volume_data_tx;
 uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
+
+utility_tx_fetch_define(utility_tx);
+utility_tx_sample_define(utility_tx);
 
 in vec4 uvcoordsvar;
 

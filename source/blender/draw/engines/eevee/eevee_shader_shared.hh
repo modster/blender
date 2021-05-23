@@ -484,6 +484,26 @@ BLI_STATIC_ASSERT_ALIGN(ShadowPunctualData, 16)
 #define UTIL_DISK_INTEGRAL_LAYER 3
 #define UTIL_DISK_INTEGRAL_COMP 2
 
+#ifndef __cplusplus
+/* For codestyle reasons, we do not declare samplers in lib files. Use a prototype instead. */
+vec4 utility_tx_fetch(vec2 texel, float layer);
+vec4 utility_tx_sample(vec2 uv, float layer);
+
+/* Fetch texel. Wrapping if above range. */
+#  define utility_tx_fetch_define(utility_tx_) \
+    vec4 utility_tx_fetch(vec2 texel, float layer) \
+    { \
+      return texelFetch(utility_tx_, ivec3(ivec2(texel) % UTIL_TEX_SIZE, layer), 0); \
+    }
+
+/* Sample at uv position. Filtered & Wrapping enabled. */
+#  define utility_tx_sample_define(utility_tx_) \
+    vec4 utility_tx_sample(vec2 uv, float layer) \
+    { \
+      return textureLod(utility_tx_, vec3(uv, layer), 0.0); \
+    }
+#endif
+
 /** \} */
 
 #ifdef __cplusplus

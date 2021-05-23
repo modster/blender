@@ -35,6 +35,7 @@ extern char datatoc_common_obinfos_lib_glsl[];
 extern char datatoc_common_uniform_attribute_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
 
+extern char datatoc_eevee_bsdf_lib_glsl[];
 extern char datatoc_eevee_camera_lib_glsl[];
 extern char datatoc_eevee_camera_velocity_frag_glsl[];
 extern char datatoc_eevee_closure_lib_glsl[];
@@ -121,6 +122,7 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_attribute_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, gpu_shader_codegen_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_closure_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_gbuffer_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_nodetree_eval_lib);

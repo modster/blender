@@ -2,6 +2,7 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_surface_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_bsdf_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_nodetree_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
@@ -11,6 +12,11 @@ layout(std140) uniform sampling_block
 {
   SamplingData sampling;
 };
+
+uniform sampler2DArray utility_tx;
+
+utility_tx_fetch_define(utility_tx);
+utility_tx_sample_define(utility_tx);
 
 layout(location = 0) out uvec4 out_diffuse_data;     /* Diffuse BSDF, BSSSDF, Translucency. */
 layout(location = 1) out uvec2 out_reflection_data;  /* Glossy BSDF. */
@@ -24,7 +30,8 @@ void main(void)
   g_data = init_globals();
 
   float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_CLOSURE);
-  g_data.closure_rand = interlieved_gradient_noise(gl_FragCoord.xy, 0, noise_offset);
+  float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
+  g_data.closure_rand = fract(noise + noise_offset);
 
   nodetree_surface();
 
