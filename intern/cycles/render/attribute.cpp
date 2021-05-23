@@ -385,6 +385,23 @@ AttributeStandard Attribute::name_standard(const char *name)
   return ATTR_STD_NONE;
 }
 
+AttrKernelDataType Attribute::kernel_type(const Attribute *attr)
+{
+  if (attr->element == ATTR_ELEMENT_CORNER) {
+    return AttrKernelDataType::UCHAR4;
+  }
+
+  if (attr->type == TypeDesc::TypeFloat) {
+    return AttrKernelDataType::FLOAT;
+  }
+
+  if (attr->type == TypeFloat2) {
+    return AttrKernelDataType::FLOAT2;
+  }
+
+  return AttrKernelDataType::FLOAT3;
+}
+
 void Attribute::get_uv_tiles(Geometry *geom,
                              AttributePrimitive prim,
                              unordered_set<int> &tiles) const
@@ -442,7 +459,7 @@ Attribute *AttributeSet::add(ustring name, TypeDesc type, AttributeElement eleme
 
   Attribute new_attr(name, type, element, geometry, prim);
   attributes.emplace_back(std::move(new_attr));
-  modified = true;
+  tag_modified(&attributes.back());
   return &attributes.back();
 }
 
@@ -464,8 +481,7 @@ void AttributeSet::remove(ustring name)
 
     for (it = attributes.begin(); it != attributes.end(); it++) {
       if (&*it == attr) {
-        modified = true;
-        attributes.erase(it);
+        remove(it);
         return;
       }
     }
@@ -643,27 +659,7 @@ void AttributeSet::remove(Attribute *attribute)
 
 void AttributeSet::remove(list<Attribute>::iterator it)
 {
-  const bool modifies_device_array = (it->std != ATTR_STD_DELTAS &&
-                                      it->std != ATTR_STD_FACE_NORMAL &&
-                                      it->std != ATTR_STD_VERTEX_NORMAL);
-
-  if (it->element == ATTR_ELEMENT_CORNER) {
-    attr_uchar4_modified |= modifies_device_array;
-  }
-  else if (it->type == TypeDesc::TypeFloat) {
-    attr_float_modified |= modifies_device_array;
-  }
-  else if (it->type == TypeFloat2) {
-    attr_float2_modified |= modifies_device_array;
-  }
-  else if (it->type == TypeDesc::TypeMatrix) {
-    attr_float3_modified |= modifies_device_array;
-  }
-  else if (it->element != ATTR_ELEMENT_VOXEL) {
-    attr_float3_modified |= modifies_device_array;
-  }
-
-  modified |= modifies_device_array;
+  tag_modified(&*it);
   attributes.erase(it);
 }
 
@@ -707,15 +703,13 @@ void AttributeSet::update(AttributeSet &&new_attributes)
   for (it = attributes.begin(); it != attributes.end();) {
     if (it->std != ATTR_STD_NONE) {
       if (new_attributes.find(it->std) == nullptr) {
-        modified = true;
-        attributes.erase(it++);
+        remove(it++);
         continue;
       }
     }
     else if (it->name != "") {
       if (new_attributes.find(it->name) == nullptr) {
-        modified = true;
-        attributes.erase(it++);
+        remove(it++);
         continue;
       }
     }
@@ -732,11 +726,24 @@ void AttributeSet::clear_modified()
   foreach (Attribute &attr, attributes) {
     attr.modified = false;
   }
-  modified = false;
-  attr_float_modified = false;
-  attr_float2_modified = false;
-  attr_float3_modified = false;
-  attr_uchar4_modified = false;
+
+  modified_flag = 0;
+}
+
+void AttributeSet::tag_modified(Attribute *attr)
+{
+  const bool modifies_device_array = (attr->std != ATTR_STD_FACE_NORMAL &&
+                                      attr->std != ATTR_STD_VERTEX_NORMAL);
+
+  if (modifies_device_array) {
+    AttrKernelDataType kernel_type = Attribute::kernel_type(attr);
+    modified_flag |= (1u << kernel_type);
+  }
+}
+
+bool AttributeSet::modified(AttrKernelDataType kernel_type) const
+{
+  return (modified_flag & (1u << kernel_type)) != 0;
 }
 
 /* AttributeRequest */

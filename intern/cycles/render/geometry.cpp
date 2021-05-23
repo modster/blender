@@ -834,27 +834,12 @@ void GeometryManager::device_update_attributes(Device *device,
   dscene->attributes_float3.alloc(attr_float3_size);
   dscene->attributes_uchar4.alloc(attr_uchar4_size);
 
+  /* The order of those flags needs to match that of AttrKernelDataType. */
   const bool attributes_need_realloc[4] = {
       dscene->attributes_float.need_realloc(),
       dscene->attributes_float2.need_realloc(),
       dscene->attributes_float3.need_realloc(),
       dscene->attributes_uchar4.need_realloc(),
-  };
-
-  auto get_slot_for_attribute_type = [](Attribute *attr) {
-    if (attr->element == ATTR_ELEMENT_CORNER) {
-      return 3;
-    }
-
-    if (attr->type == TypeDesc::TypeFloat) {
-      return 0;
-    }
-
-    if (attr->type == TypeFloat2) {
-      return 1;
-    }
-
-    return 2;
   };
 
   /* Fill in attributes. */
@@ -869,7 +854,7 @@ void GeometryManager::device_update_attributes(Device *device,
 
       if (attr) {
         /* force a copy if we need to reallocate all the data */
-        attr->modified |= attributes_need_realloc[get_slot_for_attribute_type(attr)];
+        attr->modified |= attributes_need_realloc[Attribute::kernel_type(attr)];
       }
 
       update_attribute_element_offset(geom,
@@ -888,7 +873,7 @@ void GeometryManager::device_update_attributes(Device *device,
 
         if (subd_attr) {
           /* force a copy if we need to reallocate all the data */
-          subd_attr->modified |= attributes_need_realloc[get_slot_for_attribute_type(subd_attr)];
+          subd_attr->modified |= attributes_need_realloc[Attribute::kernel_type(subd_attr)];
         }
 
         update_attribute_element_offset(mesh,
@@ -916,7 +901,7 @@ void GeometryManager::device_update_attributes(Device *device,
       Attribute *attr = values.find(req);
 
       if (attr) {
-        attr->modified |= attributes_need_realloc[get_slot_for_attribute_type(attr)];
+        attr->modified |= attributes_need_realloc[Attribute::kernel_type(attr)];
       }
 
       update_attribute_element_offset(object->geometry,
@@ -1524,21 +1509,43 @@ static void update_device_flags_attribute(uint32_t &device_update_flags,
       continue;
     }
 
-    if (attr.element == ATTR_ELEMENT_CORNER) {
-      device_update_flags |= ATTR_UCHAR4_MODIFIED;
+    AttrKernelDataType kernel_type = Attribute::kernel_type(&attr);
+
+    switch (kernel_type) {
+      case AttrKernelDataType::FLOAT: {
+        device_update_flags |= ATTR_FLOAT_MODIFIED;
+        break;
+      }
+      case AttrKernelDataType::FLOAT2: {
+        device_update_flags |= ATTR_FLOAT2_MODIFIED;
+        break;
+      }
+      case AttrKernelDataType::FLOAT3: {
+        device_update_flags |= ATTR_FLOAT3_MODIFIED;
+        break;
+      }
+      case AttrKernelDataType::UCHAR4: {
+        device_update_flags |= ATTR_UCHAR4_MODIFIED;
+        break;
+      }
     }
-    else if (attr.type == TypeDesc::TypeFloat) {
-      device_update_flags |= ATTR_FLOAT_MODIFIED;
-    }
-    else if (attr.type == TypeFloat2) {
-      device_update_flags |= ATTR_FLOAT2_MODIFIED;
-    }
-    else if (attr.type == TypeDesc::TypeMatrix) {
-      device_update_flags |= ATTR_FLOAT3_MODIFIED;
-    }
-    else if (attr.element != ATTR_ELEMENT_VOXEL) {
-      device_update_flags |= ATTR_FLOAT3_MODIFIED;
-    }
+  }
+}
+
+static void update_attribute_realloc_flags(uint32_t &device_update_flags,
+                                           const AttributeSet &attributes)
+{
+  if (attributes.modified(AttrKernelDataType::FLOAT)) {
+    device_update_flags |= ATTR_FLOAT_NEEDS_REALLOC;
+  }
+  if (attributes.modified(AttrKernelDataType::FLOAT2)) {
+    device_update_flags |= ATTR_FLOAT2_NEEDS_REALLOC;
+  }
+  if (attributes.modified(AttrKernelDataType::FLOAT3)) {
+    device_update_flags |= ATTR_FLOAT3_NEEDS_REALLOC;
+  }
+  if (attributes.modified(AttrKernelDataType::UCHAR4)) {
+    device_update_flags |= ATTR_UCHAR4_NEEDS_REALLOC;
   }
 }
 
@@ -1564,25 +1571,11 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
   foreach (Geometry *geom, scene->geometry) {
     geom->has_volume = false;
 
-    if (geom->attributes.attr_float_modified) {
-      device_update_flags |= ATTR_FLOAT_NEEDS_REALLOC;
-    }
-    if (geom->attributes.attr_float2_modified) {
-      device_update_flags |= ATTR_FLOAT2_NEEDS_REALLOC;
-    }
-    if (geom->attributes.attr_float3_modified) {
-      device_update_flags |= ATTR_FLOAT3_NEEDS_REALLOC;
-    }
-    if (geom->attributes.attr_uchar4_modified) {
-      device_update_flags |= ATTR_UCHAR4_NEEDS_REALLOC;
-    }
+    update_attribute_realloc_flags(device_update_flags, geom->attributes);
 
     if (geom->is_mesh()) {
       Mesh *mesh = static_cast<Mesh *>(geom);
-
-      if (mesh->subd_attributes.modified) {
-        device_update_flags |= ATTRS_NEED_REALLOC;
-      }
+      update_attribute_realloc_flags(device_update_flags, mesh->subd_attributes);
     }
 
     foreach (Node *node, geom->get_used_shaders()) {
