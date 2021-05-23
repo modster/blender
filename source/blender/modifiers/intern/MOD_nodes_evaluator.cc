@@ -34,6 +34,7 @@ namespace blender::modifiers::geometry_nodes {
 
 using fn::CPPType;
 using fn::GValueMap;
+using nodes::GeoNodeResolveParams;
 using nodes::GeoNodeExecParams;
 using namespace fn::multi_function_types;
 
@@ -195,6 +196,11 @@ struct NodeState {
    * Nodes that don't support lazyness have some special handling the first time they are executed.
    */
   bool non_lazy_node_is_initialized = false;
+
+  /**
+   * Used to check that nodes are not resolved more than once.
+   */
+  bool has_been_resolved = false;
 
   /**
    * Used to check that nodes that don't support lazyness do not run more than once.
@@ -383,6 +389,7 @@ class GeometryNodesEvaluator {
     task_pool_ = BLI_task_pool_create(this, TASK_PRIORITY_HIGH);
 
     this->create_states_for_reachable_nodes();
+    this->resolve_runtime_types();
     this->forward_group_inputs();
     this->schedule_initial_nodes();
 
@@ -432,6 +439,42 @@ class GeometryNodesEvaluator {
         this->initialize_node_state(item.node, *item.state, allocator);
       }
     });
+  }
+
+  /**
+   * Back-propagate base type, domain, etc. for automatic sockets.
+   * Output nodes are resolved first, so their inputs can determine
+   * the most appropriate type details among all the targets.
+   */
+  void resolve_runtime_types()
+  {
+    /* Breadth first topological starting at the output side. */
+    /* TODO find a better FIFO container */
+    Vector<DNode> nodes_to_check;
+    VectorSet<DNode> resolved_nodes;
+    /* Start at the output sockets. */
+    for (const DInputSocket &socket : params_.output_sockets) {
+      nodes_to_check.prepend(socket.node());
+    }
+    while (!nodes_to_check.is_empty()) {
+      const DNode node = nodes_to_check.pop_last();
+      if (resolved_nodes.contains(node)) {
+        /* This node has been handled already. */
+        continue;
+      }
+      resolved_nodes.add(node);
+
+      /* Resolve node socket types. */
+      NodeState *node_state = node_states_.lookup_key_as(node).state;
+      this->resolve_node_runtime_types(node, *node_state);
+
+      /* Push all linked origins on the stack. */
+      for (const InputSocketRef *input_ref : node->inputs()) {
+        const DInputSocket input{node.context(), input_ref};
+        input.foreach_origin_socket(
+            [&](const DSocket origin) { nodes_to_check.prepend(origin.node()); });
+      }
+    }
   }
 
   void initialize_node_state(const DNode node, NodeState &node_state, LinearAllocator<> &allocator)
@@ -544,6 +587,31 @@ class GeometryNodesEvaluator {
     destruct_n(node_state.outputs.data(), node_state.outputs.size());
 
     node_state.~NodeState();
+  }
+
+  void resolve_node_runtime_types(const DNode node, NodeState &node_state)
+  {
+    const bNode &bnode = *node->bnode();
+
+    if (node_state.has_been_resolved) {
+      /* Nodes must not be resolved more than once. */
+      BLI_assert_unreachable();
+    }
+    node_state.has_been_resolved = true;
+
+    /* Use the geometry node resolve callback if it exists. */
+    if (bnode.typeinfo->geometry_node_resolve != nullptr) {
+      this->resolve_geometry_node(node, node_state);
+      return;
+    }
+  }
+  
+  void resolve_geometry_node(const DNode node, NodeState &node_state)
+  {
+    const bNode &bnode = *node->bnode();
+
+    GeoNodeResolveParams params;
+    bnode.typeinfo->geometry_node_resolve(params);
   }
 
   void forward_group_inputs()

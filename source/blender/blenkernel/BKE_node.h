@@ -113,6 +113,7 @@ namespace blender {
 namespace nodes {
 class SocketMFNetworkBuilder;
 class NodeMFNetworkBuilder;
+class GeoNodeResolveParams;
 class GeoNodeExecParams;
 }  // namespace nodes
 namespace fn {
@@ -122,6 +123,7 @@ class MFDataType;
 }  // namespace blender
 
 using NodeExpandInMFNetworkFunction = void (*)(blender::nodes::NodeMFNetworkBuilder &builder);
+using NodeGeometryResolveFunction = void (*)(blender::nodes::GeoNodeResolveParams params);
 using NodeGeometryExecFunction = void (*)(blender::nodes::GeoNodeExecParams params);
 using SocketGetCPPTypeFunction = const blender::fn::CPPType *(*)();
 using SocketGetCPPValueFunction = void (*)(const struct bNodeSocket &socket, void *r_value);
@@ -130,6 +132,7 @@ using SocketExpandInMFNetworkFunction = void (*)(blender::nodes::SocketMFNetwork
 #else
 typedef void *NodeExpandInMFNetworkFunction;
 typedef void *SocketExpandInMFNetworkFunction;
+typedef void *NodeGeometryResolveFunction;
 typedef void *NodeGeometryExecFunction;
 typedef void *SocketGetCPPTypeFunction;
 typedef void *SocketGetCPPValueFunction;
@@ -324,6 +327,7 @@ typedef struct bNodeType {
   NodeExpandInMFNetworkFunction expand_in_mf_network;
 
   /* Execute a geometry node. */
+  NodeGeometryResolveFunction geometry_node_resolve;
   NodeGeometryExecFunction geometry_node_execute;
   bool geometry_node_execute_supports_lazyness;
 

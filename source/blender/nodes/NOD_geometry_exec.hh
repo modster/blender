@@ -110,6 +110,9 @@ class GeoNodeExecParamsProvider {
   virtual bool lazy_output_is_required(StringRef identifier) const = 0;
 };
 
+class GeoNodeResolveParams {
+};
+
 class GeoNodeExecParams {
  private:
   GeoNodeExecParamsProvider *provider_;
