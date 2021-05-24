@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <BKE_modifier.h>
 #include <string.h>
 
 #include "BLI_float3.hh"
@@ -39,6 +40,8 @@ void geo_node_type_base(
 bool geo_node_poll_default(struct bNodeType *ntype,
                            struct bNodeTree *ntree,
                            const char **r_disabled_hint);
+
+Mesh *solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh);
 
 namespace blender::nodes {
 void update_attribute_input_socket_availabilities(bNode &node,
