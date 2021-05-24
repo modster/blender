@@ -28,12 +28,12 @@
 
 static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Attribute")},
-    {SOCK_VECTOR, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_FLOAT, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_RGBA, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_BOOLEAN, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_INT, N_("Value"), 0, 0, 0, 0, -10000000.0f, 10000000.0f},
+    {SOCK_FLOAT, N_("Thickness"), 0.1f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
+    {SOCK_FLOAT, N_("Offset"), -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f},
+    {SOCK_FLOAT, N_("Clamp Offset"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f},
+    {SOCK_BOOLEAN, N_("Fill"), true},
+    {SOCK_BOOLEAN, N_("Rim"), true},
+
     {-1, ""},
 };
 
@@ -47,6 +47,19 @@ namespace blender::nodes {
 static void geo_node_solidify_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  bool add_rim = params.extract_input<bool>("Rim");
+  bool add_fill = params.extract_input<bool>("Fill");
+
+  char flag = MOD_SOLIDIFY_NORMAL_CALC;
+  if(add_rim){
+    flag |= MOD_SOLIDIFY_RIM;
+  }
+  if(!add_fill){
+    flag |= MOD_SOLIDIFY_NOSHELL;
+  }
+  float thickness = params.extract_input<float>("Thickness");
+  float offset = params.extract_input<float>("Offset");
+  float offset_clamp = params.extract_input<float>("Clamp Offset");
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
@@ -57,16 +70,16 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
       "shell_defgrp_name[64]",
       "rim_defgrp_name[64]",
       /** New surface offset level. */
-      20.0f,
+      thickness,
       /** Midpoint of the offset. */
-      0.5f,
+      offset,
       /**
        * Factor for the minimum weight to use when vertex-groups are used,
        * avoids 0.0 weights giving duplicate geometry.
        */
-      0.5f,
+      0.0f,
       /** Clamp offset based on surrounding geometry. */
-      2.0f,
+      offset_clamp,
       MOD_SOLIDIFY_MODE_EXTRUDE,
 
       /** Variables for #MOD_SOLIDIFY_MODE_NONMANIFOLD. */
@@ -77,11 +90,11 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
       0.0f,
       0.0f,
       0.0f,
-      MOD_SOLIDIFY_NORMAL_CALC | MOD_SOLIDIFY_RIM,
+      flag,
       0,
       0,
       0.01f,
-      0.01f,
+      0.0f,
     };
 
     MeshComponent &meshComponent = geometry_set.get_component_for_write<MeshComponent>();
