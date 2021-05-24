@@ -185,9 +185,9 @@ static inline void material_type_from_shader_uuid(uint64_t shader_uuid,
   const uint64_t geometry_mask = ((1u << 2u) - 1u);
   const uint64_t domain_mask = ((1u << 2u) - 1u);
   const uint64_t pipeline_mask = ((1u << 1u) - 1u);
-  geometry_type = static_cast<eMaterialGeometry>((shader_uuid >> 4u) & geometry_mask);
+  geometry_type = static_cast<eMaterialGeometry>(shader_uuid & geometry_mask);
   domain_type = static_cast<eMaterialDomain>((shader_uuid >> 2u) & domain_mask);
-  pipeline_type = static_cast<eMaterialPipeline>(shader_uuid & pipeline_mask);
+  pipeline_type = static_cast<eMaterialPipeline>((shader_uuid >> 4u) & pipeline_mask);
 }
 
 static inline uint64_t shader_uuid_from_material_type(eMaterialPipeline pipeline_type,
