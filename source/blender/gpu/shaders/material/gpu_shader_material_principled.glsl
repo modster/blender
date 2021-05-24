@@ -67,7 +67,7 @@ void node_bsdf_principled(vec4 base_color,
   diffuse_weight *= alpha;
   specular_weight *= alpha;
   transmission *= alpha;
-  clearcoat *= alpha;
+  clearcoat_weight *= alpha;
 
   float fresnel = (do_multiscatter != 0.0) ? btdf_lut(NV, roughness, ior).y : F_eta(ior, NV);
   glass_reflection_weight = fresnel * transmission;
@@ -76,7 +76,7 @@ void node_bsdf_principled(vec4 base_color,
   closure_weight_add(g_diffuse_data, diffuse_weight);
   closure_weight_add(g_reflection_data, glass_reflection_weight);
   closure_weight_add(g_reflection_data, specular_weight);
-  closure_weight_add(g_reflection_data, clearcoat);
+  closure_weight_add(g_reflection_data, clearcoat_weight);
   closure_weight_add(g_refraction_data, glass_transmission_weight);
 }
 
