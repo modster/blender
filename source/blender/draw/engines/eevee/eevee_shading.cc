@@ -43,7 +43,8 @@ void ForwardPass::sync()
   light_additional_ps_ = DRW_pass_create_instance("ForwardAddLight", opaque_ps_, state_add);
 }
 
-void ForwardPass::surface_add(Object *ob, GPUBatch *geom, Material *material)
+void ForwardPass::surface_add(
+    Object *ob, GPUBatch *geom, Material *material, int v_first, int v_count, bool use_instancing)
 {
   LightModule &lights = inst_.lights;
   MaterialPass &matpass = material->shading;
@@ -59,7 +60,7 @@ void ForwardPass::surface_add(Object *ob, GPUBatch *geom, Material *material)
     DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
   }
 
-  DRW_shgroup_call(grp, geom, ob);
+  shgroup_geometry_call(grp, ob, geom, v_first, v_count, use_instancing);
 }
 
 void ForwardPass::render(void)
@@ -91,7 +92,12 @@ void DeferredLayer::sync(void)
   }
 }
 
-void DeferredLayer::surface_add(Object *ob, GPUBatch *geom, Material *material)
+void DeferredLayer::surface_add(Object *ob,
+                                GPUBatch *geom,
+                                Material *material,
+                                int v_first = -1,
+                                int v_count = -1,
+                                bool use_instancing = false)
 {
   MaterialPass &matpass = material->shading;
   DRWShadingGroup *&grp = *matpass.shgrp;
@@ -104,7 +110,8 @@ void DeferredLayer::surface_add(Object *ob, GPUBatch *geom, Material *material)
     DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
     DRW_shgroup_stencil_set(grp, stencil_mask, 0xFF, 0xFF);
   }
-  DRW_shgroup_call(grp, geom, ob);
+
+  shgroup_geometry_call(grp, ob, geom, v_first, v_count, use_instancing);
 }
 
 void DeferredLayer::volume_add(Object *ob)
@@ -254,9 +261,10 @@ void DeferredPass::sync(void)
   }
 }
 
-void DeferredPass::surface_add(Object *ob, GPUBatch *geom, Material *material)
+void DeferredPass::surface_add(
+    Object *ob, GPUBatch *geom, Material *material, int v_first, int v_count, bool use_instancing)
 {
-  opaque_layer_.surface_add(ob, geom, material);
+  opaque_layer_.surface_add(ob, geom, material, v_first, v_count, use_instancing);
 }
 
 void DeferredPass::volume_add(Object *ob)

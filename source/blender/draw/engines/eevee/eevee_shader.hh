@@ -127,7 +127,8 @@ class ShaderModule {
   /* Run some custom preprocessor shader rewrite and returns a new string. */
   std::string enum_preprocess(const char *input);
 
-  char *material_shader_code_defs_get(eMaterialDomain domain_type);
+  char *material_shader_code_defs_get(eMaterialGeometry geometry_type,
+                                      eMaterialDomain domain_type);
   char *material_shader_code_vert_get(const GPUCodegenOutput *codegen,
                                       GPUMaterial *mat,
                                       eMaterialGeometry geometry_type);

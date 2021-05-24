@@ -326,6 +326,12 @@ void GPUCodegen::generate_attribs()
       case CD_TANGENT:
         load_ss << " = attr_load_tangent(" << name << ");\n";
         break;
+      case CD_MTFACE:
+        load_ss << " = attr_load_uv(" << name << ");\n";
+        break;
+      case CD_MCOL:
+        load_ss << " = attr_load_color(" << name << ");\n";
+        break;
       default:
         load_ss << " = attr_load_" << type << "(" << name << ");\n";
         break;

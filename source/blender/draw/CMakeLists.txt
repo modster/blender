@@ -87,6 +87,7 @@ set(SRC
   engines/eevee/eevee_engine.c
   engines/eevee/eevee_engine.cc
   engines/eevee/eevee_film.cc
+  engines/eevee/eevee_gpencil.cc
   engines/eevee/eevee_id_map.cc
   engines/eevee/eevee_instance.cc
   engines/eevee/eevee_light.cc
@@ -241,6 +242,7 @@ data_to_c_simple(engines/eevee/shaders/eevee_surface_deferred_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_depth_simple_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_forward_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_surface_gpencil_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_mesh_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_velocity_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_velocity_lib.glsl SRC)
@@ -286,6 +288,7 @@ data_to_c_simple(engines/workbench/shaders/workbench_world_light_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_attribute_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_colormanagement_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_globals_lib.glsl SRC)
+data_to_c_simple(intern/shaders/common_gpencil_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_pointcloud_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_hair_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_hair_refine_vert.glsl SRC)

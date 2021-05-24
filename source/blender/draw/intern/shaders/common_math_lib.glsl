@@ -127,6 +127,21 @@ vec3 safe_normalize(vec3 v)
   return v / len;
 }
 
+vec2 safe_normalize_len(vec2 v, out float len)
+{
+  len = length(v);
+  if (isnan(len) || len == 0.0) {
+    return vec2(1.0, 0.0);
+  }
+  return v / len;
+}
+
+vec2 safe_normalize(vec2 v)
+{
+  float len;
+  return safe_normalize_len(v, len);
+}
+
 vec3 normalize_len(vec3 v, out float len)
 {
   len = length(v);

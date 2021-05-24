@@ -347,7 +347,12 @@ class ShadowPass {
 
   void sync(void);
 
-  void surface_add(Object *ob, GPUBatch *geom, Material *material);
+  void surface_add(Object *ob,
+                   GPUBatch *geom,
+                   Material *material,
+                   int v_first = -1,
+                   int v_count = -1,
+                   bool use_instancing = false);
 
   void render(void);
 };

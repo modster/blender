@@ -320,4 +320,22 @@ class Framebuffer {
   }
 };
 
+static inline void shgroup_geometry_call(DRWShadingGroup *grp,
+                                         Object *ob,
+                                         GPUBatch *geom,
+                                         int v_first,
+                                         int v_count,
+                                         bool use_instancing)
+{
+  if (v_first == -1) {
+    DRW_shgroup_call(grp, geom, ob);
+  }
+  else if (use_instancing) {
+    DRW_shgroup_call_instance_range(grp, ob, geom, v_first, v_count);
+  }
+  else {
+    DRW_shgroup_call_range(grp, ob, geom, v_first, v_count);
+  }
+}
+
 }  // namespace blender::eevee

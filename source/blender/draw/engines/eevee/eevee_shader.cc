@@ -28,6 +28,7 @@
 
 extern char datatoc_common_attribute_lib_glsl[];
 extern char datatoc_common_fullscreen_vert_glsl[];
+extern char datatoc_common_gpencil_lib_glsl[];
 extern char datatoc_common_hair_lib_glsl[];
 extern char datatoc_common_math_geom_lib_glsl[];
 extern char datatoc_common_math_lib_glsl[];
@@ -83,6 +84,7 @@ extern char datatoc_eevee_surface_depth_simple_frag_glsl[];
 extern char datatoc_eevee_surface_forward_frag_glsl[];
 extern char datatoc_eevee_surface_lib_glsl[];
 extern char datatoc_eevee_surface_mesh_vert_glsl[];
+extern char datatoc_eevee_surface_gpencil_vert_glsl[];
 extern char datatoc_eevee_surface_velocity_frag_glsl[];
 extern char datatoc_eevee_surface_velocity_lib_glsl[];
 extern char datatoc_eevee_surface_velocity_mesh_vert_glsl[];
@@ -121,6 +123,7 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_attribute_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, common_gpencil_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, gpu_shader_codegen_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_closure_lib);
@@ -348,7 +351,8 @@ std::string ShaderModule::enum_preprocess(const char *input)
  *
  * \{ */
 
-char *ShaderModule::material_shader_code_defs_get(eMaterialDomain domain_type)
+char *ShaderModule::material_shader_code_defs_get(eMaterialGeometry geometry_type,
+                                                  eMaterialDomain domain_type)
 {
   std::string output = "";
 
@@ -362,6 +366,14 @@ char *ShaderModule::material_shader_code_defs_get(eMaterialDomain domain_type)
       output += "#define MESH_SHADER\n";
       break;
   }
+  switch (geometry_type) {
+    case MAT_GEOM_GPENCIL:
+      output += "#define UNIFORM_RESOURCE_ID\n";
+      break;
+    default:
+      break;
+  }
+
   return BLI_strdup(output.c_str());
 }
 
@@ -396,6 +408,12 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
           output += sub.substr(sub.find(" ") + 1, pos + delimiter.length());
           break;
         case MAT_GEOM_GPENCIL:
+          /* Example print:
+           * vec2 u015684;
+           * These are not used and just here to make the attribs_load functions call valids.
+           * Only one uv and one color attribute layer is supported by gpencil objects. */
+          output += sub.substr(0, pos + delimiter.length());
+          break;
         case MAT_GEOM_VOLUME:
           /* Not supported. */
           break;
@@ -417,30 +435,37 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
   }
   output += "}\n\n";
 
-  if (codegen->displacement) {
-    if (GPU_material_flag_get(mat, GPU_MATFLAG_UNIFORMS_ATTRIB)) {
-      output += datatoc_common_uniform_attribute_lib_glsl;
+  /* Displacement is only supported on mesh geometry for now. */
+  if (geometry_type == MAT_GEOM_MESH) {
+    if (codegen->displacement) {
+      if (GPU_material_flag_get(mat, GPU_MATFLAG_UNIFORMS_ATTRIB)) {
+        output += datatoc_common_uniform_attribute_lib_glsl;
+      }
+      output += codegen->uniforms;
+      output += "\n";
+      output += codegen->library;
+      output += "\n";
     }
-    output += codegen->uniforms;
-    output += "\n";
-    output += codegen->library;
-    output += "\n";
-  }
 
-  output += "vec3 nodetree_displacement(void)\n";
-  output += "{\n";
-  if (codegen->displacement) {
-    output += codegen->displacement;
+    output += "vec3 nodetree_displacement(void)\n";
+    output += "{\n";
+    if (codegen->displacement) {
+      output += codegen->displacement;
+    }
+    else {
+      output += "return vec3(0);\n";
+    }
+    output += "}\n\n";
   }
-  else {
-    output += "return vec3(0);\n";
-  }
-  output += "}\n\n";
 
   switch (geometry_type) {
     case MAT_GEOM_VOLUME:
       output += datatoc_eevee_volume_vert_glsl;
       break;
+    case MAT_GEOM_GPENCIL:
+      output += datatoc_eevee_surface_gpencil_vert_glsl;
+      break;
+    case MAT_GEOM_MESH:
     default:
       output += datatoc_eevee_surface_mesh_vert_glsl;
       break;
@@ -549,7 +574,7 @@ GPUShaderSource ShaderModule::material_shader_code_generate(GPUMaterial *mat,
   source.vertex = material_shader_code_vert_get(codegen, mat, geometry_type);
   source.fragment = material_shader_code_frag_get(codegen, mat, geometry_type, pipeline_type);
   source.geometry = material_shader_code_geom_get(codegen, mat, geometry_type, domain_type);
-  source.defines = material_shader_code_defs_get(domain_type);
+  source.defines = material_shader_code_defs_get(geometry_type, domain_type);
   return source;
 }
 
@@ -571,7 +596,7 @@ GPUMaterial *ShaderModule::material_shader_get(::Material *blender_mat,
 
   uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type, domain_type);
 
-  bool is_volume = (domain_type == MAT_DOMAIN_SURFACE);
+  bool is_volume = (domain_type == MAT_DOMAIN_VOLUME);
 
   return DRW_shader_from_material(
       blender_mat, nodetree, shader_uuid, is_volume, deferred_compilation, codegen_callback, this);

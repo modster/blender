@@ -127,7 +127,7 @@ void Instance::begin_sync()
 void Instance::object_sync(Object *ob)
 {
   const bool is_renderable_type = ELEM(
-      ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LAMP, OB_VOLUME);
+      ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LAMP, OB_VOLUME, OB_GPENCIL);
   const int ob_visibility = DRW_object_visibility_in_active_context(ob);
   const bool partsys_is_visible = (ob_visibility & OB_VISIBLE_PARTICLES) != 0;
   const bool object_is_visible = DRW_object_is_renderable(ob) &&
@@ -179,6 +179,9 @@ void Instance::object_sync(Object *ob)
       }
       case OB_VOLUME:
         shading_passes.deferred.volume_add(ob);
+        break;
+      case OB_GPENCIL:
+        gpencil_sync(ob);
         break;
       default:
         break;

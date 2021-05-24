@@ -58,3 +58,11 @@ vec2 attr_load_vec2(vec2 attr)
 {
   return attr;
 }
+vec4 attr_load_color(vec4 attr)
+{
+  return attr;
+}
+vec3 attr_load_uv(vec3 attr)
+{
+  return attr;
+}
