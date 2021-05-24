@@ -24,6 +24,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "DNA_modifier_types.h"
+
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_solidify_in[] = {
