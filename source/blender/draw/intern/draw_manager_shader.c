@@ -474,12 +474,17 @@ GPUMaterial *DRW_shader_from_material(Material *ma,
                                                 callback,
                                                 thunk);
 
-  if (!DRW_state_is_image_render() && deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
+  if (DRW_state_is_image_render()) {
+    /* Do not deferred if doing render. */
+    deferred = false;
+  }
+
+  if (deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
     /* Shader has been already queued. */
     return mat;
   }
 
-  if (GPU_material_status(mat) == GPU_MAT_CREATED) {
+  if (GPU_material_status(mat) == GPU_MAT_CREATED || !deferred) {
     GPU_material_status_set(mat, GPU_MAT_QUEUED);
     drw_deferred_shader_add(mat, deferred);
   }
