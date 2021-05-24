@@ -4242,7 +4242,7 @@ static void lineart_gpencil_generate(LineartCache *cache,
     if (rlc->level > level_end || rlc->level < level_start) {
       continue;
     }
-    if (orig_ob && orig_ob != rlc->object_ref) {
+    if (orig_ob && orig_ob != rlc->object_ref && rlc->type != LRT_EDGE_FLAG_INTERSECTION) {
       continue;
     }
     if (orig_col && rlc->object_ref) {
@@ -4385,26 +4385,20 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
 
   Object *source_object = NULL;
   Collection *source_collection = NULL;
-  short use_types = 0;
+  short use_types = edge_types;
   if (source_type == LRT_SOURCE_OBJECT) {
     if (!source_reference) {
       return;
     }
     source_object = (Object *)source_reference;
-    /* Note that intersection lines will only be in collection. */
-    use_types = edge_types & (~LRT_EDGE_FLAG_INTERSECTION);
   }
   else if (source_type == LRT_SOURCE_COLLECTION) {
     if (!source_reference) {
       return;
     }
     source_collection = (Collection *)source_reference;
-    use_types = edge_types;
   }
-  else {
-    /* Whole scene. */
-    use_types = edge_types;
-  }
+
   float gp_obmat_inverse[4][4];
   invert_m4_m4(gp_obmat_inverse, ob->obmat);
   lineart_gpencil_generate(cache,

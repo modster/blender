@@ -345,7 +345,7 @@ typedef struct LineartCache {
   /** Cache only contains edge types specified in this variable.
    * TODO: it's a fixed value (LRT_EDGE_FLAG_ALL_TYPE) right now, allow further selections in the
    * future. */
-  char rb_edge_types;
+  unsigned char rb_edge_types;
 } LineartCache;
 
 #define DBL_TRIANGLE_LIM 1e-8
