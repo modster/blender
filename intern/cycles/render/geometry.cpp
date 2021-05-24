@@ -2057,7 +2057,7 @@ void GeometryManager::device_update(Device *device,
    * as modified in this case, as we may accumulate displacement if the vertices do not also
    * change. */
   bool need_update_scene_bvh = (scene->bvh == nullptr ||
-                                 (update_flags & (TRANSFORM_MODIFIED | VISIBILITY_MODIFIED)) != 0);
+                                (update_flags & (TRANSFORM_MODIFIED | VISIBILITY_MODIFIED)) != 0);
 
   if ((need_update_scene_bvh || dscene->prim_tri_verts.is_modified()) &&
       bvh_layout != BVH_LAYOUT_BVH2) {

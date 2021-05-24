@@ -476,7 +476,9 @@ bool BlenderSync::sync_object_attributes(BL::DepsgraphObjectInstance &b_instance
 
 /* Object Loop */
 
-void BlenderSync::sync_procedural(BL::Object &b_ob, BL::MeshSequenceCacheModifier &b_mesh_cache, bool has_subdivision_modifier)
+void BlenderSync::sync_procedural(BL::Object &b_ob,
+                                  BL::MeshSequenceCacheModifier &b_mesh_cache,
+                                  bool has_subdivision_modifier)
 {
 #ifdef WITH_ALEMBIC
   BL::CacheFile cache_file = b_mesh_cache.cache_file();

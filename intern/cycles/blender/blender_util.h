@@ -592,8 +592,8 @@ static inline BL::MeshSequenceCacheModifier object_mesh_cache_find(BL::Object &b
       continue;
     }
 
-    /* Only skip the subsurf modifier if we are not checking for the mesh sequence cache modifier for
-     * motion blur. */
+    /* Only skip the subsurf modifier if we are not checking for the mesh sequence cache modifier
+     * for motion blur. */
     if (b_mod.type() == BL::Modifier::type_SUBSURF && !check_velocity) {
       if (has_subdivision_modifier) {
         *has_subdivision_modifier = true;

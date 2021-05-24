@@ -228,17 +228,17 @@ class AttributeSet {
    * and remove any attribute not found on the new set from this. */
   void update(AttributeSet &&new_attributes);
 
-  /* Return whether the attributes of the given kernel_type are modified, where "modified" means that
-   * some attributes of the given type were added or removed from this AttributeSet. This does not
-   * mean that the data of the remaining attributes in this AttributeSet were also modified. To check
-   * this, use Attribute.modified. */
+  /* Return whether the attributes of the given kernel_type are modified, where "modified" means
+   * that some attributes of the given type were added or removed from this AttributeSet. This does
+   * not mean that the data of the remaining attributes in this AttributeSet were also modified. To
+   * check this, use Attribute.modified. */
   bool modified(AttrKernelDataType kernel_type) const;
 
   void clear_modified();
 
  private:
-  /* Set the relevant modified flag for the attribute. Only attributes that are stored in device arrays
-   * will be considered for tagging this AttributeSet as modified. */
+  /* Set the relevant modified flag for the attribute. Only attributes that are stored in device
+   * arrays will be considered for tagging this AttributeSet as modified. */
   void tag_modified(const Attribute &attr);
 };
 
