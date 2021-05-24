@@ -17,6 +17,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "DNA_modifier_types.h"
+
 #include "node_geometry_util.hh"
 #include "node_geo_solidify.h"
 
@@ -49,8 +51,41 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
+    SolidifyNodeData solidify_node_data = {
+      /** Name of vertex group to use, MAX_VGROUP_NAME. */
+      "char defgrp_name[64]",
+      "shell_defgrp_name[64]",
+      "rim_defgrp_name[64]",
+      /** New surface offset level. */
+      20.0f,
+      /** Midpoint of the offset. */
+      0.5f,
+      /**
+       * Factor for the minimum weight to use when vertex-groups are used,
+       * avoids 0.0 weights giving duplicate geometry.
+       */
+      0.5f,
+      /** Clamp offset based on surrounding geometry. */
+      2.0f,
+      MOD_SOLIDIFY_MODE_EXTRUDE,
+
+      /** Variables for #MOD_SOLIDIFY_MODE_NONMANIFOLD. */
+      MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_FIXED,
+      MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_NONE,
+
+      0,
+      0.0f,
+      0.0f,
+      0.0f,
+      MOD_SOLIDIFY_NORMAL_CALC | MOD_SOLIDIFY_RIM,
+      0,
+      0,
+      0.01f,
+      0.01f,
+    };
+
     MeshComponent &meshComponent = geometry_set.get_component_for_write<MeshComponent>();
-    Mesh *return_mesh = solidify_extrude_modifyMesh(meshComponent.get_for_write());
+    Mesh *return_mesh = solidify_extrude_modifyMesh(&solidify_node_data, meshComponent.get_for_write());
     geometry_set.replace_mesh(return_mesh);
   }
 //  if (geometry_set.has<PointCloudComponent>()) {
