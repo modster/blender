@@ -469,10 +469,10 @@ typedef struct LineartBoundingArea {
   ListBase up;
   ListBase bp;
 
-  short triangle_count;
-  short max_triangle_count;
-  short line_count;
-  short max_line_count;
+  int16_t triangle_count;
+  int16_t max_triangle_count;
+  int16_t line_count;
+  int16_t max_line_count;
 
   /* Use array for speeding up multiple accesses. */
   struct LineartTriangle **linked_triangles;
