@@ -1433,10 +1433,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
         id_us_plus(&md->target_material->id);
       }
 
-      if (use_lights) {
-        ob->dtx |= OB_USE_GPENCIL_LIGHTS;
-      }
-      else {
+      if (!use_lights) {
         ob->dtx &= ~OB_USE_GPENCIL_LIGHTS;
       }
 
