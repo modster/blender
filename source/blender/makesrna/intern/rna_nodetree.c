@@ -9825,6 +9825,44 @@ static void def_geo_curve_resample(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_curve_deform(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_DEFORM_POSITION, "POSITION", 0, "Position", ""},
+      {GEO_NODE_CURVE_DEFORM_ATTRIBUTE, "ATTRIBUTE", 0, "Attribute", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static const EnumPropertyItem position_axis_items[] = {
+      {GEO_NODE_CURVE_DEFORM_POSX, "POS_X", 0, "X", ""},
+      {GEO_NODE_CURVE_DEFORM_POSY, "POS_Y", 0, "Y", ""},
+      {GEO_NODE_CURVE_DEFORM_POSZ, "POS_Z", 0, "Z", ""},
+      {GEO_NODE_CURVE_DEFORM_NEGX, "NEG_X", 0, "-X", ""},
+      {GEO_NODE_CURVE_DEFORM_NEGY, "NEG_Y", 0, "-Y", ""},
+      {GEO_NODE_CURVE_DEFORM_NEGZ, "NEG_Z", 0, "-Z", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveDeform", "storage");
+
+  prop = RNA_def_property(srna, "input_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(prop, "Input Mode", "How to specify the curve parameter at each point");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "position_axis", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(prop, "Position Axis", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "attribute_input_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
+  RNA_def_property_ui_text(prop, "Attribute Input Type", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_attribute_transfer(StructRNA *srna)
 {
   static EnumPropertyItem mapping_items[] = {
