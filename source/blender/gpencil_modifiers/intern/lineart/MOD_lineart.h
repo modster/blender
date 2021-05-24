@@ -400,11 +400,11 @@ typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
   struct Object *original_ob;
   struct BMesh *original_bm;
-  double new_mvp[4][4];
-  double new_mv[4][4];
+  double model_view_proj[4][4];
+  double model_view[4][4];
   double normal[4][4];
-  LineartElementLinkNode *v_reln;
-  int override_usage;
+  LineartElementLinkNode *eln;
+  int usage;
   unsigned char override_intersection_mask;
   int global_i_offset;
 
@@ -430,7 +430,7 @@ typedef struct LineartObjectLoadTaskInfo {
   /* LinkNode styled list */
   LineartObjectInfo *pending;
   /* Used to spread the load across several threads. This can not overflow. */
-  long unsigned int total_faces;
+  uint64_t total_faces;
 } LineartObjectLoadTaskInfo;
 
 /**
