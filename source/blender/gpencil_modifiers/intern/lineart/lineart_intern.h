@@ -38,26 +38,28 @@ struct LineartStaticMemPoolNode;
 struct LineartEdge;
 struct LineartRenderBuffer;
 
-void *lineart_list_append_pointer_pool(ListBase *h, struct LineartStaticMemPool *smp, void *data);
-void *lineart_list_append_pointer_pool_sized(ListBase *h,
+void *lineart_list_append_pointer_pool(ListBase *list,
+                                       struct LineartStaticMemPool *smp,
+                                       void *data);
+void *lineart_list_append_pointer_pool_sized(ListBase *list,
                                              struct LineartStaticMemPool *smp,
                                              void *data,
                                              int size);
-void *lineart_list_append_pointer_pool_thread(ListBase *h,
+void *lineart_list_append_pointer_pool_thread(ListBase *list,
                                               struct LineartStaticMemPool *smp,
                                               void *data);
-void *lineart_list_append_pointer_pool_sized_thread(ListBase *h,
+void *lineart_list_append_pointer_pool_sized_thread(ListBase *list,
                                                     LineartStaticMemPool *smp,
                                                     void *data,
                                                     int size);
-void *list_push_pointer_static(ListBase *h, struct LineartStaticMemPool *smp, void *p);
-void *list_push_pointer_static_sized(ListBase *h,
+void *list_push_pointer_static(ListBase *list, struct LineartStaticMemPool *smp, void *p);
+void *list_push_pointer_static_sized(ListBase *list,
                                      struct LineartStaticMemPool *smp,
                                      void *p,
                                      int size);
 
-void *lineart_list_pop_pointer_no_free(ListBase *h);
-void lineart_list_remove_pointer_item_no_free(ListBase *h, LinkData *lip);
+void *lineart_list_pop_pointer_no_free(ListBase *list);
+void lineart_list_remove_pointer_item_no_free(ListBase *list, LinkData *lip);
 
 struct LineartStaticMemPoolNode *lineart_mem_new_static_pool(struct LineartStaticMemPool *smp,
                                                              size_t size);
