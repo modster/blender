@@ -186,7 +186,7 @@ class Attribute {
   static const char *standard_name(AttributeStandard std);
   static AttributeStandard name_standard(const char *name);
 
-  static AttrKernelDataType kernel_type(const Attribute *attr);
+  static AttrKernelDataType kernel_type(const Attribute &attr);
 
   void get_uv_tiles(Geometry *geom, AttributePrimitive prim, unordered_set<int> &tiles) const;
 };
@@ -239,7 +239,7 @@ class AttributeSet {
  private:
   /* Set the relevant modified flag for the attribute. Only attributes that are stored in device arrays
    * will be considered for tagging this AttributeSet as modified. */
-  void tag_modified(Attribute *attr);
+  void tag_modified(const Attribute &attr);
 };
 
 /* AttributeRequest

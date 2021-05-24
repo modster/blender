@@ -385,17 +385,17 @@ AttributeStandard Attribute::name_standard(const char *name)
   return ATTR_STD_NONE;
 }
 
-AttrKernelDataType Attribute::kernel_type(const Attribute *attr)
+AttrKernelDataType Attribute::kernel_type(const Attribute &attr)
 {
-  if (attr->element == ATTR_ELEMENT_CORNER) {
+  if (attr.element == ATTR_ELEMENT_CORNER) {
     return AttrKernelDataType::UCHAR4;
   }
 
-  if (attr->type == TypeDesc::TypeFloat) {
+  if (attr.type == TypeDesc::TypeFloat) {
     return AttrKernelDataType::FLOAT;
   }
 
-  if (attr->type == TypeFloat2) {
+  if (attr.type == TypeFloat2) {
     return AttrKernelDataType::FLOAT2;
   }
 
@@ -436,7 +436,7 @@ void Attribute::get_uv_tiles(Geometry *geom,
 /* Attribute Set */
 
 AttributeSet::AttributeSet(Geometry *geometry, AttributePrimitive prim)
-    : geometry(geometry), prim(prim)
+    : modified_flag(~0u), geometry(geometry), prim(prim)
 {
 }
 
@@ -459,7 +459,7 @@ Attribute *AttributeSet::add(ustring name, TypeDesc type, AttributeElement eleme
 
   Attribute new_attr(name, type, element, geometry, prim);
   attributes.emplace_back(std::move(new_attr));
-  tag_modified(&attributes.back());
+  tag_modified(attributes.back());
   return &attributes.back();
 }
 
@@ -659,7 +659,7 @@ void AttributeSet::remove(Attribute *attribute)
 
 void AttributeSet::remove(list<Attribute>::iterator it)
 {
-  tag_modified(&*it);
+  tag_modified(*it);
   attributes.erase(it);
 }
 
@@ -730,10 +730,10 @@ void AttributeSet::clear_modified()
   modified_flag = 0;
 }
 
-void AttributeSet::tag_modified(Attribute *attr)
+void AttributeSet::tag_modified(const Attribute &attr)
 {
-  const bool modifies_device_array = (attr->std != ATTR_STD_FACE_NORMAL &&
-                                      attr->std != ATTR_STD_VERTEX_NORMAL);
+  const bool modifies_device_array = (attr.std != ATTR_STD_FACE_NORMAL &&
+                                      attr.std != ATTR_STD_VERTEX_NORMAL);
 
   if (modifies_device_array) {
     AttrKernelDataType kernel_type = Attribute::kernel_type(attr);
