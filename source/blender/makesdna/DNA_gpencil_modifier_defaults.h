@@ -298,7 +298,7 @@
     .angle_splitting_threshold = DEG2RAD(60.0f), \
     .chaining_image_threshold = 0.001f, \
     .stroke_offset = 0.05,\
-    .chain_smooth_tolerance = 0.2f,\
+    .chain_smooth_tolerance = 0.0f,\
   }
 
 #define _DNA_DEFAULT_LengthGpencilModifierData \
