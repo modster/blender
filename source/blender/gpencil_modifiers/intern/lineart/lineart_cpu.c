@@ -380,18 +380,18 @@ static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRend
   BLI_spin_lock(&rb->lock_task);
 
 #define LRT_ASSIGN_OCCLUSION_TASK(name) \
-  if (rb->name##_managed) { \
-    data = rb->name##_managed; \
-    rti->name = (void *)data; \
+  if (rb->name.last) { \
+    data = rb->name.last; \
+    rti->name.first = (void *)data; \
     for (i = 0; i < LRT_THREAD_EDGE_COUNT && data; i++) { \
       data = data->next; \
     } \
-    rti->name##_end = data; \
-    rb->name##_managed = data; \
+    rti->name.last = data; \
+    rb->name.last = data; \
     res = 1; \
   } \
   else { \
-    rti->name = NULL; \
+    rti->name.first = rti->name.last = NULL; \
   }
 
   LRT_ASSIGN_OCCLUSION_TASK(contour);
@@ -414,23 +414,23 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
 
   while (lineart_occlusion_make_task_info(rb, rti)) {
 
-    for (eip = rti->contour; eip && eip != rti->contour_end; eip = eip->next) {
+    for (eip = rti->contour.first; eip && eip != rti->contour.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
 
-    for (eip = rti->crease; eip && eip != rti->crease_end; eip = eip->next) {
+    for (eip = rti->crease.first; eip && eip != rti->crease.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
 
-    for (eip = rti->intersection; eip && eip != rti->intersection_end; eip = eip->next) {
+    for (eip = rti->intersection.first; eip && eip != rti->intersection.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
 
-    for (eip = rti->material; eip && eip != rti->material_end; eip = eip->next) {
+    for (eip = rti->material.first; eip && eip != rti->material.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
 
-    for (eip = rti->edge_mark; eip && eip != rti->edge_mark_end; eip = eip->next) {
+    for (eip = rti->edge_mark.first; eip && eip != rti->edge_mark.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
   }
@@ -448,11 +448,13 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
                                            "Task Pool");
   int i;
 
-  rb->contour_managed = rb->contours;
-  rb->crease_managed = rb->crease_lines;
-  rb->intersection_managed = rb->intersection_lines;
-  rb->material_managed = rb->material_lines;
-  rb->edge_mark_managed = rb->edge_marks;
+  /* The "last" entry is used to store worker progress in the whole list.
+   * These list themselves are single-direction linked, with list.first being the head. */
+  rb->contour.last = rb->contour.first;
+  rb->crease.last = rb->crease.first;
+  rb->intersection.last = rb->intersection.first;
+  rb->material.last = rb->material.first;
+  rb->edge_mark.last = rb->edge_mark.first;
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
@@ -857,7 +859,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_prepend_edge_direct(&rb->contours, e);
+          lineart_prepend_edge_direct(&rb->contour.first, e);
         }
         /* NOTE: inverting `e->v1/v2` (left/right point) doesn't matter as long as
          * `tri->edge` and `tri->v` has the same sequence. and the winding direction
@@ -906,7 +908,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_prepend_edge_direct(&rb->contours, e);
+          lineart_prepend_edge_direct(&rb->contour.first, e);
         }
         e->v1 = &vt[0];
         e->v2 = &vt[1];
@@ -947,7 +949,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_prepend_edge_direct(&rb->contours, e);
+          lineart_prepend_edge_direct(&rb->contour.first, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1022,7 +1024,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_prepend_edge_direct(&rb->contours, e);
+          lineart_prepend_edge_direct(&rb->contour.first, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1074,7 +1076,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_prepend_edge_direct(&rb->contours, e);
+          lineart_prepend_edge_direct(&rb->contour.first, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1122,7 +1124,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         INCREASE_EDGE
         if (allow_boundaries) {
           e->flags = LRT_EDGE_FLAG_CONTOUR;
-          lineart_prepend_edge_direct(&rb->contours, e);
+          lineart_prepend_edge_direct(&rb->contour.first, e);
         }
         e->v1 = &vt[1];
         e->v2 = &vt[0];
@@ -1435,19 +1437,19 @@ static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e)
 {
   switch (e->flags) {
     case LRT_EDGE_FLAG_CONTOUR:
-      lineart_prepend_edge_direct(&rb->contours, e);
+      lineart_prepend_edge_direct(&rb->contour.first, e);
       break;
     case LRT_EDGE_FLAG_CREASE:
-      lineart_prepend_edge_direct(&rb->crease_lines, e);
+      lineart_prepend_edge_direct(&rb->crease.first, e);
       break;
     case LRT_EDGE_FLAG_MATERIAL:
-      lineart_prepend_edge_direct(&rb->material_lines, e);
+      lineart_prepend_edge_direct(&rb->material.first, e);
       break;
     case LRT_EDGE_FLAG_EDGE_MARK:
-      lineart_prepend_edge_direct(&rb->edge_marks, e);
+      lineart_prepend_edge_direct(&rb->edge_mark.first, e);
       break;
     case LRT_EDGE_FLAG_INTERSECTION:
-      lineart_prepend_edge_direct(&rb->intersection_lines, e);
+      lineart_prepend_edge_direct(&rb->intersection.first, e);
       break;
   }
 }
@@ -2501,7 +2503,8 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
   BLI_addtail(&result->segments, es);
   /* Don't need to OR flags right now, just a type mark. */
   result->flags = LRT_EDGE_FLAG_INTERSECTION;
-  lineart_prepend_edge_direct(&rb->intersection_lines, result);
+
+  lineart_prepend_edge_direct(&rb->intersection.first, result);
   int r1, r2, c1, c2, row, col;
   if (lineart_get_edge_bounding_areas(rb, result, &r1, &r2, &c1, &c2)) {
     for (row = r1; row != r2 + 1; row++) {
@@ -2511,8 +2514,6 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
       }
     }
   }
-
-  rb->intersection_count++;
 
   return result;
 }
@@ -2602,22 +2603,11 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
     return;
   }
 
-  rb->contour_count = 0;
-  rb->contour_managed = NULL;
-  rb->intersection_count = 0;
-  rb->intersection_managed = NULL;
-  rb->material_line_count = 0;
-  rb->material_managed = NULL;
-  rb->crease_count = 0;
-  rb->crease_managed = NULL;
-  rb->edge_mark_count = 0;
-  rb->edge_mark_managed = NULL;
-
-  rb->contours = NULL;
-  rb->intersection_lines = NULL;
-  rb->crease_lines = NULL;
-  rb->material_lines = NULL;
-  rb->edge_marks = NULL;
+  memset(&rb->contour, 0, sizeof(ListBase));
+  memset(&rb->crease, 0, sizeof(ListBase));
+  memset(&rb->intersection, 0, sizeof(ListBase));
+  memset(&rb->edge_mark, 0, sizeof(ListBase));
+  memset(&rb->material, 0, sizeof(ListBase));
 
   BLI_listbase_clear(&rb->chains);
   BLI_listbase_clear(&rb->wasted_cuts);
