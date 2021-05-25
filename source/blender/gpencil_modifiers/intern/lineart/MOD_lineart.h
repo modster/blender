@@ -164,8 +164,8 @@ typedef struct LineartEdge {
   struct Object *object_ref;
 } LineartEdge;
 
-typedef struct LineartLineChain {
-  struct LineartLineChain *next, *prev;
+typedef struct LineartEdgeChain {
+  struct LineartEdgeChain *next, *prev;
   ListBase chain;
 
   /** Calculated before draw command. */
@@ -181,10 +181,10 @@ typedef struct LineartLineChain {
   unsigned char intersection_mask;
 
   struct Object *object_ref;
-} LineartLineChain;
+} LineartEdgeChain;
 
-typedef struct LineartLineChainItem {
-  struct LineartLineChainItem *next, *prev;
+typedef struct LineartEdgeChainItem {
+  struct LineartEdgeChainItem *next, *prev;
   /** Need z value for fading */
   float pos[3];
   /** For restoring position to 3d space */
@@ -194,12 +194,12 @@ typedef struct LineartLineChainItem {
   char occlusion;
   unsigned char transparency_mask;
   size_t index;
-} LineartLineChainItem;
+} LineartEdgeChainItem;
 
 typedef struct LineartChainRegisterEntry {
   struct LineartChainRegisterEntry *next, *prev;
-  LineartLineChain *rlc;
-  LineartLineChainItem *rlci;
+  LineartEdgeChain *ec;
+  LineartEdgeChainItem *eci;
   char picked;
 
   /* left/right mark.
@@ -617,7 +617,7 @@ void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshol
 void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance);
 void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb, float dist);
 
-int MOD_lineart_chain_count(const LineartLineChain *rlc);
+int MOD_lineart_chain_count(const LineartEdgeChain *ec);
 void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);
 
 bool MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
@@ -656,6 +656,6 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   const char *vgname,
                                   int modifier_flags);
 
-float MOD_lineart_chain_compute_length(LineartLineChain *rlc);
+float MOD_lineart_chain_compute_length(LineartEdgeChain *ec);
 
 void ED_operatortypes_lineart(void);
