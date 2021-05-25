@@ -239,31 +239,15 @@ typedef struct LineartRenderBuffer {
 
   int triangle_size;
 
-  unsigned int contour_count;
-  unsigned int contour_processed;
-  LineartEdge *contour_managed;
-  /** A single linked list (cast to #LinkNode). */
-  LineartEdge *contours;
-
-  unsigned int intersection_count;
-  unsigned int intersection_processed;
-  LineartEdge *intersection_managed;
-  LineartEdge *intersection_lines;
-
-  unsigned int crease_count;
-  unsigned int crease_processed;
-  LineartEdge *crease_managed;
-  LineartEdge *crease_lines;
-
-  unsigned int material_line_count;
-  unsigned int material_processed;
-  LineartEdge *material_managed;
-  LineartEdge *material_lines;
-
-  unsigned int edge_mark_count;
-  unsigned int edge_mark_processed;
-  LineartEdge *edge_mark_managed;
-  LineartEdge *edge_marks;
+  /* Although using ListBase here, LineartEdge is single linked list.
+   * list.last is used to store worker progress along the list.
+   * See lineart_main_occlusion_begin() for more info. */
+  ListBase contour;
+  ListBase intersection;
+  ListBase crease;
+  ListBase material;
+  ListBase edge_mark;
+  ListBase floating;
 
   ListBase chains;
 
@@ -336,20 +320,13 @@ typedef struct LineartRenderTaskInfo {
 
   int thread_id;
 
-  LineartEdge *contour;
-  LineartEdge *contour_end;
-
-  LineartEdge *intersection;
-  LineartEdge *intersection_end;
-
-  LineartEdge *crease;
-  LineartEdge *crease_end;
-
-  LineartEdge *material;
-  LineartEdge *material_end;
-
-  LineartEdge *edge_mark;
-  LineartEdge *edge_mark_end;
+  /* In these list, list->last doesn't end overall, it only ends for the specific task thread. */
+  ListBase contour;
+  ListBase intersection;
+  ListBase crease;
+  ListBase material;
+  ListBase edge_mark;
+  ListBase floating;
 
 } LineartRenderTaskInfo;
 
@@ -368,16 +345,13 @@ typedef struct LineartObjectInfo {
 
   /* Threads will add lines inside here, when all threads are done, we combine those into the ones
    * in LineartRenderBuffer.  */
-  LineartEdge *contour;
-  LineartEdge *contour_last;
-  LineartEdge *crease;
-  LineartEdge *crease_last;
-  LineartEdge *material;
-  LineartEdge *material_last;
-  LineartEdge *edge_mark;
-  LineartEdge *edge_mark_last;
-  LineartEdge *intersection;
-  LineartEdge *intersection_last;
+  ListBase contour;
+  ListBase intersection;
+  ListBase crease;
+  ListBase material;
+  ListBase edge_mark;
+  ListBase floating;
+
 } LineartObjectInfo;
 
 typedef struct LineartObjectLoadTaskInfo {
