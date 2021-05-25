@@ -36,7 +36,7 @@ extern "C" {
 
 static bNodeSocketTemplate geo_node_decimate_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_INT, N_("Minimum Vertices"), 4, 0, 0, 0, 4, 10000},
+    {SOCK_FLOAT, N_("Factor"), 0.5f, 0, 0, 0, 0.0f, 1.0f},
     {-1, ""},
 };
 
@@ -196,12 +196,12 @@ static Mesh *decimateMesh(DecimateNodeData *dmd, Mesh *meshData)
 static void geo_node_decimate_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-
+  float percent = params.extract_input<float>("Factor");
   if(geometry_set.has_mesh()){
     Mesh *input_mesh = geometry_set.get_mesh_for_write();
     DecimateNodeData dmd = {
         /** (mode == MOD_DECIM_MODE_COLLAPSE). */
-        0.5f,
+        percent,
         /** (mode == MOD_DECIM_MODE_UNSUBDIV). */
         2,
         /** (mode == MOD_DECIM_MODE_DISSOLVE). */
