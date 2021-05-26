@@ -236,7 +236,7 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
     case XR_CONTROLLER_DRAW_RAY: {
       /* Sphere. */
       {
-        const float color[4] = {0.5f, 0.5f, 0.5f, 0.5f};
+        const float color[4] = {0.422f, 0.438f, 0.446f, 0.4f};
         const float scale = 0.05f;
 
         GPUBatch *sphere = GPU_batch_preset_sphere(2);
@@ -257,7 +257,7 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
 
       /* Ray. */
       {
-        const float color[4] = {0.863f, 0.0f, 0.545f, 0.5f};
+        const float color[4] = {0.35f, 0.35f, 1.0f, 0.5f};
         const float scale = settings->clip_end;
         float ray[3];
 

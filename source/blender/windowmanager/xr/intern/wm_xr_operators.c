@@ -181,7 +181,7 @@ static void wm_xr_select_raycast_draw(const bContext *UNUSED(C),
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-  immUniformColor4f(0.863f, 0.0f, 0.545f, 1.0f);
+  immUniformColor4f(0.35f, 0.35f, 1.0f, 1.0f);
 
   GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   GPU_line_width(3.0f);
