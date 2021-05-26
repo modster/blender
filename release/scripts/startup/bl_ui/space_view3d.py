@@ -2312,6 +2312,7 @@ class VIEW3D_MT_object_animation(Menu):
 
         layout.operator("nla.bake", text="Bake Action...")
         layout.operator("gpencil.bake_mesh_animation", text="Bake Mesh to Grease Pencil...")
+        layout.operator("gpencil.bake_grease_pencil_animation", text="Bake Object Transform to Grease Pencil...")
 
 
 class VIEW3D_MT_object_rigid_body(Menu):
@@ -4954,75 +4955,6 @@ class VIEW3D_MT_assign_material(Menu):
                                 icon='LAYER_ACTIVE' if mat == mat_active else 'BLANK1').material = mat.name
 
 
-def gpencil_layer_append_menu_items(context, layout, only_active):
-    done = False
-    view_layer = context.view_layer
-    obact = context.active_object
-    gpl = context.active_gpencil_layer
-
-    done = False
-    if gpl is not None:
-        for ob in view_layer.objects:
-            if ob.type == 'GPENCIL' and ob != obact:
-                op = layout.operator("gpencil.layer_duplicate_object", text=ob.name)
-                op.object = ob.name
-                op.only_active = only_active
-                done = True
-
-        if done is False:
-            layout.label(text="No destination object", icon='ERROR')
-    else:
-        layout.label(text="No layer to copy", icon='ERROR')
-
-
-class VIEW3D_MT_gpencil_append_active_layer(Menu):
-    bl_label = "Append Active Layer to Object"
-
-    def draw(self, context):
-        layout = self.layout
-        gpencil_layer_append_menu_items(context, layout, True)
-
-
-class VIEW3D_MT_gpencil_append_all_layers(Menu):
-    bl_label = "Append All Layers to Object"
-
-    def draw(self, context):
-        layout = self.layout
-        gpencil_layer_append_menu_items(context, layout, False)
-
-
-def gpencil_material_menu_items(context, layout, only_selected):
-    done = False
-    view_layer = context.view_layer
-    obact = context.active_object
-
-    for ob in view_layer.objects:
-        if ob.type == 'GPENCIL' and ob != obact:
-            op = layout.operator("gpencil.materials_append_to_object", text=ob.name)
-            op.object = ob.name
-            op.only_selected = only_selected
-            done = True
-
-    if done is False:
-        layout.label(text="No destination object", icon='ERROR')
-
-
-class VIEW3D_MT_gpencil_append_active_material(Menu):
-    bl_label = "Append Active Material to Object"
-
-    def draw(self, context):
-        layout = self.layout
-        gpencil_material_menu_items(context, layout, True)
-
-
-class VIEW3D_MT_gpencil_append_all_materials(Menu):
-    bl_label = "Append All Materials to Object"
-
-    def draw(self, context):
-        layout = self.layout
-        gpencil_material_menu_items(context, layout, False)
-
-
 class VIEW3D_MT_edit_gpencil(Menu):
     bl_label = "Grease Pencil"
 
@@ -6237,6 +6169,12 @@ class VIEW3D_PT_overlay_geometry(Panel):
         sub.prop(overlay, "wireframe_opacity", text="Opacity")
 
         row = col.row(align=True)
+
+        # These properties should be always available in the UI for all modes
+        # other than Object.
+        # Even when the Fade Inactive Geometry overlay is not affecting the
+        # current active object depending on its mode, it will always affect
+        # the rest of the scene.
         if context.mode != 'OBJECT':
             row.prop(overlay, "show_fade_inactive", text="")
             sub = row.row()
@@ -7689,10 +7627,6 @@ classes = (
     VIEW3D_MT_weight_gpencil,
     VIEW3D_MT_gpencil_animation,
     VIEW3D_MT_gpencil_simplify,
-    VIEW3D_MT_gpencil_append_active_layer,
-    VIEW3D_MT_gpencil_append_all_layers,
-    VIEW3D_MT_gpencil_append_active_material,
-    VIEW3D_MT_gpencil_append_all_materials,
     VIEW3D_MT_gpencil_autoweights,
     VIEW3D_PT_gpencil_curve_fit,
     VIEW3D_MT_gpencil_edit_context_menu,

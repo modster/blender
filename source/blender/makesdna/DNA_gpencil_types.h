@@ -107,13 +107,14 @@ typedef struct bGPDspoint {
 typedef enum eGPDspoint_Flag {
   /* stroke point is selected (for editing) */
   GP_SPOINT_SELECT = (1 << 0),
-
   /* stroke point is tagged (for some editing operation) */
   GP_SPOINT_TAG = (1 << 1),
   /* stroke point is temp tagged (for some editing operation) */
   GP_SPOINT_TEMP_TAG = (1 << 2),
+  /* stroke point is temp tagged (for some editing operation) */
+  GP_SPOINT_TEMP_TAG2 = (1 << 3),
   /* Stroke point is "linked" to control point of bezier handle. */
-  GP_SPOINT_IS_BEZT_CONTROL = (1 << 3),
+  GP_SPOINT_IS_BEZT_CONTROL = (1 << 4),
 } eGPSPoint_Flag;
 
 /* ***************************************** */

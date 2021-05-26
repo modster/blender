@@ -179,7 +179,7 @@ static void add_object_relation(const ModifierUpdateDepsgraphContext *ctx, Objec
     if (object.type == OB_EMPTY && object.instance_collection != nullptr) {
       add_collection_relation(ctx, *object.instance_collection);
     }
-    else if (ELEM(object.type, OB_MESH, OB_POINTCLOUD, OB_VOLUME, OB_CURVE)) {
+    else if (DEG_object_has_geometry_component(&object)) {
       DEG_add_object_relation(ctx->node, &object, DEG_OB_COMP_GEOMETRY, "Nodes Modifier");
       DEG_add_customdata_mask(ctx->node, &object, &dependency_data_mask);
     }
@@ -684,8 +684,11 @@ static void reset_tree_ui_storage(Span<const blender::nodes::NodeTreeRef *> tree
 
 static Vector<SpaceSpreadsheet *> find_spreadsheet_editors(Main *bmain)
 {
-  Vector<SpaceSpreadsheet *> spreadsheets;
   wmWindowManager *wm = (wmWindowManager *)bmain->wm.first;
+  if (wm == nullptr) {
+    return {};
+  }
+  Vector<SpaceSpreadsheet *> spreadsheets;
   LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
     bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {

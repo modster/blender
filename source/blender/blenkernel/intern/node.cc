@@ -513,7 +513,7 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
 
     if (node->storage) {
       /* could be handlerized at some point, now only 1 exception still */
-      if ((ntree->type == NTREE_SHADER) &&
+      if ((ELEM(ntree->type, NTREE_SHADER, NTREE_GEOMETRY)) &&
           ELEM(node->type, SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB)) {
         BKE_curvemapping_blend_write(writer, (const CurveMapping *)node->storage);
       }
@@ -2258,6 +2258,17 @@ bNodeTree *ntreeCopyTree_ex_new_pointers(const bNodeTree *ntree,
   return new_ntree;
 }
 
+static int node_count_links(const bNodeTree *ntree, const bNodeSocket *socket)
+{
+  int count = 0;
+  LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
+    if (ELEM(socket, link->fromsock, link->tosock)) {
+      count++;
+    }
+  }
+  return count;
+}
+
 /* also used via rna api, so we check for proper input output direction */
 bNodeLink *nodeAddLink(
     bNodeTree *ntree, bNode *fromnode, bNodeSocket *fromsock, bNode *tonode, bNodeSocket *tosock)
@@ -2292,6 +2303,10 @@ bNodeLink *nodeAddLink(
 
   if (ntree) {
     ntree->update |= NTREE_UPDATE_LINKS;
+  }
+
+  if (link->tosock->flag & SOCK_MULTI_INPUT) {
+    link->multi_input_socket_index = node_count_links(ntree, link->tosock) - 1;
   }
 
   return link;
@@ -4312,7 +4327,7 @@ void ntreeUpdateAllUsers(Main *main, ID *id)
 
   if (GS(id->name) == ID_NT) {
     bNodeTree *ngroup = (bNodeTree *)id;
-    if (ngroup->type == NTREE_GEOMETRY) {
+    if (ngroup->type == NTREE_GEOMETRY && (ngroup->update & NTREE_UPDATE_GROUP)) {
       LISTBASE_FOREACH (Object *, object, &main->objects) {
         LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
           if (md->type == eModifierType_Nodes) {
@@ -5038,8 +5053,11 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_to_mesh();
   register_node_type_geo_curve_resample();
   register_node_type_geo_edge_split();
+  register_node_type_geo_input_material();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
+  register_node_type_geo_material_assign();
+  register_node_type_geo_material_replace();
   register_node_type_geo_mesh_primitive_circle();
   register_node_type_geo_mesh_primitive_cone();
   register_node_type_geo_mesh_primitive_cube();

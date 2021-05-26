@@ -450,6 +450,7 @@ void GPENCIL_OT_frame_clean_duplicate(struct wmOperatorType *ot);
 
 void GPENCIL_OT_convert(struct wmOperatorType *ot);
 void GPENCIL_OT_bake_mesh_animation(struct wmOperatorType *ot);
+void GPENCIL_OT_bake_grease_pencil_animation(struct wmOperatorType *ot);
 
 void GPENCIL_OT_image_to_grease_pencil(struct wmOperatorType *ot);
 void GPENCIL_OT_trace_image(struct wmOperatorType *ot);
@@ -547,7 +548,7 @@ void GPENCIL_OT_material_lock_unused(struct wmOperatorType *ot);
 void GPENCIL_OT_material_select(struct wmOperatorType *ot);
 void GPENCIL_OT_material_set(struct wmOperatorType *ot);
 void GPENCIL_OT_set_active_material(struct wmOperatorType *ot);
-void GPENCIL_OT_materials_append_to_object(struct wmOperatorType *ot);
+void GPENCIL_OT_materials_copy_to_object(struct wmOperatorType *ot);
 
 /* convert old 2.7 files to 2.8 */
 void GPENCIL_OT_convert_old_files(struct wmOperatorType *ot);
@@ -758,5 +759,26 @@ struct GP_EditableStrokes_Iter {
   } \
   } \
   (void)0
+
+/* Reused items for bake operators. */
+static const EnumPropertyItem reproject_type[] = {
+    {GP_REPROJECT_KEEP, "KEEP", 0, "No Reproject", ""},
+    {GP_REPROJECT_FRONT, "FRONT", 0, "Front", "Reproject the strokes using the X-Z plane"},
+    {GP_REPROJECT_SIDE, "SIDE", 0, "Side", "Reproject the strokes using the Y-Z plane"},
+    {GP_REPROJECT_TOP, "TOP", 0, "Top", "Reproject the strokes using the X-Y plane"},
+    {GP_REPROJECT_VIEW,
+     "VIEW",
+     0,
+     "View",
+     "Reproject the strokes to end up on the same plane, as if drawn from the current "
+     "viewpoint "
+     "using 'Cursor' Stroke Placement"},
+    {GP_REPROJECT_CURSOR,
+     "CURSOR",
+     0,
+     "Cursor",
+     "Reproject the strokes using the orientation of 3D cursor"},
+    {0, NULL, 0, NULL, NULL},
+};
 
 /* ****************************************************** */

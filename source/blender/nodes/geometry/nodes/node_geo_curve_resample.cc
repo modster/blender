@@ -26,6 +26,7 @@
 
 #include "node_geometry_util.hh"
 
+using blender::fn::GVArray_For_GSpan;
 using blender::fn::GVArray_For_Span;
 using blender::fn::GVArray_Typed;
 
@@ -131,6 +132,35 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
         input_spline, uniform_samples, interpolated_data_typed, output_spline->tilts());
   }
 
+  output_spline->attributes.reallocate(count);
+  input_spline.attributes.foreach_attribute(
+      [&](StringRefNull name, const AttributeMetaData &meta_data) {
+        std::optional<GSpan> input_attribute = input_spline.attributes.get_for_read(name);
+        BLI_assert(input_attribute);
+        if (!output_spline->attributes.create(name, meta_data.data_type)) {
+          BLI_assert_unreachable();
+          return false;
+        }
+        std::optional<GMutableSpan> output_attribute = output_spline->attributes.get_for_write(
+            name);
+        if (!output_attribute) {
+          BLI_assert_unreachable();
+          return false;
+        }
+        GVArrayPtr interpolated_attribute = input_spline.interpolate_to_evaluated_points(
+            GVArray_For_GSpan(*input_attribute));
+        attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+          using T = decltype(dummy);
+          GVArray_Typed<T> interpolated_attribute_typed{*interpolated_attribute};
+          sample_span_to_output_spline<T>(input_spline,
+                                          uniform_samples,
+                                          interpolated_attribute_typed,
+                                          (*output_attribute).typed<T>());
+        });
+        return true;
+      },
+      ATTR_DOMAIN_POINT);
+
   return output_spline;
 }
 
@@ -139,16 +169,16 @@ static std::unique_ptr<CurveEval> resample_curve(const CurveEval &input_curve,
 {
   std::unique_ptr<CurveEval> output_curve = std::make_unique<CurveEval>();
 
-  for (const SplinePtr &spline : input_curve.splines) {
+  for (const SplinePtr &spline : input_curve.splines()) {
     if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_COUNT) {
       BLI_assert(mode_param.count);
-      output_curve->splines.append(resample_spline(*spline, *mode_param.count));
+      output_curve->add_spline(resample_spline(*spline, *mode_param.count));
     }
     else if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_LENGTH) {
       BLI_assert(mode_param.length);
       const float length = spline->length();
       const int count = length / *mode_param.length;
-      output_curve->splines.append(resample_spline(*spline, count));
+      output_curve->add_spline(resample_spline(*spline, count));
     }
   }
 
