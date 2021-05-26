@@ -67,10 +67,11 @@ class DefaultSurfaceNodeTree {
 
 struct MaterialPass {
   GPUMaterial *gpumat = nullptr;
-  DRWShadingGroup **shgrp = nullptr;
+  DRWShadingGroup *shgrp = nullptr;
 };
 
 struct Material {
+  bool init = false;
   MaterialPass shadow, shading;
 };
 
@@ -102,7 +103,7 @@ class MaterialModule {
 
   void begin_sync(void);
 
-  MaterialArray &surface_materials_get(Object *ob);
+  MaterialArray &material_array_get(Object *ob);
 
  private:
   Material &material_sync(::Material *blender_mat, eMaterialGeometry geometry_type);

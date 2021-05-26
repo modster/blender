@@ -133,7 +133,8 @@ class Instance {
                                  RenderEngine *engine,
                                  Depsgraph *depsgraph);
 
-  void gpencil_sync(Object *ob);
+  void mesh_sync(Object *ob, ObjectHandle &ob_handle);
+  void gpencil_sync(Object *ob, ObjectHandle &ob_handle);
 
   rcti output_crop(const int output_res[2], const rcti *crop);
 

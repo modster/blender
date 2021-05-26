@@ -174,59 +174,11 @@ void MaterialModule::begin_sync(void)
   queued_shaders_count_ = 0;
 
   for (Material *mat : material_map_.values()) {
-    mat->shading.shgrp = nullptr;
-    mat->shadow.shgrp = nullptr;
+    mat->init = false;
   }
   for (DRWShadingGroup **shgroup : shader_map_.values()) {
     *shgroup = nullptr;
   }
-}
-
-Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeometry geometry_type)
-{
-  MaterialKey material_key(blender_mat, geometry_type);
-
-  /* TODO allocate in blocks to avoid memory fragmentation. */
-  auto add_cb = [&]() { return new Material(); };
-  Material &mat = *material_map_.lookup_or_add_cb(material_key, add_cb);
-
-  if (mat.shading.shgrp == nullptr) {
-    mat.shading = material_pass_get(blender_mat, geometry_type, MAT_DOMAIN_SURFACE);
-    mat.shadow = material_pass_get(blender_mat, geometry_type, MAT_DOMAIN_SHADOW);
-  }
-  return mat;
-}
-
-MaterialArray &MaterialModule::surface_materials_get(Object *ob)
-{
-  material_array_.materials.clear();
-  material_array_.gpu_materials.clear();
-
-  for (auto i : IndexRange(max_ii(1, ob->totcol))) {
-    ::Material *blender_mat = material_from_slot(ob, i);
-    Material &mat = material_sync(blender_mat, to_material_geometry(ob));
-    material_array_.materials.append(&mat);
-    material_array_.gpu_materials.append(mat.shading.gpumat);
-  }
-  return material_array_;
-}
-
-/* Return correct material or empty default material if slot is empty. */
-::Material *MaterialModule::material_from_slot(Object *ob, int slot)
-{
-  if (ob->base_flag & BASE_HOLDOUT) {
-    return BKE_material_default_holdout();
-  }
-  ::Material *ma = BKE_object_material_get(ob, slot + 1);
-  if (ma == nullptr) {
-    if (ob->type == OB_VOLUME) {
-      return BKE_material_default_volume();
-    }
-    else {
-      return BKE_material_default_surface();
-    }
-  }
-  return ma;
 }
 
 MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
@@ -268,14 +220,77 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
 
   /* TODO allocate in blocks to avoid memory fragmentation. */
   auto add_cb = [&]() { return new DRWShadingGroup *(); };
-  matpass.shgrp = shader_map_.lookup_or_add_cb(shader_key, add_cb);
+  DRWShadingGroup *&grp = *shader_map_.lookup_or_add_cb(shader_key, add_cb);
 
-  if (*matpass.shgrp != nullptr) {
-    /* Shading group for this shader already exists. Create a sub one for this material. */
-    *matpass.shgrp = DRW_shgroup_create_sub(*matpass.shgrp);
-    DRW_shgroup_add_material_resources(*matpass.shgrp, matpass.gpumat);
+  if (grp == nullptr) {
+    /* First time encountering this shader. Create a shading group. */
+    if (domain_type == MAT_DOMAIN_SURFACE) {
+      if (blender_mat->blend_method == MA_BM_BLEND) {
+        grp = inst_.shading_passes.forward.material_add(matpass.gpumat);
+      }
+      else {
+        grp = inst_.shading_passes.deferred.material_add(blender_mat, matpass.gpumat);
+      }
+    }
+    else {
+      grp = inst_.shading_passes.shadow.material_add(matpass.gpumat);
+    }
   }
+  else {
+    /* Shading group for this shader already exists. Create a sub one for this material. */
+    grp = DRW_shgroup_create_sub(grp);
+    DRW_shgroup_add_material_resources(grp, matpass.gpumat);
+  }
+  matpass.shgrp = grp;
+
   return matpass;
+}
+
+Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeometry geometry_type)
+{
+  MaterialKey material_key(blender_mat, geometry_type);
+
+  /* TODO allocate in blocks to avoid memory fragmentation. */
+  auto add_cb = [&]() { return new Material(); };
+  Material &mat = *material_map_.lookup_or_add_cb(material_key, add_cb);
+
+  if (mat.init == false) {
+    mat.shading = material_pass_get(blender_mat, geometry_type, MAT_DOMAIN_SURFACE);
+    mat.shadow = material_pass_get(blender_mat, geometry_type, MAT_DOMAIN_SHADOW);
+  }
+  return mat;
+}
+
+/* Return correct material or empty default material if slot is empty. */
+::Material *MaterialModule::material_from_slot(Object *ob, int slot)
+{
+  if (ob->base_flag & BASE_HOLDOUT) {
+    return BKE_material_default_holdout();
+  }
+  ::Material *ma = BKE_object_material_get(ob, slot + 1);
+  if (ma == nullptr) {
+    if (ob->type == OB_VOLUME) {
+      return BKE_material_default_volume();
+    }
+    else {
+      return BKE_material_default_surface();
+    }
+  }
+  return ma;
+}
+
+MaterialArray &MaterialModule::material_array_get(Object *ob)
+{
+  material_array_.materials.clear();
+  material_array_.gpu_materials.clear();
+
+  for (auto i : IndexRange(max_ii(1, ob->totcol))) {
+    ::Material *blender_mat = material_from_slot(ob, i);
+    Material &mat = material_sync(blender_mat, to_material_geometry(ob));
+    material_array_.materials.append(&mat);
+    material_array_.gpu_materials.append(mat.shading.gpumat);
+  }
+  return material_array_;
 }
 
 /** \} */

@@ -43,24 +43,17 @@ void ForwardPass::sync()
   light_additional_ps_ = DRW_pass_create_instance("ForwardAddLight", opaque_ps_, state_add);
 }
 
-void ForwardPass::surface_add(
-    Object *ob, GPUBatch *geom, Material *material, int v_first, int v_count, bool use_instancing)
+DRWShadingGroup *ForwardPass::material_add(GPUMaterial *gpumat)
 {
   LightModule &lights = inst_.lights;
-  MaterialPass &matpass = material->shading;
-  DRWShadingGroup *&grp = *matpass.shgrp;
-
-  if (grp == nullptr) {
-    grp = DRW_shgroup_material_create(matpass.gpumat, opaque_ps_);
-    DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
-    DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
-    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
-    DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
-  }
-
-  shgroup_geometry_call(grp, ob, geom, v_first, v_count, use_instancing);
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, opaque_ps_);
+  DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
+  DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
+  DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+  DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
+  return grp;
 }
 
 void ForwardPass::render(void)
@@ -92,26 +85,15 @@ void DeferredLayer::sync(void)
   }
 }
 
-void DeferredLayer::surface_add(Object *ob,
-                                GPUBatch *geom,
-                                Material *material,
-                                int v_first = -1,
-                                int v_count = -1,
-                                bool use_instancing = false)
+DRWShadingGroup *DeferredLayer::material_add(GPUMaterial *gpumat)
 {
-  MaterialPass &matpass = material->shading;
-  DRWShadingGroup *&grp = *matpass.shgrp;
-
-  if (grp == nullptr) {
-    uint stencil_mask = CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_TRANSPARENCY |
-                        CLOSURE_EMISSION;
-    grp = DRW_shgroup_material_create(matpass.gpumat, gbuffer_ps_);
-    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
-    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
-    DRW_shgroup_stencil_set(grp, stencil_mask, 0xFF, 0xFF);
-  }
-
-  shgroup_geometry_call(grp, ob, geom, v_first, v_count, use_instancing);
+  uint stencil_mask = CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_TRANSPARENCY |
+                      CLOSURE_EMISSION;
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, gbuffer_ps_);
+  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+  DRW_shgroup_stencil_set(grp, stencil_mask, 0xFF, 0xFF);
+  return grp;
 }
 
 void DeferredLayer::volume_add(Object *ob)
@@ -261,10 +243,14 @@ void DeferredPass::sync(void)
   }
 }
 
-void DeferredPass::surface_add(
-    Object *ob, GPUBatch *geom, Material *material, int v_first, int v_count, bool use_instancing)
+DRWShadingGroup *DeferredPass::material_add(::Material *material, GPUMaterial *gpumat)
 {
-  opaque_layer_.surface_add(ob, geom, material, v_first, v_count, use_instancing);
+  if (material->blend_flag & MA_BL_SS_REFRACTION) {
+    return refraction_layer_.material_add(gpumat);
+  }
+  else {
+    return opaque_layer_.material_add(gpumat);
+  }
 }
 
 void DeferredPass::volume_add(Object *ob)

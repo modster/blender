@@ -323,10 +323,14 @@ class Framebuffer {
 static inline void shgroup_geometry_call(DRWShadingGroup *grp,
                                          Object *ob,
                                          GPUBatch *geom,
-                                         int v_first,
-                                         int v_count,
-                                         bool use_instancing)
+                                         int v_first = -1,
+                                         int v_count = -1,
+                                         bool use_instancing = false)
 {
+  if (grp == nullptr) {
+    return;
+  }
+
   if (v_first == -1) {
     DRW_shgroup_call(grp, geom, ob);
   }

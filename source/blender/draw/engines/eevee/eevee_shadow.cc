@@ -511,15 +511,9 @@ void ShadowPass::sync(void)
   }
 }
 
-void ShadowPass::surface_add(
-    Object *ob, GPUBatch *geom, Material *material, int v_first, int v_count, bool use_instancing)
+DRWShadingGroup *ShadowPass::material_add(GPUMaterial *gpumat)
 {
-  MaterialPass &matpass = material->shadow;
-  DRWShadingGroup *&grp = *matpass.shgrp;
-  if (grp == nullptr) {
-    grp = DRW_shgroup_material_create(matpass.gpumat, surface_ps_);
-  }
-  shgroup_geometry_call(grp, ob, geom, v_first, v_count, use_instancing);
+  return DRW_shgroup_material_create(gpumat, surface_ps_);
 }
 
 void ShadowPass::render(void)
