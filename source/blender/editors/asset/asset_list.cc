@@ -240,7 +240,7 @@ void AssetList::setup(const AssetFilterSettings *filter_settings)
   /* -------------------------------------------------------------------- */
 
   ed::filelist::FileListReadParams read_params(path);
-  cpp_filelist_ = std::make_unique<ed::filelist::FileList>(read_params);
+  cpp_filelist_ = std::make_unique<ed::filelist::FileList>(std::move(read_params));
 }
 
 void AssetList::fetch(const bContext &C)

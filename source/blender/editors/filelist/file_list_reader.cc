@@ -18,6 +18,8 @@
 #include "BLI_fileops_types.h"
 #include "BLI_path_util.h"
 
+#include "BLO_readfile.h"
+
 #include "DNA_space_types.h"
 
 #include "ED_fileselect.h"
@@ -33,15 +35,15 @@ RecursiveFileListReader::RecursiveFileListReader(const FileListReadParams &read_
 {
 }
 
-void RecursiveFileListReader::read(FileTree &dest_file_tree)
+void RecursiveFileListReader::read(FileEntires &dest_file_tree)
 {
   current_recursion_level_ = 0;
   readDirectory(dest_file_tree, read_params_.path_, nullptr);
 }
 
-void RecursiveFileListReader::readDirectory(FileTree &dest_file_tree,
+void RecursiveFileListReader::readDirectory(FileEntires &dest_file_tree,
                                             const blender::StringRef path,
-                                            AbstractFileListEntry *parent)
+                                            AbstractFileEntry *parent)
 {
   bli_direntry *files;
   uint totfile = BLI_filelist_dir_contents(path.data(), &files);
@@ -55,11 +57,11 @@ void RecursiveFileListReader::readDirectory(FileTree &dest_file_tree,
 
     char childpath[FILE_MAX];
     BLI_path_join(childpath, sizeof(childpath), path.data(), current_file.relname, nullptr);
-    AbstractFileListEntry &new_entry = addEntry(dest_file_tree, childpath, current_file, parent);
+    AbstractFileEntry &new_entry = addEntry(dest_file_tree, childpath, current_file, parent);
 
+    DirectoryEntry *dir = dynamic_cast<DirectoryEntry *>(&new_entry);
     /* TODO should we recurse into symlinks? */
-    if (auto *dir = dynamic_cast<DirectoryEntry *>(&new_entry);
-        dir && shouldContinueRecursion() && ShouldRecurseIntoFile(new_entry)) {
+    if (dir && shouldContinueRecursion()) {
       current_recursion_level_++;
       readDirectory(dir->children(), path, dir);
       current_recursion_level_--;
@@ -81,12 +83,17 @@ std::optional<FileAliasInfo> create_alias_info(const bli_direntry &direntry,
 
   char targetpath[FILE_MAXDIR];
   if (BLI_file_alias_target(direntry.path, targetpath)) {
+#ifdef WIN32
+    /* On Windows don't show ".lnk" extension for valid shortcuts. */
+    BLI_path_extension_replace(targetpath, FILE_MAXDIR, "");
+#endif
+
     return_info.redirection_path = targetpath;
     if (BLI_is_dir(targetpath)) {
-      return_info.file_type = FILE_TYPE_DIR;
+      return_info.type = FileAliasInfo::Type::Directory;
     }
     else {
-      return_info.file_type = ED_path_extension_type(targetpath);
+      return_info.type = FileAliasInfo::Type::File;
     }
   }
   else {
@@ -97,45 +104,81 @@ std::optional<FileAliasInfo> create_alias_info(const bli_direntry &direntry,
   return return_info;
 }
 
-static DirectoryEntry &create_directory(FileTree &dest_file_tree,
-                                        const bli_direntry &direntry,
-                                        const eFileAttributes attributes,
-                                        AbstractFileListEntry *parent)
+template<typename Type>
+static Type &create_entry(FileEntires &dest_file_tree,
+                          const bli_direntry &direntry,
+                          const eFileAttributes attributes,
+                          AbstractFileEntry *parent)
 {
-  dest_file_tree.append_as(std::make_unique<DirectoryEntry>(direntry, attributes, parent));
-  return static_cast<DirectoryEntry &>(*dest_file_tree.last());
+  dest_file_tree.append_as(std::make_unique<Type>(direntry, attributes, parent));
+  return static_cast<Type &>(*dest_file_tree.last());
 }
 
-static FileEntry &create_file_entry(FileTree &dest_file_tree,
-                                    const bli_direntry &direntry,
-                                    const eFileAttributes attributes,
-                                    AbstractFileListEntry *parent)
+static bool is_hidden_dot_filename(const AbstractFileEntry &file)
 {
-  dest_file_tree.append_as(std::make_unique<FileEntry>(direntry, attributes, parent));
-  return static_cast<FileEntry &>(*dest_file_tree.last());
+  StringRef file_name = file.name();
+  if (file_name[0] == '.' && !ELEM(file_name[1], '.', '\0')) {
+    return true; /* ignore .file */
+  }
+
+  if (!file_name.is_empty() && file_name.back() == '~') {
+    return true; /* ignore file~ */
+  }
+
+  /* Check the file's parents (relative to the file-list root) if any of them is hidden. */
+  for (const AbstractFileEntry *parent = file.parent(); parent != nullptr;
+       parent = parent->parent()) {
+    if (is_hidden_dot_filename(*parent)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
-AbstractFileListEntry &RecursiveFileListReader::addEntry(FileTree &dest_file_tree,
-                                                         const blender::StringRef path,
-                                                         const bli_direntry &direntry,
-                                                         AbstractFileListEntry *parent)
+static bool should_hide_file(const AbstractFileEntry &file, const FileAliasInfo *alias_info)
+{
+  if (alias_info && alias_info->broken) {
+    return true;
+  }
+
+#ifndef WIN32
+  /* Set Linux-style dot files hidden too. */
+  if (is_hidden_dot_filename(file)) {
+    return true;
+  }
+#endif
+
+  return false;
+}
+
+AbstractFileEntry &RecursiveFileListReader::addEntry(FileEntires &dest_file_tree,
+                                                     const blender::StringRef path,
+                                                     const bli_direntry &direntry,
+                                                     AbstractFileEntry *parent)
 {
   BLI_assert(!shouldSkipFile(direntry));
   eFileAttributes attributes = BLI_file_attributes(path.data());
   std::optional<FileAliasInfo> alias_info = create_alias_info(direntry, attributes);
+  FileAliasInfo *alias_info_ptr = alias_info ? &*alias_info : nullptr;
 
-  AbstractFileListEntry *new_entry = nullptr;
+  AbstractFileEntry *new_entry = nullptr;
 
-  if (isDirectory(direntry.s, path, alias_info ? &*alias_info : nullptr)) {
-    DirectoryEntry &dir = create_directory(dest_file_tree, direntry, attributes, parent);
+  if (isDirectory(direntry.s, path, alias_info_ptr)) {
+    DirectoryEntry &dir = create_entry<DirectoryEntry>(
+        dest_file_tree, direntry, attributes, parent);
     new_entry = &dir;
   }
   else {
-    FileEntry &file = create_file_entry(dest_file_tree, direntry, attributes, parent);
+    FileEntry &file = create_entry<FileEntry>(dest_file_tree, direntry, attributes, parent);
     new_entry = &file;
   }
 
-  if (alias_info && alias_info->broken) {
+  if (alias_info) {
+    new_entry->setAlias(*alias_info);
+  }
+
+  if (should_hide_file(*new_entry, alias_info_ptr)) {
     new_entry->hide();
   }
 
@@ -155,7 +198,7 @@ bool RecursiveFileListReader::isDirectory(const BLI_stat_t &stat,
   }
 
   if (alias_info) {
-    return alias_info->file_type == FILE_TYPE_DIR;
+    return alias_info->type == FileAliasInfo::Type::Directory;
   }
 
 #ifndef __APPLE__
@@ -165,22 +208,16 @@ bool RecursiveFileListReader::isDirectory(const BLI_stat_t &stat,
   return false;
 }
 
-bool RecursiveFileListReader::shouldContinueRecursion() const
+bool RecursiveFileListReader::isBlend(const StringRef path, const FileAliasInfo *alias_info)
 {
-  return !read_params_.max_recursion_level_ ||
-         (current_recursion_level_ < read_params_.max_recursion_level_);
+  const char *target_path = alias_info ? alias_info->redirection_path.data() : path.data();
+  return BLO_has_bfile_extension(target_path);
 }
 
-bool RecursiveFileListReader::ShouldRecurseIntoFile(const AbstractFileListEntry &entry)
+bool RecursiveFileListReader::shouldContinueRecursion() const
 {
-  /* TODO "recurse into blends" option isn't implemented at all. */
-  const bool recurse_into_blends = false;
-  /* Only recurse into blends if requested by the file-list type. */
-  if (dynamic_cast<const BlendEntry *>(&entry)) {
-    return recurse_into_blends;
-  }
-
-  return true;
+  return read_params_.recursion_settings_ &&
+         (current_recursion_level_ < read_params_.recursion_settings_->max_recursion_level_);
 }
 
 bool RecursiveFileListReader::shouldSkipFile(const bli_direntry &file) const

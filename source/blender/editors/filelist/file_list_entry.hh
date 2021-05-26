@@ -28,20 +28,25 @@
 #include "BLI_fileops_types.h"
 #include "BLI_string_ref.hh"
 
+/* Needed for enums. */
+#include "DNA_space_types.h"
+
 #include "file_list.hh"
+
+struct Main;
 
 namespace blender::ed::filelist {
 
 using bli_direntry = struct ::direntry;
 
 struct FileAliasInfo {
+  enum class Type { Directory, File } type;
   std::string redirection_path;
-  int file_type = 0; /* eFileSel_File_Types */
   /** Indicate if the alias points to a valid target of if the redirection is broken. */
   bool broken = false;
 };
 
-class AbstractFileListEntry {
+class AbstractFileEntry {
  protected:
   std::string name_;
   /* TODO should this be in the base really? E.g. IDs/assets won't use this probably. */
@@ -50,19 +55,18 @@ class AbstractFileListEntry {
   BLI_stat_t stat_;
 
   /** The parent file (if any), used to reconstruct the path to the file-list. */
-  const AbstractFileListEntry *parent_;
-
-  AbstractFileListEntry(const bli_direntry &direntry,
-                        const eFileAttributes attributes,
-                        const AbstractFileListEntry *parent = nullptr);
+  const AbstractFileEntry *parent_;
 
  public:
-  virtual ~AbstractFileListEntry() = default;
+  virtual ~AbstractFileEntry() = default;
+
+  virtual void setAlias(const FileAliasInfo &alias_info);
 
   void hide();
   bool isHidden() const;
 
   /* Read-only getters. */
+  const AbstractFileEntry *parent() const;
   StringRef name() const;
   eFileAttributes attributes() const;
   const BLI_stat_t &stat() const;
@@ -80,13 +84,18 @@ class AbstractFileListEntry {
    * Returned as newly allocated string.
    */
   std::string relative_file_path() const;
+
+ protected:
+  AbstractFileEntry(const bli_direntry &direntry,
+                    const eFileAttributes attributes,
+                    const AbstractFileEntry *parent = nullptr);
 };
 
-class FileEntry : public AbstractFileListEntry {
-  std::optional<std::string> redirect_path_;
-
+class FileEntry : public AbstractFileEntry {
  public:
   enum class Type {
+    Blend,
+    BlendBackup,
     Image,
     Movie,
     PyScript,
@@ -101,34 +110,43 @@ class FileEntry : public AbstractFileListEntry {
     Alembic,
     ObjectIO,
     USD,
-    VOLUME
+    Volume,
   };
 
+ private:
+  std::optional<std::string> redirect_path_;
+  Type type_;
+
+ public:
   FileEntry(const bli_direntry &direntry,
             const eFileAttributes attributes,
-            const AbstractFileListEntry *parent);
+            const AbstractFileEntry *parent);
   virtual ~FileEntry() = default;
+
+  static Type filesel_type_to_file_entry_type(eFileSel_File_Types type);
 
   void setAlias(const FileAliasInfo &alias_info);
   bool isAlias() const;
 };
 
-class DirectoryEntry : public AbstractFileListEntry {
+class DirectoryEntry : public AbstractFileEntry {
   std::optional<std::string> redirect_path_;
 
  protected:
-  FileTree children_;
+  FileEntires children_;
 
  public:
   DirectoryEntry(const bli_direntry &direntry,
                  const eFileAttributes attributes,
-                 const AbstractFileListEntry *parent);
+                 const AbstractFileEntry *parent);
   virtual ~DirectoryEntry() = default;
+
+  virtual bool canBeEntered(const Main &current_main, const FileList &file_list) const;
 
   void setAlias(const FileAliasInfo &alias_info);
   bool isAlias() const;
 
-  FileTree &children();
+  FileEntires &children();
 };
 
 class BlendEntry : public DirectoryEntry {
@@ -137,15 +155,17 @@ class BlendEntry : public DirectoryEntry {
  public:
   BlendEntry(const bli_direntry &direntry,
              const eFileAttributes attributes,
-             const AbstractFileListEntry *parent);
+             const AbstractFileEntry *parent);
   virtual ~BlendEntry() = default;
+
+  bool canBeEntered(const Main &current_main, const FileList &file_list) const override;
 };
 
-class BlendIDEntry : public AbstractFileListEntry {
+class BlendIDEntry : public AbstractFileEntry {
  public:
   BlendIDEntry(const bli_direntry &direntry,
                const eFileAttributes attributes,
-               const AbstractFileListEntry &parent);
+               const AbstractFileEntry &parent);
   virtual ~BlendIDEntry() = default;
 };
 
@@ -153,7 +173,7 @@ class IDAssetEntry : public BlendIDEntry {
  public:
   IDAssetEntry(const bli_direntry &direntry,
                const eFileAttributes attributes,
-               const AbstractFileListEntry &parent);
+               const AbstractFileEntry &parent);
   virtual ~IDAssetEntry() = default;
 };
 

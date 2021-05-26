@@ -26,11 +26,21 @@ namespace blender::ed::filelist {
 
 struct FileListReadParams;
 struct FileAliasInfo;
-class AbstractFileListEntry;
+class AbstractFileEntry;
 
-using FileTree = blender::Vector<std::unique_ptr<AbstractFileListEntry>>;
+using FileEntires = blender::Vector<std::unique_ptr<AbstractFileEntry>>;
 using bli_direntry = struct ::direntry;
 
+/**
+ * Read the content of a directory and its sub-directories, up to a number of maximum recursions
+ * (or infinitely if requested).
+ *
+ * Does not recurse into .blend files, that is to be handled separately by #BlendFileListIDReader.
+ * This is not just for architectural reasons, but to allow reading multiple .blends in parallel,
+ * handled by the file list after #RecursiveFileListReader read the normal files.
+ *
+ * TODO how exactly are redirects handled? (Needs to be defined and documented here.)
+ */
 class RecursiveFileListReader {
   const FileListReadParams &read_params_;
   int current_recursion_level_ = 0;
@@ -44,26 +54,33 @@ class RecursiveFileListReader {
   /**
    * Reads the file list recursively, with the path and max-recursions defined by #read_params_.
    */
-  void read(blender::ed::filelist::FileTree &dest_file_tree);
+  void read(blender::ed::filelist::FileEntires &dest_file_tree);
 
  private:
-  void readDirectory(FileTree &dest_file_tree,
+  void readDirectory(FileEntires &dest_file_tree,
                      const blender::StringRef path,
-                     AbstractFileListEntry *parent);
-  AbstractFileListEntry &addEntry(FileTree &dest_file_tree,
-                                  const blender::StringRef path,
-                                  const blender::ed::filelist::bli_direntry &file,
-                                  AbstractFileListEntry *parent);
+                     AbstractFileEntry *parent);
+  bool shouldContinueRecursion() const;
+  static AbstractFileEntry &addEntry(FileEntires &dest_file_tree,
+                                     const blender::StringRef path,
+                                     const blender::ed::filelist::bli_direntry &file,
+                                     AbstractFileEntry *parent);
 
   static bool isDirectory(const BLI_stat_t &stat,
                           const StringRef path,
                           const FileAliasInfo *alias_info);
-  bool shouldContinueRecursion() const;
-  static bool ShouldRecurseIntoFile(const AbstractFileListEntry &entry);
+  static bool isBlend(const StringRef path, const FileAliasInfo *alias_info);
   bool shouldSkipFile(const bli_direntry &) const;
   bool shouldSkipFile(const char *file_name) const;
 
   friend bool count_files_cb(const char *, const char *, const BLI_stat_t *, void *);
+};
+
+/**
+ * Read the data-blocks of a .blend into file entries.
+ */
+class BlendFileListIDReader {
+  /* TODO */
 };
 
 }  // namespace blender::ed::filelist

@@ -30,19 +30,19 @@
 
 namespace blender::ed::filelist {
 
-class AbstractFileListEntry;
+class AbstractFileEntry;
 
 struct FileListReadParams {
-  /**
-   * \param max_recursion_level: If not set, recursion is unlimited.
-   */
-  FileListReadParams(std::string path, std::optional<int> max_recursion_level = std::nullopt)
-      : path_(path), max_recursion_level_(max_recursion_level)
-  {
-  }
+  struct RecursionSettings {
+    int max_recursion_level_ = 0;
+    bool recurse_into_blends_ = false;
+  };
+
+  FileListReadParams(std::string path,
+                     std::optional<RecursionSettings> recursion_settings = std::nullopt);
 
   std::string path_;
-  std::optional<int> max_recursion_level_;
+  std::optional<RecursionSettings> recursion_settings_;
   /* Hidden files? */
   bool skip_current_and_parent_ = true;
 };
@@ -55,16 +55,22 @@ class AbstractFileList {
   virtual void fetch() = 0;
 };
 
-using FileTree = blender::Vector<std::unique_ptr<AbstractFileListEntry>>;
+/* Note that each entry may have child entries. */
+using FileEntires = blender::Vector<std::unique_ptr<AbstractFileEntry>>;
 
 class FileList final : public AbstractFileList {
   FileListReadParams read_params_;
 
-  FileTree file_tree_;
+  FileEntires file_entries_;
 
  public:
   FileList(const FileListReadParams &read_params);
+
   void fetch() override;
+
+  StringRef rootPath() const;
+  std::string fullPathToFile(const AbstractFileEntry &file) const;
+  std::string fullFilePathToFile(const AbstractFileEntry &file) const;
 };
 
 }  // namespace blender::ed::filelist
