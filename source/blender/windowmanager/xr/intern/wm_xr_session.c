@@ -125,6 +125,8 @@ static void wm_xr_session_exit_cb(void *customdata)
                                   settings->controller1_object);
   }
 
+  wm_xr_session_actions_uninit(xr_data);
+
   if (xr_data->runtime->exit_fn) {
     xr_data->runtime->exit_fn(xr_data);
   }
@@ -865,6 +867,11 @@ void wm_xr_session_actions_update(const bContext *C)
       wm_xr_session_events_dispatch(settings, xr_context, active_action_set, state, surface, win);
     }
   }
+}
+
+void wm_xr_session_actions_uninit(wmXrData *xr)
+{
+  wm_xr_session_controller_data_clear(&xr->runtime->session_state);
 }
 
 void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action, wmXrData *xr)
