@@ -411,9 +411,15 @@ void GHOST_XrContext::getExtensionsToEnable(
   }
 
   /* Try enabling interaction profile extensions. */
+#if XR_EXT_hp_mixed_reality_controller
   try_ext.push_back(XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME);
+#endif
+#if XR_HTC_vive_cosmos_controller_interaction
   try_ext.push_back(XR_HTC_VIVE_COSMOS_CONTROLLER_INTERACTION_EXTENSION_NAME);
+#endif
+#if XR_HUAWEI_controller_interaction
   try_ext.push_back(XR_HUAWEI_CONTROLLER_INTERACTION_EXTENSION_NAME);
+#endif
 
   r_ext_names.reserve(try_ext.size() + graphics_binding_types.size());
 
