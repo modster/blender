@@ -1357,6 +1357,8 @@ typedef struct NodeGeometryCurveDeform {
   uint8_t position_axis;
   /* GeometryNodeAttributeInputMode (float or attribute). */
   uint8_t attribute_input_type;
+
+  char _pad[5];
 } NodeGeometryCurveDeform;
 
 typedef struct NodeGeometryAttributeTransfer {

@@ -34,6 +34,7 @@ static bNodeSocketTemplate geo_node_curve_deform_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
     {SOCK_STRING, N_("Parameter")},
     {SOCK_FLOAT, N_("Parameter"), 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
+    {SOCK_BOOLEAN, N_("Use Radius")},
     {-1, ""},
 };
 
@@ -54,7 +55,9 @@ static void geo_node_curve_deform_layout(uiLayout *layout, bContext *UNUSED(C), 
     uiItemR(layout, ptr, "position_axis", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
   }
   else {
-    uiItemR(layout, ptr, "attribute_input_type", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+    uiLayoutSetPropSep(layout, true);
+    uiLayoutSetPropDecorate(layout, false);
+    uiItemR(layout, ptr, "attribute_input_type", 0, nullptr, ICON_NONE);
   }
 }
 
@@ -79,16 +82,60 @@ static void geo_node_curve_deform_update(bNodeTree *UNUSED(ntree), bNode *node)
   bNodeSocket *attribute_socket = ((bNodeSocket *)node->inputs.first)->next->next;
 
   nodeSetSocketAvailability(attribute_socket, mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE);
-  if (mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE) {
-    update_attribute_input_socket_availabilities(
-        *node, "Parameter", (GeometryNodeAttributeInputMode)node_storage.attribute_input_type);
-  }
+  update_attribute_input_socket_availabilities(
+      *node,
+      "Parameter",
+      (GeometryNodeAttributeInputMode)node_storage.attribute_input_type,
+      mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE);
 }
 
-static void execute_on_component(GeoNodeExecParams params,
-                                 GeometryComponent &component,
+namespace {
+struct Parameter {
+  float parameter;
+  int index;
+};
+}  // namespace
+
+static void spline_deform(VArray<float3> &positions, Span<float> parameters, const Spline &spline)
+{
+}
+
+struct CurveDeformInput {
+  GeometryNodeAttributeInputMode mode;
+  std::optional<GeometryNodeCurveDeformPositionAxis> position_axis;
+  std::optional<std::string> attribute_name;
+};
+
+static void execute_on_component(GeometryComponent &component,
+                                 const CurveDeformInput &input,
                                  const CurveEval &curve)
 {
+  GVArray_Typed<float3> positions = component.attribute_get_for_read<float3>(
+      "position", ATTR_DOMAIN_POINT, {0, 0, 0});
+
+  Array<Parameter> parameters(positions.size());
+
+  if (input.mode == GEO_NODE_CURVE_DEFORM_POSITION) {
+    switch (*input.position_axis) {
+      case GEO_NODE_CURVE_DEFORM_POSX:
+        parallel_for(positions.index_range(), 4096, [&](IndexRange range) {
+          for (const int i : range) {
+            parameters[i] = { positions }
+          }
+        });
+        break;
+      case GEO_NODE_CURVE_DEFORM_POSY:
+        break;
+      case GEO_NODE_CURVE_DEFORM_POSZ:
+        break;
+      case GEO_NODE_CURVE_DEFORM_NEGX:
+        break;
+      case GEO_NODE_CURVE_DEFORM_NEGY:
+        break;
+      case GEO_NODE_CURVE_DEFORM_NEGZ:
+        break;
+    }
+  }
 }
 
 static void geo_node_curve_deform_exec(GeoNodeExecParams params)
