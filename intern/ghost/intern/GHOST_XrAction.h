@@ -65,7 +65,7 @@ class GHOST_XrActionProfile {
 
  private:
   XrPath m_profile = XR_NULL_PATH;
-  /* Bindings identified by interaction (user (subaction) + component) path. */
+  /** Bindings identified by interaction (user (subaction) + component) path. */
   std::map<std::string, XrPath> m_bindings;
 };
 
@@ -108,9 +108,9 @@ class GHOST_XrAction {
 
   std::unique_ptr<GHOST_C_CustomDataWrapper> m_custom_data_ = nullptr; /* wmXrAction */
 
-  /* Spaces identified by user (subaction) path. */
+  /** Spaces identified by user (subaction) path. */
   std::map<std::string, GHOST_XrActionSpace> m_spaces;
-  /* Profiles identified by interaction profile path. */
+  /** Profiles identified by interaction profile path. */
   std::map<std::string, GHOST_XrActionProfile> m_profiles;
 };
 

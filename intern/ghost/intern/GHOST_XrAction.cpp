@@ -342,9 +342,8 @@ void GHOST_XrAction::applyHapticFeedback(XrSession session,
   XrHapticActionInfo haptic_info{XR_TYPE_HAPTIC_ACTION_INFO};
   haptic_info.action = m_action;
 
-  for (std::vector<XrPath>::iterator it = m_subaction_paths.begin(); it != m_subaction_paths.end();
-       ++it) {
-    haptic_info.subactionPath = *it;
+  for (const XrPath &subaction_path : m_subaction_paths) {
+    haptic_info.subactionPath = subaction_path;
     CHECK_XR(xrApplyHapticFeedback(session, &haptic_info, (const XrHapticBaseHeader *)&vibration),
              (std::string("Failed to apply haptic action \"") + action_name + "\".").data());
   }
@@ -355,9 +354,8 @@ void GHOST_XrAction::stopHapticFeedback(XrSession session, const char *action_na
   XrHapticActionInfo haptic_info{XR_TYPE_HAPTIC_ACTION_INFO};
   haptic_info.action = m_action;
 
-  for (std::vector<XrPath>::iterator it = m_subaction_paths.begin(); it != m_subaction_paths.end();
-       ++it) {
-    haptic_info.subactionPath = *it;
+  for (const XrPath &subaction_path : m_subaction_paths) {
+    haptic_info.subactionPath = subaction_path;
     CHECK_XR(xrStopHapticFeedback(session, &haptic_info),
              (std::string("Failed to stop haptic action \"") + action_name + "\".").data());
   }

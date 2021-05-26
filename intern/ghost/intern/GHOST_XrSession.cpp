@@ -36,8 +36,6 @@
 
 #include "GHOST_XrSession.h"
 
-struct OpenXRActionSet;
-
 struct OpenXRSessionData {
   XrSystemId system_id = XR_NULL_SYSTEM_ID;
   XrSession session = XR_NULL_HANDLE;
@@ -551,6 +549,7 @@ static GHOST_XrActionSet *find_action_set(OpenXRSessionData *oxr, const char *ac
   if (it == oxr->action_sets.end()) {
     return nullptr;
   }
+
   return &it->second;
 }
 

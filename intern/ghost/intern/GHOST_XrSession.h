@@ -85,7 +85,7 @@ class GHOST_XrSession {
                          const float &amplitude);
   void stopHapticAction(const char *action_set_name, const char *action_name);
 
-  /* Custom data (owned by Blender, not GHOST) accessors. */
+  /** Custom data (owned by Blender, not GHOST) accessors. */
   void *getActionSetCustomdata(const char *action_set_name);
   void *getActionCustomdata(const char *action_set_name, const char *action_name);
   uint32_t getActionCount(const char *action_set_name);
