@@ -94,8 +94,8 @@ typedef struct LineartElementLinkNode {
   float crease_threshold;
 } LineartElementLinkNode;
 
-typedef struct LineartLineSegment {
-  struct LineartLineSegment *next, *prev;
+typedef struct LineartEdgeSegment {
+  struct LineartEdgeSegment *next, *prev;
   /** at==0: left  at==1: right  (this is in 2D projected space) */
   double at;
   /** Occlusion level after "at" point */
@@ -107,7 +107,7 @@ typedef struct LineartLineSegment {
    * bits 1<<0 and 1<<1 are for occlusion effectiveness value.
    */
   unsigned char transparency_mask;
-} LineartLineSegment;
+} LineartEdgeSegment;
 
 typedef struct LineartVert {
   double gloc[3];
@@ -365,7 +365,8 @@ typedef struct LineartRenderTaskInfo {
 
   int thread_id;
 
-  /* In these list, list->last doesn't end overall, it only ends for the specific task thread. */
+  /* These lists only denote the part of the main edge list that the thread should iterate over.
+   * Be careful to not iterate outside of these bounds as it is not thread safe to do so. */
   ListBase contour;
   ListBase intersection;
   ListBase crease;

@@ -14,29 +14,25 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "FN_cpp_type_make.hh"
+/** \file
+ * \ingroup gpu
+ */
 
-#include "BLI_color.hh"
-#include "BLI_float2.hh"
-#include "BLI_float3.hh"
-#include "BLI_float4x4.hh"
+#pragma once
 
-namespace blender::fn {
+#include "BLI_sys_types.h"
 
-MAKE_CPP_TYPE(bool, bool)
+#include "GPU_shader.h"
 
-MAKE_CPP_TYPE(float, float)
-MAKE_CPP_TYPE(float2, blender::float2)
-MAKE_CPP_TYPE(float3, blender::float3)
-MAKE_CPP_TYPE(float4x4, blender::float4x4)
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-MAKE_CPP_TYPE(int32, int32_t)
-MAKE_CPP_TYPE(uint32, uint32_t)
-MAKE_CPP_TYPE(uint8, uint8_t)
+void GPU_compute_dispatch(GPUShader *shader,
+                          uint groups_x_len,
+                          uint groups_y_len,
+                          uint groups_z_len);
 
-MAKE_CPP_TYPE(ColorGeometry4f, blender::ColorGeometry4f)
-MAKE_CPP_TYPE(ColorGeometry4b, blender::ColorGeometry4b)
-
-MAKE_CPP_TYPE(string, std::string)
-
-}  // namespace blender::fn
+#ifdef __cplusplus
+}
+#endif
