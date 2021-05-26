@@ -1502,8 +1502,8 @@ void DRW_draw_callbacks_post_scene(void)
       ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
       GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
     }
-    
-#ifdef WITH_XR_OPENXR    
+
+#ifdef WITH_XR_OPENXR
     if ((v3d->flag & V3D_XR_SESSION_SURFACE) != 0) {
       DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
 
@@ -1538,7 +1538,7 @@ void DRW_draw_callbacks_post_scene(void)
 
         DRW_state_reset();
       }
-      
+
       GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
     }
 #endif
