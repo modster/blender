@@ -1495,51 +1495,54 @@ void DRW_draw_callbacks_post_scene(void)
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
-#ifdef WITH_XR_OPENXR
-  else if ((v3d->flag & V3D_XR_SESSION_SURFACE) != 0) {
-    DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
-
-    DRW_state_reset();
-
-    GPU_framebuffer_bind(dfbl->overlay_fb);
-
-    GPU_matrix_projection_set(rv3d->winmat);
-    GPU_matrix_set(rv3d->viewmat);
-
-    /* Annotations. */
-    if (do_annotations) {
+  else {
+    if (v3d && ((v3d->flag2 & V3D_SHOW_ANNOTATION) != 0)) {
       GPU_depth_test(GPU_DEPTH_NONE);
+      /* XXX: as scene->gpd is not copied for COW yet */
       ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
+      GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
     }
+    
+#ifdef WITH_XR_OPENXR    
+    if ((v3d->flag & V3D_XR_SESSION_SURFACE) != 0) {
+      DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
 
-    /* Callbacks (controllers, custom draw functions). */
-    if (((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) ||
-        ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0)) {
-      GPU_depth_test(GPU_DEPTH_NONE);
-      GPU_apply_state();
+      DRW_state_reset();
 
-      if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
-        ARegionType *art = WM_xr_surface_controller_region_type_get();
-        if (art) {
-          ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
-        }
-      }
-      if ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0) {
-        SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
-        if (st) {
-          ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
+      GPU_framebuffer_bind(dfbl->overlay_fb);
+
+      GPU_matrix_projection_set(rv3d->winmat);
+      GPU_matrix_set(rv3d->viewmat);
+
+      /* Callbacks (controllers, custom draw functions). */
+      if (((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) ||
+          ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0)) {
+        GPU_depth_test(GPU_DEPTH_NONE);
+        GPU_apply_state();
+
+        if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
+          ARegionType *art = WM_xr_surface_controller_region_type_get();
           if (art) {
             ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
           }
         }
+        if ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0) {
+          SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+          if (st) {
+            ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
+            if (art) {
+              ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
+            }
+          }
+        }
+
+        DRW_state_reset();
       }
-
-      DRW_state_reset();
+      
+      GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
     }
-
-    GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
-  }
 #endif
+  }
 }
 
 struct DRWTextStore *DRW_text_cache_ensure(void)
