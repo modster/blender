@@ -732,6 +732,9 @@ void AttributeSet::clear_modified()
 
 void AttributeSet::tag_modified(const Attribute &attr)
 {
+  /* Some attributes are not stored in the various kernel attribute arrays
+   * (DeviceScene::attribute_*), so the modified flags are only set if the associated standard
+   * corresponds to an attribute which will be stored in the kernel's attribute arrays. */
   const bool modifies_device_array = (attr.std != ATTR_STD_FACE_NORMAL &&
                                       attr.std != ATTR_STD_VERTEX_NORMAL);
 
