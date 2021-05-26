@@ -252,7 +252,7 @@ static int dot_v3_array_find_max_index(const float dirs[][3],
 }
 
 /**
- * Re-order \a mat so \a axis_align uses it's own axis which is closest to \a v.
+ * Re-order \a mat so \a axis_align uses its own axis which is closest to \a v.
  */
 static bool mat3_align_axis_to_v3(float mat[3][3], const int axis_align, const float v[3])
 {
@@ -1762,7 +1762,7 @@ static void WIDGETGROUP_placement_setup(const bContext *UNUSED(C), wmGizmoGroup 
     gizmo->flag |= WM_GIZMO_HIDDEN_KEYMAP;
   }
 
-  /* Sets the gizmos custom-data which has it's own free callback. */
+  /* Sets the gizmos custom-data which has its own free callback. */
   preview_plane_cursor_setup(gzgroup);
 }
 
@@ -2061,7 +2061,7 @@ static void cursor_plane_draw(bContext *C, int x, int y, void *customdata)
     GPU_matrix_projection_set(rv3d->winmat);
     GPU_matrix_set(rv3d->viewmat);
 
-    const float scale_mod = U.gizmo_size * 2 * U.dpi_fac;
+    const float scale_mod = U.gizmo_size * 2 * U.dpi_fac / U.pixelsize;
 
     float final_scale = (scale_mod * pixel_size);
 

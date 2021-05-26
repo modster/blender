@@ -143,12 +143,9 @@ RenderEngine *RE_engine_create(RenderEngineType *type)
 static void engine_depsgraph_free(RenderEngine *engine)
 {
   if (engine->depsgraph) {
-    /* Need GPU context since this might free GPU buffers. This function can
-     * only be called from a render thread. We do not currently support
-     * persistent data with GPU contexts for that reason. */
+    /* Need GPU context since this might free GPU buffers. */
     const bool use_gpu_context = (engine->type->flag & RE_USE_GPU_CONTEXT);
     if (use_gpu_context) {
-      BLI_assert(!BLI_thread_is_main());
       DRW_render_context_enable(engine->re);
     }
 
@@ -549,7 +546,7 @@ float RE_engine_get_camera_shift_x(RenderEngine *engine, Object *camera, bool us
 void RE_engine_get_camera_model_matrix(RenderEngine *engine,
                                        Object *camera,
                                        bool use_spherical_stereo,
-                                       float *r_modelmat)
+                                       float r_modelmat[16])
 {
   /* When using spherical stereo, get model matrix without multiview,
    * leaving stereo to be handled by the engine. */
@@ -623,8 +620,8 @@ RenderData *RE_engine_get_render_data(Render *re)
 
 bool RE_engine_use_persistent_data(RenderEngine *engine)
 {
-  /* See engine_depsgraph_free() for why preserving the depsgraph for
-   * re-renders is not supported with GPU contexts. */
+  /* Re-rendering is not supported with GPU contexts, since the GPU context
+   * is destroyed when the render thread exists. */
   return (engine->re->r.mode & R_PERSISTENT_DATA) && !(engine->type->flag & RE_USE_GPU_CONTEXT);
 }
 

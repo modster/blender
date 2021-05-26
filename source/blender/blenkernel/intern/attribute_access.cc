@@ -45,6 +45,7 @@ using blender::Set;
 using blender::StringRef;
 using blender::StringRefNull;
 using blender::fn::GMutableSpan;
+using blender::fn::GSpan;
 
 namespace blender::bke {
 
@@ -60,7 +61,7 @@ const blender::fn::CPPType *custom_data_type_to_cpp_type(const CustomDataType ty
     case CD_PROP_INT32:
       return &CPPType::get<int>();
     case CD_PROP_COLOR:
-      return &CPPType::get<Color4f>();
+      return &CPPType::get<ColorGeometry4f>();
     case CD_PROP_BOOL:
       return &CPPType::get<bool>();
     default:
@@ -83,7 +84,7 @@ CustomDataType cpp_type_to_custom_data_type(const blender::fn::CPPType &type)
   if (type.is<int>()) {
     return CD_PROP_INT32;
   }
-  if (type.is<Color4f>()) {
+  if (type.is<ColorGeometry4f>()) {
     return CD_PROP_COLOR;
   }
   if (type.is<bool>()) {
@@ -143,10 +144,8 @@ CustomDataType attribute_data_type_highest_complexity(Span<CustomDataType> data_
 static int attribute_domain_priority(const AttributeDomain domain)
 {
   switch (domain) {
-#if 0
     case ATTR_DOMAIN_CURVE:
       return 0;
-#endif
     case ATTR_DOMAIN_FACE:
       return 1;
     case ATTR_DOMAIN_EDGE:
@@ -184,11 +183,21 @@ AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
 
 void OutputAttribute::save()
 {
+  save_has_been_called_ = true;
   if (optional_span_varray_.has_value()) {
     optional_span_varray_->save();
   }
   if (save_) {
     save_(*this);
+  }
+}
+
+OutputAttribute::~OutputAttribute()
+{
+  if (!save_has_been_called_) {
+    if (varray_) {
+      std::cout << "Warning: Call `save()` to make sure that changes persist in all cases.\n";
+    }
   }
 }
 
@@ -346,7 +355,7 @@ ReadAttributeLookup CustomDataAttributeProvider::try_get_for_read(
       case CD_PROP_INT32:
         return this->layer_to_read_attribute<int>(layer, domain_size);
       case CD_PROP_COLOR:
-        return this->layer_to_read_attribute<Color4f>(layer, domain_size);
+        return this->layer_to_read_attribute<ColorGeometry4f>(layer, domain_size);
       case CD_PROP_BOOL:
         return this->layer_to_read_attribute<bool>(layer, domain_size);
       default:
@@ -380,7 +389,7 @@ WriteAttributeLookup CustomDataAttributeProvider::try_get_for_write(
       case CD_PROP_INT32:
         return this->layer_to_write_attribute<int>(layer, domain_size);
       case CD_PROP_COLOR:
-        return this->layer_to_write_attribute<Color4f>(layer, domain_size);
+        return this->layer_to_write_attribute<ColorGeometry4f>(layer, domain_size);
       case CD_PROP_BOOL:
         return this->layer_to_write_attribute<bool>(layer, domain_size);
       default:
@@ -580,6 +589,105 @@ void NamedLegacyCustomDataProvider::foreach_domain(
     const FunctionRef<void(AttributeDomain)> callback) const
 {
   callback(domain_);
+}
+
+CustomDataAttributes::CustomDataAttributes()
+{
+  CustomData_reset(&data);
+  size_ = 0;
+}
+
+CustomDataAttributes::~CustomDataAttributes()
+{
+  CustomData_free(&data, size_);
+}
+
+CustomDataAttributes::CustomDataAttributes(const CustomDataAttributes &other)
+{
+  size_ = other.size_;
+  CustomData_copy(&other.data, &data, CD_MASK_ALL, CD_DUPLICATE, size_);
+}
+
+CustomDataAttributes::CustomDataAttributes(CustomDataAttributes &&other)
+{
+  size_ = other.size_;
+  data = other.data;
+  CustomData_reset(&other.data);
+}
+
+std::optional<GSpan> CustomDataAttributes::get_for_read(const StringRef name) const
+{
+  BLI_assert(size_ != 0);
+  for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
+    if (layer.name == name) {
+      const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
+      BLI_assert(cpp_type != nullptr);
+      return GSpan(*cpp_type, layer.data, size_);
+    }
+  }
+  return {};
+}
+
+std::optional<GMutableSpan> CustomDataAttributes::get_for_write(const StringRef name)
+{
+  BLI_assert(size_ != 0);
+  for (CustomDataLayer &layer : MutableSpan(data.layers, data.totlayer)) {
+    if (layer.name == name) {
+      const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
+      BLI_assert(cpp_type != nullptr);
+      return GMutableSpan(*cpp_type, layer.data, size_);
+    }
+  }
+  return {};
+}
+
+bool CustomDataAttributes::create(const StringRef name, const CustomDataType data_type)
+{
+  char name_c[MAX_NAME];
+  name.copy(name_c);
+  void *result = CustomData_add_layer_named(&data, data_type, CD_DEFAULT, nullptr, size_, name_c);
+  return result != nullptr;
+}
+
+bool CustomDataAttributes::create_by_move(const blender::StringRef name,
+                                          const CustomDataType data_type,
+                                          void *buffer)
+{
+  char name_c[MAX_NAME];
+  name.copy(name_c);
+  void *result = CustomData_add_layer_named(&data, data_type, CD_ASSIGN, buffer, size_, name_c);
+  return result != nullptr;
+}
+
+bool CustomDataAttributes::remove(const blender::StringRef name)
+{
+  bool result = false;
+  for (const int i : IndexRange(data.totlayer)) {
+    const CustomDataLayer &layer = data.layers[i];
+    if (layer.name == name) {
+      CustomData_free_layer(&data, layer.type, size_, i);
+      result = true;
+    }
+  }
+  return result;
+}
+
+void CustomDataAttributes::reallocate(const int size)
+{
+  size_ = size;
+  CustomData_realloc(&data, size);
+}
+
+bool CustomDataAttributes::foreach_attribute(const AttributeForeachCallback callback,
+                                             const AttributeDomain domain) const
+{
+  for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
+    AttributeMetaData meta_data{domain, (CustomDataType)layer.type};
+    if (!callback(layer.name, meta_data)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace blender::bke
