@@ -11,6 +11,9 @@ in vec4 pos, pos1, pos2, pos3, uv1, uv2, col1, col2, fcol1;
 vec2 uvs;
 vec4 color;
 
+/* TODO(fclem) remove use of macro. use interface block instead. */
+RESOURCE_ID_VARYING
+
 void main(void)
 {
   vec4 sspos;
@@ -43,6 +46,7 @@ void main(void)
   interp.barycentric_coords = vec2(0.0);
   interp.barycentric_dists = vec3(0.0);
 
+  PASS_RESOURCE_ID
   attrib_load();
 }
 

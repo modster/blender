@@ -7,6 +7,9 @@
 in vec3 pos;
 in vec3 nor;
 
+/* TODO(fclem) remove use of macro. use interface block instead. */
+RESOURCE_ID_VARYING
+
 void main(void)
 {
   interp.P = point_object_to_world(pos);
@@ -14,6 +17,7 @@ void main(void)
   interp.barycentric_coords = vec2(0.0);
   interp.barycentric_dists = vec3(0.0);
 
+  PASS_RESOURCE_ID
   attrib_load();
 
   g_data = init_globals();

@@ -43,10 +43,10 @@ static int node_shader_gpu_tex_coord(GPUMaterial *mat,
   Object *ob = (Object *)node->id;
 
   /* Use special matrix to let the shader branch to using the render object's matrix. */
-  float nan_matrix[4][4];
-  nan_matrix[3][3] = 0.0f;
+  float dummy_matrix[4][4];
+  dummy_matrix[3][3] = 0.0f;
   GPUNodeLink *inv_obmat = (ob != NULL) ? GPU_uniform(&ob->imat[0][0]) :
-                                          GPU_uniform(&nan_matrix[0][0]);
+                                          GPU_uniform(&dummy_matrix[0][0]);
 
   /* Opti: don't request orco if not needed. */
   GPUNodeLink *orco = (!out[0].hasoutput) ? GPU_constant((float[4]){0.0f, 0.0f, 0.0f, 0.0f}) :

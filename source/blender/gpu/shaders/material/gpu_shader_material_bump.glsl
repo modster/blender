@@ -17,7 +17,7 @@ void node_bump(float strength,
                float invert,
                out vec3 result)
 {
-  N = mat3(ViewMatrix) * normalize(N);
+  N = normalize(N);
   dist *= FrontFacing ? invert : -invert;
 
   vec3 dPdx = dFdx(g_data.P);
