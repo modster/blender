@@ -976,12 +976,12 @@ bool gpencil_point_xy_to_3d(const GP_SpaceConversion *gsc,
 }
 
 bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
-                                   struct Scene *scene,
                                    float persmat[4][4],
                                    const float screen_co[2],
                                    float r_out[3])
 {
   float rvec[3];
+  Scene *scene = gsc->scene;
 
   ED_gpencil_drawing_reference_get(scene, gsc->ob, scene->toolsettings->gpencil_v3d_align, rvec);
 
@@ -1374,7 +1374,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
       /* Convert to Render 2D space. */
       ED_gpencil_project_point_to_render_space(gsc->scene, &pt2, persmat, is_ortho, xy);
       /* Convert to Global Camera 3D space. */
-      gpencil_point_render_xy_to_3d(gsc, gsc->scene, persmat, xy, &pt->x);
+      gpencil_point_render_xy_to_3d(gsc, persmat, xy, &pt->x);
       /* Convert to object local space. */
       mul_m4_v3(inverse_diff_mat, &pt->x);
     }

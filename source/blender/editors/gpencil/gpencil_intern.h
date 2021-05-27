@@ -272,7 +272,6 @@ bool gpencil_point_xy_to_3d(const GP_SpaceConversion *gsc,
                             float r_out[3]);
 
 bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
-                                   struct Scene *scene,
                                    float persmat[4][4],
                                    const float screen_co[2],
                                    float r_out[3]);
