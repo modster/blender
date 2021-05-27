@@ -2633,7 +2633,6 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
   BLI_addtail(&result->segments, es);
   /* Don't need to OR flags right now, just a type mark. */
   result->flags = LRT_EDGE_FLAG_INTERSECTION;
-
   lineart_prepend_edge_direct(&rb->intersection.first, result);
   int r1, r2, c1, c2, row, col;
   if (lineart_get_edge_bounding_areas(rb, result, &r1, &r2, &c1, &c2)) {

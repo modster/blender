@@ -247,7 +247,6 @@ typedef struct LineartRenderBuffer {
   ListBase crease;
   ListBase material;
   ListBase edge_mark;
-  ListBase floating;
 
   ListBase chains;
 
@@ -320,13 +319,13 @@ typedef struct LineartRenderTaskInfo {
 
   int thread_id;
 
-  /* In these list, list->last doesn't end overall, it only ends for the specific task thread. */
+  /* These lists only denote the part of the main edge list that the thread should iterate over.
+   * Be careful to not iterate outside of these bounds as it is not thread safe to do so. */
   ListBase contour;
   ListBase intersection;
   ListBase crease;
   ListBase material;
   ListBase edge_mark;
-  ListBase floating;
 
 } LineartRenderTaskInfo;
 
