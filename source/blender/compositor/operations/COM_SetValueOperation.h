@@ -49,6 +49,12 @@ class SetValueOperation : public NodeOperation {
    * The inner loop of this operation.
    */
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer(MemoryBuffer *output,
+                            const rcti &output_rect,
+                            Span<MemoryBuffer *> inputs,
+                            ExecutionSystem &exec_system) override;
+
   void determineResolution(unsigned int resolution[2],
                            unsigned int preferredResolution[2]) override;
 };
