@@ -1329,7 +1329,9 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
 
     bGPDspoint pt2;
     gpencil_point_to_parent_space(pt, diff_mat, &pt2);
-    gpencil_point_to_xy_fl(gsc, gps_active, &pt2, &xy[0], &xy[1]);
+    if (mode != GP_REPROJECT_CAMERA) {
+      gpencil_point_to_xy_fl(gsc, gps_active, &pt2, &xy[0], &xy[1]);
+    }
 
     /* Project stroke in one axis */
     if (ELEM(mode, GP_REPROJECT_FRONT, GP_REPROJECT_SIDE, GP_REPROJECT_TOP, GP_REPROJECT_CURSOR)) {
