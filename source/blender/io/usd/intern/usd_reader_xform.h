@@ -50,6 +50,7 @@ class USDXformReader : public USDPrimReader {
   void set_use_parent_xform(bool flag)
   {
     use_parent_xform_ = flag;
+    is_root_xform_ = is_root_xform_prim();
   }
 
   bool prim_has_xform_ops() const;

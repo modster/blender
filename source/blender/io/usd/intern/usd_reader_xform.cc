@@ -162,7 +162,11 @@ bool USDXformReader::is_root_xform_prim() const
      * UsdGeomScope that has an xformable ancestor. */
     pxr::UsdPrim cur_parent = prim_.GetParent();
 
-    while (cur_parent) {
+    if (use_parent_xform_) {
+      cur_parent = cur_parent.GetParent();
+    }
+
+    while (cur_parent && !cur_parent.IsPseudoRoot()) {
       if (cur_parent.IsA<pxr::UsdGeomXformable>()) {
         return false;
       }
