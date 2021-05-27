@@ -109,7 +109,7 @@ static void applyLength(LengthGpencilModifierData *lmd, bGPdata *gpd, bGPDstroke
   changed |= gpencil_modify_stroke(gps, len * lmd->end_fac, lmd->overshoot_fac, 2);
 
   if (changed) {
-    BKE_gpencil_stroke_geometry_update(gpd, gps);
+    BKE_gpencil_stroke_geometry_update(gpd, gps, GP_GEO_UPDATE_DEFAULT);
   }
 }
 

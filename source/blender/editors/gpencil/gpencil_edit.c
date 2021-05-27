@@ -4700,7 +4700,6 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
   const bool keep_ends = RNA_boolean_get(op->ptr, "keep_ends");
 
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd_src);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd_src);
 
   /* sanity checks */
   if (ELEM(NULL, gpd_src)) {
@@ -4781,11 +4780,6 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
             /* add layer if not created before */
             if (gpl_dst == NULL) {
               gpl_dst = BKE_gpencil_layer_addnew(gpd_dst, gpl->info, false, false);
-            }
-
-            /* add layer if not created before */
-            if (gpl_dst == NULL) {
-              gpl_dst = BKE_gpencil_layer_addnew(gpd_dst, gpl->info, false);
             }
 
             /* add frame if not created before */

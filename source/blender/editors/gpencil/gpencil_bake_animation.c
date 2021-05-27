@@ -346,7 +346,7 @@ static int gpencil_bake_grease_pencil_animation_exec(bContext *C, wmOperator *op
                 depsgraph, &gsc, sctx, gpl_dst, gpf_dst, gps, project_type, false);
           }
           else {
-            BKE_gpencil_stroke_geometry_update(gpd_dst, gps);
+            BKE_gpencil_stroke_geometry_update(gpd_dst, gps, GP_GEO_UPDATE_DEFAULT);
           }
         }
       }

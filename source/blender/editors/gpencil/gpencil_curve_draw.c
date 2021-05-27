@@ -436,7 +436,7 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
   /* Get active layer or create a new one. */
   bGPDlayer *gpl = CTX_data_active_gpencil_layer(C);
   if (gpl == NULL) {
-    gpl = BKE_gpencil_layer_addnew(tcd->gpd, DATA_("Curve"), true);
+    gpl = BKE_gpencil_layer_addnew(tcd->gpd, DATA_("Curve"), true, false);
   }
   tcd->gpl = gpl;
 
