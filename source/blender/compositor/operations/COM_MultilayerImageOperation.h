@@ -37,6 +37,12 @@ class MultilayerBaseOperation : public BaseImageOperation {
    * Constructor
    */
   MultilayerBaseOperation(RenderLayer *render_layer, RenderPass *render_pass, int view);
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &output_rect,
+                                    Span<MemoryBuffer *> inputs,
+                                    ExecutionSystem &exec_system,
+                                    int current_pass) override;
 };
 
 class MultilayerColorOperation : public MultilayerBaseOperation {

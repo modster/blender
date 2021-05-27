@@ -17,6 +17,7 @@
  */
 
 #include "COM_MultilayerImageOperation.h"
+#include "COM_buffer_util.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -49,6 +50,15 @@ ImBuf *MultilayerBaseOperation::getImBuf()
 
   this->m_imageUser->view = view;
   return nullptr;
+}
+
+void MultilayerBaseOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                           const rcti &output_rect,
+                                                           Span<MemoryBuffer *> UNUSED(inputs),
+                                                           ExecutionSystem &UNUSED(exec_system),
+                                                           int UNUSED(current_pass))
+{
+  copy_buffer_rect(output, m_buffer, output_rect);
 }
 
 std::unique_ptr<MetaData> MultilayerColorOperation::getMetaData()

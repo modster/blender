@@ -17,6 +17,7 @@
  */
 
 #include "COM_ImageOperation.h"
+#include "COM_buffer_util.h"
 
 #include "BKE_image.h"
 #include "BKE_scene.h"
@@ -44,6 +45,7 @@ BaseImageOperation::BaseImageOperation()
   this->m_imageheight = 0;
   this->m_framenumber = 0;
   this->m_depthBuffer = nullptr;
+  depth_buffer_ = nullptr;
   this->m_numberOfChannels = 0;
   this->m_rd = nullptr;
   this->m_viewName = nullptr;
@@ -91,6 +93,9 @@ void BaseImageOperation::initExecution()
     this->m_imageFloatBuffer = stackbuf->rect_float;
     this->m_imageByteBuffer = stackbuf->rect;
     this->m_depthBuffer = stackbuf->zbuf_float;
+    if (stackbuf->zbuf_float) {
+      depth_buffer_ = new MemoryBuffer(stackbuf->zbuf_float, 1, stackbuf->x, stackbuf->y);
+    }
     this->m_imagewidth = stackbuf->x;
     this->m_imageheight = stackbuf->y;
     this->m_numberOfChannels = stackbuf->channels;
@@ -102,6 +107,10 @@ void BaseImageOperation::deinitExecution()
   this->m_imageFloatBuffer = nullptr;
   this->m_imageByteBuffer = nullptr;
   BKE_image_release_ibuf(this->m_image, this->m_buffer, nullptr);
+  if (depth_buffer_) {
+    delete depth_buffer_;
+    depth_buffer_ = nullptr;
+  }
 }
 
 void BaseImageOperation::determineResolution(unsigned int resolution[2],
@@ -170,6 +179,15 @@ void ImageOperation::executePixelSampled(float output[4], float x, float y, Pixe
   }
 }
 
+void ImageOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                  const rcti &output_rect,
+                                                  Span<MemoryBuffer *> UNUSED(inputs),
+                                                  ExecutionSystem &UNUSED(exec_system),
+                                                  int UNUSED(current_pass))
+{
+  copy_buffer_rect(output, m_buffer, output_rect, true);
+}
+
 void ImageAlphaOperation::executePixelSampled(float output[4],
                                               float x,
                                               float y,
@@ -185,6 +203,15 @@ void ImageAlphaOperation::executePixelSampled(float output[4],
     sampleImageAtLocation(this->m_buffer, x, y, sampler, false, tempcolor);
     output[0] = tempcolor[3];
   }
+}
+
+void ImageAlphaOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                       const rcti &output_rect,
+                                                       Span<MemoryBuffer *> UNUSED(inputs),
+                                                       ExecutionSystem &UNUSED(exec_system),
+                                                       int UNUSED(current_pass))
+{
+  copy_buffer_rect(output, output_rect.xmin, output_rect.ymin, 0, m_buffer, output_rect, 3, 1);
 }
 
 void ImageDepthOperation::executePixelSampled(float output[4],
@@ -203,6 +230,21 @@ void ImageDepthOperation::executePixelSampled(float output[4],
       int offset = y * this->m_width + x;
       output[0] = this->m_depthBuffer[offset];
     }
+  }
+}
+
+void ImageDepthOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                       const rcti &output_rect,
+                                                       Span<MemoryBuffer *> UNUSED(inputs),
+                                                       ExecutionSystem &UNUSED(exec_system),
+                                                       int UNUSED(current_pass))
+{
+  if (depth_buffer_) {
+    copy_buffer_rect(output, depth_buffer_, output_rect);
+  }
+  else {
+    float depth = 0;
+    fill_buffer_rect(output, output_rect, &depth);
   }
 }
 
