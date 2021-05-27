@@ -47,6 +47,11 @@ Node::Node(bNode *editorNode, bool create_sockets)
   if (create_sockets) {
     bNodeSocket *input = (bNodeSocket *)editorNode->inputs.first;
     while (input != nullptr) {
+      if (input->flag & SOCK_UNAVAIL) {
+        input = input->next;
+        continue;
+      }
+
       DataType dt = DataType::Value;
       if (input->type == SOCK_RGBA) {
         dt = DataType::Color;
@@ -60,6 +65,11 @@ Node::Node(bNode *editorNode, bool create_sockets)
     }
     bNodeSocket *output = (bNodeSocket *)editorNode->outputs.first;
     while (output != nullptr) {
+      if (output->flag & SOCK_UNAVAIL) {
+        output = output->next;
+        continue;
+      }
+
       DataType dt = DataType::Value;
       if (output->type == SOCK_RGBA) {
         dt = DataType::Color;
