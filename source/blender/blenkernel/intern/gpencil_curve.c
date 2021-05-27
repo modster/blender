@@ -331,7 +331,6 @@ static void gpencil_convert_spline(Main *bmain,
    * The total of points must consider that last point of each segment is equal to the first
    * point of next segment.
    */
-  int totpoints = 0;
   int segments = 0;
   int resolu = nu->resolu + 1;
   segments = nu->pntsu;
@@ -339,7 +338,6 @@ static void gpencil_convert_spline(Main *bmain,
     segments--;
     cyclic = false;
   }
-  totpoints = (resolu * segments) - (segments - 1);
 
   /* Materials
    * Notice: The color of the material is the color of viewport and not the final shader color.
@@ -359,69 +357,43 @@ static void gpencil_convert_spline(Main *bmain,
 
   switch (nu->type) {
     case CU_POLY: {
-      /* Allocate memory for storage points. */
-      gps->totpoints = nu->pntsu;
-      gps->points = MEM_callocN(sizeof(bGPDspoint) * gps->totpoints, "gp_stroke_points");
+      bGPDcurve *gpc = BKE_gpencil_stroke_editcurve_new(nu->pntsu);
+
       /* Increase thickness for this type. */
       gps->thickness = 10.0f;
 
-      /* Get all curve points */
-      for (int s = 0; s < gps->totpoints; s++) {
-        BPoint *bp = &nu->bp[s];
-        bGPDspoint *pt = &gps->points[s];
-        copy_v3_v3(&pt->x, bp->vec);
-        pt->pressure = bp->radius;
-        pt->strength = 1.0f;
+      for (int i = 0; i < nu->pntsu; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        BPoint *bp = &nu->bp[i];
+        copy_v3_v3(cpt->bezt.vec[1], bp->vec);
+        cpt->pressure = bp->radius;
+        cpt->strength = 1.0f;
+        cpt->bezt.h1 = cpt->bezt.h2 = HD_VECT;
       }
+
+      gps->editcurve = gpc;
+      BKE_gpencil_editcurve_recalculate_handles(gps);
       break;
     }
     case CU_BEZIER: {
-      /* Allocate memory for storage points. */
-      gps->totpoints = totpoints;
-      gps->points = MEM_callocN(sizeof(bGPDspoint) * gps->totpoints, "gp_stroke_points");
-
-      int init = 0;
-      resolu = nu->resolu + 1;
-      segments = nu->pntsu;
-      if ((nu->flagu & CU_NURB_CYCLIC) == 0) {
-        segments--;
-      }
-      /* Get all interpolated curve points of Beziert */
-      for (int s = 0; s < segments; s++) {
-        int inext = (s + 1) % nu->pntsu;
-        BezTriple *prevbezt = &nu->bezt[s];
-        BezTriple *bezt = &nu->bezt[inext];
-        bool last = (bool)(s == segments - 1);
-
-        coord_array = MEM_callocN((size_t)3 * resolu * sizeof(float), __func__);
+      /* Create new grease pencil editcurve. */
+      bGPDcurve *gpc = BKE_gpencil_stroke_editcurve_new(nu->pntsu);
+      for (int i = 0; i < nu->pntsu; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        BezTriple *bezt = &nu->bezt[i];
 
         for (int j = 0; j < 3; j++) {
-          BKE_curve_forward_diff_bezier(prevbezt->vec[1][j],
-                                        prevbezt->vec[2][j],
-                                        bezt->vec[0][j],
-                                        bezt->vec[1][j],
-                                        coord_array + j,
-                                        resolu - 1,
-                                        sizeof(float[3]));
+          copy_v3_v3(cpt->bezt.vec[j], bezt->vec[j]);
         }
-        /* Save first point coordinates. */
-        if (s == 0) {
-          copy_v3_v3(init_co, &coord_array[0]);
-        }
-        /* Add points to the stroke */
-        float radius_start = prevbezt->radius * scale_thickness;
-        float radius_end = bezt->radius * scale_thickness;
 
-        gpencil_add_new_points(
-            gps, coord_array, radius_start, radius_end, init, resolu, init_co, last);
-        /* Free memory. */
-        MEM_SAFE_FREE(coord_array);
-
-        /* As the last point of segment is the first point of next segment, back one array
-         * element to avoid duplicated points on the same location.
-         */
-        init += resolu - 1;
+        cpt->pressure = bezt->radius * scale_thickness;
+        cpt->strength = 1.0f;
+        cpt->bezt.h1 = bezt->h1;
+        cpt->bezt.h2 = bezt->h2;
       }
+
+      gps->editcurve = gpc;
+      BKE_gpencil_editcurve_recalculate_handles(gps);
       break;
     }
     case CU_NURBS: {
@@ -454,9 +426,10 @@ static void gpencil_convert_spline(Main *bmain,
       break;
     }
   }
-  /* Cyclic curve, close stroke. */
+
+  /* Cyclic curve. */
   if (cyclic) {
-    BKE_gpencil_stroke_close(gps);
+    gps->flag |= GP_STROKE_CYCLIC;
   }
 
   if (sample > 0.0f) {
