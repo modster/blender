@@ -39,7 +39,30 @@ namespace blender::eevee {
 class Instance;
 
 /* -------------------------------------------------------------------- */
-/** \name Passes
+/** \name Background Pass
+ *
+ * Render world values.
+ * \{ */
+
+class BackgroundPass {
+ private:
+  Instance &inst_;
+
+  DRWPass *background_ps_ = nullptr;
+
+ public:
+  BackgroundPass(Instance &inst) : inst_(inst){};
+
+  void sync(GPUMaterial *gpumat);
+  void render(void);
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Forward Pass
+ *
+ * Handles alpha blended surfaces and NPR materials (using Closure to RGBA).
  * \{ */
 
 class ForwardPass {
@@ -317,6 +340,7 @@ class ShadingPasses {
  public:
   CullingLightPass light_culling;
 
+  BackgroundPass background;
   DeferredPass deferred;
   ForwardPass forward;
   ShadowPass shadow;
@@ -329,6 +353,7 @@ class ShadingPasses {
  public:
   ShadingPasses(Instance &inst)
       : light_culling(inst),
+        background(inst),
         deferred(inst),
         forward(inst),
         shadow(inst),

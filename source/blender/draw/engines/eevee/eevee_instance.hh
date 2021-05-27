@@ -39,6 +39,7 @@
 #include "eevee_shading.hh"
 #include "eevee_shadow.hh"
 #include "eevee_view.hh"
+#include "eevee_world.hh"
 
 #include "eevee_engine.h"
 
@@ -60,6 +61,7 @@ class Instance {
   ShadingPasses shading_passes;
   MainView main_view;
   Camera camera;
+  World world;
   VelocityModule velocity;
   MotionBlurModule motion_blur;
   LightModule lights;
@@ -92,6 +94,7 @@ class Instance {
         shading_passes(*this),
         main_view(*this),
         camera(*this),
+        world(*this),
         velocity(*this),
         motion_blur(*this),
         lights(*this),

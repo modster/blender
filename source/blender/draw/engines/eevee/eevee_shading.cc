@@ -31,7 +31,35 @@
 namespace blender::eevee {
 
 /* -------------------------------------------------------------------- */
-/** \name Passes
+/** \name Background Pass
+ *
+ * \{ */
+
+void BackgroundPass::sync(GPUMaterial *gpumat)
+{
+  DRWState state = DRW_STATE_WRITE_COLOR;
+  background_ps_ = DRW_pass_create("Background", state);
+
+  /* Push a matrix at the same location as the camera. */
+  mat4 camera_mat;
+  unit_m4(camera_mat);
+  copy_v3_v3(camera_mat[3], inst_.camera.data_get().viewinv[3]);
+
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, background_ps_);
+  DRW_shgroup_call_obmat(grp, DRW_cache_fullscreen_quad_get(), camera_mat);
+}
+
+void BackgroundPass::render(void)
+{
+  DRW_draw_pass(background_ps_);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Forward Pass
+ *
+ * Handles alpha blended surfaces and NPR materials (using Closure to RGBA).
  * \{ */
 
 void ForwardPass::sync()

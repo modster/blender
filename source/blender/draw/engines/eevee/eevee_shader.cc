@@ -37,6 +37,7 @@ extern char datatoc_common_uniform_attribute_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
 
 extern char datatoc_eevee_bsdf_lib_glsl[];
+extern char datatoc_eevee_bsdf_stubs_lib_glsl[];
 extern char datatoc_eevee_camera_lib_glsl[];
 extern char datatoc_eevee_camera_velocity_frag_glsl[];
 extern char datatoc_eevee_closure_lib_glsl[];
@@ -79,6 +80,7 @@ extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_nodetree_eval_lib_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
 extern char datatoc_eevee_shadow_lib_glsl[];
+extern char datatoc_eevee_surface_background_frag_glsl[];
 extern char datatoc_eevee_surface_deferred_frag_glsl[];
 extern char datatoc_eevee_surface_depth_simple_frag_glsl[];
 extern char datatoc_eevee_surface_forward_frag_glsl[];
@@ -88,6 +90,7 @@ extern char datatoc_eevee_surface_gpencil_vert_glsl[];
 extern char datatoc_eevee_surface_velocity_frag_glsl[];
 extern char datatoc_eevee_surface_velocity_lib_glsl[];
 extern char datatoc_eevee_surface_velocity_mesh_vert_glsl[];
+extern char datatoc_eevee_surface_world_vert_glsl[];
 extern char datatoc_eevee_velocity_lib_glsl[];
 extern char datatoc_eevee_volume_deferred_frag_glsl[];
 extern char datatoc_eevee_volume_eval_lib_glsl[];
@@ -126,6 +129,7 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, common_gpencil_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, gpu_shader_codegen_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_stubs_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_closure_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_gbuffer_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_nodetree_eval_lib);
@@ -414,6 +418,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
            * Only one uv and one color attribute layer is supported by gpencil objects. */
           output += sub.substr(0, pos + delimiter.length());
           break;
+        case MAT_GEOM_WORLD:
         case MAT_GEOM_VOLUME:
           /* Not supported. */
           break;
@@ -422,15 +427,17 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
     }
     output += "\n";
 
-    output += "IN_OUT AttributesInterface\n";
-    output += "{\n";
-    output += codegen->attribs_interface;
-    output += "};\n\n";
+    if (geometry_type != MAT_GEOM_WORLD) {
+      output += "IN_OUT AttributesInterface\n";
+      output += "{\n";
+      output += codegen->attribs_interface;
+      output += "};\n\n";
+    }
   }
 
   output += "void attrib_load(void)\n";
   output += "{\n";
-  if (codegen->attribs_load) {
+  if (codegen->attribs_load && geometry_type != MAT_GEOM_WORLD) {
     output += codegen->attribs_load;
   }
   output += "}\n\n";
@@ -459,6 +466,9 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
   }
 
   switch (geometry_type) {
+    case MAT_GEOM_WORLD:
+      output += datatoc_eevee_surface_world_vert_glsl;
+      break;
     case MAT_GEOM_VOLUME:
       output += datatoc_eevee_volume_vert_glsl;
       break;
@@ -497,10 +507,36 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
   std::string output = "\n\n";
 
   if (codegen->attribs_interface) {
-    output += "IN_OUT AttributesInterface\n";
-    output += "{\n";
-    output += codegen->attribs_interface;
-    output += "};\n\n";
+    /* World material loads attribs in fragment shader (only used for orco). */
+    if (geometry_type == MAT_GEOM_WORLD) {
+      /* Declare inputs. */
+      std::string delimiter = ";\n";
+      std::string sub(codegen->attribs_declare);
+      size_t pos = 0;
+      while ((pos = sub.find(delimiter)) != std::string::npos) {
+        /* Example print:
+         * vec2 u015684;
+         * These are not used and just here to make the attribs_load functions call valids.
+         * Only orco layer is supported by world. */
+        output += sub.substr(0, pos + delimiter.length());
+        sub.erase(0, pos + delimiter.length());
+      }
+      output += "\n";
+
+      output += codegen->attribs_interface;
+      output += "\n";
+
+      output += "void attrib_load(void)\n";
+      output += "{\n";
+      output += codegen->attribs_load;
+      output += "}\n\n";
+    }
+    else {
+      output += "IN_OUT AttributesInterface\n";
+      output += "{\n";
+      output += codegen->attribs_interface;
+      output += "};\n\n";
+    }
   }
 
   if (codegen->surface || codegen->volume) {
@@ -537,6 +573,9 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
   output += "}\n\n";
 
   switch (geometry_type) {
+    case MAT_GEOM_WORLD:
+      output += datatoc_eevee_surface_background_frag_glsl;
+      break;
     case MAT_GEOM_VOLUME:
       if (pipeline_type == MAT_PIPE_DEFERRED) {
         output += datatoc_eevee_volume_deferred_frag_glsl;
@@ -600,6 +639,27 @@ GPUMaterial *ShaderModule::material_shader_get(::Material *blender_mat,
 
   return DRW_shader_from_material(
       blender_mat, nodetree, shader_uuid, is_volume, deferred_compilation, codegen_callback, this);
+}
+
+GPUMaterial *ShaderModule::world_shader_get(::World *blender_world,
+                                            struct bNodeTree *nodetree,
+                                            eMaterialDomain domain_type)
+{
+  eMaterialPipeline pipeline_type = MAT_PIPE_DEFERRED; /* Unused. */
+  eMaterialGeometry geometry_type = MAT_GEOM_WORLD;
+
+  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type, domain_type);
+
+  bool is_volume = (domain_type == MAT_DOMAIN_VOLUME);
+  bool deferred_compilation = false;
+
+  return DRW_shader_from_world(blender_world,
+                               nodetree,
+                               shader_uuid,
+                               is_volume,
+                               deferred_compilation,
+                               codegen_callback,
+                               this);
 }
 
 /** \} */

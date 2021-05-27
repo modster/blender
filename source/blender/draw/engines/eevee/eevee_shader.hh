@@ -120,6 +120,9 @@ class ShaderModule {
                                    eMaterialGeometry geometry_type,
                                    eMaterialDomain domain_type,
                                    bool deferred_compilation);
+  GPUMaterial *world_shader_get(::World *blender_world,
+                                struct bNodeTree *nodetree,
+                                eMaterialDomain domain_type);
 
   GPUShaderSource material_shader_code_generate(GPUMaterial *mat, const GPUCodegenOutput *codegen);
 

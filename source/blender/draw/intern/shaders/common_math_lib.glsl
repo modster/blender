@@ -153,6 +153,11 @@ vec4 safe_color(vec4 c)
   /* Clamp to avoid black square artifacts if a pixel goes NaN. */
   return clamp(c, vec4(0.0), vec4(1e20)); /* 1e20 arbitrary. */
 }
+vec3 safe_color(vec3 c)
+{
+  /* Clamp to avoid black square artifacts if a pixel goes NaN. */
+  return clamp(c, vec3(0.0), vec3(1e20)); /* 1e20 arbitrary. */
+}
 
 /** \} */
 

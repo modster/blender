@@ -118,6 +118,7 @@ void Instance::begin_sync()
   render_passes.sync();
   shading_passes.sync();
   main_view.sync();
+  world.sync();
 
   materials.begin_sync();
   velocity.begin_sync();

@@ -34,9 +34,8 @@ namespace blender::eevee {
 
 static void draw_data_init_cb(struct DrawData *dd)
 {
-  ObjectHandle *eevee_dd = reinterpret_cast<ObjectHandle *>(dd);
   /* Object has just been created or was never evaluated by the engine. */
-  eevee_dd->recalc = ID_RECALC_ALL;
+  dd->recalc = ID_RECALC_ALL;
 }
 
 ObjectHandle &SyncModule::sync_object(Object *ob)
@@ -56,6 +55,20 @@ ObjectHandle &SyncModule::sync_object(Object *ob)
     inst_.sampling.reset();
   }
 
+  return eevee_dd;
+}
+
+WorldHandle &SyncModule::sync_world(::World *world)
+{
+  DrawEngineType *owner = (DrawEngineType *)&DRW_engine_viewport_eevee_type;
+  struct DrawData *dd = DRW_drawdata_ensure(
+      (ID *)world, owner, sizeof(eevee::WorldHandle), draw_data_init_cb, nullptr);
+  WorldHandle &eevee_dd = *reinterpret_cast<WorldHandle *>(dd);
+
+  const int recalc_flags = ID_RECALC_ALL;
+  if ((eevee_dd.recalc & recalc_flags) != 0) {
+    inst_.sampling.reset();
+  }
   return eevee_dd;
 }
 
