@@ -16,12 +16,13 @@
 
 #include "UI_interface.h"
 #include "UI_resources.h"
+#include "BKE_mesh_remesh_voxel.h"
 
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_remesh_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_INT, N_("Minimum Vertices"), 4, 0, 0, 0, 4, 10000},
+    {SOCK_FLOAT, N_("Voxel Size"), 1.0f, 0, 0, 0, 0.01f, FLT_MAX},
     {-1, ""},
 };
 
@@ -34,6 +35,12 @@ namespace blender::nodes {
 static void geo_node_remesh_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  float voxel_size = params.extract_input<float>("Voxel Size");
+  if(geometry_set.has_mesh()){
+    Mesh *input_mesh = geometry_set.get_mesh_for_write();
+    Mesh *output_mesh = BKE_mesh_remesh_voxel_to_mesh_nomain(input_mesh, voxel_size, 0.5f, 0.0f);
+    geometry_set.replace_mesh(output_mesh);
+  }
   params.set_output("Geometry", std::move(geometry_set));
 }
 }  // namespace blender::nodes
