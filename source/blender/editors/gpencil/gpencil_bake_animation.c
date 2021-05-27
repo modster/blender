@@ -71,6 +71,7 @@ const EnumPropertyItem rna_gpencil_reproject_type_items[] = {
      "Reproject the strokes to end up on the same plane, as if drawn from the current "
      "viewpoint "
      "using 'Cursor' Stroke Placement"},
+    {GP_REPROJECT_CAMERA, "CAMERA", 0, "Camera", "Reproject the strokes using the camera view"},
     {GP_REPROJECT_CURSOR,
      "CURSOR",
      0,

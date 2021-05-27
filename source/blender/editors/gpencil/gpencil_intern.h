@@ -271,6 +271,12 @@ bool gpencil_point_xy_to_3d(const GP_SpaceConversion *gsc,
                             const float screen_co[2],
                             float r_out[3]);
 
+bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
+                                   struct Scene *scene,
+                                   float persmat[4][4],
+                                   const float screen_co[2],
+                                   float r_out[3]);
+
 /* helper to convert 2d to 3d */
 void gpencil_stroke_convertcoords_tpoint(struct Scene *scene,
                                          struct ARegion *region,

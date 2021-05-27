@@ -76,6 +76,8 @@ typedef enum eGP_ReprojectModes {
   GP_REPROJECT_SURFACE,
   /* Reprojected on 3D cursor orientation */
   GP_REPROJECT_CURSOR,
+  /* Reprojected on Camera View */
+  GP_REPROJECT_CAMERA,
   /* Keep equals (used in some operators) */
   GP_REPROJECT_KEEP,
 } eGP_ReprojectModes;
@@ -279,6 +281,11 @@ void ED_gpencil_project_point_to_plane(const struct Scene *scene,
                                        const float origin[3],
                                        const int axis,
                                        struct bGPDspoint *pt);
+void ED_gpencil_project_point_to_render_space(const struct Scene *scene,
+                                              struct bGPDspoint *pt,
+                                              const float persmat[4][4],
+                                              const bool is_ortho,
+                                              float r_co[2]);
 void ED_gpencil_drawing_reference_get(const struct Scene *scene,
                                       const struct Object *ob,
                                       char align_flag,
