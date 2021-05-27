@@ -33,7 +33,7 @@ namespace blender::compositor {
   BLI_assert((dst_buf)->get_rect().ymax >= (dst_y) + BLI_rcti_size_y(&(src_rect)))
 
 #define ASSERT_VALID_ELEM_SIZE(buf, channel_offset, elem_size) \
-  BLI_assert((buf)->get_num_channels() <= (channel_offset) + (elem_size))
+  BLI_assert((buf)->get_num_channels() >= (channel_offset) + (elem_size))
 
 static void copy_single_elem(MemoryBuffer *dst,
                              const int dst_channel_offset,
