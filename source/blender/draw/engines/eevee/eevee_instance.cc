@@ -74,6 +74,7 @@ void Instance::init(const ivec2 &output_res,
   main_view.init(output_res);
   velocity.init();
   shadows.init();
+  lightprobes.init();
 }
 
 rcti Instance::output_crop(const int res[2], const rcti *crop)
@@ -123,6 +124,7 @@ void Instance::begin_sync()
   materials.begin_sync();
   velocity.begin_sync();
   lights.begin_sync();
+  lightprobes.begin_sync();
 }
 
 void Instance::object_sync(Object *ob)

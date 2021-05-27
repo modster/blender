@@ -14,11 +14,7 @@ void generated_from_orco(vec3 orco, out vec3 generated)
 
 void generated_texco(vec3 attr_orco, out vec3 generated)
 {
-#if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
-  generated = normalize(g_data.P);
-#else
   generated_from_orco(attr_orco, generated);
-#endif
 }
 
 void node_tex_coord(mat4 obmatinv,

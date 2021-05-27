@@ -82,7 +82,7 @@ void World::sync()
     WorldHandle &wo_handle = inst_.sync.sync_world(bl_world);
 
     if (wo_handle.recalc != 0) {
-      /* TODO(fclem) Tag light probe to update. */
+      inst_.lightprobes.set_world_dirty();
     }
     wo_handle.reset_recalc_flag();
   }

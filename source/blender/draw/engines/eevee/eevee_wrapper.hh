@@ -244,6 +244,24 @@ class Texture {
     }
   }
 
+  void ensure_cubemap(const char *name, int w, int mips, eGPUTextureFormat format)
+  {
+    /* TODO(fclem) In the future, we need to check if mip_count did not change.
+     * For now it's ok as we always define all mip level.*/
+    if (tx_ && (GPU_texture_width(tx_) != w || GPU_texture_cube(tx_) != true ||
+                GPU_texture_format(tx_) != format)) {
+      GPU_TEXTURE_FREE_SAFE(tx_);
+    }
+    if (tx_ == nullptr) {
+      tx_ = GPU_texture_create_cube(name, w, mips, format, nullptr);
+      if (mips > 1) {
+        /* TODO(fclem) Remove once we have immutable storage or when mips are
+         * generated on creation. */
+        GPU_texture_generate_mipmap(tx_);
+      }
+    }
+  }
+
   void ensure(int w, int h, int mips, eGPUTextureFormat format)
   {
     ensure(name_, w, h, mips, format);

@@ -72,6 +72,9 @@ extern char datatoc_eevee_film_lib_glsl[];
 extern char datatoc_eevee_film_resolve_frag_glsl[];
 extern char datatoc_eevee_gbuffer_lib_glsl[];
 extern char datatoc_eevee_light_lib_glsl[];
+extern char datatoc_eevee_lightprobe_downsample_frag_glsl[];
+extern char datatoc_eevee_lightprobe_downsample_geom_glsl[];
+extern char datatoc_eevee_lightprobe_downsample_vert_glsl[];
 extern char datatoc_eevee_ltc_lib_glsl[];
 extern char datatoc_eevee_motion_blur_gather_frag_glsl[];
 extern char datatoc_eevee_motion_blur_lib_glsl[];
@@ -258,6 +261,11 @@ ShaderModule::ShaderModule()
                             eevee_depth_of_field_tiles_dilate_frag,
                             "#define DILATE_MODE_MIN_MAX true\n");
   SHADER_FULLSCREEN(DOF_TILES_FLATTEN, eevee_depth_of_field_tiles_flatten_frag);
+  SHADER(LIGHTPROBE_DOWNSAMPLE_CUBE,
+         eevee_lightprobe_downsample_vert,
+         eevee_lightprobe_downsample_geom,
+         eevee_lightprobe_downsample_frag,
+         "#define CUBEMAP\n");
   SHADER(MESH, eevee_surface_mesh_vert, nullptr, eevee_surface_forward_frag, nullptr);
 
   SHADER_FULLSCREEN(MOTION_BLUR_GATHER, eevee_motion_blur_gather_frag);

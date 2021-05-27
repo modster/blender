@@ -92,6 +92,7 @@ set(SRC
   engines/eevee/eevee_instance.cc
   engines/eevee/eevee_light.cc
   engines/eevee/eevee_lightcache.c
+  engines/eevee/eevee_lightprobe.cc
   engines/eevee/eevee_lut.c
   engines/eevee/eevee_material.cc
   engines/eevee/eevee_mesh.cc
@@ -233,6 +234,9 @@ data_to_c_simple(engines/eevee/shaders/eevee_film_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_film_resolve_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_gbuffer_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_light_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_lightprobe_downsample_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_lightprobe_downsample_geom.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_lightprobe_downsample_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_ltc_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_gather_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_lib.glsl SRC)

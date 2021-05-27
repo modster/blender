@@ -31,6 +31,7 @@
 #include "eevee_film.hh"
 #include "eevee_id_map.hh"
 #include "eevee_light.hh"
+#include "eevee_lightprobe.hh"
 #include "eevee_material.hh"
 #include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
@@ -65,6 +66,7 @@ class Instance {
   VelocityModule velocity;
   MotionBlurModule motion_blur;
   LightModule lights;
+  LightProbeModule lightprobes;
   /* TODO(fclem) Move it to scene layer data. */
   ShadowModule shadows;
   SyncModule sync;
@@ -98,6 +100,7 @@ class Instance {
         velocity(*this),
         motion_blur(*this),
         lights(*this),
+        lightprobes(*this),
         shadows(*this),
         sync(*this),
         materials(*this){};

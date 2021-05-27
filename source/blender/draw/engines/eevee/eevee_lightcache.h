@@ -24,6 +24,10 @@
 
 #include "BLI_sys_types.h" /* for bool */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct BlendDataReader;
 struct BlendWriter;
 struct EEVEE_Data;
@@ -66,3 +70,7 @@ void EEVEE_lightcache_info_update(struct SceneEEVEE *eevee);
 
 void EEVEE_lightcache_blend_write(struct BlendWriter *writer, struct LightCache *cache);
 void EEVEE_lightcache_blend_read_data(struct BlendDataReader *reader, struct LightCache *cache);
+
+#ifdef __cplusplus
+}
+#endif
