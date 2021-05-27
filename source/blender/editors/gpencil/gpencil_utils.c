@@ -1291,7 +1291,9 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
   invert_m4_m4(inverse_diff_mat, diff_mat);
 
   float persmat[4][4];
-  const bool is_ortho = gpencil_calculate_persmat(gsc->scene, persmat);
+  const bool is_ortho = (mode == GP_REPROJECT_CAMERA) ?
+                            gpencil_calculate_persmat(gsc->scene, persmat) :
+                            false;
 
   float origin[3];
   if (mode != GP_REPROJECT_CURSOR) {
@@ -1377,8 +1379,6 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
       ED_gpencil_project_point_to_render_space(gsc->scene, &pt2, persmat, is_ortho, xy);
       /* Convert to Global Camera 3D space. */
       gpencil_point_render_xy_to_3d(gsc, persmat, xy, &pt->x);
-      /* Convert to object local space. */
-      mul_m4_v3(inverse_diff_mat, &pt->x);
     }
     else {
       /* Geometry - Snap to surfaces of visible geometry */
