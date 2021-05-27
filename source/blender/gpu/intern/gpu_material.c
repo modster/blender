@@ -42,6 +42,7 @@
 #include "BKE_material.h"
 #include "BKE_node.h"
 #include "BKE_scene.h"
+#include "BKE_world.h"
 
 #include "GPU_material.h"
 #include "GPU_shader.h"
@@ -439,5 +440,6 @@ void GPU_materials_free(Main *bmain)
     GPU_material_free(&wo->gpumaterial);
   }
 
+  BKE_world_defaults_free_gpu();
   BKE_material_defaults_free_gpu();
 }

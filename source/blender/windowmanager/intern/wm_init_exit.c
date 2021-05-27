@@ -130,6 +130,7 @@
 
 #include "BKE_sound.h"
 #include "BKE_subdiv.h"
+#include "BKE_world.h"
 
 #include "COM_compositor.h"
 
@@ -542,6 +543,7 @@ void WM_exit_ex(bContext *C, const bool do_python)
   BKE_addon_pref_type_free();
   BKE_keyconfig_pref_type_free();
   BKE_materials_exit();
+  BKE_worlds_exit();
 
   wm_operatortype_free();
   wm_surfaces_free();

@@ -49,6 +49,8 @@
 
 #include "BLT_translation.h"
 
+#include "NOD_shader.h"
+
 #include "DRW_engine.h"
 
 #include "DEG_depsgraph.h"
@@ -224,4 +226,58 @@ void BKE_world_eval(struct Depsgraph *depsgraph, World *world)
 {
   DEG_debug_print_eval(depsgraph, __func__, world->id.name, world);
   GPU_material_free(&world->gpumaterial);
+}
+
+/* Default World
+ *
+ * Used for rendering when a scene have no world assigned. */
+
+static World default_world;
+
+static void world_default_init(World *ma)
+{
+  bNodeTree *ntree = ntreeAddTree(NULL, "Shader Nodetree", ntreeType_Shader->idname);
+  ma->nodetree = ntree;
+  ma->use_nodes = true;
+
+  bNode *background = nodeAddStaticNode(NULL, ntree, SH_NODE_BACKGROUND);
+  bNode *output = nodeAddStaticNode(NULL, ntree, SH_NODE_OUTPUT_WORLD);
+  bNodeSocket *background_out = nodeFindSocket(background, SOCK_OUT, "Background");
+  bNodeSocket *output_in = nodeFindSocket(output, SOCK_IN, "Surface");
+  nodeAddLink(ntree, background, background_out, output, output_in);
+  nodeSetActive(ntree, output);
+
+  bNodeSocketValueRGBA *color_socket_ =
+      (bNodeSocketValueRGBA *)nodeFindSocket(background, SOCK_IN, "Color")->default_value;
+
+  color_socket_->value[0] = 0.0f;
+  color_socket_->value[1] = 0.0f;
+  color_socket_->value[2] = 0.0f;
+  color_socket_->value[3] = 1.0f;
+}
+
+World *BKE_world_default(void)
+{
+  return &default_world;
+}
+
+void BKE_world_defaults_free_gpu(void)
+{
+  if (default_world.gpumaterial.first) {
+    GPU_material_free(&default_world.gpumaterial);
+  }
+}
+
+/* Module functions called on startup and exit. */
+
+void BKE_worlds_init(void)
+{
+  world_init_data(&default_world.id);
+
+  world_default_init(&default_world);
+}
+
+void BKE_worlds_exit(void)
+{
+  world_free_data(&default_world.id);
 }

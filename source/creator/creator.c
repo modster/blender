@@ -66,6 +66,7 @@
 #include "BKE_shader_fx.h"
 #include "BKE_sound.h"
 #include "BKE_volume.h"
+#include "BKE_world.h"
 
 #include "DEG_depsgraph.h"
 
@@ -456,6 +457,7 @@ int main(int argc,
   BKE_sound_init_once();
 
   BKE_materials_init();
+  BKE_worlds_init();
 
 #ifndef WITH_PYTHON_MODULE
   if (G.background == 0) {

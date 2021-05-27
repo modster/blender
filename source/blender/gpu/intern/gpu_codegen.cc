@@ -39,6 +39,7 @@
 #include "PIL_time.h"
 
 #include "BKE_material.h"
+#include "BKE_world.h"
 
 #include "GPU_capabilities.h"
 #include "GPU_material.h"
@@ -810,6 +811,7 @@ void gpu_codegen_init(void)
 
 void gpu_codegen_exit(void)
 {
+  BKE_world_defaults_free_gpu();
   BKE_material_defaults_free_gpu();
   GPU_shader_free_builtin_shaders();
 }
