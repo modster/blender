@@ -284,6 +284,8 @@ static int gpencil_bake_grease_pencil_animation_exec(bContext *C, wmOperator *op
     /* Move scene to new frame. */
     CFRA = i;
     BKE_scene_graph_update_for_newframe(depsgraph);
+    /* Ensure camera switch is applied. */
+    BKE_scene_camera_switch_update(scene);
 
     /* Loop all objects in the list. */
     LISTBASE_FOREACH (GpBakeOb *, elem, &ob_selected_list) {
