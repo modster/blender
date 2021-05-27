@@ -24,6 +24,7 @@ SetColorOperation::SetColorOperation()
 {
   this->addOutputSocket(DataType::Color);
   flags.is_set_operation = true;
+  flags.is_fullframe_operation = true;
 }
 
 void SetColorOperation::executePixelSampled(float output[4],
@@ -32,6 +33,16 @@ void SetColorOperation::executePixelSampled(float output[4],
                                             PixelSampler /*sampler*/)
 {
   copy_v4_v4(output, this->m_color);
+}
+
+void SetColorOperation::update_memory_buffer(MemoryBuffer *output,
+                                             const rcti &output_rect,
+                                             Span<MemoryBuffer *> inputs,
+                                             ExecutionSystem &exec_system)
+{
+  BLI_assert(output->is_a_single_elem());
+  float *out_elem = output->get_elem(output_rect.xmin, output_rect.ymin);
+  copy_v4_v4(out_elem, m_color);
 }
 
 void SetColorOperation::determineResolution(unsigned int resolution[2],
