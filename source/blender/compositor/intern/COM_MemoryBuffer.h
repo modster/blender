@@ -106,6 +106,11 @@ class MemoryBuffer {
    */
   bool m_is_a_single_elem;
 
+  /**
+   * Whether MemoryBuffer owns buffer data.
+   */
+  bool is_owner_;
+
  public:
   /**
    * \brief construct new temporarily MemoryBuffer for an area
@@ -116,6 +121,13 @@ class MemoryBuffer {
    * \brief construct new temporarily MemoryBuffer for an area
    */
   MemoryBuffer(DataType datatype, const rcti &rect, bool is_a_single_elem = false);
+
+  /**
+   * Construct MemoryBuffer from an existent float buffer. MemoryBuffer is not responsible for
+   * freeing given buffer.
+   */
+  MemoryBuffer(
+      float *buffer, int num_channels, int width, int height, bool is_a_single_elem = false);
 
   /**
    * Copy constructor

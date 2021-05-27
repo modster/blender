@@ -30,6 +30,7 @@ MemoryBuffer::MemoryBuffer(MemoryProxy *memoryProxy, const rcti &rect, MemoryBuf
   this->m_num_channels = COM_data_type_num_channels(memoryProxy->getDataType());
   this->m_buffer = (float *)MEM_mallocN_aligned(
       sizeof(float) * buffer_len() * this->m_num_channels, 16, "COM_MemoryBuffer");
+  is_owner_ = true;
   this->m_state = state;
   this->m_datatype = memoryProxy->getDataType();
 
@@ -44,8 +45,27 @@ MemoryBuffer::MemoryBuffer(DataType dataType, const rcti &rect, bool is_a_single
   this->m_num_channels = COM_data_type_num_channels(dataType);
   this->m_buffer = (float *)MEM_mallocN_aligned(
       sizeof(float) * buffer_len() * this->m_num_channels, 16, "COM_MemoryBuffer");
+  is_owner_ = true;
   this->m_state = MemoryBufferState::Temporary;
   this->m_datatype = dataType;
+
+  set_strides();
+}
+
+MemoryBuffer::MemoryBuffer(float *buffer,
+                           const int num_channels,
+                           const int width,
+                           const int height,
+                           const bool is_a_single_elem)
+{
+  BLI_rcti_init(&m_rect, 0, width, 0, height);
+  m_is_a_single_elem = is_a_single_elem;
+  m_memoryProxy = nullptr;
+  m_num_channels = num_channels;
+  m_datatype = COM_num_channels_data_type(num_channels);
+  m_buffer = buffer;
+  is_owner_ = false;
+  m_state = MemoryBufferState::Temporary;
 
   set_strides();
 }
@@ -112,7 +132,7 @@ float MemoryBuffer::get_max_value(const rcti &rect) const
 
 MemoryBuffer::~MemoryBuffer()
 {
-  if (this->m_buffer) {
+  if (this->m_buffer && is_owner_) {
     MEM_freeN(this->m_buffer);
     this->m_buffer = nullptr;
   }
