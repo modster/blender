@@ -68,7 +68,7 @@ void *lineart_list_append_pointer_pool_thread(ListBase *h, LineartStaticMemPool 
   if (h == NULL) {
     return 0;
   }
-  lip = lineart_mem_aquire_thread(smp, sizeof(LinkData));
+  lip = lineart_mem_acquire_thread(smp, sizeof(LinkData));
   lip->data = data;
   BLI_addtail(h, lip);
   return lip;
@@ -82,7 +82,7 @@ void *lineart_list_append_pointer_pool_sized_thread(ListBase *h,
   if (h == NULL) {
     return 0;
   }
-  lip = lineart_mem_aquire_thread(smp, size);
+  lip = lineart_mem_acquire_thread(smp, size);
   lip->data = data;
   BLI_addtail(h, lip);
   return lip;
