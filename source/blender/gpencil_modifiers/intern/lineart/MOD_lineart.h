@@ -335,7 +335,8 @@ typedef struct LineartRenderTaskInfo {
 
   int thread_id;
 
-  /* In these list, list->last doesn't end overall, it only ends for the specific task thread. */
+  /* These lists only denote the part of the main edge list that the thread should iterate over.
+   * Be careful to not iterate outside of these bounds as it is not thread safe to do so. */
   ListBase contour;
   ListBase intersection;
   ListBase crease;
@@ -522,7 +523,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb);
 void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
 void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
 
-int MOD_lineart_chain_count(const LineartEdgeChain *rlc);
+int MOD_lineart_chain_count(const LineartEdgeChain *ec);
 void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);
 
 bool MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
