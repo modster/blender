@@ -2665,6 +2665,11 @@ static bool gpencil_is_layer_mask(ViewLayer *view_layer, bGPdata *gpd, bGPDlayer
       continue;
     }
 
+    /* Skip if masks are disabled for this view layer. */
+    if (gpl->flag & GP_LAYER_DISABLE_MASKS_IN_VIEWLAYER) {
+      continue;
+    }
+
     LISTBASE_FOREACH (bGPDlayer_Mask *, mask, &gpl->mask_layers) {
       if (STREQ(gpl_mask->info, mask->name)) {
         return true;
@@ -2724,7 +2729,7 @@ void BKE_gpencil_visible_stroke_iter(ViewLayer *view_layer,
      * This is used only in final render and never in Viewport. */
     if ((view_layer != NULL) && (gpl->viewlayername[0] != '\0') &&
         (!STREQ(view_layer->name, gpl->viewlayername))) {
-      /* Do not skip masks when rendering the viewlayer so that it can still be used to clip
+      /* Do not skip masks when rendering the view-layer so that it can still be used to clip
        * other layers. Instead set their opacity to zero. */
       if (gpencil_is_layer_mask(view_layer, gpd, gpl)) {
         gpl->opacity = 0.0f;
