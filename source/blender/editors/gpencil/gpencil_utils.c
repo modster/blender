@@ -1250,7 +1250,7 @@ static bool gpencil_calculate_persmat(Scene *scene, float persmat[4][4], float p
     BKE_camera_params_compute_viewplane(&params, rd->xsch, rd->ysch, rd->xasp, rd->yasp);
     BKE_camera_params_compute_matrix(&params);
 
-    float viewmat[4][4], invview[4][4];
+    float viewmat[4][4];
     invert_m4_m4(viewmat, cam_ob->obmat);
 
     mul_m4_m4m4(persmat, params.winmat, viewmat);
@@ -1395,7 +1395,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
       /* Convert to Render 2D space. */
       ED_gpencil_project_point_to_render_space(gsc->scene, &pt2, persmat, is_ortho, xy);
       /* Convert to Global Camera 3D space. */
-      gpencil_point_render_xy_to_3d(gsc, persmat, xy, &pt->x);
+      gpencil_point_render_xy_to_3d(gsc, persmat, persinv, xy, &pt->x);
     }
     else {
       /* Geometry - Snap to surfaces of visible geometry */
