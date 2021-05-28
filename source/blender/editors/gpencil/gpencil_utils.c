@@ -977,13 +977,22 @@ bool gpencil_point_xy_to_3d(const GP_SpaceConversion *gsc,
 
 bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
                                    float persmat[4][4],
+                                   float persinv[4][4],
                                    const float screen_co[2],
                                    float r_out[3])
 {
   float rvec[3];
   Scene *scene = gsc->scene;
 
-  ED_gpencil_drawing_reference_get(scene, gsc->ob, scene->toolsettings->gpencil_v3d_align, rvec);
+  /* use object location */
+  copy_v3_v3(rvec, gsc->ob->obmat[3]);
+
+  /* Apply layer offset. */
+  bGPdata *gpd = gsc->ob->data;
+  bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
+  if (gpl != NULL) {
+    add_v3_v3(rvec, gpl->layer_mat[3]);
+  }
 
   float zfac = mul_project_m4_v3_zfac(persmat, rvec);
 
@@ -1007,7 +1016,14 @@ bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
   if (ED_view3d_project_float_ex(gsc->region, persmat, false, rvec, mval_prj, V3D_PROJ_TEST_NOP) ==
       V3D_PROJ_RET_OK) {
     sub_v2_v2v2(mval_f, mval_prj, mval_f);
-    ED_view3d_win_to_delta(gsc->region, mval_f, dvec, zfac);
+
+    float dx, dy;
+    dx = 2.0f * mval_f[0] * zfac / (scene->r.xsch * scene->r.size);
+    dy = 2.0f * mval_f[1] * zfac / (scene->r.ysch * scene->r.size);
+    dvec[0] = (persinv[0][0] * dx + persinv[1][0] * dy);
+    dvec[1] = (persinv[0][1] * dx + persinv[1][1] * dy);
+    dvec[2] = (persinv[0][2] * dx + persinv[1][2] * dy);
+
     sub_v3_v3v3(r_out, rvec, dvec);
 
     return true;
@@ -1219,7 +1235,7 @@ void ED_gpencil_project_stroke_to_plane(const Scene *scene,
 }
 
 /* Retun if is_ortho and the perspective matrix.*/
-static bool gpencil_calculate_persmat(Scene *scene, float persmat[4][4])
+static bool gpencil_calculate_persmat(Scene *scene, float persmat[4][4], float persinv[4][4])
 {
   Object *cam_ob = scene->camera;
   bool is_ortho = false;
@@ -1234,10 +1250,12 @@ static bool gpencil_calculate_persmat(Scene *scene, float persmat[4][4])
     BKE_camera_params_compute_viewplane(&params, rd->xsch, rd->ysch, rd->xasp, rd->yasp);
     BKE_camera_params_compute_matrix(&params);
 
-    float viewmat[4][4];
+    float viewmat[4][4], invview[4][4];
     invert_m4_m4(viewmat, cam_ob->obmat);
 
     mul_m4_m4m4(persmat, params.winmat, viewmat);
+    invert_m4_m4_safe(persinv, persmat);
+
     is_ortho = params.is_ortho;
   }
   else {
@@ -1290,8 +1308,8 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
   BKE_gpencil_layer_transform_matrix_get(depsgraph, gsc->ob, gpl, diff_mat);
   invert_m4_m4(inverse_diff_mat, diff_mat);
 
-  float persmat[4][4];
-  const bool is_ortho = gpencil_calculate_persmat(gsc->scene, persmat);
+  float persmat[4][4], persinv[4][4];
+  const bool is_ortho = gpencil_calculate_persmat(gsc->scene, persmat, persinv);
 
   float origin[3];
   if (mode != GP_REPROJECT_CURSOR) {
@@ -1329,12 +1347,10 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
 
     bGPDspoint pt2;
     gpencil_point_to_parent_space(pt, diff_mat, &pt2);
-    if (mode != GP_REPROJECT_CAMERA) {
-      gpencil_point_to_xy_fl(gsc, gps_active, &pt2, &xy[0], &xy[1]);
-    }
 
     /* Project stroke in one axis */
     if (ELEM(mode, GP_REPROJECT_FRONT, GP_REPROJECT_SIDE, GP_REPROJECT_TOP, GP_REPROJECT_CURSOR)) {
+      gpencil_point_to_xy_fl(gsc, gps_active, &pt2, &xy[0], &xy[1]);
       int axis = 0;
       switch (mode) {
         case GP_REPROJECT_FRONT: {
@@ -1369,6 +1385,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
     /* Project screen-space back to 3D space (from current perspective)
      * so that all points have been treated the same way. */
     else if (mode == GP_REPROJECT_VIEW) {
+      gpencil_point_to_xy_fl(gsc, gps_active, &pt2, &xy[0], &xy[1]);
       /* Planar - All on same plane parallel to the view-plane. */
       gpencil_point_xy_to_3d(gsc, gsc->scene, xy, &pt->x);
     }
@@ -1376,9 +1393,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
       /* Convert to Render 2D space. */
       ED_gpencil_project_point_to_render_space(gsc->scene, &pt2, persmat, is_ortho, xy);
       /* Convert to Global Camera 3D space. */
-      gpencil_point_render_xy_to_3d(gsc, persmat, xy, &pt->x);
-      /* Convert to object local space. */
-      mul_m4_v3(inverse_diff_mat, &pt->x);
+      gpencil_point_render_xy_to_3d(gsc, persmat, persinv, xy, &pt->x);
     }
     else {
       /* Geometry - Snap to surfaces of visible geometry */
@@ -1390,6 +1405,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
       float location[3] = {0.0f, 0.0f, 0.0f};
       float normal[3] = {0.0f, 0.0f, 0.0f};
 
+      gpencil_point_to_xy_fl(gsc, gps_active, &pt2, &xy[0], &xy[1]);
       ED_view3d_win_to_vector(region, xy, &ray_normal[0]);
       BLI_assert(gps->flag & GP_STROKE_3DSPACE);
       if (ED_transform_snap_object_project_ray(sctx,
