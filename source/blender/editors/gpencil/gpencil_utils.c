@@ -1235,7 +1235,7 @@ void ED_gpencil_project_stroke_to_plane(const Scene *scene,
 }
 
 /* Retun if is_ortho and the perspective matrix.*/
-static bool gpencil_calculate_persmat(Scene *scene, float persmat[4][4], float persinv[4][4])
+static bool gpencil_calculate_camera_matrix(Scene *scene, float persmat[4][4], float persinv[4][4])
 {
   Object *cam_ob = scene->camera;
   bool is_ortho = false;
@@ -1310,7 +1310,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
 
   float persmat[4][4], persinv[4][4];
   const bool is_ortho = (mode == GP_REPROJECT_CAMERA) ?
-                            gpencil_calculate_persmat(gsc->scene, persmat, persinv) :
+                            gpencil_calculate_camera_matrix(gsc->scene, persmat, persinv) :
                             false;
 
   float origin[3];
