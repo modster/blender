@@ -171,6 +171,19 @@ class Spline {
   LookupResult lookup_evaluated_length(const float length) const;
 
   blender::Array<float> sample_uniform_index_factors(const int samples_size) const;
+
+  struct Parameter {
+    float factor;
+    int data_index;
+
+    friend bool operator<(const Parameter &a, const Parameter &b)
+    {
+      return a.factor < b.factor;
+    }
+  };
+  void sample_parameters_to_index_factors(
+      blender::MutableSpan<Parameter> sample_index_factors) const;
+
   LookupResult lookup_data_from_index_factor(const float index_factor) const;
 
   /**
@@ -180,6 +193,11 @@ class Spline {
    */
   virtual blender::fn::GVArrayPtr interpolate_to_evaluated_points(
       const blender::fn::GVArray &source_data) const = 0;
+  template<typename T>
+  blender::fn::GVArrayPtr interpolate_to_evaluated_points(blender::Span<T> source_data) const
+  {
+    return this->interpolate_to_evaluated_points(blender::fn::GVArray_For_GSpan(source_data));
+  }
 
  protected:
   virtual void correct_end_tangents() const = 0;

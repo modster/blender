@@ -15,6 +15,7 @@
  */
 
 #include "BLI_array.hh"
+#include "BLI_float4x4.hh"
 #include "BLI_task.hh"
 #include "BLI_timeit.hh"
 
@@ -27,14 +28,15 @@
 
 #include "node_geometry_util.hh"
 
+using blender::float4x4;
 using blender::bke::GeometryInstanceGroup;
 
 static bNodeSocketTemplate geo_node_curve_deform_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_STRING, N_("Parameter")},
-    {SOCK_FLOAT, N_("Parameter"), 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
-    {SOCK_BOOLEAN, N_("Use Radius")},
+    {SOCK_STRING, N_("Factor")},
+    {SOCK_FLOAT, N_("Factor"), 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
+    // {SOCK_BOOLEAN, N_("Use Radius")},
     {-1, ""},
 };
 
@@ -57,7 +59,7 @@ static void geo_node_curve_deform_layout(uiLayout *layout, bContext *UNUSED(C), 
   else {
     uiLayoutSetPropSep(layout, true);
     uiLayoutSetPropDecorate(layout, false);
-    uiItemR(layout, ptr, "attribute_input_type", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "attribute_input_type", 0, IFACE_("Factor"), ICON_NONE);
   }
 }
 
@@ -84,45 +86,71 @@ static void geo_node_curve_deform_update(bNodeTree *UNUSED(ntree), bNode *node)
   nodeSetSocketAvailability(attribute_socket, mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE);
   update_attribute_input_socket_availabilities(
       *node,
-      "Parameter",
+      "Factor",
       (GeometryNodeAttributeInputMode)node_storage.attribute_input_type,
       mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE);
 }
 
-namespace {
-struct Parameter {
-  float parameter;
-  int index;
-};
-}  // namespace
-
-static void spline_deform(VArray<float3> &positions, Span<float> parameters, const Spline &spline)
+static void spline_deform(const Spline &spline,
+                          MutableSpan<Spline::Parameter> parameters,
+                          VMutableArray<float3> &positions)
 {
+  spline.sample_parameters_to_index_factors(parameters);
+  MutableSpan<Spline::Parameter> index_factors = std::move(parameters);
+
+  Span<float3> spline_positions = spline.evaluated_positions();
+  Span<float3> spline_tangents = spline.evaluated_tangents();
+  Span<float3> spline_normals = spline.evaluated_normals();
+  GVArray_Typed<float> radii{spline.interpolate_to_evaluated_points(spline.radii())};
+
+  parallel_for(positions.index_range(), 1024, [&](IndexRange range) {
+    for (const int i : range) {
+      const Spline::LookupResult interp = spline.lookup_data_from_index_factor(
+          index_factors[i].factor);
+      const int index = interp.evaluated_index;
+      const int next_index = interp.next_evaluated_index;
+
+      float4x4 matrix = float4x4::from_normalized_axis_data(
+          spline_positions[index], spline_normals[index], spline_tangents[index]);
+      matrix.apply_scale(radii[index]);
+
+      float4x4 next_matrix = float4x4::from_normalized_axis_data(
+          spline_positions[next_index], spline_normals[next_index], spline_tangents[next_index]);
+      matrix.apply_scale(radii[next_index]);
+
+      const float4x4 deform_matrix = float4x4::interpolate(matrix, next_matrix, interp.factor);
+
+      positions[parameters[i].data_index] = deform_matrix * positions[parameters[i].data_index];
+    }
+  });
 }
 
-struct CurveDeformInput {
-  GeometryNodeAttributeInputMode mode;
-  std::optional<GeometryNodeCurveDeformPositionAxis> position_axis;
-  std::optional<std::string> attribute_name;
-};
-
-static void execute_on_component(GeometryComponent &component,
-                                 const CurveDeformInput &input,
-                                 const CurveEval &curve)
+static void execute_on_component(const GeoNodeExecParams &params,
+                                 const CurveEval &curve,
+                                 GeometryComponent &component)
 {
-  GVArray_Typed<float3> positions = component.attribute_get_for_read<float3>(
+  const NodeGeometryCurveDeform &node_storage = *(NodeGeometryCurveDeform *)params.node().storage;
+  const GeometryNodeCurveDeformMode mode = (GeometryNodeCurveDeformMode)node_storage.input_mode;
+
+  if (curve.splines().size() == 0) {
+    params.error_message_add(NodeWarningType::Error, TIP_("Curve does not contain a spline"));
+    return;
+  }
+
+  const int size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
+  OutputAttribute_Typed<float3> positions = component.attribute_try_get_for_output<float3>(
       "position", ATTR_DOMAIN_POINT, {0, 0, 0});
 
-  Array<Parameter> parameters(positions.size());
+  Array<Spline::Parameter> parameters(size);
 
-  if (input.mode == GEO_NODE_CURVE_DEFORM_POSITION) {
-    switch (*input.position_axis) {
+  if (mode == GEO_NODE_CURVE_DEFORM_POSITION) {
+    switch ((GeometryNodeCurveDeformPositionAxis)node_storage.position_axis) {
       case GEO_NODE_CURVE_DEFORM_POSX:
-        parallel_for(positions.index_range(), 4096, [&](IndexRange range) {
-          for (const int i : range) {
-            parameters[i] = { positions }
-          }
-        });
+        // parallel_for(positions.index_range(), 4096, [&](IndexRange range) {
+        //   for (const int i : range) {
+        //     parameters[i] = { positions }
+        //   }
+        // });
         break;
       case GEO_NODE_CURVE_DEFORM_POSY:
         break;
@@ -136,6 +164,26 @@ static void execute_on_component(GeometryComponent &component,
         break;
     }
   }
+  else {
+    BLI_assert(mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE);
+    GVArrayPtr attribute = params.get_input_attribute(
+        "Factor", component, ATTR_DOMAIN_POINT, CD_PROP_FLOAT, nullptr);
+    if (!attribute) {
+      return;
+    }
+
+    /* Sanitize attribute input. */
+    GVArray_Typed<float> parameter_attribute{*attribute};
+    for (const int i : IndexRange(size)) {
+      parameters[i] = {std::clamp(parameter_attribute[i], 0.0f, 1.0f), i};
+    }
+  }
+
+  std::sort(parameters.begin(), parameters.end());
+
+  spline_deform(*curve.splines().first(), parameters, *positions);
+
+  positions.save();
 }
 
 static void geo_node_curve_deform_exec(GeoNodeExecParams params)
@@ -144,27 +192,30 @@ static void geo_node_curve_deform_exec(GeoNodeExecParams params)
   GeometrySet curve_geometry_set = params.extract_input<GeometrySet>("Curve");
 
   deform_geometry_set = bke::geometry_set_realize_instances(deform_geometry_set);
+
+  /* TODO: Theoretically this could be easily avoided. */
   curve_geometry_set = bke::geometry_set_realize_instances(curve_geometry_set);
 
   const CurveEval *curve = curve_geometry_set.get_curve_for_read();
   if (curve == nullptr) {
-    params.error_message_add(NodeWarningType::Error, TIP_("Curve input must contain curve data"));
+    params.set_output("Geometry", GeometrySet());
+    return;
   }
 
   if (deform_geometry_set.has<MeshComponent>()) {
     execute_on_component(
-        params, deform_geometry_set.get_component_for_write<MeshComponent>(), *curve);
+        params, *curve, deform_geometry_set.get_component_for_write<MeshComponent>());
   }
   if (deform_geometry_set.has<PointCloudComponent>()) {
     execute_on_component(
-        params, deform_geometry_set.get_component_for_write<PointCloudComponent>(), *curve);
+        params, *curve, deform_geometry_set.get_component_for_write<PointCloudComponent>());
   }
   if (deform_geometry_set.has<CurveComponent>()) {
     execute_on_component(
-        params, deform_geometry_set.get_component_for_write<CurveComponent>(), *curve);
+        params, *curve, deform_geometry_set.get_component_for_write<CurveComponent>());
   }
 
-  params.set_output("Geometry", GeometrySet());
+  params.set_output("Geometry", deform_geometry_set);
 }
 
 }  // namespace blender::nodes

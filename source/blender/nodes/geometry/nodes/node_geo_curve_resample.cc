@@ -118,11 +118,10 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
         input_spline, uniform_samples, positions_typed, output_spline->positions());
   }
   {
-    GVArrayPtr interpolated_data = input_spline.interpolate_to_evaluated_points(
+    GVArrayPtr radii = input_spline.interpolate_to_evaluated_points(
         GVArray_For_Span(input_spline.radii()));
-    GVArray_Typed<float> interpolated_data_typed{*interpolated_data};
     sample_span_to_output_spline<float>(
-        input_spline, uniform_samples, interpolated_data_typed, output_spline->radii());
+        input_spline, uniform_samples, radii->typed<float>(), output_spline->radii());
   }
   {
     GVArrayPtr interpolated_data = input_spline.interpolate_to_evaluated_points(
