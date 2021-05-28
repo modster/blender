@@ -124,6 +124,9 @@ const char *node_group_idname(bContext *C)
   if (ED_node_is_geometry(snode)) {
     return "GeometryNodeGroup";
   }
+  if (ED_node_is_attribute(snode)) {
+    return "AttributeNodeGroup";
+  }
 
   return "";
 }

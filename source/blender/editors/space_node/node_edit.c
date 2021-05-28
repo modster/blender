@@ -468,6 +468,7 @@ bool ED_node_is_geometry(struct SpaceNode *snode)
 
 bool ED_node_is_attribute(struct SpaceNode *snode)
 {
+  /* TODO: Better support for different tree types in the group hierarchy. */
   return STREQ(snode->tree_idname, ntreeType_Attribute->idname);
 }
 

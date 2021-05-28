@@ -31,6 +31,9 @@ void register_node_tree_type_attr(void);
 void register_node_type_geo_group(void);
 void register_node_type_geo_custom_group(bNodeType *ntype);
 
+void register_node_type_attribute_group(void);
+void register_node_type_attribute_custom_group(bNodeType *ntype);
+
 void register_node_type_geo_align_rotation_to_vector(void);
 void register_node_type_geo_attribute_clamp(void);
 void register_node_type_geo_attribute_color_ramp(void);

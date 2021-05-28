@@ -871,6 +871,20 @@ static const EnumPropertyItem *rna_node_static_type_itemf(bContext *UNUSED(C),
 #  undef DefNode
   }
 
+  if (RNA_struct_is_a(ptr->type, &RNA_AttributeNode)) {
+#  define DefNode(Category, ID, DefFunc, EnumName, StructName, UIName, UIDesc) \
+    if (STREQ(#Category, "AttributeNode")) { \
+      tmp.value = ID; \
+      tmp.identifier = EnumName; \
+      tmp.name = UIName; \
+      tmp.description = UIDesc; \
+      tmp.icon = ICON_NONE; \
+      RNA_enum_item_add(&item, &totitem, &tmp); \
+    }
+#  include "../../nodes/NOD_static_types.h"
+#  undef DefNode
+  }
+
   if (RNA_struct_is_a(ptr->type, &RNA_FunctionNode)) {
 #  define DefNode(Category, ID, DefFunc, EnumName, StructName, UIName, UIDesc) \
     if (STREQ(#Category, "FunctionNode")) { \
@@ -2286,6 +2300,28 @@ static StructRNA *rna_GeometryNode_register(Main *bmain,
   return nt->rna_ext.srna;
 }
 
+static StructRNA *rna_AttributeNode_register(Main *bmain,
+                                             ReportList *reports,
+                                             void *data,
+                                             const char *identifier,
+                                             StructValidateFunc validate,
+                                             StructCallbackFunc call,
+                                             StructFreeFunc free)
+{
+  bNodeType *nt = rna_Node_register_base(
+      bmain, reports, &RNA_AttributeNode, data, identifier, validate, call, free);
+  if (!nt) {
+    return NULL;
+  }
+
+  nodeRegisterType(nt);
+
+  /* update while blender is running */
+  WM_main_add_notifier(NC_NODE | NA_EDITED, NULL);
+
+  return nt->rna_ext.srna;
+}
+
 static StructRNA *rna_FunctionNode_register(Main *bmain,
                                             ReportList *reports,
                                             void *data,
@@ -3418,7 +3454,32 @@ static StructRNA *rna_GeometryNodeCustomGroup_register(Main *bmain,
   return nt->rna_ext.srna;
 }
 
-void register_node_type_geo_custom_group(bNodeType *ntype);
+static StructRNA *rna_AttributeNodeCustomGroup_register(Main *bmain,
+                                                        ReportList *reports,
+                                                        void *data,
+                                                        const char *identifier,
+                                                        StructValidateFunc validate,
+                                                        StructCallbackFunc call,
+                                                        StructFreeFunc free)
+{
+  bNodeType *nt = rna_Node_register_base(
+      bmain, reports, &RNA_AttributeNodeCustomGroup, data, identifier, validate, call, free);
+
+  if (!nt) {
+    return NULL;
+  }
+
+  nt->group_update_func = node_group_update;
+  nt->type = NODE_CUSTOM_GROUP;
+
+  register_node_type_attribute_custom_group(nt);
+
+  nodeRegisterType(nt);
+
+  WM_main_add_notifier(NC_NODE | NA_EDITED, NULL);
+
+  return nt->rna_ext.srna;
+}
 
 static StructRNA *rna_ShaderNodeCustomGroup_register(Main *bmain,
                                                      ReportList *reports,
@@ -10047,6 +10108,16 @@ static void rna_def_geometry_node(BlenderRNA *brna)
   RNA_def_struct_register_funcs(srna, "rna_GeometryNode_register", "rna_Node_unregister", NULL);
 }
 
+static void rna_def_attribute_node(BlenderRNA *brna)
+{
+  StructRNA *srna;
+
+  srna = RNA_def_struct(brna, "AttributeNode", "NodeInternal");
+  RNA_def_struct_ui_text(srna, "Attribute Node", "");
+  RNA_def_struct_sdna(srna, "bNode");
+  RNA_def_struct_register_funcs(srna, "rna_AttributeNode_register", "rna_Node_unregister", NULL);
+}
+
 static void rna_def_function_node(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -11983,6 +12054,7 @@ void RNA_def_nodetree(BlenderRNA *brna)
   rna_def_compositor_node(brna);
   rna_def_texture_node(brna);
   rna_def_geometry_node(brna);
+  rna_def_attribute_node(brna);
   rna_def_function_node(brna);
 
   rna_def_nodetree(brna);
@@ -12020,6 +12092,7 @@ void RNA_def_nodetree(BlenderRNA *brna)
   define_specific_node(brna, "CompositorNodeGroup", "CompositorNode", "Group", "", def_group);
   define_specific_node(brna, "TextureNodeGroup", "TextureNode", "Group", "", def_group);
   define_specific_node(brna, "GeometryNodeGroup", "GeometryNode", "Group", "", def_group);
+  define_specific_node(brna, "AttributeNodeGroup", "AttributeNode", "Group", "", def_group);
   def_custom_group(brna,
                    "ShaderNodeCustomGroup",
                    "ShaderNode",
@@ -12044,6 +12117,12 @@ void RNA_def_nodetree(BlenderRNA *brna)
                    "Geometry Custom Group",
                    "Custom Geometry Group Node for Python nodes",
                    "rna_GeometryNodeCustomGroup_register");
+  def_custom_group(brna,
+                   "AttributeNodeCustomGroup",
+                   "AttributeNode",
+                   "Attribute Custom Group",
+                   "Custom Attribute Group for Python nodes",
+                   "rna_AttributeNodeCustomGroup_register");
 
   /* special socket types */
   rna_def_cmp_output_file_slot_file(brna);
