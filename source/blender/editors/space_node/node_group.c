@@ -105,26 +105,31 @@ static bool node_group_operator_editable(bContext *C)
 static const char *group_ntree_idname(bContext *C)
 {
   SpaceNode *snode = CTX_wm_space_node(C);
-  return snode->tree_idname;
+  bNodeTree *ntree = snode->edittree;
+  return ntree ? ntree->idname : "";
 }
 
 const char *node_group_idname(bContext *C)
 {
   SpaceNode *snode = CTX_wm_space_node(C);
+  bNodeTree *ntree = snode->edittree;
+  if (ntree == NULL) {
+    return "";
+  }
 
-  if (ED_node_is_shader(snode)) {
+  if (STREQ(ntree->idname, "ShaderNodeTree")) {
     return "ShaderNodeGroup";
   }
-  if (ED_node_is_compositor(snode)) {
+  if (STREQ(ntree->idname, "CompositorNodeTree")) {
     return "CompositorNodeGroup";
   }
-  if (ED_node_is_texture(snode)) {
+  if (STREQ(ntree->idname, "TextureNodeTree")) {
     return "TextureNodeGroup";
   }
-  if (ED_node_is_geometry(snode)) {
+  if (STREQ(ntree->idname, "GeometryNodeTree")) {
     return "GeometryNodeGroup";
   }
-  if (ED_node_is_attribute(snode)) {
+  if (STREQ(ntree->idname, "AttributeNodeTree")) {
     return "AttributeNodeGroup";
   }
 
