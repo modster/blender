@@ -1277,7 +1277,7 @@ void ED_gpencil_project_point_to_render_space(const struct Scene *scene,
   float parent_co[3];
   mul_v3_m4v3(parent_co, persmat, &pt->x);
 
-  if (is_ortho) {
+  if (!is_ortho) {
     parent_co[0] = parent_co[0] / max_ff(FLT_MIN, parent_co[2]);
     parent_co[1] = parent_co[1] / max_ff(FLT_MIN, parent_co[2]);
   }
