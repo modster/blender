@@ -978,7 +978,7 @@ bool gpencil_point_xy_to_3d(const GP_SpaceConversion *gsc,
 bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
                                    float persmat[4][4],
                                    float persinv[4][4],
-                                   const float screen_co[2],
+                                   const float render_co[2],
                                    float r_out[3])
 {
   float rvec[3];
@@ -1011,7 +1011,7 @@ bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
   float mval_f[2], mval_prj[2];
   float dvec[3];
 
-  copy_v2_v2(mval_f, screen_co);
+  copy_v2_v2(mval_f, render_co);
 
   if (ED_view3d_project_float_ex(gsc->region, persmat, false, rvec, mval_prj, V3D_PROJ_TEST_NOP) ==
       V3D_PROJ_RET_OK) {
