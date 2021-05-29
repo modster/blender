@@ -510,15 +510,15 @@ void DRW_shader_free(GPUShader *shader)
  * contains the needed libraries for this shader.
  * \{ */
 
-/* 32 because we use a 32bit bitmap. */
-#define MAX_LIB 32
+/* 64 because we use a 64bit bitmap. */
+#define MAX_LIB 64
 #define MAX_LIB_NAME 64
 #define MAX_LIB_DEPS 8
 
 struct DRWShaderLibrary {
   const char *libs[MAX_LIB];
   char libs_name[MAX_LIB][MAX_LIB_NAME];
-  uint32_t libs_deps[MAX_LIB];
+  uint64_t libs_deps[MAX_LIB];
 };
 
 DRWShaderLibrary *DRW_shader_library_create(void)
@@ -547,12 +547,12 @@ static int drw_shader_library_search(const DRWShaderLibrary *lib, const char *na
 }
 
 /* Return bitmap of dependencies. */
-static uint32_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
+static uint64_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
                                             const char *lib_code,
                                             const char *lib_name)
 {
   /* Search dependencies. */
-  uint32_t deps = 0;
+  uint64_t deps = 0;
   const char *haystack = lib_code;
   while ((haystack = strstr(haystack, "BLENDER_REQUIRE("))) {
     haystack += 16;
@@ -575,7 +575,7 @@ static uint32_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
       BLI_assert(0);
     }
     else {
-      deps |= 1u << (uint32_t)dep;
+      deps |= 1lu << (uint64_t)dep;
     }
   }
   return deps;
@@ -606,21 +606,21 @@ void DRW_shader_library_add_file(DRWShaderLibrary *lib, const char *lib_code, co
  * Caller must free the string with MEM_freeN after use. */
 char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const char *shader_code)
 {
-  uint32_t deps = drw_shader_dependencies_get(lib, shader_code, "shader code");
+  uint64_t deps = drw_shader_dependencies_get(lib, shader_code, "shader code");
 
   DynStr *ds = BLI_dynstr_new();
   /* Add all dependencies recursively. */
   for (int i = MAX_LIB - 1; i > -1; i--) {
-    if (lib->libs[i] && (deps & (1u << (uint32_t)i))) {
+    if (lib->libs[i] && (deps & (1lu << (uint64_t)i))) {
       deps |= lib->libs_deps[i];
     }
   }
   /* Concatenate all needed libs into one string. */
-  for (int i = 0; i < MAX_LIB; i++) {
-    if (deps & 1u) {
+  for (int i = 0; i < MAX_LIB && deps != 0lu; i++) {
+    if (deps & 1lu) {
       BLI_dynstr_append(ds, lib->libs[i]);
     }
-    deps = deps >> 1;
+    deps = deps >> 1lu;
   }
 
   BLI_dynstr_append(ds, shader_code);
