@@ -1017,9 +1017,8 @@ bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
       V3D_PROJ_RET_OK) {
     sub_v2_v2v2(mval_f, mval_prj, mval_f);
 
-    float dx, dy;
-    dx = 2.0f * mval_f[0] * zfac / (scene->r.xsch * scene->r.size);
-    dy = 2.0f * mval_f[1] * zfac / (scene->r.ysch * scene->r.size);
+    float dx = 2.0f * mval_f[0] * zfac / (scene->r.xsch * scene->r.size / 100.0f) ;
+    float dy = 2.0f * mval_f[1] * zfac / (scene->r.ysch * scene->r.size / 100.0f);
     dvec[0] = (persinv[0][0] * dx + persinv[1][0] * dy);
     dvec[1] = (persinv[0][1] * dx + persinv[1][1] * dy);
     dvec[2] = (persinv[0][2] * dx + persinv[1][2] * dy);
