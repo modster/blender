@@ -1,7 +1,6 @@
 
 /**
- * Fullscreen pass that filter previous mipmap level using a 1 bilinear tap.
- * This uses layered rendering to filter all cubeface / layers in one drawcall.
+ * Passthrough geometry shader to use layered rendering..
  */
 
 /* TODO(fclem) Use vendor extensions to bypass geometry shader. */
@@ -9,14 +8,14 @@
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 3) out;
 
-in downsampleInterface
+in FilterInterface
 {
   vec3 coord;
   flat int layer;
 }
 interp_in[];
 
-out downsampleInterface
+out FilterInterface
 {
   vec3 coord;
   flat int layer;

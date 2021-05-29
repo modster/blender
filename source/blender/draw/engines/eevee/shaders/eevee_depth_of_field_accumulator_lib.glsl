@@ -381,7 +381,7 @@ void dof_gather_init(DepthOfFieldData dof,
                      out float intersection_multiplier)
 {
   /* Jitter center half a ring to reduce undersampling. */
-  vec2 jitter_ofs = 0.499 * disk_sample(noise);
+  vec2 jitter_ofs = 0.499 * sample_disk(noise);
   if (DOF_BOKEH_TEXTURE) {
     jitter_ofs *= dof.bokeh_anisotropic_scale;
   }

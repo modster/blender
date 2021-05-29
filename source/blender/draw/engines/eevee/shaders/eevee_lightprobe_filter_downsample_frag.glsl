@@ -4,21 +4,17 @@
  * This uses layered rendering to filter all cubeface / layers in one drawcall.
  */
 
+#pragma BLENDER_REQUIRE(eevee_lightprobe_filter_lib.glsl)
+
 #ifdef CUBEMAP
 uniform samplerCube input_tx;
 #else
 uniform sampler2DArray input_tx;
 #endif
 
-in downsampleInterface
-{
-  vec3 coord;
-  flat int layer;
-};
-
 out vec4 out_color;
 
 void main(void)
 {
-  out_color = clamp(textureLod(input_tx, coord, 0.0), 0.0, 1e20);
+  out_color = textureLod(input_tx, interp.coord, 0.0);
 }

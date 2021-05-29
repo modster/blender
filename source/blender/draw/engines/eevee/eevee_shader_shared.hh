@@ -466,6 +466,48 @@ BLI_STATIC_ASSERT_ALIGN(ShadowPunctualData, 16)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Light Probes
+ * \{ */
+
+/**
+ * Data used when filtering the cubemap.
+ * NOTE(fclem): We might want to promote some of theses to push constants as they are changed
+ * very frequently (Vulkan).
+ */
+struct LightProbeFilterData {
+  /** For glossy filter. */
+  float roughness;
+  /** Higher bias lowers the noise but increases blur and reduces quality. */
+  float lod_bias;
+  /** Final intensity multiplicator. */
+  float instensity_fac;
+  /** Luma maximum value. */
+  float luma_max;
+  /** Sample count to take from the input cubemap. */
+  float sample_count;
+  /** Visibility blur ratio [0..1]. Converted to angle in [0..PI/2] range. */
+  float visibility_blur;
+  /** Depth range to encode in the resulting visibility map. */
+  float visibility_range;
+  /** Target layer to render the fullscreen triangle to. */
+  int target_layer;
+};
+BLI_STATIC_ASSERT_ALIGN(LightProbeFilterData, 16)
+
+struct IrradianceInfoData {
+  /** Total of visibility cells per row and layer. */
+  int visibility_cells_per_row;
+  int visibility_cells_per_layer;
+  /** Sier of visibility cell. */
+  int visibility_size;
+  /** Number of irradiance cells per row. */
+  int irradiance_cells_per_row;
+};
+BLI_STATIC_ASSERT_ALIGN(IrradianceInfoData, 16)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Utility Texture
  * \{ */
 
@@ -502,6 +544,12 @@ vec4 utility_tx_sample(vec2 uv, float layer);
     { \
       return textureLod(utility_tx_, vec3(uv, layer), 0.0); \
     }
+/* Stubs declaration if not using the  */
+#  define utility_tx_fetch_define_stub(utility_tx_) \
+    vec4 utility_tx_fetch(vec2 texel, float layer) \
+    { \
+      return texelFetch(utility_tx_, ivec3(ivec2(texel) % UTIL_TEX_SIZE, layer), 0); \
+    }
 #endif
 
 /** \} */
@@ -511,6 +559,7 @@ using CameraDataBuf = StructBuffer<CameraData>;
 using CullingDataBuf = StructBuffer<CullingData>;
 using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
 using LightDataBuf = StructArrayBuffer<LightData, CULLING_ITEM_BATCH>;
+using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
 using ShadowPunctualDataBuf = StructArrayBuffer<ShadowPunctualData, CULLING_ITEM_BATCH>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 

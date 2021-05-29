@@ -34,6 +34,9 @@ class LightProbeModule {
  private:
   Instance &inst_;
 
+  LightProbeFilterDataBuf filter_data_;
+  IrradianceInfoData info_data_;
+
   /* Either scene lightcache or lookdev lightcache */
   LightCache *lightcache_ = nullptr;
   /* Own lightcache used for lookdev lighting or as fallback. */
@@ -50,17 +53,23 @@ class LightProbeModule {
                                          Framebuffer("posZ_view"),
                                          Framebuffer("negZ_view")};
 
-  Framebuffer cube_downsample_fb_ = Framebuffer("CubeDownsample");
+  Framebuffer cube_downsample_fb_ = Framebuffer("cube_downsample");
+  Framebuffer filter_cube_fb_ = Framebuffer("filter_cube");
+  Framebuffer filter_grid_fb_ = Framebuffer("filter_grid");
 
   std::array<DRWView *, 6> face_view_ = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
   DRWPass *cube_downsample_ps_ = nullptr;
   DRWPass *filter_glossy_ps_ = nullptr;
   DRWPass *filter_diffuse_ps_ = nullptr;
+  DRWPass *filter_visibility_ps_ = nullptr;
 
   bool do_world_update = false;
   /** Input texture to downsample cube pass. */
   GPUTexture *cube_downsample_input_tx_ = nullptr;
+  /** Constant values during baking. */
+  float glossy_clamp_ = 0.0;
+  float filter_quality_ = 0.0;
 
  public:
   LightProbeModule(Instance &inst) : inst_(inst){};
@@ -87,6 +96,16 @@ class LightProbeModule {
 
   void cubemap_prepare(vec3 &position, float near, float far);
 
+  void filter_glossy(int cube_index, float intensity);
+  void filter_diffuse(int sample_index, float intensity);
+  void filter_visibility(int sample_index, float visibility_blur, float visibility_range);
+
+  float lod_bias_from_cubemap(void)
+  {
+    float target_size_sq = square_f(GPU_texture_width(cube_color_tx_));
+    return 0.5f * logf(target_size_sq / filter_data_.sample_count) / logf(2);
+  }
+
   static void cube_downsample_cb(void *thunk, int UNUSED(level))
   {
     DRW_draw_pass(reinterpret_cast<LightProbeModule *>(thunk)->cube_downsample_ps_);
@@ -94,14 +113,22 @@ class LightProbeModule {
 
   template<typename RenderF> void cubemap_render(const RenderF &render_callback)
   {
+    DRW_stats_group_start("Cubemap Render");
     for (auto face_id : IndexRange(6)) {
       DRW_view_set_active(face_view_[face_id]);
       GPU_framebuffer_bind(face_fb_[face_id]);
       render_callback();
     }
-    /* Update all mipmaps. */
+    DRW_stats_group_end();
+
+    /* Update mipchain. */
+    filter_data_.target_layer = 0;
+    filter_data_.push_update();
     cube_downsample_input_tx_ = cube_color_tx_;
+
+    DRW_stats_group_start("Cubemap Downsample");
     GPU_framebuffer_recursive_downsample(cube_downsample_fb_, 8, cube_downsample_cb, this);
+    DRW_stats_group_end();
   }
 };
 
