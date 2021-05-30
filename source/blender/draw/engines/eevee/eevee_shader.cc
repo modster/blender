@@ -545,9 +545,9 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
 {
   std::string output = "\n\n";
 
-  if (codegen->attribs_interface) {
-    /* World material loads attribs in fragment shader (only used for orco). */
-    if (geometry_type == MAT_GEOM_WORLD) {
+  /* World material loads attribs in fragment shader (only used for orco). */
+  if (geometry_type == MAT_GEOM_WORLD) {
+    if (codegen->attribs_interface) {
       /* Declare inputs. */
       std::string delimiter = ";\n";
       std::string sub(codegen->attribs_declare);
@@ -564,13 +564,17 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
 
       output += codegen->attribs_interface;
       output += "\n";
-
-      output += "void attrib_load(void)\n";
-      output += "{\n";
-      output += codegen->attribs_load;
-      output += "}\n\n";
     }
-    else {
+
+    output += "void attrib_load(void)\n";
+    output += "{\n";
+    if (codegen->attribs_interface) {
+      output += codegen->attribs_load;
+    }
+    output += "}\n\n";
+  }
+  else {
+    if (codegen->attribs_interface) {
       output += "IN_OUT AttributesInterface\n";
       output += "{\n";
       output += codegen->attribs_interface;
