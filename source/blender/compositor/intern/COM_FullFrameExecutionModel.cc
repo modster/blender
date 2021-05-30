@@ -17,10 +17,14 @@
  */
 
 #include "COM_FullFrameExecutionModel.h"
+#include "COM_ConstantFolder.h"
 #include "COM_Debug.h"
 #include "COM_ExecutionGroup.h"
 #include "COM_ReadBufferOperation.h"
 #include "COM_WorkScheduler.h"
+
+#include "BLI_map.hh"
+#include "BLI_set.hh"
 
 #include "BLT_translation.h"
 
@@ -32,7 +36,7 @@ namespace blender::compositor {
 
 FullFrameExecutionModel::FullFrameExecutionModel(CompositorContext &context,
                                                  SharedOperationBuffers &shared_buffers,
-                                                 Span<NodeOperation *> operations)
+                                                 Vector<NodeOperation *> &operations)
     : ExecutionModel(context, operations),
       active_buffers_(shared_buffers),
       num_operations_finished_(0),
@@ -48,6 +52,15 @@ FullFrameExecutionModel::FullFrameExecutionModel(CompositorContext &context,
 
   BLI_mutex_init(&work_mutex_);
   BLI_condition_init(&work_finished_cond_);
+
+  /* Get operations output links to other operations. */
+  for (NodeOperation *op : operations_) {
+    for (int i = 0; i < op->getNumberOfInputSockets(); i++) {
+      NodeOperation *input_op = op->get_input_operation(i);
+      Set<NodeOperation *> &links = output_links_.lookup_or_add_default(input_op);
+      links.add(op);
+    }
+  }
 }
 
 FullFrameExecutionModel::~FullFrameExecutionModel()
@@ -61,7 +74,10 @@ void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
   const bNodeTree *node_tree = this->context_.getbNodeTree();
   node_tree->stats_draw(node_tree->sdh, TIP_("Compositing | Initializing execution"));
 
-  DebugInfo::graphviz(&exec_system);
+  DebugInfo::graphviz(&exec_system, "compositor_prior_folding");
+  ConstantFolder folder(operations_, output_links_, exec_system);
+  folder.fold_operations();
+  DebugInfo::graphviz(&exec_system, "compositor_after_folding");
 
   determine_areas_to_render_and_reads();
   render_operations(exec_system);
@@ -114,9 +130,7 @@ MemoryBuffer *FullFrameExecutionModel::create_operation_buffer(NodeOperation *op
   BLI_rcti_init(&op_rect, 0, op->getWidth(), 0, op->getHeight());
 
   const DataType data_type = op->getOutputSocket(0)->getDataType();
-  /* TODO: We should check if the operation is constant instead of is_set_operation. Finding a way
-   * to know if an operation is constant has to be implemented yet. */
-  const bool is_a_single_elem = op->get_flags().is_set_operation;
+  const bool is_a_single_elem = op->get_flags().is_constant_operation;
   return new MemoryBuffer(data_type, op_rect, is_a_single_elem);
 }
 

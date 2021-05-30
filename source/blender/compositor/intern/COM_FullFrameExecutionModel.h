@@ -20,6 +20,9 @@
 
 #include "COM_ExecutionModel.h"
 
+#include "BLI_map.hh"
+#include "BLI_set.hh"
+
 #ifdef WITH_CXX_GUARDEDALLOC
 #  include "MEM_guardedalloc.h"
 #endif
@@ -53,10 +56,15 @@ class FullFrameExecutionModel : public ExecutionModel {
   ThreadMutex work_mutex_;
   ThreadCondition work_finished_cond_;
 
+  /**
+   * Operations output links to other operations.
+   */
+  Map<NodeOperation *, Set<NodeOperation *>> output_links_;
+
  public:
   FullFrameExecutionModel(CompositorContext &context,
                           SharedOperationBuffers &shared_buffers,
-                          Span<NodeOperation *> operations);
+                          Vector<NodeOperation *> &operations);
   ~FullFrameExecutionModel();
 
   void execute(ExecutionSystem &exec_system) override;

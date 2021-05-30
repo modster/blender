@@ -20,7 +20,7 @@
 
 namespace blender::compositor {
 
-ExecutionModel::ExecutionModel(CompositorContext &context, Span<NodeOperation *> operations)
+ExecutionModel::ExecutionModel(CompositorContext &context, Vector<NodeOperation *> &operations)
     : context_(context), operations_(operations)
 {
   const bNodeTree *node_tree = context_.getbNodeTree();

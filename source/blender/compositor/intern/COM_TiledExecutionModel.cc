@@ -31,7 +31,7 @@
 namespace blender::compositor {
 
 TiledExecutionModel::TiledExecutionModel(CompositorContext &context,
-                                         Span<NodeOperation *> operations,
+                                         Vector<NodeOperation *> &operations,
                                          Span<ExecutionGroup *> groups)
     : ExecutionModel(context, operations), groups_(groups)
 {

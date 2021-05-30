@@ -13,26 +13,29 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2021, Blender Foundation.
+ * Copyright 2011, Blender Foundation.
  */
 
 #pragma once
 
-#include "COM_ConstantOperation.h"
+#include "COM_NodeOperation.h"
 
 namespace blender::compositor {
 
-class BufferOperation : public ConstantOperation {
- private:
-  MemoryBuffer *buffer_;
-
+/**
+ * Base class for primitive (Color/Vector/Value) constant operations. Constant folding is done
+ * prior rendering converting all operations that can be constant into Color/Vector/Value
+ * operations.
+ */
+class ConstantOperation : public NodeOperation {
  public:
-  BufferOperation(MemoryBuffer *buffer, DataType data_type);
+  ConstantOperation();
+  virtual float *get_constant_elem() = 0;
 
-  float *get_constant_elem();
-  void *initializeTileData(rcti *rect) override;
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
-  void executePixelFiltered(float output[4], float x, float y, float dx[2], float dy[2]) override;
+  /* Intentionally non virtual. Constant operations shouldn't need initialization/deinitialization
+   * as they are values set beforehand. */
+  void initExecution() override;
+  void deinitExecution() override;
 };
 
 }  // namespace blender::compositor

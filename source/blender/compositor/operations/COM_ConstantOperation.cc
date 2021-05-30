@@ -13,26 +13,26 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2021, Blender Foundation.
+ * Copyright 2011, Blender Foundation.
  */
-
-#pragma once
 
 #include "COM_ConstantOperation.h"
 
 namespace blender::compositor {
 
-class BufferOperation : public ConstantOperation {
- private:
-  MemoryBuffer *buffer_;
+ConstantOperation::ConstantOperation()
+{
+  flags.can_be_constant = true;
+  flags.is_constant_operation = true;
+}
 
- public:
-  BufferOperation(MemoryBuffer *buffer, DataType data_type);
-
-  float *get_constant_elem();
-  void *initializeTileData(rcti *rect) override;
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
-  void executePixelFiltered(float output[4], float x, float y, float dx[2], float dy[2]) override;
-};
+void ConstantOperation::initExecution()
+{
+  NodeOperation::initExecution();
+}
+void ConstantOperation::deinitExecution()
+{
+  NodeOperation::deinitExecution();
+}
 
 }  // namespace blender::compositor

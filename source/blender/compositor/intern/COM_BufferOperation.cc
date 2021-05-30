@@ -20,7 +20,7 @@
 
 namespace blender::compositor {
 
-BufferOperation::BufferOperation(MemoryBuffer *buffer, DataType data_type) : NodeOperation()
+BufferOperation::BufferOperation(MemoryBuffer *buffer, DataType data_type) : ConstantOperation()
 {
   buffer_ = buffer;
   /* TODO: Implement a MemoryBuffer get_size() method returning a Size2d type. Shorten following
@@ -30,6 +30,14 @@ BufferOperation::BufferOperation(MemoryBuffer *buffer, DataType data_type) : Nod
   resolution[1] = buffer->getHeight();
   setResolution(resolution);
   addOutputSocket(data_type);
+
+  flags.is_constant_operation = buffer_->is_a_single_elem();
+}
+
+float *BufferOperation::get_constant_elem()
+{
+  BLI_assert(buffer_->is_a_single_elem());
+  return buffer_->getBuffer();
 }
 
 void *BufferOperation::initializeTileData(rcti * /*rect*/)
