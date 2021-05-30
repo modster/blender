@@ -26,7 +26,7 @@ SharedOperationBuffers::SharedOperationBuffers() : buffers_()
 {
 }
 SharedOperationBuffers::BufferData::BufferData()
-    : buffer(nullptr), render_areas(), registered_reads(0), received_reads(0)
+    : buffer(nullptr), render_areas(), render_bounds({0}), registered_reads(0), received_reads(0)
 {
 }
 
@@ -56,7 +56,9 @@ bool SharedOperationBuffers::is_area_registered(NodeOperation *op, const rcti &a
  */
 void SharedOperationBuffers::register_area(NodeOperation *op, const rcti &area_to_render)
 {
-  get_buffer_data(op).render_areas.append(area_to_render);
+  BufferData &buf_data = get_buffer_data(op);
+  buf_data.render_areas.append(area_to_render);
+  BLI_rcti_union(&buf_data.render_bounds, &area_to_render);
 }
 
 /**
@@ -82,6 +84,14 @@ void SharedOperationBuffers::register_read(NodeOperation *read_op)
 blender::Span<rcti> SharedOperationBuffers::get_areas_to_render(NodeOperation *op)
 {
   return get_buffer_data(op).render_areas.as_span();
+}
+
+/**
+ * Gets the minimum rectangle that includes all rendered areas.
+ */
+const rcti &SharedOperationBuffers::get_render_bounds(NodeOperation *op)
+{
+  return get_buffer_data(op).render_bounds;
 }
 
 /**

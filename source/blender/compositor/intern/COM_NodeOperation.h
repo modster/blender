@@ -321,6 +321,16 @@ class NodeOperation {
   unsigned int m_height;
 
   /**
+   * Operation canvas x coordinate within whole compositing canvas.
+   */
+  int offset_x_;
+
+  /**
+   * Operation canvas y coordinate within whole compositing canvas.
+   */
+  int offset_y_;
+
+  /**
    * Flags how to evaluate this operation.
    */
   NodeOperationFlags flags;
@@ -354,6 +364,9 @@ class NodeOperation {
   {
     return flags;
   }
+
+  rcti get_canvas_area() const;
+  void set_canvas_area(const rcti &rect);
 
   unsigned int getNumberOfInputSockets() const
   {

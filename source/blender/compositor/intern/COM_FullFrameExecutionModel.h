@@ -74,6 +74,7 @@ class FullFrameExecutionModel : public ExecutionModel {
 
  private:
   void determine_areas_to_render_and_reads();
+  void clamp_operations_to_rendered_areas();
   void render_operations(ExecutionSystem &exec_system);
 
   void ensure_inputs_rendered(NodeOperation *op, ExecutionSystem &exec_system);

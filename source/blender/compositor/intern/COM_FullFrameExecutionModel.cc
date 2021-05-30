@@ -80,6 +80,8 @@ void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
   DebugInfo::graphviz(&exec_system, "compositor_after_folding");
 
   determine_areas_to_render_and_reads();
+  clamp_operations_to_rendered_areas();
+  DebugInfo::graphviz(&exec_system, "compositor_after_clamping");
   render_operations(exec_system);
 }
 
@@ -98,6 +100,14 @@ void FullFrameExecutionModel::determine_areas_to_render_and_reads()
         determine_reads(op);
       }
     }
+  }
+}
+
+void FullFrameExecutionModel::clamp_operations_to_rendered_areas()
+{
+  for (NodeOperation *op : operations_) {
+    rcti bounds = active_buffers_.get_render_bounds(op);
+    op->set_canvas_area(bounds);
   }
 }
 
@@ -126,12 +136,9 @@ Vector<MemoryBuffer *> FullFrameExecutionModel::get_input_buffers(NodeOperation 
 
 MemoryBuffer *FullFrameExecutionModel::create_operation_buffer(NodeOperation *op)
 {
-  rcti op_rect;
-  BLI_rcti_init(&op_rect, 0, op->getWidth(), 0, op->getHeight());
-
   const DataType data_type = op->getOutputSocket(0)->getDataType();
   const bool is_a_single_elem = op->get_flags().is_constant_operation;
-  return new MemoryBuffer(data_type, op_rect, is_a_single_elem);
+  return new MemoryBuffer(data_type, op->get_canvas_area(), is_a_single_elem);
 }
 
 void FullFrameExecutionModel::render_operation(NodeOperation *op, ExecutionSystem &exec_system)
@@ -187,8 +194,8 @@ void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *operation
   const int num_inputs = operation->getNumberOfInputSockets();
   for (int i = 0; i < num_inputs; i++) {
     NodeOperation *input_op = operation->get_input_operation(i);
-    rcti input_op_rect, input_area;
-    BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
+    rcti input_op_rect = input_op->get_canvas_area();
+    rcti input_area;
     operation->get_area_of_interest(input_op, render_area, input_area);
 
     /* Ensure area of interest is within operation bounds. */

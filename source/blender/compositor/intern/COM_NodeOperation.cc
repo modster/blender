@@ -38,7 +38,30 @@ NodeOperation::NodeOperation()
   this->m_resolutionInputSocketIndex = 0;
   this->m_width = 0;
   this->m_height = 0;
+  offset_x_ = 0;
+  offset_y_ = 0;
   this->m_btree = nullptr;
+}
+
+/**
+ * Get operation canvas area within whole compositing canvas.
+ */
+rcti NodeOperation::get_canvas_area() const
+{
+  rcti rect;
+  BLI_rcti_init(&rect, offset_x_, offset_x_ + m_width, offset_y_, offset_y_ + m_height);
+  return rect;
+}
+
+/**
+ * Set operation canvas area within whole compositing canvas.
+ */
+void NodeOperation::set_canvas_area(const rcti &rect)
+{
+  offset_x_ = rect.xmin;
+  offset_y_ = rect.ymin;
+  m_width = BLI_rcti_size_x(&rect);
+  m_height = BLI_rcti_size_y(&rect);
 }
 
 NodeOperationOutput *NodeOperation::getOutputSocket(unsigned int index)
@@ -269,8 +292,10 @@ void NodeOperation::render_full_frame_fallback(MemoryBuffer *output_buf,
   initExecution();
   const bool is_output_operation = getNumberOfOutputSockets() == 0;
   if (!is_output_operation && output_buf->is_a_single_elem()) {
-    float *output_elem = output_buf->get_elem(0, 0);
-    readSampled(output_elem, 0, 0, PixelSampler::Nearest);
+    int x = areas[0].xmin;
+    int y = areas[0].ymin;
+    float *output_elem = output_buf->get_elem(x, y);
+    readSampled(output_elem, x, y, PixelSampler::Nearest);
   }
   else {
     for (const rcti &rect : areas) {
