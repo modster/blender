@@ -16,9 +16,9 @@
  * - Define all values. This is in order to simplify custom pre-processor code.
  * - Always use uint32_t as underlying type.
  * - Use float suffix by default for float literals to avoid double promotion in C++.
+ * - Pack one float or int after a vec3/ivec3 to fullfil alligment rules.
  *
- * NOTE: Due to alignment restriction and buggy drivers, do not try to use vec3 or mat3 inside
- * structs. Use vec4 and pack an extra float at the end.
+ * NOTE: Due to alignment restriction and buggy drivers, do not try to use mat3 inside structs.
  * Do not use arrays of float. They are padded to arrays of vec4 and are not worth it.
  *
  * IMPORTANT: Don't forget to align mat4 and vec4 to 16 bytes.
@@ -86,14 +86,15 @@ enum eSamplingDimension : uint32_t {
   SAMPLING_SHADOW_W = 7u,
   SAMPLING_SHADOW_X = 8u,
   SAMPLING_SHADOW_Y = 9u,
-  SAMPLING_CLOSURE = 10u
+  SAMPLING_CLOSURE = 10u,
+  SAMPLING_LIGHTPROBE = 11u
 };
 
-#define SAMPLING_DIMENSION_COUNT 11
+/** IMPORTANT: Make sure the array can contain all sampling dimensions. */
+#define SAMPLING_DIMENSION_COUNT 12
 
 struct SamplingData {
   /** Array containing random values from Low Discrepency Sequence in [0..1) range. */
-  /** IMPORTANT: Make sure the array can contain all sampling dimensions. */
   /** HACK: float arrays are padded to vec4 in GLSL. Using vec4 for now to get the same alignment
    * but this is wasteful. */
   vec4 dimensions[SAMPLING_DIMENSION_COUNT];
@@ -494,16 +495,99 @@ struct LightProbeFilterData {
 };
 BLI_STATIC_ASSERT_ALIGN(LightProbeFilterData, 16)
 
-struct IrradianceInfoData {
+/**
+ * Common data to all irradiance grid.
+ */
+struct GridInfoData {
   /** Total of visibility cells per row and layer. */
   int visibility_cells_per_row;
   int visibility_cells_per_layer;
-  /** Sier of visibility cell. */
+  /** Size of visibility cell. */
   int visibility_size;
   /** Number of irradiance cells per row. */
   int irradiance_cells_per_row;
+  /** Smooth irradiance sample interpolation but increases light leaks. */
+  float irradiance_smooth;
+  /** Total number of active irradiance grid including world. */
+  int grid_count;
+  float _pad0;
+  float _pad1;
 };
-BLI_STATIC_ASSERT_ALIGN(IrradianceInfoData, 16)
+BLI_STATIC_ASSERT_ALIGN(GridInfoData, 16)
+
+/**
+ * Data for a single irradiance grid.
+ */
+struct GridData {
+  /** Object matrix inverse (World -> Local). */
+  mat4 local_mat;
+  /** Resolution of the light grid. */
+  ivec3 resolution;
+  /** Offset of the first cell of this grid in the grid texture. */
+  int offset;
+  /** World space vector between 2 adjacent cells. */
+  vec3 increment_x;
+  /** Attenuation Bias. */
+  float attenuation_bias;
+  /** World space vector between 2 adjacent cells. */
+  vec3 increment_y;
+  /** Attenuation scaling. */
+  float attenuation_scale;
+  /** World space vector between 2 adjacent cells. */
+  vec3 increment_z;
+  /** Number of grid levels not ready for display during baking. */
+  int level_skip;
+  /** World space corner position. */
+  vec3 corner;
+  /** Visibility test parameters. */
+  float visibility_range;
+  float visibility_bleed;
+  float visibility_bias;
+  float _pad0;
+  float _pad1;
+};
+BLI_STATIC_ASSERT_ALIGN(GridData, 16)
+
+/**
+ * Common data to all cubemaps.
+ */
+struct CubemapInfoData {
+  /** LOD containing data for roughness of 1. */
+  float roughness_max_lod;
+  /** Total number of active cubemaps including world. */
+  int cube_count;
+  float _pad1;
+  float _pad2;
+};
+BLI_STATIC_ASSERT_ALIGN(CubemapInfoData, 16)
+
+#define CUBEMAP_SHAPE_SPHERE 0.0
+#define CUBEMAP_SHAPE_BOX 1.0
+
+/**
+ * Data for a single reflection cubemap probe.
+ */
+struct CubemapData {
+  /** Influence shape matrix (World -> Local). */
+  mat4 object_mat;
+  /** Packed data in the last column of the object_mat. */
+#define _attenuation_factor object_mat[0][3]
+#define _attenuation_type object_mat[1][3]
+#define _parallax_type object_mat[2][3]
+  /** Layer of the cube array to sample. */
+#define _layer object_mat[3][3]
+  /** Parallax shape matrix (World -> Local). */
+  mat4 parallax_mat;
+};
+BLI_STATIC_ASSERT_ALIGN(CubemapData, 16)
+
+struct LightProbeInfoData {
+  GridInfoData grids;
+  CubemapInfoData cubes;
+};
+BLI_STATIC_ASSERT_ALIGN(LightProbeInfoData, 16)
+
+#define GRID_MAX 64
 
 /** \} */
 
@@ -556,10 +640,13 @@ vec4 utility_tx_sample(vec2 uv, float layer);
 
 #ifdef __cplusplus
 using CameraDataBuf = StructBuffer<CameraData>;
+using CubemapDataBuf = StructArrayBuffer<CubemapData, CULLING_ITEM_BATCH>;
 using CullingDataBuf = StructBuffer<CullingData>;
 using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
+using GridDataBuf = StructArrayBuffer<GridData, GRID_MAX>;
 using LightDataBuf = StructArrayBuffer<LightData, CULLING_ITEM_BATCH>;
 using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
+using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;
 using ShadowPunctualDataBuf = StructArrayBuffer<ShadowPunctualData, CULLING_ITEM_BATCH>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 

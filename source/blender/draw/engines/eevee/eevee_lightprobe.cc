@@ -45,6 +45,8 @@ void LightProbeModule::init()
                                          sce_eevee.gi_cubemap_resolution,
                                          sce_eevee.gi_visibility_resolution,
                                          irr_size);
+
+    do_world_update_ = true;
   }
   lightcache_ = lookdev_lightcache_;
   // }
@@ -56,13 +58,13 @@ void LightProbeModule::init()
     view = nullptr;
   }
 
-  info_data_.irradiance_cells_per_row = lookdev_lightcache_->irradiance_cells_per_row_get();
-  info_data_.visibility_size = lookdev_lightcache_->vis_res;
-  info_data_.visibility_cells_per_row = lookdev_lightcache_->grid_tx.tex_size[0] /
-                                        info_data_.visibility_size;
-  info_data_.visibility_cells_per_layer = (lookdev_lightcache_->grid_tx.tex_size[1] /
-                                           info_data_.visibility_size) *
-                                          info_data_.visibility_cells_per_row;
+  info_data_.grids.irradiance_cells_per_row = lookdev_lightcache_->irradiance_cells_per_row_get();
+  info_data_.grids.visibility_size = lookdev_lightcache_->vis_res;
+  info_data_.grids.visibility_cells_per_row = lookdev_lightcache_->grid_tx.tex_size[0] /
+                                              info_data_.grids.visibility_size;
+  info_data_.grids.visibility_cells_per_layer = (lookdev_lightcache_->grid_tx.tex_size[1] /
+                                                 info_data_.grids.visibility_size) *
+                                                info_data_.grids.visibility_cells_per_row;
 
   glossy_clamp_ = sce_eevee.gi_glossy_clamp;
   filter_quality_ = clamp_f(sce_eevee.gi_filter_quality, 1.0f, 8.0f);
@@ -127,6 +129,7 @@ void LightProbeModule::cubemap_prepare(vec3 &position, float near, float far)
   /* TODO(fclem) We might want to have theses as temporary textures. */
   cube_depth_tx_.ensure_cubemap("CubemapDepth", cube_res, cube_mip_count, GPU_DEPTH_COMPONENT32F);
   cube_color_tx_.ensure_cubemap("CubemapColor", cube_res, cube_mip_count, GPU_RGBA16F);
+  GPU_texture_mipmap_mode(cube_color_tx_, true, true);
 
   cube_downsample_fb_.ensure(GPU_ATTACHMENT_TEXTURE(cube_depth_tx_),
                              GPU_ATTACHMENT_TEXTURE(cube_color_tx_));
@@ -217,13 +220,13 @@ void LightProbeModule::filter_diffuse(int sample_index, float intensity)
 
   ivec2 extent = ivec2(3, 2);
   ivec2 offset = extent;
-  offset.x *= sample_index % info_data_.irradiance_cells_per_row;
-  offset.y *= sample_index / info_data_.irradiance_cells_per_row;
+  offset.x *= sample_index % info_data_.grids.irradiance_cells_per_row;
+  offset.y *= sample_index / info_data_.grids.irradiance_cells_per_row;
 
   GPU_framebuffer_bind(filter_grid_fb_);
-  GPU_framebuffer_viewport_set(filter_grid_fb_, UNPACK2(offset), UNPACK2(extent));
+  // GPU_framebuffer_viewport_set(filter_grid_fb_, UNPACK2(offset), UNPACK2(extent));
   DRW_draw_pass(filter_diffuse_ps_);
-  GPU_framebuffer_viewport_reset(filter_grid_fb_);
+  // GPU_framebuffer_viewport_reset(filter_grid_fb_);
 }
 
 void LightProbeModule::filter_visibility(int sample_index,
@@ -232,11 +235,11 @@ void LightProbeModule::filter_visibility(int sample_index,
 {
   ivec2 extent = ivec2(3, 2);
   ivec2 offset = extent;
-  offset.x *= sample_index % info_data_.visibility_cells_per_row;
-  offset.y *= (sample_index / info_data_.visibility_cells_per_row) %
-              info_data_.visibility_cells_per_layer;
+  offset.x *= sample_index % info_data_.grids.visibility_cells_per_row;
+  offset.y *= (sample_index / info_data_.grids.visibility_cells_per_row) %
+              info_data_.grids.visibility_cells_per_layer;
 
-  filter_data_.target_layer = 1 + sample_index / info_data_.visibility_cells_per_layer;
+  filter_data_.target_layer = 1 + sample_index / info_data_.grids.visibility_cells_per_layer;
   filter_data_.sample_count = 512.0f; /* TODO refine */
   filter_data_.visibility_blur = visibility_blur;
   filter_data_.visibility_range = visibility_range;
@@ -249,10 +252,8 @@ void LightProbeModule::filter_visibility(int sample_index,
   GPU_framebuffer_viewport_reset(filter_grid_fb_);
 }
 
-void LightProbeModule::update_world()
+void LightProbeModule::update_world_cache()
 {
-  // do_world_update = false;
-
   DRW_stats_group_start("LightProbe.world");
 
   const DRWView *view_active = DRW_view_get_active();
@@ -275,14 +276,61 @@ void LightProbeModule::update_world()
     DRW_view_set_active(view_active);
   }
 
+  do_world_update_ = false;
+
   DRW_stats_group_end();
 }
 
-void LightProbeModule::set_view(const DRWView *UNUSED(view), const ivec2 UNUSED(extent))
+/* Push world probe to first grid and cubemap slots. */
+void LightProbeModule::update_world_data(const DRWView *view)
 {
-  if (do_world_update) {
-    update_world();
+  BoundSphere view_bounds = DRW_view_frustum_bsphere_get(view);
+  /* Playing safe. The fake grid needs to be bigger than the frustum. */
+  view_bounds.radius = clamp_f(view_bounds.radius * 2.0, 0.0f, FLT_MAX);
+
+  CubemapData &cube = cube_data_[0];
+  GridData &grid = grid_data_[0];
+
+  scale_m4_fl(grid.local_mat, view_bounds.radius);
+  negate_v3_v3(grid.local_mat[3], view_bounds.center);
+  copy_m4_m4(cube.object_mat, grid.local_mat);
+  copy_m4_m4(cube.parallax_mat, cube.object_mat);
+
+  grid.resolution = ivec3(1);
+  grid.offset = 0;
+  grid.level_skip = 0;
+  grid.attenuation_bias = 0.001f;
+  grid.attenuation_scale = 1.0f;
+  grid.visibility_range = 1.0f;
+  grid.visibility_bleed = 0.001f;
+  grid.visibility_bias = 0.0f;
+  grid.increment_x = vec3(0.0f);
+  grid.increment_y = vec3(0.0f);
+  grid.increment_z = vec3(0.0f);
+  grid.corner = vec3(0.0f);
+
+  cube._parallax_type = CUBEMAP_SHAPE_SPHERE;
+  cube._layer = 0.0;
+}
+
+void LightProbeModule::set_view(const DRWView *view, const ivec2 UNUSED(extent))
+{
+  if (do_world_update_) {
+    update_world_cache();
   }
+
+  update_world_data(view);
+
+  info_data_.grids.grid_count = 1;
+  info_data_.cubes.cube_count = 1;
+  info_data_.cubes.roughness_max_lod = lightcache_->mips_len;
+
+  active_grid_tx_ = lightcache_->grid_tx.tex;
+  active_cube_tx_ = lightcache_->cube_tx.tex;
+
+  info_data_.push_update();
+  grid_data_.push_update();
+  cube_data_.push_update();
 }
 
 }  // namespace blender::eevee

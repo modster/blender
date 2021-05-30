@@ -50,7 +50,7 @@ vec2 visibility_mapping_octahedron(vec3 cubevec, vec2 texel_size)
 }
 
 /* Returns the cell weight using the visibility data and a smooth test. */
-float visibility_load_cell(IrradianceInfoData info,
+float visibility_load_cell(GridInfoData info,
                            sampler2DArray irradiance_tx,
                            int cell,
                            vec3 L,
@@ -113,7 +113,7 @@ vec3 irradiance_decode(vec4 data)
 }
 
 /* Samples an irradiance grid cell in the given direction. */
-vec3 irradiance_load_cell(IrradianceInfoData info, sampler2DArray irradiance_tx, int cell, vec3 N)
+vec3 irradiance_load_cell(GridInfoData info, sampler2DArray irradiance_tx, int cell, vec3 N)
 {
   ivec2 cell_co = ivec2(3, 2);
   cell_co.x *= cell % info.irradiance_cells_per_row;

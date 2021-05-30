@@ -66,6 +66,9 @@ extern char datatoc_eevee_depth_of_field_setup_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_deferred_direct_frag_glsl[];
+extern char datatoc_eevee_cubemap_lib_glsl[];
+extern char datatoc_eevee_lightprobe_eval_cubemap_lib_glsl[];
+extern char datatoc_eevee_lightprobe_eval_grid_lib_glsl[];
 extern char datatoc_eevee_deferred_holdout_frag_glsl[];
 extern char datatoc_eevee_deferred_transparent_frag_glsl[];
 extern char datatoc_eevee_deferred_volume_frag_glsl[];
@@ -144,6 +147,7 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_stubs_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_irradiance_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_closure_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_cubemap_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_gbuffer_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_nodetree_eval_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
@@ -154,6 +158,8 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_iter_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_light_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_filter_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_eval_cubemap_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_eval_grid_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_volume_eval_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_volume_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_velocity_lib);

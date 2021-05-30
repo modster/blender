@@ -35,7 +35,9 @@ class LightProbeModule {
   Instance &inst_;
 
   LightProbeFilterDataBuf filter_data_;
-  IrradianceInfoData info_data_;
+  LightProbeInfoDataBuf info_data_;
+  GridDataBuf grid_data_;
+  CubemapDataBuf cube_data_;
 
   /* Either scene lightcache or lookdev lightcache */
   LightCache *lightcache_ = nullptr;
@@ -64,9 +66,12 @@ class LightProbeModule {
   DRWPass *filter_diffuse_ps_ = nullptr;
   DRWPass *filter_visibility_ps_ = nullptr;
 
-  bool do_world_update = false;
+  bool do_world_update_ = false;
   /** Input texture to downsample cube pass. */
   GPUTexture *cube_downsample_input_tx_ = nullptr;
+  /** Copy of actual textures from the lightcache_. */
+  GPUTexture *active_grid_tx_ = nullptr;
+  GPUTexture *active_cube_tx_ = nullptr;
   /** Constant values during baking. */
   float glossy_clamp_ = 0.0;
   float filter_quality_ = 0.0;
@@ -86,11 +91,33 @@ class LightProbeModule {
 
   void set_world_dirty(void)
   {
-    do_world_update = true;
+    do_world_update_ = true;
+  }
+
+  const GPUUniformBuf *grid_ubo_get() const
+  {
+    return grid_data_.ubo_get();
+  }
+  const GPUUniformBuf *cube_ubo_get() const
+  {
+    return cube_data_.ubo_get();
+  }
+  const GPUUniformBuf *info_ubo_get() const
+  {
+    return info_data_.ubo_get();
+  }
+  GPUTexture **grid_tx_ref_get()
+  {
+    return &active_grid_tx_;
+  }
+  GPUTexture **cube_tx_ref_get()
+  {
+    return &active_cube_tx_;
   }
 
  private:
-  void update_world();
+  void update_world_cache();
+  void update_world_data(const DRWView *view);
 
   void cubeface_winmat_get(mat4 &winmat, float near, float far);
 
@@ -127,7 +154,7 @@ class LightProbeModule {
     cube_downsample_input_tx_ = cube_color_tx_;
 
     DRW_stats_group_start("Cubemap Downsample");
-    GPU_framebuffer_recursive_downsample(cube_downsample_fb_, 8, cube_downsample_cb, this);
+    GPU_framebuffer_recursive_downsample(cube_downsample_fb_, 7, cube_downsample_cb, this);
     DRW_stats_group_end();
   }
 };

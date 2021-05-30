@@ -149,6 +149,8 @@ class Sampling {
       BLI_halton_2d(primes, offset, sample_, r);
       data_.dimensions[SAMPLING_LENS_U][0] = r[0];
       data_.dimensions[SAMPLING_LENS_V][0] = r[1];
+      /* TODO decorelate. */
+      data_.dimensions[SAMPLING_LIGHTPROBE][0] = r[0];
     }
     {
       /* Using leaped halton sequence so we can reused the same primes as lens. */
