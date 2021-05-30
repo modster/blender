@@ -615,6 +615,7 @@ void DRW_view_persmat_get(const DRWView *view, float mat[4][4], bool inverse);
 
 void DRW_view_frustum_corners_get(const DRWView *view, BoundBox *corners);
 void DRW_view_frustum_planes_get(const DRWView *view, float planes[6][4]);
+BoundSphere DRW_view_frustum_bsphere_get(const DRWView *view);
 
 /* These are in view-space, so negative if in perspective.
  * Extract near and far clip distance from the projection matrix. */

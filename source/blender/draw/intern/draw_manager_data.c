@@ -1917,6 +1917,12 @@ void DRW_view_frustum_planes_get(const DRWView *view, float planes[6][4])
   memcpy(planes, &view->frustum_planes, sizeof(view->frustum_planes));
 }
 
+/* Return world space frustum bounding sphere. */
+BoundSphere DRW_view_frustum_bsphere_get(const DRWView *view)
+{
+  return view->frustum_bsphere;
+}
+
 bool DRW_view_is_persp_get(const DRWView *view)
 {
   view = (view) ? view : DST.view_default;
