@@ -150,6 +150,18 @@ typedef struct MeshBufferCache {
   GPUIndexBuf **tris_per_mat;
 } MeshBufferCache;
 
+/**
+ * Data that are kept around between extractions to reduce rebuilding time.
+ *
+ * - Loose geometry.
+ */
+typedef struct MeshBufferExtractionCache {
+  int edge_loose_len;
+  int vert_loose_len;
+  int *lverts;
+  int *ledges;
+} MeshBufferExtractionCache;
+
 typedef enum DRWBatchFlag {
   MBC_SURFACE = (1 << 0),
   MBC_SURFACE_WEIGHTS = (1 << 1),
@@ -194,6 +206,10 @@ typedef enum DRWBatchFlag {
 
 typedef struct MeshBatchCache {
   MeshBufferCache final, cage, uv_cage;
+
+  MeshBufferExtractionCache final_extraction_cache;
+  MeshBufferExtractionCache cage_extraction_cache;
+  MeshBufferExtractionCache uv_cage_extraction_cache;
 
   struct {
     /* Surfaces / Render */
@@ -264,9 +280,14 @@ typedef struct MeshBatchCache {
   bool no_loose_wire;
 } MeshBatchCache;
 
+#define MBC_BATCH_LEN (sizeof(((MeshBatchCache){0}).batch) / sizeof(void *))
+#define MBC_VBO_LEN (sizeof(((MeshBufferCache){0}).vbo) / sizeof(void *))
+#define MBC_IBO_LEN (sizeof(((MeshBufferCache){0}).ibo) / sizeof(void *))
+
 void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
                                         MeshBatchCache *cache,
                                         MeshBufferCache mbc,
+                                        MeshBufferExtractionCache *extraction_cache,
                                         Mesh *me,
                                         const bool is_editmode,
                                         const bool is_paint_mode,
