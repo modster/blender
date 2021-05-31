@@ -77,6 +77,7 @@ static LineartEdgeChain *lineart_chain_create(LineartRenderBuffer *rb)
   ec = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdgeChain));
 
   BLI_addtail(&rb->chains, ec);
+  printf("chain%d\n", ec);
 
   return ec;
 }

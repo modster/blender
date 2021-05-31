@@ -350,6 +350,7 @@ struct BMesh;
 typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
   struct Object *original_ob;
+  struct Mesh *me;
   struct BMesh *original_bm;
   double new_mvp[4][4];
   double new_mv[4][4];
