@@ -198,9 +198,8 @@ void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *operation
     rcti input_area;
     operation->get_area_of_interest(input_op, render_area, input_area);
 
-    /* Ensure area of interest is within operation bounds. */
-    int dummy_offset[2];
-    BLI_rcti_clamp(&input_area, &input_op_rect, dummy_offset);
+    /* Ensure area of interest is within operation bounds, cropping areas outside. */
+    BLI_rcti_isect(&input_area, &input_op_rect, &input_area);
 
     determine_areas_to_render(input_op, input_area);
   }
