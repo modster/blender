@@ -33,7 +33,7 @@ namespace blender::compositor {
 TiledExecutionModel::TiledExecutionModel(CompositorContext &context,
                                          Vector<NodeOperation *> &operations,
                                          Span<ExecutionGroup *> groups)
-    : ExecutionModel(context, operations), groups_(groups)
+    : ExecutionModel(eExecutionModel::Tiled, context, operations), groups_(groups)
 {
   const bNodeTree *node_tree = context.getbNodeTree();
   node_tree->stats_draw(node_tree->sdh, TIP_("Compositing | Determining resolution"));

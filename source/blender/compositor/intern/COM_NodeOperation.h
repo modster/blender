@@ -310,6 +310,8 @@ class NodeOperation {
   const bNodeTree *m_btree;
 
  protected:
+  eExecutionModel execution_model_;
+
   /**
    * Width of the output of this operation.
    */
@@ -363,6 +365,16 @@ class NodeOperation {
   const NodeOperationFlags get_flags() const
   {
     return flags;
+  }
+
+  eExecutionModel get_execution_model() const
+  {
+    return execution_model_;
+  }
+
+  void set_execution_model(eExecutionModel model)
+  {
+    execution_model_ = model;
   }
 
   rcti get_canvas_area() const;

@@ -59,7 +59,9 @@ class ExecutionModel {
   Vector<NodeOperation *> &operations_;
 
  public:
-  ExecutionModel(CompositorContext &context, Vector<NodeOperation *> &operations);
+  ExecutionModel(eExecutionModel model,
+                 CompositorContext &context,
+                 Vector<NodeOperation *> &operations);
 
   virtual ~ExecutionModel()
   {
