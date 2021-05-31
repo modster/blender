@@ -2096,7 +2096,7 @@ void DepsgraphRelationBuilder::build_object_data_geometry(Object *object)
         ctx.node = reinterpret_cast<::DepsNodeHandle *>(&handle);
         mti->updateDepsgraph(md, &ctx);
       }
-      if (BKE_object_modifier_use_time(object, md, graph_->mode)) {
+      if (BKE_object_modifier_use_time(scene_, object, md, graph_->mode)) {
         TimeSourceKey time_src_key;
         add_relation(time_src_key, obdata_ubereval_key, "Time Source");
       }

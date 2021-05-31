@@ -7280,7 +7280,7 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(row, &fileptr, "is_sequence", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, false);
-  uiItemR(row, &fileptr, "use_cycles_procedural", 0, NULL, ICON_NONE);
+  uiItemR(row, &fileptr, "use_render_procedural", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);

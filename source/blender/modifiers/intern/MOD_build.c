@@ -61,7 +61,7 @@ static void initData(ModifierData *md)
   MEMCPY_STRUCT_AFTER(bmd, DNA_struct_default_get(BuildModifierData), modifier);
 }
 
-static bool dependsOnTime(ModifierData *UNUSED(md), int UNUSED(dag_eval_mode))
+static bool dependsOnTime(const struct Scene *UNUSED(scene), ModifierData *UNUSED(md), int UNUSED(dag_eval_mode))
 {
   return true;
 }

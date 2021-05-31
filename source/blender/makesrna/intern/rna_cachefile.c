@@ -112,10 +112,10 @@ static void rna_def_cachefile(BlenderRNA *brna)
       prop, "Sequence", "Whether the cache is separated in a series of files");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
-  prop = RNA_def_property(srna, "use_cycles_procedural", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_render_procedural", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_ui_text(
       prop,
-      "Use Cycles Procedural",
+      "Use Render Engine Procedural",
       "Display boxes in the viewport as placeholders for the objects, Cycles will use a "
       "procedural to load the objects during viewport rendering in experimental mode, "
       "other render engines will also receive a placeholder and should take care of loading the "

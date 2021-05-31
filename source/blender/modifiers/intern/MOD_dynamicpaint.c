@@ -155,7 +155,7 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
   }
 }
 
-static bool dependsOnTime(ModifierData *UNUSED(md), int UNUSED(dag_eval_mode))
+static bool dependsOnTime(const struct Scene *UNUSED(scene), ModifierData *UNUSED(md), int UNUSED(dag_eval_mode))
 {
   return true;
 }

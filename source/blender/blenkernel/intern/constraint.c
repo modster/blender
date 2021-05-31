@@ -5302,8 +5302,8 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
     return;
   }
 
-  /* Do not process data if using the Cycles procedural. */
-  if (BKE_cache_file_uses_cycles_procedural(cache_file, (const int)DEG_get_mode(cob->depsgraph))) {
+  /* Do not process data if using a render time procedural. */
+  if (BKE_cache_file_uses_render_procedural(cache_file, scene, (const int)DEG_get_mode(cob->depsgraph))) {
     return;
   }
 

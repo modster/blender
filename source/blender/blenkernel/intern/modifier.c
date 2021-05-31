@@ -249,11 +249,11 @@ bool BKE_modifier_unique_name(ListBase *modifiers, ModifierData *md)
   return false;
 }
 
-bool BKE_modifier_depends_ontime(ModifierData *md, int dag_eval_mode)
+bool BKE_modifier_depends_ontime(Scene *scene, ModifierData *md, int dag_eval_mode)
 {
   const ModifierTypeInfo *mti = BKE_modifier_get_info(md->type);
 
-  return mti->dependsOnTime && mti->dependsOnTime(md, dag_eval_mode);
+  return mti->dependsOnTime && mti->dependsOnTime(scene, md, dag_eval_mode);
 }
 
 bool BKE_modifier_supports_mapping(ModifierData *md)

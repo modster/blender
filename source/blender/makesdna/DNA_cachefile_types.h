@@ -90,7 +90,7 @@ typedef struct CacheFile {
    * load objects directly from the CacheFile. Other render engines which can load Alembic data
    * directly can take care of rendering it themselves.
    */
-  char use_cycles_procedural;
+  char use_render_procedural;
 
   char velocity_unit;
   /* Name of the velocity property in the Alembic file. */
