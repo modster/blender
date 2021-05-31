@@ -20,6 +20,9 @@
  * \ingroup eevee
  */
 
+#include "BLI_span.hh"
+#include "DNA_lightprobe_types.h"
+
 #include "eevee_instance.hh"
 
 namespace blender::eevee {
@@ -30,39 +33,47 @@ void LightProbeModule::init()
 
   lightcache_ = static_cast<LightCache *>(sce_eevee.light_cache_data);
 
-  // if (use_lookdev || lightcache_ == nullptr || lightcache_->validate() == false) {
-  if (lookdev_lightcache_ == nullptr) {
-    int cube_len = 1;
-    int grid_len = 1;
-    int irr_samples_len = 1;
-
-    ivec3 irr_size;
-    LightCache::irradiance_cache_size_get(
-        sce_eevee.gi_visibility_resolution, irr_samples_len, irr_size);
-
-    lookdev_lightcache_ = new LightCache(grid_len,
-                                         cube_len,
-                                         sce_eevee.gi_cubemap_resolution,
-                                         sce_eevee.gi_visibility_resolution,
-                                         irr_size);
-
-    do_world_update_ = true;
+  /* TODO */
+  bool use_lookdev = false;
+  if (!use_lookdev && lightcache_ && lightcache_->load()) {
+    OBJECT_GUARDED_SAFE_DELETE(lookdev_lightcache_, LightCache);
+    do_world_update_ = false;
   }
-  lightcache_ = lookdev_lightcache_;
-  // }
-  // else {
-  // OBJECT_GUARDED_SAFE_DELETE(lookdev_lightcache_, LightCache);
-  // }
+  else {
+    if (lightcache_ && (lightcache_->flag & LIGHTCACHE_NOT_USABLE)) {
+      BLI_snprintf(
+          inst_.info, sizeof(inst_.info), "Error: LightCache cannot be loaded on this GPU");
+    }
+
+    if (lookdev_lightcache_ == nullptr) {
+      int cube_len = 1;
+      int grid_len = 1;
+      int irr_samples_len = 1;
+
+      ivec3 irr_size;
+      LightCache::irradiance_cache_size_get(
+          sce_eevee.gi_visibility_resolution, irr_samples_len, irr_size);
+
+      lookdev_lightcache_ = new LightCache(grid_len,
+                                           cube_len,
+                                           sce_eevee.gi_cubemap_resolution,
+                                           sce_eevee.gi_visibility_resolution,
+                                           irr_size);
+
+      do_world_update_ = true;
+    }
+    lightcache_ = lookdev_lightcache_;
+  }
 
   for (DRWView *&view : face_view_) {
     view = nullptr;
   }
 
-  info_data_.grids.irradiance_cells_per_row = lookdev_lightcache_->irradiance_cells_per_row_get();
-  info_data_.grids.visibility_size = lookdev_lightcache_->vis_res;
-  info_data_.grids.visibility_cells_per_row = lookdev_lightcache_->grid_tx.tex_size[0] /
+  info_data_.grids.irradiance_cells_per_row = lightcache_->irradiance_cells_per_row_get();
+  info_data_.grids.visibility_size = lightcache_->vis_res;
+  info_data_.grids.visibility_cells_per_row = lightcache_->grid_tx.tex_size[0] /
                                               info_data_.grids.visibility_size;
-  info_data_.grids.visibility_cells_per_layer = (lookdev_lightcache_->grid_tx.tex_size[1] /
+  info_data_.grids.visibility_cells_per_layer = (lightcache_->grid_tx.tex_size[1] /
                                                  info_data_.grids.visibility_size) *
                                                 info_data_.grids.visibility_cells_per_row;
 
@@ -282,7 +293,7 @@ void LightProbeModule::update_world_cache()
 }
 
 /* Push world probe to first grid and cubemap slots. */
-void LightProbeModule::update_world_data(const DRWView *view)
+void LightProbeModule::sync_world(const DRWView *view)
 {
   BoundSphere view_bounds = DRW_view_frustum_bsphere_get(view);
   /* Playing safe. The fake grid needs to be bigger than the frustum. */
@@ -313,16 +324,71 @@ void LightProbeModule::update_world_data(const DRWView *view)
   cube._layer = 0.0;
 }
 
+void LightProbeModule::sync_grid(const DRWView *UNUSED(view),
+                                 const LightGridCache &grid_cache,
+                                 int grid_index)
+{
+  /* Skip the world probe. */
+  if (grid_index == 0) {
+    return;
+  }
+  GridData &grid = grid_data_[info_data_.grids.grid_count];
+  copy_m4_m4(grid.local_mat, grid_cache.mat);
+  grid.resolution = ivec3(grid_cache.resolution);
+  grid.offset = grid_cache.offset;
+  grid.level_skip = grid_cache.level_bias;
+  grid.attenuation_bias = grid_cache.attenuation_bias;
+  grid.attenuation_scale = grid_cache.attenuation_scale;
+  grid.visibility_range = grid_cache.visibility_range;
+  grid.visibility_bleed = grid_cache.visibility_bleed;
+  grid.visibility_bias = grid_cache.visibility_bias;
+  grid.increment_x = vec3(grid_cache.increment_x);
+  grid.increment_y = vec3(grid_cache.increment_y);
+  grid.increment_z = vec3(grid_cache.increment_z);
+  grid.corner = vec3(grid_cache.corner);
+
+  info_data_.grids.grid_count++;
+}
+
+void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
+                                    const LightProbeCache &cube_cache,
+                                    int cube_index)
+{
+  /* Skip the world probe. */
+  if (cube_index == 0) {
+    return;
+  }
+  CubemapData &cube = cube_data_[info_data_.cubes.cube_count];
+  copy_m4_m4(cube.parallax_mat, cube_cache.parallaxmat);
+  copy_m4_m4(cube.object_mat, cube_cache.attenuationmat);
+  cube._attenuation_factor = cube_cache.attenuation_fac;
+  cube._attenuation_type = cube_cache.attenuation_type;
+  cube._parallax_type = cube_cache.parallax_type;
+  cube._layer = cube_index;
+
+  info_data_.cubes.cube_count++;
+}
+
 void LightProbeModule::set_view(const DRWView *view, const ivec2 UNUSED(extent))
 {
-  if (do_world_update_) {
+  /* TODO improve this. The update flag should be in the cache. */
+  if (do_world_update_ && lookdev_lightcache_) {
     update_world_cache();
   }
 
-  update_world_data(view);
-
+  /* Only sync when setting the view. This way we can cull probes not in frustum. */
+  /* TODO(fclem) implement culling. */
   info_data_.grids.grid_count = 1;
   info_data_.cubes.cube_count = 1;
+
+  sync_world(view);
+  for (auto i : IndexRange(lightcache_->grid_len)) {
+    sync_grid(view, lightcache_->grid_data[i], i);
+  }
+  for (auto i : IndexRange(lightcache_->cube_len)) {
+    sync_cubemap(view, lightcache_->cube_data[i], i);
+  }
+
   info_data_.cubes.roughness_max_lod = lightcache_->mips_len;
 
   active_grid_tx_ = lightcache_->grid_tx.tex;

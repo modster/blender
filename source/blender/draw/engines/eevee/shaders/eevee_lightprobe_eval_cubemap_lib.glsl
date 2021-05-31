@@ -60,8 +60,10 @@ vec3 lightprobe_cubemap_evaluate(CubemapInfoData info,
 #define lightprobe_cubemap_select(_cubes_info, _cubes, _P, _random_threshold, _out_index) \
   { \
     float weight = 0.0; \
-    for (_out_index = _cubes_info.cube_count - 1; weight < _random_threshold && _out_index > 0; \
-         _out_index--) { \
+    for (_out_index = _cubes_info.cube_count - 1; _out_index > 0; _out_index--) { \
       weight += lightprobe_cubemap_weight(_cubes[_out_index], _P); \
+      if (weight >= _random_threshold) { \
+        break; \
+      } \
     } \
   }

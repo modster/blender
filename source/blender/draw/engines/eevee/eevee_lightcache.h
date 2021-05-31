@@ -18,6 +18,8 @@
 
 /** \file
  * \ingroup eevee
+ *
+ * Contains functions used outside of EEVEE for lightcache baking.
  */
 
 #pragma once
@@ -54,18 +56,8 @@ void EEVEE_lightbake_job_data_free(void *custom_data);
 void EEVEE_lightbake_update(void *custom_data);
 void EEVEE_lightbake_job(void *custom_data, short *stop, short *do_update, float *progress);
 
-void EEVEE_lightbake_update_world_quick(struct EEVEE_ViewLayerData *sldata,
-                                        struct EEVEE_Data *vedata,
-                                        const Scene *scene);
-
 /* Light Cache */
-struct LightCache *EEVEE_lightcache_create(const int grid_len,
-                                           const int cube_len,
-                                           const int cube_size,
-                                           const int vis_size,
-                                           const int irr_size[3]);
 void EEVEE_lightcache_free(struct LightCache *lcache);
-bool EEVEE_lightcache_load(struct LightCache *lcache);
 void EEVEE_lightcache_info_update(struct SceneEEVEE *eevee);
 
 void EEVEE_lightcache_blend_write(struct BlendWriter *writer, struct LightCache *cache);

@@ -27,7 +27,7 @@ vec3 lightprobe_grid_evaluate(
     ivec3 offset = ivec3(i, i >> 1, i >> 2) & ivec3(1);
     ivec3 cell_coord = clamp(lP_floored + offset, ivec3(0), grid.resolution - 1);
     /* Skip cells not yet rendered during baking. */
-    cell_coord = (cell_coord >> grid.level_skip) << grid.level_skip;
+    cell_coord = (cell_coord / grid.level_skip) * grid.level_skip;
     /* Keep in sync with update_irradiance_probe. */
     int cell_id = grid.offset + cell_coord.z + cell_coord.y * grid.resolution.z +
                   cell_coord.x * grid.resolution.z * grid.resolution.y;
@@ -78,8 +78,10 @@ vec3 lightprobe_grid_evaluate(
 #define lightprobe_grid_select(_grids_info, _grids, _P, _random_threshold, _out_index) \
   { \
     float weight = 0.0; \
-    for (_out_index = _grids_info.grid_count - 1; weight < _random_threshold && _out_index > 0; \
-         _out_index--) { \
+    for (_out_index = _grids_info.grid_count - 1; _out_index > 0; _out_index--) { \
       weight += lightprobe_grid_weight(_grids[_out_index], _P); \
+      if (weight >= _random_threshold) { \
+        break; \
+      } \
     } \
   }

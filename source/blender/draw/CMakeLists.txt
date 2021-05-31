@@ -91,7 +91,7 @@ set(SRC
   engines/eevee/eevee_id_map.cc
   engines/eevee/eevee_instance.cc
   engines/eevee/eevee_light.cc
-  engines/eevee/eevee_lightcache.c
+  engines/eevee/eevee_lightcache.cc
   engines/eevee/eevee_lightprobe.cc
   engines/eevee/eevee_lut.c
   engines/eevee/eevee_material.cc

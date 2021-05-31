@@ -89,6 +89,9 @@ class Instance {
   const View3D *v3d;
   const RegionView3D *rv3d;
 
+  /* Info string displayed at the top of the render / viewport. */
+  char info[64];
+
  public:
   Instance(ShaderModule &shared_shaders)
       : shaders(shared_shaders),

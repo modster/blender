@@ -117,7 +117,10 @@ class LightProbeModule {
 
  private:
   void update_world_cache();
-  void update_world_data(const DRWView *view);
+
+  void sync_world(const DRWView *view);
+  void sync_grid(const DRWView *view, const struct LightGridCache &grid_cache, int grid_index);
+  void sync_cubemap(const DRWView *view, const struct LightProbeCache &cube_cache, int cube_index);
 
   void cubeface_winmat_get(mat4 &winmat, float near, float far);
 
