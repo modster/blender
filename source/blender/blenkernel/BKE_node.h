@@ -1443,6 +1443,14 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name Attribute Nodes
+ * \{ */
+
+#define ATTR_NODE_INDEX 1400
+
+/** \} */
+
 void BKE_node_system_init(void);
 void BKE_node_system_exit(void);
 

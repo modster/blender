@@ -67,10 +67,30 @@ bool geo_node_poll_default(bNodeType *UNUSED(ntype),
   return true;
 }
 
+bool attr_node_poll_default(bNodeType *UNUSED(ntype),
+                            bNodeTree *ntree,
+                            const char **r_disabled_hint)
+{
+  if (!STREQ(ntree->idname, "AttributeNodeTree")) {
+    *r_disabled_hint = "Not a attribute node tree";
+    return false;
+  }
+  return true;
+}
+
 void geo_node_type_base(bNodeType *ntype, int type, const char *name, short nclass, short flag)
 {
   node_type_base(ntype, type, name, nclass, flag);
   ntype->poll = geo_node_poll_default;
+  ntype->update_internal_links = node_update_internal_links_default;
+  ntype->insert_link = node_insert_link_default;
+}
+
+void attr_node_type_base(
+    struct bNodeType *ntype, int type, const char *name, short nclass, short flag)
+{
+  node_type_base(ntype, type, name, nclass, flag);
+  ntype->poll = attr_node_poll_default;
   ntype->update_internal_links = node_update_internal_links_default;
   ntype->insert_link = node_insert_link_default;
 }

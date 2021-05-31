@@ -322,6 +322,8 @@ DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform"
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
 
+DefNode(AttributeNode, ATTR_NODE_INDEX, 0, "INDEX", Index, "Index", "")
+
 /* undefine macros */
 #undef DefNode
 

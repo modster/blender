@@ -22,7 +22,7 @@
 #include "node_common.h"
 #include "node_geometry_util.hh"
 
-void register_node_type_attribute_group(void)
+void register_node_type_attr_group(void)
 {
   static bNodeType ntype;
 

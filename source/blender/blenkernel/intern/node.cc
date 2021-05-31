@@ -5059,7 +5059,6 @@ static void registerTextureNodes()
 static void registerGeometryNodes()
 {
   register_node_type_geo_group();
-  register_node_type_attribute_group();
 
   register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute_clamp();
@@ -5115,6 +5114,10 @@ static void registerGeometryNodes()
   register_node_type_geo_transform();
   register_node_type_geo_triangulate();
   register_node_type_geo_volume_to_mesh();
+
+  register_node_type_attr_group();
+
+  register_node_type_attr_index();
 }
 
 static void registerFunctionNodes()

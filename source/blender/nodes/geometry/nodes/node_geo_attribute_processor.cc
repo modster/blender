@@ -344,6 +344,13 @@ static CustomDataType get_custom_data_type(bNodeSocketType *typeinfo)
   return CD_PROP_FLOAT;
 }
 
+namespace {
+struct InputsCache {
+  Map<int, GVArrayPtr> group_inputs;
+  GVArrayPtr index;
+};
+}  // namespace
+
 static void process_attributes_on_component(GeoNodeExecParams &geo_params,
                                             GeometryComponent &component,
                                             const fn::MultiFunction &network_fn,
@@ -364,40 +371,56 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
   fn::MFParamsBuilder fn_params{network_fn, domain_size};
   fn::MFContextBuilder context;
 
-  Map<int, GVArrayPtr> input_varrays;
+  InputsCache inputs_cache;
 
   for (const DOutputSocket &dsocket : used_group_inputs) {
-    const int index = dsocket->index();
-    GVArrayPtr &input_varray = input_varrays.lookup_or_add_cb(index, [&]() -> GVArrayPtr {
-      const AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
-          BLI_findlink(&storage.inputs_settings, index);
-      const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group->inputs, index);
-      const CustomDataType type = get_custom_data_type(interface_socket->typeinfo);
-      const StringRefNull identifier = interface_socket->identifier;
-      GVArrayPtr input_varray;
-      switch ((GeometryNodeAttributeProcessorInputMode)input_settings->input_mode) {
-        case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_DEFAULT: {
-          const StringRefNull attribute_name = interface_socket->name;
-          return component.attribute_get_for_read(attribute_name, domain, type);
+    const DNode dnode = dsocket.node();
+    const GVArray *input_varray = nullptr;
+    if (dnode->is_group_input_node()) {
+      const int index = dsocket->index();
+      input_varray = &*inputs_cache.group_inputs.lookup_or_add_cb(index, [&]() -> GVArrayPtr {
+        const AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
+            BLI_findlink(&storage.inputs_settings, index);
+        const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group->inputs, index);
+        const CustomDataType type = get_custom_data_type(interface_socket->typeinfo);
+        const StringRefNull identifier = interface_socket->identifier;
+        GVArrayPtr input_varray;
+        switch ((GeometryNodeAttributeProcessorInputMode)input_settings->input_mode) {
+          case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_DEFAULT: {
+            const StringRefNull attribute_name = interface_socket->name;
+            return component.attribute_get_for_read(attribute_name, domain, type);
+          }
+          case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_CUSTOM_ATTRIBUTE: {
+            const std::string input_name = "inB" + identifier;
+            const std::string attribute_name = geo_params.extract_input<std::string>(input_name);
+            return component.attribute_get_for_read(attribute_name, domain, type);
+          }
+          case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_CUSTOM_VALUE: {
+            const std::string input_name = "inA" + identifier;
+            GMutablePointer value = geo_params.extract_input(input_name);
+            GVArrayPtr varray = std::make_unique<fn::GVArray_For_SingleValue>(
+                *value.type(), domain_size, value.get());
+            value.destruct();
+            return varray;
+          }
         }
-        case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_CUSTOM_ATTRIBUTE: {
-          const std::string input_name = "inB" + identifier;
-          const std::string attribute_name = geo_params.extract_input<std::string>(input_name);
-          return component.attribute_get_for_read(attribute_name, domain, type);
-        }
-        case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_CUSTOM_VALUE: {
-          const std::string input_name = "inA" + identifier;
-          GMutablePointer value = geo_params.extract_input(input_name);
-          GVArrayPtr varray = std::make_unique<fn::GVArray_For_SingleValue>(
-              *value.type(), domain_size, value.get());
-          value.destruct();
-          return varray;
-        }
+        BLI_assert_unreachable();
+        return {};
+      });
+    }
+    else if (dnode->idname() == "AttributeNodeIndex") {
+      if (!inputs_cache.index) {
+        auto get_index_func = [](const int64_t index) { return (int)index; };
+        inputs_cache.index = std::make_unique<
+            fn::GVArray_For_EmbeddedVArray<int, VArray_For_Func<int, decltype(get_index_func)>>>(
+            domain_size, domain_size, get_index_func);
       }
-      BLI_assert_unreachable();
-      return {};
-    });
+      input_varray = &*inputs_cache.index;
+    }
 
+    if (input_varray == nullptr) {
+      return;
+    }
     fn_params.add_readonly_single_input(*input_varray);
   }
 
