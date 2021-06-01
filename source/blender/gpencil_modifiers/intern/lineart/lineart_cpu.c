@@ -444,7 +444,8 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
   while (lineart_occlusion_make_task_info(rb, rti)) {
 
     for (eip = rti->contour.first; eip && eip != rti->contour.last; eip = eip->next) {
-      printf("eip l %d r %d t1 %d t2 %d fl %d\n", eip->v1, eip->v2, eip->t1, eip->t2, eip->flags);
+      // printf("eip l %d r %d t1 %d t2 %d fl %d\n", eip->v1, eip->v2, eip->t1, eip->t2,
+      // eip->flags);
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
 
@@ -1425,12 +1426,12 @@ static char lineart_identify_feature_line_me(LineartRenderBuffer *rb,
                                              bool count_freestyle,
                                              Mesh *me)
 {
-  return LRT_EDGE_FLAG_CONTOUR;
+  // return LRT_EDGE_FLAG_CONTOUR;
   if (!la_me->managed) {
     return 0;
   }
 
-  if (la_me->t1 && !la_me->t2) {
+  if (la_me->t1 == la_me->t2 || !la_me->t2) {
     return LRT_EDGE_FLAG_CONTOUR;
   }
 
@@ -1657,21 +1658,21 @@ static int lineart_mesh_edge_get_or_insert_from_vpair(LineartMeshEdge *table,
     if (!e->t1) {
       e->t1 = from;
       e->poly1 = poly;
-      printf("old edge %d %d f %d\n", v1, v2, from);
+      // printf("old edge %d %d f %d\n", v1, v2, from);
     }
     else {
       e->t2 = from;
       e->poly2 = poly;
-      printf("old_edge %d %d f %d\n", v1, v2, from);
+      // printf("old_edge %d %d f %d\n", v1, v2, from);
     }
     return real_edge;
   }
   else {
-    printf("new_edge %d %d f %d\n", v1, v2, from);
     for (int i = orig_edge_count; i < max_edge_count; i++) {
       LineartMeshEdge *e = &table[i];
       if (e->managed) {
         if ((e->v1 == v1 && e->v2 == v2) || (e->v1 == v2 && e->v2 == v1)) {
+          // printf("ext_edge %d %d f %d\n", v1, v2, from);
           if (!e->t1) {
             e->t1 = from;
             e->poly1 = poly;
@@ -1684,6 +1685,7 @@ static int lineart_mesh_edge_get_or_insert_from_vpair(LineartMeshEdge *table,
         }
       }
       else {
+        // printf("new_edge %d %d f %d\n", v1, v2, from);
         e->managed = true;
         e->v1 = v1;
         e->v2 = v2;
@@ -1795,6 +1797,7 @@ static void lineart_geometry_object_load_mesh(LineartObjectInfo *obi, LineartRen
   }
 
   tri = ort;
+  loop = me->mloop;
   int real_edges[3];
 
   for (i = 0; i < tri_count; i++) {
@@ -1803,13 +1806,13 @@ static void lineart_geometry_object_load_mesh(LineartObjectInfo *obi, LineartRen
     BKE_mesh_looptri_get_real_edges(me, &me->runtime.looptris.array[i], real_edges);
 
     for (int j = 0; j < 3; j++) {
-      tri->v[j] = &orv[looptri->tri[j]];
+      tri->v[j] = &orv[loop[looptri->tri[j]].v];
       lineart_mesh_edge_get_or_insert_from_vpair(table,
                                                  real_edges[j],
                                                  mesh_edge_count,
                                                  max_edge_count,
-                                                 looptri->tri[j],
-                                                 looptri->tri[(j > 1) ? 0 : (j + 1)],
+                                                 loop[looptri->tri[j]].v,
+                                                 loop[looptri->tri[(j > 1) ? 0 : (j + 1)]].v,
                                                  tri,
                                                  looptri->poly);
     }
@@ -1887,6 +1890,8 @@ static void lineart_geometry_object_load_mesh(LineartObjectInfo *obi, LineartRen
     if (!la_me->flags) {
       continue;
     }
+
+    // printf("la_me %d %d %d\n", la_me, la_me->v1, la_me->v2);
 
     la_e->v1 = &orv[la_me->v1];
     la_e->v2 = &orv[la_me->v2];
@@ -2325,7 +2330,6 @@ static void lineart_main_load_geometries(
      * who doesn't have instances or just simply have transformation channel set. */
     Object *use_ob = DEG_get_evaluated_object(depsgraph, ob);
     Mesh *use_mesh;
-    BMesh *bm;
 
     if (obi->override_usage == OBJECT_LRT_EXCLUDE) {
       continue;
@@ -2347,23 +2351,6 @@ static void lineart_main_load_geometries(
       continue;
     }
 
-    if (use_mesh->edit_mesh) {
-      /* Do not use edit_mesh directly because we will modify it, so create a copy. */
-      bm = BM_mesh_copy(use_mesh->edit_mesh->bm);
-    }
-    else {
-      const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(((Mesh *)(use_mesh)));
-      bm = BM_mesh_create(&allocsize,
-                          &((struct BMeshCreateParams){
-                              .use_toolflags = true,
-                          }));
-      BM_mesh_bm_from_me(bm,
-                         use_mesh,
-                         &((struct BMeshFromMeshParams){
-                             .calc_face_normal = true,
-                         }));
-    }
-
     obi->me = use_mesh;
 
     /* Prepare the matrix used for transforming this specific object (instance).  */
@@ -2374,9 +2361,8 @@ static void lineart_main_load_geometries(
     transpose_m4(imat);
     copy_m4d_m4(obi->normal, imat);
 
-    obi->original_bm = bm;
     obi->original_ob = (ob->id.orig_id ? (Object *)ob->id.orig_id : (Object *)ob);
-    lineart_geometry_load_assign_thread(olti, obi, thread_count, bm->totface);
+    lineart_geometry_load_assign_thread(olti, obi, thread_count, use_mesh->totface);
   }
   DEG_OBJECT_ITER_END;
 
