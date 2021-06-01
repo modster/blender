@@ -16,6 +16,7 @@
 
 #include "BKE_node.h"
 #include "BKE_solidifiy.h"
+#include "BKE_node.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"

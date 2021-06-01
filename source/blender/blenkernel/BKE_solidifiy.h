@@ -29,7 +29,6 @@ typedef struct SolidifyData {
   char nonmanifold_offset_mode;
   char nonmanifold_boundary_mode;
 
-  char _pad;
   float crease_inner;
   float crease_outer;
   float crease_rim;
