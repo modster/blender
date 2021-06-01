@@ -1,7 +1,3 @@
-//
-// Created by fabian on 24.05.21.
-//
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,7 +26,6 @@ typedef struct SolidifyData {
   char nonmanifold_offset_mode;
   char nonmanifold_boundary_mode;
 
-  char _pad;
   float crease_inner;
   float crease_outer;
   float crease_rim;
@@ -42,7 +37,8 @@ typedef struct SolidifyData {
   float bevel_convex;
 } SolidifyData;
 
-Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh);
+Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh);
+Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh);
 
 #ifdef __cplusplus
 }
