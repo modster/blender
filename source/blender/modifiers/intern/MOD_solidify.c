@@ -35,6 +35,7 @@
 #include "BKE_context.h"
 #include "BKE_particle.h"
 #include "BKE_screen.h"
+#include "BKE_solidifiy.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -81,12 +82,38 @@ static void requiredDataMask(Object *UNUSED(ob),
   }
 }
 
+static const SolidifyData solidify_data_from_modifier_data(ModifierData *md){
+  const SolidifyModifierData *smd = (SolidifyModifierData *)md;
+  const SolidifyData solidify_data = {
+      smd->defgrp_name,
+      smd->shell_defgrp_name,
+      smd->rim_defgrp_name,
+      smd->offset,
+      smd->offset_fac_vg,
+      smd->offset_clamp,
+      smd->mode,
+      smd->nonmanifold_offset_mode,
+      smd->nonmanifold_boundary_mode,
+      smd->crease_inner,
+      smd->crease_outer,
+      smd->crease_rim,
+      smd->flag,
+      smd->mat_ofs,
+      smd->mat_ofs_rim,
+      smd->merge_tolerance,
+      smd->bevel_convex,
+  };
+  return solidify_data;
+}
+
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
+  const SolidifyData solidify_data = solidify_data_from_modifier_data(md);
+
   switch (smd->mode) {
     case MOD_SOLIDIFY_MODE_EXTRUDE:
-      return MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
+      return solidify_extrude(&solidify_data, mesh);//MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
     case MOD_SOLIDIFY_MODE_NONMANIFOLD:
       return MOD_solidify_nonmanifold_modifyMesh(md, ctx, mesh);
     default:

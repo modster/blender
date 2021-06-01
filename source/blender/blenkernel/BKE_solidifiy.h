@@ -6,7 +6,9 @@
 extern "C" {
 #endif
 
-typedef struct SolidifyNodeData {
+struct Mesh;
+
+typedef struct SolidifyData {
   /** Name of vertex group to use, MAX_VGROUP_NAME. */
   char defgrp_name[64];
   char shell_defgrp_name[64];
@@ -38,9 +40,9 @@ typedef struct SolidifyNodeData {
 
   float merge_tolerance;
   float bevel_convex;
-} SolidifyNodeData;
+} SolidifyData;
 
-Mesh *solidify_extrude_modifyMesh(SolidifyNodeData *smd, Mesh *mesh);
+Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh);
 
 #ifdef __cplusplus
 }
