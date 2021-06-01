@@ -21,6 +21,7 @@
  * \ingroup modifiers
  */
 
+#include <BLI_string.h>
 #include <string.h>
 
 #include "BLI_utildefines.h"
@@ -85,10 +86,11 @@ static void requiredDataMask(Object *UNUSED(ob),
 static const SolidifyData solidify_data_from_modifier_data(ModifierData *md){
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
   const SolidifyData solidify_data = {
-      smd->defgrp_name,
-      smd->shell_defgrp_name,
-      smd->rim_defgrp_name,
+      "",
+      "",
+      "",
       smd->offset,
+      smd->offset_fac,
       smd->offset_fac_vg,
       smd->offset_clamp,
       smd->mode,
@@ -100,9 +102,14 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md){
       smd->flag,
       smd->mat_ofs,
       smd->mat_ofs_rim,
-      smd->merge_tolerance,
-      smd->bevel_convex,
+      smd->mode == MOD_SOLIDIFY_MODE_EXTRUDE ? 0.01f : smd->merge_tolerance,
+      smd->bevel_convex
   };
+
+  BLI_strcpy_rlen(solidify_data.defgrp_name, smd->defgrp_name);
+  BLI_strcpy_rlen(solidify_data.shell_defgrp_name, smd->shell_defgrp_name);
+  BLI_strcpy_rlen(solidify_data.rim_defgrp_name, smd->rim_defgrp_name);
+
   return solidify_data;
 }
 
@@ -115,7 +122,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     case MOD_SOLIDIFY_MODE_EXTRUDE:
       return solidify_extrude(&solidify_data, mesh);//MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
     case MOD_SOLIDIFY_MODE_NONMANIFOLD:
-      return MOD_solidify_nonmanifold_modifyMesh(md, ctx, mesh);
+      return solidify_nonmanifold(&solidify_data, mesh);//MOD_solidify_nonmanifold_modifyMesh(md, ctx, mesh);
     default:
       BLI_assert(0);
   }

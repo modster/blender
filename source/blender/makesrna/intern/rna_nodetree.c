@@ -480,7 +480,11 @@ static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_any[]
 };
 
 #ifndef RNA_RUNTIME
-
+static const EnumPropertyItem rna_node_geometry_solidify_mode[] = {
+    {0, "MOD_SOLIDIFY_MODE_EXTRUDE", 0, "Simple", "Simple"},
+    {1, "MOD_SOLIDIFY_MODE_NONMANIFOLD",0, "Complex", "Complex"},
+    {0, NULL, 0, NULL, NULL},
+};
 static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_vector[] = {
     ITEM_ATTRIBUTE,
     ITEM_VECTOR,
@@ -9520,6 +9524,18 @@ static void def_geo_point_scale(StructRNA *srna)
   prop = RNA_def_property(srna, "input_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float_vector);
   RNA_def_property_ui_text(prop, "Input Type", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_solidify(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometrySolidify", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_solidify_mode);
+  RNA_def_property_ui_text(prop, "Mode", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 

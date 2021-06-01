@@ -28,13 +28,11 @@
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
-#include "DNA_object_types.h"
 
 #include "MEM_guardedalloc.h"
 
 #include "BKE_deform.h"
 #include "BKE_mesh.h"
-#include "BKE_particle.h"
 #include "BKE_solidifiy.h"
 
 //#include "node_geometry_util.hh"
@@ -185,8 +183,9 @@ static void mesh_calc_hq_normal(Mesh *mesh, float (*poly_nors)[3], float (*r_ver
 /** \name Main Solidify Function
  * \{ */
 
-Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
+Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
 {
+  printf("solidify extrude: %f, %i\n", solidify_data->offset, solidify_data->flag);
   Mesh *result;
 
   MVert *mv, *mvert, *orig_mvert;
@@ -221,27 +220,27 @@ Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
   float(*vert_nors)[3] = NULL;
   float(*poly_nors)[3] = NULL;
 
-  const bool need_poly_normals = (smd->flag & MOD_SOLIDIFY_NORMAL_CALC) ||
-                                 (smd->flag & MOD_SOLIDIFY_EVEN) ||
-                                 (smd->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP) ||
-                                 (smd->bevel_convex != 0);
+  const bool need_poly_normals = (solidify_data->flag & MOD_SOLIDIFY_NORMAL_CALC) ||
+                                 (solidify_data->flag & MOD_SOLIDIFY_EVEN) ||
+                                 (solidify_data->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP) ||
+                                 (solidify_data->bevel_convex != 0);
 
-  const float ofs_orig = -(((-smd->offset_fac + 1.0f) * 0.5f) * smd->offset);
-  const float ofs_new = smd->offset + ofs_orig;
-  const float offset_fac_vg = smd->offset_fac_vg;
-  const float offset_fac_vg_inv = 1.0f - smd->offset_fac_vg;
-  const float bevel_convex = smd->bevel_convex;
-  const bool do_flip = (smd->flag & MOD_SOLIDIFY_FLIP) != 0;
-  const bool do_clamp = (smd->offset_clamp != 0.0f);
-  const bool do_angle_clamp = do_clamp && (smd->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP) != 0;
+  const float ofs_orig = -(((-solidify_data->offset_fac + 1.0f) * 0.5f) * solidify_data->offset);
+  const float ofs_new = solidify_data->offset + ofs_orig;
+  const float offset_fac_vg = solidify_data->offset_fac_vg;
+  const float offset_fac_vg_inv = 1.0f - solidify_data->offset_fac_vg;
+  const float bevel_convex = solidify_data->bevel_convex;
+  const bool do_flip = (solidify_data->flag & MOD_SOLIDIFY_FLIP) != 0;
+  const bool do_clamp = (solidify_data->offset_clamp != 0.0f);
+  const bool do_angle_clamp = do_clamp && (solidify_data->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP) != 0;
   const bool do_bevel_convex = bevel_convex != 0.0f;
-  const bool do_rim = (smd->flag & MOD_SOLIDIFY_RIM) != 0;
-  const bool do_shell = !(do_rim && (smd->flag & MOD_SOLIDIFY_NOSHELL) != 0);
+  const bool do_rim = (solidify_data->flag & MOD_SOLIDIFY_RIM) != 0;
+  const bool do_shell = !(do_rim && (solidify_data->flag & MOD_SOLIDIFY_NOSHELL) != 0);
 
   /* weights */
-  MDeformVert *dvert;
-  const bool defgrp_invert = (smd->flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
-  int defgrp_index;
+  MDeformVert *dvert = mesh->dvert;
+  const bool defgrp_invert = (solidify_data->flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
+  int defgrp_index = 0;
 //  const int shell_defgrp_index = BKE_object_defgroup_name_index(object,
 //                                                                smd->shell_defgrp_name);
 //  const int rim_defgrp_index = BKE_object_defgroup_name_index(object, smd->rim_defgrp_name);
@@ -355,7 +354,7 @@ Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
     BLI_assert(newEdges == 0);
   }
 
-  if (smd->flag & MOD_SOLIDIFY_NORMAL_CALC) {
+  if (solidify_data->flag & MOD_SOLIDIFY_NORMAL_CALC) {
     vert_nors = MEM_calloc_arrayN(numVerts, sizeof(float[3]), "mod_solid_vno_hq");
     mesh_calc_hq_normal(mesh, poly_nors, vert_nors);
   }
@@ -506,7 +505,7 @@ Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
   }
 
   /* note, copied vertex layers don't have flipped normals yet. do this after applying offset */
-  if ((smd->flag & MOD_SOLIDIFY_EVEN) == 0) {
+  if ((solidify_data->flag & MOD_SOLIDIFY_EVEN) == 0) {
     /* no even thickness, very simple */
     float scalar_short;
     float scalar_short_vgroup;
@@ -514,7 +513,7 @@ Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
     /* for clamping */
     float *vert_lens = NULL;
     float *vert_angs = NULL;
-    const float offset = fabsf(smd->offset) * smd->offset_clamp;
+    const float offset = fabsf(solidify_data->offset) * solidify_data->offset_clamp;
     const float offset_sq = offset * offset;
 
     /* for bevel weight */
@@ -723,7 +722,7 @@ Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
   }
   else {
 #ifdef USE_NONMANIFOLD_WORKAROUND
-    const bool check_non_manifold = (smd->flag & MOD_SOLIDIFY_NORMAL_CALC) != 0;
+    const bool check_non_manifold = (solidify_data->flag & MOD_SOLIDIFY_NORMAL_CALC) != 0;
 #endif
     /* same as EM_solidify() in editmesh_lib.c */
     float *vert_angles = MEM_calloc_arrayN(
@@ -879,8 +878,8 @@ Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
     }
 
     if (do_clamp) {
-      const float clamp_fac = 1 + (do_angle_clamp ? fabsf(smd->offset_fac) : 0);
-      const float offset = fabsf(smd->offset) * smd->offset_clamp * clamp_fac;
+      const float clamp_fac = 1 + (do_angle_clamp ? fabsf(solidify_data->offset_fac) : 0);
+      const float offset = fabsf(solidify_data->offset) * solidify_data->offset_clamp * clamp_fac;
       if (offset > FLT_EPSILON) {
         float *vert_lens_sq = MEM_malloc_arrayN(numVerts, sizeof(float), "vert_lens_sq");
         const float offset_sq = offset * offset;
@@ -1049,9 +1048,9 @@ Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
                                NULL;
     float nor[3];
 #endif
-    const uchar crease_rim = smd->crease_rim * 255.0f;
-    const uchar crease_outer = smd->crease_outer * 255.0f;
-    const uchar crease_inner = smd->crease_inner * 255.0f;
+    const uchar crease_rim = solidify_data->crease_rim * 255.0f;
+    const uchar crease_outer = solidify_data->crease_outer * 255.0f;
+    const uchar crease_inner = solidify_data->crease_inner * 255.0f;
 
     int *origindex_edge;
     int *orig_ed;
@@ -1163,6 +1162,7 @@ Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
         mp->mat_nr += mat_ofs_rim;
         CLAMP(mp->mat_nr, 0, mat_nr_max);
       }
+
       if (crease_outer) {
         /* crease += crease_outer; without wrapping */
         char *cr = &(ed->crease);
