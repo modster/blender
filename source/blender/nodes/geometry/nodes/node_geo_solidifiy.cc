@@ -28,6 +28,11 @@
 #include "DNA_modifier_types.h"
 
 #include "node_geometry_util.hh"
+#include "node_geo_solidify.h"
+
+/*extern "C" {    // another way
+  Mesh *solidify_extrude_modifyMesh( Mesh *mesh);
+};*/
 
 static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
