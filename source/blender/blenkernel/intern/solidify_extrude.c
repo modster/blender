@@ -35,7 +35,7 @@
 #include "BKE_deform.h"
 #include "BKE_mesh.h"
 #include "BKE_particle.h"
-#include "node_geo_solidify.h"
+#include "BKE_solidifiy.h"
 
 //#include "node_geometry_util.hh"
 
@@ -185,7 +185,7 @@ static void mesh_calc_hq_normal(Mesh *mesh, float (*poly_nors)[3], float (*r_ver
 /** \name Main Solidify Function
  * \{ */
 
-Mesh *solidify_extrude_modifyMesh(SolidifyNodeData *smd, Mesh *mesh)
+Mesh *solidify_extrude(SolidifyData *smd, Mesh *mesh)
 {
   Mesh *result;
 
