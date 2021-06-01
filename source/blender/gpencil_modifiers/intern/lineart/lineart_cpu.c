@@ -63,6 +63,8 @@
 
 #include "lineart_intern.h"
 
+#define LINEART_USE_LEGACY_LOADER
+
 static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer *rb,
                                                              LineartEdge *e);
 
@@ -2144,6 +2146,11 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 
   /* always free bm as it's a copy from before threading */
   BM_mesh_free(bm);
+
+  if (obi->original_ob->type != OB_MESH) {
+    BKE_mesh_free(obi->me);
+    MEM_freeN(obi->me);
+  }
 }
 
 static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
@@ -2151,7 +2158,11 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
 {
   LineartRenderBuffer *rb = olti->rb;
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
+#ifdef LINEART_USE_LEGACY_LOADER
+    lineart_geometry_object_load(obi, rb);
+#else
     lineart_geometry_object_load_mesh(obi, rb);
+#endif
   }
 }
 
@@ -2330,6 +2341,7 @@ static void lineart_main_load_geometries(
      * who doesn't have instances or just simply have transformation channel set. */
     Object *use_ob = DEG_get_evaluated_object(depsgraph, ob);
     Mesh *use_mesh;
+    BMesh *bm;
 
     if (obi->override_usage == OBJECT_LRT_EXCLUDE) {
       continue;
@@ -2350,6 +2362,26 @@ static void lineart_main_load_geometries(
     if (!use_mesh) {
       continue;
     }
+#ifdef LINEART_USE_LEGACY_LOADER
+    if (use_mesh->edit_mesh) {
+      /* Do not use edit_mesh directly because we will modify it, so create a copy. */
+      bm = BM_mesh_copy(use_mesh->edit_mesh->bm);
+    }
+    else {
+      const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(((Mesh *)(use_mesh)));
+      bm = BM_mesh_create(&allocsize,
+                          &((struct BMeshCreateParams){
+                              .use_toolflags = true,
+                          }));
+      BM_mesh_bm_from_me(bm,
+                         use_mesh,
+                         &((struct BMeshFromMeshParams){
+                             .calc_face_normal = true,
+                         }));
+    }
+
+    obi->original_bm = bm;
+#endif
 
     obi->me = use_mesh;
 
