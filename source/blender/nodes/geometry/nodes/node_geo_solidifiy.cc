@@ -14,17 +14,14 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "BKE_solidifiy.h"
 
 #include "DNA_modifier_types.h"
 
-#include "node_geometry_util.hh"
-#include "node_geo_solidify.h"
+#include "UI_interface.h"
+#include "UI_resources.h"
 
-/*extern "C" {    // another way
-  Mesh *solidify_extrude_modifyMesh( Mesh *mesh);
-};*/
+#include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
@@ -64,7 +61,7 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
-    SolidifyNodeData solidify_node_data = {
+    SolidifyData solidify_node_data = {
       /** Name of vertex group to use, MAX_VGROUP_NAME. */
       "char defgrp_name[64]",
       "shell_defgrp_name[64]",
@@ -98,15 +95,9 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     };
 
     MeshComponent &meshComponent = geometry_set.get_component_for_write<MeshComponent>();
-    Mesh *return_mesh = solidify_extrude_modifyMesh(&solidify_node_data, meshComponent.get_for_write());
+    Mesh *return_mesh = solidify_extrude(&solidify_node_data, meshComponent.get_for_write());
     geometry_set.replace_mesh(return_mesh);
   }
-//  if (geometry_set.has<PointCloudComponent>()) {
-//    fill_attribute(geometry_set.get_component_for_write<PointCloudComponent>(), params);
-//  }
-//  if (geometry_set.has<CurveComponent>()) {
-//    fill_attribute(geometry_set.get_component_for_write<CurveComponent>(), params);
-//  }
 
   params.set_output("Geometry", geometry_set);
 }
