@@ -545,6 +545,13 @@ def range_str(val):
 
 
 def example_extract_docstring(filepath):
+    '''
+    Return (text, line_no, line_no_has_content) where:
+    - ``text`` is the doc-string text.
+    - ``line_no`` is the line the doc-string text ends.
+    - ``line_no_has_content`` when False, this file only contains a doc-string.
+      There is no need to include the remainder.
+    '''
     file = open(filepath, "r", encoding="utf-8")
     line = file.readline()
     line_no = 0
@@ -553,7 +560,7 @@ def example_extract_docstring(filepath):
         line_no += 1
     else:
         file.close()
-        return "", 0, False
+        return "", 0, True
 
     for line in file:
         line_no += 1
@@ -947,7 +954,7 @@ def pymodule2sphinx(basepath, module_name, module, title, module_all_extra):
             # constant, not much fun we can do here except to list it.
             # TODO, figure out some way to document these!
             fw(".. data:: %s\n\n" % attribute)
-            write_indented_lines("   ", fw, "constant value %s" % repr(value), False)
+            write_indented_lines("   ", fw, "Constant value %s" % repr(value), False)
             fw("\n")
         else:
             BPY_LOGGER.debug("\tnot documenting %s.%s of %r type" % (module_name, attribute, value_type.__name__))
@@ -1239,7 +1246,7 @@ def pyrna_enum2sphinx(prop, use_empty_descriptions=False):
             "%s.\n" % (
                 identifier,
                 # Account for multi-line enum descriptions, allowing this to be a block of text.
-                indent(", ".join(escape_rst(val) for val in (name, description) if val) or "Undocumented", "  "),
+                indent(" -- ".join(escape_rst(val) for val in (name, description) if val) or "Undocumented", "  "),
             )
             for identifier, name, description in prop.enum_items
         ])
