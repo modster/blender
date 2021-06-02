@@ -92,8 +92,11 @@ void ImageNode::convertToOperations(NodeConverter &converter,
 
         for (int64_t index = 0; index < outputs.size(); index++) {
           NodeOutput *socket = outputs[index];
-          NodeOperation *operation = nullptr;
           bNodeSocket *bnodeSocket = socket->getbNodeSocket();
+          if (bnodeSocket->flag & SOCK_UNAVAIL) {
+            continue;
+          }
+          NodeOperation *operation = nullptr;
           NodeImageLayer *storage = (NodeImageLayer *)bnodeSocket->storage;
           RenderPass *rpass = (RenderPass *)BLI_findstring(
               &rl->passes, storage->pass_name, offsetof(RenderPass, name));
