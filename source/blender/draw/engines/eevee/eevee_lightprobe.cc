@@ -20,7 +20,9 @@
  * \ingroup eevee
  */
 
+#include "BLI_rect.h"
 #include "BLI_span.hh"
+#include "DNA_defaults.h"
 #include "DNA_lightprobe_types.h"
 
 #include "eevee_instance.hh"
@@ -36,8 +38,7 @@ void LightProbeModule::init()
   /* TODO */
   bool use_lookdev = false;
   if (!use_lookdev && lightcache_ && lightcache_->load()) {
-    OBJECT_GUARDED_SAFE_DELETE(lookdev_lightcache_, LightCache);
-    do_world_update_ = false;
+    OBJECT_GUARDED_SAFE_DELETE(lightcache_lookdev_, LightCache);
   }
   else {
     if (lightcache_ && (lightcache_->flag & LIGHTCACHE_NOT_USABLE)) {
@@ -45,7 +46,7 @@ void LightProbeModule::init()
           inst_.info, sizeof(inst_.info), "Error: LightCache cannot be loaded on this GPU");
     }
 
-    if (lookdev_lightcache_ == nullptr) {
+    if (lightcache_lookdev_ == nullptr) {
       int cube_len = 1;
       int grid_len = 1;
       int irr_samples_len = 1;
@@ -54,21 +55,20 @@ void LightProbeModule::init()
       LightCache::irradiance_cache_size_get(
           sce_eevee.gi_visibility_resolution, irr_samples_len, irr_size);
 
-      lookdev_lightcache_ = new LightCache(grid_len,
-                                           cube_len,
+      lightcache_lookdev_ = new LightCache(cube_len,
+                                           grid_len,
                                            sce_eevee.gi_cubemap_resolution,
                                            sce_eevee.gi_visibility_resolution,
                                            irr_size);
-
-      do_world_update_ = true;
     }
-    lightcache_ = lookdev_lightcache_;
+    lightcache_ = lightcache_lookdev_;
   }
 
   for (DRWView *&view : face_view_) {
     view = nullptr;
   }
 
+  info_data_.grids.irradiance_smooth = sce_eevee.gi_irradiance_smoothing;
   info_data_.grids.irradiance_cells_per_row = lightcache_->irradiance_cells_per_row_get();
   info_data_.grids.visibility_size = lightcache_->vis_res;
   info_data_.grids.visibility_cells_per_row = lightcache_->grid_tx.tex_size[0] /
@@ -119,6 +119,19 @@ void LightProbeModule::begin_sync()
     DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
+
+  if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_CUBEMAPS) {
+  }
+
+  if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_CUBEMAPS) {
+  }
+}
+
+void LightProbeModule::end_sync()
+{
+  if (lightcache_->flag & LIGHTCACHE_UPDATE_WORLD) {
+    cubemap_prepare(vec3(0.0f), 0.01f, 1.0f, true);
+  }
 }
 
 void LightProbeModule::cubeface_winmat_get(mat4 &winmat, float near, float far)
@@ -127,7 +140,7 @@ void LightProbeModule::cubeface_winmat_get(mat4 &winmat, float near, float far)
   perspective_m4(winmat, -near, near, -near, near, near, far);
 }
 
-void LightProbeModule::cubemap_prepare(vec3 &position, float near, float far)
+void LightProbeModule::cubemap_prepare(vec3 position, float near, float far, bool background_only)
 {
   SceneEEVEE &sce_eevee = inst_.scene->eevee;
   int cube_res = sce_eevee.gi_cubemap_resolution;
@@ -138,7 +151,7 @@ void LightProbeModule::cubemap_prepare(vec3 &position, float near, float far)
   negate_v3_v3(viewmat[3], position);
 
   /* TODO(fclem) We might want to have theses as temporary textures. */
-  cube_depth_tx_.ensure_cubemap("CubemapDepth", cube_res, cube_mip_count, GPU_DEPTH_COMPONENT32F);
+  cube_depth_tx_.ensure_cubemap("CubemapDepth", cube_res, cube_mip_count, GPU_DEPTH24_STENCIL8);
   cube_color_tx_.ensure_cubemap("CubemapColor", cube_res, cube_mip_count, GPU_RGBA16F);
   GPU_texture_mipmap_mode(cube_color_tx_, true, true);
 
@@ -150,20 +163,27 @@ void LightProbeModule::cubemap_prepare(vec3 &position, float near, float far)
 
   mat4 winmat;
   cubeface_winmat_get(winmat, near, far);
-  for (int face : IndexRange(6)) {
-    face_fb_[face].ensure(GPU_ATTACHMENT_TEXTURE_CUBEFACE_MIP(cube_depth_tx_, face, 0),
-                          GPU_ATTACHMENT_TEXTURE_CUBEFACE_MIP(cube_color_tx_, face, 0));
-    mat4 facemat;
-    mul_m4_m4m4(facemat, winmat, cubeface_mat[face]);
-
-    DRWView *&view = face_view_[face];
-    if (view == nullptr) {
-      view = DRW_view_create(viewmat, facemat, nullptr, nullptr, nullptr);
-    }
-    else {
-      DRW_view_update(view, viewmat, facemat, nullptr, nullptr);
-    }
+  for (LightProbeView &view : probe_views_) {
+    view.sync(cube_color_tx_, cube_depth_tx_, winmat, viewmat, background_only);
   }
+}
+
+void LightProbeModule::cubemap_render(void)
+{
+  DRW_stats_group_start("Cubemap Render");
+  for (LightProbeView &view : probe_views_) {
+    view.render();
+  }
+  DRW_stats_group_end();
+
+  /* Update mipchain. */
+  filter_data_.target_layer = 0;
+  filter_data_.push_update();
+  cube_downsample_input_tx_ = cube_color_tx_;
+
+  DRW_stats_group_start("Cubemap Downsample");
+  GPU_framebuffer_recursive_downsample(cube_downsample_fb_, 7, cube_downsample_cb, this);
+  DRW_stats_group_end();
 }
 
 void LightProbeModule::filter_glossy(int cube_index, float intensity)
@@ -235,9 +255,9 @@ void LightProbeModule::filter_diffuse(int sample_index, float intensity)
   offset.y *= sample_index / info_data_.grids.irradiance_cells_per_row;
 
   GPU_framebuffer_bind(filter_grid_fb_);
-  // GPU_framebuffer_viewport_set(filter_grid_fb_, UNPACK2(offset), UNPACK2(extent));
+  GPU_framebuffer_viewport_set(filter_grid_fb_, UNPACK2(offset), UNPACK2(extent));
   DRW_draw_pass(filter_diffuse_ps_);
-  // GPU_framebuffer_viewport_reset(filter_grid_fb_);
+  GPU_framebuffer_viewport_reset(filter_grid_fb_);
 }
 
 void LightProbeModule::filter_visibility(int sample_index,
@@ -269,27 +289,92 @@ void LightProbeModule::update_world_cache()
 
   const DRWView *view_active = DRW_view_get_active();
 
-  vec3 position(0.0f);
-  cubemap_prepare(position, 0.01f, 1.0f);
-
-  auto probe_render = [&]() { inst_.shading_passes.background.render(); };
-  cubemap_render(probe_render);
-
-  filter_glossy(0, 1.0f);
-
-  /* TODO(fclem) Change ray type. */
-  /* OPTI(fclem) Only re-render if there is a light path node in the world material. */
-  // cubemap_render(probe_render);
+  cubemap_render();
 
   filter_diffuse(0, 1.0f);
+
+  if ((lightcache_->flag & LIGHTCACHE_NO_REFLECTION) == 0) {
+    /* TODO(fclem) Change ray type. */
+    /* OPTI(fclem) Only re-render if there is a light path node in the world material. */
+    // cubemap_render();
+
+    filter_glossy(0, 1.0f);
+  }
 
   if (view_active != nullptr) {
     DRW_view_set_active(view_active);
   }
 
-  do_world_update_ = false;
-
   DRW_stats_group_end();
+}
+
+/* Ensure a temporary cache the same size at the target lightcache exists. */
+LightCache *LightProbeModule::baking_cache_get(void)
+{
+  if (lightcache_baking_ == nullptr) {
+    lightcache_baking_ = new LightCache(lightcache_->cube_len,
+                                        lightcache_->grid_len,
+                                        lightcache_->cube_tx.tex_size[0],
+                                        lightcache_->vis_res,
+                                        lightcache_->grid_tx.tex_size);
+    /* Avoid sampling further than mip 0. Mips > 0 being undefined. */
+    lightcache_baking_->mips_len = 0;
+    lightcache_baking_->flag |= LIGHTCACHE_NO_REFLECTION;
+
+    /* Copy cache structure. */
+    memcpy(lightcache_baking_->cube_data,
+           lightcache_->cube_data,
+           lightcache_->cube_len * sizeof(*lightcache_->cube_data));
+    memcpy(lightcache_baking_->grid_data,
+           lightcache_->grid_data,
+           lightcache_->grid_len * sizeof(*lightcache_->grid_data));
+  }
+  return lightcache_baking_;
+}
+
+void LightProbeModule::bake(Depsgraph *depsgraph,
+                            int type,
+                            int index,
+                            int UNUSED(bounce),
+                            const float position[3],
+                            const LightProbe *probe)
+{
+  rcti rect;
+  BLI_rcti_init(&rect, 0, 0, 1, 1);
+
+  /* Disable screenspace effects. */
+  SceneEEVEE &sce_eevee = DEG_get_evaluated_scene(depsgraph)->eevee;
+  sce_eevee.flag &= ~(SCE_EEVEE_GTAO_ENABLED | SCE_EEVEE_SSR_ENABLED);
+
+  inst_.init(ivec2(1), &rect, nullptr, depsgraph, probe);
+  inst_.sampling.reset();
+  inst_.render_sync();
+  inst_.sampling.step();
+
+  float near = (probe) ? probe->clipsta : 0.1f;
+  float far = (probe) ? probe->clipend : 1.0f;
+  float intensity = (probe) ? probe->intensity : 1.0f;
+
+  bool background_only = (probe == nullptr);
+  cubemap_prepare(position, near, far, background_only);
+
+  /* Render using the previous bounce to light the scene. */
+  lightcache_ = baking_cache_get();
+
+  cubemap_render();
+
+  /* Filter on the original cache. */
+  lightcache_ = reinterpret_cast<LightCache *>(sce_eevee.light_cache_data);
+
+  if (type == LIGHTPROBE_TYPE_CUBE) {
+    filter_glossy(index, intensity);
+  }
+  else {
+    filter_diffuse(index, intensity);
+    if (probe) {
+      // filter_visibility(index);
+    }
+  }
 }
 
 /* Push world probe to first grid and cubemap slots. */
@@ -329,7 +414,7 @@ void LightProbeModule::sync_grid(const DRWView *UNUSED(view),
                                  int grid_index)
 {
   /* Skip the world probe. */
-  if (grid_index == 0) {
+  if (grid_index == 0 || grid_cache.is_ready != 1) {
     return;
   }
   GridData &grid = grid_data_[info_data_.grids.grid_count];
@@ -355,7 +440,7 @@ void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
                                     int cube_index)
 {
   /* Skip the world probe. */
-  if (cube_index == 0) {
+  if (cube_index == 0 || cube_cache.is_ready != 1) {
     return;
   }
   CubemapData &cube = cube_data_[info_data_.cubes.cube_count];
@@ -371,13 +456,14 @@ void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
 
 void LightProbeModule::set_view(const DRWView *view, const ivec2 UNUSED(extent))
 {
-  /* TODO improve this. The update flag should be in the cache. */
-  if (do_world_update_ && lookdev_lightcache_) {
+  if (lightcache_->flag & LIGHTCACHE_UPDATE_WORLD) {
+    /* Set before update to avoid infinite recursion. */
+    lightcache_->flag &= ~LIGHTCACHE_UPDATE_WORLD;
     update_world_cache();
   }
 
   /* Only sync when setting the view. This way we can cull probes not in frustum. */
-  /* TODO(fclem) implement culling. */
+  /* TODO(fclem) implement culling. But needs to fix display when not all probes are present. */
   info_data_.grids.grid_count = 1;
   info_data_.cubes.cube_count = 1;
 

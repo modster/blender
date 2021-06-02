@@ -197,4 +197,59 @@ void ShadingView::update_view(void)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name LightProbeView
+ * \{ */
+
+void LightProbeView::sync(Texture &color_tx,
+                          Texture &depth_tx,
+                          const mat4 winmat,
+                          const mat4 viewmat,
+                          bool is_only_background)
+{
+  mat4 facemat;
+  mul_m4_m4m4(facemat, winmat, face_matrix_);
+
+  is_only_background_ = is_only_background;
+  extent_ = ivec2(color_tx.width());
+  view_ = DRW_view_create(viewmat, facemat, nullptr, nullptr, nullptr);
+  view_fb_.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer_),
+                  GPU_ATTACHMENT_TEXTURE_LAYER(color_tx, layer_));
+
+  if (!is_only_background_) {
+    /* Query temp textures and create framebuffers. */
+    /* HACK: View name should be unique and static.
+     * With this, we can reuse the same texture across views. */
+    DrawEngineType *owner = (DrawEngineType *)name_;
+    gbuffer_.sync(depth_tx, color_tx, owner, layer_);
+  }
+}
+
+void LightProbeView::render(void)
+{
+  if (!is_only_background_) {
+    /* TODO(fclem) Disable specular lighting on lights when rendering probes to avoid feedback
+     * loops (looks bad). */
+    inst_.lights.set_view(view_, extent_);
+    inst_.lightprobes.set_view(view_, extent_);
+  }
+
+  DRW_stats_group_start(name_);
+  DRW_view_set_active(view_);
+
+  GPU_framebuffer_bind(view_fb_);
+
+  inst_.shading_passes.background.render();
+
+  if (!is_only_background_) {
+    GPU_framebuffer_clear_depth(view_fb_, 1.0f);
+
+    inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
+    inst_.shading_passes.forward.render();
+  }
+  DRW_stats_group_end();
+}
+
+/** \} */
+
 }  // namespace blender::eevee

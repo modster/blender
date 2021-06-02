@@ -26,6 +26,7 @@
 #include "BLI_rect.h"
 #include "DEG_depsgraph_query.h"
 #include "DNA_ID.h"
+#include "DNA_lightprobe_types.h"
 
 #include "eevee_instance.hh"
 
@@ -45,14 +46,13 @@ void Instance::init(const ivec2 &output_res,
                     const rcti *output_rect,
                     RenderEngine *render_,
                     Depsgraph *depsgraph_,
+                    const struct LightProbe *light_probe_,
                     Object *camera_object_,
                     const RenderLayer *render_layer_,
                     const DRWView *drw_view_,
                     const View3D *v3d_,
                     const RegionView3D *rv3d_)
 {
-  BLI_assert(camera_object_ || drw_view_);
-
   render = render_;
   depsgraph = depsgraph_;
   render_layer = render_layer_;
@@ -60,6 +60,7 @@ void Instance::init(const ivec2 &output_res,
   drw_view = drw_view_;
   v3d = v3d_;
   rv3d = rv3d_;
+  baking_probe = light_probe_;
 
   update_eval_members();
 
@@ -100,7 +101,9 @@ void Instance::update_eval_members(void)
 {
   scene = DEG_get_evaluated_scene(depsgraph);
   view_layer = DEG_get_evaluated_view_layer(depsgraph);
-  camera_eval_object = DEG_get_evaluated_object(depsgraph, camera_orig_object);
+  camera_eval_object = (camera_orig_object) ?
+                           DEG_get_evaluated_object(depsgraph, camera_orig_object) :
+                           nullptr;
 }
 
 /** \} */
@@ -108,7 +111,7 @@ void Instance::update_eval_members(void)
 /* -------------------------------------------------------------------- */
 /** \name Sync
  *
- * Sync with gather data from the scene that can change over a time step (i.e: motion steps).
+ * Sync will gather data from the scene that can change over a time step (i.e: motion steps).
  * IMPORTANT: xxx.sync() functions area responsible for creating DRW resources (i.e: DRWView) as
  * well as querying temp texture pool. All DRWPasses should be ready by the end end_sync().
  * \{ */
@@ -180,7 +183,26 @@ void Instance::object_sync_render(void *instance_,
                                   Depsgraph *depsgraph)
 {
   UNUSED_VARS(engine, depsgraph);
-  reinterpret_cast<Instance *>(instance_)->object_sync(ob);
+
+  Instance &inst = *reinterpret_cast<Instance *>(instance_);
+
+  if (inst.baking_probe != nullptr) {
+    if (inst.baking_probe->visibility_grp != nullptr) {
+      bool test = BKE_collection_has_object_recursive(inst.baking_probe->visibility_grp, ob);
+      test = (inst.baking_probe->flag & LIGHTPROBE_FLAG_INVERT_GROUP) ? !test : test;
+      if (!test) {
+        return;
+      }
+    }
+    /* Exclude planar lightprobes. */
+    if (ob->type == OB_LIGHTPROBE) {
+      LightProbe *prb = (LightProbe *)ob->data;
+      if (prb->type == LIGHTPROBE_TYPE_PLANAR) {
+        return;
+      }
+    }
+  }
+  inst.object_sync(ob);
 }
 
 void Instance::end_sync(void)
@@ -189,6 +211,7 @@ void Instance::end_sync(void)
   lights.end_sync();
   sampling.end_sync();
   render_passes.end_sync();
+  lightprobes.end_sync();
 }
 
 void Instance::render_sync(void)

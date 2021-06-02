@@ -267,6 +267,11 @@ class Texture {
     ensure(name_, w, h, mips, format);
   }
 
+  void clear(vec4 color)
+  {
+    GPU_texture_clear(tx_, GPU_DATA_FLOAT, &color[0]);
+  }
+
   Texture &operator=(Texture &a)
   {
     if (*this != a) {

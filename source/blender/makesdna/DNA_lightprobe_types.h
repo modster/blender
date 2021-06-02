@@ -123,7 +123,9 @@ typedef struct LightProbeCache {
   float position[3], parallax_type;
   float attenuation_fac;
   float attenuation_type;
-  float _pad3[2];
+  /* Used during baking. */
+  int probe_index;
+  int is_ready;
   float attenuationmat[4][4];
   float parallaxmat[4][4];
 } LightProbeCache;
@@ -137,8 +139,10 @@ typedef struct LightGridCache {
   /** World space vector between 2 opposite cells. */
   float increment_x[3], attenuation_bias;
   float increment_y[3], level_bias;
-  float increment_z[3], _pad4;
-  float visibility_bias, visibility_bleed, visibility_range, _pad5;
+  float increment_z[3], is_ready;
+  float visibility_bias, visibility_bleed, visibility_range;
+  /* Used during baking. */
+  int probe_index;
 } LightGridCache;
 
 /* These are used as UBO data. They need to be aligned to size of vec4. */
@@ -207,6 +211,8 @@ enum {
   LIGHTCACHE_INVALID = (1 << 8),
   /** The data present in the cache is valid but unusable on this GPU. */
   LIGHTCACHE_NOT_USABLE = (1 << 9),
+  /** Used by baking cache to keep reflections black. */
+  LIGHTCACHE_NO_REFLECTION = (1 << 10),
 };
 
 /* EEVEE_LightCacheTexture->data_type */

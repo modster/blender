@@ -119,12 +119,14 @@ struct GBuffer {
   /* Pointer to the view's buffers. */
   GPUTexture *depth_tx = nullptr;
   GPUTexture *combined_tx = nullptr;
+  int layer = -1;
 
-  void sync(GPUTexture *depth_tx_, GPUTexture *combined_tx_, void *owner_)
+  void sync(GPUTexture *depth_tx_, GPUTexture *combined_tx_, void *owner_, int layer_ = -1)
   {
     owner = owner_;
     depth_tx = depth_tx_;
     combined_tx = combined_tx_;
+    layer = layer_;
     diffuse_tx.sync_tmp();
     reflection_tx.sync_tmp();
     refraction_tx.sync_tmp();
@@ -153,7 +155,8 @@ struct GBuffer {
     holdout_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
     depth_behind_tx.acquire_tmp(UNPACK2(extent), GPU_DEPTH24_STENCIL8, owner);
 
-    gbuffer_fb.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx),
+    /* Layer attachement also works with cubemap. */
+    gbuffer_fb.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer),
                       GPU_ATTACHMENT_TEXTURE(diffuse_tx),
                       GPU_ATTACHMENT_TEXTURE(reflection_tx),
                       GPU_ATTACHMENT_TEXTURE(refraction_tx),
@@ -180,7 +183,8 @@ struct GBuffer {
 
   void copy_depth_behind(void)
   {
-    GPU_texture_copy(depth_behind_tx, depth_tx);
+    /* FIXME(fclem) Will fail for cubemap. */
+    // GPU_texture_copy(depth_behind_tx, depth_tx);
   }
 
   void render_end(void)

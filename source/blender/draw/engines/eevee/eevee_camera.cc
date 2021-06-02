@@ -82,8 +82,12 @@ void Camera::init(void)
     const ::Camera *cam = reinterpret_cast<const ::Camera *>(camera_eval->data);
     data.type = from_camera(cam);
   }
-  else {
+  else if (inst_.drw_view) {
     data.type = DRW_view_is_persp_get(inst_.drw_view) ? CAMERA_PERSP : CAMERA_ORTHO;
+  }
+  else {
+    /* Lightprobe baking. */
+    data.type = CAMERA_PERSP;
   }
 }
 
@@ -116,7 +120,12 @@ void Camera::sync(void)
     data.uv_bias = vec2(0.0f);
   }
   else {
-    BLI_assert(0);
+    unit_m4(data.viewmat);
+    unit_m4(data.viewinv);
+    perspective_m4(data.winmat, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 1.0f);
+    invert_m4_m4(data.wininv, data.winmat);
+    mul_m4_m4m4(data.persmat, data.winmat, data.viewmat);
+    invert_m4_m4(data.persinv, data.persmat);
   }
 
   if (camera_eval) {
@@ -135,7 +144,7 @@ void Camera::sync(void)
 
     data.equirect_scale_inv = 1.0f / data.equirect_scale;
   }
-  else {
+  else if (inst_.drw_view) {
     data.clip_near = DRW_view_near_distance_get(inst_.drw_view);
     data.clip_far = DRW_view_far_distance_get(inst_.drw_view);
     data.fisheye_fov = data.fisheye_lens = -1.0f;

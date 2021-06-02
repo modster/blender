@@ -89,6 +89,9 @@ class Instance {
   const View3D *v3d;
   const RegionView3D *rv3d;
 
+  /** Can be null. Used to exclude objects during baking. */
+  const struct LightProbe *baking_probe = nullptr;
+
   /* Info string displayed at the top of the render / viewport. */
   char info[64];
 
@@ -113,6 +116,7 @@ class Instance {
             const rcti *output_rect,
             RenderEngine *render,
             Depsgraph *depsgraph,
+            const struct LightProbe *light_probe_ = nullptr,
             Object *camera_object = nullptr,
             const RenderLayer *render_layer = nullptr,
             const DRWView *drw_view = nullptr,
@@ -123,6 +127,7 @@ class Instance {
   void object_sync(Object *ob);
   void end_sync(void);
 
+  void render_sync(void);
   void render_frame(RenderLayer *render_layer, const char *view_name);
 
   void draw_viewport(DefaultFramebufferList *dfbl);
@@ -135,7 +140,6 @@ class Instance {
   }
 
  private:
-  void render_sync(void);
   void render_sample(void);
   static void object_sync_render(void *instance_,
                                  Object *ob,

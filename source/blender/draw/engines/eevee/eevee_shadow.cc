@@ -309,6 +309,8 @@ void ShadowModule::init(void)
     }
     inst_.sampling.reset();
   }
+
+  memset(views_, 0, sizeof(views_));
 }
 
 void ShadowModule::sync_caster(Object *ob, const ObjectHandle &handle)

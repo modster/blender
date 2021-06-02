@@ -103,7 +103,8 @@ void EEVEE_instance_init(EEVEE_Instance *instance_)
     }
   }
 
-  instance->init(size, &rect, nullptr, depsgraph, camera, nullptr, default_view, v3d, rv3d);
+  instance->init(
+      size, &rect, nullptr, depsgraph, nullptr, camera, nullptr, default_view, v3d, rv3d);
 }
 
 void EEVEE_instance_cache_init(EEVEE_Instance *instance_)
@@ -147,7 +148,7 @@ void EEVEE_instance_render_frame(EEVEE_Instance *instance_,
   rcti rect;
   RE_GetViewPlane(render, &view_rect, &rect);
 
-  instance->init(size, &rect, engine, depsgraph, camera_original_ob, render_layer);
+  instance->init(size, &rect, engine, depsgraph, nullptr, camera_original_ob, render_layer);
   instance->render_frame(render_layer, viewname);
 }
 

@@ -52,11 +52,12 @@ struct LightCache : public ::LightCache {
   constexpr static eGPUTextureFormat reflection_format = GPU_R11F_G11F_B10F;
 
  public:
-  LightCache(const int grid_len,
-             const int cube_len,
+  LightCache(const int cube_len,
+             const int grid_len,
              const int cube_size,
              const int vis_size,
              const int irr_size[3]);
+
   ~LightCache();
 
   static void irradiance_cache_size_get(int visibility_size, int total_samples, int r_size[3]);
@@ -72,12 +73,15 @@ struct LightCache : public ::LightCache {
                 const int irr_size[3]) const;
 
   uint memsize_get(void) const;
+  int64_t irradiance_sample_count(void) const;
+
+  void readback_irradiance(void);
+  void readback_reflections(void);
 
  private:
   bool version_check(void) const;
   bool can_be_saved(void) const;
   bool load_static(void);
-  int64_t irradiance_sample_count(void) const;
 
   bool create_reflection_texture(void);
   bool create_irradiance_texture(void);

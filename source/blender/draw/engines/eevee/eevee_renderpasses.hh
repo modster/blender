@@ -45,6 +45,7 @@ enum eRenderPassBit {
   RENDERPASS_VECTOR = (1 << 3),
   /** Used for iterator. */
   RENDERPASS_MAX,
+  RENDERPASS_ALL = ((RENDERPASS_MAX - 1) << 1) - 1,
 };
 
 ENUM_OPERATORS(eRenderPassBit, RENDERPASS_NORMAL)

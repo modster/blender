@@ -45,13 +45,15 @@ void RenderPasses::init(const int extent[2], const rcti *output_rect)
       enabled_passes &= ~RENDERPASS_VECTOR;
     }
   }
-  else {
-    BLI_assert(inst_.v3d);
+  else if (inst_.v3d) {
     enabled_passes = to_render_passes_bits(inst_.v3d->shading.render_pass);
     /* We need the depth pass for compositing overlays or GPencil. */
     if (!DRW_state_is_scene_render()) {
       enabled_passes |= RENDERPASS_DEPTH;
     }
+  }
+  else {
+    enabled_passes = RENDERPASS_COMBINED;
   }
 
   const bool use_log_encoding = scene->eevee.flag & SCE_EEVEE_FILM_LOG_ENCODING;
@@ -63,7 +65,7 @@ void RenderPasses::init(const int extent[2], const rcti *output_rect)
   }
 
   /* HACK to iterate over all passes. */
-  enabled_passes_ = static_cast<eRenderPassBit>(0xFFFFFFFF);
+  enabled_passes_ = RENDERPASS_ALL;
   for (RenderPassItem rpi : *this) {
     bool enable = (enabled_passes & rpi.pass_bit) != 0;
     if (enable && rpi.film == nullptr) {

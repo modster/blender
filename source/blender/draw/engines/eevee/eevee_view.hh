@@ -40,6 +40,7 @@
 #include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_shader.hh"
+#include "eevee_shading.hh"
 #include "eevee_velocity.hh"
 
 namespace blender::eevee {
@@ -109,6 +110,49 @@ class ShadingView {
 
  private:
   void update_view(void);
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name LightProbeView
+ *
+ * Render the scene to a lightprobe target cubemap face.
+ * \{ */
+
+class LightProbeView {
+ private:
+  Instance &inst_;
+  /** GBuffer for deferred passes. */
+  GBuffer gbuffer_;
+  /** Owned resources. */
+  Framebuffer view_fb_;
+  /** DRWView of this face. */
+  DRWView *view_ = nullptr;
+  /** Render size of the view. */
+  ivec2 extent_ = {-1, -1};
+  /** Static string pointer. Used as debug name and as UUID for texture pool. */
+  const char *name_;
+  /** Matrix to apply to the viewmat. */
+  const float (*face_matrix_)[4];
+
+  int layer_ = 0;
+  bool is_enabled_ = false;
+  bool is_only_background_ = false;
+
+ public:
+  LightProbeView(Instance &inst, const char *name, const float (*face_matrix)[4], int layer_)
+      : inst_(inst), name_(name), face_matrix_(face_matrix), layer_(layer_){};
+
+  ~LightProbeView(){};
+
+  void sync(Texture &color_tx,
+            Texture &depth_tx,
+            const mat4 winmat,
+            const mat4 viewmat,
+            bool is_only_background);
+
+  void render(void);
 };
 
 /** \} */
