@@ -330,7 +330,7 @@ float stroke_thickness_modulate(float thickness)
   /* Modify stroke thickness by object and layer factors.-*/
   thickness *= thicknessScale;
   thickness += thicknessOffset;
-  thickness = max(1.0, thickness);
+  thickness = max(0.05, thickness);
 
   if (thicknessIsScreenSpace) {
     /* Multiply offset by view Z so that offset is constant in screenspace.
