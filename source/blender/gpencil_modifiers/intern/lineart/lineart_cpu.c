@@ -4027,10 +4027,11 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   BKE_scene_camera_switch_update(scene);
 
   if (lmd->calculation_flags & LRT_USE_CUSTOM_CAMERA) {
-    if (!lmd->source_camera || ((Object *)lmd->source_camera->id.orig_id)->type != OB_CAMERA) {
+    if (!lmd->source_camera ||
+        (use_camera = DEG_get_evaluated_object(depsgraph, lmd->source_camera))->type !=
+            OB_CAMERA) {
       return false;
     }
-    use_camera = (Object *)lmd->source_camera->id.orig_id;
   }
   else {
     if (!scene->camera) {
