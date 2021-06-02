@@ -266,6 +266,7 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&lmd->source_collection, IDWALK_CB_NOP);
 
   walk(userData, ob, (ID **)&lmd->source_object, IDWALK_CB_NOP);
+  walk(userData, ob, (ID **)&lmd->source_camera, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -287,6 +288,9 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   if (!BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)) {
     uiItemR(layout, ptr, "use_cached_result", 0, NULL, ICON_NONE);
   }
+
+  uiItemR(layout, ptr, "use_custom_camera", 0, NULL, ICON_OBJECT_DATA);
+  uiItemR(layout, ptr, "source_camera", 0, NULL, ICON_OBJECT_DATA);
 
   uiItemR(layout, ptr, "source_type", 0, NULL, ICON_NONE);
 

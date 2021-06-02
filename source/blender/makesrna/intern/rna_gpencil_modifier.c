@@ -2702,6 +2702,12 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "LineartGpencilModifierData");
   RNA_def_struct_ui_icon(srna, ICON_MOD_EDGESPLIT);
 
+  prop = RNA_def_property(srna, "use_custom_camera", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_USE_CUSTOM_CAMERA);
+  RNA_def_property_ui_text(
+      prop, "Use Custom Camera", "Use custom camera instead of the active camera");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "use_fuzzy_intersections", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_INTERSECTION_AS_CONTOUR);
   RNA_def_property_ui_text(prop,
@@ -2836,6 +2842,14 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_range(prop, 0.0f, 0.5f, 0.001f, 4);
   RNA_def_property_range(prop, 0.0f, 0.5f);
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "source_camera", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+  RNA_def_property_struct_type(prop, "Camera");
+  RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
+  RNA_def_property_ui_text(
+      prop, "Camera Object", "Use specified camera object for generating line art");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_dependency_update");
 
   prop = RNA_def_property(srna, "source_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, modifier_lineart_source_type);

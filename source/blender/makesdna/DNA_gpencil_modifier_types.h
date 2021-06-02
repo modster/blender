@@ -903,6 +903,8 @@ typedef struct LineartGpencilModifierData {
   short level_start;
   short level_end;
 
+  struct Object *source_camera;
+
   struct Object *source_object;
   struct Collection *source_collection;
 
