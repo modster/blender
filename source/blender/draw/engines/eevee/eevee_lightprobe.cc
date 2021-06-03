@@ -69,14 +69,15 @@ void LightProbeModule::init()
   }
 
   if (info_data_.cubes.display_size != sce_eevee.gi_cubemap_draw_size ||
-      info_data_.grids.display_size != sce_eevee.gi_irradiance_draw_size) {
+      info_data_.grids.display_size != sce_eevee.gi_irradiance_draw_size ||
+      info_data_.grids.irradiance_smooth != square_f(sce_eevee.gi_irradiance_smoothing)) {
     /* TODO(fclem) reset on scene update instead. */
     inst_.sampling.reset();
   }
 
   info_data_.cubes.display_size = sce_eevee.gi_cubemap_draw_size;
   info_data_.grids.display_size = sce_eevee.gi_irradiance_draw_size;
-  info_data_.grids.irradiance_smooth = sce_eevee.gi_irradiance_smoothing;
+  info_data_.grids.irradiance_smooth = square_f(sce_eevee.gi_irradiance_smoothing);
   info_data_.grids.irradiance_cells_per_row = lightcache_->irradiance_cells_per_row_get();
   info_data_.grids.visibility_size = lightcache_->vis_res;
   info_data_.grids.visibility_cells_per_row = lightcache_->grid_tx.tex_size[0] /
