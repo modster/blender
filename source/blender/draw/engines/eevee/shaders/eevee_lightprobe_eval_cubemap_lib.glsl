@@ -6,7 +6,7 @@
 float lightprobe_cubemap_weight(CubemapData cube, vec3 P)
 {
   /* Composed transform to remove the packed data. */
-  vec3 lP = transform_direction(cube.object_mat, P) + cube._position;
+  vec3 lP = transform_direction(cube.influence_mat, P) + cube.influence_mat[3].xyz;
   float attenuation;
   if (cube._attenuation_type == CUBEMAP_SHAPE_SPHERE) {
     attenuation = saturate(cube._attenuation_factor * (1.0 - length(lP)));
@@ -27,8 +27,9 @@ vec3 lightprobe_cubemap_evaluate(CubemapInfoData info,
   float linear_roughness = fast_sqrt(roughness);
   if (cube._layer > 0.0) {
     /* Correct reflection ray using parallax volume intersection. */
-    vec3 lP = transform_point(cube.parallax_mat, P);
     vec3 lR = transform_direction(cube.parallax_mat, R);
+    /* Composed transform to remove the packed data. */
+    vec3 lP = transform_direction(cube.parallax_mat, P) + cube.parallax_mat[3].xyz;
     float dist;
     if (cube._parallax_type == CUBEMAP_SHAPE_SPHERE) {
       dist = line_unit_sphere_intersect_dist(lP, lR);
@@ -36,8 +37,9 @@ vec3 lightprobe_cubemap_evaluate(CubemapInfoData info,
     else {
       dist = line_unit_box_intersect_dist(lP, lR);
     }
+    vec3 cube_pos = vec3(cube._world_position_x, cube._world_position_y, cube._world_position_z);
     /* Use Distance in WS directly to recover intersection. */
-    vec3 intersection = P + R * dist - cube._position;
+    vec3 intersection = (P + R * dist) - cube_pos;
     /* Distance based roughness from Frostbite PBR Course.
      * http://www.frostbite.com/wp-content/uploads/2014/11/course_notes_moving_frostbite_to_pbr.pdf
      */

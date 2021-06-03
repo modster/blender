@@ -134,6 +134,8 @@ void ShadingView::render(void)
 
   inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
 
+  inst_.lightprobes.draw_cache_display();
+
   inst_.shading_passes.forward.render();
 
   velocity_.render(depth_tx_);

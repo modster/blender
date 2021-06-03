@@ -68,6 +68,14 @@ void LightProbeModule::init()
     view = nullptr;
   }
 
+  if (info_data_.cubes.display_size != sce_eevee.gi_cubemap_draw_size ||
+      info_data_.grids.display_size != sce_eevee.gi_irradiance_draw_size) {
+    /* TODO(fclem) reset on scene update instead. */
+    inst_.sampling.reset();
+  }
+
+  info_data_.cubes.display_size = sce_eevee.gi_cubemap_draw_size;
+  info_data_.grids.display_size = sce_eevee.gi_irradiance_draw_size;
   info_data_.grids.irradiance_smooth = sce_eevee.gi_irradiance_smoothing;
   info_data_.grids.irradiance_cells_per_row = lightcache_->irradiance_cells_per_row_get();
   info_data_.grids.visibility_size = lightcache_->vis_res;
@@ -120,10 +128,56 @@ void LightProbeModule::begin_sync()
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 
-  if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_CUBEMAPS) {
+  if (inst_.scene->eevee.flag & (SCE_EEVEE_SHOW_CUBEMAPS | SCE_EEVEE_SHOW_IRRADIANCE)) {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
+    display_ps_ = DRW_pass_create("LightProbe.Display", state);
+  }
+  else {
+    display_ps_ = nullptr;
   }
 
   if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_CUBEMAPS) {
+    if (lightcache_->cube_len > 1) {
+      GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_CUBEMAP);
+      DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
+      DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", cube_tx_ref_get());
+      DRW_shgroup_uniform_block(grp, "cubes_block", cube_ubo_get());
+      DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+
+      uint cubemap_count = 0;
+      /* Skip world. */
+      for (auto cube_id : IndexRange(1, lightcache_->cube_len - 1)) {
+        const LightProbeCache &cube = lightcache_->cube_data[cube_id];
+        /* Note: only works because probes are rendered in sequential order. */
+        if (cube.is_ready) {
+          cubemap_count++;
+        }
+      }
+      if (cubemap_count > 0) {
+        DRW_shgroup_call_procedural_triangles(grp, nullptr, cubemap_count * 2);
+      }
+    }
+  }
+
+  if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_IRRADIANCE) {
+    if (lightcache_->grid_len > 1) {
+      GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_IRRADIANCE);
+      DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
+      DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", grid_tx_ref_get());
+      DRW_shgroup_uniform_block(grp, "grids_block", grid_ubo_get());
+      DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+
+      /* Skip world. */
+      for (auto grid_id : IndexRange(1, lightcache_->grid_len - 1)) {
+        const LightGridCache &grid = lightcache_->grid_data[grid_id];
+        if (grid.is_ready) {
+          DRWShadingGroup *grp_sub = DRW_shgroup_create_sub(grp);
+          DRW_shgroup_uniform_int_copy(grp_sub, "grid_id", grid_id);
+          uint sample_count = grid.resolution[0] * grid.resolution[1] * grid.resolution[2];
+          DRW_shgroup_call_procedural_triangles(grp_sub, nullptr, sample_count * 2);
+        }
+      }
+    }
   }
 }
 
@@ -389,8 +443,8 @@ void LightProbeModule::sync_world(const DRWView *view)
 
   scale_m4_fl(grid.local_mat, view_bounds.radius);
   negate_v3_v3(grid.local_mat[3], view_bounds.center);
-  copy_m4_m4(cube.object_mat, grid.local_mat);
-  copy_m4_m4(cube.parallax_mat, cube.object_mat);
+  copy_m4_m4(cube.influence_mat, grid.local_mat);
+  copy_m4_m4(cube.parallax_mat, cube.influence_mat);
 
   grid.resolution = ivec3(1);
   grid.offset = 0;
@@ -445,11 +499,14 @@ void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
   }
   CubemapData &cube = cube_data_[info_data_.cubes.cube_count];
   copy_m4_m4(cube.parallax_mat, cube_cache.parallaxmat);
-  copy_m4_m4(cube.object_mat, cube_cache.attenuationmat);
+  copy_m4_m4(cube.influence_mat, cube_cache.attenuationmat);
   cube._attenuation_factor = cube_cache.attenuation_fac;
   cube._attenuation_type = cube_cache.attenuation_type;
   cube._parallax_type = cube_cache.parallax_type;
   cube._layer = cube_index;
+  cube._world_position_x = cube_cache.position[0];
+  cube._world_position_y = cube_cache.position[1];
+  cube._world_position_z = cube_cache.position[2];
 
   info_data_.cubes.cube_count++;
 }
@@ -483,6 +540,12 @@ void LightProbeModule::set_view(const DRWView *view, const ivec2 UNUSED(extent))
   info_data_.push_update();
   grid_data_.push_update();
   cube_data_.push_update();
+}
+
+void LightProbeModule::draw_cache_display(void)
+{
+  /* Only draws something if enabled. */
+  DRW_draw_pass(display_ps_);
 }
 
 }  // namespace blender::eevee

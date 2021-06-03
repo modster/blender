@@ -510,8 +510,9 @@ struct GridInfoData {
   float irradiance_smooth;
   /** Total number of active irradiance grid including world. */
   int grid_count;
+  /** Display size of sample spheres. */
+  float display_size;
   float _pad0;
-  float _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(GridInfoData, 16)
 
@@ -556,7 +557,8 @@ struct CubemapInfoData {
   float roughness_max_lod;
   /** Total number of active cubemaps including world. */
   int cube_count;
-  float _pad1;
+  /** Display size of sample spheres. */
+  float display_size;
   float _pad2;
 };
 BLI_STATIC_ASSERT_ALIGN(CubemapInfoData, 16)
@@ -569,15 +571,19 @@ BLI_STATIC_ASSERT_ALIGN(CubemapInfoData, 16)
  */
 struct CubemapData {
   /** Influence shape matrix (World -> Local). */
-  mat4 object_mat;
-  /** Packed data in the last column of the object_mat. */
-#define _attenuation_factor object_mat[0][3]
-#define _attenuation_type object_mat[1][3]
-#define _parallax_type object_mat[2][3]
+  mat4 influence_mat;
+  /** Packed data in the last column of the influence_mat. */
+#define _attenuation_factor influence_mat[0][3]
+#define _attenuation_type influence_mat[1][3]
+#define _parallax_type influence_mat[2][3]
   /** Layer of the cube array to sample. */
-#define _layer object_mat[3][3]
+#define _layer influence_mat[3][3]
   /** Parallax shape matrix (World -> Local). */
   mat4 parallax_mat;
+  /** Packed data in the last column of the parallax_mat. */
+#define _world_position_x parallax_mat[0][3]
+#define _world_position_y parallax_mat[1][3]
+#define _world_position_z parallax_mat[2][3]
 };
 BLI_STATIC_ASSERT_ALIGN(CubemapData, 16)
 

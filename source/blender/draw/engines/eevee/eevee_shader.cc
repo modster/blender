@@ -78,6 +78,11 @@ extern char datatoc_eevee_film_resolve_frag_glsl[];
 extern char datatoc_eevee_gbuffer_lib_glsl[];
 extern char datatoc_eevee_irradiance_lib_glsl[];
 extern char datatoc_eevee_light_lib_glsl[];
+extern char datatoc_eevee_lightprobe_display_cubemap_frag_glsl[];
+extern char datatoc_eevee_lightprobe_display_cubemap_vert_glsl[];
+extern char datatoc_eevee_lightprobe_display_grid_frag_glsl[];
+extern char datatoc_eevee_lightprobe_display_grid_vert_glsl[];
+extern char datatoc_eevee_lightprobe_display_lib_glsl[];
 extern char datatoc_eevee_lightprobe_filter_diffuse_frag_glsl[];
 extern char datatoc_eevee_lightprobe_filter_downsample_frag_glsl[];
 extern char datatoc_eevee_lightprobe_filter_geom_glsl[];
@@ -158,6 +163,7 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_culling_iter_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_light_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_filter_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_display_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_eval_cubemap_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_lightprobe_eval_grid_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_volume_eval_lib);
@@ -278,6 +284,16 @@ ShaderModule::ShaderModule()
                             eevee_depth_of_field_tiles_dilate_frag,
                             "#define DILATE_MODE_MIN_MAX true\n");
   SHADER_FULLSCREEN(DOF_TILES_FLATTEN, eevee_depth_of_field_tiles_flatten_frag);
+  SHADER(LIGHTPROBE_DISPLAY_CUBEMAP,
+         eevee_lightprobe_display_cubemap_vert,
+         nullptr,
+         eevee_lightprobe_display_cubemap_frag,
+         nullptr);
+  SHADER(LIGHTPROBE_DISPLAY_IRRADIANCE,
+         eevee_lightprobe_display_grid_vert,
+         nullptr,
+         eevee_lightprobe_display_grid_frag,
+         nullptr);
   SHADER(LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE,
          eevee_lightprobe_filter_vert,
          eevee_lightprobe_filter_geom,

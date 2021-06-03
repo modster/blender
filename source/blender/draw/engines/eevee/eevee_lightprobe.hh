@@ -64,6 +64,8 @@ class LightProbeModule {
   DRWPass *filter_diffuse_ps_ = nullptr;
   DRWPass *filter_visibility_ps_ = nullptr;
 
+  DRWPass *display_ps_ = nullptr;
+
   /** Input texture to downsample cube pass. */
   GPUTexture *cube_downsample_input_tx_ = nullptr;
   /** Copy of actual textures from the lightcache_. */
@@ -136,6 +138,8 @@ class LightProbeModule {
             int bounce,
             const float position[3],
             const LightProbe *probe = nullptr);
+
+  void draw_cache_display(void);
 
  private:
   void update_world_cache();
