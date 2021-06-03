@@ -210,11 +210,11 @@ void LightProbeView::sync(Texture &color_tx,
                           bool is_only_background)
 {
   mat4 facemat;
-  mul_m4_m4m4(facemat, winmat, face_matrix_);
+  mul_m4_m4m4(facemat, face_matrix_, viewmat);
 
   is_only_background_ = is_only_background;
   extent_ = ivec2(color_tx.width());
-  view_ = DRW_view_create(viewmat, facemat, nullptr, nullptr, nullptr);
+  view_ = DRW_view_create(facemat, winmat, nullptr, nullptr, nullptr);
   view_fb_.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer_),
                   GPU_ATTACHMENT_TEXTURE_LAYER(color_tx, layer_));
 
