@@ -129,53 +129,54 @@ void LightProbeModule::begin_sync()
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 
-  if (inst_.scene->eevee.flag & (SCE_EEVEE_SHOW_CUBEMAPS | SCE_EEVEE_SHOW_IRRADIANCE)) {
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
-    display_ps_ = DRW_pass_create("LightProbe.Display", state);
-  }
-  else {
-    display_ps_ = nullptr;
-  }
+  display_ps_ = nullptr;
 
-  if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_CUBEMAPS) {
-    if (lightcache_->cube_len > 1) {
-      GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_CUBEMAP);
-      DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
-      DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", cube_tx_ref_get());
-      DRW_shgroup_uniform_block(grp, "cubes_block", cube_ubo_get());
-      DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+  if ((inst_.v3d != nullptr) && ((inst_.v3d->flag2 & V3D_HIDE_OVERLAYS) == 0)) {
+    if (inst_.scene->eevee.flag & (SCE_EEVEE_SHOW_CUBEMAPS | SCE_EEVEE_SHOW_IRRADIANCE)) {
+      DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
+      display_ps_ = DRW_pass_create("LightProbe.Display", state);
+    }
 
-      uint cubemap_count = 0;
-      /* Skip world. */
-      for (auto cube_id : IndexRange(1, lightcache_->cube_len - 1)) {
-        const LightProbeCache &cube = lightcache_->cube_data[cube_id];
-        /* Note: only works because probes are rendered in sequential order. */
-        if (cube.is_ready) {
-          cubemap_count++;
+    if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_CUBEMAPS) {
+      if (lightcache_->cube_len > 1) {
+        GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_CUBEMAP);
+        DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
+        DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", cube_tx_ref_get());
+        DRW_shgroup_uniform_block(grp, "cubes_block", cube_ubo_get());
+        DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+
+        uint cubemap_count = 0;
+        /* Skip world. */
+        for (auto cube_id : IndexRange(1, lightcache_->cube_len - 1)) {
+          const LightProbeCache &cube = lightcache_->cube_data[cube_id];
+          /* Note: only works because probes are rendered in sequential order. */
+          if (cube.is_ready) {
+            cubemap_count++;
+          }
+        }
+        if (cubemap_count > 0) {
+          DRW_shgroup_call_procedural_triangles(grp, nullptr, cubemap_count * 2);
         }
       }
-      if (cubemap_count > 0) {
-        DRW_shgroup_call_procedural_triangles(grp, nullptr, cubemap_count * 2);
-      }
     }
-  }
 
-  if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_IRRADIANCE) {
-    if (lightcache_->grid_len > 1) {
-      GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_IRRADIANCE);
-      DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
-      DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", grid_tx_ref_get());
-      DRW_shgroup_uniform_block(grp, "grids_block", grid_ubo_get());
-      DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
+    if (inst_.scene->eevee.flag & SCE_EEVEE_SHOW_IRRADIANCE) {
+      if (lightcache_->grid_len > 1) {
+        GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_DISPLAY_IRRADIANCE);
+        DRWShadingGroup *grp = DRW_shgroup_create(sh, display_ps_);
+        DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", grid_tx_ref_get());
+        DRW_shgroup_uniform_block(grp, "grids_block", grid_ubo_get());
+        DRW_shgroup_uniform_block(grp, "lightprobes_info_block", info_ubo_get());
 
-      /* Skip world. */
-      for (auto grid_id : IndexRange(1, lightcache_->grid_len - 1)) {
-        const LightGridCache &grid = lightcache_->grid_data[grid_id];
-        if (grid.is_ready) {
-          DRWShadingGroup *grp_sub = DRW_shgroup_create_sub(grp);
-          DRW_shgroup_uniform_int_copy(grp_sub, "grid_id", grid_id);
-          uint sample_count = grid.resolution[0] * grid.resolution[1] * grid.resolution[2];
-          DRW_shgroup_call_procedural_triangles(grp_sub, nullptr, sample_count * 2);
+        /* Skip world. */
+        for (auto grid_id : IndexRange(1, lightcache_->grid_len - 1)) {
+          const LightGridCache &grid = lightcache_->grid_data[grid_id];
+          if (grid.is_ready) {
+            DRWShadingGroup *grp_sub = DRW_shgroup_create_sub(grp);
+            DRW_shgroup_uniform_int_copy(grp_sub, "grid_id", grid_id);
+            uint sample_count = grid.resolution[0] * grid.resolution[1] * grid.resolution[2];
+            DRW_shgroup_call_procedural_triangles(grp_sub, nullptr, sample_count * 2);
+          }
         }
       }
     }
