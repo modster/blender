@@ -2834,6 +2834,13 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       prop, "Multiple Edge Types", "Allow edges with muliple types be added for every type");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "offset_towards_custom_camera", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_OFFSET_TOWARDS_CUSTOM_CAMERA);
+  RNA_def_property_ui_text(prop,
+                           "Offset Towards Custom Camera",
+                           "Offset strokes towards selected camera instead of the active camera");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "stroke_offset", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_ui_text(prop,
                            "Stroke Offset",

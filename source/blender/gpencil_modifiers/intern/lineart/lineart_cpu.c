@@ -2960,6 +2960,7 @@ void MOD_lineart_clear_cache(struct LineartCache **lc)
 static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
                                                          LineartGpencilModifierData *lmd,
                                                          Object *camera,
+                                                         Object *active_camera,
                                                          LineartCache *lc)
 {
   LineartRenderBuffer *rb = MEM_callocN(sizeof(LineartRenderBuffer), "Line Art render buffer");
@@ -2980,6 +2981,9 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   }
 
   copy_v3db_v3fl(rb->camera_pos, camera->obmat[3]);
+  if (active_camera) {
+    copy_v3db_v3fl(rb->active_camera_pos, active_camera->obmat[3]);
+  }
   copy_m4_m4(rb->cam_obmat, camera->obmat);
   rb->cam_is_persp = (c->type == CAM_PERSP);
   rb->near_clip = c->clip_start + clipping_offset;
@@ -4043,7 +4047,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   LineartCache *lc = lineart_init_cache();
   (*cached_result) = lc;
 
-  rb = lineart_create_render_buffer(scene, lmd, use_camera, lc);
+  rb = lineart_create_render_buffer(scene, lmd, use_camera, scene->camera, lc);
 
   /* Triangle thread testing data size varies depending on the thread count.
    * See definition of LineartTriangleThread for details. */
@@ -4132,7 +4136,8 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
     }
 
     if (enable_stroke_offset && lmd->stroke_offset > FLT_EPSILON) {
-      MOD_lineart_chain_offset_towards_camera(rb, lmd->stroke_offset);
+      MOD_lineart_chain_offset_towards_camera(
+          rb, lmd->stroke_offset, lmd->flags & LRT_GPENCIL_OFFSET_TOWARDS_CUSTOM_CAMERA);
     }
 
     /* Finally transfer the result list into cache. */

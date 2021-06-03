@@ -1000,11 +1000,19 @@ void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshol
   }
 }
 
-void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb, float dist)
+void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb,
+                                             float dist,
+                                             bool use_custom_camera)
 {
   float dir[3];
   float cam[3];
-  copy_v3fl_v3db(cam, rb->camera_pos);
+
+  if (use_custom_camera) {
+    copy_v3fl_v3db(cam, rb->camera_pos);
+  }
+  else {
+    copy_v3fl_v3db(cam, rb->active_camera_pos);
+  }
 
   LISTBASE_FOREACH (LineartEdgeChain *, ec, &rb->chains) {
     LISTBASE_FOREACH (LineartEdgeChainItem *, eci, &ec->chain) {
