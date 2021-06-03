@@ -22,7 +22,7 @@ void main(void)
   nodetree_surface();
 
   out_background.rgb = safe_color(g_emission_data.emission);
-  out_background.a = saturate(1.0 - avg(g_transparency_data.transmittance));
+  out_background.a = saturate(avg(g_transparency_data.transmittance));
 }
 
 vec3 attr_load_orco(vec4 orco)
