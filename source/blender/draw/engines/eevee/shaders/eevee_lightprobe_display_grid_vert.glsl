@@ -35,10 +35,7 @@ void main(void)
 
   GridData grid = grids[grid_id];
 
-  ivec3 cell_coord;
-  cell_coord.x = (interp.sample % grid.resolution.x);
-  cell_coord.y = (interp.sample / grid.resolution.x) % grid.resolution.y;
-  cell_coord.z = (interp.sample / grid.resolution.x) / grid.resolution.y;
+  ivec3 cell_coord = grid_cell_index_to_coordinate(interp.sample, grid.resolution);
 
   interp.sample += grid.offset;
 

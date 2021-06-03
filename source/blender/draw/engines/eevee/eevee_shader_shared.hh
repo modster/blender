@@ -549,6 +549,15 @@ struct GridData {
 };
 BLI_STATIC_ASSERT_ALIGN(GridData, 16)
 
+static inline ivec3 grid_cell_index_to_coordinate(int cell_id, ivec3 resolution)
+{
+  ivec3 cell_coord;
+  cell_coord.z = cell_id % resolution.z;
+  cell_coord.y = (cell_id / resolution.z) % resolution.y;
+  cell_coord.x = cell_id / (resolution.z * resolution.y);
+  return cell_coord;
+}
+
 /**
  * Common data to all cubemaps.
  */

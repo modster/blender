@@ -508,11 +508,9 @@ class LightBake {
       //   bake.inst_->lightprobes.swap_irradiance_cache();
       // }
 
-      int z = sample_index % grid->resolution[2];
-      int y = (sample_index / grid->resolution[2]) % grid->resolution[1];
-      int x = sample_index / (grid->resolution[2] * grid->resolution[1]);
-      vec3 position = vec3(grid->corner) + vec3(grid->increment_x) * x +
-                      vec3(grid->increment_y) * y + vec3(grid->increment_z) * z;
+      ivec3 cell_co = grid_cell_index_to_coordinate(sample_index, grid->resolution);
+      vec3 position = vec3(grid->corner) + vec3(grid->increment_x) * cell_co.x +
+                      vec3(grid->increment_y) * cell_co.y + vec3(grid->increment_z) * cell_co.z;
 
       bake.inst_->lightprobes.bake(bake.depsgraph_,
                                    LIGHTPROBE_TYPE_GRID,
