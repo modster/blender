@@ -519,7 +519,8 @@ class LightBake {
                                    grid->offset + sample_index,
                                    bounce,
                                    position,
-                                   probe);
+                                   probe,
+                                   grid->visibility_range);
 
       /* TODO incremental LVL update. */
       if (sample_index + 1 == (grid->resolution[0] * grid->resolution[1] * grid->resolution[2])) {
@@ -780,6 +781,8 @@ class LightBake {
 
     grid.probe_index = probe_index;
     grid.is_ready = 0;
+    /* Update level for progressive update. TODO(fclem) port back. */
+    grid.level_bias = 1.0f;
 
     grid.visibility_bias = 0.05f * probe->vis_bias;
     grid.visibility_bleed = probe->vis_bleedbias;

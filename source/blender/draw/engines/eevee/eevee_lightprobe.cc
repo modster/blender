@@ -392,7 +392,8 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
                             int index,
                             int UNUSED(bounce),
                             const float position[3],
-                            const LightProbe *probe)
+                            const LightProbe *probe,
+                            float visibility_range)
 {
   rcti rect;
   BLI_rcti_init(&rect, 0, 0, 1, 1);
@@ -427,7 +428,7 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
   else {
     filter_diffuse(index, intensity);
     if (probe) {
-      // filter_visibility(index);
+      filter_visibility(index, probe->vis_blur, visibility_range);
     }
   }
 }

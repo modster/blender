@@ -137,7 +137,8 @@ class LightProbeModule {
             int index,
             int bounce,
             const float position[3],
-            const LightProbe *probe = nullptr);
+            const LightProbe *probe = nullptr,
+            float visibility_range = 0.0f);
 
   void draw_cache_display(void);
 
