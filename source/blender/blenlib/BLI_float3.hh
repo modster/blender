@@ -125,6 +125,12 @@ struct float3 {
     return {a.x / b, a.y / b, a.z / b};
   }
 
+  friend float3 operator/(const float3 &a, const float3 &b)
+  {
+    BLI_assert(b.x != 0.0f && b.y != 0.0f && b.z != 0.0f);
+    return {a.x / b.x, a.y / b.y, a.z / b.z};
+  }
+
   friend std::ostream &operator<<(std::ostream &stream, const float3 &v)
   {
     stream << "(" << v.x << ", " << v.y << ", " << v.z << ")";
