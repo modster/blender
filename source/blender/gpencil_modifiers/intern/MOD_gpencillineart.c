@@ -252,10 +252,18 @@ static void updateDepsgraph(GpencilModifierData *md,
   else {
     add_this_collection(ctx->scene->master_collection, ctx, mode);
   }
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  if (lmd->calculation_flags & LRT_USE_CUSTOM_CAMERA) {
+    DEG_add_object_relation(
+        ctx->node, lmd->source_camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+    DEG_add_object_relation(
+        ctx->node, lmd->source_camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  }
+  else {
+    DEG_add_object_relation(
+        ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+    DEG_add_object_relation(
+        ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  }
 }
 
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
