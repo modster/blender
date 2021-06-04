@@ -186,7 +186,7 @@ void LightProbeModule::begin_sync()
 void LightProbeModule::end_sync()
 {
   if (lightcache_->flag & LIGHTCACHE_UPDATE_WORLD) {
-    cubemap_prepare(vec3(0.0f), 0.01f, 1.0f, false);
+    cubemap_prepare(vec3(0.0f), 0.01f, 1.0f, true);
   }
 }
 
