@@ -156,10 +156,13 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
   }
 
   DeferredPass &deferred_pass = inst_.shading_passes.deferred;
-
+  deferred_pass.input_combined_tx = gbuffer.combined_tx;
   deferred_pass.input_emission_data_tx_ = gbuffer.emission_tx;
   deferred_pass.input_diffuse_data_tx_ = gbuffer.diffuse_tx;
   deferred_pass.input_reflection_data_tx_ = gbuffer.reflection_tx;
+  deferred_pass.input_transparency_data_tx_ = gbuffer.transparency_tx;
+  deferred_pass.input_volume_data_tx_ = gbuffer.volume_tx;
+  deferred_pass.input_depth_tx_ = gbuffer.depth_copy_tx;
 
   if (!no_volumes) {
     gbuffer.copy_depth_behind();
@@ -174,6 +177,8 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
       DRW_draw_pass(volume_ps_);
     }
   }
+
+  gbuffer.copy_depth();
 
   if (true) {
     gbuffer.bind_holdout();
@@ -295,20 +300,6 @@ void DeferredPass::volume_add(Object *ob)
 
 void DeferredPass::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
 {
-  input_combined_tx = gbuffer.combined_tx;
-  input_depth_tx_ = gbuffer.depth_tx;
-
-  /* TODO. Remove. */
-  gbuffer.bind(CLOSURE_DIFFUSE);
-
-  input_emission_data_tx_ = gbuffer.emission_tx;
-  input_diffuse_data_tx_ = gbuffer.diffuse_tx;
-  input_reflection_data_tx_ = gbuffer.reflection_tx;
-  input_transparency_data_tx_ = gbuffer.transparency_tx;
-  input_volume_data_tx_ = gbuffer.volume_tx;
-
-  // gbuffer.clear();
-
   opaque_layer_.render(gbuffer, view_fb);
   refraction_layer_.render(gbuffer, view_fb);
   volumetric_layer_.render(gbuffer, view_fb);

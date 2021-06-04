@@ -112,6 +112,10 @@ struct GBuffer {
   Framebuffer holdout_fb = Framebuffer("Holdout");
 
   Texture depth_behind_tx = Texture("DepthBehind");
+  Texture depth_copy_tx = Texture("DepthCopy");
+
+  Framebuffer depth_behind_fb = Framebuffer("DepthCopy");
+  Framebuffer depth_copy_fb = Framebuffer("DepthCopy");
 
   /* Owner of this GBuffer. Used to query temp textures. */
   void *owner;
@@ -135,6 +139,7 @@ struct GBuffer {
     transparency_tx.sync_tmp();
     holdout_tx.sync_tmp();
     depth_behind_tx.sync_tmp();
+    depth_copy_tx.sync_tmp();
   }
 
   void bind(eClosureBits closures_used)
@@ -154,6 +159,7 @@ struct GBuffer {
 
     holdout_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
     depth_behind_tx.acquire_tmp(UNPACK2(extent), GPU_DEPTH24_STENCIL8, owner);
+    depth_copy_tx.acquire_tmp(UNPACK2(extent), GPU_DEPTH24_STENCIL8, owner);
 
     /* Layer attachement also works with cubemap. */
     gbuffer_fb.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer),
@@ -183,8 +189,18 @@ struct GBuffer {
 
   void copy_depth_behind(void)
   {
-    /* FIXME(fclem) Will fail for cubemap. */
-    // GPU_texture_copy(depth_behind_tx, depth_tx);
+    depth_behind_fb.ensure(GPU_ATTACHMENT_TEXTURE(depth_behind_tx));
+    GPU_framebuffer_bind(depth_behind_fb);
+
+    GPU_framebuffer_blit(gbuffer_fb, 0, depth_behind_fb, 0, GPU_DEPTH_BIT);
+  }
+
+  void copy_depth(void)
+  {
+    depth_copy_fb.ensure(GPU_ATTACHMENT_TEXTURE(depth_copy_tx));
+    GPU_framebuffer_bind(depth_copy_fb);
+
+    GPU_framebuffer_blit(gbuffer_fb, 0, depth_copy_fb, 0, GPU_DEPTH_BIT);
   }
 
   void render_end(void)
@@ -197,6 +213,7 @@ struct GBuffer {
     transparency_tx.release_tmp();
     holdout_tx.release_tmp();
     depth_behind_tx.release_tmp();
+    depth_copy_tx.release_tmp();
   }
 };
 
