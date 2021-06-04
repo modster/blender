@@ -210,7 +210,7 @@ static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
         break;
       }
       case SPREADSHEET_VALUE_TYPE_COLOR: {
-        const Color4f value = row_filter.value_color;
+        const ColorGeometry4f value = row_filter.value_color;
         switch (row_filter.operation) {
           case SPREADSHEET_ROW_FILTER_EQUAL: {
             const float threshold_squared = row_filter.threshold * row_filter.threshold;
