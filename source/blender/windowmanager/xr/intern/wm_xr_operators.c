@@ -160,28 +160,31 @@ static void WM_OT_xr_session_toggle(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name XR Raycast Select
+/** \name XR Raycast Utilities
  *
- * Casts a ray from an XR controller's pose and selects any hit geometry.
  * \{ */
 
-typedef struct XrRaycastSelectData {
+static const float g_xr_default_raycast_axis[3] = {0.0f, 0.0f, -1.0f};
+static const float g_xr_default_raycast_color[4] = {0.35f, 0.35f, 1.0f, 1.0f};
+
+typedef struct XrRaycastData {
   float origin[3];
   float direction[3];
   float end[3];
+  float color[4];
   void *draw_handle;
-} XrRaycastSelectData;
+} XrRaycastData;
 
-static void wm_xr_select_raycast_draw(const bContext *UNUSED(C),
-                                      ARegion *UNUSED(region),
-                                      void *customdata)
+static void wm_xr_raycast_draw(const bContext *UNUSED(C),
+                               ARegion *UNUSED(region),
+                               void *customdata)
 {
-  const XrRaycastSelectData *data = customdata;
+  const XrRaycastData *data = customdata;
 
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-  immUniformColor4f(0.35f, 0.35f, 1.0f, 1.0f);
+  immUniformColor4fv(data->color);
 
   GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   GPU_line_width(3.0f);
@@ -194,36 +197,313 @@ static void wm_xr_select_raycast_draw(const bContext *UNUSED(C),
   immUnbindProgram();
 }
 
-static void wm_xr_select_raycast_init(wmOperator *op)
+static void wm_xr_raycast_init(wmOperator *op)
 {
   BLI_assert(op->customdata == NULL);
 
-  op->customdata = MEM_callocN(sizeof(XrRaycastSelectData), __func__);
+  op->customdata = MEM_callocN(sizeof(XrRaycastData), __func__);
 
   SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
   if (st) {
     ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
     if (art) {
-      ((XrRaycastSelectData *)op->customdata)->draw_handle = ED_region_draw_cb_activate(
-          art, wm_xr_select_raycast_draw, op->customdata, REGION_DRAW_POST_VIEW);
+      ((XrRaycastData *)op->customdata)->draw_handle = ED_region_draw_cb_activate(
+          art, wm_xr_raycast_draw, op->customdata, REGION_DRAW_POST_VIEW);
     }
   }
 }
 
-static void wm_xr_select_raycast_uninit(wmOperator *op)
+static void wm_xr_raycast_uninit(wmOperator *op)
 {
   if (op->customdata) {
     SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
     if (st) {
       ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
       if (art) {
-        ED_region_draw_cb_exit(art, ((XrRaycastSelectData *)op->customdata)->draw_handle);
+        ED_region_draw_cb_exit(art, ((XrRaycastData *)op->customdata)->draw_handle);
       }
     }
 
     MEM_freeN(op->customdata);
   }
 }
+
+static void wm_xr_raycast_update(wmOperator *op,
+                                 const wmXrData *xr,
+                                 const wmXrActionData *actiondata)
+{
+  XrRaycastData *data = op->customdata;
+  float axis[3];
+
+  float viewer_scale;
+  WM_xr_session_state_viewer_scale_get(xr, &viewer_scale);
+
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "axis");
+  if (prop) {
+    RNA_property_float_get_array(op->ptr, prop, axis);
+    normalize_v3(axis);
+  }
+  else {
+    copy_v3_v3(axis, g_xr_default_raycast_axis);
+  }
+
+  prop = RNA_struct_find_property(op->ptr, "color");
+  if (prop) {
+    RNA_property_float_get_array(op->ptr, prop, data->color);
+  }
+  else {
+    copy_v4_v4(data->color, g_xr_default_raycast_color);
+  }
+
+  copy_v3_v3(data->origin, actiondata->controller_loc);
+
+  mul_qt_v3(actiondata->controller_rot, axis);
+  copy_v3_v3(data->direction, axis);
+
+  mul_v3_v3fl(data->end, data->direction, xr->session_settings.clip_end * viewer_scale);
+  add_v3_v3(data->end, data->origin);
+}
+
+static void wm_xr_raycast(Depsgraph *depsgraph,
+                          ViewContext *vc,
+                          const float origin[3],
+                          const float direction[3],
+                          float *ray_dist,
+                          bool selectable_only,
+                          float r_location[3],
+                          float r_normal[3],
+                          int *r_index,
+                          Object **r_ob,
+                          float r_obmat[4][4])
+{
+  /* Uses same raycast method as Scene.ray_cast(). */
+  SnapObjectContext *sctx = ED_transform_snap_object_context_create(vc->scene, 0);
+
+  ED_transform_snap_object_project_ray_ex(
+      sctx,
+      depsgraph,
+      &(const struct SnapObjectParams){
+          .snap_select = vc->em ? SNAP_SELECTED : (selectable_only ? SNAP_SELECTABLE : SNAP_ALL)},
+      origin,
+      direction,
+      ray_dist,
+      r_location,
+      r_normal,
+      r_index,
+      r_ob,
+      r_obmat);
+
+  ED_transform_snap_object_context_destroy(sctx);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name XR Navigation Teleport
+ *
+ * Casts a ray from an XR controller's pose and teleports to any hit geometry.
+ * \{ */
+
+static void wm_xr_navigation_teleport(bContext *C,
+                                      wmXrData *xr,
+                                      const float origin[3],
+                                      const float direction[3],
+                                      float *ray_dist,
+                                      bool selectable_only,
+                                      const bool teleport_axes[3],
+                                      float teleport_t)
+{
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  ViewContext vc;
+  ED_view3d_viewcontext_init(C, &vc, depsgraph);
+  vc.em = NULL; /* Set to NULL to always enable teleport to non-edited objects. */
+
+  float location[3];
+  float normal[3];
+  int index;
+  Object *ob = NULL;
+  float obmat[4][4];
+
+  wm_xr_raycast(depsgraph,
+                &vc,
+                origin,
+                direction,
+                ray_dist,
+                selectable_only,
+                location,
+                normal,
+                &index,
+                &ob,
+                obmat);
+
+  /* Teleport. */
+  if (ob) {
+    float nav_location[3];
+
+    if (WM_xr_session_state_nav_location_get(xr, nav_location)) {
+      for (int a = 0; a < 3; ++a) {
+        if (teleport_axes[a]) {
+          nav_location[a] += teleport_t * (location[a] - nav_location[a]);
+        }
+      }
+      sub_v3_v3(nav_location, xr->runtime->session_state.prev_base_pose.position);
+      WM_xr_session_state_nav_location_set(xr, nav_location);
+    }
+  }
+}
+
+static int wm_xr_navigation_teleport_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  wm_xr_raycast_init(op);
+
+  int retval = op->type->modal_3d(C, op, event);
+
+  if ((retval & OPERATOR_RUNNING_MODAL) != 0) {
+    WM_event_add_modal_handler(C, op);
+  }
+
+  return retval;
+}
+
+static int wm_xr_navigation_teleport_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
+{
+  return OPERATOR_CANCELLED;
+}
+
+static int wm_xr_navigation_teleport_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmXrData *xr = &wm->xr;
+  wmXrActionData *actiondata = event->customdata;
+
+  wm_xr_raycast_update(op, xr, actiondata);
+
+  if (event->val == KM_PRESS) {
+    return OPERATOR_RUNNING_MODAL;
+  }
+  else if (event->val == KM_RELEASE) {
+    XrRaycastData *data = op->customdata;
+    bool teleport_axes[3];
+    float teleport_t, ray_dist;
+    bool selectable_only;
+
+    PropertyRNA *prop = RNA_struct_find_property(op->ptr, "teleport_axes");
+    if (prop) {
+      RNA_property_boolean_get_array(op->ptr, prop, teleport_axes);
+    }
+    else {
+      teleport_axes[0] = teleport_axes[1] = teleport_axes[2] = true;
+    }
+
+    prop = RNA_struct_find_property(op->ptr, "interpolation");
+    teleport_t = prop ? RNA_property_float_get(op->ptr, prop) : 1.0f;
+
+    prop = RNA_struct_find_property(op->ptr, "selectable_only");
+    selectable_only = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+    prop = RNA_struct_find_property(op->ptr, "distance");
+    ray_dist = prop ? RNA_property_float_get(op->ptr, prop) : BVH_RAYCAST_DIST_MAX;
+
+    wm_xr_navigation_teleport(C,
+                              xr,
+                              data->origin,
+                              data->direction,
+                              &ray_dist,
+                              selectable_only,
+                              teleport_axes,
+                              teleport_t);
+
+    wm_xr_raycast_uninit(op);
+
+    return OPERATOR_FINISHED;
+  }
+
+  /* XR events currently only support press and release. */
+  BLI_assert(false);
+  wm_xr_raycast_uninit(op);
+  return OPERATOR_CANCELLED;
+}
+
+static void WM_OT_xr_navigation_teleport(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "XR Navigation Teleport";
+  ot->idname = "WM_OT_xr_navigation_teleport";
+  ot->description = "Set VR viewer location to controller raycast hit location";
+
+  /* callbacks */
+  ot->invoke_3d = wm_xr_navigation_teleport_invoke_3d;
+  ot->exec = wm_xr_navigation_teleport_exec;
+  ot->modal_3d = wm_xr_navigation_teleport_modal_3d;
+  ot->poll = wm_xr_operator_sessionactive;
+
+  /* flags */
+  ot->flag = OPTYPE_UNDO;
+
+  /* properties */
+  static bool default_teleport_axes[3] = {true, true, true};
+
+  RNA_def_boolean_vector(ot->srna, "teleport_axes", 3, default_teleport_axes, "Teleport Axes", "");
+  RNA_def_float(ot->srna,
+                "interpolation",
+                1.0f,
+                0.0f,
+                1.0f,
+                "Interpolation",
+                "Interpolation factor between viewer and hit locations",
+                0.0f,
+                1.0f);
+  RNA_def_boolean(ot->srna,
+                  "selectable_only",
+                  true,
+                  "Selectable Only",
+                  "Only allow selectable objects to influence raycast result");
+  RNA_def_float(ot->srna,
+                "distance",
+                BVH_RAYCAST_DIST_MAX,
+                0.0,
+                BVH_RAYCAST_DIST_MAX,
+                "",
+                "Maximum raycast distance",
+                0.0,
+                BVH_RAYCAST_DIST_MAX);
+  RNA_def_float_vector(ot->srna,
+                       "axis",
+                       3,
+                       g_xr_default_raycast_axis,
+                       -1.0f,
+                       1.0f,
+                       "Axis",
+                       "Raycast axis in controller space",
+                       -1.0f,
+                       1.0f);
+  RNA_def_float_color(ot->srna,
+                      "color",
+                      4,
+                      g_xr_default_raycast_color,
+                      0.0f,
+                      1.0f,
+                      "Color",
+                      "Raycast color",
+                      0.0f,
+                      1.0f);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name XR Raycast Select
+ *
+ * Casts a ray from an XR controller's pose and selects any hit geometry.
+ * \{ */
 
 typedef enum eXrSelectElem {
   XR_SEL_BASE = 0,
@@ -311,11 +591,10 @@ static bool wm_xr_select_raycast(bContext *C,
                                  const float origin[3],
                                  const float direction[3],
                                  float *ray_dist,
+                                 bool selectable_only,
                                  eSelectOp select_op,
-                                 bool deselect_all,
-                                 bool selectable_only)
+                                 bool deselect_all)
 {
-  /* Uses same raycast method as Scene.ray_cast(). */
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewContext vc;
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
@@ -327,23 +606,17 @@ static bool wm_xr_select_raycast(bContext *C,
   Object *ob = NULL;
   float obmat[4][4];
 
-  SnapObjectContext *sctx = ED_transform_snap_object_context_create(vc.scene, 0);
-
-  ED_transform_snap_object_project_ray_ex(
-      sctx,
-      depsgraph,
-      &(const struct SnapObjectParams){
-          .snap_select = vc.em ? SNAP_SELECTED : (selectable_only ? SNAP_SELECTABLE : SNAP_ALL)},
-      origin,
-      direction,
-      ray_dist,
-      location,
-      normal,
-      &index,
-      &ob,
-      obmat);
-
-  ED_transform_snap_object_context_destroy(sctx);
+  wm_xr_raycast(depsgraph,
+                &vc,
+                origin,
+                direction,
+                ray_dist,
+                selectable_only,
+                location,
+                normal,
+                &index,
+                &ob,
+                obmat);
 
   /* Select. */
   bool hit = false;
@@ -488,7 +761,7 @@ static int wm_xr_select_raycast_invoke_3d(bContext *C, wmOperator *op, const wmE
   BLI_assert(event->custom == EVT_DATA_XR);
   BLI_assert(event->customdata);
 
-  wm_xr_select_raycast_init(op);
+  wm_xr_raycast_init(op);
 
   int retval = op->type->modal_3d(C, op, event);
 
@@ -511,42 +784,21 @@ static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEv
   BLI_assert(event->customdata);
 
   wmWindowManager *wm = CTX_wm_manager(C);
+  wmXrData *xr = &wm->xr;
   wmXrActionData *actiondata = event->customdata;
-  XrRaycastSelectData *data = op->customdata;
-  float axis[3];
 
-  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "axis");
-  if (prop) {
-    RNA_property_float_get_array(op->ptr, prop, axis);
-    normalize_v3(axis);
-  }
-  else {
-    axis[0] = 0.0f;
-    axis[1] = 0.0f;
-    axis[2] = -1.0f;
-  }
-
-  copy_v3_v3(data->origin, actiondata->controller_loc);
-
-  mul_qt_v3(actiondata->controller_rot, axis);
-  copy_v3_v3(data->direction, axis);
-
-  mul_v3_v3fl(data->end, data->direction, wm->xr.session_settings.clip_end);
-  add_v3_v3(data->end, data->origin);
+  wm_xr_raycast_update(op, xr, actiondata);
 
   if (event->val == KM_PRESS) {
     return OPERATOR_RUNNING_MODAL;
   }
   else if (event->val == KM_RELEASE) {
-    float ray_dist;
+    XrRaycastData *data = op->customdata;
     eSelectOp select_op = SEL_OP_SET;
     bool deselect_all, selectable_only;
-    bool ret;
+    float ray_dist;
 
-    prop = RNA_struct_find_property(op->ptr, "distance");
-    ray_dist = prop ? RNA_property_float_get(op->ptr, prop) : BVH_RAYCAST_DIST_MAX;
-
-    prop = RNA_struct_find_property(op->ptr, "toggle");
+    PropertyRNA *prop = RNA_struct_find_property(op->ptr, "toggle");
     if (prop && RNA_property_boolean_get(op->ptr, prop)) {
       select_op = SEL_OP_XOR;
     }
@@ -565,17 +817,20 @@ static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEv
     prop = RNA_struct_find_property(op->ptr, "selectable_only");
     selectable_only = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
 
-    ret = wm_xr_select_raycast(
-        C, data->origin, data->direction, &ray_dist, select_op, deselect_all, selectable_only);
+    prop = RNA_struct_find_property(op->ptr, "distance");
+    ray_dist = prop ? RNA_property_float_get(op->ptr, prop) : BVH_RAYCAST_DIST_MAX;
 
-    wm_xr_select_raycast_uninit(op);
+    bool changed = wm_xr_select_raycast(
+        C, data->origin, data->direction, &ray_dist, selectable_only, select_op, deselect_all);
 
-    return ret ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+    wm_xr_raycast_uninit(op);
+
+    return changed ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
   }
 
   /* XR events currently only support press and release. */
   BLI_assert(false);
-  wm_xr_select_raycast_uninit(op);
+  wm_xr_raycast_uninit(op);
   return OPERATOR_CANCELLED;
 }
 
@@ -596,8 +851,6 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
   ot->flag = OPTYPE_UNDO;
 
   /* properties */
-  static const float default_axis[3] = {0.0f, 0.0f, -1.0f};
-
   WM_operator_properties_mouse_select(ot);
 
   /* Override "deselect_all" default value. */
@@ -605,30 +858,40 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
   BLI_assert(prop != NULL);
   RNA_def_property_boolean_default(prop, true);
 
+  RNA_def_boolean(ot->srna,
+                  "selectable_only",
+                  true,
+                  "Selectable Only",
+                  "Only allow selectable objects to influence raycast result");
   RNA_def_float(ot->srna,
                 "distance",
                 BVH_RAYCAST_DIST_MAX,
                 0.0,
                 BVH_RAYCAST_DIST_MAX,
                 "",
-                "Maximum distance",
+                "Maximum raycast distance",
                 0.0,
                 BVH_RAYCAST_DIST_MAX);
   RNA_def_float_vector(ot->srna,
                        "axis",
                        3,
-                       default_axis,
+                       g_xr_default_raycast_axis,
                        -1.0f,
                        1.0f,
                        "Axis",
                        "Raycast axis in controller space",
                        -1.0f,
                        1.0f);
-  RNA_def_boolean(ot->srna,
-                  "selectable_only",
-                  true,
-                  "Selectable Only",
-                  "Only allow selectable objects to influence raycast result");
+  RNA_def_float_color(ot->srna,
+                      "color",
+                      4,
+                      g_xr_default_raycast_color,
+                      0.0f,
+                      1.0f,
+                      "Color",
+                      "Raycast color",
+                      0.0f,
+                      1.0f);
 }
 
 /** \} */
@@ -1147,7 +1410,7 @@ static void WM_OT_xr_constraints_toggle(wmOperatorType *ot)
   /* identifiers */
   ot->name = "XR Constraints Toggle";
   ot->idname = "WM_OT_xr_constraints_toggle";
-  ot->description = "Toggles enabled/auto key behavior for VR constraint objects";
+  ot->description = "Toggle enabled/auto key behavior for VR constraint objects";
 
   /* callbacks */
   ot->exec = wm_xr_constraints_toggle_exec;
@@ -1178,6 +1441,7 @@ static void WM_OT_xr_constraints_toggle(wmOperatorType *ot)
 void wm_xr_operatortypes_register(void)
 {
   WM_operatortype_append(WM_OT_xr_session_toggle);
+  WM_operatortype_append(WM_OT_xr_navigation_teleport);
   WM_operatortype_append(WM_OT_xr_select_raycast);
   WM_operatortype_append(WM_OT_xr_grab);
   WM_operatortype_append(WM_OT_xr_constraints_toggle);
