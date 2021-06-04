@@ -313,45 +313,38 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
   return samples;
 }
 
-static void verify_parameters_assert(Span<Spline::Parameter> parameters)
-{
-  float last = 0.0f;
-  for (const Spline::Parameter &parameter : parameters) {
-    BLI_assert(parameter.factor >= last);
-    last = parameter.factor;
-  }
-  BLI_assert(last <= 1.0f);
-}
-
 void Spline::sample_parameters_to_index_factors(MutableSpan<Parameter> sample_index_factors) const
 {
   const Span<float> lengths = this->evaluated_lengths();
-
-  verify_parameters_assert(sample_index_factors);
-
-  const int samples_size = sample_index_factors.size();
   const float total_length = this->length();
+
+  {
+    float last = 0.0f;
+    for (const Spline::Parameter &parameter : sample_index_factors) {
+      /* Parameters must be provided in increasing order. */
+      BLI_assert(parameter.length >= last);
+      last = parameter.length;
+    }
+    /* Parameters must be in the 0-total_length range. */
+    BLI_assert(last <= total_length);
+    BLI_assert(sample_index_factors.first().length >= 0.0f);
+  }
 
   /* Store the length at the previous evaluated point in a variable so it can
    * start out at zero (the lengths array doesn't contain 0 for the first point). */
   float prev_length = 0.0f;
-  int i_sample = 0;
-  for (const int i_evaluated : IndexRange(this->evaluated_edges_size())) {
-    const float length = lengths[i_evaluated];
-    const float sample_length = sample_index_factors[i_sample].factor * total_length;
+  int i_evaluated = 0;
+  for (const int i_sample : sample_index_factors.index_range()) {
+    const float sample_length = sample_index_factors[i_sample].length;
 
-    /* Add every sample that fits in this evaluated edge. */
-    while ((sample_length * i_sample) < length && i_sample < samples_size) {
-      const float factor = (sample_length * i_sample - prev_length) / (length - prev_length);
-      sample_index_factors[i_sample].factor = i_evaluated + factor;
-      i_sample++;
+    /* Skip over every evaluated point that fits before this sample. */
+    while (lengths[i_evaluated] < sample_length) {
+      prev_length = lengths[i_evaluated];
+      i_evaluated++;
     }
 
-    if (i_sample >= samples_size) {
-      break;
-    }
-
-    prev_length = length;
+    const float factor = (sample_length - prev_length) / (lengths[i_evaluated] - prev_length);
+    sample_index_factors[i_sample].length = i_evaluated + factor;
   }
 }
 

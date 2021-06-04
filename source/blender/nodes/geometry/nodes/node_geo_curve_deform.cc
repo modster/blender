@@ -92,12 +92,10 @@ static void geo_node_curve_deform_update(bNodeTree *UNUSED(ntree), bNode *node)
 }
 
 static void spline_deform(const Spline &spline,
-                          MutableSpan<Spline::Parameter> parameters,
-                          VMutableArray<float3> &positions)
+                          Span<Spline::Parameter> index_factors,
+                          const int axis_index,
+                          MutableSpan<float3> positions)
 {
-  spline.sample_parameters_to_index_factors(parameters);
-  MutableSpan<Spline::Parameter> index_factors = std::move(parameters);
-
   Span<float3> spline_positions = spline.evaluated_positions();
   Span<float3> spline_tangents = spline.evaluated_tangents();
   Span<float3> spline_normals = spline.evaluated_normals();
@@ -105,24 +103,84 @@ static void spline_deform(const Spline &spline,
 
   parallel_for(positions.index_range(), 1024, [&](IndexRange range) {
     for (const int i : range) {
+      const int i_position = index_factors[i].data_index;
+      float3 position = positions[i_position];
+      position[axis_index] = 0.0f;
+
       const Spline::LookupResult interp = spline.lookup_data_from_index_factor(
-          index_factors[i].factor);
+          index_factors[i].length);
       const int index = interp.evaluated_index;
       const int next_index = interp.next_evaluated_index;
+      const float factor = interp.factor;
 
       float4x4 matrix = float4x4::from_normalized_axis_data(
-          spline_positions[index], spline_normals[index], spline_tangents[index]);
-      matrix.apply_scale(radii[index]);
+          {0, 0, 0},
+          float3::interpolate(spline_normals[index], spline_normals[next_index], factor)
+              .normalized(),
+          float3::interpolate(spline_tangents[index], spline_tangents[next_index], factor)
+              .normalized());
+      matrix.apply_scale(interpf(radii[next_index], radii[index], factor));
 
-      float4x4 next_matrix = float4x4::from_normalized_axis_data(
-          spline_positions[next_index], spline_normals[next_index], spline_tangents[next_index]);
-      matrix.apply_scale(radii[next_index]);
-
-      const float4x4 deform_matrix = float4x4::interpolate(matrix, next_matrix, interp.factor);
-
-      positions[parameters[i].data_index] = deform_matrix * positions[parameters[i].data_index];
+      positions[i_position] = matrix * position;
+      positions[i_position] += float3::interpolate(
+          spline_positions[index], spline_positions[next_index], factor);
     }
   });
+}
+
+static int axis_to_index(const GeometryNodeCurveDeformPositionAxis axis)
+{
+  switch (axis) {
+    case GEO_NODE_CURVE_DEFORM_POSX:
+    case GEO_NODE_CURVE_DEFORM_NEGX:
+      return 0;
+    case GEO_NODE_CURVE_DEFORM_POSY:
+    case GEO_NODE_CURVE_DEFORM_NEGY:
+      return 1;
+    case GEO_NODE_CURVE_DEFORM_POSZ:
+    case GEO_NODE_CURVE_DEFORM_NEGZ:
+      return 2;
+  }
+  BLI_assert_unreachable();
+  return -1;
+}
+
+static bool axis_is_negative(const GeometryNodeCurveDeformPositionAxis axis)
+{
+  switch (axis) {
+    case GEO_NODE_CURVE_DEFORM_POSX:
+    case GEO_NODE_CURVE_DEFORM_POSY:
+    case GEO_NODE_CURVE_DEFORM_POSZ:
+      return false;
+    case GEO_NODE_CURVE_DEFORM_NEGX:
+    case GEO_NODE_CURVE_DEFORM_NEGY:
+    case GEO_NODE_CURVE_DEFORM_NEGZ:
+      return true;
+  }
+  BLI_assert_unreachable();
+  return false;
+}
+
+static float find_upper_bound(Span<float3> positions, const int index)
+{
+  float max = FLT_MIN;
+  for (const float3 &position : positions) {
+    if (position[index] > max) {
+      max = position[index];
+    }
+  }
+  return max;
+}
+
+static float find_lower_bound(Span<float3> positions, const int index)
+{
+  float min = FLT_MAX;
+  for (const float3 &position : positions) {
+    if (position[index] < min) {
+      min = position[index];
+    }
+  }
+  return min;
 }
 
 static void execute_on_component(const GeoNodeExecParams &params,
@@ -131,38 +189,47 @@ static void execute_on_component(const GeoNodeExecParams &params,
 {
   const NodeGeometryCurveDeform &node_storage = *(NodeGeometryCurveDeform *)params.node().storage;
   const GeometryNodeCurveDeformMode mode = (GeometryNodeCurveDeformMode)node_storage.input_mode;
+  const GeometryNodeCurveDeformPositionAxis axis = (GeometryNodeCurveDeformPositionAxis)
+                                                       node_storage.position_axis;
+  const int axis_index = axis_to_index(axis);
 
   if (curve.splines().size() == 0) {
-    params.error_message_add(NodeWarningType::Error, TIP_("Curve does not contain a spline"));
+    BLI_assert_unreachable();
     return;
   }
 
+  const Spline &spline = *curve.splines().first();
+  const float total_length = spline.length();
+
   const int size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
-  OutputAttribute_Typed<float3> positions = component.attribute_try_get_for_output<float3>(
-      "position", ATTR_DOMAIN_POINT, {0, 0, 0});
+  OutputAttribute_Typed<float3> position_attribute =
+      component.attribute_try_get_for_output<float3>("position", ATTR_DOMAIN_POINT, {0, 0, 0});
+  MutableSpan<float3> positions = position_attribute.as_span();
 
   Array<Spline::Parameter> parameters(size);
 
   if (mode == GEO_NODE_CURVE_DEFORM_POSITION) {
-    switch ((GeometryNodeCurveDeformPositionAxis)node_storage.position_axis) {
-      case GEO_NODE_CURVE_DEFORM_POSX:
-        // parallel_for(positions.index_range(), 4096, [&](IndexRange range) {
-        //   for (const int i : range) {
-        //     parameters[i] = { positions }
-        //   }
-        // });
-        break;
-      case GEO_NODE_CURVE_DEFORM_POSY:
-        break;
-      case GEO_NODE_CURVE_DEFORM_POSZ:
-        break;
-      case GEO_NODE_CURVE_DEFORM_NEGX:
-        break;
-      case GEO_NODE_CURVE_DEFORM_NEGY:
-        break;
-      case GEO_NODE_CURVE_DEFORM_NEGZ:
-        break;
+    if (axis_is_negative(axis)) {
+      parallel_for(positions.index_range(), 4096, [&](IndexRange range) {
+        for (const int i : range) {
+          parameters[i] = {std::clamp(positions[i][axis_index], 0.0f, total_length), i};
+        }
+      });
     }
+    else {
+      parallel_for(positions.index_range(), 4096, [&](IndexRange range) {
+        for (const int i : range) {
+          parameters[i] = {total_length - std::clamp(positions[i][axis_index], 0.0f, total_length),
+                           i};
+        }
+      });
+    }
+
+    std::sort(parameters.begin(),
+              parameters.end(),
+              [](const Spline::Parameter &a, const Spline::Parameter &b) {
+                return a.length < b.length;
+              });
   }
   else {
     BLI_assert(mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE);
@@ -172,18 +239,16 @@ static void execute_on_component(const GeoNodeExecParams &params,
       return;
     }
 
-    /* Sanitize attribute input. */
     GVArray_Typed<float> parameter_attribute{*attribute};
     for (const int i : IndexRange(size)) {
-      parameters[i] = {std::clamp(parameter_attribute[i], 0.0f, 1.0f), i};
+      parameters[i] = {std::clamp(parameter_attribute[i], 0.0f, total_length), i};
     }
   }
 
-  std::sort(parameters.begin(), parameters.end());
+  spline.sample_parameters_to_index_factors(parameters);
+  spline_deform(spline, parameters, axis_index, positions);
 
-  spline_deform(*curve.splines().first(), parameters, *positions);
-
-  positions.save();
+  position_attribute.save();
 }
 
 static void geo_node_curve_deform_exec(GeoNodeExecParams params)
