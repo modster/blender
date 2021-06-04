@@ -108,12 +108,6 @@ LightCache::LightCache(const int cube_len_,
   create_reflection_texture();
   create_irradiance_texture();
 
-  /* Init to black. */
-  uint data_cube = 0;
-  uchar data_grid[4] = {0, 0, 0, 0};
-  GPU_texture_clear(cube_tx.tex, GPU_DATA_10_11_11_REV, &data_cube);
-  GPU_texture_clear(grid_tx.tex, GPU_DATA_UBYTE, &data_grid);
-
   if (flag & LIGHTCACHE_NOT_USABLE) {
     /* We could not create the requested textures size. Stop baking and do not use the cache. */
     flag = LIGHTCACHE_INVALID;

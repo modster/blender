@@ -373,17 +373,28 @@ LightCache *LightProbeModule::baking_cache_get(void)
                                         lightcache_->cube_tx.tex_size[0],
                                         lightcache_->vis_res,
                                         lightcache_->grid_tx.tex_size);
-    /* Avoid sampling further than mip 0. Mips > 0 being undefined. */
-    lightcache_baking_->mips_len = 0;
-    lightcache_baking_->flag |= LIGHTCACHE_NO_REFLECTION;
 
-    /* Copy cache structure. */
-    memcpy(lightcache_baking_->cube_data,
-           lightcache_->cube_data,
-           lightcache_->cube_len * sizeof(*lightcache_->cube_data));
-    memcpy(lightcache_baking_->grid_data,
-           lightcache_->grid_data,
-           lightcache_->grid_len * sizeof(*lightcache_->grid_data));
+    if (lightcache_baking_->flag != LIGHTCACHE_INVALID) {
+      LightCache &lcache_src = *lightcache_;
+      LightCache &lcache = *lightcache_baking_;
+      /* Copy cache structure. */
+      memcpy(lcache.cube_data, lcache_src.cube_data, lcache.cube_len * sizeof(*lcache.cube_data));
+      memcpy(lcache.grid_data, lcache_src.grid_data, lcache.grid_len * sizeof(*lcache.grid_data));
+
+      /* Make grids renderable. */
+      for (LightGridCache &grid : MutableSpan(lcache.grid_data, lcache.grid_len)) {
+        grid.is_ready = 1;
+      }
+      /* Avoid sampling further than mip 0. Mips > 0 being undefined. */
+      lcache.mips_len = 0;
+      lcache.flag |= LIGHTCACHE_NO_REFLECTION;
+
+      /* Init to black. */
+      uint data_cube = 0;
+      uchar data_grid[4] = {0, 0, 0, 0};
+      GPU_texture_clear(lcache.cube_tx.tex, GPU_DATA_10_11_11_REV, &data_cube);
+      GPU_texture_clear(lcache.grid_tx.tex, GPU_DATA_UBYTE, &data_grid);
+    }
   }
   return lightcache_baking_;
 }
@@ -415,7 +426,7 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
   bool background_only = (probe == nullptr);
   cubemap_prepare(position, near, far, background_only);
 
-  if (type == LIGHTPROBE_TYPE_CUBE) {
+  if (type == LIGHTPROBE_TYPE_CUBE && probe != nullptr) {
     /* Reflections cubemaps are rendered after all irradiance bounces.
      * Swap to get the final irradiance in lightcache_baking_. */
     swap_irradiance_cache();
@@ -432,7 +443,9 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
   if (type == LIGHTPROBE_TYPE_CUBE) {
     filter_glossy(index, intensity);
     /* Swap back final irradiance to lightcache_. */
-    swap_irradiance_cache();
+    if (probe != nullptr) {
+      swap_irradiance_cache();
+    }
   }
   else {
     filter_diffuse(index, intensity);
