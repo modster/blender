@@ -320,7 +320,7 @@ void LightProbeModule::filter_visibility(int sample_index,
                                          float visibility_blur,
                                          float visibility_range)
 {
-  ivec2 extent = ivec2(3, 2);
+  ivec2 extent = ivec2(info_data_.grids.visibility_size);
   ivec2 offset = extent;
   offset.x *= sample_index % info_data_.grids.visibility_cells_per_row;
   offset.y *= (sample_index / info_data_.grids.visibility_cells_per_row) %
@@ -402,7 +402,7 @@ LightCache *LightProbeModule::baking_cache_get(void)
 void LightProbeModule::bake(Depsgraph *depsgraph,
                             int type,
                             int index,
-                            int UNUSED(bounce),
+                            int bounce,
                             const float position[3],
                             const LightProbe *probe,
                             float visibility_range)
@@ -449,7 +449,9 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
   }
   else {
     filter_diffuse(index, intensity);
-    if (probe) {
+    if (probe && bounce < 2) {
+      /* No need to filter visibility after 2nd bounce since both lightcache_ and
+       * lightcache_baking_ will have correct visibility grid. */
       filter_visibility(index, probe->vis_blur, visibility_range);
     }
   }

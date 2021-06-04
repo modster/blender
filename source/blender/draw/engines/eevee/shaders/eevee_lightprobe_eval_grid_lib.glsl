@@ -54,9 +54,9 @@ vec3 lightprobe_grid_evaluate(
                                    cell_id,
                                    ws_light,
                                    ws_dist_point_to_cell,
-                                   grid.visibility_range,
+                                   grid.visibility_bias,
                                    grid.visibility_bleed,
-                                   grid.visibility_bias);
+                                   grid.visibility_range);
     /* Smoother transition. */
     weight += info.irradiance_smooth;
     /* Trilinear weights. */
