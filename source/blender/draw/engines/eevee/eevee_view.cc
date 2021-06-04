@@ -193,8 +193,8 @@ void ShadingView::update_view(void)
   dof_.jitter_apply(winmat, viewmat);
   DRW_view_update_sub(render_view_, viewmat, winmat);
 
-  inst_.lights.set_view(render_view_, extent_);
   inst_.lightprobes.set_view(render_view_, extent_);
+  inst_.lights.set_view(render_view_, extent_);
 }
 
 /** \} */
@@ -230,10 +230,8 @@ void LightProbeView::sync(Texture &color_tx,
 void LightProbeView::render(void)
 {
   if (!is_only_background_) {
-    /* TODO(fclem) Disable specular lighting on lights when rendering probes to avoid feedback
-     * loops (looks bad). */
-    inst_.lights.set_view(view_, extent_);
     inst_.lightprobes.set_view(view_, extent_);
+    inst_.lights.set_view(view_, extent_, false);
   }
 
   DRW_stats_group_start(name_);

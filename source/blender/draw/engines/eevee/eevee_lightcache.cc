@@ -504,9 +504,9 @@ class LightBake {
                                                      nullptr;
 
       /* Swap cache on first grid of each bounce. */
-      // if (bounce > 0 && cb_data.sample_index == 0) {
-      //   bake.inst_->lightprobes.swap_irradiance_cache();
-      // }
+      if (bounce > 0 && grid->offset == 0) {
+        bake.inst_->lightprobes.swap_irradiance_cache();
+      }
 
       ivec3 cell_co = grid_cell_index_to_coordinate(sample_index, grid->resolution);
       vec3 position = vec3(grid->corner) + vec3(grid->increment_x) * cell_co.x +
@@ -525,7 +525,7 @@ class LightBake {
         grid->is_ready = 1;
       }
       /* If it's the last grid of the last bounce, tag lighting as updated. */
-      if ((sample_index == bake.irradiance_samples_count_ - 1) &&
+      if ((grid->offset + sample_index == bake.irradiance_samples_count_ - 1) &&
           (bounce == sce_eevee.gi_diffuse_bounces - 1)) {
         bake.lcache_->flag &= ~LIGHTCACHE_UPDATE_GRID;
       }

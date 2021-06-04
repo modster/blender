@@ -131,7 +131,7 @@ class LightModule {
   void sync_light(const Object *ob, ObjectHandle &handle);
   void end_sync(void);
 
-  void set_view(const DRWView *view, const ivec2 extent);
+  void set_view(const DRWView *view, const ivec2 extent, bool enable_specular = true);
 
   void bind_batch(int range_id);
 

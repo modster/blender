@@ -108,7 +108,9 @@ class LightProbeModule {
 
   void swap_irradiance_cache(void)
   {
-    // SWAP(GPUTexture *, lightcache_baking_->grid_tx.tex, lightcache_->grid_tx.tex);
+    if (lightcache_baking_ && lightcache_) {
+      SWAP(GPUTexture *, lightcache_baking_->grid_tx.tex, lightcache_->grid_tx.tex);
+    }
   }
 
   const GPUUniformBuf *grid_ubo_get() const

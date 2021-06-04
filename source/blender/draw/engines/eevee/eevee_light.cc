@@ -304,7 +304,7 @@ void LightModule::end_sync(void)
 }
 
 /* Compute acceleration structure for the given view. */
-void LightModule::set_view(const DRWView *view, const ivec2 extent)
+void LightModule::set_view(const DRWView *view, const ivec2 extent, bool enable_specular)
 {
   culling_.set_view(view, extent);
 
@@ -333,8 +333,12 @@ void LightModule::set_view(const DRWView *view, const ivec2 extent)
   /* This is only called if the light is visible under this view. */
   auto data_copy = [&](LightBatch &light_batch, uint32_t dst_index, uint32_t src_index) {
     Light &light = *this->lights_refs_[src_index];
+    LightData &dst = light_batch.lights_data[dst_index];
 
-    light_batch.lights_data[dst_index] = light;
+    dst = light;
+    if (!enable_specular) {
+      dst.specular_power = 0.0f;
+    }
 
     if (light.shadow_id != LIGHT_NO_SHADOW) {
       ShadowPunctual &shadow = this->inst_.shadows.punctual_get(light.shadow_id);

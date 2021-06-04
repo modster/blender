@@ -186,7 +186,7 @@ void LightProbeModule::begin_sync()
 void LightProbeModule::end_sync()
 {
   if (lightcache_->flag & LIGHTCACHE_UPDATE_WORLD) {
-    cubemap_prepare(vec3(0.0f), 0.01f, 1.0f, true);
+    cubemap_prepare(vec3(0.0f), 0.01f, 1.0f, false);
   }
 }
 
@@ -415,6 +415,12 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
   bool background_only = (probe == nullptr);
   cubemap_prepare(position, near, far, background_only);
 
+  if (type == LIGHTPROBE_TYPE_CUBE) {
+    /* Reflections cubemaps are rendered after all irradiance bounces.
+     * Swap to get the final irradiance in lightcache_baking_. */
+    swap_irradiance_cache();
+  }
+
   /* Render using the previous bounce to light the scene. */
   lightcache_ = baking_cache_get();
 
@@ -425,6 +431,8 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
 
   if (type == LIGHTPROBE_TYPE_CUBE) {
     filter_glossy(index, intensity);
+    /* Swap back final irradiance to lightcache_. */
+    swap_irradiance_cache();
   }
   else {
     filter_diffuse(index, intensity);
