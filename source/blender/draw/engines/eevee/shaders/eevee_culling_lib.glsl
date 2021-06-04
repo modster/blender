@@ -58,7 +58,7 @@ bool culling_sphere_cone_isect(Sphere sphere, Cone cone)
 
 bool culling_sphere_cylinder_isect(Sphere sphere, Cylinder cylinder)
 {
-  float distance_squared = len_squared(cylinder.center - sphere.position);
+  float distance_squared = len_squared(sphere.position.xy - cylinder.center.xy);
   return (distance_squared < sqr(cylinder.radius + sphere.radius));
 }
 
