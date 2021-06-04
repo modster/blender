@@ -127,6 +127,20 @@ static const EnumPropertyItem node_chunksize_items[] = {
 };
 #endif
 
+static const EnumPropertyItem rna_enum_execution_mode_items[] = {
+    {NTREE_EXECUTION_MODE_TILED,
+     "TILED",
+     0,
+     "Tiled",
+     "Compositing is tiled, having as priority to display first tiles as fast as possible"},
+    {NTREE_EXECUTION_MODE_FULL_FRAME,
+     "FULL_FRAME",
+     0,
+     "Full Frame",
+     "Composites full image result as fast as possible"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 const EnumPropertyItem rna_enum_mapping_type_items[] = {
     {NODE_MAPPING_TYPE_POINT, "POINT", 0, "Point", "Transform a point"},
     {NODE_MAPPING_TYPE_TEXTURE,
@@ -1423,6 +1437,7 @@ static void rna_NodeTree_socket_remove(bNodeTree *ntree,
     ntreeRemoveSocketInterface(ntree, sock);
 
     ntreeUpdateTree(bmain, ntree);
+    DEG_id_tag_update(&ntree->id, 0);
     WM_main_add_notifier(NC_NODE | NA_EDITED, ntree);
   }
 }
@@ -3133,7 +3148,7 @@ static void rna_NodeSocketStandard_draw(ID *id,
 }
 
 static void rna_NodeSocketStandard_draw_color(
-    ID *id, bNodeSocket *sock, struct bContext *C, PointerRNA *nodeptr, float *r_color)
+    ID *id, bNodeSocket *sock, struct bContext *C, PointerRNA *nodeptr, float r_color[4])
 {
   PointerRNA ptr;
   RNA_pointer_create(id, &RNA_NodeSocket, sock, &ptr);
@@ -3153,7 +3168,7 @@ static void rna_NodeSocketInterfaceStandard_draw(ID *id,
 static void rna_NodeSocketInterfaceStandard_draw_color(ID *id,
                                                        bNodeSocket *sock,
                                                        struct bContext *C,
-                                                       float *r_color)
+                                                       float r_color[4])
 {
   PointerRNA ptr;
   RNA_pointer_create(id, &RNA_NodeSocket, sock, &ptr);
@@ -3972,7 +3987,7 @@ static void rna_NodeCryptomatte_layer_name_set(PointerRNA *ptr, int new_value)
   }
 }
 
-static const EnumPropertyItem *rna_NodeCryptomatte_layer_name_itemf(bContext *UNUSED(C),
+static const EnumPropertyItem *rna_NodeCryptomatte_layer_name_itemf(bContext *C,
                                                                     PointerRNA *ptr,
                                                                     PropertyRNA *UNUSED(prop),
                                                                     bool *r_free)
@@ -3983,7 +3998,7 @@ static const EnumPropertyItem *rna_NodeCryptomatte_layer_name_itemf(bContext *UN
   EnumPropertyItem template = {0, "", 0, "", ""};
   int totitem = 0;
 
-  ntreeCompositCryptomatteUpdateLayerNames(node);
+  ntreeCompositCryptomatteUpdateLayerNames(CTX_data_scene(C), node);
   int layer_index;
   LISTBASE_FOREACH_INDEX (CryptomatteLayer *, layer, &storage->runtime.layers, layer_index) {
     template.value = layer_index;
@@ -4075,7 +4090,7 @@ static void rna_NodeCryptomatte_matte_set(PointerRNA *ptr, const char *value)
 
 static void rna_NodeCryptomatte_update_add(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
-  ntreeCompositCryptomatteSyncFromAdd(ptr->data);
+  ntreeCompositCryptomatteSyncFromAdd(scene, ptr->data);
   rna_Node_update(bmain, scene, ptr);
 }
 
@@ -4453,6 +4468,13 @@ void rna_ShaderNodePointDensity_density_minmax(bNode *self,
   }
 
   RE_point_density_minmax(depsgraph, pd, r_min, r_max);
+}
+
+bool rna_NodeSocketMaterial_default_value_poll(PointerRNA *UNUSED(ptr), PointerRNA value)
+{
+  /* Do not show grease pencil materials for now. */
+  Material *ma = (Material *)value.data;
+  return ma->gp_style == NULL;
 }
 
 #else
@@ -9228,12 +9250,12 @@ static void def_geo_attribute_attribute_compare(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
   prop = RNA_def_property(srna, "input_type_a", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_any);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_no_boolean);
   RNA_def_property_ui_text(prop, "Input Type A", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
   prop = RNA_def_property(srna, "input_type_b", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_any);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_no_boolean);
   RNA_def_property_ui_text(prop, "Input Type B", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
@@ -9848,6 +9870,19 @@ static void def_geo_attribute_transfer(StructRNA *srna)
   prop = RNA_def_property(srna, "mapping", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, mapping_items);
   RNA_def_property_ui_text(prop, "Mapping", "Mapping between geometries");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
+static void def_geo_input_material(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  prop = RNA_def_property(srna, "material", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_sdna(prop, NULL, "id");
+  RNA_def_property_struct_type(prop, "Material");
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
+  RNA_def_property_ui_text(prop, "Material", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
@@ -10674,6 +10709,8 @@ static void rna_def_node_socket_material(BlenderRNA *brna,
   prop = RNA_def_property(srna, "default_value", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "value");
   RNA_def_property_struct_type(prop, "Material");
+  RNA_def_property_pointer_funcs(
+      prop, NULL, NULL, NULL, "rna_NodeSocketMaterial_default_value_poll");
   RNA_def_property_ui_text(prop, "Default Value", "Input value used for unconnected socket");
   RNA_def_property_update(
       prop, NC_NODE | NA_EDITED, "rna_NodeSocketStandard_value_and_relation_update");
@@ -10689,6 +10726,8 @@ static void rna_def_node_socket_material(BlenderRNA *brna,
   prop = RNA_def_property(srna, "default_value", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "value");
   RNA_def_property_struct_type(prop, "Material");
+  RNA_def_property_pointer_funcs(
+      prop, NULL, NULL, NULL, "rna_NodeSocketMaterial_default_value_poll");
   RNA_def_property_ui_text(prop, "Default Value", "Input value used for unconnected socket");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
 }
@@ -11645,6 +11684,12 @@ static void rna_def_composite_nodetree(BlenderRNA *brna)
       srna, "Compositor Node Tree", "Node tree consisting of linked nodes used for compositing");
   RNA_def_struct_sdna(srna, "bNodeTree");
   RNA_def_struct_ui_icon(srna, ICON_RENDERLAYERS);
+
+  prop = RNA_def_property(srna, "execution_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "execution_mode");
+  RNA_def_property_enum_items(prop, rna_enum_execution_mode_items);
+  RNA_def_property_ui_text(prop, "Execution Mode", "Set how compositing is executed");
+  RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, "rna_NodeTree_update");
 
   prop = RNA_def_property(srna, "render_quality", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "render_quality");
