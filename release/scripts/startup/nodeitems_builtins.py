@@ -505,6 +505,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveResample"),
         NodeItem("GeometryNodeCurveDeform"),
         NodeItem("GeometryNodeMeshToCurve"),
+        NodeItem("GeometryNodeCurveLength"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
         NodeItem("GeometryNodeBoundBox"),
