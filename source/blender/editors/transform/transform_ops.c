@@ -491,6 +491,12 @@ static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   float viewmat_prev[4][4];
   int retval;
 
+  /* Scale to apply to clip distances. */
+  float viewer_scale = 1.0f;
+#ifdef WITH_XR_OPENXR
+  WM_xr_session_state_viewer_scale_get(xr, &viewer_scale);
+#endif
+
   wmEvent event_mut;
   memcpy(&event_mut, event, sizeof(wmEvent));
 
@@ -502,8 +508,8 @@ static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
       v3d,
       region,
       actiondata->eye_lens,
-      xr->session_settings.clip_start,
-      xr->session_settings.clip_end,
+      xr->session_settings.clip_start * viewer_scale,
+      xr->session_settings.clip_end * viewer_scale,
       t->viewmat); /* Use viewmat from when transform was invoked instead of latest XR viewmat. */
 
   map_to_pixel(event_mut.mval,
@@ -611,6 +617,12 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
   float viewmat_prev[4][4];
   int retval;
 
+  /* Scale to apply to clip distances. */
+  float viewer_scale = 1.0f;
+#ifdef WITH_XR_OPENXR
+  WM_xr_session_state_viewer_scale_get(xr, &viewer_scale);
+#endif
+
   wmEvent event_mut;
   memcpy(&event_mut, event, sizeof(wmEvent));
   event_mut.type = LEFTMOUSE;
@@ -622,8 +634,8 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
                             v3d,
                             region,
                             actiondata->eye_lens,
-                            xr->session_settings.clip_start,
-                            xr->session_settings.clip_end,
+                            xr->session_settings.clip_start * viewer_scale,
+                            xr->session_settings.clip_end * viewer_scale,
                             actiondata->eye_viewmat);
 
   map_to_pixel(event_mut.mval,

@@ -102,6 +102,13 @@ static void wm_xr_session_create_cb(void)
     wm_xr_session_object_pose_get(settings->controller1_object,
                                   &state->controller1_object_orig_pose);
   }
+
+  /* Initialize navigation. */
+  WM_xr_session_state_navigation_reset(state);
+  if (settings->base_scale < 0.001f) {
+    settings->base_scale = 1.0f;
+  }
+  state->prev_base_scale = settings->base_scale;
 }
 
 static void wm_xr_session_exit_cb(void *customdata)
@@ -193,7 +200,8 @@ bool WM_xr_session_is_ready(const wmXrData *xr)
 
 static void wm_xr_session_base_pose_calc(const Scene *scene,
                                          const XrSessionSettings *settings,
-                                         GHOST_XrPose *r_base_pose)
+                                         GHOST_XrPose *r_base_pose,
+                                         float *r_base_scale)
 {
   const Object *base_pose_object = ((settings->base_pose_type == XR_BASE_POSE_OBJECT) &&
                                     settings->base_pose_object) ?
@@ -224,6 +232,8 @@ static void wm_xr_session_base_pose_calc(const Scene *scene,
     copy_v3_fl(r_base_pose->position, 0.0f);
     axis_angle_to_quat_single(r_base_pose->orientation_quat, 'X', M_PI_2);
   }
+
+  *r_base_scale = settings->base_scale;
 }
 
 static void wm_xr_session_draw_data_populate(wmXrData *xr_data,
@@ -239,7 +249,8 @@ static void wm_xr_session_draw_data_populate(wmXrData *xr_data,
   r_draw_data->xr_data = xr_data;
   r_draw_data->surface_data = g_xr_surface->customdata;
 
-  wm_xr_session_base_pose_calc(r_draw_data->scene, settings, &r_draw_data->base_pose);
+  wm_xr_session_base_pose_calc(
+      r_draw_data->scene, settings, &r_draw_data->base_pose, &r_draw_data->base_scale);
 }
 
 wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
@@ -345,6 +356,8 @@ void wm_xr_session_draw_data_update(const wmXrSessionState *state,
       else {
         copy_v3_fl(draw_data->eye_position_ofs, 0.0f);
       }
+      /* Reset navigation. */
+      WM_xr_session_state_navigation_reset(state);
       break;
     case SESSION_STATE_EVENT_POSITION_TRACKING_TOGGLE:
       if (use_position_tracking) {
@@ -407,6 +420,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   copy_m4_m4(eye->viewmat, viewmat);
 
   memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(state->prev_base_pose));
+  state->prev_base_scale = draw_data->base_scale;
   memcpy(&state->prev_local_pose, &draw_view->local_pose, sizeof(state->prev_local_pose));
   copy_v3_v3(state->prev_eye_position_ofs, draw_data->eye_position_ofs);
 
@@ -441,7 +455,7 @@ bool WM_xr_session_state_viewer_pose_rotation_get(const wmXrData *xr, float r_ro
     return false;
   }
 
-  copy_v4_v4(r_rotation, xr->runtime->session_state.viewer_pose.orientation_quat);
+  copy_qt_qt(r_rotation, xr->runtime->session_state.viewer_pose.orientation_quat);
   return true;
 }
 
@@ -497,9 +511,82 @@ bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
     return false;
   }
 
-  copy_v4_v4(r_rotation,
+  copy_qt_qt(r_rotation,
              xr->runtime->session_state.controllers[subaction_idx].pose.orientation_quat);
   return true;
+}
+
+bool WM_xr_session_state_nav_location_get(const wmXrData *xr, float r_location[3])
+{
+  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set) {
+    zero_v3(r_location);
+    return false;
+  }
+
+  copy_v3_v3(r_location, xr->runtime->session_state.nav_pose.position);
+  return true;
+}
+
+void WM_xr_session_state_nav_location_set(wmXrData *xr, const float location[3])
+{
+  if (WM_xr_session_exists(xr)) {
+    copy_v3_v3(xr->runtime->session_state.nav_pose.position, location);
+  }
+}
+
+bool WM_xr_session_state_nav_rotation_get(const wmXrData *xr, float r_rotation[4])
+{
+  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set) {
+    unit_qt(r_rotation);
+    return false;
+  }
+
+  copy_qt_qt(r_rotation, xr->runtime->session_state.nav_pose.orientation_quat);
+  return true;
+}
+
+void WM_xr_session_state_nav_rotation_set(wmXrData *xr, const float rotation[4])
+{
+  if (WM_xr_session_exists(xr)) {
+    copy_qt_qt(xr->runtime->session_state.nav_pose.orientation_quat, rotation);
+  }
+}
+
+bool WM_xr_session_state_nav_scale_get(const wmXrData *xr, float *r_scale)
+{
+  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set) {
+    *r_scale = 1.0f;
+    return false;
+  }
+
+  *r_scale = xr->runtime->session_state.nav_scale;
+  return true;
+}
+
+void WM_xr_session_state_nav_scale_set(wmXrData *xr, float scale)
+{
+  if (WM_xr_session_exists(xr)) {
+    /* Clamp to reasonable values. */
+    CLAMP(scale, 0.001f, 1000.0f);
+    xr->runtime->session_state.nav_scale = scale;
+  }
+}
+
+bool WM_xr_session_state_viewer_scale_get(const wmXrData *xr, float *r_scale)
+{
+  if (!WM_xr_session_state_nav_scale_get(xr, r_scale)) {
+    return false;
+  }
+
+  *r_scale *= xr->session_settings.base_scale;
+  return true;
+}
+
+void WM_xr_session_state_navigation_reset(wmXrSessionState *state)
+{
+  zero_v3(state->nav_pose.position);
+  unit_qt(state->nav_pose.orientation_quat);
+  state->nav_scale = 1.0f;
 }
 
 void WM_xr_session_state_viewer_object_get(const wmXrData *xr, Object *ob)
@@ -591,7 +678,8 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
   char ob_flag;
   float view_ofs[3];
   float base_inv[4][4];
-  float tmp[4][4];
+  float nav_inv[4][4];
+  float tmp0[4][4], tmp1[4][4];
 
   if ((settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING) == 0) {
     copy_v3_v3(view_ofs, state->prev_eye_position_ofs);
@@ -603,8 +691,11 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
     add_v3_v3(view_ofs, state->prev_local_pose.position);
   }
 
-  wm_xr_pose_to_viewmat(&state->prev_base_pose, base_inv);
+  wm_xr_pose_scale_to_viewmat(&state->prev_base_pose, state->prev_base_scale, base_inv);
   invert_m4(base_inv);
+
+  wm_xr_pose_scale_to_viewmat(&state->nav_pose, state->nav_scale, nav_inv);
+  invert_m4(nav_inv);
 
   for (unsigned int i = 0; i < count; ++i) {
     wmXrControllerData *controller = &state->controllers[i];
@@ -624,11 +715,14 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
     }
 
     /* Calculate controller matrix in world space. */
-    wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp);
+    wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp0);
 
     /* Apply eye position and base pose offsets. */
-    sub_v3_v3(tmp[3], view_ofs);
-    mul_m4_m4m4(controller->mat, base_inv, tmp);
+    sub_v3_v3(tmp0[3], view_ofs);
+    mul_m4_m4m4(tmp1, base_inv, tmp0);
+
+    /* Apply navigation. */
+    mul_m4_m4m4(controller->mat, nav_inv, tmp1);
 
     /* Save final pose. */
     mat4_to_loc_quat(

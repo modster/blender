@@ -970,6 +970,14 @@ bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
 bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
                                                       unsigned int subaction_idx,
                                                       float r_rotation[4]);
+bool WM_xr_session_state_nav_location_get(const wmXrData *xr, float r_location[3]);
+void WM_xr_session_state_nav_location_set(wmXrData *xr, const float location[3]);
+bool WM_xr_session_state_nav_rotation_get(const wmXrData *xr, float r_rotation[4]);
+void WM_xr_session_state_nav_rotation_set(wmXrData *xr, const float rotation[4]);
+bool WM_xr_session_state_nav_scale_get(const wmXrData *xr, float *r_scale);
+void WM_xr_session_state_nav_scale_set(wmXrData *xr, float scale);
+bool WM_xr_session_state_viewer_scale_get(const wmXrData *xr, float *r_scale);
+void WM_xr_session_state_navigation_reset(struct wmXrSessionState *state);
 void WM_xr_session_state_viewer_object_get(const wmXrData *xr, Object *ob);
 void WM_xr_session_state_viewer_object_set(wmXrData *xr, const Object *ob);
 void WM_xr_session_state_controller_object_get(const wmXrData *xr,

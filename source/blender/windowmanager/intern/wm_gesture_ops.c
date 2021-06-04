@@ -225,6 +225,12 @@ int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
   int mval[2];
   int retval;
 
+  /* Scale to apply to clip distances. */
+  float viewer_scale = 1.0f;
+#ifdef WITH_XR_OPENXR
+  WM_xr_session_state_viewer_scale_get(xr, &viewer_scale);
+#endif
+
   wmEvent event_mut;
   memcpy(&event_mut, event, sizeof(wmEvent));
 
@@ -235,8 +241,8 @@ int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
                             v3d,
                             region,
                             actiondata->eye_lens,
-                            xr->session_settings.clip_start,
-                            xr->session_settings.clip_end,
+                            xr->session_settings.clip_start * viewer_scale,
+                            xr->session_settings.clip_end * viewer_scale,
                             NULL);
 
   map_to_pixel(mval,
@@ -360,6 +366,12 @@ int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   int mval[2];
   int retval;
 
+  /* Scale to apply to clip distances. */
+  float viewer_scale = 1.0f;
+#ifdef WITH_XR_OPENXR
+  WM_xr_session_state_viewer_scale_get(xr, &viewer_scale);
+#endif
+
   wmEvent event_mut;
   memcpy(&event_mut, event, sizeof(wmEvent));
 
@@ -373,8 +385,8 @@ int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
                             v3d,
                             region,
                             actiondata->eye_lens,
-                            xr->session_settings.clip_start,
-                            xr->session_settings.clip_end,
+                            xr->session_settings.clip_start * viewer_scale,
+                            xr->session_settings.clip_end * viewer_scale,
                             release ? actiondata->eye_viewmat : NULL);
 
   map_to_pixel(mval,

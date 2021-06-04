@@ -50,6 +50,18 @@ void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4])
   translate_m4(r_viewmat, -pose->position[0], -pose->position[1], -pose->position[2]);
 }
 
+void wm_xr_pose_scale_to_viewmat(const GHOST_XrPose *pose, float scale, float r_viewmat[4][4])
+{
+  wm_xr_pose_to_viewmat(pose, r_viewmat);
+
+  /* Clamp to reasonable values. */
+  CLAMP(scale, 0.001f, 1000.0f);
+  scale = 1.0f / scale;
+  mul_v3_fl(r_viewmat[0], scale);
+  mul_v3_fl(r_viewmat[1], scale);
+  mul_v3_fl(r_viewmat[2], scale);
+}
+
 void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4])
 {
   quat_to_mat4(r_mat, pose->orientation_quat);
@@ -59,10 +71,12 @@ void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4])
 static void wm_xr_draw_matrices_create(const wmXrDrawData *draw_data,
                                        const GHOST_XrDrawViewInfo *draw_view,
                                        const XrSessionSettings *session_settings,
+                                       const wmXrSessionState *session_state,
                                        float r_view_mat[4][4],
                                        float r_proj_mat[4][4])
 {
   GHOST_XrPose eye_pose;
+  float eye_mat[4][4], base_mat[4][4], nav_mat[4][4], tmp[4][4];
 
   copy_qt_qt(eye_pose.orientation_quat, draw_view->eye_pose.orientation_quat);
   copy_v3_v3(eye_pose.position, draw_view->eye_pose.position);
@@ -81,14 +95,16 @@ static void wm_xr_draw_matrices_create(const wmXrDrawData *draw_data,
                      session_settings->clip_start,
                      session_settings->clip_end);
 
-  float eye_mat[4][4];
-  float base_mat[4][4];
-
   wm_xr_pose_to_viewmat(&eye_pose, eye_mat);
   /* Calculate the base pose matrix (in world space!). */
-  wm_xr_pose_to_viewmat(&draw_data->base_pose, base_mat);
+  wm_xr_pose_scale_to_viewmat(&draw_data->base_pose, draw_data->base_scale, base_mat);
+  /* Calculate the navigation matrix. */
+  wm_xr_pose_scale_to_viewmat(&session_state->nav_pose, session_state->nav_scale, nav_mat);
 
-  mul_m4_m4m4(r_view_mat, eye_mat, base_mat);
+  /* Apply base pose. */
+  mul_m4_m4m4(tmp, eye_mat, base_mat);
+  /* Apply navigation. */
+  mul_m4_m4m4(r_view_mat, tmp, nav_mat);
 }
 
 static void wm_xr_draw_viewport_buffers_to_active_framebuffer(
@@ -130,12 +146,15 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
   BLI_assert(WM_xr_session_is_ready(xr_data));
 
   wm_xr_session_draw_data_update(session_state, settings, draw_view, draw_data);
-  wm_xr_draw_matrices_create(draw_data, draw_view, settings, viewmat, winmat);
+  wm_xr_draw_matrices_create(draw_data, draw_view, settings, session_state, viewmat, winmat);
   wm_xr_session_state_update(settings, draw_data, draw_view, viewmat, session_state);
 
   if (!wm_xr_session_surface_offscreen_ensure(surface_data, draw_view)) {
     return;
   }
+
+  /* Scale to apply to clip distances. */
+  const float viewer_scale = draw_data->base_scale * session_state->nav_scale;
 
   /* In case a framebuffer is still bound from drawing the last eye. */
   GPU_framebuffer_restore();
@@ -152,8 +171,8 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
                                   display_flags,
                                   viewmat,
                                   winmat,
-                                  settings->clip_start,
-                                  settings->clip_end,
+                                  settings->clip_start * viewer_scale,
+                                  settings->clip_end * viewer_scale,
                                   true,
                                   false,
                                   true,
@@ -180,13 +199,14 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
   const wmXrData *xr = customdata;
   const XrSessionSettings *settings = &xr->session_settings;
   const wmXrSessionState *state = &xr->runtime->session_state;
+  const float viewer_scale = settings->base_scale * state->nav_scale;
 
   switch (settings->controller_draw_style) {
     case XR_CONTROLLER_DRAW_AXES: {
       const float r[4] = {1.0f, 0.2f, 0.322f, 1.0f};
       const float g[4] = {0.545f, 0.863f, 0.0f, 1.0f};
       const float b[4] = {0.157f, 0.565f, 1.0f, 1.0f};
-      const float scale = 0.1f;
+      const float scale = 0.1f * viewer_scale;
       float x_axis[3], y_axis[3], z_axis[3];
 
       GPUVertFormat *format = immVertexFormat();
@@ -258,7 +278,7 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
       /* Ray. */
       {
         const float color[4] = {0.35f, 0.35f, 1.0f, 0.5f};
-        const float scale = settings->clip_end;
+        const float scale = settings->clip_end * viewer_scale;
         float ray[3];
 
         GPUVertFormat *format = immVertexFormat();

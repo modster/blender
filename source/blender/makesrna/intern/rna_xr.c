@@ -666,6 +666,19 @@ static void rna_XrSessionState_reset_to_base_pose(bContext *C)
 #  endif
 }
 
+static void rna_XrSessionState_reset_navigation(bContext *C)
+{
+#  ifdef WITH_XR_OPENXR
+  wmWindowManager *wm = CTX_wm_manager(C);
+  if (WM_xr_session_exists(&wm->xr)) {
+    struct wmXrSessionState *state = WM_xr_session_state_handle_get(&wm->xr);
+    WM_xr_session_state_navigation_reset(state);
+  }
+#  else
+  UNUSED_VARS(C);
+#  endif
+}
+
 static bool rna_XrSessionState_action_set_create(bContext *C, const char *action_set_name)
 {
 #  ifdef WITH_XR_OPENXR
@@ -985,6 +998,71 @@ static void rna_XrSessionState_controller_pose1_rotation_get(PointerRNA *ptr, fl
 #  else
   UNUSED_VARS(ptr);
   unit_qt(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_nav_location_get(PointerRNA *ptr, float *r_values)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_nav_location_get(xr, r_values);
+#  else
+  UNUSED_VARS(ptr);
+  zero_v3(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_nav_location_set(PointerRNA *ptr, const float *values)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_nav_location_set(xr, values);
+#  else
+  UNUSED_VARS(ptr, values);
+#  endif
+}
+
+static void rna_XrSessionState_nav_rotation_get(PointerRNA *ptr, float *r_values)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_nav_rotation_get(xr, r_values);
+#  else
+  UNUSED_VARS(ptr);
+  unit_qt(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_nav_rotation_set(PointerRNA *ptr, const float *values)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_nav_rotation_set(xr, values);
+#  else
+  UNUSED_VARS(ptr, values);
+#  endif
+}
+
+static float rna_XrSessionState_nav_scale_get(PointerRNA *ptr)
+{
+  float value;
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_nav_scale_get(xr, &value);
+#  else
+  UNUSED_VARS(ptr);
+  value = 1.0f;
+#  endif
+  return value;
+}
+
+static void rna_XrSessionState_nav_scale_set(PointerRNA *ptr, float value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_nav_scale_set(xr, value);
+#  else
+  UNUSED_VARS(ptr, value);
 #  endif
 }
 
@@ -1422,6 +1500,13 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
       "Rotation angle around the Z-Axis to apply the rotation deltas from the VR headset to");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
+  prop = RNA_def_property(srna, "base_scale", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Base Scale", "Uniform scale to apply to VR view");
+  RNA_def_property_range(prop, 0.001f, 1000.0f);
+  RNA_def_property_ui_range(prop, 0.001f, 1000.0f, 1, 3);
+  RNA_def_property_float_default(prop, 1.0f);
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
   prop = RNA_def_property(srna, "show_floor", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "draw_flags", V3D_OFSDRAW_SHOW_GRIDFLOOR);
   RNA_def_property_ui_text(prop, "Display Grid Floor", "Show the ground plane grid");
@@ -1605,6 +1690,12 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
 
   func = RNA_def_function(srna, "reset_to_base_pose", "rna_XrSessionState_reset_to_base_pose");
   RNA_def_function_ui_description(func, "Force resetting of position and rotation deltas");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "reset_navigation", "rna_XrSessionState_reset_navigation");
+  RNA_def_function_ui_description(func, "Reset VR navigation deltas");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
@@ -1893,6 +1984,23 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Controller Pose 1 Rotation",
                            "Last known rotation of the second controller pose in world space");
+
+  prop = RNA_def_property(srna, "navigation_location", PROP_FLOAT, PROP_TRANSLATION);
+  RNA_def_property_array(prop, 3);
+  RNA_def_property_float_funcs(
+      prop, "rna_XrSessionState_nav_location_get", "rna_XrSessionState_nav_location_set", NULL);
+  RNA_def_property_ui_text(prop, "Navigation Location", "VR navigation location in world space");
+
+  prop = RNA_def_property(srna, "navigation_rotation", PROP_FLOAT, PROP_QUATERNION);
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_float_funcs(
+      prop, "rna_XrSessionState_nav_rotation_get", "rna_XrSessionState_nav_rotation_set", NULL);
+  RNA_def_property_ui_text(prop, "Navigation Rotation", "VR navigation rotation in world space");
+
+  prop = RNA_def_property(srna, "navigation_scale", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_funcs(
+      prop, "rna_XrSessionState_nav_scale_get", "rna_XrSessionState_nav_scale_set", NULL);
+  RNA_def_property_ui_text(prop, "Navigation Scale", "VR navigation scale in world space");
 }
 
 /** \} */

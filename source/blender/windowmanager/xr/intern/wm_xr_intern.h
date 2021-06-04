@@ -54,6 +54,9 @@ typedef struct wmXrSessionState {
   /** Last known eye data. */
   wmXrEyeData eyes[2];
 
+  /** Last known controller data. */
+  wmXrControllerData controllers[2];
+
   /** Copy of XrSessionSettings.base_pose_ data to detect changes that need
    * resetting to base pose. */
   char prev_base_pose_type; /* eXRSessionBasePoseType */
@@ -62,6 +65,8 @@ typedef struct wmXrSessionState {
   int prev_settings_flag;
   /** Copy of wmXrDrawData.base_pose. */
   GHOST_XrPose prev_base_pose;
+  /** Copy of wmXrDrawData.base_scale. */
+  float prev_base_scale;
   /** Copy of GHOST_XrDrawViewInfo.local_pose. */
   GHOST_XrPose prev_local_pose;
   /** Copy of wmXrDrawData.eye_position_ofs. */
@@ -70,8 +75,9 @@ typedef struct wmXrSessionState {
   bool force_reset_to_base_pose;
   bool is_view_data_set;
 
-  /** Last known controller data. */
-  wmXrControllerData controllers[2];
+  /** Navigation transforms. */
+  GHOST_XrPose nav_pose;
+  float nav_scale;
 
   /** The currently active action set that will be updated on calls to
    * wm_xr_session_actions_update(). If NULL, all action sets will be treated as active and
@@ -124,6 +130,8 @@ typedef struct wmXrDrawData {
    * space). With positional tracking enabled, it should be the same as the base pose, when
    * disabled it also contains a location delta from the moment the option was toggled. */
   GHOST_XrPose base_pose;
+  /** Base scale (uniform, world space). */
+  float base_scale;
   /** Offset to _substract_ from the OpenXR eye and viewer pose to get the wanted effective pose
    * (e.g. a pose exactly at the landmark position). */
   float eye_position_ofs[3]; /* Local/view space. */
@@ -196,6 +204,7 @@ void wm_xr_session_object_autokey(struct bContext *C,
                                   bool notify);
 
 void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4]);
+void wm_xr_pose_scale_to_viewmat(const GHOST_XrPose *pose, float scale, float r_viewmat[4][4]);
 void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);
 void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata);
 void wm_xr_draw_controllers(const struct bContext *C, struct ARegion *region, void *customdata);
