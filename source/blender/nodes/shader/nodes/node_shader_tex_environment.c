@@ -64,7 +64,9 @@ static int node_shader_gpu_tex_environment(GPUMaterial *mat,
 
   GPUNodeLink *outalpha;
 
-  if (!ima) {
+  /* HACK(fclem): For lookdev mode: do not compile an empty environment and just create an empty
+   * texture entry point. We manually bind to it after DRW_shgroup_add_material_resources(). */
+  if (!ima && !GPU_material_flag_get(mat, GPU_MATFLAG_LOOKDEV_HACK)) {
     return GPU_stack_link(mat, node, "node_tex_environment_empty", in, out);
   }
 
@@ -112,7 +114,7 @@ static int node_shader_gpu_tex_environment(GPUMaterial *mat,
   /* Sample texture with correct interpolation. */
   GPU_link(mat, gpu_fn, in[0].link, GPU_image(mat, ima, iuser, sampler), &out[0].link, &outalpha);
 
-  if (out[0].hasoutput) {
+  if (out[0].hasoutput && ima) {
     if (ELEM(ima->alpha_mode, IMA_ALPHA_IGNORE, IMA_ALPHA_CHANNEL_PACKED) ||
         IMB_colormanagement_space_name_is_data(ima->colorspace_settings.name)) {
       /* Don't let alpha affect color output in these cases. */

@@ -35,7 +35,7 @@ namespace blender::eevee {
  *
  * \{ */
 
-void BackgroundPass::sync(GPUMaterial *gpumat)
+void BackgroundPass::sync(GPUMaterial *gpumat, GPUTexture *lookdev_tx)
 {
   DRWState state = DRW_STATE_WRITE_COLOR;
   background_ps_ = DRW_pass_create("Background", state);
@@ -46,6 +46,10 @@ void BackgroundPass::sync(GPUMaterial *gpumat)
   copy_v3_v3(camera_mat[3], inst_.camera.data_get().viewinv[3]);
 
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, background_ps_);
+  if (lookdev_tx != nullptr) {
+    /* HACK(fclem) This particular texture has been left without resource to be set here. */
+    DRW_shgroup_uniform_texture(grp, "samp0", lookdev_tx);
+  }
   DRW_shgroup_call_obmat(grp, DRW_cache_fullscreen_quad_get(), camera_mat);
 }
 

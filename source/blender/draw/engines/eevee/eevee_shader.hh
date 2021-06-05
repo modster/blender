@@ -86,6 +86,8 @@ enum eShaderType {
   LIGHTPROBE_FILTER_DIFFUSE,
   LIGHTPROBE_FILTER_VISIBILITY,
 
+  LOOKDEV_BACKGROUND,
+
   MOTION_BLUR_GATHER,
   MOTION_BLUR_TILE_DILATE,
   MOTION_BLUR_TILE_FLATTEN,
@@ -129,6 +131,12 @@ class ShaderModule {
   GPUMaterial *world_shader_get(::World *blender_world,
                                 struct bNodeTree *nodetree,
                                 eMaterialDomain domain_type);
+  GPUMaterial *material_shader_get(const char *name,
+                                   ListBase &materials,
+                                   struct bNodeTree *nodetree,
+                                   eMaterialGeometry geometry_type,
+                                   eMaterialDomain domain_type,
+                                   bool is_lookdev);
 
   GPUShaderSource material_shader_code_generate(GPUMaterial *mat, const GPUCodegenOutput *codegen);
 

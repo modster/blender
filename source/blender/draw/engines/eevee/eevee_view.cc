@@ -130,7 +130,9 @@ void ShadingView::render(void)
   GPU_framebuffer_bind(view_fb_);
   GPU_framebuffer_clear_color_depth(view_fb_, color, 1.0f);
 
-  inst_.shading_passes.background.render();
+  if (inst_.lookdev.render_background() == false) {
+    inst_.shading_passes.background.render();
+  }
 
   inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
 

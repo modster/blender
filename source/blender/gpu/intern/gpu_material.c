@@ -327,6 +327,7 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
                                         const char *name,
                                         const uint64_t shader_uuid,
                                         const bool is_volume_shader,
+                                        const bool is_lookdev,
                                         GPUCodegenCallbackFn callback,
                                         void *thunk)
 {
@@ -351,6 +352,9 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
 #else
   UNUSED_VARS(name);
 #endif
+  if (is_lookdev) {
+    mat->flag = GPU_MATFLAG_LOOKDEV_HACK;
+  }
 
   /* Localize tree to create links for reroute and mute. */
   bNodeTree *localtree = ntreeLocalize(ntree);

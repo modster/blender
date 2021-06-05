@@ -100,6 +100,9 @@ typedef enum eGPUMaterialFlag {
 
   /* Tells the render engine the material was just compiled or updated. */
   GPU_MATFLAG_UPDATED = (1 << 11),
+
+  /* HACK(fclem) Tells the environment texture node to not bail out if empty. */
+  GPU_MATFLAG_LOOKDEV_HACK = (1 << 11),
 } eGPUMaterialFlag;
 
 typedef struct GPUNodeStack {
@@ -188,14 +191,6 @@ void GPU_material_add_closure_eval(GPUMaterial *material,
                                    const GPUNodeLink *weight_link,
                                    const GPUNodeLink *eval_link);
 
-void GPU_material_sss_profile_create(GPUMaterial *material,
-                                     float radii[3],
-                                     const short *falloff_type,
-                                     const float *sharpness);
-struct GPUUniformBuf *GPU_material_sss_profile_get(GPUMaterial *material,
-                                                   int sample_len,
-                                                   struct GPUTexture **tex_profile);
-
 /* High level functions to create and use GPU materials */
 GPUMaterial *GPU_material_from_nodetree(struct Scene *scene,
                                         struct Material *ma,
@@ -204,6 +199,7 @@ GPUMaterial *GPU_material_from_nodetree(struct Scene *scene,
                                         const char *name,
                                         const uint64_t shader_uuid,
                                         const bool is_volume_shader,
+                                        const bool is_lookdev,
                                         GPUCodegenCallbackFn callback,
                                         void *thunk);
 

@@ -93,6 +93,7 @@ set(SRC
   engines/eevee/eevee_light.cc
   engines/eevee/eevee_lightcache.cc
   engines/eevee/eevee_lightprobe.cc
+  engines/eevee/eevee_lookdev.cc
   engines/eevee/eevee_lut.c
   engines/eevee/eevee_material.cc
   engines/eevee/eevee_mesh.cc
@@ -252,6 +253,7 @@ data_to_c_simple(engines/eevee/shaders/eevee_lightprobe_filter_glossy_frag.glsl 
 data_to_c_simple(engines/eevee/shaders/eevee_lightprobe_filter_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_lightprobe_filter_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_lightprobe_filter_visibility_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_lookdev_background_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_ltc_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_gather_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_lib.glsl SRC)

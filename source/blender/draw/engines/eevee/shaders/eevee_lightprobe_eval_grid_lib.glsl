@@ -20,6 +20,10 @@ vec3 lightprobe_grid_evaluate(
   ivec3 lP_floored = ivec3(floor(lP));
   vec3 trilinear_weight = fract(lP);
 
+  if (grid.offset == 0) {
+    N = transform_direction(info.lookdev_rotation, N);
+  }
+
   float weight_accum = 0.0;
   vec3 irradiance_accum = vec3(0.0);
   /* For each neighbor cells */

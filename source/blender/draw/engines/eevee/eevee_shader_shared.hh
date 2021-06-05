@@ -499,6 +499,7 @@ BLI_STATIC_ASSERT_ALIGN(LightProbeFilterData, 16)
  * Common data to all irradiance grid.
  */
 struct GridInfoData {
+  mat4 lookdev_rotation;
   /** Total of visibility cells per row and layer. */
   int visibility_cells_per_row;
   int visibility_cells_per_layer;
@@ -562,6 +563,7 @@ static inline ivec3 grid_cell_index_to_coordinate(int cell_id, ivec3 resolution)
  * Common data to all cubemaps.
  */
 struct CubemapInfoData {
+  mat4 lookdev_rotation;
   /** LOD containing data for roughness of 1. */
   float roughness_max_lod;
   /** Total number of active cubemaps including world. */

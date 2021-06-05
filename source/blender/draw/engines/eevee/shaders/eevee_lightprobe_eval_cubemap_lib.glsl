@@ -51,6 +51,9 @@ vec3 lightprobe_cubemap_evaluate(CubemapInfoData info,
     float fac = saturate(original_roughness * 2.0 - 1.0);
     R = mix(intersection, R, fac * fac);
   }
+  else {
+    R = transform_direction(info.lookdev_rotation, R);
+  }
   float lod = linear_roughness * info.roughness_max_lod;
   return cubemap_array_sample(cubemap_tx, vec4(R, cube._layer), lod).rgb;
 }

@@ -53,7 +53,7 @@ class BackgroundPass {
  public:
   BackgroundPass(Instance &inst) : inst_(inst){};
 
-  void sync(GPUMaterial *gpumat);
+  void sync(GPUMaterial *gpumat, GPUTexture *loodev_tx = nullptr);
   void render(void);
 };
 

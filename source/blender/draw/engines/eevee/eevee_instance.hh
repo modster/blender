@@ -32,6 +32,7 @@
 #include "eevee_id_map.hh"
 #include "eevee_light.hh"
 #include "eevee_lightprobe.hh"
+#include "eevee_lookdev.hh"
 #include "eevee_material.hh"
 #include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
@@ -72,7 +73,7 @@ class Instance {
   SyncModule sync;
   MaterialModule materials;
   /** Lookdev own lightweight instance. May not be allocated. */
-  // Lookdev *lookdev = nullptr;
+  LookDev lookdev;
 
   /** Input data. */
   Depsgraph *depsgraph;
@@ -109,7 +110,8 @@ class Instance {
         lightprobes(*this),
         shadows(*this),
         sync(*this),
-        materials(*this){};
+        materials(*this),
+        lookdev(*this){};
   ~Instance(){};
 
   void init(const ivec2 &output_res,
@@ -137,6 +139,24 @@ class Instance {
   bool is_viewport(void)
   {
     return !DRW_state_is_scene_render();
+  }
+
+  bool use_scene_light(void) const
+  {
+    return (!v3d) ||
+           ((v3d->shading.type == OB_MATERIAL) &&
+            (v3d->shading.flag & V3D_SHADING_SCENE_LIGHTS)) ||
+           ((v3d->shading.type == OB_RENDER) &&
+            (v3d->shading.flag & V3D_SHADING_SCENE_LIGHTS_RENDER));
+  }
+
+  /* Do we light the scene using the HDRI setup in the viewport settings. */
+  bool use_studio_light(void) const
+  {
+    return (v3d) && (((v3d->shading.type == OB_MATERIAL) &&
+                      ((v3d->shading.flag & V3D_SHADING_SCENE_WORLD) == 0)) ||
+                     ((v3d->shading.type == OB_RENDER) &&
+                      ((v3d->shading.flag & V3D_SHADING_SCENE_WORLD_RENDER) == 0)));
   }
 
  private:

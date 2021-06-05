@@ -56,7 +56,7 @@ DefaultWorldNodeTree::~DefaultWorldNodeTree()
   MEM_SAFE_FREE(ntree_);
 }
 
-/* Configure a default nodetree with the given material.  */
+/* Configure a default nodetree with the given world.  */
 bNodeTree *DefaultWorldNodeTree::nodetree_get(::World *wo)
 {
   /* WARNING: This function is not threadsafe. Which is not a problem for the moment. */
@@ -73,6 +73,10 @@ bNodeTree *DefaultWorldNodeTree::nodetree_get(::World *wo)
 
 void World::sync()
 {
+  if (inst_.lookdev.sync_world()) {
+    return;
+  }
+
   ::World *bl_world = inst_.scene->world;
 
   if (bl_world == nullptr) {

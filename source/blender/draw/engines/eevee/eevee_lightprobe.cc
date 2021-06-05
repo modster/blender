@@ -35,8 +35,7 @@ void LightProbeModule::init()
 
   lightcache_ = static_cast<LightCache *>(sce_eevee.light_cache_data);
 
-  /* TODO */
-  bool use_lookdev = false;
+  bool use_lookdev = inst_.use_studio_light();
   if (!use_lookdev && lightcache_ && lightcache_->load()) {
     OBJECT_GUARDED_SAFE_DELETE(lightcache_lookdev_, LightCache);
   }
@@ -559,6 +558,8 @@ void LightProbeModule::set_view(const DRWView *view, const ivec2 UNUSED(extent))
   }
 
   info_data_.cubes.roughness_max_lod = lightcache_->mips_len;
+  inst_.lookdev.rotation_get(info_data_.cubes.lookdev_rotation);
+  inst_.lookdev.rotation_get(info_data_.grids.lookdev_rotation);
 
   active_grid_tx_ = lightcache_->grid_tx.tex;
   active_cube_tx_ = lightcache_->cube_tx.tex;

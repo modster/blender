@@ -90,6 +90,7 @@ extern char datatoc_eevee_lightprobe_filter_glossy_frag_glsl[];
 extern char datatoc_eevee_lightprobe_filter_lib_glsl[];
 extern char datatoc_eevee_lightprobe_filter_vert_glsl[];
 extern char datatoc_eevee_lightprobe_filter_visibility_frag_glsl[];
+extern char datatoc_eevee_lookdev_background_frag_glsl[];
 extern char datatoc_eevee_ltc_lib_glsl[];
 extern char datatoc_eevee_motion_blur_gather_frag_glsl[];
 extern char datatoc_eevee_motion_blur_lib_glsl[];
@@ -315,6 +316,7 @@ ShaderModule::ShaderModule()
          eevee_lightprobe_filter_visibility_frag,
          nullptr);
 
+  SHADER_FULLSCREEN(LOOKDEV_BACKGROUND, eevee_lookdev_background_frag);
   SHADER_FULLSCREEN(MOTION_BLUR_GATHER, eevee_motion_blur_gather_frag);
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_DILATE, eevee_motion_blur_tiles_dilate_frag);
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_FLATTEN, eevee_motion_blur_tiles_flatten_frag);
@@ -719,6 +721,36 @@ GPUMaterial *ShaderModule::world_shader_get(::World *blender_world,
                                deferred_compilation,
                                codegen_callback,
                                this);
+}
+
+/* Variation to compile a material only with a nodetree. Caller needs to maintain the list of
+ * materials and call GPU_material_free on it to update the material. */
+GPUMaterial *ShaderModule::material_shader_get(const char *name,
+                                               ListBase &materials,
+                                               struct bNodeTree *nodetree,
+                                               eMaterialGeometry geometry_type,
+                                               eMaterialDomain domain_type,
+                                               bool is_lookdev)
+{
+  eMaterialPipeline pipeline_type = MAT_PIPE_DEFERRED; /* Unused. */
+
+  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type, domain_type);
+
+  bool is_volume = (domain_type == MAT_DOMAIN_VOLUME);
+
+  GPUMaterial *gpumat = GPU_material_from_nodetree(nullptr,
+                                                   nullptr,
+                                                   nodetree,
+                                                   &materials,
+                                                   name,
+                                                   shader_uuid,
+                                                   is_volume,
+                                                   is_lookdev,
+                                                   codegen_callback,
+                                                   this);
+  GPU_material_status_set(gpumat, GPU_MAT_QUEUED);
+  GPU_material_compile(gpumat);
+  return gpumat;
 }
 
 /** \} */

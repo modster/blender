@@ -441,6 +441,7 @@ GPUMaterial *DRW_shader_from_world(World *wo,
                                                 wo->id.name,
                                                 shader_id,
                                                 is_volume_shader,
+                                                false,
                                                 callback,
                                                 thunk);
   if (!DRW_state_is_image_render() && deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
@@ -471,6 +472,7 @@ GPUMaterial *DRW_shader_from_material(Material *ma,
                                                 ma->id.name,
                                                 shader_id,
                                                 is_volume_shader,
+                                                false,
                                                 callback,
                                                 thunk);
 

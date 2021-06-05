@@ -76,6 +76,7 @@ void Instance::init(const ivec2 &output_res,
   velocity.init();
   shadows.init();
   lightprobes.init();
+  lookdev.init();
 }
 
 rcti Instance::output_crop(const int res[2], const rcti *crop)
@@ -123,6 +124,7 @@ void Instance::begin_sync()
   shading_passes.sync();
   main_view.sync();
   world.sync();
+  lookdev.sync();
 
   materials.begin_sync();
   velocity.begin_sync();
@@ -279,11 +281,11 @@ void Instance::draw_viewport(DefaultFramebufferList *dfbl)
 {
   this->render_sample();
 
+  lookdev.render_sample();
+
   render_passes.resolve_viewport(dfbl);
 
-  // if (lookdev_) {
-  // lookdev_->resolve_onto(dfbl->default_fb);
-  // }
+  lookdev.resolve_viewport(dfbl->default_fb);
 
   if (!sampling.finished_viewport()) {
     DRW_viewport_request_redraw();
