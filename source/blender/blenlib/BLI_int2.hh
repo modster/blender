@@ -120,6 +120,26 @@ struct int2 {
     return b * a;
   }
 
+  friend float2 operator*(const int2 &a, float b)
+  {
+    return b * float2(a.x, a.y);
+  }
+
+  friend float2 operator/(const int2 &a, float b)
+  {
+    return float2(a.x, a.y) / b;
+  }
+
+  friend float2 operator*(float a, const int2 &b)
+  {
+    return a * float2(b.x, b.y);
+  }
+
+  friend float2 operator/(float a, const int2 &b)
+  {
+    return a / float2(b.x, b.y);
+  }
+
   friend std::ostream &operator<<(std::ostream &stream, const int2 &v)
   {
     stream << "(" << v.x << ", " << v.y << ")";
