@@ -78,10 +78,17 @@ void ForwardPass::sync()
 DRWShadingGroup *ForwardPass::material_add(GPUMaterial *gpumat)
 {
   LightModule &lights = inst_.lights;
+  LightProbeModule &lightprobes = inst_.lightprobes;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, opaque_ps_);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
+  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
+  DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
+  DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+  DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
+  DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
   DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());

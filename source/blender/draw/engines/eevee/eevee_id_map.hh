@@ -227,10 +227,10 @@ struct MaterialKey {
   Material *mat;
   uint64_t options;
 
-  MaterialKey(Material *mat_, eMaterialGeometry geometry) : mat(mat_)
+  MaterialKey(::Material *mat_, eMaterialGeometry geometry) : mat(mat_)
   {
-    /* TODO derive from mat. */
-    eMaterialPipeline pipeline = MAT_PIPE_DEFERRED;
+    eMaterialPipeline pipeline = (mat_->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
+                                                                       MAT_PIPE_DEFERRED;
     /* Domain is not chosen for a material key. Use surface just to create a uuid. */
     eMaterialDomain domain = MAT_DOMAIN_SURFACE;
     options = shader_uuid_from_material_type(pipeline, geometry, domain);
@@ -265,13 +265,12 @@ struct ShaderKey {
   uint64_t options;
 
   ShaderKey(GPUMaterial *gpumat,
-            Material *mat_,
+            ::Material *mat_,
             eMaterialGeometry geometry,
             eMaterialDomain domain)
   {
-    /* TODO derive from mat. */
-    (void)mat_;
-    eMaterialPipeline pipeline = MAT_PIPE_DEFERRED;
+    eMaterialPipeline pipeline = (mat_->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
+                                                                       MAT_PIPE_DEFERRED;
     shader = GPU_material_get_shader(gpumat);
     options = shader_uuid_from_material_type(pipeline, geometry, domain);
   }

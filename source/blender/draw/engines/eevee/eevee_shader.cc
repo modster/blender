@@ -532,6 +532,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
     case MAT_GEOM_GPENCIL:
       output += datatoc_eevee_surface_gpencil_vert_glsl;
       break;
+      break;
     case MAT_GEOM_MESH:
     default:
       output += datatoc_eevee_surface_mesh_vert_glsl;
@@ -691,8 +692,8 @@ GPUMaterial *ShaderModule::material_shader_get(::Material *blender_mat,
                                                eMaterialDomain domain_type,
                                                bool deferred_compilation)
 {
-  /* TODO derive from mat. */
-  eMaterialPipeline pipeline_type = MAT_PIPE_DEFERRED;
+  eMaterialPipeline pipeline_type = (blender_mat->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
+                                                                                 MAT_PIPE_DEFERRED;
 
   uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type, domain_type);
 
