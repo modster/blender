@@ -1346,6 +1346,11 @@ static void rna_def_strip_element(BlenderRNA *brna)
   RNA_def_property_int_sdna(prop, NULL, "orig_height");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Orig Height", "Original image height");
+
+  prop = RNA_def_property(srna, "orig_fps", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "orig_fps");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Orig FPS", "Original frames per second");
 }
 
 static void rna_def_strip_crop(BlenderRNA *brna)
@@ -1513,7 +1518,7 @@ static void rna_def_strip_proxy(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "quality", PROP_INT, PROP_UNSIGNED);
   RNA_def_property_int_sdna(prop, NULL, "quality");
-  RNA_def_property_ui_text(prop, "Quality", "JPEG Quality of proxies to build");
+  RNA_def_property_ui_text(prop, "Quality", "Quality of proxies to build");
   RNA_def_property_ui_range(prop, 1, 100, 1, -1);
 
   prop = RNA_def_property(srna, "timecode", PROP_ENUM, PROP_NONE);
@@ -2411,12 +2416,6 @@ static void rna_def_movie(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "MovieSequence", "Sequence");
   RNA_def_struct_ui_text(srna, "Movie Sequence", "Sequence strip to load a video");
   RNA_def_struct_sdna(srna, "Sequence");
-
-  prop = RNA_def_property(srna, "mpeg_preseek", PROP_INT, PROP_NONE);
-  RNA_def_property_int_sdna(prop, NULL, "anim_preseek");
-  RNA_def_property_range(prop, 0, 50);
-  RNA_def_property_ui_text(prop, "MPEG Preseek", "For MPEG movies, preseek this many frames");
-  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, NULL);
 
   prop = RNA_def_property(srna, "stream_index", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "streamindex");
