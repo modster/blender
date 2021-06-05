@@ -253,7 +253,7 @@ static int dot_v3_array_find_max_index(const float dirs[][3],
 }
 
 /**
- * Re-order \a mat so \a axis_align uses it's own axis which is closest to \a v.
+ * Re-order \a mat so \a axis_align uses its own axis which is closest to \a v.
  */
 static bool mat3_align_axis_to_v3(float mat[3][3], const int axis_align, const float v[3])
 {
@@ -1851,44 +1851,6 @@ static void WIDGETGROUP_placement_setup(const bContext *UNUSED(C), wmGizmoGroup 
     gizmo->flag |= WM_GIZMO_HIDDEN_KEYMAP;
   }
 
-  {
-    const wmGizmoType *gzt_plane = WM_gizmotype_find("GIZMO_GT_placement_plane_3d", true);
-    gizmo = WM_gizmo_new_ptr(gzt_plane, gzgroup, NULL);
-
-    WM_gizmo_set_color(gizmo, (float[4]){1.0f, 1.0f, 1.0f, 1.0f});
-
-    /* Don't handle any events, this is for display only. */
-    gizmo->flag |= WM_GIZMO_HIDDEN_KEYMAP;
-  }
-}
-
-static void WIDGETGROUP_placement_draw_prepare(const bContext *UNUSED(C), wmGizmoGroup *gzgroup)
-{
-  /* TODO only set for drag & drop. */
-  if (!gzgroup->ptr) {
-    return;
-  }
-
-  wmGizmo *gizmo_plane = ((wmGizmo *)gzgroup->gizmos.first)->next;
-
-  PropertyRNA *boundbox_prop = RNA_struct_find_property(gzgroup->ptr, "bound_box");
-  if (boundbox_prop && RNA_property_is_set(gzgroup->ptr, boundbox_prop)) {
-    float array[8][3];
-    RNA_property_float_get_array(gzgroup->ptr, boundbox_prop, (float *)array);
-    RNA_float_set_array(gizmo_plane->ptr, "bound_box", (float *)array);
-  }
-
-  PropertyRNA *matrix_basis_prop = RNA_struct_find_property(gzgroup->ptr, "matrix_basis");
-  if (matrix_basis_prop && RNA_property_is_set(gzgroup->ptr, matrix_basis_prop)) {
-    float array[4][4];
-    RNA_property_float_get_array(gzgroup->ptr, matrix_basis_prop, (float *)array);
-    RNA_float_set_array(gizmo_plane->ptr, "matrix_basis", (float *)array);
-  }
-}
-
-static bool WIDGETGROUP_placement_poll(const bContext *C, wmGizmoGroupType *gzgt)
-{
-  return ED_gizmo_poll_from_dropbox(C, gzgt) || ED_gizmo_poll_from_tool(C, gzgt);
 }
 
 void VIEW3D_GGT_placement(wmGizmoGroupType *gzgt)
