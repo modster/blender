@@ -1398,6 +1398,28 @@ static void lineart_main_perspective_division(LineartRenderBuffer *rb)
   }
 }
 
+static void lineart_main_discard_out_of_frame_edges(LineartRenderBuffer *rb)
+{
+  LineartEdge *e;
+  int i;
+
+  float overscan_x = 0.1;
+  float overscan_y = 0.1;
+
+#define LRT_VERT_OUT_OF_BOUND(v) \
+  (v && (v->fbcoord[0] < (-1 - overscan_x) || v->fbcoord[0] > (1 + overscan_x) || \
+         v->fbcoord[1] < (-1 - overscan_y) || v->fbcoord[1] > (1 + overscan_y)))
+
+  LISTBASE_FOREACH (LineartElementLinkNode *, eln, &rb->line_buffer_pointers) {
+    e = (LineartEdge *)eln->pointer;
+    for (i = 0; i < eln->element_count; i++) {
+      if ((LRT_VERT_OUT_OF_BOUND(e[i].v1) && LRT_VERT_OUT_OF_BOUND(e[i].v2))) {
+        e[i].flags = LRT_EDGE_FLAG_CHAIN_PICKED;
+      }
+    }
+  }
+}
+
 /**
  * Transform a single vert to it's viewing position.
  */
@@ -4087,6 +4109,8 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
   /* Do the perspective division after clipping is done. */
   lineart_main_perspective_division(rb);
+
+  lineart_main_discard_out_of_frame_edges(rb);
 
   /* Triangle intersections are done here during sequential adding of them. Only after this,
    * triangles and lines are all linked with acceleration structure, and the 2D occlusion stage
