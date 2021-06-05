@@ -528,16 +528,21 @@ DRWData *DRW_viewport_data_create(void)
 }
 
 /* Reduce ref count of the textures used by a viewport. */
-static void draw_texture_release(void *texture_)
+static void draw_texture_release(DRWData *drw_data)
 {
-  GPUTexture **texture = (GPUTexture **)texture_;
-  if (texture) {
-    GPU_texture_free(*texture);
+  /* Release Image textures. */
+  BLI_memblock_iter iter;
+  GPUTexture **tex;
+  BLI_memblock_iternew(drw_data->images, &iter);
+  while ((tex = BLI_memblock_iterstep(&iter))) {
+    GPU_texture_free(*tex);
   }
 }
 
 static void drw_viewport_data_reset(DRWData *drw_data)
 {
+  draw_texture_release(drw_data);
+
   BLI_memblock_clear(drw_data->commands, NULL);
   BLI_memblock_clear(drw_data->commands_small, NULL);
   BLI_memblock_clear(drw_data->callbuffers, NULL);
@@ -548,16 +553,18 @@ static void drw_viewport_data_reset(DRWData *drw_data)
   BLI_memblock_clear(drw_data->uniforms, NULL);
   BLI_memblock_clear(drw_data->passes, NULL);
   BLI_memblock_clear(drw_data->views, NULL);
-  BLI_memblock_clear(drw_data->images, draw_texture_release);
+  BLI_memblock_clear(drw_data->images, NULL);
   DRW_uniform_attrs_pool_clear_all(drw_data->obattrs_ubo_pool);
-  DRW_instance_data_list_free_unused(DST.vmempool->idatalist);
-  DRW_instance_data_list_resize(DST.vmempool->idatalist);
-  DRW_instance_data_list_reset(DST.vmempool->idatalist);
-  DRW_texture_pool_reset(DST.vmempool->texture_pool);
+  DRW_instance_data_list_free_unused(drw_data->idatalist);
+  DRW_instance_data_list_resize(drw_data->idatalist);
+  DRW_instance_data_list_reset(drw_data->idatalist);
+  DRW_texture_pool_reset(drw_data->texture_pool);
 }
 
 void DRW_viewport_data_free(DRWData *drw_data)
 {
+  draw_texture_release(drw_data);
+
   BLI_memblock_destroy(drw_data->commands, NULL);
   BLI_memblock_destroy(drw_data->commands_small, NULL);
   BLI_memblock_destroy(drw_data->callbuffers, NULL);
@@ -568,7 +575,7 @@ void DRW_viewport_data_free(DRWData *drw_data)
   BLI_memblock_destroy(drw_data->uniforms, NULL);
   BLI_memblock_destroy(drw_data->views, NULL);
   BLI_memblock_destroy(drw_data->passes, NULL);
-  BLI_memblock_destroy(drw_data->images, draw_texture_release);
+  BLI_memblock_destroy(drw_data->images, NULL);
   DRW_uniform_attrs_pool_free(drw_data->obattrs_ubo_pool);
   DRW_instance_data_list_free(drw_data->idatalist);
   DRW_texture_pool_free(drw_data->texture_pool);
