@@ -353,7 +353,7 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
   UNUSED_VARS(name);
 #endif
   if (is_lookdev) {
-    mat->flag = GPU_MATFLAG_LOOKDEV_HACK;
+    mat->flag |= GPU_MATFLAG_LOOKDEV_HACK;
   }
 
   /* Localize tree to create links for reroute and mute. */

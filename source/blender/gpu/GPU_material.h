@@ -102,7 +102,7 @@ typedef enum eGPUMaterialFlag {
   GPU_MATFLAG_UPDATED = (1 << 11),
 
   /* HACK(fclem) Tells the environment texture node to not bail out if empty. */
-  GPU_MATFLAG_LOOKDEV_HACK = (1 << 11),
+  GPU_MATFLAG_LOOKDEV_HACK = (1 << 12),
 } eGPUMaterialFlag;
 
 typedef struct GPUNodeStack {

@@ -1,17 +1,3 @@
-void node_tex_environment_texco(out vec3 worldvec)
-{
-#ifdef MESH_SHADER
-  worldvec = g_data.P;
-#else
-  vec3 V = cameraVec(g_data.P);
-
-#  if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
-  worldvec = V;
-#  else
-  worldvec = mat3(ModelMatrixInverse) * V;
-#  endif
-#endif
-}
 
 void node_tex_environment_equirectangular(vec3 co, out vec3 uv)
 {

@@ -70,11 +70,7 @@ static int node_shader_gpu_tex_environment(GPUMaterial *mat,
     return GPU_stack_link(mat, node, "node_tex_environment_empty", in, out);
   }
 
-  if (!in[0].link) {
-    GPU_link(mat, "node_tex_environment_texco", &in[0].link);
-    node_shader_gpu_bump_tex_coord(mat, node, &in[0].link);
-  }
-
+  node_shader_gpu_default_tex_coord(mat, node, &in[0].link);
   node_shader_gpu_tex_mapping(mat, node, in, out);
 
   /* Compute texture coordinate. */
