@@ -20,15 +20,16 @@
  * \ingroup eevee
  */
 
-#include "NOD_shader.h"
-
 #include "BKE_image.h"
 #include "BKE_lib_id.h"
 #include "BKE_node.h"
 #include "BKE_studiolight.h"
 #include "BKE_world.h"
-
 #include "BLI_math_matrix.h"
+#include "BLI_rect.h"
+#include "DNA_userdef_types.h"
+#include "ED_screen.h"
+#include "NOD_shader.h"
 
 #include "eevee_instance.hh"
 
@@ -85,7 +86,7 @@ bNodeTree *LookDevWorldNodeTree::nodetree_get(float strength)
  * use custom shader to draw the background.
  * \{ */
 
-void LookDev::init(void)
+void LookDev::init(const ivec2 &output_res)
 {
   StudioLight *studiolight = nullptr;
   if (inst_.v3d) {
@@ -126,6 +127,64 @@ void LookDev::init(void)
 
     GPU_material_free(&material);
   }
+
+  if (do_overlay()) {
+    rcti rect;
+    if (DRW_state_is_opengl_render()) {
+      BLI_rcti_init(&rect, 0, output_res.x, 0, output_res.y);
+    }
+    else {
+      const DRWContextState *draw_ctx = DRW_context_state_get();
+      rect = *ED_region_visible_rect(draw_ctx->region);
+    }
+
+    /* Make the viewport width scale the lookdev spheres a bit.
+     * Scale between 1000px and 2000px. */
+    float viewport_scale = clamp_f(BLI_rcti_size_x(&rect) / (2000.0f * U.dpi_fac), 0.5f, 1.0f);
+    int sphere_size = U.lookdev_sphere_size * U.dpi_fac * viewport_scale;
+    ivec2 anchor = ivec2(rect.xmax, rect.ymin);
+
+    if (sphere_size != sphere_size_ || anchor != anchor_) {
+      /* Make sphere resolution adaptive to viewport_scale, dpi and lookdev_sphere_size */
+      float res_scale = (U.lookdev_sphere_size / 400.0f) * viewport_scale * U.dpi_fac;
+      if (res_scale > 0.7f) {
+        sphere_lod_ = DRW_LOD_HIGH;
+      }
+      else if (res_scale > 0.25f) {
+        sphere_lod_ = DRW_LOD_MEDIUM;
+      }
+      else {
+        sphere_lod_ = DRW_LOD_LOW;
+      }
+      sphere_size_ = sphere_size;
+      anchor_ = anchor;
+      inst_.sampling.reset();
+    }
+  }
+  else if (sphere_size_ != 0) {
+    sphere_size_ = 0;
+    inst_.sampling.reset();
+  }
+}
+
+bool LookDev::do_overlay(void)
+{
+  const View3D *v3d = inst_.v3d;
+  /* Only show the HDRI Preview in Shading Preview in the Viewport. */
+  if (v3d == nullptr || v3d->shading.type != OB_MATERIAL) {
+    return false;
+  }
+  /* Only show the HDRI Preview when viewing the Combined render pass */
+  if (v3d->shading.render_pass != SCE_PASS_COMBINED) {
+    return false;
+  }
+  if (v3d->flag2 & V3D_HIDE_OVERLAYS) {
+    return false;
+  }
+  if ((v3d->overlay.flag & V3D_OVERLAY_LOOK_DEV) == 0) {
+    return false;
+  }
+  return true;
 }
 
 bool LookDev::sync_world(void)
@@ -136,7 +195,7 @@ bool LookDev::sync_world(void)
   /* World light probes render. */
   bNodeTree *nodetree = world_tree.nodetree_get(instensity_);
   GPUMaterial *gpumat = inst_.shaders.material_shader_get(
-      "LookdevShader", material, nodetree, MAT_GEOM_WORLD, MAT_DOMAIN_SURFACE, true);
+      "LookDev", material, nodetree, MAT_GEOM_WORLD, MAT_DOMAIN_SURFACE, true);
 
   BKE_studiolight_ensure_flag(studiolight_, STUDIOLIGHT_EQUIRECT_RADIANCE_GPUTEXTURE);
   GPUTexture *gputex = studiolight_->equirect_radiance_gputexture;
@@ -166,16 +225,16 @@ void LookDev::rotation_get(mat4 r_mat)
   }
 }
 
-void LookDev::sync(void)
+void LookDev::sync_background(void)
 {
   if (studiolight_ == nullptr) {
     return;
   }
   /* Viewport display. */
-  background_lookdev_ = DRW_pass_create("LookDev Background", DRW_STATE_WRITE_COLOR);
+  background_ps_ = DRW_pass_create("LookDev.Background", DRW_STATE_WRITE_COLOR);
 
   GPUShader *sh = inst_.shaders.static_shader_get(LOOKDEV_BACKGROUND);
-  DRWShadingGroup *grp = DRW_shgroup_create(sh, background_lookdev_);
+  DRWShadingGroup *grp = DRW_shgroup_create(sh, background_ps_);
   DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", inst_.lightprobes.cube_tx_ref_get());
   DRW_shgroup_uniform_block(grp, "lightprobes_info_block", inst_.lightprobes.info_ubo_get());
   DRW_shgroup_uniform_float_copy(grp, "blur", clamp_f(blur_, 0.0f, 0.99999f));
@@ -189,7 +248,7 @@ bool LookDev::render_background(void)
   if (studiolight_ == nullptr) {
     return false;
   }
-  DRW_draw_pass(background_lookdev_);
+  DRW_draw_pass(background_ps_);
   return true;
 }
 
@@ -202,32 +261,93 @@ bool LookDev::render_background(void)
  * The final texture is composited onto the render.
  * \{ */
 
-/* Renders the reference spheres. This is similar to the main render_sample() of the instance. */
-void LookDev::render_sample(void)
+void LookDev::sync_overlay(void)
 {
-  const View3D *v3d = inst_.v3d;
-  /* Only show the HDRI Preview in Shading Preview in the Viewport. */
-  if (v3d == NULL || v3d->shading.type != OB_MATERIAL) {
-    return;
-  }
-  /* Only show the HDRI Preview when viewing the Combined render pass */
-  if (v3d->shading.render_pass != SCE_PASS_COMBINED) {
-    return;
-  }
-  if (v3d->flag2 & V3D_HIDE_OVERLAYS) {
-    return;
-  }
-  if ((v3d->overlay.flag & V3D_OVERLAY_LOOK_DEV) == 0) {
+  if (sphere_size_ == 0) {
     return;
   }
 
-  /* TODO(fclem) Do full rendering of the 2 spheres on a special film and composite
-   * on top of main film. */
+  DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_ALWAYS |
+                   DRW_STATE_CULL_BACK;
+  overlay_ps_ = DRW_pass_create("LookDev.Overlay", state);
+
+  GPUBatch *sphere = DRW_cache_sphere_get(sphere_lod_);
+
+  const CameraData &cam = inst_.camera.data_get();
+  LightModule &lights = inst_.lights;
+  LightProbeModule &lightprobes = inst_.lightprobes;
+
+  /* Matrix used to position the spheres in viewport space. */
+  mat4 sphere_mat;
+  copy_m4_m4(sphere_mat, cam.viewmat);
+
+  const float *viewport_size = DRW_viewport_size_get();
+  const int sphere_margin = sphere_size_ / 6;
+  vec2 offset = vec2(0, sphere_margin);
+
+  std::array<::Material *, 2> materials = {inst_.materials.diffuse_mat_,
+                                           inst_.materials.glossy_mat_};
+  for (::Material *mat : materials) {
+    GPUMaterial *gpumat = inst_.shaders.material_shader_get(
+        mat, mat->nodetree, MAT_GEOM_LOOKDEV, MAT_DOMAIN_SURFACE, false);
+    DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, overlay_ps_);
+    DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
+    DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+    DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
+    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
+    DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
+    DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+    DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
+    DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
+    DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
+    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
+
+    offset.x -= sphere_size_ + sphere_margin;
+
+    /* Pass 2D scale and bias factor in the last column. */
+    vec2 scale = sphere_size_ / vec2(viewport_size);
+    vec2 bias = -1.0f + scale + 2.0f * (anchor_ + offset) / vec2(viewport_size);
+    copy_v4_fl4(sphere_mat[3], UNPACK2(scale), UNPACK2(bias));
+    DRW_shgroup_call_obmat(grp, sphere, sphere_mat);
+
+    offset.x -= sphere_margin;
+  }
+
+  view_ = nullptr;
 }
 
-void LookDev::resolve_viewport(GPUFrameBuffer *UNUSED(default_fb))
+/* Renders the reference spheres. */
+void LookDev::render_overlay(GPUFrameBuffer *fb)
 {
-  /* TODO(fclem). */
+  if (sphere_size_ == 0) {
+    return;
+  }
+
+  const DRWView *active_view = DRW_view_get_active();
+
+  inst_.lightprobes.set_view(active_view, ivec2(0));
+  inst_.lights.set_view(active_view, ivec2(0));
+  inst_.lights.bind_batch(0);
+
+  /* Create subview for correct shading. Sub because we don not care about culling. */
+  const CameraData &cam = inst_.camera.data_get();
+  mat4 winmat;
+  orthographic_m4(winmat, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+  if (view_) {
+    DRW_view_update_sub(view_, cam.viewmat, winmat);
+  }
+  else {
+    view_ = DRW_view_create_sub(active_view, cam.viewmat, winmat);
+  }
+
+  DRW_view_set_active(view_);
+
+  GPU_framebuffer_bind(fb);
+  DRW_draw_pass(overlay_ps_);
+
+  DRW_view_set_active(active_view);
 }
 
 /** \} */

@@ -186,6 +186,7 @@ enum eMaterialGeometry {
   MAT_GEOM_GPENCIL = 2,
   MAT_GEOM_VOLUME = 3,
   MAT_GEOM_WORLD = 4,
+  MAT_GEOM_LOOKDEV = 5,
 };
 
 static inline void material_type_from_shader_uuid(uint64_t shader_uuid,

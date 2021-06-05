@@ -92,6 +92,8 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
     diffuse_mat_ = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default diffuse");
     diffuse_mat_->nodetree = ntree;
     diffuse_mat_->use_nodes = true;
+    /* To use the forward pipeline. */
+    diffuse_mat_->blend_method = MA_BM_BLEND;
 
     bNode *bsdf = nodeAddStaticNode(NULL, ntree, SH_NODE_BSDF_DIFFUSE);
     bNodeSocket *base_color = nodeFindSocket(bsdf, SOCK_IN, "Color");
@@ -113,6 +115,8 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
     glossy_mat_ = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default metal");
     glossy_mat_->nodetree = ntree;
     glossy_mat_->use_nodes = true;
+    /* To use the forward pipeline. */
+    glossy_mat_->blend_method = MA_BM_BLEND;
 
     bNode *bsdf = nodeAddStaticNode(NULL, ntree, SH_NODE_BSDF_GLOSSY);
     bNodeSocket *base_color = nodeFindSocket(bsdf, SOCK_IN, "Color");

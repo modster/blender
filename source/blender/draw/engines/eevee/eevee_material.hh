@@ -81,6 +81,10 @@ struct MaterialArray {
 };
 
 class MaterialModule {
+ public:
+  ::Material *diffuse_mat_;
+  ::Material *glossy_mat_;
+
  private:
   Instance &inst_;
 
@@ -91,8 +95,6 @@ class MaterialModule {
 
   DefaultSurfaceNodeTree default_surface_ntree_;
 
-  ::Material *diffuse_mat_;
-  ::Material *glossy_mat_;
   ::Material *error_mat_;
 
   int64_t queued_shaders_count_ = 0;

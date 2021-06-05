@@ -66,13 +66,24 @@ class LookDev {
   StudioLight *studiolight_ = nullptr;
   int studiolight_index_ = -1;
   /** Draw pass to draw the viewport background. */
-  DRWPass *background_lookdev_ = nullptr;
+  DRWPass *background_ps_ = nullptr;
   /** Parameters. */
   float instensity_ = -1.0f;
   float blur_ = -1.0f;
   float opacity_ = -1.0f;
   float rotation_ = -9999.0f;
   bool view_rotation_ = false;
+
+  /** Overlay (reference spheres). */
+  DRWPass *overlay_ps_ = nullptr;
+  /** View based on main view with orthographic projection. Without this, shading is incorrect. */
+  DRWView *view_ = nullptr;
+  /** Selected LOD of the sphere mesh. */
+  eDRWLevelOfDetail sphere_lod_;
+  /** Screen space radius in pixels. */
+  int sphere_size_ = 0;
+  /** Lower right corner of the area where we can start drawing. */
+  ivec2 anchor_;
 
  public:
   LookDev(Instance &inst) : inst_(inst){};
@@ -81,16 +92,19 @@ class LookDev {
     GPU_material_free(&material);
   };
 
-  void init(void);
+  void init(const ivec2 &output_res);
 
+  void sync_background(void);
   bool sync_world(void);
-  void sync(void);
+  void sync_overlay(void);
 
   bool render_background(void);
-  void render_sample(void);
-  void resolve_viewport(GPUFrameBuffer *default_fb);
+  void render_overlay(GPUFrameBuffer *view_fb);
 
   void rotation_get(mat4 r_mat);
+
+ private:
+  bool do_overlay(void);
 };
 
 /** \} */

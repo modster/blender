@@ -103,9 +103,10 @@ extern char datatoc_eevee_surface_background_frag_glsl[];
 extern char datatoc_eevee_surface_deferred_frag_glsl[];
 extern char datatoc_eevee_surface_depth_simple_frag_glsl[];
 extern char datatoc_eevee_surface_forward_frag_glsl[];
-extern char datatoc_eevee_surface_lib_glsl[];
-extern char datatoc_eevee_surface_mesh_vert_glsl[];
 extern char datatoc_eevee_surface_gpencil_vert_glsl[];
+extern char datatoc_eevee_surface_lib_glsl[];
+extern char datatoc_eevee_surface_lookdev_vert_glsl[];
+extern char datatoc_eevee_surface_mesh_vert_glsl[];
 extern char datatoc_eevee_surface_velocity_frag_glsl[];
 extern char datatoc_eevee_surface_velocity_lib_glsl[];
 extern char datatoc_eevee_surface_velocity_mesh_vert_glsl[];
@@ -477,6 +478,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
           break;
         case MAT_GEOM_WORLD:
         case MAT_GEOM_VOLUME:
+        case MAT_GEOM_LOOKDEV:
           /* Not supported. */
           break;
       }
@@ -532,6 +534,8 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
     case MAT_GEOM_GPENCIL:
       output += datatoc_eevee_surface_gpencil_vert_glsl;
       break;
+    case MAT_GEOM_LOOKDEV:
+      output += datatoc_eevee_surface_lookdev_vert_glsl;
       break;
     case MAT_GEOM_MESH:
     default:
