@@ -1311,6 +1311,9 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
   bGPdata *gpd = (ob && (ob->type == OB_GPENCIL)) ? ob->data : NULL;
 
   const int type = RNA_enum_get(op->ptr, "type");
+  const bool use_in_front = RNA_boolean_get(op->ptr, "use_in_front");
+  const bool use_lights = RNA_boolean_get(op->ptr, "use_lights");
+  const int stroke_depth_order = RNA_enum_get(op->ptr, "stroke_depth_order");
 
   ushort local_view_bits;
   float loc[3], rot[3];
@@ -1430,8 +1433,23 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
         id_us_plus(&md->target_material->id);
       }
 
+      if (use_lights) {
+        ob->dtx |= OB_USE_GPENCIL_LIGHTS;
+      }
+      else {
+        ob->dtx &= ~OB_USE_GPENCIL_LIGHTS;
+      }
+
       /* Stroke object is drawn in front of meshes by default. */
-      ob->dtx |= OB_DRAW_IN_FRONT;
+      if (use_in_front) {
+        ob->dtx |= OB_DRAW_IN_FRONT;
+      }
+      else {
+        if (stroke_depth_order == GP_DRAWMODE_3D) {
+          gpd->draw_mode = GP_DRAWMODE_3D;
+        }
+      }
+
       break;
     }
     default:
@@ -1450,6 +1468,39 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+static void object_add_ui(bContext *UNUSED(C), wmOperator *op)
+{
+  uiLayout *layout = op->layout;
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, op->ptr, "radius", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "align", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "location", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "rotation", 0, NULL, ICON_NONE);
+  uiItemR(layout, op->ptr, "type", 0, NULL, ICON_NONE);
+
+  int type = RNA_enum_get(op->ptr, "type");
+  if (type == GP_LRT_COLLECTION || type == GP_LRT_OBJECT || type == GP_LRT_SCENE) {
+    uiItemR(layout, op->ptr, "use_lights", 0, NULL, ICON_NONE);
+    uiItemR(layout, op->ptr, "use_in_front", 0, NULL, ICON_NONE);
+    bool in_front = RNA_boolean_get(op->ptr, "use_in_front");
+    uiLayout *row = uiLayoutRow(layout, false);
+    uiLayoutSetActive(row, !in_front);
+    uiItemR(row, op->ptr, "stroke_depth_order", 0, NULL, ICON_NONE);
+  }
+}
+
+static EnumPropertyItem rna_enum_gpencil_add_stroke_depth_order_items[] = {
+    {GP_DRAWMODE_2D,
+     "2D",
+     0,
+     "2D Layers",
+     "Display strokes using grease pencil layers to define order"},
+    {GP_DRAWMODE_3D, "3D", 0, "3D Location", "Display strokes using real 3D position in 3D space"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 void OBJECT_OT_gpencil_add(wmOperatorType *ot)
 {
   /* identifiers */
@@ -1465,11 +1516,28 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
+  /* ui */
+  ot->ui = object_add_ui;
+
   /* properties */
   ED_object_add_unit_props_radius(ot);
   ED_object_add_generic_props(ot, false);
 
   ot->prop = RNA_def_enum(ot->srna, "type", rna_enum_object_gpencil_type_items, 0, "Type", "");
+  RNA_def_boolean(ot->srna,
+                  "use_in_front",
+                  false,
+                  "In Front",
+                  "Show line art grease pencil in front of everything");
+  RNA_def_boolean(
+      ot->srna, "use_lights", false, "Use Lights", "Use lights for this grease pencil object");
+  RNA_def_enum(
+      ot->srna,
+      "stroke_depth_order",
+      rna_enum_gpencil_add_stroke_depth_order_items,
+      GP_DRAWMODE_3D,
+      "Stroke Depth Order",
+      "Defines how the strokes are ordered in 3D space for objects not displayed 'In Front'");
 }
 
 /** \} */
@@ -2080,8 +2148,7 @@ static void copy_object_set_idnew(bContext *C)
   FOREACH_MAIN_ID_END;
 #endif
 
-  BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-  BKE_main_id_clear_newpoins(bmain);
+  BKE_main_id_newptr_and_tag_clear(bmain);
 }
 
 /** \} */
@@ -2402,7 +2469,7 @@ static void make_object_duplilist_real(bContext *C,
 
   free_object_duplilist(lb_duplis);
 
-  BKE_main_id_clear_newpoins(bmain);
+  BKE_main_id_newptr_and_tag_clear(bmain);
 
   base->object->transflag &= ~OB_DUPLI;
   DEG_id_tag_update(&base->object->id, ID_RECALC_COPY_ON_WRITE);
@@ -2417,7 +2484,7 @@ static int object_duplicates_make_real_exec(bContext *C, wmOperator *op)
   const bool use_base_parent = RNA_boolean_get(op->ptr, "use_base_parent");
   const bool use_hierarchy = RNA_boolean_get(op->ptr, "use_hierarchy");
 
-  BKE_main_id_clear_newpoins(bmain);
+  BKE_main_id_newptr_and_tag_clear(bmain);
 
   CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases) {
     make_object_duplilist_real(C, depsgraph, scene, base, use_base_parent, use_hierarchy);
@@ -2842,6 +2909,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
       me_eval = BKE_mesh_copy_for_eval(me_eval, false);
       /* Full (edge-angle based) draw calculation should ideally be performed. */
       BKE_mesh_edges_set_draw_render(me_eval);
+      BKE_object_material_from_eval_data(bmain, newob, &me_eval->id);
       BKE_mesh_nomain_to_mesh(me_eval, newob->data, newob, &CD_MASK_MESH, true);
       BKE_object_free_modifiers(newob, 0); /* after derivedmesh calls! */
     }
@@ -3301,7 +3369,7 @@ Base *ED_object_add_duplicate(
     DEG_id_tag_update_ex(bmain, (ID *)ob->data, ID_RECALC_EDITORS);
   }
 
-  BKE_main_id_clear_newpoins(bmain);
+  BKE_main_id_newptr_and_tag_clear(bmain);
 
   return basen;
 }
@@ -3317,8 +3385,7 @@ static int duplicate_exec(bContext *C, wmOperator *op)
 
   /* We need to handle that here ourselves, because we may duplicate several objects, in which case
    * we also want to remap pointers between those... */
-  BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-  BKE_main_id_clear_newpoins(bmain);
+  BKE_main_id_newptr_and_tag_clear(bmain);
 
   CTX_DATA_BEGIN (C, Base *, base, selected_bases) {
     Base *basen = object_add_duplicate_internal(

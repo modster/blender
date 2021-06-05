@@ -45,6 +45,8 @@ struct bNodePreview;
 struct bNodeTreeExec;
 struct bNodeType;
 struct uiBlock;
+struct Tex;
+struct Material;
 
 #define NODE_MAXSTR 64
 
@@ -165,6 +167,8 @@ typedef enum eNodeSocketDatatype {
   SOCK_IMAGE = 9,
   SOCK_GEOMETRY = 10,
   SOCK_COLLECTION = 11,
+  SOCK_TEXTURE = 12,
+  SOCK_MATERIAL = 13,
 } eNodeSocketDatatype;
 
 /* socket shape */
@@ -457,7 +461,6 @@ typedef struct bNodeTree {
   short is_updating;
   /** Generic temporary flag for recursion check (DFS/BFS). */
   short done;
-  char _pad2[4];
 
   /** Specific node type this tree is used for. */
   int nodetype DNA_DEPRECATED;
@@ -468,6 +471,8 @@ typedef struct bNodeTree {
   short render_quality;
   /** Tile size for compositor engine. */
   int chunksize;
+  /** Execution mode to use for compositor engine. */
+  int execution_mode;
 
   rctf viewer_border;
 
@@ -541,6 +546,12 @@ typedef enum eNodeTreeUpdate {
   NTREE_UPDATE_GROUP = (NTREE_UPDATE_GROUP_IN | NTREE_UPDATE_GROUP_OUT),
 } eNodeTreeUpdate;
 
+/* tree->execution_mode */
+typedef enum eNodeTreeExecutionMode {
+  NTREE_EXECUTION_MODE_TILED = 0,
+  NTREE_EXECUTION_MODE_FULL_FRAME = 1,
+} eNodeTreeExecutionMode;
+
 /* socket value structs for input buttons
  * DEPRECATED now using ID properties
  */
@@ -592,6 +603,14 @@ typedef struct bNodeSocketValueImage {
 typedef struct bNodeSocketValueCollection {
   struct Collection *value;
 } bNodeSocketValueCollection;
+
+typedef struct bNodeSocketValueTexture {
+  struct Tex *value;
+} bNodeSocketValueTexture;
+
+typedef struct bNodeSocketValueMaterial {
+  struct Material *value;
+} bNodeSocketValueMaterial;
 
 /* data structs, for node->storage */
 enum {
@@ -1184,6 +1203,19 @@ typedef struct NodeAttributeVectorMath {
   uint8_t input_type_c;
 } NodeAttributeVectorMath;
 
+typedef struct NodeAttributeVectorRotate {
+  /* GeometryNodeAttributeVectorRotateMode */
+  uint8_t mode;
+
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_vector;
+  uint8_t input_type_center;
+  uint8_t input_type_axis;
+  uint8_t input_type_angle;
+  uint8_t input_type_rotation;
+  char _pad[2];
+} NodeAttributeVectorRotate;
+
 typedef struct NodeAttributeColorRamp {
   ColorBand color_ramp;
 } NodeAttributeColorRamp;
@@ -1601,6 +1633,7 @@ typedef enum NodeVectorMathOperation {
   NODE_VECTOR_MATH_TANGENT = 23,
   NODE_VECTOR_MATH_REFRACT = 24,
   NODE_VECTOR_MATH_FACEFORWARD = 25,
+  NODE_VECTOR_MATH_MULTIPLY_ADD = 26,
 } NodeVectorMathOperation;
 
 /* Boolean math node operations. */
@@ -1774,6 +1807,14 @@ typedef enum GeometryNodeRotatePointsType {
   GEO_NODE_POINT_ROTATE_TYPE_EULER = 0,
   GEO_NODE_POINT_ROTATE_TYPE_AXIS_ANGLE = 1,
 } GeometryNodeRotatePointsType;
+
+typedef enum GeometryNodeAttributeVectorRotateMode {
+  GEO_NODE_VECTOR_ROTATE_TYPE_AXIS = 0,
+  GEO_NODE_VECTOR_ROTATE_TYPE_AXIS_X = 1,
+  GEO_NODE_VECTOR_ROTATE_TYPE_AXIS_Y = 2,
+  GEO_NODE_VECTOR_ROTATE_TYPE_AXIS_Z = 3,
+  GEO_NODE_VECTOR_ROTATE_TYPE_EULER_XYZ = 4,
+} GeometryNodeAttributeVectorRotateMode;
 
 typedef enum GeometryNodeAttributeRandomizeMode {
   GEO_NODE_ATTRIBUTE_RANDOMIZE_REPLACE_CREATE = 0,

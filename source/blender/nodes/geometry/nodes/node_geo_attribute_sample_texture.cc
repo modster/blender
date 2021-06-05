@@ -30,6 +30,7 @@
 
 static bNodeSocketTemplate geo_node_attribute_sample_texture_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_TEXTURE, N_("Texture")},
     {SOCK_STRING, N_("Mapping")},
     {SOCK_STRING, N_("Result")},
     {-1, ""},
@@ -39,13 +40,6 @@ static bNodeSocketTemplate geo_node_attribute_sample_texture_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };
-
-static void geo_node_attribute_sample_texture_layout(uiLayout *layout,
-                                                     bContext *C,
-                                                     PointerRNA *ptr)
-{
-  uiTemplateID(layout, C, ptr, "texture", "texture.new", nullptr, nullptr, 0, ICON_NONE, nullptr);
-}
 
 namespace blender::nodes {
 
@@ -71,8 +65,7 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
 
 static void execute_on_component(GeometryComponent &component, const GeoNodeExecParams &params)
 {
-  const bNode &node = params.node();
-  Tex *texture = reinterpret_cast<Tex *>(node.id);
+  Tex *texture = params.get_input<Tex *>("Texture");
   if (texture == nullptr) {
     return;
   }
@@ -86,8 +79,9 @@ static void execute_on_component(GeometryComponent &component, const GeoNodeExec
   const AttributeDomain result_domain = get_result_domain(
       component, result_attribute_name, mapping_name);
 
-  OutputAttribute_Typed<Color4f> attribute_out =
-      component.attribute_try_get_for_output_only<Color4f>(result_attribute_name, result_domain);
+  OutputAttribute_Typed<ColorGeometry4f> attribute_out =
+      component.attribute_try_get_for_output_only<ColorGeometry4f>(result_attribute_name,
+                                                                   result_domain);
   if (!attribute_out) {
     return;
   }
@@ -95,7 +89,7 @@ static void execute_on_component(GeometryComponent &component, const GeoNodeExec
   GVArray_Typed<float3> mapping_attribute = component.attribute_get_for_read<float3>(
       mapping_name, result_domain, {0, 0, 0});
 
-  MutableSpan<Color4f> colors = attribute_out.as_span();
+  MutableSpan<ColorGeometry4f> colors = attribute_out.as_span();
   parallel_for(IndexRange(mapping_attribute.size()), 128, [&](IndexRange range) {
     for (const int i : range) {
       TexResult texture_result = {0};
@@ -144,6 +138,5 @@ void register_node_type_geo_sample_texture()
   node_type_socket_templates(
       &ntype, geo_node_attribute_sample_texture_in, geo_node_attribute_sample_texture_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_sample_texture_exec;
-  ntype.draw_buttons = geo_node_attribute_sample_texture_layout;
   nodeRegisterType(&ntype);
 }

@@ -674,6 +674,9 @@ static int arg_handle_print_help(int UNUSED(argc), const char **UNUSED(argv), vo
   printf("  $BLENDER_USER_DATAFILES   Directory for user data files (icons, translations, ..).\n");
   printf("  $BLENDER_SYSTEM_DATAFILES Directory for system wide data files.\n");
   printf("  $BLENDER_SYSTEM_PYTHON    Directory for system Python libraries.\n");
+#  ifdef WITH_OCIO
+  printf("  $OCIO                     Path to override the OpenColorIO config file.\n");
+#  endif
 #  ifdef WIN32
   printf("  $TEMP                     Store temporary files here.\n");
 #  else
@@ -1195,15 +1198,17 @@ static const char arg_handle_playback_mode_doc[] =
     "\t\tZero disables (clamping to a fixed number of frames instead).";
 static int arg_handle_playback_mode(int argc, const char **argv, void *UNUSED(data))
 {
-  /* not if -b was given first */
+  /* Ignore the animation player if `-b` was given first. */
   if (G.background == 0) {
 #  ifdef WITH_FFMPEG
     /* Setup FFmpeg with current debug flags. */
     IMB_ffmpeg_init();
 #  endif
 
-    WM_main_playanim(argc, argv); /* not the same argc and argv as before */
-    exit(0);                      /* 2.4x didn't do this */
+    /* This function knows to skip this argument ('-a'). */
+    WM_main_playanim(argc, argv);
+
+    exit(0);
   }
 
   return -2;

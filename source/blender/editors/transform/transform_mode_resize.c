@@ -113,10 +113,10 @@ static void applyResize(TransInfo *t, const int UNUSED(mval[2]))
         pvec[j++] = t->values_final[i];
       }
     }
-    headerResize(t, pvec, str);
+    headerResize(t, pvec, str, sizeof(str));
   }
   else {
-    headerResize(t, t->values_final, str);
+    headerResize(t, t->values_final, str, sizeof(str));
   }
 
   copy_m3_m3(t->mat, mat); /* used in gizmo */
@@ -193,5 +193,7 @@ void initResize(TransInfo *t)
   t->num.unit_type[0] = B_UNIT_NONE;
   t->num.unit_type[1] = B_UNIT_NONE;
   t->num.unit_type[2] = B_UNIT_NONE;
+
+  transform_mode_default_modal_orientation_set(t, V3D_ORIENT_GLOBAL);
 }
 /** \} */
