@@ -129,7 +129,6 @@ typedef struct RigidBodyOb {
   short type;
   /** (eRigidBody_Shape) collision shape to use. */
   short shape;
-
   /** (eRigidBodyOb_Flag). */
   int flag;
   /** Collision groups that determines which rigid bodies can collide with each other. */
@@ -165,9 +164,12 @@ typedef struct RigidBodyOb {
   /** Rigid body position. */
   float pos[3];
   char _pad1[4];
-
   /** This pointer is shared between all evaluated copies. */
   struct RigidBodyOb_Shared *shared;
+
+  short sim_display_options;
+
+  char _pad2[6];
 } RigidBodyOb;
 
 /* Participation types for RigidBodyOb */
@@ -219,6 +221,15 @@ typedef enum eRigidBody_Shape {
   /* concave mesh approximated using primitives */
   RB_SHAPE_COMPOUND = 7,
 } eRigidBody_Shape;
+
+enum {
+  /** display forces. */
+  RB_SIM_FORCES = (1<<0),
+  /** display acceleration. */
+  RB_SIM_ACCELERATION = (1<<1),
+  /** display velocity. */
+  RB_SIM_VELOCITY = (1<<2)
+};
 
 typedef enum eRigidBody_MeshSource {
   /* base mesh */

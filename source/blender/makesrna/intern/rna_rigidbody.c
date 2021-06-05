@@ -85,6 +85,13 @@ const EnumPropertyItem rna_enum_rigidbody_object_shape_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+const EnumPropertyItem rna_enum_rigidbody_sim_display_options[] = {
+    { RB_SIM_FORCES, "FORCES", ICON_NONE, "Forces", "Display forces acting on rigid body"},
+    { RB_SIM_ACCELERATION, "ACCELERATION", ICON_NONE, "Acceleration", "Display acceleration of rigid body"},
+    { RB_SIM_VELOCITY, "VELOCITY", ICON_NONE, "Velocity", "Display velocity of rigid body"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 /* collision shapes of constraints in rigid body sim */
 const EnumPropertyItem rna_enum_rigidbody_constraint_type_items[] = {
     {RBC_TYPE_FIXED, "FIXED", ICON_NONE, "Fixed", "Glue rigid bodies together"},
@@ -1199,7 +1206,26 @@ static void rna_def_rigidbody_object(BlenderRNA *brna)
       prop, "Collision Collections", "Collision collections rigid body belongs to");
   RNA_def_property_update(prop, NC_OBJECT | ND_POINTCACHE, "rna_RigidBodyOb_reset");
   RNA_def_property_flag(prop, PROP_LIB_EXCEPTION);
+
+  /* sim data display options. */
+  prop = RNA_def_property(srna, "display_forces", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_FORCES);
+  RNA_def_property_ui_text(prop, "Forces", "Display forces acting on rigid body");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+  prop = RNA_def_property(srna, "display_acceleration", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_ACCELERATION);
+  RNA_def_property_ui_text(prop, "Acceleration", "Display acceleration of rigid body");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+  prop = RNA_def_property(srna, "display_velocity", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_VELOCITY);
+  RNA_def_property_ui_text(prop, "Velocity", "Display velocity acting on rigid body");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
 }
+
+
 
 static void rna_def_rigidbody_constraint(BlenderRNA *brna)
 {

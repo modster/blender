@@ -731,6 +731,7 @@ GPUShader *OVERLAY_shader_outline_prepass(bool use_wire);
 GPUShader *OVERLAY_shader_outline_prepass_gpencil(void);
 GPUShader *OVERLAY_shader_outline_prepass_pointcloud(void);
 GPUShader *OVERLAY_shader_extra_grid(void);
+GPUShader *OVERLAY_shader_vector(void);
 GPUShader *OVERLAY_shader_outline_detect(void);
 GPUShader *OVERLAY_shader_paint_face(void);
 GPUShader *OVERLAY_shader_paint_point(void);

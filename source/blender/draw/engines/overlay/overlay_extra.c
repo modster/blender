@@ -58,6 +58,9 @@
 #include "draw_common.h"
 #include "draw_manager_text.h"
 
+#include "math.h"
+#include "BLI_math_rotation.h"
+
 void OVERLAY_extra_cache_init(OVERLAY_Data *vedata)
 {
   OVERLAY_PassList *psl = vedata->psl;
@@ -1557,6 +1560,17 @@ static void OVERLAY_object_name(Object *ob, int theme_id)
                      color);
 }
 
+static void OVERLAY_vector_extra(OVERLAY_ExtraCallBuffers *cb,
+                         OVERLAY_Data *data,
+                         Object *ob,
+                         Scene *scene)
+{
+    GPUShader *sh = OVERLAY_shader_vector();
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[0]);
+    DRW_shgroup_uniform_vec3_copy(grp, "objPosition", ob->rigidbody_object->pos);
+    DRW_shgroup_call_procedural_lines(grp, NULL, 3);
+}
+
 void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
 {
   OVERLAY_ExtraCallBuffers *cb = OVERLAY_extra_call_buffer_get(vedata, ob);
@@ -1565,6 +1579,7 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
   ViewLayer *view_layer = draw_ctx->view_layer;
   Scene *scene = draw_ctx->scene;
   ModifierData *md = NULL;
+  RigidBodyOb *rbo;
 
   const bool is_select_mode = DRW_state_is_select();
   const bool is_paint_mode = (draw_ctx->object_mode &
@@ -1623,6 +1638,9 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
     }
     if (ob->rigidbody_object != NULL) {
       OVERLAY_collision(cb, ob, color);
+      if(ob->rigidbody_object->sim_display_options & RB_SIM_FORCES)
+        OVERLAY_vector_extra(cb, vedata, ob, scene);
+
     }
     if (ob->dtx & OB_AXIS) {
       DRW_buffer_add_entry(cb->empty_axes, color, ob->obmat);
@@ -1657,3 +1675,5 @@ void OVERLAY_extra_centers_draw(OVERLAY_Data *vedata)
   DRW_draw_pass(psl->extra_grid_ps);
   DRW_draw_pass(psl->extra_centers_ps);
 }
+
+

@@ -212,6 +212,31 @@ void RB_dworld_step_simulation(rbDynamicsWorld *world,
                                float timeSubStep)
 {
   world->dynamicsWorld->stepSimulation(timeStep, maxSubSteps, timeSubStep);
+
+  int numManifolds = world->dispatcher->getNumManifolds();
+  for (int i = 0; i < numManifolds; i++)
+  {
+      printf("manifold:%d\n",i);
+      btPersistentManifold* contactManifold =  world->dispatcher->getManifoldByIndexInternal(i);
+      const btCollisionObject* obA = contactManifold->getBody0();
+      const btCollisionObject* obB = contactManifold->getBody1();
+
+      int numContacts = contactManifold->getNumContacts();
+      for (int j = 0; j < numContacts; j++)
+      {
+          btManifoldPoint& pt = contactManifold->getContactPoint(j);
+          if (pt.getAppliedImpulse() > 0.f)
+          {
+              const btVector3& ptA = pt.getPositionWorldOnA();
+              const btVector3& ptB = pt.getPositionWorldOnB();
+              const btScalar imp = pt.getAppliedImpulse() ;
+              if((imp/timeStep)>=9.82) printf("****impulse on point%d:%f****\n",j,imp);
+              printf("impulse on point%d:%f \nloc: %f %f %f\ndist:%f\n",j,imp,ptA.getX(),ptA.getY(),ptA.getZ(),pt.getDistance());
+              printf("force on point%d:%f\n",j,imp/timeSubStep);
+
+          }
+      }
+  }
 }
 
 /* Export -------------------------- */

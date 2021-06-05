@@ -1746,6 +1746,11 @@ static void rigidbody_update_sim_ob(
                eff_force[2],
                ob->id.name + 2);
       }
+      printf("\tapplying force (%f,%f,%f) to '%s'\n",
+             eff_force[0],
+             eff_force[1],
+             eff_force[2],
+             ob->id.name + 2);
       /* activate object in case it is deactivated */
       if (!is_zero_v3(eff_force)) {
         RB_body_activate(rbo->shared->physics_object);
@@ -2239,6 +2244,7 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
     float cur_interp_val = interp_step;
 
     for (int i = 0; i < rbw->substeps_per_frame; i++) {
+      printf("substep%d\n",i);
       rigidbody_update_kinematic_obj_substep(&substep_targets, cur_interp_val);
       RB_dworld_step_simulation(rbw->shared->physics_world, substep, 0, substep);
       cur_interp_val += interp_step;

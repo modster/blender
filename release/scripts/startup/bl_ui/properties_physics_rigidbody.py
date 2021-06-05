@@ -295,6 +295,36 @@ class PHYSICS_PT_rigid_body_dynamics_deactivation(PHYSICS_PT_rigidbody_panel, Pa
         # TODO: other params such as time?
 
 
+class PHYSICS_PT_rigid_body_display_options(PHYSICS_PT_rigidbody_panel, Panel):
+    bl_label = "Display Options"
+    bl_parent_id = 'PHYSICS_PT_rigid_body'
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        if obj.parent is not None and obj.parent.rigid_body is not None:
+            return False
+        return (obj and obj.rigid_body and (context.engine in cls.COMPAT_ENGINES))
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+
+        ob = context.object
+        rbo = ob.rigid_body
+
+        if rbo is None:
+            rigid_body_warning(layout, "Object does not have a Rigid Body")
+            return
+
+        col = layout.column()
+        col.prop(rbo, "display_forces")
+        col.prop(rbo, "display_acceleration")
+        col.prop(rbo, "display_velocity")
+
+
 classes = (
     PHYSICS_PT_rigid_body,
     PHYSICS_PT_rigid_body_settings,
@@ -304,10 +334,12 @@ classes = (
     PHYSICS_PT_rigid_body_collisions_collections,
     PHYSICS_PT_rigid_body_dynamics,
     PHYSICS_PT_rigid_body_dynamics_deactivation,
+    PHYSICS_PT_rigid_body_display_options,
 )
 
 
 if __name__ == "__main__":  # only for live edit.
-    from bpy.utils import register_class
+    from bpy.utils import register_class, unregister_class
     for cls in classes:
         register_class(cls)
+

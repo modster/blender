@@ -91,6 +91,7 @@ extern char datatoc_extra_wire_frag_glsl[];
 extern char datatoc_extra_wire_vert_glsl[];
 extern char datatoc_facing_frag_glsl[];
 extern char datatoc_facing_vert_glsl[];
+extern char datatoc_vector_vert_glsl[];
 extern char datatoc_grid_frag_glsl[];
 extern char datatoc_grid_vert_glsl[];
 extern char datatoc_image_frag_glsl[];
@@ -196,6 +197,7 @@ typedef struct OVERLAY_Shaders {
   GPUShader *extra_lightprobe_grid;
   GPUShader *extra_loose_point;
   GPUShader *facing;
+  GPUShader *force_vector;
   GPUShader *gpencil_canvas;
   GPUShader *grid;
   GPUShader *grid_image;
@@ -1446,6 +1448,17 @@ struct GPUShader *OVERLAY_shader_uniform_color(void)
     });
   }
   return sh_data->uniform_color;
+}
+
+struct GPUShader *OVERLAY_shader_vector(){
+    OVERLAY_Shaders *sh_data = &e_data.sh_data[1];
+      sh_data->force_vector = DRW_shader_create_with_lib(
+          datatoc_vector_vert_glsl,
+          NULL,
+          datatoc_gpu_shader_flat_color_frag_glsl,
+          datatoc_common_view_lib_glsl,
+          "#define blender_srgb_to_framebuffer_space(a) a\n");
+      return sh_data->force_vector;
 }
 
 struct GPUShader *OVERLAY_shader_volume_velocity(bool use_needle, bool use_mac)
