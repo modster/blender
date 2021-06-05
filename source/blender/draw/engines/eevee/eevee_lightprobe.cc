@@ -536,7 +536,8 @@ void LightProbeModule::sync_cubemap(const DRWView *UNUSED(view),
   info_data_.cubes.cube_count++;
 }
 
-void LightProbeModule::set_view(const DRWView *view, const ivec2 UNUSED(extent))
+/* Only enables world light probe if extent is invalid (no culling possible). */
+void LightProbeModule::set_view(const DRWView *view, const ivec2 extent)
 {
   if (lightcache_->flag & LIGHTCACHE_UPDATE_WORLD) {
     /* Set before update to avoid infinite recursion. */
@@ -550,11 +551,14 @@ void LightProbeModule::set_view(const DRWView *view, const ivec2 UNUSED(extent))
   info_data_.cubes.cube_count = 1;
 
   sync_world(view);
-  for (auto i : IndexRange(lightcache_->grid_len)) {
-    sync_grid(view, lightcache_->grid_data[i], i);
-  }
-  for (auto i : IndexRange(lightcache_->cube_len)) {
-    sync_cubemap(view, lightcache_->cube_data[i], i);
+  /* Only world if extent is 0. */
+  if (extent.x > 0) {
+    for (auto i : IndexRange(lightcache_->grid_len)) {
+      sync_grid(view, lightcache_->grid_data[i], i);
+    }
+    for (auto i : IndexRange(lightcache_->cube_len)) {
+      sync_cubemap(view, lightcache_->cube_data[i], i);
+    }
   }
 
   info_data_.cubes.roughness_max_lod = lightcache_->mips_len;

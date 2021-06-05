@@ -99,7 +99,6 @@ class LightProbeModule {
   void end_sync();
 
   void set_view(const DRWView *view, const ivec2 extent);
-  void set_dummy(const DRWView *view, const ivec2 extent);
 
   void set_world_dirty(void)
   {

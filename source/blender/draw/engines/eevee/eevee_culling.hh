@@ -101,6 +101,12 @@ class CullingBatch {
     tiles_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(tiles_tx_));
   }
 
+  void set_empty(void)
+  {
+    init_min_max();
+    culling_data_.push_update();
+  }
+
   void insert(int32_t index, float z_dist, float radius)
   {
     ItemHandle handle = {(uint32_t)index, z_dist, radius};
@@ -119,12 +125,8 @@ class CullingBatch {
     /* Order items by Z distance to the camera. */
     auto sort = [](const ItemHandle &a, const ItemHandle &b) { return a.z_dist > b.z_dist; };
     std::sort(item_handles_.begin(), item_handles_.end(), sort);
-    /* Init min-max for each bin. */
-    for (auto i : IndexRange(CULLING_ZBIN_COUNT)) {
-      uint16_t *zbin_minmax = (uint16_t *)culling_data_.zbins;
-      zbin_minmax[i * 2 + 0] = CULLING_ITEM_BATCH - 1;
-      zbin_minmax[i * 2 + 1] = 0;
-    }
+
+    init_min_max();
     /* Fill the GPU data buffer. */
     for (auto item_idx : item_handles_.index_range()) {
       ItemHandle &handle = item_handles_[item_idx];
@@ -169,6 +171,18 @@ class CullingBatch {
   {
     return tiles_tx_;
   }
+
+ private:
+  void init_min_max(void)
+  {
+    /* Init min-max for each bin. */
+    for (auto i : IndexRange(CULLING_ZBIN_COUNT)) {
+      uint16_t *zbin_minmax = (uint16_t *)culling_data_.zbins;
+      zbin_minmax[i * 2 + 0] = CULLING_ITEM_BATCH - 1;
+      zbin_minmax[i * 2 + 1] = 0;
+    }
+    culling_data_.items_count = 0;
+  }
 };
 
 /** \} */
@@ -196,7 +210,7 @@ class Culling {
   /** View for which the culling is computed. */
   const DRWView *view_;
   /** View resolution. */
-  ivec2 extent_;
+  ivec2 extent_ = ivec2(0);
 
  public:
   Culling(){};
@@ -225,6 +239,24 @@ class Culling {
     used_batch_count_ = 1;
     active_batch_ = batches_[0];
     active_batch_->init(extent_);
+  }
+
+  /* Cull every items. Do not reset the batches to avoid freeing the vectors' memory. */
+  void set_empty(void)
+  {
+    if (extent_.x == 0) {
+      extent_ = ivec2(1);
+    }
+
+    if (batches_.size() == 0) {
+      batches_.append(new CullingBatchType());
+
+      active_batch_ = batches_[0];
+      active_batch_->init(extent_);
+    }
+
+    active_batch_ = batches_[0];
+    active_batch_->set_empty();
   }
 
   /* Returns true if we cannot add any more items.

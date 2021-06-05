@@ -303,9 +303,14 @@ void LightModule::end_sync(void)
   inst_.shadows.end_sync();
 }
 
-/* Compute acceleration structure for the given view. */
+/* Compute acceleration structure for the given view. If extent is 0, bind no lights. */
 void LightModule::set_view(const DRWView *view, const ivec2 extent, bool enable_specular)
 {
+  if (extent.x == 0) {
+    culling_.set_empty();
+    return;
+  }
+
   culling_.set_view(view, extent);
 
   for (auto light_id : lights_refs_.index_range()) {
