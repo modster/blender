@@ -45,12 +45,14 @@
 #include "BKE_editmesh.h"
 #include "BKE_editmesh_bvh.h"
 #include "BKE_report.h"
+#include "BKE_unit.h"
 
 #include "GPU_immediate.h"
 #include "GPU_matrix.h"
 #include "GPU_state.h"
 
 #include "ED_mesh.h"
+#include "ED_numinput.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"
 #include "ED_view3d.h"
@@ -86,6 +88,10 @@
 #define KNIFE_FLT_EPS_PX_VERT 0.5f
 #define KNIFE_FLT_EPS_PX_EDGE 0.05f
 #define KNIFE_FLT_EPS_PX_FACE 0.05f
+
+#define KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT 5.0f
+#define KNIFE_MIN_ANGLE_SNAPPING_INCREMENT 0.0f
+#define KNIFE_MAX_ANGLE_SNAPPING_INCREMENT 90.0f
 
 typedef struct KnifeColors {
   uchar line[3];
@@ -239,6 +245,9 @@ typedef struct KnifeTool_OpData {
   bool snap_midpoints;
   bool ignore_edge_snapping;
   bool ignore_vert_snapping;
+
+  NumInput num;
+  float angle_snapping_increment; /* degrees */
 
   /* use to check if we're currently dragging an angle snapped line */
   bool is_angle_snapping;
@@ -538,7 +547,7 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
                TIP_("%s: confirm, %s: cancel, "
                     "%s: start/define cut, %s: close cut, %s: new cut, "
                     "%s: midpoint snap (%s), %s: ignore snap (%s), "
-                    "%s: angle constraint (%s), %s: cut through (%s), "
+                    "%s: angle constraint %.2f (%s), %s: cut through (%s), "
                     "%s: panning"),
                WM_MODALKEY(KNF_MODAL_CONFIRM),
                WM_MODALKEY(KNF_MODAL_CANCEL),
@@ -550,6 +559,10 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
                WM_MODALKEY(KNF_MODAL_IGNORE_SNAP_ON),
                WM_bool_as_string(kcd->ignore_edge_snapping),
                WM_MODALKEY(KNF_MODAL_ANGLE_SNAP_TOGGLE),
+               (kcd->angle_snapping_increment > KNIFE_MIN_ANGLE_SNAPPING_INCREMENT &&
+                kcd->angle_snapping_increment < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) ?
+                   kcd->angle_snapping_increment :
+                   KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT,
                WM_bool_as_string(kcd->angle_snapping),
                WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
                WM_bool_as_string(kcd->cut_through),
@@ -2518,7 +2531,16 @@ static bool knife_snap_angle(KnifeTool_OpData *kcd)
 {
   const float dvec_ref[2] = {0.0f, 1.0f};
   float dvec[2], dvec_snap[2];
-  float snap_step = DEG2RADF(45);
+
+  float snap_step;
+  /* Currently user can input any float between 0 and 90 */
+  if (kcd->angle_snapping_increment > KNIFE_MIN_ANGLE_SNAPPING_INCREMENT &&
+      kcd->angle_snapping_increment < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) {
+    snap_step = DEG2RADF(kcd->angle_snapping_increment);
+  }
+  else {
+    snap_step = DEG2RADF(KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT);
+  }
 
   sub_v2_v2v2(dvec, kcd->curr.mval, kcd->prev.mval);
   if (is_zero_v2(dvec)) {
@@ -2532,6 +2554,16 @@ static bool knife_snap_angle(KnifeTool_OpData *kcd)
   copy_v2_v2(kcd->mval, kcd->curr.mval);
 
   return true;
+}
+
+/* Reset the snapping angle num input */
+static void knife_reset_snap_angle_input(KnifeTool_OpData *kcd)
+{
+  kcd->num.val[0] = 0;
+  while (kcd->num.str_cur > 0) {
+    kcd->num.str[kcd->num.str_cur - 1] = '\0';
+    kcd->num.str_cur--;
+  }
 }
 
 /**
@@ -2637,6 +2669,7 @@ static void knifetool_init(bContext *C,
                            KnifeTool_OpData *kcd,
                            const bool only_select,
                            const bool cut_through,
+                           const float angle_snapping_increment,
                            const bool is_interactive)
 {
   Scene *scene = CTX_data_scene(C);
@@ -2657,6 +2690,7 @@ static void knifetool_init(bContext *C,
   kcd->is_interactive = is_interactive;
   kcd->cut_through = cut_through;
   kcd->only_select = only_select;
+  kcd->angle_snapping_increment = angle_snapping_increment;
 
   knifetool_init_bmbvh(kcd);
 
@@ -2885,6 +2919,15 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
     kcd->mode = kcd->prevmode;
   }
 
+  bool handled = false;
+  if (kcd->angle_snapping) {
+    if (event->val == KM_PRESS && hasNumInput(&kcd->num) && handleNumInput(C, &kcd->num, event)) {
+      applyNumInput(&kcd->num, &kcd->angle_snapping_increment);
+      knife_update_header(C, op, kcd);
+      handled = true;
+    }
+  }
+
   /* handle modal keymap */
   if (event->type == EVT_MODAL_MAP) {
     switch (event->val) {
@@ -2913,6 +2956,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         knife_update_header(C, op, kcd);
         ED_region_tag_redraw(kcd->region);
         do_refresh = true;
+        handled = true;
         break;
       case KNF_MODAL_MIDPOINT_OFF:
         kcd->snap_midpoints = false;
@@ -2922,33 +2966,42 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         knife_update_header(C, op, kcd);
         ED_region_tag_redraw(kcd->region);
         do_refresh = true;
+        handled = true;
         break;
       case KNF_MODAL_IGNORE_SNAP_ON:
         ED_region_tag_redraw(kcd->region);
         kcd->ignore_vert_snapping = kcd->ignore_edge_snapping = true;
         knife_update_header(C, op, kcd);
         do_refresh = true;
+        handled = true;
         break;
       case KNF_MODAL_IGNORE_SNAP_OFF:
         ED_region_tag_redraw(kcd->region);
         kcd->ignore_vert_snapping = kcd->ignore_edge_snapping = false;
         knife_update_header(C, op, kcd);
         do_refresh = true;
+        handled = true;
         break;
       case KNF_MODAL_ANGLE_SNAP_TOGGLE:
         kcd->angle_snapping = !kcd->angle_snapping;
+        kcd->angle_snapping_increment = RAD2DEGF(
+            RNA_float_get(op->ptr, "angle_snapping_increment"));
+        knife_reset_snap_angle_input(kcd);
         knife_update_header(C, op, kcd);
         do_refresh = true;
+        handled = true;
         break;
       case KNF_MODAL_CUT_THROUGH_TOGGLE:
         kcd->cut_through = !kcd->cut_through;
         knife_update_header(C, op, kcd);
         do_refresh = true;
+        handled = true;
         break;
       case KNF_MODAL_NEW_CUT:
         ED_region_tag_redraw(kcd->region);
         knife_finish_cut(kcd);
         kcd->mode = MODE_IDLE;
+        handled = true;
         break;
       case KNF_MODAL_ADD_CUT:
         knife_recalc_projmat(kcd);
@@ -2980,6 +3033,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
 
         ED_region_tag_redraw(kcd->region);
+        handled = true;
         break;
       case KNF_MODAL_ADD_CUT_CLOSED:
         if (kcd->mode == MODE_DRAGGING) {
@@ -3002,6 +3056,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
           knife_finish_cut(kcd);
           kcd->mode = MODE_IDLE;
         }
+        handled = true;
         break;
       case KNF_MODAL_PANNING:
         if (event->val != KM_RELEASE) {
@@ -3042,6 +3097,13 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
 
+  if (kcd->angle_snapping) {
+    if (!handled && event->val == KM_PRESS && handleNumInput(C, &kcd->num, event)) {
+      applyNumInput(&kcd->num, &kcd->angle_snapping_increment);
+      knife_update_header(C, op, kcd);
+    }
+  }
+
   if (kcd->mode == MODE_DRAGGING) {
     op->flag &= ~OP_IS_MODAL_CURSOR_REGION;
   }
@@ -3064,8 +3126,11 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   const bool only_select = RNA_boolean_get(op->ptr, "only_selected");
   const bool cut_through = !RNA_boolean_get(op->ptr, "use_occlude_geometry");
   const bool wait_for_input = RNA_boolean_get(op->ptr, "wait_for_input");
+  const float angle_snapping_increment = RAD2DEGF(
+      RNA_float_get(op->ptr, "angle_snapping_increment"));
 
   KnifeTool_OpData *kcd;
+  Scene *scene = CTX_data_scene(C);
 
   if (only_select) {
     Object *obedit = CTX_data_edit_object(C);
@@ -3079,7 +3144,7 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   /* alloc new customdata */
   kcd = op->customdata = MEM_callocN(sizeof(KnifeTool_OpData), __func__);
 
-  knifetool_init(C, kcd, only_select, cut_through, true);
+  knifetool_init(C, kcd, only_select, cut_through, angle_snapping_increment, true);
 
   op->flag |= OP_IS_MODAL_CURSOR_REGION;
 
@@ -3102,6 +3167,13 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   knife_update_header(C, op, kcd);
+
+  /* Initialise num input handling for angle snapping */
+  initNumInput(&kcd->num);
+  kcd->num.idx_max = 0;
+  kcd->num.val_flag[0] |= NUM_NO_NEGATIVE;
+  kcd->num.unit_sys = scene->unit.system;
+  kcd->num.unit_type[0] = B_UNIT_NONE;
 
   return OPERATOR_RUNNING_MODAL;
 }
@@ -3130,6 +3202,16 @@ void MESH_OT_knife_tool(wmOperatorType *ot)
                   "Occlude Geometry",
                   "Only cut the front most geometry");
   RNA_def_boolean(ot->srna, "only_selected", false, "Only Selected", "Only cut selected geometry");
+  prop = RNA_def_float(ot->srna,
+                       "angle_snapping_increment",
+                       DEG2RADF(KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT),
+                       DEG2RADF(KNIFE_MIN_ANGLE_SNAPPING_INCREMENT),
+                       DEG2RADF(KNIFE_MAX_ANGLE_SNAPPING_INCREMENT),
+                       "Angle Snap Increment",
+                       "The angle snap increment used when in constrained angle mode",
+                       DEG2RADF(KNIFE_MIN_ANGLE_SNAPPING_INCREMENT),
+                       DEG2RADF(KNIFE_MAX_ANGLE_SNAPPING_INCREMENT));
+  RNA_def_property_subtype(prop, PROP_ANGLE);
 
   prop = RNA_def_boolean(ot->srna, "wait_for_input", true, "Wait for Input", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
@@ -3172,10 +3254,11 @@ void EDBM_mesh_knife(bContext *C, LinkNode *polys, bool use_tag, bool cut_throug
   {
     const bool only_select = false;
     const bool is_interactive = false; /* can enable for testing */
+    const float angle_snapping_increment = KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT;
 
     kcd = MEM_callocN(sizeof(KnifeTool_OpData), __func__);
 
-    knifetool_init(C, kcd, only_select, cut_through, is_interactive);
+    knifetool_init(C, kcd, only_select, cut_through, angle_snapping_increment, is_interactive);
 
     kcd->ignore_edge_snapping = true;
     kcd->ignore_vert_snapping = true;

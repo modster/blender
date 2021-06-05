@@ -4711,9 +4711,9 @@ def km_mesh(params):
         ("mesh.dissolve_mode", {"type": 'X', "value": 'PRESS', "ctrl": True}, None),
         ("mesh.dissolve_mode", {"type": 'DEL', "value": 'PRESS', "ctrl": True}, None),
         ("mesh.knife_tool", {"type": 'K', "value": 'PRESS'},
-         {"properties": [("use_occlude_geometry", True), ("only_selected", False)]}),
+         {"properties": [("use_occlude_geometry", True), ("only_selected", False), ("angle_snapping_increment", 5.0)]}),
         ("mesh.knife_tool", {"type": 'K', "value": 'PRESS', "shift": True},
-         {"properties": [("use_occlude_geometry", False), ("only_selected", True)]}),
+         {"properties": [("use_occlude_geometry", False), ("only_selected", True), ("angle_snapping_increment", 5.0)]}),
         ("object.vertex_parent_set", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
         # Menus.
         op_menu("VIEW3D_MT_edit_mesh_faces", {"type": 'F', "value": 'PRESS', "ctrl": True}),
