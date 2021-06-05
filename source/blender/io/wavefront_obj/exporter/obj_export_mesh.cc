@@ -55,7 +55,7 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
     /* Curves and NURBS surfaces need a new mesh when they're
      * exported in the form of vertices and edges.
      */
-    export_mesh_eval_ = BKE_mesh_new_from_object(depsgraph, export_object_eval_, true);
+    export_mesh_eval_ = BKE_mesh_new_from_object(depsgraph, export_object_eval_, true, true);
     /* Since a new mesh been allocated, it needs to be freed in the destructor. */
     mesh_eval_needs_free_ = true;
   }
