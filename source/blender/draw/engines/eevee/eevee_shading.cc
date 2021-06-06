@@ -68,7 +68,8 @@ void BackgroundPass::render(void)
 
 void ForwardPass::sync()
 {
-  DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
+  DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_BLEND_CUSTOM |
+                   DRW_STATE_DEPTH_LESS;
   opaque_ps_ = DRW_pass_create("Forward", state);
 
   DRWState state_add = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL | DRW_STATE_DEPTH_EQUAL;

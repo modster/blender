@@ -94,6 +94,10 @@ void main(void)
 {
   g_data = init_globals();
 
+  float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_CLOSURE);
+  float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
+  g_data.closure_rand = fract(noise + noise_offset);
+
   nodetree_surface();
 
   float vP_z = get_view_z_from_depth(gl_FragCoord.z);
@@ -131,9 +135,9 @@ void main(void)
 
   out_radiance.rgb = radiance_diffuse * g_diffuse_data.color;
   out_radiance.rgb += radiance_reflection * g_reflection_data.color;
-  out_transmittance.rgb = g_transparency_data.transmittance;
+  out_radiance.rgb += g_emission_data.emission;
+  out_radiance.a = 0.0;
 
-  /* Output alpha on alpha channel. Not transmittance. */
-  out_radiance.a = saturate(1.0 - out_radiance.a);
+  out_transmittance.rgb = g_transparency_data.transmittance;
   out_transmittance.a = saturate(avg(out_transmittance.rgb));
 }
