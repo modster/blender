@@ -92,7 +92,7 @@ class LookDev {
     GPU_material_free(&material);
   };
 
-  void init(const ivec2 &output_res);
+  void init(const ivec2 &output_res, const rcti *render_border);
 
   void sync_background(void);
   bool sync_world(void);
@@ -104,7 +104,7 @@ class LookDev {
   void rotation_get(mat4 r_mat);
 
  private:
-  bool do_overlay(void);
+  bool do_overlay(const ivec2 &output_res, const rcti *render_border);
 };
 
 /** \} */

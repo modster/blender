@@ -138,6 +138,8 @@ void ShadingView::render(void)
 
   inst_.lightprobes.draw_cache_display();
 
+  inst_.lookdev.render_overlay(view_fb_);
+
   inst_.shading_passes.forward.render();
 
   velocity_.render(depth_tx_);

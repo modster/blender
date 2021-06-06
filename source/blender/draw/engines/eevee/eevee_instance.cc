@@ -76,7 +76,7 @@ void Instance::init(const ivec2 &output_res,
   velocity.init();
   shadows.init();
   lightprobes.init();
-  lookdev.init(output_res);
+  lookdev.init(output_res, &render_border);
 }
 
 rcti Instance::output_crop(const int res[2], const rcti *crop)
@@ -284,8 +284,6 @@ void Instance::draw_viewport(DefaultFramebufferList *dfbl)
   this->render_sample();
 
   render_passes.resolve_viewport(dfbl);
-
-  lookdev.render_overlay(dfbl->default_fb);
 
   if (!sampling.finished_viewport()) {
     DRW_viewport_request_redraw();

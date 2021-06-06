@@ -86,7 +86,7 @@ bNodeTree *LookDevWorldNodeTree::nodetree_get(float strength)
  * use custom shader to draw the background.
  * \{ */
 
-void LookDev::init(const ivec2 &output_res)
+void LookDev::init(const ivec2 &output_res, const rcti *render_border)
 {
   StudioLight *studiolight = nullptr;
   if (inst_.v3d) {
@@ -128,7 +128,7 @@ void LookDev::init(const ivec2 &output_res)
     GPU_material_free(&material);
   }
 
-  if (do_overlay()) {
+  if (do_overlay(output_res, render_border)) {
     rcti rect;
     if (DRW_state_is_opengl_render()) {
       BLI_rcti_init(&rect, 0, output_res.x, 0, output_res.y);
@@ -167,7 +167,7 @@ void LookDev::init(const ivec2 &output_res)
   }
 }
 
-bool LookDev::do_overlay(void)
+bool LookDev::do_overlay(const ivec2 &output_res, const rcti *render_border)
 {
   const View3D *v3d = inst_.v3d;
   /* Only show the HDRI Preview in Shading Preview in the Viewport. */
@@ -182,6 +182,13 @@ bool LookDev::do_overlay(void)
     return false;
   }
   if ((v3d->overlay.flag & V3D_OVERLAY_LOOK_DEV) == 0) {
+    return false;
+  }
+  if (inst_.camera.is_panoramic()) {
+    return false;
+  }
+  if (output_res != ivec2(BLI_rcti_size_x(render_border), BLI_rcti_size_y(render_border))) {
+    /* TODO(fclem) support this case. */
     return false;
   }
   return true;
@@ -277,6 +284,10 @@ void LookDev::sync_overlay(void)
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
 
+  /* Jitter for AA. */
+  vec2 jitter = -0.5f + vec2(inst_.sampling.rng_get(SAMPLING_FILTER_U),
+                             inst_.sampling.rng_get(SAMPLING_FILTER_V));
+
   /* Matrix used to position the spheres in viewport space. */
   mat4 sphere_mat;
   copy_m4_m4(sphere_mat, cam.viewmat);
@@ -308,7 +319,7 @@ void LookDev::sync_overlay(void)
 
     /* Pass 2D scale and bias factor in the last column. */
     vec2 scale = sphere_size_ / vec2(viewport_size);
-    vec2 bias = -1.0f + scale + 2.0f * (anchor_ + offset) / vec2(viewport_size);
+    vec2 bias = -1.0f + scale + 2.0f * (anchor_ + offset + jitter) / vec2(viewport_size);
     copy_v4_fl4(sphere_mat[3], UNPACK2(scale), UNPACK2(bias));
     DRW_shgroup_call_obmat(grp, sphere, sphere_mat);
 
