@@ -365,7 +365,7 @@ class NODE_OT_active_preview_toggle(Operator):
 
 
 class NODE_OT_new_attribute_processor_group(Operator):
-    bl_idname= "node.new_attribute_processor_group"
+    bl_idname = "node.new_attribute_processor_group"
     bl_label = "New Attribute Processor Group"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -397,6 +397,45 @@ class NODE_OT_new_attribute_processor_group(Operator):
         return {'FINISHED'}
 
 
+class NODE_OT_group_interface_add(Operator):
+    bl_idname = "node.group_interface_add"
+    bl_label = "New Node Group Input"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    is_input: BoolProperty()
+    socket_idname: StringProperty()
+    name: StringProperty()
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        if space is None:
+            return False
+        if space.type != 'NODE_EDITOR':
+            return False
+        return space.edit_tree is not None
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "name", text="Name")
+        layout.prop(self, "socket_idname", text="Type")
+
+    def execute(self, context):
+        group = context.space_data.edit_tree
+
+        # Don't execute this operator on "root" node groups that should not have inputs/outputs.
+        if group not in list(bpy.data.node_groups):
+            return {'CANCELLED'}
+
+        sockets = group.inputs if self.is_input else group.outputs
+        sockets.new(self.socket_idname, self.name)
+        return {'FINISHED'}
+
+
 classes = (
     NodeSetting,
 
@@ -407,4 +446,5 @@ classes = (
     NODE_OT_tree_path_parent,
     NODE_OT_active_preview_toggle,
     NODE_OT_new_attribute_processor_group,
+    NODE_OT_group_interface_add,
 )

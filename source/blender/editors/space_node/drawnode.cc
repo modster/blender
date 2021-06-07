@@ -618,6 +618,44 @@ static int node_tweak_area_reroute(bNode *node, int x, int y)
   return (dx * dx + dy * dy <= tweak_radius_sq);
 }
 
+static void node_draw_buttons_group_input(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  bNodeTree *ngroup = (bNodeTree *)ptr->owner_id;
+  if (ngroup->type != NTREE_ATTRIBUTE) {
+    return;
+  }
+
+  PointerRNA props;
+  uiItemFullO(layout,
+              "node.group_interface_add",
+              "New Input",
+              ICON_ADD,
+              nullptr,
+              WM_OP_INVOKE_DEFAULT,
+              0,
+              &props);
+  RNA_boolean_set(&props, "is_input", true);
+}
+
+static void node_draw_buttons_group_output(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  bNodeTree *ngroup = (bNodeTree *)ptr->owner_id;
+  if (ngroup->type != NTREE_ATTRIBUTE) {
+    return;
+  }
+
+  PointerRNA props;
+  uiItemFullO(layout,
+              "node.group_interface_add",
+              "New Output",
+              ICON_ADD,
+              nullptr,
+              WM_OP_INVOKE_DEFAULT,
+              0,
+              &props);
+  RNA_boolean_set(&props, "is_input", false);
+}
+
 static void node_common_set_butfunc(bNodeType *ntype)
 {
   switch (ntype->type) {
@@ -634,6 +672,12 @@ static void node_common_set_butfunc(bNodeType *ntype)
       ntype->draw_nodetype = node_draw_reroute;
       ntype->draw_nodetype_prepare = node_draw_reroute_prepare;
       ntype->tweak_area_func = node_tweak_area_reroute;
+      break;
+    case NODE_GROUP_INPUT:
+      ntype->draw_buttons = node_draw_buttons_group_input;
+      break;
+    case NODE_GROUP_OUTPUT:
+      ntype->draw_buttons = node_draw_buttons_group_output;
       break;
   }
 }
