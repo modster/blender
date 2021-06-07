@@ -768,7 +768,10 @@ static void node_shader_buts_vect_transform(uiLayout *layout, bContext *UNUSED(C
 
 static void node_shader_buts_attribute(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  uiItemR(layout, ptr, "attribute_type", DEFAULT_FLAGS, IFACE_("Type"), ICON_NONE);
+  bNodeTree *ntree = (bNodeTree *)ptr->owner_id;
+  if (ntree->type == NTREE_SHADER) {
+    uiItemR(layout, ptr, "attribute_type", DEFAULT_FLAGS, IFACE_("Type"), ICON_NONE);
+  }
   uiItemR(layout, ptr, "attribute_name", DEFAULT_FLAGS, IFACE_("Name"), ICON_NONE);
 }
 

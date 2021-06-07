@@ -610,6 +610,7 @@ attribute_node_categories = [
     AttributeNodeCategory("ATTR_INPUT", "Input", items=[
         NodeItem("FunctionNodeRandomFloat"),
         NodeItem("ShaderNodeValue"),
+        NodeItem("ShaderNodeAttribute"),
         NodeItem("FunctionNodeInputString"),
         NodeItem("FunctionNodeInputVector"),
         NodeItem("AttributeNodeIndex"),

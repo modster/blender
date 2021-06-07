@@ -316,7 +316,7 @@ static void geo_node_attribute_processor_update(bNodeTree *UNUSED(ntree), bNode 
   }
 }
 
-static CustomDataType get_custom_data_type(bNodeSocketType *typeinfo)
+static CustomDataType get_custom_data_type(const bNodeSocketType *typeinfo)
 {
   switch (typeinfo->type) {
     case SOCK_FLOAT:
@@ -337,6 +337,7 @@ static CustomDataType get_custom_data_type(bNodeSocketType *typeinfo)
 namespace {
 struct InputsCache {
   Map<int, GVArrayPtr> group_inputs;
+  Map<std::pair<std::string, CustomDataType>, GVArrayPtr> attributes;
   GVArrayPtr index;
 };
 }  // namespace
@@ -402,6 +403,16 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
             domain_size, domain_size, get_index_func);
       }
       input_varray = &*inputs_cache.index;
+    }
+    else if (dnode->idname() == "ShaderNodeAttribute") {
+      NodeShaderAttribute *storage = dnode->storage<NodeShaderAttribute>();
+      const StringRefNull attribute_name = storage->name;
+      const bNodeSocketType *socket_typeinfo = dsocket->typeinfo();
+      const CustomDataType data_type = get_custom_data_type(socket_typeinfo);
+      input_varray = &*inputs_cache.attributes.lookup_or_add_cb(
+          {attribute_name, data_type}, [&]() -> GVArrayPtr {
+            return component.attribute_get_for_read(attribute_name, domain, data_type);
+          });
     }
 
     if (input_varray == nullptr) {
