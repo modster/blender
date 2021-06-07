@@ -336,19 +336,21 @@ void transform_object(Object *object, const OBJImportParams &import_params)
   unit_m4(object->obmat);
   /* Location shift should be 0. */
   copy_v3_fl(object->obmat[3], 0.0f);
-  /* -Y-forward and +Z-up are the default Blender axis settings. */
-  mat3_from_axis_conversion(OBJ_AXIS_NEGATIVE_Y_FORWARD,
+  /* +Y-forward and +Z-up are the default Blender axis settings. */
+  mat3_from_axis_conversion(OBJ_AXIS_Y_FORWARD,
                             OBJ_AXIS_Z_UP,
                             import_params.forward_axis,
                             import_params.up_axis,
                             axes_transform);
+  /* mat3_from_axis_conversion returns a transposed matrix! */
+  transpose_m3(axes_transform);
   mul_m4_m3m4(object->obmat, axes_transform, object->obmat);
 
   if (import_params.clamp_size != 0.0f) {
     float3 max_coord(-INT_MAX);
     float3 min_coord(INT_MAX);
     BoundBox *bb = BKE_mesh_boundbox_get(object);
-    for (const float (&vertex)[3] : bb->vec) {
+    for (const float(&vertex)[3] : bb->vec) {
       for (int axis = 0; axis < 3; axis++) {
         max_coord[axis] = max_ff(max_coord[axis], vertex[axis]);
         min_coord[axis] = min_ff(min_coord[axis], vertex[axis]);

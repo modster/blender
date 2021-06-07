@@ -50,12 +50,14 @@ void OBJCurve::set_world_axes_transform(const eTransformAxisForward forward,
 {
   float axes_transform[3][3];
   unit_m3(axes_transform);
-  /* -Y-forward and +Z-up are the Blender's default axis settings. */
-  mat3_from_axis_conversion(
-      OBJ_AXIS_NEGATIVE_Y_FORWARD, OBJ_AXIS_Z_UP, forward, up, axes_transform);
+  /* +Y-forward and +Z-up are the Blender's default axis settings. */
+  mat3_from_axis_conversion(OBJ_AXIS_Y_FORWARD, OBJ_AXIS_Z_UP, forward, up, axes_transform);
+  /* mat3_from_axis_conversion returns a transposed matrix! */
+  transpose_m3(axes_transform);
   mul_m4_m3m4(world_axes_transform_, axes_transform, export_object_eval_->obmat);
-  /* #mul_m4_m3m4 does not copy last row of #Object.obmat, i.e. location data. */
-  copy_v4_v4(world_axes_transform_[3], export_object_eval_->obmat[3]);
+  /* #mul_m4_m3m4 does not transform last row of #Object.obmat, i.e. location data. */
+  mul_v3_m3v3(world_axes_transform_[3], axes_transform, export_object_eval_->obmat[3]);
+  world_axes_transform_[3][3] = export_object_eval_->obmat[3][3];
 }
 
 const char *OBJCurve::get_curve_name() const

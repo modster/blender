@@ -129,12 +129,14 @@ void OBJMesh::set_world_axes_transform(const eTransformAxisForward forward,
 {
   float axes_transform[3][3];
   unit_m3(axes_transform);
-  /* -Y-forward and +Z-up are the default Blender axis settings. */
-  mat3_from_axis_conversion(
-      OBJ_AXIS_NEGATIVE_Y_FORWARD, OBJ_AXIS_Z_UP, forward, up, axes_transform);
+  /* +Y-forward and +Z-up are the default Blender axis settings. */
+  mat3_from_axis_conversion(OBJ_AXIS_Y_FORWARD, OBJ_AXIS_Z_UP, forward, up, axes_transform);
+  /* mat3_from_axis_conversion returns a transposed matrix! */
+  transpose_m3(axes_transform);
   mul_m4_m3m4(world_and_axes_transform_, axes_transform, export_object_eval_->obmat);
-  /* mul_m4_m3m4 does not copy last row of obmat, i.e. location data. */
-  copy_v4_v4(world_and_axes_transform_[3], export_object_eval_->obmat[3]);
+  /* mul_m4_m3m4 does not transform last row of obmat, i.e. location data. */
+  mul_v3_m3v3(world_and_axes_transform_[3], axes_transform, export_object_eval_->obmat[3]);
+  world_and_axes_transform_[3][3] = export_object_eval_->obmat[3][3];
 }
 
 int OBJMesh::tot_vertices() const
@@ -377,8 +379,8 @@ void OBJMesh::calc_loop_normals(const int poly_index, Vector<float3> &r_loop_nor
 {
   r_loop_normals.clear();
   const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
-  const float(*lnors)[3] = (const float(*)[3])(
-      CustomData_get_layer(&export_mesh_eval_->ldata, CD_NORMAL));
+  const float(
+      *lnors)[3] = (const float(*)[3])(CustomData_get_layer(&export_mesh_eval_->ldata, CD_NORMAL));
   for (int loop_of_poly = 0; loop_of_poly < mpoly.totloop; loop_of_poly++) {
     float3 loop_normal;
     copy_v3_v3(loop_normal, lnors[mpoly.loopstart + loop_of_poly]);
