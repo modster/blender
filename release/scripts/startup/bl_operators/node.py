@@ -396,6 +396,14 @@ class NODE_OT_new_attribute_processor_group(Operator):
         node.node_tree = group
         return {'FINISHED'}
 
+def socket_idname_items(self, context):
+    items = []
+    items.append(("NodeSocketFloat", "Float", ""))
+    items.append(("NodeSocketVector", "Vector", ""))
+    items.append(("NodeSocketColor", "Color", ""))
+    items.append(("NodeSocketInt", "Integer", ""))
+    items.append(("NodeSocketBool", "Boolean", ""))
+    return items
 
 class NODE_OT_group_interface_add(Operator):
     bl_idname = "node.group_interface_add"
@@ -403,7 +411,7 @@ class NODE_OT_group_interface_add(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     is_input: BoolProperty()
-    socket_idname: StringProperty()
+    socket_idname: EnumProperty(items=socket_idname_items)
     name: StringProperty()
 
     @classmethod
