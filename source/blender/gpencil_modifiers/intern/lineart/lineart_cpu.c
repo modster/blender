@@ -1403,12 +1403,8 @@ static void lineart_main_discard_out_of_frame_edges(LineartRenderBuffer *rb)
   LineartEdge *e;
   int i;
 
-  float overscan_x = 0.1;
-  float overscan_y = 0.1;
-
 #define LRT_VERT_OUT_OF_BOUND(v) \
-  (v && (v->fbcoord[0] < (-1 - overscan_x) || v->fbcoord[0] > (1 + overscan_x) || \
-         v->fbcoord[1] < (-1 - overscan_y) || v->fbcoord[1] > (1 + overscan_y)))
+  (v && (v->fbcoord[0] < -1 || v->fbcoord[0] > 1 || v->fbcoord[1] < -1 || v->fbcoord[1] > 1))
 
   LISTBASE_FOREACH (LineartElementLinkNode *, eln, &rb->line_buffer_pointers) {
     e = (LineartEdge *)eln->pointer;
