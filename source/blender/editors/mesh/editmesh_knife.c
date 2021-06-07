@@ -89,7 +89,7 @@
 #define KNIFE_FLT_EPS_PX_EDGE 0.05f
 #define KNIFE_FLT_EPS_PX_FACE 0.05f
 
-#define KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT 5.0f
+#define KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT 30.0f
 #define KNIFE_MIN_ANGLE_SNAPPING_INCREMENT 0.0f
 #define KNIFE_MAX_ANGLE_SNAPPING_INCREMENT 90.0f
 
@@ -2920,11 +2920,20 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   bool handled = false;
+  float snapping_increment_temp;
+
   if (kcd->angle_snapping) {
+    /* Modal numinput active, try to handle numeric inputs first... */
     if (event->val == KM_PRESS && hasNumInput(&kcd->num) && handleNumInput(C, &kcd->num, event)) {
-      applyNumInput(&kcd->num, &kcd->angle_snapping_increment);
-      knife_update_header(C, op, kcd);
       handled = true;
+      applyNumInput(&kcd->num, &snapping_increment_temp);
+      /* Restrict number key input to 0 - 90 degree range */
+      if (snapping_increment_temp > KNIFE_MIN_ANGLE_SNAPPING_INCREMENT &&
+          snapping_increment_temp < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) {
+        kcd->angle_snapping_increment = snapping_increment_temp;
+      }
+      knife_update_header(C, op, kcd);
+      return OPERATOR_RUNNING_MODAL;
     }
   }
 
@@ -3098,9 +3107,16 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   if (kcd->angle_snapping) {
+    /* Modal numinput inactive, try to handle numeric inputs last... */
     if (!handled && event->val == KM_PRESS && handleNumInput(C, &kcd->num, event)) {
-      applyNumInput(&kcd->num, &kcd->angle_snapping_increment);
+      applyNumInput(&kcd->num, &snapping_increment_temp);
+      /* Restrict number key input to 0 - 90 degree range */
+      if (snapping_increment_temp > KNIFE_MIN_ANGLE_SNAPPING_INCREMENT &&
+          snapping_increment_temp < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) {
+        kcd->angle_snapping_increment = snapping_increment_temp;
+      }
       knife_update_header(C, op, kcd);
+      return OPERATOR_RUNNING_MODAL;
     }
   }
 
