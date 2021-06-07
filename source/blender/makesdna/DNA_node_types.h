@@ -1379,10 +1379,6 @@ typedef struct AttributeProcessorOutputSettings {
   struct AttributeProcessorOutputSettings *next, *prev;
 
   char *identifier;
-
-  /* GeometryNodeAttributeProcessorOutputMode. */
-  uint8_t output_mode;
-  char _pad[7];
 } AttributeProcessorOutputSettings;
 
 typedef struct NodeGeometryAttributeProcessor {
@@ -1909,15 +1905,9 @@ typedef enum GeometryNodeAttributeTransferMapMode {
 } GeometryNodeAttributeTransferMapMode;
 
 typedef enum GeometryNodeAttributeProcessorInputMode {
-  GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_DEFAULT = 0,
-  GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_CUSTOM_ATTRIBUTE = 1,
-  GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_CUSTOM_VALUE = 2,
+  GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_VALUE = 0,
+  GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_ATTRIBUTE = 1,
 } GeometryNodeAttributeProcessorInputMode;
-
-typedef enum GeometryNodeAttributeProcessorOutputMode {
-  GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_DEFAULT = 0,
-  GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_CUSTOM = 1,
-} GeometryNodeAttributeProcessorOutputMode;
 
 #ifdef __cplusplus
 }

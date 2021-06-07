@@ -67,9 +67,9 @@ bool geo_node_poll_default(bNodeType *UNUSED(ntype),
   return true;
 }
 
-bool attr_node_poll_default(bNodeType *UNUSED(ntype),
-                            bNodeTree *ntree,
-                            const char **r_disabled_hint)
+static bool attr_node_poll_default(bNodeType *UNUSED(ntype),
+                                   bNodeTree *ntree,
+                                   const char **r_disabled_hint)
 {
   if (!STREQ(ntree->idname, "AttributeNodeTree")) {
     *r_disabled_hint = "Not a attribute node tree";

@@ -9975,21 +9975,16 @@ static void def_geo_input_material(StructRNA *srna)
 static void def_geo_attribute_processor_group_input(BlenderRNA *brna)
 {
   static EnumPropertyItem input_mode_items[] = {
-      {GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_DEFAULT,
-       "DEFAULT",
+      {GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_VALUE,
+       "VALUE",
        0,
-       "Default",
-       "Use the default value or attribute used by the group"},
-      {GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_CUSTOM_ATTRIBUTE,
-       "CUSTOM_ATTRIBUTE",
+       "Value",
+       "Pass a value into the group"},
+      {GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_ATTRIBUTE,
+       "ATTRIBUTE",
        0,
-       "Custom Attribute",
-       "Pass a custom attribute name into the group"},
-      {GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_CUSTOM_VALUE,
-       "CUSTOM_VALUE",
-       0,
-       "Custom Value",
-       "Pass a custom value into the group"},
+       "Attribute",
+       "Pass a attribute name into the group"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -10012,20 +10007,6 @@ static void def_geo_attribute_processor_group_input(BlenderRNA *brna)
 
 static void def_geo_attribute_processor_group_output(BlenderRNA *brna)
 {
-  static EnumPropertyItem output_mode_items[] = {
-      {GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_DEFAULT,
-       "DEFAULT",
-       0,
-       "Default",
-       "Use the name of the output that is used in the group"},
-      {GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_CUSTOM,
-       "CUSTOM",
-       0,
-       "Custom Name",
-       "Use a custom name for the output attribute"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   StructRNA *srna;
   PropertyRNA *prop;
 
@@ -10035,12 +10016,6 @@ static void def_geo_attribute_processor_group_output(BlenderRNA *brna)
   prop = RNA_def_property(srna, "identifier", PROP_STRING, PROP_NONE);
   RNA_def_property_ui_text(prop, "identifier", "Identifier of the matching socket in the group");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-
-  prop = RNA_def_property(srna, "output_mode", PROP_ENUM, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Output Mode", "How group output name is determined");
-  RNA_def_property_enum_items(prop, output_mode_items);
-  RNA_def_property_update(
-      prop, NC_NODE | NA_EDITED, "rna_GeometryNodeAttributeProcessor_mode_update");
 }
 
 static void def_geo_attribute_processor(StructRNA *srna)
