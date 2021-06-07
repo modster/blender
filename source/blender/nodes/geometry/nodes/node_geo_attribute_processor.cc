@@ -214,8 +214,12 @@ static void geo_node_attribute_processor_group_update(bNodeTree *ntree, bNode *n
     }
     else {
       new_inputs_settings.add_new(input_settings);
-      new_inputs.add_new(old_inputs_by_identifier.lookup(identifier1));
-      new_inputs.add_new(old_inputs_by_identifier.lookup(identifier2));
+      bNodeSocket *sock_value = old_inputs_by_identifier.lookup(identifier1);
+      bNodeSocket *sock_attribute = old_inputs_by_identifier.lookup(identifier2);
+      STRNCPY(sock_value->name, interface_sock->name);
+      STRNCPY(sock_attribute->name, interface_sock->name);
+      new_inputs.add_new(sock_value);
+      new_inputs.add_new(sock_attribute);
     }
   }
   LISTBASE_FOREACH (bNodeSocket *, interface_sock, &ngroup_outputs) {
@@ -237,7 +241,9 @@ static void geo_node_attribute_processor_group_update(bNodeTree *ntree, bNode *n
     }
     else {
       new_output_settings.add_new(output_settings);
-      new_inputs.add_new(old_inputs_by_identifier.lookup(identifier));
+      bNodeSocket *socket = old_inputs_by_identifier.lookup(identifier);
+      STRNCPY(socket->name, interface_sock->name);
+      new_inputs.add_new(socket);
     }
   }
 
