@@ -299,6 +299,7 @@
     .chaining_image_threshold = 0.001f, \
     .stroke_offset = 0.05,\
     .chain_smooth_tolerance = 0.0f,\
+    .overscan = 0.1f,\
   }
 
 #define _DNA_DEFAULT_LengthGpencilModifierData \

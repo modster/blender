@@ -2042,7 +2042,7 @@ static void lineart_main_load_geometries(
     if (fit == CAMERA_SENSOR_FIT_HOR && asp < 1) {
       sensor /= asp;
     }
-    double fov = focallength_to_fov(cam->lens, sensor);
+    double fov = focallength_to_fov(cam->lens / (1 + rb->overscan), sensor);
     lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
   }
   else if (cam->type == CAM_ORTHO) {
@@ -3013,6 +3013,11 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   int fit = BKE_camera_sensor_fit(c->sensor_fit, rb->w, rb->h);
   rb->shift_x = fit == CAMERA_SENSOR_FIT_HOR ? c->shiftx : c->shiftx / asp;
   rb->shift_y = fit == CAMERA_SENSOR_FIT_VERT ? c->shifty : c->shifty * asp;
+
+  rb->overscan = lmd->overscan;
+
+  rb->shift_x /= (1 + rb->overscan);
+  rb->shift_y /= (1 + rb->overscan);
 
   rb->crease_threshold = cos(M_PI - lmd->crease_threshold);
   rb->chaining_image_threshold = lmd->chaining_image_threshold;
