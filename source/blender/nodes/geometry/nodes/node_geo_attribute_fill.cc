@@ -110,7 +110,7 @@ static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams
       break;
     }
     case CD_PROP_COLOR: {
-      const Color4f value = params.get_input<Color4f>("Value_002");
+      const ColorGeometry4f value = params.get_input<ColorGeometry4f>("Value_002");
       attribute->fill(&value);
       break;
     }
@@ -142,6 +142,9 @@ static void geo_node_attribute_fill_exec(GeoNodeExecParams params)
   }
   if (geometry_set.has<PointCloudComponent>()) {
     fill_attribute(geometry_set.get_component_for_write<PointCloudComponent>(), params);
+  }
+  if (geometry_set.has<CurveComponent>()) {
+    fill_attribute(geometry_set.get_component_for_write<CurveComponent>(), params);
   }
 
   params.set_output("Geometry", geometry_set);

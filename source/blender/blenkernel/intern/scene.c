@@ -742,7 +742,8 @@ static void scene_foreach_id(ID *id, LibraryForeachIDData *data)
     BKE_LIB_FOREACHID_PROCESS(data, view_layer->mat_override, IDWALK_CB_USER);
 
     LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
-      BKE_LIB_FOREACHID_PROCESS(data, base->object, IDWALK_CB_NOP);
+      BKE_LIB_FOREACHID_PROCESS(
+          data, base->object, IDWALK_CB_NOP | IDWALK_CB_OVERRIDE_LIBRARY_NOT_OVERRIDABLE);
     }
 
     scene_foreach_layer_collection(data, &view_layer->layer_collections);
@@ -1984,8 +1985,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
     const bool is_subprocess = false;
 
     if (!is_subprocess) {
-      BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-      BKE_main_id_clear_newpoins(bmain);
+      BKE_main_id_newptr_and_tag_clear(bmain);
       /* In case root duplicated ID is linked, assume we want to get a local copy of it and
        * duplicate all expected linked data. */
       if (ID_IS_LINKED(sce)) {
@@ -2026,8 +2026,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
 #endif
 
       /* Cleanup. */
-      BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-      BKE_main_id_clear_newpoins(bmain);
+      BKE_main_id_newptr_and_tag_clear(bmain);
 
       BKE_main_collection_sync(bmain);
     }

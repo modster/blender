@@ -3046,6 +3046,10 @@ static void rna_SpaceSpreadsheet_geometry_component_type_update(Main *UNUSED(bma
   if (sspreadsheet->geometry_component_type == GEO_COMPONENT_TYPE_POINT_CLOUD) {
     sspreadsheet->attribute_domain = ATTR_DOMAIN_POINT;
   }
+  if (sspreadsheet->geometry_component_type == GEO_COMPONENT_TYPE_CURVE &&
+      !ELEM(sspreadsheet->attribute_domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CURVE)) {
+    sspreadsheet->attribute_domain = ATTR_DOMAIN_POINT;
+  }
 }
 
 const EnumPropertyItem *rna_SpaceSpreadsheet_attribute_domain_itemf(bContext *UNUSED(C),
@@ -3088,6 +3092,11 @@ const EnumPropertyItem *rna_SpaceSpreadsheet_attribute_domain_itemf(bContext *UN
     }
     if (component_type == GEO_COMPONENT_TYPE_POINT_CLOUD) {
       if (item->value != ATTR_DOMAIN_POINT) {
+        continue;
+      }
+    }
+    if (component_type == GEO_COMPONENT_TYPE_CURVE) {
+      if (!ELEM(item->value, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CURVE)) {
         continue;
       }
     }
@@ -4120,6 +4129,14 @@ static void rna_def_space_view3d_overlay(BlenderRNA *brna)
       prop, "Fade Inactive Objects", "Fade inactive geometry using the viewport background color");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
+  prop = RNA_def_property(srna, "show_mode_transfer", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "overlay.flag", V3D_OVERLAY_MODE_TRANSFER);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(prop,
+                           "Flash on Mode Transfer",
+                           "Flash the target object when tranfering the active mode to it");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
   prop = RNA_def_property(srna, "fade_inactive_alpha", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_float_sdna(prop, NULL, "overlay.fade_alpha");
   RNA_def_property_ui_text(prop, "Opacity", "Strength of the fade effect");
@@ -4483,7 +4500,6 @@ static void rna_def_space_view3d_overlay(BlenderRNA *brna)
   prop = RNA_def_property(srna, "gpencil_vertex_paint_opacity", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_float_sdna(prop, NULL, "overlay.gpencil_vertex_paint_opacity");
   RNA_def_property_range(prop, 0.0f, 1.0f);
-  RNA_def_property_float_default(prop, 1.0f);
   RNA_def_property_ui_text(prop, "Opacity", "Vertex Paint mix factor");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_GPencil_update");
 }
@@ -5458,7 +5474,7 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_USE_PROXIES);
   RNA_def_property_ui_text(
       prop, "Use Proxies", "Use optimized files for faster scrubbing when available");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, "rna_SequenceEditor_update_cache");
 
   /* grease pencil */
   prop = RNA_def_property(srna, "grease_pencil", PROP_POINTER, PROP_NONE);
@@ -7485,6 +7501,11 @@ static void rna_def_space_spreadsheet(BlenderRNA *brna)
        ICON_POINTCLOUD_DATA,
        "Point Cloud",
        "Point cloud component containing only point data"},
+      {GEO_COMPONENT_TYPE_CURVE,
+       "CURVE",
+       ICON_CURVE_DATA,
+       "Curve",
+       "Curve component containing spline and control point data"},
       {GEO_COMPONENT_TYPE_INSTANCES,
        "INSTANCES",
        ICON_EMPTY_AXIS,

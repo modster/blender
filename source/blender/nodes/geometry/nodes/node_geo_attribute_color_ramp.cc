@@ -14,6 +14,8 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_task.hh"
+
 #include "BKE_colorband.h"
 
 #include "UI_interface.h"
@@ -41,6 +43,14 @@ static void geo_node_attribute_color_ramp_layout(uiLayout *layout,
 }
 
 namespace blender::nodes {
+
+static void geo_node_attribute_color_ramp_init(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  NodeAttributeColorRamp *node_storage = (NodeAttributeColorRamp *)MEM_callocN(
+      sizeof(NodeAttributeColorRamp), __func__);
+  BKE_colorband_init(&node_storage->color_ramp, true);
+  node->storage = node_storage;
+}
 
 static AttributeDomain get_result_domain(const GeometryComponent &component,
                                          StringRef input_name,
@@ -73,8 +83,8 @@ static void execute_on_component(const GeoNodeExecParams &params, GeometryCompon
    * currently. */
   const AttributeDomain result_domain = get_result_domain(component, input_name, result_name);
 
-  OutputAttribute_Typed<Color4f> attribute_result =
-      component.attribute_try_get_for_output_only<Color4f>(result_name, result_domain);
+  OutputAttribute_Typed<ColorGeometry4f> attribute_result =
+      component.attribute_try_get_for_output_only<ColorGeometry4f>(result_name, result_domain);
   if (!attribute_result) {
     return;
   }
@@ -82,12 +92,14 @@ static void execute_on_component(const GeoNodeExecParams &params, GeometryCompon
   GVArray_Typed<float> attribute_in = component.attribute_get_for_read<float>(
       input_name, result_domain, 0.0f);
 
-  MutableSpan<Color4f> results = attribute_result.as_span();
+  MutableSpan<ColorGeometry4f> results = attribute_result.as_span();
 
   ColorBand *color_ramp = &node_storage->color_ramp;
-  for (const int i : IndexRange(attribute_in.size())) {
-    BKE_colorband_evaluate(color_ramp, attribute_in[i], results[i]);
-  }
+  parallel_for(IndexRange(attribute_in.size()), 512, [&](IndexRange range) {
+    for (const int i : range) {
+      BKE_colorband_evaluate(color_ramp, attribute_in[i], results[i]);
+    }
+  });
 
   attribute_result.save();
 }
@@ -104,16 +116,11 @@ static void geo_node_attribute_color_ramp_exec(GeoNodeExecParams params)
   if (geometry_set.has<PointCloudComponent>()) {
     execute_on_component(params, geometry_set.get_component_for_write<PointCloudComponent>());
   }
+  if (geometry_set.has<CurveComponent>()) {
+    execute_on_component(params, geometry_set.get_component_for_write<CurveComponent>());
+  }
 
   params.set_output("Geometry", std::move(geometry_set));
-}
-
-static void geo_node_attribute_color_ramp_init(bNodeTree *UNUSED(ntree), bNode *node)
-{
-  NodeAttributeColorRamp *node_storage = (NodeAttributeColorRamp *)MEM_callocN(
-      sizeof(NodeAttributeColorRamp), __func__);
-  BKE_colorband_init(&node_storage->color_ramp, true);
-  node->storage = node_storage;
 }
 
 }  // namespace blender::nodes

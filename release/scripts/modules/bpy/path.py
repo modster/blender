@@ -198,6 +198,7 @@ def _clean_utf8(name):
 _display_name_literals = {
     ":": "_colon_",
     "+": "_plus_",
+    "/": "_slash_",
 }
 
 
@@ -370,7 +371,7 @@ def module_names(path, recursive=False):
 
 def basename(path):
     """
-    Equivalent to os.path.basename, but skips a "//" prefix.
+    Equivalent to ``os.path.basename``, but skips a "//" prefix.
 
     Use for Windows compatibility.
     """

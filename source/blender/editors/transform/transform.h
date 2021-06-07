@@ -46,6 +46,7 @@
  * \{ */
 
 struct ARegion;
+struct BMPartialUpdate;
 struct Depsgraph;
 struct NumInput;
 struct Object;
@@ -155,11 +156,11 @@ typedef enum {
 
 /** #TransInfo.modifiers */
 typedef enum {
-  MOD_CONSTRAINT_SELECT = 1 << 0,
+  MOD_CONSTRAINT_SELECT_AXIS = 1 << 0,
   MOD_PRECISION = 1 << 1,
   MOD_SNAP = 1 << 2,
   MOD_SNAP_INVERT = 1 << 3,
-  MOD_CONSTRAINT_PLANE = 1 << 4,
+  MOD_CONSTRAINT_SELECT_PLANE = 1 << 4,
 } eTModifier;
 
 /** #TransSnap.status */
@@ -433,14 +434,14 @@ typedef struct TransCustomDataContainer {
 /**
  * Container for Transform Data
  *
- * Used to implement multi-object modes, so each object can have it's
+ * Used to implement multi-object modes, so each object can have its
  * own data array as well as object matrix, local center etc.
  *
  * Anything that can't be shared between all objects
  * and doesn't make sense to store for every vertex (in the #TransDataContainer.data).
  *
  * \note at some point this could be used to store non object containers
- * although this only makes sense if each container has it's own matrices,
+ * although this only makes sense if each container has its own matrices,
  * otherwise all elements may as well be stored in one array (#TransDataContainer.data),
  * as is already done for curve-objects, f-curves. etc.
  */
@@ -599,11 +600,18 @@ typedef struct TransInfo {
    * mouse button then.) */
   bool is_launch_event_tweak;
 
+  bool is_orient_set;
+
   struct {
     short type;
     float matrix[3][3];
   } orient[3];
-  short orient_curr;
+
+  enum {
+    O_DEFAULT = 0,
+    O_SCENE,
+    O_SET,
+  } orient_curr;
 
   /** backup from view3d, to restore on end. */
   short gizmo_flag;
