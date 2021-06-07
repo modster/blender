@@ -28,7 +28,7 @@ void register_node_type_attr_index()
 {
   static bNodeType ntype;
 
-  attr_node_type_base(&ntype, ATTR_NODE_INDEX, "Index", NODE_CLASS_ATTRIBUTE, 0);
+  attr_node_type_base(&ntype, ATTR_NODE_INDEX, "Index", NODE_CLASS_INPUT, 0);
   node_type_socket_templates(&ntype, nullptr, attr_node_index_out);
   nodeRegisterType(&ntype);
 }
