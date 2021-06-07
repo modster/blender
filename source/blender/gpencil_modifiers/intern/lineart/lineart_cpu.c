@@ -1677,7 +1677,27 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 
   int usage = obi->usage;
 
-  bm = obi->original_bm;
+  if (obi->original_me->edit_mesh) {
+    /* Do not use edit_mesh directly because we will modify it, so create a copy. */
+    bm = BM_mesh_copy(obi->original_me->edit_mesh->bm);
+  }
+  else {
+    const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(((Mesh *)(obi->original_me)));
+    bm = BM_mesh_create(&allocsize,
+                        &((struct BMeshCreateParams){
+                            .use_toolflags = true,
+                        }));
+    BM_mesh_bm_from_me(bm,
+                       obi->original_me,
+                       &((struct BMeshFromMeshParams){
+                           .calc_face_normal = true,
+                       }));
+  }
+
+  if (obi->free_use_mesh) {
+    BKE_mesh_free(obi->original_me);
+    MEM_freeN(obi->original_me);
+  }
 
   if (rb->remove_doubles) {
     BMEditMesh *em = BKE_editmesh_create(bm, false);
@@ -2109,28 +2129,8 @@ static void lineart_main_load_geometries(
       continue;
     }
 
-    if (use_mesh->edit_mesh) {
-      /* Do not use edit_mesh directly because we will modify it, so create a copy. */
-      bm = BM_mesh_copy(use_mesh->edit_mesh->bm);
-    }
-    else {
-      const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(((Mesh *)(use_mesh)));
-      bm = BM_mesh_create(&allocsize,
-                          &((struct BMeshCreateParams){
-                              .use_toolflags = true,
-                          }));
-      BM_mesh_bm_from_me(bm,
-                         use_mesh,
-                         &((struct BMeshFromMeshParams){
-                             .calc_face_normal = true,
-                         }));
-    }
-
-    /* We don't need the plain "mesh" data anymore, only BMesh post-processing is done in
-     * threads. The workers will free obi->bm */
     if (ob->type != OB_MESH) {
-      BKE_mesh_free(use_mesh);
-      MEM_freeN(use_mesh);
+      obi->free_use_mesh = true;
     }
 
     /* Prepare the matrix used for transforming this specific object (instance).  */
@@ -2141,9 +2141,9 @@ static void lineart_main_load_geometries(
     transpose_m4(imat);
     copy_m4d_m4(obi->normal, imat);
 
-    obi->original_bm = bm;
+    obi->original_me = use_mesh;
     obi->original_ob = (ob->id.orig_id ? (Object *)ob->id.orig_id : (Object *)ob);
-    lineart_geometry_load_assign_thread(olti, obi, thread_count, bm->totface);
+    lineart_geometry_load_assign_thread(olti, obi, thread_count, use_mesh->totpoly);
   }
   DEG_OBJECT_ITER_END;
 

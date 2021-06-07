@@ -384,7 +384,7 @@ struct BMesh;
 typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
   struct Object *original_ob;
-  struct BMesh *original_bm;
+  struct Mesh *original_me;
   double model_view_proj[4][4];
   double model_view[4][4];
   double normal[4][4];
@@ -393,8 +393,10 @@ typedef struct LineartObjectInfo {
   unsigned char override_intersection_mask;
   int global_i_offset;
 
-  /* Threads will add lines inside here, when all threads are done, we combine those into the ones
-   * in LineartRenderBuffer.  */
+  bool free_use_mesh;
+
+  /* Threads will add lines inside here, when all threads are done, we combine those into the
+   * ones in LineartRenderBuffer.  */
   ListBase contour;
   ListBase intersection;
   ListBase crease;
