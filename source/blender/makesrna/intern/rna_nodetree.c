@@ -81,17 +81,7 @@ static const EnumPropertyItem node_socket_data_type_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-#ifndef RNA_RUNTIME
-static const EnumPropertyItem rna_enum_node_socket_display_shape_items[] = {
-    {SOCK_DISPLAY_SHAPE_CIRCLE, "CIRCLE", 0, "Circle", ""},
-    {SOCK_DISPLAY_SHAPE_SQUARE, "SQUARE", 0, "Square", ""},
-    {SOCK_DISPLAY_SHAPE_DIAMOND, "DIAMOND", 0, "Diamond", ""},
-    {SOCK_DISPLAY_SHAPE_CIRCLE_DOT, "CIRCLE_DOT", 0, "Circle with inner dot", ""},
-    {SOCK_DISPLAY_SHAPE_SQUARE_DOT, "SQUARE_DOT", 0, "Square with inner dot", ""},
-    {SOCK_DISPLAY_SHAPE_DIAMOND_DOT, "DIAMOND_DOT", 0, "Diamond with inner dot", ""},
-    {0, NULL, 0, NULL, NULL}};
-
-static const EnumPropertyItem node_socket_type_items[] = {
+const EnumPropertyItem rna_enum_node_socket_type_items[] = {
     {SOCK_CUSTOM, "CUSTOM", 0, "Custom", ""},
     {SOCK_FLOAT, "VALUE", 0, "Value", ""},
     {SOCK_INT, "INT", 0, "Integer", ""},
@@ -108,6 +98,16 @@ static const EnumPropertyItem node_socket_type_items[] = {
     {SOCK_MATERIAL, "MATERIAL", 0, "Material", ""},
     {0, NULL, 0, NULL, NULL},
 };
+
+#ifndef RNA_RUNTIME
+static const EnumPropertyItem rna_enum_node_socket_display_shape_items[] = {
+    {SOCK_DISPLAY_SHAPE_CIRCLE, "CIRCLE", 0, "Circle", ""},
+    {SOCK_DISPLAY_SHAPE_SQUARE, "SQUARE", 0, "Square", ""},
+    {SOCK_DISPLAY_SHAPE_DIAMOND, "DIAMOND", 0, "Diamond", ""},
+    {SOCK_DISPLAY_SHAPE_CIRCLE_DOT, "CIRCLE_DOT", 0, "Circle with inner dot", ""},
+    {SOCK_DISPLAY_SHAPE_SQUARE_DOT, "SQUARE_DOT", 0, "Square with inner dot", ""},
+    {SOCK_DISPLAY_SHAPE_DIAMOND_DOT, "DIAMOND_DOT", 0, "Diamond with inner dot", ""},
+    {0, NULL, 0, NULL, NULL}};
 
 static const EnumPropertyItem node_quality_items[] = {
     {NTREE_QUALITY_HIGH, "HIGH", 0, "High", "High quality"},
@@ -6285,7 +6285,7 @@ static void def_sh_script(StructRNA *srna)
   RNA_def_function_flag(func, FUNC_USE_SELF_ID);
   parm = RNA_def_string(func, "name", NULL, 0, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_enum(func, "type", node_socket_type_items, SOCK_FLOAT, "Type", "");
+  parm = RNA_def_enum(func, "type", rna_enum_node_socket_type_items, SOCK_FLOAT, "Type", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   /*parm =*/RNA_def_boolean(func, "is_output", false, "Output", "Whether the socket is an output");
   parm = RNA_def_pointer(func, "result", "NodeSocket", "", "");
@@ -10219,7 +10219,7 @@ static void rna_def_node_socket(BlenderRNA *brna)
    */
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "type");
-  RNA_def_property_enum_items(prop, node_socket_type_items);
+  RNA_def_property_enum_items(prop, rna_enum_node_socket_type_items);
   RNA_def_property_enum_default(prop, SOCK_FLOAT);
   RNA_def_property_enum_funcs(prop, NULL, "rna_NodeSocket_type_set", NULL);
   RNA_def_property_ui_text(prop, "Type", "Data type");
@@ -10962,7 +10962,7 @@ static void rna_def_node_socket_standard_types(BlenderRNA *brna)
   /* for easier type comparison in python */
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "typeinfo->type");
-  RNA_def_property_enum_items(prop, node_socket_type_items);
+  RNA_def_property_enum_items(prop, rna_enum_node_socket_type_items);
   RNA_def_property_enum_default(prop, SOCK_FLOAT);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Type", "Data type");
@@ -11082,7 +11082,7 @@ static void rna_def_internal_node(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_funcs(prop, "rna_NodeInternalSocketTemplate_type_get", NULL, NULL);
-  RNA_def_property_enum_items(prop, node_socket_type_items);
+  RNA_def_property_enum_items(prop, rna_enum_node_socket_type_items);
   RNA_def_property_ui_text(prop, "Type", "Data type of the socket");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
@@ -11843,7 +11843,7 @@ static void rna_def_nodetree(BlenderRNA *brna)
   func = RNA_def_function(srna, "valid_socket_type", NULL);
   RNA_def_function_ui_description(func, "Check if the socket type is valid for the node tree");
   RNA_def_function_flag(func, FUNC_NO_SELF | FUNC_REGISTER_OPTIONAL);
-  parm = RNA_def_enum(func, "type", node_socket_type_items, 0, "", "");
+  parm = RNA_def_enum(func, "type", rna_enum_node_socket_type_items, 0, "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   RNA_def_function_return(func, RNA_def_boolean(func, "valid", false, "", ""));
 }

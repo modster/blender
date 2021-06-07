@@ -50,6 +50,7 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_enum_types.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -1135,6 +1136,108 @@ void NODE_OT_group_insert(wmOperatorType *ot)
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Group Interface Adds Operator
+ * \{ */
+
+static int node_group_interface_add_invoke(bContext *C,
+                                           wmOperator *op,
+                                           const wmEvent *UNUSED(event))
+{
+  return WM_operator_props_dialog_popup(C, op, 200);
+}
+
+static int node_group_interface_add_exec(bContext *C, wmOperator *op)
+{
+  Main *bmain = CTX_data_main(C);
+  SpaceNode *snode = CTX_wm_space_node(C);
+  bNodeTree *ntree = snode->edittree;
+
+  const eNodeSocketInOut in_out = (eNodeSocketInOut)RNA_enum_get(op->ptr, "in_out");
+  const eNodeSocketDatatype type = (eNodeSocketDatatype)RNA_enum_get(op->ptr, "type");
+  char *name = RNA_string_get_alloc(op->ptr, "name", nullptr, 0);
+
+  const char *socket_idname = nullptr;
+  NODE_SOCKET_TYPES_BEGIN (st) {
+    if (st->type == type && st->subtype == PROP_NONE) {
+      socket_idname = st->idname;
+      break;
+    }
+  }
+  NODE_SOCKET_TYPES_END;
+  BLI_assert(socket_idname != nullptr);
+
+  ntreeAddSocketInterface(ntree, in_out, socket_idname, name);
+
+  if (name != nullptr) {
+    MEM_freeN(name);
+  }
+
+  ntreeUpdateTree(bmain, ntree);
+  snode_notify(C, snode);
+  snode_dag_update(C, snode);
+
+  return OPERATOR_FINISHED;
+}
+
+static const EnumPropertyItem *node_group_interface_add_type_items(bContext *C,
+                                                                   PointerRNA *UNUSED(ptr),
+                                                                   PropertyRNA *UNUSED(prop),
+                                                                   bool *r_free)
+{
+  EnumPropertyItem *items = nullptr;
+  int totitem = 0;
+
+  SpaceNode *snode = CTX_wm_space_node(C);
+  bNodeTree *ntree = snode->edittree;
+
+  for (const EnumPropertyItem *item = rna_enum_node_socket_type_items; item->identifier; item++) {
+    if (ntree->typeinfo->valid_socket_type((eNodeSocketDatatype)item->value, ntree->typeinfo)) {
+      RNA_enum_item_add(&items, &totitem, item);
+    }
+  }
+  RNA_enum_item_end(&items, &totitem);
+
+  *r_free = true;
+  return items;
+}
+
+static void node_group_interface_add_ui(bContext *UNUSED(C), wmOperator *op)
+{
+  uiLayout *layout = op->layout;
+  uiLayoutSetActivateInit(layout, true);
+  uiItemR(layout, op->ptr, "name", 0, "Name", ICON_NONE);
+  uiItemR(layout, op->ptr, "type", 0, "Type", ICON_NONE);
+}
+
+void NODE_OT_group_interface_add(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Group Interface Add";
+  ot->description = "Add interface to node group";
+  ot->idname = "NODE_OT_group_interface_add";
+
+  /* api callbacks */
+  ot->invoke = node_group_interface_add_invoke;
+  ot->exec = node_group_interface_add_exec;
+  ot->poll = node_group_operator_editable;
+  ot->ui = node_group_interface_add_ui;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  PropertyRNA *prop;
+
+  RNA_def_enum(ot->srna, "in_out", rna_enum_node_socket_in_out_items, SOCK_IN, "Socket Side", "");
+
+  RNA_def_string(ot->srna, "name", nullptr, MAX_NAME, "Name", "Name of the new interface socket");
+
+  prop = RNA_def_property(ot->srna, "type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_funcs_runtime(prop, nullptr, nullptr, node_group_interface_add_type_items);
 }
 
 /** \} */

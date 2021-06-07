@@ -634,7 +634,7 @@ static void node_draw_buttons_group_input(uiLayout *layout, bContext *UNUSED(C),
               WM_OP_INVOKE_DEFAULT,
               0,
               &props);
-  RNA_boolean_set(&props, "is_input", true);
+  RNA_enum_set(&props, "in_out", SOCK_IN);
 }
 
 static void node_draw_buttons_group_output(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -653,7 +653,7 @@ static void node_draw_buttons_group_output(uiLayout *layout, bContext *UNUSED(C)
               WM_OP_INVOKE_DEFAULT,
               0,
               &props);
-  RNA_boolean_set(&props, "is_input", false);
+  RNA_enum_set(&props, "in_out", SOCK_OUT);
 }
 
 static void node_common_set_butfunc(bNodeType *ntype)

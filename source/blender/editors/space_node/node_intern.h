@@ -224,6 +224,7 @@ void NODE_OT_group_insert(struct wmOperatorType *ot);
 void NODE_OT_group_ungroup(struct wmOperatorType *ot);
 void NODE_OT_group_separate(struct wmOperatorType *ot);
 void NODE_OT_group_edit(struct wmOperatorType *ot);
+void NODE_OT_group_interface_add(struct wmOperatorType *ot);
 
 /* node_relationships.c */
 void sort_multi_input_socket_links(struct SpaceNode *snode,
