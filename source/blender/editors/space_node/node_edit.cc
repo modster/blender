@@ -753,7 +753,7 @@ void ED_node_set_active(Main *bmain, bNodeTree *ntree, bNode *node, bool *r_acti
           ED_node_tag_update_nodetree(bmain, ntree, node);
         }
 
-        /* addnode() doesn't link this yet... */
+        /* Adding a node doesn't link this yet. */
         node->id = (ID *)BKE_image_ensure_viewer(bmain, IMA_TYPE_COMPOSITE, "Viewer Node");
       }
       else if (node->type == CMP_NODE_COMPOSITE) {
@@ -1472,7 +1472,7 @@ int node_render_changed_exec(bContext *C, wmOperator *UNUSED(op))
       RNA_string_set(&op_ptr, "layer", view_layer->name);
       RNA_string_set(&op_ptr, "scene", sce->id.name + 2);
 
-      /* to keep keypositions */
+      /* To keep keyframe positions. */
       sce->r.scemode |= R_NO_FRAME_UPDATE;
 
       WM_operator_name_call(C, "RENDER_OT_render", WM_OP_INVOKE_DEFAULT, &op_ptr);
