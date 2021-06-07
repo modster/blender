@@ -186,8 +186,8 @@ void MaterialModule::begin_sync(void)
 }
 
 MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
-                                               eMaterialGeometry geometry_type,
-                                               eMaterialDomain domain_type)
+                                               eMaterialPipeline pipeline_type,
+                                               eMaterialGeometry geometry_type)
 {
   bNodeTree *ntree = (blender_mat->use_nodes && blender_mat->nodetree != nullptr) ?
                          blender_mat->nodetree :
@@ -195,13 +195,7 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
 
   MaterialPass matpass;
   matpass.gpumat = inst_.shaders.material_shader_get(
-      blender_mat, ntree, geometry_type, domain_type, true);
-
-  if (GPU_material_recalc_flag_get(matpass.gpumat)) {
-    inst_.sampling.reset();
-  }
-
-  ShaderKey shader_key(matpass.gpumat, blender_mat, geometry_type, domain_type);
+      blender_mat, ntree, pipeline_type, geometry_type, true);
 
   switch (GPU_material_status(matpass.gpumat)) {
     case GPU_MAT_SUCCESS:
@@ -211,56 +205,74 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
       blender_mat = (geometry_type == MAT_GEOM_VOLUME) ? BKE_material_default_volume() :
                                                          BKE_material_default_surface();
       matpass.gpumat = inst_.shaders.material_shader_get(
-          blender_mat, blender_mat->nodetree, geometry_type, domain_type, false);
+          blender_mat, blender_mat->nodetree, pipeline_type, geometry_type, false);
       break;
     case GPU_MAT_FAILED:
     default:
       matpass.gpumat = inst_.shaders.material_shader_get(
-          error_mat_, error_mat_->nodetree, geometry_type, domain_type, false);
+          error_mat_, error_mat_->nodetree, pipeline_type, geometry_type, false);
       break;
   }
   /* Returned material should be ready to be drawn. */
   BLI_assert(GPU_material_status(matpass.gpumat) == GPU_MAT_SUCCESS);
 
-  /* TODO allocate in blocks to avoid memory fragmentation. */
-  auto add_cb = [&]() { return new DRWShadingGroup *(); };
-  DRWShadingGroup *&grp = *shader_map_.lookup_or_add_cb(shader_key, add_cb);
+  if (GPU_material_recalc_flag_get(matpass.gpumat)) {
+    inst_.sampling.reset();
+  }
 
-  if (grp == nullptr) {
-    /* First time encountering this shader. Create a shading group. */
-    if (domain_type == MAT_DOMAIN_SURFACE) {
-      if (blender_mat->blend_method == MA_BM_BLEND) {
-        grp = inst_.shading_passes.forward.material_add(matpass.gpumat);
-      }
-      else {
-        grp = inst_.shading_passes.deferred.material_add(blender_mat, matpass.gpumat);
-      }
-    }
-    else {
-      grp = inst_.shading_passes.shadow.material_add(matpass.gpumat);
-    }
+  if ((pipeline_type == MAT_PIPE_DEFERRED) &&
+      GPU_material_flag_get(matpass.gpumat, GPU_MATFLAG_SHADER_TO_RGBA)) {
+    pipeline_type = MAT_PIPE_FORWARD;
+  }
+
+  if ((pipeline_type == MAT_PIPE_FORWARD) &&
+      GPU_material_flag_get(matpass.gpumat, GPU_MATFLAG_TRANSPARENT)) {
+    /* Transparent needs to use one shgroup per object to support reordering. */
+    matpass.shgrp = inst_.shading_passes.material_add(blender_mat, matpass.gpumat, pipeline_type);
   }
   else {
-    /* Shading group for this shader already exists. Create a sub one for this material. */
-    grp = DRW_shgroup_create_sub(grp);
-    DRW_shgroup_add_material_resources(grp, matpass.gpumat);
+    ShaderKey shader_key(matpass.gpumat, geometry_type, pipeline_type);
+
+    /* TODO(fclem) allocate in blocks to avoid memory fragmentation. */
+    auto add_cb = [&]() { return new DRWShadingGroup *(); };
+    DRWShadingGroup *&grp = *shader_map_.lookup_or_add_cb(shader_key, add_cb);
+
+    if (grp == nullptr) {
+      /* First time encountering this shader. Create a shading group. */
+      grp = inst_.shading_passes.material_add(blender_mat, matpass.gpumat, pipeline_type);
+    }
+    else {
+      /* Shading group for this shader already exists. Create a sub one for this material. */
+      grp = DRW_shgroup_create_sub(grp);
+      DRW_shgroup_add_material_resources(grp, matpass.gpumat);
+    }
+    matpass.shgrp = grp;
   }
-  matpass.shgrp = grp;
 
   return matpass;
 }
 
 Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeometry geometry_type)
 {
-  MaterialKey material_key(blender_mat, geometry_type);
+  eMaterialPipeline surface_pipe = (blender_mat->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
+                                                                                MAT_PIPE_DEFERRED;
+  eMaterialPipeline prepass_pipe = (blender_mat->blend_method == MA_BM_BLEND) ?
+                                       MAT_PIPE_FORWARD_PREPASS :
+                                       MAT_PIPE_DEFERRED_PREPASS;
+
+  MaterialKey material_key(blender_mat, geometry_type, surface_pipe);
 
   /* TODO allocate in blocks to avoid memory fragmentation. */
   auto add_cb = [&]() { return new Material(); };
   Material &mat = *material_map_.lookup_or_add_cb(material_key, add_cb);
 
-  if (mat.init == false) {
-    mat.shading = material_pass_get(blender_mat, geometry_type, MAT_DOMAIN_SURFACE);
-    mat.shadow = material_pass_get(blender_mat, geometry_type, MAT_DOMAIN_SHADOW);
+  /* Forward pipeline needs to use one shgroup per object. */
+  if (mat.init == false || (surface_pipe == MAT_PIPE_FORWARD)) {
+    mat.init = true;
+    /* Order is important for transparent. */
+    mat.prepass = material_pass_get(blender_mat, prepass_pipe, geometry_type);
+    mat.shading = material_pass_get(blender_mat, surface_pipe, geometry_type);
+    mat.shadow = material_pass_get(blender_mat, MAT_PIPE_SHADOW, geometry_type);
   }
   return mat;
 }

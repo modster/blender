@@ -202,7 +202,7 @@ bool LookDev::sync_world(void)
   /* World light probes render. */
   bNodeTree *nodetree = world_tree.nodetree_get(instensity_);
   GPUMaterial *gpumat = inst_.shaders.material_shader_get(
-      "LookDev", material, nodetree, MAT_GEOM_WORLD, MAT_DOMAIN_SURFACE, true);
+      "LookDev", material, nodetree, MAT_PIPE_FORWARD, MAT_GEOM_WORLD, true);
 
   BKE_studiolight_ensure_flag(studiolight_, STUDIOLIGHT_EQUIRECT_RADIANCE_GPUTEXTURE);
   GPUTexture *gputex = studiolight_->equirect_radiance_gputexture;
@@ -300,7 +300,7 @@ void LookDev::sync_overlay(void)
                                            inst_.materials.glossy_mat_};
   for (::Material *mat : materials) {
     GPUMaterial *gpumat = inst_.shaders.material_shader_get(
-        mat, mat->nodetree, MAT_GEOM_LOOKDEV, MAT_DOMAIN_SURFACE, false);
+        mat, mat->nodetree, MAT_PIPE_FORWARD, MAT_GEOM_LOOKDEV, false);
     DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, overlay_ps_);
     DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
     DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());

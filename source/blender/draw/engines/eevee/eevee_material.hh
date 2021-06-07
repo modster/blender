@@ -72,7 +72,7 @@ struct MaterialPass {
 
 struct Material {
   bool init = false;
-  MaterialPass shadow, shading;
+  MaterialPass shadow, shading, prepass;
 };
 
 struct MaterialArray {
@@ -112,8 +112,8 @@ class MaterialModule {
 
   ::Material *material_from_slot(Object *ob, int slot);
   MaterialPass material_pass_get(::Material *blender_mat,
-                                 eMaterialGeometry geometry_type,
-                                 eMaterialDomain domain_type);
+                                 eMaterialPipeline pipeline_type,
+                                 eMaterialGeometry geometry_type);
 };
 
 /** \} */

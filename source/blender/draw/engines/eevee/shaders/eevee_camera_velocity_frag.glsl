@@ -47,6 +47,13 @@ void main(void)
     P_next = cam_next.viewinv[3].xyz + V;
   }
 
+  if (depth == 1.0) {
+    /* Lookdev Sphere. Ouput no velocity. */
+    out_velocity_camera = vec4(0);
+    out_velocity_view = vec4(0);
+    return;
+  }
+
   compute_velocity(
       P_prev, P, P_next, cam_prev, cam_curr, cam_next, out_velocity_camera, out_velocity_view);
 }

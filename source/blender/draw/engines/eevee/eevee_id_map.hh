@@ -169,15 +169,13 @@ class SyncModule {
  *
  * \{ */
 
-enum eMaterialDomain {
-  MAT_DOMAIN_SURFACE = 0,
-  MAT_DOMAIN_VOLUME = 1,
-  MAT_DOMAIN_SHADOW = 2,
-};
-
 enum eMaterialPipeline {
   MAT_PIPE_DEFERRED = 0,
   MAT_PIPE_FORWARD = 1,
+  MAT_PIPE_DEFERRED_PREPASS = 2,
+  MAT_PIPE_FORWARD_PREPASS = 3,
+  MAT_PIPE_VOLUME = 4,
+  MAT_PIPE_SHADOW = 5,
 };
 
 enum eMaterialGeometry {
@@ -191,22 +189,18 @@ enum eMaterialGeometry {
 
 static inline void material_type_from_shader_uuid(uint64_t shader_uuid,
                                                   eMaterialPipeline &pipeline_type,
-                                                  eMaterialGeometry &geometry_type,
-                                                  eMaterialDomain &domain_type)
+                                                  eMaterialGeometry &geometry_type)
 {
   const uint64_t geometry_mask = ((1u << 3u) - 1u);
-  const uint64_t domain_mask = ((1u << 2u) - 1u);
-  const uint64_t pipeline_mask = ((1u << 1u) - 1u);
+  const uint64_t pipeline_mask = ((1u << 3u) - 1u);
   geometry_type = static_cast<eMaterialGeometry>(shader_uuid & geometry_mask);
-  domain_type = static_cast<eMaterialDomain>((shader_uuid >> 3u) & domain_mask);
-  pipeline_type = static_cast<eMaterialPipeline>((shader_uuid >> 5u) & pipeline_mask);
+  pipeline_type = static_cast<eMaterialPipeline>((shader_uuid >> 3u) & pipeline_mask);
 }
 
 static inline uint64_t shader_uuid_from_material_type(eMaterialPipeline pipeline_type,
-                                                      eMaterialGeometry geometry_type,
-                                                      eMaterialDomain domain_type)
+                                                      eMaterialGeometry geometry_type)
 {
-  return geometry_type | (domain_type << 3) | (pipeline_type << 5);
+  return geometry_type | (pipeline_type << 3);
 }
 
 static inline eMaterialGeometry to_material_geometry(const Object *ob)
@@ -228,13 +222,10 @@ struct MaterialKey {
   Material *mat;
   uint64_t options;
 
-  MaterialKey(::Material *mat_, eMaterialGeometry geometry) : mat(mat_)
+  MaterialKey(::Material *mat_, eMaterialGeometry geometry, eMaterialPipeline surface_pipeline)
+      : mat(mat_)
   {
-    eMaterialPipeline pipeline = (mat_->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
-                                                                       MAT_PIPE_DEFERRED;
-    /* Domain is not chosen for a material key. Use surface just to create a uuid. */
-    eMaterialDomain domain = MAT_DOMAIN_SURFACE;
-    options = shader_uuid_from_material_type(pipeline, geometry, domain);
+    options = shader_uuid_from_material_type(surface_pipeline, geometry);
   }
 
   uint64_t hash(void) const
@@ -266,14 +257,11 @@ struct ShaderKey {
   uint64_t options;
 
   ShaderKey(GPUMaterial *gpumat,
-            ::Material *mat_,
             eMaterialGeometry geometry,
-            eMaterialDomain domain)
+            eMaterialPipeline pipeline)
   {
-    eMaterialPipeline pipeline = (mat_->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
-                                                                       MAT_PIPE_DEFERRED;
     shader = GPU_material_get_shader(gpumat);
-    options = shader_uuid_from_material_type(pipeline, geometry, domain);
+    options = shader_uuid_from_material_type(pipeline, geometry);
   }
 
   uint64_t hash(void) const

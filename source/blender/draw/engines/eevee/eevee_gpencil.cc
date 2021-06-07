@@ -60,6 +60,12 @@ static void gpencil_drawcall_flush(gpIterData &iter)
                           iter.vfirst,
                           iter.vcount,
                           iter.instancing);
+    shgroup_geometry_call(iter.material->prepass.shgrp,
+                          iter.ob,
+                          iter.geom,
+                          iter.vfirst,
+                          iter.vcount,
+                          iter.instancing);
     shgroup_geometry_call(iter.material->shadow.shgrp,
                           iter.ob,
                           iter.geom,

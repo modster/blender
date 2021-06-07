@@ -151,6 +151,7 @@ class Sampling {
       data_.dimensions[SAMPLING_LENS_V][0] = r[1];
       /* TODO decorelate. */
       data_.dimensions[SAMPLING_LIGHTPROBE][0] = r[0];
+      data_.dimensions[SAMPLING_TRANSPARENCY][0] = r[1];
     }
     {
       /* Using leaped halton sequence so we can reused the same primes as lens. */

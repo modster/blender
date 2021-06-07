@@ -87,11 +87,12 @@ enum eSamplingDimension : uint32_t {
   SAMPLING_SHADOW_X = 8u,
   SAMPLING_SHADOW_Y = 9u,
   SAMPLING_CLOSURE = 10u,
-  SAMPLING_LIGHTPROBE = 11u
+  SAMPLING_LIGHTPROBE = 11u,
+  SAMPLING_TRANSPARENCY = 12u
 };
 
 /** IMPORTANT: Make sure the array can contain all sampling dimensions. */
-#define SAMPLING_DIMENSION_COUNT 12
+#define SAMPLING_DIMENSION_COUNT 13
 
 struct SamplingData {
   /** Array containing random values from Low Discrepency Sequence in [0..1) range. */
@@ -645,11 +646,17 @@ vec4 utility_tx_sample(vec2 uv, float layer);
     { \
       return textureLod(utility_tx_, vec3(uv, layer), 0.0); \
     }
-/* Stubs declaration if not using the  */
+
+/* Stubs declarations if not using it. */
 #  define utility_tx_fetch_define_stub(utility_tx_) \
     vec4 utility_tx_fetch(vec2 texel, float layer) \
     { \
-      return texelFetch(utility_tx_, ivec3(ivec2(texel) % UTIL_TEX_SIZE, layer), 0); \
+      return vec4(0); \
+    }
+#  define utility_tx_sample_define_stub(utility_tx_) \
+    vec4 utility_tx_sample(vec2 uv, float layer) \
+    { \
+      return vec4(0); \
     }
 #endif
 

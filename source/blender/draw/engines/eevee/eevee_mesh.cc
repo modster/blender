@@ -38,6 +38,7 @@ void Instance::mesh_sync(Object *ob, ObjectHandle &ob_handle)
     }
     Material *material = material_array.materials[i];
     shgroup_geometry_call(material->shading.shgrp, ob, geom);
+    shgroup_geometry_call(material->prepass.shgrp, ob, geom);
     shgroup_geometry_call(material->shadow.shgrp, ob, geom);
   }
   shading_passes.velocity.mesh_add(ob, ob_handle);

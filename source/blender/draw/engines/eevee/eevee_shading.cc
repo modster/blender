@@ -63,24 +63,41 @@ void BackgroundPass::render(void)
 /* -------------------------------------------------------------------- */
 /** \name Forward Pass
  *
- * Handles alpha blended surfaces and NPR materials (using Closure to RGBA).
+ * NPR materials (using Closure to RGBA) or material using ALPHA_BLEND.
  * \{ */
 
-void ForwardPass::sync()
+void ForwardPass::sync(void)
 {
-  DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_BLEND_CUSTOM |
-                   DRW_STATE_DEPTH_LESS;
-  opaque_ps_ = DRW_pass_create("Forward", state);
+  {
+    DRWState state = DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
+    prepass_ps_ = DRW_pass_create("Forward.Opaque.Prepass", state);
 
-  DRWState state_add = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL | DRW_STATE_DEPTH_EQUAL;
-  light_additional_ps_ = DRW_pass_create_instance("ForwardAddLight", opaque_ps_, state_add);
+    state |= DRW_STATE_CULL_BACK;
+    prepass_culled_ps_ = DRW_pass_create("Forward.Opaque.Prepass.Culled", state);
+
+    DRW_pass_link(prepass_ps_, prepass_culled_ps_);
+  }
+  {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_EQUAL;
+    opaque_ps_ = DRW_pass_create("Forward.Opaque", state);
+
+    state |= DRW_STATE_CULL_BACK;
+    opaque_culled_ps_ = DRW_pass_create("Forward.Opaque.Culled", state);
+
+    DRW_pass_link(opaque_ps_, opaque_culled_ps_);
+  }
+  {
+    DRWState state = DRW_STATE_DEPTH_LESS_EQUAL;
+    transparent_ps_ = DRW_pass_create("Forward.Transparent", state);
+  }
 }
 
-DRWShadingGroup *ForwardPass::material_add(GPUMaterial *gpumat)
+DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMaterial *gpumat)
 {
+  DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? opaque_culled_ps_ : opaque_ps_;
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
-  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, opaque_ps_);
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
@@ -96,13 +113,74 @@ DRWShadingGroup *ForwardPass::material_add(GPUMaterial *gpumat)
   return grp;
 }
 
+DRWShadingGroup *ForwardPass::prepass_opaque_add(::Material *blender_mat, GPUMaterial *gpumat)
+{
+  DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? prepass_culled_ps_ :
+                                                                    prepass_ps_;
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
+  return grp;
+}
+
+DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
+                                                       GPUMaterial *gpumat)
+{
+  LightModule &lights = inst_.lights;
+  LightProbeModule &lightprobes = inst_.lightprobes;
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, transparent_ps_);
+  DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
+  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+  DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
+  DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
+  DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+  DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
+  DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
+  DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
+  DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+  DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
+
+  DRWState state_disable = DRW_STATE_WRITE_DEPTH;
+  DRWState state_enable = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_CUSTOM;
+  if (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) {
+    state_enable |= DRW_STATE_CULL_BACK;
+  }
+  DRW_shgroup_state_disable(grp, state_disable);
+  DRW_shgroup_state_enable(grp, state_enable);
+  return grp;
+}
+
+DRWShadingGroup *ForwardPass::prepass_transparent_add(::Material *blender_mat, GPUMaterial *gpumat)
+{
+  if ((blender_mat->blend_flag & MA_BL_HIDE_BACKFACE) == 0) {
+    return nullptr;
+  }
+
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, transparent_ps_);
+
+  DRWState state_disable = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_CUSTOM;
+  DRWState state_enable = DRW_STATE_WRITE_DEPTH;
+  if (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) {
+    state_enable |= DRW_STATE_CULL_BACK;
+  }
+  DRW_shgroup_state_disable(grp, state_disable);
+  DRW_shgroup_state_enable(grp, state_enable);
+  return grp;
+}
+
 void ForwardPass::render(void)
 {
-  for (auto index : inst_.lights.index_range()) {
-    inst_.lights.bind_batch(index);
+  /* Only one batch of light is supported. */
+  inst_.lights.bind_batch(0);
 
-    DRW_draw_pass((index == 0) ? opaque_ps_ : light_additional_ps_);
-  }
+  DRW_draw_pass(prepass_ps_);
+  DRW_draw_pass(opaque_ps_);
+
+  /* TODO(fclem) This is suboptimal. We could sort during sync. */
+  /* FIXME(fclem) This wont work for panoramic, where we need
+   * to sort by distance to camera, not by z. */
+  DRW_pass_sort_shgroup_z(transparent_ps_);
+  DRW_draw_pass(transparent_ps_);
 }
 
 /** \} */
@@ -114,9 +192,23 @@ void ForwardPass::render(void)
 void DeferredLayer::sync(void)
 {
   {
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS |
-                     DRW_STATE_STENCIL_ALWAYS | DRW_STATE_WRITE_STENCIL;
+    DRWState state = DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS;
+    prepass_ps_ = DRW_pass_create("Gbuffer.Prepass", state);
+
+    state |= DRW_STATE_CULL_BACK;
+    prepass_culled_ps_ = DRW_pass_create("Gbuffer.Prepass.Culled", state);
+
+    DRW_pass_link(prepass_ps_, prepass_culled_ps_);
+  }
+  {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_EQUAL | DRW_STATE_STENCIL_ALWAYS |
+                     DRW_STATE_WRITE_STENCIL;
     gbuffer_ps_ = DRW_pass_create("Gbuffer", state);
+
+    state |= DRW_STATE_CULL_BACK;
+    gbuffer_culled_ps_ = DRW_pass_create("Gbuffer.Culled", state);
+
+    DRW_pass_link(gbuffer_ps_, gbuffer_culled_ps_);
   }
   {
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL |
@@ -125,14 +217,25 @@ void DeferredLayer::sync(void)
   }
 }
 
-DRWShadingGroup *DeferredLayer::material_add(GPUMaterial *gpumat)
+DRWShadingGroup *DeferredLayer::material_add(::Material *blender_mat, GPUMaterial *gpumat)
 {
   uint stencil_mask = CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_TRANSPARENCY |
                       CLOSURE_EMISSION;
-  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, gbuffer_ps_);
+  DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? gbuffer_culled_ps_ :
+                                                                    gbuffer_ps_;
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
   DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
   DRW_shgroup_stencil_set(grp, stencil_mask, 0xFF, 0xFF);
+  return grp;
+}
+
+DRWShadingGroup *DeferredLayer::prepass_add(::Material *blender_mat, GPUMaterial *gpumat)
+{
+  DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? prepass_culled_ps_ :
+                                                                    prepass_ps_;
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
+  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
   return grp;
 }
 
@@ -164,6 +267,7 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
   gbuffer.bind(CLOSURE_DIFFUSE);
 
   if (!no_surfaces) {
+    DRW_draw_pass(prepass_ps_);
     DRW_draw_pass(gbuffer_ps_);
   }
 
@@ -298,10 +402,20 @@ void DeferredPass::sync(void)
 DRWShadingGroup *DeferredPass::material_add(::Material *material, GPUMaterial *gpumat)
 {
   if (material->blend_flag & MA_BL_SS_REFRACTION) {
-    return refraction_layer_.material_add(gpumat);
+    return refraction_layer_.material_add(material, gpumat);
   }
   else {
-    return opaque_layer_.material_add(gpumat);
+    return opaque_layer_.material_add(material, gpumat);
+  }
+}
+
+DRWShadingGroup *DeferredPass::prepass_add(::Material *material, GPUMaterial *gpumat)
+{
+  if (material->blend_flag & MA_BL_SS_REFRACTION) {
+    return refraction_layer_.prepass_add(material, gpumat);
+  }
+  else {
+    return opaque_layer_.prepass_add(material, gpumat);
   }
 }
 

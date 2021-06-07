@@ -347,7 +347,7 @@ class ShadowPass {
 
   void sync(void);
 
-  DRWShadingGroup *material_add(GPUMaterial *gpumat);
+  DRWShadingGroup *material_add(::Material *blender_mat, GPUMaterial *gpumat);
 
   void render(void);
 };

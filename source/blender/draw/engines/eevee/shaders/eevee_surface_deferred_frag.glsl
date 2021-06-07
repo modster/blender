@@ -35,6 +35,15 @@ void main(void)
 
   nodetree_surface();
 
+  float alpha = saturate(1.0 - avg(g_transparency_data.transmittance));
+
+  if (alpha > 0.0) {
+    g_diffuse_data.color /= alpha;
+    g_reflection_data.color /= alpha;
+    g_refraction_data.color /= alpha;
+    g_emission_data.emission /= alpha;
+  }
+
   out_diffuse_data = gbuffer_store_diffuse_data(g_diffuse_data);
   out_reflection_data = gbuffer_store_reflection_data(g_reflection_data);
   out_refraction_data = gbuffer_store_refraction_data(g_refraction_data);

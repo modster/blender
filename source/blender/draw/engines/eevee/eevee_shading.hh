@@ -69,14 +69,35 @@ class ForwardPass {
  private:
   Instance &inst_;
 
+  DRWPass *prepass_ps_ = nullptr;
+  DRWPass *prepass_culled_ps_ = nullptr;
   DRWPass *opaque_ps_ = nullptr;
-  DRWPass *light_additional_ps_ = nullptr;
+  DRWPass *opaque_culled_ps_ = nullptr;
+  DRWPass *transparent_ps_ = nullptr;
 
  public:
   ForwardPass(Instance &inst) : inst_(inst){};
 
   void sync(void);
-  DRWShadingGroup *material_add(GPUMaterial *gpumat);
+
+  DRWShadingGroup *material_add(::Material *blender_mat, GPUMaterial *gpumat)
+  {
+    return (GPU_material_flag_get(gpumat, GPU_MATFLAG_TRANSPARENT)) ?
+               material_transparent_add(blender_mat, gpumat) :
+               material_opaque_add(blender_mat, gpumat);
+  }
+
+  DRWShadingGroup *prepass_add(::Material *blender_mat, GPUMaterial *gpumat)
+  {
+    return (GPU_material_flag_get(gpumat, GPU_MATFLAG_TRANSPARENT)) ?
+               prepass_transparent_add(blender_mat, gpumat) :
+               prepass_opaque_add(blender_mat, gpumat);
+  }
+
+  DRWShadingGroup *material_opaque_add(::Material *blender_mat, GPUMaterial *gpumat);
+  DRWShadingGroup *prepass_opaque_add(::Material *blender_mat, GPUMaterial *gpumat);
+  DRWShadingGroup *material_transparent_add(::Material *blender_mat, GPUMaterial *gpumat);
+  DRWShadingGroup *prepass_transparent_add(::Material *blender_mat, GPUMaterial *gpumat);
   void render(void);
 };
 
@@ -225,14 +246,18 @@ class DeferredLayer {
   GPUTexture *input_diffuse_data_tx_ = nullptr;
   GPUTexture *input_depth_tx_ = nullptr;
 
+  DRWPass *prepass_ps_ = nullptr;
+  DRWPass *prepass_culled_ps_ = nullptr;
   DRWPass *gbuffer_ps_ = nullptr;
+  DRWPass *gbuffer_culled_ps_ = nullptr;
   DRWPass *volume_ps_ = nullptr;
 
  public:
   DeferredLayer(Instance &inst) : inst_(inst){};
 
   void sync(void);
-  DRWShadingGroup *material_add(GPUMaterial *gpumat);
+  DRWShadingGroup *material_add(::Material *blender_mat, GPUMaterial *gpumat);
+  DRWShadingGroup *prepass_add(::Material *blender_mat, GPUMaterial *gpumat);
   void volume_add(Object *ob);
   void render(GBuffer &gbuffer, GPUFrameBuffer *view_fb);
 };
@@ -273,6 +298,7 @@ class DeferredPass {
 
   void sync(void);
   DRWShadingGroup *material_add(::Material *material, GPUMaterial *gpumat);
+  DRWShadingGroup *prepass_add(::Material *material, GPUMaterial *gpumat);
   void volume_add(Object *ob);
   void render(GBuffer &gbuffer, GPUFrameBuffer *view_fb);
 };
@@ -391,6 +417,28 @@ class ShadingPasses {
     velocity.sync();
 
     debug_culling.sync();
+  }
+
+  DRWShadingGroup *material_add(::Material *blender_mat,
+                                GPUMaterial *gpumat,
+                                eMaterialPipeline pipeline_type)
+  {
+    switch (pipeline_type) {
+      case MAT_PIPE_DEFERRED_PREPASS:
+        return deferred.prepass_add(blender_mat, gpumat);
+      case MAT_PIPE_FORWARD_PREPASS:
+        return forward.prepass_add(blender_mat, gpumat);
+      case MAT_PIPE_DEFERRED:
+        return deferred.material_add(blender_mat, gpumat);
+      case MAT_PIPE_FORWARD:
+        return forward.material_add(blender_mat, gpumat);
+      case MAT_PIPE_VOLUME:
+        /* TODO(fclem) volume pass. */
+        return nullptr;
+      case MAT_PIPE_SHADOW:
+        return shadow.material_add(blender_mat, gpumat);
+    }
+    return nullptr;
   }
 };
 

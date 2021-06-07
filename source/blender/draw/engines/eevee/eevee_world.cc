@@ -102,7 +102,7 @@ void World::sync()
                          bl_world->nodetree :
                          default_tree.nodetree_get(bl_world);
 
-  GPUMaterial *gpumat = inst_.shaders.world_shader_get(bl_world, ntree, MAT_DOMAIN_SURFACE);
+  GPUMaterial *gpumat = inst_.shaders.world_shader_get(bl_world, ntree);
   inst_.shading_passes.background.sync(gpumat);
 }
 

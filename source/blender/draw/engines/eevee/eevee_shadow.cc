@@ -513,9 +513,11 @@ void ShadowPass::sync(void)
   }
 }
 
-DRWShadingGroup *ShadowPass::material_add(GPUMaterial *gpumat)
+DRWShadingGroup *ShadowPass::material_add(::Material *UNUSED(material), GPUMaterial *gpumat)
 {
-  return DRW_shgroup_material_create(gpumat, surface_ps_);
+  DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, surface_ps_);
+  DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+  return grp;
 }
 
 void ShadowPass::render(void)

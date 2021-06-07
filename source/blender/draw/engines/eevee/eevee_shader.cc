@@ -101,6 +101,7 @@ extern char datatoc_eevee_sampling_lib_glsl[];
 extern char datatoc_eevee_shadow_lib_glsl[];
 extern char datatoc_eevee_surface_background_frag_glsl[];
 extern char datatoc_eevee_surface_deferred_frag_glsl[];
+extern char datatoc_eevee_surface_depth_frag_glsl[];
 extern char datatoc_eevee_surface_depth_simple_frag_glsl[];
 extern char datatoc_eevee_surface_forward_frag_glsl[];
 extern char datatoc_eevee_surface_gpencil_vert_glsl[];
@@ -203,11 +204,6 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(DEFERRED_EVAL_VOLUME, eevee_deferred_volume_frag);
   SHADER(DEFERRED_MESH, eevee_surface_mesh_vert, nullptr, eevee_surface_deferred_frag, nullptr);
   SHADER(DEFERRED_VOLUME, eevee_volume_vert, nullptr, eevee_volume_deferred_frag, nullptr);
-  SHADER(DEPTH_SIMPLE_MESH,
-         eevee_surface_mesh_vert,
-         nullptr,
-         eevee_surface_depth_simple_frag,
-         nullptr);
   SHADER_FULLSCREEN(DOF_BOKEH_LUT, eevee_depth_of_field_bokeh_lut_frag);
   SHADER_FULLSCREEN(DOF_FILTER, eevee_depth_of_field_filter_frag);
   SHADER_FULLSCREEN_DEFINES(DOF_GATHER_BACKGROUND_LUT,
@@ -413,21 +409,10 @@ std::string ShaderModule::enum_preprocess(const char *input)
  *
  * \{ */
 
-char *ShaderModule::material_shader_code_defs_get(eMaterialGeometry geometry_type,
-                                                  eMaterialDomain domain_type)
+char *ShaderModule::material_shader_code_defs_get(eMaterialGeometry geometry_type)
 {
   std::string output = "";
 
-  switch (domain_type) {
-    case MAT_DOMAIN_VOLUME:
-      output += "#define VOLUME_SHADER\n";
-      break;
-    default:
-    case MAT_DOMAIN_SURFACE:
-      /* TODO rename define or make it obsolete. */
-      output += "#define MESH_SHADER\n";
-      break;
-  }
   switch (geometry_type) {
     case MAT_GEOM_GPENCIL:
       output += "#define UNIFORM_RESOURCE_ID\n";
@@ -548,13 +533,11 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
 
 char *ShaderModule::material_shader_code_geom_get(const GPUCodegenOutput *UNUSED(codegen),
                                                   GPUMaterial *mat,
-                                                  eMaterialGeometry geometry_type,
-                                                  eMaterialDomain domain_type)
+                                                  eMaterialGeometry geometry_type)
 {
   /* Force geometry usage if GPU_BARYCENTRIC_DIST or GPU_BARYCENTRIC_TEXCO are used.
    * Note: GPU_BARYCENTRIC_TEXCO only requires it if the shader is not drawing hairs. */
-  if ((geometry_type != MAT_GEOM_HAIR) && (domain_type == MAT_DOMAIN_SURFACE) &&
-      GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC)) {
+  if ((geometry_type != MAT_GEOM_HAIR) && GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC)) {
     /* TODO. */
     BLI_assert(0);
   }
@@ -562,7 +545,7 @@ char *ShaderModule::material_shader_code_geom_get(const GPUCodegenOutput *UNUSED
 }
 
 char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codegen,
-                                                  GPUMaterial *mat,
+                                                  GPUMaterial *gpumat,
                                                   eMaterialGeometry geometry_type,
                                                   eMaterialPipeline pipeline_type)
 {
@@ -606,10 +589,10 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
   }
 
   if (codegen->surface || codegen->volume) {
-    if (GPU_material_flag_get(mat, GPU_MATFLAG_UNIFORMS_ATTRIB)) {
+    if (GPU_material_flag_get(gpumat, GPU_MATFLAG_UNIFORMS_ATTRIB)) {
       output += datatoc_common_uniform_attribute_lib_glsl;
     }
-    if (GPU_material_flag_get(mat, GPU_MATFLAG_OBJECT_INFO)) {
+    if (GPU_material_flag_get(gpumat, GPU_MATFLAG_OBJECT_INFO)) {
       output += datatoc_common_obinfos_lib_glsl;
     }
     output += codegen->uniforms;
@@ -643,19 +626,38 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
       output += datatoc_eevee_surface_background_frag_glsl;
       break;
     case MAT_GEOM_VOLUME:
-      if (pipeline_type == MAT_PIPE_DEFERRED) {
-        output += datatoc_eevee_volume_deferred_frag_glsl;
-      }
-      else {
-        output += nullptr; /* TODO */
+      switch (pipeline_type) {
+        case MAT_PIPE_DEFERRED:
+          output += datatoc_eevee_volume_deferred_frag_glsl;
+          break;
+        default:
+          BLI_assert(0);
+          break;
       }
       break;
     default:
-      if (pipeline_type == MAT_PIPE_DEFERRED) {
-        output += datatoc_eevee_surface_deferred_frag_glsl;
-      }
-      else {
-        output += datatoc_eevee_surface_forward_frag_glsl;
+      switch (pipeline_type) {
+        case MAT_PIPE_FORWARD_PREPASS:
+          output += datatoc_eevee_surface_depth_simple_frag_glsl;
+          break;
+        case MAT_PIPE_DEFERRED_PREPASS:
+        case MAT_PIPE_SHADOW:
+          if (GPU_material_flag_get(gpumat, GPU_MATFLAG_TRANSPARENT)) {
+            output += datatoc_eevee_surface_depth_frag_glsl;
+          }
+          else {
+            output += datatoc_eevee_surface_depth_simple_frag_glsl;
+          }
+          break;
+        case MAT_PIPE_DEFERRED:
+          output += datatoc_eevee_surface_deferred_frag_glsl;
+          break;
+        case MAT_PIPE_FORWARD:
+          output += datatoc_eevee_surface_forward_frag_glsl;
+          break;
+        default:
+          BLI_assert(0);
+          break;
       }
       break;
   }
@@ -672,14 +674,13 @@ GPUShaderSource ShaderModule::material_shader_code_generate(GPUMaterial *mat,
 
   eMaterialPipeline pipeline_type;
   eMaterialGeometry geometry_type;
-  eMaterialDomain domain_type;
-  material_type_from_shader_uuid(shader_uuid, pipeline_type, geometry_type, domain_type);
+  material_type_from_shader_uuid(shader_uuid, pipeline_type, geometry_type);
 
   GPUShaderSource source;
   source.vertex = material_shader_code_vert_get(codegen, mat, geometry_type);
   source.fragment = material_shader_code_frag_get(codegen, mat, geometry_type, pipeline_type);
-  source.geometry = material_shader_code_geom_get(codegen, mat, geometry_type, domain_type);
-  source.defines = material_shader_code_defs_get(geometry_type, domain_type);
+  source.geometry = material_shader_code_geom_get(codegen, mat, geometry_type);
+  source.defines = material_shader_code_defs_get(geometry_type);
   return source;
 }
 
@@ -692,31 +693,26 @@ static GPUShaderSource codegen_callback(void *thunk,
 
 GPUMaterial *ShaderModule::material_shader_get(::Material *blender_mat,
                                                struct bNodeTree *nodetree,
+                                               eMaterialPipeline pipeline_type,
                                                eMaterialGeometry geometry_type,
-                                               eMaterialDomain domain_type,
                                                bool deferred_compilation)
 {
-  eMaterialPipeline pipeline_type = (blender_mat->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
-                                                                                 MAT_PIPE_DEFERRED;
+  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type);
 
-  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type, domain_type);
-
-  bool is_volume = (domain_type == MAT_DOMAIN_VOLUME);
+  bool is_volume = (pipeline_type == MAT_PIPE_VOLUME);
 
   return DRW_shader_from_material(
       blender_mat, nodetree, shader_uuid, is_volume, deferred_compilation, codegen_callback, this);
 }
 
-GPUMaterial *ShaderModule::world_shader_get(::World *blender_world,
-                                            struct bNodeTree *nodetree,
-                                            eMaterialDomain domain_type)
+GPUMaterial *ShaderModule::world_shader_get(::World *blender_world, struct bNodeTree *nodetree)
 {
   eMaterialPipeline pipeline_type = MAT_PIPE_DEFERRED; /* Unused. */
   eMaterialGeometry geometry_type = MAT_GEOM_WORLD;
 
-  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type, domain_type);
+  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type);
 
-  bool is_volume = (domain_type == MAT_DOMAIN_VOLUME);
+  bool is_volume = (pipeline_type == MAT_PIPE_VOLUME);
   bool deferred_compilation = false;
 
   return DRW_shader_from_world(blender_world,
@@ -733,15 +729,13 @@ GPUMaterial *ShaderModule::world_shader_get(::World *blender_world,
 GPUMaterial *ShaderModule::material_shader_get(const char *name,
                                                ListBase &materials,
                                                struct bNodeTree *nodetree,
+                                               eMaterialPipeline pipeline_type,
                                                eMaterialGeometry geometry_type,
-                                               eMaterialDomain domain_type,
                                                bool is_lookdev)
 {
-  eMaterialPipeline pipeline_type = MAT_PIPE_DEFERRED; /* Unused. */
+  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type);
 
-  uint64_t shader_uuid = shader_uuid_from_material_type(pipeline_type, geometry_type, domain_type);
-
-  bool is_volume = (domain_type == MAT_DOMAIN_VOLUME);
+  bool is_volume = (pipeline_type == MAT_PIPE_VOLUME);
 
   GPUMaterial *gpumat = GPU_material_from_nodetree(nullptr,
                                                    nullptr,

@@ -92,17 +92,18 @@ typedef enum eGPUMaterialFlag {
   GPU_MATFLAG_EMISSION = (1 << 4),
   GPU_MATFLAG_TRANSPARENT = (1 << 5),
   GPU_MATFLAG_HOLDOUT = (1 << 6),
+  GPU_MATFLAG_SHADER_TO_RGBA = (1 << 7),
 
-  GPU_MATFLAG_OBJECT_INFO = (1 << 7),
-  GPU_MATFLAG_UNIFORMS_ATTRIB = (1 << 9),
+  GPU_MATFLAG_OBJECT_INFO = (1 << 10),
+  GPU_MATFLAG_UNIFORMS_ATTRIB = (1 << 11),
 
-  GPU_MATFLAG_BARYCENTRIC = (1 << 10),
+  GPU_MATFLAG_BARYCENTRIC = (1 << 20),
 
   /* Tells the render engine the material was just compiled or updated. */
-  GPU_MATFLAG_UPDATED = (1 << 11),
+  GPU_MATFLAG_UPDATED = (1 << 29),
 
   /* HACK(fclem) Tells the environment texture node to not bail out if empty. */
-  GPU_MATFLAG_LOOKDEV_HACK = (1 << 12),
+  GPU_MATFLAG_LOOKDEV_HACK = (1 << 30),
 } eGPUMaterialFlag;
 
 typedef struct GPUNodeStack {

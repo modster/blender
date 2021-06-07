@@ -50,8 +50,6 @@ enum eShaderType {
   DEFERRED_MESH,
   DEFERRED_VOLUME,
 
-  DEPTH_SIMPLE_MESH,
-
   DOF_BOKEH_LUT,
   DOF_GATHER_BACKGROUND_LUT,
   DOF_GATHER_BACKGROUND,
@@ -125,17 +123,15 @@ class ShaderModule {
   GPUShader *static_shader_get(eShaderType shader_type);
   GPUMaterial *material_shader_get(::Material *blender_mat,
                                    struct bNodeTree *nodetree,
+                                   eMaterialPipeline pipeline_type,
                                    eMaterialGeometry geometry_type,
-                                   eMaterialDomain domain_type,
                                    bool deferred_compilation);
-  GPUMaterial *world_shader_get(::World *blender_world,
-                                struct bNodeTree *nodetree,
-                                eMaterialDomain domain_type);
+  GPUMaterial *world_shader_get(::World *blender_world, struct bNodeTree *nodetree);
   GPUMaterial *material_shader_get(const char *name,
                                    ListBase &materials,
                                    struct bNodeTree *nodetree,
+                                   eMaterialPipeline pipeline_type,
                                    eMaterialGeometry geometry_type,
-                                   eMaterialDomain domain_type,
                                    bool is_lookdev);
 
   GPUShaderSource material_shader_code_generate(GPUMaterial *mat, const GPUCodegenOutput *codegen);
@@ -144,15 +140,13 @@ class ShaderModule {
   /* Run some custom preprocessor shader rewrite and returns a new string. */
   std::string enum_preprocess(const char *input);
 
-  char *material_shader_code_defs_get(eMaterialGeometry geometry_type,
-                                      eMaterialDomain domain_type);
+  char *material_shader_code_defs_get(eMaterialGeometry geometry_type);
   char *material_shader_code_vert_get(const GPUCodegenOutput *codegen,
                                       GPUMaterial *mat,
                                       eMaterialGeometry geometry_type);
   char *material_shader_code_geom_get(const GPUCodegenOutput *codegen,
                                       GPUMaterial *mat,
-                                      eMaterialGeometry geometry_type,
-                                      eMaterialDomain domain_type);
+                                      eMaterialGeometry geometry_type);
   char *material_shader_code_frag_get(const GPUCodegenOutput *codegen,
                                       GPUMaterial *mat,
                                       eMaterialGeometry geometry_type,
