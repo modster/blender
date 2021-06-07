@@ -30,9 +30,19 @@ from nodeitems_utils import (
 
 class SortedNodeCategory(NodeCategory):
     def __init__(self, identifier, name, description="", items=None):
-        # for builtin nodes the convention is to sort by name
         if isinstance(items, list):
-            items = sorted(items, key=lambda item: item.label.lower())
+            # Sort node items by name but leave custom node items where they are.
+            sort_key = lambda value: value.label.lower()
+            new_items = []
+            section = []
+            for item in items:
+                if isinstance(item, NodeItemCustom):
+                    new_items.extend(sorted(section, key=sort_key))
+                    new_items.append(item)
+                else:
+                    section.append(item)
+            new_items.extend(sorted(section, key=sort_key))
+            items = new_items
 
         super().__init__(identifier, name, description, items)
 
@@ -485,6 +495,8 @@ texture_node_categories = [
 geometry_node_categories = [
     # Geometry Nodes
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
+        NodeItem("GeometryNodeAttributeProcessor"),
+        NodeItemCustom(draw=lambda self, layout, context: layout.separator()),
         NodeItem("GeometryNodeAttributeRandomize"),
         NodeItem("GeometryNodeAttributeMath"),
         NodeItem("GeometryNodeAttributeClamp"),
@@ -503,7 +515,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeRemove"),
         NodeItem("GeometryNodeAttributeMapRange"),
         NodeItem("GeometryNodeAttributeTransfer"),
-        NodeItem("GeometryNodeAttributeProcessor"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
         NodeItem("ShaderNodeRGBCurve"),
