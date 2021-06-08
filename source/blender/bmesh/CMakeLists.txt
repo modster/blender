@@ -108,8 +108,6 @@ set(SRC
   intern/bmesh_mesh_partial_update.h
   intern/bmesh_mesh_tessellate.c
   intern/bmesh_mesh_tessellate.h
-  intern/bmesh_mesh_partial_update.c
-  intern/bmesh_mesh_partial_update.h
   intern/bmesh_mesh_validate.c
   intern/bmesh_mesh_validate.h
   intern/bmesh_mods.c
