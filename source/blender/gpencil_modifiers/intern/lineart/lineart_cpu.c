@@ -56,8 +56,6 @@
 #include "DNA_scene_types.h"
 #include "MEM_guardedalloc.h"
 
-#include "BLI_math.h"
-
 #include "bmesh.h"
 #include "bmesh_class.h"
 #include "bmesh_tools.h"
@@ -496,7 +494,7 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   rb->edge_mark.last = rb->edge_mark.first;
   rb->floating.last = rb->floating.first;
 
-  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
+  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH, TASK_ISOLATION_OFF);
 
   for (i = 0; i < thread_count; i++) {
     rti[i].thread_id = i;
@@ -2144,7 +2142,7 @@ static void lineart_main_load_geometries(
   }
   DEG_OBJECT_ITER_END;
 
-  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
+  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH, TASK_ISOLATION_OFF);
 
   for (int i = 0; i < thread_count; i++) {
     olti[i].rb = rb;
@@ -2821,7 +2819,6 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
       }
     }
   }
-
   return result;
 }
 
@@ -4037,8 +4034,6 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   if (G.debug_value == 4000) {
     t_start = PIL_check_seconds_timer();
   }
-
-  BKE_scene_camera_switch_update(scene);
 
   if (lmd->calculation_flags & LRT_USE_CUSTOM_CAMERA) {
     if (!lmd->source_camera ||
