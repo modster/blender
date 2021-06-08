@@ -55,6 +55,8 @@ using SplinePtr = std::unique_ptr<Spline>;
  *     along the length of a curve.
  *  3. #sample_uniform_index_factors returns an array that stores uniform-length samples
  *     along the spline which can be used to interpolate data from method 1.
+ *  4. #sample_length_parameters_to_index_factors does the same, but uses arbitrary parameter
+ *     inputs, instead of sampling uniformly.
  *
  * Commonly used evaluated data is stored in caches on the spline itself so that operations on
  * splines don't need to worry about taking ownership of evaluated data when they don't need to.
@@ -170,7 +172,6 @@ class Spline {
   LookupResult lookup_evaluated_length(const float length) const;
 
   blender::Array<float> sample_uniform_index_factors(const int samples_size) const;
-
   void sample_length_parameters_to_index_factors(blender::MutableSpan<float> parameters) const;
 
   LookupResult lookup_data_from_index_factor(const float index_factor) const;

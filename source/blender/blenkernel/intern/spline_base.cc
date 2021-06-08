@@ -314,9 +314,9 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
 }
 
 /**
- * Transform an array of unsorted length parameters into index factors (integer part the segment
- * index, float part the factor), which can be used for retrieving evaluated values from the curve
- * at specific points.
+ * Transform an array of unsorted length parameters into index factors. The samples are indices
+ * and factors to the next index encoded in floats. The logic for converting from the float values
+ * to interpolation data is in #lookup_data_from_index_factor.
  *
  * \param parameters: Lengths along the spline to be transformed into index factors.
  * Must be between 0 and the total length of the spline.
