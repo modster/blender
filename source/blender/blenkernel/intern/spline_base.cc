@@ -16,6 +16,7 @@
 
 #include "BLI_array.hh"
 #include "BLI_span.hh"
+#include "BLI_task.hh"
 #include "BLI_timeit.hh"
 
 #include "BKE_spline.hh"
@@ -27,6 +28,12 @@ using blender::float3;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
+using blender::fn::GMutableSpan;
+using blender::fn::GSpan;
+using blender::fn::GVArray;
+using blender::fn::GVArray_For_GSpan;
+using blender::fn::GVArray_Typed;
+using blender::fn::GVArrayPtr;
 
 Spline::Type Spline::type() const
 {
@@ -340,4 +347,30 @@ void Spline::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) 
   for (const float3 &position : positions) {
     minmax_v3v3_v3(min, max, position);
   }
+}
+
+GVArrayPtr Spline::interpolate_to_evaluated_points(GSpan data) const
+{
+  return this->interpolate_to_evaluated_points(GVArray_For_GSpan(data));
+}
+
+void Spline::sample_data_based_on_index_factors(const GVArray &src,
+                                                Span<float> index_factors,
+                                                GMutableSpan dst) const
+{
+  BLI_assert(src.size() == this->evaluated_points_size());
+
+  blender::attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
+    using T = decltype(dummy);
+    const GVArray_Typed<T> src_typed = src.typed<T>();
+    MutableSpan<T> dst_typed = dst.typed<T>();
+    blender::parallel_for(dst_typed.index_range(), 1024, [&](IndexRange range) {
+      for (const int i : range) {
+        const LookupResult interp = this->lookup_data_from_index_factor(index_factors[i]);
+        dst_typed[i] = blender::attribute_math::mix2(interp.factor,
+                                                     src_typed[interp.evaluated_index],
+                                                     src_typed[interp.next_evaluated_index]);
+      }
+    });
+  });
 }
