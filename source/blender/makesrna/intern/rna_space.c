@@ -1755,9 +1755,17 @@ static const EnumPropertyItem *rna_SpaceImageEditor_pivot_itemf(bContext *UNUSED
                                                                 bool *UNUSED(r_free))
 {
   static const EnumPropertyItem pivot_items[] = {
-      {V3D_AROUND_CENTER_BOUNDS, "CENTER", ICON_PIVOT_BOUNDBOX, "Bounding Box Center", ""},
-      {V3D_AROUND_CENTER_MEDIAN, "MEDIAN", ICON_PIVOT_MEDIAN, "Median Point", ""},
-      {V3D_AROUND_CURSOR, "CURSOR", ICON_PIVOT_CURSOR, "2D Cursor", ""},
+      {V3D_AROUND_CENTER_BOUNDS,
+       "CENTER",
+       ICON_PIVOT_BOUNDBOX,
+       "Bounding Box Center",
+       "Pivot around bounding box center of selected UVs"},
+      {V3D_AROUND_CENTER_MEDIAN,
+       "MEDIAN",
+       ICON_PIVOT_MEDIAN,
+       "Median Point",
+       "Pivot around the median point of selected UVs"},
+      {V3D_AROUND_CURSOR, "CURSOR", ICON_PIVOT_CURSOR, "2D Cursor", "Pivot around the 2D Cursor"},
       {V3D_AROUND_LOCAL_ORIGINS,
        "INDIVIDUAL_ORIGINS",
        ICON_PIVOT_INDIVIDUAL,
