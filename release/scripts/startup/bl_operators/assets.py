@@ -88,11 +88,16 @@ class ASSET_OT_open_containing_blend_file(Operator):
         asset_file_handle = getattr(context, 'asset_file_handle', None)
         asset_library = getattr(context, 'asset_library', None)
 
-        if not asset_file_handle or not asset_library:
+        if not asset_library:
+            cls.poll_message_set("No asset library selected")
             return False
-
-        # TODO add tooltip disabled hint (to explain why the operator isn't available).
-        return not asset_file_handle.local_id
+        if not asset_file_handle:
+            cls.poll_message_set("No asset selected")
+            return False
+        if asset_file_handle.local_id:
+            cls.poll_message_set("Selected asset is contained in the current file")
+            return False
+        return True
 
     def execute(self, context):
         asset_file_handle = context.asset_file_handle
