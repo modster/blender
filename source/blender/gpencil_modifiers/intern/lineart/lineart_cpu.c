@@ -2103,11 +2103,8 @@ static void lineart_main_load_geometries(
     obi->usage = lineart_usage_check(scene->master_collection, ob);
     obi->override_intersection_mask = lineart_intersection_mask_check(scene->master_collection,
                                                                       ob);
-    /* TODO: We better make it so we can extract BMesh in parallel or at least for those objects
-     * who doesn't have instances or just simply have transformation channel set. */
     Object *use_ob = DEG_get_evaluated_object(depsgraph, ob);
     Mesh *use_mesh;
-    BMesh *bm;
 
     if (obi->usage == OBJECT_LRT_EXCLUDE) {
       continue;
