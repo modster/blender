@@ -9864,7 +9864,7 @@ static void def_geo_curve_to_points(StructRNA *srna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveResample", "storage");
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveToPoints", "storage");
 
   prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, mode_items);
