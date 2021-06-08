@@ -118,15 +118,11 @@ def register():
             register_class(cls)
 
     from bpy.props import (
-        CollectionProperty,
         EnumProperty,
-        IntProperty,
         StringProperty,
     )
     from bpy.types import (
-        AssetHandle,
         WindowManager,
-        WorkSpace,
     )
 
     # space_userprefs.py
@@ -168,19 +164,6 @@ def register():
         description="Display support level",
         default={'OFFICIAL', 'COMMUNITY'},
         options={'ENUM_FLAG'},
-    )
-    # done...
-
-    # space_view3d.py
-    WorkSpace.active_pose_asset_index = IntProperty(
-        name="Active Pose Asset",
-        # TODO explain which list the index belongs to, or how it can be used to get the pose.
-        description="Per workspace index of the active pose asset"
-    )
-    # Register for window-manager. This is a global property that shouldn't be
-    # written to files.
-    WindowManager.pose_assets = CollectionProperty(
-        type=AssetHandle
     )
     # done...
 
