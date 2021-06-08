@@ -143,7 +143,10 @@ void Instance::gpencil_sync(Object *ob, ObjectHandle &ob_handle)
   BKE_gpencil_visible_stroke_iter(
       view_layer, ob, nullptr, gpencil_stroke_sync, &iter, false, iter.cfra);
 
-  shading_passes.velocity.mesh_add(ob, ob_handle);
+  gpencil_drawcall_flush(iter);
+
+  /* TODO(fclem) Gpencil velocity. */
+  // shading_passes.velocity.gpencil_add(ob, ob_handle);
 
   shadows.sync_caster(ob, ob_handle);
 }
