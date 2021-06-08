@@ -217,13 +217,13 @@ void ShadowPunctual::view_update(DRWView *&view,
                                  eShadowCubeFace face)
 {
   mat4 facemat;
-  mul_m4_m4m4(facemat, winmat, shadow_face_mat[face]);
+  mul_m4_m4m4(facemat, shadow_face_mat[face], viewmat);
 
   if (view == nullptr) {
-    view = DRW_view_create(viewmat, facemat, nullptr, nullptr, nullptr);
+    view = DRW_view_create(facemat, winmat, nullptr, nullptr, nullptr);
   }
   else {
-    DRW_view_update(view, viewmat, facemat, nullptr, nullptr);
+    DRW_view_update(view, facemat, winmat, nullptr, nullptr);
   }
 }
 
