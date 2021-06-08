@@ -49,6 +49,9 @@ struct Curve;
 #define GPENCIL_MIN_FILL_FAC 0.05f
 #define GPENCIL_MAX_FILL_FAC 5.0f
 
+/* Used to convert pixel scale. */
+#define GPENCIL_PIXEL_FACTOR 2000.0f
+
 /* ***************************************** */
 /* GP Stroke Points */
 

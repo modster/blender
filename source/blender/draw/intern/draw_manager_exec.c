@@ -1067,8 +1067,13 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
   }
 }
 
-static void drw_update_view(void)
+static void drw_update_view(const float viewport_size[2])
 {
+  DRWViewUboStorage *storage = &DST.view_active->storage;
+  copy_v2_v2(storage->viewport_size, viewport_size);
+  copy_v2_v2(storage->viewport_size_inv, viewport_size);
+  invert_v2(storage->viewport_size_inv);
+
   /* TODO(fclem): update a big UBO and only bind ranges here. */
   GPU_uniformbuf_update(G_draw.view_ubo, &DST.view_active->storage);
 
@@ -1096,8 +1101,11 @@ static void drw_draw_pass_ex(DRWPass *pass,
   BLI_assert(DST.buffer_finish_called &&
              "DRW_render_instance_buffer_finish had not been called before drawing");
 
-  if (DST.view_previous != DST.view_active || DST.view_active->is_dirty) {
-    drw_update_view();
+  float viewport[4];
+  GPU_viewport_size_get_f(viewport);
+  if (DST.view_previous != DST.view_active || DST.view_active->is_dirty ||
+      !equals_v2v2(DST.view_active->storage.viewport_size, &viewport[2])) {
+    drw_update_view(&viewport[2]);
     DST.view_active->is_dirty = false;
     DST.view_previous = DST.view_active;
   }

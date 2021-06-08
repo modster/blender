@@ -46,9 +46,6 @@ struct RenderLayer;
 struct View3D;
 struct bGPDstroke;
 
-/* used to convert pixel scale. */
-#define GPENCIL_PIXEL_FACTOR 2000.0f
-
 /* used to expand VBOs. Size has a big impact in the speed */
 #define GPENCIL_VBO_BLOCK_SIZE 128
 

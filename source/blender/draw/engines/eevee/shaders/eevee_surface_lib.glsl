@@ -44,6 +44,9 @@ GlobalData init_globals(void)
   GlobalData surf;
   surf.P = interp.P;
   surf.N = normalize(interp.N);
+#  ifndef MAT_GEOM_GPENCIL
+  surf.N = (FrontFacing) ? surf.N : -surf.N;
+#  endif
 #  ifdef GPU_FRAGMENT_SHADER
   surf.Ng = safe_normalize(cross(dFdx(surf.P), dFdy(surf.P)));
 #  else

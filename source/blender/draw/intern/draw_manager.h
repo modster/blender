@@ -394,6 +394,8 @@ typedef struct DRWViewUboStorage {
   float viewvecs[2][4];
   /* Should not be here. Not view dependent (only main view). */
   float viewcamtexcofac[4];
+  float viewport_size[2];
+  float viewport_size_inv[2];
 } DRWViewUboStorage;
 
 BLI_STATIC_ASSERT_ALIGN(DRWViewUboStorage, 16)

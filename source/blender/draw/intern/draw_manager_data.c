@@ -32,6 +32,7 @@
 #include "BKE_pbvh.h"
 
 #include "DNA_curve_types.h"
+#include "DNA_gpencil_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
 
@@ -477,6 +478,19 @@ static void drw_call_calc_orco(Object *ob, float (*r_orcofacs)[4])
         texcosize = mb->size;
         break;
       }
+      case ID_GD: {
+        /* TODO(fclem) Put in the object eval somehow. */
+        /* Note this is used for shading to get the average normal.
+         * A user modified texture space would not have this bounding property. */
+        BoundBox *bbox = BKE_object_boundbox_get(ob);
+        /* TODO(fclem) Do real orco. */
+        copy_v3_fl(r_orcofacs[0], 0.0f);
+        BKE_boundbox_calc_size_aabb(bbox, r_orcofacs[1]);
+        /* Avoid division by 0. */
+        add_v3_fl(r_orcofacs[1], 1e-8f);
+        invert_v3(r_orcofacs[1]);
+        return;
+      }
       default:
         break;
     }
@@ -531,6 +545,15 @@ static void drw_call_obinfos_init(DRWObjectInfos *ob_infos, Object *ob)
   ob_infos->ob_flag *= (ob->transflag & OB_NEG_SCALE) ? -1.0f : 1.0f;
   /* Object Color. */
   copy_v4_v4(ob_infos->ob_color, ob->color);
+  /* Grease Pencil object parameters. */
+  if (ob->type == OB_GPENCIL) {
+    bGPdata *gpdata = ob->data;
+    float ob_scale = mat4_to_scale(ob->obmat);
+    ob_infos->orcotexfac[0][3] = (gpdata->flag & GP_DATA_STROKE_KEEPTHICKNESS) ?
+                                     -1.0 :
+                                     (gpdata->pixfactor / GPENCIL_PIXEL_FACTOR);
+    ob_infos->orcotexfac[1][3] = (gpdata->draw_mode == GP_DRAWMODE_2D) ? -ob_scale : ob_scale;
+  }
 }
 
 static void drw_call_culling_init(DRWCullingState *cull, Object *ob)

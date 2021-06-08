@@ -19,7 +19,6 @@ void main(void)
   vec4 sspos;
   vec2 aspect;
   vec2 thickness;
-  vec4 viewport_size = vec4(1500.0, 1500.0, 1.0 / 1500.0, 1.0 / 1500.0);
 
   gl_Position = gpencil_vertex(ma,
                                ma1,
@@ -34,15 +33,15 @@ void main(void)
                                col1,
                                col2,
                                fcol1,
-                               viewport_size,
+                               vec4(ViewportSize, ViewportSizeInverse),
                                interp.P,
+                               interp.N,
                                color,
                                uvs,
                                sspos,
                                aspect,
                                thickness);
 
-  interp.N = normal_object_to_world(vec3(0.0, 1.0, 0.0)); /* TODO */
   interp.barycentric_coords = vec2(0.0);
   interp.barycentric_dists = vec3(0.0);
 
@@ -50,13 +49,11 @@ void main(void)
   attrib_load();
 }
 
-#ifdef OBINFO_LIB
 vec3 attr_load_orco(vec4 orco)
 {
   vec3 lP = point_world_to_object(interp.P);
   return OrcoTexCoFactors[0].xyz + lP * OrcoTexCoFactors[1].xyz;
 }
-#endif
 
 vec4 attr_load_tangent(vec4 tangent)
 {

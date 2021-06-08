@@ -147,6 +147,7 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_attribute_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, common_obinfos_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_gpencil_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, gpu_shader_codegen_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_bsdf_lib);
@@ -415,6 +416,7 @@ char *ShaderModule::material_shader_code_defs_get(eMaterialGeometry geometry_typ
 
   switch (geometry_type) {
     case MAT_GEOM_GPENCIL:
+      output += "#define MAT_GEOM_GPENCIL\n";
       output += "#define UNIFORM_RESOURCE_ID\n";
       break;
     default:
@@ -432,7 +434,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
 
   /* Might be needed by attr_load_orco. */
   if (GPU_material_flag_get(mat, GPU_MATFLAG_OBJECT_INFO)) {
-    output += datatoc_common_obinfos_lib_glsl;
+    output += "#pragma BLENDER_REQUIRE(common_obinfos_lib.glsl)\n";
   }
 
   if (codegen->attribs_interface) {
@@ -593,7 +595,7 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
       output += datatoc_common_uniform_attribute_lib_glsl;
     }
     if (GPU_material_flag_get(gpumat, GPU_MATFLAG_OBJECT_INFO)) {
-      output += datatoc_common_obinfos_lib_glsl;
+      output += "#pragma BLENDER_REQUIRE(common_obinfos_lib.glsl)\n";
     }
     output += codegen->uniforms;
     output += "\n";

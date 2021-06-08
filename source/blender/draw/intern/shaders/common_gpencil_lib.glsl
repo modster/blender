@@ -1,6 +1,7 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
+#pragma BLENDER_REQUIRE(common_obinfos_lib.glsl)
 
 #ifdef GPU_FRAGMENT_SHADER
 float gpencil_stroke_round_cap_mask(vec2 p1, vec2 p2, vec2 aspect, float thickness, float hardfac)
@@ -61,17 +62,16 @@ float gpencil_stroke_thickness_modulate(float thickness, vec4 ndc_pos, vec4 view
 {
   /* Modify stroke thickness by object and layer factors. */
   /* TODO */
-  thickness = max(1.0, thickness /* * thicknessScale + thicknessOffset */);
+  thickness = max(1.0, thickness * ObjectGpencilThickness /*  + thicknessOffset */);
 
-  if (false /* TODO thicknessIsScreenSpace */) {
+  if (ObjectGpencilThicknessIsScreenSpace) {
     /* Multiply offset by view Z so that offset is constant in screenspace.
      * (e.i: does not change with the distance to camera) */
     thickness *= ndc_pos.w;
   }
   else {
     /* World space point size. */
-    float thicknessWorldScale = 1.0 / 2000.0; /* TODO */
-    thickness *= thicknessWorldScale * ProjectionMatrix[1][1] * viewport_size.y;
+    thickness *= ObjectGpencilWorldScale * ProjectionMatrix[1][1] * viewport_size.y;
   }
   return thickness;
 }
@@ -125,6 +125,7 @@ vec4 gpencil_vertex(ivec4 ma,
                     vec4 fcol1,
                     vec4 viewport_size,
                     out vec3 out_pos,
+                    out vec3 out_nor,
                     out vec4 out_color,
                     out vec2 out_uv,
                     out vec4 out_sspos,
@@ -177,6 +178,22 @@ vec4 gpencil_vertex(ivec4 ma,
     vec3 wpos_adj = transform_point(ModelMatrix, (use_curr) ? pos.xyz : pos3.xyz);
     vec3 wpos1 = transform_point(ModelMatrix, pos1.xyz);
     vec3 wpos2 = transform_point(ModelMatrix, pos2.xyz);
+
+    vec3 T;
+    if (is_dot) {
+      /* Shade as facing billboards. */
+      T = ViewMatrixInverse[0].xyz;
+    }
+    else if (use_curr && ma.x != -1) {
+      T = wpos1 - wpos_adj;
+    }
+    else {
+      T = wpos2 - wpos1;
+    }
+    T = safe_normalize(T);
+
+    vec3 B = cross(T, ViewMatrixInverse[2].xyz);
+    out_nor = normalize(cross(B, T));
 
     vec4 ndc_adj = point_world_to_ndc(wpos_adj);
     vec4 ndc1 = point_world_to_ndc(wpos1);
@@ -273,6 +290,13 @@ vec4 gpencil_vertex(ivec4 ma,
     out_thickness.y = 1e20;
     out_aspect = vec2(1.0);
     out_sspos = vec4(0.0);
+
+    /* Flat normal following camera and object bounds. */
+    vec3 V = cameraVec(ModelMatrix[3].xyz);
+    vec3 N = normal_world_to_object(V);
+    N *= OrcoTexCoFactors[1].xyz;
+    N = normal_object_to_world(N);
+    out_nor = safe_normalize(N);
 
     /* Decode fill opacity. */
     out_color = vec4(fcol1.rgb, floor(fcol1.a / 10.0));

@@ -16,5 +16,10 @@ layout(std140) uniform infoBlock
 #define OrcoTexCoFactors (drw_infos[resource_id].drw_OrcoTexCoFactors)
 #define ObjectInfo (drw_infos[resource_id].drw_Infos)
 #define ObjectColor (drw_infos[resource_id].drw_ObjectColor)
+#define ObjectGpencilWorldScale abs(drw_infos[resource_id].drw_OrcoTexCoFactors[0].w)
+#define ObjectGpencilThicknessIsScreenSpace \
+  (drw_infos[resource_id].drw_OrcoTexCoFactors[0].w < 0.0)
+#define ObjectGpencilDepthOrder2D (drw_infos[resource_id].drw_OrcoTexCoFactors[1].w < 0.0)
+#define ObjectGpencilThickness abs(drw_infos[resource_id].drw_OrcoTexCoFactors[1].w)
 
 #define OBINFO_LIB

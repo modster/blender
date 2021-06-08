@@ -20,6 +20,8 @@ layout(std140) uniform viewBlock
 
   /* TODO move it elsewhere. */
   vec4 CameraTexCoFactors;
+  vec2 ViewportSize;
+  vec2 ViewportSizeInverse;
 };
 
 #define ViewNear (ViewVecs[0].w)
