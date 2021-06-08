@@ -171,13 +171,7 @@ class Spline {
 
   blender::Array<float> sample_uniform_index_factors(const int samples_size) const;
 
-  struct Parameter {
-    /* Used as an "index factor" after the function. */
-    float length;
-    int data_index;
-  };
-  void sample_parameters_to_index_factors(
-      blender::MutableSpan<Parameter> sample_index_factors) const;
+  void sample_length_parameters_to_index_factors(blender::MutableSpan<float> parameters) const;
 
   LookupResult lookup_data_from_index_factor(const float index_factor) const;
 
