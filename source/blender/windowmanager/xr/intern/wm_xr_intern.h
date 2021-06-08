@@ -176,7 +176,7 @@ void wm_xr_runtime_data_free(wmXrRuntimeData **runtime);
 
 wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
                                                     const wmXrRuntimeData *runtime_data);
-void wm_xr_session_draw_data_update(const wmXrSessionState *state,
+void wm_xr_session_draw_data_update(wmXrSessionState *state,
                                     const XrSessionSettings *settings,
                                     const GHOST_XrDrawViewInfo *draw_view,
                                     wmXrDrawData *draw_data);

@@ -328,7 +328,7 @@ static wmXrSessionStateEvent wm_xr_session_state_to_event(const wmXrSessionState
   return SESSION_STATE_EVENT_NONE;
 }
 
-void wm_xr_session_draw_data_update(const wmXrSessionState *state,
+void wm_xr_session_draw_data_update(wmXrSessionState *state,
                                     const XrSessionSettings *settings,
                                     const GHOST_XrDrawViewInfo *draw_view,
                                     wmXrDrawData *draw_data)
@@ -772,21 +772,22 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
 
   wmXrAction **actions = MEM_calloc_arrayN(count, sizeof(*actions), __func__);
 
-  GHOST_XrGetActionCustomdatas(xr_context, action_set_name, actions);
+  GHOST_XrGetActionCustomdatas(xr_context, action_set_name, (void **)actions);
 
-  for (unsigned int i = 0; i < count; ++i) {
-    wmXrAction *action = actions[i];
+  for (unsigned int action_idx = 0; action_idx < count; ++action_idx) {
+    wmXrAction *action = actions[action_idx];
     if (action && action->ot) {
       bool modal = (action->ot->modal || action->ot->modal_3d) ? true : false;
 
-      for (unsigned int i = 0; i < action->count_subaction_paths; ++i) {
+      for (unsigned int subaction_idx = 0; subaction_idx < action->count_subaction_paths;
+           ++subaction_idx) {
         short val = KM_NOTHING;
         bool press_start;
 
         switch (action->type) {
           case XR_BOOLEAN_INPUT: {
-            const bool *state = &((bool *)action->states)[i];
-            bool *state_prev = &((bool *)action->states_prev)[i];
+            const bool *state = &((bool *)action->states)[subaction_idx];
+            bool *state_prev = &((bool *)action->states_prev)[subaction_idx];
             if (*state) {
               if (!*state_prev) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
@@ -795,7 +796,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                   if (modal && !active_modal_action) {
                     /* Set active modal action. */
                     active_modal_action = action_set->active_modal_action = action;
-                    active_modal_action->active_modal_path = &action->subaction_paths[i];
+                    active_modal_action->active_modal_path =
+                        &action->subaction_paths[subaction_idx];
                   }
                 }
               }
@@ -808,8 +810,9 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
               if (modal || action->op_flag == XR_OP_RELEASE) {
                 val = KM_RELEASE;
                 press_start = false;
-                if (modal && ((action == active_modal_action) &&
-                              (&action->subaction_paths[i] == action->active_modal_path))) {
+                if (modal &&
+                    ((action == active_modal_action) &&
+                     (&action->subaction_paths[subaction_idx] == action->active_modal_path))) {
                   /* Unset active modal action. */
                   active_modal_action->active_modal_path = NULL;
                   active_modal_action = action_set->active_modal_action = NULL;
@@ -820,8 +823,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
             break;
           }
           case XR_FLOAT_INPUT: {
-            const float *state = &((float *)action->states)[i];
-            float *state_prev = &((float *)action->states_prev)[i];
+            const float *state = &((float *)action->states)[subaction_idx];
+            float *state_prev = &((float *)action->states_prev)[subaction_idx];
             if (fabsf(*state) > action->float_threshold) {
               if (fabsf(*state_prev) <= action->float_threshold) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
@@ -830,7 +833,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                   if (modal && !active_modal_action) {
                     /* Set active modal action. */
                     active_modal_action = action_set->active_modal_action = action;
-                    active_modal_action->active_modal_path = &action->subaction_paths[i];
+                    active_modal_action->active_modal_path =
+                        &action->subaction_paths[subaction_idx];
                   }
                 }
               }
@@ -843,8 +847,9 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
               if (modal || action->op_flag == XR_OP_RELEASE) {
                 val = KM_RELEASE;
                 press_start = false;
-                if (modal && ((action == active_modal_action) &&
-                              (&action->subaction_paths[i] == action->active_modal_path))) {
+                if (modal &&
+                    ((action == active_modal_action) &&
+                     (&action->subaction_paths[subaction_idx] == action->active_modal_path))) {
                   /* Unset active modal action. */
                   active_modal_action->active_modal_path = NULL;
                   active_modal_action = action_set->active_modal_action = NULL;
@@ -855,8 +860,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
             break;
           }
           case XR_VECTOR2F_INPUT: {
-            const float(*state)[2] = &((float(*)[2])action->states)[i];
-            float(*state_prev)[2] = &((float(*)[2])action->states_prev)[i];
+            const float(*state)[2] = &((float(*)[2])action->states)[subaction_idx];
+            float(*state_prev)[2] = &((float(*)[2])action->states_prev)[subaction_idx];
             if (len_v2(*state) > action->float_threshold) {
               if (len_v2(*state_prev) <= action->float_threshold) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
@@ -865,7 +870,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                   if (modal && !active_modal_action) {
                     /* Set active modal action. */
                     active_modal_action = action_set->active_modal_action = action;
-                    active_modal_action->active_modal_path = &action->subaction_paths[i];
+                    active_modal_action->active_modal_path =
+                        &action->subaction_paths[subaction_idx];
                   }
                 }
               }
@@ -878,8 +884,9 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
               if (modal || action->op_flag == XR_OP_RELEASE) {
                 val = KM_RELEASE;
                 press_start = false;
-                if (modal && ((action == active_modal_action) &&
-                              (&action->subaction_paths[i] == action->active_modal_path))) {
+                if (modal &&
+                    ((action == active_modal_action) &&
+                     (&action->subaction_paths[subaction_idx] == action->active_modal_path))) {
                   /* Unset active modal action. */
                   active_modal_action->active_modal_path = NULL;
                   active_modal_action = action_set->active_modal_action = NULL;
@@ -895,13 +902,21 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
             break;
         }
 
-        if ((val != KM_NOTHING) && (!active_modal_action || ((action == active_modal_action) &&
-                                                             (&action->subaction_paths[i] ==
-                                                              action->active_modal_path)))) {
+        if ((val != KM_NOTHING) &&
+            (!active_modal_action ||
+             ((action == active_modal_action) &&
+              (&action->subaction_paths[subaction_idx] == action->active_modal_path)))) {
           const GHOST_XrPose *pose = wm_xr_session_controller_pose_find(
-              session_state, action->subaction_paths[i]);
-          wm_event_add_xrevent(
-              action_set_name, action, pose, eye_data, surface, win, i, val, press_start);
+              session_state, action->subaction_paths[subaction_idx]);
+          wm_event_add_xrevent(action_set_name,
+                               action,
+                               pose,
+                               eye_data,
+                               surface,
+                               win,
+                               subaction_idx,
+                               val,
+                               press_start);
         }
       }
     }
