@@ -5,7 +5,7 @@
         {
             "submodules":
             [
-                { "path": "release/scripts/addons", "branch": "master", "commit_id": "HEAD" },
+                { "path": "release/scripts/addons", "branch": "xr-controller-support", "commit_id": "HEAD" },
                 { "path": "release/scripts/addons_contrib", "branch": "master", "commit_id": "HEAD" },
                 { "path": "release/datafiles/locale", "branch": "master", "commit_id": "HEAD" },
                 { "path": "source/tools", "branch": "master", "commit_id": "HEAD" }
