@@ -39,6 +39,7 @@ class SortedNodeCategory(NodeCategory):
                 if isinstance(item, NodeItemCustom):
                     new_items.extend(sorted(section, key=sort_key))
                     new_items.append(item)
+                    section.clear()
                 else:
                     section.append(item)
             new_items.extend(sorted(section, key=sort_key))
