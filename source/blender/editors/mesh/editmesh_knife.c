@@ -2181,9 +2181,9 @@ static void knife_pos_data_clear(KnifePosData *kpd)
  * \{ */
 
 static BMFace *knife_find_closest_face(KnifeTool_OpData *kcd,
-                                       float co[3],
-                                       float cageco[3],
-                                       bool *is_space)
+                                       bool *is_space,
+                                       float r_co[3],
+                                       float r_cageco[3])
 {
   BMFace *f;
   float dist = KMAXDIST;
@@ -2196,7 +2196,7 @@ static BMFace *knife_find_closest_face(KnifeTool_OpData *kcd,
   sub_v3_v3v3(ray, origin_ofs, origin);
   normalize_v3_v3(ray_normal, ray);
 
-  f = BKE_bmbvh_ray_cast(kcd->bmbvh, origin, ray_normal, 0.0f, NULL, co, cageco);
+  f = BKE_bmbvh_ray_cast(kcd->bmbvh, origin, ray_normal, 0.0f, NULL, r_co, r_cageco);
 
   if (f && kcd->only_select && BM_elem_flag_test(f, BM_ELEM_SELECT) == 0) {
     f = NULL;
@@ -2221,9 +2221,9 @@ static BMFace *knife_find_closest_face(KnifeTool_OpData *kcd,
       /* cheat for now; just put in the origin instead
        * of a true coordinate on the face.
        * This just puts a point 1.0f in front of the view. */
-      add_v3_v3v3(co, origin, ray);
+      add_v3_v3v3(r_co, origin, ray);
       /* Use this value for the cage location too as it's used to find near edges/vertices. */
-      copy_v3_v3(cageco, co);
+      copy_v3_v3(r_cageco, r_co);
     }
   }
 
@@ -2591,7 +2591,7 @@ static bool knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float mval[
 
   {
     kcd->curr.bmface = knife_find_closest_face(
-        kcd, kcd->curr.co, kcd->curr.cage, &kcd->curr.is_space);
+        kcd, &kcd->curr.is_space, kcd->curr.co, kcd->curr.cage);
 
     if (kcd->curr.bmface) {
       kcd->curr.edge = knife_find_closest_edge_of_face(
