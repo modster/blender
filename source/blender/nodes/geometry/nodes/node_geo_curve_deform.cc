@@ -51,12 +51,11 @@ static void geo_node_curve_deform_layout(uiLayout *layout, bContext *UNUSED(C), 
   NodeGeometryCurveDeform &node_storage = *(NodeGeometryCurveDeform *)node->storage;
   const GeometryNodeCurveDeformMode mode = (GeometryNodeCurveDeformMode)node_storage.input_mode;
 
+  uiItemR(layout, ptr, "position_axis", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+
   uiItemR(layout, ptr, "input_mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
 
-  if (mode == GEO_NODE_CURVE_DEFORM_POSITION) {
-    uiItemR(layout, ptr, "position_axis", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
-  }
-  else {
+  if (mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE) {
     uiLayoutSetPropSep(layout, true);
     uiLayoutSetPropDecorate(layout, false);
     uiItemR(layout, ptr, "attribute_input_type", 0, IFACE_("Factor"), ICON_NONE);
@@ -103,7 +102,6 @@ static void spline_deform(const Spline &spline,
 
   parallel_for(positions.index_range(), 1024, [&](IndexRange range) {
     for (const int i : range) {
-
       const Spline::LookupResult interp = spline.lookup_data_from_index_factor(index_factors[i]);
       const int index = interp.evaluated_index;
       const int next_index = interp.next_evaluated_index;
