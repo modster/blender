@@ -4092,6 +4092,9 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
     }
   }
   else {
+
+    BKE_scene_camera_switch_update(scene);
+
     if (!scene->camera) {
       return false;
     }
