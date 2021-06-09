@@ -1,3 +1,5 @@
+#include "DNA_object_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -6,6 +8,7 @@ struct Mesh;
 
 typedef struct SolidifyData {
   /** Name of vertex group to use, MAX_VGROUP_NAME. */
+  const Object *object;
   char defgrp_name[64];
   char shell_defgrp_name[64];
   char rim_defgrp_name[64];
@@ -35,6 +38,7 @@ typedef struct SolidifyData {
 
   float merge_tolerance;
   float bevel_convex;
+  float *selection;
 } SolidifyData;
 
 Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh);

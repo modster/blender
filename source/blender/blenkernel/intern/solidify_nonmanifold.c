@@ -30,6 +30,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BKE_deform.h"
+#include "BKE_lattice.h"
 #include "BKE_mesh.h"
 #include "BKE_solidifiy.h"
 
@@ -134,6 +135,22 @@ static int comp_float_int_pair(const void *a, const void *b)
   return (int)(x->angle > y->angle) - (int)(x->angle < y->angle);
 }
 
+static void get_vgroup(
+    const Object *ob, struct Mesh *mesh, const char *name, MDeformVert **dvert, int *defgrp_index)
+{
+  *defgrp_index = BKE_object_defgroup_name_index(ob, name);
+  *dvert = NULL;
+
+  if (*defgrp_index != -1) {
+    if (ob->type == OB_LATTICE) {
+      *dvert = BKE_lattice_deform_verts_get(ob);
+    }
+    else if (mesh) {
+      *dvert = mesh->dvert;
+    }
+  }
+}
+
 /* NOLINTNEXTLINE: readability-function-size */
 Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
 {
@@ -154,10 +171,10 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
   }
 
   /* Only use material offsets if we have 2 or more materials. */
-  const short mat_nrs = 0;//ctx->object->totcol > 1 ? ctx->object->totcol : 1;
-  const short mat_nr_max = 0;//mat_nrs - 1;
-  const short mat_ofs = 0;//mat_nrs > 1 ? solidify_data->mat_ofs : 0;
-  const short mat_ofs_rim = 0;//mat_nrs > 1 ? solidify_data->mat_ofs_rim : 0;
+  const short mat_nrs = solidify_data->object->totcol > 1 ? solidify_data->object->totcol : 1;
+  const short mat_nr_max = mat_nrs - 1;
+  const short mat_ofs = mat_nrs > 1 ? solidify_data->mat_ofs : 0;
+  const short mat_ofs_rim = mat_nrs > 1 ? solidify_data->mat_ofs_rim : 0;
 
   float(*poly_nors)[3] = NULL;
 
@@ -177,13 +194,13 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
 
   const float bevel_convex = solidify_data->bevel_convex;
 
-  MDeformVert *dvert = mesh->dvert; //<----
+  MDeformVert *dvert = mesh->dvert;
   const bool defgrp_invert = (solidify_data->flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
   int defgrp_index = 0;
-  const int shell_defgrp_index = -1;//BKE_object_defgroup_name_index(ctx->object,smd->shell_defgrp_name);
-  const int rim_defgrp_index = -1;//BKE_object_defgroup_name_index(ctx->object, smd->rim_defgrp_name);
+  const int shell_defgrp_index = BKE_object_defgroup_name_index(solidify_data->object,solidify_data->shell_defgrp_name);
+  const int rim_defgrp_index = BKE_object_defgroup_name_index(solidify_data->object, solidify_data->rim_defgrp_name);
 
-  //MOD_get_vgroup(ctx->object, mesh, smd->defgrp_name, &dvert, &defgrp_index);
+  get_vgroup(solidify_data->object, mesh, solidify_data->defgrp_name, &dvert, &defgrp_index);
 
   const bool do_flat_faces = dvert && (solidify_data->flag & MOD_SOLIDIFY_NONMANIFOLD_FLAT_FACES);
 
