@@ -17,6 +17,7 @@
 #include "BKE_solidifiy.h"
 #include "BKE_node.h"
 
+#include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_node_types.h"
 
@@ -32,6 +33,7 @@ static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_FLOAT, N_("Offset"), -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f},
     {SOCK_BOOLEAN, N_("Fill"), true},
     {SOCK_BOOLEAN, N_("Rim Only"), false},
+    {SOCK_STRING, N_("Selection")},
     {-1, ""},
 };
 
@@ -64,10 +66,12 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 {
   const bNode &node = params.node();
   NodeGeometrySolidify &node_storage = *(NodeGeometrySolidify *)node.storage;
+  const Object *self_object = params.self_object();
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   bool add_fill = params.extract_input<bool>("Fill");
   bool add_rim_only = params.extract_input<bool>("Rim Only");
+  const std::string selection_name = params.extract_input<std::string>("Selection");
 
   char flag = 0;
 
@@ -86,30 +90,42 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
-    SolidifyData solidify_node_data = {
-      "",
-      "",
-      "",
-      thickness,
-      offset,
-      0.0f,
-      offset_clamp,
-      node_storage.mode,
-      node_storage.nonmanifold_offset_mode,
-      node_storage.nonmanifold_boundary_mode,
-        0.0f,
-      0.0f,
-      0.0f,
-      flag,
-      0,
-      0,
-      0.01f,
-      0.0f,
-    };
-
     MeshComponent &meshComponent = geometry_set.get_component_for_write<MeshComponent>();
     Mesh *input_mesh = meshComponent.get_for_write();
     Mesh *return_mesh;
+
+    GVArray_Typed<float> vertex_mask = meshComponent.attribute_get_for_read<float>(
+        selection_name, ATTR_DOMAIN_POINT, 1.0f);
+
+    float *selection = (float*)MEM_callocN(sizeof(float) * (unsigned long)input_mesh->totvert, __func__ );
+
+    for (int i : vertex_mask.index_range()) {
+      selection[i] = vertex_mask[i];
+    }
+    //Span<float> selection_span = vertex_mask->get_internal_span();
+
+    SolidifyData solidify_node_data = {
+        self_object,
+        "",
+        "",
+        "",
+        thickness,
+        offset,
+        0.0f,
+        offset_clamp,
+        node_storage.mode,
+        node_storage.nonmanifold_offset_mode,
+        node_storage.nonmanifold_boundary_mode,
+        0.0f,
+        0.0f,
+        0.0f,
+        flag,
+        0,
+        0,
+        0.01f,
+        0.0f,
+        selection,
+    };
 
     if(node_storage.mode == MOD_SOLIDIFY_MODE_EXTRUDE){
       return_mesh = solidify_extrude(&solidify_node_data, input_mesh);
