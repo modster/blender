@@ -23,7 +23,7 @@ static bool fn_node_poll_default(bNodeType *UNUSED(ntype),
 {
   /* Function nodes are only supported in simulation node trees so far. */
   if (!STREQ(ntree->idname, "GeometryNodeTree") && !STREQ(ntree->idname, "AttributeNodeTree")) {
-    *r_disabled_hint = "Not a geometry node tree";
+    *r_disabled_hint = "Not a geometry or attribute node tree";
     return false;
   }
   return true;

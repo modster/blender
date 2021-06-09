@@ -28,7 +28,7 @@ void register_node_type_attr_group(void)
 
   node_type_base_custom(&ntype, "AttributeNodeGroup", "Group", NODE_CLASS_GROUP, 0);
   ntype.type = NODE_GROUP;
-  ntype.poll = geo_node_poll_default;
+  ntype.poll = attr_node_poll_default;
   ntype.poll_instance = node_group_poll_instance;
   ntype.insert_link = node_insert_link_default;
   ntype.update_internal_links = node_update_internal_links_default;
@@ -48,7 +48,7 @@ void register_node_type_attribute_custom_group(bNodeType *ntype)
 {
   /* These methods can be overridden but need a default implementation otherwise. */
   if (ntype->poll == nullptr) {
-    ntype->poll = geo_node_poll_default;
+    ntype->poll = attr_node_poll_default;
   }
   if (ntype->insert_link == nullptr) {
     ntype->insert_link = node_insert_link_default;
