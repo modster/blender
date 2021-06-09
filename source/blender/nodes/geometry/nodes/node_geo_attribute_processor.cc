@@ -48,18 +48,18 @@ static void geo_node_attribute_processor_layout(uiLayout *layout, bContext *C, P
   if (group == nullptr) {
     return;
   }
-  {
-    uiLayout *box = uiLayoutBox(layout);
-    bNodeSocket *interface_socket = (bNodeSocket *)group->inputs.first;
-    AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
-                                                          storage->inputs_settings.first;
-    for (; interface_socket && input_settings;
-         interface_socket = interface_socket->next, input_settings = input_settings->next) {
-      PointerRNA input_ptr;
-      RNA_pointer_create(
-          ptr->owner_id, &RNA_AttributeProcessorInputSettings, input_settings, &input_ptr);
-      uiItemR(box, &input_ptr, "input_mode", 0, interface_socket->name, ICON_NONE);
-    }
+
+  uiLayout *col = uiLayoutColumn(layout, false);
+
+  bNodeSocket *interface_socket = (bNodeSocket *)group->inputs.first;
+  AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
+                                                        storage->inputs_settings.first;
+  for (; interface_socket && input_settings;
+       interface_socket = interface_socket->next, input_settings = input_settings->next) {
+    PointerRNA input_ptr;
+    RNA_pointer_create(
+        ptr->owner_id, &RNA_AttributeProcessorInputSettings, input_settings, &input_ptr);
+    uiItemR(col, &input_ptr, "input_mode", 0, interface_socket->name, ICON_NONE);
   }
 }
 
