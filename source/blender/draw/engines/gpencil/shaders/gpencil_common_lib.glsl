@@ -330,7 +330,7 @@ float stroke_thickness_modulate(float thickness)
   /* Modify stroke thickness by object and layer factors.-*/
   thickness *= thicknessScale;
   thickness += thicknessOffset;
-  thickness = max(0.05, thickness);
+  thickness = max(1.0, thickness);
 
   if (thicknessIsScreenSpace) {
     /* Multiply offset by view Z so that offset is constant in screenspace.
@@ -347,8 +347,11 @@ float stroke_thickness_modulate(float thickness)
 float clamp_small_stroke_thickness(float thickness)
 {
   /* To avoid aliasing artifacts, we clamp the line thickness and
-   * reduce its opacity in the fragment shader.*/
-  float min_thickness = gl_Position.w * 1.3;
+   * reduce its opacity in the fragment shader.
+   * The minimum thickness is not multiplied by any factor to get very thin lines.
+   */
+
+  float min_thickness = gl_Position.w * 1.0;
   thickness = max(min_thickness, thickness);
 
   return thickness;
