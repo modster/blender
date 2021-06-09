@@ -617,6 +617,9 @@ attribute_node_categories = [
         NodeItem("FunctionNodeInputVector"),
         NodeItem("AttributeNodeIndex"),
     ]),
+    AttributeNodeCategory("ATTR_OUTPUT", "Output", items=[
+        NodeItem("AttributeNodeSetAttribute"),
+    ]),
     AttributeNodeCategory("ATTR_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),
         NodeItem("ShaderNodeClamp"),

@@ -94,6 +94,7 @@ void register_node_type_attr_group(void);
 void register_node_type_attribute_custom_group(bNodeType *ntype);
 
 void register_node_type_attr_index(void);
+void register_node_type_attr_set_attribute(void);
 
 #ifdef __cplusplus
 }

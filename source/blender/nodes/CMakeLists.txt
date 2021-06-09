@@ -141,6 +141,7 @@ set(SRC
 
   geometry/nodes/node_attr_group.cc
   geometry/nodes/node_attr_index.cc
+  geometry/nodes/node_attr_set_attribute.cc
   geometry/nodes/node_geo_align_rotation_to_vector.cc
   geometry/nodes/node_geo_attribute_clamp.cc
   geometry/nodes/node_geo_attribute_color_ramp.cc
@@ -165,7 +166,7 @@ set(SRC
   geometry/nodes/node_geo_bounding_box.cc
   geometry/nodes/node_geo_collection_info.cc
   geometry/nodes/node_geo_common.cc
-  geometry/nodes/node_geo_curve_length.cc  
+  geometry/nodes/node_geo_curve_length.cc
   geometry/nodes/node_geo_curve_to_mesh.cc
   geometry/nodes/node_geo_curve_resample.cc
   geometry/nodes/node_geo_delete_geometry.cc
