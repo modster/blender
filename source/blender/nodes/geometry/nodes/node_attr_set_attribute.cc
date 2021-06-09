@@ -54,7 +54,7 @@ void register_node_type_attr_set_attribute()
 {
   static bNodeType ntype;
 
-  attr_node_type_base(&ntype, ATTR_NODE_SET_ATTRIBUTE, "Set Attribute", NODE_CLASS_OUTPUT, 0);
+  attr_node_type_base(&ntype, ATTR_NODE_SET_ATTRIBUTE, "Set Attribute", -1, 0);
   node_type_socket_templates(&ntype, attr_node_set_attribute_in, nullptr);
   node_type_storage(
       &ntype, "NodeAttributeSetAttribute", node_free_standard_storage, node_copy_standard_storage);

@@ -174,6 +174,7 @@ class DerivedNodeTree {
 
   bool has_link_cycles() const;
   void foreach_node(FunctionRef<void(DNode)> callback) const;
+  void foreach_node_with_type(StringRef idname, FunctionRef<void(DNode)> callback) const;
 
   std::string to_dot() const;
 

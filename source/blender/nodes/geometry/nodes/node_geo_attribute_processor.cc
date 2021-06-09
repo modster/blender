@@ -318,9 +318,9 @@ static void geo_node_attribute_processor_update(bNodeTree *UNUSED(ntree), bNode 
   }
 }
 
-static CustomDataType get_custom_data_type(const bNodeSocketType *typeinfo)
+static CustomDataType get_custom_data_type(const eNodeSocketDatatype type)
 {
-  switch (typeinfo->type) {
+  switch (type) {
     case SOCK_FLOAT:
       return CD_PROP_FLOAT;
     case SOCK_VECTOR:
@@ -331,6 +331,8 @@ static CustomDataType get_custom_data_type(const bNodeSocketType *typeinfo)
       return CD_PROP_BOOL;
     case SOCK_INT:
       return CD_PROP_INT32;
+    default:
+      break;
   }
   BLI_assert_unreachable();
   return CD_PROP_FLOAT;
@@ -387,7 +389,8 @@ static bool load_input_varrays(InputsCache &inputs_cache,
         const AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
             BLI_findlink(&storage.inputs_settings, index);
         const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group.inputs, index);
-        const CustomDataType type = get_custom_data_type(interface_socket->typeinfo);
+        const CustomDataType type = get_custom_data_type(
+            (eNodeSocketDatatype)interface_socket->typeinfo->type);
         const StringRefNull identifier = interface_socket->identifier;
         GVArrayPtr input_varray;
         switch ((GeometryNodeAttributeProcessorInputMode)input_settings->input_mode) {
@@ -421,7 +424,8 @@ static bool load_input_varrays(InputsCache &inputs_cache,
       NodeShaderAttribute *storage = dnode->storage<NodeShaderAttribute>();
       const StringRefNull attribute_name = storage->name;
       const bNodeSocketType *socket_typeinfo = dsocket->typeinfo();
-      const CustomDataType data_type = get_custom_data_type(socket_typeinfo);
+      const CustomDataType data_type = get_custom_data_type(
+          (eNodeSocketDatatype)socket_typeinfo->type);
       input_varray = &*inputs_cache.attributes.lookup_or_add_cb(
           {attribute_name, data_type}, [&]() -> GVArrayPtr {
             return component.attribute_get_for_read(attribute_name, domain, data_type);
@@ -436,8 +440,7 @@ static bool load_input_varrays(InputsCache &inputs_cache,
   return true;
 }
 
-static bool prepare_group_outputs(const DNode output_node,
-                                  const DerivedNodeTree &tree,
+static bool prepare_group_outputs(const Span<DInputSocket> used_group_outputs,
                                   bNodeTree &group,
                                   GeoNodeExecParams &geo_params,
                                   GeometryComponent &component,
@@ -446,16 +449,30 @@ static bool prepare_group_outputs(const DNode output_node,
                                   fn::MFParamsBuilder &fn_params,
                                   Vector<std::unique_ptr<OutputAttribute>> &r_output_attributes)
 {
-  for (const InputSocketRef *socket_ref : output_node->inputs().drop_back(1)) {
-    const DInputSocket socket{&tree.root_context(), socket_ref};
-    const int index = socket->index();
-    const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group.outputs, index);
-    const StringRefNull identifier = interface_socket->identifier;
-    const std::string socket_identifier = "out" + identifier;
-    std::string output_attribute_name = geo_params.extract_input<std::string>(socket_identifier);
-    const CustomDataType type = get_custom_data_type(interface_socket->typeinfo);
+  for (const DInputSocket &socket : used_group_outputs) {
+    const DNode node = socket.node();
+    std::string attribute_name;
+    CustomDataType attribute_type;
+    if (node->is_group_output_node()) {
+      const int index = socket->index();
+      const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group.outputs, index);
+      const StringRefNull identifier = interface_socket->identifier;
+      const std::string socket_identifier = "out" + identifier;
+      attribute_name = geo_params.extract_input<std::string>(socket_identifier);
+      attribute_type = get_custom_data_type((eNodeSocketDatatype)interface_socket->typeinfo->type);
+    }
+    else if (node->idname() == "AttributeNodeSetAttribute") {
+      const NodeAttributeSetAttribute *storage = node->storage<NodeAttributeSetAttribute>();
+      attribute_name = storage->attribute_name;
+      attribute_type = get_custom_data_type((eNodeSocketDatatype)storage->type);
+    }
+
+    if (attribute_name.empty()) {
+      return false;
+    }
+
     auto attribute = std::make_unique<OutputAttribute>(
-        component.attribute_try_get_for_output_only(output_attribute_name, domain, type));
+        component.attribute_try_get_for_output_only(attribute_name, domain, attribute_type));
     if (!*attribute) {
       /* Cannot create the output attribute. */
       return false;
@@ -472,9 +489,8 @@ static bool prepare_group_outputs(const DNode output_node,
 static void process_attributes_on_component(GeoNodeExecParams &geo_params,
                                             GeometryComponent &component,
                                             const fn::MultiFunction &network_fn,
-                                            const DerivedNodeTree &tree,
-                                            const DNode output_node,
-                                            const Span<DOutputSocket> used_group_inputs)
+                                            const Span<DOutputSocket> used_group_inputs,
+                                            const Span<DInputSocket> used_group_outputs)
 {
   const bNode &node = geo_params.node();
   bNodeTree *group = (bNodeTree *)node.id;
@@ -507,8 +523,7 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
   }
 
   Vector<std::unique_ptr<OutputAttribute>> output_attributes;
-  if (!prepare_group_outputs(output_node,
-                             tree,
+  if (!prepare_group_outputs(used_group_outputs,
                              *group,
                              geo_params,
                              component,
@@ -558,10 +573,24 @@ static void process_attributes(GeoNodeExecParams &geo_params, GeometrySet &geome
   if (output_node->inputs().size() <= 1) {
     return;
   }
+  Vector<DInputSocket> used_group_outputs;
+  for (const InputSocketRef *socket_ref : output_node->inputs().drop_back(1)) {
+    used_group_outputs.append({&root_context, socket_ref});
+  }
+  tree.foreach_node_with_type("AttributeNodeSetAttribute", [&](const DNode dnode) {
+    NodeAttributeSetAttribute *storage = dnode->storage<NodeAttributeSetAttribute>();
+    if (storage->attribute_name[0] == '\0') {
+      return;
+    }
+    for (const InputSocketRef *socket_ref : dnode->inputs()) {
+      if (socket_ref->is_available()) {
+        used_group_outputs.append({dnode.context(), socket_ref});
+      }
+    }
+  });
 
   Vector<fn::MFInputSocket *> network_outputs;
-  for (const InputSocketRef *socket_ref : output_node->inputs().drop_back(1)) {
-    const DInputSocket socket{&root_context, socket_ref};
+  for (const DInputSocket &socket : used_group_outputs) {
     network_outputs.append(network_map.lookup(socket).first());
   }
 
@@ -584,25 +613,22 @@ static void process_attributes(GeoNodeExecParams &geo_params, GeometrySet &geome
     process_attributes_on_component(geo_params,
                                     geometry_set.get_component_for_write<MeshComponent>(),
                                     network_fn,
-                                    tree,
-                                    output_node,
-                                    used_group_inputs);
+                                    used_group_inputs,
+                                    used_group_outputs);
   }
   if (geometry_set.has_pointcloud()) {
     process_attributes_on_component(geo_params,
                                     geometry_set.get_component_for_write<PointCloudComponent>(),
                                     network_fn,
-                                    tree,
-                                    output_node,
-                                    used_group_inputs);
+                                    used_group_inputs,
+                                    used_group_outputs);
   }
   if (geometry_set.has_curve()) {
     process_attributes_on_component(geo_params,
                                     geometry_set.get_component_for_write<CurveComponent>(),
                                     network_fn,
-                                    tree,
-                                    output_node,
-                                    used_group_inputs);
+                                    used_group_inputs,
+                                    used_group_outputs);
   }
 }
 

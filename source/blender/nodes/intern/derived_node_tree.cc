@@ -90,6 +90,17 @@ void DerivedNodeTree::foreach_node(FunctionRef<void(DNode)> callback) const
   this->foreach_node_in_context_recursive(*root_context_, callback);
 }
 
+void DerivedNodeTree::foreach_node_with_type(StringRef idname,
+                                             FunctionRef<void(DNode)> callback) const
+{
+  /* TODO: Use more efficient approach that does not require iterating over all nodes. */
+  this->foreach_node([&](const DNode node) {
+    if (node->idname() == idname) {
+      callback(node);
+    }
+  });
+}
+
 void DerivedNodeTree::foreach_node_in_context_recursive(const DTreeContext &context,
                                                         FunctionRef<void(DNode)> callback) const
 {
