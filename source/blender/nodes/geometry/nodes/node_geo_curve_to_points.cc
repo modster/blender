@@ -236,15 +236,15 @@ static void copy_uniform_sample_point_attributes(Span<SplinePtr> splines,
 
       const Array<float> uniform_samples = spline.sample_uniform_index_factors(size);
 
-      spline.sample_data_based_on_index_factors<float3>(
+      spline.sample_based_on_index_factors<float3>(
           spline.evaluated_positions(), uniform_samples, data.positions.slice(offset, size));
 
-      spline.sample_data_based_on_index_factors<float>(
+      spline.sample_based_on_index_factors<float>(
           spline.interpolate_to_evaluated_points(spline.radii()),
           uniform_samples,
           data.radii.slice(offset, size));
 
-      spline.sample_data_based_on_index_factors<float>(
+      spline.sample_based_on_index_factors<float>(
           spline.interpolate_to_evaluated_points(spline.tilts()),
           uniform_samples,
           data.tilts.slice(offset, size));
@@ -256,19 +256,18 @@ static void copy_uniform_sample_point_attributes(Span<SplinePtr> splines,
         BLI_assert(spline.attributes.get_for_read(name));
         GSpan spline_span = *spline.attributes.get_for_read(name);
 
-        spline.sample_data_based_on_index_factors(
-            *spline.interpolate_to_evaluated_points(spline_span),
-            uniform_samples,
-            point_span.slice(offset, size));
+        spline.sample_based_on_index_factors(*spline.interpolate_to_evaluated_points(spline_span),
+                                             uniform_samples,
+                                             point_span.slice(offset, size));
       }
 
-      spline.sample_data_based_on_index_factors<float3>(
+      spline.sample_based_on_index_factors<float3>(
           spline.evaluated_tangents(), uniform_samples, data.tangents.slice(offset, size));
       for (float3 &tangent : data.tangents) {
         tangent.normalize();
       }
 
-      spline.sample_data_based_on_index_factors<float3>(
+      spline.sample_based_on_index_factors<float3>(
           spline.evaluated_normals(), uniform_samples, data.normals.slice(offset, size));
       for (float3 &normals : data.normals) {
         normals.normalize();

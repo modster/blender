@@ -171,24 +171,24 @@ class Spline {
 
   blender::Array<float> sample_uniform_index_factors(const int samples_size) const;
   LookupResult lookup_data_from_index_factor(const float index_factor) const;
-  void sample_data_based_on_index_factors(const blender::fn::GVArray &src,
-                                          blender::Span<float> index_factors,
-                                          blender::fn::GMutableSpan dst) const;
+
+  void sample_based_on_index_factors(const blender::fn::GVArray &src,
+                                     blender::Span<float> index_factors,
+                                     blender::fn::GMutableSpan dst) const;
   template<typename T>
-  void sample_data_based_on_index_factors(const blender::VArray<T> &src,
-                                          blender::Span<float> index_factors,
-                                          blender::MutableSpan<T> dst) const
+  void sample_based_on_index_factors(const blender::VArray<T> &src,
+                                     blender::Span<float> index_factors,
+                                     blender::MutableSpan<T> dst) const
   {
-    this->sample_data_based_on_index_factors(
+    this->sample_based_on_index_factors(
         blender::fn::GVArray_For_VArray(src), index_factors, blender::fn::GMutableSpan(dst));
   }
   template<typename T>
-  void sample_data_based_on_index_factors(blender::Span<T> src,
-                                          blender::Span<float> index_factors,
-                                          blender::MutableSpan<T> dst) const
+  void sample_based_on_index_factors(blender::Span<T> src,
+                                     blender::Span<float> index_factors,
+                                     blender::MutableSpan<T> dst) const
   {
-    this->sample_data_based_on_index_factors(
-        blender::fn::GVArray_For_Span(src), index_factors, blender::fn::GMutableSpan(dst));
+    this->sample_based_on_index_factors(blender::VArray_For_Span(src), index_factors, dst);
   }
 
   /**

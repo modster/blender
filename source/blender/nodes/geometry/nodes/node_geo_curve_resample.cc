@@ -82,9 +82,11 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
   output_spline->set_cyclic(input_spline.is_cyclic());
   output_spline->normal_mode = input_spline.normal_mode;
 
-  if (input_spline.evaluated_edges_size() < 1) {
-    output_spline->resize(1);
-    output_spline->positions().first() = input_spline.positions().first();
+  if (input_spline.evaluated_edges_size() < 1 || count == 1) {
+    output_spline->add_point(input_spline.positions().first(),
+                             input_spline.tilts().first(),
+                             input_spline.radii().first());
+    output_spline->attributes.reallocate(1);
     return output_spline;
   }
 
@@ -92,15 +94,15 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
 
   Array<float> uniform_samples = input_spline.sample_uniform_index_factors(count);
 
-  input_spline.sample_data_based_on_index_factors<float3>(
+  input_spline.sample_based_on_index_factors<float3>(
       input_spline.evaluated_positions(), uniform_samples, output_spline->positions());
 
-  input_spline.sample_data_based_on_index_factors<float>(
+  input_spline.sample_based_on_index_factors<float>(
       input_spline.interpolate_to_evaluated_points(input_spline.radii()),
       uniform_samples,
       output_spline->radii());
 
-  input_spline.sample_data_based_on_index_factors<float>(
+  input_spline.sample_based_on_index_factors<float>(
       input_spline.interpolate_to_evaluated_points(input_spline.tilts()),
       uniform_samples,
       output_spline->tilts());
@@ -121,7 +123,7 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
           return false;
         }
 
-        input_spline.sample_data_based_on_index_factors(
+        input_spline.sample_based_on_index_factors(
             *input_spline.interpolate_to_evaluated_points(*input_attribute),
             uniform_samples,
             *output_attribute);
@@ -146,7 +148,7 @@ static std::unique_ptr<CurveEval> resample_curve(const CurveEval &input_curve,
     else if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_LENGTH) {
       BLI_assert(mode_param.length);
       const float length = spline->length();
-      const int count = length / *mode_param.length;
+      const int count = std::max(int(length / *mode_param.length), 1);
       output_curve->add_spline(resample_spline(*spline, count));
     }
   }
