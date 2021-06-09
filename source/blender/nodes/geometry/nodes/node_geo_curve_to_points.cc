@@ -72,6 +72,7 @@ namespace blender::nodes {
 static void evaluate_splines(Span<SplinePtr> splines)
 {
   parallel_for_each(splines, [](const SplinePtr &spline) {
+    /* These functions fill the corresponding caches on each spline. */
     spline->evaluated_positions();
     spline->evaluated_tangents();
     spline->evaluated_normals();
