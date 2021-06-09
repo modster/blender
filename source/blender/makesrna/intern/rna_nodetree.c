@@ -2011,6 +2011,20 @@ static const EnumPropertyItem *rna_GeometryNodeSwitch_type_itemf(bContext *UNUSE
   return itemf_function_check(node_socket_data_type_items, switch_type_supported);
 }
 
+static bool set_attribute_type_supported(const EnumPropertyItem *item)
+{
+  return ELEM(item->value, SOCK_FLOAT, SOCK_INT, SOCK_BOOLEAN, SOCK_VECTOR, SOCK_RGBA);
+}
+
+static const EnumPropertyItem *rna_AttributeNodeSetAttribute_type_itemf(bContext *UNUSED(C),
+                                                                        PointerRNA *UNUSED(ptr),
+                                                                        PropertyRNA *UNUSED(prop),
+                                                                        bool *r_free)
+{
+  *r_free = true;
+  return itemf_function_check(node_socket_data_type_items, set_attribute_type_supported);
+}
+
 static bool attribute_clamp_type_supported(const EnumPropertyItem *item)
 {
   return ELEM(item->value, CD_PROP_FLOAT, CD_PROP_FLOAT3, CD_PROP_INT32, CD_PROP_COLOR);
@@ -10046,6 +10060,23 @@ static void def_geo_attribute_processor(StructRNA *srna)
   prop = RNA_def_property(srna, "outputs_settings", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "AttributeProcessorOutputSettings");
   RNA_def_property_ui_text(prop, "Group Outputs", "");
+}
+
+static void def_attr_set_attribute(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeAttributeSetAttribute", "storage");
+
+  prop = RNA_def_property(srna, "attribute_name", PROP_STRING, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Attribute Name", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, node_socket_data_type_items);
+  RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_AttributeNodeSetAttribute_type_itemf");
+  RNA_def_property_ui_text(prop, "Type", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
 /* -------------------------------------------------------------------------- */

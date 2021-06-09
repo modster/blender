@@ -1391,6 +1391,12 @@ typedef struct NodeGeometryAttributeProcessor {
   ListBase outputs_settings;
 } NodeGeometryAttributeProcessor;
 
+typedef struct NodeAttributeSetAttribute {
+  char attribute_name[64];
+  uint8_t type;
+  char _pad[7];
+} NodeAttributeSetAttribute;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
