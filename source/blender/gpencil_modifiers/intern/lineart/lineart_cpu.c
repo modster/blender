@@ -2166,7 +2166,6 @@ static void lineart_main_load_geometries(
       use_mesh = use_ob->data;
     }
     else {
-      /* Do not have curve boundbox api at the moment? */
       use_mesh = BKE_mesh_new_from_object(depsgraph, use_ob, true, true);
     }
 
