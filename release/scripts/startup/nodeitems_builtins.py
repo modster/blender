@@ -45,7 +45,7 @@ class SortedNodeCategory(NodeCategory):
             new_items.extend(sorted(section, key=sort_key))
             items = new_items
 
-        super().__init__(identifier, name, description, items)
+        super().__init__(identifier, name, description=description, items=items)
 
 
 def is_node_tree_type_visible(context, idname):
