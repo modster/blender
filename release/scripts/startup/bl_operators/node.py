@@ -396,15 +396,6 @@ class NODE_OT_new_attribute_processor_group(Operator):
         node.node_tree = group
         return {'FINISHED'}
 
-def socket_idname_items(self, context):
-    items = []
-    items.append(("NodeSocketFloat", "Float", ""))
-    items.append(("NodeSocketVector", "Vector", ""))
-    items.append(("NodeSocketColor", "Color", ""))
-    items.append(("NodeSocketInt", "Integer", ""))
-    items.append(("NodeSocketBool", "Boolean", ""))
-    return items
-
 
 classes = (
     NodeSetting,
