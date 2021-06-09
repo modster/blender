@@ -1528,33 +1528,9 @@ static PyObject *BPy_IDGroup_get(BPy_IDProperty *self, PyObject *args)
   return def;
 }
 
-static bool pyobject_can_convert_to_number(PyObject *py_object)
-{
-  if (ELEM(py_object, NULL, Py_None)) {
-    return false;
-  }
-
-  if (PyLong_Check(py_object) || PyFloat_Check(py_object) || PyBool_Check(py_object)) {
-    return true;
-  }
-
-  PyErr_SetString(PyExc_TypeError, "UI data values must be integers, floats, or booleans");
-  return false;
-}
-
 static int pyobject_convert_to_int(PyObject *py_object)
 {
-  int value = 0;
-  if (PyLong_Check(py_object)) {
-    value = PyC_Long_AsI32(py_object);
-  }
-  else if (PyFloat_Check(py_object)) {
-    value = (int)PyFloat_AsDouble(py_object);
-  }
-  else if (PyBool_Check(py_object)) {
-    value = PyObject_IsTrue(py_object);
-  }
-
+  const int value = PyLong_AsLong(py_object);
   if ((value == -1) && PyErr_Occurred()) {
     PyErr_SetString(PyExc_ValueError, "Error converting object to integer for UI data");
   }
@@ -1570,27 +1546,27 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
                                           PyObject *py_default_value)
 {
   IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)idprop->ui_data;
-  if (pyobject_can_convert_to_number(py_min)) {
+  if (!ELEM(py_min, NULL, Py_None)) {
     ui_data->min = pyobject_convert_to_int(py_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
     ui_data->max = MAX2(ui_data->min, ui_data->max);
   }
-  if (pyobject_can_convert_to_number(py_max)) {
+  if (!ELEM(py_max, NULL, Py_None)) {
     ui_data->max = pyobject_convert_to_int(py_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
     ui_data->min = MIN2(ui_data->min, ui_data->max);
   }
-  if (pyobject_can_convert_to_number(py_soft_min)) {
+  if (!ELEM(py_soft_min, NULL, Py_None)) {
     ui_data->soft_min = pyobject_convert_to_int(py_soft_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
     ui_data->soft_max = MAX2(ui_data->soft_min, ui_data->soft_max);
   }
-  if (pyobject_can_convert_to_number(py_soft_max)) {
+  if (!ELEM(py_soft_max, NULL, Py_None)) {
     ui_data->soft_max = pyobject_convert_to_int(py_soft_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
     ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->soft_max);
   }
-  if (pyobject_can_convert_to_number(py_step)) {
+  if (!ELEM(py_step, NULL, Py_None)) {
     ui_data->step = pyobject_convert_to_int(py_step);
   }
   if (!ELEM(py_default_value, NULL, Py_None)) {
@@ -1607,13 +1583,13 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
         ui_data->default_array = MEM_malloc_arrayN(len, sizeof(int), __func__);
         for (Py_ssize_t i = 0; i < len; i++) {
           PyObject *item = ob_seq_fast_items[i];
-          if (pyobject_can_convert_to_number(item)) {
+          if (!ELEM(item, NULL, Py_None)) {
             ui_data->default_array[i] = pyobject_convert_to_int(item);
           }
         }
       }
     }
-    else if (pyobject_can_convert_to_number(py_default_value)) {
+    else if (!ELEM(py_default_value, NULL, Py_None)) {
       ui_data->default_value = pyobject_convert_to_int(py_default_value);
     }
   }
@@ -1621,17 +1597,7 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
 
 static double pyobject_convert_to_double(PyObject *py_object)
 {
-  double value = 0.0;
-  if (PyLong_Check(py_object)) {
-    value = (double)PyC_Long_AsI32(py_object);
-  }
-  else if (PyFloat_Check(py_object)) {
-    value = PyFloat_AsDouble(py_object);
-  }
-  else if (PyBool_Check(py_object)) {
-    value = (double)PyObject_IsTrue(py_object);
-  }
-
+  const double value = PyFloat_AsDouble(py_object);
   if ((value == -1.0) && PyErr_Occurred()) {
     PyErr_SetString(PyExc_ValueError, "Error converting object to double for UI data");
   }
@@ -1648,30 +1614,30 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
                                             PyObject *py_default_value)
 {
   IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
-  if (pyobject_can_convert_to_number(py_min)) {
+  if (!ELEM(py_min, NULL, Py_None)) {
     ui_data->min = pyobject_convert_to_double(py_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
     ui_data->max = MAX2(ui_data->min, ui_data->max);
   }
-  if (pyobject_can_convert_to_number(py_max)) {
+  if (!ELEM(py_max, NULL, Py_None)) {
     ui_data->max = pyobject_convert_to_double(py_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
     ui_data->min = MIN2(ui_data->min, ui_data->max);
   }
-  if (pyobject_can_convert_to_number(py_soft_min)) {
+  if (!ELEM(py_soft_min, NULL, Py_None)) {
     ui_data->soft_min = pyobject_convert_to_double(py_soft_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
     ui_data->soft_max = MAX2(ui_data->soft_min, ui_data->soft_max);
   }
-  if (pyobject_can_convert_to_number(py_soft_max)) {
+  if (!ELEM(py_soft_max, NULL, Py_None)) {
     ui_data->soft_max = pyobject_convert_to_double(py_soft_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
     ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->soft_max);
   }
-  if (pyobject_can_convert_to_number(py_step)) {
+  if (!ELEM(py_step, NULL, Py_None)) {
     ui_data->step = (float)pyobject_convert_to_double(py_step);
   }
-  if (pyobject_can_convert_to_number(py_precision)) {
+  if (!ELEM(py_precision, NULL, Py_None)) {
     ui_data->precision = pyobject_convert_to_int(py_precision);
   }
   if (!ELEM(py_default_value, NULL, Py_None)) {
@@ -1688,17 +1654,18 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
         ui_data->default_array = MEM_malloc_arrayN(len, sizeof(double), __func__);
         for (Py_ssize_t i = 0; i < len; i++) {
           PyObject *item = ob_seq_fast_items[i];
-          if (pyobject_can_convert_to_number(item)) {
+          if (!ELEM(item, NULL, Py_None)) {
             ui_data->default_array[i] = pyobject_convert_to_double(item);
           }
         }
       }
     }
-    else if (pyobject_can_convert_to_number(py_default_value)) {
+    else if (!ELEM(py_default_value, NULL, Py_None)) {
       ui_data->default_value = pyobject_convert_to_double(py_default_value);
     }
   }
 }
+
 static void idprop_update_rna_ui_data_string(IDProperty *idprop, PyObject *py_default_value)
 {
   IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
