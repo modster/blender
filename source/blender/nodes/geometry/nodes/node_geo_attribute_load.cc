@@ -36,14 +36,13 @@ static bNodeSocketTemplate geo_node_attribute_load_in[] = {
 };
 
 static bNodeSocketTemplate geo_node_attribute_load_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_ATTRIBUTE, N_("Attribute")},
     {-1, ""},
 };
 
 static void geo_node_attribute_load_layout(uiLayout *layout,
-                                               bContext *UNUSED(C),
-                                               PointerRNA *ptr)
+                                           bContext *UNUSED(C),
+                                           PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -58,37 +57,32 @@ static void geo_node_attribute_load_init(bNodeTree *UNUSED(tree), bNode *node)
 
 namespace blender::nodes {
 
+static void load_attribute(const GeometryComponent *component, const GeoNodeExecParams &params)
+{
+
+}
+
 static void geo_node_attribute_load_exec(GeoNodeExecParams params)
 {
-  GeometrySet dst_geometry_set = params.extract_input<GeometrySet>("Geometry");
-  GeometrySet src_geometry_set = params.extract_input<GeometrySet>("Source Geometry");
-  const std::string src_attribute_name = params.extract_input<std::string>("Source");
-  const std::string dst_attribute_name = params.extract_input<std::string>("Destination");
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  const std::string attribute_name = params.extract_input<std::string>("Name");
 
-  if (src_attribute_name.empty() || dst_attribute_name.empty()) {
-    params.set_output("Geometry", dst_geometry_set);
+  if (attribute_name.empty()) {
+    params.set_output("Attribute", AttributeRef::None);
     return;
   }
 
-  dst_geometry_set = bke::geometry_set_realize_instances(dst_geometry_set);
-  src_geometry_set = bke::geometry_set_realize_instances(src_geometry_set);
+  geometry_set = bke::geometry_set_realize_instances(geometry_set);
 
-  if (dst_geometry_set.has<MeshComponent>()) {
-    transfer_attribute(params,
-                       src_geometry_set,
-                       dst_geometry_set.get_component_for_write<MeshComponent>(),
-                       src_attribute_name,
-                       dst_attribute_name);
+  if (geometry_set.has<MeshComponent>()) {
+    load_attribute(geometry_set.get_component_for_read<MeshComponent>(), params);
   }
-  if (dst_geometry_set.has<PointCloudComponent>()) {
-    transfer_attribute(params,
-                       src_geometry_set,
-                       dst_geometry_set.get_component_for_write<PointCloudComponent>(),
-                       src_attribute_name,
-                       dst_attribute_name);
+  if (geometry_set.has<PointCloudComponent>()) {
+    load_attribute(geometry_set.get_component_for_read<PointCloudComponent>(), params);
   }
-
-  params.set_output("Geometry", dst_geometry_set);
+  if (geometry_set.has<CurveComponent>()) {
+    load_attribute(geometry_set.get_component_for_read<CurveComponent>(), params);
+  }
 }
 
 }  // namespace blender::nodes

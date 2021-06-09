@@ -79,27 +79,27 @@ static void store_attribute(GeometryComponent &component, const GeoNodeExecParam
 
   switch (data_type) {
     case CD_PROP_FLOAT: {
-      const float value = params.get_input<float>("Value_001");
+      const float value = params.get_input<float>("Attribute");
       attribute->fill(&value);
       break;
     }
     case CD_PROP_FLOAT3: {
-      const float3 value = params.get_input<float3>("Value");
+      const float3 value = params.get_input<float3>("Attribute");
       attribute->fill(&value);
       break;
     }
     case CD_PROP_COLOR: {
-      const Color4f value = params.get_input<Color4f>("Value_002");
+      const ColorGeometry4f value = params.get_input<ColorGeometry4f>("Attribute");
       attribute->fill(&value);
       break;
     }
     case CD_PROP_BOOL: {
-      const bool value = params.get_input<bool>("Value_003");
+      const bool value = params.get_input<bool>("Attribute");
       attribute->fill(&value);
       break;
     }
     case CD_PROP_INT32: {
-      const int value = params.get_input<int>("Value_004");
+      const int value = params.get_input<int>("Attribute");
       attribute->fill(&value);
       break;
     }

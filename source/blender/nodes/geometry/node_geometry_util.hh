@@ -34,6 +34,8 @@
 
 #include "node_util.h"
 
+#include "node_geometry_attribute.hh"
+
 void geo_node_type_base(
     struct bNodeType *ntype, int type, const char *name, short nclass, short flag);
 bool geo_node_poll_default(struct bNodeType *ntype,
