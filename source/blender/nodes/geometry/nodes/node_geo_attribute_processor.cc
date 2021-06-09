@@ -365,34 +365,19 @@ static IndexMask prepare_index_mask_from_selection(Vector<int64_t> &selection_in
     }
     selection = selection_indices.as_span();
   }
+  return selection;
 }
 
-static void process_attributes_on_component(GeoNodeExecParams &geo_params,
-                                            GeometryComponent &component,
-                                            const fn::MultiFunction &network_fn,
-                                            const DerivedNodeTree &tree,
-                                            const DNode output_node,
-                                            const Span<DOutputSocket> used_group_inputs)
+static bool load_input_varrays(InputsCache &inputs_cache,
+                               const Span<DOutputSocket> used_group_inputs,
+                               const NodeGeometryAttributeProcessor &storage,
+                               const bNodeTree &group,
+                               const GeoNodeExecParams &geo_params,
+                               const GeometryComponent &component,
+                               const AttributeDomain domain,
+                               const int domain_size,
+                               fn::MFParamsBuilder &fn_params)
 {
-  const bNode &node = geo_params.node();
-  bNodeTree *group = (bNodeTree *)node.id;
-  const NodeGeometryAttributeProcessor &storage = *(NodeGeometryAttributeProcessor *)node.storage;
-  const AttributeDomain domain = (AttributeDomain)storage.domain;
-
-  const int domain_size = component.attribute_domain_size(domain);
-  if (domain_size == 0) {
-    return;
-  }
-
-  Vector<int64_t> selection_indices;
-  const IndexMask selection = prepare_index_mask_from_selection(
-      selection_indices, domain, domain_size, component, geo_params);
-
-  fn::MFParamsBuilder fn_params{network_fn, domain_size};
-  fn::MFContextBuilder context;
-
-  InputsCache inputs_cache;
-
   for (const DOutputSocket &dsocket : used_group_inputs) {
     const DNode dnode = dsocket.node();
     const GVArray *input_varray = nullptr;
@@ -401,22 +386,21 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
       input_varray = &*inputs_cache.group_inputs.lookup_or_add_cb(index, [&]() -> GVArrayPtr {
         const AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
             BLI_findlink(&storage.inputs_settings, index);
-        const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group->inputs, index);
+        const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group.inputs, index);
         const CustomDataType type = get_custom_data_type(interface_socket->typeinfo);
         const StringRefNull identifier = interface_socket->identifier;
         GVArrayPtr input_varray;
         switch ((GeometryNodeAttributeProcessorInputMode)input_settings->input_mode) {
           case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_ATTRIBUTE: {
             const std::string input_name = "inB" + identifier;
-            const std::string attribute_name = geo_params.extract_input<std::string>(input_name);
+            const std::string attribute_name = geo_params.get_input<std::string>(input_name);
             return component.attribute_get_for_read(attribute_name, domain, type);
           }
           case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_VALUE: {
             const std::string input_name = "inA" + identifier;
-            GMutablePointer value = geo_params.extract_input(input_name);
-            GVArrayPtr varray = std::make_unique<fn::GVArray_For_SingleValue>(
+            GPointer value = geo_params.get_input(input_name);
+            GVArrayPtr varray = std::make_unique<fn::GVArray_For_SingleValueRef>(
                 *value.type(), domain_size, value.get());
-            value.destruct();
             return varray;
           }
         }
@@ -445,16 +429,27 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
     }
 
     if (input_varray == nullptr) {
-      return;
+      return false;
     }
     fn_params.add_readonly_single_input(*input_varray);
   }
+  return true;
+}
 
-  Vector<std::unique_ptr<OutputAttribute>> output_attributes;
+static bool prepare_group_outputs(const DNode output_node,
+                                  const DerivedNodeTree &tree,
+                                  bNodeTree &group,
+                                  GeoNodeExecParams &geo_params,
+                                  GeometryComponent &component,
+                                  const AttributeDomain domain,
+                                  const int domain_size,
+                                  fn::MFParamsBuilder &fn_params,
+                                  Vector<std::unique_ptr<OutputAttribute>> &r_output_attributes)
+{
   for (const InputSocketRef *socket_ref : output_node->inputs().drop_back(1)) {
     const DInputSocket socket{&tree.root_context(), socket_ref};
     const int index = socket->index();
-    const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group->outputs, index);
+    const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group.outputs, index);
     const StringRefNull identifier = interface_socket->identifier;
     const std::string socket_identifier = "out" + identifier;
     std::string output_attribute_name = geo_params.extract_input<std::string>(socket_identifier);
@@ -463,13 +458,65 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
         component.attribute_try_get_for_output_only(output_attribute_name, domain, type));
     if (!*attribute) {
       /* Cannot create the output attribute. */
-      return;
+      return false;
     }
     GMutableSpan attribute_span = attribute->as_span();
     /* Destruct because the function expects an uninitialized array. */
     attribute_span.type().destruct_n(attribute_span.data(), domain_size);
     fn_params.add_uninitialized_single_output(attribute_span);
-    output_attributes.append(std::move(attribute));
+    r_output_attributes.append(std::move(attribute));
+  }
+  return true;
+}
+
+static void process_attributes_on_component(GeoNodeExecParams &geo_params,
+                                            GeometryComponent &component,
+                                            const fn::MultiFunction &network_fn,
+                                            const DerivedNodeTree &tree,
+                                            const DNode output_node,
+                                            const Span<DOutputSocket> used_group_inputs)
+{
+  const bNode &node = geo_params.node();
+  bNodeTree *group = (bNodeTree *)node.id;
+  const NodeGeometryAttributeProcessor &storage = *(NodeGeometryAttributeProcessor *)node.storage;
+  const AttributeDomain domain = (AttributeDomain)storage.domain;
+
+  const int domain_size = component.attribute_domain_size(domain);
+  if (domain_size == 0) {
+    return;
+  }
+
+  Vector<int64_t> selection_indices;
+  const IndexMask selection = prepare_index_mask_from_selection(
+      selection_indices, domain, domain_size, component, geo_params);
+
+  fn::MFParamsBuilder fn_params{network_fn, domain_size};
+  fn::MFContextBuilder context;
+
+  InputsCache inputs_cache;
+  if (!load_input_varrays(inputs_cache,
+                          used_group_inputs,
+                          storage,
+                          *group,
+                          geo_params,
+                          component,
+                          domain,
+                          domain_size,
+                          fn_params)) {
+    return;
+  }
+
+  Vector<std::unique_ptr<OutputAttribute>> output_attributes;
+  if (!prepare_group_outputs(output_node,
+                             tree,
+                             *group,
+                             geo_params,
+                             component,
+                             domain,
+                             domain_size,
+                             fn_params,
+                             output_attributes)) {
+    return;
   }
 
   network_fn.call(selection, fn_params, context);

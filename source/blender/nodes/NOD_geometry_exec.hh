@@ -175,6 +175,14 @@ class GeoNodeExecParams {
     return *(const T *)gvalue.get();
   }
 
+  GPointer get_input(StringRef identifier) const
+  {
+#ifdef DEBUG
+    this->check_input_access(identifier);
+#endif
+    return provider_->get_input(identifier);
+  }
+
   /**
    * Store the output value for the given socket identifier.
    */
