@@ -590,6 +590,9 @@ static void process_attributes(GeoNodeExecParams &geo_params, GeometrySet &geome
       }
     }
   });
+  if (used_group_outputs.is_empty()) {
+    return;
+  }
 
   Vector<fn::MFInputSocket *> network_outputs;
   for (const DInputSocket &socket : used_group_outputs) {
