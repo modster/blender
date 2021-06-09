@@ -43,6 +43,7 @@
 #include "BKE_gpencil_modifier.h"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
+#include "BKE_object.h"
 #include "BKE_pointcache.h"
 #include "BKE_scene.h"
 #include "DEG_depsgraph_query.h"
@@ -2036,7 +2037,12 @@ static void lineart_geometry_load_assign_thread(LineartObjectLoadTaskInfo *olti_
 
 static bool lineart_geometry_check_visible(double (*model_view_proj)[4], Object *use_ob)
 {
-  BoundBox *bb = BKE_mesh_boundbox_get(use_ob);
+  BoundBox *bb = BKE_object_boundbox_get(use_ob);
+  if (!bb) {
+    /* For lights and empty stuff there will be no bbox. */
+    return false;
+  }
+
   double co[8][4];
   double tmp[3];
   for (int i = 0; i < 8; i++) {
@@ -2145,17 +2151,18 @@ static void lineart_main_load_geometries(
     mul_m4db_m4db_m4fl_uniq(obi->model_view_proj, rb->view_projection, ob->obmat);
     mul_m4db_m4db_m4fl_uniq(obi->model_view, rb->view, ob->obmat);
 
+    if (!lineart_geometry_check_visible(obi->model_view_proj, use_ob)) {
+      if (G.debug_value == 4000) {
+        bound_box_discard_count++;
+      }
+      continue;
+    }
+
     if (!(use_ob->type == OB_MESH || use_ob->type == OB_MBALL || use_ob->type == OB_CURVE ||
           use_ob->type == OB_SURF || use_ob->type == OB_FONT)) {
       continue;
     }
     if (use_ob->type == OB_MESH) {
-      if (!lineart_geometry_check_visible(obi->model_view_proj, use_ob)) {
-        if (G.debug_value == 4000) {
-          bound_box_discard_count++;
-        }
-        continue;
-      }
       use_mesh = use_ob->data;
     }
     else {
