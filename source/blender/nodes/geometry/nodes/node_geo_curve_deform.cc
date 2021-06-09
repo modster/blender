@@ -98,7 +98,7 @@ static void spline_deform(const Spline &spline,
   Span<float3> spline_positions = spline.evaluated_positions();
   Span<float3> spline_tangents = spline.evaluated_tangents();
   Span<float3> spline_normals = spline.evaluated_normals();
-  GVArray_Typed<float> radii{spline.interpolate_to_evaluated_points(spline.radii())};
+  GVArray_Typed<float> radii = spline.interpolate_to_evaluated_points(spline.radii());
 
   parallel_for(positions.index_range(), 1024, [&](IndexRange range) {
     for (const int i : range) {

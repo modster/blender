@@ -176,6 +176,25 @@ class Spline {
 
   LookupResult lookup_data_from_index_factor(const float index_factor) const;
 
+  void sample_based_on_index_factors(const blender::fn::GVArray &src,
+                                     blender::Span<float> index_factors,
+                                     blender::fn::GMutableSpan dst) const;
+  template<typename T>
+  void sample_based_on_index_factors(const blender::VArray<T> &src,
+                                     blender::Span<float> index_factors,
+                                     blender::MutableSpan<T> dst) const
+  {
+    this->sample_based_on_index_factors(
+        blender::fn::GVArray_For_VArray(src), index_factors, blender::fn::GMutableSpan(dst));
+  }
+  template<typename T>
+  void sample_based_on_index_factors(blender::Span<T> src,
+                                     blender::Span<float> index_factors,
+                                     blender::MutableSpan<T> dst) const
+  {
+    this->sample_based_on_index_factors(blender::VArray_For_Span(src), index_factors, dst);
+  }
+
   /**
    * Interpolate a virtual array of data with the size of the number of control points to the
    * evaluated points. For poly splines, the lifetime of the returned virtual array must not
@@ -183,10 +202,12 @@ class Spline {
    */
   virtual blender::fn::GVArrayPtr interpolate_to_evaluated_points(
       const blender::fn::GVArray &source_data) const = 0;
+  blender::fn::GVArrayPtr interpolate_to_evaluated_points(blender::fn::GSpan data) const;
   template<typename T>
-  blender::fn::GVArrayPtr interpolate_to_evaluated_points(blender::Span<T> source_data) const
+  blender::fn::GVArray_Typed<T> interpolate_to_evaluated_points(blender::Span<T> data) const
   {
-    return this->interpolate_to_evaluated_points(blender::fn::GVArray_For_GSpan(source_data));
+    return blender::fn::GVArray_Typed<T>(
+        this->interpolate_to_evaluated_points(blender::fn::GSpan(data)));
   }
 
  protected:
