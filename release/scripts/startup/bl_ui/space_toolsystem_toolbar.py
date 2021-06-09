@@ -1192,6 +1192,17 @@ class _defs_edit_curve:
         )
 
     @ToolDef.from_fn
+    def edit():
+        return dict(
+            idname="builtin.edit",
+            label="Edit Curve",
+            cursor='PAINT_BRUSH',
+            icon="ops.curve.draw",
+            widget=None,
+            keymap=(),
+        )
+
+    @ToolDef.from_fn
     def tilt():
         return dict(
             idname="builtin.tilt",
@@ -2790,6 +2801,8 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             None,
             _defs_transform.shear,
             _defs_edit_curve.curve_vertex_randomize,
+            None,
+            _defs_edit_curve.edit,
         ],
         'EDIT_SURFACE': [
             *_tools_default,
