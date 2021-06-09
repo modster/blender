@@ -308,6 +308,11 @@ const EnumPropertyItem rna_enum_object_modifier_type_items[] = {
      "Spawn particles from the shape"},
     {eModifierType_Softbody, "SOFT_BODY", ICON_MOD_SOFT, "Soft Body", ""},
     {eModifierType_Surface, "SURFACE", ICON_MODIFIER, "Surface", ""},
+    {eModifierType_AdaptiveRemesh,
+     "ADAPTIVEREMESH",
+     ICON_MOD_CLOTH,
+     "Adaptive Remesh",
+     ""}, /* TODO(ish): Use correct icon. */
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -7222,6 +7227,21 @@ static void rna_def_modifier_volume_to_mesh(BlenderRNA *brna)
   RNA_define_lib_overridable(false);
 }
 
+static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "AdaptiveRemeshModifier", "Modifier");
+  RNA_def_struct_ui_text(srna, "Adaptive Remesh Modifier", "");
+  RNA_def_struct_sdna(srna, "AdaptiveRemeshModifierData");
+  RNA_def_struct_ui_icon(srna, ICON_MOD_CLOTH); /* TODO(ish): Use correct icon. */
+
+  RNA_define_lib_overridable(true);
+
+  RNA_define_lib_overridable(false);
+}
+
 void RNA_def_modifier(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -7363,6 +7383,7 @@ void RNA_def_modifier(BlenderRNA *brna)
   rna_def_modifier_mesh_to_volume(brna);
   rna_def_modifier_volume_displace(brna);
   rna_def_modifier_volume_to_mesh(brna);
+  rna_def_modifier_adaptive_remesh(brna);
 }
 
 #endif

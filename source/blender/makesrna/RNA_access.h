@@ -53,6 +53,7 @@ extern StructRNA RNA_ActionFCurves;
 extern StructRNA RNA_ActionGroup;
 extern StructRNA RNA_ActionGroups;
 extern StructRNA RNA_ActionPoseMarkers;
+extern StructRNA RNA_AdaptiveRemeshModifier;
 extern StructRNA RNA_Addon;
 extern StructRNA RNA_AddonPreferences;
 extern StructRNA RNA_AdjustmentSequence;

@@ -47,6 +47,7 @@ set(INC_SYS
 )
 
 set(SRC
+  intern/MOD_adaptive_remesh.cc
   intern/MOD_armature.c
   intern/MOD_array.c
   intern/MOD_bevel.c
