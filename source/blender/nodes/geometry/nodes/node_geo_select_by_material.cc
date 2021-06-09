@@ -22,9 +22,11 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
+#include "BLI_task.hh"
+
 #include "BKE_material.h"
 
-static bNodeSocketTemplate geo_node_material_assign_in[] = {
+static bNodeSocketTemplate geo_node_select_by_material_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_MATERIAL,
      N_("Material"),
@@ -40,54 +42,49 @@ static bNodeSocketTemplate geo_node_material_assign_in[] = {
     {-1, ""},
 };
 
-static bNodeSocketTemplate geo_node_material_assign_out[] = {
+static bNodeSocketTemplate geo_node_select_by_material_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };
 
 namespace blender::nodes {
 
-static void assign_material_to_faces(Mesh &mesh, const VArray<bool> &face_mask, Material *material)
+static void select_mesh_by_material(const Mesh &mesh,
+                                    const Material *material,
+                                    const MutableSpan<bool> r_selection)
 {
-  int new_material_index = -1;
+  BLI_assert(mesh.totpoly == r_selection.size());
+  Vector<int> material_indices;
   for (const int i : IndexRange(mesh.totcol)) {
-    Material *other_material = mesh.mat[i];
-    if (other_material == material) {
-      new_material_index = i;
-      break;
+    if (mesh.mat[i] == material) {
+      material_indices.append(i);
     }
   }
-  if (new_material_index == -1) {
-    /* Append a new material index. */
-    new_material_index = mesh.totcol;
-    BKE_id_material_eval_assign(&mesh.id, new_material_index + 1, material);
-  }
-
-  mesh.mpoly = (MPoly *)CustomData_duplicate_referenced_layer(&mesh.pdata, CD_MPOLY, mesh.totpoly);
-  for (const int i : IndexRange(mesh.totpoly)) {
-    if (face_mask[i]) {
-      MPoly &poly = mesh.mpoly[i];
-      poly.mat_nr = new_material_index;
+  parallel_for(r_selection.index_range(), 1024, [&](IndexRange range) {
+    for (const int i : range) {
+      r_selection[i] = material_indices.contains(mesh.mpoly[i].mat_nr);
     }
-  }
+  });
 }
 
-static void geo_node_material_assign_exec(GeoNodeExecParams params)
+static void geo_node_select_by_material_exec(GeoNodeExecParams params)
 {
   Material *material = params.extract_input<Material *>("Material");
-  const std::string mask_name = params.extract_input<std::string>("Selection");
+  const std::string selection_name = params.extract_input<std::string>("Selection");
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-    Mesh *mesh = mesh_component.get_for_write();
+    const Mesh *mesh = mesh_component.get_for_read();
     if (mesh != nullptr) {
-      GVArray_Typed<bool> face_mask = mesh_component.attribute_get_for_read<bool>(
-          mask_name, ATTR_DOMAIN_FACE, true);
-      assign_material_to_faces(*mesh, face_mask, material);
+      OutputAttribute_Typed<bool> selection =
+          mesh_component.attribute_try_get_for_output_only<bool>(selection_name, ATTR_DOMAIN_FACE);
+      if (selection) {
+        select_mesh_by_material(*mesh, material, selection.as_span());
+        selection.save();
+      }
     }
   }
 
@@ -96,12 +93,14 @@ static void geo_node_material_assign_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_material_assign()
+void register_node_type_geo_select_by_material()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_MATERIAL_ASSIGN, "Material Assign", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_material_assign_in, geo_node_material_assign_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_material_assign_exec;
+  geo_node_type_base(
+      &ntype, GEO_NODE_SELECT_BY_MATERIAL, "Select by Material", NODE_CLASS_GEOMETRY, 0);
+  node_type_socket_templates(
+      &ntype, geo_node_select_by_material_in, geo_node_select_by_material_out);
+  ntype.geometry_node_execute = blender::nodes::geo_node_select_by_material_exec;
   nodeRegisterType(&ntype);
 }
