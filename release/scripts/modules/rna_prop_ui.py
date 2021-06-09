@@ -131,7 +131,7 @@ def rna_idprop_ui_create(
     item.property_overridable_library_set(prop_path, overridable)
 
 
-def draw(layout, context, context_member, property_type, use_edit=True):
+def draw(layout, context, context_member, property_type, *, use_edit=True):
 
     def assign_props(prop, val, key):
         prop.data_path = context_member
