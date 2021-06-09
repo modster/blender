@@ -134,19 +134,6 @@ struct ResultAttributes {
   MutableSpan<float3> rotations;
 };
 
-template<typename T>
-static MutableSpan<T> create_attribute_and_retrieve_span(PointCloudComponent &points,
-                                                         const StringRef name)
-{
-  points.attribute_try_create(name,
-                              ATTR_DOMAIN_POINT,
-                              bke::cpp_type_to_custom_data_type(CPPType::get<T>()),
-                              AttributeInitDefault());
-  WriteAttributeLookup attribute = points.attribute_try_get_for_write(name);
-  BLI_assert(attribute);
-  return attribute.varray->get_internal_span().typed<T>();
-}
-
 static GMutableSpan create_attribute_and_retrieve_span(PointCloudComponent &points,
                                                        const StringRef name,
                                                        const CustomDataType data_type)
@@ -155,6 +142,15 @@ static GMutableSpan create_attribute_and_retrieve_span(PointCloudComponent &poin
   WriteAttributeLookup attribute = points.attribute_try_get_for_write(name);
   BLI_assert(attribute);
   return attribute.varray->get_internal_span();
+}
+
+template<typename T>
+static MutableSpan<T> create_attribute_and_retrieve_span(PointCloudComponent &points,
+                                                         const StringRef name)
+{
+  GMutableSpan attribute = create_attribute_and_retrieve_span(
+      points, name, bke::cpp_type_to_custom_data_type(CPPType::get<T>()));
+  return attribute.typed<T>();
 }
 
 /**
@@ -189,7 +185,7 @@ static ResultAttributes create_point_attributes(PointCloudComponent &points,
 }
 
 /**
- * TODO: In non-poly cases this has double copies that could be avoided as part
+ * TODO: For non-poly splines, this has double copies that could be avoided as part
  * of a general look at optimizing uses of #interpolate_to_evaluated_points.
  */
 static void copy_evaluated_point_attributes(Span<SplinePtr> splines,
@@ -225,15 +221,18 @@ static void copy_evaluated_point_attributes(Span<SplinePtr> splines,
   });
 }
 
-static void copy_even_sample_point_attributes(Span<SplinePtr> splines,
-                                              Span<int> offsets,
-                                              ResultAttributes &data)
+static void copy_uniform_sample_point_attributes(Span<SplinePtr> splines,
+                                                 Span<int> offsets,
+                                                 ResultAttributes &data)
 {
   parallel_for(splines.index_range(), 64, [&](IndexRange range) {
     for (const int i : range) {
       const Spline &spline = *splines[i];
       const int offset = offsets[i];
       const int size = offsets[i + 1] - offsets[i];
+      if (size == 0) {
+        continue;
+      }
 
       const Array<float> uniform_samples = spline.sample_uniform_index_factors(size);
 
@@ -301,9 +300,11 @@ static void copy_spline_domain_attributes(const CurveComponent &curve_component,
     for (const int i : IndexRange(spline_attribute->size())) {
       const int offset = offsets[i];
       const int size = offsets[i + 1] - offsets[i];
-      BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
-      spline_attribute->get(i, buffer);
-      type.fill_initialized(buffer, result[offset], size);
+      if (size != 0) {
+        BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
+        spline_attribute->get(i, buffer);
+        type.fill_initialized(buffer, result[offset], size);
+      }
     }
 
     result_attribute.save();
@@ -357,7 +358,7 @@ static void geo_node_curve_to_points_exec(GeoNodeExecParams params)
   switch (mode) {
     case GEO_NODE_CURVE_SAMPLE_COUNT:
     case GEO_NODE_CURVE_SAMPLE_LENGTH:
-      copy_even_sample_point_attributes(splines, offsets, new_attributes);
+      copy_uniform_sample_point_attributes(splines, offsets, new_attributes);
       break;
     case GEO_NODE_CURVE_SAMPLE_EVALUATED:
       copy_evaluated_point_attributes(splines, offsets, new_attributes);
