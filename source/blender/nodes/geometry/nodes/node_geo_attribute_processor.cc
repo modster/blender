@@ -209,10 +209,13 @@ static void geo_node_attribute_processor_group_update(bNodeTree *ntree, bNode *n
       BLI_addtail(&storage->inputs_settings, input_settings);
 
       new_inputs_settings.add_new(input_settings);
-      new_inputs.add_new(nodeAddSocket(
-          ntree, node, SOCK_IN, interface_sock->idname, identifier1, interface_sock->name));
-      new_inputs.add_new(nodeAddSocket(
-          ntree, node, SOCK_IN, "NodeSocketString", identifier2, interface_sock->name));
+      bNodeSocket *sock_value = nodeAddSocket(
+          ntree, node, SOCK_IN, interface_sock->idname, identifier1, interface_sock->name);
+      bNodeSocket *sock_attribute = nodeAddSocket(
+          ntree, node, SOCK_IN, "NodeSocketString", identifier2, interface_sock->name);
+      node_socket_copy_default_value(sock_value, interface_sock);
+      new_inputs.add_new(sock_value);
+      new_inputs.add_new(sock_attribute);
     }
     else {
       new_inputs_settings.add_new(input_settings);
