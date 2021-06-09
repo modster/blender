@@ -71,6 +71,7 @@ static void geo_node_attribute_processor_init(bNodeTree *ntree, bNode *node)
   node->storage = node_storage;
 
   nodeAddSocket(ntree, node, SOCK_IN, "NodeSocketGeometry", "Geometry", "Geometry");
+  nodeAddSocket(ntree, node, SOCK_IN, "NodeSocketString", "Selection", "Selection");
   nodeAddSocket(ntree, node, SOCK_OUT, "NodeSocketGeometry", "Geometry", "Geometry");
 }
 
@@ -188,8 +189,9 @@ static void geo_node_attribute_processor_group_update(bNodeTree *ntree, bNode *n
   VectorSet<AttributeProcessorInputSettings *> new_inputs_settings;
   VectorSet<AttributeProcessorOutputSettings *> new_output_settings;
 
-  /* Keep geometry socket. */
+  /* Keep geometry and selection socket. */
   new_inputs.add_new((bNodeSocket *)node->inputs.first);
+  new_inputs.add_new(((bNodeSocket *)node->inputs.first)->next);
 
   LISTBASE_FOREACH (bNodeSocket *, interface_sock, &ngroup_inputs) {
     AttributeProcessorInputSettings *input_settings =
@@ -297,8 +299,8 @@ static void geo_node_attribute_processor_update(bNodeTree *UNUSED(ntree), bNode 
   }
 
   bNodeSocket *next_socket = (bNodeSocket *)node->inputs.first;
-  /* Skip geometry socket. */
-  next_socket = next_socket->next;
+  /* Skip geometry and selection socket. */
+  next_socket = next_socket->next->next;
   LISTBASE_FOREACH (AttributeProcessorInputSettings *, input_settings, &storage->inputs_settings) {
     bNodeSocket *value_socket = next_socket;
     bNodeSocket *attribute_socket = value_socket->next;
@@ -357,6 +359,23 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
   const int domain_size = component.attribute_domain_size(domain);
   if (domain_size == 0) {
     return;
+  }
+
+  Vector<int64_t> selection_indices;
+  IndexMask selection;
+  const std::string selection_name = geo_params.get_input<std::string>("Selection");
+  if (selection_name.empty()) {
+    selection = IndexRange(domain_size);
+  }
+  else {
+    GVArray_Typed<bool> selection_attribute = component.attribute_get_for_read<bool>(
+        selection_name, domain, false);
+    for (const int i : IndexRange(domain_size)) {
+      if (selection_attribute[i]) {
+        selection_indices.append(i);
+      }
+    }
+    selection = selection_indices.as_span();
   }
 
   fn::MFParamsBuilder fn_params{network_fn, domain_size};
@@ -443,7 +462,7 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
     output_attributes.append(std::move(attribute));
   }
 
-  network_fn.call(IndexRange(domain_size), fn_params, context);
+  network_fn.call(selection, fn_params, context);
 
   for (std::unique_ptr<OutputAttribute> &output_attribute : output_attributes) {
     output_attribute->save();
