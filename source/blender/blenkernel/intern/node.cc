@@ -515,7 +515,7 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
 
     if (node->storage) {
       /* could be handlerized at some point, now only 1 exception still */
-      if ((ntree->type == NTREE_SHADER) &&
+      if ((ELEM(ntree->type, NTREE_SHADER, NTREE_GEOMETRY)) &&
           ELEM(node->type, SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB)) {
         BKE_curvemapping_blend_write(writer, (const CurveMapping *)node->storage);
       }
@@ -5060,8 +5060,10 @@ static void registerGeometryNodes()
   register_node_type_geo_boolean();
   register_node_type_geo_bounding_box();
   register_node_type_geo_collection_info();
+  register_node_type_geo_curve_length();
   register_node_type_geo_curve_to_mesh();
   register_node_type_geo_curve_resample();
+  register_node_type_geo_delete_geometry();
   register_node_type_geo_edge_split();
   register_node_type_geo_input_material();
   register_node_type_geo_is_viewport();
@@ -5076,6 +5078,7 @@ static void registerGeometryNodes()
   register_node_type_geo_mesh_primitive_ico_sphere();
   register_node_type_geo_mesh_primitive_line();
   register_node_type_geo_mesh_primitive_uv_sphere();
+  register_node_type_geo_mesh_to_curve();
   register_node_type_geo_object_info();
   register_node_type_geo_point_distribute();
   register_node_type_geo_point_instance();
@@ -5085,6 +5088,7 @@ static void registerGeometryNodes()
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
   register_node_type_geo_sample_texture();
+  register_node_type_geo_select_by_material();
   register_node_type_geo_subdivide();
   register_node_type_geo_subdivision_surface();
   register_node_type_geo_switch();

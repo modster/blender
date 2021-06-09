@@ -70,6 +70,7 @@
 #include "SEQ_proxy.h"
 #include "SEQ_render.h"
 #include "SEQ_sequencer.h"
+#include "SEQ_time.h"
 #include "SEQ_utils.h"
 
 #include "effects.h"
@@ -273,15 +274,6 @@ static bool seq_is_effect_of(const Sequence *seq_effect, const Sequence *possibl
  * Order of applying these conditions is important. */
 static bool must_render_strip(const Sequence *seq, SeqCollection *strips_under_playhead)
 {
-  /* Sound strips are not rendered. */
-  if (seq->type == SEQ_TYPE_SOUND_RAM) {
-    return false;
-  }
-  /* Muted strips are not rendered. */
-  if ((seq->flag & SEQ_MUTE) != 0) {
-    return false;
-  }
-
   bool seq_have_effect_in_stack = false;
   Sequence *seq_iter;
   SEQ_ITERATOR_FOREACH (seq_iter, strips_under_playhead) {
@@ -318,7 +310,7 @@ static SeqCollection *query_strips_at_frame(ListBase *seqbase, const int timelin
   SeqCollection *collection = SEQ_collection_create();
 
   LISTBASE_FOREACH (Sequence *, seq, seqbase) {
-    if ((seq->startdisp <= timeline_frame) && (seq->enddisp > timeline_frame)) {
+    if (SEQ_time_strip_intersects_frame(seq, timeline_frame)) {
       SEQ_collection_append_strip(seq, collection);
     }
   }
@@ -340,6 +332,15 @@ static void collection_filter_channel_up_to_incl(SeqCollection *collection, cons
 static void collection_filter_rendered_strips(SeqCollection *collection)
 {
   Sequence *seq;
+
+  /* Remove sound strips and muted strips from collection, because these are not rendered.
+   * Function must_render_strip() don't have to check for these strips anymore. */
+  SEQ_ITERATOR_FOREACH (seq, collection) {
+    if (seq->type == SEQ_TYPE_SOUND_RAM || (seq->flag & SEQ_MUTE) != 0) {
+      SEQ_collection_remove_strip(seq, collection);
+    }
+  }
+
   SEQ_ITERATOR_FOREACH (seq, collection) {
     if (must_render_strip(seq, collection)) {
       continue;
@@ -543,9 +544,9 @@ static void sequencer_image_crop_transform_init(void *handle_v,
   handle->tot_line = tot_line;
 }
 
-static void *sequencer_image_crop_transform_do_thread(void *data_v)
+static void sequencer_image_crop_transform_matrix(const ImageTransformThreadData *data,
+                                                  float r_transform_matrix[3][3])
 {
-  const ImageTransformThreadData *data = (ImageTransformThreadData *)data_v;
   const StripTransform *transform = data->seq->strip->transform;
   const float scale_x = transform->scale_x * data->image_scale_factor;
   const float scale_y = transform->scale_y * data->image_scale_factor;
@@ -554,13 +555,79 @@ static void *sequencer_image_crop_transform_do_thread(void *data_v)
   const float translate_x = transform->xofs * data->preview_scale_factor + image_center_offs_x;
   const float translate_y = transform->yofs * data->preview_scale_factor + image_center_offs_y;
   const float pivot[2] = {data->ibuf_source->x / 2, data->ibuf_source->y / 2};
-  float transform_matrix[3][3];
-  loc_rot_size_to_mat3(transform_matrix,
+  loc_rot_size_to_mat3(r_transform_matrix,
                        (const float[]){translate_x, translate_y},
                        transform->rotation,
                        (const float[]){scale_x, scale_y});
-  transform_pivot_set_m3(transform_matrix, pivot);
-  invert_m3(transform_matrix);
+  transform_pivot_set_m3(r_transform_matrix, pivot);
+  invert_m3(r_transform_matrix);
+}
+
+static void sequencer_image_crop_transform_start_uv(const ImageTransformThreadData *data,
+                                                    const float transform_matrix[3][3],
+                                                    float r_start_uv[2])
+{
+  float orig[2];
+  orig[0] = 0.0f;
+  orig[1] = data->start_line;
+  mul_v2_m3v2(r_start_uv, transform_matrix, orig);
+}
+
+static void sequencer_image_crop_transform_uv_min(const float transform_matrix[3][3],
+                                                  float r_uv_min[2])
+{
+  float orig[2];
+  orig[0] = 0.0f;
+  orig[1] = 0.0f;
+  mul_v2_m3v2(r_uv_min, transform_matrix, orig);
+}
+
+static void sequencer_image_crop_transform_delta_x(const ImageTransformThreadData *data,
+                                                   const float transform_matrix[3][3],
+                                                   const float uv_min[2],
+                                                   float r_add_x[2])
+{
+  float uv_max_x[2];
+  uv_max_x[0] = data->ibuf_out->x;
+  uv_max_x[1] = 0.0f;
+  mul_v2_m3v2(r_add_x, transform_matrix, uv_max_x);
+  sub_v2_v2(r_add_x, uv_min);
+  mul_v2_fl(r_add_x, 1.0f / data->ibuf_out->x);
+}
+
+static void sequencer_image_crop_transform_delta_y(const ImageTransformThreadData *data,
+                                                   const float transform_matrix[3][3],
+                                                   const float uv_min[2],
+                                                   float r_add_y[2])
+{
+  float uv_max_y[2];
+  uv_max_y[0] = 0.0f;
+  uv_max_y[1] = data->ibuf_out->y;
+  mul_v2_m3v2(r_add_y, transform_matrix, uv_max_y);
+  sub_v2_v2(r_add_y, uv_min);
+  mul_v2_fl(r_add_y, 1.0f / data->ibuf_out->y);
+}
+
+static void sequencer_image_crop_transform_interpolation_coefs(
+    const ImageTransformThreadData *data, float r_start_uv[2], float r_add_x[2], float r_add_y[2])
+{
+  float transform_matrix[3][3];
+  sequencer_image_crop_transform_matrix(data, transform_matrix);
+  sequencer_image_crop_transform_start_uv(data, transform_matrix, r_start_uv);
+  float uv_min[2];
+  sequencer_image_crop_transform_uv_min(transform_matrix, uv_min);
+  sequencer_image_crop_transform_delta_x(data, transform_matrix, uv_min, r_add_x);
+  sequencer_image_crop_transform_delta_y(data, transform_matrix, uv_min, r_add_y);
+}
+
+static void *sequencer_image_crop_transform_do_thread(void *data_v)
+{
+  const ImageTransformThreadData *data = data_v;
+
+  float last_uv[2];
+  float add_x[2];
+  float add_y[2];
+  sequencer_image_crop_transform_interpolation_coefs(data_v, last_uv, add_x, add_y);
 
   /* Image crop is done by offsetting image boundary limits. */
   const StripCrop *c = data->seq->strip->crop;
@@ -574,13 +641,15 @@ static void *sequencer_image_crop_transform_do_thread(void *data_v)
   const float source_pixel_range_min[2] = {left, bottom};
 
   const int width = data->ibuf_out->x;
-  for (int yi = data->start_line; yi < data->start_line + data->tot_line; yi++) {
-    for (int xi = 0; xi < width; xi++) {
-      float uv[2] = {xi, yi};
-      mul_v2_m3v2(uv, transform_matrix, uv);
 
+  float uv[2];
+  for (int yi = data->start_line; yi < data->start_line + data->tot_line; yi++) {
+    copy_v2_v2(uv, last_uv);
+    add_v2_v2(last_uv, add_y);
+    for (int xi = 0; xi < width; xi++) {
       if (source_pixel_range_min[0] >= uv[0] || uv[0] >= source_pixel_range_max[0] ||
           source_pixel_range_min[1] >= uv[1] || uv[1] >= source_pixel_range_max[1]) {
+        add_v2_v2(uv, add_x);
         continue;
       }
 
@@ -590,6 +659,8 @@ static void *sequencer_image_crop_transform_do_thread(void *data_v)
       else {
         nearest_interpolation(data->ibuf_source, data->ibuf_out, uv[0], uv[1], xi, yi);
       }
+
+      add_v2_v2(uv, add_x);
     }
   }
 
@@ -1124,8 +1195,6 @@ static ImBuf *seq_render_movie_strip_view(const SeqRenderData *context,
   ImBuf *ibuf = NULL;
   IMB_Proxy_Size psize = SEQ_rendersize_to_proxysize(context->preview_render_size);
 
-  IMB_anim_set_preseek(sanim->anim, seq->anim_preseek);
-
   if (SEQ_can_use_proxy(context, seq, psize)) {
     /* Try to get a proxy image.
      * Movie proxies are handled by ImBuf module with exception of `custom file` setting. */
@@ -1237,6 +1306,12 @@ static ImBuf *seq_render_movie_strip(const SeqRenderData *context,
   }
 
   if (*r_is_proxy_image == false) {
+    if (sanim && sanim->anim) {
+      short fps_denom;
+      float fps_num;
+      IMB_anim_get_fps(sanim->anim, &fps_denom, &fps_num, true);
+      seq->strip->stripdata->orig_fps = fps_denom / fps_num;
+    }
     seq->strip->stripdata->orig_width = ibuf->x;
     seq->strip->stripdata->orig_height = ibuf->y;
   }

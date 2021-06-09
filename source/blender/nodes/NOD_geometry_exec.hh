@@ -203,7 +203,7 @@ class GeoNodeExecParams {
 
   /**
    * Returns true when the output has to be computed.
-   * Nodes that support lazyness could use the #lazy_output_is_required variant to possibly avoid
+   * Nodes that support laziness could use the #lazy_output_is_required variant to possibly avoid
    * some computations.
    */
   bool output_is_required(StringRef identifier) const
@@ -215,7 +215,7 @@ class GeoNodeExecParams {
    * Tell the evaluator that a specific input is required.
    * This returns true when the input will only be available in the next execution.
    * False is returned if the input is available already.
-   * This can only be used when the node supports lazyness.
+   * This can only be used when the node supports laziness.
    */
   bool lazy_require_input(StringRef identifier)
   {
@@ -225,7 +225,7 @@ class GeoNodeExecParams {
   /**
    * Asks the evaluator if a specific output is required right now. If this returns false, the
    * value might still need to be computed later.
-   * This can only be used when the node supports lazyness.
+   * This can only be used when the node supports laziness.
    */
   bool lazy_output_is_required(StringRef identifier)
   {

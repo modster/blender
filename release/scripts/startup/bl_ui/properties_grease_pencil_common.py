@@ -179,21 +179,6 @@ class GreasePencilBrushFalloff:
     bl_label = "Falloff"
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        ts = context.tool_settings
-        settings = None
-        if context.mode == 'PAINT_GPENCIL':
-            settings = ts.gpencil_paint
-        if context.mode == 'SCULPT_GPENCIL':
-            settings = ts.gpencil_sculpt_paint
-        elif context.mode == 'WEIGHT_GPENCIL':
-            settings = ts.gpencil_weight_paint
-        elif context.mode == 'VERTEX_GPENCIL':
-            settings = ts.gpencil_vertex_paint
-
-        return (settings and settings.brush and settings.brush.curve)
-
     def draw(self, context):
         layout = self.layout
         ts = context.tool_settings
@@ -407,7 +392,7 @@ class AnnotationDataPanel:
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw_header(self, context):
-        if context.space_data.type not in {'VIEW_3D', 'TOPBAR'}:
+        if context.space_data.type not in {'VIEW_3D', 'TOPBAR', 'SEQUENCE_EDITOR'}:
             self.layout.prop(context.space_data, "show_annotation", text="")
 
     def draw(self, context):
@@ -857,6 +842,10 @@ class GreasePencilLayerRelationsPanel:
         col = layout.row(align=True)
         col.prop_search(gpl, "viewlayer_render", scene, "view_layers", text="View Layer")
 
+        col = layout.row(align=True)
+        # Only enable this property when a view layer is selected.
+        col.enabled = bool(gpl.viewlayer_render)
+        col.prop(gpl, "use_viewlayer_masks")
 
 class GreasePencilLayerDisplayPanel:
 
