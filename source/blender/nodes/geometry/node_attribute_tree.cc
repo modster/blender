@@ -41,8 +41,7 @@ static void attribute_node_tree_update(bNodeTree *ntree)
 static bool attribute_node_tree_socket_type_valid(eNodeSocketDatatype socket_type,
                                                   bNodeTreeType *UNUSED(ntreetype))
 {
-  return ELEM(
-      socket_type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT, SOCK_OBJECT);
+  return ELEM(socket_type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT);
 }
 
 void register_node_tree_type_attr()

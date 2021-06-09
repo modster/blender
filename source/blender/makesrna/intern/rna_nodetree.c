@@ -4551,8 +4551,7 @@ static void rna_GeometryNodeAttributeProcessor_mode_update(Main *bmain,
                                                            PointerRNA *ptr)
 {
   /* Unfortunately, `ptr->data` points to data within the node storage. We can't get the node
-   * without iterating over all nodes.
-   * TODO: Investigate the viability of adding a back-pointer to the node. */
+   * without iterating over all nodes. */
   bNodeTree *ntree = (bNodeTree *)ptr->owner_id;
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     if (node->type == GEO_NODE_ATTRIBUTE_PROCESSOR) {
@@ -11702,7 +11701,7 @@ static void rna_def_nodetree(BlenderRNA *brna)
       {NTREE_TEXTURE, "TEXTURE", ICON_TEXTURE, "Texture", "Texture nodes"},
       {NTREE_COMPOSIT, "COMPOSITING", ICON_RENDERLAYERS, "Compositing", "Compositing nodes"},
       {NTREE_GEOMETRY, "GEOMETRY", ICON_NODETREE, "Geometry", "Geometry nodes"},
-      {NTREE_ATTRIBUTE, "ATTRIBUTE", ICON_SPREADSHEET, "Attribute", "Attribute Nodes"},
+      {NTREE_ATTRIBUTE, "ATTRIBUTE", ICON_NODETREE, "Attribute", "Attribute Nodes"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -11960,7 +11959,7 @@ static void rna_def_attribute_nodetree(BlenderRNA *brna)
                          "Attribute Node Tree",
                          "Node tree consisting of linked nodes used for attribute processing");
   RNA_def_struct_sdna(srna, "bNodeTree");
-  RNA_def_struct_ui_icon(srna, ICON_SPREADSHEET);
+  RNA_def_struct_ui_icon(srna, ICON_NODETREE);
 }
 
 static StructRNA *define_specific_node(BlenderRNA *brna,

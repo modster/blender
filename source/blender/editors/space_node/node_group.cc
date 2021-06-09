@@ -1141,7 +1141,7 @@ void NODE_OT_group_insert(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Group Interface Adds Operator
+/** \name Group Interface Add Operator
  * \{ */
 
 static int node_group_interface_add_invoke(bContext *C,

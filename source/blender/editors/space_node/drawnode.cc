@@ -628,7 +628,7 @@ static void node_draw_buttons_group_input(uiLayout *layout, bContext *UNUSED(C),
   PointerRNA props;
   uiItemFullO(layout,
               "node.group_interface_add",
-              "New Input",
+              "New",
               ICON_ADD,
               nullptr,
               WM_OP_INVOKE_DEFAULT,
@@ -647,7 +647,7 @@ static void node_draw_buttons_group_output(uiLayout *layout, bContext *UNUSED(C)
   PointerRNA props;
   uiItemFullO(layout,
               "node.group_interface_add",
-              "New Output",
+              "New",
               ICON_ADD,
               nullptr,
               WM_OP_INVOKE_DEFAULT,
@@ -3464,7 +3464,7 @@ void ED_node_init_butfuncs(void)
   ntreeType_Shader->ui_icon = ICON_NODE_MATERIAL;
   ntreeType_Texture->ui_icon = ICON_NODE_TEXTURE;
   ntreeType_Geometry->ui_icon = ICON_NODETREE;
-  ntreeType_Attribute->ui_icon = ICON_SPREADSHEET;
+  ntreeType_Attribute->ui_icon = ICON_NODETREE;
 }
 
 void ED_init_custom_node_type(bNodeType *ntype)
