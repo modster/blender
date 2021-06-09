@@ -53,7 +53,8 @@ static void geo_node_solidify_init(bNodeTree *UNUSED(tree), bNode *node)
 
 static void geo_node_solidify_update(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometrySolidify &node_storage = *(NodeGeometrySolidify *)node->storage;
+  //const bNode &node = params.node();
+  //NodeGeometrySolidify &node_storage = *(NodeGeometrySolidify *)node->storage;
 
   //update_attribute_input_socket_availabilities(
   //    *node, "Translation", (GeometryNodeAttributeInputMode)node_storage.input_type);
@@ -94,8 +95,8 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
       0.0f,
       offset_clamp,
       node_storage.mode,
-        MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_FIXED,
-      MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_NONE,
+      node_storage.nonmanifold_offset_mode,
+      node_storage.nonmanifold_boundary_mode,
         0.0f,
       0.0f,
       0.0f,
@@ -123,7 +124,14 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
 static void geo_node_solidify_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
+  const bNode *node = (bNode *)ptr->data;
+  NodeGeometrySolidify &node_storage = *(NodeGeometrySolidify *)node->storage;
+
   uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  if(node_storage.mode == MOD_SOLIDIFY_MODE_NONMANIFOLD){
+    uiItemR(layout, ptr, "nonmanifold_offset_mode", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "nonmanifold_boundary_mode", 0, nullptr, ICON_NONE);
+  }
 }
 
 }  // namespace blender::nodes
