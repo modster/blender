@@ -344,6 +344,29 @@ struct InputsCache {
 };
 }  // namespace
 
+static IndexMask prepare_index_mask_from_selection(Vector<int64_t> &selection_indices,
+                                                   const AttributeDomain domain,
+                                                   const int domain_size,
+                                                   const GeometryComponent &component,
+                                                   const GeoNodeExecParams &geo_params)
+{
+  IndexMask selection;
+  const std::string selection_name = geo_params.get_input<std::string>("Selection");
+  if (selection_name.empty()) {
+    selection = IndexRange(domain_size);
+  }
+  else {
+    GVArray_Typed<bool> selection_attribute = component.attribute_get_for_read<bool>(
+        selection_name, domain, false);
+    for (const int i : IndexRange(domain_size)) {
+      if (selection_attribute[i]) {
+        selection_indices.append(i);
+      }
+    }
+    selection = selection_indices.as_span();
+  }
+}
+
 static void process_attributes_on_component(GeoNodeExecParams &geo_params,
                                             GeometryComponent &component,
                                             const fn::MultiFunction &network_fn,
@@ -362,21 +385,8 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
   }
 
   Vector<int64_t> selection_indices;
-  IndexMask selection;
-  const std::string selection_name = geo_params.get_input<std::string>("Selection");
-  if (selection_name.empty()) {
-    selection = IndexRange(domain_size);
-  }
-  else {
-    GVArray_Typed<bool> selection_attribute = component.attribute_get_for_read<bool>(
-        selection_name, domain, false);
-    for (const int i : IndexRange(domain_size)) {
-      if (selection_attribute[i]) {
-        selection_indices.append(i);
-      }
-    }
-    selection = selection_indices.as_span();
-  }
+  const IndexMask selection = prepare_index_mask_from_selection(
+      selection_indices, domain, domain_size, component, geo_params);
 
   fn::MFParamsBuilder fn_params{network_fn, domain_size};
   fn::MFContextBuilder context;
