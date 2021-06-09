@@ -22,18 +22,23 @@
  */
 
 #include <BLI_string.h>
+#include <MEM_guardedalloc.h>
 #include <string.h>
+#include "stdio.h"
 
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
+#include "BKE_lattice.h"
 
 #include "DNA_defaults.h"
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
+#include "DNA_meshdata_types.h"
 
 #include "BKE_context.h"
+#include "BKE_deform.h"
 #include "BKE_particle.h"
 #include "BKE_screen.h"
 #include "BKE_solidifiy.h"
@@ -83,12 +88,41 @@ static void requiredDataMask(Object *UNUSED(ob),
   }
 }
 
-static const SolidifyData solidify_data_from_modifier_data(ModifierData *md){
+static float* get_selection(Mesh *mesh, Object *ob, char name[64]){
+  int defgrp_index = BKE_object_defgroup_name_index(ob, name);
+  MDeformVert *dvert = mesh->dvert;
+
+  float *selection = MEM_callocN(sizeof(float) * (unsigned long)mesh->totvert, __func__ );
+
+  if (defgrp_index != -1) {
+    if (ob->type == OB_LATTICE) {
+      dvert = BKE_lattice_deform_verts_get(ob);
+    }
+    else if (mesh) {
+      dvert = mesh->dvert;
+      for (int i = 0; i < mesh->totvert; i++) {
+        MDeformVert *dv = &dvert[i];
+        printf("sel: %i\n", defgrp_index);
+        selection[i] = BKE_defvert_find_weight(dv, defgrp_index);
+      }
+    }
+  }
+  else{
+    for (int i = 0; i < mesh->totvert; i++) {
+      selection[i] = 1.0f;
+    }
+  }
+
+  return selection;
+}
+
+static const SolidifyData solidify_data_from_modifier_data(ModifierData *md, const ModifierEvalContext *ctx){
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
   const SolidifyData solidify_data = {
-      "",
-      "",
-      "",
+      ctx->object,
+      "",//smd->defgrp_name,
+      "",//smd->shell_defgrp_name,
+      "",//smd->rim_defgrp_name,
       smd->offset,
       smd->offset_fac,
       smd->offset_fac_vg,
@@ -103,7 +137,8 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md){
       smd->mat_ofs,
       smd->mat_ofs_rim,
       smd->mode == MOD_SOLIDIFY_MODE_EXTRUDE ? 0.01f : smd->merge_tolerance,
-      smd->bevel_convex
+      smd->bevel_convex,
+      NULL,
   };
 
   BLI_strcpy_rlen(solidify_data.defgrp_name, smd->defgrp_name);
@@ -116,7 +151,9 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md){
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
-  const SolidifyData solidify_data = solidify_data_from_modifier_data(md);
+  SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
+
+  solidify_data.selection = get_selection(mesh, ctx->object, smd->defgrp_name);
 
   switch (smd->mode) {
     case MOD_SOLIDIFY_MODE_EXTRUDE:
