@@ -472,7 +472,7 @@ static bool prepare_group_outputs(const Span<DInputSocket> used_group_outputs,
     }
 
     auto attribute = std::make_unique<OutputAttribute>(
-        component.attribute_try_get_for_output_only(attribute_name, domain, attribute_type));
+        component.attribute_try_get_for_output(attribute_name, domain, attribute_type));
     if (!*attribute) {
       /* Cannot create the output attribute. */
       return false;
@@ -566,16 +566,15 @@ static void process_attributes(GeoNodeExecParams &geo_params, GeometrySet &geome
 
   Span<const NodeRef *> output_nodes = root_tree_ref.nodes_by_type("NodeGroupOutput");
 
-  if (output_nodes.size() != 1) {
-    return;
-  }
-  const DNode output_node{&root_context, output_nodes[0]};
-  if (output_node->inputs().size() <= 1) {
+  if (output_nodes.size() >= 2) {
     return;
   }
   Vector<DInputSocket> used_group_outputs;
-  for (const InputSocketRef *socket_ref : output_node->inputs().drop_back(1)) {
-    used_group_outputs.append({&root_context, socket_ref});
+  if (output_nodes.size() == 1) {
+    const DNode output_node{&root_context, output_nodes[0]};
+    for (const InputSocketRef *socket_ref : output_node->inputs().drop_back(1)) {
+      used_group_outputs.append({&root_context, socket_ref});
+    }
   }
   tree.foreach_node_with_type("AttributeNodeSetAttribute", [&](const DNode dnode) {
     NodeAttributeSetAttribute *storage = dnode->storage<NodeAttributeSetAttribute>();
