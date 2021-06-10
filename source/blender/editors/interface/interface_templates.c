@@ -7285,7 +7285,7 @@ void uiTemplateCacheFile(uiLayout *layout,
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);
 
-  if (RNA_boolean_get(&fileptr, "use_cycles_procedural")) {
+  if (RNA_boolean_get(&fileptr, "use_render_procedural")) {
     row = uiLayoutRow(layout, false);
     uiItemR(row, &fileptr, "use_prefetch", 0, NULL, ICON_NONE);
 
