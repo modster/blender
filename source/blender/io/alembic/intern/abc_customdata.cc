@@ -45,6 +45,7 @@
 
 using Alembic::AbcGeom::kFacevaryingScope;
 using Alembic::AbcGeom::kVertexScope;
+using Alembic::AbcGeom::kVaryingScope;
 
 using Alembic::Abc::C4fArraySample;
 using Alembic::Abc::UInt32ArraySample;
@@ -304,23 +305,44 @@ static void read_uvs(const CDStreamConfig &config,
                      const Alembic::AbcGeom::UInt32ArraySamplePtr &indices)
 {
   MPoly *mpolys = config.mpoly;
+  MLoop *mloops = config.mloop;
   MLoopUV *mloopuvs = static_cast<MLoopUV *>(data);
 
   unsigned int uv_index, loop_index, rev_loop_index;
 
-  for (int i = 0; i < config.totpoly; i++) {
-    MPoly &poly = mpolys[i];
-    unsigned int rev_loop_offset = poly.loopstart + poly.totloop - 1;
+  if (indices->size() == config.totloop) {
+    for (int i = 0; i < config.totpoly; i++) {
+      MPoly &poly = mpolys[i];
+      unsigned int rev_loop_offset = poly.loopstart + poly.totloop - 1;
 
-    for (int f = 0; f < poly.totloop; f++) {
-      loop_index = poly.loopstart + f;
-      rev_loop_index = rev_loop_offset - f;
-      uv_index = (*indices)[loop_index];
-      const Imath::V2f &uv = (*uvs)[uv_index];
+      for (int f = 0; f < poly.totloop; f++) {
+        loop_index = poly.loopstart + f;
+        rev_loop_index = rev_loop_offset - f;
+        uv_index = (*indices)[loop_index];
+        const Imath::V2f &uv = (*uvs)[uv_index];
 
-      MLoopUV &loopuv = mloopuvs[rev_loop_index];
-      loopuv.uv[0] = uv[0];
-      loopuv.uv[1] = uv[1];
+        MLoopUV &loopuv = mloopuvs[rev_loop_index];
+        loopuv.uv[0] = uv[0];
+        loopuv.uv[1] = uv[1];
+      }
+    }
+  }
+  else if (indices->size() == config.totvert) {
+    for (int i = 0; i < config.totpoly; i++) {
+      MPoly &poly = mpolys[i];
+      unsigned int rev_loop_offset = poly.loopstart + poly.totloop - 1;
+
+      for (int f = 0; f < poly.totloop; f++) {
+        rev_loop_index = rev_loop_offset - f;
+
+        MLoop &loop = mloops[rev_loop_index];
+        uv_index = (*indices)[loop.v];
+        const Imath::V2f &uv = (*uvs)[uv_index];
+
+        MLoopUV &loopuv = mloopuvs[rev_loop_index];
+        loopuv.uv[0] = uv[0];
+        loopuv.uv[1] = uv[1];
+      }
     }
   }
 }
@@ -473,7 +495,7 @@ static void read_custom_data_uvs(const ICompoundProperty &prop,
   IV2fGeomParam::Sample sample;
   uv_param.getIndexed(sample, iss);
 
-  if (uv_param.getScope() != kFacevaryingScope) {
+  if (uv_param.getScope() != kFacevaryingScope || uv_param.getScope() != kVaryingScope) {
     return;
   }
 

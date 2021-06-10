@@ -185,6 +185,7 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
   MLoop *mloops = config.mloop;
   MLoopUV *mloopuvs = config.mloopuv;
 
+  const P3fArraySamplePtr &positions = mesh_data.positions;
   const Int32ArraySamplePtr &face_indices = mesh_data.face_indices;
   const Int32ArraySamplePtr &face_counts = mesh_data.face_counts;
   const V2fArraySamplePtr &uvs = mesh_data.uvs;
@@ -192,8 +193,9 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
 
   const UInt32ArraySamplePtr &uvs_indices = mesh_data.uvs_indices;
 
-  const bool do_uvs = (mloopuvs && uvs && uvs_indices) &&
-                      (uvs_indices->size() == face_indices->size());
+  const bool do_uvs = (mloopuvs && uvs && uvs_indices);
+  const bool do_uvs_per_loop = do_uvs && (uvs_indices->size() == face_indices->size());
+  const bool do_uvs_per_vertex = do_uvs && (uvs_indices->size() == positions->size());
   unsigned int loop_index = 0;
   unsigned int rev_loop_index = 0;
   unsigned int uv_index = 0;
@@ -225,12 +227,24 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
       }
       last_vertex_index = loop.v;
 
-      if (do_uvs) {
+      if (do_uvs_per_loop) {
         MLoopUV &loopuv = mloopuvs[rev_loop_index];
 
         uv_index = (*uvs_indices)[loop_index];
 
         /* Some Alembic files are broken (or at least export UVs in a way we don't expect). */
+        if (uv_index >= uvs_size) {
+          continue;
+        }
+
+        loopuv.uv[0] = (*uvs)[uv_index][0];
+        loopuv.uv[1] = (*uvs)[uv_index][1];
+      }
+      else if (do_uvs_per_vertex) {
+        MLoopUV &loopuv = mloopuvs[rev_loop_index];
+
+        uv_index = (*uvs_indices)[loop.v];
+
         if (uv_index >= uvs_size) {
           continue;
         }
@@ -360,7 +374,7 @@ BLI_INLINE void read_uvs_params(CDStreamConfig &config,
   abc_data.uvs = uvsamp.getVals();
   abc_data.uvs_indices = uvsamp.getIndices();
 
-  if (abc_data.uvs_indices->size() == config.totloop) {
+  if (abc_data.uvs_indices->size() == config.totloop || abc_data.uvs_indices->size() == config.totvert) {
     std::string name = Alembic::Abc::GetSourceName(uv.getMetaData());
 
     /* According to the convention, primary UVs should have had their name
@@ -462,6 +476,7 @@ CDStreamConfig get_config(Mesh *mesh, const bool use_vertex_interpolation)
   config.mvert = mesh->mvert;
   config.mloop = mesh->mloop;
   config.mpoly = mesh->mpoly;
+  config.totvert = mesh->totvert;
   config.totloop = mesh->totloop;
   config.totpoly = mesh->totpoly;
   config.loopdata = &mesh->ldata;
