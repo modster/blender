@@ -184,7 +184,7 @@ static void mesh_calc_hq_normal(Mesh *mesh, float (*poly_nors)[3], float (*r_ver
 /** \name Main Solidify Function
  * \{ */
 static void get_vgroup(
-    Object *ob, struct Mesh *mesh, const char *name, MDeformVert **dvert, int *defgrp_index)
+    const Object *ob, struct Mesh *mesh, const char *name, MDeformVert **dvert, int *defgrp_index)
 {
   *defgrp_index = BKE_object_defgroup_name_index(ob, name);
   *dvert = NULL;
@@ -201,9 +201,6 @@ static void get_vgroup(
 
 Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
 {
-  //printf("solidify extrude: %f, %i\n", solidify_data->offset, solidify_data->flag);
-  printf("selection data %f\n",solidify_data->selection[0]);
-
   Mesh *result;
 
   MVert *mv, *mvert, *orig_mvert;
@@ -611,10 +608,6 @@ Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
       MEM_freeN(edge_user_pairs);
     }
 
-    /////
-    /////
-    ///// V-Group influence start
-
     if (ofs_new != 0.0f) {
       uint i_orig, i_end;
       bool do_shell_align;
@@ -707,10 +700,6 @@ Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
         madd_v3v3short_fl(mv->co, mv->no, scalar_short_vgroup);
       }
     }
-
-    ///// V-Group influende end
-    /////
-    /////
 
     if (do_bevel_convex) {
       for (uint i = 0; i < numEdges; i++) {
@@ -815,8 +804,6 @@ Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
     }
 
     /* vertex group support */
-    //if (dvert) {
-      //MDeformVert *dv = dvert;
       float scalar;
 
       if (defgrp_invert) {
@@ -930,8 +917,7 @@ Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
         else {
           for (i = 0; i < numVerts; i++) {
             if (vert_lens_sq[i] < offset_sq) {
-              float scalar = sqrtf(vert_lens_sq[i]) / offset;
-              vert_angles[i] *= scalar;
+              vert_angles[i] *= sqrtf(vert_lens_sq[i]) / offset;
             }
           }
         }
