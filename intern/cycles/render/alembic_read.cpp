@@ -746,7 +746,7 @@ static void process_uvs(CachedData &cache,
                         const IV2fGeomParam::Sample &sample,
                         double time)
 {
-  if (scope != kFacevaryingScope) {
+  if (scope != kFacevaryingScope && scope != kVaryingScope) {
     return;
   }
 
@@ -776,9 +776,27 @@ static void process_uvs(CachedData &cache,
   const uint32_t *indices = sample.getIndices()->get();
   const V2f *values = sample.getVals()->get();
 
-  for (const int uv_loop_index : *uv_loops) {
-    const uint32_t index = indices[uv_loop_index];
-    *data_float2++ = make_float2(values[index][0], values[index][1]);
+  if (scope == kFacevaryingScope) {
+    for (const int uv_loop_index : *uv_loops) {
+      const uint32_t index = indices[uv_loop_index];
+      *data_float2++ = make_float2(values[index][0], values[index][1]);
+    }
+  }
+  else if (scope == kVaryingScope) {
+    if (triangles) {
+      for (size_t i = 0; i < triangles->size(); i++) {
+        const int3 t = (*triangles)[i];
+        *data_float2++ = make_float2(values[t.x][0], values[t.x][1]);
+        *data_float2++ = make_float2(values[t.y][0], values[t.y][1]);
+        *data_float2++ = make_float2(values[t.z][0], values[t.z][1]);
+      }
+    }
+    else if (corners) {
+      for (size_t i = 0; i < corners->size(); i++) {
+        const int c = (*corners)[i];
+        *data_float2++ = make_float2(values[c][0], values[c][1]);
+      }
+    }
   }
 
   attribute.data.add_data(data, time);
