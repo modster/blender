@@ -49,6 +49,8 @@
 
 #include "FN_cpp_type_make.hh"
 
+#include "attribute_ref.hh"
+
 struct bNodeSocket *node_add_socket_from_template(struct bNodeTree *ntree,
                                                   struct bNode *node,
                                                   struct bNodeSocketTemplate *stemp,
@@ -687,6 +689,16 @@ static bNodeSocketType *make_socket_type_geometry()
   return socktype;
 }
 
+static bNodeSocketType *make_socket_type_attribute()
+{
+  bNodeSocketType *socktype = make_standard_socket_type(SOCK_ATTRIBUTE, PROP_NONE);
+  socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<AttributeRef>(); };
+  socktype->get_cpp_value = [](const bNodeSocket &UNUSED(socket), void *r_value) {
+    new (r_value) AttributeRef();
+  };
+  return socktype;
+}
+
 static bNodeSocketType *make_socket_type_collection()
 {
   bNodeSocketType *socktype = make_standard_socket_type(SOCK_COLLECTION, PROP_NONE);
@@ -762,7 +774,7 @@ void register_standard_node_socket_types(void)
 
   nodeRegisterSocketType(make_socket_type_material());
 
-  nodeRegisterSocketType(make_standard_socket_type(SOCK_ATTRIBUTE, PROP_NONE));
+  nodeRegisterSocketType(make_socket_type_attribute());
 
   nodeRegisterSocketType(make_socket_type_virtual());
 }

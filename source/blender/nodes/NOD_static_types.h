@@ -323,6 +323,8 @@ DefNode(GeometryNode, GEO_NODE_SWITCH, def_geo_switch, "SWITCH", Switch, "Switch
 DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform", "")
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_LOAD, def_geo_attribute_load, "ATTRIBUTE_LOAD", AttributeLoad, "Load Attribute", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_STORE, 0, "ATTRIBUTE_STORE", AttributeStore, "Store Attribute", "")
 
 /* undefine macros */
 #undef DefNode

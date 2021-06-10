@@ -39,12 +39,6 @@ static void geo_node_attribute_store_layout(uiLayout *layout, bContext *UNUSED(C
   uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
 }
 
-static void geo_node_attribute_store_init(bNodeTree *UNUSED(tree), bNode *node)
-{
-  node->custom1 = CD_PROP_FLOAT;
-  node->custom2 = ATTR_DOMAIN_AUTO;
-}
-
 namespace blender::nodes {
 
 static AttributeDomain get_result_domain(const GeometryComponent &component, const StringRef name)
@@ -135,9 +129,8 @@ void register_node_type_geo_attribute_store()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_STORE, "Attribute Store", NODE_CLASS_ATTRIBUTE, 0);
+  geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_STORE, "Attribute Store", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_attribute_store_in, geo_node_attribute_store_out);
-  node_type_init(&ntype, geo_node_attribute_store_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_store_exec;
   ntype.draw_buttons = geo_node_attribute_store_layout;
   nodeRegisterType(&ntype);

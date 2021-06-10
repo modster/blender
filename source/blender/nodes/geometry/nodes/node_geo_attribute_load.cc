@@ -91,8 +91,7 @@ void register_node_type_geo_attribute_load()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_ATTRIBUTE_LOAD, "Attribute Load", NODE_CLASS_ATTRIBUTE, 0);
+  geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_LOAD, "Attribute Load", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(
       &ntype, geo_node_attribute_load_in, geo_node_attribute_load_out);
   node_type_init(&ntype, geo_node_attribute_load_init);
