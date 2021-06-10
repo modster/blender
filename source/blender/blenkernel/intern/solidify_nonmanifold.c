@@ -154,7 +154,9 @@ static void get_vgroup(
 /* NOLINTNEXTLINE: readability-function-size */
 Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
 {
-  printf("solidify nonmanifold: %f, %i\n", solidify_data->offset, solidify_data->flag);
+  //printf("solidify nonmanifold: %f, %i\n", solidify_data->offset, solidify_data->flag);
+  printf("selection data non manifold %f\n",solidify_data->selection[3]);
+
   Mesh *result;
 
   MVert *mv, *mvert, *orig_mvert;
@@ -202,7 +204,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
 
   get_vgroup(solidify_data->object, mesh, solidify_data->defgrp_name, &dvert, &defgrp_index);
 
-  const bool do_flat_faces = dvert && (solidify_data->flag & MOD_SOLIDIFY_NONMANIFOLD_FLAT_FACES);
+  const bool do_flat_faces = solidify_data->flag & MOD_SOLIDIFY_NONMANIFOLD_FLAT_FACES;
 
   orig_mvert = mesh->mvert;
   orig_medge = mesh->medge;
@@ -1400,6 +1402,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
     float *face_weight = NULL;
 
     if (do_flat_faces) {
+      printf('DO FLAT FACES\n');
       face_weight = MEM_malloc_arrayN(numPolys, sizeof(*face_weight), "face_weight in solidify");
 
       mp = orig_mpoly;
@@ -1410,11 +1413,10 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
         for (int j = mp->loopstart; j < loopend; j++, ml++) {
           MDeformVert *dv = &dvert[ml->v];
           if (defgrp_invert) {
-            scalar_vgroup = min_ff(1.0f - BKE_defvert_find_weight(dv, defgrp_index),
-                                   scalar_vgroup);
+            scalar_vgroup = min_ff(1.0f - solidify_data->selection[i],scalar_vgroup);
           }
           else {
-            scalar_vgroup = min_ff(BKE_defvert_find_weight(dv, defgrp_index), scalar_vgroup);
+            scalar_vgroup = min_ff(solidify_data->selection[i], scalar_vgroup);
           }
         }
         scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
@@ -1800,13 +1802,13 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
             }
             float scalar_vgroup = 1;
             /* Use vertex group. */
-            if (dvert && !do_flat_faces) {
-              MDeformVert *dv = &dvert[i];
+            if (!do_flat_faces) {
+              //MDeformVert *dv = &dvert[i];
               if (defgrp_invert) {
-                scalar_vgroup = 1.0f - BKE_defvert_find_weight(dv, defgrp_index);
+                scalar_vgroup = 1.0f - solidify_data->selection[i];
               }
               else {
-                scalar_vgroup = BKE_defvert_find_weight(dv, defgrp_index);
+                scalar_vgroup = solidify_data->selection[i];
               }
               scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
             }
