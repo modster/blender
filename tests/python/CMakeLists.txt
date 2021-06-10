@@ -740,6 +740,21 @@ if(WITH_COMPOSITOR)
 
 endif()
 
+set(geo_node_tests
+  geometry
+  mesh
+  points
+)
+
+foreach(geo_node_test ${geo_node_tests})
+
+  add_blender_test(
+    geo_node_${geo_node_test}_test
+    ${TEST_SRC_DIR}/geometry_nodes/${geo_node_test}
+    --python ${TEST_PYTHON_DIR}/geo_node_test.py
+  )
+endforeach()
+
 if(WITH_OPENGL_DRAW_TESTS)
   if(NOT OPENIMAGEIO_IDIFF)
     MESSAGE(STATUS "Disabling OpenGL draw tests because OIIO idiff does not exist")
