@@ -494,9 +494,9 @@ static const EnumPropertyItem rna_node_geometry_solidify_offset_mode[] = {
 };
 
 static const EnumPropertyItem rna_node_geometry_solidify_boundary_mode[] = {
-    {0, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_NONE", 0, "Simple", "Simple"},
-    {1, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_ROUND",0, "Complex", "Complex"},
-    {2, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT",0, "Complex", "Complex"},
+    {0, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_NONE", 0, "None", "None"},
+    {1, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_ROUND",0, "Round", "Round"},
+    {2, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT",0, "Flat", "Flat"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -9555,12 +9555,12 @@ static void def_geo_solidify(StructRNA *srna)
 
   prop = RNA_def_property(srna, "nonmanifold_offset_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_node_geometry_solidify_offset_mode);
-  RNA_def_property_ui_text(prop, "Mode", "");
+  RNA_def_property_ui_text(prop, "Thickness", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
   prop = RNA_def_property(srna, "nonmanifold_boundary_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_node_geometry_solidify_boundary_mode);
-  RNA_def_property_ui_text(prop, "Mode", "");
+  RNA_def_property_ui_text(prop, "Boundary", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
