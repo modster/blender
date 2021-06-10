@@ -70,7 +70,7 @@ static void geo_node_attribute_processor_layout(uiLayout *layout, bContext *C, P
   {
     uiLayout *col = uiLayoutColumn(layout, false);
 
-    bNodeSocket *interface_socket = (bNodeSocket *)group->inputs.first;
+    bNodeSocket *interface_socket = (bNodeSocket *)group->outputs.first;
     AttributeProcessorOutputSettings *output_settings = (AttributeProcessorOutputSettings *)
                                                             storage->outputs_settings.first;
     for (; interface_socket && output_settings;
@@ -261,7 +261,7 @@ static void geo_node_attribute_processor_group_update(bNodeTree *ntree, bNode *n
       output_settings = (AttributeProcessorOutputSettings *)MEM_callocN(
           sizeof(AttributeProcessorOutputSettings), __func__);
       output_settings->identifier = BLI_strdup(interface_sock->identifier);
-      if (interface_sock->default_attribute_name[0] != '\0') {
+      if (!StringRef(interface_sock->default_attribute_name).is_empty()) {
         output_settings->output_mode = GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_DEFAULT;
       }
       BLI_addtail(&storage->outputs_settings, output_settings);
