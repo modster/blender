@@ -18,20 +18,37 @@
 
 #include "FN_cpp_type_make.hh"
 
-const AttributeRef AttributeRef::None = AttributeRef("", ATTR_DOMAIN_AUTO);
+const AttributeRef AttributeRef::None = AttributeRef("", ATTR_DOMAIN_AUTO, CD_PROP_FLOAT);
+
+const std::string &AttributeRef::name() const
+{
+  return name_;
+}
+
+AttributeDomain AttributeRef::domain() const
+{
+  return domain_;
+}
+
+CustomDataType AttributeRef::data_type() const
+{
+  return data_type_;
+}
 
 AttributeRef::AttributeRef()
 {
 }
 
-AttributeRef::AttributeRef(const std::string &name, AttributeDomain domain)
-    : name_(name), domain_(domain)
+AttributeRef::AttributeRef(const std::string &name,
+                           AttributeDomain domain,
+                           CustomDataType data_type)
+    : name_(name), domain_(domain), data_type_(data_type)
 {
 }
 
 std::ostream &operator<<(std::ostream &stream, const AttributeRef &attr)
 {
-  stream << "<AttributeRef name=" << attr.name_ << ", domain=" << attr.domain_ << ">";
+  stream << "<AttributeRef name=" << attr.name_ << ", domain=" << attr.domain_ << ", data_type=" << attr.data_type_ << ">";
   return stream;
 }
 

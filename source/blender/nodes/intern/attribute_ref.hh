@@ -28,15 +28,21 @@ struct AttributeRef {
  private:
   std::string name_;
   AttributeDomain domain_;
+  CustomDataType data_type_;
 
  public:
   static const AttributeRef None;
 
  public:
+  const std::string& name() const;
+  AttributeDomain domain() const;
+  CustomDataType data_type() const;
+
   AttributeRef();
-  AttributeRef(const std::string &name, AttributeDomain domain);
+  AttributeRef(const std::string &name, AttributeDomain domain, CustomDataType data_type);
 
   friend std::ostream &operator<<(std::ostream &stream, const AttributeRef &geometry_set);
   friend bool operator==(const AttributeRef &a, const AttributeRef &b);
   uint64_t hash() const;
 };
+

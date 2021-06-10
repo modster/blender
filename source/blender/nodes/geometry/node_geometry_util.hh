@@ -34,7 +34,7 @@
 
 #include "node_util.h"
 
-#include "node_geometry_attribute.hh"
+#include "attribute_ref.hh"
 
 void geo_node_type_base(
     struct bNodeType *ntype, int type, const char *name, short nclass, short flag);

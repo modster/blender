@@ -41,35 +41,42 @@ static void geo_node_attribute_store_layout(uiLayout *layout, bContext *UNUSED(C
 
 namespace blender::nodes {
 
-static AttributeDomain get_result_domain(const GeometryComponent &component, const StringRef name)
+static AttributeDomain get_result_domain(AttributeDomain declared_domain,
+                                         const GeometryComponent &component,
+                                         const StringRef name)
 {
-  /* Use the domain of the result attribute if it already exists. */
-  std::optional<AttributeMetaData> result_info = component.attribute_get_meta_data(name);
-  if (result_info) {
-    return result_info->domain;
+  if (declared_domain == ATTR_DOMAIN_AUTO) {
+    /* Use the domain of the result attribute if it already exists. */
+    std::optional<AttributeMetaData> result_info = component.attribute_get_meta_data(name);
+    if (result_info) {
+      return result_info->domain;
+    }
+    else {
+      return ATTR_DOMAIN_POINT;
+    }
   }
-  return ATTR_DOMAIN_POINT;
+  else {
+    return declared_domain;
+  }
 }
 
 static void store_attribute(GeometryComponent &component, const GeoNodeExecParams &params)
 {
+  const AttributeRef &attribute_ref = params.get_input<AttributeRef>("Attribute");
+  const CustomDataType data_type = attribute_ref.data_type();
+  const AttributeDomain domain = get_result_domain(attribute_ref.domain(), component, input_name);
   const std::string attribute_name = params.get_input<std::string>("Name");
-  if (attribute_name.empty()) {
+
+  GVArrayPtr attribute_input = component.attribute_try_get_for_read(
+      attribute_ref.name(), domain, data_type);
+  if (!attribute_input) {
     return;
   }
+  OutputAttribute attribute_output = component.attribute_try_get_for_output_only(
+      attribute_name, domain, data_type);
 
-  const bNode &node = params.node();
-  const CustomDataType data_type = static_cast<CustomDataType>(node.custom1);
-  const AttributeDomain domain = static_cast<AttributeDomain>(node.custom2);
-  const AttributeDomain result_domain = (domain == ATTR_DOMAIN_AUTO) ?
-                                            get_result_domain(component, attribute_name) :
-                                            domain;
-
-  OutputAttribute attribute = component.attribute_try_get_for_output_only(
-      attribute_name, result_domain, data_type);
-  if (!attribute) {
-    return;
-  }
+  MutableSpan<float> results = attribute_output.as_span<float>();
+  results.copy_from(attribute_input->typed<float>());
 
   switch (data_type) {
     case CD_PROP_FLOAT: {
@@ -108,7 +115,13 @@ static void geo_node_attribute_store_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  geometry_set = geometry_set_realize_instances(geometry_set);
+  const std::string attribute_name = params.get_input<std::string>("Name");
+  if (attribute_name.empty()) {
+    params.set_output("Geometry", geometry_set);
+    return;
+  }
+
+  // geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
     store_attribute(geometry_set.get_component_for_write<MeshComponent>(), params);

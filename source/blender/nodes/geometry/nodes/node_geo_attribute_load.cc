@@ -72,7 +72,7 @@ static void geo_node_attribute_load_exec(GeoNodeExecParams params)
     return;
   }
 
-  geometry_set = bke::geometry_set_realize_instances(geometry_set);
+  //geometry_set = bke::geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
     load_attribute(geometry_set.get_component_for_read<MeshComponent>(), params);
