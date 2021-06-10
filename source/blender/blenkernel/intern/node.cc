@@ -5129,8 +5129,11 @@ static void registerGeometryNodes()
 
   register_node_type_attr_group();
 
+  register_node_type_attr_attribute_input();
   register_node_type_attr_index();
   register_node_type_attr_set_attribute();
+  register_node_type_attr_position_input();
+  register_node_type_attr_position_output();
 }
 
 static void registerFunctionNodes()

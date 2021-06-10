@@ -1403,9 +1403,17 @@ typedef struct NodeGeometryAttributeProcessor {
 
 typedef struct NodeAttributeSetAttribute {
   char attribute_name[64];
+  /* eNodeSocketDatatype */
   uint8_t type;
   char _pad[7];
 } NodeAttributeSetAttribute;
+
+typedef struct NodeAttributeAttributeInput {
+  char attribute_name[64];
+  /* eNodeSocketDatatype */
+  uint8_t type;
+  char _pad[7];
+} NodeAttributeAttributeInput;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0

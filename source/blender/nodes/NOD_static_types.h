@@ -328,6 +328,9 @@ DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_T
 
 DefNode(AttributeNode, ATTR_NODE_INDEX, 0, "INDEX", Index, "Index", "")
 DefNode(AttributeNode, ATTR_NODE_SET_ATTRIBUTE, def_attr_set_attribute, "SET_ATTRIBUTE", SetAttribute, "Set Attribute", "")
+DefNode(AttributeNode, ATTR_NODE_POSITION_INPUT, 0, "POSITION_INPUT", PositionInput, "Position Input", "")
+DefNode(AttributeNode, ATTR_NODE_POSITION_OUTPUT, 0, "POSITION_OUTPUT", PositionOutput, "Position Output", "")
+DefNode(AttributeNode, ATTR_NODE_ATTRIBUTE_INPUT, def_attr_attribute_input, "ATTRIBUTE_INPUT", AttributeInput, "Attribute Input", "")
 
 /* undefine macros */
 #undef DefNode

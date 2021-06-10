@@ -139,8 +139,11 @@ set(SRC
   function/nodes/node_fn_random_float.cc
   function/node_function_util.cc
 
+  geometry/nodes/node_attr_attribute_input.cc
   geometry/nodes/node_attr_group.cc
   geometry/nodes/node_attr_index.cc
+  geometry/nodes/node_attr_position_input.cc
+  geometry/nodes/node_attr_position_output.cc
   geometry/nodes/node_attr_set_attribute.cc
   geometry/nodes/node_geo_align_rotation_to_vector.cc
   geometry/nodes/node_geo_attribute_clamp.cc

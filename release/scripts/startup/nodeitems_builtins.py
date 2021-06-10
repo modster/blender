@@ -614,13 +614,15 @@ attribute_node_categories = [
     AttributeNodeCategory("ATTR_INPUT", "Input", items=[
         NodeItem("FunctionNodeRandomFloat"),
         NodeItem("ShaderNodeValue"),
-        NodeItem("ShaderNodeAttribute"),
         NodeItem("FunctionNodeInputString"),
         NodeItem("FunctionNodeInputVector"),
         NodeItem("AttributeNodeIndex"),
+        NodeItem("AttributeNodeAttributeInput"),
+        NodeItem("AttributeNodePositionInput"),
     ]),
     AttributeNodeCategory("ATTR_OUTPUT", "Output", items=[
         NodeItem("AttributeNodeSetAttribute"),
+        NodeItem("AttributeNodePositionOutput"),
     ]),
     AttributeNodeCategory("ATTR_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),

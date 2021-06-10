@@ -94,8 +94,11 @@ void register_node_tree_type_attr(void);
 void register_node_type_attr_group(void);
 void register_node_type_attribute_custom_group(bNodeType *ntype);
 
+void register_node_type_attr_attribute_input(void);
 void register_node_type_attr_index(void);
 void register_node_type_attr_set_attribute(void);
+void register_node_type_attr_position_input(void);
+void register_node_type_attr_position_output(void);
 
 #ifdef __cplusplus
 }

@@ -1456,6 +1456,9 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 
 #define ATTR_NODE_INDEX 1400
 #define ATTR_NODE_SET_ATTRIBUTE 1401
+#define ATTR_NODE_POSITION_INPUT 1402
+#define ATTR_NODE_POSITION_OUTPUT 1403
+#define ATTR_NODE_ATTRIBUTE_INPUT 1404
 
 /** \} */
 

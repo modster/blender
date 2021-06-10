@@ -414,15 +414,16 @@ static bool load_input_varrays(InputsCache &inputs_cache,
   for (const DOutputSocket &dsocket : used_group_inputs) {
     const DNode dnode = dsocket.node();
     const GVArray *input_varray = nullptr;
+    const bNodeSocketType *socket_typeinfo = dsocket->typeinfo();
+    const CustomDataType data_type = get_custom_data_type(
+        (eNodeSocketDatatype)socket_typeinfo->type);
+    const CPPType *cpp_type = bke::custom_data_type_to_cpp_type(data_type);
     if (dnode->is_group_input_node()) {
       const int index = dsocket->index();
       input_varray = &*inputs_cache.group_inputs.lookup_or_add_cb(index, [&]() -> GVArrayPtr {
         const AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
             BLI_findlink(&storage.inputs_settings, index);
         const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group.inputs, index);
-        const CustomDataType type = get_custom_data_type(
-            (eNodeSocketDatatype)interface_socket->typeinfo->type);
-        const CPPType *cpp_type = bke::custom_data_type_to_cpp_type(type);
         if (cpp_type == nullptr) {
           return {};
         }
@@ -432,7 +433,7 @@ static bool load_input_varrays(InputsCache &inputs_cache,
           case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_ATTRIBUTE: {
             const std::string input_name = "inB" + identifier;
             const std::string attribute_name = geo_params.get_input<std::string>(input_name);
-            return component.attribute_get_for_read(attribute_name, domain, type);
+            return component.attribute_get_for_read(attribute_name, domain, data_type);
           }
           case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_VALUE: {
             const std::string input_name = "inA" + identifier;
@@ -446,7 +447,7 @@ static bool load_input_varrays(InputsCache &inputs_cache,
             BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
             socket_cpp_value_get(*interface_socket, buffer);
             GVArrayPtr varray = component.attribute_get_for_read(
-                default_attribute_name, domain, type, buffer);
+                default_attribute_name, domain, data_type, buffer);
             cpp_type->destruct(buffer);
             return varray;
           }
@@ -467,12 +468,24 @@ static bool load_input_varrays(InputsCache &inputs_cache,
     else if (dnode->idname() == "ShaderNodeAttribute") {
       NodeShaderAttribute *storage = dnode->storage<NodeShaderAttribute>();
       const StringRefNull attribute_name = storage->name;
-      const bNodeSocketType *socket_typeinfo = dsocket->typeinfo();
-      const CustomDataType data_type = get_custom_data_type(
-          (eNodeSocketDatatype)socket_typeinfo->type);
+
       input_varray = &*inputs_cache.attributes.lookup_or_add_cb(
           {attribute_name, data_type}, [&]() -> GVArrayPtr {
             return component.attribute_get_for_read(attribute_name, domain, data_type);
+          });
+    }
+    else if (dnode->idname() == "AttributeNodeAttributeInput") {
+      NodeAttributeAttributeInput *storage = dnode->storage<NodeAttributeAttributeInput>();
+      const StringRefNull attribute_name = storage->attribute_name;
+      input_varray = &*inputs_cache.attributes.lookup_or_add_cb(
+          {attribute_name, data_type}, [&]() -> GVArrayPtr {
+            return component.attribute_get_for_read(attribute_name, domain, data_type);
+          });
+    }
+    else if (dnode->idname() == "AttributeNodePositionInput") {
+      input_varray = &*inputs_cache.attributes.lookup_or_add_cb(
+          {"position", CD_PROP_FLOAT3}, [&]() -> GVArrayPtr {
+            return component.attribute_get_for_read("position", domain, CD_PROP_FLOAT3);
           });
     }
 
@@ -521,6 +534,10 @@ static bool prepare_group_outputs(const Span<DInputSocket> used_group_outputs,
       const NodeAttributeSetAttribute *storage = node->storage<NodeAttributeSetAttribute>();
       attribute_name = storage->attribute_name;
       attribute_type = get_custom_data_type((eNodeSocketDatatype)storage->type);
+    }
+    else if (node->idname() == "AttributeNodePositionOutput") {
+      attribute_name = "position";
+      attribute_type = CD_PROP_FLOAT3;
     }
 
     if (attribute_name.empty()) {
@@ -643,6 +660,9 @@ static void process_attributes(GeoNodeExecParams &geo_params, GeometrySet &geome
         used_group_outputs.append({dnode.context(), socket_ref});
       }
     }
+  });
+  tree.foreach_node_with_type("AttributeNodePositionOutput", [&](const DNode dnode) {
+    used_group_outputs.append(dnode.input(0));
   });
   if (used_group_outputs.is_empty()) {
     return;
