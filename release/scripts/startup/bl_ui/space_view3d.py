@@ -5035,6 +5035,10 @@ class VIEW3D_MT_edit_gpencil_stroke(Menu):
         layout.menu("GPENCIL_MT_stroke_type")
 
         layout.separator()
+        layout.operator("gpencil.stroke_normalize", text="Normalize Thickness").mode = 'THICKNESS'
+        layout.operator("gpencil.stroke_normalize", text="Normalize Opacity").mode = 'OPACITY'
+
+        layout.separator()
         layout.operator("gpencil.reset_transform_fill", text="Reset Fill Transform")
 
 
@@ -6181,6 +6185,9 @@ class VIEW3D_PT_overlay_geometry(Panel):
             sub.active = overlay.show_fade_inactive
             sub.prop(overlay, "fade_inactive_alpha", text="Fade Inactive Geometry")
 
+        row = col.row(align=True)
+        row.prop(overlay, "show_mode_transfer", text="Flash on Mode Transfer")
+
         col = layout.column(align=True)
         col.active = display_all
 
@@ -6993,7 +7000,7 @@ class VIEW3D_PT_context_properties(Panel):
 
         if member:
             # Draw with no edit button
-            rna_prop_ui.draw(self.layout, context, member, object, False)
+            rna_prop_ui.draw(self.layout, context, member, object, use_edit=False)
 
 
 # Grease Pencil Object - Multiframe falloff tools
