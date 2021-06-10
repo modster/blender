@@ -319,13 +319,22 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
   return samples;
 }
 
+static void assert_sorted_array_in_range(Span<float> data, const float min, const float max)
+{
+  BLI_assert(data.first() >= min);
+  for (const int i : IndexRange(1, data.size() - 1)) {
+    BLI_assert(data[i] >= data[i - 1]);
+  }
+  BLI_assert(data.last() <= max);
+}
+
 /**
- * Transform an array of unsorted length parameters into index factors. The samples are indices
- * and factors to the next index encoded in floats. The logic for converting from the float values
- * to interpolation data is in #lookup_data_from_index_factor.
+ * Transform an array of sorted length parameters into index factors. The result is indices
+ * and factors to the next index, encoded in floats. The logic for converting from the float
+ * values to interpolation data is in #lookup_data_from_index_factor.
  *
- * \param parameters: Lengths along the spline to be transformed into index factors.
- * Must be between 0 and the total length of the spline.
+ * \param parameters: Lengths along the spline to be transformed into index factors
+ * (to save another allocation). Must be between zero and the total length of the spline.
  *
  * \note The implementation is similar to #sample_uniform_index_factors(), though
  * the two loops are inverted, and obviously custom parameters are provided.
@@ -333,26 +342,14 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
 void Spline::sample_length_parameters_to_index_factors(MutableSpan<float> parameters) const
 {
   const Span<float> lengths = this->evaluated_lengths();
-
-  /* In order to quickly loop through the evaluated lengths to find the index factors, access the
-   * incoming parameters via an array of sorted indices. Knowing the order significantly speeds up
-   * finding the results, since we can avoid doing a separate binary search for every parameter. */
-  Array<int> sorted_indices(parameters.size());
-  for (const int i : sorted_indices.index_range()) {
-    sorted_indices[i] = i;
-  }
-  std::sort(sorted_indices.begin(), sorted_indices.end(), [&](const int &a, const int &b) {
-    return parameters[a] < parameters[b];
-  });
-  BLI_assert(parameters[sorted_indices[0] >= 0.0f]);
-  BLI_assert(parameters[sorted_indices.last()] <= this->length());
+  assert_sorted_array_in_range(parameters, 0.0f, this->length());
 
   /* Store the length at the previous evaluated point in a variable so it can
    * start out at zero (the lengths array doesn't contain 0 for the first point). */
   float prev_length = 0.0f;
   int i_evaluated = 0;
-  for (const int parameter_index : sorted_indices) {
-    const float sample_length = parameters[parameter_index];
+  for (const int i_sample : parameters.index_range()) {
+    const float sample_length = parameters[i_sample];
 
     /* Skip over every evaluated point that fits before this sample. */
     while (lengths[i_evaluated] < sample_length) {
@@ -361,7 +358,7 @@ void Spline::sample_length_parameters_to_index_factors(MutableSpan<float> parame
     }
 
     const float factor = (sample_length - prev_length) / (lengths[i_evaluated] - prev_length);
-    parameters[parameter_index] = i_evaluated + factor;
+    parameters[i_sample] = i_evaluated + factor;
   }
 }
 

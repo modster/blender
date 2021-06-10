@@ -92,6 +92,7 @@ static void geo_node_curve_deform_update(bNodeTree *UNUSED(ntree), bNode *node)
 
 static void spline_deform(const Spline &spline,
                           Span<float> index_factors,
+                          Span<int> sorted_indices,
                           const int axis_index,
                           MutableSpan<float3> positions)
 {
@@ -102,6 +103,7 @@ static void spline_deform(const Spline &spline,
 
   parallel_for(positions.index_range(), 1024, [&](IndexRange range) {
     for (const int i : range) {
+      const int i_position = sorted_indices[i];
       const Spline::LookupResult interp = spline.lookup_data_from_index_factor(index_factors[i]);
       const int index = interp.evaluated_index;
       const int next_index = interp.next_evaluated_index;
@@ -115,11 +117,11 @@ static void spline_deform(const Spline &spline,
               .normalized());
       matrix.apply_scale(interpf(radii[next_index], radii[index], factor));
 
-      float3 position = positions[i];
+      float3 position = positions[i_position];
       position[axis_index] = 0.0f;
 
-      positions[i] = matrix * position;
-      positions[i] += float3::interpolate(
+      positions[i_position] = matrix * position;
+      positions[i_position] += float3::interpolate(
           spline_positions[index], spline_positions[next_index], factor);
     }
   });
@@ -203,40 +205,50 @@ static void execute_on_component(const GeoNodeExecParams &params,
       component.attribute_try_get_for_output<float3>("position", ATTR_DOMAIN_POINT, {0, 0, 0});
   MutableSpan<float3> positions = position_attribute.as_span();
 
+  /* #sample_length_parameters_to_index_factors requires an array of sorted parameters.
+   * Sort indices based on the parameters before processing, build the parameters final
+   * parameters, then use the indices to map back to the orignal positions. */
   Array<float> parameters(size);
+  Array<int> sorted_indices(size);
+  for (const int i : sorted_indices.index_range()) {
+    sorted_indices[i] = i;
+  }
 
   if (mode == GEO_NODE_CURVE_DEFORM_POSITION) {
     if (axis_is_negative(axis)) {
-      parallel_for(positions.index_range(), 4096, [&](IndexRange range) {
-        for (const int i : range) {
-          parameters[i] = std::clamp(positions[i][axis_index], 0.0f, total_length);
-        }
+      std::sort(sorted_indices.begin(), sorted_indices.end(), [&](const int &a, const int &b) {
+        return positions[a][axis_index] > positions[b][axis_index];
       });
+      for (const int i : IndexRange(size)) {
+        parameters[i] = total_length -
+                        std::clamp(positions[sorted_indices[i]][axis_index], 0.0f, total_length);
+      }
     }
     else {
-      parallel_for(positions.index_range(), 4096, [&](IndexRange range) {
-        for (const int i : range) {
-          parameters[i] = total_length - std::clamp(positions[i][axis_index], 0.0f, total_length);
-        }
+      std::sort(sorted_indices.begin(), sorted_indices.end(), [&](const int &a, const int &b) {
+        return positions[a][axis_index] < positions[b][axis_index];
       });
+      for (const int i : IndexRange(size)) {
+        parameters[i] = std::clamp(positions[sorted_indices[i]][axis_index], 0.0f, total_length);
+      }
     }
   }
   else {
     BLI_assert(mode == GEO_NODE_CURVE_DEFORM_ATTRIBUTE);
-    GVArrayPtr attribute = params.get_input_attribute(
-        "Factor", component, ATTR_DOMAIN_POINT, CD_PROP_FLOAT, nullptr);
-    if (!attribute) {
-      return;
-    }
+    GVArray_Typed<float> attribute = params.get_input_attribute<float>(
+        "Factor", component, ATTR_DOMAIN_POINT, 0.0f);
 
-    GVArray_Typed<float> parameter_attribute{*attribute};
+    std::sort(sorted_indices.begin(), sorted_indices.end(), [&](const int &a, const int &b) {
+      return attribute[a] < attribute[b];
+    });
+
     for (const int i : IndexRange(size)) {
-      parameters[i] = std::clamp(parameter_attribute[i], 0.0f, total_length);
+      parameters[i] = std::clamp(attribute[sorted_indices[i]] * total_length, 0.0f, total_length);
     }
   }
 
   spline.sample_length_parameters_to_index_factors(parameters);
-  spline_deform(spline, parameters, axis_index, positions);
+  spline_deform(spline, parameters, sorted_indices, axis_index, positions);
 
   position_attribute.save();
 }
