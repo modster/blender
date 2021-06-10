@@ -48,7 +48,7 @@ static void geo_node_curve_to_points_init(bNodeTree *UNUSED(tree), bNode *node)
   NodeGeometryCurveToPoints *data = (NodeGeometryCurveToPoints *)MEM_callocN(
       sizeof(NodeGeometryCurveToPoints), __func__);
 
-  data->mode = GEO_NODE_CURVE_SAMPLE_EVALUATED;
+  data->mode = GEO_NODE_CURVE_SAMPLE_COUNT;
   node->storage = data;
 }
 
@@ -85,14 +85,14 @@ static Array<int> calculate_spline_point_offsets(GeoNodeExecParams &params,
                                                  const CurveEval &curve,
                                                  const Span<SplinePtr> splines)
 {
-  const int splines_size = curve.splines().size();
+  const int size = curve.splines().size();
   switch (mode) {
     case GEO_NODE_CURVE_SAMPLE_COUNT: {
       const int count = params.extract_input<int>("Count");
       if (count < 1) {
         return {0};
       }
-      Array<int> offsets(splines_size + 1);
+      Array<int> offsets(size + 1);
       for (const int i : offsets.index_range()) {
         offsets[i] = count * i;
       }
@@ -101,9 +101,9 @@ static Array<int> calculate_spline_point_offsets(GeoNodeExecParams &params,
     case GEO_NODE_CURVE_SAMPLE_LENGTH: {
       /* Don't allow asymptotic count increase for low resolution values. */
       const float resolution = std::max(params.extract_input<float>("Length"), 0.0001f);
-      Array<int> offsets(splines_size + 1);
+      Array<int> offsets(size + 1);
       int offset = 0;
-      for (const int i : IndexRange(splines_size)) {
+      for (const int i : IndexRange(size)) {
         offsets[i] = offset;
         offset += splines[i]->length() / resolution;
       }
@@ -366,6 +366,11 @@ static void geo_node_curve_to_points_exec(GeoNodeExecParams params)
 
   copy_spline_domain_attributes(curve_component, offsets, point_component);
   create_default_rotation_attribute(new_attributes);
+
+  /* The default radius is way too large for points, divide by 10. */
+  for (float &radius : new_attributes.radii) {
+    radius *= 0.1f;
+  }
 
   params.set_output("Geometry", std::move(result));
 }
