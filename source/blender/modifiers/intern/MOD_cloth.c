@@ -89,13 +89,10 @@ static void initData(ModifierData *md)
   }
 }
 
-static void deformVerts(ModifierData *md,
-                        const ModifierEvalContext *ctx,
-                        Mesh *mesh,
-                        float (*vertexCos)[3],
-                        int numVerts)
+static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
-  Mesh *mesh_src;
+  BLI_assert(mesh != NULL);
+
   ClothModifierData *clmd = (ClothModifierData *)md;
   Scene *scene = DEG_get_evaluated_scene(ctx->depsgraph);
 
@@ -104,44 +101,43 @@ static void deformVerts(ModifierData *md,
     initData(md);
 
     if (!clmd->sim_parms || !clmd->coll_parms) {
-      return;
+      return mesh;
     }
   }
 
-  if (mesh == NULL) {
-    mesh_src = MOD_deform_mesh_eval_get(ctx->object, NULL, NULL, NULL, numVerts, false, false);
-  }
-  else {
-    /* Not possible to use get_mesh() in this case as we'll modify its vertices
-     * and get_mesh() would return 'mesh' directly. */
-    mesh_src = (Mesh *)BKE_id_copy_ex(NULL, (ID *)mesh, NULL, LIB_ID_COPY_LOCALIZE);
-  }
+  /* TODO(ish): Add back support for "Dynamic Mesh", there is
+   * something weird going on here, even with "Dynamic Mesh" on and the
+   * next part commented out, it just works. */
+  /* /\* TODO(sergey): For now it actually duplicates logic from DerivedMesh.cc */
+  /*  * and needs some more generic solution. But starting experimenting with */
+  /*  * this so close to the release is not that nice.. */
+  /*  * */
+  /*  * Also hopefully new cloth system will arrive soon.. */
+  /*  *\/ */
+  /* if (mesh == NULL && clmd->sim_parms->shapekey_rest) { */
+  /*   KeyBlock *kb = BKE_keyblock_from_key(BKE_key_from_object(ctx->object), */
+  /*                                        clmd->sim_parms->shapekey_rest); */
+  /*   if (kb && kb->data != NULL) { */
+  /*     float(*layerorco)[3]; */
+  /*     if (!(layerorco = CustomData_get_layer(&mesh_src->vdata, CD_CLOTH_ORCO))) { */
+  /*       layerorco = CustomData_add_layer( */
+  /*           &mesh_src->vdata, CD_CLOTH_ORCO, CD_CALLOC, NULL, mesh_src->totvert); */
+  /*     } */
 
-  /* TODO(sergey): For now it actually duplicates logic from DerivedMesh.cc
-   * and needs some more generic solution. But starting experimenting with
-   * this so close to the release is not that nice..
-   *
-   * Also hopefully new cloth system will arrive soon..
-   */
-  if (mesh == NULL && clmd->sim_parms->shapekey_rest) {
-    KeyBlock *kb = BKE_keyblock_from_key(BKE_key_from_object(ctx->object),
-                                         clmd->sim_parms->shapekey_rest);
-    if (kb && kb->data != NULL) {
-      float(*layerorco)[3];
-      if (!(layerorco = CustomData_get_layer(&mesh_src->vdata, CD_CLOTH_ORCO))) {
-        layerorco = CustomData_add_layer(
-            &mesh_src->vdata, CD_CLOTH_ORCO, CD_CALLOC, NULL, mesh_src->totvert);
-      }
+  /*     memcpy(layerorco, kb->data, sizeof(float[3]) * numVerts); */
+  /*   } */
+  /* } */
 
-      memcpy(layerorco, kb->data, sizeof(float[3]) * numVerts);
-    }
-  }
+  Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
 
-  BKE_mesh_vert_coords_apply(mesh_src, vertexCos);
+  float(*vert_coords)[3] = BKE_mesh_vert_coords_alloc(mesh_result, NULL);
+  BKE_mesh_vert_coords_get(mesh_result, vert_coords);
 
-  clothModifier_do(clmd, ctx->depsgraph, scene, ctx->object, mesh_src, vertexCos);
+  clothModifier_do(clmd, ctx->depsgraph, scene, ctx->object, mesh_result, vert_coords);
 
-  BKE_id_free(NULL, mesh_src);
+  BKE_mesh_vert_coords_apply(mesh_result, vert_coords);
+
+  return mesh_result;
 }
 
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
@@ -297,18 +293,18 @@ ModifierTypeInfo modifierType_Cloth = {
     /* structName */ "ClothModifierData",
     /* structSize */ sizeof(ClothModifierData),
     /* srna */ &RNA_ClothModifier,
-    /* type */ eModifierTypeType_OnlyDeform,
+    /* type */ eModifierTypeType_Nonconstructive,
     /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_UsesPointCache |
         eModifierTypeFlag_Single,
     /* icon */ ICON_MOD_CLOTH,
 
     /* copyData */ copyData,
 
-    /* deformVerts */ deformVerts,
+    /* deformVerts */ NULL,
     /* deformMatrices */ NULL,
     /* deformVertsEM */ NULL,
     /* deformMatricesEM */ NULL,
-    /* modifyMesh */ NULL,
+    /* modifyMesh */ modifyMesh,
     /* modifyHair */ NULL,
     /* modifyGeometrySet */ NULL,
 
