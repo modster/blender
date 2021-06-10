@@ -154,9 +154,6 @@ static void get_vgroup(
 /* NOLINTNEXTLINE: readability-function-size */
 Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
 {
-  //printf("solidify nonmanifold: %f, %i\n", solidify_data->offset, solidify_data->flag);
-  printf("selection data non manifold %f\n",solidify_data->selection[3]);
-
   Mesh *result;
 
   MVert *mv, *mvert, *orig_mvert;
@@ -1402,7 +1399,6 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
     float *face_weight = NULL;
 
     if (do_flat_faces) {
-      printf('DO FLAT FACES\n');
       face_weight = MEM_malloc_arrayN(numPolys, sizeof(*face_weight), "face_weight in solidify");
 
       mp = orig_mpoly;
@@ -1411,7 +1407,6 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
         int loopend = mp->loopstart + mp->totloop;
         ml = orig_mloop + mp->loopstart;
         for (int j = mp->loopstart; j < loopend; j++, ml++) {
-          MDeformVert *dv = &dvert[ml->v];
           if (defgrp_invert) {
             scalar_vgroup = min_ff(1.0f - solidify_data->selection[i],scalar_vgroup);
           }

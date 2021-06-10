@@ -53,13 +53,8 @@ static void geo_node_solidify_init(bNodeTree *UNUSED(tree), bNode *node)
   node->storage = node_storage;
 }
 
-static void geo_node_solidify_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void geo_node_solidify_update(bNodeTree *UNUSED(ntree), bNode *UNUSED(node))
 {
-  //const bNode &node = params.node();
-  //NodeGeometrySolidify &node_storage = *(NodeGeometrySolidify *)node->storage;
-
-  //update_attribute_input_socket_availabilities(
-  //    *node, "Translation", (GeometryNodeAttributeInputMode)node_storage.input_type);
 }
 
 static void geo_node_solidify_exec(GeoNodeExecParams params)
