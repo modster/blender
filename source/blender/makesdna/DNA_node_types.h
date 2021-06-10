@@ -114,6 +114,7 @@ typedef struct bNodeSocket {
 
   /** Default input value used for unlinked sockets. */
   void *default_value;
+  char *default_attribute_name;
 
   /* execution data */
   /** Local stack index. */
@@ -1384,6 +1385,10 @@ typedef struct AttributeProcessorOutputSettings {
   struct AttributeProcessorOutputSettings *next, *prev;
 
   char *identifier;
+
+  /* GeometryNodeAttributeProcessorOutputMode. */
+  uint8_t output_mode;
+  char _pad[7];
 } AttributeProcessorOutputSettings;
 
 typedef struct NodeGeometryAttributeProcessor {
@@ -1916,7 +1921,13 @@ typedef enum GeometryNodeAttributeTransferMapMode {
 typedef enum GeometryNodeAttributeProcessorInputMode {
   GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_VALUE = 0,
   GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_ATTRIBUTE = 1,
+  GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_DEFAULT = 2,
 } GeometryNodeAttributeProcessorInputMode;
+
+typedef enum GeometryNodeAttributeProcessorOutputMode {
+  GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_ATTRIBUTE = 0,
+  GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_DEFAULT = 1,
+} GeometryNodeAttributeProcessorOutputMode;
 
 #ifdef __cplusplus
 }

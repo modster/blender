@@ -480,6 +480,7 @@ static void write_node_socket_interface(BlendWriter *writer, bNodeSocket *sock)
   }
 
   write_node_socket_default_value(writer, sock);
+  BLO_write_string(writer, sock->default_attribute_name);
 }
 
 /* this is only direct data, tree itself should have been written */
@@ -653,6 +654,7 @@ static void direct_link_node_socket(BlendDataReader *reader, bNodeSocket *sock)
   sock->typeinfo = nullptr;
   BLO_read_data_address(reader, &sock->storage);
   BLO_read_data_address(reader, &sock->default_value);
+  BLO_read_data_address(reader, &sock->default_attribute_name);
   sock->total_inputs = 0; /* Clear runtime data set before drawing. */
   sock->cache = nullptr;
 }
@@ -2150,6 +2152,9 @@ static void node_socket_copy(bNodeSocket *sock_dst, const bNodeSocket *sock_src,
       socket_id_user_increment(sock_dst);
     }
   }
+  if (sock_src->default_attribute_name) {
+    sock_dst->default_attribute_name = (char *)MEM_dupallocN(sock_src->default_attribute_name);
+  }
 
   sock_dst->stack_index = 0;
   /* XXX some compositor node (e.g. image, render layers) still store
@@ -3101,6 +3106,9 @@ static void node_socket_interface_free(bNodeTree *UNUSED(ntree),
       socket_id_user_decrement(sock);
     }
     MEM_freeN(sock->default_value);
+  }
+  if (sock->default_attribute_name) {
+    MEM_freeN(sock->default_attribute_name);
   }
 }
 

@@ -9998,6 +9998,11 @@ static void def_geo_attribute_processor_group_input(BlenderRNA *brna)
        0,
        "Attribute",
        "Pass a attribute name into the group"},
+      {GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_DEFAULT,
+       "DEFAULT",
+       0,
+       "Default",
+       "Use the default attribute name or default value if the attribute does not exist"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -10020,6 +10025,20 @@ static void def_geo_attribute_processor_group_input(BlenderRNA *brna)
 
 static void def_geo_attribute_processor_group_output(BlenderRNA *brna)
 {
+  static EnumPropertyItem input_mode_items[] = {
+      {GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_ATTRIBUTE,
+       "ATTRIBUTE",
+       0,
+       "Attribute",
+       "Specify the attribute the result should be stored in"},
+      {GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_DEFAULT,
+       "DEFAULT",
+       0,
+       "Default",
+       "Use the default attribute name for the output"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   StructRNA *srna;
   PropertyRNA *prop;
 
@@ -10029,6 +10048,12 @@ static void def_geo_attribute_processor_group_output(BlenderRNA *brna)
   prop = RNA_def_property(srna, "identifier", PROP_STRING, PROP_NONE);
   RNA_def_property_ui_text(prop, "identifier", "Identifier of the matching socket in the group");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+  prop = RNA_def_property(srna, "output_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Output Mode", "Where the group output is stored");
+  RNA_def_property_enum_items(prop, input_mode_items);
+  RNA_def_property_update(
+      prop, NC_NODE | NA_EDITED, "rna_GeometryNodeAttributeProcessor_mode_update");
 }
 
 static void def_geo_attribute_processor(StructRNA *srna)
@@ -10336,6 +10361,10 @@ static void rna_def_node_socket_interface(BlenderRNA *brna)
   prop = RNA_def_property(srna, "description", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "description");
   RNA_def_property_ui_text(prop, "Tooltip", "Socket tooltip");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
+
+  prop = RNA_def_property(srna, "default_attribute_name", PROP_STRING, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Default Attribute Name", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
 
   prop = RNA_def_property(srna, "is_output", PROP_BOOLEAN, PROP_NONE);

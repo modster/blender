@@ -27,6 +27,7 @@
 #include "UI_resources.h"
 
 #include "NOD_node_tree_multi_function.hh"
+#include "NOD_type_callbacks.hh"
 
 #include "FN_multi_function_network_evaluation.hh"
 
@@ -34,6 +35,9 @@
 
 static void geo_node_attribute_processor_layout(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+
   bNode *node = (bNode *)ptr->data;
   NodeGeometryAttributeProcessor *storage = (NodeGeometryAttributeProcessor *)node->storage;
 
@@ -49,17 +53,33 @@ static void geo_node_attribute_processor_layout(uiLayout *layout, bContext *C, P
     return;
   }
 
-  uiLayout *col = uiLayoutColumn(layout, false);
+  {
+    uiLayout *col = uiLayoutColumn(layout, false);
 
-  bNodeSocket *interface_socket = (bNodeSocket *)group->inputs.first;
-  AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
-                                                        storage->inputs_settings.first;
-  for (; interface_socket && input_settings;
-       interface_socket = interface_socket->next, input_settings = input_settings->next) {
-    PointerRNA input_ptr;
-    RNA_pointer_create(
-        ptr->owner_id, &RNA_AttributeProcessorInputSettings, input_settings, &input_ptr);
-    uiItemR(col, &input_ptr, "input_mode", 0, interface_socket->name, ICON_NONE);
+    bNodeSocket *interface_socket = (bNodeSocket *)group->inputs.first;
+    AttributeProcessorInputSettings *input_settings = (AttributeProcessorInputSettings *)
+                                                          storage->inputs_settings.first;
+    for (; interface_socket && input_settings;
+         interface_socket = interface_socket->next, input_settings = input_settings->next) {
+      PointerRNA input_ptr;
+      RNA_pointer_create(
+          ptr->owner_id, &RNA_AttributeProcessorInputSettings, input_settings, &input_ptr);
+      uiItemR(col, &input_ptr, "input_mode", 0, interface_socket->name, ICON_NONE);
+    }
+  }
+  {
+    uiLayout *col = uiLayoutColumn(layout, false);
+
+    bNodeSocket *interface_socket = (bNodeSocket *)group->inputs.first;
+    AttributeProcessorOutputSettings *output_settings = (AttributeProcessorOutputSettings *)
+                                                            storage->outputs_settings.first;
+    for (; interface_socket && output_settings;
+         interface_socket = interface_socket->next, output_settings = output_settings->next) {
+      PointerRNA input_ptr;
+      RNA_pointer_create(
+          ptr->owner_id, &RNA_AttributeProcessorOutputSettings, output_settings, &input_ptr);
+      uiItemR(col, &input_ptr, "output_mode", 0, interface_socket->name, ICON_NONE);
+    }
   }
 }
 
@@ -206,6 +226,9 @@ static void geo_node_attribute_processor_group_update(bNodeTree *ntree, bNode *n
       input_settings = (AttributeProcessorInputSettings *)MEM_callocN(
           sizeof(AttributeProcessorInputSettings), __func__);
       input_settings->identifier = BLI_strdup(interface_sock->identifier);
+      if (!StringRef(interface_sock->default_attribute_name).is_empty()) {
+        input_settings->input_mode = GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_DEFAULT;
+      }
       BLI_addtail(&storage->inputs_settings, input_settings);
 
       new_inputs_settings.add_new(input_settings);
@@ -238,6 +261,9 @@ static void geo_node_attribute_processor_group_update(bNodeTree *ntree, bNode *n
       output_settings = (AttributeProcessorOutputSettings *)MEM_callocN(
           sizeof(AttributeProcessorOutputSettings), __func__);
       output_settings->identifier = BLI_strdup(interface_sock->identifier);
+      if (interface_sock->default_attribute_name[0] != '\0') {
+        output_settings->output_mode = GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_DEFAULT;
+      }
       BLI_addtail(&storage->outputs_settings, output_settings);
 
       new_output_settings.add_new(output_settings);
@@ -316,7 +342,9 @@ static void geo_node_attribute_processor_update(bNodeTree *UNUSED(ntree), bNode 
   }
   LISTBASE_FOREACH (
       AttributeProcessorOutputSettings *, output_settings, &storage->outputs_settings) {
-    nodeSetSocketAvailability(next_socket, true);
+    nodeSetSocketAvailability(next_socket,
+                              output_settings->output_mode ==
+                                  GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_ATTRIBUTE);
     next_socket = next_socket->next;
   }
 }
@@ -394,6 +422,10 @@ static bool load_input_varrays(InputsCache &inputs_cache,
         const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group.inputs, index);
         const CustomDataType type = get_custom_data_type(
             (eNodeSocketDatatype)interface_socket->typeinfo->type);
+        const CPPType *cpp_type = bke::custom_data_type_to_cpp_type(type);
+        if (cpp_type == nullptr) {
+          return {};
+        }
         const StringRefNull identifier = interface_socket->identifier;
         GVArrayPtr input_varray;
         switch ((GeometryNodeAttributeProcessorInputMode)input_settings->input_mode) {
@@ -407,6 +439,15 @@ static bool load_input_varrays(InputsCache &inputs_cache,
             GPointer value = geo_params.get_input(input_name);
             GVArrayPtr varray = std::make_unique<fn::GVArray_For_SingleValueRef>(
                 *value.type(), domain_size, value.get());
+            return varray;
+          }
+          case GEO_NODE_ATTRIBUTE_PROCESSOR_INPUT_MODE_DEFAULT: {
+            const StringRef default_attribute_name = interface_socket->default_attribute_name;
+            BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
+            socket_cpp_value_get(*interface_socket, buffer);
+            GVArrayPtr varray = component.attribute_get_for_read(
+                default_attribute_name, domain, type, buffer);
+            cpp_type->destruct(buffer);
             return varray;
           }
         }
@@ -444,6 +485,7 @@ static bool load_input_varrays(InputsCache &inputs_cache,
 }
 
 static bool prepare_group_outputs(const Span<DInputSocket> used_group_outputs,
+                                  const NodeGeometryAttributeProcessor &storage,
                                   bNodeTree &group,
                                   GeoNodeExecParams &geo_params,
                                   GeometryComponent &component,
@@ -459,10 +501,21 @@ static bool prepare_group_outputs(const Span<DInputSocket> used_group_outputs,
     if (node->is_group_output_node()) {
       const int index = socket->index();
       const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&group.outputs, index);
-      const StringRefNull identifier = interface_socket->identifier;
-      const std::string socket_identifier = "out" + identifier;
-      attribute_name = geo_params.extract_input<std::string>(socket_identifier);
+      const AttributeProcessorOutputSettings *output_settings =
+          (AttributeProcessorOutputSettings *)BLI_findlink(&storage.outputs_settings, index);
       attribute_type = get_custom_data_type((eNodeSocketDatatype)interface_socket->typeinfo->type);
+      switch ((GeometryNodeAttributeProcessorOutputMode)output_settings->output_mode) {
+        case GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_ATTRIBUTE: {
+          const StringRefNull identifier = interface_socket->identifier;
+          const std::string socket_identifier = "out" + identifier;
+          attribute_name = geo_params.extract_input<std::string>(socket_identifier);
+          break;
+        }
+        case GEO_NODE_ATTRIBUTE_PROCESSOR_OUTPUT_MODE_DEFAULT: {
+          attribute_name = StringRef(interface_socket->default_attribute_name);
+          break;
+        }
+      }
     }
     else if (node->idname() == "AttributeNodeSetAttribute") {
       const NodeAttributeSetAttribute *storage = node->storage<NodeAttributeSetAttribute>();
@@ -527,6 +580,7 @@ static void process_attributes_on_component(GeoNodeExecParams &geo_params,
 
   Vector<std::unique_ptr<OutputAttribute>> output_attributes;
   if (!prepare_group_outputs(used_group_outputs,
+                             storage,
                              *group,
                              geo_params,
                              component,

@@ -165,6 +165,10 @@ static void draw_socket_list(const bContext *C,
     if (socket->typeinfo->interface_draw) {
       socket->typeinfo->interface_draw((bContext *)C, layout, &socket_ptr);
     }
+
+    if (ntree->type == NTREE_ATTRIBUTE) {
+      uiItemR(layout, &socket_ptr, "default_attribute_name", 0, "Attribute", ICON_NONE);
+    }
   }
 }
 

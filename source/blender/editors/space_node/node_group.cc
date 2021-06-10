@@ -1146,7 +1146,7 @@ static int node_group_interface_add_invoke(bContext *C,
                                            wmOperator *op,
                                            const wmEvent *UNUSED(event))
 {
-  return WM_operator_props_dialog_popup(C, op, 200);
+  return WM_operator_props_dialog_popup(C, op, 300);
 }
 
 static int node_group_interface_add_exec(bContext *C, wmOperator *op)
@@ -1169,7 +1169,8 @@ static int node_group_interface_add_exec(bContext *C, wmOperator *op)
   NODE_SOCKET_TYPES_END;
   BLI_assert(socket_idname != nullptr);
 
-  ntreeAddSocketInterface(ntree, in_out, socket_idname, name);
+  bNodeSocket *sock = ntreeAddSocketInterface(ntree, in_out, socket_idname, name);
+  sock->default_attribute_name = RNA_string_get_alloc(op->ptr, "attribute_name", nullptr, 0);
 
   if (name != nullptr) {
     MEM_freeN(name);
@@ -1207,8 +1208,11 @@ static const EnumPropertyItem *node_group_interface_add_type_items(bContext *C,
 static void node_group_interface_add_ui(bContext *UNUSED(C), wmOperator *op)
 {
   uiLayout *layout = op->layout;
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
   uiLayoutSetActivateInit(layout, true);
   uiItemR(layout, op->ptr, "name", 0, "Name", ICON_NONE);
+  uiItemR(layout, op->ptr, "attribute_name", 0, "Default Attribute", ICON_NONE);
   uiItemR(layout, op->ptr, "type", 0, "Type", ICON_NONE);
 }
 
@@ -1233,6 +1237,7 @@ void NODE_OT_group_interface_add(wmOperatorType *ot)
   RNA_def_enum(ot->srna, "in_out", rna_enum_node_socket_in_out_items, SOCK_IN, "Socket Side", "");
 
   RNA_def_string(ot->srna, "name", nullptr, MAX_NAME, "Name", "Name of the new interface socket");
+  RNA_def_string(ot->srna, "attribute_name", nullptr, MAX_NAME, "Attribute Name", "");
 
   prop = RNA_def_property(ot->srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_funcs_runtime(prop, nullptr, nullptr, node_group_interface_add_type_items);
