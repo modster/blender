@@ -50,6 +50,7 @@
 #include "DNA_camera_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_light_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -433,6 +434,7 @@ static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRend
   LRT_ASSIGN_OCCLUSION_TASK(material);
   LRT_ASSIGN_OCCLUSION_TASK(edge_mark);
   LRT_ASSIGN_OCCLUSION_TASK(floating);
+  LRT_ASSIGN_OCCLUSION_TASK(light_contour);
 
 #undef LRT_ASSIGN_OCCLUSION_TASK
 
@@ -471,6 +473,10 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
     for (eip = rti->floating.first; eip && eip != rti->floating.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
+
+    for (eip = rti->light_contour.first; eip && eip != rti->light_contour.last; eip = eip->next) {
+      lineart_occlusion_single_line(rb, eip, rti->thread_id);
+    }
   }
 }
 
@@ -494,6 +500,7 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   rb->material.last = rb->material.first;
   rb->edge_mark.last = rb->edge_mark.first;
   rb->floating.last = rb->floating.first;
+  rb->light_contour.last = rb->light_contour.first;
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH, TASK_ISOLATION_OFF);
 
@@ -1534,6 +1541,21 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
   }
 
+  if (rb->light_is_sun) {
+    view_vector = rb->light_vector;
+  }
+  else {
+    view_vector = vv;
+    sub_v3_v3v3_db(view_vector, l->gloc, rb->light_vector);
+  }
+
+  dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+  dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+
+  if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+    edge_flag_result |= LRT_EDGE_FLAG_LIGHT_CONTOUR;
+  }
+
   if (rb->use_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
     if (!no_crease) {
       edge_flag_result |= LRT_EDGE_FLAG_CREASE;
@@ -1573,6 +1595,9 @@ static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e)
     case LRT_EDGE_FLAG_FLOATING:
       lineart_prepend_edge_direct(&rb->floating.first, e);
       break;
+    case LRT_EDGE_FLAG_LIGHT_CONTOUR:
+      lineart_prepend_edge_direct(&rb->light_contour.first, e);
+      break;
   }
 }
 
@@ -1603,6 +1628,9 @@ static void lineart_add_edge_to_list_thread(LineartObjectInfo *obi, LineartEdge 
     case LRT_EDGE_FLAG_FLOATING:
       LRT_ASSIGN_EDGE(floating);
       break;
+    case LRT_EDGE_FLAG_LIGHT_CONTOUR:
+      LRT_ASSIGN_EDGE(light_contour);
+      break;
   }
 #undef LRT_ASSIGN_EDGE
 }
@@ -1620,6 +1648,7 @@ static void lineart_finalize_object_edge_list(LineartRenderBuffer *rb, LineartOb
   LRT_OBI_TO_RB(edge_mark);
   LRT_OBI_TO_RB(intersection);
   LRT_OBI_TO_RB(floating);
+  LRT_OBI_TO_RB(light_contour);
 #undef LRT_OBI_TO_RB
 }
 
@@ -2961,6 +2990,7 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   memset(&rb->edge_mark, 0, sizeof(ListBase));
   memset(&rb->material, 0, sizeof(ListBase));
   memset(&rb->floating, 0, sizeof(ListBase));
+  memset(&rb->light_contour, 0, sizeof(ListBase));
 
   BLI_listbase_clear(&rb->chains);
   BLI_listbase_clear(&rb->wasted_cuts);
@@ -3059,6 +3089,19 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->shift_x /= (1 + rb->overscan);
   rb->shift_y /= (1 + rb->overscan);
 
+  if (lmd->light_contour_object) {
+    Object *lo = lmd->light_contour_object;
+    if (lo->type == OB_LAMP && ((Light *)lo->data)->type == LA_SUN) {
+      rb->light_is_sun = true;
+      float vec[3] = {0.0f, 0.0f, 1.0f};
+      mul_mat3_m4_v3(lo->obmat, vec);
+      copy_v3db_v3fl(rb->light_vector, vec);
+    }
+    else {
+      copy_v3db_v3fl(rb->light_vector, lmd->light_contour_object->obmat[3]);
+    }
+  }
+
   rb->crease_threshold = cos(M_PI - lmd->crease_threshold);
   rb->chaining_image_threshold = lmd->chaining_image_threshold;
   rb->angle_splitting_threshold = lmd->angle_splitting_threshold;
@@ -3084,6 +3127,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->use_edge_marks = (lmd->edge_types_override & LRT_EDGE_FLAG_EDGE_MARK) != 0;
   rb->use_intersections = (lmd->edge_types_override & LRT_EDGE_FLAG_INTERSECTION) != 0;
   rb->use_floating = (lmd->edge_types_override & LRT_EDGE_FLAG_FLOATING) != 0;
+  rb->use_light_contour = (lmd->edge_types_override & LRT_EDGE_FLAG_LIGHT_CONTOUR) != 0;
 
   rb->filter_face_mark_invert = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_INVERT) != 0;
   rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;
@@ -4226,6 +4270,7 @@ static int lineart_rb_edge_types(LineartRenderBuffer *rb)
   types |= rb->use_edge_marks ? LRT_EDGE_FLAG_EDGE_MARK : 0;
   types |= rb->use_intersections ? LRT_EDGE_FLAG_INTERSECTION : 0;
   types |= rb->use_floating ? LRT_EDGE_FLAG_FLOATING : 0;
+  types |= rb->use_light_contour ? LRT_EDGE_FLAG_LIGHT_CONTOUR : 0;
   return types;
 }
 

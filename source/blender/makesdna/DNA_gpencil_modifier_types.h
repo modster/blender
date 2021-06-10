@@ -896,7 +896,7 @@ struct LineartCache;
 typedef struct LineartGpencilModifierData {
   GpencilModifierData modifier;
 
-  short edge_types; /* line type enable flags, bits in eLineartEdgeFlag */
+  uint16_t edge_types; /* line type enable flags, bits in eLineartEdgeFlag */
 
   char source_type; /* Object or Collection, from eLineartGpencilModifierSource */
 
@@ -905,6 +905,7 @@ typedef struct LineartGpencilModifierData {
   short level_end;
 
   struct Object *source_camera;
+  struct Object *light_contour_object;
 
   struct Object *source_object;
   struct Collection *source_collection;

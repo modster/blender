@@ -271,6 +271,7 @@ typedef struct LineartRenderBuffer {
   ListBase material;
   ListBase edge_mark;
   ListBase floating;
+  ListBase light_contour;
 
   ListBase chains;
 
@@ -292,6 +293,7 @@ typedef struct LineartRenderBuffer {
   bool use_edge_marks;
   bool use_intersections;
   bool use_floating;
+  bool use_light_contour;
   bool fuzzy_intersections;
   bool fuzzy_everything;
   bool allow_boundaries;
@@ -317,6 +319,10 @@ typedef struct LineartRenderBuffer {
   float chaining_image_threshold;
   float angle_splitting_threshold;
   float chain_smooth_tolerance;
+
+  /* Could be direction or position, depends on light_is_sun. */
+  double light_vector[3];
+  bool light_is_sun;
 
   /* FIXME(Yiming): Temporary solution for speeding up calculation by not including lines that
    * are not in the selected source. This will not be needed after we have a proper scene-wise
@@ -376,6 +382,7 @@ typedef struct LineartRenderTaskInfo {
   ListBase material;
   ListBase edge_mark;
   ListBase floating;
+  ListBase light_contour;
 
 } LineartRenderTaskInfo;
 
@@ -403,6 +410,7 @@ typedef struct LineartObjectInfo {
   ListBase material;
   ListBase edge_mark;
   ListBase floating;
+  ListBase light_contour;
 
 } LineartObjectInfo;
 

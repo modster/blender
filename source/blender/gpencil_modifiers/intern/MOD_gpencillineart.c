@@ -275,6 +275,7 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
 
   walk(userData, ob, (ID **)&lmd->source_object, IDWALK_CB_NOP);
   walk(userData, ob, (ID **)&lmd->source_camera, IDWALK_CB_NOP);
+  walk(userData, ob, (ID **)&lmd->light_contour_object, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -318,12 +319,20 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_intersection", 0, IFACE_("Intersections"), ICON_NONE);
   uiItemR(col, ptr, "use_crease", 0, IFACE_("Crease"), ICON_NONE);
 
-  uiLayout *sub = uiLayoutRow(col, true);
+  uiLayout *sub = uiLayoutRow(col, false);
   uiLayoutSetActive(sub,
                     (RNA_boolean_get(ptr, "use_crease") && !use_cache) ||
                         BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data));
   uiLayoutSetPropSep(sub, true);
   uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
+
+  sub = uiLayoutRowWithHeading(col, false, IFACE_("Light Contour"));
+  uiItemR(sub, ptr, "use_light_contour", 0, "", ICON_NONE);
+  uiLayout *entry = uiLayoutRow(sub, false);
+  uiLayoutSetActive(entry,
+                    (RNA_boolean_get(ptr, "use_light_contour") && !use_cache) ||
+                        BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data));
+  uiItemR(entry, ptr, "light_contour_object", 0, "", ICON_NONE);
 
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
 
