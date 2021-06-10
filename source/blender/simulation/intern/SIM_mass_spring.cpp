@@ -731,7 +731,8 @@ static void cloth_calc_force(
                           &epoint,
                           forcevec[i],
                           winvec[i],
-                          nullptr);
+                          nullptr,
+                          NULL);
 
       has_wind = has_wind || !is_zero_v3(winvec[i]);
       has_force = has_force || !is_zero_v3(forcevec[i]);

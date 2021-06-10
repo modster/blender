@@ -204,6 +204,65 @@ void RB_dworld_set_split_impulse(rbDynamicsWorld *world, int split_impulse)
   info.m_splitImpulse = split_impulse;
 }
 
+/* Get last applied impulse at contact points */
+/* TODO: this may not be the most efficient way to do it. get all forces at once and store in a lookup table. */
+void RB_dworld_get_impulse(rbDynamicsWorld *world,
+                           rbRigidBody *rbo,
+                           float timeSubStep,
+                           float norm_forces[3][3],
+                           float vec_locations[3][3])
+{
+    int numManifolds = world->dispatcher->getNumManifolds();
+    int num_forces = 0;
+    for (int i = 0; i < numManifolds; i++)
+    {
+        btPersistentManifold* contactManifold =  world->dispatcher->getManifoldByIndexInternal(i);
+        const void *obA = contactManifold->getBody0();
+        const void *obB = contactManifold->getBody1();
+        if(num_forces>2)
+          break;
+        if(obA != rbo->body && obB != rbo->body)
+        {
+          printf("%p,%p,\n",rbo,obA);
+          continue;
+        }
+        else
+        {
+          btVector3 tot_impulse = btVector3(0.0,0.0,0.0);
+          btVector3 final_loc =  btVector3(0.0,0.0,0.0);
+          int numContacts = contactManifold->getNumContacts();
+          int num_impulse_points = 0;
+          for (int j = 0; j < numContacts; j++)
+          {
+              /* Find points where impulse was appplied. */
+              btManifoldPoint& pt = contactManifold->getContactPoint(j);
+              if (pt.getAppliedImpulse() > 0.f)
+                num_impulse_points++;
+          }
+
+          for (int j = 0; j < numContacts; j++)
+          {
+            btManifoldPoint& pt = contactManifold->getContactPoint(j);
+            if (pt.getAppliedImpulse() > 0.f)
+            {
+               const btVector3& loc = pt.getPositionWorldOnB();
+               const btVector3 lat_imp1 = pt.m_appliedImpulseLateral1 * pt.m_lateralFrictionDir1;
+               const btVector3 lat_imp2 = pt.m_appliedImpulseLateral2 * pt.m_lateralFrictionDir2;
+               printf("%f,%f,%f     %f,%f,%f\n",lat_imp1.getX(),lat_imp1.getY(),lat_imp1.getZ(),lat_imp2.getX(), lat_imp2.getY(),lat_imp2.getZ());
+               const btVector3 imp = (rbo->body == obB)? -pt.m_normalWorldOnB * pt.getAppliedImpulse()/timeSubStep:pt.m_normalWorldOnB * pt.getAppliedImpulse()/timeSubStep;
+
+               tot_impulse += imp;
+               final_loc += num_impulse_points>1 ? loc * pt.getAppliedImpulse() / numContacts : loc;
+            }
+          }
+          copy_v3_btvec3(norm_forces[num_forces],tot_impulse);
+          copy_v3_btvec3(vec_locations[num_forces],final_loc);
+          num_forces++;
+        }
+
+     }
+}
+
 /* Simulation ----------------------- */
 
 void RB_dworld_step_simulation(rbDynamicsWorld *world,
@@ -212,31 +271,6 @@ void RB_dworld_step_simulation(rbDynamicsWorld *world,
                                float timeSubStep)
 {
   world->dynamicsWorld->stepSimulation(timeStep, maxSubSteps, timeSubStep);
-
-  int numManifolds = world->dispatcher->getNumManifolds();
-  for (int i = 0; i < numManifolds; i++)
-  {
-      printf("manifold:%d\n",i);
-      btPersistentManifold* contactManifold =  world->dispatcher->getManifoldByIndexInternal(i);
-      const btCollisionObject* obA = contactManifold->getBody0();
-      const btCollisionObject* obB = contactManifold->getBody1();
-
-      int numContacts = contactManifold->getNumContacts();
-      for (int j = 0; j < numContacts; j++)
-      {
-          btManifoldPoint& pt = contactManifold->getContactPoint(j);
-          if (pt.getAppliedImpulse() > 0.f)
-          {
-              const btVector3& ptA = pt.getPositionWorldOnA();
-              const btVector3& ptB = pt.getPositionWorldOnB();
-              const btScalar imp = pt.getAppliedImpulse() ;
-              if((imp/timeStep)>=9.82) printf("****impulse on point%d:%f****\n",j,imp);
-              printf("impulse on point%d:%f \nloc: %f %f %f\ndist:%f\n",j,imp,ptA.getX(),ptA.getY(),ptA.getZ(),pt.getDistance());
-              printf("force on point%d:%f\n",j,imp/timeSubStep);
-
-          }
-      }
-  }
 }
 
 /* Export -------------------------- */

@@ -45,8 +45,10 @@ extern "C" {
 #define BPHYS_DATA_SIZE 5
 #define BPHYS_DATA_TIMES 6
 #define BPHYS_DATA_BOIDS 7
+#define BPHYS_DATA_EFF_FORCES 8
+#define BPHYS_DATA_NORM_FORCES 9
 
-#define BPHYS_TOT_DATA 8
+#define BPHYS_TOT_DATA 10
 
 #define BPHYS_EXTRA_FLUID_SPRINGS 1
 #define BPHYS_EXTRA_CLOTH_ACCELERATION 2
@@ -63,7 +65,7 @@ typedef struct PTCacheMem {
   unsigned int data_types, flag;
 
   /** BPHYS_TOT_DATA. */
-  void *data[8];
+  void *data[10];
 
   struct ListBase extradata;
 } PTCacheMem;

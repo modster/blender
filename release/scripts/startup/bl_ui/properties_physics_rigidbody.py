@@ -320,10 +320,42 @@ class PHYSICS_PT_rigid_body_display_options(PHYSICS_PT_rigidbody_panel, Panel):
             return
 
         col = layout.column()
-        col.prop(rbo, "display_forces")
+        col.prop(rbo, "display_data_text")
         col.prop(rbo, "display_acceleration")
         col.prop(rbo, "display_velocity")
 
+class PHYSICS_PT_rigid_body_display_force_types(PHYSICS_PT_rigidbody_panel, Panel):
+    bl_label = "Forces"
+    bl_parent_id = 'PHYSICS_PT_rigid_body_display_options'
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        if obj.parent is not None and obj.parent.rigid_body is not None:
+            return False
+        return (obj and obj.rigid_body and (context.engine in cls.COMPAT_ENGINES))
+
+    def draw_header(self, context):
+        ob = context.object
+        rbo = ob.rigid_body
+
+        self.layout.prop(rbo, "display_forces", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+
+        ob = context.object
+        rbo = ob.rigid_body
+
+        col = layout.column()
+        col.active = rbo.display_forces
+        col.prop(rbo, "show_gravity")
+        col.prop(rbo, "show_effectors_force")
+        col.prop(rbo, "show_normal_force")
+        col.prop(rbo, "show_frictional_force")
 
 classes = (
     PHYSICS_PT_rigid_body,
@@ -335,6 +367,7 @@ classes = (
     PHYSICS_PT_rigid_body_dynamics,
     PHYSICS_PT_rigid_body_dynamics_deactivation,
     PHYSICS_PT_rigid_body_display_options,
+    PHYSICS_PT_rigid_body_display_force_types,
 )
 
 

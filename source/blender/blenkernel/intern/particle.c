@@ -2569,6 +2569,7 @@ static void do_path_effectors(ParticleSimulationData *sim,
                       &epoint,
                       force,
                       NULL,
+                      NULL,
                       NULL);
 
   mul_v3_fl(force,

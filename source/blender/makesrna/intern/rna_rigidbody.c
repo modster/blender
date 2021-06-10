@@ -85,12 +85,6 @@ const EnumPropertyItem rna_enum_rigidbody_object_shape_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-const EnumPropertyItem rna_enum_rigidbody_sim_display_options[] = {
-    { RB_SIM_FORCES, "FORCES", ICON_NONE, "Forces", "Display forces acting on rigid body"},
-    { RB_SIM_ACCELERATION, "ACCELERATION", ICON_NONE, "Acceleration", "Display acceleration of rigid body"},
-    { RB_SIM_VELOCITY, "VELOCITY", ICON_NONE, "Velocity", "Display velocity of rigid body"},
-    {0, NULL, 0, NULL, NULL},
-};
 
 /* collision shapes of constraints in rigid body sim */
 const EnumPropertyItem rna_enum_rigidbody_constraint_type_items[] = {
@@ -1221,6 +1215,31 @@ static void rna_def_rigidbody_object(BlenderRNA *brna)
   prop = RNA_def_property(srna, "display_velocity", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_VELOCITY);
   RNA_def_property_ui_text(prop, "Velocity", "Display velocity acting on rigid body");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+  prop = RNA_def_property(srna, "display_data_text", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_TEXT);
+  RNA_def_property_ui_text(prop, "Text", "Display the magnitudes of the vectors as text");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+  prop = RNA_def_property(srna, "show_gravity", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_GRAVITY);
+  RNA_def_property_ui_text(prop, "Gravity", "Display the force of gravity");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+  prop = RNA_def_property(srna, "show_effectors_force", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_EFFECTORS);
+  RNA_def_property_ui_text(prop, "Effectors", "Display the forces aplied by effectors");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+  prop = RNA_def_property(srna, "show_normal_force", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_NORMAL);
+  RNA_def_property_ui_text(prop, "Normal forces", "Display contact normal forces");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+  prop = RNA_def_property(srna, "show_frictional_force", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_FRICTION);
+  RNA_def_property_ui_text(prop, "Frictional forces", "Display contact frictional forces");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 
 }

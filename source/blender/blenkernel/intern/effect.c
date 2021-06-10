@@ -1148,7 +1148,8 @@ void BKE_effectors_apply(ListBase *effectors,
                          EffectedPoint *point,
                          float *force,
                          float *wind_force,
-                         float *impulse)
+                         float *impulse,
+                         float eff_forces[3][3])
 {
   /*
    * Modifies the force on a particle according to its
@@ -1170,6 +1171,7 @@ void BKE_effectors_apply(ListBase *effectors,
   /* Cycle through collected objects, get total of (1/(gravity_strength * dist^gravity_power)) */
   /* Check for min distance here? (yes would be cool to add that, ton) */
 
+  int num_eff_forces = 0;
   if (effectors) {
     for (eff = effectors->first; eff; eff = eff->next) {
       /* object effectors were fully checked to be OK to evaluate! */
@@ -1210,6 +1212,10 @@ void BKE_effectors_apply(ListBase *effectors,
         else if (eff->flag & PE_VELOCITY_TO_IMPULSE && impulse) {
           /* special case for harmonic effector */
           add_v3_v3v3(impulse, impulse, efd.vel);
+        }
+
+        if(eff_forces!=NULL){
+            copy_v3_v3(eff_forces[num_eff_forces],force);
         }
       }
     }

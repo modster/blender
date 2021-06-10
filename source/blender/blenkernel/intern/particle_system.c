@@ -2254,7 +2254,8 @@ static void basic_force_cb(void *efdata_v, ParticleKey *state, float *force, flo
                         &epoint,
                         force,
                         NULL,
-                        impulse);
+                        impulse,
+                        NULL);
   }
 
   mul_v3_fl(force, efdata->ptex.field);

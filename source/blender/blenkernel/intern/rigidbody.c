@@ -1286,6 +1286,16 @@ RigidBodyOb *BKE_rigidbody_create_object(Scene *scene, Object *ob, short type)
 
   rbo->col_groups = 1;
 
+  zero_v3(rbo->eff_forces[0].force);
+  zero_v3(rbo->eff_forces[1].force);
+  zero_v3(rbo->eff_forces[2].force);
+  zero_v3(rbo->norm_forces[0].force);
+  zero_v3(rbo->norm_forces[1].force);
+  zero_v3(rbo->norm_forces[2].force);
+  zero_v3(rbo->norm_forces[0].loc);
+  zero_v3(rbo->norm_forces[1].loc);
+  zero_v3(rbo->norm_forces[2].loc);
+
   /* use triangle meshes for passive objects
    * use convex hulls for active objects since dynamic triangle meshes are very unstable
    */
@@ -1603,6 +1613,8 @@ void BKE_rigidbody_remove_constraint(Main *bmain, Scene *scene, Object *ob, cons
 /* ************************************** */
 /* Simulation Interface - Bullet */
 
+
+
 /* Update object array and rigid body count so they're in sync with the rigid body group */
 static void rigidbody_update_ob_array(RigidBodyWorld *rbw)
 {
@@ -1738,7 +1750,13 @@ static void rigidbody_update_sim_ob(
       /* Calculate net force of effectors, and apply to sim object:
        * - we use 'central force' since apply force requires a "relative position"
        *   which we don't have... */
-      BKE_effectors_apply(effectors, NULL, effector_weights, &epoint, eff_force, NULL, NULL);
+      float eff_forces[3][3] = {{0.0}};
+      BKE_effectors_apply(effectors, NULL, effector_weights, &epoint, eff_force, NULL, NULL,eff_forces);
+      if(rbo->display_force_types & RB_SIM_EFFECTORS) {
+        for(int i=0; i<3; i++){
+            copy_v3_v3(rbo->eff_forces[i].force, eff_forces[i]);
+        }
+      }
       if (G.f & G_DEBUG) {
         printf("\tapplying force (%f,%f,%f) to '%s'\n",
                eff_force[0],
@@ -1746,11 +1764,6 @@ static void rigidbody_update_sim_ob(
                eff_force[2],
                ob->id.name + 2);
       }
-      printf("\tapplying force (%f,%f,%f) to '%s'\n",
-             eff_force[0],
-             eff_force[1],
-             eff_force[2],
-             ob->id.name + 2);
       /* activate object in case it is deactivated */
       if (!is_zero_v3(eff_force)) {
         RB_body_activate(rbo->shared->physics_object);
@@ -2248,6 +2261,22 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
       rigidbody_update_kinematic_obj_substep(&substep_targets, cur_interp_val);
       RB_dworld_step_simulation(rbw->shared->physics_world, substep, 0, substep);
       cur_interp_val += interp_step;
+      for (int j = 0; j < rbw->numbodies; j++){
+
+        float norm_forces[3][3] = {{0.0f}};
+        float vec_locations[3][3] = {{0.0f}};
+        Object *ob = rbw->objects[j];
+        if(ob->rigidbody_object != NULL){
+          rbRigidBody *rbo = (rbRigidBody*)(ob->rigidbody_object->shared->physics_object);
+          RB_dworld_get_impulse(rbw->shared->physics_world, rbo ,substep,norm_forces,vec_locations);
+          copy_v3_v3(ob->rigidbody_object->norm_forces[0].force,norm_forces[0]);
+          copy_v3_v3(ob->rigidbody_object->norm_forces[1].force,norm_forces[1]);
+          copy_v3_v3(ob->rigidbody_object->norm_forces[2].force,norm_forces[2]);
+          copy_v3_v3(ob->rigidbody_object->norm_forces[0].loc,vec_locations[0]);
+          copy_v3_v3(ob->rigidbody_object->norm_forces[1].loc,vec_locations[1]);
+          copy_v3_v3(ob->rigidbody_object->norm_forces[2].loc,vec_locations[2]);
+        }
+      }
     }
     rigidbody_free_substep_data(&substep_targets);
 

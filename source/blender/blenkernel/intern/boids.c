@@ -1389,6 +1389,7 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
                       &epoint,
                       force,
                       NULL,
+                      NULL,
                       NULL);
 
   if (ELEM(bpa->data.mode, eBoidMode_OnLand, eBoidMode_Climbing)) {

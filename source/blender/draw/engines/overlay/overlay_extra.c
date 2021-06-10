@@ -61,6 +61,10 @@
 #include "math.h"
 #include "BLI_math_rotation.h"
 
+#ifdef WITH_BULLET
+#  include "RBI_api.h"
+#endif
+
 void OVERLAY_extra_cache_init(OVERLAY_Data *vedata)
 {
   OVERLAY_PassList *psl = vedata->psl;
@@ -1560,16 +1564,146 @@ static void OVERLAY_object_name(Object *ob, int theme_id)
                      color);
 }
 
-static void OVERLAY_vector_extra(OVERLAY_ExtraCallBuffers *cb,
-                         OVERLAY_Data *data,
-                         Object *ob,
-                         Scene *scene)
+static void scale_vec_by_magnitude(float vector[3], float min_clamp, float scale, float pos[3])
 {
+    float min_clamp_vec[3];
+    float vec_len = len_v3(vector);
+    normalize_v3(vector);
+    copy_v3_v3(min_clamp_vec, vector);
+    mul_v3_fl(min_clamp_vec,(min_clamp+0.2f));
+    mul_v3_fl(vector, scale*vec_len);
+    add_v3_v3(vector, min_clamp_vec);
+    add_v3_v3(vector,pos);
+
+}
+
+static void OVERLAY_vector_extra(OVERLAY_Data *data, float vector[3], float pos[3], float scale, float min_clamp, float color[3], int text_flag) {
+
+    uchar text_color[4];
+    UI_GetThemeColor4ubv(TH_DRAWEXTRA_EDGELEN, text_color);
+
+    float vector_head_pos[3];
+    char vec_magnitude[9];
+    copy_v3_v3(vector_head_pos,vector);
+    float vec_len = len_v3(vector);
+    BLI_snprintf(vec_magnitude, 9, "%f", vec_len);
+    /* Scale the vector */
+    scale_vec_by_magnitude(vector_head_pos, min_clamp, scale, pos);
+
     GPUShader *sh = OVERLAY_shader_vector();
     DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[0]);
-    DRW_shgroup_uniform_vec3_copy(grp, "objPosition", ob->rigidbody_object->pos);
+    DRW_shgroup_uniform_vec3_copy(grp, "objPosition", pos);
+    DRW_shgroup_uniform_vec3_copy(grp, "vector", vector);
+    DRW_shgroup_uniform_float_copy(grp, "scale", scale);
+    DRW_shgroup_uniform_float_copy(grp, "min_clamp", min_clamp);
+    DRW_shgroup_uniform_vec3_copy(grp, "colour", color);
     DRW_shgroup_call_procedural_lines(grp, NULL, 3);
+
+    if(text_flag)
+    {
+      struct DRWTextStore *dt = DRW_text_cache_ensure();
+      DRW_text_cache_add(dt,
+                         vector_head_pos,
+                         vec_magnitude,
+                         strlen(vec_magnitude),
+                         -25,
+                         0,
+                         DRW_TEXT_CACHE_GLOBALSPACE,
+                         text_color);
+    }
 }
+
+static void OVERLAY_forces_extra(OVERLAY_Data *data,
+                         Scene *scene,
+                         RigidBodyOb *rbo)
+{
+
+    float scale = 0.05f;
+    float min_clamp = 2.0f;
+    float vector[3] = {0.0f};
+    float color1[3] = {1.0,0.0,1.0};
+    float color2[3] = {0.0,1.0,0.5};
+
+    float net_force[3];
+    copy_v3_v3(net_force, scene->physics_settings.gravity);
+    mul_v3_fl(net_force, rbo->mass);
+    for(int i=0; i<3; i++){
+      add_v3_v3(net_force, rbo->eff_forces[i].force);
+      add_v3_v3(net_force, rbo->norm_forces[i].force);
+    }
+
+    int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
+
+    OVERLAY_vector_extra(data, net_force, rbo->pos, scale, min_clamp, color2, text_flag);
+
+
+
+    if(rbo->display_force_types & RB_SIM_GRAVITY){
+     /* Draw the force of gravity. */
+
+      /* Get magnitude of vector to be displayed. */
+      copy_v3_v3(vector,scene->physics_settings.gravity);
+      mul_v3_fl(vector, rbo->mass);
+      OVERLAY_vector_extra(data, vector, rbo->pos, scale, min_clamp, color1,text_flag);
+    }
+
+    if(rbo->display_force_types & RB_SIM_EFFECTORS) {
+
+        for(int i=0; i<3; i++){
+            if(!is_zero_v3(rbo->eff_forces[i].force)){
+              /* Get magnitude of vector to be displayed. */
+              OVERLAY_vector_extra(data, rbo->eff_forces[i].force, rbo->pos, scale, min_clamp, color1, text_flag);
+            }
+            else
+              /* If the force is zero, there won't be any more forces of this type applied, so break. */
+              break;
+        }
+    }
+
+    if(rbo->display_force_types & RB_SIM_NORMAL) {
+        for(int i=0; i<3; i++){
+            if(!is_zero_v3(rbo->norm_forces[i].force)){
+              /* Get magnitude of vector to be displayed. */
+              OVERLAY_vector_extra(data, rbo->norm_forces[i].force, rbo->norm_forces[i].loc, scale, min_clamp, color1, text_flag);
+            }
+            else
+              break;
+        }
+    }
+
+}
+
+/*static void OVERLAY_velocity_extra(OVERLAY_Data *data,
+                         Scene *scene,
+                         RigidBodyOb *rbo)
+{
+    float scale = 0.5f;
+    float min_clamp = 2.0f;
+    float color[3] = {1.0, 0.5, 1.0};
+
+    int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
+
+    rbRigidBody *rb = rbo->shared->physics_object;
+    float vel[3];
+    RB_body_get_linear_velocity(rb, vel);
+    OVERLAY_vector_extra(data, vel, rbo->pos, scale, min_clamp, color, text_flag);
+}
+
+static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
+                         Scene *scene,
+                         RigidBodyOb *rbo)
+{
+    float scale = 0.5f;
+    float min_clamp = 2.0f;
+    float color[3] = {1.0, 1.0, 0.0};
+
+    int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
+
+    rbRigidBody *rb = rbo->shared->physics_object;
+    float acc[3];
+    RB_body_get_linear_velocity(rb, acc);
+    OVERLAY_vector_extra(data, acc, rbo->pos, scale, min_clamp, color, text_flag);
+} */
 
 void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
 {
@@ -1579,7 +1713,6 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
   ViewLayer *view_layer = draw_ctx->view_layer;
   Scene *scene = draw_ctx->scene;
   ModifierData *md = NULL;
-  RigidBodyOb *rbo;
 
   const bool is_select_mode = DRW_state_is_select();
   const bool is_paint_mode = (draw_ctx->object_mode &
@@ -1639,7 +1772,11 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
     if (ob->rigidbody_object != NULL) {
       OVERLAY_collision(cb, ob, color);
       if(ob->rigidbody_object->sim_display_options & RB_SIM_FORCES)
-        OVERLAY_vector_extra(cb, vedata, ob, scene);
+        OVERLAY_forces_extra(vedata, scene, ob->rigidbody_object);
+      /*if(ob->rigidbody_object->sim_display_options & RB_SIM_VELOCITY)
+        OVERLAY_velocity_extra(vedata, scene, ob->rigidbody_object);
+      if(ob->rigidbody_object->sim_display_options & RB_SIM_ACCELERATION)
+        OVERLAY_acceleration_extra(vedata, scene, ob->rigidbody_object); */
 
     }
     if (ob->dtx & OB_AXIS) {

@@ -129,7 +129,8 @@ void BKE_effectors_apply(struct ListBase *effectors,
                          struct EffectedPoint *point,
                          float *force,
                          float *wind_force,
-                         float *impulse);
+                         float *impulse,
+                         float eff_forces[3][3]);
 void BKE_effectors_free(struct ListBase *lb);
 
 void pd_point_from_particle(struct ParticleSimulationData *sim,

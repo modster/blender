@@ -100,6 +100,12 @@ typedef enum eRigidBodyWorld_Flag {
   RBW_FLAG_USE_SPLIT_IMPULSE = (1 << 2),
 } eRigidBodyWorld_Flag;
 
+typedef struct force_vec {
+    float force[3];
+    /* place where the arrow will originate from */
+    float loc[3];
+}force_vec;
+
 /* ******************************** */
 /* RigidBody Object */
 
@@ -166,11 +172,21 @@ typedef struct RigidBodyOb {
   char _pad1[4];
   /** This pointer is shared between all evaluated copies. */
   struct RigidBodyOb_Shared *shared;
-
+  /** Options for display simulation data. */
   short sim_display_options;
+  short display_force_types;
+  char _pad2[4];
 
-  char _pad2[6];
+  force_vec eff_forces[3];
+  force_vec norm_forces[3];
+
+  char _pad3[8];
+
 } RigidBodyOb;
+
+
+
+
 
 /* Participation types for RigidBodyOb */
 typedef enum eRigidBodyOb_Type {
@@ -228,7 +244,20 @@ enum {
   /** display acceleration. */
   RB_SIM_ACCELERATION = (1<<1),
   /** display velocity. */
-  RB_SIM_VELOCITY = (1<<2)
+  RB_SIM_VELOCITY = (1<<2),
+  /** display magnitude as text */
+  RB_SIM_TEXT = (1<<3)
+};
+
+enum {
+  /** display gravity force. */
+  RB_SIM_GRAVITY = (1<<0),
+  /** display force due to effectors. */
+  RB_SIM_EFFECTORS = (1<<1),
+  /** display contact normal forces. */
+  RB_SIM_NORMAL = (1<<2),
+  /** display contact normal frictional. */
+  RB_SIM_FRICTION = (1<<3)
 };
 
 typedef enum eRigidBody_MeshSource {

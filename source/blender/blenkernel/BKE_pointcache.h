@@ -25,6 +25,7 @@
 
 #include "DNA_boid_types.h"       /* for #BoidData */
 #include "DNA_pointcache_types.h" /* for #BPHYS_TOT_DATA */
+#include "DNA_rigidbody_types.h"
 
 #include <stdio.h> /* for #FILE */
 
@@ -103,6 +104,8 @@ typedef struct PTCacheData {
   float size;
   float times[3];
   struct BoidData boids;
+  struct force_vec eff_forces[3];
+  struct force_vec norm_forces[3];
 } PTCacheData;
 
 typedef struct PTCacheFile {

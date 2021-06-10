@@ -22,6 +22,7 @@
  * \brief Rigid Body API for interfacing with external Physics Engines
  */
 
+
 #ifndef __RB_API_H__
 #define __RB_API_H__
 
@@ -80,6 +81,13 @@ void RB_dworld_set_gravity(rbDynamicsWorld *world, const float g_in[3]);
 void RB_dworld_set_solver_iterations(rbDynamicsWorld *world, int num_solver_iterations);
 /* Split Impulse */
 void RB_dworld_set_split_impulse(rbDynamicsWorld *world, int split_impulse);
+
+/* Get latest applied impulse */
+void RB_dworld_get_impulse(rbDynamicsWorld *world,
+                           rbRigidBody *rbo,
+                           float timeSubStep,
+                           float norm_forces[3][3],
+                           float vec_locations[3][3]);
 
 /* Simulation ----------------------- */
 
