@@ -782,7 +782,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
   int e_count = *r_e_count;
   int t_count = *r_t_count;
   int v1_obi, v2_obi;
-  char new_flag = 0;
+  uint16_t new_flag = 0;
 
   LineartEdge *new_e, *e, *old_e;
   LineartEdgeSegment *es;
@@ -1441,15 +1441,15 @@ static LineartTriangle *lineart_triangle_from_index(LineartRenderBuffer *rb,
   return (LineartTriangle *)b;
 }
 
-static char lineart_identify_feature_line(LineartRenderBuffer *rb,
-                                          BMEdge *e,
-                                          LineartTriangle *rt_array,
-                                          LineartVert *rv_array,
-                                          float crease_threshold,
-                                          bool no_crease,
-                                          bool use_freestyle_edge,
-                                          bool use_freestyle_face,
-                                          BMesh *bm_if_freestyle)
+static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
+                                              BMEdge *e,
+                                              LineartTriangle *rt_array,
+                                              LineartVert *rv_array,
+                                              float crease_threshold,
+                                              bool no_crease,
+                                              bool use_freestyle_edge,
+                                              bool use_freestyle_face,
+                                              BMesh *bm_if_freestyle)
 {
   BMLoop *ll, *lr = NULL;
 
@@ -1518,7 +1518,7 @@ static char lineart_identify_feature_line(LineartRenderBuffer *rb,
   double *view_vector = vv;
   double dot_1 = 0, dot_2 = 0;
   double result;
-  char edge_flag_result = 0;
+  uint16_t edge_flag_result = 0;
 
   if (rb->cam_is_persp) {
     sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
@@ -1638,11 +1638,11 @@ static void lineart_triangle_adjacent_assign(LineartTriangle *tri,
   }
 }
 
-static int lineart_edge_type_duplication_count(char eflag)
+static int lineart_edge_type_duplication_count(uint8_t eflag)
 {
   int count = 0;
   /* See eLineartEdgeFlag for details. */
-  for (int i = 0; i < LRT_EDGE_FLAG_FLOATING; i++) {
+  for (int i = 0; i < LRT_EDGE_FLAG_TYPE_MAX_BITS; i++) {
     if (eflag & (1 << i)) {
       count++;
     }
@@ -1838,15 +1838,15 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     e = BM_edge_at_index(bm, i);
 
     /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
-    char eflag = lineart_identify_feature_line(rb,
-                                               e,
-                                               ort,
-                                               orv,
-                                               use_crease,
-                                               orig_ob->type == OB_FONT,
-                                               can_find_freestyle_edge,
-                                               can_find_freestyle_face,
-                                               bm);
+    uint16_t eflag = lineart_identify_feature_line(rb,
+                                                   e,
+                                                   ort,
+                                                   orv,
+                                                   use_crease,
+                                                   orig_ob->type == OB_FONT,
+                                                   can_find_freestyle_edge,
+                                                   can_find_freestyle_face,
+                                                   bm);
     if (eflag) {
       /* Only allocate for feature lines (instead of all lines) to save memory.
        * If allow duplicated edges, one edge gets added multiple times if it has multiple types. */
@@ -1855,7 +1855,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     /* Here we just use bm's flag for when loading actual lines, then we don't need to call
      * lineart_identify_feature_line() again, e->head.hflag deleted after loading anyway. Always
      * set the flag, so hflag stays 0 for lines that are not feature lines. */
-    e->head.hflag = eflag;
+    e->head.hflag = 0;
+    e->head.hflag |= eflag;
   }
 
   o_la_e = lineart_mem_acquire_thread(&rb->render_data_pool, sizeof(LineartEdge) * allocate_la_e);
@@ -1881,8 +1882,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     bool edge_added = false;
 
     /* See eLineartEdgeFlag for details. */
-    for (int flag_bit = 0; flag_bit < LRT_EDGE_FLAG_FLOATING; flag_bit++) {
-      char use_type = 1 << flag_bit;
+    for (int flag_bit = 0; flag_bit < LRT_EDGE_FLAG_TYPE_MAX_BITS; flag_bit++) {
+      uint8_t use_type = 1 << flag_bit;
       if (!(use_type & e->head.hflag)) {
         continue;
       }

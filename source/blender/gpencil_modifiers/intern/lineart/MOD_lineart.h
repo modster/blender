@@ -151,8 +151,8 @@ typedef struct LineartEdge {
   char min_occ;
 
   /** Also for line type determination on chaining. */
-  unsigned char flags;
-  unsigned char intersection_mask;
+  uint16_t flags;
+  uint8_t intersection_mask;
 
   /**
    * Still need this entry because culled lines will not add to object
