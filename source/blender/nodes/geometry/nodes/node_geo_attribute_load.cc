@@ -47,12 +47,15 @@ static void geo_node_attribute_load_layout(uiLayout *layout,
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
+  uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
 }
 
 static void geo_node_attribute_load_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   node->custom1 = CD_PROP_FLOAT;
   node->custom2 = ATTR_DOMAIN_AUTO;
+
+  nodeFindSocket(node, SOCK_OUT, "Attribute")->display_shape = SOCK_DISPLAY_SHAPE_SQUARE;
 }
 
 namespace blender::nodes {
@@ -64,7 +67,9 @@ static void load_attribute(const GeometryComponent *component, const GeoNodeExec
 
 static void geo_node_attribute_load_exec(GeoNodeExecParams params)
 {
-  //GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  params.set_output("Attribute", AttributeRef::None);
+
+  // GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   //const std::string attribute_name = params.extract_input<std::string>("Name");
 
   //if (attribute_name.empty()) {
