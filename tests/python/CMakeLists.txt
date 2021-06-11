@@ -748,11 +748,15 @@ set(geo_node_tests
 
 foreach(geo_node_test ${geo_node_tests})
 
-  add_blender_test(
-    geo_node_${geo_node_test}_test
-    ${TEST_SRC_DIR}/geometry_nodes/${geo_node_test}
-    --python ${TEST_PYTHON_DIR}/geo_node_test.py
-  )
+  file(GLOB files "${TEST_SRC_DIR}/geometry_nodes/${geo_node_test}/*.blend")
+  foreach(file ${files})
+    get_filename_component(filename ${file} NAME_WE)  
+    add_blender_test(
+      geo_node_${geo_node_test}_test_${filename}
+      ${file}
+      --python ${TEST_PYTHON_DIR}/geo_node_test.py
+    )
+    endforeach()
 endforeach()
 
 if(WITH_OPENGL_DRAW_TESTS)
