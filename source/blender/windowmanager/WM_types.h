@@ -715,10 +715,15 @@ typedef struct wmXrActionData {
   eXrActionType type;
   /** State. Set appropriately based on type. */
   float state[2];
+  /** State of the other subaction path for bimanual actions. */
+  float state_other[2];
 
   /** Controller pose corresponding to the action's subaction path. */
   float controller_loc[3];
   float controller_rot[4];
+  /** Controller pose of the other subaction path for bimanual actions. */
+  float controller_loc_other[3];
+  float controller_rot_other[4];
 
   /** Viewmat of the selection eye. */
   float eye_viewmat[4][4];
@@ -728,6 +733,9 @@ typedef struct wmXrActionData {
   /** Operator. */
   struct wmOperatorType *ot;
   struct IDProperty *op_properties;
+
+  /** Flag. */
+  eXrActionFlag flag;
 } wmXrActionData;
 
 /** Timer flags. */

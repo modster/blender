@@ -5033,10 +5033,12 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 void wm_event_add_xrevent(const char *action_set_name,
                           const wmXrAction *action,
                           const GHOST_XrPose *controller_pose,
+                          const GHOST_XrPose *controller_pose_other,
                           const wmXrEyeData *eye_data,
                           wmSurface *surface,
                           wmWindow *win,
                           unsigned int subaction_idx,
+                          unsigned int subaction_idx_other,
                           short val,
                           bool press_start)
 {
@@ -5061,25 +5063,43 @@ void wm_event_add_xrevent(const char *action_set_name,
   switch (action->type) {
     case XR_BOOLEAN_INPUT:
       data->state[0] = ((bool *)action->states)[subaction_idx] ? 1.0f : 0.0f;
+      if (subaction_idx_other != subaction_idx) {
+        data->state_other[0] = ((bool *)action->states)[subaction_idx_other] ? 1.0f : 0.0f;
+      }
       break;
     case XR_FLOAT_INPUT:
       data->state[0] = ((float *)action->states)[subaction_idx];
+      if (subaction_idx_other != subaction_idx) {
+        data->state_other[0] = ((float *)action->states)[subaction_idx_other];
+      }
       break;
     case XR_VECTOR2F_INPUT:
       copy_v2_v2(data->state, ((float(*)[2])action->states)[subaction_idx]);
+      if (subaction_idx_other != subaction_idx) {
+        copy_v2_v2(data->state_other, ((float(*)[2])action->states)[subaction_idx_other]);
+      }
       break;
     case XR_POSE_INPUT:
     case XR_VIBRATION_OUTPUT:
-      BLI_assert(false);
+      BLI_assert_unreachable();
       return;
   }
 
   if (controller_pose) {
     copy_v3_v3(data->controller_loc, controller_pose->position);
     copy_qt_qt(data->controller_rot, controller_pose->orientation_quat);
+
+    if (controller_pose_other) {
+      copy_v3_v3(data->controller_loc_other, controller_pose_other->position);
+      copy_qt_qt(data->controller_rot_other, controller_pose_other->orientation_quat);
+    }
+    else {
+      data->controller_rot_other[0] = 1.0f;
+    }
   }
   else {
     data->controller_rot[0] = 1.0f;
+    data->controller_rot_other[0] = 1.0f;
   }
 
   if (eye_data) {
@@ -5089,6 +5109,8 @@ void wm_event_add_xrevent(const char *action_set_name,
 
   data->ot = action->ot;
   data->op_properties = action->op_properties;
+
+  data->flag = action->flag;
 
   event->custom = EVT_DATA_XR;
   event->customdata = data;

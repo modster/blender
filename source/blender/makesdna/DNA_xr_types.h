@@ -36,7 +36,7 @@ typedef struct XrSessionSettings {
 
   float base_scale;
   char _pad[3];
-  char base_pose_type; /* eXRSessionBasePoseType */
+  char base_pose_type; /* eXrSessionBasePoseType */
   /** Object to take the location and rotation as base position from. */
   Object *base_pose_object;
   float base_pose_location[3];
@@ -75,31 +75,16 @@ typedef struct XrSessionSettings {
   char _pad3[5];
 } XrSessionSettings;
 
-/** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
-typedef enum eXrActionType {
-  XR_BOOLEAN_INPUT = 1,
-  XR_FLOAT_INPUT = 2,
-  XR_VECTOR2F_INPUT = 3,
-  XR_POSE_INPUT = 4,
-  XR_VIBRATION_OUTPUT = 100,
-} eXrActionType;
-
-typedef enum eXrOpFlag {
-  XR_OP_PRESS = 0,
-  XR_OP_RELEASE = 1,
-  XR_OP_MODAL = 2,
-} eXrOpFlag;
-
 typedef enum eXrSessionFlag {
   XR_SESSION_USE_POSITION_TRACKING = (1 << 0),
   XR_SESSION_USE_ABSOLUTE_TRACKING = (1 << 1),
 } eXrSessionFlag;
 
-typedef enum eXRSessionBasePoseType {
+typedef enum eXrSessionBasePoseType {
   XR_BASE_POSE_SCENE_CAMERA = 0,
   XR_BASE_POSE_OBJECT = 1,
   XR_BASE_POSE_CUSTOM = 2,
-} eXRSessionBasePoseType;
+} eXrSessionBasePoseType;
 
 typedef enum eXrSessionControllerDrawStyle {
   XR_CONTROLLER_DRAW_AXES = 0,
@@ -115,6 +100,30 @@ typedef enum eXrSessionObjectFlag {
   XR_OBJECT_ENABLE = (1 << 0),
   XR_OBJECT_AUTOKEY = (1 << 1),
 } eXrSessionObjectFlag;
+
+/** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
+typedef enum eXrActionType {
+  XR_BOOLEAN_INPUT = 1,
+  XR_FLOAT_INPUT = 2,
+  XR_VECTOR2F_INPUT = 3,
+  XR_POSE_INPUT = 4,
+  XR_VIBRATION_OUTPUT = 100,
+} eXrActionType;
+
+typedef enum eXrActionFlag {
+  /** Determines how the operator will be executed (mutually exclusive). */
+  XR_ACTION_PRESS = (1 << 0),
+  XR_ACTION_RELEASE = (1 << 1),
+  XR_ACTION_MODAL = (1 << 2),
+  /** For axis-based inputs (thumbstick/trackpad/etc). Determines the region for operator execution
+     (mutually exclusive per axis). */
+  XR_ACTION_AXIS0_POS = (1 << 3),
+  XR_ACTION_AXIS0_NEG = (1 << 4),
+  XR_ACTION_AXIS1_POS = (1 << 5),
+  XR_ACTION_AXIS1_NEG = (1 << 6),
+  /** Action depends on two subaction paths (i.e. two-handed/bimanual action). */
+  XR_ACTION_BIMANUAL = (1 << 7),
+} eXrActionFlag;
 
 /* -------------------------------------------------------------------- */
 
@@ -145,11 +154,12 @@ typedef struct XrActionMapItem {
   IDProperty *op_properties;
   /** RNA pointer to access properties. */
   struct PointerRNA *op_properties_ptr;
-  char op_flag; /* eXrOpFlag */
+
+  short action_flag; /* eXrActionFlag */
 
   /** Pose action properties. */
   char pose_is_controller;
-  char _pad2[2];
+  char _pad2[1];
   float pose_location[3];
   float pose_rotation[3];
 

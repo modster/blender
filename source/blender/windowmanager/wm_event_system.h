@@ -31,10 +31,10 @@
 
 struct ARegion;
 struct GHOST_TabletData;
-struct GHOST_XrPose;
 struct ScrArea;
 
 #ifdef WITH_XR_OPENXR
+struct GHOST_XrPose;
 struct wmSurface;
 struct wmXrAction;
 struct wmXrEyeData;
@@ -159,10 +159,12 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 void wm_event_add_xrevent(const char *action_set_name,
                           const struct wmXrAction *action,
                           const struct GHOST_XrPose *controller_pose,
+                          const struct GHOST_XrPose *controller_pose_other,
                           const struct wmXrEyeData *eye_data,
                           struct wmSurface *surface,
                           wmWindow *win,
                           unsigned int subaction_idx,
+                          unsigned int subaction_idx_other,
                           short val,
                           bool press_start);
 #endif

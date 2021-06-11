@@ -59,7 +59,7 @@ typedef struct wmXrSessionState {
 
   /** Copy of XrSessionSettings.base_pose_ data to detect changes that need
    * resetting to base pose. */
-  char prev_base_pose_type; /* eXRSessionBasePoseType */
+  char prev_base_pose_type; /* eXrSessionBasePoseType */
   Object *prev_base_pose_object;
   /** Copy of XrSessionSettings.flag created on the last draw call, stored to detect changes. */
   int prev_settings_flag;
@@ -156,7 +156,9 @@ typedef struct wmXrAction {
   /** Operator to be called on XR events. */
   struct wmOperatorType *ot;
   IDProperty *op_properties;
-  eXrOpFlag op_flag;
+
+  /** Flag. */
+  eXrActionFlag flag;
 } wmXrAction;
 
 typedef struct wmXrActionSet {

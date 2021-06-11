@@ -71,7 +71,7 @@ static wmXrAction *action_create(const char *action_name,
                                  const float *float_threshold,
                                  wmOperatorType *ot,
                                  IDProperty *op_properties,
-                                 eXrOpFlag op_flag)
+                                 eXrActionFlag flag)
 {
   wmXrAction *action = MEM_callocN(sizeof(*action), __func__);
   action->name = MEM_mallocN(strlen(action_name) + 1, "XrAction_Name");
@@ -117,7 +117,8 @@ static wmXrAction *action_create(const char *action_name,
 
   action->ot = ot;
   action->op_properties = op_properties;
-  action->op_flag = op_flag;
+
+  action->flag = flag;
 
   return action;
 }
@@ -201,7 +202,7 @@ bool WM_xr_action_create(wmXrData *xr,
                          const float *float_threshold,
                          wmOperatorType *ot,
                          IDProperty *op_properties,
-                         eXrOpFlag op_flag)
+                         eXrActionFlag flag)
 {
   if (action_find(xr, action_set_name, action_name)) {
     return false;
@@ -214,7 +215,7 @@ bool WM_xr_action_create(wmXrData *xr,
                                      float_threshold,
                                      ot,
                                      op_properties,
-                                     op_flag);
+                                     flag);
 
   GHOST_XrActionInfo info = {
       .name = action_name,

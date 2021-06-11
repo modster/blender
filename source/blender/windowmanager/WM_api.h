@@ -899,12 +899,15 @@ int WM_event_absolute_delta_x(const struct wmEvent *event);
 int WM_event_absolute_delta_y(const struct wmEvent *event);
 
 void WM_event_xr_data(const struct wmEvent *event,
-                      char **action_set,
+                      char **actionmap,
                       char **action,
                       char *type,
                       float state[2],
+                      float state_other[2],
                       float controller_loc[3],
                       float controller_rot[4],
+                      float controller_loc_other[3],
+                      float controller_rot_other[4],
                       float eye_viewmat[4][4],
                       float *eye_lens);
 bool WM_event_is_xr(const struct wmEvent *event);
@@ -1003,7 +1006,7 @@ bool WM_xr_action_create(wmXrData *xr,
                          const float *float_threshold,
                          struct wmOperatorType *ot,
                          struct IDProperty *op_properties,
-                         eXrOpFlag op_flag);
+                         eXrActionFlag flag);
 void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char *action_name);
 bool WM_xr_action_space_create(wmXrData *xr,
                                const char *action_set_name,

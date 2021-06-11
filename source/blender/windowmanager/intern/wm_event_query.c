@@ -488,8 +488,11 @@ void WM_event_xr_data(const wmEvent *event,
                       char **action,
                       char *type,
                       float state[2],
+                      float state_other[2],
                       float controller_loc[3],
                       float controller_rot[4],
+                      float controller_loc_other[3],
+                      float controller_rot_other[4],
                       float eye_viewmat[4][4],
                       float *eye_lens)
 {
@@ -507,11 +510,20 @@ void WM_event_xr_data(const wmEvent *event,
   if (state) {
     copy_v2_v2(state, data->state);
   }
+  if (state_other) {
+    copy_v2_v2(state_other, data->state_other);
+  }
   if (controller_loc) {
     copy_v3_v3(controller_loc, data->controller_loc);
   }
   if (controller_rot) {
     copy_v4_v4(controller_rot, data->controller_rot);
+  }
+  if (controller_loc_other) {
+    copy_v3_v3(controller_loc_other, data->controller_loc_other);
+  }
+  if (controller_rot_other) {
+    copy_v4_v4(controller_rot_other, data->controller_rot_other);
   }
   if (eye_viewmat) {
     copy_m4_m4(eye_viewmat, data->eye_viewmat);
