@@ -34,7 +34,7 @@ class SortedNodeCategory(NodeCategory):
         if isinstance(items, list):
             items = sorted(items, key=lambda item: item.label.lower())
 
-        super().__init__(identifier, name, description, items)
+        super().__init__(identifier, name, description=description, items=items)
 
 
 class CompositorNodeCategory(SortedNodeCategory):
@@ -472,14 +472,6 @@ texture_node_categories = [
     ]),
 ]
 
-
-def not_implemented_node(idname):
-    NodeType = getattr(bpy.types, idname)
-    name = NodeType.bl_rna.name
-    label = "%s (mockup)" % name
-    return NodeItem(idname, label=label)
-
-
 geometry_node_categories = [
     # Geometry Nodes
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
@@ -503,6 +495,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeTransfer"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
+        NodeItem("ShaderNodeRGBCurve"),
         NodeItem("ShaderNodeValToRGB"),
         NodeItem("ShaderNodeSeparateRGB"),
         NodeItem("ShaderNodeCombineRGB"),
@@ -510,9 +503,13 @@ geometry_node_categories = [
     GeometryNodeCategory("GEO_CURVE", "Curve", items=[
         NodeItem("GeometryNodeCurveToMesh"),
         NodeItem("GeometryNodeCurveResample"),
+        NodeItem("GeometryNodeMeshToCurve"),
+        NodeItem("GeometryNodeCurveLength"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
         NodeItem("GeometryNodeBoundBox"),
+        NodeItem("GeometryNodeConvexHull"),
+        NodeItem("GeometryNodeDeleteGeometry"),
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeJoinGeometry"),
     ]),
@@ -523,7 +520,13 @@ geometry_node_categories = [
         NodeItem("ShaderNodeValue"),
         NodeItem("FunctionNodeInputString"),
         NodeItem("FunctionNodeInputVector"),
+        NodeItem("GeometryNodeInputMaterial"),
         NodeItem("GeometryNodeIsViewport"),
+    ]),
+    GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
+        NodeItem("GeometryNodeMaterialAssign"),
+        NodeItem("GeometryNodeSelectByMaterial"),
+        NodeItem("GeometryNodeMaterialReplace"),
     ]),
     GeometryNodeCategory("GEO_MESH", "Mesh", items=[
         NodeItem("GeometryNodeBoolean"),
@@ -560,6 +563,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSwitch"),
     ]),
     GeometryNodeCategory("GEO_VECTOR", "Vector", items=[
+        NodeItem("ShaderNodeVectorCurve"),
         NodeItem("ShaderNodeSeparateXYZ"),
         NodeItem("ShaderNodeCombineXYZ"),
         NodeItem("ShaderNodeVectorMath"),

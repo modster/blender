@@ -3201,6 +3201,8 @@ static const char *rna_property_subtypename(PropertySubType type)
       return "PROP_ANGLE";
     case PROP_TIME:
       return "PROP_TIME";
+    case PROP_TIME_ABSOLUTE:
+      return "PROP_TIME_ABSOLUTE";
     case PROP_DISTANCE:
       return "PROP_DISTANCE";
     case PROP_DISTANCE_CAMERA:
@@ -3266,6 +3268,8 @@ static const char *rna_property_subtype_unit(PropertySubType type)
       return "PROP_UNIT_ROTATION";
     case PROP_UNIT_TIME:
       return "PROP_UNIT_TIME";
+    case PROP_UNIT_TIME_ABSOLUTE:
+      return "PROP_UNIT_TIME_ABSOLUTE";
     case PROP_UNIT_VELOCITY:
       return "PROP_UNIT_VELOCITY";
     case PROP_UNIT_ACCELERATION:
@@ -4368,7 +4372,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_screen.c", NULL, RNA_def_screen},
     {"rna_sculpt_paint.c", NULL, RNA_def_sculpt_paint},
     {"rna_sequencer.c", "rna_sequencer_api.c", RNA_def_sequencer},
-#ifdef WITH_GEOMETRY_NODES
+#ifdef WITH_SIMULATION_DATABLOCK
     {"rna_simulation.c", NULL, RNA_def_simulation},
 #endif
     {"rna_space.c", "rna_space_api.c", RNA_def_space},

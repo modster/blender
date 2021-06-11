@@ -770,6 +770,7 @@ int BKE_object_material_count_eval(Object *ob)
 
 void BKE_id_material_eval_assign(ID *id, int slot, Material *material)
 {
+  BLI_assert(slot >= 1);
   Material ***materials_ptr = BKE_id_material_array_p(id);
   short *len_ptr = BKE_id_material_len_p(id);
   if (ELEM(NULL, materials_ptr, len_ptr)) {
@@ -791,6 +792,21 @@ void BKE_id_material_eval_assign(ID *id, int slot, Material *material)
   }
 
   (*materials_ptr)[slot_index] = material;
+}
+
+/**
+ * Add an empty material slot if the id has no material slots. This material slot allows the
+ * material to be overwritten by object-linked materials.
+ */
+void BKE_id_material_eval_ensure_default_slot(ID *id)
+{
+  short *len_ptr = BKE_id_material_len_p(id);
+  if (len_ptr == NULL) {
+    return;
+  }
+  if (*len_ptr == 0) {
+    BKE_id_material_eval_assign(id, 1, NULL);
+  }
 }
 
 Material *BKE_gpencil_material(Object *ob, short act)
@@ -953,12 +969,6 @@ void BKE_object_material_assign(Main *bmain, Object *ob, Material *ma, short act
     act = 1;
   }
 
-  /* prevent crashing when using accidentally */
-  BLI_assert(!ID_IS_LINKED(ob));
-  if (ID_IS_LINKED(ob)) {
-    return;
-  }
-
   /* test arraylens */
 
   totcolp = BKE_object_material_len_p(ob);
@@ -1119,6 +1129,43 @@ void BKE_object_material_remap_calc(Object *ob_dst, Object *ob_src, short *remap
   }
 
   BLI_ghash_free(gh_mat_map, NULL, NULL);
+}
+
+/**
+ * Copy materials from evaluated geometry to the original geometry of an object.
+ */
+void BKE_object_material_from_eval_data(Main *bmain, Object *ob_orig, ID *data_eval)
+{
+  ID *data_orig = ob_orig->data;
+
+  short *orig_totcol = BKE_id_material_len_p(data_orig);
+  Material ***orig_mat = BKE_id_material_array_p(data_orig);
+
+  short *eval_totcol = BKE_id_material_len_p(data_eval);
+  Material ***eval_mat = BKE_id_material_array_p(data_eval);
+
+  if (ELEM(NULL, orig_totcol, orig_mat, eval_totcol, eval_mat)) {
+    return;
+  }
+
+  /* Remove old materials from original geometry. */
+  for (int i = 0; i < *orig_totcol; i++) {
+    id_us_min(&(*orig_mat)[i]->id);
+  }
+  MEM_SAFE_FREE(*orig_mat);
+
+  /* Create new material slots based on materials on evaluated geometry. */
+  *orig_totcol = *eval_totcol;
+  *orig_mat = MEM_callocN(sizeof(void *) * (*eval_totcol), __func__);
+  for (int i = 0; i < *eval_totcol; i++) {
+    Material *material_eval = (*eval_mat)[i];
+    if (material_eval != NULL) {
+      Material *material_orig = (Material *)DEG_get_original_id(&material_eval->id);
+      (*orig_mat)[i] = material_orig;
+      id_us_plus(&material_orig->id);
+    }
+  }
+  BKE_object_materials_test(bmain, ob_orig, data_orig);
 }
 
 /* XXX - this calls many more update calls per object then are needed, could be optimized */
@@ -1460,16 +1507,16 @@ void BKE_texpaint_slots_refresh_object(Scene *scene, struct Object *ob)
 }
 
 struct FindTexPaintNodeData {
-  bNode *node;
-  short iter_index;
-  short index;
+  Image *ima;
+  bNode *r_node;
 };
 
 static bool texpaint_slot_node_find_cb(bNode *node, void *userdata)
 {
   struct FindTexPaintNodeData *find_data = userdata;
-  if (find_data->iter_index++ == find_data->index) {
-    find_data->node = node;
+  Image *ima = (Image *)node->id;
+  if (find_data->ima == ima) {
+    find_data->r_node = node;
     return false;
   }
 
@@ -1478,10 +1525,10 @@ static bool texpaint_slot_node_find_cb(bNode *node, void *userdata)
 
 bNode *BKE_texpaint_slot_material_find_node(Material *ma, short texpaint_slot)
 {
-  struct FindTexPaintNodeData find_data = {NULL, 0, texpaint_slot};
+  struct FindTexPaintNodeData find_data = {ma->texpaintslot[texpaint_slot].ima, NULL};
   ntree_foreach_texnode_recursive(ma->nodetree, texpaint_slot_node_find_cb, &find_data);
 
-  return find_data.node;
+  return find_data.r_node;
 }
 
 /* r_col = current value, col = new value, (fac == 0) is no change */

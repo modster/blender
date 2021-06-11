@@ -42,6 +42,7 @@
 #include "SEQ_iterator.h"
 #include "SEQ_select.h"
 #include "SEQ_sequencer.h"
+#include "SEQ_time.h"
 #include "SEQ_transform.h"
 
 /* For menu, popup, icons, etc. */
@@ -807,7 +808,7 @@ static bool select_linked_internal(Scene *scene)
   bool changed = false;
 
   LISTBASE_FOREACH (Sequence *, seq, SEQ_active_seqbase_get(ed)) {
-    if ((seq->flag & SELECT) != 0) {
+    if ((seq->flag & SELECT) == 0) {
       continue;
     }
     /* Only get unselected neighbors. */
@@ -1187,7 +1188,7 @@ static int sequencer_select_side_of_frame_exec(bContext *C, wmOperator *op)
         test = (timeline_frame <= seq->startdisp);
         break;
       case 2:
-        test = (timeline_frame <= seq->enddisp) && (timeline_frame >= seq->startdisp);
+        test = SEQ_time_strip_intersects_frame(seq, timeline_frame);
         break;
     }
 
@@ -1209,7 +1210,7 @@ void SEQUENCER_OT_select_side_of_frame(wmOperatorType *ot)
   static const EnumPropertyItem sequencer_select_left_right_types[] = {
       {-1, "LEFT", 0, "Left", "Select to the left of the current frame"},
       {1, "RIGHT", 0, "Right", "Select to the right of the current frame"},
-      {2, "CURRENT", 0, "Current frame", "Select intersecting with the current frame"},
+      {2, "CURRENT", 0, "Current Frame", "Select intersecting with the current frame"},
       {0, NULL, 0, NULL, NULL},
   };
 
