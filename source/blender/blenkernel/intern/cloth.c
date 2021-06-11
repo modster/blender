@@ -259,8 +259,12 @@ static bool do_init_cloth(Object *ob, ClothModifierData *clmd, Mesh *result, int
   return true;
 }
 
+/**
+ * Performs the next step in the cloth simulation
+ * @param r_mesh The `Mesh` that has the input mesh information and
+ * will be modified with the updated `Mesh` information */
 static int do_step_cloth(
-    Depsgraph *depsgraph, Object *ob, ClothModifierData *clmd, Mesh *result, int framenr)
+    Depsgraph *depsgraph, Object *ob, ClothModifierData *clmd, int framenr, Mesh *r_mesh)
 {
   ClothVertex *verts = NULL;
   Cloth *cloth;
@@ -272,7 +276,7 @@ static int do_step_cloth(
   /* simulate 1 frame forward */
   cloth = clmd->clothObject;
   verts = cloth->verts;
-  mvert = result->mvert;
+  mvert = r_mesh->mvert;
 
   /* force any pinned verts to their constrained location. */
   for (i = 0; i < clmd->clothObject->mvert_num; i++, verts++) {
@@ -288,15 +292,15 @@ static int do_step_cloth(
   effectors = BKE_effectors_create(depsgraph, ob, NULL, clmd->sim_parms->effector_weights, false);
 
   if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH) {
-    cloth_update_verts(ob, clmd, result);
+    cloth_update_verts(ob, clmd, r_mesh);
   }
 
   /* Support for dynamic vertex groups, changing from frame to frame */
-  cloth_apply_vgroup(clmd, result);
+  cloth_apply_vgroup(clmd, r_mesh);
 
   if ((clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH) ||
       (clmd->sim_parms->vgroup_shrink > 0) || (clmd->sim_parms->shrink_min != 0.0f)) {
-    cloth_update_spring_lengths(clmd, result);
+    cloth_update_spring_lengths(clmd, r_mesh);
   }
 
   cloth_update_springs(clmd);
@@ -311,6 +315,8 @@ static int do_step_cloth(
   BKE_effectors_free(effectors);
 
   // printf ( "%f\n", ( float ) tval() );
+
+  cloth_to_object(ob, clmd, r_mesh);
 
   return ret;
 }
@@ -414,16 +420,15 @@ Mesh *clothModifier_do(
   /* do simulation */
   BKE_ptcache_validate(cache, framenr);
 
-  if (!do_step_cloth(depsgraph, ob, clmd, mesh, framenr)) {
+  Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
+
+  if (!do_step_cloth(depsgraph, ob, clmd, framenr, mesh_result)) {
     BKE_ptcache_invalidate(cache);
   }
   else {
     BKE_ptcache_write(&pid, framenr);
   }
 
-  Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
-
-  cloth_to_object(ob, clmd, mesh_result);
   clmd->clothObject->last_frame = framenr;
 
   return mesh_result;
