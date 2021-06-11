@@ -26,20 +26,20 @@
 
 static bNodeSocketTemplate geo_node_attribute_vector_math_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("A")},
+    {SOCK_ATTRIBUTE, N_("A")},
     {SOCK_VECTOR, N_("A"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_STRING, N_("B")},
+    {SOCK_ATTRIBUTE, N_("B")},
     {SOCK_VECTOR, N_("B"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("B"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_STRING, N_("C")},
+    {SOCK_ATTRIBUTE, N_("C")},
     {SOCK_VECTOR, N_("C"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("C"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_STRING, N_("Result")},
     {-1, ""},
 };
 
 static bNodeSocketTemplate geo_node_attribute_vector_math_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_ATTRIBUTE, N_("Result")},
     {-1, ""},
 };
 
@@ -76,15 +76,15 @@ static void geo_node_attribute_vector_math_layout(uiLayout *layout,
 
   uiItemR(layout, ptr, "operation", 0, "", ICON_NONE);
 
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "input_type_a", 0, IFACE_("A"), ICON_NONE);
-  if (operation_use_input_b(operation)) {
-    uiItemR(layout, ptr, "input_type_b", 0, IFACE_("B"), ICON_NONE);
-  }
-  if (operation_use_input_c(operation)) {
-    uiItemR(layout, ptr, "input_type_c", 0, IFACE_("C"), ICON_NONE);
-  }
+  //uiLayoutSetPropSep(layout, true);
+  //uiLayoutSetPropDecorate(layout, false);
+  //uiItemR(layout, ptr, "input_type_a", 0, IFACE_("A"), ICON_NONE);
+  //if (operation_use_input_b(operation)) {
+  //  uiItemR(layout, ptr, "input_type_b", 0, IFACE_("B"), ICON_NONE);
+  //}
+  //if (operation_use_input_c(operation)) {
+  //  uiItemR(layout, ptr, "input_type_c", 0, IFACE_("C"), ICON_NONE);
+  //}
 }
 
 static CustomDataType operation_get_read_type_b(const NodeVectorMathOperation operation)
@@ -112,6 +112,16 @@ static void geo_node_attribute_vector_math_init(bNodeTree *UNUSED(tree), bNode *
   data->input_type_a = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
   data->input_type_b = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
   node->storage = data;
+
+#define DEF_ATTRIBUTE(_in_out, _name, _data_type) \
+  nodeFindSocket(node, (_in_out), (_name))->display_shape = SOCK_DISPLAY_SHAPE_SQUARE; \
+  ((bNodeSocketValueAttribute *)nodeFindSocket(node, (_in_out), (_name))->default_value) \
+      ->data_type = (_data_type);
+
+  DEF_ATTRIBUTE(SOCK_IN, "A", SOCK_VECTOR)
+  DEF_ATTRIBUTE(SOCK_IN, "B", SOCK_VECTOR)
+  DEF_ATTRIBUTE(SOCK_IN, "C", SOCK_VECTOR)
+  DEF_ATTRIBUTE(SOCK_OUT, "Result", SOCK_VECTOR)
 }
 
 static CustomDataType operation_get_result_type(const NodeVectorMathOperation operation)
@@ -519,6 +529,7 @@ static void attribute_vector_math_calc(GeometryComponent &component,
 
 static void geo_node_attribute_vector_math_exec(GeoNodeExecParams params)
 {
+  return;
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = geometry_set_realize_instances(geometry_set);

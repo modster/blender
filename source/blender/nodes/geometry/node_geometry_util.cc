@@ -46,6 +46,7 @@ void update_attribute_input_socket_availabilities(bNode &node,
       const bool socket_is_available =
           name_is_available &&
           ((socket->type == SOCK_STRING && mode_ == GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE) ||
+           (socket->type == SOCK_ATTRIBUTE && mode_ == GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE) ||
            (socket->type == SOCK_FLOAT && mode_ == GEO_NODE_ATTRIBUTE_INPUT_FLOAT) ||
            (socket->type == SOCK_VECTOR && mode_ == GEO_NODE_ATTRIBUTE_INPUT_VECTOR) ||
            (socket->type == SOCK_RGBA && mode_ == GEO_NODE_ATTRIBUTE_INPUT_COLOR));

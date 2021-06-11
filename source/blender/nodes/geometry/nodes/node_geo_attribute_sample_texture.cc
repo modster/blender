@@ -31,13 +31,13 @@
 static bNodeSocketTemplate geo_node_attribute_sample_texture_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_TEXTURE, N_("Texture")},
-    {SOCK_STRING, N_("Mapping")},
-    {SOCK_STRING, N_("Result")},
+    {SOCK_ATTRIBUTE, N_("Mapping")},
     {-1, ""},
 };
 
 static bNodeSocketTemplate geo_node_attribute_sample_texture_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_ATTRIBUTE, N_("Result")},
     {-1, ""},
 };
 
@@ -106,6 +106,8 @@ static void execute_on_component(GeometryComponent &component, const GeoNodeExec
 
 static void geo_node_attribute_sample_texture_exec(GeoNodeExecParams params)
 {
+  return;
+
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = geometry_set_realize_instances(geometry_set);
@@ -125,6 +127,16 @@ static void geo_node_attribute_sample_texture_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
+static void init(bNodeTree *UNUSED(tree), bNode *node)
+{
+#define DEF_ATTRIBUTE(_in_out, _name, _data_type) \
+  nodeFindSocket(node, (_in_out), (_name))->display_shape = SOCK_DISPLAY_SHAPE_SQUARE; \
+  ((bNodeSocketValueAttribute *)nodeFindSocket(node, (_in_out), (_name))->default_value)->data_type = (_data_type);
+
+  DEF_ATTRIBUTE(SOCK_IN, "Mapping", SOCK_VECTOR)
+  DEF_ATTRIBUTE(SOCK_OUT, "Result", SOCK_RGBA)
+}
+
 void register_node_type_geo_sample_texture()
 {
   static bNodeType ntype;
@@ -135,6 +147,7 @@ void register_node_type_geo_sample_texture()
                      NODE_CLASS_ATTRIBUTE,
                      0);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
+  node_type_init(&ntype, &init);
   node_type_socket_templates(
       &ntype, geo_node_attribute_sample_texture_in, geo_node_attribute_sample_texture_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_sample_texture_exec;
