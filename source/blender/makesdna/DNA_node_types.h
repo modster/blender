@@ -1365,8 +1365,8 @@ typedef struct NodeGeometryCurveResample {
 typedef struct NodeGeometryCurveDeform {
   /* GeometryNodeCurveDeformMode. */
   uint8_t input_mode;
-  /* GeometryNodeCurveDeformPositionAxis. */
-  uint8_t position_axis;
+  /* GeometryNodeCurveDeformAxis. */
+  uint8_t axis;
   /* GeometryNodeAttributeInputMode (float or attribute). */
   uint8_t attribute_input_type;
 
@@ -1896,14 +1896,14 @@ typedef enum GeometryNodeCurveDeformMode {
   GEO_NODE_CURVE_DEFORM_ATTRIBUTE = 1,
 } GeometryNodeCurveDeformMode;
 
-typedef enum GeometryNodeCurveDeformPositionAxis {
-  GEO_NODE_CURVE_DEFORM_POSX = 1,
-  GEO_NODE_CURVE_DEFORM_POSY = 2,
-  GEO_NODE_CURVE_DEFORM_POSZ = 3,
-  GEO_NODE_CURVE_DEFORM_NEGX = 4,
-  GEO_NODE_CURVE_DEFORM_NEGY = 5,
-  GEO_NODE_CURVE_DEFORM_NEGZ = 6,
-} GeometryNodeCurveDeformPositionAxis;
+typedef enum GeometryNodeCurveDeformAxis {
+  GEO_NODE_CURVE_DEFORM_POSX = 0,
+  GEO_NODE_CURVE_DEFORM_POSY = 1,
+  GEO_NODE_CURVE_DEFORM_POSZ = 2,
+  GEO_NODE_CURVE_DEFORM_NEGX = 3,
+  GEO_NODE_CURVE_DEFORM_NEGY = 4,
+  GEO_NODE_CURVE_DEFORM_NEGZ = 5,
+} GeometryNodeCurveDeformAxis;
 
 #ifdef __cplusplus
 }

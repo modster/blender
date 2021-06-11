@@ -9852,7 +9852,7 @@ static void def_geo_curve_deform(StructRNA *srna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  static const EnumPropertyItem position_axis_items[] = {
+  static const EnumPropertyItem axis_items[] = {
       {GEO_NODE_CURVE_DEFORM_POSX, "POS_X", 0, "X", ""},
       {GEO_NODE_CURVE_DEFORM_POSY, "POS_Y", 0, "Y", ""},
       {GEO_NODE_CURVE_DEFORM_POSZ, "POS_Z", 0, "Z", ""},
@@ -9869,8 +9869,8 @@ static void def_geo_curve_deform(StructRNA *srna)
   RNA_def_property_ui_text(prop, "Input Mode", "How to specify the curve parameter at each point");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
-  prop = RNA_def_property(srna, "position_axis", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, position_axis_items);
+  prop = RNA_def_property(srna, "axis", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, axis_items);
   RNA_def_property_ui_text(prop, "Position Axis", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
@@ -10871,8 +10871,10 @@ static void rna_def_node_socket_standard_types(BlenderRNA *brna)
       brna, "NodeSocketFloatAngle", "NodeSocketInterfaceFloatAngle", PROP_ANGLE);
   rna_def_node_socket_float(
       brna, "NodeSocketFloatTime", "NodeSocketInterfaceFloatTime", PROP_TIME);
-  rna_def_node_socket_float(
-      brna, "NodeSocketFloatTimeAbsolute", "NodeSocketInterfaceFloatTimeAbsolute", PROP_TIME_ABSOLUTE);
+  rna_def_node_socket_float(brna,
+                            "NodeSocketFloatTimeAbsolute",
+                            "NodeSocketInterfaceFloatTimeAbsolute",
+                            PROP_TIME_ABSOLUTE);
   rna_def_node_socket_float(
       brna, "NodeSocketFloatDistance", "NodeSocketInterfaceFloatDistance", PROP_DISTANCE);
 
