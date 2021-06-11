@@ -1053,6 +1053,13 @@ static void rna_def_cloth_sim_settings(BlenderRNA *brna)
       "that has zero weight will be excluded from the volume calculation");
   RNA_def_property_update(prop, 0, "rna_cloth_update");
 
+  prop = RNA_def_property(srna, "use_remesh", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", CLOTH_SIMSETTINGS_FLAG_REMESH);
+  RNA_def_property_ui_text(
+      prop, "Remesh", "Remesh the cloth's mesh based on user defined parameters");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_update(prop, 0, "rna_cloth_update");
+
   /* unused */
 
   /* unused still */

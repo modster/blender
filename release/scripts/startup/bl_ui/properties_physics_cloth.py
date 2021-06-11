@@ -307,6 +307,30 @@ class PHYSICS_PT_cloth_shape(PhysicButtonsPanel, Panel):
             col.prop_search(cloth, "rest_shape_key", key, "key_blocks", text="Rest Shape Key")
 
 
+class PHYSICS_PT_cloth_remesh(PhysicButtonsPanel, Panel):
+    bl_label = "Remesh"
+    bl_parent_id = 'PHYSICS_PT_cloth_shape'
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    def draw_header(self, context):
+        cloth = context.cloth.settings
+
+        self.layout.active = cloth_panel_enabled(context.cloth)
+        self.layout.prop(cloth, "use_remesh", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+
+        cloth = context.cloth.settings
+        md = context.cloth
+        ob = context.object
+
+        layout.active = cloth.use_remesh and cloth_panel_enabled(md)
+
+        flow = layout.grid_flow(row_major=False, columns=0, even_columns=True, even_rows=False, align=True)
+
+
 class PHYSICS_PT_cloth_collision(PhysicButtonsPanel, Panel):
     bl_label = "Collisions"
     bl_parent_id = 'PHYSICS_PT_cloth'
@@ -475,6 +499,7 @@ classes = (
     PHYSICS_PT_cloth_pressure,
     PHYSICS_PT_cloth_cache,
     PHYSICS_PT_cloth_shape,
+    PHYSICS_PT_cloth_remesh,
     PHYSICS_PT_cloth_collision,
     PHYSICS_PT_cloth_object_collision,
     PHYSICS_PT_cloth_self_collision,

@@ -211,6 +211,8 @@ typedef enum {
   CLOTH_SIMSETTINGS_FLAG_SEW = (1 << 14),
   /** Make simulation respect deformations in the base object. */
   CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH = (1 << 15),
+  /** True if remeshing is enabled */
+  CLOTH_SIMSETTINGS_FLAG_REMESH = (1 << 16),
 } CLOTH_SIMSETTINGS_FLAGS;
 
 /* ClothSimSettings.bending_model. */
