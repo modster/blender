@@ -1388,6 +1388,8 @@ typedef struct ToolSettings {
   char uv_selectmode;
 
   float uvcalc_margin;
+  int target_udim;
+  int _pad3[3];
 
   /* Auto-IK */
   /** Runtime only. */

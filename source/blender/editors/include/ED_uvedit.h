@@ -249,6 +249,8 @@ struct UVPackIsland_Params {
 void ED_uvedit_pack_islands_multi(const struct Scene *scene,
                                   Object **objects,
                                   const uint objects_len,
+                                  const struct SpaceImage *sima,
+                                  bool use_target,
                                   const struct UVPackIsland_Params *params);
 
 #ifdef __cplusplus
