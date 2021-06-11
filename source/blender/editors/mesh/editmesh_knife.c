@@ -45,6 +45,7 @@
 #include "BKE_editmesh.h"
 #include "BKE_editmesh_bvh.h"
 #include "BKE_report.h"
+#include "BKE_scene.h"
 #include "BKE_unit.h"
 
 #include "GPU_immediate.h"
@@ -55,6 +56,7 @@
 #include "ED_numinput.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"
+#include "ED_transform.h"
 #include "ED_view3d.h"
 
 #include "WM_api.h"
@@ -255,6 +257,11 @@ typedef struct KnifeTool_OpData {
   float angle;
 
   const float (*cagecos)[3];
+
+  short constrain_axis;
+  short constrain_axis_mode;
+  bool axis_constrained;
+  float curr_cage_adjusted[3];
 } KnifeTool_OpData;
 
 enum {
@@ -272,13 +279,25 @@ enum {
   KNF_MODAL_ADD_CUT_CLOSED,
 };
 
+enum {
+  KNF_CONSTRAIN_AXIS_NONE = 0,
+  KNF_CONSTRAIN_AXIS_X = 1,
+  KNF_CONSTRAIN_AXIS_Y = 2,
+  KNF_CONSTRAIN_AXIS_Z = 3
+};
+
+enum {
+  KNF_CONSTRAIN_AXIS_MODE_NONE = 0,
+  KNF_CONSTRAIN_AXIS_MODE_GLOBAL = 1,
+  KNF_CONSTRAIN_AXIS_MODE_LOCAL = 2
+};
+
 /* -------------------------------------------------------------------- */
 /** \name Drawing
  * \{ */
 
-static void knifetool_draw_angle_snapping(const KnifeTool_OpData *kcd)
+static void knifetool_raycast_planes(const KnifeTool_OpData *kcd, float r_v1[3], float r_v2[3])
 {
-  float v1[3], v2[3];
   float planes[4][4];
 
   planes_from_projmat(
@@ -328,9 +347,16 @@ static void knifetool_draw_angle_snapping(const KnifeTool_OpData *kcd)
       }
     }
 
-    copy_v3_v3(v1, ray_hit_best[0]);
-    copy_v3_v3(v2, ray_hit_best[1]);
+    copy_v3_v3(r_v1, ray_hit_best[0]);
+    copy_v3_v3(r_v2, ray_hit_best[1]);
   }
+}
+
+static void knifetool_draw_angle_snapping(const KnifeTool_OpData *kcd)
+{
+  float v1[3], v2[3];
+
+  knifetool_raycast_planes(kcd, v1, v2);
 
   uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
 
@@ -346,6 +372,46 @@ static void knifetool_draw_angle_snapping(const KnifeTool_OpData *kcd)
   immUnbindProgram();
 }
 
+static void knifetool_draw_orientation_locking(const KnifeTool_OpData *kcd)
+{
+  if (!compare_v3v3(kcd->prev.cage, kcd->curr.cage, KNIFE_FLT_EPSBIG)) {
+    float v1[3], v2[3];
+
+    knifetool_raycast_planes(kcd, v1, v2);
+
+    uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+    immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+
+    switch (kcd->constrain_axis) {
+      case KNF_CONSTRAIN_AXIS_X: {
+        immUniformThemeColor3(TH_AXIS_X);
+        break;
+      }
+      case KNF_CONSTRAIN_AXIS_Y: {
+        immUniformThemeColor3(TH_AXIS_Y);
+        break;
+      }
+      case KNF_CONSTRAIN_AXIS_Z: {
+        immUniformThemeColor3(TH_AXIS_Z);
+        break;
+      }
+      default: {
+        immUniformThemeColor3(TH_TRANSFORM);
+        break;
+      }
+    }
+
+    GPU_line_width(2.0);
+
+    immBegin(GPU_PRIM_LINES, 2);
+    immVertex3fv(pos, v1);
+    immVertex3fv(pos, v2);
+    immEnd();
+
+    immUnbindProgram();
+  }
+}
+
 /* modal loop selection drawing callback */
 static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), void *arg)
 {
@@ -358,8 +424,13 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
   GPU_matrix_push();
   GPU_matrix_mul(kcd->ob->obmat);
 
-  if (kcd->mode == MODE_DRAGGING && kcd->is_angle_snapping) {
-    knifetool_draw_angle_snapping(kcd);
+  if (kcd->mode == MODE_DRAGGING) {
+    if (kcd->is_angle_snapping) {
+      knifetool_draw_angle_snapping(kcd);
+    }
+    else if (kcd->axis_constrained) {
+      knifetool_draw_orientation_locking(kcd);
+    }
   }
 
   GPUVertFormat *format = immVertexFormat();
@@ -548,7 +619,7 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
                     "%s: start/define cut, %s: close cut, %s: new cut, "
                     "%s: midpoint snap (%s), %s: ignore snap (%s), "
                     "%s: angle constraint %.2f (%s), %s: cut through (%s), "
-                    "%s: panning"),
+                    "%s: panning, XYZ: orientation lock (%s)"),
                WM_MODALKEY(KNF_MODAL_CONFIRM),
                WM_MODALKEY(KNF_MODAL_CANCEL),
                WM_MODALKEY(KNF_MODAL_ADD_CUT),
@@ -566,7 +637,8 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
                WM_bool_as_string(kcd->angle_snapping),
                WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
                WM_bool_as_string(kcd->cut_through),
-               WM_MODALKEY(KNF_MODAL_PANNING));
+               WM_MODALKEY(KNF_MODAL_PANNING),
+               WM_bool_as_string(kcd->axis_constrained));
 
 #undef WM_MODALKEY
 
@@ -1566,7 +1638,8 @@ static void set_lowest_face_tri(KnifeTool_OpData *kcd, BMFace *f, int index)
   BLI_ghash_insert(kcd->facetrimap, f, POINTER_FROM_INT(i + 1));
 }
 
-/* This should only be called for faces that have had a lowest face tri set by previous function */
+/* This should only be called for faces that have had a lowest face tri set by previous function
+ */
 static int get_lowest_face_tri(KnifeTool_OpData *kcd, BMFace *f)
 {
   int ans;
@@ -1835,7 +1908,8 @@ static void set_linehit_depth(KnifeTool_OpData *kcd, KnifeLineHit *lh)
   lh->m = dot_m4_v3_row_z(kcd->vc.rv3d->persmatob, lh->cagehit);
 }
 
-/* Finds visible (or all, if cutting through) edges that intersects the current screen drag line */
+/* Finds visible (or all, if cutting through) edges that intersects the current screen drag line
+ */
 static void knife_find_line_hits(KnifeTool_OpData *kcd)
 {
   SmallHash faces, kfes, kfvs;
@@ -2297,21 +2371,21 @@ static float knife_snap_size(KnifeTool_OpData *kcd, float maxsize)
   return density ? min_ff(maxsize / ((float)density * 0.5f), maxsize) : maxsize;
 }
 
-/* Snap to edge in a specified angle.
+/* Snap to edge when in a constrained mode
  * Returns 'lambda' calculated (in screen-space). */
-static bool knife_snap_edge_in_angle(KnifeTool_OpData *kcd,
-                                     const float sco[3],
-                                     const float kfv1_sco[2],
-                                     const float kfv2_sco[2],
-                                     float *r_dist_sq,
-                                     float *r_lambda)
+static bool knife_snap_edge_constrained(KnifeTool_OpData *kcd,
+                                        const float sco[3],
+                                        const float kfv1_sco[2],
+                                        const float kfv2_sco[2],
+                                        float *r_dist_sq,
+                                        float *r_lambda)
 {
   /* if snapping, check we're in bounds */
   float sco_snap[2];
   isect_line_line_v2_point(kfv1_sco, kfv2_sco, kcd->prev.mval, kcd->curr.mval, sco_snap);
   float lambda = line_point_factor_v2(sco_snap, kfv1_sco, kfv2_sco);
 
-  /* be strict about angle-snapping within edge */
+  /* be strict when constrained within edge */
   if ((lambda < 0.0f - KNIFE_FLT_EPSBIG) || (lambda > 1.0f + KNIFE_FLT_EPSBIG)) {
     return false;
   }
@@ -2389,9 +2463,9 @@ static KnifeEdge *knife_find_closest_edge_of_face(KnifeTool_OpData *kcd,
     knife_project_v2(kcd, kfe->v2->cageco, kfv2_sco);
 
     /* check if we're close enough and calculate 'lambda' */
-    if (kcd->is_angle_snapping) {
+    if (kcd->is_angle_snapping || kcd->axis_constrained) {
       dis_sq = curdis_sq;
-      if (!knife_snap_edge_in_angle(kcd, sco, kfv1_sco, kfv2_sco, &dis_sq, &lambda)) {
+      if (!knife_snap_edge_constrained(kcd, sco, kfv1_sco, kfv2_sco, &dis_sq, &lambda)) {
         continue;
       }
     }
@@ -2474,9 +2548,9 @@ static KnifeVert *knife_find_closest_vert_of_edge(KnifeTool_OpData *kcd,
 
     knife_project_v2(kcd, kfv->cageco, kfv_sco);
 
-    /* be strict about angle snapping, the vertex needs to be very close to the angle,
+    /* be strict when in a constrained mode, the vertex needs to be very close to the cut line,
      * or we ignore */
-    if (kcd->is_angle_snapping) {
+    if (kcd->is_angle_snapping || kcd->axis_constrained) {
       if (dist_squared_to_line_segment_v2(kfv_sco, kcd->prev.mval, kcd->curr.mval) >
           KNIFE_FLT_EPSBIG) {
         continue;
@@ -2565,6 +2639,69 @@ static void knife_reset_snap_angle_input(KnifeTool_OpData *kcd)
     kcd->num.str_cur--;
   }
 }
+/**
+ * Constrains the current cut to an axis.
+ * If scene orientation is set to anything other than global it takes priority.
+ * Otherwise kcd->constrain_axis_mode is used.
+ */
+static void knife_constrain_axis(bContext *C, KnifeTool_OpData *kcd)
+{
+  /* Obtain previous cage and current mouse position in world space */
+  float prev_cage_adjusted[3];
+  copy_v3_v3(prev_cage_adjusted, kcd->prev.cage);
+  mul_m4_v3(kcd->ob->obmat, prev_cage_adjusted);
+  ED_view3d_win_to_3d(
+      kcd->vc.v3d, kcd->region, prev_cage_adjusted, kcd->curr.mval, kcd->curr_cage_adjusted);
+
+  /* Constrain axes */
+  Scene *scene = kcd->scene;
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  Object *obedit = kcd->ob;
+  RegionView3D *rv3d = kcd->region->regiondata;
+  Object *ob = OBACT(view_layer);
+  const short scene_orientation = BKE_scene_orientation_get_index(scene, SCE_ORIENT_DEFAULT);
+  /* Scene orientation takes priority */
+  const short orientation_type = scene_orientation ? scene_orientation :
+                                                     kcd->constrain_axis_mode - 1;
+  const int pivot_point = scene->toolsettings->transform_pivot_point;
+  float mat[3][3];
+  ED_transform_calc_orientation_from_type_ex(
+      C, mat, scene, rv3d, ob, obedit, orientation_type, pivot_point);
+
+  /* Apply orientation matrix (can be simplified?) */
+  float co[3][3];
+  copy_v3_v3(co[0], prev_cage_adjusted);
+  copy_v3_v3(co[2], kcd->curr_cage_adjusted);
+  invert_m3(mat);
+  mul_m3_m3_pre(co, mat);
+  for (int i = 0; i <= 2; i++) {
+    if ((kcd->constrain_axis - 1) != i) {
+      /* kcd->curr_cage_adjusted[i] = kcd->prev_cage_adjusted[i]; */
+      co[2][i] = co[0][i];
+    }
+  }
+  invert_m3(mat);
+  mul_m3_m3_pre(co, mat);
+  copy_v3_v3(prev_cage_adjusted, co[0]);
+  copy_v3_v3(kcd->curr_cage_adjusted, co[2]);
+
+  /* Maybe delete!!! */
+  mul_m4_v3(kcd->ob_imat, kcd->curr_cage_adjusted);
+
+  /* Set mval to closest point on constrained line in screen space */
+  float curr_screenspace[2];
+  float prev_screenspace[2];
+  knife_project_v2(kcd, kcd->curr_cage_adjusted, curr_screenspace);
+  knife_project_v2(kcd, kcd->prev.cage, prev_screenspace);
+  float intersection[2];
+  if (closest_to_line_v2(intersection, kcd->curr.mval, prev_screenspace, curr_screenspace)) {
+    copy_v2_v2(kcd->curr.mval, intersection);
+  }
+  else {
+    copy_v2_v2(kcd->curr.mval, curr_screenspace);
+  }
+  copy_v2_v2(kcd->mval, kcd->curr.mval);
+}
 
 /**
  * \return true when `kcd->curr.co` & `kcd->curr.cage` are set.
@@ -2574,7 +2711,7 @@ static void knife_reset_snap_angle_input(KnifeTool_OpData *kcd)
  * In this case the selection-buffer is used to select the face,
  * then the closest `vert` or `edge` is set, and those will enable `is_co_set`.
  */
-static bool knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float mval[2])
+static bool knife_snap_update_from_mval(bContext *C, KnifeTool_OpData *kcd, const float mval[2])
 {
   knife_pos_data_clear(&kcd->curr);
   copy_v2_v2(kcd->curr.mval, mval);
@@ -2587,6 +2724,10 @@ static bool knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float mval[
   }
   else {
     kcd->is_angle_snapping = false;
+  }
+
+  if (kcd->axis_constrained && (kcd->mode == MODE_DRAGGING)) {
+    knife_constrain_axis(C, kcd);
   }
 
   {
@@ -2607,6 +2748,8 @@ static bool knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float mval[
       }
     }
   }
+
+  copy_v3_v3(kcd->curr_cage_adjusted, kcd->curr.cage);
 
   return kcd->curr.vert || kcd->curr.edge || (kcd->curr.bmface && !kcd->curr.is_space);
 }
@@ -2786,13 +2929,13 @@ static void knifetool_exit(bContext *C, wmOperator *op)
  * \{ */
 
 /* update active knife edge/vert pointers */
-static int knife_update_active(KnifeTool_OpData *kcd)
+static int knife_update_active(bContext *C, KnifeTool_OpData *kcd)
 {
   /* if no hits are found this would normally default to (0, 0, 0) so instead
    * get a point at the mouse ray closest to the previous point.
    * Note that drawing lines in `free-space` isn't properly supported
    * but there's no guarantee (0, 0, 0) has any geometry either - campbell */
-  if (!knife_snap_update_from_mval(kcd, kcd->mval)) {
+  if (!knife_snap_update_from_mval(C, kcd, kcd->mval)) {
     float origin[3];
     float origin_ofs[3];
 
@@ -2813,20 +2956,20 @@ static int knife_update_active(KnifeTool_OpData *kcd)
   return 1;
 }
 
-static void knifetool_update_mval(KnifeTool_OpData *kcd, const float mval[2])
+static void knifetool_update_mval(bContext *C, KnifeTool_OpData *kcd, const float mval[2])
 {
   knife_recalc_projmat(kcd);
   copy_v2_v2(kcd->mval, mval);
 
-  if (knife_update_active(kcd)) {
+  if (knife_update_active(C, kcd)) {
     ED_region_tag_redraw(kcd->region);
   }
 }
 
-static void knifetool_update_mval_i(KnifeTool_OpData *kcd, const int mval_i[2])
+static void knifetool_update_mval_i(bContext *C, KnifeTool_OpData *kcd, const int mval_i[2])
 {
   const float mval[2] = {UNPACK2(mval_i)};
-  knifetool_update_mval(kcd, mval);
+  knifetool_update_mval(C, kcd, mval);
 }
 
 /** \} */
@@ -2898,6 +3041,21 @@ wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
   return keymap;
 }
 
+/* Turn off angle snapping */
+static void knifetool_disable_angle_snapping(KnifeTool_OpData *kcd)
+{
+  kcd->angle_snapping = false;
+  kcd->is_angle_snapping = false;
+}
+
+/* Turn off orientation locking */
+static void knifetool_disable_orientation_locking(KnifeTool_OpData *kcd)
+{
+  kcd->constrain_axis = KNF_CONSTRAIN_AXIS_MODE_NONE;
+  kcd->constrain_axis_mode = KNF_CONSTRAIN_AXIS_MODE_NONE;
+  kcd->axis_constrained = false;
+}
+
 static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Object *obedit = CTX_data_edit_object(C);
@@ -2961,7 +3119,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         kcd->snap_midpoints = true;
 
         knife_recalc_projmat(kcd);
-        knife_update_active(kcd);
+        knife_update_active(C, kcd);
         knife_update_header(C, op, kcd);
         ED_region_tag_redraw(kcd->region);
         do_refresh = true;
@@ -2971,7 +3129,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         kcd->snap_midpoints = false;
 
         knife_recalc_projmat(kcd);
-        knife_update_active(kcd);
+        knife_update_active(C, kcd);
         knife_update_header(C, op, kcd);
         ED_region_tag_redraw(kcd->region);
         do_refresh = true;
@@ -2995,6 +3153,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         kcd->angle_snapping = !kcd->angle_snapping;
         kcd->angle_snapping_increment = RAD2DEGF(
             RNA_float_get(op->ptr, "angle_snapping_increment"));
+        knifetool_disable_orientation_locking(kcd);
         knife_reset_snap_angle_input(kcd);
         knife_update_header(C, op, kcd);
         do_refresh = true;
@@ -3038,7 +3197,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
           kcd->ignore_edge_snapping = false;
 
           /* needed because the last face 'hit' is ignored when dragging */
-          knifetool_update_mval(kcd, kcd->curr.mval);
+          knifetool_update_mval(C, kcd, kcd->curr.mval);
         }
 
         ED_region_tag_redraw(kcd->region);
@@ -3050,14 +3209,14 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
           /* Shouldn't be possible with default key-layout, just in case. */
           if (kcd->is_drag_hold) {
             kcd->is_drag_hold = false;
-            knifetool_update_mval(kcd, kcd->curr.mval);
+            knifetool_update_mval(C, kcd, kcd->curr.mval);
           }
 
           kcd->prev = kcd->curr;
           kcd->curr = kcd->init;
 
           knife_project_v2(kcd, kcd->curr.cage, kcd->curr.mval);
-          knifetool_update_mval(kcd, kcd->curr.mval);
+          knifetool_update_mval(C, kcd, kcd->curr.mval);
 
           knife_add_cut(kcd);
 
@@ -3093,7 +3252,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         return OPERATOR_PASS_THROUGH;
       case MOUSEMOVE: /* mouse moved somewhere to select another loop */
         if (kcd->mode != MODE_PANNING) {
-          knifetool_update_mval_i(kcd, event->mval);
+          knifetool_update_mval_i(C, kcd, event->mval);
 
           if (kcd->is_drag_hold) {
             if (kcd->totlinehit >= 2) {
@@ -3120,6 +3279,35 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
 
+  /* Constrain axes with X,Y,Z keys */
+  if (event->val == KM_PRESS && ELEM(event->type, EVT_XKEY, EVT_YKEY, EVT_ZKEY)) {
+    if (event->type == EVT_XKEY && kcd->constrain_axis != KNF_CONSTRAIN_AXIS_X) {
+      kcd->constrain_axis = KNF_CONSTRAIN_AXIS_X;
+      kcd->constrain_axis_mode = KNF_CONSTRAIN_AXIS_MODE_GLOBAL;
+    }
+    else if (event->type == EVT_YKEY && kcd->constrain_axis != KNF_CONSTRAIN_AXIS_Y) {
+      kcd->constrain_axis = KNF_CONSTRAIN_AXIS_Y;
+      kcd->constrain_axis_mode = KNF_CONSTRAIN_AXIS_MODE_GLOBAL;
+    }
+    else if (event->type == EVT_ZKEY && kcd->constrain_axis != KNF_CONSTRAIN_AXIS_Z) {
+      kcd->constrain_axis = KNF_CONSTRAIN_AXIS_Z;
+      kcd->constrain_axis_mode = KNF_CONSTRAIN_AXIS_MODE_GLOBAL;
+    }
+    else {
+      /* Cycle through modes with repeated key presses */
+      if (kcd->constrain_axis_mode != KNF_CONSTRAIN_AXIS_MODE_LOCAL) {
+        kcd->constrain_axis_mode++;
+      }
+      else {
+        kcd->constrain_axis = KNF_CONSTRAIN_AXIS_NONE;
+        kcd->constrain_axis_mode = KNF_CONSTRAIN_AXIS_MODE_NONE;
+      }
+    }
+    kcd->axis_constrained = (kcd->constrain_axis != KNF_CONSTRAIN_AXIS_NONE);
+    knifetool_disable_angle_snapping(kcd);
+    knife_update_header(C, op, kcd);
+  }
+
   if (kcd->mode == MODE_DRAGGING) {
     op->flag &= ~OP_IS_MODAL_CURSOR_REGION;
   }
@@ -3130,7 +3318,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
   if (do_refresh) {
     /* we don't really need to update mval,
      * but this happens to be the best way to refresh at the moment */
-    knifetool_update_mval_i(kcd, event->mval);
+    knifetool_update_mval_i(C, kcd, event->mval);
   }
 
   /* keep going until the user confirms */
@@ -3168,7 +3356,7 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   WM_cursor_modal_set(CTX_wm_window(C), WM_CURSOR_KNIFE);
   WM_event_add_modal_handler(C, op);
 
-  knifetool_update_mval_i(kcd, event->mval);
+  knifetool_update_mval_i(C, kcd, event->mval);
 
   if (wait_for_input == false) {
     /* Avoid copy-paste logic. */
@@ -3296,7 +3484,7 @@ void EDBM_mesh_knife(bContext *C, LinkNode *polys, bool use_tag, bool cut_throug
       int i;
 
       for (i = 0; i < mval_tot; i++) {
-        knifetool_update_mval(kcd, mval_fl[i]);
+        knifetool_update_mval(C, kcd, mval_fl[i]);
         if (i == 0) {
           knife_start_cut(kcd);
           kcd->mode = MODE_DRAGGING;

@@ -5363,7 +5363,7 @@ def km_knife_tool_modal_map(_params):
         ("IGNORE_SNAP_ON", {"type": 'RIGHT_SHIFT', "value": 'PRESS', "any": True}, None),
         ("IGNORE_SNAP_OFF", {"type": 'RIGHT_SHIFT', "value": 'RELEASE', "any": True}, None),
         ("ANGLE_SNAP_TOGGLE", {"type": 'C', "value": 'PRESS'}, None),
-        ("CUT_THROUGH_TOGGLE", {"type": 'Z', "value": 'PRESS'}, None),
+        ("CUT_THROUGH_TOGGLE", {"type": 'T', "value": 'PRESS'}, None),
     ])
 
     return keymap
