@@ -10623,6 +10623,7 @@ static void rna_def_node_socket_attribute(BlenderRNA *brna,
 
   prop = RNA_def_property(srna, "default_value_vector", PROP_FLOAT, subtype);
   RNA_def_property_float_sdna(prop, NULL, "value_float");
+  RNA_def_property_array(prop, 3);
   //RNA_def_property_float_array_default(prop, value_default);
   RNA_def_property_float_funcs(prop, NULL, NULL, "rna_NodeSocketStandard_attribute_range_float");
   RNA_def_property_ui_text(prop, "Default Value", "Input value used for unconnected socket");
@@ -10667,6 +10668,7 @@ static void rna_def_node_socket_attribute(BlenderRNA *brna,
 
   prop = RNA_def_property(srna, "default_value_vector", PROP_FLOAT, subtype);
   RNA_def_property_float_sdna(prop, NULL, "value_float");
+  RNA_def_property_array(prop, 3);
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_float_funcs(prop, NULL, NULL, "rna_NodeSocketStandard_attribute_range_float");
   RNA_def_property_ui_text(prop, "Default Value", "Input value used for unconnected socket");
