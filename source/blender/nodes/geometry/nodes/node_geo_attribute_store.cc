@@ -60,80 +60,80 @@ static AttributeDomain get_result_domain(AttributeDomain declared_domain,
   }
 }
 
-static void store_attribute(GeometryComponent &component, const GeoNodeExecParams &params)
-{
-  const AttributeRef &attribute_ref = params.get_input<AttributeRef>("Attribute");
-  const CustomDataType data_type = attribute_ref.data_type();
-  const AttributeDomain domain = get_result_domain(attribute_ref.domain(), component, input_name);
-  const std::string attribute_name = params.get_input<std::string>("Name");
-
-  GVArrayPtr attribute_input = component.attribute_try_get_for_read(
-      attribute_ref.name(), domain, data_type);
-  if (!attribute_input) {
-    return;
-  }
-  OutputAttribute attribute_output = component.attribute_try_get_for_output_only(
-      attribute_name, domain, data_type);
-
-  MutableSpan<float> results = attribute_output.as_span<float>();
-  results.copy_from(attribute_input->typed<float>());
-
-  switch (data_type) {
-    case CD_PROP_FLOAT: {
-      const float value = params.get_input<float>("Attribute");
-      attribute->fill(&value);
-      break;
-    }
-    case CD_PROP_FLOAT3: {
-      const float3 value = params.get_input<float3>("Attribute");
-      attribute->fill(&value);
-      break;
-    }
-    case CD_PROP_COLOR: {
-      const ColorGeometry4f value = params.get_input<ColorGeometry4f>("Attribute");
-      attribute->fill(&value);
-      break;
-    }
-    case CD_PROP_BOOL: {
-      const bool value = params.get_input<bool>("Attribute");
-      attribute->fill(&value);
-      break;
-    }
-    case CD_PROP_INT32: {
-      const int value = params.get_input<int>("Attribute");
-      attribute->fill(&value);
-      break;
-    }
-    default:
-      break;
-  }
-
-  attribute.save();
-}
+//static void store_attribute(GeometryComponent &component, const GeoNodeExecParams &params)
+//{
+//  const AttributeRef &attribute_ref = params.get_input<AttributeRef>("Attribute");
+//  const CustomDataType data_type = attribute_ref.data_type();
+//  const AttributeDomain domain = get_result_domain(attribute_ref.domain(), component, input_name);
+//  const std::string attribute_name = params.get_input<std::string>("Name");
+//
+//  GVArrayPtr attribute_input = component.attribute_try_get_for_read(
+//      attribute_ref.name(), domain, data_type);
+//  if (!attribute_input) {
+//    return;
+//  }
+//  OutputAttribute attribute_output = component.attribute_try_get_for_output_only(
+//      attribute_name, domain, data_type);
+//
+//  MutableSpan<float> results = attribute_output.as_span<float>();
+//  results.copy_from(attribute_input->typed<float>());
+//
+//  switch (data_type) {
+//    case CD_PROP_FLOAT: {
+//      const float value = params.get_input<float>("Attribute");
+//      attribute->fill(&value);
+//      break;
+//    }
+//    case CD_PROP_FLOAT3: {
+//      const float3 value = params.get_input<float3>("Attribute");
+//      attribute->fill(&value);
+//      break;
+//    }
+//    case CD_PROP_COLOR: {
+//      const ColorGeometry4f value = params.get_input<ColorGeometry4f>("Attribute");
+//      attribute->fill(&value);
+//      break;
+//    }
+//    case CD_PROP_BOOL: {
+//      const bool value = params.get_input<bool>("Attribute");
+//      attribute->fill(&value);
+//      break;
+//    }
+//    case CD_PROP_INT32: {
+//      const int value = params.get_input<int>("Attribute");
+//      attribute->fill(&value);
+//      break;
+//    }
+//    default:
+//      break;
+//  }
+//
+//  attribute.save();
+//}
 
 static void geo_node_attribute_store_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  //GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  const std::string attribute_name = params.get_input<std::string>("Name");
-  if (attribute_name.empty()) {
-    params.set_output("Geometry", geometry_set);
-    return;
-  }
+  //const std::string attribute_name = params.get_input<std::string>("Name");
+  //if (attribute_name.empty()) {
+  //  params.set_output("Geometry", geometry_set);
+  //  return;
+  //}
 
-  // geometry_set = geometry_set_realize_instances(geometry_set);
+  //// geometry_set = geometry_set_realize_instances(geometry_set);
 
-  if (geometry_set.has<MeshComponent>()) {
-    store_attribute(geometry_set.get_component_for_write<MeshComponent>(), params);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    store_attribute(geometry_set.get_component_for_write<PointCloudComponent>(), params);
-  }
-  if (geometry_set.has<CurveComponent>()) {
-    store_attribute(geometry_set.get_component_for_write<CurveComponent>(), params);
-  }
+  //if (geometry_set.has<MeshComponent>()) {
+  //  store_attribute(geometry_set.get_component_for_write<MeshComponent>(), params);
+  //}
+  //if (geometry_set.has<PointCloudComponent>()) {
+  //  store_attribute(geometry_set.get_component_for_write<PointCloudComponent>(), params);
+  //}
+  //if (geometry_set.has<CurveComponent>()) {
+  //  store_attribute(geometry_set.get_component_for_write<CurveComponent>(), params);
+  //}
 
-  params.set_output("Geometry", geometry_set);
+  //params.set_output("Geometry", geometry_set);
 }
 
 }  // namespace blender::nodes

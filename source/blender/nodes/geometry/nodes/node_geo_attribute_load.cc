@@ -64,25 +64,25 @@ static void load_attribute(const GeometryComponent *component, const GeoNodeExec
 
 static void geo_node_attribute_load_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  const std::string attribute_name = params.extract_input<std::string>("Name");
+  //GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  //const std::string attribute_name = params.extract_input<std::string>("Name");
 
-  if (attribute_name.empty()) {
-    params.set_output("Attribute", AttributeRef::None);
-    return;
-  }
+  //if (attribute_name.empty()) {
+  //  params.set_output("Attribute", AttributeRef::None);
+  //  return;
+  //}
 
-  //geometry_set = bke::geometry_set_realize_instances(geometry_set);
+  ////geometry_set = bke::geometry_set_realize_instances(geometry_set);
 
-  if (geometry_set.has<MeshComponent>()) {
-    load_attribute(geometry_set.get_component_for_read<MeshComponent>(), params);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    load_attribute(geometry_set.get_component_for_read<PointCloudComponent>(), params);
-  }
-  if (geometry_set.has<CurveComponent>()) {
-    load_attribute(geometry_set.get_component_for_read<CurveComponent>(), params);
-  }
+  //if (geometry_set.has<MeshComponent>()) {
+  //  load_attribute(geometry_set.get_component_for_read<MeshComponent>(), params);
+  //}
+  //if (geometry_set.has<PointCloudComponent>()) {
+  //  load_attribute(geometry_set.get_component_for_read<PointCloudComponent>(), params);
+  //}
+  //if (geometry_set.has<CurveComponent>()) {
+  //  load_attribute(geometry_set.get_component_for_read<CurveComponent>(), params);
+  //}
 }
 
 }  // namespace blender::nodes
