@@ -54,7 +54,7 @@
 /* ********** cloth engine ******* */
 /* Prototypes for internal functions.
  */
-static void cloth_to_object(Object *ob, ClothModifierData *clmd, float (*vertexCos)[3]);
+static void cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *r_mesh);
 static void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mesh);
 static bool cloth_from_object(
     Object *ob, ClothModifierData *clmd, Mesh *mesh, float framenr, int first);
@@ -318,12 +318,8 @@ static int do_step_cloth(
 /************************************************
  * clothModifier_do - main simulation function
  ************************************************/
-void clothModifier_do(ClothModifierData *clmd,
-                      Depsgraph *depsgraph,
-                      Scene *scene,
-                      Object *ob,
-                      Mesh *mesh,
-                      float (*vertexCos)[3])
+Mesh *clothModifier_do(
+    ClothModifierData *clmd, Depsgraph *depsgraph, Scene *scene, Object *ob, Mesh *mesh)
 {
   PointCache *cache;
   PTCacheID pid;
@@ -351,7 +347,7 @@ void clothModifier_do(ClothModifierData *clmd,
   /* simulation is only active during a specific period */
   if (framenr < startframe) {
     BKE_ptcache_invalidate(cache);
-    return;
+    return NULL;
   }
   if (framenr > endframe) {
     framenr = endframe;
@@ -359,7 +355,7 @@ void clothModifier_do(ClothModifierData *clmd,
 
   /* initialize simulation data if it didn't exist already */
   if (!do_init_cloth(ob, clmd, mesh, framenr)) {
-    return;
+    return NULL;
   }
 
   if (framenr == startframe) {
@@ -368,7 +364,7 @@ void clothModifier_do(ClothModifierData *clmd,
     BKE_ptcache_validate(cache, framenr);
     cache->flag &= ~PTCACHE_REDO_NEEDED;
     clmd->clothObject->last_frame = framenr;
-    return;
+    return NULL;
   }
 
   /* try to read from cache */
@@ -380,7 +376,10 @@ void clothModifier_do(ClothModifierData *clmd,
   if (cache_result == PTCACHE_READ_EXACT || cache_result == PTCACHE_READ_INTERPOLATED ||
       (!can_simulate && cache_result == PTCACHE_READ_OLD)) {
     SIM_cloth_solver_set_positions(clmd);
-    cloth_to_object(ob, clmd, vertexCos);
+
+    Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
+
+    cloth_to_object(ob, clmd, mesh_result);
 
     BKE_ptcache_validate(cache, framenr);
 
@@ -390,7 +389,7 @@ void clothModifier_do(ClothModifierData *clmd,
 
     clmd->clothObject->last_frame = framenr;
 
-    return;
+    return mesh_result;
   }
   if (cache_result == PTCACHE_READ_OLD) {
     SIM_cloth_solver_set_positions(clmd);
@@ -400,7 +399,8 @@ void clothModifier_do(ClothModifierData *clmd,
       /*ob->id.lib ||*/ (cache->flag & PTCACHE_BAKED)) {
     /* if baked and nothing in cache, do nothing */
     BKE_ptcache_invalidate(cache);
-    return;
+    return NULL; /* TODO(ish): figure out if this is an early escape because of some error or
+                    something else */
   }
 
   /* if on second frame, write cache for first frame */
@@ -421,8 +421,12 @@ void clothModifier_do(ClothModifierData *clmd,
     BKE_ptcache_write(&pid, framenr);
   }
 
-  cloth_to_object(ob, clmd, vertexCos);
+  Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
+
+  cloth_to_object(ob, clmd, mesh_result);
   clmd->clothObject->last_frame = framenr;
+
+  return mesh_result;
 }
 
 /* frees all */
@@ -589,21 +593,32 @@ void cloth_free_modifier_extern(ClothModifierData *clmd)
  ******************************************************************************/
 
 /**
- * Copies the deformed vertices to the object.
+ * Copies the deformed vertices to `r_mesh` after converting the world
+ * space coordinates stored in `cloth->verts` to local space coords
+ * required by `r_mesh`
  */
-static void cloth_to_object(Object *ob, ClothModifierData *clmd, float (*vertexCos)[3])
+static void cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *r_mesh)
 {
-  unsigned int i = 0;
+  /* TODO(ish): might need a better name for the function now that it
+   * directly applies the vertex * positions to the mesh */
   Cloth *cloth = clmd->clothObject;
 
   if (clmd->clothObject) {
     /* inverse matrix is not uptodate... */
     invert_m4_m4(ob->imat, ob->obmat);
 
-    for (i = 0; i < cloth->mvert_num; i++) {
-      copy_v3_v3(vertexCos[i], cloth->verts[i].x);
-      mul_m4_v3(ob->imat, vertexCos[i]); /* cloth is in global coords */
+    BLI_assert(cloth->mvert_num == r_mesh->totvert);
+
+    float(*vert_coords)[3] = MEM_mallocN(sizeof(float[3]) * cloth->mvert_num, __func__);
+
+    for (size_t i = 0; i < cloth->mvert_num; i++) {
+      copy_v3_v3(vert_coords[i], cloth->verts[i].x);
     }
+
+    /* need to convert from world space to local space */
+    BKE_mesh_vert_coords_apply_with_mat4(r_mesh, vert_coords, ob->imat);
+
+    MEM_freeN(vert_coords);
   }
 }
 

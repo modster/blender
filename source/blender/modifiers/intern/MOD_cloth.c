@@ -128,15 +128,13 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   /*   } */
   /* } */
 
-  Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
+  Mesh *mesh_result = clothModifier_do(clmd, ctx->depsgraph, scene, ctx->object, mesh);
 
-  float(*vert_coords)[3] = BKE_mesh_vert_coords_alloc(mesh_result, NULL);
-  BKE_mesh_vert_coords_get(mesh_result, vert_coords);
-
-  clothModifier_do(clmd, ctx->depsgraph, scene, ctx->object, mesh_result, vert_coords);
-
-  BKE_mesh_vert_coords_apply(mesh_result, vert_coords);
-
+  if (mesh_result == NULL) {
+    /* didn't get a valid mesh so there is a chance the modifier
+     * failed, return the mesh that the modifier got */
+    return mesh;
+  }
   return mesh_result;
 }
 

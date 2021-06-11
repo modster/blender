@@ -241,12 +241,11 @@ int cloth_bvh_collision(struct Depsgraph *depsgraph,
 // needed for modifier.c
 void cloth_free_modifier_extern(struct ClothModifierData *clmd);
 void cloth_free_modifier(struct ClothModifierData *clmd);
-void clothModifier_do(struct ClothModifierData *clmd,
-                      struct Depsgraph *depsgraph,
-                      struct Scene *scene,
-                      struct Object *ob,
-                      struct Mesh *me,
-                      float (*vertexCos)[3]);
+struct Mesh *clothModifier_do(struct ClothModifierData *clmd,
+                              struct Depsgraph *depsgraph,
+                              struct Scene *scene,
+                              struct Object *ob,
+                              struct Mesh *mesh);
 
 int cloth_uses_vgroup(struct ClothModifierData *clmd);
 
