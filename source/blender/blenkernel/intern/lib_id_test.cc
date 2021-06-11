@@ -47,7 +47,6 @@ static void test_lib_id_main_sort_free(LibIDMainSortTestContext *ctx)
   BKE_main_free(ctx->bmain);
 }
 
-#if 0
 static void test_lib_id_main_sort_check_order(std::initializer_list<ID *> list)
 {
   ID *prev_id = nullptr;
@@ -60,17 +59,6 @@ static void test_lib_id_main_sort_check_order(std::initializer_list<ID *> list)
   }
   EXPECT_EQ(prev_id->next, nullptr);
 }
-#else
-static void test_lib_id_main_sort_check_order(ID *id_a, ID *id_b, ID *id_c)
-{
-  EXPECT_EQ(id_a->prev, nullptr);
-  EXPECT_EQ(id_a->next, id_b);
-  EXPECT_EQ(id_b->prev, id_a);
-  EXPECT_EQ(id_b->next, id_c);
-  EXPECT_EQ(id_c->prev, id_b);
-  EXPECT_EQ(id_c->next, nullptr);
-}
-#endif
 
 TEST(lib_id_main_sort, local_ids_1)
 {
@@ -83,7 +71,7 @@ TEST(lib_id_main_sort, local_ids_1)
   ID *id_b = static_cast<ID *>(BKE_id_new(ctx.bmain, ID_OB, "OB_B"));
   EXPECT_TRUE(ctx.bmain->objects.first == id_a);
   EXPECT_TRUE(ctx.bmain->objects.last == id_c);
-  test_lib_id_main_sort_check_order(id_a, id_b, id_c);
+  test_lib_id_main_sort_check_order({id_a, id_b, id_c});
 
   test_lib_id_main_sort_free(&ctx);
 }
@@ -106,19 +94,19 @@ TEST(lib_id_main_sort, linked_ids_1)
   id_sort_by_name(&ctx.bmain->objects, id_b, nullptr);
   EXPECT_TRUE(ctx.bmain->objects.first == id_c);
   EXPECT_TRUE(ctx.bmain->objects.last == id_b);
-  test_lib_id_main_sort_check_order(id_c, id_a, id_b);
+  test_lib_id_main_sort_check_order({id_c, id_a, id_b});
 
   id_a->lib = lib_b;
   id_sort_by_name(&ctx.bmain->objects, id_a, nullptr);
   EXPECT_TRUE(ctx.bmain->objects.first == id_c);
   EXPECT_TRUE(ctx.bmain->objects.last == id_a);
-  test_lib_id_main_sort_check_order(id_c, id_b, id_a);
+  test_lib_id_main_sort_check_order({id_c, id_b, id_a});
 
   id_b->lib = lib_b;
   id_sort_by_name(&ctx.bmain->objects, id_b, nullptr);
   EXPECT_TRUE(ctx.bmain->objects.first == id_c);
   EXPECT_TRUE(ctx.bmain->objects.last == id_b);
-  test_lib_id_main_sort_check_order(id_c, id_a, id_b);
+  test_lib_id_main_sort_check_order({id_c, id_a, id_b});
 
   test_lib_id_main_sort_free(&ctx);
 }
