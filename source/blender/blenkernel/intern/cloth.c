@@ -40,6 +40,7 @@
 
 #include "BKE_bvhutils.h"
 #include "BKE_cloth.h"
+#include "BKE_cloth_remesh.hh"
 #include "BKE_effect.h"
 #include "BKE_global.h"
 #include "BKE_mesh.h"
@@ -316,7 +317,14 @@ static int do_step_cloth(
 
   // printf ( "%f\n", ( float ) tval() );
 
-  cloth_to_object(ob, clmd, r_mesh);
+  if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_REMESH) {
+    /* In case remeshing is enabled, the remeshing function would update `r_mesh` */
+    BKE_cloth_remesh(ob, clmd, r_mesh);
+  }
+  else {
+    /* if remeshing is off, need to update `r_mesh` from clmd->clothObject */
+    cloth_to_object(ob, clmd, r_mesh);
+  }
 
   return ret;
 }

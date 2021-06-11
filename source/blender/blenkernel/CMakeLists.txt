@@ -99,6 +99,7 @@ set(SRC
   intern/camera.c
   intern/cdderivedmesh.c
   intern/cloth.c
+  intern/cloth_remesh.cc
   intern/collection.c
   intern/collision.c
   intern/colorband.c
@@ -313,6 +314,7 @@ set(SRC
   BKE_ccg.h
   BKE_cdderivedmesh.h
   BKE_cloth.h
+  BKE_cloth_remesh.hh
   BKE_collection.h
   BKE_collision.h
   BKE_colorband.h
