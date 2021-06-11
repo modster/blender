@@ -3453,7 +3453,7 @@ static const float std_node_socket_colors[][4] = {
     {0.96, 0.96, 0.96, 1.0}, /* SOCK_COLLECTION */
     {0.62, 0.31, 0.64, 1.0}, /* SOCK_TEXTURE */
     {0.92, 0.46, 0.51, 1.0}, /* SOCK_MATERIAL */
-    {0.8, 0.0, 0.3, 1.0}, /* SOCK_ATTRIBUTE */
+    {1.0, 0.0, 1.0, 1.0},    /* SOCK_ATTRIBUTE (placeholder, copies from other types) */
 };
 
 /* common color callbacks for standard types */
@@ -3464,7 +3464,13 @@ static void std_node_socket_draw_color(bContext *UNUSED(C),
 {
   bNodeSocket *sock = (bNodeSocket *)ptr->data;
   int type = sock->typeinfo->type;
-  copy_v4_v4(r_color, std_node_socket_colors[type]);
+  if (type != SOCK_ATTRIBUTE) {
+    copy_v4_v4(r_color, std_node_socket_colors[type]);
+  }
+  else {
+    int data_type = ((bNodeSocketValueAttribute *)sock->default_value)->data_type;
+    copy_v4_v4(r_color, std_node_socket_colors[data_type]);
+  }
 }
 static void std_node_socket_interface_draw_color(bContext *UNUSED(C),
                                                  PointerRNA *ptr,
@@ -3472,7 +3478,13 @@ static void std_node_socket_interface_draw_color(bContext *UNUSED(C),
 {
   bNodeSocket *sock = (bNodeSocket *)ptr->data;
   int type = sock->typeinfo->type;
-  copy_v4_v4(r_color, std_node_socket_colors[type]);
+  if (type != SOCK_ATTRIBUTE) {
+    copy_v4_v4(r_color, std_node_socket_colors[type]);
+  }
+  else {
+    int data_type = ((bNodeSocketValueAttribute *)sock->default_value)->data_type;
+    copy_v4_v4(r_color, std_node_socket_colors[data_type]);
+  }
 }
 
 /* draw function for file output node sockets,
@@ -3605,6 +3617,41 @@ static void std_node_socket_draw(
       uiItemR(layout, ptr, "default_value", DEFAULT_FLAGS, text, 0);
       break;
     }
+    case SOCK_ATTRIBUTE: {
+      int data_type = ((bNodeSocketValueAttribute *)sock->default_value)->data_type;
+      switch (data_type) {
+        case SOCK_FLOAT:
+          uiItemR(layout, ptr, "default_value_float", DEFAULT_FLAGS, text, 0);
+          break;
+        case SOCK_INT:
+          uiItemR(layout, ptr, "default_value_int", DEFAULT_FLAGS, text, 0);
+          break;
+        case SOCK_BOOLEAN:
+          uiItemR(layout, ptr, "default_value_bool", DEFAULT_FLAGS, text, 0);
+          break;
+        case SOCK_VECTOR:
+          if (sock->flag & SOCK_COMPACT) {
+            uiTemplateComponentMenu(layout, ptr, "default_value_vector", text);
+          }
+          else {
+            if (sock->typeinfo->subtype == PROP_DIRECTION) {
+              uiItemR(layout, ptr, "default_value_vector", DEFAULT_FLAGS, "", ICON_NONE);
+            }
+            else {
+              uiLayout *column = uiLayoutColumn(layout, true);
+              uiItemR(column, ptr, "default_value_vector", DEFAULT_FLAGS, text, ICON_NONE);
+            }
+          }
+          break;
+        case SOCK_RGBA: {
+          uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
+          uiItemL(row, text, 0);
+          uiItemR(row, ptr, "default_value_color", DEFAULT_FLAGS, "", 0);
+          break;
+        }
+      }
+      break;
+    }
     default:
       node_socket_button_label(C, layout, ptr, node_ptr, text);
       break;
@@ -3644,6 +3691,40 @@ static void std_node_socket_interface_draw(bContext *UNUSED(C), uiLayout *layout
     case SOCK_RGBA:
     case SOCK_STRING: {
       uiItemR(col, ptr, "default_value", DEFAULT_FLAGS, IFACE_("Default"), 0);
+      break;
+    }
+    case SOCK_ATTRIBUTE: {
+      int data_type = ((bNodeSocketValueAttribute *)sock->default_value)->data_type;
+      switch (data_type) {
+        case SOCK_FLOAT: {
+          uiItemR(col, ptr, "default_value_float", DEFAULT_FLAGS, IFACE_("Default"), ICON_NONE);
+          uiLayout *sub = uiLayoutColumn(col, true);
+          uiItemR(sub, ptr, "min_value", DEFAULT_FLAGS, IFACE_("Min"), ICON_NONE);
+          uiItemR(sub, ptr, "max_value", DEFAULT_FLAGS, IFACE_("Max"), ICON_NONE);
+          break;
+        }
+        case SOCK_INT: {
+          uiItemR(col, ptr, "default_value_int", DEFAULT_FLAGS, IFACE_("Default"), ICON_NONE);
+          uiLayout *sub = uiLayoutColumn(col, true);
+          uiItemR(sub, ptr, "min_value", DEFAULT_FLAGS, IFACE_("Min"), ICON_NONE);
+          uiItemR(sub, ptr, "max_value", DEFAULT_FLAGS, IFACE_("Max"), ICON_NONE);
+          break;
+        }
+        case SOCK_VECTOR: {
+          uiItemR(col, ptr, "default_value_vector", UI_ITEM_R_EXPAND, IFACE_("Default"), ICON_NONE);
+          uiLayout *sub = uiLayoutColumn(col, true);
+          uiItemR(sub, ptr, "min_value", DEFAULT_FLAGS, IFACE_("Min"), ICON_NONE);
+          uiItemR(sub, ptr, "max_value", DEFAULT_FLAGS, IFACE_("Max"), ICON_NONE);
+          break;
+        }
+        case SOCK_BOOLEAN:
+          uiItemR(col, ptr, "default_value_bool", DEFAULT_FLAGS, IFACE_("Default"), 0);
+          break;
+        case SOCK_RGBA: {
+          uiItemR(col, ptr, "default_value_color", DEFAULT_FLAGS, IFACE_("Default"), 0);
+          break;
+        }
+      }
       break;
     }
   }

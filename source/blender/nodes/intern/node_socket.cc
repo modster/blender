@@ -99,6 +99,19 @@ struct bNodeSocket *node_add_socket_from_template(struct bNodeTree *ntree,
       dval->value[3] = stemp->val4;
       break;
     }
+    case SOCK_ATTRIBUTE: {
+      bNodeSocketValueAttribute *dval = (bNodeSocketValueAttribute *)sock->default_value;
+      dval->data_type = SOCK_FLOAT;
+      dval->value_int = (int)stemp->val1;
+      dval->value_float[0] = stemp->val1;
+      dval->value_float[1] = stemp->val2;
+      dval->value_float[2] = stemp->val3;
+      dval->value_float[3] = stemp->val4;
+      dval->value_bool = (bool)stemp->val1;
+      dval->min = stemp->min;
+      dval->max = stemp->max;
+      break;
+    }
   }
 
   return sock;
@@ -273,6 +286,16 @@ void node_socket_init_default_value(bNodeSocket *sock)
       sock->default_value = dval;
       break;
     }
+    case SOCK_ATTRIBUTE: {
+      bNodeSocketValueAttribute *dval = (bNodeSocketValueAttribute *)MEM_callocN(
+          sizeof(bNodeSocketValueAttribute), "node socket value attribute");
+      dval->data_type = SOCK_FLOAT;
+      dval->min = -FLT_MAX;
+      dval->max = FLT_MAX;
+
+      sock->default_value = dval;
+      break;
+    }
     case SOCK_OBJECT: {
       bNodeSocketValueObject *dval = (bNodeSocketValueObject *)MEM_callocN(
           sizeof(bNodeSocketValueObject), "node socket value object");
@@ -368,6 +391,12 @@ void node_socket_copy_default_value(bNodeSocket *to, const bNodeSocket *from)
     case SOCK_STRING: {
       bNodeSocketValueString *toval = (bNodeSocketValueString *)to->default_value;
       bNodeSocketValueString *fromval = (bNodeSocketValueString *)from->default_value;
+      *toval = *fromval;
+      break;
+    }
+    case SOCK_ATTRIBUTE: {
+      bNodeSocketValueAttribute *toval = (bNodeSocketValueAttribute *)to->default_value;
+      bNodeSocketValueAttribute *fromval = (bNodeSocketValueAttribute *)from->default_value;
       *toval = *fromval;
       break;
     }

@@ -618,6 +618,16 @@ typedef struct bNodeSocketValueMaterial {
   struct Material *value;
 } bNodeSocketValueMaterial;
 
+typedef struct bNodeSocketValueAttribute {
+  int data_type;
+  /* XXX Does DNA support union? */
+  int value_int;
+  float value_float[4];
+  char value_bool;
+  char _pad[7];
+  float min, max;
+} bNodeSocketValueAttribute;
+
 /* Data structs, for node->storage. */
 enum {
   CMP_NODE_MASKTYPE_ADD = 0,

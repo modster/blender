@@ -858,6 +858,40 @@ static void ui_node_draw_input(
               split_wrapper.decorate_column, &inputptr, "default_value", RNA_NO_INDEX);
           break;
         }
+        case SOCK_ATTRIBUTE: {
+          int data_type = ((bNodeSocketValueAttribute *)input->default_value)->data_type;
+          switch (data_type) {
+            case SOCK_VECTOR:
+              if (input->type == SOCK_VECTOR) {
+                uiItemS(row);
+                sub = uiLayoutColumn(row, true);
+              }
+              uiItemR(sub, &inputptr, "default_value_vector", 0, "", ICON_NONE);
+              uiItemDecoratorR(
+                  split_wrapper.decorate_column, &inputptr, "default_value_vector", RNA_NO_INDEX);
+            case SOCK_FLOAT:
+              uiItemR(sub, &inputptr, "default_value_float", 0, "", ICON_NONE);
+              uiItemDecoratorR(
+                  split_wrapper.decorate_column, &inputptr, "default_value_float", RNA_NO_INDEX);
+              break;
+            case SOCK_INT:
+              uiItemR(sub, &inputptr, "default_value_int", 0, "", ICON_NONE);
+              uiItemDecoratorR(
+                  split_wrapper.decorate_column, &inputptr, "default_value_int", RNA_NO_INDEX);
+              break;
+            case SOCK_BOOLEAN:
+              uiItemR(sub, &inputptr, "default_value_bool", 0, "", ICON_NONE);
+              uiItemDecoratorR(
+                  split_wrapper.decorate_column, &inputptr, "default_value_bool", RNA_NO_INDEX);
+              break;
+            case SOCK_RGBA:
+              uiItemR(sub, &inputptr, "default_value_color", 0, "", ICON_NONE);
+              uiItemDecoratorR(
+                  split_wrapper.decorate_column, &inputptr, "default_value_color", RNA_NO_INDEX);
+              break;
+          }
+          break;
+        }
         default:
           add_dummy_decorator = true;
       }

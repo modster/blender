@@ -86,10 +86,15 @@ static void foreach_nodeclass(Scene *UNUSED(scene), void *calldata, bNodeClassCa
 
 static bool geometry_node_tree_validate_link(bNodeTree *UNUSED(ntree), bNodeLink *link)
 {
-  /* Geometry, string, object, material, texture and collection sockets can only be connected to
-   * themselves. The other types can be converted between each other. */
-  if (ELEM(link->fromsock->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT) &&
-      ELEM(link->tosock->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT)) {
+  /* Geometry, attribute, string, object, material, texture and collection sockets can only be
+   * connected to themselves. Basic data types can be converted between each other. Basic data
+   * types can be connected to attributes */
+  bool from_elemental = ELEM(
+      link->fromsock->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT);
+  bool to_elemental = ELEM(
+      link->tosock->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN, SOCK_INT);
+  bool to_attribute = (link->tosock->type == SOCK_ATTRIBUTE);
+  if (from_elemental && (to_elemental || to_attribute)) {
     return true;
   }
   return (link->tosock->type == link->fromsock->type);

@@ -451,11 +451,13 @@ static void write_node_socket_default_value(BlendWriter *writer, bNodeSocket *so
     case SOCK_MATERIAL:
       BLO_write_struct(writer, bNodeSocketValueMaterial, sock->default_value);
       break;
+    case SOCK_ATTRIBUTE:
+      BLO_write_struct(writer, bNodeSocketValueAttribute, sock->default_value);
+      break;
     case __SOCK_MESH:
     case SOCK_CUSTOM:
     case SOCK_SHADER:
     case SOCK_GEOMETRY:
-    case SOCK_ATTRIBUTE:
       BLI_assert_unreachable();
       break;
   }
