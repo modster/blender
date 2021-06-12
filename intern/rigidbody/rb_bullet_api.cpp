@@ -210,26 +210,31 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
                            rbRigidBody *rbo,
                            float timeSubStep,
                            float norm_forces[3][3],
-                           float vec_locations[3][3])
+                           float fric_forces[3][3],
+                           float vec_locations[3][3],
+                           int norm_flag,
+                           int fric_flag)
 {
     int numManifolds = world->dispatcher->getNumManifolds();
-    int num_forces = 0;
+    int num_norm_forces = 0;
+    int num_fric_forces = 0;
     for (int i = 0; i < numManifolds; i++)
     {
         btPersistentManifold* contactManifold =  world->dispatcher->getManifoldByIndexInternal(i);
         const void *obA = contactManifold->getBody0();
         const void *obB = contactManifold->getBody1();
-        if(num_forces>2)
+        if(num_norm_forces>2)
           break;
         if(obA != rbo->body && obB != rbo->body)
         {
-          printf("%p,%p,\n",rbo,obA);
           continue;
         }
         else
         {
           btVector3 tot_impulse = btVector3(0.0,0.0,0.0);
           btVector3 final_loc =  btVector3(0.0,0.0,0.0);
+          btScalar tot_impulse_magnitude=0.f;
+          btVector3 tot_lat_impulse = btVector3(0.0,0.0,0.0);
           int numContacts = contactManifold->getNumContacts();
           int num_impulse_points = 0;
           for (int j = 0; j < numContacts; j++)
@@ -245,19 +250,33 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
             btManifoldPoint& pt = contactManifold->getContactPoint(j);
             if (pt.getAppliedImpulse() > 0.f)
             {
-               const btVector3& loc = pt.getPositionWorldOnB();
-               const btVector3 lat_imp1 = pt.m_appliedImpulseLateral1 * pt.m_lateralFrictionDir1;
-               const btVector3 lat_imp2 = pt.m_appliedImpulseLateral2 * pt.m_lateralFrictionDir2;
-               printf("%f,%f,%f     %f,%f,%f\n",lat_imp1.getX(),lat_imp1.getY(),lat_imp1.getZ(),lat_imp2.getX(), lat_imp2.getY(),lat_imp2.getZ());
-               const btVector3 imp = (rbo->body == obB)? -pt.m_normalWorldOnB * pt.getAppliedImpulse()/timeSubStep:pt.m_normalWorldOnB * pt.getAppliedImpulse()/timeSubStep;
-
-               tot_impulse += imp;
-               final_loc += num_impulse_points>1 ? loc * pt.getAppliedImpulse() / numContacts : loc;
+                 const btVector3& loc = pt.getPositionWorldOnB();
+                 const btVector3 imp = (rbo->body == obB)? -pt.m_normalWorldOnB * pt.getAppliedImpulse()/timeSubStep:pt.m_normalWorldOnB * pt.getAppliedImpulse()/timeSubStep;
+                 tot_impulse_magnitude += pt.getAppliedImpulse();
+                 tot_impulse += imp;
+                 final_loc += num_impulse_points>1 ? loc * pt.getAppliedImpulse() : loc;
+               if (fric_flag)
+               {
+                   const btVector3 lat_imp1 = (rbo->body == obB)? -pt.m_appliedImpulseLateral1 * pt.m_lateralFrictionDir1/timeSubStep : pt.m_appliedImpulseLateral1 * pt.m_lateralFrictionDir1/timeSubStep;
+                   const btVector3 lat_imp2 = (rbo->body == obB)? -pt.m_appliedImpulseLateral2 * pt.m_lateralFrictionDir2/timeSubStep : pt.m_appliedImpulseLateral2 * pt.m_lateralFrictionDir2/timeSubStep;
+                   tot_lat_impulse += lat_imp1 + lat_imp2;
+               }
             }
           }
-          copy_v3_btvec3(norm_forces[num_forces],tot_impulse);
-          copy_v3_btvec3(vec_locations[num_forces],final_loc);
-          num_forces++;
+
+          if(num_impulse_points >1) final_loc = final_loc / tot_impulse_magnitude;
+          copy_v3_btvec3(vec_locations[num_norm_forces],final_loc);
+          if(norm_flag)
+          {
+            copy_v3_btvec3(norm_forces[num_norm_forces],tot_impulse);
+            num_norm_forces++;
+          }
+          if(fric_flag)
+          {
+            copy_v3_btvec3(fric_forces[num_fric_forces], tot_lat_impulse);
+            printf("%f %f %f\n", tot_lat_impulse.getX(), tot_lat_impulse.getY(),tot_lat_impulse.getZ());
+            num_fric_forces++;
+          }
         }
 
      }

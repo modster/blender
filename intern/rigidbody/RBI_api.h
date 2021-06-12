@@ -87,7 +87,10 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
                            rbRigidBody *rbo,
                            float timeSubStep,
                            float norm_forces[3][3],
-                           float vec_locations[3][3]);
+                           float fric_forces[3][3],
+                           float vec_locations[3][3],
+                           int norm_flag,
+                           int fric_flag);
 
 /* Simulation ----------------------- */
 

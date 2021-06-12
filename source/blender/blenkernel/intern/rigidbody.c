@@ -1286,15 +1286,18 @@ RigidBodyOb *BKE_rigidbody_create_object(Scene *scene, Object *ob, short type)
 
   rbo->col_groups = 1;
 
-  zero_v3(rbo->eff_forces[0].force);
-  zero_v3(rbo->eff_forces[1].force);
-  zero_v3(rbo->eff_forces[2].force);
-  zero_v3(rbo->norm_forces[0].force);
-  zero_v3(rbo->norm_forces[1].force);
-  zero_v3(rbo->norm_forces[2].force);
-  zero_v3(rbo->norm_forces[0].loc);
-  zero_v3(rbo->norm_forces[1].loc);
-  zero_v3(rbo->norm_forces[2].loc);
+  zero_v3(rbo->eff_forces[0].vector);
+  zero_v3(rbo->eff_forces[1].vector);
+  zero_v3(rbo->eff_forces[2].vector);
+  zero_v3(rbo->norm_forces[0].vector);
+  zero_v3(rbo->norm_forces[1].vector);
+  zero_v3(rbo->norm_forces[2].vector);
+  zero_v3(rbo->fric_forces[0].vector);
+  zero_v3(rbo->fric_forces[1].vector);
+  zero_v3(rbo->fric_forces[2].vector);
+  zero_v3(rbo->vec_locations[0].vector);
+  zero_v3(rbo->vec_locations[1].vector);
+  zero_v3(rbo->vec_locations[2].vector);
 
   /* use triangle meshes for passive objects
    * use convex hulls for active objects since dynamic triangle meshes are very unstable
@@ -1754,7 +1757,7 @@ static void rigidbody_update_sim_ob(
       BKE_effectors_apply(effectors, NULL, effector_weights, &epoint, eff_force, NULL, NULL,eff_forces);
       if(rbo->display_force_types & RB_SIM_EFFECTORS) {
         for(int i=0; i<3; i++){
-            copy_v3_v3(rbo->eff_forces[i].force, eff_forces[i]);
+            copy_v3_v3(rbo->eff_forces[i].vector, eff_forces[i]);
         }
       }
       if (G.f & G_DEBUG) {
@@ -2264,17 +2267,29 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
       for (int j = 0; j < rbw->numbodies; j++){
 
         float norm_forces[3][3] = {{0.0f}};
+        float fric_forces[3][3] = {{0.0f}};
         float vec_locations[3][3] = {{0.0f}};
         Object *ob = rbw->objects[j];
         if(ob->rigidbody_object != NULL){
           rbRigidBody *rbo = (rbRigidBody*)(ob->rigidbody_object->shared->physics_object);
-          RB_dworld_get_impulse(rbw->shared->physics_world, rbo ,substep,norm_forces,vec_locations);
-          copy_v3_v3(ob->rigidbody_object->norm_forces[0].force,norm_forces[0]);
-          copy_v3_v3(ob->rigidbody_object->norm_forces[1].force,norm_forces[1]);
-          copy_v3_v3(ob->rigidbody_object->norm_forces[2].force,norm_forces[2]);
-          copy_v3_v3(ob->rigidbody_object->norm_forces[0].loc,vec_locations[0]);
-          copy_v3_v3(ob->rigidbody_object->norm_forces[1].loc,vec_locations[1]);
-          copy_v3_v3(ob->rigidbody_object->norm_forces[2].loc,vec_locations[2]);
+          int norm_flag = (ob->rigidbody_object->display_force_types & RB_SIM_NORMAL);
+          int fric_flag = (ob->rigidbody_object->display_force_types & RB_SIM_FRICTION);
+          if(norm_flag || fric_flag){
+            RB_dworld_get_impulse(rbw->shared->physics_world, rbo ,substep, norm_forces, fric_forces, vec_locations, norm_flag, fric_flag);
+            copy_v3_v3(ob->rigidbody_object->vec_locations[0].vector,vec_locations[0]);
+            copy_v3_v3(ob->rigidbody_object->vec_locations[1].vector,vec_locations[1]);
+            copy_v3_v3(ob->rigidbody_object->vec_locations[2].vector,vec_locations[2]);
+            if(norm_flag){
+              copy_v3_v3(ob->rigidbody_object->norm_forces[0].vector,norm_forces[0]);
+              copy_v3_v3(ob->rigidbody_object->norm_forces[1].vector,norm_forces[1]);
+              copy_v3_v3(ob->rigidbody_object->norm_forces[2].vector,norm_forces[2]);
+            }
+            if(fric_flag){
+              copy_v3_v3(ob->rigidbody_object->fric_forces[0].vector,fric_forces[0]);
+              copy_v3_v3(ob->rigidbody_object->fric_forces[1].vector,fric_forces[1]);
+              copy_v3_v3(ob->rigidbody_object->fric_forces[2].vector,fric_forces[2]);
+            }
+          }
         }
       }
     }

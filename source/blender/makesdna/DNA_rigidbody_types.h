@@ -100,11 +100,9 @@ typedef enum eRigidBodyWorld_Flag {
   RBW_FLAG_USE_SPLIT_IMPULSE = (1 << 2),
 } eRigidBodyWorld_Flag;
 
-typedef struct force_vec {
-    float force[3];
-    /* place where the arrow will originate from */
-    float loc[3];
-}force_vec;
+typedef struct sim_data_vec {
+    float vector[3];
+}sim_data_vec;
 
 /* ******************************** */
 /* RigidBody Object */
@@ -177,10 +175,14 @@ typedef struct RigidBodyOb {
   short display_force_types;
   char _pad2[4];
 
-  force_vec eff_forces[3];
-  force_vec norm_forces[3];
-
-  char _pad3[8];
+  sim_data_vec eff_forces[3];
+  char _pad3[4];
+  sim_data_vec norm_forces[3];
+  char _pad4[4];
+  sim_data_vec fric_forces[3];
+  char _pad5[4];
+  sim_data_vec vec_locations[3];
+  char _pad6[4];
 
 } RigidBodyOb;
 
