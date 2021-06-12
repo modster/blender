@@ -9894,6 +9894,12 @@ static void def_geo_raycast(StructRNA *srna)
   PropertyRNA *prop;
 
   RNA_def_struct_sdna_from(srna, "NodeGeometryRaycast", "storage");
+
+  prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_attribute_domain_with_auto_items);
+  RNA_def_property_enum_default(prop, ATTR_DOMAIN_AUTO);
+  RNA_def_property_ui_text(prop, "Domain", "The geometry domain to save the result attribute in");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
 /* -------------------------------------------------------------------------- */
