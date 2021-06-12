@@ -338,15 +338,15 @@ static void wm_xr_navigation_teleport(bContext *C,
 
   /* Teleport. */
   if (ob) {
-    float nav_location[3];
+    float nav_location[3], viewer_location[3];
 
-    if (WM_xr_session_state_nav_location_get(xr, nav_location)) {
+    if (WM_xr_session_state_nav_location_get(xr, nav_location) &&
+        WM_xr_session_state_viewer_pose_location_get(xr, viewer_location)) {
       for (int a = 0; a < 3; ++a) {
         if (teleport_axes[a]) {
-          nav_location[a] += teleport_t * (location[a] - nav_location[a]);
+          nav_location[a] += teleport_t * (location[a] - viewer_location[a]);
         }
       }
-      sub_v3_v3(nav_location, xr->runtime->session_state.prev_base_pose.position);
       WM_xr_session_state_nav_location_set(xr, nav_location);
     }
   }

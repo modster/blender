@@ -391,11 +391,11 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   const bool use_position_tracking = settings->flag & XR_SESSION_USE_POSITION_TRACKING;
   const bool use_absolute_tracking = settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING;
   wmXrEyeData *eye = &state->eyes[draw_view->view];
+  float q[4];
 
-  mul_qt_qtqt(viewer_pose.orientation_quat,
-              draw_data->base_pose.orientation_quat,
-              draw_view->local_pose.orientation_quat);
-  copy_v3_v3(viewer_pose.position, draw_data->base_pose.position);
+  mul_qt_qtqt(q, draw_data->base_pose.orientation_quat, draw_view->local_pose.orientation_quat);
+  mul_qt_qtqt(viewer_pose.orientation_quat, q, state->nav_pose.orientation_quat);
+  add_v3_v3v3(viewer_pose.position, draw_data->base_pose.position, state->nav_pose.position);
   /* The local pose and the eye pose (which is copied from an earlier local pose) both are view
    * space, so Y-up. In this case we need them in regular Z-up. */
   if (!use_absolute_tracking) {
@@ -411,7 +411,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
 
   copy_v3_v3(state->viewer_pose.position, viewer_pose.position);
   copy_qt_qt(state->viewer_pose.orientation_quat, viewer_pose.orientation_quat);
-  wm_xr_pose_to_viewmat(&viewer_pose, state->viewer_viewmat);
+  wm_xr_pose_scale_to_viewmat(&viewer_pose, state->nav_scale, state->viewer_viewmat);
 
   /* No idea why, but multiplying by two seems to make it match the VR view more. */
   eye->focal_len = 2.0f *
