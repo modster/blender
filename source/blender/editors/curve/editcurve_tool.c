@@ -467,6 +467,57 @@ static void curve_edit_cancel(bContext *UNUSED(C), wmOperator *op)
   curve_edit_exit(op);
 }
 
+static float *mouse_location_to_worldspace(int *mouse_loc, float *depth, ViewContext vc)
+{
+  float location[3];
+  mul_v3_m4v3(location, vc.obedit->obmat, depth);
+  ED_view3d_win_to_3d_int(vc.v3d, vc.region, location, mouse_loc, location);
+  return location;
+}
+
+static void move_bezt_handles_to_mouse(BezTriple *bezt,
+                                       bool is_end_point,
+                                       const wmEvent *event,
+                                       ViewContext vc)
+{
+  if (bezt->h1 == HD_VECT && bezt->h2 == HD_VECT) {
+    bezt->h1 = HD_ALIGN;
+    bezt->h2 = HD_ALIGN;
+  }
+
+  /* Set handle type to free when moved with shift. */
+  if (event->shift && bezt->h1 != HD_FREE) {
+    bezt->h1 = HD_FREE;
+    bezt->h2 = HD_FREE;
+  }
+
+  /* Obtain world space mouse location. */
+  float *location = mouse_location_to_worldspace(event->mval, bezt->vec[1], vc);
+
+  /* If the new point is the last point of the curve, move the second handle. */
+  if (is_end_point) {
+    /* Set handle 2 location. */
+    copy_v3_v3(bezt->vec[2], location);
+
+    /* Set handle 1 location if handle not of type FREE */
+    if (bezt->h2 != HD_FREE) {
+      mul_v3_fl(location, -1);
+      madd_v3_v3v3fl(bezt->vec[0], location, bezt->vec[1], 2);
+    }
+  }
+  /* Else move the first handle. */
+  else {
+    /* Set handle 1 location. */
+    copy_v3_v3(bezt->vec[0], location);
+
+    /* Set handle 2 location if handle not of type FREE */
+    if (bezt->h1 != HD_FREE) {
+      mul_v3_fl(location, -1);
+      madd_v3_v3v3fl(bezt->vec[2], location, bezt->vec[1], 2);
+    }
+  }
+}
+
 static int curve_edit_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   bool extend = RNA_boolean_get(op->ptr, "extend");
@@ -509,29 +560,7 @@ static int curve_edit_modal(bContext *C, wmOperator *op, const wmEvent *event)
         /* Get pointer to new control point. */
         ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact);
         if (bezt) {
-          if (bezt->h1 == HD_VECT && bezt->h2 == HD_VECT) {
-            bezt->h1 = HD_ALIGN;
-            bezt->h2 = HD_ALIGN;
-          }
-          /* Set handle type to free when moved with shift. */
-          if (event->shift && bezt->h1 != HD_FREE) {
-            bezt->h1 = HD_FREE;
-            bezt->h2 = HD_FREE;
-          }
-
-          /* Obtain world space mouse location. */
-          float location[3];
-          mul_v3_m4v3(location, vc.obedit->obmat, bezt->vec[2]);
-          ED_view3d_win_to_3d_int(vc.v3d, vc.region, location, event->mval, location);
-
-          /* Set handle 1 location */
-          copy_v3_v3(bezt->vec[0], location);
-
-          /* Set handle 2 location if handle not of type FREE */
-          if (bezt->h1 != HD_FREE) {
-            mul_v3_fl(location, -1);
-            madd_v3_v3v3fl(bezt->vec[2], location, bezt->vec[1], 2);
-          }
+          move_bezt_handles_to_mouse(bezt, nu->bezt + nu->pntsu - 1 == bezt, event, vc);
 
           BKE_nurb_handles_calc(nu);
         }
@@ -554,10 +583,9 @@ static int curve_edit_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
         if (bezt) {
 
-          float location[3], change[3];
+          float change[3];
           /* Get mouse location in 3D space. */
-          mul_v3_m4v3(location, vc.obedit->obmat, bezt->vec[2]);
-          ED_view3d_win_to_3d_int(vc.v3d, vc.region, location, event->mval, location);
+          float *location = mouse_location_to_worldspace(event->mval, bezt->vec[2], vc);
 
           /* Move entire BezTriple if center point is dragged. */
           if (bezt->f2) {
@@ -592,10 +620,8 @@ static int curve_edit_modal(bContext *C, wmOperator *op, const wmEvent *event)
           BKE_nurb_handles_calc(nu);
         }
         else if (bp) {
-          float location[3];
           /* Get mouse location in 3D space. */
-          mul_v3_m4v3(location, vc.obedit->obmat, bp->vec);
-          ED_view3d_win_to_3d_int(vc.v3d, vc.region, location, event->mval, location);
+          float *location = mouse_location_to_worldspace(event->mval, bp->vec, vc);
 
           copy_v3_v3(bp->vec, location);
 
