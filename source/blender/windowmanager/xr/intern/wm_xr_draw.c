@@ -76,7 +76,7 @@ static void wm_xr_draw_matrices_create(const wmXrDrawData *draw_data,
                                        float r_proj_mat[4][4])
 {
   GHOST_XrPose eye_pose;
-  float eye_mat[4][4], base_mat[4][4], nav_mat[4][4], tmp[4][4];
+  float eye_mat[4][4], base_mat[4][4], nav_mat[4][4], m[4][4];
 
   copy_qt_qt(eye_pose.orientation_quat, draw_view->eye_pose.orientation_quat);
   copy_v3_v3(eye_pose.position, draw_view->eye_pose.position);
@@ -102,9 +102,9 @@ static void wm_xr_draw_matrices_create(const wmXrDrawData *draw_data,
   wm_xr_pose_scale_to_viewmat(&session_state->nav_pose, session_state->nav_scale, nav_mat);
 
   /* Apply base pose. */
-  mul_m4_m4m4(tmp, eye_mat, base_mat);
+  mul_m4_m4m4(m, eye_mat, base_mat);
   /* Apply navigation. */
-  mul_m4_m4m4(r_view_mat, tmp, nav_mat);
+  mul_m4_m4m4(r_view_mat, m, nav_mat);
 }
 
 static void wm_xr_draw_viewport_buffers_to_active_framebuffer(

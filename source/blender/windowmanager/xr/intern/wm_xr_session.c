@@ -679,7 +679,7 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
   float view_ofs[3];
   float base_inv[4][4];
   float nav_inv[4][4];
-  float tmp0[4][4], tmp1[4][4];
+  float m0[4][4], m1[4][4];
 
   if ((settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING) == 0) {
     copy_v3_v3(view_ofs, state->prev_eye_position_ofs);
@@ -715,14 +715,14 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
     }
 
     /* Calculate controller matrix in world space. */
-    wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp0);
+    wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], m0);
 
     /* Apply eye position and base pose offsets. */
-    sub_v3_v3(tmp0[3], view_ofs);
-    mul_m4_m4m4(tmp1, base_inv, tmp0);
+    sub_v3_v3(m0[3], view_ofs);
+    mul_m4_m4m4(m1, base_inv, m0);
 
     /* Apply navigation. */
-    mul_m4_m4m4(controller->mat, nav_inv, tmp1);
+    mul_m4_m4m4(controller->mat, nav_inv, m1);
 
     /* Save final pose. */
     mat4_to_loc_quat(
@@ -823,7 +823,6 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
     wmXrAction *action = actions[action_idx];
     if (action && action->ot) {
       const bool modal = (action->ot->modal || action->ot->modal_3d);
-      const bool bimanual = ((action->flag & XR_ACTION_BIMANUAL) != 0);
 
       for (unsigned int subaction_idx = 0; subaction_idx < action->count_subaction_paths;
            ++subaction_idx) {
@@ -952,18 +951,51 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
             (!active_modal_action ||
              ((action == active_modal_action) &&
               (&action->subaction_paths[subaction_idx] == action->active_modal_path)))) {
-          const unsigned int subaction_idx_other =
-              bimanual ? ((subaction_idx == 0) ?
-                              (unsigned int)min_ii(1, action->count_subaction_paths - 1) :
-                              0) :
-                         subaction_idx;
           const GHOST_XrPose *pose = wm_xr_session_controller_pose_find(
               session_state, action->subaction_paths[subaction_idx]);
-          const GHOST_XrPose *pose_other = bimanual ?
-                                               wm_xr_session_controller_pose_find(
-                                                   session_state,
-                                                   action->subaction_paths[subaction_idx_other]) :
-                                               NULL;
+          const GHOST_XrPose *pose_other = NULL;
+          unsigned int subaction_idx_other;
+
+          /* Test for bimanual interaction. */
+          bool bimanual = false;
+          if ((action->flag & XR_ACTION_BIMANUAL) != 0) {
+            subaction_idx_other = (subaction_idx == 0) ?
+                                      (unsigned int)min_ii(1, action->count_subaction_paths - 1) :
+                                      0;
+
+            switch (action->type) {
+              case XR_BOOLEAN_INPUT: {
+                const bool *state = &((bool *)action->states)[subaction_idx_other];
+                if (*state) {
+                  bimanual = true;
+                }
+                break;
+              }
+              case XR_FLOAT_INPUT: {
+                const float *state = &((float *)action->states)[subaction_idx_other];
+                if (test_float_state(state, action->float_threshold, action->flag)) {
+                  bimanual = true;
+                }
+                break;
+              }
+              case XR_VECTOR2F_INPUT: {
+                const float(*state)[2] = &((float(*)[2])action->states)[subaction_idx_other];
+                if (test_vec2f_state(*state, action->float_threshold, action->flag)) {
+                  bimanual = true;
+                }
+                break;
+              }
+              case XR_POSE_INPUT:
+              case XR_VIBRATION_OUTPUT:
+                BLI_assert_unreachable();
+                break;
+            }
+
+            if (bimanual) {
+              pose_other = wm_xr_session_controller_pose_find(
+                  session_state, action->subaction_paths[subaction_idx_other]);
+            }
+          }
 
           wm_event_add_xrevent(action_set_name,
                                action,
@@ -973,7 +1005,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                                surface,
                                win,
                                subaction_idx,
-                               subaction_idx_other,
+                               bimanual ? subaction_idx_other : subaction_idx,
                                val,
                                press_start);
         }

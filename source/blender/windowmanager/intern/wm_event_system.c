@@ -5045,9 +5045,10 @@ void wm_event_add_xrevent(const char *action_set_name,
   BLI_assert(surface->is_xr && surface->customdata);
   BLI_assert(val == KM_PRESS || val == KM_RELEASE);
 
-  wmXrSurfaceData *surface_data = surface->customdata;
   const bool add_win_event = ((action->ot->modal || action->ot->modal_3d) &&
                               ((val == KM_PRESS && !press_start) || val == KM_RELEASE));
+  const bool bimanual = (((action->flag & XR_ACTION_BIMANUAL) != 0) &&
+                         (subaction_idx_other != subaction_idx));
 
   wmEvent _event;
   wmEvent *event = add_win_event ? &_event : MEM_callocN(sizeof(wmEvent), __func__);
@@ -5063,19 +5064,19 @@ void wm_event_add_xrevent(const char *action_set_name,
   switch (action->type) {
     case XR_BOOLEAN_INPUT:
       data->state[0] = ((bool *)action->states)[subaction_idx] ? 1.0f : 0.0f;
-      if (subaction_idx_other != subaction_idx) {
+      if (bimanual) {
         data->state_other[0] = ((bool *)action->states)[subaction_idx_other] ? 1.0f : 0.0f;
       }
       break;
     case XR_FLOAT_INPUT:
       data->state[0] = ((float *)action->states)[subaction_idx];
-      if (subaction_idx_other != subaction_idx) {
+      if (bimanual) {
         data->state_other[0] = ((float *)action->states)[subaction_idx_other];
       }
       break;
     case XR_VECTOR2F_INPUT:
       copy_v2_v2(data->state, ((float(*)[2])action->states)[subaction_idx]);
-      if (subaction_idx_other != subaction_idx) {
+      if (bimanual) {
         copy_v2_v2(data->state_other, ((float(*)[2])action->states)[subaction_idx_other]);
       }
       break;
@@ -5089,7 +5090,7 @@ void wm_event_add_xrevent(const char *action_set_name,
     copy_v3_v3(data->controller_loc, controller_pose->position);
     copy_qt_qt(data->controller_rot, controller_pose->orientation_quat);
 
-    if (controller_pose_other) {
+    if (bimanual && controller_pose_other) {
       copy_v3_v3(data->controller_loc_other, controller_pose_other->position);
       copy_qt_qt(data->controller_rot_other, controller_pose_other->orientation_quat);
     }
@@ -5110,7 +5111,7 @@ void wm_event_add_xrevent(const char *action_set_name,
   data->ot = action->ot;
   data->op_properties = action->op_properties;
 
-  data->flag = action->flag;
+  data->bimanual = bimanual;
 
   event->custom = EVT_DATA_XR;
   event->customdata = data;
@@ -5123,6 +5124,7 @@ void wm_event_add_xrevent(const char *action_set_name,
   else {
     /* Operators will be called by the surface. For modal operators, this will
      * create the modal handlers to later be handled by the window. */
+    wmXrSurfaceData *surface_data = surface->customdata;
     BLI_addtail(&surface_data->events, event);
   }
 }

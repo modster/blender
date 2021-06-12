@@ -734,8 +734,8 @@ typedef struct wmXrActionData {
   struct wmOperatorType *ot;
   struct IDProperty *op_properties;
 
-  /** Flag. */
-  eXrActionFlag flag;
+  /** Whether bimanual interaction is occuring. */
+  bool bimanual;
 } wmXrActionData;
 
 /** Timer flags. */

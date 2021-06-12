@@ -712,7 +712,8 @@ static void rna_Event_xr_actionmap_get(PointerRNA *ptr, char *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, &value, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(
+        event, &value, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     value[0] = '\0';
@@ -735,7 +736,8 @@ static void rna_Event_xr_action_get(PointerRNA *ptr, char *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, &value, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(
+        event, NULL, &value, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     value[0] = '\0';
@@ -760,7 +762,7 @@ static int rna_Event_xr_type_get(PointerRNA *ptr)
   if (WM_event_is_xr(event)) {
     int type;
     WM_event_xr_data(
-        event, NULL, NULL, (char *)&type, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+        event, NULL, NULL, (char *)&type, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     return type;
   }
   else {
@@ -772,7 +774,8 @@ static void rna_Event_xr_state_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(
+        event, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     memset(value, 0, sizeof(float[2]));
@@ -783,7 +786,8 @@ static void rna_Event_xr_state_other_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(
+        event, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     memset(value, 0, sizeof(float[2]));
@@ -794,7 +798,8 @@ static void rna_Event_xr_controller_location_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(
+        event, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     memset(value, 0, sizeof(float[3]));
@@ -805,7 +810,8 @@ static void rna_Event_xr_controller_rotation_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(
+        event, NULL, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     value[0] = 1.0f;
@@ -817,7 +823,8 @@ static void rna_Event_xr_controller_location_other_get(PointerRNA *ptr, float *v
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL);
+    WM_event_xr_data(
+        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL);
   }
   else {
     memset(value, 0, sizeof(float[3]));
@@ -828,7 +835,8 @@ static void rna_Event_xr_controller_rotation_other_get(PointerRNA *ptr, float *v
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL);
+    WM_event_xr_data(
+        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL);
   }
   else {
     value[0] = 1.0f;
@@ -840,8 +848,19 @@ static void rna_Event_xr_view_matrix_get(PointerRNA *ptr, float values[16])
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(
-        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, (float(*)[4])values, NULL);
+    WM_event_xr_data(event,
+                     NULL,
+                     NULL,
+                     NULL,
+                     NULL,
+                     NULL,
+                     NULL,
+                     NULL,
+                     NULL,
+                     NULL,
+                     (float(*)[4])values,
+                     NULL,
+                     NULL);
   }
   else {
     memset(values, 0, sizeof(float[16]));
@@ -854,11 +873,25 @@ static float rna_Event_xr_focal_length_get(PointerRNA *ptr)
   if (WM_event_is_xr(event)) {
     float focal_len;
     WM_event_xr_data(
-        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &focal_len);
+        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &focal_len, NULL);
     return focal_len;
   }
   else {
     return 0.0f;
+  }
+}
+
+static bool rna_Event_xr_bimanual_get(PointerRNA *ptr)
+{
+  const wmEvent *event = ptr->data;
+  if (WM_event_is_xr(event)) {
+    bool bimanual;
+    WM_event_xr_data(
+        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &bimanual);
+    return bimanual;
+  }
+  else {
+    return false;
   }
 }
 
@@ -2502,6 +2535,11 @@ static void rna_def_event(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_float_funcs(prop, "rna_Event_xr_focal_length_get", NULL, NULL);
   RNA_def_property_ui_text(prop, "XR Focal Length", "Focal length of the XR selection eye");
+
+  prop = RNA_def_property(srna, "xr_bimanual", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(prop, "rna_Event_xr_bimanual_get", NULL);
+  RNA_def_property_ui_text(prop, "XR Bimanual", "Bimanual interaction is occurring");
 
   RNA_define_verify_sdna(1); /* not in sdna */
 }
