@@ -224,7 +224,7 @@ static void execute_on_component(const GeoNodeExecParams &params,
     for (const int i : range) {
       const float parameter = process_parameter(
           positions[i], axis_index, is_negative, input, parameter_bounds);
-      std::cout << "Parameter: " << parameter << "\n";
+
       const Spline::LookupResult lookup = input.spline.lookup_evaluated_length(parameter);
 
       const float3 co = (positions[i] - bounds.min) * bounds.inv_size * 2.0f - float3(1);
