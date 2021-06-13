@@ -1084,6 +1084,92 @@ static void draw_seq_fcurve_overlay(
   }
 }
 
+static void draw_seq_strip_thumbnail(View2D *v2d,
+                                     const bContext *C,
+                                     SpaceSeq *sseq,
+                                     Scene *scene,
+                                     Sequence *seq,
+                                     ARegion *region,
+                                     float x1,
+                                     float y1,
+                                     float x2,
+                                     float handsize_clamped,
+                                     float pixelx,
+                                     float pixely,
+                                     float y_threshold)
+{
+  struct Main *bmain = CTX_data_main(C);
+  struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+  SeqRenderData context = {0};
+  ImBuf *ibuf;
+  int rectx, recty;
+  double render_size;
+  float y2, strip_x2 = x2;
+  float seq_disp_len;
+
+  if (sseq->render_size == SEQ_RENDER_SIZE_NONE) {
+    return;
+  }
+
+  if (sseq->render_size == SEQ_RENDER_SIZE_SCENE) {
+    render_size = scene->r.size / 100.0;
+  }
+  else {
+    render_size = SEQ_rendersize_to_scale_factor(sseq->render_size);
+  }
+
+  if (!(y_threshold))
+    return;
+
+  rectx = roundf(render_size * scene->r.xsch);
+  recty = roundf(render_size * scene->r.ysch);
+
+  SEQ_render_new_render_data(
+      bmain, depsgraph, scene, rectx, recty, sseq->render_size, false, &context);
+  context.view_id = BKE_scene_multiview_view_id_get(&scene->r, STEREO_LEFT_NAME);
+  context.use_proxies = false;
+  context.is_prefetch_render = false;
+  context.is_proxy_render = false;
+
+  /*Calculate thumb dimensions */
+  float thumb_h = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
+  float aspect_ratio = ((float)scene->r.xsch) / scene->r.ysch;
+  float thumb_h_px = thumb_h / pixely;
+  float thumb_w = aspect_ratio * thumb_h_px * pixelx;
+  float zoom_x = thumb_w / scene->r.xsch;
+  float zoom_y = thumb_h / scene->r.ysch;
+
+  y2 = y1 + thumb_h;
+  x1 = x1 + handsize_clamped;
+
+  seq_disp_len = seq->enddisp - seq->startdisp;
+  int frame_offset = thumb_w;
+
+  float upper_thumb_bound = strip_x2 - handsize_clamped;
+
+  while (x1 < upper_thumb_bound - 1) {
+    x2 = x1 + thumb_w;
+
+    /* clip if full thumbnail cannot be displayed */
+    if (x2 >= (upper_thumb_bound - 1)) {
+      x2 = (upper_thumb_bound - 1);
+      if (x2 - x1 < 1)
+        break;
+    }
+
+    /* Get the image */
+    ibuf = SEQ_render_give_ibuf_direct(&context, seq->startdisp + x1 - handsize_clamped, seq);
+
+    if (ibuf) {
+      ED_draw_imbuf_ctx_clipping(
+          C, ibuf, x1, y1 + pixely * 2, false, x1, y1 + pixely * 2, x2, y2, zoom_x, zoom_y);
+      IMB_freeImBuf(ibuf);
+    }
+
+    x1 = x2;
+  }
+}
+
 /* Draw visible strips. Bounds check are already made. */
 static void draw_seq_strip(const bContext *C,
                            SpaceSeq *sseq,
@@ -1181,6 +1267,22 @@ static void draw_seq_strip(const bContext *C,
   /* Draw Red line on the top of invalid strip (Missing media). */
   if (!SEQ_sequence_has_source(seq)) {
     draw_seq_invalid(x1, x2, y2, text_margin_y);
+  }
+
+  if (seq->type == SEQ_TYPE_MOVIE) {
+    draw_seq_strip_thumbnail(v2d,
+                             C,
+                             sseq,
+                             scene,
+                             seq,
+                             region,
+                             x1,
+                             y1,
+                             x2,
+                             handsize_clamped,
+                             pixelx,
+                             pixely,
+                             y_threshold);
   }
 
   pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
@@ -1341,7 +1443,8 @@ ImBuf *sequencer_ibuf_get(struct Main *bmain,
   }
 
   if (viewport) {
-    /* Follows same logic as wm_draw_window_offscreen to make sure to restore the same viewport. */
+    /* Follows same logic as wm_draw_window_offscreen to make sure to restore the same viewport.
+     */
     int view = (sseq->multiview_eye == STEREO_RIGHT_ID) ? 1 : 0;
     GPU_viewport_bind(viewport, view, &region->winrct);
   }
