@@ -518,7 +518,11 @@ static void move_bezt_handles_to_mouse(BezTriple *bezt,
   }
 }
 
-static int curve_edit_modal(bContext *C, wmOperator *op, const wmEvent *event)
+static float *get_closest_point_on_segment(BezTriple *bezt, float *point)
+{
+}
+
+static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   bool extend = RNA_boolean_get(op->ptr, "extend");
   bool deselect = RNA_boolean_get(op->ptr, "deselect");
@@ -539,7 +543,7 @@ static int curve_edit_modal(bContext *C, wmOperator *op, const wmEvent *event)
   int mval[2];
 
   RNA_int_get_array(op->ptr, "location", mval);
-
+  printf("Modal\n");
   view3d_operator_needs_opengl(C);
   BKE_object_update_select_id(CTX_data_main(C));
 
@@ -709,6 +713,7 @@ static int curve_edit_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
                 float screen_co[2];
                 bool prev_acute = true;
+                /* Convert point to screen coordinates */
                 ED_view3d_project_float_object(
                     vc.region, points, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
 
@@ -864,34 +869,36 @@ static int curve_edit_modal(bContext *C, wmOperator *op, const wmEvent *event)
   return ret;
 }
 
-static int curve_edit_exec(bContext *C, wmOperator *op)
+static int curve_pen_exec(bContext *C, wmOperator *op)
 {
+  printf("exec\n");
 }
 
-static int curve_edit_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   RNA_int_set_array(op->ptr, "location", event->mval);
 
-  int ret = curve_edit_modal(C, op, event);
+  int ret = curve_pen_modal(C, op, event);
   BLI_assert(ret == OPERATOR_RUNNING_MODAL);
   if (ret == OPERATOR_RUNNING_MODAL) {
     WM_event_add_modal_handler(C, op);
   }
+  printf("invoke\n");
   // return view3d_select_invoke(C, op, event);
   return ret;
 }
 
-void CURVE_OT_edit(wmOperatorType *ot)
+void CURVE_OT_pen(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Edit Curve";
-  ot->idname = "CURVE_OT_edit";
+  ot->name = "Curve Pen";
+  ot->idname = "CURVE_OT_pen";
   ot->description = "Edit curves with less shortcuts";
 
   /* api callbacks */
-  ot->exec = curve_edit_exec;
-  ot->invoke = curve_edit_invoke;
-  ot->modal = curve_edit_modal;
+  ot->exec = curve_pen_exec;
+  ot->invoke = curve_pen_invoke;
+  ot->modal = curve_pen_modal;
   ot->poll = ED_operator_view3d_active;
 
   /* flags */

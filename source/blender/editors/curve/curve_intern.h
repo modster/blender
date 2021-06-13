@@ -198,5 +198,5 @@ void ED_curve_nurb_vert_selected_find(
 void CURVE_OT_draw(struct wmOperatorType *ot);
 
 /* editcurve_tool.c */
-void CURVE_OT_edit(struct wmOperatorType *ot);
+void CURVE_OT_pen(struct wmOperatorType *ot);
 // struct wmKeyMap *edit_curve_tool_modal_keymap(struct wmKeyConfig *keyconf);

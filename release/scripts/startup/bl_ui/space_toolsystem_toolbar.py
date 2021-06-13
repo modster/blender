@@ -1192,11 +1192,11 @@ class _defs_edit_curve:
         )
 
     @ToolDef.from_fn
-    def edit():
+    def pen():
         return dict(
-            idname="builtin.edit",
-            label="Edit Curve",
-            cursor='PAINT_BRUSH',
+            idname="builtin.pen",
+            label="Curve Pen",
+            cursor='CROSSHAIR',
             icon="ops.curve.draw",
             widget=None,
             keymap=(),
@@ -2802,7 +2802,7 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             _defs_transform.shear,
             _defs_edit_curve.curve_vertex_randomize,
             None,
-            _defs_edit_curve.edit,
+            _defs_edit_curve.pen,
         ],
         'EDIT_SURFACE': [
             *_tools_default,

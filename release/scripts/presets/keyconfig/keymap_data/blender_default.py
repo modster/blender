@@ -4276,7 +4276,7 @@ def km_curve(params):
         ("curve.dissolve_verts", {"type": 'X', "value": 'PRESS', "ctrl": True}, None),
         ("curve.dissolve_verts", {"type": 'DEL', "value": 'PRESS', "ctrl": True}, None),
         ("curve.tilt_clear", {"type": 'T', "value": 'PRESS', "alt": True}, None),
-        ("curve.edit", {"type": 'X', "value": 'PRESS', "alt": True}, None),
+        ("curve.pen", {"type": 'X', "value": 'PRESS', "alt": True}, None),
         ("transform.tilt", {"type": 'T', "value": 'PRESS', "ctrl": True}, None),
         ("transform.transform", {"type": 'S', "value": 'PRESS', "alt": True},
          {"properties": [("mode", 'CURVE_SHRINKFATTEN')]}),
@@ -6462,14 +6462,14 @@ def km_3d_view_tool_edit_curve_draw(params):
     )
 
 
-def km_3d_view_tool_edit_curve_edit(params):
+def km_3d_view_tool_edit_curve_pen(params):
     return (
-        "3D View Tool: Edit Curve, Edit Curve",
+        "3D View Tool: Edit Curve, Curve Pen",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("curve.edit", {"type": params.tool_mouse, "value": 'PRESS'},
+            ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS'},
              {"properties": [("wait_for_input", False)]}),
-            ("curve.edit", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
+            ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
              {"properties": [("ctrl", True)]}),
         ]},
     )
@@ -7251,7 +7251,7 @@ def generate_keymaps(params=None):
         km_3d_view_tool_edit_mesh_rip_region(params),
         km_3d_view_tool_edit_mesh_rip_edge(params),
         km_3d_view_tool_edit_curve_draw(params),
-        km_3d_view_tool_edit_curve_edit(params),
+        km_3d_view_tool_edit_curve_pen(params),
         km_3d_view_tool_edit_curve_radius(params),
         km_3d_view_tool_edit_curve_tilt(params),
         km_3d_view_tool_edit_curve_randomize(params),
