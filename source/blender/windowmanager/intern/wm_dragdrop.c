@@ -618,7 +618,8 @@ void wm_drags_draw(bContext *C, wmWindow *win, rcti *rect)
     int padding = 4 * UI_DPI_FAC;
 
     /* image or icon */
-    int x, y;
+    int x = cursorx - 2 * padding;
+    int y = cursory - 2 * UI_DPI_FAC;
     if (drag->no_preview) {
       /* Pass. */
     }
@@ -648,9 +649,6 @@ void wm_drags_draw(bContext *C, wmWindow *win, rcti *rect)
       }
     }
     else {
-      x = cursorx - 2 * padding;
-      y = cursory - 2 * UI_DPI_FAC;
-
       if (rect) {
         drag_rect_minmax(rect, x, y, x + iconsize, y + iconsize);
       }
@@ -660,7 +658,7 @@ void wm_drags_draw(bContext *C, wmWindow *win, rcti *rect)
     }
 
     /* item name */
-    if (drag->imb) {
+    if (!drag->no_preview && drag->imb) {
       x = cursorx - drag->sx / 2;
       y = cursory - drag->sy / 2 - iconsize;
     }

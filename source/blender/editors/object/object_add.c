@@ -3574,7 +3574,7 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
 void OBJECT_OT_add_named(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Add Named Object";
+  ot->name = "Add Object";
   ot->description = "Add named object";
   ot->idname = "OBJECT_OT_add_named";
 
