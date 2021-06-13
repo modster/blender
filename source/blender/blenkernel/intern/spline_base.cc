@@ -255,21 +255,33 @@ Spline::LookupResult Spline::lookup_evaluated_factor(const float factor) const
   return this->lookup_evaluated_length(this->length() * factor);
 }
 
-/**
- * \note This does not support extrapolation currently.
- */
 Spline::LookupResult Spline::lookup_evaluated_length(const float length) const
 {
-  BLI_assert(length >= 0.0f && length <= this->length());
-
+  const int64_t evaluated_size = this->evaluated_points_size();
   Span<float> lengths = this->evaluated_lengths();
 
+  if (is_cyclic_) {
+    const float *offset = std::lower_bound(
+        lengths.begin(), lengths.end(), std::remainder(length, this->length()));
+    const int index = offset - lengths.begin();
+    const int next_index = (index == evaluated_size - 1) ? 0 : index + 1;
+
+    const float previous_length = (index == 0) ? 0.0f : lengths[index - 1];
+    const float factor = (lengths[index] == previous_length) ?
+                             0.0f :
+                             (length - previous_length) / (lengths[index] - previous_length);
+
+    return LookupResult{index, next_index, factor};
+  }
+
   const float *offset = std::lower_bound(lengths.begin(), lengths.end(), length);
-  const int index = offset - lengths.begin();
-  const int next_index = (index == this->size() - 1) ? 0 : index + 1;
+  const int index = std::min(offset - lengths.begin(), evaluated_size - 2);
+  const int next_index = index + 1;
 
   const float previous_length = (index == 0) ? 0.0f : lengths[index - 1];
-  const float factor = (length - previous_length) / (lengths[index] - previous_length);
+  const float factor = (lengths[index] == previous_length) ?
+                           0.0f :
+                           (length - previous_length) / (lengths[index] - previous_length);
 
   return LookupResult{index, next_index, factor};
 }
@@ -319,6 +331,7 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
   return samples;
 }
 
+#ifdef DEBUG
 static void assert_sorted_array_in_range(Span<float> data, const float min, const float max)
 {
   BLI_assert(data.first() >= min);
@@ -327,6 +340,7 @@ static void assert_sorted_array_in_range(Span<float> data, const float min, cons
   }
   BLI_assert(data.last() <= max);
 }
+#endif
 
 /**
  * Transform an array of sorted length parameters into index factors. The result is indices
@@ -342,7 +356,9 @@ static void assert_sorted_array_in_range(Span<float> data, const float min, cons
 void Spline::sample_length_parameters_to_index_factors(MutableSpan<float> parameters) const
 {
   const Span<float> lengths = this->evaluated_lengths();
+#ifdef DEBUG
   assert_sorted_array_in_range(parameters, 0.0f, this->length());
+#endif
 
   /* Store the length at the previous evaluated point in a variable so it can
    * start out at zero (the lengths array doesn't contain 0 for the first point). */

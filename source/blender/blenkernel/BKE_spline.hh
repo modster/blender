@@ -170,6 +170,7 @@ class Spline {
   };
   LookupResult lookup_evaluated_factor(const float factor) const;
   LookupResult lookup_evaluated_length(const float length) const;
+  LookupResult lookup_evaluated_length_cyclic(const float length) const;
 
   blender::Array<float> sample_uniform_index_factors(const int samples_size) const;
   void sample_length_parameters_to_index_factors(blender::MutableSpan<float> parameters) const;

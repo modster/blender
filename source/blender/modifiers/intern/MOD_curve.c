@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "BLI_utildefines.h"
+#include "PIL_time.h"
 
 #include "BLT_translation.h"
 

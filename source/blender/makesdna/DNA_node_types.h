@@ -1363,14 +1363,8 @@ typedef struct NodeGeometryCurveResample {
 } NodeGeometryCurveResample;
 
 typedef struct NodeGeometryCurveDeform {
-  /* GeometryNodeCurveDeformMode. */
-  uint8_t input_mode;
   /* GeometryNodeCurveDeformAxis. */
   uint8_t axis;
-  /* GeometryNodeAttributeInputMode (float or attribute). */
-  uint8_t attribute_input_type;
-
-  char _pad[5];
 } NodeGeometryCurveDeform;
 
 typedef struct NodeGeometryAttributeTransfer {
@@ -1890,11 +1884,6 @@ typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST = 1,
 } GeometryNodeAttributeTransferMapMode;
-
-typedef enum GeometryNodeCurveDeformMode {
-  GEO_NODE_CURVE_DEFORM_POSITION = 0,
-  GEO_NODE_CURVE_DEFORM_ATTRIBUTE = 1,
-} GeometryNodeCurveDeformMode;
 
 typedef enum GeometryNodeCurveDeformAxis {
   GEO_NODE_CURVE_DEFORM_POSX = 0,
