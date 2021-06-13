@@ -929,6 +929,7 @@ typedef struct wmDragAsset {
   const char *path;
   int id_type;
   struct AssetMetaData *metadata;
+  int import_type; /* eFileAssetImportType */
 } wmDragAsset;
 
 typedef struct wmDrag {

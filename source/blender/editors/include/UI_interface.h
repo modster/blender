@@ -733,6 +733,7 @@ void UI_but_drag_set_asset(uiBut *but,
                            const char *path,
                            int id_type,
                            struct AssetMetaData *metadata,
+                           int import_type, /* eFileAssetImportType */
                            int icon,
                            struct ImBuf *imb,
                            float scale);
