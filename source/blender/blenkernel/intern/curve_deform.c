@@ -137,8 +137,6 @@ static bool calc_curve_deform(
     }
   }
 
-  printf("FAC: %.5f\n", fac);
-
   if (BKE_where_on_path(ob_curve, fac, loc, dir, new_quat, &radius, NULL)) { /* returns OK */
     float quat[4], cent[3];
 
