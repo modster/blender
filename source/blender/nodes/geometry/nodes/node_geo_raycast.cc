@@ -27,7 +27,9 @@ static bNodeSocketTemplate geo_node_raycast_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_GEOMETRY, N_("Cast Geometry")},
     {SOCK_STRING, N_("Ray Direction")},
+    {SOCK_VECTOR, N_("Ray Direction"), 1.0, 0.0, 0.0, 0.0, -FLT_MAX, FLT_MAX},
     {SOCK_STRING, N_("Ray Length")},
+    {SOCK_FLOAT, N_("Ray Length"), 0.0, 0.0, 0.0, 0.0, 0.0f, FLT_MAX},
     {SOCK_STRING, N_("Hit")},
     {SOCK_STRING, N_("Hit Index")},
     {SOCK_STRING, N_("Hit Position")},
@@ -43,17 +45,33 @@ static bNodeSocketTemplate geo_node_raycast_out[] = {
 
 static void geo_node_raycast_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
+  uiItemR(layout, ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
+
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
+  uiItemR(layout, ptr, "input_type_ray_direction", 0, IFACE_("Ray Direction"), ICON_NONE);
+  uiItemR(layout, ptr, "input_type_ray_length", 0, IFACE_("Ray Length"), ICON_NONE);
 }
 
 static void geo_node_raycast_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   NodeGeometryRaycast *data = (NodeGeometryRaycast *)MEM_callocN(sizeof(NodeGeometryRaycast),
                                                                  __func__);
-
+  data->domain = ATTR_DOMAIN_AUTO;
+  data->input_type_ray_direction = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
+  data->input_type_ray_length = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
   node->storage = data;
+}
+
+static void geo_node_raycast_update(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  NodeGeometryRaycast *node_storage = (NodeGeometryRaycast *)node->storage;
+  blender::nodes::update_attribute_input_socket_availabilities(
+      *node,
+      "Ray Direction",
+      (GeometryNodeAttributeInputMode)node_storage->input_type_ray_direction);
+  blender::nodes::update_attribute_input_socket_availabilities(
+      *node, "Ray Length", (GeometryNodeAttributeInputMode)node_storage->input_type_ray_length);
 }
 
 namespace blender::nodes {
@@ -89,29 +107,6 @@ static void raycast_to_mesh(const GeometrySet &src_geometry,
     return;
   }
 
-  //for (const int i : ray_origins.index_range()) {
-  //  const float ray_length = ray_lengths[i];
-  //  const float3 ray_origin = ray_origins[i];
-  //  const float3 ray_direction = ray_directions[i];
-  //  if (!r_hit.is_empty()) {
-  //    r_hit[i] = true;
-  //  }
-  //  if (!r_hit_indices.is_empty()) {
-  //    r_hit_indices[i] = 123;
-  //  }
-  //  if (!r_hit_positions.is_empty()) {
-  //    r_hit_positions[i] = ray_origin;
-  //  }
-  //  if (!r_hit_normals.is_empty()) {
-  //    r_hit_normals[i] = ray_direction;
-  //  }
-  //  if (!r_hit_distances.is_empty()) {
-  //    r_hit_distances[i] = 3.1415f;
-  //  }
-  //}
-  //return;
-
-
   BVHTreeFromMesh tree_data;
   BKE_bvhtree_from_mesh_get(&tree_data, const_cast<Mesh *>(mesh), BVHTREE_FROM_LOOPTRI, 4);
 
@@ -119,7 +114,7 @@ static void raycast_to_mesh(const GeometrySet &src_geometry,
     for (const int i : ray_origins.index_range()) {
       const float ray_length = ray_lengths[i];
       const float3 ray_origin = ray_origins[i];
-      const float3 ray_direction = ray_directions[i];
+      const float3 ray_direction = ray_directions[i].normalized();
 
       BVHTreeRayHit hit;
       hit.index = -1;
@@ -216,8 +211,6 @@ static void get_result_domain_and_data_type(const GeometrySet &geometry,
 static void raycast_from_points(const GeoNodeExecParams &params,
                                 const GeometrySet &src_geometry,
                                 GeometryComponent &dst_component,
-                                const StringRef ray_direction_name,
-                                const StringRef ray_length_name,
                                 const StringRef hit_name,
                                 const StringRef hit_index_name,
                                 const StringRef hit_position_name,
@@ -230,15 +223,15 @@ static void raycast_from_points(const GeoNodeExecParams &params,
   CustomDataType data_type;
   AttributeDomain auto_domain;
   get_result_domain_and_data_type(
-      src_geometry, dst_component, ray_direction_name, data_type, auto_domain);
+      src_geometry, dst_component, "position", data_type, auto_domain);
   const AttributeDomain result_domain = (domain == ATTR_DOMAIN_AUTO) ? auto_domain : domain;
 
   GVArray_Typed<float3> ray_origins = dst_component.attribute_get_for_read<float3>(
       "position", result_domain, {0, 0, 0});
-  GVArray_Typed<float3> ray_directions = dst_component.attribute_get_for_read<float3>(
-      ray_direction_name, result_domain, {0, 0, 0});
-  GVArray_Typed<float> ray_lengths = dst_component.attribute_get_for_read<float>(
-      ray_length_name, result_domain, 0);
+  GVArray_Typed<float3> ray_directions = params.get_input_attribute<float3>(
+      "Ray Direction", dst_component, result_domain, {0, 0, 0});
+  GVArray_Typed<float> ray_lengths = params.get_input_attribute<float>(
+      "Ray Length", dst_component, result_domain, 0);
 
   OutputAttribute_Typed<bool> hit_attribute =
       dst_component.attribute_try_get_for_output_only<bool>(hit_name, result_domain);
@@ -279,19 +272,12 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   GeometrySet cast_geometry_set = params.extract_input<GeometrySet>("Cast Geometry");
-  const std::string ray_direction_name = params.extract_input<std::string>("Ray Direction");
-  const std::string ray_length_name = params.extract_input<std::string>("Ray Length");
 
   const std::string hit_name = params.extract_input<std::string>("Hit");
   const std::string hit_index_name = params.extract_input<std::string>("Hit Index");
   const std::string hit_position_name = params.extract_input<std::string>("Hit Position");
   const std::string hit_normal_name = params.extract_input<std::string>("Hit Normal");
   const std::string hit_distance_name = params.extract_input<std::string>("Hit Distance");
-
-  if (ray_direction_name.empty()) {
-    params.set_output("Geometry", geometry_set);
-    return;
-  }
 
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
   cast_geometry_set = bke::geometry_set_realize_instances(cast_geometry_set);
@@ -300,8 +286,6 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
     raycast_from_points(params,
                         cast_geometry_set,
                         geometry_set.get_component_for_write<MeshComponent>(),
-                        ray_direction_name,
-                        ray_length_name,
                         hit_name,
                         hit_index_name,
                         hit_position_name,
@@ -312,8 +296,6 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
     raycast_from_points(params,
                         cast_geometry_set,
                         geometry_set.get_component_for_write<MeshComponent>(),
-                        ray_direction_name,
-                        ray_length_name,
                         hit_name,
                         hit_index_name,
                         hit_position_name,
@@ -333,6 +315,7 @@ void register_node_type_geo_raycast()
   geo_node_type_base(&ntype, GEO_NODE_RAYCAST, "Raycast", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_raycast_in, geo_node_raycast_out);
   node_type_init(&ntype, geo_node_raycast_init);
+  node_type_update(&ntype, geo_node_raycast_update);
   node_type_storage(
       &ntype, "NodeGeometryRaycast", node_free_standard_storage, node_copy_standard_storage);
   ntype.geometry_node_execute = blender::nodes::geo_node_raycast_exec;
