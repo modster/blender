@@ -5084,8 +5084,6 @@ static void registerGeometryNodes()
   register_node_type_geo_points_to_volume();
   register_node_type_geo_sample_texture();
   register_node_type_geo_select_by_material();
-  register_node_type_geo_string_join();
-  register_node_type_geo_string_to_curve();
   register_node_type_geo_subdivide();
   register_node_type_geo_subdivision_surface();
   register_node_type_geo_switch();
@@ -5101,9 +5099,6 @@ static void registerFunctionNodes()
   register_node_type_fn_input_string();
   register_node_type_fn_input_vector();
   register_node_type_fn_random_float();
-  register_node_type_fn_value_to_string();
-  register_node_type_fn_string_length();
-  register_node_type_fn_string_substring();
 }
 
 void BKE_node_system_init(void)
