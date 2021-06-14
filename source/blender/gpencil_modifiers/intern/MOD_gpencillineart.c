@@ -38,6 +38,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
+#include "MOD_gpencil_lineart.h"
 #include "lineart/MOD_lineart.h"
 
 #include "BKE_collection.h"
@@ -156,16 +157,31 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     return;
   }
 
+  LineartCache *local_lc = gpd->runtime.lineart_cache;
   if (!gpd->runtime.lineart_cache) {
     MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
     MOD_lineart_destroy_render_data(lmd);
   }
   else {
-    MOD_lineart_chain_clear_picked_flag(gpd->runtime.lineart_cache);
-    lmd->cache = gpd->runtime.lineart_cache;
+    if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+      MOD_lineart_compute_feature_lines(depsgraph, lmd, &local_lc);
+      MOD_lineart_destroy_render_data(lmd);
+    }
+    MOD_lineart_chain_clear_picked_flag(local_lc);
+    lmd->cache = local_lc;
   }
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
+
+  if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+    /* Clear local cache. */
+    if (local_lc != gpd->runtime.lineart_cache) {
+      MOD_lineart_clear_cache(&local_lc);
+    }
+    /* Restore the original cache pointer so the modifiers below still have access to the "global"
+     * cache. */
+    lmd->cache = gpd->runtime.lineart_cache;
+  }
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
 }
