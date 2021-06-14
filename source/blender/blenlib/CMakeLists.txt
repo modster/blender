@@ -195,6 +195,7 @@ set(SRC
   BLI_float4x4.hh
   BLI_fnmatch.h
   BLI_function_ref.hh
+  BLI_generational_arena.hh
   BLI_ghash.h
   BLI_gsqueue.h
   BLI_hash.h
