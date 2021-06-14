@@ -47,6 +47,7 @@
 #include "BKE_curve.h"
 #include "BKE_displist.h"
 #include "BKE_font.h"
+#include "BKE_geometry_set.hh"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
 #include "BKE_lib_id.h"
@@ -55,6 +56,7 @@
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_object.h"
+#include "BKE_spline.hh"
 
 #include "BLI_sys_types.h"  // for intptr_t support
 
@@ -749,7 +751,7 @@ static ModifierData *curve_get_tessellate_point(const Scene *scene,
 /**
  * \return True if any modifier was applied.
  */
-bool BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
+void BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
                                   const Scene *scene,
                                   Object *ob,
                                   ListBase *source_nurb,
@@ -794,7 +796,6 @@ bool BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
 
   const ModifierEvalContext mectx = {depsgraph, ob, apply_flag};
   ModifierData *pretessellatePoint = curve_get_tessellate_point(scene, ob, for_render, editmode);
-  bool modified = false;
 
   if (pretessellatePoint) {
     VirtualModifierData virtualModifierData;
@@ -814,7 +815,6 @@ bool BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
       }
 
       mti->deformVerts(md, &mectx, nullptr, deformedVerts, numVerts);
-      modified = true;
 
       if (md == pretessellatePoint) {
         break;
@@ -833,36 +833,6 @@ bool BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
   if (keyVerts) {
     MEM_freeN(keyVerts);
   }
-  return modified;
-}
-
-static float (*displist_vert_coords_alloc(ListBase *dispbase, int *r_vert_len))[3]
-{
-  *r_vert_len = 0;
-
-  LISTBASE_FOREACH (DispList *, dl, dispbase) {
-    *r_vert_len += (dl->type == DL_INDEX3) ? dl->nr : dl->parts * dl->nr;
-  }
-
-  float(*allverts)[3] = (float(*)[3])MEM_mallocN(sizeof(float[3]) * (*r_vert_len), __func__);
-  float *fp = (float *)allverts;
-  LISTBASE_FOREACH (DispList *, dl, dispbase) {
-    const int ofs = 3 * ((dl->type == DL_INDEX3) ? dl->nr : dl->parts * dl->nr);
-    memcpy(fp, dl->verts, sizeof(float) * ofs);
-    fp += ofs;
-  }
-
-  return allverts;
-}
-
-static void displist_vert_coords_apply(ListBase *dispbase, const float (*allverts)[3])
-{
-  const float *fp = (float *)allverts;
-  LISTBASE_FOREACH (DispList *, dl, dispbase) {
-    int ofs = 3 * ((dl->type == DL_INDEX3) ? dl->nr : dl->parts * dl->nr);
-    memcpy(dl->verts, fp, sizeof(float) * ofs);
-    fp += ofs;
-  }
 }
 
 static void curve_calc_modifiers_post(Depsgraph *depsgraph,
@@ -870,8 +840,8 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
                                       Object *ob,
                                       ListBase *dispbase,
                                       const bool for_render,
-                                      const bool force_mesh_conversion,
-                                      Mesh **r_final)
+                                      Mesh **r_final,
+                                      GeometrySet **r_geometry_set)
 {
   const Curve *cu = (const Curve *)ob->data;
 
@@ -903,6 +873,17 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
   }
 
   Mesh *modified = nullptr;
+  GeometrySet geometry_set;
+  if (md && md->type == eModifierType_Nodes) {
+    geometry_set.replace_curve(curve_eval_from_dna_curve(*cu).release());
+  }
+  else {
+    if (ELEM(ob->type, OB_CURVE, OB_FONT) && (cu->flag & CU_DEFORM_FILL)) {
+      curve_to_filledpoly(cu, dispbase);
+    }
+    modified = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
+  }
+
   float(*vertCos)[3] = nullptr;
   for (; md; md = md->next) {
     const ModifierTypeInfo *mti = BKE_modifier_get_info((ModifierType)md->type);
@@ -911,74 +892,51 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
       continue;
     }
 
-    /* If we need normals, no choice, have to convert to mesh now. */
-    const bool need_normal = mti->dependsOnNormals != nullptr && mti->dependsOnNormals(md);
-    /* XXX 2.8 : now that batch cache is stored inside the ob->data
-     * we need to create a Mesh for each curve that uses modifiers. */
-    if (modified == nullptr /* && need_normal */) {
-      if (vertCos != nullptr) {
-        displist_vert_coords_apply(dispbase, vertCos);
+    if (md->type == eModifierType_Nodes) {
+      MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+      mesh_component.replace_mesh_but_keep_vertex_group_names(modified,
+                                                              GeometryOwnershipType::Editable);
+      mti->modifyGeometrySet(md, &mectx_apply, &geometry_set);
+      if (geometry_set.has<MeshComponent>()) {
+        MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+        modified = mesh_component.release();
       }
-
-      if (ELEM(ob->type, OB_CURVE, OB_FONT) && (cu->flag & CU_DEFORM_FILL)) {
-        curve_to_filledpoly(cu, dispbase);
+      /* Use an empty mesh instead of null.  */
+      if (modified == nullptr) {
+        modified = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
       }
-
-      modified = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
+      continue;
     }
+
+    const bool need_normal = mti->dependsOnNormals != nullptr && mti->dependsOnNormals(md);
 
     if (mti->type == eModifierTypeType_OnlyDeform ||
         (mti->type == eModifierTypeType_DeformOrConstruct && !modified)) {
-      if (modified) {
-        int totvert = 0;
-        if (!vertCos) {
-          vertCos = BKE_mesh_vert_coords_alloc(modified, &totvert);
-        }
-        if (need_normal) {
-          BKE_mesh_ensure_normals(modified);
-        }
-        mti->deformVerts(md, &mectx_deform, modified, vertCos, totvert);
+      int totvert = 0;
+      if (!vertCos) {
+        vertCos = BKE_mesh_vert_coords_alloc(modified, &totvert);
       }
-      else {
-        int totvert = 0;
-        if (!vertCos) {
-          vertCos = displist_vert_coords_alloc(dispbase, &totvert);
-        }
-        mti->deformVerts(md, &mectx_deform, nullptr, vertCos, totvert);
+      if (need_normal) {
+        BKE_mesh_ensure_normals(modified);
       }
+      mti->deformVerts(md, &mectx_deform, modified, vertCos, totvert);
     }
     else {
-      if (!r_final) {
+      if (!r_final && !r_geometry_set) {
         /* makeDisplistCurveTypes could be used for beveling, where mesh
          * is totally unnecessary, so we could stop modifiers applying
          * when we found constructive modifier but mesh is unwanted. */
         break;
       }
 
-      if (modified) {
-        if (vertCos) {
-          Mesh *temp_mesh = (Mesh *)BKE_id_copy_ex(
-              nullptr, &modified->id, nullptr, LIB_ID_COPY_LOCALIZE);
-          BKE_id_free(nullptr, modified);
-          modified = temp_mesh;
-
-          BKE_mesh_vert_coords_apply(modified, vertCos);
-        }
-      }
-      else {
-        if (vertCos) {
-          displist_vert_coords_apply(dispbase, vertCos);
-        }
-
-        if (ELEM(ob->type, OB_CURVE, OB_FONT) && (cu->flag & CU_DEFORM_FILL)) {
-          curve_to_filledpoly(cu, dispbase);
-        }
-
-        modified = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
-      }
-
       if (vertCos) {
-        /* Vertex coordinates were applied to necessary data, could free it */
+        Mesh *temp_mesh = (Mesh *)BKE_id_copy_ex(
+            nullptr, &modified->id, nullptr, LIB_ID_COPY_LOCALIZE);
+        BKE_id_free(nullptr, modified);
+        modified = temp_mesh;
+
+        BKE_mesh_vert_coords_apply(modified, vertCos);
+
         MEM_freeN(vertCos);
         vertCos = nullptr;
       }
@@ -989,7 +947,7 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
       Mesh *mesh_applied = mti->modifyMesh(md, &mectx_apply, modified);
 
       if (mesh_applied) {
-        if (modified && modified != mesh_applied) {
+        if (modified != mesh_applied) {
           BKE_id_free(nullptr, modified);
         }
         modified = mesh_applied;
@@ -998,66 +956,40 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
   }
 
   if (vertCos) {
-    if (modified) {
-      Mesh *temp_mesh = (Mesh *)BKE_id_copy_ex(
-          nullptr, &modified->id, nullptr, LIB_ID_COPY_LOCALIZE);
-      BKE_id_free(nullptr, modified);
-      modified = temp_mesh;
+    Mesh *temp_mesh = (Mesh *)BKE_id_copy_ex(
+        nullptr, &modified->id, nullptr, LIB_ID_COPY_LOCALIZE);
+    BKE_id_free(nullptr, modified);
+    modified = temp_mesh;
 
-      BKE_mesh_vert_coords_apply(modified, vertCos);
-      BKE_mesh_calc_normals_mapping_simple(modified);
+    BKE_mesh_vert_coords_apply(modified, vertCos);
+    BKE_mesh_calc_normals_mapping_simple(modified);
 
-      MEM_freeN(vertCos);
-    }
-    else {
-      displist_vert_coords_apply(dispbase, vertCos);
-      MEM_freeN(vertCos);
-      vertCos = nullptr;
-    }
+    MEM_freeN(vertCos);
   }
 
   if (r_final) {
-    if (force_mesh_conversion && !modified) {
-      /* XXX 2.8 : This is a workaround for by some deeper technical debts:
-       * - DRW Batch cache is stored inside the ob->data.
-       * - Curve data is not COWed for instances that use different modifiers.
-       * This can causes the modifiers to be applied on all user of the same data-block
-       * (see T71055)
-       *
-       * The easy workaround is to force to generate a Mesh that will be used for display data
-       * since a Mesh output is already used for generative modifiers.
-       * However it does not fix problems with actual edit data still being shared.
-       *
-       * The right solution would be to COW the Curve data block at the input of the modifier
-       * stack just like what the mesh modifier does.
-       */
-      modified = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
-    }
+    /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
+    BKE_mesh_ensure_normals(modified);
 
-    if (modified) {
+    /* Special tweaks, needed since neither BKE_mesh_new_nomain_from_template() nor
+     * BKE_mesh_new_nomain_from_curve_displist() properly duplicate mat info... */
+    BLI_strncpy(modified->id.name, cu->id.name, sizeof(modified->id.name));
+    *((short *)modified->id.name) = ID_ME;
+    MEM_SAFE_FREE(modified->mat);
+    /* Set flag which makes it easier to see what's going on in a debugger. */
+    modified->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
+    modified->mat = (Material **)MEM_dupallocN(cu->mat);
+    modified->totcol = cu->totcol;
 
-      /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
-      BKE_mesh_ensure_normals(modified);
-
-      /* Special tweaks, needed since neither BKE_mesh_new_nomain_from_template() nor
-       * BKE_mesh_new_nomain_from_curve_displist() properly duplicate mat info... */
-      BLI_strncpy(modified->id.name, cu->id.name, sizeof(modified->id.name));
-      *((short *)modified->id.name) = ID_ME;
-      MEM_SAFE_FREE(modified->mat);
-      /* Set flag which makes it easier to see what's going on in a debugger. */
-      modified->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
-      modified->mat = (Material **)MEM_dupallocN(cu->mat);
-      modified->totcol = cu->totcol;
-
-      (*r_final) = modified;
-    }
-    else {
-      (*r_final) = nullptr;
-    }
+    (*r_final) = modified;
   }
   else if (modified != nullptr) {
     /* Pretty stupid to generate that whole mesh if it's unused, yet we have to free it. */
     BKE_id_free(nullptr, modified);
+  }
+
+  if (r_geometry_set) {
+    *r_geometry_set = new GeometrySet(std::move(geometry_set));
   }
 }
 
@@ -1110,10 +1042,8 @@ static void displist_make_surf(Depsgraph *depsgraph,
     BKE_nurbList_duplicate(&nubase, &cu->nurb);
   }
 
-  bool force_mesh_conversion = false;
   if (!for_orco) {
-    force_mesh_conversion = BKE_curve_calc_modifiers_pre(
-        depsgraph, scene, ob, &nubase, &nubase, for_render);
+    BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, &nubase, &nubase, for_render);
   }
 
   LISTBASE_FOREACH (Nurb *, nu, &nubase) {
@@ -1179,8 +1109,7 @@ static void displist_make_surf(Depsgraph *depsgraph,
 
   if (!for_orco) {
     BKE_nurbList_duplicate(&ob->runtime.curve_cache->deformed_nurbs, &nubase);
-    curve_calc_modifiers_post(
-        depsgraph, scene, ob, dispbase, for_render, force_mesh_conversion, r_final);
+    curve_calc_modifiers_post(depsgraph, scene, ob, dispbase, for_render, r_final, nullptr);
   }
 
   BKE_nurbList_free(&nubase);
@@ -1409,7 +1338,8 @@ static void do_makeDispListCurveTypes(Depsgraph *depsgraph,
                                       ListBase *dispbase,
                                       const bool for_render,
                                       const bool for_orco,
-                                      Mesh **r_final)
+                                      Mesh **r_final,
+                                      GeometrySet **r_geometry_set)
 {
   const Curve *cu = (const Curve *)ob->data;
 
@@ -1424,7 +1354,6 @@ static void do_makeDispListCurveTypes(Depsgraph *depsgraph,
   }
 
   ListBase nubase = {nullptr, nullptr};
-  bool force_mesh_conversion = false;
 
   BKE_curve_bevelList_free(&ob->runtime.curve_cache->bev);
 
@@ -1446,8 +1375,7 @@ static void do_makeDispListCurveTypes(Depsgraph *depsgraph,
   }
 
   if (!for_orco) {
-    force_mesh_conversion = BKE_curve_calc_modifiers_pre(
-        depsgraph, scene, ob, &nubase, &nubase, for_render);
+    BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, &nubase, &nubase, for_render);
   }
 
   BKE_curve_bevelList_make(ob, &nubase, for_render);
@@ -1640,10 +1568,8 @@ static void do_makeDispListCurveTypes(Depsgraph *depsgraph,
         DEG_get_eval_flags_for_id(depsgraph, &ob->id) & DAG_EVAL_NEED_CURVE_PATH) {
       BKE_anim_path_calc_data(ob);
     }
-
     BKE_nurbList_duplicate(&ob->runtime.curve_cache->deformed_nurbs, &nubase);
-    curve_calc_modifiers_post(
-        depsgraph, scene, ob, dispbase, for_render, force_mesh_conversion, r_final);
+    curve_calc_modifiers_post(depsgraph, scene, ob, dispbase, for_render, r_final, r_geometry_set);
   }
 
   if (cu->flag & CU_DEFORM_FILL && !ob->runtime.data_eval) {
@@ -1675,8 +1601,17 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
 
   ListBase *dispbase = &(ob->runtime.curve_cache->disp);
 
+  GeometrySet *geometry_set = nullptr;
   Mesh *mesh_eval = nullptr;
-  do_makeDispListCurveTypes(depsgraph, scene, ob, dispbase, for_render, for_orco, &mesh_eval);
+  do_makeDispListCurveTypes(
+      depsgraph, scene, ob, dispbase, for_render, for_orco, &mesh_eval, &geometry_set);
+
+  if (geometry_set != nullptr) {
+    MeshComponent &mesh_component = geometry_set->get_component_for_write<MeshComponent>();
+    mesh_component.replace_mesh_but_keep_vertex_group_names(mesh_eval,
+                                                            GeometryOwnershipType::ReadOnly);
+    ob->runtime.geometry_set_eval = geometry_set;
+  }
 
   if (mesh_eval != nullptr) {
     BKE_object_eval_assign_data(ob, &mesh_eval->id, true);
@@ -1697,7 +1632,7 @@ void BKE_displist_make_curveTypes_forRender(Depsgraph *depsgraph,
                                                         "CurveCache for Curve");
   }
 
-  do_makeDispListCurveTypes(depsgraph, scene, ob, dispbase, true, for_orco, r_final);
+  do_makeDispListCurveTypes(depsgraph, scene, ob, dispbase, true, for_orco, r_final, nullptr);
 }
 
 void BKE_displist_minmax(const ListBase *dispbase, float min[3], float max[3])
