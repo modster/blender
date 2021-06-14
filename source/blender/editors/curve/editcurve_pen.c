@@ -543,7 +543,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   int mval[2];
 
   RNA_int_get_array(op->ptr, "location", mval);
-  printf("Modal\n");
+
   view3d_operator_needs_opengl(C);
   BKE_object_update_select_id(CTX_data_main(C));
 
@@ -871,7 +871,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 static int curve_pen_exec(bContext *C, wmOperator *op)
 {
-  printf("exec\n");
 }
 
 static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -883,8 +882,7 @@ static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   if (ret == OPERATOR_RUNNING_MODAL) {
     WM_event_add_modal_handler(C, op);
   }
-  printf("invoke\n");
-  // return view3d_select_invoke(C, op, event);
+
   return ret;
 }
 
