@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h" /* Needed here for inline functions. */
 #include "BLI_threads.h"
@@ -205,6 +206,17 @@ typedef struct LineartChainRegisterEntry {
   char is_left;
 } LineartChainRegisterEntry;
 
+enum eLineArtTileRecursiveLimit {
+  /* If tile gets this small, it's already much smaller than a pixel. No need to continue
+   * splitting. */
+  LRT_TILE_RECURSIVE_PERSPECTIVE = 30,
+  /* This is a tried-and-true safe value for high poly models that also needed ortho rendering. */
+  LRT_TILE_RECURSIVE_ORTHO = 10,
+};
+
+#define LRT_TILE_SPLITTING_TRIANGLE_LIMIT 100
+#define LRT_TILE_EDGE_COUNT_INITIAL 32
+
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
 
@@ -215,9 +227,15 @@ typedef struct LineartRenderBuffer {
   int tile_count_x, tile_count_y;
   double width_per_tile, height_per_tile;
   double view_projection[4][4];
+  double view[4][4];
 
   struct LineartBoundingArea *initial_bounding_areas;
   unsigned int bounding_area_count;
+
+  /* When splitting bounding areas, if there's an ortho camera placed at a straight angle, there
+   * will be a lot of triangles aligned in line which can not be separated by continue subdividing
+   * the tile. So we set a strict limit when using ortho camera. See eLineArtTileRecursiveLimit. */
+  int tile_recursive_level;
 
   ListBase vertex_buffer_pointers;
   ListBase line_buffer_pointers;
@@ -312,7 +330,7 @@ typedef struct LineartCache {
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
 
-#define LRT_MEMORY_POOL_64MB (1 << 26)
+#define LRT_MEMORY_POOL_1MB (1 << 20)
 
 typedef enum eLineartTriangleFlags {
   LRT_CULL_DONT_CARE = 0,
@@ -344,6 +362,41 @@ typedef struct LineartRenderTaskInfo {
   ListBase edge_mark;
 
 } LineartRenderTaskInfo;
+
+struct BMesh;
+
+typedef struct LineartObjectInfo {
+  struct LineartObjectInfo *next;
+  struct Object *original_ob;
+  struct Mesh *original_me;
+  double model_view_proj[4][4];
+  double model_view[4][4];
+  double normal[4][4];
+  LineartElementLinkNode *v_reln;
+  int usage;
+  int global_i_offset;
+
+  bool free_use_mesh;
+
+  /* Threads will add lines inside here, when all threads are done, we combine those into the
+   * ones in LineartRenderBuffer.  */
+  ListBase contour;
+  ListBase intersection;
+  ListBase crease;
+  ListBase material;
+  ListBase edge_mark;
+  ListBase floating;
+
+} LineartObjectInfo;
+
+typedef struct LineartObjectLoadTaskInfo {
+  struct LineartRenderBuffer *rb;
+  struct Depsgraph *dg;
+  /* LinkNode styled list */
+  LineartObjectInfo *pending;
+  /* Used to spread the load across several threads. This can not overflow. */
+  long unsigned int total_faces;
+} LineartObjectLoadTaskInfo;
 
 /**
  * Bounding area diagram:
@@ -381,10 +434,14 @@ typedef struct LineartBoundingArea {
   ListBase up;
   ListBase bp;
 
-  short triangle_count;
+  int16_t triangle_count;
+  int16_t max_triangle_count;
+  int16_t line_count;
+  int16_t max_line_count;
 
-  ListBase linked_triangles;
-  ListBase linked_edges;
+  /* Use array for speeding up multiple accesses. */
+  struct LineartTriangle **linked_triangles;
+  struct LineartEdge **linked_lines;
 
   /** Reserved for image space reduction && multi-thread chaining. */
   ListBase linked_chains;
