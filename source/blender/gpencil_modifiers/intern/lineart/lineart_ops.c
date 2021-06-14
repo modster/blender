@@ -200,7 +200,7 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
     if (md->type != eGpencilModifierType_Lineart) {
       continue;
     }
-    BKE_gpencil_set_lineart_global_limits(md, &info);
+    BKE_gpencil_set_lineart_modifier_limits(md, &info);
     if (bake_strokes(ob, bj->dg, &lc, md, frame)) {
       touched = true;
     }

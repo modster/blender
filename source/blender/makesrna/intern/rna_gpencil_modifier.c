@@ -2934,8 +2934,8 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_USE_CACHE);
   RNA_def_property_ui_text(prop,
                            "Use Cached Result",
-                           "Use line art cache from the configuration in the first line art "
-                           "modifier instead of running line art once again");
+                           "Use cached line art data from the first line art modifier in the "
+                           "stack. Certain settings will be unavailable when using cached data.");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "thickness", PROP_INT, PROP_NONE);

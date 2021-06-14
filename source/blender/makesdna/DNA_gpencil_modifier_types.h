@@ -936,14 +936,15 @@ typedef struct LineartGpencilModifierData {
 
   /* Runtime data. */
 
-  /* Because we only do calculation once per modifier stack, so we need global override values for
-   * line art to compute as much data as possible. */
+  /* Because we can potentially only compute features lines once per modifier stack (Use Cache), we
+   * need to have these override values to ensure that we have the data we need is computed and
+   * stored in the cache. */
   char level_start_override;
   char level_end_override;
   short edge_types_override;
 
   struct LineartCache *cache;
-  /* Keep render buffer so we can call destroy from ModifierData. */
+  /* Keep a pointer to the render buffer so we can call destroy from ModifierData. */
   struct LineartRenderBuffer *render_buffer_onetime;
 
 } LineartGpencilModifierData;

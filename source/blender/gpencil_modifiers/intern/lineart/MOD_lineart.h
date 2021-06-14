@@ -250,8 +250,8 @@ typedef struct LineartRenderBuffer {
   ListBase wasted_cuts;
   SpinLock lock_cuts;
 
-  /* This is just a reference to LineartCache::chain_data_pool, which is not cleared after line art
-   * completes which serves as a cache. */
+  /* This is just a pointer to LineartCache::chain_data_pool, which acts as a cache for line
+   * chains. */
   LineartStaticMemPool *chain_data_pool;
 
   /*  Render status */
@@ -318,12 +318,10 @@ typedef struct LineartCache {
    * chains will still be available. */
   LineartStaticMemPool chain_data_pool;
 
-  /** A copy of rb->Chains after calculation is done, then we can destroy rb. */
+  /** A copy of rb->chains so we have that data available after rb has been destroyed. */
   ListBase chains;
 
-  /** Cache only contains edge types specified in this variable.
-   * TODO: it's a fixed value (LRT_EDGE_FLAG_ALL_TYPE) right now, allow further selections in the
-   * future. */
+  /** Cache only contains edge types specified in this variable. */
   char rb_edge_types;
 } LineartCache;
 

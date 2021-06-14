@@ -216,8 +216,8 @@ void BKE_gpencil_get_lineart_modifier_limits(Object *ob, struct GpencilLineartLi
   }
 }
 
-void BKE_gpencil_set_lineart_global_limits(GpencilModifierData *md,
-                                           struct GpencilLineartLimitInfo *info)
+void BKE_gpencil_set_lineart_modifier_limits(GpencilModifierData *md,
+                                             struct GpencilLineartLimitInfo *info)
 {
   BLI_assert(md->type == eGpencilModifierType_Lineart);
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
@@ -826,7 +826,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
       }
 
       if (md->type == eGpencilModifierType_Lineart) {
-        BKE_gpencil_set_lineart_global_limits(md, &info);
+        BKE_gpencil_set_lineart_modifier_limits(md, &info);
       }
 
       /* Apply geometry modifiers (add new geometry). */
