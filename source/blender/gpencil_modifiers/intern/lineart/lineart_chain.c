@@ -204,7 +204,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     ec->object_ref = e->object_ref;
     ec->intersection_mask = e->intersection_mask;
 
-    LineartEdge *new_e = e;
+    LineartEdge *new_e;
     LineartVert *new_vt;
     float N[3] = {0};
 
