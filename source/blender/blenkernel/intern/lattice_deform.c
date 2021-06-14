@@ -47,6 +47,7 @@
 #include "BKE_key.h"
 #include "BKE_lattice.h"
 #include "BKE_modifier.h"
+#include "BKE_object.h"
 
 #include "BKE_deform.h"
 
@@ -69,7 +70,7 @@ typedef struct LatticeDeformData {
 LatticeDeformData *BKE_lattice_deform_data_create(const Object *oblatt, const Object *ob)
 {
   /* we make an array with all differences */
-  Lattice *lt = oblatt->data;
+  Lattice *lt = BKE_object_get_lattice(oblatt);
   BPoint *bp;
   DispList *dl = oblatt->runtime.curve_cache ?
                      BKE_displist_find(&oblatt->runtime.curve_cache->disp, DL_VERTS) :
@@ -83,9 +84,6 @@ LatticeDeformData *BKE_lattice_deform_data_create(const Object *oblatt, const Ob
   float latmat[4][4];
   LatticeDeformData *lattice_deform_data;
 
-  if (lt->editlatt) {
-    lt = lt->editlatt->latt;
-  }
   bp = lt->def;
 
   const int32_t num_points = lt->pntsu * lt->pntsv * lt->pntsw;
@@ -322,7 +320,9 @@ static void lattice_deform_vert_task(void *__restrict userdata,
   lattice_deform_vert_with_dvert(data, index, data->dvert ? &data->dvert[index] : NULL);
 }
 
-static void lattice_vert_task_editmesh(void *__restrict userdata, MempoolIterData *iter)
+static void lattice_vert_task_editmesh(void *__restrict userdata,
+                                       MempoolIterData *iter,
+                                       const TaskParallelTLS *__restrict UNUSED(tls))
 {
   const LatticeDeformUserdata *data = userdata;
   BMVert *v = (BMVert *)iter;
@@ -330,7 +330,9 @@ static void lattice_vert_task_editmesh(void *__restrict userdata, MempoolIterDat
   lattice_deform_vert_with_dvert(data, BM_elem_index_get(v), dvert);
 }
 
-static void lattice_vert_task_editmesh_no_dvert(void *__restrict userdata, MempoolIterData *iter)
+static void lattice_vert_task_editmesh_no_dvert(void *__restrict userdata,
+                                                MempoolIterData *iter,
+                                                const TaskParallelTLS *__restrict UNUSED(tls))
 {
   const LatticeDeformUserdata *data = userdata;
   BMVert *v = (BMVert *)iter;
@@ -399,12 +401,16 @@ static void lattice_deform_coords_impl(const Object *ob_lattice,
      * have already been properly set. */
     BM_mesh_elem_index_ensure(em_target->bm, BM_VERT);
 
+    TaskParallelSettings settings;
+    BLI_parallel_mempool_settings_defaults(&settings);
+
     if (cd_dvert_offset != -1) {
-      BLI_task_parallel_mempool(em_target->bm->vpool, &data, lattice_vert_task_editmesh, true);
+      BLI_task_parallel_mempool(
+          em_target->bm->vpool, &data, lattice_vert_task_editmesh, &settings);
     }
     else {
       BLI_task_parallel_mempool(
-          em_target->bm->vpool, &data, lattice_vert_task_editmesh_no_dvert, true);
+          em_target->bm->vpool, &data, lattice_vert_task_editmesh_no_dvert, &settings);
     }
   }
   else {

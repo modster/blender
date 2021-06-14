@@ -49,7 +49,7 @@
 #include "UI_view2d.h"
 
 #include "gpencil_io.h"
-#include "gpencil_io_export_svg.h"
+#include "gpencil_io_export_svg.hh"
 
 #include "pugixml.hpp"
 
@@ -119,6 +119,7 @@ void GpencilExporterSVG::create_document_header()
   main_node_.append_attribute("version").set_value("1.0");
   main_node_.append_attribute("x").set_value("0px");
   main_node_.append_attribute("y").set_value("0px");
+  main_node_.append_attribute("xmlns").set_value("http://www.w3.org/2000/svg");
 
   std::string width;
   std::string height;
@@ -396,7 +397,7 @@ void GpencilExporterSVG::color_string_set(bGPDlayer *gpl,
  * \param node: Parent node
  * \param x: X location
  * \param y: Y location
- * \param width: width of the recntagle
+ * \param width: width of the rectangle
  * \param height: Height of the rectangle
  * \param thickness: Thickness of the line
  * \param hexcolor: Color of the line
@@ -427,7 +428,7 @@ void GpencilExporterSVG::add_rect(pugi::xml_node node,
  * \param x: X location
  * \param y: Y location
  * \param text: Text to include
- * \param size: Size of th etext
+ * \param size: Size of the text
  * \param hexcolor: Color of the text
  */
 void GpencilExporterSVG::add_text(pugi::xml_node node,
@@ -448,7 +449,7 @@ void GpencilExporterSVG::add_text(pugi::xml_node node,
 }
 
 /** Convert a color to Hex value (#FFFFFF). */
-std::string GpencilExporterSVG::rgb_to_hexstr(float color[3])
+std::string GpencilExporterSVG::rgb_to_hexstr(const float color[3])
 {
   uint8_t r = color[0] * 255.0f;
   uint8_t g = color[1] * 255.0f;

@@ -50,6 +50,7 @@
 
 #include "gpencil_io.h"
 
+#if defined(WITH_PUGIXML) || defined(WITH_HARU)
 /* Definition of enum elements to export. */
 /* Common props for exporting. */
 static void gpencil_export_common_props_definition(wmOperatorType *ot)
@@ -102,6 +103,7 @@ static void set_export_filepath(bContext *C, wmOperator *op, const char *extensi
     RNA_string_set(op->ptr, "filepath", filepath);
   }
 }
+#endif
 
 /* <-------- SVG single frame export. --------> */
 #ifdef WITH_PUGIXML
@@ -215,11 +217,7 @@ static void ui_gpencil_export_svg_settings(uiLayout *layout, PointerRNA *imfptr)
 
 static void wm_gpencil_export_svg_draw(bContext *UNUSED(C), wmOperator *op)
 {
-  PointerRNA ptr;
-
-  RNA_pointer_create(NULL, op->type->srna, op->properties, &ptr);
-
-  ui_gpencil_export_svg_settings(op->layout, &ptr);
+  ui_gpencil_export_svg_settings(op->layout, op->ptr);
 }
 
 static bool wm_gpencil_export_svg_poll(bContext *C)
@@ -377,11 +375,7 @@ static void ui_gpencil_export_pdf_settings(uiLayout *layout, PointerRNA *imfptr)
 
 static void wm_gpencil_export_pdf_draw(bContext *UNUSED(C), wmOperator *op)
 {
-  PointerRNA ptr;
-
-  RNA_pointer_create(NULL, op->type->srna, op->properties, &ptr);
-
-  ui_gpencil_export_pdf_settings(op->layout, &ptr);
+  ui_gpencil_export_pdf_settings(op->layout, op->ptr);
 }
 
 static bool wm_gpencil_export_pdf_poll(bContext *C)

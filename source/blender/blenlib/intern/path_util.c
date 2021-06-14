@@ -1044,17 +1044,17 @@ bool BLI_path_abs(char *path, const char *basepath)
 #else
   BLI_strncpy(tmp, path, sizeof(tmp));
 
-  /* Check for loading a windows path on a posix system
-   * in this case, there is no use in trying C:/ since it
-   * will never exist on a unix os.
+  /* Check for loading a MS-Windows path on a POSIX system
+   * in this case, there is no use in trying `C:/` since it
+   * will never exist on a Unix system.
    *
-   * Add a '/' prefix and lowercase the drive-letter, remove the ':'.
-   * C:\foo.JPG -> /c/foo.JPG */
+   * Add a `/` prefix and lowercase the drive-letter, remove the `:`.
+   * `C:\foo.JPG` -> `/c/foo.JPG` */
 
   if (isalpha(tmp[0]) && (tmp[1] == ':') && ELEM(tmp[2], '\\', '/')) {
     tmp[1] = tolower(tmp[0]); /* Replace ':' with drive-letter. */
     tmp[0] = '/';
-    /* '\' the slash will be converted later */
+    /* `\` the slash will be converted later. */
   }
 
 #endif
@@ -2013,9 +2013,9 @@ void BLI_path_slash_native(char *path)
 {
 #ifdef WIN32
   if (path && BLI_strnlen(path, 3) > 2) {
-    BLI_str_replace_char(path + 2, '/', '\\');
+    BLI_str_replace_char(path + 2, ALTSEP, SEP);
   }
 #else
-  BLI_str_replace_char(path + BLI_path_unc_prefix_len(path), '\\', '/');
+  BLI_str_replace_char(path + BLI_path_unc_prefix_len(path), ALTSEP, SEP);
 #endif
 }

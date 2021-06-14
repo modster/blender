@@ -818,12 +818,7 @@ static bool datastack_drop_are_types_valid(StackDropData *drop_data)
   switch (drop_data->drag_tselem->type) {
     case TSE_MODIFIER_BASE:
     case TSE_MODIFIER:
-      if (ob_parent->type == OB_GPENCIL) {
-        return ob_dst->type == OB_GPENCIL;
-      }
-      else if (ob_parent->type != OB_GPENCIL) {
-        return ob_dst->type != OB_GPENCIL;
-      }
+      return (ob_parent->type == OB_GPENCIL) == (ob_dst->type == OB_GPENCIL);
       break;
     case TSE_CONSTRAINT_BASE:
     case TSE_CONSTRAINT:
@@ -1008,7 +1003,7 @@ static void datastack_drop_reorder(bContext *C, ReportList *reports, StackDropDa
             drag_te, drop_te, insert_type, &ob->greasepencil_modifiers);
         ED_object_gpencil_modifier_move_to_index(reports, ob, drop_data->drag_directdata, index);
       }
-      else if (ob->type != OB_GPENCIL) {
+      else {
         index = outliner_get_insert_index(drag_te, drop_te, insert_type, &ob->modifiers);
         ED_object_modifier_move_to_index(reports, ob, drop_data->drag_directdata, index);
       }
@@ -1104,8 +1099,6 @@ static bool collection_drop_init(bContext *C,
                                  const wmEvent *event,
                                  CollectionDrop *data)
 {
-  SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
-
   /* Get collection to drop into. */
   TreeElementInsertType insert_type;
   TreeElement *te = outliner_drop_insert_collection_find(C, event, &insert_type);
@@ -1140,7 +1133,7 @@ static bool collection_drop_init(bContext *C,
   /* Get collection to drag out of. */
   ID *parent = drag_id->from_parent;
   Collection *from_collection = collection_parent_from_ID(parent);
-  if (event->ctrl || space_outliner->outlinevis == SO_SCENES) {
+  if (event->ctrl) {
     from_collection = NULL;
   }
 

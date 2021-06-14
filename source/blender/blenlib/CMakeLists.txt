@@ -39,6 +39,7 @@ set(SRC
   intern/BLI_args.c
   intern/BLI_array.c
   intern/BLI_assert.c
+  intern/BLI_color.cc
   intern/BLI_dial_2d.c
   intern/BLI_dynstr.c
   intern/BLI_filelist.c
@@ -144,6 +145,9 @@ set(SRC
   intern/winstuff.c
   intern/winstuff_dir.c
 
+  # Private headers.
+  intern/BLI_mempool_private.h
+
   # Header as source (included in C files above).
   intern/kdtree_impl.h
   intern/list_sort_impl.h
@@ -185,6 +189,7 @@ set(SRC
   BLI_edgehash.h
   BLI_endian_switch.h
   BLI_endian_switch_inline.h
+  BLI_enumerable_thread_specific.hh
   BLI_expr_pylike_eval.h
   BLI_fileops.h
   BLI_fileops_types.h
@@ -259,11 +264,12 @@ set(SRC
   BLI_rand.h
   BLI_rand.hh
   BLI_rect.h
-  BLI_resource_collector.hh
+  BLI_resource_scope.hh
   BLI_scanfill.h
   BLI_session_uuid.h
   BLI_set.hh
   BLI_set_slots.hh
+  BLI_simd.h
   BLI_smallhash.h
   BLI_sort.h
   BLI_sort_utils.h
@@ -388,6 +394,7 @@ if(WITH_GTESTS)
     tests/BLI_array_store_test.cc
     tests/BLI_array_test.cc
     tests/BLI_array_utils_test.cc
+    tests/BLI_color_test.cc
     tests/BLI_delaunay_2d_test.cc
     tests/BLI_disjoint_set_test.cc
     tests/BLI_edgehash_test.cc

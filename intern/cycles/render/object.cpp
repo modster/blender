@@ -153,10 +153,6 @@ void Object::update_motion()
 
 void Object::compute_bounds(bool motion_blur)
 {
-  if (!is_modified() && !geometry->is_modified()) {
-    return;
-  }
-
   BoundBox mbounds = geometry->bounds;
 
   if (motion_blur && use_motion()) {
@@ -222,6 +218,10 @@ void Object::tag_update(Scene *scene)
   if (geometry) {
     if (tfm_is_modified()) {
       flag |= ObjectManager::TRANSFORM_MODIFIED;
+    }
+
+    if (visibility_is_modified()) {
+      flag |= ObjectManager::VISIBILITY_MODIFIED;
     }
 
     foreach (Node *node, geometry->get_used_shaders()) {
@@ -916,6 +916,10 @@ void ObjectManager::tag_update(Scene *scene, uint32_t flag)
 
     if ((flag & TRANSFORM_MODIFIED) != 0) {
       geometry_flag |= GeometryManager::TRANSFORM_MODIFIED;
+    }
+
+    if ((flag & VISIBILITY_MODIFIED) != 0) {
+      geometry_flag |= GeometryManager::VISIBILITY_MODIFIED;
     }
 
     scene->geometry_manager->tag_update(scene, geometry_flag);

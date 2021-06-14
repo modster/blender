@@ -34,7 +34,7 @@ class SortedNodeCategory(NodeCategory):
         if isinstance(items, list):
             items = sorted(items, key=lambda item: item.label.lower())
 
-        super().__init__(identifier, name, description, items)
+        super().__init__(identifier, name, description=description, items=items)
 
 
 class CompositorNodeCategory(SortedNodeCategory):
@@ -119,8 +119,8 @@ def node_group_items(context):
         if group.name.startswith('.'):
             continue
         yield NodeItem(node_tree_group_type[group.bl_idname],
-                       group.name,
-                       {"node_tree": "bpy.data.node_groups[%r]" % group.name})
+                       label=group.name,
+                       settings={"node_tree": "bpy.data.node_groups[%r]" % group.name})
 
 
 # only show input/output nodes inside node groups
@@ -368,6 +368,7 @@ compositor_node_categories = [
         NodeItem("CompositorNodePixelate"),
         NodeItem("CompositorNodeSunBeams"),
         NodeItem("CompositorNodeDenoise"),
+        NodeItem("CompositorNodeAntiAliasing"),
     ]),
     CompositorNodeCategory("CMP_OP_VECTOR", "Vector", items=[
         NodeItem("CompositorNodeNormal"),
@@ -471,37 +472,44 @@ texture_node_categories = [
     ]),
 ]
 
-
-def not_implemented_node(idname):
-    NodeType = getattr(bpy.types, idname)
-    name = NodeType.bl_rna.name
-    label = "%s (mockup)" % name
-    return NodeItem(idname, label=label)
-
-
 geometry_node_categories = [
     # Geometry Nodes
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
         NodeItem("GeometryNodeAttributeRandomize"),
         NodeItem("GeometryNodeAttributeMath"),
+        NodeItem("GeometryNodeAttributeClamp"),
         NodeItem("GeometryNodeAttributeCompare"),
         NodeItem("GeometryNodeAttributeConvert"),
+        NodeItem("GeometryNodeAttributeCurveMap"),
         NodeItem("GeometryNodeAttributeFill"),
         NodeItem("GeometryNodeAttributeMix"),
         NodeItem("GeometryNodeAttributeProximity"),
         NodeItem("GeometryNodeAttributeColorRamp"),
         NodeItem("GeometryNodeAttributeVectorMath"),
+        NodeItem("GeometryNodeAttributeVectorRotate"),
         NodeItem("GeometryNodeAttributeSampleTexture"),
         NodeItem("GeometryNodeAttributeCombineXYZ"),
         NodeItem("GeometryNodeAttributeSeparateXYZ"),
         NodeItem("GeometryNodeAttributeRemove"),
+        NodeItem("GeometryNodeAttributeMapRange"),
+        NodeItem("GeometryNodeAttributeTransfer"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
+        NodeItem("ShaderNodeRGBCurve"),
         NodeItem("ShaderNodeValToRGB"),
         NodeItem("ShaderNodeSeparateRGB"),
         NodeItem("ShaderNodeCombineRGB"),
     ]),
+    GeometryNodeCategory("GEO_CURVE", "Curve", items=[
+        NodeItem("GeometryNodeCurveToMesh"),
+        NodeItem("GeometryNodeCurveResample"),
+        NodeItem("GeometryNodeMeshToCurve"),
+        NodeItem("GeometryNodeCurveLength"),
+    ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
+        NodeItem("GeometryNodeBoundBox"),
+        NodeItem("GeometryNodeConvexHull"),
+        NodeItem("GeometryNodeDeleteGeometry"),
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeJoinGeometry"),
     ]),
@@ -512,7 +520,13 @@ geometry_node_categories = [
         NodeItem("ShaderNodeValue"),
         NodeItem("FunctionNodeInputString"),
         NodeItem("FunctionNodeInputVector"),
+        NodeItem("GeometryNodeInputMaterial"),
         NodeItem("GeometryNodeIsViewport"),
+    ]),
+    GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
+        NodeItem("GeometryNodeMaterialAssign"),
+        NodeItem("GeometryNodeSelectByMaterial"),
+        NodeItem("GeometryNodeMaterialReplace"),
     ]),
     GeometryNodeCategory("GEO_MESH", "Mesh", items=[
         NodeItem("GeometryNodeBoolean"),
@@ -520,7 +534,16 @@ geometry_node_categories = [
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeSubdivisionSurface"),
         NodeItem("GeometryNodeSubdivide"),
-
+    ]),
+    GeometryNodeCategory("GEO_PRIMITIVES", "Mesh Primitives", items=[
+        NodeItem("GeometryNodeMeshCircle"),
+        NodeItem("GeometryNodeMeshCone"),
+        NodeItem("GeometryNodeMeshCube"),
+        NodeItem("GeometryNodeMeshCylinder"),
+        NodeItem("GeometryNodeMeshGrid"),
+        NodeItem("GeometryNodeMeshIcoSphere"),
+        NodeItem("GeometryNodeMeshLine"),
+        NodeItem("GeometryNodeMeshUVSphere"),
     ]),
     GeometryNodeCategory("GEO_POINT", "Point", items=[
         NodeItem("GeometryNodePointDistribute"),
@@ -531,32 +554,24 @@ geometry_node_categories = [
         NodeItem("GeometryNodeRotatePoints"),
         NodeItem("GeometryNodeAlignRotationToVector"),
     ]),
-    GeometryNodeCategory("GEO_VOLUME", "Volume", items=[
-        NodeItem("GeometryNodePointsToVolume"),
-        NodeItem("GeometryNodeVolumeToMesh"),
-    ]),
-    GeometryNodeCategory("GEO_PRIMITIVES", "Mesh Primitives", items=[
-        NodeItem("GeometryNodeMeshCube"),
-        NodeItem("GeometryNodeMeshCircle"),
-        NodeItem("GeometryNodeMeshUVSphere"),
-        NodeItem("GeometryNodeMeshIcoSphere"),
-        NodeItem("GeometryNodeMeshCylinder"),
-        NodeItem("GeometryNodeMeshCone"),
-        NodeItem("GeometryNodeMeshLine"),
-        NodeItem("GeometryNodeMeshPlane"),
-    ]),
     GeometryNodeCategory("GEO_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),
         NodeItem("ShaderNodeClamp"),
         NodeItem("ShaderNodeMath"),
         NodeItem("FunctionNodeBooleanMath"),
         NodeItem("FunctionNodeFloatCompare"),
+        NodeItem("GeometryNodeSwitch"),
     ]),
     GeometryNodeCategory("GEO_VECTOR", "Vector", items=[
+        NodeItem("ShaderNodeVectorCurve"),
         NodeItem("ShaderNodeSeparateXYZ"),
         NodeItem("ShaderNodeCombineXYZ"),
         NodeItem("ShaderNodeVectorMath"),
         NodeItem("ShaderNodeVectorRotate"),
+    ]),
+    GeometryNodeCategory("GEO_VOLUME", "Volume", items=[
+        NodeItem("GeometryNodePointsToVolume"),
+        NodeItem("GeometryNodeVolumeToMesh"),
     ]),
     GeometryNodeCategory("GEO_GROUP", "Group", items=node_group_items),
     GeometryNodeCategory("GEO_LAYOUT", "Layout", items=[

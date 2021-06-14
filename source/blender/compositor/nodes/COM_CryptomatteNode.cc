@@ -31,6 +31,8 @@
 #include <iterator>
 #include <string>
 
+namespace blender::compositor {
+
 /** \name Cryptomatte base
  * \{ */
 
@@ -75,10 +77,10 @@ void CryptomatteBaseNode::convertToOperations(NodeConverter &converter,
 
 /** \name Cryptomatte V2
  * \{ */
-static std::string prefix_from_node(const bNode &node)
+static std::string prefix_from_node(const CompositorContext &context, const bNode &node)
 {
   char prefix[MAX_NAME];
-  ntreeCompositCryptomatteLayerPrefix(&node, prefix, sizeof(prefix));
+  ntreeCompositCryptomatteLayerPrefix(context.getScene(), &node, prefix, sizeof(prefix));
   return std::string(prefix, BLI_strnlen(prefix, sizeof(prefix)));
 }
 
@@ -101,7 +103,7 @@ static std::string combined_layer_pass_name(RenderLayer *render_layer, RenderPas
 void CryptomatteNode::input_operations_from_render_source(
     const CompositorContext &context,
     const bNode &node,
-    blender::Vector<NodeOperation *> &r_input_operations)
+    Vector<NodeOperation *> &r_input_operations)
 {
   Scene *scene = (Scene *)node.id;
   if (!scene) {
@@ -116,9 +118,9 @@ void CryptomatteNode::input_operations_from_render_source(
     return;
   }
 
-  const short cryptomatte_layer_id = 0;
-  const std::string prefix = prefix_from_node(node);
-  LISTBASE_FOREACH (ViewLayer *, view_layer, &scene->view_layers) {
+  short view_layer_id = 0;
+  const std::string prefix = prefix_from_node(context, node);
+  LISTBASE_FOREACH_INDEX (ViewLayer *, view_layer, &scene->view_layers, view_layer_id) {
     RenderLayer *render_layer = RE_GetRenderLayer(render_result, view_layer->name);
     if (render_layer) {
       LISTBASE_FOREACH (RenderPass *, render_pass, &render_layer->passes) {
@@ -127,7 +129,7 @@ void CryptomatteNode::input_operations_from_render_source(
           RenderLayersProg *op = new RenderLayersProg(
               render_pass->name, DataType::Color, render_pass->channels);
           op->setScene(scene);
-          op->setLayerId(cryptomatte_layer_id);
+          op->setLayerId(view_layer_id);
           op->setRenderData(context.getRenderData());
           op->setViewName(context.getViewName());
           r_input_operations.append(op);
@@ -141,7 +143,7 @@ void CryptomatteNode::input_operations_from_render_source(
 void CryptomatteNode::input_operations_from_image_source(
     const CompositorContext &context,
     const bNode &node,
-    blender::Vector<NodeOperation *> &r_input_operations)
+    Vector<NodeOperation *> &r_input_operations)
 {
   NodeCryptomatte *cryptomatte_settings = (NodeCryptomatte *)node.storage;
   Image *image = (Image *)node.id;
@@ -175,8 +177,13 @@ void CryptomatteNode::input_operations_from_image_source(
       }
     }
 
-    const std::string prefix = prefix_from_node(node);
-    LISTBASE_FOREACH (RenderLayer *, render_layer, &image->rr->layers) {
+    const std::string prefix = prefix_from_node(context, node);
+    int layer_index;
+    LISTBASE_FOREACH_INDEX (RenderLayer *, render_layer, &image->rr->layers, layer_index) {
+      if (!blender::StringRef(prefix).startswith(blender::StringRef(
+              render_layer->name, BLI_strnlen(render_layer->name, sizeof(render_layer->name))))) {
+        continue;
+      }
       LISTBASE_FOREACH (RenderPass *, render_pass, &render_layer->passes) {
         const std::string combined_name = combined_layer_pass_name(render_layer, render_pass);
         if (blender::StringRef(combined_name).startswith(prefix)) {
@@ -184,19 +191,21 @@ void CryptomatteNode::input_operations_from_image_source(
               render_layer, render_pass, view);
           op->setImage(image);
           op->setImageUser(iuser);
+          iuser->layer = layer_index;
           op->setFramenumber(context.getFramenumber());
           r_input_operations.append(op);
         }
       }
+      break;
     }
   }
   BKE_image_release_ibuf(image, ibuf, nullptr);
 }
 
-blender::Vector<NodeOperation *> CryptomatteNode::create_input_operations(
-    const CompositorContext &context, const bNode &node)
+Vector<NodeOperation *> CryptomatteNode::create_input_operations(const CompositorContext &context,
+                                                                 const bNode &node)
 {
-  blender::Vector<NodeOperation *> input_operations;
+  Vector<NodeOperation *> input_operations;
   switch (node.custom1) {
     case CMP_CRYPTOMATTE_SRC_RENDER:
       input_operations_from_render_source(context, node, input_operations);
@@ -222,7 +231,7 @@ CryptomatteOperation *CryptomatteNode::create_cryptomatte_operation(
     const bNode &node,
     const NodeCryptomatte *cryptomatte_settings) const
 {
-  blender::Vector<NodeOperation *> input_operations = create_input_operations(context, node);
+  Vector<NodeOperation *> input_operations = create_input_operations(context, node);
   CryptomatteOperation *operation = new CryptomatteOperation(input_operations.size());
   LISTBASE_FOREACH (CryptomatteEntry *, cryptomatte_entry, &cryptomatte_settings->entries) {
     operation->addObjectIndex(cryptomatte_entry->encoded_hash);
@@ -245,7 +254,7 @@ CryptomatteOperation *CryptomatteLegacyNode::create_cryptomatte_operation(
     const bNode &UNUSED(node),
     const NodeCryptomatte *cryptomatte_settings) const
 {
-  const int num_inputs = getNumberOfInputSockets() - 1;
+  const int num_inputs = inputs.size() - 1;
   CryptomatteOperation *operation = new CryptomatteOperation(num_inputs);
   if (cryptomatte_settings) {
     LISTBASE_FOREACH (CryptomatteEntry *, cryptomatte_entry, &cryptomatte_settings->entries) {
@@ -261,3 +270,5 @@ CryptomatteOperation *CryptomatteLegacyNode::create_cryptomatte_operation(
 }
 
 /* \} */
+
+}  // namespace blender::compositor

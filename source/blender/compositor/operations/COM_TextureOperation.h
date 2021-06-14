@@ -26,6 +26,8 @@
 #include "RE_pipeline.h"
 #include "RE_texture.h"
 
+namespace blender::compositor {
+
 /**
  * Base class for all renderlayeroperations
  *
@@ -42,7 +44,7 @@ class TextureBaseOperation : public NodeOperation {
 
  protected:
   /**
-   * Determine the output resolution. The resolution is retrieved from the Renderer
+   * Determine the output resolution.
    */
   void determineResolution(unsigned int resolution[2],
                            unsigned int preferredResolution[2]) override;
@@ -80,3 +82,5 @@ class TextureAlphaOperation : public TextureBaseOperation {
   TextureAlphaOperation();
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
 };
+
+}  // namespace blender::compositor

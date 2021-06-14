@@ -570,7 +570,7 @@ class USERPREF_PT_system_sound(SystemPanel, CenterAlignMixIn, Panel):
         layout.prop(system, "audio_device", expand=False)
 
         sub = layout.grid_flow(row_major=False, columns=0, even_columns=False, even_rows=False, align=False)
-        sub.active = system.audio_device not in {'NONE', 'Null'}
+        sub.active = system.audio_device not in {'NONE', 'None'}
         sub.prop(system, "audio_channels", text="Channels")
         sub.prop(system, "audio_mixing_buffer", text="Mixing Buffer")
         sub.prop(system, "audio_sample_rate", text="Sample Rate")
@@ -1815,7 +1815,7 @@ class USERPREF_PT_addons(AddOnPanel, Panel):
         addon_user_dirs = tuple(
             p for p in (
                 os.path.join(prefs.filepaths.script_directory, "addons"),
-                bpy.utils.user_resource('SCRIPTS', "addons"),
+                bpy.utils.user_resource('SCRIPTS', path="addons"),
             )
             if p
         )
@@ -2241,9 +2241,9 @@ class USERPREF_PT_experimental_new_features(ExperimentalPanel, Panel):
         self._draw_items(
             context, (
                 ({"property": "use_sculpt_vertex_colors"}, "T71947"),
-                ({"property": "use_switch_object_operator"}, "T80402"),
                 ({"property": "use_sculpt_tools_tilt"}, "T82877"),
                 ({"property": "use_asset_browser"}, ("project/profile/124/", "Milestone 1")),
+                ({"property": "use_override_templates"}, ("T73318", "Milestone 4")),
             ),
         )
 
@@ -2256,6 +2256,7 @@ class USERPREF_PT_experimental_prototypes(ExperimentalPanel, Panel):
             context, (
                 ({"property": "use_new_hair_type"}, "T68981"),
                 ({"property": "use_new_point_cloud_type"}, "T75717"),
+                ({"property": "use_full_frame_compositor"}, "T88150"),
             ),
         )
 

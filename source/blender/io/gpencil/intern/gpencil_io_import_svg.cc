@@ -36,7 +36,7 @@
 #include "ED_gpencil.h"
 
 #include "gpencil_io.h"
-#include "gpencil_io_import_svg.h"
+#include "gpencil_io_import_svg.hh"
 
 /* Custom flags for NanoSVG. */
 #define NANOSVG_ALL_COLOR_KEYWORDS
@@ -69,9 +69,7 @@ bool GpencilImporterSVG::read()
   params_.ob = create_object();
   if (params_.ob == nullptr) {
     std::cout << "Unable to create new object.\n";
-    if (svg_data) {
-      nsvgDelete(svg_data);
-    }
+    nsvgDelete(svg_data);
 
     return false;
   }
@@ -102,7 +100,7 @@ bool GpencilImporterSVG::read()
     bGPDlayer *gpl = (bGPDlayer *)BLI_findstring(
         &gpd_->layers, layer_id, offsetof(bGPDlayer, info));
     if (gpl == nullptr) {
-      gpl = BKE_gpencil_layer_addnew(gpd_, layer_id, true);
+      gpl = BKE_gpencil_layer_addnew(gpd_, layer_id, true, false);
       /* Disable lights. */
       gpl->flag &= ~GP_LAYER_USE_LIGHTS;
     }
@@ -118,14 +116,16 @@ bool GpencilImporterSVG::read()
     }
 
     /* Create_shape materials. */
-    const char *const mat_names[] = {"Stroke", "Fill"};
+    const char *const mat_names[] = {"Stroke", "Fill", "Both"};
     int index = 0;
-    if ((is_stroke) && (is_fill)) {
+    if ((is_stroke) && (!is_fill)) {
       index = 0;
-      is_fill = false;
     }
     else if ((!is_stroke) && (is_fill)) {
       index = 1;
+    }
+    else if ((is_stroke) && (is_fill)) {
+      index = 2;
     }
     int32_t mat_index = create_material(mat_names[index], is_stroke, is_fill);
 
@@ -196,10 +196,10 @@ void GpencilImporterSVG::create_stroke(bGPdata *gpd,
       pt->strength = shape->opacity;
       pt->pressure = 1.0f;
       pt->z = 0.0f;
-      /* TODO: (antoniov) Can be improved loading curve data instead of loading strokes. */
+      /* TODO(antoniov): Can be improved loading curve data instead of loading strokes. */
       interp_v2_v2v2v2v2_cubic(&pt->x, &p[0], &p[2], &p[4], &p[6], a);
 
-      /* Scale from milimeters. */
+      /* Scale from millimeters. */
       mul_v3_fl(&pt->x, 0.001f);
       mul_m4_v3(matrix, &pt->x);
 

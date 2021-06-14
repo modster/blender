@@ -16,13 +16,18 @@
  * Copyright 2011, Blender Foundation.
  */
 
-class MemoryProxy;
-
 #pragma once
 
-#include "COM_ExecutionGroup.h"
-#include "COM_MemoryBuffer.h"
+#ifdef WITH_CXX_GUARDEDALLOC
+#  include "MEM_guardedalloc.h"
+#endif
 
+#include "COM_defines.h"
+
+namespace blender::compositor {
+
+/* Forward declarations. */
+class MemoryBuffer;
 class ExecutionGroup;
 class WriteBufferOperation;
 
@@ -69,7 +74,7 @@ class MemoryProxy {
   /**
    * \brief get the ExecutionGroup that can be scheduled to calculate a certain chunk.
    */
-  ExecutionGroup *getExecutor()
+  ExecutionGroup *getExecutor() const
   {
     return this->m_executor;
   }
@@ -87,7 +92,7 @@ class MemoryProxy {
    * \brief get the WriteBufferOperation that is responsible for writing to this MemoryProxy
    * \return WriteBufferOperation
    */
-  WriteBufferOperation *getWriteBufferOperation()
+  WriteBufferOperation *getWriteBufferOperation() const
   {
     return this->m_writeBufferOperation;
   }
@@ -119,3 +124,5 @@ class MemoryProxy {
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:MemoryProxy")
 #endif
 };
+
+}  // namespace blender::compositor

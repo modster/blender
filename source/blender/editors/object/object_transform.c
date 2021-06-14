@@ -1654,7 +1654,7 @@ static void object_transform_axis_target_calc_depth_init(struct XFormAxisData *x
   if (center_tot) {
     mul_v3_fl(center, 1.0f / center_tot);
     float center_proj[3];
-    ED_view3d_project(xfd->vc.region, center, center_proj);
+    ED_view3d_project_v3(xfd->vc.region, center, center_proj);
     xfd->prev.depth = center_proj[2];
     xfd->prev.is_depth_valid = true;
   }
@@ -1782,12 +1782,7 @@ static int object_transform_axis_target_invoke(bContext *C, wmOperator *op, cons
   vc.v3d->flag2 |= V3D_HIDE_OVERLAYS;
 #endif
 
-  ED_view3d_autodist_init(vc.depsgraph, vc.region, vc.v3d, 0);
-
-  if (vc.rv3d->depths != NULL) {
-    vc.rv3d->depths->damaged = true;
-  }
-  ED_view3d_depth_update(vc.region);
+  ED_view3d_depth_override(vc.depsgraph, vc.region, vc.v3d, NULL, V3D_DEPTH_NO_GPENCIL, true);
 
 #ifdef USE_RENDER_OVERRIDE
   vc.v3d->flag2 = flag2_prev;
@@ -1870,30 +1865,32 @@ static int object_transform_axis_target_modal(bContext *C, wmOperator *op, const
   if (event->type == MOUSEMOVE || is_translate_init) {
     const ViewDepths *depths = xfd->vc.rv3d->depths;
     if (depths && ((uint)event->mval[0] < depths->w) && ((uint)event->mval[1] < depths->h)) {
-      double depth = (double)ED_view3d_depth_read_cached(&xfd->vc, event->mval);
+      float depth_fl = 1.0f;
+      ED_view3d_depth_read_cached(depths, event->mval, 0, &depth_fl);
       float location_world[3];
-      if (depth == 1.0f) {
+      if (depth_fl == 1.0f) {
         if (xfd->prev.is_depth_valid) {
-          depth = (double)xfd->prev.depth;
+          depth_fl = xfd->prev.depth;
         }
       }
 
 #ifdef USE_FAKE_DEPTH_INIT
       /* First time only. */
-      if (depth == 1.0f) {
+      if (depth_fl == 1.0f) {
         if (xfd->prev.is_depth_valid == false) {
           object_transform_axis_target_calc_depth_init(xfd, event->mval);
           if (xfd->prev.is_depth_valid) {
-            depth = (double)xfd->prev.depth;
+            depth_fl = xfd->prev.depth;
           }
         }
       }
 #endif
 
+      double depth = (double)depth_fl;
       if ((depth > depths->depth_range[0]) && (depth < depths->depth_range[1])) {
-        xfd->prev.depth = depth;
+        xfd->prev.depth = depth_fl;
         xfd->prev.is_depth_valid = true;
-        if (ED_view3d_depth_unproject(region, event->mval, depth, location_world)) {
+        if (ED_view3d_depth_unproject_v3(region, event->mval, depth, location_world)) {
           if (is_translate) {
 
             float normal[3];

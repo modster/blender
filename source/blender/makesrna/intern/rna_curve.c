@@ -357,9 +357,8 @@ static void rna_Curve_dimension_set(PointerRNA *ptr, int value)
   }
   else {
     cu->flag &= ~CU_3D;
+    BKE_curve_dimension_update(cu);
   }
-
-  BKE_curve_curve_dimension_update(cu);
 }
 
 static const EnumPropertyItem *rna_Curve_fill_mode_itemf(bContext *UNUSED(C),
@@ -721,10 +720,6 @@ static Nurb *rna_Curve_spline_new(Curve *cu, int type)
   nu->resolv = cu->resolv;
   nu->flag = CU_SMOOTH;
 
-  if ((cu->flag & CU_3D) == 0) {
-    nu->flag |= CU_2D;
-  }
-
   BLI_addtail(BKE_curve_nurbs_get(cu), nu);
 
   return nu;
@@ -1033,6 +1028,14 @@ static void rna_def_path(BlenderRNA *UNUSED(brna), StructRNA *srna)
   prop = RNA_def_property(srna, "use_path_follow", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_FOLLOW);
   RNA_def_property_ui_text(prop, "Follow", "Make curve path children to rotate along the path");
+  RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
+  prop = RNA_def_property(srna, "use_path_clamp", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_PATH_CLAMP);
+  RNA_def_property_ui_text(
+      prop,
+      "Clamp",
+      "Clamp the curve path children so they can't travel past the start/end point of the curve");
   RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
   prop = RNA_def_property(srna, "use_stretch", PROP_BOOLEAN, PROP_NONE);
@@ -1373,7 +1376,7 @@ static void rna_def_charinfo(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "material_index", PROP_INT, PROP_UNSIGNED);
   // RNA_def_property_int_sdna(prop, NULL, "mat_nr");
-  RNA_def_property_ui_text(prop, "Material Index", "");
+  RNA_def_property_ui_text(prop, "Material Index", "Material slot index of this character");
   RNA_def_property_int_funcs(prop,
                              "rna_ChariInfo_material_index_get",
                              "rna_ChariInfo_material_index_set",
@@ -1834,7 +1837,7 @@ static void rna_def_curve(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "texspace_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);
-  RNA_def_property_ui_text(prop, "Texture Space Location", "Texture space location");
+  RNA_def_property_ui_text(prop, "Texture Space Location", "");
   RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, RNA_TRANSLATION_PREC_DEFAULT);
   RNA_def_property_editable_func(prop, "rna_Curve_texspace_editable");
   RNA_def_property_float_funcs(
@@ -1844,7 +1847,7 @@ static void rna_def_curve(BlenderRNA *brna)
   prop = RNA_def_property(srna, "texspace_size", PROP_FLOAT, PROP_XYZ);
   RNA_def_property_array(prop, 3);
   RNA_def_property_flag(prop, PROP_PROPORTIONAL);
-  RNA_def_property_ui_text(prop, "Texture Space Size", "Texture space size");
+  RNA_def_property_ui_text(prop, "Texture Space Size", "");
   RNA_def_property_editable_func(prop, "rna_Curve_texspace_editable");
   RNA_def_property_float_funcs(
       prop, "rna_Curve_texspace_size_get", "rna_Curve_texspace_size_set", NULL);
@@ -2065,7 +2068,7 @@ static void rna_def_curve_nurb(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "material_index", PROP_INT, PROP_UNSIGNED);
   RNA_def_property_int_sdna(prop, NULL, "mat_nr");
-  RNA_def_property_ui_text(prop, "Material Index", "");
+  RNA_def_property_ui_text(prop, "Material Index", "Material slot index of this curve");
   RNA_def_property_int_funcs(prop, NULL, NULL, "rna_Curve_material_index_range");
   RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
