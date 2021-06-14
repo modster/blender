@@ -205,13 +205,16 @@ bool BKE_gpencil_has_transform_modifiers(Object *ob)
 
 void BKE_gpencil_get_lineart_modifier_limits(Object *ob, struct GpencilLineartLimitInfo *info)
 {
+  bool is_first = true;
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
     if (md->type == eGpencilModifierType_Lineart) {
       LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-      info->min_level = MIN2(info->min_level, lmd->level_start);
-      info->max_level = MAX2(info->max_level,
-                             (lmd->use_multiple_levels ? lmd->level_end : lmd->level_start));
-      info->edge_types |= lmd->edge_types;
+      if (is_first || (lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+        info->min_level = MIN2(info->min_level, lmd->level_start);
+        info->max_level = MAX2(info->max_level,
+                               (lmd->use_multiple_levels ? lmd->level_end : lmd->level_start));
+        info->edge_types |= lmd->edge_types;
+      }
     }
   }
 }
