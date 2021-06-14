@@ -25,9 +25,6 @@ void register_node_type_fn_float_compare(void);
 void register_node_type_fn_input_string(void);
 void register_node_type_fn_input_vector(void);
 void register_node_type_fn_random_float(void);
-void register_node_type_fn_value_to_string(void);
-void register_node_type_fn_string_length(void);
-void register_node_type_fn_string_substring(void);
 
 #ifdef __cplusplus
 }
