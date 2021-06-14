@@ -297,7 +297,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  if (!BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)) {
+  if (!BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)) {
     uiItemR(layout, ptr, "use_cached_result", 0, NULL, ICON_NONE);
   }
 
@@ -325,7 +325,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *sub = uiLayoutRow(col, false);
   uiLayoutSetActive(sub,
                     (RNA_boolean_get(ptr, "use_crease") && !use_cache) ||
-                        BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data));
+                        BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data));
   uiLayoutSetPropSep(sub, true);
   uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
 
@@ -334,7 +334,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *entry = uiLayoutRow(sub, false);
   uiLayoutSetActive(entry,
                     (RNA_boolean_get(ptr, "use_light_contour") && !use_cache) ||
-                        BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data));
+                        BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data));
   uiItemR(entry, ptr, "light_contour_object", 0, "", ICON_NONE);
 
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
@@ -371,9 +371,9 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiLayout *row = uiLayoutRowWithHeading(layout, false, IFACE_("Custom Camera"));
   uiItemR(row, ptr, "use_custom_camera", 0, "", 0);
@@ -534,9 +534,9 @@ static void face_mark_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiItemR(layout, ptr, "use_face_mark", 0, IFACE_("Filter Face Mark"), ICON_NONE);
 }
@@ -551,9 +551,9 @@ static void face_mark_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_mark = RNA_boolean_get(ptr, "use_face_mark");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiLayoutSetPropSep(layout, true);
 
@@ -574,9 +574,9 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
   uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
@@ -601,9 +601,9 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiLayout *col = uiLayoutColumn(layout, true);
 

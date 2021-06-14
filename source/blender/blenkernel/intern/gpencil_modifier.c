@@ -203,7 +203,7 @@ bool BKE_gpencil_has_transform_modifiers(Object *ob)
   return false;
 }
 
-void BKE_gpencil_get_lineart_global_limits(Object *ob, struct GpencilLineartLimitInfo *info)
+void BKE_gpencil_get_lineart_modifier_limits(Object *ob, struct GpencilLineartLimitInfo *info)
 {
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
     if (md->type == eGpencilModifierType_Lineart) {
@@ -216,16 +216,17 @@ void BKE_gpencil_get_lineart_global_limits(Object *ob, struct GpencilLineartLimi
   }
 }
 
-void BKE_gpencil_assign_lineart_global_limits(GpencilModifierData *md,
-                                              struct GpencilLineartLimitInfo *info)
+void BKE_gpencil_set_lineart_global_limits(GpencilModifierData *md,
+                                           struct GpencilLineartLimitInfo *info)
 {
+  BLI_assert(md->type == eGpencilModifierType_Lineart);
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
   lmd->level_start_override = info->min_level;
   lmd->level_end_override = info->max_level;
   lmd->edge_types_override = info->edge_types;
 }
 
-bool BKE_gpencil_lineart_is_first_run(Object *ob, GpencilModifierData *md)
+bool BKE_gpencil_is_first_lineart_in_stack(Object *ob, GpencilModifierData *md)
 {
   if (md->type != eGpencilModifierType_Lineart) {
     return false;
@@ -813,7 +814,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
 
   const bool time_remap = BKE_gpencil_has_time_modifiers(ob);
   GpencilLineartLimitInfo info = {0};
-  BKE_gpencil_get_lineart_global_limits(ob, &info);
+  BKE_gpencil_get_lineart_modifier_limits(ob, &info);
 
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
 
@@ -825,7 +826,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
       }
 
       if (md->type == eGpencilModifierType_Lineart) {
-        BKE_gpencil_assign_lineart_global_limits(md, &info);
+        BKE_gpencil_set_lineart_global_limits(md, &info);
       }
 
       /* Apply geometry modifiers (add new geometry). */

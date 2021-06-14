@@ -3030,8 +3030,9 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_cached_result", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_USE_CACHE);
   RNA_def_property_ui_text(prop,
-                           "Used Cached Result",
-                           "Use cached line art result instead of run line art once again.");
+                           "Use Cached Result",
+                           "Use line art cache from the configuration in the first line art "
+                           "modifier instead of running line art once again");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "overscan", PROP_FLOAT, PROP_NONE);

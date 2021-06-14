@@ -27,7 +27,6 @@
 
 #include "DNA_brush_types.h"
 #include "DNA_genfile.h"
-#include "DNA_gpencil_modifier_types.h"
 #include "DNA_listBase.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
@@ -199,21 +198,6 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
             MirrorModifierData *mmd = (MirrorModifierData *)md;
             /* This was the previous hard-coded value. */
             mmd->bisect_threshold = 0.001f;
-          }
-        }
-      }
-    }
-    /* Line art: Default values for new options. */
-    if (!DNA_struct_elem_find(
-            fd->filesdna, "LineartGpencilModifierData", "bool", "use_cached_result")) {
-      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
-        if (ob->type == OB_GPENCIL) {
-          LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-            if (md->type == eGpencilModifierType_Lineart) {
-              LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-              lmd->flags |= LRT_GPENCIL_USE_CACHE;
-              lmd->chain_smooth_tolerance = 0.2f;
-            }
           }
         }
       }
