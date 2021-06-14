@@ -27,7 +27,6 @@
 
 #include "DNA_brush_types.h"
 #include "DNA_genfile.h"
-#include "DNA_gpencil_modifier_types.h"
 #include "DNA_listBase.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
@@ -255,19 +254,6 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
               if (sfile->asset_params) {
                 sfile->asset_params->import_type = FILE_ASSET_IMPORT_APPEND;
               }
-            }
-          }
-        }
-      }
-    }
-    if (!DNA_struct_elem_find(
-            fd->filesdna, "LineartGpencilModifierData", "bool", "use_cached_result")) {
-      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
-        if (ob->type == OB_GPENCIL) {
-          LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-            if (md->type == eGpencilModifierType_Lineart) {
-              LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-              lmd->flags |= LRT_GPENCIL_USE_CACHE;
             }
           }
         }
