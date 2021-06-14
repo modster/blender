@@ -88,8 +88,12 @@ static void clear_strokes(Object *ob, GpencilModifierData *md, int frame)
   BKE_gpencil_layer_frame_delete(gpl, gpf);
 }
 
-static bool bake_strokes(
-    Object *ob, Depsgraph *dg, LineartCache **lc, GpencilModifierData *md, int frame)
+static bool bake_strokes(Object *ob,
+                         Depsgraph *dg,
+                         LineartCache **lc,
+                         GpencilModifierData *md,
+                         int frame,
+                         bool is_first)
 {
   /* Modifier data sanity check. */
   if (lineart_mod_is_disabled(md)) {
@@ -118,7 +122,7 @@ static bool bake_strokes(
     MOD_lineart_destroy_render_data(lmd);
   }
   else {
-    if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+    if (is_first || (!(lmd->flags & LRT_GPENCIL_USE_CACHE))) {
       MOD_lineart_compute_feature_lines(dg, lmd, &local_lc);
       MOD_lineart_destroy_render_data(lmd);
     }
@@ -149,9 +153,11 @@ static bool bake_strokes(
 
   if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
     /* Clear local cache. */
-    MOD_lineart_clear_cache(&local_lc);
-    /* Restore the original cache pointer so the modifiers below still have access to the "global"
-     * cache. */
+    if (!is_first) {
+      MOD_lineart_clear_cache(&local_lc);
+    }
+    /* Restore the original cache pointer so the modifiers below still have access to the
+     * "global" cache. */
     lmd->cache = gpd->runtime.lineart_cache;
   }
 
@@ -195,14 +201,16 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
   GpencilLineartLimitInfo info = {0};
   BKE_gpencil_get_lineart_modifier_limits(ob, &info);
 
-  LineartCache *lc;
+  LineartCache *lc = NULL;
+  bool is_first = true;
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
     if (md->type != eGpencilModifierType_Lineart) {
       continue;
     }
     BKE_gpencil_set_lineart_modifier_limits(md, &info);
-    if (bake_strokes(ob, bj->dg, &lc, md, frame)) {
+    if (bake_strokes(ob, bj->dg, &lc, md, frame, is_first)) {
       touched = true;
+      is_first = false;
     }
   }
   MOD_lineart_clear_cache(&lc);

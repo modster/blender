@@ -2775,13 +2775,13 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
 
 void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
 {
-  LineartRenderBuffer *rb = lmd->render_buffer_onetime;
+  LineartRenderBuffer *rb = lmd->render_buffer_ptr;
 
   lineart_destroy_render_data(rb);
 
   if (rb) {
     MEM_freeN(rb);
-    lmd->render_buffer_onetime = NULL;
+    lmd->render_buffer_ptr = NULL;
   }
 
   if (G.debug_value == 4000) {
@@ -2812,7 +2812,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   LineartRenderBuffer *rb = MEM_callocN(sizeof(LineartRenderBuffer), "Line Art render buffer");
 
   lmd->cache = lc;
-  lmd->render_buffer_onetime = rb;
+  lmd->render_buffer_ptr = rb;
   lc->rb_edge_types = LRT_EDGE_FLAG_ALL_TYPE;
 
   if (!scene || !scene->camera || !lc) {
