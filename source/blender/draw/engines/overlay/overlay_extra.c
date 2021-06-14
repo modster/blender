@@ -1635,14 +1635,13 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
 
     int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
 
-    if(len_v3(net_force)!=0.0f)
+    if(len_v3(net_force)>0.0f)
       OVERLAY_vector_extra(data, net_force, rbo->pos, scale, min_clamp, color2, text_flag);
 
 
     if(rbo->display_force_types & RB_SIM_GRAVITY){
      /* Draw the force of gravity. */
 
-      /* Get magnitude of vector to be displayed. */
       copy_v3_v3(vector,scene->physics_settings.gravity);
       mul_v3_fl(vector, rbo->mass);
       OVERLAY_vector_extra(data, vector, rbo->pos, scale, min_clamp, color1,text_flag);
@@ -1652,7 +1651,6 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
 
         for(int i=0; i<3; i++){
             if(!is_zero_v3(rbo->eff_forces[i].vector)){
-              /* Get magnitude of vector to be displayed. */
               OVERLAY_vector_extra(data, rbo->eff_forces[i].vector, rbo->pos, scale, min_clamp, color1, text_flag);
             }
             else
@@ -1664,7 +1662,6 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
     if(rbo->display_force_types & RB_SIM_NORMAL) {
         for(int i=0; i<3; i++){
             if(!is_zero_v3(rbo->norm_forces[i].vector)){
-              /* Get magnitude of vector to be displayed. */
               OVERLAY_vector_extra(data, rbo->norm_forces[i].vector, rbo->vec_locations[i].vector , scale, min_clamp, color1, text_flag);
             }
             else
@@ -1674,7 +1671,6 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
     if(rbo->display_force_types & RB_SIM_FRICTION) {
         for(int i=0; i<3; i++){
             if(!is_zero_v3(rbo->fric_forces[i].vector)){
-              /* Get magnitude of vector to be displayed. */
               OVERLAY_vector_extra(data, rbo->fric_forces[i].vector, rbo->vec_locations[i].vector , scale, min_clamp, color3, text_flag);
             }
         }
@@ -1682,7 +1678,7 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
 
 }
 
-/*#ifdef WITH_BULLET
+#ifdef WITH_BULLET
  static void OVERLAY_velocity_extra(OVERLAY_Data *data,
                          RigidBodyOb *rbo)
 {
@@ -1694,12 +1690,13 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
 
     rbRigidBody *rb = (rbRigidBody*)rbo->shared->physics_object;
     float vel[3] = {0.0f};
-    //printf("%p\n", rb->body);
-    if(rb!=NULL)RB_body_get_linear_velocity(rbo->shared->physics_object, vel);
-    printf("vel:%f %f %f\n", vel[0],vel[1], vel[2]);
+    if(rb!=NULL && is_zero_v3(rbo->vel))
+        RB_body_get_linear_velocity(rbo->shared->physics_object, vel);
+    else
+        copy_v3_v3(vel, rbo->vel);
     OVERLAY_vector_extra(data, vel, rbo->pos, scale, min_clamp, color, text_flag);
 }
-#endif */
+
 /*static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
                          RigidBodyOb *rbo)
 {
@@ -1714,6 +1711,7 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
     RB_body_get_linear_velocity(rb, acc);
     OVERLAY_vector_extra(data, acc, rbo->pos, scale, min_clamp, color, text_flag);
 } */
+ #endif
 
 void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
 {
@@ -1781,13 +1779,14 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
     }
     if (ob->rigidbody_object != NULL) {
       OVERLAY_collision(cb, ob, color);
+#ifdef WITH_BULLET
       if(ob->rigidbody_object->sim_display_options & RB_SIM_FORCES)
         OVERLAY_forces_extra(vedata, scene, ob->rigidbody_object);
-      //if(ob->rigidbody_object->sim_display_options & RB_SIM_VELOCITY)
-       // OVERLAY_velocity_extra(vedata, ob->rigidbody_object);
+      if(ob->rigidbody_object->sim_display_options & RB_SIM_VELOCITY)
+        OVERLAY_velocity_extra(vedata, ob->rigidbody_object);
       //if(ob->rigidbody_object->sim_display_options & RB_SIM_ACCELERATION)
        // OVERLAY_acceleration_extra(vedata, ob->rigidbody_object);
-
+#endif
     }
     if (ob->dtx & OB_AXIS) {
       DRW_buffer_add_entry(cb->empty_axes, color, ob->obmat);

@@ -483,6 +483,13 @@ if(WITH_GTESTS)
   endif()
 endif()
 
+if(WITH_BULLET)
+  list(APPEND INC
+    ../../../intern/rigidbody
+  )
+  add_definitions(-DWITH_BULLET)
+endif()
+
 
 blender_add_lib(bf_draw "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 

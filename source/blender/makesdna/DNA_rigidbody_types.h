@@ -182,7 +182,9 @@ typedef struct RigidBodyOb {
   sim_data_vec fric_forces[3];
   char _pad5[4];
   sim_data_vec vec_locations[3];
-  char _pad6[4];
+
+  /* Velocity, to display sim data */
+  float vel[3];
 
 } RigidBodyOb;
 

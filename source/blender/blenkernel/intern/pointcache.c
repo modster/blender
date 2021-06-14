@@ -781,9 +781,11 @@ static int ptcache_rigidbody_write(int index, void *rb_v, void **data, int UNUSE
 #ifdef WITH_BULLET
       RB_body_get_position(rbo->shared->physics_object, rbo->pos);
       RB_body_get_orientation(rbo->shared->physics_object, rbo->orn);
+      RB_body_get_linear_velocity(rbo->shared->physics_object, rbo->vel);
 #endif
       PTCACHE_DATA_FROM(data, BPHYS_DATA_LOCATION, rbo->pos);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_ROTATION, rbo->orn);
+      PTCACHE_DATA_FROM(data, BPHYS_DATA_VELOCITY, rbo->vel);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_EFF_FORCES, rbo->eff_forces);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_NORM_FORCES, rbo->norm_forces);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_FRIC_FORCES, rbo->fric_forces);
@@ -815,6 +817,7 @@ static void ptcache_rigidbody_read(
       else {
         PTCACHE_DATA_TO(data, BPHYS_DATA_LOCATION, 0, rbo->pos);
         PTCACHE_DATA_TO(data, BPHYS_DATA_ROTATION, 0, rbo->orn);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_VELOCITY, 0, rbo->vel);
         PTCACHE_DATA_TO(data, BPHYS_DATA_EFF_FORCES, 0 ,rbo->eff_forces);
         PTCACHE_DATA_TO(data, BPHYS_DATA_NORM_FORCES, 0 ,rbo->norm_forces);
         PTCACHE_DATA_TO(data, BPHYS_DATA_FRIC_FORCES, 0 ,rbo->fric_forces);
@@ -1106,7 +1109,7 @@ void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, Object *ob, RigidBodyWorld *r
   pid->write_header = ptcache_basic_header_write;
   pid->read_header = ptcache_basic_header_read;
 
-  pid->data_types = (1 << BPHYS_DATA_LOCATION) | (1 << BPHYS_DATA_ROTATION) | (1 << BPHYS_DATA_EFF_FORCES) |  (1 << BPHYS_DATA_NORM_FORCES) | (1 << BPHYS_DATA_FRIC_FORCES) | (1 << BPHYS_DATA_VEC_LOCATIONS);
+  pid->data_types = (1 << BPHYS_DATA_LOCATION) | (1 << BPHYS_DATA_ROTATION) | (1 << BPHYS_DATA_VELOCITY) | (1 << BPHYS_DATA_EFF_FORCES) |  (1 << BPHYS_DATA_NORM_FORCES) | (1 << BPHYS_DATA_FRIC_FORCES) | (1 << BPHYS_DATA_VEC_LOCATIONS);
   pid->info_types = 0;
 
   pid->stack_index = pid->cache->index;

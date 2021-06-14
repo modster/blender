@@ -1299,6 +1299,8 @@ RigidBodyOb *BKE_rigidbody_create_object(Scene *scene, Object *ob, short type)
   zero_v3(rbo->vec_locations[1].vector);
   zero_v3(rbo->vec_locations[2].vector);
 
+  zero_v3(rbo->vel);
+
   /* use triangle meshes for passive objects
    * use convex hulls for active objects since dynamic triangle meshes are very unstable
    */
@@ -1755,7 +1757,7 @@ static void rigidbody_update_sim_ob(
        *   which we don't have... */
       float eff_forces[3][3] = {{0.0}};
       BKE_effectors_apply(effectors, NULL, effector_weights, &epoint, eff_force, NULL, NULL,eff_forces);
-      if(rbo->display_force_types & RB_SIM_EFFECTORS) {
+      if(rbo->sim_display_options & RB_SIM_FORCES) {
         for(int i=0; i<3; i++){
             copy_v3_v3(rbo->eff_forces[i].vector, eff_forces[i]);
         }
