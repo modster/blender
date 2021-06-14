@@ -266,6 +266,9 @@ DefNode(FunctionNode, FN_NODE_FLOAT_COMPARE, def_float_compare, "FLOAT_COMPARE",
 DefNode(FunctionNode, FN_NODE_INPUT_STRING, def_fn_input_string, "INPUT_STRING", InputString, "String", "")
 DefNode(FunctionNode, FN_NODE_INPUT_VECTOR, def_fn_input_vector, "INPUT_VECTOR", InputVector, "Vector", "")
 DefNode(FunctionNode, FN_NODE_RANDOM_FLOAT, 0,                  "RANDOM_FLOAT", RandomFloat, "Random Float", "")
+DefNode(FunctionNode, FN_NODE_VALUE_TO_STRING, 0,                  "VALUE_TO_STRING", ValueToString, "Value to String", "")
+DefNode(FunctionNode, FN_NODE_STRING_LENGTH, 0,                  "STRING_LENGTH", StringLength, "String Length", "")
+DefNode(FunctionNode, FN_NODE_STRING_SUBSTRING, 0,                  "STRING_SUBSTRING", StringSubstring, "String Substring", "")
 
 DefNode(GeometryNode, GEO_NODE_ALIGN_ROTATION_TO_VECTOR, def_geo_align_rotation_to_vector, "ALIGN_ROTATION_TO_VECTOR", AlignRotationToVector, "Align Rotation to Vector", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_CLAMP, def_geo_attribute_clamp, "ATTRIBUTE_CLAMP", AttributeClamp, "Attribute Clamp", "")
@@ -318,6 +321,8 @@ DefNode(GeometryNode, GEO_NODE_POINT_SEPARATE, 0, "POINT_SEPARATE", PointSeparat
 DefNode(GeometryNode, GEO_NODE_POINT_TRANSLATE, def_geo_point_translate, "POINT_TRANSLATE", PointTranslate, "Point Translate", "")
 DefNode(GeometryNode, GEO_NODE_POINTS_TO_VOLUME, def_geo_points_to_volume, "POINTS_TO_VOLUME", PointsToVolume, "Points to Volume", "")
 DefNode(GeometryNode, GEO_NODE_SELECT_BY_MATERIAL, 0, "SELECT_BY_MATERIAL", SelectByMaterial, "Select by Material", "")
+DefNode(GeometryNode, GEO_NODE_STRING_JOIN, 0,                  "STRING_JOIN", StringJoin, "String Join", "")
+DefNode(GeometryNode, GEO_NODE_STRING_TO_CURVE, def_geo_string_to_curve, "STRING_TO_CURVE", StringToCurve, "String to Curve", "")
 DefNode(GeometryNode, GEO_NODE_SUBDIVIDE, 0, "SUBDIVIDE", Subdivide, "Subdivide", "")
 DefNode(GeometryNode, GEO_NODE_SUBDIVISION_SURFACE, 0, "SUBDIVISION_SURFACE", SubdivisionSurface, "Subdivision Surface", "")
 DefNode(GeometryNode, GEO_NODE_SWITCH, def_geo_switch, "SWITCH", Switch, "Switch", "")

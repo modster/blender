@@ -504,6 +504,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveToMesh"),
         NodeItem("GeometryNodeCurveResample"),
         NodeItem("GeometryNodeMeshToCurve"),
+        NodeItem("GeometryNodeStringToCurve"),
         NodeItem("GeometryNodeCurveLength"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
@@ -560,6 +561,10 @@ geometry_node_categories = [
         NodeItem("ShaderNodeMath"),
         NodeItem("FunctionNodeBooleanMath"),
         NodeItem("FunctionNodeFloatCompare"),
+        NodeItem("FunctionNodeValueToString"),
+        NodeItem("FunctionNodeStringLength"),
+        NodeItem("GeometryNodeStringJoin"),
+        NodeItem("FunctionNodeStringSubstring"),
         NodeItem("GeometryNodeSwitch"),
     ]),
     GeometryNodeCategory("GEO_VECTOR", "Vector", items=[
