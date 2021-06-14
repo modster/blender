@@ -101,6 +101,8 @@ static void particle_settings_init(ID *id)
   MEMCPY_STRUCT_AFTER(particle_settings, DNA_struct_default_get(ParticleSettings), id);
 
   particle_settings->effector_weights = BKE_effector_add_weights(NULL);
+  particle_settings->pd = BKE_partdeflect_new(PFIELD_NULL);
+  particle_settings->pd2 = BKE_partdeflect_new(PFIELD_NULL);
 }
 
 static void particle_settings_copy_data(Main *UNUSED(bmain),
@@ -3177,7 +3179,7 @@ void psys_cache_child_paths(ParticleSimulationData *sim,
     return;
   }
 
-  task_pool = BLI_task_pool_create(&ctx, TASK_PRIORITY_LOW);
+  task_pool = BLI_task_pool_create(&ctx, TASK_PRIORITY_LOW, TASK_ISOLATION_ON);
   totchild = ctx.totchild;
   totparent = ctx.totparent;
 
