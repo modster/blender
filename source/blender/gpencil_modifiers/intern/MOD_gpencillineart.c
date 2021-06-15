@@ -295,12 +295,18 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   const int source_type = RNA_enum_get(ptr, "source_type");
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  if (!BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)) {
+  if (!is_first) {
     uiItemR(layout, ptr, "use_cached_result", 0, NULL, ICON_NONE);
+    if (use_cache) {
+      uiItemL(layout,
+              "Some cached settings needs to be changed in the first line art modifier.",
+              ICON_INFO);
+    }
   }
 
   uiItemR(layout, ptr, "source_type", 0, NULL, ICON_NONE);
@@ -325,9 +331,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_crease", 0, IFACE_("Crease"), ICON_NONE);
 
   uiLayout *sub = uiLayoutRow(col, false);
-  uiLayoutSetActive(sub,
-                    (RNA_boolean_get(ptr, "use_crease") && !use_cache) ||
-                        BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data));
+  uiLayoutSetActive(sub, (RNA_boolean_get(ptr, "use_crease") && !use_cache) || is_first);
   uiLayoutSetPropSep(sub, true);
   uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
 
