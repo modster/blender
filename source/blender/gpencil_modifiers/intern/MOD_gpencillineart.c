@@ -281,6 +281,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   const int source_type = RNA_enum_get(ptr, "source_type");
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
@@ -307,14 +308,17 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_material", 0, IFACE_("Material Borders"), ICON_NONE);
   uiItemR(col, ptr, "use_edge_mark", 0, IFACE_("Edge Marks"), ICON_NONE);
   uiItemR(col, ptr, "use_intersection", 0, IFACE_("Intersections"), ICON_NONE);
-  uiItemR(col, ptr, "use_crease", 0, IFACE_("Crease"), ICON_NONE);
 
-  uiLayout *sub = uiLayoutRow(col, false);
-  uiLayoutSetActive(sub,
-                    (RNA_boolean_get(ptr, "use_crease") && !use_cache) ||
-                        BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data));
-  uiLayoutSetPropSep(sub, true);
-  uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
+  uiLayout *sub = uiLayoutRowWithHeading(col, false, IFACE_("Crease"));
+  uiItemR(sub, ptr, "use_crease", 0, "", ICON_NONE);
+  uiLayout *entry = uiLayoutRow(sub, false);
+  uiLayoutSetActive(entry, RNA_boolean_get(ptr, "use_crease") || is_first);
+  if (use_cache && !is_first) {
+    uiItemL(entry, IFACE_("Angle Cached"), ICON_INFO);
+  }
+  else {
+    uiItemR(entry, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
+  }
 
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
 
@@ -348,16 +352,29 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(
-      layout,
-      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(layout, !is_baked);
 
-  uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
-  uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
+  if (!use_cache || is_first) {
+    uiLayout *row = uiLayoutRowWithHeading(layout, false, IFACE_("Custom Camera"));
+    uiItemR(row, ptr, "use_custom_camera", 0, "", 0);
+    uiLayout *subrow = uiLayoutRow(row, true);
+    uiLayoutSetActive(subrow, RNA_boolean_get(ptr, "use_custom_camera"));
+    uiLayoutSetPropSep(subrow, true);
+    uiItemR(subrow, ptr, "source_camera", 0, "", ICON_OBJECT_DATA);
+
+    uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
+
+    uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
+    uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
+  }
+  else {
+    uiItemL(layout, "Cached with the first line art modifier.", ICON_INFO);
+  }
 }
 
 static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -446,19 +463,23 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(
-      layout,
-      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(layout, !is_baked);
 
-  uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
-  uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
-  uiItemR(col, ptr, "use_fuzzy_all", 0, NULL, ICON_NONE);
+  if (!use_cache || is_first) {
+    uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
+    uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
+    uiItemR(col, ptr, "use_fuzzy_all", 0, NULL, ICON_NONE);
 
-  uiItemR(layout, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
 
-  uiItemR(layout, ptr, "split_angle", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "split_angle", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  }
+  else {
+    uiItemL(layout, "Cached with the first line art modifier.", ICON_INFO);
+  }
 }
 
 static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -470,24 +491,29 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(
-      layout,
-      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(layout, !is_baked);
 
-  uiLayout *col = uiLayoutColumn(layout, true);
+  if (!use_cache || is_first) {
+    uiLayout *col = uiLayoutColumn(layout, true);
 
-  uiLayout *row = uiLayoutRow(col, true);
-  uiItemR(row, ptr, "source_vertex_group", 0, IFACE_("Filter Source"), ICON_GROUP_VERTEX);
-  uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
+    uiLayout *row = uiLayoutRow(col, true);
 
-  uiItemR(col, ptr, "use_output_vertex_group_match_by_name", 0, NULL, ICON_NONE);
+    uiItemR(row, ptr, "source_vertex_group", 0, IFACE_("Filter Source"), ICON_GROUP_VERTEX);
+    uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
 
-  const bool match_output = RNA_boolean_get(ptr, "use_output_vertex_group_match_by_name");
-  if (!match_output) {
-    uiItemPointerR(
-        col, ptr, "vertex_group", &ob_ptr, "vertex_groups", IFACE_("Target"), ICON_NONE);
+    uiItemR(col, ptr, "use_output_vertex_group_match_by_name", 0, NULL, ICON_NONE);
+
+    const bool match_output = RNA_boolean_get(ptr, "use_output_vertex_group_match_by_name");
+    if (!match_output) {
+      uiItemPointerR(
+          col, ptr, "vertex_group", &ob_ptr, "vertex_groups", IFACE_("Target"), ICON_NONE);
+    }
+  }
+  else {
+    uiItemL(layout, "Cached with the first line art modifier.", ICON_INFO);
   }
 }
 
