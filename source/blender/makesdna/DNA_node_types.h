@@ -1364,6 +1364,11 @@ typedef struct NodeGeometryCurveResample {
   uint8_t mode;
 } NodeGeometryCurveResample;
 
+typedef struct NodeGeometryCurveToPoints {
+  /* GeometryNodeCurveSampleMode. */
+  uint8_t mode;
+} NodeGeometryCurveToPoints;
+
 typedef struct NodeGeometryAttributeTransfer {
   /* AttributeDomain. */
   int8_t domain;
@@ -1919,6 +1924,7 @@ typedef enum GeometryNodeMeshLineCountMode {
 typedef enum GeometryNodeCurveSampleMode {
   GEO_NODE_CURVE_SAMPLE_COUNT = 0,
   GEO_NODE_CURVE_SAMPLE_LENGTH = 1,
+  GEO_NODE_CURVE_SAMPLE_EVALUATED = 2,
 } GeometryNodeCurveSampleMode;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
