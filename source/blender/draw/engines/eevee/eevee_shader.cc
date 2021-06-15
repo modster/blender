@@ -107,6 +107,7 @@ extern char datatoc_eevee_surface_forward_frag_glsl[];
 extern char datatoc_eevee_surface_gpencil_vert_glsl[];
 extern char datatoc_eevee_surface_lib_glsl[];
 extern char datatoc_eevee_surface_lookdev_vert_glsl[];
+extern char datatoc_eevee_surface_mesh_geom_glsl[];
 extern char datatoc_eevee_surface_mesh_vert_glsl[];
 extern char datatoc_eevee_surface_velocity_frag_glsl[];
 extern char datatoc_eevee_surface_velocity_lib_glsl[];
@@ -533,17 +534,63 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
   return DRW_shader_library_create_shader_string(shader_lib_, output.c_str());
 }
 
-char *ShaderModule::material_shader_code_geom_get(const GPUCodegenOutput *UNUSED(codegen),
+char *ShaderModule::material_shader_code_geom_get(const GPUCodegenOutput *codegen,
                                                   GPUMaterial *mat,
                                                   eMaterialGeometry geometry_type)
 {
-  /* Force geometry usage if GPU_BARYCENTRIC_DIST or GPU_BARYCENTRIC_TEXCO are used.
-   * Note: GPU_BARYCENTRIC_TEXCO only requires it if the shader is not drawing hairs. */
-  if ((geometry_type != MAT_GEOM_HAIR) && GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC)) {
-    /* TODO. */
-    BLI_assert(0);
+  /* Force geometry usage if GPU_BARYCENTRIC_DIST is used. */
+  if (!GPU_material_flag_get(mat, GPU_MATFLAG_BARYCENTRIC) ||
+      !ELEM(geometry_type, MAT_GEOM_GPENCIL, MAT_GEOM_MESH)) {
+    return nullptr;
   }
-  return nullptr;
+
+  StringRefNull interp_lib(datatoc_eevee_surface_lib_glsl);
+  int64_t start = interp_lib.find("SurfaceInterface");
+  int64_t end = interp_lib.find("interp");
+  StringRef interp_lib_stripped = interp_lib.substr(start, end - start);
+  std::string output = "\n\n";
+
+  if (codegen->attribs_interface) {
+    output += "in AttributesInterface\n";
+    output += "{\n";
+    output += codegen->attribs_interface;
+    output += "} attr_in[];\n\n";
+
+    output += "out AttributesInterface\n";
+    output += "{\n";
+    output += codegen->attribs_interface;
+    output += "} attr_out;\n\n";
+  }
+
+  output += "in ";
+  output += interp_lib_stripped;
+  output += "interp_in[];\n\n";
+
+  output += "out ";
+  output += interp_lib_stripped;
+  output += "interp_out;\n\n";
+
+  output += datatoc_eevee_surface_mesh_geom_glsl;
+
+  output += "void main(void)\n";
+  output += "{\n";
+  output += "interp_out.barycentric_dists = calc_barycentric_distances(";
+  output += "  interp_in[0].P, interp_in[1].P, interp_in[2].P);\n ";
+
+  for (int i = 0; i < 3; i++) {
+    output += "{\n";
+    output += "const int vert_id = " + std::to_string(i) + ";\n";
+    output += "interp_out.barycentric_coords = calc_barycentric_co(vert_id);";
+    output += "gl_Position = gl_in[vert_id].gl_Position;";
+    if (codegen->attribs_passthrough) {
+      output += codegen->attribs_passthrough;
+    }
+    output += "EmitVertex();";
+    output += "}\n";
+  }
+  output += "}\n";
+
+  return DRW_shader_library_create_shader_string(shader_lib_, output.c_str());
 }
 
 char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codegen,
