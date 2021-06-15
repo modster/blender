@@ -23,21 +23,14 @@
 #
 # General Idea
 #
-# Load a blend file
-# Select the object
-# Apply the GN modifier on a duplicated object
-# Compare the result
-# If test pass, print("SUCESS")
+# Load a blend file.
+# Select the object.
+# Apply the GN modifier on a duplicated object.
+# Compare the result.
+# If test pass, print("SUCCESS")
 # If test fail, print("FAIL")
 #    Update tests if BLENDER_TEST_UPDATE flag is set.
-# Display result of failed tests
-
-# Code to be re-used from Mesh Test
-# Depending on what all we want to use
-# the mesh comparison code
-# -- run-test code
-# Code to be re-used from a Compositor
-# Edit Cmake to iterate over directories.
+# Display result of failed tests.
 
 ### RUN TEST COMMAND ###
 # blender -b path_to_blend_file --python path/to/geo_node_test.py -- [--first-time]
@@ -46,6 +39,8 @@ import bpy
 import os
 import sys
 
+FILE_UPDATE_COUNT = 0
+
 
 def get_test_object():
     """
@@ -53,9 +48,9 @@ def get_test_object():
     """
     try:
         test_object = bpy.data.objects["test_object"]
+        return test_object
     except KeyError:
         raise Exception("No test object found!")
-    return test_object
 
 
 def get_expected_object():
@@ -64,18 +59,19 @@ def get_expected_object():
     """
     try:
         expected_object = bpy.data.objects["expected_object"]
+        return expected_object
     except KeyError:
         raise Exception("No expected object found!")
-    return expected_object
 
 
-def select_the_object(any_object):
+def select_only_object(any_object):
     """
     Select the given object.
     """
     bpy.ops.object.mode_set(mode="OBJECT")
     bpy.ops.object.select_all(action="DESELECT")
     bpy.context.view_layer.objects.active = any_object
+    any_object.select_set(True)
 
     return any_object
 
@@ -84,22 +80,22 @@ def remove_modifiers_from_object(any_object):
     """
     Remove modifiers from the selected object.
     """
-    any_object = select_the_object(any_object)
+    any_object = select_only_object(any_object)
     modifier_list = list(any_object.modifiers)
     for modifier in modifier_list:
-        bpy.ops.object.modifier_remove(modifier=modifier.name)
+        any_object.modifiers.remove(modifier=modifier)
     return any_object
 
 
 def run_first_time():
     """
     Automatically creates the expected object when script
-    is run with argument "--first-time"
+    is run with argument "--first-time".
     """
     try:
         expected_object = bpy.data.objects["expected_object"]
-        print("\nExpected Object already, skipping creating a new object.")
-        return
+        print("\nExpected Object already present, skipping creating a new object.")
+
     except KeyError:
         expected_object = duplicate_test_object(get_test_object())
         expected_object.location = (0, 10, 0)
@@ -115,7 +111,7 @@ def apply_modifier(evaluated_object):
     """
     Apply all modifiers (Geometry Nodes for now) added to the current object [Discuss]
     """
-    evaluated_object = select_the_object(evaluated_object)
+    evaluated_object = select_only_object(evaluated_object)
 
     modifiers_list = evaluated_object.modifiers
 
@@ -126,17 +122,14 @@ def apply_modifier(evaluated_object):
     return evaluated_object
 
 
-def compare_mesh(evaluated_object, expected_object):
+def compare_meshes(evaluated_object, expected_object):
     """
     Compares the meshes of evaluated and expected objects.
     """
     evaluated_data = evaluated_object.data
     exp_data = expected_object.data
     result = evaluated_data.unit_test_compare(mesh=exp_data)
-    if result == "Same":
-        print("PASS")
-    else:
-        failed_test(evaluated_object, expected_object, result)
+    return result
 
 
 def failed_test(evaluated_object, expected_object, result):
@@ -151,6 +144,7 @@ def failed_test(evaluated_object, expected_object, result):
         return
 
     print("Updating the test...")
+    FILE_UPDATE_COUNT += 1
     evaluated_object.location = expected_object.location
     expected_object_name = expected_object.name
     bpy.data.objects.remove(expected_object, do_unlink=True)
@@ -160,20 +154,20 @@ def failed_test(evaluated_object, expected_object, result):
     bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
 
     print("The test file was updated with new expected object")
-    print("The blend file : {} was updated.".format(
+    print("The blend file : {} was updated".format(
         bpy.path.display_name_from_filepath(bpy.data.filepath)))
     print("Re-running the test...")
-    main()
+    if FILE_UPDATE_COUNT < 2:
+        main()
+    else:
+        print("The script has run into some errors. Exiting...")
 
 
 def duplicate_test_object(test_object):
     """
     Duplicate test object.
     """
-    bpy.ops.object.select_all(action="DESELECT")
-    bpy.context.view_layer.objects.active = test_object
-
-    test_object.select_set(True)
+    test_object = select_only_object(test_object)
     bpy.ops.object.duplicate()
     evaluated_object = bpy.context.active_object
     evaluated_object.name = "evaluated_object"
@@ -199,7 +193,11 @@ def main():
     expected_object = get_expected_object()
     evaluated_object = duplicate_test_object(test_object)
     evaluated_object = apply_modifier(evaluated_object)
-    compare_mesh(evaluated_object, expected_object)
+    result = compare_meshes(evaluated_object, expected_object)
+    if result == "Same":
+        print("PASS")
+    else:
+        failed_test(evaluated_object, expected_object, result)
 
 
 if __name__ == "__main__":
