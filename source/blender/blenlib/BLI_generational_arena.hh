@@ -23,6 +23,32 @@
  * contiguous array for values of type T. It is designed to have
  * a similar api as `blender::Vector<T>` but with generational
  * indices. There are benefits to generational arenas.
+ *
+ * **How it works**
+ * The `Arena` has a `Vector` of `Entry`(s), an optional location of
+ * next `EntryNoExist` position in the `Vector`, current generation and the
+ * length (note: cannot use `Vector`'s length since any element in the
+ * `Arena` can be deleted but this doesn't affect the length of the
+ * vector).
+ *
+ * Insertion involves finding a `EntryNoExist` position, if it exists,
+ * update the `Arena` with the next `EntryNoExist` position with the
+ * `next_free` stored in the position that is now filled. At this
+ * position, set to `EntryExist` and let the `generation` be current
+ * generation value in the `Arena` and value as the value supplied by
+ * the user.
+ *
+ * Deletion involves updating setting that location to `EntryNoExist`
+ * with the `next_free` set as the `Arena`'s `next_free` and updating
+ * the `Arena`'s `next_free` to the location that is to be
+ * deleted. The generation should also be incremented as well as the
+ * length.
+ *
+ * When user requests for a value using `Index`, the `generation` is
+ * verified to match the generation at that `index`, if it doesn't
+ * match, the value at that position was deleted and then some other
+ * value was inserted which means the requested value doesn't exist at
+ * that location.
  */
 /* TODO(ish): need to complete documentation */
 
