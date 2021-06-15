@@ -22,6 +22,7 @@
 #include "UI_resources.h"
 
 #include "node_geometry_util.hh"
+#include "node_geometry_util_interp.hh"
 
 static bNodeSocketTemplate geo_node_raycast_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
@@ -35,6 +36,8 @@ static bNodeSocketTemplate geo_node_raycast_in[] = {
     {SOCK_STRING, N_("Hit Position")},
     {SOCK_STRING, N_("Hit Normal")},
     {SOCK_STRING, N_("Hit Distance")},
+    {SOCK_STRING, N_("Hit Attribute")},
+    {SOCK_STRING, N_("Hit Attribute Output")},
     {-1, ""},
 };
 
@@ -76,8 +79,7 @@ static void geo_node_raycast_update(bNodeTree *UNUSED(ntree), bNode *node)
 
 namespace blender::nodes {
 
-static void raycast_to_mesh(const GeometrySet &src_geometry,
-                            GeometryComponent &dst_component,
+static void raycast_to_mesh(const Mesh *mesh,
                             const VArray<float3> &ray_origins,
                             const VArray<float3> &ray_directions,
                             const VArray<float> &ray_lengths,
@@ -94,18 +96,6 @@ static void raycast_to_mesh(const GeometrySet &src_geometry,
   BLI_assert(ray_origins.size() == r_hit_positions.size() || r_hit_positions.is_empty());
   BLI_assert(ray_origins.size() == r_hit_normals.size() || r_hit_normals.is_empty());
   BLI_assert(ray_origins.size() == r_hit_distances.size() || r_hit_distances.is_empty());
-
-  const MeshComponent *component = src_geometry.get_component_for_read<MeshComponent>();
-  if (component == nullptr) {
-    return;
-  }
-  const Mesh *mesh = component->get_for_read();
-  if (mesh == nullptr) {
-    return;
-  }
-  if (mesh->totpoly == 0) {
-    return;
-  }
 
   BVHTreeFromMesh tree_data;
   BKE_bvhtree_from_mesh_get(&tree_data, const_cast<Mesh *>(mesh), BVHTREE_FROM_LOOPTRI, 4);
@@ -130,7 +120,8 @@ static void raycast_to_mesh(const GeometrySet &src_geometry,
           r_hit[i] = hit.index >= 0;
         }
         if (!r_hit_indices.is_empty()) {
-          r_hit_indices[i] = hit.index;
+          /* Index should always be a valid looptri index, use 0 when hit failed. */
+          r_hit_indices[i] = max_ii(hit.index, 0);
         }
         if (!r_hit_positions.is_empty()) {
           r_hit_positions[i] = hit.co;
@@ -147,7 +138,7 @@ static void raycast_to_mesh(const GeometrySet &src_geometry,
           r_hit[i] = false;
         }
         if (!r_hit_indices.is_empty()) {
-          r_hit_indices[i] = -1;
+          r_hit_indices[i] = 0;
         }
         if (!r_hit_positions.is_empty()) {
           r_hit_positions[i] = float3(0.0f, 0.0f, 0.0f);
@@ -215,15 +206,30 @@ static void raycast_from_points(const GeoNodeExecParams &params,
                                 const StringRef hit_index_name,
                                 const StringRef hit_position_name,
                                 const StringRef hit_normal_name,
-                                const StringRef hit_distance_name)
+                                const StringRef hit_distance_name,
+                                const Span<std::string> hit_attribute_names,
+                                const Span<std::string> hit_attribute_output_names)
 {
+  BLI_assert(hit_attribute_names.size() == hit_attribute_output_names.size());
+
+  const MeshComponent *src_mesh_component = src_geometry.get_component_for_read<MeshComponent>();
+  if (src_mesh_component == nullptr) {
+    return;
+  }
+  const Mesh *src_mesh = src_mesh_component->get_for_read();
+  if (src_mesh == nullptr) {
+    return;
+  }
+  if (src_mesh->totpoly == 0) {
+    return;
+  }
+
   const NodeGeometryRaycast &storage = *(const NodeGeometryRaycast *)params.node().storage;
   const AttributeDomain domain = (AttributeDomain)storage.domain;
 
   CustomDataType data_type;
   AttributeDomain auto_domain;
-  get_result_domain_and_data_type(
-      src_geometry, dst_component, "position", data_type, auto_domain);
+  get_result_domain_and_data_type(src_geometry, dst_component, "position", data_type, auto_domain);
   const AttributeDomain result_domain = (domain == ATTR_DOMAIN_AUTO) ? auto_domain : domain;
 
   GVArray_Typed<float3> ray_origins = dst_component.attribute_get_for_read<float3>(
@@ -243,29 +249,64 @@ static void raycast_from_points(const GeoNodeExecParams &params,
       dst_component.attribute_try_get_for_output_only<float3>(hit_normal_name, result_domain);
   OutputAttribute_Typed<float> hit_distance_attribute =
       dst_component.attribute_try_get_for_output_only<float>(hit_distance_name, result_domain);
-  const MutableSpan<bool> hit_span = hit_attribute ? hit_attribute.as_span() : MutableSpan<bool>();
-  const MutableSpan<int> hit_index_span = hit_index_attribute ? hit_index_attribute.as_span() :
-                                                                MutableSpan<int>();
-  const MutableSpan<float3> hit_position_span = hit_position_attribute ?
-                                                    hit_position_attribute.as_span() :
-                                                    MutableSpan<float3>();
-  const MutableSpan<float3> hit_normal_span = hit_normal_attribute ?
-                                                  hit_normal_attribute.as_span() :
-                                                  MutableSpan<float3>();
-  const MutableSpan<float> hit_distance_span = hit_distance_attribute ?
-                                                   hit_distance_attribute.as_span() :
-                                                   MutableSpan<float>();
 
-  raycast_to_mesh(src_geometry,
-                  dst_component,
+  /* Positions and looptri indices are always needed for interpolation,
+   * so create temporary arrays if no output attribute is given.
+   */
+  Array<int> indices_internal;
+  Array<float3> positions_internal;
+  if (!hit_attribute_names.is_empty()) {
+    if (!hit_index_attribute) {
+      indices_internal.reinitialize(ray_origins->size());
+    }
+    if (!hit_position_attribute) {
+      positions_internal.reinitialize(ray_origins->size());
+    }
+  }
+  const MutableSpan<bool> hit = hit_attribute ? hit_attribute.as_span() : MutableSpan<bool>();
+  const MutableSpan<int> hit_indices = hit_index_attribute ? hit_index_attribute.as_span() :
+                                                             indices_internal;
+  const MutableSpan<float3> hit_positions = hit_position_attribute ?
+                                                hit_position_attribute.as_span() :
+                                                positions_internal;
+  const MutableSpan<float3> hit_normals = hit_normal_attribute ? hit_normal_attribute.as_span() :
+                                                                 MutableSpan<float3>();
+  const MutableSpan<float> hit_distances = hit_distance_attribute ?
+                                               hit_distance_attribute.as_span() :
+                                               MutableSpan<float>();
+
+  raycast_to_mesh(src_mesh,
                   ray_origins,
                   ray_directions,
                   ray_lengths,
-                  hit_span,
-                  hit_index_span,
-                  hit_position_span,
-                  hit_normal_span,
-                  hit_distance_span);
+                  hit,
+                  hit_indices,
+                  hit_positions,
+                  hit_normals,
+                  hit_distances);
+
+  hit_attribute.save();
+  hit_index_attribute.save();
+  hit_position_attribute.save();
+  hit_normal_attribute.save();
+  hit_distance_attribute.save();
+
+  /* Custom interpolated attributes */
+  AttributeInterpolator interp(src_mesh, hit_positions, hit_indices);
+  for (int i = 0; i < hit_attribute_names.size(); ++i) {
+    const std::optional<AttributeMetaData> meta_data = src_mesh_component->attribute_get_meta_data(
+        hit_attribute_names[i]);
+    if (meta_data) {
+      ReadAttributeLookup hit_attribute = src_mesh_component->attribute_try_get_for_read(
+          hit_attribute_names[i]);
+      OutputAttribute hit_attribute_output = dst_component.attribute_try_get_for_output_only(
+          hit_attribute_output_names[i], result_domain, meta_data->data_type);
+
+      interp.interpolate_attribute(hit_attribute, hit_attribute_output);
+
+      hit_attribute_output.save();
+    }
+  }
 }
 
 static void geo_node_raycast_exec(GeoNodeExecParams params)
@@ -279,6 +320,11 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
   const std::string hit_normal_name = params.extract_input<std::string>("Hit Normal");
   const std::string hit_distance_name = params.extract_input<std::string>("Hit Distance");
 
+  const Array<std::string> hit_attribute_names = {
+      params.extract_input<std::string>("Hit Attribute")};
+  const Array<std::string> hit_attribute_output_names = {
+      params.extract_input<std::string>("Hit Attribute Output")};
+
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
   cast_geometry_set = bke::geometry_set_realize_instances(cast_geometry_set);
 
@@ -290,7 +336,9 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
                         hit_index_name,
                         hit_position_name,
                         hit_normal_name,
-                        hit_distance_name);
+                        hit_distance_name,
+                        hit_attribute_names,
+                        hit_attribute_output_names);
   }
   if (geometry_set.has<PointCloudComponent>()) {
     raycast_from_points(params,
@@ -300,7 +348,9 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
                         hit_index_name,
                         hit_position_name,
                         hit_normal_name,
-                        hit_distance_name);
+                        hit_distance_name,
+                        hit_attribute_names,
+                        hit_attribute_output_names);
   }
 
   params.set_output("Geometry", geometry_set);
