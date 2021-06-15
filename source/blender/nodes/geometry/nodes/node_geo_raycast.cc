@@ -26,18 +26,18 @@
 
 static bNodeSocketTemplate geo_node_raycast_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_GEOMETRY, N_("Cast Geometry")},
+    {SOCK_GEOMETRY, N_("Target Geometry")},
     {SOCK_STRING, N_("Ray Direction")},
     {SOCK_VECTOR, N_("Ray Direction"), 1.0, 0.0, 0.0, 0.0, -FLT_MAX, FLT_MAX},
     {SOCK_STRING, N_("Ray Length")},
     {SOCK_FLOAT, N_("Ray Length"), 0.0, 0.0, 0.0, 0.0, 0.0f, FLT_MAX},
-    {SOCK_STRING, N_("Hit")},
+    {SOCK_STRING, N_("Target Attribute")},
+    {SOCK_STRING, N_("Is Hit")},
     {SOCK_STRING, N_("Hit Index")},
     {SOCK_STRING, N_("Hit Position")},
     {SOCK_STRING, N_("Hit Normal")},
     {SOCK_STRING, N_("Hit Distance")},
     {SOCK_STRING, N_("Hit Attribute")},
-    {SOCK_STRING, N_("Hit Attribute Output")},
     {-1, ""},
 };
 
@@ -312,18 +312,18 @@ static void raycast_from_points(const GeoNodeExecParams &params,
 static void geo_node_raycast_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  GeometrySet cast_geometry_set = params.extract_input<GeometrySet>("Cast Geometry");
+  GeometrySet cast_geometry_set = params.extract_input<GeometrySet>("Target Geometry");
 
-  const std::string hit_name = params.extract_input<std::string>("Hit");
+  const std::string hit_name = params.extract_input<std::string>("Is Hit");
   const std::string hit_index_name = params.extract_input<std::string>("Hit Index");
   const std::string hit_position_name = params.extract_input<std::string>("Hit Position");
   const std::string hit_normal_name = params.extract_input<std::string>("Hit Normal");
   const std::string hit_distance_name = params.extract_input<std::string>("Hit Distance");
 
   const Array<std::string> hit_attribute_names = {
-      params.extract_input<std::string>("Hit Attribute")};
+      params.extract_input<std::string>("Target Attribute")};
   const Array<std::string> hit_attribute_output_names = {
-      params.extract_input<std::string>("Hit Attribute Output")};
+      params.extract_input<std::string>("Hit Attribute")};
 
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
   cast_geometry_set = bke::geometry_set_realize_instances(cast_geometry_set);
