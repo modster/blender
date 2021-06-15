@@ -220,13 +220,21 @@ void BKE_gpencil_get_lineart_modifier_limits(Object *ob, struct GpencilLineartLi
 }
 
 void BKE_gpencil_set_lineart_modifier_limits(GpencilModifierData *md,
-                                             struct GpencilLineartLimitInfo *info)
+                                             struct GpencilLineartLimitInfo *info,
+                                             bool is_first_lineart)
 {
   BLI_assert(md->type == eGpencilModifierType_Lineart);
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-  lmd->level_start_override = info->min_level;
-  lmd->level_end_override = info->max_level;
-  lmd->edge_types_override = info->edge_types;
+  if (is_first_lineart || lmd->flags & LRT_GPENCIL_USE_CACHE) {
+    lmd->level_start_override = info->min_level;
+    lmd->level_end_override = info->max_level;
+    lmd->edge_types_override = info->edge_types;
+  }
+  else {
+    lmd->level_start_override = lmd->level_start;
+    lmd->level_end_override = lmd->level_end;
+    lmd->edge_types_override = lmd->edge_types;
+  }
 }
 
 bool BKE_gpencil_is_first_lineart_in_stack(Object *ob, GpencilModifierData *md)
@@ -816,6 +824,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
   BKE_gpencil_lattice_init(ob);
 
   const bool time_remap = BKE_gpencil_has_time_modifiers(ob);
+  bool is_first_lineart = true;
   GpencilLineartLimitInfo info = {0};
   BKE_gpencil_get_lineart_modifier_limits(ob, &info);
 
@@ -829,7 +838,8 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
       }
 
       if (md->type == eGpencilModifierType_Lineart) {
-        BKE_gpencil_set_lineart_modifier_limits(md, &info);
+        BKE_gpencil_set_lineart_modifier_limits(md, &info, is_first_lineart);
+        is_first_lineart = false;
       }
 
       /* Apply geometry modifiers (add new geometry). */

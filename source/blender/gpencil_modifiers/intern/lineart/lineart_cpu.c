@@ -2813,7 +2813,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
 
   lmd->cache = lc;
   lmd->render_buffer_ptr = rb;
-  lc->rb_edge_types = LRT_EDGE_FLAG_ALL_TYPE;
+  lc->rb_edge_types = lmd->edge_types_override;
 
   if (!scene || !scene->camera || !lc) {
     return NULL;
@@ -2858,8 +2858,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   /* See lineart_edge_from_triangle() for how this option may impact performance. */
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
 
-  int16_t edge_types = (lmd->flags & LRT_GPENCIL_USE_CACHE) ? lmd->edge_types_override :
-                                                              lmd->edge_types;
+  int16_t edge_types = lmd->edge_types_override;
 
   rb->use_contour = (edge_types & LRT_EDGE_FLAG_CONTOUR) != 0;
   rb->use_crease = (edge_types & LRT_EDGE_FLAG_CREASE) != 0;
