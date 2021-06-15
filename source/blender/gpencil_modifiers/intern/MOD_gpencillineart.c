@@ -178,7 +178,9 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
     /* Clear local cache. */
-    MOD_lineart_clear_cache(&local_lc);
+    if (local_lc != gpd->runtime.lineart_cache) {
+      MOD_lineart_clear_cache(&local_lc);
+    }
     /* Restore the original cache pointer so the modifiers below still have access to the "global"
      * cache. */
     lmd->cache = gpd->runtime.lineart_cache;
@@ -222,6 +224,9 @@ static void add_this_collection(Collection *c,
                                 const ModifierUpdateDepsgraphContext *ctx,
                                 const int mode)
 {
+  if (!c) {
+    return;
+  }
   FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (c, ob, mode) {
     if (ELEM(ob->type, OB_MESH, OB_MBALL, OB_CURVE, OB_SURF, OB_FONT)) {
       if (ob->lineart.usage != OBJECT_LRT_EXCLUDE) {
@@ -252,10 +257,18 @@ static void updateDepsgraph(GpencilModifierData *md,
   else {
     add_this_collection(ctx->scene->master_collection, ctx, mode);
   }
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  if (lmd->calculation_flags & LRT_USE_CUSTOM_CAMERA) {
+    DEG_add_object_relation(
+        ctx->node, lmd->source_camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+    DEG_add_object_relation(
+        ctx->node, lmd->source_camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  }
+  else {
+    DEG_add_object_relation(
+        ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+    DEG_add_object_relation(
+        ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  }
 }
 
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
@@ -266,6 +279,8 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&lmd->source_collection, IDWALK_CB_NOP);
 
   walk(userData, ob, (ID **)&lmd->source_object, IDWALK_CB_NOP);
+  walk(userData, ob, (ID **)&lmd->source_camera, IDWALK_CB_NOP);
+  walk(userData, ob, (ID **)&lmd->light_contour_object, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -280,12 +295,18 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   const int source_type = RNA_enum_get(ptr, "source_type");
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  if (!BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)) {
+  if (!is_first) {
     uiItemR(layout, ptr, "use_cached_result", 0, NULL, ICON_NONE);
+    if (use_cache) {
+      uiItemL(layout,
+              "Some cached settings needs to be changed in the first line art modifier.",
+              ICON_INFO);
+    }
   }
 
   uiItemR(layout, ptr, "source_type", 0, NULL, ICON_NONE);
@@ -309,12 +330,18 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_intersection", 0, IFACE_("Intersections"), ICON_NONE);
   uiItemR(col, ptr, "use_crease", 0, IFACE_("Crease"), ICON_NONE);
 
-  uiLayout *sub = uiLayoutRow(col, true);
-  uiLayoutSetActive(sub,
-                    (RNA_boolean_get(ptr, "use_crease") && !use_cache) ||
-                        BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data));
+  uiLayout *sub = uiLayoutRow(col, false);
+  uiLayoutSetActive(sub, (RNA_boolean_get(ptr, "use_crease") && !use_cache) || is_first);
   uiLayoutSetPropSep(sub, true);
   uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
+
+  sub = uiLayoutRowWithHeading(col, false, IFACE_("Light Contour"));
+  uiItemR(sub, ptr, "use_light_contour", 0, "", ICON_NONE);
+  uiLayout *entry = uiLayoutRow(sub, false);
+  uiLayoutSetActive(entry,
+                    (RNA_boolean_get(ptr, "use_light_contour") && !use_cache) ||
+                        BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data));
+  uiItemR(entry, ptr, "light_contour_object", 0, "", ICON_NONE);
 
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
 
@@ -350,9 +377,18 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
+
+  uiLayout *row = uiLayoutRowWithHeading(layout, false, IFACE_("Custom Camera"));
+  uiItemR(row, ptr, "use_custom_camera", 0, "", 0);
+  uiLayout *subrow = uiLayoutRow(row, true);
+  uiLayoutSetActive(subrow, RNA_boolean_get(ptr, "use_custom_camera"));
+  uiLayoutSetPropSep(subrow, true);
+  uiItemR(subrow, ptr, "source_camera", 0, "", ICON_OBJECT_DATA);
+
+  uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
 
   uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
@@ -504,9 +540,9 @@ static void face_mark_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiItemR(layout, ptr, "use_face_mark", 0, IFACE_("Filter Face Mark"), ICON_NONE);
 }
@@ -521,9 +557,9 @@ static void face_mark_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_mark = RNA_boolean_get(ptr, "use_face_mark");
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiLayoutSetPropSep(layout, true);
 
@@ -544,9 +580,9 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
   uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
@@ -571,9 +607,9 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
 
   uiLayoutSetPropSep(layout, true);
-  uiLayoutSetEnabled(layout,
-                     !is_baked &&
-                         (!use_cache || BKE_gpencil_lineart_is_first_run(ob_ptr.data, ptr->data)));
+  uiLayoutSetEnabled(
+      layout,
+      !is_baked && (!use_cache || BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)));
 
   uiLayout *col = uiLayoutColumn(layout, true);
 
@@ -633,10 +669,11 @@ static void composition_panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemL(layout, IFACE_("Object is shown in front"), ICON_ERROR);
   }
 
-  uiLayout *row = uiLayoutRow(layout, false);
-  uiLayoutSetActive(row, !show_in_front);
+  uiLayout *col = uiLayoutColumn(layout, false);
+  uiLayoutSetActive(col, !show_in_front);
 
-  uiItemR(row, ptr, "stroke_offset", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(col, ptr, "stroke_offset", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(col, ptr, "offset_towards_custom_camera", 0, IFACE_("Towards Custom Camera"), ICON_NONE);
 }
 
 static void panelRegister(ARegionType *region_type)

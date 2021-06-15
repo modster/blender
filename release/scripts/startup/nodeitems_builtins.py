@@ -34,7 +34,7 @@ class SortedNodeCategory(NodeCategory):
         if isinstance(items, list):
             items = sorted(items, key=lambda item: item.label.lower())
 
-        super().__init__(identifier, name, description, items)
+        super().__init__(identifier, name, description=description, items=items)
 
 
 class CompositorNodeCategory(SortedNodeCategory):
@@ -66,7 +66,7 @@ class GeometryNodeCategory(SortedNodeCategory):
 
 
 # menu entry for node group tools
-def group_tools_draw(self, layout, context):
+def group_tools_draw(self, layout, _context):
     layout.operator("node.group_make")
     layout.operator("node.group_ungroup")
     layout.separator()
@@ -119,8 +119,8 @@ def node_group_items(context):
         if group.name.startswith('.'):
             continue
         yield NodeItem(node_tree_group_type[group.bl_idname],
-                       group.name,
-                       {"node_tree": "bpy.data.node_groups[%r]" % group.name})
+                       label=group.name,
+                       settings={"node_tree": "bpy.data.node_groups[%r]" % group.name})
 
 
 # only show input/output nodes inside node groups
@@ -472,14 +472,6 @@ texture_node_categories = [
     ]),
 ]
 
-
-def not_implemented_node(idname):
-    NodeType = getattr(bpy.types, idname)
-    name = NodeType.bl_rna.name
-    label = "%s (mockup)" % name
-    return NodeItem(idname, label=label)
-
-
 geometry_node_categories = [
     # Geometry Nodes
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
@@ -503,6 +495,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeTransfer"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
+        NodeItem("ShaderNodeRGBCurve"),
         NodeItem("ShaderNodeValToRGB"),
         NodeItem("ShaderNodeSeparateRGB"),
         NodeItem("ShaderNodeCombineRGB"),
@@ -510,9 +503,15 @@ geometry_node_categories = [
     GeometryNodeCategory("GEO_CURVE", "Curve", items=[
         NodeItem("GeometryNodeCurveToMesh"),
         NodeItem("GeometryNodeCurveResample"),
+        NodeItem("GeometryNodeMeshToCurve"),
+        NodeItem("GeometryNodeCurveToPoints"),
+        NodeItem("GeometryNodeCurveLength"),
+        NodeItem("GeometryNodeCurveReverse"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
         NodeItem("GeometryNodeBoundBox"),
+        NodeItem("GeometryNodeConvexHull"),
+        NodeItem("GeometryNodeDeleteGeometry"),
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeJoinGeometry"),
     ]),
@@ -528,6 +527,7 @@ geometry_node_categories = [
     ]),
     GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
         NodeItem("GeometryNodeMaterialAssign"),
+        NodeItem("GeometryNodeSelectByMaterial"),
         NodeItem("GeometryNodeMaterialReplace"),
     ]),
     GeometryNodeCategory("GEO_MESH", "Mesh", items=[
@@ -565,6 +565,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSwitch"),
     ]),
     GeometryNodeCategory("GEO_VECTOR", "Vector", items=[
+        NodeItem("ShaderNodeVectorCurve"),
         NodeItem("ShaderNodeSeparateXYZ"),
         NodeItem("ShaderNodeCombineXYZ"),
         NodeItem("ShaderNodeVectorMath"),

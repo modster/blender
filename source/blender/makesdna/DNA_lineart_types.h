@@ -56,6 +56,7 @@ typedef enum eLineartMainFlags {
   LRT_CHAIN_FLOATING_EDGES = (1 << 11),
   LRT_CHAIN_GEOMETRY_SPACE = (1 << 12),
   LRT_ALLOW_MULTIPLE_EDGE_TYPES = (1 << 13),
+  LRT_USE_CUSTOM_CAMERA = (1 << 14),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {
@@ -64,14 +65,18 @@ typedef enum eLineartEdgeFlag {
   LRT_EDGE_FLAG_CREASE = (1 << 2),
   LRT_EDGE_FLAG_MATERIAL = (1 << 3),
   LRT_EDGE_FLAG_INTERSECTION = (1 << 4),
-  /** Floating edge, unimplemented yet. */
   LRT_EDGE_FLAG_FLOATING = (1 << 5),
+  LRT_EDGE_FLAG_LIGHT_CONTOUR = (1 << 6),
+  /* LRT_EDGE_FLAG_FOR_FUTURE = (1 << 7), */
+  /* Limited to 8 bits for edge type flag, don't add anymore because BMEdge->head.eflag only has 8
+     bits. So unless we changed this into a non-single-bit flag thing, we keep it this way. */
   /** Also used as discarded line mark. */
-  LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 6),
-  LRT_EDGE_FLAG_CLIPPED = (1 << 7),
-  /** Limited to 8 bits, DON'T ADD ANYMORE until improvements on the data structure. */
+  LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 8),
+  LRT_EDGE_FLAG_CLIPPED = (1 << 9),
+  /** Limited to 16 bits for the entire thing. */
 } eLineartEdgeFlag;
 
-#define LRT_EDGE_FLAG_ALL_TYPE 0x3f
+#define LRT_EDGE_FLAG_ALL_TYPE 0x7f
+#define LRT_EDGE_FLAG_TYPE_MAX_BITS 7
 
 #endif

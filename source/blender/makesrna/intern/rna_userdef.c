@@ -1072,10 +1072,9 @@ static void rna_UserDef_studiolight_solid_lights_begin(CollectionPropertyIterato
   rna_iterator_array_begin(iter, sl->light, sizeof(*sl->light), ARRAY_SIZE(sl->light), 0, NULL);
 }
 
-static int rna_UserDef_studiolight_solid_lights_length(PointerRNA *ptr)
+static int rna_UserDef_studiolight_solid_lights_length(PointerRNA *UNUSED(ptr))
 {
-  StudioLight *sl = (StudioLight *)ptr->data;
-  return ARRAY_SIZE(sl->light);
+  return ARRAY_SIZE(((StudioLight *)NULL)->light);
 }
 
 /* StudioLight.light_ambient */
@@ -6275,6 +6274,14 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "use_new_point_cloud_type", 1);
   RNA_def_property_ui_text(
       prop, "New Point Cloud Type", "Enable the new point cloud type in the ui");
+
+  prop = RNA_def_property(srna, "use_full_frame_compositor", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_full_frame_compositor", 1);
+  RNA_def_property_ui_text(prop,
+                           "Full Frame Compositor",
+                           "Enable compositor full frame execution mode option (no tiling, "
+                           "reduces execution time and memory usage)");
+  RNA_def_property_update(prop, 0, "rna_userdef_update");
 
   prop = RNA_def_property(srna, "use_new_hair_type", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_new_hair_type", 1);

@@ -880,6 +880,7 @@ typedef enum eLineArtGPencilModifierFlags {
   LRT_GPENCIL_BINARY_WEIGHTS = (1 << 2) /* Deprecated, this is removed for lack of use case. */,
   LRT_GPENCIL_IS_BAKED = (1 << 3),
   LRT_GPENCIL_USE_CACHE = (1 << 4),
+  LRT_GPENCIL_OFFSET_TOWARDS_CUSTOM_CAMERA = (1 << 5),
 } eLineArtGPencilModifierFlags;
 
 typedef enum eLineartGpencilMaskSwitches {
@@ -895,13 +896,16 @@ struct LineartCache;
 typedef struct LineartGpencilModifierData {
   GpencilModifierData modifier;
 
-  short edge_types; /* line type enable flags, bits in eLineartEdgeFlag */
+  uint16_t edge_types; /* line type enable flags, bits in eLineartEdgeFlag */
 
   char source_type; /* Object or Collection, from eLineartGpencilModifierSource */
 
   char use_multiple_levels;
   short level_start;
   short level_end;
+
+  struct Object *source_camera;
+  struct Object *light_contour_object;
 
   struct Object *source_object;
   struct Collection *source_collection;
@@ -916,6 +920,12 @@ typedef struct LineartGpencilModifierData {
   char source_vertex_group[64];
   char vgname[64];
 
+  /* Camera focal length is divided by (1 + overscan), before caluclation, which give a wider FOV,
+   * this doesn't change coordinates range internally (-1, 1), but makes the caluclated frame
+   * bigger than actual output. This is for the easier shifting calculation. A value of 0.5 means
+   * the "internal" focal length become 2/3 of the actual camera. */
+  float overscan;
+
   float opacity;
   short thickness;
 
@@ -923,7 +933,7 @@ typedef struct LineartGpencilModifierData {
   unsigned char transparency_mask;
   unsigned char intersection_mask;
 
-  char _pad[7];
+  char _pad[3];
 
   /** `0..1` range for cosine angle */
   float crease_threshold;

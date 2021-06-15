@@ -2314,6 +2314,7 @@ class VIEW3D_MT_object_animation(Menu):
 
         layout.operator("nla.bake", text="Bake Action...")
         layout.operator("gpencil.bake_mesh_animation", text="Bake Mesh to Grease Pencil...")
+        layout.operator("gpencil.bake_grease_pencil_animation", text="Bake Object Transform to Grease Pencil...")
 
 
 class VIEW3D_MT_object_rigid_body(Menu):
@@ -4016,7 +4017,7 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
 class VIEW3D_MT_edit_mesh_edges_data(Menu):
     bl_label = "Edge Data"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator_context = 'INVOKE_REGION_WIN'
@@ -5033,6 +5034,10 @@ class VIEW3D_MT_edit_gpencil_stroke(Menu):
         layout.operator_menu_enum("gpencil.stroke_caps_set", text="Toggle Caps", property="type")
         layout.operator("gpencil.stroke_flip", text="Switch Direction")
         layout.prop(settings, "use_scale_thickness", text="Scale Thickness")
+
+        layout.separator()
+        layout.operator("gpencil.stroke_normalize", text="Normalize Thickness").mode = 'THICKNESS'
+        layout.operator("gpencil.stroke_normalize", text="Normalize Opacity").mode = 'OPACITY'
 
         layout.separator()
         layout.operator("gpencil.reset_transform_fill", text="Reset Fill Transform")
@@ -6994,7 +6999,7 @@ class VIEW3D_PT_context_properties(Panel):
 
         if member:
             # Draw with no edit button
-            rna_prop_ui.draw(self.layout, context, member, object, False)
+            rna_prop_ui.draw(self.layout, context, member, object, use_edit=False)
 
 
 # Grease Pencil Object - Multiframe falloff tools
