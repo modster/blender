@@ -178,7 +178,9 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
     /* Clear local cache. */
-    MOD_lineart_clear_cache(&local_lc);
+    if (local_lc != gpd->runtime.lineart_cache) {
+      MOD_lineart_clear_cache(&local_lc);
+    }
     /* Restore the original cache pointer so the modifiers below still have access to the "global"
      * cache. */
     lmd->cache = gpd->runtime.lineart_cache;
