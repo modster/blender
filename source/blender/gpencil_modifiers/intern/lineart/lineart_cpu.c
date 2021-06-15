@@ -65,7 +65,7 @@
 
 #include "lineart_intern.h"
 
-// #define LINEART_WITH_BVH
+#define LINEART_WITH_BVH
 
 static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer *rb,
                                                              LineartEdge *e);
@@ -3868,8 +3868,10 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
 
 #ifdef LINEART_WITH_BVH
       float bounding[6];
-      lineart_triangle_bbox(rt, bounding);
-      BLI_bvhtree_insert(rb->bvh_main, i_triangle + i, bounding, 2);
+      lineart_triangle_bbox(tri, bounding);
+      if (!(tri->flags & LRT_TRIANGLE_NO_INTERSECTION)) {
+        BLI_bvhtree_insert(rb->bvh_main, i_triangle + i, bounding, 2);
+      }
 #endif
 
       if (lineart_get_triangle_bounding_areas(rb, tri, &y1, &y2, &x1, &x2)) {
@@ -3927,31 +3929,12 @@ static void lineart_do_intersections(LineartRenderBuffer *rb)
       continue;
     }
 
-    double *G0 = rt1->v[0]->gloc, *G1 = rt1->v[1]->gloc, *G2 = rt1->v[2]->gloc;
-
-    LineartTriangleThread *rtt = (LineartTriangleThread *)rt2;
-
-    if (rt2 == rt1 || rtt->testing_e[0] == (LineartEdge *)rt1) {
+    if ((rt2->flags & LRT_TRIANGLE_INTERSECTION_ONLY) &&
+        (rt1->flags & LRT_TRIANGLE_INTERSECTION_ONLY)) {
       continue;
     }
-    rtt->testing_e[0] = (LineartEdge *)rt1;
-
-    if ((rt2->flags & LRT_TRIANGLE_NO_INTERSECTION) ||
-        ((rt2->flags & LRT_TRIANGLE_INTERSECTION_ONLY) &&
-         (rt1->flags & LRT_TRIANGLE_INTERSECTION_ONLY))) {
-      continue;
-    }
-
-    double *RG0 = rt2->v[0]->gloc, *RG1 = rt2->v[1]->gloc, *RG2 = rt2->v[2]->gloc;
-
     /* Bounding box not overlapping or triangles share edges, not potential of intersecting. */
-    if ((MIN3(G0[2], G1[2], G2[2]) > MAX3(RG0[2], RG1[2], RG2[2])) ||
-        (MAX3(G0[2], G1[2], G2[2]) < MIN3(RG0[2], RG1[2], RG2[2])) ||
-        (MIN3(G0[0], G1[0], G2[0]) > MAX3(RG0[0], RG1[0], RG2[0])) ||
-        (MAX3(G0[0], G1[0], G2[0]) < MIN3(RG0[0], RG1[0], RG2[0])) ||
-        (MIN3(G0[1], G1[1], G2[1]) > MAX3(RG0[1], RG1[1], RG2[1])) ||
-        (MAX3(G0[1], G1[1], G2[1]) < MIN3(RG0[1], RG1[1], RG2[1])) ||
-        lineart_triangle_share_edge(rt1, rt2)) {
+    if (lineart_triangle_share_edge(rt1, rt2)) {
       continue;
     }
 
