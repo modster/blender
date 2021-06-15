@@ -32,8 +32,7 @@
 
 #include "BLI_vector.hh"
 
-namespace blender {
-namespace generational_arena {
+namespace blender::generational_arena {
 
 template<
     /**
@@ -55,6 +54,8 @@ template<
      */
     typename Allocator = GuardedAllocator>
 class Arena {
+  struct EntryNoExist;
+  struct EntryExist;
   /* using declarations */
   using usize = uint64_t;
   using isize = int64_t;
@@ -109,10 +110,8 @@ class Index {
 
   std::tuple<usize, usize> get_raw() const
   {
-    return std::make_tuple(this->index, this->generation)
+    return std::make_tuple(this->index, this->generation);
   }
 };
 
-} /* namespace generational_arena */
-
-} /* namespace blender */
+} /* namespace blender::generational_arena */
