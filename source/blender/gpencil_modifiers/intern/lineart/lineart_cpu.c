@@ -3008,13 +3008,13 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
 
 void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
 {
-  LineartRenderBuffer *rb = lmd->render_buffer_onetime;
+  LineartRenderBuffer *rb = lmd->render_buffer_ptr;
 
   lineart_destroy_render_data(rb);
 
   if (rb) {
     MEM_freeN(rb);
-    lmd->render_buffer_onetime = NULL;
+    lmd->render_buffer_ptr = NULL;
   }
 
   if (G.debug_value == 4000) {
@@ -3047,8 +3047,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   LineartRenderBuffer *rb = MEM_callocN(sizeof(LineartRenderBuffer), "Line Art render buffer");
 
   lmd->cache = lc;
-  lmd->render_buffer_onetime = rb;
-  lc->rb_edge_types = LRT_EDGE_FLAG_ALL_TYPE;
+  lmd->render_buffer_ptr = rb;
+  lc->rb_edge_types = lmd->edge_types_override;
 
   if (!scene || !camera || !lc) {
     return NULL;
@@ -3120,14 +3120,16 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
 
   rb->allow_duplicated_types = (lmd->calculation_flags & LRT_ALLOW_MULTIPLE_EDGE_TYPES) != 0;
 
+  int16_t edge_types = lmd->edge_types_override;
+
   /* lmd->edge_types_override contains all used flags in the modifier stack. */
-  rb->use_contour = (lmd->edge_types_override & LRT_EDGE_FLAG_CONTOUR) != 0;
-  rb->use_crease = (lmd->edge_types_override & LRT_EDGE_FLAG_CREASE) != 0;
-  rb->use_material = (lmd->edge_types_override & LRT_EDGE_FLAG_MATERIAL) != 0;
-  rb->use_edge_marks = (lmd->edge_types_override & LRT_EDGE_FLAG_EDGE_MARK) != 0;
-  rb->use_intersections = (lmd->edge_types_override & LRT_EDGE_FLAG_INTERSECTION) != 0;
-  rb->use_floating = (lmd->edge_types_override & LRT_EDGE_FLAG_FLOATING) != 0;
-  rb->use_light_contour = (lmd->edge_types_override & LRT_EDGE_FLAG_LIGHT_CONTOUR) != 0;
+  rb->use_contour = (edge_types & LRT_EDGE_FLAG_CONTOUR) != 0;
+  rb->use_crease = (edge_types & LRT_EDGE_FLAG_CREASE) != 0;
+  rb->use_material = (edge_types & LRT_EDGE_FLAG_MATERIAL) != 0;
+  rb->use_edge_marks = (edge_types & LRT_EDGE_FLAG_EDGE_MARK) != 0;
+  rb->use_intersections = (edge_types & LRT_EDGE_FLAG_INTERSECTION) != 0;
+  rb->use_floating = (edge_types & LRT_EDGE_FLAG_FLOATING) != 0;
+  rb->use_light_contour = (edge_types & LRT_EDGE_FLAG_LIGHT_CONTOUR) != 0;
 
   rb->filter_face_mark_invert = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_INVERT) != 0;
   rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;

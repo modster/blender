@@ -303,8 +303,9 @@ typedef struct GpencilLineartLimitInfo {
 void BKE_gpencil_get_lineart_modifier_limits(struct Object *ob,
                                              struct GpencilLineartLimitInfo *info);
 
-void BKE_gpencil_set_lineart_global_limits(struct GpencilModifierData *md,
-                                           struct GpencilLineartLimitInfo *info);
+void BKE_gpencil_set_lineart_modifier_limits(struct GpencilModifierData *md,
+                                             struct GpencilLineartLimitInfo *info,
+                                             bool is_first_lineart);
 bool BKE_gpencil_is_first_lineart_in_stack(struct Object *ob, struct GpencilModifierData *md);
 
 void BKE_gpencil_lattice_init(struct Object *ob);

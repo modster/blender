@@ -966,7 +966,7 @@ typedef struct LineartGpencilModifierData {
 
   struct LineartCache *cache;
   /* Keep render buffer so we can call destroy from ModifierData. */
-  struct LineartRenderBuffer *render_buffer_onetime;
+  struct LineartRenderBuffer *render_buffer_ptr;
 
 } LineartGpencilModifierData;
 
