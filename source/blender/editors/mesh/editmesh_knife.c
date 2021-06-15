@@ -3091,7 +3091,9 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
           snapping_increment_temp < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) {
         kcd->angle_snapping_increment = snapping_increment_temp;
       }
+      knife_update_active(C, kcd);
       knife_update_header(C, op, kcd);
+      ED_region_tag_redraw(kcd->region);
       return OPERATOR_RUNNING_MODAL;
     }
   }
@@ -3156,7 +3158,9 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
             RNA_float_get(op->ptr, "angle_snapping_increment"));
         knifetool_disable_orientation_locking(kcd);
         knife_reset_snap_angle_input(kcd);
+        knife_update_active(C, kcd);
         knife_update_header(C, op, kcd);
+        ED_region_tag_redraw(kcd->region);
         do_refresh = true;
         handled = true;
         break;
@@ -3275,7 +3279,9 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
           snapping_increment_temp < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) {
         kcd->angle_snapping_increment = snapping_increment_temp;
       }
+      knife_update_active(C, kcd);
       knife_update_header(C, op, kcd);
+      ED_region_tag_redraw(kcd->region);
       return OPERATOR_RUNNING_MODAL;
     }
   }
