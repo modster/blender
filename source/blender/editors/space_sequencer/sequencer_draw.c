@@ -1089,14 +1089,13 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
                                      SpaceSeq *sseq,
                                      Scene *scene,
                                      Sequence *seq,
-                                     ARegion *region,
                                      float x1,
                                      float y1,
                                      float x2,
+                                     float y2,
                                      float handsize_clamped,
                                      float pixelx,
-                                     float pixely,
-                                     float y_threshold)
+                                     float pixely)
 {
   struct Main *bmain = CTX_data_main(C);
   struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
@@ -1104,8 +1103,8 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   ImBuf *ibuf;
   int rectx, recty;
   double render_size;
-  float y2, strip_x2 = x2;
-  float seq_disp_len;
+  float strip_x2 = x2;
+  bool min_size;
 
   if (sseq->render_size == SEQ_RENDER_SIZE_NONE) {
     return;
@@ -1118,11 +1117,14 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     render_size = SEQ_rendersize_to_scale_factor(sseq->render_size);
   }
 
-  if (!(y_threshold))
-    return;
-
   rectx = roundf(render_size * scene->r.xsch);
   recty = roundf(render_size * scene->r.ysch);
+
+  /* if thumbs too small ignore */
+  min_size = ((y2 - y1) / pixely) > 40 * U.dpi_fac;
+
+  if (!min_size)
+    return;
 
   SEQ_render_new_render_data(
       bmain, depsgraph, scene, rectx, recty, sseq->render_size, false, &context);
@@ -1139,33 +1141,43 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   float zoom_x = thumb_w / scene->r.xsch;
   float zoom_y = thumb_h / scene->r.ysch;
 
-  y2 = y1 + thumb_h;
+  y2 = y1 + thumb_h - pixely;
   x1 = x1 + handsize_clamped;
 
-  seq_disp_len = seq->enddisp - seq->startdisp;
-  int frame_offset = thumb_w;
+  int frame_factor = 0;
 
   float upper_thumb_bound = strip_x2 - handsize_clamped;
 
   while (x1 < upper_thumb_bound - 1) {
     x2 = x1 + thumb_w;
 
+    /* Checks to make sure that thumbs are loaded only when in view */
+    if (x1 > v2d->cur.xmax)
+      break;
+
+    if (x2 < v2d->cur.xmin) {
+      x1 = x2;
+      frame_factor++;
+      continue;
+    }
+
     /* clip if full thumbnail cannot be displayed */
     if (x2 >= (upper_thumb_bound - 1)) {
       x2 = (upper_thumb_bound - 1);
-      if (x2 - x1 < 1)
+      if (x2 - x1 < 4)
         break;
     }
 
     /* Get the image */
-    ibuf = SEQ_render_give_ibuf_direct(&context, seq->startdisp + x1 - handsize_clamped, seq);
+    ibuf = SEQ_render_give_ibuf_direct(
+        &context, seq->start + seq->startofs + frame_factor * roundf(thumb_w), seq);
 
     if (ibuf) {
-      ED_draw_imbuf_ctx_clipping(
-          C, ibuf, x1, y1 + pixely * 2, false, x1, y1 + pixely * 2, x2, y2, zoom_x, zoom_y);
+      ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, false, x1, y1, x2, y2, zoom_x, zoom_y);
       IMB_freeImBuf(ibuf);
     }
 
+    frame_factor++;
     x1 = x2;
   }
 }
@@ -1270,19 +1282,8 @@ static void draw_seq_strip(const bContext *C,
   }
 
   if (seq->type == SEQ_TYPE_MOVIE) {
-    draw_seq_strip_thumbnail(v2d,
-                             C,
-                             sseq,
-                             scene,
-                             seq,
-                             region,
-                             x1,
-                             y1,
-                             x2,
-                             handsize_clamped,
-                             pixelx,
-                             pixely,
-                             y_threshold);
+    draw_seq_strip_thumbnail(
+        v2d, C, sseq, scene, seq, x1, y1, x2, y2, handsize_clamped, pixelx, pixely);
   }
 
   pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
