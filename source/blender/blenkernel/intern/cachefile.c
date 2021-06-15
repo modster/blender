@@ -339,11 +339,13 @@ float BKE_cachefile_time_offset(const CacheFile *cache_file, const float time, c
   return cache_file->is_sequence ? frame : frame / fps - time_offset;
 }
 
-bool BKE_cache_file_uses_render_procedural(const CacheFile *cache_file, const Scene *scene, int dag_eval_mode)
+bool BKE_cache_file_uses_render_procedural(const CacheFile *cache_file,
+                                           Scene *scene,
+                                           const int dag_eval_mode)
 {
   RenderEngineType *render_engine_type = RE_engines_find(scene->r.engine);
 
-  if ((render_engine_type->flag & RE_USE_ALEMBIC_PROCEDURAL) == 0) {
+  if (!RE_engine_supports_alembic_procedural(render_engine_type, scene, NULL)) {
     return false;
   }
 

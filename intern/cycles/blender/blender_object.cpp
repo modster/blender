@@ -506,10 +506,10 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   }
 
   procedural->set_frame(current_frame);
-
-  procedural->set_frame_rate(cache_file.frame_rate());
-  procedural->set_default_radius(cache_file.default_radius());
+  procedural->set_frame_rate(b_scene.render().fps() / b_scene.render().fps_base());
   procedural->set_frame_offset(cache_file.frame_offset());
+
+  procedural->set_default_radius(cache_file.default_radius());
 
   string absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
   procedural->set_filepath(ustring(absolute_path));

@@ -86,7 +86,9 @@ static void copyData(const ModifierData *md, ModifierData *target, const int fla
 
   temd->facepa = NULL;
 }
-static bool dependsOnTime(const struct Scene *UNUSED(scene), ModifierData *UNUSED(md), int UNUSED(dag_eval_mode))
+static bool dependsOnTime(struct Scene *UNUSED(scene),
+                          ModifierData *UNUSED(md),
+                          const int UNUSED(dag_eval_mode))
 {
   return true;
 }

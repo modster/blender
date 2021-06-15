@@ -84,6 +84,8 @@
 #include "ED_screen.h"
 #include "ED_undo.h"
 
+#include "RE_engine.h"
+
 #include "RNA_access.h"
 
 #include "WM_api.h"
@@ -7279,11 +7281,28 @@ void uiTemplateCacheFile(uiLayout *layout,
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "is_sequence", 0, NULL, ICON_NONE);
 
-  row = uiLayoutRow(layout, false);
-  uiItemR(row, &fileptr, "use_render_procedural", 0, NULL, ICON_NONE);
+  /* Only enable render procedural option if the active engine supports it. */
+  const struct RenderEngineType *engine_type = CTX_data_engine_type(C);
+
+  bool engine_is_cycles = false;
+  const bool engine_supports_procedural = RE_engine_supports_alembic_procedural(
+      engine_type, CTX_data_scene(C), &engine_is_cycles);
+
+  if (!engine_supports_procedural) {
+    row = uiLayoutRow(layout, false);
+    if (!engine_is_cycles) {
+      uiItemL(row, "The active render engine does not have an Alembic Procedural", ICON_INFO);
+    }
+    else {
+      uiItemL(row,
+              "The Cycles Alembic Procedural is only available with the experimental feature set",
+              ICON_INFO);
+    }
+  }
 
   row = uiLayoutRow(layout, false);
-  uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);
+  uiLayoutSetActive(row, engine_supports_procedural);
+  uiItemR(row, &fileptr, "use_render_procedural", 0, NULL, ICON_NONE);
 
   if (RNA_boolean_get(&fileptr, "use_render_procedural")) {
     row = uiLayoutRow(layout, false);
@@ -7293,6 +7312,9 @@ void uiTemplateCacheFile(uiLayout *layout,
     uiLayoutSetEnabled(sub, RNA_boolean_get(&fileptr, "use_prefetch"));
     uiItemR(sub, &fileptr, "prefetch_cache_size", 0, NULL, ICON_NONE);
   }
+
+  row = uiLayoutRow(layout, false);
+  uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);
 
   row = uiLayoutRowWithHeading(layout, true, IFACE_("Override Frame"));
   sub = uiLayoutRow(row, true);
@@ -7315,7 +7337,9 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(layout, &fileptr, "velocity_name", 0, NULL, ICON_NONE);
   uiItemR(layout, &fileptr, "velocity_unit", 0, NULL, ICON_NONE);
 
-  uiItemR(layout, &fileptr, "default_radius", 0, NULL, ICON_NONE);
+  row = uiLayoutRow(layout, false);
+  uiLayoutSetActive(row, engine_supports_procedural && RNA_boolean_get(&fileptr, "use_render_procedural"));
+  uiItemR(row, &fileptr, "default_radius", 0, NULL, ICON_NONE);
 
   /* TODO: unused for now, so no need to expose. */
 #if 0

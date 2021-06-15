@@ -1075,7 +1075,8 @@ static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
         continue;
       }
 
-      if (useDeform < 0 && mti->dependsOnTime && mti->dependsOnTime(scene, md, DEG_get_mode(depsgraph))) {
+      if (useDeform < 0 && mti->dependsOnTime &&
+          mti->dependsOnTime(scene, md, DEG_get_mode(depsgraph))) {
         continue;
       }
 
@@ -1172,7 +1173,8 @@ static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
       continue;
     }
 
-    if (useDeform < 0 && mti->dependsOnTime && mti->dependsOnTime(scene, md, DEG_get_mode(depsgraph))) {
+    if (useDeform < 0 && mti->dependsOnTime &&
+        mti->dependsOnTime(scene, md, DEG_get_mode(depsgraph))) {
       continue;
     }
 

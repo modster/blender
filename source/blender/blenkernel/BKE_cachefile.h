@@ -66,7 +66,9 @@ void BKE_cachefile_reader_free(struct CacheFile *cache_file, struct CacheReader 
  * will receive the bounding box as a placeholder but can instead load the data directly if they
  * support it.
  */
-bool BKE_cache_file_uses_render_procedural(const struct CacheFile *cache_file, const struct Scene *scene, int dag_eval_mode);
+bool BKE_cache_file_uses_render_procedural(const struct CacheFile *cache_file,
+                                           struct Scene *scene,
+                                           const int dag_eval_mode);
 
 #ifdef __cplusplus
 }

@@ -243,7 +243,7 @@ static void rna_def_cachefile(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
-  prop = RNA_def_property(srna, "default_radius", PROP_FLOAT, PROP_NONE);
+  prop = RNA_def_property(srna, "default_radius", PROP_FLOAT, PROP_UNIT_LENGTH);
   RNA_def_property_float_sdna(prop, NULL, "default_radius");
   RNA_def_property_ui_text(prop,
                            "Default Radius",

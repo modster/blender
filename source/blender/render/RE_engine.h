@@ -236,6 +236,10 @@ void RE_engines_register(RenderEngineType *render_type);
 
 bool RE_engine_is_opengl(RenderEngineType *render_type);
 
+bool RE_engine_supports_alembic_procedural(const RenderEngineType *render_type,
+                                           struct Scene *scene,
+                                           bool *r_is_cycles);
+
 RenderEngineType *RE_engines_find(const char *idname);
 
 rcti *RE_engine_get_current_tiles(struct Render *re, int *r_total_tiles, bool *r_needs_free);

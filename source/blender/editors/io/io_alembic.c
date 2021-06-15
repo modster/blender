@@ -739,7 +739,7 @@ void WM_OT_alembic_import(wmOperatorType *ot)
                 0.0001f,
                 1000.0f,
                 "Default Radius",
-                "Value to use for defining the radius of curves of points when then do not have a "
+                "Value to use for defining the radius of curves or points when they do not have a "
                 "property for it",
                 0.0001f,
                 1000.0f);

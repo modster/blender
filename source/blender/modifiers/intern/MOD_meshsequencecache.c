@@ -175,7 +175,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
   /* Do not process data if using a render procedural, return a box instead for displaying in the
    * viewport. */
-  if (BKE_cache_file_uses_render_procedural(cache_file, scene, (int)DEG_get_mode(ctx->depsgraph))) {
+  if (BKE_cache_file_uses_render_procedural(
+          cache_file, scene, (int)DEG_get_mode(ctx->depsgraph))) {
     return generate_bounding_box_mesh(ctx->object, org_mesh);
   }
 
@@ -203,7 +204,12 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     }
   }
 
-  Mesh *result = ABC_read_mesh(mcmd->reader, ctx->object, mesh, time, &err_str, mcmd->read_flag);
+  Mesh *result = ABC_read_mesh(mcmd->reader,
+                               ctx->object,
+                               mesh,
+                               time,
+                               &err_str,
+                               mcmd->read_flag);
 
   mcmd->velocity_delta = 1.0f;
   if (mcmd->cache_file->velocity_unit == CACHEFILE_VELOCITY_UNIT_SECOND) {
@@ -232,11 +238,11 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 #endif
 }
 
-static bool dependsOnTime(const Scene *scene, ModifierData *md, int dag_eval_mode)
+static bool dependsOnTime(Scene *scene, ModifierData *md, const int dag_eval_mode)
 {
 #ifdef WITH_ALEMBIC
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
-  /* Do not evaluate animations if using the Cycles procedural. */
+  /* Do not evaluate animations if using the render engine procedural. */
   return (mcmd->cache_file != NULL) &&
          !BKE_cache_file_uses_render_procedural(mcmd->cache_file, scene, dag_eval_mode);
 #else
@@ -286,7 +292,11 @@ static void panel_draw(const bContext *C, Panel *panel)
   }
 
   uiItemR(layout, ptr, "velocity_scale", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "radius_scale", 0, NULL, ICON_NONE);
+
+  uiLayout *row = uiLayoutRow(layout, false);
+  const bool can_use_render_procedural = has_cache_file && RNA_boolean_get(&cache_file_ptr, "use_render_procedural");
+  uiLayoutSetActive(row, can_use_render_procedural);
+  uiItemR(row, ptr, "radius_scale", 0, NULL, ICON_NONE);
 
   modifier_panel_end(layout, ptr);
 }

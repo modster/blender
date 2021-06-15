@@ -2635,6 +2635,7 @@ void DepsgraphRelationBuilder::build_cachefile(CacheFile *cache_file)
     ComponentKey datablock_key(&cache_file->id, NodeType::CACHE);
     add_relation(animation_key, datablock_key, "Drivers -> Cache Eval");
   }
+
   /* Cache file updates */
   if (cache_file->is_sequence) {
     OperationKey cache_update_key(
