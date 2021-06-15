@@ -52,6 +52,7 @@
  */
 /* TODO(ish): need to complete documentation */
 
+#include <limits>
 #include <optional>
 #include <tuple>
 #include <variant>
@@ -59,6 +60,32 @@
 #include "BLI_vector.hh"
 
 namespace blender::generational_arena {
+
+namespace extra {
+template<typename... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+template<typename... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+} /* namespace extra */
+
+class Index {
+  using usize = uint64_t;
+
+  usize index;
+  usize generation;
+
+ public:
+  Index(usize index, usize generation)
+  {
+    this->index = index;
+    this->generation = generation;
+  }
+
+  std::tuple<usize, usize> get_raw() const
+  {
+    return std::make_tuple(this->index, this->generation);
+  }
+};
 
 template<
     /**
@@ -109,6 +136,12 @@ class Arena {
   struct EntryExist {
     T value;
     usize generation;
+
+    EntryExist(T value, usize generation)
+    {
+      this->value = value;
+      this->generation = generation;
+    }
   };
 
   blender::Vector<Entry> data;
@@ -158,6 +191,50 @@ class Arena {
     this->next_free_head = start;
   }
 
+  /* TODO(ish): add optimization by moving `value`, can be done by
+   * returning value if `try_insert()` fails */
+  std::optional<Index> try_insert(T value)
+  {
+    if (this->next_free_head) {
+      auto loc = this->next_free_head;
+      std::visit(extra::overloaded{[this, value](EntryNoExist &data) {
+                                     this->next_free_head = data.next_free;
+                                     data = EntryExist(value, this->generation);
+                                   },
+                                   [](EntryExist &data) {
+                                     /* The linked list created to
+                                      * know where to insert next is
+                                      * corrupted.
+                                      * `this->next_free_head` is corrupted */
+                                     BLI_assert_unreachable();
+                                   }},
+                 this->data[loc]);
+      this->length += 1;
+      return Index(loc, this->generation);
+    }
+    return std::nullopt;
+  }
+
+  Index insert(T value)
+  {
+    if (auto index = this->try_insert(value)) {
+      return index;
+    }
+    else {
+      /* couldn't insert the value within reserved memory space  */
+      /* TODO(ish): might be possible that `this->data.size()` is 0,
+       * needs a special case for that */
+      this->reserve(this->data.size() * 2);
+      if (auto index = this->try_insert(value)) {
+        return index;
+      }
+      else {
+        /* now that more memory has been reserved, it shouldn't fail */
+        BLI_assert_unreachable();
+      }
+    }
+  }
+
  protected:
   /* all protected static methods */
   /* all protected non-static methods */
@@ -165,25 +242,6 @@ class Arena {
  private:
   /* all private static methods */
   /* all private non-static methods */
-};
-
-class Index {
-  using usize = uint64_t;
-
-  usize index;
-  usize generation;
-
- public:
-  Index(usize index, usize generation)
-  {
-    this->index = index;
-    this->generation = generation;
-  }
-
-  std::tuple<usize, usize> get_raw() const
-  {
-    return std::make_tuple(this->index, this->generation);
-  }
 };
 
 } /* namespace blender::generational_arena */
