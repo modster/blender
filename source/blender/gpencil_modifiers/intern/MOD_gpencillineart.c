@@ -315,8 +315,45 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   else {
     /* Source is Scene. */
   }
+  uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
 
-  uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Edge Types"));
+  /* Material has to be used by grease pencil object already, it was possible to assign materials
+   * without this requirement in earlier versions of blender. */
+  bool material_valid = false;
+  PointerRNA material_ptr = RNA_pointer_get(ptr, "target_material");
+  if (!RNA_pointer_is_null(&material_ptr)) {
+    Material *current_material = material_ptr.data;
+    Object *ob = ob_ptr.data;
+    material_valid = BKE_gpencil_object_material_index_get(ob, current_material) != -1;
+  }
+  uiLayout *row = uiLayoutRow(layout, true);
+  uiLayoutSetRedAlert(row, !material_valid);
+  uiItemPointerR(row,
+                 ptr,
+                 "target_material",
+                 &obj_data_ptr,
+                 "materials",
+                 NULL,
+                 material_valid ? ICON_SHADING_TEXTURE : ICON_ERROR);
+
+  gpencil_modifier_panel_end(layout, ptr);
+}
+
+static void line_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
+
+  uiLayoutSetEnabled(layout, !is_baked);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayout *col = uiLayoutColumn(layout, false);
 
   uiItemR(col, ptr, "use_contour", 0, IFACE_("Contour"), ICON_NONE);
   uiItemR(col, ptr, "use_floating", 0, IFACE_("Floating"), ICON_NONE);
@@ -345,29 +382,6 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   else {
     uiItemR(entry, ptr, "light_contour_object", 0, "", ICON_NONE);
   }
-
-  uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
-
-  /* Material has to be used by grease pencil object already, it was possible to assign materials
-   * without this requirement in earlier versions of blender. */
-  bool material_valid = false;
-  PointerRNA material_ptr = RNA_pointer_get(ptr, "target_material");
-  if (!RNA_pointer_is_null(&material_ptr)) {
-    Material *current_material = material_ptr.data;
-    Object *ob = ob_ptr.data;
-    material_valid = BKE_gpencil_object_material_index_get(ob, current_material) != -1;
-  }
-  uiLayout *row = uiLayoutRow(layout, true);
-  uiLayoutSetRedAlert(row, !material_valid);
-  uiItemPointerR(row,
-                 ptr,
-                 "target_material",
-                 &obj_data_ptr,
-                 "materials",
-                 NULL,
-                 material_valid ? ICON_SHADING_TEXTURE : ICON_ERROR);
-
-  gpencil_modifier_panel_end(layout, ptr);
 }
 
 static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -701,6 +715,8 @@ static void panelRegister(ARegionType *region_type)
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Lineart, panel_draw);
 
+  gpencil_modifier_subpanel_register(
+      region_type, "line_types", "Line Types", NULL, line_types_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "options", "Options", NULL, options_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
