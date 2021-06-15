@@ -328,29 +328,21 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
   cast_geometry_set = bke::geometry_set_realize_instances(cast_geometry_set);
 
-  if (geometry_set.has<MeshComponent>()) {
-    raycast_from_points(params,
-                        cast_geometry_set,
-                        geometry_set.get_component_for_write<MeshComponent>(),
-                        hit_name,
-                        hit_index_name,
-                        hit_position_name,
-                        hit_normal_name,
-                        hit_distance_name,
-                        hit_attribute_names,
-                        hit_attribute_output_names);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    raycast_from_points(params,
-                        cast_geometry_set,
-                        geometry_set.get_component_for_write<MeshComponent>(),
-                        hit_name,
-                        hit_index_name,
-                        hit_position_name,
-                        hit_normal_name,
-                        hit_distance_name,
-                        hit_attribute_names,
-                        hit_attribute_output_names);
+  static const Array<GeometryComponentType> SupportedTypes = {
+      GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
+  for (GeometryComponentType geo_type : SupportedTypes) {
+    if (geometry_set.has(geo_type)) {
+      raycast_from_points(params,
+                          cast_geometry_set,
+                          geometry_set.get_component_for_write(geo_type),
+                          hit_name,
+                          hit_index_name,
+                          hit_position_name,
+                          hit_normal_name,
+                          hit_distance_name,
+                          hit_attribute_names,
+                          hit_attribute_output_names);
+    }
   }
 
   params.set_output("Geometry", geometry_set);
