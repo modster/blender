@@ -2676,7 +2676,7 @@ static void knife_constrain_axis(bContext *C, KnifeTool_OpData *kcd)
   mul_m3_m3_pre(co, mat);
   for (int i = 0; i <= 2; i++) {
     if ((kcd->constrain_axis - 1) != i) {
-      /* kcd->curr_cage_adjusted[i] = kcd->prev_cage_adjusted[i]; */
+      /* kcd->curr_cage_adjusted[i] = prev_cage_adjusted[i]; */
       co[2][i] = co[0][i];
     }
   }
@@ -2685,7 +2685,6 @@ static void knife_constrain_axis(bContext *C, KnifeTool_OpData *kcd)
   copy_v3_v3(prev_cage_adjusted, co[0]);
   copy_v3_v3(kcd->curr_cage_adjusted, co[2]);
 
-  /* Maybe delete!!! */
   mul_m4_v3(kcd->ob_imat, kcd->curr_cage_adjusted);
 
   /* Set mval to closest point on constrained line in screen space */
