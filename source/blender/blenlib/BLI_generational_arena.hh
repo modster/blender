@@ -52,6 +52,7 @@
  */
 /* TODO(ish): need to complete documentation */
 
+#include <functional>
 #include <limits>
 #include <optional>
 #include <tuple>
@@ -233,6 +234,70 @@ class Arena {
         BLI_assert_unreachable();
       }
     }
+  }
+
+  std::optional<std::reference_wrapper<const T>> get(Index index) const
+  {
+    /* if index exceeds size of the container, return std::nullopt */
+    if (index.index >= this->data.size()) {
+      return std::nullopt;
+    }
+
+    if (index.generation != this->data[index.index]) {
+      return std::nullopt;
+    }
+
+    return std::cref(this->data[index.index]);
+  }
+
+  std::optional<std::reference_wrapper<T>> get(Index index)
+  {
+    /* if index exceeds size of the container, return std::nullopt */
+    if (index.index >= this->data.size()) {
+      return std::nullopt;
+    }
+
+    if (index.generation != this->data[index.index]) {
+      return std::nullopt;
+    }
+
+    return std::ref(this->data[index.index]);
+  }
+
+  std::optional<std::reference_wrapper<const T>> get_no_gen(usize index) const
+  {
+    /* if index exceeds size of the container, return std::nullopt */
+    if (index >= this->data.size()) {
+      return std::nullopt;
+    }
+
+    return std::cref(this->data[index]);
+  }
+
+  std::optional<std::reference_wrapper<T>> get_no_gen(usize index)
+  {
+    /* if index exceeds size of the container, return std::nullopt */
+    if (index >= this->data.size()) {
+      return std::nullopt;
+    }
+
+    return std::ref(this->data[index]);
+  }
+
+  std::optional<Index> get_no_gen_index(usize index) const
+  {
+    /* if index exceeds size of the container, return std::nullopt */
+    if (index >= this->data.size()) {
+      return std::nullopt;
+    }
+
+    std::optional<Index> res;
+    std::visit(extra::overloaded{
+                   [&res](EntryNoExist &entry) { res = std::nullopt; },
+                   [&res, index](EntryExist &entry) { res = Index(index, entry.generation); }},
+               this->data[index]);
+
+    return res;
   }
 
  protected:
