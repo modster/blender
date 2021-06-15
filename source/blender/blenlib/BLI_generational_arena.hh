@@ -91,15 +91,39 @@ class Arena {
   /* non-static data members */
   struct EntryNoExist {
     std::optional<usize> next_free;
+
+    EntryNoExist()
+    {
+    }
+
+    EntryNoExist(usize next_free)
+    {
+      this->next_free = next_free;
+    }
+
+    EntryNoExist(std::optional<usize> next_free)
+    {
+      this->next_free = next_free;
+    }
   };
   struct EntryExist {
     T value;
     usize generation;
   };
 
+  blender::Vector<Entry> data;
+  std::optional<usize> next_free_head;
+  usize generation;
+  usize length;
+
  public:
   /* default constructor */
+  Arena() = default;
   /* other constructors */
+  Arena(const usize size) : Arena()
+  {
+    this->reserve(size);
+  }
   /* copy constructor */
   /* move constructor */
 
@@ -111,6 +135,28 @@ class Arena {
 
   /* all public static methods */
   /* all public non-static methods */
+  void reserve(const usize new_cap)
+  {
+    /* Must only increase capacity */
+    if (new_cap < this->data.size()) {
+      return;
+    }
+
+    this->data.reserve(new_cap);
+    /* next_free_head is set to start of extended list
+     *
+     * in the extended elements, next_free is set to the next element
+     *
+     * last element in the extended elements's next_free is the old
+     * next_free_head */
+    auto const old_next_free_head = this->next_free_head;
+    auto const start = this->data.size();
+    for (auto i = start; i < new_cap - 1; i++) {
+      this->data.append(EntryNoExist(i + 1));
+    }
+    this->data.append(EntryNoExist(old_next_free_head));
+    this->next_free_head = start;
+  }
 
  protected:
   /* all protected static methods */
