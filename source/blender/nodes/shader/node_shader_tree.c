@@ -1135,7 +1135,7 @@ void ntreeGPUMaterialNodes(bNodeTree *localtree, GPUMaterial *mat)
   /* Tree is valid if it contains no undefined implicit socket type cast. */
   bool valid_tree = ntree_shader_implicit_closure_cast(localtree);
 
-  if (valid_tree) {
+  if (valid_tree && output != NULL) {
     ntree_shader_weight_tree_invert(localtree, output);
   }
 
