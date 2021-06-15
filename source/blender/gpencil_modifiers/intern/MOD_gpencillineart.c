@@ -358,15 +358,6 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (!use_cache || is_first) {
-    uiLayout *row = uiLayoutRowWithHeading(layout, false, IFACE_("Custom Camera"));
-    uiItemR(row, ptr, "use_custom_camera", 0, "", 0);
-    uiLayout *subrow = uiLayoutRow(row, true);
-    uiLayoutSetActive(subrow, RNA_boolean_get(ptr, "use_custom_camera"));
-    uiLayoutSetPropSep(subrow, true);
-    uiItemR(subrow, ptr, "source_camera", 0, "", ICON_OBJECT_DATA);
-
-    uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
-
     uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
     uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
     uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
