@@ -138,7 +138,8 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
                                                     filter->operation;
 
   const SpreadsheetColumn *column = lookup_visible_column_for_filter(*sspreadsheet, column_name);
-  if (column == nullptr && !column_name.is_empty()) {
+  if (!(sspreadsheet->filter_flag & SPREADSHEET_FILTER_ENABLE) ||
+      column == nullptr && !column_name.is_empty()) {
     uiLayoutSetActive(layout, false);
   }
   if (column != nullptr) {
@@ -183,21 +184,27 @@ static void spreadsheet_filter_panel_draw(const bContext *C, Panel *panel)
   PointerRNA *filter_ptr = UI_panel_custom_data_get(panel);
   SpreadsheetRowFilter *filter = (SpreadsheetRowFilter *)filter_ptr->data;
   const StringRef column_name = filter->column_name;
-  const eSpreadsheetFilterOperation operation = (const eSpreadsheetFilterOperation)
-                                                    filter->operation;
+  const eSpreadsheetFilterOperation operation = (eSpreadsheetFilterOperation)filter->operation;
 
   const SpreadsheetColumn *column = lookup_visible_column_for_filter(*sspreadsheet, column_name);
-  if (!(filter->flag & SPREADSHEET_ROW_FILTER_ENABLED) ||
+  if (!(sspreadsheet->filter_flag & SPREADSHEET_FILTER_ENABLE) ||
+      !(filter->flag & SPREADSHEET_ROW_FILTER_ENABLED) ||
       (column == nullptr && !column_name.is_empty())) {
     uiLayoutSetActive(layout, false);
   }
-  const eSpreadsheetColumnValueType data_type = static_cast<eSpreadsheetColumnValueType>(
-      filter->last_data_type);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
 
   uiItemR(layout, filter_ptr, "column_name", 0, IFACE_("Column"), ICON_NONE);
+
+  /* Don't draw settings for filters with no corresponding visible column. */
+  if (column == nullptr || column_name.is_empty()) {
+    return;
+  }
+
+  const eSpreadsheetColumnValueType data_type = static_cast<eSpreadsheetColumnValueType>(
+      filter->last_data_type);
 
   switch (data_type) {
     case SPREADSHEET_VALUE_TYPE_INT32:
@@ -249,6 +256,10 @@ static void spreadsheet_row_filters_layout(const bContext *C, Panel *panel)
   PointerRNA sspreadsheet_ptr;
   RNA_pointer_create(&screen->id, &RNA_SpaceSpreadsheet, sspreadsheet, &sspreadsheet_ptr);
   uiItemR(layout, &sspreadsheet_ptr, "show_only_selected", 0, IFACE_("Selected Only"), ICON_NONE);
+
+  if (!(sspreadsheet->filter_flag & SPREADSHEET_FILTER_ENABLE)) {
+    uiLayoutSetActive(layout, false);
+  }
 
   uiItemO(layout, nullptr, ICON_ADD, "SPREADSHEET_OT_add_row_filter_rule");
 
