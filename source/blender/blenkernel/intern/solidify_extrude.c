@@ -621,10 +621,10 @@ Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
         //if (dvert) {
           //MDeformVert *dv = &dvert[i];
           if (defgrp_invert) {
-            scalar_short_vgroup = 1.0f - solidify_data->selection[i];//BKE_defvert_find_weight(dv, defgrp_index);
+            scalar_short_vgroup = 1.0f - solidify_data->distance[i];//BKE_defvert_find_weight(dv, defgrp_index);
           }
           else {
-            scalar_short_vgroup = solidify_data->selection[i];//BKE_defvert_find_weight(dv, defgrp_index);
+            scalar_short_vgroup = solidify_data->distance[i];//BKE_defvert_find_weight(dv, defgrp_index);
           }
           scalar_short_vgroup = (offset_fac_vg + (scalar_short_vgroup * offset_fac_vg_inv)) *
                                 scalar_short;
@@ -668,10 +668,10 @@ Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
         //if (dvert) {
           //MDeformVert *dv = &dvert[i];
           if (defgrp_invert) {
-            scalar_short_vgroup = 1.0f - solidify_data->selection[i];//BKE_defvert_find_weight(dv, defgrp_index);
+            scalar_short_vgroup = 1.0f - solidify_data->distance[i];//BKE_defvert_find_weight(dv, defgrp_index);
           }
           else {
-            scalar_short_vgroup = solidify_data->selection[i];//BKE_defvert_find_weight(dv, defgrp_index);
+            scalar_short_vgroup = solidify_data->distance[i];//BKE_defvert_find_weight(dv, defgrp_index);
           }
           scalar_short_vgroup = (offset_fac_vg + (scalar_short_vgroup * offset_fac_vg_inv)) *
                                 scalar_short;
@@ -808,14 +808,14 @@ Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh)
 
       if (defgrp_invert) {
         for (i = 0; i < numVerts; i++){//}, dv++) {
-          scalar = 1.0f - solidify_data->selection[i];//BKE_defvert_find_weight(dv, defgrp_index);
+          scalar = 1.0f - solidify_data->distance[i];//BKE_defvert_find_weight(dv, defgrp_index);
           scalar = offset_fac_vg + (scalar * offset_fac_vg_inv);
           vert_angles[i] *= scalar;
         }
       }
       else {
         for (i = 0; i < numVerts; i++){//, dv++) {
-          scalar = solidify_data->selection[i];//BKE_defvert_find_weight(dv, defgrp_index);
+          scalar = solidify_data->distance[i];//BKE_defvert_find_weight(dv, defgrp_index);
           scalar = offset_fac_vg + (scalar * offset_fac_vg_inv);
           vert_angles[i] *= scalar;
         }
