@@ -132,7 +132,7 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
   uiLayout *layout = panel->layout;
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
   PointerRNA *filter_ptr = UI_panel_custom_data_get(panel);
-  SpreadsheetRowFilter *filter = (SpreadsheetRowFilter *)filter_ptr->data;
+  const SpreadsheetRowFilter *filter = (SpreadsheetRowFilter *)filter_ptr->data;
   const StringRef column_name = filter->column_name;
   const eSpreadsheetFilterOperation operation = (eSpreadsheetFilterOperation)filter->operation;
 
@@ -141,14 +141,6 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
       (column == nullptr && !column_name.is_empty())) {
     uiLayoutSetActive(layout, false);
   }
-  if (column != nullptr) {
-    /* Set the cache of the last data type in the row filter. Two notes:
-     *  - Changing data during drawing can be dangerous and should be done with care.
-     *  - We only need to do this once in the header, since it is always drawn. */
-    filter->last_data_type = column->data_type;
-  }
-  const eSpreadsheetColumnValueType data_type = static_cast<eSpreadsheetColumnValueType>(
-      filter->last_data_type);
 
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayoutSetEmboss(row, UI_EMBOSS_NONE);
@@ -157,7 +149,11 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
   if (column_name.is_empty()) {
     uiItemL(row, IFACE_("Filter"), ICON_NONE);
   }
+  else if (column == nullptr) {
+    uiItemL(row, column_name.data(), ICON_NONE);
+  }
   else {
+    const eSpreadsheetColumnValueType data_type = (eSpreadsheetColumnValueType)column->data_type;
     std::stringstream ss;
     ss << column_name;
     ss << " ";
@@ -202,10 +198,7 @@ static void spreadsheet_filter_panel_draw(const bContext *C, Panel *panel)
     return;
   }
 
-  const eSpreadsheetColumnValueType data_type = static_cast<eSpreadsheetColumnValueType>(
-      filter->last_data_type);
-
-  switch (data_type) {
+  switch (static_cast<eSpreadsheetColumnValueType>(column->data_type)) {
     case SPREADSHEET_VALUE_TYPE_INT32:
       uiItemR(layout, filter_ptr, "operation", 0, nullptr, ICON_NONE);
       uiItemR(layout, filter_ptr, "value_int", 0, IFACE_("Value"), ICON_NONE);
