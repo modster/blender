@@ -30,7 +30,7 @@ static bNodeSocketTemplate geo_node_raycast_in[] = {
     {SOCK_STRING, N_("Ray Direction")},
     {SOCK_VECTOR, N_("Ray Direction"), 1.0, 0.0, 0.0, 0.0, -FLT_MAX, FLT_MAX},
     {SOCK_STRING, N_("Ray Length")},
-    {SOCK_FLOAT, N_("Ray Length"), 0.0, 0.0, 0.0, 0.0, 0.0f, FLT_MAX},
+    {SOCK_FLOAT, N_("Ray Length"), 100.0, 0.0, 0.0, 0.0, 0.0f, FLT_MAX},
     {SOCK_STRING, N_("Target Attribute")},
     {SOCK_STRING, N_("Is Hit")},
     {SOCK_STRING, N_("Hit Index")},
