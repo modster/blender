@@ -1370,9 +1370,12 @@ typedef struct NodeGeometryAttributeTransfer {
 } NodeGeometryAttributeTransfer;
 
 typedef struct NodeGeometryRaycast {
+  /* GeometryNodeRaycastMapMode. */
+  uint8_t mapping;
+
   uint8_t input_type_ray_direction;
   uint8_t input_type_ray_length;
-  char _pad[2];
+  char _pad[1];
 } NodeGeometryRaycast;
 
 /* script node mode */
@@ -1885,6 +1888,11 @@ typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST = 1,
 } GeometryNodeAttributeTransferMapMode;
+
+typedef enum GeometryNodeRaycastMapMode {
+  GEO_NODE_RAYCAST_INTERPOLATED = 0,
+  GEO_NODE_RAYCAST_NEAREST = 1,
+} GeometryNodeRaycastMapMode;
 
 #ifdef __cplusplus
 }

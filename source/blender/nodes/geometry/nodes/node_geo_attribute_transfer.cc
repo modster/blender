@@ -289,7 +289,7 @@ static void transfer_attribute_nearest_face_interpolated(const GeometrySet &src_
   get_closest_mesh_looptris(*mesh, dst_positions, looptri_indices, {}, positions);
 
   AttributeInterpolator interp(mesh, positions, looptri_indices);
-  interp.interpolate_attribute(src_attribute, dst_attribute);
+  interp.sample_attribute(src_attribute, dst_attribute, eAttributeMapMode::INTERPOLATED);
 
   dst_attribute.save();
 }

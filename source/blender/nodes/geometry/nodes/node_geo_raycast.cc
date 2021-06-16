@@ -50,6 +50,7 @@ static void geo_node_raycast_layout(uiLayout *layout, bContext *UNUSED(C), Point
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "mapping", 0, IFACE_("Mapping"), ICON_NONE);
   uiItemR(layout, ptr, "input_type_ray_direction", 0, IFACE_("Ray Direction"), ICON_NONE);
   uiItemR(layout, ptr, "input_type_ray_length", 0, IFACE_("Ray Length"), ICON_NONE);
 }
@@ -153,6 +154,17 @@ static void raycast_to_mesh(const Mesh *mesh,
   }
 }
 
+static eAttributeMapMode get_map_mode(GeometryNodeRaycastMapMode map_mode)
+{
+  switch (map_mode) {
+    case GEO_NODE_RAYCAST_INTERPOLATED:
+      return eAttributeMapMode::INTERPOLATED;
+    default:
+    case GEO_NODE_RAYCAST_NEAREST:
+      return eAttributeMapMode::NEAREST;
+  }
+}
+
 static void raycast_from_points(const GeoNodeExecParams &params,
                                 const GeometrySet &src_geometry,
                                 GeometryComponent &dst_component,
@@ -178,6 +190,8 @@ static void raycast_from_points(const GeoNodeExecParams &params,
     return;
   }
 
+  const NodeGeometryRaycast &storage = *(const NodeGeometryRaycast *)params.node().storage;
+  eAttributeMapMode map_mode = get_map_mode((GeometryNodeRaycastMapMode)storage.mapping);
   const AttributeDomain result_domain = ATTR_DOMAIN_POINT;
 
   GVArray_Typed<float3> ray_origins = dst_component.attribute_get_for_read<float3>(
@@ -250,7 +264,7 @@ static void raycast_from_points(const GeoNodeExecParams &params,
       OutputAttribute hit_attribute_output = dst_component.attribute_try_get_for_output_only(
           hit_attribute_output_names[i], result_domain, meta_data->data_type);
 
-      interp.interpolate_attribute(hit_attribute, hit_attribute_output);
+      interp.sample_attribute(hit_attribute, hit_attribute_output, map_mode);
 
       hit_attribute_output.save();
     }

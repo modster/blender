@@ -42,8 +42,12 @@ AttributeInterpolator::AttributeInterpolator(const Mesh *mesh,
   BLI_assert(positions.size() == looptri_indices.size());
 }
 
-void AttributeInterpolator::compute_barycentric_coords()
+Span<float3> AttributeInterpolator::ensure_barycentric_coords()
 {
+  if (!bary_coords_.is_empty()) {
+    BLI_assert(bary_coords_.size() == positions_.size());
+    return bary_coords_;
+  }
   bary_coords_.reinitialize(positions_.size());
 
   Span<MLoopTri> looptris = get_mesh_looptris(*mesh_);
@@ -62,11 +66,44 @@ void AttributeInterpolator::compute_barycentric_coords()
                           mesh_->mvert[v2_index].co,
                           positions_[i]);
   }
+  return bary_coords_;
 }
 
-void AttributeInterpolator::interpolate_attribute(const ReadAttributeLookup &src_attribute,
-                                                  OutputAttribute &dst_attribute)
+Span<float3> AttributeInterpolator::ensure_nearest_weights()
 {
+  if (!nearest_weights_.is_empty()) {
+    BLI_assert(nearest_weights_.size() == positions_.size());
+    return nearest_weights_;
+  }
+  nearest_weights_.reinitialize(positions_.size());
+
+  Span<MLoopTri> looptris = get_mesh_looptris(*mesh_);
+
+  for (const int i : nearest_weights_.index_range()) {
+    const int looptri_index = looptri_indices_[i];
+    const MLoopTri &looptri = looptris[looptri_index];
+
+    const int v0_index = mesh_->mloop[looptri.tri[0]].v;
+    const int v1_index = mesh_->mloop[looptri.tri[1]].v;
+    const int v2_index = mesh_->mloop[looptri.tri[2]].v;
+
+    const float d0 = len_squared_v3v3(positions_[i], mesh_->mvert[v0_index].co);
+    const float d1 = len_squared_v3v3(positions_[i], mesh_->mvert[v1_index].co);
+    const float d2 = len_squared_v3v3(positions_[i], mesh_->mvert[v2_index].co);
+
+    nearest_weights_[i] = MIN3_PAIR(d0, d1, d2, float3(1, 0, 0), float3(0, 1, 0), float3(0, 0, 1));
+  }
+  return nearest_weights_;
+}
+
+void AttributeInterpolator::sample_attribute(const ReadAttributeLookup &src_attribute,
+                                             OutputAttribute &dst_attribute,
+                                             eAttributeMapMode mode)
+{
+  if (looptri_indices_.is_empty()) {
+    return;
+  }
+
   if (!src_attribute || !dst_attribute) {
     return;
   }
@@ -76,20 +113,24 @@ void AttributeInterpolator::interpolate_attribute(const ReadAttributeLookup &src
     return;
   }
 
-  if (looptri_indices_.is_empty()) {
-  }
-
   /* Compute barycentric coordinates only when they are needed. */
-  if (bary_coords_.is_empty() &&
-      ELEM(src_attribute.domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CORNER)) {
-    compute_barycentric_coords();
+  Span<float3> weights;
+  if (ELEM(src_attribute.domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CORNER)) {
+    switch (mode) {
+      case eAttributeMapMode::INTERPOLATED:
+        weights = ensure_barycentric_coords();
+        break;
+      case eAttributeMapMode::NEAREST:
+        weights = ensure_nearest_weights();
+        break;
+    }
   }
 
   /* Interpolate the source attributes on the surface. */
   switch (src_attribute.domain) {
     case ATTR_DOMAIN_POINT: {
       bke::mesh_surface_sample::sample_point_attribute(
-          *mesh_, looptri_indices_, bary_coords_, src_varray, dst_span);
+          *mesh_, looptri_indices_, weights, src_varray, dst_span);
       break;
     }
     case ATTR_DOMAIN_FACE: {
@@ -99,7 +140,7 @@ void AttributeInterpolator::interpolate_attribute(const ReadAttributeLookup &src
     }
     case ATTR_DOMAIN_CORNER: {
       bke::mesh_surface_sample::sample_corner_attribute(
-          *mesh_, looptri_indices_, bary_coords_, src_varray, dst_span);
+          *mesh_, looptri_indices_, weights, src_varray, dst_span);
       break;
     }
     case ATTR_DOMAIN_EDGE: {

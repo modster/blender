@@ -25,6 +25,11 @@ namespace blender::nodes {
 
 Span<MLoopTri> get_mesh_looptris(const Mesh &mesh);
 
+enum class eAttributeMapMode {
+  INTERPOLATED,
+  NEAREST,
+};
+
 /**
  * A utility class that performs attribute interpolation from a source mesh.
  *
@@ -39,17 +44,20 @@ class AttributeInterpolator {
   const Span<int> looptri_indices_;
 
   Array<float3> bary_coords_;
+  Array<float3> nearest_weights_;
 
  public:
   AttributeInterpolator(const Mesh *mesh,
                         const Span<float3> positions,
                         const Span<int> looptri_indices);
 
-  void interpolate_attribute(const blender::bke::ReadAttributeLookup &src_attribute,
-                             blender::bke::OutputAttribute &dst_attribute);
+  void sample_attribute(const blender::bke::ReadAttributeLookup &src_attribute,
+                        blender::bke::OutputAttribute &dst_attribute,
+                        eAttributeMapMode mode);
 
  protected:
-  void compute_barycentric_coords();
+  Span<float3> ensure_barycentric_coords();
+  Span<float3> ensure_nearest_weights();
 };
 
 }  // namespace blender::nodes
