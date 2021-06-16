@@ -1142,10 +1142,12 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   float zoom_y = thumb_h / scene->r.ysch;
 
   y2 = y1 + thumb_h - pixely;
-  x1 = x1 + handsize_clamped;
+  x1 = seq->start;
+
+  // TODO(AYJ) : add x1 = x1 + handsize_clamped
 
   int frame_factor = 0;
-
+  float cut_off = 0;
   float upper_thumb_bound = strip_x2 - handsize_clamped;
 
   while (x1 < upper_thumb_bound - 1) {
@@ -1161,6 +1163,17 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
       continue;
     }
 
+    /* set the clipping bound to show the left handle moving over thumbs and not shift thumbs */
+    if (IN_RANGE_INCL(seq->startdisp, x1, x2)) {
+      cut_off = seq->startdisp - x1;
+    }
+
+    /* ignore thumbs to the left of strip */
+    if (x2 < seq->startdisp) {
+      x1 = x2;
+      continue;
+    }
+
     /* clip if full thumbnail cannot be displayed */
     if (x2 >= (upper_thumb_bound - 1)) {
       x2 = (upper_thumb_bound - 1);
@@ -1169,14 +1182,14 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
 
     /* Get the image */
-    ibuf = SEQ_render_give_ibuf_direct(
-        &context, seq->start + seq->startofs + frame_factor * roundf(thumb_w), seq);
+    ibuf = SEQ_render_give_ibuf_direct(&context, x1 + cut_off, seq);
 
     if (ibuf) {
-      ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, false, x1, y1, x2, y2, zoom_x, zoom_y);
+      ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
       IMB_freeImBuf(ibuf);
     }
 
+    cut_off = 0;
     frame_factor++;
     x1 = x2;
   }
