@@ -1370,12 +1370,9 @@ typedef struct NodeGeometryAttributeTransfer {
 } NodeGeometryAttributeTransfer;
 
 typedef struct NodeGeometryRaycast {
-  /* AttributeDomain. */
-  int8_t domain;
-
   uint8_t input_type_ray_direction;
   uint8_t input_type_ray_length;
-  char _pad[1];
+  char _pad[2];
 } NodeGeometryRaycast;
 
 /* script node mode */

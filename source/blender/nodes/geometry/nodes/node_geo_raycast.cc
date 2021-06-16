@@ -48,8 +48,6 @@ static bNodeSocketTemplate geo_node_raycast_out[] = {
 
 static void geo_node_raycast_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  uiItemR(layout, ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
-
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "input_type_ray_direction", 0, IFACE_("Ray Direction"), ICON_NONE);
@@ -60,7 +58,6 @@ static void geo_node_raycast_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   NodeGeometryRaycast *data = (NodeGeometryRaycast *)MEM_callocN(sizeof(NodeGeometryRaycast),
                                                                  __func__);
-  data->domain = ATTR_DOMAIN_AUTO;
   data->input_type_ray_direction = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
   data->input_type_ray_length = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
   node->storage = data;
@@ -224,13 +221,7 @@ static void raycast_from_points(const GeoNodeExecParams &params,
     return;
   }
 
-  const NodeGeometryRaycast &storage = *(const NodeGeometryRaycast *)params.node().storage;
-  const AttributeDomain domain = (AttributeDomain)storage.domain;
-
-  CustomDataType data_type;
-  AttributeDomain auto_domain;
-  get_result_domain_and_data_type(src_geometry, dst_component, "position", data_type, auto_domain);
-  const AttributeDomain result_domain = (domain == ATTR_DOMAIN_AUTO) ? auto_domain : domain;
+  const AttributeDomain result_domain = ATTR_DOMAIN_POINT;
 
   GVArray_Typed<float3> ray_origins = dst_component.attribute_get_for_read<float3>(
       "position", result_domain, {0, 0, 0});
