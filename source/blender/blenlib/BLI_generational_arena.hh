@@ -60,6 +60,8 @@
 
 #include "BLI_vector.hh"
 
+#include "testing/testing.h"
+
 namespace blender::generational_arena {
 
 namespace extra {
@@ -384,6 +386,27 @@ class Arena {
  private:
   /* all private static methods */
   /* all private non-static methods */
+
+  FRIEND_TEST(generational_arena, GetNextFreeLocations);
+
+  blender::Vector<usize> get_next_free_locations() const
+  {
+    auto next_free = this->next_free_head;
+    blender::Vector<usize> locs;
+    locs.reserve(this->capacity() - this->size());
+
+    while (next_free) {
+      locs.append(*next_free);
+      if (auto entry = std::get_if<EntryNoExist>(&this->data[*next_free])) {
+        next_free = entry->next_free;
+      }
+      else {
+        BLI_assert_unreachable();
+      }
+    }
+
+    return locs;
+  }
 };
 
 } /* namespace blender::generational_arena */
