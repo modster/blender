@@ -199,4 +199,4 @@ void CURVE_OT_draw(struct wmOperatorType *ot);
 
 /* editcurve_pen.c */
 void CURVE_OT_pen(struct wmOperatorType *ot);
-// struct wmKeyMap *edit_curve_tool_modal_keymap(struct wmKeyConfig *keyconf);
+struct wmKeyMap *curve_pen_modal_keymap(struct wmKeyConfig *keyconf);

@@ -486,12 +486,6 @@ static void move_bezt_handles_to_mouse(BezTriple *bezt,
     bezt->h2 = HD_ALIGN;
   }
 
-  /* Set handle type to free when moved with shift. */
-  if (event->shift && bezt->h1 != HD_FREE) {
-    bezt->h1 = HD_FREE;
-    bezt->h2 = HD_FREE;
-  }
-
   /* Obtain world space mouse location. */
   float location[3];
   mouse_location_to_worldspace(event->mval, bezt->vec[1], vc, location);
@@ -682,6 +676,37 @@ static BPoint *get_closest_bp_to_point(Nurb *nu, float point[2], ViewContext vc)
   return NULL;
 }
 
+enum {
+  PEN_MODAL_CANCEL = 1,
+  PEN_MODAL_FREE_MOVE_HANDLE,
+};
+
+wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
+{
+  static const EnumPropertyItem modal_items[] = {
+      {PEN_MODAL_CANCEL, "CANCEL", 0, "Cancel", "Cancel pen"},
+      {PEN_MODAL_FREE_MOVE_HANDLE,
+       "FREE_MOVE_HANDLE",
+       0,
+       "Free Move handle",
+       "Move handle of newly added point freely"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  wmKeyMap *keymap = WM_modalkeymap_find(keyconf, "Curve Pen Modal Map");
+
+  /* This function is called for each spacetype, only needs to add map once */
+  if (keymap && keymap->modal_items) {
+    return NULL;
+  }
+
+  keymap = WM_modalkeymap_ensure(keyconf, "Curve Pen Modal Map", modal_items);
+
+  WM_modalkeymap_assign(keymap, "CURVE_OT_pen");
+
+  return keymap;
+}
+
 static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   bool extend = RNA_boolean_get(op->ptr, "extend");
@@ -700,14 +725,26 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   Nurb *nu;
 
   bool retval = false;
-  int mval[2];
 
-  RNA_int_get_array(op->ptr, "location", mval);
   view3d_operator_needs_opengl(C);
   BKE_object_update_select_id(CTX_data_main(C));
 
   int ret = OPERATOR_RUNNING_MODAL;
   bool dragging = RNA_boolean_get(op->ptr, "dragging");
+
+  bool picked = false;
+  if (event->type == EVT_MODAL_MAP) {
+    if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
+      short hand;
+      copy_v2_v2_int(vc.mval, event->mval);
+      ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact);
+      picked = true;
+
+      if (bezt) {
+        bezt->h1 = bezt->h2 = HD_FREE;
+      }
+    }
+  }
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (!dragging && WM_event_drag_test(event, &event->prevclickx) && event->val == KM_PRESS) {
@@ -717,11 +754,12 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     if (dragging) {
       /* Move handle point with mouse cursor if dragging a new control point. */
       if (RNA_boolean_get(op->ptr, "new")) {
-        short hand;
-
-        copy_v2_v2_int(vc.mval, mval);
-        /* Get pointer to new control point. */
-        ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact);
+        if (!picked) {
+          short hand;
+          copy_v2_v2_int(vc.mval, event->mval);
+          /* Get pointer to new control point. */
+          ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact);
+        }
         if (bezt) {
           move_bezt_handles_to_mouse(bezt, nu->bezt + nu->pntsu - 1 == bezt, event, vc);
 
@@ -731,7 +769,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* Move entire control point with mouse cursor if dragging an existing control point. */
       else {
         short hand;
-
+        int mval[2];
         mval[0] = event->prevx;
         mval[1] = event->prevy;
         copy_v2_v2_int(vc.mval, mval);
@@ -781,15 +819,17 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
-      retval = ED_curve_editnurb_select_pick(C, mval, extend, deselect, toggle);
+      retval = ED_curve_editnurb_select_pick(C, event->mval, extend, deselect, toggle);
       RNA_boolean_set(op->ptr, "new", !retval);
+      bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
+
       /* Check if point underneath mouse. Get point if any. */
       if (retval) {
-        if (event->ctrl) {
+        if (cut_or_delete) {
           /* Delete retrieved control point. */
           short hand;
 
-          copy_v2_v2_int(vc.mval, mval);
+          copy_v2_v2_int(vc.mval, event->mval);
           // ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact);
 
           ListBase *nurbs = BKE_curve_editNurbs_get(cu);
@@ -813,7 +853,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else {
-        if (event->ctrl) {
+        if (cut_or_delete) {
           /* If curve segment is nearby, add control point at the snapped point
           between the adjacent control points in the curve data structure. */
           EditNurb *editnurb = cu->editnurb;
@@ -997,8 +1037,6 @@ static int curve_pen_exec(bContext *C, wmOperator *op)
 
 static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  RNA_int_set_array(op->ptr, "location", event->mval);
-
   int ret = curve_pen_modal(C, op, event);
   BLI_assert(ret == OPERATOR_RUNNING_MODAL);
   if (ret == OPERATOR_RUNNING_MODAL) {
@@ -1028,33 +1066,14 @@ void CURVE_OT_pen(wmOperatorType *ot)
   WM_operator_properties_mouse_select(ot);
 
   PropertyRNA *prop;
-  prop = RNA_def_boolean(
-      ot->srna,
-      "center",
-      0,
-      "Center",
-      "Use the object center when selecting, in edit mode used to extend object selection");
-  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-  prop = RNA_def_boolean(ot->srna, "object", 0, "Object", "Use object selection (edit mode only)");
-  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   prop = RNA_def_boolean(ot->srna, "dragging", 0, "Dragging", "Check if click and drag");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   prop = RNA_def_boolean(
       ot->srna, "new", 0, "New Point Drag", "The point was added with the press before drag");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-
-  prop = RNA_def_int_vector(ot->srna,
-                            "location",
-                            2,
-                            NULL,
-                            INT_MIN,
-                            INT_MAX,
-                            "Location",
-                            "Mouse location",
-                            INT_MIN,
-                            INT_MAX);
-  RNA_def_property_flag(prop, PROP_HIDDEN);
-
   prop = RNA_def_boolean(ot->srna, "wait_for_input", true, "Wait for Input", "");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(
+      ot->srna, "cut_or_delete", true, "Whether cut or delete key bindings are pressed", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }

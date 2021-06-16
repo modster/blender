@@ -5645,6 +5645,22 @@ def km_sculpt_expand_modal(_params):
     ])
     return keymap
 
+def km_curve_pen_modal_map(_params):
+    items = []
+    keymap = (
+        "Curve Pen Modal Map",
+        {"space_type": 'EMPTY', "region_type": 'WINDOW', "modal": True},
+        {"items": items},
+    )
+
+    items.extend([
+        ("CANCEL", {"type": 'ESC', "value": 'PRESS', "any": True}, None),
+        ("CANCEL", {"type": 'RIGHTMOUSE', "value": 'PRESS', "any": True}, None),
+        ("FREE_MOVE_HANDLE", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
+    ])
+
+    return keymap
+
 
 # Fallback for gizmos that don't have custom a custom key-map.
 def km_generic_gizmo(_params):
@@ -6468,9 +6484,9 @@ def km_3d_view_tool_edit_curve_pen(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS'},
-             {"properties": [("wait_for_input", False)]}),
+             {"properties": [("wait_for_input", False), ("cut_or_delete", False)]}),
             ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
-             {"properties": [("ctrl", True)]}),
+             {"properties": [("cut_or_delete", True)]}),
         ]},
     )
 
@@ -7173,6 +7189,7 @@ def generate_keymaps(params=None):
         km_view3d_dolly_modal(params),
         km_paint_stroke_modal(params),
         km_sculpt_expand_modal(params),
+        km_curve_pen_modal_map(params),
 
         # Gizmos.
         km_generic_gizmo(params),
