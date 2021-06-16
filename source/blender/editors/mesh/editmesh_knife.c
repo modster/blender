@@ -262,6 +262,7 @@ typedef struct KnifeTool_OpData {
   short constrain_axis_mode;
   bool axis_constrained;
   float curr_cage_adjusted[3];
+  char axis_string[2];
 } KnifeTool_OpData;
 
 enum {
@@ -613,32 +614,33 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
   WM_modalkeymap_operator_items_to_string_buf( \
       op->type, (_id), true, UI_MAX_SHORTCUT_STR, &available_len, &p)
 
-  BLI_snprintf(header,
-               sizeof(header),
-               TIP_("%s: confirm, %s: cancel, "
-                    "%s: start/define cut, %s: close cut, %s: new cut, "
-                    "%s: midpoint snap (%s), %s: ignore snap (%s), "
-                    "%s: angle constraint %.2f (%s), %s: cut through (%s), "
-                    "%s: panning, XYZ: orientation lock (%s)"),
-               WM_MODALKEY(KNF_MODAL_CONFIRM),
-               WM_MODALKEY(KNF_MODAL_CANCEL),
-               WM_MODALKEY(KNF_MODAL_ADD_CUT),
-               WM_MODALKEY(KNF_MODAL_ADD_CUT_CLOSED),
-               WM_MODALKEY(KNF_MODAL_NEW_CUT),
-               WM_MODALKEY(KNF_MODAL_MIDPOINT_ON),
-               WM_bool_as_string(kcd->snap_midpoints),
-               WM_MODALKEY(KNF_MODAL_IGNORE_SNAP_ON),
-               WM_bool_as_string(kcd->ignore_edge_snapping),
-               WM_MODALKEY(KNF_MODAL_ANGLE_SNAP_TOGGLE),
-               (kcd->angle_snapping_increment > KNIFE_MIN_ANGLE_SNAPPING_INCREMENT &&
-                kcd->angle_snapping_increment < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) ?
-                   kcd->angle_snapping_increment :
-                   KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT,
-               WM_bool_as_string(kcd->angle_snapping),
-               WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
-               WM_bool_as_string(kcd->cut_through),
-               WM_MODALKEY(KNF_MODAL_PANNING),
-               WM_bool_as_string(kcd->axis_constrained));
+  BLI_snprintf(
+      header,
+      sizeof(header),
+      TIP_("%s: confirm, %s: cancel, "
+           "%s: start/define cut, %s: close cut, %s: new cut, "
+           "%s: midpoint snap (%s), %s: ignore snap (%s), "
+           "%s: angle constraint %.2f (%s), %s: cut through (%s), "
+           "%s: panning, XYZ: orientation lock (%s)"),
+      WM_MODALKEY(KNF_MODAL_CONFIRM),
+      WM_MODALKEY(KNF_MODAL_CANCEL),
+      WM_MODALKEY(KNF_MODAL_ADD_CUT),
+      WM_MODALKEY(KNF_MODAL_ADD_CUT_CLOSED),
+      WM_MODALKEY(KNF_MODAL_NEW_CUT),
+      WM_MODALKEY(KNF_MODAL_MIDPOINT_ON),
+      WM_bool_as_string(kcd->snap_midpoints),
+      WM_MODALKEY(KNF_MODAL_IGNORE_SNAP_ON),
+      WM_bool_as_string(kcd->ignore_edge_snapping),
+      WM_MODALKEY(KNF_MODAL_ANGLE_SNAP_TOGGLE),
+      (kcd->angle_snapping_increment > KNIFE_MIN_ANGLE_SNAPPING_INCREMENT &&
+       kcd->angle_snapping_increment < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) ?
+          kcd->angle_snapping_increment :
+          KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT,
+      WM_bool_as_string(kcd->angle_snapping),
+      WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
+      WM_bool_as_string(kcd->cut_through),
+      WM_MODALKEY(KNF_MODAL_PANNING),
+      (kcd->axis_constrained ? kcd->axis_string : WM_bool_as_string(kcd->axis_constrained)));
 
 #undef WM_MODALKEY
 
@@ -3291,19 +3293,23 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
     if (event->type == EVT_XKEY && kcd->constrain_axis != KNF_CONSTRAIN_AXIS_X) {
       kcd->constrain_axis = KNF_CONSTRAIN_AXIS_X;
       kcd->constrain_axis_mode = KNF_CONSTRAIN_AXIS_MODE_GLOBAL;
+      kcd->axis_string[0] = 'X';
     }
     else if (event->type == EVT_YKEY && kcd->constrain_axis != KNF_CONSTRAIN_AXIS_Y) {
       kcd->constrain_axis = KNF_CONSTRAIN_AXIS_Y;
       kcd->constrain_axis_mode = KNF_CONSTRAIN_AXIS_MODE_GLOBAL;
+      kcd->axis_string[0] = 'Y';
     }
     else if (event->type == EVT_ZKEY && kcd->constrain_axis != KNF_CONSTRAIN_AXIS_Z) {
       kcd->constrain_axis = KNF_CONSTRAIN_AXIS_Z;
       kcd->constrain_axis_mode = KNF_CONSTRAIN_AXIS_MODE_GLOBAL;
+      kcd->axis_string[0] = 'Z';
     }
     else {
       /* Cycle through modes with repeated key presses */
       if (kcd->constrain_axis_mode != KNF_CONSTRAIN_AXIS_MODE_LOCAL) {
         kcd->constrain_axis_mode++;
+        kcd->axis_string[0] += 32; /* lower case */
       }
       else {
         kcd->constrain_axis = KNF_CONSTRAIN_AXIS_NONE;
@@ -3376,6 +3382,9 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     BLI_assert(ret == OPERATOR_RUNNING_MODAL);
     UNUSED_VARS_NDEBUG(ret);
   }
+
+  kcd->axis_string[0] = ' ';
+  kcd->axis_string[1] = '\0';
 
   knife_update_header(C, op, kcd);
 
