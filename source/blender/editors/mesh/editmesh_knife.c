@@ -2870,6 +2870,16 @@ static void knifetool_init(bContext *C,
 
     knife_init_colors(&kcd->colors);
   }
+
+  kcd->axis_string[0] = ' ';
+  kcd->axis_string[1] = '\0';
+
+  /* Initialise num input handling for angle snapping */
+  initNumInput(&kcd->num);
+  kcd->num.idx_max = 0;
+  kcd->num.val_flag[0] |= NUM_NO_NEGATIVE;
+  kcd->num.unit_sys = scene->unit.system;
+  kcd->num.unit_type[0] = B_UNIT_NONE;
 }
 
 /* called when modal loop selection is done... */
@@ -3383,17 +3393,7 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     UNUSED_VARS_NDEBUG(ret);
   }
 
-  kcd->axis_string[0] = ' ';
-  kcd->axis_string[1] = '\0';
-
   knife_update_header(C, op, kcd);
-
-  /* Initialise num input handling for angle snapping */
-  initNumInput(&kcd->num);
-  kcd->num.idx_max = 0;
-  kcd->num.val_flag[0] |= NUM_NO_NEGATIVE;
-  kcd->num.unit_sys = scene->unit.system;
-  kcd->num.unit_type[0] = B_UNIT_NONE;
 
   return OPERATOR_RUNNING_MODAL;
 }
