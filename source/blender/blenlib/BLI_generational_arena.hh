@@ -257,6 +257,31 @@ class Arena {
     }
   }
 
+  std::optional<T> remove(Index index)
+  {
+    if (index.index >= this->data.size()) {
+      return std::nullopt;
+    }
+
+    if (auto entry = std::get_if<EntryExist>(&this->data[index.index])) {
+      if (index.generation != entry->generation) {
+        return std::nullopt;
+      }
+      else {
+        /* must update the next_free list, length and generation */
+        this->length -= 1;
+        this->generation += 1;
+        auto value = std::move(entry->value);
+        this->data[index.index] = EntryNoExist(this->next_free_head);
+        this->next_free_head = index.index;
+        return value;
+      }
+    }
+    else {
+      return std::nullopt;
+    }
+  }
+
   std::optional<std::reference_wrapper<const T>> get(Index index) const
   {
     /* if index exceeds size of the container, return std::nullopt */
