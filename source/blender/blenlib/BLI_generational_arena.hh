@@ -85,6 +85,11 @@ class Index {
     this->generation = generation;
   }
 
+  inline bool operator==(const Index &other) const
+  {
+    return (this->index == other.index) && (this->generation == other.generation);
+  }
+
   static inline Index invalid()
   {
     return Index(std::numeric_limits<usize>::max(), std::numeric_limits<usize>::max());
@@ -299,7 +304,12 @@ class Arena {
       return std::nullopt;
     }
 
-    return std::cref(this->data[index]);
+    if (auto entry = std::get_if<EntryExist>(&this->data[index])) {
+      return std::cref(entry->value);
+    }
+    else {
+      return std::nullopt;
+    }
   }
 
   std::optional<std::reference_wrapper<T>> get_no_gen(usize index)
@@ -309,7 +319,12 @@ class Arena {
       return std::nullopt;
     }
 
-    return std::ref(this->data[index]);
+    if (auto entry = std::get_if<EntryExist>(&this->data[index])) {
+      return std::ref(entry->value);
+    }
+    else {
+      return std::nullopt;
+    }
   }
 
   std::optional<Index> get_no_gen_index(usize index) const
@@ -320,12 +335,12 @@ class Arena {
     }
 
     std::optional<Index> res;
-    std::visit(extra::overloaded{
-                   [&res](EntryNoExist &entry) { res = std::nullopt; },
-                   [&res, index](EntryExist &entry) { res = Index(index, entry.generation); }},
-               this->data[index]);
-
-    return res;
+    if (auto entry = std::get_if<EntryExist>(&this->data[index])) {
+      return Index(index, entry->generation);
+    }
+    else {
+      return std::nullopt;
+    }
   }
 
   isize capacity() const
