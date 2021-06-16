@@ -73,18 +73,15 @@ def select_only_object(any_object):
     bpy.context.view_layer.objects.active = any_object
     any_object.select_set(True)
 
-    return any_object
-
 
 def remove_modifiers_from_object(any_object):
     """
     Remove modifiers from the selected object.
     """
-    any_object = select_only_object(any_object)
+    select_only_object(any_object)
     modifier_list = list(any_object.modifiers)
     for modifier in modifier_list:
         any_object.modifiers.remove(modifier=modifier)
-    return any_object
 
 
 def run_first_time():
@@ -101,7 +98,7 @@ def run_first_time():
         expected_object.location = (0, 10, 0)
         expected_object.name = "expected_object"
 
-        expected_object = remove_modifiers_from_object(expected_object)
+        remove_modifiers_from_object(expected_object)
 
         # Save file with the expected object.
         bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
@@ -111,7 +108,7 @@ def apply_modifier(evaluated_object):
     """
     Apply all modifiers (Geometry Nodes for now) added to the current object [Discuss]
     """
-    evaluated_object = select_only_object(evaluated_object)
+    select_only_object(evaluated_object)
 
     modifiers_list = evaluated_object.modifiers
 
@@ -119,7 +116,6 @@ def apply_modifier(evaluated_object):
         bpy.ops.object.modifier_apply(modifier=modifiers_list[0].name)
     else:
         raise Exception("Modifier not of Geometry Nodes type")
-    return evaluated_object
 
 
 def compare_meshes(evaluated_object, expected_object):
@@ -172,7 +168,7 @@ def duplicate_test_object(test_object):
     """
     Duplicate test object.
     """
-    test_object = select_only_object(test_object)
+    select_only_object(test_object)
     bpy.ops.object.duplicate()
     evaluated_object = bpy.context.active_object
     evaluated_object.name = "evaluated_object"
@@ -197,7 +193,7 @@ def main():
     test_object = get_test_object()
     expected_object = get_expected_object()
     evaluated_object = duplicate_test_object(test_object)
-    evaluated_object = apply_modifier(evaluated_object)
+    apply_modifier(evaluated_object)
     compare_meshes(evaluated_object, expected_object)
 
 
