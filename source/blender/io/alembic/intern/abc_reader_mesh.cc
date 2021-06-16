@@ -186,7 +186,6 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
   MLoop *mloops = config.mloop;
   MLoopUV *mloopuvs = config.mloopuv;
 
-  const P3fArraySamplePtr &positions = mesh_data.positions;
   const Int32ArraySamplePtr &face_indices = mesh_data.face_indices;
   const Int32ArraySamplePtr &face_counts = mesh_data.face_counts;
   const V2fArraySamplePtr &uvs = mesh_data.uvs;
@@ -228,23 +227,11 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
       }
       last_vertex_index = loop.v;
 
-      if (do_uvs_per_loop) {
+      if (do_uvs) {
         MLoopUV &loopuv = mloopuvs[rev_loop_index];
         uv_index = (*uvs_indices)[do_uvs_per_loop ? loop_index : loop.v];
 
         /* Some Alembic files are broken (or at least export UVs in a way we don't expect). */
-        if (uv_index >= uvs_size) {
-          continue;
-        }
-
-        loopuv.uv[0] = (*uvs)[uv_index][0];
-        loopuv.uv[1] = (*uvs)[uv_index][1];
-      }
-      else if (do_uvs_per_vertex) {
-        MLoopUV &loopuv = mloopuvs[rev_loop_index];
-
-        uv_index = (*uvs_indices)[loop.v];
-
         if (uv_index >= uvs_size) {
           continue;
         }

@@ -46,7 +46,6 @@
 using Alembic::AbcGeom::kFacevaryingScope;
 using Alembic::AbcGeom::kVaryingScope;
 using Alembic::AbcGeom::kVertexScope;
-using Alembic::AbcGeom::kVaryingScope;
 
 using Alembic::Abc::C4fArraySample;
 using Alembic::Abc::UInt32ArraySample;
