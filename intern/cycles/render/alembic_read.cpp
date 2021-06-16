@@ -746,13 +746,14 @@ static void process_uvs(CachedData &cache,
                         const IV2fGeomParam::Sample &sample,
                         double time)
 {
-  if (scope != kFacevaryingScope && scope != kVaryingScope) {
+  if (scope != kFacevaryingScope && scope != kVaryingScope && scope != kVertexScope) {
     return;
   }
 
   const array<int> *uv_loops = cache.uv_loops.data_for_time_no_check(time).get_data_or_null();
 
-  if (!uv_loops) {
+  /* It's ok to not have loop indices, as long as the scope is not face-varying. */
+  if (!uv_loops && scope == kFacevaryingScope) {
     return;
   }
 
@@ -782,7 +783,7 @@ static void process_uvs(CachedData &cache,
       *data_float2++ = make_float2(values[index][0], values[index][1]);
     }
   }
-  else if (scope == kVaryingScope) {
+  else if (scope == kVaryingScope || scope == kVertexScope) {
     if (triangles) {
       for (size_t i = 0; i < triangles->size(); i++) {
         const int3 t = (*triangles)[i];
