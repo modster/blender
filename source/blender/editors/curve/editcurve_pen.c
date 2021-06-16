@@ -589,16 +589,16 @@ static float get_view_zoom(const float *depth, ViewContext vc)
   return 10 / len_v2v2(p1_3d, p2_3d);
 }
 
-static void *get_closest_point_on_edge(
+static bool *get_closest_point_on_edge(
     float *point, const float pos[2], const float pos1[3], const float pos2[3], ViewContext vc)
 {
   float pos1_2d[2], pos2_2d[2], vec1[2], vec2[2], vec3[2];
 
   /* Get screen space coordinates of points. */
   ED_view3d_project_float_object(
-      vc.region, pos1, pos1_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) == V3D_PROJ_RET_OK;
+      vc.region, pos1, pos1_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
   ED_view3d_project_float_object(
-      vc.region, pos2, pos2_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) == V3D_PROJ_RET_OK;
+      vc.region, pos2, pos2_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
 
   /* Obtain the vectors of each side. */
   sub_v2_v2v2(vec1, pos, pos1_2d);
@@ -620,13 +620,14 @@ static void *get_closest_point_on_edge(
     float pos_dif[3], intersect[3];
     sub_v3_v3v3(pos_dif, pos2, pos1);
     madd_v3_v3v3fl(point, pos1, pos_dif, factor);
-    return;
+    return true;
   }
   if (len_manhattan_v2(vec1) < len_manhattan_v2(vec2)) {
     copy_v3_v3(point, pos1);
-    return;
+    return false;
   }
   copy_v3_v3(point, pos2);
+  return false;
 }
 
 static BezTriple *get_closest_bezt_to_point(Nurb *nu, float point[2], ViewContext vc)
@@ -639,8 +640,7 @@ static BezTriple *get_closest_bezt_to_point(Nurb *nu, float point[2], ViewContex
     BezTriple *bezt = &nu->bezt[i];
     float bezt_vec[2];
     ED_view3d_project_float_object(
-        vc.region, bezt->vec[1], bezt_vec, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-        V3D_PROJ_RET_OK;
+        vc.region, bezt->vec[1], bezt_vec, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
     float distance = len_manhattan_v2v2(bezt_vec, point);
     if (distance < min_distance) {
       min_distance = distance;
@@ -666,8 +666,7 @@ static BPoint *get_closest_bp_to_point(Nurb *nu, float point[2], ViewContext vc)
     BPoint *bp = &nu->bp[i];
     float bp_vec[2];
     ED_view3d_project_float_object(
-        vc.region, bp->vec, bp_vec, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-        V3D_PROJ_RET_OK;
+        vc.region, bp->vec, bp_vec, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
     float distance = len_manhattan_v2v2(bp_vec, point);
     if (distance < min_distance) {
       min_distance = distance;
@@ -818,12 +817,20 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           /* If curve segment is nearby, add control point at the snapped point
           between the adjacent control points in the curve data structure. */
           EditNurb *editnurb = cu->editnurb;
+
+          /* Data structure to keep track of details about the cut location */
           struct {
+            /* Index of the last bez triple before the cut. */
             int bezt_index;
+            /* Nurb to which the cut belongs to. */
             Nurb *nurb;
+            /* Minimum distance to curve from mouse location. */
             float min_dist;
+            /* Whether the cut has any vertices before/after it. */
             bool has_prev, has_next;
+            /* Locations of adjacent vertices. */
             float prev_loc[3], cut_loc[3], next_loc[3];
+            /* Mouse location as floats. */
             float mval[2];
           } data = {NULL};
 
@@ -839,8 +846,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                 ED_view3d_project_float_object(vc.region,
                                                nu->bezt->vec[1],
                                                screen_co,
-                                               V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-                    V3D_PROJ_RET_OK;
+                                               V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
 
                 data.nurb = nu;
                 data.bezt_index = 0;
@@ -872,6 +878,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                                                               V3D_PROJ_RET_CLIP_BB |
                                                                   V3D_PROJ_RET_CLIP_WIN) ==
                                V3D_PROJ_RET_OK;
+
                   if (check) {
                     float distance = len_manhattan_v2v2(screen_co, data.mval);
                     if (distance < data.min_dist) {
@@ -895,44 +902,31 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                 MEM_freeN(points);
               }
             }
-            else if (nu->type == CU_NURBS) {
-            }
           }
           float threshold_distance = get_view_zoom(data.cut_loc, vc);
           /* If the minimum distance found < threshold distance, make cut. */
           if (data.min_dist < threshold_distance) {
-            int index = data.bezt_index;
             nu = data.nurb;
-            float *cut_loc;
+            int index = data.bezt_index + 1;
             if (nu->bezt) {
+              bool found_min = false;
+              float point[3];
               if (data.has_prev) {
-                float point[3];
-                get_closest_point_on_edge(point, data.mval, data.cut_loc, data.prev_loc, vc);
+                found_min = get_closest_point_on_edge(
+                    point, data.mval, data.cut_loc, data.prev_loc, vc);
+              }
+              if (!found_min && data.has_next) {
+                found_min = get_closest_point_on_edge(
+                    point, data.mval, data.cut_loc, data.next_loc, vc);
+              }
+              if (found_min) {
                 float point_2d[2];
                 ED_view3d_project_float_object(
-                    vc.region, point, point_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-                    V3D_PROJ_RET_OK;
+                    vc.region, point, point_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
                 float dist = len_manhattan_v2v2(point_2d, data.mval);
-                if (dist < data.min_dist) {
-                  data.min_dist = dist;
-                  copy_v3_v3(data.cut_loc, point);
-                }
+                data.min_dist = dist;
+                copy_v3_v3(data.cut_loc, point);
               }
-              if (data.has_next) {
-                float point[3];
-                get_closest_point_on_edge(point, data.mval, data.cut_loc, data.next_loc, vc);
-                float point_2d[2];
-                ED_view3d_project_float_object(
-                    vc.region, point, point_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-                    V3D_PROJ_RET_OK;
-                float dist = len_manhattan_v2v2(point_2d, data.mval);
-                if (dist < data.min_dist) {
-                  data.min_dist = dist;
-                  copy_v3_v3(data.cut_loc, point);
-                }
-              }
-
-              index++;
 
               BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
                                                           "delNurb");
@@ -956,24 +950,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
               ED_curve_deselect_all(editnurb);
               BKE_nurb_handles_calc(nu);
               new_bezt->f1 = new_bezt->f2 = new_bezt->f3 = 1;
-            }
-            else if (nu->bp) {
-              BPoint *bp1 = (BPoint *)MEM_mallocN((nu->pntsu + 1) * sizeof(BPoint), "delNurb");
-              memcpy(bp1, nu->bp, index * sizeof(BPoint));
-              BPoint *new_bp = bp1 + index;
-
-              // ED_curve_bpcpy(editnurb, new_bp, new_bp - 1, 1);
-              memcpy(new_bp, new_bp - 1, sizeof(BPoint));
-              copy_v3_v3(new_bp->vec, data.cut_loc);
-
-              memcpy(bp1 + index + 1, nu->bp + index, (nu->pntsu - index) * sizeof(BPoint));
-              nu->pntsu += 1;
-              cu->actvert = CU_ACT_NONE;
-
-              MEM_freeN(nu->bp);
-              nu->bp = bp1;
-              ED_curve_deselect_all(editnurb);
-              BKE_nurb_handles_calc(nu);
             }
           }
         }
