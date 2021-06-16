@@ -66,6 +66,7 @@
 #include "lineart_intern.h"
 
 #define LINEART_WITH_BVH
+#define LINEART_WITH_BVH_THREAD
 
 static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer *rb,
                                                              LineartEdge *e);
@@ -3533,14 +3534,14 @@ static bool lineart_bounding_area_triangle_intersect(LineartRenderBuffer *fb,
   return false;
 }
 
-static void lineart_triangle_bbox(LineartTriangle *rt, float *result)
+static void lineart_triangle_bbox(LineartTriangle *tri, float *result)
 {
-  result[0] = MIN3(rt->v[0]->gloc[0], rt->v[1]->gloc[0], rt->v[2]->gloc[0]);
-  result[1] = MIN3(rt->v[0]->gloc[1], rt->v[1]->gloc[1], rt->v[2]->gloc[1]);
-  result[2] = MIN3(rt->v[0]->gloc[2], rt->v[1]->gloc[2], rt->v[2]->gloc[2]);
-  result[3] = MAX3(rt->v[0]->gloc[0], rt->v[1]->gloc[0], rt->v[2]->gloc[0]);
-  result[4] = MAX3(rt->v[0]->gloc[1], rt->v[1]->gloc[1], rt->v[2]->gloc[1]);
-  result[5] = MAX3(rt->v[0]->gloc[2], rt->v[1]->gloc[2], rt->v[2]->gloc[2]);
+  result[0] = MIN3(tri->v[0]->gloc[0], tri->v[1]->gloc[0], tri->v[2]->gloc[0]);
+  result[1] = MIN3(tri->v[0]->gloc[1], tri->v[1]->gloc[1], tri->v[2]->gloc[1]);
+  result[2] = MIN3(tri->v[0]->gloc[2], tri->v[1]->gloc[2], tri->v[2]->gloc[2]);
+  result[3] = MAX3(tri->v[0]->gloc[0], tri->v[1]->gloc[0], tri->v[2]->gloc[0]);
+  result[4] = MAX3(tri->v[0]->gloc[1], tri->v[1]->gloc[1], tri->v[2]->gloc[1]);
+  result[5] = MAX3(tri->v[0]->gloc[2], tri->v[1]->gloc[2], tri->v[2]->gloc[2]);
 }
 
 /**
@@ -3914,35 +3915,207 @@ static LineartTriangle *lineart_get_triangle_from_index(LineartRenderBuffer *rb,
   return NULL;
 }
 
+typedef struct LineartIsecSingle {
+  float v1[3], v2[3];
+  LineartTriangle *tri1, *tri2;
+} LineartIsecSingle;
+typedef struct LineartIsecThread {
+  LineartIsecSingle *array;
+  int current;
+  int max;
+} LineartIsecThread;
+typedef struct LineartIsecData {
+  LineartRenderBuffer *rb;
+  LineartIsecThread *threads;
+  int thread_count;
+} LineartIsecData;
+
+static void lineart_add_isec_thread(LineartIsecData *data,
+                                    const int thread,
+                                    const float *v1,
+                                    const float *v2,
+                                    LineartTriangle *tri1,
+                                    LineartTriangle *tri2)
+{
+  LineartIsecThread *th = &data->threads[thread];
+  if (th->current == th->max) {
+
+    LineartIsecSingle *new_array = MEM_mallocN(sizeof(LineartIsecSingle) * th->max * 2,
+                                               "LineartIsecSingle");
+    memcpy(new_array, th->array, sizeof(LineartIsecSingle) * th->max);
+    th->max *= 2;
+    MEM_freeN(th->array);
+    th->array = new_array;
+  }
+  LineartIsecSingle *is = &th->array[th->current];
+  copy_v3_v3(is->v1, v1);
+  copy_v3_v3(is->v2, v2);
+  is->tri1 = tri1;
+  is->tri2 = tri2;
+  th->current++;
+}
+
+static void lineart_init_isec_thread(LineartIsecData *d, LineartRenderBuffer *rb, int thread_count)
+{
+  d->threads = MEM_callocN(sizeof(LineartIsecThread) * thread_count, "LineartIsecThread arr");
+  d->rb = rb;
+  d->thread_count = thread_count;
+  for (int i = 0; i < thread_count; i++) {
+    LineartIsecThread *it = &d->threads[i];
+    it->array = MEM_mallocN(sizeof(LineartIsecSingle) * 100, "LineartIsecSingle arr");
+    it->max = 100;
+    it->current = 0;
+  }
+}
+
+static void lineart_destroy_isec_thread(LineartIsecData *d)
+{
+  for (int i = 0; i < d->thread_count; i++) {
+    LineartIsecThread *it = &d->threads[i];
+    MEM_freeN(it->array);
+  }
+  MEM_freeN(d->threads);
+}
+
+static bool lineart_bvh_isec_callback(void *userdata, int index_a, int index_b, int thread)
+{
+  LineartIsecData *d = (LineartIsecData *)userdata;
+  LineartRenderBuffer *rb = d->rb;
+
+  LineartTriangle *tri1 = lineart_get_triangle_from_index(rb, index_a);
+  LineartTriangle *tri2 = lineart_get_triangle_from_index(rb, index_b);
+
+  if (!tri1 || !tri2) {
+    return false;
+  }
+
+  if ((tri2->flags & LRT_TRIANGLE_INTERSECTION_ONLY) &&
+      (tri1->flags & LRT_TRIANGLE_INTERSECTION_ONLY)) {
+    return false;
+  }
+  /* Bounding box not overlapping or triangles share edges, not potential of intersecting. */
+  if (lineart_triangle_share_edge(tri1, tri2)) {
+    return false;
+  }
+
+  float t_a0[3], t_a1[3], t_a2[3], t_b0[3], t_b1[3], t_b2[3], e1[3], e2[3];
+  copy_v3fl_v3db(t_a0, tri1->v[0]->gloc);
+  copy_v3fl_v3db(t_a1, tri1->v[1]->gloc);
+  copy_v3fl_v3db(t_a2, tri1->v[2]->gloc);
+  copy_v3fl_v3db(t_b0, tri2->v[0]->gloc);
+  copy_v3fl_v3db(t_b1, tri2->v[1]->gloc);
+  copy_v3fl_v3db(t_b2, tri2->v[2]->gloc);
+
+  if (isect_tri_tri_v3(t_a0, t_a1, t_a2, t_b0, t_b1, t_b2, e1, e2)) {
+    lineart_add_isec_thread(d, thread, e1, e2, tri1, tri2);
+  };
+
+  return true;
+}
+
+static void lineart_create_edges_from_isec_data(LineartIsecData *d)
+{
+  LineartRenderBuffer *rb = d->rb;
+  double ZMax = rb->far_clip;
+  double ZMin = rb->near_clip;
+
+  for (int i = 0; i < d->thread_count; i++) {
+    LineartIsecThread *th = &d->threads[i];
+    if (!th->current) {
+      continue;
+    }
+    /* We don't care about removing duplicated vert in this method, chaning can handle that, and it
+     * saves us from using locks and look up tables. */
+    LineartVert *v = lineart_mem_acquire(&rb->render_data_pool,
+                                         sizeof(LineartVert) * th->current * 2);
+    LineartEdge *e = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdge) * th->current);
+    LineartEdgeSegment *es = lineart_mem_acquire(&rb->render_data_pool,
+                                                 sizeof(LineartEdgeSegment) * th->current);
+    for (int j = 0; j < th->current; j++) {
+      LineartVert *v1 = v;
+      LineartVert *v2 = v + 1;
+      LineartIsecSingle *is = &th->array[j];
+      copy_v3db_v3fl(v1->gloc, is->v1);
+      copy_v3db_v3fl(v2->gloc, is->v2);
+      /* The intersection line has been generated only in geometry space, so we need to transform
+       * them as well. */
+      mul_v4_m4v3_db(v1->fbcoord, rb->view_projection, v1->gloc);
+      mul_v4_m4v3_db(v2->fbcoord, rb->view_projection, v2->gloc);
+      mul_v3db_db(v1->fbcoord, (1 / v1->fbcoord[3]));
+      mul_v3db_db(v2->fbcoord, (1 / v2->fbcoord[3]));
+
+      v1->fbcoord[0] -= rb->shift_x * 2;
+      v1->fbcoord[1] -= rb->shift_y * 2;
+      v2->fbcoord[0] -= rb->shift_x * 2;
+      v2->fbcoord[1] -= rb->shift_y * 2;
+
+      /* This z transformation is not the same as the rest of the part, because the data don't go
+       * through normal perspective division calls in the pipeline, but this way the 3D result and
+       * occlusion on the generated line is correct, and we don't really use 2D for viewport stroke
+       * generation anyway. */
+      v1->fbcoord[2] = ZMin * ZMax / (ZMax - fabs(v1->fbcoord[2]) * (ZMax - ZMin));
+      v2->fbcoord[2] = ZMin * ZMax / (ZMax - fabs(v2->fbcoord[2]) * (ZMax - ZMin));
+      e->v1 = v1;
+      e->v2 = v2;
+      e->t1 = is->tri1;
+      e->t2 = is->tri2;
+      e->flags = LRT_EDGE_FLAG_INTERSECTION;
+      e->intersection_mask = (is->tri1->intersection_mask | is->tri2->intersection_mask);
+      BLI_addtail(&e->segments, es);
+
+      lineart_prepend_edge_direct(&rb->intersection.first, e);
+
+      v += 2;
+      e++;
+      es++;
+    }
+  }
+}
+
 static void lineart_do_intersections(LineartRenderBuffer *rb)
 {
   BLI_bvhtree_balance(rb->bvh_main);
   unsigned int overlap_tot;
+
+#ifdef LINEART_WITH_BVH_THREAD
+  LineartIsecData d;
+  lineart_init_isec_thread(&d, rb, rb->thread_count);
+
+  BVHTreeOverlap *overlap = BLI_bvhtree_overlap(
+      rb->bvh_main, rb->bvh_main, &overlap_tot, lineart_bvh_isec_callback, &d);
+
+  lineart_create_edges_from_isec_data(&d);
+  lineart_destroy_isec_thread(&d);
+#else
   BVHTreeOverlap *overlap = BLI_bvhtree_overlap(
       rb->bvh_main, rb->bvh_main, &overlap_tot, NULL, NULL);
+
   for (unsigned int i = 0; i < overlap_tot; i++) {
     BVHTreeOverlap *ov = &overlap[i];
-    LineartTriangle *rt1 = lineart_get_triangle_from_index(rb, ov->indexA);
-    LineartTriangle *rt2 = lineart_get_triangle_from_index(rb, ov->indexB);
+    LineartTriangle *tri1 = lineart_get_triangle_from_index(rb, ov->indexA);
+    LineartTriangle *tri2 = lineart_get_triangle_from_index(rb, ov->indexB);
 
-    if (!rt1 || !rt2) {
+    if (!tri1 || !tri2) {
       continue;
     }
 
-    if ((rt2->flags & LRT_TRIANGLE_INTERSECTION_ONLY) &&
-        (rt1->flags & LRT_TRIANGLE_INTERSECTION_ONLY)) {
+    if ((tri2->flags & LRT_TRIANGLE_INTERSECTION_ONLY) &&
+        (tri1->flags & LRT_TRIANGLE_INTERSECTION_ONLY)) {
       continue;
     }
     /* Bounding box not overlapping or triangles share edges, not potential of intersecting. */
-    if (lineart_triangle_share_edge(rt1, rt2)) {
+    if (lineart_triangle_share_edge(tri1, tri2)) {
       continue;
     }
 
     /* If we do need to compute intersection, then finally do it. */
-    lineart_triangle_intersect(rb, rt1, rt2);
+    lineart_triangle_intersect(rb, tri1, tri2);
   }
-  BLI_bvhtree_free(rb->bvh_main);
+
+#endif
+
   MEM_freeN(overlap);
+  BLI_bvhtree_free(rb->bvh_main);
 }
 
 /**
