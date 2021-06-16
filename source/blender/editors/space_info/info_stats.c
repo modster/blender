@@ -344,7 +344,7 @@ static void stats_object_edit(Object *obedit, SceneStats *stats)
   }
 }
 
-static void stats_object_pose(Object *ob, SceneStats *stats)
+static void stats_object_pose(const Object *ob, SceneStats *stats)
 {
   if (ob->pose) {
     bArmature *arm = ob->data;
@@ -361,16 +361,13 @@ static void stats_object_pose(Object *ob, SceneStats *stats)
   }
 }
 
-static bool stats_is_object_dynamic_topology_sculpt(Object *ob)
+static bool stats_is_object_dynamic_topology_sculpt(const Object *ob)
 {
-  if (ob == NULL) {
-    return false;
-  }
-  const eObjectMode object_mode = ob->mode;
-  return ((object_mode & OB_MODE_SCULPT) && ob->sculpt && ob->sculpt->bm);
+  BLI_assert(ob->mode & OB_MODE_SCULPT);
+  return (ob->sculpt && ob->sculpt->bm);
 }
 
-static void stats_object_sculpt(Object *ob, SceneStats *stats)
+static void stats_object_sculpt(const Object *ob, SceneStats *stats)
 {
 
   SculptSession *ss = ob->sculpt;
@@ -396,68 +393,74 @@ static void stats_object_sculpt(Object *ob, SceneStats *stats)
 }
 
 /* Statistics displayed in info header. Called regularly on scene changes. */
-static void stats_update(Depsgraph *depsgraph, ViewLayer *view_layer, View3D *v3d_local)
+static void stats_update(Depsgraph *depsgraph,
+                         ViewLayer *view_layer,
+                         View3D *v3d_local,
+                         SceneStats *stats)
 {
-  SceneStats stats = {0};
-  Object *ob = OBACT(view_layer);
-  Object *obedit = OBEDIT_FROM_VIEW_LAYER(view_layer);
+  const Object *ob = OBACT(view_layer);
+  const Object *obedit = OBEDIT_FROM_VIEW_LAYER(view_layer);
+
+  memset(stats, 0x0, sizeof(*stats));
 
   if (obedit) {
-    /* Edit Mode */
+    /* Edit Mode. */
     FOREACH_OBJECT_BEGIN (view_layer, ob_iter) {
       if (ob_iter->base_flag & BASE_VISIBLE_VIEWLAYER) {
-        if (ob_iter->mode == OB_MODE_EDIT) {
-          stats_object_edit(ob_iter, &stats);
-          stats.totobjsel++;
+        if (ob_iter->mode & OB_MODE_EDIT) {
+          stats_object_edit(ob_iter, stats);
+          stats->totobjsel++;
         }
         else {
           /* Skip hidden objects in local view that are not in edit-mode,
-           * an exception for edit-mode, in other modes these would be considered hidden. */
+           * an exception for edit-mode, in most other modes these would be considered hidden. */
           if ((v3d_local && !BKE_object_is_visible_in_viewport(v3d_local, ob_iter))) {
             continue;
           }
         }
-        stats.totobj++;
+        stats->totobj++;
       }
     }
     FOREACH_OBJECT_END;
   }
   else if (ob && (ob->mode & OB_MODE_POSE)) {
-    /* Pose Mode */
-    stats_object_pose(ob, &stats);
+    /* Pose Mode. */
+    FOREACH_OBJECT_BEGIN (view_layer, ob_iter) {
+      if (ob_iter->base_flag & BASE_VISIBLE_VIEWLAYER) {
+        if (ob_iter->mode & OB_MODE_POSE) {
+          stats_object_pose(ob_iter, stats);
+          stats->totobjsel++;
+        }
+        else {
+          /* See comment for edit-mode. */
+          if ((v3d_local && !BKE_object_is_visible_in_viewport(v3d_local, ob_iter))) {
+            continue;
+          }
+        }
+        stats->totobj++;
+      }
+    }
+    FOREACH_OBJECT_END;
   }
-  else if (stats_is_object_dynamic_topology_sculpt(ob)) {
-    /* Dynamic topology. Do not count all vertices, dynamic topology stats are initialized later as
-     * part of sculpt stats. */
+  else if (ob && (ob->mode & OB_MODE_SCULPT)) {
+    /* Sculpt Mode. */
+    if (stats_is_object_dynamic_topology_sculpt(ob)) {
+      /* Dynamic topology. Do not count all vertices,
+       * dynamic topology stats are initialized later as part of sculpt stats. */
+    }
+    else {
+      /* When dynamic topology is not enabled both sculpt stats and scene stats are collected. */
+      stats_object_sculpt(ob, stats);
+    }
   }
   else {
-    /* Objects */
+    /* Objects. */
     GSet *objects_gset = BLI_gset_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, __func__);
     DEG_OBJECT_ITER_FOR_RENDER_ENGINE_BEGIN (depsgraph, ob_iter) {
-      stats_object(ob_iter, v3d_local, &stats, objects_gset);
+      stats_object(ob_iter, v3d_local, stats, objects_gset);
     }
     DEG_OBJECT_ITER_FOR_RENDER_ENGINE_END;
     BLI_gset_free(objects_gset, NULL);
-  }
-
-  if (ob && (ob->mode & OB_MODE_SCULPT)) {
-    /* Sculpt Mode. When dynamic topology is not enabled both sculpt stats and scene stats are
-     * collected. */
-    stats_object_sculpt(ob, &stats);
-  }
-
-  if (v3d_local) {
-    BLI_assert(v3d_local->localvd != NULL);
-    if (v3d_local->runtime.local_stats == NULL) {
-      v3d_local->runtime.local_stats = MEM_mallocN(sizeof(SceneStats), "LocalStats");
-    }
-    *v3d_local->runtime.local_stats = stats;
-  }
-  else {
-    if (!view_layer->stats) {
-      view_layer->stats = MEM_callocN(sizeof(SceneStats), "SceneStats");
-    }
-    *view_layer->stats = stats;
   }
 }
 
@@ -497,7 +500,8 @@ static bool format_stats(
       return false;
     }
     Depsgraph *depsgraph = BKE_scene_ensure_depsgraph(bmain, scene, view_layer);
-    stats_update(depsgraph, view_layer, v3d_local);
+    *stats_p = MEM_mallocN(sizeof(SceneStats), __func__);
+    stats_update(depsgraph, view_layer, v3d_local, *stats_p);
   }
 
   SceneStats *stats = *stats_p;
@@ -793,8 +797,8 @@ void ED_info_draw_stats(
   }
 
   if (obedit) {
+    stats_row(col1, labels[OBJ], col2, stats_fmt.totobjsel, stats_fmt.totobj, y, height);
     if (obedit->type == OB_MESH) {
-      stats_row(col1, labels[OBJ], col2, stats_fmt.totobjsel, stats_fmt.totobj, y, height);
       stats_row(col1, labels[VERTS], col2, stats_fmt.totvertsel, stats_fmt.totvert, y, height);
       stats_row(col1, labels[EDGES], col2, stats_fmt.totedgesel, stats_fmt.totedge, y, height);
       stats_row(col1, labels[FACES], col2, stats_fmt.totfacesel, stats_fmt.totface, y, height);
@@ -809,6 +813,7 @@ void ED_info_draw_stats(
     }
   }
   else if (ob && (object_mode & OB_MODE_POSE)) {
+    stats_row(col1, labels[OBJ], col2, stats_fmt.totobjsel, stats_fmt.totobj, y, height);
     stats_row(col1, labels[BONES], col2, stats_fmt.totbonesel, stats_fmt.totbone, y, height);
   }
   else if ((ob) && (ob->type == OB_GPENCIL)) {
