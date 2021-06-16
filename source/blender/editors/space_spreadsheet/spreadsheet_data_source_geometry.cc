@@ -226,6 +226,17 @@ static void get_selected_indices_on_domain(const Mesh &mesh,
   }
 }
 
+bool GeometryDataSource::has_selection_filter() const
+{
+  Object *object_orig = DEG_get_original_object(object_eval_);
+  if (object_orig->type == OB_MESH) {
+    if (object_orig->mode == OB_MODE_EDIT) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void GeometryDataSource::apply_selection_filter(MutableSpan<bool> rows_included) const
 {
   std::lock_guard lock{mutex_};
@@ -263,6 +274,11 @@ void GeometryDataSource::apply_selection_filter(MutableSpan<bool> rows_included)
     };
     get_selected_indices_on_domain(*mesh_eval, domain_, is_vertex_selected, rows_included);
   }
+}
+
+bool InstancesDataSource::has_selection_filter() const
+{
+  return false;
 }
 
 void InstancesDataSource::foreach_default_column_ids(

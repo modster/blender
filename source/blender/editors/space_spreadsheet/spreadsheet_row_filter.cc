@@ -265,22 +265,6 @@ static void apply_row_filter(const SpreadsheetLayout &spreadsheet_layout,
   }
 }
 
-bool spreadsheet_data_source_has_selection_filter(const DataSource &data_source)
-{
-  if (const GeometryDataSource *geometry_data_source = dynamic_cast<const GeometryDataSource *>(
-          &data_source)) {
-    Object *object_eval = geometry_data_source->object_eval();
-    Object *object_orig = DEG_get_original_object(object_eval);
-    if (object_orig->type == OB_MESH) {
-      if (object_orig->mode == OB_MODE_EDIT) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 static void index_vector_from_bools(Span<bool> selection, Vector<int64_t> &indices)
 {
   for (const int i : selection.index_range()) {
@@ -290,6 +274,29 @@ static void index_vector_from_bools(Span<bool> selection, Vector<int64_t> &indic
   }
 }
 
+static bool use_row_filters(const SpaceSpreadsheet &sspreadsheet)
+{
+  if (!(sspreadsheet.filter_flag & SPREADSHEET_FILTER_ENABLE)) {
+    return false;
+  }
+  if (BLI_listbase_is_empty(&sspreadsheet.row_filters)) {
+    return false;
+  }
+  return true;
+}
+
+static bool use_selection_filter(const SpaceSpreadsheet &sspreadsheet,
+                                 const DataSource &data_source)
+{
+  if (!(sspreadsheet.filter_flag & SPREADSHEET_FILTER_SELECTED_ONLY)) {
+    return false;
+  }
+  if (!data_source.has_selection_filter()) {
+    return false;
+  }
+  return true;
+}
+
 Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
                                       const SpreadsheetLayout &spreadsheet_layout,
                                       const DataSource &data_source,
@@ -297,29 +304,27 @@ Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
 {
   const int tot_rows = data_source.tot_rows();
 
-  if (!(sspreadsheet.filter_flag & SPREADSHEET_FILTER_ENABLE)) {
-    return IndexRange(tot_rows).as_span();
-  }
+  const bool use_selection = use_selection_filter(sspreadsheet, data_source);
+  const bool use_filters = use_row_filters(sspreadsheet);
 
-  const bool use_selection = (sspreadsheet.filter_flag & SPREADSHEET_FILTER_SELECTED_ONLY) &&
-                             spreadsheet_data_source_has_selection_filter(data_source);
-
-  if (BLI_listbase_is_empty(&sspreadsheet.row_filters) && !use_selection) {
+  /* Avoid allocating an array if no row filtering is necessary. */
+  if (!(use_filters || use_selection)) {
     return IndexRange(tot_rows).as_span();
   }
 
   Array<bool> rows_included(tot_rows, true);
 
-  LISTBASE_FOREACH (const SpreadsheetRowFilter *, row_filter, &sspreadsheet.row_filters) {
-    if (row_filter->flag & SPREADSHEET_ROW_FILTER_ENABLED) {
-      apply_row_filter(spreadsheet_layout, *row_filter, rows_included);
+  if (use_filters) {
+    LISTBASE_FOREACH (const SpreadsheetRowFilter *, row_filter, &sspreadsheet.row_filters) {
+      if (row_filter->flag & SPREADSHEET_ROW_FILTER_ENABLED) {
+        apply_row_filter(spreadsheet_layout, *row_filter, rows_included);
+      }
     }
   }
 
   if (use_selection) {
     const GeometryDataSource *geometry_data_source = dynamic_cast<const GeometryDataSource *>(
         &data_source);
-
     geometry_data_source->apply_selection_filter(rows_included);
   }
 

@@ -58,6 +58,7 @@ class GeometryDataSource : public DataSource {
     return object_eval_;
   }
 
+  bool has_selection_filter() const override;
   void apply_selection_filter(MutableSpan<bool> rows_included) const;
 
   void foreach_default_column_ids(

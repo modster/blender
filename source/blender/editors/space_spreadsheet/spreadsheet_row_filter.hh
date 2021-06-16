@@ -23,8 +23,6 @@
 
 namespace blender::ed::spreadsheet {
 
-bool spreadsheet_data_source_has_selection_filter(const DataSource &data_source);
-
 Span<int64_t> spreadsheet_filter_rows(const SpaceSpreadsheet &sspreadsheet,
                                       const SpreadsheetLayout &spreadsheet_layout,
                                       const DataSource &data_source,
