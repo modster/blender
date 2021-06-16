@@ -134,12 +134,11 @@ static void spreadsheet_filter_panel_draw_header(const bContext *C, Panel *panel
   PointerRNA *filter_ptr = UI_panel_custom_data_get(panel);
   SpreadsheetRowFilter *filter = (SpreadsheetRowFilter *)filter_ptr->data;
   const StringRef column_name = filter->column_name;
-  const eSpreadsheetFilterOperation operation = (const eSpreadsheetFilterOperation)
-                                                    filter->operation;
+  const eSpreadsheetFilterOperation operation = (eSpreadsheetFilterOperation)filter->operation;
 
   const SpreadsheetColumn *column = lookup_visible_column_for_filter(*sspreadsheet, column_name);
   if (!(sspreadsheet->filter_flag & SPREADSHEET_FILTER_ENABLE) ||
-      column == nullptr && !column_name.is_empty()) {
+      (column == nullptr && !column_name.is_empty())) {
     uiLayoutSetActive(layout, false);
   }
   if (column != nullptr) {
@@ -252,10 +251,6 @@ static void spreadsheet_row_filters_layout(const bContext *C, Panel *panel)
   bScreen *screen = CTX_wm_screen(C);
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
   ListBase *row_filters = &sspreadsheet->row_filters;
-
-  PointerRNA sspreadsheet_ptr;
-  RNA_pointer_create(&screen->id, &RNA_SpaceSpreadsheet, sspreadsheet, &sspreadsheet_ptr);
-  uiItemR(layout, &sspreadsheet_ptr, "show_only_selected", 0, IFACE_("Selected Only"), ICON_NONE);
 
   if (!(sspreadsheet->filter_flag & SPREADSHEET_FILTER_ENABLE)) {
     uiLayoutSetActive(layout, false);

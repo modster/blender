@@ -7696,6 +7696,7 @@ static void rna_def_space_spreadsheet(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "filter_flag", SPREADSHEET_FILTER_SELECTED_ONLY);
   RNA_def_property_ui_text(
       prop, "Show Only Selected", "Only include rows that correspond to selected elements");
+  RNA_def_property_ui_icon(prop, ICON_RESTRICT_SELECT_OFF, 0);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 
   prop = RNA_def_property(srna, "geometry_component_type", PROP_ENUM, PROP_NONE);
