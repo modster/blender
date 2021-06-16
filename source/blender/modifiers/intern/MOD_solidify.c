@@ -153,13 +153,15 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
   SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
 
-  solidify_data.selection = get_selection(mesh, ctx->object, smd->defgrp_name);
+  solidify_data.distance = get_selection(mesh, ctx->object, smd->defgrp_name);
+  bool *shell_verts;
+  bool *rim_verts;
 
   switch (smd->mode) {
     case MOD_SOLIDIFY_MODE_EXTRUDE:
       return solidify_extrude(&solidify_data, mesh);//MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
     case MOD_SOLIDIFY_MODE_NONMANIFOLD:
-      return solidify_nonmanifold(&solidify_data, mesh);//MOD_solidify_nonmanifold_modifyMesh(md, ctx, mesh);
+      return solidify_nonmanifold(&solidify_data, mesh, shell_verts, rim_verts);//MOD_solidify_nonmanifold_modifyMesh(md, ctx, mesh);
     default:
       BLI_assert(0);
   }

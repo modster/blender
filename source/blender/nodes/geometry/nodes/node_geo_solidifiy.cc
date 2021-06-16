@@ -29,11 +29,13 @@
 static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Thickness"), 0.1f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_FLOAT, N_("Clamp Thickness"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f},
+    {SOCK_FLOAT, N_("Clamp"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f},
     {SOCK_FLOAT, N_("Offset"), -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f},
     {SOCK_BOOLEAN, N_("Fill"), true},
-    {SOCK_BOOLEAN, N_("Rim Only"), false},
-    {SOCK_STRING, N_("Selection")},
+    {SOCK_BOOLEAN, N_("Rim"), true},
+    {SOCK_STRING, N_("Distance")},
+    {SOCK_STRING, N_("Fill Tag")},
+    {SOCK_STRING, N_("Rim Tag")},
     {-1, ""},
 };
 
@@ -49,7 +51,7 @@ static void geo_node_solidify_init(bNodeTree *UNUSED(tree), bNode *node)
   NodeGeometrySolidify *node_storage = (NodeGeometrySolidify *)MEM_callocN(
       sizeof(NodeGeometrySolidify), __func__);
 
-  node_storage->mode = MOD_SOLIDIFY_MODE_EXTRUDE;
+  node_storage->mode = MOD_SOLIDIFY_MODE_NONMANIFOLD;
   node->storage = node_storage;
 }
 
@@ -65,39 +67,39 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   bool add_fill = params.extract_input<bool>("Fill");
-  bool add_rim_only = params.extract_input<bool>("Rim Only");
-  const std::string selection_name = params.extract_input<std::string>("Selection");
+  bool add_rim = params.extract_input<bool>("Rim");
+  const std::string Distance_name = params.extract_input<std::string>("Distance");
 
   char flag = 0;
 
   if(add_fill) {
-    flag |= MOD_SOLIDIFY_RIM;
+    flag |= MOD_SOLIDIFY_SHELL;
   }
 
-  if(add_rim_only){
-    flag |= MOD_SOLIDIFY_NOSHELL;
+  if(add_rim){
+    flag |= MOD_SOLIDIFY_RIM;
   }
 
   float thickness = params.extract_input<float>("Thickness");
   float offset = params.extract_input<float>("Offset");
-  float offset_clamp = params.extract_input<float>("Clamp Thickness");
+  float offset_clamp = params.extract_input<float>("Clamp");
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
-    MeshComponent &meshComponent = geometry_set.get_component_for_write<MeshComponent>();
-    Mesh *input_mesh = meshComponent.get_for_write();
-    Mesh *return_mesh;
+    MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+    Mesh *input_mesh = mesh_component.get_for_write();
+    Mesh *output_mesh;
 
-    GVArray_Typed<float> vertex_mask = meshComponent.attribute_get_for_read<float>(
-        selection_name, ATTR_DOMAIN_POINT, 1.0f);
+    GVArray_Typed<float> vertex_mask = mesh_component.attribute_get_for_read<float>(
+        Distance_name, ATTR_DOMAIN_POINT, 1.0f);
 
-    float *selection = (float*)MEM_callocN(sizeof(float) * (unsigned long)input_mesh->totvert, __func__ );
+    float *distance = (float*)MEM_callocN(sizeof(float) * (unsigned long)input_mesh->totvert, __func__ );
 
     for (int i : vertex_mask.index_range()) {
-      selection[i] = vertex_mask[i];
+      distance[i] = vertex_mask[i];
     }
-    //Span<float> selection_span = vertex_mask->get_internal_span();
+    //Span<float> Distance_span = vertex_mask->get_internal_span();
 
     SolidifyData solidify_node_data = {
         self_object,
@@ -108,7 +110,7 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
         offset,
         0.0f,
         offset_clamp,
-        node_storage.mode,
+        MOD_SOLIDIFY_MODE_NONMANIFOLD,
         node_storage.nonmanifold_offset_mode,
         node_storage.nonmanifold_boundary_mode,
         0.0f,
@@ -119,15 +121,45 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
         0,
         0.01f,
         0.0f,
-        selection,
+        distance,
     };
 
-    if(node_storage.mode == MOD_SOLIDIFY_MODE_EXTRUDE){
-      return_mesh = solidify_extrude(&solidify_node_data, input_mesh);
-    }else{
-      return_mesh = solidify_nonmanifold(&solidify_node_data, input_mesh);
+    bool *fill_verts = nullptr;
+    bool *rim_verts = nullptr;
+    output_mesh = solidify_nonmanifold(&solidify_node_data, input_mesh, &fill_verts, &rim_verts);
+
+    geometry_set.replace_mesh(output_mesh);
+
+    ////
+
+    const AttributeDomain result_domain = ATTR_DOMAIN_POINT;
+
+    const std::string fill_verts_attribute_name = params.get_input<std::string>("Fill Tag");
+    OutputAttribute_Typed<bool> fill_verts_attribute =
+        mesh_component.attribute_try_get_for_output_only<bool>(fill_verts_attribute_name, result_domain);
+
+    const std::string rim_verts_attribute_name = params.get_input<std::string>("Rim Tag");
+    OutputAttribute_Typed<bool> rim_verts_attribute =
+        mesh_component.attribute_try_get_for_output_only<bool>(rim_verts_attribute_name, result_domain);
+
+    //if(node_storage.mode == MOD_SOLIDIFY_MODE_EXTRUDE){
+    //return_mesh = solidify_extrude(&solidify_node_data, input_mesh);
+    //}else{
+    //}
+
+    if(!fill_verts_attribute_name.empty()){
+      MutableSpan<bool> fill_verts_span = fill_verts_attribute.as_span();
+      for(const int i : fill_verts_span.index_range()){
+        fill_verts_span[i] = fill_verts[i];
+      }
     }
-    geometry_set.replace_mesh(return_mesh);
+
+    if(!rim_verts_attribute_name.empty()){
+      MutableSpan<bool> rim_verts_span = rim_verts_attribute.as_span();
+      for(const int i : rim_verts_span.index_range()){
+        rim_verts_span[i] = rim_verts[i];
+      }
+    }
   }
 
   params.set_output("Geometry", geometry_set);
@@ -135,14 +167,16 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
 static void geo_node_solidify_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  const bNode *node = (bNode *)ptr->data;
-  NodeGeometrySolidify &node_storage = *(NodeGeometrySolidify *)node->storage;
+  //const bNode *node = (bNode *)ptr->data;
+  //NodeGeometrySolidify &node_storage = *(NodeGeometrySolidify *)node->storage;
 
-  uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
-  if(node_storage.mode == MOD_SOLIDIFY_MODE_NONMANIFOLD){
-    uiItemR(layout, ptr, "nonmanifold_offset_mode", 0, nullptr, ICON_NONE);
-    uiItemR(layout, ptr, "nonmanifold_boundary_mode", 0, nullptr, ICON_NONE);
-  }
+  //uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  //if(node_storage.mode == MOD_SOLIDIFY_MODE_NONMANIFOLD){
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "nonmanifold_offset_mode", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "nonmanifold_boundary_mode", 0, nullptr, ICON_NONE);
+  //}
 }
 
 }  // namespace blender::nodes
@@ -155,6 +189,7 @@ void register_node_type_geo_solidify()
   node_type_storage(
       &ntype, "NodeGeometrySolidify", node_free_standard_storage, node_copy_standard_storage);
   node_type_init(&ntype, blender::nodes::geo_node_solidify_init);
+  node_type_size(&ntype, 167, 100, 600);
   node_type_update(&ntype, blender::nodes::geo_node_solidify_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_solidify_exec;
   ntype.draw_buttons = blender::nodes::geo_node_solidify_layout;

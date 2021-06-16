@@ -152,7 +152,7 @@ static void get_vgroup(
 }
 
 /* NOLINTNEXTLINE: readability-function-size */
-Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
+Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool **r_shell_verts, bool **r_rim_verts)
 {
   Mesh *result;
 
@@ -187,8 +187,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
   const bool do_angle_clamp = solidify_data->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP;
   const bool do_flip = (solidify_data->flag & MOD_SOLIDIFY_FLIP) != 0;
   const bool do_rim = solidify_data->flag & MOD_SOLIDIFY_RIM;
-  const bool do_shell = ((solidify_data->flag & MOD_SOLIDIFY_RIM) && (solidify_data->flag & MOD_SOLIDIFY_NOSHELL)) ==
-                        0;
+  const bool do_shell = solidify_data->flag & MOD_SOLIDIFY_SHELL;
   const bool do_clamp = (solidify_data->offset_clamp != 0.0f);
 
   const float bevel_convex = solidify_data->bevel_convex;
@@ -1408,10 +1407,10 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
         ml = orig_mloop + mp->loopstart;
         for (int j = mp->loopstart; j < loopend; j++, ml++) {
           if (defgrp_invert) {
-            scalar_vgroup = min_ff(1.0f - solidify_data->selection[i],scalar_vgroup);
+            scalar_vgroup = min_ff(1.0f - solidify_data->distance[i],scalar_vgroup);
           }
           else {
-            scalar_vgroup = min_ff(solidify_data->selection[i], scalar_vgroup);
+            scalar_vgroup = min_ff(solidify_data->distance[i], scalar_vgroup);
           }
         }
         scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
@@ -1800,10 +1799,10 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
             if (!do_flat_faces) {
               //MDeformVert *dv = &dvert[i];
               if (defgrp_invert) {
-                scalar_vgroup = 1.0f - solidify_data->selection[i];
+                scalar_vgroup = 1.0f - solidify_data->distance[i];
               }
               else {
-                scalar_vgroup = solidify_data->selection[i];
+                scalar_vgroup = solidify_data->distance[i];
               }
               scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
             }
@@ -1938,6 +1937,13 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
   }
 
   /* Checks that result has dvert data. */
+  //////---->/////
+  *r_shell_verts = MEM_malloc_arrayN(
+      (size_t)result->totvert, sizeof(bool), "shell verts selection in solidify");
+
+  *r_rim_verts = MEM_malloc_arrayN(
+      (size_t)result->totvert, sizeof(bool), "rim verts selection in solidify");
+
   if (shell_defgrp_index != -1 || rim_defgrp_index != -1) {
     dvert = CustomData_duplicate_referenced_layer(&result->vdata, CD_MDEFORMVERT, result->totvert);
     /* If no vertices were ever added to an object's vgroup, dvert might be NULL. */
@@ -1948,6 +1954,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
     }
     result->dvert = dvert;
   }
+  //////---->/////
 
   /* Make_new_verts. */
   {
@@ -2312,20 +2319,26 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
         MEdge *open_face_edge;
         uint open_face_edge_index;
         if (!do_flip) {
+          //////---->/////
+          (*r_rim_verts)[medge[edge1->new_edge].v1] = true;
           if (rim_defgrp_index != -1) {
             BKE_defvert_ensure_index(&result->dvert[medge[edge1->new_edge].v1], rim_defgrp_index)
                 ->weight = 1.0f;
           }
+          //////---->/////
           CustomData_copy_data(&mesh->ldata, &result->ldata, loop1, (int)loop_index, 1);
           mloop[loop_index].v = medge[edge1->new_edge].v1;
           mloop[loop_index++].e = edge1->new_edge;
 
           if (!v2_singularity) {
             open_face_edge_index = edge1->link_edge_groups[1]->open_face_edge;
+            //////---->/////
+            (*r_rim_verts)[medge[edge1->new_edge].v2] = true;
             if (rim_defgrp_index != -1) {
               BKE_defvert_ensure_index(&result->dvert[medge[edge1->new_edge].v2], rim_defgrp_index)
                   ->weight = 1.0f;
             }
+            //////---->/////
             CustomData_copy_data(&mesh->ldata, &result->ldata, loop2, (int)loop_index, 1);
             mloop[loop_index].v = medge[edge1->new_edge].v2;
             open_face_edge = medge + open_face_edge_index;
@@ -2336,21 +2349,26 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
               mloop[loop_index++].e = edge2->link_edge_groups[1]->open_face_edge;
             }
           }
-
+          //////---->/////
+          (*r_rim_verts)[medge[edge2->new_edge].v2] = true;
           if (rim_defgrp_index != -1) {
             BKE_defvert_ensure_index(&result->dvert[medge[edge2->new_edge].v2], rim_defgrp_index)
                 ->weight = 1.0f;
           }
+          //////---->/////
           CustomData_copy_data(&mesh->ldata, &result->ldata, loop2, (int)loop_index, 1);
           mloop[loop_index].v = medge[edge2->new_edge].v2;
           mloop[loop_index++].e = edge2->new_edge;
 
           if (!v1_singularity) {
             open_face_edge_index = edge2->link_edge_groups[0]->open_face_edge;
+            //////---->/////
+            (*r_rim_verts)[medge[edge2->new_edge].v1] = true;
             if (rim_defgrp_index != -1) {
               BKE_defvert_ensure_index(&result->dvert[medge[edge2->new_edge].v1], rim_defgrp_index)
                   ->weight = 1.0f;
             }
+            //////---->/////
             CustomData_copy_data(&mesh->ldata, &result->ldata, loop1, (int)loop_index, 1);
             mloop[loop_index].v = medge[edge2->new_edge].v1;
             open_face_edge = medge + open_face_edge_index;
@@ -2365,10 +2383,13 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
         else {
           if (!v1_singularity) {
             open_face_edge_index = edge1->link_edge_groups[0]->open_face_edge;
+            //////---->/////
+            (*r_rim_verts)[medge[edge1->new_edge].v1] = true;
             if (rim_defgrp_index != -1) {
               BKE_defvert_ensure_index(&result->dvert[medge[edge1->new_edge].v1], rim_defgrp_index)
                   ->weight = 1.0f;
             }
+            //////---->/////
             CustomData_copy_data(&mesh->ldata, &result->ldata, loop1, (int)loop_index, 1);
             mloop[loop_index].v = medge[edge1->new_edge].v1;
             open_face_edge = medge + open_face_edge_index;
@@ -2379,21 +2400,26 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
               mloop[loop_index++].e = edge2->link_edge_groups[0]->open_face_edge;
             }
           }
-
+        //////---->/////
+          (*r_rim_verts)[medge[edge2->new_edge].v1] = true;
           if (rim_defgrp_index != -1) {
             BKE_defvert_ensure_index(&result->dvert[medge[edge2->new_edge].v1], rim_defgrp_index)
                 ->weight = 1.0f;
           }
+          //////---->/////
           CustomData_copy_data(&mesh->ldata, &result->ldata, loop1, (int)loop_index, 1);
           mloop[loop_index].v = medge[edge2->new_edge].v1;
           mloop[loop_index++].e = edge2->new_edge;
 
           if (!v2_singularity) {
             open_face_edge_index = edge2->link_edge_groups[1]->open_face_edge;
+            //////---->/////
+            (*r_rim_verts)[medge[edge2->new_edge].v2] = true;
             if (rim_defgrp_index != -1) {
               BKE_defvert_ensure_index(&result->dvert[medge[edge2->new_edge].v2], rim_defgrp_index)
                   ->weight = 1.0f;
             }
+            //////---->/////
             CustomData_copy_data(&mesh->ldata, &result->ldata, loop2, (int)loop_index, 1);
             mloop[loop_index].v = medge[edge2->new_edge].v2;
             open_face_edge = medge + open_face_edge_index;
@@ -2404,11 +2430,13 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
               mloop[loop_index++].e = edge1->link_edge_groups[1]->open_face_edge;
             }
           }
-
+          //////---->/////
+          (*r_rim_verts)[medge[edge1->new_edge].v2] = true;
           if (rim_defgrp_index != -1) {
             BKE_defvert_ensure_index(&result->dvert[medge[edge1->new_edge].v2], rim_defgrp_index)
                 ->weight = 1.0f;
           }
+          //////---->/////
           CustomData_copy_data(&mesh->ldata, &result->ldata, loop2, (int)loop_index, 1);
           mloop[loop_index].v = medge[edge1->new_edge].v2;
           mloop[loop_index++].e = edge1->new_edge;
@@ -2422,10 +2450,13 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
     NewFaceRef *fr = face_sides_arr;
     uint *face_loops = MEM_malloc_arrayN(
         largest_ngon * 2, sizeof(*face_loops), "face_loops in solidify");
+
     uint *face_verts = MEM_malloc_arrayN(
         largest_ngon * 2, sizeof(*face_verts), "face_verts in solidify");
+
     uint *face_edges = MEM_malloc_arrayN(
         largest_ngon * 2, sizeof(*face_edges), "face_edges in solidify");
+
     for (uint i = 0; i < numPolys * 2; i++, fr++) {
       const uint loopstart = (uint)fr->face->loopstart;
       uint totloop = (uint)fr->face->totloop;
@@ -2486,10 +2517,13 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
           mpoly[poly_index].flag = fr->face->flag;
           if (fr->reversed != do_flip) {
             for (int l = (int)k - 1; l >= 0; l--) {
+              //////---->/////
+              (*r_shell_verts)[face_verts[l]] = true;
               if (shell_defgrp_index != -1) {
                 BKE_defvert_ensure_index(&result->dvert[face_verts[l]], shell_defgrp_index)
                     ->weight = 1.0f;
               }
+              //////---->/////
               CustomData_copy_data(
                   &mesh->ldata, &result->ldata, (int)face_loops[l], (int)loop_index, 1);
               mloop[loop_index].v = face_verts[l];
@@ -2525,7 +2559,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh)
     /*BKE_modifier_set_error(ctx->object,
                            md,
                            "Internal Error: polys array wrong size: %u instead of %u",
-                           numNewPolys,
+                           numNewPolys,f
                            poly_index);*/
   }
   if (loop_index != numNewLoops) {
