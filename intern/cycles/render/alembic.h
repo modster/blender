@@ -60,7 +60,7 @@ template<typename T> class CacheLookupResult {
     NO_DATA_FOR_TIME,
   };
 
-  T *data;
+  const T *data;
   State state;
 
  protected:
@@ -69,7 +69,7 @@ template<typename T> class CacheLookupResult {
   CacheLookupResult() = default;
 
  public:
-  static CacheLookupResult new_data(T *data_)
+  static CacheLookupResult new_data(const T *data_)
   {
     CacheLookupResult result;
     result.data = data_;
@@ -101,7 +101,7 @@ template<typename T> class CacheLookupResult {
     return *data;
   }
 
-  T *get_data_or_null() const
+  const T *get_data_or_null() const
   {
     // data_ should already be null if there is no new data so no need to check
     return data;
@@ -194,7 +194,7 @@ template<typename T> class DataStore {
 
   /* get the data for the specified time, but do not check if the data was already loaded for this
    * time return nullptr if there is no data */
-  CacheLookupResult<T> data_for_time_no_check(double time)
+  CacheLookupResult<T> data_for_time_no_check(double time) const
   {
     if (size() == 0) {
       return CacheLookupResult<T>::no_data_found_for_time();
