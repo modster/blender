@@ -276,11 +276,6 @@ void GeometryDataSource::apply_selection_filter(MutableSpan<bool> rows_included)
   }
 }
 
-bool InstancesDataSource::has_selection_filter() const
-{
-  return false;
-}
-
 void InstancesDataSource::foreach_default_column_ids(
     FunctionRef<void(const SpreadsheetColumnID &)> fn) const
 {
