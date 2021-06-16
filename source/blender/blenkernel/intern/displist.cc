@@ -1606,15 +1606,15 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
   do_makeDispListCurveTypes(
       depsgraph, scene, ob, dispbase, for_render, for_orco, &mesh_eval, &geometry_set);
 
+  if (mesh_eval != nullptr) {
+    BKE_object_eval_assign_data(ob, &mesh_eval->id, true);
+  }
+
   if (geometry_set != nullptr) {
     MeshComponent &mesh_component = geometry_set->get_component_for_write<MeshComponent>();
     mesh_component.replace_mesh_but_keep_vertex_group_names(mesh_eval,
                                                             GeometryOwnershipType::ReadOnly);
     ob->runtime.geometry_set_eval = geometry_set;
-  }
-
-  if (mesh_eval != nullptr) {
-    BKE_object_eval_assign_data(ob, &mesh_eval->id, true);
   }
 
   boundbox_displist_object(ob);
