@@ -242,10 +242,9 @@ class Arena {
       return *index;
     }
     else {
-      /* couldn't insert the value within reserved memory space  */
-      /* TODO(ish): might be possible that `this->data.size()` is 0,
-       * needs a special case for that */
-      this->reserve(this->data.size() * 2);
+      /* couldn't insert the value within reserved memory space */
+      const auto reserve_cap = this->data.size() == 0 ? 1 : this->data.size();
+      this->reserve(reserve_cap * 2);
       if (auto index = this->try_insert(value)) {
         return *index;
       }
