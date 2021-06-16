@@ -738,6 +738,89 @@ static void process_attribute(CachedData &cache,
   }
 }
 
+#if 0
+struct ScopeInfo {
+  /* The expected size of the data if it is defined for each point in the geometry. */
+  size_t points_scope_size;
+
+  /* The expected size of the data if it is defined for each polygon in the geometry. */
+  size_t face_scope_size;
+
+  /* The expected size of the data if it is defined for each polygon corner. */
+  size_t face_varying_scope_size;
+
+  bool valid() const
+  {
+    return points_scope_size != 0 || face_scope_size != 0 || face_varying_scope_size != 0;
+  }
+};
+
+static ScopeInfo get_scope_info(const CachedData &cache, const double time)
+{
+  ScopeInfo scope_info = {0, 0, 0};
+
+  const array<int> *uv_loops = cache.uv_loops.data_for_time_no_check(time).get_data_or_null();
+
+  if (uv_loops) {
+    scope_info.face_varying_scope_size = uv_loops->size();
+  }
+
+  const array<float3> *vertices = cache.vertices.data_for_time_no_check(time).get_data_or_null();
+
+  if (vertices) {
+    scope_info.points_scope_size = vertices->size();
+  }
+
+  return scope_info;
+}
+
+/* The coresponding Cycles scope for an Alembic scope. The name are somewhat similar that of
+ * AttributeElement, however, we do not use AttributeElement as we may need to convert the
+ * representation of the Alembic data to what Cycles expects. */
+enum class CyclesScope {
+  NONE,
+  VERTEX,
+  CORNER,
+  FACE,
+};
+
+/* Convert an Alembic scope to a CyclesScope based on the indices size. This also verifies that the
+ * scope and the data size agree. */
+static CyclesScope determine_cycles_scope(const ScopeInfo scope_info, const GeometryScope scope, const UInt32ArraySamplePtr indices)
+{
+  if (indices == nullptr) {
+    return CyclesScope::NONE;
+  }
+
+  if (scope == kFacevaryingScope && scope_info.face_varying_scope_size == indices->size()) {
+    return CyclesScope::CORNER;
+  }
+
+  if (scope == kVertexScope && scope_info.points_scope_size == indices->size()) {
+    return CyclesScope::VERTEX;
+  }
+
+  /* We need to be careful for kVaryingScope. It can mean multiple things depending on the context,
+   * so to be sure we compare the size of the data with what the scope_info tells us and determine a
+   * scope from there. */
+  if (scope == kVaryingScope) {
+    if (scope_info.points_scope_size == indices->size()) {
+      return CyclesScope::VERTEX;
+    }
+
+    if (scope_info.face_scope_size == indices->size()) {
+      return CyclesScope::FACE;
+    }
+
+    if (scope_info.face_varying_scope_size == indices->size()) {
+      return CyclesScope::CORNER;
+    }
+  }
+
+  return CyclesScope::NONE;
+}
+#endif
+
 /* UVs are processed separately as their indexing is based on loops, instead of vertices or
  * corners. */
 static void process_uvs(CachedData &cache,
@@ -746,6 +829,23 @@ static void process_uvs(CachedData &cache,
                         const IV2fGeomParam::Sample &sample,
                         double time)
 {
+#if 0
+  const ScopeInfo scope_info = get_scope_info(cache, time);
+
+  /* Empty geometry, or no data for time. */
+  if (!scope_info.valid()) {
+    return;
+  }
+
+  const UInt32ArraySamplePtr indices_ptr = sample.getIndices();
+
+  const CyclesScope cycles_scope = determine_cycles_scope(scope_info, scope, indices_ptr);
+
+  if (cycles_scope != CyclesScope::VERTEX && cycles_scope != CyclesScope::CORNER) {
+    return;
+  }
+#endif
+
   if (scope != kFacevaryingScope && scope != kVaryingScope && scope != kVertexScope) {
     return;
   }
