@@ -38,6 +38,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
+#include "MOD_gpencil_lineart.h"
 #include "lineart/MOD_lineart.h"
 
 #include "BKE_collection.h"

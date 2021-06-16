@@ -342,9 +342,7 @@ typedef struct LineartCache {
   /** A copy of rb->Chains after calculation is done, then we can destroy rb. */
   ListBase chains;
 
-  /** Cache only contains edge types specified in this variable.
-   * TODO: it's a fixed value (LRT_EDGE_FLAG_ALL_TYPE) right now, allow further selections in the
-   * future. */
+  /** Cache only contains edge types specified in this variable. */
   unsigned char rb_edge_types;
 } LineartCache;
 

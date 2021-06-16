@@ -111,6 +111,8 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
 
 static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e);
 
+static LineartCache *lineart_init_cache(void);
+
 static void lineart_discard_segment(LineartRenderBuffer *rb, LineartEdgeSegment *es)
 {
   BLI_spin_lock(&rb->lock_cuts);
