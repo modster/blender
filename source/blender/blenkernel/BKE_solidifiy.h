@@ -38,11 +38,11 @@ typedef struct SolidifyData {
 
   float merge_tolerance;
   float bevel_convex;
-  float *selection;
+  float *distance;
 } SolidifyData;
 
 Mesh *solidify_extrude(const SolidifyData *solidify_data, Mesh *mesh);
-Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh);
+Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool **r_shell_verts, bool **r_rim_verts);
 
 #ifdef __cplusplus
 }
