@@ -153,49 +153,6 @@ static void raycast_to_mesh(const Mesh *mesh,
   }
 }
 
-template<class ComponentT>
-static void try_append_attribute_meta_data(const GeometrySet &geometry,
-                                           const StringRef attribute_name,
-                                           Vector<CustomDataType> &data_types,
-                                           Vector<AttributeDomain> &domains)
-{
-  const ComponentT *component = geometry.get_component_for_read<ComponentT>();
-  if (component != nullptr) {
-    std::optional<AttributeMetaData> meta_data = component->attribute_get_meta_data(
-        attribute_name);
-    if (meta_data.has_value()) {
-      data_types.append(meta_data->data_type);
-      domains.append(meta_data->domain);
-    }
-  }
-}
-
-static void get_result_domain_and_data_type(const GeometrySet &geometry,
-                                            const GeometryComponent &component,
-                                            const StringRef attribute_name,
-                                            CustomDataType &r_data_type,
-                                            AttributeDomain &r_domain)
-{
-  Vector<CustomDataType> data_types;
-  Vector<AttributeDomain> domains;
-
-  try_append_attribute_meta_data<PointCloudComponent>(
-      geometry, attribute_name, data_types, domains);
-  try_append_attribute_meta_data<MeshComponent>(geometry, attribute_name, data_types, domains);
-
-  r_data_type = bke::attribute_data_type_highest_complexity(data_types);
-
-  /* TODO would be nice to have a function that knows about supported domain types, like:
-   *   bke::attribute_supported_domain_highest_priority(component, domains);
-   */
-  if (component.type() == GEO_COMPONENT_TYPE_POINT_CLOUD) {
-    r_domain = ATTR_DOMAIN_POINT;
-  }
-  else {
-    r_domain = bke::attribute_domain_highest_priority(domains);
-  }
-}
-
 static void raycast_from_points(const GeoNodeExecParams &params,
                                 const GeometrySet &src_geometry,
                                 GeometryComponent &dst_component,
