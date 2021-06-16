@@ -69,6 +69,9 @@ template<typename... Ts> struct overloaded : Ts... {
 template<typename... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 } /* namespace extra */
 
+class Index;
+template<typename, int64_t, typename> class Arena;
+
 class Index {
   using usize = uint64_t;
 
@@ -82,10 +85,17 @@ class Index {
     this->generation = generation;
   }
 
+  static inline Index invalid()
+  {
+    return Index(std::numeric_limits<usize>::max(), std::numeric_limits<usize>::max());
+  }
+
   std::tuple<usize, usize> get_raw() const
   {
     return std::make_tuple(this->index, this->generation);
   }
+
+  template<typename, int64_t, typename> friend class Arena;
 };
 
 template<
@@ -152,7 +162,13 @@ class Arena {
 
  public:
   /* default constructor */
-  Arena() = default;
+  Arena()
+  {
+    this->data = Vector<Entry>();
+    this->next_free_head = std::nullopt;
+    this->generation = 0;
+    this->length = 0;
+  }
   /* other constructors */
   Arena(const usize size) : Arena()
   {
@@ -197,19 +213,18 @@ class Arena {
   std::optional<Index> try_insert(T value)
   {
     if (this->next_free_head) {
-      auto loc = this->next_free_head;
-      std::visit(extra::overloaded{[this, value](EntryNoExist &data) {
-                                     this->next_free_head = data.next_free;
-                                     data = EntryExist(value, this->generation);
-                                   },
-                                   [](EntryExist &data) {
-                                     /* The linked list created to
-                                      * know where to insert next is
-                                      * corrupted.
-                                      * `this->next_free_head` is corrupted */
-                                     BLI_assert_unreachable();
-                                   }},
-                 this->data[loc]);
+      auto loc = *this->next_free_head;
+      if (auto entry = std::get_if<EntryNoExist>(&this->data[loc])) {
+        this->next_free_head = entry->next_free;
+        this->data[loc] = EntryExist(value, this->generation);
+      }
+      else {
+        /* The linked list created to
+         * know where to insert next is
+         * corrupted.
+         * `this->next_free_head` is corrupted */
+        BLI_assert_unreachable();
+      }
       this->length += 1;
       return Index(loc, this->generation);
     }
@@ -219,7 +234,7 @@ class Arena {
   Index insert(T value)
   {
     if (auto index = this->try_insert(value)) {
-      return index;
+      return *index;
     }
     else {
       /* couldn't insert the value within reserved memory space  */
@@ -227,11 +242,12 @@ class Arena {
        * needs a special case for that */
       this->reserve(this->data.size() * 2);
       if (auto index = this->try_insert(value)) {
-        return index;
+        return *index;
       }
       else {
         /* now that more memory has been reserved, it shouldn't fail */
         BLI_assert_unreachable();
+        return Index::invalid();
       }
     }
   }
@@ -243,11 +259,17 @@ class Arena {
       return std::nullopt;
     }
 
-    if (index.generation != this->data[index.index]) {
+    if (auto entry = std::get_if<EntryExist>(&this->data[index.index])) {
+      if (index.generation != entry->generation) {
+        return std::nullopt;
+      }
+      else {
+        return std::cref(entry->value);
+      }
+    }
+    else {
       return std::nullopt;
     }
-
-    return std::cref(this->data[index.index]);
   }
 
   std::optional<std::reference_wrapper<T>> get(Index index)
@@ -257,11 +279,17 @@ class Arena {
       return std::nullopt;
     }
 
-    if (index.generation != this->data[index.index]) {
+    if (auto entry = std::get_if<EntryExist>(&this->data[index.index])) {
+      if (index.generation != entry->generation) {
+        return std::nullopt;
+      }
+      else {
+        return std::ref(entry->value);
+      }
+    }
+    else {
       return std::nullopt;
     }
-
-    return std::ref(this->data[index.index]);
   }
 
   std::optional<std::reference_wrapper<const T>> get_no_gen(usize index) const
@@ -298,6 +326,16 @@ class Arena {
                this->data[index]);
 
     return res;
+  }
+
+  isize capacity() const
+  {
+    return static_cast<isize>(this->data.size());
+  }
+
+  isize size() const
+  {
+    return static_cast<isize>(this->length);
   }
 
  protected:

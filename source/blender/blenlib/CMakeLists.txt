@@ -397,6 +397,7 @@ if(WITH_GTESTS)
     tests/BLI_edgehash_test.cc
     tests/BLI_expr_pylike_eval_test.cc
     tests/BLI_function_ref_test.cc
+    tests/BLI_generational_arena_test.cc
     tests/BLI_ghash_test.cc
     tests/BLI_hash_mm2a_test.cc
     tests/BLI_heap_simple_test.cc
