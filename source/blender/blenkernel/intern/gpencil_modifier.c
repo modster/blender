@@ -203,22 +203,27 @@ bool BKE_gpencil_has_transform_modifiers(Object *ob)
   return false;
 }
 
-void BKE_gpencil_get_lineart_modifier_limits(Object *ob, struct GpencilLineartLimitInfo *info)
+GpencilLineartLimitInfo BKE_gpencil_get_lineart_modifier_limits(const Object *ob)
 {
+  GpencilLineartLimitInfo info = {0};
+  bool is_first = true;
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
     if (md->type == eGpencilModifierType_Lineart) {
       LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-      info->min_level = MIN2(info->min_level, lmd->level_start);
-      info->max_level = MAX2(info->max_level,
-                             (lmd->use_multiple_levels ? lmd->level_end : lmd->level_start));
-      info->edge_types |= lmd->edge_types;
+      if (is_first || (lmd->flags & LRT_GPENCIL_USE_CACHE)) {
+        info.min_level = MIN2(info.min_level, lmd->level_start);
+        info.max_level = MAX2(info.max_level,
+                              (lmd->use_multiple_levels ? lmd->level_end : lmd->level_start));
+        info.edge_types |= lmd->edge_types;
+      }
     }
   }
+  return info;
 }
 
 void BKE_gpencil_set_lineart_modifier_limits(GpencilModifierData *md,
-                                             struct GpencilLineartLimitInfo *info,
-                                             bool is_first_lineart)
+                                             const GpencilLineartLimitInfo *info,
+                                             const bool is_first_lineart)
 {
   BLI_assert(md->type == eGpencilModifierType_Lineart);
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
@@ -234,7 +239,7 @@ void BKE_gpencil_set_lineart_modifier_limits(GpencilModifierData *md,
   }
 }
 
-bool BKE_gpencil_is_first_lineart_in_stack(Object *ob, GpencilModifierData *md)
+bool BKE_gpencil_is_first_lineart_in_stack(const Object *ob, const GpencilModifierData *md)
 {
   if (md->type != eGpencilModifierType_Lineart) {
     return false;
@@ -249,7 +254,9 @@ bool BKE_gpencil_is_first_lineart_in_stack(Object *ob, GpencilModifierData *md)
       }
     }
   }
-  return false; /* Unlikely. */
+  /* If we reach here it means md is not in ob's modifier stack. */
+  BLI_assert(false);
+  return false;
 }
 
 /* apply time modifiers */
@@ -822,8 +829,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
 
   const bool time_remap = BKE_gpencil_has_time_modifiers(ob);
   bool is_first_lineart = true;
-  GpencilLineartLimitInfo info = {0};
-  BKE_gpencil_get_lineart_modifier_limits(ob, &info);
+  GpencilLineartLimitInfo info = BKE_gpencil_get_lineart_modifier_limits(ob);
 
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
 

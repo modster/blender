@@ -4149,7 +4149,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   }
 
   LineartCache *lc = lineart_init_cache();
-  (*cached_result) = lc;
+  *cached_result = lc;
 
   rb = lineart_create_render_buffer(scene, lmd, use_camera, scene->camera, lc);
 

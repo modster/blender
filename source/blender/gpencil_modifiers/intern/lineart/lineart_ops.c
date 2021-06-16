@@ -199,8 +199,7 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
     }
   }
 
-  GpencilLineartLimitInfo info = {0};
-  BKE_gpencil_get_lineart_modifier_limits(ob, &info);
+  GpencilLineartLimitInfo info = BKE_gpencil_get_lineart_modifier_limits(ob);
 
   LineartCache *lc = NULL;
   bool is_first = true;

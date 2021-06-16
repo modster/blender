@@ -294,14 +294,14 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   const int source_type = RNA_enum_get(ptr, "source_type");
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
-  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
   const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (!BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data)) {
-    uiItemR(layout, ptr, "use_cached_result", 0, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "use_cache", 0, NULL, ICON_NONE);
   }
 
   uiItemR(layout, ptr, "source_type", 0, NULL, ICON_NONE);
@@ -346,7 +346,7 @@ static void line_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
-  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
   const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetEnabled(layout, !is_baked);
@@ -391,32 +391,32 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
-  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
   const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  if (!use_cache || is_first) {
-    uiLayout *row = uiLayoutRowWithHeading(layout, false, IFACE_("Custom Camera"));
-    uiItemR(row, ptr, "use_custom_camera", 0, "", 0);
-    uiLayout *subrow = uiLayoutRow(row, true);
-    uiLayoutSetActive(subrow, RNA_boolean_get(ptr, "use_custom_camera"));
-    uiLayoutSetPropSep(subrow, true);
-    uiItemR(subrow, ptr, "source_camera", 0, "", ICON_OBJECT_DATA);
-
-    uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
-
-    uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
-    uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
-    uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
-    uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
-    uiItemR(layout, ptr, "floating_as_contour", 0, NULL, ICON_NONE);
-    uiItemR(layout, ptr, "use_multiple_edge_types", 0, NULL, ICON_NONE);
+  if (use_cache && !is_first) {
+    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    return;
   }
-  else {
-    uiItemL(layout, "Cached with the first line art modifier.", ICON_INFO);
-  }
+
+  uiLayout *row = uiLayoutRowWithHeading(layout, false, IFACE_("Custom Camera"));
+  uiItemR(row, ptr, "use_custom_camera", 0, "", 0);
+  uiLayout *subrow = uiLayoutRow(row, true);
+  uiLayoutSetActive(subrow, RNA_boolean_get(ptr, "use_custom_camera"));
+  uiLayoutSetPropSep(subrow, true);
+  uiItemR(subrow, ptr, "source_camera", 0, "", ICON_OBJECT_DATA);
+
+  uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
+
+  uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
+  uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "floating_as_contour", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "use_multiple_edge_types", 0, NULL, ICON_NONE);
 }
 
 static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -559,7 +559,7 @@ static void face_mark_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
-  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
 
   uiLayoutSetEnabled(
       layout,
@@ -576,7 +576,7 @@ static void face_mark_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_mark = RNA_boolean_get(ptr, "use_face_mark");
-  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
   const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetEnabled(layout, !is_baked);
@@ -602,27 +602,26 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *layout = panel->layout;
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
-  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
   const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  if (!use_cache || is_first) {
-    uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
-    uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
-    uiItemR(col, ptr, "use_fuzzy_all", 0, NULL, ICON_NONE);
-    uiItemR(col, ptr, "chain_floating_edges", 0, NULL, ICON_NONE);
-    uiItemR(col, ptr, "chain_geometry_space", 0, NULL, ICON_NONE);
-
-    uiItemR(layout, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
-
-    uiItemR(layout, ptr, "smooth_tolerance", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
-    uiItemR(layout, ptr, "split_angle", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  if (use_cache && !is_first) {
+    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    return;
   }
-  else {
-    uiItemL(layout, "Cached with the first line art modifier.", ICON_INFO);
-  }
+
+  uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
+  uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "use_fuzzy_all", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "chain_floating_edges", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "chain_geometry_space", 0, NULL, ICON_NONE);
+
+  uiItemR(layout, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "smooth_tolerance", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "split_angle", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
 
 static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -633,30 +632,30 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *layout = panel->layout;
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
-  const bool use_cache = RNA_boolean_get(ptr, "use_cached_result");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
   const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  if (!use_cache || is_first) {
-    uiLayout *col = uiLayoutColumn(layout, true);
-
-    uiLayout *row = uiLayoutRow(col, true);
-
-    uiItemR(row, ptr, "source_vertex_group", 0, IFACE_("Filter Source"), ICON_GROUP_VERTEX);
-    uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
-
-    uiItemR(col, ptr, "use_output_vertex_group_match_by_name", 0, NULL, ICON_NONE);
-
-    const bool match_output = RNA_boolean_get(ptr, "use_output_vertex_group_match_by_name");
-    if (!match_output) {
-      uiItemPointerR(
-          col, ptr, "vertex_group", &ob_ptr, "vertex_groups", IFACE_("Target"), ICON_NONE);
-    }
+  if (use_cache && !is_first) {
+    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    return;
   }
-  else {
-    uiItemL(layout, "Cached with the first line art modifier.", ICON_INFO);
+
+  uiLayout *col = uiLayoutColumn(layout, true);
+
+  uiLayout *row = uiLayoutRow(col, true);
+
+  uiItemR(row, ptr, "source_vertex_group", 0, IFACE_("Filter Source"), ICON_GROUP_VERTEX);
+  uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
+
+  uiItemR(col, ptr, "use_output_vertex_group_match_by_name", 0, NULL, ICON_NONE);
+
+  const bool match_output = RNA_boolean_get(ptr, "use_output_vertex_group_match_by_name");
+  if (!match_output) {
+    uiItemPointerR(
+        col, ptr, "vertex_group", &ob_ptr, "vertex_groups", IFACE_("Target"), ICON_NONE);
   }
 }
 
@@ -718,7 +717,7 @@ static void panelRegister(ARegionType *region_type)
   gpencil_modifier_subpanel_register(
       region_type, "line_types", "Line Types", NULL, line_types_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
-      region_type, "options", "Options", NULL, options_panel_draw, panel_type);
+      region_type, "geometry", "Geometry Processing", NULL, options_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "style", "Style", NULL, style_panel_draw, panel_type);
   PanelType *occlusion_panel = gpencil_modifier_subpanel_register(
