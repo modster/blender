@@ -129,7 +129,10 @@ def compare_meshes(evaluated_object, expected_object):
     evaluated_data = evaluated_object.data
     exp_data = expected_object.data
     result = evaluated_data.unit_test_compare(mesh=exp_data)
-    return result
+    if result == "Same":
+        print("\nPASSED")
+    else:
+        failed_test(evaluated_object, expected_object, result)
 
 
 def failed_test(evaluated_object, expected_object, result):
@@ -138,12 +141,13 @@ def failed_test(evaluated_object, expected_object, result):
     Updates the expected object on failure if BLENDER_TEST_UPDATE
     environment variable is set.
     """
-    print("FAIL with {}".format(result))
+    print("\nFAILED with {}".format(result))
     update_test_flag = os.getenv('BLENDER_TEST_UPDATE') is not None
     if not update_test_flag:
-        return
+        sys.exit(1)
 
     print("Updating the test...")
+    global FILE_UPDATE_COUNT
     FILE_UPDATE_COUNT += 1
     evaluated_object.location = expected_object.location
     expected_object_name = expected_object.name
@@ -154,13 +158,14 @@ def failed_test(evaluated_object, expected_object, result):
     bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
 
     print("The test file was updated with new expected object")
-    print("The blend file : {} was updated".format(
+    print("The blend file {} was updated.".format(
         bpy.path.display_name_from_filepath(bpy.data.filepath)))
     print("Re-running the test...")
     if FILE_UPDATE_COUNT < 2:
         main()
     else:
-        print("The script has run into some errors. Exiting...")
+        print("The script has run into some errors. Test cannot pass. Exiting...")
+        sys.exit(1)
 
 
 def duplicate_test_object(test_object):
@@ -193,11 +198,7 @@ def main():
     expected_object = get_expected_object()
     evaluated_object = duplicate_test_object(test_object)
     evaluated_object = apply_modifier(evaluated_object)
-    result = compare_meshes(evaluated_object, expected_object)
-    if result == "Same":
-        print("PASS")
-    else:
-        failed_test(evaluated_object, expected_object, result)
+    compare_meshes(evaluated_object, expected_object)
 
 
 if __name__ == "__main__":
