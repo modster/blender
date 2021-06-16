@@ -318,6 +318,7 @@ void register_node_type_geo_raycast()
 
   geo_node_type_base(&ntype, GEO_NODE_RAYCAST, "Raycast", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_raycast_in, geo_node_raycast_out);
+  node_type_size_preset(&ntype, NODE_SIZE_LARGE);
   node_type_init(&ntype, geo_node_raycast_init);
   node_type_update(&ntype, geo_node_raycast_update);
   node_type_storage(
