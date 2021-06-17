@@ -1943,12 +1943,12 @@ static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
   Py_DECREF(item);
 }
 
-PyDoc_STRVAR(BPy_IDGroup_ui_data_doc,
+PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_doc,
              ".. method:: ui_data(key)\n"
              "\n"
              "   Return a dictionary of the property's RNA UI data. The fields in the\n"
              "   returned dictionary and their types will depend on the property's type.\n");
-static PyObject *BPy_IDGroup_ui_data(BPy_IDProperty *self, PyObject *args)
+static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
 {
   const char *key;
 
@@ -2009,13 +2009,13 @@ static PyObject *BPy_IDGroup_ui_data(BPy_IDProperty *self, PyObject *args)
   return dict;
 }
 
-PyDoc_STRVAR(BPy_IDGroup_ui_data_clear_doc,
+PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_clear_doc,
              ".. method:: ui_data_clear(key)\n"
              "\n"
              "   Remove the RNA UI data from this IDProperty.\n"
              "\n"
              "   :raises KeyError: If no property with the name is in the group.\n");
-static PyObject *BPy_IDGroup_ui_data_clear(BPy_IDProperty *self, PyObject *args)
+static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *args)
 {
   const char *key;
 
@@ -2037,7 +2037,7 @@ static PyObject *BPy_IDGroup_ui_data_clear(BPy_IDProperty *self, PyObject *args)
 }
 
 PyDoc_STRVAR(
-    BPy_IDGroup_ui_data_copy_doc,
+    BPy_IDGroup_rna_ui_data_copy_doc,
     ".. method:: ui_data_copy(source_group, key_source, key_destination)\n"
     "\n"
     "   Copy UI data from an IDProperty in the source group to a property in this group.\n "
@@ -2045,7 +2045,7 @@ PyDoc_STRVAR(
     "\n"
     "   :raises KeyError: If either the source or destination item doesn't exist.\n"
     "   :raises TypeError: If the types of the two properties don't match.\n");
-static PyObject *BPy_IDGroup_ui_data_copy(BPy_IDProperty *self, PyObject *args)
+static PyObject *BPy_IDGroup_rna_ui_data_copy(BPy_IDProperty *self, PyObject *args)
 {
   BPy_IDProperty *group_src;
   const char *key_src;
@@ -2097,15 +2097,15 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
      (PyCFunction)BPy_IDGroup_ui_data_update,
      METH_VARARGS | METH_KEYWORDS,
      BPy_IDGroup_ui_data_update_doc},
-    {"ui_data", (PyCFunction)BPy_IDGroup_ui_data, METH_VARARGS, BPy_IDGroup_ui_data_doc},
+    {"ui_data", (PyCFunction)BPy_IDGroup_rna_ui_data, METH_VARARGS, BPy_IDGroup_rna_ui_data_doc},
     {"ui_data_clear",
-     (PyCFunction)BPy_IDGroup_ui_data_clear,
+     (PyCFunction)BPy_IDGroup_rna_ui_data_clear,
      METH_VARARGS,
-     BPy_IDGroup_ui_data_clear_doc},
+     BPy_IDGroup_rna_ui_data_clear_doc},
     {"ui_data_copy",
-     (PyCFunction)BPy_IDGroup_ui_data_copy,
+     (PyCFunction)BPy_IDGroup_rna_ui_data_copy,
      METH_VARARGS,
-     BPy_IDGroup_ui_data_copy_doc},
+     BPy_IDGroup_rna_ui_data_copy_doc},
     {NULL, NULL, 0, NULL},
 };
 
