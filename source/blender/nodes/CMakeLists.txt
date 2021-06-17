@@ -204,7 +204,6 @@ set(SRC
   geometry/node_geometry_exec.cc
   geometry/node_geometry_tree.cc
   geometry/node_geometry_util.cc
-  geometry/node_geometry_util_interp.cc
 
   shader/nodes/node_shader_add_shader.c
   shader/nodes/node_shader_ambient_occlusion.c
@@ -341,7 +340,6 @@ set(SRC
   function/node_function_util.hh
   shader/node_shader_util.h
   geometry/node_geometry_util.hh
-  geometry/node_geometry_util_interp.hh
   texture/node_texture_util.h
 
   NOD_common.h

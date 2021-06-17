@@ -28,7 +28,6 @@
 #include "UI_resources.h"
 
 #include "node_geometry_util.hh"
-#include "node_geometry_util_interp.hh"
 
 static bNodeSocketTemplate geo_node_attribute_transfer_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
@@ -205,7 +204,7 @@ static void get_closest_mesh_polygons(const Mesh &mesh,
   Array<int> looptri_indices(positions.size());
   get_closest_mesh_looptris(mesh, positions, looptri_indices, r_distances_sq, r_positions);
 
-  Span<MLoopTri> looptris = get_mesh_looptris(mesh);
+  Span<MLoopTri> looptris = bke::mesh_surface_sample::get_mesh_looptris(mesh);
   for (const int i : positions.index_range()) {
     const MLoopTri &looptri = looptris[looptri_indices[i]];
     r_poly_indices[i] = looptri.poly;
@@ -288,8 +287,9 @@ static void transfer_attribute_nearest_face_interpolated(const GeometrySet &src_
   Array<float3> positions(tot_samples);
   get_closest_mesh_looptris(*mesh, dst_positions, looptri_indices, {}, positions);
 
-  AttributeInterpolator interp(mesh, positions, looptri_indices);
-  interp.sample_attribute(src_attribute, dst_attribute, eAttributeMapMode::INTERPOLATED);
+  bke::mesh_surface_sample::MeshAttributeInterpolator interp(mesh, positions, looptri_indices);
+  interp.sample_attribute(
+      src_attribute, dst_attribute, bke::mesh_surface_sample::eAttributeMapMode::INTERPOLATED);
 
   dst_attribute.save();
 }

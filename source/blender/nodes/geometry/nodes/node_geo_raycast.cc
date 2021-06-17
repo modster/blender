@@ -17,12 +17,12 @@
 #include "DNA_mesh_types.h"
 
 #include "BKE_bvhutils.h"
+#include "BKE_mesh_sample.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
 
 #include "node_geometry_util.hh"
-#include "node_geometry_util_interp.hh"
 
 static bNodeSocketTemplate geo_node_raycast_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
@@ -153,14 +153,14 @@ static void raycast_to_mesh(const Mesh *mesh,
   }
 }
 
-static eAttributeMapMode get_map_mode(GeometryNodeRaycastMapMode map_mode)
+static bke::mesh_surface_sample::eAttributeMapMode get_map_mode(GeometryNodeRaycastMapMode map_mode)
 {
   switch (map_mode) {
     case GEO_NODE_RAYCAST_INTERPOLATED:
-      return eAttributeMapMode::INTERPOLATED;
+      return bke::mesh_surface_sample::eAttributeMapMode::INTERPOLATED;
     default:
     case GEO_NODE_RAYCAST_NEAREST:
-      return eAttributeMapMode::NEAREST;
+      return bke::mesh_surface_sample::eAttributeMapMode::NEAREST;
   }
 }
 
@@ -189,7 +189,8 @@ static void raycast_from_points(const GeoNodeExecParams &params,
   }
 
   const NodeGeometryRaycast &storage = *(const NodeGeometryRaycast *)params.node().storage;
-  eAttributeMapMode map_mode = get_map_mode((GeometryNodeRaycastMapMode)storage.mapping);
+  bke::mesh_surface_sample::eAttributeMapMode map_mode = get_map_mode(
+      (GeometryNodeRaycastMapMode)storage.mapping);
   const AttributeDomain result_domain = ATTR_DOMAIN_POINT;
 
   GVArray_Typed<float3> ray_origins = dst_component.attribute_get_for_read<float3>(
@@ -246,7 +247,7 @@ static void raycast_from_points(const GeoNodeExecParams &params,
   hit_distance_attribute.save();
 
   /* Custom interpolated attributes */
-  AttributeInterpolator interp(src_mesh, hit_positions, hit_indices);
+  bke::mesh_surface_sample::MeshAttributeInterpolator interp(src_mesh, hit_positions, hit_indices);
   for (int i = 0; i < hit_attribute_names.size(); ++i) {
     const std::optional<AttributeMetaData> meta_data = src_mesh_component->attribute_get_meta_data(
         hit_attribute_names[i]);
