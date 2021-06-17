@@ -2816,7 +2816,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Smooth Tolerance", "Strength of smoothing applied on jagged chains");
   RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.05f, 4);
-  RNA_def_property_range(prop, 0.0f, 1.0f);
+  RNA_def_property_range(prop, 0.0f, 30.0f);
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_remove_doubles", PROP_BOOLEAN, PROP_NONE);
