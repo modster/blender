@@ -153,7 +153,8 @@ static void raycast_to_mesh(const Mesh *mesh,
   }
 }
 
-static bke::mesh_surface_sample::eAttributeMapMode get_map_mode(GeometryNodeRaycastMapMode map_mode)
+static bke::mesh_surface_sample::eAttributeMapMode get_map_mode(
+    GeometryNodeRaycastMapMode map_mode)
 {
   switch (map_mode) {
     case GEO_NODE_RAYCAST_INTERPOLATED:
@@ -248,7 +249,7 @@ static void raycast_from_points(const GeoNodeExecParams &params,
 
   /* Custom interpolated attributes */
   bke::mesh_surface_sample::MeshAttributeInterpolator interp(src_mesh, hit_positions, hit_indices);
-  for (int i = 0; i < hit_attribute_names.size(); ++i) {
+  for (const int i : hit_attribute_names.index_range()) {
     const std::optional<AttributeMetaData> meta_data = src_mesh_component->attribute_get_meta_data(
         hit_attribute_names[i]);
     if (meta_data) {
