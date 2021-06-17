@@ -222,10 +222,6 @@ void MeshAttributeInterpolator::sample_attribute(const ReadAttributeLookup &src_
                                              OutputAttribute &dst_attribute,
                                              eAttributeMapMode mode)
 {
-  if (looptri_indices_.is_empty()) {
-    return;
-  }
-
   if (!src_attribute || !dst_attribute) {
     return;
   }
