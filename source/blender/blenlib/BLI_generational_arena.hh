@@ -137,9 +137,7 @@ class Arena {
   struct EntryNoExist {
     std::optional<usize> next_free;
 
-    EntryNoExist()
-    {
-    }
+    EntryNoExist() = default;
 
     EntryNoExist(usize next_free)
     {
@@ -243,19 +241,17 @@ class Arena {
     if (auto index = this->try_insert(value)) {
       return *index;
     }
-    else {
-      /* couldn't insert the value within reserved memory space */
-      const auto reserve_cap = this->data.size() == 0 ? 1 : this->data.size();
-      this->reserve(reserve_cap * 2);
-      if (auto index = this->try_insert(value)) {
-        return *index;
-      }
-      else {
-        /* now that more memory has been reserved, it shouldn't fail */
-        BLI_assert_unreachable();
-        return Index::invalid();
-      }
+
+    /* couldn't insert the value within reserved memory space */
+    const auto reserve_cap = this->data.size() == 0 ? 1 : this->data.size();
+    this->reserve(reserve_cap * 2);
+    if (auto index = this->try_insert(value)) {
+      return *index;
     }
+
+    /* now that more memory has been reserved, it shouldn't fail */
+    BLI_assert_unreachable();
+    return Index::invalid();
   }
 
   std::optional<T> remove(Index index)
@@ -268,19 +264,17 @@ class Arena {
       if (index.generation != entry->generation) {
         return std::nullopt;
       }
-      else {
-        /* must update the next_free list, length and generation */
-        this->length -= 1;
-        this->generation += 1;
-        auto value = std::move(entry->value);
-        this->data[index.index] = EntryNoExist(this->next_free_head);
-        this->next_free_head = index.index;
-        return value;
-      }
+
+      /* must update the next_free list, length and generation */
+      this->length -= 1;
+      this->generation += 1;
+      auto value = std::move(entry->value);
+      this->data[index.index] = EntryNoExist(this->next_free_head);
+      this->next_free_head = index.index;
+      return value;
     }
-    else {
-      return std::nullopt;
-    }
+
+    return std::nullopt;
   }
 
   std::optional<std::reference_wrapper<const T>> get(Index index) const
@@ -294,13 +288,11 @@ class Arena {
       if (index.generation != entry->generation) {
         return std::nullopt;
       }
-      else {
-        return std::cref(entry->value);
-      }
+
+      return std::cref(entry->value);
     }
-    else {
-      return std::nullopt;
-    }
+
+    return std::nullopt;
   }
 
   std::optional<std::reference_wrapper<T>> get(Index index)
@@ -314,13 +306,11 @@ class Arena {
       if (index.generation != entry->generation) {
         return std::nullopt;
       }
-      else {
-        return std::ref(entry->value);
-      }
+
+      return std::ref(entry->value);
     }
-    else {
-      return std::nullopt;
-    }
+
+    return std::nullopt;
   }
 
   std::optional<std::reference_wrapper<const T>> get_no_gen(usize index) const
@@ -333,9 +323,8 @@ class Arena {
     if (auto entry = std::get_if<EntryExist>(&this->data[index])) {
       return std::cref(entry->value);
     }
-    else {
-      return std::nullopt;
-    }
+
+    return std::nullopt;
   }
 
   std::optional<std::reference_wrapper<T>> get_no_gen(usize index)
@@ -348,9 +337,8 @@ class Arena {
     if (auto entry = std::get_if<EntryExist>(&this->data[index])) {
       return std::ref(entry->value);
     }
-    else {
-      return std::nullopt;
-    }
+
+    return std::nullopt;
   }
 
   std::optional<Index> get_no_gen_index(usize index) const
@@ -359,14 +347,11 @@ class Arena {
     if (index >= this->data.size()) {
       return std::nullopt;
     }
-
-    std::optional<Index> res;
     if (auto entry = std::get_if<EntryExist>(&this->data[index])) {
       return Index(index, entry->generation);
     }
-    else {
-      return std::nullopt;
-    }
+
+    return std::nullopt;
   }
 
   isize capacity() const
