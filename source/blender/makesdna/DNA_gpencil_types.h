@@ -97,10 +97,9 @@ typedef struct bGPDspoint {
   /** Vertex Color RGBA (A=mix factor). */
   float vert_color[4];
 
-  /** Generic custom vector for various use cases. */
-  float custom_vector[3];
-
   /** Runtime data */
+  char _pad2[4];
+
   bGPDspoint_Runtime runtime;
 } bGPDspoint;
 
@@ -630,6 +629,7 @@ typedef struct bGPdata_Runtime {
   /** Brush pointer */
   Brush *sbuffer_brush;
   struct GpencilBatchCache *gpencil_cache;
+  struct LineartCache *lineart_cache;
 } bGPdata_Runtime;
 
 /* grid configuration */

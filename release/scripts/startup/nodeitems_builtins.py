@@ -66,7 +66,7 @@ class GeometryNodeCategory(SortedNodeCategory):
 
 
 # menu entry for node group tools
-def group_tools_draw(self, layout, context):
+def group_tools_draw(self, layout, _context):
     layout.operator("node.group_make")
     layout.operator("node.group_ungroup")
     layout.separator()
@@ -119,8 +119,8 @@ def node_group_items(context):
         if group.name.startswith('.'):
             continue
         yield NodeItem(node_tree_group_type[group.bl_idname],
-                       group.name,
-                       {"node_tree": "bpy.data.node_groups[%r]" % group.name})
+                       label=group.name,
+                       settings={"node_tree": "bpy.data.node_groups[%r]" % group.name})
 
 
 # only show input/output nodes inside node groups
@@ -506,13 +506,17 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveToMesh"),
         NodeItem("GeometryNodeCurveResample"),
         NodeItem("GeometryNodeMeshToCurve"),
+        NodeItem("GeometryNodeCurveToPoints"),
         NodeItem("GeometryNodeCurveLength"),
+        NodeItem("GeometryNodeCurveReverse"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
         NodeItem("GeometryNodeBoundBox"),
+        NodeItem("GeometryNodeConvexHull"),
         NodeItem("GeometryNodeDeleteGeometry"),
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeJoinGeometry"),
+        NodeItem("GeometryNodeSeparateComponents"),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
         NodeItem("GeometryNodeObjectInfo"),

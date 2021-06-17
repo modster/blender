@@ -169,7 +169,7 @@ static void do_math_operation(const VArray<float> &span_a,
 {
   bool success = try_dispatch_float_math_fl_fl_fl_to_fl(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
-        parallel_for(IndexRange(span_result.size()), 512, [&](IndexRange range) {
+        threading::parallel_for(IndexRange(span_result.size()), 512, [&](IndexRange range) {
           for (const int i : range) {
             span_result[i] = math_function(span_a[i], span_b[i], span_c[i]);
           }
@@ -186,7 +186,7 @@ static void do_math_operation(const VArray<float> &span_a,
 {
   bool success = try_dispatch_float_math_fl_fl_to_fl(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
-        parallel_for(IndexRange(span_result.size()), 1024, [&](IndexRange range) {
+        threading::parallel_for(IndexRange(span_result.size()), 1024, [&](IndexRange range) {
           for (const int i : range) {
             span_result[i] = math_function(span_a[i], span_b[i]);
           }
@@ -202,7 +202,7 @@ static void do_math_operation(const VArray<float> &span_input,
 {
   bool success = try_dispatch_float_math_fl_to_fl(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
-        parallel_for(IndexRange(span_result.size()), 1024, [&](IndexRange range) {
+        threading::parallel_for(IndexRange(span_result.size()), 1024, [&](IndexRange range) {
           for (const int i : range) {
             span_result[i] = math_function(span_input[i]);
           }
