@@ -27,13 +27,15 @@
 # Select the object.
 # Apply the GN modifier on a duplicated object.
 # Compare the result.
-# If test pass, print("SUCCESS")
-# If test fail, print("FAIL")
+# If test pass, print("SUCCESS").
+# If test fail, print("FAIL").
 #    Update tests if BLENDER_TEST_UPDATE flag is set.
 # Display result of failed tests.
-
+#
+# Set the BLENDER_TEST_UPDATE env variable to update the expected object.
+#
 ### RUN TEST COMMAND ###
-# blender -b path_to_blend_file --python path/to/geo_node_test.py -- [--first-time]
+# blender -b path_to_blend_file --python path/to/geo_node_test.py
 
 import bpy
 import os
@@ -64,41 +66,39 @@ def get_expected_object():
         raise Exception("No expected object found!")
 
 
+def get_evaluated_object(test_object):
+    evaluated_object = duplicate_test_object(test_object)
+    apply_modifier(evaluated_object)
+    return evaluated_object
+
+
 def select_only_object(any_object):
     """
-    Select the given object.
+    Select the given object and make it active object.
     """
-    bpy.ops.object.mode_set(mode="OBJECT")
     bpy.ops.object.select_all(action="DESELECT")
     bpy.context.view_layer.objects.active = any_object
     any_object.select_set(True)
 
 
-def remove_modifiers_from_object(any_object):
+def create_expected_object(test_object):
     """
-    Remove modifiers from the selected object.
-    """
-    select_only_object(any_object)
-    modifier_list = list(any_object.modifiers)
-    for modifier in modifier_list:
-        any_object.modifiers.remove(modifier=modifier)
-
-
-def run_first_time():
-    """
-    Automatically creates the expected object when script
-    is run with argument "--first-time".
+    Create expected object when run with BLENDER_TEST_UPDATE
     """
     try:
         expected_object = bpy.data.objects["expected_object"]
-        print("\nExpected Object already present, skipping creating a new object.")
 
     except KeyError:
-        expected_object = duplicate_test_object(get_test_object())
-        expected_object.location = (0, 10, 0)
+        print("Creating an expected object...")
+        evaluated_object = get_evaluated_object(test_object)
+
+        # Setting evaluted_object to expected_object to create
+        # a new expected_object.
+        expected_object = evaluated_object
         expected_object.name = "expected_object"
 
-        remove_modifiers_from_object(expected_object)
+        # Be careful with tests dealing with global coordinates.
+        expected_object.location = (0, 10, 0)
 
         # Save file with the expected object.
         bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
@@ -142,6 +142,16 @@ def failed_test(evaluated_object, expected_object, result):
     if not update_test_flag:
         sys.exit(1)
 
+    update_expected_object(evaluated_object, expected_object)
+    print("Re-running the test...")
+    if FILE_UPDATE_COUNT < 2:
+        main()
+    else:
+        print("The script has run into some errors. Test cannot pass. Exiting...")
+        sys.exit(1)
+
+
+def update_expected_object(evaluated_object, expected_object):
     print("Updating the test...")
     global FILE_UPDATE_COUNT
     FILE_UPDATE_COUNT += 1
@@ -156,12 +166,6 @@ def failed_test(evaluated_object, expected_object, result):
     print("The test file was updated with new expected object")
     print("The blend file {} was updated.".format(
         bpy.path.display_name_from_filepath(bpy.data.filepath)))
-    print("Re-running the test...")
-    if FILE_UPDATE_COUNT < 2:
-        main()
-    else:
-        print("The script has run into some errors. Test cannot pass. Exiting...")
-        sys.exit(1)
 
 
 def duplicate_test_object(test_object):
@@ -179,21 +183,12 @@ def main():
     """
     Main function controlling the workflow and running the tests.
     """
-    argv = sys.argv
-    try:
-        command = argv[argv.index("--") + 1:]
-        for cmd in command:
-            if cmd == "--first-time":
-                run_first_time()
-                break
-    except:
-        # If no arguments were given to Python, run normally.
-        pass
-
     test_object = get_test_object()
+    update_test_flag = os.getenv('BLENDER_TEST_UPDATE') is not None
+    if update_test_flag:
+        create_expected_object(test_object)
     expected_object = get_expected_object()
-    evaluated_object = duplicate_test_object(test_object)
-    apply_modifier(evaluated_object)
+    evaluated_object = get_evaluated_object(test_object)
     compare_meshes(evaluated_object, expected_object)
 
 
