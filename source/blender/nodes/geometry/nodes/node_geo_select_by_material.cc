@@ -28,7 +28,16 @@
 
 static bNodeSocketTemplate geo_node_select_by_material_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_MATERIAL, N_("Material")},
+    {SOCK_MATERIAL,
+     N_("Material"),
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     PROP_NONE,
+     SOCK_HIDE_LABEL},
     {SOCK_STRING, N_("Selection")},
     {-1, ""},
 };
@@ -51,7 +60,7 @@ static void select_mesh_by_material(const Mesh &mesh,
       material_indices.append(i);
     }
   }
-  parallel_for(r_selection.index_range(), 1024, [&](IndexRange range) {
+  threading::parallel_for(r_selection.index_range(), 1024, [&](IndexRange range) {
     for (const int i : range) {
       r_selection[i] = material_indices.contains(mesh.mpoly[i].mat_nr);
     }
