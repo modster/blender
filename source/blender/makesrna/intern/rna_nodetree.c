@@ -9947,7 +9947,7 @@ static void def_geo_raycast(StructRNA *srna)
        "INTERPOLATED",
        0,
        "Interpolated",
-       "Interpolate the attribute from corners of the hit face"},
+       "Interpolate the attribute from the corners of the hit face"},
       {GEO_NODE_RAYCAST_NEAREST,
        "NEAREST",
        0,
