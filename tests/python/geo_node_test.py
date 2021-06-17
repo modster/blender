@@ -41,8 +41,6 @@ import bpy
 import os
 import sys
 
-FILE_UPDATE_COUNT = 0
-
 
 def get_test_object():
     """
@@ -144,17 +142,11 @@ def failed_test(evaluated_object, expected_object, result):
 
     update_expected_object(evaluated_object, expected_object)
     print("Re-running the test...")
-    if FILE_UPDATE_COUNT < 2:
-        main()
-    else:
-        print("The script has run into some errors. Test cannot pass. Exiting...")
-        sys.exit(1)
+    run_test()
 
 
 def update_expected_object(evaluated_object, expected_object):
     print("Updating the test...")
-    global FILE_UPDATE_COUNT
-    FILE_UPDATE_COUNT += 1
     evaluated_object.location = expected_object.location
     expected_object_name = expected_object.name
     bpy.data.objects.remove(expected_object, do_unlink=True)
@@ -179,6 +171,13 @@ def duplicate_test_object(test_object):
     return evaluated_object
 
 
+def run_test():
+    test_object = get_test_object()
+    expected_object = get_expected_object()
+    evaluated_object = get_evaluated_object(test_object)
+    compare_meshes(evaluated_object, expected_object)
+
+
 def main():
     """
     Main function controlling the workflow and running the tests.
@@ -187,9 +186,7 @@ def main():
     update_test_flag = os.getenv('BLENDER_TEST_UPDATE') is not None
     if update_test_flag:
         create_expected_object(test_object)
-    expected_object = get_expected_object()
-    evaluated_object = get_evaluated_object(test_object)
-    compare_meshes(evaluated_object, expected_object)
+    run_test()
 
 
 if __name__ == "__main__":
