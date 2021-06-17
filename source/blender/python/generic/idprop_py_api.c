@@ -1528,215 +1528,286 @@ static PyObject *BPy_IDGroup_get(BPy_IDProperty *self, PyObject *args)
   return def;
 }
 
-static int pyobject_convert_to_int(PyObject *py_object)
+typedef struct OptionalInt {
+  int value;
+  bool has_value;
+} OptionalInt;
+
+typedef struct OptionalDouble {
+  double value;
+  bool has_value;
+} OptionalDouble;
+
+/**
+ * \return False when parsing fails, in which case caller should return NULL.
+ */
+static bool args_extract_int(PyObject *args,
+                             PyObject *kwargs,
+                             const char *name,
+                             OptionalInt *value)
 {
-  const int value = PyLong_AsLong(py_object);
-  if ((value == -1) && PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ValueError, "Error converting object to integer for UI data");
+  const char *kwlist[] = {NULL, NULL};
+  kwlist[0] = name;
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "|$i:ui_data_update", (char **)kwlist, &value->value)) {
+    return false;
   }
-  return value;
+
+  PyObject *py_key = PyUnicode_FromString(name);
+  value->has_value = PyDict_Contains(kwargs, py_key) == 1;
+  Py_DECREF(py_key);
+
+  return true;
 }
 
-static void idprop_update_rna_ui_data_int(IDProperty *idprop,
-                                          PyObject *py_min,
-                                          PyObject *py_max,
-                                          PyObject *py_soft_min,
-                                          PyObject *py_soft_max,
-                                          PyObject *py_step,
-                                          PyObject *py_default_value)
+/**
+ * \return False when parsing fails, in which case caller should return NULL.
+ */
+static bool args_extract_double(PyObject *args,
+                                PyObject *kwargs,
+                                const char *name,
+                                OptionalDouble *value)
 {
+  const char *kwlist[] = {NULL, NULL};
+  kwlist[0] = name;
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "|$d:ui_data_update", (char **)kwlist, &value->value)) {
+    return false;
+  }
+
+  PyObject *py_key = PyUnicode_FromString(name);
+  value->has_value = PyDict_Contains(kwargs, py_key) == 1;
+  Py_DECREF(py_key);
+
+  return true;
+}
+
+/**
+ * \return False when parsing fails, in which case caller should return NULL.
+ */
+static bool idprop_ui_data_update_ui_data_int(IDProperty *idprop, PyObject *args, PyObject *kwargs)
+{
+  OptionalInt min, max, soft_min, soft_max, step;
+  if (!(args_extract_int(args, kwargs, "min", &min) &&
+        args_extract_int(args, kwargs, "max", &max) &&
+        args_extract_int(args, kwargs, "soft_min", &soft_min) &&
+        args_extract_int(args, kwargs, "soft_max", &soft_max) &&
+        args_extract_int(args, kwargs, "step", &step))) {
+    return false;
+  }
+
   IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)idprop->ui_data;
-  if (!ELEM(py_min, NULL, Py_None)) {
-    ui_data->min = pyobject_convert_to_int(py_min);
+  if (min.has_value) {
+    ui_data->min = min.value;
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
     ui_data->max = MAX2(ui_data->min, ui_data->max);
   }
-  if (!ELEM(py_max, NULL, Py_None)) {
-    ui_data->max = pyobject_convert_to_int(py_max);
+  if (max.has_value) {
+    ui_data->max = max.value;
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
     ui_data->min = MIN2(ui_data->min, ui_data->max);
   }
-  if (!ELEM(py_soft_min, NULL, Py_None)) {
-    ui_data->soft_min = pyobject_convert_to_int(py_soft_min);
+  if (soft_min.has_value) {
+    ui_data->soft_min = soft_min.value;
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
     ui_data->soft_max = MAX2(ui_data->soft_min, ui_data->soft_max);
   }
-  if (!ELEM(py_soft_max, NULL, Py_None)) {
-    ui_data->soft_max = pyobject_convert_to_int(py_soft_max);
+  if (soft_max.has_value) {
+    ui_data->soft_max = soft_max.value;
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
     ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->soft_max);
   }
-  if (!ELEM(py_step, NULL, Py_None)) {
-    ui_data->step = pyobject_convert_to_int(py_step);
+  if (step.has_value) {
+    ui_data->step = step.value;
   }
-  if (!ELEM(py_default_value, NULL, Py_None)) {
-    if (PySequence_Check(py_default_value)) {
-      if (idprop->type != IDP_ARRAY) {
-        PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
-      }
-      else {
-        MEM_SAFE_FREE(ui_data->default_array);
-        PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(py_default_value);
-        Py_ssize_t len = PySequence_Fast_GET_SIZE(py_default_value);
 
-        ui_data->default_array_len = len;
-        ui_data->default_array = MEM_malloc_arrayN(len, sizeof(int), __func__);
-        for (Py_ssize_t i = 0; i < len; i++) {
-          PyObject *item = ob_seq_fast_items[i];
-          if (!ELEM(item, NULL, Py_None)) {
-            ui_data->default_array[i] = pyobject_convert_to_int(item);
-          }
-        }
-      }
+  /* The default value needs special handling because for array IDProperties it can be a single
+   * value or an array, but for non-array properties it can only be a value. Parse it once as a
+   * generic object to check if it was passed as an array. */
+  PyObject *py_default = NULL;
+  const char *default_kwlist[] = {"default", NULL};
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "|$O:ui_data_update", (char **)default_kwlist, &py_default)) {
+    return false;
+  }
+
+  if (ELEM(py_default, NULL, Py_None)) {
+    return true;
+  }
+
+  if (PySequence_Check(py_default)) {
+    if (idprop->type != IDP_ARRAY) {
+      PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
     }
-    else if (!ELEM(py_default_value, NULL, Py_None)) {
-      ui_data->default_value = pyobject_convert_to_int(py_default_value);
+    MEM_SAFE_FREE(ui_data->default_array);
+    PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(py_default);
+    Py_ssize_t len = PySequence_Fast_GET_SIZE(py_default);
+
+    ui_data->default_array_len = len;
+    ui_data->default_array = MEM_malloc_arrayN(len, sizeof(int), __func__);
+    for (Py_ssize_t i = 0; i < len; i++) {
+      const int value = PyC_Long_AsI32(ob_seq_fast_items[i]);
+      if ((value == -1) && PyErr_Occurred()) {
+        PyErr_SetString(PyExc_ValueError,
+                        "Error converting default value array object to integer");
+        return false;
+      }
+      ui_data->default_array[i] = value;
     }
   }
+  else {
+    if (!PyArg_ParseTupleAndKeywords(args,
+                                     kwargs,
+                                     "|$i:ui_data_update",
+                                     (char **)default_kwlist,
+                                     &ui_data->default_value)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-static double pyobject_convert_to_double(PyObject *py_object)
+/**
+ * \return False when parsing fails, in which case caller should return NULL.
+ */
+static bool idprop_ui_data_update_ui_data_float(IDProperty *idprop,
+                                                PyObject *args,
+                                                PyObject *kwargs)
 {
-  const double value = PyFloat_AsDouble(py_object);
-  if ((value == -1.0) && PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ValueError, "Error converting object to double for UI data");
+  OptionalInt precision;
+  OptionalDouble min, max, soft_min, soft_max, step;
+  if (!(args_extract_double(args, kwargs, "min", &min) &&
+        args_extract_double(args, kwargs, "max", &max) &&
+        args_extract_double(args, kwargs, "soft_min", &soft_min) &&
+        args_extract_double(args, kwargs, "soft_max", &soft_max) &&
+        args_extract_double(args, kwargs, "step", &step) &&
+        args_extract_int(args, kwargs, "precision", &precision))) {
+    return false;
   }
-  return value;
-}
 
-static void idprop_update_rna_ui_data_float(IDProperty *idprop,
-                                            PyObject *py_min,
-                                            PyObject *py_max,
-                                            PyObject *py_soft_min,
-                                            PyObject *py_soft_max,
-                                            PyObject *py_step,
-                                            PyObject *py_precision,
-                                            PyObject *py_default_value)
-{
   IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
-  if (!ELEM(py_min, NULL, Py_None)) {
-    ui_data->min = pyobject_convert_to_double(py_min);
+  if (min.has_value) {
+    ui_data->min = min.value;
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
     ui_data->max = MAX2(ui_data->min, ui_data->max);
   }
-  if (!ELEM(py_max, NULL, Py_None)) {
-    ui_data->max = pyobject_convert_to_double(py_max);
+  if (max.has_value) {
+    ui_data->max = max.value;
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
     ui_data->min = MIN2(ui_data->min, ui_data->max);
   }
-  if (!ELEM(py_soft_min, NULL, Py_None)) {
-    ui_data->soft_min = pyobject_convert_to_double(py_soft_min);
+  if (soft_min.has_value) {
+    ui_data->soft_min = soft_min.value;
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
     ui_data->soft_max = MAX2(ui_data->soft_min, ui_data->soft_max);
   }
-  if (!ELEM(py_soft_max, NULL, Py_None)) {
-    ui_data->soft_max = pyobject_convert_to_double(py_soft_max);
+  if (soft_max.has_value) {
+    ui_data->soft_max = soft_max.value;
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
     ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->soft_max);
   }
-  if (!ELEM(py_step, NULL, Py_None)) {
-    ui_data->step = (float)pyobject_convert_to_double(py_step);
+  if (step.has_value) {
+    ui_data->step = (float)step.value;
   }
-  if (!ELEM(py_precision, NULL, Py_None)) {
-    ui_data->precision = pyobject_convert_to_int(py_precision);
+  if (precision.has_value) {
+    ui_data->precision = precision.value;
   }
-  if (!ELEM(py_default_value, NULL, Py_None)) {
-    if (PySequence_Check(py_default_value)) {
-      if (idprop->type != IDP_ARRAY) {
-        PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
-      }
-      else {
-        MEM_SAFE_FREE(ui_data->default_array);
-        PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(py_default_value);
-        Py_ssize_t len = PySequence_Fast_GET_SIZE(py_default_value);
 
-        ui_data->default_array_len = len;
-        ui_data->default_array = MEM_malloc_arrayN(len, sizeof(double), __func__);
-        for (Py_ssize_t i = 0; i < len; i++) {
-          PyObject *item = ob_seq_fast_items[i];
-          if (!ELEM(item, NULL, Py_None)) {
-            ui_data->default_array[i] = pyobject_convert_to_double(item);
-          }
-        }
-      }
-    }
-    else if (!ELEM(py_default_value, NULL, Py_None)) {
-      ui_data->default_value = pyobject_convert_to_double(py_default_value);
-    }
+  /* The default value needs special handling because for array IDProperties it can be a single
+   * value or an array, but for non-array properties it can only be a value. Parse it once as a
+   * generic object to check if it was passed as an array. */
+  PyObject *py_default = NULL;
+  const char *default_kwlist[] = {"default", NULL};
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "|$O:ui_data_update", (char **)default_kwlist, &py_default)) {
+    return false;
   }
-}
 
-static void idprop_update_rna_ui_data_string(IDProperty *idprop, PyObject *py_default_value)
-{
-  IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
+  if (ELEM(py_default, NULL, Py_None)) {
+    return true;
+  }
 
-  if (!ELEM(py_default_value, NULL, Py_None)) {
-    if (PyUnicode_Check(py_default_value)) {
-      ui_data->default_value = BLI_strdup(_PyUnicode_AsString(py_default_value));
+  if (PySequence_Check(py_default)) {
+    if (idprop->type != IDP_ARRAY) {
+      PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
     }
     else {
-      PyErr_SetString(PyExc_TypeError, "String property default value must have a string type");
+      MEM_SAFE_FREE(ui_data->default_array);
+      PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(py_default);
+      Py_ssize_t len = PySequence_Fast_GET_SIZE(py_default);
+
+      ui_data->default_array_len = len;
+      ui_data->default_array = MEM_malloc_arrayN(len, sizeof(double), __func__);
+      for (Py_ssize_t i = 0; i < len; i++) {
+        const double value = PyFloat_AsDouble(ob_seq_fast_items[i]);
+        if ((value == -1.0) && PyErr_Occurred()) {
+          PyErr_SetString(PyExc_ValueError,
+                          "Error converting default value array object to double");
+          return false;
+        }
+        ui_data->default_array[i] = value;
+      }
     }
   }
+  else {
+    if (!PyArg_ParseTupleAndKeywords(args,
+                                     kwargs,
+                                     "|$d:ui_data_update",
+                                     (char **)default_kwlist,
+                                     &ui_data->default_value)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
+/**
+ * \return False when parsing fails, in which case caller should return NULL.
+ */
+static bool idprop_ui_data_update_ui_data_string(IDProperty *idprop,
+                                                 PyObject *args,
+                                                 PyObject *kwargs)
+{
+  const char *default_value = NULL;
+  const char *default_kwlist[] = {"default", NULL};
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "|$s:ui_data_update", (char **)default_kwlist, &default_value)) {
+    return false;
+  }
+
+  IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
+
+  if (default_value != NULL) {
+    MEM_SAFE_FREE(ui_data->default_value);
+    ui_data->default_value = BLI_strdup(default_value);
+  }
+
+  return true;
+}
+
+PyDoc_STRVAR(BPy_IDGroup_ui_data_update_doc,
              ".. method:: ui_data_update(key, "
-             "   subtype=None, "
-             "   min=None, "
-             "   max=None, "
-             "   soft_min=None, "
-             "   soft_max=None, "
-             "   precision=None, "
-             "   step=None, "
-             "   default=None, "
-             "   description=None)\n"
+             "subtype=None, "
+             "min=None, "
+             "max=None, "
+             "soft_min=None, "
+             "soft_max=None, "
+             "precision=None, "
+             "step=None, "
+             "default=None, "
+             "description=None)\n"
              "\n"
              "   Update the RNA type information of the IDProperty used for interaction and\n"
              "   drawing in the user interface. The property specified by the key must be a\n"
              "   direct child of the group. The required types for many of the keyword arguments\n"
              "   depend on the type of the property.\n ");
-static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
+static PyObject *BPy_IDGroup_ui_data_update(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
   const char *key;
-  const char *rna_subtype = NULL;
-  PyObject *min = NULL;
-  PyObject *max = NULL;
-  PyObject *soft_min = NULL;
-  PyObject *soft_max = NULL;
-  PyObject *precision = NULL;
-  PyObject *step = NULL;
-  PyObject *default_value = NULL;
-  const char *description = NULL;
-
-  static const char *kwlist[] = {
-      "key",
-      "subtype",
-      "min",
-      "max",
-      "soft_min",
-      "soft_max",
-      "precision",
-      "step",
-      "default",
-      "description",
-      NULL,
-  };
-
-  if (!PyArg_ParseTupleAndKeywords(args,
-                                   kwargs,
-                                   "s|$zOOOOOOOz:ui_data_update",
-                                   (char **)kwlist,
-                                   &key,
-                                   &rna_subtype,
-                                   &min,
-                                   &max,
-                                   &soft_min,
-                                   &soft_max,
-                                   &precision,
-                                   &step,
-                                   &default_value,
-                                   &description)) {
+  const char *key_kwlist[] = {"key", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s:ui_data_update", (char **)key_kwlist, &key)) {
     return NULL;
   }
 
@@ -1746,12 +1817,47 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
     return NULL;
   }
 
-  if (!IDP_ui_data_supported(idprop)) {
-    PyErr_Format(PyExc_KeyError, "IDProperty \"%s\" does not support RNA data", idprop->name);
-    return NULL;
+  /* Parse and save type specific UI data. */
+  switch (IDP_ui_data_type(self->prop)) {
+    case IDP_UI_DATA_TYPE_INT: {
+      IDP_ui_data_ensure(idprop);
+      if (!idprop_ui_data_update_ui_data_int(idprop, args, kwargs)) {
+        return NULL;
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      IDP_ui_data_ensure(idprop);
+      if (!idprop_ui_data_update_ui_data_float(idprop, args, kwargs)) {
+        return NULL;
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_STRING: {
+      IDP_ui_data_ensure(idprop);
+
+      if (!idprop_ui_data_update_ui_data_string(idprop, args, kwargs)) {
+        return NULL;
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      PyErr_Format(PyExc_KeyError, "IDProperty \"%s\" does not support RNA data", idprop->name);
+      return NULL;
+    }
   }
 
-  IDP_ui_data_ensure(idprop);
+  /* Handle UI data for all supported IDProperty types. */
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
+  const char *kwlist[] = {"subtype", "description", NULL};
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "s|$zz:ui_data_update", (char **)kwlist, &rna_subtype, &description)) {
+    return NULL;
+  }
 
   if (rna_subtype != NULL) {
     int result = PROP_NONE;
@@ -1763,25 +1869,6 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
 
   if (description != NULL) {
     idprop->ui_data->description = BLI_strdup(description);
-  }
-
-  /* Type specific data. */
-  switch (IDP_ui_data_type(idprop)) {
-    case IDP_UI_DATA_TYPE_STRING:
-      idprop_update_rna_ui_data_string(idprop, default_value);
-      break;
-    case IDP_UI_DATA_TYPE_ID:
-      break;
-    case IDP_UI_DATA_TYPE_INT:
-      idprop_update_rna_ui_data_int(idprop, min, max, soft_min, soft_max, step, default_value);
-      break;
-    case IDP_UI_DATA_TYPE_FLOAT:
-      idprop_update_rna_ui_data_float(
-          idprop, min, max, soft_min, soft_max, step, precision, default_value);
-      break;
-    case IDP_UI_DATA_TYPE_UNSUPPORTED:
-      BLI_assert_unreachable();
-      break;
   }
 
   Py_RETURN_NONE;
@@ -1856,12 +1943,12 @@ static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
   Py_DECREF(item);
 }
 
-PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_doc,
+PyDoc_STRVAR(BPy_IDGroup_ui_data_doc,
              ".. method:: ui_data(key)\n"
              "\n"
              "   Return a dictionary of the property's RNA UI data. The fields in the\n"
              "   returned dictionary and their types will depend on the property's type.\n");
-static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
+static PyObject *BPy_IDGroup_ui_data(BPy_IDProperty *self, PyObject *args)
 {
   const char *key;
 
@@ -1922,13 +2009,13 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
   return dict;
 }
 
-PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_clear_doc,
+PyDoc_STRVAR(BPy_IDGroup_ui_data_clear_doc,
              ".. method:: ui_data_clear(key)\n"
              "\n"
              "   Remove the RNA UI data from this IDProperty.\n"
              "\n"
              "   :raises KeyError: If no property with the name is in the group.\n");
-static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *args)
+static PyObject *BPy_IDGroup_ui_data_clear(BPy_IDProperty *self, PyObject *args)
 {
   const char *key;
 
@@ -1950,7 +2037,7 @@ static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *a
 }
 
 PyDoc_STRVAR(
-    BPy_IDGroup_rna_ui_data_copy_doc,
+    BPy_IDGroup_ui_data_copy_doc,
     ".. method:: ui_data_copy(source_group, key_source, key_destination)\n"
     "\n"
     "   Copy UI data from an IDProperty in the source group to a property in this group.\n "
@@ -1958,7 +2045,7 @@ PyDoc_STRVAR(
     "\n"
     "   :raises KeyError: If either the source or destination item doesn't exist.\n"
     "   :raises TypeError: If the types of the two properties don't match.\n");
-static PyObject *BPy_IDGroup_rna_ui_data_copy(BPy_IDProperty *self, PyObject *args)
+static PyObject *BPy_IDGroup_ui_data_copy(BPy_IDProperty *self, PyObject *args)
 {
   BPy_IDProperty *group_src;
   const char *key_src;
@@ -2007,18 +2094,18 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
     {"to_dict", (PyCFunction)BPy_IDGroup_to_dict, METH_NOARGS, BPy_IDGroup_to_dict_doc},
     {"clear", (PyCFunction)BPy_IDGroup_clear, METH_NOARGS, BPy_IDGroup_clear_doc},
     {"ui_data_update",
-     (PyCFunction)BPy_IDGroup_update_rna,
+     (PyCFunction)BPy_IDGroup_ui_data_update,
      METH_VARARGS | METH_KEYWORDS,
-     BPy_IDGroup_update_rna_doc},
-    {"ui_data", (PyCFunction)BPy_IDGroup_rna_ui_data, METH_VARARGS, BPy_IDGroup_rna_ui_data_doc},
+     BPy_IDGroup_ui_data_update_doc},
+    {"ui_data", (PyCFunction)BPy_IDGroup_ui_data, METH_VARARGS, BPy_IDGroup_ui_data_doc},
     {"ui_data_clear",
-     (PyCFunction)BPy_IDGroup_rna_ui_data_clear,
+     (PyCFunction)BPy_IDGroup_ui_data_clear,
      METH_VARARGS,
-     BPy_IDGroup_rna_ui_data_clear_doc},
+     BPy_IDGroup_ui_data_clear_doc},
     {"ui_data_copy",
-     (PyCFunction)BPy_IDGroup_rna_ui_data_copy,
+     (PyCFunction)BPy_IDGroup_ui_data_copy,
      METH_VARARGS,
-     BPy_IDGroup_rna_ui_data_copy_doc},
+     BPy_IDGroup_ui_data_copy_doc},
     {NULL, NULL, 0, NULL},
 };
 
