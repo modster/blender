@@ -33,7 +33,6 @@ static bNodeSocketTemplate geo_node_raycast_in[] = {
     {SOCK_FLOAT, N_("Ray Length"), 100.0, 0.0, 0.0, 0.0, 0.0f, FLT_MAX},
     {SOCK_STRING, N_("Target Attribute")},
     {SOCK_STRING, N_("Is Hit")},
-    {SOCK_STRING, N_("Hit Index")},
     {SOCK_STRING, N_("Hit Position")},
     {SOCK_STRING, N_("Hit Normal")},
     {SOCK_STRING, N_("Hit Distance")},
@@ -169,7 +168,6 @@ static void raycast_from_points(const GeoNodeExecParams &params,
                                 const GeometrySet &src_geometry,
                                 GeometryComponent &dst_component,
                                 const StringRef hit_name,
-                                const StringRef hit_index_name,
                                 const StringRef hit_position_name,
                                 const StringRef hit_normal_name,
                                 const StringRef hit_distance_name,
@@ -203,8 +201,6 @@ static void raycast_from_points(const GeoNodeExecParams &params,
 
   OutputAttribute_Typed<bool> hit_attribute =
       dst_component.attribute_try_get_for_output_only<bool>(hit_name, result_domain);
-  OutputAttribute_Typed<int> hit_index_attribute =
-      dst_component.attribute_try_get_for_output_only<int>(hit_index_name, result_domain);
   OutputAttribute_Typed<float3> hit_position_attribute =
       dst_component.attribute_try_get_for_output_only<float3>(hit_position_name, result_domain);
   OutputAttribute_Typed<float3> hit_normal_attribute =
@@ -215,22 +211,19 @@ static void raycast_from_points(const GeoNodeExecParams &params,
   /* Positions and looptri indices are always needed for interpolation,
    * so create temporary arrays if no output attribute is given.
    */
-  Array<int> indices_internal;
-  Array<float3> positions_internal;
+  Array<int> hit_indices;
+  Array<float3> hit_positions_internal;
   if (!hit_attribute_names.is_empty()) {
-    if (!hit_index_attribute) {
-      indices_internal.reinitialize(ray_origins->size());
-    }
+    hit_indices.reinitialize(ray_origins->size());
+
     if (!hit_position_attribute) {
-      positions_internal.reinitialize(ray_origins->size());
+      hit_positions_internal.reinitialize(ray_origins->size());
     }
   }
-  const MutableSpan<bool> hit = hit_attribute ? hit_attribute.as_span() : MutableSpan<bool>();
-  const MutableSpan<int> hit_indices = hit_index_attribute ? hit_index_attribute.as_span() :
-                                                             indices_internal;
+  const MutableSpan<bool> is_hit = hit_attribute ? hit_attribute.as_span() : MutableSpan<bool>();
   const MutableSpan<float3> hit_positions = hit_position_attribute ?
                                                 hit_position_attribute.as_span() :
-                                                positions_internal;
+                                                hit_positions_internal;
   const MutableSpan<float3> hit_normals = hit_normal_attribute ? hit_normal_attribute.as_span() :
                                                                  MutableSpan<float3>();
   const MutableSpan<float> hit_distances = hit_distance_attribute ?
@@ -241,14 +234,13 @@ static void raycast_from_points(const GeoNodeExecParams &params,
                   ray_origins,
                   ray_directions,
                   ray_lengths,
-                  hit,
+                  is_hit,
                   hit_indices,
                   hit_positions,
                   hit_normals,
                   hit_distances);
 
   hit_attribute.save();
-  hit_index_attribute.save();
   hit_position_attribute.save();
   hit_normal_attribute.save();
   hit_distance_attribute.save();
@@ -277,7 +269,6 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
   GeometrySet cast_geometry_set = params.extract_input<GeometrySet>("Target Geometry");
 
   const std::string hit_name = params.extract_input<std::string>("Is Hit");
-  const std::string hit_index_name = params.extract_input<std::string>("Hit Index");
   const std::string hit_position_name = params.extract_input<std::string>("Hit Position");
   const std::string hit_normal_name = params.extract_input<std::string>("Hit Normal");
   const std::string hit_distance_name = params.extract_input<std::string>("Hit Distance");
@@ -298,7 +289,6 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
                           cast_geometry_set,
                           geometry_set.get_component_for_write(geo_type),
                           hit_name,
-                          hit_index_name,
                           hit_position_name,
                           hit_normal_name,
                           hit_distance_name,
