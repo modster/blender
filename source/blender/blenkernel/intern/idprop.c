@@ -1239,6 +1239,7 @@ static void write_ui_data(const IDProperty *prop, BlendWriter *writer)
       break;
     }
     case IDP_UI_DATA_TYPE_ID: {
+      BLO_write_struct(writer, IDPropertyUIDataID, ui_data);
       break;
     }
     case IDP_UI_DATA_TYPE_INT: {
