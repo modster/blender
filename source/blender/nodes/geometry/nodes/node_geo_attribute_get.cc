@@ -58,33 +58,30 @@ static void geo_node_attribute_get_init(bNodeTree *UNUSED(tree), bNode *node)
 
 namespace blender::nodes {
 
-static void get_attribute(const GeometryComponent *component, const GeoNodeExecParams &params)
-{
-}
-
 static void geo_node_attribute_get_exec(GeoNodeExecParams params)
 {
-  //params.set_output("Attribute", AttributeRef::None);
+  params.set_output("Attribute", AttributeRef::None);
 
-  //GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  //const std::string attribute_name = params.extract_input<std::string>("Name");
+  const CustomDataType data_type = (CustomDataType)params.node().custom1;
+  const AttributeDomain domain = (AttributeDomain)params.node().custom2;
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  const std::string attribute_name = params.extract_input<std::string>("Name");
 
-  //if (attribute_name.empty()) {
-  //  params.set_output("Attribute", AttributeRef::None);
-  //  return;
-  //}
+  if (attribute_name.empty()) {
+    params.set_output("Attribute", AttributeRef::None);
+    return;
+  }
 
-  //geometry_set.get_component_for_read()
+  AttributeRef attribute = AttributeRef(attribute_name, domain, data_type);
 
-  // if (geometry_set.has<MeshComponent>()) {
-  //  get_attribute(geometry_set.get_component_for_read<MeshComponent>(), params);
-  //}
-  // if (geometry_set.has<PointCloudComponent>()) {
-  //  get_attribute(geometry_set.get_component_for_read<PointCloudComponent>(), params);
-  //}
-  // if (geometry_set.has<CurveComponent>()) {
-  //  get_attribute(geometry_set.get_component_for_read<CurveComponent>(), params);
-  //}
+  /* TODO check for existence of the attribute on the geometry.
+   * This isn't really necessary for it to function, but can help catch invalid
+   * references early in the node graph.
+   * Technically this node does not even need a geometry input other than for
+   * checking validity. It could also just create an AttributeRef on good faith.
+   */
+
+  params.set_output("Attribute", attribute);
 }
 
 }  // namespace blender::nodes
