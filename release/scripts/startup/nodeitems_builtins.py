@@ -475,7 +475,6 @@ texture_node_categories = [
 geometry_node_categories = [
     # Geometry Nodes
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
-        NodeItem("GeometryNodeAttributeLoad"),
         NodeItem("GeometryNodeAttributeStore"),
         NodeItem("GeometryNodeAttributeRandomize"),
         NodeItem("GeometryNodeAttributeMath"),
@@ -484,6 +483,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeConvert"),
         NodeItem("GeometryNodeAttributeCurveMap"),
         NodeItem("GeometryNodeAttributeFill"),
+        NodeItem("GeometryNodeAttributeGet"),
         NodeItem("GeometryNodeAttributeMix"),
         NodeItem("GeometryNodeAttributeProximity"),
         NodeItem("GeometryNodeAttributeColorRamp"),

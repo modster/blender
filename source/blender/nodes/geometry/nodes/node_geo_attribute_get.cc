@@ -29,20 +29,18 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_attribute_load_in[] = {
+static bNodeSocketTemplate geo_node_attribute_get_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_STRING, N_("Name")},
     {-1, ""},
 };
 
-static bNodeSocketTemplate geo_node_attribute_load_out[] = {
+static bNodeSocketTemplate geo_node_attribute_get_out[] = {
     {SOCK_ATTRIBUTE, N_("Attribute")},
     {-1, ""},
 };
 
-static void geo_node_attribute_load_layout(uiLayout *layout,
-                                           bContext *UNUSED(C),
-                                           PointerRNA *ptr)
+static void geo_node_attribute_get_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -50,7 +48,7 @@ static void geo_node_attribute_load_layout(uiLayout *layout,
   uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
 }
 
-static void geo_node_attribute_load_init(bNodeTree *UNUSED(tree), bNode *node)
+static void geo_node_attribute_get_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   node->custom1 = CD_PROP_FLOAT;
   node->custom2 = ATTR_DOMAIN_AUTO;
@@ -60,16 +58,15 @@ static void geo_node_attribute_load_init(bNodeTree *UNUSED(tree), bNode *node)
 
 namespace blender::nodes {
 
-static void load_attribute(const GeometryComponent *component, const GeoNodeExecParams &params)
+static void get_attribute(const GeometryComponent *component, const GeoNodeExecParams &params)
 {
-
 }
 
-static void geo_node_attribute_load_exec(GeoNodeExecParams params)
+static void geo_node_attribute_get_exec(GeoNodeExecParams params)
 {
-  params.set_output("Attribute", AttributeRef::None);
+  //params.set_output("Attribute", AttributeRef::None);
 
-  // GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  //GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   //const std::string attribute_name = params.extract_input<std::string>("Name");
 
   //if (attribute_name.empty()) {
@@ -77,30 +74,29 @@ static void geo_node_attribute_load_exec(GeoNodeExecParams params)
   //  return;
   //}
 
-  ////geometry_set = bke::geometry_set_realize_instances(geometry_set);
+  //geometry_set.get_component_for_read()
 
-  //if (geometry_set.has<MeshComponent>()) {
-  //  load_attribute(geometry_set.get_component_for_read<MeshComponent>(), params);
+  // if (geometry_set.has<MeshComponent>()) {
+  //  get_attribute(geometry_set.get_component_for_read<MeshComponent>(), params);
   //}
-  //if (geometry_set.has<PointCloudComponent>()) {
-  //  load_attribute(geometry_set.get_component_for_read<PointCloudComponent>(), params);
+  // if (geometry_set.has<PointCloudComponent>()) {
+  //  get_attribute(geometry_set.get_component_for_read<PointCloudComponent>(), params);
   //}
-  //if (geometry_set.has<CurveComponent>()) {
-  //  load_attribute(geometry_set.get_component_for_read<CurveComponent>(), params);
+  // if (geometry_set.has<CurveComponent>()) {
+  //  get_attribute(geometry_set.get_component_for_read<CurveComponent>(), params);
   //}
 }
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_attribute_load()
+void register_node_type_geo_attribute_get()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_LOAD, "Attribute Load", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_attribute_load_in, geo_node_attribute_load_out);
-  node_type_init(&ntype, geo_node_attribute_load_init);
-  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_load_exec;
-  ntype.draw_buttons = geo_node_attribute_load_layout;
+  geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_GET, "Attribute Get", NODE_CLASS_GEOMETRY, 0);
+  node_type_socket_templates(&ntype, geo_node_attribute_get_in, geo_node_attribute_get_out);
+  node_type_init(&ntype, geo_node_attribute_get_init);
+  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_get_exec;
+  ntype.draw_buttons = geo_node_attribute_get_layout;
   nodeRegisterType(&ntype);
 }

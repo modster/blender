@@ -147,7 +147,7 @@ set(SRC
   geometry/nodes/node_geo_attribute_convert.cc
   geometry/nodes/node_geo_attribute_curve_map.cc
   geometry/nodes/node_geo_attribute_fill.cc
-  geometry/nodes/node_geo_attribute_load.cc
+  geometry/nodes/node_geo_attribute_get.cc
   geometry/nodes/node_geo_attribute_map_range.cc
   geometry/nodes/node_geo_attribute_math.cc
   geometry/nodes/node_geo_attribute_mix.cc
