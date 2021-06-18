@@ -76,15 +76,15 @@ static void geo_node_attribute_vector_math_layout(uiLayout *layout,
 
   uiItemR(layout, ptr, "operation", 0, "", ICON_NONE);
 
-  //uiLayoutSetPropSep(layout, true);
-  //uiLayoutSetPropDecorate(layout, false);
-  //uiItemR(layout, ptr, "input_type_a", 0, IFACE_("A"), ICON_NONE);
-  //if (operation_use_input_b(operation)) {
-  //  uiItemR(layout, ptr, "input_type_b", 0, IFACE_("B"), ICON_NONE);
-  //}
-  //if (operation_use_input_c(operation)) {
-  //  uiItemR(layout, ptr, "input_type_c", 0, IFACE_("C"), ICON_NONE);
-  //}
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "input_type_a", 0, IFACE_("A"), ICON_NONE);
+  if (operation_use_input_b(operation)) {
+    uiItemR(layout, ptr, "input_type_b", 0, IFACE_("B"), ICON_NONE);
+  }
+  if (operation_use_input_c(operation)) {
+    uiItemR(layout, ptr, "input_type_c", 0, IFACE_("C"), ICON_NONE);
+  }
 }
 
 static CustomDataType operation_get_read_type_b(const NodeVectorMathOperation operation)
@@ -113,14 +113,10 @@ static void geo_node_attribute_vector_math_init(bNodeTree *UNUSED(tree), bNode *
   data->input_type_b = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
   node->storage = data;
 
-#define DEF_ATTRIBUTE(_in_out, _name, _data_type) \
-  ((bNodeSocketValueAttribute *)nodeFindSocket(node, (_in_out), (_name))->default_value) \
-      ->data_type = (_data_type);
-
-  DEF_ATTRIBUTE(SOCK_IN, "A", SOCK_VECTOR)
-  DEF_ATTRIBUTE(SOCK_IN, "B", SOCK_VECTOR)
-  DEF_ATTRIBUTE(SOCK_IN, "C", SOCK_VECTOR)
-  DEF_ATTRIBUTE(SOCK_OUT, "Result", SOCK_VECTOR)
+  blender::nodes::set_attribute_socket_data_type(*node, "A", SOCK_VECTOR);
+  blender::nodes::set_attribute_socket_data_type(*node, "B", SOCK_VECTOR);
+  blender::nodes::set_attribute_socket_data_type(*node, "C", SOCK_VECTOR);
+  blender::nodes::set_attribute_socket_data_type(*node, "Result", SOCK_VECTOR);
 }
 
 static CustomDataType operation_get_result_type(const NodeVectorMathOperation operation)
@@ -180,6 +176,20 @@ static void geo_node_attribute_vector_math_update(bNodeTree *UNUSED(ntree), bNod
       "C",
       (GeometryNodeAttributeInputMode)node_storage->input_type_c,
       operation_use_input_c(operation));
+
+  blender::nodes::set_attribute_socket_data_type(*node, "A", SOCK_VECTOR);
+  blender::nodes::set_attribute_socket_data_type(
+      *node, "B", ELEM(operation, NODE_VECTOR_MATH_SCALE) ? SOCK_FLOAT : SOCK_VECTOR);
+  blender::nodes::set_attribute_socket_data_type(
+      *node, "C", ELEM(operation, NODE_VECTOR_MATH_REFRACT) ? SOCK_FLOAT : SOCK_VECTOR);
+  blender::nodes::set_attribute_socket_data_type(*node,
+                                                 "Result",
+                                                 ELEM(operation,
+                                                      NODE_VECTOR_MATH_DOT_PRODUCT,
+                                                      NODE_VECTOR_MATH_DISTANCE,
+                                                      NODE_VECTOR_MATH_LENGTH) ?
+                                                     SOCK_FLOAT :
+                                                     SOCK_VECTOR);
 }
 
 static void do_math_operation_fl3_fl3_to_fl3(const VArray<float3> &input_a,

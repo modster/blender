@@ -129,11 +129,8 @@ static void geo_node_attribute_sample_texture_exec(GeoNodeExecParams params)
 
 static void init(bNodeTree *UNUSED(tree), bNode *node)
 {
-#define DEF_ATTRIBUTE(_in_out, _name, _data_type) \
-  ((bNodeSocketValueAttribute *)nodeFindSocket(node, (_in_out), (_name))->default_value)->data_type = (_data_type);
-
-  DEF_ATTRIBUTE(SOCK_IN, "Mapping", SOCK_VECTOR)
-  DEF_ATTRIBUTE(SOCK_OUT, "Result", SOCK_RGBA)
+  blender::nodes::set_attribute_socket_data_type(*node, "Mapping", SOCK_VECTOR);
+  blender::nodes::set_attribute_socket_data_type(*node, "Result", SOCK_RGBA);
 }
 
 void register_node_type_geo_sample_texture()

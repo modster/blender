@@ -56,6 +56,27 @@ void update_attribute_input_socket_availabilities(bNode &node,
   }
 }
 
+void set_attribute_socket_data_type(bNode &node,
+                                    const StringRef name,
+                                    eNodeSocketDatatype data_type)
+{
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node.inputs) {
+    if (socket->type == SOCK_ATTRIBUTE && name == socket->name) {
+      ((bNodeSocketValueAttribute *)socket->default_value)->data_type = data_type;
+    }
+  }
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node.outputs) {
+    if (socket->type == SOCK_ATTRIBUTE && name == socket->name) {
+      ((bNodeSocketValueAttribute *)socket->default_value)->data_type = data_type;
+    }
+  }
+}
+
+void reset_attribute_socket_data_type(bNode &node, const StringRef name)
+{
+  set_attribute_socket_data_type(node, name, SOCK_ATTRIBUTE);
+}
+
 }  // namespace blender::nodes
 
 bool geo_node_poll_default(bNodeType *UNUSED(ntype),

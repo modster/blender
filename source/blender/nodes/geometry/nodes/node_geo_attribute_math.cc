@@ -108,15 +108,15 @@ static void geo_node_attribute_math_layout(uiLayout *layout, bContext *UNUSED(C)
 
   uiItemR(layout, ptr, "operation", 0, "", ICON_NONE);
 
-  //uiLayoutSetPropSep(layout, true);
-  //uiLayoutSetPropDecorate(layout, false);
-  //uiItemR(layout, ptr, "input_type_a", 0, IFACE_("A"), ICON_NONE);
-  //if (operation_use_input_b(operation)) {
-  //  uiItemR(layout, ptr, "input_type_b", 0, IFACE_("B"), ICON_NONE);
-  //}
-  //if (operation_use_input_c(operation)) {
-  //  uiItemR(layout, ptr, "input_type_c", 0, IFACE_("C"), ICON_NONE);
-  //}
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "input_type_a", 0, IFACE_("A"), ICON_NONE);
+  if (operation_use_input_b(operation)) {
+    uiItemR(layout, ptr, "input_type_b", 0, IFACE_("B"), ICON_NONE);
+  }
+  if (operation_use_input_c(operation)) {
+    uiItemR(layout, ptr, "input_type_c", 0, IFACE_("C"), ICON_NONE);
+  }
 }
 
 static void geo_node_attribute_math_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -129,14 +129,10 @@ static void geo_node_attribute_math_init(bNodeTree *UNUSED(tree), bNode *node)
   data->input_type_c = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
   node->storage = data;
 
-#define DEF_ATTRIBUTE(_in_out, _name, _data_type) \
-  ((bNodeSocketValueAttribute *)nodeFindSocket(node, (_in_out), (_name))->default_value) \
-      ->data_type = (_data_type);
-
-  DEF_ATTRIBUTE(SOCK_IN, "A", SOCK_FLOAT)
-  DEF_ATTRIBUTE(SOCK_IN, "B", SOCK_FLOAT)
-  DEF_ATTRIBUTE(SOCK_IN, "C", SOCK_FLOAT)
-  DEF_ATTRIBUTE(SOCK_OUT, "Result", SOCK_FLOAT)
+  blender::nodes::set_attribute_socket_data_type(*node, "A", SOCK_FLOAT);
+  blender::nodes::set_attribute_socket_data_type(*node, "B", SOCK_FLOAT);
+  blender::nodes::set_attribute_socket_data_type(*node, "C", SOCK_FLOAT);
+  blender::nodes::set_attribute_socket_data_type(*node, "Result", SOCK_FLOAT);
 }
 
 namespace blender::nodes {

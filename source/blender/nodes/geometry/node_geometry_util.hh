@@ -48,6 +48,11 @@ void update_attribute_input_socket_availabilities(bNode &node,
                                                   const GeometryNodeAttributeInputMode mode,
                                                   const bool name_is_available = true);
 
+void set_attribute_socket_data_type(bNode &node,
+                                    const StringRef name,
+                                    eNodeSocketDatatype data_type);
+void reset_attribute_socket_data_type(bNode &node, const StringRef name);
+
 Array<uint32_t> get_geometry_element_ids_as_uints(const GeometryComponent &component,
                                                   const AttributeDomain domain);
 
