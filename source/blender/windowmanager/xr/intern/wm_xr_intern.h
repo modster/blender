@@ -205,8 +205,10 @@ void wm_xr_session_object_autokey(struct bContext *C,
                                   Object *ob,
                                   bool notify);
 
-void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4]);
-void wm_xr_pose_scale_to_viewmat(const GHOST_XrPose *pose, float scale, float r_viewmat[4][4]);
-void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);
+void wm_xr_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);
+void wm_xr_pose_scale_to_mat(const GHOST_XrPose *pose, float scale, float r_mat[4][4]);
+void wm_xr_pose_to_imat(const GHOST_XrPose *pose, float r_imat[4][4]);
+void wm_xr_pose_scale_to_imat(const GHOST_XrPose *pose, float scale, float r_imat[4][4]);
+;
 void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata);
 void wm_xr_draw_controllers(const struct bContext *C, struct ARegion *region, void *customdata);

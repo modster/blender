@@ -2770,12 +2770,6 @@ static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *e
   int mval[2];
   int retval;
 
-  /* Scale to apply to clip distances. */
-  float viewer_scale = 1.0f;
-#ifdef WITH_XR_OPENXR
-  WM_xr_session_state_viewer_scale_get(xr, &viewer_scale);
-#endif
-
   /* Since this function is called in a window context, we need to replace the
    * window view parameters with the XR surface counterparts to get a correct
    * result for GPU select. */
@@ -2785,8 +2779,8 @@ static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *e
                             v3d,
                             region,
                             actiondata->eye_lens,
-                            xr->session_settings.clip_start * viewer_scale,
-                            xr->session_settings.clip_end * viewer_scale,
+                            xr->session_settings.clip_start,
+                            xr->session_settings.clip_end,
                             actiondata->eye_viewmat);
 
   map_to_pixel(mval,

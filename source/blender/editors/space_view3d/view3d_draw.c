@@ -359,8 +359,10 @@ static void view3d_xr_mirror_setup(const wmWindowManager *wm,
   else {
     v3d->flag2 &= ~V3D_XR_SHOW_CUSTOM_OVERLAYS;
   }
+  /* Hide navigation gizmo. */
+  v3d->gizmo_flag |= V3D_GIZMO_HIDE_NAVIGATE;
 
-  /* Reset overridden View3D data */
+  /* Reset overridden View3D data. */
   v3d->lens = lens_old;
   v3d->clip_start = clip_start_old;
   v3d->clip_end = clip_end_old;

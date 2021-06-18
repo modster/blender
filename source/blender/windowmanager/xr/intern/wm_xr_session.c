@@ -387,31 +387,33 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const float viewmat[4][4],
                                 wmXrSessionState *state)
 {
-  GHOST_XrPose viewer_pose;
-  const bool use_position_tracking = settings->flag & XR_SESSION_USE_POSITION_TRACKING;
-  const bool use_absolute_tracking = settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING;
   wmXrEyeData *eye = &state->eyes[draw_view->view];
-  float q[4];
+  GHOST_XrPose viewer_pose;
+  float viewer_mat[4][4], base_mat[4][4], nav_mat[4][4], m[4][4];
 
-  mul_qt_qtqt(q, draw_data->base_pose.orientation_quat, draw_view->local_pose.orientation_quat);
-  mul_qt_qtqt(viewer_pose.orientation_quat, q, state->nav_pose.orientation_quat);
-  add_v3_v3v3(viewer_pose.position, draw_data->base_pose.position, state->nav_pose.position);
-  /* The local pose and the eye pose (which is copied from an earlier local pose) both are view
-   * space, so Y-up. In this case we need them in regular Z-up. */
-  if (!use_absolute_tracking) {
-    viewer_pose.position[0] -= draw_data->eye_position_ofs[0];
-    viewer_pose.position[1] += draw_data->eye_position_ofs[2];
-    viewer_pose.position[2] -= draw_data->eye_position_ofs[1];
+  /* Calculate viewer matrix. */
+  copy_qt_qt(viewer_pose.orientation_quat, draw_view->local_pose.orientation_quat);
+  if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
+    zero_v3(viewer_pose.position);
   }
-  if (use_position_tracking) {
-    viewer_pose.position[0] += draw_view->local_pose.position[0];
-    viewer_pose.position[1] -= draw_view->local_pose.position[2];
-    viewer_pose.position[2] += draw_view->local_pose.position[1];
+  else {
+    copy_v3_v3(viewer_pose.position, draw_view->local_pose.position);
   }
+  if ((settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING) == 0) {
+    sub_v3_v3(viewer_pose.position, draw_data->eye_position_ofs);
+  }
+  wm_xr_pose_to_mat(&viewer_pose, viewer_mat);
 
-  copy_v3_v3(state->viewer_pose.position, viewer_pose.position);
-  copy_qt_qt(state->viewer_pose.orientation_quat, viewer_pose.orientation_quat);
-  wm_xr_pose_scale_to_viewmat(&viewer_pose, state->nav_scale, state->viewer_viewmat);
+  /* Apply base pose and navigation. */
+  wm_xr_pose_scale_to_mat(&draw_data->base_pose, draw_data->base_scale, base_mat);
+  wm_xr_pose_scale_to_mat(&state->nav_pose, state->nav_scale, nav_mat);
+  mul_m4_m4m4(m, base_mat, viewer_mat);
+  mul_m4_m4m4(viewer_mat, nav_mat, m);
+
+  /* Save final viewer pose and viewmat. */
+  mat4_to_loc_quat(state->viewer_pose.position, state->viewer_pose.orientation_quat, viewer_mat);
+  wm_xr_pose_scale_to_imat(
+      &state->viewer_pose, draw_data->base_scale * state->nav_scale, state->viewer_viewmat);
 
   /* No idea why, but multiplying by two seems to make it match the VR view more. */
   eye->focal_len = 2.0f *
@@ -548,6 +550,7 @@ bool WM_xr_session_state_nav_rotation_get(const wmXrData *xr, float r_rotation[4
 void WM_xr_session_state_nav_rotation_set(wmXrData *xr, const float rotation[4])
 {
   if (WM_xr_session_exists(xr)) {
+    BLI_ASSERT_UNIT_QUAT(rotation);
     copy_qt_qt(xr->runtime->session_state.nav_pose.orientation_quat, rotation);
   }
 }
@@ -566,20 +569,12 @@ bool WM_xr_session_state_nav_scale_get(const wmXrData *xr, float *r_scale)
 void WM_xr_session_state_nav_scale_set(wmXrData *xr, float scale)
 {
   if (WM_xr_session_exists(xr)) {
+#if 0
     /* Clamp to reasonable values. */
     CLAMP(scale, 0.001f, 1000.0f);
+#endif
     xr->runtime->session_state.nav_scale = scale;
   }
-}
-
-bool WM_xr_session_state_viewer_scale_get(const wmXrData *xr, float *r_scale)
-{
-  if (!WM_xr_session_state_nav_scale_get(xr, r_scale)) {
-    return false;
-  }
-
-  *r_scale *= xr->session_settings.base_scale;
-  return true;
 }
 
 void WM_xr_session_state_navigation_reset(wmXrSessionState *state)
@@ -676,26 +671,20 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   Object *ob_constraint = NULL;
   char ob_flag;
-  float view_ofs[3];
-  float base_inv[4][4];
-  float nav_inv[4][4];
-  float m0[4][4], m1[4][4];
+  float view_ofs[3], base_mat[4][4], nav_mat[4][4], m0[4][4], m1[4][4];
 
-  if ((settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING) == 0) {
-    copy_v3_v3(view_ofs, state->prev_eye_position_ofs);
+  if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
+    copy_v3_v3(view_ofs, state->prev_local_pose.position);
   }
   else {
     zero_v3(view_ofs);
   }
-  if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
-    add_v3_v3(view_ofs, state->prev_local_pose.position);
+  if ((settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING) == 0) {
+    add_v3_v3(view_ofs, state->prev_eye_position_ofs);
   }
 
-  wm_xr_pose_scale_to_viewmat(&state->prev_base_pose, state->prev_base_scale, base_inv);
-  invert_m4(base_inv);
-
-  wm_xr_pose_scale_to_viewmat(&state->nav_pose, state->nav_scale, nav_inv);
-  invert_m4(nav_inv);
+  wm_xr_pose_scale_to_mat(&state->prev_base_pose, state->prev_base_scale, base_mat);
+  wm_xr_pose_scale_to_mat(&state->nav_pose, state->nav_scale, nav_mat);
 
   for (unsigned int i = 0; i < count; ++i) {
     wmXrControllerData *controller = &state->controllers[i];
@@ -715,14 +704,14 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
     }
 
     /* Calculate controller matrix in world space. */
-    wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], m0);
+    wm_xr_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], m0);
 
-    /* Apply eye position and base pose offsets. */
+    /* Apply eye position offset. */
     sub_v3_v3(m0[3], view_ofs);
-    mul_m4_m4m4(m1, base_inv, m0);
 
-    /* Apply navigation. */
-    mul_m4_m4m4(controller->mat, nav_inv, m1);
+    /* Apply base pose and navigation. */
+    mul_m4_m4m4(m1, base_mat, m0);
+    mul_m4_m4m4(controller->mat, nav_mat, m1);
 
     /* Save final pose. */
     mat4_to_loc_quat(
