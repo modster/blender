@@ -247,7 +247,7 @@ USDPrimReader *USDStageReader::collect_readers(Main *bmain, const pxr::UsdPrim &
 
     USDPrimReader *child_reader = child_readers.front();
 
-    if (_merge_with_parent(child_reader)) {
+    if (merge_with_parent(child_reader)) {
       return child_reader;
     }
   }
