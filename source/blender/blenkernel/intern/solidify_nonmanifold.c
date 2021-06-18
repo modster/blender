@@ -34,10 +34,6 @@
 #include "BKE_mesh.h"
 #include "BKE_solidifiy.h"
 
-//#include "MOD_modifiertypes.h"
-//#include "MOD_solidify_util.h" /* Own include. */
-//#include "MOD_util.h"
-
 #ifdef __GNUC__
 #  pragma GCC diagnostic error "-Wsign-conversion"
 #endif
@@ -135,22 +131,6 @@ static int comp_float_int_pair(const void *a, const void *b)
   return (int)(x->angle > y->angle) - (int)(x->angle < y->angle);
 }
 
-static void get_vgroup(
-    const Object *ob, struct Mesh *mesh, const char *name, MDeformVert **dvert, int *defgrp_index)
-{
-  *defgrp_index = BKE_object_defgroup_name_index(ob, name);
-  *dvert = NULL;
-
-  if (*defgrp_index != -1) {
-    if (ob->type == OB_LATTICE) {
-      *dvert = BKE_lattice_deform_verts_get(ob);
-    }
-    else if (mesh) {
-      *dvert = mesh->dvert;
-    }
-  }
-}
-
 /* NOLINTNEXTLINE: readability-function-size */
 Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
                            Mesh *mesh,
@@ -196,16 +176,6 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
   const bool do_clamp = (solidify_data->offset_clamp != 0.0f);
 
   const float bevel_convex = solidify_data->bevel_convex;
-
-  MDeformVert *dvert = mesh->dvert;
-  const bool defgrp_invert = (solidify_data->flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
-  int defgrp_index = 0;
-  //  const int shell_defgrp_index =
-  //  BKE_object_defgroup_name_index(solidify_data->object,solidify_data->shell_defgrp_name); const
-  //  int rim_defgrp_index = BKE_object_defgroup_name_index(solidify_data->object,
-  //  solidify_data->rim_defgrp_name);
-
-  get_vgroup(solidify_data->object, mesh, solidify_data->defgrp_name, &dvert, &defgrp_index);
 
   const bool do_flat_faces = solidify_data->flag & MOD_SOLIDIFY_NONMANIFOLD_FLAT_FACES;
 
@@ -1414,12 +1384,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
         int loopend = mp->loopstart + mp->totloop;
         ml = orig_mloop + mp->loopstart;
         for (int j = mp->loopstart; j < loopend; j++, ml++) {
-          if (defgrp_invert) {
-            scalar_vgroup = min_ff(1.0f - solidify_data->distance[i], scalar_vgroup);
-          }
-          else {
             scalar_vgroup = min_ff(solidify_data->distance[i], scalar_vgroup);
-          }
         }
         scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
         face_weight[i] = scalar_vgroup;
@@ -1808,12 +1773,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
             float scalar_vgroup = 1;
             /* Use vertex group. */
             if (!do_flat_faces) {
-              if (defgrp_invert) {
-                scalar_vgroup = 1.0f - solidify_data->distance[i];
-              }
-              else {
-                scalar_vgroup = solidify_data->distance[i];
-              }
+              scalar_vgroup = solidify_data->distance[i];
               scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
             }
             /* Do clamping. */
