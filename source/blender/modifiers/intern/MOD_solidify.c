@@ -88,7 +88,7 @@ static void requiredDataMask(Object *UNUSED(ob),
   }
 }
 
-static float *get_selection(Mesh *mesh, Object *ob, const char name[64])
+static float *get_distance_factor(Mesh *mesh, Object *ob, const char *name, bool invert)
 {
   int defgrp_index = BKE_object_defgroup_name_index(ob, name);
   MDeformVert *dvert = mesh->dvert;
@@ -114,6 +114,12 @@ static float *get_selection(Mesh *mesh, Object *ob, const char name[64])
     }
   }
 
+  if(invert){
+    for (int i = 0; i < mesh->totvert; i++) {
+      selection[i] = 1.0f - selection[i];
+    }
+  }
+
   return selection;
 }
 
@@ -123,9 +129,9 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md,
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
   SolidifyData solidify_data = {
       ctx->object,
-      "",  // smd->defgrp_name,
-      "",  // smd->shell_defgrp_name,
-      "",  // smd->rim_defgrp_name,
+      "",
+      "",
+      "",
       smd->offset,
       smd->offset_fac,
       smd->offset_fac_vg,
@@ -164,7 +170,11 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       return MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
     case MOD_SOLIDIFY_MODE_NONMANIFOLD: {
       SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
-      solidify_data.distance = get_selection(mesh, ctx->object, smd->defgrp_name);
+
+      const bool defgrp_invert = (solidify_data.flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
+      solidify_data.distance = get_distance_factor(
+          mesh, ctx->object, smd->defgrp_name, defgrp_invert);
+
       bool *shell_verts = NULL;
       bool *rim_verts = NULL;
       Mesh *output_mesh = solidify_nonmanifold(&solidify_data, mesh, &shell_verts, &rim_verts);
