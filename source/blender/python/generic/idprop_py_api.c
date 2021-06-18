@@ -1539,16 +1539,70 @@ static bool args_contain_key(PyObject *kwargs, const char *name)
 /**
  * \return False when parsing fails, in which case caller should return NULL.
  */
-static bool idprop_ui_data_update_ui_data_int(IDProperty *idprop,
-                                              const int min,
-                                              const int max,
-                                              const int soft_min,
-                                              const int soft_max,
-                                              const int step,
-                                              PyObject *py_default,
-                                              PyObject *kwargs)
+static bool idprop_ui_data_update_base(IDProperty *idprop,
+                                       const char *rna_subtype,
+                                       const char *description)
 {
+  if (rna_subtype != NULL) {
+    int result = PROP_NONE;
+    if (!RNA_enum_value_from_id(rna_enum_property_subtype_items, rna_subtype, &result)) {
+      PyErr_SetString(PyExc_KeyError, "RNA subtype not found");
+      return false;
+    }
+    idprop->ui_data->rna_subtype = result;
+  }
+
+  if (description != NULL) {
+    idprop->ui_data->description = BLI_strdup(description);
+  }
+
+  return true;
+}
+
+/**
+ * \return False when parsing fails, in which case caller should return NULL.
+ */
+static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObject *kwargs)
+{
+  /* Base class data included here to allow parsing all arguments at once. */
+  const char *dummy_key;
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
+
+  int min, max, soft_min, soft_max, step;
+  PyObject *py_default = NULL;
+  const char *kwlist[] = {"key",
+                          "min",
+                          "max",
+                          "soft_min",
+                          "soft_max",
+                          "step",
+                          "default",
+                          "subtype",
+                          "description",
+                          NULL};
+  if (!PyArg_ParseTupleAndKeywords(args,
+                                   kwargs,
+                                   "s|$iiiiiOzz:ui_data_update",
+                                   (char **)kwlist,
+                                   &dummy_key,
+                                   &min,
+                                   &max,
+                                   &soft_min,
+                                   &soft_max,
+                                   &step,
+                                   &py_default,
+                                   &rna_subtype,
+                                   &description)) {
+    return false;
+  }
+
+  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+    return false;
+  }
+
   IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)idprop->ui_data;
+
   if (args_contain_key(kwargs, "min")) {
     ui_data->min = min;
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
@@ -1613,17 +1667,50 @@ static bool idprop_ui_data_update_ui_data_int(IDProperty *idprop,
 /**
  * \return False when parsing fails, in which case caller should return NULL.
  */
-static bool idprop_ui_data_update_ui_data_float(IDProperty *idprop,
-                                                const double min,
-                                                const double max,
-                                                const double soft_min,
-                                                const double soft_max,
-                                                const float step,
-                                                const int precision,
-                                                PyObject *py_default,
-                                                PyObject *kwargs)
+static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
+  /* Base class data included here to allow parsing all arguments at once. */
+  const char *dummy_key;
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
+
+  int precision;
+  double min, max, soft_min, soft_max, step;
+  PyObject *default_value = NULL;
+  const char *kwlist[] = {"key",
+                          "min",
+                          "max",
+                          "soft_min",
+                          "soft_max",
+                          "step",
+                          "precision",
+                          "default",
+                          "subtype",
+                          "description",
+                          NULL};
+  if (!PyArg_ParseTupleAndKeywords(args,
+                                   kwargs,
+                                   "s|$dddddiOzz:ui_data_update",
+                                   (char **)kwlist,
+                                   &dummy_key,
+                                   &min,
+                                   &max,
+                                   &soft_min,
+                                   &soft_max,
+                                   &step,
+                                   &precision,
+                                   &default_value,
+                                   &rna_subtype,
+                                   &description)) {
+    return false;
+  }
+
+  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+    return false;
+  }
+
   IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
+
   if (args_contain_key(kwargs, "min")) {
     ui_data->min = min;
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
@@ -1654,15 +1741,15 @@ static bool idprop_ui_data_update_ui_data_float(IDProperty *idprop,
   /* The default value needs special handling because for array IDProperties it can be a single
    * value or an array, but for non-array properties it can only be a value. Parse it once as a
    * generic object to check if it was passed as an array. */
-  if (!ELEM(py_default, NULL, Py_None)) {
-    if (PySequence_Check(py_default)) {
+  if (!ELEM(default_value, NULL, Py_None)) {
+    if (PySequence_Check(default_value)) {
       if (idprop->type != IDP_ARRAY) {
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
         return false;
       }
       MEM_SAFE_FREE(ui_data->default_array);
-      PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(py_default);
-      Py_ssize_t len = PySequence_Fast_GET_SIZE(py_default);
+      PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(default_value);
+      Py_ssize_t len = PySequence_Fast_GET_SIZE(default_value);
 
       ui_data->default_array_len = len;
       ui_data->default_array = MEM_malloc_arrayN(len, sizeof(double), __func__);
@@ -1676,13 +1763,78 @@ static bool idprop_ui_data_update_ui_data_float(IDProperty *idprop,
       }
     }
     else {
-      const double value = PyFloat_AsDouble(py_default);
+      const double value = PyFloat_AsDouble(default_value);
       if ((value == -1.0) && PyErr_Occurred()) {
         PyErr_SetString(PyExc_ValueError, "Error converting \"default\" argument to double");
         return false;
       }
       ui_data->default_value = value;
     }
+  }
+
+  return true;
+}
+
+/**
+ * \return False when parsing fails, in which case caller should return NULL.
+ */
+static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyObject *kwargs)
+{
+  /* Base class data included here to allow parsing all arguments at once. */
+  const char *dummy_key;
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
+
+  const char *default_value;
+  const char *kwlist[] = {"key", "default", "subtype", "description", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args,
+                                   kwargs,
+                                   "s|$zzz:ui_data_update",
+                                   (char **)kwlist,
+                                   &dummy_key,
+                                   &default_value,
+                                   &rna_subtype,
+                                   &description)) {
+    return false;
+  }
+
+  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+    return false;
+  }
+
+  IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
+
+  if (default_value != NULL) {
+    MEM_SAFE_FREE(ui_data->default_value);
+    ui_data->default_value = BLI_strdup(default_value);
+  }
+
+  return true;
+}
+
+/**
+ * \return False when parsing fails, in which case caller should return NULL.
+ */
+static bool idprop_ui_data_update_id(IDProperty *idprop, PyObject *args, PyObject *kwargs)
+{
+  /* Base class data included here to allow parsing all arguments at once. */
+  const char *dummy_key;
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
+
+  const char *kwlist[] = {"key", "subtype", "description", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args,
+                                   kwargs,
+                                   "s|$zz:ui_data_update",
+                                   (char **)kwlist,
+                                   &dummy_key,
+                                   &rna_subtype,
+                                   &description)) {
+    return false;
+  }
+
+  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+    return false;
   }
 
   return true;
@@ -1706,6 +1858,8 @@ PyDoc_STRVAR(BPy_IDGroup_ui_data_update_doc,
              "   depend on the type of the property.\n ");
 static PyObject *BPy_IDGroup_ui_data_update(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
+  /* First extract the key as only positional-only argument in order to choose a different
+   * parsing call based on the IDProperty's type. */
   const char *key;
   if (!PyArg_ParseTuple(args, "s", &key)) {
     return NULL;
@@ -1717,123 +1871,42 @@ static PyObject *BPy_IDGroup_ui_data_update(BPy_IDProperty *self, PyObject *args
     return NULL;
   }
 
-  if (!IDP_ui_data_supported(idprop)) {
-    PyErr_Format(PyExc_KeyError, "IDProperty \"%s\" does not support RNA data", idprop->name);
-    return NULL;
-  }
-
-  IDP_ui_data_ensure(idprop);
-
-  const char *rna_subtype = NULL;
-  const char *description = NULL;
   switch (IDP_ui_data_type(idprop)) {
     case IDP_UI_DATA_TYPE_INT: {
-      int min, max, soft_min, soft_max, step;
-      PyObject *default_value = NULL;
-      const char *kwlist[] = {"key",
-                              "min",
-                              "max",
-                              "soft_min",
-                              "soft_max",
-                              "step",
-                              "default",
-                              "subtype",
-                              "description",
-                              NULL};
-      if (!PyArg_ParseTupleAndKeywords(args,
-                                       kwargs,
-                                       "s|$iiiiiOzz:ui_data_update",
-                                       (char **)kwlist,
-                                       &key,
-                                       &min,
-                                       &max,
-                                       &soft_min,
-                                       &soft_max,
-                                       &step,
-                                       &default_value,
-                                       &rna_subtype,
-                                       &description)) {
+      IDP_ui_data_ensure(idprop);
+      if (!idprop_ui_data_update_int(idprop, args, kwargs)) {
         return NULL;
       }
-      if (!idprop_ui_data_update_ui_data_int(
-              idprop, min, max, soft_min, soft_max, step, default_value, kwargs)) {
-        return NULL;
-      }
-      break;
+      Py_RETURN_NONE;
     }
     case IDP_UI_DATA_TYPE_FLOAT: {
-      int precision;
-      double min, max, soft_min, soft_max, step;
-      PyObject *default_value = NULL;
-      const char *kwlist[] = {"key",
-                              "min",
-                              "max",
-                              "soft_min",
-                              "soft_max",
-                              "step",
-                              "precision",
-                              "default",
-                              "subtype",
-                              "description",
-                              NULL};
-      if (!PyArg_ParseTupleAndKeywords(args,
-                                       kwargs,
-                                       "s|$dddddiOzz:ui_data_update",
-                                       (char **)kwlist,
-                                       &key,
-                                       &min,
-                                       &max,
-                                       &soft_min,
-                                       &soft_max,
-                                       &step,
-                                       &precision,
-                                       &default_value,
-                                       &rna_subtype,
-                                       &description)) {
+      IDP_ui_data_ensure(idprop);
+      if (!idprop_ui_data_update_float(idprop, args, kwargs)) {
         return NULL;
       }
-      if (!idprop_ui_data_update_ui_data_float(
-              idprop, min, max, soft_min, soft_max, step, precision, default_value, kwargs)) {
-        return NULL;
-      }
-      break;
+      Py_RETURN_NONE;
     }
     case IDP_UI_DATA_TYPE_STRING: {
-      const char *default_value;
-      const char *kwlist[] = {"key", "default", "subtype", "description", NULL};
-      if (!PyArg_ParseTupleAndKeywords(
-              args, kwargs, "s|$zzz:ui_data_update", (char **)kwlist, &key, &default_value)) {
-        return false;
+      IDP_ui_data_ensure(idprop);
+      if (!idprop_ui_data_update_string(idprop, args, kwargs)) {
+        return NULL;
       }
-      if (default_value != NULL) {
-        IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
-        MEM_SAFE_FREE(ui_data->default_value);
-        ui_data->default_value = BLI_strdup(default_value);
-      }
-      break;
+      Py_RETURN_NONE;
     }
     case IDP_UI_DATA_TYPE_ID: {
-      break;
+      IDP_ui_data_ensure(idprop);
+      if (!idprop_ui_data_update_id(idprop, args, kwargs)) {
+        return NULL;
+      }
+      Py_RETURN_NONE;
     }
     case IDP_UI_DATA_TYPE_UNSUPPORTED: {
-      /* Handled above. */
-      BLI_assert_unreachable();
-    }
-  }
-
-  if (rna_subtype != NULL) {
-    int result = PROP_NONE;
-    if (!RNA_enum_value_from_id(rna_enum_property_subtype_items, rna_subtype, &result)) {
-      PyErr_SetString(PyExc_KeyError, "RNA subtype not found");
+      PyErr_Format(PyExc_KeyError, "IDProperty \"%s\" does not support RNA data", idprop->name);
       return NULL;
     }
-    idprop->ui_data->rna_subtype = result;
   }
 
-  if (description != NULL) {
-    idprop->ui_data->description = BLI_strdup(description);
-  }
-
+  BLI_assert_unreachable();
   Py_RETURN_NONE;
 }
 
@@ -1902,7 +1975,9 @@ static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
   IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
   PyObject *item;
 
-  PyDict_SetItemString(dict, "default", item = PyUnicode_FromString(ui_data->default_value));
+  const char *default_value = (ui_data->default_value == NULL) ? "" : ui_data->default_value;
+
+  PyDict_SetItemString(dict, "default", item = PyUnicode_FromString(default_value));
   Py_DECREF(item);
 }
 
