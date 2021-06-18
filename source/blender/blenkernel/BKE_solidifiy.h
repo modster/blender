@@ -41,7 +41,10 @@ typedef struct SolidifyData {
   float *distance;
 } SolidifyData;
 
-Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool **r_shell_verts, bool **r_rim_verts);
+Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
+                           Mesh *mesh,
+                           bool **r_shell_verts,
+                           bool **r_rim_verts);
 
 #ifdef __cplusplus
 }

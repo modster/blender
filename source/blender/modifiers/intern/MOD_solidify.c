@@ -21,21 +21,21 @@
  * \ingroup modifiers
  */
 
+#include "stdio.h"
 #include <BLI_string.h>
 #include <MEM_guardedalloc.h>
 #include <string.h>
-#include "stdio.h"
 
 #include "BLI_utildefines.h"
 
-#include "BLT_translation.h"
 #include "BKE_lattice.h"
+#include "BLT_translation.h"
 
 #include "DNA_defaults.h"
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
-#include "DNA_meshdata_types.h"
 
 #include "BKE_context.h"
 #include "BKE_deform.h"
@@ -88,11 +88,12 @@ static void requiredDataMask(Object *UNUSED(ob),
   }
 }
 
-static float* get_selection(Mesh *mesh, Object *ob, const char name[64]){
+static float *get_selection(Mesh *mesh, Object *ob, const char name[64])
+{
   int defgrp_index = BKE_object_defgroup_name_index(ob, name);
   MDeformVert *dvert = mesh->dvert;
 
-  float *selection = MEM_callocN(sizeof(float) * (unsigned long)mesh->totvert, __func__ );
+  float *selection = MEM_callocN(sizeof(float) * (unsigned long)mesh->totvert, __func__);
 
   if (defgrp_index != -1) {
     if (ob->type == OB_LATTICE) {
@@ -107,7 +108,7 @@ static float* get_selection(Mesh *mesh, Object *ob, const char name[64]){
       }
     }
   }
-  else{
+  else {
     for (int i = 0; i < mesh->totvert; i++) {
       selection[i] = 1.0f;
     }
@@ -116,13 +117,15 @@ static float* get_selection(Mesh *mesh, Object *ob, const char name[64]){
   return selection;
 }
 
-static const SolidifyData solidify_data_from_modifier_data(ModifierData *md, const ModifierEvalContext *ctx){
+static const SolidifyData solidify_data_from_modifier_data(ModifierData *md,
+                                                           const ModifierEvalContext *ctx)
+{
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
   SolidifyData solidify_data = {
       ctx->object,
-      "",//smd->defgrp_name,
-      "",//smd->shell_defgrp_name,
-      "",//smd->rim_defgrp_name,
+      "",  // smd->defgrp_name,
+      "",  // smd->shell_defgrp_name,
+      "",  // smd->rim_defgrp_name,
       smd->offset,
       smd->offset_fac,
       smd->offset_fac_vg,
@@ -145,7 +148,7 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md, con
   BLI_strncpy(solidify_data.shell_defgrp_name, smd->shell_defgrp_name, MAX_NAME);
   BLI_strncpy(solidify_data.rim_defgrp_name, smd->rim_defgrp_name, MAX_NAME);
 
-  if(!(smd->flag & MOD_SOLIDIFY_NOSHELL)){
+  if (!(smd->flag & MOD_SOLIDIFY_NOSHELL)) {
     solidify_data.flag |= MOD_SOLIDIFY_SHELL;
   }
 
