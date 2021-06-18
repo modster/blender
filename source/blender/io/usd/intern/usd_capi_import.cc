@@ -500,8 +500,8 @@ CacheReader *CacheReader_open_usd_object(CacheArchiveHandle *handle,
     USD_CacheReader_free(reader);
   }
 
-  // TODO: The handle does not have the proper import params or settings
-  USDPrimReader *usd_reader = USDStageReader::create_reader(archive, prim);
+  /* TODO(makowalski): The handle does not have the proper import params or settings. */
+  USDPrimReader *usd_reader = archive->create_reader(prim);
 
   if (usd_reader == NULL) {
     /* This object is not supported */

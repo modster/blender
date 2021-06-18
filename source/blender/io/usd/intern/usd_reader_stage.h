@@ -49,14 +49,9 @@ class USDStageReader {
   USDStageReader(const char *filename);
   ~USDStageReader();
 
-  static USDPrimReader *create_reader(const pxr::UsdPrim &prim,
-                                      const USDImportParams &params,
-                                      const ImportSettings &settings);
+  USDPrimReader *create_reader_if_allowed(const pxr::UsdPrim &prim);
 
-  // This version of create_reader() does not filter by primitive type.  I.e.,
-  // it will convert any prim to a reader, if possible, regardless of the
-  // primitive types specified by the user in the import options.
-  static USDPrimReader *create_reader(const USDStageReader *archive, const pxr::UsdPrim &prim);
+  USDPrimReader *create_reader(const pxr::UsdPrim &prim);
 
   void collect_readers(struct Main *bmain,
                        const USDImportParams &params,

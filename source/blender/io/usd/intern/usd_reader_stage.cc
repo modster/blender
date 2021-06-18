@@ -59,63 +59,59 @@ bool USDStageReader::valid() const
   return stage_;
 }
 
-USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim,
-                                             const USDImportParams &params,
-                                             const ImportSettings &settings)
+USDPrimReader *USDStageReader::create_reader_if_allowed(const pxr::UsdPrim &prim)
 {
   USDPrimReader *reader = nullptr;
 
-  if (params.import_cameras && prim.IsA<pxr::UsdGeomCamera>()) {
-    reader = new USDCameraReader(prim, params, settings);
+  if (params_.import_cameras && prim.IsA<pxr::UsdGeomCamera>()) {
+    reader = new USDCameraReader(prim, params_, settings_);
   }
-  else if (params.import_curves && prim.IsA<pxr::UsdGeomBasisCurves>()) {
-    reader = new USDCurvesReader(prim, params, settings);
+  else if (params_.import_curves && prim.IsA<pxr::UsdGeomBasisCurves>()) {
+    reader = new USDCurvesReader(prim, params_, settings_);
   }
-  else if (params.import_curves && prim.IsA<pxr::UsdGeomNurbsCurves>()) {
-    reader = new USDNurbsReader(prim, params, settings);
+  else if (params_.import_curves && prim.IsA<pxr::UsdGeomNurbsCurves>()) {
+    reader = new USDNurbsReader(prim, params_, settings_);
   }
-  else if (params.import_meshes && prim.IsA<pxr::UsdGeomMesh>()) {
-    reader = new USDMeshReader(prim, params, settings);
+  else if (params_.import_meshes && prim.IsA<pxr::UsdGeomMesh>()) {
+    reader = new USDMeshReader(prim, params_, settings_);
   }
-  else if (params.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
-    reader = new USDLightReader(prim, params, settings);
+  else if (params_.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
+    reader = new USDLightReader(prim, params_, settings_);
   }
-  else if (params.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
-    reader = new USDVolumeReader(prim, params, settings);
+  else if (params_.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
+    reader = new USDVolumeReader(prim, params_, settings_);
   }
   else if (prim.IsA<pxr::UsdGeomImageable>()) {
-    reader = new USDXformReader(prim, params, settings);
+    reader = new USDXformReader(prim, params_, settings_);
   }
 
   return reader;
 }
 
-// TODO(makowalski): The handle does not have the proper import params or settings
-USDPrimReader *USDStageReader::create_reader(const USDStageReader *archive,
-                                             const pxr::UsdPrim &prim)
+USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim)
 {
   USDPrimReader *reader = nullptr;
 
   if (prim.IsA<pxr::UsdGeomCamera>()) {
-    reader = new USDCameraReader(prim, archive->params(), archive->settings());
+    reader = new USDCameraReader(prim, params_, settings_);
   }
   else if (prim.IsA<pxr::UsdGeomBasisCurves>()) {
-    reader = new USDCurvesReader(prim, archive->params(), archive->settings());
+    reader = new USDCurvesReader(prim, params_, settings_);
   }
   else if (prim.IsA<pxr::UsdGeomNurbsCurves>()) {
-    reader = new USDNurbsReader(prim, archive->params(), archive->settings());
+    reader = new USDNurbsReader(prim, params_, settings_);
   }
   else if (prim.IsA<pxr::UsdGeomMesh>()) {
-    reader = new USDMeshReader(prim, archive->params(), archive->settings());
+    reader = new USDMeshReader(prim, params_, settings_);
   }
   else if (prim.IsA<pxr::UsdLuxLight>()) {
-    reader = new USDLightReader(prim, archive->params(), archive->settings());
+    reader = new USDLightReader(prim, params_, settings_);
   }
   else if (prim.IsA<pxr::UsdVolVolume>()) {
-    reader = new USDVolumeReader(prim, archive->params(), archive->settings());
+    reader = new USDVolumeReader(prim, params_, settings_);
   }
   else if (prim.IsA<pxr::UsdGeomImageable>()) {
-    reader = new USDXformReader(prim, archive->params(), archive->settings());
+    reader = new USDXformReader(prim, params_, settings_);
   }
   return reader;
 }
@@ -258,7 +254,7 @@ USDPrimReader *USDStageReader::collect_readers(Main *bmain, const pxr::UsdPrim &
     }
   }
 
-  USDPrimReader *reader = USDStageReader::create_reader(prim, params_, settings_);
+  USDPrimReader *reader = create_reader_if_allowed(prim);
 
   if (!reader) {
     return nullptr;
