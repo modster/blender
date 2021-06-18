@@ -242,7 +242,6 @@ set(SRC
   intern/shrinkwrap.c
   intern/simulation.cc
   intern/softbody.c
-  intern/solidify_extrude.c
   intern/solidify_nonmanifold.c
   intern/sound.c
   intern/speaker.c

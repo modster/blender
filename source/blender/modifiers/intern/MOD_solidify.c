@@ -88,7 +88,7 @@ static void requiredDataMask(Object *UNUSED(ob),
   }
 }
 
-static float* get_selection(Mesh *mesh, Object *ob, char name[64]){
+static float* get_selection(Mesh *mesh, Object *ob, const char name[64]){
   int defgrp_index = BKE_object_defgroup_name_index(ob, name);
   MDeformVert *dvert = mesh->dvert;
 
@@ -118,7 +118,7 @@ static float* get_selection(Mesh *mesh, Object *ob, char name[64]){
 
 static const SolidifyData solidify_data_from_modifier_data(ModifierData *md, const ModifierEvalContext *ctx){
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
-  const SolidifyData solidify_data = {
+  SolidifyData solidify_data = {
       ctx->object,
       "",//smd->defgrp_name,
       "",//smd->shell_defgrp_name,
@@ -141,9 +141,13 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md, con
       NULL,
   };
 
-  BLI_strcpy_rlen(solidify_data.defgrp_name, smd->defgrp_name);
-  BLI_strcpy_rlen(solidify_data.shell_defgrp_name, smd->shell_defgrp_name);
-  BLI_strcpy_rlen(solidify_data.rim_defgrp_name, smd->rim_defgrp_name);
+  BLI_strncpy(solidify_data.defgrp_name, smd->defgrp_name, MAX_NAME);
+  BLI_strncpy(solidify_data.shell_defgrp_name, smd->shell_defgrp_name, MAX_NAME);
+  BLI_strncpy(solidify_data.rim_defgrp_name, smd->rim_defgrp_name, MAX_NAME);
+
+  if(!(smd->flag & MOD_SOLIDIFY_NOSHELL)){
+    solidify_data.flag |= MOD_SOLIDIFY_SHELL;
+  }
 
   return solidify_data;
 }
@@ -151,17 +155,51 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md, con
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
-  SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
-
-  solidify_data.distance = get_selection(mesh, ctx->object, smd->defgrp_name);
-  bool *shell_verts;
-  bool *rim_verts;
 
   switch (smd->mode) {
     case MOD_SOLIDIFY_MODE_EXTRUDE:
-      return solidify_extrude(&solidify_data, mesh);//MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
-    case MOD_SOLIDIFY_MODE_NONMANIFOLD:
-      return solidify_nonmanifold(&solidify_data, mesh, shell_verts, rim_verts);//MOD_solidify_nonmanifold_modifyMesh(md, ctx, mesh);
+      return MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
+    case MOD_SOLIDIFY_MODE_NONMANIFOLD: {
+      SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
+      solidify_data.distance = get_selection(mesh, ctx->object, smd->defgrp_name);
+      bool *shell_verts = NULL;
+      bool *rim_verts = NULL;
+      Mesh *output_mesh = solidify_nonmanifold(&solidify_data, mesh, &shell_verts, &rim_verts);
+
+      const int shell_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
+                                                                    smd->shell_defgrp_name);
+      const int rim_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
+                                                                  smd->rim_defgrp_name);
+
+      MDeformVert *dvert;
+      if (shell_defgrp_index != -1 || rim_defgrp_index != -1) {
+        dvert = CustomData_duplicate_referenced_layer(
+            &output_mesh->vdata, CD_MDEFORMVERT, output_mesh->totvert);
+        /* If no vertices were ever added to an object's vgroup, dvert might be NULL. */
+        if (dvert == NULL) {
+          /* Add a valid data layer! */
+          dvert = CustomData_add_layer(
+              &output_mesh->vdata, CD_MDEFORMVERT, CD_CALLOC, NULL, output_mesh->totvert);
+        }
+        output_mesh->dvert = dvert;
+        if ((solidify_data.flag & MOD_SOLIDIFY_SHELL) && shell_defgrp_index != -1) {
+          for (int i = 0; i < output_mesh->totvert; i++) {
+            BKE_defvert_ensure_index(&output_mesh->dvert[i], shell_defgrp_index)->weight =
+                shell_verts[i];
+          }
+        }
+        if ((solidify_data.flag & MOD_SOLIDIFY_RIM) && rim_defgrp_index != -1) {
+          for (int i = 0; i < output_mesh->totvert; i++) {
+            BKE_defvert_ensure_index(&output_mesh->dvert[i], rim_defgrp_index)->weight =
+                rim_verts[i];
+          }
+        }
+      }
+      MEM_freeN(solidify_data.distance);
+      MEM_freeN(shell_verts);
+      MEM_freeN(rim_verts);
+      return output_mesh;
+    }
     default:
       BLI_assert(0);
   }
