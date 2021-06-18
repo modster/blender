@@ -173,7 +173,7 @@ bool USDStageReader::prune_by_purpose(const pxr::UsdGeomImageable &imageable) co
 /* Determine if the given reader can use the parent of the encapsulated USD prim
  * to compute the Blender object's transform. If so, the reader is appropriately
  * flagged and the function returns true. Otherwise, the function returns false. */
-static bool _merge_with_parent(USDPrimReader *reader)
+static bool merge_with_parent(USDPrimReader *reader)
 {
   USDXformReader *xform_reader = dynamic_cast<USDXformReader *>(reader);
 
