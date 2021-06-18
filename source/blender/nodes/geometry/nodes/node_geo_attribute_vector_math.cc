@@ -26,12 +26,12 @@
 
 static bNodeSocketTemplate geo_node_attribute_vector_math_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_ATTRIBUTE, N_("A")},
+    {SOCK_ATTRIBUTE, N_("A"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_VECTOR, N_("A"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_ATTRIBUTE, N_("B")},
+    {SOCK_ATTRIBUTE, N_("B"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_VECTOR, N_("B"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("B"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_ATTRIBUTE, N_("C")},
+    {SOCK_ATTRIBUTE, N_("C"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_VECTOR, N_("C"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("C"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {-1, ""},
@@ -404,15 +404,8 @@ static void do_math_operation_fl3_to_fl(const VArray<float3> &input_a,
 
 static AttributeDomain get_result_domain(const GeometryComponent &component,
                                          const GeoNodeExecParams &params,
-                                         const NodeVectorMathOperation operation,
-                                         StringRef result_name)
+                                         const NodeVectorMathOperation operation)
 {
-  /* Use the domain of the result attribute if it already exists. */
-  ReadAttributeLookup result_attribute = component.attribute_try_get_for_read(result_name);
-  if (result_attribute) {
-    return result_attribute.domain;
-  }
-
   /* Otherwise use the highest priority domain from existing input attributes, or the default. */
   const AttributeDomain default_domain = ATTR_DOMAIN_POINT;
   if (operation_use_input_b(operation)) {
@@ -425,12 +418,11 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
 }
 
 static void attribute_vector_math_calc(GeometryComponent &component,
-                                       const GeoNodeExecParams &params)
+                                       GeoNodeExecParams &params)
 {
   const bNode &node = params.node();
   const NodeAttributeVectorMath *node_storage = (const NodeAttributeVectorMath *)node.storage;
   const NodeVectorMathOperation operation = (NodeVectorMathOperation)node_storage->operation;
-  const std::string result_name = params.get_input<std::string>("Result");
 
   /* The number and type of the input attribute depend on the operation. */
   const CustomDataType read_type_a = CD_PROP_FLOAT3;
@@ -441,8 +433,7 @@ static void attribute_vector_math_calc(GeometryComponent &component,
 
   /* The result domain is always point for now. */
   const CustomDataType result_type = operation_get_result_type(operation);
-  const AttributeDomain result_domain = get_result_domain(
-      component, params, operation, result_name);
+  const AttributeDomain result_domain = get_result_domain(component, params, operation);
 
   GVArrayPtr attribute_a = params.get_input_attribute(
       "A", component, result_domain, read_type_a, nullptr);
@@ -465,8 +456,9 @@ static void attribute_vector_math_calc(GeometryComponent &component,
   }
 
   /* Get result attribute first, in case it has to overwrite one of the existing attributes. */
+  AttributeRef result_ref = AttributeRef("DummyName this will be auto generated", result_domain, result_type);
   OutputAttribute attribute_result = component.attribute_try_get_for_output_only(
-      result_name, result_domain, result_type);
+      result_ref.name(), result_ref.domain(), result_ref.data_type());
   if (!attribute_result) {
     return;
   }
@@ -534,11 +526,12 @@ static void attribute_vector_math_calc(GeometryComponent &component,
       break;
   }
   attribute_result.save();
+
+  params.set_output("Result", result_ref);
 }
 
 static void geo_node_attribute_vector_math_exec(GeoNodeExecParams params)
 {
-  return;
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = geometry_set_realize_instances(geometry_set);

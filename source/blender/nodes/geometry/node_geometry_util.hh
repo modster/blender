@@ -51,6 +51,9 @@ void update_attribute_input_socket_availabilities(bNode &node,
 void set_attribute_socket_data_type(bNode &node,
                                     const StringRef name,
                                     eNodeSocketDatatype data_type);
+void set_attribute_socket_data_type(bNode &node,
+                                    const StringRef name,
+                                    CustomDataType custom_data_type);
 void reset_attribute_socket_data_type(bNode &node, const StringRef name);
 
 Array<uint32_t> get_geometry_element_ids_as_uints(const GeometryComponent &component,

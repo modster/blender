@@ -72,6 +72,39 @@ void set_attribute_socket_data_type(bNode &node,
   }
 }
 
+static eNodeSocketDatatype get_socket_type_from_customdata(CustomDataType custom_data_type)
+{
+  switch (custom_data_type) {
+    case CD_AUTO_FROM_NAME:
+      return SOCK_ATTRIBUTE;
+    case CD_PROP_FLOAT:
+      return SOCK_FLOAT;
+    case CD_PROP_INT32:
+      return SOCK_INT;
+    case CD_PROP_FLOAT3:
+      return SOCK_VECTOR;
+    case CD_PROP_COLOR:
+      return SOCK_RGBA;
+    case CD_MLOOPCOL:
+      return SOCK_RGBA;
+    case CD_PROP_STRING:
+      return SOCK_STRING;
+    case CD_PROP_BOOL:
+      return SOCK_BOOLEAN;
+    case CD_PROP_FLOAT2:
+      return SOCK_VECTOR;
+    default:
+      BLI_assert_unreachable();
+  }
+}
+
+void set_attribute_socket_data_type(bNode &node,
+                                    const StringRef name,
+                                    CustomDataType custom_data_type)
+{
+  set_attribute_socket_data_type(node, name, get_socket_type_from_customdata(custom_data_type));
+}
+
 void reset_attribute_socket_data_type(bNode &node, const StringRef name)
 {
   set_attribute_socket_data_type(node, name, SOCK_ATTRIBUTE);

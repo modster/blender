@@ -54,12 +54,16 @@ static void geo_node_attribute_get_init(bNodeTree *UNUSED(tree), bNode *node)
   node->custom2 = ATTR_DOMAIN_AUTO;
 }
 
+static void geo_node_attribute_vector_math_update(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  blender::nodes::set_attribute_socket_data_type(
+      *node, "Attribute", (CustomDataType)node->custom1);
+}
+
 namespace blender::nodes {
 
 static void geo_node_attribute_get_exec(GeoNodeExecParams params)
 {
-  params.set_output("Attribute", AttributeRef::None);
-
   const CustomDataType data_type = (CustomDataType)params.node().custom1;
   const AttributeDomain domain = (AttributeDomain)params.node().custom2;
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -91,6 +95,7 @@ void register_node_type_geo_attribute_get()
   geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_GET, "Attribute Get", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_attribute_get_in, geo_node_attribute_get_out);
   node_type_init(&ntype, geo_node_attribute_get_init);
+  node_type_update(&ntype, geo_node_attribute_vector_math_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_get_exec;
   ntype.draw_buttons = geo_node_attribute_get_layout;
   nodeRegisterType(&ntype);

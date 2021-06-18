@@ -66,4 +66,9 @@ uint64_t AttributeRef::hash() const
   return reinterpret_cast<uint64_t>(this);
 }
 
+bool AttributeRef::valid() const
+{
+  return !name_.empty();
+}
+
 MAKE_CPP_TYPE(AttributeRef, AttributeRef);
