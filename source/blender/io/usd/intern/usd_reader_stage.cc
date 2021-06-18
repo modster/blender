@@ -61,59 +61,55 @@ bool USDStageReader::valid() const
 
 USDPrimReader *USDStageReader::create_reader_if_allowed(const pxr::UsdPrim &prim)
 {
-  USDPrimReader *reader = nullptr;
-
   if (params_.import_cameras && prim.IsA<pxr::UsdGeomCamera>()) {
-    reader = new USDCameraReader(prim, params_, settings_);
+    return new USDCameraReader(prim, params_, settings_);
   }
-  else if (params_.import_curves && prim.IsA<pxr::UsdGeomBasisCurves>()) {
-    reader = new USDCurvesReader(prim, params_, settings_);
+  if (params_.import_curves && prim.IsA<pxr::UsdGeomBasisCurves>()) {
+    return new USDCurvesReader(prim, params_, settings_);
   }
-  else if (params_.import_curves && prim.IsA<pxr::UsdGeomNurbsCurves>()) {
-    reader = new USDNurbsReader(prim, params_, settings_);
+  if (params_.import_curves && prim.IsA<pxr::UsdGeomNurbsCurves>()) {
+    return new USDNurbsReader(prim, params_, settings_);
   }
-  else if (params_.import_meshes && prim.IsA<pxr::UsdGeomMesh>()) {
-    reader = new USDMeshReader(prim, params_, settings_);
+  if (params_.import_meshes && prim.IsA<pxr::UsdGeomMesh>()) {
+    return new USDMeshReader(prim, params_, settings_);
   }
-  else if (params_.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
-    reader = new USDLightReader(prim, params_, settings_);
+  if (params_.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
+    return new USDLightReader(prim, params_, settings_);
   }
-  else if (params_.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
-    reader = new USDVolumeReader(prim, params_, settings_);
+  if (params_.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
+    return new USDVolumeReader(prim, params_, settings_);
   }
-  else if (prim.IsA<pxr::UsdGeomImageable>()) {
-    reader = new USDXformReader(prim, params_, settings_);
+  if (prim.IsA<pxr::UsdGeomImageable>()) {
+    return new USDXformReader(prim, params_, settings_);
   }
 
-  return reader;
+  return nullptr;
 }
 
 USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim)
 {
-  USDPrimReader *reader = nullptr;
-
   if (prim.IsA<pxr::UsdGeomCamera>()) {
-    reader = new USDCameraReader(prim, params_, settings_);
+    return new USDCameraReader(prim, params_, settings_);
   }
-  else if (prim.IsA<pxr::UsdGeomBasisCurves>()) {
-    reader = new USDCurvesReader(prim, params_, settings_);
+  if (prim.IsA<pxr::UsdGeomBasisCurves>()) {
+    return new USDCurvesReader(prim, params_, settings_);
   }
-  else if (prim.IsA<pxr::UsdGeomNurbsCurves>()) {
-    reader = new USDNurbsReader(prim, params_, settings_);
+  if (prim.IsA<pxr::UsdGeomNurbsCurves>()) {
+    return new USDNurbsReader(prim, params_, settings_);
   }
-  else if (prim.IsA<pxr::UsdGeomMesh>()) {
-    reader = new USDMeshReader(prim, params_, settings_);
+  if (prim.IsA<pxr::UsdGeomMesh>()) {
+    return new USDMeshReader(prim, params_, settings_);
   }
-  else if (prim.IsA<pxr::UsdLuxLight>()) {
-    reader = new USDLightReader(prim, params_, settings_);
+  if (prim.IsA<pxr::UsdLuxLight>()) {
+    return new USDLightReader(prim, params_, settings_);
   }
   else if (prim.IsA<pxr::UsdVolVolume>()) {
-    reader = new USDVolumeReader(prim, params_, settings_);
+    return new USDVolumeReader(prim, params_, settings_);
   }
-  else if (prim.IsA<pxr::UsdGeomImageable>()) {
-    reader = new USDXformReader(prim, params_, settings_);
+  if (prim.IsA<pxr::UsdGeomImageable>()) {
+    return new USDXformReader(prim, params_, settings_);
   }
-  return reader;
+  return nullptr;
 }
 
 /* Returns true if the given prim should be excluded from the
