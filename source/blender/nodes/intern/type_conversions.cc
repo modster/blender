@@ -22,6 +22,8 @@
 #include "BLI_float2.hh"
 #include "BLI_float3.hh"
 
+#include "attribute_ref.hh"
+
 namespace blender::nodes {
 
 using fn::GVArrayPtr;
@@ -176,6 +178,12 @@ static float3 color_to_float3(const ColorGeometry4f &a)
   return float3(a.r, a.g, a.b);
 }
 
+/* Temporary implicit conversion to allow attributes directly connected to string inputs. */
+static std::string attribute_to_string(const AttributeRef& a)
+{
+  return a.name();
+}
+
 static DataTypeConversions create_implicit_conversions()
 {
   DataTypeConversions conversions;
@@ -215,6 +223,8 @@ static DataTypeConversions create_implicit_conversions()
   add_implicit_conversion<ColorGeometry4f, int32_t, color_to_int>(conversions);
   add_implicit_conversion<ColorGeometry4f, float2, color_to_float2>(conversions);
   add_implicit_conversion<ColorGeometry4f, float3, color_to_float3>(conversions);
+
+  add_implicit_conversion<AttributeRef, std::string, attribute_to_string>(conversions);
 
   return conversions;
 }

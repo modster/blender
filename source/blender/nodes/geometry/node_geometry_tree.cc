@@ -86,6 +86,12 @@ static void foreach_nodeclass(Scene *UNUSED(scene), void *calldata, bNodeClassCa
 
 static bool geometry_node_tree_validate_link(bNodeTree *UNUSED(ntree), bNodeLink *link)
 {
+  /* Temporary exception: For the time being allow direct conversion of attributes to strings
+   * to facilitate use of new attribute sockets with old-style attribute name inputs. */
+  if (link->fromsock->type == SOCK_ATTRIBUTE && link->tosock->type == SOCK_STRING) {
+    return true;
+  }
+
   /* Geometry, attribute, string, object, material, texture and collection sockets can only be
    * connected to themselves. Basic data types can be converted between each other. Basic data
    * types can be connected to attributes */
