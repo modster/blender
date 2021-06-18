@@ -20,6 +20,8 @@
 
 #include "NOD_geometry.h"
 
+#include "BLI_listbase.h"
+
 #include "BKE_context.h"
 #include "BKE_node.h"
 #include "BKE_object.h"
@@ -106,6 +108,22 @@ static bool geometry_node_tree_validate_link(bNodeTree *UNUSED(ntree), bNodeLink
   return (link->tosock->type == link->fromsock->type);
 }
 
+/* Common initialization for nodes added to geometry node trees. */
+static void geometry_node_tree_node_add_init(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  /* Set the display shape for all attribute sockets. */
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
+    if (socket->type == SOCK_ATTRIBUTE) {
+      socket->display_shape = SOCK_DISPLAY_SHAPE_SQUARE;
+    }
+  }
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+    if (socket->type == SOCK_ATTRIBUTE) {
+      socket->display_shape = SOCK_DISPLAY_SHAPE_SQUARE;
+    }
+  }
+}
+
 static bool geometry_node_tree_socket_type_valid(eNodeSocketDatatype socket_type,
                                                  bNodeTreeType *UNUSED(ntreetype))
 {
@@ -139,6 +157,7 @@ void register_node_tree_type_geo(void)
   tt->foreach_nodeclass = foreach_nodeclass;
   tt->valid_socket_type = geometry_node_tree_socket_type_valid;
   tt->validate_link = geometry_node_tree_validate_link;
+  tt->node_add_init = geometry_node_tree_node_add_init;
 
   ntreeTypeAdd(tt);
 }

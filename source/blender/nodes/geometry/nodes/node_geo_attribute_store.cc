@@ -31,11 +31,6 @@ static bNodeSocketTemplate geo_node_attribute_store_out[] = {
     {-1, ""},
 };
 
-static void geo_node_attribute_store_init(bNodeTree *UNUSED(tree), bNode *node)
-{
-  nodeFindSocket(node, SOCK_IN, "Attribute")->display_shape = SOCK_DISPLAY_SHAPE_SQUARE;
-}
-
 namespace blender::nodes {
 
 static AttributeDomain get_result_domain(AttributeDomain declared_domain,
@@ -143,7 +138,6 @@ void register_node_type_geo_attribute_store()
 
   geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_STORE, "Attribute Store", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_attribute_store_in, geo_node_attribute_store_out);
-  node_type_init(&ntype, geo_node_attribute_store_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_store_exec;
   nodeRegisterType(&ntype);
 }

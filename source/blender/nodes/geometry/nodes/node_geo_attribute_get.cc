@@ -52,8 +52,6 @@ static void geo_node_attribute_get_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   node->custom1 = CD_PROP_FLOAT;
   node->custom2 = ATTR_DOMAIN_AUTO;
-
-  nodeFindSocket(node, SOCK_OUT, "Attribute")->display_shape = SOCK_DISPLAY_SHAPE_SQUARE;
 }
 
 namespace blender::nodes {

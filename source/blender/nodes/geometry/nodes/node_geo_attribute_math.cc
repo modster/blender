@@ -130,7 +130,6 @@ static void geo_node_attribute_math_init(bNodeTree *UNUSED(tree), bNode *node)
   node->storage = data;
 
 #define DEF_ATTRIBUTE(_in_out, _name, _data_type) \
-  nodeFindSocket(node, (_in_out), (_name))->display_shape = SOCK_DISPLAY_SHAPE_SQUARE; \
   ((bNodeSocketValueAttribute *)nodeFindSocket(node, (_in_out), (_name))->default_value) \
       ->data_type = (_data_type);
 

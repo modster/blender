@@ -79,16 +79,6 @@ static void geo_node_attribute_remove_exec(GeoNodeExecParams params)
 }
 }  // namespace blender::nodes
 
-static void init(bNodeTree *UNUSED(tree), bNode *node)
-{
-#define DEF_ATTRIBUTE(_in_out, _name, _data_type) \
-  nodeFindSocket(node, (_in_out), (_name))->display_shape = SOCK_DISPLAY_SHAPE_SQUARE; \
-  ((bNodeSocketValueAttribute *)nodeFindSocket(node, (_in_out), (_name))->default_value) \
-      ->data_type = (_data_type);
-
-  DEF_ATTRIBUTE(SOCK_IN, "Attribute", SOCK_ATTRIBUTE)
-}
-
 void register_node_type_geo_attribute_remove()
 {
   static bNodeType ntype;
@@ -96,7 +86,6 @@ void register_node_type_geo_attribute_remove()
   geo_node_type_base(
       &ntype, GEO_NODE_ATTRIBUTE_REMOVE, "Attribute Remove", NODE_CLASS_ATTRIBUTE, 0);
   node_type_socket_templates(&ntype, geo_node_attribute_remove_in, geo_node_attribute_remove_out);
-  node_type_init(&ntype, &init);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_remove_exec;
   nodeRegisterType(&ntype);
 }
