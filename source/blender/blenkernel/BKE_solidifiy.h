@@ -45,7 +45,9 @@ typedef struct SolidifyData {
 Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
                            Mesh *mesh,
                            bool **r_shell_verts,
-                           bool **r_rim_verts);
+                           bool **r_rim_verts,
+                           bool **r_shell_faces,
+                           bool **r_rim_faces);
 
 #ifdef __cplusplus
 }

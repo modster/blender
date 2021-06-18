@@ -161,6 +161,94 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md,
   return solidify_data;
 }
 
+static Mesh *MOD_solidify_nonmanifold(ModifierData *md,
+                                      const ModifierEvalContext *ctx,
+                                      Mesh *mesh,
+                                      const SolidifyModifierData *smd)
+{
+  SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
+
+  const bool defgrp_invert = (solidify_data.flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
+  solidify_data.distance = get_distance_factor(
+      mesh, ctx->object, smd->defgrp_name, defgrp_invert);
+
+  bool *shell_verts = NULL;
+  bool *rim_verts = NULL;
+  bool *shell_faces = NULL;
+  bool *rim_faces = NULL;
+
+  Mesh *output_mesh = solidify_nonmanifold(&solidify_data, mesh, &shell_verts, &rim_verts, &shell_faces, &rim_faces);
+
+  const int shell_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
+                                                                smd->shell_defgrp_name);
+  const int rim_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
+                                                              smd->rim_defgrp_name);
+
+  MDeformVert *dvert;
+  if (shell_defgrp_index != -1 || rim_defgrp_index != -1) {
+    dvert = CustomData_duplicate_referenced_layer(
+        &output_mesh->vdata, CD_MDEFORMVERT, output_mesh->totvert);
+    /* If no vertices were ever added to an object's vgroup, dvert might be NULL. */
+    if (dvert == NULL) {
+      /* Add a valid data layer! */
+      dvert = CustomData_add_layer(
+          &output_mesh->vdata, CD_MDEFORMVERT, CD_CALLOC, NULL, output_mesh->totvert);
+    }
+    output_mesh->dvert = dvert;
+    if ((solidify_data.flag & MOD_SOLIDIFY_SHELL) && shell_defgrp_index != -1) {
+      for (int i = 0; i < output_mesh->totvert; i++) {
+        BKE_defvert_ensure_index(&output_mesh->dvert[i], shell_defgrp_index)->weight =
+            shell_verts[i];
+      }
+    }
+    if ((solidify_data.flag & MOD_SOLIDIFY_RIM) && rim_defgrp_index != -1) {
+      for (int i = 0; i < output_mesh->totvert; i++) {
+        BKE_defvert_ensure_index(&output_mesh->dvert[i], rim_defgrp_index)->weight =
+            rim_verts[i];
+      }
+    }
+  }
+
+  /* Only use material offsets if we have 2 or more materials. */
+  const short mat_nrs = solidify_data.object->totcol > 1 ? solidify_data.object->totcol : 1;
+  const short mat_nr_max = mat_nrs - 1;
+  const short mat_ofs = mat_nrs > 1 ? solidify_data.mat_ofs : 0;
+  const short mat_ofs_rim = mat_nrs > 1 ? solidify_data.mat_ofs_rim : 0;
+
+  short most_mat_nr = 0;
+  uint most_mat_nr_count = 0;
+  for(int mat_nr = 0; mat_nr < mat_nrs; mat_nr++){
+    uint count = 0;
+    for(int i = 0; i < mesh->totpoly; i++){
+      if(mesh->mpoly[i].mat_nr == mat_nr){
+        count++;
+      }
+    }
+    if(count > most_mat_nr_count){
+      most_mat_nr = mat_nr;
+    }
+  }
+
+  for(int i = 0; i < output_mesh->totpoly; i++){
+    output_mesh->mpoly[i].mat_nr = most_mat_nr;
+    if(mat_ofs > 0 && shell_faces && shell_faces[i]){
+      output_mesh->mpoly[i].mat_nr += mat_ofs;
+      CLAMP(output_mesh->mpoly[i].mat_nr, 0, mat_nr_max);
+    }
+    else if(mat_ofs_rim > 0 && rim_faces && rim_faces[i]){
+      output_mesh->mpoly[i].mat_nr += mat_ofs_rim;
+      CLAMP(output_mesh->mpoly[i].mat_nr, 0, mat_nr_max);
+    }
+  }
+
+  MEM_freeN(solidify_data.distance);
+  MEM_freeN(shell_verts);
+  MEM_freeN(rim_verts);
+  MEM_freeN(shell_faces);
+  MEM_freeN(rim_faces);
+  return output_mesh;
+}
+
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
@@ -169,49 +257,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     case MOD_SOLIDIFY_MODE_EXTRUDE:
       return MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
     case MOD_SOLIDIFY_MODE_NONMANIFOLD: {
-      SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
-
-      const bool defgrp_invert = (solidify_data.flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
-      solidify_data.distance = get_distance_factor(
-          mesh, ctx->object, smd->defgrp_name, defgrp_invert);
-
-      bool *shell_verts = NULL;
-      bool *rim_verts = NULL;
-      Mesh *output_mesh = solidify_nonmanifold(&solidify_data, mesh, &shell_verts, &rim_verts);
-
-      const int shell_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
-                                                                    smd->shell_defgrp_name);
-      const int rim_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
-                                                                  smd->rim_defgrp_name);
-
-      MDeformVert *dvert;
-      if (shell_defgrp_index != -1 || rim_defgrp_index != -1) {
-        dvert = CustomData_duplicate_referenced_layer(
-            &output_mesh->vdata, CD_MDEFORMVERT, output_mesh->totvert);
-        /* If no vertices were ever added to an object's vgroup, dvert might be NULL. */
-        if (dvert == NULL) {
-          /* Add a valid data layer! */
-          dvert = CustomData_add_layer(
-              &output_mesh->vdata, CD_MDEFORMVERT, CD_CALLOC, NULL, output_mesh->totvert);
-        }
-        output_mesh->dvert = dvert;
-        if ((solidify_data.flag & MOD_SOLIDIFY_SHELL) && shell_defgrp_index != -1) {
-          for (int i = 0; i < output_mesh->totvert; i++) {
-            BKE_defvert_ensure_index(&output_mesh->dvert[i], shell_defgrp_index)->weight =
-                shell_verts[i];
-          }
-        }
-        if ((solidify_data.flag & MOD_SOLIDIFY_RIM) && rim_defgrp_index != -1) {
-          for (int i = 0; i < output_mesh->totvert; i++) {
-            BKE_defvert_ensure_index(&output_mesh->dvert[i], rim_defgrp_index)->weight =
-                rim_verts[i];
-          }
-        }
-      }
-      MEM_freeN(solidify_data.distance);
-      MEM_freeN(shell_verts);
-      MEM_freeN(rim_verts);
-      return output_mesh;
+      return MOD_solidify_nonmanifold(md, ctx, mesh, smd);
     }
     default:
       BLI_assert(0);

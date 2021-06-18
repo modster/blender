@@ -36,8 +36,10 @@ static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_BOOLEAN, N_("Fill"), true},
     {SOCK_BOOLEAN, N_("Rim"), true},
     {SOCK_STRING, N_("Distance")},
-    {SOCK_STRING, N_("Fill Tag")},
-    {SOCK_STRING, N_("Rim Tag")},
+    {SOCK_STRING, N_("Shell Verts")},
+    {SOCK_STRING, N_("Rim Verts")},
+    {SOCK_STRING, N_("Shell Faces")},
+    {SOCK_STRING, N_("Rim Faces")},
     {-1, ""},
 };
 
@@ -126,40 +128,77 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
         distance,
     };
 
-    bool *fill_verts = nullptr;
+    bool *shell_verts = nullptr;
     bool *rim_verts = nullptr;
-    output_mesh = solidify_nonmanifold(&solidify_node_data, input_mesh, &fill_verts, &rim_verts);
+    bool *shell_faces = nullptr;
+    bool *rim_faces = nullptr;
+
+    output_mesh = solidify_nonmanifold(&solidify_node_data, input_mesh, &shell_verts, &rim_verts, &shell_faces, &rim_faces);
 
     geometry_set.replace_mesh(output_mesh);
 
-    const AttributeDomain result_domain = ATTR_DOMAIN_POINT;
+    const AttributeDomain result_point_domain = ATTR_DOMAIN_POINT;
 
-    const std::string fill_verts_attribute_name = params.get_input<std::string>("Fill Tag");
-    OutputAttribute_Typed<bool> fill_verts_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(fill_verts_attribute_name,
-                                                               result_domain);
+    const std::string shell_verts_attribute_name = params.get_input<std::string>("Shell Verts");
+    OutputAttribute_Typed<bool> shell_verts_attribute =
+        mesh_component.attribute_try_get_for_output_only<bool>(shell_verts_attribute_name,
+                                                               result_point_domain);
 
-    const std::string rim_verts_attribute_name = params.get_input<std::string>("Rim Tag");
+    const std::string rim_verts_attribute_name = params.get_input<std::string>("Rim Verts");
     OutputAttribute_Typed<bool> rim_verts_attribute =
         mesh_component.attribute_try_get_for_output_only<bool>(rim_verts_attribute_name,
-                                                               result_domain);
+                                                               result_point_domain);
 
-    if ((solidify_node_data.flag & MOD_SOLIDIFY_SHELL) && !fill_verts_attribute_name.empty()) {
-      MutableSpan<bool> fill_verts_span = fill_verts_attribute.as_span();
-      for (const int i : fill_verts_span.index_range()) {
-        fill_verts_span[i] = fill_verts[i];
+    const AttributeDomain result_face_domain = ATTR_DOMAIN_FACE;
+
+    const std::string shell_faces_attribute_name = params.get_input<std::string>("Shell Faces");
+    OutputAttribute_Typed<bool> shell_faces_attribute =
+        mesh_component.attribute_try_get_for_output_only<bool>(shell_faces_attribute_name,
+                                                               result_face_domain);
+
+    const std::string rim_faces_attribute_name = params.get_input<std::string>("Rim Faces");
+    OutputAttribute_Typed<bool> rim_faces_attribute =
+        mesh_component.attribute_try_get_for_output_only<bool>(rim_faces_attribute_name,
+                                                               result_face_domain);
+
+    if (solidify_node_data.flag & MOD_SOLIDIFY_SHELL) {
+      if(!shell_verts_attribute_name.empty()){
+        MutableSpan<bool> shell_verts_span = shell_verts_attribute.as_span();
+        for (const int i : shell_verts_span.index_range()) {
+          shell_verts_span[i] = shell_verts[i];
+        }
+        shell_verts_attribute.save();
+      }
+      if(!shell_faces_attribute_name.empty()){
+        MutableSpan<bool> shell_faces_span = shell_faces_attribute.as_span();
+        for (const int i : shell_faces_span.index_range()) {
+          shell_faces_span[i] = shell_faces[i];
+        }
+        shell_faces_attribute.save();
       }
     }
 
-    if ((solidify_node_data.flag & MOD_SOLIDIFY_RIM) && !rim_verts_attribute_name.empty()) {
-      MutableSpan<bool> rim_verts_span = rim_verts_attribute.as_span();
-      for (const int i : rim_verts_span.index_range()) {
-        rim_verts_span[i] = rim_verts[i];
+    if (solidify_node_data.flag & MOD_SOLIDIFY_RIM) {
+      if(!rim_verts_attribute_name.empty()) {
+        MutableSpan<bool> rim_verts_span = rim_verts_attribute.as_span();
+        for (const int i : rim_verts_span.index_range()) {
+          rim_verts_span[i] = rim_verts[i];
+        }
+        rim_verts_attribute.save();
+      }
+      if(!rim_faces_attribute_name.empty()) {
+        MutableSpan<bool> rim_faces_span = rim_faces_attribute.as_span();
+        for (const int i : rim_faces_span.index_range()) {
+          rim_faces_span[i] = rim_faces[i];
+        }
+        rim_faces_attribute.save();
       }
     }
     MEM_freeN(distance);
-    MEM_freeN(fill_verts);
+    MEM_freeN(shell_verts);
     MEM_freeN(rim_verts);
+    MEM_freeN(shell_faces);
+    MEM_freeN(rim_faces);
   }
   params.set_output("Geometry", geometry_set);
 }

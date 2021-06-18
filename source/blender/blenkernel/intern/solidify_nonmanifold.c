@@ -135,7 +135,9 @@ static int comp_float_int_pair(const void *a, const void *b)
 Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
                            Mesh *mesh,
                            bool **r_shell_verts,
-                           bool **r_rim_verts)
+                           bool **r_rim_verts,
+                           bool **r_shell_faces,
+                           bool **r_rim_faces)
 {
   Mesh *result;
 
@@ -151,12 +153,6 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
   if (numPolys == 0 && numVerts != 0) {
     return mesh;
   }
-
-  /* Only use material offsets if we have 2 or more materials. */
-  const short mat_nrs = solidify_data->object->totcol > 1 ? solidify_data->object->totcol : 1;
-  const short mat_nr_max = mat_nrs - 1;
-  const short mat_ofs = mat_nrs > 1 ? solidify_data->mat_ofs : 0;
-  const short mat_ofs_rim = mat_nrs > 1 ? solidify_data->mat_ofs_rim : 0;
 
   float(*poly_nors)[3] = NULL;
 
@@ -1920,6 +1916,21 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
     (*r_rim_verts)[i] = false;
   }
 
+  *r_shell_faces = MEM_malloc_arrayN(
+      (size_t)result->totpoly, sizeof(bool), "shell faces selection in solidify");
+
+  for (int i = 0; i < result->totpoly; i++) {
+    (*r_shell_faces)[i] = false;
+  }
+
+  *r_rim_faces = MEM_malloc_arrayN(
+      (size_t)result->totpoly, sizeof(bool), "rim faces selection in solidify");
+
+  for (int i = 0; i < result->totpoly; i++) {
+    (*r_rim_faces)[i] = false;
+  }
+
+
   /* Make_new_verts. */
   {
     gs_ptr = orig_vert_groups_arr;
@@ -2146,50 +2157,17 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
 
               /* Loop data. */
               int *loops = MEM_malloc_arrayN(j, sizeof(*loops), "loops in solidify");
-              /* The #mat_nr is from consensus. */
-              short most_mat_nr = 0;
-              uint most_mat_nr_face = 0;
-              uint most_mat_nr_count = 0;
-              for (short l = 0; l < mat_nrs; l++) {
-                uint count = 0;
-                uint face = 0;
-                uint k = 0;
-                for (EdgeGroup *g3 = g2; g3->valid && k < j; g3++) {
-                  if ((do_rim && !g3->is_orig_closed) || (do_shell && g3->split)) {
-                    /* Check both far ends in terms of faces of an edge group. */
-                    if (g3->edges[0]->faces[0]->face->mat_nr == l) {
-                      face = g3->edges[0]->faces[0]->index;
-                      count++;
-                    }
-                    NewEdgeRef *le = g3->edges[g3->edges_len - 1];
-                    if (le->faces[1] && le->faces[1]->face->mat_nr == l) {
-                      face = le->faces[1]->index;
-                      count++;
-                    }
-                    else if (!le->faces[1] && le->faces[0]->face->mat_nr == l) {
-                      face = le->faces[0]->index;
-                      count++;
-                    }
-                    k++;
-                  }
-                }
-                if (count > most_mat_nr_count) {
-                  most_mat_nr = l;
-                  most_mat_nr_face = face;
-                  most_mat_nr_count = count;
-                }
-              }
-              CustomData_copy_data(
-                  &mesh->pdata, &result->pdata, (int)most_mat_nr_face, (int)poly_index, 1);
+
               if (origindex_poly) {
                 origindex_poly[poly_index] = ORIGINDEX_NONE;
               }
               mpoly[poly_index].loopstart = (int)loop_index;
               mpoly[poly_index].totloop = (int)j;
-              mpoly[poly_index].mat_nr = most_mat_nr +
-                                         (g->is_orig_closed || !do_rim ? 0 : mat_ofs_rim);
-              CLAMP(mpoly[poly_index].mat_nr, 0, mat_nr_max);
-              mpoly[poly_index].flag = orig_mpoly[most_mat_nr_face].flag;
+
+              if(g->is_orig_closed || !do_rim){
+                (*r_rim_faces)[poly_index] = true;
+              }
+
               poly_index++;
 
               for (uint k = 0; g2->valid && k < j; g2++) {
@@ -2261,8 +2239,8 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
             &mesh->pdata, &result->pdata, (int)(*new_edges)->faces[0]->index, (int)poly_index, 1);
         mpoly[poly_index].loopstart = (int)loop_index;
         mpoly[poly_index].totloop = 4 - (int)(v1_singularity || v2_singularity);
-        mpoly[poly_index].mat_nr = face->mat_nr + mat_ofs_rim;
-        CLAMP(mpoly[poly_index].mat_nr, 0, mat_nr_max);
+
+        (*r_rim_faces)[poly_index] = true;
         mpoly[poly_index].flag = face->flag;
         poly_index++;
 
@@ -2442,8 +2420,10 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
           CustomData_copy_data(&mesh->pdata, &result->pdata, (int)(i / 2), (int)poly_index, 1);
           mpoly[poly_index].loopstart = (int)loop_index;
           mpoly[poly_index].totloop = (int)k;
-          mpoly[poly_index].mat_nr = fr->face->mat_nr + (fr->reversed != do_flip ? mat_ofs : 0);
-          CLAMP(mpoly[poly_index].mat_nr, 0, mat_nr_max);
+
+          if(fr->reversed != do_flip){
+            (*r_shell_faces)[poly_index] = true;
+          }
           mpoly[poly_index].flag = fr->face->flag;
           if (fr->reversed != do_flip) {
             for (int l = (int)k - 1; l >= 0; l--) {
@@ -2473,27 +2453,28 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
     MEM_freeN(face_verts);
     MEM_freeN(face_edges);
   }
-  if (edge_index != numNewEdges) {
+  /* Haven't found a good way to generalize this. */
+  //if (edge_index != numNewEdges) {
     /*BKE_modifier_set_error(ctx->object,
                            md,
                            "Internal Error: edges array wrong size: %u instead of %u",
                            numNewEdges,
                            edge_index);*/
-  }
-  if (poly_index != numNewPolys) {
+  //}
+  //if (poly_index != numNewPolys) {
     /*BKE_modifier_set_error(ctx->object,
                            md,
                            "Internal Error: polys array wrong size: %u instead of %u",
                            numNewPolys,f
                            poly_index);*/
-  }
-  if (loop_index != numNewLoops) {
+  //}
+  //if (loop_index != numNewLoops) {
     /*BKE_modifier_set_error(ctx->object,
                            md,
                            "Internal Error: loops array wrong size: %u instead of %u",
                            numNewLoops,
                            loop_index);*/
-  }
+  //}
   BLI_assert(edge_index == numNewEdges);
   BLI_assert(poly_index == numNewPolys);
   BLI_assert(loop_index == numNewLoops);
