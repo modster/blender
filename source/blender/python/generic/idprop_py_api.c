@@ -1570,7 +1570,7 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
   const char *description = NULL;
 
   int min, max, soft_min, soft_max, step;
-  PyObject *py_default = NULL;
+  PyObject *default_value = NULL;
   const char *kwlist[] = {"key",
                           "min",
                           "max",
@@ -1591,7 +1591,7 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
                                    &soft_min,
                                    &soft_max,
                                    &step,
-                                   &py_default,
+                                   &default_value,
                                    &rna_subtype,
                                    &description)) {
     return false;
@@ -1630,18 +1630,17 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
   /* The default value needs special handling because for array IDProperties it can be a single
    * value or an array, but for non-array properties it can only be a value. Parse it once as a
    * generic object to check if it was passed as an array. */
-  if (!ELEM(py_default, NULL, Py_None)) {
-    if (PySequence_Check(py_default)) {
+  if (!ELEM(default_value, NULL, Py_None)) {
+    if (PySequence_Check(default_value)) {
       if (idprop->type != IDP_ARRAY) {
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
         return false;
       }
-      MEM_SAFE_FREE(ui_data->default_array);
-      PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(py_default);
-      Py_ssize_t len = PySequence_Fast_GET_SIZE(py_default);
+      PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(default_value);
+      Py_ssize_t len = PySequence_Fast_GET_SIZE(default_value);
 
       ui_data->default_array_len = len;
-      ui_data->default_array = MEM_malloc_arrayN(len, sizeof(int), __func__);
+      ui_data->default_array = MEM_reallocN(ui_data->default_array, sizeof(int) * len);
       for (Py_ssize_t i = 0; i < len; i++) {
         const int value = PyC_Long_AsI32(ob_seq_fast_items[i]);
         if ((value == -1) && PyErr_Occurred()) {
@@ -1652,7 +1651,7 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
       }
     }
     else {
-      const int value = PyC_Long_AsI32(py_default);
+      const int value = PyC_Long_AsI32(default_value);
       if ((value == -1) && PyErr_Occurred()) {
         PyErr_SetString(PyExc_ValueError, "Error converting \"default\" argument to integer");
         return false;
@@ -1747,12 +1746,11 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
         return false;
       }
-      MEM_SAFE_FREE(ui_data->default_array);
       PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(default_value);
       Py_ssize_t len = PySequence_Fast_GET_SIZE(default_value);
 
       ui_data->default_array_len = len;
-      ui_data->default_array = MEM_malloc_arrayN(len, sizeof(double), __func__);
+      ui_data->default_array = MEM_reallocN(ui_data->default_array, sizeof(double) * len);
       for (Py_ssize_t i = 0; i < len; i++) {
         const double value = PyFloat_AsDouble(ob_seq_fast_items[i]);
         if ((value == -1.0) && PyErr_Occurred()) {
