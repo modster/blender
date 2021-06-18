@@ -627,8 +627,7 @@ static bool *get_closest_point_on_edge(
 static BezTriple *get_closest_bezt_to_point(Nurb *nu, float point[2], ViewContext vc)
 {
   float min_distance = 10000;
-  float temp[2];
-  copy_v2_v2(temp, point);
+
   BezTriple *closest;
   for (int i = 0; i < nu->pntsu; i++) {
     BezTriple *bezt = &nu->bezt[i];
@@ -674,6 +673,30 @@ static BPoint *get_closest_bp_to_point(Nurb *nu, float point[2], ViewContext vc)
     }
   }
   return NULL;
+}
+
+static void select_and_get_point(
+    ViewContext vc, Nurb **nu, BezTriple **bezt, BPoint **bp, int point[2], bool is_start)
+{
+  short hand;
+  BezTriple *bezt1 = NULL;
+  BPoint *bp1 = NULL;
+  Base *basact1 = NULL;
+  Nurb *nu1 = NULL;
+  Curve *cu = vc.obedit->data;
+  copy_v2_v2_int(vc.mval, point);
+  if (is_start) {
+    ED_curve_pick_vert(&vc, 1, &nu1, &bezt1, &bp1, &hand, &basact1);
+  }
+  else {
+    ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu1, &bezt1, &bp1);
+  }
+  if (bezt1)
+    *bezt = bezt1;
+  if (bp1)
+    *bp = bp1;
+  if (nu1)
+    *nu = nu1;
 }
 
 enum {
@@ -722,7 +745,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   BezTriple *bezt = NULL;
   BPoint *bp = NULL;
   Base *basact = NULL;
-  Nurb *nu;
+  Nurb *nu = NULL;
 
   bool retval = false;
 
@@ -735,9 +758,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   bool picked = false;
   if (event->type == EVT_MODAL_MAP) {
     if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
-      short hand;
-      copy_v2_v2_int(vc.mval, event->mval);
-      ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact);
+      select_and_get_point(vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
       picked = true;
 
       if (bezt) {
@@ -755,10 +776,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* Move handle point with mouse cursor if dragging a new control point. */
       if (RNA_boolean_get(op->ptr, "new")) {
         if (!picked) {
-          short hand;
-          copy_v2_v2_int(vc.mval, event->mval);
-          /* Get pointer to new control point. */
-          ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact);
+          select_and_get_point(vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
         }
         if (bezt) {
           move_bezt_handles_to_mouse(bezt, nu->bezt + nu->pntsu - 1 == bezt, event, vc);
@@ -768,19 +786,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
       /* Move entire control point with mouse cursor if dragging an existing control point. */
       else {
-        short hand;
-        int mval[2];
-        mval[0] = event->prevx;
-        mval[1] = event->prevy;
-        copy_v2_v2_int(vc.mval, mval);
-
-        /* Select point if the mouse was just clicked and get the selected point. */
-        if (event->prevval != KM_PRESS) {
-          ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact);
-        }
-        else {
-          ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
-        }
+        select_and_get_point(vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
 
         if (bezt) {
           /* Get mouse location in 3D space. */
