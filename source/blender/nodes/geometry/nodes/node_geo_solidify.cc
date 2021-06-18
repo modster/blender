@@ -99,7 +99,6 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     for (int i : vertex_mask.index_range()) {
       distance[i] = vertex_mask[i];
     }
-    //Span<float> Distance_span = vertex_mask->get_internal_span();
 
     SolidifyData solidify_node_data = {
         self_object,
@@ -130,8 +129,6 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
     geometry_set.replace_mesh(output_mesh);
 
-    ////
-
     const AttributeDomain result_domain = ATTR_DOMAIN_POINT;
 
     const std::string fill_verts_attribute_name = params.get_input<std::string>("Fill Tag");
@@ -142,41 +139,32 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     OutputAttribute_Typed<bool> rim_verts_attribute =
         mesh_component.attribute_try_get_for_output_only<bool>(rim_verts_attribute_name, result_domain);
 
-    //if(node_storage.mode == MOD_SOLIDIFY_MODE_EXTRUDE){
-    //return_mesh = solidify_extrude(&solidify_node_data, input_mesh);
-    //}else{
-    //}
-
-    if(!fill_verts_attribute_name.empty()){
+    if((solidify_node_data.flag & MOD_SOLIDIFY_SHELL) && !fill_verts_attribute_name.empty()){
       MutableSpan<bool> fill_verts_span = fill_verts_attribute.as_span();
       for(const int i : fill_verts_span.index_range()){
         fill_verts_span[i] = fill_verts[i];
       }
     }
 
-    if(!rim_verts_attribute_name.empty()){
+    if((solidify_node_data.flag & MOD_SOLIDIFY_RIM) && !rim_verts_attribute_name.empty()){
       MutableSpan<bool> rim_verts_span = rim_verts_attribute.as_span();
       for(const int i : rim_verts_span.index_range()){
         rim_verts_span[i] = rim_verts[i];
       }
     }
+    MEM_freeN(distance);
+    MEM_freeN(fill_verts);
+    MEM_freeN(rim_verts);
   }
-
   params.set_output("Geometry", geometry_set);
 }
 
 static void geo_node_solidify_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  //const bNode *node = (bNode *)ptr->data;
-  //NodeGeometrySolidify &node_storage = *(NodeGeometrySolidify *)node->storage;
-
-  //uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
-  //if(node_storage.mode == MOD_SOLIDIFY_MODE_NONMANIFOLD){
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "nonmanifold_offset_mode", 0, nullptr, ICON_NONE);
   uiItemR(layout, ptr, "nonmanifold_boundary_mode", 0, nullptr, ICON_NONE);
-  //}
 }
 
 }  // namespace blender::nodes
