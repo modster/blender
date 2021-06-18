@@ -741,7 +741,7 @@ static const GHOST_XrPose *wm_xr_session_controller_pose_find(const wmXrSessionS
   return NULL;
 }
 
-inline bool test_float_state(const float *state, float threshold, eXrActionFlag flag)
+BLI_INLINE bool test_float_state(const float *state, float threshold, eXrActionFlag flag)
 {
   if ((flag & XR_ACTION_AXIS0_POS) != 0) {
     if (*state > threshold) {
@@ -761,7 +761,7 @@ inline bool test_float_state(const float *state, float threshold, eXrActionFlag 
   return false;
 }
 
-inline bool test_vec2f_state(const float state[2], float threshold, eXrActionFlag flag)
+BLI_INLINE bool test_vec2f_state(const float state[2], float threshold, eXrActionFlag flag)
 {
   if ((flag & XR_ACTION_AXIS0_POS) != 0) {
     if (state[0] < 0.0f) {
@@ -827,17 +827,17 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                 if (modal || (action->flag & XR_ACTION_PRESS) != 0) {
                   val = KM_PRESS;
                   press_start = true;
-                  if (modal && !active_modal_action) {
-                    /* Set active modal action. */
-                    active_modal_action = action_set->active_modal_action = action;
-                    active_modal_action->active_modal_path =
-                        &action->subaction_paths[subaction_idx];
-                  }
                 }
               }
               else if (modal) {
                 val = KM_PRESS;
                 press_start = false;
+              }
+              if (modal && !active_modal_action) {
+                /* Set active modal action. */
+                active_modal_action = action_set->active_modal_action = action;
+                active_modal_action->active_modal_path = &action->subaction_paths[subaction_idx];
+                press_start = true;
               }
             }
             else if (*state_prev) {
@@ -864,17 +864,17 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                 if (modal || (action->flag & XR_ACTION_PRESS) != 0) {
                   val = KM_PRESS;
                   press_start = true;
-                  if (modal && !active_modal_action) {
-                    /* Set active modal action. */
-                    active_modal_action = action_set->active_modal_action = action;
-                    active_modal_action->active_modal_path =
-                        &action->subaction_paths[subaction_idx];
-                  }
                 }
               }
               else if (modal) {
                 val = KM_PRESS;
                 press_start = false;
+              }
+              if (modal && !active_modal_action) {
+                /* Set active modal action. */
+                active_modal_action = action_set->active_modal_action = action;
+                active_modal_action->active_modal_path = &action->subaction_paths[subaction_idx];
+                press_start = true;
               }
             }
             else if (test_float_state(state_prev, action->float_threshold, action->flag)) {
@@ -901,17 +901,17 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                 if (modal || (action->flag & XR_ACTION_PRESS) != 0) {
                   val = KM_PRESS;
                   press_start = true;
-                  if (modal && !active_modal_action) {
-                    /* Set active modal action. */
-                    active_modal_action = action_set->active_modal_action = action;
-                    active_modal_action->active_modal_path =
-                        &action->subaction_paths[subaction_idx];
-                  }
                 }
               }
               else if (modal) {
                 val = KM_PRESS;
                 press_start = false;
+              }
+              if (modal && !active_modal_action) {
+                /* Set active modal action. */
+                active_modal_action = action_set->active_modal_action = action;
+                active_modal_action->active_modal_path = &action->subaction_paths[subaction_idx];
+                press_start = true;
               }
             }
             else if (test_vec2f_state(*state_prev, action->float_threshold, action->flag)) {
