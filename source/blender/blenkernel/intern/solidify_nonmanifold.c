@@ -152,7 +152,10 @@ static void get_vgroup(
 }
 
 /* NOLINTNEXTLINE: readability-function-size */
-Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool **r_shell_verts, bool **r_rim_verts)
+Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
+                           Mesh *mesh,
+                           bool **r_shell_verts,
+                           bool **r_rim_verts)
 {
   Mesh *result;
 
@@ -179,8 +182,10 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool *
 
   const float ofs_front = (solidify_data->offset_fac + 1.0f) * 0.5f * solidify_data->offset;
   const float ofs_back = ofs_front - solidify_data->offset * solidify_data->offset_fac;
-  const float ofs_front_clamped = max_ff(1e-5f, fabsf(solidify_data->offset > 0 ? ofs_front : ofs_back));
-  const float ofs_back_clamped = max_ff(1e-5f, fabsf(solidify_data->offset > 0 ? ofs_back : ofs_front));
+  const float ofs_front_clamped = max_ff(1e-5f,
+                                         fabsf(solidify_data->offset > 0 ? ofs_front : ofs_back));
+  const float ofs_back_clamped = max_ff(1e-5f,
+                                        fabsf(solidify_data->offset > 0 ? ofs_back : ofs_front));
   const float offset_fac_vg = solidify_data->offset_fac_vg;
   const float offset_fac_vg_inv = 1.0f - solidify_data->offset_fac_vg;
   const float offset = fabsf(solidify_data->offset) * solidify_data->offset_clamp;
@@ -195,8 +200,10 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool *
   MDeformVert *dvert = mesh->dvert;
   const bool defgrp_invert = (solidify_data->flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
   int defgrp_index = 0;
-//  const int shell_defgrp_index = BKE_object_defgroup_name_index(solidify_data->object,solidify_data->shell_defgrp_name);
-//  const int rim_defgrp_index = BKE_object_defgroup_name_index(solidify_data->object, solidify_data->rim_defgrp_name);
+  //  const int shell_defgrp_index =
+  //  BKE_object_defgroup_name_index(solidify_data->object,solidify_data->shell_defgrp_name); const
+  //  int rim_defgrp_index = BKE_object_defgroup_name_index(solidify_data->object,
+  //  solidify_data->rim_defgrp_name);
 
   get_vgroup(solidify_data->object, mesh, solidify_data->defgrp_name, &dvert, &defgrp_index);
 
@@ -228,10 +235,11 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool *
 
   NewFaceRef *face_sides_arr = MEM_malloc_arrayN(
       numPolys * 2, sizeof(*face_sides_arr), "face_sides_arr in solidify");
-  bool *null_faces =
-      (solidify_data->nonmanifold_offset_mode == MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS) ?
-          MEM_calloc_arrayN(numPolys, sizeof(*null_faces), "null_faces in solidify") :
-          NULL;
+  bool *null_faces = (solidify_data->nonmanifold_offset_mode ==
+                      MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS) ?
+                         MEM_calloc_arrayN(
+                             numPolys, sizeof(*null_faces), "null_faces in solidify") :
+                         NULL;
   uint largest_ngon = 3;
   /* Calculate face to #NewFaceRef map. */
   {
@@ -1407,7 +1415,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool *
         ml = orig_mloop + mp->loopstart;
         for (int j = mp->loopstart; j < loopend; j++, ml++) {
           if (defgrp_invert) {
-            scalar_vgroup = min_ff(1.0f - solidify_data->distance[i],scalar_vgroup);
+            scalar_vgroup = min_ff(1.0f - solidify_data->distance[i], scalar_vgroup);
           }
           else {
             scalar_vgroup = min_ff(solidify_data->distance[i], scalar_vgroup);
@@ -1431,7 +1439,8 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool *
                                              MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_NONE ||
                                          (g->is_orig_closed || g->split));
             /* Constraints Method. */
-            if (solidify_data->nonmanifold_offset_mode == MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS) {
+            if (solidify_data->nonmanifold_offset_mode ==
+                MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS) {
               NewEdgeRef *first_edge = NULL;
               NewEdgeRef **edge_ptr = g->edges;
               /* Contains normal and offset [nx, ny, nz, ofs]. */
@@ -1673,7 +1682,8 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool *
               }
 
               /* Set normal length with selected method. */
-              if (solidify_data->nonmanifold_offset_mode == MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_EVEN) {
+              if (solidify_data->nonmanifold_offset_mode ==
+                  MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_EVEN) {
                 if (has_front) {
                   float length_sq = len_squared_v3(nor);
                   if (LIKELY(length_sq > FLT_EPSILON)) {
@@ -1762,7 +1772,8 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool *
               sub_v3_v3v3(e1,
                           orig_mvert_co[vm[e1_edge->v1] == i ? e1_edge->v2 : e1_edge->v1],
                           orig_mvert_co[i]);
-              if (solidify_data->nonmanifold_boundary_mode == MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT) {
+              if (solidify_data->nonmanifold_boundary_mode ==
+                  MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT) {
                 cross_v3_v3v3(constr_nor, e0, e1);
               }
               else {
@@ -1938,14 +1949,14 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data, Mesh *mesh, bool *
   *r_shell_verts = MEM_malloc_arrayN(
       (size_t)result->totvert, sizeof(bool), "shell verts selection in solidify");
 
-  for(int i = 0; i < result->totvert; i++){
+  for (int i = 0; i < result->totvert; i++) {
     (*r_shell_verts)[i] = false;
   }
 
   *r_rim_verts = MEM_malloc_arrayN(
       (size_t)result->totvert, sizeof(bool), "rim verts selection in solidify");
 
-  for(int i = 0; i < result->totvert; i++){
+  for (int i = 0; i < result->totvert; i++) {
     (*r_rim_verts)[i] = false;
   }
 

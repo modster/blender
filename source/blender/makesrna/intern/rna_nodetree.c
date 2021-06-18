@@ -487,21 +487,21 @@ static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_any[]
 #ifndef RNA_RUNTIME
 static const EnumPropertyItem rna_node_geometry_solidify_mode[] = {
     {0, "MOD_SOLIDIFY_MODE_EXTRUDE", 0, "Simple", "Simple"},
-    {1, "MOD_SOLIDIFY_MODE_NONMANIFOLD",0, "Complex", "Complex"},
+    {1, "MOD_SOLIDIFY_MODE_NONMANIFOLD", 0, "Complex", "Complex"},
     {0, NULL, 0, NULL, NULL},
 };
 
 static const EnumPropertyItem rna_node_geometry_solidify_offset_mode[] = {
     {0, "MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_FIXED", 0, "Fixed", "Fixed"},
-    {1, "MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_EVEN",0, "Even", "Even"},
-    {2, "MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS",0, "Constraint", "Constraint"},
+    {1, "MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_EVEN", 0, "Even", "Even"},
+    {2, "MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS", 0, "Constraint", "Constraint"},
     {0, NULL, 0, NULL, NULL},
 };
 
 static const EnumPropertyItem rna_node_geometry_solidify_boundary_mode[] = {
     {0, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_NONE", 0, "None", "None"},
-    {1, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_ROUND",0, "Round", "Round"},
-    {2, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT",0, "Flat", "Flat"},
+    {1, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_ROUND", 0, "Round", "Round"},
+    {2, "MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT", 0, "Flat", "Flat"},
     {0, NULL, 0, NULL, NULL},
 };
 

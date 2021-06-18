@@ -14,8 +14,8 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BKE_solidifiy.h"
 #include "BKE_node.h"
+#include "BKE_solidifiy.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
@@ -72,11 +72,11 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
   char flag = 0;
 
-  if(add_fill) {
+  if (add_fill) {
     flag |= MOD_SOLIDIFY_SHELL;
   }
 
-  if(add_rim){
+  if (add_rim) {
     flag |= MOD_SOLIDIFY_RIM;
   }
 
@@ -94,7 +94,8 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     GVArray_Typed<float> vertex_mask = mesh_component.attribute_get_for_read<float>(
         Distance_name, ATTR_DOMAIN_POINT, 1.0f);
 
-    float *distance = (float*)MEM_callocN(sizeof(float) * (unsigned long)input_mesh->totvert, __func__ );
+    float *distance = (float *)MEM_callocN(sizeof(float) * (unsigned long)input_mesh->totvert,
+                                           __func__);
 
     for (int i : vertex_mask.index_range()) {
       distance[i] = vertex_mask[i];
@@ -133,22 +134,24 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
     const std::string fill_verts_attribute_name = params.get_input<std::string>("Fill Tag");
     OutputAttribute_Typed<bool> fill_verts_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(fill_verts_attribute_name, result_domain);
+        mesh_component.attribute_try_get_for_output_only<bool>(fill_verts_attribute_name,
+                                                               result_domain);
 
     const std::string rim_verts_attribute_name = params.get_input<std::string>("Rim Tag");
     OutputAttribute_Typed<bool> rim_verts_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(rim_verts_attribute_name, result_domain);
+        mesh_component.attribute_try_get_for_output_only<bool>(rim_verts_attribute_name,
+                                                               result_domain);
 
-    if((solidify_node_data.flag & MOD_SOLIDIFY_SHELL) && !fill_verts_attribute_name.empty()){
+    if ((solidify_node_data.flag & MOD_SOLIDIFY_SHELL) && !fill_verts_attribute_name.empty()) {
       MutableSpan<bool> fill_verts_span = fill_verts_attribute.as_span();
-      for(const int i : fill_verts_span.index_range()){
+      for (const int i : fill_verts_span.index_range()) {
         fill_verts_span[i] = fill_verts[i];
       }
     }
 
-    if((solidify_node_data.flag & MOD_SOLIDIFY_RIM) && !rim_verts_attribute_name.empty()){
+    if ((solidify_node_data.flag & MOD_SOLIDIFY_RIM) && !rim_verts_attribute_name.empty()) {
       MutableSpan<bool> rim_verts_span = rim_verts_attribute.as_span();
-      for(const int i : rim_verts_span.index_range()){
+      for (const int i : rim_verts_span.index_range()) {
         rim_verts_span[i] = rim_verts[i];
       }
     }
