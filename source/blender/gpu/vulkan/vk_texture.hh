@@ -282,6 +282,8 @@ inline VkFormat to_vk(eGPUTextureFormat format)
     case GPU_DEPTH_COMPONENT16:
       return VK_FORMAT_D16_UNORM;
   }
+  BLI_assert(!"Unable to convert to vulkan textureformat.");
+  return VK_FORMAT_R32G32B32A32_SFLOAT;
 }
 
 }  // namespace gpu
