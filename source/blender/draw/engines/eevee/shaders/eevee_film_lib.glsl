@@ -55,9 +55,9 @@ vec4 film_data_decode(FilmData film, vec4 data, float weight)
 vec2 film_uv_history_get(CameraData camera, CameraData camera_history, vec2 uv)
 {
 #if 0 /* TODO reproject history */
-  vec3 V = camera_world_from_uv(camera, uv);
+  vec3 V = camera_view_from_uv(camera, uv);
   vec3 V_prev = transform_point(hitory_mat, V);
-  vec2 uv_history = camera_uv_from_world(camera_history, V_prev);
+  vec2 uv_history = camera_uv_from_view(camera_history, V_prev);
   return uv_history;
 #endif
   return uv;
@@ -107,14 +107,14 @@ void film_process_sample(CameraData camera,
   /* Project sample from destrination space to source texture. */
   vec2 sample_center = gl_FragCoord.xy;
   vec2 sample_uv = film_sample_to_camera_uv(film, sample_center + sample_offset);
-  vec3 V_dst = camera_world_from_uv(camera, sample_uv);
+  vec3 vV_dst = camera_view_from_uv(camera, sample_uv);
   /* Pixels outside of projection range. */
-  if (V_dst == vec3(0.0)) {
+  if (vV_dst == vec3(0.0)) {
     return;
   }
 
   bool is_persp = camera.type != CAMERA_ORTHO;
-  vec2 uv_src = camera_uv_from_world(input_persmat, is_persp, V_dst);
+  vec2 uv_src = camera_uv_from_view(input_persmat, is_persp, vV_dst);
   /* Snap to sample actual location (pixel center). */
   vec2 input_size = vec2(textureSize(input_tx, 0));
   vec2 texel_center_src = floor(uv_src * input_size) + 0.5;
@@ -125,8 +125,8 @@ void film_process_sample(CameraData camera,
   }
 
   /* Reproject sample location in destination space to have correct distance metric. */
-  vec3 V_src = camera_world_from_uv(input_persinv, uv_src);
-  vec2 uv_cam = camera_uv_from_world(camera, V_src);
+  vec3 vV_src = camera_view_from_uv(input_persinv, uv_src);
+  vec2 uv_cam = camera_uv_from_view(camera, vV_src);
   vec2 sample_dst = film_sample_from_camera_uv(film, uv_cam);
 
   /* Equirectangular projection might wrap and have more than one point mapping to the same
@@ -134,8 +134,8 @@ void film_process_sample(CameraData camera,
    * NOTE: This is wrong for projection outside the main frame. */
   if (camera.type == CAMERA_PANO_EQUIRECT) {
     sample_center = film_sample_to_camera_uv(film, sample_center);
-    vec3 V_center = camera_world_from_uv(camera, sample_center);
-    sample_center = camera_uv_from_world(camera, V_center);
+    vec3 vV_center = camera_view_from_uv(camera, sample_center);
+    sample_center = camera_uv_from_view(camera, vV_center);
     sample_center = film_sample_from_camera_uv(film, sample_center);
   }
   /* Compute filter weight and add to weighted sum. */
