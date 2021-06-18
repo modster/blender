@@ -118,10 +118,9 @@ USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim)
 
 /* Returns true if the given prim should be excluded from the
  * traversal because it's invisible. */
-static bool _prune_by_visibility(const pxr::UsdGeomImageable &imageable,
-                                 const USDImportParams &params)
+bool USDStageReader::prune_by_visibility(const pxr::UsdGeomImageable &imageable) const
 {
-  if (!(imageable && params.import_visible_only)) {
+  if (!(imageable && params_.import_visible_only)) {
     return false;
   }
 
@@ -142,14 +141,13 @@ static bool _prune_by_visibility(const pxr::UsdGeomImageable &imageable,
  * traversal because it has a purpose which was not requested
  * by the user; e.g., the prim represents guide geometry and
  * the import_guide parameter is toggled off. */
-static bool _prune_by_purpose(const pxr::UsdGeomImageable &imageable,
-                              const USDImportParams &params)
+bool USDStageReader::prune_by_purpose(const pxr::UsdGeomImageable &imageable) const
 {
   if (!imageable) {
     return false;
   }
 
-  if (params.import_guide && params.import_proxy && params.import_render) {
+  if (params_.import_guide && params_.import_proxy && params_.import_render) {
     return false;
   }
 
@@ -158,13 +156,13 @@ static bool _prune_by_purpose(const pxr::UsdGeomImageable &imageable,
     if (!purpose_attr.Get(&purpose)) {
       return false;
     }
-    if (purpose == pxr::UsdGeomTokens->guide && !params.import_guide) {
+    if (purpose == pxr::UsdGeomTokens->guide && !params_.import_guide) {
       return true;
     }
-    if (purpose == pxr::UsdGeomTokens->proxy && !params.import_proxy) {
+    if (purpose == pxr::UsdGeomTokens->proxy && !params_.import_proxy) {
       return true;
     }
-    if (purpose == pxr::UsdGeomTokens->render && !params.import_render) {
+    if (purpose == pxr::UsdGeomTokens->render && !params_.import_render) {
       return true;
     }
   }
@@ -215,11 +213,11 @@ USDPrimReader *USDStageReader::collect_readers(Main *bmain, const pxr::UsdPrim &
   if (prim.IsA<pxr::UsdGeomImageable>()) {
     pxr::UsdGeomImageable imageable(prim);
 
-    if (_prune_by_purpose(imageable, params_)) {
+    if (prune_by_purpose(imageable)) {
       return nullptr;
     }
 
-    if (_prune_by_visibility(imageable, params_)) {
+    if (prune_by_visibility(imageable)) {
       return nullptr;
     }
   }
