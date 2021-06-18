@@ -57,8 +57,6 @@ struct ImportSettings {
 
   CacheFile *cache_file;
 
-  float vel_scale;
-
   ImportSettings()
       : do_convert_mat(false),
         from_up(0),
@@ -70,8 +68,7 @@ struct ImportSettings {
         sequence_offset(0),
         read_flag(0),
         validate_meshes(false),
-        cache_file(NULL),
-        vel_scale(1.0f)
+        cache_file(NULL)
   {
   }
 };
