@@ -87,7 +87,7 @@ class USDStageReader {
     settings_ = a_settings;
   }
 
-  void clear_readers(bool decref = true);
+  void clear_readers();
 
   const std::vector<USDPrimReader *> &readers() const
   {

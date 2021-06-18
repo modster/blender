@@ -47,7 +47,7 @@ USDStageReader::USDStageReader(const char *filename)
 
 USDStageReader::~USDStageReader()
 {
-  clear_readers(true);
+  clear_readers();
 
   if (stage_) {
     stage_->Unload();
@@ -284,7 +284,7 @@ void USDStageReader::collect_readers(Main *bmain,
   params_ = params;
   settings_ = settings;
 
-  clear_readers(true);
+  clear_readers();
 
   // Iterate through stage
   pxr::UsdPrim root = stage_->GetPseudoRoot();
@@ -312,16 +312,14 @@ void USDStageReader::collect_readers(Main *bmain,
   collect_readers(bmain, root);
 }
 
-void USDStageReader::clear_readers(bool decref)
+void USDStageReader::clear_readers()
 {
   for (USDPrimReader *reader : readers_) {
     if (!reader) {
       continue;
     }
 
-    if (decref) {
-      reader->decref();
-    }
+    reader->decref();
 
     if (reader->refcount() == 0) {
       delete reader;
