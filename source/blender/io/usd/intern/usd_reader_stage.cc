@@ -214,28 +214,23 @@ static bool _merge_with_parent(USDPrimReader *reader)
   return true;
 }
 
-static USDPrimReader *_handlePrim(Main *bmain,
-                                  pxr::UsdStageRefPtr stage,
-                                  const USDImportParams &params,
-                                  pxr::UsdPrim prim,
-                                  std::vector<USDPrimReader *> &readers,
-                                  const ImportSettings &settings)
+USDPrimReader *USDStageReader::handle_prim(Main *bmain, const pxr::UsdPrim &prim)
 {
   if (prim.IsA<pxr::UsdGeomImageable>()) {
     pxr::UsdGeomImageable imageable(prim);
 
-    if (_prune_by_purpose(imageable, params)) {
+    if (_prune_by_purpose(imageable, params_)) {
       return nullptr;
     }
 
-    if (_prune_by_visibility(imageable, params)) {
+    if (_prune_by_visibility(imageable, params_)) {
       return nullptr;
     }
   }
 
   pxr::Usd_PrimFlagsPredicate filter_predicate = pxr::UsdPrimDefaultPredicate;
 
-  if (params.import_instance_proxies) {
+  if (params_.import_instance_proxies) {
     filter_predicate = pxr::UsdTraverseInstanceProxies(filter_predicate);
   }
 
@@ -244,10 +239,13 @@ static USDPrimReader *_handlePrim(Main *bmain,
   std::vector<USDPrimReader *> child_readers;
 
   for (const auto &childPrim : children) {
-    USDPrimReader *child_reader = _handlePrim(bmain, stage, params, childPrim, readers, settings);
-    if (child_reader) {
+    if (USDPrimReader *child_reader = handle_prim(bmain, childPrim)) {
       child_readers.push_back(child_reader);
     }
+  }
+
+  if (prim.IsPseudoRoot()) {
+    return nullptr;
   }
 
   /* Check if we can merge an Xform with its child prim. */
@@ -260,24 +258,20 @@ static USDPrimReader *_handlePrim(Main *bmain,
     }
   }
 
-  USDPrimReader *reader = nullptr;
+  USDPrimReader *reader = USDStageReader::create_reader(prim, params_, settings_);
 
-  if (!prim.IsPseudoRoot()) {
-    reader = USDStageReader::create_reader(prim, params, settings);
+  if (!reader) {
+    return nullptr;
+  }
 
-    if (reader == nullptr) {
-      return nullptr;
-    }
+  reader->create_object(bmain, 0.0);
 
-    reader->create_object(bmain, 0.0);
+  readers_.push_back(reader);
+  reader->incref();
 
-    readers.push_back(reader);
-    reader->incref();
-
-    /* Set each child reader's parent. */
-    for (USDPrimReader *child_reader : child_readers) {
-      child_reader->parent(reader);
-    }
+  /* Set each child reader's parent. */
+  for (USDPrimReader *child_reader : child_readers) {
+    child_reader->parent(reader);
   }
 
   return reader;
@@ -315,7 +309,7 @@ void USDStageReader::collect_readers(Main *bmain,
   }
 
   stage_->SetInterpolationType(pxr::UsdInterpolationType::UsdInterpolationTypeHeld);
-  _handlePrim(bmain, stage_, params, root, readers_, settings);
+  handle_prim(bmain, root);
 }
 
 void USDStageReader::clear_readers(bool decref)
