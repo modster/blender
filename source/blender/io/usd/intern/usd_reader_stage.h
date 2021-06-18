@@ -95,7 +95,7 @@ class USDStageReader {
   };
 
  private:
-  USDPrimReader *handle_prim(Main *bmain, const pxr::UsdPrim &prim);
+  USDPrimReader *collect_readers(Main *bmain, const pxr::UsdPrim &prim);
 };
 
 };  // namespace blender::io::usd

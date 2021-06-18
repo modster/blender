@@ -214,7 +214,7 @@ static bool _merge_with_parent(USDPrimReader *reader)
   return true;
 }
 
-USDPrimReader *USDStageReader::handle_prim(Main *bmain, const pxr::UsdPrim &prim)
+USDPrimReader *USDStageReader::collect_readers(Main *bmain, const pxr::UsdPrim &prim)
 {
   if (prim.IsA<pxr::UsdGeomImageable>()) {
     pxr::UsdGeomImageable imageable(prim);
@@ -239,7 +239,7 @@ USDPrimReader *USDStageReader::handle_prim(Main *bmain, const pxr::UsdPrim &prim
   std::vector<USDPrimReader *> child_readers;
 
   for (const auto &childPrim : children) {
-    if (USDPrimReader *child_reader = handle_prim(bmain, childPrim)) {
+    if (USDPrimReader *child_reader = collect_readers(bmain, childPrim)) {
       child_readers.push_back(child_reader);
     }
   }
@@ -309,7 +309,7 @@ void USDStageReader::collect_readers(Main *bmain,
   }
 
   stage_->SetInterpolationType(pxr::UsdInterpolationType::UsdInterpolationTypeHeld);
-  handle_prim(bmain, root);
+  collect_readers(bmain, root);
 }
 
 void USDStageReader::clear_readers(bool decref)
