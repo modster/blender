@@ -287,8 +287,7 @@ void USDStageReader::collect_readers(Main *bmain,
 
   std::string prim_path_mask(params.prim_path_mask);
 
-  if (prim_path_mask.size() > 0) {
-    std::cout << prim_path_mask << '\n';
+  if (!prim_path_mask.empty()) {
     pxr::SdfPath path = pxr::SdfPath(prim_path_mask);
     pxr::UsdPrim prim = stage_->GetPrimAtPath(path.StripAllVariantSelections());
     if (prim.IsValid()) {
