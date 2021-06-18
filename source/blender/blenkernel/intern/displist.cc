@@ -844,7 +844,10 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
                                       GeometrySet **r_geometry_set)
 {
   const Curve *cu = (const Curve *)ob->data;
-
+  if (r_final) {
+    /* The result mesh should already be cleared by the caller. */
+    BLI_assert(*r_final == nullptr);
+  }
   const bool editmode = (!for_render && (cu->editnurb || cu->editfont));
   const bool use_cache = !for_render;
 
@@ -867,14 +870,13 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
   ModifierData *md = pretessellatePoint == nullptr ?
                          BKE_modifiers_get_virtual_modifierlist(ob, &virtualModifierData) :
                          pretessellatePoint->next;
-
-  if (r_final && *r_final) {
-    BKE_id_free(nullptr, *r_final);
+  if (md == nullptr) {
+    return;
   }
 
   Mesh *modified = nullptr;
   GeometrySet geometry_set;
-  if (md && md->type == eModifierType_Nodes) {
+  if (md->type == eModifierType_Nodes) {
     geometry_set.replace_curve(curve_eval_from_dna_curve(*cu).release());
   }
   else {
