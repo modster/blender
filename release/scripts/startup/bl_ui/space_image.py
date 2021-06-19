@@ -436,6 +436,7 @@ class IMAGE_MT_uvs(Menu):
         layout.separator()
 
         layout.operator("uv.pack_islands")
+        layout.operator("uv.pack_islands_to_area")
         layout.operator("uv.average_islands_scale")
 
         layout.separator()

@@ -784,3 +784,90 @@ void BLI_box_pack_2d_fixedarea(ListBase *boxes, int width, int height, ListBase 
 
   BLI_freelistN(&spaces);
 }
+
+/* Similar implementation of BLI_box_pack_2d_fixedarea() that works with BoxPack array and float
+ * variables.
+ * A current problem with the algorithm is that boxes that do not fit are not packed (skipped), so
+ * that finally causes those boxes to be placed at the bottom left position overlapping with other
+ * boxes.
+ * TODO : Fix this issue by setting a callback that cancels the operator (and possibly prints an
+ * error message saying the area is too small for packing islands without scaling) when a
+ * particular box does not fit any empty space */
+void BLI_rect_pack_2d(BoxPack *boxarray,
+                      const uint len,
+                      const float rect_width,
+                      const float rect_height)
+{
+  ListBase spaces = {NULL};
+  RectSizeBoxPack *full_rect = MEM_callocN(sizeof(RectSizeBoxPack), __func__);
+  full_rect->w = rect_width;
+  full_rect->h = rect_height;
+
+  BLI_addhead(&spaces, full_rect);
+  qsort(boxarray, (size_t)len, sizeof(BoxPack), box_areasort);
+
+  for (uint i = 0; i < len; i++) {
+    LISTBASE_FOREACH (RectSizeBoxPack *, space, &spaces) {
+      /* Skip this space if it's too small. */
+      if (boxarray[i].w > space->w || boxarray[i].h > space->h) {
+        continue;
+      }
+
+      /* Pack this box into this space. */
+      boxarray[i].x = space->x;
+      boxarray[i].y = space->y;
+
+      if (boxarray[i].w == space->w && boxarray[i].h == space->h) {
+        /* Box exactly fills space, so just remove the space. */
+        BLI_remlink(&spaces, space);
+        MEM_freeN(space);
+      }
+      else if (boxarray[i].w == space->w) {
+        /* Box fills the entire width, so we can just contract the box
+         * to the upper part that remains. */
+        space->y += boxarray[i].h;
+        space->h -= boxarray[i].h;
+      }
+      else if (boxarray[i].h == space->h) {
+        /* Box fills the entire height, so we can just contract the box
+         * to the right part that remains. */
+        space->x += boxarray[i].w;
+        space->w -= boxarray[i].w;
+      }
+      else {
+        /* Split the remaining L-shaped space into two spaces.
+         * There are two ways to do so, we pick the one that produces the biggest
+         * remaining space */
+        float area_hsplit_large = space->w * (space->h - boxarray[i].h);
+        float area_vsplit_large = (space->w - boxarray[i].w) * space->h;
+
+        /* Perform split. This space becomes the larger space,
+         * while the new smaller space is inserted _before_ it. */
+        RectSizeBoxPack *new_space = MEM_callocN(sizeof(RectSizeBoxPack), __func__);
+        if (area_hsplit_large > area_vsplit_large) {
+          new_space->x = space->x + boxarray[i].w;
+          new_space->y = space->y;
+          new_space->w = space->w - boxarray[i].w;
+          new_space->h = boxarray[i].h;
+
+          space->y += boxarray[i].h;
+          space->h -= boxarray[i].h;
+        }
+        else {
+          new_space->x = space->x;
+          new_space->y = space->y + boxarray[i].h;
+          new_space->w = boxarray[i].w;
+          new_space->h = space->h - boxarray[i].h;
+
+          space->x += boxarray[i].w;
+          space->w -= boxarray[i].w;
+        }
+        BLI_addhead(&spaces, new_space);
+      }
+
+      break;
+    }
+  }
+
+  BLI_freelistN(&spaces);
+}

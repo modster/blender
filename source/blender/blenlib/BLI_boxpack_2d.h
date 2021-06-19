@@ -52,10 +52,22 @@ typedef struct FixedSizeBoxPack {
   int w, h;
 } FixedSizeBoxPack;
 
+/* Similar to FixedSizeBoxPack. Uses float variables */
+typedef struct RectSizeBoxPack {
+  struct RectSizeBoxPack *next, *prev;
+  float x, y;
+  float w, h;
+} RectSizeBoxPack;
+
 void BLI_box_pack_2d_fixedarea(struct ListBase *boxes,
                                int width,
                                int height,
                                struct ListBase *packed);
+
+void BLI_rect_pack_2d(BoxPack *boxarray,
+                      const uint len,
+                      const float rect_width,
+                      const float rect_height);
 
 #ifdef __cplusplus
 }

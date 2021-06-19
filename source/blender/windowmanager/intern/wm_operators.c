@@ -3911,6 +3911,7 @@ static void gesture_box_modal_keymap(wmKeyConfig *keyconf)
   WM_modalkeymap_assign(keymap, "VIEW3D_OT_zoom_border");
   WM_modalkeymap_assign(keymap, "IMAGE_OT_render_border");
   WM_modalkeymap_assign(keymap, "IMAGE_OT_view_zoom_border");
+  WM_modalkeymap_assign(keymap, "UV_OT_pack_islands_to_area");
   WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_box");
 }
 
