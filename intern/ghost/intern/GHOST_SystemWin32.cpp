@@ -1596,6 +1596,17 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
             }
             else {
               wt->leaveRange();
+
+              /* Send mouse event to signal end of tablet tracking to operators. */
+              DWORD msgPos = ::GetMessagePos();
+              int x = GET_X_LPARAM(msgPos);
+              int y = GET_Y_LPARAM(msgPos);
+              event = new GHOST_EventCursor(system->getMilliSeconds(),
+                                            GHOST_kEventCursorMove,
+                                            window,
+                                            x,
+                                            y,
+                                            GHOST_TABLET_DATA_NONE);
             }
           }
           eventHandled = true;
@@ -1635,6 +1646,18 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
           /* Reset pointer pen info if pen device has left tracking range. */
           if (pointerInfo.pointerType == PT_PEN) {
             window->resetPointerPenInfo();
+
+            /* Send mouse event to signal end of tablet tracking to operators. */
+            DWORD msgPos = ::GetMessagePos();
+            int x = GET_X_LPARAM(msgPos);
+            int y = GET_Y_LPARAM(msgPos);
+            event = new GHOST_EventCursor(system->getMilliSeconds(),
+                                          GHOST_kEventCursorMove,
+                                          window,
+                                          x,
+                                          y,
+                                          GHOST_TABLET_DATA_NONE);
+
             eventHandled = true;
           }
           break;

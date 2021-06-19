@@ -693,6 +693,9 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
       if ((walk->center_mval[0] == event->mval[0]) && (walk->center_mval[1] == event->mval[1])) {
         walk->is_cursor_first = false;
       }
+      else if (event->tablet.is_motion_absolute) {
+        walk->is_cursor_first = false;
+      }
       else {
         /* NOTE: its possible the system isn't giving us the warp event
          * ideally we shouldn't have to worry about this, see: T45361 */
@@ -704,10 +707,14 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
       return;
     }
 
-    if ((walk->is_cursor_absolute == false) && event->tablet.is_motion_absolute) {
+    if (!walk->is_cursor_absolute && event->tablet.is_motion_absolute) {
       walk->is_cursor_absolute = true;
       copy_v2_v2_int(walk->prev_mval, event->mval);
       copy_v2_v2_int(walk->center_mval, event->mval);
+    }
+    else if (walk->is_cursor_absolute && !event->tablet.is_motion_absolute) {
+      walk->is_cursor_absolute = false;
+      walk->is_cursor_first = true;
     }
 #endif /* USE_TABLET_SUPPORT */
 
