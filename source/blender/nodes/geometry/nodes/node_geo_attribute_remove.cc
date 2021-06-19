@@ -40,16 +40,16 @@ namespace blender::nodes {
 
 static void remove_attribute(GeometryComponent &component,
                              GeoNodeExecParams &params,
-                             Span<std::string> attribute_names)
+                             Span<AttributeRef> attribute_refs)
 {
-  for (std::string attribute_name : attribute_names) {
-    if (attribute_name.empty()) {
+  for (const AttributeRef& attribute_ref : attribute_refs) {
+    if (!attribute_ref.valid()) {
       continue;
     }
 
-    if (!component.attribute_try_delete(attribute_name)) {
+    if (!component.attribute_try_delete(attribute_ref.name())) {
       params.error_message_add(NodeWarningType::Error,
-                               TIP_("Cannot delete attribute with name \"") + attribute_name +
+                               TIP_("Cannot delete attribute with name \"") + attribute_ref.name() +
                                    "\"");
     }
   }
@@ -58,21 +58,21 @@ static void remove_attribute(GeometryComponent &component,
 static void geo_node_attribute_remove_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  Vector<std::string> attribute_names = params.extract_multi_input<std::string>("Attribute");
+  Vector<AttributeRef> attribute_refs = params.extract_multi_input<AttributeRef>("Attribute");
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
     remove_attribute(
-        geometry_set.get_component_for_write<MeshComponent>(), params, attribute_names);
+        geometry_set.get_component_for_write<MeshComponent>(), params, attribute_refs);
   }
   if (geometry_set.has<PointCloudComponent>()) {
     remove_attribute(
-        geometry_set.get_component_for_write<PointCloudComponent>(), params, attribute_names);
+        geometry_set.get_component_for_write<PointCloudComponent>(), params, attribute_refs);
   }
   if (geometry_set.has<CurveComponent>()) {
     remove_attribute(
-        geometry_set.get_component_for_write<CurveComponent>(), params, attribute_names);
+        geometry_set.get_component_for_write<CurveComponent>(), params, attribute_refs);
   }
 
   params.set_output("Geometry", geometry_set);
