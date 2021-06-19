@@ -252,6 +252,50 @@ class Arena {
     return Index::invalid();
   }
 
+  /* TODO(ish): add optimization by moving `f`, can be done by
+   * returning value if `try_insert()` fails */
+  std::optional<Index> try_insert_with(std::function<T(Index)> f)
+  {
+    if (this->next_free_head) {
+      auto loc = *this->next_free_head;
+
+      if (auto entry = std::get_if<EntryNoExist>(&this->data[loc])) {
+        this->next_free_head = entry->next_free;
+        Index index(loc, this->generation);
+        T value = f(index);
+        this->data[loc] = EntryExist(value, this->generation);
+        this->length += 1;
+
+        return index;
+      }
+
+      /* The linked list created to
+       * know where to insert next is
+       * corrupted.
+       * `this->next_free_head` is corrupted */
+      BLI_assert_unreachable();
+    }
+    return std::nullopt;
+  }
+
+  Index insert_with(std::function<T(Index)> f)
+  {
+    if (auto index = this->try_insert_with(f)) {
+      return *index;
+    }
+
+    /* couldn't insert the value within reserved memory space */
+    const auto reserve_cap = this->data.size() == 0 ? 1 : this->data.size();
+    this->reserve(reserve_cap * 2);
+    if (auto index = this->try_insert_with(f)) {
+      return *index;
+    }
+
+    /* now that more memory has been reserved, it shouldn't fail */
+    BLI_assert_unreachable();
+    return Index::invalid();
+  }
+
   std::optional<T> remove(Index index)
   {
     if (index.index >= this->data.size()) {

@@ -2,6 +2,9 @@
 
 #include "testing/testing.h"
 
+#include <functional>
+#include <tuple>
+
 namespace blender::tests {
 
 using namespace blender::generational_arena;
@@ -54,6 +57,24 @@ TEST(generational_arena, Insert2)
   EXPECT_EQ(arena.get(i3), 3);
   EXPECT_EQ(arena.get(i4), 4);
   EXPECT_EQ(arena.get(i5), 5);
+}
+
+TEST(generational_arena, InsertWith)
+{
+  Arena<std::tuple<Index, int>> arena;
+  auto i0 = arena.insert_with([](Index index) { return std::make_tuple(index, 0); });
+  auto i1 = arena.insert_with([](Index index) { return std::make_tuple(index, 1); });
+  auto i2 = arena.insert_with([](Index index) { return std::make_tuple(index, 2); });
+  auto i3 = arena.insert_with([](Index index) { return std::make_tuple(index, 3); });
+  auto i4 = arena.insert_with([](Index index) { return std::make_tuple(index, 4); });
+
+  EXPECT_EQ(arena.capacity(), 8);
+  EXPECT_EQ(arena.size(), 5);
+  EXPECT_EQ(arena.get(i0).value().get(), std::make_tuple(i0, 0));
+  EXPECT_EQ(arena.get(i1).value().get(), std::make_tuple(i1, 1));
+  EXPECT_EQ(arena.get(i2).value().get(), std::make_tuple(i2, 2));
+  EXPECT_EQ(arena.get(i3).value().get(), std::make_tuple(i3, 3));
+  EXPECT_EQ(arena.get(i4).value().get(), std::make_tuple(i4, 4));
 }
 
 TEST(generational_arena, Remove)
