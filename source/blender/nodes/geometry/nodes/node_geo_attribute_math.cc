@@ -25,11 +25,11 @@
 
 static bNodeSocketTemplate geo_node_attribute_math_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_ATTRIBUTE, N_("A")},
+    {SOCK_ATTRIBUTE, N_("A"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("A"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_ATTRIBUTE, N_("B")},
+    {SOCK_ATTRIBUTE, N_("B"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("B"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_ATTRIBUTE, N_("C")},
+    {SOCK_ATTRIBUTE, N_("C"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("C"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {-1, ""},
 };
@@ -209,16 +209,9 @@ static void do_math_operation(const VArray<float> &span_input,
 
 static AttributeDomain get_result_domain(const GeometryComponent &component,
                                          const GeoNodeExecParams &params,
-                                         const NodeMathOperation operation,
-                                         StringRef result_name)
+                                         const NodeMathOperation operation)
 {
-  /* Use the domain of the result attribute if it already exists. */
-  std::optional<AttributeMetaData> result_info = component.attribute_get_meta_data(result_name);
-  if (result_info) {
-    return result_info->domain;
-  }
-
-  /* Otherwise use the highest priority domain from existing input attributes, or the default. */
+  /* Use the highest priority domain from existing input attributes, or the default. */
   const AttributeDomain default_domain = ATTR_DOMAIN_POINT;
   if (operation_use_input_b(operation)) {
     if (operation_use_input_c(operation)) {
@@ -229,19 +222,19 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
   return params.get_highest_priority_input_domain({"A"}, component, default_domain);
 }
 
-static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecParams &params)
+static void attribute_math_calc(GeometryComponent &component,
+                                const GeoNodeExecParams &params,
+                                const AttributeRef &result)
 {
   const bNode &node = params.node();
   const NodeAttributeMath *node_storage = (const NodeAttributeMath *)node.storage;
   const NodeMathOperation operation = static_cast<NodeMathOperation>(node_storage->operation);
-  const std::string result_name = params.get_input<std::string>("Result");
 
   /* The result type of this node is always float. */
-  const AttributeDomain result_domain = get_result_domain(
-      component, params, operation, result_name);
+  const AttributeDomain result_domain = get_result_domain(component, params, operation);
 
   OutputAttribute_Typed<float> attribute_result =
-      component.attribute_try_get_for_output_only<float>(result_name, result_domain);
+      component.attribute_try_get_for_output_only<float>(result.name(), result_domain);
   if (!attribute_result) {
     return;
   }
@@ -274,22 +267,24 @@ static void attribute_math_calc(GeometryComponent &component, const GeoNodeExecP
 
 static void geo_node_attribute_math_exec(GeoNodeExecParams params)
 {
-  return;
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  AttributeRef result("DummyName this will be auto generated", CD_PROP_FLOAT);
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
-    attribute_math_calc(geometry_set.get_component_for_write<MeshComponent>(), params);
+    attribute_math_calc(geometry_set.get_component_for_write<MeshComponent>(), params, result);
   }
   if (geometry_set.has<PointCloudComponent>()) {
-    attribute_math_calc(geometry_set.get_component_for_write<PointCloudComponent>(), params);
+    attribute_math_calc(
+        geometry_set.get_component_for_write<PointCloudComponent>(), params, result);
   }
   if (geometry_set.has<CurveComponent>()) {
-    attribute_math_calc(geometry_set.get_component_for_write<CurveComponent>(), params);
+    attribute_math_calc(geometry_set.get_component_for_write<CurveComponent>(), params, result);
   }
 
   params.set_output("Geometry", geometry_set);
+  params.set_output("Result", result);
 }
 
 }  // namespace blender::nodes
