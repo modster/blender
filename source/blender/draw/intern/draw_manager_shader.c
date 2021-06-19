@@ -550,14 +550,16 @@ static int drw_shader_library_search(const DRWShaderLibrary *lib, const char *na
 
 /* Return bitmap of dependencies. */
 static uint64_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
+                                            const char *pragma_str,
                                             const char *lib_code,
                                             const char *lib_name)
 {
   /* Search dependencies. */
+  uint pragma_len = strlen(pragma_str);
   uint64_t deps = 0;
   const char *haystack = lib_code;
-  while ((haystack = strstr(haystack, "BLENDER_REQUIRE("))) {
-    haystack += 16;
+  while ((haystack = strstr(haystack, pragma_str))) {
+    haystack += pragma_len;
     int dep = drw_shader_library_search(lib, haystack);
     if (dep == -1) {
       char dbg_name[MAX_NAME];
@@ -567,7 +569,7 @@ static uint64_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
         haystack++;
         i++;
       }
-      dbg_name[i + 1] = '\0';
+      dbg_name[i] = '\0';
 
       printf(
           "Error: Dependency %s not found for %s.\n"
@@ -596,7 +598,8 @@ void DRW_shader_library_add_file(DRWShaderLibrary *lib, const char *lib_code, co
   if (index > -1) {
     lib->libs[index] = lib_code;
     BLI_strncpy(lib->libs_name[index], lib_name, MAX_LIB_NAME);
-    lib->libs_deps[index] = drw_shader_dependencies_get(lib, lib_code, lib_name);
+    lib->libs_deps[index] = drw_shader_dependencies_get(
+        lib, "BLENDER_REQUIRE(", lib_code, lib_name);
   }
   else {
     printf("Error: Too many libraries. Cannot add %s.\n", lib_name);
@@ -608,24 +611,33 @@ void DRW_shader_library_add_file(DRWShaderLibrary *lib, const char *lib_code, co
  * Caller must free the string with MEM_freeN after use. */
 char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const char *shader_code)
 {
-  uint64_t deps = drw_shader_dependencies_get(lib, shader_code, "shader code");
+  /* TODO(fclem) Could be done in one pass. */
+  uint64_t deps = drw_shader_dependencies_get(lib, "BLENDER_REQUIRE(", shader_code, "shader code");
+  uint64_t deps_post = drw_shader_dependencies_get(
+      lib, "BLENDER_REQUIRE_POST(", shader_code, "shader code");
 
   DynStr *ds = BLI_dynstr_new();
   /* Add all dependencies recursively. */
   for (int i = MAX_LIB - 1; i > -1; i--) {
-    if (lib->libs[i] && (deps & (1lu << (uint64_t)i))) {
+    if (lib->libs[i] && ((deps & (1lu << (uint64_t)i)) || (deps_post & (1lu << (uint64_t)i)))) {
       deps |= lib->libs_deps[i];
     }
   }
   /* Concatenate all needed libs into one string. */
-  for (int i = 0; i < MAX_LIB && deps != 0lu; i++) {
+  for (int i = 0; i < MAX_LIB && deps != 0lu; i++, deps >>= 1lu) {
     if (deps & 1lu) {
       BLI_dynstr_append(ds, lib->libs[i]);
     }
-    deps = deps >> 1lu;
   }
 
   BLI_dynstr_append(ds, shader_code);
+
+  /* Concatenate all needed libs into one string. */
+  for (int i = 0; i < MAX_LIB && deps_post != 0lu; i++, deps_post >>= 1lu) {
+    if (deps_post & 1lu) {
+      BLI_dynstr_append(ds, lib->libs[i]);
+    }
+  }
 
   char *str = BLI_dynstr_get_cstring(ds);
   BLI_dynstr_free(ds);
