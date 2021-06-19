@@ -275,7 +275,8 @@ DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_COMPARE, def_geo_attribute_attribute_co
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_CONVERT, def_geo_attribute_convert, "ATTRIBUTE_CONVERT", AttributeConvert, "Attribute Convert", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_CURVE_MAP, def_geo_attribute_curve_map, "ATTRIBUTE_CURVE_MAP", AttributeCurveMap, "Attribute Curve Map", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_FILL, def_geo_attribute_fill, "ATTRIBUTE_FILL", AttributeFill, "Attribute Fill", "")
-DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_GET, def_geo_attribute_get, "ATTRIBUTE_GET", AttributeGet, "Get Attribute", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_GET, def_geo_attribute_get, "ATTRIBUTE_GET", AttributeGet, "Attribute Get", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_SET, 0, "ATTRIBUTE_SET", AttributeSet, "Attribute Set", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_MAP_RANGE, def_geo_attribute_map_range, "ATTRIBUTE_MAP_RANGE", AttributeMapRange, "Attribute Map Range", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_MATH, def_geo_attribute_math, "ATTRIBUTE_MATH", AttributeMath, "Attribute Math", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_MIX, def_geo_attribute_mix, "ATTRIBUTE_MIX", AttributeMix, "Attribute Mix", "")
@@ -330,7 +331,6 @@ DefNode(GeometryNode, GEO_NODE_SWITCH, def_geo_switch, "SWITCH", Switch, "Switch
 DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform", "")
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
-DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_STORE, 0, "ATTRIBUTE_STORE", AttributeStore, "Store Attribute", "")
 
 /* undefine macros */
 #undef DefNode

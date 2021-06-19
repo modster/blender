@@ -5058,7 +5058,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_proximity();
   register_node_type_geo_attribute_randomize();
   register_node_type_geo_attribute_separate_xyz();
-  register_node_type_geo_attribute_store();
+  register_node_type_geo_attribute_set();
   register_node_type_geo_attribute_transfer();
   register_node_type_geo_attribute_vector_math();
   register_node_type_geo_attribute_vector_rotate();

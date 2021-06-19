@@ -48,7 +48,7 @@ void register_node_type_geo_attribute_transfer(void);
 void register_node_type_geo_attribute_vector_math(void);
 void register_node_type_geo_attribute_vector_rotate(void);
 void register_node_type_geo_attribute_remove(void);
-void register_node_type_geo_attribute_store(void);
+void register_node_type_geo_attribute_set(void);
 void register_node_type_geo_boolean(void);
 void register_node_type_geo_bounding_box(void);
 void register_node_type_geo_collection_info(void);

@@ -745,7 +745,7 @@ static bNodeSocketType *make_socket_type_attribute()
         attribute_ref->single_value<bool>() = default_value->value_bool;
         break;
       default:
-        BLI_assert_unreachable();
+        break;
     }
   };
   return socktype;

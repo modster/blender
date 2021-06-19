@@ -1444,7 +1444,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_CURVE_SUBDIVIDE 1060
 #define GEO_NODE_RAYCAST 1061
 #define GEO_NODE_ATTRIBUTE_GET 1062
-#define GEO_NODE_ATTRIBUTE_STORE 1063
+#define GEO_NODE_ATTRIBUTE_SET 1063
 
 /** \} */
 
