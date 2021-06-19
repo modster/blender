@@ -569,10 +569,8 @@ bool WM_xr_session_state_nav_scale_get(const wmXrData *xr, float *r_scale)
 void WM_xr_session_state_nav_scale_set(wmXrData *xr, float scale)
 {
   if (WM_xr_session_exists(xr)) {
-#if 0
     /* Clamp to reasonable values. */
     CLAMP(scale, 0.001f, 1000.0f);
-#endif
     xr->runtime->session_state.nav_scale = scale;
   }
 }

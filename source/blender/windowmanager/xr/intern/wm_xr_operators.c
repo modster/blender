@@ -200,100 +200,116 @@ static void wm_xr_grab_update(wmOperator *op, const wmXrActionData *actiondata)
   }
 }
 
+static void orient_mat_z_normalized(float R[4][4], const float z_axis[3])
+{
+  const float scale = len_v3(R[0]);
+  float x_axis[3], y_axis[3];
+
+  cross_v3_v3v3(y_axis, z_axis, R[0]);
+  normalize_v3(y_axis);
+  mul_v3_v3fl(R[1], y_axis, scale);
+
+  cross_v3_v3v3(x_axis, R[1], z_axis);
+  normalize_v3(x_axis);
+  mul_v3_v3fl(R[0], x_axis, scale);
+
+  mul_v3_v3fl(R[2], z_axis, scale);
+}
+
+static void wm_xr_grab_navlocks_apply(const float nav_mat[4][4],
+                                      const float nav_inv[4][4],
+                                      bool loc_lock,
+                                      bool locz_lock,
+                                      bool rotz_lock,
+                                      float r_prev[4][4],
+                                      float r_curr[4][4])
+{
+  /* Locked in base pose coordinates. */
+  float prev_base[4][4], curr_base[4][4];
+
+  mul_m4_m4m4(prev_base, nav_inv, r_prev);
+  mul_m4_m4m4(curr_base, nav_inv, r_curr);
+
+  if (rotz_lock) {
+    const float z_axis[3] = {0.0f, 0.0f, 1.0f};
+    orient_mat_z_normalized(prev_base, z_axis);
+    orient_mat_z_normalized(curr_base, z_axis);
+  }
+
+  if (loc_lock) {
+    copy_v3_v3(curr_base[3], prev_base[3]);
+  }
+  else if (locz_lock) {
+    curr_base[3][2] = prev_base[3][2];
+  }
+
+  mul_m4_m4m4(r_prev, nav_mat, prev_base);
+  mul_m4_m4m4(r_curr, nav_mat, curr_base);
+}
+
 static void wm_xr_grab_compute(const wmXrActionData *actiondata,
                                const XrGrabData *data,
                                const Object *obedit,
+                               const float nav_mat[4][4],
+                               const float nav_inv[4][4],
                                bool reverse,
                                bool loc_lock,
+                               bool locz_lock,
                                bool rot_lock,
+                               bool rotz_lock,
                                float r_delta[4][4])
 {
-  float m0[4][4], m1[4][4];
+  const bool nav_lock = (nav_mat && nav_inv);
+  float prev[4][4], curr[4][4];
 
-  if (obedit) {
-    float m2[4][4];
-
-    if (rot_lock) {
-      unit_m4(m0);
-      copy_v3_v3(m0[3], reverse ? actiondata->controller_loc : data->mat_prev[3]);
-      mul_m4_m4m4(m1, obedit->imat, m0);
-      invert_m4(m1);
-
-      copy_v3_v3(m0[3], reverse ? data->mat_prev[3] : actiondata->controller_loc);
-      mul_m4_m4m4(m2, obedit->imat, m0);
-
-      mul_m4_m4m4(r_delta, m2, m1);
-    }
-    else {
-      if (reverse) {
-        quat_to_mat4(m0, actiondata->controller_rot);
-        copy_v3_v3(m0[3], actiondata->controller_loc);
-        mul_m4_m4m4(m1, obedit->imat, m0);
-        invert_m4(m1);
-
-        mul_m4_m4m4(m2, obedit->imat, data->mat_prev);
-
-        mul_m4_m4m4(r_delta, m2, m1);
-      }
-      else {
-        mul_m4_m4m4(m1, obedit->imat, data->mat_prev);
-        invert_m4(m1);
-
-        quat_to_mat4(m0, actiondata->controller_rot);
-        copy_v3_v3(m0[3], actiondata->controller_loc);
-        mul_m4_m4m4(m2, obedit->imat, m0);
-
-        mul_m4_m4m4(r_delta, m2, m1);
-      }
-
-      if (loc_lock) {
-        zero_v3(r_delta[3]);
-      }
-    }
+  if (!rot_lock) {
+    copy_m4_m4(prev, data->mat_prev);
+    zero_v3(prev[3]);
+    quat_to_mat4(curr, actiondata->controller_rot);
   }
   else {
-    if (rot_lock) {
-      unit_m4(m0);
-      copy_v3_v3(m0[3], reverse ? actiondata->controller_loc : data->mat_prev[3]);
-      invert_m4_m4(m1, m0);
+    unit_m4(prev);
+    unit_m4(curr);
+  }
 
-      copy_v3_v3(m0[3], reverse ? data->mat_prev[3] : actiondata->controller_loc);
+  if (!loc_lock || nav_lock) {
+    copy_v3_v3(prev[3], data->mat_prev[3]);
+    copy_v3_v3(curr[3], actiondata->controller_loc);
+  }
 
-      mul_m4_m4m4(r_delta, m0, m1);
-    }
-    else {
-      if (reverse) {
-        quat_to_mat4(m1, actiondata->controller_rot);
-        copy_v3_v3(m1[3], actiondata->controller_loc);
-        invert_m4(m1);
+  if (obedit) {
+    mul_m4_m4m4(prev, obedit->imat, prev);
+    mul_m4_m4m4(curr, obedit->imat, curr);
+  }
 
-        mul_m4_m4m4(r_delta, data->mat_prev, m1);
-      }
-      else {
-        invert_m4_m4(m1, data->mat_prev);
+  if (nav_lock) {
+    wm_xr_grab_navlocks_apply(nav_mat, nav_inv, loc_lock, locz_lock, rotz_lock, prev, curr);
+  }
 
-        quat_to_mat4(m0, actiondata->controller_rot);
-        copy_v3_v3(m0[3], actiondata->controller_loc);
-
-        mul_m4_m4m4(r_delta, m0, m1);
-      }
-
-      if (loc_lock) {
-        zero_v3(r_delta[3]);
-      }
-    }
+  if (reverse) {
+    invert_m4(curr);
+    mul_m4_m4m4(r_delta, prev, curr);
+  }
+  else {
+    invert_m4(prev);
+    mul_m4_m4m4(r_delta, curr, prev);
   }
 }
 
 static void wm_xr_grab_compute_bimanual(const wmXrActionData *actiondata,
                                         const XrGrabData *data,
                                         const Object *obedit,
+                                        const float nav_mat[4][4],
+                                        const float nav_inv[4][4],
                                         bool reverse,
                                         bool loc_lock,
+                                        bool locz_lock,
                                         bool rot_lock,
+                                        bool rotz_lock,
                                         bool scale_lock,
                                         float r_delta[4][4])
 {
+  const bool nav_lock = (nav_mat && nav_inv);
   float prev[4][4], curr[4][4];
   unit_m4(prev);
   unit_m4(curr);
@@ -329,7 +345,7 @@ static void wm_xr_grab_compute_bimanual(const wmXrActionData *actiondata,
     normalize_v3_v3(curr[2], z_axis_curr);
   }
 
-  if (!loc_lock) {
+  if (!loc_lock || nav_lock) {
     /* Translation: translation of the averaged controller locations. */
     add_v3_v3v3(prev[3], data->mat_prev[3], data->mat_other_prev[3]);
     mul_v3_fl(prev[3], 0.5f);
@@ -357,6 +373,10 @@ static void wm_xr_grab_compute_bimanual(const wmXrActionData *actiondata,
   if (obedit) {
     mul_m4_m4m4(prev, obedit->imat, prev);
     mul_m4_m4m4(curr, obedit->imat, curr);
+  }
+
+  if (nav_lock) {
+    wm_xr_grab_navlocks_apply(nav_mat, nav_inv, loc_lock, locz_lock, rotz_lock, prev, curr);
   }
 
   if (reverse) {
@@ -408,14 +428,18 @@ static int wm_xr_navigation_grab_modal_3d(bContext *C, wmOperator *op, const wmE
   XrGrabData *data = op->customdata;
   wmWindowManager *wm = CTX_wm_manager(C);
   wmXrData *xr = &wm->xr;
-  bool loc_lock, rot_lock, scale_lock;
+  bool loc_lock, locz_lock, rot_lock, rotz_lock, scale_lock;
   GHOST_XrPose nav_pose;
-  float nav_scale, nav_mat[4][4], delta[4][4], m[4][4];
+  float nav_scale, nav_mat[4][4], nav_inv[4][4], delta[4][4], m[4][4];
 
   PropertyRNA *prop = RNA_struct_find_property(op->ptr, "lock_location");
   loc_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+  prop = RNA_struct_find_property(op->ptr, "lock_location_z");
+  locz_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
   prop = RNA_struct_find_property(op->ptr, "lock_rotation");
   rot_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+  prop = RNA_struct_find_property(op->ptr, "lock_rotation_z");
+  rotz_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
   prop = RNA_struct_find_property(op->ptr, "lock_scale");
   scale_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
 
@@ -425,38 +449,67 @@ static int wm_xr_navigation_grab_modal_3d(bContext *C, wmOperator *op, const wmE
                                 (actiondata->bimanual || !data->bimanual_prev);
 
   if (apply_navigation) {
+    const bool nav_lock = (loc_lock || locz_lock || rotz_lock);
+
     WM_xr_session_state_nav_location_get(xr, nav_pose.position);
     WM_xr_session_state_nav_rotation_get(xr, nav_pose.orientation_quat);
     WM_xr_session_state_nav_scale_get(xr, &nav_scale);
 
     wm_xr_pose_scale_to_mat(&nav_pose, nav_scale, nav_mat);
+    if (nav_lock) {
+      wm_xr_pose_scale_to_imat(&nav_pose, nav_scale, nav_inv);
+    }
 
     if (do_bimanual) {
-      wm_xr_grab_compute_bimanual(
-          actiondata, data, NULL, true, loc_lock, rot_lock, scale_lock, delta);
+      wm_xr_grab_compute_bimanual(actiondata,
+                                  data,
+                                  NULL,
+                                  nav_lock ? nav_mat : NULL,
+                                  nav_lock ? nav_inv : NULL,
+                                  true,
+                                  loc_lock,
+                                  locz_lock,
+                                  rot_lock,
+                                  rotz_lock,
+                                  scale_lock,
+                                  delta);
     }
     else {
-      wm_xr_grab_compute(actiondata, data, NULL, true, loc_lock, rot_lock, delta);
+      wm_xr_grab_compute(actiondata,
+                         data,
+                         NULL,
+                         nav_lock ? nav_mat : NULL,
+                         nav_lock ? nav_inv : NULL,
+                         true,
+                         loc_lock,
+                         locz_lock,
+                         rot_lock,
+                         rotz_lock,
+                         delta);
     }
 
     mul_m4_m4m4(m, delta, nav_mat);
 
-    if (!loc_lock) {
+    /* Limit scale to reasonable values. */
+    nav_scale = len_v3(m[0]);
+
+    if (!(nav_scale < 0.001f || nav_scale > 1000.0f)) {
       WM_xr_session_state_nav_location_set(xr, m[3]);
-    }
-    if (!rot_lock) {
-      mat4_to_quat(nav_pose.orientation_quat, m);
-      normalize_qt(nav_pose.orientation_quat);
-      WM_xr_session_state_nav_rotation_set(xr, nav_pose.orientation_quat);
-    }
-    if (!scale_lock && do_bimanual) {
-      nav_scale = len_v3(m[0]);
-      WM_xr_session_state_nav_scale_set(xr, nav_scale);
+      if (!rot_lock) {
+        mat4_to_quat(nav_pose.orientation_quat, m);
+        normalize_qt(nav_pose.orientation_quat);
+        WM_xr_session_state_nav_rotation_set(xr, nav_pose.orientation_quat);
+      }
+      if (!scale_lock && do_bimanual) {
+        WM_xr_session_state_nav_scale_set(xr, nav_scale);
+      }
     }
   }
 
   if (actiondata->bimanual) {
     if (!data->bimanual_prev) {
+      quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+      copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
       quat_to_mat4(data->mat_other_prev, actiondata->controller_rot_other);
       copy_v3_v3(data->mat_other_prev[3], actiondata->controller_loc_other);
     }
@@ -498,12 +551,17 @@ static void WM_OT_xr_navigation_grab(wmOperatorType *ot)
   ot->poll = wm_xr_operator_sessionactive;
 
   /* properties */
-#if 0
   RNA_def_boolean(
       ot->srna, "lock_location", false, "Lock Location", "Prevent changes to viewer location");
-#endif
+  RNA_def_boolean(
+      ot->srna, "lock_location_z", false, "Lock Elevation", "Prevent changes to viewer elevation");
   RNA_def_boolean(
       ot->srna, "lock_rotation", false, "Lock Rotation", "Prevent changes to viewer rotation");
+  RNA_def_boolean(ot->srna,
+                  "lock_rotation_z",
+                  false,
+                  "Lock Up Orientation",
+                  "Prevent changes to viewer up orientation");
   RNA_def_boolean(ot->srna, "lock_scale", false, "Lock Scale", "Prevent changes to viewer scale");
 }
 
@@ -814,7 +872,7 @@ static void WM_OT_xr_navigation_teleport(wmOperatorType *ot)
                          3,
                          default_teleport_axes,
                          "Teleport Axes",
-                         "Axes (in navigation space) to allow teleportation");
+                         "Enabled teleport axes in viewer space");
   RNA_def_float(ot->srna,
                 "interpolation",
                 1.0f,
@@ -1474,11 +1532,22 @@ static int wm_xr_transform_grab_modal_3d(bContext *C, wmOperator *op, const wmEv
       BMIter iter;
 
       if (do_bimanual) {
-        wm_xr_grab_compute_bimanual(
-            actiondata, data, obedit, false, loc_lock, rot_lock, scale_lock, delta);
+        wm_xr_grab_compute_bimanual(actiondata,
+                                    data,
+                                    obedit,
+                                    NULL,
+                                    NULL,
+                                    false,
+                                    loc_lock,
+                                    false,
+                                    rot_lock,
+                                    false,
+                                    scale_lock,
+                                    delta);
       }
       else {
-        wm_xr_grab_compute(actiondata, data, obedit, false, loc_lock, rot_lock, delta);
+        wm_xr_grab_compute(
+            actiondata, data, obedit, NULL, NULL, false, loc_lock, false, rot_lock, false, delta);
       }
 
       if ((ts->selectmode & SCE_SELECT_VERTEX) != 0) {
@@ -1532,11 +1601,22 @@ static int wm_xr_transform_grab_modal_3d(bContext *C, wmOperator *op, const wmEv
   else {
     if (apply_transform) {
       if (do_bimanual) {
-        wm_xr_grab_compute_bimanual(
-            actiondata, data, NULL, false, loc_lock, rot_lock, scale_lock, delta);
+        wm_xr_grab_compute_bimanual(actiondata,
+                                    data,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    false,
+                                    loc_lock,
+                                    false,
+                                    rot_lock,
+                                    false,
+                                    scale_lock,
+                                    delta);
       }
       else {
-        wm_xr_grab_compute(actiondata, data, NULL, false, loc_lock, rot_lock, delta);
+        wm_xr_grab_compute(
+            actiondata, data, NULL, NULL, NULL, false, loc_lock, false, rot_lock, false, delta);
       }
     }
 
