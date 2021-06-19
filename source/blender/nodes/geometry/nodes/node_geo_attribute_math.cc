@@ -268,7 +268,7 @@ static void attribute_math_calc(GeometryComponent &component,
 static void geo_node_attribute_math_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  AttributeRef result("DummyName this will be auto generated", CD_PROP_FLOAT);
+  AttributeRef result = params.declare_output_attribute("Result", CD_PROP_FLOAT);
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 

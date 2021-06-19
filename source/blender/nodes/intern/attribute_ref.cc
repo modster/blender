@@ -14,7 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "attribute_ref.hh"
+#include "NOD_attribute_ref.hh"
 
 #include "FN_cpp_type_make.hh"
 

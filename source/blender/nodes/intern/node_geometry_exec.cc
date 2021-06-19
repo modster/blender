@@ -93,10 +93,11 @@ GVArrayPtr GeoNodeExecParams::get_input_attribute(const StringRef name,
     else {
       /* Broadcast the attribute single value */
       BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
-      conversions.convert_to_uninitialized(*blender::bke::custom_data_type_to_cpp_type(attribute_ref.data_type()),
-                                           *cpp_type,
-                                           attribute_ref.single_value_ptr(),
-                                           buffer);
+      conversions.convert_to_uninitialized(
+          *blender::bke::custom_data_type_to_cpp_type(attribute_ref.data_type()),
+          *cpp_type,
+          attribute_ref.single_value_ptr(),
+          buffer);
       return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, buffer);
     }
   }
@@ -214,6 +215,13 @@ AttributeDomain GeoNodeExecParams::get_highest_priority_input_domain(
   }
 
   return default_domain;
+}
+
+AttributeRef GeoNodeExecParams::declare_output_attribute(const StringRef identifier,
+                                                         CustomDataType data_type) const
+{
+  return AttributeRef("Node" + std::to_string(provider_->dnode->id()) + "::" + identifier,
+                      data_type);
 }
 
 void GeoNodeExecParams::check_input_access(StringRef identifier,

@@ -29,12 +29,11 @@
 
 #include "BLT_translation.h"
 
+#include "NOD_attribute_ref.hh"
 #include "NOD_geometry.h"
 #include "NOD_geometry_exec.hh"
 
 #include "node_util.h"
-
-#include "attribute_ref.hh"
 
 void geo_node_type_base(
     struct bNodeType *ntype, int type, const char *name, short nclass, short flag);

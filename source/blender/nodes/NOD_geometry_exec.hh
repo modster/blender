@@ -25,6 +25,7 @@
 
 #include "DNA_node_types.h"
 
+#include "NOD_attribute_ref.hh"
 #include "NOD_derived_node_tree.hh"
 
 struct Depsgraph;
@@ -291,6 +292,10 @@ class GeoNodeExecParams {
   AttributeDomain get_highest_priority_input_domain(Span<std::string> names,
                                                     const GeometryComponent &component,
                                                     const AttributeDomain default_domain) const;
+
+  /* Create an attribute reference with a unique name to use for an output attribute. */
+  AttributeRef declare_output_attribute(const StringRef identifier,
+                                        CustomDataType data_type) const;
 
  private:
   /* Utilities for detecting common errors at when using this class. */

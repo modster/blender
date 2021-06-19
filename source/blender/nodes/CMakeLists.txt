@@ -346,6 +346,7 @@ set(SRC
   geometry/node_geometry_util.hh
   texture/node_texture_util.h
 
+  NOD_attribute_ref.hh
   NOD_common.h
   NOD_composite.h
   NOD_derived_node_tree.hh
@@ -361,7 +362,6 @@ set(SRC
   NOD_texture.h
   NOD_type_callbacks.hh
   NOD_type_conversions.hh
-  intern/attribute_ref.hh
   intern/node_common.h
   intern/node_exec.h
   intern/node_util.h

@@ -538,7 +538,7 @@ static void geo_node_attribute_vector_math_exec(GeoNodeExecParams params)
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   const CustomDataType result_type = operation_get_result_type(operation);
-  AttributeRef result("DummyName this will be auto generated", result_type);
+  AttributeRef result = params.declare_output_attribute("Result", result_type);
 
   if (geometry_set.has<MeshComponent>()) {
     attribute_vector_math_calc(

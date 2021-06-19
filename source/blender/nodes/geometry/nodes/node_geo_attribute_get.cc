@@ -71,7 +71,7 @@ static void geo_node_attribute_get_exec(GeoNodeExecParams params)
     return;
   }
 
-  AttributeRef attribute = AttributeRef(attribute_name, data_type);
+  AttributeRef attribute(attribute_name, data_type);
 
   /* TODO check for existence of the attribute on the geometry.
    * This isn't really necessary for it to function, but can help catch invalid
