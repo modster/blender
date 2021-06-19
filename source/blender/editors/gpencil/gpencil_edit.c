@@ -863,7 +863,7 @@ static void gpencil_duplicate_points(bGPdata *gpd,
         start_idx = i;
       }
     }
-    else {
+    if ((start_idx != -1) || (start_idx == gps->totpoints - 1)) {
       size_t len = 0;
 
       /* is this the end of current island yet?
@@ -2779,7 +2779,7 @@ void GPENCIL_OT_dissolve(wmOperatorType *ot)
 
 /* Poll callback for snap operators */
 /* NOTE: For now, we only allow these in the 3D view, as other editors do not
- *       define a cursor or gridstep which can be used
+ *       define a cursor or grid-step which can be used.
  */
 static bool gpencil_snap_poll(bContext *C)
 {
@@ -4618,6 +4618,7 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
               /* add layer if not created before */
               if (gpl_dst == NULL) {
                 gpl_dst = BKE_gpencil_layer_addnew(gpd_dst, gpl->info, false, false);
+                BKE_gpencil_layer_copy_settings(gpl, gpl_dst);
               }
 
               /* add frame if not created before */
