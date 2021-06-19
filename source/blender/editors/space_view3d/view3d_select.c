@@ -3779,6 +3779,9 @@ static bool mesh_circle_select(ViewContext *vc,
   if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
     if (vc->em->bm->totvertsel) {
       EDBM_flag_disable_all(vc->em, BM_ELEM_SELECT);
+      vc->em->bm->totvertsel = 0;
+      vc->em->bm->totedgesel = 0;
+      vc->em->bm->totfacesel = 0;
       changed = true;
     }
   }
@@ -3844,7 +3847,8 @@ static bool mesh_circle_select(ViewContext *vc,
   changed |= data.is_changed;
 
   if (changed) {
-    EDBM_selectmode_flush(vc->em);
+    BM_mesh_select_mode_flush_ex(
+        vc->em->bm, vc->em->selectmode, BM_SELECT_LEN_FLUSH_RECALC_NOTHING);
   }
   return changed;
 }
