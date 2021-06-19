@@ -619,7 +619,7 @@ typedef struct bNodeSocketValueMaterial {
 } bNodeSocketValueMaterial;
 
 typedef struct bNodeSocketValueAttribute {
-  int data_type;
+  int data_type; /* eNodeSocketDatatype */
   /* XXX Does DNA support union? */
   int value_int;
   float value_float[4];

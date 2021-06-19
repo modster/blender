@@ -44,14 +44,12 @@ static void geo_node_attribute_get_layout(uiLayout *layout, bContext *UNUSED(C),
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
   uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
 }
 
 static void geo_node_attribute_get_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   node->custom1 = CD_PROP_FLOAT;
-  node->custom2 = ATTR_DOMAIN_AUTO;
 }
 
 static void geo_node_attribute_vector_math_update(bNodeTree *UNUSED(ntree), bNode *node)
@@ -65,7 +63,6 @@ namespace blender::nodes {
 static void geo_node_attribute_get_exec(GeoNodeExecParams params)
 {
   const CustomDataType data_type = (CustomDataType)params.node().custom1;
-  const AttributeDomain domain = (AttributeDomain)params.node().custom2;
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const std::string attribute_name = params.extract_input<std::string>("Name");
 
@@ -74,7 +71,7 @@ static void geo_node_attribute_get_exec(GeoNodeExecParams params)
     return;
   }
 
-  AttributeRef attribute = AttributeRef(attribute_name, domain, data_type);
+  AttributeRef attribute = AttributeRef(attribute_name, data_type);
 
   /* TODO check for existence of the attribute on the geometry.
    * This isn't really necessary for it to function, but can help catch invalid

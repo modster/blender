@@ -73,22 +73,32 @@ GVArrayPtr GeoNodeExecParams::get_input_attribute(const StringRef name,
     return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, default_value);
   }
 
+  const DataTypeConversions &conversions = get_implicit_type_conversions();
   if (found_socket->type == SOCK_ATTRIBUTE) {
     const AttributeRef attribute_ref = this->get_input<AttributeRef>(found_socket->identifier);
-    /* Try getting the attribute without the default value. */
-    GVArrayPtr attribute = component.attribute_try_get_for_read(attribute_ref.name(), domain, type);
-    if (attribute) {
-      return attribute;
-    }
 
-    /* If the attribute doesn't exist, use the default value and output an error message
-     * (except when the field is empty, to avoid spamming error messages, and not when
-     * the domain is empty and we don't expect an attribute anyway). */
-    if (attribute_ref.valid() && component.attribute_domain_size(domain) != 0) {
+    if (attribute_ref.valid()) {
+      /* Try getting the attribute without the default value. */
+      GVArrayPtr attribute = component.attribute_try_get_for_read(
+          attribute_ref.name(), domain, type);
+      if (attribute) {
+        return attribute;
+      }
+
+      /* If the attribute doesn't exist, use the default value and output an error message */
       this->error_message_add(NodeWarningType::Error,
                               TIP_("No attribute with name \"") + attribute_ref.name() + "\"");
+      return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, default_value);
     }
-    return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, default_value);
+    else {
+      /* Broadcast the attribute single value */
+      BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
+      conversions.convert_to_uninitialized(*blender::bke::custom_data_type_to_cpp_type(attribute_ref.data_type()),
+                                           *cpp_type,
+                                           attribute_ref.single_value_ptr(),
+                                           buffer);
+      return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, buffer);
+    }
   }
   if (found_socket->type == SOCK_STRING) {
     const std::string name = this->get_input<std::string>(found_socket->identifier);
@@ -107,7 +117,6 @@ GVArrayPtr GeoNodeExecParams::get_input_attribute(const StringRef name,
     }
     return std::make_unique<fn::GVArray_For_SingleValue>(*cpp_type, domain_size, default_value);
   }
-  const DataTypeConversions &conversions = get_implicit_type_conversions();
   if (found_socket->type == SOCK_FLOAT) {
     const float value = this->get_input<float>(found_socket->identifier);
     BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);

@@ -18,16 +18,11 @@
 
 #include "FN_cpp_type_make.hh"
 
-const AttributeRef AttributeRef::None = AttributeRef("", ATTR_DOMAIN_AUTO, CD_PROP_FLOAT);
+const AttributeRef AttributeRef::None = AttributeRef();
 
 const std::string &AttributeRef::name() const
 {
   return name_;
-}
-
-AttributeDomain AttributeRef::domain() const
-{
-  return domain_;
 }
 
 CustomDataType AttributeRef::data_type() const
@@ -35,20 +30,22 @@ CustomDataType AttributeRef::data_type() const
   return data_type_;
 }
 
-AttributeRef::AttributeRef()
+AttributeRef::AttributeRef() : name_(""), data_type_(CD_PROP_FLOAT)
 {
 }
 
-AttributeRef::AttributeRef(const std::string &name,
-                           AttributeDomain domain,
-                           CustomDataType data_type)
-    : name_(name), domain_(domain), data_type_(data_type)
+AttributeRef::AttributeRef(CustomDataType data_type) : name_(""), data_type_(data_type)
+{
+}
+
+AttributeRef::AttributeRef(const std::string &name, CustomDataType data_type)
+    : name_(name), data_type_(data_type)
 {
 }
 
 std::ostream &operator<<(std::ostream &stream, const AttributeRef &attr)
 {
-  stream << "<AttributeRef name=" << attr.name_ << ", domain=" << attr.domain_ << ", data_type=" << attr.data_type_ << ">";
+  stream << "<AttributeRef name=" << attr.name_ << ", data_type=" << attr.data_type_ << ">";
   return stream;
 }
 
@@ -69,6 +66,16 @@ uint64_t AttributeRef::hash() const
 bool AttributeRef::valid() const
 {
   return !name_.empty();
+}
+
+void *AttributeRef::single_value_ptr()
+{
+  return &value_float_;
+}
+
+const void *AttributeRef::single_value_ptr() const
+{
+  return &value_float_;
 }
 
 MAKE_CPP_TYPE(AttributeRef, AttributeRef);

@@ -72,7 +72,7 @@ void set_attribute_socket_data_type(bNode &node,
   }
 }
 
-static eNodeSocketDatatype get_socket_type_from_customdata(CustomDataType custom_data_type)
+static eNodeSocketDatatype customdata_to_socket_type(CustomDataType custom_data_type)
 {
   switch (custom_data_type) {
     case CD_AUTO_FROM_NAME:
@@ -95,14 +95,16 @@ static eNodeSocketDatatype get_socket_type_from_customdata(CustomDataType custom
       return SOCK_VECTOR;
     default:
       BLI_assert_unreachable();
+      return SOCK_ATTRIBUTE;
   }
+  BLI_assert_unreachable();
 }
 
 void set_attribute_socket_data_type(bNode &node,
                                     const StringRef name,
                                     CustomDataType custom_data_type)
 {
-  set_attribute_socket_data_type(node, name, get_socket_type_from_customdata(custom_data_type));
+  set_attribute_socket_data_type(node, name, customdata_to_socket_type(custom_data_type));
 }
 
 void reset_attribute_socket_data_type(bNode &node, const StringRef name)

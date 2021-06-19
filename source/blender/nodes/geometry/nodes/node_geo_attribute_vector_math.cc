@@ -418,7 +418,8 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
 }
 
 static void attribute_vector_math_calc(GeometryComponent &component,
-                                       GeoNodeExecParams &params)
+                                       GeoNodeExecParams &params,
+                                       const AttributeRef& result)
 {
   const bNode &node = params.node();
   const NodeAttributeVectorMath *node_storage = (const NodeAttributeVectorMath *)node.storage;
@@ -432,7 +433,6 @@ static void attribute_vector_math_calc(GeometryComponent &component,
   const CustomDataType read_type_c = operation_get_read_type_c(operation);
 
   /* The result domain is always point for now. */
-  const CustomDataType result_type = operation_get_result_type(operation);
   const AttributeDomain result_domain = get_result_domain(component, params, operation);
 
   GVArrayPtr attribute_a = params.get_input_attribute(
@@ -456,9 +456,8 @@ static void attribute_vector_math_calc(GeometryComponent &component,
   }
 
   /* Get result attribute first, in case it has to overwrite one of the existing attributes. */
-  AttributeRef result_ref = AttributeRef("DummyName this will be auto generated", result_domain, result_type);
   OutputAttribute attribute_result = component.attribute_try_get_for_output_only(
-      result_ref.name(), result_ref.domain(), result_ref.data_type());
+      result.name(), result_domain, result.data_type());
   if (!attribute_result) {
     return;
   }
@@ -526,28 +525,36 @@ static void attribute_vector_math_calc(GeometryComponent &component,
       break;
   }
   attribute_result.save();
-
-  params.set_output("Result", result_ref);
 }
 
 static void geo_node_attribute_vector_math_exec(GeoNodeExecParams params)
 {
+  const bNode &node = params.node();
+  const NodeAttributeVectorMath *node_storage = (const NodeAttributeVectorMath *)node.storage;
+  const NodeVectorMathOperation operation = (NodeVectorMathOperation)node_storage->operation;
+
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
+  const CustomDataType result_type = operation_get_result_type(operation);
+  AttributeRef result = AttributeRef("DummyName this will be auto generated", result_type);
+
   if (geometry_set.has<MeshComponent>()) {
-    attribute_vector_math_calc(geometry_set.get_component_for_write<MeshComponent>(), params);
+    attribute_vector_math_calc(
+        geometry_set.get_component_for_write<MeshComponent>(), params, result);
   }
   if (geometry_set.has<PointCloudComponent>()) {
-    attribute_vector_math_calc(geometry_set.get_component_for_write<PointCloudComponent>(),
-                               params);
+    attribute_vector_math_calc(
+        geometry_set.get_component_for_write<PointCloudComponent>(), params, result);
   }
   if (geometry_set.has<CurveComponent>()) {
-    attribute_vector_math_calc(geometry_set.get_component_for_write<CurveComponent>(), params);
+    attribute_vector_math_calc(
+        geometry_set.get_component_for_write<CurveComponent>(), params, result);
   }
 
   params.set_output("Geometry", geometry_set);
+  params.set_output("Result", result);
 }
 
 }  // namespace blender::nodes

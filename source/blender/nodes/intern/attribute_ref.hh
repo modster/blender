@@ -18,6 +18,11 @@
 
 #include <string>
 
+#include "BLI_color.hh"
+#include "BLI_float3.hh"
+
+#include "FN_cpp_type.hh"
+
 #include "BKE_attribute.h"
 
 /**
@@ -27,24 +32,47 @@
 struct AttributeRef {
  private:
   std::string name_;
-  AttributeDomain domain_;
   CustomDataType data_type_;
+
+  /* Single value to use when the socket is not connected. */
+  union {
+    float value_float_;
+    int value_int_;
+    bool value_bool_;
+    blender::float3 value_float3_;
+    blender::ColorGeometry4f value_color_;
+  };
 
  public:
   static const AttributeRef None;
 
  public:
-  const std::string& name() const;
-  AttributeDomain domain() const;
+  const std::string &name() const;
   CustomDataType data_type() const;
 
   AttributeRef();
-  AttributeRef(const std::string &name, AttributeDomain domain, CustomDataType data_type);
+  AttributeRef(CustomDataType data_type);
+  AttributeRef(const std::string &name, CustomDataType data_type);
 
   friend std::ostream &operator<<(std::ostream &stream, const AttributeRef &geometry_set);
   friend bool operator==(const AttributeRef &a, const AttributeRef &b);
   uint64_t hash() const;
 
   bool valid() const;
-};
 
+  void *single_value_ptr();
+  const void *single_value_ptr() const;
+
+  template<typename T> T &single_value()
+  {
+    BLI_assert(blender::fn::CPPType::get<T>() ==
+               *blender::bke::custom_data_type_to_cpp_type(data_type_));
+    return *(T *)single_value_ptr();
+  }
+  template<typename T> const T &single_value() const
+  {
+    BLI_assert(blender::fn::CPPType::get<T>() ==
+               *blender::bke::custom_data_type_to_cpp_type(data_type_));
+    return *(const T *)single_value_ptr();
+  }
+};

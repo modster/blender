@@ -693,6 +693,64 @@ static bNodeSocketType *make_socket_type_string()
   return socktype;
 }
 
+static CustomDataType socket_to_customdata_type(eNodeSocketDatatype socket_type)
+{
+  switch (socket_type) {
+    case SOCK_ATTRIBUTE:
+      return CD_AUTO_FROM_NAME;
+    case SOCK_FLOAT:
+      return CD_PROP_FLOAT;
+    case SOCK_INT:
+      return CD_PROP_INT32;
+    case SOCK_VECTOR:
+      return CD_PROP_FLOAT3;
+    case SOCK_RGBA:
+      return CD_PROP_COLOR;
+    case SOCK_STRING:
+      return CD_PROP_STRING;
+    case SOCK_BOOLEAN:
+      return CD_PROP_BOOL;
+    default:
+      BLI_assert_unreachable();
+      return CD_AUTO_FROM_NAME;
+  }
+  BLI_assert_unreachable();
+}
+
+static bNodeSocketType *make_socket_type_attribute()
+{
+  bNodeSocketType *socktype = make_standard_socket_type(SOCK_ATTRIBUTE, PROP_NONE);
+  socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<AttributeRef>(); };
+  socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
+    const bNodeSocketValueAttribute *default_value = (bNodeSocketValueAttribute *)
+                                                         socket.default_value;
+    eNodeSocketDatatype socket_data_type = (eNodeSocketDatatype)default_value->data_type;
+    AttributeRef *attribute_ref = new (r_value)
+        AttributeRef(socket_to_customdata_type(socket_data_type));
+    switch (socket_data_type) {
+      case SOCK_FLOAT:
+        attribute_ref->single_value<float>() = default_value->value_float[0];
+        break;
+      case SOCK_VECTOR:
+        attribute_ref->single_value<blender::float3>() = blender::float3(default_value->value_float);
+        break;
+      case SOCK_RGBA:
+        attribute_ref->single_value<blender::ColorGeometry4f>() =
+            blender::ColorGeometry4f(default_value->value_float);
+        break;
+      case SOCK_INT:
+        attribute_ref->single_value<int>() = default_value->value_int;
+        break;
+      case SOCK_BOOLEAN:
+        attribute_ref->single_value<bool>() = default_value->value_bool;
+        break;
+      default:
+        BLI_assert_unreachable();
+    }
+  };
+  return socktype;
+}
+
 MAKE_CPP_TYPE(Object, Object *)
 MAKE_CPP_TYPE(Collection, Collection *)
 MAKE_CPP_TYPE(Texture, Tex *)
@@ -714,16 +772,6 @@ static bNodeSocketType *make_socket_type_geometry()
   socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<GeometrySet>(); };
   socktype->get_cpp_value = [](const bNodeSocket &UNUSED(socket), void *r_value) {
     new (r_value) GeometrySet();
-  };
-  return socktype;
-}
-
-static bNodeSocketType *make_socket_type_attribute()
-{
-  bNodeSocketType *socktype = make_standard_socket_type(SOCK_ATTRIBUTE, PROP_NONE);
-  socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<AttributeRef>(); };
-  socktype->get_cpp_value = [](const bNodeSocket &UNUSED(socket), void *r_value) {
-    new (r_value) AttributeRef();
   };
   return socktype;
 }
@@ -790,6 +838,8 @@ void register_standard_node_socket_types(void)
 
   nodeRegisterSocketType(make_socket_type_string());
 
+  nodeRegisterSocketType(make_socket_type_attribute());
+
   nodeRegisterSocketType(make_standard_socket_type(SOCK_SHADER, PROP_NONE));
 
   nodeRegisterSocketType(make_socket_type_object());
@@ -803,8 +853,6 @@ void register_standard_node_socket_types(void)
   nodeRegisterSocketType(make_socket_type_texture());
 
   nodeRegisterSocketType(make_socket_type_material());
-
-  nodeRegisterSocketType(make_socket_type_attribute());
 
   nodeRegisterSocketType(make_socket_type_virtual());
 }

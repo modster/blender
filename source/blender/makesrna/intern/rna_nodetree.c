@@ -10046,13 +10046,6 @@ static void def_geo_attribute_get(StructRNA *srna)
   RNA_def_property_enum_default(prop, CD_PROP_FLOAT);
   RNA_def_property_ui_text(prop, "Data Type", "Type of data stored in attribute");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_GeometryNode_socket_update");
-
-  prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "custom2");
-  RNA_def_property_enum_items(prop, rna_enum_attribute_domain_with_auto_items);
-  RNA_def_property_enum_default(prop, ATTR_DOMAIN_AUTO);
-  RNA_def_property_ui_text(prop, "Domain", "");
-  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
 /* -------------------------------------------------------------------------- */
