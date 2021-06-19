@@ -243,25 +243,29 @@ typedef enum eRigidBody_Shape {
 } eRigidBody_Shape;
 
 enum {
-  /** display forces. */
+  /** Display forces. */
   RB_SIM_FORCES = (1<<0),
-  /** display acceleration. */
+  /** Display acceleration. */
   RB_SIM_ACCELERATION = (1<<1),
-  /** display velocity. */
+  /** Display velocity. */
   RB_SIM_VELOCITY = (1<<2),
-  /** display magnitude as text */
-  RB_SIM_TEXT = (1<<3)
+  /** Display magnitude as text */
+  RB_SIM_TEXT = (1<<3),
+  /** Indicate when collisions occur. */
+  RB_SIM_COLLISIONS = (1<<4),
 };
 
 enum {
-  /** display gravity force. */
+  /** Display gravity force. */
   RB_SIM_GRAVITY = (1<<0),
-  /** display force due to effectors. */
+  /** Display force due to effectors. */
   RB_SIM_EFFECTORS = (1<<1),
-  /** display contact normal forces. */
+  /** Display contact normal forces. */
   RB_SIM_NORMAL = (1<<2),
-  /** display contact normal frictional. */
-  RB_SIM_FRICTION = (1<<3)
+  /** Display contact normal frictional. */
+  RB_SIM_FRICTION = (1<<3),
+  /** Display resultant force. */
+  RB_SIM_NET_FORCE = (1<<4),
 };
 
 typedef enum eRigidBody_MeshSource {

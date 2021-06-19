@@ -323,6 +323,7 @@ class PHYSICS_PT_rigid_body_display_options(PHYSICS_PT_rigidbody_panel, Panel):
         col.prop(rbo, "display_data_text")
         col.prop(rbo, "display_acceleration")
         col.prop(rbo, "display_velocity")
+        col.prop(rbo, "display_collisions")
 
 class PHYSICS_PT_rigid_body_display_force_types(PHYSICS_PT_rigidbody_panel, Panel):
     bl_label = "Forces"
@@ -356,6 +357,7 @@ class PHYSICS_PT_rigid_body_display_force_types(PHYSICS_PT_rigidbody_panel, Pane
         col.prop(rbo, "show_effectors_force")
         col.prop(rbo, "show_normal_force")
         col.prop(rbo, "show_frictional_force")
+        col.prop(rbo, "show_net_force")
 
 classes = (
     PHYSICS_PT_rigid_body,

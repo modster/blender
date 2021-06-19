@@ -2262,7 +2262,6 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
     float cur_interp_val = interp_step;
 
     for (int i = 0; i < rbw->substeps_per_frame; i++) {
-      printf("substep%d\n",i);
       rigidbody_update_kinematic_obj_substep(&substep_targets, cur_interp_val);
       RB_dworld_step_simulation(rbw->shared->physics_world, substep, 0, substep);
       cur_interp_val += interp_step;
@@ -2274,8 +2273,11 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
         Object *ob = rbw->objects[j];
         if(ob->rigidbody_object != NULL){
           rbRigidBody *rbo = (rbRigidBody*)(ob->rigidbody_object->shared->physics_object);
-          int norm_flag = (ob->rigidbody_object->display_force_types & RB_SIM_NORMAL);
-          int fric_flag = (ob->rigidbody_object->display_force_types & RB_SIM_FRICTION);
+          int norm_flag = (ob->rigidbody_object->display_force_types & RB_SIM_NORMAL) ||
+                  (ob->rigidbody_object->display_force_types & RB_SIM_NET_FORCE) ||
+                  (ob->rigidbody_object->sim_display_options & RB_SIM_COLLISIONS);
+          int fric_flag = (ob->rigidbody_object->display_force_types & RB_SIM_FRICTION) ||
+                  (ob->rigidbody_object->display_force_types & RB_SIM_NET_FORCE);
           if(norm_flag || fric_flag){
             RB_dworld_get_impulse(rbw->shared->physics_world, rbo ,substep, norm_forces, fric_forces, vec_locations, norm_flag, fric_flag);
             copy_v3_v3(ob->rigidbody_object->vec_locations[0].vector,vec_locations[0]);

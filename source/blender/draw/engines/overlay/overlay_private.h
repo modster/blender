@@ -687,6 +687,8 @@ GPUShader *OVERLAY_shader_armature_stick(void);
 GPUShader *OVERLAY_shader_armature_wire(void);
 GPUShader *OVERLAY_shader_background(void);
 GPUShader *OVERLAY_shader_clipbound(void);
+GPUShader *OVERLAY_shader_collision_box(void);
+GPUShader *OVERLAY_shader_collision_cylinder(void);
 GPUShader *OVERLAY_shader_depth_only(void);
 GPUShader *OVERLAY_shader_edit_curve_handle(void);
 GPUShader *OVERLAY_shader_edit_curve_point(void);

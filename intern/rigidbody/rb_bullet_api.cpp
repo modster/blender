@@ -274,7 +274,6 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
           if(fric_flag)
           {
             copy_v3_btvec3(fric_forces[num_fric_forces], tot_lat_impulse);
-            printf("%f %f %f\n", tot_lat_impulse.getX(), tot_lat_impulse.getY(),tot_lat_impulse.getZ());
             num_fric_forces++;
           }
         }
@@ -290,6 +289,23 @@ void RB_dworld_step_simulation(rbDynamicsWorld *world,
                                float timeSubStep)
 {
   world->dynamicsWorld->stepSimulation(timeStep, maxSubSteps, timeSubStep);
+  //printf("step\n");
+  int numManifolds = world->dispatcher->getNumManifolds();
+  for (int i = 0; i < numManifolds; i++)
+  {
+      btPersistentManifold* contactManifold =  world->dispatcher->getManifoldByIndexInternal(i);
+      const void *obA = contactManifold->getBody0();
+      const void *obB = contactManifold->getBody1();
+      int numContacts = contactManifold->getNumContacts();
+      for (int j = 0; j < numContacts; j++)
+      {
+        btManifoldPoint& pt = contactManifold->getContactPoint(j);
+        if (pt.getAppliedImpulse() > 0.f)
+        {
+          //printf("%d,%f %f %f\n",j,pt.getPositionWorldOnB().getX(), pt.getPositionWorldOnB().getY(), pt.getPositionWorldOnB().getZ());
+        }
+      }
+  }
 }
 
 /* Export -------------------------- */
