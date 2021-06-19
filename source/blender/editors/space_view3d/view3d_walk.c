@@ -693,6 +693,9 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
       if ((walk->center_mval[0] == event->mval[0]) && (walk->center_mval[1] == event->mval[1])) {
         walk->is_cursor_first = false;
       }
+      else if (event->tablet.is_motion_absolute) {
+        walk->is_cursor_first = false;
+      }
       else {
         /* note, its possible the system isn't giving us the warp event
          * ideally we shouldn't have to worry about this, see: T45361 */
@@ -704,12 +707,18 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
       return;
     }
 
-    if ((walk->is_cursor_absolute == false) && event->tablet.is_motion_absolute) {
+    if (!walk->is_cursor_absolute && event->tablet.is_motion_absolute) {
       walk->is_cursor_absolute = true;
       copy_v2_v2_int(walk->prev_mval, event->mval);
       copy_v2_v2_int(walk->center_mval, event->mval);
       /* Without this we can't turn 180d with the default speed of 1.0. */
       walk->mouse_speed *= 4.0f;
+    }
+    else if (walk->is_cursor_absolute && !event->tablet.is_motion_absolute) {
+        walk->is_cursor_absolute = false;
+        walk->is_cursor_first = true;
+        /* Return walk speed to normal. */
+        walk->mouse_speed = U.walk_navigation.mouse_speed;
     }
 #endif /* USE_TABLET_SUPPORT */
 
