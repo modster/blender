@@ -153,10 +153,8 @@ class Arena {
     T value;
     usize generation;
 
-    EntryExist(T value, usize generation)
+    EntryExist(T value, usize generation) : value(value), generation(generation)
     {
-      this->value = value;
-      this->generation = generation;
     }
   };
 
@@ -219,19 +217,19 @@ class Arena {
   {
     if (this->next_free_head) {
       auto loc = *this->next_free_head;
+
       if (auto entry = std::get_if<EntryNoExist>(&this->data[loc])) {
         this->next_free_head = entry->next_free;
         this->data[loc] = EntryExist(value, this->generation);
+        this->length += 1;
+        return Index(loc, this->generation);
       }
-      else {
-        /* The linked list created to
-         * know where to insert next is
-         * corrupted.
-         * `this->next_free_head` is corrupted */
-        BLI_assert_unreachable();
-      }
-      this->length += 1;
-      return Index(loc, this->generation);
+
+      /* The linked list created to
+       * know where to insert next is
+       * corrupted.
+       * `this->next_free_head` is corrupted */
+      BLI_assert_unreachable();
     }
     return std::nullopt;
   }
