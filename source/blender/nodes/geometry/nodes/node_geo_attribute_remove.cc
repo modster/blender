@@ -36,21 +36,26 @@ static bNodeSocketTemplate geo_node_attribute_remove_out[] = {
     {-1, ""},
 };
 
+static void geo_node_attribute_remove_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  blender::nodes::set_attribute_socket_data_type(*node, "Attribute", SOCK_ATTRIBUTE);
+}
+
 namespace blender::nodes {
 
 static void remove_attribute(GeometryComponent &component,
                              GeoNodeExecParams &params,
                              Span<AttributeRef> attribute_refs)
 {
-  for (const AttributeRef& attribute_ref : attribute_refs) {
+  for (const AttributeRef &attribute_ref : attribute_refs) {
     if (!attribute_ref.valid()) {
       continue;
     }
 
     if (!component.attribute_try_delete(attribute_ref.name())) {
       params.error_message_add(NodeWarningType::Error,
-                               TIP_("Cannot delete attribute with name \"") + attribute_ref.name() +
-                                   "\"");
+                               TIP_("Cannot delete attribute with name \"") +
+                                   attribute_ref.name() + "\"");
     }
   }
 }
@@ -86,6 +91,7 @@ void register_node_type_geo_attribute_remove()
   geo_node_type_base(
       &ntype, GEO_NODE_ATTRIBUTE_REMOVE, "Attribute Remove", NODE_CLASS_ATTRIBUTE, 0);
   node_type_socket_templates(&ntype, geo_node_attribute_remove_in, geo_node_attribute_remove_out);
+  node_type_init(&ntype, geo_node_attribute_remove_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_remove_exec;
   nodeRegisterType(&ntype);
 }
