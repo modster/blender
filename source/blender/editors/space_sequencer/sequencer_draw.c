@@ -1115,8 +1115,8 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     render_size = SEQ_rendersize_to_scale_factor(sseq->render_size);
   }
 
-  rectx = roundf(render_size * scene->r.xsch);
-  recty = roundf(render_size * scene->r.ysch);
+  rectx = roundf(render_size * 0.25 * scene->r.xsch);
+  recty = roundf(render_size * 0.25 * scene->r.ysch);
 
   /* if thumbs too small ignore */
   min_size = ((y2 - y1) / pixely) > 40 * U.dpi_fac;
@@ -1130,19 +1130,18 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.use_proxies = false;
   context.is_prefetch_render = false;
   context.is_proxy_render = false;
+  context.is_thumb = true;
 
   /*Calculate thumb dimensions */
   float thumb_h = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
-  float aspect_ratio = ((float)scene->r.xsch) / scene->r.ysch;
+  float aspect_ratio = ((float)rectx) / recty;
   float thumb_h_px = thumb_h / pixely;
   float thumb_w = aspect_ratio * thumb_h_px * pixelx;
-  float zoom_x = thumb_w / scene->r.xsch;
-  float zoom_y = thumb_h / scene->r.ysch;
+  float zoom_x = thumb_w / rectx;
+  float zoom_y = thumb_h / recty;
 
   y2 = y1 + thumb_h - pixely;
   x1 = seq->start;
-
-  // TODO(AYJ) : add x1 = x1 + handsize_clamped
 
   int frame_factor = 0;
   float cut_off = 0;
@@ -1175,7 +1174,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     /* clip if full thumbnail cannot be displayed */
     if (x2 >= (upper_thumb_bound - 1)) {
       x2 = (upper_thumb_bound - 1);
-      if (x2 - x1 < 4)
+      if (x2 - x1 < 1)
         break;
     }
 

@@ -1302,8 +1302,9 @@ void seq_cache_cleanup_sequence(Scene *scene,
   }
 
   int invalidate_composite = invalidate_types & SEQ_CACHE_STORE_FINAL_OUT;
-  int invalidate_source = invalidate_types & (SEQ_CACHE_STORE_RAW | SEQ_CACHE_STORE_PREPROCESSED |
-                                              SEQ_CACHE_STORE_COMPOSITE);
+  int invalidate_source = invalidate_types &
+                          (SEQ_CACHE_STORE_RAW | SEQ_CACHE_STORE_PREPROCESSED |
+                           SEQ_CACHE_STORE_COMPOSITE);  // TODO(AYJ) : add thumbnail
 
   GHashIterator gh_iter;
   BLI_ghashIterator_init(&gh_iter, cache->hash);
