@@ -31,7 +31,7 @@
 static bNodeSocketTemplate geo_node_attribute_sample_texture_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_TEXTURE, N_("Texture")},
-    {SOCK_ATTRIBUTE, N_("Mapping")},
+    {SOCK_ATTRIBUTE, N_("Mapping"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {-1, ""},
 };
 
@@ -41,19 +41,18 @@ static bNodeSocketTemplate geo_node_attribute_sample_texture_out[] = {
     {-1, ""},
 };
 
+static void geo_node_attribute_sample_texture_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  blender::nodes::set_attribute_socket_data_type(*node, "Mapping", SOCK_VECTOR);
+  blender::nodes::set_attribute_socket_data_type(*node, "Result", SOCK_RGBA);
+}
+
 namespace blender::nodes {
 
 static AttributeDomain get_result_domain(const GeometryComponent &component,
-                                         const StringRef result_name,
                                          const StringRef map_name)
 {
-  /* Use the domain of the result attribute if it already exists. */
-  std::optional<AttributeMetaData> result_info = component.attribute_get_meta_data(result_name);
-  if (result_info) {
-    return result_info->domain;
-  }
-
-  /* Otherwise use the name of the map attribute. */
+  /* Use the name of the map attribute. */
   std::optional<AttributeMetaData> map_info = component.attribute_get_meta_data(map_name);
   if (map_info) {
     return map_info->domain;
@@ -63,31 +62,31 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
   return ATTR_DOMAIN_POINT;
 }
 
-static void execute_on_component(GeometryComponent &component, const GeoNodeExecParams &params)
+static void execute_on_component(GeometryComponent &component,
+                                 const GeoNodeExecParams &params,
+                                 const AttributeRef &result_ref)
 {
   Tex *texture = params.get_input<Tex *>("Texture");
   if (texture == nullptr) {
     return;
   }
 
-  const std::string result_attribute_name = params.get_input<std::string>("Result");
-  const std::string mapping_name = params.get_input<std::string>("Mapping");
-  if (!component.attribute_exists(mapping_name)) {
+  const AttributeRef mapping_ref = params.get_input<AttributeRef>("Mapping");
+  if (!component.attribute_exists(mapping_ref.name())) {
     return;
   }
 
-  const AttributeDomain result_domain = get_result_domain(
-      component, result_attribute_name, mapping_name);
+  const AttributeDomain result_domain = get_result_domain(component, mapping_ref.name());
 
   OutputAttribute_Typed<ColorGeometry4f> attribute_out =
-      component.attribute_try_get_for_output_only<ColorGeometry4f>(result_attribute_name,
+      component.attribute_try_get_for_output_only<ColorGeometry4f>(result_ref.name(),
                                                                    result_domain);
   if (!attribute_out) {
     return;
   }
 
   GVArray_Typed<float3> mapping_attribute = component.attribute_get_for_read<float3>(
-      mapping_name, result_domain, {0, 0, 0});
+      mapping_ref.name(), result_domain, {0, 0, 0});
 
   MutableSpan<ColorGeometry4f> colors = attribute_out.as_span();
   threading::parallel_for(IndexRange(mapping_attribute.size()), 128, [&](IndexRange range) {
@@ -106,32 +105,29 @@ static void execute_on_component(GeometryComponent &component, const GeoNodeExec
 
 static void geo_node_attribute_sample_texture_exec(GeoNodeExecParams params)
 {
-  return;
-
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  AttributeRef result_attribute_ref("DummyName this will be auto generated", CD_PROP_COLOR);
 
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
-    execute_on_component(geometry_set.get_component_for_write<MeshComponent>(), params);
+    execute_on_component(
+        geometry_set.get_component_for_write<MeshComponent>(), params, result_attribute_ref);
   }
   if (geometry_set.has<PointCloudComponent>()) {
-    execute_on_component(geometry_set.get_component_for_write<PointCloudComponent>(), params);
+    execute_on_component(
+        geometry_set.get_component_for_write<PointCloudComponent>(), params, result_attribute_ref);
   }
   if (geometry_set.has<CurveComponent>()) {
-    execute_on_component(geometry_set.get_component_for_write<CurveComponent>(), params);
+    execute_on_component(
+        geometry_set.get_component_for_write<CurveComponent>(), params, result_attribute_ref);
   }
 
   params.set_output("Geometry", geometry_set);
+  params.set_output("Result", result_attribute_ref);
 }
 
 }  // namespace blender::nodes
-
-static void init(bNodeTree *UNUSED(tree), bNode *node)
-{
-  blender::nodes::set_attribute_socket_data_type(*node, "Mapping", SOCK_VECTOR);
-  blender::nodes::set_attribute_socket_data_type(*node, "Result", SOCK_RGBA);
-}
 
 void register_node_type_geo_sample_texture()
 {
@@ -143,7 +139,7 @@ void register_node_type_geo_sample_texture()
                      NODE_CLASS_ATTRIBUTE,
                      0);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
-  node_type_init(&ntype, &init);
+  node_type_init(&ntype, &geo_node_attribute_sample_texture_init);
   node_type_socket_templates(
       &ntype, geo_node_attribute_sample_texture_in, geo_node_attribute_sample_texture_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_sample_texture_exec;
