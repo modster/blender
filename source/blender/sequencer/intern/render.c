@@ -541,7 +541,6 @@ static void sequencer_preprocess_transform_crop(
                                              context->preview_render_size);
   const bool do_scale_to_render_size = seq_need_scale_to_render_size(seq, is_proxy_image);
   float image_scale_factor = do_scale_to_render_size ? 1.0f : preview_scale_factor;
-  // TODO(AYJ) : check is setting image_scale_factor as const is imp
   if (context->is_thumb)
     image_scale_factor = 0.25f;
 

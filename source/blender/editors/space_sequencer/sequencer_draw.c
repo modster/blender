@@ -1145,7 +1145,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 
   int frame_factor = 0;
   float cut_off = 0;
-  float upper_thumb_bound = strip_x2 - handsize_clamped;
+  float upper_thumb_bound = strip_x2;
 
   while (x1 < upper_thumb_bound - 1) {
     x2 = x1 + thumb_w;
@@ -1172,6 +1172,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
 
     /* clip if full thumbnail cannot be displayed */
+
     if (x2 >= (upper_thumb_bound - 1)) {
       x2 = (upper_thumb_bound - 1);
       if (x2 - x1 < 1)
@@ -1179,7 +1180,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
 
     /* Get the image */
-    ibuf = SEQ_render_give_ibuf_direct(&context, x1 + cut_off, seq);
+    ibuf = SEQ_render_give_ibuf_direct(&context, x1 + (int)(cut_off), seq);
 
     if (ibuf) {
       ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
