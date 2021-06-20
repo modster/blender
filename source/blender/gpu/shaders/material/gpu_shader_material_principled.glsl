@@ -142,6 +142,7 @@ void node_bsdf_principled_eval(vec4 base_color,
 
     g_reflection_data.color = brdf * glass_reflection_weight;
     g_reflection_data.N = N;
+    g_reflection_data.roughness = roughness;
   }
   else if (closure_weight_threshold(g_reflection_data, specular_weight)) {
     vec3 dielectric_f0_color = mix(vec3(1.0), base_color_tint, specular_tint);
@@ -177,5 +178,6 @@ void node_bsdf_principled_eval(vec4 base_color,
     g_refraction_data.color = base_color.rgb * (btdf * glass_transmission_weight);
     g_refraction_data.N = N;
     g_refraction_data.roughness = do_multiscatter != 0.0 ? roughness : transmission_roughness;
+    g_refraction_data.ior = ior;
   }
 }

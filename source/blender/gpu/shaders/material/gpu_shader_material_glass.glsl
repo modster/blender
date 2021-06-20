@@ -44,5 +44,6 @@ void node_bsdf_glass_eval(vec4 color,
     g_refraction_data.color = color.rgb * (refraction_weight * btdf);
     g_refraction_data.N = N;
     g_refraction_data.roughness = roughness;
+    g_refraction_data.ior = ior;
   }
 }

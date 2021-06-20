@@ -71,7 +71,7 @@ vec3 lightprobe_cubemap_evaluate(CubemapInfoData info,
   return cubemap_array_sample(cubemap_tx, vec4(R, cube._layer), lod).rgb;
 }
 
-vec3 lightprobe_cubemap_eval(ClosureReflection reflection, vec3 P, vec3 R, float random_threshold)
+vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold)
 {
   /* Go through all cubemaps, computing and adding their weights for this pixel
    * until reaching a random threshold. */
@@ -85,5 +85,5 @@ vec3 lightprobe_cubemap_eval(ClosureReflection reflection, vec3 P, vec3 R, float
   }
 
   return lightprobe_cubemap_evaluate(
-      probes_info.cubes, lightprobe_cube_tx, cubes[cube_index], P, R, reflection.roughness);
+      probes_info.cubes, lightprobe_cube_tx, cubes[cube_index], P, R, roughness);
 }

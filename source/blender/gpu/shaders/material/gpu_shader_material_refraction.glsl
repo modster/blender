@@ -12,5 +12,6 @@ void node_bsdf_refraction_eval(
     g_refraction_data.color = color.rgb * weight;
     g_refraction_data.N = N;
     g_refraction_data.roughness = roughness;
+    g_refraction_data.ior = ior;
   }
 }

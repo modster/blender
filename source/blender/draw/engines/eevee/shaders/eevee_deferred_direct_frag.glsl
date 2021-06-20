@@ -50,6 +50,7 @@ uniform sampler2D depth_tx;
 uniform sampler2D emission_data_tx;
 uniform usampler2D diffuse_data_tx;
 uniform usampler2D reflection_data_tx;
+uniform usampler2D refraction_data_tx;
 uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
@@ -73,8 +74,8 @@ void light_eval(ClosureDiffuse diffuse,
                 float vP_z,
                 inout vec3 out_diffuse,
                 inout vec3 out_specular);
-vec3 lightprobe_grid_eval(ClosureDiffuse diffuse, vec3 P, float random_threshold);
-vec3 lightprobe_cubemap_eval(ClosureReflection reflection, vec3 P, vec3 R, float random_threshold);
+vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold);
+vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold);
 
 void main(void)
 {
@@ -86,6 +87,7 @@ void main(void)
   ClosureEmission emission = gbuffer_load_emission_data(emission_data_tx, uvcoordsvar.xy);
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(diffuse_data_tx, uvcoordsvar.xy);
   ClosureReflection reflection = gbuffer_load_reflection_data(reflection_data_tx, uvcoordsvar.xy);
+  ClosureRefraction refraction = gbuffer_load_refraction_data(refraction_data_tx, uvcoordsvar.xy);
 
   float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE);
   float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
@@ -93,14 +95,17 @@ void main(void)
 
   vec3 radiance_diffuse = vec3(0);
   vec3 radiance_reflection = vec3(0);
+  vec3 radiance_refraction = vec3(0);
   vec3 R = -reflect(V, reflection.N);
+  vec3 T = refract(-V, refraction.N, refraction.ior);
 
   light_eval(diffuse, reflection, P, V, vP.z, radiance_diffuse, radiance_reflection);
-  radiance_diffuse += lightprobe_grid_eval(diffuse, P, random_probe);
-  radiance_reflection += lightprobe_cubemap_eval(reflection, P, R, random_probe);
+  radiance_diffuse += lightprobe_grid_eval(P, diffuse.N, random_probe);
+  radiance_reflection += lightprobe_cubemap_eval(P, R, reflection.roughness, random_probe);
+  radiance_refraction += lightprobe_cubemap_eval(P, T, sqr(refraction.roughness), random_probe);
 
   out_diffuse = radiance_diffuse * diffuse.color;
-  out_specular = radiance_reflection * reflection.color;
+  out_specular = radiance_reflection * reflection.color + radiance_refraction * refraction.color;
   out_combined = vec4(out_diffuse + out_specular + emission.emission, 0.0);
 }
 

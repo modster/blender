@@ -276,6 +276,7 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
   deferred_pass.input_emission_data_tx_ = gbuffer.emission_tx;
   deferred_pass.input_diffuse_data_tx_ = gbuffer.diffuse_tx;
   deferred_pass.input_reflection_data_tx_ = gbuffer.reflection_tx;
+  deferred_pass.input_refraction_data_tx_ = gbuffer.refraction_tx;
   deferred_pass.input_transparency_data_tx_ = gbuffer.transparency_tx;
   deferred_pass.input_volume_data_tx_ = gbuffer.volume_tx;
   deferred_pass.input_depth_tx_ = gbuffer.depth_copy_tx;
@@ -354,6 +355,7 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "emission_data_tx", &input_emission_data_tx_);
     DRW_shgroup_uniform_texture_ref(grp, "diffuse_data_tx", &input_diffuse_data_tx_);
     DRW_shgroup_uniform_texture_ref(grp, "reflection_data_tx", &input_reflection_data_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "refraction_data_tx", &input_refraction_data_tx_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_stencil_set(
         grp, 0x0, 0x0, CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_EMISSION);

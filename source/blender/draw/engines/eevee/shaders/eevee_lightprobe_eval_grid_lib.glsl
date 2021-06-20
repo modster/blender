@@ -88,7 +88,7 @@ vec3 lightprobe_grid_evaluate(
   return irradiance_accum / weight_accum;
 }
 
-vec3 lightprobe_grid_eval(ClosureDiffuse diffuse, vec3 P, float random_threshold)
+vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold)
 {
   /* Go through all grids, computing and adding their weights for this pixel
    * until reaching a random threshold. */
@@ -101,6 +101,5 @@ vec3 lightprobe_grid_eval(ClosureDiffuse diffuse, vec3 P, float random_threshold
     }
   }
 
-  return lightprobe_grid_evaluate(
-      probes_info.grids, lightprobe_grid_tx, grids[grid_index], P, diffuse.N);
+  return lightprobe_grid_evaluate(probes_info.grids, lightprobe_grid_tx, grids[grid_index], P, N);
 }

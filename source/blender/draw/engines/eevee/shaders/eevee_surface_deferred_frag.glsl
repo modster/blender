@@ -44,6 +44,10 @@ void main(void)
     g_emission_data.emission /= alpha;
   }
 
+  if (gl_FrontFacing) {
+    g_refraction_data.ior = safe_rcp(g_refraction_data.ior);
+  }
+
   out_diffuse_data = gbuffer_store_diffuse_data(g_diffuse_data);
   out_reflection_data = gbuffer_store_reflection_data(g_reflection_data);
   out_refraction_data = gbuffer_store_refraction_data(g_refraction_data);

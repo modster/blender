@@ -70,8 +70,8 @@ void light_eval(ClosureDiffuse diffuse,
                 float vP_z,
                 inout vec3 out_diffuse,
                 inout vec3 out_specular);
-vec3 lightprobe_grid_eval(ClosureDiffuse diffuse, vec3 P, float random_threshold);
-vec3 lightprobe_cubemap_eval(ClosureReflection reflection, vec3 P, vec3 R, float random_threshold);
+vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold);
+vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_threshold);
 
 void main(void)
 {
@@ -89,18 +89,27 @@ void main(void)
   float noise_probe = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).g;
   float random_probe = fract(noise_probe + sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE));
 
+  if (gl_FrontFacing) {
+    g_refraction_data.ior = safe_rcp(g_refraction_data.ior);
+  }
+
   vec3 radiance_diffuse = vec3(0);
   vec3 radiance_reflection = vec3(0);
+  vec3 radiance_refraction = vec3(0);
   vec3 R = -reflect(V, g_reflection_data.N);
+  vec3 T = refract(-V, g_refraction_data.N, g_refraction_data.ior);
 
   light_eval(g_diffuse_data, g_reflection_data, P, V, vP_z, radiance_diffuse, radiance_reflection);
-  radiance_diffuse += lightprobe_grid_eval(g_diffuse_data, P, random_probe);
-  radiance_reflection += lightprobe_cubemap_eval(g_reflection_data, P, R, random_probe);
+  radiance_diffuse += lightprobe_grid_eval(P, g_diffuse_data.N, random_probe);
+  radiance_reflection += lightprobe_cubemap_eval(P, R, g_reflection_data.roughness, random_probe);
+  radiance_refraction += lightprobe_cubemap_eval(
+      P, T, sqr(g_refraction_data.roughness), random_probe);
 
   // volume_eval(ray, volume_radiance, volume_transmittance, volume_depth);
 
   out_radiance.rgb = radiance_diffuse * g_diffuse_data.color;
   out_radiance.rgb += radiance_reflection * g_reflection_data.color;
+  out_radiance.rgb += radiance_refraction * g_refraction_data.color;
   out_radiance.rgb += g_emission_data.emission;
   out_radiance.a = 0.0;
 

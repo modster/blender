@@ -287,6 +287,7 @@ class DeferredPass {
   GPUTexture *input_emission_data_tx_ = nullptr;
   GPUTexture *input_diffuse_data_tx_ = nullptr;
   GPUTexture *input_reflection_data_tx_ = nullptr;
+  GPUTexture *input_refraction_data_tx_ = nullptr;
   GPUTexture *input_transparency_data_tx_ = nullptr;
   GPUTexture *input_volume_data_tx_ = nullptr;
   GPUTexture *input_volume_radiance_tx_ = nullptr;
