@@ -865,7 +865,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             float prev_loc[3], cut_loc[3], next_loc[3];
             /* Mouse location as floats. */
             float mval[2];
-          } data = {NULL};
+          } data = {.bezt_index = 0, .min_dist = 10000, .has_prev = false, .has_next = false};
 
           data.mval[0] = event->mval[0];
           data.mval[1] = event->mval[1];
