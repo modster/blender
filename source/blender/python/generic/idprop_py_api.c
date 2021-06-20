@@ -1571,16 +1571,8 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
 
   int min, max, soft_min, soft_max, step;
   PyObject *default_value = NULL;
-  const char *kwlist[] = {"key",
-                          "min",
-                          "max",
-                          "soft_min",
-                          "soft_max",
-                          "step",
-                          "default",
-                          "subtype",
-                          "description",
-                          NULL};
+  const char *kwlist[] = {
+      "", "min", "max", "soft_min", "soft_max", "step", "default", "subtype", "description", NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
                                    "s|$iiiiiOzz:ui_data_update",
@@ -1628,27 +1620,26 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
   }
 
   /* The default value needs special handling because for array IDProperties it can be a single
-   * value or an array, but for non-array properties it can only be a value. Parse it once as a
-   * generic object to check if it was passed as an array. */
+   * value or an array, but for non-array properties it can only be a value. */
   if (!ELEM(default_value, NULL, Py_None)) {
     if (PySequence_Check(default_value)) {
       if (idprop->type != IDP_ARRAY) {
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
         return false;
       }
-      PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(default_value);
-      Py_ssize_t len = PySequence_Fast_GET_SIZE(default_value);
+
+      Py_ssize_t len = PySequence_Size(default_value);
+      int *new_default_array = MEM_malloc_arrayN(len, sizeof(int), __func__);
+      if (PyC_AsArray(
+              new_default_array, default_value, len, &PyLong_Type, false, "ui_data_update") ==
+          -1) {
+        MEM_freeN(new_default_array);
+        return false;
+      }
 
       ui_data->default_array_len = len;
-      ui_data->default_array = MEM_reallocN(ui_data->default_array, sizeof(int) * len);
-      for (Py_ssize_t i = 0; i < len; i++) {
-        const int value = PyC_Long_AsI32(ob_seq_fast_items[i]);
-        if ((value == -1) && PyErr_Occurred()) {
-          PyErr_SetString(PyExc_ValueError, "Error converting default array object to integer");
-          return false;
-        }
-        ui_data->default_array[i] = value;
-      }
+      MEM_SAFE_FREE(ui_data->default_array);
+      ui_data->default_array = new_default_array;
     }
     else {
       const int value = PyC_Long_AsI32(default_value);
@@ -1676,7 +1667,7 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
   int precision;
   double min, max, soft_min, soft_max, step;
   PyObject *default_value = NULL;
-  const char *kwlist[] = {"key",
+  const char *kwlist[] = {"",
                           "min",
                           "max",
                           "soft_min",
@@ -1738,27 +1729,26 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
   }
 
   /* The default value needs special handling because for array IDProperties it can be a single
-   * value or an array, but for non-array properties it can only be a value. Parse it once as a
-   * generic object to check if it was passed as an array. */
+   * value or an array, but for non-array properties it can only be a value. */
   if (!ELEM(default_value, NULL, Py_None)) {
     if (PySequence_Check(default_value)) {
       if (idprop->type != IDP_ARRAY) {
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
         return false;
       }
-      PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(default_value);
-      Py_ssize_t len = PySequence_Fast_GET_SIZE(default_value);
+
+      Py_ssize_t len = PySequence_Size(default_value);
+      double *new_default_array = MEM_malloc_arrayN(len, sizeof(double), __func__);
+      if (PyC_AsArray(
+              new_default_array, default_value, len, &PyFloat_Type, true, "ui_data_update") ==
+          -1) {
+        MEM_freeN(new_default_array);
+        return false;
+      }
 
       ui_data->default_array_len = len;
-      ui_data->default_array = MEM_reallocN(ui_data->default_array, sizeof(double) * len);
-      for (Py_ssize_t i = 0; i < len; i++) {
-        const double value = PyFloat_AsDouble(ob_seq_fast_items[i]);
-        if ((value == -1.0) && PyErr_Occurred()) {
-          PyErr_SetString(PyExc_ValueError, "Error converting default array object to double");
-          return false;
-        }
-        ui_data->default_array[i] = value;
-      }
+      MEM_SAFE_FREE(ui_data->default_array);
+      ui_data->default_array = new_default_array;
     }
     else {
       const double value = PyFloat_AsDouble(default_value);
@@ -1784,7 +1774,7 @@ static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyO
   const char *description = NULL;
 
   const char *default_value;
-  const char *kwlist[] = {"key", "default", "subtype", "description", NULL};
+  const char *kwlist[] = {"", "default", "subtype", "description", NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
                                    "s|$zzz:ui_data_update",
@@ -1820,7 +1810,7 @@ static bool idprop_ui_data_update_id(IDProperty *idprop, PyObject *args, PyObjec
   const char *rna_subtype = NULL;
   const char *description = NULL;
 
-  const char *kwlist[] = {"key", "subtype", "description", NULL};
+  const char *kwlist[] = {"", "subtype", "description", NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
                                    "s|$zz:ui_data_update",
@@ -1859,7 +1849,7 @@ static PyObject *BPy_IDGroup_ui_data_update(BPy_IDProperty *self, PyObject *args
   /* First extract the key as only positional-only argument in order to choose a different
    * parsing call based on the IDProperty's type. */
   const char *key;
-  if (!PyArg_ParseTuple(args, "s", &key)) {
+  if (!PyArg_ParseTuple(args, "s:ui_data_update", &key)) {
     return NULL;
   }
 

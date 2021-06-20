@@ -1431,15 +1431,29 @@ class WM_OT_properties_edit(Operator):
 
         if prop_type in {float, int}:
             props = item.id_properties_create()
-            props.ui_data_update(prop, 
-                             subtype=self.subtype, 
-                             min=self.min, 
-                             max=self.max, 
-                             soft_min=self.soft_min, 
-                             soft_max=self.soft_max,
-                             description=self.description)
+
+            prop_min, prop_max = self.min, self.max
+            prop_soft_min, prop_soft_max = self.soft_min, self.soft_max
+            if prop_type == int:
+                prop_min = int(round(prop_min))
+                prop_max = int(round(prop_max))
+                prop_soft_min = int(round(prop_soft_min))
+                prop_soft_max = int(round(prop_soft_max))
+
+            props.ui_data_update(
+                prop,
+                subtype=self.subtype,
+                min=prop_min,
+                max=prop_max,
+                soft_min=prop_soft_min,
+                soft_max=prop_soft_max,
+                description=self.description,
+            )
         if prop_type in {float, int, str}:
             props = item.id_properties_create()
+            if prop_type == int:
+                if hasattr(default_eval, "__len__"):
+                    default_eval = [int(round(value)) for value in default_eval]
             props.ui_data_update(prop, default=default_eval)
 
         # If we have changed the type of the property, update its potential anim curves!
