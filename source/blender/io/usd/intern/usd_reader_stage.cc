@@ -112,25 +112,34 @@ USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim)
   return nullptr;
 }
 
-/* Returns true if the given prim should be excluded from the
- * traversal because it's invisible. */
+/* Returns true if the given prim should be included in the
+ * traversal based on the import options and the prim's visibility
+ * attribute.  Note that the prim will be trivially included
+ * if it has no visibility attribute or if the visibility
+ * is inherited. */
 bool USDStageReader::prune_by_visibility(const pxr::UsdGeomImageable &imageable) const
 {
-  if (!(imageable && params_.import_visible_only)) {
-    return false;
+  if (!params_.import_visible_only) {
+    /* Invisible prims are allowed. */
+    return true;
   }
 
-  if (pxr::UsdAttribute visibility_attr = imageable.GetVisibilityAttr()) {
-    // Prune if the prim has a non-animating visibility attribute and is
-    // invisible.
-    if (!visibility_attr.ValueMightBeTimeVarying()) {
-      pxr::TfToken visibility;
-      visibility_attr.Get(&visibility);
-      return visibility == pxr::UsdGeomTokens->invisible;
-    }
+  pxr::UsdAttribute visibility_attr = imageable.GetVisibilityAttr();
+
+  if (!visibility_attr) {
+    /* No visibility attribute, so allow. */
+    return true;
   }
 
-  return false;
+  /* Include if the prim has an animating visibility attribute or is not invisible. */
+
+  if (visibility_attr.ValueMightBeTimeVarying()) {
+    return true;
+  }
+
+  pxr::TfToken visibility;
+  visibility_attr.Get(&visibility);
+  return visibility != pxr::UsdGeomTokens->invisible;
 }
 
 /* Returns true if the given prim should be excluded from the
@@ -213,7 +222,7 @@ USDPrimReader *USDStageReader::collect_readers(Main *bmain, const pxr::UsdPrim &
       return nullptr;
     }
 
-    if (prune_by_visibility(imageable)) {
+    if (!prune_by_visibility(imageable)) {
       return nullptr;
     }
   }
