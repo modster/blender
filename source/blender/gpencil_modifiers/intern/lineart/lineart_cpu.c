@@ -115,6 +115,8 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *spl,
 
 static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e);
 
+static LineartCache *lineart_init_cache(void);
+
 static void lineart_discard_segment(LineartRenderBuffer *rb, LineartEdgeSegment *es)
 {
   BLI_spin_lock(&rb->lock_cuts);
@@ -506,7 +508,7 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   rb->floating.last = rb->floating.first;
   rb->light_contour.last = rb->light_contour.first;
 
-  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH, TASK_ISOLATION_OFF);
+  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
   for (i = 0; i < thread_count; i++) {
     rti[i].thread_id = i;
@@ -2226,7 +2228,7 @@ static void lineart_main_load_geometries(
   }
   DEG_OBJECT_ITER_END;
 
-  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH, TASK_ISOLATION_OFF);
+  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
   for (int i = 0; i < thread_count; i++) {
     olti[i].rb = rb;
@@ -3014,13 +3016,13 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
 
 void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
 {
-  LineartRenderBuffer *rb = lmd->render_buffer_onetime;
+  LineartRenderBuffer *rb = lmd->render_buffer_ptr;
 
   lineart_destroy_render_data(rb);
 
   if (rb) {
     MEM_freeN(rb);
-    lmd->render_buffer_onetime = NULL;
+    lmd->render_buffer_ptr = NULL;
   }
 
   if (G.debug_value == 4000) {
@@ -3053,7 +3055,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   LineartRenderBuffer *rb = MEM_callocN(sizeof(LineartRenderBuffer), "Line Art render buffer");
 
   lmd->cache = lc;
-  lmd->render_buffer_onetime = rb;
+  lmd->render_buffer_ptr = rb;
   lc->rb_edge_types = LRT_EDGE_FLAG_ALL_TYPE;
 
   if (!scene || !camera || !lc) {
@@ -3124,21 +3126,13 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   /* See lineart_edge_from_triangle() for how this option may impact performance. */
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
 
-  rb->allow_duplicated_types = (lmd->calculation_flags & LRT_ALLOW_MULTIPLE_EDGE_TYPES) != 0;
+  int16_t edge_types = lmd->edge_types_override;
 
-  /* lmd->edge_types_override contains all used flags in the modifier stack. */
-  rb->use_contour = (lmd->edge_types_override & LRT_EDGE_FLAG_CONTOUR) != 0;
-  rb->use_crease = (lmd->edge_types_override & LRT_EDGE_FLAG_CREASE) != 0;
-  rb->use_material = (lmd->edge_types_override & LRT_EDGE_FLAG_MATERIAL) != 0;
-  rb->use_edge_marks = (lmd->edge_types_override & LRT_EDGE_FLAG_EDGE_MARK) != 0;
-  rb->use_intersections = (lmd->edge_types_override & LRT_EDGE_FLAG_INTERSECTION) != 0;
-  rb->use_floating = (lmd->edge_types_override & LRT_EDGE_FLAG_FLOATING) != 0;
-  rb->use_light_contour = (lmd->edge_types_override & LRT_EDGE_FLAG_LIGHT_CONTOUR) != 0;
-
-  rb->filter_face_mark_invert = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_INVERT) != 0;
-  rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;
-  rb->filter_face_mark_boundaries = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_BOUNDARIES) !=
-                                    0;
+  rb->use_contour = (edge_types & LRT_EDGE_FLAG_CONTOUR) != 0;
+  rb->use_crease = (edge_types & LRT_EDGE_FLAG_CREASE) != 0;
+  rb->use_material = (edge_types & LRT_EDGE_FLAG_MATERIAL) != 0;
+  rb->use_edge_marks = (edge_types & LRT_EDGE_FLAG_EDGE_MARK) != 0;
+  rb->use_intersections = (edge_types & LRT_EDGE_FLAG_INTERSECTION) != 0;
 
   rb->chain_data_pool = &lc->chain_data_pool;
 
@@ -4534,7 +4528,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   return true;
 }
 
-static int lineart_rb_edge_types(LineartRenderBuffer *rb)
+static int UNUSED_FUNCTION(lineart_rb_edge_types)(LineartRenderBuffer *rb)
 {
   int types = 0;
   types |= rb->use_contour ? LRT_EDGE_FLAG_CONTOUR : 0;

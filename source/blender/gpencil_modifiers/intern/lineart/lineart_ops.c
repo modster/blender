@@ -157,8 +157,8 @@ static bool bake_strokes(Object *ob,
     if (!is_first) {
       MOD_lineart_clear_cache(&local_lc);
     }
-    /* Restore the original cache pointer so the modifiers below still have access to the "global"
-     * cache. */
+    /* Restore the original cache pointer so the modifiers below still have access to the
+     * "global" cache. */
     lmd->cache = gpd->runtime.lineart_cache;
   }
 
@@ -199,8 +199,7 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
     }
   }
 
-  GpencilLineartLimitInfo info = {0};
-  BKE_gpencil_get_lineart_modifier_limits(ob, &info);
+  GpencilLineartLimitInfo info = BKE_gpencil_get_lineart_modifier_limits(ob);
 
   LineartCache *lc = NULL;
   bool is_first = true;
@@ -208,7 +207,7 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
     if (md->type != eGpencilModifierType_Lineart) {
       continue;
     }
-    BKE_gpencil_set_lineart_global_limits(md, &info);
+    BKE_gpencil_set_lineart_modifier_limits(md, &info, is_first);
     if (bake_strokes(ob, bj->dg, &lc, md, frame, is_first)) {
       touched = true;
       is_first = false;

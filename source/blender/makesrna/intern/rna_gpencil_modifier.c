@@ -2875,7 +2875,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "chain_geometry_space", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_CHAIN_GEOMETRY_SPACE);
   RNA_def_property_ui_text(
-      prop, "Use Geometry Space", "Use geometry distance for chaining instead of image space.");
+      prop, "Use Geometry Space", "Use geometry distance for chaining instead of image space");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_multiple_edge_types", PROP_BOOLEAN, PROP_NONE);
@@ -2895,7 +2895,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Stroke Offset",
                            "Move strokes slightly towards the camera to avoid clipping while "
-                           "preserve depth for the viewport.");
+                           "preserve depth for the viewport");
   RNA_def_property_ui_range(prop, 0.0f, 0.5f, 0.001f, 4);
   RNA_def_property_range(prop, 0.0f, 0.5f);
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
@@ -3027,22 +3027,13 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Is Baked", "This modifier has baked data");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "use_cached_result", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_cache", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_USE_CACHE);
   RNA_def_property_ui_text(prop,
-                           "Use Cached Result",
-                           "Use line art cache from the configuration in the first line art "
-                           "modifier instead of running line art once again");
+                           "Use Cache",
+                           "Use cached scene data from the first line art modifier in the stack. "
+                           "Certain settings will be unavailable");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
-
-  prop = RNA_def_property(srna, "overscan", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_ui_text(
-      prop,
-      "Overscan",
-      "A margin to prevent strokes from ending abruptly at the edge of the image");
-  RNA_def_property_ui_range(prop, 0.0f, 0.5f, 0.01f, 3);
-  RNA_def_property_range(prop, 0.0f, 0.5f);
-  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "thickness", PROP_INT, PROP_NONE);
   RNA_def_property_ui_text(prop, "Thickness", "The thickness for the generated strokes");
