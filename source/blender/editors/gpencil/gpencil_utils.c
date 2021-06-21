@@ -1017,7 +1017,7 @@ bool gpencil_point_render_xy_to_3d(const GP_SpaceConversion *gsc,
       V3D_PROJ_RET_OK) {
     sub_v2_v2v2(mval_f, mval_prj, mval_f);
 
-    float dx = 2.0f * mval_f[0] * zfac / (scene->r.xsch * scene->r.size / 100.0f) ;
+    float dx = 2.0f * mval_f[0] * zfac / (scene->r.xsch * scene->r.size / 100.0f);
     float dy = 2.0f * mval_f[1] * zfac / (scene->r.ysch * scene->r.size / 100.0f);
     dvec[0] = (persinv[0][0] * dx + persinv[1][0] * dy);
     dvec[1] = (persinv[0][1] * dx + persinv[1][1] * dy);
@@ -1410,6 +1410,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
       BLI_assert(gps->flag & GP_STROKE_3DSPACE);
       BLI_assert(gsc->area && gsc->area->spacetype == SPACE_VIEW3D);
       const View3D *v3d = gsc->area->spacedata.first;
+      gpencil_point_to_xy_fl(gsc, gps_active, &pt2, &xy[0], &xy[1]);
       ED_view3d_win_to_ray_clipped(
           depsgraph, region, v3d, xy, &ray_start[0], &ray_normal[0], true);
       if (ED_transform_snap_object_project_ray(sctx,
