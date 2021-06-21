@@ -182,12 +182,12 @@ void GPU_backend_init(eGPUBackendType backend_type)
   BLI_assert(g_backend == nullptr);
 
   switch (backend_type) {
-#if WITH_OPENGL_BACKEND
+#ifdef WITH_OPENGL_BACKEND
     case GPU_BACKEND_OPENGL:
       g_backend = new GLBackend;
       break;
 #endif
-#if WITH_VULKAN
+#ifdef WITH_VULKAN
     case GPU_BACKEND_VULKAN:
       g_backend = new VKBackend;
       break;
