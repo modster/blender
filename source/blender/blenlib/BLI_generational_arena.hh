@@ -52,12 +52,15 @@
  */
 /* TODO(ish): need to complete documentation */
 
+#include <cstddef>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <tuple>
 #include <variant>
 
+#include "BLI_assert.h"
 #include "BLI_vector.hh"
 
 #include "testing/testing.h"
@@ -125,6 +128,10 @@ template<
      */
     typename Allocator = GuardedAllocator>
 class Arena {
+ public:
+  class Iterator;
+
+ private:
   struct EntryNoExist;
   struct EntryExist;
   /* using declarations */
@@ -405,6 +412,112 @@ class Arena {
   {
     return static_cast<isize>(this->length);
   }
+
+  Iterator begin()
+  {
+    return Iterator(this->data.begin(), this->data.begin(), this->data.end());
+  }
+
+  Iterator end()
+  {
+    return Iterator(this->data.end(), this->data.begin(), this->data.end());
+  }
+
+  class Iterator {
+   public:
+    using iterator_category = std::bidirectional_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = T;
+    using pointer = value_type *;
+    using reference = value_type &;
+
+   private:
+    Entry *ptr;   /* points to current position */
+    Entry *start; /* points to first element in the
+                   * Arena::data, aka Arena::data.begin() */
+    Entry *end;   /* points to last+1 element in the Arena::data, aka Arena::data.end()*/
+
+   public:
+    Iterator(Entry *ptr, Entry *start, Entry *end) : ptr(ptr), start(start), end(end)
+    {
+    }
+
+    reference operator*() const
+    {
+      if (auto val = std::get_if<EntryExist>(this->ptr)) {
+        return val->value;
+      }
+
+      BLI_assert_unreachable();
+
+      return std::get<EntryExist>(*this->ptr).value;
+    }
+
+    pointer operator->()
+    {
+      return this->ptr;
+    }
+
+    /* pre fix */
+    Iterator &operator++()
+    {
+      BLI_assert(this->ptr != this->end);
+      while (true) {
+        this->ptr++;
+
+        if (this->ptr == this->end) {
+          break;
+        }
+
+        if (auto val = std::get_if<EntryExist>(this->ptr)) {
+          break;
+        }
+      }
+      return *this;
+    }
+
+    Iterator &operator--()
+    {
+      BLI_assert(this->ptr != this->start);
+      while (true) {
+        this->ptr--;
+
+        if (this->ptr == this->start) {
+          break;
+        }
+
+        if (auto val = std::get_if<EntryExist>(this->ptr)) {
+          break;
+        }
+      }
+      return *this;
+    }
+
+    /* post fix */
+    Iterator operator++(int)
+    {
+      Iterator temp = *this;
+      ++(*this);
+      return temp;
+    }
+
+    Iterator operator--(int)
+    {
+      Iterator temp = *this;
+      --(*this);
+      return temp;
+    }
+
+    friend bool operator==(const Iterator &a, const Iterator &b)
+    {
+      return a.start == b.start && a.end == b.end && a.ptr == b.ptr;
+    }
+
+    friend bool operator!=(const Iterator &a, const Iterator &b)
+    {
+      return a.start != b.start || a.end != b.end || a.ptr != b.ptr;
+    }
+  };
 
  protected:
   /* all protected static methods */

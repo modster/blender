@@ -2,7 +2,9 @@
 
 #include "testing/testing.h"
 
+#include <algorithm>
 #include <functional>
+#include <gtest/gtest.h>
 #include <tuple>
 
 namespace blender::tests {
@@ -143,6 +145,88 @@ TEST(generational_arena, GetNoGenIndex)
   EXPECT_EQ(arena.get_no_gen_index(0), i1);
   EXPECT_EQ(arena.get_no_gen_index(1), i2);
   EXPECT_EQ(arena.get_no_gen(2), std::nullopt);
+}
+
+TEST(generational_arena, Iter)
+{
+  Arena<int> arena;
+  arena.insert(0);
+  arena.insert(0);
+  arena.insert(0);
+  arena.insert(0);
+  arena.insert(0);
+
+  for (const auto &i : arena) {
+    EXPECT_EQ(i, 0);
+  }
+}
+
+TEST(generational_arena, Iter2)
+{
+  Arena<int> arena;
+  arena.insert(2);
+  arena.insert(1);
+  arena.insert(4);
+  arena.insert(3);
+  arena.insert(0);
+
+  EXPECT_TRUE(std::any_of(arena.begin(), arena.end(), [](const int &val) { return val % 2; }));
+
+  auto it = std::partition(arena.begin(), arena.end(), [](const int &val) { return val % 2; });
+
+  EXPECT_NE(std::find(arena.begin(), it, 1), arena.end());
+  EXPECT_NE(std::find(arena.begin(), it, 3), arena.end());
+  EXPECT_NE(std::find(it, arena.end(), 0), arena.end());
+  EXPECT_NE(std::find(it, arena.end(), 2), arena.end());
+  EXPECT_NE(std::find(it, arena.end(), 4), arena.end());
+}
+
+TEST(generational_arena, IterIncrement)
+{
+  Arena<int> arena;
+  arena.insert(0);
+  arena.insert(1);
+  auto i2 = arena.insert(2);
+  arena.insert(3);
+  arena.insert(4);
+
+  arena.remove(i2);
+
+  auto iter = arena.begin();
+  EXPECT_EQ(*iter, 0);
+  iter++;
+  EXPECT_EQ(*iter, 1);
+  iter++;
+  EXPECT_EQ(*iter, 3);
+  ++iter;
+  EXPECT_EQ(*iter, 4);
+  ++iter;
+  EXPECT_EQ(iter, arena.end());
+}
+
+TEST(generational_arena, IterDecrement)
+{
+  Arena<int> arena;
+  arena.insert(0);
+  arena.insert(1);
+  auto i2 = arena.insert(2);
+  arena.insert(3);
+  arena.insert(4);
+
+  arena.remove(i2);
+
+  auto iter = arena.end();
+  --iter;
+  EXPECT_EQ(*iter, 4);
+  iter--;
+  EXPECT_EQ(*iter, 3);
+  iter--;
+  EXPECT_EQ(*iter, 1);
+  --iter;
+  EXPECT_EQ(*iter, 0);
+  EXPECT_EQ(iter, arena.begin());
+
+  EXPECT_BLI_ASSERT(--iter, "");
 }
 
 } /* namespace blender::tests */
