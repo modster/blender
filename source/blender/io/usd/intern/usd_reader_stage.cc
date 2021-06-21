@@ -142,37 +142,39 @@ bool USDStageReader::prune_by_visibility(const pxr::UsdGeomImageable &imageable)
   return visibility != pxr::UsdGeomTokens->invisible;
 }
 
-/* Returns true if the given prim should be excluded from the
- * traversal because it has a purpose which was not requested
- * by the user; e.g., the prim represents guide geometry and
- * the import_guide parameter is toggled off. */
+/* Returns true if the given prim should be included in the
+ * traversal based on the import options and the prim's purpose
+ * attribute. E.g., return false (to exclude the prim) if the prim
+ * represents guide geometry and the 'Import Guide' option is
+ * toggled off. */
 bool USDStageReader::prune_by_purpose(const pxr::UsdGeomImageable &imageable) const
 {
-  if (!imageable) {
-    return false;
-  }
-
   if (params_.import_guide && params_.import_proxy && params_.import_render) {
-    return false;
+    /* The options allow any purpose, so we trivially include the prim. */
+    return true;
   }
 
-  if (pxr::UsdAttribute purpose_attr = imageable.GetPurposeAttr()) {
-    pxr::TfToken purpose;
-    if (!purpose_attr.Get(&purpose)) {
-      return false;
-    }
-    if (purpose == pxr::UsdGeomTokens->guide && !params_.import_guide) {
-      return true;
-    }
-    if (purpose == pxr::UsdGeomTokens->proxy && !params_.import_proxy) {
-      return true;
-    }
-    if (purpose == pxr::UsdGeomTokens->render && !params_.import_render) {
-      return true;
-    }
+  pxr::UsdAttribute purpose_attr = imageable.GetPurposeAttr();
+
+  if (!purpose_attr) {
+    /* No purpose attribute, so trivially include the prim. */
+    return true;
   }
 
-  return false;
+  pxr::TfToken purpose;
+  purpose_attr.Get(&purpose);
+
+  if (purpose == pxr::UsdGeomTokens->guide) {
+    return params_.import_guide;
+  }
+  if (purpose == pxr::UsdGeomTokens->proxy) {
+    return params_.import_proxy;
+  }
+  if (purpose == pxr::UsdGeomTokens->render) {
+    return params_.import_render;
+  }
+
+  return true;
 }
 
 /* Determine if the given reader can use the parent of the encapsulated USD prim
@@ -218,7 +220,7 @@ USDPrimReader *USDStageReader::collect_readers(Main *bmain, const pxr::UsdPrim &
   if (prim.IsA<pxr::UsdGeomImageable>()) {
     pxr::UsdGeomImageable imageable(prim);
 
-    if (prune_by_purpose(imageable)) {
+    if (!prune_by_purpose(imageable)) {
       return nullptr;
     }
 
