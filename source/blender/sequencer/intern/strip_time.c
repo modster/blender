@@ -184,7 +184,7 @@ static void seq_time_update_meta_strip(Scene *scene, Sequence *seq_meta)
   seq_update_sound_bounds_recursive(scene, seq_meta);
 }
 
-static void seq_time_update_meta_strip_range(Scene *scene, Sequence *seq_meta)
+void SEQ_time_update_meta_strip_range(Scene *scene, Sequence *seq_meta)
 {
   seq_time_update_meta_strip(scene, seq_meta);
 
@@ -250,7 +250,7 @@ void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
     Editing *ed = SEQ_editing_get(scene, false);
     MetaStack *ms = SEQ_meta_stack_active_get(ed);
     if (ms != NULL) {
-      seq_time_update_meta_strip_range(scene, ms->parseq);
+      SEQ_time_update_meta_strip_range(scene, ms->parseq);
     }
 
     SEQ_time_update_sequence_bounds(scene, seq);
@@ -409,7 +409,7 @@ static bool strip_exists_at_frame(SeqCollection *all_strips, const int timeline_
 {
   Sequence *seq;
   SEQ_ITERATOR_FOREACH (seq, all_strips) {
-    if ((seq->startdisp <= timeline_frame) && (seq->enddisp > timeline_frame)) {
+    if (SEQ_time_strip_intersects_frame(seq, timeline_frame)) {
       return true;
     }
   }
@@ -467,4 +467,18 @@ void seq_time_gap_info_get(const Scene *scene,
       break;
     }
   }
+}
+
+/**
+ * Test if strip intersects with timeline frame.
+ * Note: This checks if strip would be rendered at this frame. For rendering it is assumed, that
+ * timeline frame has width of 1 frame and therefore ends at timeline_frame + 1
+ *
+ * \param seq: Sequence to be checked
+ * \param timeline_frame: absolute frame position
+ * \return true if strip intersects with timeline frame.
+ */
+bool SEQ_time_strip_intersects_frame(const Sequence *seq, const int timeline_frame)
+{
+  return (seq->startdisp <= timeline_frame) && (seq->enddisp > timeline_frame);
 }

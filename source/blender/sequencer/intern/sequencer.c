@@ -271,6 +271,7 @@ void SEQ_editing_free(Scene *scene, const bool do_id_user)
   SEQ_ALL_END;
 
   BLI_freelistN(&ed->metastack);
+  SEQ_sequence_lookup_free(scene);
   MEM_freeN(ed);
 
   scene->ed = NULL;
@@ -514,11 +515,7 @@ static Sequence *seq_dupli(const Scene *scene_src,
 
   if (scene_src == scene_dst) {
     if (dupe_flag & SEQ_DUPE_UNIQUE_NAME) {
-      SEQ_sequence_base_unique_name_recursive(&scene_dst->ed->seqbase, seqn);
-    }
-
-    if (dupe_flag & SEQ_DUPE_ANIM) {
-      SEQ_dupe_animdata(scene_dst, seq->name + 2, seqn->name + 2);
+      SEQ_sequence_base_unique_name_recursive(scene_dst, &scene_dst->ed->seqbase, seqn);
     }
   }
 
@@ -565,30 +562,21 @@ void SEQ_sequence_base_dupli_recursive(const Scene *scene_src,
 {
   Sequence *seq;
   Sequence *seqn = NULL;
-  Sequence *last_seq = SEQ_select_active_get((Scene *)scene_src);
-  /* always include meta's strips */
-  int dupe_flag_recursive = dupe_flag | SEQ_DUPE_ALL | SEQ_DUPE_IS_RECURSIVE_CALL;
 
   for (seq = seqbase->first; seq; seq = seq->next) {
     seq->tmp = NULL;
     if ((seq->flag & SELECT) || (dupe_flag & SEQ_DUPE_ALL)) {
       seqn = seq_dupli(scene_src, scene_dst, nseqbase, seq, dupe_flag, flag);
-      if (seqn) { /*should never fail */
-        if (dupe_flag & SEQ_DUPE_CONTEXT) {
-          seq->flag &= ~SEQ_ALLSEL;
-          seqn->flag &= ~(SEQ_LEFTSEL + SEQ_RIGHTSEL + SEQ_LOCK);
-        }
 
-        if (seq->type == SEQ_TYPE_META) {
-          SEQ_sequence_base_dupli_recursive(
-              scene_src, scene_dst, &seqn->seqbase, &seq->seqbase, dupe_flag_recursive, flag);
-        }
+      if (seqn == NULL) {
+        continue; /* Should never fail. */
+      }
 
-        if (dupe_flag & SEQ_DUPE_CONTEXT) {
-          if (seq == last_seq) {
-            SEQ_select_active_set(scene_dst, seqn);
-          }
-        }
+      if (seq->type == SEQ_TYPE_META) {
+        /* Always include meta all strip children. */
+        int dupe_flag_recursive = dupe_flag | SEQ_DUPE_ALL | SEQ_DUPE_IS_RECURSIVE_CALL;
+        SEQ_sequence_base_dupli_recursive(
+            scene_src, scene_dst, &seqn->seqbase, &seq->seqbase, dupe_flag_recursive, flag);
       }
     }
   }

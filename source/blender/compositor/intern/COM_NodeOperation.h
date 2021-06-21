@@ -297,6 +297,11 @@ class NodeOperation {
 
  protected:
   /**
+   * Compositor execution model.
+   */
+  eExecutionModel execution_model_;
+
+  /**
    * Width of the output of this operation.
    */
   unsigned int m_width;
@@ -314,6 +319,11 @@ class NodeOperation {
  public:
   virtual ~NodeOperation()
   {
+  }
+
+  void set_execution_model(const eExecutionModel model)
+  {
+    execution_model_ = model;
   }
 
   void set_name(const std::string name)
@@ -568,7 +578,7 @@ class NodeOperation {
    * Executes operation updating output memory buffer. Single-threaded calls.
    */
   virtual void update_memory_buffer(MemoryBuffer *UNUSED(output),
-                                    const rcti &UNUSED(output_area),
+                                    const rcti &UNUSED(area),
                                     Span<MemoryBuffer *> UNUSED(inputs),
                                     ExecutionSystem &UNUSED(exec_system))
   {
@@ -577,7 +587,7 @@ class NodeOperation {
   /**
    * Get input operation area being read by this operation on rendering given output area.
    */
-  virtual void get_area_of_interest(int input_op_idx, const rcti &output_area, rcti &r_input_area);
+  virtual void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area);
   void get_area_of_interest(NodeOperation *input_op, const rcti &output_area, rcti &r_input_area);
 
   /** \} */

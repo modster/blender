@@ -1930,19 +1930,27 @@ static void widget_draw_text_ime_underline(const uiFontStyle *fstyle,
 }
 #endif /* WITH_INPUT_IME */
 
-static bool widget_draw_text_underline_calc_center_x(const char *UNUSED(str),
+struct UnderlineData {
+  size_t str_offset;  /* The string offset of the underlined character. */
+  int width_px;       /* The underline width in pixels. */
+  int r_offset_px[2]; /* Write the X,Y offset here. */
+};
+
+static bool widget_draw_text_underline_calc_position(const char *UNUSED(str),
                                                      const size_t str_step_ofs,
                                                      const rcti *glyph_step_bounds,
                                                      const int UNUSED(glyph_advance_x),
                                                      const rctf *glyph_bounds,
-                                                     const int glyph_bearing[2],
+                                                     const int UNUSED(glyph_bearing[2]),
                                                      void *user_data)
 {
-  /* The index of the character to get, set to the x-position. */
-  int *ul_data = user_data;
-  if (ul_data[0] == (int)str_step_ofs) {
-    ul_data[1] = glyph_step_bounds->xmin + glyph_bearing[0] +
-                 (BLI_rctf_size_x(glyph_bounds) / 2.0f);
+  struct UnderlineData *ul_data = user_data;
+  if (ul_data->str_offset == str_step_ofs) {
+    /* Full width of this glyph including both bearings. */
+    const float width = glyph_bounds->xmin + BLI_rctf_size_x(glyph_bounds) + glyph_bounds->xmin;
+    ul_data->r_offset_px[0] = glyph_step_bounds->xmin + ((width - ul_data->width_px) * 0.5f);
+    /* One line-width below the lower glyph bounds. */
+    ul_data->r_offset_px[1] = glyph_bounds->ymin - U.pixelsize;
     /* Early exit. */
     return false;
   }
@@ -2123,14 +2131,15 @@ static void widget_draw_text(const uiFontStyle *fstyle,
   transopts = ui_translate_buttons();
 #endif
 
+  bool use_drawstr_right_as_hint = false;
+
   /* cut string in 2 parts - only for menu entries */
-  if ((but->drawflag & UI_BUT_HAS_SHORTCUT) && (but->editstr == NULL)) {
-    if (but->flag & UI_BUT_HAS_SEP_CHAR) {
-      drawstr_right = strrchr(drawstr, UI_SEP_CHAR);
-      if (drawstr_right) {
-        drawstr_left_len = (drawstr_right - drawstr);
-        drawstr_right++;
-      }
+  if (but->flag & UI_BUT_HAS_SEP_CHAR && (but->editstr == NULL)) {
+    drawstr_right = strrchr(drawstr, UI_SEP_CHAR);
+    if (drawstr_right) {
+      use_drawstr_right_as_hint = true;
+      drawstr_left_len = (drawstr_right - drawstr);
+      drawstr_right++;
     }
   }
 
@@ -2198,21 +2207,24 @@ static void widget_draw_text(const uiFontStyle *fstyle,
             BLF_enable(fstyle->uifont_id, BLF_KERNING_DEFAULT);
           }
 
-          int ul_data[2] = {
-              ul_index, /* Character index to test. */
-              0,        /* Write the x-offset here. */
+          int ul_width = round_fl_to_int(BLF_width(fstyle->uifont_id, "_", 2));
+
+          struct UnderlineData ul_data = {
+              .str_offset = ul_index,
+              .width_px = ul_width,
           };
+
           BLF_boundbox_foreach_glyph(fstyle->uifont_id,
                                      drawstr_ofs,
                                      ul_index + 1,
-                                     widget_draw_text_underline_calc_center_x,
-                                     ul_data);
-          ul_data[1] -= BLF_width(fstyle->uifont_id, "_", 2) / 2.0f;
+                                     widget_draw_text_underline_calc_position,
+                                     &ul_data);
 
-          BLF_position(fstyle->uifont_id,
-                       rect->xmin + font_xofs + ul_data[1],
-                       rect->ymin + font_yofs,
-                       0.0f);
+          const int pos_x = rect->xmin + font_xofs + ul_data.r_offset_px[0];
+          const int pos_y = rect->ymin + font_yofs + ul_data.r_offset_px[1];
+
+          /* Use text output because direct drawing doesn't always work. See T89246. */
+          BLF_position(fstyle->uifont_id, pos_x, pos_y, 0.0f);
           BLF_color4ubv(fstyle->uifont_id, wcol->text);
           BLF_draw(fstyle->uifont_id, "_", 2);
 
@@ -2228,7 +2240,7 @@ static void widget_draw_text(const uiFontStyle *fstyle,
   if (drawstr_right) {
     uchar col[4];
     copy_v4_v4_uchar(col, wcol->text);
-    if (but->drawflag & UI_BUT_HAS_SHORTCUT) {
+    if (use_drawstr_right_as_hint) {
       col[3] *= 0.5f;
     }
 
