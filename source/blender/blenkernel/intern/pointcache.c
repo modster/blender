@@ -813,6 +813,11 @@ static void ptcache_rigidbody_read(
       if (old_data) {
         memcpy(rbo->pos, data, sizeof(float[3]));
         memcpy(rbo->orn, data + 3, sizeof(float[4]));
+        memcpy(rbo->vel, data + 7, sizeof(float[3]));
+        memcpy(rbo->eff_forces, data + 10, sizeof(sim_data_vec[3]));
+        memcpy(rbo->norm_forces, data + 13, sizeof(sim_data_vec[3]));
+        memcpy(rbo->fric_forces, data + 16, sizeof(sim_data_vec[3]));
+        memcpy(rbo->vec_locations, data + 19, sizeof(sim_data_vec[3]));
       }
       else {
         PTCACHE_DATA_TO(data, BPHYS_DATA_LOCATION, 0, rbo->pos);

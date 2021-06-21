@@ -1665,9 +1665,6 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
             if(!is_zero_v3(rbo->eff_forces[i].vector)){
               OVERLAY_vector_extra(data, rbo->eff_forces[i].vector, rbo->pos, scale, min_clamp, color1, text_flag);
             }
-            else
-              /* If the force is zero, there won't be any more forces of this type applied, so break. */
-              break;
         }
     }
 
@@ -1676,8 +1673,6 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
             if(!is_zero_v3(rbo->norm_forces[i].vector)){
               OVERLAY_vector_extra(data, rbo->norm_forces[i].vector, rbo->vec_locations[i].vector , scale, min_clamp, color1, text_flag);
             }
-            else
-              break;
         }
     }
     if(rbo->display_force_types & RB_SIM_FRICTION) {
@@ -1709,8 +1704,10 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
     OVERLAY_vector_extra(data, vel, rbo->pos, scale, min_clamp, color, text_flag);
 }
 
-/*static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
-                         RigidBodyOb *rbo)
+static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
+                         RigidBodyOb *rbo,
+                         Depsgraph *depsgraph,
+                         Scene *scene)
 {
     float scale = 0.5f;
     float min_clamp = 2.0f;
@@ -1718,11 +1715,19 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
 
     int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
 
+    /* Calculate timestep. */
+    const float ctime = DEG_get_ctime(depsgraph);
+    const float frame_diff = ctime - scene->rigidbody_world->ltime;
+    const float timestep = 1.0f / (float)FPS * frame_diff * scene->rigidbody_world->time_scale;
+
     rbRigidBody *rb = rbo->shared->physics_object;
     float acc[3];
     RB_body_get_linear_velocity(rb, acc);
+    sub_v3_v3(acc, rbo->vel);
+    RB_body_get_linear_velocity(rb, rbo->vel);
+    mul_v3_fl(acc, 1/timestep);
     OVERLAY_vector_extra(data, acc, rbo->pos, scale, min_clamp, color, text_flag);
-} */
+}
 #endif
 
  static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data, float point[3], float mat[4][4] , float dir[3]) {
@@ -1741,7 +1746,7 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
 
    /* Triangles that make up the faces of the box. */
    uint box_shape_tris[12][3] = {
-       {0, 2, 1},
+       {0, 1, 2},
        {0, 2, 3},
 
        {0, 1, 5},
@@ -1765,7 +1770,8 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
      mul_m4_v3(mat, box_shape[i]);
    }
 
-   int face;
+   int face = -1;
+   float point_to_face_distance;
    float isect_co[3];
    for(int i=0; i<6; i++){
        if(isect_point_tri_v3(point,
@@ -1777,17 +1783,9 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
                                            box_shape[box_shape_tris[2*i+1][1]],
                                            box_shape[box_shape_tris[2*i+1][2]], isect_co) )
        {
-         if(len_manhattan_v3v3(point, isect_co)<=0.000001f ||
-                 (len_manhattan_v3v3(point, isect_co)<=0.05f &&
-                  fabsf(dot_v3v3(point, dir)-dot_v3v3(isect_co, dir))<0.05))
+         if(len_manhattan_v3v3(point, isect_co)<=0.000001f)
          {
-             face = i;
-             for(int j=0; j<3; j++){
-                 printf("plane point%d:%f %f %f\n", j, box_shape[box_shape_tris[2*face][j]][0], box_shape[box_shape_tris[2*face][j]][1], box_shape[box_shape_tris[2*face][j]][2]);
-             }
-             printf("%f, %f, %f, \n", point[0], point[1], point[2]);
-             printf("%f, %f, %f, \n", isect_co[0], isect_co[1], isect_co[2]);
-             printf("sect: %f %f\n", len_manhattan_v3v3(point, isect_co), fabsf(dot_v3v3(point, dir)-dot_v3v3(isect_co, dir)));
+           face = i;
 
            GPUShader *sh = OVERLAY_shader_collision_box();
            DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
@@ -1798,7 +1796,28 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
            DRW_shgroup_call_procedural_triangles(grp, NULL, 2);
            break;
          }
+         else if(len_manhattan_v3v3(point, isect_co)<=0.05f &&
+                 fabsf(dot_v3v3(point, dir)-dot_v3v3(isect_co, dir))<0.05) {
+             if(face==-1){
+               face = i;
+               point_to_face_distance = len_manhattan_v3v3(point, isect_co);
+             }
+             else if(len_manhattan_v3v3(point, isect_co) < point_to_face_distance){
+               face = i;
+               point_to_face_distance = len_manhattan_v3v3(point, isect_co);
+             }
+         }
        }
+   }
+   if(face != -1){
+       GPUShader *sh = OVERLAY_shader_collision_box();
+       DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
+       DRW_shgroup_uniform_vec3_copy(grp, "vert1", box_shape[box_shape_tris[2*face][0]]);
+       DRW_shgroup_uniform_vec3_copy(grp, "vert2", box_shape[box_shape_tris[2*face][1]]);
+       DRW_shgroup_uniform_vec3_copy(grp, "vert3", box_shape[box_shape_tris[2*face][2]]);
+       DRW_shgroup_uniform_vec3_copy(grp, "vert4", box_shape[box_shape_tris[2*face+1][2]]);
+       DRW_shgroup_call_procedural_triangles(grp, NULL, 2);
+
    }
  }
 
@@ -1909,11 +1928,15 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data,
    copy_v3_v3(dir,ob->rigidbody_object->norm_forces[0].vector);
    normalize_v3(dir);
    if(!is_zero_v3(ob->rigidbody_object->norm_forces[0].vector)){
-     float color[4] = {0.1,0.05,1.0,1.0};
+     float color[4] = {0.5,0.7,0.1,1.0};
      switch (ob->rigidbody_object->shape) {
        case RB_SHAPE_BOX:
          OVERLAY_bounds(cb, ob, color, OB_BOUND_BOX, true, mat);
-         OVERLAY_colliding_face_on_box(data, ob->rigidbody_object->vec_locations[0].vector, mat, dir);
+         for(int i=0; i<3; i++){
+           if(!is_zero_v3(ob->rigidbody_object->norm_forces[i].vector)){
+             OVERLAY_colliding_face_on_box(data, ob->rigidbody_object->vec_locations[i].vector, mat, dir);
+           }
+         }
          break;
        case RB_SHAPE_SPHERE:
          OVERLAY_bounds(cb, ob, color, OB_BOUND_SPHERE, true, NULL);
@@ -2008,10 +2031,10 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
 #ifdef WITH_BULLET
       if(ob->rigidbody_object->sim_display_options & RB_SIM_FORCES)
         OVERLAY_forces_extra(vedata, scene, ob->rigidbody_object);
+      if(ob->rigidbody_object->sim_display_options & RB_SIM_ACCELERATION)
+        OVERLAY_acceleration_extra(vedata, ob->rigidbody_object, draw_ctx->depsgraph, draw_ctx->scene);
       if(ob->rigidbody_object->sim_display_options & RB_SIM_VELOCITY)
-        OVERLAY_velocity_extra(vedata, ob->rigidbody_object);
-      //if(ob->rigidbody_object->sim_display_options & RB_SIM_ACCELERATION)
-       // OVERLAY_acceleration_extra(vedata, ob->rigidbody_object);
+        OVERLAY_velocity_extra(vedata, ob->rigidbody_object);   
 #endif
     }
     if (ob->dtx & OB_AXIS) {

@@ -2272,6 +2272,7 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
         float vec_locations[3][3] = {{0.0f}};
         Object *ob = rbw->objects[j];
         if(ob->rigidbody_object != NULL){
+          printf("%s\n", ob->id.name);
           rbRigidBody *rbo = (rbRigidBody*)(ob->rigidbody_object->shared->physics_object);
           int norm_flag = (ob->rigidbody_object->display_force_types & RB_SIM_NORMAL) ||
                   (ob->rigidbody_object->display_force_types & RB_SIM_NET_FORCE) ||

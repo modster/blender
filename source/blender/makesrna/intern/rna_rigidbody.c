@@ -859,6 +859,14 @@ static PointerRNA rna_RigidBodyWorld_PointCache_get(PointerRNA *ptr)
 
 #else
 
+static void rna_def_rigidbody_sim_data(BlenderRNA *brna)
+{
+  StructRNA *srna;
+
+  srna = RNA_def_struct(brna, "sim_data_vec", NULL);
+  RNA_def_struct_sdna(srna, "sim_data_vec");
+}
+
 static void rna_def_rigidbody_world(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -1205,52 +1213,52 @@ static void rna_def_rigidbody_object(BlenderRNA *brna)
   prop = RNA_def_property(srna, "display_forces", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_FORCES);
   RNA_def_property_ui_text(prop, "Forces", "Display forces acting on rigid body");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "display_acceleration", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_ACCELERATION);
   RNA_def_property_ui_text(prop, "Acceleration", "Display acceleration of rigid body");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "display_velocity", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_VELOCITY);
   RNA_def_property_ui_text(prop, "Velocity", "Display velocity acting on rigid body");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "display_data_text", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_TEXT);
   RNA_def_property_ui_text(prop, "Text", "Display the magnitudes of the vectors as text");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "display_collisions", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "sim_display_options", RB_SIM_COLLISIONS);
   RNA_def_property_ui_text(prop, "Collisions", "Indicate when collisions occur");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "show_gravity", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_GRAVITY);
   RNA_def_property_ui_text(prop, "Gravity", "Display the force of gravity");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "show_effectors_force", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_EFFECTORS);
   RNA_def_property_ui_text(prop, "Effectors", "Display the forces aplied by effectors");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "show_normal_force", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_NORMAL);
   RNA_def_property_ui_text(prop, "Normal forces", "Display contact normal forces");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "show_frictional_force", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_FRICTION);
   RNA_def_property_ui_text(prop, "Normal forces", "Display contact frcitional forces");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
   prop = RNA_def_property(srna, "show_net_force", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_NET_FORCE);
   RNA_def_property_ui_text(prop, "Resultant force", "Display the net force acting on the rigid body");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
 
 
 
@@ -1650,6 +1658,7 @@ void RNA_def_rigidbody(BlenderRNA *brna)
   rna_def_rigidbody_world(brna);
   rna_def_rigidbody_object(brna);
   rna_def_rigidbody_constraint(brna);
+  rna_def_rigidbody_sim_data(brna);
 }
 
 #endif
