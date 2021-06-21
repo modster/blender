@@ -67,6 +67,7 @@
 
 #define LINEART_WITH_BVH
 #define LINEART_WITH_BVH_THREAD
+//#define LINEART_BVH_OWN_ISEC
 
 static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer *rb,
                                                              LineartEdge *e);
@@ -3909,6 +3910,126 @@ static LineartTriangle *lineart_get_triangle_from_index(LineartRenderBuffer *rb,
   return NULL;
 }
 
+static bool lineart_triangle_2v_intersection_math(LineartVert *v1,
+                                                  LineartVert *v2,
+                                                  LineartTriangle *tri,
+                                                  LineartTriangle *t2,
+                                                  float *last,
+                                                  float *rv)
+{
+  double Lv[3];
+  double Rv[3];
+  double dot_l, dot_r;
+  LineartVert *result;
+  double gloc[3];
+  LineartVert *l = v1, *r = v2;
+
+  sub_v3_v3v3_db(Lv, l->gloc, t2->v[0]->gloc);
+  sub_v3_v3v3_db(Rv, r->gloc, t2->v[0]->gloc);
+
+  dot_l = dot_v3v3_db(Lv, t2->gn);
+  dot_r = dot_v3v3_db(Rv, t2->gn);
+
+  if (dot_l * dot_r > 0 || (!dot_l && !dot_r)) {
+    return false;
+  }
+
+  dot_l = fabs(dot_l);
+  dot_r = fabs(dot_r);
+
+  interp_v3_v3v3_db(gloc, l->gloc, r->gloc, dot_l / (dot_l + dot_r));
+
+  /* Due to precision issue, we might end up with the same point as the one we already detected.
+   */
+  if (last && LRT_DOUBLE_CLOSE_ENOUGH(last[0], gloc[0]) &&
+      LRT_DOUBLE_CLOSE_ENOUGH(last[1], gloc[1]) && LRT_DOUBLE_CLOSE_ENOUGH(last[2], gloc[2])) {
+    return false;
+  }
+
+  if (!(lineart_point_inside_triangle3d(gloc, t2->v[0]->gloc, t2->v[1]->gloc, t2->v[2]->gloc))) {
+    return false;
+  }
+
+  copy_v3fl_v3db(rv, gloc);
+
+  return true;
+}
+
+static bool lineart_triangle_intersect_math(LineartTriangle *tri,
+                                            LineartTriangle *t2,
+                                            float *v1,
+                                            float *v2)
+{
+  float *next = v1, *last = NULL;
+  LineartVert *sv1, *sv2;
+  double cl[3];
+
+  LineartVert *share = lineart_triangle_share_point(t2, tri);
+
+  if (share) {
+    /* If triangles have sharing points like `abc` and `acd`, then we only need to detect `bc`
+     * against `acd` or `cd` against `abc`. */
+
+    LineartVert *new_share;
+    lineart_triangle_get_other_verts(tri, share, &sv1, &sv2);
+
+    copy_v3fl_v3db(v1, share->gloc);
+
+    if (!lineart_triangle_2v_intersection_math(sv1, sv2, tri, t2, 0, v2)) {
+      lineart_triangle_get_other_verts(t2, share, &sv1, &sv2);
+      if (lineart_triangle_2v_intersection_math(sv1, sv2, t2, tri, 0, v2)) {
+        return true;
+      }
+    }
+  }
+  else {
+    /* If not sharing any points, then we need to try all the possibilities. */
+
+    if (lineart_triangle_2v_intersection_math(tri->v[0], tri->v[1], tri, t2, 0, v1)) {
+      next = v2;
+      last = v1;
+    }
+
+    if (lineart_triangle_2v_intersection_math(tri->v[1], tri->v[2], tri, t2, last, next)) {
+      if (last) {
+        return true;
+      }
+      next = v2;
+      last = v1;
+    }
+    if (lineart_triangle_2v_intersection_math(tri->v[2], tri->v[0], tri, t2, last, next)) {
+      if (last) {
+        return true;
+      }
+      next = v2;
+      last = v1;
+    }
+
+    if (lineart_triangle_2v_intersection_math(t2->v[0], t2->v[1], t2, tri, last, next)) {
+      if (last) {
+        return true;
+      }
+      next = v2;
+      last = v1;
+    }
+    if (lineart_triangle_2v_intersection_math(t2->v[1], t2->v[2], t2, tri, last, next)) {
+      if (last) {
+        return true;
+      }
+      next = v2;
+      last = v1;
+    }
+    if (lineart_triangle_2v_intersection_math(t2->v[2], t2->v[0], t2, tri, last, next)) {
+      if (last) {
+        return true;
+      }
+      next = v2;
+      last = v1;
+    }
+  }
+  return false;
+}
+
 typedef struct LineartIsecSingle {
   float v1[3], v2[3];
   LineartTriangle *tri1, *tri2;
@@ -3992,6 +4113,15 @@ static bool lineart_bvh_isec_callback(void *userdata, int index_a, int index_b, 
     return false;
   }
 
+#ifdef LINEART_BVH_OWN_ISEC
+  float e1[3], e2[3];
+
+  if (lineart_triangle_intersect_math(tri1, tri2, e1, e2)) {
+    lineart_add_isec_thread(d, thread, e1, e2, tri1, tri2);
+  }
+
+#else
+
   float t_a0[3], t_a1[3], t_a2[3], t_b0[3], t_b1[3], t_b2[3], e1[3], e2[3];
   copy_v3fl_v3db(t_a0, tri1->v[0]->gloc);
   copy_v3fl_v3db(t_a1, tri1->v[1]->gloc);
@@ -4003,6 +4133,7 @@ static bool lineart_bvh_isec_callback(void *userdata, int index_a, int index_b, 
   if (isect_tri_tri_v3(t_a0, t_a1, t_a2, t_b0, t_b1, t_b2, e1, e2)) {
     lineart_add_isec_thread(d, thread, e1, e2, tri1, tri2);
   };
+#endif
 
   return true;
 }
