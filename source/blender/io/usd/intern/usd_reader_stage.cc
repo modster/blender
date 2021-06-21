@@ -117,7 +117,7 @@ USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim)
  * attribute.  Note that the prim will be trivially included
  * if it has no visibility attribute or if the visibility
  * is inherited. */
-bool USDStageReader::prune_by_visibility(const pxr::UsdGeomImageable &imageable) const
+bool USDStageReader::include_by_visibility(const pxr::UsdGeomImageable &imageable) const
 {
   if (!params_.import_visible_only) {
     /* Invisible prims are allowed. */
@@ -147,7 +147,7 @@ bool USDStageReader::prune_by_visibility(const pxr::UsdGeomImageable &imageable)
  * attribute. E.g., return false (to exclude the prim) if the prim
  * represents guide geometry and the 'Import Guide' option is
  * toggled off. */
-bool USDStageReader::prune_by_purpose(const pxr::UsdGeomImageable &imageable) const
+bool USDStageReader::include_by_purpose(const pxr::UsdGeomImageable &imageable) const
 {
   if (params_.import_guide && params_.import_proxy && params_.import_render) {
     /* The options allow any purpose, so we trivially include the prim. */
@@ -220,11 +220,11 @@ USDPrimReader *USDStageReader::collect_readers(Main *bmain, const pxr::UsdPrim &
   if (prim.IsA<pxr::UsdGeomImageable>()) {
     pxr::UsdGeomImageable imageable(prim);
 
-    if (!prune_by_purpose(imageable)) {
+    if (!include_by_purpose(imageable)) {
       return nullptr;
     }
 
-    if (!prune_by_visibility(imageable)) {
+    if (!include_by_visibility(imageable)) {
       return nullptr;
     }
   }

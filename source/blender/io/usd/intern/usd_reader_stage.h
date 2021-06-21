@@ -92,9 +92,9 @@ class USDStageReader {
  private:
   USDPrimReader *collect_readers(Main *bmain, const pxr::UsdPrim &prim);
 
-  bool prune_by_visibility(const pxr::UsdGeomImageable &imageable) const;
+  bool include_by_visibility(const pxr::UsdGeomImageable &imageable) const;
 
-  bool prune_by_purpose(const pxr::UsdGeomImageable &imageable) const;
+  bool include_by_purpose(const pxr::UsdGeomImageable &imageable) const;
 };
 
 };  // namespace blender::io::usd
