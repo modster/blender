@@ -22,7 +22,7 @@
 #include "BLI_float2.hh"
 #include "BLI_float3.hh"
 
-#include "attribute_ref.hh"
+#include "NOD_attribute_ref.hh"
 
 namespace blender::nodes {
 

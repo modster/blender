@@ -44,12 +44,11 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "NOD_attribute_ref.hh"
 #include "NOD_node_tree_multi_function.hh"
 #include "NOD_socket.h"
 
 #include "FN_cpp_type_make.hh"
-
-#include "attribute_ref.hh"
 
 struct bNodeSocket *node_add_socket_from_template(struct bNodeTree *ntree,
                                                   struct bNode *node,
