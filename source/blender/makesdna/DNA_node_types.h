@@ -620,13 +620,25 @@ typedef struct bNodeSocketValueMaterial {
 
 typedef struct bNodeSocketValueAttribute {
   int data_type; /* eNodeSocketDatatype */
+  int flag; /* eNodeSocketAttributeFlag */
+
   /* XXX Does DNA support union? */
   int value_int;
   float value_float[4];
   char value_bool;
-  char _pad[7];
+  char _pad[3];
   float min, max;
+
+  /** 1024 = FILEMAX. */
+  char attribute_name[1024];
 } bNodeSocketValueAttribute;
+
+typedef enum eNodeSocketAttributeFlag {
+  /* Use the name string to look up an attribute when not connected,
+   * instead of a default value.
+   */
+  SOCK_ATTRIBUTE_USE_NAME = (1 << 0),
+} eNodeSocketAttributeFlag;
 
 /* Data structs, for node->storage. */
 enum {

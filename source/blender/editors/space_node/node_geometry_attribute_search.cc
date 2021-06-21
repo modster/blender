@@ -140,8 +140,19 @@ static void attribute_search_exec_fn(bContext *C, void *data_v, void *item_v)
   AvailableAttributeInfo *item = static_cast<AvailableAttributeInfo *>(item_v);
 
   bNodeSocket &socket = data->socket;
-  bNodeSocketValueString *value = static_cast<bNodeSocketValueString *>(socket.default_value);
-  BLI_strncpy(value->value, item->name.c_str(), MAX_NAME);
+  switch (socket.type) {
+    case SOCK_STRING: {
+      bNodeSocketValueString *value = static_cast<bNodeSocketValueString *>(socket.default_value);
+      BLI_strncpy(value->value, item->name.c_str(), MAX_NAME);
+      break;
+    }
+    case SOCK_ATTRIBUTE: {
+      bNodeSocketValueAttribute *value = static_cast<bNodeSocketValueAttribute *>(
+          socket.default_value);
+      BLI_strncpy(value->attribute_name, item->name.c_str(), MAX_NAME);
+      break;
+    }
+  }
 
   ED_undo_push(C, "Assign Attribute Name");
 }
@@ -150,13 +161,14 @@ void node_geometry_add_attribute_search_button(const bContext *C,
                                                const bNodeTree *node_tree,
                                                const bNode *node,
                                                PointerRNA *socket_ptr,
+                                               const char *propname,
                                                uiLayout *layout)
 {
   const NodeUIStorage *ui_storage = BKE_node_tree_ui_storage_get_from_context(
       C, *node_tree, *node);
 
   if (ui_storage == nullptr) {
-    uiItemR(layout, socket_ptr, "default_value", 0, "", 0);
+    uiItemR(layout, socket_ptr, propname, 0, "", 0);
     return;
   }
 
@@ -173,7 +185,7 @@ void node_geometry_add_attribute_search_button(const bContext *C,
                                  10 * UI_UNIT_X, /* Dummy value, replaced by layout system. */
                                  UI_UNIT_Y,
                                  socket_ptr,
-                                 "default_value",
+                                 propname,
                                  0,
                                  0.0f,
                                  0.0f,

@@ -3588,7 +3588,7 @@ static void std_node_socket_draw(
 
       const bNodeTree *node_tree = (const bNodeTree *)node_ptr->owner_id;
       if (node_tree->type == NTREE_GEOMETRY) {
-        node_geometry_add_attribute_search_button(C, node_tree, node, ptr, row);
+        node_geometry_add_attribute_search_button(C, node_tree, node, ptr, "default_value", row);
       }
       else {
         uiItemR(row, ptr, "default_value", DEFAULT_FLAGS, "", 0);
@@ -3618,38 +3618,57 @@ static void std_node_socket_draw(
       break;
     }
     case SOCK_ATTRIBUTE: {
-      int data_type = ((bNodeSocketValueAttribute *)sock->default_value)->data_type;
-      switch (data_type) {
-        case SOCK_FLOAT:
-          uiItemR(layout, ptr, "default_value_float", DEFAULT_FLAGS, text, 0);
-          break;
-        case SOCK_INT:
-          uiItemR(layout, ptr, "default_value_int", DEFAULT_FLAGS, text, 0);
-          break;
-        case SOCK_BOOLEAN:
-          uiItemR(layout, ptr, "default_value_bool", DEFAULT_FLAGS, text, 0);
-          break;
-        case SOCK_VECTOR:
-          if (sock->flag & SOCK_COMPACT) {
-            uiTemplateComponentMenu(layout, ptr, "default_value_vector", text);
-          }
-          else {
-            if (sock->typeinfo->subtype == PROP_DIRECTION) {
-              uiItemR(layout, ptr, "default_value_vector", DEFAULT_FLAGS, "", ICON_NONE);
-            }
-            else {
-              uiLayout *column = uiLayoutColumn(layout, true);
-              uiItemR(column, ptr, "default_value_vector", DEFAULT_FLAGS, text, ICON_NONE);
-            }
-          }
-          break;
-        case SOCK_RGBA: {
-          uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
-          uiItemL(row, text, 0);
-          uiItemR(row, ptr, "default_value_color", DEFAULT_FLAGS, "", 0);
-          break;
+      const int data_type = ((bNodeSocketValueAttribute *)sock->default_value)->data_type;
+      const bool use_attribute_name = ((bNodeSocketValueAttribute *)sock->default_value)->flag &
+                                      SOCK_ATTRIBUTE_USE_NAME;
+
+      uiLayout *row = uiLayoutRow(layout, false);
+      if (use_attribute_name) {
+        uiLayout *split = uiLayoutSplit(row, 0.4f, false);
+        uiItemL(split, text, 0);
+
+        const bNodeTree *node_tree = (const bNodeTree *)node_ptr->owner_id;
+        if (node_tree->type == NTREE_GEOMETRY) {
+          node_geometry_add_attribute_search_button(C, node_tree, node, ptr, "attribute_name", split);
+        }
+        else {
+          uiItemR(split, ptr, "attribute_name", DEFAULT_FLAGS, "", 0);
         }
       }
+      else {
+        switch (data_type) {
+          case SOCK_FLOAT:
+            uiItemR(row, ptr, "default_value_float", DEFAULT_FLAGS, text, 0);
+            break;
+          case SOCK_INT:
+            uiItemR(row, ptr, "default_value_int", DEFAULT_FLAGS, text, 0);
+            break;
+          case SOCK_BOOLEAN:
+            uiItemR(row, ptr, "default_value_bool", DEFAULT_FLAGS, text, 0);
+            break;
+          case SOCK_VECTOR:
+            if (sock->flag & SOCK_COMPACT) {
+              uiTemplateComponentMenu(row, ptr, "default_value_vector", text);
+            }
+            else {
+              if (sock->typeinfo->subtype == PROP_DIRECTION) {
+                uiItemR(row, ptr, "default_value_vector", DEFAULT_FLAGS, "", ICON_NONE);
+              }
+              else {
+                uiLayout *column = uiLayoutColumn(row, true);
+                uiItemR(column, ptr, "default_value_vector", DEFAULT_FLAGS, text, ICON_NONE);
+              }
+            }
+            break;
+          case SOCK_RGBA: {
+            uiLayout *split = uiLayoutSplit(row, 0.4f, false);
+            uiItemL(split, text, 0);
+            uiItemR(split, ptr, "default_value_color", DEFAULT_FLAGS, "", 0);
+            break;
+          }
+        }
+      }
+      uiItemR(row, ptr, "use_attribute_name", 0, "", ICON_VIEWZOOM);
       break;
     }
     default:

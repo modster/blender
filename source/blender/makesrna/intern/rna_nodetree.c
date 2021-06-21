@@ -82,6 +82,17 @@ static const EnumPropertyItem node_socket_data_type_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+/* Subset of socket data types that are supported by attributes. */
+static const EnumPropertyItem node_socket_attribute_data_type_items[] = {
+    {SOCK_FLOAT, "FLOAT", 0, "Float", ""},
+    {SOCK_INT, "INT", 0, "Integer", ""},
+    {SOCK_BOOLEAN, "BOOLEAN", 0, "Boolean", ""},
+    {SOCK_VECTOR, "VECTOR", 0, "Vector", ""},
+    {SOCK_RGBA, "RGBA", 0, "Color", ""},
+    {SOCK_ATTRIBUTE, "ATTRIBUTE", 0, "Attribute", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
 #ifndef RNA_RUNTIME
 static const EnumPropertyItem rna_enum_node_socket_display_shape_items[] = {
     {SOCK_DISPLAY_SHAPE_CIRCLE, "CIRCLE", 0, "Circle", ""},
@@ -10690,6 +10701,21 @@ static void rna_def_node_socket_attribute(BlenderRNA *brna,
 
   RNA_def_struct_sdna_from(srna, "bNodeSocketValueAttribute", "default_value");
 
+  prop = RNA_def_property(srna, "data_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "data_type");
+  RNA_def_property_enum_items(prop, node_socket_attribute_data_type_items);
+  RNA_def_property_enum_default(prop, SOCK_ATTRIBUTE);
+  RNA_def_property_ui_text(
+      prop, "Attribute Data Type", "Type of data stored in attribute elements");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketStandard_value_update");
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+
+  prop = RNA_def_property(srna, "use_attribute_name", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SOCK_ATTRIBUTE_USE_NAME);
+  RNA_def_property_ui_text(prop, "Use Attribute Name", "Use the name string to look up an attribute when not connected");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketStandard_value_update");
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+
   prop = RNA_def_property(srna, "default_value_float", PROP_FLOAT, subtype);
   RNA_def_property_float_sdna(prop, NULL, "value_float[0]");
   // RNA_def_property_float_array_default(prop, value_default);
@@ -10728,6 +10754,13 @@ static void rna_def_node_socket_attribute(BlenderRNA *brna,
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketStandard_value_update");
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
 
+  prop = RNA_def_property(srna, "attribute_name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "attribute_name");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(prop, "Attribute Name", "Name of an attribute");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketStandard_value_update");
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+
   RNA_def_struct_sdna_from(srna, "bNodeSocket", NULL);
 
   /* socket interface */
@@ -10736,6 +10769,14 @@ static void rna_def_node_socket_attribute(BlenderRNA *brna,
   RNA_def_struct_sdna(srna, "bNodeSocket");
 
   RNA_def_struct_sdna_from(srna, "bNodeSocketValueAttribute", "default_value");
+
+  prop = RNA_def_property(srna, "data_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "data_type");
+  RNA_def_property_enum_items(prop, node_socket_attribute_data_type_items);
+  RNA_def_property_enum_default(prop, SOCK_ATTRIBUTE);
+  RNA_def_property_ui_text(
+      prop, "Attribute Data Type", "Type of data stored in attribute elements");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
 
   prop = RNA_def_property(srna, "default_value_float", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "value_float");
@@ -10782,6 +10823,12 @@ static void rna_def_node_socket_attribute(BlenderRNA *brna,
   RNA_def_property_float_sdna(prop, NULL, "max");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_ui_text(prop, "Maximum Value", "Maximum value");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
+
+  prop = RNA_def_property(srna, "attribute_name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "attribute_name");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(prop, "Attribute Name", "Name of an attribute");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
 
   RNA_def_struct_sdna_from(srna, "bNodeSocket", NULL);

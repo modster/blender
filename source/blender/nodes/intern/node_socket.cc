@@ -723,28 +723,34 @@ static bNodeSocketType *make_socket_type_attribute()
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     const bNodeSocketValueAttribute *default_value = (bNodeSocketValueAttribute *)
                                                          socket.default_value;
-    eNodeSocketDatatype socket_data_type = (eNodeSocketDatatype)default_value->data_type;
-    AttributeRef *attribute_ref = new (r_value)
-        AttributeRef(socket_to_customdata_type(socket_data_type));
-    switch (socket_data_type) {
-      case SOCK_FLOAT:
-        attribute_ref->single_value<float>() = default_value->value_float[0];
-        break;
-      case SOCK_VECTOR:
-        attribute_ref->single_value<blender::float3>() = blender::float3(default_value->value_float);
-        break;
-      case SOCK_RGBA:
-        attribute_ref->single_value<blender::ColorGeometry4f>() =
-            blender::ColorGeometry4f(default_value->value_float);
-        break;
-      case SOCK_INT:
-        attribute_ref->single_value<int>() = default_value->value_int;
-        break;
-      case SOCK_BOOLEAN:
-        attribute_ref->single_value<bool>() = default_value->value_bool;
-        break;
-      default:
-        break;
+    const eNodeSocketDatatype socket_data_type = (eNodeSocketDatatype)default_value->data_type;
+    if (default_value->flag & SOCK_ATTRIBUTE_USE_NAME) {
+      new (r_value) AttributeRef(default_value->attribute_name, socket_to_customdata_type(socket_data_type));
+    }
+    else {
+      AttributeRef *attribute_ref = new (r_value)
+          AttributeRef(socket_to_customdata_type(socket_data_type));
+      switch (socket_data_type) {
+        case SOCK_FLOAT:
+          attribute_ref->single_value<float>() = default_value->value_float[0];
+          break;
+        case SOCK_VECTOR:
+          attribute_ref->single_value<blender::float3>() = blender::float3(
+              default_value->value_float);
+          break;
+        case SOCK_RGBA:
+          attribute_ref->single_value<blender::ColorGeometry4f>() = blender::ColorGeometry4f(
+              default_value->value_float);
+          break;
+        case SOCK_INT:
+          attribute_ref->single_value<int>() = default_value->value_int;
+          break;
+        case SOCK_BOOLEAN:
+          attribute_ref->single_value<bool>() = default_value->value_bool;
+          break;
+        default:
+          break;
+      }
     }
   };
   return socktype;
