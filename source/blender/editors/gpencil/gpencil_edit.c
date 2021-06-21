@@ -3845,29 +3845,6 @@ static int gpencil_strokes_reproject_exec(bContext *C, wmOperator *op)
 
 void GPENCIL_OT_reproject(wmOperatorType *ot)
 {
-  static const EnumPropertyItem reproject_type[] = {
-      {GP_REPROJECT_FRONT, "FRONT", 0, "Front", "Reproject the strokes using the X-Z plane"},
-      {GP_REPROJECT_SIDE, "SIDE", 0, "Side", "Reproject the strokes using the Y-Z plane"},
-      {GP_REPROJECT_TOP, "TOP", 0, "Top", "Reproject the strokes using the X-Y plane"},
-      {GP_REPROJECT_VIEW,
-       "VIEW",
-       0,
-       "View",
-       "Reproject the strokes to end up on the same plane, as if drawn from the current "
-       "viewpoint "
-       "using 'Cursor' Stroke Placement"},
-      {GP_REPROJECT_SURFACE,
-       "SURFACE",
-       0,
-       "Surface",
-       "Reproject the strokes on to the scene geometry, as if drawn using 'Surface' placement"},
-      {GP_REPROJECT_CURSOR,
-       "CURSOR",
-       0,
-       "Cursor",
-       "Reproject the strokes using the orientation of 3D cursor"},
-      {0, NULL, 0, NULL, NULL},
-  };
 
   /* identifiers */
   ot->name = "Reproject Strokes";
@@ -3887,8 +3864,12 @@ void GPENCIL_OT_reproject(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* properties */
-  ot->prop = RNA_def_enum(
-      ot->srna, "type", reproject_type, GP_REPROJECT_VIEW, "Projection Type", "");
+  ot->prop = RNA_def_enum(ot->srna,
+                          "type",
+                          rna_gpencil_reproject_type_items,
+                          GP_REPROJECT_VIEW,
+                          "Projection Type",
+                          "");
 
   RNA_def_boolean(
       ot->srna,
