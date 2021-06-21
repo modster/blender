@@ -623,8 +623,8 @@ typedef struct bNodeSocketValueAttribute {
   int flag; /* eNodeSocketAttributeFlag */
 
   /* XXX Does DNA support union? */
-  int value_int;
   float value_float[4];
+  int value_int;
   char value_bool;
   char _pad[3];
   float min, max;

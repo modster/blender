@@ -125,7 +125,8 @@ void node_socket_color_get(struct bContext *C,
                            struct bNodeTree *ntree,
                            struct PointerRNA *node_ptr,
                            struct bNodeSocket *sock,
-                           float r_color[4]);
+                           float r_color[4],
+                           eNodeSocketDisplayShape *r_display_shape);
 void node_update_nodetree(const struct bContext *C, struct bNodeTree *ntree);
 void node_draw_nodetree(const struct bContext *C,
                         struct ARegion *region,

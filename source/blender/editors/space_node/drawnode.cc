@@ -3343,7 +3343,7 @@ static void node_socket_undefined_draw(bContext *UNUSED(C),
 }
 
 static void node_socket_undefined_draw_color(bContext *UNUSED(C),
-                                             PointerRNA *UNUSED(ptr),
+                                             PointerRNA *ptr,
                                              PointerRNA *UNUSED(node_ptr),
                                              float *r_color)
 {
@@ -3472,6 +3472,22 @@ static void std_node_socket_draw_color(bContext *UNUSED(C),
     copy_v4_v4(r_color, std_node_socket_colors[data_type]);
   }
 }
+
+static void std_node_socket_draw_shape(bContext *UNUSED(C),
+                                       PointerRNA *ptr,
+                                       PointerRNA *UNUSED(node_ptr),
+                                       eNodeSocketDisplayShape *r_display_shape)
+{
+  bNodeSocket *sock = (bNodeSocket *)ptr->data;
+  int type = sock->typeinfo->type;
+  if (type != SOCK_ATTRIBUTE) {
+    *r_display_shape = (eNodeSocketDisplayShape)sock->display_shape;
+  }
+  else {
+    *r_display_shape = SOCK_DISPLAY_SHAPE_SQUARE;
+  }
+}
+
 static void std_node_socket_interface_draw_color(bContext *UNUSED(C),
                                                  PointerRNA *ptr,
                                                  float *r_color)
@@ -3755,12 +3771,13 @@ void ED_init_standard_node_socket_type(bNodeSocketType *stype)
 {
   stype->draw = std_node_socket_draw;
   stype->draw_color = std_node_socket_draw_color;
+  stype->draw_shape = std_node_socket_draw_shape;
   stype->interface_draw = std_node_socket_interface_draw;
   stype->interface_draw_color = std_node_socket_interface_draw_color;
 }
 
 static void node_socket_virtual_draw_color(bContext *UNUSED(C),
-                                           PointerRNA *UNUSED(ptr),
+                                           PointerRNA *ptr,
                                            PointerRNA *UNUSED(node_ptr),
                                            float *r_color)
 {

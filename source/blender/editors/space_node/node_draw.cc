@@ -717,9 +717,9 @@ static void node_draw_mute_line(const View2D *v2d, const SpaceNode *snode, const
 #define MARKER_SHAPE_CIRCLE 0x2
 #define MARKER_SHAPE_INNER_DOT 0x10
 
-static void node_socket_draw(const bNodeSocket *sock,
-                             const float color[4],
+static void node_socket_draw(const float color[4],
                              const float color_outline[4],
+                             const eNodeSocketDisplayShape display_shape,
                              float size,
                              int locx,
                              int locy,
@@ -732,7 +732,7 @@ static void node_socket_draw(const bNodeSocket *sock,
   int flags;
 
   /* Set shape flags. */
-  switch (sock->display_shape) {
+  switch (display_shape) {
     case SOCK_DISPLAY_SHAPE_DIAMOND:
     case SOCK_DISPLAY_SHAPE_DIAMOND_DOT:
       flags = MARKER_SHAPE_DIAMOND;
@@ -748,7 +748,7 @@ static void node_socket_draw(const bNodeSocket *sock,
       break;
   }
 
-  if (ELEM(sock->display_shape,
+  if (ELEM(display_shape,
            SOCK_DISPLAY_SHAPE_DIAMOND_DOT,
            SOCK_DISPLAY_SHAPE_SQUARE_DOT,
            SOCK_DISPLAY_SHAPE_CIRCLE_DOT)) {
@@ -764,6 +764,7 @@ static void node_socket_draw(const bNodeSocket *sock,
 
 static void node_socket_draw_multi_input(const float color[4],
                                          const float color_outline[4],
+                                         const eNodeSocketDisplayShape UNUSED(display_shape),
                                          const float width,
                                          const float height,
                                          const int locx,
@@ -807,14 +808,24 @@ static void node_socket_outline_color_get(const bool selected,
 
 /* Usual convention here would be node_socket_get_color(), but that's already used (for setting a
  * color property socket). */
-void node_socket_color_get(
-    bContext *C, bNodeTree *ntree, PointerRNA *node_ptr, bNodeSocket *sock, float r_color[4])
+void node_socket_color_get(bContext *C,
+                           bNodeTree *ntree,
+                           PointerRNA *node_ptr,
+                           bNodeSocket *sock,
+                           float r_color[4],
+                           eNodeSocketDisplayShape *r_display_shape)
 {
   PointerRNA ptr;
   BLI_assert(RNA_struct_is_a(node_ptr->type, &RNA_Node));
   RNA_pointer_create((ID *)ntree, &RNA_NodeSocket, sock, &ptr);
 
   sock->typeinfo->draw_color(C, &ptr, node_ptr, r_color);
+  if (sock->typeinfo->draw_shape) {
+    sock->typeinfo->draw_shape(C, &ptr, node_ptr, r_display_shape);
+  }
+  else {
+    *r_display_shape = (eNodeSocketDisplayShape)sock->display_shape;
+  }
 
   bNode *node = (bNode *)node_ptr->data;
   if (node->flag & NODE_MUTED) {
@@ -836,13 +847,14 @@ static void node_socket_draw_nested(const bContext *C,
 {
   float color[4];
   float outline_color[4];
+  eNodeSocketDisplayShape display_shape;
 
-  node_socket_color_get((bContext *)C, ntree, node_ptr, sock, color);
+  node_socket_color_get((bContext *)C, ntree, node_ptr, sock, color, &display_shape);
   node_socket_outline_color_get(selected, sock->type, outline_color);
 
-  node_socket_draw(sock,
-                   color,
+  node_socket_draw(color,
                    outline_color,
+                   display_shape,
                    size,
                    sock->locx,
                    sock->locy,
@@ -858,7 +870,11 @@ static void node_socket_draw_nested(const bContext *C,
  * \note this is only called from external code, internally #node_socket_draw_nested() is used for
  *       optimized drawing of multiple/all sockets of a node.
  */
-void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[4], float scale)
+void ED_node_socket_draw(bNodeSocket *sock,
+                         const rcti *rect,
+                         const float color[4],
+                         float scale,
+                         char display_shape)
 {
   const float size = 2.25f * NODE_SOCKSIZE * scale;
   rcti draw_rect = *rect;
@@ -886,9 +902,9 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
 
   /* Single point. */
   immBegin(GPU_PRIM_POINTS, 1);
-  node_socket_draw(sock,
-                   color,
+  node_socket_draw(color,
                    outline_color,
+                   (eNodeSocketDisplayShape)display_shape,
                    BLI_rcti_size_y(&draw_rect),
                    BLI_rcti_cent_x(&draw_rect),
                    BLI_rcti_cent_y(&draw_rect),
@@ -1178,10 +1194,12 @@ void node_draw_sockets(const View2D *v2d,
 
     float color[4];
     float outline_color[4];
-    node_socket_color_get((bContext *)C, ntree, &node_ptr, socket, color);
+    eNodeSocketDisplayShape display_shape;
+    node_socket_color_get((bContext *)C, ntree, &node_ptr, socket, color, &display_shape);
     node_socket_outline_color_get(selected, socket->type, outline_color);
 
-    node_socket_draw_multi_input(color, outline_color, width, height, socket->locx, socket->locy);
+    node_socket_draw_multi_input(
+        color, outline_color, display_shape, width, height, socket->locx, socket->locy);
   }
 }
 

@@ -155,6 +155,10 @@ typedef struct bNodeSocketType {
                      struct PointerRNA *ptr,
                      struct PointerRNA *node_ptr,
                      float *r_color);
+  void (*draw_shape)(struct bContext *C,
+                     struct PointerRNA *ptr,
+                     struct PointerRNA *node_ptr,
+                     eNodeSocketDisplayShape *r_display_shape);
 
   void (*interface_draw)(struct bContext *C, struct uiLayout *layout, struct PointerRNA *ptr);
   void (*interface_draw_color)(struct bContext *C, struct PointerRNA *ptr, float *r_color);

@@ -685,6 +685,7 @@ void uiTemplateNodeLink(
   NodeLinkArg *arg;
   uiBut *but;
   float socket_col[4];
+  eNodeSocketDisplayShape display_shape;
 
   arg = (NodeLinkArg *)MEM_callocN(sizeof(NodeLinkArg), "NodeLinkArg");
   arg->ntree = ntree;
@@ -693,7 +694,7 @@ void uiTemplateNodeLink(
 
   PointerRNA node_ptr;
   RNA_pointer_create((ID *)ntree, &RNA_Node, node, &node_ptr);
-  node_socket_color_get(C, ntree, &node_ptr, input, socket_col);
+  node_socket_color_get(C, ntree, &node_ptr, input, socket_col, &display_shape);
 
   UI_block_layout_set_current(block, layout);
 

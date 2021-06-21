@@ -89,7 +89,8 @@ void ED_node_draw_snap(
 void ED_node_socket_draw(struct bNodeSocket *sock,
                          const struct rcti *rect,
                          const float color[4],
-                         float scale);
+                         float scale,
+                         char display_shape);
 void ED_node_tree_update(const struct bContext *C);
 void ED_node_tag_update_id(struct ID *id);
 void ED_node_tag_update_nodetree(struct Main *bmain, struct bNodeTree *ntree, struct bNode *node);
