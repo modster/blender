@@ -4265,7 +4265,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   return true;
 }
 
-static int lineart_rb_edge_types(LineartRenderBuffer *rb)
+static int UNUSED_FUNCTION(lineart_rb_edge_types)(LineartRenderBuffer *rb)
 {
   int types = 0;
   types |= rb->use_contour ? LRT_EDGE_FLAG_CONTOUR : 0;
