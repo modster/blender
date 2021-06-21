@@ -293,18 +293,13 @@ void USDStageReader::collect_readers(Main *bmain,
   std::string prim_path_mask(params.prim_path_mask);
 
   if (!prim_path_mask.empty()) {
-    pxr::SdfPath path = pxr::SdfPath(prim_path_mask);
-    pxr::UsdPrim prim = stage_->GetPrimAtPath(path.StripAllVariantSelections());
+    pxr::UsdPrim prim = stage_->GetPrimAtPath(pxr::SdfPath(prim_path_mask));
     if (prim.IsValid()) {
       root = prim;
-      if (path.ContainsPrimVariantSelection()) {
-        // TODO(makowalski): This will not work properly with setting variants on child prims
-        while (path.ContainsPrimVariantSelection()) {
-          std::pair<std::string, std::string> variantSelection = path.GetVariantSelection();
-          root.GetVariantSet(variantSelection.first).SetVariantSelection(variantSelection.second);
-          path = path.GetParentPath();
-        }
-      }
+    }
+    else {
+      std::cerr << "WARNING: Prim Path Mask " << prim_path_mask
+                << " does not specify a valid prim.\n";
     }
   }
 
