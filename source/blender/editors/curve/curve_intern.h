@@ -141,6 +141,10 @@ void CURVE_OT_match_texture_space(struct wmOperatorType *ot);
 struct GHash *ED_curve_keyindex_hash_duplicate(struct GHash *keyindex);
 void ED_curve_keyindex_update_nurb(struct EditNurb *editnurb, struct Nurb *nu, struct Nurb *newnu);
 
+/* exported for editcurve_pen.c */
+bool ed_editcurve_extrude(Curve *cu, EditNurb *editnurb, View3D *v3d);
+int ed_editcurve_addvert(Curve *cu, EditNurb *editnurb, View3D *v3d, const float location_init[3]);
+
 /* helper functions */
 void ed_editnurb_translate_flag(struct ListBase *editnurb,
                                 uint8_t flag,
