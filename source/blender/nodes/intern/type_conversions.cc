@@ -72,6 +72,12 @@ static ColorGeometry4f float_to_color(const float &a)
 {
   return ColorGeometry4f(a, a, a, 1.0f);
 }
+static AttributeRef float_to_attribute(const float &a)
+{
+  AttributeRef attr_ref;
+  attr_ref.single_value<float>() = a;
+  return attr_ref;
+}
 
 static float3 float2_to_float3(const float2 &a)
 {
@@ -92,6 +98,12 @@ static bool float2_to_bool(const float2 &a)
 static ColorGeometry4f float2_to_color(const float2 &a)
 {
   return ColorGeometry4f(a.x, a.y, 0.0f, 1.0f);
+}
+static AttributeRef float2_to_attribute(const float2 &a)
+{
+  AttributeRef attr_ref;
+  attr_ref.single_value<float3>() = float3(a.x, a.y, 0.0f);
+  return attr_ref;
 }
 
 static bool float3_to_bool(const float3 &a)
@@ -114,6 +126,12 @@ static ColorGeometry4f float3_to_color(const float3 &a)
 {
   return ColorGeometry4f(a.x, a.y, a.z, 1.0f);
 }
+static AttributeRef float3_to_attribute(const float3 &a)
+{
+  AttributeRef attr_ref;
+  attr_ref.single_value<float3>() = a;
+  return attr_ref;
+}
 
 static bool int_to_bool(const int32_t &a)
 {
@@ -134,6 +152,12 @@ static float3 int_to_float3(const int32_t &a)
 static ColorGeometry4f int_to_color(const int32_t &a)
 {
   return ColorGeometry4f((float)a, (float)a, (float)a, 1.0f);
+}
+static AttributeRef int_to_attribute(const int &a)
+{
+  AttributeRef attr_ref;
+  attr_ref.single_value<int>() = a;
+  return attr_ref;
 }
 
 static float bool_to_float(const bool &a)
@@ -156,6 +180,12 @@ static ColorGeometry4f bool_to_color(const bool &a)
 {
   return (a) ? ColorGeometry4f(1.0f, 1.0f, 1.0f, 1.0f) : ColorGeometry4f(0.0f, 0.0f, 0.0f, 1.0f);
 }
+static AttributeRef bool_to_attribute(const bool &a)
+{
+  AttributeRef attr_ref;
+  attr_ref.single_value<bool>() = a;
+  return attr_ref;
+}
 
 static bool color_to_bool(const ColorGeometry4f &a)
 {
@@ -177,6 +207,12 @@ static float3 color_to_float3(const ColorGeometry4f &a)
 {
   return float3(a.r, a.g, a.b);
 }
+static AttributeRef color_to_attribute(const ColorGeometry4f &a)
+{
+  AttributeRef attr_ref;
+  attr_ref.single_value<ColorGeometry4f>() = a;
+  return attr_ref;
+}
 
 /* Temporary implicit conversion to allow attributes directly connected to string inputs. */
 static std::string attribute_to_string(const AttributeRef& a)
@@ -193,36 +229,42 @@ static DataTypeConversions create_implicit_conversions()
   add_implicit_conversion<float, int32_t, float_to_int>(conversions);
   add_implicit_conversion<float, bool, float_to_bool>(conversions);
   add_implicit_conversion<float, ColorGeometry4f, float_to_color>(conversions);
+  add_implicit_conversion<float, AttributeRef, float_to_attribute>(conversions);
 
   add_implicit_conversion<float2, float3, float2_to_float3>(conversions);
   add_implicit_conversion<float2, float, float2_to_float>(conversions);
   add_implicit_conversion<float2, int32_t, float2_to_int>(conversions);
   add_implicit_conversion<float2, bool, float2_to_bool>(conversions);
   add_implicit_conversion<float2, ColorGeometry4f, float2_to_color>(conversions);
+  add_implicit_conversion<float2, AttributeRef, float2_to_attribute>(conversions);
 
   add_implicit_conversion<float3, bool, float3_to_bool>(conversions);
   add_implicit_conversion<float3, float, float3_to_float>(conversions);
   add_implicit_conversion<float3, int32_t, float3_to_int>(conversions);
   add_implicit_conversion<float3, float2, float3_to_float2>(conversions);
   add_implicit_conversion<float3, ColorGeometry4f, float3_to_color>(conversions);
+  add_implicit_conversion<float3, AttributeRef, float3_to_attribute>(conversions);
 
   add_implicit_conversion<int32_t, bool, int_to_bool>(conversions);
   add_implicit_conversion<int32_t, float, int_to_float>(conversions);
   add_implicit_conversion<int32_t, float2, int_to_float2>(conversions);
   add_implicit_conversion<int32_t, float3, int_to_float3>(conversions);
   add_implicit_conversion<int32_t, ColorGeometry4f, int_to_color>(conversions);
+  add_implicit_conversion<int32_t, AttributeRef, int_to_attribute>(conversions);
 
   add_implicit_conversion<bool, float, bool_to_float>(conversions);
   add_implicit_conversion<bool, int32_t, bool_to_int>(conversions);
   add_implicit_conversion<bool, float2, bool_to_float2>(conversions);
   add_implicit_conversion<bool, float3, bool_to_float3>(conversions);
   add_implicit_conversion<bool, ColorGeometry4f, bool_to_color>(conversions);
+  add_implicit_conversion<bool, AttributeRef, bool_to_attribute>(conversions);
 
   add_implicit_conversion<ColorGeometry4f, bool, color_to_bool>(conversions);
   add_implicit_conversion<ColorGeometry4f, float, color_to_float>(conversions);
   add_implicit_conversion<ColorGeometry4f, int32_t, color_to_int>(conversions);
   add_implicit_conversion<ColorGeometry4f, float2, color_to_float2>(conversions);
   add_implicit_conversion<ColorGeometry4f, float3, color_to_float3>(conversions);
+  add_implicit_conversion<ColorGeometry4f, AttributeRef, color_to_attribute>(conversions);
 
   add_implicit_conversion<AttributeRef, std::string, attribute_to_string>(conversions);
 

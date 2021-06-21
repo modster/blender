@@ -24,6 +24,7 @@
 #include "FN_cpp_type.hh"
 
 #include "BKE_attribute.h"
+#include "BKE_attribute_access.hh"
 
 /**
  * Runtime data struct that references attributes during evaluation of geometry node trees.
