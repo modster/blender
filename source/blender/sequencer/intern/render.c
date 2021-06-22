@@ -469,9 +469,6 @@ static bool seq_input_have_to_preprocess(const SeqRenderData *context,
     return true;
   }
 
-  if (context->is_thumb)
-    return true;
-
   return false;
 }
 
@@ -539,7 +536,7 @@ static void sequencer_thumbnail_transform(ImBuf *in, ImBuf *out, const SeqRender
                                          SEQ_rendersize_to_scale_factor(
                                              context->preview_render_size);
 
-  float image_scale_factor = (float)context->rectx / in->x;
+  float image_scale_factor = (float)out->x / in->x;
   float transform_matrix[3][3];
 
   /* set to keep same loc,scale,rot but change scale to thumb size limit*/
@@ -576,9 +573,7 @@ static void sequencer_preprocess_transform_crop(
                                              context->preview_render_size);
   const bool do_scale_to_render_size = seq_need_scale_to_render_size(seq, is_proxy_image);
   float image_scale_factor = do_scale_to_render_size ? 1.0f : preview_scale_factor;
-  if (context->is_thumb) {
-    image_scale_factor = (float)context->rectx / in->x;
-  }
+
   float transform_matrix[3][3];
   sequencer_image_crop_transform_matrix(
       seq, in, out, image_scale_factor, preview_scale_factor, transform_matrix);
@@ -647,21 +642,8 @@ static ImBuf *input_preprocess(const SeqRenderData *context,
     IMB_filtery(preprocessed_ibuf);
   }
 
-  /* For thumbnails only scale to low res and return. No need for other preprocess as thumbnail
-   * represents source */
-  if (context->is_thumb) {
-    preprocessed_ibuf = IMB_allocImBuf(
-        context->rectx, context->recty, 32, ibuf->rect_float ? IB_rectfloat : IB_rect);
-    sequencer_thumbnail_transform(ibuf, preprocessed_ibuf, context);
-    seq_imbuf_assign_spaces(scene, preprocessed_ibuf);
-    IMB_metadata_copy(preprocessed_ibuf, ibuf);
-    IMB_freeImBuf(ibuf);
-
-    return preprocessed_ibuf;
-  }
-
   if (sequencer_use_crop(seq) || sequencer_use_transform(seq) || context->rectx != ibuf->x ||
-      context->recty != ibuf->y || context->is_thumb) {
+      context->recty != ibuf->y) {
     const int x = context->rectx;
     const int y = context->recty;
     preprocessed_ibuf = IMB_allocImBuf(x, y, 32, ibuf->rect_float ? IB_rectfloat : IB_rect);
@@ -735,17 +717,12 @@ static ImBuf *seq_render_preprocess_ibuf(const SeqRenderData *context,
   }
 
   /* Proxies and effect strips are not stored in cache. */
-  if (!is_proxy_image && (seq->type & SEQ_TYPE_EFFECT) == 0 && !context->is_thumb) {
+  if (!is_proxy_image && (seq->type & SEQ_TYPE_EFFECT) == 0) {
     seq_cache_put(context, seq, timeline_frame, SEQ_CACHE_STORE_RAW, ibuf);
   }
 
   if (use_preprocess) {
     ibuf = input_preprocess(context, seq, timeline_frame, ibuf, is_proxy_image);
-  }
-
-  if (context->is_thumb) {
-    seq_cache_put(context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL, ibuf);
-    return ibuf;
   }
 
   seq_cache_put(context, seq, timeline_frame, SEQ_CACHE_STORE_PREPROCESSED, ibuf);
@@ -1796,22 +1773,14 @@ ImBuf *seq_render_strip(const SeqRenderData *context,
   bool use_preprocess = false;
   bool is_proxy_image = false;
 
-  if (context->is_thumb) {
-    ibuf = seq_cache_get(context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL);
-    if (ibuf != NULL)
-      return ibuf;
-  }
-  else {
-    ibuf = seq_cache_get(context, seq, timeline_frame, SEQ_CACHE_STORE_PREPROCESSED);
-    if (ibuf != NULL) {
-      return ibuf;
-    }
+  ibuf = seq_cache_get(context, seq, timeline_frame, SEQ_CACHE_STORE_PREPROCESSED);
+  if (ibuf != NULL) {
+    return ibuf;
   }
 
   /* Proxies are not stored in cache. */
   if (!SEQ_can_use_proxy(
-          context, seq, SEQ_rendersize_to_proxysize(context->preview_render_size)) &&
-      !context->is_thumb) {
+          context, seq, SEQ_rendersize_to_proxysize(context->preview_render_size))) {
     ibuf = seq_cache_get(context, seq, timeline_frame, SEQ_CACHE_STORE_RAW);
   }
 
@@ -2056,7 +2025,54 @@ ImBuf *SEQ_render_give_ibuf_direct(const SeqRenderData *context,
   seq_render_state_init(&state);
 
   ImBuf *ibuf = seq_render_strip(context, &state, seq, timeline_frame);
-
   return ibuf;
 }
+
+ImBuf *SEQ_render_thumbnail(SeqRenderData *context, Sequence *seq, float timeline_frame)
+{
+  SeqRenderState state;
+  seq_render_state_init(&state);
+  ImBuf *ibuf = NULL, *scaled_ibuf = NULL;
+  bool is_proxy_image = false;
+  float rectx, recty;
+
+  ibuf = seq_cache_get(context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL);
+  if (ibuf != NULL) {
+    return ibuf;
+  }
+
+  ibuf = do_render_strip_uncached(context, &state, seq, timeline_frame, &is_proxy_image);
+
+  if (ibuf) {
+    float aspect_ratio = (float)ibuf->x / ibuf->y;
+
+    /* Fix the dimensions to be max 256 for x or y */
+    if (ibuf->x > ibuf->y) {
+      rectx = 256;
+      recty = roundf(rectx / aspect_ratio);
+    }
+    else {
+      recty = 256;
+      rectx = roundf(recty * aspect_ratio);
+    }
+
+    /* perform scaling of ibuf to thumb size */
+    scaled_ibuf = IMB_allocImBuf(rectx, recty, 32, ibuf->rect_float ? IB_rectfloat : IB_rect);
+    sequencer_thumbnail_transform(ibuf, scaled_ibuf, context);
+    seq_imbuf_assign_spaces(context->scene, scaled_ibuf);
+    IMB_metadata_copy(scaled_ibuf, ibuf);
+    IMB_freeImBuf(ibuf);
+  }
+
+  if (scaled_ibuf)
+    seq_cache_put(context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL, scaled_ibuf);
+
+  if (scaled_ibuf == NULL) {
+    ibuf = IMB_allocImBuf(rectx, recty, 32, IB_rect);
+    seq_imbuf_assign_spaces(context->scene, scaled_ibuf);
+  }
+
+  return scaled_ibuf;
+}
+
 /** \} */

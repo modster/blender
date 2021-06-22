@@ -1099,24 +1099,9 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   SeqRenderData context = {0};
   ImBuf *ibuf;
-  int rectx, recty;
-  double render_size;
   float strip_x2 = x2;
   bool min_size;
   float aspect_ratio;
-
-  /* Fix size of obtained ibuf to max 256 for any dimension keeping aspect ratio same. Depends upon
-   * the scene set resolution for uniformity in all strips */
-  aspect_ratio = (float)scene->r.xsch / scene->r.ysch;
-
-  if (scene->r.xsch > scene->r.ysch) {
-    rectx = 256;
-    recty = roundf(rectx / aspect_ratio);
-  }
-  else {
-    recty = 256;
-    rectx = roundf(recty * aspect_ratio);
-  }
 
   /* if thumbs too small ignore */
   min_size = ((y2 - y1) / pixely) > 40 * U.dpi_fac;
@@ -1124,26 +1109,28 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   if (!min_size)
     return;
 
-  SEQ_render_new_render_data(
-      bmain, depsgraph, scene, rectx, recty, sseq->render_size, false, &context);
+  SEQ_render_new_render_data(bmain, depsgraph, scene, 0, 0, sseq->render_size, false, &context);
   context.view_id = BKE_scene_multiview_view_id_get(&scene->r, STEREO_LEFT_NAME);
   context.use_proxies = false;
   context.is_prefetch_render = false;
   context.is_proxy_render = false;
   context.is_thumb = true;
 
+  ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp);
+
   /*Calculate thumb dimensions */
   float thumb_h = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
-  aspect_ratio = ((float)rectx) / recty;
+  aspect_ratio = ((float)ibuf->x) / ibuf->y;
   float thumb_h_px = thumb_h / pixely;
   float thumb_w = aspect_ratio * thumb_h_px * pixelx;
-  float zoom_x = thumb_w / rectx;
-  float zoom_y = thumb_h / recty;
+  float zoom_x = thumb_w / ibuf->x;
+  float zoom_y = thumb_h / ibuf->y;
+
+  IMB_freeImBuf(ibuf);
 
   y2 = y1 + thumb_h - pixely;
   x1 = seq->start;
 
-  int frame_factor = 0;
   float cut_off = 0;
   float upper_thumb_bound = strip_x2;
 
@@ -1156,7 +1143,6 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 
     if (x2 < v2d->cur.xmin) {
       x1 = x2;
-      frame_factor++;
       continue;
     }
 
@@ -1180,7 +1166,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
 
     /* Get the image */
-    ibuf = SEQ_render_give_ibuf_direct(&context, x1 + (int)(cut_off), seq);
+    ibuf = SEQ_render_thumbnail(&context, seq, x1 + (int)(cut_off));
 
     if (ibuf) {
       ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
@@ -1188,7 +1174,6 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
 
     cut_off = 0;
-    frame_factor++;
     x1 = x2;
   }
 }
