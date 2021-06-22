@@ -67,7 +67,7 @@
 
 #define LINEART_WITH_BVH
 #define LINEART_WITH_BVH_THREAD
-//#define LINEART_BVH_OWN_ISEC
+#define LINEART_BVH_OWN_ISEC
 
 static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer *rb,
                                                              LineartEdge *e);
@@ -2258,6 +2258,23 @@ static void lineart_main_load_geometries(
     }
   }
 
+  int tri_count = 0;
+  int global_tri_i = 0;
+  LineartTriangle *tri;
+  LISTBASE_FOREACH (LineartElementLinkNode *, eln, &rb->triangle_buffer_pointers) {
+    tri_count += eln->element_count;
+  }
+
+  rb->triangle_lookup = lineart_mem_acquire(&rb->render_data_pool, sizeof(void *) * tri_count);
+
+  LISTBASE_FOREACH (LineartElementLinkNode *, eln, &rb->triangle_buffer_pointers) {
+    for (int i = 0; i < eln->element_count; i++) {
+      tri = (void *)(((uchar *)eln->pointer) + rb->triangle_size * i);
+      rb->triangle_lookup[global_tri_i] = tri;
+      global_tri_i++;
+    }
+  }
+
   if (G.debug_value == 4000) {
     double t_elapsed = PIL_check_seconds_timer() - t_start;
     printf("Line art loading time: %lf\n", t_elapsed);
@@ -3891,6 +3908,7 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
 
 static LineartTriangle *lineart_get_triangle_from_index(LineartRenderBuffer *rb, int index)
 {
+  return rb->triangle_lookup[index];
   int left = 0;
   int right = rb->bvh_inderxer_count - 1;
   while (left <= right) {

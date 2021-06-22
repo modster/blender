@@ -257,6 +257,7 @@ typedef struct LineartRenderBuffer {
   ListBase vertex_buffer_pointers;
   ListBase line_buffer_pointers;
   ListBase triangle_buffer_pointers;
+  LineartTriangle **triangle_lookup;
 
   /** This one's memory is not from main pool and is free()ed after culling stage. */
   ListBase triangle_adjacent_pointers;
