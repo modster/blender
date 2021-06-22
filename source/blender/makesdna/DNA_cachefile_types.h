@@ -51,7 +51,7 @@ enum {
 };
 #endif
 
-/* Representation of an object's path inside the Alembic file.
+/* Representation of an object's path inside the archive.
  * Note that this is not a file path. */
 typedef struct CacheObjectPath {
   struct CacheObjectPath *next, *prev;
@@ -70,7 +70,7 @@ typedef struct CacheFile {
   ID id;
   struct AnimData *adt;
 
-  /** Paths of the objects inside of the Alembic archive referenced by this CacheFile. */
+  /** Paths of the objects inside of the archive referenced by this CacheFile. */
   ListBase object_paths;
 
   /** 1024 = FILE_MAX. */
@@ -97,7 +97,7 @@ typedef struct CacheFile {
   char _pad[2];
 
   char velocity_unit;
-  /* Name of the velocity property in the Alembic file. */
+  /* Name of the velocity property in the archive. */
   char velocity_name[64];
 
   /* Runtime */
