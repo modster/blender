@@ -369,7 +369,7 @@ class MeshReader {
         continue;
       }
 
-      if (line.rfind('v', 0) == 0) {
+      if (line.rfind("v ", 0) == 0) {
         std::istringstream li(line);
         float x, y, z;
         std::string temp;
@@ -380,7 +380,7 @@ class MeshReader {
         BLI_assert(temp == "v");
         this->positions.append(float3(x, y, z));
       }
-      else if (line.rfind("vt", 0) == 0) {
+      else if (line.rfind("vt ", 0) == 0) {
         std::istringstream li(line);
         float u, v;
         std::string temp;
@@ -402,8 +402,10 @@ class MeshReader {
         BLI_assert(temp == "vn");
         this->normals.append(float3(x, y, z));
       }
-      else if (line.rfind("f", 0) == 0) {
+      else if (line.rfind("f ", 0) == 0) {
         const auto line_toks = this->tokenize(line, ' ');
+
+        BLI_assert(line_toks.size() != 0);
 
         blender::Vector<FaceData> face;
 
@@ -448,9 +450,10 @@ class MeshReader {
           }
         }
 
+        BLI_assert(line_toks[0] == "f");
         this->face_indices.append(face);
       }
-      else if (line.rfind("l", 0) == 0) {
+      else if (line.rfind("l ", 0) == 0) {
         std::istringstream li(line);
         std::string temp;
         li >> temp;
@@ -461,6 +464,8 @@ class MeshReader {
           indices.append(index - 1); /* obj starts from 1, we want to
                                       * start from 0 */
         }
+
+        BLI_assert(temp == "l");
         this->line_indices.append(indices);
       }
       else {
