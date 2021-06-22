@@ -49,6 +49,7 @@ void BKE_cloth_remesh(const struct Object *ob,
 #  include <bits/stdint-uintn.h>
 #  include <filesystem>
 #  include <fstream>
+#  include <istream>
 #  include <limits>
 #  include <sstream>
 #  include <string>
@@ -302,8 +303,13 @@ class MeshReader {
       return false;
     }
 
+    return read(std::move(fin), type);
+  }
+
+  bool read(std::istream &&in, FileType type)
+  {
     if (type == FILETYPE_OBJ) {
-      auto res = this->read_obj(std::move(fin));
+      auto res = this->read_obj(std::move(in));
       if (!res) {
         return false;
       }
@@ -313,6 +319,31 @@ class MeshReader {
     }
 
     return true;
+  }
+
+  const auto &get_positions() const
+  {
+    return this->positions;
+  }
+
+  const auto &get_uvs() const
+  {
+    return this->uvs;
+  }
+
+  const auto &get_normals() const
+  {
+    return this->normals;
+  }
+
+  const auto &get_face_indices() const
+  {
+    return this->face_indices;
+  }
+
+  const auto &get_line_indices() const
+  {
+    return this->line_indices;
   }
 
  private:
@@ -330,10 +361,10 @@ class MeshReader {
     return res;
   }
 
-  bool read_obj(std::fstream &&fin)
+  bool read_obj(std::istream &&in)
   {
     std::string line;
-    while (std::getline(fin, line)) {
+    while (std::getline(in, line)) {
       if (line.rfind('#', 0) == 0) {
         continue;
       }

@@ -773,6 +773,8 @@ if(WITH_GTESTS)
     intern/layer_test.cc
     intern/lib_id_test.cc
     intern/tracking_test.cc
+
+    tests/BKE_cloth_remesh_test.cc
   )
   set(TEST_INC
     ../editors/include
