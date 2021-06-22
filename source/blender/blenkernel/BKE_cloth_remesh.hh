@@ -218,6 +218,37 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
  private:
   /* all private static methods */
   /* all private non-static methods */
+
+  Node<END> &add_empty_node(float3 pos, float3 normal)
+  {
+    auto node_index = this->nodes.insert_with(
+        [=](NodeIndex index) { return Node<END>(index, pos, normal); });
+
+    return this->nodes.get(node_index);
+  }
+
+  Vert<EVD> &add_empty_vert(float2 uv)
+  {
+    auto vert_index = this->verts.insert_with(
+        [=](VertIndex index) { return Vert<EVD>(index, uv); });
+
+    return this->verts.get(vert_index);
+  }
+
+  Edge<EED> &add_empty_edge()
+  {
+    auto edge_index = this->edges.insert_with([=](EdgeIndex index) { return Edge<EED>(index); });
+
+    return this->edges.get(edge_index);
+  }
+
+  Face<EFD> &add_empty_face(float3 normal)
+  {
+    auto face_index = this->faces.insert_with(
+        [=](FaceIndex index) { return Face<EFD>(index, normal); });
+
+    return this->faces.get(face_index);
+  }
 };
 } /* namespace blender::bke::internal */
 
