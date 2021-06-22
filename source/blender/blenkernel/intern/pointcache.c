@@ -119,14 +119,14 @@
 static CLG_LogRef LOG = {"bke.pointcache"};
 
 static int ptcache_data_size[] = {
-    sizeof(unsigned int), /* BPHYS_DATA_INDEX */
-    sizeof(float[3]),     /* BPHYS_DATA_LOCATION */
-    sizeof(float[3]),     /* BPHYS_DATA_VELOCITY */
-    sizeof(float[4]),     /* BPHYS_DATA_ROTATION */
-    sizeof(float[3]),     /* BPHYS_DATA_AVELOCITY / BPHYS_DATA_XCONST */
-    sizeof(float),        /* BPHYS_DATA_SIZE */
-    sizeof(float[3]),     /* BPHYS_DATA_TIMES */
-    sizeof(BoidData),     /* case BPHYS_DATA_BOIDS */
+    sizeof(unsigned int),    /* BPHYS_DATA_INDEX */
+    sizeof(float[3]),        /* BPHYS_DATA_LOCATION */
+    sizeof(float[3]),        /* BPHYS_DATA_VELOCITY */
+    sizeof(float[4]),        /* BPHYS_DATA_ROTATION */
+    sizeof(float[3]),        /* BPHYS_DATA_AVELOCITY / BPHYS_DATA_XCONST */
+    sizeof(float),           /* BPHYS_DATA_SIZE */
+    sizeof(float[3]),        /* BPHYS_DATA_TIMES */
+    sizeof(BoidData),        /* case BPHYS_DATA_BOIDS */
     sizeof(sim_data_vec[3]), /* BPHYS_DATA_EFF_FORCES */
     sizeof(sim_data_vec[3]), /* BPHYS_DATA_NORM_FORCES */
     sizeof(sim_data_vec[3]), /* BPHYS_DATA_FRIC_FORCES */
@@ -823,10 +823,10 @@ static void ptcache_rigidbody_read(
         PTCACHE_DATA_TO(data, BPHYS_DATA_LOCATION, 0, rbo->pos);
         PTCACHE_DATA_TO(data, BPHYS_DATA_ROTATION, 0, rbo->orn);
         PTCACHE_DATA_TO(data, BPHYS_DATA_VELOCITY, 0, rbo->vel);
-        PTCACHE_DATA_TO(data, BPHYS_DATA_EFF_FORCES, 0 ,rbo->eff_forces);
-        PTCACHE_DATA_TO(data, BPHYS_DATA_NORM_FORCES, 0 ,rbo->norm_forces);
-        PTCACHE_DATA_TO(data, BPHYS_DATA_FRIC_FORCES, 0 ,rbo->fric_forces);
-        PTCACHE_DATA_TO(data, BPHYS_DATA_VEC_LOCATIONS, 0 ,rbo->vec_locations);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_EFF_FORCES, 0, rbo->eff_forces);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_NORM_FORCES, 0, rbo->norm_forces);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_FRIC_FORCES, 0, rbo->fric_forces);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_VEC_LOCATIONS, 0, rbo->vec_locations);
       }
     }
   }
@@ -1114,7 +1114,10 @@ void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, Object *ob, RigidBodyWorld *r
   pid->write_header = ptcache_basic_header_write;
   pid->read_header = ptcache_basic_header_read;
 
-  pid->data_types = (1 << BPHYS_DATA_LOCATION) | (1 << BPHYS_DATA_ROTATION) | (1 << BPHYS_DATA_VELOCITY) | (1 << BPHYS_DATA_EFF_FORCES) |  (1 << BPHYS_DATA_NORM_FORCES) | (1 << BPHYS_DATA_FRIC_FORCES) | (1 << BPHYS_DATA_VEC_LOCATIONS);
+  pid->data_types = (1 << BPHYS_DATA_LOCATION) | (1 << BPHYS_DATA_ROTATION) |
+                    (1 << BPHYS_DATA_VELOCITY) | (1 << BPHYS_DATA_EFF_FORCES) |
+                    (1 << BPHYS_DATA_NORM_FORCES) | (1 << BPHYS_DATA_FRIC_FORCES) |
+                    (1 << BPHYS_DATA_VEC_LOCATIONS);
   pid->info_types = 0;
 
   pid->stack_index = pid->cache->index;
@@ -1752,10 +1755,18 @@ static void ptcache_file_pointers_init(PTCacheFile *pf)
   pf->cur[BPHYS_DATA_SIZE] = (data_types & (1 << BPHYS_DATA_SIZE)) ? &pf->data.size : NULL;
   pf->cur[BPHYS_DATA_TIMES] = (data_types & (1 << BPHYS_DATA_TIMES)) ? &pf->data.times : NULL;
   pf->cur[BPHYS_DATA_BOIDS] = (data_types & (1 << BPHYS_DATA_BOIDS)) ? &pf->data.boids : NULL;
-  pf->cur[BPHYS_DATA_EFF_FORCES] = (data_types & (1 << BPHYS_DATA_EFF_FORCES)) ? &pf->data.eff_forces : NULL;
-  pf->cur[BPHYS_DATA_NORM_FORCES] = (data_types & (1 << BPHYS_DATA_NORM_FORCES)) ? &pf->data.norm_forces : NULL;
-  pf->cur[BPHYS_DATA_FRIC_FORCES] = (data_types & (1 << BPHYS_DATA_FRIC_FORCES)) ? &pf->data.fric_forces : NULL;
-  pf->cur[BPHYS_DATA_VEC_LOCATIONS] = (data_types & (1 << BPHYS_DATA_VEC_LOCATIONS)) ? &pf->data.vec_locations : NULL;
+  pf->cur[BPHYS_DATA_EFF_FORCES] = (data_types & (1 << BPHYS_DATA_EFF_FORCES)) ?
+                                       &pf->data.eff_forces :
+                                       NULL;
+  pf->cur[BPHYS_DATA_NORM_FORCES] = (data_types & (1 << BPHYS_DATA_NORM_FORCES)) ?
+                                        &pf->data.norm_forces :
+                                        NULL;
+  pf->cur[BPHYS_DATA_FRIC_FORCES] = (data_types & (1 << BPHYS_DATA_FRIC_FORCES)) ?
+                                        &pf->data.fric_forces :
+                                        NULL;
+  pf->cur[BPHYS_DATA_VEC_LOCATIONS] = (data_types & (1 << BPHYS_DATA_VEC_LOCATIONS)) ?
+                                          &pf->data.vec_locations :
+                                          NULL;
 }
 
 /* Check to see if point number "index" is in pm, uses binary search for index data. */

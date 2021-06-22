@@ -101,8 +101,8 @@ typedef enum eRigidBodyWorld_Flag {
 } eRigidBodyWorld_Flag;
 
 typedef struct sim_data_vec {
-    float vector[3];
-}sim_data_vec;
+  float vector[3];
+} sim_data_vec;
 
 /* ******************************** */
 /* RigidBody Object */
@@ -188,10 +188,6 @@ typedef struct RigidBodyOb {
 
 } RigidBodyOb;
 
-
-
-
-
 /* Participation types for RigidBodyOb */
 typedef enum eRigidBodyOb_Type {
   /* active geometry participant in simulation. is directly controlled by sim */
@@ -244,28 +240,28 @@ typedef enum eRigidBody_Shape {
 
 enum {
   /** Display forces. */
-  RB_SIM_FORCES = (1<<0),
+  RB_SIM_FORCES = (1 << 0),
   /** Display acceleration. */
-  RB_SIM_ACCELERATION = (1<<1),
+  RB_SIM_ACCELERATION = (1 << 1),
   /** Display velocity. */
-  RB_SIM_VELOCITY = (1<<2),
+  RB_SIM_VELOCITY = (1 << 2),
   /** Display magnitude as text */
-  RB_SIM_TEXT = (1<<3),
+  RB_SIM_TEXT = (1 << 3),
   /** Indicate when collisions occur. */
-  RB_SIM_COLLISIONS = (1<<4),
+  RB_SIM_COLLISIONS = (1 << 4),
 };
 
 enum {
   /** Display gravity force. */
-  RB_SIM_GRAVITY = (1<<0),
+  RB_SIM_GRAVITY = (1 << 0),
   /** Display force due to effectors. */
-  RB_SIM_EFFECTORS = (1<<1),
+  RB_SIM_EFFECTORS = (1 << 1),
   /** Display contact normal forces. */
-  RB_SIM_NORMAL = (1<<2),
+  RB_SIM_NORMAL = (1 << 2),
   /** Display contact normal frictional. */
-  RB_SIM_FRICTION = (1<<3),
+  RB_SIM_FRICTION = (1 << 3),
   /** Display resultant force. */
-  RB_SIM_NET_FORCE = (1<<4),
+  RB_SIM_NET_FORCE = (1 << 4),
 };
 
 typedef enum eRigidBody_MeshSource {

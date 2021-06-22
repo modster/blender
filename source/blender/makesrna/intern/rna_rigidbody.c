@@ -85,7 +85,6 @@ const EnumPropertyItem rna_enum_rigidbody_object_shape_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-
 /* collision shapes of constraints in rigid body sim */
 const EnumPropertyItem rna_enum_rigidbody_constraint_type_items[] = {
     {RBC_TYPE_FIXED, "FIXED", ICON_NONE, "Fixed", "Glue rigid bodies together"},
@@ -1257,14 +1256,10 @@ static void rna_def_rigidbody_object(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "show_net_force", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "display_force_types", RB_SIM_NET_FORCE);
-  RNA_def_property_ui_text(prop, "Resultant force", "Display the net force acting on the rigid body");
+  RNA_def_property_ui_text(
+      prop, "Resultant force", "Display the net force acting on the rigid body");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_RigidBodyOb_reset");
-
-
-
 }
-
-
 
 static void rna_def_rigidbody_constraint(BlenderRNA *brna)
 {

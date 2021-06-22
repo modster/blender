@@ -2111,7 +2111,8 @@ static int _softbody_calc_forces_slice_in_a_thread(Scene *scene,
         float eval_sb_fric_force_scale = sb_fric_force_scale(ob);
 
         pd_point_from_soft(scene, bp->pos, bp->vec, sb->bpoint - bp, &epoint);
-        BKE_effectors_apply(effectors, NULL, sb->effector_weights, &epoint, force, NULL, speed,NULL);
+        BKE_effectors_apply(
+            effectors, NULL, sb->effector_weights, &epoint, force, NULL, speed, NULL);
 
         /* apply forcefield*/
         mul_v3_fl(force, fieldfactor * eval_sb_fric_force_scale);

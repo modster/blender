@@ -58,8 +58,8 @@
 #include "draw_common.h"
 #include "draw_manager_text.h"
 
-#include "math.h"
 #include "BLI_math_rotation.h"
+#include "math.h"
 
 #ifdef WITH_BULLET
 #  include "RBI_api.h"
@@ -442,8 +442,8 @@ static void OVERLAY_bounds(OVERLAY_ExtraCallBuffers *cb,
       DRW_buffer_add_entry(cb->empty_capsule_body, color, final_mat);
       break;
   }
-  if(mat != NULL)
-    copy_m4_m4(mat,tmp);
+  if (mat != NULL)
+    copy_m4_m4(mat, tmp);
 }
 
 static void OVERLAY_collision(OVERLAY_ExtraCallBuffers *cb, Object *ob, const float *color)
@@ -1569,392 +1569,411 @@ static void OVERLAY_object_name(Object *ob, int theme_id)
 
 static void scale_vec_by_magnitude(float vector[3], float min_clamp, float scale, float pos[3])
 {
-    /* Vectors as scaled by multiplying by Scale and then adding "min_clamp"
-     * Vectors are only drawn if they are greater than 0
-     * Otherwise zero vectors will be drawn with magnitude = min_clamp". */
-    float min_clamp_vec[3];
-    float vec_len = len_v3(vector);
-    normalize_v3(vector);
-    copy_v3_v3(min_clamp_vec, vector);
-    mul_v3_fl(min_clamp_vec,(min_clamp+0.2f));
-    mul_v3_fl(vector, scale*vec_len);
-    add_v3_v3(vector, min_clamp_vec);
-    add_v3_v3(vector,pos);
-
+  /* Vectors as scaled by multiplying by Scale and then adding "min_clamp"
+   * Vectors are only drawn if they are greater than 0
+   * Otherwise zero vectors will be drawn with magnitude = min_clamp". */
+  float min_clamp_vec[3];
+  float vec_len = len_v3(vector);
+  normalize_v3(vector);
+  copy_v3_v3(min_clamp_vec, vector);
+  mul_v3_fl(min_clamp_vec, (min_clamp + 0.2f));
+  mul_v3_fl(vector, scale * vec_len);
+  add_v3_v3(vector, min_clamp_vec);
+  add_v3_v3(vector, pos);
 }
 
-static void OVERLAY_vector_extra(OVERLAY_Data *data, float vector[3], float pos[3], float scale, float min_clamp, float color[3], int text_flag) {
-
-    uchar text_color[4];
-    UI_GetThemeColor4ubv(TH_DRAWEXTRA_EDGELEN, text_color);
-
-    float vector_head_pos[3];
-    char vec_magnitude[9];
-    copy_v3_v3(vector_head_pos,vector);
-    float vec_len = len_v3(vector);
-    BLI_snprintf(vec_magnitude, 9, "%f", vec_len);
-    /* Scale the vector */
-    scale_vec_by_magnitude(vector_head_pos, min_clamp, scale, pos);
-
-    GPUShader *sh = OVERLAY_shader_vector();
-    DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
-    DRW_shgroup_uniform_vec3_copy(grp, "objPosition", pos);
-    DRW_shgroup_uniform_vec3_copy(grp, "vector", vector);
-    DRW_shgroup_uniform_float_copy(grp, "scale", scale);
-    DRW_shgroup_uniform_float_copy(grp, "min_clamp", min_clamp);
-    DRW_shgroup_uniform_vec3_copy(grp, "colour", color);
-    DRW_shgroup_call_procedural_lines(grp, NULL, 3);
-
-    /* Draw magnitude of vector as text */
-    if(text_flag)
-    {
-      struct DRWTextStore *dt = DRW_text_cache_ensure();
-      DRW_text_cache_add(dt,
-                         vector_head_pos,
-                         vec_magnitude,
-                         strlen(vec_magnitude),
-                         -25,
-                         0,
-                         DRW_TEXT_CACHE_GLOBALSPACE,
-                         text_color);
-    }
-}
-
-static void OVERLAY_forces_extra(OVERLAY_Data *data,
-                         Scene *scene,
-                         RigidBodyOb *rbo)
+static void OVERLAY_vector_extra(OVERLAY_Data *data,
+                                 float vector[3],
+                                 float pos[3],
+                                 float scale,
+                                 float min_clamp,
+                                 float color[3],
+                                 int text_flag)
 {
 
-    float scale = 0.05f;
-    float min_clamp = 2.0f;
-    float vector[3] = {0.0f};
-    float color1[3] = {1.0,0.0,1.0};   /* Pink. */
-    float color2[3] = {0.0,1.0,0.5};   /* Cyan. */
-    float color3[3] = {1.0,1.0,0.0};   /* Yellow. */
+  uchar text_color[4];
+  UI_GetThemeColor4ubv(TH_DRAWEXTRA_EDGELEN, text_color);
 
-    int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
+  float vector_head_pos[3];
+  char vec_magnitude[9];
+  copy_v3_v3(vector_head_pos, vector);
+  float vec_len = len_v3(vector);
+  BLI_snprintf(vec_magnitude, 9, "%f", vec_len);
+  /* Scale the vector */
+  scale_vec_by_magnitude(vector_head_pos, min_clamp, scale, pos);
 
-    if(rbo->display_force_types & RB_SIM_NET_FORCE) {
-      /* Calculate net force. */
-      float net_force[3];
+  GPUShader *sh = OVERLAY_shader_vector();
+  DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
+  DRW_shgroup_uniform_vec3_copy(grp, "objPosition", pos);
+  DRW_shgroup_uniform_vec3_copy(grp, "vector", vector);
+  DRW_shgroup_uniform_float_copy(grp, "scale", scale);
+  DRW_shgroup_uniform_float_copy(grp, "min_clamp", min_clamp);
+  DRW_shgroup_uniform_vec3_copy(grp, "colour", color);
+  DRW_shgroup_call_procedural_lines(grp, NULL, 3);
 
-      copy_v3_v3(net_force, scene->physics_settings.gravity);
-      mul_v3_fl(net_force, rbo->mass);
-      for(int i=0; i<3; i++){
-        add_v3_v3(net_force, rbo->eff_forces[i].vector);
-        add_v3_v3(net_force, rbo->norm_forces[i].vector);
-        printf("norm%d:%f %f %f\n",i, rbo->norm_forces[i].vector[0], rbo->norm_forces[i].vector[1], rbo->norm_forces[i].vector[2]);
+  /* Draw magnitude of vector as text */
+  if (text_flag) {
+    struct DRWTextStore *dt = DRW_text_cache_ensure();
+    DRW_text_cache_add(dt,
+                       vector_head_pos,
+                       vec_magnitude,
+                       strlen(vec_magnitude),
+                       -25,
+                       0,
+                       DRW_TEXT_CACHE_GLOBALSPACE,
+                       text_color);
+  }
+}
+
+static void OVERLAY_forces_extra(OVERLAY_Data *data, Scene *scene, RigidBodyOb *rbo)
+{
+
+  float scale = 0.05f;
+  float min_clamp = 2.0f;
+  float vector[3] = {0.0f};
+  float color1[3] = {1.0, 0.0, 1.0}; /* Pink. */
+  float color2[3] = {0.0, 1.0, 0.5}; /* Cyan. */
+  float color3[3] = {1.0, 1.0, 0.0}; /* Yellow. */
+
+  int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
+
+  if (rbo->display_force_types & RB_SIM_NET_FORCE) {
+    /* Calculate net force. */
+    float net_force[3];
+
+    copy_v3_v3(net_force, scene->physics_settings.gravity);
+    mul_v3_fl(net_force, rbo->mass);
+    for (int i = 0; i < 3; i++) {
+      add_v3_v3(net_force, rbo->eff_forces[i].vector);
+      add_v3_v3(net_force, rbo->norm_forces[i].vector);
+    }
+
+    if ((len_v3(net_force) > 0.000001f)) {
+      OVERLAY_vector_extra(data, net_force, rbo->pos, scale, min_clamp, color2, text_flag);
+    }
+  }
+
+  if (rbo->display_force_types & RB_SIM_GRAVITY) {
+    /* Draw the force of gravity. */
+
+    copy_v3_v3(vector, scene->physics_settings.gravity);
+    mul_v3_fl(vector, rbo->mass);
+    OVERLAY_vector_extra(data, vector, rbo->pos, scale, min_clamp, color1, text_flag);
+  }
+
+  if (rbo->display_force_types & RB_SIM_EFFECTORS) {
+
+    for (int i = 0; i < 3; i++) {
+      if (!is_zero_v3(rbo->eff_forces[i].vector)) {
+        OVERLAY_vector_extra(
+            data, rbo->eff_forces[i].vector, rbo->pos, scale, min_clamp, color1, text_flag);
       }
+    }
+  }
 
-      if((len_v3(net_force)>0.000001f)){
-        OVERLAY_vector_extra(data, net_force, rbo->pos, scale, min_clamp, color2, text_flag);
+  if (rbo->display_force_types & RB_SIM_NORMAL) {
+    for (int i = 0; i < 3; i++) {
+      if (!is_zero_v3(rbo->norm_forces[i].vector)) {
+        OVERLAY_vector_extra(data,
+                             rbo->norm_forces[i].vector,
+                             rbo->vec_locations[i].vector,
+                             scale,
+                             min_clamp,
+                             color1,
+                             text_flag);
       }
     }
-
-    if(rbo->display_force_types & RB_SIM_GRAVITY){
-     /* Draw the force of gravity. */
-
-      copy_v3_v3(vector,scene->physics_settings.gravity);
-      mul_v3_fl(vector, rbo->mass);
-      OVERLAY_vector_extra(data, vector, rbo->pos, scale, min_clamp, color1,text_flag);
+  }
+  if (rbo->display_force_types & RB_SIM_FRICTION) {
+    for (int i = 0; i < 3; i++) {
+      if (!is_zero_v3(rbo->fric_forces[i].vector)) {
+        OVERLAY_vector_extra(data,
+                             rbo->fric_forces[i].vector,
+                             rbo->vec_locations[i].vector,
+                             scale,
+                             min_clamp,
+                             color3,
+                             text_flag);
+      }
     }
-
-    if(rbo->display_force_types & RB_SIM_EFFECTORS) {
-
-        for(int i=0; i<3; i++){
-            if(!is_zero_v3(rbo->eff_forces[i].vector)){
-              OVERLAY_vector_extra(data, rbo->eff_forces[i].vector, rbo->pos, scale, min_clamp, color1, text_flag);
-            }
-        }
-    }
-
-    if(rbo->display_force_types & RB_SIM_NORMAL) {
-        for(int i=0; i<3; i++){
-            if(!is_zero_v3(rbo->norm_forces[i].vector)){
-              OVERLAY_vector_extra(data, rbo->norm_forces[i].vector, rbo->vec_locations[i].vector , scale, min_clamp, color1, text_flag);
-            }
-        }
-    }
-    if(rbo->display_force_types & RB_SIM_FRICTION) {
-        for(int i=0; i<3; i++){
-            if(!is_zero_v3(rbo->fric_forces[i].vector)){
-              OVERLAY_vector_extra(data, rbo->fric_forces[i].vector, rbo->vec_locations[i].vector , scale, min_clamp, color3, text_flag);
-            }
-        }
-    }
-
+  }
 }
 
 #ifdef WITH_BULLET
- static void OVERLAY_velocity_extra(OVERLAY_Data *data,
-                         RigidBodyOb *rbo)
+static void OVERLAY_velocity_extra(OVERLAY_Data *data, RigidBodyOb *rbo)
 {
-    float scale = 0.5f;
-    float min_clamp = 2.0f;
-    float color[3] = {1.0, 0.5, 1.0};
+  float scale = 0.5f;
+  float min_clamp = 2.0f;
+  float color[3] = {1.0, 0.5, 1.0};
 
-    int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
+  int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
 
-    rbRigidBody *rb = (rbRigidBody*)rbo->shared->physics_object;
-    float vel[3] = {0.0f};
-    if(rb!=NULL && is_zero_v3(rbo->vel))
-        RB_body_get_linear_velocity(rbo->shared->physics_object, vel);
-    else
-        copy_v3_v3(vel, rbo->vel);
-    OVERLAY_vector_extra(data, vel, rbo->pos, scale, min_clamp, color, text_flag);
+  rbRigidBody *rb = (rbRigidBody *)rbo->shared->physics_object;
+  float vel[3] = {0.0f};
+  if (rb != NULL && is_zero_v3(rbo->vel))
+    RB_body_get_linear_velocity(rbo->shared->physics_object, vel);
+  else
+    copy_v3_v3(vel, rbo->vel);
+  OVERLAY_vector_extra(data, vel, rbo->pos, scale, min_clamp, color, text_flag);
 }
 
 static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
-                         RigidBodyOb *rbo,
-                         Depsgraph *depsgraph,
-                         Scene *scene)
+                                       RigidBodyOb *rbo,
+                                       Depsgraph *depsgraph,
+                                       Scene *scene)
 {
-    float scale = 0.5f;
-    float min_clamp = 2.0f;
-    float color[3] = {1.0, 1.0, 0.0};
+  float scale = 0.5f;
+  float min_clamp = 2.0f;
+  float color[3] = {1.0, 1.0, 0.0};
 
-    int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
+  int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
 
-    /* Calculate timestep. */
-    const float ctime = DEG_get_ctime(depsgraph);
-    const float frame_diff = ctime - scene->rigidbody_world->ltime;
-    const float timestep = 1.0f / (float)FPS * frame_diff * scene->rigidbody_world->time_scale;
+  /* Calculate timestep. */
+  const float ctime = DEG_get_ctime(depsgraph);
+  const float frame_diff = ctime - scene->rigidbody_world->ltime;
+  const float timestep = 1.0f / (float)FPS * frame_diff * scene->rigidbody_world->time_scale;
 
-    rbRigidBody *rb = rbo->shared->physics_object;
-    float acc[3];
-    RB_body_get_linear_velocity(rb, acc);
-    sub_v3_v3(acc, rbo->vel);
-    RB_body_get_linear_velocity(rb, rbo->vel);
-    mul_v3_fl(acc, 1/timestep);
-    OVERLAY_vector_extra(data, acc, rbo->pos, scale, min_clamp, color, text_flag);
+  rbRigidBody *rb = rbo->shared->physics_object;
+  float acc[3];
+  RB_body_get_linear_velocity(rb, acc);
+  sub_v3_v3(acc, rbo->vel);
+  RB_body_get_linear_velocity(rb, rbo->vel);
+  mul_v3_fl(acc, 1 / timestep);
+  OVERLAY_vector_extra(data, acc, rbo->pos, scale, min_clamp, color, text_flag);
 }
 #endif
 
- static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data, float point[3], float mat[4][4] , float dir[3]) {
+static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
+                                          float point[3],
+                                          float mat[4][4],
+                                          float dir[3])
+{
 
-   /* Unit Box vertices. */
-   float box_shape[8][3] = {
-       {1.0f, -1.0f, 1.0f},
-       {1.0f, -1.0f, -1.0f},
-       {-1.0f, -1.0f, -1.0f},
-       {-1.0f, -1.0f, 1.0f},
-       {1.0f, 1.0f, 1.0f},
-       {1.0f, 1.0f, -1.0f},
-       {-1.0f, 1.0f, -1.0f},
-       {-1.0f, 1.0f, 1.0f},
-   };
+  /* Unit Box vertices. */
+  float box_shape[8][3] = {
+      {1.0f, -1.0f, 1.0f},
+      {1.0f, -1.0f, -1.0f},
+      {-1.0f, -1.0f, -1.0f},
+      {-1.0f, -1.0f, 1.0f},
+      {1.0f, 1.0f, 1.0f},
+      {1.0f, 1.0f, -1.0f},
+      {-1.0f, 1.0f, -1.0f},
+      {-1.0f, 1.0f, 1.0f},
+  };
 
-   /* Triangles that make up the faces of the box. */
-   uint box_shape_tris[12][3] = {
-       {0, 1, 2},
-       {0, 2, 3},
+  /* Triangles that make up the faces of the box. */
+  uint box_shape_tris[12][3] = {
+      {0, 1, 2},
+      {0, 2, 3},
 
-       {0, 1, 5},
-       {0, 5, 4},
+      {0, 1, 5},
+      {0, 5, 4},
 
-       {1, 2, 6},
-       {1, 6, 5},
+      {1, 2, 6},
+      {1, 6, 5},
 
-       {2, 3, 7},
-       {2, 7, 6},
+      {2, 3, 7},
+      {2, 7, 6},
 
-       {3, 0, 4},
-       {3, 4, 7},
+      {3, 0, 4},
+      {3, 4, 7},
 
-       {4, 5, 6},
-       {4, 6, 7},
-   };
+      {4, 5, 6},
+      {4, 6, 7},
+  };
 
-   /* Transform the box to correct location, orientaion and scale. */
-   for(int i=0; i<8; i++){
-     mul_m4_v3(mat, box_shape[i]);
-   }
+  /* Transform the box to correct location, orientaion and scale. */
+  for (int i = 0; i < 8; i++) {
+    mul_m4_v3(mat, box_shape[i]);
+  }
 
-   int face = -1;
-   float point_to_face_distance;
-   float isect_co[3];
-   for(int i=0; i<6; i++){
-       if(isect_point_tri_v3(point,
-                             box_shape[box_shape_tris[2*i][0]],
-                             box_shape[box_shape_tris[2*i][1]],
-                             box_shape[box_shape_tris[2*i][2]], isect_co) ||
-               isect_point_tri_v3(point,
-                                           box_shape[box_shape_tris[2*i+1][0]],
-                                           box_shape[box_shape_tris[2*i+1][1]],
-                                           box_shape[box_shape_tris[2*i+1][2]], isect_co) )
-       {
-         if(len_manhattan_v3v3(point, isect_co)<=0.000001f)
-         {
-           face = i;
+  int face = -1;
+  float isect_co[3];
+  for (int i = 0; i < 6; i++) {
+    if (isect_point_tri_v3(point,
+                           box_shape[box_shape_tris[2 * i][0]],
+                           box_shape[box_shape_tris[2 * i][1]],
+                           box_shape[box_shape_tris[2 * i][2]],
+                           isect_co) ||
+        isect_point_tri_v3(point,
+                           box_shape[box_shape_tris[2 * i + 1][0]],
+                           box_shape[box_shape_tris[2 * i + 1][1]],
+                           box_shape[box_shape_tris[2 * i + 1][2]],
+                           isect_co)) {
+      /* Find normal to the face. */
+      float edge1[3], edge2[3], norm[3];
+      sub_v3_v3v3(edge1, box_shape[box_shape_tris[2 * i][0]], box_shape[box_shape_tris[2 * i][1]]);
+      sub_v3_v3v3(edge2, box_shape[box_shape_tris[2 * i][2]], box_shape[box_shape_tris[2 * i][1]]);
+      cross_v3_v3v3(norm, edge1, edge2);
+      normalize_v3(norm);
+      if ((len_manhattan_v3v3(point, isect_co) <=
+               0.000001f && /* check if distance between impulse point and intersection is small.
+                             */
+           fabsf(dot_v3v3(norm, dir)) >
+               0.00001f) || /* impulse direction must not be parallel to face. */
+          (len_manhattan_v3v3(point, isect_co) <= 0.05f &&
+           fabsf(dot_v3v3(point, dir) - dot_v3v3(isect_co, dir)) <
+               0.05 && /* If distance is noy very small, check if error lies in the dir. of
+                          impulse. */
+           fabsf(dot_v3v3(norm, dir)) >
+               0.00001f)) /* impulse direction must not be parallel to face. */
+      {
+        face = i;
+        if (fabsf(dot_v3v3(norm, dir)) < 0.0001f) {
+          printf("n%f %f %f\n", norm[0], norm[1], norm[2]);
+          printf("d%f %f %f\n", dir[0], dir[1], dir[2]);
+          printf("%f\n", fabsf(dot_v3v3(norm, dir)));
+        }
+        GPUShader *sh = OVERLAY_shader_collision_box();
+        DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
+        DRW_shgroup_uniform_vec3_copy(grp, "vert1", box_shape[box_shape_tris[2 * face][0]]);
+        DRW_shgroup_uniform_vec3_copy(grp, "vert2", box_shape[box_shape_tris[2 * face][1]]);
+        DRW_shgroup_uniform_vec3_copy(grp, "vert3", box_shape[box_shape_tris[2 * face][2]]);
+        DRW_shgroup_uniform_vec3_copy(grp, "vert4", box_shape[box_shape_tris[2 * face + 1][2]]);
+        DRW_shgroup_call_procedural_triangles(grp, NULL, 2);
+        break;
+      }
+    }
+  }
+}
 
-           GPUShader *sh = OVERLAY_shader_collision_box();
-           DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
-           DRW_shgroup_uniform_vec3_copy(grp, "vert1", box_shape[box_shape_tris[2*face][0]]);
-           DRW_shgroup_uniform_vec3_copy(grp, "vert2", box_shape[box_shape_tris[2*face][1]]);
-           DRW_shgroup_uniform_vec3_copy(grp, "vert3", box_shape[box_shape_tris[2*face][2]]);
-           DRW_shgroup_uniform_vec3_copy(grp, "vert4", box_shape[box_shape_tris[2*face+1][2]]);
-           DRW_shgroup_call_procedural_triangles(grp, NULL, 2);
-           break;
-         }
-         else if(len_manhattan_v3v3(point, isect_co)<=0.05f &&
-                 fabsf(dot_v3v3(point, dir)-dot_v3v3(isect_co, dir))<0.05) {
-             if(face==-1){
-               face = i;
-               point_to_face_distance = len_manhattan_v3v3(point, isect_co);
-             }
-             else if(len_manhattan_v3v3(point, isect_co) < point_to_face_distance){
-               face = i;
-               point_to_face_distance = len_manhattan_v3v3(point, isect_co);
-             }
-         }
-       }
-   }
-   if(face != -1){
-       GPUShader *sh = OVERLAY_shader_collision_box();
-       DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
-       DRW_shgroup_uniform_vec3_copy(grp, "vert1", box_shape[box_shape_tris[2*face][0]]);
-       DRW_shgroup_uniform_vec3_copy(grp, "vert2", box_shape[box_shape_tris[2*face][1]]);
-       DRW_shgroup_uniform_vec3_copy(grp, "vert3", box_shape[box_shape_tris[2*face][2]]);
-       DRW_shgroup_uniform_vec3_copy(grp, "vert4", box_shape[box_shape_tris[2*face+1][2]]);
-       DRW_shgroup_call_procedural_triangles(grp, NULL, 2);
+static bool OVERLAY_colliding_face_on_cylinder(OVERLAY_Data *data,
+                                               float point[3],
+                                               float mat[4][4],
+                                               float dir[3])
+{
+  /* Using a unit cube to check if collision is on top/bottom face of cylinder. */
+  float box_shape[8][3] = {
+      {1.0f, -1.0f, 1.0f},
+      {1.0f, -1.0f, -1.0f},
+      {-1.0f, -1.0f, -1.0f},
+      {-1.0f, -1.0f, 1.0f},
+      {1.0f, 1.0f, 1.0f},
+      {1.0f, 1.0f, -1.0f},
+      {-1.0f, 1.0f, -1.0f},
+      {-1.0f, 1.0f, 1.0f},
+  };
 
-   }
- }
+  int top_bottom_tris[4][3] = {
+      /* Top.    */
+      {0, 4, 3},
+      {4, 3, 7},
+      /* Bottom. */
+      {1, 5, 2},
+      {5, 2, 6},
+  };
 
- static bool OVERLAY_colliding_face_on_cylinder(OVERLAY_Data *data, float point[3], float mat[4][4], float dir[3]){
-     /* Using a unit cube to check if collision is on top/bottom face of cylinder. */
-     float box_shape[8][3] = {
-         {1.0f, -1.0f, 1.0f},
-         {1.0f, -1.0f, -1.0f},
-         {-1.0f, -1.0f, -1.0f},
-         {-1.0f, -1.0f, 1.0f},
-         {1.0f, 1.0f, 1.0f},
-         {1.0f, 1.0f, -1.0f},
-         {-1.0f, 1.0f, -1.0f},
-         {-1.0f, 1.0f, 1.0f},
-     };
+  /* Transform the box to correct location, orientaion and scale. */
+  for (int i = 0; i < 8; i++) {
+    mul_m4_v3(mat, box_shape[i]);
+  }
+  float isect_co[3];
+  for (int i = 0; i < 2; i++) {
+    if (isect_point_tri_v3(point,
+                           box_shape[top_bottom_tris[2 * i][0]],
+                           box_shape[top_bottom_tris[2 * i][1]],
+                           box_shape[top_bottom_tris[2 * i][2]],
+                           isect_co) ||
+        isect_point_tri_v3(point,
+                           box_shape[top_bottom_tris[2 * i + 1][0]],
+                           box_shape[top_bottom_tris[2 * i + 1][1]],
+                           box_shape[top_bottom_tris[2 * i + 1][2]],
+                           isect_co)) {
+      if (len_manhattan_v3v3(point, isect_co) <= 0.000001f ||
+          fabsf(dot_v3v3(point, dir) - dot_v3v3(isect_co, dir)) < 0.05) {
+        float height = -2.0f * i + 1.0f;
+        GPUShader *sh = OVERLAY_shader_collision_cylinder();
+        DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
+        DRW_shgroup_uniform_vec4_array_copy(grp, "mat_vecs", mat, 4);
+        DRW_shgroup_uniform_float_copy(grp, "zheight", height);
+        DRW_shgroup_uniform_bool_copy(grp, "flag", false);
+        DRW_shgroup_uniform_int_copy(grp, "n_segments", 12);
+        DRW_shgroup_call_procedural_triangles(grp, NULL, 12);
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
-     int top_bottom_tris[4][3] = {
-         /* Top.    */
-         {0, 4, 3},
-         {4, 3, 7},
-         /* Bottom. */
-         {1, 5, 2},
-         {5, 2, 6},
-     };
+static bool OVERLAY_colliding_face_on_cone(OVERLAY_Data *data,
+                                           float point[3],
+                                           float mat[4][4],
+                                           float dir[3])
+{
+  /* Using a unit cube to check if collision is on top/bottom face of cylinder. */
+  float square[4][3] = {
+      {1.0f, 0.0f, 1.0f},
+      {1.0f, 0.0f, -1.0f},
+      {-1.0f, 0.0f, -1.0f},
+      {-1.0f, 0.0f, 1.0f},
+  };
 
-     /* Transform the box to correct location, orientaion and scale. */
-     for(int i=0; i<8; i++){
-       mul_m4_v3(mat, box_shape[i]);
-     }
-     float isect_co[3];
-     for(int i=0; i<2; i++){
-         if(isect_point_tri_v3(point,
-                               box_shape[top_bottom_tris[2*i][0]],
-                               box_shape[top_bottom_tris[2*i][1]],
-                               box_shape[top_bottom_tris[2*i][2]], isect_co) ||
-                 isect_point_tri_v3(point,
-                                             box_shape[top_bottom_tris[2*i+1][0]],
-                                             box_shape[top_bottom_tris[2*i+1][1]],
-                                             box_shape[top_bottom_tris[2*i+1][2]], isect_co) )
-         {
-           if(len_manhattan_v3v3(point, isect_co)<=0.000001f ||
-                   fabsf(dot_v3v3(point, dir)-dot_v3v3(isect_co, dir))<0.05)
-           {
-             float height =  -2.0f * i + 1.0f;
-             GPUShader *sh = OVERLAY_shader_collision_cylinder();
-             DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
-             DRW_shgroup_uniform_vec4_array_copy(grp, "mat_vecs", mat, 4);
-             DRW_shgroup_uniform_float_copy(grp, "zheight", height);
-             DRW_shgroup_uniform_bool_copy(grp, "flag", false);
-             DRW_shgroup_call_procedural_triangles(grp, NULL, 12);
-             return true;
-           }
-         }
-     }
-     return false;
- }
+  /* Transform the box to correct location, orientaion and scale. */
+  for (int i = 0; i < 8; i++) {
+    mul_m4_v3(mat, square[i]);
+  }
 
- static bool OVERLAY_colliding_face_on_cone(OVERLAY_Data *data, float point[3], float mat[4][4], float dir[3]){
-     /* Using a unit cube to check if collision is on top/bottom face of cylinder. */
-     float square[4][3] = {
-         {1.0f, 0.0f, 1.0f},
-         {1.0f, 0.0f, -1.0f},
-         {-1.0f, 0.0f, -1.0f},
-         {-1.0f, 0.0f, 1.0f},
-     };
+  float isect_co[3];
+  if (isect_point_tri_v3(point, square[0], square[1], square[2], isect_co) ||
+      isect_point_tri_v3(point, square[2], square[3], square[0], isect_co)) {
+    if (len_manhattan_v3v3(point, isect_co) <= 0.000001f ||
+        fabsf(dot_v3v3(point, dir) - dot_v3v3(isect_co, dir)) < 0.05) {
+      printf("base collided\n");
+      float height = 1.0f;
+      GPUShader *sh = OVERLAY_shader_collision_cylinder();
+      DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
+      DRW_shgroup_uniform_vec4_array_copy(grp, "mat_vecs", mat, 4);
+      DRW_shgroup_uniform_float_copy(grp, "zheight", height);
+      DRW_shgroup_uniform_bool_copy(grp, "flag", true);
+      DRW_shgroup_uniform_int_copy(grp, "n_segments", 8);
+      DRW_shgroup_call_procedural_triangles(grp, NULL, 12);
+      return true;
+    }
+  }
+  return false;
+}
 
-     /* Transform the box to correct location, orientaion and scale. */
-     for(int i=0; i<8; i++){
-       mul_m4_v3(mat, square[i]);
-     }
+static void OVERLAY_indicate_collision(OVERLAY_Data *data, Object *ob)
+{
 
-
-     float isect_co[3];
-     if(isect_point_tri_v3(point,
-                           square[0],
-                           square[1],
-                           square[2], isect_co) ||
-             isect_point_tri_v3(point,
-                                square[2],
-                                square[3],
-                                square[0], isect_co))
-     {
-       if(len_manhattan_v3v3(point, isect_co)<=0.000001f ||
-               fabsf(dot_v3v3(point, dir)-dot_v3v3(isect_co, dir))<0.05)
-       {
-         printf("base collided\n");
-         float height = 1.0f;
-         GPUShader *sh = OVERLAY_shader_collision_cylinder();
-         DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
-         DRW_shgroup_uniform_vec4_array_copy(grp, "mat_vecs", mat, 4);
-         DRW_shgroup_uniform_float_copy(grp, "zheight", height);
-         DRW_shgroup_uniform_bool_copy(grp, "flag", true);
-         DRW_shgroup_call_procedural_triangles(grp, NULL, 12);
-         return true;
-       }
-       printf("%f, %f, %f, \n", point[0], point[1], point[2]);
-       printf("%f, %f, %f, \n", isect_co[0], isect_co[1], isect_co[2]);
-     }
-     return false;
- }
-
- static void OVERLAY_indicate_collision(OVERLAY_Data *data, Object *ob) {
-
-   OVERLAY_PrivateData *pd = data->stl->pd;
-   OVERLAY_ExtraCallBuffers *cb = &pd->extra_call_buffers[1];
-   float mat[4][4];
-   float dir[3];
-   copy_v3_v3(dir,ob->rigidbody_object->norm_forces[0].vector);
-   normalize_v3(dir);
-   if(!is_zero_v3(ob->rigidbody_object->norm_forces[0].vector)){
-     float color[4] = {0.5,0.7,0.1,1.0};
-     switch (ob->rigidbody_object->shape) {
-       case RB_SHAPE_BOX:
-         OVERLAY_bounds(cb, ob, color, OB_BOUND_BOX, true, mat);
-         for(int i=0; i<3; i++){
-           if(!is_zero_v3(ob->rigidbody_object->norm_forces[i].vector)){
-             OVERLAY_colliding_face_on_box(data, ob->rigidbody_object->vec_locations[i].vector, mat, dir);
-           }
-         }
-         break;
-       case RB_SHAPE_SPHERE:
-         OVERLAY_bounds(cb, ob, color, OB_BOUND_SPHERE, true, NULL);
-         break;
-       case RB_SHAPE_CONE:
-         OVERLAY_bounds(cb, ob, color, OB_BOUND_CONE, true, mat);
-         OVERLAY_colliding_face_on_cone(data, ob->rigidbody_object->vec_locations[0].vector, mat, dir);
-         break;
-       case RB_SHAPE_CYLINDER:
-         OVERLAY_bounds(cb, ob, color, OB_BOUND_CYLINDER, true, mat);
-         OVERLAY_colliding_face_on_cylinder(data, ob->rigidbody_object->vec_locations[0].vector, mat, dir);
-         break;
-       case RB_SHAPE_CAPSULE:
-         OVERLAY_bounds(cb, ob, color, OB_BOUND_CAPSULE, true, NULL);
-         break;
-     }
-   }
- }
+  OVERLAY_PrivateData *pd = data->stl->pd;
+  OVERLAY_ExtraCallBuffers *cb = &pd->extra_call_buffers[1];
+  float mat[4][4];
+  float dir[3];
+  copy_v3_v3(dir, ob->rigidbody_object->norm_forces[0].vector);
+  normalize_v3(dir);
+  if (!is_zero_v3(ob->rigidbody_object->norm_forces[0].vector)) {
+    float color[4] = {0.5, 0.7, 0.1, 1.0};
+    switch (ob->rigidbody_object->shape) {
+      case RB_SHAPE_BOX:
+        OVERLAY_bounds(cb, ob, color, OB_BOUND_BOX, true, mat);
+        for (int i = 0; i < 3; i++) {
+          if (!is_zero_v3(ob->rigidbody_object->norm_forces[i].vector)) {
+            OVERLAY_colliding_face_on_box(
+                data, ob->rigidbody_object->vec_locations[i].vector, mat, dir);
+          }
+        }
+        break;
+      case RB_SHAPE_SPHERE:
+        OVERLAY_bounds(cb, ob, color, OB_BOUND_SPHERE, true, NULL);
+        break;
+      case RB_SHAPE_CONE:
+        OVERLAY_bounds(cb, ob, color, OB_BOUND_CONE, true, mat);
+        OVERLAY_colliding_face_on_cone(
+            data, ob->rigidbody_object->vec_locations[0].vector, mat, dir);
+        break;
+      case RB_SHAPE_CYLINDER:
+        OVERLAY_bounds(cb, ob, color, OB_BOUND_CYLINDER, true, mat);
+        OVERLAY_colliding_face_on_cylinder(
+            data, ob->rigidbody_object->vec_locations[0].vector, mat, dir);
+        break;
+      case RB_SHAPE_CAPSULE:
+        OVERLAY_bounds(cb, ob, color, OB_BOUND_CAPSULE, true, NULL);
+        break;
+    }
+  }
+}
 
 void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
 {
@@ -2021,20 +2040,21 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
       OVERLAY_texture_space(cb, ob, color);
     }
     if (ob->rigidbody_object != NULL) {
-      if(!is_zero_v3(ob->rigidbody_object->norm_forces[0].vector) &&
-              ob->rigidbody_object->sim_display_options & RB_SIM_COLLISIONS) {
+      if (!is_zero_v3(ob->rigidbody_object->norm_forces[0].vector) &&
+          ob->rigidbody_object->sim_display_options & RB_SIM_COLLISIONS) {
         OVERLAY_indicate_collision(vedata, ob);
       }
       else {
         OVERLAY_collision(cb, ob, color);
       }
 #ifdef WITH_BULLET
-      if(ob->rigidbody_object->sim_display_options & RB_SIM_FORCES)
+      if (ob->rigidbody_object->sim_display_options & RB_SIM_FORCES)
         OVERLAY_forces_extra(vedata, scene, ob->rigidbody_object);
-      if(ob->rigidbody_object->sim_display_options & RB_SIM_ACCELERATION)
-        OVERLAY_acceleration_extra(vedata, ob->rigidbody_object, draw_ctx->depsgraph, draw_ctx->scene);
-      if(ob->rigidbody_object->sim_display_options & RB_SIM_VELOCITY)
-        OVERLAY_velocity_extra(vedata, ob->rigidbody_object);   
+      if (ob->rigidbody_object->sim_display_options & RB_SIM_ACCELERATION)
+        OVERLAY_acceleration_extra(
+            vedata, ob->rigidbody_object, draw_ctx->depsgraph, draw_ctx->scene);
+      if (ob->rigidbody_object->sim_display_options & RB_SIM_VELOCITY)
+        OVERLAY_velocity_extra(vedata, ob->rigidbody_object);
 #endif
     }
     if (ob->dtx & OB_AXIS) {
@@ -2070,5 +2090,3 @@ void OVERLAY_extra_centers_draw(OVERLAY_Data *vedata)
   DRW_draw_pass(psl->extra_grid_ps);
   DRW_draw_pass(psl->extra_centers_ps);
 }
-
-

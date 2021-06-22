@@ -205,7 +205,8 @@ void RB_dworld_set_split_impulse(rbDynamicsWorld *world, int split_impulse)
 }
 
 /* Get last applied impulse at contact points */
-/* TODO: this may not be the most efficient way to do it. get all forces at once and store in a lookup table. */
+/* TODO: this may not be the most efficient way to do it. get all forces at once and store in a
+ * lookup table. */
 void RB_dworld_get_impulse(rbDynamicsWorld *world,
                            rbRigidBody *rbo,
                            float timeSubStep,
@@ -215,70 +216,71 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
                            int norm_flag,
                            int fric_flag)
 {
-    int numManifolds = world->dispatcher->getNumManifolds();
-    int num_norm_forces = 0;
-    int num_fric_forces = 0;
-    for (int i = 0; i < numManifolds; i++)
-    {
-        btPersistentManifold* contactManifold =  world->dispatcher->getManifoldByIndexInternal(i);
-        const void *obA = contactManifold->getBody0();
-        const void *obB = contactManifold->getBody1();
-        if(num_norm_forces>2)
-          break;
-        if(obA != rbo->body && obB != rbo->body)
-        {
-          continue;
-        }
-        else
-        {
-          btVector3 tot_impulse = btVector3(0.0,0.0,0.0);
-          btVector3 final_loc =  btVector3(0.0,0.0,0.0);
-          btScalar tot_impulse_magnitude=0.f;
-          btVector3 tot_lat_impulse = btVector3(0.0,0.0,0.0);
-          int numContacts = contactManifold->getNumContacts();
-          int num_impulse_points = 0;
-          for (int j = 0; j < numContacts; j++)
-          {
-              /* Find points where impulse was appplied. */
-              btManifoldPoint& pt = contactManifold->getContactPoint(j);
-              if (pt.getAppliedImpulse() > 0.f)
-                num_impulse_points++;
-          }
+  int numManifolds = world->dispatcher->getNumManifolds();
+  int num_norm_forces = 0;
+  int num_fric_forces = 0;
+  for (int i = 0; i < numManifolds; i++) {
+    btPersistentManifold *contactManifold = world->dispatcher->getManifoldByIndexInternal(i);
+    const void *obA = contactManifold->getBody0();
+    const void *obB = contactManifold->getBody1();
+    if (num_norm_forces > 2)
+      break;
+    if (obA != rbo->body && obB != rbo->body) {
+      continue;
+    }
+    else {
+      btVector3 tot_impulse = btVector3(0.0, 0.0, 0.0);
+      btVector3 final_loc = btVector3(0.0, 0.0, 0.0);
+      btScalar tot_impulse_magnitude = 0.f;
+      btVector3 tot_lat_impulse = btVector3(0.0, 0.0, 0.0);
+      int numContacts = contactManifold->getNumContacts();
+      int num_impulse_points = 0;
+      for (int j = 0; j < numContacts; j++) {
+        /* Find points where impulse was appplied. */
+        btManifoldPoint &pt = contactManifold->getContactPoint(j);
+        if (pt.getAppliedImpulse() > 0.f)
+          num_impulse_points++;
+      }
 
-          for (int j = 0; j < numContacts; j++)
-          {
-            btManifoldPoint& pt = contactManifold->getContactPoint(j);
-            if (pt.getAppliedImpulse() > 0.f)
-            {
-                 const btVector3& loc = pt.getPositionWorldOnB();
-                 const btVector3 imp = (rbo->body == obB)? -pt.m_normalWorldOnB * pt.getAppliedImpulse()/timeSubStep:pt.m_normalWorldOnB * pt.getAppliedImpulse()/timeSubStep;
-                 tot_impulse_magnitude += pt.getAppliedImpulse();
-                 tot_impulse += imp;
-                 final_loc += num_impulse_points>1 ? loc * pt.getAppliedImpulse() : loc;
-               if (fric_flag)
-               {
-                   const btVector3 lat_imp1 = (rbo->body == obB)? -pt.m_appliedImpulseLateral1 * pt.m_lateralFrictionDir1/timeSubStep : pt.m_appliedImpulseLateral1 * pt.m_lateralFrictionDir1/timeSubStep;
-                   const btVector3 lat_imp2 = (rbo->body == obB)? -pt.m_appliedImpulseLateral2 * pt.m_lateralFrictionDir2/timeSubStep : pt.m_appliedImpulseLateral2 * pt.m_lateralFrictionDir2/timeSubStep;
-                   tot_lat_impulse += lat_imp1 + lat_imp2;
-               }
-            }
-          }
-
-          if(num_impulse_points >1) final_loc = final_loc / tot_impulse_magnitude;
-          copy_v3_btvec3(vec_locations[num_norm_forces],final_loc);
-          if(norm_flag)
-          {
-            copy_v3_btvec3(norm_forces[num_norm_forces],tot_impulse);
-            num_norm_forces++;
-          }
-          if(fric_flag)
-          {
-            copy_v3_btvec3(fric_forces[num_fric_forces], tot_lat_impulse);
-            num_fric_forces++;
+      for (int j = 0; j < numContacts; j++) {
+        btManifoldPoint &pt = contactManifold->getContactPoint(j);
+        if (pt.getAppliedImpulse() > 0.f) {
+          const btVector3 &loc = pt.getPositionWorldOnB();
+          const btVector3 imp = (rbo->body == obB) ?
+                                    -pt.m_normalWorldOnB * pt.getAppliedImpulse() / timeSubStep :
+                                    pt.m_normalWorldOnB * pt.getAppliedImpulse() / timeSubStep;
+          tot_impulse_magnitude += pt.getAppliedImpulse();
+          tot_impulse += imp;
+          final_loc += num_impulse_points > 1 ? loc * pt.getAppliedImpulse() : loc;
+          if (fric_flag) {
+            const btVector3 lat_imp1 = (rbo->body == obB) ?
+                                           -pt.m_appliedImpulseLateral1 *
+                                               pt.m_lateralFrictionDir1 / timeSubStep :
+                                           pt.m_appliedImpulseLateral1 * pt.m_lateralFrictionDir1 /
+                                               timeSubStep;
+            const btVector3 lat_imp2 = (rbo->body == obB) ?
+                                           -pt.m_appliedImpulseLateral2 *
+                                               pt.m_lateralFrictionDir2 / timeSubStep :
+                                           pt.m_appliedImpulseLateral2 * pt.m_lateralFrictionDir2 /
+                                               timeSubStep;
+            tot_lat_impulse += lat_imp1 + lat_imp2;
           }
         }
+      }
 
-     }
+      if (num_impulse_points > 1)
+        final_loc = final_loc / tot_impulse_magnitude;
+      copy_v3_btvec3(vec_locations[num_norm_forces], final_loc);
+      if (norm_flag) {
+        copy_v3_btvec3(norm_forces[num_norm_forces], tot_impulse);
+        num_norm_forces++;
+      }
+      if (fric_flag) {
+        copy_v3_btvec3(fric_forces[num_fric_forces], tot_lat_impulse);
+        num_fric_forces++;
+      }
+    }
+  }
 }
 
 /* Simulation ----------------------- */
@@ -289,23 +291,6 @@ void RB_dworld_step_simulation(rbDynamicsWorld *world,
                                float timeSubStep)
 {
   world->dynamicsWorld->stepSimulation(timeStep, maxSubSteps, timeSubStep);
-  //printf("step\n");
-  int numManifolds = world->dispatcher->getNumManifolds();
-  for (int i = 0; i < numManifolds; i++)
-  {
-      btPersistentManifold* contactManifold =  world->dispatcher->getManifoldByIndexInternal(i);
-      const void *obA = contactManifold->getBody0();
-      const void *obB = contactManifold->getBody1();
-      int numContacts = contactManifold->getNumContacts();
-      for (int j = 0; j < numContacts; j++)
-      {
-        btManifoldPoint& pt = contactManifold->getContactPoint(j);
-        if (pt.getAppliedImpulse() > 0.f)
-        {
-          //printf("%d,%f %f %f\n",j,pt.getPositionWorldOnB().getX(), pt.getPositionWorldOnB().getY(), pt.getPositionWorldOnB().getZ());
-        }
-      }
-  }
 }
 
 /* Export -------------------------- */

@@ -3195,7 +3195,7 @@ static void update_effectors_task_cb(void *__restrict userdata,
       /* Do effectors. */
       pd_point_from_loc(data->scene, voxel_center, vel, index, &epoint);
       BKE_effectors_apply(
-          data->effectors, NULL, fds->effector_weights, &epoint, retvel, NULL, NULL,NULL);
+          data->effectors, NULL, fds->effector_weights, &epoint, retvel, NULL, NULL, NULL);
 
       /* Convert retvel to local space. */
       mag = len_v3(retvel);

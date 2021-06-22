@@ -22,7 +22,6 @@
  * \brief Rigid Body API for interfacing with external Physics Engines
  */
 
-
 #ifndef __RB_API_H__
 #define __RB_API_H__
 

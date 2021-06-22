@@ -1214,13 +1214,13 @@ void BKE_effectors_apply(ListBase *effectors,
           add_v3_v3v3(impulse, impulse, efd.vel);
         }
 
-        if(eff_forces!=NULL){
-            if(eff->flag & PE_VELOCITY_TO_IMPULSE && impulse){
-              copy_v3_v3(eff_forces[num_eff_forces],impulse);
-            }
-            else{
-              copy_v3_v3(eff_forces[num_eff_forces],force);
-            }
+        if (eff_forces != NULL) {
+          if (eff->flag & PE_VELOCITY_TO_IMPULSE && impulse) {
+            copy_v3_v3(eff_forces[num_eff_forces], impulse);
+          }
+          else {
+            copy_v3_v3(eff_forces[num_eff_forces], force);
+          }
         }
       }
     }
