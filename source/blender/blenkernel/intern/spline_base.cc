@@ -74,9 +74,9 @@ float Spline::length() const
 
 int Spline::segments_size() const
 {
-  const int points_len = this->size();
+  const int size = this->size();
 
-  return is_cyclic_ ? points_len : points_len - 1;
+  return is_cyclic_ ? size : size - 1;
 }
 
 bool Spline::is_cyclic() const
@@ -331,7 +331,7 @@ Span<float3> Spline::evaluated_normals() const
   }
 
   /* Rotate the generated normals with the interpolated tilt data. */
-  GVArray_Typed<float> tilts = this->interpolate_to_evaluated_points(this->tilts());
+  GVArray_Typed<float> tilts = this->interpolate_to_evaluated(this->tilts());
   for (const int i : normals.index_range()) {
     normals[i] = rotate_direction_around_axis(normals[i], tangents[i], tilts[i]);
   }
@@ -411,23 +411,23 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
 
 Spline::LookupResult Spline::lookup_data_from_index_factor(const float index_factor) const
 {
-  const int points_len = this->evaluated_points_size();
+  const int eval_size = this->evaluated_points_size();
 
   if (is_cyclic_) {
-    if (index_factor < points_len) {
+    if (index_factor < eval_size) {
       const int index = std::floor(index_factor);
-      const int next_index = (index < points_len - 1) ? index + 1 : 0;
+      const int next_index = (index < eval_size - 1) ? index + 1 : 0;
       return LookupResult{index, next_index, index_factor - index};
     }
-    return LookupResult{points_len - 1, 0, 1.0f};
+    return LookupResult{eval_size - 1, 0, 1.0f};
   }
 
-  if (index_factor < points_len - 1) {
+  if (index_factor < eval_size - 1) {
     const int index = std::floor(index_factor);
     const int next_index = index + 1;
     return LookupResult{index, next_index, index_factor - index};
   }
-  return LookupResult{points_len - 2, points_len - 1, 1.0f};
+  return LookupResult{eval_size - 2, eval_size - 1, 1.0f};
 }
 
 void Spline::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) const
@@ -438,9 +438,9 @@ void Spline::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) 
   }
 }
 
-GVArrayPtr Spline::interpolate_to_evaluated_points(GSpan data) const
+GVArrayPtr Spline::interpolate_to_evaluated(GSpan data) const
 {
-  return this->interpolate_to_evaluated_points(GVArray_For_GSpan(data));
+  return this->interpolate_to_evaluated(GVArray_For_GSpan(data));
 }
 
 /**
@@ -448,9 +448,9 @@ GVArrayPtr Spline::interpolate_to_evaluated_points(GSpan data) const
  * points) to arbitrary parameters in between the evaluated points. The interpolation is quite
  * simple, but this handles the cyclic and end point special cases.
  */
-void Spline::sample_based_on_index_factors(const GVArray &src,
-                                           Span<float> index_factors,
-                                           GMutableSpan dst) const
+void Spline::sample_with_index_factors(const GVArray &src,
+                                       Span<float> index_factors,
+                                       GMutableSpan dst) const
 {
   BLI_assert(src.size() == this->evaluated_points_size());
 
