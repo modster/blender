@@ -492,7 +492,9 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                       "Flags",
                       "Set read flag for all USD import mesh sequence cache modifiers");
 
+  /* Specify that the flag contains multiple enums. */
   RNA_def_property_flag(prop, PROP_ENUM_FLAG);
+  /* Set the flag bits enabled by default. */
   RNA_def_property_enum_default(
       prop, (MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV));
 
