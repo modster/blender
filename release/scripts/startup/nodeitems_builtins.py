@@ -633,6 +633,7 @@ attribute_node_categories = [
         NodeItem("ShaderNodeMath"),
         NodeItem("FunctionNodeBooleanMath"),
         NodeItem("FunctionNodeFloatCompare"),
+        NodeItem("ShaderNodeTexNoise"),
     ]),
     AttributeNodeCategory("ATTR_VECTOR", "Vector", items=[
         NodeItem("ShaderNodeSeparateXYZ"),
