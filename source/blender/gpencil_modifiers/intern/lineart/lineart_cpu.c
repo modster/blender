@@ -2190,6 +2190,10 @@ static void lineart_main_load_geometries(
     mul_m4db_m4db_m4fl_uniq(obi->model_view_proj, rb->view_projection, ob->obmat);
     mul_m4db_m4db_m4fl_uniq(obi->model_view, rb->view, ob->obmat);
 
+    if (!ELEM(use_ob->type, OB_MESH, OB_MBALL, OB_CURVE, OB_SURF, OB_FONT)) {
+      continue;
+    }
+
     if (!lineart_geometry_check_visible(obi->model_view_proj, use_ob)) {
       if (G.debug_value == 4000) {
         bound_box_discard_count++;
@@ -2197,10 +2201,6 @@ static void lineart_main_load_geometries(
       continue;
     }
 
-    if (!(use_ob->type == OB_MESH || use_ob->type == OB_MBALL || use_ob->type == OB_CURVE ||
-          use_ob->type == OB_SURF || use_ob->type == OB_FONT)) {
-      continue;
-    }
     if (use_ob->type == OB_MESH) {
       use_mesh = use_ob->data;
     }
