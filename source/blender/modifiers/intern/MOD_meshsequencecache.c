@@ -60,16 +60,16 @@
 
 #include "MEM_guardedalloc.h"
 
-#ifdef WITH_ALEMBIC
-#  include "ABC_alembic.h"
+#if defined(WITH_USD) || defined(WITH_ALEMBIC)
 #  include "BKE_global.h"
 #  include "BKE_lib_id.h"
 #endif
 
+#ifdef WITH_ALEMBIC
+#  include "ABC_alembic.h"
+#endif
+
 #ifdef WITH_USD
-#  include "BKE_global.h"
-#  include "BKE_lib_id.h"
-#  include "BKE_library.h"
 #  include "usd.h"
 #endif
 
