@@ -203,7 +203,7 @@ USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim,
       last_num_positions_(-1),
       has_uvs_(false),
       is_time_varying_(false),
-      is_initial_load_(true)
+      is_initial_load_(false)
 {
 }
 
