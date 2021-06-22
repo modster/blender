@@ -829,7 +829,7 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
 #elif defined(__APPLE__)
   const bool use_window_surface = (m_metal_layer != NULL);
 #else /* X11 */
-  const bool use_window_surface = (m_display != NULL);
+  const bool use_window_surface = (m_display != NULL) && (m_window != (Window)NULL);
 #endif
 
   auto layers_available = getLayersAvailable();
