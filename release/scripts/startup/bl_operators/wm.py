@@ -1429,32 +1429,41 @@ class WM_OT_properties_edit(Operator):
         prop_type_new = type(prop_value)
         prop_type, is_array = rna_idprop_value_item_type(prop_value)
 
-        if prop_type in {float, int}:
-            props = item.id_properties_create()
-
-            prop_min, prop_max = self.min, self.max
-            prop_soft_min, prop_soft_max = self.soft_min, self.soft_max
-            if prop_type == int:
-                prop_min = int(round(prop_min))
-                prop_max = int(round(prop_max))
-                prop_soft_min = int(round(prop_soft_min))
-                prop_soft_max = int(round(prop_soft_max))
-
+        props = item.id_properties_create()
+        props.ui_data_update(
+            prop,
+            subtype=self.subtype,
+            description=self.description,
+        )
+        if prop_type == int:
+            if type(default_eval) == str:
+                self.report({'ERROR'}, "Could not evaluate number from default")
+                default_eval = None
+            elif hasattr(default_eval, "__len__"):
+                default_eval = [int(round(value)) for value in default_eval]
             props.ui_data_update(
                 prop,
-                subtype=self.subtype,
-                min=prop_min,
-                max=prop_max,
-                soft_min=prop_soft_min,
-                soft_max=prop_soft_max,
-                description=self.description,
+                min=int(round(self.min)),
+                max=int(round(self.max)),
+                soft_min=int(round(self.soft_min)),
+                soft_max=int(round(self.soft_max)),
+                default=default_eval,
             )
-        if prop_type in {float, int, str}:
-            props = item.id_properties_create()
-            if prop_type == int:
-                if hasattr(default_eval, "__len__"):
-                    default_eval = [int(round(value)) for value in default_eval]
-            props.ui_data_update(prop, default=default_eval)
+        elif prop_type == float:
+            if type(default_eval) == str:
+                self.report({'ERROR'}, "Could not evaluate number from default")
+                default_eval = None
+            props.ui_data_update(
+                prop,
+                min=self.min,
+                max=self.max,
+                soft_min=self.soft_min,
+                soft_max=self.soft_max,
+                default=default_eval,
+            )
+        elif prop_type == str:
+            props.ui_data_update(prop, default=self.default)
+            
 
         # If we have changed the type of the property, update its potential anim curves!
         if prop_type_old != prop_type_new:
