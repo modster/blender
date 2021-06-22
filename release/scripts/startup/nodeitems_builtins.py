@@ -627,13 +627,15 @@ attribute_node_categories = [
         NodeItem("AttributeNodeSetAttribute"),
         NodeItem("AttributeNodePositionOutput"),
     ]),
+    AttributeNodeCategory("ATTR_TEXTURE", "Texture", items=[
+        NodeItem("ShaderNodeTexNoise"),
+    ]),
     AttributeNodeCategory("ATTR_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),
         NodeItem("ShaderNodeClamp"),
         NodeItem("ShaderNodeMath"),
         NodeItem("FunctionNodeBooleanMath"),
         NodeItem("FunctionNodeFloatCompare"),
-        NodeItem("ShaderNodeTexNoise"),
     ]),
     AttributeNodeCategory("ATTR_VECTOR", "Vector", items=[
         NodeItem("ShaderNodeSeparateXYZ"),
