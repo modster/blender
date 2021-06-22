@@ -184,7 +184,8 @@ static bool get_closest_point_on_edge(float *point,
                                       const float pos[2],
                                       const float pos1[3],
                                       const float pos2[3],
-                                      const ViewContext *vc)
+                                      const ViewContext *vc,
+                                      float *factor)
 {
   float pos1_2d[2], pos2_2d[2], vec1[2], vec2[2], vec3[2];
 
@@ -207,11 +208,11 @@ static bool get_closest_point_on_edge(float *point,
   perpendicular line from the mouse to the line.*/
   if ((dot1 > 0) == (dot2 > 0)) {
     float len_vec3_sq = len_squared_v2(vec3);
-    float factor = 1 - dot2 / len_vec3_sq;
+    *factor = 1 - dot2 / len_vec3_sq;
 
     float pos_dif[3];
     sub_v3_v3v3(pos_dif, pos2, pos1);
-    madd_v3_v3v3fl(point, pos1, pos_dif, factor);
+    madd_v3_v3v3fl(point, pos1, pos_dif, *factor);
     return true;
   }
   if (len_manhattan_v2(vec1) < len_manhattan_v2(vec2)) {
@@ -296,6 +297,22 @@ static void select_and_get_point(ViewContext *vc,
   *bezt = bezt1;
   *bp = bp1;
   *nu = nu1;
+}
+
+static void calculate_new_bezier_point(const float *point_prev,
+                                       float *handle_prev,
+                                       float *new_left_handle,
+                                       float *new_right_handle,
+                                       float *handle_next,
+                                       const float *point_next,
+                                       const float parameter)
+{
+  const float center_point[3];
+  interp_v3_v3v3(center_point, handle_prev, handle_next, parameter);
+  interp_v3_v3v3(handle_prev, point_prev, handle_prev, parameter);
+  interp_v3_v3v3(handle_next, handle_next, point_next, parameter);
+  interp_v3_v3v3(new_left_handle, handle_prev, center_point, parameter);
+  interp_v3_v3v3(new_right_handle, center_point, handle_next, parameter);
 }
 
 enum {
@@ -469,13 +486,19 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             Nurb *nurb;
             /* Minimum distance to curve from mouse location. */
             float min_dist;
+            /* Ratio at which the new point divides the curve segment. */
+            float parameter;
             /* Whether the cut has any vertices before/after it. */
             bool has_prev, has_next;
             /* Locations of adjacent vertices. */
             float prev_loc[3], cut_loc[3], next_loc[3];
             /* Mouse location as floats. */
             float mval[2];
-          } data = {.bezt_index = 0, .min_dist = 10000, .has_prev = false, .has_next = false};
+          } data = {.bezt_index = 0,
+                    .min_dist = 10000,
+                    .parameter = 0.5f,
+                    .has_prev = false,
+                    .has_next = false};
 
           data.mval[0] = event->mval[0];
           data.mval[1] = event->mval[1];
@@ -528,6 +551,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                       data.min_dist = distance;
                       data.nurb = nu;
                       data.bezt_index = i;
+                      data.parameter = ((float)k) / resolu;
 
                       copy_v3_v3(data.cut_loc, points + 3 * k);
 
@@ -554,13 +578,14 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             if (nu && nu->bezt) {
               bool found_min = false;
               float point[3];
+              float factor;
               if (data.has_prev) {
                 found_min = get_closest_point_on_edge(
-                    point, data.mval, data.cut_loc, data.prev_loc, &vc);
+                    point, data.mval, data.cut_loc, data.prev_loc, &vc, &factor);
               }
               if (!found_min && data.has_next) {
                 found_min = get_closest_point_on_edge(
-                    point, data.mval, data.cut_loc, data.next_loc, &vc);
+                    point, data.mval, data.next_loc, data.cut_loc, &vc, &factor);
               }
               if (found_min) {
                 float point_2d[2];
@@ -568,6 +593,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                     vc.region, point, point_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
                 float dist = len_manhattan_v2v2(point_2d, data.mval);
                 data.min_dist = dist;
+                data.parameter += factor / nu->resolu;
                 copy_v3_v3(data.cut_loc, point);
               }
 
@@ -578,15 +604,22 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
               BezTriple *new_bezt = bezt1 + index;
 
               /* Duplicate control point after the cut. */
-              // ED_curve_beztcpy(editnurb, new_bezt, new_bezt - 1, 1);
               memcpy(new_bezt, new_bezt - 1, sizeof(BezTriple));
-              new_bezt->h1 = new_bezt->h2 = HD_AUTO;
+              // new_bezt->h1 = new_bezt->h2 = HD_AUTO;
               copy_v3_v3(new_bezt->vec[1], data.cut_loc);
 
               /* Copy all control points after the cut to the new memory. */
               memcpy(bezt1 + index + 1, nu->bezt + index, (nu->pntsu - index) * sizeof(BezTriple));
               nu->pntsu += 1;
               cu->actvert = CU_ACT_NONE;
+
+              calculate_new_bezier_point((new_bezt - 1)->vec[1],
+                                         (new_bezt - 1)->vec[2],
+                                         new_bezt->vec[0],
+                                         new_bezt->vec[2],
+                                         (new_bezt + 1)->vec[0],
+                                         (new_bezt + 1)->vec[1],
+                                         data.parameter);
 
               MEM_freeN(nu->bezt);
               nu->bezt = bezt1;
