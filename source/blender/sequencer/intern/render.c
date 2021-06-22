@@ -531,6 +531,41 @@ static void sequencer_image_crop_init(const Sequence *seq,
   BLI_rctf_init(r_crop, left, in->x - right, bottom, in->y - top);
 }
 
+static void sequencer_thumbnail_transform(ImBuf *in, ImBuf *out, const SeqRenderData *context)
+{
+  const Scene *scene = context->scene;
+  const float preview_scale_factor = context->preview_render_size == SEQ_RENDER_SIZE_SCENE ?
+                                         (float)scene->r.size / 100 :
+                                         SEQ_rendersize_to_scale_factor(
+                                             context->preview_render_size);
+
+  float image_scale_factor = (float)context->rectx / in->x;
+  float transform_matrix[3][3];
+
+  /* set to keep same loc,scale,rot but change scale to thumb size limit*/
+  const float scale_x = 1 * image_scale_factor;
+  const float scale_y = 1 * image_scale_factor;
+  const float image_center_offs_x = (out->x - in->x) / 2;
+  const float image_center_offs_y = (out->y - in->y) / 2;
+  const float translate_x = 0 * preview_scale_factor + image_center_offs_x;
+  const float translate_y = 0 * preview_scale_factor + image_center_offs_y;
+  const float pivot[2] = {in->x / 2, in->y / 2};
+  loc_rot_size_to_mat3(transform_matrix,
+                       (const float[]){translate_x, translate_y},
+                       0,
+                       (const float[]){scale_x, scale_y});
+  transform_pivot_set_m3(transform_matrix, pivot);
+  invert_m3(transform_matrix);
+
+  /* no crop */
+  rctf source_crop;
+  BLI_rctf_init(&source_crop, 0, in->x, 0, in->y);
+
+  const eIMBInterpolationFilterMode filter = context->for_render ? IMB_FILTER_BILINEAR :
+                                                                   IMB_FILTER_NEAREST;
+  IMB_transform(in, out, transform_matrix, &source_crop, filter);
+}
+
 static void sequencer_preprocess_transform_crop(
     ImBuf *in, ImBuf *out, const SeqRenderData *context, Sequence *seq, const bool is_proxy_image)
 {
@@ -541,9 +576,9 @@ static void sequencer_preprocess_transform_crop(
                                              context->preview_render_size);
   const bool do_scale_to_render_size = seq_need_scale_to_render_size(seq, is_proxy_image);
   float image_scale_factor = do_scale_to_render_size ? 1.0f : preview_scale_factor;
-  if (context->is_thumb)
-    image_scale_factor = 0.25f;
-
+  if (context->is_thumb) {
+    image_scale_factor = (float)context->rectx / in->x;
+  }
   float transform_matrix[3][3];
   sequencer_image_crop_transform_matrix(
       seq, in, out, image_scale_factor, preview_scale_factor, transform_matrix);
@@ -610,6 +645,19 @@ static ImBuf *input_preprocess(const SeqRenderData *context,
     ibuf = preprocessed_ibuf;
 
     IMB_filtery(preprocessed_ibuf);
+  }
+
+  /* For thumbnails only scale to low res and return. No need for other preprocess as thumbnail
+   * represents source */
+  if (context->is_thumb) {
+    preprocessed_ibuf = IMB_allocImBuf(
+        context->rectx, context->recty, 32, ibuf->rect_float ? IB_rectfloat : IB_rect);
+    sequencer_thumbnail_transform(ibuf, preprocessed_ibuf, context);
+    seq_imbuf_assign_spaces(scene, preprocessed_ibuf);
+    IMB_metadata_copy(preprocessed_ibuf, ibuf);
+    IMB_freeImBuf(ibuf);
+
+    return preprocessed_ibuf;
   }
 
   if (sequencer_use_crop(seq) || sequencer_use_transform(seq) || context->rectx != ibuf->x ||

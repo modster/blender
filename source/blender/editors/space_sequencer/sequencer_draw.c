@@ -1103,20 +1103,20 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   double render_size;
   float strip_x2 = x2;
   bool min_size;
+  float aspect_ratio;
 
-  if (sseq->render_size == SEQ_RENDER_SIZE_NONE) {
-    return;
-  }
+  /* Fix size of obtained ibuf to max 256 for any dimension keeping aspect ratio same. Depends upon
+   * the scene set resolution for uniformity in all strips */
+  aspect_ratio = (float)scene->r.xsch / scene->r.ysch;
 
-  if (sseq->render_size == SEQ_RENDER_SIZE_SCENE) {
-    render_size = scene->r.size / 100.0;
+  if (scene->r.xsch > scene->r.ysch) {
+    rectx = 256;
+    recty = roundf(rectx / aspect_ratio);
   }
   else {
-    render_size = SEQ_rendersize_to_scale_factor(sseq->render_size);
+    recty = 256;
+    rectx = roundf(recty * aspect_ratio);
   }
-
-  rectx = roundf(render_size * 0.25 * scene->r.xsch);
-  recty = roundf(render_size * 0.25 * scene->r.ysch);
 
   /* if thumbs too small ignore */
   min_size = ((y2 - y1) / pixely) > 40 * U.dpi_fac;
@@ -1134,7 +1134,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 
   /*Calculate thumb dimensions */
   float thumb_h = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
-  float aspect_ratio = ((float)rectx) / recty;
+  aspect_ratio = ((float)rectx) / recty;
   float thumb_h_px = thumb_h / pixely;
   float thumb_w = aspect_ratio * thumb_h_px * pixelx;
   float zoom_x = thumb_w / rectx;
@@ -1292,7 +1292,7 @@ static void draw_seq_strip(const bContext *C,
     draw_seq_invalid(x1, x2, y2, text_margin_y);
   }
 
-  if (seq->type == SEQ_TYPE_MOVIE) {
+  if (seq->type == SEQ_TYPE_MOVIE || seq->type == SEQ_TYPE_IMAGE) {
     draw_seq_strip_thumbnail(
         v2d, C, sseq, scene, seq, x1, y1, x2, y2, handsize_clamped, pixelx, pixely);
   }
