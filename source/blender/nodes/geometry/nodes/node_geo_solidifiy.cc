@@ -28,7 +28,6 @@
 #include "DNA_modifier_types.h"
 
 #include "node_geometry_util.hh"
-#include "node_geo_solidify.h"
 
 /*extern "C" {    // another way
   Mesh *solidify_extrude_modifyMesh( Mesh *mesh);
@@ -144,31 +143,19 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     geometry_set.replace_mesh(output_mesh);
 
     const AttributeDomain result_point_domain = ATTR_DOMAIN_POINT;
-
-    const std::string shell_verts_attribute_name = params.get_input<std::string>("Shell Verts");
-    OutputAttribute_Typed<bool> shell_verts_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(shell_verts_attribute_name,
-                                                               result_point_domain);
-
-    const std::string rim_verts_attribute_name = params.get_input<std::string>("Rim Verts");
-    OutputAttribute_Typed<bool> rim_verts_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(rim_verts_attribute_name,
-                                                               result_point_domain);
-
     const AttributeDomain result_face_domain = ATTR_DOMAIN_FACE;
 
+    const std::string shell_verts_attribute_name = params.get_input<std::string>("Shell Verts");
+    const std::string rim_verts_attribute_name = params.get_input<std::string>("Rim Verts");
     const std::string shell_faces_attribute_name = params.get_input<std::string>("Shell Faces");
-    OutputAttribute_Typed<bool> shell_faces_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(shell_faces_attribute_name,
-                                                               result_face_domain);
-
     const std::string rim_faces_attribute_name = params.get_input<std::string>("Rim Faces");
-    OutputAttribute_Typed<bool> rim_faces_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(rim_faces_attribute_name,
-                                                               result_face_domain);
+
 
     if (solidify_node_data.flag & MOD_SOLIDIFY_SHELL) {
       if(!shell_verts_attribute_name.empty()){
+        OutputAttribute_Typed<bool> shell_verts_attribute =
+            mesh_component.attribute_try_get_for_output_only<bool>(shell_verts_attribute_name,
+                                                                   result_point_domain);
         MutableSpan<bool> shell_verts_span = shell_verts_attribute.as_span();
         for (const int i : shell_verts_span.index_range()) {
           shell_verts_span[i] = shell_verts[i];
@@ -176,6 +163,9 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
         shell_verts_attribute.save();
       }
       if(!shell_faces_attribute_name.empty()){
+        OutputAttribute_Typed<bool> shell_faces_attribute =
+            mesh_component.attribute_try_get_for_output_only<bool>(shell_faces_attribute_name,
+                                                                   result_face_domain);
         MutableSpan<bool> shell_faces_span = shell_faces_attribute.as_span();
         for (const int i : shell_faces_span.index_range()) {
           shell_faces_span[i] = shell_faces[i];
@@ -186,6 +176,9 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
     if (solidify_node_data.flag & MOD_SOLIDIFY_RIM) {
       if(!rim_verts_attribute_name.empty()) {
+        OutputAttribute_Typed<bool> rim_verts_attribute =
+            mesh_component.attribute_try_get_for_output_only<bool>(rim_verts_attribute_name,
+                                                                   result_point_domain);
         MutableSpan<bool> rim_verts_span = rim_verts_attribute.as_span();
         for (const int i : rim_verts_span.index_range()) {
           rim_verts_span[i] = rim_verts[i];
@@ -193,6 +186,9 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
         rim_verts_attribute.save();
       }
       if(!rim_faces_attribute_name.empty()) {
+        OutputAttribute_Typed<bool> rim_faces_attribute =
+            mesh_component.attribute_try_get_for_output_only<bool>(rim_faces_attribute_name,
+                                                                   result_face_domain);
         MutableSpan<bool> rim_faces_span = rim_faces_attribute.as_span();
         for (const int i : rim_faces_span.index_range()) {
           rim_faces_span[i] = rim_faces[i];
