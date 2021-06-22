@@ -27,6 +27,7 @@
  * reference http://graphics.berkeley.edu/papers/Narain-AAR-2012-11/index.html
  ******************************************************************************/
 
+#include "BLI_assert.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,6 +46,10 @@ void BKE_cloth_remesh(const struct Object *ob,
 
 #ifdef __cplusplus
 
+#  include <bits/stdint-uintn.h>
+#  include <filesystem>
+#  include <fstream>
+#  include <string>
 #  include <tuple>
 
 #  include "BLI_float2.hh"
@@ -54,7 +59,15 @@ void BKE_cloth_remesh(const struct Object *ob,
 
 namespace blender::bke::internal {
 
+template<typename> class Node;
+template<typename> class Vert;
+template<typename> class Edge;
+template<typename> class Face;
+template<typename, typename, typename, typename> class Mesh;
+class MeshReader;
+
 namespace ga = blender::generational_arena;
+namespace fs = std::filesystem;
 
 using NodeIndex = ga::Index;
 using VertIndex = ga::Index;
@@ -250,6 +263,84 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return this->faces.get(face_index);
   }
 };
+
+class MeshReader {
+  using usize = uint64_t;
+
+  blender::Vector<float3> positions;
+  blender::Vector<float2> uvs;
+  blender::Vector<float3> normals;
+  blender::Vector<std::tuple<usize, usize, usize>> face_indices; /* position,
+                                                                  * uv,
+                                                                  * normal */
+  blender::Vector<blender::Vector<usize>> line_indices;
+
+ public:
+  enum FileType {
+    FILETYPE_OBJ,
+  };
+
+  MeshReader() = default;
+
+  bool read(const fs::path &filepath, FileType type)
+  {
+    if (type != FILETYPE_OBJ) {
+      return false;
+    }
+
+    if (!fs::exists(filepath)) {
+      return false;
+    }
+
+    std::fstream fin;
+    fin.open(filepath, std::ios::in);
+
+    if (!fin.is_open()) {
+      return false;
+    }
+
+    if (type == FILETYPE_OBJ) {
+      this->read_obj(std::move(fin));
+    }
+    else {
+      BLI_assert_unreachable();
+    }
+
+    return true;
+  }
+
+ private:
+  void read_obj(std::fstream &&fin)
+  {
+    std::string line;
+    while (std::getline(fin, line)) {
+      if (line.rfind('#', 0) == 0) {
+        continue;
+      }
+
+      if (line.rfind('v', 0) == 0) {
+        /* TODO(ish): process positions */
+      }
+      else if (line.rfind("vt", 0) == 0) {
+        /* TODO(ish): process uvs */
+      }
+      else if (line.rfind("vn", 0) == 0) {
+        /* TODO(ish): process normals */
+      }
+      else if (line.rfind("f", 0) == 0) {
+        /* TODO(ish): process face indices */
+      }
+      else if (line.rfind("l", 0) == 0) {
+        /* TODO(ish): process uvs */
+      }
+      else {
+        /* unknown type, continuing */
+        continue;
+      }
+    }
+  }
+};
+
 } /* namespace blender::bke::internal */
 
 #endif /* __cplusplus */
