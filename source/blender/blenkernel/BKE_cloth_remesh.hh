@@ -49,6 +49,8 @@ void BKE_cloth_remesh(const struct Object *ob,
 #  include <bits/stdint-uintn.h>
 #  include <filesystem>
 #  include <fstream>
+#  include <limits>
+#  include <sstream>
 #  include <string>
 #  include <tuple>
 
@@ -266,13 +268,14 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
 class MeshReader {
   using usize = uint64_t;
+  using FaceData = std::tuple<usize, usize, usize>; /* position,
+                                                     * uv,
+                                                     * normal */
 
   blender::Vector<float3> positions;
   blender::Vector<float2> uvs;
   blender::Vector<float3> normals;
-  blender::Vector<std::tuple<usize, usize, usize>> face_indices; /* position,
-                                                                  * uv,
-                                                                  * normal */
+  blender::Vector<blender::Vector<FaceData>> face_indices;
   blender::Vector<blender::Vector<usize>> line_indices;
 
  public:
@@ -300,7 +303,10 @@ class MeshReader {
     }
 
     if (type == FILETYPE_OBJ) {
-      this->read_obj(std::move(fin));
+      auto res = this->read_obj(std::move(fin));
+      if (!res) {
+        return false;
+      }
     }
     else {
       BLI_assert_unreachable();
@@ -310,7 +316,21 @@ class MeshReader {
   }
 
  private:
-  void read_obj(std::fstream &&fin)
+  blender::Vector<std::string> tokenize(std::string const &str, const char delim)
+  {
+    blender::Vector<std::string> res;
+    // construct a stream from the string
+    std::stringstream ss(str);
+
+    std::string s;
+    while (std::getline(ss, s, delim)) {
+      res.append(s);
+    }
+
+    return res;
+  }
+
+  bool read_obj(std::fstream &&fin)
   {
     std::string line;
     while (std::getline(fin, line)) {
@@ -319,25 +339,106 @@ class MeshReader {
       }
 
       if (line.rfind('v', 0) == 0) {
-        /* TODO(ish): process positions */
+        std::istringstream li(line);
+        float x, y, z;
+        std::string temp;
+        li >> temp >> x >> y >> z;
+        if (li.fail()) {
+          return false;
+        }
+        BLI_assert(temp == "v");
+        this->positions.append(float3(x, y, z));
       }
       else if (line.rfind("vt", 0) == 0) {
-        /* TODO(ish): process uvs */
+        std::istringstream li(line);
+        float u, v;
+        std::string temp;
+        li >> temp >> u >> v;
+        if (li.fail()) {
+          return false;
+        }
+        BLI_assert(temp == "vt");
+        this->uvs.append(float2(u, v));
       }
       else if (line.rfind("vn", 0) == 0) {
-        /* TODO(ish): process normals */
+        std::istringstream li(line);
+        float x, y, z;
+        std::string temp;
+        li >> temp >> x >> y >> z;
+        if (li.fail()) {
+          return false;
+        }
+        BLI_assert(temp == "vn");
+        this->normals.append(float3(x, y, z));
       }
       else if (line.rfind("f", 0) == 0) {
-        /* TODO(ish): process face indices */
+        const auto line_toks = this->tokenize(line, ' ');
+
+        blender::Vector<FaceData> face;
+
+        for (const auto *indices_group_iter = line_toks.begin() + 1;
+             indices_group_iter != line_toks.end();
+             indices_group_iter++) {
+          const auto indices_group = *indices_group_iter;
+
+          auto indices_str = this->tokenize(indices_group, '/');
+          if (indices_str.size() == 1) {
+            std::istringstream isi(indices_str[0]);
+            usize pos_index;
+            isi >> pos_index;
+            face.append(std::make_tuple(pos_index - 1,
+                                        std::numeric_limits<usize>::max(),
+                                        std::numeric_limits<usize>::max()));
+          }
+          else if (indices_str.size() == 2) {
+            std::istringstream isi_pos(indices_str[0]);
+            std::istringstream isi_uv(indices_str[1]);
+            usize pos_index;
+            usize uv_index;
+            isi_pos >> pos_index;
+            isi_uv >> uv_index;
+            face.append(
+                std::make_tuple(pos_index - 1, uv_index - 1, std::numeric_limits<usize>::max()));
+          }
+          else if (indices_str.size() == 3) {
+            std::istringstream isi_pos(indices_str[0]);
+            std::istringstream isi_uv(indices_str[1]);
+            std::istringstream isi_normal(indices_str[2]);
+            usize pos_index;
+            usize uv_index;
+            usize normal_index;
+            isi_pos >> pos_index;
+            isi_uv >> uv_index;
+            isi_normal >> normal_index;
+            face.append(std::make_tuple(pos_index - 1, uv_index - 1, normal_index - 1));
+          }
+          else {
+            return false;
+          }
+        }
+
+        this->face_indices.append(face);
       }
       else if (line.rfind("l", 0) == 0) {
-        /* TODO(ish): process uvs */
+        std::istringstream li(line);
+        std::string temp;
+        li >> temp;
+
+        blender::Vector<usize> indices;
+        usize index;
+        while (li >> index) {
+          indices.append(index - 1); /* obj starts from 1, we want to
+                                      * start from 0 */
+        }
+        this->line_indices.append(indices);
       }
       else {
         /* unknown type, continuing */
         continue;
       }
     }
+
+    return true;
   }
 };
 
