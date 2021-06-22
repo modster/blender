@@ -83,10 +83,8 @@ template<typename T> class Node {
 
  public:
   Node(NodeIndex self_index, float3 pos, float3 normal)
+      : self_index(self_index), pos(pos), normal(normal)
   {
-    this->self_index = self_index;
-    this->pos = pos;
-    this->normal = normal;
   }
 
   void set_extra_data(T extra_data)
@@ -116,10 +114,8 @@ template<typename T> class Vert {
   std::optional<T> extra_data;
 
  public:
-  Vert(VertIndex self_index, float2 uv)
+  Vert(VertIndex self_index, float2 uv) : self_index(self_index), uv(uv)
   {
-    this->self_index = self_index;
-    this->uv = uv;
   }
 
   void set_extra_data(T extra_data)
@@ -150,9 +146,8 @@ template<typename T> class Edge {
   std::optional<T> extra_data;
 
  public:
-  Edge(EdgeIndex self_index)
+  Edge(EdgeIndex self_index) : self_index(self_index)
   {
-    this->self_index = self_index;
   }
 
   void set_extra_data(T extra_data)
@@ -181,10 +176,8 @@ template<typename T> class Face {
   std::optional<T> extra_data;
 
  public:
-  Face(FaceIndex self_index, float3 normal)
+  Face(FaceIndex self_index, float3 normal) : self_index(self_index), normal(normal)
   {
-    this->self_index = self_index;
-    this->normal = normal;
   }
 
   void set_extra_data(T extra_data)
