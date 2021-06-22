@@ -112,9 +112,6 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
     SolidifyData solidify_node_data = {
         self_object,
-        "",
-        "",
-        "",
         thickness,
         offset,
         0.0f,

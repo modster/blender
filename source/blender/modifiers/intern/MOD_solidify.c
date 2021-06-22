@@ -129,9 +129,6 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md,
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
   SolidifyData solidify_data = {
       ctx->object,
-      "",
-      "",
-      "",
       smd->offset,
       smd->offset_fac,
       smd->offset_fac_vg,
@@ -149,10 +146,6 @@ static const SolidifyData solidify_data_from_modifier_data(ModifierData *md,
       smd->bevel_convex,
       NULL,
   };
-
-  BLI_strncpy(solidify_data.defgrp_name, smd->defgrp_name, MAX_NAME);
-  BLI_strncpy(solidify_data.shell_defgrp_name, smd->shell_defgrp_name, MAX_NAME);
-  BLI_strncpy(solidify_data.rim_defgrp_name, smd->rim_defgrp_name, MAX_NAME);
 
   if (!(smd->flag & MOD_SOLIDIFY_NOSHELL)) {
     solidify_data.flag |= MOD_SOLIDIFY_SHELL;
