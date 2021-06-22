@@ -289,7 +289,7 @@
 
 #define _DNA_DEFAULT_LineartGpencilModifierData \
   { \
-    .edge_types = LRT_EDGE_FLAG_ALL_TYPE, \
+    .edge_types = LRT_EDGE_FLAG_INIT_TYPE, \
     .thickness = 25, \
     .opacity = 1.0f, \
     .flags = LRT_GPENCIL_MATCH_OUTPUT_VGROUP, \

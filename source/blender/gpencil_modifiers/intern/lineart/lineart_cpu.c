@@ -1529,33 +1529,38 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
   double result;
   uint16_t edge_flag_result = 0;
 
-  if (rb->cam_is_persp) {
-    sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
-  }
-  else {
-    view_vector = rb->view_vector;
-  }
+  if (rb->use_contour) {
 
-  dot_1 = dot_v3v3_db(view_vector, tri1->gn);
-  dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+    if (rb->cam_is_persp) {
+      sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
+    }
+    else {
+      view_vector = rb->view_vector;
+    }
 
-  if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
-    edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
-  }
+    dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+    dot_2 = dot_v3v3_db(view_vector, tri2->gn);
 
-  if (rb->light_is_sun) {
-    view_vector = rb->light_vector;
-  }
-  else {
-    view_vector = vv;
-    sub_v3_v3v3_db(view_vector, l->gloc, rb->light_vector);
+    if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+      edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
+    }
   }
 
-  dot_1 = dot_v3v3_db(view_vector, tri1->gn);
-  dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+  if (rb->use_light_contour) {
+    if (rb->light_is_sun) {
+      view_vector = rb->light_vector;
+    }
+    else {
+      view_vector = vv;
+      sub_v3_v3v3_db(view_vector, l->gloc, rb->light_vector);
+    }
 
-  if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
-    edge_flag_result |= LRT_EDGE_FLAG_LIGHT_CONTOUR;
+    dot_1 = dot_v3v3_db(view_vector, tri1->gn);
+    dot_2 = dot_v3v3_db(view_vector, tri2->gn);
+
+    if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+      edge_flag_result |= LRT_EDGE_FLAG_LIGHT_CONTOUR;
+    }
   }
 
   if (rb->use_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
@@ -3131,7 +3136,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->use_edge_marks = (edge_types & LRT_EDGE_FLAG_EDGE_MARK) != 0;
   rb->use_intersections = (edge_types & LRT_EDGE_FLAG_INTERSECTION) != 0;
   rb->use_floating = (edge_types & LRT_EDGE_FLAG_FLOATING) != 0;
-  rb->use_light_contour = (edge_types & LRT_EDGE_FLAG_LIGHT_CONTOUR) != 0;
+  rb->use_light_contour = ((edge_types & LRT_EDGE_FLAG_LIGHT_CONTOUR) != 0 &&
+                           (lmd->light_contour_object != NULL));
 
   rb->filter_face_mark_invert = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_INVERT) != 0;
   rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;

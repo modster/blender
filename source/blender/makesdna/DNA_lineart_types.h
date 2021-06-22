@@ -77,6 +77,7 @@ typedef enum eLineartEdgeFlag {
 } eLineartEdgeFlag;
 
 #define LRT_EDGE_FLAG_ALL_TYPE 0x7f
+#define LRT_EDGE_FLAG_INIT_TYPE 0x37 /* Without material & light contour */
 #define LRT_EDGE_FLAG_TYPE_MAX_BITS 7
 
 #endif
