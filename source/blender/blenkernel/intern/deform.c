@@ -83,7 +83,6 @@ void BKE_defgroup_copy_list(ListBase *outbase, const ListBase *inbase)
   BLI_listbase_clear(outbase);
 
   for (defgroup = inbase->first; defgroup; defgroup = defgroup->next) {
-    printf("Copying defgroup %p\n", defgroup);
     defgroupn = BKE_defgroup_duplicate(defgroup);
     BLI_addtail(outbase, defgroupn);
   }
@@ -494,8 +493,8 @@ bDeformGroup *BKE_object_defgroup_find_name(const Object *ob, const char *name)
   if (name == NULL || name[0] == '\0') {
     return NULL;
   }
-  const ListBase *list = BKE_object_defgroup_list_for_read(ob);
-  return BLI_findstring(list, name, offsetof(bDeformGroup, name));
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  return BLI_findstring(defbase, name, offsetof(bDeformGroup, name));
 }
 
 int BKE_object_defgroup_name_index(const Object *ob, const char *name)
@@ -503,8 +502,8 @@ int BKE_object_defgroup_name_index(const Object *ob, const char *name)
   if (name == NULL || name[0] == '\0') {
     return -1;
   }
-  const ListBase *list = BKE_object_defgroup_list_for_read(ob);
-  return BLI_findstringindex(list, name, offsetof(bDeformGroup, name));
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  return BLI_findstringindex(defbase, name, offsetof(bDeformGroup, name));
 }
 
 const ListBase *BKE_object_defgroup_list_for_read(const Object *ob)
@@ -552,8 +551,8 @@ ListBase *BKE_object_defgroup_list_for_write(Object *ob)
  */
 int *BKE_object_defgroup_flip_map(const Object *ob, int *flip_map_len, const bool use_default)
 {
-  const ListBase *list = BKE_object_defgroup_list_for_read(ob);
-  int defbase_tot = *flip_map_len = BLI_listbase_count(list);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  int defbase_tot = *flip_map_len = BLI_listbase_count(defbase);
 
   if (defbase_tot == 0) {
     return NULL;
@@ -567,7 +566,7 @@ int *BKE_object_defgroup_flip_map(const Object *ob, int *flip_map_len, const boo
     map[i] = -1;
   }
 
-  for (dg = list->first, i = 0; dg; dg = dg->next, i++) {
+  for (dg = defbase->first, i = 0; dg; dg = dg->next, i++) {
     if (map[i] == -1) { /* may be calculated previously */
 
       /* in case no valid value is found, use this */
@@ -597,8 +596,8 @@ int *BKE_object_defgroup_flip_map_single(const Object *ob,
                                          const bool use_default,
                                          int defgroup)
 {
-  const ListBase *list = BKE_object_defgroup_list_for_read(ob);
-  int defbase_tot = *flip_map_len = BLI_listbase_count(list);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  int defbase_tot = *flip_map_len = BLI_listbase_count(defbase);
 
   if (defbase_tot == 0) {
     return NULL;
@@ -612,7 +611,7 @@ int *BKE_object_defgroup_flip_map_single(const Object *ob,
     map[i] = use_default ? i : -1;
   }
 
-  dg = BLI_findlink(list, defgroup);
+  dg = BLI_findlink(defbase, defgroup);
 
   BLI_string_flip_side_name(name_flip, dg->name, false, sizeof(name_flip));
   if (!STREQ(name_flip, dg->name)) {
@@ -629,8 +628,8 @@ int *BKE_object_defgroup_flip_map_single(const Object *ob,
 
 int BKE_object_defgroup_flip_index(const Object *ob, int index, const bool use_default)
 {
-  const ListBase *list = BKE_object_defgroup_list_for_read(ob);
-  bDeformGroup *dg = BLI_findlink(list, index);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  bDeformGroup *dg = BLI_findlink(defbase, index);
   int flip_index = -1;
 
   if (dg) {
@@ -647,10 +646,10 @@ int BKE_object_defgroup_flip_index(const Object *ob, int index, const bool use_d
 
 static bool defgroup_find_name_dupe(const char *name, bDeformGroup *dg, Object *ob)
 {
-  const ListBase *list = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
   bDeformGroup *curdef;
 
-  for (curdef = list->first; curdef; curdef = curdef->next) {
+  for (curdef = defbase->first; curdef; curdef = curdef->next) {
     if (dg != curdef) {
       if (STREQ(curdef->name, name)) {
         return true;
@@ -1243,9 +1242,9 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(ListBase *r_map,
   int idx_src;
   int idx_dst;
   const ListBase *src_list = BKE_object_defgroup_list_for_read(ob_src);
-  ListBase *dst_list = BKE_object_defgroup_list_for_write(ob_dst);
+  ListBase *dst_defbase = BKE_object_defgroup_list_for_write(ob_dst);
 
-  int tot_dst = BLI_listbase_count(dst_list);
+  int tot_dst = BLI_listbase_count(dst_defbase);
 
   const size_t elem_size = sizeof(*((MDeformVert *)NULL));
 
@@ -1274,7 +1273,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(ListBase *r_map,
       }
       else if (use_delete && idx_dst > idx_src) {
         while (idx_dst-- > idx_src) {
-          BKE_object_defgroup_remove(ob_dst, dst_list->last);
+          BKE_object_defgroup_remove(ob_dst, dst_defbase->last);
         }
       }
       if (r_map) {
@@ -1311,7 +1310,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(ListBase *r_map,
 
       if (use_delete) {
         /* Remove all unused dst vgroups first, simpler in this case. */
-        for (dg_dst = dst_list->first; dg_dst;) {
+        for (dg_dst = dst_defbase->first; dg_dst;) {
           bDeformGroup *dg_dst_next = dg_dst->next;
 
           if (BKE_object_defgroup_name_index(ob_src, dg_dst->name) == -1) {
@@ -1400,9 +1399,9 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
    * Note: Above comment is outdated, but this function was written when that was true.
    */
 
-  const ListBase *src_list = BKE_object_defgroup_list_for_read(ob_src);
-  ListBase *dst_list = BKE_object_defgroup_list_for_write(ob_dst);
-  if (BLI_listbase_is_empty(src_list)) {
+  const ListBase *src_defbase = BKE_object_defgroup_list_for_read(ob_src);
+  ListBase *dst_defbase = BKE_object_defgroup_list_for_write(ob_dst);
+  if (BLI_listbase_is_empty(src_defbase)) {
     if (use_delete) {
       BKE_object_defgroup_remove_all(ob_dst);
     }
@@ -1422,7 +1421,7 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
 
     if (fromlayers >= 0) {
       idx_src = fromlayers;
-      if (idx_src >= BLI_listbase_count(src_list)) {
+      if (idx_src >= BLI_listbase_count(src_defbase)) {
         /* This can happen when vgroups are removed from source object...
          * Remapping would be really tricky here, we'd need to go over all objects in
          * Main every time we delete a vgroup... for now, simpler and safer to abort. */
@@ -1436,7 +1435,7 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
     if (tolayers >= 0) {
       /* Note: in this case we assume layer exists! */
       idx_dst = tolayers;
-      BLI_assert(idx_dst < BLI_listbase_count(dst_list));
+      BLI_assert(idx_dst < BLI_listbase_count(dst_defbase));
     }
     else if (tolayers == DT_LAYERS_ACTIVE_DST) {
       if ((idx_dst = ob_dst->actdef - 1) == -1) {
@@ -1444,13 +1443,13 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
         if (!use_create) {
           return true;
         }
-        dg_src = BLI_findlink(src_list, idx_src);
+        dg_src = BLI_findlink(src_defbase, idx_src);
         BKE_object_defgroup_add_name(ob_dst, dg_src->name);
         idx_dst = ob_dst->actdef - 1;
       }
     }
     else if (tolayers == DT_LAYERS_INDEX_DST) {
-      int num = BLI_listbase_count(src_list);
+      int num = BLI_listbase_count(src_defbase);
       idx_dst = idx_src;
       if (num <= idx_dst) {
         if (!use_create) {
@@ -1463,7 +1462,7 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
       }
     }
     else if (tolayers == DT_LAYERS_NAME_DST) {
-      bDeformGroup *dg_src = BLI_findlink(src_list, idx_src);
+      bDeformGroup *dg_src = BLI_findlink(src_defbase, idx_src);
       if ((idx_dst = BKE_object_defgroup_name_index(ob_dst, dg_src->name)) == -1) {
         if (!use_create) {
           return true;
@@ -1595,7 +1594,6 @@ void BKE_defvert_weight_to_rgb(float r_rgb[3], const float weight)
 void BKE_defbase_blend_write(BlendWriter *writer, const ListBase *defbase)
 {
   LISTBASE_FOREACH (bDeformGroup *, defgroup, defbase) {
-    printf("Saving defgroup %p\n", defgroup);
     BLO_write_struct(writer, bDeformGroup, defgroup);
   }
 }

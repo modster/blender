@@ -158,10 +158,6 @@ static void mesh_free_data(ID *id)
 {
   Mesh *mesh = (Mesh *)id;
 
-  LISTBASE_FOREACH (bDeformGroup *, defgroup, &mesh->vertex_group_names) {
-    printf("Freeing defgroup %p\n", defgroup);
-  }
-
   BLI_freelistN(&mesh->vertex_group_names);
 
   BKE_mesh_runtime_clear_cache(mesh);
