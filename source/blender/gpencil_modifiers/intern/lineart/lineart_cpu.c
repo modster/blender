@@ -1455,7 +1455,6 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
                                               LineartTriangle *rt_array,
                                               LineartVert *rv_array,
                                               float crease_threshold,
-                                              bool force_crease,
                                               bool use_auto_smooth,
                                               bool use_freestyle_edge,
                                               bool use_freestyle_face,
@@ -1564,17 +1563,24 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     }
   }
 
-  bool do_crease = true;
-  if (!force_crease &&
-      (BM_elem_flag_test(ll->f, BM_ELEM_SMOOTH) && BM_elem_flag_test(lr->f, BM_ELEM_SMOOTH))) {
-    if (!use_auto_smooth) {
-      do_crease = false;
+  if (rb->use_crease) {
+    if (rb->sharp_as_crease && !BM_elem_flag_test(e, BM_ELEM_SMOOTH)) {
+      edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+    }
+    else {
+      bool do_crease = true;
+      if (!rb->force_crease &&
+          (BM_elem_flag_test(ll->f, BM_ELEM_SMOOTH) && BM_elem_flag_test(lr->f, BM_ELEM_SMOOTH))) {
+        if (!use_auto_smooth) {
+          do_crease = false;
+        }
+      }
+      if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
+        edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+      }
     }
   }
-  if (do_crease && rb->use_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
-    edge_flag_result |= LRT_EDGE_FLAG_CREASE;
-  }
-  else if (rb->use_material && (ll->f->mat_nr != lr->f->mat_nr)) {
+  if (rb->use_material && (ll->f->mat_nr != lr->f->mat_nr)) {
     edge_flag_result |= LRT_EDGE_FLAG_MATERIAL;
   }
   else if (use_freestyle_edge && rb->use_edge_marks) {
@@ -1714,7 +1720,6 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   bool can_find_freestyle_edge = false;
   bool can_find_freestyle_face = false;
   bool use_auto_smooth = obi->original_me->flag & ME_AUTOSMOOTH;
-  bool force_crease = rb->force_crease;
   int i;
   float use_crease = 0;
 
@@ -1890,7 +1895,6 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
                                                    ort,
                                                    orv,
                                                    use_crease,
-                                                   force_crease,
                                                    use_auto_smooth,
                                                    can_find_freestyle_edge,
                                                    can_find_freestyle_face,
@@ -3140,6 +3144,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->allow_duplicated_types = (lmd->calculation_flags & LRT_ALLOW_MULTIPLE_EDGE_TYPES) != 0;
 
   rb->force_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SMOOTH_SURFACES) != 0;
+  rb->sharp_as_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SHARP_EDGES) != 0;
 
   int16_t edge_types = lmd->edge_types_override;
 
