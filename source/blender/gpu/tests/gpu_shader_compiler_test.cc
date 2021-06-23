@@ -1,3 +1,4 @@
+/* Apache License, Version 2.0 */
 
 #include "gpu_testing.hh"
 #include "shader_compiler.hh"
