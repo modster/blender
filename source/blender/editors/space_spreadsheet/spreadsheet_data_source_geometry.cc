@@ -410,7 +410,6 @@ static GeometrySet get_display_geometry_set(SpaceSpreadsheet *sspreadsheet,
         Mesh *mesh = (Mesh *)object_orig->data;
         mesh_component.replace(mesh, GeometryOwnershipType::ReadOnly);
       }
-      mesh_component.copy_vertex_group_names_from_object(*object_orig);
     }
     else if (object_orig->type == OB_POINTCLOUD) {
       PointCloud *pointcloud = (PointCloud *)object_orig->data;
@@ -428,7 +427,6 @@ static GeometrySet get_display_geometry_set(SpaceSpreadsheet *sspreadsheet,
       BKE_mesh_wrapper_ensure_mdata(mesh);
       MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
       mesh_component.replace(mesh, GeometryOwnershipType::ReadOnly);
-      mesh_component.copy_vertex_group_names_from_object(*object_eval);
     }
     else {
       if (BLI_listbase_count(&sspreadsheet->context_path) == 1) {

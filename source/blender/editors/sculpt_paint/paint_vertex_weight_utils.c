@@ -79,6 +79,8 @@ bool ED_wpaint_ensure_data(bContext *C,
     WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
   }
 
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+
   /* this happens on a Bone select, when no vgroup existed yet */
   if (ob->actdef <= 0) {
     Object *modob;
@@ -94,7 +96,8 @@ bool ED_wpaint_ensure_data(bContext *C,
             DEG_relations_tag_update(CTX_data_main(C));
           }
           else {
-            int actdef = 1 + BLI_findindex(&ob->defbase, dg);
+
+            int actdef = 1 + BLI_findindex(defbase, dg);
             BLI_assert(actdef >= 0);
             ob->actdef = actdef;
           }
@@ -102,7 +105,7 @@ bool ED_wpaint_ensure_data(bContext *C,
       }
     }
   }
-  if (BLI_listbase_is_empty(&ob->defbase)) {
+  if (BLI_listbase_is_empty(defbase)) {
     BKE_object_defgroup_add(ob);
     DEG_relations_tag_update(CTX_data_main(C));
   }
@@ -133,7 +136,8 @@ bool ED_wpaint_ensure_data(bContext *C,
 /* mirror_vgroup is set to -1 when invalid */
 int ED_wpaint_mirror_vgroup_ensure(Object *ob, const int vgroup_active)
 {
-  bDeformGroup *defgroup = BLI_findlink(&ob->defbase, vgroup_active);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  bDeformGroup *defgroup = BLI_findlink(defbase, vgroup_active);
 
   if (defgroup) {
     int mirrdef;
@@ -143,7 +147,7 @@ int ED_wpaint_mirror_vgroup_ensure(Object *ob, const int vgroup_active)
     mirrdef = BKE_object_defgroup_name_index(ob, name_flip);
     if (mirrdef == -1) {
       if (BKE_object_defgroup_new(ob, name_flip)) {
-        mirrdef = BLI_listbase_count(&ob->defbase) - 1;
+        mirrdef = BLI_listbase_count(defbase) - 1;
       }
     }
 

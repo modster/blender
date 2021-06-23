@@ -844,7 +844,7 @@ static void gpencil_edit_batches_ensure(Object *ob, GpencilBatchCache *cache, in
 
     gpEditIterData iter;
     iter.vgindex = ob->actdef - 1;
-    if (!BLI_findlink(&ob->defbase, iter.vgindex)) {
+    if (!BLI_findlink(&gpd->vertex_group_names, iter.vgindex)) {
       iter.vgindex = -1;
     }
 

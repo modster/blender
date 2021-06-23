@@ -1607,13 +1607,13 @@ static bool wpaint_stroke_test_start(bContext *C, wmOperator *op, const float mo
     /* check if we are attempting to paint onto a locked vertex group,
      * and other options disallow it from doing anything useful */
     bDeformGroup *dg;
-    dg = BLI_findlink(&ob->defbase, vgroup_index.active);
+    dg = BLI_findlink(&me->vertex_group_names, vgroup_index.active);
     if (dg->flag & DG_LOCK_WEIGHT) {
       BKE_report(op->reports, RPT_WARNING, "Active group is locked, aborting");
       return false;
     }
     if (vgroup_index.mirror != -1) {
-      dg = BLI_findlink(&ob->defbase, vgroup_index.mirror);
+      dg = BLI_findlink(&me->vertex_group_names, vgroup_index.mirror);
       if (dg->flag & DG_LOCK_WEIGHT) {
         BKE_report(op->reports, RPT_WARNING, "Mirror group is locked, aborting");
         return false;
@@ -1622,7 +1622,7 @@ static bool wpaint_stroke_test_start(bContext *C, wmOperator *op, const float mo
   }
 
   /* check that multipaint groups are unlocked */
-  defbase_tot = BLI_listbase_count(&ob->defbase);
+  defbase_tot = BLI_listbase_count(&me->vertex_group_names);
   defbase_sel = BKE_object_defgroup_selected_get(ob, defbase_tot, &defbase_tot_sel);
 
   if (ts->multipaint && defbase_tot_sel > 1) {
@@ -1636,7 +1636,7 @@ static bool wpaint_stroke_test_start(bContext *C, wmOperator *op, const float mo
 
     for (i = 0; i < defbase_tot; i++) {
       if (defbase_sel[i]) {
-        dg = BLI_findlink(&ob->defbase, i);
+        dg = BLI_findlink(&me->vertex_group_names, i);
         if (dg->flag & DG_LOCK_WEIGHT) {
           BKE_report(op->reports, RPT_WARNING, "Multipaint group is locked, aborting");
           MEM_freeN(defbase_sel);

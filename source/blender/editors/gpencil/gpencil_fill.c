@@ -1523,7 +1523,8 @@ static void gpencil_stroke_from_buffer(tGPDfill *tgpf)
   point2D = (tGPspoint *)tgpf->sbuffer;
 
   const int def_nr = tgpf->ob->actdef - 1;
-  const bool have_weight = (bool)BLI_findlink(&tgpf->ob->defbase, def_nr);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(tgpf->ob);
+  const bool have_weight = (bool)BLI_findlink(defbase, def_nr);
 
   if ((ts->gpencil_flags & GP_TOOL_FLAG_CREATE_WEIGHTS) && (have_weight)) {
     BKE_gpencil_dvert_ensure(gps);

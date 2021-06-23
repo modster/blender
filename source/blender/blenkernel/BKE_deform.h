@@ -38,6 +38,9 @@ struct MPoly;
 struct Object;
 struct bDeformGroup;
 
+const struct ListBase *BKE_object_defgroup_list_for_read(const struct Object *ob);
+struct ListBase *BKE_object_defgroup_list_for_write(struct Object *ob);
+
 struct bDeformGroup *BKE_object_defgroup_new(struct Object *ob, const char *name);
 void BKE_defgroup_copy_list(struct ListBase *outbase, const struct ListBase *inbase);
 struct bDeformGroup *BKE_defgroup_duplicate(const struct bDeformGroup *ingroup);
@@ -171,6 +174,7 @@ void BKE_defvert_blend_write(struct BlendWriter *writer, int count, struct MDefo
 void BKE_defvert_blend_read(struct BlendDataReader *reader,
                             int count,
                             struct MDeformVert *mdverts);
+void BKE_defbase_blend_write(struct BlendWriter *writer, const ListBase *defbase);
 
 #ifdef __cplusplus
 }

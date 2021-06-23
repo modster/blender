@@ -666,6 +666,9 @@ typedef struct bGPdata {
   /** List of bGPDpalette's   - Deprecated (2.78 - 2.79 only). */
   ListBase palettes DNA_DEPRECATED;
 
+  /** List of bDeformGroup names and flag only. */
+  ListBase vertex_group_names;
+
   /* 3D Viewport/Appearance Settings */
   /** Factor to define pixel size conversion. */
   float pixfactor;

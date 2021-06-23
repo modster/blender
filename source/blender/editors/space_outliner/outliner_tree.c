@@ -62,6 +62,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_armature.h"
+#include "BKE_deform.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -556,17 +557,20 @@ static void outliner_add_object_contents(SpaceOutliner *space_outliner,
   }
 
   /* vertex groups */
-  if (!BLI_listbase_is_empty(&ob->defbase)) {
-    TreeElement *tenla = outliner_add_element(
-        space_outliner, &te->subtree, ob, te, TSE_DEFGROUP_BASE, 0);
-    tenla->name = IFACE_("Vertex Groups");
+  if (ELEM(ob->type, OB_MESH, OB_GPENCIL, OB_LATTICE)) {
+    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    if (!BLI_listbase_is_empty(defbase)) {
+      TreeElement *tenla = outliner_add_element(
+          space_outliner, &te->subtree, ob, te, TSE_DEFGROUP_BASE, 0);
+      tenla->name = IFACE_("Vertex Groups");
 
-    int index;
-    LISTBASE_FOREACH_INDEX (bDeformGroup *, defgroup, &ob->defbase, index) {
-      TreeElement *ten = outliner_add_element(
-          space_outliner, &tenla->subtree, ob, tenla, TSE_DEFGROUP, index);
-      ten->name = defgroup->name;
-      ten->directdata = defgroup;
+      int index;
+      LISTBASE_FOREACH_INDEX (bDeformGroup *, defgroup, defbase, index) {
+        TreeElement *ten = outliner_add_element(
+            space_outliner, &tenla->subtree, ob, tenla, TSE_DEFGROUP, index);
+        ten->name = defgroup->name;
+        ten->directdata = defgroup;
+      }
     }
   }
 

@@ -72,6 +72,8 @@ typedef struct Lattice {
   struct MDeformVert *dvert;
   /** Multiply the influence, MAX_VGROUP_NAME. */
   char vgroup[64];
+  /** List of bDeformGroup names and flag only. */
+  ListBase vertex_group_names;
 
   struct EditLatt *editlatt;
   void *batch_cache;

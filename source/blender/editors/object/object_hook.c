@@ -129,7 +129,8 @@ static bool return_editmesh_vgroup(Object *obedit, BMEditMesh *em, char *r_name,
       }
     }
     if (totvert) {
-      bDeformGroup *dg = BLI_findlink(&obedit->defbase, defgrp_index);
+      const ListBase *defbase = BKE_object_defgroup_list_for_read(obedit);
+      bDeformGroup *dg = BLI_findlink(defbase, defgrp_index);
       BLI_strncpy(r_name, dg->name, sizeof(dg->name));
       mul_v3_fl(r_cent, 1.0f / (float)totvert);
       return true;

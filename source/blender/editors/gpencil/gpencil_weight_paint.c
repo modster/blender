@@ -252,7 +252,7 @@ static bool brush_draw_apply(tGP_BrushWeightpaintData *gso,
     }
   }
   else {
-    bDeformGroup *defgroup = BLI_findlink(&gso->object->defbase, gso->vrgroup);
+    bDeformGroup *defgroup = BLI_findlink(&gso->gpd->vertex_group_names, gso->vrgroup);
     if (defgroup->flag & DG_LOCK_WEIGHT) {
       return false;
     }
@@ -309,7 +309,7 @@ static bool gpencil_weightpaint_brush_init(bContext *C, wmOperator *op)
   gso->object = ob;
   if (ob) {
     gso->vrgroup = ob->actdef - 1;
-    if (!BLI_findlink(&ob->defbase, gso->vrgroup)) {
+    if (!BLI_findlink(&gso->gpd->vertex_group_names, gso->vrgroup)) {
       gso->vrgroup = -1;
     }
   }

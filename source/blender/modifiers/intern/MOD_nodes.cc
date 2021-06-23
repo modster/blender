@@ -1082,8 +1082,7 @@ static void modifyGeometry(ModifierData *md,
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
   GeometrySet geometry_set = GeometrySet::create_with_mesh(mesh, GeometryOwnershipType::Editable);
-  geometry_set.get_component_for_write<MeshComponent>().copy_vertex_group_names_from_object(
-      *ctx->object);
+
   modifyGeometry(md, ctx, geometry_set);
 
   /* This function is only called when applying modifiers. In this case it makes sense to realize

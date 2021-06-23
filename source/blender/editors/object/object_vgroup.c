@@ -389,8 +389,11 @@ bool ED_vgroup_array_copy(Object *ob, Object *ob_from)
   int dvert_tot_from;
   int dvert_tot;
   int i;
-  int defbase_tot_from = BLI_listbase_count(&ob_from->defbase);
-  int defbase_tot = BLI_listbase_count(&ob->defbase);
+  ListBase *defbase_dst = BKE_object_defgroup_list_for_write(ob);
+  const ListBase *defbase_src = BKE_object_defgroup_list_for_read(ob_from);
+
+  int defbase_tot_from = BLI_listbase_count(defbase_src);
+  int defbase_tot = BLI_listbase_count(defbase_dst);
   bool new_vgroup = false;
 
   if (ob == ob_from) {
@@ -429,8 +432,8 @@ bool ED_vgroup_array_copy(Object *ob, Object *ob_from)
   }
 
   /* do the copy */
-  BLI_freelistN(&ob->defbase);
-  BLI_duplicatelist(&ob->defbase, &ob_from->defbase);
+  BLI_freelistN(defbase_dst);
+  BLI_duplicatelist(defbase_dst, defbase_src);
   ob->actdef = ob_from->actdef;
 
   if (defbase_tot_from < defbase_tot) {
@@ -882,7 +885,8 @@ void ED_vgroup_vert_add(Object *ob, bDeformGroup *dg, int vertnum, float weight,
   /* add the vert to the deform group with the
    * specified assign mode
    */
-  const int def_nr = BLI_findindex(&ob->defbase, dg);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const int def_nr = BLI_findindex(defbase, dg);
 
   MDeformVert *dv = NULL;
   int tot;
@@ -913,7 +917,8 @@ void ED_vgroup_vert_remove(Object *ob, bDeformGroup *dg, int vertnum)
 
   /* TODO(campbell): This is slow in a loop, better pass def_nr directly,
    * but leave for later. */
-  const int def_nr = BLI_findindex(&ob->defbase, dg);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const int def_nr = BLI_findindex(defbase, dg);
 
   if (def_nr != -1) {
     MDeformVert *dvert = NULL;
@@ -989,7 +994,8 @@ static float get_vert_def_nr(Object *ob, const int def_nr, const int vertnum)
 
 float ED_vgroup_vert_weight(Object *ob, bDeformGroup *dg, int vertnum)
 {
-  const int def_nr = BLI_findindex(&ob->defbase, dg);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const int def_nr = BLI_findindex(defbase, dg);
 
   if (def_nr == -1) {
     return -1;
@@ -1016,7 +1022,8 @@ static void vgroup_select_verts(Object *ob, int select)
 {
   const int def_nr = ob->actdef - 1;
 
-  if (!BLI_findlink(&ob->defbase, def_nr)) {
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  if (!BLI_findlink(defbase, def_nr)) {
     return;
   }
 
@@ -1111,7 +1118,9 @@ static void vgroup_duplicate(Object *ob)
   MDeformVert **dvert_array = NULL;
   int i, idg, icdg, dvert_tot = 0;
 
-  dg = BLI_findlink(&ob->defbase, (ob->actdef - 1));
+  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+
+  dg = BLI_findlink(defbase, (ob->actdef - 1));
   if (!dg) {
     return;
   }
@@ -1127,10 +1136,10 @@ static void vgroup_duplicate(Object *ob)
   BLI_strncpy(cdg->name, name, sizeof(cdg->name));
   BKE_object_defgroup_unique_name(cdg, ob);
 
-  BLI_addtail(&ob->defbase, cdg);
+  BLI_addtail(defbase, cdg);
 
   idg = (ob->actdef - 1);
-  ob->actdef = BLI_listbase_count(&ob->defbase);
+  ob->actdef = BLI_listbase_count(defbase);
   icdg = (ob->actdef - 1);
 
   /* TODO, we might want to allow only copy selected verts here? - campbell */
@@ -1161,7 +1170,8 @@ static bool vgroup_normalize(Object *ob)
 
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
 
-  if (!BLI_findlink(&ob->defbase, def_nr)) {
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  if (!BLI_findlink(defbase, def_nr)) {
     return false;
   }
 
@@ -1651,7 +1661,8 @@ static bool vgroup_normalize_all(Object *ob,
   ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, use_vert_sel);
 
   if (dvert_array) {
-    const int defbase_tot = BLI_listbase_count(&ob->defbase);
+    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    const int defbase_tot = BLI_listbase_count(defbase);
     bool *lock_flags = BKE_object_defgroup_lock_flags_get(ob, defbase_tot);
     bool changed = false;
 
@@ -1742,7 +1753,8 @@ static const EnumPropertyItem vgroup_lock_mask[] = {
 
 static bool *vgroup_selected_get(Object *ob)
 {
-  int sel_count = 0, defbase_tot = BLI_listbase_count(&ob->defbase);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  int sel_count = 0, defbase_tot = BLI_listbase_count(defbase);
   bool *mask;
 
   if (ob->mode & OB_MODE_WEIGHT_PAINT) {
@@ -1775,11 +1787,12 @@ static void vgroup_lock_all(Object *ob, int action, int mask)
   if (mask != VGROUP_MASK_ALL) {
     selected = vgroup_selected_get(ob);
   }
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
 
   if (action == VGROUP_TOGGLE) {
     action = VGROUP_LOCK;
 
-    for (dg = ob->defbase.first, i = 0; dg; dg = dg->next, i++) {
+    for (dg = defbase->first, i = 0; dg; dg = dg->next, i++) {
       switch (mask) {
         case VGROUP_MASK_INVERT_UNSELECTED:
         case VGROUP_MASK_SELECTED:
@@ -1802,7 +1815,7 @@ static void vgroup_lock_all(Object *ob, int action, int mask)
     }
   }
 
-  for (dg = ob->defbase.first, i = 0; dg; dg = dg->next, i++) {
+  for (dg = defbase->first, i = 0; dg; dg = dg->next, i++) {
     switch (mask) {
       case VGROUP_MASK_SELECTED:
         if (!selected[i]) {
@@ -2384,8 +2397,10 @@ void ED_vgroup_mirror(Object *ob,
 
   *r_totmirr = *r_totfail = 0;
 
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+
   if ((mirror_weights == false && flip_vgroups == false) ||
-      (BLI_findlink(&ob->defbase, def_nr) == NULL)) {
+      (BLI_findlink(defbase, def_nr) == NULL)) {
     return;
   }
 
@@ -2569,7 +2584,8 @@ cleanup:
 
 static void vgroup_delete_active(Object *ob)
 {
-  bDeformGroup *dg = BLI_findlink(&ob->defbase, ob->actdef - 1);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  bDeformGroup *dg = BLI_findlink(defbase, ob->actdef - 1);
   if (!dg) {
     return;
   }
@@ -2582,7 +2598,8 @@ static void vgroup_assign_verts(Object *ob, const float weight)
 {
   const int def_nr = ob->actdef - 1;
 
-  if (!BLI_findlink(&ob->defbase, def_nr)) {
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  if (!BLI_findlink(defbase, def_nr)) {
     return;
   }
 
@@ -2700,7 +2717,8 @@ static bool vertex_group_poll_ex(bContext *C, Object *ob)
     return false;
   }
 
-  if (BLI_listbase_is_empty(&ob->defbase)) {
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  if (BLI_listbase_is_empty(defbase)) {
     CTX_wm_operator_poll_msg_set(C, "Object has no vertex groups");
     return false;
   }
@@ -2824,7 +2842,8 @@ static bool vertex_group_vert_select_unlocked_poll(bContext *C)
   }
 
   if (ob->actdef != 0) {
-    bDeformGroup *dg = BLI_findlink(&ob->defbase, ob->actdef - 1);
+    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    const bDeformGroup *dg = BLI_findlink(defbase, ob->actdef - 1);
     if (dg) {
       return !(dg->flag & DG_LOCK_WEIGHT);
     }
@@ -3025,8 +3044,8 @@ static int vertex_group_remove_from_exec(bContext *C, wmOperator *op)
     }
   }
   else {
-    bDeformGroup *dg = BLI_findlink(&ob->defbase, ob->actdef - 1);
-
+    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    bDeformGroup *dg = BLI_findlink(defbase, ob->actdef - 1);
     if ((dg == NULL) || (BKE_object_defgroup_clear(ob, dg, !use_all_verts) == false)) {
       return OPERATOR_CANCELLED;
     }
@@ -3860,55 +3879,6 @@ void OBJECT_OT_vertex_group_mirror(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Vertex Group Copy to Linked Operator
- * \{ */
-
-static int vertex_group_copy_to_linked_exec(bContext *C, wmOperator *UNUSED(op))
-{
-  Scene *scene = CTX_data_scene(C);
-  Object *ob_active = ED_object_context(C);
-  int retval = OPERATOR_CANCELLED;
-
-  FOREACH_SCENE_OBJECT_BEGIN (scene, ob_iter) {
-    if (ob_iter->type == ob_active->type) {
-      if (ob_iter != ob_active && ob_iter->data == ob_active->data) {
-        BLI_freelistN(&ob_iter->defbase);
-        BLI_duplicatelist(&ob_iter->defbase, &ob_active->defbase);
-        ob_iter->actdef = ob_active->actdef;
-
-        DEG_id_tag_update(&ob_iter->id, ID_RECALC_GEOMETRY);
-        WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob_iter);
-        WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, ob_iter->data);
-
-        retval = OPERATOR_FINISHED;
-      }
-    }
-  }
-  FOREACH_SCENE_OBJECT_END;
-
-  return retval;
-}
-
-void OBJECT_OT_vertex_group_copy_to_linked(wmOperatorType *ot)
-{
-  /* identifiers */
-  ot->name = "Copy Vertex Groups to Linked";
-  ot->idname = "OBJECT_OT_vertex_group_copy_to_linked";
-  ot->description =
-      "Replace vertex groups of all users of the same geometry data by vertex groups of active "
-      "object";
-
-  /* api callbacks */
-  ot->poll = vertex_group_poll;
-  ot->exec = vertex_group_copy_to_linked_exec;
-
-  /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Vertex Group Copy to Selected Operator
  * \{ */
 
@@ -3999,7 +3969,8 @@ static const EnumPropertyItem *vgroup_itemf(bContext *C,
     return DummyRNA_NULL_items;
   }
 
-  for (a = 0, def = ob->defbase.first; def; def = def->next, a++) {
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  for (a = 0, def = defbase->first; def; def = def->next, a++) {
     tmp.value = a;
     tmp.icon = ICON_GROUP_VERTEX;
     tmp.identifier = def->name;
@@ -4048,13 +4019,13 @@ void OBJECT_OT_vertex_group_set_active(wmOperatorType *ot)
  * with the order of vgroups then call vgroup_do_remap after */
 static char *vgroup_init_remap(Object *ob)
 {
-  bDeformGroup *def;
-  int defbase_tot = BLI_listbase_count(&ob->defbase);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  int defbase_tot = BLI_listbase_count(defbase);
   char *name_array = MEM_mallocN(MAX_VGROUP_NAME * sizeof(char) * defbase_tot, "sort vgroups");
   char *name;
 
   name = name_array;
-  for (def = ob->defbase.first; def; def = def->next) {
+  for (const bDeformGroup *def = defbase->first; def; def = def->next) {
     BLI_strncpy(name, def->name, MAX_VGROUP_NAME);
     name += MAX_VGROUP_NAME;
   }
@@ -4065,8 +4036,9 @@ static char *vgroup_init_remap(Object *ob)
 static int vgroup_do_remap(Object *ob, const char *name_array, wmOperator *op)
 {
   MDeformVert *dvert = NULL;
-  bDeformGroup *def;
-  int defbase_tot = BLI_listbase_count(&ob->defbase);
+  const bDeformGroup *def;
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  int defbase_tot = BLI_listbase_count(defbase);
 
   /* needs a dummy index at the start*/
   int *sort_map_update = MEM_mallocN(sizeof(int) * (defbase_tot + 1), "sort vgroups");
@@ -4076,8 +4048,8 @@ static int vgroup_do_remap(Object *ob, const char *name_array, wmOperator *op)
   int i;
 
   name = name_array;
-  for (def = ob->defbase.first, i = 0; def; def = def->next, i++) {
-    sort_map[i] = BLI_findstringindex(&ob->defbase, name, offsetof(bDeformGroup, name));
+  for (def = defbase->first, i = 0; def; def = def->next, i++) {
+    sort_map[i] = BLI_findstringindex(defbase, name, offsetof(bDeformGroup, name));
     name += MAX_VGROUP_NAME;
 
     BLI_assert(sort_map[i] != -1);
@@ -4159,6 +4131,7 @@ static void vgroup_sort_bone_hierarchy(Object *ob, ListBase *bonebase)
       bonebase = &armature->bonebase;
     }
   }
+  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
 
   if (bonebase != NULL) {
     Bone *bone;
@@ -4167,8 +4140,8 @@ static void vgroup_sort_bone_hierarchy(Object *ob, ListBase *bonebase)
       vgroup_sort_bone_hierarchy(ob, &bone->childbase);
 
       if (dg != NULL) {
-        BLI_remlink(&ob->defbase, dg);
-        BLI_addhead(&ob->defbase, dg);
+        BLI_remlink(defbase, dg);
+        BLI_addhead(defbase, dg);
       }
     }
   }
@@ -4189,10 +4162,12 @@ static int vertex_group_sort_exec(bContext *C, wmOperator *op)
   /*init remapping*/
   name_array = vgroup_init_remap(ob);
 
+  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+
   /*sort vgroup names*/
   switch (sort_type) {
     case SORT_TYPE_NAME:
-      BLI_listbase_sort(&ob->defbase, vgroup_sort_name);
+      BLI_listbase_sort(defbase, vgroup_sort_name);
       break;
     case SORT_TYPE_BONEHIERARCHY:
       vgroup_sort_bone_hierarchy(ob, NULL);
@@ -4250,14 +4225,16 @@ static int vgroup_move_exec(bContext *C, wmOperator *op)
   int dir = RNA_enum_get(op->ptr, "direction");
   int ret = OPERATOR_FINISHED;
 
-  def = BLI_findlink(&ob->defbase, ob->actdef - 1);
+  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+
+  def = BLI_findlink(defbase, ob->actdef - 1);
   if (!def) {
     return OPERATOR_CANCELLED;
   }
 
   name_array = vgroup_init_remap(ob);
 
-  if (BLI_listbase_link_move(&ob->defbase, def, dir)) {
+  if (BLI_listbase_link_move(defbase, def, dir)) {
     ret = vgroup_do_remap(ob, name_array, op);
 
     if (ret != OPERATOR_CANCELLED) {
@@ -4376,7 +4353,8 @@ static void vgroup_copy_active_to_sel_single(Object *ob, const int def_nr)
 
 static bool check_vertex_group_accessible(wmOperator *op, Object *ob, int def_nr)
 {
-  bDeformGroup *dg = BLI_findlink(&ob->defbase, def_nr);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  bDeformGroup *dg = BLI_findlink(defbase, def_nr);
 
   if (!dg) {
     BKE_report(op->reports, RPT_ERROR, "Invalid vertex group index");

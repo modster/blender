@@ -728,6 +728,16 @@ static const EnumPropertyItem *rna_Object_parent_type_itemf(bContext *UNUSED(C),
   return item;
 }
 
+static void rna_Object_vertex_groups_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+  Object *ob = (Object *)ptr->data;
+
+  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+  iter->valid = defbase != NULL;
+
+  rna_iterator_listbase_begin(iter, defbase, NULL);
+}
+
 static void rna_Object_empty_display_type_set(PointerRNA *ptr, int value)
 {
   Object *ob = (Object *)ptr->data;
@@ -802,14 +812,16 @@ static int rna_VertexGroup_index_get(PointerRNA *ptr)
 {
   Object *ob = (Object *)ptr->owner_id;
 
-  return BLI_findindex(&ob->defbase, ptr->data);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  return BLI_findindex(defbase, ptr->data);
 }
 
 static PointerRNA rna_Object_active_vertex_group_get(PointerRNA *ptr)
 {
   Object *ob = (Object *)ptr->owner_id;
-  return rna_pointer_inherit_refine(
-      ptr, &RNA_VertexGroup, BLI_findlink(&ob->defbase, ob->actdef - 1));
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+
+  return rna_pointer_inherit_refine(ptr, &RNA_VertexGroup, BLI_findlink(defbase, ob->actdef - 1));
 }
 
 static void rna_Object_active_vertex_group_set(PointerRNA *ptr,
@@ -817,7 +829,8 @@ static void rna_Object_active_vertex_group_set(PointerRNA *ptr,
                                                struct ReportList *reports)
 {
   Object *ob = (Object *)ptr->owner_id;
-  int index = BLI_findindex(&ob->defbase, value.data);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  int index = BLI_findindex(defbase, value.data);
   if (index == -1) {
     BKE_reportf(reports,
                 RPT_ERROR,
@@ -848,7 +861,8 @@ static void rna_Object_active_vertex_group_index_range(
   Object *ob = (Object *)ptr->owner_id;
 
   *min = 0;
-  *max = max_ii(0, BLI_listbase_count(&ob->defbase) - 1);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  *max = max_ii(0, BLI_listbase_count(defbase) - 1);
 }
 
 void rna_object_vgroup_name_index_get(PointerRNA *ptr, char *value, int index)
@@ -856,7 +870,8 @@ void rna_object_vgroup_name_index_get(PointerRNA *ptr, char *value, int index)
   Object *ob = (Object *)ptr->owner_id;
   bDeformGroup *dg;
 
-  dg = BLI_findlink(&ob->defbase, index - 1);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  dg = BLI_findlink(defbase, index - 1);
 
   if (dg) {
     BLI_strncpy(value, dg->name, sizeof(dg->name));
@@ -871,7 +886,8 @@ int rna_object_vgroup_name_index_length(PointerRNA *ptr, int index)
   Object *ob = (Object *)ptr->owner_id;
   bDeformGroup *dg;
 
-  dg = BLI_findlink(&ob->defbase, index - 1);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  dg = BLI_findlink(defbase, index - 1);
   return (dg) ? strlen(dg->name) : 0;
 }
 
@@ -1958,7 +1974,9 @@ static void rna_Object_vgroup_remove(Object *ob,
                                      PointerRNA *defgroup_ptr)
 {
   bDeformGroup *defgroup = defgroup_ptr->data;
-  if (BLI_findindex(&ob->defbase, defgroup) == -1) {
+  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+
+  if (BLI_findindex(defbase, defgroup) == -1) {
     BKE_reportf(reports,
                 RPT_ERROR,
                 "DeformGroup '%s' not in object '%s'",
@@ -3272,7 +3290,15 @@ static void rna_def_object(BlenderRNA *brna)
 
   /* vertex groups */
   prop = RNA_def_property(srna, "vertex_groups", PROP_COLLECTION, PROP_NONE);
-  RNA_def_property_collection_sdna(prop, NULL, "defbase", NULL);
+  RNA_def_property_collection_funcs(prop,
+                                    "rna_Object_vertex_groups_begin",
+                                    "rna_iterator_listbase_next",
+                                    "rna_iterator_listbase_end",
+                                    "rna_iterator_listbase_get",
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    NULL);
   RNA_def_property_struct_type(prop, "VertexGroup");
   RNA_def_property_override_clear_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
   RNA_def_property_ui_text(prop, "Vertex Groups", "Vertex groups of the object");

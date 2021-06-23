@@ -478,7 +478,8 @@ void ED_object_vgroup_calc_from_armature(ReportList *reports,
   bArmature *arm = par->data;
 
   if (mode == ARM_GROUPS_NAME) {
-    const int defbase_tot = BLI_listbase_count(&ob->defbase);
+    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    const int defbase_tot = BLI_listbase_count(defbase);
     int defbase_add;
     /* Traverse the bone list, trying to create empty vertex
      * groups corresponding to the bone.

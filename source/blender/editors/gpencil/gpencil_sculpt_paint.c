@@ -1178,7 +1178,7 @@ static bool gpencil_sculpt_brush_init(bContext *C, wmOperator *op)
   if (ob) {
     invert_m4_m4(gso->inv_mat, ob->obmat);
     gso->vrgroup = ob->actdef - 1;
-    if (!BLI_findlink(&ob->defbase, gso->vrgroup)) {
+    if (!BLI_findlink(&gso->gpd->vertex_group_names, gso->vrgroup)) {
       gso->vrgroup = -1;
     }
     /* Check if some modifier can transform the stroke. */

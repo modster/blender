@@ -127,7 +127,8 @@ static void compute_vertex_mask__armature_mode(MDeformVert *dvert,
   /* Element i is true if there is a selected bone that uses vertex group i. */
   Vector<bool> selected_bone_uses_group;
 
-  for (bDeformGroup *def : ListBaseWrapper<bDeformGroup>(ob->defbase)) {
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  LISTBASE_FOREACH (bDeformGroup *, def, defbase) {
     bPoseChannel *pchan = BKE_pose_channel_find_name(armature_ob->pose, def->name);
     bool bone_for_group_exists = pchan && pchan->bone && (pchan->bone->flag & BONE_SELECTED);
     selected_bone_uses_group.append(bone_for_group_exists);
@@ -338,8 +339,9 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   }
 
   /* Quick test to see if we can return early. */
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
   if (!(ELEM(mmd->mode, MOD_MASK_MODE_ARM, MOD_MASK_MODE_VGROUP)) || (mesh->totvert == 0) ||
-      BLI_listbase_is_empty(&ob->defbase)) {
+      BLI_listbase_is_empty(defbase)) {
     return mesh;
   }
 
@@ -348,7 +350,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     Object *armature_ob = mmd->ob_arm;
 
     /* Return input mesh if there is no armature with bones. */
-    if (ELEM(NULL, armature_ob, armature_ob->pose, ob->defbase.first)) {
+    if (ELEM(NULL, armature_ob, armature_ob->pose, defbase->first)) {
       return mesh;
     }
 

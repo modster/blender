@@ -502,9 +502,10 @@ static void armature_deform_coords_impl(const Object *ob_arm,
 
   /* get the def_nr for the overall armature vertex group if present */
   armature_def_nr = BKE_object_defgroup_name_index(ob_target, defgrp_name);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob_target);
 
   if (ELEM(ob_target->type, OB_MESH, OB_LATTICE, OB_GPENCIL)) {
-    defbase_len = BLI_listbase_count(&ob_target->defbase);
+    defbase_len = BLI_listbase_count(defbase);
 
     if (ob_target->type == OB_MESH) {
       if (em_target == NULL) {
@@ -551,7 +552,7 @@ static void armature_deform_coords_impl(const Object *ob_arm,
          *
          * - Check whether keeping this consistent across frames gives speedup.
          */
-        for (i = 0, dg = ob_target->defbase.first; dg; i++, dg = dg->next) {
+        for (i = 0, dg = defbase->first; dg; i++, dg = dg->next) {
           pchan_from_defbase[i] = BKE_pose_channel_find_name(ob_arm->pose, dg->name);
           /* exclude non-deforming bones */
           if (pchan_from_defbase[i]) {

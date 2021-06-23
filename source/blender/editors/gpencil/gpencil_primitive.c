@@ -1316,7 +1316,8 @@ static void gpencil_primitive_interaction_end(bContext *C,
   BrushGpencilSettings *brush_settings = brush->gpencil_settings;
 
   const int def_nr = tgpi->ob->actdef - 1;
-  const bool have_weight = (bool)BLI_findlink(&tgpi->ob->defbase, def_nr);
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(tgpi->ob);
+  const bool have_weight = (bool)BLI_findlink(defbase, def_nr);
 
   /* return to normal cursor and header status */
   ED_workspace_status_text(C, NULL);

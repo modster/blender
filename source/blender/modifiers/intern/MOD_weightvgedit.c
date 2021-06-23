@@ -194,7 +194,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   /* Check if we can just return the original mesh.
    * Must have verts and therefore verts assigned to vgroups to do anything useful!
    */
-  if ((numVerts == 0) || BLI_listbase_is_empty(&ctx->object->defbase)) {
+  const ListBase *defbase = BKE_object_defgroup_list_for_read(ctx->object);
+  if ((numVerts == 0) || BLI_listbase_is_empty(defbase)) {
     return mesh;
   }
 

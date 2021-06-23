@@ -215,7 +215,7 @@ static int weight_sample_invoke(bContext *C, wmOperator *op, const wmEvent *even
       Brush *brush = BKE_paint_brush(&ts->wpaint->paint);
       const int vgroup_active = vc.obact->actdef - 1;
       float vgroup_weight = BKE_defvert_find_weight(&me->dvert[v_idx_best], vgroup_active);
-      const int defbase_tot = BLI_listbase_count(&vc.obact->defbase);
+      const int defbase_tot = BLI_listbase_count(&me->vertex_group_names);
       bool use_lock_relative = ts->wpaint_lock_relative;
       bool *defbase_locked = NULL, *defbase_unlocked = NULL;
 
@@ -331,8 +331,8 @@ static const EnumPropertyItem *weight_paint_sample_enum_itemf(bContext *C,
       ED_view3d_viewcontext_init(C, &vc, depsgraph);
       me = BKE_mesh_from_object(vc.obact);
 
-      if (me && me->dvert && vc.v3d && vc.rv3d && vc.obact->defbase.first) {
-        const int defbase_tot = BLI_listbase_count(&vc.obact->defbase);
+      if (me && me->dvert && vc.v3d && vc.rv3d && me->vertex_group_names.first) {
+        const int defbase_tot = BLI_listbase_count(&me->vertex_group_names);
         const bool use_vert_sel = (me->editflag & ME_EDIT_PAINT_VERT_SEL) != 0;
         int *groups = MEM_callocN(defbase_tot * sizeof(int), "groups");
         bool found = false;
@@ -372,7 +372,7 @@ static const EnumPropertyItem *weight_paint_sample_enum_itemf(bContext *C,
           int totitem = 0;
           int i = 0;
           bDeformGroup *dg;
-          for (dg = vc.obact->defbase.first; dg && i < defbase_tot; i++, dg = dg->next) {
+          for (dg = me->vertex_group_names.first; dg && i < defbase_tot; i++, dg = dg->next) {
             if (groups[i]) {
               item_tmp.identifier = item_tmp.name = dg->name;
               item_tmp.value = i;
@@ -863,7 +863,7 @@ static int paint_weight_gradient_exec(bContext *C, wmOperator *op)
   }
 
   if (scene->toolsettings->auto_normalize) {
-    const int vgroup_num = BLI_listbase_count(&ob->defbase);
+    const int vgroup_num = BLI_listbase_count(&me->vertex_group_names);
     bool *vgroup_validmap = BKE_object_defgroup_validmap_get(ob, vgroup_num);
     if (vgroup_validmap != NULL) {
       MDeformVert *dvert = me->dvert;

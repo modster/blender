@@ -29,11 +29,15 @@
 #include "DNA_armature_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_genfile.h"
+#include "DNA_gpencil_types.h"
+#include "DNA_lattice_types.h"
 #include "DNA_listBase.h"
+#include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
 
 #include "BKE_animsys.h"
+#include "BKE_deform.h"
 #include "BKE_fcurve_driver.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -83,6 +87,35 @@ static void assert_sorted_ids(Main *bmain)
 #endif
 }
 
+static void move_vertex_group_names_to_object_data(Main *bmain)
+{
+  LISTBASE_FOREACH (Mesh *, mesh, &bmain->meshes) {
+    BLI_listbase_clear(&mesh->vertex_group_names);
+  }
+  LISTBASE_FOREACH (Lattice *, lattice, &bmain->lattices) {
+    BLI_listbase_clear(&lattice->vertex_group_names);
+  }
+  LISTBASE_FOREACH (bGPdata *, gpd, &bmain->gpencils) {
+    BLI_listbase_clear(&gpd->vertex_group_names);
+  }
+  LISTBASE_FOREACH (Object *, object, &bmain->objects) {
+    if (ELEM(object->type, OB_MESH, OB_LATTICE, OB_GPENCIL)) {
+      ListBase *new_defbase = BKE_object_defgroup_list_for_write(object);
+
+      LISTBASE_FOREACH (bDeformGroup *, defgroup, new_defbase) {
+        printf("Freeing defgroup %p\n", defgroup);
+      }
+
+      BLI_freelistN(new_defbase);
+      BKE_defgroup_copy_list(new_defbase, &object->defbase);
+      BLI_freelistN(&object->defbase);
+
+      // *new_defbase = object->defbase;
+      // BLI_listbase_clear(&object->defbase);
+    }
+  }
+}
+
 void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
 {
   if (MAIN_VERSION_ATLEAST(bmain, 300, 0) && !MAIN_VERSION_ATLEAST(bmain, 300, 1)) {
@@ -124,6 +157,10 @@ void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
   }
   if (MAIN_VERSION_ATLEAST(bmain, 300, 3)) {
     assert_sorted_ids(bmain);
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 5)) {
+    move_vertex_group_names_to_object_data(bmain);
   }
 
   /**
