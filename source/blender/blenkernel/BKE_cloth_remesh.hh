@@ -464,20 +464,44 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
   /* all public static methods */
   /* all public non-static methods */
+  const auto &get_nodes() const
+  {
+    return this->nodes;
+  }
+
+  const auto &get_verts() const
+  {
+    return this->verts;
+  }
+
+  const auto &get_edges() const
+  {
+    return this->edges;
+  }
+
+  const auto &get_faces() const
+  {
+    return this->faces;
+  }
+
   std::optional<EdgeIndex> get_connecting_edge_index(VertIndex vert_1_index,
                                                      VertIndex vert_2_index)
   {
-    auto vert_1 = this->verts.get(vert_1_index);
-    if (vert_1 == std::nullopt) {
+    auto op_vert_1 = this->verts.get(vert_1_index);
+    if (op_vert_1 == std::nullopt) {
       return std::nullopt;
     }
 
-    for (const auto &edge_index : vert_1.edges) {
-      auto edge = this->edges.get(edge_index);
+    auto vert_1 = op_vert_1.value().get();
 
-      if (edge == std::nullopt) {
+    for (const auto &edge_index : vert_1.edges) {
+      auto op_edge = this->edges.get(edge_index);
+
+      if (op_edge == std::nullopt) {
         return std::nullopt;
       }
+
+      auto edge = op_edge.value().get();
 
       if (edge.has_vert(vert_2_index)) {
         return edge_index;
@@ -487,12 +511,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return std::nullopt;
   }
 
-  void read_obj(const fs::path &filepath)
+  void read(const MeshReader &reader)
   {
-    MeshReader reader;
-    const auto reader_success = reader.read(filepath, MeshReader::FILETYPE_OBJ);
-    BLI_assert(reader_success); /* must successfully load obj */
-
     const auto positions = reader.get_positions();
     const auto uvs = reader.get_uvs();
     const auto normals = reader.get_normals();
@@ -521,9 +541,12 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
       /* update verts and nodes */
       for (const auto &[pos_index, uv_index, normal_index] : face_index_data) {
-        auto vert = this->verts.get_no_gen(uv_index);
-        auto node = this->node.get_no_gen(pos_index);
-        BLI_assert(vert && node);
+        auto op_vert = this->verts.get_no_gen(uv_index);
+        auto op_node = this->nodes.get_no_gen(pos_index);
+        BLI_assert(op_vert && op_node);
+
+        auto vert = op_vert.value().get();
+        auto node = op_node.value().get();
 
         vert.node = node.self_index;
         node.verts.append(vert.self_index);
@@ -535,35 +558,38 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
 
       /* update edges */
-      auto vert_1_i = face_index_data[0];
-      auto vert_2_i = face_index_data[0];
+      auto vert_1_i = std::get<1>(face_index_data[0]);
+      auto vert_2_i = std::get<1>(face_index_data[0]);
       blender::Vector<VertIndex> face_verts;
       blender::Vector<EdgeIndex> face_edges;
       for (auto i = 1; i <= face_index_data.size(); i++) {
         vert_1_i = vert_2_i;
         if (i == face_index_data.size()) {
-          vert_2_i = face_index_data[0];
+          vert_2_i = std::get<1>(face_index_data[0]);
         }
         else {
-          vert_2_i = face_index_data[i];
+          vert_2_i = std::get<1>(face_index_data[i]);
         }
 
-        auto vert_1_index = this->verts.get_no_gen_index(vert_1_i);
-        auto vert_2_index = this->verts.get_no_gen_index(vert_2_i);
-        BLI_assert(vert_1_index && vert_2_index);
+        auto op_vert_1_index = this->verts.get_no_gen_index(vert_1_i);
+        auto op_vert_2_index = this->verts.get_no_gen_index(vert_2_i);
+        BLI_assert(op_vert_1_index && op_vert_2_index);
 
-        if (auto edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index)) {
-          face_edges.append(edge_index);
+        auto vert_1_index = op_vert_1_index.value();
+        auto vert_2_index = op_vert_2_index.value();
+
+        if (auto op_edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index)) {
+          face_edges.append(op_edge_index.value());
         }
         else {
           auto edge = this->add_empty_edge();
 
           edge.verts = std::make_tuple(vert_1_index, vert_2_index);
 
-          auto vert_1 = this->verts.get(vert_1_index);
+          auto vert_1 = this->verts.get(vert_1_index).value().get();
           vert_1.edges.append(edge.self_index);
 
-          auto vert_2 = this->verts.get(vert_2_index);
+          auto vert_2 = this->verts.get(vert_2_index).value().get();
           vert_2.edges.append(edge.self_index);
 
           face_edges.append(edge.self_index);
@@ -577,15 +603,26 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         face.verts = face_verts;
 
         for (const auto &edge_index : face_edges) {
-          auto edge = this->edges.get(edge_index);
-          BLI_assert(edge);
+          auto op_edge = this->edges.get(edge_index);
+          BLI_assert(op_edge);
 
-          edge.faces.push(face.self_index);
+          auto edge = op_edge.value().get();
+
+          edge.faces.append(face.self_index);
         }
       }
     }
 
     /* TODO(ish): add support for lines */
+  }
+
+  void read_obj(const fs::path &filepath)
+  {
+    MeshReader reader;
+    const auto reader_success = reader.read(filepath, MeshReader::FILETYPE_OBJ);
+    BLI_assert(reader_success); /* must successfully load obj */
+
+    this->read(reader);
   }
 
  protected:
@@ -610,7 +647,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto node_index = this->nodes.insert_with(
         [=](NodeIndex index) { return Node<END>(index, pos, normal); });
 
-    return this->nodes.get(node_index);
+    return this->nodes.get(node_index).value().get();
   }
 
   Vert<EVD> &add_empty_vert(float2 uv)
@@ -618,14 +655,14 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto vert_index = this->verts.insert_with(
         [=](VertIndex index) { return Vert<EVD>(index, uv); });
 
-    return this->verts.get(vert_index);
+    return this->verts.get(vert_index).value().get();
   }
 
   Edge<EED> &add_empty_edge()
   {
     auto edge_index = this->edges.insert_with([=](EdgeIndex index) { return Edge<EED>(index); });
 
-    return this->edges.get(edge_index);
+    return this->edges.get(edge_index).value().get();
   }
 
   Face<EFD> &add_empty_face(float3 normal)
@@ -633,7 +670,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto face_index = this->faces.insert_with(
         [=](FaceIndex index) { return Face<EFD>(index, normal); });
 
-    return this->faces.get(face_index);
+    return this->faces.get(face_index).value().get();
   }
 };
 
