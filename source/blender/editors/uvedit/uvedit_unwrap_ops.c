@@ -1197,6 +1197,7 @@ static int pack_islands_to_area_exec(bContext *C, wmOperator *op)
    * visible in the UV editor
    * NOTE : Could be removed/changed */
   if ((max_co[0] - min_co[0]) <= 0.001f || (max_co[1] - min_co[1]) <= 0.001f) {
+    MEM_freeN(objects);
     return OPERATOR_CANCELLED;
   }
 
