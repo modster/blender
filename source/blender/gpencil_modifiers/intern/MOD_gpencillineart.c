@@ -418,6 +418,7 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "floating_as_contour", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_multiple_edge_types", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "use_crease_on_smooth", 0, IFACE_("Crease On Smooth"), ICON_NONE);
 }
 
 static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)

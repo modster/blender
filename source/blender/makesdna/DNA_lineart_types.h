@@ -57,6 +57,7 @@ typedef enum eLineartMainFlags {
   LRT_CHAIN_GEOMETRY_SPACE = (1 << 12),
   LRT_ALLOW_MULTIPLE_EDGE_TYPES = (1 << 13),
   LRT_USE_CUSTOM_CAMERA = (1 << 14),
+  LRT_USE_CREASE_ON_SMOOTH_SURFACES = (1 << 15),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {

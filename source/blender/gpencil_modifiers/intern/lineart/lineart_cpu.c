@@ -1455,7 +1455,8 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
                                               LineartTriangle *rt_array,
                                               LineartVert *rv_array,
                                               float crease_threshold,
-                                              bool no_crease,
+                                              bool force_crease,
+                                              bool use_auto_smooth,
                                               bool use_freestyle_edge,
                                               bool use_freestyle_face,
                                               BMesh *bm_if_freestyle)
@@ -1563,10 +1564,15 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     }
   }
 
-  if (rb->use_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
-    if (!no_crease) {
-      edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+  bool do_crease = true;
+  if (!force_crease &&
+      (BM_elem_flag_test(ll->f, BM_ELEM_SMOOTH) && BM_elem_flag_test(lr->f, BM_ELEM_SMOOTH))) {
+    if (!use_auto_smooth) {
+      do_crease = false;
     }
+  }
+  if (do_crease && rb->use_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
+    edge_flag_result |= LRT_EDGE_FLAG_CREASE;
   }
   else if (rb->use_material && (ll->f->mat_nr != lr->f->mat_nr)) {
     edge_flag_result |= LRT_EDGE_FLAG_MATERIAL;
@@ -1707,6 +1713,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   Object *orig_ob;
   bool can_find_freestyle_edge = false;
   bool can_find_freestyle_face = false;
+  bool use_auto_smooth = obi->original_me->flag & ME_AUTOSMOOTH;
+  bool force_crease = rb->force_crease;
   int i;
   float use_crease = 0;
 
@@ -1789,6 +1797,9 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   }
   else {
     use_crease = rb->crease_threshold;
+    if (use_auto_smooth) {
+      use_crease = cos(obi->original_me->smoothresh);
+    }
   }
 
   /* FIXME(Yiming): Hack for getting clean 3D text, the seam that extruded text object creates
@@ -1879,7 +1890,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
                                                    ort,
                                                    orv,
                                                    use_crease,
-                                                   orig_ob->type == OB_FONT,
+                                                   force_crease,
+                                                   use_auto_smooth,
                                                    can_find_freestyle_edge,
                                                    can_find_freestyle_face,
                                                    bm);
@@ -3126,6 +3138,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
 
   rb->allow_duplicated_types = (lmd->calculation_flags & LRT_ALLOW_MULTIPLE_EDGE_TYPES) != 0;
+
+  rb->force_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SMOOTH_SURFACES) != 0;
 
   int16_t edge_types = lmd->edge_types_override;
 
