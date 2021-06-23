@@ -65,7 +65,7 @@
 
 #include "lineart_intern.h"
 
-#define LINEART_WITH_BVH
+//#define LINEART_WITH_BVH
 #define LINEART_WITH_BVH_THREAD
 #define LINEART_BVH_OWN_ISEC
 
@@ -2977,6 +2977,8 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
       continue;
     }
 
+    rb->debug_triangle_isec_test_count++;
+
     /* If we do need to compute intersection, then finally do it. */
     lineart_triangle_intersect(rb, tri, testing_triangle);
   }
@@ -4056,6 +4058,7 @@ typedef struct LineartIsecThread {
   LineartIsecSingle *array;
   int current;
   int max;
+  int count_test;
 } LineartIsecThread;
 typedef struct LineartIsecData {
   LineartRenderBuffer *rb;
@@ -4130,6 +4133,8 @@ static bool lineart_bvh_isec_callback(void *userdata, int index_a, int index_b, 
   if (lineart_triangle_share_edge(tri1, tri2)) {
     return false;
   }
+
+  d->threads[thread].count_test++;
 
 #ifdef LINEART_BVH_OWN_ISEC
   float e1[3], e2[3];
@@ -4226,6 +4231,14 @@ static void lineart_do_intersections(LineartRenderBuffer *rb)
 
   BVHTreeOverlap *overlap = BLI_bvhtree_overlap(
       rb->bvh_main, rb->bvh_main, &overlap_tot, lineart_bvh_isec_callback, &d);
+
+  if (G.debug_value == 4000) {
+    int total_test_count = 0;
+    for (int i = 0; i < rb->thread_count; i++) {
+      total_test_count += d.threads[i].count_test;
+    }
+    printf("BVH has done %d pairs.\n", total_test_count);
+  }
 
   lineart_create_edges_from_isec_data(&d);
   lineart_destroy_isec_thread(&d);
@@ -4611,6 +4624,10 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
 #ifdef LINEART_WITH_BVH
   lineart_do_intersections(rb);
+#else
+  if (G.debug_value == 4000) {
+    printf("Legacy triangle isec pairs: %d\n", rb->debug_triangle_isec_test_count);
+  }
 #endif
 
   /* Link lines to acceleration structure, this can only be done after perspective division, if

@@ -347,6 +347,8 @@ typedef struct LineartRenderBuffer {
   struct Collection *_source_collection;
   struct Object *_source_object;
 
+  int debug_triangle_isec_test_count;
+
 } LineartRenderBuffer;
 
 typedef struct LineartCache {
