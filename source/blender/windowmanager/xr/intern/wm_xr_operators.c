@@ -216,13 +216,13 @@ static void orient_mat_z_normalized(float R[4][4], const float z_axis[3])
   mul_v3_v3fl(R[2], z_axis, scale);
 }
 
-static void wm_xr_grab_navlocks_apply(const float nav_mat[4][4],
-                                      const float nav_inv[4][4],
-                                      bool loc_lock,
-                                      bool locz_lock,
-                                      bool rotz_lock,
-                                      float r_prev[4][4],
-                                      float r_curr[4][4])
+static void wm_xr_navlocks_apply(const float nav_mat[4][4],
+                                 const float nav_inv[4][4],
+                                 bool loc_lock,
+                                 bool locz_lock,
+                                 bool rotz_lock,
+                                 float r_prev[4][4],
+                                 float r_curr[4][4])
 {
   /* Locked in base pose coordinates. */
   float prev_base[4][4], curr_base[4][4];
@@ -283,7 +283,7 @@ static void wm_xr_grab_compute(const wmXrActionData *actiondata,
   }
 
   if (nav_lock) {
-    wm_xr_grab_navlocks_apply(nav_mat, nav_inv, loc_lock, locz_lock, rotz_lock, prev, curr);
+    wm_xr_navlocks_apply(nav_mat, nav_inv, loc_lock, locz_lock, rotz_lock, prev, curr);
   }
 
   if (reverse) {
@@ -376,7 +376,7 @@ static void wm_xr_grab_compute_bimanual(const wmXrActionData *actiondata,
   }
 
   if (nav_lock) {
-    wm_xr_grab_navlocks_apply(nav_mat, nav_inv, loc_lock, locz_lock, rotz_lock, prev, curr);
+    wm_xr_navlocks_apply(nav_mat, nav_inv, loc_lock, locz_lock, rotz_lock, prev, curr);
   }
 
   if (reverse) {
@@ -703,6 +703,356 @@ static void wm_xr_raycast(Depsgraph *depsgraph,
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name XR Navigation Fly
+ *
+ * Navigates the scene by moving/turning relative to navigation space or the XR viewer or
+ * controller.
+ * \{ */
+
+#define XR_DEFAULT_FLY_SPEED_MOVE 0.054f
+#define XR_DEFAULT_FLY_SPEED_TURN 0.03f
+
+typedef enum eXrFlyMode {
+  XR_FLY_FORWARD = 0,
+  XR_FLY_BACK = 1,
+  XR_FLY_LEFT = 2,
+  XR_FLY_RIGHT = 3,
+  XR_FLY_UP = 4,
+  XR_FLY_DOWN = 5,
+  XR_FLY_TURNLEFT = 6,
+  XR_FLY_TURNRIGHT = 7,
+  XR_FLY_VIEWER_FORWARD = 8,
+  XR_FLY_VIEWER_BACK = 9,
+  XR_FLY_VIEWER_LEFT = 10,
+  XR_FLY_VIEWER_RIGHT = 11,
+  XR_FLY_CONTROLLER_FORWARD = 12,
+} eXrFlyMode;
+
+static void wm_xr_fly_compute_move(eXrFlyMode mode,
+                                   float speed,
+                                   const float ref_quat[4],
+                                   const float nav_mat[4][4],
+                                   bool locz_lock,
+                                   float r_delta[4][4])
+{
+  float ref_axes[3][3];
+  quat_to_mat3(ref_axes, ref_quat);
+
+  unit_m4(r_delta);
+
+  switch (mode) {
+    /* Navigation space reference. */
+    case XR_FLY_FORWARD:
+      madd_v3_v3fl(r_delta[3], ref_axes[1], speed);
+      return;
+    case XR_FLY_BACK:
+      madd_v3_v3fl(r_delta[3], ref_axes[1], -speed);
+      return;
+    case XR_FLY_LEFT:
+      madd_v3_v3fl(r_delta[3], ref_axes[0], -speed);
+      return;
+    case XR_FLY_RIGHT:
+      madd_v3_v3fl(r_delta[3], ref_axes[0], speed);
+      return;
+    case XR_FLY_UP:
+    case XR_FLY_DOWN:
+      if (!locz_lock) {
+        madd_v3_v3fl(r_delta[3], ref_axes[2], (mode == XR_FLY_UP) ? speed : -speed);
+      }
+      return;
+    /* Viewer/controller space reference. */
+    case XR_FLY_VIEWER_FORWARD:
+    case XR_FLY_CONTROLLER_FORWARD:
+      negate_v3_v3(r_delta[3], ref_axes[2]);
+      break;
+    case XR_FLY_VIEWER_BACK:
+      copy_v3_v3(r_delta[3], ref_axes[2]);
+      break;
+    case XR_FLY_VIEWER_LEFT:
+      negate_v3_v3(r_delta[3], ref_axes[0]);
+      break;
+    case XR_FLY_VIEWER_RIGHT:
+      copy_v3_v3(r_delta[3], ref_axes[0]);
+      break;
+    /* Unused. */
+    case XR_FLY_TURNLEFT:
+    case XR_FLY_TURNRIGHT:
+      BLI_assert_unreachable();
+      return;
+  }
+
+  if (locz_lock) {
+    /* Lock elevation in navigation space. */
+    float z_axis[3], projected[3];
+
+    normalize_v3_v3(z_axis, nav_mat[2]);
+    project_v3_v3v3_normalized(projected, r_delta[3], z_axis);
+    sub_v3_v3(r_delta[3], projected);
+
+    normalize_v3(r_delta[3]);
+  }
+
+  mul_v3_fl(r_delta[3], speed);
+}
+
+static void wm_xr_fly_compute_turn(eXrFlyMode mode,
+                                   float speed,
+                                   const float viewer_mat[4][4],
+                                   const float nav_mat[4][4],
+                                   const float nav_inv[4][4],
+                                   float r_delta[4][4])
+{
+  BLI_assert(mode == XR_FLY_TURNLEFT || mode == XR_FLY_TURNRIGHT);
+
+  float z_axis[3], m[3][3], prev[4][4], curr[4][4];
+
+  /* Turn around Z-axis in navigation space. */
+  normalize_v3_v3(z_axis, nav_mat[2]);
+  axis_angle_normalized_to_mat3(m, z_axis, (mode == XR_FLY_TURNLEFT) ? speed : -speed);
+  copy_m4_m3(r_delta, m);
+
+  copy_m4_m4(prev, viewer_mat);
+  mul_m4_m4m4(curr, r_delta, viewer_mat);
+
+  /* Lock location in base pose space. */
+  wm_xr_navlocks_apply(nav_mat, nav_inv, true, false, false, prev, curr);
+
+  invert_m4(prev);
+  mul_m4_m4m4(r_delta, curr, prev);
+}
+
+static void wm_xr_basenav_rotation_calc(const wmXrData *xr,
+                                        const float nav_rotation[4],
+                                        float r_rotation[4])
+{
+  /* Apply nav rotation to base pose Z-rotation. */
+  float base_eul[3], base_quatz[4];
+  quat_to_eul(base_eul, xr->runtime->session_state.prev_base_pose.orientation_quat);
+  axis_angle_to_quat_single(base_quatz, 'Z', base_eul[2]);
+  mul_qt_qtqt(r_rotation, nav_rotation, base_quatz);
+}
+
+static int wm_xr_navigation_fly_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  int retval = op->type->modal_3d(C, op, event);
+
+  if ((retval & OPERATOR_RUNNING_MODAL) != 0) {
+    WM_event_add_modal_handler(C, op);
+  }
+
+  return retval;
+}
+
+static int wm_xr_navigation_fly_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
+{
+  return OPERATOR_CANCELLED;
+}
+
+static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  if (event->val == KM_RELEASE) {
+    return OPERATOR_FINISHED;
+  }
+
+  const wmXrActionData *actiondata = event->customdata;
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmXrData *xr = &wm->xr;
+  eXrFlyMode mode;
+  bool locz_lock, turn;
+  float speed, speed_max;
+  GHOST_XrPose nav_pose;
+  float nav_mat[4][4], delta[4][4], m[4][4];
+
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "mode");
+  mode = prop ? RNA_property_enum_get(op->ptr, prop) : XR_FLY_VIEWER_FORWARD;
+
+  turn = (mode == XR_FLY_TURNLEFT || mode == XR_FLY_TURNRIGHT);
+
+  prop = RNA_struct_find_property(op->ptr, "lock_location_z");
+  locz_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+
+  prop = RNA_struct_find_property(op->ptr, "speed_min");
+  speed = prop ? RNA_property_float_get(op->ptr, prop) :
+                 (turn ? XR_DEFAULT_FLY_SPEED_TURN : XR_DEFAULT_FLY_SPEED_MOVE) / 3.0f;
+
+  prop = RNA_struct_find_property(op->ptr, "speed_max");
+  speed_max = prop ? RNA_property_float_get(op->ptr, prop) :
+                     (turn ? XR_DEFAULT_FLY_SPEED_TURN : XR_DEFAULT_FLY_SPEED_MOVE);
+
+  /* Ensure valid interpolation. */
+  if (speed_max < speed) {
+    speed_max = speed;
+  }
+
+  /* Lerp between min/max speeds based on button state. */
+  switch (actiondata->type) {
+    case XR_BOOLEAN_INPUT:
+      speed = speed_max;
+      break;
+    case XR_FLOAT_INPUT:
+    case XR_VECTOR2F_INPUT: {
+      float state = (actiondata->type == XR_FLOAT_INPUT) ? fabsf(actiondata->state[0]) :
+                                                           len_v2(actiondata->state);
+      float speed_t = (actiondata->float_threshold < 1.0f) ?
+                          (state - actiondata->float_threshold) /
+                              (1.0f - actiondata->float_threshold) :
+                          1.0f;
+      speed += speed_t * (speed_max - speed);
+      break;
+    }
+    case XR_POSE_INPUT:
+    case XR_VIBRATION_OUTPUT:
+      BLI_assert_unreachable();
+      break;
+  }
+
+  WM_xr_session_state_nav_location_get(xr, nav_pose.position);
+  WM_xr_session_state_nav_rotation_get(xr, nav_pose.orientation_quat);
+  wm_xr_pose_to_mat(&nav_pose, nav_mat);
+
+  if (turn) {
+    GHOST_XrPose viewer_pose;
+    float viewer_mat[4][4], nav_inv[4][4];
+
+    WM_xr_session_state_viewer_pose_location_get(xr, viewer_pose.position);
+    WM_xr_session_state_viewer_pose_rotation_get(xr, viewer_pose.orientation_quat);
+    wm_xr_pose_to_mat(&viewer_pose, viewer_mat);
+    wm_xr_pose_to_imat(&nav_pose, nav_inv);
+
+    wm_xr_fly_compute_turn(mode, speed, viewer_mat, nav_mat, nav_inv, delta);
+  }
+  else {
+    float nav_scale, ref_quat[4];
+
+    /* Adjust speed for navigation scale. */
+    WM_xr_session_state_nav_scale_get(xr, &nav_scale);
+    speed *= nav_scale;
+
+    switch (mode) {
+      /* Move relative to navigation space. */
+      case XR_FLY_FORWARD:
+      case XR_FLY_BACK:
+      case XR_FLY_LEFT:
+      case XR_FLY_RIGHT:
+      case XR_FLY_UP:
+      case XR_FLY_DOWN:
+        wm_xr_basenav_rotation_calc(xr, nav_pose.orientation_quat, ref_quat);
+        break;
+      /* Move relative to viewer. */
+      case XR_FLY_VIEWER_FORWARD:
+      case XR_FLY_VIEWER_BACK:
+      case XR_FLY_VIEWER_LEFT:
+      case XR_FLY_VIEWER_RIGHT:
+        WM_xr_session_state_viewer_pose_rotation_get(xr, ref_quat);
+        break;
+      /* Move relative to controller. */
+      case XR_FLY_CONTROLLER_FORWARD:
+        copy_qt_qt(ref_quat, actiondata->controller_rot);
+        break;
+      /* Unused. */
+      case XR_FLY_TURNLEFT:
+      case XR_FLY_TURNRIGHT:
+        BLI_assert_unreachable();
+        break;
+    }
+
+    wm_xr_fly_compute_move(mode, speed, ref_quat, nav_mat, locz_lock, delta);
+  }
+
+  mul_m4_m4m4(m, delta, nav_mat);
+
+  WM_xr_session_state_nav_location_set(xr, m[3]);
+  if (turn) {
+    mat4_to_quat(nav_pose.orientation_quat, m);
+    WM_xr_session_state_nav_rotation_set(xr, nav_pose.orientation_quat);
+  }
+
+  if (event->val == KM_PRESS) {
+    return OPERATOR_RUNNING_MODAL;
+  }
+
+  /* XR events currently only support press and release. */
+  BLI_assert(false);
+  return OPERATOR_CANCELLED;
+}
+
+static void WM_OT_xr_navigation_fly(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "XR Navigation Fly";
+  ot->idname = "WM_OT_xr_navigation_fly";
+  ot->description = "Move/turn relative to the VR viewer or controller";
+
+  /* callbacks */
+  ot->invoke_3d = wm_xr_navigation_fly_invoke_3d;
+  ot->exec = wm_xr_navigation_fly_exec;
+  ot->modal_3d = wm_xr_navigation_fly_modal_3d;
+  ot->poll = wm_xr_operator_sessionactive;
+
+  /* properties */
+  static const EnumPropertyItem fly_modes[] = {
+      {XR_FLY_FORWARD, "FORWARD", 0, "Forward", "Move along navigation forward axis"},
+      {XR_FLY_BACK, "BACK", 0, "Back", "Move along navigation back axis"},
+      {XR_FLY_LEFT, "LEFT", 0, "Left", "Move along navigation left axis"},
+      {XR_FLY_RIGHT, "RIGHT", 0, "Right", "Move along navigation right axis"},
+      {XR_FLY_UP, "UP", 0, "Up", "Move along navigation up axis"},
+      {XR_FLY_DOWN, "DOWN", 0, "Down", "Move along navigation down axis"},
+      {XR_FLY_TURNLEFT,
+       "TURNLEFT",
+       0,
+       "Turn Left",
+       "Turn counter-clockwise around navigation up axis"},
+      {XR_FLY_TURNRIGHT, "TURNRIGHT", 0, "Turn Right", "Turn clockwise around navigation up axis"},
+      {XR_FLY_VIEWER_FORWARD,
+       "VIEWER_FORWARD",
+       0,
+       "Viewer Forward",
+       "Move along viewer's forward axis"},
+      {XR_FLY_VIEWER_BACK, "VIEWER_BACK", 0, "Viewer Back", "Move along viewer's back axis"},
+      {XR_FLY_VIEWER_LEFT, "VIEWER_LEFT", 0, "Viewer Left", "Move along viewer's left axis"},
+      {XR_FLY_VIEWER_RIGHT, "VIEWER_RIGHT", 0, "Viewer Right", "Move along viewer's right axis"},
+      {XR_FLY_CONTROLLER_FORWARD,
+       "CONTROLLER_FORWARD",
+       0,
+       "Controller Forward",
+       "Move along controller's forward axis"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_enum(ot->srna, "mode", fly_modes, XR_FLY_VIEWER_FORWARD, "Mode", "Fly mode");
+  RNA_def_boolean(
+      ot->srna, "lock_location_z", false, "Lock Elevation", "Prevent changes to viewer elevation");
+  RNA_def_float(ot->srna,
+                "speed_min",
+                XR_DEFAULT_FLY_SPEED_MOVE / 3.0f,
+                0.0f,
+                1000.0f,
+                "Minimum Speed",
+                "Minimum move/turn speed",
+                0.0f,
+                1000.0f);
+  RNA_def_float(ot->srna,
+                "speed_max",
+                XR_DEFAULT_FLY_SPEED_MOVE,
+                0.0f,
+                1000.0f,
+                "Maximum Speed",
+                "Maximum move/turn speed",
+                0.0f,
+                1000.0f);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name XR Navigation Teleport
  *
  * Casts a ray from an XR controller's pose and teleports to any hit geometry.
@@ -750,11 +1100,11 @@ static void wm_xr_navigation_teleport(bContext *C,
     WM_xr_session_state_nav_rotation_get(xr, nav_rotation);
     WM_xr_session_state_viewer_pose_location_get(xr, viewer_location);
 
+    wm_xr_basenav_rotation_calc(xr, nav_rotation, nav_rotation);
     quat_to_mat3(nav_axes, nav_rotation);
 
     /* Project locations onto navigation axes. */
     for (int a = 0; a < 3; ++a) {
-      normalize_v3(nav_axes[a]);
       project_v3_v3v3_normalized(projected, nav_location, nav_axes[a]);
       if (teleport_axes[a]) {
         /* Interpolate between projected locations. */
@@ -810,9 +1160,8 @@ static int wm_xr_navigation_teleport_modal_3d(bContext *C, wmOperator *op, const
   }
   else if (event->val == KM_RELEASE) {
     XrRaycastData *data = op->customdata;
-    bool teleport_axes[3];
+    bool selectable_only, teleport_axes[3];
     float teleport_t, ray_dist;
-    bool selectable_only;
 
     PropertyRNA *prop = RNA_struct_find_property(op->ptr, "teleport_axes");
     if (prop) {
@@ -872,7 +1221,7 @@ static void WM_OT_xr_navigation_teleport(wmOperatorType *ot)
                          3,
                          default_teleport_axes,
                          "Teleport Axes",
-                         "Enabled teleport axes in viewer space");
+                         "Enabled teleport axes in navigation space");
   RNA_def_float(ot->srna,
                 "interpolation",
                 1.0f,
@@ -1835,6 +2184,7 @@ void wm_xr_operatortypes_register(void)
 {
   WM_operatortype_append(WM_OT_xr_session_toggle);
   WM_operatortype_append(WM_OT_xr_navigation_grab);
+  WM_operatortype_append(WM_OT_xr_navigation_fly);
   WM_operatortype_append(WM_OT_xr_navigation_teleport);
   WM_operatortype_append(WM_OT_xr_select_raycast);
   WM_operatortype_append(WM_OT_xr_transform_grab);

@@ -5086,6 +5086,8 @@ void wm_event_add_xrevent(const char *action_set_name,
       return;
   }
 
+  data->float_threshold = action->float_threshold;
+
   if (controller_pose) {
     copy_v3_v3(data->controller_loc, controller_pose->position);
     copy_qt_qt(data->controller_rot, controller_pose->orientation_quat);

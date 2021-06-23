@@ -489,6 +489,7 @@ void WM_event_xr_data(const wmEvent *event,
                       char *type,
                       float state[2],
                       float state_other[2],
+                      float *float_threshold,
                       float controller_loc[3],
                       float controller_rot[4],
                       float controller_loc_other[3],
@@ -513,6 +514,9 @@ void WM_event_xr_data(const wmEvent *event,
   }
   if (state_other) {
     copy_v2_v2(state_other, data->state_other);
+  }
+  if (float_threshold) {
+    *float_threshold = data->float_threshold;
   }
   if (controller_loc) {
     copy_v3_v3(controller_loc, data->controller_loc);
