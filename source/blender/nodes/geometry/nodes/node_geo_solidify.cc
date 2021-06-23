@@ -26,16 +26,18 @@
 
 #include "node_geometry_util.hh"
 
+/*extern "C" {    // another way
+  Mesh *solidify_extrude_modifyMesh( Mesh *mesh);
+};*/
+
 static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Thickness"), 0.1f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
+    {SOCK_STRING, N_("Thickness")},
+    {SOCK_FLOAT, N_("Thickness"), 0.1f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
     {SOCK_FLOAT, N_("Clamp"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f},
-    {SOCK_FLOAT, N_("Offset"), -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f},
+    {SOCK_FLOAT, N_("Offset"), -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, PROP_FACTOR},
     {SOCK_BOOLEAN, N_("Fill"), true},
     {SOCK_BOOLEAN, N_("Rim"), true},
-    {SOCK_STRING, N_("Distance")},
-    {SOCK_STRING, N_("Shell Verts")},
-    {SOCK_STRING, N_("Rim Verts")},
     {SOCK_STRING, N_("Shell Faces")},
     {SOCK_STRING, N_("Rim Faces")},
     {-1, ""},
@@ -53,12 +55,24 @@ static void geo_node_solidify_init(bNodeTree *UNUSED(tree), bNode *node)
   NodeGeometrySolidify *node_storage = (NodeGeometrySolidify *)MEM_callocN(
       sizeof(NodeGeometrySolidify), __func__);
 
-  node_storage->mode = MOD_SOLIDIFY_MODE_NONMANIFOLD;
   node->storage = node_storage;
 }
 
-static void geo_node_solidify_update(bNodeTree *UNUSED(ntree), bNode *UNUSED(node))
+static void geo_node_solidify_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "thickness_mode", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "nonmanifold_offset_mode", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "nonmanifold_boundary_mode", 0, nullptr, ICON_NONE);
+}
+
+static void geo_node_solidify_update(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  const NodeGeometrySolidify *node_storage = (NodeGeometrySolidify *)node->storage;
+
+  update_attribute_input_socket_availabilities(
+      *node, "Thickness", (GeometryNodeAttributeInputMode)node_storage->thickness_mode, true);
 }
 
 static void geo_node_solidify_exec(GeoNodeExecParams params)
@@ -70,7 +84,6 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   bool add_fill = params.extract_input<bool>("Fill");
   bool add_rim = params.extract_input<bool>("Rim");
-  const std::string Distance_name = params.extract_input<std::string>("Distance");
 
   char flag = 0;
 
@@ -82,7 +95,6 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     flag |= MOD_SOLIDIFY_RIM;
   }
 
-  float thickness = params.extract_input<float>("Thickness");
   float offset = params.extract_input<float>("Offset");
   float offset_clamp = params.extract_input<float>("Clamp");
 
@@ -93,22 +105,21 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     Mesh *input_mesh = mesh_component.get_for_write();
     Mesh *output_mesh;
 
-    GVArray_Typed<float> vertex_mask = mesh_component.attribute_get_for_read<float>(
-        Distance_name, ATTR_DOMAIN_POINT, 1.0f);
-
+    GVArrayPtr thickness = params.get_input_attribute(
+        "Thickness", mesh_component, ATTR_DOMAIN_POINT, CD_PROP_FLOAT, nullptr);
+    if (!thickness) {
+      return;
+    }
     float *distance = (float *)MEM_callocN(sizeof(float) * (unsigned long)input_mesh->totvert,
                                            __func__);
 
-    for (int i : vertex_mask.index_range()) {
-      distance[i] = vertex_mask[i];
+    for (int i : thickness->typed<float>().index_range()) {
+      distance[i] = thickness->typed<float>()[i];
     }
 
     SolidifyData solidify_node_data = {
         self_object,
-        "",
-        "",
-        "",
-        thickness,
+        1,
         offset,
         0.0f,
         offset_clamp,
@@ -136,62 +147,32 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     geometry_set.replace_mesh(output_mesh);
 
     const AttributeDomain result_point_domain = ATTR_DOMAIN_POINT;
-
-    const std::string shell_verts_attribute_name = params.get_input<std::string>("Shell Verts");
-    OutputAttribute_Typed<bool> shell_verts_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(shell_verts_attribute_name,
-                                                               result_point_domain);
-
-    const std::string rim_verts_attribute_name = params.get_input<std::string>("Rim Verts");
-    OutputAttribute_Typed<bool> rim_verts_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(rim_verts_attribute_name,
-                                                               result_point_domain);
-
     const AttributeDomain result_face_domain = ATTR_DOMAIN_FACE;
 
     const std::string shell_faces_attribute_name = params.get_input<std::string>("Shell Faces");
-    OutputAttribute_Typed<bool> shell_faces_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(shell_faces_attribute_name,
-                                                               result_face_domain);
-
     const std::string rim_faces_attribute_name = params.get_input<std::string>("Rim Faces");
-    OutputAttribute_Typed<bool> rim_faces_attribute =
-        mesh_component.attribute_try_get_for_output_only<bool>(rim_faces_attribute_name,
-                                                               result_face_domain);
+
 
     if (solidify_node_data.flag & MOD_SOLIDIFY_SHELL) {
-      if(!shell_verts_attribute_name.empty()){
-        MutableSpan<bool> shell_verts_span = shell_verts_attribute.as_span();
-        for (const int i : shell_verts_span.index_range()) {
-          shell_verts_span[i] = shell_verts[i];
-        }
-        shell_verts_attribute.save();
-      }
       if(!shell_faces_attribute_name.empty()){
-        MutableSpan<bool> shell_faces_span = shell_faces_attribute.as_span();
-        for (const int i : shell_faces_span.index_range()) {
-          shell_faces_span[i] = shell_faces[i];
-        }
-        shell_faces_attribute.save();
+        OutputAttribute_Typed<bool> shell_faces_attribute =
+            mesh_component.attribute_try_get_for_output_only<bool>(shell_faces_attribute_name,
+                                                                   result_face_domain);
+        Span<bool> s(shell_faces, shell_faces_attribute->size());
+        shell_faces_attribute->set_all(s);
       }
     }
 
     if (solidify_node_data.flag & MOD_SOLIDIFY_RIM) {
-      if(!rim_verts_attribute_name.empty()) {
-        MutableSpan<bool> rim_verts_span = rim_verts_attribute.as_span();
-        for (const int i : rim_verts_span.index_range()) {
-          rim_verts_span[i] = rim_verts[i];
-        }
-        rim_verts_attribute.save();
-      }
       if(!rim_faces_attribute_name.empty()) {
-        MutableSpan<bool> rim_faces_span = rim_faces_attribute.as_span();
-        for (const int i : rim_faces_span.index_range()) {
-          rim_faces_span[i] = rim_faces[i];
-        }
-        rim_faces_attribute.save();
+        OutputAttribute_Typed<bool> rim_faces_attribute =
+            mesh_component.attribute_try_get_for_output_only<bool>(rim_faces_attribute_name,
+                                                                   result_face_domain);
+        Span<bool> s(shell_faces, rim_faces_attribute->size());
+        rim_faces_attribute->set_all(s);
       }
     }
+
     MEM_freeN(distance);
     MEM_freeN(shell_verts);
     MEM_freeN(rim_verts);
@@ -199,14 +180,6 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     MEM_freeN(rim_faces);
   }
   params.set_output("Geometry", geometry_set);
-}
-
-static void geo_node_solidify_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "nonmanifold_offset_mode", 0, nullptr, ICON_NONE);
-  uiItemR(layout, ptr, "nonmanifold_boundary_mode", 0, nullptr, ICON_NONE);
 }
 
 }  // namespace blender::nodes

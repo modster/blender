@@ -21,14 +21,11 @@
  * \ingroup modifiers
  */
 
-#include "stdio.h"
-#include <BLI_string.h>
-#include <MEM_guardedalloc.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "BLI_utildefines.h"
 
-#include "BKE_lattice.h"
 #include "BLT_translation.h"
 
 #include "DNA_defaults.h"
@@ -39,7 +36,7 @@
 
 #include "BKE_context.h"
 #include "BKE_deform.h"
-#include "BKE_particle.h"
+#include "BKE_lattice.h"
 #include "BKE_screen.h"
 #include "BKE_solidifiy.h"
 
@@ -48,9 +45,10 @@
 
 #include "RNA_access.h"
 
+#include "MEM_guardedalloc.h"
+
 #include "MOD_modifiertypes.h"
 #include "MOD_ui_common.h"
-
 #include "MOD_solidify_util.h"
 
 static bool dependsOnNormals(ModifierData *md)
@@ -123,7 +121,7 @@ static float *get_distance_factor(Mesh *mesh, Object *ob, const char *name, bool
   return selection;
 }
 
-static const SolidifyData solidify_data_from_modifier_data(ModifierData *md,
+static SolidifyData solidify_data_from_modifier_data(ModifierData *md,
                                                            const ModifierEvalContext *ctx)
 {
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
