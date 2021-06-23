@@ -188,10 +188,6 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
   }
 
   BLI_path_abs(data->filename, BKE_main_blendfile_path_from_global());
-  USDStageReader *archive = new USDStageReader(data->filename);
-
-  archive->params(data->params);
-  archive->settings(data->settings);
 
   CacheFile *cache_file = static_cast<CacheFile *>(
       BKE_cachefile_add(data->bmain, BLI_path_basename(data->filename)));
@@ -205,7 +201,6 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
   cache_file->scale = data->params.scale;
   STRNCPY(cache_file->filepath, data->filename);
 
-  data->archive = archive;
   data->settings.cache_file = cache_file;
 
   *data->do_update = true;
@@ -219,29 +214,29 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
   *data->do_update = true;
   *data->progress = 0.1f;
 
-  Scene *scene = data->scene;
+  pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(data->filename);
 
-  if (!archive->stage()) {
-    /* This happens when the USD JSON files cannot be found. When that happens,
-     * the USD library doesn't know it has the functionality to write USDA and
-     * USDC files, and creating a new UsdStage fails. */
-    WM_reportf(
-        RPT_ERROR, "USD Import: unable to find suitable USD plugin to read %s", data->filename);
+  if (!stage) {
+    WM_reportf(RPT_ERROR, "USD Import: unable to open stage to read %s", data->filename);
     data->import_ok = false;
     return;
   }
 
-  convert_to_z_up(archive->stage(), data->settings);
+  convert_to_z_up(stage, data->settings);
 
   // Set up the stage for animated data.
   if (data->params.set_frame_range) {
-    scene->r.sfra = archive->stage()->GetStartTimeCode();
-    scene->r.efra = archive->stage()->GetEndTimeCode();
+    data->scene->r.sfra = stage->GetStartTimeCode();
+    data->scene->r.efra = stage->GetEndTimeCode();
   }
 
   *data->progress = 0.15f;
 
-  archive->collect_readers(data->bmain, data->params, data->settings);
+  USDStageReader *archive = new USDStageReader(stage, data->params, data->settings);
+
+  data->archive = archive;
+
+  archive->collect_readers(data->bmain);
 
   *data->progress = 0.2f;
 
@@ -527,20 +522,21 @@ CacheArchiveHandle *USD_create_handle(struct Main * /*bmain*/,
                                       const char *filename,
                                       ListBase *object_paths)
 {
-  USDStageReader *stage_reader = new USDStageReader(filename);
+  pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(filename);
 
-  if (!stage_reader->valid()) {
-    delete stage_reader;
-    return NULL;
+  if (!stage) {
+    return nullptr;
   }
 
-  blender::io::usd::ImportSettings settings;
-  convert_to_z_up(stage_reader->stage(), settings);
+  USDImportParams params{};
 
-  stage_reader->settings(settings);
+  blender::io::usd::ImportSettings settings{};
+  convert_to_z_up(stage, settings);
+
+  USDStageReader *stage_reader = new USDStageReader(stage, params, settings);
 
   if (object_paths) {
-    gather_objects_paths(stage_reader->stage()->GetPseudoRoot(), object_paths);
+    gather_objects_paths(stage->GetPseudoRoot(), object_paths);
   }
 
   return handle_from_stage_reader(stage_reader);

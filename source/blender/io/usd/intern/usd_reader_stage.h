@@ -46,16 +46,17 @@ class USDStageReader {
   std::vector<USDPrimReader *> readers_;
 
  public:
-  USDStageReader(const char *filename);
+  USDStageReader(pxr::UsdStageRefPtr stage,
+                 const USDImportParams &params,
+                 const ImportSettings &settings);
+
   ~USDStageReader();
 
   USDPrimReader *create_reader_if_allowed(const pxr::UsdPrim &prim);
 
   USDPrimReader *create_reader(const pxr::UsdPrim &prim);
 
-  void collect_readers(struct Main *bmain,
-                       const USDImportParams &params,
-                       const ImportSettings &settings);
+  void collect_readers(struct Main *bmain);
 
   bool valid() const;
 
@@ -71,15 +72,6 @@ class USDStageReader {
   const ImportSettings &settings() const
   {
     return settings_;
-  }
-
-  void params(const USDImportParams &a_params)
-  {
-    params_ = a_params;
-  }
-  void settings(const ImportSettings &a_settings)
-  {
-    settings_ = a_settings;
   }
 
   void clear_readers();

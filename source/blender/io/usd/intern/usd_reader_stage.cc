@@ -40,18 +40,16 @@
 
 namespace blender::io::usd {
 
-USDStageReader::USDStageReader(const char *filename)
+USDStageReader::USDStageReader(pxr::UsdStageRefPtr stage,
+                               const USDImportParams &params,
+                               const ImportSettings &settings)
+    : stage_(stage), params_(params), settings_(settings)
 {
-  stage_ = pxr::UsdStage::Open(filename);
 }
 
 USDStageReader::~USDStageReader()
 {
   clear_readers();
-
-  if (stage_) {
-    stage_->Unload();
-  }
 }
 
 bool USDStageReader::valid() const
@@ -278,19 +276,18 @@ USDPrimReader *USDStageReader::collect_readers(Main *bmain, const pxr::UsdPrim &
   return reader;
 }
 
-void USDStageReader::collect_readers(Main *bmain,
-                                     const USDImportParams &params,
-                                     const ImportSettings &settings)
+void USDStageReader::collect_readers(Main *bmain)
 {
-  params_ = params;
-  settings_ = settings;
+  if (!valid()) {
+    return;
+  }
 
   clear_readers();
 
   // Iterate through stage
   pxr::UsdPrim root = stage_->GetPseudoRoot();
 
-  std::string prim_path_mask(params.prim_path_mask);
+  std::string prim_path_mask(params_.prim_path_mask);
 
   if (!prim_path_mask.empty()) {
     pxr::UsdPrim prim = stage_->GetPrimAtPath(pxr::SdfPath(prim_path_mask));
