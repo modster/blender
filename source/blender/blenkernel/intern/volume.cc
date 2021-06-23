@@ -36,6 +36,7 @@
 #include "BLI_math.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
+#include "BLI_task.hh"
 #include "BLI_utildefines.h"
 
 #include "BKE_anim_data.h"
@@ -325,9 +326,8 @@ struct VolumeGrid {
     openvdb::io::File file(filepath);
 
     /* Isolate file loading since that's potentially multithreaded and we are
-     * holding a mutex lock. See BLI_task_isolate. Note OpenVDB already uses
-     * TBB, so it's fine to use here without a wrapper. */
-    tbb::this_task_arena::isolate([&] {
+     * holding a mutex lock. */
+    blender::threading::isolate_task([&] {
       try {
         file.setCopyMaxBytes(0);
         file.open();
@@ -745,7 +745,7 @@ static int volume_sequence_frame(const Depsgraph *depsgraph, const Volume *volum
     }
   }
 
-  /* Important to apply after, else we cant loop on e.g. frames 100 - 110. */
+  /* Important to apply after, else we can't loop on e.g. frames 100 - 110. */
   frame += frame_offset;
 
   return frame;
