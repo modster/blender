@@ -29,6 +29,8 @@
 #include "DNA_armature_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_genfile.h"
+#include "DNA_gpencil_modifier_types.h"
+#include "DNA_lineart_types.h"
 #include "DNA_listBase.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
@@ -389,6 +391,19 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
 
       BKE_animdata_main_cb(bmain, do_version_bbone_len_scale_animdata_cb, NULL);
+    }
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "LineartGpencilModifierData", "bool", "use_crease_on_smooth")) {
+      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+        if (ob->type == OB_GPENCIL) {
+          LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+            if (md->type == eGpencilModifierType_Lineart) {
+              LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+              lmd->calculation_flags |= LRT_USE_CREASE_ON_SMOOTH_SURFACES;
+            }
+          }
+        }
+      }
     }
   }
 
