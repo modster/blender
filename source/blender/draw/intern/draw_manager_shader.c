@@ -453,6 +453,11 @@ GPUMaterial *DRW_shader_from_world(World *wo,
     GPU_material_status_set(mat, GPU_MAT_QUEUED);
     drw_deferred_shader_add(mat, deferred);
   }
+
+  if (!deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
+    /* Force compilation for shaders already queued. */
+    drw_deferred_shader_add(mat, false);
+  }
   return mat;
 }
 
@@ -486,9 +491,14 @@ GPUMaterial *DRW_shader_from_material(Material *ma,
     return mat;
   }
 
-  if (GPU_material_status(mat) == GPU_MAT_CREATED || !deferred) {
+  if (GPU_material_status(mat) == GPU_MAT_CREATED) {
     GPU_material_status_set(mat, GPU_MAT_QUEUED);
     drw_deferred_shader_add(mat, deferred);
+  }
+
+  if (!deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
+    /* Force compilation for shaders already queued. */
+    drw_deferred_shader_add(mat, false);
   }
   return mat;
 }
