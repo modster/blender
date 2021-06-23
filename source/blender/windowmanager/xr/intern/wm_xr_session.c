@@ -421,6 +421,17 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                                       DEFAULT_SENSOR_WIDTH);
   copy_m4_m4(eye->viewmat, viewmat);
 
+  /* Update controller poses with any navigation changes since the last actions/controllers sync.
+     This can happen if an operator changes the navigation. */
+  if (state->active_action_set && state->active_action_set->controller_pose_action) {
+    for (int i = 0; i < (int)ARRAY_SIZE(state->controllers); ++i) {
+      wmXrControllerData *controller = &state->controllers[i];
+      mul_m4_m4m4(controller->mat, nav_mat, controller->mat_base);
+      mat4_to_loc_quat(
+          controller->pose.position, controller->pose.orientation_quat, controller->mat);
+    }
+  }
+
   memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(state->prev_base_pose));
   state->prev_base_scale = draw_data->base_scale;
   memcpy(&state->prev_local_pose, &draw_view->local_pose, sizeof(state->prev_local_pose));
@@ -669,7 +680,7 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   Object *ob_constraint = NULL;
   char ob_flag;
-  float view_ofs[3], base_mat[4][4], nav_mat[4][4], m0[4][4], m1[4][4];
+  float view_ofs[3], base_mat[4][4], nav_mat[4][4], m[4][4];
 
   if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
     copy_v3_v3(view_ofs, state->prev_local_pose.position);
@@ -702,14 +713,14 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
     }
 
     /* Calculate controller matrix in world space. */
-    wm_xr_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], m0);
+    wm_xr_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], m);
 
     /* Apply eye position offset. */
-    sub_v3_v3(m0[3], view_ofs);
+    sub_v3_v3(m[3], view_ofs);
 
     /* Apply base pose and navigation. */
-    mul_m4_m4m4(m1, base_mat, m0);
-    mul_m4_m4m4(controller->mat, nav_mat, m1);
+    mul_m4_m4m4(controller->mat_base, base_mat, m);
+    mul_m4_m4m4(controller->mat, nav_mat, controller->mat_base);
 
     /* Save final pose. */
     mat4_to_loc_quat(

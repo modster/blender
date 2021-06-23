@@ -42,6 +42,8 @@ typedef struct wmXrControllerData {
   GHOST_XrPose pose;
   /** The last known controller matrix, calculated from above's controller pose. */
   float mat[4][4];
+  /** Controller matrix without navigation applied. */
+  float mat_base[4][4];
 } wmXrControllerData;
 
 typedef struct wmXrSessionState {
