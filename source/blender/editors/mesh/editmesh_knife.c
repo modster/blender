@@ -29,6 +29,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLF_api.h"
+
 #include "BLI_alloca.h"
 #include "BLI_array.h"
 #include "BLI_linklist.h"
@@ -263,6 +265,15 @@ typedef struct KnifeTool_OpData {
   bool axis_constrained;
   float curr_cage_adjusted[3];
   char axis_string[2];
+
+  short dist_angle_mode;
+  bool show_dist_angle;
+  /* Save the second most recent point for angle drawing calculations */
+  float old_cage[3];
+  float old_mval[2];
+  bool old_stored;
+  float corr_prev_cage[3]; /* "knife_start_cut" updates prev.cage breaking angle calculations,
+                              store correct version */
 } KnifeTool_OpData;
 
 enum {
@@ -276,6 +287,7 @@ enum {
   KNF_MODAL_ADD_CUT,
   KNF_MODAL_ANGLE_SNAP_TOGGLE,
   KNF_MODAL_CUT_THROUGH_TOGGLE,
+  KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE,
   KNF_MODAL_PANNING,
   KNF_MODAL_ADD_CUT_CLOSED,
 };
@@ -291,6 +303,13 @@ enum {
   KNF_CONSTRAIN_AXIS_MODE_NONE = 0,
   KNF_CONSTRAIN_AXIS_MODE_GLOBAL = 1,
   KNF_CONSTRAIN_AXIS_MODE_LOCAL = 2
+};
+
+enum {
+  KNF_MEASUREMENT_NONE = 0,
+  KNF_MEASUREMENT_BOTH = 1,
+  KNF_MEASUREMENT_DISTANCE = 2,
+  KNF_MEASUREMENT_ANGLE = 3
 };
 
 /* -------------------------------------------------------------------- */
@@ -410,6 +429,316 @@ static void knifetool_draw_orientation_locking(const KnifeTool_OpData *kcd)
     immEnd();
 
     immUnbindProgram();
+  }
+}
+
+static void knifetool_draw_visible_distances(const KnifeTool_OpData *kcd)
+{
+  GPU_matrix_push_projection();
+  GPU_matrix_push();
+  GPU_matrix_identity_set();
+  wmOrtho2_region_pixelspace(kcd->region);
+
+  uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
+  immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+
+  char numstr[256];
+  float numstr_size[2];
+  float posit[2];
+  const float bg_margin = 4.0f * U.dpi_fac;
+  const int font_size = 14.0f * U.pixelsize;
+  const int distance_precision = 4;
+
+  /* calculate distance and convert to string */
+  float prev_cage_world[3];
+  float curr_cage_world[3];
+  copy_v3_v3(prev_cage_world, kcd->corr_prev_cage);
+  copy_v3_v3(curr_cage_world, kcd->curr.cage);
+  mul_m4_v3(kcd->ob->obmat, prev_cage_world);
+  mul_m4_v3(kcd->ob->obmat, curr_cage_world);
+  const float cut_len = len_v3v3(prev_cage_world, curr_cage_world);
+
+  UnitSettings *unit = &kcd->scene->unit;
+  if (unit->system == USER_UNIT_NONE) {
+    BLI_snprintf(numstr, sizeof(numstr), "%.*f", distance_precision, cut_len);
+  }
+  else {
+    BKE_unit_value_as_string(numstr,
+                             sizeof(numstr),
+                             (double)(cut_len * unit->scale_length),
+                             distance_precision,
+                             B_UNIT_LENGTH,
+                             unit,
+                             false);
+  }
+
+  BLF_enable(blf_mono_font, BLF_ROTATION);
+  BLF_size(blf_mono_font, font_size, U.dpi);
+  BLF_rotation(blf_mono_font, 0.0f);
+  BLF_width_and_height(blf_mono_font, numstr, sizeof(numstr), &numstr_size[0], &numstr_size[1]);
+
+  /* center text */
+  mid_v2_v2v2(posit, kcd->prev.mval, kcd->curr.mval);
+  posit[0] -= numstr_size[0] / 2.0f;
+  posit[1] -= numstr_size[1] / 2.0f;
+
+  /* draw text background */
+  float color_back[4] = {0.0f, 0.0f, 0.0f, 0.5f}; /* TODO: replace with theme color */
+  immUniformColor4fv(color_back);
+
+  GPU_blend(GPU_BLEND_ALPHA);
+  immRectf(pos,
+           posit[0] - bg_margin,
+           posit[1] - bg_margin,
+           posit[0] + bg_margin + numstr_size[0],
+           posit[1] + bg_margin + numstr_size[1]);
+  GPU_blend(GPU_BLEND_NONE);
+  immUnbindProgram();
+
+  /* draw text */
+  uchar color_text[3];
+  UI_GetThemeColor3ubv(TH_TEXT, color_text);
+
+  BLF_color3ubv(blf_mono_font, color_text);
+  BLF_position(blf_mono_font, posit[0], posit[1], 0.0f);
+  BLF_draw(blf_mono_font, numstr, sizeof(numstr));
+  BLF_disable(blf_mono_font, BLF_ROTATION);
+
+  GPU_matrix_pop();
+  GPU_matrix_pop_projection();
+}
+
+static void knifetool_draw_angle(const KnifeTool_OpData *kcd,
+                                 const float start[3],
+                                 const float mid[3],
+                                 const float end[3],
+                                 const float start_ss[2],
+                                 const float mid_ss[2],
+                                 const float end_ss[2],
+                                 const float angle)
+{
+  const RegionView3D *rv3d = kcd->region->regiondata;
+  const int arc_steps = 24;
+  const float arc_size = 64.0f * U.dpi_fac;
+  const float bg_margin = 4.0f * U.dpi_fac;
+  const float cap_size = 4.0f * U.dpi_fac;
+  const int font_size = 14 * U.pixelsize;
+  const int angle_precision = 2;
+
+  /* angle arc in 3d space */
+  GPU_blend(GPU_BLEND_ALPHA);
+
+  const uint pos_3d = GPU_vertformat_attr_add(
+      immVertexFormat(), "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+
+  {
+    float dir_tmp[3];
+    float ar_coord[3];
+
+    float dir_a[3];
+    float dir_b[3];
+    float quat[4];
+    float axis[3];
+    float arc_angle;
+
+    const float inverse_average_scale = 1 / (kcd->ob->obmat[0][0] + kcd->ob->obmat[1][1] +
+                                             kcd->ob->obmat[2][2]);
+    const float px_scale =
+        3.0f * inverse_average_scale *
+        (ED_view3d_pixel_size_no_ui_scale(rv3d, mid) *
+         min_fff(arc_size, len_v2v2(start_ss, mid_ss) / 2.0f, len_v2v2(end_ss, mid_ss) / 2.0f));
+
+    sub_v3_v3v3(dir_a, start, mid);
+    sub_v3_v3v3(dir_b, end, mid);
+    normalize_v3(dir_a);
+    normalize_v3(dir_b);
+
+    cross_v3_v3v3(axis, dir_a, dir_b);
+    arc_angle = angle_normalized_v3v3(dir_a, dir_b);
+
+    axis_angle_to_quat(quat, axis, arc_angle / arc_steps);
+
+    copy_v3_v3(dir_tmp, dir_a);
+
+    immUniformThemeColor3(TH_WIRE);
+    immBegin(GPU_PRIM_LINE_STRIP, arc_steps + 1);
+    for (int j = 0; j <= arc_steps; j++) {
+      madd_v3_v3v3fl(ar_coord, mid, dir_tmp, px_scale);
+      mul_qt_v3(quat, dir_tmp);
+
+      immVertex3fv(pos_3d, ar_coord);
+    }
+    immEnd();
+  }
+
+  immUnbindProgram();
+
+  /* angle text and background in 2d space */
+  GPU_matrix_push_projection();
+  GPU_matrix_push();
+  GPU_matrix_identity_set();
+  wmOrtho2_region_pixelspace(kcd->region);
+
+  uint pos_2d = GPU_vertformat_attr_add(
+      immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
+  immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+
+  /* angle as string */
+  char numstr[256];
+  float numstr_size[2];
+  float posit[2];
+
+  UnitSettings *unit = &kcd->scene->unit;
+  if (unit->system == USER_UNIT_NONE) {
+    BLI_snprintf(numstr, sizeof(numstr), "%.*f°", angle_precision, RAD2DEGF(angle));
+  }
+  else {
+    BKE_unit_value_as_string(
+        numstr, sizeof(numstr), (double)angle, angle_precision, B_UNIT_ROTATION, unit, false);
+  }
+
+  BLF_enable(blf_mono_font, BLF_ROTATION);
+  BLF_size(blf_mono_font, font_size, U.dpi);
+  BLF_rotation(blf_mono_font, 0.0f);
+  BLF_width_and_height(blf_mono_font, numstr, sizeof(numstr), &numstr_size[0], &numstr_size[1]);
+
+  posit[0] = mid_ss[0] + (cap_size * 2.0f);
+  posit[1] = mid_ss[1] - (numstr_size[1] / 2.0f);
+
+  /* draw text background */
+  float color_back[4] = {0.0f, 0.0f, 0.0f, 0.5f}; /* TODO: replace with theme color */
+  immUniformColor4fv(color_back);
+
+  GPU_blend(GPU_BLEND_ALPHA);
+  immRectf(pos_2d,
+           posit[0] - bg_margin,
+           posit[1] - bg_margin,
+           posit[0] + bg_margin + numstr_size[0],
+           posit[1] + bg_margin + numstr_size[1]);
+  GPU_blend(GPU_BLEND_NONE);
+  immUnbindProgram();
+
+  /* draw text */
+  uchar color_text[3];
+  UI_GetThemeColor3ubv(TH_TEXT, color_text);
+
+  BLF_color3ubv(blf_mono_font, color_text);
+  BLF_position(blf_mono_font, posit[0], posit[1], 0.0f);
+  BLF_rotation(blf_mono_font, 0.0f);
+  BLF_draw(blf_mono_font, numstr, sizeof(numstr));
+  BLF_disable(blf_mono_font, BLF_ROTATION);
+
+  GPU_matrix_pop();
+  GPU_matrix_pop_projection();
+
+  GPU_blend(GPU_BLEND_NONE);
+}
+
+static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
+{
+  if (kcd->curr.edge) {
+    KnifeEdge *kfe = kcd->curr.edge;
+    /* check for most recent cut (if cage is part of previous cut) */
+    if (!compare_v3v3(kfe->v1->cageco, kcd->corr_prev_cage, KNIFE_FLT_EPSBIG) &&
+        !compare_v3v3(kfe->v2->cageco, kcd->corr_prev_cage, KNIFE_FLT_EPSBIG)) {
+      /* determine acute angle */
+      float angle1 = angle_v3v3v3(kcd->corr_prev_cage, kcd->curr.cage, kfe->v1->cageco);
+      float angle2 = angle_v3v3v3(kcd->corr_prev_cage, kcd->curr.cage, kfe->v2->cageco);
+
+      float angle;
+      float *end;
+      if (angle1 < angle2) {
+        angle = angle1;
+        end = kfe->v1->cageco;
+      }
+      else {
+        angle = angle2;
+        end = kfe->v2->cageco;
+      }
+
+      /* last vertex in screen space */
+      float end_ss[2];
+      ED_view3d_project_float_v2_m4(kcd->region, end, end_ss, (float(*)[4])kcd->projmat);
+
+      knifetool_draw_angle(kcd,
+                           kcd->corr_prev_cage,
+                           kcd->curr.cage,
+                           end,
+                           kcd->prev.mval,
+                           kcd->curr.mval,
+                           end_ss,
+                           angle);
+    }
+  }
+
+  if (kcd->prev.edge) {
+    /* determine acute angle */
+    KnifeEdge *kfe = kcd->prev.edge;
+    float angle1 = angle_v3v3v3(kcd->curr.cage, kcd->prev.cage, kfe->v1->cageco);
+    float angle2 = angle_v3v3v3(kcd->curr.cage, kcd->prev.cage, kfe->v2->cageco);
+
+    float angle;
+    float *end;
+    /* kcd->prev.edge can have one vertex part of cut and one part of mesh? */
+    /* This never seems to happen for kcd->curr.edge */
+    if ((!kcd->prev.vert || kcd->prev.vert->v == kfe->v1->v) || kfe->v1->is_cut) {
+      angle = angle2;
+      end = kfe->v2->cageco;
+    }
+    else if ((!kcd->prev.vert || kcd->prev.vert->v == kfe->v2->v) || kfe->v2->is_cut) {
+      angle = angle1;
+      end = kfe->v1->cageco;
+    }
+    else {
+      if (angle1 < angle2) {
+        angle = angle1;
+        end = kfe->v1->cageco;
+      }
+      else {
+        angle = angle2;
+        end = kfe->v2->cageco;
+      }
+    }
+
+    /* last vertex in screen space */
+    float end_ss[2];
+    ED_view3d_project_float_v2_m4(kcd->region, end, end_ss, (float(*)[4])kcd->projmat);
+
+    knifetool_draw_angle(
+        kcd, kcd->curr.cage, kcd->prev.cage, end, kcd->curr.mval, kcd->prev.mval, end_ss, angle);
+  }
+  else if (kcd->old_stored && !kcd->prev.is_space) {
+    float angle = angle_v3v3v3(kcd->curr.cage, kcd->corr_prev_cage, kcd->old_cage);
+    knifetool_draw_angle(kcd,
+                         kcd->curr.cage,
+                         kcd->corr_prev_cage,
+                         kcd->old_cage,
+                         kcd->curr.mval,
+                         kcd->prev.mval,
+                         kcd->old_mval,
+                         angle);
+  }
+
+  /* TODO: better vertices handling */
+}
+
+static void knifetool_draw_dist_angle(const KnifeTool_OpData *kcd)
+{
+  switch (kcd->dist_angle_mode) {
+    case KNF_MEASUREMENT_BOTH: {
+      knifetool_draw_visible_distances(kcd);
+      knifetool_draw_visible_angles(kcd);
+      break;
+    }
+    case KNF_MEASUREMENT_DISTANCE: {
+      knifetool_draw_visible_distances(kcd);
+      break;
+    }
+    case KNF_MEASUREMENT_ANGLE: {
+      knifetool_draw_visible_angles(kcd);
+      break;
+    }
   }
 }
 
@@ -589,6 +918,12 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   immUnbindProgram();
 
+  if (kcd->mode == MODE_DRAGGING) {
+    if (kcd->show_dist_angle) {
+      knifetool_draw_dist_angle(kcd);
+    }
+  }
+
   GPU_matrix_pop();
   GPU_matrix_pop_projection();
 
@@ -621,7 +956,8 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
            "%s: start/define cut, %s: close cut, %s: new cut, "
            "%s: midpoint snap (%s), %s: ignore snap (%s), "
            "%s: angle constraint %.2f (%s), %s: cut through (%s), "
-           "%s: panning, XYZ: orientation lock (%s)"),
+           "%s: panning, XYZ: orientation lock (%s), "
+           "%s: distance/angle measurements (%s)"),
       WM_MODALKEY(KNF_MODAL_CONFIRM),
       WM_MODALKEY(KNF_MODAL_CANCEL),
       WM_MODALKEY(KNF_MODAL_ADD_CUT),
@@ -640,7 +976,9 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
       WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
       WM_bool_as_string(kcd->cut_through),
       WM_MODALKEY(KNF_MODAL_PANNING),
-      (kcd->axis_constrained ? kcd->axis_string : WM_bool_as_string(kcd->axis_constrained)));
+      (kcd->axis_constrained ? kcd->axis_string : WM_bool_as_string(kcd->axis_constrained)),
+      WM_MODALKEY(KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE),
+      WM_bool_as_string(kcd->show_dist_angle));
 
 #undef WM_MODALKEY
 
@@ -671,6 +1009,21 @@ static void knife_input_ray_segment(KnifeTool_OpData *kcd,
   /* transform into object space */
   mul_m4_v3(kcd->ob_imat, r_origin);
   mul_m4_v3(kcd->ob_imat, r_origin_ofs);
+}
+
+static void knifetool_recast_cageco(KnifeTool_OpData *kcd, float mval[3], float r_cage[3])
+{
+  float origin[3];
+  float origin_ofs[3];
+  float ray[3], ray_normal[3];
+  float co[3]; /* unused */
+
+  knife_input_ray_segment(kcd, mval, 1.0f, origin, origin_ofs);
+
+  sub_v3_v3v3(ray, origin_ofs, origin);
+  normalize_v3_v3(ray_normal, ray);
+
+  BKE_bmbvh_ray_cast(kcd->bmbvh, origin, ray_normal, 0.0f, NULL, co, r_cage);
 }
 
 static bool knife_verts_edge_in_face(KnifeVert *v1, KnifeVert *v2, BMFace *f)
@@ -1026,6 +1379,7 @@ static void knife_start_cut(KnifeTool_OpData *kcd)
 {
   kcd->prev = kcd->curr;
   kcd->curr.is_space = 0; /*TODO: why do we do this? */
+  kcd->old_stored = false;
 
   if (kcd->prev.vert == NULL && kcd->prev.edge == NULL) {
     float origin[3], origin_ofs[3];
@@ -1536,12 +1890,22 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
   GHashIterator giter;
   ListBase *list;
 
+  /* save values for angle drawing calculations */
+  copy_v3_v3(kcd->old_cage, kcd->corr_prev_cage);
+  copy_v2_v2(kcd->old_mval, kcd->prev.mval);
+  kcd->old_stored = true;
+
   prepare_linehits_for_cut(kcd);
   if (kcd->totlinehit == 0) {
     if (kcd->is_drag_hold == false) {
       kcd->prev = kcd->curr;
     }
     return;
+  }
+
+  /* consider most recent linehit in angle drawing calculations */
+  if (kcd->totlinehit >= 2) {
+    copy_v3_v3(kcd->old_cage, kcd->linehits[kcd->totlinehit - 2].cagehit);
   }
 
   /* make facehits: map face -> list of linehits touching it */
@@ -3033,6 +3397,11 @@ wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
       {KNF_MODAL_IGNORE_SNAP_OFF, "IGNORE_SNAP_OFF", 0, "Ignore Snapping Off", ""},
       {KNF_MODAL_ANGLE_SNAP_TOGGLE, "ANGLE_SNAP_TOGGLE", 0, "Toggle Angle Snapping", ""},
       {KNF_MODAL_CUT_THROUGH_TOGGLE, "CUT_THROUGH_TOGGLE", 0, "Toggle Cut Through", ""},
+      {KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE,
+       "SHOW_DISTANCE_ANGLE_TOGGLE",
+       0,
+       "Toggle Distance and Angle Measurements",
+       ""},
       {KNF_MODAL_NEW_CUT, "NEW_CUT", 0, "End Current Cut", ""},
       {KNF_MODAL_ADD_CUT, "ADD_CUT", 0, "Add Cut", ""},
       {KNF_MODAL_ADD_CUT_CLOSED, "ADD_CUT_CLOSED", 0, "Add Cut Closed", ""},
@@ -3182,6 +3551,18 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         do_refresh = true;
         handled = true;
         break;
+      case KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE:
+        if (kcd->dist_angle_mode != KNF_MEASUREMENT_ANGLE) {
+          kcd->dist_angle_mode++;
+        }
+        else {
+          kcd->dist_angle_mode = KNF_MEASUREMENT_NONE;
+        }
+        kcd->show_dist_angle = (kcd->dist_angle_mode != KNF_MEASUREMENT_NONE);
+        knife_update_header(C, op, kcd);
+        do_refresh = true;
+        handled = true;
+        break;
       case KNF_MODAL_NEW_CUT:
         ED_region_tag_redraw(kcd->region);
         knife_finish_cut(kcd);
@@ -3200,6 +3581,16 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
             knife_start_cut(kcd);
             kcd->mode = MODE_DRAGGING;
             kcd->init = kcd->curr;
+          }
+
+          /* preserve correct prev.cage for angle drawing calculations */
+          if (kcd->prev.edge == NULL && kcd->prev.vert == NULL) {
+            /* "knife_start_cut" moves prev.cage so needs to be recalculated */
+            /* Only occurs if prev was started on a face */
+            knifetool_recast_cageco(kcd, kcd->prev.mval, kcd->corr_prev_cage);
+          }
+          else {
+            copy_v3_v3(kcd->corr_prev_cage, kcd->prev.cage);
           }
 
           /* freehand drawing is incompatible with cut-through */
@@ -3357,7 +3748,6 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
       RNA_float_get(op->ptr, "angle_snapping_increment"));
 
   KnifeTool_OpData *kcd;
-  Scene *scene = CTX_data_scene(C);
 
   if (only_select) {
     Object *obedit = CTX_data_edit_object(C);
