@@ -1007,6 +1007,12 @@ static void uvedit_pack_islands_multi(const Scene *scene,
   }
 }
 
+/* Packing targets */
+enum {
+  CLOSEST_UDIM = 0,
+  SPECIFIED_UDIM = 1,
+};
+
 static int pack_islands_exec(bContext *C, wmOperator *op)
 {
   ViewLayer *view_layer = CTX_data_view_layer(C);
@@ -1028,7 +1034,7 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
   bool rotate = RNA_boolean_get(op->ptr, "rotate");
 
   /* Check if specified UDIM is valid - specified tile exists in the udim grid or tiled image */
-  if (RNA_enum_get(op->ptr, "packTo") == 1) {
+  if (RNA_enum_get(op->ptr, "packTo") == SPECIFIED_UDIM) {
     if (RNA_struct_property_is_set(op->ptr, "target_udim")) {
       int target_udim = RNA_int_get(op->ptr, "target_udim");
 
@@ -1037,7 +1043,6 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
         target_udim -= 1001;
         const int target_x = (target_udim % 10) + 1;
         const int target_y = (target_udim / 10) + 1;
-
         if (target_x <= sima->tile_grid_shape[0] && target_y <= sima->tile_grid_shape[1]) {
           scene->toolsettings->target_udim = RNA_int_get(op->ptr, "target_udim");
         }
@@ -1049,9 +1054,7 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
       /* If tiled image present then check if target_udim is valid */
       else if (image && is_tiled_image) {
         RNA_int_set(op->ptr, "target_udim", scene->toolsettings->target_udim);
-
         LISTBASE_FOREACH (const ImageTile *, tile, &image->tiles) {
-
           if (target_udim == tile->tile_number) {
             scene->toolsettings->target_udim = target_udim;
             RNA_int_set(op->ptr, "target_udim", target_udim);
@@ -1067,7 +1070,6 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
       }
     }
 
-    /*  */
     else {
       scene->toolsettings->target_udim = RNA_int_get(op->ptr, "target_udim");
     }
@@ -1108,7 +1110,6 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
                                });
 
   MEM_freeN(objects);
-
   return OPERATOR_FINISHED;
 }
 
@@ -1122,8 +1123,9 @@ static void pack_islands_draw(bContext *C, wmOperator *op)
 
   col = uiLayoutColumn(layout, false);
 
+  /* Expose target UDIM prop only if packing target is specified UDIM */
   uiItemR(col, op->ptr, "packTo", 0, NULL, 0);
-  if (RNA_enum_get(op->ptr, "packTo") == 1) {
+  if (RNA_enum_get(op->ptr, "packTo") == SPECIFIED_UDIM) {
     uiItemR(col, op->ptr, "target_udim", 0, NULL, 0);
   }
 
@@ -1151,7 +1153,7 @@ void UV_OT_pack_islands(wmOperatorType *ot)
   ot->ui = pack_islands_draw;
 
   /* properties */
-  RNA_def_enum(ot->srna, "packTo", pack_to, 0, "Pack to", "");
+  RNA_def_enum(ot->srna, "packTo", pack_to, CLOSEST_UDIM, "Pack to", "");
   RNA_def_boolean(ot->srna, "rotate", true, "Rotate", "Rotate islands for best fit");
   RNA_def_int(ot->srna,
               "target_udim",
@@ -1179,7 +1181,6 @@ static int pack_islands_to_area_exec(bContext *C, wmOperator *op)
   ARegion *region = CTX_wm_region(C);
 
   uint objects_len = 0;
-  /* Get reference to objects currently in edit mode */
   Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data_with_uvs(
       view_layer, CTX_wm_view3d(C), &objects_len);
 
@@ -1195,13 +1196,9 @@ static int pack_islands_to_area_exec(bContext *C, wmOperator *op)
   /* Keeping a lower bound of 0.001 for user-defined space, smaller than that and the UVs won't be
    * visible in the UV editor
    * NOTE : Could be removed/changed */
-  if ((max_co[0] - min_co[0]) <= 0.001 || (max_co[1] - min_co[1]) <= 0.001) {
+  if ((max_co[0] - min_co[0]) <= 0.001f || (max_co[1] - min_co[1]) <= 0.001f) {
     return OPERATOR_CANCELLED;
   }
-
-  /* Check : packing area coordinates */
-  printf("Bottom-left coordinates : (%f,%f) \n", bounds.xmin, bounds.ymin);
-  printf("Top-right coordinates : (%f,%f) \n\n", bounds.xmax, bounds.ymax);
 
   /* RNA props */
   bool rotate_islands = RNA_boolean_get(op->ptr, "rotate");
@@ -1275,7 +1272,6 @@ void UV_OT_pack_islands_to_area(wmOperatorType *ot)
   ot->cancel = WM_gesture_box_cancel;
 
   ot->poll = ED_operator_uvedit;
-  // ot->poll = ED_operator_uvedit_space_image;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
