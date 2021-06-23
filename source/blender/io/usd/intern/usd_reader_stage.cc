@@ -101,7 +101,7 @@ USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim)
   if (prim.IsA<pxr::UsdLuxLight>()) {
     return new USDLightReader(prim, params_, settings_);
   }
-  else if (prim.IsA<pxr::UsdVolVolume>()) {
+  if (prim.IsA<pxr::UsdVolVolume>()) {
     return new USDVolumeReader(prim, params_, settings_);
   }
   if (prim.IsA<pxr::UsdGeomImageable>()) {
