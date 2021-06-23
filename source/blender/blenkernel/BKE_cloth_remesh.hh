@@ -82,6 +82,8 @@ using IncidentFaces = blender::Vector<FaceIndex>;
 using AdjacentVerts = IncidentVerts;
 using EdgeVerts = std::tuple<VertIndex, VertIndex>;
 
+using usize = uint64_t;
+
 /**
  * `Node`: Stores the worldspace/localspace coordinates of the
  * `Mesh`. Commonly called the vertex of the mesh (note: in this mesh
@@ -107,6 +109,8 @@ template<typename T> class Node {
   {
     this->extra_data = extra_data;
   }
+
+  template<typename, typename, typename, typename> friend class Mesh;
 };
 
 /**
@@ -138,6 +142,8 @@ template<typename T> class Vert {
   {
     this->extra_data = extra_data;
   }
+
+  template<typename, typename, typename, typename> friend class Mesh;
 };
 
 /**
@@ -170,6 +176,20 @@ template<typename T> class Edge {
   {
     this->extra_data = extra_data;
   }
+
+  bool has_vert(VertIndex vert_index)
+  {
+    if (this->verts) {
+      if (std::get<0>(this->verts.value()) == vert_index ||
+          std::get<1>(this->verts.value()) == vert_index) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  template<typename, typename, typename, typename> friend class Mesh;
 };
 
 /**
@@ -200,75 +220,11 @@ template<typename T> class Face {
   {
     this->extra_data = extra_data;
   }
-};
 
-template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
-  /* using declarations */
-  /* static data members */
-  /* non-static data members */
-  ga::Arena<Node<END>> nodes;
-  ga::Arena<Vert<EVD>> verts;
-  ga::Arena<Edge<EED>> edges;
-  ga::Arena<Face<EFD>> faces;
-
- public:
-  /* default constructor */
-  Mesh() = default;
-  /* other constructors */
-  /* copy constructor */
-  /* move constructor */
-
-  /* destructor */
-
-  /* copy assignment operator */
-  /* move assignment operator */
-  /* other operator overloads */
-
-  /* all public static methods */
-  /* all public non-static methods */
-
- protected:
-  /* all protected static methods */
-  /* all protected non-static methods */
-
- private:
-  /* all private static methods */
-  /* all private non-static methods */
-
-  Node<END> &add_empty_node(float3 pos, float3 normal)
-  {
-    auto node_index = this->nodes.insert_with(
-        [=](NodeIndex index) { return Node<END>(index, pos, normal); });
-
-    return this->nodes.get(node_index);
-  }
-
-  Vert<EVD> &add_empty_vert(float2 uv)
-  {
-    auto vert_index = this->verts.insert_with(
-        [=](VertIndex index) { return Vert<EVD>(index, uv); });
-
-    return this->verts.get(vert_index);
-  }
-
-  Edge<EED> &add_empty_edge()
-  {
-    auto edge_index = this->edges.insert_with([=](EdgeIndex index) { return Edge<EED>(index); });
-
-    return this->edges.get(edge_index);
-  }
-
-  Face<EFD> &add_empty_face(float3 normal)
-  {
-    auto face_index = this->faces.insert_with(
-        [=](FaceIndex index) { return Face<EFD>(index, normal); });
-
-    return this->faces.get(face_index);
-  }
+  template<typename, typename, typename, typename> friend class Mesh;
 };
 
 class MeshReader {
-  using usize = uint64_t;
   using FaceData = std::tuple<usize, usize, usize>; /* position,
                                                      * uv,
                                                      * normal */
@@ -317,6 +273,8 @@ class MeshReader {
     else {
       BLI_assert_unreachable();
     }
+
+    /* TODO(ish): do some checks to ensure the data makes sense */
 
     return true;
   }
@@ -475,6 +433,207 @@ class MeshReader {
     }
 
     return true;
+  }
+};
+
+template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
+  /* using declarations */
+  /* static data members */
+  /* non-static data members */
+  ga::Arena<Node<END>> nodes;
+  ga::Arena<Vert<EVD>> verts;
+  ga::Arena<Edge<EED>> edges;
+  ga::Arena<Face<EFD>> faces;
+
+  bool node_normals_dirty;
+  bool face_normals_dirty;
+
+ public:
+  /* default constructor */
+  Mesh() = default;
+
+  /* other constructors */
+  /* copy constructor */
+  /* move constructor */
+
+  /* destructor */
+
+  /* copy assignment operator */
+  /* move assignment operator */
+  /* other operator overloads */
+
+  /* all public static methods */
+  /* all public non-static methods */
+  std::optional<EdgeIndex> get_connecting_edge_index(VertIndex vert_1_index,
+                                                     VertIndex vert_2_index)
+  {
+    auto vert_1 = this->verts.get(vert_1_index);
+    if (vert_1 == std::nullopt) {
+      return std::nullopt;
+    }
+
+    for (const auto &edge_index : vert_1.edges) {
+      auto edge = this->edges.get(edge_index);
+
+      if (edge == std::nullopt) {
+        return std::nullopt;
+      }
+
+      if (edge.has_vert(vert_2_index)) {
+        return edge_index;
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  void read_obj(const fs::path &filepath)
+  {
+    MeshReader reader;
+    const auto reader_success = reader.read(filepath, MeshReader::FILETYPE_OBJ);
+    BLI_assert(reader_success); /* must successfully load obj */
+
+    const auto positions = reader.get_positions();
+    const auto uvs = reader.get_uvs();
+    const auto normals = reader.get_normals();
+    const auto face_indices = reader.get_face_indices();
+    const auto line_indices = reader.get_line_indices();
+
+    /* TODO(ish): add support for when uvs doesn't exist */
+    BLI_assert(uvs.size() != 0);
+
+    this->node_normals_dirty = true;
+    this->face_normals_dirty = true;
+
+    /* create all `Node`(s) */
+    for (const auto &pos : positions) {
+      this->add_empty_node(pos, float3_unknown());
+    }
+
+    /* create all `Vert`(s) */
+    for (const auto &uv : uvs) {
+      this->add_empty_vert(uv);
+    }
+
+    /* use face information for create `Face`(s), `Edge`(s) and
+     * create the necessary references */
+    for (const auto &face_index_data : face_indices) {
+
+      /* update verts and nodes */
+      for (const auto &[pos_index, uv_index, normal_index] : face_index_data) {
+        auto vert = this->verts.get_no_gen(uv_index);
+        auto node = this->node.get_no_gen(pos_index);
+        BLI_assert(vert && node);
+
+        vert.node = node.self_index;
+        node.verts.append(vert.self_index);
+
+        /* if vertex normals exist */
+        if (normals.size() > normal_index) {
+          node.normal = normals[normal_index];
+        }
+      }
+
+      /* update edges */
+      auto vert_1_i = face_index_data[0];
+      auto vert_2_i = face_index_data[0];
+      blender::Vector<VertIndex> face_verts;
+      blender::Vector<EdgeIndex> face_edges;
+      for (auto i = 1; i <= face_index_data.size(); i++) {
+        vert_1_i = vert_2_i;
+        if (i == face_index_data.size()) {
+          vert_2_i = face_index_data[0];
+        }
+        else {
+          vert_2_i = face_index_data[i];
+        }
+
+        auto vert_1_index = this->verts.get_no_gen_index(vert_1_i);
+        auto vert_2_index = this->verts.get_no_gen_index(vert_2_i);
+        BLI_assert(vert_1_index && vert_2_index);
+
+        if (auto edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index)) {
+          face_edges.append(edge_index);
+        }
+        else {
+          auto edge = this->add_empty_edge();
+
+          edge.verts = std::make_tuple(vert_1_index, vert_2_index);
+
+          auto vert_1 = this->verts.get(vert_1_index);
+          vert_1.edges.append(edge.self_index);
+
+          auto vert_2 = this->verts.get(vert_2_index);
+          vert_2.edges.append(edge.self_index);
+
+          face_edges.append(edge.self_index);
+        }
+      }
+
+      /* update faces */
+      {
+        auto face = this->add_empty_face(float3_unknown());
+
+        face.verts = face_verts;
+
+        for (const auto &edge_index : face_edges) {
+          auto edge = this->edges.get(edge_index);
+          BLI_assert(edge);
+
+          edge.faces.push(face.self_index);
+        }
+      }
+    }
+
+    /* TODO(ish): add support for lines */
+  }
+
+ protected:
+  /* all protected static methods */
+  /* all protected non-static methods */
+
+ private:
+  /* all private static methods */
+  static constexpr inline float3 float3_unknown()
+  {
+    return float3(std::numeric_limits<float>::signaling_NaN());
+  }
+
+  static constexpr inline float2 float2_unknown()
+  {
+    return float2(std::numeric_limits<float>::signaling_NaN());
+  }
+
+  /* all private non-static methods */
+  Node<END> &add_empty_node(float3 pos, float3 normal)
+  {
+    auto node_index = this->nodes.insert_with(
+        [=](NodeIndex index) { return Node<END>(index, pos, normal); });
+
+    return this->nodes.get(node_index);
+  }
+
+  Vert<EVD> &add_empty_vert(float2 uv)
+  {
+    auto vert_index = this->verts.insert_with(
+        [=](VertIndex index) { return Vert<EVD>(index, uv); });
+
+    return this->verts.get(vert_index);
+  }
+
+  Edge<EED> &add_empty_edge()
+  {
+    auto edge_index = this->edges.insert_with([=](EdgeIndex index) { return Edge<EED>(index); });
+
+    return this->edges.get(edge_index);
+  }
+
+  Face<EFD> &add_empty_face(float3 normal)
+  {
+    auto face_index = this->faces.insert_with(
+        [=](FaceIndex index) { return Face<EFD>(index, normal); });
+
+    return this->faces.get(face_index);
   }
 };
 
