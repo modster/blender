@@ -52,6 +52,13 @@
 #  define GHOST_PRINTF(x, ...)
 #endif  // WITH_GHOST_DEBUG
 
+#include <stdio.h>  //for printf()
+#define WINTAB_PRINTF(x, ...) \
+  { \
+    printf(x, __VA_ARGS__); \
+  } \
+  (void)0
+
 #ifdef WITH_ASSERT_ABORT
 #  include <stdio.h>   //for fprintf()
 #  include <stdlib.h>  //for abort()

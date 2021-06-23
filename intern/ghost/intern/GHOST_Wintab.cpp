@@ -21,6 +21,7 @@
 #define _USE_MATH_DEFINES
 
 #include "GHOST_Wintab.h"
+#include "GHOST_Debug.h"
 
 GHOST_Wintab *GHOST_Wintab::loadWintab(HWND hwnd)
 {
@@ -130,6 +131,11 @@ GHOST_Wintab *GHOST_Wintab::loadWintab(HWND hwnd)
     }
   }
 
+  int sanityQueueSize = queueSizeGet(hctx.get());
+  WINTAB_PRINTF("initializeWintab queueSize: %d, queueSizeGet: %d\n", queueSize, sanityQueueSize);
+
+  WINTAB_PRINTF("Loaded Wintab context %p\n", hctx.get());
+
   return new GHOST_Wintab(hwnd,
                           std::move(handle),
                           info,
@@ -200,6 +206,51 @@ GHOST_Wintab::GHOST_Wintab(HWND hwnd,
 {
   m_fpInfo(WTI_INTERFACE, IFC_NDEVICES, &m_numDevices);
   updateCursorInfo();
+
+  /* Debug info. */
+
+  WINTAB_PRINTF("initializeWintab numDevices: %d\n", m_numDevices);
+
+  UINT maxcontexts, opencontexts;
+  m_fpInfo(WTI_INTERFACE, IFC_NCONTEXTS, &maxcontexts);
+  m_fpInfo(WTI_STATUS, STA_CONTEXTS, &opencontexts);
+  WINTAB_PRINTF("%u max contexts, %u open contexts\n", maxcontexts, opencontexts);
+
+  /* Print button maps. */
+  BYTE logicalButtons[32] = {0};
+  BYTE systemButtons[32] = {0};
+  for (int i = 0; i < 3; i++) {
+    WINTAB_PRINTF("initializeWintab cursor %d buttons\n", i);
+    UINT lbut = m_fpInfo(WTI_CURSORS + i, CSR_BUTTONMAP, &logicalButtons);
+    if (lbut) {
+      WINTAB_PRINTF("%d", logicalButtons[0]);
+      for (int j = 1; j < lbut; j++) {
+        WINTAB_PRINTF(", %d", logicalButtons[j]);
+      }
+      WINTAB_PRINTF("\n");
+    }
+    else {
+      WINTAB_PRINTF("logical button error\n");
+    }
+    UINT sbut = m_fpInfo(WTI_CURSORS + i, CSR_SYSBTNMAP, &systemButtons);
+    if (sbut) {
+      WINTAB_PRINTF("%d", systemButtons[0]);
+      for (int j = 1; j < sbut; j++) {
+        WINTAB_PRINTF(", %d", systemButtons[j]);
+      }
+      WINTAB_PRINTF("\n");
+    }
+    else {
+      WINTAB_PRINTF("system button error\n");
+    }
+  }
+
+  printContextInfo();
+}
+
+GHOST_Wintab::~GHOST_Wintab()
+{
+  WINTAB_PRINTF("Closing Wintab context %p\n", m_context.get());
 }
 
 void GHOST_Wintab::enable()
@@ -265,6 +316,7 @@ void GHOST_Wintab::updateCursorInfo()
 
   BOOL pressureSupport = m_fpInfo(WTI_DEVICES, DVC_NPRESSURE, &Pressure);
   m_maxPressure = pressureSupport ? Pressure.axMax : 0;
+  WINTAB_PRINTF("cursorInfo maxPressure: %d\n", m_maxPressure);
 
   BOOL tiltSupport = m_fpInfo(WTI_DEVICES, DVC_ORIENTATION, &Orientation);
   /* Check if tablet supports azimuth [0] and altitude [1], encoded in axResolution. */
@@ -275,12 +327,14 @@ void GHOST_Wintab::updateCursorInfo()
   else {
     m_maxAzimuth = m_maxAltitude = 0;
   }
+  WINTAB_PRINTF("cursorInfo maxAzimuth: %d, maxAltitude: %d\n", m_maxAzimuth, m_maxAltitude);
 }
 
 void GHOST_Wintab::processInfoChange(LPARAM lParam)
 {
   /* Update number of connected Wintab digitizers. */
   if (LOWORD(lParam) == WTI_INTERFACE && HIWORD(lParam) == IFC_NDEVICES) {
+    WINTAB_PRINTF("%p processWintabInfoChangeEvent numDevices: %d\n", m_numDevices);
     m_fpInfo(WTI_INTERFACE, IFC_NDEVICES, &m_numDevices);
   }
 }
@@ -487,5 +541,106 @@ bool GHOST_Wintab::testCoordinates(int sysX, int sysY, int wtX, int wtY)
   else {
     m_coordTrusted = false;
     return false;
+  }
+}
+
+void GHOST_Wintab::printContextInfo()
+{
+  LOGCONTEXT debuglc;
+  m_fpInfo(WTI_DEFSYSCTX, 0, &debuglc);
+
+  /* Print system context. */
+  WINTAB_PRINTF("lcOutOrgX: %d, lcOutOrgY: %d, lcOutExtX: %d, lcOutExtY: %d\n",
+                debuglc.lcOutOrgX,
+                debuglc.lcOutOrgY,
+                debuglc.lcOutExtX,
+                debuglc.lcOutExtY);
+  WINTAB_PRINTF("lcInOrgX: %d, lcInOrgY: %d, lcInExtX: %d, lcInExtY: %d\n",
+                debuglc.lcInOrgX,
+                debuglc.lcInOrgY,
+                debuglc.lcInExtX,
+                debuglc.lcInExtY);
+  WINTAB_PRINTF("lcSysOrgX: %d, lcSysOrgY: %d, lcSysExtX: %d, lcSysExtY: %d\n",
+                debuglc.lcSysOrgX,
+                debuglc.lcSysOrgY,
+                debuglc.lcSysExtX,
+                debuglc.lcSysExtY);
+  WINTAB_PRINTF("left: %d, top: %d, width: %d, height: %d\n",
+                ::GetSystemMetrics(SM_XVIRTUALSCREEN),
+                ::GetSystemMetrics(SM_YVIRTUALSCREEN),
+                ::GetSystemMetrics(SM_CXVIRTUALSCREEN),
+                ::GetSystemMetrics(SM_CYVIRTUALSCREEN));
+
+  /* Print system context, manually populated. */
+  m_fpInfo(WTI_DEFSYSCTX, CTX_OUTORGX, &debuglc.lcOutOrgX);
+  m_fpInfo(WTI_DEFSYSCTX, CTX_OUTORGY, &debuglc.lcOutOrgY);
+  m_fpInfo(WTI_DEFSYSCTX, CTX_OUTEXTX, &debuglc.lcOutExtX);
+  m_fpInfo(WTI_DEFSYSCTX, CTX_OUTEXTY, &debuglc.lcOutExtY);
+  m_fpInfo(WTI_DEFSYSCTX, CTX_SYSORGX, &debuglc.lcSysOrgX);
+  m_fpInfo(WTI_DEFSYSCTX, CTX_SYSORGY, &debuglc.lcSysOrgY);
+  m_fpInfo(WTI_DEFSYSCTX, CTX_SYSEXTX, &debuglc.lcSysExtX);
+  m_fpInfo(WTI_DEFSYSCTX, CTX_SYSEXTY, &debuglc.lcSysExtY);
+  WINTAB_PRINTF("index def lcOutOrgX: %d, lcOutOrgY: %d, lcOutExtX: %d, lcOutExtY: %d\n",
+                debuglc.lcOutOrgX,
+                debuglc.lcOutOrgY,
+                debuglc.lcOutExtX,
+                debuglc.lcOutExtY);
+  WINTAB_PRINTF("index def lcSysOrgX: %d, lcSysOrgY: %d, lcSysExtX: %d, lcSysExtY: %d\n",
+                debuglc.lcSysOrgX,
+                debuglc.lcSysOrgY,
+                debuglc.lcSysExtX,
+                debuglc.lcSysExtY);
+
+  for (unsigned int i = 0; i < m_numDevices; i++) {
+    /* Print individual device system context. */
+    m_fpInfo(WTI_DSCTXS + i, 0, &debuglc);
+    WINTAB_PRINTF("dev %d lcOutOrgX: %d, lcOutOrgY: %d, lcOutExtX: %d, lcOutExtY: %d\n",
+                  i,
+                  debuglc.lcOutOrgX,
+                  debuglc.lcOutOrgY,
+                  debuglc.lcOutExtX,
+                  debuglc.lcOutExtY);
+    WINTAB_PRINTF("dev %d lcSysOrgX: %d, lcSysOrgY: %d, lcSysExtX: %d, lcSysExtY: %d\n",
+                  i,
+                  debuglc.lcSysOrgX,
+                  debuglc.lcSysOrgY,
+                  debuglc.lcSysExtX,
+                  debuglc.lcSysExtY);
+
+    /* Print individual device system context, manually populated. */
+    m_fpInfo(WTI_DSCTXS + i, CTX_OUTORGX, &debuglc.lcOutOrgX);
+    m_fpInfo(WTI_DSCTXS + i, CTX_OUTORGY, &debuglc.lcOutOrgY);
+    m_fpInfo(WTI_DSCTXS + i, CTX_OUTEXTX, &debuglc.lcOutExtX);
+    m_fpInfo(WTI_DSCTXS + i, CTX_OUTEXTY, &debuglc.lcOutExtY);
+    m_fpInfo(WTI_DSCTXS + i, CTX_SYSORGX, &debuglc.lcSysOrgX);
+    m_fpInfo(WTI_DSCTXS + i, CTX_SYSORGY, &debuglc.lcSysOrgY);
+    m_fpInfo(WTI_DSCTXS + i, CTX_SYSEXTX, &debuglc.lcSysExtX);
+    m_fpInfo(WTI_DSCTXS + i, CTX_SYSEXTY, &debuglc.lcSysExtY);
+    WINTAB_PRINTF("index def dev %d lcOutOrgX: %d, lcOutOrgY: %d, lcOutExtX: %d, lcOutExtY: %d\n",
+                  i,
+                  debuglc.lcOutOrgX,
+                  debuglc.lcOutOrgY,
+                  debuglc.lcOutExtX,
+                  debuglc.lcOutExtY);
+    WINTAB_PRINTF("index def dev %d lcSysOrgX: %d, lcSysOrgY: %d, lcSysExtX: %d, lcSysExtY: %d\n",
+                  i,
+                  debuglc.lcSysOrgX,
+                  debuglc.lcSysOrgY,
+                  debuglc.lcSysExtX,
+                  debuglc.lcSysExtY);
+
+    /* Print device axis. */
+    AXIS axis_x, axis_y;
+    m_fpInfo(WTI_DEVICES + i, DVC_X, &axis_x);
+    m_fpInfo(WTI_DEVICES + i, DVC_Y, &axis_y);
+    WINTAB_PRINTF("dev %d axis_x org: %d, axis_y org: %d axis_x ext: %d, axis_y ext: %d\n",
+                  i,
+                  axis_x.axMin,
+                  axis_y.axMin,
+                  axis_x.axMax - axis_x.axMin + 1,
+                  axis_y.axMax - axis_y.axMin + 1);
+
+    /* Other stuff while we have a logcontext. */
+    WINTAB_PRINTF("sysmode %d\n", debuglc.lcSysMode);
   }
 }

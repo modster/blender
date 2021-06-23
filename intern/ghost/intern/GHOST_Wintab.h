@@ -159,6 +159,8 @@ class GHOST_Wintab {
    */
   GHOST_TabletData getLastTabletData();
 
+  ~GHOST_Wintab();
+
  private:
   /** Wintab DLL handle. */
   unique_hmodule m_handle;
@@ -247,4 +249,6 @@ class GHOST_Wintab {
    * \param system: System coordinates.
    */
   static void extractCoordinates(LOGCONTEXT &lc, Coord &tablet, Coord &system);
+
+  void printContextInfo();
 };
