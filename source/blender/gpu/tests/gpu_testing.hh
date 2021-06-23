@@ -20,8 +20,24 @@ class GPUTest : public ::testing::Test {
   struct GPUContext *context;
 
  protected:
+  GHOST_TDrawingContextType draw_context_type = GHOST_kDrawingContextTypeOpenGL;
+
   void SetUp() override;
   void TearDown() override;
 };
+
+class GPUOpenGLTest : public GPUTest {
+ public:
+  GPUOpenGLTest();
+};
+
+#ifdef WITH_VULKAN
+
+class GPUVulkanTest : public GPUTest {
+ public:
+  GPUVulkanTest();
+};
+
+#endif
 
 }  // namespace blender::gpu

@@ -12,10 +12,10 @@ namespace blender::gpu {
 
 void GPUTest::SetUp()
 {
-  GHOST_TDrawingContextType type = GHOST_kDrawingContextTypeOpenGL;
+
   GHOST_GLSettings glSettings = {0};
   ghost_system = GHOST_CreateSystem();
-  ghost_context = GHOST_CreateOpenGLContext(ghost_system, type, glSettings);
+  ghost_context = GHOST_CreateOpenGLContext(ghost_system, draw_context_type, glSettings);
   context = GPU_context_create(NULL, ghost_context);
   GPU_init();
 }
@@ -28,5 +28,19 @@ void GPUTest::TearDown()
   GHOST_DisposeOpenGLContext(ghost_system, ghost_context);
   GHOST_DisposeSystem(ghost_system);
 }
+
+GPUOpenGLTest::GPUOpenGLTest()
+{
+  draw_context_type = GHOST_kDrawingContextTypeOpenGL;
+}
+
+#ifdef WITH_VULKAN
+
+GPUVulkanTest::GPUVulkanTest()
+{
+  draw_context_type = GHOST_kDrawingContextTypeVulkan;
+}
+
+#endif
 
 }  // namespace blender::gpu

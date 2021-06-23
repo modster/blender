@@ -6,7 +6,8 @@
 namespace blender::gpu::tests {
 
 #ifdef WITH_VULKAN
-TEST_F(GPUTest, shader_compiler)
+/* TODO(jbakker): GPUVulkanTest crashes. */
+TEST_F(GPUOpenGLTest, shader_compiler)
 {
   const char *source = "#version 450\nvoid main() {}";
   shader_compiler::Compiler *compiler = shader_compiler::Compiler::create_default();

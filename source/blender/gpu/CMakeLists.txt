@@ -435,6 +435,7 @@ if(WITH_GTESTS)
     set(TEST_SRC
       tests/gpu_testing.cc
       tests/gpu_shader_compiler_test.cc
+      tests/gpu_shader_builtin_test.cc
 
       tests/gpu_testing.hh
     )
