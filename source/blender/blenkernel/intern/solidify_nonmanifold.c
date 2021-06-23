@@ -1380,7 +1380,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
         int loopend = mp->loopstart + mp->totloop;
         ml = orig_mloop + mp->loopstart;
         for (int j = mp->loopstart; j < loopend; j++, ml++) {
-            scalar_vgroup = min_ff(solidify_data->distance[i], scalar_vgroup);
+          scalar_vgroup = min_ff(solidify_data->distance[i], scalar_vgroup);
         }
         scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
         face_weight[i] = scalar_vgroup;
@@ -1930,7 +1930,6 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
     (*r_rim_faces)[i] = false;
   }
 
-
   /* Make_new_verts. */
   {
     gs_ptr = orig_vert_groups_arr;
@@ -2164,7 +2163,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
               mpoly[poly_index].loopstart = (int)loop_index;
               mpoly[poly_index].totloop = (int)j;
 
-              if(g->is_orig_closed || !do_rim){
+              if (g->is_orig_closed || !do_rim) {
                 (*r_rim_faces)[poly_index] = true;
               }
 
@@ -2421,7 +2420,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
           mpoly[poly_index].loopstart = (int)loop_index;
           mpoly[poly_index].totloop = (int)k;
 
-          if(fr->reversed != do_flip){
+          if (fr->reversed != do_flip) {
             (*r_shell_faces)[poly_index] = true;
           }
           mpoly[poly_index].flag = fr->face->flag;
@@ -2454,26 +2453,26 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
     MEM_freeN(face_edges);
   }
   /* Haven't found a good way to generalize this. */
-  //if (edge_index != numNewEdges) {
-    /*BKE_modifier_set_error(ctx->object,
-                           md,
-                           "Internal Error: edges array wrong size: %u instead of %u",
-                           numNewEdges,
-                           edge_index);*/
+  // if (edge_index != numNewEdges) {
+  /*BKE_modifier_set_error(ctx->object,
+                         md,
+                         "Internal Error: edges array wrong size: %u instead of %u",
+                         numNewEdges,
+                         edge_index);*/
   //}
-  //if (poly_index != numNewPolys) {
-    /*BKE_modifier_set_error(ctx->object,
-                           md,
-                           "Internal Error: polys array wrong size: %u instead of %u",
-                           numNewPolys,f
-                           poly_index);*/
+  // if (poly_index != numNewPolys) {
+  /*BKE_modifier_set_error(ctx->object,
+                         md,
+                         "Internal Error: polys array wrong size: %u instead of %u",
+                         numNewPolys,f
+                         poly_index);*/
   //}
-  //if (loop_index != numNewLoops) {
-    /*BKE_modifier_set_error(ctx->object,
-                           md,
-                           "Internal Error: loops array wrong size: %u instead of %u",
-                           numNewLoops,
-                           loop_index);*/
+  // if (loop_index != numNewLoops) {
+  /*BKE_modifier_set_error(ctx->object,
+                         md,
+                         "Internal Error: loops array wrong size: %u instead of %u",
+                         numNewLoops,
+                         loop_index);*/
   //}
   BLI_assert(edge_index == numNewEdges);
   BLI_assert(poly_index == numNewPolys);

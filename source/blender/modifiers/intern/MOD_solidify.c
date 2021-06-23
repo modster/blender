@@ -48,8 +48,8 @@
 #include "MEM_guardedalloc.h"
 
 #include "MOD_modifiertypes.h"
-#include "MOD_ui_common.h"
 #include "MOD_solidify_util.h"
+#include "MOD_ui_common.h"
 
 static bool dependsOnNormals(ModifierData *md)
 {
@@ -112,7 +112,7 @@ static float *get_distance_factor(Mesh *mesh, Object *ob, const char *name, bool
     }
   }
 
-  if(invert){
+  if (invert) {
     for (int i = 0; i < mesh->totvert; i++) {
       selection[i] = 1.0f - selection[i];
     }
@@ -122,7 +122,7 @@ static float *get_distance_factor(Mesh *mesh, Object *ob, const char *name, bool
 }
 
 static SolidifyData solidify_data_from_modifier_data(ModifierData *md,
-                                                           const ModifierEvalContext *ctx)
+                                                     const ModifierEvalContext *ctx)
 {
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
   SolidifyData solidify_data = {
@@ -160,20 +160,19 @@ static Mesh *MOD_solidify_nonmanifold(ModifierData *md,
   SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
 
   const bool defgrp_invert = (solidify_data.flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
-  solidify_data.distance = get_distance_factor(
-      mesh, ctx->object, smd->defgrp_name, defgrp_invert);
+  solidify_data.distance = get_distance_factor(mesh, ctx->object, smd->defgrp_name, defgrp_invert);
 
   bool *shell_verts = NULL;
   bool *rim_verts = NULL;
   bool *shell_faces = NULL;
   bool *rim_faces = NULL;
 
-  Mesh *output_mesh = solidify_nonmanifold(&solidify_data, mesh, &shell_verts, &rim_verts, &shell_faces, &rim_faces);
+  Mesh *output_mesh = solidify_nonmanifold(
+      &solidify_data, mesh, &shell_verts, &rim_verts, &shell_faces, &rim_faces);
 
   const int shell_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
                                                                 smd->shell_defgrp_name);
-  const int rim_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
-                                                              smd->rim_defgrp_name);
+  const int rim_defgrp_index = BKE_object_defgroup_name_index(ctx->object, smd->rim_defgrp_name);
 
   MDeformVert *dvert;
   if (shell_defgrp_index != -1 || rim_defgrp_index != -1) {
@@ -194,8 +193,7 @@ static Mesh *MOD_solidify_nonmanifold(ModifierData *md,
     }
     if ((solidify_data.flag & MOD_SOLIDIFY_RIM) && rim_defgrp_index != -1) {
       for (int i = 0; i < output_mesh->totvert; i++) {
-        BKE_defvert_ensure_index(&output_mesh->dvert[i], rim_defgrp_index)->weight =
-            rim_verts[i];
+        BKE_defvert_ensure_index(&output_mesh->dvert[i], rim_defgrp_index)->weight = rim_verts[i];
       }
     }
   }
@@ -208,25 +206,25 @@ static Mesh *MOD_solidify_nonmanifold(ModifierData *md,
 
   short most_mat_nr = 0;
   uint most_mat_nr_count = 0;
-  for(int mat_nr = 0; mat_nr < mat_nrs; mat_nr++){
+  for (int mat_nr = 0; mat_nr < mat_nrs; mat_nr++) {
     uint count = 0;
-    for(int i = 0; i < mesh->totpoly; i++){
-      if(mesh->mpoly[i].mat_nr == mat_nr){
+    for (int i = 0; i < mesh->totpoly; i++) {
+      if (mesh->mpoly[i].mat_nr == mat_nr) {
         count++;
       }
     }
-    if(count > most_mat_nr_count){
+    if (count > most_mat_nr_count) {
       most_mat_nr = mat_nr;
     }
   }
 
-  for(int i = 0; i < output_mesh->totpoly; i++){
+  for (int i = 0; i < output_mesh->totpoly; i++) {
     output_mesh->mpoly[i].mat_nr = most_mat_nr;
-    if(mat_ofs > 0 && shell_faces && shell_faces[i]){
+    if (mat_ofs > 0 && shell_faces && shell_faces[i]) {
       output_mesh->mpoly[i].mat_nr += mat_ofs;
       CLAMP(output_mesh->mpoly[i].mat_nr, 0, mat_nr_max);
     }
-    else if(mat_ofs_rim > 0 && rim_faces && rim_faces[i]){
+    else if (mat_ofs_rim > 0 && rim_faces && rim_faces[i]) {
       output_mesh->mpoly[i].mat_nr += mat_ofs_rim;
       CLAMP(output_mesh->mpoly[i].mat_nr, 0, mat_nr_max);
     }

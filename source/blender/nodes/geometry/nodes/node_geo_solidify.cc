@@ -142,7 +142,8 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     bool *shell_faces = nullptr;
     bool *rim_faces = nullptr;
 
-    output_mesh = solidify_nonmanifold(&solidify_node_data, input_mesh, &shell_verts, &rim_verts, &shell_faces, &rim_faces);
+    output_mesh = solidify_nonmanifold(
+        &solidify_node_data, input_mesh, &shell_verts, &rim_verts, &shell_faces, &rim_faces);
 
     geometry_set.replace_mesh(output_mesh);
 
@@ -152,24 +153,25 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     const std::string shell_faces_attribute_name = params.get_input<std::string>("Shell Faces");
     const std::string rim_faces_attribute_name = params.get_input<std::string>("Rim Faces");
 
-
     if (solidify_node_data.flag & MOD_SOLIDIFY_SHELL) {
-      if(!shell_faces_attribute_name.empty()){
+      if (!shell_faces_attribute_name.empty()) {
         OutputAttribute_Typed<bool> shell_faces_attribute =
             mesh_component.attribute_try_get_for_output_only<bool>(shell_faces_attribute_name,
                                                                    result_face_domain);
-        Span<bool> s(shell_faces, shell_faces_attribute->size());
-        shell_faces_attribute->set_all(s);
+        Span<bool> shell_faces_span(shell_faces, shell_faces_attribute->size());
+        shell_faces_attribute->set_all(shell_faces_span);
+        shell_faces_attribute.save();
       }
     }
 
     if (solidify_node_data.flag & MOD_SOLIDIFY_RIM) {
-      if(!rim_faces_attribute_name.empty()) {
+      if (!rim_faces_attribute_name.empty()) {
         OutputAttribute_Typed<bool> rim_faces_attribute =
             mesh_component.attribute_try_get_for_output_only<bool>(rim_faces_attribute_name,
                                                                    result_face_domain);
-        Span<bool> s(shell_faces, rim_faces_attribute->size());
-        rim_faces_attribute->set_all(s);
+        Span<bool> rim_faces_span(rim_faces, rim_faces_attribute->size());
+        rim_faces_attribute->set_all(rim_faces_span);
+        rim_faces_attribute.save();
       }
     }
 

@@ -1237,7 +1237,7 @@ typedef struct NodeInputVector {
   float vector[3];
 } NodeInputVector;
 
-typedef struct NodeGeometrySolidify{
+typedef struct NodeGeometrySolidify {
   /* GeometryNodeAttributeInputMode */
   uint8_t thickness_mode;
   uint8_t nonmanifold_offset_mode;
