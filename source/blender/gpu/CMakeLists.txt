@@ -192,10 +192,14 @@ if(WITH_VULKAN)
 
   list(APPEND LIB
     extern_vulkan_memory_allocator
+    bf_intern_shadercompiler
+    ${SHADERC_LIBRARIES}
   )
 
   list(APPEND INC
     ../../../extern/vulkan_memory_allocator
+    ../../../intern/shader_compiler
+
   )
 
   list(APPEND SRC
@@ -430,15 +434,17 @@ if(WITH_GTESTS)
   if(WITH_OPENGL_DRAW_TESTS)
     set(TEST_SRC
       tests/gpu_testing.cc
+      tests/gpu_shader_compiler_test.cc
 
       tests/gpu_testing.hh
     )
     set(TEST_INC
       "../../../intern/ghost/"
+      "../../../intern/shader_compiler/"
     )
     set(TEST_LIB
-
     )
+
     include(GTestTesting)
     blender_add_test_lib(bf_gpu_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
   endif()

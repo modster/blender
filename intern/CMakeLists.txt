@@ -85,3 +85,7 @@ endif()
 if(UNIX AND NOT APPLE)
   add_subdirectory(libc_compat)
 endif()
+
+if(WITH_VULKAN)
+  add_subdirectory(shader_compiler)
+endif()
