@@ -777,23 +777,23 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
           BLO_read_data_address(reader, &storage->string);
           break;
         }
-        case GEO_NODE_ATTRIBUTE_PROCESSOR: {
-          NodeGeometryAttributeProcessor *storage = (NodeGeometryAttributeProcessor *)
-                                                        node->storage;
-          BLO_read_list(reader, &storage->inputs_settings);
-          BLO_read_list(reader, &storage->outputs_settings);
-          LISTBASE_FOREACH (
-              AttributeProcessorInputSettings *, input_settings, &storage->inputs_settings) {
-            BLO_read_data_address(reader, &input_settings->identifier);
-          }
-          LISTBASE_FOREACH (
-              AttributeProcessorOutputSettings *, output_settings, &storage->outputs_settings) {
-            BLO_read_data_address(reader, &output_settings->identifier);
-          }
-          break;
-        }
         default:
           break;
+      }
+      /* TODO: Handling this separately now so that it doesn't break when node->type changes when
+       * merging master. */
+      if (STREQ(node->idname, "GeometryNodeAttributeProcessor")) {
+        NodeGeometryAttributeProcessor *storage = (NodeGeometryAttributeProcessor *)node->storage;
+        BLO_read_list(reader, &storage->inputs_settings);
+        BLO_read_list(reader, &storage->outputs_settings);
+        LISTBASE_FOREACH (
+            AttributeProcessorInputSettings *, input_settings, &storage->inputs_settings) {
+          BLO_read_data_address(reader, &input_settings->identifier);
+        }
+        LISTBASE_FOREACH (
+            AttributeProcessorOutputSettings *, output_settings, &storage->outputs_settings) {
+          BLO_read_data_address(reader, &output_settings->identifier);
+        }
       }
     }
   }
