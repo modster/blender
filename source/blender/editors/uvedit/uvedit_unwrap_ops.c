@@ -1184,14 +1184,34 @@ static int pack_islands_to_area_exec(bContext *C, wmOperator *op)
   Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data_with_uvs(
       view_layer, CTX_wm_view3d(C), &objects_len);
 
-  /* User-defined area for packing */
-  rctf bounds;
-  WM_operator_properties_border_to_rctf(op, &bounds);
-  UI_view2d_region_to_view_rctf(&region->v2d, &bounds, &bounds);
+  /* Packing area coordinates */
+  float min_co[2] = {0.0f, 0.0f};
+  float max_co[2] = {1.0f, 1.0f};
 
-  /* Store the bounding coordinates for the user-defined area */
-  float min_co[2] = {bounds.xmin, bounds.ymin};
-  float max_co[2] = {bounds.xmax, bounds.ymax};
+  /* Fixes the issue of modified packing coordinates when user reuses the operator from the
+   * properties panel after zooming in/out in the UV editor */
+  if (RNA_struct_property_is_set(op->ptr, "box_min_co") ||
+      RNA_struct_property_is_set(op->ptr, "box_max_co") ||
+      RNA_struct_property_is_set(op->ptr, "rotate") ||
+      RNA_struct_property_is_set(op->ptr, "scale") ||
+      RNA_struct_property_is_set(op->ptr, "margin")) {
+    RNA_float_get_array(op->ptr, "box_min_co", min_co);
+    RNA_float_get_array(op->ptr, "box_max_co", max_co);
+  }
+  /* MISSING : Implement a way to clamp box coordinates properly so that invalid cases such as
+   * (max_co < min_co) are handled */
+  else {
+    rctf bounds;
+    WM_operator_properties_border_to_rctf(op, &bounds);
+    UI_view2d_region_to_view_rctf(&region->v2d, &bounds, &bounds);
+    /* Bounding coordinates for the user-defined area */
+    min_co[0] = bounds.xmin;
+    min_co[1] = bounds.ymin;
+    max_co[0] = bounds.xmax;
+    max_co[1] = bounds.ymax;
+    RNA_float_set_array(op->ptr, "box_min_co", min_co);
+    RNA_float_set_array(op->ptr, "box_max_co", max_co);
+  }
 
   /* Keeping a lower bound of 0.001 for user-defined space, smaller than that and the UVs won't be
    * visible in the UV editor
@@ -1278,6 +1298,30 @@ void UV_OT_pack_islands_to_area(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* RNA properties */
+  /* Max coordinates of the packing area */
+  static float default_max[2] = {1.0f, 1.0f};
+  RNA_def_float_vector(ot->srna,
+                       "box_max_co",
+                       2,
+                       default_max,
+                       -100.0f,
+                       100.0f,
+                       "Maximum",
+                       "Maximum coordinates for the packing area",
+                       -100.0f,
+                       100.0f);
+  /* Min coordinates of packing area */
+  static float default_min[2] = {0.0f, 0.0f};
+  RNA_def_float_vector(ot->srna,
+                       "box_min_co",
+                       2,
+                       default_min,
+                       -100.0f,
+                       100.0f,
+                       "Minimum",
+                       "Minimum coordinates for the packing area",
+                       -100.0f,
+                       100.0f);
   RNA_def_boolean(ot->srna, "rotate", true, "Rotate", "Rotate islands for best fit");
   RNA_def_boolean(ot->srna, "scale", true, "Scale", "Scale islands for best fit");
   RNA_def_float_factor(
