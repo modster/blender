@@ -1508,9 +1508,19 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     }
   }
 
+  uint16_t edge_flag_result = 0;
+
+  if (use_freestyle_edge && rb->use_edge_marks) {
+    FreestyleEdge *fe;
+    fe = CustomData_bmesh_get(&bm_if_freestyle->edata, e->head.data, CD_FREESTYLE_EDGE);
+    if (fe->flag & FREESTYLE_EDGE_MARK) {
+      edge_flag_result |= LRT_EDGE_FLAG_EDGE_MARK;
+    }
+  }
+
   /* Mesh boundary */
   if (!lr || ll == lr) {
-    return LRT_EDGE_FLAG_CONTOUR;
+    return (edge_flag_result | LRT_EDGE_FLAG_CONTOUR);
   }
 
   LineartTriangle *tri1, *tri2;
@@ -1526,7 +1536,6 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
   double *view_vector = vv;
   double dot_1 = 0, dot_2 = 0;
   double result;
-  uint16_t edge_flag_result = 0;
 
   if (rb->use_contour) {
 
@@ -1577,16 +1586,11 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
       }
     }
   }
+
   if (rb->use_material && (ll->f->mat_nr != lr->f->mat_nr)) {
     edge_flag_result |= LRT_EDGE_FLAG_MATERIAL;
   }
-  else if (use_freestyle_edge && rb->use_edge_marks) {
-    FreestyleEdge *fe;
-    fe = CustomData_bmesh_get(&bm_if_freestyle->edata, e->head.data, CD_FREESTYLE_EDGE);
-    if (fe->flag & FREESTYLE_EDGE_MARK) {
-      edge_flag_result |= LRT_EDGE_FLAG_EDGE_MARK;
-    }
-  }
+
   return edge_flag_result;
 }
 
