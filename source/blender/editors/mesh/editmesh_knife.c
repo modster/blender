@@ -521,7 +521,7 @@ static void knifetool_draw_angle(const KnifeTool_OpData *kcd,
   const float bg_margin = 4.0f * U.dpi_fac;
   const float cap_size = 4.0f * U.dpi_fac;
   const int font_size = 14 * U.pixelsize;
-  const int angle_precision = 2;
+  const int angle_precision = 3;
 
   /* Angle arc in 3d space. */
   GPU_blend(GPU_BLEND_ALPHA);
