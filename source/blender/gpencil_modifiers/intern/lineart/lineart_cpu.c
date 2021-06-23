@@ -1455,7 +1455,6 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
                                               LineartTriangle *rt_array,
                                               LineartVert *rv_array,
                                               float crease_threshold,
-                                              bool use_auto_smooth,
                                               bool use_freestyle_edge,
                                               bool use_freestyle_face,
                                               BMesh *bm_if_freestyle)
@@ -1571,9 +1570,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
       bool do_crease = true;
       if (!rb->force_crease &&
           (BM_elem_flag_test(ll->f, BM_ELEM_SMOOTH) && BM_elem_flag_test(lr->f, BM_ELEM_SMOOTH))) {
-        if (!use_auto_smooth) {
-          do_crease = false;
-        }
+        do_crease = false;
       }
       if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
         edge_flag_result |= LRT_EDGE_FLAG_CREASE;
@@ -1719,7 +1716,6 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   Object *orig_ob;
   bool can_find_freestyle_edge = false;
   bool can_find_freestyle_face = false;
-  bool use_auto_smooth = obi->original_me->flag & ME_AUTOSMOOTH;
   int i;
   float use_crease = 0;
 
@@ -1802,9 +1798,6 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   }
   else {
     use_crease = rb->crease_threshold;
-    if (use_auto_smooth) {
-      use_crease = cos(obi->original_me->smoothresh);
-    }
   }
 
   /* FIXME(Yiming): Hack for getting clean 3D text, the seam that extruded text object creates
@@ -1890,15 +1883,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     e = BM_edge_at_index(bm, i);
 
     /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
-    uint16_t eflag = lineart_identify_feature_line(rb,
-                                                   e,
-                                                   ort,
-                                                   orv,
-                                                   use_crease,
-                                                   use_auto_smooth,
-                                                   can_find_freestyle_edge,
-                                                   can_find_freestyle_face,
-                                                   bm);
+    uint16_t eflag = lineart_identify_feature_line(
+        rb, e, ort, orv, use_crease, can_find_freestyle_edge, can_find_freestyle_face, bm);
     if (eflag) {
       /* Only allocate for feature lines (instead of all lines) to save memory.
        * If allow duplicated edges, one edge gets added multiple times if it has multiple types. */
