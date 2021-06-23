@@ -1145,6 +1145,7 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
     BLO_read_data_address(reader, &ed->act_seq);
     ed->cache = NULL;
     ed->prefetch_job = NULL;
+    ed->runtime.sequence_lookup = NULL;
 
     /* recursive link sequences, lb will be correctly initialized */
     link_recurs_seq(reader, &ed->seqbase);
@@ -1465,8 +1466,8 @@ static void scene_blend_read_lib(BlendLibReader *reader, ID *id)
     IDP_BlendReadLib(reader, seq->prop);
 
     if (seq->ipo) {
-      BLO_read_id_address(
-          reader, sce->id.lib, &seq->ipo); /* XXX deprecated - old animation system */
+      /* XXX: deprecated - old animation system. */
+      BLO_read_id_address(reader, sce->id.lib, &seq->ipo);
     }
     seq->scene_sound = NULL;
     if (seq->scene) {

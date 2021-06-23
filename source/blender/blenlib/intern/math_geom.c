@@ -4911,8 +4911,8 @@ void window_translate_m4(float winmat[4][4], float perspmat[4][4], const float x
 void planes_from_projmat(const float mat[4][4],
                          float left[4],
                          float right[4],
-                         float top[4],
                          float bottom[4],
+                         float top[4],
                          float near[4],
                          float far[4])
 {
@@ -6218,6 +6218,19 @@ bool is_quad_flip_v3_first_third_fast(const float v1[3],
   return dot_v3v3(cross_a, cross_b) > 0.0f;
 }
 
+bool is_quad_flip_v3_first_third_fast_with_normal(const float v1[3],
+                                                  const float v2[3],
+                                                  const float v3[3],
+                                                  const float v4[3],
+                                                  const float normal[3])
+{
+  float dir_v3v1[3], tangent[3];
+  sub_v3_v3v3(dir_v3v1, v3, v1);
+  cross_v3_v3v3(tangent, dir_v3v1, normal);
+  const float dot = dot_v3v3(v1, tangent);
+  return (dot_v3v3(v4, tangent) >= dot) || (dot_v3v3(v2, tangent) <= dot);
+}
+
 /**
  * Return the value which the distance between points will need to be scaled by,
  * to define a handle, given both points are on a perfect circle.
@@ -6236,7 +6249,7 @@ float cubic_tangent_factor_circle_v3(const float tan_l[3], const float tan_r[3])
 
   const float tan_dot = dot_v3v3(tan_l, tan_r);
   if (tan_dot > 1.0f - eps) {
-    /* no angle difference (use fallback, length wont make any difference) */
+    /* no angle difference (use fallback, length won't make any difference) */
     return (1.0f / 3.0f) * 0.75f;
   }
   if (tan_dot < -1.0f + eps) {

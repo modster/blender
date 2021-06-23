@@ -380,8 +380,7 @@ void wm_event_do_depsgraph(bContext *C, bool is_after_open_file)
      */
     Depsgraph *depsgraph = BKE_scene_ensure_depsgraph(bmain, scene, view_layer);
     if (is_after_open_file) {
-      DEG_graph_relations_update(depsgraph);
-      DEG_graph_on_visible_update(bmain, depsgraph, true);
+      DEG_graph_tag_on_visible_update(depsgraph, true);
     }
     DEG_make_active(depsgraph);
     BKE_scene_graph_update_tagged(depsgraph, bmain);
@@ -520,7 +519,7 @@ void wm_event_do_notifiers(bContext *C)
     if (clear_info_stats) {
       /* Only do once since adding notifiers is slow when there are many. */
       ViewLayer *view_layer = CTX_data_view_layer(C);
-      ED_info_stats_clear(view_layer);
+      ED_info_stats_clear(wm, view_layer);
       WM_event_add_notifier(C, NC_SPACE | ND_SPACE_INFO, NULL);
     }
 

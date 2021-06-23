@@ -320,8 +320,7 @@ static void knifetool_raycast_planes(const KnifeTool_OpData *kcd, float r_v1[3],
 {
   float planes[4][4];
 
-  planes_from_projmat(
-      (const float(*)[4])kcd->projmat, planes[2], planes[0], planes[3], planes[1], NULL, NULL);
+  planes_from_projmat(kcd->projmat, planes[2], planes[0], planes[1], planes[3], NULL, NULL);
 
   /* ray-cast all planes */
   {

@@ -1553,8 +1553,7 @@ static void filelist_cache_preview_freef(TaskPool *__restrict UNUSED(pool), void
 static void filelist_cache_preview_ensure_running(FileListEntryCache *cache)
 {
   if (!cache->previews_pool) {
-    cache->previews_pool = BLI_task_pool_create_background(
-        cache, TASK_PRIORITY_LOW, TASK_ISOLATION_ON);
+    cache->previews_pool = BLI_task_pool_create_background(cache, TASK_PRIORITY_LOW);
     cache->previews_done = BLI_thread_queue_init();
 
     IMB_thumb_locks_acquire();
@@ -2895,7 +2894,7 @@ static int filelist_readjob_list_lib(const char *root, ListBase *entries, const 
   }
 
   /* there we go */
-  libfiledata = BLO_blendhandle_from_file(dir, NULL);
+  libfiledata = BLO_blendhandle_from_file(dir, &(BlendFileReadReport){.reports = NULL});
   if (libfiledata == NULL) {
     return nbr_entries;
   }
