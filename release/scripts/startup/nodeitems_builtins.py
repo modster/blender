@@ -629,6 +629,7 @@ attribute_node_categories = [
     ]),
     AttributeNodeCategory("ATTR_TEXTURE", "Texture", items=[
         NodeItem("ShaderNodeTexNoise"),
+        NodeItem("ShaderNodeTexVoronoi"),
     ]),
     AttributeNodeCategory("ATTR_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),

@@ -631,7 +631,6 @@ static void process_attributes(GeoNodeExecParams &geo_params, GeometrySet &geome
   fn::MFNetwork network;
   ResourceScope scope;
   MFNetworkTreeMap network_map = insert_node_tree_into_mf_network(network, tree, scope);
-  std::cout << network.to_dot() << "\n";
 
   Vector<const fn::MFOutputSocket *> fn_input_sockets;
   Vector<const fn::MFInputSocket *> fn_output_sockets;

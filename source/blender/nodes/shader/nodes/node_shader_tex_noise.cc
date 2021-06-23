@@ -141,6 +141,11 @@ class NoiseTextureFunction : public blender::fn::MultiFunction {
 static void sh_node_tex_noise_expand_in_mf_network(blender::nodes::NodeMFNetworkBuilder &builder)
 {
   /* TODO: Not only support 3D. */
+  NodeTexNoise *tex = builder.dnode()->storage<NodeTexNoise>();
+  if (tex->dimensions != 3) {
+    builder.set_not_implemented();
+    return;
+  }
   static NoiseTextureFunction fn;
   builder.set_matching_fn(fn);
 }

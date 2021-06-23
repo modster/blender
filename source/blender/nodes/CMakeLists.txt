@@ -284,7 +284,7 @@ set(SRC
   shader/nodes/node_shader_tex_noise.cc
   shader/nodes/node_shader_tex_pointdensity.c
   shader/nodes/node_shader_tex_sky.c
-  shader/nodes/node_shader_tex_voronoi.c
+  shader/nodes/node_shader_tex_voronoi.cc
   shader/nodes/node_shader_tex_wave.c
   shader/nodes/node_shader_tex_white_noise.c
   shader/nodes/node_shader_uvAlongStroke.c
