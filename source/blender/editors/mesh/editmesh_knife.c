@@ -953,7 +953,7 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
       TIP_("%s: confirm, %s: cancel, "
            "%s: start/define cut, %s: close cut, %s: new cut, "
            "%s: midpoint snap (%s), %s: ignore snap (%s), "
-           "%s: angle constraint %.2f (%s), %s: cut through (%s), "
+           "%s: angle constraint %.2f(%.2f) (%s), %s: cut through (%s), "
            "%s: panning, XYZ: orientation lock (%s), "
            "%s: distance/angle measurements (%s)"),
       WM_MODALKEY(KNF_MODAL_CONFIRM),
@@ -966,6 +966,7 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
       WM_MODALKEY(KNF_MODAL_IGNORE_SNAP_ON),
       WM_bool_as_string(kcd->ignore_edge_snapping),
       WM_MODALKEY(KNF_MODAL_ANGLE_SNAP_TOGGLE),
+      (kcd->angle >= 0.0f) ? RAD2DEGF(kcd->angle) : 360.0f + RAD2DEGF(kcd->angle),
       (kcd->angle_snapping_increment > KNIFE_MIN_ANGLE_SNAPPING_INCREMENT &&
        kcd->angle_snapping_increment < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) ?
           kcd->angle_snapping_increment :
@@ -2965,7 +2966,7 @@ static float snap_v2_angle(float r[2], const float v[2], const float v_ref[2], f
 /* Update both kcd->curr.mval and kcd->mval to snap to required angle. */
 static bool knife_snap_angle(KnifeTool_OpData *kcd)
 {
-  const float dvec_ref[2] = {0.0f, 1.0f};
+  const float dvec_ref[2] = {1.0f, 0.0f};
   float dvec[2], dvec_snap[2];
 
   float snap_step;
@@ -3461,6 +3462,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
   float snapping_increment_temp;
 
   if (kcd->angle_snapping) {
+    knife_update_header(C, op, kcd); /* Update the angle multiple. */
     /* Modal numinput active, try to handle numeric inputs first... */
     if (event->val == KM_PRESS && hasNumInput(&kcd->num) && handleNumInput(C, &kcd->num, event)) {
       handled = true;
