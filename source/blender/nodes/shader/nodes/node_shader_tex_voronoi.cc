@@ -223,7 +223,7 @@ class VoronoiTextureFunction : public blender::fn::MultiFunction {
       float pa[12];
       BLI_noise_voronoi(vector.x, vector.y, vector.z, da, pa, 1, 0);
       blender::ColorGeometry4f color;
-      BLI_noise_cell_v3(pa[0], pa[1], pa[1], color);
+      BLI_noise_cell_v3(pa[0], pa[1], pa[2], color);
       color.a = 1.0f;
       r_distances[i] = da[0];
       r_colors[i] = color;
