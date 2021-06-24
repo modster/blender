@@ -70,7 +70,8 @@ struct ImBuf *SEQ_render_give_ibuf_direct(const SeqRenderData *context,
                                           struct Sequence *seq);
 struct ImBuf *SEQ_render_thumbnail(SeqRenderData *context,
                                    struct Sequence *seq,
-                                   float timeline_frame);
+                                   float timeline_frame,
+                                   View2D *v2d);
 void SEQ_render_init_colorspace(struct Sequence *seq);
 void SEQ_render_new_render_data(struct Main *bmain,
                                 struct Depsgraph *depsgraph,

@@ -148,6 +148,7 @@ typedef struct SeqCache {
   struct BLI_mempool *items_pool;
   struct SeqCacheKey *last_key;
   SeqDiskCache *disk_cache;
+  int count;
 } SeqCache;
 
 typedef struct SeqCacheItem {
@@ -1151,6 +1152,7 @@ static void seq_cache_create(Main *bmain, Scene *scene)
     cache->hash = BLI_ghash_new(seq_cache_hashhash, seq_cache_hashcmp, "SeqCache hash");
     cache->last_key = NULL;
     cache->bmain = bmain;
+    cache->count = 0;
     BLI_mutex_init(&cache->iterator_mutex);
     scene->ed->cache = cache;
 
@@ -1268,6 +1270,7 @@ void SEQ_cache_cleanup(Scene *scene)
     BLI_ghash_remove(cache->hash, key, seq_cache_keyfree, seq_cache_valfree);
   }
   cache->last_key = NULL;
+  cache->count = 0;
   seq_cache_unlock(scene);
 }
 
@@ -1334,6 +1337,36 @@ void seq_cache_cleanup_sequence(Scene *scene,
   }
   cache->last_key = NULL;
   seq_cache_unlock(scene);
+}
+
+void seq_cache_thumbnail_cleanup(Scene *scene, Sequence *seq, Sequence *seq_changed)
+{
+  SeqCache *cache = seq_cache_get_from_scene(scene);
+  if (!cache) {
+    return;
+  }
+
+  int range_start = seq_changed->startdisp;
+  int range_end = seq_changed->enddisp;
+
+  int invalidate_composite = SEQ_CACHE_STORE_THUMBNAIL;
+
+  GHashIterator gh_iter;
+  BLI_ghashIterator_init(&gh_iter, cache->hash);
+  while (!BLI_ghashIterator_done(&gh_iter)) {
+    SeqCacheKey *key = BLI_ghashIterator_getKey(&gh_iter);
+    BLI_ghashIterator_step(&gh_iter);
+
+    if ((key->type & invalidate_composite) && key->timeline_frame >= range_start &&
+        key->timeline_frame <= range_end) {
+      if (key->link_next || key->link_prev) {
+        seq_cache_relink_keys(key->link_next, key->link_prev);
+      }
+      cache->count--;
+      BLI_ghash_remove(cache->hash, key, seq_cache_keyfree, seq_cache_valfree);
+    }
+  }
+  cache->last_key = NULL;
 }
 
 struct ImBuf *seq_cache_get(const SeqRenderData *context,
@@ -1425,6 +1458,65 @@ bool seq_cache_put_if_possible(
   seq_cache_set_temp_cache_linked(scene, scene->ed->cache->last_key);
   scene->ed->cache->last_key = NULL;
   return false;
+}
+
+void seq_cache_thumbnail_put(const SeqRenderData *context,
+                             Sequence *seq,
+                             float timeline_frame,
+                             int type,
+                             ImBuf *i,
+                             View2D *v2d)
+{
+  if (i == NULL || context->skip_cache || context->is_proxy_render || !seq) {
+    return;
+  }
+
+  Scene *scene = context->scene;
+
+  if (context->is_prefetch_render) {
+    context = seq_prefetch_get_original_context(context);
+    scene = context->scene;
+    seq = seq_prefetch_get_original_sequence(seq, scene);
+    BLI_assert(seq != NULL);
+  }
+
+  /* Prevent reinserting, it breaks cache key linking. */
+  ImBuf *test = seq_cache_get(context, seq, timeline_frame, type);
+  if (test) {
+    IMB_freeImBuf(test);
+    return;
+  }
+
+  if (!scene->ed->cache) {
+    seq_cache_create(context->bmain, scene);
+  }
+
+  seq_cache_lock(scene);
+  SeqCache *cache = seq_cache_get_from_scene(scene);
+  SeqCacheKey *key = seq_cache_allocate_key(cache, context, seq, timeline_frame, type);
+
+  /* Limit cache to 1000 images stored. */
+  if (cache->count >= 1000) {
+    float safe_ofs = 20;
+    Sequence cut = *seq;
+
+    /* Frames to the left */
+    cut.startdisp = (int)v2d->tot.xmin;
+    cut.enddisp = (int)v2d->cur.xmin - (int)safe_ofs;
+    if (cut.startdisp < cut.enddisp) {
+      seq_cache_thumbnail_cleanup(scene, seq, &cut);
+    }
+    /* Frames to the right */
+    cut.startdisp = v2d->cur.xmax + safe_ofs;
+    cut.enddisp = v2d->tot.xmax;
+    if (cut.startdisp < cut.enddisp) {
+      seq_cache_thumbnail_cleanup(scene, seq, &cut);
+    }
+  }
+
+  seq_cache_put_ex(scene, key, i);
+  cache->count++;
+  seq_cache_unlock(scene);
 }
 
 void seq_cache_put(

@@ -1116,7 +1116,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.is_proxy_render = false;
   context.is_thumb = true;
 
-  ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp);
+  ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp, v2d);
 
   /*Calculate thumb dimensions */
   float thumb_h = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
@@ -1166,7 +1166,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
 
     /* Get the image */
-    ibuf = SEQ_render_thumbnail(&context, seq, x1 + (int)(cut_off));
+    ibuf = SEQ_render_thumbnail(&context, seq, x1 + (int)(cut_off), v2d);
 
     if (ibuf) {
       ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);

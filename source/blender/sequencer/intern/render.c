@@ -2028,7 +2028,10 @@ ImBuf *SEQ_render_give_ibuf_direct(const SeqRenderData *context,
   return ibuf;
 }
 
-ImBuf *SEQ_render_thumbnail(SeqRenderData *context, Sequence *seq, float timeline_frame)
+ImBuf *SEQ_render_thumbnail(SeqRenderData *context,
+                            Sequence *seq,
+                            float timeline_frame,
+                            View2D *v2d)
 {
   SeqRenderState state;
   seq_render_state_init(&state);
@@ -2065,7 +2068,8 @@ ImBuf *SEQ_render_thumbnail(SeqRenderData *context, Sequence *seq, float timelin
   }
 
   if (scaled_ibuf)
-    seq_cache_put(context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL, scaled_ibuf);
+    seq_cache_thumbnail_put(
+        context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL, scaled_ibuf, v2d);
 
   if (scaled_ibuf == NULL) {
     ibuf = IMB_allocImBuf(rectx, recty, 32, IB_rect);
