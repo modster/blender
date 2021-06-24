@@ -105,6 +105,12 @@ class Index {
     return std::make_tuple(this->index, this->generation);
   }
 
+  friend std::ostream &operator<<(std::ostream &stream, const Index &index)
+  {
+    stream << "(" << index.index << ", " << index.generation << ")";
+    return stream;
+  }
+
   template<typename, int64_t, typename> friend class Arena;
 };
 

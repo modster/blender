@@ -49,6 +49,7 @@ void BKE_cloth_remesh(const struct Object *ob,
 #  include <bits/stdint-uintn.h>
 #  include <filesystem>
 #  include <fstream>
+#  include <iostream>
 #  include <istream>
 #  include <limits>
 #  include <sstream>
@@ -84,6 +85,27 @@ using EdgeVerts = std::tuple<VertIndex, VertIndex>;
 
 using usize = uint64_t;
 
+template<typename T> std::ostream &operator<<(std::ostream &stream, const blender::Vector<T> &vec)
+{
+  stream << "(";
+  for (const auto &i : vec) {
+    stream << i << ", ";
+  }
+  stream << "\b\b)";
+  return stream;
+}
+
+template<typename T> std::ostream &operator<<(std::ostream &stream, const std::optional<T> &option)
+{
+  if (option) {
+    stream << "Some(" << option << ")";
+  }
+  else {
+    stream << "None";
+  }
+  return stream;
+}
+
 /**
  * `Node`: Stores the worldspace/localspace coordinates of the
  * `Mesh`. Commonly called the vertex of the mesh (note: in this mesh
@@ -108,6 +130,13 @@ template<typename T> class Node {
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, const Node &node)
+  {
+    stream << "(" << node.self_index << ", " << node.verts << ", " << node.pos << ","
+           << node.normal << ")";
+    return stream;
   }
 
   template<typename, typename, typename, typename> friend class Mesh;
@@ -141,6 +170,13 @@ template<typename T> class Vert {
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, const Vert &vert)
+  {
+    stream << "(" << vert.self_index << ", " << vert.edges << ", " << vert.node << "," << vert.uv
+           << ")";
+    return stream;
   }
 
   template<typename, typename, typename, typename> friend class Mesh;
@@ -189,6 +225,17 @@ template<typename T> class Edge {
     return false;
   }
 
+  const auto &get_faces() const
+  {
+    return this->faces;
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, const Edge &edge)
+  {
+    stream << "(" << edge.self_index << ", " << edge.faces << ", " << edge.verts << ")";
+    return stream;
+  }
+
   template<typename, typename, typename, typename> friend class Mesh;
 };
 
@@ -219,6 +266,17 @@ template<typename T> class Face {
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
+  }
+
+  const auto &get_verts() const
+  {
+    return this->verts;
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, const Face &face)
+  {
+    stream << "(" << face.self_index << ", " << face.verts << ", " << face.normal << ")";
+    return stream;
   }
 
   template<typename, typename, typename, typename> friend class Mesh;
