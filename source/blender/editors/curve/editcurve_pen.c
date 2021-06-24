@@ -463,10 +463,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   int ret = OPERATOR_RUNNING_MODAL;
   bool dragging = RNA_boolean_get(op->ptr, "dragging");
   bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
+  bool is_new_point = RNA_boolean_get(op->ptr, "new");
 
   bool picked = false;
   if (event->type == EVT_MODAL_MAP) {
-    if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
+    if (event->val == PEN_MODAL_FREE_MOVE_HANDLE && is_new_point) {
       select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
       picked = true;
 
@@ -483,7 +484,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
     if (dragging) {
       /* Move handle point with mouse cursor if dragging a new control point. */
-      if (RNA_boolean_get(op->ptr, "new")) {
+      if (is_new_point) {
         if (!picked) {
           select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
         }
@@ -727,6 +728,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           BKE_nurb_handles_calc(nu);
         }
       }
+      RNA_boolean_set(op->ptr, "new", false);
       ret = OPERATOR_FINISHED;
     }
   }
