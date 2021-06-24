@@ -181,6 +181,29 @@ TEST(generational_arena, Iter2)
   EXPECT_NE(std::find(it, arena.end(), 4), arena.end());
 }
 
+TEST(generational_arena, Iter3)
+{
+  struct Foo {
+    int a;
+    int b;
+    Foo(int a, int b) : a(a), b(b)
+    {
+    }
+  };
+  Arena<Foo> arena;
+  arena.insert(Foo(0, 0));
+  arena.insert(Foo(1, 0));
+  arena.insert(Foo(2, 0));
+  arena.insert(Foo(3, 0));
+  arena.insert(Foo(4, 0));
+
+  const Arena<Foo> &arena_ref = arena;
+
+  for (const auto &i : arena_ref) {
+    EXPECT_EQ(i.b, 0);
+  }
+}
+
 TEST(generational_arena, IterIncrement)
 {
   Arena<int> arena;
