@@ -960,7 +960,7 @@ static Mesh *modifier_modify_mesh_and_geometry_set(ModifierData *md,
       mesh_output = mesh_component.release();
     }
 
-    /* Return an empty mesh instead of null.  */
+    /* Return an empty mesh instead of null. */
     if (mesh_output == nullptr) {
       mesh_output = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
       BKE_mesh_copy_parameters_for_eval(mesh_output, input_mesh);
@@ -1572,7 +1572,7 @@ static void editbmesh_calc_modifier_final_normals(Mesh *mesh_final,
   /* BMESH_ONLY, ensure tessface's used for drawing,
    * but don't recalculate if the last modifier in the stack gives us tessfaces
    * check if the derived meshes are DM_TYPE_EDITBMESH before calling, this isn't essential
-   * but quiets annoying error messages since tessfaces wont be created. */
+   * but quiets annoying error messages since tessfaces won't be created. */
   if (final_datamask->fmask & CD_MASK_MFACE) {
     if (mesh_final->edit_mesh == nullptr) {
       BKE_mesh_tessface_ensure(mesh_final);

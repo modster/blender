@@ -509,7 +509,7 @@ static void viewops_data_create(bContext *C,
         negate_v3_v3(my_origin, rv3d->ofs); /* ofs is flipped */
 
         /* Set the dist value to be the distance from this 3d point this means you'll
-         * always be able to zoom into it and panning wont go bad when dist was zero. */
+         * always be able to zoom into it and panning won't go bad when dist was zero. */
 
         /* remove dist value */
         upvec[0] = upvec[1] = 0;
@@ -611,7 +611,7 @@ enum {
   VIEWROT_MODAL_SWITCH_ROTATE = 6,
 };
 
-/* called in transform_ops.c, on each regeneration of keymaps  */
+/* Called in transform_ops.c, on each regeneration of key-maps. */
 void viewrotate_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -895,7 +895,7 @@ static void viewrotate_apply(ViewOpsData *vod, const int event_xy[2])
   copy_qt_qt(rv3d->viewquat, vod->curr.viewquat);
 
   /* check for view snap,
-   * note: don't apply snap to vod->viewquat so the view wont jam up */
+   * note: don't apply snap to vod->viewquat so the view won't jam up */
   if (vod->axis_snap) {
     viewrotate_apply_snap(vod);
   }
@@ -1686,7 +1686,7 @@ void VIEW3D_OT_ndof_all(struct wmOperatorType *ot)
 
 /* NOTE: these defines are saved in keymap files, do not change values but just add new ones */
 
-/* called in transform_ops.c, on each regeneration of keymaps  */
+/* Called in transform_ops.c, on each regeneration of key-maps. */
 void viewmove_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -1881,8 +1881,8 @@ void VIEW3D_OT_move(wmOperatorType *ot)
 /** \name View Zoom Operator
  * \{ */
 
-/* viewdolly_modal_keymap has an exact copy of this, apply fixes to both */
-/* called in transform_ops.c, on each regeneration of keymaps  */
+/* #viewdolly_modal_keymap has an exact copy of this, apply fixes to both. */
+/* Called in transform_ops.c, on each regeneration of key-maps. */
 void viewzoom_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -2445,8 +2445,8 @@ void VIEW3D_OT_zoom(wmOperatorType *ot)
  * which avoids #RegionView3D.dist approaching zero.
  * \{ */
 
-/* this is an exact copy of viewzoom_modal_keymap */
-/* called in transform_ops.c, on each regeneration of keymaps  */
+/* This is an exact copy of #viewzoom_modal_keymap. */
+/* Called in transform_ops.c, on each regeneration of key-maps. */
 void viewdolly_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -3647,7 +3647,7 @@ static int view3d_zoom_border_exec(bContext *C, wmOperator *op)
   if (rv3d->is_persp) {
     float p_corner[3];
 
-    /* no depths to use, we cant do anything! */
+    /* no depths to use, we can't do anything! */
     if (depth_close == FLT_MAX) {
       BKE_report(op->reports, RPT_ERROR, "Depth too large");
       return OPERATOR_CANCELLED;
