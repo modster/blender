@@ -68,6 +68,24 @@
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 
+/* Data structure to keep track of details about the cut location */
+struct TempBeztData {
+  /* Index of the last bez triple before the cut. */
+  int bezt_index;
+  /* Nurb to which the cut belongs to. */
+  Nurb *nurb;
+  /* Minimum distance to curve from mouse location. */
+  float min_dist;
+  /* Ratio at which the new point divides the curve segment. */
+  float parameter;
+  /* Whether the cut has any vertices before/after it. */
+  bool has_prev, has_next;
+  /* Locations of adjacent vertices. */
+  float prev_loc[3], cut_loc[3], next_loc[3];
+  /* Mouse location as floats. */
+  float mval[2];
+} temp_bezt_data;
+
 static void mouse_location_to_worldspace(const int *mouse_loc,
                                          const float *depth,
                                          const ViewContext *vc,
@@ -343,23 +361,8 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
                                                     float screen_co[2],
                                                     void *op_data)
 {
-  struct temp_bezt_data {
-    /* Index of the last bez triple before the cut. */
-    int bezt_index;
-    /* Nurb to which the cut belongs to. */
-    Nurb *nurb;
-    /* Minimum distance to curve from mouse location. */
-    float min_dist;
-    /* Ratio at which the new point divides the curve segment. */
-    float parameter;
-    /* Whether the cut has any vertices before/after it. */
-    bool has_prev, has_next;
-    /* Locations of adjacent vertices. */
-    float prev_loc[3], cut_loc[3], next_loc[3];
-    /* Mouse location as floats. */
-    float mval[2];
-  } temp_bezt_data;
-  struct temp_bezt_data *data = op_data;
+
+  struct TempBeztData *data = op_data;
 
   float resolu = nu->resolu;
   float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), "makeCut_bezier");
@@ -406,6 +409,84 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
     }
   }
   MEM_freeN(points);
+}
+
+static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op_data)
+{
+  struct TempBeztData *data = op_data;
+
+  for (Nurb *nu = nurbs->first; nu; nu = nu->next) {
+    if (nu->type == CU_BEZIER) {
+      float screen_co[2];
+      if (data->nurb == NULL) {
+        ED_view3d_project_float_object(
+            vc->region, nu->bezt->vec[1], screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+
+        data->nurb = nu;
+        data->bezt_index = 0;
+        data->min_dist = len_manhattan_v2v2(screen_co, data->mval);
+        copy_v3_v3(data->cut_loc, nu->bezt->vec[1]);
+      }
+      int i;
+
+      BezTriple *bezt;
+      for (i = 0; i < nu->pntsu - 1; i++) {
+        bezt = &nu->bezt[i];
+        update_data_if_nearest_point_in_segment(bezt, bezt + 1, nu, i, vc, screen_co, data);
+      }
+
+      if (nu->flagu & CU_NURB_CYCLIC) {
+        update_data_if_nearest_point_in_segment(bezt + 1, nu->bezt, nu, i, vc, screen_co, data);
+      }
+    }
+  }
+}
+
+static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
+{
+  EditNurb *editnurb = cu->editnurb;
+  struct TempBeztData *data = op_data;
+
+  BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
+                                              "new_bezt_nurb");
+  int index = data->bezt_index + 1;
+  /* Copy all control points before the cut to the new memory. */
+  memcpy(bezt1, nu->bezt, index * sizeof(BezTriple));
+  BezTriple *new_bezt = bezt1 + index;
+
+  /* Duplicate control point after the cut. */
+  memcpy(new_bezt, new_bezt - 1, sizeof(BezTriple));
+  copy_v3_v3(new_bezt->vec[1], data->cut_loc);
+
+  if (index < nu->pntsu) {
+    /* Copy all control points after the cut to the new memory. */
+    memcpy(bezt1 + index + 1, nu->bezt + index, (nu->pntsu - index) * sizeof(BezTriple));
+  }
+
+  nu->pntsu += 1;
+  cu->actvert = CU_ACT_NONE;
+
+  BezTriple *next_bezt;
+  if ((nu->flagu & CU_NURB_CYCLIC) && (index == nu->pntsu - 1)) {
+    next_bezt = bezt1;
+  }
+  else {
+    next_bezt = new_bezt + 1;
+  }
+
+  calculate_new_bezier_point((new_bezt - 1)->vec[1],
+                             (new_bezt - 1)->vec[2],
+                             new_bezt->vec[0],
+                             new_bezt->vec[2],
+                             next_bezt->vec[0],
+                             next_bezt->vec[1],
+                             data->parameter);
+
+  MEM_freeN(nu->bezt);
+  nu->bezt = bezt1;
+  ED_curve_deselect_all(editnurb);
+  BKE_nurb_handles_calc(nu);
+  new_bezt->f1 = new_bezt->f2 = new_bezt->f3 = 1;
 }
 
 enum {
@@ -596,62 +677,19 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (!found_point) {
           /* If curve segment is nearby, add control point at the snapped point
           between the adjacent control points in the curve data structure. */
-          EditNurb *editnurb = cu->editnurb;
 
-          /* Data structure to keep track of details about the cut location */
-          struct {
-            /* Index of the last bez triple before the cut. */
-            int bezt_index;
-            /* Nurb to which the cut belongs to. */
-            Nurb *nurb;
-            /* Minimum distance to curve from mouse location. */
-            float min_dist;
-            /* Ratio at which the new point divides the curve segment. */
-            float parameter;
-            /* Whether the cut has any vertices before/after it. */
-            bool has_prev, has_next;
-            /* Locations of adjacent vertices. */
-            float prev_loc[3], cut_loc[3], next_loc[3];
-            /* Mouse location as floats. */
-            float mval[2];
-          } data = {.bezt_index = 0,
-                    .min_dist = 10000,
-                    .parameter = 0.5f,
-                    .has_prev = false,
-                    .has_next = false};
-
-          data.mval[0] = event->mval[0];
-          data.mval[1] = event->mval[1];
+          struct TempBeztData data = {.bezt_index = 0,
+                                      .min_dist = 10000,
+                                      .parameter = 0.5f,
+                                      .has_prev = false,
+                                      .has_next = false,
+                                      .mval[0] = event->mval[0],
+                                      .mval[1] = event->mval[1]};
 
           ListBase *nurbs = BKE_curve_editNurbs_get(cu);
 
-          for (nu = nurbs->first; nu; nu = nu->next) {
-            if (nu->type == CU_BEZIER) {
-              float screen_co[2];
-              if (data.nurb == NULL) {
-                ED_view3d_project_float_object(vc.region,
-                                               nu->bezt->vec[1],
-                                               screen_co,
-                                               V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+          update_data_for_all_nurbs(nurbs, &vc, &data);
 
-                data.nurb = nu;
-                data.bezt_index = 0;
-                data.min_dist = len_manhattan_v2v2(screen_co, data.mval);
-                copy_v3_v3(data.cut_loc, nu->bezt->vec[1]);
-              }
-              int i;
-              for (i = 0; i < nu->pntsu - 1; i++) {
-                bezt = &nu->bezt[i];
-                update_data_if_nearest_point_in_segment(
-                    bezt, bezt + 1, nu, i, &vc, screen_co, &data);
-              }
-
-              if (nu->flagu & CU_NURB_CYCLIC) {
-                update_data_if_nearest_point_in_segment(
-                    bezt + 1, nu->bezt, nu, i, &vc, screen_co, &data);
-              }
-            }
-          }
           float threshold_distance = get_view_zoom(data.cut_loc, &vc);
           /* If the minimum distance found < threshold distance, make cut. */
           if (data.min_dist < threshold_distance) {
@@ -679,47 +717,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                 copy_v3_v3(data.cut_loc, point);
               }
 
-              BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
-                                                          "delNurb");
-              int index = data.bezt_index + 1;
-              /* Copy all control points before the cut to the new memory. */
-              memcpy(bezt1, nu->bezt, index * sizeof(BezTriple));
-              BezTriple *new_bezt = bezt1 + index;
-
-              /* Duplicate control point after the cut. */
-              memcpy(new_bezt, new_bezt - 1, sizeof(BezTriple));
-              copy_v3_v3(new_bezt->vec[1], data.cut_loc);
-
-              if (index < nu->pntsu) {
-                /* Copy all control points after the cut to the new memory. */
-                memcpy(
-                    bezt1 + index + 1, nu->bezt + index, (nu->pntsu - index) * sizeof(BezTriple));
-              }
-
-              nu->pntsu += 1;
-              cu->actvert = CU_ACT_NONE;
-
-              BezTriple *next_bezt;
-              if ((nu->flagu & CU_NURB_CYCLIC) && (index == nu->pntsu - 1)) {
-                next_bezt = bezt1;
-              }
-              else {
-                next_bezt = new_bezt + 1;
-              }
-
-              calculate_new_bezier_point((new_bezt - 1)->vec[1],
-                                         (new_bezt - 1)->vec[2],
-                                         new_bezt->vec[0],
-                                         new_bezt->vec[2],
-                                         next_bezt->vec[0],
-                                         next_bezt->vec[1],
-                                         data.parameter);
-
-              MEM_freeN(nu->bezt);
-              nu->bezt = bezt1;
-              ED_curve_deselect_all(editnurb);
-              BKE_nurb_handles_calc(nu);
-              new_bezt->f1 = new_bezt->f2 = new_bezt->f3 = 1;
+              add_bezt_to_nurb(nu, &data, cu);
             }
           }
         }
