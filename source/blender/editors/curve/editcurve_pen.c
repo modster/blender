@@ -616,43 +616,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
-      retval = ED_curve_editnurb_select_pick(C, event->mval, extend, deselect, toggle);
-      RNA_boolean_set(op->ptr, "new", !retval);
-
-      /* Check if point underneath mouse. Get point if any. */
-      if (!cut_or_delete && !retval) {
-
-        /* Create new point under the mouse cursor. Set handle types as vector.
-        If an end point of a spline is selected, set the new point as the
-        new end point of the spline. */
-        float location[3];
-
-        ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
-
-        if (bezt) {
-          mul_v3_m4v3(location, vc.obedit->obmat, bezt->vec[1]);
-        }
-        else if (bp) {
-          mul_v3_m4v3(location, vc.obedit->obmat, bp->vec);
-        }
-        else {
-          copy_v3_v3(location, vc.scene->cursor.location);
-        }
-
-        ED_view3d_win_to_3d_int(vc.v3d, vc.region, location, event->mval, location);
-        EditNurb *editnurb = cu->editnurb;
-        ed_editcurve_addvert(cu, editnurb, vc.v3d, location);
-        ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
-        if (bezt) {
-          bezt->h1 = HD_VECT;
-          bezt->h2 = HD_VECT;
-        }
-      }
-    }
-    if (event->val == KM_RELEASE) {
-      if (dragging) {
-        RNA_boolean_set(op->ptr, "dragging", false);
-      }
       bool found_point = false;
 
       if (cut_or_delete) {
@@ -726,6 +689,46 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           BKE_nurb_handles_calc(nu);
         }
       }
+      else {
+        retval = ED_curve_editnurb_select_pick(C, event->mval, extend, deselect, toggle);
+        RNA_boolean_set(op->ptr, "new", !retval);
+
+        /* Check if point underneath mouse. Get point if any. */
+        if (!retval) {
+
+          /* Create new point under the mouse cursor. Set handle types as vector.
+          If an end point of a spline is selected, set the new point as the
+          new end point of the spline. */
+          float location[3];
+
+          ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
+
+          if (bezt) {
+            mul_v3_m4v3(location, vc.obedit->obmat, bezt->vec[1]);
+          }
+          else if (bp) {
+            mul_v3_m4v3(location, vc.obedit->obmat, bp->vec);
+          }
+          else {
+            copy_v3_v3(location, vc.scene->cursor.location);
+          }
+
+          ED_view3d_win_to_3d_int(vc.v3d, vc.region, location, event->mval, location);
+          EditNurb *editnurb = cu->editnurb;
+          ed_editcurve_addvert(cu, editnurb, vc.v3d, location);
+          ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
+          if (bezt) {
+            bezt->h1 = HD_VECT;
+            bezt->h2 = HD_VECT;
+          }
+        }
+      }
+    }
+    if (event->val == KM_RELEASE) {
+      if (dragging) {
+        RNA_boolean_set(op->ptr, "dragging", false);
+      }
+
       RNA_boolean_set(op->ptr, "new", false);
       ret = OPERATOR_FINISHED;
     }
