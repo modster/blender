@@ -985,12 +985,12 @@ bool UI_but_active_only(const bContext *C, ARegion *region, uiBlock *block, uiBu
 
 /**
  * \warning This must run after other handlers have been added,
- * otherwise the handler wont be removed, see: T71112.
+ * otherwise the handler won't be removed, see: T71112.
  */
 bool UI_block_active_only_flagged_buttons(const bContext *C, ARegion *region, uiBlock *block)
 {
   /* Running this command before end-block has run, means buttons that open menus
-   * wont have those menus correctly positioned, see T83539. */
+   * won't have those menus correctly positioned, see T83539. */
   BLI_assert(block->endblock);
 
   bool done = false;
@@ -1160,7 +1160,6 @@ void ui_but_add_shortcut(uiBut *but, const char *shortcut_str, const bool do_str
   MEM_freeN(butstr_orig);
   but->str = but->strdata;
   but->flag |= UI_BUT_HAS_SEP_CHAR;
-  but->drawflag |= UI_BUT_HAS_SHORTCUT;
   ui_but_update(but);
 }
 
@@ -3224,8 +3223,8 @@ void ui_but_range_set_hard(uiBut *but)
 /* note: this could be split up into functions which handle arrays and not */
 void ui_but_range_set_soft(uiBut *but)
 {
-  /* ideally we would not limit this but practically, its more than
-   * enough worst case is very long vectors wont use a smart soft-range
+  /* Ideally we would not limit this, but practically it's more than
+   * enough. Worst case is very long vectors won't use a smart soft-range,
    * which isn't so bad. */
 
   if (but->rnaprop) {
@@ -6144,6 +6143,7 @@ void UI_but_drag_set_asset(uiBut *but,
                            const char *name,
                            const char *path,
                            int id_type,
+                           int import_type,
                            int icon,
                            struct ImBuf *imb,
                            float scale)
@@ -6153,6 +6153,7 @@ void UI_but_drag_set_asset(uiBut *but,
   BLI_strncpy(asset_drag->name, name, sizeof(asset_drag->name));
   asset_drag->path = path;
   asset_drag->id_type = id_type;
+  asset_drag->import_type = import_type;
 
   but->dragtype = WM_DRAG_ASSET;
   ui_def_but_icon(but, icon, 0); /* no flag UI_HAS_ICON, so icon doesn't draw in button */

@@ -45,6 +45,7 @@
 
 #include "intern/depsgraph.h"
 #include "intern/depsgraph_relation.h"
+#include "intern/depsgraph_tag.h"
 #include "intern/eval/deg_eval_copy_on_write.h"
 #include "intern/eval/deg_eval_flush.h"
 #include "intern/eval/deg_eval_stats.h"
@@ -353,8 +354,7 @@ static TaskPool *deg_evaluate_task_pool_create(DepsgraphEvalState *state)
     return BLI_task_pool_create_no_threads(state);
   }
 
-  /* TODO: Disable task isolation. */
-  return BLI_task_pool_create_suspended(state, TASK_PRIORITY_HIGH, TASK_ISOLATION_ON);
+  return BLI_task_pool_create_suspended(state, TASK_PRIORITY_HIGH);
 }
 
 /**
@@ -366,6 +366,8 @@ static TaskPool *deg_evaluate_task_pool_create(DepsgraphEvalState *state)
  */
 void deg_evaluate_on_refresh(Depsgraph *graph)
 {
+  graph_tag_ids_for_visible_update(graph);
+
   /* Nothing to update, early out. */
   if (graph->entry_tags.is_empty()) {
     return;

@@ -220,7 +220,7 @@ static void execute_on_component(const GeoNodeExecParams &params,
   const Bounds bounds = position_bounds(positions);
   const Bounds parameter_bounds = input.use_bounds ? bounds : dummy_parameter_bounds(deform_axis);
 
-  parallel_for(positions.index_range(), 1024, [&](IndexRange range) {
+  threading::parallel_for(positions.index_range(), 1024, [&](IndexRange range) {
     for (const int i : range) {
       const float parameter = process_parameter(
           positions[i], axis_index, is_negative, input, parameter_bounds);
@@ -267,7 +267,7 @@ static void geo_node_curve_deform_exec(GeoNodeExecParams params)
                                       spline.evaluated_positions(),
                                       spline.evaluated_tangents(),
                                       spline.evaluated_normals(),
-                                      spline.interpolate_to_evaluated_points(spline.radii()),
+                                      spline.interpolate_to_evaluated(spline.radii()),
                                       total_length,
                                       params.extract_input<bool>("Stretch"),
                                       params.extract_input<bool>("Use Bounds")};

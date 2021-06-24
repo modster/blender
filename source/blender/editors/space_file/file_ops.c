@@ -1677,7 +1677,7 @@ void file_draw_check_ex(bContext *C, ScrArea *area)
       if (op->type->check(C, op)) {
         file_operator_to_sfile(bmain, sfile, op);
 
-        /* redraw, else the changed settings wont get updated */
+        /* redraw, else the changed settings won't get updated */
         ED_area_tag_redraw(area);
       }
     }
@@ -2628,6 +2628,43 @@ void FILE_OT_hidedot(struct wmOperatorType *ot)
   /* api callbacks */
   ot->exec = file_hidedot_exec;
   ot->poll = ED_operator_file_active; /* <- important, handler is on window level */
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Associate File Type Operator (Windows only)
+ * \{ */
+
+static int associate_blend_exec(bContext *UNUSED(C), wmOperator *op)
+{
+#ifdef WIN32
+  WM_cursor_wait(true);
+  if (BLI_windows_register_blend_extension(true)) {
+    BKE_report(op->reports, RPT_INFO, "File association registered");
+    WM_cursor_wait(false);
+    return OPERATOR_FINISHED;
+  }
+  else {
+    BKE_report(op->reports, RPT_ERROR, "Unable to register file association");
+    WM_cursor_wait(false);
+    return OPERATOR_CANCELLED;
+  }
+#else
+  BKE_report(op->reports, RPT_WARNING, "Operator Not supported");
+  return OPERATOR_CANCELLED;
+#endif
+}
+
+void FILE_OT_associate_blend(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Register File Association";
+  ot->description = "Use this installation for .blend files and to display thumbnails";
+  ot->idname = "FILE_OT_associate_blend";
+
+  /* api callbacks */
+  ot->exec = associate_blend_exec;
 }
 
 /** \} */

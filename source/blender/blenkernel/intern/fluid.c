@@ -1615,8 +1615,9 @@ static void emit_from_particles(Object *flow_ob,
         }
       }
 
-      state.time = BKE_scene_frame_get(
-          scene); /* DEG_get_ctime(depsgraph) does not give subframe time */
+      /* `DEG_get_ctime(depsgraph)` does not give sub-frame time. */
+      state.time = BKE_scene_frame_get(scene);
+
       if (psys_get_particle_state(&sim, p, &state, 0) == 0) {
         continue;
       }
@@ -4234,7 +4235,7 @@ struct Mesh *BKE_fluid_modifier_do(
     result = BKE_mesh_copy_for_eval(me, false);
   }
   else {
-    BKE_mesh_copy_settings(result, me);
+    BKE_mesh_copy_parameters_for_eval(result, me);
   }
 
   /* Liquid simulation has a texture space that based on the bounds of the fluid mesh.

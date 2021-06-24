@@ -1007,7 +1007,7 @@ void psys_get_birth_coords(
           mul_qt_v3(q_imat, rot_vec_local);
 
           /* vtan_local */
-          copy_v3_v3(vtan_local, vtan); /* flips, cant use */
+          copy_v3_v3(vtan_local, vtan); /* flips, can't use */
           mul_qt_v3(q_imat, vtan_local);
 
           /* ensure orthogonal matrix (rot_vec aligned) */
@@ -1320,6 +1320,14 @@ void psys_get_pointcache_start_end(Scene *scene, ParticleSystem *psys, int *sfra
   *efra = min_ii((int)(part->end + part->lifetime + 1.0f), max_ii(scene->r.pefra, scene->r.efra));
 }
 
+/* BVH tree balancing inside a mutex lock must be run in isolation. Balancing
+ * is multithreaded, and we do not want the current thread to start another task
+ * that may involve acquiring the same mutex lock that it is waiting for. */
+static void bvhtree_balance_isolated(void *userdata)
+{
+  BLI_bvhtree_balance((BVHTree *)userdata);
+}
+
 /************************************************/
 /*          Effectors                           */
 /************************************************/
@@ -1356,7 +1364,8 @@ static void psys_update_particle_bvhtree(ParticleSystem *psys, float cfra)
           }
         }
       }
-      BLI_bvhtree_balance(psys->bvhtree);
+
+      BLI_task_isolate(bvhtree_balance_isolated, psys->bvhtree);
 
       psys->bvhtree_frame = cfra;
 
@@ -3312,13 +3321,11 @@ static MDeformVert *hair_set_pinning(MDeformVert *dvert, float weight)
 static void hair_create_input_mesh(ParticleSimulationData *sim,
                                    int totpoint,
                                    int totedge,
-                                   Mesh **r_mesh,
-                                   ClothHairData **r_hairdata)
+                                   Mesh **r_mesh)
 {
   ParticleSystem *psys = sim->psys;
   ParticleSettings *part = psys->part;
   Mesh *mesh;
-  ClothHairData *hairdata;
   MVert *mvert;
   MEdge *medge;
   MDeformVert *dvert;
@@ -3339,9 +3346,8 @@ static void hair_create_input_mesh(ParticleSimulationData *sim,
   medge = mesh->medge;
   dvert = mesh->dvert;
 
-  hairdata = *r_hairdata;
-  if (!hairdata) {
-    *r_hairdata = hairdata = MEM_mallocN(sizeof(ClothHairData) * totpoint, "hair data");
+  if (psys->clmd->hairdata == NULL) {
+    psys->clmd->hairdata = MEM_mallocN(sizeof(ClothHairData) * totpoint, "hair data");
   }
 
   /* calculate maximum segment length */
@@ -3493,7 +3499,7 @@ static void do_hair_dynamics(ParticleSimulationData *sim)
     }
   }
 
-  hair_create_input_mesh(sim, totpoint, totedge, &psys->hair_in_mesh, &psys->clmd->hairdata);
+  hair_create_input_mesh(sim, totpoint, totedge, &psys->hair_in_mesh);
 
   if (psys->hair_out_mesh) {
     BKE_id_free(NULL, psys->hair_out_mesh);

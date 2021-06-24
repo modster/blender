@@ -476,8 +476,7 @@ static void rna_Object_active_shape_update(Main *bmain, Scene *UNUSED(scene), Po
 
         DEG_id_tag_update(&me->id, 0);
 
-        EDBM_mesh_normals_update(em);
-        BKE_editmesh_looptri_calc(em);
+        BKE_editmesh_looptri_and_normals_calc(em);
         break;
       }
       case OB_CURVE:
@@ -2000,8 +1999,8 @@ static void rna_VertexGroup_vertex_add(ID *id,
   }
 
   while (index_len--) {
-    ED_vgroup_vert_add(
-        ob, def, *index++, weight, assignmode); /* XXX, not efficient calling within loop*/
+    /* XXX: not efficient calling within loop. */
+    ED_vgroup_vert_add(ob, def, *index++, weight, assignmode);
   }
 
   DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
