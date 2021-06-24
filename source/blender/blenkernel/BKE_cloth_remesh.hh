@@ -389,6 +389,38 @@ class MeshIO {
     return true;
   }
 
+  bool write(const fs::path &filepath, FileType type)
+  {
+    if (type != FILETYPE_OBJ) {
+      return false;
+    }
+
+    if (!fs::exists(filepath)) {
+      return false;
+    }
+
+    std::fstream fout;
+    fout.open(filepath, std::ios::out);
+
+    if (!fout.is_open()) {
+      return false;
+    }
+
+    write(fout, type);
+
+    return true;
+  }
+
+  void write(std::ostream &out, FileType type)
+  {
+    if (type == FILETYPE_OBJ) {
+      this->write_obj(out);
+    }
+    else {
+      BLI_assert_unreachable();
+    }
+  }
+
   const auto &get_positions() const
   {
     return this->positions;
@@ -412,6 +444,11 @@ class MeshIO {
   const auto &get_line_indices() const
   {
     return this->line_indices;
+  }
+
+  static constexpr inline auto invalid_index()
+  {
+    return std::numeric_limits<usize>::max();
   }
 
  private:
@@ -487,9 +524,8 @@ class MeshIO {
             std::istringstream isi(indices_str[0]);
             usize pos_index;
             isi >> pos_index;
-            face.append(std::make_tuple(pos_index - 1,
-                                        std::numeric_limits<usize>::max(),
-                                        std::numeric_limits<usize>::max()));
+            face.append(
+                std::make_tuple(pos_index - 1, MeshIO::invalid_index(), MeshIO::invalid_index()));
           }
           else if (indices_str.size() == 2) {
             std::istringstream isi_pos(indices_str[0]);
@@ -498,8 +534,7 @@ class MeshIO {
             usize uv_index;
             isi_pos >> pos_index;
             isi_uv >> uv_index;
-            face.append(
-                std::make_tuple(pos_index - 1, uv_index - 1, std::numeric_limits<usize>::max()));
+            face.append(std::make_tuple(pos_index - 1, uv_index - 1, MeshIO::invalid_index()));
           }
           else if (indices_str.size() == 3) {
             std::istringstream isi_pos(indices_str[0]);
@@ -543,6 +578,41 @@ class MeshIO {
     }
 
     return true;
+  }
+
+  void write_obj(std::ostream &out)
+  {
+    for (const auto &pos : this->positions) {
+      out << "v " << pos.x << " " << pos.y << " " << pos.z << std::endl;
+    }
+
+    for (const auto &uv : this->uvs) {
+      out << "vt " << uv.x << " " << uv.y << std::endl;
+    }
+
+    for (const auto &normal : this->normals) {
+      out << "v " << normal.x << " " << normal.y << " " << normal.z << std::endl;
+    }
+
+    for (const auto &face : this->face_indices) {
+      out << "f ";
+      for (const auto &[pos_index, uv_index, normal_index] : face) {
+        if (normal_index == MeshIO::invalid_index()) {
+          if (uv_index == MeshIO::invalid_index()) {
+            out << pos_index + 1 << " ";
+          }
+          else {
+            out << pos_index + 1 << "/" << uv_index + 1 << " ";
+          }
+        }
+        else {
+          out << pos_index + 1 << "/" << uv_index + 1 << "/" << normal_index + 1 << " ";
+        }
+      }
+      out << std::endl;
+    }
+
+    /* TODO(ish): add line support */
   }
 };
 

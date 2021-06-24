@@ -71,6 +71,55 @@ TEST(cloth_remesh, MeshIO_ReadObj)
   EXPECT_EQ(line_indices.size(), 0);
 }
 
+TEST(cloth_remesh, MeshIO_WriteObj)
+{
+  MeshIO reader;
+  std::istringstream stream_in(cube_pos_uv_normal);
+  auto res = reader.read(std::move(stream_in), MeshIO::FILETYPE_OBJ);
+  EXPECT_TRUE(res);
+
+  std::ostringstream stream_out;
+  reader.write(stream_out, MeshIO::FILETYPE_OBJ);
+
+  std::string expected =
+      "v 1 1 -1\n"
+      "v 1 -1 -1\n"
+      "v 1 1 1\n"
+      "v 1 -1 1\n"
+      "v -1 1 -1\n"
+      "v -1 -1 -1\n"
+      "v -1 1 1\n"
+      "v -1 -1 1\n"
+      "vt 0.625 0.5\n"
+      "vt 0.875 0.5\n"
+      "vt 0.875 0.75\n"
+      "vt 0.625 0.75\n"
+      "vt 0.375 0.75\n"
+      "vt 0.625 1\n"
+      "vt 0.375 1\n"
+      "vt 0.375 0\n"
+      "vt 0.625 0\n"
+      "vt 0.625 0.25\n"
+      "vt 0.375 0.25\n"
+      "vt 0.125 0.5\n"
+      "vt 0.375 0.5\n"
+      "vt 0.125 0.75\n"
+      "v 0 1 0\n"
+      "v 0 0 1\n"
+      "v -1 0 0\n"
+      "v 0 -1 0\n"
+      "v 1 0 0\n"
+      "v 0 0 -1\n"
+      "f 1/1/1 5/2/1 7/3/1 3/4/1 \n"
+      "f 4/5/2 3/4/2 7/6/2 8/7/2 \n"
+      "f 8/8/3 7/9/3 5/10/3 6/11/3 \n"
+      "f 6/12/4 2/13/4 4/5/4 8/14/4 \n"
+      "f 2/13/5 1/1/5 3/4/5 4/5/5 \n"
+      "f 6/11/6 5/10/6 1/1/6 2/13/6 \n";
+
+  EXPECT_EQ(stream_out.str(), expected);
+}
+
 TEST(cloth_remesh, Mesh_Read)
 {
   MeshIO reader;
