@@ -167,6 +167,11 @@ template<typename T> class Node {
     this->extra_data = extra_data;
   }
 
+  const auto &get_verts() const
+  {
+    return this->verts;
+  }
+
   friend std::ostream &operator<<(std::ostream &stream, const Node &node)
   {
     stream << "(self_index: " << node.self_index << ", verts: " << node.verts
@@ -205,6 +210,16 @@ template<typename T> class Vert {
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
+  }
+
+  const auto &get_edges() const
+  {
+    return this->edges;
+  }
+
+  auto get_node() const
+  {
+    return this->node;
   }
 
   friend std::ostream &operator<<(std::ostream &stream, const Vert &vert)
@@ -640,8 +655,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         auto op_node = this->nodes.get_no_gen(pos_index);
         BLI_assert(op_vert && op_node);
 
-        auto vert = op_vert.value().get();
-        auto node = op_node.value().get();
+        auto &vert = op_vert.value().get();
+        auto &node = op_node.value().get();
 
         vert.node = node.self_index;
         node.verts.append(vert.self_index);
@@ -677,31 +692,33 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
           face_edges.append(op_edge_index.value());
         }
         else {
-          auto edge = this->add_empty_edge();
+          auto &edge = this->add_empty_edge();
 
           edge.verts = std::make_tuple(vert_1_index, vert_2_index);
 
-          auto vert_1 = this->verts.get(vert_1_index).value().get();
+          auto &vert_1 = this->verts.get(vert_1_index).value().get();
           vert_1.edges.append(edge.self_index);
 
-          auto vert_2 = this->verts.get(vert_2_index).value().get();
+          auto &vert_2 = this->verts.get(vert_2_index).value().get();
           vert_2.edges.append(edge.self_index);
 
           face_edges.append(edge.self_index);
         }
+
+        face_verts.append(vert_1_index);
       }
 
       /* update faces */
       {
-        auto face = this->add_empty_face(float3_unknown());
+        auto &face = this->add_empty_face(float3_unknown());
 
-        face.verts = face_verts;
+        face.verts = std::move(face_verts);
 
         for (const auto &edge_index : face_edges) {
           auto op_edge = this->edges.get(edge_index);
           BLI_assert(op_edge);
 
-          auto edge = op_edge.value().get();
+          auto &edge = op_edge.value().get();
 
           edge.faces.append(face.self_index);
         }

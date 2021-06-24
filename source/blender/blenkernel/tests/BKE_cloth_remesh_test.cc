@@ -80,15 +80,35 @@ TEST(cloth_remesh, Mesh_Read)
   Mesh<bool, bool, bool, bool> mesh;
   mesh.read(reader);
 
-  const auto nodes = mesh.get_nodes();
-  const auto verts = mesh.get_verts();
-  const auto edges = mesh.get_edges();
-  const auto faces = mesh.get_faces();
+  const auto &nodes = mesh.get_nodes();
+  const auto &verts = mesh.get_verts();
+  const auto &edges = mesh.get_edges();
+  const auto &faces = mesh.get_faces();
 
   EXPECT_EQ(nodes.size(), 8);
   EXPECT_EQ(verts.size(), 14);
-  EXPECT_EQ(edges.size(), 12);
+  EXPECT_EQ(edges.size(), 19);
   EXPECT_EQ(faces.size(), 6);
+
+  for (const auto &face : faces) {
+    EXPECT_EQ(face.get_verts().size(), 4);
+  }
+
+  for (const auto &edge : edges) {
+    auto num_faces = edge.get_faces().size();
+    EXPECT_TRUE(num_faces == 1 || num_faces == 2);
+  }
+
+  for (const auto &vert : verts) {
+    auto num_edges = vert.get_edges().size();
+    EXPECT_TRUE(num_edges >= 2 && num_edges <= 4);
+    EXPECT_NE(vert.get_node(), std::nullopt);
+  }
+
+  for (const auto &node : nodes) {
+    auto num_verts = node.get_verts().size();
+    EXPECT_TRUE(num_verts >= 1 && num_verts <= 3);
+  }
 }
 
 } /* namespace blender::bke::tests */
