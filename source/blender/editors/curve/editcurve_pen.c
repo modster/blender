@@ -148,6 +148,7 @@ static void free_up_selected_handles_for_movement(BezTriple *bezt)
 
 static void delete_bezt_from_nurb(BezTriple *bezt, Nurb *nu)
 {
+  BLI_assert(nu->type == CU_BEZIER);
   int index = BKE_curve_nurb_vert_index_get(nu, bezt);
   nu->pntsu -= 1;
   BezTriple *bezt1 = (BezTriple *)MEM_mallocN(nu->pntsu * sizeof(BezTriple), "NewBeztCurve");
@@ -160,6 +161,7 @@ static void delete_bezt_from_nurb(BezTriple *bezt, Nurb *nu)
 
 static void delete_bp_from_nurb(BPoint *bp, Nurb *nu)
 {
+  BLI_assert(nu->type == CU_NURBS);
   int index = BKE_curve_nurb_vert_index_get(nu, bp);
   nu->pntsu -= 1;
   BPoint *bp1 = (BPoint *)MEM_mallocN(nu->pntsu * sizeof(BPoint), "NewBpCurve");
@@ -223,55 +225,73 @@ static bool get_closest_point_on_edge(float *point,
   return false;
 }
 
-static BezTriple *get_closest_bezt_to_point(Nurb *nu, const float point[2], const ViewContext *vc)
+static void *get_closest_cp_to_point_in_nurbs(ListBase *nurbs,
+                                              Nurb **r_nu,
+                                              BezTriple **r_bezt,
+                                              BPoint **r_bp,
+                                              const float point[2],
+                                              const ViewContext *vc)
 {
-  float min_distance = 10000;
+  float min_distance_bezt = 10000;
+  float min_distance_bp = 10000;
 
-  BezTriple *closest = NULL;
-  for (int i = 0; i < nu->pntsu; i++) {
-    BezTriple *bezt = &nu->bezt[i];
-    float bezt_vec[2];
-    ED_view3d_project_float_object(
-        vc->region, bezt->vec[1], bezt_vec, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
-    float distance = len_manhattan_v2v2(bezt_vec, point);
-    if (distance < min_distance) {
-      min_distance = distance;
-      closest = bezt;
-    }
-  }
-  if (closest) {
-    float threshold_distance = get_view_zoom(closest->vec[1], vc);
-    if (min_distance < threshold_distance) {
-      return closest;
-    }
-  }
-  return NULL;
-}
+  BezTriple *closest_bezt = NULL;
+  BPoint *closest_bp = NULL;
+  Nurb *closest_bezt_nu = NULL;
+  Nurb *closest_bp_nu = NULL;
 
-static BPoint *get_closest_bp_to_point(Nurb *nu, const float point[2], const ViewContext *vc)
-{
-  float min_distance = 10000;
-  float temp[2];
-  copy_v2_v2(temp, point);
-  BPoint *closest = NULL;
-  for (int i = 0; i < nu->pntsu; i++) {
-    BPoint *bp = &nu->bp[i];
-    float bp_vec[2];
-    ED_view3d_project_float_object(
-        vc->region, bp->vec, bp_vec, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
-    float distance = len_manhattan_v2v2(bp_vec, point);
-    if (distance < min_distance) {
-      min_distance = distance;
-      closest = bp;
+  for (Nurb *nu = nurbs->first; nu; nu = nu->next) {
+    if (nu->type == CU_BEZIER) {
+      for (int i = 0; i < nu->pntsu; i++) {
+        BezTriple *bezt = &nu->bezt[i];
+        float bezt_vec[2];
+        ED_view3d_project_float_object(
+            vc->region, bezt->vec[1], bezt_vec, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+        float distance = len_manhattan_v2v2(bezt_vec, point);
+        if (distance < min_distance_bezt) {
+          min_distance_bezt = distance;
+          closest_bezt = bezt;
+          closest_bezt_nu = nu;
+        }
+      }
+    }
+    if (nu->type == CU_NURBS) {
+      for (int i = 0; i < nu->pntsu; i++) {
+        BPoint *bp = &nu->bp[i];
+        float bp_vec[2];
+        ED_view3d_project_float_object(
+            vc->region, bp->vec, bp_vec, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+        float distance = len_manhattan_v2v2(bp_vec, point);
+        if (distance < min_distance_bp) {
+          min_distance_bp = distance;
+          closest_bp = bp;
+          closest_bp_nu = nu;
+        }
+      }
     }
   }
-  if (closest) {
-    float threshold_distance = get_view_zoom(closest->vec, vc);
-    if (min_distance < threshold_distance) {
-      return closest;
+
+  float threshold_distance;
+  if (closest_bezt) {
+    threshold_distance = get_view_zoom(closest_bezt->vec[1], vc);
+  }
+  else if (closest_bp) {
+    threshold_distance = get_view_zoom(closest_bp->vec, vc);
+  }
+  else {
+    return;
+  }
+
+  if (min_distance_bezt < threshold_distance || min_distance_bp < threshold_distance) {
+    if (min_distance_bp < min_distance_bezt) {
+      *r_bp = closest_bp;
+      *r_nu = closest_bp_nu;
+    }
+    else {
+      *r_bezt = closest_bezt;
+      *r_nu = closest_bezt_nu;
     }
   }
-  return NULL;
 }
 
 static void select_and_get_point(ViewContext *vc,
@@ -442,6 +462,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   int ret = OPERATOR_RUNNING_MODAL;
   bool dragging = RNA_boolean_get(op->ptr, "dragging");
+  bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
 
   bool picked = false;
   if (event->type == EVT_MODAL_MAP) {
@@ -513,9 +534,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
-      RNA_boolean_set(op->ptr, "new", !retval);
-      bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
       retval = ED_curve_editnurb_select_pick(C, event->mval, extend, deselect, toggle);
+      RNA_boolean_set(op->ptr, "new", !retval);
 
       /* Check if point underneath mouse. Get point if any. */
       if (!cut_or_delete && !retval) {
@@ -551,7 +571,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       if (dragging) {
         RNA_boolean_set(op->ptr, "dragging", false);
       }
-      bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
       bool found_point = false;
 
       if (cut_or_delete) {
@@ -559,20 +578,15 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         ListBase *nurbs = BKE_curve_editNurbs_get(cu);
         float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
 
-        for (nu = nurbs->first; nu; nu = nu->next) {
+        get_closest_cp_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
+        found_point = nu != NULL;
+
+        if (found_point) {
           if (nu->type == CU_BEZIER) {
-            bezt = get_closest_bezt_to_point(nu, mouse_point, &vc);
-            if (bezt && nu) {
-              found_point = true;
-              delete_bezt_from_nurb(bezt, nu);
-            }
+            delete_bezt_from_nurb(bezt, nu);
           }
-          else if (nu->type == CU_NURBS) {
-            bp = get_closest_bp_to_point(nu, mouse_point, &vc);
-            if (bp && nu) {
-              found_point = true;
-              delete_bp_from_nurb(bp, nu);
-            }
+          if (nu->type == CU_NURBS) {
+            delete_bp_from_nurb(bp, nu);
           }
         }
 
