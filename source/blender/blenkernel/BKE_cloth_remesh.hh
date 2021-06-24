@@ -87,8 +87,26 @@ using usize = uint64_t;
 
 template<typename T> std::ostream &operator<<(std::ostream &stream, const blender::Vector<T> &vec)
 {
+  if (vec.size() == 0) {
+    stream << "()";
+    return stream;
+  }
   stream << "(";
   for (const auto &i : vec) {
+    stream << i << ", ";
+  }
+  stream << "\b\b)";
+  return stream;
+}
+
+template<typename T> std::ostream &operator<<(std::ostream &stream, const ga::Arena<T> &arena)
+{
+  if (arena.size() == 0) {
+    stream << "()";
+    return stream;
+  }
+  stream << "(";
+  for (const auto &i : arena) {
     stream << i << ", ";
   }
   stream << "\b\b)";
@@ -98,11 +116,28 @@ template<typename T> std::ostream &operator<<(std::ostream &stream, const blende
 template<typename T> std::ostream &operator<<(std::ostream &stream, const std::optional<T> &option)
 {
   if (option) {
-    stream << "Some(" << option << ")";
+    stream << "Some(" << option.value() << ")";
   }
   else {
     stream << "None";
   }
+  return stream;
+}
+
+template<typename... Types>
+constexpr std::ostream &operator<<(std::ostream &stream, const std::tuple<Types...> &tuple)
+{
+  auto tuple_size = std::tuple_size<std::tuple<Types...>>();
+
+  if (tuple_size == 0) {
+    stream << "()";
+    return stream;
+  }
+
+  stream << "(";
+  std::apply([&](const auto &... i) { ((stream << i << ", "), ...); }, tuple);
+  stream << "\b\b)";
+
   return stream;
 }
 
@@ -134,8 +169,8 @@ template<typename T> class Node {
 
   friend std::ostream &operator<<(std::ostream &stream, const Node &node)
   {
-    stream << "(" << node.self_index << ", " << node.verts << ", " << node.pos << ","
-           << node.normal << ")";
+    stream << "(self_index: " << node.self_index << ", verts: " << node.verts
+           << ", pos: " << node.pos << ", normal: " << node.normal << ")";
     return stream;
   }
 
@@ -174,8 +209,8 @@ template<typename T> class Vert {
 
   friend std::ostream &operator<<(std::ostream &stream, const Vert &vert)
   {
-    stream << "(" << vert.self_index << ", " << vert.edges << ", " << vert.node << "," << vert.uv
-           << ")";
+    stream << "(self_index: " << vert.self_index << ", edges: " << vert.edges
+           << ", node: " << vert.node << ", uv: " << vert.uv << ")";
     return stream;
   }
 
@@ -232,7 +267,8 @@ template<typename T> class Edge {
 
   friend std::ostream &operator<<(std::ostream &stream, const Edge &edge)
   {
-    stream << "(" << edge.self_index << ", " << edge.faces << ", " << edge.verts << ")";
+    stream << "(self_index: " << edge.self_index << ", faces: " << edge.faces
+           << ", verts: " << edge.verts << ")";
     return stream;
   }
 
@@ -275,7 +311,8 @@ template<typename T> class Face {
 
   friend std::ostream &operator<<(std::ostream &stream, const Face &face)
   {
-    stream << "(" << face.self_index << ", " << face.verts << ", " << face.normal << ")";
+    stream << "(self_index: " << face.self_index << ", verts: " << face.verts
+           << ", normal: " << face.normal << ")";
     return stream;
   }
 
