@@ -38,7 +38,7 @@ static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_FLOAT, N_("Offset"), -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, PROP_FACTOR},
     {SOCK_BOOLEAN, N_("Fill"), true},
     {SOCK_BOOLEAN, N_("Rim"), true},
-    {SOCK_STRING, N_("Shell Faces")},
+    {SOCK_STRING, N_("Fill Faces")},
     {SOCK_STRING, N_("Rim Faces")},
     {-1, ""},
 };
@@ -56,6 +56,7 @@ static void geo_node_solidify_init(bNodeTree *UNUSED(tree), bNode *node)
       sizeof(NodeGeometrySolidify), __func__);
 
   node->storage = node_storage;
+  node_storage->thickness_mode = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
 }
 
 static void geo_node_solidify_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -147,10 +148,9 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
 
     geometry_set.replace_mesh(output_mesh);
 
-    const AttributeDomain result_point_domain = ATTR_DOMAIN_POINT;
     const AttributeDomain result_face_domain = ATTR_DOMAIN_FACE;
 
-    const std::string shell_faces_attribute_name = params.get_input<std::string>("Shell Faces");
+    const std::string shell_faces_attribute_name = params.get_input<std::string>("Fill Faces");
     const std::string rim_faces_attribute_name = params.get_input<std::string>("Rim Faces");
 
     if (solidify_node_data.flag & MOD_SOLIDIFY_SHELL) {
@@ -194,7 +194,7 @@ void register_node_type_geo_solidify()
   node_type_storage(
       &ntype, "NodeGeometrySolidify", node_free_standard_storage, node_copy_standard_storage);
   node_type_init(&ntype, blender::nodes::geo_node_solidify_init);
-  node_type_size(&ntype, 167, 100, 600);
+  node_type_size(&ntype, 172, 100, 600);
   node_type_update(&ntype, blender::nodes::geo_node_solidify_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_solidify_exec;
   ntype.draw_buttons = blender::nodes::geo_node_solidify_layout;

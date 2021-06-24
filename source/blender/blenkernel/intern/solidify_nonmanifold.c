@@ -2455,7 +2455,7 @@ Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
   /* Haven't found a good way to generalize this. */
   // if (edge_index != numNewEdges) {
   /*BKE_modifier_set_error(ctx->object,
-                         md,
+                         md,A
                          "Internal Error: edges array wrong size: %u instead of %u",
                          numNewEdges,
                          edge_index);*/
