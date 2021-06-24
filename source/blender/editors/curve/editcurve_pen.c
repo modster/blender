@@ -315,6 +315,79 @@ static void calculate_new_bezier_point(const float *point_prev,
   interp_v3_v3v3(new_right_handle, center_point, handle_next, parameter);
 }
 
+static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
+                                                    BezTriple *bezt2,
+                                                    Nurb *nu,
+                                                    int index,
+                                                    ViewContext *vc,
+                                                    float screen_co[2],
+                                                    void *op_data)
+{
+  struct temp_bezt_data {
+    /* Index of the last bez triple before the cut. */
+    int bezt_index;
+    /* Nurb to which the cut belongs to. */
+    Nurb *nurb;
+    /* Minimum distance to curve from mouse location. */
+    float min_dist;
+    /* Ratio at which the new point divides the curve segment. */
+    float parameter;
+    /* Whether the cut has any vertices before/after it. */
+    bool has_prev, has_next;
+    /* Locations of adjacent vertices. */
+    float prev_loc[3], cut_loc[3], next_loc[3];
+    /* Mouse location as floats. */
+    float mval[2];
+  } temp_bezt_data;
+  struct temp_bezt_data *data = op_data;
+
+  float resolu = nu->resolu;
+  float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), "makeCut_bezier");
+
+  /* Calculate all points on curve. TODO: Get existing . */
+  for (int j = 0; j < 3; j++) {
+    BKE_curve_forward_diff_bezier(bezt1->vec[1][j],
+                                  bezt1->vec[2][j],
+                                  bezt2->vec[0][j],
+                                  bezt2->vec[1][j],
+                                  points + j,
+                                  resolu,
+                                  sizeof(float[3]));
+  }
+
+  /* Calculate angle for middle points */
+  for (int k = 0; k <= resolu; k++) {
+    /* Convert point to screen coordinates */
+    bool check = ED_view3d_project_float_object(vc->region,
+                                                points + 3 * k,
+                                                screen_co,
+                                                V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
+                 V3D_PROJ_RET_OK;
+
+    if (check) {
+      float distance = len_manhattan_v2v2(screen_co, data->mval);
+      if (distance < data->min_dist) {
+        data->min_dist = distance;
+        data->nurb = nu;
+        data->bezt_index = index;
+        data->parameter = ((float)k) / resolu;
+
+        copy_v3_v3(data->cut_loc, points + 3 * k);
+
+        data->has_prev = k > 0;
+        data->has_next = k < resolu;
+        if (data->has_prev) {
+          copy_v3_v3(data->prev_loc, points + 3 * (k - 1));
+        }
+        if (data->has_next) {
+          copy_v3_v3(data->next_loc, points + 3 * (k + 1));
+        }
+      }
+    }
+  }
+  MEM_freeN(points);
+}
+
 enum {
   PEN_MODAL_CANCEL = 1,
   PEN_MODAL_FREE_MOVE_HANDLE,
@@ -519,54 +592,16 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                 data.min_dist = len_manhattan_v2v2(screen_co, data.mval);
                 copy_v3_v3(data.cut_loc, nu->bezt->vec[1]);
               }
-              for (int i = 0; i < nu->pntsu - 1; i++) {
+              int i;
+              for (i = 0; i < nu->pntsu - 1; i++) {
                 bezt = &nu->bezt[i];
-                float resolu = nu->resolu;
-                float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), "makeCut_bezier");
+                update_data_if_nearest_point_in_segment(
+                    bezt, bezt + 1, nu, i, &vc, screen_co, &data);
+              }
 
-                /* Calculate all points on curve. TODO: Get existing . */
-                for (int j = 0; j < 3; j++) {
-                  BKE_curve_forward_diff_bezier(bezt->vec[1][j],
-                                                bezt->vec[2][j],
-                                                (bezt + 1)->vec[0][j],
-                                                (bezt + 1)->vec[1][j],
-                                                points + j,
-                                                resolu,
-                                                sizeof(float[3]));
-                }
-
-                /* Calculate angle for middle points */
-                for (int k = 0; k <= resolu; k++) {
-                  /* Convert point to screen coordinates */
-                  bool check = ED_view3d_project_float_object(vc.region,
-                                                              points + 3 * k,
-                                                              screen_co,
-                                                              V3D_PROJ_RET_CLIP_BB |
-                                                                  V3D_PROJ_RET_CLIP_WIN) ==
-                               V3D_PROJ_RET_OK;
-
-                  if (check) {
-                    float distance = len_manhattan_v2v2(screen_co, data.mval);
-                    if (distance < data.min_dist) {
-                      data.min_dist = distance;
-                      data.nurb = nu;
-                      data.bezt_index = i;
-                      data.parameter = ((float)k) / resolu;
-
-                      copy_v3_v3(data.cut_loc, points + 3 * k);
-
-                      data.has_prev = k > 0;
-                      data.has_next = k < resolu;
-                      if (data.has_prev) {
-                        copy_v3_v3(data.prev_loc, points + 3 * (k - 1));
-                      }
-                      if (data.has_next) {
-                        copy_v3_v3(data.next_loc, points + 3 * (k + 1));
-                      }
-                    }
-                  }
-                }
-                MEM_freeN(points);
+              if (nu->flagu & CU_NURB_CYCLIC) {
+                update_data_if_nearest_point_in_segment(
+                    bezt + 1, nu->bezt, nu, i, &vc, screen_co, &data);
               }
             }
           }
@@ -574,7 +609,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           /* If the minimum distance found < threshold distance, make cut. */
           if (data.min_dist < threshold_distance) {
             nu = data.nurb;
-            int index = data.bezt_index + 1;
             if (nu && nu->bezt) {
               bool found_min = false;
               float point[3];
@@ -582,10 +616,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
               if (data.has_prev) {
                 found_min = get_closest_point_on_edge(
                     point, data.mval, data.cut_loc, data.prev_loc, &vc, &factor);
+                factor = -factor;
               }
               if (!found_min && data.has_next) {
                 found_min = get_closest_point_on_edge(
-                    point, data.mval, data.next_loc, data.cut_loc, &vc, &factor);
+                    point, data.mval, data.cut_loc, data.next_loc, &vc, &factor);
               }
               if (found_min) {
                 float point_2d[2];
@@ -599,26 +634,38 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
               BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
                                                           "delNurb");
+              int index = data.bezt_index + 1;
               /* Copy all control points before the cut to the new memory. */
               memcpy(bezt1, nu->bezt, index * sizeof(BezTriple));
               BezTriple *new_bezt = bezt1 + index;
 
               /* Duplicate control point after the cut. */
               memcpy(new_bezt, new_bezt - 1, sizeof(BezTriple));
-              // new_bezt->h1 = new_bezt->h2 = HD_AUTO;
               copy_v3_v3(new_bezt->vec[1], data.cut_loc);
 
-              /* Copy all control points after the cut to the new memory. */
-              memcpy(bezt1 + index + 1, nu->bezt + index, (nu->pntsu - index) * sizeof(BezTriple));
+              if (index < nu->pntsu) {
+                /* Copy all control points after the cut to the new memory. */
+                memcpy(
+                    bezt1 + index + 1, nu->bezt + index, (nu->pntsu - index) * sizeof(BezTriple));
+              }
+
               nu->pntsu += 1;
               cu->actvert = CU_ACT_NONE;
+
+              BezTriple *next_bezt;
+              if ((nu->flagu & CU_NURB_CYCLIC) && (index == nu->pntsu - 1)) {
+                next_bezt = bezt1;
+              }
+              else {
+                next_bezt = new_bezt + 1;
+              }
 
               calculate_new_bezier_point((new_bezt - 1)->vec[1],
                                          (new_bezt - 1)->vec[2],
                                          new_bezt->vec[0],
                                          new_bezt->vec[2],
-                                         (new_bezt + 1)->vec[0],
-                                         (new_bezt + 1)->vec[1],
+                                         next_bezt->vec[0],
+                                         next_bezt->vec[1],
                                          data.parameter);
 
               MEM_freeN(nu->bezt);
