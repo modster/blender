@@ -68,7 +68,7 @@ template<typename> class Vert;
 template<typename> class Edge;
 template<typename> class Face;
 template<typename, typename, typename, typename> class Mesh;
-class MeshReader;
+class MeshIO;
 
 namespace ga = blender::generational_arena;
 namespace fs = std::filesystem;
@@ -334,7 +334,7 @@ template<typename T> class Face {
   template<typename, typename, typename, typename> friend class Mesh;
 };
 
-class MeshReader {
+class MeshIO {
   using FaceData = std::tuple<usize, usize, usize>; /* position,
                                                      * uv,
                                                      * normal */
@@ -350,7 +350,7 @@ class MeshReader {
     FILETYPE_OBJ,
   };
 
-  MeshReader() = default;
+  MeshIO() = default;
 
   bool read(const fs::path &filepath, FileType type)
   {
@@ -621,7 +621,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return std::nullopt;
   }
 
-  void read(const MeshReader &reader)
+  void read(const MeshIO &reader)
   {
     const auto positions = reader.get_positions();
     const auto uvs = reader.get_uvs();
@@ -730,8 +730,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
   void read_obj(const fs::path &filepath)
   {
-    MeshReader reader;
-    const auto reader_success = reader.read(filepath, MeshReader::FILETYPE_OBJ);
+    MeshIO reader;
+    const auto reader_success = reader.read(filepath, MeshIO::FILETYPE_OBJ);
     BLI_assert(reader_success); /* must successfully load obj */
 
     this->read(reader);

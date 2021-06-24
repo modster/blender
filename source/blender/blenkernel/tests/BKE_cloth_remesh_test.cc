@@ -50,11 +50,11 @@ static const char *cube_pos_uv_normal =
     "f 2/13/5 1/1/5 3/4/5 4/5/5\n"
     "f 6/11/6 5/10/6 1/1/6 2/13/6\n";
 
-TEST(cloth_remesh, MeshReader_ReadObj)
+TEST(cloth_remesh, MeshIO_ReadObj)
 {
-  MeshReader reader;
+  MeshIO reader;
   std::istringstream stream(cube_pos_uv_normal);
-  auto res = reader.read(std::move(stream), MeshReader::FILETYPE_OBJ);
+  auto res = reader.read(std::move(stream), MeshIO::FILETYPE_OBJ);
 
   EXPECT_TRUE(res);
 
@@ -73,9 +73,9 @@ TEST(cloth_remesh, MeshReader_ReadObj)
 
 TEST(cloth_remesh, Mesh_Read)
 {
-  MeshReader reader;
+  MeshIO reader;
   std::istringstream stream(cube_pos_uv_normal);
-  reader.read(std::move(stream), MeshReader::FILETYPE_OBJ);
+  reader.read(std::move(stream), MeshIO::FILETYPE_OBJ);
 
   Mesh<bool, bool, bool, bool> mesh;
   mesh.read(reader);
