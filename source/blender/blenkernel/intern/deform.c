@@ -1400,7 +1400,6 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
    */
 
   const ListBase *src_defbase = BKE_object_defgroup_list_for_read(ob_src);
-  ListBase *dst_defbase = BKE_object_defgroup_list_for_write(ob_dst);
   if (BLI_listbase_is_empty(src_defbase)) {
     if (use_delete) {
       BKE_object_defgroup_remove_all(ob_dst);
@@ -1435,7 +1434,9 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
     if (tolayers >= 0) {
       /* Note: in this case we assume layer exists! */
       idx_dst = tolayers;
+      const ListBase *dst_defbase = BKE_object_defgroup_list_for_read(ob_dst);
       BLI_assert(idx_dst < BLI_listbase_count(dst_defbase));
+      UNUSED_VARS_NDEBUG(dst_defbase);
     }
     else if (tolayers == DT_LAYERS_ACTIVE_DST) {
       if ((idx_dst = ob_dst->actdef - 1) == -1) {
