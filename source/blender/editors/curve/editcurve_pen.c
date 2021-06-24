@@ -84,8 +84,9 @@ struct TempBeztData {
   float prev_loc[3], cut_loc[3], next_loc[3];
   /* Mouse location as floats. */
   float mval[2];
-} temp_bezt_data;
+} TempBeztData;
 
+/* Convert mouse location to worldspace coordinates. */
 static void mouse_location_to_worldspace(const int *mouse_loc,
                                          const float *depth,
                                          const ViewContext *vc,
@@ -95,6 +96,7 @@ static void mouse_location_to_worldspace(const int *mouse_loc,
   ED_view3d_win_to_3d_int(vc->v3d, vc->region, r_location, mouse_loc, r_location);
 }
 
+/* Move the handle of BezTriple to mouse based on the previously added point. */
 static void move_bezt_handles_to_mouse(BezTriple *bezt,
                                        const bool is_end_point,
                                        const wmEvent *event,
@@ -114,7 +116,7 @@ static void move_bezt_handles_to_mouse(BezTriple *bezt,
     /* Set handle 2 location. */
     copy_v3_v3(bezt->vec[2], location);
 
-    /* Set handle 1 location if handle not of type FREE */
+    /* Set handle 1 location if handle not of type FREE. */
     if (bezt->h2 != HD_FREE) {
       mul_v3_fl(location, -1);
       madd_v3_v3v3fl(bezt->vec[0], location, bezt->vec[1], 2);
@@ -125,7 +127,7 @@ static void move_bezt_handles_to_mouse(BezTriple *bezt,
     /* Set handle 1 location. */
     copy_v3_v3(bezt->vec[0], location);
 
-    /* Set handle 2 location if handle not of type FREE */
+    /* Set handle 2 location if handle not of type FREE. */
     if (bezt->h1 != HD_FREE) {
       mul_v3_fl(location, -1);
       madd_v3_v3v3fl(bezt->vec[2], location, bezt->vec[1], 2);
@@ -133,6 +135,7 @@ static void move_bezt_handles_to_mouse(BezTriple *bezt,
   }
 }
 
+/* Move entire control point to given worldspace location. */
 static void move_bezt_to_location(BezTriple *bezt, const float location[3])
 {
   float change[3];
@@ -142,6 +145,7 @@ static void move_bezt_to_location(BezTriple *bezt, const float location[3])
   add_v3_v3(bezt->vec[2], change);
 }
 
+/* Alter handle types to allow free movement. */
 static void free_up_selected_handles_for_movement(BezTriple *bezt)
 {
   if (bezt->f1) {
@@ -164,6 +168,7 @@ static void free_up_selected_handles_for_movement(BezTriple *bezt)
   }
 }
 
+/* Delete given BezTriple from given Nurb. */
 static void delete_bezt_from_nurb(BezTriple *bezt, Nurb *nu)
 {
   BLI_assert(nu->type == CU_BEZIER);
@@ -177,6 +182,7 @@ static void delete_bezt_from_nurb(BezTriple *bezt, Nurb *nu)
   nu->bezt = bezt1;
 }
 
+/* Delete given BPoint from given Nurb. */
 static void delete_bp_from_nurb(BPoint *bp, Nurb *nu)
 {
   BLI_assert(nu->type == CU_NURBS);
@@ -190,6 +196,7 @@ static void delete_bp_from_nurb(BPoint *bp, Nurb *nu)
   nu->bp = bp1;
 }
 
+/* Get a measure of how zoomed in the current view is. */
 static float get_view_zoom(const float *depth, const ViewContext *vc)
 {
   int p1[2] = {0, 0};
@@ -200,6 +207,7 @@ static float get_view_zoom(const float *depth, const ViewContext *vc)
   return 10 / len_v2v2(p1_3d, p2_3d);
 }
 
+/* Get the closest point on an edge to a given point based on perpendicular distance. */
 static bool get_closest_point_on_edge(float *point,
                                       const float pos[2],
                                       const float pos1[3],
@@ -243,6 +251,7 @@ static bool get_closest_point_on_edge(float *point,
   return false;
 }
 
+/* Get closest control point in all nurbs in given ListBase to a given point. */
 static void *get_closest_cp_to_point_in_nurbs(ListBase *nurbs,
                                               Nurb **r_nu,
                                               BezTriple **r_bezt,
@@ -312,47 +321,7 @@ static void *get_closest_cp_to_point_in_nurbs(ListBase *nurbs,
   }
 }
 
-static void select_and_get_point(ViewContext *vc,
-                                 Nurb **nu,
-                                 BezTriple **bezt,
-                                 BPoint **bp,
-                                 const int point[2],
-                                 const bool is_start)
-{
-  short hand;
-  BezTriple *bezt1 = NULL;
-  BPoint *bp1 = NULL;
-  Base *basact1 = NULL;
-  Nurb *nu1 = NULL;
-  Curve *cu = vc->obedit->data;
-  copy_v2_v2_int(vc->mval, point);
-  if (is_start) {
-    ED_curve_pick_vert(vc, 1, &nu1, &bezt1, &bp1, &hand, &basact1);
-  }
-  else {
-    ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu1, &bezt1, &bp1);
-  }
-  *bezt = bezt1;
-  *bp = bp1;
-  *nu = nu1;
-}
-
-static void calculate_new_bezier_point(const float *point_prev,
-                                       float *handle_prev,
-                                       float *new_left_handle,
-                                       float *new_right_handle,
-                                       float *handle_next,
-                                       const float *point_next,
-                                       const float parameter)
-{
-  const float center_point[3];
-  interp_v3_v3v3(center_point, handle_prev, handle_next, parameter);
-  interp_v3_v3v3(handle_prev, point_prev, handle_prev, parameter);
-  interp_v3_v3v3(handle_next, handle_next, point_next, parameter);
-  interp_v3_v3v3(new_left_handle, handle_prev, center_point, parameter);
-  interp_v3_v3v3(new_right_handle, center_point, handle_next, parameter);
-}
-
+/* Update data structure with location of closest vertex on curve. */
 static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
                                                     BezTriple *bezt2,
                                                     Nurb *nu,
@@ -409,6 +378,77 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
     }
   }
   MEM_freeN(points);
+}
+
+/* Update the closest point in the data structure. */
+static void update_closest_point_in_data(void *op_data, int resolution, ViewContext *vc)
+{
+  struct TempBeztData *data = op_data;
+  bool found_min = false;
+  float point[3];
+  float factor;
+
+  if (data->has_prev) {
+    found_min = get_closest_point_on_edge(
+        point, data->mval, data->cut_loc, data->prev_loc, vc, &factor);
+    factor = -factor;
+  }
+  if (!found_min && data->has_next) {
+    found_min = get_closest_point_on_edge(
+        point, data->mval, data->cut_loc, data->next_loc, vc, &factor);
+  }
+  if (found_min) {
+    float point_2d[2];
+    ED_view3d_project_float_object(
+        vc->region, point, point_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+    float dist = len_manhattan_v2v2(point_2d, data->mval);
+    data->min_dist = dist;
+    data->parameter += factor / resolution;
+    copy_v3_v3(data->cut_loc, point);
+  }
+}
+
+/* Select nearby point and get a reference to it. */
+static void select_and_get_point(ViewContext *vc,
+                                 Nurb **nu,
+                                 BezTriple **bezt,
+                                 BPoint **bp,
+                                 const int point[2],
+                                 const bool is_start)
+{
+  short hand;
+  BezTriple *bezt1 = NULL;
+  BPoint *bp1 = NULL;
+  Base *basact1 = NULL;
+  Nurb *nu1 = NULL;
+  Curve *cu = vc->obedit->data;
+  copy_v2_v2_int(vc->mval, point);
+  if (is_start) {
+    ED_curve_pick_vert(vc, 1, &nu1, &bezt1, &bp1, &hand, &basact1);
+  }
+  else {
+    ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu1, &bezt1, &bp1);
+  }
+  *bezt = bezt1;
+  *bp = bp1;
+  *nu = nu1;
+}
+
+/* Calculates handle lengths of added and adjacent control points such that shape is preserved. */
+static void calculate_new_bezier_point(const float *point_prev,
+                                       float *handle_prev,
+                                       float *new_left_handle,
+                                       float *new_right_handle,
+                                       float *handle_next,
+                                       const float *point_next,
+                                       const float parameter)
+{
+  const float center_point[3];
+  interp_v3_v3v3(center_point, handle_prev, handle_next, parameter);
+  interp_v3_v3v3(handle_prev, point_prev, handle_prev, parameter);
+  interp_v3_v3v3(handle_next, handle_next, point_next, parameter);
+  interp_v3_v3v3(new_left_handle, handle_prev, center_point, parameter);
+  interp_v3_v3v3(new_right_handle, center_point, handle_next, parameter);
 }
 
 static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op_data)
@@ -657,29 +697,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           /* If the minimum distance found < threshold distance, make cut. */
           if (data.min_dist < threshold_distance) {
             nu = data.nurb;
-            if (nu && nu->bezt) {
-              bool found_min = false;
-              float point[3];
-              float factor;
-              if (data.has_prev) {
-                found_min = get_closest_point_on_edge(
-                    point, data.mval, data.cut_loc, data.prev_loc, &vc, &factor);
-                factor = -factor;
-              }
-              if (!found_min && data.has_next) {
-                found_min = get_closest_point_on_edge(
-                    point, data.mval, data.cut_loc, data.next_loc, &vc, &factor);
-              }
-              if (found_min) {
-                float point_2d[2];
-                ED_view3d_project_float_object(
-                    vc.region, point, point_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
-                float dist = len_manhattan_v2v2(point_2d, data.mval);
-                data.min_dist = dist;
-                data.parameter += factor / nu->resolu;
-                copy_v3_v3(data.cut_loc, point);
-              }
-
+            if (nu && nu->type == CU_BEZIER) {
+              update_closest_point_in_data(&data, nu->resolu, &vc);
               add_bezt_to_nurb(nu, &data, cu);
             }
           }
@@ -725,10 +744,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
     }
     if (event->val == KM_RELEASE) {
-      if (dragging) {
-        RNA_boolean_set(op->ptr, "dragging", false);
-      }
-
+      RNA_boolean_set(op->ptr, "dragging", false);
       RNA_boolean_set(op->ptr, "new", false);
       ret = OPERATOR_FINISHED;
     }
