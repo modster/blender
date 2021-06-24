@@ -160,4 +160,31 @@ TEST(cloth_remesh, Mesh_Read)
   }
 }
 
+TEST(cloth_remesh, Mesh_Write)
+{
+  MeshIO reader;
+  std::istringstream stream(cube_pos_uv_normal);
+  reader.read(std::move(stream), MeshIO::FILETYPE_OBJ);
+
+  Mesh<bool, bool, bool, bool> mesh;
+  mesh.read(reader);
+
+  auto result = mesh.write();
+
+  const auto positions = result.get_positions();
+  const auto uvs = result.get_uvs();
+  const auto normals = result.get_normals();
+  const auto face_indices = result.get_face_indices();
+  const auto line_indices = result.get_line_indices();
+
+  /* TODO(ish): add some more complex checks, it should fail when the
+   * `Mesh` had gaps in the arena, say after some collapse edge operation */
+
+  EXPECT_EQ(positions.size(), 8);
+  EXPECT_EQ(uvs.size(), 14);
+  EXPECT_EQ(normals.size(), 8);
+  EXPECT_EQ(face_indices.size(), 6);
+  EXPECT_EQ(line_indices.size(), 0);
+}
+
 } /* namespace blender::bke::tests */

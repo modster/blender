@@ -421,6 +421,31 @@ class MeshIO {
     }
   }
 
+  void set_positions(blender::Vector<float3> &&positions)
+  {
+    this->positions = std::move(positions);
+  }
+
+  void set_uvs(blender::Vector<float2> &&uvs)
+  {
+    this->uvs = std::move(uvs);
+  }
+
+  void set_normals(blender::Vector<float3> &&normals)
+  {
+    this->normals = std::move(normals);
+  }
+
+  void set_face_indices(blender::Vector<blender::Vector<FaceData>> &&face_indices)
+  {
+    this->face_indices = std::move(face_indices);
+  }
+
+  void set_line_indices(blender::Vector<blender::Vector<usize>> &&line_indices)
+  {
+    this->line_indices = std::move(line_indices);
+  }
+
   const auto &get_positions() const
   {
     return this->positions;
@@ -796,6 +821,80 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     }
 
     /* TODO(ish): add support for lines */
+
+    /* TODO(ish): ensure normal information properly, right now need
+     * to just assume it is not dirty for faster development */
+    this->node_normals_dirty = false;
+  }
+
+  MeshIO write() const
+  {
+    using FaceData = std::tuple<usize, usize, usize>;
+    blender::Vector<float3> positions;
+    blender::Vector<float2> uvs;
+    blender::Vector<float3> normals;
+    blender::Vector<blender::Vector<FaceData>> face_indices;
+    blender::Vector<blender::Vector<usize>> line_indices;
+
+    /* TODO(ish): drain all nodes, verts, edges, and faces into a new
+     * arena, and update the self indices. Some operations (such as
+     * collapse edges) can cause gaps in the arena which isn't
+     * acceptable here. It is more than just updating the self
+     * indices because the references would break then. There must be
+     * a simple way to do this but can't think of one right now.
+     * Maybe just go through the whole arena, assigning incrementing
+     * position data. Need to decide if drain and store in a wrapped
+     * datatype or always store or store that info in a map.
+     *
+     * As of now, using the index directly, assuming no gaps */
+
+    /* TODO(ish): this assert should change to some sort of error
+     * handled thing */
+    BLI_assert(this->node_normals_dirty == false);
+
+    for (const auto &node : this->nodes) {
+      auto pos = node.pos;
+      positions.append(pos);
+
+      auto normal = node.normal;
+      normals.append(normal);
+    }
+
+    for (const auto &vert : this->verts) {
+      auto uv = vert.uv;
+      uvs.append(uv);
+    }
+
+    for (const auto &face : this->faces) {
+      blender::Vector<FaceData> io_face;
+
+      for (const auto &vert_index : face.verts) {
+        auto op_vert = this->verts.get(vert_index);
+        BLI_assert(op_vert);
+        const auto &vert = op_vert.value().get();
+
+        BLI_assert(vert.node); /* a vert cannot exist without a node */
+
+        auto pos_index = std::get<0>(vert.node.value().get_raw());
+        auto uv_index = std::get<0>(vert.self_index.get_raw());
+        auto normal_index = pos_index;
+
+        io_face.append(std::make_tuple(pos_index, uv_index, normal_index));
+      }
+
+      face_indices.append(io_face);
+    }
+
+    /* TODO(ish): add support for lines */
+
+    MeshIO result;
+    result.set_positions(std::move(positions));
+    result.set_uvs(std::move(uvs));
+    result.set_normals(std::move(normals));
+    result.set_face_indices(std::move(face_indices));
+    result.set_line_indices(std::move(line_indices));
+
+    return result;
   }
 
   void read_obj(const fs::path &filepath)
