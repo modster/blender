@@ -513,40 +513,72 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
-      retval = ED_curve_editnurb_select_pick(C, event->mval, extend, deselect, toggle);
       RNA_boolean_set(op->ptr, "new", !retval);
       bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
+      retval = ED_curve_editnurb_select_pick(C, event->mval, extend, deselect, toggle);
 
       /* Check if point underneath mouse. Get point if any. */
-      if (retval) {
-        if (cut_or_delete) {
-          /* Delete retrieved control point. */
-          ListBase *nurbs = BKE_curve_editNurbs_get(cu);
-          float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
+      if (!cut_or_delete && !retval) {
 
-          for (nu = nurbs->first; nu; nu = nu->next) {
-            if (nu->type == CU_BEZIER) {
-              bezt = get_closest_bezt_to_point(nu, mouse_point, &vc);
-              if (bezt && nu) {
-                delete_bezt_from_nurb(bezt, nu);
-              }
-            }
-            else if (nu->type == CU_NURBS) {
-              bp = get_closest_bp_to_point(nu, mouse_point, &vc);
-              if (bp && nu) {
-                delete_bp_from_nurb(bp, nu);
-              }
-            }
-          }
+        /* Create new point under the mouse cursor. Set handle types as vector.
+        If an end point of a spline is selected, set the new point as the
+        new end point of the spline. */
+        float location[3];
 
-          cu->actvert = CU_ACT_NONE;
-          if (nu) {
-            BKE_nurb_handles_calc(nu);
-          }
+        ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
+
+        if (bezt) {
+          mul_v3_m4v3(location, vc.obedit->obmat, bezt->vec[1]);
+        }
+        else if (bp) {
+          mul_v3_m4v3(location, vc.obedit->obmat, bp->vec);
+        }
+        else {
+          copy_v3_v3(location, vc.scene->cursor.location);
+        }
+
+        ED_view3d_win_to_3d_int(vc.v3d, vc.region, location, event->mval, location);
+        EditNurb *editnurb = cu->editnurb;
+        ed_editcurve_addvert(cu, editnurb, vc.v3d, location);
+        ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
+        if (bezt) {
+          bezt->h1 = HD_VECT;
+          bezt->h2 = HD_VECT;
         }
       }
-      else {
-        if (cut_or_delete) {
+    }
+    if (event->val == KM_RELEASE) {
+      if (dragging) {
+        RNA_boolean_set(op->ptr, "dragging", false);
+      }
+      bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
+      bool found_point = false;
+
+      if (cut_or_delete) {
+        /* Delete retrieved control point. */
+        ListBase *nurbs = BKE_curve_editNurbs_get(cu);
+        float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
+
+        for (nu = nurbs->first; nu; nu = nu->next) {
+          if (nu->type == CU_BEZIER) {
+            bezt = get_closest_bezt_to_point(nu, mouse_point, &vc);
+            if (bezt && nu) {
+              found_point = true;
+              delete_bezt_from_nurb(bezt, nu);
+            }
+          }
+          else if (nu->type == CU_NURBS) {
+            bp = get_closest_bp_to_point(nu, mouse_point, &vc);
+            if (bp && nu) {
+              found_point = true;
+              delete_bp_from_nurb(bp, nu);
+            }
+          }
+        }
+
+        cu->actvert = CU_ACT_NONE;
+
+        if (!found_point) {
           /* If curve segment is nearby, add control point at the snapped point
           between the adjacent control points in the curve data structure. */
           EditNurb *editnurb = cu->editnurb;
@@ -676,38 +708,10 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             }
           }
         }
-        else {
-          /* Create new point under the mouse cursor. Set handle types as vector.
-          If an end point of a spline is selected, set the new point as the
-          new end point of the spline. */
-          float location[3];
 
-          ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
-
-          if (bezt) {
-            mul_v3_m4v3(location, vc.obedit->obmat, bezt->vec[1]);
-          }
-          else if (bp) {
-            mul_v3_m4v3(location, vc.obedit->obmat, bp->vec);
-          }
-          else {
-            copy_v3_v3(location, vc.scene->cursor.location);
-          }
-
-          ED_view3d_win_to_3d_int(vc.v3d, vc.region, location, event->mval, location);
-          EditNurb *editnurb = cu->editnurb;
-          ed_editcurve_addvert(cu, editnurb, vc.v3d, location);
-          ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
-          if (bezt) {
-            bezt->h1 = HD_VECT;
-            bezt->h2 = HD_VECT;
-          }
+        if (nu) {
+          BKE_nurb_handles_calc(nu);
         }
-      }
-    }
-    if (event->val == KM_RELEASE) {
-      if (dragging) {
-        RNA_boolean_set(op->ptr, "dragging", false);
       }
       ret = OPERATOR_FINISHED;
     }
