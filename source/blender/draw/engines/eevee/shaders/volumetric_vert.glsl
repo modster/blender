@@ -8,8 +8,8 @@ RESOURCE_ID_VARYING
 void main()
 {
   /* Generate Triangle : less memory fetches from a VBO */
-  int v_id = gl_VertexID % 3; /* Vertex Id */
-  int t_id = gl_VertexID / 3; /* Triangle Id */
+  int v_id = gl_VertexIndex % 3; /* Vertex Id */
+  int t_id = gl_VertexIndex / 3; /* Triangle Id */
 
   /* Crappy diagram
    * ex 1

@@ -14,8 +14,8 @@ void main()
   GPU_INTEL_VERTEX_SHADER_WORKAROUND
 
   vec2 pos;
-  pos.x = float(gl_VertexID % 2);
-  pos.y = float(gl_VertexID / 2) / float(halfLineCount - 1);
+  pos.x = float(gl_VertexIndex % 2);
+  pos.y = float(gl_VertexIndex / 2) / float(halfLineCount - 1);
 
   if (pos.y > 1.0) {
     pos.xy = pos.yx;

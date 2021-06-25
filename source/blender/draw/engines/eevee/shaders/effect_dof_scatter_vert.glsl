@@ -58,7 +58,7 @@ void main()
 {
   ivec2 tex_size = textureSize(cocBuffer, 0);
 
-  int t_id = gl_VertexID / 3; /* Triangle Id */
+  int t_id = gl_VertexIndex / 3; /* Triangle Id */
 
   /* Some math to get the target pixel. */
   ivec2 texelco = ivec2(t_id % spritePerRow, t_id / spritePerRow) * 2;
@@ -117,7 +117,7 @@ void main()
    */
 
   /* Generate Triangle : less memory fetches from a VBO */
-  int v_id = gl_VertexID % 3;                     /* Vertex Id */
+  int v_id = gl_VertexIndex % 3;                  /* Vertex Id */
   gl_Position.x = float(v_id / 2) * extend - 1.0; /* int divisor round down */
   gl_Position.y = float(v_id % 2) * extend - 1.0;
   gl_Position.z = 0.0;

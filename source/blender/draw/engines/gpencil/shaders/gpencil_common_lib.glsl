@@ -245,7 +245,7 @@ in vec4 col1;
 in vec4 col2;
 in vec4 fcol1;
 /* WARNING: Max attribute count is actually 14 because OSX OpenGL implementation
- * considers gl_VertexID and gl_InstanceID as vertex attribute. (see T74536) */
+ * considers gl_VertexIndex and gl_InstanceID as vertex attribute. (see T74536) */
 #  define stroke_id1 ma1.y
 #  define point_id1 ma1.z
 #  define thickness1 pos1.w
@@ -408,8 +408,8 @@ void stroke_vertex()
   mat4 model_mat = model_matrix_get();
 
   /* Avoid using a vertex attribute for quad positioning. */
-  float x = float(gl_VertexID & 1) * 2.0 - 1.0; /* [-1..1] */
-  float y = float(gl_VertexID & 2) - 1.0;       /* [-1..1] */
+  float x = float(gl_VertexIndex & 1) * 2.0 - 1.0; /* [-1..1] */
+  float y = float(gl_VertexIndex & 2) - 1.0;       /* [-1..1] */
 
   bool use_curr = is_dot || (x == -1.0);
 

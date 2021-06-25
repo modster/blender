@@ -61,7 +61,7 @@ vec4 flag_to_color(uint flag)
 
 void main()
 {
-  int cell = gl_VertexID / 8;
+  int cell = gl_VertexIndex / 8;
   mat3 rot_mat = mat3(0.0);
 
   vec3 cell_offset = vec3(0.5);
@@ -113,7 +113,7 @@ void main()
 #endif
 
   vec3 pos = domainOriginOffset + cellSize * (vec3(cell_co + adaptiveCellOffset) + cell_offset);
-  vec3 rotated_pos = rot_mat * corners[indices[gl_VertexID % 8]];
+  vec3 rotated_pos = rot_mat * corners[indices[gl_VertexIndex % 8]];
   pos += rotated_pos * cellSize;
 
   vec3 world_pos = point_object_to_world(pos);

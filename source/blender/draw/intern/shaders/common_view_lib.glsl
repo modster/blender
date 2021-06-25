@@ -201,10 +201,10 @@ uniform mat4 ModelMatrixInverse;
 #define point_world_to_object(p) ((ModelMatrixInverse * vec4(p, 1.0)).xyz)
 #define point_world_to_view(p) ((ViewMatrix * vec4(p, 1.0)).xyz)
 
-/* Due to some shader compiler bug, we somewhat need to access gl_VertexID
+/* Due to some shader compiler bug, we somewhat need to access gl_VertexIndex
  * to make vertex shaders work. even if it's actually dead code. */
 #ifdef GPU_INTEL
-#  define GPU_INTEL_VERTEX_SHADER_WORKAROUND gl_Position.x = float(gl_VertexID);
+#  define GPU_INTEL_VERTEX_SHADER_WORKAROUND gl_Position.x = float(gl_VertexIndex);
 #else
 #  define GPU_INTEL_VERTEX_SHADER_WORKAROUND
 #endif

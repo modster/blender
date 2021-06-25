@@ -30,8 +30,8 @@ const vec2 pos[6] = vec2[6](vec2(-1.0, -1.0),
 
 void main()
 {
-  pid = 1 + (gl_VertexID / 6); /* +1 for the world */
-  int vert_id = gl_VertexID % 6;
+  pid = 1 + (gl_VertexIndex / 6); /* +1 for the world */
+  int vert_id = gl_VertexIndex % 6;
 
   quadCoord = pos[vert_id];
 

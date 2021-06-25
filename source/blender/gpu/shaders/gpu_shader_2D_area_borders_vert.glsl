@@ -11,7 +11,7 @@ out vec2 uv;
 
 void main()
 {
-  int corner_id = (gl_VertexID / cornerLen) % 4;
+  int corner_id = (gl_VertexIndex / cornerLen) % 4;
 
   vec2 final_pos = pos * scale;
 

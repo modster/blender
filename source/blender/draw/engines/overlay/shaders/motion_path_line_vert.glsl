@@ -28,7 +28,7 @@ void main()
 
   ssPos = proj(gl_Position);
 
-  int frame = gl_VertexID + cacheStart;
+  int frame = gl_VertexIndex + cacheStart;
 
   float intensity; /* how faint */
 

@@ -82,7 +82,7 @@ void main(void)
   float expand_dist = (uv.y * 2.0 - 1.0);
   colorGradient = expand_dist;
 
-  if (gl_VertexID < MID_VERTEX) {
+  if (gl_VertexIndex < MID_VERTEX) {
     /* Shadow pass */
     finalColor = colShadow;
   }

@@ -107,6 +107,9 @@ char *GLShader::glsl_patch_get()
   STR_CONCATF(patch, slen, "#define DFDX_SIGN %1.1f\n", GLContext::derivative_signs[0]);
   STR_CONCATF(patch, slen, "#define DFDY_SIGN %1.1f\n", GLContext::derivative_signs[1]);
 
+  /* Converting Vulkan GLSL to OpenGL GLSL. */
+  STR_CONCAT(patch, slen, "#define gl_VertexIndex gl_VertexID\n");
+
   BLI_assert(slen < sizeof(patch));
   return patch;
 }

@@ -147,11 +147,18 @@ static std::string combine_sources(MutableSpan<const char *> sources)
   }
   return combined.str();
 }
+static std::string glsl_patch_get()
+{
+  std::stringstream patch;
+  patch << "#version 330\n";
+  return patch.str();
+}
 
 std::unique_ptr<std::vector<uint32_t>> VKShader::compile_source(MutableSpan<const char *> sources,
                                                                 VKShaderStageType stage)
 {
   std::string stage_name = to_stage_name(name, stage);
+
   std::string source = combine_sources(sources);
 
   shader_compiler::Compiler *compiler = shader_compiler::Compiler::create_default();
@@ -196,6 +203,9 @@ std::unique_ptr<std::vector<uint32_t>> VKShader::compile_source(MutableSpan<cons
 VkShaderModule VKShader::create_shader_module(MutableSpan<const char *> sources,
                                               VKShaderStageType stage)
 {
+  /* Patch the shader code using the first source slot. */
+  sources[0] = glsl_patch_get().c_str();
+
   std::unique_ptr<std::vector<uint32_t>> code = compile_source(sources, stage);
   if (!code || code->size() == 0) {
     compilation_failed_ = true;

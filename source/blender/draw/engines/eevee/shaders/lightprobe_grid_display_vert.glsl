@@ -23,8 +23,8 @@ const vec2 pos[6] = vec2[6](vec2(-1.0, -1.0),
 
 void main()
 {
-  int cell_id = gl_VertexID / 6;
-  int vert_id = gl_VertexID % 6;
+  int cell_id = gl_VertexIndex / 6;
+  int vert_id = gl_VertexIndex % 6;
 
   vec3 ls_cell_location;
   /* Keep in sync with update_irradiance_probe */

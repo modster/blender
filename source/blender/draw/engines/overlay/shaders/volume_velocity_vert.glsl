@@ -118,11 +118,11 @@ vec3 get_vector_mac(ivec3 cell_co)
 void main()
 {
 #ifdef USE_NEEDLE
-  int cell = gl_VertexID / 12;
+  int cell = gl_VertexIndex / 12;
 #elif defined(USE_MAC)
-  int cell = gl_VertexID / 6;
+  int cell = gl_VertexIndex / 6;
 #else
-  int cell = gl_VertexID / 2;
+  int cell = gl_VertexIndex / 2;
 #endif
 
   ivec3 volume_size = textureSize(velocityX, 0);
@@ -156,7 +156,7 @@ void main()
   vec3 color;
   vector = (isCellCentered) ? get_vector_mac(cell_co) : get_vector(cell_co);
 
-  switch (gl_VertexID % 6) {
+  switch (gl_VertexIndex % 6) {
     case 0: /* Tail of X component. */
       pos.x += (drawMACX) ? -0.5 * cellSize.x : 0.0;
       color = vec3(1.0, 0.0, 0.0); /* red */
@@ -201,12 +201,12 @@ void main()
   mat3 rot_mat = rotation_from_vector(vector);
 
 #  ifdef USE_NEEDLE
-  vec3 rotated_pos = rot_mat * corners[indices[gl_VertexID % 12]];
+  vec3 rotated_pos = rot_mat * corners[indices[gl_VertexIndex % 12]];
   pos += rotated_pos * vector_length * displaySize * cellSize;
 #  else
   vec3 rotated_pos = rot_mat * vec3(0.0, 0.0, 1.0);
-  pos += ((gl_VertexID % 2) == 1) ? rotated_pos * vector_length * displaySize * cellSize :
-                                    vec3(0.0);
+  pos += ((gl_VertexIndex % 2) == 1) ? rotated_pos * vector_length * displaySize * cellSize :
+                                       vec3(0.0);
 #  endif
 #endif
 

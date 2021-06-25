@@ -60,7 +60,7 @@ void main(void)
   finalColor = interp_data(data0, data1, data2, data3, weights);
 
 #ifdef TF_WORKAROUND
-  int id = gl_VertexID - idOffset;
+  int id = gl_VertexIndex - idOffset;
   gl_Position.x = ((float(id % targetWidth) + 0.5) / float(targetWidth)) * 2.0 - 1.0;
   gl_Position.y = ((float(id / targetWidth) + 0.5) / float(targetHeight)) * 2.0 - 1.0;
   gl_Position.z = 0.0;

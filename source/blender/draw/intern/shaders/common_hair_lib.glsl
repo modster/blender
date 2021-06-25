@@ -64,9 +64,9 @@ int hair_get_base_id(float local_time, int strand_segments, out float interp_tim
 void hair_get_interp_attrs(
     out vec4 data0, out vec4 data1, out vec4 data2, out vec4 data3, out float interp_time)
 {
-  float local_time = float(gl_VertexID % hairStrandsRes) / float(hairStrandsRes - 1);
+  float local_time = float(gl_VertexIndex % hairStrandsRes) / float(hairStrandsRes - 1);
 
-  int hair_id = gl_VertexID / hairStrandsRes;
+  int hair_id = gl_VertexIndex / hairStrandsRes;
   int strand_offset = int(texelFetch(hairStrandBuffer, hair_id).x);
   int strand_segments = int(texelFetch(hairStrandSegBuffer, hair_id).x);
 
@@ -98,12 +98,12 @@ void hair_get_interp_attrs(
 #if !defined(HAIR_PHASE_SUBDIV) && defined(GPU_VERTEX_SHADER)
 int hair_get_strand_id(void)
 {
-  return gl_VertexID / (hairStrandsRes * hairThicknessRes);
+  return gl_VertexIndex / (hairStrandsRes * hairThicknessRes);
 }
 
 int hair_get_base_id(void)
 {
-  return gl_VertexID / hairThicknessRes;
+  return gl_VertexIndex / hairThicknessRes;
 }
 
 /* Copied from cycles. */
@@ -171,7 +171,7 @@ void hair_get_pos_tan_binor_time(bool is_persp,
   thickness = hair_shaperadius(hairRadShape, hairRadRoot, hairRadTip, time);
 
   if (hairThicknessRes > 1) {
-    thick_time = float(gl_VertexID % hairThicknessRes) / float(hairThicknessRes - 1);
+    thick_time = float(gl_VertexIndex % hairThicknessRes) / float(hairThicknessRes - 1);
     thick_time = thickness * (thick_time * 2.0 - 1.0);
 
     /* Take object scale into account.

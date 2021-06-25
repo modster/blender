@@ -65,7 +65,7 @@ vec2 do_widget(void)
                           rect.xw + ofs.yx,
                           rect.yz + emboss_ofs + ofs.xy,
                           rect.yw + ofs.xx);
-  vec2 pos = v_pos[gl_VertexID];
+  vec2 pos = v_pos[gl_VertexIndex];
 
   uvInterp = pos - rect.xz;
   outRectSize = rect.yw - rect.xz;
@@ -92,8 +92,8 @@ vec2 do_widget(void)
 
 vec2 do_tria()
 {
-  int vidx = gl_VertexID % 4;
-  bool tria2 = gl_VertexID > 7;
+  int vidx = gl_VertexIndex % 4;
+  bool tria2 = gl_VertexIndex > 7;
 
   vec2 pos;
   float size = (tria2) ? -tria2Size : tria1Size;
@@ -188,7 +188,7 @@ vec2 do_tria()
 void main()
 {
   discardFac = discardFactor;
-  bool is_tria = (gl_VertexID > 3);
+  bool is_tria = (gl_VertexIndex > 3);
   vec2 pos = (is_tria) ? do_tria() : do_widget();
 
   gl_Position = ModelViewProjectionMatrix * vec4(pos, 0.0, 1.0);

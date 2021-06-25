@@ -3,7 +3,7 @@ uniform vec3 boundbox[8];
 
 void main()
 {
-  vec3 world_pos = boundbox[gl_VertexID];
+  vec3 world_pos = boundbox[gl_VertexIndex];
   gl_Position = point_world_to_ndc(world_pos);
 
   /* Result in a position at 1.0 (far plane). Small epsilon to avoid precision issue.

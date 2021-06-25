@@ -16,7 +16,7 @@ void main()
 
   float flip = (gl_InstanceID != 0) ? -1.0 : 1.0;
 
-  if (gl_VertexID % 2 == 0) {
+  if (gl_VertexIndex % 2 == 0) {
     final_pos += normalSize * rad * (flip * nor - tan);
   }
 

@@ -21,14 +21,14 @@ void main()
   gl_Position = ViewProjectionMatrix * vec4(pos, 1.0);
   gl_PointSize = float(pointSize + 2);
 
-  int frame = gl_VertexID + cacheStart;
+  int frame = gl_VertexIndex + cacheStart;
   bool use_custom_color = customColor.x >= 0.0;
   finalColor = (use_custom_color) ? vec4(customColor, 1.0) : vec4(1.0);
 
   /* Bias to reduce z fighting with the path */
   gl_Position.z -= 1e-4;
 
-  if (gl_VertexID % stepSize == 0) {
+  if (gl_VertexIndex % stepSize == 0) {
     gl_PointSize = float(pointSize) + 4;
   }
 

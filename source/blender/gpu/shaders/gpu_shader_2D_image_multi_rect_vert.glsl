@@ -19,7 +19,7 @@ void main()
   vec4 tex = calls_data[gl_InstanceID * 3 + 1];
   finalColor = calls_data[gl_InstanceID * 3 + 2];
 
-  /* Use pos to select the right swizzle (instead of gl_VertexID)
+  /* Use pos to select the right swizzle (instead of gl_VertexIndex)
    * in order to workaround an OSX driver bug. */
   if (pos == vec2(0.0, 0.0)) {
     rect.xy = rect.xz;

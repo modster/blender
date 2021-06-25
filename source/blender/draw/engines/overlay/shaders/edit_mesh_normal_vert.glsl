@@ -52,7 +52,7 @@ void main()
 
   vec3 world_pos = point_object_to_world(pos);
 
-  if (gl_VertexID == 0) {
+  if (gl_VertexIndex == 0) {
     world_pos += n * normalSize;
   }
 

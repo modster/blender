@@ -17,7 +17,7 @@ void main()
   vec4 pos_4d = ModelMatrix * vec4(local_pos + screen_pos, 1.0);
   gl_Position = ViewProjectionMatrix * pos_4d;
   /* Manual stipple: one segment out of 2 is transparent. */
-  finalColor = ((gl_VertexID & 1) == 0) ? colorSkinRoot : vec4(0.0);
+  finalColor = ((gl_VertexIndex & 1) == 0) ? colorSkinRoot : vec4(0.0);
 
 #ifdef USE_WORLD_CLIP_PLANES
   world_clip_planes_calc_clip_distance(pos_4d.xyz);

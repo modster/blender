@@ -40,9 +40,9 @@ void main()
 
   vec3 ls_cell_location;
   /* Keep in sync with update_irradiance_probe */
-  ls_cell_location.z = float(gl_VertexID % grid_resolution.z);
-  ls_cell_location.y = float((gl_VertexID / grid_resolution.z) % grid_resolution.y);
-  ls_cell_location.x = float(gl_VertexID / (grid_resolution.z * grid_resolution.y));
+  ls_cell_location.z = float(gl_VertexIndex % grid_resolution.z);
+  ls_cell_location.y = float((gl_VertexIndex / grid_resolution.z) % grid_resolution.y);
+  ls_cell_location.x = float(gl_VertexIndex / (grid_resolution.z * grid_resolution.y));
 
   ls_cell_location += 0.5;
   ls_cell_location /= vec3(grid_resolution);
