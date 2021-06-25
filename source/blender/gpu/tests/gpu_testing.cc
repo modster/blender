@@ -2,6 +2,8 @@
 
 #include "testing/testing.h"
 
+#include "BKE_global.h"
+
 #include "GPU_context.h"
 #include "GPU_init_exit.h"
 #include "gpu_testing.hh"
@@ -12,7 +14,6 @@ namespace blender::gpu {
 
 void GPUTest::SetUp()
 {
-
   GHOST_GLSettings glSettings = {0};
   ghost_system = GHOST_CreateSystem();
   ghost_context = GHOST_CreateOpenGLContext(ghost_system, draw_context_type, glSettings);
@@ -31,6 +32,7 @@ void GPUTest::TearDown()
 
 GPUOpenGLTest::GPUOpenGLTest()
 {
+  G.debug &= ~G_DEBUG_VK_CONTEXT;
   draw_context_type = GHOST_kDrawingContextTypeOpenGL;
 }
 
@@ -38,6 +40,7 @@ GPUOpenGLTest::GPUOpenGLTest()
 
 GPUVulkanTest::GPUVulkanTest()
 {
+  G.debug |= G_DEBUG_VK_CONTEXT;
   draw_context_type = GHOST_kDrawingContextTypeVulkan;
 }
 

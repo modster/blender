@@ -18,7 +18,7 @@
 namespace blender::draw {
 
 /* Base class for draw test cases. It will setup and tear down the GPU part around each test. */
-class DrawTest : public blender::gpu::GPUTest {
+class DrawOpenGLTest : public blender::gpu::GPUOpenGLTest {
   void SetUp() override
   {
     GPUTest::SetUp();
@@ -26,8 +26,21 @@ class DrawTest : public blender::gpu::GPUTest {
   }
 };
 
-TEST_F(DrawTest, workbench_glsl_shaders)
+#ifdef WITH_VULKAN
+
+class DrawVulkanTest : public blender::gpu::GPUVulkanTest {
+  void SetUp() override
+  {
+    GPUTest::SetUp();
+    DRW_draw_state_init_gtests(GPU_SHADER_CFG_DEFAULT);
+  }
+};
+
+#endif
+
+static void test_workbench_glsl_shaders()
 {
+
   workbench_shader_library_ensure();
   DRW_draw_state_init_gtests(GPU_SHADER_CFG_DEFAULT);
 
@@ -161,8 +174,9 @@ TEST_F(DrawTest, workbench_glsl_shaders)
   workbench_shader_free();
 }
 
-TEST_F(DrawTest, gpencil_glsl_shaders)
+static void test_gpencil_glsl_shaders()
 {
+
   EXPECT_NE(GPENCIL_shader_antialiasing(0), nullptr);
   EXPECT_NE(GPENCIL_shader_antialiasing(1), nullptr);
   EXPECT_NE(GPENCIL_shader_antialiasing(2), nullptr);
@@ -183,8 +197,9 @@ TEST_F(DrawTest, gpencil_glsl_shaders)
   GPENCIL_shader_free();
 }
 
-TEST_F(DrawTest, image_glsl_shaders)
+static void test_image_glsl_shaders()
 {
+
   IMAGE_shader_library_ensure();
 
   EXPECT_NE(IMAGE_shader_image_get(false), nullptr);
@@ -193,7 +208,7 @@ TEST_F(DrawTest, image_glsl_shaders)
   IMAGE_shader_free();
 }
 
-TEST_F(DrawTest, overlay_glsl_shaders)
+static void test_overlay_glsl_shaders()
 {
   OVERLAY_shader_library_ensure();
 
@@ -286,7 +301,7 @@ TEST_F(DrawTest, overlay_glsl_shaders)
   OVERLAY_shader_free();
 }
 
-TEST_F(DrawTest, eevee_glsl_shaders_static)
+static void test_eevee_glsl_shaders()
 {
   EEVEE_shaders_lightprobe_shaders_init();
   EEVEE_shaders_material_shaders_init();
@@ -379,5 +394,59 @@ TEST_F(DrawTest, eevee_glsl_shaders_static)
   }
   EEVEE_shaders_free();
 }
+
+TEST_F(DrawOpenGLTest, workbench_glsl_shaders)
+{
+  test_workbench_glsl_shaders();
+}
+
+TEST_F(DrawOpenGLTest, gpencil_glsl_shaders)
+{
+  test_gpencil_glsl_shaders();
+}
+
+TEST_F(DrawOpenGLTest, image_glsl_shaders)
+{
+  test_image_glsl_shaders();
+}
+
+TEST_F(DrawOpenGLTest, overlay_glsl_shaders)
+{
+  test_overlay_glsl_shaders();
+}
+
+TEST_F(DrawOpenGLTest, eevee_glsl_shaders_static)
+{
+  test_eevee_glsl_shaders();
+}
+
+#ifdef WITH_VULKAN
+
+TEST_F(DrawVulkanTest, workbench_glsl_shaders)
+{
+  test_workbench_glsl_shaders();
+}
+
+TEST_F(DrawVulkanTest, gpencil_glsl_shaders)
+{
+  test_gpencil_glsl_shaders();
+}
+
+TEST_F(DrawVulkanTest, image_glsl_shaders)
+{
+  test_image_glsl_shaders();
+}
+
+TEST_F(DrawVulkanTest, overlay_glsl_shaders)
+{
+  test_overlay_glsl_shaders();
+}
+
+TEST_F(DrawVulkanTest, eevee_glsl_shaders_static)
+{
+  test_eevee_glsl_shaders();
+}
+
+#endif
 
 }  // namespace blender::draw
