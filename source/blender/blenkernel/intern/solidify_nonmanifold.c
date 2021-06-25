@@ -18,21 +18,17 @@
  * \ingroup modifiers
  */
 
-#include "BLI_utildefines.h"
-#include <BKE_customdata.h>
-#include <DNA_modifier_types.h>
-
+#include "BKE_customdata.h"
 #include "BLI_math.h"
+#include "BKE_mesh.h"
+#include "BKE_solidifiy.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_modifier_types.h"
 
 #include "MEM_guardedalloc.h"
-
-#include "BKE_deform.h"
-#include "BKE_lattice.h"
-#include "BKE_mesh.h"
-#include "BKE_solidifiy.h"
 
 #ifdef __GNUC__
 #  pragma GCC diagnostic error "-Wsign-conversion"

@@ -9548,17 +9548,17 @@ static void def_geo_solidify(StructRNA *srna)
 
   prop = RNA_def_property(srna, "thickness_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
-  RNA_def_property_ui_text(prop, "Thickness", "");
+  RNA_def_property_ui_text(prop, "Thickness", "Changes the Thickness input between Float and Attribute");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
   prop = RNA_def_property(srna, "nonmanifold_offset_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, nonmanifold_thickness_mode_items);
-  RNA_def_property_ui_text(prop, "Mode", "");
+  RNA_def_property_ui_text(prop, "Mode", "Selects the used thickness algorithm");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
   prop = RNA_def_property(srna, "nonmanifold_boundary_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, nonmanifold_boundary_mode_items);
-  RNA_def_property_ui_text(prop, "Boundary", "");
+  RNA_def_property_ui_text(prop, "Boundary", "Selects the boundary adjustment algorithm");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 

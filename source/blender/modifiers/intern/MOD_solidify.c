@@ -131,16 +131,10 @@ static SolidifyData solidify_data_from_modifier_data(ModifierData *md,
       smd->offset_fac,
       smd->offset_fac_vg,
       smd->offset_clamp,
-      smd->mode,
       smd->nonmanifold_offset_mode,
       smd->nonmanifold_boundary_mode,
-      smd->crease_inner,
-      smd->crease_outer,
-      smd->crease_rim,
       smd->flag,
-      smd->mat_ofs,
-      smd->mat_ofs_rim,
-      smd->mode == MOD_SOLIDIFY_MODE_EXTRUDE ? 0.01f : smd->merge_tolerance,
+      smd->merge_tolerance,
       smd->bevel_convex,
       NULL,
   };
@@ -152,7 +146,7 @@ static SolidifyData solidify_data_from_modifier_data(ModifierData *md,
   return solidify_data;
 }
 
-static Mesh *MOD_solidify_nonmanifold(ModifierData *md,
+static Mesh *solidify_nonmanifold_modify_mesh(ModifierData *md,
                                       const ModifierEvalContext *ctx,
                                       Mesh *mesh,
                                       const SolidifyModifierData *smd)
@@ -199,10 +193,10 @@ static Mesh *MOD_solidify_nonmanifold(ModifierData *md,
   }
 
   /* Only use material offsets if we have 2 or more materials. */
-  const short mat_nrs = solidify_data.object->totcol > 1 ? solidify_data.object->totcol : 1;
+  const short mat_nrs = ctx->object->totcol > 1 ? ctx->object->totcol : 1;
   const short mat_nr_max = mat_nrs - 1;
-  const short mat_ofs = mat_nrs > 1 ? solidify_data.mat_ofs : 0;
-  const short mat_ofs_rim = mat_nrs > 1 ? solidify_data.mat_ofs_rim : 0;
+  const short mat_ofs = mat_nrs > 1 ? smd->mat_ofs : 0;
+  const short mat_ofs_rim = mat_nrs > 1 ? smd->mat_ofs_rim : 0;
 
   short most_mat_nr = 0;
   uint most_mat_nr_count = 0;
@@ -246,7 +240,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     case MOD_SOLIDIFY_MODE_EXTRUDE:
       return MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
     case MOD_SOLIDIFY_MODE_NONMANIFOLD: {
-      return MOD_solidify_nonmanifold(md, ctx, mesh, smd);
+      return solidify_nonmanifold_modify_mesh(md, ctx, mesh, smd);
     }
     default:
       BLI_assert(0);
