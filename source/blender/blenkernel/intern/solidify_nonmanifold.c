@@ -19,9 +19,10 @@
  */
 
 #include "BKE_customdata.h"
-#include "BLI_math.h"
 #include "BKE_mesh.h"
 #include "BKE_solidifiy.h"
+
+#include "BLI_math.h"
 #include "BLI_utildefines.h"
 
 #include "DNA_mesh_types.h"
