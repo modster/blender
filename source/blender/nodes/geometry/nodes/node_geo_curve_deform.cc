@@ -35,10 +35,10 @@ using blender::bke::GeometryInstanceGroup;
 static bNodeSocketTemplate geo_node_curve_deform_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_STRING, N_("Factor")},
-    {SOCK_FLOAT, N_("Factor"), 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
     {SOCK_BOOLEAN, N_("Use Bounds")},
     {SOCK_BOOLEAN, N_("Stretch")},
+    {SOCK_BOOLEAN, N_("Temp Only Bounds")},
+    {SOCK_VECTOR, N_("Weird Hack"), 0.5f, 0.5f, 0.5f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
     {-1, ""},
 };
 
@@ -168,6 +168,7 @@ static float3 deform_position(const SplineDeformInput &in,
 struct Bounds {
   float3 min;
   float3 max;
+  float3 size;
   float3 inv_size;
 };
 
@@ -178,15 +179,16 @@ static Bounds position_bounds(const Span<float3> positions)
   for (const float3 &position : positions) {
     minmax_v3v3_v3(min, max, position);
   }
-  return {min, max, float3::safe_divide(float3(1), max - min)};
+  const float3 size = max - min;
+  return {min, max, size, float3::safe_divide(float3(1), size)};
 }
 
 static Bounds dummy_parameter_bounds(const GeometryNodeCurveDeformAxis deform_axis)
 {
   if (axis_is_negative(deform_axis)) {
-    return {float3(-1), float3(0), float3(-1)};
+    return {float3(-1), float3(0), float3(-1), float3(-1)};
   }
-  return {float3(0), float3(1), float3(1)};
+  return {float3(0), float3(1), float3(1), float3(1)};
 }
 
 static float process_parameter(const float3 position,
@@ -220,6 +222,15 @@ static void execute_on_component(const GeoNodeExecParams &params,
   const Bounds bounds = position_bounds(positions);
   const Bounds parameter_bounds = input.use_bounds ? bounds : dummy_parameter_bounds(deform_axis);
 
+  float3 center_offset(0);
+  if (bounds.size[next_axis] != 0.0f) {
+    center_offset[next_axis] = 0.5f;
+  }
+  float3 input_center_offset = params.get_input<float3>("Weird Hack");
+  if (!input_center_offset.is_zero()) {
+    center_offset = input_center_offset;
+  }
+
   threading::parallel_for(positions.index_range(), 1024, [&](IndexRange range) {
     for (const int i : range) {
       const float parameter = process_parameter(
@@ -227,12 +238,16 @@ static void execute_on_component(const GeoNodeExecParams &params,
 
       const Spline::LookupResult lookup = input.spline.lookup_evaluated_length(parameter);
 
-      const float3 co = (positions[i] - bounds.min) * bounds.inv_size * 2.0f - float3(1);
+      const float3 co = ((positions[i] - bounds.min) * bounds.inv_size - center_offset) *
+                        bounds.size;
       if (is_negative) {
         positions[i] = deform_position(input, lookup, co[next_axis], co[other_axis], is_negative);
       }
       else {
         positions[i] = deform_position(input, lookup, co[other_axis], co[next_axis], is_negative);
+      }
+      if (params.get_input<bool>("Temp Only Bounds")) {
+        positions[i] = co;
       }
     }
   });
