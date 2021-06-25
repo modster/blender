@@ -387,8 +387,6 @@ typedef struct LineartRenderTaskInfo {
 
 } LineartRenderTaskInfo;
 
-struct BMesh;
-
 typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
   struct Object *original_ob;
@@ -404,7 +402,7 @@ typedef struct LineartObjectInfo {
   bool free_use_mesh;
 
   /* Threads will add lines inside here, when all threads are done, we combine those into the
-   * ones in LineartRenderBuffer.  */
+   * ones in LineartRenderBuffer. */
   ListBase contour;
   ListBase intersection;
   ListBase crease;

@@ -1487,7 +1487,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
       fer = CustomData_bmesh_get(&bm_if_freestyle->pdata, lr->f->head.data, CD_FREESTYLE_FACE);
     }
     else {
-      /* Hanles mesh boundary case */
+      /* Handles mesh boundary case */
       fer = fel;
     }
     if (rb->filter_face_mark_boundaries ^ rb->filter_face_mark_invert) {
@@ -1781,8 +1781,9 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     can_find_freestyle_face = true;
   }
 
-  /* Only allocate memory for verts and tris as we don't know how many lines we will generate
-   * yet. */
+  /* If we allow duplicated edges, one edge should get added multiple times if is has been
+   * classified as more than one edge type. This is so we can create multiple different line type
+   * chains containing the same edge. */
   orv = lineart_mem_acquire_thread(&rb->render_data_pool, sizeof(LineartVert) * bm->totvert);
   ort = lineart_mem_acquire_thread(&rb->render_data_pool, bm->totface * rb->triangle_size);
 
@@ -1974,9 +1975,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
                                        LineartObjectLoadTaskInfo *olti)
 {
-  LineartRenderBuffer *rb = olti->rb;
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
-    lineart_geometry_object_load(obi, rb);
+    lineart_geometry_object_load(obi, olti->rb);
   }
 }
 
@@ -2095,7 +2095,7 @@ static bool lineart_geometry_check_visible(double (*model_view_proj)[4], Object 
   }
 
   bool cond[6] = {true, true, true, true, true, true};
-  /* Beause for a point to be inside clip space, it must satisfy -Wc <= XYCc <= Wc, here if all
+  /* Because for a point to be inside clip space, it must satisfy `-Wc <= XYCc <= Wc`, here if all
    * verts falls to the same side of the clip space border, we know it's outside view. */
   for (int i = 0; i < 8; i++) {
     cond[0] &= (co[i][0] < -co[i][3]);
@@ -2122,7 +2122,6 @@ static void lineart_main_load_geometries(
 {
   double proj[4][4], view[4][4], result[4][4];
   float inv[4][4];
-
   Camera *cam = camera->data;
   float sensor = BKE_camera_sensor_size(cam->sensor_fit, cam->sensor_x, cam->sensor_y);
   int fit = BKE_camera_sensor_fit(cam->sensor_fit, rb->w, rb->h);
@@ -3131,7 +3130,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   /* See lineart_edge_from_triangle() for how this option may impact performance. */
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
 
-  rb->allow_duplicated_types = (lmd->calculation_flags & LRT_ALLOW_MULTIPLE_EDGE_TYPES) != 0;
+  rb->allow_duplicated_types = (lmd->calculation_flags & LRT_ALLOW_OVERLAP_EDGE_TYPES) != 0;
 
   rb->force_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SMOOTH_SURFACES) != 0;
   rb->sharp_as_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SHARP_EDGES) != 0;

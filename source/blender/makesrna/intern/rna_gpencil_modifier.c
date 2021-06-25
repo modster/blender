@@ -2806,7 +2806,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "angle_splitting_threshold");
   RNA_def_property_ui_text(
       prop, "Angle Splitting", "Angle in screen space below which a stroke is split in two");
-  /*  Don't allow value very close to PI, or we get a lot of small segments.*/
+  /* Don't allow value very close to PI, or we get a lot of small segments. */
   RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(179.5f), 0.01f, 1);
   RNA_def_property_range(prop, 0.0f, DEG2RAD(180.0f));
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
@@ -2843,7 +2843,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_face_mark", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_FILTER_FACE_MARK);
   RNA_def_property_ui_text(
-      prop, "Filter Face Mark", "Filter feature lines using freestyle face mark");
+      prop, "Filter Face Marks", "Filter feature lines using freestyle face marks");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_face_mark_invert", PROP_BOOLEAN, PROP_NONE);
@@ -2878,10 +2878,12 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       prop, "Use Geometry Space", "Use geometry distance for chaining instead of image space");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "use_multiple_edge_types", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_ALLOW_MULTIPLE_EDGE_TYPES);
-  RNA_def_property_ui_text(
-      prop, "Multiple Edge Types", "Allow edges with muliple types be added for every type");
+  prop = RNA_def_property(srna, "allow_overlap_edge_types", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_ALLOW_OVERLAP_EDGE_TYPES);
+  RNA_def_property_ui_text(prop,
+                           "Overlapping Edge Types",
+                           "Allow an edge to have multiple overlapping types. This will create an "
+                           "individual stroke for each overlapping type");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "offset_towards_custom_camera", PROP_BOOLEAN, PROP_NONE);
