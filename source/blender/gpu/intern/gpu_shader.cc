@@ -89,37 +89,65 @@ void Shader::print_log(Span<const char *> sources, char *log, const char *stage,
     }
     /* 0 = error, 1 = warning. */
     int type = -1;
-    /* Skip ERROR: or WARNING:. */
-    const char *prefix[] = {"ERROR", "WARNING"};
-    for (int i = 0; i < ARRAY_SIZE(prefix); i++) {
-      if (STREQLEN(log_line, prefix[i], strlen(prefix[i]))) {
-        log_line += strlen(prefix[i]);
-        type = i;
-        break;
-      }
-    }
-    /* Skip whitespaces and separators. */
-    while (ELEM(log_line[0], ':', '(', ' ')) {
-      log_line++;
-    }
     /* Parse error line & char numbers. */
     error_line = error_char = -1;
-    if (log_line[0] >= '0' && log_line[0] <= '9') {
-      error_line = (int)strtol(log_line, &error_line_number_end, 10);
-      /* Try to fetch the error character (not always available). */
-      if (ELEM(error_line_number_end[0], '(', ':') && error_line_number_end[1] != ' ') {
-        error_char = (int)strtol(error_line_number_end + 1, &log_line, 10);
+
+    /* SpirV log starts with the `shader name.stage name` */
+    /* TODO(jbakker): Use virtual functions and common data structure for parsing. */
+    /* TODO(jbakker): SpirV loglines are off by one. */
+    if (STREQLEN(log_line, name, strlen(name))) {
+      log_line += strlen(name);
+      while (ELEM(log_line[0], '.')) {
+        log_line++;
       }
-      else {
-        log_line = error_line_number_end;
+      log_line += strlen(stage);
+
+      /* Skip whitespaces and separators. */
+      while (ELEM(log_line[0], ':', '(', ' ')) {
+        log_line++;
       }
-      /* There can be a 3rd number (case of mesa driver). */
-      if (ELEM(log_line[0], '(', ':') && log_line[1] >= '0' && log_line[1] <= '9') {
-        error_line = error_char;
-        error_char = (int)strtol(log_line + 1, &error_line_number_end, 10);
-        log_line = error_line_number_end;
+
+      if (log_line[0] >= '0' && log_line[0] <= '9') {
+        error_line = (int)strtol(log_line, &error_line_number_end, 10);
+      }
+
+      while (ELEM(log_line[0], ':', '(', ' ')) {
+        log_line++;
       }
     }
+    else {
+      /* Skip ERROR: or WARNING:. */
+      const char *prefix[] = {"ERROR", "WARNING"};
+      for (int i = 0; i < ARRAY_SIZE(prefix); i++) {
+        if (STREQLEN(log_line, prefix[i], strlen(prefix[i]))) {
+          log_line += strlen(prefix[i]);
+          type = i;
+          break;
+        }
+      }
+      /* Skip whitespaces and separators. */
+      while (ELEM(log_line[0], ':', '(', ' ')) {
+        log_line++;
+      }
+      /* Parse error line & char numbers. */
+      if (log_line[0] >= '0' && log_line[0] <= '9') {
+        error_line = (int)strtol(log_line, &error_line_number_end, 10);
+        /* Try to fetch the error character (not always available). */
+        if (ELEM(error_line_number_end[0], '(', ':') && error_line_number_end[1] != ' ') {
+          error_char = (int)strtol(error_line_number_end + 1, &log_line, 10);
+        }
+        else {
+          log_line = error_line_number_end;
+        }
+        /* There can be a 3rd number (case of mesa driver). */
+        if (ELEM(log_line[0], '(', ':') && log_line[1] >= '0' && log_line[1] <= '9') {
+          error_line = error_char;
+          error_char = (int)strtol(log_line + 1, &error_line_number_end, 10);
+          log_line = error_line_number_end;
+        }
+      }
+    }
+
     /* Skip whitespaces and separators. */
     while (ELEM(log_line[0], ':', ')', ' ')) {
       log_line++;
@@ -198,7 +226,7 @@ void Shader::print_log(Span<const char *> sources, char *log, const char *stage,
     BLI_dynstr_appendf(dynstr, line_prefix);
     /* Skip to message. Avoid redundant info. */
     const char *keywords[] = {"error", "warning"};
-    for (int i = 0; i < ARRAY_SIZE(prefix); i++) {
+    for (int i = 0; i < ARRAY_SIZE(keywords); i++) {
       if (STREQLEN(log_line, keywords[i], strlen(keywords[i]))) {
         log_line += strlen(keywords[i]);
         type = i;

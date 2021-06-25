@@ -135,11 +135,11 @@ static std::string to_stage_name(StringRef name, VKShaderStageType stage)
   return ss.str();
 }
 
-static std::string combine_sources(MutableSpan<const char *> sources)
+static std::string combine_sources(Span<const char *> sources)
 {
   std::stringstream combined;
-  for (std::string source : sources) {
-    combined << source;
+  for (int i = 0; i < sources.size(); i++) {
+    combined << sources[i];
   }
   return combined.str();
 }
@@ -150,7 +150,7 @@ static std::string glsl_patch_get()
   return patch.str();
 }
 
-std::unique_ptr<std::vector<uint32_t>> VKShader::compile_source(MutableSpan<const char *> sources,
+std::unique_ptr<std::vector<uint32_t>> VKShader::compile_source(Span<const char *> sources,
                                                                 VKShaderStageType stage)
 {
   std::string stage_name = to_stage_name(name, stage);
@@ -159,7 +159,7 @@ std::unique_ptr<std::vector<uint32_t>> VKShader::compile_source(MutableSpan<cons
 
   shader_compiler::Compiler *compiler = shader_compiler::Compiler::create_default();
   shader_compiler::Job job;
-  job.name = name;
+  job.name = stage_name;
   job.source = source;
   job.compilation_target = shader_compiler::TargetType::SpirV;
   job.source_type = to_source_type(stage);

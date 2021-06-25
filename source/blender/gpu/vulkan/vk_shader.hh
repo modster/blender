@@ -92,7 +92,7 @@ class VKShader : public Shader {
   }
 
  private:
-  std::unique_ptr<std::vector<uint32_t>> compile_source(MutableSpan<const char *> sources,
+  std::unique_ptr<std::vector<uint32_t>> compile_source(Span<const char *> sources,
                                                         VKShaderStageType stage);
   VkShaderModule create_shader_module(MutableSpan<const char *> sources, VKShaderStageType stage);
 
