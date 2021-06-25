@@ -748,9 +748,6 @@ static ModifierData *curve_get_tessellate_point(const Scene *scene,
   return pretessellatePoint;
 }
 
-/**
- * \return True if any modifier was applied.
- */
 void BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
                                   const Scene *scene,
                                   Object *ob,
