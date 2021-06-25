@@ -109,7 +109,7 @@ static int cddm_poly_compare(MLoop *mloop_array,
       i_loop_source++;
 
       if (i_loop_source == mpoly_source->totloop) {
-        /* End of loops for source, must match end of loop for target.  */
+        /* End of loops for source, must match end of loop for target. */
         if (i_loop_target_offset == mpoly_target->totloop - 1) {
           compare_completed = true;
           same_loops = true;
@@ -179,13 +179,13 @@ static int cddm_poly_compare(MLoop *mloop_array,
 /* Utility stuff for using GHash with polys, used by vertex merging. */
 
 typedef struct PolyKey {
-  int poly_index;        /* index of the MPoly within the derived mesh */
-  int totloops;          /* number of loops in the poly */
-  unsigned int hash_sum; /* Sum of all vertices indices */
-  unsigned int hash_xor; /* Xor of all vertices indices */
+  int poly_index; /* index of the MPoly within the derived mesh */
+  int totloops;   /* number of loops in the poly */
+  uint hash_sum;  /* Sum of all vertices indices */
+  uint hash_xor;  /* Xor of all vertices indices */
 } PolyKey;
 
-static unsigned int poly_gset_hash_fn(const void *key)
+static uint poly_gset_hash_fn(const void *key)
 {
   const PolyKey *pk = key;
   return pk->hash_sum;
@@ -331,8 +331,8 @@ Mesh *BKE_mesh_merge_verts(Mesh *mesh,
   med = mesh->medge;
   c = 0;
   for (i = 0; i < totedge; i++, med++) {
-    const unsigned int v1 = (vtargetmap[med->v1] != -1) ? vtargetmap[med->v1] : med->v1;
-    const unsigned int v2 = (vtargetmap[med->v2] != -1) ? vtargetmap[med->v2] : med->v2;
+    const uint v1 = (vtargetmap[med->v1] != -1) ? vtargetmap[med->v1] : med->v1;
+    const uint v2 = (vtargetmap[med->v2] != -1) ? vtargetmap[med->v2] : med->v2;
     if (LIKELY(v1 != v2)) {
       void **val_p;
 
@@ -597,7 +597,7 @@ Mesh *BKE_mesh_merge_verts(Mesh *mesh,
     mp_new->loopstart = STACK_SIZE(mloop) - c;
 
     STACK_PUSH(oldp, i);
-  } /* end of the loop that tests polys   */
+  } /* End of the loop that tests polys. */
 
   if (poly_gset) {
     // printf("hash quality %.6f\n", BLI_gset_calc_quality(poly_gset));

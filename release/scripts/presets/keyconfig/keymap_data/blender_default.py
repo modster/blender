@@ -187,7 +187,7 @@ def _template_items_context_panel(menu, key_args_primary):
     ]
 
 
-def _template_space_region_type_toggle(*, toolbar_key=None, sidebar_key=None):
+def _template_space_region_type_toggle(*, toolbar_key=None, sidebar_key=None, channels_key=None):
     items = []
     if toolbar_key is not None:
         items.append(
@@ -199,6 +199,12 @@ def _template_space_region_type_toggle(*, toolbar_key=None, sidebar_key=None):
             ("wm.context_toggle", sidebar_key,
              {"properties": [("data_path", 'space_data.show_region_ui')]}),
         )
+    if channels_key is not None:
+        items.append(
+            ("wm.context_toggle", channels_key,
+             {"properties": [("data_path", 'space_data.show_region_channels')]}),
+        )
+
     return items
 
 
@@ -3006,6 +3012,23 @@ def km_clip_dopesheet_editor(_params):
          {"properties": [("extend", True)]}),
         ("clip.dopesheet_view_all", {"type": 'HOME', "value": 'PRESS'}, None),
         ("clip.dopesheet_view_all", {"type": 'NDOF_BUTTON_FIT', "value": 'PRESS'}, None),
+    ])
+
+    return keymap
+
+def km_spreadsheet_generic(_params):
+    items = []
+    keymap = (
+        "Spreadsheet Generic",
+        {"space_type": 'SPREADSHEET', "region_type": 'WINDOW'},
+        {"items": items},
+    )
+
+    items.extend([
+        *_template_space_region_type_toggle(
+            sidebar_key={"type": 'N', "value": 'PRESS'},
+            channels_key={"type": 'T', "value": 'PRESS'},
+        ),
     ])
 
     return keymap
@@ -7067,6 +7090,7 @@ def generate_keymaps(params=None):
         km_image(params),
         km_node_generic(params),
         km_node_editor(params),
+        km_spreadsheet_generic(params),
         km_info(params),
         km_file_browser(params),
         km_file_browser_main(params),

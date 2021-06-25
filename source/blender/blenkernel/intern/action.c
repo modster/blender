@@ -370,7 +370,7 @@ void set_active_action_group(bAction *act, bActionGroup *agrp, short select)
 /* Sync colors used for action/bone group with theme settings */
 void action_group_colors_sync(bActionGroup *grp, const bActionGroup *ref_grp)
 {
-  /* only do color copying if using a custom color (i.e. not default color)  */
+  /* Only do color copying if using a custom color (i.e. not default color). */
   if (grp->customCol) {
     if (grp->customCol > 0) {
       /* copy theme colors on-to group's custom color in case user tries to edit color */
@@ -665,8 +665,8 @@ bPoseChannel *BKE_pose_channel_ensure(bPose *pose, const char *name)
   unit_axis_angle(chan->rotAxis, &chan->rotAngle);
   chan->size[0] = chan->size[1] = chan->size[2] = 1.0f;
 
-  chan->scale_in_x = chan->scale_in_y = 1.0f;
-  chan->scale_out_x = chan->scale_out_y = 1.0f;
+  copy_v3_fl(chan->scale_in, 1.0f);
+  copy_v3_fl(chan->scale_out, 1.0f);
 
   chan->limitmin[0] = chan->limitmin[1] = chan->limitmin[2] = -M_PI;
   chan->limitmax[0] = chan->limitmax[1] = chan->limitmax[2] = M_PI;
@@ -846,8 +846,9 @@ void BKE_pose_copy_data_ex(bPose **dst,
     }
 
     if (copy_constraints) {
-      BKE_constraints_copy_ex(
-          &listb, &pchan->constraints, flag, true); /* BKE_constraints_copy NULLs listb */
+      /* #BKE_constraints_copy NULL's `listb` */
+      BKE_constraints_copy_ex(&listb, &pchan->constraints, flag, true);
+
       pchan->constraints = listb;
 
       /* XXX: This is needed for motionpath drawing to work.
@@ -1659,11 +1660,12 @@ void BKE_pose_rest(bPose *pose, bool selected_bones_only)
     pchan->size[0] = pchan->size[1] = pchan->size[2] = 1.0f;
 
     pchan->roll1 = pchan->roll2 = 0.0f;
-    pchan->curve_in_x = pchan->curve_in_y = 0.0f;
-    pchan->curve_out_x = pchan->curve_out_y = 0.0f;
+    pchan->curve_in_x = pchan->curve_in_z = 0.0f;
+    pchan->curve_out_x = pchan->curve_out_z = 0.0f;
     pchan->ease1 = pchan->ease2 = 0.0f;
-    pchan->scale_in_x = pchan->scale_in_y = 1.0f;
-    pchan->scale_out_x = pchan->scale_out_y = 1.0f;
+
+    copy_v3_fl(pchan->scale_in, 1.0f);
+    copy_v3_fl(pchan->scale_out, 1.0f);
 
     pchan->flag &= ~(POSE_LOC | POSE_ROT | POSE_SIZE | POSE_BBONE_SHAPE);
   }
@@ -1686,15 +1688,14 @@ void BKE_pose_copy_pchan_result(bPoseChannel *pchanto, const bPoseChannel *pchan
   pchanto->roll1 = pchanfrom->roll1;
   pchanto->roll2 = pchanfrom->roll2;
   pchanto->curve_in_x = pchanfrom->curve_in_x;
-  pchanto->curve_in_y = pchanfrom->curve_in_y;
+  pchanto->curve_in_z = pchanfrom->curve_in_z;
   pchanto->curve_out_x = pchanfrom->curve_out_x;
-  pchanto->curve_out_y = pchanfrom->curve_out_y;
+  pchanto->curve_out_z = pchanfrom->curve_out_z;
   pchanto->ease1 = pchanfrom->ease1;
   pchanto->ease2 = pchanfrom->ease2;
-  pchanto->scale_in_x = pchanfrom->scale_in_x;
-  pchanto->scale_in_y = pchanfrom->scale_in_y;
-  pchanto->scale_out_x = pchanfrom->scale_out_x;
-  pchanto->scale_out_y = pchanfrom->scale_out_y;
+
+  copy_v3_v3(pchanto->scale_in, pchanfrom->scale_in);
+  copy_v3_v3(pchanto->scale_out, pchanfrom->scale_out);
 
   pchanto->rotmode = pchanfrom->rotmode;
   pchanto->flag = pchanfrom->flag;
