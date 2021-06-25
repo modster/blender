@@ -25,33 +25,50 @@
 
 #include "MEM_guardedalloc.h"
 
+#include <vulkan/vulkan.h>
+
 #include "gpu_shader_private.hh"
 
 /* TODO move this deps to the .cc file. */
+#include "vk_context.hh"
 #include "vk_shader_interface.hh"
 
 namespace blender {
 namespace gpu {
 
+enum class VKShaderStageType {
+  VertexShader,
+  GeometryShader,
+  FragmentShader,
+  ComputeShader,
+};
+
+std::ostream &operator<<(std::ostream &os, const VKShaderStageType &stage);
+
 /**
  * Implementation of shader compilation and uniforms handling using OpenGL.
  **/
 class VKShader : public Shader {
- public:
-  VKShader(const char *name) : Shader(name)
-  {
-    interface = new VKShaderInterface();
-  };
-  ~VKShader(){};
+ private:
+  VKContext *context_ = nullptr;
 
+  VkShaderModule vertex_shader_ = VK_NULL_HANDLE;
+  VkShaderModule geometry_shader_ = VK_NULL_HANDLE;
+  VkShaderModule fragment_shader_ = VK_NULL_HANDLE;
+  VkShaderModule compute_shader_ = VK_NULL_HANDLE;
+
+  /** True if any shader failed to compile. */
+  bool compilation_failed_ = false;
+
+ public:
+  VKShader(const char *name);
+  ~VKShader();
+
+  void vertex_shader_from_glsl(MutableSpan<const char *> sources) override;
+  void geometry_shader_from_glsl(MutableSpan<const char *> sources) override;
+  void fragment_shader_from_glsl(MutableSpan<const char *> sources) override;
   /* Return true on success. */
-  void vertex_shader_from_glsl(MutableSpan<const char *> sources) override{};
-  void geometry_shader_from_glsl(MutableSpan<const char *> sources) override{};
-  void fragment_shader_from_glsl(MutableSpan<const char *> sources) override{};
-  bool finalize(void) override
-  {
-    return true;
-  };
+  bool finalize(void);
 
   void transform_feedback_names_set(Span<const char *> name_list,
                                     const eGPUShaderTFBType geom_type) override{};
@@ -73,6 +90,11 @@ class VKShader : public Shader {
   {
     return 0;
   }
+
+ private:
+  std::unique_ptr<std::vector<uint32_t>> compile_source(MutableSpan<const char *> sources,
+                                                        VKShaderStageType stage);
+  VkShaderModule create_shader_module(MutableSpan<const char *> sources, VKShaderStageType stage);
 
   MEM_CXX_CLASS_ALLOC_FUNCS("VKShader");
 };

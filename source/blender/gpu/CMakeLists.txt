@@ -207,6 +207,7 @@ if(WITH_VULKAN)
     vulkan/vk_context.cc
     vulkan/vk_framebuffer.cc
     vulkan/vk_texture.cc
+    vulkan/vk_shader.cc
 
     vulkan/vk_backend.hh
     vulkan/vk_batch.hh
