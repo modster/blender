@@ -25,6 +25,8 @@
 
 namespace shader_compiler::shaderc {
 
+class ShaderCResult;
+
 class ShaderCCompiler : public Compiler {
  private:
   ::shaderc::Compiler compiler_;
@@ -36,6 +38,8 @@ class ShaderCCompiler : public Compiler {
   Result *compile(const Job &job) override;
 
  private:
+  ShaderCResult *compile_spirv(const Job &job);
+
   static void set_optimization_level(::shaderc::CompileOptions options,
                                      const OptimizationLevel new_value);
   static shaderc_shader_kind get_source_kind(SourceType source_type);

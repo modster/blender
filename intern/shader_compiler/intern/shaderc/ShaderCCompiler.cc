@@ -65,11 +65,10 @@ shaderc_shader_kind ShaderCCompiler::get_source_kind(SourceType source_type)
   return shaderc_glsl_vertex_shader;
 }
 
-Result *ShaderCCompiler::compile(const Job &job)
+ShaderCResult *ShaderCCompiler::compile_spirv(const Job &job)
 {
   ::shaderc::CompileOptions options;
   set_optimization_level(options, job.optimization_level);
-
   shaderc_shader_kind kind = get_source_kind(job.source_type);
 
   ::shaderc::SpvCompilationResult shaderc_result = compiler_.CompileGlslToSpv(
@@ -78,6 +77,16 @@ Result *ShaderCCompiler::compile(const Job &job)
   ShaderCResult *result = new ShaderCResult();
   result->init(job, shaderc_result);
   return result;
+}
+
+Result *ShaderCCompiler::compile(const Job &job)
+{
+  switch (job.compilation_target) {
+    case TargetType::SpirV:
+      return compile_spirv(job);
+      break;
+  }
+  return nullptr;
 }
 
 }  // namespace shader_compiler::shaderc
