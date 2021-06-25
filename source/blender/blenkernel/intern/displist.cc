@@ -873,7 +873,7 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
 
   Mesh *modified = nullptr;
   GeometrySet geometry_set;
-  if (md->type == eModifierType_Nodes) {
+  if (md->type == eModifierType_Nodes && !BKE_modifier_is_enabled(scene, md, required_mode)) {
     geometry_set.replace_curve(curve_eval_from_dna_curve(*cu).release());
   }
   else {
@@ -886,7 +886,6 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
   float(*vertCos)[3] = nullptr;
   for (; md; md = md->next) {
     const ModifierTypeInfo *mti = BKE_modifier_get_info((ModifierType)md->type);
-
     if (!BKE_modifier_is_enabled(scene, md, required_mode)) {
       continue;
     }
@@ -900,11 +899,12 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
         MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
         modified = mesh_component.release();
       }
-      /* Use an empty mesh instead of null.  */
-      if (modified == nullptr) {
-        modified = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
-      }
       continue;
+    }
+
+    /* Use an empty mesh instead of null.  */
+    if (modified == nullptr) {
+      modified = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
     }
 
     const bool need_normal = mti->dependsOnNormals != nullptr && mti->dependsOnNormals(md);
@@ -966,25 +966,27 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
     MEM_freeN(vertCos);
   }
 
-  if (r_final) {
-    /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
-    BKE_mesh_ensure_normals(modified);
+  if (modified != nullptr) {
+    if (r_final) {
+      /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
+      BKE_mesh_ensure_normals(modified);
 
-    /* Special tweaks, needed since neither BKE_mesh_new_nomain_from_template() nor
-     * BKE_mesh_new_nomain_from_curve_displist() properly duplicate mat info... */
-    BLI_strncpy(modified->id.name, cu->id.name, sizeof(modified->id.name));
-    *((short *)modified->id.name) = ID_ME;
-    MEM_SAFE_FREE(modified->mat);
-    /* Set flag which makes it easier to see what's going on in a debugger. */
-    modified->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
-    modified->mat = (Material **)MEM_dupallocN(cu->mat);
-    modified->totcol = cu->totcol;
+      /* Special tweaks, needed since neither BKE_mesh_new_nomain_from_template() nor
+       * BKE_mesh_new_nomain_from_curve_displist() properly duplicate mat info... */
+      BLI_strncpy(modified->id.name, cu->id.name, sizeof(modified->id.name));
+      *((short *)modified->id.name) = ID_ME;
+      MEM_SAFE_FREE(modified->mat);
+      /* Set flag which makes it easier to see what's going on in a debugger. */
+      modified->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
+      modified->mat = (Material **)MEM_dupallocN(cu->mat);
+      modified->totcol = cu->totcol;
 
-    (*r_final) = modified;
-  }
-  else if (modified != nullptr) {
-    /* Pretty stupid to generate that whole mesh if it's unused, yet we have to free it. */
-    BKE_id_free(nullptr, modified);
+      (*r_final) = modified;
+    }
+    else {
+      /* Pretty stupid to generate that whole mesh if it's unused, yet we have to free it. */
+      BKE_id_free(nullptr, modified);
+    }
   }
 
   if (r_geometry_set) {
