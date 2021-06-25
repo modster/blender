@@ -468,7 +468,8 @@ endif()
 
 
 # Vulkan
-option(WITH_VULKAN              "Enable Vulkan backend (Experimental)" OFF)
+option(WITH_VULKAN                    "Enable Vulkan backend (Experimental)" OFF)
+option(WITH_VULKAN_SHADER_COMPILATION "Temporary flag to enable vulkan shader compilation needed to continue development during the migration of GLSL to Vulkan." OFF)
 
 # OpenGL
 
@@ -482,6 +483,7 @@ mark_as_advanced(
   WITH_GLEW_ES
   WITH_GL_EGL
   WITH_GL_PROFILE_ES20
+  WITH_VULKAN_SHADER_COMPILATION
 )
 
 if(WIN32)
@@ -1086,6 +1088,9 @@ if(WITH_VULKAN)
   list(APPEND BLENDER_GL_LIBRARIES ${Vulkan_LIBRARY})
 
   add_definitions(-DWITH_VULKAN)
+  if(WITH_VULKAN_SHADER_COMPILATION)
+    add_definitions(-DWITH_VULKAN_SHADER_COMPILATION)
+  endif()
 endif()
 
 #-----------------------------------------------------------------------------

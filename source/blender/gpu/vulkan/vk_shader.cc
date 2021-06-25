@@ -29,10 +29,6 @@
 
 #include "shader_compiler.hh"
 
-/* Enable when actually developing on the shader compilation. When disabled compilation
- * will not be done. Allows development on other areas during migrating shaders.*/
-// #define VULKAN_SHADER_COMPILATION
-
 namespace blender::gpu {
 
 /* -------------------------------------------------------------------- */
@@ -228,21 +224,21 @@ VkShaderModule VKShader::create_shader_module(MutableSpan<const char *> sources,
 
 void VKShader::vertex_shader_from_glsl(MutableSpan<const char *> sources)
 {
-#ifdef VULKAN_SHADER_COMPILATION
+#ifdef WITH_VULKAN_SHADER_COMPILATION
   vertex_shader_ = this->create_shader_module(sources, VKShaderStageType::VertexShader);
 #endif
 }
 
 void VKShader::geometry_shader_from_glsl(MutableSpan<const char *> sources)
 {
-#ifdef VULKAN_SHADER_COMPILATION
+#ifdef WITH_VULKAN_SHADER_COMPILATION
   geometry_shader_ = this->create_shader_module(sources, VKShaderStageType::GeometryShader);
 #endif
 }
 
 void VKShader::fragment_shader_from_glsl(MutableSpan<const char *> sources)
 {
-#ifdef VULKAN_SHADER_COMPILATION
+#ifdef WITH_VULKAN_SHADER_COMPILATION
   fragment_shader_ = this->create_shader_module(sources, VKShaderStageType::FragmentShader);
 #endif
 }
@@ -251,7 +247,7 @@ void VKShader::fragment_shader_from_glsl(MutableSpan<const char *> sources)
 #if 0
 void VKShader::compute_shader_from_glsl(MutableSpan<const char *> sources)
 {
-#  ifdef VULKAN_SHADER_COMPILATION
+#  ifdef WITH_VULKAN_SHADER_COMPILATION
   compute_shader_ = this->create_shader_module(sources, VKShaderStageType::Compute);
 #  endif
 }
@@ -265,7 +261,7 @@ void VKShader::compute_shader_from_glsl(MutableSpan<const char *> sources)
 
 bool VKShader::finalize(void)
 {
-#ifdef VULKAN_SHADER_COMPILATION
+#ifdef WITH_VULKAN_SHADER_COMPILATION
   if (compilation_failed_) {
     return false;
   }
