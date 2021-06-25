@@ -146,9 +146,9 @@ static void move_bezt_to_location(BezTriple *bezt, const float location[3])
 }
 
 /* Alter handle types to allow free movement. */
-static void free_up_selected_handles_for_movement(BezTriple *bezt)
+static void free_up_handles_for_movement(BezTriple *bezt, bool f1, bool f3)
 {
-  if (bezt->f1) {
+  if (f1) {
     if (bezt->h1 == HD_VECT) {
       bezt->h1 = HD_FREE;
     }
@@ -157,7 +157,7 @@ static void free_up_selected_handles_for_movement(BezTriple *bezt)
       bezt->h2 = HD_ALIGN;
     }
   }
-  else {
+  if (f3) {
     if (bezt->h2 == HD_VECT) {
       bezt->h2 = HD_FREE;
     }
@@ -180,7 +180,7 @@ static void move_selected_bezt_to_mouse(BezTriple *bezt, ViewContext *vc, wmEven
   }
   /* Move handle separately if only a handle is dragged. */
   else {
-    free_up_selected_handles_for_movement(bezt);
+    free_up_handles_for_movement(bezt, bezt->f1, bezt->f3);
     if (bezt->f1) {
       copy_v3_v3(bezt->vec[0], location);
     }
@@ -530,7 +530,6 @@ static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
   /* Duplicate control point after the cut. */
   memcpy(new_bezt, new_bezt - 1, sizeof(BezTriple));
   copy_v3_v3(new_bezt->vec[1], data->cut_loc);
-  new_bezt->h1 = new_bezt->h2 = HD_ALIGN;
 
   if (index < nu->pntsu) {
     /* Copy all control points after the cut to the new memory. */
@@ -547,6 +546,10 @@ static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
   else {
     next_bezt = new_bezt + 1;
   }
+
+  free_up_handles_for_movement(new_bezt, true, true);
+  free_up_handles_for_movement(new_bezt - 1, false, true);
+  free_up_handles_for_movement(next_bezt, true, false);
 
   calculate_new_bezier_point((new_bezt - 1)->vec[1],
                              (new_bezt - 1)->vec[2],
