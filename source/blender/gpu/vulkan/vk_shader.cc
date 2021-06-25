@@ -156,10 +156,8 @@ std::unique_ptr<std::vector<uint32_t>> VKShader::compile_source(MutableSpan<cons
 
   shader_compiler::Compiler *compiler = shader_compiler::Compiler::create_default();
   shader_compiler::Job job;
-
-  /* TODO(jbakker): Ugly! should change interface. */
-  job.name = std::string(name).c_str();
-  job.source = std::string(source).c_str();
+  job.name = name;
+  job.source = source;
   job.compilation_target = shader_compiler::TargetType::SpirV;
   job.source_type = to_source_type(stage);
 

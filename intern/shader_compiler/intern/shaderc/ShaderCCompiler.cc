@@ -72,7 +72,7 @@ ShaderCResult *ShaderCCompiler::compile_spirv(const Job &job)
   shaderc_shader_kind kind = get_source_kind(job.source_type);
 
   ::shaderc::SpvCompilationResult shaderc_result = compiler_.CompileGlslToSpv(
-      job.source, kind, job.name, options);
+      job.source.c_str(), kind, job.name.c_str(), options);
 
   ShaderCResult *result = new ShaderCResult();
   result->init(job, shaderc_result);

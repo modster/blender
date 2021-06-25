@@ -8,7 +8,7 @@ namespace blender::gpu::tests {
 #ifdef WITH_VULKAN
 TEST_F(GPUVulkanTest, shader_compiler)
 {
-  const char *source = "#version 450\nvoid main() {}";
+  std::string source = "#version 450\nvoid main() {}";
   shader_compiler::Compiler *compiler = shader_compiler::Compiler::create_default();
   shader_compiler::Job job;
   job.source = source;

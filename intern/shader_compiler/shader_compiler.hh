@@ -72,8 +72,8 @@ class Compiler {
 
 class Job {
  public:
-  const char *name = nullptr;
-  const char *source = nullptr;
+  std::string name;
+  std::string source;
   SourceType source_type;
   TargetType compilation_target;
   OptimizationLevel optimization_level = OptimizationLevel::NotOptimized;
