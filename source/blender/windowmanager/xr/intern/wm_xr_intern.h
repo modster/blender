@@ -51,8 +51,10 @@ typedef struct wmXrSessionState {
 
   /** Last known viewer pose (centroid of eyes, in world space) stored for queries. */
   GHOST_XrPose viewer_pose;
-  /** The last known view matrix, calculated from above's viewer pose. */
+  /** The last known view matrix (inverse viewer matrix), calculated from above's viewer pose. */
   float viewer_viewmat[4][4];
+  /** The last known viewer matrix, without navigation applied. */
+  float viewer_mat_base[4][4];
   /** Last known eye data. */
   wmXrEyeData eyes[2];
 
@@ -77,9 +79,14 @@ typedef struct wmXrSessionState {
   bool force_reset_to_base_pose;
   bool is_view_data_set;
 
-  /** Navigation transforms. */
+  /** Current navigation transforms. */
   GHOST_XrPose nav_pose;
   float nav_scale;
+  /** Navigation transforms from the last actions sync, used to calculate the viewer/controller
+   * poses. */
+  GHOST_XrPose nav_pose_prev;
+  float nav_scale_prev;
+  bool is_navigation_dirty;
 
   /** The currently active action set that will be updated on calls to
    * wm_xr_session_actions_update(). If NULL, all action sets will be treated as active and

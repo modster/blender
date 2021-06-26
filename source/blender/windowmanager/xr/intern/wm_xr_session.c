@@ -389,7 +389,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
 {
   wmXrEyeData *eye = &state->eyes[draw_view->view];
   GHOST_XrPose viewer_pose;
-  float viewer_mat[4][4], base_mat[4][4], nav_mat[4][4], m[4][4];
+  float viewer_mat[4][4], base_mat[4][4], nav_mat[4][4];
 
   /* Calculate viewer matrix. */
   copy_qt_qt(viewer_pose.orientation_quat, draw_view->local_pose.orientation_quat);
@@ -406,31 +406,20 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
 
   /* Apply base pose and navigation. */
   wm_xr_pose_scale_to_mat(&draw_data->base_pose, draw_data->base_scale, base_mat);
-  wm_xr_pose_scale_to_mat(&state->nav_pose, state->nav_scale, nav_mat);
-  mul_m4_m4m4(m, base_mat, viewer_mat);
-  mul_m4_m4m4(viewer_mat, nav_mat, m);
+  wm_xr_pose_scale_to_mat(&state->nav_pose_prev, state->nav_scale_prev, nav_mat);
+  mul_m4_m4m4(state->viewer_mat_base, base_mat, viewer_mat);
+  mul_m4_m4m4(viewer_mat, nav_mat, state->viewer_mat_base);
 
   /* Save final viewer pose and viewmat. */
   mat4_to_loc_quat(state->viewer_pose.position, state->viewer_pose.orientation_quat, viewer_mat);
   wm_xr_pose_scale_to_imat(
-      &state->viewer_pose, draw_data->base_scale * state->nav_scale, state->viewer_viewmat);
+      &state->viewer_pose, draw_data->base_scale * state->nav_scale_prev, state->viewer_viewmat);
 
   /* No idea why, but multiplying by two seems to make it match the VR view more. */
   eye->focal_len = 2.0f *
                    fov_to_focallength(draw_view->fov.angle_right - draw_view->fov.angle_left,
                                       DEFAULT_SENSOR_WIDTH);
   copy_m4_m4(eye->viewmat, viewmat);
-
-  /* Update controller poses with any navigation changes since the last actions/controllers sync.
-     This can happen if an operator changes the navigation. */
-  if (state->active_action_set && state->active_action_set->controller_pose_action) {
-    for (int i = 0; i < (int)ARRAY_SIZE(state->controllers); ++i) {
-      wmXrControllerData *controller = &state->controllers[i];
-      mul_m4_m4m4(controller->mat, nav_mat, controller->mat_base);
-      mat4_to_loc_quat(
-          controller->pose.position, controller->pose.orientation_quat, controller->mat);
-    }
-  }
 
   memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(state->prev_base_pose));
   state->prev_base_scale = draw_data->base_scale;
@@ -544,6 +533,7 @@ void WM_xr_session_state_nav_location_set(wmXrData *xr, const float location[3])
 {
   if (WM_xr_session_exists(xr)) {
     copy_v3_v3(xr->runtime->session_state.nav_pose.position, location);
+    xr->runtime->session_state.is_navigation_dirty = true;
   }
 }
 
@@ -563,6 +553,7 @@ void WM_xr_session_state_nav_rotation_set(wmXrData *xr, const float rotation[4])
   if (WM_xr_session_exists(xr)) {
     BLI_ASSERT_UNIT_QUAT(rotation);
     copy_qt_qt(xr->runtime->session_state.nav_pose.orientation_quat, rotation);
+    xr->runtime->session_state.is_navigation_dirty = true;
   }
 }
 
@@ -583,6 +574,7 @@ void WM_xr_session_state_nav_scale_set(wmXrData *xr, float scale)
     /* Clamp to reasonable values. */
     CLAMP(scale, 0.001f, 1000.0f);
     xr->runtime->session_state.nav_scale = scale;
+    xr->runtime->session_state.is_navigation_dirty = true;
   }
 }
 
@@ -591,6 +583,7 @@ void WM_xr_session_state_navigation_reset(wmXrSessionState *state)
   zero_v3(state->nav_pose.position);
   unit_qt(state->nav_pose.orientation_quat);
   state->nav_scale = 1.0f;
+  state->is_navigation_dirty = true;
 }
 
 void WM_xr_session_state_viewer_object_get(const wmXrData *xr, Object *ob)
@@ -1027,11 +1020,25 @@ void wm_xr_session_actions_update(const bContext *C)
   GHOST_XrContextHandle xr_context = xr->runtime->context;
   wmXrSessionState *state = &xr->runtime->session_state;
   wmXrActionSet *active_action_set = state->active_action_set;
-
-  /* Update headset constraint object (if any). */
   Object *ob_constraint = settings->headset_object;
   char ob_flag = settings->headset_flag;
 
+  if (state->is_navigation_dirty) {
+    memcpy(&state->nav_pose_prev, &state->nav_pose, sizeof(state->nav_pose_prev));
+    state->nav_scale_prev = state->nav_scale;
+    state->is_navigation_dirty = false;
+
+    /* Update viewer pose with any navigation changes since the last actions sync so that data is
+     * correct for queries. */
+    float nav_mat[4][4], viewer_mat[4][4];
+    wm_xr_pose_scale_to_mat(&state->nav_pose, state->nav_scale, nav_mat);
+    mul_m4_m4m4(viewer_mat, nav_mat, state->viewer_mat_base);
+    mat4_to_loc_quat(state->viewer_pose.position, state->viewer_pose.orientation_quat, viewer_mat);
+    wm_xr_pose_scale_to_imat(
+        &state->viewer_pose, settings->base_scale * state->nav_scale, state->viewer_viewmat);
+  }
+
+  /* Update headset constraint object (if any). */
   if (ob_constraint && ((ob_flag & XR_OBJECT_ENABLE) != 0)) {
     wm_xr_session_object_pose_set(&state->viewer_pose, ob_constraint);
 
