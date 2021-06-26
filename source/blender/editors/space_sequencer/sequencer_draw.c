@@ -1091,7 +1091,6 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
                                      float y1,
                                      float x2,
                                      float y2,
-                                     float handsize_clamped,
                                      float pixelx,
                                      float pixely)
 {
@@ -1099,9 +1098,9 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   SeqRenderData context = {0};
   ImBuf *ibuf;
-  float strip_x2 = x2;
-  bool min_size;
-  float aspect_ratio;
+  bool min_size, clipped = false;
+  float aspect_ratio, image_x, image_y, cropx_min, cropx_max;
+  rctf crop;
 
   /* if thumbs too small ignore */
   min_size = ((y2 - y1) / pixely) > 40 * U.dpi_fac;
@@ -1116,7 +1115,9 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.is_proxy_render = false;
   context.is_thumb = true;
 
-  ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp, v2d);
+  ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp, v2d, &crop, clipped);
+  image_x = ibuf->x;
+  image_y = ibuf->y;
 
   /*Calculate thumb dimensions */
   float thumb_h = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
@@ -1132,12 +1133,14 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   x1 = seq->start;
 
   float cut_off = 0;
-  float upper_thumb_bound = strip_x2;
+  float upper_thumb_bound = seq->endstill ? seq->enddisp - seq->endstill : seq->enddisp;
 
-  while (x1 < upper_thumb_bound - 1) {
+  while (x1 < upper_thumb_bound) {
     x2 = x1 + thumb_w;
+    clipped = false;
 
-    /* Checks to make sure that thumbs are loaded only when in view */
+    /* Checks to make sure that thumbs are loaded only when in view and within the confines of the
+     * strip */
     if (x1 > v2d->cur.xmax)
       break;
 
@@ -1149,6 +1152,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     /* set the clipping bound to show the left handle moving over thumbs and not shift thumbs */
     if (IN_RANGE_INCL(seq->startdisp, x1, x2)) {
       cut_off = seq->startdisp - x1;
+      clipped = true;
     }
 
     /* ignore thumbs to the left of strip */
@@ -1159,19 +1163,27 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 
     /* clip if full thumbnail cannot be displayed */
 
-    if (x2 >= (upper_thumb_bound - 1)) {
-      x2 = (upper_thumb_bound - 1);
+    if (x2 > (upper_thumb_bound)) {
+      x2 = upper_thumb_bound;
+      clipped = true;
       if (x2 - x1 < 1)
         break;
     }
 
+    cropx_min = (cut_off / pixelx) / (zoom_y / pixely);
+    cropx_max = ((x2 - x1) / pixelx) / (zoom_y / pixely);
+    BLI_rctf_init(&crop, cropx_min, cropx_max, 0, image_y);
     /* Get the image */
-    ibuf = SEQ_render_thumbnail(&context, seq, x1 + (int)(cut_off), v2d);
 
+    ibuf = SEQ_render_thumbnail(&context, seq, x1 + (int)(cut_off), v2d, &crop, clipped);
+
+    GPU_blend(GPU_BLEND_ALPHA);
     if (ibuf) {
-      ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
+      ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, false, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
       IMB_freeImBuf(ibuf);
     }
+
+    GPU_blend(GPU_BLEND_NONE);
 
     cut_off = 0;
     x1 = x2;
@@ -1278,8 +1290,7 @@ static void draw_seq_strip(const bContext *C,
   }
 
   if (seq->type == SEQ_TYPE_MOVIE || seq->type == SEQ_TYPE_IMAGE) {
-    draw_seq_strip_thumbnail(
-        v2d, C, sseq, scene, seq, x1, y1, x2, y2, handsize_clamped, pixelx, pixely);
+    draw_seq_strip_thumbnail(v2d, C, sseq, scene, seq, x1, y1, x2, y2, pixelx, pixely);
   }
 
   pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);

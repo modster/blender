@@ -544,11 +544,9 @@ static void sequencer_thumbnail_transform(ImBuf *in, ImBuf *out, const SeqRender
   const float scale_y = 1 * image_scale_factor;
   const float image_center_offs_x = (out->x - in->x) / 2;
   const float image_center_offs_y = (out->y - in->y) / 2;
-  const float translate_x = 0 * preview_scale_factor + image_center_offs_x;
-  const float translate_y = 0 * preview_scale_factor + image_center_offs_y;
   const float pivot[2] = {in->x / 2, in->y / 2};
   loc_rot_size_to_mat3(transform_matrix,
-                       (const float[]){translate_x, translate_y},
+                       (const float[]){image_center_offs_x, image_center_offs_y},
                        0,
                        (const float[]){scale_x, scale_y});
   transform_pivot_set_m3(transform_matrix, pivot);
@@ -2031,16 +2029,46 @@ ImBuf *SEQ_render_give_ibuf_direct(const SeqRenderData *context,
 ImBuf *SEQ_render_thumbnail(SeqRenderData *context,
                             Sequence *seq,
                             float timeline_frame,
-                            View2D *v2d)
+                            View2D *v2d,
+                            rctf *crop,
+                            bool clipped)
 {
   SeqRenderState state;
   seq_render_state_init(&state);
-  ImBuf *ibuf = NULL, *scaled_ibuf = NULL;
+  ImBuf *ibuf = NULL, *scaled_ibuf = NULL, *cropped_ibuf = NULL;
   bool is_proxy_image = false;
   float rectx, recty;
 
   ibuf = seq_cache_get(context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL);
   if (ibuf != NULL) {
+    /* do clipping */  // TODO(AYJ) : Move to separate function
+    if (clipped) {
+      cropped_ibuf = IMB_allocImBuf(
+          ibuf->x, ibuf->y, 32, ibuf->rect_float ? IB_rectfloat : IB_rect);
+
+      float transform_matrix[3][3];
+      const float scale_x = 1;
+      const float scale_y = 1;
+      const float image_center_offs_x = (cropped_ibuf->x - ibuf->x) / 2;
+      const float image_center_offs_y = (cropped_ibuf->y - ibuf->y) / 2;
+      const float pivot[2] = {ibuf->x / 2, ibuf->y / 2};
+      loc_rot_size_to_mat3(transform_matrix,
+                           (const float[]){image_center_offs_x, image_center_offs_y},
+                           0,
+                           (const float[]){scale_x, scale_y});
+      transform_pivot_set_m3(transform_matrix, pivot);
+      invert_m3(transform_matrix);
+
+      const eIMBInterpolationFilterMode filter = context->for_render ? IMB_FILTER_BILINEAR :
+                                                                       IMB_FILTER_NEAREST;
+      IMB_transform(ibuf, cropped_ibuf, transform_matrix, crop, filter);
+
+      seq_imbuf_assign_spaces(context->scene, cropped_ibuf);
+      IMB_metadata_copy(cropped_ibuf, ibuf);
+      IMB_freeImBuf(ibuf);
+      if (cropped_ibuf != NULL)
+        return cropped_ibuf;
+    }
     return ibuf;
   }
 
@@ -2067,12 +2095,41 @@ ImBuf *SEQ_render_thumbnail(SeqRenderData *context,
     IMB_freeImBuf(ibuf);
   }
 
-  if (scaled_ibuf)
+  if (scaled_ibuf) {
     seq_cache_thumbnail_put(
         context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL, scaled_ibuf, v2d);
 
+    /* do clipping */  // TODO(AYJ) : Move to separate function
+    if (clipped) {
+      cropped_ibuf = IMB_allocImBuf(rectx, recty, 32, ibuf->rect_float ? IB_rectfloat : IB_rect);
+
+      float transform_matrix[3][3];
+      const float scale_x = 1;
+      const float scale_y = 1;
+      const float image_center_offs_x = (cropped_ibuf->x - scaled_ibuf->x) / 2;
+      const float image_center_offs_y = (cropped_ibuf->y - scaled_ibuf->y) / 2;
+      const float pivot[2] = {scaled_ibuf->x / 2, scaled_ibuf->y / 2};
+      loc_rot_size_to_mat3(transform_matrix,
+                           (const float[]){image_center_offs_x, image_center_offs_y},
+                           0,
+                           (const float[]){scale_x, scale_y});
+      transform_pivot_set_m3(transform_matrix, pivot);
+      invert_m3(transform_matrix);
+
+      const eIMBInterpolationFilterMode filter = context->for_render ? IMB_FILTER_BILINEAR :
+                                                                       IMB_FILTER_NEAREST;
+      IMB_transform(scaled_ibuf, cropped_ibuf, transform_matrix, crop, filter);
+
+      seq_imbuf_assign_spaces(context->scene, cropped_ibuf);
+      IMB_metadata_copy(cropped_ibuf, scaled_ibuf);
+      IMB_freeImBuf(scaled_ibuf);
+      if (cropped_ibuf != NULL)
+        return cropped_ibuf;
+    }
+  }
+
   if (scaled_ibuf == NULL) {
-    ibuf = IMB_allocImBuf(rectx, recty, 32, IB_rect);
+    scaled_ibuf = IMB_allocImBuf(rectx, recty, 32, IB_rect);
     seq_imbuf_assign_spaces(context->scene, scaled_ibuf);
   }
 
