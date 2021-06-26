@@ -32,11 +32,7 @@
 #include "GHOST_WindowCocoa.h"
 #include "GHOST_WindowManager.h"
 
-#if defined(WITH_GL_EGL)
-#  include "GHOST_ContextEGL.h"
-#else
-#  include "GHOST_ContextCGL.h"
-#endif
+#include "GHOST_ContextCGL.h"
 
 #ifdef WITH_INPUT_NDOF
 #  include "GHOST_NDOFManagerCocoa.h"
@@ -553,10 +549,12 @@ GHOST_TSuccess GHOST_SystemCocoa::init()
     // ProcessSerialNumber psn;
 
     // Carbon stuff to move window & menu to foreground
-    /*if (!GetCurrentProcess(&psn)) {
+#if 0
+    if (!GetCurrentProcess(&psn)) {
       TransformProcessType(&psn, kProcessTransformToForegroundApplication);
       SetFrontProcess(&psn);
-    }*/
+    }
+#endif
 
     @autoreleasepool {
       [NSApplication sharedApplication];  // initializes   NSApp
