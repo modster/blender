@@ -3440,6 +3440,19 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
       prop, "Tile Grid Shape", "How many tiles will be shown in the background");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 
+  prop = RNA_def_property(srna, "use_dynamic_grid", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SI_DYNAMIC_GRID);
+  RNA_def_property_ui_text(prop, "Dynamic Grid", "Replace the default grid with a Dynamic grid");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
+
+  prop = RNA_def_property(srna, "dynamic_grid_size", PROP_INT, PROP_NONE);
+  RNA_def_property_int_sdna(prop, NULL, "dynamic_grid_size");
+  RNA_def_property_int_default(prop, 1);
+  RNA_def_property_range(prop, 1, 12);
+  RNA_def_property_ui_text(
+      prop, "Dynamic Grid Size", "How many grid units in UV space make one UV Unit");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
+
   prop = RNA_def_property(srna, "uv_opacity", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_float_sdna(prop, NULL, "uv_opacity");
   RNA_def_property_range(prop, 0.0f, 1.0f);

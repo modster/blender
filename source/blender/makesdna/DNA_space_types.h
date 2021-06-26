@@ -1263,6 +1263,8 @@ typedef struct SpaceImage {
   float uv_opacity;
 
   int tile_grid_shape[2];
+  int dynamic_grid_size; /* Dynamic grid size in UV editor */
+  char _pad3[4];
 
   MaskSpaceInfo mask_info;
   SpaceImageOverlay overlay;
@@ -1318,7 +1320,9 @@ typedef enum eSpaceImage_Flag {
   SI_FLAG_UNUSED_7 = (1 << 7), /* cleared */
   SI_FLAG_UNUSED_8 = (1 << 8), /* cleared */
   SI_COORDFLOATS = (1 << 9),
-  SI_FLAG_UNUSED_10 = (1 << 10),
+
+  /* Replacing SI_FLAG_UNUSED_10, unused in versioning code */
+  SI_DYNAMIC_GRID = (1 << 10),
   SI_LIVE_UNWRAP = (1 << 11),
   SI_USE_ALPHA = (1 << 12),
   SI_SHOW_ALPHA = (1 << 13),

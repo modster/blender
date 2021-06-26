@@ -66,7 +66,14 @@ void OVERLAY_grid_init(OVERLAY_Data *vedata)
     copy_v3_fl3(
         shd->grid_size, (float)sima->tile_grid_shape[0], (float)sima->tile_grid_shape[1], 1.0f);
     for (int step = 0; step < 8; step++) {
-      shd->grid_steps[step] = powf(4, step) * (1.0f / 16.0f);
+      if (sima->flag & SI_DYNAMIC_GRID) {
+        /* Temporary fix : dynamic_grid_size is not using the default value (=1) assignd in RNA */
+        sima->dynamic_grid_size = (sima->dynamic_grid_size == 0) ? 1 : sima->dynamic_grid_size;
+        shd->grid_steps[step] = powf(1, step) * (1.0f / ((float)sima->dynamic_grid_size));
+      }
+      else {
+        shd->grid_steps[step] = powf(4, step) * (1.0f / 16.0f);
+      }
     }
     return;
   }
