@@ -1461,12 +1461,9 @@ static bool ui_drag_toggle_but_is_supported(const uiBut *but)
 
 /* Button pushed state to compare if other buttons match. Can be more
  * then just true or false for toggle buttons with more than 2 states. */
-static int ui_drag_toggle_but_pushed_state(bContext *C, uiBut *but)
+static int ui_drag_toggle_but_pushed_state(uiBut *but)
 {
   if (but->rnapoin.data == NULL && but->poin == NULL && but->icon) {
-    if (but->pushed_state_func) {
-      return but->pushed_state_func(C, but->pushed_state_arg);
-    }
     /* Assume icon identifies a unique state, for buttons that
      * work through functions callbacks and don't have an boolean
      * value that indicates the state. */
@@ -1513,7 +1510,7 @@ static bool ui_drag_toggle_set_xy_xy(
           /* execute the button */
           if (ui_drag_toggle_but_is_supported(but)) {
             /* is it pressed? */
-            const int pushed_state_but = ui_drag_toggle_but_pushed_state(C, but);
+            const int pushed_state_but = ui_drag_toggle_but_pushed_state(but);
             if (pushed_state_but != pushed_state) {
               UI_but_execute(C, region, but);
               if (do_check) {
@@ -1943,7 +1940,7 @@ static bool ui_but_drag_init(bContext *C,
        * typically 'button_activate_exit()' handles this */
       ui_apply_but_autokey(C, but);
 
-      drag_info->pushed_state = ui_drag_toggle_but_pushed_state(C, but);
+      drag_info->pushed_state = ui_drag_toggle_but_pushed_state(but);
       drag_info->but_cent_start[0] = BLI_rctf_cent_x(&but->rect);
       drag_info->but_cent_start[1] = BLI_rctf_cent_y(&but->rect);
       copy_v2_v2_int(drag_info->xy_init, &event->x);
@@ -2185,6 +2182,9 @@ static void ui_apply_but(
       break;
     case UI_BTYPE_ROW:
     case UI_BTYPE_LISTROW:
+      ui_apply_but_ROW(C, block, but, data);
+      break;
+    case UI_BTYPE_DATASETROW:
       ui_apply_but_ROW(C, block, but, data);
       break;
     case UI_BTYPE_TAB:
@@ -4770,7 +4770,7 @@ static float ui_numedit_apply_snapf(
       UnitSettings *unit = but->block->unit;
       const int unit_type = UI_but_unit_type_get(but);
       if ((unit_type == PROP_UNIT_ROTATION) && (unit->system_rotation != USER_UNIT_ROT_RADIANS)) {
-        /* pass (degrees)*/
+        /* Pass (degrees). */
       }
       else {
         softrange = 20.0f;
@@ -7851,6 +7851,9 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
     case UI_BTYPE_LABEL:
     case UI_BTYPE_IMAGE:
     case UI_BTYPE_PROGRESS_BAR:
+    case UI_BTYPE_DATASETROW:
+      retval = ui_do_but_TOG(C, but, data, event);
+      break;
     case UI_BTYPE_NODE_SOCKET:
       retval = ui_do_but_EXIT(C, but, data, event);
       break;
@@ -8216,8 +8219,8 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
     data->hold_action_timer = NULL;
   }
 
-  /* add a blocking ui handler at the window handler for blocking, modal states
-   * but not for popups, because we already have a window level handler*/
+  /* Add a blocking ui handler at the window handler for blocking, modal states
+   * but not for popups, because we already have a window level handler. */
   if (!(but->block->handle && but->block->handle->popup)) {
     if (button_modal_state(state)) {
       if (!button_modal_state(data->state)) {
@@ -10015,7 +10018,7 @@ static int ui_handle_menu_event(bContext *C,
               }
 
               if (!but) {
-                /* wrap button or no active button*/
+                /* Wrap button or no active button. */
                 uiBut *but_wrap = NULL;
                 if (ELEM(scrolltype, MENU_SCROLL_UP, MENU_SCROLL_BOTTOM)) {
                   but_wrap = ui_but_last(block);
@@ -10359,7 +10362,7 @@ static int ui_handle_menu_event(bContext *C,
    * anymore why it was there? but it meant enter didn't work
    * for example when mouse was not over submenu */
   if ((event->type == TIMER) ||
-      (/*inside &&*/ (!menu->menuretval || (menu->menuretval & UI_RETURN_UPDATE)) &&
+      (/* inside && */ (!menu->menuretval || (menu->menuretval & UI_RETURN_UPDATE)) &&
        retval == WM_UI_HANDLER_CONTINUE)) {
     retval = ui_handle_menu_button(C, event, menu);
   }
