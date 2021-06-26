@@ -21,6 +21,7 @@
 #include "BKE_callbacks.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_idprop.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_scene.h"
@@ -788,6 +789,55 @@ BLI_INLINE bool test_vec2f_state(const float state[2], float threshold, eXrActio
   return (len_v2(state) > threshold);
 }
 
+static bool wm_xr_session_modal_action_test(const ListBase *active_modal_actions,
+                                            const wmXrAction *action,
+                                            bool *r_found)
+{
+  if (r_found) {
+    *r_found = false;
+  }
+
+  LISTBASE_FOREACH (LinkData *, ld, active_modal_actions) {
+    wmXrAction *active_modal_action = ld->data;
+    if (action == active_modal_action) {
+      if (r_found) {
+        *r_found = true;
+      }
+      return true;
+    }
+    if (action->ot == active_modal_action->ot &&
+        IDP_EqualsProperties(action->op_properties, active_modal_action->op_properties)) {
+      /* Don't allow duplicate modal operators since this can lead to unwanted modal handler
+       * behavior. */
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static void wm_xr_session_modal_action_test_add(ListBase *active_modal_actions,
+                                                const wmXrAction *action)
+{
+  bool found;
+  if (wm_xr_session_modal_action_test(active_modal_actions, action, &found) && !found) {
+    LinkData *ld = MEM_callocN(sizeof(LinkData), __func__);
+    ld->data = (void *)action;
+    BLI_addtail(active_modal_actions, ld);
+  }
+}
+
+static void wm_xr_session_modal_action_remove(ListBase *active_modal_actions,
+                                              const wmXrAction *action)
+{
+  LISTBASE_FOREACH (LinkData *, ld, active_modal_actions) {
+    if (action == ld->data) {
+      BLI_freelinkN(active_modal_actions, ld);
+      return;
+    }
+  }
+}
+
 /* Dispatch events to XR surface / window queues. */
 static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                                           GHOST_XrContextHandle xr_context,
@@ -804,7 +854,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
   }
 
   const wmXrEyeData *eye_data = &session_state->eyes[settings->selection_eye];
-  wmXrAction *active_modal_action = action_set->active_modal_action;
+  ListBase *active_modal_actions = &action_set->active_modal_actions;
 
   wmXrAction **actions = MEM_calloc_arrayN(count, sizeof(*actions), __func__);
 
@@ -818,7 +868,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
       for (unsigned int subaction_idx = 0; subaction_idx < action->count_subaction_paths;
            ++subaction_idx) {
         short val = KM_NOTHING;
-        bool press_start;
+        bool press_start = false;
 
         switch (action->type) {
           case XR_BOOLEAN_INPUT: {
@@ -833,25 +883,24 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
               }
               else if (modal) {
                 val = KM_PRESS;
-                press_start = false;
               }
-              if (modal && !active_modal_action) {
-                /* Set active modal action. */
-                active_modal_action = action_set->active_modal_action = action;
-                active_modal_action->active_modal_path = &action->subaction_paths[subaction_idx];
+              if (modal && !action->active_modal_path) {
+                /* Set active modal path. */
+                action->active_modal_path = &action->subaction_paths[subaction_idx];
                 press_start = true;
+                /* Add to active modal actions. */
+                wm_xr_session_modal_action_test_add(active_modal_actions, action);
               }
             }
             else if (*state_prev) {
               if (modal || (action->flag & XR_ACTION_RELEASE) != 0) {
                 val = KM_RELEASE;
-                press_start = false;
                 if (modal &&
-                    ((action == active_modal_action) &&
-                     (&action->subaction_paths[subaction_idx] == action->active_modal_path))) {
-                  /* Unset active modal action. */
-                  active_modal_action->active_modal_path = NULL;
-                  active_modal_action = action_set->active_modal_action = NULL;
+                    (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
+                  /* Unset active modal path. */
+                  action->active_modal_path = NULL;
+                  /* Remove from active modal actions. */
+                  wm_xr_session_modal_action_remove(active_modal_actions, action);
                 }
               }
             }
@@ -870,25 +919,24 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
               }
               else if (modal) {
                 val = KM_PRESS;
-                press_start = false;
               }
-              if (modal && !active_modal_action) {
-                /* Set active modal action. */
-                active_modal_action = action_set->active_modal_action = action;
-                active_modal_action->active_modal_path = &action->subaction_paths[subaction_idx];
+              if (modal && !action->active_modal_path) {
+                /* Set active modal path. */
+                action->active_modal_path = &action->subaction_paths[subaction_idx];
                 press_start = true;
+                /* Add to active modal actions. */
+                wm_xr_session_modal_action_test_add(active_modal_actions, action);
               }
             }
             else if (test_float_state(state_prev, action->float_threshold, action->flag)) {
               if (modal || (action->flag & XR_ACTION_RELEASE) != 0) {
                 val = KM_RELEASE;
-                press_start = false;
                 if (modal &&
-                    ((action == active_modal_action) &&
-                     (&action->subaction_paths[subaction_idx] == action->active_modal_path))) {
-                  /* Unset active modal action. */
-                  active_modal_action->active_modal_path = NULL;
-                  active_modal_action = action_set->active_modal_action = NULL;
+                    (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
+                  /* Unset active modal path. */
+                  action->active_modal_path = NULL;
+                  /* Remove from active modal actions. */
+                  wm_xr_session_modal_action_remove(active_modal_actions, action);
                 }
               }
             }
@@ -907,25 +955,24 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
               }
               else if (modal) {
                 val = KM_PRESS;
-                press_start = false;
               }
-              if (modal && !active_modal_action) {
-                /* Set active modal action. */
-                active_modal_action = action_set->active_modal_action = action;
-                active_modal_action->active_modal_path = &action->subaction_paths[subaction_idx];
+              if (modal && !action->active_modal_path) {
+                /* Set active modal path. */
+                action->active_modal_path = &action->subaction_paths[subaction_idx];
                 press_start = true;
+                /* Add to active modal actions. */
+                wm_xr_session_modal_action_test_add(active_modal_actions, action);
               }
             }
             else if (test_vec2f_state(*state_prev, action->float_threshold, action->flag)) {
               if (modal || (action->flag & XR_ACTION_RELEASE) != 0) {
                 val = KM_RELEASE;
-                press_start = false;
                 if (modal &&
-                    ((action == active_modal_action) &&
-                     (&action->subaction_paths[subaction_idx] == action->active_modal_path))) {
-                  /* Unset active modal action. */
-                  active_modal_action->active_modal_path = NULL;
-                  active_modal_action = action_set->active_modal_action = NULL;
+                    (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
+                  /* Unset active modal path. */
+                  action->active_modal_path = NULL;
+                  /* Remove from active modal actions. */
+                  wm_xr_session_modal_action_remove(active_modal_actions, action);
                 }
               }
             }
@@ -939,9 +986,9 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
         }
 
         if ((val != KM_NOTHING) &&
-            (!active_modal_action ||
-             ((action == active_modal_action) &&
-              (&action->subaction_paths[subaction_idx] == action->active_modal_path)))) {
+            (!modal || (wm_xr_session_modal_action_test(active_modal_actions, action, NULL) &&
+                        (!action->active_modal_path || (&action->subaction_paths[subaction_idx] ==
+                                                        action->active_modal_path))))) {
           const GHOST_XrPose *pose = wm_xr_session_controller_pose_find(
               session_state, action->subaction_paths[subaction_idx]);
           const GHOST_XrPose *pose_other = NULL;

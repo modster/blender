@@ -23,6 +23,7 @@
  * All functions are designed to be usable by RNA / the Python API.
  */
 
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 
 #include "GHOST_C-api.h"
@@ -55,6 +56,8 @@ static void action_set_destroy(void *val)
   wmXrActionSet *action_set = val;
 
   MEM_SAFE_FREE(action_set->name);
+
+  BLI_freelistN(&action_set->active_modal_actions);
 
   MEM_freeN(action_set);
 }
@@ -184,9 +187,9 @@ void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name)
       wm_xr_session_controller_data_clear(session_state);
       action_set->controller_pose_action = NULL;
     }
-    if (action_set->active_modal_action) {
-      action_set->active_modal_action = NULL;
-    }
+
+    BLI_freelistN(&action_set->active_modal_actions);
+
     session_state->active_action_set = NULL;
   }
 
@@ -265,14 +268,12 @@ void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char 
     }
     action_set->controller_pose_action = NULL;
   }
-  if (action_set->active_modal_action &&
-      STREQ(action_set->active_modal_action->name, action_name)) {
-    action_set->active_modal_action = NULL;
-  }
 
-  wmXrAction *action = action_find(xr, action_set_name, action_name);
-  if (!action) {
-    return;
+  LISTBASE_FOREACH (LinkData *, ld, &action_set->active_modal_actions) {
+    wmXrAction *action = ld->data;
+    if (STREQ(action->name, action_name)) {
+      BLI_freelinkN(&action_set->active_modal_actions, ld);
+    }
   }
 }
 
@@ -372,16 +373,10 @@ bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name)
   }
 
   {
-    /* Unset active modal action (if any). */
+    /* Clear any active modal actions. */
     wmXrActionSet *active_action_set = xr->runtime->session_state.active_action_set;
     if (active_action_set) {
-      wmXrAction *active_modal_action = active_action_set->active_modal_action;
-      if (active_modal_action) {
-        if (active_modal_action->active_modal_path) {
-          active_modal_action->active_modal_path = NULL;
-        }
-        active_action_set->active_modal_action = NULL;
-      }
+      BLI_freelistN(&active_action_set->active_modal_actions);
     }
   }
 

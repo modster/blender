@@ -29,6 +29,7 @@
 #include "BKE_context.h"
 #include "BKE_editmesh.h"
 #include "BKE_global.h"
+#include "BKE_idprop.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
@@ -61,17 +62,25 @@
 #include "wm_xr_intern.h"
 
 /* -------------------------------------------------------------------- */
-/** \name Operator Callbacks
+/** \name Operator Conditions
  * \{ */
 
 /* op->poll */
 static bool wm_xr_operator_sessionactive(bContext *C)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
-  if (WM_xr_session_is_ready(&wm->xr)) {
-    return true;
-  }
-  return false;
+  return WM_xr_session_is_ready(&wm->xr);
+}
+
+static bool wm_xr_operator_test_event(const wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  wmXrActionData *actiondata = event->customdata;
+  return (actiondata->ot == op->type &&
+          IDP_EqualsProperties(actiondata->op_properties, op->properties));
 }
 
 /** \} */
@@ -399,9 +408,9 @@ static void wm_xr_grab_compute_bimanual(const wmXrActionData *actiondata,
 
 static int wm_xr_navigation_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   const wmXrActionData *actiondata = event->customdata;
 
@@ -420,9 +429,9 @@ static int wm_xr_navigation_grab_exec(bContext *UNUSED(C), wmOperator *UNUSED(op
 
 static int wm_xr_navigation_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   const wmXrActionData *actiondata = event->customdata;
   XrGrabData *data = op->customdata;
@@ -834,9 +843,9 @@ static void wm_xr_basenav_rotation_calc(const wmXrData *xr,
 
 static int wm_xr_navigation_fly_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   int retval = op->type->modal_3d(C, op, event);
 
@@ -854,9 +863,9 @@ static int wm_xr_navigation_fly_exec(bContext *UNUSED(C), wmOperator *UNUSED(op)
 
 static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   if (event->val == KM_RELEASE) {
     return OPERATOR_FINISHED;
@@ -1123,9 +1132,9 @@ static void wm_xr_navigation_teleport(bContext *C,
 
 static int wm_xr_navigation_teleport_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   wm_xr_raycast_init(op);
 
@@ -1145,9 +1154,9 @@ static int wm_xr_navigation_teleport_exec(bContext *UNUSED(C), wmOperator *UNUSE
 
 static int wm_xr_navigation_teleport_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   const wmXrActionData *actiondata = event->customdata;
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -1527,9 +1536,9 @@ static bool wm_xr_select_raycast(bContext *C,
 
 static int wm_xr_select_raycast_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   wm_xr_raycast_init(op);
 
@@ -1549,9 +1558,9 @@ static int wm_xr_select_raycast_exec(bContext *UNUSED(C), wmOperator *UNUSED(op)
 
 static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   const wmXrActionData *actiondata = event->customdata;
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -1674,9 +1683,9 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
 
 static int wm_xr_transform_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   bool loc_lock, rot_lock, scale_lock;
   float loc_t, rot_t;
@@ -1847,9 +1856,9 @@ static int wm_xr_transform_grab_exec(bContext *UNUSED(C), wmOperator *UNUSED(op)
 
 static int wm_xr_transform_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
-  BLI_assert(event->custom == EVT_DATA_XR);
-  BLI_assert(event->customdata);
+  if (!wm_xr_operator_test_event(op, event)) {
+    return OPERATOR_PASS_THROUGH;
+  }
 
   const wmXrActionData *actiondata = event->customdata;
   XrGrabData *data = op->customdata;

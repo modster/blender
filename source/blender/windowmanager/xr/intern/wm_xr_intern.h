@@ -178,8 +178,8 @@ typedef struct wmXrActionSet {
    * although it could differ depending on the specification and hardware. */
   wmXrAction *controller_pose_action;
 
-  /** The currently active modal action (if any). */
-  wmXrAction *active_modal_action;
+  /** Currently active modal actions. */
+  ListBase active_modal_actions;
 } wmXrActionSet;
 
 wmXrRuntimeData *wm_xr_runtime_data_create(void);
