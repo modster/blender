@@ -190,17 +190,16 @@ template<typename T> inline std::unique_ptr<const CPPType> create_cpp_type(Strin
 {
   using namespace cpp_type_util;
 
-  static T default_value;
-
   CPPTypeMembers m;
   m.name = name;
   m.size = (int64_t)sizeof(T);
   m.alignment = (int64_t)alignof(T);
-  m.default_value = (void *)&default_value;
   m.is_trivially_destructible = std::is_trivially_destructible_v<T>;
   if constexpr (std::is_default_constructible_v<T>) {
     m.default_construct = default_construct_cb<T>;
     m.default_construct_indices = default_construct_indices_cb<T>;
+    static T default_value;
+    m.default_value = (void *)&default_value;
   }
   if constexpr (std::is_destructible_v<T>) {
     m.destruct = destruct_cb<T>;
