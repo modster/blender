@@ -190,39 +190,63 @@ template<typename T> uint64_t hash_cb(const void *value)
 
 namespace blender::fn {
 
-template<typename T>
-inline std::unique_ptr<const CPPType> create_cpp_type(StringRef name, const T &default_value)
+template<typename T> inline std::unique_ptr<const CPPType> create_cpp_type(StringRef name)
 {
   using namespace cpp_type_util;
+
+  static T default_value;
+
   CPPTypeMembers m;
   m.name = name;
   m.size = (int64_t)sizeof(T);
   m.alignment = (int64_t)alignof(T);
+  m.default_value = (void *)&default_value;
   m.is_trivially_destructible = std::is_trivially_destructible_v<T>;
-  m.construct_default = construct_default_cb<T>;
-  m.construct_default_indices = construct_default_indices_cb<T>;
-  m.destruct = destruct_cb<T>;
-  m.destruct_indices = destruct_indices_cb<T>;
-  m.copy_to_initialized = copy_to_initialized_cb<T>;
-  m.copy_to_initialized_indices = copy_to_initialized_indices_cb<T>;
-  m.copy_to_uninitialized = copy_to_uninitialized_cb<T>;
-  m.copy_to_uninitialized_indices = copy_to_uninitialized_indices_cb<T>;
-  m.move_to_initialized = move_to_initialized_cb<T>;
-  m.move_to_initialized_indices = move_to_initialized_indices_cb<T>;
-  m.move_to_uninitialized = move_to_uninitialized_cb<T>;
-  m.move_to_uninitialized_indices = move_to_uninitialized_indices_cb<T>;
-  m.relocate_to_initialized = relocate_to_initialized_cb<T>;
-  m.relocate_to_initialized_indices = relocate_to_initialized_indices_cb<T>;
-  m.relocate_to_uninitialized = relocate_to_uninitialized_cb<T>;
-  m.relocate_to_uninitialized_indices = relocate_to_uninitialized_indices_cb<T>;
-  m.fill_initialized = fill_initialized_cb<T>;
-  m.fill_initialized_indices = fill_initialized_indices_cb<T>;
-  m.fill_uninitialized = fill_uninitialized_cb<T>;
-  m.fill_uninitialized_indices = fill_uninitialized_indices_cb<T>;
+  if constexpr (std::is_default_constructible_v<T>) {
+    m.construct_default = construct_default_cb<T>;
+    m.construct_default_indices = construct_default_indices_cb<T>;
+  }
+  if constexpr (std::is_destructible_v<T>) {
+    m.destruct = destruct_cb<T>;
+    m.destruct_indices = destruct_indices_cb<T>;
+  }
+  if constexpr (std::is_copy_assignable_v<T>) {
+    m.copy_to_initialized = copy_to_initialized_cb<T>;
+    m.copy_to_initialized_indices = copy_to_initialized_indices_cb<T>;
+  }
+  if constexpr (std::is_copy_constructible_v<T>) {
+    m.copy_to_uninitialized = copy_to_uninitialized_cb<T>;
+    m.copy_to_uninitialized_indices = copy_to_uninitialized_indices_cb<T>;
+  }
+  if constexpr (std::is_move_assignable_v<T>) {
+    m.move_to_initialized = move_to_initialized_cb<T>;
+    m.move_to_initialized_indices = move_to_initialized_indices_cb<T>;
+  }
+  if constexpr (std::is_move_constructible_v<T>) {
+    m.move_to_uninitialized = move_to_uninitialized_cb<T>;
+    m.move_to_uninitialized_indices = move_to_uninitialized_indices_cb<T>;
+  }
+  if constexpr (std::is_destructible_v<T>) {
+    if constexpr (std::is_move_assignable_v<T>) {
+      m.relocate_to_initialized = relocate_to_initialized_cb<T>;
+      m.relocate_to_initialized_indices = relocate_to_initialized_indices_cb<T>;
+    }
+    if constexpr (std::is_move_constructible_v<T>) {
+      m.relocate_to_uninitialized = relocate_to_uninitialized_cb<T>;
+      m.relocate_to_uninitialized_indices = relocate_to_uninitialized_indices_cb<T>;
+    }
+  }
+  if constexpr (std::is_copy_assignable_v<T>) {
+    m.fill_initialized = fill_initialized_cb<T>;
+    m.fill_initialized_indices = fill_initialized_indices_cb<T>;
+  }
+  if constexpr (std::is_copy_constructible_v<T>) {
+    m.fill_uninitialized = fill_uninitialized_cb<T>;
+    m.fill_uninitialized_indices = fill_uninitialized_indices_cb<T>;
+  }
   m.debug_print = debug_print_cb<T>;
   m.is_equal = is_equal_cb<T>;
   m.hash = hash_cb<T>;
-  m.default_value = static_cast<const void *>(&default_value);
 
   const CPPType *type = new CPPType(std::move(m));
   return std::unique_ptr<const CPPType>(type);
@@ -233,9 +257,8 @@ inline std::unique_ptr<const CPPType> create_cpp_type(StringRef name, const T &d
 #define MAKE_CPP_TYPE(IDENTIFIER, TYPE_NAME) \
   template<> const blender::fn::CPPType &blender::fn::CPPType::get<TYPE_NAME>() \
   { \
-    static TYPE_NAME default_value; \
     static std::unique_ptr<const CPPType> cpp_type = blender::fn::create_cpp_type<TYPE_NAME>( \
-        STRINGIFY(IDENTIFIER), default_value); \
+        STRINGIFY(IDENTIFIER)); \
     return *cpp_type; \
   } \
   /* Support using `CPPType::get<const T>()`. Otherwise the caller would have to remove const. */ \

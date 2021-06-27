@@ -77,7 +77,8 @@ struct CPPTypeMembers {
   int64_t size = 0;
   int64_t alignment = 0;
   uintptr_t alignment_mask = 0;
-  bool is_trivially_destructible = 0;
+  bool is_trivially_destructible = false;
+  bool has_special_member_functions = false;
 
   void (*construct_default)(void *ptr) = nullptr;
   void (*construct_default_indices)(void *ptr, IndexMask mask) = nullptr;
@@ -126,6 +127,9 @@ class CPPType : NonCopyable, NonMovable {
   {
     BLI_assert(is_power_of_2_i(m_.alignment));
     m_.alignment_mask = (uintptr_t)members.alignment - (uintptr_t)1;
+    m_.has_special_member_functions = (m_.construct_default && m_.copy_to_uninitialized &&
+                                       m_.copy_to_initialized && m_.move_to_uninitialized &&
+                                       m_.move_to_initialized && m_.destruct);
   }
 
   /**
@@ -190,6 +194,50 @@ class CPPType : NonCopyable, NonMovable {
   bool is_trivially_destructible() const
   {
     return m_.is_trivially_destructible;
+  }
+
+  bool is_default_constructible() const
+  {
+    return m_.construct_default != nullptr;
+  }
+
+  bool is_copy_constructible() const
+  {
+    return m_.copy_to_initialized != nullptr;
+  }
+
+  bool is_move_constructible() const
+  {
+    return m_.move_to_initialized != nullptr;
+  }
+
+  bool is_destructible() const
+  {
+    return m_.destruct != nullptr;
+  }
+
+  bool is_copy_assignable() const
+  {
+    return m_.copy_to_initialized != nullptr;
+  }
+
+  bool is_move_assignable() const
+  {
+    return m_.copy_to_uninitialized != nullptr;
+  }
+
+  /**
+   * Returns true, when the type has the following functions:
+   * - Default constructor.
+   * - Copy constructor.
+   * - Move constructor.
+   * - Copy assignment operator.
+   * - Move assignment operator.
+   * - Destructor.
+   */
+  bool has_special_member_functions() const
+  {
+    return m_.has_special_member_functions;
   }
 
   /**

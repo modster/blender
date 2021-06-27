@@ -292,14 +292,22 @@ class LockedNode : NonCopyable, NonMovable {
   }
 };
 
-static const CPPType *get_socket_cpp_type(const DSocket socket)
-{
-  return nodes::socket_cpp_type_get(*socket->typeinfo());
-}
-
 static const CPPType *get_socket_cpp_type(const SocketRef &socket)
 {
-  return nodes::socket_cpp_type_get(*socket.typeinfo());
+  const CPPType *type = nodes::socket_cpp_type_get(*socket.typeinfo());
+  if (type == nullptr) {
+    return nullptr;
+  }
+  /* The evaluator only supports types that have special member functions. */
+  if (!type->has_special_member_functions()) {
+    return nullptr;
+  }
+  return type;
+}
+
+static const CPPType *get_socket_cpp_type(const DSocket socket)
+{
+  return get_socket_cpp_type(*socket.socket_ref());
 }
 
 static bool node_supports_laziness(const DNode node)
