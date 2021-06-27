@@ -104,10 +104,8 @@ struct CPPTypeMembers {
   void (*relocate_construct)(void *src, void *dst) = nullptr;
   void (*relocate_construct_indices)(void *src, void *dst, IndexMask mask) = nullptr;
 
-  void (*fill_assign)(const void *value, void *dst, int64_t n) = nullptr;
   void (*fill_assign_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
 
-  void (*fill_construct)(const void *value, void *dst, int64_t n) = nullptr;
   void (*fill_construct_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
 
   void (*debug_print)(const void *value, std::stringstream &ss) = nullptr;
@@ -496,12 +494,9 @@ class CPPType : NonCopyable, NonMovable {
    *
    * Other instances of the same type should live in the array before this method is called.
    */
-  void fill_assign(const void *value, void *dst, int64_t n) const
+  void fill_assign_n(const void *value, void *dst, int64_t n) const
   {
-    BLI_assert(n == 0 || this->pointer_can_point_to_instance(value));
-    BLI_assert(n == 0 || this->pointer_can_point_to_instance(dst));
-
-    m_.fill_assign(value, dst, n);
+    this->fill_assign_indices(value, dst, IndexMask(n));
   }
 
   void fill_assign_indices(const void *value, void *dst, IndexMask mask) const
@@ -517,12 +512,9 @@ class CPPType : NonCopyable, NonMovable {
    *
    * The array should be uninitialized before this method is called.
    */
-  void fill_construct(const void *value, void *dst, int64_t n) const
+  void fill_construct_n(const void *value, void *dst, int64_t n) const
   {
-    BLI_assert(n == 0 || this->pointer_can_point_to_instance(value));
-    BLI_assert(n == 0 || this->pointer_can_point_to_instance(dst));
-
-    m_.fill_construct(value, dst, n);
+    this->fill_construct_indices(value, dst, IndexMask(n));
   }
 
   void fill_construct_indices(const void *value, void *dst, IndexMask mask) const

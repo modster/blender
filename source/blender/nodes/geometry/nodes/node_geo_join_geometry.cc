@@ -353,7 +353,7 @@ static void ensure_control_point_attribute(const StringRef name,
 
         BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
         current_curve_attribute->get(spline_index_in_component, buffer);
-        type.fill_assign(buffer, new_attribute->data(), new_attribute->size());
+        type.fill_assign_n(buffer, new_attribute->data(), new_attribute->size());
       }
     }
 

@@ -233,11 +233,9 @@ template<typename T> inline std::unique_ptr<const CPPType> create_cpp_type(Strin
     }
   }
   if constexpr (std::is_copy_assignable_v<T>) {
-    m.fill_assign = fill_assign_cb<T>;
     m.fill_assign_indices = fill_assign_indices_cb<T>;
   }
   if constexpr (std::is_copy_constructible_v<T>) {
-    m.fill_construct = fill_construct_cb<T>;
     m.fill_construct_indices = fill_construct_indices_cb<T>;
   }
   m.debug_print = debug_print_cb<T>;

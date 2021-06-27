@@ -182,7 +182,7 @@ void GVMutableArray::fill(const void *value)
 {
   if (this->is_span()) {
     const GMutableSpan span = this->get_internal_span();
-    type_->fill_assign(value, span.data(), size_);
+    type_->fill_assign_n(value, span.data(), size_);
   }
   else {
     for (int64_t i : IndexRange(size_)) {
