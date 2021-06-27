@@ -71,8 +71,8 @@ struct ImBuf *SEQ_render_give_ibuf_direct(const SeqRenderData *context,
 struct ImBuf *SEQ_render_thumbnail(SeqRenderData *context,
                                    struct Sequence *seq,
                                    float timeline_frame,
-                                   View2D *v2d,
-                                   rctf *crop,
+                                   float *cache_limits,
+                                   rcti *crop,
                                    bool clipped);
 void SEQ_render_init_colorspace(struct Sequence *seq);
 void SEQ_render_new_render_data(struct Main *bmain,

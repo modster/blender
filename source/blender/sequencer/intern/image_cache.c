@@ -1339,7 +1339,7 @@ void seq_cache_cleanup_sequence(Scene *scene,
   seq_cache_unlock(scene);
 }
 
-void seq_cache_thumbnail_cleanup(Scene *scene, Sequence *seq, Sequence *seq_changed)
+void seq_cache_thumbnail_cleanup(Scene *scene, Sequence *seq_changed)
 {
   SeqCache *cache = seq_cache_get_from_scene(scene);
   if (!cache) {
@@ -1465,7 +1465,7 @@ void seq_cache_thumbnail_put(const SeqRenderData *context,
                              float timeline_frame,
                              int type,
                              ImBuf *i,
-                             View2D *v2d)
+                             float *cache_limits)
 {
   if (i == NULL || context->skip_cache || context->is_proxy_render || !seq) {
     return;
@@ -1495,22 +1495,22 @@ void seq_cache_thumbnail_put(const SeqRenderData *context,
   SeqCache *cache = seq_cache_get_from_scene(scene);
   SeqCacheKey *key = seq_cache_allocate_key(cache, context, seq, timeline_frame, type);
 
-  /* Limit cache to 1000 images stored. */
-  if (cache->count >= 1000) {
-    float safe_ofs = 20;
+  /* Limit cache to 5000 images stored. */
+  if (cache->count >= 5000) {
+    float safe_ofs = 200;
     Sequence cut = *seq;
 
     /* Frames to the left */
-    cut.startdisp = (int)v2d->tot.xmin;
-    cut.enddisp = (int)v2d->cur.xmin - (int)safe_ofs;
+    cut.startdisp = (int)cache_limits[0];
+    cut.enddisp = (int)cache_limits[2] - (int)safe_ofs;
     if (cut.startdisp < cut.enddisp) {
-      seq_cache_thumbnail_cleanup(scene, seq, &cut);
+      seq_cache_thumbnail_cleanup(scene, &cut);
     }
     /* Frames to the right */
-    cut.startdisp = v2d->cur.xmax + safe_ofs;
-    cut.enddisp = v2d->tot.xmax;
+    cut.startdisp = cache_limits[3] + safe_ofs;
+    cut.enddisp = cache_limits[1];
     if (cut.startdisp < cut.enddisp) {
-      seq_cache_thumbnail_cleanup(scene, seq, &cut);
+      seq_cache_thumbnail_cleanup(scene, &cut);
     }
   }
 
