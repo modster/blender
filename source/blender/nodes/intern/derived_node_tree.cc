@@ -84,6 +84,16 @@ bool DerivedNodeTree::has_link_cycles() const
   return false;
 }
 
+bool DerivedNodeTree::has_undefined_nodes_or_sockets() const
+{
+  for (const NodeTreeRef *tree_ref : used_node_tree_refs_) {
+    if (tree_ref->has_undefined_nodes_or_sockets()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /* Calls the given callback on all nodes in the (possibly nested) derived node tree. */
 void DerivedNodeTree::foreach_node(FunctionRef<void(DNode)> callback) const
 {
@@ -220,7 +230,7 @@ void DInputSocket::foreach_origin_socket(FunctionRef<void(DSocket)> origin_fn) c
 /* Calls `target_fn` for every "real" target socket. "Real" means that reroutes, muted nodes
  * and node groups are handled by this function. Target sockets are on the nodes that use the value
  * from this socket. The `skipped_fn` function is called for sockets that have been skipped during
- * the search for target sockets (e.g. reroutes).  */
+ * the search for target sockets (e.g. reroutes). */
 void DOutputSocket::foreach_target_socket(FunctionRef<void(DInputSocket)> target_fn,
                                           FunctionRef<void(DSocket)> skipped_fn) const
 {

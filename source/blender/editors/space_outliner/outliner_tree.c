@@ -312,12 +312,8 @@ static void outliner_add_object_contents(SpaceOutliner *space_outliner,
     outliner_add_element(space_outliner, &te->subtree, ob, te, TSE_ANIM_DATA, 0);
   }
 
-  outliner_add_element(space_outliner,
-                       &te->subtree,
-                       ob->poselib,
-                       te,
-                       TSE_SOME_ID,
-                       0); /* XXX FIXME.. add a special type for this. */
+  /* FIXME: add a special type for this. */
+  outliner_add_element(space_outliner, &te->subtree, ob->poselib, te, TSE_SOME_ID, 0);
 
   if (ob->proxy && !ID_IS_LINKED(ob)) {
     outliner_add_element(space_outliner, &te->subtree, ob->proxy, te, TSE_PROXY, 0);
@@ -1925,5 +1921,5 @@ void outliner_build_tree(Main *mainvar,
   outliner_filter_tree(space_outliner, view_layer);
   outliner_restore_scrolling_position(space_outliner, region, &focus);
 
-  BKE_main_id_clear_newpoins(mainvar);
+  BKE_main_id_newptr_and_tag_clear(mainvar);
 }

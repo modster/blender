@@ -30,6 +30,7 @@
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_string.h"
+#include "BLI_string_utf8.h"
 
 #include "BLT_translation.h"
 
@@ -202,6 +203,7 @@ void SEQ_edit_remove_flagged_sequences(Scene *scene, ListBase *seqbase)
       }
       BLI_remlink(seqbase, seq);
       SEQ_sequence_free(scene, seq, true);
+      SEQ_sequence_lookup_tag(scene, SEQ_LOOKUP_TAG_INVALID);
     }
   }
 }
@@ -411,8 +413,7 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
 
   /* Duplicate ListBase. */
   ListBase right_strips = {NULL, NULL};
-  SEQ_sequence_base_dupli_recursive(
-      scene, scene, &right_strips, &left_strips, SEQ_DUPE_ANIM | SEQ_DUPE_ALL, 0);
+  SEQ_sequence_base_dupli_recursive(scene, scene, &right_strips, &left_strips, SEQ_DUPE_ALL, 0);
 
   /* Split strips. */
   Sequence *left_seq = left_strips.first;
@@ -424,11 +425,12 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
     right_seq = right_seq->next;
   }
 
-  /* Move strips back to seqbase. Move right strips first, so left strips don't change name. */
-  BLI_movelisttolist(seqbase, &right_strips);
+  seq = right_strips.first;
   BLI_movelisttolist(seqbase, &left_strips);
-  LISTBASE_FOREACH (Sequence *, seq_iter, seqbase) {
-    SEQ_ensure_unique_name(seq_iter, scene);
+  BLI_movelisttolist(seqbase, &right_strips);
+
+  for (; seq; seq = seq->next) {
+    SEQ_ensure_unique_name(seq, scene);
   }
 
   return return_seq;
@@ -467,4 +469,11 @@ bool SEQ_edit_remove_gaps(Scene *scene,
         scene, seqbase, -gap_info.gap_length, gap_info.gap_start_frame);
   }
   return true;
+}
+
+void SEQ_edit_sequence_name_set(Scene *scene, Sequence *seq, const char *new_name)
+{
+  BLI_strncpy_utf8(seq->name + 2, new_name, MAX_NAME - 2);
+  BLI_utf8_invalid_strip(seq->name + 2, strlen(seq->name + 2));
+  SEQ_sequence_lookup_tag(scene, SEQ_LOOKUP_TAG_INVALID);
 }

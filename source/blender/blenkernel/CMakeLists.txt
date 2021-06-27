@@ -165,6 +165,7 @@ set(SRC
   intern/layer_utils.c
   intern/lib_id.c
   intern/lib_id_delete.c
+  intern/lib_id_eval.c
   intern/lib_override.c
   intern/lib_query.c
   intern/lib_remap.c
@@ -194,6 +195,7 @@ set(SRC
   intern/mesh_runtime.c
   intern/mesh_sample.cc
   intern/mesh_tangent.c
+  intern/mesh_tessellate.c
   intern/mesh_validate.c
   intern/mesh_validate.cc
   intern/mesh_wrapper.c

@@ -1349,10 +1349,12 @@ static void join_groups_action_temp(bAction *act)
 
   /* BLI_movelisttolist() doesn't touch first->prev and last->next pointers in its "dst" list.
    * Ensure that after the reshuffling the list is properly terminated. */
-  FCurve *act_fcurves_first = act->curves.first;
-  act_fcurves_first->prev = NULL;
-  FCurve *act_fcurves_last = act->curves.last;
-  act_fcurves_last->next = NULL;
+  if (!BLI_listbase_is_empty(&act->curves)) {
+    FCurve *act_fcurves_first = act->curves.first;
+    act_fcurves_first->prev = NULL;
+    FCurve *act_fcurves_last = act->curves.last;
+    act_fcurves_last->next = NULL;
+  }
 }
 
 /* Change the order of anim-channels within action
@@ -1683,7 +1685,7 @@ static void animchannels_group_channels(bAnimContext *ac,
       agrp = action_groups_add_new(act, name);
       BLI_assert(agrp != NULL);
 
-      /* transfer selected F-Curves across to new group  */
+      /* Transfer selected F-Curves across to new group. */
       for (ale = anim_data.first; ale; ale = ale->next) {
         FCurve *fcu = (FCurve *)ale->data;
         bActionGroup *grp = fcu->grp;
@@ -1724,7 +1726,7 @@ static int animchannels_group_exec(bContext *C, wmOperator *op)
     bAnimListElem *ale;
     int filter;
 
-    /* handle each animdata block separately, so that the regrouping doesn't flow into blocks  */
+    /* Handle each animdata block separately, so that the regrouping doesn't flow into blocks. */
     filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_ANIMDATA |
               ANIMFILTER_NODUPLIS);
     ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
@@ -3441,12 +3443,14 @@ static void ANIM_OT_channels_click(wmOperatorType *ot)
   ot->flag = OPTYPE_UNDO;
 
   /* properties */
-  /* NOTE: don't save settings, otherwise, can end up with some weird behavior (sticky extend) */
-  prop = RNA_def_boolean(ot->srna, "extend", false, "Extend Select", ""); /* SHIFTKEY */
+  /* NOTE: don't save settings, otherwise, can end up with some weird behavior (sticky extend)
+   *
+   * Key-map: Enable with `Shift`. */
+  prop = RNA_def_boolean(ot->srna, "extend", false, "Extend Select", "");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
-  prop = RNA_def_boolean(
-      ot->srna, "children_only", false, "Select Children Only", ""); /* CTRLKEY|SHIFTKEY */
+  /* Key-map: Enable with `Ctrl-Shift`. */
+  prop = RNA_def_boolean(ot->srna, "children_only", false, "Select Children Only", "");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 

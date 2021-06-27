@@ -513,7 +513,7 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
 
     if (node->storage) {
       /* could be handlerized at some point, now only 1 exception still */
-      if ((ntree->type == NTREE_SHADER) &&
+      if ((ELEM(ntree->type, NTREE_SHADER, NTREE_GEOMETRY)) &&
           ELEM(node->type, SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB)) {
         BKE_curvemapping_blend_write(writer, (const CurveMapping *)node->storage);
       }
@@ -875,7 +875,7 @@ void ntreeBlendReadLib(struct BlendLibReader *reader, struct bNodeTree *ntree)
 
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     /* Link ID Properties -- and copy this comment EXACTLY for easy finding
-     * of library blocks that implement this.*/
+     * of library blocks that implement this. */
     IDP_BlendReadLib(reader, node->prop);
 
     BLO_read_id_address(reader, lib, &node->id);
@@ -1662,6 +1662,8 @@ const char *nodeStaticSocketType(int type, int subtype)
           return "NodeSocketFloatAngle";
         case PROP_TIME:
           return "NodeSocketFloatTime";
+        case PROP_TIME_ABSOLUTE:
+          return "NodeSocketFloatTimeAbsolute";
         case PROP_DISTANCE:
           return "NodeSocketFloatDistance";
         case PROP_NONE:
@@ -1737,6 +1739,8 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype)
           return "NodeSocketInterfaceFloatAngle";
         case PROP_TIME:
           return "NodeSocketInterfaceFloatTime";
+        case PROP_TIME_ABSOLUTE:
+          return "NodeSocketInterfaceFloatTimeAbsolute";
         case PROP_DISTANCE:
           return "NodeSocketInterfaceFloatDistance";
         case PROP_NONE:
@@ -2361,7 +2365,7 @@ static void nodeUnMuteLink(bNodeLink *link)
   link->tosock->flag |= SOCK_IN_USE;
 }
 
-/* Upstream muting. Always happens when unmuting but checks when muting. O(n^2) algorithm.*/
+/* Upstream muting. Always happens when unmuting but checks when muting. O(n^2) algorithm. */
 static void nodeMuteRerouteInputLinks(bNodeTree *ntree, bNode *node, const bool mute)
 {
   if (node->type != NODE_REROUTE) {
@@ -2384,7 +2388,7 @@ static void nodeMuteRerouteInputLinks(bNodeTree *ntree, bNode *node, const bool 
   }
 }
 
-/* Downstream muting propagates when reaching reroute nodes. O(n^2) algorithm.*/
+/* Downstream muting propagates when reaching reroute nodes. O(n^2) algorithm. */
 static void nodeMuteRerouteOutputLinks(bNodeTree *ntree, bNode *node, const bool mute)
 {
   if (node->type != NODE_REROUTE) {
@@ -3338,8 +3342,6 @@ static bNodeSocket *make_socket_interface(bNodeTree *ntree,
                                           const char *name)
 {
   bNodeSocketType *stype = nodeSocketTypeFind(idname);
-  int own_index = ntree->cur_index++;
-
   if (stype == nullptr) {
     return nullptr;
   }
@@ -3351,7 +3353,7 @@ static bNodeSocket *make_socket_interface(bNodeTree *ntree,
   sock->type = SOCK_CUSTOM; /* int type undefined by default */
 
   /* assign new unique index */
-  own_index = ntree->cur_index++;
+  const int own_index = ntree->cur_index++;
   /* use the own_index as socket identifier */
   if (in_out == SOCK_IN) {
     BLI_snprintf(sock->identifier, MAX_NAME, "Input_%d", own_index);
@@ -5050,12 +5052,21 @@ static void registerGeometryNodes()
   register_node_type_geo_boolean();
   register_node_type_geo_bounding_box();
   register_node_type_geo_collection_info();
+  register_node_type_geo_convex_hull();
+  register_node_type_geo_curve_length();
   register_node_type_geo_curve_to_mesh();
+  register_node_type_geo_curve_to_points();
   register_node_type_geo_curve_resample();
+  register_node_type_geo_curve_reverse();
+  register_node_type_geo_curve_subdivide();
   register_node_type_geo_decimate();
+  register_node_type_geo_delete_geometry();
   register_node_type_geo_edge_split();
+  register_node_type_geo_input_material();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
+  register_node_type_geo_material_assign();
+  register_node_type_geo_material_replace();
   register_node_type_geo_mesh_primitive_circle();
   register_node_type_geo_mesh_primitive_cone();
   register_node_type_geo_mesh_primitive_cube();
@@ -5064,6 +5075,7 @@ static void registerGeometryNodes()
   register_node_type_geo_mesh_primitive_ico_sphere();
   register_node_type_geo_mesh_primitive_line();
   register_node_type_geo_mesh_primitive_uv_sphere();
+  register_node_type_geo_mesh_to_curve();
   register_node_type_geo_object_info();
   register_node_type_geo_point_distribute();
   register_node_type_geo_point_instance();
@@ -5072,7 +5084,10 @@ static void registerGeometryNodes()
   register_node_type_geo_point_separate();
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
+  register_node_type_geo_raycast();
   register_node_type_geo_sample_texture();
+  register_node_type_geo_select_by_material();
+  register_node_type_geo_separate_components();
   register_node_type_geo_subdivide();
   register_node_type_geo_subdivision_surface();
   register_node_type_geo_switch();

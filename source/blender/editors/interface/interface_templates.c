@@ -344,7 +344,7 @@ typedef struct TemplateID {
   float scale;
 } TemplateID;
 
-/* Search browse menu, assign  */
+/* Search browse menu, assign. */
 static void template_ID_set_property_exec_fn(bContext *C, void *arg_template, void *item)
 {
   TemplateID *template_ui = (TemplateID *)arg_template;
@@ -653,7 +653,7 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
             /* Only remap that specific ID usage to overriding local data-block. */
             ID *override_id = BKE_lib_override_library_create_from_id(bmain, id, false);
             if (override_id != NULL) {
-              BKE_main_id_clear_newpoins(bmain);
+              BKE_main_id_newptr_and_tag_clear(bmain);
 
               if (GS(override_id->name) == ID_OB) {
                 Scene *scene = CTX_data_scene(C);
@@ -672,7 +672,7 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
         }
         else {
           if (BKE_lib_id_make_local(bmain, id, false, 0)) {
-            BKE_main_id_clear_newpoins(bmain);
+            BKE_main_id_newptr_and_tag_clear(bmain);
 
             /* reassign to get get proper updates/notifiers */
             idptr = RNA_property_pointer_get(&template_ui->ptr, template_ui->prop);
@@ -1078,7 +1078,7 @@ static void template_ID(const bContext *C,
       char numstr[32];
       short numstr_len;
 
-      numstr_len = BLI_snprintf(numstr, sizeof(numstr), "%d", ID_REAL_USERS(id));
+      numstr_len = BLI_snprintf_rlen(numstr, sizeof(numstr), "%d", ID_REAL_USERS(id));
 
       but = uiDefBut(
           block,
@@ -3050,7 +3050,7 @@ static void colorband_flip_cb(bContext *C, ColorBand *coba)
     coba->data[a] = data_tmp[a];
   }
 
-  /* may as well flip the cur*/
+  /* May as well flip the `cur`. */
   coba->cur = coba->tot - (coba->cur + 1);
 
   ED_undo_push(C, "Flip Color Ramp");
@@ -5883,7 +5883,7 @@ static void uilist_prepare(uiList *ui_list,
   }
 
   /* If list length changes or list is tagged to check this,
-   * and active is out of view, scroll to it .*/
+   * and active is out of view, scroll to it. */
   if (ui_list->list_last_len != len || ui_list->flag & UILST_SCROLL_TO_ACTIVE_ITEM) {
     if (activei_row < ui_list->list_scroll) {
       ui_list->list_scroll = activei_row;

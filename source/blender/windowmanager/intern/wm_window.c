@@ -136,7 +136,7 @@ static void wm_window_set_drawable(wmWindowManager *wm, wmWindow *win, bool acti
 static bool wm_window_timer(const bContext *C);
 
 /* XXX this one should correctly check for apple top header...
- * done for Cocoa : returns window contents (and not frame) max size*/
+ * done for Cocoa : returns window contents (and not frame) max size. */
 void wm_get_screensize(int *r_width, int *r_height)
 {
   unsigned int uiwidth;
@@ -188,7 +188,7 @@ static void wm_ghostwindow_destroy(wmWindowManager *wm, wmWindow *win)
     GHOST_ActivateWindowDrawingContext(win->ghostwin);
     GPU_context_active_set(win->gpuctx);
 
-    /* Delete local gpu context.  */
+    /* Delete local GPU context. */
     GPU_context_discard(win->gpuctx);
 
     GHOST_DisposeWindow(g_system, win->ghostwin);
@@ -440,8 +440,8 @@ void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
 void wm_window_title(wmWindowManager *wm, wmWindow *win)
 {
   if (WM_window_is_temp_screen(win)) {
-    /* nothing to do for 'temp' windows,
-     * because WM_window_open always sets window title  */
+    /* Nothing to do for 'temp' windows,
+     * because #WM_window_open always sets window title. */
   }
   else if (win->ghostwin) {
     /* this is set to 1 if you don't have startup.blend open */
@@ -550,7 +550,7 @@ static void wm_window_ghostwindow_add(wmWindowManager *wm,
   }
 
   int scr_w, scr_h;
-  wm_get_screensize(&scr_w, &scr_h);
+  wm_get_desktopsize(&scr_w, &scr_h);
   int posy = (scr_h - win->posy - win->sizey);
 
   /* Clear drawable so we can set the new window. */
@@ -756,6 +756,7 @@ static bool wm_window_update_size_position(wmWindow *win)
 
 /**
  * \param space_type: SPACE_VIEW3D, SPACE_INFO, ... (eSpace_Type)
+ * \param toplevel: Not a child owned by other windows. A peer of main window.
  * \param dialog: whether this should be made as a dialog-style window
  * \param temp: whether this is considered a short-lived window
  * \param alignment: how this window is positioned relative to its parent
@@ -768,6 +769,7 @@ wmWindow *WM_window_open(bContext *C,
                          int sizex,
                          int sizey,
                          int space_type,
+                         bool toplevel,
                          bool dialog,
                          bool temp,
                          WindowAlignment alignment)
@@ -822,7 +824,7 @@ wmWindow *WM_window_open(bContext *C,
 
   /* add new window? */
   if (win == NULL) {
-    win = wm_window_new(bmain, wm, win_prev, dialog);
+    win = wm_window_new(bmain, wm, toplevel ? NULL : win_prev, dialog);
     win->posx = rect.xmin;
     win->posy = rect.ymin;
     *win->stereo3d_format = *win_prev->stereo3d_format;
@@ -923,6 +925,7 @@ int wm_window_new_exec(bContext *C, wmOperator *UNUSED(op))
                             win_src->sizex * 0.95f,
                             win_src->sizey * 0.9f,
                             area->spacetype,
+                            false,
                             false,
                             false,
                             WIN_ALIGN_PARENT_CENTER) != NULL);
@@ -2077,7 +2080,7 @@ void WM_init_tablet_api(void)
   if (g_system) {
     switch (U.tablet_api) {
       case USER_TABLET_NATIVE:
-        GHOST_SetTabletAPI(g_system, GHOST_kTabletNative);
+        GHOST_SetTabletAPI(g_system, GHOST_kTabletWinPointer);
         break;
       case USER_TABLET_WINTAB:
         GHOST_SetTabletAPI(g_system, GHOST_kTabletWintab);

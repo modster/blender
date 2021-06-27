@@ -97,8 +97,8 @@ static int pygpu_offscreen_valid_check(BPyGPUOffScreen *py_ofs)
  * \{ */
 
 typedef struct {
-  PyObject_HEAD /* required python macro */
-      BPyGPUOffScreen *py_offscreen;
+  PyObject_HEAD /* Required Python macro. */
+  BPyGPUOffScreen *py_offscreen;
   int level;
   bool is_explicitly_bound; /* Bound by "bind" method. */
 } OffScreenStackContext;
@@ -194,7 +194,7 @@ static PyObject *pygpu_offscreen_unbind(BPyGPUOffScreen *self, PyObject *args, P
   BPY_GPU_OFFSCREEN_CHECK_OBJ(self);
 
   static const char *_keywords[] = {"restore", NULL};
-  static _PyArg_Parser _parser = {"|O&:unbind", _keywords, 0};
+  static _PyArg_Parser _parser = {"|$O&:unbind", _keywords, 0};
   if (!_PyArg_ParseTupleAndKeywordsFast(args, kwds, &_parser, PyC_ParseBool, &restore)) {
     return NULL;
   }

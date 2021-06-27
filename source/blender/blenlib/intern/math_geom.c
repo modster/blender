@@ -856,7 +856,7 @@ void dist_squared_to_projected_aabb_precalc(struct DistProjectedAABBPrecalc *pre
   }
 #else
   if (!isect_plane_plane_v3(px, py, precalc->ray_origin, precalc->ray_direction)) {
-    /* Matrix with weird coplanar planes. Undetermined origin.*/
+    /* Matrix with weird co-planar planes. Undetermined origin. */
     zero_v3(precalc->ray_origin);
     precalc->ray_direction[0] = precalc->pmat[0][3];
     precalc->ray_direction[1] = precalc->pmat[1][3];
@@ -2133,7 +2133,7 @@ bool isect_ray_line_v3(const float ray_origin[3],
   const float nlen = len_squared_v3(n);
 
   if (nlen == 0.0f) {
-    /* the lines are parallel.*/
+    /* The lines are parallel. */
     return false;
   }
 
@@ -2353,7 +2353,7 @@ bool isect_planes_v3_fn(
         for (i_test = 0; i_test < planes_len; i_test++) {
           const float *np_test = planes[i_test];
           if (((dot_v3v3(np_test, co_test) + np_test[3]) > eps_isect)) {
-            /* For low epsilon values the point could intersect it's own plane. */
+            /* For low epsilon values the point could intersect its own plane. */
             if (!ELEM(i_test, i, j, k)) {
               break;
             }
@@ -2903,7 +2903,7 @@ bool isect_sweeping_sphere_tri_v3(const float p1[3],
   /*---test edges---*/
   sub_v3_v3v3(e3, v2, v1); /* wasn't yet calculated */
 
-  /*e1*/
+  /* `e1` */
   sub_v3_v3v3(bv, v0, p1);
 
   elen2 = dot_v3v3(e1, e1);
@@ -2926,8 +2926,8 @@ bool isect_sweeping_sphere_tri_v3(const float p1[3],
     }
   }
 
-  /*e2*/
-  /*bv is same*/
+  /* `e2` */
+  /* `bv` is same. */
   elen2 = dot_v3v3(e2, e2);
   edotv = dot_v3v3(e2, vel);
   edotbv = dot_v3v3(e2, bv);
@@ -2948,11 +2948,11 @@ bool isect_sweeping_sphere_tri_v3(const float p1[3],
     }
   }
 
-  /*e3*/
-  /* sub_v3_v3v3(bv, v0, p1); */   /* UNUSED */
-  /* elen2 = dot_v3v3(e1, e1); */  /* UNUSED */
-  /* edotv = dot_v3v3(e1, vel); */ /* UNUSED */
-  /* edotbv = dot_v3v3(e1, bv); */ /* UNUSED */
+  /* `e3` */
+  // sub_v3_v3v3(bv, v0, p1);   /* UNUSED */
+  // elen2 = dot_v3v3(e1, e1);  /* UNUSED */
+  // edotv = dot_v3v3(e1, vel); /* UNUSED */
+  // edotbv = dot_v3v3(e1, bv); /* UNUSED */
 
   sub_v3_v3v3(bv, v1, p1);
   elen2 = dot_v3v3(e3, e3);
@@ -3344,6 +3344,13 @@ float closest_to_ray_v3(float r_close[3],
                         const float ray_dir[3])
 {
   float h[3], lambda;
+
+  if (UNLIKELY(is_zero_v3(ray_dir))) {
+    lambda = 0.0f;
+    copy_v3_v3(r_close, ray_orig);
+    return lambda;
+  }
+
   sub_v3_v3v3(h, p, ray_orig);
   lambda = dot_v3v3(ray_dir, h) / dot_v3v3(ray_dir, ray_dir);
   madd_v3_v3v3fl(r_close, ray_orig, ray_dir, lambda);
@@ -4467,7 +4474,7 @@ void interp_weights_poly_v2(float *w, float v[][2], const int n, const float co[
     d_curr = d_next;
     DIR_V2_SET(&d_next, v_next, co);
     ht = mean_value_half_tan_v2_db(&d_curr, &d_next);
-    w[i_curr] = (float)((ht_prev + ht) / d_curr.len);
+    w[i_curr] = (d_curr.len == 0.0) ? 0.0f : (float)((ht_prev + ht) / d_curr.len);
     totweight += w[i_curr];
 
     /* step */
@@ -4635,7 +4642,7 @@ void resolve_quad_uv_v2_deriv(float r_uv[2],
                              (st3[0] * st0[1] - st3[1] * st0[0]);
 
   /* X is 2D cross product (determinant)
-   * A = (p0 - p) X (p0 - p3)*/
+   * A = (p0 - p) X (p0 - p3) */
   const double a = (st0[0] - st[0]) * (st0[1] - st3[1]) - (st0[1] - st[1]) * (st0[0] - st3[0]);
 
   /* B = ( (p0 - p) X (p1 - p2) + (p1 - p) X (p0 - p3) ) / 2 */
@@ -4724,7 +4731,7 @@ float resolve_quad_u_v2(const float st[2],
                              (st3[0] * st0[1] - st3[1] * st0[0]);
 
   /* X is 2D cross product (determinant)
-   * A = (p0 - p) X (p0 - p3)*/
+   * A = (p0 - p) X (p0 - p3) */
   const double a = (st0[0] - st[0]) * (st0[1] - st3[1]) - (st0[1] - st[1]) * (st0[0] - st3[0]);
 
   /* B = ( (p0 - p) X (p1 - p2) + (p1 - p) X (p0 - p3) ) / 2 */
@@ -4904,8 +4911,8 @@ void window_translate_m4(float winmat[4][4], float perspmat[4][4], const float x
 void planes_from_projmat(const float mat[4][4],
                          float left[4],
                          float right[4],
-                         float top[4],
                          float bottom[4],
+                         float top[4],
                          float near[4],
                          float far[4])
 {
@@ -6211,6 +6218,19 @@ bool is_quad_flip_v3_first_third_fast(const float v1[3],
   return dot_v3v3(cross_a, cross_b) > 0.0f;
 }
 
+bool is_quad_flip_v3_first_third_fast_with_normal(const float v1[3],
+                                                  const float v2[3],
+                                                  const float v3[3],
+                                                  const float v4[3],
+                                                  const float normal[3])
+{
+  float dir_v3v1[3], tangent[3];
+  sub_v3_v3v3(dir_v3v1, v3, v1);
+  cross_v3_v3v3(tangent, dir_v3v1, normal);
+  const float dot = dot_v3v3(v1, tangent);
+  return (dot_v3v3(v4, tangent) >= dot) || (dot_v3v3(v2, tangent) <= dot);
+}
+
 /**
  * Return the value which the distance between points will need to be scaled by,
  * to define a handle, given both points are on a perfect circle.
@@ -6224,12 +6244,12 @@ float cubic_tangent_factor_circle_v3(const float tan_l[3], const float tan_r[3])
   BLI_ASSERT_UNIT_V3(tan_l);
   BLI_ASSERT_UNIT_V3(tan_r);
 
-  /* -7f causes instability/glitches with Bendy Bones + Custom Refs  */
+  /* -7f causes instability/glitches with Bendy Bones + Custom Refs. */
   const float eps = 1e-5f;
 
   const float tan_dot = dot_v3v3(tan_l, tan_r);
   if (tan_dot > 1.0f - eps) {
-    /* no angle difference (use fallback, length wont make any difference) */
+    /* no angle difference (use fallback, length won't make any difference) */
     return (1.0f / 3.0f) * 0.75f;
   }
   if (tan_dot < -1.0f + eps) {

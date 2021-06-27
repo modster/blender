@@ -76,34 +76,17 @@ struct SampleModeParam {
   std::optional<int> count;
 };
 
-template<typename T>
-static void sample_span_to_output_spline(const Spline &input_spline,
-                                         Span<float> index_factors,
-                                         const VArray<T> &input_data,
-                                         MutableSpan<T> output_data)
-{
-  BLI_assert(input_data.size() == input_spline.evaluated_points_size());
-
-  parallel_for(output_data.index_range(), 1024, [&](IndexRange range) {
-    for (const int i : range) {
-      const Spline::LookupResult interp = input_spline.lookup_data_from_index_factor(
-          index_factors[i]);
-      output_data[i] = blender::attribute_math::mix2(interp.factor,
-                                                     input_data[interp.evaluated_index],
-                                                     input_data[interp.next_evaluated_index]);
-    }
-  });
-}
-
 static SplinePtr resample_spline(const Spline &input_spline, const int count)
 {
   std::unique_ptr<PolySpline> output_spline = std::make_unique<PolySpline>();
   output_spline->set_cyclic(input_spline.is_cyclic());
   output_spline->normal_mode = input_spline.normal_mode;
 
-  if (input_spline.evaluated_edges_size() < 1) {
-    output_spline->resize(1);
-    output_spline->positions().first() = input_spline.positions().first();
+  if (input_spline.evaluated_edges_size() < 1 || count == 1) {
+    output_spline->add_point(input_spline.positions().first(),
+                             input_spline.tilts().first(),
+                             input_spline.radii().first());
+    output_spline->attributes.reallocate(1);
     return output_spline;
   }
 
@@ -111,26 +94,18 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
 
   Array<float> uniform_samples = input_spline.sample_uniform_index_factors(count);
 
-  {
-    GVArray_For_Span positions(input_spline.evaluated_positions());
-    GVArray_Typed<float3> positions_typed(positions);
-    sample_span_to_output_spline<float3>(
-        input_spline, uniform_samples, positions_typed, output_spline->positions());
-  }
-  {
-    GVArrayPtr interpolated_data = input_spline.interpolate_to_evaluated_points(
-        GVArray_For_Span(input_spline.radii()));
-    GVArray_Typed<float> interpolated_data_typed{*interpolated_data};
-    sample_span_to_output_spline<float>(
-        input_spline, uniform_samples, interpolated_data_typed, output_spline->radii());
-  }
-  {
-    GVArrayPtr interpolated_data = input_spline.interpolate_to_evaluated_points(
-        GVArray_For_Span(input_spline.tilts()));
-    GVArray_Typed<float> interpolated_data_typed{*interpolated_data};
-    sample_span_to_output_spline<float>(
-        input_spline, uniform_samples, interpolated_data_typed, output_spline->tilts());
-  }
+  input_spline.sample_with_index_factors<float3>(
+      input_spline.evaluated_positions(), uniform_samples, output_spline->positions());
+
+  input_spline.sample_with_index_factors<float>(
+      input_spline.interpolate_to_evaluated(input_spline.radii()),
+      uniform_samples,
+      output_spline->radii());
+
+  input_spline.sample_with_index_factors<float>(
+      input_spline.interpolate_to_evaluated(input_spline.tilts()),
+      uniform_samples,
+      output_spline->tilts());
 
   output_spline->attributes.reallocate(count);
   input_spline.attributes.foreach_attribute(
@@ -147,16 +122,12 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
           BLI_assert_unreachable();
           return false;
         }
-        GVArrayPtr interpolated_attribute = input_spline.interpolate_to_evaluated_points(
-            GVArray_For_GSpan(*input_attribute));
-        attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
-          using T = decltype(dummy);
-          GVArray_Typed<T> interpolated_attribute_typed{*interpolated_attribute};
-          sample_span_to_output_spline<T>(input_spline,
-                                          uniform_samples,
-                                          interpolated_attribute_typed,
-                                          (*output_attribute).typed<T>());
-        });
+
+        input_spline.sample_with_index_factors(
+            *input_spline.interpolate_to_evaluated(*input_attribute),
+            uniform_samples,
+            *output_attribute);
+
         return true;
       },
       ATTR_DOMAIN_POINT);
@@ -167,20 +138,31 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
 static std::unique_ptr<CurveEval> resample_curve(const CurveEval &input_curve,
                                                  const SampleModeParam &mode_param)
 {
-  std::unique_ptr<CurveEval> output_curve = std::make_unique<CurveEval>();
+  Span<SplinePtr> input_splines = input_curve.splines();
 
-  for (const SplinePtr &spline : input_curve.splines()) {
-    if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_COUNT) {
-      BLI_assert(mode_param.count);
-      output_curve->add_spline(resample_spline(*spline, *mode_param.count));
-    }
-    else if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_LENGTH) {
-      BLI_assert(mode_param.length);
-      const float length = spline->length();
-      const int count = length / *mode_param.length;
-      output_curve->add_spline(resample_spline(*spline, count));
-    }
+  std::unique_ptr<CurveEval> output_curve = std::make_unique<CurveEval>();
+  output_curve->resize(input_splines.size());
+  MutableSpan<SplinePtr> output_splines = output_curve->splines();
+
+  if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_COUNT) {
+    threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
+      for (const int i : range) {
+        BLI_assert(mode_param.count);
+        output_splines[i] = resample_spline(*input_splines[i], *mode_param.count);
+      }
+    });
   }
+  else if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_LENGTH) {
+    threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
+      for (const int i : range) {
+        const float length = input_splines[i]->length();
+        const int count = std::max(int(length / *mode_param.length), 1);
+        output_splines[i] = resample_spline(*input_splines[i], count);
+      }
+    });
+  }
+
+  output_curve->attributes = input_curve.attributes;
 
   return output_curve;
 }

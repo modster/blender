@@ -816,7 +816,7 @@ bool constraints_list_needinv(TransInfo *t, ListBase *list)
       /* only consider constraint if it is enabled, and has influence on result */
       if ((con->flag & CONSTRAINT_DISABLE) == 0 && (con->enforce != 0.0f)) {
         /* (affirmative) returns for specific constraints here... */
-        /* constraints that require this regardless  */
+        /* constraints that require this regardless. */
         if (ELEM(con->type,
                  CONSTRAINT_TYPE_FOLLOWPATH,
                  CONSTRAINT_TYPE_CLAMPTO,
@@ -1698,8 +1698,10 @@ void recalcData(TransInfo *t)
       recalcData_mask_common(t);
       break;
     case TC_MESH_VERTS:
-    case TC_MESH_EDGES:
       recalcData_mesh(t);
+      break;
+    case TC_MESH_EDGES:
+      recalcData_mesh_edge(t);
       break;
     case TC_MESH_SKIN:
       recalcData_mesh_skin(t);

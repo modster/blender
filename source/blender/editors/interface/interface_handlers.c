@@ -1461,12 +1461,9 @@ static bool ui_drag_toggle_but_is_supported(const uiBut *but)
 
 /* Button pushed state to compare if other buttons match. Can be more
  * then just true or false for toggle buttons with more than 2 states. */
-static int ui_drag_toggle_but_pushed_state(bContext *C, uiBut *but)
+static int ui_drag_toggle_but_pushed_state(uiBut *but)
 {
   if (but->rnapoin.data == NULL && but->poin == NULL && but->icon) {
-    if (but->pushed_state_func) {
-      return but->pushed_state_func(C, but->pushed_state_arg);
-    }
     /* Assume icon identifies a unique state, for buttons that
      * work through functions callbacks and don't have an boolean
      * value that indicates the state. */
@@ -1513,7 +1510,7 @@ static bool ui_drag_toggle_set_xy_xy(
           /* execute the button */
           if (ui_drag_toggle_but_is_supported(but)) {
             /* is it pressed? */
-            const int pushed_state_but = ui_drag_toggle_but_pushed_state(C, but);
+            const int pushed_state_but = ui_drag_toggle_but_pushed_state(but);
             if (pushed_state_but != pushed_state) {
               UI_but_execute(C, region, but);
               if (do_check) {
@@ -1561,7 +1558,7 @@ static void ui_drag_toggle_set(bContext *C, uiDragToggleHandle *drag_info, const
         };
 
         /* check if this is a different button,
-         * chances are high the button wont move about :) */
+         * chances are high the button won't move about :) */
         if (len_manhattan_v2v2(drag_info->but_cent_start, but_cent_new) > 1.0f) {
           if (fabsf(drag_info->but_cent_start[0] - but_cent_new[0]) <
               fabsf(drag_info->but_cent_start[1] - but_cent_new[1])) {
@@ -1939,11 +1936,11 @@ static bool ui_but_drag_init(bContext *C,
       uiDragToggleHandle *drag_info = MEM_callocN(sizeof(*drag_info), __func__);
       ARegion *region_prev;
 
-      /* call here because regular mouse-up event wont run,
+      /* call here because regular mouse-up event won't run,
        * typically 'button_activate_exit()' handles this */
       ui_apply_but_autokey(C, but);
 
-      drag_info->pushed_state = ui_drag_toggle_but_pushed_state(C, but);
+      drag_info->pushed_state = ui_drag_toggle_but_pushed_state(but);
       drag_info->but_cent_start[0] = BLI_rctf_cent_x(&but->rect);
       drag_info->but_cent_start[1] = BLI_rctf_cent_y(&but->rect);
       copy_v2_v2_int(drag_info->xy_init, &event->x);
@@ -2187,6 +2184,9 @@ static void ui_apply_but(
     case UI_BTYPE_LISTROW:
       ui_apply_but_ROW(C, block, but, data);
       break;
+    case UI_BTYPE_DATASETROW:
+      ui_apply_but_ROW(C, block, but, data);
+      break;
     case UI_BTYPE_TAB:
       ui_apply_but_TAB(C, but, data);
       break;
@@ -2346,16 +2346,16 @@ static int get_but_property_array_length(uiBut *but)
 }
 
 static void ui_but_set_float_array(
-    bContext *C, uiBut *but, uiHandleButtonData *data, float *values, int array_length)
+    bContext *C, uiBut *but, uiHandleButtonData *data, const float *values, const int values_len)
 {
   button_activate_state(C, but, BUTTON_STATE_NUM_EDITING);
 
-  for (int i = 0; i < array_length; i++) {
+  for (int i = 0; i < values_len; i++) {
     RNA_property_float_set_index(&but->rnapoin, but->rnaprop, i, values[i]);
   }
   if (data) {
     if (but->type == UI_BTYPE_UNITVEC) {
-      BLI_assert(array_length == 3);
+      BLI_assert(values_len == 3);
       copy_v3_v3(data->vec, values);
     }
     else {
@@ -2366,56 +2366,39 @@ static void ui_but_set_float_array(
   button_activate_state(C, but, BUTTON_STATE_EXIT);
 }
 
-static void float_array_to_string(float *values,
-                                  int array_length,
+static void float_array_to_string(const float *values,
+                                  const int values_len,
                                   char *output,
                                   int output_len_max)
 {
-  /* to avoid buffer overflow attacks; numbers are quite arbitrary */
-  BLI_assert(output_len_max > 15);
-  output_len_max -= 10;
-
-  int current_index = 0;
-  output[current_index] = '[';
-  current_index++;
-
-  for (int i = 0; i < array_length; i++) {
-    int length = BLI_snprintf(
-        output + current_index, output_len_max - current_index, "%f", values[i]);
-    current_index += length;
-
-    if (i < array_length - 1) {
-      if (current_index < output_len_max) {
-        output[current_index + 0] = ',';
-        output[current_index + 1] = ' ';
-        current_index += 2;
-      }
-    }
+  const int values_end = values_len - 1;
+  int ofs = 0;
+  output[ofs++] = '[';
+  for (int i = 0; i < values_len; i++) {
+    ofs += BLI_snprintf_rlen(
+        output + ofs, output_len_max - ofs, (i != values_end) ? "%f, " : "%f]", values[i]);
   }
-
-  output[current_index + 0] = ']';
-  output[current_index + 1] = '\0';
 }
 
 static void ui_but_copy_numeric_array(uiBut *but, char *output, int output_len_max)
 {
-  const int array_length = get_but_property_array_length(but);
-  float *values = alloca(array_length * sizeof(float));
+  const int values_len = get_but_property_array_length(but);
+  float *values = alloca(values_len * sizeof(float));
   RNA_property_float_get_array(&but->rnapoin, but->rnaprop, values);
-  float_array_to_string(values, array_length, output, output_len_max);
+  float_array_to_string(values, values_len, output, output_len_max);
 }
 
-static bool parse_float_array(char *text, float *values, int expected_length)
+static bool parse_float_array(char *text, float *values, int values_len_expected)
 {
   /* can parse max 4 floats for now */
-  BLI_assert(0 <= expected_length && expected_length <= 4);
+  BLI_assert(0 <= values_len_expected && values_len_expected <= 4);
 
   float v[5];
-  const int actual_length = sscanf(
+  const int values_len_actual = sscanf(
       text, "[%f, %f, %f, %f, %f]", &v[0], &v[1], &v[2], &v[3], &v[4]);
 
-  if (actual_length == expected_length) {
-    memcpy(values, v, sizeof(float) * expected_length);
+  if (values_len_actual == values_len_expected) {
+    memcpy(values, v, sizeof(float) * values_len_expected);
     return true;
   }
   return false;
@@ -2426,16 +2409,16 @@ static void ui_but_paste_numeric_array(bContext *C,
                                        uiHandleButtonData *data,
                                        char *buf_paste)
 {
-  const int array_length = get_but_property_array_length(but);
-  if (array_length > 4) {
+  const int values_len = get_but_property_array_length(but);
+  if (values_len > 4) {
     /* not supported for now */
     return;
   }
 
-  float *values = alloca(sizeof(float) * array_length);
+  float *values = alloca(sizeof(float) * values_len);
 
-  if (parse_float_array(buf_paste, values, array_length)) {
-    ui_but_set_float_array(C, but, data, values, array_length);
+  if (parse_float_array(buf_paste, values, values_len)) {
+    ui_but_set_float_array(C, but, data, values, values_len);
   }
   else {
     WM_report(RPT_ERROR, "Expected an array of numbers: [n, n, ...]");
@@ -3085,7 +3068,7 @@ static bool ui_textedit_insert_buf(uiBut *but,
 
     if ((len + step >= data->maxlen) && (data->maxlen - (len + 1) > 0)) {
       if (UI_but_is_utf8(but)) {
-        /* shorten 'step' to a utf8 aligned size that fits  */
+        /* Shorten 'step' to a utf8 aligned size that fits. */
         BLI_strnlen_utf8_ex(buf, data->maxlen - (len + 1), &step);
       }
       else {
@@ -3431,7 +3414,7 @@ static void ui_textedit_end(bContext *C, uiBut *but, uiHandleButtonData *data)
       const int strip = BLI_utf8_invalid_strip(but->editstr, strlen(but->editstr));
       /* not a file?, strip non utf-8 chars */
       if (strip) {
-        /* wont happen often so isn't that annoying to keep it here for a while */
+        /* won't happen often so isn't that annoying to keep it here for a while */
         printf("%s: invalid utf8 - stripped chars %d\n", __func__, strip);
       }
     }
@@ -3923,7 +3906,6 @@ static void ui_numedit_begin_set_values(uiBut *but, uiHandleButtonData *data)
   data->startvalue = ui_but_value_get(but);
   data->origvalue = data->startvalue;
   data->value = data->origvalue;
-  but->editval = &data->value;
 }
 
 static void ui_numedit_begin(uiBut *but, uiHandleButtonData *data)
@@ -3952,6 +3934,7 @@ static void ui_numedit_begin(uiBut *but, uiHandleButtonData *data)
   }
   else {
     ui_numedit_begin_set_values(but, data);
+    but->editval = &data->value;
 
     float softmin = but->softmin;
     float softmax = but->softmax;
@@ -4787,7 +4770,7 @@ static float ui_numedit_apply_snapf(
       UnitSettings *unit = but->block->unit;
       const int unit_type = UI_but_unit_type_get(but);
       if ((unit_type == PROP_UNIT_ROTATION) && (unit->system_rotation != USER_UNIT_ROT_RADIANS)) {
-        /* pass (degrees)*/
+        /* Pass (degrees). */
       }
       else {
         softrange = 20.0f;
@@ -7868,6 +7851,9 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
     case UI_BTYPE_LABEL:
     case UI_BTYPE_IMAGE:
     case UI_BTYPE_PROGRESS_BAR:
+    case UI_BTYPE_DATASETROW:
+      retval = ui_do_but_TOG(C, but, data, event);
+      break;
     case UI_BTYPE_NODE_SOCKET:
       retval = ui_do_but_EXIT(C, but, data, event);
       break;
@@ -8233,8 +8219,8 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
     data->hold_action_timer = NULL;
   }
 
-  /* add a blocking ui handler at the window handler for blocking, modal states
-   * but not for popups, because we already have a window level handler*/
+  /* Add a blocking ui handler at the window handler for blocking, modal states
+   * but not for popups, because we already have a window level handler. */
   if (!(but->block->handle && but->block->handle->popup)) {
     if (button_modal_state(state)) {
       if (!button_modal_state(data->state)) {
@@ -9679,7 +9665,7 @@ static void ui_region_auto_open_clear(ARegion *region)
  * This allows a menu to be open,
  * but send key events to the parent if there's no active buttons.
  *
- * Without this keyboard navigation from menu's wont work.
+ * Without this keyboard navigation from menus won't work.
  */
 static bool ui_menu_pass_event_to_parent_if_nonactive(uiPopupBlockHandle *menu,
                                                       const uiBut *but,
@@ -10032,7 +10018,7 @@ static int ui_handle_menu_event(bContext *C,
               }
 
               if (!but) {
-                /* wrap button or no active button*/
+                /* Wrap button or no active button. */
                 uiBut *but_wrap = NULL;
                 if (ELEM(scrolltype, MENU_SCROLL_UP, MENU_SCROLL_BOTTOM)) {
                   but_wrap = ui_but_last(block);
@@ -10376,7 +10362,7 @@ static int ui_handle_menu_event(bContext *C,
    * anymore why it was there? but it meant enter didn't work
    * for example when mouse was not over submenu */
   if ((event->type == TIMER) ||
-      (/*inside &&*/ (!menu->menuretval || (menu->menuretval & UI_RETURN_UPDATE)) &&
+      (/* inside && */ (!menu->menuretval || (menu->menuretval & UI_RETURN_UPDATE)) &&
        retval == WM_UI_HANDLER_CONTINUE)) {
     retval = ui_handle_menu_button(C, event, menu);
   }

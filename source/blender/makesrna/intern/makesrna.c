@@ -114,7 +114,7 @@ static void rna_generate_static_parameter_prototypes(FILE *f,
 
 static int replace_if_different(const char *tmpfile, const char *dep_files[])
 {
-  /* return 0;  */ /* use for testing had edited rna */
+  /* return 0; */ /* use for testing had edited rna */
 
 #define REN_IF_DIFF \
   { \
@@ -641,7 +641,7 @@ static char *rna_def_property_get_func(
       return NULL;
     }
 
-    /* typecheck,  */
+    /* Type check. */
     if (dp->dnatype && *dp->dnatype) {
 
       if (prop->type == PROP_FLOAT) {
@@ -3083,7 +3083,7 @@ static void rna_auto_types(void)
   PropertyDefRNA *dp;
 
   for (ds = DefRNA.structs.first; ds; ds = ds->cont.next) {
-    /* DNA name for Screen is patched in 2.5, we do the reverse here .. */
+    /* DNA name for Screen is patched in 2.5, we do the reverse here. */
     if (ds->dnaname) {
       if (STREQ(ds->dnaname, "Screen")) {
         ds->dnaname = "bScreen";
@@ -3201,6 +3201,8 @@ static const char *rna_property_subtypename(PropertySubType type)
       return "PROP_ANGLE";
     case PROP_TIME:
       return "PROP_TIME";
+    case PROP_TIME_ABSOLUTE:
+      return "PROP_TIME_ABSOLUTE";
     case PROP_DISTANCE:
       return "PROP_DISTANCE";
     case PROP_DISTANCE_CAMERA:
@@ -3266,6 +3268,8 @@ static const char *rna_property_subtype_unit(PropertySubType type)
       return "PROP_UNIT_ROTATION";
     case PROP_UNIT_TIME:
       return "PROP_UNIT_TIME";
+    case PROP_UNIT_TIME_ABSOLUTE:
+      return "PROP_UNIT_TIME_ABSOLUTE";
     case PROP_UNIT_VELOCITY:
       return "PROP_UNIT_VELOCITY";
     case PROP_UNIT_ACCELERATION:
@@ -4225,7 +4229,7 @@ static void rna_generate_struct(BlenderRNA *UNUSED(brna), StructRNA *srna, FILE 
   }
   fprintf(f, "\t");
   rna_print_c_string(f, srna->identifier);
-  fprintf(f, ", NULL, NULL"); /* PyType - Cant initialize here */
+  fprintf(f, ", NULL, NULL"); /* PyType - Can't initialize here */
   fprintf(f, ", %d, NULL, ", srna->flag);
   rna_print_c_string(f, srna->name);
   fprintf(f, ",\n\t");
@@ -4368,7 +4372,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_screen.c", NULL, RNA_def_screen},
     {"rna_sculpt_paint.c", NULL, RNA_def_sculpt_paint},
     {"rna_sequencer.c", "rna_sequencer_api.c", RNA_def_sequencer},
-#ifdef WITH_GEOMETRY_NODES
+#ifdef WITH_SIMULATION_DATABLOCK
     {"rna_simulation.c", NULL, RNA_def_simulation},
 #endif
     {"rna_space.c", "rna_space_api.c", RNA_def_space},

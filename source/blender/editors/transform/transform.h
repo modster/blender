@@ -46,6 +46,7 @@
  * \{ */
 
 struct ARegion;
+struct BMPartialUpdate;
 struct Depsgraph;
 struct NumInput;
 struct Object;
@@ -148,15 +149,18 @@ typedef enum {
   T_AUTOMERGE = 1 << 20,
   /** Runs auto-merge & splits. */
   T_AUTOSPLIT = 1 << 21,
+
+  /** No cursor wrapping on region bounds */
+  T_NO_CURSOR_WRAP = 1 << 23,
 } eTFlag;
 
 /** #TransInfo.modifiers */
 typedef enum {
-  MOD_CONSTRAINT_SELECT = 1 << 0,
+  MOD_CONSTRAINT_SELECT_AXIS = 1 << 0,
   MOD_PRECISION = 1 << 1,
   MOD_SNAP = 1 << 2,
   MOD_SNAP_INVERT = 1 << 3,
-  MOD_CONSTRAINT_PLANE = 1 << 4,
+  MOD_CONSTRAINT_SELECT_PLANE = 1 << 4,
 } eTModifier;
 
 /** #TransSnap.status */
@@ -419,7 +423,7 @@ typedef struct TransCenterData {
  *   (typically in transform_conversion.c).
  */
 typedef struct TransCustomDataContainer {
-  /** Owned by the mode (grab, scale, bend... ).*/
+  /** Owned by the mode (grab, scale, bend... ). */
   union {
     TransCustomData mode, first_elem;
   };
@@ -430,14 +434,14 @@ typedef struct TransCustomDataContainer {
 /**
  * Container for Transform Data
  *
- * Used to implement multi-object modes, so each object can have it's
+ * Used to implement multi-object modes, so each object can have its
  * own data array as well as object matrix, local center etc.
  *
  * Anything that can't be shared between all objects
  * and doesn't make sense to store for every vertex (in the #TransDataContainer.data).
  *
  * \note at some point this could be used to store non object containers
- * although this only makes sense if each container has it's own matrices,
+ * although this only makes sense if each container has its own matrices,
  * otherwise all elements may as well be stored in one array (#TransDataContainer.data),
  * as is already done for curve-objects, f-curves. etc.
  */

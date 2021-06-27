@@ -86,7 +86,7 @@ static FileSelection find_file_mouse_rect(SpaceFile *sfile,
 
   BLI_rctf_rcti_copy(&rect_region_fl, rect_region);
 
-  /* Okay, manipulating v2d rects here is hacky...  */
+  /* Okay, manipulating v2d rects here is hacky... */
   v2d->mask.ymax -= sfile->layout->offset_top;
   v2d->cur.ymax -= sfile->layout->offset_top;
   UI_view2d_region_to_view_rctf(v2d, &rect_region_fl, &rect_view_fl);
@@ -1677,7 +1677,7 @@ void file_draw_check_ex(bContext *C, ScrArea *area)
       if (op->type->check(C, op)) {
         file_operator_to_sfile(bmain, sfile, op);
 
-        /* redraw, else the changed settings wont get updated */
+        /* redraw, else the changed settings won't get updated */
         ED_area_tag_redraw(area);
       }
     }
@@ -1744,7 +1744,7 @@ static bool file_execute(bContext *C, SpaceFile *sfile)
   /* directory change */
   if (file && (file->typeflag & FILE_TYPE_DIR)) {
     if (!file->relpath) {
-      return OPERATOR_CANCELLED;
+      return false;
     }
 
     if (FILENAME_IS_PARENT(file->relpath)) {
@@ -1783,7 +1783,7 @@ static bool file_execute(bContext *C, SpaceFile *sfile)
     WM_event_fileselect_event(CTX_wm_manager(C), op, EVT_FILESELECT_EXEC);
   }
 
-  return OPERATOR_FINISHED;
+  return true;
 }
 
 static int file_exec(bContext *C, wmOperator *UNUSED(op))
@@ -2263,23 +2263,24 @@ void FILE_OT_filepath_drop(wmOperatorType *ot)
  * \{ */
 
 /**
- * Create a new, non-existing folder name, returns 1 if successful, 0 if name couldn't be created.
+ * Create a new, non-existing folder name, returns true if successful,
+ * false if name couldn't be created.
  * The actual name is returned in 'name', 'folder' contains the complete path,
  * including the new folder name.
  */
-static int new_folder_path(const char *parent, char *folder, char *name)
+static bool new_folder_path(const char *parent, char folder[FILE_MAX], char name[FILE_MAXFILE])
 {
   int i = 1;
   int len = 0;
 
   BLI_strncpy(name, "New Folder", FILE_MAXFILE);
-  BLI_join_dirfile(folder, FILE_MAX, parent, name); /* XXX, not real length */
+  BLI_join_dirfile(folder, FILE_MAX, parent, name);
   /* check whether folder with the name already exists, in this case
    * add number to the name. Check length of generated name to avoid
    * crazy case of huge number of folders each named 'New Folder (x)' */
   while (BLI_exists(folder) && (len < FILE_MAXFILE)) {
     len = BLI_snprintf(name, FILE_MAXFILE, "New Folder(%d)", i);
-    BLI_join_dirfile(folder, FILE_MAX, parent, name); /* XXX, not real length */
+    BLI_join_dirfile(folder, FILE_MAX, parent, name);
     i++;
   }
 
@@ -2627,6 +2628,43 @@ void FILE_OT_hidedot(struct wmOperatorType *ot)
   /* api callbacks */
   ot->exec = file_hidedot_exec;
   ot->poll = ED_operator_file_active; /* <- important, handler is on window level */
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Associate File Type Operator (Windows only)
+ * \{ */
+
+static int associate_blend_exec(bContext *UNUSED(C), wmOperator *op)
+{
+#ifdef WIN32
+  WM_cursor_wait(true);
+  if (BLI_windows_register_blend_extension(true)) {
+    BKE_report(op->reports, RPT_INFO, "File association registered");
+    WM_cursor_wait(false);
+    return OPERATOR_FINISHED;
+  }
+  else {
+    BKE_report(op->reports, RPT_ERROR, "Unable to register file association");
+    WM_cursor_wait(false);
+    return OPERATOR_CANCELLED;
+  }
+#else
+  BKE_report(op->reports, RPT_WARNING, "Operator Not supported");
+  return OPERATOR_CANCELLED;
+#endif
+}
+
+void FILE_OT_associate_blend(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Register File Association";
+  ot->description = "Use this installation for .blend files and to display thumbnails";
+  ot->idname = "FILE_OT_associate_blend";
+
+  /* api callbacks */
+  ot->exec = associate_blend_exec;
 }
 
 /** \} */

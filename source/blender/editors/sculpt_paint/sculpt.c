@@ -1146,10 +1146,9 @@ void SCULPT_floodfill_add_active(
       v = SCULPT_active_vertex_get(ss);
     }
     else if (radius > 0.0f) {
-      float radius_squared = (radius == FLT_MAX) ? FLT_MAX : radius * radius;
       float location[3];
       flip_v3_v3(location, SCULPT_active_vertex_co_get(ss), i);
-      v = SCULPT_nearest_vertex_get(sd, ob, location, radius_squared, false);
+      v = SCULPT_nearest_vertex_get(sd, ob, location, radius, false);
     }
 
     if (v != -1) {
@@ -1854,7 +1853,7 @@ static void flip_v3(float v[3], const ePaintSymmetryFlags symm)
   flip_v3_v3(v, v, symm);
 }
 
-static void flip_qt(float quat[3], const ePaintSymmetryFlags symm)
+static void flip_qt(float quat[4], const ePaintSymmetryFlags symm)
 {
   flip_qt_qt(quat, quat, symm);
 }
@@ -4196,7 +4195,7 @@ void SCULPT_flip_v3_by_symm_area(float v[3],
   }
 }
 
-void SCULPT_flip_quat_by_symm_area(float quat[3],
+void SCULPT_flip_quat_by_symm_area(float quat[4],
                                    const ePaintSymmetryFlags symm,
                                    const ePaintSymmetryAreas symmarea,
                                    const float pivot[3])

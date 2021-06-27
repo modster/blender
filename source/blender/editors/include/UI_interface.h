@@ -290,18 +290,14 @@ enum {
   /** Active right part of number button */
   UI_BUT_ACTIVE_RIGHT = 1 << 22,
 
-  /* (also used by search buttons to enforce shortcut display for their items). */
-  /** Button has shortcut text. */
-  UI_BUT_HAS_SHORTCUT = 1 << 23,
-
   /** Reverse order of consecutive off/on icons */
-  UI_BUT_ICON_REVERSE = 1 << 24,
+  UI_BUT_ICON_REVERSE = 1 << 23,
 
   /** Value is animated, but the current value differs from the animated one. */
-  UI_BUT_ANIMATED_CHANGED = 1 << 25,
+  UI_BUT_ANIMATED_CHANGED = 1 << 24,
 
   /* Draw the checkbox buttons inverted. */
-  UI_BUT_CHECKBOX_INVERT = 1 << 26,
+  UI_BUT_CHECKBOX_INVERT = 1 << 25,
 };
 
 /* scale fixed button widths by this to account for DPI */
@@ -322,8 +318,8 @@ typedef enum {
   UI_BUT_POIN_SHORT = 64,
   UI_BUT_POIN_INT = 96,
   UI_BUT_POIN_FLOAT = 128,
-  /*  UI_BUT_POIN_FUNCTION = 192, */ /*UNUSED*/
-  UI_BUT_POIN_BIT = 256,             /* OR'd with a bit index*/
+  // UI_BUT_POIN_FUNCTION = 192, /* UNUSED */
+  UI_BUT_POIN_BIT = 256, /* OR'd with a bit index. */
 } eButPointerType;
 
 /* requires (but->poin != NULL) */
@@ -390,6 +386,7 @@ typedef enum {
   /** Resize handle (resize uilist). */
   UI_BTYPE_GRIP = 57 << 9,
   UI_BTYPE_DECORATOR = 58 << 9,
+  UI_BTYPE_DATASETROW = 59 << 9,
 } eButType;
 
 #define BUTTYPE (63 << 9)
@@ -520,7 +517,7 @@ typedef struct ARegion *(*uiButSearchTooltipFn)(struct bContext *C,
 
 /* Must return allocated string. */
 typedef char *(*uiButToolTipFunc)(struct bContext *C, void *argN, const char *tip);
-typedef int (*uiButPushedStateFunc)(struct bContext *C, void *arg);
+typedef int (*uiButPushedStateFunc)(struct uiBut *but, const void *arg);
 
 typedef void (*uiBlockHandleFunc)(struct bContext *C, void *arg, int event);
 
@@ -723,6 +720,7 @@ void UI_but_drag_set_asset(uiBut *but,
                            const char *name,
                            const char *path,
                            int id_type,
+                           int import_type, /* eFileAssetImportType */
                            int icon,
                            struct ImBuf *imb,
                            float scale);
@@ -1615,6 +1613,13 @@ int UI_searchbox_size_x(void);
 /* check if a string is in an existing search box */
 int UI_search_items_find_index(uiSearchItems *items, const char *name);
 
+void UI_but_hint_drawstr_set(uiBut *but, const char *string);
+void UI_but_datasetrow_indentation_set(uiBut *but, int indentation);
+void UI_but_datasetrow_component_set(uiBut *but, uint8_t geometry_component_type);
+void UI_but_datasetrow_domain_set(uiBut *but, uint8_t attribute_domain);
+uint8_t UI_but_datasetrow_component_get(uiBut *but);
+uint8_t UI_but_datasetrow_domain_get(uiBut *but);
+
 void UI_but_node_link_set(uiBut *but, struct bNodeSocket *socket, const float draw_color[4]);
 
 void UI_but_number_step_size_set(uiBut *but, float step_size);
@@ -1653,7 +1658,7 @@ void UI_but_focus_on_enter_event(struct wmWindow *win, uiBut *but);
 
 void UI_but_func_hold_set(uiBut *but, uiButHandleHoldFunc func, void *argN);
 
-void UI_but_func_pushed_state_set(uiBut *but, uiButPushedStateFunc func, void *arg);
+void UI_but_func_pushed_state_set(uiBut *but, uiButPushedStateFunc func, const void *arg);
 
 struct PointerRNA *UI_but_extra_operator_icon_add(uiBut *but,
                                                   const char *opname,

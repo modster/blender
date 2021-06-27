@@ -3747,8 +3747,8 @@ static void subdividenurb(Object *obedit, View3D *v3d, int number_cuts)
           }
 
           if (sel) { /* U ! */
-            /* Inserting U points is sort of 'default' Flat curves only get */
-            /* U points inserted in them.                                   */
+            /* Inserting U points is sort of 'default' Flat curves only get
+             * U points inserted in them. */
             bpn = bpnew = MEM_mallocN((sel + nu->pntsu) * nu->pntsv * sizeof(BPoint),
                                       "subdivideNurb4");
             bp = nu->bp;
@@ -3786,7 +3786,7 @@ static void subdividenurb(Object *obedit, View3D *v3d, int number_cuts)
       MEM_freeN(usel);
       MEM_freeN(vsel);
 
-    } /* End of 'if (nu->type == CU_NURBS)'  */
+    } /* End of `if (nu->type == CU_NURBS)`. */
   }
 }
 
@@ -6646,7 +6646,7 @@ void CURVE_OT_dissolve_verts(wmOperatorType *ot)
 
 static bool nurb_bezt_flag_any(const Nurb *nu, const char flag_test)
 {
-  BezTriple *bezt = nu->bezt;
+  const BezTriple *bezt;
   int i;
 
   for (i = nu->pntsu, bezt = nu->bezt; i--; bezt++) {

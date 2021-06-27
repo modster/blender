@@ -565,7 +565,7 @@ bool ED_gpencil_layer_has_selected_stroke(const bGPDlayer *gpl, const bool is_mu
         return true;
       }
     }
-    /* If not multiedit, exit loop. */
+    /* If not multi-edit, exit loop. */
     if (!is_multiedit) {
       break;
     }
@@ -680,7 +680,7 @@ void gpencil_point_conversion_init(bContext *C, GP_SpaceConversion *r_gsc)
     view3d_operator_needs_opengl(C);
 
     view3d_region_operator_needs_opengl(win, region);
-    ED_view3d_depth_override(depsgraph, region, v3d, NULL, V3D_DEPTH_NO_GPENCIL, false);
+    ED_view3d_depth_override(depsgraph, region, v3d, NULL, V3D_DEPTH_NO_GPENCIL, NULL);
 
     /* for camera view set the subrect */
     if (rv3d->persp == RV3D_CAMOB) {
@@ -1276,6 +1276,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
     }
     else {
       /* Geometry - Snap to surfaces of visible geometry */
+      float ray_start[3];
       float ray_normal[3];
       /* magic value for initial depth copied from the default
        * value of Python's Scene.ray_cast function
@@ -1284,14 +1285,17 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
       float location[3] = {0.0f, 0.0f, 0.0f};
       float normal[3] = {0.0f, 0.0f, 0.0f};
 
-      ED_view3d_win_to_vector(region, xy, &ray_normal[0]);
       BLI_assert(gps->flag & GP_STROKE_3DSPACE);
+      BLI_assert(gsc->area && gsc->area->spacetype == SPACE_VIEW3D);
+      const View3D *v3d = gsc->area->spacedata.first;
+      ED_view3d_win_to_ray_clipped(
+          depsgraph, region, v3d, xy, &ray_start[0], &ray_normal[0], true);
       if (ED_transform_snap_object_project_ray(sctx,
                                                depsgraph,
                                                &(const struct SnapObjectParams){
                                                    .snap_select = SNAP_ALL,
                                                },
-                                               &pt2.x,
+                                               &ray_start[0],
                                                &ray_normal[0],
                                                &depth,
                                                &location[0],
@@ -1636,7 +1640,7 @@ void ED_gpencil_vgroup_assign(bContext *C, Object *ob, float weight)
         }
       }
 
-      /* if not multiedit, exit loop*/
+      /* If not multi-edit, exit loop. */
       if (!is_multiedit) {
         break;
       }
@@ -1689,7 +1693,7 @@ void ED_gpencil_vgroup_remove(bContext *C, Object *ob)
         }
       }
 
-      /* if not multiedit, exit loop*/
+      /* If not multi-edit, exit loop. */
       if (!is_multiedit) {
         break;
       }
@@ -1744,7 +1748,7 @@ void ED_gpencil_vgroup_select(bContext *C, Object *ob)
         }
       }
 
-      /* if not multiedit, exit loop*/
+      /* If not multi-edit, exit loop. */
       if (!is_multiedit) {
         break;
       }
@@ -1794,7 +1798,7 @@ void ED_gpencil_vgroup_deselect(bContext *C, Object *ob)
         }
       }
 
-      /* if not multiedit, exit loop*/
+      /* If not multi-edit, exit loop. */
       if (!is_multiedit) {
         break;
       }
@@ -2211,7 +2215,7 @@ void ED_gpencil_tpoint_to_point(ARegion *region,
 void ED_gpencil_update_color_uv(Main *bmain, Material *mat)
 {
   Material *gps_ma = NULL;
-  /* read all strokes  */
+  /* Read all strokes. */
   for (Object *ob = bmain->objects.first; ob; ob = ob->id.next) {
     if (ob->type == OB_GPENCIL) {
       bGPdata *gpd = ob->data;
@@ -2474,7 +2478,7 @@ int ED_gpencil_select_stroke_segment(bGPdata *gpd,
     return 0;
   }
 
-  /* convert all gps points to 2d and save in a hash to avoid recalculation  */
+  /* Convert all gps points to 2d and save in a hash to avoid recalculation. */
   int direction = 0;
   float(*points2d)[2] = MEM_mallocN(sizeof(*points2d) * gps->totpoints,
                                     "GP Stroke temp 2d points");
@@ -3298,7 +3302,7 @@ bGPDstroke *ED_gpencil_stroke_nearest_to_ends(bContext *C,
   return gps_rtn;
 }
 
-/* Join two stroke using a contact point index and trimming the rest.  */
+/* Join two stroke using a contact point index and trimming the rest. */
 bGPDstroke *ED_gpencil_stroke_join_and_trim(
     bGPdata *gpd, bGPDframe *gpf, bGPDstroke *gps, bGPDstroke *gps_dst, const int pt_index)
 {

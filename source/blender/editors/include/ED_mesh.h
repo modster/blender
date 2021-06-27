@@ -36,6 +36,7 @@ struct BMFace;
 struct BMLoop;
 struct BMVert;
 struct BMesh;
+struct BMeshNormalsUpdate_Params;
 struct Base;
 struct Depsgraph;
 struct ID;
@@ -76,6 +77,8 @@ struct BMFace *EDBM_verts_mirror_get_face(struct BMEditMesh *em, struct BMFace *
 void EDBM_verts_mirror_cache_clear(struct BMEditMesh *em, struct BMVert *v);
 void EDBM_verts_mirror_cache_end(struct BMEditMesh *em);
 
+void EDBM_mesh_normals_update_ex(struct BMEditMesh *em,
+                                 const struct BMeshNormalsUpdate_Params *params);
 void EDBM_mesh_normals_update(struct BMEditMesh *em);
 void EDBM_mesh_clear(struct BMEditMesh *em);
 
@@ -88,7 +91,7 @@ void EDBM_mesh_load(struct Main *bmain, struct Object *ob);
 /* flushes based on the current select mode.  if in vertex select mode,
  * verts select/deselect edges and faces, if in edge select mode,
  * edges select/deselect faces and vertices, and in face select mode faces select/deselect
- * edges and vertices.*/
+ * edges and vertices. */
 void EDBM_select_more(struct BMEditMesh *em, const bool use_face_step);
 void EDBM_select_less(struct BMEditMesh *em, const bool use_face_step);
 
@@ -103,7 +106,14 @@ bool EDBM_vert_color_check(struct BMEditMesh *em);
 bool EDBM_mesh_hide(struct BMEditMesh *em, bool swap);
 bool EDBM_mesh_reveal(struct BMEditMesh *em, bool select);
 
-void EDBM_update_generic(struct Mesh *me, const bool do_tessellation, const bool is_destructive);
+struct EDBMUpdate_Params {
+  uint calc_looptri : 1;
+  uint calc_normals : 1;
+  uint is_destructive : 1;
+};
+
+void EDBM_update(struct Mesh *me, const struct EDBMUpdate_Params *params);
+void EDBM_update_extern(struct Mesh *me, const bool do_tessellation, const bool is_destructive);
 
 struct UvElementMap *BM_uv_element_map_create(struct BMesh *bm,
                                               const struct Scene *scene,
@@ -471,9 +481,8 @@ int ED_mesh_mirror_spatial_table_lookup(struct Object *ob,
 void ED_mesh_mirror_topo_table_begin(struct Object *ob, struct Mesh *me_eval);
 void ED_mesh_mirror_topo_table_end(struct Object *ob);
 
-/* retrieves mirrored cache vert, or NULL if there isn't one.
- * note: calling this without ensuring the mirror cache state
- * is bad.*/
+/* Retrieves mirrored cache vert, or NULL if there isn't one.
+ * NOTE: calling this without ensuring the mirror cache state is bad. */
 int mesh_get_x_mirror_vert(struct Object *ob,
                            struct Mesh *me_eval,
                            int index,

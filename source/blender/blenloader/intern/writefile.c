@@ -100,6 +100,7 @@
 
 #include "BLI_bitmap.h"
 #include "BLI_blenlib.h"
+#include "BLI_endian_defines.h"
 #include "BLI_mempool.h"
 #include "MEM_guardedalloc.h" /* MEM_freeN */
 
@@ -261,7 +262,7 @@ typedef struct {
   size_t write_len;
 #endif
 
-  /** Set on unlikely case of an error (ignores further file writing).  */
+  /** Set on unlikely case of an error (ignores further file writing). */
   bool error;
 
   /** #MemFile writing (used for undo). */
@@ -604,7 +605,7 @@ static void writelist_id(WriteData *wd, int filecode, const char *structname, co
  * \{ */
 
 /**
- * Take care using 'use_active_win', since we wont want the currently active window
+ * Take care using 'use_active_win', since we won't want the currently active window
  * to change which scene renders (currently only used for undo).
  */
 static void current_screen_compat(Main *mainvar,

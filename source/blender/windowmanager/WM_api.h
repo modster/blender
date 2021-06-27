@@ -190,6 +190,7 @@ struct wmWindow *WM_window_open(struct bContext *C,
                                 int sizex,
                                 int sizey,
                                 int space_type,
+                                bool toplevel,
                                 bool dialog,
                                 bool temp,
                                 WindowAlignment alignment);
@@ -205,6 +206,13 @@ void WM_autosave_init(struct wmWindowManager *wm);
 bool WM_recover_last_session(struct bContext *C, struct ReportList *reports);
 void WM_file_tag_modified(void);
 
+struct ID *WM_file_link_datablock(struct Main *bmain,
+                                  struct Scene *scene,
+                                  struct ViewLayer *view_layer,
+                                  struct View3D *v3d,
+                                  const char *filepath,
+                                  const short id_code,
+                                  const char *id_name);
 struct ID *WM_file_append_datablock(struct Main *bmain,
                                     struct Scene *scene,
                                     struct ViewLayer *view_layer,
@@ -991,9 +999,9 @@ void WM_xr_action_binding_destroy(wmXrData *xr,
                                   unsigned int count_interaction_paths,
                                   const char **interaction_paths);
 
-bool WM_xr_active_action_set_set(
-    wmXrData *xr, const char *action_set_name); /* If action_set_name is NULL, then
-                                                 * all action sets will be treated as active. */
+/* If action_set_name is NULL, then all action sets will be treated as active. */
+bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name);
+
 bool WM_xr_controller_pose_action_set(wmXrData *xr,
                                       const char *action_set_name,
                                       const char *action_name);

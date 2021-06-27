@@ -161,7 +161,7 @@ class Vector {
   }
 
   /**
-   * Create a vector from an array ref. The values in the vector are copy constructed.
+   * Create a vector from a span. The values in the vector are copy constructed.
    */
   template<typename U, typename std::enable_if_t<std::is_convertible_v<U, T>> * = nullptr>
   Vector(Span<U> values, Allocator allocator = {}) : Vector(NoExceptConstructor(), allocator)
@@ -963,7 +963,7 @@ class Vector {
     }
 
     /* At least double the size of the previous allocation. Otherwise consecutive calls to grow can
-     * cause a reallocation every time even though min_capacity only increments.  */
+     * cause a reallocation every time even though min_capacity only increments. */
     const int64_t min_new_capacity = this->capacity() * 2;
 
     const int64_t new_capacity = std::max(min_capacity, min_new_capacity);

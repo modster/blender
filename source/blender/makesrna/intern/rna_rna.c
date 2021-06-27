@@ -36,7 +36,7 @@
 /** \name Generic Enum's
  * \{ */
 
-/* Reuse for dynamic types  */
+/* Reuse for dynamic types. */
 const EnumPropertyItem DummyRNA_NULL_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
@@ -81,7 +81,16 @@ const EnumPropertyItem rna_enum_property_subtype_items[] = {
     {PROP_PERCENTAGE, "PERCENTAGE", 0, "Percentage", ""},
     {PROP_FACTOR, "FACTOR", 0, "Factor", ""},
     {PROP_ANGLE, "ANGLE", 0, "Angle", ""},
-    {PROP_TIME, "TIME", 0, "Time", ""},
+    {PROP_TIME,
+     "TIME",
+     0,
+     "Time (Scene Relative)",
+     "Time specified in frames, converted to seconds based on scene frame rate"},
+    {PROP_TIME_ABSOLUTE,
+     "TIME_ABSOLUTE",
+     0,
+     "Time (Absolute)",
+     "Time specified in seconds, independent of the scene"},
     {PROP_DISTANCE, "DISTANCE", 0, "Distance", ""},
     {PROP_DISTANCE_CAMERA, "DISTANCE_CAMERA", 0, "Camera Distance", ""},
     {PROP_POWER, "POWER", 0, "Power", ""},
@@ -942,7 +951,7 @@ static int rna_enum_check_separator(CollectionPropertyIterator *UNUSED(iter), vo
 static void rna_EnumProperty_items_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
 {
   PropertyRNA *prop = (PropertyRNA *)ptr->data;
-  /* EnumPropertyRNA *eprop;  */ /* UNUSED */
+  /* EnumPropertyRNA *eprop; */ /* UNUSED */
   const EnumPropertyItem *item = NULL;
   int totitem;
   bool free;
@@ -2957,7 +2966,7 @@ static void rna_def_function(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Description", "Description of the Function's purpose");
 
   prop = RNA_def_property(srna, "parameters", PROP_COLLECTION, PROP_NONE);
-  /*RNA_def_property_clear_flag(prop, PROP_EDITABLE);*/
+  // RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_struct_type(prop, "Property");
   RNA_def_property_collection_funcs(prop,
                                     "rna_Function_parameters_begin",
@@ -3261,7 +3270,7 @@ void RNA_def_rna(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
-  /* Struct*/
+  /* Struct */
   rna_def_struct(brna);
 
   /* Property */

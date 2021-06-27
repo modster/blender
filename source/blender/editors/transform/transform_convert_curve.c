@@ -278,7 +278,7 @@ void createTransCurveVerts(TransInfo *t)
               td->ext = NULL;
 
               /* TODO - make points scale */
-              if (t->mode == TFM_CURVE_SHRINKFATTEN) { /* || t->mode==TFM_RESIZE) {*/
+              if (t->mode == TFM_CURVE_SHRINKFATTEN /* `|| t->mode == TFM_RESIZE` */) {
                 td->val = &(bezt->radius);
                 td->ival = bezt->radius;
               }
@@ -449,11 +449,11 @@ void recalcData_curve(TransInfo *t)
     ListBase *nurbs = BKE_curve_editNurbs_get(cu);
     Nurb *nu = nurbs->first;
 
-    DEG_id_tag_update(tc->obedit->data, 0); /* sets recalc flags */
+    DEG_id_tag_update(tc->obedit->data, ID_RECALC_GEOMETRY);
 
     if (t->state == TRANS_CANCEL) {
       while (nu) {
-        /* Cant do testhandlesNurb here, it messes up the h1 and h2 flags */
+        /* Can't do testhandlesNurb here, it messes up the h1 and h2 flags */
         BKE_nurb_handles_calc(nu);
         nu = nu->next;
       }

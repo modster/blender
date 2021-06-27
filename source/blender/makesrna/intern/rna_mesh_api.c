@@ -172,7 +172,7 @@ static void rna_Mesh_normals_split_custom_set_from_vertices(Mesh *mesh,
   DEG_id_tag_update(&mesh->id, 0);
 }
 
-static void rna_Mesh_transform(Mesh *mesh, float *mat, bool shape_keys)
+static void rna_Mesh_transform(Mesh *mesh, float mat[16], bool shape_keys)
 {
   BKE_mesh_transform(mesh, (float(*)[4])mat, shape_keys);
 
@@ -208,7 +208,7 @@ static void rna_Mesh_clear_geometry(Mesh *mesh)
 {
   BKE_mesh_clear_geometry(mesh);
 
-  DEG_id_tag_update(&mesh->id, ID_RECALC_GEOMETRY);
+  DEG_id_tag_update(&mesh->id, ID_RECALC_GEOMETRY_ALL_MODES);
   WM_main_add_notifier(NC_GEOM | ND_DATA, mesh);
 }
 

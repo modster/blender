@@ -1309,7 +1309,7 @@ void calchandles_fcurve_ex(FCurve *fcu, eBezTriple_Flag handle_sel_flag)
    * - Need bezier keys.
    * - Only bezier-interpolation has handles (for now).
    */
-  if (ELEM(NULL, fcu, fcu->bezt) || (a < 2) /*|| ELEM(fcu->ipo, BEZT_IPO_CONST, BEZT_IPO_LIN)*/) {
+  if (ELEM(NULL, fcu, fcu->bezt) || (a < 2) /*|| ELEM(fcu->ipo, BEZT_IPO_CONST, BEZT_IPO_LIN) */) {
     return;
   }
 
@@ -1559,8 +1559,7 @@ void BKE_fcurve_correct_bezpart(const float v1[2], float v2[2], float v3[2], con
 }
 
 /**
-   .
- * Find roots of cubic equation (c0 x³ + c1 x² + c2 x + c3)
+ * Find roots of cubic equation (c0 x^3 + c1 x^2 + c2 x + c3)
  * \return number of roots in `o`.
  *
  * \note it is up to the caller to allocate enough memory for `o`.
@@ -2323,7 +2322,7 @@ void BKE_fmodifiers_blend_write(BlendWriter *writer, ListBase *fmodifiers)
           FMod_Python *data = fcm->data;
 
           /* Write ID Properties -- and copy this comment EXACTLY for easy finding
-           * of library blocks that implement this.*/
+           * of library blocks that implement this. */
           IDP_BlendWrite(writer, data->prop);
 
           break;

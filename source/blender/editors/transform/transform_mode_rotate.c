@@ -194,7 +194,7 @@ static void applyRotation(TransInfo *t, const int UNUSED(mval[2]))
 {
   char str[UI_MAX_DRAW_STR];
   float axis_final[3];
-  float final = t->values[0];
+  float final = t->values[0] + t->values_modal_offset[0];
 
   if ((t->con.mode & CON_APPLY) && t->con.applyRot) {
     t->con.applyRot(t, NULL, NULL, axis_final, &final);
@@ -217,7 +217,7 @@ static void applyRotation(TransInfo *t, const int UNUSED(mval[2]))
 
   t->values_final[0] = final;
 
-  headerRotation(t, str, final);
+  headerRotation(t, str, sizeof(str), final);
 
   const bool is_large_rotation = hasNumInput(&t->num);
   applyRotationValue(t, final, axis_final, is_large_rotation);

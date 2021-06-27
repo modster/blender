@@ -611,9 +611,7 @@ static bool ed_preview_draw_rect(ScrArea *area, int split, int first, rcti *rect
         float fy = rect->ymin;
 
         /* material preview only needs monoscopy (view 0) */
-        if (re) {
-          RE_AcquiredResultGet32(re, &rres, (uint *)rect_byte, 0);
-        }
+        RE_AcquiredResultGet32(re, &rres, (uint *)rect_byte, 0);
 
         IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
         immDrawPixelsTex(
@@ -957,7 +955,7 @@ static void shader_preview_texture(ShaderPreview *sp, Tex *tex, Scene *sce, Rend
     for (int x = 0; x < width; x++) {
       tex_coord[0] = ((float)x / (float)height) * 2.0f - 1.0f;
 
-      /* Evaluate texture at tex_coord .*/
+      /* Evaluate texture at tex_coord. */
       TexResult texres = {0};
       BKE_texture_get_value_ex(sce, tex, tex_coord, &texres, img_pool, color_manage);
 

@@ -47,6 +47,7 @@
 #endif
 
 #include "GPU_buffers.h"
+#include "GPU_capabilities.h"
 #include "GPU_material.h"
 #include "GPU_uniform_buffer.h"
 
@@ -446,6 +447,19 @@ void DRW_shgroup_uniform_vec4_array_copy(DRWShadingGroup *shgroup,
   }
 }
 
+void DRW_shgroup_vertex_buffer(DRWShadingGroup *shgroup,
+                               const char *name,
+                               GPUVertBuf *vertex_buffer)
+{
+  int location = GPU_shader_get_ssbo(shgroup->shader, name);
+  if (location == -1) {
+    BLI_assert(false && "Unable to locate binding of shader storage buffer objects.");
+    return;
+  }
+  drw_shgroup_uniform_create_ex(
+      shgroup, location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE, vertex_buffer, 0, 0, 1);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -700,6 +714,17 @@ static void drw_command_draw_intance_range(
   cmd->inst_count = count;
 }
 
+static void drw_command_compute(DRWShadingGroup *shgroup,
+                                int groups_x_len,
+                                int groups_y_len,
+                                int groups_z_len)
+{
+  DRWCommandCompute *cmd = drw_command_create(shgroup, DRW_CMD_COMPUTE);
+  cmd->groups_x_len = groups_x_len;
+  cmd->groups_y_len = groups_y_len;
+  cmd->groups_z_len = groups_z_len;
+}
+
 static void drw_command_draw_procedural(DRWShadingGroup *shgroup,
                                         GPUBatch *batch,
                                         DRWResourceHandle handle,
@@ -813,6 +838,17 @@ void DRW_shgroup_call_instance_range(
   }
   DRWResourceHandle handle = drw_resource_handle(shgroup, ob ? ob->obmat : NULL, ob);
   drw_command_draw_intance_range(shgroup, geom, handle, i_sta, i_ct);
+}
+
+void DRW_shgroup_call_compute(DRWShadingGroup *shgroup,
+                              int groups_x_len,
+                              int groups_y_len,
+                              int groups_z_len)
+{
+  BLI_assert(groups_x_len > 0 && groups_y_len > 0 && groups_z_len > 0);
+  BLI_assert(GPU_compute_shader_support());
+
+  drw_command_compute(shgroup, groups_x_len, groups_y_len, groups_z_len);
 }
 
 static void drw_shgroup_call_procedural_add_ex(DRWShadingGroup *shgroup,
@@ -1536,8 +1572,8 @@ static void draw_frustum_culling_planes_calc(const float (*persmat)[4], float (*
   planes_from_projmat(persmat,
                       frustum_planes[0],
                       frustum_planes[5],
-                      frustum_planes[3],
                       frustum_planes[1],
+                      frustum_planes[3],
                       frustum_planes[4],
                       frustum_planes[2]);
 
@@ -2081,8 +2117,8 @@ void DRW_pass_sort_shgroup_z(DRWPass *pass)
         }
       }
     }
-    /* To be sorted a shgroup needs to have at least one draw command.  */
-    /* FIXME(fclem) In some case, we can still have empty shading group to sort. However their
+    /* To be sorted a shgroup needs to have at least one draw command. */
+    /* FIXME(fclem): In some case, we can still have empty shading group to sort. However their
      * final order is not well defined.
      * (see T76730 & D7729). */
     // BLI_assert(handle != 0);

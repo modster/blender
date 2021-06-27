@@ -421,10 +421,10 @@ void BMO_slot_mat_set(BMOperator *op,
   slot->data.p = BLI_memarena_alloc(op->arena, sizeof(float[4][4]));
 
   if (size == 4) {
-    copy_m4_m4(slot->data.p, (float(*)[4])mat);
+    copy_m4_m4(slot->data.p, (const float(*)[4])mat);
   }
   else if (size == 3) {
-    copy_m4_m3(slot->data.p, (float(*)[3])mat);
+    copy_m4_m3(slot->data.p, (const float(*)[3])mat);
   }
   else {
     fprintf(stderr, "%s: invalid size argument %d (bmesh internal error)\n", __func__, size);
@@ -1293,7 +1293,7 @@ static void bmo_flag_layer_alloc(BMesh *bm)
   bm->ftoolflagpool = BLI_mempool_create(
       sizeof(BMFlagLayer) * bm->totflags, bm->totface, 512, BLI_MEMPOOL_NOP);
 
-  /* now go through and memcpy all the flags. Loops don't get a flag layer at this time.. */
+  /* now go through and memcpy all the flags. Loops don't get a flag layer at this time. */
   BMIter iter;
   int i;
 
@@ -1346,7 +1346,7 @@ static void bmo_flag_layer_free(BMesh *bm)
   /* store memcpy size for reuse */
   const size_t new_totflags_size = ((bm->totflags - 1) * sizeof(BMFlagLayer));
 
-  /* de-increment the totflags first.. */
+  /* de-increment the totflags first. */
   bm->totflags--;
 
   bm->vtoolflagpool = BLI_mempool_create(new_totflags_size, bm->totvert, 512, BLI_MEMPOOL_NOP);

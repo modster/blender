@@ -524,7 +524,7 @@ void constraintSizeLim(TransInfo *t, TransData *td)
 /** \name Transform (Rotation Utils)
  * \{ */
 /* Used by Transform Rotation and Transform Normal Rotation */
-void headerRotation(TransInfo *t, char str[UI_MAX_DRAW_STR], float final)
+void headerRotation(TransInfo *t, char *str, const int str_size, float final)
 {
   size_t ofs = 0;
 
@@ -533,25 +533,21 @@ void headerRotation(TransInfo *t, char str[UI_MAX_DRAW_STR], float final)
 
     outputNumInput(&(t->num), c, &t->scene->unit);
 
-    ofs += BLI_snprintf(str + ofs,
-                        UI_MAX_DRAW_STR - ofs,
-                        TIP_("Rotation: %s %s %s"),
-                        &c[0],
-                        t->con.text,
-                        t->proptext);
+    ofs += BLI_snprintf_rlen(
+        str + ofs, str_size - ofs, TIP_("Rotation: %s %s %s"), &c[0], t->con.text, t->proptext);
   }
   else {
-    ofs += BLI_snprintf(str + ofs,
-                        UI_MAX_DRAW_STR - ofs,
-                        TIP_("Rotation: %.2f%s %s"),
-                        RAD2DEGF(final),
-                        t->con.text,
-                        t->proptext);
+    ofs += BLI_snprintf_rlen(str + ofs,
+                             str_size - ofs,
+                             TIP_("Rotation: %.2f%s %s"),
+                             RAD2DEGF(final),
+                             t->con.text,
+                             t->proptext);
   }
 
   if (t->flag & T_PROP_EDIT_ALL) {
-    ofs += BLI_snprintf(
-        str + ofs, UI_MAX_DRAW_STR - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
+    ofs += BLI_snprintf_rlen(
+        str + ofs, str_size - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
   }
 }
 
@@ -738,9 +734,25 @@ void ElementRotation_ex(TransInfo *t,
         /* can be called for texture space translate for example, then opt out */
         if (td->ext->quat) {
           mul_m3_series(fmat, td->smtx, mat, td->mtx);
+
+          if (!is_zero_v3(td->ext->dquat)) {
+            /* Correct for delta quat */
+            float tmp_mat[3][3];
+            quat_to_mat3(tmp_mat, td->ext->dquat);
+            mul_m3_m3m3(fmat, fmat, tmp_mat);
+          }
+
           mat3_to_quat(quat, fmat); /* Actual transform */
 
+          if (!is_zero_v4(td->ext->dquat)) {
+            /* Correct back for delta quat. */
+            float idquat[4];
+            invert_qt_qt_normalized(idquat, td->ext->dquat);
+            mul_qt_qtqt(quat, idquat, quat);
+          }
+
           mul_qt_qtqt(td->ext->quat, quat, td->ext->iquat);
+
           /* this function works on end result */
           protectedQuaternionBits(td->protectflag, td->ext->quat, td->ext->iquat);
         }
@@ -765,21 +777,28 @@ void ElementRotation_ex(TransInfo *t,
                                td->ext->irotAngle);
       }
       else {
+        /* Calculate the total rotation in eulers. */
         float obmat[3][3];
 
         mul_m3_m3m3(totmat, mat, td->mtx);
         mul_m3_m3m3(smat, td->smtx, totmat);
 
-        /* Calculate the total rotation in eulers. */
-        add_v3_v3v3(eul, td->ext->irot, td->ext->drot); /* correct for delta rot */
-        eulO_to_mat3(obmat, eul, td->ext->rotOrder);
-        /* mat = transform, obmat = object rotation */
-        mul_m3_m3m3(fmat, smat, obmat);
+        if (!is_zero_v3(td->ext->drot)) {
+          /* Correct for delta rot */
+          add_eul_euleul(eul, td->ext->irot, td->ext->drot, td->ext->rotOrder);
+        }
+        else {
+          copy_v3_v3(eul, td->ext->irot);
+        }
 
+        eulO_to_mat3(obmat, eul, td->ext->rotOrder);
+        mul_m3_m3m3(fmat, smat, obmat);
         mat3_to_compatible_eulO(eul, td->ext->rot, td->ext->rotOrder, fmat);
 
-        /* correct back for delta rot */
-        sub_v3_v3v3(eul, eul, td->ext->drot);
+        if (!is_zero_v3(td->ext->drot)) {
+          /* Correct back for delta rot. */
+          sub_eul_euleul(eul, eul, td->ext->drot, td->ext->rotOrder);
+        }
 
         /* and apply */
         protectedRotateBits(td->protectflag, eul, td->ext->irot);
@@ -811,7 +830,7 @@ void ElementRotation(
 /* -------------------------------------------------------------------- */
 /** \name Transform (Resize Utils)
  * \{ */
-void headerResize(TransInfo *t, const float vec[3], char str[UI_MAX_DRAW_STR])
+void headerResize(TransInfo *t, const float vec[3], char *str, const int str_size)
 {
   char tvec[NUM_STR_REP_LEN * 3];
   size_t ofs = 0;
@@ -827,59 +846,55 @@ void headerResize(TransInfo *t, const float vec[3], char str[UI_MAX_DRAW_STR])
   if (t->con.mode & CON_APPLY) {
     switch (t->num.idx_max) {
       case 0:
-        ofs += BLI_snprintf(str + ofs,
-                            UI_MAX_DRAW_STR - ofs,
-                            TIP_("Scale: %s%s %s"),
-                            &tvec[0],
-                            t->con.text,
-                            t->proptext);
+        ofs += BLI_snprintf_rlen(
+            str + ofs, str_size - ofs, TIP_("Scale: %s%s %s"), &tvec[0], t->con.text, t->proptext);
         break;
       case 1:
-        ofs += BLI_snprintf(str + ofs,
-                            UI_MAX_DRAW_STR - ofs,
-                            TIP_("Scale: %s : %s%s %s"),
-                            &tvec[0],
-                            &tvec[NUM_STR_REP_LEN],
-                            t->con.text,
-                            t->proptext);
+        ofs += BLI_snprintf_rlen(str + ofs,
+                                 str_size - ofs,
+                                 TIP_("Scale: %s : %s%s %s"),
+                                 &tvec[0],
+                                 &tvec[NUM_STR_REP_LEN],
+                                 t->con.text,
+                                 t->proptext);
         break;
       case 2:
-        ofs += BLI_snprintf(str + ofs,
-                            UI_MAX_DRAW_STR - ofs,
-                            TIP_("Scale: %s : %s : %s%s %s"),
-                            &tvec[0],
-                            &tvec[NUM_STR_REP_LEN],
-                            &tvec[NUM_STR_REP_LEN * 2],
-                            t->con.text,
-                            t->proptext);
+        ofs += BLI_snprintf_rlen(str + ofs,
+                                 str_size - ofs,
+                                 TIP_("Scale: %s : %s : %s%s %s"),
+                                 &tvec[0],
+                                 &tvec[NUM_STR_REP_LEN],
+                                 &tvec[NUM_STR_REP_LEN * 2],
+                                 t->con.text,
+                                 t->proptext);
         break;
     }
   }
   else {
     if (t->flag & T_2D_EDIT) {
-      ofs += BLI_snprintf(str + ofs,
-                          UI_MAX_DRAW_STR - ofs,
-                          TIP_("Scale X: %s   Y: %s%s %s"),
-                          &tvec[0],
-                          &tvec[NUM_STR_REP_LEN],
-                          t->con.text,
-                          t->proptext);
+      ofs += BLI_snprintf_rlen(str + ofs,
+                               str_size - ofs,
+                               TIP_("Scale X: %s   Y: %s%s %s"),
+                               &tvec[0],
+                               &tvec[NUM_STR_REP_LEN],
+                               t->con.text,
+                               t->proptext);
     }
     else {
-      ofs += BLI_snprintf(str + ofs,
-                          UI_MAX_DRAW_STR - ofs,
-                          TIP_("Scale X: %s   Y: %s  Z: %s%s %s"),
-                          &tvec[0],
-                          &tvec[NUM_STR_REP_LEN],
-                          &tvec[NUM_STR_REP_LEN * 2],
-                          t->con.text,
-                          t->proptext);
+      ofs += BLI_snprintf_rlen(str + ofs,
+                               str_size - ofs,
+                               TIP_("Scale X: %s   Y: %s  Z: %s%s %s"),
+                               &tvec[0],
+                               &tvec[NUM_STR_REP_LEN],
+                               &tvec[NUM_STR_REP_LEN * 2],
+                               t->con.text,
+                               t->proptext);
     }
   }
 
   if (t->flag & T_PROP_EDIT_ALL) {
-    ofs += BLI_snprintf(
-        str + ofs, UI_MAX_DRAW_STR - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
+    ofs += BLI_snprintf_rlen(
+        str + ofs, str_size - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
   }
 }
 

@@ -347,7 +347,7 @@ static int mesh_bisect_exec(bContext *C, wmOperator *op)
       BMOperator bmop_attr;
 
       /* The fill normal sign is ignored as the face-winding is defined by surrounding faces.
-       * The normal is passed so triangle fill wont have to calculate it. */
+       * The normal is passed so triangle fill won't have to calculate it. */
       normalize_v3_v3(normal_fill, plane_no_local);
 
       /* Fill */
@@ -383,7 +383,12 @@ static int mesh_bisect_exec(bContext *C, wmOperator *op)
         bm, bmop.slots_out, "geom_cut.out", BM_VERT | BM_EDGE, BM_ELEM_SELECT, true);
 
     if (EDBM_op_finish(em, &bmop, op, true)) {
-      EDBM_update_generic(obedit->data, true, true);
+      EDBM_update(obedit->data,
+                  &(const struct EDBMUpdate_Params){
+                      .calc_looptri = true,
+                      .calc_normals = false,
+                      .is_destructive = true,
+                  });
       EDBM_selectmode_flush(em);
       ret = OPERATOR_FINISHED;
     }

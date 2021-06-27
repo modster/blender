@@ -2346,7 +2346,7 @@ void uiItemFullR(uiLayout *layout,
    * In this case we want the ability not to have an icon.
    *
    * We could pass an argument not to set the icon to begin with however this is the one case
-   * the functionality is needed.  */
+   * the functionality is needed. */
   if (but && no_icon) {
     if ((icon == ICON_NONE) && (but->icon != ICON_NONE)) {
       ui_def_but_icon_clear(but);
@@ -2860,7 +2860,7 @@ static uiBut *ui_item_menu(uiLayout *layout,
   int w = ui_text_icon_width(layout, name, icon, 1);
   const int h = UI_UNIT_Y;
 
-  if (layout->root->type == UI_LAYOUT_HEADER) { /* ugly .. */
+  if (layout->root->type == UI_LAYOUT_HEADER) { /* Ugly! */
     if (icon == ICON_NONE && force_menu) {
       /* pass */
     }
@@ -2893,7 +2893,7 @@ static uiBut *ui_item_menu(uiLayout *layout,
   }
 
   if (argN) {
-    /* ugly .. */
+    /* ugly! */
     if (arg != argN) {
       but->poin = (char *)but;
     }
@@ -4042,12 +4042,11 @@ static void ui_litem_layout_column_flow(uiLayout *litem)
   int emy = 0;
   int miny = 0;
 
-  int w = litem->w - (flow->totcol - 1) * style->columnspace;
   emh = toth / flow->totcol;
 
   /* create column per column */
   col = 0;
-  w = (litem->w - (flow->totcol - 1) * style->columnspace) / flow->totcol;
+  int w = (litem->w - (flow->totcol - 1) * style->columnspace) / flow->totcol;
   LISTBASE_FOREACH (uiItem *, item, &litem->items) {
     ui_item_size(item, &itemw, &itemh);
 
