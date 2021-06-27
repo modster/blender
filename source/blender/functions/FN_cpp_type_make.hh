@@ -20,6 +20,7 @@
  * \ingroup fn
  */
 
+#include "BLI_utildefines.h"
 #include "FN_cpp_type.hh"
 
 namespace blender::fn::cpp_type_util {
@@ -184,9 +185,25 @@ template<typename T> uint64_t hash_cb(const void *value)
 
 }  // namespace blender::fn::cpp_type_util
 
+/**
+ * Different types support different features. Features like copy constructibility can be detected
+ * automatically easily. For some features this is harder as of C++17. Those have flags in this
+ * enum and need to be determined by the programmer.
+ */
+enum class CPPTypeFlags {
+  None = 0,
+  Hashable = 1 << 0,
+  Printable = 1 << 1,
+  EqualityComparable = 1 << 2,
+
+  BasicType = Hashable | Printable | EqualityComparable,
+};
+ENUM_OPERATORS(CPPTypeFlags, CPPTypeFlags::EqualityComparable)
+
 namespace blender::fn {
 
-template<typename T> inline std::unique_ptr<const CPPType> create_cpp_type(StringRef name)
+template<typename T, CPPTypeFlags flags>
+inline std::unique_ptr<const CPPType> create_cpp_type(StringRef name)
 {
   using namespace cpp_type_util;
 
@@ -237,9 +254,15 @@ template<typename T> inline std::unique_ptr<const CPPType> create_cpp_type(Strin
   if constexpr (std::is_copy_constructible_v<T>) {
     m.fill_construct_indices = fill_construct_indices_cb<T>;
   }
-  m.debug_print = debug_print_cb<T>;
-  m.is_equal = is_equal_cb<T>;
-  m.hash = hash_cb<T>;
+  if constexpr ((bool)(flags & CPPTypeFlags::Hashable)) {
+    m.hash = hash_cb<T>;
+  }
+  if constexpr ((bool)(flags & CPPTypeFlags::Printable)) {
+    m.debug_print = debug_print_cb<T>;
+  }
+  if constexpr ((bool)(flags & CPPTypeFlags::EqualityComparable)) {
+    m.is_equal = is_equal_cb<T>;
+  }
 
   const CPPType *type = new CPPType(std::move(m));
   return std::unique_ptr<const CPPType>(type);
@@ -247,11 +270,11 @@ template<typename T> inline std::unique_ptr<const CPPType> create_cpp_type(Strin
 
 }  // namespace blender::fn
 
-#define MAKE_CPP_TYPE(IDENTIFIER, TYPE_NAME) \
+#define MAKE_CPP_TYPE(IDENTIFIER, TYPE_NAME, FLAGS) \
   template<> const blender::fn::CPPType &blender::fn::CPPType::get<TYPE_NAME>() \
   { \
-    static std::unique_ptr<const CPPType> cpp_type = blender::fn::create_cpp_type<TYPE_NAME>( \
-        STRINGIFY(IDENTIFIER)); \
+    static std::unique_ptr<const CPPType> cpp_type = \
+        blender::fn::create_cpp_type<TYPE_NAME, FLAGS>(STRINGIFY(IDENTIFIER)); \
     return *cpp_type; \
   } \
   /* Support using `CPPType::get<const T>()`. Otherwise the caller would have to remove const. */ \
