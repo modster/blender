@@ -970,7 +970,7 @@ void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshol
         angle = angle_v2v2v2(prev_eci->pos, eci->pos, next_eci->pos);
       }
       else {
-        break; /* No need to split at the last point anyway.*/
+        break; /* No need to split at the last point anyway. */
       }
       if (angle < angle_threshold_rad) {
         new_ec = lineart_chain_create(rb);
