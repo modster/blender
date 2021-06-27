@@ -1099,8 +1099,11 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   SeqRenderData context = {0};
   ImBuf *ibuf;
   bool min_size, clipped = false;
-  float aspect_ratio, image_x, image_y, cropx_min, cropx_max;
-  rctf crop;
+  float aspect_ratio, image_y, cropx_min, cropx_max;
+  rcti crop;
+
+  /* Not sending v2d directly to have Drawing and Internal code separation */
+  float cache_limits[4] = {v2d->tot.xmin, v2d->tot.xmax, v2d->cur.xmin, v2d->cur.xmax};
 
   /* if thumbs too small ignore */
   min_size = ((y2 - y1) / pixely) > 40 * U.dpi_fac;
@@ -1115,8 +1118,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.is_proxy_render = false;
   context.is_thumb = true;
 
-  ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp, v2d, &crop, clipped);
-  image_x = ibuf->x;
+  ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp, cache_limits, &crop, false);
   image_y = ibuf->y;
 
   /*Calculate thumb dimensions */
@@ -1133,7 +1135,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   x1 = seq->start;
 
   float cut_off = 0;
-  float upper_thumb_bound = seq->endstill ? seq->enddisp - seq->endstill : seq->enddisp;
+  float upper_thumb_bound = (seq->endstill) ? (seq->start + seq->len) : seq->enddisp;
 
   while (x1 < upper_thumb_bound) {
     x2 = x1 + thumb_w;
@@ -1162,7 +1164,6 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
 
     /* clip if full thumbnail cannot be displayed */
-
     if (x2 > (upper_thumb_bound)) {
       x2 = upper_thumb_bound;
       clipped = true;
@@ -1172,18 +1173,16 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 
     cropx_min = (cut_off / pixelx) / (zoom_y / pixely);
     cropx_max = ((x2 - x1) / pixelx) / (zoom_y / pixely);
-    BLI_rctf_init(&crop, cropx_min, cropx_max, 0, image_y);
+    BLI_rcti_init(&crop, (int)(cropx_min), (int)(cropx_max)-1, 0, (int)(image_y)-1);
+
     /* Get the image */
+    ibuf = SEQ_render_thumbnail(&context, seq, x1 + (int)(cut_off), cache_limits, &crop, clipped);
 
-    ibuf = SEQ_render_thumbnail(&context, seq, x1 + (int)(cut_off), v2d, &crop, clipped);
-
-    GPU_blend(GPU_BLEND_ALPHA);
     if (ibuf) {
-      ED_draw_imbuf_ctx_clipping(C, ibuf, x1, y1, false, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
+      ED_draw_imbuf_ctx_clipping(
+          C, ibuf, x1 + cut_off, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
       IMB_freeImBuf(ibuf);
     }
-
-    GPU_blend(GPU_BLEND_NONE);
 
     cut_off = 0;
     x1 = x2;
