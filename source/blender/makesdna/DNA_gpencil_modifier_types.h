@@ -873,11 +873,14 @@ typedef enum eLineartGpencilModifierSource {
   LRT_SOURCE_SCENE = 2,
 } eLineartGpencilModifierSource;
 
+/* This enum is for modifier internal state only. */
 typedef enum eLineArtGPencilModifierFlags {
-  LRT_GPENCIL_INVERT_SOURCE_VGROUP = (1 << 0),
-  LRT_GPENCIL_MATCH_OUTPUT_VGROUP = (1 << 1),
+  /* These two moved to #eLineartMainFlags to keep consistent with flag variable purpose. */
+  /* LRT_GPENCIL_INVERT_SOURCE_VGROUP = (1 << 0), */
+  /* LRT_GPENCIL_MATCH_OUTPUT_VGROUP = (1 << 1), */
   LRT_GPENCIL_BINARY_WEIGHTS = (1 << 2) /* Deprecated, this is removed for lack of use case. */,
   LRT_GPENCIL_IS_BAKED = (1 << 3),
+  LRT_GPENCIL_USE_CACHE = (1 << 4),
 } eLineArtGPencilModifierFlags;
 
 typedef enum eLineartGpencilTransparencyFlags {
@@ -885,6 +888,8 @@ typedef enum eLineartGpencilTransparencyFlags {
   /** Set to true means using "and" instead of "or" logic on mask bits. */
   LRT_GPENCIL_TRANSPARENCY_MATCH = (1 << 1),
 } eLineartGpencilTransparencyFlags;
+
+struct LineartCache;
 
 typedef struct LineartGpencilModifierData {
   GpencilModifierData modifier;
@@ -922,19 +927,27 @@ typedef struct LineartGpencilModifierData {
   /** `0..PI` angle, for splitting strokes at sharp points. */
   float angle_splitting_threshold;
 
-  /* CPU mode */
+  /* Doubles as geometry threshold when geometry space chaining is enabled */
   float chaining_image_threshold;
-
-  int _pad;
 
   /* Ported from SceneLineArt flags. */
   int calculation_flags;
 
-  /* Additional Switches. */
+  /* eLineArtGPencilModifierFlags, modifier internal state. */
   int flags;
 
-  /* Runtime only. */
-  void *render_buffer;
+  /* Runtime data. */
+
+  /* Because we can potentially only compute features lines once per modifier stack (Use Cache), we
+   * need to have these override values to ensure that we have the data we need is computed and
+   * stored in the cache. */
+  char level_start_override;
+  char level_end_override;
+  short edge_types_override;
+
+  struct LineartCache *cache;
+  /* Keep a pointer to the render buffer so we can call destroy from ModifierData. */
+  struct LineartRenderBuffer *render_buffer_ptr;
 
 } LineartGpencilModifierData;
 

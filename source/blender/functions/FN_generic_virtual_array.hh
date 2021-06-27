@@ -66,7 +66,7 @@ class GVArray {
 
   bool is_empty() const
   {
-    return size_;
+    return size_ == 0;
   }
 
   /* Copies the value at the given index into the provided storage. The `r_value` pointer is
@@ -832,7 +832,7 @@ template<typename T> class GVArray_Typed {
   }
 
   /* Support implicit cast to the typed virtual array for convenience when `varray->typed<T>()` is
-   * used within an expression.  */
+   * used within an expression. */
   operator const VArray<T> &() const
   {
     return *varray_;

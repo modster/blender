@@ -875,7 +875,7 @@ void ntreeBlendReadLib(struct BlendLibReader *reader, struct bNodeTree *ntree)
 
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     /* Link ID Properties -- and copy this comment EXACTLY for easy finding
-     * of library blocks that implement this.*/
+     * of library blocks that implement this. */
     IDP_BlendReadLib(reader, node->prop);
 
     BLO_read_id_address(reader, lib, &node->id);
@@ -2365,7 +2365,7 @@ static void nodeUnMuteLink(bNodeLink *link)
   link->tosock->flag |= SOCK_IN_USE;
 }
 
-/* Upstream muting. Always happens when unmuting but checks when muting. O(n^2) algorithm.*/
+/* Upstream muting. Always happens when unmuting but checks when muting. O(n^2) algorithm. */
 static void nodeMuteRerouteInputLinks(bNodeTree *ntree, bNode *node, const bool mute)
 {
   if (node->type != NODE_REROUTE) {
@@ -2388,7 +2388,7 @@ static void nodeMuteRerouteInputLinks(bNodeTree *ntree, bNode *node, const bool 
   }
 }
 
-/* Downstream muting propagates when reaching reroute nodes. O(n^2) algorithm.*/
+/* Downstream muting propagates when reaching reroute nodes. O(n^2) algorithm. */
 static void nodeMuteRerouteOutputLinks(bNodeTree *ntree, bNode *node, const bool mute)
 {
   if (node->type != NODE_REROUTE) {
@@ -5055,7 +5055,10 @@ static void registerGeometryNodes()
   register_node_type_geo_convex_hull();
   register_node_type_geo_curve_length();
   register_node_type_geo_curve_to_mesh();
+  register_node_type_geo_curve_to_points();
   register_node_type_geo_curve_resample();
+  register_node_type_geo_curve_reverse();
+  register_node_type_geo_curve_subdivide();
   register_node_type_geo_delete_geometry();
   register_node_type_geo_edge_split();
   register_node_type_geo_input_material();
@@ -5080,8 +5083,10 @@ static void registerGeometryNodes()
   register_node_type_geo_point_separate();
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
+  register_node_type_geo_raycast();
   register_node_type_geo_sample_texture();
   register_node_type_geo_select_by_material();
+  register_node_type_geo_separate_components();
   register_node_type_geo_subdivide();
   register_node_type_geo_subdivision_surface();
   register_node_type_geo_switch();

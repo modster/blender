@@ -74,7 +74,7 @@ static LineartEdge *lineart_line_get_connected(LineartBoundingArea *ba,
 static LineartEdgeChain *lineart_chain_create(LineartRenderBuffer *rb)
 {
   LineartEdgeChain *ec;
-  ec = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdgeChain));
+  ec = lineart_mem_acquire(rb->chain_data_pool, sizeof(LineartEdgeChain));
 
   BLI_addtail(&rb->chains, ec);
 
@@ -119,7 +119,7 @@ static LineartEdgeChainItem *lineart_chain_append_point(LineartRenderBuffer *rb,
     return old_rlci;
   }
 
-  eci = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdgeChainItem));
+  eci = lineart_mem_acquire(rb->chain_data_pool, sizeof(LineartEdgeChainItem));
 
   copy_v2_v2(eci->pos, fbcoord);
   copy_v3_v3(eci->gpos, gpos);
@@ -149,7 +149,7 @@ static LineartEdgeChainItem *lineart_chain_prepend_point(LineartRenderBuffer *rb
     return ec->chain.first;
   }
 
-  eci = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdgeChainItem));
+  eci = lineart_mem_acquire(rb->chain_data_pool, sizeof(LineartEdgeChainItem));
 
   copy_v2_v2(eci->pos, fbcoord);
   copy_v3_v3(eci->gpos, gpos);
@@ -587,7 +587,7 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
         }
         else {
           /* Set the same occlusion level for the end vertex, so when further connection is needed
-           * the backwards occlusion info is also correct.  */
+           * the backwards occlusion info is also correct. */
           eci->occlusion = fixed_occ;
           eci->transparency_mask = fixed_mask;
           /* No need to split at the last point anyway. */
@@ -729,7 +729,8 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
       }
     }
 
-    float new_len = len_v2v2(cre->eci->pos, eci->pos);
+    float new_len = rb->chain_geometry_space ? len_v3v3(cre->eci->gpos, eci->gpos) :
+                                               len_v2v2(cre->eci->pos, eci->pos);
     if (new_len < dist) {
       closest_cre = cre;
       dist = new_len;
@@ -799,6 +800,10 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
       continue;
     }
     BLI_addtail(&rb->chains, ec);
+
+    if (ec->type == LRT_EDGE_FLAG_FLOATING && (!rb->chain_floating_edges)) {
+      continue;
+    }
 
     occlusion = ec->level;
     transparency_mask = ec->transparency_mask;
@@ -889,12 +894,12 @@ int MOD_lineart_chain_count(const LineartEdgeChain *ec)
   return count;
 }
 
-void MOD_lineart_chain_clear_picked_flag(LineartRenderBuffer *rb)
+void MOD_lineart_chain_clear_picked_flag(LineartCache *lc)
 {
-  if (rb == NULL) {
+  if (lc == NULL) {
     return;
   }
-  LISTBASE_FOREACH (LineartEdgeChain *, ec, &rb->chains) {
+  LISTBASE_FOREACH (LineartEdgeChain *, ec, &lc->chains) {
     ec->picked = 0;
   }
 }
@@ -926,7 +931,7 @@ void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshol
         angle = angle_v2v2v2(prev_rlci->pos, eci->pos, next_rlci->pos);
       }
       else {
-        break; /* No need to split at the last point anyway.*/
+        break; /* No need to split at the last point anyway. */
       }
       if (angle < angle_threshold_rad) {
         new_rlc = lineart_chain_create(rb);

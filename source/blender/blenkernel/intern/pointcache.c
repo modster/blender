@@ -2667,7 +2667,7 @@ void BKE_ptcache_id_clear(PTCacheID *pid, int mode, unsigned int cfra)
   }
 #endif
 
-  /*if (!G.relbase_valid) return; */ /* save blend file before using pointcache */
+  // if (!G.relbase_valid) return; /* Save blend file before using pointcache. */
 
   /* clear all files in the temp dir with the prefix of the ID and the ".bphys" suffix */
   switch (mode) {
@@ -2694,8 +2694,8 @@ void BKE_ptcache_id_clear(PTCacheID *pid, int mode, unsigned int cfra)
         ptcache_filename_ext_append(pid, ext, 0, false, 0);
 
         while ((de = readdir(dir)) != NULL) {
-          if (strstr(de->d_name, ext)) {               /* do we have the right extension?*/
-            if (STREQLEN(filename, de->d_name, len)) { /* do we have the right prefix */
+          if (strstr(de->d_name, ext)) {               /* Do we have the right extension? */
+            if (STREQLEN(filename, de->d_name, len)) { /* Do we have the right prefix. */
               if (mode == PTCACHE_CLEAR_ALL) {
                 pid->cache->last_exact = MIN2(pid->cache->startframe, 0);
                 BLI_join_dirfile(path_full, sizeof(path_full), path, de->d_name);
@@ -2730,7 +2730,7 @@ void BKE_ptcache_id_clear(PTCacheID *pid, int mode, unsigned int cfra)
         PTCacheMem *link = NULL;
 
         if (mode == PTCACHE_CLEAR_ALL) {
-          /*we want startframe if the cache starts before zero*/
+          /* We want startframe if the cache starts before zero. */
           pid->cache->last_exact = MIN2(pid->cache->startframe, 0);
           for (; pm; pm = pm->next) {
             ptcache_mem_clear(pm);
@@ -2891,8 +2891,8 @@ void BKE_ptcache_id_time(
       ptcache_filename_ext_append(pid, ext, 0, false, 0);
 
       while ((de = readdir(dir)) != NULL) {
-        if (strstr(de->d_name, ext)) {               /* do we have the right extension?*/
-          if (STREQLEN(filename, de->d_name, len)) { /* do we have the right prefix */
+        if (strstr(de->d_name, ext)) {               /* Do we have the right extension? */
+          if (STREQLEN(filename, de->d_name, len)) { /* Do we have the right prefix. */
             /* read the number of the file */
             const int frame = ptcache_frame_from_filename(de->d_name, ext);
 
@@ -3073,7 +3073,7 @@ void BKE_ptcache_remove(void)
       if (FILENAME_IS_CURRPAR(de->d_name)) {
         /* do nothing */
       }
-      else if (strstr(de->d_name, PTCACHE_EXT)) { /* do we have the right extension?*/
+      else if (strstr(de->d_name, PTCACHE_EXT)) { /* Do we have the right extension? */
         BLI_join_dirfile(path_full, sizeof(path_full), path, de->d_name);
         BLI_delete(path_full, false, false);
       }
@@ -3085,7 +3085,7 @@ void BKE_ptcache_remove(void)
     closedir(dir);
   }
   else {
-    rmdir = 0; /* path doesn't exist  */
+    rmdir = 0; /* Path doesn't exist. */
   }
 
   if (rmdir) {
@@ -3604,8 +3604,8 @@ void BKE_ptcache_disk_cache_rename(PTCacheID *pid, const char *name_src, const c
   BLI_strncpy(pid->cache->name, name_dst, sizeof(pid->cache->name));
 
   while ((de = readdir(dir)) != NULL) {
-    if (strstr(de->d_name, ext)) {                   /* do we have the right extension?*/
-      if (STREQLEN(old_filename, de->d_name, len)) { /* do we have the right prefix */
+    if (strstr(de->d_name, ext)) {                   /* Do we have the right extension? */
+      if (STREQLEN(old_filename, de->d_name, len)) { /* Do we have the right prefix. */
         /* read the number of the file */
         const int frame = ptcache_frame_from_filename(de->d_name, ext);
 
@@ -3624,7 +3624,7 @@ void BKE_ptcache_disk_cache_rename(PTCacheID *pid, const char *name_src, const c
 
 void BKE_ptcache_load_external(PTCacheID *pid)
 {
-  /*todo*/
+  /* TODO: */
   PointCache *cache = pid->cache;
   int len; /* store the length of the string */
   int info = 0;
@@ -3661,8 +3661,8 @@ void BKE_ptcache_load_external(PTCacheID *pid)
   }
 
   while ((de = readdir(dir)) != NULL) {
-    if (strstr(de->d_name, ext)) {               /* do we have the right extension?*/
-      if (STREQLEN(filename, de->d_name, len)) { /* do we have the right prefix */
+    if (strstr(de->d_name, ext)) {               /* Do we have the right extension? */
+      if (STREQLEN(filename, de->d_name, len)) { /* Do we have the right prefix. */
         /* read the number of the file */
         const int frame = ptcache_frame_from_filename(de->d_name, ext);
 

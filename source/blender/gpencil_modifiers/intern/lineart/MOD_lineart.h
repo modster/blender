@@ -189,7 +189,7 @@ typedef struct LineartEdgeChainItem {
   /** For restoring position to 3d space */
   float gpos[3];
   float normal[3];
-  char line_type;
+  unsigned char line_type;
   char occlusion;
   unsigned char transparency_mask;
   size_t index;
@@ -250,6 +250,10 @@ typedef struct LineartRenderBuffer {
   ListBase wasted_cuts;
   SpinLock lock_cuts;
 
+  /* This is just a pointer to LineartCache::chain_data_pool, which acts as a cache for line
+   * chains. */
+  LineartStaticMemPool *chain_data_pool;
+
   /*  Render status */
   double view_vector[3];
 
@@ -263,6 +267,7 @@ typedef struct LineartRenderBuffer {
   ListBase crease;
   ListBase material;
   ListBase edge_mark;
+  ListBase floating;
 
   ListBase chains;
 
@@ -283,11 +288,20 @@ typedef struct LineartRenderBuffer {
   bool use_material;
   bool use_edge_marks;
   bool use_intersections;
+  bool use_floating;
   bool fuzzy_intersections;
   bool fuzzy_everything;
   bool allow_boundaries;
   bool allow_overlapping_edges;
+  bool allow_duplicated_types;
   bool remove_doubles;
+  bool floating_as_contour;
+  bool chain_floating_edges;
+  bool chain_geometry_space;
+
+  bool filter_face_mark;
+  bool filter_face_mark_invert;
+  bool filter_face_mark_boundaries;
 
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
@@ -308,6 +322,18 @@ typedef struct LineartRenderBuffer {
   struct Object *_source_object;
 
 } LineartRenderBuffer;
+
+typedef struct LineartCache {
+  /** Separate memory pool for chain data, this goes to the cache, so when we free the main pool,
+   * chains will still be available. */
+  LineartStaticMemPool chain_data_pool;
+
+  /** A copy of rb->chains so we have that data available after rb has been destroyed. */
+  ListBase chains;
+
+  /** Cache only contains edge types specified in this variable. */
+  char rb_edge_types;
+} LineartCache;
 
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
@@ -342,10 +368,9 @@ typedef struct LineartRenderTaskInfo {
   ListBase crease;
   ListBase material;
   ListBase edge_mark;
+  ListBase floating;
 
 } LineartRenderTaskInfo;
-
-struct BMesh;
 
 typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
@@ -354,14 +379,14 @@ typedef struct LineartObjectInfo {
   double model_view_proj[4][4];
   double model_view[4][4];
   double normal[4][4];
-  LineartElementLinkNode *v_reln;
+  LineartElementLinkNode *v_eln;
   int usage;
   int global_i_offset;
 
   bool free_use_mesh;
 
   /* Threads will add lines inside here, when all threads are done, we combine those into the
-   * ones in LineartRenderBuffer.  */
+   * ones in LineartRenderBuffer. */
   ListBase contour;
   ListBase intersection;
   ListBase crease;
@@ -563,10 +588,11 @@ void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float thresh
 void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
 
 int MOD_lineart_chain_count(const LineartEdgeChain *ec);
-void MOD_lineart_chain_clear_picked_flag(struct LineartRenderBuffer *rb);
+void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);
 
 bool MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
-                                       struct LineartGpencilModifierData *lmd);
+                                       struct LineartGpencilModifierData *lmd,
+                                       LineartCache **cached_result);
 
 struct Scene;
 
@@ -579,7 +605,7 @@ LineartBoundingArea *MOD_lineart_get_bounding_area(LineartRenderBuffer *rb, doub
 struct bGPDlayer;
 struct bGPDframe;
 
-void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
+void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   struct Depsgraph *depsgraph,
                                   struct Object *ob,
                                   struct bGPDlayer *gpl,

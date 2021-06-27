@@ -517,7 +517,7 @@ extern "C" {
 #  define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(*(arr)))
 #endif
 
-/* ARRAY_SET_ITEMS#(v, ...): set indices of array 'v'  */
+/* ARRAY_SET_ITEMS#(v, ...): set indices of array 'v' */
 /* internal helpers */
 #define _VA_ARRAY_SET_ITEMS2(v, a) ((v)[0] = (a))
 #define _VA_ARRAY_SET_ITEMS3(v, a, b) \
@@ -785,6 +785,7 @@ extern bool BLI_memory_is_zero(const void *arr, const size_t arr_size);
  * To use after the enum declaration. */
 /* If any enumerator `C` is set to say `A|B`, then `C` would be the max enum value. */
 #  define ENUM_OPERATORS(_enum_type, _max_enum_value) \
+    extern "C++" { \
     inline constexpr _enum_type operator|(_enum_type a, _enum_type b) \
     { \
       return static_cast<_enum_type>(static_cast<int>(a) | b); \
@@ -804,7 +805,8 @@ extern bool BLI_memory_is_zero(const void *arr, const size_t arr_size);
     inline _enum_type &operator&=(_enum_type &a, _enum_type b) \
     { \
       return a = static_cast<_enum_type>(static_cast<int>(a) & b); \
-    }
+    } \
+    } /* extern "C++" */
 
 #else
 /* Output nothing. */
