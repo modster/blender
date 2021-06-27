@@ -2260,6 +2260,14 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
     const float interp_step = 1.0f / rbw->substeps_per_frame;
     float cur_interp_val = interp_step;
 
+    /* Set all Objects normal forces to zero. */
+    for (int i = 0; i < rbw->numbodies; i++) {
+        Object *ob = rbw->objects[i];
+        zero_v3(ob->rigidbody_object->norm_forces[0].vector);
+        zero_v3(ob->rigidbody_object->norm_forces[1].vector);
+        zero_v3(ob->rigidbody_object->norm_forces[2].vector);
+    }
+
     for (int i = 0; i < rbw->substeps_per_frame; i++) {
       rigidbody_update_kinematic_obj_substep(&substep_targets, cur_interp_val);
       RB_dworld_step_simulation(rbw->shared->physics_world, substep, 0, substep);
@@ -2286,18 +2294,16 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
                                   vec_locations,
                                   norm_flag,
                                   fric_flag);
-            copy_v3_v3(ob->rigidbody_object->vec_locations[0].vector, vec_locations[0]);
-            copy_v3_v3(ob->rigidbody_object->vec_locations[1].vector, vec_locations[1]);
-            copy_v3_v3(ob->rigidbody_object->vec_locations[2].vector, vec_locations[2]);
-            if (norm_flag) {
-              copy_v3_v3(ob->rigidbody_object->norm_forces[0].vector, norm_forces[0]);
-              copy_v3_v3(ob->rigidbody_object->norm_forces[1].vector, norm_forces[1]);
-              copy_v3_v3(ob->rigidbody_object->norm_forces[2].vector, norm_forces[2]);
-            }
-            if (fric_flag) {
-              copy_v3_v3(ob->rigidbody_object->fric_forces[0].vector, fric_forces[0]);
-              copy_v3_v3(ob->rigidbody_object->fric_forces[1].vector, fric_forces[1]);
-              copy_v3_v3(ob->rigidbody_object->fric_forces[2].vector, fric_forces[2]);
+            for(int k=0; k<3; k++){
+              if(len_v3(norm_forces[k])>len_v3(ob->rigidbody_object->norm_forces[k].vector)){
+                copy_v3_v3(ob->rigidbody_object->vec_locations[k].vector, vec_locations[k]);
+                if (norm_flag) {
+                  copy_v3_v3(ob->rigidbody_object->norm_forces[k].vector, norm_forces[k]);
+                }
+                if (fric_flag) {
+                  copy_v3_v3(ob->rigidbody_object->fric_forces[k].vector, fric_forces[k]);
+                }
+              }
             }
           }
         }

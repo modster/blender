@@ -32,6 +32,7 @@
 
 #include "DNA_mesh_types.h"
 #include "DNA_node_types.h"
+#include "DNA_rigidbody_types.h"
 
 #include "GPU_uniform_buffer.h"
 
@@ -49,7 +50,6 @@ void workbench_material_ubo_data(WORKBENCH_PrivateData *wpd,
   float metallic = 0.0f;
   float roughness = 0.632455532f; /* sqrtf(0.4f); */
   float alpha = wpd->shading.xray_alpha;
-
   switch (color_type) {
     case V3D_SHADING_SINGLE_COLOR:
       copy_v3_v3(data->base_color, wpd->shading.single_color);
@@ -74,7 +74,36 @@ void workbench_material_ubo_data(WORKBENCH_PrivateData *wpd,
     default:
       if (mat) {
         alpha *= mat->a;
-        copy_v3_v3(data->base_color, &mat->r);
+        if(ob && ob->rigidbody_object) {
+            if(ob->rigidbody_object->sim_display_options & RB_SIM_STATE) {
+                float rbo_color_active[4] = {0.8f, 0.8f, 0.8f, 1.0f};
+                float rbo_color_passive[4] = {0.3f, 0.3f, 0.3f, 1.0f};
+                float *rbo_color;
+                if(ob->rigidbody_object->type == RBO_TYPE_ACTIVE){
+                  rbo_color = rbo_color_active;
+                  if(ob->rigidbody_object->flag & RBO_FLAG_KINEMATIC) {
+                      rbo_color[2] += 0.2f;
+                      rbo_color[0] -= 0.1f;
+                      rbo_color[1] -= 0.1f;
+                  }
+                }
+                else if(ob->rigidbody_object->type == RBO_TYPE_PASSIVE){
+                  rbo_color = rbo_color_passive;
+                  if(ob->rigidbody_object->flag & RBO_FLAG_KINEMATIC) {
+                      rbo_color[2] += 0.2f;
+                  }
+                }
+
+                copy_v3_v3(data->base_color, rbo_color);
+
+            }
+            else {
+              copy_v3_v3(data->base_color, &mat->r);
+            }
+        }
+        else {
+          copy_v3_v3(data->base_color, &mat->r);
+        }
         metallic = mat->metallic;
         roughness = sqrtf(mat->roughness); /* Remap to Disney roughness. */
       }
@@ -177,7 +206,6 @@ DRWShadingGroup *workbench_material_setup_ex(WORKBENCH_PrivateData *wpd,
       color_type = V3D_SHADING_MATERIAL_COLOR;
     }
   }
-
   switch (color_type) {
     case V3D_SHADING_TEXTURE_COLOR: {
       return workbench_image_setup_ex(wpd, ob, mat_nr, ima, iuser, sampler, datatype);
@@ -200,7 +228,14 @@ DRWShadingGroup *workbench_material_setup_ex(WORKBENCH_PrivateData *wpd,
       DRWShadingGroup **grp_mat = NULL;
       /* A hashmap stores material shgroups to pack all similar drawcalls together. */
       if (BLI_ghash_ensure_p(prepass->material_hash, ma, (void ***)&grp_mat)) {
-        return *grp_mat;
+        if(ob){
+            if(!ob->rigidbody_object){
+                return *grp_mat;
+            }
+        }
+        if(!ob){
+          return *grp_mat;
+        }
       }
 
       uint32_t mat_id, id = wpd->material_index++;
@@ -209,12 +244,14 @@ DRWShadingGroup *workbench_material_setup_ex(WORKBENCH_PrivateData *wpd,
       workbench_material_ubo_data(wpd, ob, ma, &wpd->material_ubo_data_curr[mat_id], color_type);
 
       DRWShadingGroup *grp = prepass->common_shgrp;
+
       *grp_mat = grp = DRW_shgroup_create_sub(grp);
       DRW_shgroup_uniform_block(grp, "material_block", wpd->material_ubo_curr);
       DRW_shgroup_uniform_int_copy(grp, "materialIndex", mat_id);
       return grp;
     }
     case V3D_SHADING_VERTEX_COLOR: {
+      printf("b\n");
       const bool transp = wpd->shading.xray_alpha < 1.0f;
       DRWShadingGroup *grp = wpd->prepass[transp][infront][datatype].vcol_shgrp;
       return grp;

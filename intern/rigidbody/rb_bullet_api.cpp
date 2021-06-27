@@ -225,10 +225,10 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
     const void *obB = contactManifold->getBody1();
     if (num_norm_forces > 2)
       break;
-    if (obA != rbo->body && obB != rbo->body) {
-      continue;
-    }
-    else {
+        if (obA != rbo->body && obB != rbo->body) {
+          continue;
+        }
+        else {
       btVector3 tot_impulse = btVector3(0.0, 0.0, 0.0);
       btVector3 final_loc = btVector3(0.0, 0.0, 0.0);
       btScalar tot_impulse_magnitude = 0.f;
@@ -238,13 +238,15 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
       for (int j = 0; j < numContacts; j++) {
         /* Find points where impulse was appplied. */
         btManifoldPoint &pt = contactManifold->getContactPoint(j);
-        if (pt.getAppliedImpulse() > 0.f)
+        if (pt.getAppliedImpulse() > 0.f || -pt.getAppliedImpulse() > 0.f) {
           num_impulse_points++;
+          printf("getApplied:%f\n",pt.getAppliedImpulse());
+        }
       }
 
       for (int j = 0; j < numContacts; j++) {
         btManifoldPoint &pt = contactManifold->getContactPoint(j);
-        if (pt.getAppliedImpulse() > 0.f) {
+        if (pt.getAppliedImpulse() > 0.f || -pt.getAppliedImpulse() > 0.f) {
           const btVector3 &loc = pt.getPositionWorldOnB();
           const btVector3 imp = (rbo->body == obB) ?
                                     -pt.m_normalWorldOnB * pt.getAppliedImpulse() / timeSubStep :

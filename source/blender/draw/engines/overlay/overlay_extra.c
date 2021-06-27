@@ -1819,11 +1819,13 @@ static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
                0.00001f)) /* impulse direction must not be parallel to face. */
       {
         face = i;
-        if (fabsf(dot_v3v3(norm, dir)) < 0.0001f) {
+        /*if (fabsf(dot_v3v3(norm, dir)) < 0.0001f) {
           printf("n%f %f %f\n", norm[0], norm[1], norm[2]);
           printf("d%f %f %f\n", dir[0], dir[1], dir[2]);
           printf("%f\n", fabsf(dot_v3v3(norm, dir)));
         }
+        printf("impulse:%f %f %f\n", point[0], point[1],point[2]);
+        printf("intersect:%f %f %f\n", isect_co[0], isect_co[1], isect_co[2]); */
         GPUShader *sh = OVERLAY_shader_collision_box();
         DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
         DRW_shgroup_uniform_vec3_copy(grp, "vert1", box_shape[box_shape_tris[2 * face][0]]);

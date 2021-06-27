@@ -249,6 +249,8 @@ enum {
   RB_SIM_TEXT = (1 << 3),
   /** Indicate when collisions occur. */
   RB_SIM_COLLISIONS = (1 << 4),
+  /** Display states of rigid body. */
+  RB_SIM_STATE = (1 << 5),
 };
 
 enum {
