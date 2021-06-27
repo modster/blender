@@ -25,7 +25,7 @@ CustomMF_GenericConstant::CustomMF_GenericConstant(const CPPType &type, const vo
 {
   MFSignatureBuilder signature{"Constant " + type.name()};
   std::stringstream ss;
-  type.debug_print(value, ss);
+  type.print_or_default(value, ss, type.name());
   signature.single_output(ss.str(), type);
   signature_ = signature.build();
   this->set_signature(&signature_);
@@ -58,11 +58,12 @@ bool CustomMF_GenericConstant::equals(const MultiFunction &other) const
 
 static std::string gspan_to_string(GSpan array)
 {
+  const CPPType &type = array.type();
   std::stringstream ss;
   ss << "[";
   const int64_t max_amount = 5;
   for (int64_t i : IndexRange(std::min(max_amount, array.size()))) {
-    array.type().debug_print(array[i], ss);
+    type.print_or_default(array[i], ss, type.name());
     ss << ", ";
   }
   if (max_amount < array.size()) {

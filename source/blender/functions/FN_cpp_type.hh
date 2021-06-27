@@ -107,7 +107,7 @@ struct CPPTypeMembers {
 
   void (*fill_construct_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
 
-  void (*debug_print)(const void *value, std::stringstream &ss) = nullptr;
+  void (*print)(const void *value, std::stringstream &ss) = nullptr;
   bool (*is_equal)(const void *a, const void *b) = nullptr;
   uint64_t (*hash)(const void *value) = nullptr;
 
@@ -221,6 +221,21 @@ class CPPType : NonCopyable, NonMovable {
   bool is_move_assignable() const
   {
     return m_.copy_construct != nullptr;
+  }
+
+  bool is_printable() const
+  {
+    return m_.print != nullptr;
+  }
+
+  bool is_equality_comparable() const
+  {
+    return m_.is_equal != nullptr;
+  }
+
+  bool is_hashable() const
+  {
+    return m_.hash != nullptr;
   }
 
   /**
@@ -524,10 +539,20 @@ class CPPType : NonCopyable, NonMovable {
     m_.fill_construct_indices(value, dst, mask);
   }
 
-  void debug_print(const void *value, std::stringstream &ss) const
+  void print(const void *value, std::stringstream &ss) const
   {
     BLI_assert(this->pointer_can_point_to_instance(value));
-    m_.debug_print(value, ss);
+    m_.print(value, ss);
+  }
+
+  void print_or_default(const void *value, std::stringstream &ss, StringRef default_value) const
+  {
+    if (this->is_printable()) {
+      m_.print(value, ss);
+    }
+    else {
+      ss << default_value;
+    }
   }
 
   bool is_equal(const void *a, const void *b) const

@@ -164,7 +164,7 @@ template<typename T> void fill_construct_indices_cb(const void *value, void *dst
   mask.foreach_index([&](int64_t i) { new (dst_ + i) T(value_); });
 }
 
-template<typename T> void debug_print_cb(const void *value, std::stringstream &ss)
+template<typename T> void print_cb(const void *value, std::stringstream &ss)
 {
   const T &value_ = *static_cast<const T *>(value);
   ss << value_;
@@ -258,7 +258,7 @@ inline std::unique_ptr<const CPPType> create_cpp_type(StringRef name)
     m.hash = hash_cb<T>;
   }
   if constexpr ((bool)(flags & CPPTypeFlags::Printable)) {
-    m.debug_print = debug_print_cb<T>;
+    m.print = print_cb<T>;
   }
   if constexpr ((bool)(flags & CPPTypeFlags::EqualityComparable)) {
     m.is_equal = is_equal_cb<T>;
