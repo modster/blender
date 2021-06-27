@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BKE_curve.h"
 #include "BKE_geometry_set_instances.hh"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
@@ -56,7 +57,9 @@ static void add_curve_data_as_geometry_component(const Object &object, GeometryS
 {
   BLI_assert(object.type == OB_CURVE);
   if (object.data != nullptr) {
-    std::unique_ptr<CurveEval> curve = curve_eval_from_dna_curve(*(Curve *)object.data);
+    const Curve &dna_curve = *static_cast<const Curve *>(object.data);
+    std::unique_ptr<CurveEval> curve = curve_eval_from_dna_curve(
+        dna_curve, *BKE_curve_nurbs_get_for_read(&dna_curve));
     CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
     curve_component.replace(curve.release(), GeometryOwnershipType::Owned);
   }
