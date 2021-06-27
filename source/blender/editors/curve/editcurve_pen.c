@@ -168,7 +168,7 @@ static void free_up_handles_for_movement(BezTriple *bezt, bool f1, bool f3)
   }
 }
 
-static void move_selected_bezt_to_mouse(BezTriple *bezt, ViewContext *vc, wmEvent *event)
+static void move_selected_bezt_to_mouse(BezTriple *bezt, ViewContext *vc, const wmEvent *event)
 {
   /* Get mouse location in 3D space. */
   float location[3];
@@ -283,12 +283,12 @@ static bool get_closest_point_on_edge(float *point,
 }
 
 /* Get closest control point in all nurbs in given ListBase to a given point. */
-static void *get_closest_cp_to_point_in_nurbs(ListBase *nurbs,
-                                              Nurb **r_nu,
-                                              BezTriple **r_bezt,
-                                              BPoint **r_bp,
-                                              const float point[2],
-                                              const ViewContext *vc)
+static void get_closest_cp_to_point_in_nurbs(ListBase *nurbs,
+                                             Nurb **r_nu,
+                                             BezTriple **r_bezt,
+                                             BPoint **r_bp,
+                                             const float point[2],
+                                             const ViewContext *vc)
 {
   float min_distance_bezt = 10000;
   float min_distance_bp = 10000;
@@ -474,7 +474,7 @@ static void calculate_new_bezier_point(const float *point_prev,
                                        const float *point_next,
                                        const float parameter)
 {
-  const float center_point[3];
+  float center_point[3];
   interp_v3_v3v3(center_point, handle_prev, handle_next, parameter);
   interp_v3_v3v3(handle_prev, point_prev, handle_prev, parameter);
   interp_v3_v3v3(handle_next, handle_next, point_next, parameter);
@@ -501,7 +501,7 @@ static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op
       }
       int i;
 
-      BezTriple *bezt;
+      BezTriple *bezt = NULL;
       for (i = 0; i < nu->pntsu - 1; i++) {
         bezt = &nu->bezt[i];
         update_data_if_nearest_point_in_segment(bezt, bezt + 1, nu, i, vc, screen_co, data);
@@ -567,7 +567,7 @@ static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
 }
 
 /* Make a cut on the nearest nurb at the closest point. */
-static void make_cut(wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *vc)
+static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *vc)
 {
   struct TempBeztData data = {.bezt_index = 0,
                               .min_dist = 10000,
@@ -594,7 +594,7 @@ static void make_cut(wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *vc)
 }
 
 /* Add a new control point connected to the selected control point. */
-static void add_point_connected_to_selected_point(Curve *cu, ViewContext *vc, wmEvent *event)
+static void add_point_connected_to_selected_point(Curve *cu, ViewContext *vc, const wmEvent *event)
 {
   Nurb *nu = NULL;
   BezTriple *bezt = NULL;
@@ -691,7 +691,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE) && !cut_or_delete) {
-    if (!dragging && WM_event_drag_test(event, &event->prevclickx) && event->val == KM_PRESS) {
+    int prev_xy[2] = {event->prevclickx, event->prevclicky};
+    if (!dragging && WM_event_drag_test(event, prev_xy) && event->val == KM_PRESS) {
       RNA_boolean_set(op->ptr, "dragging", true);
       dragging = true;
     }
