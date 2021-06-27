@@ -231,42 +231,45 @@ template<typename T>
 inline std::unique_ptr<const CPPType> create_cpp_type(StringRef name, const T &default_value)
 {
   using namespace cpp_type_util;
-  const CPPType *type = new CPPType(name,
-                                    sizeof(T),
-                                    alignof(T),
-                                    std::is_trivially_destructible_v<T>,
-                                    construct_default_cb<T>,
-                                    construct_default_n_cb<T>,
-                                    construct_default_indices_cb<T>,
-                                    destruct_cb<T>,
-                                    destruct_n_cb<T>,
-                                    destruct_indices_cb<T>,
-                                    copy_to_initialized_cb<T>,
-                                    copy_to_initialized_n_cb<T>,
-                                    copy_to_initialized_indices_cb<T>,
-                                    copy_to_uninitialized_cb<T>,
-                                    copy_to_uninitialized_n_cb<T>,
-                                    copy_to_uninitialized_indices_cb<T>,
-                                    move_to_initialized_cb<T>,
-                                    move_to_initialized_n_cb<T>,
-                                    move_to_initialized_indices_cb<T>,
-                                    move_to_uninitialized_cb<T>,
-                                    move_to_uninitialized_n_cb<T>,
-                                    move_to_uninitialized_indices_cb<T>,
-                                    relocate_to_initialized_cb<T>,
-                                    relocate_to_initialized_n_cb<T>,
-                                    relocate_to_initialized_indices_cb<T>,
-                                    relocate_to_uninitialized_cb<T>,
-                                    relocate_to_uninitialized_n_cb<T>,
-                                    relocate_to_uninitialized_indices_cb<T>,
-                                    fill_initialized_cb<T>,
-                                    fill_initialized_indices_cb<T>,
-                                    fill_uninitialized_cb<T>,
-                                    fill_uninitialized_indices_cb<T>,
-                                    debug_print_cb<T>,
-                                    is_equal_cb<T>,
-                                    hash_cb<T>,
-                                    static_cast<const void *>(&default_value));
+  CPPTypeMembers m;
+  m.name = name;
+  m.size = (int64_t)sizeof(T);
+  m.alignment = (int64_t)alignof(T);
+  m.is_trivially_destructible = std::is_trivially_destructible_v<T>;
+  m.construct_default = construct_default_cb<T>;
+  m.construct_default_n = construct_default_n_cb<T>;
+  m.construct_default_indices = construct_default_indices_cb<T>;
+  m.destruct = destruct_cb<T>;
+  m.destruct_n = destruct_n_cb<T>;
+  m.destruct_indices = destruct_indices_cb<T>;
+  m.copy_to_initialized = copy_to_initialized_cb<T>;
+  m.copy_to_initialized_n = copy_to_initialized_n_cb<T>;
+  m.copy_to_initialized_indices = copy_to_initialized_indices_cb<T>;
+  m.copy_to_uninitialized = copy_to_uninitialized_cb<T>;
+  m.copy_to_uninitialized_n = copy_to_uninitialized_n_cb<T>;
+  m.copy_to_uninitialized_indices = copy_to_uninitialized_indices_cb<T>;
+  m.move_to_initialized = move_to_initialized_cb<T>;
+  m.move_to_initialized_n = move_to_initialized_n_cb<T>;
+  m.move_to_initialized_indices = move_to_initialized_indices_cb<T>;
+  m.move_to_uninitialized = move_to_uninitialized_cb<T>;
+  m.move_to_uninitialized_n = move_to_uninitialized_n_cb<T>;
+  m.move_to_uninitialized_indices = move_to_uninitialized_indices_cb<T>;
+  m.relocate_to_initialized = relocate_to_initialized_cb<T>;
+  m.relocate_to_initialized_n = relocate_to_initialized_n_cb<T>;
+  m.relocate_to_initialized_indices = relocate_to_initialized_indices_cb<T>;
+  m.relocate_to_uninitialized = relocate_to_uninitialized_cb<T>;
+  m.relocate_to_uninitialized_n = relocate_to_uninitialized_n_cb<T>;
+  m.relocate_to_uninitialized_indices = relocate_to_uninitialized_indices_cb<T>;
+  m.fill_initialized = fill_initialized_cb<T>;
+  m.fill_initialized_indices = fill_initialized_indices_cb<T>;
+  m.fill_uninitialized = fill_uninitialized_cb<T>;
+  m.fill_uninitialized_indices = fill_uninitialized_indices_cb<T>;
+  m.debug_print = debug_print_cb<T>;
+  m.is_equal = is_equal_cb<T>;
+  m.hash = hash_cb<T>;
+  m.default_value = static_cast<const void *>(&default_value);
+
+  const CPPType *type = new CPPType(std::move(m));
   return std::unique_ptr<const CPPType>(type);
 }
 
