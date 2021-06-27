@@ -19,10 +19,9 @@
 /** \file
  * \ingroup fn
  *
- * The CPPType class is the core of the runtime-type-system used by the functions system. It can
- * represent C++ types that are default-constructible, destructible, movable, copyable,
- * equality comparable and hashable. In the future we might want to make some of these properties
- * optional.
+ * The `CPPType` class is the core of a runtime-type-system. It allows working with arbitrary C++
+ * types in a generic way. An instance of `CPPType` wraps exactly one type like `int` or
+ * `std::string`.
  *
  * Every type has a size and an alignment. Every function dealing with C++ types in a generic way,
  * has to make sure that alignment rules are followed. The methods provided by a CPPType instance
