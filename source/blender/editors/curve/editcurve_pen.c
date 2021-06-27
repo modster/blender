@@ -87,8 +87,8 @@ struct TempBeztData {
 } TempBeztData;
 
 /* Convert mouse location to worldspace coordinates. */
-static void mouse_location_to_worldspace(const int *mouse_loc,
-                                         const float *depth,
+static void mouse_location_to_worldspace(const int mouse_loc[2],
+                                         const float depth[3],
                                          const ViewContext *vc,
                                          float r_location[3])
 {
@@ -228,7 +228,7 @@ static void delete_bp_from_nurb(BPoint *bp, Nurb *nu)
 }
 
 /* Get a measure of how zoomed in the current view is. */
-static float get_view_zoom(const float *depth, const ViewContext *vc)
+static float get_view_zoom(const float depth[3], const ViewContext *vc)
 {
   int p1[2] = {0, 0};
   int p2[2] = {100, 0};
@@ -239,7 +239,7 @@ static float get_view_zoom(const float *depth, const ViewContext *vc)
 }
 
 /* Get the closest point on an edge to a given point based on perpendicular distance. */
-static bool get_closest_point_on_edge(float *point,
+static bool get_closest_point_on_edge(float point[3],
                                       const float pos[2],
                                       const float pos1[3],
                                       const float pos2[3],
@@ -466,12 +466,12 @@ static void select_and_get_point(ViewContext *vc,
 }
 
 /* Calculates handle lengths of added and adjacent control points such that shape is preserved. */
-static void calculate_new_bezier_point(const float *point_prev,
-                                       float *handle_prev,
-                                       float *new_left_handle,
-                                       float *new_right_handle,
-                                       float *handle_next,
-                                       const float *point_next,
+static void calculate_new_bezier_point(const float point_prev[3],
+                                       float handle_prev[3],
+                                       float new_left_handle[3],
+                                       float new_right_handle[3],
+                                       float handle_next[3],
+                                       const float point_next[3],
                                        const float parameter)
 {
   float center_point[3];
