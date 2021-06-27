@@ -28,10 +28,6 @@ template<typename T> void construct_default_cb(void *ptr)
 {
   new (ptr) T;
 }
-template<typename T> void construct_default_n_cb(void *ptr, int64_t n)
-{
-  blender::default_construct_n(static_cast<T *>(ptr), n);
-}
 template<typename T> void construct_default_indices_cb(void *ptr, IndexMask mask)
 {
   mask.foreach_index([&](int64_t i) { new (static_cast<T *>(ptr) + i) T; });
@@ -40,10 +36,6 @@ template<typename T> void construct_default_indices_cb(void *ptr, IndexMask mask
 template<typename T> void destruct_cb(void *ptr)
 {
   (static_cast<T *>(ptr))->~T();
-}
-template<typename T> void destruct_n_cb(void *ptr, int64_t n)
-{
-  blender::destruct_n(static_cast<T *>(ptr), n);
 }
 template<typename T> void destruct_indices_cb(void *ptr, IndexMask mask)
 {
@@ -54,15 +46,6 @@ template<typename T> void destruct_indices_cb(void *ptr, IndexMask mask)
 template<typename T> void copy_to_initialized_cb(const void *src, void *dst)
 {
   *static_cast<T *>(dst) = *static_cast<const T *>(src);
-}
-template<typename T> void copy_to_initialized_n_cb(const void *src, void *dst, int64_t n)
-{
-  const T *src_ = static_cast<const T *>(src);
-  T *dst_ = static_cast<T *>(dst);
-
-  for (int64_t i = 0; i < n; i++) {
-    dst_[i] = src_[i];
-  }
 }
 template<typename T>
 void copy_to_initialized_indices_cb(const void *src, void *dst, IndexMask mask)
@@ -77,10 +60,6 @@ template<typename T> void copy_to_uninitialized_cb(const void *src, void *dst)
 {
   blender::uninitialized_copy_n(static_cast<const T *>(src), 1, static_cast<T *>(dst));
 }
-template<typename T> void copy_to_uninitialized_n_cb(const void *src, void *dst, int64_t n)
-{
-  blender::uninitialized_copy_n(static_cast<const T *>(src), n, static_cast<T *>(dst));
-}
 template<typename T>
 void copy_to_uninitialized_indices_cb(const void *src, void *dst, IndexMask mask)
 {
@@ -94,10 +73,6 @@ template<typename T> void move_to_initialized_cb(void *src, void *dst)
 {
   blender::initialized_move_n(static_cast<T *>(src), 1, static_cast<T *>(dst));
 }
-template<typename T> void move_to_initialized_n_cb(void *src, void *dst, int64_t n)
-{
-  blender::initialized_move_n(static_cast<T *>(src), n, static_cast<T *>(dst));
-}
 template<typename T> void move_to_initialized_indices_cb(void *src, void *dst, IndexMask mask)
 {
   T *src_ = static_cast<T *>(src);
@@ -109,10 +84,6 @@ template<typename T> void move_to_initialized_indices_cb(void *src, void *dst, I
 template<typename T> void move_to_uninitialized_cb(void *src, void *dst)
 {
   blender::uninitialized_move_n(static_cast<T *>(src), 1, static_cast<T *>(dst));
-}
-template<typename T> void move_to_uninitialized_n_cb(void *src, void *dst, int64_t n)
-{
-  blender::uninitialized_move_n(static_cast<T *>(src), n, static_cast<T *>(dst));
 }
 template<typename T> void move_to_uninitialized_indices_cb(void *src, void *dst, IndexMask mask)
 {
@@ -129,10 +100,6 @@ template<typename T> void relocate_to_initialized_cb(void *src, void *dst)
 
   *dst_ = std::move(*src_);
   src_->~T();
-}
-template<typename T> void relocate_to_initialized_n_cb(void *src, void *dst, int64_t n)
-{
-  blender::initialized_relocate_n(static_cast<T *>(src), n, static_cast<T *>(dst));
 }
 template<typename T> void relocate_to_initialized_indices_cb(void *src, void *dst, IndexMask mask)
 {
@@ -152,10 +119,6 @@ template<typename T> void relocate_to_uninitialized_cb(void *src, void *dst)
 
   new (dst_) T(std::move(*src_));
   src_->~T();
-}
-template<typename T> void relocate_to_uninitialized_n_cb(void *src, void *dst, int64_t n)
-{
-  blender::uninitialized_relocate_n(static_cast<T *>(src), n, static_cast<T *>(dst));
 }
 template<typename T>
 void relocate_to_uninitialized_indices_cb(void *src, void *dst, IndexMask mask)
@@ -237,28 +200,20 @@ inline std::unique_ptr<const CPPType> create_cpp_type(StringRef name, const T &d
   m.alignment = (int64_t)alignof(T);
   m.is_trivially_destructible = std::is_trivially_destructible_v<T>;
   m.construct_default = construct_default_cb<T>;
-  m.construct_default_n = construct_default_n_cb<T>;
   m.construct_default_indices = construct_default_indices_cb<T>;
   m.destruct = destruct_cb<T>;
-  m.destruct_n = destruct_n_cb<T>;
   m.destruct_indices = destruct_indices_cb<T>;
   m.copy_to_initialized = copy_to_initialized_cb<T>;
-  m.copy_to_initialized_n = copy_to_initialized_n_cb<T>;
   m.copy_to_initialized_indices = copy_to_initialized_indices_cb<T>;
   m.copy_to_uninitialized = copy_to_uninitialized_cb<T>;
-  m.copy_to_uninitialized_n = copy_to_uninitialized_n_cb<T>;
   m.copy_to_uninitialized_indices = copy_to_uninitialized_indices_cb<T>;
   m.move_to_initialized = move_to_initialized_cb<T>;
-  m.move_to_initialized_n = move_to_initialized_n_cb<T>;
   m.move_to_initialized_indices = move_to_initialized_indices_cb<T>;
   m.move_to_uninitialized = move_to_uninitialized_cb<T>;
-  m.move_to_uninitialized_n = move_to_uninitialized_n_cb<T>;
   m.move_to_uninitialized_indices = move_to_uninitialized_indices_cb<T>;
   m.relocate_to_initialized = relocate_to_initialized_cb<T>;
-  m.relocate_to_initialized_n = relocate_to_initialized_n_cb<T>;
   m.relocate_to_initialized_indices = relocate_to_initialized_indices_cb<T>;
   m.relocate_to_uninitialized = relocate_to_uninitialized_cb<T>;
-  m.relocate_to_uninitialized_n = relocate_to_uninitialized_n_cb<T>;
   m.relocate_to_uninitialized_indices = relocate_to_uninitialized_indices_cb<T>;
   m.fill_initialized = fill_initialized_cb<T>;
   m.fill_initialized_indices = fill_initialized_indices_cb<T>;
