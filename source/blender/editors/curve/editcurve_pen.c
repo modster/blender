@@ -594,11 +594,14 @@ static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *
 }
 
 /* Add a new control point connected to the selected control point. */
-static void add_point_connected_to_selected_point(Curve *cu, ViewContext *vc, const wmEvent *event)
+static void add_point_connected_to_selected_point(ViewContext *vc,
+                                                  Object *obedit,
+                                                  const wmEvent *event)
 {
   Nurb *nu = NULL;
   BezTriple *bezt = NULL;
   BPoint *bp = NULL;
+  Curve *cu = vc->obedit->data;
 
   float location[3];
 
@@ -616,6 +619,11 @@ static void add_point_connected_to_selected_point(Curve *cu, ViewContext *vc, co
 
   ED_view3d_win_to_3d_int(vc->v3d, vc->region, location, event->mval, location);
   EditNurb *editnurb = cu->editnurb;
+
+  float imat[4][4];
+  invert_m4_m4(imat, obedit->obmat);
+  mul_m4_v3(imat, location);
+
   ed_editcurve_addvert(cu, editnurb, vc->v3d, location);
   ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
   if (bezt) {
@@ -662,7 +670,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   Object *obedit = CTX_data_edit_object(C);
 
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
-  Curve *cu = vc.obedit->data;
 
   BezTriple *bezt = NULL;
   BPoint *bp = NULL;
@@ -727,6 +734,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       if (cut_or_delete) {
         /* Delete retrieved control point. */
+        Curve *cu = vc.obedit->data;
         ListBase *nurbs = BKE_curve_editNurbs_get(cu);
         float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
 
@@ -757,7 +765,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         RNA_boolean_set(op->ptr, "new", !retval);
 
         if (!retval) {
-          add_point_connected_to_selected_point(cu, &vc, event);
+          add_point_connected_to_selected_point(&vc, obedit, event);
         }
       }
     }
