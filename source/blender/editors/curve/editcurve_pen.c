@@ -205,12 +205,7 @@ static void delete_bezt_from_nurb(BezTriple *bezt, Nurb *nu)
   BLI_assert(nu->type == CU_BEZIER);
   int index = BKE_curve_nurb_vert_index_get(nu, bezt);
   nu->pntsu -= 1;
-  BezTriple *bezt1 = (BezTriple *)MEM_mallocN(nu->pntsu * sizeof(BezTriple), "NewBeztCurve");
-  memcpy(bezt1, nu->bezt, index * sizeof(BezTriple));
-  memcpy(bezt1 + index, nu->bezt + index + 1, (nu->pntsu - index) * sizeof(BezTriple));
-
-  MEM_freeN(nu->bezt);
-  nu->bezt = bezt1;
+  memcpy(nu->bezt + index, nu->bezt + index + 1, (nu->pntsu - index) * sizeof(BezTriple));
 }
 
 /* Delete given BPoint from given Nurb. */
@@ -219,12 +214,7 @@ static void delete_bp_from_nurb(BPoint *bp, Nurb *nu)
   BLI_assert(nu->type == CU_NURBS);
   int index = BKE_curve_nurb_vert_index_get(nu, bp);
   nu->pntsu -= 1;
-  BPoint *bp1 = (BPoint *)MEM_mallocN(nu->pntsu * sizeof(BPoint), "NewBpCurve");
-  memcpy(bp1, nu->bp, index * sizeof(BPoint));
-  memcpy(bp1 + index, nu->bp + index + 1, (nu->pntsu - index) * sizeof(BPoint));
-
-  MEM_freeN(nu->bp);
-  nu->bp = bp1;
+  memcpy(nu->bp + index, nu->bp + index + 1, (nu->pntsu - index) * sizeof(BPoint));
 }
 
 /* Get a measure of how zoomed in the current view is. */
