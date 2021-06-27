@@ -35,11 +35,11 @@
  *
  * A CPPType instance comes with many methods that allow dealing with types in a generic way. Most
  * methods come in three variants. Using the construct-default methods as example:
- *  - construct_default(void *ptr):
+ *  - default_construct(void *ptr):
  *      Constructs a single instance of that type at the given pointer.
- *  - construct_default_n(void *ptr, int64_t n):
+ *  - default_construct_n(void *ptr, int64_t n):
  *      Constructs n instances of that type in an array that starts at the given pointer.
- *  - construct_default_indices(void *ptr, IndexMask mask):
+ *  - default_construct_indices(void *ptr, IndexMask mask):
  *      Constructs multiple instances of that type in an array that starts at the given pointer.
  *      Only the indices referenced by `mask` will by constructed.
  *
@@ -58,7 +58,7 @@
  * used now with explicit function pointers to work better. Here are some reasons:
  *  - If CPPType would be inherited once for every used C++ type, we would get a lot of classes
  *    that would only be instanced once each.
- *  - Methods like `construct_default` that operate on a single instance have to be fast. Even this
+ *  - Methods like `default_construct` that operate on a single instance have to be fast. Even this
  *    one necessary indirection using function pointers adds a lot of overhead. If all methods were
  *    virtual, there would be a second level of indirection that increases the overhead even more.
  *  - If it becomes necessary, we could pass the function pointers to C functions more easily than
@@ -80,35 +80,35 @@ struct CPPTypeMembers {
   bool is_trivially_destructible = false;
   bool has_special_member_functions = false;
 
-  void (*construct_default)(void *ptr) = nullptr;
-  void (*construct_default_indices)(void *ptr, IndexMask mask) = nullptr;
+  void (*default_construct)(void *ptr) = nullptr;
+  void (*default_construct_indices)(void *ptr, IndexMask mask) = nullptr;
 
   void (*destruct)(void *ptr) = nullptr;
   void (*destruct_indices)(void *ptr, IndexMask mask) = nullptr;
 
-  void (*copy_to_initialized)(const void *src, void *dst) = nullptr;
-  void (*copy_to_initialized_indices)(const void *src, void *dst, IndexMask mask) = nullptr;
+  void (*copy_assign)(const void *src, void *dst) = nullptr;
+  void (*copy_assign_indices)(const void *src, void *dst, IndexMask mask) = nullptr;
 
-  void (*copy_to_uninitialized)(const void *src, void *dst) = nullptr;
-  void (*copy_to_uninitialized_indices)(const void *src, void *dst, IndexMask mask) = nullptr;
+  void (*copy_construct)(const void *src, void *dst) = nullptr;
+  void (*copy_construct_indices)(const void *src, void *dst, IndexMask mask) = nullptr;
 
-  void (*move_to_initialized)(void *src, void *dst) = nullptr;
-  void (*move_to_initialized_indices)(void *src, void *dst, IndexMask mask) = nullptr;
+  void (*move_assign)(void *src, void *dst) = nullptr;
+  void (*move_assign_indices)(void *src, void *dst, IndexMask mask) = nullptr;
 
-  void (*move_to_uninitialized)(void *src, void *dst) = nullptr;
-  void (*move_to_uninitialized_indices)(void *src, void *dst, IndexMask mask) = nullptr;
+  void (*move_construct)(void *src, void *dst) = nullptr;
+  void (*move_construct_indices)(void *src, void *dst, IndexMask mask) = nullptr;
 
-  void (*relocate_to_initialized)(void *src, void *dst) = nullptr;
-  void (*relocate_to_initialized_indices)(void *src, void *dst, IndexMask mask) = nullptr;
+  void (*relocate_assign)(void *src, void *dst) = nullptr;
+  void (*relocate_assign_indices)(void *src, void *dst, IndexMask mask) = nullptr;
 
-  void (*relocate_to_uninitialized)(void *src, void *dst) = nullptr;
-  void (*relocate_to_uninitialized_indices)(void *src, void *dst, IndexMask mask) = nullptr;
+  void (*relocate_construct)(void *src, void *dst) = nullptr;
+  void (*relocate_construct_indices)(void *src, void *dst, IndexMask mask) = nullptr;
 
-  void (*fill_initialized)(const void *value, void *dst, int64_t n) = nullptr;
-  void (*fill_initialized_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
+  void (*fill_assign)(const void *value, void *dst, int64_t n) = nullptr;
+  void (*fill_assign_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
 
-  void (*fill_uninitialized)(const void *value, void *dst, int64_t n) = nullptr;
-  void (*fill_uninitialized_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
+  void (*fill_construct)(const void *value, void *dst, int64_t n) = nullptr;
+  void (*fill_construct_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
 
   void (*debug_print)(const void *value, std::stringstream &ss) = nullptr;
   bool (*is_equal)(const void *a, const void *b) = nullptr;
@@ -127,9 +127,9 @@ class CPPType : NonCopyable, NonMovable {
   {
     BLI_assert(is_power_of_2_i(m_.alignment));
     m_.alignment_mask = (uintptr_t)members.alignment - (uintptr_t)1;
-    m_.has_special_member_functions = (m_.construct_default && m_.copy_to_uninitialized &&
-                                       m_.copy_to_initialized && m_.move_to_uninitialized &&
-                                       m_.move_to_initialized && m_.destruct);
+    m_.has_special_member_functions = (m_.default_construct && m_.copy_construct &&
+                                       m_.copy_assign && m_.move_construct && m_.move_assign &&
+                                       m_.destruct);
   }
 
   /**
@@ -198,17 +198,17 @@ class CPPType : NonCopyable, NonMovable {
 
   bool is_default_constructible() const
   {
-    return m_.construct_default != nullptr;
+    return m_.default_construct != nullptr;
   }
 
   bool is_copy_constructible() const
   {
-    return m_.copy_to_initialized != nullptr;
+    return m_.copy_assign != nullptr;
   }
 
   bool is_move_constructible() const
   {
-    return m_.move_to_initialized != nullptr;
+    return m_.move_assign != nullptr;
   }
 
   bool is_destructible() const
@@ -218,12 +218,12 @@ class CPPType : NonCopyable, NonMovable {
 
   bool is_copy_assignable() const
   {
-    return m_.copy_to_initialized != nullptr;
+    return m_.copy_assign != nullptr;
   }
 
   bool is_move_assignable() const
   {
-    return m_.copy_to_uninitialized != nullptr;
+    return m_.copy_construct != nullptr;
   }
 
   /**
@@ -261,23 +261,23 @@ class CPPType : NonCopyable, NonMovable {
    * C++ equivalent:
    *   new (ptr) T;
    */
-  void construct_default(void *ptr) const
+  void default_construct(void *ptr) const
   {
     BLI_assert(this->pointer_can_point_to_instance(ptr));
 
-    m_.construct_default(ptr);
+    m_.default_construct(ptr);
   }
 
-  void construct_default_n(void *ptr, int64_t n) const
+  void default_construct_n(void *ptr, int64_t n) const
   {
-    this->construct_default_indices(ptr, IndexMask(n));
+    this->default_construct_indices(ptr, IndexMask(n));
   }
 
-  void construct_default_indices(void *ptr, IndexMask mask) const
+  void default_construct_indices(void *ptr, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(ptr));
 
-    m_.construct_default_indices(ptr, mask);
+    m_.default_construct_indices(ptr, mask);
   }
 
   /**
@@ -313,27 +313,27 @@ class CPPType : NonCopyable, NonMovable {
    * C++ equivalent:
    *   dst = src;
    */
-  void copy_to_initialized(const void *src, void *dst) const
+  void copy_assign(const void *src, void *dst) const
   {
     BLI_assert(src != dst);
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.copy_to_initialized(src, dst);
+    m_.copy_assign(src, dst);
   }
 
-  void copy_to_initialized_n(const void *src, void *dst, int64_t n) const
+  void copy_assign_n(const void *src, void *dst, int64_t n) const
   {
-    this->copy_to_initialized_indices(src, dst, IndexMask(n));
+    this->copy_assign_indices(src, dst, IndexMask(n));
   }
 
-  void copy_to_initialized_indices(const void *src, void *dst, IndexMask mask) const
+  void copy_assign_indices(const void *src, void *dst, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || src != dst);
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.copy_to_initialized_indices(src, dst, mask);
+    m_.copy_assign_indices(src, dst, mask);
   }
 
   /**
@@ -344,27 +344,27 @@ class CPPType : NonCopyable, NonMovable {
    * C++ equivalent:
    *   new (dst) T(src);
    */
-  void copy_to_uninitialized(const void *src, void *dst) const
+  void copy_construct(const void *src, void *dst) const
   {
     BLI_assert(src != dst);
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.copy_to_uninitialized(src, dst);
+    m_.copy_construct(src, dst);
   }
 
-  void copy_to_uninitialized_n(const void *src, void *dst, int64_t n) const
+  void copy_construct_n(const void *src, void *dst, int64_t n) const
   {
-    this->copy_to_uninitialized_indices(src, dst, IndexMask(n));
+    this->copy_construct_indices(src, dst, IndexMask(n));
   }
 
-  void copy_to_uninitialized_indices(const void *src, void *dst, IndexMask mask) const
+  void copy_construct_indices(const void *src, void *dst, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || src != dst);
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.copy_to_uninitialized_indices(src, dst, mask);
+    m_.copy_construct_indices(src, dst, mask);
   }
 
   /**
@@ -375,27 +375,27 @@ class CPPType : NonCopyable, NonMovable {
    * C++ equivalent:
    *   dst = std::move(src);
    */
-  void move_to_initialized(void *src, void *dst) const
+  void move_assign(void *src, void *dst) const
   {
     BLI_assert(src != dst);
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.move_to_initialized(src, dst);
+    m_.move_assign(src, dst);
   }
 
-  void move_to_initialized_n(void *src, void *dst, int64_t n) const
+  void move_assign_n(void *src, void *dst, int64_t n) const
   {
-    this->move_to_initialized_indices(src, dst, IndexMask(n));
+    this->move_assign_indices(src, dst, IndexMask(n));
   }
 
-  void move_to_initialized_indices(void *src, void *dst, IndexMask mask) const
+  void move_assign_indices(void *src, void *dst, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || src != dst);
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.move_to_initialized_indices(src, dst, mask);
+    m_.move_assign_indices(src, dst, mask);
   }
 
   /**
@@ -406,27 +406,27 @@ class CPPType : NonCopyable, NonMovable {
    * C++ equivalent:
    *   new (dst) T(std::move(src));
    */
-  void move_to_uninitialized(void *src, void *dst) const
+  void move_construct(void *src, void *dst) const
   {
     BLI_assert(src != dst);
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.move_to_uninitialized(src, dst);
+    m_.move_construct(src, dst);
   }
 
-  void move_to_uninitialized_n(void *src, void *dst, int64_t n) const
+  void move_construct_n(void *src, void *dst, int64_t n) const
   {
-    this->move_to_uninitialized_indices(src, dst, IndexMask(n));
+    this->move_construct_indices(src, dst, IndexMask(n));
   }
 
-  void move_to_uninitialized_indices(void *src, void *dst, IndexMask mask) const
+  void move_construct_indices(void *src, void *dst, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || src != dst);
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.move_to_uninitialized_indices(src, dst, mask);
+    m_.move_construct_indices(src, dst, mask);
   }
 
   /**
@@ -437,27 +437,27 @@ class CPPType : NonCopyable, NonMovable {
    *   dst = std::move(src);
    *   src->~T();
    */
-  void relocate_to_initialized(void *src, void *dst) const
+  void relocate_assign(void *src, void *dst) const
   {
     BLI_assert(src != dst);
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.relocate_to_initialized(src, dst);
+    m_.relocate_assign(src, dst);
   }
 
-  void relocate_to_initialized_n(void *src, void *dst, int64_t n) const
+  void relocate_assign_n(void *src, void *dst, int64_t n) const
   {
-    this->relocate_to_initialized_indices(src, dst, IndexMask(n));
+    this->relocate_assign_indices(src, dst, IndexMask(n));
   }
 
-  void relocate_to_initialized_indices(void *src, void *dst, IndexMask mask) const
+  void relocate_assign_indices(void *src, void *dst, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || src != dst);
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.relocate_to_initialized_indices(src, dst, mask);
+    m_.relocate_assign_indices(src, dst, mask);
   }
 
   /**
@@ -468,27 +468,27 @@ class CPPType : NonCopyable, NonMovable {
    *   new (dst) T(std::move(src))
    *   src->~T();
    */
-  void relocate_to_uninitialized(void *src, void *dst) const
+  void relocate_construct(void *src, void *dst) const
   {
     BLI_assert(src != dst);
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.relocate_to_uninitialized(src, dst);
+    m_.relocate_construct(src, dst);
   }
 
-  void relocate_to_uninitialized_n(void *src, void *dst, int64_t n) const
+  void relocate_construct_n(void *src, void *dst, int64_t n) const
   {
-    this->relocate_to_uninitialized_indices(src, dst, IndexMask(n));
+    this->relocate_construct_indices(src, dst, IndexMask(n));
   }
 
-  void relocate_to_uninitialized_indices(void *src, void *dst, IndexMask mask) const
+  void relocate_construct_indices(void *src, void *dst, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || src != dst);
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.relocate_to_uninitialized_indices(src, dst, mask);
+    m_.relocate_construct_indices(src, dst, mask);
   }
 
   /**
@@ -496,20 +496,20 @@ class CPPType : NonCopyable, NonMovable {
    *
    * Other instances of the same type should live in the array before this method is called.
    */
-  void fill_initialized(const void *value, void *dst, int64_t n) const
+  void fill_assign(const void *value, void *dst, int64_t n) const
   {
     BLI_assert(n == 0 || this->pointer_can_point_to_instance(value));
     BLI_assert(n == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.fill_initialized(value, dst, n);
+    m_.fill_assign(value, dst, n);
   }
 
-  void fill_initialized_indices(const void *value, void *dst, IndexMask mask) const
+  void fill_assign_indices(const void *value, void *dst, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(value));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.fill_initialized_indices(value, dst, mask);
+    m_.fill_assign_indices(value, dst, mask);
   }
 
   /**
@@ -517,20 +517,20 @@ class CPPType : NonCopyable, NonMovable {
    *
    * The array should be uninitialized before this method is called.
    */
-  void fill_uninitialized(const void *value, void *dst, int64_t n) const
+  void fill_construct(const void *value, void *dst, int64_t n) const
   {
     BLI_assert(n == 0 || this->pointer_can_point_to_instance(value));
     BLI_assert(n == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.fill_uninitialized(value, dst, n);
+    m_.fill_construct(value, dst, n);
   }
 
-  void fill_uninitialized_indices(const void *value, void *dst, IndexMask mask) const
+  void fill_construct_indices(const void *value, void *dst, IndexMask mask) const
   {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(value));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.fill_uninitialized_indices(value, dst, mask);
+    m_.fill_construct_indices(value, dst, mask);
   }
 
   void debug_print(const void *value, std::stringstream &ss) const

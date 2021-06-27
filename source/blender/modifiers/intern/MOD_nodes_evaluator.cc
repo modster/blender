@@ -896,7 +896,7 @@ class GeometryNodesEvaluator {
       OutputState &output_state = node_state.outputs[socket->index()];
       output_state.has_been_computed = true;
       void *buffer = allocator.allocate(type->size(), type->alignment());
-      type->copy_to_uninitialized(type->default_value(), buffer);
+      type->copy_construct(type->default_value(), buffer);
       this->forward_output({node.context(), socket}, {*type, buffer});
     }
   }
@@ -975,7 +975,7 @@ class GeometryNodesEvaluator {
       /* Move value into memory owned by the outer allocator. */
       const CPPType &type = *input_state.type;
       void *buffer = outer_allocator_.allocate(type.size(), type.alignment());
-      type.move_to_uninitialized(value, buffer);
+      type.move_construct(value, buffer);
 
       params_.r_output_values.append({type, buffer});
     }
@@ -1212,7 +1212,7 @@ class GeometryNodesEvaluator {
     }
     else {
       /* Cannot convert, use default value instead. */
-      to_type.copy_to_uninitialized(to_type.default_value(), buffer);
+      to_type.copy_construct(to_type.default_value(), buffer);
     }
     this->add_value_to_input_socket(to_socket, from_socket, {to_type, buffer});
   }
@@ -1238,7 +1238,7 @@ class GeometryNodesEvaluator {
       const CPPType &type = *value_to_forward.type();
       for (const DInputSocket &to_socket : to_sockets.drop_front(1)) {
         void *buffer = allocator.allocate(type.size(), type.alignment());
-        type.copy_to_uninitialized(value_to_forward.get(), buffer);
+        type.copy_construct(value_to_forward.get(), buffer);
         this->add_value_to_input_socket(to_socket, from_socket, {type, buffer});
       }
       /* Forward the original value to one of the targets. */
@@ -1339,7 +1339,7 @@ class GeometryNodesEvaluator {
     }
     /* Use a default fallback value when the loaded type is not compatible. */
     void *default_buffer = allocator.allocate(required_type.size(), required_type.alignment());
-    required_type.copy_to_uninitialized(required_type.default_value(), default_buffer);
+    required_type.copy_construct(required_type.default_value(), default_buffer);
     return {required_type, default_buffer};
   }
 
