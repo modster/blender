@@ -548,7 +548,7 @@ class CPPType : NonCopyable, NonMovable {
   void print_or_default(const void *value, std::stringstream &ss, StringRef default_value) const
   {
     if (this->is_printable()) {
-      m_.print(value, ss);
+      this->print(value, ss);
     }
     else {
       ss << default_value;
@@ -560,6 +560,14 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(this->pointer_can_point_to_instance(a));
     BLI_assert(this->pointer_can_point_to_instance(b));
     return m_.is_equal(a, b);
+  }
+
+  bool is_equal_or_false(const void *a, const void *b) const
+  {
+    if (this->is_equality_comparable()) {
+      return this->is_equal(a, b);
+    }
+    return false;
   }
 
   uint64_t hash(const void *value) const
