@@ -576,6 +576,14 @@ class CPPType : NonCopyable, NonMovable {
     return m_.hash(value);
   }
 
+  uint64_t hash_or_fallback(const void *value, uint64_t fallback_hash) const
+  {
+    if (this->is_hashable()) {
+      return this->hash(value);
+    }
+    return fallback_hash;
+  }
+
   /**
    * Get a pointer to a constant value of this type. The specific value depends on the type.
    * It is usually a zero-initialized or default constructed value.
