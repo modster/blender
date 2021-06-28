@@ -43,6 +43,7 @@
 #include "BKE_curve.h"
 #include "BKE_duplilist.h"
 #include "BKE_editmesh.h"
+#include "BKE_geometry_set.h"
 #include "BKE_global.h"
 #include "BKE_layer.h"
 #include "BKE_mesh.h"
@@ -500,10 +501,12 @@ static void iter_snap_objects(SnapObjectContext *sctx,
     }
 
     Object *obj_eval = DEG_get_evaluated_object(depsgraph, base->object);
-    if (obj_eval->transflag & OB_DUPLI) {
-      DupliObject *dupli_ob;
+    if (obj_eval->transflag & OB_DUPLI ||
+        (obj_eval->runtime.geometry_set_eval != NULL &&
+         BKE_geometry_set_has_instances(obj_eval->runtime.geometry_set_eval))) {
       ListBase *lb = object_duplilist(depsgraph, sctx->scene, obj_eval);
-      for (dupli_ob = lb->first; dupli_ob; dupli_ob = dupli_ob->next) {
+      for (DupliObject *dupli_ob = lb->first; dupli_ob; dupli_ob = dupli_ob->next) {
+        BLI_assert(DEG_is_evaluated_object(dupli_ob->ob));
         sob_callback(sctx,
                      dupli_ob->ob,
                      dupli_ob->mat,
@@ -886,7 +889,8 @@ static bool raycastEditMesh(SnapObjectContext *sctx,
 
   if (treedata->tree == NULL) {
     /* Operators only update the editmesh looptris of the original mesh. */
-    BLI_assert(sod->treedata_editmesh.em == BKE_editmesh_from_object(DEG_get_original_object(ob_eval)));
+    BLI_assert(sod->treedata_editmesh.em ==
+               BKE_editmesh_from_object(DEG_get_original_object(ob_eval)));
     em = sod->treedata_editmesh.em;
 
     if (sctx->callbacks.edit_mesh.test_face_fn) {
@@ -2276,7 +2280,7 @@ static short snapMesh(SnapObjectContext *sctx,
   if (me_eval->totvert == 0) {
     return 0;
   }
-  else if (me_eval->totedge == 0 && !(snapdata->snap_to_flag & SCE_SNAP_MODE_VERTEX)) {
+  if (me_eval->totedge == 0 && !(snapdata->snap_to_flag & SCE_SNAP_MODE_VERTEX)) {
     return 0;
   }
 
@@ -3115,8 +3119,15 @@ static short transform_snap_context_project_view3d_mixed_impl(
       new_clipplane[3] += 0.01f;
 
       /* Try to snap only to the polygon. */
-      elem_test = snap_mesh_polygon(
-          sctx, &snapdata, ob_eval, obmat, params->use_backface_culling, &dist_px_tmp, loc, no, &index);
+      elem_test = snap_mesh_polygon(sctx,
+                                    &snapdata,
+                                    ob_eval,
+                                    obmat,
+                                    params->use_backface_culling,
+                                    &dist_px_tmp,
+                                    loc,
+                                    no,
+                                    &index);
       if (elem_test) {
         elem = elem_test;
       }
