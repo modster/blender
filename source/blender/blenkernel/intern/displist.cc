@@ -930,17 +930,6 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
   return geometry_set;
 }
 
-static Mesh *curve_calc_modifiers_post_for_mesh(Depsgraph *depsgraph,
-                                                const Scene *scene,
-                                                Object *ob,
-                                                ListBase *dispbase,
-                                                const bool for_render)
-{
-  GeometrySet geometry_set = curve_calc_modifiers_post(depsgraph, scene, ob, dispbase, for_render);
-  MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-  return mesh_component.release();
-}
-
 static void displist_surf_indices(DispList *dl)
 {
   int b, p1, p2, p3, p4;
@@ -979,19 +968,20 @@ static void displist_make_surf(Depsgraph *depsgraph,
                                Mesh **r_final,
                                const bool for_render)
 {
-  ListBase nubase = {nullptr, nullptr};
   const Curve *cu = (const Curve *)ob->data;
 
+  ListBase *nubase = &ob->runtime.curve_cache->deformed_nurbs;
+
   if (!for_render && cu->editnurb) {
-    BKE_nurbList_duplicate(&nubase, BKE_curve_editNurbs_get(const_cast<Curve *>(cu)));
+    BKE_nurbList_duplicate(nubase, BKE_curve_editNurbs_get_for_read(cu));
   }
   else {
-    BKE_nurbList_duplicate(&nubase, &cu->nurb);
+    BKE_nurbList_duplicate(nubase, &cu->nurb);
   }
 
-  BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, &nubase, &nubase, for_render);
+  BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, nubase, nubase, for_render);
 
-  LISTBASE_FOREACH (Nurb *, nu, &nubase) {
+  LISTBASE_FOREACH (Nurb *, nu, nubase) {
     if (!(for_render || nu->hide == 0) || !BKE_nurb_check_valid_uv(nu)) {
       continue;
     }
@@ -1052,13 +1042,9 @@ static void displist_make_surf(Depsgraph *depsgraph,
     }
   }
 
-  BKE_nurbList_duplicate(&ob->runtime.curve_cache->deformed_nurbs, &nubase);
-
-  if (r_final) {
-    *r_final = curve_calc_modifiers_post_for_mesh(depsgraph, scene, ob, dispbase, for_render);
-  }
-
-  BKE_nurbList_free(&nubase);
+  GeometrySet geometry_set = curve_calc_modifiers_post(depsgraph, scene, ob, dispbase, for_render);
+  MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+  *r_final = mesh_component.release();
 }
 
 static void rotateBevelPiece(const Curve *cu,
@@ -1287,13 +1273,6 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
 {
   const Curve *cu = (const Curve *)ob->data;
   BLI_assert(ELEM(ob->type, OB_CURVE, OB_FONT));
-
-  BKE_curve_bevelList_free(&ob->runtime.curve_cache->bev);
-
-  if (ob->runtime.curve_cache->anim_path_accum_length) {
-    MEM_freeN((void *)ob->runtime.curve_cache->anim_path_accum_length);
-  }
-  ob->runtime.curve_cache->anim_path_accum_length = nullptr;
 
   ListBase *nubase = &ob->runtime.curve_cache->deformed_nurbs;
 
