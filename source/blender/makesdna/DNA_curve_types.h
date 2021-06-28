@@ -344,8 +344,6 @@ enum {
   CU_DS_EXPAND = 1 << 11,
   /** make use of the path radius if this is enabled (default for new curves) */
   CU_PATH_RADIUS = 1 << 12,
-  /** fill 2d curve after deformation */
-  CU_DEFORM_FILL = 1 << 13,
   /** fill bevel caps */
   CU_FILL_CAPS = 1 << 14,
   /** map taper object to beveled area */

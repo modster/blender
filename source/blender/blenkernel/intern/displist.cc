@@ -546,11 +546,6 @@ static void bevels_to_filledpoly(const Curve *cu, ListBase *dispbase)
 
   LISTBASE_FOREACH (const DispList *, dl, dispbase) {
     if (dl->type == DL_SURF) {
-
-      /* This should be moved specifically to the surface evaluation functions,
-       * now that they are further separated. */
-      BLI_assert_unreachable();
-
       if ((dl->flag & DL_CYCL_V) && (dl->flag & DL_CYCL_U) == 0) {
         if ((cu->flag & CU_BACK) && (dl->flag & DL_BACK_CURVE)) {
           DispList *dlnew = (DispList *)MEM_callocN(sizeof(DispList), __func__);
@@ -874,9 +869,7 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
     geometry_set.replace_curve(curve_eval.release());
   }
   else {
-    if (cu->flag & CU_DEFORM_FILL) {
-      curve_to_filledpoly(cu, dispbase);
-    }
+    curve_to_filledpoly(cu, dispbase);
     Mesh *mesh = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
     /* Copy materials, since BKE_mesh_new_nomain_from_curve_displist() doesn't. */
     mesh->mat = (Material **)MEM_dupallocN(cu->mat);
@@ -1295,8 +1288,6 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
   const Curve *cu = (const Curve *)ob->data;
   BLI_assert(ELEM(ob->type, OB_CURVE, OB_FONT));
 
-  ListBase nubase = {nullptr, nullptr};
-
   BKE_curve_bevelList_free(&ob->runtime.curve_cache->bev);
 
   if (ob->runtime.curve_cache->anim_path_accum_length) {
@@ -1304,29 +1295,31 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
   }
   ob->runtime.curve_cache->anim_path_accum_length = nullptr;
 
+  ListBase *nubase = &ob->runtime.curve_cache->deformed_nurbs;
+
   if (ob->type == OB_FONT) {
-    BKE_vfont_to_curve_nubase(ob, FO_EDIT, &nubase);
+    BKE_vfont_to_curve_nubase(ob, FO_EDIT, nubase);
   }
   else {
-    BKE_nurbList_duplicate(&nubase, BKE_curve_nurbs_get(const_cast<Curve *>(cu)));
+    BKE_nurbList_duplicate(nubase, BKE_curve_nurbs_get(const_cast<Curve *>(cu)));
   }
 
-  BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, &nubase, &nubase, for_render);
+  BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, nubase, nubase, for_render);
 
-  BKE_curve_bevelList_make(ob, &nubase, for_render);
+  BKE_curve_bevelList_make(ob, nubase, for_render);
 
   /* If curve has no bevel will return nothing */
   ListBase dlbev = BKE_curve_bevel_make(cu);
 
   /* no bevel or extrude, and no width correction? */
   if (BLI_listbase_is_empty(&dlbev) && cu->width == 1.0f) {
-    curve_to_displist(cu, &nubase, for_render, dispbase);
+    curve_to_displist(cu, nubase, for_render, dispbase);
   }
   else {
     const float widfac = cu->width - 1.0f;
 
-    BevList *bl = (BevList *)ob->runtime.curve_cache->bev.first;
-    Nurb *nu = (Nurb *)nubase.first;
+    const BevList *bl = (BevList *)ob->runtime.curve_cache->bev.first;
+    const Nurb *nu = (Nurb *)nubase->first;
     for (; bl && nu; bl = bl->next, nu = nu->next) {
       float *data;
 
@@ -1491,23 +1484,16 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
         }
       }
     }
-    BKE_displist_free(&dlbev);
   }
 
-  if (!(cu->flag & CU_DEFORM_FILL)) {
-    curve_to_filledpoly(cu, dispbase);
-  }
+  BKE_displist_free(&dlbev);
 
   if ((cu->flag & CU_PATH) ||
       DEG_get_eval_flags_for_id(depsgraph, &ob->id) & DAG_EVAL_NEED_CURVE_PATH) {
     BKE_anim_path_calc_data(ob);
   }
 
-  BKE_nurbList_duplicate(&ob->runtime.curve_cache->deformed_nurbs, &nubase);
-
   *r_geometry_set = curve_calc_modifiers_post(depsgraph, scene, ob, dispbase, for_render);
-
-  BKE_nurbList_free(&nubase);
 }
 
 void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
