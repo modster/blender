@@ -149,11 +149,11 @@ typedef struct MaterialLineArt {
   /* eMaterialLineArtFlags */
   int flags;
 
-  /* Used to filter line art occlusion */
+  /* Used to filter line art occlusion edges */
   unsigned char material_mask_bits;
 
   /** Maximum 255 levels of equavalent occlusion. */
-  unsigned char occlusion_effectiveness;
+  unsigned char mat_occlusion;
 
   unsigned char _pad[2];
 } MaterialLineArt;

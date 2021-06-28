@@ -152,7 +152,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
                              double start,
                              double end,
                              uchar material_mask_bits,
-                             uchar occlusion_effectiveness)
+                             uchar mat_occlusion)
 {
   LineartEdgeSegment *es, *ies, *next_es, *prev_es;
   LineartEdgeSegment *cut_start_before = 0, *cut_end_before = 0;
@@ -287,7 +287,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
 
   /* Register 1 level of occlusion for all touched segments. */
   for (es = ns; es && es != ns2; es = es->next) {
-    es->occlusion += occlusion_effectiveness;
+    es->occlusion += mat_occlusion;
     es->material_mask_bits |= material_mask_bits;
   }
 
@@ -382,7 +382,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
           lineart_occlusion_is_adjacent_intersection(e, (LineartTriangle *)tri) ||
           /* Or if this triangle isn't effectively occluding anything nor it's providing a
             material flag. */
-          ((!tri->base.occlusion_effectiveness) && (!tri->base.material_mask_bits))) {
+          ((!tri->base.mat_occlusion) && (!tri->base.material_mask_bits))) {
         continue;
       }
       tri->testing_e[thread_id] = e;
@@ -398,8 +398,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
                                                       rb->shift_y,
                                                       &l,
                                                       &r)) {
-        lineart_edge_cut(
-            rb, e, l, r, tri->base.material_mask_bits, tri->base.occlusion_effectiveness);
+        lineart_edge_cut(rb, e, l, r, tri->base.material_mask_bits, tri->base.mat_occlusion);
         if (e->min_occ > rb->max_occlusion_level) {
           /* No need to calculate any longer on this line because no level more than set value is
            * going to show up in the rendered result. */
@@ -1867,16 +1866,15 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     loop = loop->next;
     tri->v[2] = &orv[BM_elem_index_get(loop->v)];
 
-    /* material mask bits and occlusion effectiveness assignment, */
-    /* bits are shifted to higher 6 bits. See MaterialLineArt::material_mask_flags for details. */
+    /* Material mask bits and occlusion effectiveness assignment. */
     Material *mat = BKE_object_material_get(orig_ob, f->mat_nr + 1);
     tri->material_mask_bits |= ((mat && (mat->lineart.flags & LRT_MATERIAL_MASK_ENABLED)) ?
                                     mat->lineart.material_mask_bits :
                                     0);
-    tri->occlusion_effectiveness |= ((mat && (mat->lineart.flags &
-                                              LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) ?
-                                         mat->lineart.occlusion_effectiveness :
-                                         1);
+    tri->mat_occlusion |= ((mat &&
+                            (mat->lineart.flags & LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) ?
+                               mat->lineart.mat_occlusion :
+                               1);
 
     tri->intersection_mask = obi->override_intersection_mask;
 

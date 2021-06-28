@@ -54,7 +54,7 @@ typedef struct LineartTriangle {
 
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
-  unsigned char occlusion_effectiveness;
+  unsigned char mat_occlusion;
   unsigned char flags; /* #eLineartTriangleFlags */
 
   /**
@@ -102,7 +102,7 @@ typedef struct LineartEdgeSegment {
   /** Occlusion level after "at" point */
   unsigned char occlusion;
 
-  /* Used to filter line art occlusion */
+  /* Used to filter line art occlusion edges */
   unsigned char material_mask_bits;
 } LineartEdgeSegment;
 

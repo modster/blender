@@ -886,7 +886,7 @@ typedef enum eLineArtGPencilModifierFlags {
 
 typedef enum eLineartGpencilMaskSwitches {
   LRT_GPENCIL_MATERIAL_MASK_ENABLE = (1 << 0),
-  /** Set to true means using "and" instead of "or" logic on mask bits. */
+  /** When set, material mask bit comparisons are done with bit wise "AND" instead of "OR". */
   LRT_GPENCIL_MATERIAL_MASK_MATCH = (1 << 1),
   LRT_GPENCIL_INTERSECTION_FILTER = (1 << 2),
   LRT_GPENCIL_INTERSECTION_MATCH = (1 << 3),
