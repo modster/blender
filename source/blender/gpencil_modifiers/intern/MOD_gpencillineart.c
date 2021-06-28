@@ -593,6 +593,7 @@ static void face_mark_panel_draw(const bContext *UNUSED(C), Panel *panel)
   if (!use_cache || is_first) {
     uiItemR(layout, ptr, "use_face_mark_invert", 0, NULL, ICON_NONE);
     uiItemR(layout, ptr, "use_face_mark_boundaries", 0, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "use_face_mark_keep_contour", 0, NULL, ICON_NONE);
   }
   else {
     uiItemL(layout, "Cached with the first line art modifier.", ICON_INFO);

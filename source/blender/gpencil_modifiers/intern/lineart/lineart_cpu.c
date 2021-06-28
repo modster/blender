@@ -1485,6 +1485,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
 
   FreestyleEdge *fel, *fer;
   bool face_mark_filtered = false;
+  bool only_contour = false;
 
   if (use_freestyle_face && rb->filter_face_mark) {
     fel = CustomData_bmesh_get(&bm_if_freestyle->pdata, ll->f->head.data, CD_FREESTYLE_FACE);
@@ -1509,13 +1510,18 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
       face_mark_filtered = !face_mark_filtered;
     }
     if (!face_mark_filtered) {
-      return 0;
+      if (rb->filter_face_mark_keep_contour) {
+        only_contour = true;
+      }
+      else {
+        return 0;
+      }
     }
   }
 
   uint16_t edge_flag_result = 0;
 
-  if (use_freestyle_edge && rb->use_edge_marks) {
+  if ((!only_contour) && use_freestyle_edge && rb->use_edge_marks) {
     FreestyleEdge *fe;
     fe = CustomData_bmesh_get(&bm_if_freestyle->edata, e->head.data, CD_FREESTYLE_EDGE);
     if (fe->flag & FREESTYLE_EDGE_MARK) {
@@ -1557,6 +1563,12 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
       edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
     }
+  }
+
+  /* For when face mark filtering decided that we discard the face but keep_contour option is on.
+   * so we still have correct full contour around the object. */
+  if (only_contour) {
+    return edge_flag_result;
   }
 
   if (rb->use_light_contour) {
@@ -3156,6 +3168,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;
   rb->filter_face_mark_boundaries = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_BOUNDARIES) !=
                                     0;
+  rb->filter_face_mark_keep_contour = (lmd->calculation_flags &
+                                       LRT_FILTER_FACE_MARK_KEEP_CONTOUR) != 0;
 
   rb->chain_data_pool = &lc->chain_data_pool;
 
