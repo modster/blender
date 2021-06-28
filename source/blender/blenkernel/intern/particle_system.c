@@ -1007,7 +1007,7 @@ void psys_get_birth_coords(
           mul_qt_v3(q_imat, rot_vec_local);
 
           /* vtan_local */
-          copy_v3_v3(vtan_local, vtan); /* flips, cant use */
+          copy_v3_v3(vtan_local, vtan); /* flips, can't use */
           mul_qt_v3(q_imat, vtan_local);
 
           /* ensure orthogonal matrix (rot_vec aligned) */
@@ -1320,6 +1320,14 @@ void psys_get_pointcache_start_end(Scene *scene, ParticleSystem *psys, int *sfra
   *efra = min_ii((int)(part->end + part->lifetime + 1.0f), max_ii(scene->r.pefra, scene->r.efra));
 }
 
+/* BVH tree balancing inside a mutex lock must be run in isolation. Balancing
+ * is multithreaded, and we do not want the current thread to start another task
+ * that may involve acquiring the same mutex lock that it is waiting for. */
+static void bvhtree_balance_isolated(void *userdata)
+{
+  BLI_bvhtree_balance((BVHTree *)userdata);
+}
+
 /************************************************/
 /*          Effectors                           */
 /************************************************/
@@ -1356,7 +1364,8 @@ static void psys_update_particle_bvhtree(ParticleSystem *psys, float cfra)
           }
         }
       }
-      BLI_bvhtree_balance(psys->bvhtree);
+
+      BLI_task_isolate(bvhtree_balance_isolated, psys->bvhtree);
 
       psys->bvhtree_frame = cfra;
 
