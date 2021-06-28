@@ -37,24 +37,24 @@ namespace blender::gpu {
 void VKBackend::platform_init(void)
 {
   BLI_assert(!GPG.initialized);
-  GPG.initialized = true;
+
+  const char *vendor = "vendor";
+  const char *renderer = "renderer";
+  const char *version = "version";
+  eGPUDeviceType device = GPU_DEVICE_ANY;
+  eGPUOSType os = GPU_OS_ANY;
+  eGPUDriverType driver = GPU_DRIVER_ANY;
+  eGPUSupportLevel support_level = GPU_SUPPORT_LEVEL_SUPPORTED;
 
 #ifdef _WIN32
-  GPG.os = GPU_OS_WIN;
+  os = GPU_OS_WIN;
 #elif defined(__APPLE__)
-  GPG.os = GPU_OS_MAC;
+  os = GPU_OS_MAC;
 #else
-  GPG.os = GPU_OS_UNIX;
+  os = GPU_OS_UNIX;
 #endif
 
-  GPG.device = GPU_DEVICE_ANY;
-  GPG.driver = GPU_DRIVER_ANY;
-
-  /* Detect support level */
-  GPG.support_level = GPU_SUPPORT_LEVEL_SUPPORTED;
-
-  GPG.create_key(GPG.support_level, "vendor", "renderer", "version");
-  GPG.create_gpu_name("vendor", "renderer", "version");
+  GPG.init(device, os, driver, support_level, vendor, renderer, version);
 }
 
 void VKBackend::platform_exit(void)

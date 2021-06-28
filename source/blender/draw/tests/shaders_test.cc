@@ -2,12 +2,12 @@
 
 #include "testing/testing.h"
 
+#include "draw_testing.hh"
 #include "intern/draw_manager_testing.h"
 
 #include "GPU_context.h"
 #include "GPU_init_exit.h"
 #include "GPU_shader.h"
-#include "gpu_testing.hh"
 
 #include "engines/eevee/eevee_private.h"
 #include "engines/gpencil/gpencil_engine.h"
@@ -42,7 +42,6 @@ static void test_workbench_glsl_shaders()
 {
 
   workbench_shader_library_ensure();
-  DRW_draw_state_init_gtests(GPU_SHADER_CFG_DEFAULT);
 
   const int MAX_WPD = 6;
   WORKBENCH_PrivateData wpds[MAX_WPD];
