@@ -110,6 +110,10 @@ if(WITH_MOD_FLUID)
   add_subdirectory(mantaflow)
 endif()
 
+if (WITH_COMPOSITOR)
+	add_subdirectory(smaa_areatex)
+endif()
+
 if(WITH_VULKAN)
   add_subdirectory(vulkan_memory_allocator)
 endif()
