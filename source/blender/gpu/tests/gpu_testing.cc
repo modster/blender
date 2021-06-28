@@ -3,6 +3,7 @@
 #include "testing/testing.h"
 
 #include "BKE_global.h"
+#include "CLG_log.h"
 
 #include "GPU_context.h"
 #include "GPU_init_exit.h"
@@ -15,6 +16,7 @@ namespace blender::gpu {
 void GPUTest::SetUp()
 {
   GHOST_GLSettings glSettings = {0};
+  CLG_init();
   ghost_system = GHOST_CreateSystem();
   ghost_context = GHOST_CreateOpenGLContext(ghost_system, draw_context_type, glSettings);
   context = GPU_context_create(NULL, ghost_context);
@@ -28,6 +30,7 @@ void GPUTest::TearDown()
   GPU_context_discard(context);
   GHOST_DisposeOpenGLContext(ghost_system, ghost_context);
   GHOST_DisposeSystem(ghost_system);
+  CLG_exit();
 }
 
 GPUOpenGLTest::GPUOpenGLTest()
