@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "BKE_mesh_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,8 +46,6 @@ struct MetaBall;
 struct PointCloud;
 struct Volume;
 struct bGPdata;
-
-#include "BKE_mesh_types.h"
 
 /* Expose via BKE callbacks */
 void DRW_mball_batch_cache_dirty_tag(struct MetaBall *mb, int mode);
