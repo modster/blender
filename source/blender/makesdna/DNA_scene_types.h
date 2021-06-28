@@ -241,7 +241,8 @@ typedef struct SceneRenderLayer {
 #define SCE_LAY_FRS (1 << 6)
 #define SCE_LAY_AO (1 << 7)
 #define SCE_LAY_VOLUMES (1 << 8)
-/* flags between (1 << 8) and (1 << 15) are set to 1 already, for future options */
+#define SCE_LAY_MOTION_BLUR (1 << 9)
+/* flags between (1 << 9) and (1 << 15) are set to 1 already, for future options */
 
 #define SCE_LAY_ALL_Z (1 << 15)
 /* #define SCE_LAY_XOR         (1 << 16) */ /* UNUSED */
@@ -699,7 +700,8 @@ typedef struct RenderData {
   float frs_sec_base;
 
   /**
-   * Value used to define filter size for all filter options  */
+   * Value used to define filter size for all filter options.
+   */
   float gauss;
 
   /* color management settings - color profiles, gamma correction, etc */

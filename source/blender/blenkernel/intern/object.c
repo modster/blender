@@ -957,8 +957,8 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
         ob, eModifierType_Fluidsim);
 
     if (fluidmd && fluidmd->fss) {
-      BLO_read_id_address(
-          reader, ob->id.lib, &fluidmd->fss->ipo); /* XXX deprecated - old animation system */
+      /* XXX: deprecated - old animation system. */
+      BLO_read_id_address(reader, ob->id.lib, &fluidmd->fss->ipo);
     }
   }
 
@@ -2854,7 +2854,7 @@ void BKE_object_copy_proxy_drivers(Object *ob, Object *target)
             else {
               /* only on local objects because this causes indirect links
                * 'a -> b -> c', blend to point directly to a.blend
-               * when a.blend has a proxy that's linked into c.blend  */
+               * when a.blend has a proxy that's linked into `c.blend`. */
               if (!ID_IS_LINKED(ob)) {
                 id_lib_extern((ID *)dtar->id);
               }
@@ -2890,7 +2890,7 @@ void BKE_object_make_proxy(Main *bmain, Object *ob, Object *target, Object *cob)
 
   /* copy transform
    * - cob means this proxy comes from a collection, just apply the matrix
-   *   so the object wont move from its dupli-transform.
+   *   so the object won't move from its dupli-transform.
    *
    * - no cob means this is being made from a linked object,
    *   this is closer to making a copy of the object - in-place. */
@@ -4447,7 +4447,7 @@ bool BKE_object_obdata_texspace_get(Object *ob, short **r_texflag, float **r_loc
 }
 
 /** Get evaluated mesh for given object. */
-Mesh *BKE_object_get_evaluated_mesh(Object *object)
+Mesh *BKE_object_get_evaluated_mesh(const Object *object)
 {
   ID *data_eval = object->runtime.data_eval;
   return (data_eval && GS(data_eval->name) == ID_ME) ? (Mesh *)data_eval : NULL;
@@ -4460,7 +4460,7 @@ Mesh *BKE_object_get_evaluated_mesh(Object *object)
  * - For copied-on-write objects it will give pointer to a copied-on-write
  *   mesh which corresponds to original object's mesh.
  */
-Mesh *BKE_object_get_pre_modified_mesh(Object *object)
+Mesh *BKE_object_get_pre_modified_mesh(const Object *object)
 {
   if (object->type == OB_MESH && object->runtime.data_orig != NULL) {
     BLI_assert(object->id.tag & LIB_TAG_COPIED_ON_WRITE);
@@ -4481,7 +4481,7 @@ Mesh *BKE_object_get_pre_modified_mesh(Object *object)
  * - For evaluated objects it will be same mesh as corresponding original
  *   object uses as data.
  */
-Mesh *BKE_object_get_original_mesh(Object *object)
+Mesh *BKE_object_get_original_mesh(const Object *object)
 {
   Mesh *result = NULL;
   if (object->id.orig_id == NULL) {

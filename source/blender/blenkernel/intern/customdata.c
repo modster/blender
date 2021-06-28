@@ -1970,7 +1970,7 @@ const CustomData_MeshMasks CD_MASK_BMESH = {
               CD_MASK_SCULPT_FACE_SETS),
 };
 /**
- * cover values copied by #BKE_mesh_loops_to_tessdata
+ * cover values copied by #mesh_loops_to_tessdata
  */
 const CustomData_MeshMasks CD_MASK_FACECORNERS = {
     .vmask = 0,
@@ -2811,6 +2811,14 @@ void *CustomData_duplicate_referenced_layer_named(CustomData *data,
   int layer_index = CustomData_get_named_layer_index(data, type, name);
 
   return customData_duplicate_referenced_layer_index(data, layer_index, totelem);
+}
+
+void CustomData_duplicate_referenced_layers(CustomData *data, int totelem)
+{
+  for (int i = 0; i < data->totlayer; i++) {
+    CustomDataLayer *layer = &data->layers[i];
+    layer->data = CustomData_duplicate_referenced_layer(data, layer->type, totelem);
+  }
 }
 
 bool CustomData_is_referenced_layer(struct CustomData *data, int type)
