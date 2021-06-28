@@ -57,9 +57,7 @@ static void add_curve_data_as_geometry_component(const Object &object, GeometryS
 {
   BLI_assert(object.type == OB_CURVE);
   if (object.data != nullptr) {
-    const Curve &dna_curve = *static_cast<const Curve *>(object.data);
-    std::unique_ptr<CurveEval> curve = curve_eval_from_dna_curve(
-        dna_curve, *BKE_curve_nurbs_get_for_read(&dna_curve));
+    std::unique_ptr<CurveEval> curve = curve_eval_from_dna_curve(*(const Curve *)object.data);
     CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
     curve_component.replace(curve.release(), GeometryOwnershipType::Owned);
   }

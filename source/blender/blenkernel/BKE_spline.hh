@@ -549,3 +549,4 @@ struct CurveEval {
 
 std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &curve,
                                                      const ListBase &nurbs_list);
+std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve);

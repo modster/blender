@@ -296,6 +296,11 @@ std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve,
   return curve;
 }
 
+std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve)
+{
+  return curve_eval_from_dna_curve(dna_curve, *BKE_curve_nurbs_get_for_read(&dna_curve));
+}
+
 /**
  * Check the invariants that curve control point attributes should always uphold, necessary
  * because attributes are stored on splines rather than in a flat array on the curve:
