@@ -89,8 +89,11 @@ class COLLECTION_PT_lineart_collection(CollectionButtonsPanel, Panel):
         row.prop(collection, "lineart_usage")
 
         layout.prop(collection, "lineart_use_intersection_mask")
-        row = layout.row()
-        row.prop(collection, "lineart_intersection_mask", text="Masks", toggle=True)
+
+        row = layout.row(align=True)
+        row.active = collection.lineart_use_intersection_mask
+        for i in range(0,8):
+            row.prop(collection, "lineart_intersection_mask", index=i, text=str(i), toggle=True)
 
 
 classes = (
