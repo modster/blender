@@ -67,6 +67,7 @@ class VKShader : public Shader {
   void vertex_shader_from_glsl(MutableSpan<const char *> sources) override;
   void geometry_shader_from_glsl(MutableSpan<const char *> sources) override;
   void fragment_shader_from_glsl(MutableSpan<const char *> sources) override;
+  void compute_shader_from_glsl(MutableSpan<const char *> sources) override;
   /* Return true on success. */
   bool finalize(void);
 

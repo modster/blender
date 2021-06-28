@@ -243,15 +243,12 @@ void VKShader::fragment_shader_from_glsl(MutableSpan<const char *> sources)
 #endif
 }
 
-/* TODO: Need to merge with master first. */
-#if 0
 void VKShader::compute_shader_from_glsl(MutableSpan<const char *> sources)
 {
-#  ifdef WITH_VULKAN_SHADER_COMPILATION
+#ifdef WITH_VULKAN_SHADER_COMPILATION
   compute_shader_ = this->create_shader_module(sources, VKShaderStageType::Compute);
-#  endif
-}
 #endif
+}
 
 /** \} */
 

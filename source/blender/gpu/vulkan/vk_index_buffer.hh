@@ -33,6 +33,13 @@ class VKIndexBuf : public IndexBuf {
  public:
   ~VKIndexBuf(){};
 
+  void bind_as_ssbo(uint binding) override{};
+
+  const uint32_t *read() const override
+  {
+    return nullptr;
+  };
+
   MEM_CXX_CLASS_ALLOC_FUNCS("VKIndexBuf")
 };
 

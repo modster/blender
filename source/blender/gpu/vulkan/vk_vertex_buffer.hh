@@ -34,7 +34,14 @@ class VKVertBuf : public VertBuf {
   friend class VKTexture; /* For buffer texture. */
 
  public:
+  void bind_as_ssbo(uint binding) override{};
+
   void update_sub(uint start, uint len, void *data) override{};
+  const void *read() const override
+  {
+    return nullptr;
+  };
+  void *unmap(const void *mapped_data) const override{return nullptr;};
 
  protected:
   void acquire_data(void) override

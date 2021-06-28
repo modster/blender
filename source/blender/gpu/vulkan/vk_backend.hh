@@ -59,6 +59,7 @@ class VKBackend : public GPUBackend {
   };
 
   void samplers_update(void) override{};
+  void compute_dispatch(int groups_x_len, int groups_y_len, int groups_z_len) override{};
 
   Context *context_alloc(void *ghost_window, void *ghost_context) override
   {
