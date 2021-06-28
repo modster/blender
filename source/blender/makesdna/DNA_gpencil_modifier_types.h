@@ -885,9 +885,9 @@ typedef enum eLineArtGPencilModifierFlags {
 } eLineArtGPencilModifierFlags;
 
 typedef enum eLineartGpencilMaskSwitches {
-  LRT_GPENCIL_TRANSPARENCY_ENABLE = (1 << 0),
+  LRT_GPENCIL_MATERIAL_MASK_ENABLE = (1 << 0),
   /** Set to true means using "and" instead of "or" logic on mask bits. */
-  LRT_GPENCIL_TRANSPARENCY_MATCH = (1 << 1),
+  LRT_GPENCIL_MATERIAL_MASK_MATCH = (1 << 1),
   LRT_GPENCIL_INTERSECTION_FILTER = (1 << 2),
   LRT_GPENCIL_INTERSECTION_MATCH = (1 << 3),
 } eLineartGpencilMaskSwitches;
@@ -933,7 +933,7 @@ typedef struct LineartGpencilModifierData {
   short thickness;
 
   unsigned char mask_switches; /* eLineartGpencilMaskSwitches */
-  unsigned char transparency_mask;
+  unsigned char material_mask_bits;
   unsigned char intersection_mask;
 
   char _pad[3];

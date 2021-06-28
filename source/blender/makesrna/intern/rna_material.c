@@ -688,16 +688,16 @@ static void rna_def_material_lineart(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "MaterialLineArt");
   RNA_def_struct_ui_text(srna, "Material Line Art", "");
 
-  prop = RNA_def_property(srna, "use_transparency", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_material_mask", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_default(prop, 0);
-  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_MATERIAL_TRANSPARENCY_ENABLED);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_MATERIAL_MASK_ENABLED);
   RNA_def_property_ui_text(
-      prop, "Use Transparency", "Use transparency mask from this material in line art");
+      prop, "Use Material Mask", "Use material masks to filter out occluded strokes");
   RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
 
-  prop = RNA_def_property(srna, "use_transparency_mask", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_material_mask_bits", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_default(prop, 0);
-  RNA_def_property_boolean_sdna(prop, NULL, "transparency_mask", 1);
+  RNA_def_property_boolean_sdna(prop, NULL, "material_mask_bits", 1);
   RNA_def_property_array(prop, 8);
   RNA_def_property_ui_text(prop, "Mask", "");
   RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");

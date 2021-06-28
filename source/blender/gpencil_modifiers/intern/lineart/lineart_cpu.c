@@ -151,7 +151,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
                              LineartEdge *e,
                              double start,
                              double end,
-                             uchar transparency_mask,
+                             uchar material_mask_bits,
                              uchar occlusion_effectiveness)
 {
   LineartEdgeSegment *es, *ies, *next_es, *prev_es;
@@ -245,7 +245,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
       /* Insert cutting points for when a new cut is needed. */
       ies = cut_start_before->prev ? cut_start_before->prev : NULL;
       ns->occlusion = ies ? ies->occlusion : 0;
-      ns->transparency_mask = ies->transparency_mask;
+      ns->material_mask_bits = ies->material_mask_bits;
       BLI_insertlinkbefore(&e->segments, cut_start_before, ns);
     }
     /* Otherwise we already found a existing cutting point, no need to insert a new one. */
@@ -255,7 +255,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
      * append the new cut to the end. */
     ies = e->segments.last;
     ns->occlusion = ies->occlusion;
-    ns->transparency_mask = ies->transparency_mask;
+    ns->material_mask_bits = ies->material_mask_bits;
     BLI_addtail(&e->segments, ns);
   }
   if (cut_end_before) {
@@ -263,14 +263,14 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
     if (cut_end_before != ns2) {
       ies = cut_end_before->prev ? cut_end_before->prev : NULL;
       ns2->occlusion = ies ? ies->occlusion : 0;
-      ns2->transparency_mask = ies ? ies->transparency_mask : 0;
+      ns2->material_mask_bits = ies ? ies->material_mask_bits : 0;
       BLI_insertlinkbefore(&e->segments, cut_end_before, ns2);
     }
   }
   else {
     ies = e->segments.last;
     ns2->occlusion = ies->occlusion;
-    ns2->transparency_mask = ies->transparency_mask;
+    ns2->material_mask_bits = ies->material_mask_bits;
     BLI_addtail(&e->segments, ns2);
   }
 
@@ -288,7 +288,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
   /* Register 1 level of occlusion for all touched segments. */
   for (es = ns; es && es != ns2; es = es->next) {
     es->occlusion += occlusion_effectiveness;
-    es->transparency_mask |= transparency_mask;
+    es->material_mask_bits |= material_mask_bits;
   }
 
   /* Reduce adjacent cutting points of the same level, which saves memory. */
@@ -298,7 +298,7 @@ static void lineart_edge_cut(LineartRenderBuffer *rb,
     next_es = es->next;
 
     if (prev_es && prev_es->occlusion == es->occlusion &&
-        prev_es->transparency_mask == es->transparency_mask) {
+        prev_es->material_mask_bits == es->material_mask_bits) {
       BLI_remlink(&e->segments, es);
       /* This puts the node back to the render buffer, if more cut happens, these unused nodes get
        * picked first. */
@@ -381,8 +381,8 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
           /* Ignore this triangle if an intersection line directly comes from it, */
           lineart_occlusion_is_adjacent_intersection(e, (LineartTriangle *)tri) ||
           /* Or if this triangle isn't effectively occluding anything nor it's providing a
-            transparency flag. */
-          (!tri->base.occlusion_effectiveness)) {
+            material flag. */
+          ((!tri->base.occlusion_effectiveness) && (!tri->base.material_mask_bits))) {
         continue;
       }
       tri->testing_e[thread_id] = e;
@@ -399,7 +399,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
                                                       &l,
                                                       &r)) {
         lineart_edge_cut(
-            rb, e, l, r, tri->base.transparency_mask, tri->base.occlusion_effectiveness);
+            rb, e, l, r, tri->base.material_mask_bits, tri->base.occlusion_effectiveness);
         if (e->min_occ > rb->max_occlusion_level) {
           /* No need to calculate any longer on this line because no level more than set value is
            * going to show up in the rendered result. */
@@ -743,7 +743,7 @@ static void lineart_triangle_post(LineartTriangle *tri, LineartTriangle *orig)
   copy_v3_v3_db(tri->gn, orig->gn);
   tri->flags = LRT_CULL_GENERATED;
   tri->intersection_mask = orig->intersection_mask;
-  tri->transparency_mask = orig->transparency_mask;
+  tri->material_mask_bits = orig->material_mask_bits;
 }
 
 static void lineart_triangle_set_cull_flag(LineartTriangle *tri, uchar flag)
@@ -1867,16 +1867,16 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     loop = loop->next;
     tri->v[2] = &orv[BM_elem_index_get(loop->v)];
 
-    /* Transparency bits and occlusion effectiveness assignment, */
-    /* bits are shifted to higher 6 bits. See MaterialLineArt::transparency_mask for details. */
+    /* material mask bits and occlusion effectiveness assignment, */
+    /* bits are shifted to higher 6 bits. See MaterialLineArt::material_mask_flags for details. */
     Material *mat = BKE_object_material_get(orig_ob, f->mat_nr + 1);
-    tri->transparency_mask |= ((mat && (mat->lineart.flags & LRT_MATERIAL_TRANSPARENCY_ENABLED)) ?
-                                   mat->lineart.transparency_mask :
-                                   0);
-    tri->occlusion_effectiveness |=
-        ((mat && (mat->lineart.flags & LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) ?
-             mat->lineart.occlusion_effectiveness & LRT_OCCLUSION_EFFECTIVE_BITS :
-             1);
+    tri->material_mask_bits |= ((mat && (mat->lineart.flags & LRT_MATERIAL_MASK_ENABLED)) ?
+                                    mat->lineart.material_mask_bits :
+                                    0);
+    tri->occlusion_effectiveness |= ((mat && (mat->lineart.flags &
+                                              LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) ?
+                                         mat->lineart.occlusion_effectiveness :
+                                         1);
 
     tri->intersection_mask = obi->override_intersection_mask;
 
@@ -4324,7 +4324,7 @@ static void lineart_gpencil_generate(LineartCache *cache,
                                      Collection *source_collection,
                                      int types,
                                      uchar mask_switches,
-                                     uchar transparency_mask,
+                                     uchar material_mask_bits,
                                      uchar intersection_mask,
                                      short thickness,
                                      float opacity,
@@ -4362,9 +4362,6 @@ static void lineart_gpencil_generate(LineartCache *cache,
   bool invert_input = modifier_flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP;
   bool match_output = modifier_flags & LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
 
-  /* Bits are shifted to higher 6 bits. See MaterialLineArt::transparency_mask for details. */
-  transparency_mask <<= 2;
-
   LISTBASE_FOREACH (LineartEdgeChain *, ec, &cache->chains) {
 
     if (ec->picked) {
@@ -4384,14 +4381,14 @@ static void lineart_gpencil_generate(LineartCache *cache,
         continue;
       }
     }
-    if (mask_switches & LRT_GPENCIL_TRANSPARENCY_ENABLE) {
-      if (mask_switches & LRT_GPENCIL_TRANSPARENCY_MATCH) {
-        if (ec->transparency_mask != transparency_mask) {
+    if (mask_switches & LRT_GPENCIL_MATERIAL_MASK_ENABLE) {
+      if (mask_switches & LRT_GPENCIL_MATERIAL_MASK_MATCH) {
+        if (ec->material_mask_bits != material_mask_bits) {
           continue;
         }
       }
       else {
-        if (!(ec->transparency_mask & transparency_mask)) {
+        if (!(ec->material_mask_bits & material_mask_bits)) {
           continue;
         }
       }
@@ -4504,7 +4501,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   int mat_nr,
                                   short edge_types,
                                   uchar mask_switches,
-                                  uchar transparency_mask,
+                                  uchar material_mask_bits,
                                   uchar intersection_mask,
                                   short thickness,
                                   float opacity,
@@ -4548,7 +4545,7 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                            source_collection,
                            use_types,
                            mask_switches,
-                           transparency_mask,
+                           material_mask_bits,
                            intersection_mask,
                            thickness,
                            opacity,

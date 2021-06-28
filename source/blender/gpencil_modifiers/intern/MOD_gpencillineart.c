@@ -103,7 +103,7 @@ static void generate_strokes_actual(
       lmd->target_material ? BKE_gpencil_object_material_index_get(ob, lmd->target_material) : 0,
       lmd->edge_types,
       lmd->mask_switches,
-      lmd->transparency_mask,
+      lmd->material_mask_bits,
       lmd->intersection_mask,
       lmd->thickness,
       lmd->opacity,
@@ -469,7 +469,7 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
 }
 
-static void transparency_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+static void material_mask_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA ob_ptr;
@@ -481,10 +481,10 @@ static void transparency_panel_draw_header(const bContext *UNUSED(C), Panel *pan
   uiLayoutSetEnabled(layout, !is_baked);
   uiLayoutSetActive(layout, show_in_front);
 
-  uiItemR(layout, ptr, "use_transparency", 0, IFACE_("Transparency"), ICON_NONE);
+  uiItemR(layout, ptr, "use_material_mask", 0, IFACE_("Material Mask"), ICON_NONE);
 }
 
-static void transparency_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void material_mask_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
@@ -494,21 +494,21 @@ static void transparency_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  uiLayoutSetEnabled(layout, RNA_boolean_get(ptr, "use_transparency"));
+  uiLayoutSetEnabled(layout, RNA_boolean_get(ptr, "use_material_mask"));
 
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayoutSetPropDecorate(row, false);
   uiLayout *sub = uiLayoutRowWithHeading(row, true, IFACE_("Masks"));
   char text[2] = "0";
 
-  PropertyRNA *prop = RNA_struct_find_property(ptr, "use_transparency_mask");
+  PropertyRNA *prop = RNA_struct_find_property(ptr, "use_material_mask_bits");
   for (int i = 0; i < 8; i++, text[0]++) {
     uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, text, ICON_NONE);
   }
   uiItemL(row, "", ICON_BLANK1); /* Space for decorator. */
 
   uiLayout *col = uiLayoutColumn(layout, true);
-  uiItemR(col, ptr, "use_transparency_match", 0, IFACE_("Match All Masks"), ICON_NONE);
+  uiItemR(col, ptr, "use_material_mask_match", 0, IFACE_("Match All Masks"), ICON_NONE);
 }
 
 static void intersection_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
@@ -737,10 +737,10 @@ static void panelRegister(ARegionType *region_type)
   PanelType *occlusion_panel = gpencil_modifier_subpanel_register(
       region_type, "occlusion", "Occlusion", NULL, occlusion_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(region_type,
-                                     "transparency",
+                                     "material_mask",
                                      "",
-                                     transparency_panel_draw_header,
-                                     transparency_panel_draw,
+                                     material_mask_panel_draw_header,
+                                     material_mask_panel_draw,
                                      occlusion_panel);
   gpencil_modifier_subpanel_register(region_type,
                                      "intersection",
