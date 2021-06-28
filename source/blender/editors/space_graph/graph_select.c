@@ -597,7 +597,7 @@ static bool box_select_graphkeys(bAnimContext *ac,
   initialize_box_select_key_editing_data(
       sipo, incl_handles, mode, ac, data, &scaled_rectf, &ked, &mapping_flag);
 
-  /* Get beztriple editing/validation funcs.  */
+  /* Get beztriple editing/validation funcs. */
   const KeyframeEditFunc select_cb = ANIM_editkeyframes_select(selectmode);
   const KeyframeEditFunc ok_cb = ANIM_editkeyframes_ok(mode);
 
@@ -1611,7 +1611,7 @@ void GRAPH_OT_select_leftright(wmOperatorType *ot)
   ot->idname = "GRAPH_OT_select_leftright";
   ot->description = "Select keyframes to the left or the right of the current frame";
 
-  /* api callbacks  */
+  /* api callbacks */
   ot->invoke = graphkeys_select_leftright_invoke;
   ot->exec = graphkeys_select_leftright_exec;
   ot->poll = graphop_visible_keyframes_poll;
@@ -1681,10 +1681,8 @@ static int mouse_graph_keys(bAnimContext *ac,
     /* deselect all other keyframes (+ F-Curves too) */
     deselect_graph_keys(ac, 0, SELECT_SUBTRACT, true);
 
-    /* deselect other channels too, but only only do this if
-     * selection of channel when the visibility of keyframes
-     * doesn't depend on this
-     */
+    /* Deselect other channels too, but only do this if selection of channel
+     * when the visibility of keyframes doesn't depend on this. */
     if ((sipo->flag & SIPO_SELCUVERTSONLY) == 0) {
       ANIM_anim_channels_select_set(ac, ACHANNEL_SETFLAG_CLEAR);
     }

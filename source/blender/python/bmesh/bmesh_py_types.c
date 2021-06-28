@@ -1060,7 +1060,7 @@ static PyObject *bpy_bmesh_to_mesh(BPy_BMesh *self, PyObject *args)
 
   /* we could have the user do this but if they forget blender can easy crash
    * since the references arrays for the objects derived meshes are now invalid */
-  DEG_id_tag_update(&me->id, ID_RECALC_GEOMETRY);
+  DEG_id_tag_update(&me->id, ID_RECALC_GEOMETRY_ALL_MODES);
 
   Py_RETURN_NONE;
 }
@@ -3354,7 +3354,7 @@ static void bpy_bmesh_dealloc(BPy_BMesh *self)
 {
   BMesh *bm = self->bm;
 
-  /* have have been freed by bmesh */
+  /* The mesh has not been freed by #BMesh. */
   if (bm) {
     bm_dealloc_editmode_warn(self);
 

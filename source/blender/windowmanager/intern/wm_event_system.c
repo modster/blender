@@ -96,7 +96,7 @@
  *
  * Without tools using press events which would prevent click/drag events getting to the gizmos.
  *
- * This is not a fool proof solution since since it's possible the gizmo operators would pass
+ * This is not a fool proof solution since it's possible the gizmo operators would pass
  * through these events when called, see: T65479.
  */
 #define USE_GIZMO_MOUSE_PRIORITY_HACK
@@ -2084,7 +2084,7 @@ static int wm_handler_operator_call(bContext *C,
         wm->op_undo_depth--;
       }
 
-      /* When the window changes the the modal modifier may have loaded a new blend file
+      /* When the window changes the modal modifier may have loaded a new blend file
        * (the `system_demo_mode` add-on does this), so we have to assume the event,
        * operator, area, region etc have all been freed. */
       if ((CTX_wm_window(C) == win)) {
@@ -3493,7 +3493,7 @@ void wm_event_do_handlers(bContext *C)
       }
 
       /* If press was handled, we don't want to do click. This way
-       * press in tool keymap can override click in editor keymap.*/
+       * press in tool key-map can override click in editor key-map. */
       if (ISMOUSE_BUTTON(event->type) && event->val == KM_PRESS &&
           !wm_action_not_handled(action)) {
         win->event_queue_check_click = false;
@@ -4753,8 +4753,8 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
         event.val = KM_DBL_CLICK;
       }
 
-      /* This case happens on holding a key pressed, it should not generate
-       * press events events with the same key as modifier. */
+      /* This case happens on holding a key pressed,
+       * it should not generate press events with the same key as modifier. */
       if (event.keymodifier == event.type) {
         event.keymodifier = 0;
       }
