@@ -111,7 +111,6 @@ VKShader::~VKShader()
     compute_shader_ = VK_NULL_HANDLE;
   }
 
-  delete interface;
   context_ = nullptr;
 };
 
