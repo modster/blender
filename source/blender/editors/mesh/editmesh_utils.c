@@ -474,7 +474,7 @@ void EDBM_select_more(BMEditMesh *em, const bool use_face_step)
                use_faces,
                use_face_step);
   BMO_op_exec(em->bm, &bmop);
-  /* don't flush selection in edge/vertex mode  */
+  /* Don't flush selection in edge/vertex mode. */
   BMO_slot_buffer_hflag_enable(
       em->bm, bmop.slots_out, "geom.out", BM_ALL_NOLOOP, BM_ELEM_SELECT, use_faces ? true : false);
   BMO_op_finish(em->bm, &bmop);
@@ -496,7 +496,7 @@ void EDBM_select_less(BMEditMesh *em, const bool use_face_step)
                use_faces,
                use_face_step);
   BMO_op_exec(em->bm, &bmop);
-  /* don't flush selection in edge/vertex mode  */
+  /* Don't flush selection in edge/vertex mode. */
   BMO_slot_buffer_hflag_disable(
       em->bm, bmop.slots_out, "geom.out", BM_ALL_NOLOOP, BM_ELEM_SELECT, use_faces ? true : false);
   BMO_op_finish(em->bm, &bmop);
@@ -1011,7 +1011,7 @@ BMFace *EDBM_uv_active_face_get(BMEditMesh *em, const bool sloppy, const bool se
   return NULL;
 }
 
-/* can we edit UV's for this mesh?*/
+/* Can we edit UV's for this mesh? */
 bool EDBM_uv_check(BMEditMesh *em)
 {
   /* some of these checks could be a touch overkill */
@@ -1689,8 +1689,8 @@ bool BMBVH_EdgeVisible(struct BMBVHTree *tree,
   scale_point(co1, co2, 0.99);
   scale_point(co3, co2, 0.99);
 
-  /* ok, idea is to generate rays going from the camera origin to the
-   * three points on the edge (v1, mid, v2)*/
+  /* OK, idea is to generate rays going from the camera origin to the
+   * three points on the edge (v1, mid, v2). */
   sub_v3_v3v3(dir1, origin, co1);
   sub_v3_v3v3(dir2, origin, co2);
   sub_v3_v3v3(dir3, origin, co3);
@@ -1699,8 +1699,8 @@ bool BMBVH_EdgeVisible(struct BMBVHTree *tree,
   normalize_v3_length(dir2, epsilon);
   normalize_v3_length(dir3, epsilon);
 
-  /* offset coordinates slightly along view vectors, to avoid
-   * hitting the faces that own the edge.*/
+  /* Offset coordinates slightly along view vectors,
+   * to avoid hitting the faces that own the edge. */
   add_v3_v3v3(co1, co1, dir1);
   add_v3_v3v3(co2, co2, dir2);
   add_v3_v3v3(co3, co3, dir3);

@@ -33,20 +33,4 @@ void GPUTest::TearDown()
   CLG_exit();
 }
 
-GPUOpenGLTest::GPUOpenGLTest()
-{
-  G.debug &= ~G_DEBUG_VK_CONTEXT;
-  draw_context_type = GHOST_kDrawingContextTypeOpenGL;
-}
-
-#ifdef WITH_VULKAN
-
-GPUVulkanTest::GPUVulkanTest()
-{
-  G.debug |= G_DEBUG_VK_CONTEXT;
-  draw_context_type = GHOST_kDrawingContextTypeVulkan;
-}
-
-#endif
-
 }  // namespace blender::gpu

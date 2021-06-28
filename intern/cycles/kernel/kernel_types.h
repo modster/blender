@@ -302,7 +302,7 @@ enum PathRayFlag {
   PATH_RAY_DIFFUSE_ANCESTOR = (1 << 15),
   /* Single pass has been written. */
   PATH_RAY_SINGLE_PASS_DONE = (1 << 16),
-  /* Ray is behind a shadow catcher .*/
+  /* Ray is behind a shadow catcher. */
   PATH_RAY_SHADOW_CATCHER = (1 << 17),
   /* Store shadow data for shadow catcher or denoising. */
   PATH_RAY_STORE_SHADOW_INFO = (1 << 18),
@@ -1479,7 +1479,8 @@ typedef struct KernelObject {
   float cryptomatte_object;
   float cryptomatte_asset;
 
-  float shadow_terminator_offset;
+  float shadow_terminator_shading_offset;
+  float shadow_terminator_geometry_offset;
   float pad1, pad2, pad3;
 } KernelObject;
 static_assert_align(KernelObject, 16);

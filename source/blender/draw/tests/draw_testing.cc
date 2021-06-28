@@ -15,9 +15,9 @@
 namespace blender::draw {
 
 /* Base class for draw test cases. It will setup and tear down the GPU part around each test. */
-void DrawTest::SetUp()
+void DrawOpenGLTest::SetUp()
 {
-  GPUTest::SetUp();
+  GPUOpenGLTest::SetUp();
 
   /* Initialize color management. Required to construct a scene creation depends on it. */
   BKE_idtype_init();
@@ -29,7 +29,7 @@ void DrawTest::SetUp()
   DRW_draw_state_init_gtests(GPU_SHADER_CFG_DEFAULT);
 }
 
-void DrawTest::TearDown()
+void DrawOpenGLTest::TearDown()
 {
   DRW_engines_free();
 

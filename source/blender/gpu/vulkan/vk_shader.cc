@@ -174,10 +174,12 @@ std::unique_ptr<std::vector<uint32_t>> VKShader::compile_source(Span<const char 
   if (!result->error_log.empty()) {
     const char *error_log = result->error_log.c_str();
     std::vector<char> error(error_log, error_log + result->error_log.size() + 1);
+    VKLogParser parser;
     print_log(sources,
               error.data(),
               to_stage_name(stage).c_str(),
-              result->status_code == shader_compiler::StatusCode::CompilationError);
+              result->status_code == shader_compiler::StatusCode::CompilationError,
+              &parser);
     BLI_assert(!"Failed to compile shader!");
   }
 

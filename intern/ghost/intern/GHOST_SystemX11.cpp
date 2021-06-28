@@ -93,7 +93,7 @@
 /* see T34039 Fix Alt key glitch on Unity desktop */
 #define USE_UNITY_WORKAROUND
 
-/* Fix 'shortcut' part of keyboard reading code only ever using first defined keymap
+/* Fix 'shortcut' part of keyboard reading code only ever using first defined key-map
  * instead of active one. See T47228 and D1746 */
 #define USE_NON_LATIN_KB_WORKAROUND
 
@@ -486,7 +486,8 @@ GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextTyp
     }
 
 #if defined(WITH_GL_EGL)
-    context = new GHOST_ContextEGL(false,
+    context = new GHOST_ContextEGL(this,
+                                   false,
                                    EGLNativeWindowType(nullptr),
                                    EGLNativeDisplayType(m_display),
                                    profile_mask,
@@ -607,9 +608,7 @@ static void SleepTillEvent(Display *display, GHOST_TInt64 maxSleep)
   }
 }
 
-/* This function borrowed from Qt's X11 support
- * qclipboard_x11.cpp
- *  */
+/* This function borrowed from Qt's X11 support qclipboard_x11.cpp */
 struct init_timestamp_data {
   Time timestamp;
 };
@@ -2693,8 +2692,8 @@ void GHOST_SystemX11::refreshXInputDevices()
                   xtablet.PressureLevels = xvi->axes[2].max_value;
 
                   if (xvi->num_axes > 3) {
-                    /* this is assuming that the tablet has the same tilt resolution in both
-                     * positive and negative directions. It would be rather weird if it didn't.. */
+                    /* This is assuming that the tablet has the same tilt resolution in both
+                     * positive and negative directions. It would be rather weird if it didn't. */
                     xtablet.XtiltLevels = xvi->axes[3].max_value;
                     xtablet.YtiltLevels = xvi->axes[4].max_value;
                   }

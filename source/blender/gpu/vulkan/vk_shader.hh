@@ -100,5 +100,16 @@ class VKShader : public Shader {
   MEM_CXX_CLASS_ALLOC_FUNCS("VKShader");
 };
 
+class VKLogParser : public GPULogParser {
+ public:
+  char *parse_line(char *log_line, GPULogItem &log_item) override;
+
+ protected:
+  char *skip_severity_prefix(char *log_line, GPULogItem &log_item);
+  char *skip_severity_keyword(char *log_line, GPULogItem &log_item);
+
+  MEM_CXX_CLASS_ALLOC_FUNCS("GLLogParser");
+};
+
 }  // namespace gpu
 }  // namespace blender

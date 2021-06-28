@@ -43,14 +43,14 @@ namespace blender::draw {
  */
 constexpr bool RUN_SINGLE_THREADED = false;
 
-class DrawCacheTest : public DrawTest {
+class DrawCacheTest : public DrawOpenGLTest {
  protected:
   TaskGraph *task_graph;
 
  public:
   void SetUp() override
   {
-    DrawTest::SetUp();
+    DrawOpenGLTest::SetUp();
     if (RUN_SINGLE_THREADED) {
       BLI_system_num_threads_override_set(1);
     }
@@ -63,7 +63,7 @@ class DrawCacheTest : public DrawTest {
     if (RUN_SINGLE_THREADED) {
       BLI_system_num_threads_override_set(0);
     }
-    DrawTest::TearDown();
+    DrawOpenGLTest::TearDown();
   }
 };
 
