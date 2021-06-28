@@ -968,20 +968,21 @@ static void displist_make_surf(Depsgraph *depsgraph,
                                Mesh **r_final,
                                const bool for_render)
 {
+  BLI_assert(ob->type == OB_SURF);
   const Curve *cu = (const Curve *)ob->data;
 
-  ListBase *nubase = &ob->runtime.curve_cache->deformed_nurbs;
+  ListBase *deformed_nurbs = &ob->runtime.curve_cache->deformed_nurbs;
 
   if (!for_render && cu->editnurb) {
-    BKE_nurbList_duplicate(nubase, BKE_curve_editNurbs_get_for_read(cu));
+    BKE_nurbList_duplicate(deformed_nurbs, BKE_curve_editNurbs_get_for_read(cu));
   }
   else {
-    BKE_nurbList_duplicate(nubase, &cu->nurb);
+    BKE_nurbList_duplicate(deformed_nurbs, &cu->nurb);
   }
 
-  BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, nubase, nubase, for_render);
+  BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, deformed_nurbs, deformed_nurbs, for_render);
 
-  LISTBASE_FOREACH (Nurb *, nu, nubase) {
+  LISTBASE_FOREACH (Nurb *, nu, deformed_nurbs) {
     if (!(for_render || nu->hide == 0) || !BKE_nurb_check_valid_uv(nu)) {
       continue;
     }
@@ -1274,31 +1275,31 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
   const Curve *cu = (const Curve *)ob->data;
   BLI_assert(ELEM(ob->type, OB_CURVE, OB_FONT));
 
-  ListBase *nubase = &ob->runtime.curve_cache->deformed_nurbs;
+  ListBase *deformed_nurbs = &ob->runtime.curve_cache->deformed_nurbs;
 
   if (ob->type == OB_FONT) {
-    BKE_vfont_to_curve_nubase(ob, FO_EDIT, nubase);
+    BKE_vfont_to_curve_nubase(ob, FO_EDIT, deformed_nurbs);
   }
   else {
-    BKE_nurbList_duplicate(nubase, BKE_curve_nurbs_get(const_cast<Curve *>(cu)));
+    BKE_nurbList_duplicate(deformed_nurbs, BKE_curve_nurbs_get(const_cast<Curve *>(cu)));
   }
 
-  BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, nubase, nubase, for_render);
+  BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, deformed_nurbs, deformed_nurbs, for_render);
 
-  BKE_curve_bevelList_make(ob, nubase, for_render);
+  BKE_curve_bevelList_make(ob, deformed_nurbs, for_render);
 
   /* If curve has no bevel will return nothing */
   ListBase dlbev = BKE_curve_bevel_make(cu);
 
   /* no bevel or extrude, and no width correction? */
   if (BLI_listbase_is_empty(&dlbev) && cu->width == 1.0f) {
-    curve_to_displist(cu, nubase, for_render, dispbase);
+    curve_to_displist(cu, deformed_nurbs, for_render, dispbase);
   }
   else {
     const float widfac = cu->width - 1.0f;
 
     const BevList *bl = (BevList *)ob->runtime.curve_cache->bev.first;
-    const Nurb *nu = (Nurb *)nubase->first;
+    const Nurb *nu = (Nurb *)deformed_nurbs->first;
     for (; bl && nu; bl = bl->next, nu = nu->next) {
       float *data;
 
