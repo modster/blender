@@ -267,7 +267,7 @@ static bool instances_attribute_foreach_recursive(const GeometrySet &geometry_se
     }
   }
 
-  /* Now that this this geometry set is visited, increase the count and check with the limit. */
+  /* Now that this geometry set is visited, increase the count and check with the limit. */
   if (limit > 0 && count++ > limit) {
     return false;
   }
@@ -538,7 +538,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
             const void *src_buffer = src_span.data();
             for (const int UNUSED(i) : set_group.transforms.index_range()) {
               void *dst_buffer = dst_span[offset];
-              cpp_type->copy_to_initialized_n(src_buffer, dst_buffer, domain_size);
+              cpp_type->copy_assign_n(src_buffer, dst_buffer, domain_size);
               offset += domain_size;
             }
           }
