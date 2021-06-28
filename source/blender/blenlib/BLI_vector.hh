@@ -222,21 +222,6 @@ class Vector {
   }
 
   /**
-   * Create a vector from a const ListBase. The caller has to make sure that the values in the
-   * linked list have the correct type.
-   *
-   * Example Usage:
-   *  Vector<const ModifierData *> modifiers(ob->modifiers);
-   */
-  Vector(const ListBase &values, Allocator allocator = {})
-      : Vector(NoExceptConstructor(), allocator)
-  {
-    LISTBASE_FOREACH (T, value, &values) {
-      this->append(value);
-    }
-  }
-
-  /**
    * Create a copy of another vector. The other vector will not be changed. If the other vector has
    * less than InlineBufferCapacity elements, no allocation will be made.
    */
