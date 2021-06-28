@@ -160,8 +160,29 @@ static fn::MFOutputSocket &insert_default_value_for_type(CommonMFNetworkBuilderD
   return node.output(0);
 }
 
+static fn::MFOutputSocket &insert_optional_conversion(CommonMFNetworkBuilderData &common,
+                                                      fn::MFOutputSocket &socket,
+                                                      const fn::MFDataType &to_type)
+{
+  const fn::MFDataType from_type = socket.data_type();
+  if (from_type == to_type) {
+    return socket;
+  }
+  const fn::MultiFunction *conversion_fn =
+      get_implicit_type_conversions().get_conversion_multi_function(from_type, to_type);
+  if (conversion_fn != nullptr) {
+    fn::MFNode &node = common.network.add_function(*conversion_fn);
+    common.network.add_link(socket, node.input(0));
+    return node.output(0);
+  }
+  else {
+    return insert_default_value_for_type(common, to_type);
+  }
+}
+
 static fn::MFOutputSocket *insert_unlinked_input(CommonMFNetworkBuilderData &common,
-                                                 const DInputSocket &dsocket)
+                                                 const DInputSocket &dsocket,
+                                                 const fn::MFDataType &to_type)
 {
   BLI_assert(socket_is_mf_data_socket(*dsocket->typeinfo()));
 
@@ -170,7 +191,7 @@ static fn::MFOutputSocket *insert_unlinked_input(CommonMFNetworkBuilderData &com
 
   fn::MFOutputSocket *built_socket = builder.built_socket();
   BLI_assert(built_socket != nullptr);
-  return built_socket;
+  return &insert_optional_conversion(common, *built_socket, to_type);
 }
 
 static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
@@ -200,7 +221,7 @@ static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
       }
       if (from_dsockets.is_empty()) {
         /* The socket is not linked. Need to use the value of the socket itself. */
-        fn::MFOutputSocket *built_socket = insert_unlinked_input(common, to_dsocket);
+        fn::MFOutputSocket *built_socket = insert_unlinked_input(common, to_dsocket, to_type);
         for (fn::MFInputSocket *to_socket : to_sockets) {
           common.network.add_link(*built_socket, *to_socket);
         }
@@ -208,7 +229,7 @@ static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
       }
       if (from_dsockets[0]->is_input()) {
         DInputSocket from_dsocket{from_dsockets[0]};
-        fn::MFOutputSocket *built_socket = insert_unlinked_input(common, from_dsocket);
+        fn::MFOutputSocket *built_socket = insert_unlinked_input(common, from_dsocket, to_type);
         for (fn::MFInputSocket *to_socket : to_sockets) {
           common.network.add_link(*built_socket, *to_socket);
         }
@@ -216,20 +237,7 @@ static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
       }
       DOutputSocket from_dsocket{from_dsockets[0]};
       fn::MFOutputSocket *from_socket = &common.network_map.lookup(from_dsocket);
-      const fn::MFDataType from_type = from_socket->data_type();
-
-      if (from_type != to_type) {
-        const fn::MultiFunction *conversion_fn =
-            get_implicit_type_conversions().get_conversion_multi_function(from_type, to_type);
-        if (conversion_fn != nullptr) {
-          fn::MFNode &node = common.network.add_function(*conversion_fn);
-          common.network.add_link(*from_socket, node.input(0));
-          from_socket = &node.output(0);
-        }
-        else {
-          from_socket = &insert_default_value_for_type(common, to_type);
-        }
-      }
+      from_socket = &insert_optional_conversion(common, *from_socket, to_type);
 
       for (fn::MFInputSocket *to_socket : to_sockets) {
         common.network.add_link(*from_socket, *to_socket);
