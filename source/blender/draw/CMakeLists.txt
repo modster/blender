@@ -51,7 +51,10 @@ set(INC
 
 set(SRC
   intern/draw_cache.c
-  intern/draw_cache_extract_mesh.c
+  intern/draw_cache_extract_mesh_extractors.c
+  intern/draw_cache_extract_mesh_render_data.c
+  intern/draw_cache_extract_mesh.cc
+  intern/mesh_extractors/extract_mesh_ibo_points.cc
   intern/draw_cache_impl_curve.cc
   intern/draw_cache_impl_displist.c
   intern/draw_cache_impl_gpencil.c
@@ -147,6 +150,7 @@ set(SRC
   engines/overlay/overlay_image.c
   engines/overlay/overlay_lattice.c
   engines/overlay/overlay_metaball.c
+  engines/overlay/overlay_mode_transfer.c
   engines/overlay/overlay_motion_path.c
   engines/overlay/overlay_outline.c
   engines/overlay/overlay_paint.c
