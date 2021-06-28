@@ -14,7 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BKE_curve.h"
 #include "BKE_geometry_set_instances.hh"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
