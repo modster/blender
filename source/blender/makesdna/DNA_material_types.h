@@ -168,8 +168,6 @@ typedef enum eMaterialLineArtFlags {
   LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS = (1 << 1),
 } eMaterialLineArtFlags;
 
-#define LRT_TRANSPARENCY_BITS_DNA 0x3f    /* Bits 1<<0 to 1<<6. */
-#define LRT_TRANSPARENCY_BITS 0xfc        /* Bits 1<<2 to 1<<7. */
 #define LRT_OCCLUSION_EFFECTIVE_BITS 0x03 /* Bits 1<<0 to 1<<1. */
 
 typedef struct Material {

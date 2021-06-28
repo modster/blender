@@ -54,6 +54,7 @@ typedef struct LineartTriangle {
 
   unsigned char transparency_mask;
   unsigned char intersection_mask;
+  unsigned char occlusion_effectiveness;
   unsigned char flags; /* #eLineartTriangleFlags */
 
   /**

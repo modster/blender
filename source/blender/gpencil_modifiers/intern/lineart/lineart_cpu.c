@@ -147,8 +147,12 @@ static LineartEdgeSegment *lineart_give_segment(LineartRenderBuffer *rb)
 /**
  * Cuts the edge in image space and mark occlusion level for each segment.
  */
-static void lineart_edge_cut(
-    LineartRenderBuffer *rb, LineartEdge *e, double start, double end, uchar transparency_mask)
+static void lineart_edge_cut(LineartRenderBuffer *rb,
+                             LineartEdge *e,
+                             double start,
+                             double end,
+                             uchar transparency_mask,
+                             uchar occlusion_effectiveness)
 {
   LineartEdgeSegment *es, *ies, *next_es, *prev_es;
   LineartEdgeSegment *cut_start_before = 0, *cut_end_before = 0;
@@ -283,8 +287,8 @@ static void lineart_edge_cut(
 
   /* Register 1 level of occlusion for all touched segments. */
   for (es = ns; es && es != ns2; es = es->next) {
-    es->occlusion += (transparency_mask & LRT_OCCLUSION_EFFECTIVE_BITS);
-    es->transparency_mask |= (transparency_mask & LRT_TRANSPARENCY_BITS);
+    es->occlusion += occlusion_effectiveness;
+    es->transparency_mask |= transparency_mask;
   }
 
   /* Reduce adjacent cutting points of the same level, which saves memory. */
@@ -378,7 +382,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
           lineart_occlusion_is_adjacent_intersection(e, (LineartTriangle *)tri) ||
           /* Or if this triangle isn't effectively occluding anything nor it's providing a
             transparency flag. */
-          (!tri->base.transparency_mask)) {
+          (!tri->base.occlusion_effectiveness)) {
         continue;
       }
       tri->testing_e[thread_id] = e;
@@ -394,7 +398,8 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
                                                       rb->shift_y,
                                                       &l,
                                                       &r)) {
-        lineart_edge_cut(rb, e, l, r, tri->base.transparency_mask);
+        lineart_edge_cut(
+            rb, e, l, r, tri->base.transparency_mask, tri->base.occlusion_effectiveness);
         if (e->min_occ > rb->max_occlusion_level) {
           /* No need to calculate any longer on this line because no level more than set value is
            * going to show up in the rendered result. */
@@ -1854,9 +1859,9 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     /* bits are shifted to higher 6 bits. See MaterialLineArt::transparency_mask for details. */
     Material *mat = BKE_object_material_get(orig_ob, f->mat_nr + 1);
     tri->transparency_mask |= ((mat && (mat->lineart.flags & LRT_MATERIAL_TRANSPARENCY_ENABLED)) ?
-                                   (mat->lineart.transparency_mask << 2) :
+                                   mat->lineart.transparency_mask :
                                    0);
-    tri->transparency_mask |=
+    tri->occlusion_effectiveness |=
         ((mat && (mat->lineart.flags & LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) ?
              mat->lineart.occlusion_effectiveness & LRT_OCCLUSION_EFFECTIVE_BITS :
              1);
