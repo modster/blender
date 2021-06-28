@@ -547,8 +547,10 @@ BMEdge *EDBM_edge_find_nearest_ex(ViewContext *vc,
 
       ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d);
 
-      mesh_foreachScreenEdge(
-          vc, find_nearest_edge_center__doZBuf, &data, V3D_PROJ_TEST_CLIP_DEFAULT);
+      mesh_foreachScreenEdge(vc,
+                             find_nearest_edge_center__doZBuf,
+                             &data,
+                             V3D_PROJ_TEST_CLIP_DEFAULT | V3D_PROJ_TEST_CLIP_CONTENT_DEFAULT);
 
       *r_dist_center_px_manhattan = data.dist;
     }
@@ -601,7 +603,8 @@ BMEdge *EDBM_edge_find_nearest_ex(ViewContext *vc,
         *dist_px_manhattan_p;
 
     ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d);
-    mesh_foreachScreenEdge(vc, find_nearest_edge__doClosest, &data, clip_flag);
+    mesh_foreachScreenEdge(
+        vc, find_nearest_edge__doClosest, &data, clip_flag | V3D_PROJ_TEST_CLIP_CONTENT_DEFAULT);
 
     hit = (data.use_cycle && data.hit_cycle.edge) ? &data.hit_cycle : &data.hit;
 
@@ -4270,7 +4273,12 @@ static int edbm_select_nth_exec(bContext *C, wmOperator *op)
 
     if (edbm_deselect_nth(em, &op_params) == true) {
       found_active_elt = true;
-      EDBM_update_generic(obedit->data, false, false);
+      EDBM_update(obedit->data,
+                  &(const struct EDBMUpdate_Params){
+                      .calc_looptri = false,
+                      .calc_normals = false,
+                      .is_destructive = false,
+                  });
     }
   }
   MEM_freeN(objects);
