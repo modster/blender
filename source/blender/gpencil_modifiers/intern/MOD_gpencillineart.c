@@ -416,7 +416,7 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
   uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "use_multiple_edge_types", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "allow_overlap_edge_types", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_smooth", 0, IFACE_("Crease On Smooth"), ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_sharp", 0, IFACE_("Crease On Sharp"), ICON_NONE);
 }
@@ -747,8 +747,6 @@ static void panelRegister(ARegionType *region_type)
                                      intersection_panel_draw_header,
                                      intersection_panel_draw,
                                      panel_type);
-  gpencil_modifier_subpanel_register(
-      region_type, "face_mark", "", face_mark_panel_draw_header, face_mark_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "face_mark", "", face_mark_panel_draw_header, face_mark_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
