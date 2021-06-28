@@ -51,10 +51,26 @@ class GPUVulkanTest : public GPUTest {
 
 #endif
 
-#define GPU_TEST(test_name) \
-  TEST_F(GPUOpenGLTest, test_name) \
-  { \
-    test_##test_name(); \
-  }
+#ifdef WITH_VULKAN
+
+#  define GPU_TEST(test_name) \
+    TEST_F(GPUOpenGLTest, test_name) \
+    { \
+      test_##test_name(); \
+    } \
+    TEST_F(GPUVulkanTest, test_name) \
+    { \
+      test_##test_name(); \
+    }
+
+#else /* WITH_VULKAN */
+
+#  define GPU_TEST(test_name) \
+    TEST_F(GPUOpenGLTest, test_name) \
+    { \
+      test_##test_name(); \
+    }
+
+#endif /* WITH_VULKAN */
 
 }  // namespace blender::gpu
