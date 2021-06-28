@@ -253,6 +253,7 @@ typedef struct KnifeTool_OpData {
   float angle_snapping_increment; /* Degrees */
 
   /* Use to check if we're currently dragging an angle snapped line. */
+  short angle_snapping_mode;
   bool is_angle_snapping;
   bool angle_snapping;
   float angle;
@@ -289,6 +290,12 @@ enum {
   KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE,
   KNF_MODAL_PANNING,
   KNF_MODAL_ADD_CUT_CLOSED,
+};
+
+enum {
+  KNF_CONSTRAIN_ANGLE_MODE_NONE = 0,
+  KNF_CONSTRAIN_ANGLE_MODE_SCREEN = 1,
+  KNF_CONSTRAIN_ANGLE_MODE_LOCAL = 2
 };
 
 enum {
@@ -971,7 +978,9 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
        kcd->angle_snapping_increment < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) ?
           kcd->angle_snapping_increment :
           KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT,
-      WM_bool_as_string(kcd->angle_snapping),
+      kcd->angle_snapping ?
+          ((kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) ? "Screen" : "Local") :
+          "OFF",
       WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
       WM_bool_as_string(kcd->cut_through),
       WM_MODALKEY(KNF_MODAL_PANNING),
@@ -2964,7 +2973,7 @@ static float snap_v2_angle(float r[2], const float v[2], const float v_ref[2], f
 }
 
 /* Update both kcd->curr.mval and kcd->mval to snap to required angle. */
-static bool knife_snap_angle(KnifeTool_OpData *kcd)
+static bool knife_snap_angle_screen(KnifeTool_OpData *kcd)
 {
   const float dvec_ref[2] = {1.0f, 0.0f};
   float dvec[2], dvec_snap[2];
@@ -2991,6 +3000,128 @@ static bool knife_snap_angle(KnifeTool_OpData *kcd)
   copy_v2_v2(kcd->mval, kcd->curr.mval);
 
   return true;
+}
+
+/**
+ * Snaps a 3d vector to an angle, relative to \a v_ref, along the plane with normal \a plane_no.
+ */
+static float snap_v3_angle_plane(
+    float r[3], const float v[3], const float v_ref[3], const float plane_no[3], float snap_step)
+{
+  /* Calculate angle between current cut vector and reference vector. */
+  float angle, angle_delta;
+  angle = angle_signed_on_axis_v3v3_v3(v, v_ref, plane_no);
+  /* Use this to calculate the angle to rotate by based on snap_step. */
+  angle_delta = (roundf(angle / snap_step) * snap_step) - angle;
+
+  /* Snap to angle. */
+  rotate_v3_v3v3fl(r, v, plane_no, angle_delta);
+  return angle + angle_delta;
+}
+
+/* Snap to required angle along the plane of the face nearest to kcd->prev. */
+static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
+{
+  /* Calculate a reference vector using previous cut segment. If none exists then exit. */
+  float ref[3];
+  if (kcd->old_stored && !kcd->prev.is_space) {
+    sub_v3_v3v3(ref, kcd->old_cage, kcd->prev.cage);
+  }
+  else {
+    return false;
+  }
+
+  /* Ray for kcd->curr. */
+  float curr_origin[3];
+  float curr_origin_ofs[3];
+  float curr_ray[3], curr_ray_normal[3];
+  float curr_co[3], curr_cage[3]; /* Unused. */
+
+  float plane[4];
+  float ray_hit[3];
+  float lambda;
+
+  knife_input_ray_segment(kcd, kcd->curr.mval, 1.0f, curr_origin, curr_origin_ofs);
+  sub_v3_v3v3(curr_ray, curr_origin_ofs, curr_origin);
+  normalize_v3_v3(curr_ray_normal, curr_ray);
+
+  BMFace *fcurr = BKE_bmbvh_ray_cast(
+      kcd->bmbvh, curr_origin, curr_ray_normal, 0.0f, NULL, curr_co, curr_cage);
+
+  if (!fcurr) {
+    return false;
+  }
+
+  /* Choose best face for plane. */
+  BMFace *fprev = NULL;
+  if (kcd->prev.vert && kcd->prev.vert->v) {
+    Ref *ref;
+    for (ref = kcd->prev.vert->faces.first; ref; ref = ref->next) {
+      BMFace *f = ((BMFace *)(ref->ref));
+      if (f == fcurr) {
+        fprev = f;
+      }
+    }
+  }
+  else if (kcd->prev.edge) {
+    Ref *ref;
+    for (ref = kcd->prev.edge->faces.first; ref; ref = ref->next) {
+      BMFace *f = ((BMFace *)(ref->ref));
+      if (f == fcurr) {
+        fprev = f;
+      }
+    }
+  }
+  else {
+    /* Cut segment was started in a face. */
+    float prev_origin[3];
+    float prev_origin_ofs[3];
+    float prev_ray[3], prev_ray_normal[3];
+    float prev_co[3], prev_cage[3]; /* Unused. */
+
+    knife_input_ray_segment(kcd, kcd->prev.mval, 1.0f, prev_origin, prev_origin_ofs);
+
+    sub_v3_v3v3(prev_ray, prev_origin_ofs, prev_origin);
+    normalize_v3_v3(prev_ray_normal, prev_ray);
+
+    /* kcd->prev.face is usually not set. */
+    fprev = BKE_bmbvh_ray_cast(
+        kcd->bmbvh, prev_origin, prev_ray_normal, 0.0f, NULL, prev_co, prev_cage);
+  }
+
+  if (!fprev || fprev != fcurr) {
+    return false;
+  }
+
+  plane_from_point_normal_v3(plane, kcd->prev.cage, fprev->no);
+
+  if (isect_ray_plane_v3(curr_origin, curr_ray_normal, plane, &lambda, false)) {
+    madd_v3_v3v3fl(ray_hit, curr_origin, curr_ray_normal, lambda);
+
+    /* Calculate snap step. */
+    float snap_step;
+    if (kcd->angle_snapping_increment > KNIFE_MIN_ANGLE_SNAPPING_INCREMENT &&
+        kcd->angle_snapping_increment < KNIFE_MAX_ANGLE_SNAPPING_INCREMENT) {
+      snap_step = DEG2RADF(kcd->angle_snapping_increment);
+    }
+    else {
+      snap_step = DEG2RADF(KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT);
+    }
+
+    float v1[3];
+    float v2[3];
+    float rotated_vec[3];
+    /* Maybe check for vectors being zero here? */
+    sub_v3_v3v3(v1, ray_hit, kcd->prev.cage);
+    copy_v3_v3(v2, ref);
+    kcd->angle = snap_v3_angle_plane(rotated_vec, v1, v2, fprev->no, snap_step);
+    add_v3_v3(rotated_vec, kcd->prev.cage);
+
+    knife_project_v2(kcd, rotated_vec, kcd->curr.mval);
+    copy_v2_v2(kcd->mval, kcd->curr.mval);
+    return true;
+  }
+  return false;
 }
 
 /* Reset the snapping angle num input. */
@@ -3081,15 +3212,22 @@ static bool knife_snap_update_from_mval(bContext *C, KnifeTool_OpData *kcd, cons
   /* view matrix may have changed, reproject */
   knife_project_v2(kcd, kcd->prev.cage, kcd->prev.mval);
 
-  if (kcd->angle_snapping && (kcd->mode == MODE_DRAGGING)) {
-    kcd->is_angle_snapping = knife_snap_angle(kcd);
-  }
-  else {
-    kcd->is_angle_snapping = false;
-  }
+  if (kcd->mode == MODE_DRAGGING) {
+    if (kcd->angle_snapping) {
+      if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) {
+        kcd->is_angle_snapping = knife_snap_angle_screen(kcd);
+      }
+      else if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+        kcd->is_angle_snapping = knife_snap_angle_local(kcd);
+      }
+    }
+    else {
+      kcd->is_angle_snapping = false;
+    }
 
-  if (kcd->axis_constrained && (kcd->mode == MODE_DRAGGING)) {
-    knife_constrain_axis(C, kcd);
+    if (kcd->axis_constrained) {
+      knife_constrain_axis(C, kcd);
+    }
   }
 
   {
@@ -3425,6 +3563,7 @@ wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
 /* Turn off angle snapping. */
 static void knifetool_disable_angle_snapping(KnifeTool_OpData *kcd)
 {
+  kcd->angle_snapping_mode = KNF_CONSTRAIN_ANGLE_MODE_NONE;
   kcd->angle_snapping = false;
   kcd->is_angle_snapping = false;
 }
@@ -3534,7 +3673,13 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         handled = true;
         break;
       case KNF_MODAL_ANGLE_SNAP_TOGGLE:
-        kcd->angle_snapping = !kcd->angle_snapping;
+        if (kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+          kcd->angle_snapping_mode++;
+        }
+        else {
+          kcd->angle_snapping_mode = KNF_CONSTRAIN_ANGLE_MODE_NONE;
+        }
+        kcd->angle_snapping = (kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_NONE);
         kcd->angle_snapping_increment = RAD2DEGF(
             RNA_float_get(op->ptr, "angle_snapping_increment"));
         knifetool_disable_orientation_locking(kcd);
