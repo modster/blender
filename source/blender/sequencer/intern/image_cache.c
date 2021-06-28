@@ -1209,7 +1209,7 @@ void seq_cache_free_temp_cache(Scene *scene, short id, int timeline_frame)
     SeqCacheKey *key = BLI_ghashIterator_getKey(&gh_iter);
     BLI_ghashIterator_step(&gh_iter);
 
-    if (key->is_temp_cache && key->task_id == id && !key->context.is_thumb) {
+    if (key->is_temp_cache && key->task_id == id && key->type != SEQ_CACHE_STORE_THUMBNAIL) {
       /* Use frame_index here to avoid freeing raw images if they are used for multiple frames. */
       float frame_index = seq_cache_timeline_frame_to_frame_index(
           key->seq, timeline_frame, key->type);

@@ -235,7 +235,6 @@ void SEQ_render_new_render_data(Main *bmain,
   r_context->gpu_offscreen = NULL;
   r_context->task_id = SEQ_TASK_MAIN_RENDER;
   r_context->is_prefetch_render = false;
-  r_context->is_thumb = false;
 }
 
 void seq_render_state_init(SeqRenderState *state)
@@ -564,7 +563,7 @@ static void sequencer_preprocess_transform_crop(
                                          SEQ_rendersize_to_scale_factor(
                                              context->preview_render_size);
   const bool do_scale_to_render_size = seq_need_scale_to_render_size(seq, is_proxy_image);
-  float image_scale_factor = do_scale_to_render_size ? 1.0f : preview_scale_factor;
+  const float image_scale_factor = do_scale_to_render_size ? 1.0f : preview_scale_factor;
 
   float transform_matrix[3][3];
   sequencer_image_crop_transform_matrix(
@@ -573,7 +572,7 @@ static void sequencer_preprocess_transform_crop(
   /* Proxy image is smaller, so crop values must be corrected by proxy scale factor.
    * Proxy scale factor always matches preview_scale_factor. */
   rctf source_crop;
-  float crop_scale_factor = do_scale_to_render_size ? preview_scale_factor : 1.0f;
+  const float crop_scale_factor = do_scale_to_render_size ? preview_scale_factor : 1.0f;
   sequencer_image_crop_init(seq, in, crop_scale_factor, &source_crop);
 
   const eIMBInterpolationFilterMode filter = context->for_render ? IMB_FILTER_BILINEAR :

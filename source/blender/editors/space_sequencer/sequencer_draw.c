@@ -1116,7 +1116,6 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.use_proxies = false;
   context.is_prefetch_render = false;
   context.is_proxy_render = false;
-  context.is_thumb = true;
 
   ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp, cache_limits, &crop, false);
   image_y = ibuf->y;
@@ -1176,7 +1175,8 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     BLI_rcti_init(&crop, (int)(cropx_min), (int)(cropx_max)-1, 0, (int)(image_y)-1);
 
     /* Get the image */
-    ibuf = SEQ_render_thumbnail(&context, seq, x1 + (int)(cut_off), cache_limits, &crop, clipped);
+    ibuf = SEQ_render_thumbnail(
+        &context, seq, round_fl_to_int(x1 + (cut_off)), cache_limits, &crop, clipped);
 
     if (ibuf) {
       ED_draw_imbuf_ctx_clipping(
