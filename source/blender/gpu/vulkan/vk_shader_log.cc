@@ -29,54 +29,32 @@ namespace blender::gpu {
 
 char *VKLogParser::parse_line(char *log_line, GPULogItem &log_item)
 {
-  /* Skip ERROR: or WARNING:. */
-  log_line = skip_severity_prefix(log_line, log_item);
-  log_line = skip_separators(log_line, ':', '(', ' ');
+  log_line = skip_name_and_stage(log_line);
+  log_line = skip_separator(log_line, ':');
 
   /* Parse error line & char numbers. */
   if (log_line[0] >= '0' && log_line[0] <= '9') {
     char *error_line_number_end;
     log_item.cursor.row = (int)strtol(log_line, &error_line_number_end, 10);
-    /* Try to fetch the error character (not always available). */
-    if (ELEM(error_line_number_end[0], '(', ':') && error_line_number_end[1] != ' ') {
-      log_item.cursor.column = (int)strtol(error_line_number_end + 1, &log_line, 10);
-    }
-    else {
-      log_line = error_line_number_end;
-    }
-    /* There can be a 3rd number (case of mesa driver). */
-    if (ELEM(log_line[0], '(', ':') && log_line[1] >= '0' && log_line[1] <= '9') {
-      log_item.cursor.source = log_item.cursor.row;
-      log_item.cursor.row = log_item.cursor.column;
-      log_item.cursor.column = (int)strtol(log_line + 1, &error_line_number_end, 10);
-      log_line = error_line_number_end;
-    }
+    log_line = error_line_number_end;
   }
-
-  if ((log_item.cursor.row != -1) && (log_item.cursor.column != -1)) {
-    if (GPU_type_matches(GPU_DEVICE_NVIDIA, GPU_OS_ANY, GPU_DRIVER_OFFICIAL) ||
-        GPU_type_matches(GPU_DEVICE_INTEL, GPU_OS_MAC, GPU_DRIVER_OFFICIAL)) {
-      /* 0:line */
-      log_item.cursor.row = log_item.cursor.column;
-      log_item.cursor.column = -1;
-    }
-    else {
-      /* line:char */
-    }
-  }
-
-  log_line = skip_separators(log_line, ':', ')', ' ');
+  log_line = skip_separators(log_line, ':', ' ');
 
   /* Skip to message. Avoid redundant info. */
   log_line = skip_severity_keyword(log_line, log_item);
-  log_line = skip_separators(log_line, ':', ')', ' ');
+  log_line = skip_separators(log_line, ':', ' ');
 
   return log_line;
 }
 
-char *VKLogParser::skip_severity_prefix(char *log_line, GPULogItem &log_item)
+char *VKLogParser::skip_name_and_stage(char *log_line)
 {
-  return skip_severity(log_line, log_item, "ERROR", "WARNING");
+  char *name_skip = skip_until(log_line, '.');
+  if (name_skip == log_line) {
+    return log_line;
+  }
+
+  return skip_until(name_skip, ':');
 }
 
 char *VKLogParser::skip_severity_keyword(char *log_line, GPULogItem &log_item)

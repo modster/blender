@@ -142,11 +142,19 @@ static std::string combine_sources(Span<const char *> sources)
   }
   return combined.str();
 }
-static std::string glsl_patch_get()
+static char *glsl_patch_get()
 {
-  std::stringstream patch;
-  patch << "#version 330\n";
-  return patch.str();
+  static char patch[512] = "\0";
+  if (patch[0] != '\0') {
+    return patch;
+  }
+
+  size_t slen = 0;
+  /* Version need to go first. */
+  STR_CONCAT(patch, slen, "#version 330\n");
+
+  BLI_assert(slen < sizeof(patch));
+  return patch;
 }
 
 std::unique_ptr<std::vector<uint32_t>> VKShader::compile_source(Span<const char *> sources,
@@ -201,7 +209,7 @@ VkShaderModule VKShader::create_shader_module(MutableSpan<const char *> sources,
                                               VKShaderStageType stage)
 {
   /* Patch the shader code using the first source slot. */
-  sources[0] = glsl_patch_get().c_str();
+  sources[0] = glsl_patch_get();
 
   std::unique_ptr<std::vector<uint32_t>> code = compile_source(sources, stage);
   if (!code || code->size() == 0) {
@@ -247,7 +255,7 @@ void VKShader::fragment_shader_from_glsl(MutableSpan<const char *> sources)
 void VKShader::compute_shader_from_glsl(MutableSpan<const char *> sources)
 {
 #ifdef WITH_VULKAN_SHADER_COMPILATION
-  compute_shader_ = this->create_shader_module(sources, VKShaderStageType::Compute);
+  compute_shader_ = this->create_shader_module(sources, VKShaderStageType::ComputeShader);
 #endif
 }
 

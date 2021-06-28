@@ -185,6 +185,34 @@ char *GPULogParser::skip_separators(char *log_line, char sep1, char sep2, char s
   return log_line;
 }
 
+char *GPULogParser::skip_separators(char *log_line, char sep1, char sep2) const
+{
+  while (ELEM(log_line[0], sep1, sep2)) {
+    log_line++;
+  }
+  return log_line;
+}
+
+char *GPULogParser::skip_separator(char *log_line, char sep) const
+{
+  while (ELEM(log_line[0], sep)) {
+    log_line++;
+  }
+  return log_line;
+}
+
+char *GPULogParser::skip_until(char *log_line, char stop_char) const
+{
+  char *cursor = log_line;
+  while (!ELEM(cursor[0], '\n', '\0')) {
+    if (cursor[0] == stop_char) {
+      return cursor;
+    }
+    cursor++;
+  }
+  return log_line;
+}
+
 /** \} */
 
 }  // namespace blender::gpu

@@ -105,7 +105,7 @@ class VKLogParser : public GPULogParser {
   char *parse_line(char *log_line, GPULogItem &log_item) override;
 
  protected:
-  char *skip_severity_prefix(char *log_line, GPULogItem &log_item);
+  char *skip_name_and_stage(char *log_line);
   char *skip_severity_keyword(char *log_line, GPULogItem &log_item);
 
   MEM_CXX_CLASS_ALLOC_FUNCS("GLLogParser");

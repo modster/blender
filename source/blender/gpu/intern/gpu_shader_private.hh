@@ -123,7 +123,11 @@ class GPULogParser {
                       GPULogItem &log_item,
                       const char *error_msg,
                       const char *warning_msg) const;
+  /* TODO(jbakker): Make variable arguments. */
+  char *skip_separator(char *log_line, char sep) const;
+  char *skip_separators(char *log_line, char sep1, char sep2) const;
   char *skip_separators(char *log_line, char sep1, char sep2, char sep3) const;
+  char *skip_until(char *log_line, char stop_char) const;
 
   MEM_CXX_CLASS_ALLOC_FUNCS("GPULogParser");
 };
