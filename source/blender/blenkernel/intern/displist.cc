@@ -539,12 +539,12 @@ void BKE_displist_fill(const ListBase *dispbase,
   /* do not free polys, needed for wireframe display */
 }
 
-static void bevels_to_filledpoly(const Curve *cu, const ListBase *src, ListBase *dst)
+static void bevels_to_filledpoly(const Curve *cu, ListBase *dispbase)
 {
   ListBase front = {nullptr, nullptr};
   ListBase back = {nullptr, nullptr};
 
-  LISTBASE_FOREACH (const DispList *, dl, src) {
+  LISTBASE_FOREACH (const DispList *, dl, dispbase) {
     if (dl->type == DL_SURF) {
 
       /* This should be moved specifically to the surface evaluation functions,
@@ -595,32 +595,28 @@ static void bevels_to_filledpoly(const Curve *cu, const ListBase *src, ListBase 
   }
 
   const float z_up[3] = {0.0f, 0.0f, -1.0f};
-  BKE_displist_fill(&front, dst, z_up, true);
-  BKE_displist_fill(&back, dst, z_up, false);
+  BKE_displist_fill(&front, dispbase, z_up, true);
+  BKE_displist_fill(&back, dispbase, z_up, false);
 
   BKE_displist_free(&front);
   BKE_displist_free(&back);
 
-  BKE_displist_fill(src, dst, z_up, false);
+  BKE_displist_fill(dispbase, dispbase, z_up, false);
 }
 
-static ListBase curve_to_filledpoly(const Curve *cu, const ListBase *src)
+static void curve_to_filledpoly(const Curve *cu, ListBase *dispbase)
 {
   if (!CU_DO_2DFILL(cu)) {
     return;
   }
 
-  ListBase dst = {nullptr, nullptr};
-
-  if (src->first && ((DispList *)src->first)->type == DL_SURF) {
-    bevels_to_filledpoly(cu, src, &dst);
+  if (dispbase->first && ((DispList *)dispbase->first)->type == DL_SURF) {
+    bevels_to_filledpoly(cu, dispbase);
   }
   else {
     const float z_up[3] = {0.0f, 0.0f, -1.0f};
-    BKE_displist_fill(src, &dst, z_up, false);
+    BKE_displist_fill(dispbase, dispbase, z_up, false);
   }
-
-  return dst;
 }
 
 /* taper rules:
@@ -873,11 +869,12 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
 
   GeometrySet geometry_set;
   if (md && md->type == eModifierType_Nodes && BKE_modifier_is_enabled(scene, md, required_mode)) {
-    geometry_set.replace_curve(curve_eval_from_dna_curve(*cu, *dispbase).release());
+    std::unique_ptr<CurveEval> curve_eval = curve_eval_from_dna_curve(
+        *cu, ob->runtime.curve_cache->deformed_nurbs);
+    geometry_set.replace_curve(curve_eval.release());
   }
   else {
-    const ListBase final_ if (cu->flag & CU_DEFORM_FILL)
-    {
+    if (cu->flag & CU_DEFORM_FILL) {
       curve_to_filledpoly(cu, dispbase);
     }
     Mesh *mesh = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
@@ -911,6 +908,7 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
         BKE_mesh_ensure_normals(mesh);
       }
       mti->deformVerts(md, &mectx_deform, mesh, vertex_coords, totvert);
+      BKE_mesh_vert_coords_apply(mesh, vertex_coords);
       MEM_freeN(vertex_coords);
     }
     else {
@@ -1509,10 +1507,6 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
 
   *r_geometry_set = curve_calc_modifiers_post(depsgraph, scene, ob, dispbase, for_render);
 
-  if (cu->flag & CU_DEFORM_FILL && !ob->runtime.data_eval) {
-    curve_to_filledpoly(cu, dispbase);
-  }
-
   BKE_nurbList_free(&nubase);
 }
 
@@ -1539,9 +1533,6 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
   else {
     GeometrySet geometry_set;
     evaluate_curve_type_object(depsgraph, scene, ob, dispbase, for_render, &geometry_set);
-    std::cout << "Final has mesh: " << geometry_set.has_mesh() << "\n";
-    std::cout << "Final has points: " << geometry_set.has_pointcloud() << "\n";
-    std::cout << "Final has curve: " << geometry_set.has_curve() << "\n";
     ob->runtime.geometry_set_eval = new GeometrySet(std::move(geometry_set));
   }
 
