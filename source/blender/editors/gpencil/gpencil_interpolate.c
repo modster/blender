@@ -435,16 +435,16 @@ static void gpencil_interpolate_update_strokes(bContext *C, tGPDinterpolate *tgp
   WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
 }
 
-/* Helper: Get previous keyframe. */
+/* Helper: Get previous keyframe (exclude breakdown type). */
 static bGPDframe *gpencil_get_previous_keyframe(bGPDlayer *gpl, int cfra)
 {
   if (gpl->actframe != NULL && gpl->actframe->framenum < cfra &&
-      gpl->actframe->key_type == BEZT_KEYTYPE_KEYFRAME) {
+      gpl->actframe->key_type != BEZT_KEYTYPE_BREAKDOWN) {
     return gpl->actframe;
   }
 
   LISTBASE_FOREACH_BACKWARD (bGPDframe *, gpf, &gpl->frames) {
-    if (gpf->key_type != BEZT_KEYTYPE_KEYFRAME) {
+    if (gpf->key_type == BEZT_KEYTYPE_BREAKDOWN) {
       continue;
     }
     if (gpf->framenum >= cfra) {
@@ -456,11 +456,11 @@ static bGPDframe *gpencil_get_previous_keyframe(bGPDlayer *gpl, int cfra)
   return NULL;
 }
 
-/* Helper: Get next keyframe. */
+/* Helper: Get next keyframe (exclude breakdown type). */
 static bGPDframe *gpencil_get_next_keyframe(bGPDlayer *gpl, int cfra)
 {
   LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-    if (gpf->key_type != BEZT_KEYTYPE_KEYFRAME) {
+    if (gpf->key_type == BEZT_KEYTYPE_BREAKDOWN) {
       continue;
     }
     if (gpf->framenum <= cfra) {
@@ -760,7 +760,7 @@ static int gpencil_interpolate_invoke(bContext *C, wmOperator *op, const wmEvent
   Scene *scene = CTX_data_scene(C);
   tGPDinterpolate *tgpi = NULL;
 
-  /* cannot interpolate if not between 2 frames */
+  /* Cannot interpolate if not between 2 frames. */
   int cfra = CFRA;
   bGPDframe *gpf_prv = gpencil_get_previous_keyframe(gpl, cfra);
   bGPDframe *gpf_next = gpencil_get_next_keyframe(gpl, cfra);
@@ -768,7 +768,7 @@ static int gpencil_interpolate_invoke(bContext *C, wmOperator *op, const wmEvent
     BKE_report(
         op->reports,
         RPT_ERROR,
-        "Cannot find a pair of grease pencil frames to interpolate between in active layer");
+        "Cannot find valid keyframes to interpolate (Breakdowns keyframes are not allowed)");
     return OPERATOR_CANCELLED;
   }
 
@@ -1260,7 +1260,7 @@ static int gpencil_interpolate_seq_exec(bContext *C, wmOperator *op)
     BKE_report(
         op->reports,
         RPT_ERROR,
-        "Cannot find a pair of grease pencil frames to interpolate between in active layer");
+        "Cannot find valid keyframes to interpolate (Breakdowns keyframes are not allowed)");
     return OPERATOR_CANCELLED;
   }
 
@@ -1427,15 +1427,26 @@ static void gpencil_interpolate_seq_ui(bContext *C, wmOperator *op)
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
+  row = uiLayoutRow(layout, true);
+  uiItemR(row, &ptr, "step", 0, NULL, ICON_NONE);
+
+  row = uiLayoutRow(layout, true);
+  uiItemR(row, &ptr, "layers", 0, NULL, ICON_NONE);
+
+  if (CTX_data_mode_enum(C) == CTX_MODE_EDIT_GPENCIL) {
+    row = uiLayoutRow(layout, true);
+    uiItemR(row, &ptr, "interpolate_selected_only", 0, NULL, ICON_NONE);
+  }
+
+  row = uiLayoutRow(layout, true);
+  uiItemR(row, &ptr, "flip", 0, NULL, ICON_NONE);
 
   col = uiLayoutColumn(layout, true);
-  uiItemR(col, &ptr, "step", 0, NULL, ICON_NONE);
-  uiItemR(col, &ptr, "layers", 0, NULL, ICON_NONE);
-  uiItemR(col, &ptr, "interpolate_selected_only", 0, NULL, ICON_NONE);
-  uiItemR(col, &ptr, "flip", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "smooth_factor", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "smooth_steps", 0, NULL, ICON_NONE);
-  uiItemR(col, &ptr, "type", 0, NULL, ICON_NONE);
+
+  row = uiLayoutRow(layout, true);
+  uiItemR(row, &ptr, "type", 0, NULL, ICON_NONE);
 
   if (type == GP_IPO_CURVEMAP) {
     /* Get an RNA pointer to ToolSettings to give to the custom curve. */

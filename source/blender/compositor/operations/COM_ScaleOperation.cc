@@ -28,7 +28,7 @@
 BaseScaleOperation::BaseScaleOperation()
 {
 #ifdef USE_FORCE_BILINEAR
-  m_sampler = (int)COM_PS_BILINEAR;
+  m_sampler = (int)PixelSampler::Bilinear;
 #else
   m_sampler = -1;
 #endif
@@ -37,10 +37,10 @@ BaseScaleOperation::BaseScaleOperation()
 
 ScaleOperation::ScaleOperation() : BaseScaleOperation()
 {
-  this->addInputSocket(COM_DT_COLOR);
-  this->addInputSocket(COM_DT_VALUE);
-  this->addInputSocket(COM_DT_VALUE);
-  this->addOutputSocket(COM_DT_COLOR);
+  this->addInputSocket(DataType::Color);
+  this->addInputSocket(DataType::Value);
+  this->addInputSocket(DataType::Value);
+  this->addOutputSocket(DataType::Color);
   this->setResolutionInputSocketIndex(0);
   this->m_inputOperation = nullptr;
   this->m_inputXOperation = nullptr;
@@ -89,8 +89,8 @@ bool ScaleOperation::determineDependingAreaOfInterest(rcti *input,
     float scaleX[4];
     float scaleY[4];
 
-    this->m_inputXOperation->readSampled(scaleX, 0, 0, COM_PS_NEAREST);
-    this->m_inputYOperation->readSampled(scaleY, 0, 0, COM_PS_NEAREST);
+    this->m_inputXOperation->readSampled(scaleX, 0, 0, PixelSampler::Nearest);
+    this->m_inputYOperation->readSampled(scaleY, 0, 0, PixelSampler::Nearest);
 
     const float scx = scaleX[0];
     const float scy = scaleY[0];
@@ -112,10 +112,10 @@ bool ScaleOperation::determineDependingAreaOfInterest(rcti *input,
 // SCALE ABSOLUTE
 ScaleAbsoluteOperation::ScaleAbsoluteOperation() : BaseScaleOperation()
 {
-  this->addInputSocket(COM_DT_COLOR);
-  this->addInputSocket(COM_DT_VALUE);
-  this->addInputSocket(COM_DT_VALUE);
-  this->addOutputSocket(COM_DT_COLOR);
+  this->addInputSocket(DataType::Color);
+  this->addInputSocket(DataType::Value);
+  this->addInputSocket(DataType::Value);
+  this->addOutputSocket(DataType::Color);
   this->setResolutionInputSocketIndex(0);
   this->m_inputOperation = nullptr;
   this->m_inputXOperation = nullptr;
@@ -174,8 +174,8 @@ bool ScaleAbsoluteOperation::determineDependingAreaOfInterest(rcti *input,
     float scaleX[4];
     float scaleY[4];
 
-    this->m_inputXOperation->readSampled(scaleX, 0, 0, COM_PS_NEAREST);
-    this->m_inputYOperation->readSampled(scaleY, 0, 0, COM_PS_NEAREST);
+    this->m_inputXOperation->readSampled(scaleX, 0, 0, PixelSampler::Nearest);
+    this->m_inputYOperation->readSampled(scaleY, 0, 0, PixelSampler::Nearest);
 
     const float scx = scaleX[0];
     const float scy = scaleY[0];
@@ -203,8 +203,8 @@ bool ScaleAbsoluteOperation::determineDependingAreaOfInterest(rcti *input,
 // Absolute fixed size
 ScaleFixedSizeOperation::ScaleFixedSizeOperation() : BaseScaleOperation()
 {
-  this->addInputSocket(COM_DT_COLOR, COM_SC_NO_RESIZE);
-  this->addOutputSocket(COM_DT_COLOR);
+  this->addInputSocket(DataType::Color, ResizeMode::None);
+  this->addOutputSocket(DataType::Color);
   this->setResolutionInputSocketIndex(0);
   this->m_inputOperation = nullptr;
   this->m_is_offset = false;

@@ -48,15 +48,15 @@ BaseImageOperation::BaseImageOperation()
 }
 ImageOperation::ImageOperation() : BaseImageOperation()
 {
-  this->addOutputSocket(COM_DT_COLOR);
+  this->addOutputSocket(DataType::Color);
 }
 ImageAlphaOperation::ImageAlphaOperation() : BaseImageOperation()
 {
-  this->addOutputSocket(COM_DT_VALUE);
+  this->addOutputSocket(DataType::Value);
 }
 ImageDepthOperation::ImageDepthOperation() : BaseImageOperation()
 {
-  this->addOutputSocket(COM_DT_VALUE);
+  this->addOutputSocket(DataType::Value);
 }
 
 ImBuf *BaseImageOperation::getImBuf()
@@ -123,13 +123,13 @@ static void sampleImageAtLocation(
 {
   if (ibuf->rect_float) {
     switch (sampler) {
-      case COM_PS_NEAREST:
+      case PixelSampler::Nearest:
         nearest_interpolation_color(ibuf, nullptr, color, x, y);
         break;
-      case COM_PS_BILINEAR:
+      case PixelSampler::Bilinear:
         bilinear_interpolation_color(ibuf, nullptr, color, x, y);
         break;
-      case COM_PS_BICUBIC:
+      case PixelSampler::Bicubic:
         bicubic_interpolation_color(ibuf, nullptr, color, x, y);
         break;
     }
@@ -137,13 +137,13 @@ static void sampleImageAtLocation(
   else {
     unsigned char byte_color[4];
     switch (sampler) {
-      case COM_PS_NEAREST:
+      case PixelSampler::Nearest:
         nearest_interpolation_color(ibuf, byte_color, nullptr, x, y);
         break;
-      case COM_PS_BILINEAR:
+      case PixelSampler::Bilinear:
         bilinear_interpolation_color(ibuf, byte_color, nullptr, x, y);
         break;
-      case COM_PS_BICUBIC:
+      case PixelSampler::Bicubic:
         bicubic_interpolation_color(ibuf, byte_color, nullptr, x, y);
         break;
     }

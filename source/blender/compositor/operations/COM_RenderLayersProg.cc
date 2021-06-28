@@ -92,7 +92,7 @@ void RenderLayersProg::doInterpolation(float output[4], float x, float y, PixelS
   }
 
   switch (sampler) {
-    case COM_PS_NEAREST: {
+    case PixelSampler::Nearest: {
       offset = (iy * width + ix) * this->m_elementsize;
 
       if (this->m_elementsize == 1) {
@@ -107,12 +107,12 @@ void RenderLayersProg::doInterpolation(float output[4], float x, float y, PixelS
       break;
     }
 
-    case COM_PS_BILINEAR:
+    case PixelSampler::Bilinear:
       BLI_bilinear_interpolation_fl(
           this->m_inputBuffer, output, width, height, this->m_elementsize, x, y);
       break;
 
-    case COM_PS_BICUBIC:
+    case PixelSampler::Bicubic:
       BLI_bicubic_interpolation_fl(
           this->m_inputBuffer, output, width, height, this->m_elementsize, x, y);
       break;
@@ -146,13 +146,13 @@ void RenderLayersProg::executePixelSampled(float output[4], float x, float y, Pi
     const DataType data_type = this->getOutputSocket()->getDataType();
     int actual_element_size = this->m_elementsize;
     int expected_element_size;
-    if (data_type == COM_DT_VALUE) {
+    if (data_type == DataType::Value) {
       expected_element_size = 1;
     }
-    else if (data_type == COM_DT_VECTOR) {
+    else if (data_type == DataType::Vector) {
       expected_element_size = 3;
     }
-    else if (data_type == COM_DT_COLOR) {
+    else if (data_type == DataType::Color) {
       expected_element_size = 4;
     }
     else {
@@ -216,7 +216,7 @@ void RenderLayersProg::determineResolution(unsigned int resolution[2],
   }
 }
 
-std::unique_ptr<MetaData> RenderLayersProg::getMetaData() const
+std::unique_ptr<MetaData> RenderLayersProg::getMetaData()
 {
   Scene *scene = this->getScene();
   Render *re = (scene) ? RE_GetSceneRender(scene) : nullptr;

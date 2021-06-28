@@ -303,7 +303,6 @@ static void test_overlay_glsl_shaders()
 
 static void test_eevee_glsl_shaders()
 {
-  EEVEE_shaders_lightprobe_shaders_init();
   EEVEE_shaders_material_shaders_init();
 
   EXPECT_NE(EEVEE_shaders_bloom_blit_get(false), nullptr);
@@ -355,7 +354,6 @@ static void test_eevee_glsl_shaders()
   EXPECT_NE(EEVEE_shaders_effect_motion_blur_velocity_tiles_sh_get(), nullptr);
   EXPECT_NE(EEVEE_shaders_effect_motion_blur_velocity_tiles_expand_sh_get(), nullptr);
   EXPECT_NE(EEVEE_shaders_effect_ambient_occlusion_sh_get(), nullptr);
-  EXPECT_NE(EEVEE_shaders_effect_ambient_occlusion_layer_sh_get(), nullptr);
   EXPECT_NE(EEVEE_shaders_effect_ambient_occlusion_debug_sh_get(), nullptr);
   EXPECT_NE(EEVEE_shaders_ggx_lut_sh_get(), nullptr);
   EXPECT_NE(EEVEE_shaders_ggx_refraction_lut_sh_get(), nullptr);
@@ -388,10 +386,8 @@ static void test_eevee_glsl_shaders()
   EXPECT_NE(EEVEE_shaders_velocity_resolve_sh_get(), nullptr);
   EXPECT_NE(EEVEE_shaders_taa_resolve_sh_get(EFFECT_TAA), nullptr);
   EXPECT_NE(EEVEE_shaders_taa_resolve_sh_get(EFFECT_TAA_REPROJECT), nullptr);
-  for (int index = 0; index < SSR_MAX_SHADER; index++) {
-    EEVEE_SSRShaderOptions ssr_option = (EEVEE_SSRShaderOptions)index;
-    EXPECT_NE(EEVEE_shaders_effect_screen_raytrace_sh_get(ssr_option), nullptr);
-  }
+  EXPECT_NE(EEVEE_shaders_effect_reflection_trace_sh_get(), nullptr);
+  EXPECT_NE(EEVEE_shaders_effect_reflection_resolve_sh_get(), nullptr);
   EEVEE_shaders_free();
 }
 

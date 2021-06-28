@@ -38,8 +38,6 @@
 
 #include <sys/sysctl.h>
 
-/* clang-format off */
-
 #pragma mark Cocoa window delegate object
 
 @interface CocoaWindowDelegate : NSObject <NSWindowDelegate>
@@ -124,8 +122,8 @@
 
 - (void)windowDidResize:(NSNotification *)notification
 {
-  //if (![[notification object] inLiveResize]) {
-  //Send event only once, at end of resize operation (when user has released mouse button)
+  // if (![[notification object] inLiveResize]) {
+  // Send event only once, at end of resize operation (when user has released mouse button)
   systemCocoa->handleWindowEvent(GHOST_kEventWindowSize, associatedWindow);
   //}
   /* Live resize, send event, gets handled in wm_window.c.
@@ -143,7 +141,7 @@
 
 - (BOOL)windowShouldClose:(id)sender;
 {
-  //Let Blender close the window rather than closing immediately
+  // Let Blender close the window rather than closing immediately
   systemCocoa->handleWindowEvent(GHOST_kEventWindowClose, associatedWindow);
   return false;
 }
@@ -182,7 +180,7 @@
   return (associatedWindow->isDialog() || !systemCocoa->hasDialogWindow());
 }
 
-//The drag'n'drop dragging destination methods
+// The drag'n'drop dragging destination methods
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender
 {
   NSPoint mouseLocation = [sender draggingLocation];
@@ -197,7 +195,7 @@
   else
     return NSDragOperationNone;
 
-  associatedWindow->setAcceptDragOperation(TRUE);  //Drag operation is accepted by default
+  associatedWindow->setAcceptDragOperation(TRUE);  // Drag operation is accepted by default
   systemCocoa->handleDraggingEvent(GHOST_kEventDraggingEntered,
                                    m_draggedObjectType,
                                    associatedWindow,
@@ -209,7 +207,7 @@
 
 - (BOOL)wantsPeriodicDraggingUpdates
 {
-  return NO;  //No need to overflow blender event queue. Events shall be sent only on changes
+  return NO;  // No need to overflow blender event queue. Events shall be sent only on changes
 }
 
 - (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender
@@ -291,8 +289,6 @@
 #undef COCOA_VIEW_BASE_CLASS
 
 #pragma mark initialization / finalization
-
-/* clang-format on */
 
 GHOST_WindowCocoa::GHOST_WindowCocoa(GHOST_SystemCocoa *systemCocoa,
                                      const char *title,

@@ -24,9 +24,9 @@
 
 BlurBaseOperation::BlurBaseOperation(DataType data_type)
 {
-  /* data_type is almost always COM_DT_COLOR except for alpha-blur */
+  /* data_type is almost always DataType::Color except for alpha-blur */
   this->addInputSocket(data_type);
-  this->addInputSocket(COM_DT_VALUE);
+  this->addInputSocket(DataType::Value);
   this->addOutputSocket(data_type);
   this->setComplex(true);
   this->m_inputProgram = nullptr;
@@ -167,7 +167,7 @@ void BlurBaseOperation::updateSize()
 {
   if (!this->m_sizeavailable) {
     float result[4];
-    this->getInputSocketReader(1)->readSampled(result, 0, 0, COM_PS_NEAREST);
+    this->getInputSocketReader(1)->readSampled(result, 0, 0, PixelSampler::Nearest);
     this->m_size = result[0];
     this->m_sizeavailable = true;
   }

@@ -26,10 +26,10 @@
 
 ScreenLensDistortionOperation::ScreenLensDistortionOperation()
 {
-  this->addInputSocket(COM_DT_COLOR);
-  this->addInputSocket(COM_DT_VALUE);
-  this->addInputSocket(COM_DT_VALUE);
-  this->addOutputSocket(COM_DT_COLOR);
+  this->addInputSocket(DataType::Color);
+  this->addInputSocket(DataType::Value);
+  this->addInputSocket(DataType::Value);
+  this->addOutputSocket(DataType::Color);
   this->setComplex(true);
   this->m_inputProgram = nullptr;
   this->m_distortion = 0.0f;
@@ -83,12 +83,12 @@ void *ScreenLensDistortionOperation::initializeTileData(rcti * /*rect*/)
 
     if (!m_distortion_const) {
       float result[4];
-      getInputSocketReader(1)->readSampled(result, 0, 0, COM_PS_NEAREST);
+      getInputSocketReader(1)->readSampled(result, 0, 0, PixelSampler::Nearest);
       m_distortion = result[0];
     }
     if (!m_dispersion_const) {
       float result[4];
-      getInputSocketReader(2)->readSampled(result, 0, 0, COM_PS_NEAREST);
+      getInputSocketReader(2)->readSampled(result, 0, 0, PixelSampler::Nearest);
       m_dispersion = result[0];
     }
 
