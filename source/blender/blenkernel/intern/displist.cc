@@ -1286,7 +1286,7 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
     BKE_vfont_to_curve_nubase(ob, FO_EDIT, deformed_nurbs);
   }
   else {
-    BKE_nurbList_duplicate(deformed_nurbs, BKE_curve_nurbs_get(const_cast<Curve *>(cu)));
+    BKE_nurbList_duplicate(deformed_nurbs, BKE_curve_nurbs_get_for_read(cu));
   }
 
   BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, deformed_nurbs, deformed_nurbs, for_render);
