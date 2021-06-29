@@ -1260,6 +1260,10 @@ static void draw_seq_strip(const bContext *C,
     drawmeta_contents(scene, seq, x1, y1, x2, y2);
   }
 
+  if (seq->type == SEQ_TYPE_MOVIE || seq->type == SEQ_TYPE_IMAGE) {
+    draw_seq_strip_thumbnail(v2d, C, sseq, scene, seq, x1, y1, x2, y2, pixelx, pixely);
+  }
+
   if ((sseq->flag & SEQ_SHOW_STRIP_OVERLAY) && (sseq->flag & SEQ_SHOW_FCURVES)) {
     draw_seq_fcurve_overlay(scene, v2d, seq, x1, y1, x2, y2, pixelx);
   }
@@ -1286,10 +1290,6 @@ static void draw_seq_strip(const bContext *C,
   /* Draw Red line on the top of invalid strip (Missing media). */
   if (!SEQ_sequence_has_source(seq)) {
     draw_seq_invalid(x1, x2, y2, text_margin_y);
-  }
-
-  if (seq->type == SEQ_TYPE_MOVIE || seq->type == SEQ_TYPE_IMAGE) {
-    draw_seq_strip_thumbnail(v2d, C, sseq, scene, seq, x1, y1, x2, y2, pixelx, pixely);
   }
 
   pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
