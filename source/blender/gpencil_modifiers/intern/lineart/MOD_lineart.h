@@ -289,7 +289,7 @@ typedef struct LineartRenderBuffer {
   bool use_material;
   bool use_edge_marks;
   bool use_intersections;
-  bool use_floating;
+  bool use_loose;
   bool use_light_contour;
   bool fuzzy_intersections;
   bool fuzzy_everything;
@@ -297,9 +297,9 @@ typedef struct LineartRenderBuffer {
   bool allow_overlapping_edges;
   bool allow_duplicated_types;
   bool remove_doubles;
-  bool floating_as_contour;
-  bool chain_floating_edges;
-  bool chain_geometry_space;
+  bool use_loose_as_contour;
+  bool use_loose_edge_chain;
+  bool use_geometry_space_chain;
 
   bool filter_face_mark;
   bool filter_face_mark_invert;

@@ -357,7 +357,7 @@ static void line_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *col = uiLayoutColumn(layout, false);
 
   uiItemR(col, ptr, "use_contour", 0, IFACE_("Contour"), ICON_NONE);
-  uiItemR(col, ptr, "use_floating", 0, IFACE_("Floating"), ICON_NONE);
+  uiItemR(col, ptr, "use_loose", 0, IFACE_("Loose"), ICON_NONE);
   uiItemR(col, ptr, "use_material", 0, IFACE_("Material Borders"), ICON_NONE);
   uiItemR(col, ptr, "use_edge_mark", 0, IFACE_("Edge Marks"), ICON_NONE);
   uiItemR(col, ptr, "use_intersection", 0, IFACE_("Intersections"), ICON_NONE);
@@ -416,7 +416,7 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
   uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "allow_overlap_edge_types", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_smooth", 0, IFACE_("Crease On Smooth"), ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_sharp", 0, IFACE_("Crease On Sharp"), ICON_NONE);
 }
@@ -610,7 +610,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   const bool use_cache = RNA_boolean_get(ptr, "use_cache");
   const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
-  const bool is_geom = RNA_boolean_get(ptr, "chain_geometry_space");
+  const bool is_geom = RNA_boolean_get(ptr, "use_geometry_space_chain");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
@@ -624,8 +624,8 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_fuzzy_intersections", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "use_fuzzy_all", 0, NULL, ICON_NONE);
 
-  uiItemR(col, ptr, "chain_floating_edges", 0, IFACE_("Floating Edges"), ICON_NONE);
-  uiItemR(col, ptr, "chain_geometry_space", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "use_loose_edge_chain", 0, IFACE_("Loose Edges"), ICON_NONE);
+  uiItemR(col, ptr, "use_geometry_space_chain", 0, NULL, ICON_NONE);
 
   uiItemR(layout,
           ptr,
