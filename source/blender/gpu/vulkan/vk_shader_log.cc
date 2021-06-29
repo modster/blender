@@ -30,19 +30,19 @@ namespace blender::gpu {
 char *VKLogParser::parse_line(char *log_line, GPULogItem &log_item)
 {
   log_line = skip_name_and_stage(log_line);
-  log_line = skip_separator(log_line, ':');
+  log_line = skip_separators(log_line, ":");
 
   /* Parse error line & char numbers. */
-  if (log_line[0] >= '0' && log_line[0] <= '9') {
+  if (at_number(log_line)) {
     char *error_line_number_end;
-    log_item.cursor.row = (int)strtol(log_line, &error_line_number_end, 10);
+    log_item.cursor.row = parse_number(log_line, &error_line_number_end);
     log_line = error_line_number_end;
   }
-  log_line = skip_separators(log_line, ':', ' ');
+  log_line = skip_separators(log_line, ": ");
 
   /* Skip to message. Avoid redundant info. */
   log_line = skip_severity_keyword(log_line, log_item);
-  log_line = skip_separators(log_line, ':', ' ');
+  log_line = skip_separators(log_line, ": ");
 
   return log_line;
 }

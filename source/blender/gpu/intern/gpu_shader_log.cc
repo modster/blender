@@ -177,25 +177,9 @@ char *GPULogParser::skip_severity(char *log_line,
   return log_line;
 }
 
-char *GPULogParser::skip_separators(char *log_line, char sep1, char sep2, char sep3) const
+char *GPULogParser::skip_separators(char *log_line, const StringRef separators) const
 {
-  while (ELEM(log_line[0], sep1, sep2, sep3)) {
-    log_line++;
-  }
-  return log_line;
-}
-
-char *GPULogParser::skip_separators(char *log_line, char sep1, char sep2) const
-{
-  while (ELEM(log_line[0], sep1, sep2)) {
-    log_line++;
-  }
-  return log_line;
-}
-
-char *GPULogParser::skip_separator(char *log_line, char sep) const
-{
-  while (ELEM(log_line[0], sep)) {
+  while (at_any(log_line, separators)) {
     log_line++;
   }
   return log_line;
@@ -211,6 +195,21 @@ char *GPULogParser::skip_until(char *log_line, char stop_char) const
     cursor++;
   }
   return log_line;
+}
+
+bool GPULogParser::at_number(const char *log_line) const
+{
+  return log_line[0] >= '0' && log_line[0] <= '9';
+}
+
+bool GPULogParser::at_any(const char *log_line, const StringRef chars) const
+{
+  return chars.find(log_line[0]) != StringRef::not_found;
+}
+
+int GPULogParser::parse_number(const char *log_line, char **r_new_position) const
+{
+  return (int)strtol(log_line, r_new_position, 10);
 }
 
 /** \} */
