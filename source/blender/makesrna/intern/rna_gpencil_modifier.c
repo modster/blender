@@ -3111,6 +3111,15 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Crease On Sharp Edges", "Allow crease to show on sharp edges");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "use_back_face_culling", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_USE_BACK_FACE_CULLING);
+  RNA_def_property_ui_text(
+      prop,
+      "Back Face Culling",
+      "Remove all back faces to speed up calculation, this will create edges in "
+      "different occlusion levels than when disabled");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   RNA_define_lib_overridable(false);
 }
 

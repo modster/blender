@@ -419,6 +419,7 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_smooth", 0, IFACE_("Crease On Smooth"), ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_sharp", 0, IFACE_("Crease On Sharp"), ICON_NONE);
+  uiItemR(layout, ptr, "use_back_face_culling", 0, NULL, ICON_NONE);
 }
 
 static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)

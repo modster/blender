@@ -1335,6 +1335,10 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
       /* Select the triangle in the array. */
       tri = (void *)(((uchar *)eln->pointer) + rb->triangle_size * i);
 
+      if (tri->flags & LRT_CULL_DISCARD) {
+        continue;
+      }
+
       LRT_CULL_DECIDE_INSIDE
       LRT_CULL_ENSURE_MEMORY
       lineart_triangle_cull_single(rb,
@@ -1547,7 +1551,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
   double dot_1 = 0, dot_2 = 0;
   double result;
 
-  if (rb->use_contour) {
+  if (rb->use_contour || rb->use_back_face_culling) {
 
     if (rb->cam_is_persp) {
       sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
@@ -1559,8 +1563,18 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     dot_1 = dot_v3v3_db(view_vector, tri1->gn);
     dot_2 = dot_v3v3_db(view_vector, tri2->gn);
 
-    if ((result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+    if (rb->use_contour && (result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
       edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
+    }
+
+    /* Because the camera ray starts from camera, so backface is when dot value being positive. */
+    if (rb->use_back_face_culling) {
+      if (dot_1 > 0) {
+        tri1->flags |= LRT_CULL_DISCARD;
+      }
+      if (dot_2 > 0) {
+        tri2->flags |= LRT_CULL_DISCARD;
+      }
     }
   }
 
@@ -3150,6 +3164,18 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->force_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SMOOTH_SURFACES) != 0;
   rb->sharp_as_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SHARP_EDGES) != 0;
 
+  /* This is used to limit calculation to a certain level to save time, lines who have higher
+   * occlusion levels will get ignored. */
+  rb->max_occlusion_level = lmd->level_end_override;
+
+  rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
+  if (rb->max_occlusion_level < 1) {
+    rb->use_back_face_culling = true;
+    if (G.debug_value = 4000) {
+      printf("Backface culling enabled automatically.\n");
+    }
+  }
+
   int16_t edge_types = lmd->edge_types_override;
 
   /* lmd->edge_types_override contains all used flags in the modifier stack. */
@@ -4189,10 +4215,6 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   /* Triangle thread testing data size varies depending on the thread count.
    * See definition of LineartTriangleThread for details. */
   rb->triangle_size = lineart_triangle_size_get(scene, rb);
-
-  /* This is used to limit calculation to a certain level to save time, lines who have higher
-   * occlusion levels will get ignored. */
-  rb->max_occlusion_level = lmd->level_end_override;
 
   /* FIXME(Yiming): See definition of int #LineartRenderBuffer::_source_type for detailed. */
   rb->_source_type = lmd->source_type;
