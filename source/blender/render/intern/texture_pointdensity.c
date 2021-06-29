@@ -349,7 +349,7 @@ static void pointdensity_cache_vertex_weight(PointDensity *pd,
   }
   mdef_index = BKE_object_defgroup_name_index(ob, pd->vertex_attribute_name);
   if (mdef_index < 0) {
-    mdef_index = ob->actdef - 1;
+    mdef_index = BKE_object_defgroup_active_index_get(ob) - 1;
   }
   if (mdef_index < 0) {
     return;

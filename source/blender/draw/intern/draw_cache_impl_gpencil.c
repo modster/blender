@@ -843,7 +843,7 @@ static void gpencil_edit_batches_ensure(Object *ob, GpencilBatchCache *cache, in
     int vert_len = GPU_vertbuf_get_vertex_len(cache->vbo);
 
     gpEditIterData iter;
-    iter.vgindex = ob->actdef - 1;
+    iter.vgindex = BKE_object_defgroup_active_index_get(ob) - 1;
     if (!BLI_findlink(&gpd->vertex_group_names, iter.vgindex)) {
       iter.vgindex = -1;
     }

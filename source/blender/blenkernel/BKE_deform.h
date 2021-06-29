@@ -41,6 +41,10 @@ struct bDeformGroup;
 const struct ListBase *BKE_object_defgroup_list_for_read(const struct Object *ob);
 struct ListBase *BKE_object_defgroup_list_for_write(struct Object *ob);
 
+int BKE_object_defgroup_count(const struct Object *ob);
+int BKE_object_defgroup_active_index_get(const struct Object *ob);
+void BKE_object_defgroup_active_index_set(struct Object *ob, const int new_index);
+
 struct bDeformGroup *BKE_object_defgroup_new(struct Object *ob, const char *name);
 void BKE_defgroup_copy_list(struct ListBase *outbase, const struct ListBase *inbase);
 struct bDeformGroup *BKE_defgroup_duplicate(const struct bDeformGroup *ingroup);

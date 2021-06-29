@@ -546,6 +546,61 @@ ListBase *BKE_object_defgroup_list_for_write(Object *ob)
   return NULL;
 }
 
+int BKE_object_defgroup_count(const Object *ob)
+{
+  return BLI_listbase_count(BKE_object_defgroup_list_for_read(ob));
+}
+
+/**
+ * \note For historical reasons, the index starts at 1 rather than 0.
+ */
+int BKE_object_defgroup_active_index_get(const Object *ob)
+{
+  switch (ob->type) {
+    case OB_MESH: {
+      const Mesh *mesh = (const Mesh *)ob->data;
+      return mesh->vertex_group_active_index;
+    }
+    case OB_LATTICE: {
+      const Lattice *lattice = (const Lattice *)ob->data;
+      return lattice->vertex_group_active_index;
+    }
+    case OB_GPENCIL: {
+      const bGPdata *gpd = (const bGPdata *)ob->data;
+      return gpd->vertex_group_active_index;
+    }
+  }
+  BLI_assert_unreachable();
+  return -1;
+}
+
+/**
+ * \note For historical reasons, the index starts at 1 rather than 0.
+ */
+void BKE_object_defgroup_active_index_set(Object *ob, const int new_index)
+{
+  switch (ob->type) {
+    case OB_MESH: {
+      Mesh *mesh = (Mesh *)ob->data;
+      mesh->vertex_group_active_index = new_index;
+      break;
+    }
+    case OB_LATTICE: {
+      Lattice *lattice = (Lattice *)ob->data;
+      lattice->vertex_group_active_index = new_index;
+      break;
+    }
+    case OB_GPENCIL: {
+      bGPdata *gpd = (bGPdata *)ob->data;
+      gpd->vertex_group_active_index = new_index;
+      break;
+    }
+    default: {
+      BLI_assert_unreachable();
+    }
+  }
+}
+
 /**
  * \note caller must free.
  */
@@ -1329,7 +1384,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(ListBase *r_map,
         if ((idx_dst = BKE_object_defgroup_name_index(ob_dst, dg_src->name)) == -1) {
           if (use_create) {
             BKE_object_defgroup_add_name(ob_dst, dg_src->name);
-            idx_dst = ob_dst->actdef - 1;
+            idx_dst = BKE_object_defgroup_active_index_get(ob_dst) - 1;
           }
           else {
             /* If we are not allowed to create missing dst vgroups, just skip matching src one. */
@@ -1427,7 +1482,7 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
         return false;
       }
     }
-    else if ((idx_src = ob_src->actdef - 1) == -1) {
+    else if ((idx_src = BKE_object_defgroup_active_index_get(ob_src) - 1) == -1) {
       return false;
     }
 
@@ -1439,14 +1494,14 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
       UNUSED_VARS_NDEBUG(dst_defbase);
     }
     else if (tolayers == DT_LAYERS_ACTIVE_DST) {
-      if ((idx_dst = ob_dst->actdef - 1) == -1) {
+      if ((idx_dst = BKE_object_defgroup_active_index_get(ob_dst) - 1) == -1) {
         bDeformGroup *dg_src;
         if (!use_create) {
           return true;
         }
         dg_src = BLI_findlink(src_defbase, idx_src);
         BKE_object_defgroup_add_name(ob_dst, dg_src->name);
-        idx_dst = ob_dst->actdef - 1;
+        idx_dst = BKE_object_defgroup_active_index_get(ob_dst) - 1;
       }
     }
     else if (tolayers == DT_LAYERS_INDEX_DST) {
@@ -1469,7 +1524,7 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
           return true;
         }
         BKE_object_defgroup_add_name(ob_dst, dg_src->name);
-        idx_dst = ob_dst->actdef - 1;
+        idx_dst = BKE_object_defgroup_active_index_get(ob_dst) - 1;
       }
     }
     else {

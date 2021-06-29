@@ -483,8 +483,9 @@ int ED_mesh_join_objects_exec(bContext *C, wmOperator *op)
           BLI_addtail(&mesh_active->vertex_group_names, odg);
         }
       }
-      if (!BLI_listbase_is_empty(&mesh_active->vertex_group_names) && ob->actdef == 0) {
-        ob->actdef = 1;
+      if (!BLI_listbase_is_empty(&mesh_active->vertex_group_names) &&
+          me->vertex_group_active_index == 0) {
+        me->vertex_group_active_index = 1;
       }
 
       /* Join this object's face maps to the base one's. */

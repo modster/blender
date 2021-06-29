@@ -718,7 +718,8 @@ typedef struct bGPdata {
 
   /** Stroke selection last index. Used to generate a unique selection index. */
   int select_last_index;
-  char _pad3[4];
+
+  int vertex_group_active_index;
 
   bGPgrid grid;
 

@@ -2345,7 +2345,7 @@ static int gpencil_vertex_group_invert_exec(bContext *C, wmOperator *op)
   }
 
   MDeformVert *dvert;
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = gpd->vertex_group_active_index - 1;
 
   bDeformGroup *defgroup = BLI_findlink(&gpd->vertex_group_names, def_nr);
   if (defgroup == NULL) {
@@ -2415,7 +2415,7 @@ static int gpencil_vertex_group_smooth_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = gpd->vertex_group_active_index - 1;
   bDeformGroup *defgroup = BLI_findlink(&gpd->vertex_group_names, def_nr);
   if (defgroup == NULL) {
     return OPERATOR_CANCELLED;
@@ -2514,7 +2514,7 @@ static int gpencil_vertex_group_normalize_exec(bContext *C, wmOperator *op)
 
   MDeformVert *dvert = NULL;
   MDeformWeight *dw = NULL;
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = gpd->vertex_group_active_index - 1;
   bDeformGroup *defgroup = BLI_findlink(&gpd->vertex_group_names, def_nr);
   if (defgroup == NULL) {
     return OPERATOR_CANCELLED;
@@ -2591,7 +2591,7 @@ static int gpencil_vertex_group_normalize_all_exec(bContext *C, wmOperator *op)
   bDeformGroup *defgroup = NULL;
   MDeformVert *dvert = NULL;
   MDeformWeight *dw = NULL;
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = gpd->vertex_group_active_index - 1;
   const int defbase_tot = BLI_listbase_count(&gpd->vertex_group_names);
   if (defbase_tot == 0) {
     return OPERATOR_CANCELLED;
@@ -2856,8 +2856,9 @@ int ED_gpencil_join_objects_exec(bContext *C, wmOperator *op)
           }
           old_idx++;
         }
-        if (!BLI_listbase_is_empty(&gpd_dst->vertex_group_names) && ob_active->actdef == 0) {
-          ob_active->actdef = 1;
+        if (!BLI_listbase_is_empty(&gpd_dst->vertex_group_names) &&
+            gpd_dst->vertex_group_active_index == 0) {
+          gpd_dst->vertex_group_active_index = 1;
         }
 
         /* add missing materials reading source materials and checking in destination object */

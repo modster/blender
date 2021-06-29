@@ -74,6 +74,9 @@ typedef struct Lattice {
   char vgroup[64];
   /** List of bDeformGroup names and flag only. */
   ListBase vertex_group_names;
+  int vertex_group_active_index;
+
+  char _pad0[4];
 
   struct EditLatt *editlatt;
   void *batch_cache;

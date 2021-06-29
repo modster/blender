@@ -1522,7 +1522,7 @@ static void gpencil_stroke_from_buffer(tGPDfill *tgpf)
   pt = gps->points;
   point2D = (tGPspoint *)tgpf->sbuffer;
 
-  const int def_nr = tgpf->ob->actdef - 1;
+  const int def_nr = tgpf->gpd->vertex_group_active_index - 1;
   const ListBase *defbase = BKE_object_defgroup_list_for_read(tgpf->ob);
   const bool have_weight = (bool)BLI_findlink(defbase, def_nr);
 

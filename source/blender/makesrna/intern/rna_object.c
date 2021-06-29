@@ -821,7 +821,8 @@ static PointerRNA rna_Object_active_vertex_group_get(PointerRNA *ptr)
   Object *ob = (Object *)ptr->owner_id;
   const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
 
-  return rna_pointer_inherit_refine(ptr, &RNA_VertexGroup, BLI_findlink(defbase, ob->actdef - 1));
+  return rna_pointer_inherit_refine(
+      ptr, &RNA_VertexGroup, BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1));
 }
 
 static void rna_Object_active_vertex_group_set(PointerRNA *ptr,
@@ -840,19 +841,19 @@ static void rna_Object_active_vertex_group_set(PointerRNA *ptr,
     return;
   }
 
-  ob->actdef = index + 1;
+  BKE_object_defgroup_active_index_set(ob, index + 1);
 }
 
 static int rna_Object_active_vertex_group_index_get(PointerRNA *ptr)
 {
   Object *ob = (Object *)ptr->owner_id;
-  return ob->actdef - 1;
+  return BKE_object_defgroup_active_index_get(ob) - 1;
 }
 
 static void rna_Object_active_vertex_group_index_set(PointerRNA *ptr, int value)
 {
   Object *ob = (Object *)ptr->owner_id;
-  ob->actdef = value + 1;
+  BKE_object_defgroup_active_index_set(ob, value + 1);
 }
 
 static void rna_Object_active_vertex_group_index_range(
@@ -2703,7 +2704,6 @@ static void rna_def_object_vertex_groups(BlenderRNA *brna, PropertyRNA *cprop)
 
   prop = RNA_def_property(srna, "active_index", PROP_INT, PROP_UNSIGNED);
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_int_sdna(prop, NULL, "actdef");
   RNA_def_property_int_funcs(prop,
                              "rna_Object_active_vertex_group_index_get",
                              "rna_Object_active_vertex_group_index_set",

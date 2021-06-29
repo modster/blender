@@ -130,7 +130,7 @@ bool ED_vgroup_sync_from_pose(Object *ob)
     if (arm->act_bone) {
       int def_num = BKE_object_defgroup_name_index(ob, arm->act_bone->name);
       if (def_num != -1) {
-        ob->actdef = def_num + 1;
+        BKE_object_defgroup_active_index_set(ob, def_num + 1);
         return true;
       }
     }
@@ -434,7 +434,7 @@ bool ED_vgroup_array_copy(Object *ob, Object *ob_from)
   /* do the copy */
   BLI_freelistN(defbase_dst);
   BLI_duplicatelist(defbase_dst, defbase_src);
-  ob->actdef = ob_from->actdef;
+  BKE_object_defgroup_active_index_set(ob, BKE_object_defgroup_active_index_get(ob_from));
 
   if (defbase_tot_from < defbase_tot) {
     /* correct vgroup indices because the number of vgroups is being reduced. */
@@ -1006,9 +1006,9 @@ float ED_vgroup_vert_weight(Object *ob, bDeformGroup *dg, int vertnum)
 
 void ED_vgroup_select_by_name(Object *ob, const char *name)
 {
-  /* note: ob->actdef==0 signals on painting to create a new one,
+  /* note: actdef==0 signals on painting to create a new one,
    * if a bone in posemode is selected */
-  ob->actdef = BKE_object_defgroup_name_index(ob, name) + 1;
+  BKE_object_defgroup_active_index_set(ob, BKE_object_defgroup_name_index(ob, name) + 1);
 }
 
 /** \} */
@@ -1020,7 +1020,7 @@ void ED_vgroup_select_by_name(Object *ob, const char *name)
 /* only in editmode */
 static void vgroup_select_verts(Object *ob, int select)
 {
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = BKE_object_defgroup_active_index_get(ob) - 1;
 
   const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
   if (!BLI_findlink(defbase, def_nr)) {
@@ -1120,7 +1120,7 @@ static void vgroup_duplicate(Object *ob)
 
   ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
 
-  dg = BLI_findlink(defbase, (ob->actdef - 1));
+  dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
   if (!dg) {
     return;
   }
@@ -1138,9 +1138,9 @@ static void vgroup_duplicate(Object *ob)
 
   BLI_addtail(defbase, cdg);
 
-  idg = (ob->actdef - 1);
-  ob->actdef = BLI_listbase_count(defbase);
-  icdg = (ob->actdef - 1);
+  idg = BKE_object_defgroup_active_index_get(ob) - 1;
+  BKE_object_defgroup_active_index_set(ob, BLI_listbase_count(defbase));
+  icdg = BKE_object_defgroup_active_index_get(ob) - 1;
 
   /* TODO, we might want to allow only copy selected verts here? - campbell */
   ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, false);
@@ -1166,7 +1166,7 @@ static bool vgroup_normalize(Object *ob)
   MDeformWeight *dw;
   MDeformVert *dv, **dvert_array = NULL;
   int dvert_tot = 0;
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = BKE_object_defgroup_active_index_get(ob) - 1;
 
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
 
@@ -1649,7 +1649,7 @@ static bool vgroup_normalize_all(Object *ob,
 {
   MDeformVert *dv, **dvert_array = NULL;
   int i, dvert_tot = 0;
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = BKE_object_defgroup_active_index_get(ob) - 1;
 
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
 
@@ -1771,8 +1771,9 @@ static bool *vgroup_selected_get(Object *ob)
     mask = MEM_callocN(defbase_tot * sizeof(bool), __func__);
   }
 
-  if (sel_count == 0 && ob->actdef >= 1 && ob->actdef <= defbase_tot) {
-    mask[ob->actdef - 1] = true;
+  const int actdef = BKE_object_defgroup_active_index_get(ob);
+  if (sel_count == 0 && actdef >= 1 && actdef <= defbase_tot) {
+    mask[actdef - 1] = true;
   }
 
   return mask;
@@ -2392,7 +2393,7 @@ void ED_vgroup_mirror(Object *ob,
   MDeformVert *dvert, *dvert_mirr;
   char sel, sel_mirr;
   int *flip_map = NULL, flip_map_len;
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = BKE_object_defgroup_active_index_get(ob) - 1;
   int totmirr = 0, totfail = 0;
 
   *r_totmirr = *r_totfail = 0;
@@ -2585,7 +2586,7 @@ cleanup:
 static void vgroup_delete_active(Object *ob)
 {
   const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
-  bDeformGroup *dg = BLI_findlink(defbase, ob->actdef - 1);
+  bDeformGroup *dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
   if (!dg) {
     return;
   }
@@ -2596,7 +2597,7 @@ static void vgroup_delete_active(Object *ob)
 /* only in editmode */
 static void vgroup_assign_verts(Object *ob, const float weight)
 {
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = BKE_object_defgroup_active_index_get(ob) - 1;
 
   const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
   if (!BLI_findlink(defbase, def_nr)) {
@@ -2841,9 +2842,9 @@ static bool vertex_group_vert_select_unlocked_poll(bContext *C)
     return false;
   }
 
-  if (ob->actdef != 0) {
+  if (BKE_object_defgroup_active_index_get(ob) != 0) {
     const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
-    const bDeformGroup *dg = BLI_findlink(defbase, ob->actdef - 1);
+    const bDeformGroup *dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
     if (dg) {
       return !(dg->flag & DG_LOCK_WEIGHT);
     }
@@ -3045,7 +3046,7 @@ static int vertex_group_remove_from_exec(bContext *C, wmOperator *op)
   }
   else {
     const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
-    bDeformGroup *dg = BLI_findlink(defbase, ob->actdef - 1);
+    bDeformGroup *dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
     if ((dg == NULL) || (BKE_object_defgroup_clear(ob, dg, !use_all_verts) == false)) {
       return OPERATOR_CANCELLED;
     }
@@ -3942,7 +3943,7 @@ static int set_active_group_exec(bContext *C, wmOperator *op)
   int nr = RNA_enum_get(op->ptr, "group");
 
   BLI_assert(nr + 1 >= 0);
-  ob->actdef = nr + 1;
+  BKE_object_defgroup_active_index_set(ob, nr + 1);
 
   DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
   WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, ob);
@@ -4102,8 +4103,9 @@ static int vgroup_do_remap(Object *ob, const char *name_array, wmOperator *op)
   sort_map_update[0] = 0;
   BKE_object_defgroup_remap_update_users(ob, sort_map_update);
 
-  BLI_assert(sort_map_update[ob->actdef] >= 0);
-  ob->actdef = sort_map_update[ob->actdef];
+  BLI_assert(sort_map_update[BKE_object_defgroup_active_index_get(ob)] >= 0);
+  BKE_object_defgroup_active_index_set(ob,
+                                       sort_map_update[BKE_object_defgroup_active_index_get(ob)]);
 
   MEM_freeN(sort_map_update);
 
@@ -4227,7 +4229,7 @@ static int vgroup_move_exec(bContext *C, wmOperator *op)
 
   ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
 
-  def = BLI_findlink(defbase, ob->actdef - 1);
+  def = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
   if (!def) {
     return OPERATOR_CANCELLED;
   }
@@ -4476,7 +4478,7 @@ static int vertex_weight_set_active_exec(bContext *C, wmOperator *op)
   const int wg_index = RNA_int_get(op->ptr, "weight_group");
 
   if (wg_index != -1) {
-    ob->actdef = wg_index + 1;
+    BKE_object_defgroup_active_index_set(ob, wg_index + 1);
     DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
     WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
   }

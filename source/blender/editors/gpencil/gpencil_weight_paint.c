@@ -308,7 +308,7 @@ static bool gpencil_weightpaint_brush_init(bContext *C, wmOperator *op)
   gso->scene = scene;
   gso->object = ob;
   if (ob) {
-    gso->vrgroup = ob->actdef - 1;
+    gso->vrgroup = gso->gpd->vertex_group_active_index - 1;
     if (!BLI_findlink(&gso->gpd->vertex_group_names, gso->vrgroup)) {
       gso->vrgroup = -1;
     }

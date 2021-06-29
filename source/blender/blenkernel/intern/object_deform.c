@@ -123,8 +123,7 @@ bDeformGroup *BKE_object_defgroup_add_name(Object *ob, const char *name)
   }
 
   defgroup = BKE_object_defgroup_new(ob, name);
-
-  ob->actdef = BLI_listbase_count(BKE_object_defgroup_list_for_read(ob));
+  BKE_object_defgroup_active_index_set(ob, BKE_object_defgroup_count(ob));
 
   return defgroup;
 }
@@ -294,8 +293,9 @@ static void object_defgroup_remove_common(Object *ob, bDeformGroup *dg, const in
   BLI_freelinkN(defbase, dg);
 
   /* Update the active deform index if necessary */
-  if (ob->actdef > def_nr) {
-    ob->actdef--;
+  const int active_index = BKE_object_defgroup_active_index_get(ob);
+  if (active_index > def_nr) {
+    BKE_object_defgroup_active_index_set(ob, active_index - 1);
   }
 
   /* remove all dverts */
@@ -313,8 +313,9 @@ static void object_defgroup_remove_common(Object *ob, bDeformGroup *dg, const in
       }
     }
   }
-  else if (ob->actdef < 1) { /* Keep a valid active index if we still have some vgroups. */
-    ob->actdef = 1;
+  else if (BKE_object_defgroup_active_index_get(ob) < 1) {
+    /* Keep a valid active index if we still have some vgroups. */
+    BKE_object_defgroup_active_index_set(ob, 1);
   }
 }
 
@@ -470,7 +471,7 @@ void BKE_object_defgroup_remove_all_ex(struct Object *ob, bool only_unlocked)
       }
     }
     /* Fix counters/indices */
-    ob->actdef = 0;
+    BKE_object_defgroup_active_index_set(ob, 0);
   }
 }
 
@@ -828,7 +829,7 @@ bool *BKE_object_defgroup_subset_from_select_type(Object *ob,
 
   switch (subset_type) {
     case WT_VGROUP_ACTIVE: {
-      const int def_nr_active = ob->actdef - 1;
+      const int def_nr_active = BKE_object_defgroup_active_index_get(ob) - 1;
       defgroup_validmap = MEM_mallocN(*r_defgroup_tot * sizeof(*defgroup_validmap), __func__);
       memset(defgroup_validmap, false, *r_defgroup_tot * sizeof(*defgroup_validmap));
       if ((def_nr_active >= 0) && (def_nr_active < *r_defgroup_tot)) {

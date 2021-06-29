@@ -1600,7 +1600,7 @@ void ED_gpencil_vgroup_assign(bContext *C, Object *ob, float weight)
 {
   bGPdata *gpd = (bGPdata *)ob->data;
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = gpd->vertex_group_active_index - 1;
   if (!BLI_findlink(&gpd->vertex_group_names, def_nr)) {
     return;
   }
@@ -1654,7 +1654,7 @@ void ED_gpencil_vgroup_remove(bContext *C, Object *ob)
 {
   bGPdata *gpd = (bGPdata *)ob->data;
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = gpd->vertex_group_active_index - 1;
   if (!BLI_findlink(&gpd->vertex_group_names, def_nr)) {
     return;
   }
@@ -1707,7 +1707,7 @@ void ED_gpencil_vgroup_select(bContext *C, Object *ob)
 {
   bGPdata *gpd = (bGPdata *)ob->data;
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = gpd->vertex_group_active_index - 1;
   if (!BLI_findlink(&gpd->vertex_group_names, def_nr)) {
     return;
   }
@@ -1762,7 +1762,7 @@ void ED_gpencil_vgroup_deselect(bContext *C, Object *ob)
 {
   bGPdata *gpd = (bGPdata *)ob->data;
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
-  const int def_nr = ob->actdef - 1;
+  const int def_nr = gpd->vertex_group_active_index - 1;
   if (!BLI_findlink(&gpd->vertex_group_names, def_nr)) {
     return;
   }

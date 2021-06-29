@@ -388,7 +388,7 @@ typedef struct Object {
   /** Custom index, for renderpasses. */
   short index;
   /** Current deformation group, note: index starts at 1. */
-  unsigned short actdef; /* TODO: Remove. */
+  unsigned short actdef DNA_DEPRECATED;
   /** Current face map, note: index starts at 1. */
   unsigned short actfmap;
   char _pad2[2];

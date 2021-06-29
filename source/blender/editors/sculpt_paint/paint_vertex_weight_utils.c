@@ -82,7 +82,7 @@ bool ED_wpaint_ensure_data(bContext *C,
   const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
 
   /* this happens on a Bone select, when no vgroup existed yet */
-  if (ob->actdef <= 0) {
+  if (me->vertex_group_active_index <= 0) {
     Object *modob;
     if ((modob = BKE_modifiers_is_deformed_by_armature(ob))) {
       Bone *actbone = ((bArmature *)modob->data)->act_bone;
@@ -99,7 +99,7 @@ bool ED_wpaint_ensure_data(bContext *C,
 
             int actdef = 1 + BLI_findindex(defbase, dg);
             BLI_assert(actdef >= 0);
-            ob->actdef = actdef;
+            me->vertex_group_active_index = actdef;
           }
         }
       }
@@ -111,18 +111,18 @@ bool ED_wpaint_ensure_data(bContext *C,
   }
 
   /* ensure we don't try paint onto an invalid group */
-  if (ob->actdef <= 0) {
+  if (me->vertex_group_active_index <= 0) {
     BKE_report(reports, RPT_WARNING, "No active vertex group for painting, aborting");
     return false;
   }
 
   if (vgroup_index) {
-    vgroup_index->active = ob->actdef - 1;
+    vgroup_index->active = me->vertex_group_active_index - 1;
   }
 
   if (flag & WPAINT_ENSURE_MIRROR) {
     if (ME_USING_MIRROR_X_VERTEX_GROUPS(me)) {
-      int mirror = ED_wpaint_mirror_vgroup_ensure(ob, ob->actdef - 1);
+      int mirror = ED_wpaint_mirror_vgroup_ensure(ob, me->vertex_group_active_index - 1);
       if (vgroup_index) {
         vgroup_index->mirror = mirror;
       }
