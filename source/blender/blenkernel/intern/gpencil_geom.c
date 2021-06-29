@@ -2050,7 +2050,7 @@ void BKE_gpencil_stroke_subdivide(bGPdata *gpd, bGPDstroke *gps, int level, int 
     MEM_SAFE_FREE(temp_points);
     MEM_SAFE_FREE(temp_dverts);
 
-    /* move points to smooth stroke (not simple type )*/
+    /* Move points to smooth stroke (not simple type). */
     if (type != GP_SUBDIV_SIMPLE) {
       /* duplicate points in a temp area with the new subdivide data */
       temp_points = MEM_dupallocN(gps->points);
@@ -2133,7 +2133,7 @@ void BKE_gpencil_stroke_merge_distance(bGPdata *gpd,
       else {
         pt->flag |= GP_SPOINT_TAG;
       }
-      /* Jump to next pair of points, keeping first point segment equals.*/
+      /* Jump to next pair of points, keeping first point segment equals. */
       step++;
     }
     else {
@@ -2868,7 +2868,7 @@ static void gpencil_stroke_join_islands(bGPdata *gpd,
     MDeformVert *dvert_src = NULL;
     MDeformVert *dvert_dst = NULL;
 
-    /* Copy weights (last before)*/
+    /* Copy weights (last before). */
     e1 = 0;
     e2 = 0;
     for (int i = 0; i < totpoints; i++) {
@@ -3808,11 +3808,11 @@ static ListBase *gpencil_stroke_perimeter_ex(const bGPdata *gpd,
     last_prev_pt[0] -= 1.0f;
   }
 
-  /* generate points for start cap */
+  /* Generate points for start cap. */
   num_perimeter_points += generate_perimeter_cap(
       first_pt, first_next_pt, first_radius, perimeter_right_side, subdivisions, gps->caps[0]);
 
-  /* generate perimeter points  */
+  /* Generate perimeter points. */
   float curr_pt[3], next_pt[3], prev_pt[3];
   float vec_next[2], vec_prev[2];
   float nvec_next[2], nvec_prev[2];

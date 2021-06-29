@@ -30,11 +30,8 @@
 #include "utf_winfunc.h"
 #include "utfconv.h"
 
-#if defined(WITH_GL_EGL)
-#  include "GHOST_ContextEGL.h"
-#else
-#  include "GHOST_ContextWGL.h"
-#endif
+#include "GHOST_ContextWGL.h"
+
 #ifdef WIN32_COMPOSITING
 #  include <Dwmapi.h>
 #endif
@@ -290,7 +287,7 @@ void GHOST_WindowWin32::setTitle(const char *title)
 
 std::string GHOST_WindowWin32::getTitle() const
 {
-  char buf[s_maxTitleLength]; /*CHANGE + never used yet*/
+  char buf[s_maxTitleLength]; /* CHANGE + never used yet. */
   ::GetWindowText(m_hWnd, buf, s_maxTitleLength);
   return std::string(buf);
 }

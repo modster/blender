@@ -1806,7 +1806,7 @@ static bool mouse_mesh_loop(
               V3D_PROJ_RET_OK) {
             tdist = len_squared_v2v2(mvalf, co);
             if (tdist < best_dist) {
-              /*                          printf("Best face: %p (%f)\n", f, tdist);*/
+              // printf("Best face: %p (%f)\n", f, tdist);
               best_dist = tdist;
               efa = f;
             }
@@ -2984,7 +2984,7 @@ bool EDBM_select_interior_faces(BMEditMesh *em)
           int i_b = BM_elem_index_get(l_pair[1]->f);
           if (i_a != i_b) {
             /* Only for predictable results that don't depend on the order of radial loops,
-             * not essential.  */
+             * not essential. */
             if (i_a > i_b) {
               SWAP(int, i_a, i_b);
             }
@@ -4653,7 +4653,7 @@ static int edbm_select_random_exec(bContext *C, wmOperator *op)
         }
       }
 
-      BLI_array_randomize(elem_map, sizeof(*elem_map), elem_map_len, seed);
+      BLI_array_randomize(elem_map, sizeof(*elem_map), elem_map_len, seed_iter);
       const int count_select = elem_map_len * randfac;
       for (int i = 0; i < count_select; i++) {
         BM_vert_select_set(em->bm, elem_map[i], select);
@@ -4669,7 +4669,7 @@ static int edbm_select_random_exec(bContext *C, wmOperator *op)
           elem_map[elem_map_len++] = eed;
         }
       }
-      BLI_array_randomize(elem_map, sizeof(*elem_map), elem_map_len, seed);
+      BLI_array_randomize(elem_map, sizeof(*elem_map), elem_map_len, seed_iter);
       const int count_select = elem_map_len * randfac;
       for (int i = 0; i < count_select; i++) {
         BM_edge_select_set(em->bm, elem_map[i], select);
@@ -4685,7 +4685,7 @@ static int edbm_select_random_exec(bContext *C, wmOperator *op)
           elem_map[elem_map_len++] = efa;
         }
       }
-      BLI_array_randomize(elem_map, sizeof(*elem_map), elem_map_len, seed);
+      BLI_array_randomize(elem_map, sizeof(*elem_map), elem_map_len, seed_iter);
       const int count_select = elem_map_len * randfac;
       for (int i = 0; i < count_select; i++) {
         BM_face_select_set(em->bm, elem_map[i], select);
