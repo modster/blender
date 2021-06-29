@@ -506,44 +506,64 @@ int BKE_object_defgroup_name_index(const Object *ob, const char *name)
   return BLI_findstringindex(defbase, name, offsetof(bDeformGroup, name));
 }
 
-const ListBase *BKE_object_defgroup_list_for_read(const Object *ob)
+int BKE_id_defgroup_name_index(const ID *id, const char *name)
 {
-  switch (ob->type) {
-    case OB_MESH: {
-      const Mesh *mesh = (const Mesh *)ob->data;
-      return &mesh->vertex_group_names;
+  const ListBase *defbase = BKE_id_defgroup_list_get(id);
+  return BLI_findstringindex(defbase, name, offsetof(bDeformGroup, name));
+}
+
+const ListBase *BKE_id_defgroup_list_get(const ID *id)
+{
+  switch (GS(id->name)) {
+    case ID_ME: {
+      const Mesh *me = (const Mesh *)id;
+      return &me->vertex_group_names;
     }
-    case OB_LATTICE: {
-      const Lattice *lattice = (const Lattice *)ob->data;
-      return &lattice->vertex_group_names;
+    case ID_LT: {
+      const Lattice *lt = (const Lattice *)id;
+      return &lt->vertex_group_names;
     }
-    case OB_GPENCIL: {
-      const bGPdata *gpd = (const bGPdata *)ob->data;
+    case ID_GD: {
+      const bGPdata *gpd = (const bGPdata *)id;
       return &gpd->vertex_group_names;
     }
+    default: {
+      BLI_assert_unreachable();
+    }
   }
-  BLI_assert_unreachable();
   return NULL;
+}
+
+ListBase *BKE_id_defgroup_list_get_mutable(ID *id)
+{
+  switch (GS(id->name)) {
+    case ID_ME: {
+      Mesh *me = (Mesh *)id;
+      return &me->vertex_group_names;
+    }
+    case ID_LT: {
+      Lattice *lt = (Lattice *)id;
+      return &lt->vertex_group_names;
+    }
+    case ID_GD: {
+      bGPdata *gpd = (bGPdata *)id;
+      return &gpd->vertex_group_names;
+    }
+    default: {
+      BLI_assert_unreachable();
+    }
+  }
+  return NULL;
+}
+
+const ListBase *BKE_object_defgroup_list_for_read(const Object *ob)
+{
+  return BKE_id_defgroup_list_get((const ID *)ob->data);
 }
 
 ListBase *BKE_object_defgroup_list_for_write(Object *ob)
 {
-  switch (ob->type) {
-    case OB_MESH: {
-      Mesh *mesh = (Mesh *)ob->data;
-      return &mesh->vertex_group_names;
-    }
-    case OB_LATTICE: {
-      Lattice *lattice = (Lattice *)ob->data;
-      return &lattice->vertex_group_names;
-    }
-    case OB_GPENCIL: {
-      bGPdata *gpd = (bGPdata *)ob->data;
-      return &gpd->vertex_group_names;
-    }
-  }
-  BLI_assert_unreachable();
-  return NULL;
+  return BKE_id_defgroup_list_get_mutable((ID *)ob->data);
 }
 
 int BKE_object_defgroup_count(const Object *ob)

@@ -396,7 +396,9 @@ bool ED_vgroup_array_copy(Object *ob, Object *ob_from)
   int defbase_tot = BLI_listbase_count(defbase_dst);
   bool new_vgroup = false;
 
-  if (ob == ob_from) {
+  BLI_assert(ob != ob_from);
+
+  if (ob->data == ob_from->data) {
     return true;
   }
 
