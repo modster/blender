@@ -1277,8 +1277,8 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
                                        ListBase *r_dispbase,
                                        GeometrySet *r_geometry_set)
 {
-  const Curve *cu = (const Curve *)ob->data;
   BLI_assert(ELEM(ob->type, OB_CURVE, OB_FONT));
+  const Curve *cu = (const Curve *)ob->data;
 
   ListBase *deformed_nurbs = &ob->runtime.curve_cache->deformed_nurbs;
 
@@ -1512,18 +1512,18 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
 }
 
 void BKE_displist_make_curveTypes_forRender(
-    Depsgraph *depsgraph, const Scene *scene, Object *ob, ListBase *dispbase, Mesh **r_final)
+    Depsgraph *depsgraph, const Scene *scene, Object *ob, ListBase *r_dispbase, Mesh **r_final)
 {
   if (ob->runtime.curve_cache == nullptr) {
     ob->runtime.curve_cache = (CurveCache *)MEM_callocN(sizeof(CurveCache), __func__);
   }
 
   if (ob->type == OB_SURF) {
-    evaluate_surface_object(depsgraph, scene, ob, true, dispbase, r_final);
+    evaluate_surface_object(depsgraph, scene, ob, true, r_dispbase, r_final);
   }
   else {
     GeometrySet geometry_set;
-    evaluate_curve_type_object(depsgraph, scene, ob, true, dispbase, &geometry_set);
+    evaluate_curve_type_object(depsgraph, scene, ob, true, r_dispbase, &geometry_set);
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
     *r_final = mesh_component.release();
   }
