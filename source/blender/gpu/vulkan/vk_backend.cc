@@ -34,13 +34,57 @@ namespace blender::gpu {
 /** \name Platform
  * \{ */
 
+static std::string api_version_get(VkPhysicalDeviceProperties &properties)
+{
+  uint32_t major = VK_VERSION_MAJOR(properties.driverVersion);
+  uint32_t minor = VK_VERSION_MINOR(properties.driverVersion);
+  uint32_t patch = VK_VERSION_PATCH(properties.driverVersion);
+
+  std::stringstream version;
+  version << major << "." << minor << "." << patch;
+  return version.str();
+}
+
+enum class VendorID : uint32_t {
+  AMD = 0x1002,
+  Intel = 0x1F96,
+  NVIDIA = 0x10de,
+};
+static constexpr StringRef VENDOR_NAME_AMD = "Advanced Micro Devices";
+static constexpr StringRef VENDOR_NAME_INTEL = "Intel";
+static constexpr StringRef VENDOR_NAME_NVIDIA = "NVIDIA";
+static constexpr StringRef VENDOR_NAME_UNKNOWN = "Unknown";
+
+static constexpr StringRef vendor_name_get(VendorID vendor_id)
+{
+  switch (vendor_id) {
+    case VendorID::AMD:
+      return VENDOR_NAME_AMD;
+    case VendorID::Intel:
+      return VENDOR_NAME_INTEL;
+    case VendorID::NVIDIA:
+      return VENDOR_NAME_NVIDIA;
+  }
+  return VENDOR_NAME_UNKNOWN;
+}
+
+static VendorID vendor_id_get(VkPhysicalDeviceProperties &properties)
+{
+  return static_cast<VendorID>(properties.vendorID);
+}
+
 void VKBackend::platform_init(void)
 {
   BLI_assert(!GPG.initialized);
 
-  const char *vendor = "vendor";
-  const char *renderer = "renderer";
-  const char *version = "version";
+  VKContext *context = VKContext::get();
+  VkPhysicalDeviceProperties physical_device_properties;
+  VkPhysicalDevice physical_device = context->physical_device_get();
+  vkGetPhysicalDeviceProperties(physical_device, &physical_device_properties);
+  const VendorID vendor_id = vendor_id_get(physical_device_properties);
+  const std::string vendor = vendor_name_get(vendor_id);
+  const std::string renderer = physical_device_properties.deviceName;
+  const std::string version = api_version_get(physical_device_properties).c_str();
   eGPUDeviceType device = GPU_DEVICE_ANY;
   eGPUOSType os = GPU_OS_ANY;
   eGPUDriverType driver = GPU_DRIVER_ANY;
@@ -54,7 +98,18 @@ void VKBackend::platform_init(void)
   os = GPU_OS_UNIX;
 #endif
 
-  GPG.init(device, os, driver, support_level, vendor, renderer, version);
+  /* TODO(jbakker): extract the driver type. */
+  if (vendor_id == VendorID::AMD) {
+    device = GPU_DEVICE_ATI;
+  }
+  else if (vendor_id == VendorID::Intel) {
+    device = GPU_DEVICE_INTEL;
+  }
+  else if (vendor_id == VendorID::NVIDIA) {
+    device = GPU_DEVICE_NVIDIA;
+  }
+
+  GPG.init(device, os, driver, support_level, vendor.c_str(), renderer.c_str(), version.c_str());
 }
 
 void VKBackend::platform_exit(void)

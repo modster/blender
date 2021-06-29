@@ -46,6 +46,8 @@ class GPUBackend {
 
   static GPUBackend *get(void);
 
+  virtual void init() = 0;
+
   virtual void samplers_update(void) = 0;
   virtual void compute_dispatch(int groups_x_len, int groups_y_len, int groups_z_len) = 0;
 

@@ -41,16 +41,17 @@ namespace gpu {
 
 class VKBackend : public GPUBackend {
  public:
-  VKBackend()
+  ~VKBackend()
+  {
+    VKBackend::platform_exit();
+  }
+
+  void init() override
   {
     /* platform_init needs to go first. */
     VKBackend::platform_init();
 
     VKBackend::capabilities_init();
-  }
-  ~VKBackend()
-  {
-    VKBackend::platform_exit();
   }
 
   static VKBackend *get(void)

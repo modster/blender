@@ -105,6 +105,7 @@ Context *Context::get()
 
 GPUContext *GPU_context_create(void *ghost_window, void *ghost_context)
 {
+  bool backend_created = false;
   if (GPUBackend::get() == nullptr) {
     /* FIXME We should get the context type from ghost instead of guessing it. */
     eGPUBackendType type = GPU_BACKEND_OPENGL;
@@ -113,12 +114,16 @@ GPUContext *GPU_context_create(void *ghost_window, void *ghost_context)
       type = GPU_BACKEND_VULKAN;
     }
 #endif
-    GPU_backend_init(type);
+    backend_created = true;
+    GPU_backend_create(type);
   }
-
-  Context *ctx = GPUBackend::get()->context_alloc(ghost_window, ghost_context);
-
+  GPUBackend *backend = GPUBackend::get();
+  Context *ctx = backend->context_alloc(ghost_window, ghost_context);
   GPU_context_active_set(wrap(ctx));
+
+  if (backend_created) {
+    backend->init();
+  }
   return wrap(ctx);
 }
 
@@ -177,7 +182,7 @@ void GPU_context_main_unlock(void)
 
 static GPUBackend *g_backend;
 
-void GPU_backend_init(eGPUBackendType backend_type)
+void GPU_backend_create(eGPUBackendType backend_type)
 {
   BLI_assert(g_backend == nullptr);
 

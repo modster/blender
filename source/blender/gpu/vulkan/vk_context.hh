@@ -78,6 +78,11 @@ class VKContext : public Context {
     return device_;
   }
 
+  VkPhysicalDevice physical_device_get() const
+  {
+    return physical_device_;
+  }
+
   VmaAllocator mem_allocator_get(void) const
   {
     return mem_allocator_;
