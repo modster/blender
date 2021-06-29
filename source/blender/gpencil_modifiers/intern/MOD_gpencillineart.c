@@ -340,7 +340,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   gpencil_modifier_panel_end(layout, ptr);
 }
 
-static void line_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void edge_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA ob_ptr;
@@ -354,7 +354,7 @@ static void line_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  uiLayout *col = uiLayoutColumn(layout, false);
+  uiLayout *col = uiLayoutColumn(layout, true);
 
   uiItemR(col, ptr, "use_contour", 0, IFACE_("Contour"), ICON_NONE);
   uiItemR(col, ptr, "use_loose", 0, IFACE_("Loose"), ICON_NONE);
@@ -383,6 +383,8 @@ static void line_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
   else {
     uiItemR(entry, ptr, "light_contour_object", 0, "", ICON_NONE);
   }
+
+  uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, IFACE_("Allow Overlap"), ICON_NONE);
 }
 
 static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -416,7 +418,6 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
   uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_smooth", 0, IFACE_("Crease On Smooth"), ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_sharp", 0, IFACE_("Crease On Sharp"), ICON_NONE);
   uiItemR(layout, ptr, "use_back_face_culling", 0, NULL, ICON_NONE);
@@ -730,7 +731,7 @@ static void panelRegister(ARegionType *region_type)
       region_type, eGpencilModifierType_Lineart, panel_draw);
 
   gpencil_modifier_subpanel_register(
-      region_type, "line_types", "Line Types", NULL, line_types_panel_draw, panel_type);
+      region_type, "edge_types", "Edge Types", NULL, edge_types_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "geometry", "Geometry Processing", NULL, options_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
