@@ -832,10 +832,17 @@ void BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
   }
 }
 
+static void geometry_set_ensure_mesh(GeometrySet &geometry_set)
+{
+  if (!geometry_set.has_mesh()) {
+    geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0, 0));
+  }
+}
+
 static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
                                              const Scene *scene,
                                              Object *ob,
-                                             ListBase *dispbase,
+                                             const ListBase *dispbase,
                                              const bool for_render)
 {
   const Curve *cu = (const Curve *)ob->data;
@@ -869,7 +876,6 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
     geometry_set.replace_curve(curve_eval.release());
   }
   else {
-    curve_to_filledpoly(cu, dispbase);
     Mesh *mesh = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
     /* Copy materials, since BKE_mesh_new_nomain_from_curve_displist() doesn't. */
     mesh->mat = (Material **)MEM_dupallocN(cu->mat);
@@ -889,9 +895,7 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
       continue;
     }
 
-    if (!geometry_set.has_mesh()) {
-      geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0, 0));
-    }
+    geometry_set_ensure_mesh(geometry_set);
     Mesh *mesh = geometry_set.get_mesh_for_write();
 
     if (mti->type == eModifierTypeType_OnlyDeform) {
@@ -915,17 +919,16 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
     }
   }
 
-  if (geometry_set.has_mesh()) {
-    Mesh *final_mesh = geometry_set.get_mesh_for_write();
+  geometry_set_ensure_mesh(geometry_set);
+  Mesh *final_mesh = geometry_set.get_mesh_for_write();
 
-    /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
-    BKE_mesh_ensure_normals(final_mesh);
+  /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
+  BKE_mesh_ensure_normals(final_mesh);
 
-    /* Set flag which makes it easier to see what's going on in a debugger. */
-    final_mesh->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
-    BLI_strncpy(final_mesh->id.name, cu->id.name, sizeof(final_mesh->id.name));
-    *((short *)final_mesh->id.name) = ID_ME;
-  }
+  /* Set flag which makes it easier to see what's going on in a debugger. */
+  final_mesh->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
+  BLI_strncpy(final_mesh->id.name, cu->id.name, sizeof(final_mesh->id.name));
+  *((short *)final_mesh->id.name) = ID_ME;
 
   return geometry_set;
 }
@@ -961,12 +964,12 @@ static void displist_surf_indices(DispList *dl)
   }
 }
 
-static void displist_make_surf(Depsgraph *depsgraph,
-                               const Scene *scene,
-                               Object *ob,
-                               ListBase *dispbase,
-                               Mesh **r_final,
-                               const bool for_render)
+static void evaluate_surface_object(Depsgraph *depsgraph,
+                                    const Scene *scene,
+                                    Object *ob,
+                                    const bool for_render,
+                                    ListBase *r_dispbase,
+                                    Mesh **r_final)
 {
   BLI_assert(ob->type == OB_SURF);
   const Curve *cu = (const Curve *)ob->data;
@@ -982,7 +985,7 @@ static void displist_make_surf(Depsgraph *depsgraph,
 
   BKE_curve_calc_modifiers_pre(depsgraph, scene, ob, deformed_nurbs, deformed_nurbs, for_render);
 
-  LISTBASE_FOREACH (Nurb *, nu, deformed_nurbs) {
+  LISTBASE_FOREACH (const Nurb *, nu, deformed_nurbs) {
     if (!(for_render || nu->hide == 0) || !BKE_nurb_check_valid_uv(nu)) {
       continue;
     }
@@ -996,7 +999,7 @@ static void displist_make_surf(Depsgraph *depsgraph,
       DispList *dl = (DispList *)MEM_callocN(sizeof(DispList), "makeDispListsurf");
       dl->verts = (float *)MEM_mallocN(len * sizeof(float[3]), "dlverts");
 
-      BLI_addtail(dispbase, dl);
+      BLI_addtail(r_dispbase, dl);
       dl->parts = 1;
       dl->nr = len;
       dl->col = nu->mat_nr;
@@ -1018,7 +1021,7 @@ static void displist_make_surf(Depsgraph *depsgraph,
 
       DispList *dl = (DispList *)MEM_callocN(sizeof(DispList), "makeDispListsurf");
       dl->verts = (float *)MEM_mallocN(len * sizeof(float[3]), "dlverts");
-      BLI_addtail(dispbase, dl);
+      BLI_addtail(r_dispbase, dl);
 
       dl->col = nu->mat_nr;
       dl->charidx = nu->charidx;
@@ -1043,7 +1046,9 @@ static void displist_make_surf(Depsgraph *depsgraph,
     }
   }
 
-  GeometrySet geometry_set = curve_calc_modifiers_post(depsgraph, scene, ob, dispbase, for_render);
+  curve_to_filledpoly(cu, r_dispbase);
+  GeometrySet geometry_set = curve_calc_modifiers_post(
+      depsgraph, scene, ob, r_dispbase, for_render);
   MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
   *r_final = mesh_component.release();
 }
@@ -1268,8 +1273,8 @@ static void calc_bevfac_mapping(const Curve *cu,
 static void evaluate_curve_type_object(Depsgraph *depsgraph,
                                        const Scene *scene,
                                        Object *ob,
-                                       ListBase *dispbase,
                                        const bool for_render,
+                                       ListBase *r_dispbase,
                                        GeometrySet *r_geometry_set)
 {
   const Curve *cu = (const Curve *)ob->data;
@@ -1288,12 +1293,17 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
 
   BKE_curve_bevelList_make(ob, deformed_nurbs, for_render);
 
+  if ((cu->flag & CU_PATH) ||
+      DEG_get_eval_flags_for_id(depsgraph, &ob->id) & DAG_EVAL_NEED_CURVE_PATH) {
+    BKE_anim_path_calc_data(ob);
+  }
+
   /* If curve has no bevel will return nothing */
   ListBase dlbev = BKE_curve_bevel_make(cu);
 
   /* no bevel or extrude, and no width correction? */
   if (BLI_listbase_is_empty(&dlbev) && cu->width == 1.0f) {
-    curve_to_displist(cu, deformed_nurbs, for_render, dispbase);
+    curve_to_displist(cu, deformed_nurbs, for_render, r_dispbase);
   }
   else {
     const float widfac = cu->width - 1.0f;
@@ -1311,7 +1321,7 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
       if (BLI_listbase_is_empty(&dlbev)) {
         DispList *dl = (DispList *)MEM_callocN(sizeof(DispList), "makeDispListbev");
         dl->verts = (float *)MEM_mallocN(sizeof(float[3]) * bl->nr, "dlverts");
-        BLI_addtail(dispbase, dl);
+        BLI_addtail(r_dispbase, dl);
 
         if (bl->poly != -1) {
           dl->type = DL_POLY;
@@ -1361,7 +1371,7 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
           /* for each part of the bevel use a separate displblock */
           DispList *dl = (DispList *)MEM_callocN(sizeof(DispList), "makeDispListbev1");
           dl->verts = data = (float *)MEM_mallocN(sizeof(float[3]) * dlb->nr * steps, "dlverts");
-          BLI_addtail(dispbase, dl);
+          BLI_addtail(r_dispbase, dl);
 
           dl->type = DL_SURF;
 
@@ -1457,8 +1467,8 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
         }
 
         if (bottom_capbase.first) {
-          BKE_displist_fill(&bottom_capbase, dispbase, bottom_no, false);
-          BKE_displist_fill(&top_capbase, dispbase, top_no, false);
+          BKE_displist_fill(&bottom_capbase, r_dispbase, bottom_no, false);
+          BKE_displist_fill(&top_capbase, r_dispbase, top_no, false);
           BKE_displist_free(&bottom_capbase);
           BKE_displist_free(&top_capbase);
         }
@@ -1468,12 +1478,8 @@ static void evaluate_curve_type_object(Depsgraph *depsgraph,
 
   BKE_displist_free(&dlbev);
 
-  if ((cu->flag & CU_PATH) ||
-      DEG_get_eval_flags_for_id(depsgraph, &ob->id) & DAG_EVAL_NEED_CURVE_PATH) {
-    BKE_anim_path_calc_data(ob);
-  }
-
-  *r_geometry_set = curve_calc_modifiers_post(depsgraph, scene, ob, dispbase, for_render);
+  curve_to_filledpoly(cu, r_dispbase);
+  *r_geometry_set = curve_calc_modifiers_post(depsgraph, scene, ob, r_dispbase, for_render);
 }
 
 void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
@@ -1493,12 +1499,12 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
 
   if (ob->type == OB_SURF) {
     Mesh *mesh_eval;
-    displist_make_surf(depsgraph, scene, ob, dispbase, &mesh_eval, for_render);
+    evaluate_surface_object(depsgraph, scene, ob, for_render, dispbase, &mesh_eval);
     BKE_object_eval_assign_data(ob, &mesh_eval->id, true);
   }
   else {
     GeometrySet geometry_set;
-    evaluate_curve_type_object(depsgraph, scene, ob, dispbase, for_render, &geometry_set);
+    evaluate_curve_type_object(depsgraph, scene, ob, for_render, dispbase, &geometry_set);
     ob->runtime.geometry_set_eval = new GeometrySet(std::move(geometry_set));
   }
 
@@ -1513,11 +1519,11 @@ void BKE_displist_make_curveTypes_forRender(
   }
 
   if (ob->type == OB_SURF) {
-    displist_make_surf(depsgraph, scene, ob, dispbase, r_final, true);
+    evaluate_surface_object(depsgraph, scene, ob, true, dispbase, r_final);
   }
   else {
     GeometrySet geometry_set;
-    evaluate_curve_type_object(depsgraph, scene, ob, dispbase, true, &geometry_set);
+    evaluate_curve_type_object(depsgraph, scene, ob, true, dispbase, &geometry_set);
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
     *r_final = mesh_component.release();
   }
