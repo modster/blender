@@ -73,7 +73,7 @@ bool VKTexture::init_internal(void)
     info.usage = usage;
     info.flags = 0;
 
-    views_.resize(info.mipLevels * (info.arrayLayers + 1));
+    views_.resize(info.mipLevels * (info.arrayLayers + 1), VK_NULL_HANDLE);
 
     VmaAllocationCreateInfo alloc_info = {};
     alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
