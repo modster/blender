@@ -3171,7 +3171,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
   if (rb->max_occlusion_level < 1) {
     rb->use_back_face_culling = true;
-    if (G.debug_value = 4000) {
+    if (G.debug_value == 4000) {
       printf("Backface culling enabled automatically.\n");
     }
   }
