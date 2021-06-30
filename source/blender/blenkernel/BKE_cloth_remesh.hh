@@ -23,9 +23,18 @@
  * \ingroup bke
  */
 
-/******************************************************************************
- * reference http://graphics.berkeley.edu/papers/Narain-AAR-2012-11/index.html
- ******************************************************************************/
+/**********************************************************************
+ * references
+ *
+ * [1] "Adaptive Anisotropic Remeshing for Cloth Simulation" by Rahul
+ * Narain, Armin Samii and James F. O'Brien (SIGGRAPH 2012)
+ * http://graphics.berkeley.edu/papers/Narain-AAR-2012-11/index.html
+ *
+ * [2] "Adjacency and incidence framework: a data structure for
+ * efficient and fast management of multiresolution meshes" by
+ * Frutuoso G. M. Silva and Abel J. P. Gomes (GRAPHITE '03)
+ * https://doi.org/10.1145/604471.604503
+ * ********************************************************************/
 
 #include "BLI_assert.h"
 #ifdef __cplusplus
