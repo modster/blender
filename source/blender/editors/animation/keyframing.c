@@ -2244,7 +2244,7 @@ static int clear_anim_v3d_exec(bContext *C, wmOperator *UNUSED(op))
               bPoseChannel *pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
               MEM_freeN(bone_name);
 
-              /* delete if bone is selected*/
+              /* Delete if bone is selected. */
               if ((pchan) && (pchan->bone)) {
                 if (pchan->bone->flag & BONE_SELECTED) {
                   can_delete = true;
@@ -2810,7 +2810,7 @@ bool autokeyframe_cfra_can_key(const Scene *scene, ID *id)
 /* --------------- API/Per-Datablock Handling ------------------- */
 
 /* Checks if some F-Curve has a keyframe for a given frame */
-bool fcurve_frame_has_keyframe(FCurve *fcu, float frame, short filter)
+bool fcurve_frame_has_keyframe(const FCurve *fcu, float frame, short filter)
 {
   /* quick sanity check */
   if (ELEM(NULL, fcu, fcu->bezt)) {
