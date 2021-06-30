@@ -911,6 +911,13 @@ static bool ntree_weight_tree_tag_nodes(bNode *fromnode, bNode *tonode, void *us
  * with their respective weights. */
 static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node)
 {
+  bNodeLink *displace_link = NULL;
+  bNodeSocket *displace_output = ntree_shader_node_find_input(output_node, "Displacement");
+  if (displace_output && displace_output->link) {
+    /* Remove any displacement link to avoid tagging it later on. */
+    displace_link = displace_output->link;
+    displace_output->link = NULL;
+  }
   /* Init tmp flag. */
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     node->tmp_flag = -1;
@@ -1110,6 +1117,11 @@ static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node
         }
       }
     }
+  }
+  /* Restore displacement link. */
+  if (displace_link) {
+    nodeAddLink(
+        ntree, displace_link->fromnode, displace_link->fromsock, output_node, displace_output);
   }
   ntreeUpdateTree(G.main, ntree);
 
