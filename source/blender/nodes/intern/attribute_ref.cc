@@ -49,20 +49,6 @@ std::ostream &operator<<(std::ostream &stream, const AttributeRef &attr)
   return stream;
 }
 
-/* This generally should not be used. It is necessary currently, so that GeometrySet can by used by
- * the CPPType system. */
-bool operator==(const AttributeRef &UNUSED(a), const AttributeRef &UNUSED(b))
-{
-  return false;
-}
-
-/* This generally should not be used. It is necessary currently, so that GeometrySet can by used by
- * the CPPType system. */
-uint64_t AttributeRef::hash() const
-{
-  return reinterpret_cast<uint64_t>(this);
-}
-
 bool AttributeRef::valid() const
 {
   return !name_.empty();
@@ -78,4 +64,4 @@ const void *AttributeRef::single_value_ptr() const
   return &value_float_;
 }
 
-MAKE_CPP_TYPE(AttributeRef, AttributeRef);
+MAKE_CPP_TYPE(AttributeRef, AttributeRef, CPPTypeFlags::Printable);

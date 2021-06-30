@@ -56,8 +56,6 @@ struct AttributeRef {
   AttributeRef(const std::string &name, CustomDataType data_type);
 
   friend std::ostream &operator<<(std::ostream &stream, const AttributeRef &geometry_set);
-  friend bool operator==(const AttributeRef &a, const AttributeRef &b);
-  uint64_t hash() const;
 
   bool valid() const;
 
