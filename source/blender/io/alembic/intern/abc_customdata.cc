@@ -299,6 +299,7 @@ using Alembic::AbcGeom::IC3fGeomParam;
 using Alembic::AbcGeom::IC4fGeomParam;
 using Alembic::AbcGeom::IV2fGeomParam;
 using Alembic::AbcGeom::IV3fGeomParam;
+using Alembic::AbcGeom::IV3dGeomParam;
 
 static void read_uvs(const CDStreamConfig &config,
                      void *data,
@@ -493,16 +494,17 @@ static void read_custom_data_uvs(const ICompoundProperty &prop,
   read_uvs(config, cd_data, uv_scope, sample.getVals(), uvs_indices);
 }
 
-void read_generated_coordinates(const ICompoundProperty &prop,
-                                const CDStreamConfig &config,
-                                const Alembic::Abc::ISampleSelector &iss)
+template <typename T>
+static void read_generated_coordinates_impl(const ICompoundProperty &prop,
+                                            const CDStreamConfig &config,
+                                            const Alembic::Abc::ISampleSelector &iss)
 {
-  if (!prop.valid() || prop.getPropertyHeader(propNameOriginalCoordinates) == nullptr) {
-    /* The ORCO property isn't there, so don't bother trying to process it. */
-    return;
-  }
+  using TypedGeomParam = Alembic::AbcGeom::ITypedGeomParam<T>;
+  using TypedGeomParamSample = typename Alembic::AbcGeom::ITypedGeomParam<T>::Sample;
+  using TypedArraySamplePtr = typename TypedGeomParamSample::samp_ptr_type;
+  using Vec3Type = typename T::value_type;
 
-  IV3fGeomParam param(prop, propNameOriginalCoordinates);
+  TypedGeomParam param(prop, propNameOriginalCoordinates);
   if (!param.valid() || param.isIndexed()) {
     /* Invalid or indexed coordinates aren't supported. */
     return;
@@ -512,8 +514,8 @@ void read_generated_coordinates(const ICompoundProperty &prop,
     return;
   }
 
-  IV3fGeomParam::Sample sample = param.getExpandedValue(iss);
-  Alembic::AbcGeom::V3fArraySamplePtr abc_ocro = sample.getVals();
+  TypedGeomParamSample sample = param.getExpandedValue(iss);
+  TypedArraySamplePtr abc_ocro = sample.getVals();
   const size_t totvert = abc_ocro.get()->size();
 
   void *cd_data;
@@ -526,8 +528,33 @@ void read_generated_coordinates(const ICompoundProperty &prop,
 
   float(*orcodata)[3] = static_cast<float(*)[3]>(cd_data);
   for (int vertex_idx = 0; vertex_idx < totvert; ++vertex_idx) {
-    const Imath::V3f &abc_coords = (*abc_ocro)[vertex_idx];
+    const Vec3Type &abc_coords = (*abc_ocro)[vertex_idx];
     copy_zup_from_yup(orcodata[vertex_idx], abc_coords.getValue());
+  }
+}
+
+void read_generated_coordinates(const ICompoundProperty &prop,
+                                const CDStreamConfig &config,
+                                const Alembic::Abc::ISampleSelector &iss)
+{
+  if (!prop.valid()) {
+    return;
+  }
+
+  const PropertyHeader *prop_header = prop.getPropertyHeader(propNameOriginalCoordinates);
+  if (prop_header == nullptr) {
+    /* The ORCO property isn't there, so don't bother trying to process it. */
+    return;
+  }
+
+  if (IV3fGeomParam::matches(*prop_header)) {
+    read_generated_coordinates_impl<Alembic::AbcGeom::V3fTPTraits>(prop, config, iss);
+    return;
+  }
+
+  if (IV3dGeomParam::matches(*prop_header)) {
+    read_generated_coordinates_impl<Alembic::AbcGeom::V3dTPTraits>(prop, config, iss);
+    return;
   }
 }
 

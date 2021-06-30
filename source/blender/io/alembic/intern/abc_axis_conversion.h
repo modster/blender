@@ -43,6 +43,16 @@ BLI_INLINE void copy_zup_from_yup(float zup[3], const float yup[3])
   zup[2] = old_yup1;
 }
 
+/* This takes a double[3] but converts to a float[3] as it is mainly for using
+ * in code which automatically converts to floats.  */
+BLI_INLINE void copy_zup_from_yup(float zup[3], const double yup[3])
+{
+  const double old_yup1 = yup[1]; /* in case zup == yup */
+  zup[0] = static_cast<float>(yup[0]);
+  zup[1] = static_cast<float>(-yup[2]);
+  zup[2] = static_cast<float>(old_yup1);
+}
+
 BLI_INLINE void copy_zup_from_yup(short zup[3], const short yup[3])
 {
   const short old_yup1 = yup[1]; /* in case zup == yup */
