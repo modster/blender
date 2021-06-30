@@ -50,7 +50,6 @@
 #include "GHOST_WindowManager.h"
 #include "GHOST_WindowWin32.h"
 
-<<<<<<< HEAD
 #if defined(WITH_VULKAN)
 #  include "GHOST_ContextVK.h"
 #endif
@@ -60,9 +59,6 @@
 #else
 #  include "GHOST_ContextWGL.h"
 #endif
-=======
-#include "GHOST_ContextWGL.h"
->>>>>>> master
 
 #ifdef WITH_INPUT_NDOF
 #  include "GHOST_NDOFManagerWin32.h"
