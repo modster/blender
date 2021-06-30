@@ -106,6 +106,7 @@ class MaterialModule {
   void begin_sync(void);
 
   MaterialArray &material_array_get(Object *ob);
+  Material &material_get(Object *ob, int mat_nr, eMaterialGeometry geometry_type);
 
  private:
   Material &material_sync(::Material *blender_mat, eMaterialGeometry geometry_type);

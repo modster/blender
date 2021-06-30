@@ -129,6 +129,14 @@ float hair_shaperadius(float shape, float root, float tip, float time)
 in float dummy;
 #  endif
 
+/* From http://libnoise.sourceforge.net/noisegen/index.html */
+float hair_integer_noise(int n)
+{
+  n = (n >> 13) ^ n;
+  int nn = (n * (n * n * 60493 + 19990303) + 1376312589) & 0x7FFFFFFF;
+  return (float(nn) / 1073741824.0);
+}
+
 void hair_get_pos_tan_binor_time(bool is_persp,
                                  mat4 invmodel_mat,
                                  vec3 camera_pos,
@@ -179,6 +187,11 @@ void hair_get_pos_tan_binor_time(bool is_persp,
     float scale = 1.0 / length(mat3(invmodel_mat) * wbinor);
 
     wpos += wbinor * thick_time * scale;
+  }
+  else {
+    /* Random hair time in V direction (binormal). Mimics cylinder shading. */
+    thick_time = hair_integer_noise(hair_get_strand_id());
+    thick_time = thickness * (thick_time * 2.0 - 1.0);
   }
 }
 

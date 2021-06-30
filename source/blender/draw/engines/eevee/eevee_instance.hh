@@ -168,6 +168,7 @@ class Instance {
 
   void mesh_sync(Object *ob, ObjectHandle &ob_handle);
   void gpencil_sync(Object *ob, ObjectHandle &ob_handle);
+  void hair_sync(Object *ob, ObjectHandle &ob_handle, ModifierData *modifier_data = nullptr);
 
   rcti output_crop(const int output_res[2], const rcti *crop);
 

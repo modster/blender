@@ -88,6 +88,7 @@ set(SRC
   engines/eevee/eevee_engine.cc
   engines/eevee/eevee_film.cc
   engines/eevee/eevee_gpencil.cc
+  engines/eevee/eevee_hair.cc
   engines/eevee/eevee_id_map.cc
   engines/eevee/eevee_instance.cc
   engines/eevee/eevee_light.cc
@@ -269,6 +270,7 @@ data_to_c_simple(engines/eevee/shaders/eevee_surface_depth_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_depth_simple_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_forward_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_gpencil_vert.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_surface_hair_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_lookdev_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_mesh_geom.glsl SRC)

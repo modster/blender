@@ -106,6 +106,7 @@ extern char datatoc_eevee_surface_depth_frag_glsl[];
 extern char datatoc_eevee_surface_depth_simple_frag_glsl[];
 extern char datatoc_eevee_surface_forward_frag_glsl[];
 extern char datatoc_eevee_surface_gpencil_vert_glsl[];
+extern char datatoc_eevee_surface_hair_vert_glsl[];
 extern char datatoc_eevee_surface_lib_glsl[];
 extern char datatoc_eevee_surface_lookdev_vert_glsl[];
 extern char datatoc_eevee_surface_mesh_geom_glsl[];
@@ -418,6 +419,9 @@ char *ShaderModule::material_shader_code_defs_get(eMaterialGeometry geometry_typ
   std::string output = "";
 
   switch (geometry_type) {
+    case MAT_GEOM_HAIR:
+      output += "#define MAT_GEOM_HAIR\n";
+      break;
     case MAT_GEOM_GPENCIL:
       output += "#define MAT_GEOM_GPENCIL\n";
       output += "#define UNIFORM_RESOURCE_ID\n";
@@ -444,7 +448,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
     /* Declare inputs. */
     std::string delimiter = ";\n";
     std::string sub(codegen->attribs_declare);
-    size_t pos = 0;
+    size_t start, pos = 0;
     while ((pos = sub.find(delimiter)) != std::string::npos) {
       switch (geometry_type) {
         case MAT_GEOM_MESH:
@@ -457,7 +461,8 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
           /* Example print:
            * uniform samplerBuffer u015684; */
           output += "uniform samplerBuffer ";
-          output += sub.substr(sub.find(" ") + 1, pos + delimiter.length());
+          start = sub.find(" ") + 1;
+          output += sub.substr(start, pos + delimiter.length() - start);
           break;
         case MAT_GEOM_GPENCIL:
           /* Example print:
@@ -491,8 +496,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
   }
   output += "}\n\n";
 
-  /* Displacement is only supported on mesh geometry for now. */
-  if (geometry_type == MAT_GEOM_MESH) {
+  if (ELEM(geometry_type, MAT_GEOM_MESH, MAT_GEOM_HAIR)) {
     if (codegen->displacement) {
       if (GPU_material_flag_get(mat, GPU_MATFLAG_UNIFORMS_ATTRIB)) {
         output += datatoc_common_uniform_attribute_lib_glsl;
@@ -526,6 +530,9 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
       break;
     case MAT_GEOM_LOOKDEV:
       output += datatoc_eevee_surface_lookdev_vert_glsl;
+      break;
+    case MAT_GEOM_HAIR:
+      output += datatoc_eevee_surface_hair_vert_glsl;
       break;
     case MAT_GEOM_MESH:
     default:

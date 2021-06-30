@@ -27,6 +27,7 @@
 #include "DEG_depsgraph_query.h"
 #include "DNA_ID.h"
 #include "DNA_lightprobe_types.h"
+#include "DNA_modifier_types.h"
 
 #include "eevee_instance.hh"
 
@@ -139,7 +140,8 @@ void Instance::object_sync(Object *ob)
   const bool is_renderable_type = ELEM(
       ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LAMP, OB_VOLUME, OB_GPENCIL);
   const int ob_visibility = DRW_object_visibility_in_active_context(ob);
-  const bool partsys_is_visible = (ob_visibility & OB_VISIBLE_PARTICLES) != 0;
+  const bool partsys_is_visible = (ob_visibility & OB_VISIBLE_PARTICLES) != 0 &&
+                                  (ob->type == OB_MESH);
   const bool object_is_visible = DRW_object_is_renderable(ob) &&
                                  (ob_visibility & OB_VISIBLE_SELF) != 0;
 
@@ -149,8 +151,12 @@ void Instance::object_sync(Object *ob)
 
   ObjectHandle &ob_handle = sync.sync_object(ob);
 
-  if (partsys_is_visible) {
-    /* TODO render particle hair. */
+  if (partsys_is_visible && ob != DRW_context_state_get()->object_edit) {
+    LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
+      if (md->type == eModifierType_ParticleSystem) {
+        hair_sync(ob, ob_handle, md);
+      }
+    }
   }
 
   if (object_is_visible) {
@@ -168,6 +174,9 @@ void Instance::object_sync(Object *ob)
       }
       case OB_VOLUME:
         shading_passes.deferred.volume_add(ob);
+        break;
+      case OB_HAIR:
+        hair_sync(ob, ob_handle);
         break;
       case OB_GPENCIL:
         gpencil_sync(ob, ob_handle);

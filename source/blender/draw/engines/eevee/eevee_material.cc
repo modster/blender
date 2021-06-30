@@ -241,12 +241,14 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
       /* First time encountering this shader. Create a shading group. */
       grp = inst_.shading_passes.material_add(blender_mat, matpass.gpumat, pipeline_type);
     }
-    else {
-      /* Shading group for this shader already exists. Create a sub one for this material. */
-      grp = DRW_shgroup_create_sub(grp);
-      DRW_shgroup_add_material_resources(grp, matpass.gpumat);
-    }
-    matpass.shgrp = grp;
+
+    /* Shading group for this shader already exists. Create a sub one for this material. */
+    /* IMPORTANT: We always create a subgroup so that all subgroups are inserted after the
+     * first "empty" shgroup. This avoids messing the order of subgroups when there is more nested
+     * subgroup (i.e: hair drawing). */
+    /* TODO(fclem) Remove material resource binding from the first group creation. */
+    matpass.shgrp = DRW_shgroup_create_sub(grp);
+    DRW_shgroup_add_material_resources(matpass.shgrp, matpass.gpumat);
   }
 
   return matpass;
@@ -295,6 +297,8 @@ Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeomet
   return ma;
 }
 
+/* Return Material references are valid until the next call to this function or
+ * material_get(). */
 MaterialArray &MaterialModule::material_array_get(Object *ob)
 {
   material_array_.materials.clear();
@@ -307,6 +311,15 @@ MaterialArray &MaterialModule::material_array_get(Object *ob)
     material_array_.gpu_materials.append(mat.shading.gpumat);
   }
   return material_array_;
+}
+
+/* Return Material references are valid until the next call to this function or
+ * material_array_get(). */
+Material &MaterialModule::material_get(Object *ob, int mat_nr, eMaterialGeometry geometry_type)
+{
+  ::Material *blender_mat = material_from_slot(ob, mat_nr);
+  Material &mat = material_sync(blender_mat, geometry_type);
+  return mat;
 }
 
 /** \} */

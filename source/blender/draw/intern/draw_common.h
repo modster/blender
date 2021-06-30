@@ -22,6 +22,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct DRWShadingGroup;
 struct FluidModifierData;
 struct ModifierData;
@@ -215,3 +219,7 @@ struct DRW_Global {
   struct GPUUniformBuf *view_ubo;
 };
 extern struct DRW_Global G_draw;
+
+#ifdef __cplusplus
+}
+#endif
