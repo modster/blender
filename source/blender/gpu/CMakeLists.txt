@@ -104,6 +104,7 @@ set(SRC
   opengl/gl_query.cc
   opengl/gl_shader.cc
   opengl/gl_shader_log.cc
+  opengl/gl_shader_converter.cc
   opengl/gl_shader_interface.cc
   opengl/gl_state.cc
   opengl/gl_texture.cc
@@ -399,6 +400,7 @@ if(WITH_GTESTS)
 
       tests/gpu_index_buffer_test.cc
       tests/gpu_shader_builtin_test.cc
+      tests/gpu_shader_push_constants_test.cc
       tests/gpu_shader_test.cc
 
       tests/gpu_testing.hh

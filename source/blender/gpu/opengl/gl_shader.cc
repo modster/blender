@@ -148,6 +148,11 @@ GLuint GLShader::create_shader_stage(GLenum gl_stage, MutableSpan<const char *> 
 
   /* Patch the shader code using the first source slot. */
   sources[0] = glsl_patch_get(gl_stage);
+  converter_.patch(sources);
+  if (converter_.has_error()) {
+    compilation_failed_ = true;
+    return 0;
+  }
 
   glShaderSource(shader, sources.size(), sources.data(), nullptr);
   glCompileShader(shader);
@@ -227,6 +232,10 @@ bool GLShader::finalize()
   }
 
   interface = new GLShaderInterface(shader_program_);
+
+  /* Only patched sources are only freed when shader compilation and linking succeeds for
+   * debugging. */
+  converter_.free();
 
   return true;
 }

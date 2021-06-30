@@ -29,6 +29,8 @@
 
 #include "gpu_shader_private.hh"
 
+#include "gl_shader_converter.hh"
+
 namespace blender {
 namespace gpu {
 
@@ -48,6 +50,7 @@ class GLShader : public Shader {
   bool compilation_failed_ = false;
 
   eGPUShaderTFBType transform_feedback_type_ = GPU_SHADER_TFB_NONE;
+  GLShaderConverter converter_;
 
  public:
   GLShader(const char *name);
