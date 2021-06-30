@@ -54,7 +54,7 @@ TEST(cloth_remesh, MeshIO_ReadObj)
 {
   MeshIO reader;
   std::istringstream stream(cube_pos_uv_normal);
-  auto res = reader.read(std::move(stream), MeshIO::FILETYPE_OBJ);
+  auto res = reader.read(std::move(stream), MeshIO::IOTYPE_OBJ);
 
   EXPECT_TRUE(res);
 
@@ -75,11 +75,11 @@ TEST(cloth_remesh, MeshIO_WriteObj)
 {
   MeshIO reader;
   std::istringstream stream_in(cube_pos_uv_normal);
-  auto res = reader.read(std::move(stream_in), MeshIO::FILETYPE_OBJ);
+  auto res = reader.read(std::move(stream_in), MeshIO::IOTYPE_OBJ);
   EXPECT_TRUE(res);
 
   std::ostringstream stream_out;
-  reader.write(stream_out, MeshIO::FILETYPE_OBJ);
+  reader.write(stream_out, MeshIO::IOTYPE_OBJ);
 
   std::string expected =
       "v 1 1 -1\n"
@@ -124,7 +124,7 @@ TEST(cloth_remesh, Mesh_Read)
 {
   MeshIO reader;
   std::istringstream stream(cube_pos_uv_normal);
-  reader.read(std::move(stream), MeshIO::FILETYPE_OBJ);
+  reader.read(std::move(stream), MeshIO::IOTYPE_OBJ);
 
   Mesh<bool, bool, bool, bool> mesh;
   mesh.read(reader);
@@ -164,7 +164,7 @@ TEST(cloth_remesh, Mesh_Write)
 {
   MeshIO reader;
   std::istringstream stream(cube_pos_uv_normal);
-  reader.read(std::move(stream), MeshIO::FILETYPE_OBJ);
+  reader.read(std::move(stream), MeshIO::IOTYPE_OBJ);
 
   Mesh<bool, bool, bool, bool> mesh;
   mesh.read(reader);

@@ -355,15 +355,15 @@ class MeshIO {
   blender::Vector<blender::Vector<usize>> line_indices;
 
  public:
-  enum FileType {
-    FILETYPE_OBJ,
+  enum IOType {
+    IOTYPE_OBJ,
   };
 
   MeshIO() = default;
 
-  bool read(const fs::path &filepath, FileType type)
+  bool read(const fs::path &filepath, IOType type)
   {
-    if (type != FILETYPE_OBJ) {
+    if (type != IOTYPE_OBJ) {
       return false;
     }
 
@@ -381,9 +381,9 @@ class MeshIO {
     return read(std::move(fin), type);
   }
 
-  bool read(std::istream &&in, FileType type)
+  bool read(std::istream &&in, IOType type)
   {
-    if (type == FILETYPE_OBJ) {
+    if (type == IOTYPE_OBJ) {
       auto res = this->read_obj(std::move(in));
       if (!res) {
         return false;
@@ -398,9 +398,9 @@ class MeshIO {
     return true;
   }
 
-  bool write(const fs::path &filepath, FileType type)
+  bool write(const fs::path &filepath, IOType type)
   {
-    if (type != FILETYPE_OBJ) {
+    if (type != IOTYPE_OBJ) {
       return false;
     }
 
@@ -420,9 +420,9 @@ class MeshIO {
     return true;
   }
 
-  void write(std::ostream &out, FileType type)
+  void write(std::ostream &out, IOType type)
   {
-    if (type == FILETYPE_OBJ) {
+    if (type == IOTYPE_OBJ) {
       this->write_obj(out);
     }
     else {
@@ -909,7 +909,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   void read_obj(const fs::path &filepath)
   {
     MeshIO reader;
-    const auto reader_success = reader.read(filepath, MeshIO::FILETYPE_OBJ);
+    const auto reader_success = reader.read(filepath, MeshIO::IOTYPE_OBJ);
     BLI_assert(reader_success); /* must successfully load obj */
 
     this->read(reader);
