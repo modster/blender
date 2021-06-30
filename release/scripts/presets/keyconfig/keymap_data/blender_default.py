@@ -5365,7 +5365,6 @@ def km_knife_tool_modal_map(_params):
         ("PANNING", {"type": 'MIDDLEMOUSE', "value": 'ANY', "any": True}, None),
         ("ADD_CUT_CLOSED", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "any": True}, None),
         ("ADD_CUT", {"type": 'LEFTMOUSE', "value": 'ANY', "any": True}, None),
-        ("CANCEL", {"type": 'E', "value": 'PRESS', "any": True}, None),
         ("CONFIRM", {"type": 'RET', "value": 'PRESS', "any": True}, None),
         ("CONFIRM", {"type": 'NUMPAD_ENTER', "value": 'PRESS', "any": True}, None),
         ("CONFIRM", {"type": 'SPACE', "value": 'PRESS', "any": True}, None),
@@ -5380,7 +5379,7 @@ def km_knife_tool_modal_map(_params):
         ("IGNORE_SNAP_OFF", {"type": 'RIGHT_SHIFT', "value": 'RELEASE', "any": True}, None),
         ("ANGLE_SNAP_TOGGLE", {"type": 'C', "value": 'PRESS'}, None),
         ("CUT_THROUGH_TOGGLE", {"type": 'T', "value": 'PRESS'}, None),
-        ("SHOW_DISTANCE_ANGLE_TOGGLE", {"type": 'M', "value": 'PRESS'}, None),
+        ("SHOW_DISTANCE_ANGLE_TOGGLE", {"type": 'D', "value": 'PRESS'}, None),
     ])
 
     return keymap
