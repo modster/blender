@@ -749,8 +749,6 @@ static void panelRegister(ARegionType *region_type)
                                      intersection_panel_draw,
                                      panel_type);
   gpencil_modifier_subpanel_register(
-      region_type, "intersection", "Intersection", NULL, intersection_panel_draw, panel_type);
-  gpencil_modifier_subpanel_register(
       region_type, "face_mark", "", face_mark_panel_draw_header, face_mark_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "chaining", "Chaining", NULL, chaining_panel_draw, panel_type);
