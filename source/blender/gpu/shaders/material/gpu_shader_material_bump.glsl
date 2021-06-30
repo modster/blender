@@ -20,6 +20,7 @@ void node_bump(float strength,
   N = normalize(N);
   dist *= FrontFacing ? invert : -invert;
 
+#ifdef GPU_FRAGMENT_SHADER
   vec3 dPdx = dFdx(g_data.P);
   vec3 dPdy = dFdy(g_data.P);
 
@@ -38,4 +39,7 @@ void node_bump(float strength,
 
   result = normalize(abs(det) * N - dist * sign(det) * surfgrad);
   result = normalize(mix(N, result, strength));
+#else
+  result = N;
+#endif
 }

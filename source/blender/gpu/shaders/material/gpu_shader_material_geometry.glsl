@@ -24,9 +24,13 @@ void node_geometry(vec3 orco,
   position = g_data.P;
 #  ifndef VOLUMETRICS
   normal = normalize(g_data.N);
+#    ifdef GPU_FRAGMENT_SHADER
   vec3 B = dFdx(g_data.P);
   vec3 T = dFdy(g_data.P);
   true_normal = normalize(cross(B, T));
+#    else /* GPU_VERTEX_SHADER */
+  true_normal = normal;
+#    endif
 #  else
   normal = (toworld * vec4(g_data.N, 0.0)).xyz;
   true_normal = normal;
