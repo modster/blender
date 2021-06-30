@@ -692,7 +692,7 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
                                                                 LineartEdgeChain *ec,
                                                                 LineartEdgeChainItem *eci,
                                                                 int occlusion,
-                                                                unsigned char fixed_mask,
+                                                                unsigned char material_mask_bits,
                                                                 unsigned char isec_mask,
                                                                 float dist,
                                                                 float *result_new_len,
@@ -722,7 +722,8 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
       continue;
     }
     if (cre->ec == ec || (!cre->ec->chain.first) || (cre->ec->level != occlusion) ||
-        (cre->ec->material_mask_bits != fixed_mask) || (cre->ec->intersection_mask != isec_mask)) {
+        (cre->ec->material_mask_bits != material_mask_bits) ||
+        (cre->ec->intersection_mask != isec_mask)) {
       continue;
     }
     if (!rb->fuzzy_everything) {
@@ -758,8 +759,16 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
   if (dist_to < dist && dist_to > 0) { \
     LISTBASE_FOREACH (LinkData *, ld, list) { \
       LineartBoundingArea *sba = (LineartBoundingArea *)ld->data; \
-      adjacent_closest = lineart_chain_get_closest_cre( \
-          rb, sba, ec, eci, occlusion, fixed_mask, isec_mask, dist, &adjacent_new_len, ba); \
+      adjacent_closest = lineart_chain_get_closest_cre(rb, \
+                                                       sba, \
+                                                       ec, \
+                                                       eci, \
+                                                       occlusion, \
+                                                       material_mask_bits, \
+                                                       isec_mask, \
+                                                       dist, \
+                                                       &adjacent_new_len, \
+                                                       ba); \
       if (adjacent_new_len < dist) { \
         dist = adjacent_new_len; \
         closest_cre = adjacent_closest; \
@@ -792,7 +801,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
   float dist = rb->chaining_image_threshold;
   float dist_l, dist_r;
   int occlusion, reverse_main;
-  unsigned char fixed_mask, isec_mask;
+  unsigned char material_mask_bits, isec_mask;
   ListBase swap = {0};
 
   if (rb->chaining_image_threshold < 0.0001) {
@@ -816,7 +825,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
     }
 
     occlusion = ec->level;
-    fixed_mask = ec->material_mask_bits;
+    material_mask_bits = ec->material_mask_bits;
     isec_mask = ec->intersection_mask;
 
     eci_l = ec->chain.first;
@@ -824,9 +833,9 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
     while ((ba_l = lineart_bounding_area_get_end_point(rb, eci_l)) &&
            (ba_r = lineart_bounding_area_get_end_point(rb, eci_r))) {
       closest_cre_l = lineart_chain_get_closest_cre(
-          rb, ba_l, ec, eci_l, occlusion, fixed_mask, isec_mask, dist, &dist_l, NULL);
+          rb, ba_l, ec, eci_l, occlusion, material_mask_bits, isec_mask, dist, &dist_l, NULL);
       closest_cre_r = lineart_chain_get_closest_cre(
-          rb, ba_r, ec, eci_r, occlusion, fixed_mask, isec_mask, dist, &dist_r, NULL);
+          rb, ba_r, ec, eci_r, occlusion, material_mask_bits, isec_mask, dist, &dist_r, NULL);
       if (closest_cre_l && closest_cre_r) {
         if (dist_l < dist_r) {
           closest_cre = closest_cre_l;

@@ -190,6 +190,7 @@ typedef struct LineartEdgeChainItem {
   unsigned char line_type;
   char occlusion;
   unsigned char material_mask_bits;
+  unsigned char intersection_mask;
   size_t index;
 } LineartEdgeChainItem;
 
@@ -395,7 +396,7 @@ typedef struct LineartObjectInfo {
   double normal[4][4];
   LineartElementLinkNode *eln;
   int usage;
-  unsigned char override_intersection_mask;
+  uint8_t override_intersection_mask;
   int global_i_offset;
 
   bool free_use_mesh;

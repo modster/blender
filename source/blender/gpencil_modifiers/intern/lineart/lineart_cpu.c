@@ -883,7 +883,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
        * (!in0) means "when point 0 is visible".
        * conditions for point 1, 2 are the same idea.
        *
-       * \code{.txt}
+       * \code{.txt}identify
        * 1-----|-------0
        * |     |   ---
        * |     |---
@@ -2009,19 +2009,23 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
   }
 }
 
-static bool _lineart_object_not_in_source_collection(Collection *source, Object *ob)
+static uchar lineart_intersection_mask_check(Collection *c, Object *ob)
 {
-  CollectionChild *cc;
-  Collection *c = source->id.orig_id ? (Collection *)source->id.orig_id : source;
-  if (BKE_collection_has_object_recursive_instanced(c, (Object *)(ob->id.orig_id))) {
-    return false;
-  }
-  for (cc = source->children.first; cc; cc = cc->next) {
-    if (!_lineart_object_not_in_source_collection(cc->collection, ob)) {
-      return false;
+  LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
+    uchar result = lineart_intersection_mask_check(cc->collection, ob);
+    if (result) {
+      return result;
     }
   }
-  return true;
+
+  if (c->children.first == NULL) {
+    if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
+      if (c->lineart_flags & COLLECTION_LRT_USE_INTERSECTION_MASK) {
+        return c->lineart_intersection_mask;
+      }
+    }
+  }
+  return 0;
 }
 
 static uchar lineart_intersection_mask_check(Collection *c, Object *ob)

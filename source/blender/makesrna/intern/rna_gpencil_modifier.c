@@ -3078,7 +3078,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_material_mask_bits", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "material_mask_bits", 1);
   RNA_def_property_array(prop, 8);
-  RNA_def_property_ui_text(prop, "Masks", "");
+  RNA_def_property_ui_text(prop, "Masks", "Mask bits to match from Material Line Art settings");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_intersection_filter", PROP_BOOLEAN, PROP_NONE);
@@ -3096,7 +3096,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_intersection_mask", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "intersection_mask", 1);
   RNA_def_property_array(prop, 8);
-  RNA_def_property_ui_text(prop, "Masks", "");
+  RNA_def_property_ui_text(prop, "Masks", "Mask bits to match from Collection Line Art settings");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_crease_on_smooth", PROP_BOOLEAN, PROP_NONE);
