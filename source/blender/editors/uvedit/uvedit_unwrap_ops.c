@@ -1136,8 +1136,8 @@ static void pack_islands_draw(bContext *C, wmOperator *op)
 void UV_OT_pack_islands(wmOperatorType *ot)
 {
   static const EnumPropertyItem pack_to[] = {
-      {0, "CLOSEST_UDIM", 0, "Closest UDIM", "Pack islands to closest UDIM"},
-      {1, "SPECIFIED_UDIM", 0, "Specified UDIM", "Pack islands to specified UDIM"},
+      {CLOSEST_UDIM, "CLOSEST_UDIM", 0, "Closest UDIM", "Pack islands to closest UDIM"},
+      {SPECIFIED_UDIM, "SPECIFIED_UDIM", 0, "Specified UDIM", "Pack islands to specified UDIM"},
       {0, NULL, 0, NULL, NULL},
   };
   /* identifiers */

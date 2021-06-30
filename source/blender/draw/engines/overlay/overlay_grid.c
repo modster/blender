@@ -81,9 +81,6 @@ void OVERLAY_grid_init(OVERLAY_Data *vedata)
      * (N^2) pixels in the UV/Image editor */
     shd->zoom_factor *= (N * N);
 
-    printf("xzoom = %f\n", xzoom);
-    printf("zoom Factor = %f\n\n", shd->zoom_factor);
-
     if (sima->flag & SI_DYNAMIC_GRID) {
       shd->grid_flag |= DYNAMIC_GRID;
       for (int step = 0; step < 8; step++) {
