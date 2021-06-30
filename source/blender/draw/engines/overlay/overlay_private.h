@@ -142,6 +142,7 @@ typedef struct OVERLAY_ShadingData {
   float grid_steps[8];
   float inv_viewport_size[2];
   float grid_line_size;
+  float zoom_factor; /* Length per pixel in the UV editor viewport */
   int grid_flag;
   int zpos_flag;
   int zneg_flag;
