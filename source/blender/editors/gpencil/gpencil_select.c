@@ -1319,7 +1319,7 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
     const bool handles_visible = (v3d->overlay.handle_display != CURVE_HANDLE_NONE) &&
                                  (!only_selected || BEZT_ISSEL_ANY(bezt));
 
-    /* if the handles are not visible only check ctrl point (vec[1])*/
+    /* If the handles are not visible only check control point (vec[1]). */
     int from = (!handles_visible) ? 1 : 0;
     int to = (!handles_visible) ? 2 : 3;
 

@@ -187,7 +187,11 @@ void BKE_editmesh_looptri_calc_with_partial_ex(BMEditMesh *em,
 
 void BKE_editmesh_looptri_calc_with_partial(BMEditMesh *em, struct BMPartialUpdate *bmpinfo)
 {
-  BKE_editmesh_looptri_calc_with_partial_ex(em, bmpinfo, false);
+  BKE_editmesh_looptri_calc_with_partial_ex(em,
+                                            bmpinfo,
+                                            &(const struct BMeshCalcTessellation_Params){
+                                                .face_normals = false,
+                                            });
 }
 
 void BKE_editmesh_looptri_and_normals_calc_with_partial(BMEditMesh *em,
@@ -218,7 +222,7 @@ void BKE_editmesh_free_derivedmesh(BMEditMesh *em)
   MEM_SAFE_FREE(em->bb_cage);
 }
 
-/*does not free the BMEditMesh struct itself*/
+/* Does not free the #BMEditMesh struct itself. */
 void BKE_editmesh_free(BMEditMesh *em)
 {
   BKE_editmesh_free_derivedmesh(em);

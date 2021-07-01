@@ -119,6 +119,7 @@ struct bGPDframe *BKE_gpencil_frame_duplicate(const struct bGPDframe *gpf_src,
 struct bGPDlayer *BKE_gpencil_layer_duplicate(const struct bGPDlayer *gpl_src,
                                               const bool dup_frames,
                                               const bool dup_strokes);
+void BKE_gpencil_layer_copy_settings(const struct bGPDlayer *gpl_src, struct bGPDlayer *gpl_dst);
 void BKE_gpencil_frame_copy_strokes(struct bGPDframe *gpf_src, struct bGPDframe *gpf_dst);
 void BKE_gpencil_frame_selected_hash(struct bGPdata *gpd, struct GHash *r_list);
 
@@ -213,6 +214,10 @@ void BKE_gpencil_layer_mask_remove_ref(struct bGPdata *gpd, const char *name);
 struct bGPDlayer_Mask *BKE_gpencil_layer_mask_named_get(struct bGPDlayer *gpl, const char *name);
 void BKE_gpencil_layer_mask_sort(struct bGPdata *gpd, struct bGPDlayer *gpl);
 void BKE_gpencil_layer_mask_sort_all(struct bGPdata *gpd);
+void BKE_gpencil_layer_mask_copy(const struct bGPDlayer *gpl_src, struct bGPDlayer *gpl_dst);
+void BKE_gpencil_layer_mask_cleanup(struct bGPdata *gpd, struct bGPDlayer *gpl);
+void BKE_gpencil_layer_mask_cleanup_all_layers(struct bGPdata *gpd);
+
 void BKE_gpencil_layer_frames_sort(struct bGPDlayer *gpl, bool *r_has_duplicate_frames);
 
 struct bGPDlayer *BKE_gpencil_layer_get_by_name(struct bGPdata *gpd,

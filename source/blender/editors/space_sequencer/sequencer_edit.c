@@ -1816,8 +1816,8 @@ static int sequencer_separate_images_exec(bContext *C, wmOperator *op)
       /* Remove seq so overlap tests don't conflict,
        * see seq_free_sequence below for the real freeing. */
       BLI_remlink(ed->seqbasep, seq);
-      /* if (seq->ipo) id_us_min(&seq->ipo->id); */
-      /* XXX, remove fcurve and assign to split image strips */
+      /* TODO: remove f-curve and assign to split image strips.
+       * The old animation system would remove the user of `seq->ipo`. */
 
       start_ofs = timeline_frame = SEQ_transform_get_left_handle_frame(seq);
       frame_end = SEQ_transform_get_right_handle_frame(seq);
@@ -2486,7 +2486,7 @@ static int sequencer_paste_exec(bContext *C, wmOperator *op)
         min_seq_startdisp = seq->startdisp;
       }
     }
-    /* Paste strips after playhead. */
+    /* Paste strips relative to the current-frame. */
     ofs = scene->r.cfra - min_seq_startdisp;
   }
 
@@ -2539,7 +2539,11 @@ void SEQUENCER_OT_paste(wmOperatorType *ot)
 
   /* Properties. */
   PropertyRNA *prop = RNA_def_boolean(
-      ot->srna, "keep_offset", false, "Keep Offset", "Keep strip offset to playhead when pasting");
+      ot->srna,
+      "keep_offset",
+      false,
+      "Keep Offset",
+      "Keep strip offset relative to the current frame when pasting");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
@@ -2825,7 +2829,7 @@ static int sequencer_change_path_exec(bContext *C, wmOperator *op)
       RNA_END;
     }
 
-    /* Reset these else we wont see all the images. */
+    /* Reset these else we won't see all the images. */
     seq->anim_startofs = seq->anim_endofs = 0;
 
     /* Correct start/end frames so we don't move.
@@ -2980,8 +2984,10 @@ static int sequencer_export_subtitles_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
+  /* Only text strips that are not muted and don't end with negative frame. */
   SEQ_ALL_BEGIN (ed, seq) {
-    if (seq->type == SEQ_TYPE_TEXT) {
+    if ((seq->type == SEQ_TYPE_TEXT) && ((seq->flag & SEQ_MUTE) == 0) &&
+        (seq->enddisp > scene->r.sfra)) {
       BLI_addtail(&text_seq, MEM_dupallocN(seq));
     }
   }
@@ -3002,16 +3008,17 @@ static int sequencer_export_subtitles_exec(bContext *C, wmOperator *op)
     char timecode_str_start[32];
     char timecode_str_end[32];
 
+    /* Write timecode relative to start frame of scene. Don't allow negative timecodes. */
     BLI_timecode_string_from_time(timecode_str_start,
                                   sizeof(timecode_str_start),
                                   -2,
-                                  FRA2TIME(seq->startdisp),
+                                  FRA2TIME(max_ii(seq->startdisp - scene->r.sfra, 0)),
                                   FPS,
                                   USER_TIMECODE_SUBRIP);
     BLI_timecode_string_from_time(timecode_str_end,
                                   sizeof(timecode_str_end),
                                   -2,
-                                  FRA2TIME(seq->enddisp),
+                                  FRA2TIME(seq->enddisp - scene->r.sfra),
                                   FPS,
                                   USER_TIMECODE_SUBRIP);
 

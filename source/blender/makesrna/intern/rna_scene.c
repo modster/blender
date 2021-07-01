@@ -190,6 +190,16 @@ const EnumPropertyItem rna_enum_snap_node_element_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+const EnumPropertyItem rna_enum_snap_seq_element_items[] = {
+    {SEQ_SNAP_TO_CURRENT_FRAME,
+     "CURRENT_FRAME",
+     ICON_NONE,
+     "Current Frame",
+     "Snap to current frame"},
+    {SEQ_SNAP_TO_STRIP_HOLD, "STRIP_HOLD", ICON_NONE, "Hold Offset", "Snap to strip hold offset"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 #ifndef RNA_RUNTIME
 static const EnumPropertyItem snap_uv_element_items[] = {
     {SCE_SNAP_MODE_INCREMENT,
@@ -3126,6 +3136,12 @@ static void rna_def_tool_settings(BlenderRNA *brna)
       "Absolute grid alignment while translating (based on the pivot center)");
   RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
 
+  prop = RNA_def_property(srna, "use_snap_sequencer", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "snap_flag", SCE_SNAP_SEQ);
+  RNA_def_property_ui_text(prop, "Use Snapping", "Snap to strip edges or current frame");
+  RNA_def_property_ui_icon(prop, ICON_SNAP_OFF, 1);
+  RNA_def_property_boolean_default(prop, true);
+
   prop = RNA_def_property(srna, "snap_elements", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_bitflag_sdna(prop, NULL, "snap_mode");
   RNA_def_property_enum_items(prop, rna_enum_snap_element_items);
@@ -3372,7 +3388,7 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, NULL);
 
   /* Annotations - 3D View Stroke Placement */
-  /* XXX: Do we need to decouple the stroke_endpoints setting too?  */
+  /* XXX: Do we need to decouple the stroke_endpoints setting too? */
   prop = RNA_def_property(srna, "annotation_stroke_placement_view3d", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_bitflag_sdna(prop, NULL, "annotate_v3d_align");
   RNA_def_property_enum_items(prop, annotation_stroke_placement_items);
@@ -3526,9 +3542,36 @@ static void rna_def_sequencer_tool_settings(BlenderRNA *brna)
   RNA_def_struct_path_func(srna, "rna_SequencerToolSettings_path");
   RNA_def_struct_ui_text(srna, "Sequencer Tool Settings", "");
 
+  /* Add strip settings. */
   prop = RNA_def_property(srna, "fit_method", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, scale_fit_methods);
   RNA_def_property_ui_text(prop, "Fit Method", "Scale fit method");
+
+  /* Transform snapping. */
+
+  /* Sequencer editor uses own set of snap modes */
+  prop = RNA_def_property(srna, "snap_seq_element", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_bitflag_sdna(prop, NULL, "snap_mode");
+  RNA_def_property_enum_items(prop, rna_enum_snap_seq_element_items);
+  RNA_def_property_ui_text(prop, "Snap To", "Type of element to snap to");
+  RNA_def_property_flag(prop, PROP_ENUM_FLAG);
+  RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
+
+  prop = RNA_def_property(srna, "snap_ignore_muted", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "snap_flag", SEQ_SNAP_IGNORE_MUTED);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_ui_text(prop, "Ignore Muted Strips", "Don't snap to hidden strips");
+
+  prop = RNA_def_property(srna, "snap_ignore_sound", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "snap_flag", SEQ_SNAP_IGNORE_SOUND);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_ui_text(prop, "Ignore Sound Strips", "Don't snap to sound strips");
+
+  prop = RNA_def_property(srna, "snap_distance", PROP_INT, PROP_PIXEL);
+  RNA_def_property_int_sdna(prop, NULL, "snap_distance");
+  RNA_def_property_int_default(prop, 15);
+  RNA_def_property_ui_range(prop, 0, 50, 1, 1);
+  RNA_def_property_ui_text(prop, "Snapping Distance", "Maximum distance for snapping in pixels");
 }
 
 static void rna_def_unified_paint_settings(BlenderRNA *brna)
@@ -4218,6 +4261,17 @@ void rna_def_view_layer_common(BlenderRNA *brna, StructRNA *srna, const bool sce
   prop = RNA_def_property(srna, "use_volumes", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "layflag", SCE_LAY_VOLUMES);
   RNA_def_property_ui_text(prop, "Volumes", "Render volumes in this Layer");
+  if (scene) {
+    RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
+  }
+  else {
+    RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  }
+
+  prop = RNA_def_property(srna, "use_motion_blur", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "layflag", SCE_LAY_MOTION_BLUR);
+  RNA_def_property_ui_text(
+      prop, "Motion Blur", "Render motion blur in this Layer, if enabled in the scene");
   if (scene) {
     RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
   }
@@ -5783,7 +5837,7 @@ static void rna_def_scene_ffmpeg_settings(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Lossless Output", "Use lossless output for video streams");
   RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
 
-  /* FFMPEG Audio*/
+  /* FFMPEG Audio. */
   prop = RNA_def_property(srna, "audio_codec", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_bitflag_sdna(prop, NULL, "audio_codec");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
@@ -6461,27 +6515,12 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 
   /* sequencer draw options */
 
-#  if 0 /* see R_SEQ_GL_REND comment */
-  prop = RNA_def_property(srna, "use_sequencer_gl_render", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "seq_flag", R_SEQ_GL_REND);
-  RNA_def_property_ui_text(prop, "Sequencer OpenGL", "");
-#  endif
-
   prop = RNA_def_property(srna, "sequencer_gl_preview", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "seq_prev_type");
   RNA_def_property_enum_items(prop, rna_enum_shading_type_items);
   RNA_def_property_ui_text(
       prop, "Sequencer Preview Shading", "Display method used in the sequencer view");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SceneSequencer_update");
-
-#  if 0 /* UNUSED, see R_SEQ_GL_REND comment */
-  prop = RNA_def_property(srna, "sequencer_gl_render", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "seq_rend_type");
-  RNA_def_property_enum_items(prop, rna_enum_shading_type_items);
-  /* XXX Label and tooltips are obviously wrong! */
-  RNA_def_property_ui_text(
-      prop, "Sequencer Preview Shading", "Display method used in the sequencer view");
-#  endif
 
   prop = RNA_def_property(srna, "use_sequencer_override_scene_strip", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "seq_flag", R_SEQ_OVERRIDE_SCENE_SETTINGS);
@@ -6660,7 +6699,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
   RNA_def_property_struct_type(prop, "BakeSettings");
   RNA_def_property_ui_text(prop, "Bake Data", "");
 
-  /* Nestled Data  */
+  /* Nestled Data. */
   /* *** Non-Animated *** */
   RNA_define_animate_sdna(false);
   rna_def_bake_data(brna);
@@ -7976,7 +8015,7 @@ void RNA_def_scene(BlenderRNA *brna)
   RNA_def_property_struct_type(prop, "SceneGpencil");
   RNA_def_property_ui_text(prop, "Grease Pencil", "Grease Pencil settings for the scene");
 
-  /* Nestled Data  */
+  /* Nestled Data. */
   /* *** Non-Animated *** */
   RNA_define_animate_sdna(false);
   rna_def_tool_settings(brna);

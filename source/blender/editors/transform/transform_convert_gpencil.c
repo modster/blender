@@ -535,8 +535,7 @@ static void createTransGPencil_strokes(TransInfo *t,
             BKE_gpencil_editcurve_recalculate_handles(gps);
           }
         }
-
-        /* if not multiedit out of loop */
+        /* If not multi-edit out of loop. */
         if (!is_multiedit) {
           break;
         }

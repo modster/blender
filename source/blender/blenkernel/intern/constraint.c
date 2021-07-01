@@ -222,7 +222,7 @@ void BKE_constraints_clear_evalob(bConstraintOb *cob)
   /* XXX This would seem to be in wrong order. However, it does not work in 'right' order -
    *     would be nice to understand why premul is needed here instead of usual postmul?
    *     In any case, we **do not get a delta** here (e.g. startmat & matrix having same location,
-   *     still gives a 'delta' with non-null translation component :/ ).*/
+   *     still gives a 'delta' with non-null translation component :/ ). */
   mul_m4_m4m4(delta, cob->matrix, imat);
 
   /* copy matrices back to source */
@@ -272,7 +272,7 @@ void BKE_constraint_mat_convertspace(Object *ob,
   float diff_mat[4][4];
   float imat[4][4];
 
-  /* prevent crashes in these unlikely events  */
+  /* Prevent crashes in these unlikely events. */
   if (ob == NULL || mat == NULL) {
     return;
   }
@@ -1476,7 +1476,10 @@ static void followpath_get_tarmat(struct Depsgraph *UNUSED(depsgraph),
          * to get a time factor. */
         curvetime /= cu->pathlen;
 
-        if (cu->flag & CU_PATH_CLAMP) {
+        Nurb *nu = cu->nurb.first;
+        if (!(nu && nu->flagu & CU_NURB_CYCLIC) && cu->flag & CU_PATH_CLAMP) {
+          /* If curve is not cyclic, clamp to the begin/end points if the curve clamp option is on.
+           */
           CLAMP(curvetime, 0.0f, 1.0f);
         }
       }
@@ -1491,7 +1494,7 @@ static void followpath_get_tarmat(struct Depsgraph *UNUSED(depsgraph),
                             dir,
                             (data->followflag & FOLLOWPATH_FOLLOW) ? quat : NULL,
                             &radius,
-                            NULL)) { /* quat_pt is quat or NULL*/
+                            NULL)) { /* quat_pt is quat or NULL. */
         float totmat[4][4];
         unit_m4(totmat);
 
@@ -2361,7 +2364,7 @@ static void pycon_new_data(void *cdata)
 {
   bPythonConstraint *data = (bPythonConstraint *)cdata;
 
-  /* everything should be set correctly by calloc, except for the prop->type constant.*/
+  /* Everything should be set correctly by calloc, except for the prop->type constant. */
   data->prop = MEM_callocN(sizeof(IDProperty), "PyConstraintProps");
   data->prop->type = IDP_GROUP;
 }
@@ -3523,7 +3526,7 @@ static void stretchto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *t
         scale[0] = 1.0;
         scale[2] = 1.0;
         break;
-      default: /* should not happen, but in case*/
+      default: /* Should not happen, but in case. */
         return;
     } /* switch (data->volmode) */
 
@@ -3536,34 +3539,34 @@ static void stretchto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *t
         damptrack_do_transform(cob->matrix, vec, TRACK_Y);
         break;
       case PLANE_X:
-        /* new Y aligns  object target connection*/
+        /* New Y aligns  object target connection. */
         copy_v3_v3(cob->matrix[1], vec);
 
-        /* build new Z vector */
-        /* othogonal to "new Y" "old X! plane */
+        /* Build new Z vector. */
+        /* Orthogonal to "new Y" "old X! plane. */
         cross_v3_v3v3(orth, xx, vec);
         normalize_v3(orth);
 
-        /* new Z*/
+        /* New Z. */
         copy_v3_v3(cob->matrix[2], orth);
 
-        /* we decided to keep X plane*/
+        /* We decided to keep X plane. */
         cross_v3_v3v3(xx, vec, orth);
         normalize_v3_v3(cob->matrix[0], xx);
         break;
       case PLANE_Z:
-        /* new Y aligns  object target connection*/
+        /* New Y aligns  object target connection. */
         copy_v3_v3(cob->matrix[1], vec);
 
-        /* build new X vector */
-        /* othogonal to "new Y" "old Z! plane */
+        /* Build new X vector. */
+        /* Orthogonal to "new Y" "old Z! plane. */
         cross_v3_v3v3(orth, zz, vec);
         normalize_v3(orth);
 
-        /* new X */
+        /* New X. */
         negate_v3_v3(cob->matrix[0], orth);
 
-        /* we decided to keep Z */
+        /* We decided to keep Z. */
         cross_v3_v3v3(zz, vec, orth);
         normalize_v3_v3(cob->matrix[2], zz);
         break;
@@ -4678,7 +4681,7 @@ static void pivotcon_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *ta
     }
   }
 
-  /* find the pivot-point to use  */
+  /* Find the pivot-point to use. */
   if (VALID_CONS_TARGET(ct)) {
     /* apply offset to target location */
     add_v3_v3v3(pivot, ct->matrix[3], data->offset);
@@ -6297,7 +6300,7 @@ void BKE_constraint_blend_write(BlendWriter *writer, ListBase *conlist)
           }
 
           /* Write ID Properties -- and copy this comment EXACTLY for easy finding
-           * of library blocks that implement this.*/
+           * of library blocks that implement this. */
           IDP_BlendWrite(writer, data->prop);
 
           break;
