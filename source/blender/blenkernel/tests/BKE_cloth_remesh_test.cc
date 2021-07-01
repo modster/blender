@@ -161,50 +161,69 @@ TEST(cloth_remesh, MeshIO_ReadDNAMesh)
   auto *result = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
   BM_mesh_bm_to_me(nullptr, bm_copy, result, &bmesh_to_mesh_params);
 
-  /* auto *result = BKE_mesh_from_bmesh_for_eval_nomain( */
-  /*     bm, &bmesh_to_mesh_params.cd_mask_extra, mesh); */
-
-  {
-    BMVert *v;
-    BMIter v_iter;
-    BM_ITER_MESH (v, &v_iter, bm, BM_VERTS_OF_MESH) {
-      std::cout << "(" << v->co[0] << ", " << v->co[1] << ", " << v->co[2] << ")";
-    }
-    std::cout << std::endl;
-  }
-  {
-    for (auto i = 0; i < result->totvert; i++) {
-      std::cout << "(" << result->mvert[i].co[0] << ", " << result->mvert[i].co[1] << ", "
-                << result->mvert[i].co[2] << ")";
-    }
-    std::cout << std::endl;
-  }
+  BKE_mesh_calc_normals(result);
 
   auto res = reader.read(result);
 
   EXPECT_TRUE(res);
 
-  std::ostringstream stream_out;
-  reader.write(stream_out, MeshIO::IOTYPE_OBJ);
-
-  std::cout << stream_out.str() << std::endl;
-
-  const auto &positions = reader.get_positions();
-  const auto &uvs = reader.get_uvs();
-  const auto &normals = reader.get_normals();
-  const auto &face_indices = reader.get_face_indices();
-  const auto &line_indices = reader.get_line_indices();
-
-  std::cout << "positions: " << positions << std::endl;
-  std::cout << "uvs: " << uvs << std::endl;
-  std::cout << "normals: " << normals << std::endl;
-  std::cout << "face_indices: " << face_indices << std::endl;
-  std::cout << "line_indices: " << line_indices << std::endl;
-
   BM_mesh_free(bm);
   BM_mesh_free(bm_copy);
   BKE_mesh_eval_delete(mesh);
   BKE_mesh_eval_delete(result);
+
+  std::ostringstream stream_out;
+  reader.write(stream_out, MeshIO::IOTYPE_OBJ);
+
+  std::string expected =
+      "v -0.5 -0.5 -0.5\n"
+      "v -0.5 -0.5 0.5\n"
+      "v -0.5 0.5 -0.5\n"
+      "v -0.5 0.5 0.5\n"
+      "v 0.5 -0.5 -0.5\n"
+      "v 0.5 -0.5 0.5\n"
+      "v 0.5 0.5 -0.5\n"
+      "v 0.5 0.5 0.5\n"
+      "vt 0.375 0\n"
+      "vt 0.625 0\n"
+      "vt 0.625 0.25\n"
+      "vt 0.375 0.25\n"
+      "vt 0.375 0.25\n"
+      "vt 0.625 0.25\n"
+      "vt 0.625 0.5\n"
+      "vt 0.375 0.5\n"
+      "vt 0.375 0.5\n"
+      "vt 0.625 0.5\n"
+      "vt 0.625 0.75\n"
+      "vt 0.375 0.75\n"
+      "vt 0.375 0.75\n"
+      "vt 0.625 0.75\n"
+      "vt 0.625 1\n"
+      "vt 0.375 1\n"
+      "vt 0.125 0.5\n"
+      "vt 0.375 0.5\n"
+      "vt 0.375 0.75\n"
+      "vt 0.125 0.75\n"
+      "vt 0.625 0.5\n"
+      "vt 0.875 0.5\n"
+      "vt 0.875 0.75\n"
+      "vt 0.625 0.75\n"
+      "vn -0.577349 -0.577349 -0.577349\n"
+      "vn -0.577349 -0.577349 0.577349\n"
+      "vn -0.577349 0.577349 -0.577349\n"
+      "vn -0.577349 0.577349 0.577349\n"
+      "vn 0.577349 -0.577349 -0.577349\n"
+      "vn 0.577349 -0.577349 0.577349\n"
+      "vn 0.577349 0.577349 -0.577349\n"
+      "vn 0.577349 0.577349 0.577349\n"
+      "f 1/1/1 2/2/2 4/3/4 3/4/3 \n"
+      "f 3/5/3 4/6/4 8/7/8 7/8/7 \n"
+      "f 7/9/7 8/10/8 6/11/6 5/12/5 \n"
+      "f 5/13/5 6/14/6 2/15/2 1/16/1 \n"
+      "f 3/17/3 7/18/7 5/19/5 1/20/1 \n"
+      "f 8/21/8 4/22/4 2/23/2 6/24/6 \n";
+
+  EXPECT_EQ(stream_out.str(), expected);
 }
 
 TEST(cloth_remesh, Mesh_Read)

@@ -424,14 +424,16 @@ class MeshIO {
     auto &uvs = this->uvs;
     auto &normals = this->normals;
     auto &face_indices = this->face_indices;
-    auto &line_indices = this->line_indices;
+    /* auto &line_indices = this->line_indices; */
 
     /* TODO(ish): check if normals must be recalcuated */
 
     for (auto i = 0; i < mesh->totvert; i++) {
       positions.append(mesh->mvert[i].co);
       /* TODO(ish): figure out short normal conversion to float3 */
-      normals.append(float3(mesh->mvert[i].no[0], mesh->mvert[i].no[1], mesh->mvert[i].no[2]));
+      float normal[3];
+      normal_short_to_float_v3(normal, mesh->mvert[i].no);
+      normals.append(normal);
     }
 
     /* TODO(ish): ensure that we need to loop until mesh->totloop only */
