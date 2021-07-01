@@ -1,6 +1,24 @@
 #include "BKE_cloth_remesh.hh"
 
+#include "BKE_customdata.h"
+#include "BKE_idtype.h"
+#include "BKE_main.h"
+#include "DNA_customdata_types.h"
+#include "DNA_meshdata_types.h"
+#include "bmesh.h"
+
+#include "BKE_mesh.h"
+
+#include "DNA_mesh_types.h"
+
+#include "bmesh_class.h"
+#include "intern/bmesh_construct.h"
+#include "intern/bmesh_iterators.h"
+#include "intern/bmesh_mesh.h"
+#include "intern/bmesh_mesh_convert.h"
+#include "intern/bmesh_operators.h"
 #include "testing/testing.h"
+
 #include <gtest/gtest.h>
 #include <sstream>
 
@@ -118,6 +136,75 @@ TEST(cloth_remesh, MeshIO_WriteObj)
       "f 6/11/6 5/10/6 1/1/6 2/13/6 \n";
 
   EXPECT_EQ(stream_out.str(), expected);
+}
+
+TEST(cloth_remesh, MeshIO_ReadDNAMesh)
+{
+  BKE_idtype_init();
+  MeshIO reader;
+  auto *mesh = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
+  CustomData_add_layer(&mesh->ldata, CD_MLOOPUV, CD_CALLOC, nullptr, 0);
+  BMeshCreateParams bmesh_create_params = {0};
+  bmesh_create_params.use_toolflags = true;
+  BMeshFromMeshParams bmesh_from_mesh_params = {0};
+  bmesh_from_mesh_params.cd_mask_extra = CD_MASK_MESH;
+
+  auto *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
+
+  BMO_op_callf(bm, (BMO_FLAG_DEFAULTS & ~BMO_FLAG_RESPECT_HIDE), "create_cube calc_uvs=%b", true);
+
+  BMeshToMeshParams bmesh_to_mesh_params = {0};
+  bmesh_to_mesh_params.cd_mask_extra = CD_MASK_MESH;
+
+  auto *bm_copy = BM_mesh_copy(bm);
+
+  auto *result = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
+  BM_mesh_bm_to_me(nullptr, bm_copy, result, &bmesh_to_mesh_params);
+
+  /* auto *result = BKE_mesh_from_bmesh_for_eval_nomain( */
+  /*     bm, &bmesh_to_mesh_params.cd_mask_extra, mesh); */
+
+  {
+    BMVert *v;
+    BMIter v_iter;
+    BM_ITER_MESH (v, &v_iter, bm, BM_VERTS_OF_MESH) {
+      std::cout << "(" << v->co[0] << ", " << v->co[1] << ", " << v->co[2] << ")";
+    }
+    std::cout << std::endl;
+  }
+  {
+    for (auto i = 0; i < result->totvert; i++) {
+      std::cout << "(" << result->mvert[i].co[0] << ", " << result->mvert[i].co[1] << ", "
+                << result->mvert[i].co[2] << ")";
+    }
+    std::cout << std::endl;
+  }
+
+  auto res = reader.read(result);
+
+  EXPECT_TRUE(res);
+
+  std::ostringstream stream_out;
+  reader.write(stream_out, MeshIO::IOTYPE_OBJ);
+
+  std::cout << stream_out.str() << std::endl;
+
+  const auto &positions = reader.get_positions();
+  const auto &uvs = reader.get_uvs();
+  const auto &normals = reader.get_normals();
+  const auto &face_indices = reader.get_face_indices();
+  const auto &line_indices = reader.get_line_indices();
+
+  std::cout << "positions: " << positions << std::endl;
+  std::cout << "uvs: " << uvs << std::endl;
+  std::cout << "normals: " << normals << std::endl;
+  std::cout << "face_indices: " << face_indices << std::endl;
+  std::cout << "line_indices: " << line_indices << std::endl;
+
+  BM_mesh_free(bm);
+  BM_mesh_free(bm_copy);
+  BKE_mesh_eval_delete(mesh);
+  BKE_mesh_eval_delete(result);
 }
 
 TEST(cloth_remesh, Mesh_Read)

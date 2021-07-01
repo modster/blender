@@ -36,13 +36,19 @@
  * https://doi.org/10.1145/604471.604503
  * ********************************************************************/
 
+#include "BKE_mesh.h"
 #include "BLI_assert.h"
+
+#include "BKE_customdata.h"
+
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct ClothModifierData;
-struct Mesh;
 struct Object;
 
 void BKE_cloth_remesh(const struct Object *ob,
@@ -394,6 +400,63 @@ class MeshIO {
     }
 
     /* TODO(ish): do some checks to ensure the data makes sense */
+
+    return true;
+  }
+
+  bool read(::Mesh *mesh)
+  {
+    BLI_assert(mesh != nullptr);
+
+    /* Update the mesh internal pointers with the customdata stuff */
+    BKE_mesh_update_customdata_pointers(mesh, false);
+
+    if (mesh->totvert == 0) {
+      return false;
+    }
+
+    /* We need uv information */
+    if (mesh->mloopuv == nullptr) {
+      return false;
+    }
+
+    auto &positions = this->positions;
+    auto &uvs = this->uvs;
+    auto &normals = this->normals;
+    auto &face_indices = this->face_indices;
+    auto &line_indices = this->line_indices;
+
+    /* TODO(ish): check if normals must be recalcuated */
+
+    for (auto i = 0; i < mesh->totvert; i++) {
+      positions.append(mesh->mvert[i].co);
+      /* TODO(ish): figure out short normal conversion to float3 */
+      normals.append(float3(mesh->mvert[i].no[0], mesh->mvert[i].no[1], mesh->mvert[i].no[2]));
+    }
+
+    /* TODO(ish): ensure that we need to loop until mesh->totloop only */
+    for (auto i = 0; i < mesh->totloop; i++) {
+      uvs.append(mesh->mloopuv[i].uv);
+    }
+
+    for (auto i = 0; i < mesh->totpoly; i++) {
+      const auto mp = mesh->mpoly[i];
+      blender::Vector<FaceData> face;
+      face.reserve(mp.totloop);
+
+      for (auto j = 0; j < mp.totloop; j++) {
+        const auto ml = mesh->mloop[mp.loopstart + j];
+        usize pos_index = ml.v;
+        usize uv_index = mp.loopstart + j;
+        usize normal_index = ml.v;
+
+        face.append(std::make_tuple(pos_index, uv_index, normal_index));
+      }
+
+      face_indices.append(face);
+    }
+
+    /* TODO(ish): support line indices */
 
     return true;
   }
