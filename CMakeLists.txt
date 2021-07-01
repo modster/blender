@@ -1093,8 +1093,6 @@ endif()
 # Configure Vulkan.
 
 if(WITH_VULKAN)
-  find_package(Vulkan REQUIRED)
-
   list(APPEND BLENDER_GL_LIBRARIES ${Vulkan_LIBRARY})
 
   add_definitions(-DWITH_VULKAN)

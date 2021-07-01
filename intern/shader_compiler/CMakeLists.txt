@@ -23,9 +23,6 @@ set(INC
   ../guardedalloc
 )
 
-find_package(ShaderC REQUIRED)
-
-
 set(INC_SYS
     ${SHADERC_INCLUDE_DIRS}
 )

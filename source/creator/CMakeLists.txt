@@ -913,6 +913,26 @@ elseif(WIN32)
     list(APPEND LIB ${TBB_MALLOC_LIBRARIES})
   endif()
 
+  if(WITH_VULKAN)
+    install(
+      FILES
+        ${LIBDIR}/vulkan/bin/vulkan-1.dll
+      DESTINATION "."
+    )
+    install(
+      FILES
+        ${LIBDIR}/shaderc/bin/shaderc_shared.dll
+      DESTINATION "."
+      CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
+    )
+    install(
+      FILES
+        ${LIBDIR}/shaderc/bin/shaderc_shared_d.dll
+      DESTINATION "."
+      CONFIGURATIONS Debug
+    )
+  endif()
+
   if(WITH_CODEC_SNDFILE)
     install(
       FILES ${LIBDIR}/sndfile/lib/libsndfile-1.dll

@@ -101,6 +101,11 @@ find_package_wrapper(PNG REQUIRED)
 find_package_wrapper(ZLIB REQUIRED)
 find_package_wrapper(Freetype REQUIRED)
 
+if(WITH_VULKAN)
+  find_package_wrapper(Vulkan REQUIRED)
+  find_package(ShaderC REQUIRED)
+endif()
+
 if(WITH_PYTHON)
   # No way to set py35, remove for now.
   # find_package(PythonLibs)
