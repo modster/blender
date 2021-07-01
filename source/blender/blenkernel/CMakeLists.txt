@@ -773,12 +773,25 @@ if(WITH_GTESTS)
     intern/layer_test.cc
     intern/lib_id_test.cc
     intern/tracking_test.cc
-
-    tests/BKE_cloth_remesh_test.cc
   )
   set(TEST_INC
     ../editors/include
   )
   include(GTestTesting)
   blender_add_test_lib(bf_blenkernel_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB}")
+endif()
+
+# TODO(ish): Need to merge with above, this is to make testing faster by having a separate executable which makes linking faster
+if(WITH_GTESTS)
+  set(TEST_SRC
+      tests/BKE_cloth_remesh_test.cc
+  )
+  set(TEST_INC
+    ../editors/include
+  )
+  set(TEST_LIB
+    bf_blenlib
+  )
+  include(GTestTesting)
+  blender_add_test_executable(bke_cloth_remesh "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
 endif()
