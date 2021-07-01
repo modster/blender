@@ -3448,7 +3448,7 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
   prop = RNA_def_property(srna, "dynamic_grid_size", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "dynamic_grid_size");
   RNA_def_property_int_default(prop, 1);
-  RNA_def_property_range(prop, 1, 12);
+  RNA_def_property_range(prop, 1, 5000);
   RNA_def_property_ui_text(
       prop, "Dynamic Grid Size", "How many grid units in UV space make one UV Unit");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
