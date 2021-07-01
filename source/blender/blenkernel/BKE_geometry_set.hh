@@ -413,6 +413,7 @@ class CurveComponent : public GeometryComponent {
    */
   mutable Curve *curve_for_render_ = nullptr;
   mutable std::mutex curve_for_render_mutex_;
+  // std::unique_ptr<CurveEval> owned_edit_mode_curve_;
 
  public:
   CurveComponent();
@@ -439,11 +440,15 @@ class CurveComponent : public GeometryComponent {
   void ensure_owns_direct_data() override;
 
   const Curve *get_curve_for_render() const;
+  void add_edit_mode_data_to_result(const Curve &original_curve);
+  // void add_edit_curve_eval_to_render_curve(std::unique_ptr<CurveEval> curve);
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_CURVE;
 
  private:
   const blender::bke::ComponentAttributeProviders *get_attribute_providers() const final;
+
+  void create_render_curve() const;
 };
 
 class InstanceReference {

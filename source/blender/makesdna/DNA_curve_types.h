@@ -307,6 +307,13 @@ typedef struct Curve {
    */
   struct CurveEval *curve_eval;
 
+  /**
+   * A pointer to the curve data created from edit mode, for drawing edit mode overlays, etc. even
+   * when the curve evaluates to a different data type or changes unrecognizably in the modifier
+   * stack.
+   */
+  // struct CurveEval *edit_mode_curve_eval;
+
   void *batch_cache;
 } Curve;
 

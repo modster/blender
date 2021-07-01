@@ -869,7 +869,8 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
                          pretessellatePoint->next;
 
   GeometrySet geometry_set;
-  if (md && md->type == eModifierType_Nodes && BKE_modifier_is_enabled(scene, md, required_mode)) {
+  if (md == nullptr ||
+      (md->type == eModifierType_Nodes && BKE_modifier_is_enabled(scene, md, required_mode))) {
     std::unique_ptr<CurveEval> curve_eval = curve_eval_from_dna_curve(
         *cu, ob->runtime.curve_cache->deformed_nurbs);
     geometry_set.replace_curve(curve_eval.release());
@@ -1504,6 +1505,12 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
   else {
     GeometrySet geometry_set;
     evaluate_curve_type_object(depsgraph, scene, ob, for_render, dispbase, &geometry_set);
+
+    if (ob->mode == OB_MODE_EDIT) {
+      const Curve &original_curve = *(const Curve *)ob->data;
+      CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
+      curve_component.add_edit_mode_data_to_result(original_curve);
+    }
     ob->runtime.geometry_set_eval = new GeometrySet(std::move(geometry_set));
   }
 

@@ -220,6 +220,9 @@ struct CurveRenderData {
   /* Owned by the evaluated object's geometry set (#geometry_set_eval). */
   const CurveEval *curve_eval;
 
+  /* Owned by the evaluated object's geometry set (#geometry_set_eval). */
+  // const CurveEval *edit_mode_curve_eval;
+
   /* borrow from 'Curve' */
   ListBase *nurbs;
 
