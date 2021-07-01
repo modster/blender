@@ -688,7 +688,7 @@ class MeshIO {
     }
 
     for (const auto &normal : this->normals) {
-      out << "v " << normal.x << " " << normal.y << " " << normal.z << std::endl;
+      out << "vn " << normal.x << " " << normal.y << " " << normal.z << std::endl;
     }
 
     for (const auto &face : this->face_indices) {
