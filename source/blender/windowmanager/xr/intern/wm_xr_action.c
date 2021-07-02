@@ -58,6 +58,7 @@ static void action_set_destroy(void *val)
   MEM_SAFE_FREE(action_set->name);
 
   BLI_freelistN(&action_set->active_modal_actions);
+  BLI_freelistN(&action_set->active_haptic_actions);
 
   MEM_freeN(action_set);
 }
@@ -74,6 +75,10 @@ static wmXrAction *action_create(const char *action_name,
                                  const float *float_threshold,
                                  wmOperatorType *ot,
                                  IDProperty *op_properties,
+                                 const char **haptic_name,
+                                 const long long *haptic_duration,
+                                 const float *haptic_frequency,
+                                 const float *haptic_amplitude,
                                  eXrActionFlag flag)
 {
   wmXrAction *action = MEM_callocN(sizeof(*action), __func__);
@@ -121,6 +126,15 @@ static wmXrAction *action_create(const char *action_name,
   action->ot = ot;
   action->op_properties = op_properties;
 
+  if (haptic_name) {
+    BLI_assert(type == XR_FLOAT_INPUT || type == XR_VECTOR2F_INPUT);
+    action->haptic_name = MEM_mallocN(strlen(*haptic_name) + 1, "XrAction_HapticName");
+    strcpy(action->haptic_name, *haptic_name);
+    action->haptic_duration = *haptic_duration;
+    action->haptic_frequency = *haptic_frequency;
+    action->haptic_amplitude = *haptic_amplitude;
+  }
+
   action->flag = flag;
 
   return action;
@@ -143,6 +157,8 @@ static void action_destroy(void *val)
 
   MEM_SAFE_FREE(action->states);
   MEM_SAFE_FREE(action->states_prev);
+
+  MEM_SAFE_FREE(action->haptic_name);
 
   MEM_freeN(action);
 }
@@ -189,6 +205,7 @@ void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name)
     }
 
     BLI_freelistN(&action_set->active_modal_actions);
+    BLI_freelistN(&action_set->active_haptic_actions);
 
     session_state->active_action_set = NULL;
   }
@@ -205,6 +222,10 @@ bool WM_xr_action_create(wmXrData *xr,
                          const float *float_threshold,
                          wmOperatorType *ot,
                          IDProperty *op_properties,
+                         const char **haptic_name,
+                         const long long *haptic_duration,
+                         const float *haptic_frequency,
+                         const float *haptic_amplitude,
                          eXrActionFlag flag)
 {
   if (action_find(xr, action_set_name, action_name)) {
@@ -218,6 +239,10 @@ bool WM_xr_action_create(wmXrData *xr,
                                      float_threshold,
                                      ot,
                                      op_properties,
+                                     haptic_name,
+                                     haptic_duration,
+                                     haptic_frequency,
+                                     haptic_amplitude,
                                      flag);
 
   GHOST_XrActionInfo info = {
@@ -273,6 +298,19 @@ void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char 
     wmXrAction *action = ld->data;
     if (STREQ(action->name, action_name)) {
       BLI_freelinkN(&action_set->active_modal_actions, ld);
+      break;
+    }
+  }
+
+  wmXrHapticAction *ha = action_set->active_haptic_actions.first;
+  while (ha) {
+    if (STREQ(ha->action->name, action_name)) {
+      wmXrHapticAction *_ha = ha;
+      ha = ha->next;
+      BLI_freelinkN(&action_set->active_haptic_actions, _ha);
+    }
+    else {
+      ha = ha->next;
     }
   }
 }
@@ -373,10 +411,11 @@ bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name)
   }
 
   {
-    /* Clear any active modal actions. */
+    /* Clear any active modal/haptic actions. */
     wmXrActionSet *active_action_set = xr->runtime->session_state.active_action_set;
     if (active_action_set) {
       BLI_freelistN(&active_action_set->active_modal_actions);
+      BLI_freelistN(&active_action_set->active_haptic_actions);
     }
   }
 
@@ -458,19 +497,28 @@ bool WM_xr_action_state_get(const wmXrData *xr,
 bool WM_xr_haptic_action_apply(wmXrData *xr,
                                const char *action_set_name,
                                const char *action_name,
+                               const char **subaction_path,
                                const long long *duration,
                                const float *frequency,
                                const float *amplitude)
 {
-  return GHOST_XrApplyHapticAction(
-             xr->runtime->context, action_set_name, action_name, duration, frequency, amplitude) ?
+  return GHOST_XrApplyHapticAction(xr->runtime->context,
+                                   action_set_name,
+                                   action_name,
+                                   subaction_path,
+                                   duration,
+                                   frequency,
+                                   amplitude) ?
              true :
              false;
 }
 
-void WM_xr_haptic_action_stop(wmXrData *xr, const char *action_set_name, const char *action_name)
+void WM_xr_haptic_action_stop(wmXrData *xr,
+                              const char *action_set_name,
+                              const char *action_name,
+                              const char **subaction_path)
 {
-  GHOST_XrStopHapticAction(xr->runtime->context, action_set_name, action_name);
+  GHOST_XrStopHapticAction(xr->runtime->context, action_set_name, action_name, subaction_path);
 }
 
 /** \} */ /* XR-Action API */

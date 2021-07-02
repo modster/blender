@@ -254,6 +254,64 @@ static void rna_XrActionMapItem_bimanual_set(PointerRNA *ptr, bool value)
 #  endif
 }
 
+static bool rna_XrActionMapItem_haptic_match_user_paths_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if ((ami->action_flag & XR_ACTION_HAPTIC_MATCHUSERPATHS) != 0) {
+    return true;
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  return false;
+}
+
+static void rna_XrActionMapItem_haptic_match_user_paths_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (value) {
+    ami->action_flag |= XR_ACTION_HAPTIC_MATCHUSERPATHS;
+  }
+  else {
+    ami->action_flag &= ~XR_ACTION_HAPTIC_MATCHUSERPATHS;
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+static int rna_XrActionMapItem_haptic_flag_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if ((ami->action_flag & XR_ACTION_HAPTIC_RELEASE) != 0) {
+    return ((ami->action_flag & XR_ACTION_HAPTIC_PRESS) != 0) ?
+               (XR_ACTION_HAPTIC_PRESS | XR_ACTION_HAPTIC_RELEASE) :
+               XR_ACTION_HAPTIC_RELEASE;
+  }
+  if ((ami->action_flag & XR_ACTION_HAPTIC_REPEAT) != 0) {
+    return XR_ACTION_HAPTIC_REPEAT;
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  return XR_ACTION_HAPTIC_PRESS;
+}
+
+static void rna_XrActionMapItem_haptic_flag_set(PointerRNA *ptr, int value)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  ami->action_flag &= ~(XR_ACTION_HAPTIC_PRESS | XR_ACTION_HAPTIC_RELEASE |
+                        XR_ACTION_HAPTIC_REPEAT);
+  ami->action_flag |= value;
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
 static void rna_XrActionMapItem_name_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -810,24 +868,30 @@ static bool rna_XrSessionState_action_create(bContext *C,
                                              int axis1_flag,
                                              const char *op,
                                              int op_flag,
-                                             bool bimanual)
+                                             bool bimanual,
+                                             const char *haptic_name,
+                                             bool haptic_match_user_paths,
+                                             float haptic_duration,
+                                             float haptic_frequency,
+                                             float haptic_amplitude,
+                                             int haptic_flag)
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
   unsigned int count_subaction_paths = 0;
   const char *subaction_paths[2];
 
-  if (user_path0 && !STREQ(user_path0, "")) {
+  if (user_path0[0]) {
     subaction_paths[0] = user_path0;
     ++count_subaction_paths;
 
-    if (user_path1 && !STREQ(user_path1, "")) {
+    if (user_path1[0]) {
       subaction_paths[1] = user_path1;
       ++count_subaction_paths;
     }
   }
   else {
-    if (user_path1 && !STREQ(user_path1, "")) {
+    if (user_path1[0]) {
       subaction_paths[0] = user_path1;
       ++count_subaction_paths;
     }
@@ -839,6 +903,7 @@ static bool rna_XrSessionState_action_create(bContext *C,
   const bool is_float_action = (type == XR_FLOAT_INPUT || type == XR_VECTOR2F_INPUT);
   wmOperatorType *ot = NULL;
   IDProperty *op_properties = NULL;
+  long long haptic_duration_msec;
   eXrActionFlag flag = 0;
 
   if (is_float_action) {
@@ -861,9 +926,14 @@ static bool rna_XrSessionState_action_create(bContext *C,
       }
     }
 
-    flag |= (op_flag | axis0_flag | axis1_flag);
+    haptic_duration_msec = (long long)(haptic_duration * 1000.0f);
+
+    flag |= (op_flag | axis0_flag | axis1_flag | haptic_flag);
     if (bimanual) {
       flag |= XR_ACTION_BIMANUAL;
+    }
+    if (haptic_match_user_paths) {
+      flag |= XR_ACTION_HAPTIC_MATCHUSERPATHS;
     }
   }
 
@@ -876,6 +946,10 @@ static bool rna_XrSessionState_action_create(bContext *C,
                              is_float_action ? &threshold : NULL,
                              ot,
                              op_properties,
+                             is_float_action ? &haptic_name : NULL,
+                             is_float_action ? &haptic_duration_msec : NULL,
+                             is_float_action ? &haptic_frequency : NULL,
+                             is_float_action ? &haptic_amplitude : NULL,
                              flag);
 #  else
   UNUSED_VARS(C,
@@ -889,7 +963,12 @@ static bool rna_XrSessionState_action_create(bContext *C,
               axis1_flag,
               op,
               op_flag,
-              bimanual);
+              bimanual,
+              haptic_name,
+              haptic_match_user_paths,
+              haptic_duration,
+              haptic_frequency,
+              haptic_amplitude);
   return false;
 #  endif
 }
@@ -907,17 +986,17 @@ bool rna_XrSessionState_action_space_create(bContext *C,
   unsigned int count_subaction_paths = 0;
   const char *subaction_paths[2];
 
-  if (user_path0 && !STREQ(user_path0, "")) {
+  if (user_path0[0]) {
     subaction_paths[0] = user_path0;
     ++count_subaction_paths;
 
-    if (user_path1 && !STREQ(user_path1, "")) {
+    if (user_path1[0]) {
       subaction_paths[1] = user_path1;
       ++count_subaction_paths;
     }
   }
   else {
-    if (user_path1 && !STREQ(user_path1, "")) {
+    if (user_path1[0]) {
       subaction_paths[0] = user_path1;
       ++count_subaction_paths;
     }
@@ -952,17 +1031,17 @@ bool rna_XrSessionState_action_binding_create(bContext *C,
   unsigned int count_interaction_paths = 0;
   const char *interaction_paths[2];
 
-  if (interaction_path0 && !STREQ(interaction_path0, "")) {
+  if (interaction_path0[0]) {
     interaction_paths[0] = interaction_path0;
     ++count_interaction_paths;
 
-    if (interaction_path1 && !STREQ(interaction_path1, "")) {
+    if (interaction_path1[0]) {
       interaction_paths[1] = interaction_path1;
       ++count_interaction_paths;
     }
   }
   else {
-    if (interaction_path1 && !STREQ(interaction_path1, "")) {
+    if (interaction_path1[0]) {
       interaction_paths[0] = interaction_path1;
       ++count_interaction_paths;
     }
@@ -1049,6 +1128,7 @@ void rna_XrSessionState_pose_action_state_get(bContext *C,
 bool rna_XrSessionState_haptic_action_apply(bContext *C,
                                             const char *action_set_name,
                                             const char *action_name,
+                                            const char *user_path,
                                             float duration,
                                             float frequency,
                                             float amplitude)
@@ -1056,12 +1136,30 @@ bool rna_XrSessionState_haptic_action_apply(bContext *C,
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
   long long duration_msec = (long long)(duration * 1000.0f);
-
-  return WM_xr_haptic_action_apply(
-      &wm->xr, action_set_name, action_name, &duration_msec, &frequency, &amplitude);
+  return WM_xr_haptic_action_apply(&wm->xr,
+                                   action_set_name,
+                                   action_name,
+                                   user_path[0] ? &user_path : NULL,
+                                   &duration_msec,
+                                   &frequency,
+                                   &amplitude);
 #  else
-  UNUSED_VARS(C, action_set_name, action_name, duration, frequency, amplitude);
+  UNUSED_VARS(C, action_set_name, action_name, user_path, duration, frequency, amplitude);
   return false;
+#  endif
+}
+
+void rna_XrSessionState_haptic_action_stop(bContext *C,
+                                           const char *action_set_name,
+                                           const char *action_name,
+                                           const char *user_path)
+{
+#  ifdef WITH_XR_OPENXR
+  wmWindowManager *wm = CTX_wm_manager(C);
+  WM_xr_haptic_action_stop(
+      &wm->xr, action_set_name, action_name, user_path[0] ? &user_path : NULL);
+#  else
+  UNUSED_VARS(C, action_set_name, action_name, user_path);
 #  endif
 }
 
@@ -1252,6 +1350,22 @@ static const EnumPropertyItem rna_enum_xr_axis1_flags[] = {
      0,
      "Negative",
      "Use negative axis region only for operator execution"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static const EnumPropertyItem rna_enum_xr_haptic_flags[] = {
+    {XR_ACTION_HAPTIC_PRESS, "PRESS", 0, "Press", "Apply haptics on button press"},
+    {XR_ACTION_HAPTIC_RELEASE, "RELEASE", 0, "Release", "Apply haptics on button release"},
+    {XR_ACTION_HAPTIC_PRESS | XR_ACTION_HAPTIC_RELEASE,
+     "PRESS_RELEASE",
+     0,
+     "Press Release",
+     "Apply haptics on button press and release"},
+    {XR_ACTION_HAPTIC_REPEAT,
+     "REPEAT",
+     0,
+     "Repeat",
+     "Apply haptics repeatedly for the duration of the button press"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -1580,6 +1694,18 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   prop = RNA_def_property(srna, "pose_rotation", PROP_FLOAT, PROP_EULER);
   RNA_def_property_ui_text(prop, "Pose Rotation Offset", "Pose rotation offset");
 
+  prop = RNA_def_property(srna, "haptic_name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "haptic_idname");
+  RNA_def_property_ui_text(
+      prop, "Haptic Name", "Name of the haptic action to apply when executing this action");
+
+  prop = RNA_def_property(srna, "haptic_match_user_paths", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrActionMapItem_haptic_match_user_paths_get",
+                                 "rna_XrActionMapItem_haptic_match_user_paths_set");
+  RNA_def_property_ui_text(
+      prop, "Haptic Match User Paths", "Whether to apply haptics to the matching user paths");
+
   prop = RNA_def_property(srna, "haptic_duration", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0.0, FLT_MAX);
   RNA_def_property_ui_text(
@@ -1592,6 +1718,12 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   prop = RNA_def_property(srna, "haptic_amplitude", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0.0, 1.0);
   RNA_def_property_ui_text(prop, "Haptic Amplitude", "Haptic amplitude (0 ~ 1)");
+
+  prop = RNA_def_property(srna, "haptic_flag", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_xr_haptic_flags);
+  RNA_def_property_enum_funcs(
+      prop, "rna_XrActionMapItem_haptic_flag_get", "rna_XrActionMapItem_haptic_flag_set", NULL);
+  RNA_def_property_ui_text(prop, "Haptic Flag", "Haptic flag");
 }
 
 /** \} */
@@ -1955,6 +2087,56 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
+  parm = RNA_def_string(func,
+                        "haptic_name",
+                        NULL,
+                        64,
+                        "Haptic Name",
+                        "Name of the haptic action to apply when executing this action");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_boolean(func,
+                         "haptic_match_user_paths",
+                         false,
+                         "Haptic Match User Paths",
+                         "Whether to apply haptics to matching user paths");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float(func,
+                       "haptic_duration",
+                       0.3f,
+                       0.0f,
+                       FLT_MAX,
+                       "Haptic Duration",
+                       "Haptic duration in seconds, 0 = minimum supported duration",
+                       0.0f,
+                       FLT_MAX);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float(func,
+                       "haptic_frequency",
+                       3000.0f,
+                       0.0f,
+                       FLT_MAX,
+                       "Haptic Frequency",
+                       "Haptic frequency, 0 = default frequency",
+                       0.0f,
+                       FLT_MAX);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float(func,
+                       "haptic_amplitude",
+                       0.5f,
+                       0.0f,
+                       1.0f,
+                       "Haptic Amplitude",
+                       "Haptic amplitude (0 ~ 1)",
+                       0.0f,
+                       1.0f);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_enum(func,
+                      "haptic_flag",
+                      rna_enum_xr_haptic_flags,
+                      0,
+                      "Haptic Flag",
+                      "How to apply haptics on button interaction");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
   func = RNA_def_function(srna, "create_action_space", "rna_XrSessionState_action_space_create");
   RNA_def_function_ui_description(func, "Create a VR action space");
@@ -2102,6 +2284,9 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_string(
+      func, "user_path", NULL, 64, "User Path", "OpenXR user path, empty = apply to all paths");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_float(func,
                        "duration",
                        0.0f,
@@ -2127,6 +2312,19 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "stop_haptic_action", "rna_XrSessionState_haptic_action_stop");
+  RNA_def_function_ui_description(func, "Stop a VR haptic action");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_string(
+      func, "user_path", NULL, 64, "User Path", "OpenXR user path, empty = stop all paths");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
 
   prop = RNA_def_property(srna, "viewer_pose_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);

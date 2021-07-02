@@ -1054,25 +1054,29 @@ int GHOST_XrSyncActions(GHOST_XrContextHandle xr_contexthandle, const char *acti
 int GHOST_XrApplyHapticAction(GHOST_XrContextHandle xr_contexthandle,
                               const char *action_set_name,
                               const char *action_name,
+                              const char **subaction_path,
                               const GHOST_TInt64 *duration,
                               const float *frequency,
                               const float *amplitude)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL_RET(xr_session->applyHapticAction(
-                             action_set_name, action_name, *duration, *frequency, *amplitude),
-                         xr_context);
+  GHOST_XR_CAPI_CALL_RET(
+      xr_session->applyHapticAction(
+          action_set_name, action_name, subaction_path, *duration, *frequency, *amplitude),
+      xr_context);
   return 0;
 }
 
 void GHOST_XrStopHapticAction(GHOST_XrContextHandle xr_contexthandle,
                               const char *action_set_name,
-                              const char *action_name)
+                              const char *action_name,
+                              const char **subaction_path)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL(xr_session->stopHapticAction(action_set_name, action_name), xr_context);
+  GHOST_XR_CAPI_CALL(xr_session->stopHapticAction(action_set_name, action_name, subaction_path),
+                     xr_context);
 }
 
 void *GHOST_XrGetActionSetCustomdata(GHOST_XrContextHandle xr_contexthandle,

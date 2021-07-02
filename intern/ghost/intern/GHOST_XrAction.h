@@ -19,7 +19,7 @@
  */
 
 /* Note: Requires OpenXR headers to be included before this one for OpenXR types (XrSpace, XrPath,
- * etc.). */
+ * etc). */
 
 #pragma once
 
@@ -91,10 +91,11 @@ class GHOST_XrAction {
                    const XrTime &predicted_display_time);
   void applyHapticFeedback(XrSession session,
                            const char *action_name,
+                           const char **subaction_path,
                            const GHOST_TInt64 &duration,
                            const float &frequency,
                            const float &amplitude);
-  void stopHapticFeedback(XrSession session, const char *action_name);
+  void stopHapticFeedback(XrSession session, const char *action_name, const char **subaction_path);
 
   void *getCustomdata();
   void getBindings(std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
@@ -102,6 +103,7 @@ class GHOST_XrAction {
  private:
   XrAction m_action = XR_NULL_HANDLE;
   GHOST_XrActionType m_type;
+  std::map<std::string, uint32_t> m_subaction_indices;
   std::vector<XrPath> m_subaction_paths;
   /** States for each subaction path. */
   void *m_states;

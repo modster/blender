@@ -123,6 +123,13 @@ typedef enum eXrActionFlag {
   XR_ACTION_AXIS1_NEG = (1 << 6),
   /** Action depends on two subaction paths (i.e. two-handed/bimanual action). */
   XR_ACTION_BIMANUAL = (1 << 7),
+  /** Whether to apply haptics to matching user paths. */
+  XR_ACTION_HAPTIC_MATCHUSERPATHS = (1 << 8),
+  /** Determines how haptics will be applied ("repeat" is mutually exclusive with
+     "press"/"release"). */
+  XR_ACTION_HAPTIC_PRESS = (1 << 9),
+  XR_ACTION_HAPTIC_RELEASE = (1 << 10),
+  XR_ACTION_HAPTIC_REPEAT = (1 << 11),
 } eXrActionFlag;
 
 /* -------------------------------------------------------------------- */
@@ -163,7 +170,8 @@ typedef struct XrActionMapItem {
   float pose_location[3];
   float pose_rotation[3];
 
-  /** Haptic action properties. */
+  /** Haptic properties. */
+  char haptic_idname[64];
   float haptic_duration;
   float haptic_frequency;
   float haptic_amplitude;

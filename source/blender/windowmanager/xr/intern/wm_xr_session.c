@@ -48,6 +48,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "PIL_time.h"
+
 #include "../transform/transform.h"
 #include "../transform/transform_convert.h"
 
@@ -838,8 +840,261 @@ static void wm_xr_session_modal_action_remove(ListBase *active_modal_actions,
   }
 }
 
+static wmXrHapticAction *wm_xr_session_haptic_action_find(ListBase *active_haptic_actions,
+                                                          const wmXrAction *action,
+                                                          const char **subaction_path)
+{
+  LISTBASE_FOREACH (wmXrHapticAction *, ha, active_haptic_actions) {
+    if (action == ha->action && subaction_path == ha->subaction_path) {
+      return ha;
+    }
+  }
+
+  return NULL;
+}
+
+static void wm_xr_session_haptic_action_add(ListBase *active_haptic_actions,
+                                            const wmXrAction *action,
+                                            const char **subaction_path,
+                                            long long time_now)
+{
+  wmXrHapticAction *ha = wm_xr_session_haptic_action_find(
+      active_haptic_actions, action, subaction_path);
+  if (ha) {
+    /* Reset start time since OpenXR restarts haptics if they are already active. */
+    ha->time_start = time_now;
+  }
+  else {
+    ha = MEM_callocN(sizeof(wmXrHapticAction), __func__);
+    ha->action = (wmXrAction *)action;
+    ha->subaction_path = subaction_path;
+    ha->time_start = time_now;
+    BLI_addtail(active_haptic_actions, ha);
+  }
+}
+
+static void wm_xr_session_haptic_action_remove(ListBase *active_haptic_actions,
+                                               const wmXrAction *action)
+{
+  LISTBASE_FOREACH (wmXrHapticAction *, ha, active_haptic_actions) {
+    if (action == ha->action) {
+      BLI_freelinkN(active_haptic_actions, ha);
+      return;
+    }
+  }
+}
+
+static void wm_xr_session_haptic_timers_check(ListBase *active_haptic_actions, long long time_now)
+{
+  wmXrHapticAction *ha = active_haptic_actions->first;
+  while (ha) {
+    if (time_now - ha->time_start >= ha->action->haptic_duration) {
+      wmXrHapticAction *_ha = ha;
+      ha = ha->next;
+      BLI_freelinkN(active_haptic_actions, _ha);
+    }
+    else {
+      ha = ha->next;
+    }
+  }
+}
+
+static void wm_xr_session_action_states_interpret(wmXrData *xr,
+                                                  const char *action_set_name,
+                                                  wmXrAction *action,
+                                                  unsigned int subaction_idx,
+                                                  ListBase *active_modal_actions,
+                                                  ListBase *active_haptic_actions,
+                                                  long long time_now,
+                                                  bool modal,
+                                                  bool haptic,
+                                                  short *r_val,
+                                                  bool *r_press_start)
+{
+  const char **haptic_subaction_path = ((action->flag & XR_ACTION_HAPTIC_MATCHUSERPATHS) != 0) ?
+                                           &action->subaction_paths[subaction_idx] :
+                                           NULL;
+  bool curr = false;
+  bool prev = false;
+
+  switch (action->type) {
+    case XR_BOOLEAN_INPUT: {
+      const bool *state = &((bool *)action->states)[subaction_idx];
+      bool *state_prev = &((bool *)action->states_prev)[subaction_idx];
+      if (*state) {
+        curr = true;
+      }
+      if (*state_prev) {
+        prev = true;
+      }
+      *state_prev = *state;
+      break;
+    }
+    case XR_FLOAT_INPUT: {
+      const float *state = &((float *)action->states)[subaction_idx];
+      float *state_prev = &((float *)action->states_prev)[subaction_idx];
+      if (test_float_state(state, action->float_threshold, action->flag)) {
+        curr = true;
+      }
+      if (test_float_state(state_prev, action->float_threshold, action->flag)) {
+        prev = true;
+      }
+      *state_prev = *state;
+      break;
+    }
+    case XR_VECTOR2F_INPUT: {
+      const float(*state)[2] = &((float(*)[2])action->states)[subaction_idx];
+      float(*state_prev)[2] = &((float(*)[2])action->states_prev)[subaction_idx];
+      if (test_vec2f_state(*state, action->float_threshold, action->flag)) {
+        curr = true;
+      }
+      if (test_vec2f_state(*state_prev, action->float_threshold, action->flag)) {
+        prev = true;
+      }
+      copy_v2_v2(*state_prev, *state);
+      break;
+    }
+    case XR_POSE_INPUT:
+    case XR_VIBRATION_OUTPUT:
+      BLI_assert_unreachable();
+      break;
+  }
+
+  if (curr) {
+    if (!prev) {
+      if (modal || (action->flag & XR_ACTION_PRESS) != 0) {
+        *r_val = KM_PRESS;
+        *r_press_start = true;
+      }
+      if (haptic && (action->flag & (XR_ACTION_HAPTIC_PRESS | XR_ACTION_HAPTIC_REPEAT)) != 0) {
+        /* Apply haptics. */
+        if (WM_xr_haptic_action_apply(xr,
+                                      action_set_name,
+                                      action->haptic_name,
+                                      haptic_subaction_path,
+                                      &action->haptic_duration,
+                                      &action->haptic_frequency,
+                                      &action->haptic_amplitude)) {
+          wm_xr_session_haptic_action_add(
+              active_haptic_actions, action, haptic_subaction_path, time_now);
+        }
+      }
+    }
+    else if (modal) {
+      *r_val = KM_PRESS;
+    }
+    if (modal && !action->active_modal_path) {
+      /* Set active modal path. */
+      action->active_modal_path = &action->subaction_paths[subaction_idx];
+      *r_press_start = true;
+      /* Add to active modal actions. */
+      wm_xr_session_modal_action_test_add(active_modal_actions, action);
+    }
+    if (haptic && ((action->flag & XR_ACTION_HAPTIC_REPEAT) != 0)) {
+      if (!wm_xr_session_haptic_action_find(
+              active_haptic_actions, action, haptic_subaction_path)) {
+        /* Apply haptics. */
+        if (WM_xr_haptic_action_apply(xr,
+                                      action_set_name,
+                                      action->haptic_name,
+                                      haptic_subaction_path,
+                                      &action->haptic_duration,
+                                      &action->haptic_frequency,
+                                      &action->haptic_amplitude)) {
+          wm_xr_session_haptic_action_add(
+              active_haptic_actions, action, haptic_subaction_path, time_now);
+        }
+      }
+    }
+  }
+  else if (prev) {
+    if (modal || (action->flag & XR_ACTION_RELEASE) != 0) {
+      *r_val = KM_RELEASE;
+      if (modal && (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
+        /* Unset active modal path. */
+        action->active_modal_path = NULL;
+        /* Remove from active modal actions. */
+        wm_xr_session_modal_action_remove(active_modal_actions, action);
+      }
+    }
+    if (haptic) {
+      if ((action->flag & XR_ACTION_HAPTIC_RELEASE) != 0) {
+        /* Apply haptics. */
+        if (WM_xr_haptic_action_apply(xr,
+                                      action_set_name,
+                                      action->haptic_name,
+                                      haptic_subaction_path,
+                                      &action->haptic_duration,
+                                      &action->haptic_frequency,
+                                      &action->haptic_amplitude)) {
+          wm_xr_session_haptic_action_add(
+              active_haptic_actions, action, haptic_subaction_path, time_now);
+        }
+      }
+      else if ((action->flag & XR_ACTION_HAPTIC_REPEAT) != 0) {
+        /* Stop any active haptics. */
+        WM_xr_haptic_action_stop(xr, action_set_name, action->haptic_name, haptic_subaction_path);
+        wm_xr_session_haptic_action_remove(active_haptic_actions, action);
+      }
+    }
+  }
+}
+
+static bool wm_xr_session_action_test_bimanual(const wmXrSessionState *session_state,
+                                               wmXrAction *action,
+                                               unsigned int subaction_idx,
+                                               unsigned int *r_subaction_idx_other,
+                                               const GHOST_XrPose **r_pose_other)
+{
+  if ((action->flag & XR_ACTION_BIMANUAL) == 0) {
+    return false;
+  }
+
+  bool bimanual = false;
+
+  *r_subaction_idx_other = (subaction_idx == 0) ?
+                               (unsigned int)min_ii(1, action->count_subaction_paths - 1) :
+                               0;
+
+  switch (action->type) {
+    case XR_BOOLEAN_INPUT: {
+      const bool *state = &((bool *)action->states)[*r_subaction_idx_other];
+      if (*state) {
+        bimanual = true;
+      }
+      break;
+    }
+    case XR_FLOAT_INPUT: {
+      const float *state = &((float *)action->states)[*r_subaction_idx_other];
+      if (test_float_state(state, action->float_threshold, action->flag)) {
+        bimanual = true;
+      }
+      break;
+    }
+    case XR_VECTOR2F_INPUT: {
+      const float(*state)[2] = &((float(*)[2])action->states)[*r_subaction_idx_other];
+      if (test_vec2f_state(*state, action->float_threshold, action->flag)) {
+        bimanual = true;
+      }
+      break;
+    }
+    case XR_POSE_INPUT:
+    case XR_VIBRATION_OUTPUT:
+      BLI_assert_unreachable();
+      break;
+  }
+
+  if (bimanual) {
+    *r_pose_other = wm_xr_session_controller_pose_find(
+        session_state, action->subaction_paths[*r_subaction_idx_other]);
+  }
+
+  return bimanual;
+}
+
 /* Dispatch events to XR surface / window queues. */
-static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
+static void wm_xr_session_events_dispatch(wmXrData *xr,
+                                          const XrSessionSettings *settings,
                                           GHOST_XrContextHandle xr_context,
                                           wmXrActionSet *action_set,
                                           wmXrSessionState *session_state,
@@ -853,137 +1108,43 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
     return;
   }
 
+  const long long time_now = (long long)(PIL_check_seconds_timer() * 1000);
+
   const wmXrEyeData *eye_data = &session_state->eyes[settings->selection_eye];
   ListBase *active_modal_actions = &action_set->active_modal_actions;
+  ListBase *active_haptic_actions = &action_set->active_haptic_actions;
 
   wmXrAction **actions = MEM_calloc_arrayN(count, sizeof(*actions), __func__);
 
   GHOST_XrGetActionCustomdatas(xr_context, action_set_name, (void **)actions);
 
+  /* Check haptic action timers. */
+  wm_xr_session_haptic_timers_check(active_haptic_actions, time_now);
+
   for (unsigned int action_idx = 0; action_idx < count; ++action_idx) {
     wmXrAction *action = actions[action_idx];
     if (action && action->ot) {
       const bool modal = (action->ot->modal || action->ot->modal_3d);
+      const bool haptic = (GHOST_XrGetActionCustomdata(
+                               xr_context, action_set_name, action->haptic_name) != NULL);
 
       for (unsigned int subaction_idx = 0; subaction_idx < action->count_subaction_paths;
            ++subaction_idx) {
         short val = KM_NOTHING;
         bool press_start = false;
 
-        switch (action->type) {
-          case XR_BOOLEAN_INPUT: {
-            const bool *state = &((bool *)action->states)[subaction_idx];
-            bool *state_prev = &((bool *)action->states_prev)[subaction_idx];
-            if (*state) {
-              if (!*state_prev) {
-                if (modal || (action->flag & XR_ACTION_PRESS) != 0) {
-                  val = KM_PRESS;
-                  press_start = true;
-                }
-              }
-              else if (modal) {
-                val = KM_PRESS;
-              }
-              if (modal && !action->active_modal_path) {
-                /* Set active modal path. */
-                action->active_modal_path = &action->subaction_paths[subaction_idx];
-                press_start = true;
-                /* Add to active modal actions. */
-                wm_xr_session_modal_action_test_add(active_modal_actions, action);
-              }
-            }
-            else if (*state_prev) {
-              if (modal || (action->flag & XR_ACTION_RELEASE) != 0) {
-                val = KM_RELEASE;
-                if (modal &&
-                    (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
-                  /* Unset active modal path. */
-                  action->active_modal_path = NULL;
-                  /* Remove from active modal actions. */
-                  wm_xr_session_modal_action_remove(active_modal_actions, action);
-                }
-              }
-            }
-            *state_prev = *state;
-            break;
-          }
-          case XR_FLOAT_INPUT: {
-            const float *state = &((float *)action->states)[subaction_idx];
-            float *state_prev = &((float *)action->states_prev)[subaction_idx];
-            if (test_float_state(state, action->float_threshold, action->flag)) {
-              if (!test_float_state(state_prev, action->float_threshold, action->flag)) {
-                if (modal || (action->flag & XR_ACTION_PRESS) != 0) {
-                  val = KM_PRESS;
-                  press_start = true;
-                }
-              }
-              else if (modal) {
-                val = KM_PRESS;
-              }
-              if (modal && !action->active_modal_path) {
-                /* Set active modal path. */
-                action->active_modal_path = &action->subaction_paths[subaction_idx];
-                press_start = true;
-                /* Add to active modal actions. */
-                wm_xr_session_modal_action_test_add(active_modal_actions, action);
-              }
-            }
-            else if (test_float_state(state_prev, action->float_threshold, action->flag)) {
-              if (modal || (action->flag & XR_ACTION_RELEASE) != 0) {
-                val = KM_RELEASE;
-                if (modal &&
-                    (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
-                  /* Unset active modal path. */
-                  action->active_modal_path = NULL;
-                  /* Remove from active modal actions. */
-                  wm_xr_session_modal_action_remove(active_modal_actions, action);
-                }
-              }
-            }
-            *state_prev = *state;
-            break;
-          }
-          case XR_VECTOR2F_INPUT: {
-            const float(*state)[2] = &((float(*)[2])action->states)[subaction_idx];
-            float(*state_prev)[2] = &((float(*)[2])action->states_prev)[subaction_idx];
-            if (test_vec2f_state(*state, action->float_threshold, action->flag)) {
-              if (!test_vec2f_state(*state_prev, action->float_threshold, action->flag)) {
-                if (modal || (action->flag & XR_ACTION_PRESS) != 0) {
-                  val = KM_PRESS;
-                  press_start = true;
-                }
-              }
-              else if (modal) {
-                val = KM_PRESS;
-              }
-              if (modal && !action->active_modal_path) {
-                /* Set active modal path. */
-                action->active_modal_path = &action->subaction_paths[subaction_idx];
-                press_start = true;
-                /* Add to active modal actions. */
-                wm_xr_session_modal_action_test_add(active_modal_actions, action);
-              }
-            }
-            else if (test_vec2f_state(*state_prev, action->float_threshold, action->flag)) {
-              if (modal || (action->flag & XR_ACTION_RELEASE) != 0) {
-                val = KM_RELEASE;
-                if (modal &&
-                    (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
-                  /* Unset active modal path. */
-                  action->active_modal_path = NULL;
-                  /* Remove from active modal actions. */
-                  wm_xr_session_modal_action_remove(active_modal_actions, action);
-                }
-              }
-            }
-            copy_v2_v2(*state_prev, *state);
-            break;
-          }
-          case XR_POSE_INPUT:
-          case XR_VIBRATION_OUTPUT:
-            BLI_assert_unreachable();
-            break;
-        }
+        /* Interpret action states (update modal/haptic action lists, apply haptics, etc). */
+        wm_xr_session_action_states_interpret(xr,
+                                              action_set_name,
+                                              action,
+                                              subaction_idx,
+                                              active_modal_actions,
+                                              active_haptic_actions,
+                                              time_now,
+                                              modal,
+                                              haptic,
+                                              &val,
+                                              &press_start);
 
         if ((val != KM_NOTHING) &&
             (!modal || (wm_xr_session_modal_action_test(active_modal_actions, action, NULL) &&
@@ -995,45 +1156,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
           unsigned int subaction_idx_other;
 
           /* Test for bimanual interaction. */
-          bool bimanual = false;
-          if ((action->flag & XR_ACTION_BIMANUAL) != 0) {
-            subaction_idx_other = (subaction_idx == 0) ?
-                                      (unsigned int)min_ii(1, action->count_subaction_paths - 1) :
-                                      0;
-
-            switch (action->type) {
-              case XR_BOOLEAN_INPUT: {
-                const bool *state = &((bool *)action->states)[subaction_idx_other];
-                if (*state) {
-                  bimanual = true;
-                }
-                break;
-              }
-              case XR_FLOAT_INPUT: {
-                const float *state = &((float *)action->states)[subaction_idx_other];
-                if (test_float_state(state, action->float_threshold, action->flag)) {
-                  bimanual = true;
-                }
-                break;
-              }
-              case XR_VECTOR2F_INPUT: {
-                const float(*state)[2] = &((float(*)[2])action->states)[subaction_idx_other];
-                if (test_vec2f_state(*state, action->float_threshold, action->flag)) {
-                  bimanual = true;
-                }
-                break;
-              }
-              case XR_POSE_INPUT:
-              case XR_VIBRATION_OUTPUT:
-                BLI_assert_unreachable();
-                break;
-            }
-
-            if (bimanual) {
-              pose_other = wm_xr_session_controller_pose_find(
-                  session_state, action->subaction_paths[subaction_idx_other]);
-            }
-          }
+          const bool bimanual = wm_xr_session_action_test_bimanual(
+              session_state, action, subaction_idx, &subaction_idx_other, &pose_other);
 
           wm_event_add_xrevent(action_set_name,
                                action,
@@ -1116,7 +1240,8 @@ void wm_xr_session_actions_update(const bContext *C)
     }
 
     if (surface && win) {
-      wm_xr_session_events_dispatch(settings, xr_context, active_action_set, state, surface, win);
+      wm_xr_session_events_dispatch(
+          xr, settings, xr_context, active_action_set, state, surface, win);
     }
   }
 }

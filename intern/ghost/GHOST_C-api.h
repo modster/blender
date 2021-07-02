@@ -1138,6 +1138,7 @@ int GHOST_XrSyncActions(GHOST_XrContextHandle xr_context, const char *action_set
 int GHOST_XrApplyHapticAction(GHOST_XrContextHandle xr_context,
                               const char *action_set_name,
                               const char *action_name,
+                              const char **subaction_path,
                               const GHOST_TInt64 *duration,
                               const float *frequency,
                               const float *amplitude);
@@ -1147,7 +1148,8 @@ int GHOST_XrApplyHapticAction(GHOST_XrContextHandle xr_context,
  */
 void GHOST_XrStopHapticAction(GHOST_XrContextHandle xr_context,
                               const char *action_set_name,
-                              const char *action_name);
+                              const char *action_name,
+                              const char **subaction_path);
 
 /**
  * Get action set custom data (owned by Blender, not GHOST).

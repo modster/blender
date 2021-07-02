@@ -166,20 +166,33 @@ typedef struct wmXrAction {
   struct wmOperatorType *ot;
   IDProperty *op_properties;
 
+  /** Haptics. */
+  char *haptic_name;
+  long long haptic_duration;
+  float haptic_frequency;
+  float haptic_amplitude;
+
   /** Flag. */
   eXrActionFlag flag;
 } wmXrAction;
 
+typedef struct wmXrHapticAction {
+  struct wmXrHapticAction *next, *prev;
+  wmXrAction *action;
+  const char **subaction_path;
+  long long time_start;
+} wmXrHapticAction;
+
 typedef struct wmXrActionSet {
   char *name;
-
   /** The XR pose action that determines the controller
    * transforms. This is usually identified by the OpenXR path "/grip/pose" or "/aim/pose",
    * although it could differ depending on the specification and hardware. */
   wmXrAction *controller_pose_action;
-
   /** Currently active modal actions. */
   ListBase active_modal_actions;
+  /** Currently active haptic actions. */
+  ListBase active_haptic_actions;
 } wmXrActionSet;
 
 wmXrRuntimeData *wm_xr_runtime_data_create(void);

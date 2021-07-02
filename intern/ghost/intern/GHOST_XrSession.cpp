@@ -815,6 +815,7 @@ bool GHOST_XrSession::syncActions(const char *action_set_name)
 
 bool GHOST_XrSession::applyHapticAction(const char *action_set_name,
                                         const char *action_name,
+                                        const char **subaction_path,
                                         const GHOST_TInt64 &duration,
                                         const float &frequency,
                                         const float &amplitude)
@@ -829,12 +830,15 @@ bool GHOST_XrSession::applyHapticAction(const char *action_set_name,
     return false;
   }
 
-  action->applyHapticFeedback(m_oxr->session, action_name, duration, frequency, amplitude);
+  action->applyHapticFeedback(
+      m_oxr->session, action_name, subaction_path, duration, frequency, amplitude);
 
   return true;
 }
 
-void GHOST_XrSession::stopHapticAction(const char *action_set_name, const char *action_name)
+void GHOST_XrSession::stopHapticAction(const char *action_set_name,
+                                       const char *action_name,
+                                       const char **subaction_path)
 {
   GHOST_XrActionSet *action_set = find_action_set(m_oxr.get(), action_set_name);
   if (action_set == nullptr) {
@@ -846,7 +850,7 @@ void GHOST_XrSession::stopHapticAction(const char *action_set_name, const char *
     return;
   }
 
-  action->stopHapticFeedback(m_oxr->session, action_name);
+  action->stopHapticFeedback(m_oxr->session, action_name, subaction_path);
 }
 
 void *GHOST_XrSession::getActionSetCustomdata(const char *action_set_name)
