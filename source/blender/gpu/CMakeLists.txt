@@ -104,7 +104,7 @@ set(SRC
   opengl/gl_query.cc
   opengl/gl_shader.cc
   opengl/gl_shader_log.cc
-  opengl/gl_shader_converter.cc
+  opengl/gl_shader_patcher.cc
   opengl/gl_shader_interface.cc
   opengl/gl_state.cc
   opengl/gl_texture.cc
@@ -180,6 +180,7 @@ set(SRC
   opengl/gl_query.hh
   opengl/gl_shader.hh
   opengl/gl_shader_interface.hh
+  opengl/gl_shader_patcher.hh
   opengl/gl_state.hh
   opengl/gl_texture.hh
   opengl/gl_uniform_buffer.hh

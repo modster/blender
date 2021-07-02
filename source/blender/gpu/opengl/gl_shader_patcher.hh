@@ -28,32 +28,32 @@
 
 namespace blender::gpu {
 
-enum class GLShaderConverterState {
+enum class GLShaderPatcherState {
   OkUnchanged,
   OkChanged,
   MismatchedPushConstantNames,
 };
 
-struct PatchContext {
+struct GLShaderPatchState {
+  GLShaderPatcherState state = GLShaderPatcherState::OkUnchanged;
   struct {
     std::string name;
   } push_constants;
 };
 
-class GLShaderConverter {
+class GLShaderPatcher {
  public:
-  GLShaderConverterState state = GLShaderConverterState::OkUnchanged;
+  GLShaderPatchState context;
 
  private:
   Vector<std::string> patched_sources_;
-  PatchContext context_;
 
  public:
   void patch(MutableSpan<const char *> sources);
   bool has_errors() const;
   void free();
 
-  MEM_CXX_CLASS_ALLOC_FUNCS("GLShaderConverter");
+  MEM_CXX_CLASS_ALLOC_FUNCS("GLShaderPatcher");
 };
 
 }  // namespace blender::gpu

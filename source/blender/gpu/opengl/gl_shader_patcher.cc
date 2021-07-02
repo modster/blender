@@ -20,10 +20,10 @@
 /** \file
  * \ingroup gpu
  *
- * Parse/convert GLSL source from Vulkan GLSL to OpenGL GLSL.
+ * Patch GLSL source from Vulkan GLSL to OpenGL GLSL.
  */
 
-#include "gl_shader_converter.hh"
+#include "gl_shader_patcher.hh"
 
 #include <optional>
 
@@ -33,28 +33,28 @@ static CLG_LogRef LOG = {"gpu.gl.shader.converter"};
 
 namespace blender::gpu {
 
-static bool is_error_state(GLShaderConverterState state)
+static bool is_error_state(GLShaderPatcherState state)
 {
-  return !ELEM(state, GLShaderConverterState::OkChanged, GLShaderConverterState::OkUnchanged);
+  return !ELEM(state, GLShaderPatcherState::OkChanged, GLShaderPatcherState::OkUnchanged);
 }
 
 struct GLSLPatchResult {
   std::optional<std::string> patched_glsl;
-  GLShaderConverterState state = GLShaderConverterState::OkUnchanged;
+  GLShaderPatcherState state = GLShaderPatcherState::OkUnchanged;
 
   void merge(const GLSLPatchResult &other, const StringRef unchanged_result)
   {
     switch (other.state) {
-      case GLShaderConverterState::OkUnchanged:
+      case GLShaderPatcherState::OkUnchanged:
         patched_glsl = unchanged_result;
         break;
-      case GLShaderConverterState::OkChanged:
+      case GLShaderPatcherState::OkChanged:
         patched_glsl = other.patched_glsl;
-        if (state == GLShaderConverterState::OkUnchanged) {
-          state = GLShaderConverterState::OkChanged;
+        if (state == GLShaderPatcherState::OkUnchanged) {
+          state = GLShaderPatcherState::OkChanged;
         }
         break;
-      case GLShaderConverterState::MismatchedPushConstantNames:
+      case GLShaderPatcherState::MismatchedPushConstantNames:
         state = other.state;
         break;
     }
@@ -68,7 +68,7 @@ class GLSLPatch {
       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01232456789_";
 
  public:
-  virtual GLSLPatchResult patch(PatchContext &context, StringRef source) = 0;
+  virtual GLSLPatchResult patch(GLShaderPatchState &context, StringRef source) = 0;
 
  protected:
   static StringRef skip_whitespace(StringRef ref)
@@ -94,13 +94,13 @@ class PatchPushConstants : public GLSLPatch {
   static constexpr StringRef LAYOUT_STD140 = "layout(std140)";
 
  public:
-  GLSLPatchResult patch(PatchContext &context, StringRef source) override
+  GLSLPatchResult patch(GLShaderPatchState &context, StringRef source) override
   {
     GLSLPatchResult result;
 
     size_t pos = source.find(LAYOUT_PUSH_CONSTANTS);
     if (pos == StringRef::not_found) {
-      result.state = GLShaderConverterState::OkUnchanged;
+      result.state = GLShaderPatcherState::OkUnchanged;
       return result;
     }
 
@@ -124,12 +124,12 @@ class PatchPushConstants : public GLSLPatch {
                  "binding names must be identical across all stages.",
                  context.push_constants.name.c_str(),
                  std::string(name).c_str());
-      result.state = GLShaderConverterState::MismatchedPushConstantNames;
+      result.state = GLShaderPatcherState::MismatchedPushConstantNames;
       return result;
     }
 
     std::string patched_glsl_str = patched_glsl.str();
-    result.state = GLShaderConverterState::OkChanged;
+    result.state = GLShaderPatcherState::OkChanged;
     GLSLPatchResult recursive_result = patch(context, patched_glsl_str);
     result.merge(recursive_result, patched_glsl_str);
     return result;
@@ -138,7 +138,7 @@ class PatchPushConstants : public GLSLPatch {
 
 class GLSLPatcher : public GLSLPatch {
  private:
-  static void patch(PatchContext &context,
+  static void patch(GLShaderPatchState &context,
                     GLSLPatch &patch,
                     StringRef source,
                     GLSLPatchResult &r_result)
@@ -153,7 +153,7 @@ class GLSLPatcher : public GLSLPatch {
   }
 
  public:
-  GLSLPatchResult patch(PatchContext &context, StringRef source) override
+  GLSLPatchResult patch(GLShaderPatchState &context, StringRef source) override
   {
     GLSLPatchResult result;
     PatchPushConstants push_constants;
@@ -162,30 +162,41 @@ class GLSLPatcher : public GLSLPatch {
   }
 };
 
-void GLShaderConverter::patch(MutableSpan<const char *> sources)
+void GLShaderPatcher::patch(MutableSpan<const char *> sources)
 {
   for (int i = 0; i < sources.size(); i++) {
     GLSLPatcher patcher;
     const char *source = sources[i];
-    GLSLPatchResult patch_result = patcher.patch(context_, source);
-    if (is_error_state(patch_result.state)) {
-      state = patch_result.state;
-      return;
-    }
-    if (patch_result.state == GLShaderConverterState::OkChanged) {
-      BLI_assert(patch_result.patched_glsl);
-      patched_sources_.append(*patch_result.patched_glsl);
-      sources[i] = patched_sources_.last().c_str();
+    GLSLPatchResult patch_result = patcher.patch(context, source);
+    switch (patch_result.state) {
+      case GLShaderPatcherState::OkUnchanged:
+        break;
+
+      case GLShaderPatcherState::OkChanged:
+        BLI_assert(patch_result.patched_glsl);
+        patched_sources_.append(*patch_result.patched_glsl);
+        sources[i] = patched_sources_.last().c_str();
+
+        /* Keep any errors from previous stages. */
+        if (context.state == GLShaderPatcherState::OkUnchanged) {
+          context.state = GLShaderPatcherState::OkChanged;
+        }
+        break;
+
+      case GLShaderPatcherState::MismatchedPushConstantNames:
+        context.state = patch_result.state;
+        return;
+        break;
     }
   }
 }
 
-bool GLShaderConverter::has_errors() const
+bool GLShaderPatcher::has_errors() const
 {
-  return is_error_state(state);
+  return is_error_state(context.state);
 }
 
-void GLShaderConverter::free()
+void GLShaderPatcher::free()
 {
   patched_sources_.clear();
 }
