@@ -55,7 +55,7 @@
 /* ********** cloth engine ******* */
 /* Prototypes for internal functions.
  */
-static void cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *r_mesh);
+static Mesh *cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *mesh);
 static void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mesh);
 static bool cloth_from_object(
     Object *ob, ClothModifierData *clmd, Mesh *mesh, float framenr, int first);
@@ -262,10 +262,9 @@ static bool do_init_cloth(Object *ob, ClothModifierData *clmd, Mesh *result, int
 
 /**
  * Performs the next step in the cloth simulation
- * @param r_mesh The `Mesh` that has the input mesh information and
- * will be modified with the updated `Mesh` information */
-static int do_step_cloth(
-    Depsgraph *depsgraph, Object *ob, ClothModifierData *clmd, int framenr, Mesh *r_mesh)
+ * Returns a new `Mesh` object when cloth simulation step is successful */
+static Mesh *do_step_cloth(
+    Depsgraph *depsgraph, Object *ob, ClothModifierData *clmd, int framenr, Mesh *mesh)
 {
   ClothVertex *verts = NULL;
   Cloth *cloth;
@@ -277,7 +276,7 @@ static int do_step_cloth(
   /* simulate 1 frame forward */
   cloth = clmd->clothObject;
   verts = cloth->verts;
-  mvert = r_mesh->mvert;
+  mvert = mesh->mvert;
 
   /* force any pinned verts to their constrained location. */
   for (i = 0; i < clmd->clothObject->mvert_num; i++, verts++) {
@@ -293,15 +292,15 @@ static int do_step_cloth(
   effectors = BKE_effectors_create(depsgraph, ob, NULL, clmd->sim_parms->effector_weights, false);
 
   if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH) {
-    cloth_update_verts(ob, clmd, r_mesh);
+    cloth_update_verts(ob, clmd, mesh);
   }
 
   /* Support for dynamic vertex groups, changing from frame to frame */
-  cloth_apply_vgroup(clmd, r_mesh);
+  cloth_apply_vgroup(clmd, mesh);
 
   if ((clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH) ||
       (clmd->sim_parms->vgroup_shrink > 0) || (clmd->sim_parms->shrink_min != 0.0f)) {
-    cloth_update_spring_lengths(clmd, r_mesh);
+    cloth_update_spring_lengths(clmd, mesh);
   }
 
   cloth_update_springs(clmd);
@@ -315,18 +314,20 @@ static int do_step_cloth(
 
   BKE_effectors_free(effectors);
 
+  if (ret != 1) {
+    return NULL;
+  }
+
   // printf ( "%f\n", ( float ) tval() );
 
   if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_REMESH) {
-    /* In case remeshing is enabled, the remeshing function would update `r_mesh` */
-    BKE_cloth_remesh(ob, clmd, r_mesh);
-  }
-  else {
-    /* if remeshing is off, need to update `r_mesh` from clmd->clothObject */
-    cloth_to_object(ob, clmd, r_mesh);
+    /* In case remeshing is enabled, the remeshing function will
+     * return the final mesh needed */
+    return BKE_cloth_remesh(ob, clmd, mesh);
   }
 
-  return ret;
+  /* if remeshing is off, need to update `mesh` from `clmd->clothObject` */
+  return cloth_to_object(ob, clmd, mesh);
 }
 
 /************************************************
@@ -391,9 +392,7 @@ Mesh *clothModifier_do(
       (!can_simulate && cache_result == PTCACHE_READ_OLD)) {
     SIM_cloth_solver_set_positions(clmd);
 
-    Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
-
-    cloth_to_object(ob, clmd, mesh_result);
+    Mesh *mesh_result = cloth_to_object(ob, clmd, mesh);
 
     BKE_ptcache_validate(cache, framenr);
 
@@ -428,9 +427,8 @@ Mesh *clothModifier_do(
   /* do simulation */
   BKE_ptcache_validate(cache, framenr);
 
-  Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
-
-  if (!do_step_cloth(depsgraph, ob, clmd, framenr, mesh_result)) {
+  Mesh *mesh_result = do_step_cloth(depsgraph, ob, clmd, framenr, mesh);
+  if (mesh_result == NULL) {
     BKE_ptcache_invalidate(cache);
   }
   else {
@@ -606,21 +604,22 @@ void cloth_free_modifier_extern(ClothModifierData *clmd)
  ******************************************************************************/
 
 /**
- * Copies the deformed vertices to `r_mesh` after converting the world
- * space coordinates stored in `cloth->verts` to local space coords
- * required by `r_mesh`
+ * Creates a copy of `mesh` without reference and applies the deformed vertices after converting
+ * the world space coordinates stored in `cloth->verts` to local space coords Returns the copy.
  */
-static void cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *r_mesh)
+static Mesh *cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
   /* TODO(ish): might need a better name for the function now that it
    * directly applies the vertex * positions to the mesh */
   Cloth *cloth = clmd->clothObject;
 
+  Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
+
   if (clmd->clothObject) {
     /* inverse matrix is not uptodate... */
     invert_m4_m4(ob->imat, ob->obmat);
 
-    BLI_assert(cloth->mvert_num == r_mesh->totvert);
+    BLI_assert(cloth->mvert_num == mesh_result->totvert);
 
     float(*vert_coords)[3] = MEM_mallocN(sizeof(float[3]) * cloth->mvert_num, __func__);
 
@@ -629,10 +628,12 @@ static void cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *r_mesh)
     }
 
     /* need to convert from world space to local space */
-    BKE_mesh_vert_coords_apply_with_mat4(r_mesh, vert_coords, ob->imat);
+    BKE_mesh_vert_coords_apply_with_mat4(mesh_result, vert_coords, ob->imat);
 
     MEM_freeN(vert_coords);
   }
+
+  return mesh_result;
 }
 
 int cloth_uses_vgroup(ClothModifierData *clmd)

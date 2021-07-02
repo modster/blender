@@ -51,9 +51,7 @@ extern "C" {
 struct ClothModifierData;
 struct Object;
 
-void BKE_cloth_remesh(const struct Object *ob,
-                      struct ClothModifierData *clmd,
-                      struct Mesh *r_mesh);
+Mesh *BKE_cloth_remesh(const struct Object *ob, struct ClothModifierData *clmd, struct Mesh *mesh);
 
 #ifdef __cplusplus
 }

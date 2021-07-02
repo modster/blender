@@ -31,8 +31,9 @@
 
 #include <cstdio>
 
-void BKE_cloth_remesh(const Object *UNUSED(ob),
-                      ClothModifierData *UNUSED(clmd),
-                      Mesh *UNUSED(r_mesh))
+Mesh *BKE_cloth_remesh(const Object *UNUSED(ob),
+                       ClothModifierData *UNUSED(clmd),
+                       Mesh *UNUSED(r_mesh))
 {
+  return nullptr;
 }
