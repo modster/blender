@@ -518,6 +518,10 @@ class MeshIO {
   ::Mesh *write()
   {
     auto num_verts = this->positions.size();
+    auto num_edges = 0;
+    for (const auto &line : this->line_indices) {
+      num_edges += line.size() - 1;
+    }
     auto num_loops = 0;
     for (const auto &face : this->face_indices) {
       num_loops += face.size();
@@ -525,7 +529,7 @@ class MeshIO {
     auto num_uvs = num_loops; /* for `::Mesh` the number of uvs has
                                * to match number of loops  */
     auto num_poly = this->face_indices.size();
-    auto *mesh = BKE_mesh_new_nomain(num_verts, 0, 0, num_loops, num_poly);
+    auto *mesh = BKE_mesh_new_nomain(num_verts, num_edges, 0, num_loops, num_poly);
     if (!mesh) {
       return nullptr;
     }
@@ -535,6 +539,7 @@ class MeshIO {
     BKE_mesh_update_customdata_pointers(mesh, false);
 
     auto *mverts = mesh->mvert;
+    auto *medges = mesh->medge;
     auto *mloopuvs = mesh->mloopuv;
     auto *mloops = mesh->mloop;
     auto *mpolys = mesh->mpoly;
@@ -543,9 +548,22 @@ class MeshIO {
       copy_v3_float3(mverts[i].co, this->positions[i]);
     }
 
+    auto edges_total = 0;
+    for (auto i = 0; i < this->line_indices.size(); i++) {
+      const auto &edge = this->line_indices[i];
+      for (auto j = 0; j < edge.size() - 1; j++) {
+        auto &me = medges[edges_total + j];
+        me.v1 = edge[j];
+        me.v2 = edge[j + 1];
+        me.flag |= ME_LOOSEEDGE;
+      }
+
+      edges_total += edge.size() - 1;
+    }
+
     auto loopstart = 0;
     for (auto i = 0; i < this->face_indices.size(); i++) {
-      auto &face = this->face_indices[i];
+      const auto &face = this->face_indices[i];
       auto &mpoly = mpolys[i];
       mpoly.loopstart = loopstart;
       mpoly.totloop = face.size();
@@ -565,10 +583,9 @@ class MeshIO {
     }
 
     BKE_mesh_ensure_normals(mesh);
-    BKE_mesh_calc_edges(mesh, false, false);
+    BKE_mesh_calc_edges(mesh, true, false);
 
     /* TODO(ish): handle vertex normals */
-    /* TODO(ish): handle line_indices/mesh wires (edges without faces) */
 
     return mesh;
   }
