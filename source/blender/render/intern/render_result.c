@@ -363,7 +363,7 @@ RenderResult *render_result_new(
     } \
   } while (false)
 
-      /* a renderlayer should always have a Combined pass*/
+      /* A renderlayer should always have a Combined pass. */
       render_layer_add_pass(rr, rl, 4, "Combined", view, "RGBA");
 
       if (view_layer->passflag & SCE_PASS_Z) {
@@ -804,9 +804,9 @@ void render_result_views_new(RenderResult *rr, const RenderData *rd)
   }
 }
 
-bool render_result_has_views(RenderResult *rr)
+bool render_result_has_views(const RenderResult *rr)
 {
-  RenderView *rv = rr->views.first;
+  const RenderView *rv = rr->views.first;
   return (rv && (rv->next || rv->name[0]));
 }
 

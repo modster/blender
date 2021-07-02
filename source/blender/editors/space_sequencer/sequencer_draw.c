@@ -367,8 +367,6 @@ static void draw_seq_waveform_overlay(View2D *v2d,
 
 static void drawmeta_contents(Scene *scene, Sequence *seqm, float x1, float y1, float x2, float y2)
 {
-  /* Don't use SEQ_ALL_BEGIN/SEQ_ALL_END here,
-   * because it changes seq->depth, which is needed for transform. */
   Sequence *seq;
   uchar col[4];
 
@@ -455,13 +453,13 @@ static void drawmeta_contents(Scene *scene, Sequence *seqm, float x1, float y1, 
   GPU_blend(GPU_BLEND_NONE);
 }
 
-/* Get handle width in pixels. */
+/* Get handle width in 2d-View space. */
 float sequence_handle_size_get_clamped(Sequence *seq, const float pixelx)
 {
   const float maxhandle = (pixelx * SEQ_HANDLE_SIZE) * U.pixelsize;
 
-  /* Ensure that handle is not wider, than half of strip. */
-  return min_ff(maxhandle, ((float)(seq->enddisp - seq->startdisp) / 2.0f) / pixelx);
+  /* Ensure that handle is not wider, than quarter of strip. */
+  return min_ff(maxhandle, ((float)(seq->enddisp - seq->startdisp) / 4.0f));
 }
 
 /* Draw a handle, on left or right side of strip. */
@@ -1058,7 +1056,7 @@ static void draw_seq_fcurve_overlay(
         continue;
       }
 
-      /* If some frames were skipped above, we need to close the shape.  */
+      /* If some frames were skipped above, we need to close the shape. */
       if (skip) {
         fcurve_batch_add_verts(
             vbo, y1, y2, y_height, timeline_frame - eval_step, prev_val, &vert_count);

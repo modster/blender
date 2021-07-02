@@ -1357,12 +1357,21 @@ static void write_area(BlendWriter *writer, ScrArea *area)
     }
     else if (sl->spacetype == SPACE_SPREADSHEET) {
       BLO_write_struct(writer, SpaceSpreadsheet, sl);
-
       SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
+
+      LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
+        BLO_write_struct(writer, SpreadsheetRowFilter, row_filter);
+        BLO_write_string(writer, row_filter->value_string);
+      }
+
       LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
         BLO_write_struct(writer, SpreadsheetColumn, column);
         BLO_write_struct(writer, SpreadsheetColumnID, column->id);
         BLO_write_string(writer, column->id->name);
+        /* While the display name is technically runtime data, we write it here, otherwise the row
+         * filters might not now their type if their region draws before the main region.
+         * This would ideally be cleared here. */
+        BLO_write_string(writer, column->display_name);
       }
       LISTBASE_FOREACH (SpreadsheetContext *, context, &sspreadsheet->context_path) {
         switch (context->type) {
@@ -1458,7 +1467,6 @@ static void direct_link_region(BlendDataReader *reader, ARegion *region, int spa
         BLO_read_data_address(reader, &rv3d->localvd);
         BLO_read_data_address(reader, &rv3d->clipbb);
 
-        rv3d->depths = NULL;
         rv3d->render_engine = NULL;
         rv3d->sms = NULL;
         rv3d->smooth_timer = NULL;
@@ -1695,9 +1703,9 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       BLO_read_list(reader, &sconsole->scrollback);
       BLO_read_list(reader, &sconsole->history);
 
-      /* comma expressions, (e.g. expr1, expr2, expr3) evaluate each expression,
+      /* Comma expressions, (e.g. expr1, expr2, expr3) evaluate each expression,
        * from left to right.  the right-most expression sets the result of the comma
-       * expression as a whole*/
+       * expression as a whole. */
       LISTBASE_FOREACH_MUTABLE (ConsoleLine *, cl, &sconsole->history) {
         BLO_read_data_address(reader, &cl->line);
         if (cl->line) {
@@ -1743,11 +1751,18 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
 
       sspreadsheet->runtime = NULL;
-
+      BLO_read_list(reader, &sspreadsheet->row_filters);
+      LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
+        BLO_read_data_address(reader, &row_filter->value_string);
+      }
       BLO_read_list(reader, &sspreadsheet->columns);
       LISTBASE_FOREACH (SpreadsheetColumn *, column, &sspreadsheet->columns) {
         BLO_read_data_address(reader, &column->id);
         BLO_read_data_address(reader, &column->id->name);
+        /* While the display name is technically runtime data, it is loaded here, otherwise the row
+         * filters might not now their type if their region draws before the main region.
+         * This would ideally be cleared here. */
+        BLO_read_data_address(reader, &column->display_name);
       }
 
       BLO_read_list(reader, &sspreadsheet->context_path);

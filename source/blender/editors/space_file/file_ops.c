@@ -86,7 +86,7 @@ static FileSelection find_file_mouse_rect(SpaceFile *sfile,
 
   BLI_rctf_rcti_copy(&rect_region_fl, rect_region);
 
-  /* Okay, manipulating v2d rects here is hacky...  */
+  /* Okay, manipulating v2d rects here is hacky... */
   v2d->mask.ymax -= sfile->layout->offset_top;
   v2d->cur.ymax -= sfile->layout->offset_top;
   UI_view2d_region_to_view_rctf(v2d, &rect_region_fl, &rect_view_fl);
@@ -1677,7 +1677,7 @@ void file_draw_check_ex(bContext *C, ScrArea *area)
       if (op->type->check(C, op)) {
         file_operator_to_sfile(bmain, sfile, op);
 
-        /* redraw, else the changed settings wont get updated */
+        /* redraw, else the changed settings won't get updated */
         ED_area_tag_redraw(area);
       }
     }
@@ -1882,7 +1882,7 @@ static int file_refresh_exec(bContext *C, wmOperator *UNUSED(unused))
   SpaceFile *sfile = CTX_wm_space_file(C);
   struct FSMenu *fsmenu = ED_fsmenu_get();
 
-  ED_fileselect_clear(wm, CTX_data_scene(C), sfile);
+  ED_fileselect_clear(wm, sfile);
 
   /* refresh system directory menu */
   fsmenu_refresh_system_category(fsmenu);
@@ -2360,7 +2360,7 @@ static int file_directory_new_exec(bContext *C, wmOperator *op)
   sfile->scroll_offset = 0;
 
   /* reload dir to make sure we're seeing what's in the directory */
-  ED_fileselect_clear(wm, CTX_data_scene(C), sfile);
+  ED_fileselect_clear(wm, sfile);
 
   if (do_diropen) {
     BLI_strncpy(params->dir, path, sizeof(params->dir));
@@ -2611,7 +2611,7 @@ static int file_hidedot_exec(bContext *C, wmOperator *UNUSED(unused))
 
   if (params) {
     params->flag ^= FILE_HIDE_DOT;
-    ED_fileselect_clear(wm, CTX_data_scene(C), sfile);
+    ED_fileselect_clear(wm, sfile);
     WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
   }
 
@@ -2908,7 +2908,7 @@ static int file_delete_exec(bContext *C, wmOperator *op)
     }
   }
 
-  ED_fileselect_clear(wm, CTX_data_scene(C), sfile);
+  ED_fileselect_clear(wm, sfile);
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 
   return OPERATOR_FINISHED;

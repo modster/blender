@@ -83,7 +83,7 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<const MeshComponent 
 
   const Mesh *first_input_mesh = src_components[0]->get_for_read();
   Mesh *new_mesh = BKE_mesh_new_nomain(totverts, totedges, 0, totloops, totpolys);
-  BKE_mesh_copy_settings(new_mesh, first_input_mesh);
+  BKE_mesh_copy_parameters_for_eval(new_mesh, first_input_mesh);
 
   for (const int i : IndexRange(materials.size())) {
     Material *material = materials[i];
@@ -208,7 +208,7 @@ static void fill_new_attribute(Span<const GeometryComponent *> src_components,
     GVArray_GSpan src_span{*read_attribute};
     const void *src_buffer = src_span.data();
     void *dst_buffer = dst_span[offset];
-    cpp_type->copy_to_initialized_n(src_buffer, dst_buffer, domain_size);
+    cpp_type->copy_assign_n(src_buffer, dst_buffer, domain_size);
 
     offset += domain_size;
   }
@@ -353,7 +353,7 @@ static void ensure_control_point_attribute(const StringRef name,
 
         BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
         current_curve_attribute->get(spline_index_in_component, buffer);
-        type.fill_initialized(buffer, new_attribute->data(), new_attribute->size());
+        type.fill_assign_n(buffer, new_attribute->data(), new_attribute->size());
       }
     }
 
@@ -392,7 +392,7 @@ static void ensure_spline_attribute(const StringRef name,
     GVArray_GSpan src_span{*read_attribute};
 
     const void *src_buffer = src_span.data();
-    type.copy_to_initialized_n(src_buffer, result_attribute[offset], size);
+    type.copy_assign_n(src_buffer, result_attribute[offset], size);
 
     offset += size;
   }

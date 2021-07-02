@@ -501,12 +501,20 @@ geometry_node_categories = [
         NodeItem("ShaderNodeCombineRGB"),
     ]),
     GeometryNodeCategory("GEO_CURVE", "Curve", items=[
+        NodeItem("GeometryNodeCurveSubdivide"),
         NodeItem("GeometryNodeCurveToMesh"),
         NodeItem("GeometryNodeCurveResample"),
         NodeItem("GeometryNodeMeshToCurve"),
         NodeItem("GeometryNodeCurveToPoints"),
         NodeItem("GeometryNodeCurveLength"),
         NodeItem("GeometryNodeCurveReverse"),
+    ]),
+    GeometryNodeCategory("GEO_PRIMITIVES_CURVE", "Curve Primitives", items=[
+        NodeItem("GeometryNodeCurvePrimitiveCircle"),
+        NodeItem("GeometryNodeCurveStar"),
+        NodeItem("GeometryNodeCurveSpiral"),
+        NodeItem("GeometryNodeCurveQuadraticBezier"),
+        NodeItem("GeometryNodeCurvePrimitiveBezierSegment"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
         NodeItem("GeometryNodeBoundBox"),
@@ -515,6 +523,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeJoinGeometry"),
         NodeItem("GeometryNodeSeparateComponents"),
+        NodeItem("GeometryNodeRaycast"),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
         NodeItem("GeometryNodeObjectInfo"),
@@ -538,7 +547,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSubdivisionSurface"),
         NodeItem("GeometryNodeSubdivide"),
     ]),
-    GeometryNodeCategory("GEO_PRIMITIVES", "Mesh Primitives", items=[
+    GeometryNodeCategory("GEO_PRIMITIVES_MESH", "Mesh Primitives", items=[
         NodeItem("GeometryNodeMeshCircle"),
         NodeItem("GeometryNodeMeshCone"),
         NodeItem("GeometryNodeMeshCube"),

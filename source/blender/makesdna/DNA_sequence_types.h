@@ -167,8 +167,9 @@ typedef struct Sequence {
    * frames that use the last frame after data ends.
    */
   int startstill, endstill;
-  /** Machine: the strip channel, depth the depth in the sequence when dealing with metastrips. */
-  int machine, depth;
+  /** Machine: the strip channel */
+  int machine;
+  int _pad3;
   /** Starting and ending points of the strip in the sequence. */
   int startdisp, enddisp;
   float sat;
@@ -544,8 +545,8 @@ enum {
 /* convenience define for all selection flags */
 #define SEQ_ALLSEL (SELECT + SEQ_LEFTSEL + SEQ_RIGHTSEL)
 
-/* deprecated, don't use a flag anymore*/
-/*#define SEQ_ACTIVE                            1048576*/
+/* Deprecated, don't use a flag anymore. */
+// #define SEQ_ACTIVE 1048576
 
 #define SEQ_COLOR_BALANCE_INVERSE_GAIN 1
 #define SEQ_COLOR_BALANCE_INVERSE_GAMMA 2

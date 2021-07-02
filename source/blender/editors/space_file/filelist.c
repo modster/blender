@@ -785,12 +785,12 @@ static bool is_filtered_hidden(const char *filename,
                                const FileListInternEntry *file)
 {
   if ((filename[0] == '.') && (filename[1] == '\0')) {
-    return true; /* Ignore . */
+    return true; /* Ignore. */
   }
 
   if (filter->flags & FLF_HIDE_PARENT) {
     if (filename[0] == '.' && filename[1] == '.' && filename[2] == '\0') {
-      return true; /* Ignore .. */
+      return true; /* Ignore. */
     }
   }
 
@@ -1191,7 +1191,7 @@ static int filelist_geticon_ex(const FileDirEntry *file,
     if (FILENAME_IS_PARENT(file->relpath)) {
       return is_main ? ICON_FILE_PARENT : ICON_NONE;
     }
-    if (typeflag & FILE_TYPE_APPLICATIONBUNDLE) {
+    if (typeflag & FILE_TYPE_BUNDLE) {
       return ICON_UGLYPACKAGE;
     }
     if (typeflag & FILE_TYPE_BLENDER) {
@@ -2519,9 +2519,16 @@ int ED_path_extension_type(const char *path)
   if (file_is_blend_backup(path)) {
     return FILE_TYPE_BLENDER_BACKUP;
   }
-  if (BLI_path_extension_check(path, ".app")) {
-    return FILE_TYPE_APPLICATIONBUNDLE;
+#ifdef __APPLE__
+  if (BLI_path_extension_check_n(path,
+                                 /* Application bundle */
+                                 ".app",
+                                 /* Safari in-progress/paused download */
+                                 ".download",
+                                 NULL)) {
+    return FILE_TYPE_BUNDLE;
   }
+#endif
   if (BLI_path_extension_check(path, ".py")) {
     return FILE_TYPE_PYSCRIPT;
   }
@@ -2815,7 +2822,7 @@ static int filelist_readjob_list_dir(const char *root,
       entry->attributes = BLI_file_attributes(full_path);
       if (S_ISDIR(files[i].s.st_mode)
 #ifdef __APPLE__
-          && !(ED_path_extension_type(full_path) & FILE_TYPE_APPLICATIONBUNDLE)
+          && !(ED_path_extension_type(full_path) & FILE_TYPE_BUNDLE)
 #endif
       ) {
         entry->typeflag = FILE_TYPE_DIR;
@@ -2894,7 +2901,8 @@ static int filelist_readjob_list_lib(const char *root, ListBase *entries, const 
   }
 
   /* there we go */
-  libfiledata = BLO_blendhandle_from_file(dir, NULL);
+  BlendFileReadReport bf_reports = {.reports = NULL};
+  libfiledata = BLO_blendhandle_from_file(dir, &bf_reports);
   if (libfiledata == NULL) {
     return nbr_entries;
   }
@@ -3497,7 +3505,7 @@ void filelist_readjob_start(FileList *filelist, const bContext *C)
   /* setup job */
   wm_job = WM_jobs_get(CTX_wm_manager(C),
                        CTX_wm_window(C),
-                       CTX_data_scene(C),
+                       filelist,
                        "Listing Dirs...",
                        WM_JOB_PROGRESS,
                        WM_JOB_TYPE_FILESEL_READDIR);
@@ -3513,12 +3521,12 @@ void filelist_readjob_start(FileList *filelist, const bContext *C)
   WM_jobs_start(CTX_wm_manager(C), wm_job);
 }
 
-void filelist_readjob_stop(wmWindowManager *wm, Scene *owner_scene)
+void filelist_readjob_stop(FileList *filelist, wmWindowManager *wm)
 {
-  WM_jobs_kill_type(wm, owner_scene, WM_JOB_TYPE_FILESEL_READDIR);
+  WM_jobs_kill_type(wm, filelist, WM_JOB_TYPE_FILESEL_READDIR);
 }
 
-int filelist_readjob_running(wmWindowManager *wm, Scene *owner_scene)
+int filelist_readjob_running(FileList *filelist, wmWindowManager *wm)
 {
-  return WM_jobs_test(wm, owner_scene, WM_JOB_TYPE_FILESEL_READDIR);
+  return WM_jobs_test(wm, filelist, WM_JOB_TYPE_FILESEL_READDIR);
 }

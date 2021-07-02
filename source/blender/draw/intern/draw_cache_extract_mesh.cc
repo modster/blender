@@ -50,8 +50,6 @@
 #  include "PIL_time_utildefines.h"
 #endif
 
-#define MIM_RANGE_LEN 1024
-
 namespace blender::draw {
 
 /* ---------------------------------------------------------------------- */
@@ -126,7 +124,7 @@ class ExtractorRunDatas : public Vector<ExtractorRunData> {
     return iter_type;
   }
 
-  const uint iter_types_len() const
+  uint iter_types_len() const
   {
     const eMRIterType iter_type = iter_types();
     uint bits = static_cast<uint>(iter_type);
@@ -440,7 +438,7 @@ static void extract_task_range_run(void *__restrict taskdata)
   const bool is_mesh = data->mr->extract_type != MR_EXTRACT_BMESH;
 
   size_t userdata_chunk_size = data->extractors->data_size_total();
-  char *userdata_chunk = new char[userdata_chunk_size];
+  void *userdata_chunk = MEM_callocN(userdata_chunk_size, __func__);
 
   TaskParallelSettings settings;
   BLI_parallel_range_settings_defaults(&settings);
@@ -448,9 +446,9 @@ static void extract_task_range_run(void *__restrict taskdata)
   settings.userdata_chunk = userdata_chunk;
   settings.userdata_chunk_size = userdata_chunk_size;
   settings.func_reduce = extract_task_reduce;
-  settings.min_iter_per_thread = MIM_RANGE_LEN;
+  settings.min_iter_per_thread = MIN_RANGE_LEN;
 
-  extract_init(data->mr, data->cache, *data->extractors, data->mbc, (void *)userdata_chunk);
+  extract_init(data->mr, data->cache, *data->extractors, data->mbc, userdata_chunk);
 
   if (iter_type & MR_ITER_LOOPTRI) {
     extract_task_range_run_iter(data->mr, data->extractors, MR_ITER_LOOPTRI, is_mesh, &settings);
@@ -465,8 +463,8 @@ static void extract_task_range_run(void *__restrict taskdata)
     extract_task_range_run_iter(data->mr, data->extractors, MR_ITER_LVERT, is_mesh, &settings);
   }
 
-  extract_finish(data->mr, data->cache, *data->extractors, (void *)userdata_chunk);
-  delete[] userdata_chunk;
+  extract_finish(data->mr, data->cache, *data->extractors, userdata_chunk);
+  MEM_freeN(userdata_chunk);
 }
 
 /** \} */
@@ -617,44 +615,54 @@ static void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
   /* Create an array containing all the extractors that needs to be executed. */
   ExtractorRunDatas extractors;
 
-#define EXTRACT_ADD_REQUESTED(type, type_lowercase, name) \
+#define EXTRACT_ADD_REQUESTED(type, name) \
   do { \
-    if (DRW_##type_lowercase##_requested(mbc->type_lowercase.name)) { \
+    if (DRW_##type##_requested(mbc->type.name)) { \
       const MeshExtract *extractor = mesh_extract_override_get( \
           &extract_##name, do_hq_normals, override_single_mat); \
       extractors.append(extractor); \
     } \
   } while (0)
 
-  EXTRACT_ADD_REQUESTED(VBO, vbo, pos_nor);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, lnor);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, uv);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, tan);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, vcol);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, sculpt_data);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, orco);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, edge_fac);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, weights);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, edit_data);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, edituv_data);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, edituv_stretch_area);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, edituv_stretch_angle);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, mesh_analysis);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, fdots_pos);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, fdots_nor);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, fdots_uv);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, fdots_edituv_data);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, poly_idx);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, edge_idx);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, vert_idx);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, fdot_idx);
-  EXTRACT_ADD_REQUESTED(VBO, vbo, skin_roots);
+  EXTRACT_ADD_REQUESTED(vbo, pos_nor);
+  EXTRACT_ADD_REQUESTED(vbo, lnor);
+  EXTRACT_ADD_REQUESTED(vbo, uv);
+  EXTRACT_ADD_REQUESTED(vbo, tan);
+  EXTRACT_ADD_REQUESTED(vbo, vcol);
+  EXTRACT_ADD_REQUESTED(vbo, sculpt_data);
+  EXTRACT_ADD_REQUESTED(vbo, orco);
+  EXTRACT_ADD_REQUESTED(vbo, edge_fac);
+  EXTRACT_ADD_REQUESTED(vbo, weights);
+  EXTRACT_ADD_REQUESTED(vbo, edit_data);
+  EXTRACT_ADD_REQUESTED(vbo, edituv_data);
+  EXTRACT_ADD_REQUESTED(vbo, edituv_stretch_area);
+  EXTRACT_ADD_REQUESTED(vbo, edituv_stretch_angle);
+  EXTRACT_ADD_REQUESTED(vbo, mesh_analysis);
+  EXTRACT_ADD_REQUESTED(vbo, fdots_pos);
+  EXTRACT_ADD_REQUESTED(vbo, fdots_nor);
+  EXTRACT_ADD_REQUESTED(vbo, fdots_uv);
+  EXTRACT_ADD_REQUESTED(vbo, fdots_edituv_data);
+  EXTRACT_ADD_REQUESTED(vbo, poly_idx);
+  EXTRACT_ADD_REQUESTED(vbo, edge_idx);
+  EXTRACT_ADD_REQUESTED(vbo, vert_idx);
+  EXTRACT_ADD_REQUESTED(vbo, fdot_idx);
+  EXTRACT_ADD_REQUESTED(vbo, skin_roots);
 
-  EXTRACT_ADD_REQUESTED(IBO, ibo, tris);
-  if (DRW_ibo_requested(mbc->ibo.lines)) {
+  EXTRACT_ADD_REQUESTED(ibo, tris);
+  if (DRW_ibo_requested(mbc->ibo.lines_loose)) {
+    /* `ibo.lines_loose` require the `ibo.lines` buffer. */
+    if (mbc->ibo.lines == nullptr) {
+      DRW_ibo_request(nullptr, &mbc->ibo.lines);
+    }
+    const MeshExtract *extractor = DRW_ibo_requested(mbc->ibo.lines) ?
+                                       &extract_lines_with_lines_loose :
+                                       &extract_lines_loose_only;
+    extractors.append(extractor);
+  }
+  else if (DRW_ibo_requested(mbc->ibo.lines)) {
     const MeshExtract *extractor;
     if (mbc->ibo.lines_loose != nullptr) {
-      /* Update #lines_loose ibo. */
+      /* Update `ibo.lines_loose` as it depends on `ibo.lines`. */
       extractor = &extract_lines_with_lines_loose;
     }
     else {
@@ -662,19 +670,14 @@ static void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
     }
     extractors.append(extractor);
   }
-  else if (DRW_ibo_requested(mbc->ibo.lines_loose)) {
-    /* Note: #ibo.lines must have been created first. */
-    const MeshExtract *extractor = &extract_lines_loose_only;
-    extractors.append(extractor);
-  }
-  EXTRACT_ADD_REQUESTED(IBO, ibo, points);
-  EXTRACT_ADD_REQUESTED(IBO, ibo, fdots);
-  EXTRACT_ADD_REQUESTED(IBO, ibo, lines_paint_mask);
-  EXTRACT_ADD_REQUESTED(IBO, ibo, lines_adjacency);
-  EXTRACT_ADD_REQUESTED(IBO, ibo, edituv_tris);
-  EXTRACT_ADD_REQUESTED(IBO, ibo, edituv_lines);
-  EXTRACT_ADD_REQUESTED(IBO, ibo, edituv_points);
-  EXTRACT_ADD_REQUESTED(IBO, ibo, edituv_fdots);
+  EXTRACT_ADD_REQUESTED(ibo, points);
+  EXTRACT_ADD_REQUESTED(ibo, fdots);
+  EXTRACT_ADD_REQUESTED(ibo, lines_paint_mask);
+  EXTRACT_ADD_REQUESTED(ibo, lines_adjacency);
+  EXTRACT_ADD_REQUESTED(ibo, edituv_tris);
+  EXTRACT_ADD_REQUESTED(ibo, edituv_lines);
+  EXTRACT_ADD_REQUESTED(ibo, edituv_points);
+  EXTRACT_ADD_REQUESTED(ibo, edituv_fdots);
 
 #undef EXTRACT_ADD_REQUESTED
 
@@ -711,7 +714,7 @@ static void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
       task_graph, mr, extraction_cache, iter_type, data_flag);
 
   /* Simple heuristic. */
-  const bool use_thread = (mr->loop_len + mr->loop_loose_len) > MIM_RANGE_LEN;
+  const bool use_thread = (mr->loop_len + mr->loop_loose_len) > MIN_RANGE_LEN;
 
   if (use_thread) {
     /* First run the requested extractors that do not support asynchronous ranges. */

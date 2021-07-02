@@ -79,7 +79,8 @@ static bool collection_object_remove(Main *bmain,
 static CollectionChild *collection_find_child(Collection *parent, Collection *collection);
 static CollectionParent *collection_find_parent(Collection *child, Collection *collection);
 
-static bool collection_find_child_recursive(Collection *parent, Collection *collection);
+static bool collection_find_child_recursive(const Collection *parent,
+                                            const Collection *collection);
 
 /** \} */
 
@@ -710,7 +711,7 @@ Collection *BKE_collection_duplicate(Main *bmain,
      * unless its duplication is a sub-process of another one. */
     collection_new->id.tag &= ~LIB_TAG_NEW;
 
-    /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW.*/
+    /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW. */
     BKE_libblock_relink_to_newid(&collection_new->id);
 
 #ifndef NDEBUG
@@ -1458,7 +1459,7 @@ bool BKE_collection_cycle_find(Collection *new_ancestor, Collection *collection)
   }
 
   /* Find possible objects in collection or its children, that would instantiate the given ancestor
-   * collection (that would also make a fully invalid cycle of dependencies) .*/
+   * collection (that would also make a fully invalid cycle of dependencies). */
   return collection_instance_find_recursive(collection, new_ancestor);
 }
 
@@ -1521,9 +1522,9 @@ static CollectionChild *collection_find_child(Collection *parent, Collection *co
   return BLI_findptr(&parent->children, collection, offsetof(CollectionChild, collection));
 }
 
-static bool collection_find_child_recursive(Collection *parent, Collection *collection)
+static bool collection_find_child_recursive(const Collection *parent, const Collection *collection)
 {
-  LISTBASE_FOREACH (CollectionChild *, child, &parent->children) {
+  LISTBASE_FOREACH (const CollectionChild *, child, &parent->children) {
     if (child->collection == collection) {
       return true;
     }
@@ -1536,7 +1537,7 @@ static bool collection_find_child_recursive(Collection *parent, Collection *coll
   return false;
 }
 
-bool BKE_collection_has_collection(Collection *parent, Collection *collection)
+bool BKE_collection_has_collection(const Collection *parent, const Collection *collection)
 {
   return collection_find_child_recursive(parent, collection);
 }

@@ -41,10 +41,6 @@ class SPREADSHEET_HT_header(bpy.types.Header):
             return
 
         layout.prop(space, "object_eval_state", text="")
-        if space.object_eval_state != 'ORIGINAL':
-            layout.prop(space, "geometry_component_type", text="")
-        if space.geometry_component_type != 'INSTANCES':
-            layout.prop(space, "attribute_domain", text="")
 
         context_path = space.context_path
         if space.object_eval_state == 'ORIGINAL':
@@ -59,9 +55,12 @@ class SPREADSHEET_HT_header(bpy.types.Header):
         layout.operator("spreadsheet.toggle_pin", text="", icon=pin_icon, emboss=False)
 
         layout.separator_spacer()
-
-        if isinstance(obj, bpy.types.Object) and obj.mode == 'EDIT':
-            layout.prop(space, "show_only_selected", text="Selected Only")
+        
+        row = layout.row(align=True)
+        sub = row.row(align=True)
+        sub.active = self.selection_filter_available(space)
+        sub.prop(space, "show_only_selected", text="")
+        row.prop(space, "use_filter", toggle=True, icon='FILTER', icon_only=True)
 
     def draw_without_context_path(self, layout):
         layout.label(text="No active context")
@@ -101,6 +100,17 @@ class SPREADSHEET_HT_header(bpy.types.Header):
 
     def draw_spreadsheet_context_path_icon(self, layout, space, icon='RIGHTARROW_THIN'):
         layout.prop(space, "display_context_path_collapsed", icon_only=True, emboss=False, icon=icon)
+
+    def selection_filter_available(self, space):
+        root_context = space.context_path[0]
+        if root_context.type != 'OBJECT':
+            return False
+        obj = root_context.object
+        if obj is None:
+            return False
+        if obj.type != 'MESH' or obj.mode != 'EDIT':
+            return False
+        return True
 
 classes = (
     SPREADSHEET_HT_header,
