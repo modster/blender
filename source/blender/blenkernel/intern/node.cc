@@ -5051,6 +5051,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_remove();
   register_node_type_geo_boolean();
   register_node_type_geo_bounding_box();
+  register_node_type_geo_collapse();
   register_node_type_geo_collection_info();
   register_node_type_geo_convex_hull();
   register_node_type_geo_curve_length();
@@ -5060,6 +5061,7 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_reverse();
   register_node_type_geo_curve_subdivide();
   register_node_type_geo_decimate();
+  register_node_type_geo_dissolve();
   register_node_type_geo_delete_geometry();
   register_node_type_geo_edge_split();
   register_node_type_geo_input_material();
@@ -5093,6 +5095,7 @@ static void registerGeometryNodes()
   register_node_type_geo_switch();
   register_node_type_geo_transform();
   register_node_type_geo_triangulate();
+  register_node_type_geo_unsubdivide();
   register_node_type_geo_volume_to_mesh();
 }
 

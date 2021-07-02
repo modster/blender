@@ -540,6 +540,9 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSubdivisionSurface"),
         NodeItem("GeometryNodeSubdivide"),
         NodeItem("GeometryNodeDecimate"),
+        NodeItem("GeometryNodeCollapse"),
+        NodeItem("GeometryNodeUnsubdivide"),
+        NodeItem("GeometryNodeDissolve"),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES", "Mesh Primitives", items=[
         NodeItem("GeometryNodeMeshCircle"),

@@ -19,7 +19,6 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "BKE_mesh.h"
-#include "BKE_mesh_types.h"
 #include "BKE_deform.h"
 #include "bmesh.h"
 #include "bmesh_tools.h"
@@ -68,7 +67,7 @@ typedef struct DecimateNodeData {
   int face_count;
 } DecimateNodeData;
 
-static Mesh *decimateMesh(DecimateNodeData *dmd, Mesh *meshData)
+static Mesh *unsubdivideMesh(DecimateNodeData *dmd, Mesh *meshData)
 {
   printf("RUNNING - A\n");
 
@@ -193,6 +192,30 @@ static Mesh *decimateMesh(DecimateNodeData *dmd, Mesh *meshData)
   return result;
 }
 
+static void geo_node_decimate_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  NodeGeometryDecimate *node_storage = (NodeGeometryDecimate *)MEM_callocN(
+      sizeof(NodeGeometryDecimate), __func__);
+
+  node->storage = node_storage;
+  node_storage->mode = MOD_DECIM_MODE_COLLAPSE;
+}
+
+static void geo_node_decimate_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  //uiLayoutSetPropSep(layout, true);
+  //uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "mode", 0, nullptr, ICON_NONE);
+}
+
+static void geo_node_decimate_update(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  //const NodeGeometrySolidify *node_storage = (NodeGeometrySolidify *)node->storage;
+
+  //update_attribute_input_socket_availabilities(
+  //    *node, "Thickness", (GeometryNodeAttributeInputMode)node_storage->thickness_mode, true);
+}
+
 static void geo_node_decimate_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -218,7 +241,7 @@ static void geo_node_decimate_exec(GeoNodeExecParams params)
         MOD_DECIM_MODE_COLLAPSE,
         input_mesh->totpoly,
     };
-    Mesh *result = decimateMesh(&dmd, input_mesh);
+    Mesh *result = unsubdivideMesh(&dmd, input_mesh);
     geometry_set.replace_mesh(result);
     printf("RUNNING\n");
   }
@@ -232,6 +255,10 @@ void register_node_type_geo_decimate()
 
   geo_node_type_base(&ntype, GEO_NODE_DECIMATE, "decimate", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_decimate_in, geo_node_decimate_out);
+  node_type_storage(
+      &ntype, "NodeGeometryDecimate", node_free_standard_storage, node_copy_standard_storage);
+  node_type_init(&ntype, blender::nodes::geo_node_decimate_init);
+  node_type_update(&ntype, blender::nodes::geo_node_decimate_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_decimate_exec;
   nodeRegisterType(&ntype);
 }

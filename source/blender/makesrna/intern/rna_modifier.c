@@ -2243,18 +2243,19 @@ static void rna_def_modifier_mirror(BlenderRNA *brna)
   RNA_define_lib_overridable(false);
 }
 
+const EnumPropertyItem modifier_decim_mode_items[] = {
+    {MOD_DECIM_MODE_COLLAPSE, "COLLAPSE", 0, "Collapse", "Use edge collapsing"},
+    {MOD_DECIM_MODE_UNSUBDIV, "UNSUBDIV", 0, "Un-Subdivide", "Use un-subdivide face reduction"},
+    {MOD_DECIM_MODE_DISSOLVE,
+                              "DISSOLVE",
+                                          0,
+                                             "Planar",
+        "Dissolve geometry to form planar polygons"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 static void rna_def_modifier_decimate(BlenderRNA *brna)
 {
-  static const EnumPropertyItem modifier_decim_mode_items[] = {
-      {MOD_DECIM_MODE_COLLAPSE, "COLLAPSE", 0, "Collapse", "Use edge collapsing"},
-      {MOD_DECIM_MODE_UNSUBDIV, "UNSUBDIV", 0, "Un-Subdivide", "Use un-subdivide face reduction"},
-      {MOD_DECIM_MODE_DISSOLVE,
-       "DISSOLVE",
-       0,
-       "Planar",
-       "Dissolve geometry to form planar polygons"},
-      {0, NULL, 0, NULL, NULL},
-  };
 
   /* Note, keep in sync with operator 'MESH_OT_decimate' */
 

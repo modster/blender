@@ -9859,6 +9859,59 @@ static void def_geo_curve_resample(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_decimate(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryDecimate", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, modifier_decim_mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "Sets the algorithm");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_collapse(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem symmetry_axis_items[] = {
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_NONE, "OFF", 0,"Off", "No Symmetry is applied"},
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_X, "X", 0,"X", "Symmetry is applied on X axis"},
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Y, "Y", 0,"Y", "Symmetry is applied on Y axis"},
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Z, "Z", 0,"Z", "Symmetry is applied on Z axis"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCollapse", "storage");
+
+  prop = RNA_def_property(srna, "symmetry_axis", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, symmetry_axis_items);
+  RNA_def_property_ui_text(prop, "Symmetry", "Sets if and on what axis symmetry is applied by the operation");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_dissolve(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem delimiter_items[] = {
+      {GEO_NODE_DISSOLVE_DELIMITTER_NORMAL, "normal", 0,"Normal", "No Symmetry is applied"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_MATERIAL, "material", 0,"Material", "Symmetry is applied on X axis"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_SEAM, "seam", 0,"Seam", "Symmetry is applied on Y axis"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_SHARP, "sharp", 0,"Sharp", "Symmetry is applied on Z axis"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_UV, "uv", 0,"UV", "Symmetry is applied on Z axis"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryDissolve", "storage");
+
+  prop = RNA_def_property(srna, "delimiter", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, delimiter_items);
+  RNA_def_property_ui_text(prop, "Limit", "Sets if and on what axis symmetry is applied by the operation");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_curve_subdivide(StructRNA *srna)
 {
   PropertyRNA *prop;

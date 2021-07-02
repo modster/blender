@@ -49,6 +49,7 @@ void register_node_type_geo_attribute_vector_rotate(void);
 void register_node_type_geo_attribute_remove(void);
 void register_node_type_geo_boolean(void);
 void register_node_type_geo_bounding_box(void);
+void register_node_type_geo_collapse(void);
 void register_node_type_geo_collection_info(void);
 void register_node_type_geo_convex_hull(void);
 void register_node_type_geo_curve_length(void);
@@ -59,6 +60,7 @@ void register_node_type_geo_curve_reverse(void);
 void register_node_type_geo_curve_subdivide(void);
 void register_node_type_geo_delete_geometry(void);
 void register_node_type_geo_decimate(void);
+void register_node_type_geo_dissolve(void);
 void register_node_type_geo_edge_split(void);
 void register_node_type_geo_input_material(void);
 void register_node_type_geo_is_viewport(void);
@@ -91,6 +93,7 @@ void register_node_type_geo_subdivision_surface(void);
 void register_node_type_geo_switch(void);
 void register_node_type_geo_transform(void);
 void register_node_type_geo_triangulate(void);
+void register_node_type_geo_unsubdivide(void);
 void register_node_type_geo_volume_to_mesh(void);
 
 #ifdef __cplusplus
