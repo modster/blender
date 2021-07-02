@@ -282,6 +282,11 @@ TEST(cloth_remesh, MeshIO_ReadDNAMesh)
   BMeshToMeshParams bmesh_to_mesh_params = {0};
   bmesh_to_mesh_params.cd_mask_extra = CD_MASK_MESH;
 
+  /* This is a necessary evil because the MVert, MPoly, etc. blocks
+   * stored per element in the BMesh have not been updated for some
+   * reason. Would be nice to know what causes this. This was the best
+   * fix found as of now.
+   **/
   auto *bm_copy = BM_mesh_copy(bm);
 
   auto *result = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
@@ -348,6 +353,194 @@ TEST(cloth_remesh, MeshIO_ReadDNAMesh)
       "f 5/13/5 6/14/6 2/15/2 1/16/1 \n"
       "f 3/17/3 7/18/7 5/19/5 1/20/1 \n"
       "f 8/21/8 4/22/4 2/23/2 6/24/6 \n";
+
+  EXPECT_EQ(stream_out.str(), expected);
+}
+
+TEST(cloth_remesh, MeshIO_ReadDNAMesh_LooseEdges)
+{
+  BKE_idtype_init();
+  MeshIO reader;
+  auto *mesh = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
+  CustomData_add_layer(&mesh->ldata, CD_MLOOPUV, CD_CALLOC, nullptr, 0);
+  BMeshCreateParams bmesh_create_params = {0};
+  bmesh_create_params.use_toolflags = true;
+  BMeshFromMeshParams bmesh_from_mesh_params = {0};
+  bmesh_from_mesh_params.cd_mask_extra = CD_MASK_MESH;
+
+  auto *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
+
+  blender::Vector<float3> pos_data;
+  pos_data.append(float3(1.0, 0.0, 1.0));
+  pos_data.append(float3(1.0, 0.0, -1.0));
+  pos_data.append(float3(-1.0, 0.0, -1.0));
+  pos_data.append(float3(-1.0, 0.0, 1.0));
+  pos_data.append(float3(1.0, 0.0, 2.0));
+
+  pos_data.append(float3(2.0, 0.0, 1.0));
+  pos_data.append(float3(2.0, 0.0, -1.0));
+  pos_data.append(float3(3.0, 0.0, 1.0));
+  pos_data.append(float3(3.0, 0.0, -1.0));
+  pos_data.append(float3(1.0, 0.0, -2.0));
+
+  pos_data.append(float3(-1.0, 0.0, -2.0));
+  pos_data.append(float3(-2.0, 0.0, -1.0));
+  pos_data.append(float3(-2.0, 0.0, 1.0));
+  pos_data.append(float3(-1.0, 0.0, 2.0));
+
+  blender::Vector<BMVert *> bm_verts;
+  for (const auto &pos : pos_data) {
+    float pos_v3[3];
+    copy_v3_float3(pos_v3, pos);
+    auto *bm_vert = BM_vert_create(bm, pos_v3, nullptr, BM_CREATE_NOP);
+    bm_verts.append(bm_vert);
+  }
+  BLI_assert(bm_verts.size() == 14);
+
+  auto *bm_face = BM_face_create_quad_tri(
+      bm, bm_verts[0], bm_verts[1], bm_verts[2], bm_verts[3], nullptr, BM_CREATE_NOP);
+
+  BM_edge_create(bm, bm_verts[0], bm_verts[5], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[5], bm_verts[6], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[6], bm_verts[1], nullptr, BM_CREATE_NOP);
+
+  BM_edge_create(bm, bm_verts[1], bm_verts[9], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[9], bm_verts[10], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[10], bm_verts[2], nullptr, BM_CREATE_NOP);
+
+  BM_edge_create(bm, bm_verts[2], bm_verts[11], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[11], bm_verts[12], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[12], bm_verts[3], nullptr, BM_CREATE_NOP);
+
+  BM_edge_create(bm, bm_verts[3], bm_verts[13], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[13], bm_verts[4], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[4], bm_verts[0], nullptr, BM_CREATE_NOP);
+
+  BM_edge_create(bm, bm_verts[1], bm_verts[9], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[9], bm_verts[10], nullptr, BM_CREATE_NOP);
+  BM_edge_create(bm, bm_verts[10], bm_verts[2], nullptr, BM_CREATE_NOP);
+
+  BM_edge_create(bm, bm_verts[7], bm_verts[8], nullptr, BM_CREATE_NOP);
+
+  /* UV gen */
+  {
+    BMLoop *l;
+    BMIter liter;
+    usize loop_index;
+    auto cd_loop_uv_offset = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
+    auto dx = 1.0;
+    auto dy = 1.0;
+    auto x = 0.0;
+    auto y = dy;
+    auto dx_wrap = 1.0 - (dx / 2.0);
+    BM_ITER_ELEM_INDEX (l, &liter, bm_face, BM_LOOPS_OF_FACE, loop_index) {
+      MLoopUV *luv = static_cast<MLoopUV *>(BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset));
+
+      switch (loop_index) {
+        case 0:
+          y -= dy;
+          break;
+        case 1:
+          x += dx;
+          break;
+        case 2:
+          y += dy;
+          break;
+        case 3:
+          x -= dx;
+          break;
+        default:
+          break;
+      }
+
+      luv->uv[0] = x;
+      luv->uv[1] = y;
+    }
+
+    x += dx;
+    if (x >= dx_wrap) {
+      x = 0.0f;
+      y += dy;
+    }
+  }
+
+  BMeshToMeshParams bmesh_to_mesh_params = {0};
+  bmesh_to_mesh_params.cd_mask_extra = CD_MASK_MESH;
+
+  /* This is a necessary evil because the MVert, MPoly, etc. blocks
+   * stored per element in the BMesh have not been updated for some
+   * reason. Would be nice to know what causes this. This was the best
+   * fix found as of now.
+   **/
+  auto *bm_copy = BM_mesh_copy(bm);
+
+  auto *result = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
+  BM_mesh_bm_to_me(nullptr, bm_copy, result, &bmesh_to_mesh_params);
+
+  BKE_mesh_calc_normals(result);
+
+  auto res = reader.read(result);
+
+  EXPECT_TRUE(res);
+
+  BM_mesh_free(bm);
+  BM_mesh_free(bm_copy);
+  BKE_mesh_eval_delete(mesh);
+  BKE_mesh_eval_delete(result);
+
+  std::ostringstream stream_out;
+  reader.write(stream_out, MeshIO::IOTYPE_OBJ);
+
+  std::string expected =
+      "v 1 0 1\n"
+      "v 1 0 -1\n"
+      "v -1 0 -1\n"
+      "v -1 0 1\n"
+      "v 1 0 2\n"
+      "v 2 0 1\n"
+      "v 2 0 -1\n"
+      "v 3 0 1\n"
+      "v 3 0 -1\n"
+      "v 1 0 -2\n"
+      "v -1 0 -2\n"
+      "v -2 0 -1\n"
+      "v -2 0 1\n"
+      "v -1 0 2\n"
+      "vt 0 0\n"
+      "vt 1 0\n"
+      "vt 1 1\n"
+      "vt 0 1\n"
+      "vn 0 1 0\n"
+      "vn 0 1 0\n"
+      "vn 0 1 0\n"
+      "vn 0 1 0\n"
+      "vn 0.447188 0 0.894406\n"
+      "vn 0.894406 0 0.447188\n"
+      "vn 0.894406 0 -0.447188\n"
+      "vn 0.948668 0 0.316202\n"
+      "vn 0.948668 0 -0.316202\n"
+      "vn 0.447188 0 -0.894406\n"
+      "vn -0.447188 0 -0.894406\n"
+      "vn -0.894406 0 -0.447188\n"
+      "vn -0.894406 0 0.447188\n"
+      "vn -0.447188 0 0.894406\n"
+      "f 1/1/1 2/2/2 3/3/3 4/4/4 \n"
+      "l 1 6 \n"
+      "l 6 7 \n"
+      "l 7 2 \n"
+      "l 2 10 \n"
+      "l 10 11 \n"
+      "l 11 3 \n"
+      "l 3 12 \n"
+      "l 12 13 \n"
+      "l 13 4 \n"
+      "l 4 14 \n"
+      "l 14 5 \n"
+      "l 5 1 \n"
+      "l 2 10 \n"
+      "l 10 11 \n"
+      "l 11 3 \n"
+      "l 8 9 \n";
 
   EXPECT_EQ(stream_out.str(), expected);
 }
