@@ -27,13 +27,21 @@
 
 #include "BLI_utildefines.h"
 
+#include "BKE_cloth.h"
 #include "BKE_cloth_remesh.hh"
 
 #include <cstdio>
 
-Mesh *BKE_cloth_remesh(const Object *UNUSED(ob),
-                       ClothModifierData *UNUSED(clmd),
-                       Mesh *UNUSED(r_mesh))
+using namespace blender::bke;
+
+Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
-  return nullptr;
+  auto *cloth_to_object_res = cloth_to_object(ob, clmd, mesh, false);
+  BLI_assert(cloth_to_object_res == nullptr);
+
+  internal::MeshIO meshio;
+
+  meshio.read(mesh);
+
+  return meshio.write();
 }

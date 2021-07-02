@@ -249,6 +249,12 @@ struct Mesh *clothModifier_do(struct ClothModifierData *clmd,
 
 int cloth_uses_vgroup(struct ClothModifierData *clmd);
 
+/* Needed for cloth_remesh.cc */
+struct Mesh *cloth_to_object(struct Object *ob,
+                             struct ClothModifierData *clmd,
+                             struct Mesh *mesh,
+                             bool create_new);
+
 // needed for collision.c
 void bvhtree_update_from_cloth(struct ClothModifierData *clmd, bool moving, bool self);
 

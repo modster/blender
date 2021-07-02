@@ -55,7 +55,6 @@
 /* ********** cloth engine ******* */
 /* Prototypes for internal functions.
  */
-static Mesh *cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *mesh);
 static void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mesh);
 static bool cloth_from_object(
     Object *ob, ClothModifierData *clmd, Mesh *mesh, float framenr, int first);
@@ -327,7 +326,8 @@ static Mesh *do_step_cloth(
   }
 
   /* if remeshing is off, need to update `mesh` from `clmd->clothObject` */
-  return cloth_to_object(ob, clmd, mesh);
+  cloth_to_object(ob, clmd, mesh, false);
+  return mesh;
 }
 
 /************************************************
@@ -392,7 +392,7 @@ Mesh *clothModifier_do(
       (!can_simulate && cache_result == PTCACHE_READ_OLD)) {
     SIM_cloth_solver_set_positions(clmd);
 
-    Mesh *mesh_result = cloth_to_object(ob, clmd, mesh);
+    cloth_to_object(ob, clmd, mesh, false);
 
     BKE_ptcache_validate(cache, framenr);
 
@@ -402,7 +402,7 @@ Mesh *clothModifier_do(
 
     clmd->clothObject->last_frame = framenr;
 
-    return mesh_result;
+    return mesh;
   }
   if (cache_result == PTCACHE_READ_OLD) {
     SIM_cloth_solver_set_positions(clmd);
@@ -604,16 +604,19 @@ void cloth_free_modifier_extern(ClothModifierData *clmd)
  ******************************************************************************/
 
 /**
- * Creates a copy of `mesh` without reference and applies the deformed vertices after converting
- * the world space coordinates stored in `cloth->verts` to local space coords Returns the copy.
+ * Creates a copy of `mesh` without reference if `create_new` is true
+ * and applies the deformed vertices after converting the world space
+ * coordinates stored in `cloth->verts` to local space coords.
+ *
+ * Returns the copy if create_new else NULL.
  */
-static Mesh *cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *mesh)
+Mesh *cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *mesh, bool create_new)
 {
   /* TODO(ish): might need a better name for the function now that it
    * directly applies the vertex * positions to the mesh */
   Cloth *cloth = clmd->clothObject;
 
-  Mesh *mesh_result = BKE_mesh_copy_for_eval(mesh, false);
+  Mesh *mesh_result = create_new ? BKE_mesh_copy_for_eval(mesh, false) : mesh;
 
   if (clmd->clothObject) {
     /* inverse matrix is not uptodate... */
@@ -633,7 +636,11 @@ static Mesh *cloth_to_object(Object *ob, ClothModifierData *clmd, Mesh *mesh)
     MEM_freeN(vert_coords);
   }
 
-  return mesh_result;
+  if (create_new) {
+    return mesh_result;
+  }
+
+  return NULL;
 }
 
 int cloth_uses_vgroup(ClothModifierData *clmd)
