@@ -584,6 +584,7 @@ static const float g_xr_default_raycast_axis[3] = {0.0f, 0.0f, -1.0f};
 static const float g_xr_default_raycast_color[4] = {0.35f, 0.35f, 1.0f, 1.0f};
 
 typedef struct XrRaycastData {
+  bool from_viewer;
   float origin[3];
   float direction[3];
   float end[3];
@@ -602,13 +603,23 @@ static void wm_xr_raycast_draw(const bContext *UNUSED(C),
   immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
   immUniformColor4fv(data->color);
 
-  GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
-  GPU_line_width(3.0f);
+  if (data->from_viewer) {
+    GPU_depth_test(GPU_DEPTH_NONE);
+    GPU_point_size(7.0f);
 
-  immBegin(GPU_PRIM_LINES, 2);
-  immVertex3fv(pos, data->origin);
-  immVertex3fv(pos, data->end);
-  immEnd();
+    immBegin(GPU_PRIM_POINTS, 1);
+    immVertex3fv(pos, data->end);
+    immEnd();
+  }
+  else {
+    GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
+    GPU_line_width(3.0f);
+
+    immBegin(GPU_PRIM_LINES, 2);
+    immVertex3fv(pos, data->origin);
+    immVertex3fv(pos, data->end);
+    immEnd();
+  }
 
   immUnbindProgram();
 }
@@ -649,9 +660,12 @@ static void wm_xr_raycast_update(wmOperator *op,
                                  const wmXrActionData *actiondata)
 {
   XrRaycastData *data = op->customdata;
-  float axis[3];
+  float ray_length, axis[3];
 
-  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "axis");
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "from_viewer");
+  data->from_viewer = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+
+  prop = RNA_struct_find_property(op->ptr, "axis");
   if (prop) {
     RNA_property_float_get_array(op->ptr, prop, axis);
     normalize_v3(axis);
@@ -668,13 +682,21 @@ static void wm_xr_raycast_update(wmOperator *op,
     copy_v4_v4(data->color, g_xr_default_raycast_color);
   }
 
-  copy_v3_v3(data->origin, actiondata->controller_loc);
+  if (data->from_viewer) {
+    float viewer_rot[4];
+    WM_xr_session_state_viewer_pose_location_get(xr, data->origin);
+    WM_xr_session_state_viewer_pose_rotation_get(xr, viewer_rot);
+    mul_qt_v3(viewer_rot, axis);
+    ray_length = (xr->session_settings.clip_start + xr->session_settings.clip_end) / 2.0f;
+  }
+  else {
+    copy_v3_v3(data->origin, actiondata->controller_loc);
+    mul_qt_v3(actiondata->controller_rot, axis);
+    ray_length = xr->session_settings.clip_end;
+  }
 
-  mul_qt_v3(actiondata->controller_rot, axis);
   copy_v3_v3(data->direction, axis);
-
-  mul_v3_v3fl(data->end, data->direction, xr->session_settings.clip_end);
-  add_v3_v3(data->end, data->origin);
+  madd_v3_v3v3fl(data->end, data->origin, data->direction, ray_length);
 }
 
 static void wm_xr_raycast(Depsgraph *depsgraph,
@@ -1254,6 +1276,8 @@ static void WM_OT_xr_navigation_teleport(wmOperatorType *ot)
                 "Maximum raycast distance",
                 0.0,
                 BVH_RAYCAST_DIST_MAX);
+  RNA_def_boolean(
+      ot->srna, "from_viewer", false, "From Viewer", "Use viewer pose as raycast origin");
   RNA_def_float_vector(ot->srna,
                        "axis",
                        3,
@@ -1261,7 +1285,7 @@ static void WM_OT_xr_navigation_teleport(wmOperatorType *ot)
                        -1.0f,
                        1.0f,
                        "Axis",
-                       "Raycast axis in controller space",
+                       "Raycast axis in controller/viewer space",
                        -1.0f,
                        1.0f);
   RNA_def_float_color(ot->srna,
@@ -1651,6 +1675,8 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
                 "Maximum raycast distance",
                 0.0,
                 BVH_RAYCAST_DIST_MAX);
+  RNA_def_boolean(
+      ot->srna, "from_viewer", false, "From Viewer", "Use viewer pose as raycast origin");
   RNA_def_float_vector(ot->srna,
                        "axis",
                        3,
@@ -1658,7 +1684,7 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
                        -1.0f,
                        1.0f,
                        "Axis",
-                       "Raycast axis in controller space",
+                       "Raycast axis in controller/viewer space",
                        -1.0f,
                        1.0f);
   RNA_def_float_color(ot->srna,
