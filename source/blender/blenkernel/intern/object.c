@@ -2914,10 +2914,6 @@ void BKE_object_make_proxy(Main *bmain, Object *ob, Object *target, Object *cob)
   ob->data = target->data;
   id_us_plus((ID *)ob->data); /* ensures lib data becomes LIB_TAG_EXTERN */
 
-  /* copy vertex groups */
-  BKE_defgroup_copy_list(BKE_object_defgroup_list_for_write(target),
-                         BKE_object_defgroup_list_for_read(ob));
-
   /* copy material and index information */
   ob->actcol = ob->totcol = 0;
   if (ob->mat) {

@@ -1042,8 +1042,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
       if (cd_dvert_offset == -1) {
         continue;
       }
-      const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
-      defbase_len = BLI_listbase_count(defbase);
+      defbase_len = BKE_object_defgroup_count(ob);
       if (defbase_len == 0) {
         continue;
       }

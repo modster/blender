@@ -1755,8 +1755,7 @@ static const EnumPropertyItem vgroup_lock_mask[] = {
 
 static bool *vgroup_selected_get(Object *ob)
 {
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
-  int sel_count = 0, defbase_tot = BLI_listbase_count(defbase);
+  int sel_count = 0, defbase_tot = BKE_object_defgroup_count(ob);
   bool *mask;
 
   if (ob->mode & OB_MODE_WEIGHT_PAINT) {

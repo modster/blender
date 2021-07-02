@@ -1311,14 +1311,13 @@ static float *get_weights_array(Object *ob, char *vgroup, WeightsArrayCache *cac
   }
 
   /* find the group (weak loop-in-loop) */
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
   defgrp_index = BKE_object_defgroup_name_index(ob, vgroup);
   if (defgrp_index != -1) {
     float *weights;
 
     if (cache) {
       if (cache->defgroup_weights == NULL) {
-        int num_defgroup = BLI_listbase_count(defbase);
+        int num_defgroup = BKE_object_defgroup_count(ob);
         cache->defgroup_weights = MEM_callocN(sizeof(*cache->defgroup_weights) * num_defgroup,
                                               "cached defgroup weights");
         cache->num_defgroup_weights = num_defgroup;

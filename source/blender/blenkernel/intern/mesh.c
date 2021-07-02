@@ -931,6 +931,10 @@ void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
   me_dst->texflag = me_src->texflag;
   copy_v3_v3(me_dst->loc, me_src->loc);
   copy_v3_v3(me_dst->size, me_src->size);
+
+  /* Copy vertex group names. */
+  BKE_defgroup_copy_list(&me_dst->vertex_group_names, &me_src->vertex_group_names);
+  me_dst->vertex_group_active_index = me_src->vertex_group_active_index;
 }
 
 /**

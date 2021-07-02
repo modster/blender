@@ -268,8 +268,7 @@ bool BKE_object_defgroup_clear_all(Object *ob, const bool use_selection)
 
 static void object_defgroup_remove_update_users(Object *ob, const int idx)
 {
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
-  int i, defbase_tot = BLI_listbase_count(defbase) + 1;
+  int i, defbase_tot = BKE_object_defgroup_count(ob) + 1;
   int *map = MEM_mallocN(sizeof(int) * defbase_tot, "vgroup del");
 
   map[idx] = map[0] = 0;
@@ -824,9 +823,8 @@ bool *BKE_object_defgroup_subset_from_select_type(Object *ob,
                                                   int *r_subset_count)
 {
   bool *defgroup_validmap = NULL;
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
 
-  *r_defgroup_tot = BLI_listbase_count(defbase);
+  *r_defgroup_tot = BKE_object_defgroup_count(ob);
 
   switch (subset_type) {
     case WT_VGROUP_ACTIVE: {

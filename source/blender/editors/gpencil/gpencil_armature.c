@@ -454,8 +454,7 @@ static void gpencil_object_vgroup_calc_from_armature(const bContext *C,
   bArmature *arm = ob_arm->data;
 
   /* always create groups */
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
-  const int defbase_tot = BLI_listbase_count(defbase);
+  const int defbase_tot = BKE_object_defgroup_count(ob);
   int defbase_add;
   /* Traverse the bone list, trying to create empty vertex
    * groups corresponding to the bone.
