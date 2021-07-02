@@ -1688,8 +1688,7 @@ static int wm_xr_transform_grab_invoke_3d(bContext *C, wmOperator *op, const wmE
   }
 
   bool loc_lock, rot_lock, scale_lock;
-  float loc_t, rot_t;
-  float loc_ofs[3], rot_ofs[4];
+  float loc_t, rot_t, loc_ofs[3], rot_ofs[4];
   bool loc_ofs_set = false;
   bool rot_ofs_set = false;
 
@@ -1730,7 +1729,6 @@ static int wm_xr_transform_grab_invoke_3d(bContext *C, wmOperator *op, const wmE
   const wmXrActionData *actiondata = event->customdata;
   Object *obedit = CTX_data_edit_object(C);
   BMEditMesh *em = (obedit && (obedit->type == OB_MESH)) ? BKE_editmesh_from_object(obedit) : NULL;
-  float q0[4], q1[4], q2[4];
   bool selected = false;
 
   if (loc_ofs_set) {
@@ -1741,8 +1739,9 @@ static int wm_xr_transform_grab_invoke_3d(bContext *C, wmOperator *op, const wmE
   }
   if (rot_ofs_set) {
     /* Convert to controller space. */
-    invert_qt_qt_normalized(q0, rot_ofs);
-    mul_qt_qtqt(rot_ofs, actiondata->controller_rot, q0);
+    float q[4];
+    invert_qt_qt_normalized(q, rot_ofs);
+    mul_qt_qtqt(rot_ofs, actiondata->controller_rot, q);
     normalize_qt(rot_ofs);
   }
 
@@ -1785,6 +1784,8 @@ static int wm_xr_transform_grab_invoke_3d(bContext *C, wmOperator *op, const wmE
     }
   }
   else {
+    float q0[4], q1[4], q2[4];
+
     /* Apply interpolation and offsets. */
     CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
       bool update = false;
@@ -1832,6 +1833,7 @@ static int wm_xr_transform_grab_invoke_3d(bContext *C, wmOperator *op, const wmE
       if (update) {
         DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
       }
+
       selected = true;
     }
     CTX_DATA_END;
@@ -1870,7 +1872,7 @@ static int wm_xr_transform_grab_modal_3d(bContext *C, wmOperator *op, const wmEv
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   bool loc_lock, rot_lock, scale_lock;
   bool selected = false;
-  float delta[4][4], m[4][4];
+  float delta[4][4];
 
   PropertyRNA *prop = RNA_struct_find_property(op->ptr, "location_lock");
   loc_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
@@ -1957,6 +1959,8 @@ static int wm_xr_transform_grab_modal_3d(bContext *C, wmOperator *op, const wmEv
     selected = true;
   }
   else {
+    float m[4][4], m0[4][4], m1[4][4];
+
     if (apply_transform) {
       if (do_bimanual) {
         wm_xr_grab_compute_bimanual(actiondata,
@@ -1981,6 +1985,12 @@ static int wm_xr_transform_grab_modal_3d(bContext *C, wmOperator *op, const wmEv
     CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
       if (apply_transform) {
         mul_m4_m4m4(m, delta, ob->obmat);
+
+        if (ob->parent) {
+          invert_m4_m4(m0, ob->parentinv);
+          mul_m4_m4m4(m1, ob->parent->imat, m);
+          mul_m4_m4m4(m, m0, m1);
+        }
 
         if (!loc_lock) {
           copy_v3_v3(ob->loc, m[3]);
