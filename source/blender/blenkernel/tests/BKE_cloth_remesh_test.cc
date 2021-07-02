@@ -216,6 +216,54 @@ TEST(cloth_remesh, MeshIO_WriteObj)
   EXPECT_EQ(stream_out.str(), expected);
 }
 
+TEST(cloth_remesh, MeshIO_WriteObj_LooseEdges)
+{
+  MeshIO reader;
+  std::istringstream stream_in(plane_extra_loose_edges);
+  auto res = reader.read(std::move(stream_in), MeshIO::IOTYPE_OBJ);
+  EXPECT_TRUE(res);
+
+  std::ostringstream stream_out;
+  reader.write(stream_out, MeshIO::IOTYPE_OBJ);
+
+  std::string expected =
+      "v -1 0 1\n"
+      "v 1 0 1\n"
+      "v -1 0 -1\n"
+      "v 1 0 -1\n"
+      "v -1 0 -2\n"
+      "v 1 0 -2\n"
+      "v 2 0 1\n"
+      "v 2 0 -1\n"
+      "v -1 0 2\n"
+      "v 1 0 2\n"
+      "v -2 0 1\n"
+      "v -2 0 -1\n"
+      "v 3 0 1\n"
+      "v 3 0 -1\n"
+      "vt 0 0\n"
+      "vt 1 0\n"
+      "vt 1 1\n"
+      "vt 0 1\n"
+      "vn 0 1 0\n"
+      "f 1/1/1 2/2/1 4/3/1 3/4/1 \n"
+      "l 6 5 \n"
+      "l 4 6 \n"
+      "l 5 3 \n"
+      "l 7 8 \n"
+      "l 2 7 \n"
+      "l 8 4 \n"
+      "l 9 10 \n"
+      "l 1 9 \n"
+      "l 10 2 \n"
+      "l 12 11 \n"
+      "l 3 12 \n"
+      "l 11 1 \n"
+      "l 14 13 \n";
+
+  EXPECT_EQ(stream_out.str(), expected);
+}
+
 TEST(cloth_remesh, MeshIO_ReadDNAMesh)
 {
   BKE_idtype_init();
