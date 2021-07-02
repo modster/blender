@@ -1060,6 +1060,9 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
                                cmd->compute.groups_y_len,
                                cmd->compute.groups_z_len);
           break;
+        case DRW_CMD_PUSH_CONSTANTS:
+          GPU_shader_uniform_push_constant(shgroup->shader, cmd->push_constants.buf);
+          break;
       }
     }
 

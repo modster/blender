@@ -445,6 +445,7 @@ void DRW_shgroup_call_compute(DRWShadingGroup *shgroup,
 void DRW_shgroup_call_procedural_points(DRWShadingGroup *sh, Object *ob, uint point_count);
 void DRW_shgroup_call_procedural_lines(DRWShadingGroup *sh, Object *ob, uint line_count);
 void DRW_shgroup_call_procedural_triangles(DRWShadingGroup *sh, Object *ob, uint tri_count);
+void DRW_shgroup_call_push_constants(DRWShadingGroup *shgroup, GPUUniformBuf *ubo);
 /* Warning: Only use with Shaders that have IN_PLACE_INSTANCES defined. */
 void DRW_shgroup_call_instances(DRWShadingGroup *shgroup,
                                 Object *ob,
