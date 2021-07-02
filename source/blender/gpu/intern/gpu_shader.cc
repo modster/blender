@@ -556,6 +556,12 @@ void GPU_shader_uniform_4fv_array(GPUShader *sh, const char *name, int len, cons
   GPU_shader_uniform_vector(sh, loc, 4, len, (const float *)val);
 }
 
+void GPU_shader_uniform_push_constant(GPUShader *sh, GPUUniformBuf *ubo)
+{
+  UniformBuf *buf = unwrap(ubo);
+  unwrap(sh)->uniform_push_constant(buf);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

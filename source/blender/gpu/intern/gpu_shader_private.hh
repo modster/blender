@@ -25,6 +25,7 @@
 
 #include "GPU_shader.h"
 #include "gpu_shader_interface.hh"
+#include "gpu_uniform_buffer_private.hh"
 #include "gpu_vertex_buffer_private.hh"
 
 namespace blender {
@@ -65,6 +66,7 @@ class Shader {
 
   virtual void uniform_float(int location, int comp_len, int array_size, const float *data) = 0;
   virtual void uniform_int(int location, int comp_len, int array_size, const int *data) = 0;
+  virtual void uniform_push_constant(UniformBuf *buf) = 0;
 
   virtual void vertformat_from_shader(GPUVertFormat *) const = 0;
 

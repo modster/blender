@@ -3,10 +3,15 @@
 #include "testing/testing.h"
 
 #include "GPU_shader.h"
+#include "GPU_uniform_buffer.h"
 
 #include "gpu_testing.hh"
 
 namespace blender::gpu::tests {
+
+struct PushConstants {
+  float color[4];
+};
 
 static void test_gpu_shader_push_constants()
 {
@@ -40,6 +45,12 @@ void main()
   GPUShader *shader = GPU_shader_create(
       vert_glsl, frag_glsl, nullptr, nullptr, nullptr, "test_gpu_shader_push_constants");
   EXPECT_NE(shader, nullptr);
+
+  PushConstants push_constants;
+  GPUUniformBuf *push_constants_buffer = GPU_uniformbuf_create_ex(
+      sizeof(PushConstants), &push_constants, __func__);
+  GPU_shader_uniform_push_constant(shader, push_constants_buffer);
+  GPU_uniformbuf_free(push_constants_buffer);
 
   GPU_shader_free(shader);
 }

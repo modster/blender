@@ -36,6 +36,10 @@
 #include "gl_shader.hh"
 #include "gl_shader_interface.hh"
 
+#include "CLG_log.h"
+
+static CLG_LogRef LOG = {"gpu.gl.shader"};
+
 using namespace blender;
 using namespace blender::gpu;
 
@@ -362,6 +366,18 @@ void GLShader::uniform_int(int location, int comp_len, int array_size, const int
       BLI_assert(0);
       break;
   }
+}
+
+void GLShader::uniform_push_constant(UniformBuf *buf)
+{
+  GLShaderInterface *gl_interface = static_cast<GLShaderInterface *>(interface);
+  const ShaderInput *input = gl_interface->push_constant_get();
+  if (!input) {
+    CLOG_WARN(&LOG, "Cannot bind push_constants, Shader does not have a push constant defined.");
+    return;
+  }
+
+  buf->bind(input->binding);
 }
 
 /** \} */

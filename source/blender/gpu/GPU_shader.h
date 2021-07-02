@@ -29,6 +29,7 @@ extern "C" {
 
 struct GPUIndexBuf;
 struct GPUVertBuf;
+struct GPUUniformBuf;
 
 /** Opaque type hiding #blender::gpu::Shader */
 typedef struct GPUShader GPUShader;
@@ -157,7 +158,7 @@ void GPU_shader_uniform_4fv(GPUShader *sh, const char *name, const float data[4]
 void GPU_shader_uniform_mat4(GPUShader *sh, const char *name, const float data[4][4]);
 void GPU_shader_uniform_2fv_array(GPUShader *sh, const char *name, int len, const float (*val)[2]);
 void GPU_shader_uniform_4fv_array(GPUShader *sh, const char *name, int len, const float (*val)[4]);
-
+void GPU_shader_uniform_push_constant(GPUShader *sh, struct GPUUniformBuf *ubo);
 int GPU_shader_get_attribute(GPUShader *shader, const char *name);
 
 void GPU_shader_set_framebuffer_srgb_target(int use_srgb_to_linear);
