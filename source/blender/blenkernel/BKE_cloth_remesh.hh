@@ -435,30 +435,30 @@ class MeshIO {
     auto &uvs = this->uvs;
     auto &normals = this->normals;
     auto &face_indices = this->face_indices;
-    /* auto &line_indices = this->line_indices; */
+    auto &line_indices = this->line_indices;
+
+    /* TODO(ish): might make sense to clear all these vectors */
 
     /* TODO(ish): check if normals must be recalcuated */
 
     for (auto i = 0; i < mesh->totvert; i++) {
       positions.append(mesh->mvert[i].co);
-      /* TODO(ish): figure out short normal conversion to float3 */
       float normal[3];
       normal_short_to_float_v3(normal, mesh->mvert[i].no);
       normals.append(normal);
     }
 
-    /* TODO(ish): ensure that we need to loop until mesh->totloop only */
     for (auto i = 0; i < mesh->totloop; i++) {
       uvs.append(mesh->mloopuv[i].uv);
     }
 
     for (auto i = 0; i < mesh->totpoly; i++) {
-      const auto mp = mesh->mpoly[i];
+      const auto &mp = mesh->mpoly[i];
       blender::Vector<FaceData> face;
       face.reserve(mp.totloop);
 
       for (auto j = 0; j < mp.totloop; j++) {
-        const auto ml = mesh->mloop[mp.loopstart + j];
+        const auto &ml = mesh->mloop[mp.loopstart + j];
         usize pos_index = ml.v;
         usize uv_index = mp.loopstart + j;
         usize normal_index = ml.v;
@@ -469,7 +469,16 @@ class MeshIO {
       face_indices.append(face);
     }
 
-    /* TODO(ish): support line indices */
+    for (auto i = 0; i < mesh->totedge; i++) {
+      const auto &me = mesh->medge[i];
+
+      if (me.flag & ME_LOOSEEDGE) {
+        blender::Vector<usize> line;
+        line.append(me.v1);
+        line.append(me.v2);
+        line_indices.append(line);
+      }
+    }
 
     return true;
   }
@@ -664,7 +673,7 @@ class MeshIO {
         BLI_assert(temp == "vt");
         this->uvs.append(float2(u, v));
       }
-      else if (line.rfind("vn", 0) == 0) {
+      else if (line.rfind("vn ", 0) == 0) {
         std::istringstream li(line);
         float x, y, z;
         std::string temp;
@@ -780,7 +789,13 @@ class MeshIO {
       out << std::endl;
     }
 
-    /* TODO(ish): add line support */
+    for (const auto &line : this->line_indices) {
+      out << "l ";
+      for (const auto &index : line) {
+        out << index + 1 << " ";
+      }
+      out << std::endl;
+    }
   }
 };
 
