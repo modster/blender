@@ -2980,7 +2980,7 @@ static void rna_FileBrowser_FSMenu_active_range(PointerRNA *UNUSED(ptr),
 static void rna_FileBrowser_FSMenu_active_update(struct bContext *C, PointerRNA *ptr)
 {
   ScrArea *area = rna_area_from_space(ptr);
-  ED_file_change_dir_ex(C, (bScreen *)ptr->owner_id, area);
+  ED_file_change_dir_ex(C, area);
 }
 
 static int rna_FileBrowser_FSMenuSystem_active_get(PointerRNA *ptr)
@@ -3622,6 +3622,11 @@ static void rna_def_space_outliner(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_filter_collection", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_negative_sdna(prop, NULL, "filter", SO_FILTER_NO_COLLECTION);
   RNA_def_property_ui_text(prop, "Show Collections", "Show collections");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
+
+  prop = RNA_def_property(srna, "use_filter_view_layers", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "filter", SO_FILTER_NO_VIEW_LAYERS);
+  RNA_def_property_ui_text(prop, "Show All View Layers", "Show all the view layers");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
 
   /* Filters object state. */

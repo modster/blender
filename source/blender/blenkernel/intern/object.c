@@ -3860,7 +3860,7 @@ void BKE_object_boundbox_flag(Object *ob, int flag, const bool set)
   }
 }
 
-void BKE_object_boundbox_calc_from_mesh(struct Object *ob, struct Mesh *me_eval)
+void BKE_object_boundbox_calc_from_mesh(struct Object *ob, const struct Mesh *me_eval)
 {
   float min[3], max[3];
 
@@ -4169,7 +4169,7 @@ void BKE_object_foreach_display_point(Object *ob,
                                       void *user_data)
 {
   /* TODO: pointcloud and hair objects support */
-  Mesh *mesh_eval = BKE_object_get_evaluated_mesh(ob);
+  const Mesh *mesh_eval = BKE_object_get_evaluated_mesh(ob);
   float co[3];
 
   if (mesh_eval != NULL) {
@@ -4475,7 +4475,7 @@ Mesh *BKE_object_get_pre_modified_mesh(const Object *object)
 }
 
 /**
- * Get a mesh which corresponds to very very original mesh from #Main.
+ * Get a mesh which corresponds to the very original mesh from #Main.
  * - For original objects it will be object->data.
  * - For evaluated objects it will be same mesh as corresponding original
  *   object uses as data.
@@ -5303,7 +5303,7 @@ KDTree_3d *BKE_object_as_kdtree(Object *ob, int *r_tot)
         tot = 0;
         tree = BLI_kdtree_3d_new(totvert);
 
-        /* we don't how how many verts from the DM we can use */
+        /* We don't how many verts from the DM we can use. */
         for (i = 0; i < totvert; i++) {
           if (index[i] != ORIGINDEX_NONE) {
             float co[3];

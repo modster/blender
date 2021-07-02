@@ -1090,7 +1090,8 @@ static void outliner_draw_restrictbuts(uiBlock *block,
     RestrictPropertiesActive props_active = props_active_parent;
 
     if (te->ys + 2 * UI_UNIT_Y >= region->v2d.cur.ymin && te->ys <= region->v2d.cur.ymax) {
-      if (tselem->type == TSE_R_LAYER && (space_outliner->outlinevis == SO_SCENES)) {
+      if (tselem->type == TSE_R_LAYER &&
+          ELEM(space_outliner->outlinevis, SO_SCENES, SO_VIEW_LAYER)) {
         if (space_outliner->show_restrict_flags & SO_RESTRICT_RENDER) {
           /* View layer render toggle. */
           ViewLayer *layer = te->directdata;
@@ -2354,6 +2355,9 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
               break;
             case eGpencilModifierType_Texture:
               data.icon = ICON_TEXTURE;
+              break;
+            case eGpencilModifierType_Weight:
+              data.icon = ICON_MOD_VERTEX_WEIGHT;
               break;
 
               /* Default */
