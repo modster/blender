@@ -149,7 +149,7 @@ GLuint GLShader::create_shader_stage(GLenum gl_stage, MutableSpan<const char *> 
   /* Patch the shader code using the first source slot. */
   sources[0] = glsl_patch_get(gl_stage);
   converter_.patch(sources);
-  if (converter_.has_error()) {
+  if (converter_.has_errors()) {
     compilation_failed_ = true;
     return 0;
   }

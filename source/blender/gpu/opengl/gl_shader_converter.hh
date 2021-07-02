@@ -29,31 +29,29 @@
 namespace blender::gpu {
 
 enum class GLShaderConverterState {
-  Ok,
-  NOT_MATCHING_PUSH_CONSTANT_NAME,
+  OkUnchanged,
+  OkChanged,
+  MismatchedPushConstantNames,
 };
-class GLShaderConverter {
- public:
+
+struct PatchContext {
   struct {
     std::string name;
   } push_constants;
-  GLShaderConverterState status = GLShaderConverterState::Ok;
+};
+
+class GLShaderConverter {
+ public:
+  GLShaderConverterState state = GLShaderConverterState::OkUnchanged;
 
  private:
   Vector<std::string> patched_sources_;
+  PatchContext context_;
 
  public:
   void patch(MutableSpan<const char *> sources);
-  bool has_error() const;
+  bool has_errors() const;
   void free();
-
- private:
-  std::string patch(StringRef src);
-  bool is_valid_name_char(const char c) const;
-  StringRef skip_whitespace(StringRef src);
-
-  StringRef extract_name(StringRef src);
-  std::string patch_push_constants(StringRef src);
 
   MEM_CXX_CLASS_ALLOC_FUNCS("GLShaderConverter");
 };
