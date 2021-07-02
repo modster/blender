@@ -63,6 +63,11 @@ class UniformBuf {
   {
     data_ = data;
   }
+
+  size_t size_in_bytes() const
+  {
+    return size_in_bytes_;
+  }
 };
 
 /* Syntactic sugar. */

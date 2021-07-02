@@ -558,7 +558,11 @@ void GPU_shader_uniform_4fv_array(GPUShader *sh, const char *name, int len, cons
 
 void GPU_shader_uniform_push_constant(GPUShader *sh, GPUUniformBuf *ubo)
 {
+  /* According to the specification all platforms should at least support 128 bytes. We should
+   * support only upto the minimum size as some platforms have set this as their max. */
+  static constexpr size_t MAX_PUSH_CONSTANTS_LEN = 128;
   UniformBuf *buf = unwrap(ubo);
+  BLI_assert(buf->size_in_bytes() < MAX_PUSH_CONSTANTS_LEN);
   unwrap(sh)->uniform_push_constant(buf);
 }
 
