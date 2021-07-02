@@ -3,6 +3,7 @@
 #include "BKE_customdata.h"
 #include "BKE_idtype.h"
 #include "BKE_main.h"
+#include "BLI_float3.hh"
 #include "DNA_customdata_types.h"
 #include "DNA_meshdata_types.h"
 #include "bmesh.h"
@@ -13,6 +14,7 @@
 
 #include "bmesh_class.h"
 #include "intern/bmesh_construct.h"
+#include "intern/bmesh_core.h"
 #include "intern/bmesh_iterators.h"
 #include "intern/bmesh_mesh.h"
 #include "intern/bmesh_mesh_convert.h"
@@ -82,6 +84,47 @@ static const char *cube_pos_uv_normal =
     "f 2/13/5 1/1/5 3/4/5 4/5/5\n"
     "f 6/11/6 5/10/6 1/1/6 2/13/6\n";
 
+static const char *plane_extra_loose_edges =
+    "# Blender v3.0.0 Alpha OBJ File: ''\n"
+    "# www.blender.org\n"
+    "mtllib plane_extra_loose_edges.mtl\n"
+    "o Plane\n"
+    "v -1.000000 0.000000 1.000000\n"
+    "v 1.000000 0.000000 1.000000\n"
+    "v -1.000000 0.000000 -1.000000\n"
+    "v 1.000000 0.000000 -1.000000\n"
+    "v -1.000000 0.000000 -2.000000\n"
+    "v 1.000000 0.000000 -2.000000\n"
+    "v 2.000000 0.000000 1.000000\n"
+    "v 2.000000 0.000000 -1.000000\n"
+    "v -1.000000 0.000000 2.000000\n"
+    "v 1.000000 0.000000 2.000000\n"
+    "v -2.000000 0.000000 1.000000\n"
+    "v -2.000000 0.000000 -1.000000\n"
+    "v 3.000000 0.000000 1.000000\n"
+    "v 3.000000 0.000000 -1.000000\n"
+    "vt 0.000000 0.000000\n"
+    "vt 1.000000 0.000000\n"
+    "vt 1.000000 1.000000\n"
+    "vt 0.000000 1.000000\n"
+    "vn 0.0000 1.0000 0.0000\n"
+    "usemtl None\n"
+    "s off\n"
+    "f 1/1/1 2/2/1 4/3/1 3/4/1\n"
+    "l 6 5\n"
+    "l 4 6\n"
+    "l 5 3\n"
+    "l 7 8\n"
+    "l 2 7\n"
+    "l 8 4\n"
+    "l 9 10\n"
+    "l 1 9\n"
+    "l 10 2\n"
+    "l 12 11\n"
+    "l 3 12\n"
+    "l 11 1\n"
+    "l 14 13\n";
+
 TEST(cloth_remesh, MeshIO_ReadObj)
 {
   MeshIO reader;
@@ -101,6 +144,27 @@ TEST(cloth_remesh, MeshIO_ReadObj)
   EXPECT_EQ(normals.size(), 6);
   EXPECT_EQ(face_indices.size(), 6);
   EXPECT_EQ(line_indices.size(), 0);
+}
+
+TEST(cloth_remesh, MeshIO_ReadObj_LooseEdges)
+{
+  MeshIO reader;
+  std::istringstream stream(plane_extra_loose_edges);
+  auto res = reader.read(std::move(stream), MeshIO::IOTYPE_OBJ);
+
+  EXPECT_TRUE(res);
+
+  const auto positions = reader.get_positions();
+  const auto uvs = reader.get_uvs();
+  const auto normals = reader.get_normals();
+  const auto face_indices = reader.get_face_indices();
+  const auto line_indices = reader.get_line_indices();
+
+  EXPECT_EQ(positions.size(), 14);
+  EXPECT_EQ(uvs.size(), 4);
+  EXPECT_EQ(normals.size(), 1);
+  EXPECT_EQ(face_indices.size(), 1);
+  EXPECT_EQ(line_indices.size(), 13);
 }
 
 TEST(cloth_remesh, MeshIO_WriteObj)
