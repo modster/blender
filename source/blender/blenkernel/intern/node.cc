@@ -5059,6 +5059,7 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_primitive_quadratic_bezier();
   register_node_type_geo_curve_primitive_spiral();
   register_node_type_geo_curve_primitive_star();
+  register_node_type_geo_curve_sample();
   register_node_type_geo_curve_to_mesh();
   register_node_type_geo_curve_to_points();
   register_node_type_geo_curve_resample();

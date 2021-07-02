@@ -57,6 +57,7 @@ void register_node_type_geo_curve_primitive_circle(void);
 void register_node_type_geo_curve_primitive_quadratic_bezier(void);
 void register_node_type_geo_curve_primitive_spiral(void);
 void register_node_type_geo_curve_primitive_star(void);
+void register_node_type_geo_curve_sample(void);
 void register_node_type_geo_curve_to_mesh(void);
 void register_node_type_geo_curve_to_points(void);
 void register_node_type_geo_curve_resample(void);

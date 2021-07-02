@@ -205,6 +205,8 @@ class Spline {
     return blender::fn::GVArray_Typed<T>(this->interpolate_to_evaluated(blender::fn::GSpan(data)));
   }
 
+  blender::fn::GVArrayPtr get_evaluated_attribute(const blender::StringRef name) const;
+
  protected:
   virtual void correct_end_tangents() const = 0;
   virtual void copy_settings(Spline &dst) const = 0;

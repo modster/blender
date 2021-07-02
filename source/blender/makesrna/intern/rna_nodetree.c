@@ -9890,17 +9890,43 @@ static void def_geo_curve_resample(StructRNA *srna)
   PropertyRNA *prop;
 
   static EnumPropertyItem mode_items[] = {
-      {GEO_NODE_CURVE_SAMPLE_COUNT,
+      {GEO_NODE_CURVE_RESAMPLE_COUNT,
        "COUNT",
        0,
        "Count",
        "Sample the specified number of points along each spline"},
-      {GEO_NODE_CURVE_SAMPLE_LENGTH,
+      {GEO_NODE_CURVE_RESAMPLE_LENGTH,
        "LENGTH",
        0,
        "Length",
        "Calculate the number of samples by splitting each spline into segments with the specified "
        "length"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveResample", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "How to specify the amount of samples");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_curve_sample(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_SAMPLE_FACTOR,
+       "COUNT",
+       0,
+       "Count",
+       "Choose sample points on the curve based on the portion of the total length"},
+      {GEO_NODE_CURVE_SAMPLE_LENGTH,
+       "LENGTH",
+       0,
+       "Length",
+       "Choose sample points on the curve based on the assumulated length at that point"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -9929,18 +9955,18 @@ static void def_geo_curve_to_points(StructRNA *srna)
   PropertyRNA *prop;
 
   static EnumPropertyItem mode_items[] = {
-      {GEO_NODE_CURVE_SAMPLE_EVALUATED,
+      {GEO_NODE_CURVE_RESAMPLE_EVALUATED,
        "EVALUATED",
        0,
        "Evaluated",
        "Create points from the curve's evaluated points, based on the resolution attribute for "
        "NURBS and Bezier splines"},
-      {GEO_NODE_CURVE_SAMPLE_COUNT,
+      {GEO_NODE_CURVE_RESAMPLE_COUNT,
        "COUNT",
        0,
        "Count",
        "Sample each spline by evenly distributing the specified number of points"},
-      {GEO_NODE_CURVE_SAMPLE_LENGTH,
+      {GEO_NODE_CURVE_RESAMPLE_LENGTH,
        "LENGTH",
        0,
        "Length",
