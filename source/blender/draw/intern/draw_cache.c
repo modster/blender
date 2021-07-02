@@ -2931,11 +2931,6 @@ GPUBatch *DRW_cache_curve_edge_wire_get(Object *ob)
   BLI_assert(ob->type == OB_CURVE);
 
   struct Curve *cu = ob->data;
-  struct Mesh *mesh_eval = BKE_object_get_evaluated_mesh(ob);
-  if (mesh_eval != NULL) {
-    return DRW_mesh_batch_cache_get_loose_edges(mesh_eval);
-  }
-
   return DRW_curve_batch_cache_get_wire_edge(cu);
 }
 
