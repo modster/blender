@@ -116,6 +116,45 @@ void EDBM_redo_state_free(BMBackup *backup, BMEditMesh *em, int recalctess)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Edit-Mesh Copy API (Internal)
+ * \{ */
+
+static void edbm_op_emcopy_incref_and_ensure(BMEditMesh *em, const BMOperator *UNUSED(bmop))
+{
+  if (em->emcopy == NULL) {
+    em->emcopy = BKE_editmesh_copy(em);
+  }
+  em->emcopyusers++;
+}
+
+static void edbm_op_emcopy_decref(BMEditMesh *em, const BMOperator *UNUSED(bmop))
+{
+  em->emcopyusers--;
+  if (em->emcopyusers < 0) {
+    printf("warning: em->emcopyusers was less than zero.\n");
+  }
+  if (em->emcopyusers <= 0) {
+    BKE_editmesh_free(em->emcopy);
+    MEM_freeN(em->emcopy);
+    em->emcopy = NULL;
+  }
+}
+
+static void edbm_op_emcopy_restore_and_clear(BMEditMesh *em, const BMOperator *UNUSED(bmop))
+{
+  BLI_assert(em->emcopy != NULL);
+  BMEditMesh *emcopy = em->emcopy;
+  EDBM_mesh_free(em);
+  *em = *emcopy;
+
+  MEM_freeN(emcopy);
+  em->emcopyusers = 0;
+  em->emcopy = NULL;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name BMesh Operator (BMO) API Wrapper
  * \{ */
 
@@ -132,17 +171,18 @@ bool EDBM_op_init(BMEditMesh *em, BMOperator *bmop, wmOperator *op, const char *
     return false;
   }
 
-  if (!em->emcopy) {
-    em->emcopy = BKE_editmesh_copy(em);
-  }
-  em->emcopyusers++;
+  edbm_op_emcopy_incref_and_ensure(em, bmop);
 
   va_end(list);
 
   return true;
 }
 
-/* returns 0 on error, 1 on success.  executes and finishes a bmesh operator */
+/**
+ * The return value:
+ * - False on error (the mesh must not be changed).
+ * - True on success, executes and finishes a #BMesh operator.
+ */
 bool EDBM_op_finish(BMEditMesh *em, BMOperator *bmop, wmOperator *op, const bool do_report)
 {
   const char *errmsg;
@@ -150,18 +190,13 @@ bool EDBM_op_finish(BMEditMesh *em, BMOperator *bmop, wmOperator *op, const bool
   BMO_op_finish(em->bm, bmop);
 
   if (BMO_error_get(em->bm, &errmsg, NULL)) {
-    BMEditMesh *emcopy = em->emcopy;
+    BLI_assert(em->emcopy != NULL);
 
     if (do_report) {
       BKE_report(op->reports, RPT_ERROR, errmsg);
     }
 
-    EDBM_mesh_free(em);
-    *em = *emcopy;
-
-    MEM_freeN(emcopy);
-    em->emcopyusers = 0;
-    em->emcopy = NULL;
+    edbm_op_emcopy_restore_and_clear(em, bmop);
 
     /**
      * Note, we could pass in the mesh, however this is an exceptional case, allow a slow lookup.
@@ -189,16 +224,7 @@ bool EDBM_op_finish(BMEditMesh *em, BMOperator *bmop, wmOperator *op, const bool
     return false;
   }
 
-  em->emcopyusers--;
-  if (em->emcopyusers < 0) {
-    printf("warning: em->emcopyusers was less than zero.\n");
-  }
-
-  if (em->emcopyusers <= 0) {
-    BKE_editmesh_free(em->emcopy);
-    MEM_freeN(em->emcopy);
-    em->emcopy = NULL;
-  }
+  edbm_op_emcopy_decref(em, bmop);
 
   return true;
 }
@@ -217,10 +243,7 @@ bool EDBM_op_callf(BMEditMesh *em, wmOperator *op, const char *fmt, ...)
     return false;
   }
 
-  if (!em->emcopy) {
-    em->emcopy = BKE_editmesh_copy(em);
-  }
-  em->emcopyusers++;
+  edbm_op_emcopy_incref_and_ensure(em, &bmop);
 
   BMO_op_exec(bm, &bmop);
 
@@ -249,10 +272,7 @@ bool EDBM_op_call_and_selectf(BMEditMesh *em,
     return false;
   }
 
-  if (!em->emcopy) {
-    em->emcopy = BKE_editmesh_copy(em);
-  }
-  em->emcopyusers++;
+  edbm_op_emcopy_incref_and_ensure(em, &bmop);
 
   BMO_op_exec(bm, &bmop);
 
@@ -284,10 +304,7 @@ bool EDBM_op_call_silentf(BMEditMesh *em, const char *fmt, ...)
     return false;
   }
 
-  if (!em->emcopy) {
-    em->emcopy = BKE_editmesh_copy(em);
-  }
-  em->emcopyusers++;
+  edbm_op_emcopy_incref_and_ensure(em, &bmop);
 
   BMO_op_exec(bm, &bmop);
 
@@ -474,7 +491,7 @@ void EDBM_select_more(BMEditMesh *em, const bool use_face_step)
                use_faces,
                use_face_step);
   BMO_op_exec(em->bm, &bmop);
-  /* don't flush selection in edge/vertex mode  */
+  /* Don't flush selection in edge/vertex mode. */
   BMO_slot_buffer_hflag_enable(
       em->bm, bmop.slots_out, "geom.out", BM_ALL_NOLOOP, BM_ELEM_SELECT, use_faces ? true : false);
   BMO_op_finish(em->bm, &bmop);
@@ -496,7 +513,7 @@ void EDBM_select_less(BMEditMesh *em, const bool use_face_step)
                use_faces,
                use_face_step);
   BMO_op_exec(em->bm, &bmop);
-  /* don't flush selection in edge/vertex mode  */
+  /* Don't flush selection in edge/vertex mode. */
   BMO_slot_buffer_hflag_disable(
       em->bm, bmop.slots_out, "geom.out", BM_ALL_NOLOOP, BM_ELEM_SELECT, use_faces ? true : false);
   BMO_op_finish(em->bm, &bmop);
@@ -1011,7 +1028,7 @@ BMFace *EDBM_uv_active_face_get(BMEditMesh *em, const bool sloppy, const bool se
   return NULL;
 }
 
-/* can we edit UV's for this mesh?*/
+/* Can we edit UV's for this mesh? */
 bool EDBM_uv_check(BMEditMesh *em)
 {
   /* some of these checks could be a touch overkill */
@@ -1222,12 +1239,12 @@ BMVert *EDBM_verts_mirror_get(BMEditMesh *em, BMVert *v)
 
 BMEdge *EDBM_verts_mirror_get_edge(BMEditMesh *em, BMEdge *e)
 {
-  BMVert *v1_mirr = EDBM_verts_mirror_get(em, e->v1);
-  if (v1_mirr) {
-    BMVert *v2_mirr = EDBM_verts_mirror_get(em, e->v2);
-    if (v2_mirr) {
-      return BM_edge_exists(v1_mirr, v2_mirr);
-    }
+  BMVert *v1_mirr, *v2_mirr;
+  if ((v1_mirr = EDBM_verts_mirror_get(em, e->v1)) &&
+      (v2_mirr = EDBM_verts_mirror_get(em, e->v2)) &&
+      /* While highly unlikely, a zero length central edges vertices can match, see T89342. */
+      LIKELY(v1_mirr != v2_mirr)) {
+    return BM_edge_exists(v1_mirr, v2_mirr);
   }
 
   return NULL;
@@ -1574,7 +1591,7 @@ int EDBM_elem_to_index_any(BMEditMesh *em, BMElem *ele)
   return index;
 }
 
-BMElem *EDBM_elem_from_index_any(BMEditMesh *em, int index)
+BMElem *EDBM_elem_from_index_any(BMEditMesh *em, uint index)
 {
   BMesh *bm = em->bm;
 
@@ -1615,14 +1632,14 @@ int EDBM_elem_to_index_any_multi(ViewLayer *view_layer,
 }
 
 BMElem *EDBM_elem_from_index_any_multi(ViewLayer *view_layer,
-                                       int object_index,
-                                       int elem_index,
+                                       uint object_index,
+                                       uint elem_index,
                                        Object **r_obedit)
 {
   uint bases_len;
   Base **bases = BKE_view_layer_array_from_bases_in_edit_mode(view_layer, NULL, &bases_len);
   *r_obedit = NULL;
-  Object *obedit = ((uint)object_index < bases_len) ? bases[object_index]->object : NULL;
+  Object *obedit = (object_index < bases_len) ? bases[object_index]->object : NULL;
   MEM_freeN(bases);
   if (obedit != NULL) {
     BMEditMesh *em = BKE_editmesh_from_object(obedit);
@@ -1689,8 +1706,8 @@ bool BMBVH_EdgeVisible(struct BMBVHTree *tree,
   scale_point(co1, co2, 0.99);
   scale_point(co3, co2, 0.99);
 
-  /* ok, idea is to generate rays going from the camera origin to the
-   * three points on the edge (v1, mid, v2)*/
+  /* OK, idea is to generate rays going from the camera origin to the
+   * three points on the edge (v1, mid, v2). */
   sub_v3_v3v3(dir1, origin, co1);
   sub_v3_v3v3(dir2, origin, co2);
   sub_v3_v3v3(dir3, origin, co3);
@@ -1699,8 +1716,8 @@ bool BMBVH_EdgeVisible(struct BMBVHTree *tree,
   normalize_v3_length(dir2, epsilon);
   normalize_v3_length(dir3, epsilon);
 
-  /* offset coordinates slightly along view vectors, to avoid
-   * hitting the faces that own the edge.*/
+  /* Offset coordinates slightly along view vectors,
+   * to avoid hitting the faces that own the edge. */
   add_v3_v3v3(co1, co1, dir1);
   add_v3_v3v3(co2, co2, dir2);
   add_v3_v3v3(co3, co3, dir3);

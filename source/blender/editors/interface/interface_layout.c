@@ -1191,7 +1191,7 @@ static uiBut *uiItemFullO_ptr_ex(uiLayout *layout,
 
   const eUIEmbossType prev_emboss = layout->emboss;
   if (flag & UI_ITEM_R_NO_BG) {
-    layout->emboss = UI_EMBOSS_NONE;
+    layout->emboss = UI_EMBOSS_NONE_OR_STATUS;
   }
 
   /* create the button */
@@ -2122,7 +2122,7 @@ void uiItemFullR(uiLayout *layout,
 
   const eUIEmbossType prev_emboss = layout->emboss;
   if (no_bg) {
-    layout->emboss = UI_EMBOSS_NONE;
+    layout->emboss = UI_EMBOSS_NONE_OR_STATUS;
   }
 
   uiBut *but = NULL;
@@ -2346,7 +2346,7 @@ void uiItemFullR(uiLayout *layout,
    * In this case we want the ability not to have an icon.
    *
    * We could pass an argument not to set the icon to begin with however this is the one case
-   * the functionality is needed.  */
+   * the functionality is needed. */
   if (but && no_icon) {
     if ((icon == ICON_NONE) && (but->icon != ICON_NONE)) {
       ui_def_but_icon_clear(but);
@@ -2355,7 +2355,7 @@ void uiItemFullR(uiLayout *layout,
 
   /* Mark non-embossed textfields inside a listbox. */
   if (but && (block->flag & UI_BLOCK_LIST_ITEM) && (but->type == UI_BTYPE_TEXT) &&
-      (but->emboss & UI_EMBOSS_NONE)) {
+      ELEM(but->emboss, UI_EMBOSS_NONE, UI_EMBOSS_NONE_OR_STATUS)) {
     UI_but_flag_enable(but, UI_BUT_LIST_ITEM);
   }
 
@@ -2860,7 +2860,7 @@ static uiBut *ui_item_menu(uiLayout *layout,
   int w = ui_text_icon_width(layout, name, icon, 1);
   const int h = UI_UNIT_Y;
 
-  if (layout->root->type == UI_LAYOUT_HEADER) { /* ugly .. */
+  if (layout->root->type == UI_LAYOUT_HEADER) { /* Ugly! */
     if (icon == ICON_NONE && force_menu) {
       /* pass */
     }
@@ -2893,7 +2893,7 @@ static uiBut *ui_item_menu(uiLayout *layout,
   }
 
   if (argN) {
-    /* ugly .. */
+    /* ugly! */
     if (arg != argN) {
       but->poin = (char *)but;
     }
@@ -3381,10 +3381,13 @@ typedef struct MenuItemLevel {
 
 static void menu_item_enum_opname_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
 {
-  MenuItemLevel *lvl = (MenuItemLevel *)(((uiBut *)arg)->func_argN);
+  uiBut *but = arg;
+  MenuItemLevel *lvl = but->func_argN;
+  /* Use the operator properties from the button owning the menu. */
+  IDProperty *op_props = but->opptr ? but->opptr->data : NULL;
 
   uiLayoutSetOperatorContext(layout, lvl->opcontext);
-  uiItemsEnumO(layout, lvl->opname, lvl->propname);
+  uiItemsFullEnumO(layout, lvl->opname, lvl->propname, op_props, lvl->opcontext, 0);
 
   layout->root->block->flag |= UI_BLOCK_IS_FLIP;
 
@@ -3392,12 +3395,13 @@ static void menu_item_enum_opname_menu(bContext *UNUSED(C), uiLayout *layout, vo
   UI_block_direction_set(layout->root->block, UI_DIR_DOWN);
 }
 
-void uiItemMenuEnumO_ptr(uiLayout *layout,
-                         bContext *C,
-                         wmOperatorType *ot,
-                         const char *propname,
-                         const char *name,
-                         int icon)
+void uiItemMenuEnumFullO_ptr(uiLayout *layout,
+                             bContext *C,
+                             wmOperatorType *ot,
+                             const char *propname,
+                             const char *name,
+                             int icon,
+                             PointerRNA *r_opptr)
 {
   /* Caller must check */
   BLI_assert(ot->srna != NULL);
@@ -3416,6 +3420,15 @@ void uiItemMenuEnumO_ptr(uiLayout *layout,
   lvl->opcontext = layout->root->opcontext;
 
   uiBut *but = ui_item_menu(layout, name, icon, menu_item_enum_opname_menu, NULL, lvl, NULL, true);
+  /* Use the menu button as owner for the operator properties, which will then be passed to the
+   * individual menu items. */
+  if (r_opptr) {
+    but->opptr = MEM_callocN(sizeof(PointerRNA), "uiButOpPtr");
+    WM_operator_properties_create_ptr(but->opptr, ot);
+    BLI_assert(but->opptr->data == NULL);
+    WM_operator_properties_alloc(&but->opptr, (IDProperty **)&but->opptr->data, ot->idname);
+    *r_opptr = *but->opptr;
+  }
 
   /* add hotkey here, lower UI code can't detect it */
   if ((layout->root->block->flag & UI_BLOCK_LOOP) && (ot->prop && ot->invoke)) {
@@ -3427,12 +3440,13 @@ void uiItemMenuEnumO_ptr(uiLayout *layout,
   }
 }
 
-void uiItemMenuEnumO(uiLayout *layout,
-                     bContext *C,
-                     const char *opname,
-                     const char *propname,
-                     const char *name,
-                     int icon)
+void uiItemMenuEnumFullO(uiLayout *layout,
+                         bContext *C,
+                         const char *opname,
+                         const char *propname,
+                         const char *name,
+                         int icon,
+                         PointerRNA *r_opptr)
 {
   wmOperatorType *ot = WM_operatortype_find(opname, 0); /* print error next */
 
@@ -3444,7 +3458,17 @@ void uiItemMenuEnumO(uiLayout *layout,
     return;
   }
 
-  uiItemMenuEnumO_ptr(layout, C, ot, propname, name, icon);
+  uiItemMenuEnumFullO_ptr(layout, C, ot, propname, name, icon, r_opptr);
+}
+
+void uiItemMenuEnumO(uiLayout *layout,
+                     bContext *C,
+                     const char *opname,
+                     const char *propname,
+                     const char *name,
+                     int icon)
+{
+  uiItemMenuEnumFullO(layout, C, opname, propname, name, icon, NULL);
 }
 
 static void menu_item_enum_rna_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)

@@ -960,7 +960,7 @@ static Mesh *modifier_modify_mesh_and_geometry_set(ModifierData *md,
       mesh_output = mesh_component.release();
     }
 
-    /* Return an empty mesh instead of null.  */
+    /* Return an empty mesh instead of null. */
     if (mesh_output == nullptr) {
       mesh_output = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
       BKE_mesh_copy_parameters_for_eval(mesh_output, input_mesh);
@@ -973,7 +973,7 @@ static Mesh *modifier_modify_mesh_and_geometry_set(ModifierData *md,
 static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
                                 Scene *scene,
                                 Object *ob,
-                                int useDeform,
+                                const bool use_deform,
                                 const bool need_mapping,
                                 const CustomData_MeshMasks *dataMask,
                                 const int index,
@@ -1068,15 +1068,11 @@ static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
   BKE_modifiers_clear_errors(ob);
 
   /* Apply all leading deform modifiers. */
-  if (useDeform) {
+  if (use_deform) {
     for (; md; md = md->next, md_datamask = md_datamask->next) {
       const ModifierTypeInfo *mti = BKE_modifier_get_info((ModifierType)md->type);
 
       if (!BKE_modifier_is_enabled(scene, md, required_mode)) {
-        continue;
-      }
-
-      if (useDeform < 0 && mti->dependsOnTime && mti->dependsOnTime(md)) {
         continue;
       }
 
@@ -1128,7 +1124,7 @@ static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
       continue;
     }
 
-    if (mti->type == eModifierTypeType_OnlyDeform && !useDeform) {
+    if (mti->type == eModifierTypeType_OnlyDeform && !use_deform) {
       continue;
     }
 
@@ -1170,10 +1166,6 @@ static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
     }
 
     if (need_mapping && !BKE_modifier_supports_mapping(md)) {
-      continue;
-    }
-
-    if (useDeform < 0 && mti->dependsOnTime && mti->dependsOnTime(md)) {
       continue;
     }
 
@@ -1572,7 +1564,7 @@ static void editbmesh_calc_modifier_final_normals(Mesh *mesh_final,
   /* BMESH_ONLY, ensure tessface's used for drawing,
    * but don't recalculate if the last modifier in the stack gives us tessfaces
    * check if the derived meshes are DM_TYPE_EDITBMESH before calling, this isn't essential
-   * but quiets annoying error messages since tessfaces wont be created. */
+   * but quiets annoying error messages since tessfaces won't be created. */
   if (final_datamask->fmask & CD_MASK_MFACE) {
     if (mesh_final->edit_mesh == nullptr) {
       BKE_mesh_tessface_ensure(mesh_final);
@@ -1937,7 +1929,7 @@ static void mesh_build_data(struct Depsgraph *depsgraph,
   mesh_calc_modifiers(depsgraph,
                       scene,
                       ob,
-                      1,
+                      true,
                       need_mapping,
                       dataMask,
                       -1,
@@ -2162,7 +2154,7 @@ Mesh *mesh_create_eval_final(Depsgraph *depsgraph,
   Mesh *final;
 
   mesh_calc_modifiers(
-      depsgraph, scene, ob, 1, false, dataMask, -1, false, false, nullptr, &final, nullptr);
+      depsgraph, scene, ob, true, false, dataMask, -1, false, false, nullptr, &final, nullptr);
 
   return final;
 }
@@ -2176,7 +2168,7 @@ Mesh *mesh_create_eval_final_index_render(Depsgraph *depsgraph,
   Mesh *final;
 
   mesh_calc_modifiers(
-      depsgraph, scene, ob, 1, false, dataMask, index, false, false, nullptr, &final, nullptr);
+      depsgraph, scene, ob, true, false, dataMask, index, false, false, nullptr, &final, nullptr);
 
   return final;
 }
@@ -2189,7 +2181,7 @@ Mesh *mesh_create_eval_no_deform(Depsgraph *depsgraph,
   Mesh *final;
 
   mesh_calc_modifiers(
-      depsgraph, scene, ob, 0, false, dataMask, -1, false, false, nullptr, &final, nullptr);
+      depsgraph, scene, ob, false, false, dataMask, -1, false, false, nullptr, &final, nullptr);
 
   return final;
 }
@@ -2202,7 +2194,7 @@ Mesh *mesh_create_eval_no_deform_render(Depsgraph *depsgraph,
   Mesh *final;
 
   mesh_calc_modifiers(
-      depsgraph, scene, ob, 0, false, dataMask, -1, false, false, nullptr, &final, nullptr);
+      depsgraph, scene, ob, false, false, dataMask, -1, false, false, nullptr, &final, nullptr);
 
   return final;
 }
