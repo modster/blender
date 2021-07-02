@@ -972,7 +972,7 @@ static Mesh *modifier_modify_mesh_and_geometry_set(ModifierData *md,
 static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
                                 Scene *scene,
                                 Object *ob,
-                                int useDeform,
+                                const bool use_deform,
                                 const bool need_mapping,
                                 const CustomData_MeshMasks *dataMask,
                                 const int index,
@@ -1061,15 +1061,11 @@ static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
   BKE_modifiers_clear_errors(ob);
 
   /* Apply all leading deform modifiers. */
-  if (useDeform) {
+  if (use_deform) {
     for (; md; md = md->next, md_datamask = md_datamask->next) {
       const ModifierTypeInfo *mti = BKE_modifier_get_info((ModifierType)md->type);
 
       if (!BKE_modifier_is_enabled(scene, md, required_mode)) {
-        continue;
-      }
-
-      if (useDeform < 0 && mti->dependsOnTime && mti->dependsOnTime(md)) {
         continue;
       }
 
@@ -1121,7 +1117,7 @@ static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
       continue;
     }
 
-    if (mti->type == eModifierTypeType_OnlyDeform && !useDeform) {
+    if (mti->type == eModifierTypeType_OnlyDeform && !use_deform) {
       continue;
     }
 
@@ -1163,10 +1159,6 @@ static void mesh_calc_modifiers(struct Depsgraph *depsgraph,
     }
 
     if (need_mapping && !BKE_modifier_supports_mapping(md)) {
-      continue;
-    }
-
-    if (useDeform < 0 && mti->dependsOnTime && mti->dependsOnTime(md)) {
       continue;
     }
 
@@ -1924,7 +1916,7 @@ static void mesh_build_data(struct Depsgraph *depsgraph,
   mesh_calc_modifiers(depsgraph,
                       scene,
                       ob,
-                      1,
+                      true,
                       need_mapping,
                       dataMask,
                       -1,
@@ -2148,7 +2140,7 @@ Mesh *mesh_create_eval_final(Depsgraph *depsgraph,
   Mesh *final;
 
   mesh_calc_modifiers(
-      depsgraph, scene, ob, 1, false, dataMask, -1, false, false, nullptr, &final, nullptr);
+      depsgraph, scene, ob, true, false, dataMask, -1, false, false, nullptr, &final, nullptr);
 
   return final;
 }
@@ -2162,7 +2154,7 @@ Mesh *mesh_create_eval_final_index_render(Depsgraph *depsgraph,
   Mesh *final;
 
   mesh_calc_modifiers(
-      depsgraph, scene, ob, 1, false, dataMask, index, false, false, nullptr, &final, nullptr);
+      depsgraph, scene, ob, true, false, dataMask, index, false, false, nullptr, &final, nullptr);
 
   return final;
 }
@@ -2175,7 +2167,7 @@ Mesh *mesh_create_eval_no_deform(Depsgraph *depsgraph,
   Mesh *final;
 
   mesh_calc_modifiers(
-      depsgraph, scene, ob, 0, false, dataMask, -1, false, false, nullptr, &final, nullptr);
+      depsgraph, scene, ob, false, false, dataMask, -1, false, false, nullptr, &final, nullptr);
 
   return final;
 }
@@ -2188,7 +2180,7 @@ Mesh *mesh_create_eval_no_deform_render(Depsgraph *depsgraph,
   Mesh *final;
 
   mesh_calc_modifiers(
-      depsgraph, scene, ob, 0, false, dataMask, -1, false, false, nullptr, &final, nullptr);
+      depsgraph, scene, ob, false, false, dataMask, -1, false, false, nullptr, &final, nullptr);
 
   return final;
 }
