@@ -545,10 +545,18 @@ Mesh *BKE_mesh_new_nomain_from_curve_displist(const Object *ob, const ListBase *
   mesh = BKE_mesh_new_nomain(totvert, totedge, 0, totloop, totpoly);
   mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
 
-  memcpy(mesh->mvert, allvert, totvert * sizeof(MVert));
-  memcpy(mesh->medge, alledge, totedge * sizeof(MEdge));
-  memcpy(mesh->mloop, allloop, totloop * sizeof(MLoop));
-  memcpy(mesh->mpoly, allpoly, totpoly * sizeof(MPoly));
+  if (totvert != 0) {
+    memcpy(mesh->mvert, allvert, totvert * sizeof(MVert));
+  }
+  if (totedge != 0) {
+    memcpy(mesh->medge, alledge, totedge * sizeof(MEdge));
+  }
+  if (totloop != 0) {
+    memcpy(mesh->mloop, allloop, totloop * sizeof(MLoop));
+  }
+  if (totpoly != 0) {
+    memcpy(mesh->mpoly, allpoly, totpoly * sizeof(MPoly));
+  }
 
   if (alluv) {
     const char *uvname = "UVMap";
@@ -1107,7 +1115,7 @@ static void curve_to_mesh_eval_ensure(Object *object)
    * Brecht says hold off with that. */
   Mesh *mesh_eval = NULL;
   BKE_displist_make_curveTypes_forRender(
-      NULL, NULL, &remapped_object, &remapped_object.runtime.curve_cache->disp, false, &mesh_eval);
+      NULL, NULL, &remapped_object, &remapped_object.runtime.curve_cache->disp, &mesh_eval);
 
   /* Note: this is to be consistent with `BKE_displist_make_curveTypes()`, however that is not a
    * real issue currently, code here is broken in more than one way, fix(es) will be done
