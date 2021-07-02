@@ -284,7 +284,6 @@ void ED_gpencil_project_point_to_plane(const struct Scene *scene,
 void ED_gpencil_project_point_to_render_space(const struct Scene *scene,
                                               struct bGPDspoint *pt,
                                               const float persmat[4][4],
-                                              const bool is_ortho,
                                               float r_co[2]);
 void ED_gpencil_drawing_reference_get(const struct Scene *scene,
                                       const struct Object *ob,

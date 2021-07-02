@@ -1267,19 +1267,13 @@ static bool gpencil_calculate_camera_matrix(Scene *scene, float persmat[4][4], f
 void ED_gpencil_project_point_to_render_space(const struct Scene *scene,
                                               struct bGPDspoint *pt,
                                               const float persmat[4][4],
-                                              const bool is_ortho,
                                               float r_co[2])
 {
   float render_x = (scene->r.xsch * scene->r.size) / 100;
   float render_y = (scene->r.ysch * scene->r.size) / 100;
 
-  float parent_co[3];
-  mul_v3_m4v3(parent_co, persmat, &pt->x);
-
-  if (!is_ortho) {
-    parent_co[0] = parent_co[0] / max_ff(FLT_MIN, parent_co[2]);
-    parent_co[1] = parent_co[1] / max_ff(FLT_MIN, parent_co[2]);
-  }
+  float parent_co[2];
+  mul_v2_project_m4_v3(parent_co, persmat, &pt->x);
 
   r_co[0] = (parent_co[0] + 1.0f) / 2.0f * (float)render_x;
   r_co[1] = (parent_co[1] + 1.0f) / 2.0f * (float)render_y;
@@ -1308,9 +1302,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
   invert_m4_m4(inverse_diff_mat, diff_mat);
 
   float persmat[4][4], persinv[4][4];
-  const bool is_ortho = (mode == GP_REPROJECT_CAMERA) ?
-                            gpencil_calculate_camera_matrix(gsc->scene, persmat, persinv) :
-                            false;
+  gpencil_calculate_camera_matrix(gsc->scene, persmat, persinv);
 
   float origin[3];
   if (mode != GP_REPROJECT_CURSOR) {
@@ -1392,7 +1384,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
     }
     else if (mode == GP_REPROJECT_CAMERA) {
       /* Convert to Render 2D space. */
-      ED_gpencil_project_point_to_render_space(gsc->scene, &pt2, persmat, is_ortho, xy);
+      ED_gpencil_project_point_to_render_space(gsc->scene, &pt2, persmat, xy);
       /* Convert to Global Camera 3D space. */
       gpencil_point_render_xy_to_3d(gsc, persmat, persinv, xy, &pt->x);
     }
