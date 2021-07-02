@@ -690,6 +690,118 @@ TEST(cloth_remesh, MeshIO_WriteDNAMesh)
   BKE_mesh_eval_delete(mesh);
 }
 
+TEST(cloth_remesh, MeshIO_WriteDNAMesh_LooseEdges)
+{
+  MeshIO reader;
+  std::istringstream stream_in(plane_extra_loose_edges);
+  auto res = reader.read(std::move(stream_in), MeshIO::IOTYPE_OBJ);
+  EXPECT_TRUE(res);
+
+  auto *mesh = reader.write();
+  EXPECT_NE(mesh, nullptr);
+
+  EXPECT_NE(mesh->mvert, nullptr);
+  EXPECT_NE(mesh->medge, nullptr);
+  EXPECT_NE(mesh->mpoly, nullptr);
+  EXPECT_NE(mesh->mloop, nullptr);
+  EXPECT_NE(mesh->mloopuv, nullptr);
+
+  auto format_string_mvert = [](const MVert &mvert) {
+    std::ostringstream stream;
+    stream << "[mvert: ("
+           << "co: " << stringify_v3(mvert.co) << ")]";
+    return stream.str();
+  };
+  auto format_string_mloopuv = [](const MLoopUV &mloopuv) {
+    std::ostringstream stream;
+    stream << "[mloopuv: ("
+           << "uv: " << stringify_v2(mloopuv.uv) << ")]";
+    return stream.str();
+  };
+  auto format_string_medge = [](const MEdge &medge) {
+    std::ostringstream stream;
+    stream << "[medge: ("
+           << "v1: " << medge.v1 << ", v2: " << medge.v2
+           << ", loose: " << ((medge.flag & ME_LOOSEEDGE) != 0) << ")]";
+    return stream.str();
+  };
+  auto format_string_mpoly = [](const MPoly &mpoly) {
+    std::ostringstream stream;
+    stream << "[mpoly: ("
+           << "loopstart: " << mpoly.loopstart << ", totloop: " << mpoly.totloop << ")]";
+    return stream.str();
+  };
+  auto format_string_mloop = [](const MLoop &mloop) {
+    std::ostringstream stream;
+    stream << "[mloop: ("
+           << "v: " << mloop.v << ", e: " << mloop.e << ")]";
+    return stream.str();
+  };
+
+  std::string expected =
+      "[mvert: (co: (-1, 0, 1))]\n"
+      "[mvert: (co: (1, 0, 1))]\n"
+      "[mvert: (co: (-1, 0, -1))]\n"
+      "[mvert: (co: (1, 0, -1))]\n"
+      "[mvert: (co: (-1, 0, -2))]\n"
+      "[mvert: (co: (1, 0, -2))]\n"
+      "[mvert: (co: (2, 0, 1))]\n"
+      "[mvert: (co: (2, 0, -1))]\n"
+      "[mvert: (co: (-1, 0, 2))]\n"
+      "[mvert: (co: (1, 0, 2))]\n"
+      "[mvert: (co: (-2, 0, 1))]\n"
+      "[mvert: (co: (-2, 0, -1))]\n"
+      "[mvert: (co: (3, 0, 1))]\n"
+      "[mvert: (co: (3, 0, -1))]\n"
+      "[mloopuv: (uv: (0, 0))]\n"
+      "[mloopuv: (uv: (1, 0))]\n"
+      "[mloopuv: (uv: (1, 1))]\n"
+      "[mloopuv: (uv: (0, 1))]\n"
+      "[mpoly: (loopstart: 0, totloop: 4)]\n"
+      "[mloop: (v: 0, e: 0)]\n"
+      "[mloop: (v: 1, e: 2)]\n"
+      "[mloop: (v: 3, e: 12)]\n"
+      "[mloop: (v: 2, e: 1)]\n"
+      "[medge: (v1: 0, v2: 1, loose: 0)]\n"
+      "[medge: (v1: 0, v2: 2, loose: 0)]\n"
+      "[medge: (v1: 1, v2: 3, loose: 0)]\n"
+      "[medge: (v1: 4, v2: 2, loose: 1)]\n"
+      "[medge: (v1: 5, v2: 4, loose: 1)]\n"
+      "[medge: (v1: 1, v2: 6, loose: 1)]\n"
+      "[medge: (v1: 6, v2: 7, loose: 1)]\n"
+      "[medge: (v1: 0, v2: 8, loose: 1)]\n"
+      "[medge: (v1: 8, v2: 9, loose: 1)]\n"
+      "[medge: (v1: 10, v2: 0, loose: 1)]\n"
+      "[medge: (v1: 11, v2: 10, loose: 1)]\n"
+      "[medge: (v1: 13, v2: 12, loose: 1)]\n"
+      "[medge: (v1: 2, v2: 3, loose: 0)]\n"
+      "[medge: (v1: 2, v2: 11, loose: 1)]\n"
+      "[medge: (v1: 3, v2: 5, loose: 1)]\n"
+      "[medge: (v1: 9, v2: 1, loose: 1)]\n"
+      "[medge: (v1: 7, v2: 3, loose: 1)]\n";
+
+  std::ostringstream sout;
+  for (auto i = 0; i < mesh->totvert; i++) {
+    sout << format_string_mvert(mesh->mvert[i]) << std::endl;
+  }
+  for (auto i = 0; i < mesh->totloop; i++) {
+    sout << format_string_mloopuv(mesh->mloopuv[i]) << std::endl;
+  }
+  for (auto i = 0; i < mesh->totpoly; i++) {
+    sout << format_string_mpoly(mesh->mpoly[i]) << std::endl;
+  }
+  for (auto i = 0; i < mesh->totloop; i++) {
+    sout << format_string_mloop(mesh->mloop[i]) << std::endl;
+  }
+  for (auto i = 0; i < mesh->totedge; i++) {
+    sout << format_string_medge(mesh->medge[i]) << std::endl;
+  }
+
+  EXPECT_EQ(sout.str(), expected);
+
+  BKE_mesh_eval_delete(mesh);
+}
+
 TEST(cloth_remesh, Mesh_Read)
 {
   MeshIO reader;
