@@ -68,7 +68,7 @@ class GLSLPatch {
       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01232456789_";
 
  public:
-  virtual GLSLPatchResult patch(GLShaderPatchState &context, StringRef source) = 0;
+  virtual GLSLPatchResult patch(GLShaderPatcherContext &context, StringRef source) = 0;
 
  protected:
   static StringRef skip_whitespace(StringRef ref)
@@ -94,7 +94,7 @@ class PatchPushConstants : public GLSLPatch {
   static constexpr StringRef LAYOUT_STD140 = "layout(std140)";
 
  public:
-  GLSLPatchResult patch(GLShaderPatchState &context, StringRef source) override
+  GLSLPatchResult patch(GLShaderPatcherContext &context, StringRef source) override
   {
     GLSLPatchResult result;
 
@@ -115,14 +115,14 @@ class PatchPushConstants : public GLSLPatch {
     name = skip_whitespace(name);
     name = extract_name(name);
 
-    if (context.push_constants.name.empty()) {
+    if (!context.push_constants.name) {
       context.push_constants.name = name;
     }
     else if (context.push_constants.name != name) {
       CLOG_ERROR(&LOG,
                  "Detected different push_constants binding names ('%s' and '%s'). push_constants "
                  "binding names must be identical across all stages.",
-                 context.push_constants.name.c_str(),
+                 context.push_constants.name->c_str(),
                  std::string(name).c_str());
       result.state = GLShaderPatcherState::MismatchedPushConstantNames;
       return result;
@@ -138,7 +138,7 @@ class PatchPushConstants : public GLSLPatch {
 
 class GLSLPatcher : public GLSLPatch {
  private:
-  static void patch(GLShaderPatchState &context,
+  static void patch(GLShaderPatcherContext &context,
                     GLSLPatch &patch,
                     StringRef source,
                     GLSLPatchResult &r_result)
@@ -153,7 +153,7 @@ class GLSLPatcher : public GLSLPatch {
   }
 
  public:
-  GLSLPatchResult patch(GLShaderPatchState &context, StringRef source) override
+  GLSLPatchResult patch(GLShaderPatcherContext &context, StringRef source) override
   {
     GLSLPatchResult result;
     PatchPushConstants push_constants;
@@ -162,7 +162,7 @@ class GLSLPatcher : public GLSLPatch {
   }
 };
 
-void GLShaderPatcher::patch(MutableSpan<const char *> sources)
+void patch_vulkan_to_opengl(GLShaderPatcherContext &context, MutableSpan<const char *> sources)
 {
   for (int i = 0; i < sources.size(); i++) {
     GLSLPatcher patcher;
@@ -174,8 +174,8 @@ void GLShaderPatcher::patch(MutableSpan<const char *> sources)
 
       case GLShaderPatcherState::OkChanged:
         BLI_assert(patch_result.patched_glsl);
-        patched_sources_.append(*patch_result.patched_glsl);
-        sources[i] = patched_sources_.last().c_str();
+        context.patched_sources.append(*patch_result.patched_glsl);
+        sources[i] = context.patched_sources.last().c_str();
 
         /* Keep any errors from previous stages. */
         if (context.state == GLShaderPatcherState::OkUnchanged) {
@@ -191,14 +191,14 @@ void GLShaderPatcher::patch(MutableSpan<const char *> sources)
   }
 }
 
-bool GLShaderPatcher::has_errors() const
+void GLShaderPatcherContext::free_patched_sources()
 {
-  return is_error_state(context.state);
+  patched_sources.clear();
 }
 
-void GLShaderPatcher::free()
+bool GLShaderPatcherContext::has_errors() const
 {
-  patched_sources_.clear();
+  return is_error_state(state);
 }
 
 }  // namespace blender::gpu

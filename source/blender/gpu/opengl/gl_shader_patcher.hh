@@ -26,6 +26,8 @@
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
 
+#include <optional>
+
 namespace blender::gpu {
 
 enum class GLShaderPatcherState {
@@ -34,26 +36,24 @@ enum class GLShaderPatcherState {
   MismatchedPushConstantNames,
 };
 
-struct GLShaderPatchState {
+/** State to keep over GLSL compilation stages, linkage and shader_interface building. */
+struct GLShaderPatcherContext {
   GLShaderPatcherState state = GLShaderPatcherState::OkUnchanged;
+
+  /**
+   * All patched sources. During compilation stage source code is references as `const
+   * char*` These needs to be owned by a `std::string`.
+   */
+  Vector<std::string> patched_sources;
   struct {
-    std::string name;
+    std::optional<std::string> name;
   } push_constants;
-};
 
-class GLShaderPatcher {
- public:
-  GLShaderPatchState context;
-
- private:
-  Vector<std::string> patched_sources_;
-
- public:
-  void patch(MutableSpan<const char *> sources);
   bool has_errors() const;
-  void free();
 
-  MEM_CXX_CLASS_ALLOC_FUNCS("GLShaderPatcher");
+  void free_patched_sources();
 };
+
+void patch_vulkan_to_opengl(GLShaderPatcherContext &context, MutableSpan<const char *> sources);
 
 }  // namespace blender::gpu

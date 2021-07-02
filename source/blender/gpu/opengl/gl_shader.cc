@@ -148,8 +148,8 @@ GLuint GLShader::create_shader_stage(GLenum gl_stage, MutableSpan<const char *> 
 
   /* Patch the shader code using the first source slot. */
   sources[0] = glsl_patch_get(gl_stage);
-  converter_.patch(sources);
-  if (converter_.has_errors()) {
+  patch_vulkan_to_opengl(patcher_context_, sources);
+  if (patcher_context_.has_errors()) {
     compilation_failed_ = true;
     return 0;
   }
@@ -231,11 +231,12 @@ bool GLShader::finalize()
     return false;
   }
 
-  interface = new GLShaderInterface(shader_program_);
+  interface = new GLShaderInterface(patcher_context_, shader_program_);
 
-  /* Only patched sources are only freed when shader compilation and linking succeeds for
-   * debugging. */
-  converter_.free();
+  /* Patched sources are only freed when shader compilation and linking successful completed. In
+   * other cases they are kept for debugging purposes and will be GC'd when the GPUShader is freed.
+   */
+  patcher_context_.free_patched_sources();
 
   return true;
 }

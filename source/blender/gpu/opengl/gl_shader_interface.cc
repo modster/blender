@@ -145,7 +145,7 @@ static inline int ssbo_binding(int32_t program, uint32_t ssbo_index)
 /** \name Creation / Destruction
  * \{ */
 
-GLShaderInterface::GLShaderInterface(GLuint program)
+GLShaderInterface::GLShaderInterface(GLShaderPatcherContext &context, GLuint program)
 {
   /* Necessary to make #glUniform works. */
   glUseProgram(program);
@@ -321,6 +321,13 @@ GLShaderInterface::GLShaderInterface(GLuint program)
   // this->debug_print();
 
   this->sort_inputs();
+
+  /* Push Constant Blocks */
+  /* Push constants are converted by GLShaderPatcher to regular uniform buffers. Here we retrieve
+   * the reference to its binding.  */
+  if (context.push_constants.name) {
+    push_constant_input_ = ubo_get(context.push_constants.name->c_str());
+  }
 }
 
 GLShaderInterface::~GLShaderInterface()

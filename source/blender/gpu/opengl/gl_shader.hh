@@ -50,7 +50,8 @@ class GLShader : public Shader {
   bool compilation_failed_ = false;
 
   eGPUShaderTFBType transform_feedback_type_ = GPU_SHADER_TFB_NONE;
-  GLShaderPatcher converter_;
+
+  GLShaderPatcherContext patcher_context_;
 
  public:
   GLShader(const char *name);

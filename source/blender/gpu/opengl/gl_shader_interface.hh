@@ -34,6 +34,8 @@
 
 #include "glew-mx.h"
 
+#include "gl_shader_patcher.hh"
+
 #include "gpu_shader_interface.hh"
 
 namespace blender::gpu {
@@ -48,12 +50,20 @@ class GLShaderInterface : public ShaderInterface {
   /** Reference to VaoCaches using this interface */
   Vector<GLVaoCache *> refs_;
 
+  /* Reference to the ubo binding that is used for push constants. */
+  const ShaderInput *push_constant_input_ = nullptr;
+
  public:
-  GLShaderInterface(GLuint program);
+  GLShaderInterface(GLShaderPatcherContext &context, GLuint program);
   ~GLShaderInterface();
 
   void ref_add(GLVaoCache *ref);
   void ref_remove(GLVaoCache *ref);
+
+  inline const ShaderInput *push_constant_get()
+  {
+    return push_constant_input_;
+  }
 
   MEM_CXX_CLASS_ALLOC_FUNCS("GLShaderInterface");
 };
