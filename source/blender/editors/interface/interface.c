@@ -811,7 +811,8 @@ static void ui_but_update_old_active_from_new(uiBut *oldbut, uiBut *but)
 
   /* Move tooltip from new to old. */
   SWAP(uiButToolTipFunc, oldbut->tip_func, but->tip_func);
-  SWAP(void *, oldbut->tip_argN, but->tip_argN);
+  SWAP(void *, oldbut->tip_arg, but->tip_arg);
+  SWAP(uiFreeArgFunc, oldbut->tip_arg_free, but->tip_arg_free);
 
   oldbut->flag = (oldbut->flag & ~flag_copy) | (but->flag & flag_copy);
   oldbut->drawflag = (oldbut->drawflag & ~drawflag_copy) | (but->drawflag & drawflag_copy);
@@ -822,7 +823,7 @@ static void ui_but_update_old_active_from_new(uiBut *oldbut, uiBut *but)
   if (oldbut->type == UI_BTYPE_SEARCH_MENU) {
     uiButSearch *search_oldbut = (uiButSearch *)oldbut, *search_but = (uiButSearch *)but;
 
-    SWAP(uiButSearchArgFreeFn, search_oldbut->arg_free_fn, search_but->arg_free_fn);
+    SWAP(uiFreeArgFunc, search_oldbut->arg_free_fn, search_but->arg_free_fn);
     SWAP(void *, search_oldbut->arg, search_but->arg);
   }
 
@@ -2108,7 +2109,8 @@ int ui_but_is_pushed_ex(uiBut *but, double *value)
   if (but->pushed_state_func) {
     return but->pushed_state_func(but, but->pushed_state_arg);
   }
-  else if (but->bit) {
+
+  if (but->bit) {
     const bool state = !ELEM(
         but->type, UI_BTYPE_TOGGLE_N, UI_BTYPE_ICON_TOGGLE_N, UI_BTYPE_CHECKBOX_N);
     int lvalue;
@@ -3244,8 +3246,8 @@ void ui_but_range_set_soft(uiBut *but)
       RNA_property_int_ui_range(&but->rnapoin, but->rnaprop, &imin, &imax, &istep);
       softmin = (imin == INT_MIN) ? -1e4 : imin;
       softmax = (imin == INT_MAX) ? 1e4 : imax;
-      /*step = istep;*/  /*UNUSED*/
-      /*precision = 1;*/ /*UNUSED*/
+      // step = istep;  /* UNUSED */
+      // precision = 1; /* UNUSED */
 
       if (is_array) {
         int value_range[2];
@@ -3264,8 +3266,8 @@ void ui_but_range_set_soft(uiBut *but)
       RNA_property_float_ui_range(&but->rnapoin, but->rnaprop, &fmin, &fmax, &fstep, &fprecision);
       softmin = (fmin == -FLT_MAX) ? (float)-1e4 : fmin;
       softmax = (fmax == FLT_MAX) ? (float)1e4 : fmax;
-      /*step = fstep;*/           /*UNUSED*/
-      /*precision = fprecision;*/ /*UNUSED*/
+      // step = fstep;           /* UNUSED */
+      // precision = fprecision; /* UNUSED */
 
       /* Use shared min/max for array values, except for color alpha. */
       if (is_array && !(subtype == PROP_COLOR && but->rnaindex == 3)) {
@@ -3357,8 +3359,8 @@ static void ui_but_free(const bContext *C, uiBut *but)
     MEM_freeN(but->func_argN);
   }
 
-  if (but->tip_argN) {
-    MEM_freeN(but->tip_argN);
+  if (but->tip_arg_free) {
+    but->tip_arg_free(but->tip_arg);
   }
 
   if (but->hold_argN) {
@@ -4595,7 +4597,7 @@ static uiBut *ui_def_but_rna(uiBlock *block,
 
   if (proptype == PROP_POINTER) {
     /* If the button shows an ID, automatically set it as focused in context so operators can
-     * access it.*/
+     * access it. */
     const PointerRNA pptr = RNA_property_pointer_get(ptr, prop);
     if (pptr.data && RNA_struct_is_ID(pptr.type)) {
       but->context = CTX_store_add(&block->contexts, "id", &pptr);
@@ -6333,13 +6335,14 @@ void UI_but_func_menu_step_set(uiBut *but, uiMenuStepFunc func)
   but->menu_step_func = func;
 }
 
-void UI_but_func_tooltip_set(uiBut *but, uiButToolTipFunc func, void *argN)
+void UI_but_func_tooltip_set(uiBut *but, uiButToolTipFunc func, void *arg, uiFreeArgFunc free_arg)
 {
   but->tip_func = func;
-  if (but->tip_argN) {
-    MEM_freeN(but->tip_argN);
+  if (but->tip_arg_free) {
+    but->tip_arg_free(but->tip_arg);
   }
-  but->tip_argN = argN;
+  but->tip_arg = arg;
+  but->tip_arg_free = free_arg;
 }
 
 void UI_but_func_pushed_state_set(uiBut *but, uiButPushedStateFunc func, const void *arg)
@@ -6629,7 +6632,7 @@ void UI_but_func_search_set(uiBut *but,
                             uiButSearchUpdateFn search_update_fn,
                             void *arg,
                             const bool free_arg,
-                            uiButSearchArgFreeFn search_arg_free_fn,
+                            uiFreeArgFunc search_arg_free_fn,
                             uiButHandleFunc search_exec_fn,
                             void *active)
 {
@@ -6964,7 +6967,7 @@ void UI_but_string_info_get(bContext *C, uiBut *but, ...)
     }
     else if (type == BUT_GET_TIP) {
       if (but->tip_func) {
-        tmp = but->tip_func(C, but->tip_argN, but->tip);
+        tmp = but->tip_func(C, but->tip_arg, but->tip);
       }
       else if (but->tip && but->tip[0]) {
         tmp = BLI_strdup(but->tip);

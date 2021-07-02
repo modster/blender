@@ -3489,7 +3489,7 @@ static void widget_menubut(uiWidgetColors *wcol, rcti *rect, int UNUSED(state), 
 /**
  * Draw menu buttons still with triangles when field is not embossed
  */
-static void widget_menubut_embossn(uiBut *UNUSED(but),
+static void widget_menubut_embossn(const uiBut *UNUSED(but),
                                    uiWidgetColors *wcol,
                                    rcti *rect,
                                    int UNUSED(state),
@@ -3512,7 +3512,7 @@ static void widget_menubut_embossn(uiBut *UNUSED(but),
  * Draw number buttons still with triangles when field is not embossed
  */
 static void widget_numbut_embossn(
-    uiBut *UNUSED(but), uiWidgetColors *wcol, rcti *rect, int state, int roundboxalign)
+    const uiBut *UNUSED(but), uiWidgetColors *wcol, rcti *rect, int state, int roundboxalign)
 {
   widget_numbut_draw(wcol, rect, state, roundboxalign, true);
 }
@@ -4956,7 +4956,7 @@ void ui_draw_menu_back(uiStyle *UNUSED(style), uiBlock *block, rcti *rect)
 }
 
 /**
- * Uses the widget base drawing and colors from from the box widget, but ensures an opaque
+ * Uses the widget base drawing and colors from the box widget, but ensures an opaque
  * inner color.
  */
 void ui_draw_box_opaque(rcti *rect, int roundboxalign)

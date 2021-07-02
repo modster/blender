@@ -105,7 +105,7 @@
 
 #include "CLG_log.h"
 
-/* for menu/popup icons etc etc*/
+/* For menu/popup icons etc etc. */
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -157,7 +157,7 @@ Object *ED_object_active_context(const bContext *C)
  *   (assuming they need to be modified).
  */
 Object **ED_object_array_in_mode_or_selected(bContext *C,
-                                             bool (*filter_fn)(Object *ob, void *user_data),
+                                             bool (*filter_fn)(const Object *ob, void *user_data),
                                              void *filter_user_data,
                                              uint *r_objects_len)
 {
@@ -1990,7 +1990,7 @@ static int move_to_collection_invoke(bContext *C, wmOperator *op, const wmEvent 
    * Technically we could use #wmOperator.customdata. However there is no free callback
    * called to an operator that exit with OPERATOR_INTERFACE to launch a menu.
    *
-   * So we are left with a memory that will necessarily leak. It's a small leak though.*/
+   * So we are left with a memory that will necessarily leak. It's a small leak though. */
   if (master_collection_menu == NULL) {
     master_collection_menu = MEM_callocN(sizeof(MoveToCollectionData),
                                          "MoveToCollectionData menu - expected eventual memleak");
