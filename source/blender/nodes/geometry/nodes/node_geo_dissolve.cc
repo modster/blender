@@ -21,12 +21,12 @@
 #include "BKE_mesh.h"
 #include "bmesh.h"
 #include "bmesh_tools.h"
-
 #include "node_geometry_util.hh"
+#include "math.h"
 
 static bNodeSocketTemplate geo_node_dissolve_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Angle"), 45.0f, 0.0f, 0.0f, 1.0f, 0.0f, 180.0f, PROP_ANGLE},
+    {SOCK_FLOAT, N_("Angle"), M_PI * 0.25, 0.0f, 0.0f, 1.0f, 0.0f, M_PI, PROP_ANGLE},
     {SOCK_BOOLEAN, N_("All Boundaries"), false},
     {-1, ""},
 };
