@@ -14,12 +14,13 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BKE_mesh.h"
+
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
-#include "BKE_mesh.h"
+
 #include "bmesh.h"
 #include "bmesh_tools.h"
-
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_unsubdivide_in[] = {
@@ -33,7 +34,7 @@ static bNodeSocketTemplate geo_node_unsubdivide_out[] = {
     {-1, ""},
 };
 
-namespace blender::nodes{
+namespace blender::nodes {
 
 static Mesh *unsubdivideMesh(const uint iterations, Mesh *mesh)
 {
@@ -44,7 +45,8 @@ static Mesh *unsubdivideMesh(const uint iterations, Mesh *mesh)
   }
 
   BMeshCreateParams bmesh_create_params = {0};
-  BMeshFromMeshParams bmesh_from_mesh_params = {true,0,0,0,{CD_MASK_ORIGINDEX,CD_MASK_ORIGINDEX,CD_MASK_ORIGINDEX}};
+  BMeshFromMeshParams bmesh_from_mesh_params = {
+      true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
 
   BM_mesh_decimate_unsubdivide(bm, iterations);
@@ -60,7 +62,7 @@ static void geo_node_unsubdivide_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   int iterations = params.extract_input<int>("Iterations");
-  if(geometry_set.has_mesh()){
+  if (geometry_set.has_mesh()) {
     Mesh *input_mesh = geometry_set.get_mesh_for_write();
     Mesh *result = unsubdivideMesh(iterations, input_mesh);
     geometry_set.replace_mesh(result);

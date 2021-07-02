@@ -1439,10 +1439,9 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_SEPARATE_COMPONENTS 1059
 #define GEO_NODE_CURVE_SUBDIVIDE 1060
 #define GEO_NODE_RAYCAST 1061
-#define GEO_NODE_DECIMATE 1062
-#define GEO_NODE_COLLAPSE 1063
-#define GEO_NODE_UNSUBDIVIDE 1064
-#define GEO_NODE_DISSOLVE 1065
+#define GEO_NODE_COLLAPSE 1062
+#define GEO_NODE_UNSUBDIVIDE 1063
+#define GEO_NODE_DISSOLVE 1064
 /** \} */
 
 /* -------------------------------------------------------------------- */

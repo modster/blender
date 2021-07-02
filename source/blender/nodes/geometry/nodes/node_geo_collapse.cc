@@ -14,11 +14,14 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "BKE_mesh.h"
+
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
-#include "BKE_mesh.h"
+
+#include "UI_interface.h"
+#include "UI_resources.h"
+
 #include "bmesh.h"
 #include "bmesh_tools.h"
 
@@ -37,9 +40,13 @@ static bNodeSocketTemplate geo_node_collapse_out[] = {
     {-1, ""},
 };
 
-namespace blender::nodes{
+namespace blender::nodes {
 
-static Mesh *collapseMesh(const float factor, const GVArrayPtr &selection, const bool triangulate, const int symmetry_axis, Mesh *mesh)
+static Mesh *collapseMesh(const float factor,
+                          const GVArrayPtr &selection,
+                          const bool triangulate,
+                          const int symmetry_axis,
+                          Mesh *mesh)
 {
   if (factor == 1.0f) {
     return mesh;
@@ -47,22 +54,18 @@ static Mesh *collapseMesh(const float factor, const GVArrayPtr &selection, const
 
   BMesh *bm;
 
-  float *mask = (float*)MEM_malloc_arrayN(mesh->totvert, sizeof(float), __func__);
+  float *mask = (float *)MEM_malloc_arrayN(mesh->totvert, sizeof(float), __func__);
   for (int i : selection->typed<float>().index_range()) {
     mask[i] = selection->typed<float>()[i];
   }
 
   BMeshCreateParams bmesh_create_params = {0};
-  BMeshFromMeshParams bmesh_from_mesh_params = {true ,0,0,0,{CD_MASK_ORIGINDEX,CD_MASK_ORIGINDEX,CD_MASK_ORIGINDEX}};
+  BMeshFromMeshParams bmesh_from_mesh_params = {
+      true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
 
- const float symmetry_eps = 0.00002f;
- BM_mesh_decimate_collapse(bm,
-                                factor, mask,
-                                1.0f,
-                                triangulate,
-                                symmetry_axis,
-                                symmetry_eps);
+  const float symmetry_eps = 0.00002f;
+  BM_mesh_decimate_collapse(bm, factor, mask, 1.0f, triangulate, symmetry_axis, symmetry_eps);
   MEM_freeN(mask);
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
   BM_mesh_free(bm);
@@ -90,7 +93,7 @@ static void geo_node_collapse_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   float factor = params.extract_input<float>("Factor");
 
-  if(geometry_set.has_mesh()){
+  if (geometry_set.has_mesh()) {
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
 
     float default_factor = 1.0f;
@@ -102,7 +105,7 @@ static void geo_node_collapse_exec(GeoNodeExecParams params)
 
     Mesh *input_mesh = mesh_component.get_for_write();
 
-    if (input_mesh->totvert <= 3){
+    if (input_mesh->totvert <= 3) {
       params.error_message_add(NodeWarningType::Error,
                                TIP_("Node requires mesh with more than 3 input faces"));
     }
@@ -110,7 +113,8 @@ static void geo_node_collapse_exec(GeoNodeExecParams params)
     const bool triangulate = params.extract_input<bool>("Triangulate");
     const bNode &node = params.node();
     NodeGeometryCollapse &node_storage = *(NodeGeometryCollapse *)node.storage;
-    Mesh *result = collapseMesh(factor, selection, triangulate, node_storage.symmetry_axis, input_mesh);
+    Mesh *result = collapseMesh(
+        factor, selection, triangulate, node_storage.symmetry_axis, input_mesh);
     geometry_set.replace_mesh(result);
   }
 

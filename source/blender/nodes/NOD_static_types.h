@@ -295,7 +295,6 @@ DefNode(GeometryNode, GEO_NODE_CURVE_LENGTH, 0, "CURVE_LENGTH", CurveLength, "Cu
 DefNode(GeometryNode, GEO_NODE_CURVE_RESAMPLE, def_geo_curve_resample, "CURVE_RESAMPLE", CurveResample, "Resample Curve", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_SUBDIVIDE, def_geo_curve_subdivide, "CURVE_SUBDIVIDE", CurveSubdivide, "Curve Subdivide", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_TO_MESH, 0, "CURVE_TO_MESH", CurveToMesh, "Curve to Mesh", "")
-DefNode(GeometryNode, GEO_NODE_DECIMATE, def_geo_decimate, "DECIMATE", Decimate, "Decimate", "")
 DefNode(GeometryNode, GEO_NODE_DISSOLVE, def_geo_dissolve, "DISSOLVE", Dissolve, "Dissolve", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_REVERSE, 0, "CURVE_REVERSE", CurveReverse, "Curve Reverse", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_TO_POINTS, def_geo_curve_to_points, "CURVE_TO_POINTS", CurveToPoints, "Curve to Points", "")
@@ -331,7 +330,7 @@ DefNode(GeometryNode, GEO_NODE_SUBDIVISION_SURFACE, 0, "SUBDIVISION_SURFACE", Su
 DefNode(GeometryNode, GEO_NODE_SWITCH, def_geo_switch, "SWITCH", Switch, "Switch", "")
 DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform", "")
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
-DefNode(GeometryNode, GEO_NODE_UNSUBDIVIDE, def_geo_decimate, "UNSUBDIVIDE", Unsubdivide, "Unsubdivide", "")
+DefNode(GeometryNode, GEO_NODE_UNSUBDimIVIDE, 0, "UNSUBDIVIDE", Unsubdivide, "Unsubdivide", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
 
 /* undefine macros */

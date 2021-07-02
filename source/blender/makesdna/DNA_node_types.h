@@ -1388,11 +1388,6 @@ typedef struct NodeGeometryRaycast {
   char _pad[1];
 } NodeGeometryRaycast;
 
-typedef struct NodeGeometryDecimate {
-  uint8_t mode;
-  char _pad[7];
-} NodeGeometryDecimate;
-
 typedef struct NodeGeometryCollapse {
   int symmetry_axis;
   char _pad[4];

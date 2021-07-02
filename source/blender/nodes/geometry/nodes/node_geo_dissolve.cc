@@ -14,15 +14,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "BKE_mesh.h"
+
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
-#include "BKE_mesh.h"
+
+#include "UI_interface.h"
+#include "UI_resources.h"
+
 #include "bmesh.h"
 #include "bmesh_tools.h"
-#include "node_geometry_util.hh"
 #include "math.h"
+#include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_dissolve_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
@@ -36,13 +39,17 @@ static bNodeSocketTemplate geo_node_dissolve_out[] = {
     {-1, ""},
 };
 
-namespace blender::nodes{
+namespace blender::nodes {
 
-static Mesh *dissolveMesh(const float angle, const bool all_boundaries, const int delimiter, Mesh *mesh)
+static Mesh *dissolveMesh(const float angle,
+                          const bool all_boundaries,
+                          const int delimiter,
+                          Mesh *mesh)
 {
   BMesh *bm;
   BMeshCreateParams bmesh_create_params = {0};
-  BMeshFromMeshParams bmesh_from_mesh_params = {true ,0,0,0,{CD_MASK_ORIGINDEX,CD_MASK_ORIGINDEX,CD_MASK_ORIGINDEX}};
+  BMeshFromMeshParams bmesh_from_mesh_params = {
+      true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
 
   BM_mesh_decimate_dissolve(bm, angle, all_boundaries, (BMO_Delimit)delimiter);
@@ -74,12 +81,12 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   float angle = params.extract_input<float>("Angle");
 
-  if(geometry_set.has_mesh()){
+  if (geometry_set.has_mesh()) {
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
 
     Mesh *input_mesh = mesh_component.get_for_write();
 
-    if (input_mesh->totvert <= 3){
+    if (input_mesh->totvert <= 3) {
       params.error_message_add(NodeWarningType::Error,
                                TIP_("Node requires mesh with more than 3 input faces"));
     }
@@ -87,7 +94,7 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
     const bool all_boundaries = params.extract_input<bool>("All Boundaries");
     const bNode &node = params.node();
     NodeGeometryDissolve &node_storage = *(NodeGeometryDissolve *)node.storage;
-    Mesh *result = dissolveMesh(angle, all_boundaries , node_storage.delimiter, input_mesh);
+    Mesh *result = dissolveMesh(angle, all_boundaries, node_storage.delimiter, input_mesh);
     geometry_set.replace_mesh(result);
   }
 

@@ -172,7 +172,6 @@ set(SRC
   geometry/nodes/node_geo_curve_subdivide.cc
   geometry/nodes/node_geo_delete_geometry.cc
   geometry/nodes/node_geo_dissolve.cc
-  geometry/nodes/node_geo_decimate.cc
   geometry/nodes/node_geo_edge_split.cc
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_is_viewport.cc
