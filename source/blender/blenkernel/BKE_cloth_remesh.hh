@@ -100,6 +100,19 @@ using EdgeVerts = std::tuple<VertIndex, VertIndex>;
 
 using usize = uint64_t;
 
+inline void copy_v2_float2(float *res, const float2 &v2)
+{
+  res[0] = v2[0];
+  res[1] = v2[1];
+}
+
+inline void copy_v3_float3(float *res, const float3 &v3)
+{
+  res[0] = v3[0];
+  res[1] = v3[1];
+  res[2] = v3[2];
+}
+
 template<typename T> std::ostream &operator<<(std::ostream &stream, const blender::Vector<T> &vec)
 {
   if (vec.size() == 0) {
@@ -493,6 +506,64 @@ class MeshIO {
     else {
       BLI_assert_unreachable();
     }
+  }
+
+  ::Mesh *write()
+  {
+    auto num_verts = this->positions.size();
+    auto num_loops = 0;
+    for (const auto &face : this->face_indices) {
+      num_loops += face.size();
+    }
+    auto num_uvs = num_loops; /* for `::Mesh` the number of uvs has
+                               * to match number of loops  */
+    auto num_poly = this->face_indices.size();
+    auto *mesh = BKE_mesh_new_nomain(num_verts, 0, 0, num_loops, num_poly);
+    if (!mesh) {
+      return nullptr;
+    }
+
+    CustomData_add_layer(&mesh->ldata, CD_MLOOPUV, CD_CALLOC, nullptr, num_uvs);
+
+    BKE_mesh_update_customdata_pointers(mesh, false);
+
+    auto *mverts = mesh->mvert;
+    auto *mloopuvs = mesh->mloopuv;
+    auto *mloops = mesh->mloop;
+    auto *mpolys = mesh->mpoly;
+
+    for (auto i = 0; i < this->positions.size(); i++) {
+      copy_v3_float3(mverts[i].co, this->positions[i]);
+    }
+
+    auto loopstart = 0;
+    for (auto i = 0; i < this->face_indices.size(); i++) {
+      auto &face = this->face_indices[i];
+      auto &mpoly = mpolys[i];
+      mpoly.loopstart = loopstart;
+      mpoly.totloop = face.size();
+
+      for (auto j = 0; j < face.size(); j++) {
+        auto [pos_index, uv_index, normal_index] = face[j];
+        /* TODO(ish): handle normal index */
+        mloops[loopstart + j].v = pos_index;
+
+        /* Need to update mloopuvs here since `mesh->mloop` and
+         * `mesh->mloopuv` need to maintain same size and correspond
+         * with one another  */
+        copy_v2_float2(mloopuvs[loopstart + j].uv, this->uvs[uv_index]);
+      }
+
+      loopstart += face.size();
+    }
+
+    BKE_mesh_ensure_normals(mesh);
+    BKE_mesh_calc_edges(mesh, false, false);
+
+    /* TODO(ish): handle vertex normals */
+    /* TODO(ish): handle line_indices/mesh wires (edges without faces) */
+
+    return mesh;
   }
 
   void set_positions(blender::Vector<float3> &&positions)

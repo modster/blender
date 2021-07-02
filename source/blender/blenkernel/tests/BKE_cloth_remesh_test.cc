@@ -24,6 +24,20 @@
 
 namespace blender::bke::tests {
 
+static std::string stringify_v2(const float *v2)
+{
+  std::ostringstream stream;
+  stream << "(" << v2[0] << ", " << v2[1] << ")";
+  return stream.str();
+}
+
+static std::string stringify_v3(const float *v3)
+{
+  std::ostringstream stream;
+  stream << "(" << v3[0] << ", " << v3[1] << ", " << v3[2] << ")";
+  return stream.str();
+}
+
 using namespace internal;
 
 static const char *cube_pos_uv_normal =
@@ -224,6 +238,151 @@ TEST(cloth_remesh, MeshIO_ReadDNAMesh)
       "f 8/21/8 4/22/4 2/23/2 6/24/6 \n";
 
   EXPECT_EQ(stream_out.str(), expected);
+}
+
+TEST(cloth_remesh, MeshIO_WriteDNAMesh)
+{
+  MeshIO reader;
+  std::istringstream stream_in(cube_pos_uv_normal);
+  auto res = reader.read(std::move(stream_in), MeshIO::IOTYPE_OBJ);
+  EXPECT_TRUE(res);
+
+  auto *mesh = reader.write();
+  EXPECT_NE(mesh, nullptr);
+
+  EXPECT_NE(mesh->mvert, nullptr);
+  EXPECT_NE(mesh->medge, nullptr);
+  EXPECT_NE(mesh->mpoly, nullptr);
+  EXPECT_NE(mesh->mloop, nullptr);
+  EXPECT_NE(mesh->mloopuv, nullptr);
+
+  auto format_string_mvert = [](const MVert &mvert) {
+    std::ostringstream stream;
+    stream << "[mvert: ("
+           << "co: " << stringify_v3(mvert.co) << ")]";
+    return stream.str();
+  };
+  auto format_string_mloopuv = [](const MLoopUV &mloopuv) {
+    std::ostringstream stream;
+    stream << "[mloopuv: ("
+           << "uv: " << stringify_v2(mloopuv.uv) << ")]";
+    return stream.str();
+  };
+  auto format_string_medge = [](const MEdge &medge) {
+    std::ostringstream stream;
+    stream << "[medge: ("
+           << "v1: " << medge.v1 << ", v2: " << medge.v2 << ")]";
+    return stream.str();
+  };
+  auto format_string_mpoly = [](const MPoly &mpoly) {
+    std::ostringstream stream;
+    stream << "[mpoly: ("
+           << "loopstart: " << mpoly.loopstart << ", totloop: " << mpoly.totloop << ")]";
+    return stream.str();
+  };
+  auto format_string_mloop = [](const MLoop &mloop) {
+    std::ostringstream stream;
+    stream << "[mloop: ("
+           << "v: " << mloop.v << ", e: " << mloop.e << ")]";
+    return stream.str();
+  };
+
+  std::string expected =
+      "[mvert: (co: (1, 1, -1))]\n"
+      "[mvert: (co: (1, -1, -1))]\n"
+      "[mvert: (co: (1, 1, 1))]\n"
+      "[mvert: (co: (1, -1, 1))]\n"
+      "[mvert: (co: (-1, 1, -1))]\n"
+      "[mvert: (co: (-1, -1, -1))]\n"
+      "[mvert: (co: (-1, 1, 1))]\n"
+      "[mvert: (co: (-1, -1, 1))]\n"
+      "[mloopuv: (uv: (0.625, 0.5))]\n"
+      "[mloopuv: (uv: (0.875, 0.5))]\n"
+      "[mloopuv: (uv: (0.875, 0.75))]\n"
+      "[mloopuv: (uv: (0.625, 0.75))]\n"
+      "[mloopuv: (uv: (0.375, 0.75))]\n"
+      "[mloopuv: (uv: (0.625, 0.75))]\n"
+      "[mloopuv: (uv: (0.625, 1))]\n"
+      "[mloopuv: (uv: (0.375, 1))]\n"
+      "[mloopuv: (uv: (0.375, 0))]\n"
+      "[mloopuv: (uv: (0.625, 0))]\n"
+      "[mloopuv: (uv: (0.625, 0.25))]\n"
+      "[mloopuv: (uv: (0.375, 0.25))]\n"
+      "[mloopuv: (uv: (0.125, 0.5))]\n"
+      "[mloopuv: (uv: (0.375, 0.5))]\n"
+      "[mloopuv: (uv: (0.375, 0.75))]\n"
+      "[mloopuv: (uv: (0.125, 0.75))]\n"
+      "[mloopuv: (uv: (0.375, 0.5))]\n"
+      "[mloopuv: (uv: (0.625, 0.5))]\n"
+      "[mloopuv: (uv: (0.625, 0.75))]\n"
+      "[mloopuv: (uv: (0.375, 0.75))]\n"
+      "[mloopuv: (uv: (0.375, 0.25))]\n"
+      "[mloopuv: (uv: (0.625, 0.25))]\n"
+      "[mloopuv: (uv: (0.625, 0.5))]\n"
+      "[mloopuv: (uv: (0.375, 0.5))]\n"
+      "[mpoly: (loopstart: 0, totloop: 4)]\n"
+      "[mpoly: (loopstart: 4, totloop: 4)]\n"
+      "[mpoly: (loopstart: 8, totloop: 4)]\n"
+      "[mpoly: (loopstart: 12, totloop: 4)]\n"
+      "[mpoly: (loopstart: 16, totloop: 4)]\n"
+      "[mpoly: (loopstart: 20, totloop: 4)]\n"
+      "[mloop: (v: 0, e: 3)]\n"
+      "[mloop: (v: 4, e: 5)]\n"
+      "[mloop: (v: 6, e: 9)]\n"
+      "[mloop: (v: 2, e: 1)]\n"
+      "[mloop: (v: 3, e: 2)]\n"
+      "[mloop: (v: 2, e: 9)]\n"
+      "[mloop: (v: 6, e: 10)]\n"
+      "[mloop: (v: 7, e: 6)]\n"
+      "[mloop: (v: 7, e: 10)]\n"
+      "[mloop: (v: 6, e: 5)]\n"
+      "[mloop: (v: 4, e: 4)]\n"
+      "[mloop: (v: 5, e: 8)]\n"
+      "[mloop: (v: 5, e: 7)]\n"
+      "[mloop: (v: 1, e: 11)]\n"
+      "[mloop: (v: 3, e: 6)]\n"
+      "[mloop: (v: 7, e: 8)]\n"
+      "[mloop: (v: 1, e: 0)]\n"
+      "[mloop: (v: 0, e: 1)]\n"
+      "[mloop: (v: 2, e: 2)]\n"
+      "[mloop: (v: 3, e: 11)]\n"
+      "[mloop: (v: 5, e: 4)]\n"
+      "[mloop: (v: 4, e: 3)]\n"
+      "[mloop: (v: 0, e: 0)]\n"
+      "[mloop: (v: 1, e: 7)]\n"
+      "[medge: (v1: 0, v2: 1)]\n"
+      "[medge: (v1: 0, v2: 2)]\n"
+      "[medge: (v1: 2, v2: 3)]\n"
+      "[medge: (v1: 0, v2: 4)]\n"
+      "[medge: (v1: 4, v2: 5)]\n"
+      "[medge: (v1: 4, v2: 6)]\n"
+      "[medge: (v1: 3, v2: 7)]\n"
+      "[medge: (v1: 1, v2: 5)]\n"
+      "[medge: (v1: 5, v2: 7)]\n"
+      "[medge: (v1: 2, v2: 6)]\n"
+      "[medge: (v1: 6, v2: 7)]\n"
+      "[medge: (v1: 1, v2: 3)]\n";
+
+  std::ostringstream sout;
+  for (auto i = 0; i < mesh->totvert; i++) {
+    sout << format_string_mvert(mesh->mvert[i]) << std::endl;
+  }
+  for (auto i = 0; i < mesh->totloop; i++) {
+    sout << format_string_mloopuv(mesh->mloopuv[i]) << std::endl;
+  }
+  for (auto i = 0; i < mesh->totpoly; i++) {
+    sout << format_string_mpoly(mesh->mpoly[i]) << std::endl;
+  }
+  for (auto i = 0; i < mesh->totloop; i++) {
+    sout << format_string_mloop(mesh->mloop[i]) << std::endl;
+  }
+  for (auto i = 0; i < mesh->totedge; i++) {
+    sout << format_string_medge(mesh->medge[i]) << std::endl;
+  }
+
+  EXPECT_EQ(sout.str(), expected);
+
+  BKE_mesh_eval_delete(mesh);
 }
 
 TEST(cloth_remesh, Mesh_Read)
