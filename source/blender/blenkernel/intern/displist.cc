@@ -831,13 +831,6 @@ void BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
   }
 }
 
-static void geometry_set_ensure_mesh(GeometrySet &geometry_set)
-{
-  if (!geometry_set.has_mesh()) {
-    geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0, 0));
-  }
-}
-
 static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
                                              const Scene *scene,
                                              Object *ob,
@@ -895,7 +888,9 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
       continue;
     }
 
-    geometry_set_ensure_mesh(geometry_set);
+    if (!geometry_set.has_mesh()) {
+      geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0, 0));
+    }
     Mesh *mesh = geometry_set.get_mesh_for_write();
 
     if (mti->type == eModifierTypeType_OnlyDeform) {
@@ -919,16 +914,17 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
     }
   }
 
-  geometry_set_ensure_mesh(geometry_set);
-  Mesh *final_mesh = geometry_set.get_mesh_for_write();
+  if (geometry_set.has_mesh()) {
+    Mesh *final_mesh = geometry_set.get_mesh_for_write();
 
-  /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
-  BKE_mesh_ensure_normals(final_mesh);
+    /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
+    BKE_mesh_ensure_normals(final_mesh);
 
-  /* Set flag which makes it easier to see what's going on in a debugger. */
-  final_mesh->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
-  BLI_strncpy(final_mesh->id.name, cu->id.name, sizeof(final_mesh->id.name));
-  *((short *)final_mesh->id.name) = ID_ME;
+    /* Set flag which makes it easier to see what's going on in a debugger. */
+    final_mesh->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
+    BLI_strncpy(final_mesh->id.name, cu->id.name, sizeof(final_mesh->id.name));
+    *((short *)final_mesh->id.name) = ID_ME;
+  }
 
   return geometry_set;
 }
@@ -1505,13 +1501,15 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
   else {
     GeometrySet geometry_set;
     evaluate_curve_type_object(depsgraph, scene, ob, for_render, dispbase, &geometry_set);
-
-    if (ob->mode == OB_MODE_EDIT) {
-      const Curve &original_curve = *(const Curve *)ob->data;
-      CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
-      curve_component.add_edit_mode_data_to_result(original_curve);
+    if (BKE_curve_editNurbs_get_for_read((const Curve *)ob->data) &&
+        !geometry_set.has<CurveComponent>()) {
+      geometry_set.get_component_for_write<CurveComponent>();
     }
     ob->runtime.geometry_set_eval = new GeometrySet(std::move(geometry_set));
+
+    if (geometry_set.has<MeshComponent>()) {
+      std::cout << "Output has mesh component\n";
+    }
   }
 
   boundbox_displist_object(ob);

@@ -813,6 +813,8 @@ GPUBatch *DRW_cache_object_edge_detection_get(Object *ob, bool *r_is_manifold)
   switch (ob->type) {
     case OB_MESH:
       return DRW_cache_mesh_edge_detection_get(ob, r_is_manifold);
+    case OB_CURVE:
+      return NULL;
     case OB_SURF:
       return DRW_cache_surf_edge_detection_get(ob, r_is_manifold);
     case OB_FONT:
@@ -835,6 +837,8 @@ GPUBatch *DRW_cache_object_face_wireframe_get(Object *ob)
   switch (ob->type) {
     case OB_MESH:
       return DRW_cache_mesh_face_wireframe_get(ob);
+    case OB_CURVE:
+      return NULL;
     case OB_SURF:
       return DRW_cache_surf_face_wireframe_get(ob);
     case OB_FONT:
@@ -860,6 +864,8 @@ GPUBatch *DRW_cache_object_loose_edges_get(struct Object *ob)
   switch (ob->type) {
     case OB_MESH:
       return DRW_cache_mesh_loose_edges_get(ob);
+    case OB_CURVE:
+      return NULL;
     case OB_SURF:
       return DRW_cache_surf_loose_edges_get(ob);
     case OB_FONT:
@@ -882,6 +888,8 @@ GPUBatch *DRW_cache_object_surface_get(Object *ob)
   switch (ob->type) {
     case OB_MESH:
       return DRW_cache_mesh_surface_get(ob);
+    case OB_CURVE:
+      return NULL;
     case OB_SURF:
       return DRW_cache_surf_surface_get(ob);
     case OB_FONT:
@@ -965,6 +973,8 @@ GPUBatch **DRW_cache_object_surface_material_get(struct Object *ob,
   switch (ob->type) {
     case OB_MESH:
       return DRW_cache_mesh_surface_shaded_get(ob, gpumat_array, gpumat_array_len);
+    case OB_CURVE:
+      return NULL;
     case OB_SURF:
       return DRW_cache_surf_surface_shaded_get(ob, gpumat_array, gpumat_array_len);
     case OB_FONT:

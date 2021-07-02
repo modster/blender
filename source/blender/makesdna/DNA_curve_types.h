@@ -43,7 +43,6 @@ struct Key;
 struct Material;
 struct Object;
 struct VFont;
-struct CurveEval;
 
 /* These two Lines with # tell makesdna this struct can be excluded. */
 #
@@ -300,19 +299,6 @@ typedef struct Curve {
 
   char _pad2[6];
   float fsize_realtime;
-
-  /**
-   * A pointer to curve data from geometry nodes, currently only set for evaluated
-   * objects by the dependency graph iterator, and owned by #geometry_set_eval.
-   */
-  struct CurveEval *curve_eval;
-
-  /**
-   * A pointer to the curve data created from edit mode, for drawing edit mode overlays, etc. even
-   * when the curve evaluates to a different data type or changes unrecognizably in the modifier
-   * stack.
-   */
-  // struct CurveEval *edit_mode_curve_eval;
 
   void *batch_cache;
 } Curve;

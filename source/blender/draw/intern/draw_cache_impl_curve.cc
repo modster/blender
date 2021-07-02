@@ -220,9 +220,6 @@ struct CurveRenderData {
   /* Owned by the evaluated object's geometry set (#geometry_set_eval). */
   const CurveEval *curve_eval;
 
-  /* Owned by the evaluated object's geometry set (#geometry_set_eval). */
-  // const CurveEval *edit_mode_curve_eval;
-
   /* borrow from 'Curve' */
   ListBase *nurbs;
 
@@ -248,9 +245,7 @@ enum {
 /*
  * ob_curve_cache can be NULL, only needed for CU_DATATYPE_WIRE
  */
-static CurveRenderData *curve_render_data_create(Curve *cu,
-                                                 CurveCache *ob_curve_cache,
-                                                 const int types)
+static CurveRenderData *curve_render_data_create(Curve *cu, Object *ob, const int types)
 {
   CurveRenderData *rdata = (CurveRenderData *)MEM_callocN(sizeof(*rdata), __func__);
   rdata->types = types;
@@ -259,9 +254,9 @@ static CurveRenderData *curve_render_data_create(Curve *cu,
   rdata->actnu = cu->actnu;
   rdata->actvert = cu->actvert;
 
-  rdata->ob_curve_cache = ob_curve_cache;
+  rdata->ob_curve_cache = ob->runtime.curve_cache;
 
-  rdata->curve_eval = cu->curve_eval;
+  rdata->curve_eval = ob->runtime.geometry_set_eval->get_curve_for_read();
 
   if (types & CU_DATATYPE_WIRE) {
     if (rdata->curve_eval != nullptr) {
@@ -1151,7 +1146,7 @@ void DRW_curve_batch_cache_create_requested(Object *ob, const struct Scene *scen
   printf("  mr_flag %d\n\n", mr_flag);
 #endif
 
-  CurveRenderData *rdata = curve_render_data_create(cu, ob->runtime.curve_cache, mr_flag);
+  CurveRenderData *rdata = curve_render_data_create(cu, ob, mr_flag);
 
   /* The object's curve cache can be empty (in one case because we use #CurveEval's cache instead),
    * If so, point to an empty DispList list to avoid the need to check for null in the following

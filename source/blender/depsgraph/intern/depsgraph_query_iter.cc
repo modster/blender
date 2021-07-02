@@ -225,16 +225,19 @@ bool deg_iterator_components_step(BLI_Iterator *iter)
 
     const CurveComponent *component = geometry_set->get_component_for_read<CurveComponent>();
     if (component != nullptr) {
-      const Curve *curve = component->get_curve_for_render();
 
+      /* Don't use a temporary object for this component when the owner is a curve object. */
+      if (data->geometry_component_owner->type == OB_CURVE) {
+        iter->current = data->geometry_component_owner;
+        return true;
+      }
+
+      const Curve *curve = component->get_curve_for_render();
       if (curve != nullptr) {
         Object *temp_object = &data->temp_geometry_component_object;
         *temp_object = *data->geometry_component_owner;
         temp_object->type = OB_CURVE;
         temp_object->data = (void *)curve;
-        /* Assign data_eval here too, because curve rendering code tries
-         * to use a mesh if it can find one in this pointer. */
-        temp_object->runtime.data_eval = (ID *)curve;
         temp_object->runtime.select_id = data->geometry_component_owner->runtime.select_id;
         iter->current = temp_object;
         return true;

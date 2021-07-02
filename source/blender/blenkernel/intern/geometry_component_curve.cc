@@ -64,8 +64,6 @@ void CurveComponent::clear()
       delete curve_;
     }
     if (curve_for_render_ != nullptr) {
-      /* Don't free the edit mode data, it's only borrowed! */
-      curve_for_render_->editnurb = nullptr;
       BKE_id_free(nullptr, curve_for_render_);
       curve_for_render_ = nullptr;
     }
@@ -130,52 +128,27 @@ void CurveComponent::ensure_owns_direct_data()
   }
 }
 
-void CurveComponent::create_render_curve() const
-{
-  if (curve_for_render_ != nullptr) {
-    return;
-  }
-  std::lock_guard lock{curve_for_render_mutex_};
-  if (curve_for_render_ != nullptr) {
-    return;
-  }
-
-  curve_for_render_ = (Curve *)BKE_id_new_nomain(ID_CU, nullptr);
-  curve_for_render_->curve_eval = curve_;
-}
-
 /**
  * Create empty curve data used for rendering the spline's wire edges.
  * \note See comment on #curve_for_render_ for further explanation.
  */
 const Curve *CurveComponent::get_curve_for_render() const
 {
-  this->create_render_curve();
+  if (curve_ == nullptr) {
+    return nullptr;
+  }
+  if (curve_for_render_ != nullptr) {
+    return curve_for_render_;
+  }
+  std::lock_guard lock{curve_for_render_mutex_};
+  if (curve_for_render_ != nullptr) {
+    return curve_for_render_;
+  }
+
+  curve_for_render_ = (Curve *)BKE_id_new_nomain(ID_CU, nullptr);
 
   return curve_for_render_;
 }
-
-/**
- * TODO: Comment
- */
-void CurveComponent::add_edit_mode_data_to_result(const Curve &original_curve)
-{
-  std::cout << __func__ << "\n";
-  this->create_render_curve();
-
-  curve_for_render_->editnurb = original_curve.editnurb;
-  curve_for_render_->actnu = original_curve.actnu;
-  curve_for_render_->actvert = original_curve.actvert;
-}
-
-// void CurveComponent::add_edit_curve_eval_to_render_curve(std::unique_ptr<CurveEval> edit_curve)
-// {
-//   this->create_render_curve();
-
-//   owned_edit_mode_curve_ = std::move(edit_curve);
-
-//   curve_for_render_->edit_mode_curve_eval = owned_edit_mode_curve_.get();
-// }
 
 /** \} */
 
