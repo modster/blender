@@ -898,7 +898,8 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
   wmXrData *xr = &wm->xr;
   eXrFlyMode mode;
   bool locz_lock, turn;
-  float speed, speed_max;
+  bool speed_interp_cubic = false;
+  float speed, speed_max, speed_p0[2], speed_p1[2];
   GHOST_XrPose nav_pose;
   float nav_mat[4][4], delta[4][4], m[4][4];
 
@@ -918,25 +919,59 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
   speed_max = prop ? RNA_property_float_get(op->ptr, prop) :
                      (turn ? XR_DEFAULT_FLY_SPEED_TURN : XR_DEFAULT_FLY_SPEED_MOVE);
 
+  prop = RNA_struct_find_property(op->ptr, "speed_interpolation0");
+  if (prop && RNA_property_is_set(op->ptr, prop)) {
+    RNA_property_float_get_array(op->ptr, prop, speed_p0);
+    speed_interp_cubic = true;
+  }
+  else {
+    speed_p0[0] = speed_p0[1] = 0.0f;
+  }
+
+  prop = RNA_struct_find_property(op->ptr, "speed_interpolation1");
+  if (prop && RNA_property_is_set(op->ptr, prop)) {
+    RNA_property_float_get_array(op->ptr, prop, speed_p1);
+    speed_interp_cubic = true;
+  }
+  else {
+    speed_p1[0] = speed_p1[1] = 1.0f;
+  }
+
   /* Ensure valid interpolation. */
   if (speed_max < speed) {
     speed_max = speed;
   }
 
-  /* Lerp between min/max speeds based on button state. */
+  /* Interpolate between min/max speeds based on button state. */
   switch (actiondata->type) {
     case XR_BOOLEAN_INPUT:
       speed = speed_max;
       break;
     case XR_FLOAT_INPUT:
     case XR_VECTOR2F_INPUT: {
-      float state = (actiondata->type == XR_FLOAT_INPUT) ? fabsf(actiondata->state[0]) :
-                                                           len_v2(actiondata->state);
-      float speed_t = (actiondata->float_threshold < 1.0f) ?
-                          (state - actiondata->float_threshold) /
-                              (1.0f - actiondata->float_threshold) :
-                          1.0f;
-      speed += speed_t * (speed_max - speed);
+      const float state = (actiondata->type == XR_FLOAT_INPUT) ? fabsf(actiondata->state[0]) :
+                                                                 len_v2(actiondata->state);
+      const float speed_t = (actiondata->float_threshold < 1.0f) ?
+                                (state - actiondata->float_threshold) /
+                                    (1.0f - actiondata->float_threshold) :
+                                1.0f;
+
+      if (speed_interp_cubic) {
+        float start[2], end[2], out[2];
+
+        start[0] = 0.0f;
+        start[1] = speed;
+        speed_p0[1] = speed + speed_p0[1] * (speed_max - speed);
+        speed_p1[1] = speed + speed_p1[1] * (speed_max - speed);
+        end[0] = 1.0f;
+        end[1] = speed_max;
+
+        interp_v2_v2v2v2v2_cubic(out, start, speed_p0, speed_p1, end, speed_t);
+        speed = out[1];
+      }
+      else {
+        speed += speed_t * (speed_max - speed);
+      }
       break;
     }
     case XR_POSE_INPUT:
@@ -1058,6 +1093,9 @@ static void WM_OT_xr_navigation_fly(wmOperatorType *ot)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const float default_speed_p0[2] = {0.0f, 0.0f};
+  static const float default_speed_p1[2] = {1.0f, 1.0f};
+
   RNA_def_enum(ot->srna, "mode", fly_modes, XR_FLY_VIEWER_FORWARD, "Mode", "Fly mode");
   RNA_def_boolean(
       ot->srna, "lock_location_z", false, "Lock Elevation", "Prevent changes to viewer elevation");
@@ -1079,6 +1117,26 @@ static void WM_OT_xr_navigation_fly(wmOperatorType *ot)
                 "Maximum move/turn speed",
                 0.0f,
                 1000.0f);
+  RNA_def_float_vector(ot->srna,
+                       "speed_interpolation0",
+                       2,
+                       default_speed_p0,
+                       0.0f,
+                       1.0f,
+                       "Speed Interpolation 0",
+                       "First cubic spline control point between min/max speeds",
+                       0.0f,
+                       1.0f);
+  RNA_def_float_vector(ot->srna,
+                       "speed_interpolation1",
+                       2,
+                       default_speed_p1,
+                       0.0f,
+                       1.0f,
+                       "Speed Interpolation 1",
+                       "Second cubic spline control point between min/max speeds",
+                       0.0f,
+                       1.0f);
 }
 
 /** \} */
