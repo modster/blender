@@ -842,7 +842,7 @@ TEST(cloth_remesh, Mesh_Read)
   }
 }
 
-TEST(cloth_remesh, Mesh_LooseEdges)
+TEST(cloth_remesh, Mesh_Read_LooseEdges)
 {
   MeshIO reader;
   std::istringstream stream(plane_extra_loose_edges);
@@ -909,6 +909,83 @@ TEST(cloth_remesh, Mesh_Write)
   EXPECT_EQ(normals.size(), 8);
   EXPECT_EQ(face_indices.size(), 6);
   EXPECT_EQ(line_indices.size(), 0);
+}
+
+TEST(cloth_remesh, Mesh_Write_LooseEdges)
+{
+  MeshIO reader;
+  std::istringstream stream(plane_extra_loose_edges);
+  auto res = reader.read(std::move(stream), MeshIO::IOTYPE_OBJ);
+
+  EXPECT_TRUE(res);
+
+  Mesh<bool, bool, bool, bool> mesh;
+  mesh.read(reader);
+
+  auto result = mesh.write();
+
+  std::ostringstream stream_out;
+  result.write(stream_out, MeshIO::IOTYPE_OBJ);
+
+  std::string expected =
+      "v -1 0 1\n"
+      "v 1 0 1\n"
+      "v -1 0 -1\n"
+      "v 1 0 -1\n"
+      "v -1 0 -2\n"
+      "v 1 0 -2\n"
+      "v 2 0 1\n"
+      "v 2 0 -1\n"
+      "v -1 0 2\n"
+      "v 1 0 2\n"
+      "v -2 0 1\n"
+      "v -2 0 -1\n"
+      "v 3 0 1\n"
+      "v 3 0 -1\n"
+      "vt 0 0\n"
+      "vt 1 0\n"
+      "vt 1 1\n"
+      "vt 0 1\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vt nan nan\n"
+      "vn 0 1 0\n"
+      "vn 0 1 0\n"
+      "vn 0 1 0\n"
+      "vn 0 1 0\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "vn nan nan nan\n"
+      "f 1/1/1 2/2/2 4/3/4 3/4/3 \n"
+      "l 6 5 \n"
+      "l 4 6 \n"
+      "l 5 3 \n"
+      "l 7 8 \n"
+      "l 2 7 \n"
+      "l 8 4 \n"
+      "l 9 10 \n"
+      "l 1 9 \n"
+      "l 10 2 \n"
+      "l 12 11 \n"
+      "l 3 12 \n"
+      "l 11 1 \n"
+      "l 14 13 \n";
+
+  EXPECT_EQ(stream_out.str(), expected);
 }
 
 } /* namespace blender::bke::tests */
