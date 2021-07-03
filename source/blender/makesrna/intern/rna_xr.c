@@ -1704,7 +1704,7 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
                                  "rna_XrActionMapItem_haptic_match_user_paths_get",
                                  "rna_XrActionMapItem_haptic_match_user_paths_set");
   RNA_def_property_ui_text(
-      prop, "Haptic Match User Paths", "Whether to apply haptics to the matching user paths");
+      prop, "Haptic Match User Paths", "Whether to apply haptics to matching user paths");
 
   prop = RNA_def_property(srna, "haptic_duration", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0.0, FLT_MAX);
