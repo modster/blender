@@ -60,6 +60,7 @@ Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct
 #ifdef __cplusplus
 
 #  include <bits/stdint-uintn.h>
+#  include <cmath>
 #  include <filesystem>
 #  include <fstream>
 #  include <iostream>
@@ -1103,15 +1104,20 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
     for (const auto &node : this->nodes) {
       auto pos = node.pos;
+      /* dont need unkown check for position, it should always be present */
       positions.append(pos);
 
       auto normal = node.normal;
-      normals.append(normal);
+      if (float3_is_unknown(normal) == false) {
+        normals.append(normal);
+      }
     }
 
     for (const auto &vert : this->verts) {
       auto uv = vert.uv;
-      uvs.append(uv);
+      if (float2_is_unknown(uv) == false) {
+        uvs.append(uv);
+      }
     }
 
     for (const auto &face : this->faces) {
@@ -1200,6 +1206,16 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   static constexpr inline float2 float2_unknown()
   {
     return float2(std::numeric_limits<float>::signaling_NaN());
+  }
+
+  static inline bool float3_is_unknown(const float3 &f3)
+  {
+    return std::isnan(f3[0]) && std::isnan(f3[1]) && std::isnan(f3[2]);
+  }
+
+  static inline bool float2_is_unknown(const float2 &f2)
+  {
+    return std::isnan(f2[0]) && std::isnan(f2[1]);
   }
 
   /* all private non-static methods */
