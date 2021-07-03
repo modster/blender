@@ -129,14 +129,6 @@ static void deformStroke(GpencilModifierData *md,
       }
     }
   }
-  /* Calculate Random matrix. */
-  float mat_rnd[4][4];
-  float rnd_loc[3], rnd_rot[3];
-  float rnd_scale[3] = {1.0f, 1.0f, 1.0f};
-  mul_v3_v3v3(rnd_loc, mmd->rnd_offset, rand[0]);
-  mul_v3_v3v3(rnd_rot, mmd->rnd_rot, rand[1]);
-  madd_v3_v3v3(rnd_scale, mmd->rnd_scale, rand[2]);
-  loc_eul_size_to_mat4(mat_rnd, rnd_loc, rnd_rot, rnd_scale);
 
   bGPdata *gpd = ob->data;
 
@@ -150,6 +142,16 @@ static void deformStroke(GpencilModifierData *md,
     if (weight < 0.0f) {
       continue;
     }
+
+    /* Calculate Random matrix. */
+    float mat_rnd[4][4];
+    float rnd_loc[3] = {rand[0][0] * weight, rand[0][1] * weight, rand[0][2] * weight};
+    float rnd_rot[3] = {rand[1][0] * weight, rand[1][1] * weight, rand[1][2] * weight};
+    float rnd_scale[3] = {rand[2][0] * weight, rand[2][1] * weight, rand[2][2] * weight};
+    mul_v3_v3v3(rnd_loc, mmd->rnd_offset, rnd_loc);
+    mul_v3_v3v3(rnd_rot, mmd->rnd_rot, rnd_rot);
+    madd_v3_v3v3(rnd_scale, mmd->rnd_scale, rnd_scale);
+    loc_eul_size_to_mat4(mat_rnd, rnd_loc, rnd_rot, rnd_scale);
     /* Apply randomness matrix. */
     mul_m4_v3(mat_rnd, &pt->x);
 
