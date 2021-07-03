@@ -256,7 +256,12 @@ void MOD_get_vgroup(
 {
   if (mesh) {
     *defgrp_index = BKE_id_defgroup_name_index(&mesh->id, name);
-    *dvert = mesh->dvert;
+    if (*defgrp_index != -1) {
+      *dvert = mesh->dvert;
+    }
+    else {
+      *dvert = NULL;
+    }
   }
   else {
     *defgrp_index = BKE_object_defgroup_name_index(ob, name);

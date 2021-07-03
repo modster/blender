@@ -87,7 +87,7 @@ static void greasepencil_copy_data(Main *UNUSED(bmain),
     gpd_dst->mat = MEM_dupallocN(gpd_src->mat);
   }
 
-  BKE_defgroup_copy_list(&gpd_dst->vertex_group_names, &gpd_src->vertex_group_names, __func__);
+  BKE_defgroup_copy_list(&gpd_dst->vertex_group_names, &gpd_src->vertex_group_names);
 
   /* copy layers */
   BLI_listbase_clear(&gpd_dst->layers);
