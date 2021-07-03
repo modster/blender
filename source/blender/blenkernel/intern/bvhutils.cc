@@ -704,7 +704,7 @@ BVHTree *bvhtree_from_editmesh_verts(
 }
 
 /**
- * Builds a bvh tree where nodes are the given vertices (note: does not copy given `vert`!).
+ * Builds a bvh tree where nodes are the given vertices (NOTE: does not copy given `vert`!).
  * \param vert_allocated: if true, vert freeing will be done when freeing data.
  * \param verts_mask: if not null, true elements give which vert to add to BVH tree.
  * \param verts_num_active: if >= 0, number of active verts to add to BVH tree
@@ -1051,7 +1051,7 @@ static void bvhtree_from_mesh_faces_setup_data(BVHTreeFromMesh *data,
 
 /**
  * Builds a bvh tree where nodes are the given tessellated faces
- * (note: does not copy given mfaces!).
+ * (NOTE: does not copy given mfaces!).
  * \param vert_allocated: if true, vert freeing will be done when freeing data.
  * \param face_allocated: if true, face freeing will be done when freeing data.
  * \param faces_mask: if not null, true elements give which faces to add to BVH tree.
@@ -1438,9 +1438,12 @@ static BLI_bitmap *looptri_no_hidden_map_get(const MPoly *mpoly,
 
 /**
  * Builds or queries a bvhcache for the cache bvhtree of the request type.
+ *
+ * \note This function only fills a cache, and therefore the mesh argument can
+ * be considered logically const. Concurrent access is protected by a mutex.
  */
 BVHTree *BKE_bvhtree_from_mesh_get(struct BVHTreeFromMesh *data,
-                                   struct Mesh *mesh,
+                                   const struct Mesh *mesh,
                                    const BVHCacheType bvh_cache_type,
                                    const int tree_type)
 {
@@ -1448,7 +1451,7 @@ BVHTree *BKE_bvhtree_from_mesh_get(struct BVHTreeFromMesh *data,
   BVHCache **bvh_cache_p = (BVHCache **)&mesh->runtime.bvh_cache;
   ThreadMutex *mesh_eval_mutex = (ThreadMutex *)mesh->runtime.eval_mutex;
 
-  bool is_cached = bvhcache_find(bvh_cache_p, bvh_cache_type, &tree, nullptr, nullptr);
+  const bool is_cached = bvhcache_find(bvh_cache_p, bvh_cache_type, &tree, nullptr, nullptr);
 
   if (is_cached && tree == nullptr) {
     memset(data, 0, sizeof(*data));
