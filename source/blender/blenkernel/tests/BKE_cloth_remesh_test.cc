@@ -842,6 +842,48 @@ TEST(cloth_remesh, Mesh_Read)
   }
 }
 
+TEST(cloth_remesh, Mesh_LooseEdges)
+{
+  MeshIO reader;
+  std::istringstream stream(plane_extra_loose_edges);
+  auto res = reader.read(std::move(stream), MeshIO::IOTYPE_OBJ);
+
+  EXPECT_TRUE(res);
+
+  Mesh<bool, bool, bool, bool> mesh;
+  mesh.read(reader);
+
+  const auto &nodes = mesh.get_nodes();
+  const auto &verts = mesh.get_verts();
+  const auto &edges = mesh.get_edges();
+  const auto &faces = mesh.get_faces();
+
+  EXPECT_EQ(nodes.size(), 14);
+  EXPECT_EQ(verts.size(), 14);
+  EXPECT_EQ(edges.size(), 17);
+  EXPECT_EQ(faces.size(), 1);
+
+  for (const auto &face : faces) {
+    EXPECT_EQ(face.get_verts().size(), 4);
+  }
+
+  for (const auto &edge : edges) {
+    auto num_faces = edge.get_faces().size();
+    EXPECT_TRUE(num_faces == 0 || num_faces == 1);
+  }
+
+  for (const auto &vert : verts) {
+    auto num_edges = vert.get_edges().size();
+    EXPECT_TRUE(num_edges >= 1 && num_edges <= 4);
+    EXPECT_NE(vert.get_node(), std::nullopt);
+  }
+
+  for (const auto &node : nodes) {
+    auto num_verts = node.get_verts().size();
+    EXPECT_EQ(num_verts, 1);
+  }
+}
+
 TEST(cloth_remesh, Mesh_Write)
 {
   MeshIO reader;

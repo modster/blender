@@ -893,11 +893,11 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
   void read(const MeshIO &reader)
   {
-    const auto positions = reader.get_positions();
-    const auto uvs = reader.get_uvs();
-    const auto normals = reader.get_normals();
-    const auto face_indices = reader.get_face_indices();
-    const auto line_indices = reader.get_line_indices();
+    const auto &positions = reader.get_positions();
+    const auto &uvs = reader.get_uvs();
+    const auto &normals = reader.get_normals();
+    const auto &face_indices = reader.get_face_indices();
+    const auto &line_indices = reader.get_line_indices();
 
     /* TODO(ish): add support for when uvs doesn't exist */
     BLI_assert(uvs.size() != 0);
@@ -995,7 +995,66 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
-    /* TODO(ish): add support for lines */
+    /* Add loose edges
+     *
+     * Need to create "empty" `Vert`(s) since `Edge`(s) store
+     * `Vert`(s) which has UV coords but since these are loose edges,
+     * they don't have any UV coords. Ideally we would store `Node`(s)
+     * directly but this might lead to problems else where with
+     * respect to speed (the link between edges and faces would be
+     * slower to access).
+     **/
+    {
+      /* For each loose edge, add the correct connectivity */
+      for (const auto &line : line_indices) {
+        blender::Vector<std::tuple<usize, usize>> line_pairs;
+        for (auto i = 0; i < line.size() - 1; i++) {
+          line_pairs.append(std::make_tuple(line[i], line[i + 1]));
+        }
+
+        for (const auto &[node_1_i, node_2_i] : line_pairs) {
+          auto &edge = this->add_empty_edge();
+
+          auto op_node_1 = this->nodes.get_no_gen(node_1_i);
+          BLI_assert(op_node_1);
+          auto &node_1 = op_node_1.value().get();
+
+          auto op_node_2 = this->nodes.get_no_gen(node_2_i);
+          BLI_assert(op_node_2);
+          auto &node_2 = op_node_2.value().get();
+
+          /* For `Node`(s) without `Vert`(s) create an empty vert */
+          {
+            auto connect_node_to_empty_vert = [this](auto &node) {
+              if (node.verts.size() == 0) {
+                auto &vert = this->add_empty_vert(float2_unknown());
+                vert.node = node.self_index;
+                node.verts.append(vert.self_index);
+              }
+            };
+
+            connect_node_to_empty_vert(node_1);
+            connect_node_to_empty_vert(node_2);
+          }
+
+          /* TODO(ish): in case `node_1` or `node_2` are part of a
+           * face, then it might make sense to pick the "best"
+           * `Vert`, maybe via distance?  */
+          /* Pick the first `Vert` of the `Node` to connect to loose edge */
+          auto op_vert_1 = this->verts.get(node_1.verts[0]);
+          BLI_assert(op_vert_1);
+          auto &vert_1 = op_vert_1.value().get();
+          auto op_vert_2 = this->verts.get(node_2.verts[0]);
+          BLI_assert(op_vert_2);
+          auto &vert_2 = op_vert_2.value().get();
+
+          /* Connect up the edge with the verts */
+          vert_1.edges.append(edge.self_index);
+          vert_2.edges.append(edge.self_index);
+          edge.verts = std::make_tuple(vert_1.self_index, vert_2.self_index);
+        }
+      }
+    }
 
     /* TODO(ish): ensure normal information properly, right now need
      * to just assume it is not dirty for faster development */
