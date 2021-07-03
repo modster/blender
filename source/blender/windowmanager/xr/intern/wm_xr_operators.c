@@ -53,6 +53,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "PIL_time.h"
+
 #include "RNA_access.h"
 #include "RNA_define.h"
 
@@ -759,6 +761,26 @@ typedef enum eXrFlyMode {
   XR_FLY_CONTROLLER_FORWARD = 12,
 } eXrFlyMode;
 
+typedef struct XrFlyData {
+  float viewer_rot[4];
+  double time_prev;
+} XrFlyData;
+
+static void wm_xr_fly_init(wmOperator *op, const wmXrData *xr)
+{
+  BLI_assert(op->customdata == NULL);
+
+  XrFlyData *data = op->customdata = MEM_callocN(sizeof(XrFlyData), __func__);
+
+  WM_xr_session_state_viewer_pose_rotation_get(xr, data->viewer_rot);
+  data->time_prev = PIL_check_seconds_timer();
+}
+
+static void wm_xr_fly_uninit(wmOperator *op)
+{
+  MEM_SAFE_FREE(op->customdata);
+}
+
 static void wm_xr_fly_compute_move(eXrFlyMode mode,
                                    float speed,
                                    const float ref_quat[4],
@@ -869,13 +891,13 @@ static int wm_xr_navigation_fly_invoke_3d(bContext *C, wmOperator *op, const wmE
     return OPERATOR_PASS_THROUGH;
   }
 
-  int retval = op->type->modal_3d(C, op, event);
+  wmWindowManager *wm = CTX_wm_manager(C);
 
-  if ((retval & OPERATOR_RUNNING_MODAL) != 0) {
-    WM_event_add_modal_handler(C, op);
-  }
+  wm_xr_fly_init(op, &wm->xr);
 
-  return retval;
+  WM_event_add_modal_handler(C, op);
+
+  return OPERATOR_RUNNING_MODAL;
 }
 
 static int wm_xr_navigation_fly_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
@@ -890,18 +912,22 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
   }
 
   if (event->val == KM_RELEASE) {
+    wm_xr_fly_uninit(op);
     return OPERATOR_FINISHED;
   }
 
   const wmXrActionData *actiondata = event->customdata;
+  XrFlyData *data = op->customdata;
   wmWindowManager *wm = CTX_wm_manager(C);
   wmXrData *xr = &wm->xr;
   eXrFlyMode mode;
-  bool locz_lock, turn;
+  bool turn, locz_lock, dir_lock, speed_frame_based;
   bool speed_interp_cubic = false;
   float speed, speed_max, speed_p0[2], speed_p1[2];
   GHOST_XrPose nav_pose;
   float nav_mat[4][4], delta[4][4], m[4][4];
+
+  const float time_now = PIL_check_seconds_timer();
 
   PropertyRNA *prop = RNA_struct_find_property(op->ptr, "mode");
   mode = prop ? RNA_property_enum_get(op->ptr, prop) : XR_FLY_VIEWER_FORWARD;
@@ -911,13 +937,21 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
   prop = RNA_struct_find_property(op->ptr, "lock_location_z");
   locz_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
 
+  prop = RNA_struct_find_property(op->ptr, "lock_direction");
+  dir_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+
+  prop = RNA_struct_find_property(op->ptr, "speed_frame_based");
+  speed_frame_based = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
   prop = RNA_struct_find_property(op->ptr, "speed_min");
   speed = prop ? RNA_property_float_get(op->ptr, prop) :
-                 (turn ? XR_DEFAULT_FLY_SPEED_TURN : XR_DEFAULT_FLY_SPEED_MOVE) / 3.0f;
+                 (turn ? XR_DEFAULT_FLY_SPEED_TURN : XR_DEFAULT_FLY_SPEED_MOVE) /
+                     (speed_frame_based ? 3.0f : 0.03f);
 
   prop = RNA_struct_find_property(op->ptr, "speed_max");
   speed_max = prop ? RNA_property_float_get(op->ptr, prop) :
-                     (turn ? XR_DEFAULT_FLY_SPEED_TURN : XR_DEFAULT_FLY_SPEED_MOVE);
+                     (turn ? XR_DEFAULT_FLY_SPEED_TURN : XR_DEFAULT_FLY_SPEED_MOVE) /
+                         (speed_frame_based ? 1.0f : 0.01f);
 
   prop = RNA_struct_find_property(op->ptr, "speed_interpolation0");
   if (prop && RNA_property_is_set(op->ptr, prop)) {
@@ -949,13 +983,12 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
       break;
     case XR_FLOAT_INPUT:
     case XR_VECTOR2F_INPUT: {
-      const float state = (actiondata->type == XR_FLOAT_INPUT) ? fabsf(actiondata->state[0]) :
-                                                                 len_v2(actiondata->state);
-      const float speed_t = (actiondata->float_threshold < 1.0f) ?
-                                (state - actiondata->float_threshold) /
-                                    (1.0f - actiondata->float_threshold) :
-                                1.0f;
-
+      float state = (actiondata->type == XR_FLOAT_INPUT) ? fabsf(actiondata->state[0]) :
+                                                           len_v2(actiondata->state);
+      float speed_t = (actiondata->float_threshold < 1.0f) ?
+                          (state - actiondata->float_threshold) /
+                              (1.0f - actiondata->float_threshold) :
+                          1.0f;
       if (speed_interp_cubic) {
         float start[2], end[2], out[2];
 
@@ -980,20 +1013,31 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
       break;
   }
 
+  if (!speed_frame_based) {
+    /* Adjust speed based on last update time. */
+    speed *= time_now - data->time_prev;
+  }
+  data->time_prev = time_now;
+
   WM_xr_session_state_nav_location_get(xr, nav_pose.position);
   WM_xr_session_state_nav_rotation_get(xr, nav_pose.orientation_quat);
   wm_xr_pose_to_mat(&nav_pose, nav_mat);
 
   if (turn) {
-    GHOST_XrPose viewer_pose;
-    float viewer_mat[4][4], nav_inv[4][4];
+    if (dir_lock) {
+      unit_m4(delta);
+    }
+    else {
+      GHOST_XrPose viewer_pose;
+      float viewer_mat[4][4], nav_inv[4][4];
 
-    WM_xr_session_state_viewer_pose_location_get(xr, viewer_pose.position);
-    WM_xr_session_state_viewer_pose_rotation_get(xr, viewer_pose.orientation_quat);
-    wm_xr_pose_to_mat(&viewer_pose, viewer_mat);
-    wm_xr_pose_to_imat(&nav_pose, nav_inv);
+      WM_xr_session_state_viewer_pose_location_get(xr, viewer_pose.position);
+      WM_xr_session_state_viewer_pose_rotation_get(xr, viewer_pose.orientation_quat);
+      wm_xr_pose_to_mat(&viewer_pose, viewer_mat);
+      wm_xr_pose_to_imat(&nav_pose, nav_inv);
 
-    wm_xr_fly_compute_turn(mode, speed, viewer_mat, nav_mat, nav_inv, delta);
+      wm_xr_fly_compute_turn(mode, speed, viewer_mat, nav_mat, nav_inv, delta);
+    }
   }
   else {
     float nav_scale, ref_quat[4];
@@ -1017,7 +1061,12 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
       case XR_FLY_VIEWER_BACK:
       case XR_FLY_VIEWER_LEFT:
       case XR_FLY_VIEWER_RIGHT:
-        WM_xr_session_state_viewer_pose_rotation_get(xr, ref_quat);
+        if (dir_lock) {
+          copy_qt_qt(ref_quat, data->viewer_rot);
+        }
+        else {
+          WM_xr_session_state_viewer_pose_rotation_get(xr, ref_quat);
+        }
         break;
       /* Move relative to controller. */
       case XR_FLY_CONTROLLER_FORWARD:
@@ -1047,6 +1096,7 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
 
   /* XR events currently only support press and release. */
   BLI_assert(false);
+  wm_xr_fly_uninit(op);
   return OPERATOR_CANCELLED;
 }
 
@@ -1099,13 +1149,23 @@ static void WM_OT_xr_navigation_fly(wmOperatorType *ot)
   RNA_def_enum(ot->srna, "mode", fly_modes, XR_FLY_VIEWER_FORWARD, "Mode", "Fly mode");
   RNA_def_boolean(
       ot->srna, "lock_location_z", false, "Lock Elevation", "Prevent changes to viewer elevation");
+  RNA_def_boolean(ot->srna,
+                  "lock_direction",
+                  false,
+                  "Lock Direction",
+                  "Limit movement to viewer's intial direction");
+  RNA_def_boolean(ot->srna,
+                  "speed_frame_based",
+                  true,
+                  "Frame Based Speed",
+                  "Apply fixed movement deltas every update");
   RNA_def_float(ot->srna,
                 "speed_min",
                 XR_DEFAULT_FLY_SPEED_MOVE / 3.0f,
                 0.0f,
                 1000.0f,
                 "Minimum Speed",
-                "Minimum move/turn speed",
+                "Minimum move (turn) speed in meters (radians) per second or frame",
                 0.0f,
                 1000.0f);
   RNA_def_float(ot->srna,
@@ -1114,7 +1174,7 @@ static void WM_OT_xr_navigation_fly(wmOperatorType *ot)
                 0.0f,
                 1000.0f,
                 "Maximum Speed",
-                "Maximum move/turn speed",
+                "Maximum move (turn) speed in meters (radians) per second or frame",
                 0.0f,
                 1000.0f);
   RNA_def_float_vector(ot->srna,
