@@ -54,6 +54,9 @@ extern "C" char datatoc_gpu_shader_colorspace_lib_glsl[];
 
 static CLG_LogRef LOG = {"gpu.shader"};
 
+/* Number of lines before and after the error line to print for compilation errors. */
+#define DEBUG_CONTEXT_LINES 2
+
 using namespace blender;
 using namespace blender::gpu;
 
@@ -166,11 +169,10 @@ void Shader::print_log(Span<const char *> sources, char *log, const char *stage,
           found_line_id = true;
           break;
         }
-/* TODO(fclem) Make this an option to display N lines before error. */
-#if 0 /* Uncomment to print shader file up to the error line to have more context. */
-        BLI_dynstr_appendf(dynstr, "%5d | ", src_line_index);
-        BLI_dynstr_nappend(dynstr, src_line, (src_line_end + 1) - src_line);
-#endif
+        if (src_line_index >= error_line - DEBUG_CONTEXT_LINES) {
+          BLI_dynstr_appendf(dynstr, "%5d | ", src_line_index);
+          BLI_dynstr_nappend(dynstr, src_line, (src_line_end + 1) - src_line);
+        }
         /* Continue to next line. */
         src_line = src_line_end + 1;
         src_line_index++;
@@ -193,6 +195,20 @@ void Shader::print_log(Span<const char *> sources, char *log, const char *stage,
           BLI_dynstr_appendf(dynstr, "^");
         }
         BLI_dynstr_appendf(dynstr, "\n");
+
+        /* Skip the error line. */
+        src_line = src_line_end + 1;
+        src_line_index++;
+        while ((src_line_end = strchr(src_line, '\n'))) {
+          if (src_line_index > error_line + DEBUG_CONTEXT_LINES) {
+            break;
+          }
+          BLI_dynstr_appendf(dynstr, "%5d | ", src_line_index);
+          BLI_dynstr_nappend(dynstr, src_line, (src_line_end + 1) - src_line);
+          /* Continue to next line. */
+          src_line = src_line_end + 1;
+          src_line_index++;
+        }
       }
     }
     BLI_dynstr_appendf(dynstr, line_prefix);
