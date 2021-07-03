@@ -116,8 +116,9 @@ typedef struct wmXrRuntimeData {
 } wmXrRuntimeData;
 
 typedef struct {
-  struct GPUOffScreen *offscreen;
-  struct GPUViewport *viewport;
+  /* Offscreen buffers/viewports for each view. */
+  struct GPUOffScreen *offscreen[2];
+  struct GPUViewport *viewport[2];
 
   /** XR events. */
   ListBase events;

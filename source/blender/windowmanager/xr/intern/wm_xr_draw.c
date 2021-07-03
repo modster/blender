@@ -132,7 +132,7 @@ static void wm_xr_draw_viewport_buffers_to_active_framebuffer(
     SWAP(int, rect.ymin, rect.ymax);
   }
   GPU_viewport_draw_to_screen_ex(
-      surface_data->viewport, 0, &rect, draw_view->expects_srgb_buffer, true);
+      surface_data->viewport[draw_view->view_idx], 0, &rect, draw_view->expects_srgb_buffer, true);
 }
 
 /**
@@ -185,8 +185,8 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
                                   true,
                                   NULL,
                                   false,
-                                  surface_data->offscreen,
-                                  surface_data->viewport);
+                                  surface_data->offscreen[draw_view->view_idx],
+                                  surface_data->viewport[draw_view->view_idx]);
 
   /* The draw-manager uses both GPUOffscreen and GPUViewport to manage frame and texture buffers. A
    * call to GPU_viewport_draw_to_screen() is still needed to get the final result from the
@@ -196,7 +196,7 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
    * In a next step, Ghost-XR will use the currently bound frame-buffer to retrieve the image
    * to be submitted to the OpenXR swap-chain. So do not un-bind the off-screen yet! */
 
-  GPU_offscreen_bind(surface_data->offscreen, false);
+  GPU_offscreen_bind(surface_data->offscreen[draw_view->view_idx], false);
 
   wm_xr_draw_viewport_buffers_to_active_framebuffer(xr_data->runtime, surface_data, draw_view);
 }

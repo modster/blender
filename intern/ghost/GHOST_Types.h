@@ -697,8 +697,9 @@ typedef struct GHOST_XrDrawViewInfo {
   /** Set if the buffer should be submitted with a SRGB transfer applied. */
   char expects_srgb_buffer;
 
-  /** The eye (left or right) that this view represents. */
-  char view;
+  /** The view that this info represents. Not necessarily the "eye index" (e.g. for quad view
+   * systems, etc). */
+  char view_idx;
 } GHOST_XrDrawViewInfo;
 
 typedef struct GHOST_XrError {
