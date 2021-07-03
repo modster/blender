@@ -301,6 +301,11 @@ template<typename T> class Edge {
     return false;
   }
 
+  bool is_loose() const
+  {
+    return this->faces.size() == 0;
+  }
+
   const auto &get_faces() const
   {
     return this->faces;
@@ -643,6 +648,16 @@ class MeshIO {
   static constexpr inline auto invalid_index()
   {
     return std::numeric_limits<usize>::max();
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, const MeshIO &meshio)
+  {
+    stream << "positions: " << meshio.get_positions() << std::endl;
+    stream << "uvs: " << meshio.get_uvs() << std::endl;
+    stream << "normals: " << meshio.get_normals() << std::endl;
+    stream << "face_indices: " << meshio.get_face_indices() << std::endl;
+    stream << "line_indices: " << meshio.get_line_indices();
+    return stream;
   }
 
  private:
@@ -1119,7 +1134,38 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       face_indices.append(io_face);
     }
 
-    /* TODO(ish): add support for lines */
+    for (const auto &edge : this->edges) {
+      if (edge.is_loose()) {
+        blender::Vector<usize> line;
+
+        BLI_assert(edge.verts);
+
+        const auto &vert_indices = edge.verts.value();
+
+        const auto op_vert_1 = this->verts.get(std::get<0>(vert_indices));
+        const auto op_vert_2 = this->verts.get(std::get<1>(vert_indices));
+
+        BLI_assert(op_vert_1);
+        BLI_assert(op_vert_2);
+
+        const auto &vert_1 = op_vert_1.value().get();
+        const auto &vert_2 = op_vert_2.value().get();
+
+        const auto op_node_1_index = vert_1.node;
+        const auto op_node_2_index = vert_2.node;
+
+        BLI_assert(op_node_1_index);
+        BLI_assert(op_node_2_index);
+
+        const auto node_1_index = op_node_1_index.value();
+        const auto node_2_index = op_node_2_index.value();
+
+        line.append(std::get<0>(node_1_index.get_raw()));
+        line.append(std::get<0>(node_2_index.get_raw()));
+
+        line_indices.append(line);
+      }
+    }
 
     MeshIO result;
     result.set_positions(std::move(positions));
