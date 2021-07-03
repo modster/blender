@@ -242,13 +242,15 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
       grp = inst_.shading_passes.material_add(blender_mat, matpass.gpumat, pipeline_type);
     }
 
-    /* Shading group for this shader already exists. Create a sub one for this material. */
-    /* IMPORTANT: We always create a subgroup so that all subgroups are inserted after the
-     * first "empty" shgroup. This avoids messing the order of subgroups when there is more nested
-     * subgroup (i.e: hair drawing). */
-    /* TODO(fclem) Remove material resource binding from the first group creation. */
-    matpass.shgrp = DRW_shgroup_create_sub(grp);
-    DRW_shgroup_add_material_resources(matpass.shgrp, matpass.gpumat);
+    if (grp != nullptr) {
+      /* Shading group for this shader already exists. Create a sub one for this material. */
+      /* IMPORTANT: We always create a subgroup so that all subgroups are inserted after the
+       * first "empty" shgroup. This avoids messing the order of subgroups when there is more
+       * nested subgroup (i.e: hair drawing). */
+      /* TODO(fclem) Remove material resource binding from the first group creation. */
+      matpass.shgrp = DRW_shgroup_create_sub(grp);
+      DRW_shgroup_add_material_resources(matpass.shgrp, matpass.gpumat);
+    }
   }
 
   return matpass;
