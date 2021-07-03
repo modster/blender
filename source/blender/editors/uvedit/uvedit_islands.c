@@ -593,7 +593,7 @@ void ED_uvedit_pack_islands_multi(const Scene *scene,
 /* Almost similar to ED_uvedit_pack_islands_multi().
  * TODO : Break some of the code into smaller functions since same operations are being done in
  * both ED_uvedit_pack_islands_to_area_multi() and ED_uvedit_pack_islands_multi() */
-void ED_uvedit_pack_islands_to_area_multi(const Scene *scene,
+bool ED_uvedit_pack_islands_to_area_multi(const Scene *scene,
                                           Object **objects,
                                           const uint objects_len,
                                           const float min_co[2],
@@ -628,7 +628,7 @@ void ED_uvedit_pack_islands_to_area_multi(const Scene *scene,
 
   /* This check could probably be removed */
   if (island_list_len == 0) {
-    return;
+    return true;
   }
 
   float margin = scene->toolsettings->uvcalc_margin;
@@ -641,7 +641,7 @@ void ED_uvedit_pack_islands_to_area_multi(const Scene *scene,
   int index;
   LISTBASE_FOREACH_INDEX (struct FaceIsland *, island, &island_list, index) {
     /* For now using the same conditions for rotating islands when scaling is enabled and disabled.
-     * TODO : New heuristic for rotating islands when scaling is disabled (using the
+     * TODO : Use new heuristic for rotating islands when scaling is disabled (using the
      * RectPack2D algorithm) */
     if (params->rotate) {
       if (island->aspect_y != 1.0f) {
@@ -714,7 +714,17 @@ void ED_uvedit_pack_islands_to_area_multi(const Scene *scene,
     scale[1] = 1.0f / boxarray_size[1];
   }
   else {
-    BLI_rect_pack_2d(boxarray, island_list_len, (max_co[0] - min_co[0]), (max_co[1] - min_co[1]));
+    if (!BLI_rect_pack_2d(
+            boxarray, island_list_len, (max_co[0] - min_co[0]), (max_co[1] - min_co[1]))) {
+      /* Cancel operator : Packing area not big enough for selected islands */
+      for (int i = 0; i < island_list_len; i++) {
+        MEM_freeN(island_array[i]->faces);
+        MEM_freeN(island_array[i]);
+      }
+      MEM_freeN(island_array);
+      MEM_freeN(boxarray);
+      return false;
+    }
   }
 
   for (int i = 0; i < island_list_len; i++) {
@@ -758,4 +768,7 @@ void ED_uvedit_pack_islands_to_area_multi(const Scene *scene,
 
   MEM_freeN(island_array);
   MEM_freeN(boxarray);
+
+  /* All islands packed successfully */
+  return true;
 }

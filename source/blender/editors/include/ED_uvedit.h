@@ -253,7 +253,7 @@ void ED_uvedit_pack_islands_multi(const struct Scene *scene,
                                   bool use_target,
                                   const struct UVPackIsland_Params *params);
 
-void ED_uvedit_pack_islands_to_area_multi(const struct Scene *scene,
+bool ED_uvedit_pack_islands_to_area_multi(const struct Scene *scene,
                                           Object **objects,
                                           const uint objects_len,
                                           const float min_co[2],

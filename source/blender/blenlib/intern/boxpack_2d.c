@@ -786,14 +786,8 @@ void BLI_box_pack_2d_fixedarea(ListBase *boxes, int width, int height, ListBase 
 }
 
 /* Similar implementation of BLI_box_pack_2d_fixedarea() that works with BoxPack array and float
- * variables.
- * A current problem with the algorithm is that boxes that do not fit are not packed (skipped), so
- * that finally causes those boxes to be placed at the bottom left position overlapping with other
- * boxes.
- * TODO : Fix this issue by setting a callback that cancels the operator (and possibly prints an
- * error message saying the area is too small for packing islands without scaling) when a
- * particular box does not fit any empty space */
-void BLI_rect_pack_2d(BoxPack *boxarray,
+ * variables */
+bool BLI_rect_pack_2d(BoxPack *boxarray,
                       const uint len,
                       const float rect_width,
                       const float rect_height)
@@ -802,11 +796,19 @@ void BLI_rect_pack_2d(BoxPack *boxarray,
   RectSizeBoxPack *full_rect = MEM_callocN(sizeof(RectSizeBoxPack), __func__);
   full_rect->w = rect_width;
   full_rect->h = rect_height;
+  bool is_box_packed;
 
   BLI_addhead(&spaces, full_rect);
+  /* CHECK : Sorting is probably used incorrectly here */
   qsort(boxarray, (size_t)len, sizeof(BoxPack), box_areasort);
 
+  /* Rotating islands in uvedits_islands.c doesn't work well with this algorithm
+   * TODO : Implement heuristic for rotating islands - Rotate islands if they don't fit in any
+   * empty space, but can fit if they are rotated. A boolean might be needed per island to check if
+   * islands need to be rotated when they are translated in uvedit_islands.c */
+
   for (uint i = 0; i < len; i++) {
+    is_box_packed = false;
     LISTBASE_FOREACH (RectSizeBoxPack *, space, &spaces) {
       /* Skip this space if it's too small. */
       if (boxarray[i].w > space->w || boxarray[i].h > space->h) {
@@ -816,6 +818,7 @@ void BLI_rect_pack_2d(BoxPack *boxarray,
       /* Pack this box into this space. */
       boxarray[i].x = space->x;
       boxarray[i].y = space->y;
+      is_box_packed = true;
 
       if (boxarray[i].w == space->w && boxarray[i].h == space->h) {
         /* Box exactly fills space, so just remove the space. */
@@ -867,7 +870,14 @@ void BLI_rect_pack_2d(BoxPack *boxarray,
 
       break;
     }
+    /* Packing area not big enough to pack all boxes */
+    if (!is_box_packed) {
+      BLI_freelistN(&spaces);
+      return false;
+    }
   }
 
+  /* All boxes packed successfully */
   BLI_freelistN(&spaces);
+  return true;
 }

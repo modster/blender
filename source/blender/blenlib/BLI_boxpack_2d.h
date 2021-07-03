@@ -64,7 +64,7 @@ void BLI_box_pack_2d_fixedarea(struct ListBase *boxes,
                                int height,
                                struct ListBase *packed);
 
-void BLI_rect_pack_2d(BoxPack *boxarray,
+bool BLI_rect_pack_2d(BoxPack *boxarray,
                       const uint len,
                       const float rect_width,
                       const float rect_height);
