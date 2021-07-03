@@ -347,6 +347,10 @@ if(WITH_GMP)
   )
 endif()
 
+if(WITH_GTESTS)
+  add_definitions(-DWITH_GTESTS)
+endif()
+
 if(WIN32)
   list(APPEND INC
     ../../../intern/utfconv

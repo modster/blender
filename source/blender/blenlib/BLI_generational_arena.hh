@@ -74,7 +74,9 @@
 #include "BLI_assert.h"
 #include "BLI_vector.hh"
 
-#include "testing/testing.h"
+#ifdef WITH_GTESTS
+#  include "testing/testing.h"
+#endif /* WITH_GTESTS */
 
 namespace blender::generational_arena {
 
@@ -656,7 +658,9 @@ class Arena {
   /* all private static methods */
   /* all private non-static methods */
 
+#ifdef WITH_GTESTS
   FRIEND_TEST(generational_arena, GetNextFreeLocations);
+#endif /* WITH_GTESTS */
 
   blender::Vector<usize> get_next_free_locations() const
   {
