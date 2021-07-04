@@ -198,7 +198,7 @@ static void write_bone(BlendWriter *writer, Bone *bone)
   BLO_write_struct(writer, Bone, bone);
 
   /* Write ID Properties -- and copy this comment EXACTLY for easy finding
-   * of library blocks that implement this.*/
+   * of library blocks that implement this. */
   if (bone->prop) {
     IDP_BlendWrite(writer, bone->prop);
   }
@@ -358,7 +358,7 @@ bArmature *BKE_armature_from_object(Object *ob)
   return NULL;
 }
 
-int BKE_armature_bonelist_count(ListBase *lb)
+int BKE_armature_bonelist_count(const ListBase *lb)
 {
   int i = 0;
   LISTBASE_FOREACH (Bone *, bone, lb) {
