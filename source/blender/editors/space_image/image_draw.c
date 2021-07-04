@@ -34,6 +34,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
+#include "DNA_view2d_types.h"
 
 #include "PIL_time.h"
 
@@ -1047,5 +1048,34 @@ void draw_image_cache(const bContext *C, ARegion *region)
 
   if (mask != NULL) {
     ED_mask_draw_frames(mask, region, cfra, sfra, efra);
+  }
+}
+
+float ED_space_image_zoom_level(const View2D *v2d, const int grid_dimension)
+{
+  float xzoom = (v2d->cur.xmax - v2d->cur.xmin) / ((float)(v2d->mask.xmax - v2d->mask.xmin));
+  float yzoom = (v2d->cur.ymax - v2d->cur.ymin) / ((float)(v2d->mask.ymax - v2d->mask.ymin));
+  /* Calculating average of xzoom and yzoom for accuracy. Using only xzoom or yzoom would have
+   * been sufficient */
+  float zoom_factor = (xzoom + yzoom) / 2.0f;
+  /* grid begins to appear when the length of one grid unit is at least (N^2) pixels in the
+   * UV/Image editor for a (NxN grid) */
+  zoom_factor *= (grid_dimension * grid_dimension);
+  return zoom_factor;
+}
+
+void ED_space_image_grid_steps(const int grid_dimension,
+                               float grid_steps[8],
+                               const bool is_dynamic_grid)
+{
+  if (is_dynamic_grid) {
+    for (int step = 0; step < 8; step++) {
+      grid_steps[step] = powf(1, step) * (1.0f / ((float)grid_dimension));
+    }
+  }
+  else {
+    for (int step = 0; step < 8; step++) {
+      grid_steps[step] = powf(grid_dimension, step) * (1.0f / (powf(grid_dimension, 8)));
+    }
   }
 }

@@ -70,29 +70,18 @@ void OVERLAY_grid_init(OVERLAY_Data *vedata)
     copy_v3_fl3(
         shd->grid_size, (float)sima->tile_grid_shape[0], (float)sima->tile_grid_shape[1], 1.0f);
 
-    /* For a NxN grid */
+    /* For a NxN grid. Keep insync with value in initSnapSpatial() inside transform.c */
     int N = 4;
-    float xzoom = (v2d->cur.xmax - v2d->cur.xmin) / ((float)(v2d->mask.xmax - v2d->mask.xmin));
-    float yzoom = (v2d->cur.ymax - v2d->cur.ymin) / ((float)(v2d->mask.ymax - v2d->mask.ymin));
-    /* Calculating average of xzoom and yzoom for accuracy. Using only xzoom or yzoom would have
-     * been sufficient */
-    shd->zoom_factor = (xzoom + yzoom) / 2.0f;
-    /* grid begins to appear when the length of one grid unit is at least
-     * (N^2) pixels in the UV/Image editor */
-    shd->zoom_factor *= (N * N);
+    shd->zoom_factor = ED_space_image_zoom_level(v2d, N);
 
     if (sima->flag & SI_DYNAMIC_GRID) {
       shd->grid_flag |= DYNAMIC_GRID;
-      for (int step = 0; step < 8; step++) {
-        /* Temporary fix : dynamic_grid_size is not using the default value (=1) assignd in RNA */
-        sima->dynamic_grid_size = (sima->dynamic_grid_size == 0) ? 1 : sima->dynamic_grid_size;
-        shd->grid_steps[step] = powf(1, step) * (1.0f / ((float)sima->dynamic_grid_size));
-      }
+      /* Temporary fix : dynamic_grid_size is not using the default value (=1) assignd in RNA */
+      sima->dynamic_grid_size = (sima->dynamic_grid_size == 0) ? 1 : sima->dynamic_grid_size;
+      ED_space_image_grid_steps(sima->dynamic_grid_size, shd->grid_steps, true);
     }
     else {
-      for (int step = 0; step < 8; step++) {
-        shd->grid_steps[step] = powf(N, step) * (1.0f / (powf(N, 8)));
-      }
+      ED_space_image_grid_steps(N, shd->grid_steps, false);
     }
     return;
   }
