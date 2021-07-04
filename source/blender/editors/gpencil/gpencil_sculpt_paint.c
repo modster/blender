@@ -1381,7 +1381,7 @@ static float gpencil_sculpt_rotation_eval_get(tGP_BrushEditData *gso,
     return 0.0f;
   }
 
-  GP_SpaceConversion *gsc = &gso->gsc;
+  const GP_SpaceConversion *gsc = &gso->gsc;
   bGPDstroke *gps_orig = (gps_eval->runtime.gps_orig) ? gps_eval->runtime.gps_orig : gps_eval;
   bGPDspoint *pt_orig = &gps_orig->points[pt_eval->runtime.idx_orig];
   bGPDspoint *pt_prev_eval = NULL;
@@ -2020,7 +2020,7 @@ static int gpencil_sculpt_brush_modal(bContext *C, wmOperator *op, const wmEvent
 
   /* The operator can be in 2 states: Painting and Idling */
   if (gso->is_painting) {
-    /* Painting  */
+    /* Painting. */
     switch (event->type) {
       /* Mouse Move = Apply somewhere else */
       case MOUSEMOVE:

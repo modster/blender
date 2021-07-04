@@ -125,7 +125,7 @@ static void object_force_modifier_update_for_bind(Depsgraph *depsgraph, Object *
     BKE_displist_make_mball(depsgraph, scene_eval, ob_eval);
   }
   else if (ELEM(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
-    BKE_displist_make_curveTypes(depsgraph, scene_eval, ob_eval, false, false);
+    BKE_displist_make_curveTypes(depsgraph, scene_eval, ob_eval, false);
   }
   else if (ob->type == OB_GPENCIL) {
     BKE_gpencil_modifiers_calc(depsgraph, scene_eval, ob_eval);
@@ -2147,7 +2147,7 @@ static int multires_external_pack_exec(bContext *C, wmOperator *UNUSED(op))
     return OPERATOR_CANCELLED;
   }
 
-  /* XXX don't remove.. */
+  /* XXX don't remove. */
   CustomData_external_remove(&me->ldata, &me->id, CD_MDISPS, me->totloop);
 
   return OPERATOR_FINISHED;

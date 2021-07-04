@@ -40,7 +40,7 @@ struct Image;
 struct Ipo;
 struct bNodeTree;
 
-/* WATCH IT: change type? also make changes in ipo.h  */
+/* WATCH IT: change type? also make changes in ipo.h */
 
 typedef struct TexPaintSlot {
   /** Image to be painted on. */
@@ -149,22 +149,17 @@ typedef struct MaterialLineArt {
   /* eMaterialLineArtFlags */
   int flags;
 
-  /** transparency_mask is for determining lines behind a glass window material. Only the lower 6
-   * bits are used in this variable which allows 6 materials for "transparent mask", because the
-   * other two bits when running line art is used to register occlusion effectiveness value so we
-   * save 1 byte for each triangle during run time. When loading line art, these bits were shifted
-   * to higher 6 bits and reserved 2 bits of space for occlusion_effectiveness.
-   */
-  unsigned char transparency_mask;
+  /* Used to filter line art occlusion edges */
+  unsigned char material_mask_bits;
 
-  /** bits 1<<0 and 1<<1 are for occlusion effectiveness value (which means 0-3 layers). */
-  unsigned char occlusion_effectiveness;
+  /** Maximum 255 levels of equivalent occlusion. */
+  unsigned char mat_occlusion;
 
   unsigned char _pad[2];
 } MaterialLineArt;
 
 typedef enum eMaterialLineArtFlags {
-  LRT_MATERIAL_TRANSPARENCY_ENABLED = (1 << 0),
+  LRT_MATERIAL_MASK_ENABLED = (1 << 0),
   LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS = (1 << 1),
 } eMaterialLineArtFlags;
 
