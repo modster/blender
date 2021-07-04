@@ -1003,7 +1003,7 @@ struct ARegionType *WM_xr_surface_controller_region_type_get(void);
 
 /* wm_xr_actions.c */
 /* XR action functions to be called pre-XR session start.
- * Note: The "destroy" functions can also be called post-session start. */
+ * NOTE: The "destroy" functions can also be called post-session start. */
 bool WM_xr_action_set_create(wmXrData *xr, const char *action_set_name);
 void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name);
 bool WM_xr_action_create(wmXrData *xr,
