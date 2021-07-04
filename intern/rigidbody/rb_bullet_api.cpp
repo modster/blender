@@ -240,7 +240,6 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
         btManifoldPoint &pt = contactManifold->getContactPoint(j);
         if (pt.getAppliedImpulse() > 0.f || -pt.getAppliedImpulse() > 0.f) {
           num_impulse_points++;
-          printf("getApplied:%f\n",pt.getAppliedImpulse());
         }
       }
 
@@ -936,6 +935,10 @@ rbCollisionShape *RB_shape_new_gimpact_mesh(rbMeshData *mesh)
   shape->compoundChilds = 0;
   shape->compoundChildShapes = NULL;
   return shape;
+}
+
+void RB_mesh_collision_shape_draw_data(rbCollisionShape *shape) {
+
 }
 
 /* Compound Shape ---------------- */

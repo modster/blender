@@ -44,6 +44,7 @@
 #include "DNA_fluid_types.h"
 #include "DNA_lightprobe_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_meta_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_pointcache_types.h"
@@ -52,6 +53,8 @@
 #include "DEG_depsgraph_query.h"
 
 #include "ED_view3d.h"
+
+#include "GPU_batch.h"
 
 #include "overlay_private.h"
 
@@ -235,6 +238,12 @@ void OVERLAY_extra_cache_init(OVERLAY_Data *vedata)
       DRW_shgroup_uniform_vec4_copy(grp_sub, "color", G_draw.block.colorLibrary);
       cb->center_deselected_lib = BUF_POINT(grp_sub, format);
     }
+    {
+        sh = OVERLAY_shader_uniform_color();
+        cb->collision_shape = grp = DRW_shgroup_create(sh, extra_ps);
+        DRW_shgroup_uniform_vec4_copy(grp, "color", G_draw.block.colorLibrary);
+
+    }
   }
 }
 
@@ -360,6 +369,25 @@ void OVERLAY_empty_cache_populate(OVERLAY_Data *vedata, Object *ob)
   }
 }
 
+
+static void OVERLAY_convex_hull_collision_shape(OVERLAY_ExtraCallBuffers *cb,
+                                                OVERLAY_Data *data,
+                                                Object *ob)
+{
+
+    float color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    GPUBatch *geom = DRW_convex_hull_batch_get(ob);
+    if(geom){
+      GPUShader *sh = OVERLAY_shader_uniform_color();
+      DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[0]);
+      DRW_shgroup_uniform_vec4_copy(grp, "color", color);
+
+      DRW_shgroup_call_obmat(grp, geom, ob->obmat);
+    }
+
+
+}
+
 static void OVERLAY_bounds(OVERLAY_ExtraCallBuffers *cb,
                            Object *ob,
                            const float *color,
@@ -383,6 +411,35 @@ static void OVERLAY_bounds(OVERLAY_ExtraCallBuffers *cb,
   }
 
   BKE_boundbox_calc_size_aabb(bb, size);
+  if(ob->parent) {
+      if(ob->parent->rigidbody_object) {
+          if(ob->parent->rigidbody_object->shape == RB_SHAPE_COMPOUND) {
+              float transform_mat[4][4];
+              float ob_size[3];
+              float parent_size[3];
+              mat4_to_size(ob_size, ob->obmat);
+              mat4_to_size(parent_size, ob->parent->obmat);
+              float transformed_obmat[4][4];
+              copy_m4_m4(transformed_obmat, ob->parent->obmat);
+              for(int i=0; i<3; i++){
+                  for(int j=0; j<3; j++){
+                      transformed_obmat[i][j] = transformed_obmat[i][j] * (ob_size[j]/parent_size[j]);
+                  }
+              }
+              copy_m4_m4(transform_mat, ob->parent->obmat);
+              invert_m4(transform_mat);
+              mul_m4_m4m4(transform_mat, transform_mat, transformed_obmat);
+              /* This is the transform that is given to bullet while creating the collisions shapes,
+               * so the extra scale factor that is applied to the collision shape
+               * should be extracted from the same matrix. */
+              invert_m4(transform_mat);
+
+              mat4_to_size(parent_size, transform_mat);
+              copy_v3_v3(size, parent_size);
+
+          }
+      }
+  }
 
   if (around_origin) {
     zero_v3(center);
@@ -446,7 +503,7 @@ static void OVERLAY_bounds(OVERLAY_ExtraCallBuffers *cb,
     copy_m4_m4(mat, tmp);
 }
 
-static void OVERLAY_collision(OVERLAY_ExtraCallBuffers *cb, Object *ob, const float *color)
+static void OVERLAY_collision(OVERLAY_ExtraCallBuffers *cb, OVERLAY_Data *data, Object *ob, const float *color)
 {
   switch (ob->rigidbody_object->shape) {
     case RB_SHAPE_BOX:
@@ -464,6 +521,8 @@ static void OVERLAY_collision(OVERLAY_ExtraCallBuffers *cb, Object *ob, const fl
     case RB_SHAPE_CAPSULE:
       OVERLAY_bounds(cb, ob, color, OB_BOUND_CAPSULE, true, NULL);
       break;
+    case RB_SHAPE_CONVEXH:
+      OVERLAY_convex_hull_collision_shape(cb, data, ob);
   }
 }
 
@@ -2047,7 +2106,7 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
         OVERLAY_indicate_collision(vedata, ob);
       }
       else {
-        OVERLAY_collision(cb, ob, color);
+        OVERLAY_collision(cb, vedata, ob, color);
       }
 #ifdef WITH_BULLET
       if (ob->rigidbody_object->sim_display_options & RB_SIM_FORCES)

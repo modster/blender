@@ -22,11 +22,13 @@
 #include "DNA_hair_types.h"
 #include "DNA_lattice_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_meta_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_particle_types.h"
 #include "DNA_pointcloud_types.h"
+#include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_volume_types.h"
 
@@ -2825,6 +2827,42 @@ GPUBatch *DRW_cache_camera_distances_get(void)
   }
   return SHC.drw_camera_distances;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Convex Hull batch
+ * \{ */
+
+GPUBatch *DRW_convex_hull_batch_get(Object *ob) {
+    if(ob->rigidbody_object->col_shape_draw_data){
+    Mesh *hull = ob->rigidbody_object->col_shape_draw_data;
+    const int num_edges = hull->totedge;
+    float color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    GPUVertFormat format = extra_vert_format();
+
+    GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
+    GPU_vertbuf_data_alloc(vbo, num_edges*2+1);
+
+    int v = 0;
+    for(int i=0; i<num_edges; i++){
+        int v_from = hull->medge[i].v1;
+        int v_to = hull->medge[i].v2;
+
+         GPU_vertbuf_vert_set(vbo, v++, &(Vert){{hull->mvert[v_from].co[0],
+                                                 hull->mvert[v_from].co[1],
+                                                 hull->mvert[v_from].co[2]}, VCLASS_EMPTY_SCALED});
+         GPU_vertbuf_vert_set(vbo, v++, &(Vert){{hull->mvert[v_to].co[0],
+                                                 hull->mvert[v_to].co[1],
+                                                 hull->mvert[v_to].co[2]}, VCLASS_EMPTY_SCALED});
+    }
+    GPUBatch *geom = GPU_batch_create_ex(GPU_PRIM_LINES, vbo, NULL, GPU_BATCH_OWNS_VBO);
+    return geom;
+    }
+    return NULL;
+}
+
+
 
 /** \} */
 

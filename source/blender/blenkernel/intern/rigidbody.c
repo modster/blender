@@ -38,6 +38,7 @@
 
 #ifdef WITH_BULLET
 #  include "RBI_api.h"
+#  include "RBI_hull_api.h"
 #endif
 
 #include "DNA_ID.h"
@@ -400,6 +401,67 @@ static rbCollisionShape *rigidbody_get_shape_convexhull_from_mesh(Object *ob,
   return shape;
 }
 
+static void rigidbody_store_convex_hull_draw_data(Object *ob) {
+    Mesh *hull_draw_data;
+
+    Mesh *mesh = NULL;
+    MVert *mvert = NULL;
+    int totvert = 0;
+
+    if (ob->type == OB_MESH && ob->data) {
+      mesh = rigidbody_get_mesh(ob);
+      mvert = (mesh) ? mesh->mvert : NULL;
+      totvert = (mesh) ? mesh->totvert : 0;
+    }
+    else {
+      CLOG_ERROR(&LOG, "cannot make Convex Hull collision shape for non-Mesh object");
+    }
+    float (*verts)[3] = MEM_malloc_arrayN(totvert, sizeof(float)*3, __func__);
+    for(int i=0; i<totvert; i++){
+        copy_v3_v3(verts[i], mvert[i].co);
+    }
+
+    plConvexHull hull = plConvexHullCompute((float(*)[3])verts, totvert);
+    free(verts);
+    const int num_verts = plConvexHullNumVertices(hull);
+    const int num_faces = num_verts <= 2 ? 0 : plConvexHullNumFaces(hull);
+    const int num_loops = num_verts <= 2 ? 0 : plConvexHullNumLoops(hull);
+
+    const int num_edges = num_verts == 2 ? 1 : num_verts < 2 ? 0 : num_loops / 2;
+    hull_draw_data = BKE_mesh_new_nomain(num_verts, num_edges, 0, num_loops, num_faces);
+
+     for (int i=0; i<num_verts; i++) {
+      float co[3];
+      int original_index;
+      plConvexHullGetVertex(hull, i, co, &original_index);
+
+      if (original_index >= 0 && original_index < totvert) {
+
+        copy_v3_v3(hull_draw_data->mvert[i].co, co);
+      }
+      else {
+        BLI_assert(!"Unexpected new vertex in hull output");
+      }
+    }
+
+    uint edge_index = 0;
+    for (int i=0; i<num_loops; i++) {
+      int v_from;
+      int v_to;
+      plConvexHullGetLoop(hull, i, &v_from, &v_to);
+
+
+      if (v_from < v_to) {
+        hull_draw_data->medge[edge_index].v1 = v_from;
+        hull_draw_data->medge[edge_index].v2 = v_to;
+        hull_draw_data->medge[edge_index].flag = ME_EDGEDRAW | ME_EDGERENDER;
+        edge_index++;
+      }
+    }
+
+    ob->rigidbody_object->col_shape_draw_data = hull_draw_data;
+
+}
 /* create collision shape of mesh - triangulated mesh
  * returns NULL if creation fails.
  */
@@ -565,6 +627,7 @@ static rbCollisionShape *rigidbody_validate_sim_shape_helper(RigidBodyWorld *rbw
                           0.04f :
                           0.0f; /* RB_TODO ideally we shouldn't directly change the margin here */
       }
+      rigidbody_store_convex_hull_draw_data(ob);
       break;
     case RB_SHAPE_TRIMESH:
       new_shape = rigidbody_get_shape_trimesh_from_mesh(ob);
@@ -1300,6 +1363,8 @@ RigidBodyOb *BKE_rigidbody_create_object(Scene *scene, Object *ob, short type)
   zero_v3(rbo->vec_locations[2].vector);
 
   zero_v3(rbo->vel);
+
+  rbo->col_shape_draw_data = NULL;
 
   /* use triangle meshes for passive objects
    * use convex hulls for active objects since dynamic triangle meshes are very unstable

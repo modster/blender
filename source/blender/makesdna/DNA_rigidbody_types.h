@@ -26,6 +26,7 @@
 
 #include "DNA_listBase.h"
 #include "DNA_object_force_types.h"
+#include "DNA_mesh_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -183,8 +184,10 @@ typedef struct RigidBodyOb {
   char _pad5[4];
   sim_data_vec vec_locations[3];
 
-  /* Velocity, to display sim data */
+  /** Velocity, to display sim data */
   float vel[3];
+
+  Mesh *col_shape_draw_data;
 
 } RigidBodyOb;
 
