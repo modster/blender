@@ -83,6 +83,7 @@ template<typename> class Edge;
 template<typename> class Face;
 template<typename, typename, typename, typename> class Mesh;
 class MeshIO;
+template<typename, typename, typename, typename> class MeshDiff;
 
 namespace ga = blender::generational_arena;
 namespace fs = std::filesystem;
@@ -1248,6 +1249,82 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         [=](FaceIndex index) { return Face<EFD>(index, normal); });
 
     return this->faces.get(face_index).value().get();
+  }
+};
+
+template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff {
+  blender::Vector<NodeIndex> added_nodes;
+  blender::Vector<VertIndex> added_verts;
+  blender::Vector<EdgeIndex> added_edges;
+  blender::Vector<FaceIndex> added_faces;
+
+  blender::Vector<Node<END>> deleted_nodes;
+  blender::Vector<Vert<EVD>> deleted_verts;
+  blender::Vector<Edge<EED>> deleted_edges;
+  blender::Vector<Face<EFD>> deleted_faces;
+
+ public:
+  MeshDiff() = default;
+
+  /* Move based constructor */
+  MeshDiff(blender::Vector<NodeIndex> &&added_nodes,
+           blender::Vector<VertIndex> &&added_verts,
+           blender::Vector<EdgeIndex> &&added_edges,
+           blender::Vector<FaceIndex> &&added_faces,
+
+           blender::Vector<Node<END>> &&deleted_nodes,
+           blender::Vector<Vert<EVD>> &&deleted_verts,
+           blender::Vector<Edge<EED>> &&deleted_edges,
+           blender::Vector<Face<EFD>> &&deleted_faces)
+      : added_nodes(std::move(added_nodes)),
+        added_verts(std::move(added_verts)),
+        added_edges(std::move(added_edges)),
+        added_faces(std::move(added_faces)),
+        deleted_nodes(std::move(deleted_nodes)),
+        deleted_verts(std::move(deleted_verts)),
+        deleted_edges(std::move(deleted_edges)),
+        deleted_faces(std::move(deleted_faces))
+  {
+  }
+
+  const auto &get_added_nodes() const
+  {
+    return this->added_nodes;
+  }
+
+  const auto &get_added_verts() const
+  {
+    return this->added_verts;
+  }
+
+  const auto &get_added_edges() const
+  {
+    return this->added_edges;
+  }
+
+  const auto &get_added_faces() const
+  {
+    return this->added_faces;
+  }
+
+  const auto &get_deleted_nodes() const
+  {
+    return this->deleted_nodes;
+  }
+
+  const auto &get_deleted_verts() const
+  {
+    return this->deleted_verts;
+  }
+
+  const auto &get_deleted_edges() const
+  {
+    return this->deleted_edges;
+  }
+
+  const auto &get_deleted_faces() const
+  {
+    return this->deleted_faces;
   }
 };
 
