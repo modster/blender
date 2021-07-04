@@ -63,7 +63,7 @@ void OVERLAY_grid_init(OVERLAY_Data *vedata)
 
   if (pd->space_type == SPACE_IMAGE) {
     SpaceImage *sima = (SpaceImage *)draw_ctx->space_data;
-    View2D v2d = draw_ctx->region->v2d;
+    View2D *v2d = &draw_ctx->region->v2d;
 
     shd->grid_flag = ED_space_image_has_buffer(sima) ? 0 : PLANE_IMAGE | SHOW_GRID;
     shd->grid_distance = 1.0f;
@@ -72,8 +72,8 @@ void OVERLAY_grid_init(OVERLAY_Data *vedata)
 
     /* For a NxN grid */
     int N = 4;
-    float xzoom = (v2d.cur.xmax - v2d.cur.xmin) / ((float)(v2d.mask.xmax - v2d.mask.xmin));
-    float yzoom = (v2d.cur.ymax - v2d.cur.ymin) / ((float)(v2d.mask.ymax - v2d.mask.ymin));
+    float xzoom = (v2d->cur.xmax - v2d->cur.xmin) / ((float)(v2d->mask.xmax - v2d->mask.xmin));
+    float yzoom = (v2d->cur.ymax - v2d->cur.ymin) / ((float)(v2d->mask.ymax - v2d->mask.ymin));
     /* Calculating average of xzoom and yzoom for accuracy. Using only xzoom or yzoom would have
      * been sufficient */
     shd->zoom_factor = (xzoom + yzoom) / 2.0f;
