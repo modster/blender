@@ -917,8 +917,8 @@ void WM_event_xr_data(const struct wmEvent *event,
                       float controller_rot[4],
                       float controller_loc_other[3],
                       float controller_rot_other[4],
-                      float eye_viewmat[4][4],
                       float *eye_lens,
+                      float eye_viewmat[4][4],
                       bool *bimanual);
 bool WM_event_is_xr(const struct wmEvent *event);
 

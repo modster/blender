@@ -882,6 +882,20 @@ static void rna_Event_xr_controller_rotation_other_get(PointerRNA *ptr, float *v
   }
 }
 
+static float rna_Event_xr_focal_length_get(PointerRNA *ptr)
+{
+  const wmEvent *event = ptr->data;
+  if (WM_event_is_xr(event)) {
+    float focal_len;
+    WM_event_xr_data(
+        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &focal_len, NULL, NULL);
+    return focal_len;
+  }
+  else {
+    return 0.0f;
+  }
+}
+
 static void rna_Event_xr_view_matrix_get(PointerRNA *ptr, float values[16])
 {
   const wmEvent *event = ptr->data;
@@ -897,26 +911,12 @@ static void rna_Event_xr_view_matrix_get(PointerRNA *ptr, float values[16])
                      NULL,
                      NULL,
                      NULL,
-                     (float(*)[4])values,
                      NULL,
+                     (float(*)[4])values,
                      NULL);
   }
   else {
     memset(values, 0, sizeof(float[16]));
-  }
-}
-
-static float rna_Event_xr_focal_length_get(PointerRNA *ptr)
-{
-  const wmEvent *event = ptr->data;
-  if (WM_event_is_xr(event)) {
-    float focal_len;
-    WM_event_xr_data(
-        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &focal_len, NULL);
-    return focal_len;
-  }
-  else {
-    return 0.0f;
   }
 }
 
@@ -2570,16 +2570,16 @@ static void rna_def_event(BlenderRNA *brna)
                            "XR Controller Rotation Other",
                            "Controller rotation of the other user path for bimanual actions");
 
+  prop = RNA_def_property(srna, "xr_focal_length", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(prop, "rna_Event_xr_focal_length_get", NULL, NULL);
+  RNA_def_property_ui_text(prop, "XR Focal Length", "Focal length of the XR selection eye");
+
   prop = RNA_def_property(srna, "xr_view_matrix", PROP_FLOAT, PROP_MATRIX);
   RNA_def_property_array(prop, 16);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_float_funcs(prop, "rna_Event_xr_view_matrix_get", NULL, NULL);
   RNA_def_property_ui_text(prop, "XR View Matrix", "View matrix of the XR selection eye");
-
-  prop = RNA_def_property(srna, "xr_focal_length", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_float_funcs(prop, "rna_Event_xr_focal_length_get", NULL, NULL);
-  RNA_def_property_ui_text(prop, "XR Focal Length", "Focal length of the XR selection eye");
 
   prop = RNA_def_property(srna, "xr_bimanual", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);

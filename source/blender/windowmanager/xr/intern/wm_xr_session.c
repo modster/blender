@@ -388,6 +388,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const wmXrDrawData *draw_data,
                                 const GHOST_XrDrawViewInfo *draw_view,
                                 const float viewmat[4][4],
+                                const float viewmat_base[4][4],
                                 wmXrSessionState *state)
 {
   const unsigned int view_idx = (unsigned int)min_ii((int)ARRAY_SIZE(state->eyes),
@@ -425,6 +426,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                    fov_to_focallength(draw_view->fov.angle_right - draw_view->fov.angle_left,
                                       DEFAULT_SENSOR_WIDTH);
   copy_m4_m4(eye->viewmat, viewmat);
+  copy_m4_m4(eye->viewmat_base, viewmat_base);
 
   memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(state->prev_base_pose));
   state->prev_base_scale = draw_data->base_scale;
@@ -914,7 +916,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
                                                   bool *r_press_start)
 {
   const char **haptic_subaction_path = ((action->flag & XR_ACTION_HAPTIC_MATCHUSERPATHS) != 0) ?
-                                           &action->subaction_paths[subaction_idx] :
+                                           (const char **)&action->subaction_paths[subaction_idx] :
                                            NULL;
   bool curr = false;
   bool prev = false;
@@ -1201,14 +1203,19 @@ void wm_xr_session_actions_update(const bContext *C)
     state->nav_scale_prev = state->nav_scale;
     state->is_navigation_dirty = false;
 
-    /* Update viewer pose with any navigation changes since the last actions sync so that data is
-     * correct for queries. */
-    float nav_mat[4][4], viewer_mat[4][4];
-    wm_xr_pose_scale_to_mat(&state->nav_pose, state->nav_scale, nav_mat);
-    mul_m4_m4m4(viewer_mat, nav_mat, state->viewer_mat_base);
+    /* Update viewer/eye poses with any navigation changes since the last actions sync so that data
+     * is correct for queries. */
+    float m[4][4], viewer_mat[4][4];
+    wm_xr_pose_scale_to_mat(&state->nav_pose, state->nav_scale, m);
+    mul_m4_m4m4(viewer_mat, m, state->viewer_mat_base);
     mat4_to_loc_quat(state->viewer_pose.position, state->viewer_pose.orientation_quat, viewer_mat);
     wm_xr_pose_scale_to_imat(
         &state->viewer_pose, settings->base_scale * state->nav_scale, state->viewer_viewmat);
+
+    wm_xr_pose_scale_to_imat(&state->nav_pose, state->nav_scale, m);
+    for (unsigned int i = 0; i < (unsigned int)ARRAY_SIZE(state->eyes); ++i) {
+      mul_m4_m4m4(state->eyes[i].viewmat, state->eyes[i].viewmat_base, m);
+    }
   }
 
   /* Update headset constraint object (if any). */
@@ -1360,7 +1367,6 @@ void wm_xr_session_object_autokey(
  */
 static void wm_xr_session_surface_draw(bContext *C)
 {
-  wmXrSurfaceData *surface_data = g_xr_surface->customdata;
   wmWindowManager *wm = CTX_wm_manager(C);
   Main *bmain = CTX_data_main(C);
   wmXrDrawData draw_data;
@@ -1376,7 +1382,7 @@ static void wm_xr_session_surface_draw(bContext *C)
 
   GHOST_XrSessionDrawViews(wm->xr.runtime->context, &draw_data);
 
-  GPU_offscreen_unbind(surface_data->offscreen, false);
+  GPU_framebuffer_restore();
 }
 
 bool wm_xr_session_surface_offscreen_ensure(wmXrSurfaceData *surface_data,

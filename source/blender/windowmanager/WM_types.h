@@ -729,10 +729,10 @@ typedef struct wmXrActionData {
   float controller_loc_other[3];
   float controller_rot_other[4];
 
-  /** Viewmat of the selection eye. */
-  float eye_viewmat[4][4];
   /** Lens (focal length) of the selection eye. */
   float eye_lens;
+  /** Viewmat of the selection eye. */
+  float eye_viewmat[4][4];
 
   /** Operator. */
   struct wmOperatorType *ot;

@@ -424,6 +424,9 @@ bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name)
   if (action_set->controller_pose_action) {
     wm_xr_session_controller_data_populate(action_set->controller_pose_action, xr);
   }
+  else {
+    wm_xr_session_controller_data_clear(&xr->runtime->session_state);
+  }
 
   return true;
 }

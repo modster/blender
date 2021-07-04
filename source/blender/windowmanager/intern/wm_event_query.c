@@ -494,8 +494,8 @@ void WM_event_xr_data(const wmEvent *event,
                       float controller_rot[4],
                       float controller_loc_other[3],
                       float controller_rot_other[4],
-                      float eye_viewmat[4][4],
                       float *eye_lens,
+                      float eye_viewmat[4][4],
                       bool *bimanual)
 {
   const wmXrActionData *data = event->customdata;
@@ -530,11 +530,11 @@ void WM_event_xr_data(const wmEvent *event,
   if (controller_rot_other) {
     copy_v4_v4(controller_rot_other, data->controller_rot_other);
   }
-  if (eye_viewmat) {
-    copy_m4_m4(eye_viewmat, data->eye_viewmat);
-  }
   if (eye_lens) {
     *eye_lens = data->eye_lens;
+  }
+  if (eye_viewmat) {
+    copy_m4_m4(eye_viewmat, data->eye_viewmat);
   }
   if (bimanual) {
     *bimanual = data->bimanual;

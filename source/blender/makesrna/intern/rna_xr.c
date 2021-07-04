@@ -1856,7 +1856,7 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_enum_items(prop, selection_eyes);
   RNA_def_property_ui_text(
-      prop, "Selection Eye", "Which eye's perspective to use when selecting in VR");
+      prop, "Selection Eye", "Which eye's perspective to use when selecting in VR (GPU select)");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "clip_start", PROP_FLOAT, PROP_DISTANCE);
