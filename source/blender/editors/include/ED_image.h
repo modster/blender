@@ -43,11 +43,12 @@ struct wmOperator;
 struct wmWindowManager;
 struct View2D;
 
-/* image_draw.c */
+/* image_draw.c (Utility functions - should probably be moved to a BKE header) */
 float ED_space_image_zoom_level(const struct View2D *v2d, const int grid_dimension);
 void ED_space_image_grid_steps(const int grid_dimension,
                                float grid_steps[8],
                                const bool is_dynamic_grid);
+float ED_space_image_increment_snap_value(const float grid_steps[8], const float zoom_factor);
 
 /* image_edit.c, exported for transform */
 struct Image *ED_space_image(struct SpaceImage *sima);

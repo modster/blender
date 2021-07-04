@@ -1079,3 +1079,40 @@ void ED_space_image_grid_steps(const int grid_dimension,
     }
   }
 }
+
+/* Calculate the increment snapping value for UV/image editor based on the zoom factor
+ * The code in here (except the offset part) is used in `grid_frag.glsl` (see `grid_res`) for
+ * drawing the grid overlay for the UV/Image editor */
+float ED_space_image_increment_snap_value(const float grid_steps[8], const float zoom_factor)
+{
+  /* Small offset on each grid_steps[] so that snapping value doesn't change until grid lines are
+   * significantly visible.
+   * Offset = 3/4 * (grid_steps[i] - grid_steps[i+1])
+   *
+   * Refer grid_frag.glsl to find out when grid lines actually start
+   * appearing */
+  if ((grid_steps[0] - ((9 * grid_steps[0]) / (4.0f * 4.0f))) > zoom_factor) {
+    return grid_steps[0];
+  }
+  else if ((grid_steps[1] - ((9 * grid_steps[1]) / (4.0f * 4.0f))) > zoom_factor) {
+    return grid_steps[1];
+  }
+  else if ((grid_steps[2] - ((9 * grid_steps[2]) / (4.0f * 4.0f))) > zoom_factor) {
+    return grid_steps[2];
+  }
+  else if ((grid_steps[3] - ((9 * grid_steps[3]) / (4.0f * 4.0f))) > zoom_factor) {
+    return grid_steps[3];
+  }
+  else if ((grid_steps[4] - ((9 * grid_steps[4]) / (4.0f * 4.0f))) > zoom_factor) {
+    return grid_steps[4];
+  }
+  else if ((grid_steps[5] - ((9 * grid_steps[5]) / (4.0f * 4.0f))) > zoom_factor) {
+    return grid_steps[5];
+  }
+  else if ((grid_steps[6] - ((9 * grid_steps[6]) / (4.0f * 4.0f))) > zoom_factor) {
+    return grid_steps[6];
+  }
+  else {
+    return grid_steps[7];
+  }
+}
