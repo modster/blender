@@ -5754,7 +5754,7 @@ static void def_sh_tex_pointdensity(StructRNA *srna)
   func = RNA_def_function(srna, "calc_point_density", "rna_ShaderNodePointDensity_density_calc");
   RNA_def_function_ui_description(func, "Calculate point density");
   RNA_def_pointer(func, "depsgraph", "Depsgraph", "", "");
-  /* TODO, See how array size of 0 works, this shouldn't be used. */
+  /* TODO: See how array size of 0 works, this shouldn't be used. */
   parm = RNA_def_float_array(func, "rgba_values", 1, NULL, 0, 0, "", "RGBA Values", 0, 0);
   RNA_def_parameter_flags(parm, PROP_DYNAMIC, 0);
   RNA_def_function_output(func, parm);
@@ -6205,7 +6205,7 @@ static void def_sh_script(StructRNA *srna)
 
   /* API functions */
 
-#  if 0 /* XXX TODO use general node api for this */
+#  if 0 /* XXX TODO: use general node api for this. */
   func = RNA_def_function(srna, "find_socket", "rna_ShaderNodeScript_find_socket");
   RNA_def_function_ui_description(func, "Find a socket by name");
   parm = RNA_def_string(func, "name", NULL, 0, "Socket name", "");
@@ -11319,12 +11319,6 @@ static void rna_def_node(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flag", NODE_ACTIVE_TEXTURE);
   RNA_def_property_ui_text(prop, "Show Texture", "Display node in viewport textured shading mode");
   RNA_def_property_update(prop, 0, "rna_Node_update");
-
-  prop = RNA_def_property(srna, "active_preview", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", NODE_ACTIVE_PREVIEW);
-  RNA_def_property_ui_text(prop, "Active Preview", "Node is previewed in other editor");
-  RNA_def_property_flag(prop, PROP_NO_DEG_UPDATE);
-  RNA_def_property_update(prop, NC_NODE, NULL);
 
   /* generic property update function */
   func = RNA_def_function(srna, "socket_value_update", "rna_Node_socket_value_update");

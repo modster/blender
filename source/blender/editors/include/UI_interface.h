@@ -129,12 +129,6 @@ enum {
   UI_DIR_ALL = UI_DIR_UP | UI_DIR_DOWN | UI_DIR_LEFT | UI_DIR_RIGHT,
 };
 
-#if 0
-/* uiBlock->autofill (not yet used) */
-#  define UI_BLOCK_COLLUMNS 1
-#  define UI_BLOCK_ROWS 2
-#endif
-
 /** #uiBlock.flag (controls) */
 enum {
   UI_BLOCK_LOOP = 1 << 0,
@@ -251,7 +245,7 @@ enum {
 #define UI_PANEL_BOX_STYLE_MARGIN (U.widget_unit * 0.2f)
 
 /* but->drawflag - these flags should only affect how the button is drawn. */
-/* Note: currently, these flags _are not passed_ to the widget's state() or draw() functions
+/* NOTE: currently, these flags _are not passed_ to the widget's state() or draw() functions
  *       (except for the 'align' ones)!
  */
 enum {
@@ -1370,7 +1364,7 @@ typedef struct uiStringInfo {
   char *strinfo;
 } uiStringInfo;
 
-/* Note: Expects pointers to uiStringInfo structs as parameters.
+/* NOTE: Expects pointers to uiStringInfo structs as parameters.
  *       Will fill them with translated strings, when possible.
  *       Strings in uiStringInfo must be MEM_freeN'ed by caller. */
 void UI_but_string_info_get(struct bContext *C, uiBut *but, ...) ATTR_SENTINEL(0);

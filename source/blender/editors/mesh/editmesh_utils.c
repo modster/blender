@@ -132,75 +132,76 @@ bool EDBM_op_init(BMEditMesh *em, BMOperator *bmop, wmOperator *op, const char *
     return false;
   }
 
-  if (!em->emcopy) {
-    em->emcopy = BKE_editmesh_copy(em);
-  }
-  em->emcopyusers++;
-
   va_end(list);
 
   return true;
 }
 
-/* returns 0 on error, 1 on success.  executes and finishes a bmesh operator */
+/**
+ * The return value:
+ * - False on error (the mesh must not be changed).
+ * - True on success, executes and finishes a #BMesh operator.
+ */
 bool EDBM_op_finish(BMEditMesh *em, BMOperator *bmop, wmOperator *op, const bool do_report)
 {
   const char *errmsg;
 
+#ifndef NDEBUG
+  struct {
+    int verts_len, edges_len, loops_len, faces_len;
+  } em_state_prev = {
+      .verts_len = em->bm->totvert,
+      .edges_len = em->bm->totedge,
+      .loops_len = em->bm->totloop,
+      .faces_len = em->bm->totface,
+  };
+#endif
+
   BMO_op_finish(em->bm, bmop);
 
-  if (BMO_error_get(em->bm, &errmsg, NULL)) {
-    BMEditMesh *emcopy = em->emcopy;
+  bool changed = false;
+  bool changed_was_set = false;
 
-    if (do_report) {
-      BKE_report(op->reports, RPT_ERROR, errmsg);
-    }
-
-    EDBM_mesh_free(em);
-    *em = *emcopy;
-
-    MEM_freeN(emcopy);
-    em->emcopyusers = 0;
-    em->emcopy = NULL;
-
-    /**
-     * Note, we could pass in the mesh, however this is an exceptional case, allow a slow lookup.
-     *
-     * This is needed because the COW mesh makes a full copy of the #BMEditMesh
-     * instead of sharing the pointer, tagging since this has been freed above,
-     * the #BMEditMesh.emcopy needs to be flushed to the COW edit-mesh, see T55457.
-     */
-    {
-      Main *bmain = G_MAIN;
-      for (Mesh *mesh = bmain->meshes.first; mesh; mesh = mesh->id.next) {
-        if (mesh->edit_mesh == em) {
-          DEG_id_tag_update(&mesh->id, ID_RECALC_COPY_ON_WRITE);
-          break;
-        }
+  eBMOpErrorLevel level;
+  while (BMO_error_pop(em->bm, &errmsg, NULL, &level)) {
+    ReportType type = RPT_INFO;
+    switch (level) {
+      case BMO_ERROR_CANCEL: {
+        changed_was_set = true;
+        break;
+      }
+      case BMO_ERROR_WARN: {
+        type = RPT_WARNING;
+        changed_was_set = true;
+        changed = true;
+        break;
+      }
+      case BMO_ERROR_FATAL: {
+        type = RPT_ERROR;
+        changed_was_set = true;
+        changed = true;
+        break;
       }
     }
 
-    /* when copying, tessellation isn't to for faster copying,
-     * but means we need to re-tessellate here */
-    if (em->looptris == NULL) {
-      BKE_editmesh_looptri_calc(em);
+    if (do_report) {
+      BKE_report(op->reports, type, errmsg);
     }
-
-    return false;
+  }
+  if (changed_was_set == false) {
+    changed = true;
   }
 
-  em->emcopyusers--;
-  if (em->emcopyusers < 0) {
-    printf("warning: em->emcopyusers was less than zero.\n");
+#ifndef NDEBUG
+  if (changed == false) {
+    BLI_assert((em_state_prev.verts_len == em->bm->totvert) &&
+               (em_state_prev.edges_len == em->bm->totedge) &&
+               (em_state_prev.loops_len == em->bm->totloop) &&
+               (em_state_prev.faces_len == em->bm->totface));
   }
+#endif
 
-  if (em->emcopyusers <= 0) {
-    BKE_editmesh_free(em->emcopy);
-    MEM_freeN(em->emcopy);
-    em->emcopy = NULL;
-  }
-
-  return true;
+  return changed;
 }
 
 bool EDBM_op_callf(BMEditMesh *em, wmOperator *op, const char *fmt, ...)
@@ -216,11 +217,6 @@ bool EDBM_op_callf(BMEditMesh *em, wmOperator *op, const char *fmt, ...)
     va_end(list);
     return false;
   }
-
-  if (!em->emcopy) {
-    em->emcopy = BKE_editmesh_copy(em);
-  }
-  em->emcopyusers++;
 
   BMO_op_exec(bm, &bmop);
 
@@ -248,11 +244,6 @@ bool EDBM_op_call_and_selectf(BMEditMesh *em,
     va_end(list);
     return false;
   }
-
-  if (!em->emcopy) {
-    em->emcopy = BKE_editmesh_copy(em);
-  }
-  em->emcopyusers++;
 
   BMO_op_exec(bm, &bmop);
 
@@ -283,11 +274,6 @@ bool EDBM_op_call_silentf(BMEditMesh *em, const char *fmt, ...)
     va_end(list);
     return false;
   }
-
-  if (!em->emcopy) {
-    em->emcopy = BKE_editmesh_copy(em);
-  }
-  em->emcopyusers++;
 
   BMO_op_exec(bm, &bmop);
 
@@ -1472,7 +1458,7 @@ void EDBM_update(Mesh *mesh, const struct EDBMUpdate_Params *params)
   }
 
   if (params->is_destructive) {
-    /* TODO. we may be able to remove this now! - Campbell */
+    /* TODO(campbell): we may be able to remove this now! */
     // BM_mesh_elem_table_free(em->bm, BM_ALL_NOLOOP);
   }
   else {
