@@ -1282,6 +1282,64 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
     return this->faces.get(face_index).value().get();
   }
+
+  /**
+   * Adds an empty node with interpolation of the elements of `node_1`
+   * and `node_2`.
+   *
+   * @return Reference to newly added node.
+   */
+  Node<END> &add_empty_interp_node(const Node<END> &node_1, const Node<END> &node_2)
+  {
+    auto pos = (node_1.pos + node_2.pos) * 0.5;
+    /* The normal calculation might not be valid but good enough */
+    auto normal = (node_1.normal + node_2.normal) * 0.5;
+    auto &new_node = this->add_empty_node(pos, normal);
+    new_node.extra_data = interp(node_1.extra_data, node_2.extra_data);
+    return new_node;
+  }
+
+  /**
+   * Adds an empty vert with interpolation of the elements of `vert_1`
+   * and `vert_2`.
+   *
+   * @return Reference to newly added vert.
+   */
+  Vert<EVD> &add_empty_interp_vert(const Vert<EVD> &vert_1, const Vert<EVD> &vert_2)
+  {
+    auto uv = (vert_1.uv + vert_2.uv) * 0.5;
+    auto &new_vert = this->add_empty_vert(uv);
+    new_vert.extra_data = interp(vert_1.extra_data, vert_2.extra_data);
+    return new_vert;
+  }
+
+  /**
+   * Adds an empty edge with interpolation of the elements of `edge_1`
+   * and `edge_2`.
+   *
+   * @return Reference to newly added edge.
+   */
+  Edge<EED> &add_empty_interp_edge(const Edge<EED> &edge_1, const Edge<EED> &edge_2)
+  {
+    auto &new_edge = this->add_empty_edge();
+    new_edge.extra_data = interp(edge_1.extra_data, edge_2.extra_data);
+    return new_edge;
+  }
+
+  /**
+   * Adds an empty face with interpolation of the elements of `face_1`
+   * and `face_2`.
+   *
+   * @return Reference to newly added face.
+   */
+  Face<EFD> &add_empty_interp_face(const Face<EFD> &face_1, const Face<EFD> &face_2)
+  {
+    /* The normal calculation might not be valid but good enough */
+    auto normal = (face_1.normal + face_2.normal) * 0.5;
+    auto &new_face = this->add_empty_face(normal);
+    new_face.extra_data = interp(face_1.extra_data, face_2.extra_data);
+    return new_face;
+  }
 };
 
 template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff {
