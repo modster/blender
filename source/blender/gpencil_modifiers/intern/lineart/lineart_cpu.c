@@ -774,6 +774,7 @@ static void lineart_triangle_post(LineartTriangle *tri, LineartTriangle *orig)
   tri->flags = LRT_CULL_GENERATED;
   tri->intersection_mask = orig->intersection_mask;
   tri->material_mask_bits = orig->material_mask_bits;
+  tri->mat_occlusion = orig->mat_occlusion;
 }
 
 static void lineart_triangle_set_cull_flag(LineartTriangle *tri, uchar flag)
