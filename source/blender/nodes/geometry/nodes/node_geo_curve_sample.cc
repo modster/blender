@@ -92,12 +92,29 @@ static AttributeDomain get_result_domain(const GeometryComponent &component,
   return ATTR_DOMAIN_POINT;
 }
 
+Array<float> calculate_spline_accumulated_lengths(Span<SplinePtr> splines)
+{
+  Array<float> lengths(splines.size() + 1);
+  float length = 0.0f;
+  for (const int i : splines.index_range()) {
+    length += splines[i]->length();
+    lengths[i] = length;
+  }
+  lengths.last() = length;
+  return lengths;
+}
+
+static void spline_sample_data(const Span<GSpan> evaluated_spans)
+{
+}
+
 /**
  * 1. Sort input parameters
  * 2. For each spline in the curve, sample the values on it.
  */
-static void curve_sample_attributes(const CurveEval &curve,
-                                    const StringRef name,
+static void curve_sample_attributes(const Span<SplinePtr> splines,
+                                    const Span<float> spline_lengths,
+                                    const Span<GSpan> evaluated_spans,
                                     const Span<float> parameters,
                                     GMutableSpan result)
 {
@@ -109,6 +126,15 @@ static void curve_sample_attributes(const CurveEval &curve,
   std::sort(original_indices.begin(), original_indices.end(), [parameters](int a, int b) {
     return parameters[a] > parameters[b];
   });
+
+  Span<float> remaining_parameters = parameters;
+
+  std::lower_bound
+
+      int spline_start_index = 0;
+  int spline_end_index = 0;
+  for (const int i : splines.index_range()) {
+  }
 
   for (const int i : range) {
   }
@@ -133,9 +159,11 @@ static void execute_on_component(GeometryComponent &component,
   GMutableSpan result_span = result.as_span();
 
   const CurveEval &curve = *curve_component.get_for_read();
+  const Array<float> lengths = calculate_spline_accumulated_lengths(curve.splines());
 
   threading::parallel_for(IndexRange(result_span.size()), 1024, [&](IndexRange range) {
     curve_sample_attributes(curve,
+                            lengths,
                             attribute_name,
                             parameters_span.slice(range.start(), range.size()),
                             result_span.slice(range.start(), range.size()));
