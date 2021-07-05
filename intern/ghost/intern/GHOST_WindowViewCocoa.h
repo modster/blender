@@ -25,7 +25,7 @@
  * Objective-C does not have multiple inheritance. */
 
 // We need to subclass it in order to give Cocoa the feeling key events are trapped
-@interface COCOA_VIEW_CLASS : COCOA_VIEW_BASE_CLASS <NSTextInput>
+@interface COCOA_VIEW_CLASS : COCOA_VIEW_BASE_CLASS <NSTextInputClient>
 {
   GHOST_SystemCocoa *systemCocoa;
   GHOST_WindowCocoa *associatedWindow;
@@ -74,12 +74,7 @@
     composing = YES;
 
     // interpret event to call insertText
-    NSMutableArray *events;
-    events = [[NSMutableArray alloc] initWithCapacity:1];
-    [events addObject:event];
-    [self interpretKeyEvents:events];  // calls insertText
-    [events removeObject:event];
-    [events release];
+    [self interpretKeyEvents:[NSArray arrayWithObject:event]];  // calls insertText
     return;
   }
 }
@@ -207,12 +202,14 @@
   }
 }
 
-- (void)insertText:(id)chars
+- (void)insertText:(id)chars replacementRange:(NSRange)replacementRange
 {
   [self composing_free];
 }
 
-- (void)setMarkedText:(id)chars selectedRange:(NSRange)range
+- (void)setMarkedText:(id)chars
+        selectedRange:(NSRange)range
+     replacementRange:(NSRange)replacementRange
 {
   [self composing_free];
   if ([chars length] == 0)
@@ -246,12 +243,8 @@
   return composing;
 }
 
-- (NSInteger)conversationIdentifier
-{
-  return (NSInteger)self;
-}
-
-- (NSAttributedString *)attributedSubstringFromRange:(NSRange)range
+- (NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range
+                                                actualRange:(NSRangePointer)actualRange
 {
   return [[[NSAttributedString alloc] init] autorelease];
 }
@@ -272,7 +265,7 @@
   return NSMakeRange(0, length);
 }
 
-- (NSRect)firstRectForCharacterRange:(NSRange)range
+- (NSRect)firstRectForCharacterRange:(NSRange)range actualRange:(NSRangePointer)actualRange
 {
   return NSZeroRect;
 }

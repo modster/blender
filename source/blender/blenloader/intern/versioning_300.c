@@ -145,7 +145,7 @@ void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
     assert_sorted_ids(bmain);
   }
 
-  if (!MAIN_VERSION_ATLEAST(bmain, 300, 7)) {
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 8)) {
     move_vertex_group_names_to_object_data(bmain);
   }
 

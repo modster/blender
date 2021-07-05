@@ -514,7 +514,7 @@ void ED_vgroup_parray_from_weight_array(MDeformVert **dvert_array,
   }
 }
 
-/* TODO, cache flip data to speedup calls within a loop. */
+/* TODO: cache flip data to speedup calls within a loop. */
 static void mesh_defvert_mirror_update_internal(Object *ob,
                                                 MDeformVert *dvert_dst,
                                                 MDeformVert *dvert_src,
@@ -1008,7 +1008,7 @@ float ED_vgroup_vert_weight(Object *ob, bDeformGroup *dg, int vertnum)
 
 void ED_vgroup_select_by_name(Object *ob, const char *name)
 {
-  /* note: actdef==0 signals on painting to create a new one,
+  /* NOTE: actdef==0 signals on painting to create a new one,
    * if a bone in posemode is selected */
   BKE_object_defgroup_active_index_set(ob, BKE_object_defgroup_name_index(ob, name) + 1);
 }
@@ -1144,7 +1144,7 @@ static void vgroup_duplicate(Object *ob)
   BKE_object_defgroup_active_index_set(ob, BLI_listbase_count(defbase));
   icdg = BKE_object_defgroup_active_index_get(ob) - 1;
 
-  /* TODO, we might want to allow only copy selected verts here? - campbell */
+  /* TODO(campbell): we might want to allow only copy selected verts here? */
   ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, false);
 
   if (dvert_array) {
@@ -2367,8 +2367,8 @@ static void dvert_mirror_op(MDeformVert *dvert,
   }
 }
 
-/* TODO, vgroup locking */
-/* TODO, face masking */
+/* TODO: vgroup locking. */
+/* TODO: face masking. */
 void ED_vgroup_mirror(Object *ob,
                       const bool mirror_weights,
                       const bool flip_vgroups,
@@ -3795,7 +3795,7 @@ static int vertex_group_limit_total_exec(bContext *C, wmOperator *op)
     return OPERATOR_FINISHED;
   }
 
-  /* note, would normally return canceled, except we want the redo
+  /* NOTE: would normally return canceled, except we want the redo
    * UI to show up for users to change */
   return OPERATOR_FINISHED;
 }

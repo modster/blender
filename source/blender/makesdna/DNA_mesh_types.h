@@ -164,8 +164,7 @@ typedef struct Mesh {
   struct MVert *mvert;
   /** Array of edges. */
   struct MEdge *medge;
-
-  /** Deformgroup vertices. */
+  /** Deform-group vertices. */
   struct MDeformVert *dvert;
   /** List of bDeformGroup names and flag only. */
   ListBase vertex_group_names;
