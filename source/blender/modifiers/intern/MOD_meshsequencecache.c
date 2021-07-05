@@ -176,7 +176,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   /* Do not process data if using a render procedural, return a box instead for displaying in the
    * viewport. */
   if (BKE_cache_file_uses_render_procedural(
-          cache_file, scene, (int)DEG_get_mode(ctx->depsgraph))) {
+          cache_file, scene, DEG_get_mode(ctx->depsgraph))) {
     return generate_bounding_box_mesh(ctx->object, org_mesh);
   }
 

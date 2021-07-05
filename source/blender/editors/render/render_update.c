@@ -207,7 +207,7 @@ void ED_render_engine_changed(Main *bmain, const bool update_scene_data)
   }
 
   /* Update CacheFiles to ensure that procedurals are properly taken into account. */
-  for (CacheFile *cachefile = bmain->cachefiles.first; cachefile; cachefile = cachefile->id.next) {
+  LISTBASE_FOREACH (CacheFile *, cachefile, &bmain->cachefiles) {
     /* Only update cachefiles which are set to use a render procedural. We do not use
      * BKE_cachefile_uses_render_procedural here as we need to update regardless of the current
      * engine or its settings. */
