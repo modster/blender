@@ -193,6 +193,9 @@ class OptiXDevice : public CUDADevice {
   device_only_memory<unsigned char> denoiser_state;
   int denoiser_input_passes = 0;
 
+  vector<device_only_memory<char>> delayed_free_bvh_memory;
+  thread_mutex delayed_free_bvh_mutex;
+
  public:
   OptiXDevice(DeviceInfo &info_, Stats &stats_, Profiler &profiler_, bool background_)
       : CUDADevice(info_, stats_, profiler_, background_),
@@ -257,6 +260,8 @@ class OptiXDevice : public CUDADevice {
 
     // Make CUDA context current
     const CUDAContextScope scope(cuContext);
+
+    free_bvh_memory_delayed();
 
     sbt_data.free();
     texture_info.free();
@@ -721,7 +726,11 @@ class OptiXDevice : public CUDADevice {
       }
     }
     else if (task.type == DeviceTask::SHADER) {
-      launch_shader_eval(task, thread_index);
+      // CUDA kernels are used when doing baking
+      if (optix_module == NULL)
+        CUDADevice::shader(task);
+      else
+        launch_shader_eval(task, thread_index);
     }
     else if (task.type == DeviceTask::DENOISE_BUFFER) {
       // Set up a single tile that covers the whole task and denoise it
@@ -1187,16 +1196,18 @@ class OptiXDevice : public CUDADevice {
 
     const CUDAContextScope scope(cuContext);
 
+    const bool use_fast_trace_bvh = (bvh->params.bvh_type == SceneParams::BVH_STATIC);
+
     // Compute memory usage
     OptixAccelBufferSizes sizes = {};
     OptixAccelBuildOptions options = {};
     options.operation = operation;
-    if (background) {
-      // Prefer best performance and lowest memory consumption in background
+    if (use_fast_trace_bvh) {
+      VLOG(2) << "Using fast to trace OptiX BVH";
       options.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
     }
     else {
-      // Prefer fast updates in viewport
+      VLOG(2) << "Using fast to update OptiX BVH";
       options.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_BUILD | OPTIX_BUILD_FLAG_ALLOW_UPDATE;
     }
 
@@ -1244,15 +1255,16 @@ class OptiXDevice : public CUDADevice {
                                            out_data.device_pointer,
                                            sizes.outputSizeInBytes,
                                            &out_handle,
-                                           background ? &compacted_size_prop : NULL,
-                                           background ? 1 : 0));
+                                           use_fast_trace_bvh ? &compacted_size_prop : NULL,
+                                           use_fast_trace_bvh ? 1 : 0));
     bvh->traversable_handle = static_cast<uint64_t>(out_handle);
 
     // Wait for all operations to finish
     check_result_cuda_ret(cuStreamSynchronize(NULL));
 
-    // Compact acceleration structure to save memory (do not do this in viewport for faster builds)
-    if (background) {
+    // Compact acceleration structure to save memory (only if using fast trace as the
+    // OPTIX_BUILD_FLAG_ALLOW_COMPACTION flag is only set in this case).
+    if (use_fast_trace_bvh) {
       uint64_t compacted_size = sizes.outputSizeInBytes;
       check_result_cuda_ret(
           cuMemcpyDtoH(&compacted_size, compacted_size_prop.result, sizeof(compacted_size)));
@@ -1297,6 +1309,10 @@ class OptiXDevice : public CUDADevice {
       return;
     }
 
+    const bool use_fast_trace_bvh = (bvh->params.bvh_type == SceneParams::BVH_STATIC);
+
+    free_bvh_memory_delayed();
+
     BVHOptiX *const bvh_optix = static_cast<BVHOptiX *>(bvh);
 
     progress.set_substatus("Building OptiX acceleration structure");
@@ -1304,10 +1320,10 @@ class OptiXDevice : public CUDADevice {
     if (!bvh->params.top_level) {
       assert(bvh->objects.size() == 1 && bvh->geometry.size() == 1);
 
-      // Refit is only possible in viewport for now (because AS is built with
-      // OPTIX_BUILD_FLAG_ALLOW_UPDATE only there, see above)
       OptixBuildOperation operation = OPTIX_BUILD_OPERATION_BUILD;
-      if (refit && !background) {
+      /* Refit is only possible when using fast to trace BVH (because AS is built with
+       * OPTIX_BUILD_FLAG_ALLOW_UPDATE only there, see above). */
+      if (refit && !use_fast_trace_bvh) {
         assert(bvh_optix->traversable_handle != 0);
         operation = OPTIX_BUILD_OPERATION_UPDATE;
       }
@@ -1765,6 +1781,24 @@ class OptiXDevice : public CUDADevice {
       }
       tlas_handle = bvh_optix->traversable_handle;
     }
+  }
+
+  void release_optix_bvh(BVH *bvh) override
+  {
+    thread_scoped_lock lock(delayed_free_bvh_mutex);
+    /* Do delayed free of BVH memory, since geometry holding BVH might be deleted
+     * while GPU is still rendering. */
+    BVHOptiX *const bvh_optix = static_cast<BVHOptiX *>(bvh);
+
+    delayed_free_bvh_memory.emplace_back(std::move(bvh_optix->as_data));
+    delayed_free_bvh_memory.emplace_back(std::move(bvh_optix->motion_transform_data));
+    bvh_optix->traversable_handle = 0;
+  }
+
+  void free_bvh_memory_delayed()
+  {
+    thread_scoped_lock lock(delayed_free_bvh_mutex);
+    delayed_free_bvh_memory.free_memory();
   }
 
   void const_copy_to(const char *name, void *host, size_t size) override

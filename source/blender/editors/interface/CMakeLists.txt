@@ -75,6 +75,7 @@ set(SRC
   resources.c
   view2d.c
   view2d_draw.c
+  view2d_edge_pan.c
   view2d_gizmo_navigate.c
   view2d_ops.c
 
@@ -101,7 +102,7 @@ if(WITH_PYTHON)
   add_definitions(-DWITH_PYTHON)
 endif()
 
-if(WIN32)
+if(WIN32 OR APPLE)
   if(WITH_INPUT_IME)
     add_definitions(-DWITH_INPUT_IME)
   endif()

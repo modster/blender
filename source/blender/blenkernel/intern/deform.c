@@ -716,7 +716,7 @@ MDeformWeight *BKE_defvert_ensure_index(MDeformVert *dvert, const int defgroup)
   return dw_new;
 }
 
-/* TODO. merge with code above! */
+/* TODO: merge with code above! */
 
 /**
  * Adds the given vertex to the specified vertex group, with given weight.
@@ -1130,11 +1130,13 @@ static void vgroups_datatransfer_interp(const CustomDataTransferLayerMap *laymap
   MDeformWeight *dw_dst = BKE_defvert_find_index(data_dst, idx_dst);
   float weight_src = 0.0f, weight_dst = 0.0f;
 
+  bool has_dw_sources = false;
   if (sources) {
     for (i = count; i--;) {
       for (j = data_src[i]->totweight; j--;) {
         if ((dw_src = &data_src[i]->dw[j])->def_nr == idx_src) {
           weight_src += dw_src->weight * weights[i];
+          has_dw_sources = true;
           break;
         }
       }
@@ -1152,7 +1154,14 @@ static void vgroups_datatransfer_interp(const CustomDataTransferLayerMap *laymap
 
   CLAMP(weight_src, 0.0f, 1.0f);
 
-  if (!dw_dst) {
+  /* Do not create a destination MDeformWeight data if we had no sources at all. */
+  if (!has_dw_sources) {
+    BLI_assert(weight_src == 0.0f);
+    if (dw_dst) {
+      dw_dst->weight = weight_src;
+    }
+  }
+  else if (!dw_dst) {
     BKE_defvert_add_index_notest(data_dst, idx_dst, weight_src);
   }
   else {
@@ -1325,7 +1334,7 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
 
   const size_t elem_size = sizeof(*((MDeformVert *)NULL));
 
-  /* Note:
+  /* NOTE:
    * VGroups are a bit hairy, since their layout is defined on object level (ob->defbase),
    * while their actual data is a (mesh) CD layer.
    * This implies we may have to handle data layout itself while having NULL data itself,
@@ -1348,7 +1357,7 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
   }
 
   if (fromlayers == DT_LAYERS_ACTIVE_SRC || fromlayers >= 0) {
-    /* Note: use_delete has not much meaning in this case, ignored. */
+    /* NOTE: use_delete has not much meaning in this case, ignored. */
 
     if (fromlayers >= 0) {
       idx_src = fromlayers;
@@ -1364,7 +1373,7 @@ bool data_transfer_layersmapping_vgroups(ListBase *r_map,
     }
 
     if (tolayers >= 0) {
-      /* Note: in this case we assume layer exists! */
+      /* NOTE: in this case we assume layer exists! */
       idx_dst = tolayers;
       BLI_assert(idx_dst < BLI_listbase_count(&ob_dst->defbase));
     }

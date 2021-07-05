@@ -153,6 +153,8 @@ static SpaceLink *action_duplicate(SpaceLink *sl)
 {
   SpaceAction *sactionn = MEM_dupallocN(sl);
 
+  memset(&sactionn->runtime, 0x0, sizeof(sactionn->runtime));
+
   /* clear or remove stuff from old */
 
   return (SpaceLink *)sactionn;
@@ -528,7 +530,7 @@ static void action_listener(const wmSpaceTypeListenerParams *params)
       }
       break;
     case NC_ANIMATION:
-      /* for NLA tweakmode enter/exit, need complete refresh */
+      /* For NLA tweak-mode enter/exit, need complete refresh. */
       if (wmn->data == ND_NLA_ACTCHANGE) {
         saction->runtime.flag |= SACTION_RUNTIME_FLAG_NEED_CHAN_SYNC;
         ED_area_tag_refresh(area);

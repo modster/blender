@@ -192,7 +192,7 @@ static void scene_init_data(ID *id)
 
   BLI_strncpy(scene->r.pic, U.renderdir, sizeof(scene->r.pic));
 
-  /* Note; in header_info.c the scene copy happens...,
+  /* NOTE: in header_info.c the scene copy happens...,
    * if you add more to renderdata it has to be checked there. */
 
   /* multiview - stereo */
@@ -228,7 +228,10 @@ static void scene_init_data(ID *id)
 
   /* Curve Profile */
   scene->toolsettings->custom_bevel_profile_preset = BKE_curveprofile_add(PROF_PRESET_LINE);
+
+  /* Sequencer */
   scene->toolsettings->sequencer_tool_settings = SEQ_tool_settings_init();
+  scene->toolsettings->snap_flag |= SCE_SNAP_SEQ;
 
   for (size_t i = 0; i < ARRAY_SIZE(scene->orientation_slots); i++) {
     scene->orientation_slots[i].index_custom = -1;
@@ -1042,7 +1045,7 @@ static void scene_blend_write(BlendWriter *writer, ID *id, const void *id_addres
 
 static void direct_link_paint_helper(BlendDataReader *reader, const Scene *scene, Paint **paint)
 {
-  /* TODO. is this needed */
+  /* TODO: is this needed. */
   BLO_read_data_address(reader, paint);
 
   if (*paint) {
@@ -1145,6 +1148,7 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
     BLO_read_data_address(reader, &ed->act_seq);
     ed->cache = NULL;
     ed->prefetch_job = NULL;
+    ed->runtime.sequence_lookup = NULL;
 
     /* recursive link sequences, lb will be correctly initialized */
     link_recurs_seq(reader, &ed->seqbase);
@@ -1465,8 +1469,8 @@ static void scene_blend_read_lib(BlendLibReader *reader, ID *id)
     IDP_BlendReadLib(reader, seq->prop);
 
     if (seq->ipo) {
-      BLO_read_id_address(
-          reader, sce->id.lib, &seq->ipo); /* XXX deprecated - old animation system */
+      /* XXX: deprecated - old animation system. */
+      BLO_read_id_address(reader, sce->id.lib, &seq->ipo);
     }
     seq->scene_sound = NULL;
     if (seq->scene) {
@@ -1895,14 +1899,14 @@ void BKE_scene_copy_data_eevee(Scene *sce_dst, const Scene *sce_src)
   sce_dst->eevee = sce_src->eevee;
   sce_dst->eevee.light_cache_data = NULL;
   sce_dst->eevee.light_cache_info[0] = '\0';
-  /* TODO Copy the cache. */
+  /* TODO: Copy the cache. */
 }
 
 Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
 {
   Scene *sce_copy;
 
-  /* TODO this should/could most likely be replaced by call to more generic code at some point...
+  /* TODO: this should/could most likely be replaced by call to more generic code at some point...
    * But for now, let's keep it well isolated here. */
   if (type == SCE_COPY_EMPTY) {
     ListBase rv;
@@ -1985,8 +1989,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
     const bool is_subprocess = false;
 
     if (!is_subprocess) {
-      BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-      BKE_main_id_clear_newpoins(bmain);
+      BKE_main_id_newptr_and_tag_clear(bmain);
       /* In case root duplicated ID is linked, assume we want to get a local copy of it and
        * duplicate all expected linked data. */
       if (ID_IS_LINKED(sce)) {
@@ -2013,7 +2016,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
         bmain, NULL, sce_copy->master_collection, duplicate_flags, LIB_ID_DUPLICATE_IS_SUBPROCESS);
 
     if (!is_subprocess) {
-      /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW.*/
+      /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW. */
       BKE_libblock_relink_to_newid(&sce_copy->id);
 
 #ifndef NDEBUG
@@ -2027,8 +2030,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
 #endif
 
       /* Cleanup. */
-      BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-      BKE_main_id_clear_newpoins(bmain);
+      BKE_main_id_newptr_and_tag_clear(bmain);
 
       BKE_main_collection_sync(bmain);
     }
@@ -3380,7 +3382,7 @@ static bool depsgraph_key_compare(const void *key_a_v, const void *key_b_v)
 {
   const DepsgraphKey *key_a = key_a_v;
   const DepsgraphKey *key_b = key_b_v;
-  /* TODO(sergey): Compare rest of  */
+  /* TODO(sergey): Compare rest of. */
   return !(key_a->view_layer == key_b->view_layer);
 }
 
@@ -3789,9 +3791,7 @@ void BKE_scene_eval_sequencer_sequences(Depsgraph *depsgraph, Scene *scene)
   SEQ_ALL_BEGIN (scene->ed, seq) {
     if (seq->scene_sound == NULL) {
       if (seq->sound != NULL) {
-        if (seq->scene_sound == NULL) {
-          seq->scene_sound = BKE_sound_add_scene_sound_defaults(scene, seq);
-        }
+        seq->scene_sound = BKE_sound_add_scene_sound_defaults(scene, seq);
       }
       else if (seq->type == SEQ_TYPE_SCENE) {
         if (seq->scene != NULL) {

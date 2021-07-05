@@ -364,7 +364,7 @@ static void node_foreach_cache(ID *id,
   key.offset_in_ID = offsetof(bNodeTree, previews);
   key.cache_v = nodetree->previews;
 
-  /* TODO, see also `direct_link_nodetree()` in readfile.c. */
+  /* TODO: see also `direct_link_nodetree()` in readfile.c. */
 #if 0
   function_callback(id, &key, (void **)&nodetree->previews, 0, user_data);
 #endif
@@ -513,7 +513,7 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
 
     if (node->storage) {
       /* could be handlerized at some point, now only 1 exception still */
-      if ((ntree->type == NTREE_SHADER) &&
+      if ((ELEM(ntree->type, NTREE_SHADER, NTREE_GEOMETRY)) &&
           ELEM(node->type, SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB)) {
         BKE_curvemapping_blend_write(writer, (const CurveMapping *)node->storage);
       }
@@ -645,7 +645,7 @@ static void direct_link_node_socket(BlendDataReader *reader, bNodeSocket *sock)
 /* ntree itself has been read! */
 void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
 {
-  /* note: writing and reading goes in sync, for speed */
+  /* NOTE: writing and reading goes in sync, for speed. */
   ntree->init = 0; /* to set callbacks and force setting types */
   ntree->is_updating = false;
   ntree->typeinfo = nullptr;
@@ -796,7 +796,7 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
     BLO_read_data_address(reader, &link->tosock);
   }
 
-  /* TODO, should be dealt by new generic cache handling of IDs... */
+  /* TODO: should be dealt by new generic cache handling of IDs... */
   ntree->previews = nullptr;
 
   /* type verification is in lib-link */
@@ -875,7 +875,7 @@ void ntreeBlendReadLib(struct BlendLibReader *reader, struct bNodeTree *ntree)
 
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     /* Link ID Properties -- and copy this comment EXACTLY for easy finding
-     * of library blocks that implement this.*/
+     * of library blocks that implement this. */
     IDP_BlendReadLib(reader, node->prop);
 
     BLO_read_id_address(reader, lib, &node->id);
@@ -1042,7 +1042,7 @@ static void node_add_sockets_from_type(bNodeTree *ntree, bNode *node, bNodeType 
   }
 }
 
-/* Note: This function is called to initialize node data based on the type.
+/* NOTE: This function is called to initialize node data based on the type.
  * The bNodeType may not be registered at creation time of the node,
  * so this can be delayed until the node type gets registered.
  */
@@ -1064,7 +1064,7 @@ static void node_init(const struct bContext *C, bNodeTree *ntree, bNode *node)
   node->height = ntype->height;
   node->color[0] = node->color[1] = node->color[2] = 0.608; /* default theme color */
   /* initialize the node name with the node label.
-   * note: do this after the initfunc so nodes get their data set which may be used in naming
+   * NOTE: do this after the initfunc so nodes get their data set which may be used in naming
    * (node groups for example) */
   /* XXX Do not use nodeLabel() here, it returns translated content for UI,
    *     which should *only* be used in UI, *never* in data...
@@ -1662,6 +1662,8 @@ const char *nodeStaticSocketType(int type, int subtype)
           return "NodeSocketFloatAngle";
         case PROP_TIME:
           return "NodeSocketFloatTime";
+        case PROP_TIME_ABSOLUTE:
+          return "NodeSocketFloatTimeAbsolute";
         case PROP_DISTANCE:
           return "NodeSocketFloatDistance";
         case PROP_NONE:
@@ -1737,6 +1739,8 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype)
           return "NodeSocketInterfaceFloatAngle";
         case PROP_TIME:
           return "NodeSocketInterfaceFloatTime";
+        case PROP_TIME_ABSOLUTE:
+          return "NodeSocketInterfaceFloatTimeAbsolute";
         case PROP_DISTANCE:
           return "NodeSocketInterfaceFloatDistance";
         case PROP_NONE:
@@ -2361,7 +2365,7 @@ static void nodeUnMuteLink(bNodeLink *link)
   link->tosock->flag |= SOCK_IN_USE;
 }
 
-/* Upstream muting. Always happens when unmuting but checks when muting. O(n^2) algorithm.*/
+/* Upstream muting. Always happens when unmuting but checks when muting. O(n^2) algorithm. */
 static void nodeMuteRerouteInputLinks(bNodeTree *ntree, bNode *node, const bool mute)
 {
   if (node->type != NODE_REROUTE) {
@@ -2384,7 +2388,7 @@ static void nodeMuteRerouteInputLinks(bNodeTree *ntree, bNode *node, const bool 
   }
 }
 
-/* Downstream muting propagates when reaching reroute nodes. O(n^2) algorithm.*/
+/* Downstream muting propagates when reaching reroute nodes. O(n^2) algorithm. */
 static void nodeMuteRerouteOutputLinks(bNodeTree *ntree, bNode *node, const bool mute)
 {
   if (node->type != NODE_REROUTE) {
@@ -2879,7 +2883,7 @@ void BKE_node_preview_merge_tree(bNodeTree *to_ntree, bNodeTree *from_ntree, boo
         BKE_node_instance_hash_insert(to_ntree->previews, key, preview);
       }
 
-      /* Note: null free function here,
+      /* NOTE: null free function here,
        * because pointers have already been moved over to to_ntree->previews! */
       BKE_node_instance_hash_free(from_ntree->previews, nullptr);
       from_ntree->previews = nullptr;
@@ -3147,8 +3151,8 @@ void ntreeSetOutput(bNodeTree *ntree)
           if (ntree->type == NTREE_COMPOSIT) {
             /* same type, exception for viewer */
             if (tnode->type == node->type ||
-                (ELEM(tnode->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER) &&
-                 ELEM(node->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER))) {
+                (ELEM(tnode->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER, GEO_NODE_VIEWER) &&
+                 ELEM(node->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER, GEO_NODE_VIEWER))) {
               if (tnode->flag & NODE_DO_OUTPUT) {
                 output++;
                 if (output > 1) {
@@ -3270,7 +3274,7 @@ bNodeTree *ntreeLocalize(bNodeTree *ntree)
 {
   if (ntree) {
     /* Make full copy outside of Main database.
-     * Note: previews are not copied here.
+     * NOTE: previews are not copied here.
      */
     bNodeTree *ltree = (bNodeTree *)BKE_id_copy_ex(
         nullptr, &ntree->id, nullptr, (LIB_ID_COPY_LOCALIZE | LIB_ID_COPY_NO_ANIMDATA));
@@ -3338,8 +3342,6 @@ static bNodeSocket *make_socket_interface(bNodeTree *ntree,
                                           const char *name)
 {
   bNodeSocketType *stype = nodeSocketTypeFind(idname);
-  int own_index = ntree->cur_index++;
-
   if (stype == nullptr) {
     return nullptr;
   }
@@ -3351,7 +3353,7 @@ static bNodeSocket *make_socket_interface(bNodeTree *ntree,
   sock->type = SOCK_CUSTOM; /* int type undefined by default */
 
   /* assign new unique index */
-  own_index = ntree->cur_index++;
+  const int own_index = ntree->cur_index++;
   /* use the own_index as socket identifier */
   if (in_out == SOCK_IN) {
     BLI_snprintf(sock->identifier, MAX_NAME, "Input_%d", own_index);
@@ -4749,7 +4751,7 @@ static bool node_undefined_poll(bNodeType *UNUSED(ntype),
 /* register fallback types used for undefined tree, nodes, sockets */
 static void register_undefined_types()
 {
-  /* Note: these types are not registered in the type hashes,
+  /* NOTE: these types are not registered in the type hashes,
    * they are just used as placeholders in case the actual types are not registered.
    */
 
@@ -5050,11 +5052,26 @@ static void registerGeometryNodes()
   register_node_type_geo_boolean();
   register_node_type_geo_bounding_box();
   register_node_type_geo_collection_info();
+  register_node_type_geo_convex_hull();
+  register_node_type_geo_curve_length();
+  register_node_type_geo_curve_primitive_bezier_segment();
+  register_node_type_geo_curve_primitive_circle();
+  register_node_type_geo_curve_primitive_line();
+  register_node_type_geo_curve_primitive_quadratic_bezier();
+  register_node_type_geo_curve_primitive_spiral();
+  register_node_type_geo_curve_primitive_star();
   register_node_type_geo_curve_to_mesh();
+  register_node_type_geo_curve_to_points();
   register_node_type_geo_curve_resample();
+  register_node_type_geo_curve_reverse();
+  register_node_type_geo_curve_subdivide();
+  register_node_type_geo_delete_geometry();
   register_node_type_geo_edge_split();
+  register_node_type_geo_input_material();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
+  register_node_type_geo_material_assign();
+  register_node_type_geo_material_replace();
   register_node_type_geo_mesh_primitive_circle();
   register_node_type_geo_mesh_primitive_cone();
   register_node_type_geo_mesh_primitive_cube();
@@ -5063,6 +5080,7 @@ static void registerGeometryNodes()
   register_node_type_geo_mesh_primitive_ico_sphere();
   register_node_type_geo_mesh_primitive_line();
   register_node_type_geo_mesh_primitive_uv_sphere();
+  register_node_type_geo_mesh_to_curve();
   register_node_type_geo_object_info();
   register_node_type_geo_point_distribute();
   register_node_type_geo_point_instance();
@@ -5071,13 +5089,17 @@ static void registerGeometryNodes()
   register_node_type_geo_point_separate();
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
+  register_node_type_geo_raycast();
   register_node_type_geo_sample_texture();
+  register_node_type_geo_select_by_material();
+  register_node_type_geo_separate_components();
   register_node_type_geo_subdivide();
   register_node_type_geo_subdivision_surface();
   register_node_type_geo_switch();
   register_node_type_geo_remesh();
   register_node_type_geo_transform();
   register_node_type_geo_triangulate();
+  register_node_type_geo_viewer();
   register_node_type_geo_volume_to_mesh();
 }
 
@@ -5085,6 +5107,7 @@ static void registerFunctionNodes()
 {
   register_node_type_fn_boolean_math();
   register_node_type_fn_float_compare();
+  register_node_type_fn_float_to_int();
   register_node_type_fn_input_string();
   register_node_type_fn_input_vector();
   register_node_type_fn_random_float();

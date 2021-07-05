@@ -400,7 +400,7 @@ ImBuf *BKE_main_thumbnail_to_imbuf(Main *bmain, BlendThumbnail *data)
   }
 
   if (data) {
-    /* Note: we cannot use IMB_allocFromBuffer(), since it tries to dupalloc passed buffer,
+    /* NOTE: we cannot use IMB_allocFromBuffer(), since it tries to dupalloc passed buffer,
      *       which will fail here (we do not want to pass the first two ints!). */
     img = IMB_allocImBuf(
         (unsigned int)data->width, (unsigned int)data->height, 32, IB_rect | IB_metadata);
@@ -538,10 +538,12 @@ ListBase *which_libbase(Main *bmain, short type)
  * This is useful for generic traversal of all the blocks in a #Main (by traversing all the lists
  * in turn), without worrying about block types.
  *
+ * \param lb: Array of lists #INDEX_ID_MAX in length.
+ *
  * \note The order of each ID type #ListBase in the array is determined by the `INDEX_ID_<IDTYPE>`
  * enum definitions in `DNA_ID.h`. See also the #FOREACH_MAIN_ID_BEGIN macro in `BKE_main.h`
  */
-int set_listbasepointers(Main *bmain, ListBase *lb[INDEX_ID_MAX])
+int set_listbasepointers(Main *bmain, ListBase *lb[/*INDEX_ID_MAX*/])
 {
   /* Libraries may be accessed from pretty much any other ID. */
   lb[INDEX_ID_LI] = &(bmain->libraries);

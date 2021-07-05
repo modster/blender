@@ -325,6 +325,7 @@ typedef struct bNodeType {
 
   /* Execute a geometry node. */
   NodeGeometryExecFunction geometry_node_execute;
+  bool geometry_node_execute_supports_laziness;
 
   /* RNA integration */
   ExtensionRNA rna_ext;
@@ -964,7 +965,7 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree,
 /** \name Shader Nodes
  * \{ */
 
-/* note: types are needed to restore callbacks, don't change values */
+/* NOTE: types are needed to restore callbacks, don't change values. */
 /* range 1 - 100 is reserved for common nodes */
 /* using toolbox, we add node groups by assuming the values below
  * don't exceed NODE_GROUP_MENU for now. */
@@ -1131,7 +1132,7 @@ void ntreeGPUMaterialNodes(struct bNodeTree *localtree,
 // #define RRES_OUT_SUBSURFACE_COLOR 30
 // #define RRES_OUT_DEBUG 31
 
-/* note: types are needed to restore callbacks, don't change values */
+/* NOTE: types are needed to restore callbacks, don't change values. */
 #define CMP_NODE_VIEWER 201
 #define CMP_NODE_RGB 202
 #define CMP_NODE_VALUE 203
@@ -1304,15 +1305,18 @@ void ntreeCompositOutputFileUniqueLayer(struct ListBase *list,
 void ntreeCompositColorBalanceSyncFromLGG(bNodeTree *ntree, bNode *node);
 void ntreeCompositColorBalanceSyncFromCDL(bNodeTree *ntree, bNode *node);
 
-void ntreeCompositCryptomatteSyncFromAdd(bNode *node);
+void ntreeCompositCryptomatteSyncFromAdd(const Scene *scene, bNode *node);
 void ntreeCompositCryptomatteSyncFromRemove(bNode *node);
 bNodeSocket *ntreeCompositCryptomatteAddSocket(bNodeTree *ntree, bNode *node);
 int ntreeCompositCryptomatteRemoveSocket(bNodeTree *ntree, bNode *node);
-void ntreeCompositCryptomatteLayerPrefix(const bNode *node, char *r_prefix, size_t prefix_len);
+void ntreeCompositCryptomatteLayerPrefix(const Scene *scene,
+                                         const bNode *node,
+                                         char *r_prefix,
+                                         size_t prefix_len);
 /* Update the runtime layer names with the cryptomatte layer names of the references
  * render layer or image. */
-void ntreeCompositCryptomatteUpdateLayerNames(bNode *node);
-struct CryptomatteSession *ntreeCompositCryptomatteSession(bNode *node);
+void ntreeCompositCryptomatteUpdateLayerNames(const Scene *scene, bNode *node);
+struct CryptomatteSession *ntreeCompositCryptomatteSession(const Scene *scene, bNode *node);
 
 /** \} */
 
@@ -1422,7 +1426,27 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_ATTRIBUTE_CURVE_MAP 1046
 #define GEO_NODE_CURVE_RESAMPLE 1047
 #define GEO_NODE_ATTRIBUTE_VECTOR_ROTATE 1048
-#define GEO_NODE_REMESH 1049
+#define GEO_NODE_MATERIAL_ASSIGN 1049
+#define GEO_NODE_INPUT_MATERIAL 1050
+#define GEO_NODE_MATERIAL_REPLACE 1051
+#define GEO_NODE_MESH_TO_CURVE 1052
+#define GEO_NODE_DELETE_GEOMETRY 1053
+#define GEO_NODE_CURVE_LENGTH 1054
+#define GEO_NODE_SELECT_BY_MATERIAL 1055
+#define GEO_NODE_CONVEX_HULL 1056
+#define GEO_NODE_CURVE_TO_POINTS 1057
+#define GEO_NODE_CURVE_REVERSE 1058
+#define GEO_NODE_SEPARATE_COMPONENTS 1059
+#define GEO_NODE_CURVE_SUBDIVIDE 1060
+#define GEO_NODE_RAYCAST 1061
+#define GEO_NODE_CURVE_PRIMITIVE_STAR 1062
+#define GEO_NODE_CURVE_PRIMITIVE_SPIRAL 1063
+#define GEO_NODE_CURVE_PRIMITIVE_QUADRATIC_BEZIER 1064
+#define GEO_NODE_CURVE_PRIMITIVE_BEZIER_SEGMENT 1065
+#define GEO_NODE_CURVE_PRIMITIVE_CIRCLE 1066
+#define GEO_NODE_VIEWER 1067
+#define GEO_NODE_CURVE_PRIMITIVE_LINE 1068
+#define GEO_NODE_REMESH 1069
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1434,6 +1458,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define FN_NODE_RANDOM_FLOAT 1206
 #define FN_NODE_INPUT_VECTOR 1207
 #define FN_NODE_INPUT_STRING 1208
+#define FN_NODE_FLOAT_TO_INT 1209
 
 /** \} */
 

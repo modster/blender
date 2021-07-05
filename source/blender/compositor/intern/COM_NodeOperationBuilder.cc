@@ -79,7 +79,7 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
     if (!op_from || op_to_list.is_empty()) {
       /* XXX allow this? error/debug message? */
       // BLI_assert(false);
-      /* XXX note: this can happen with certain nodes (e.g. OutputFile)
+      /* XXX NOTE: this can happen with certain nodes (e.g. OutputFile)
        * which only generate operations in certain circumstances (rendering)
        * just let this pass silently for now ...
        */
@@ -99,8 +99,10 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
 
   determineResolutions();
 
-  /* surround complex ops with read/write buffer */
-  add_complex_operation_buffers();
+  if (m_context->get_execution_model() == eExecutionModel::Tiled) {
+    /* surround complex ops with read/write buffer */
+    add_complex_operation_buffers();
+  }
 
   /* links not available from here on */
   /* XXX make m_links a local variable to avoid confusion! */
@@ -111,8 +113,10 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
   /* ensure topological (link-based) order of nodes */
   /*sort_operations();*/ /* not needed yet */
 
-  /* create execution groups */
-  group_operations();
+  if (m_context->get_execution_model() == eExecutionModel::Tiled) {
+    /* create execution groups */
+    group_operations();
+  }
 
   /* transfer resulting operations to the system */
   system->set_operations(m_operations, m_groups);
@@ -125,6 +129,7 @@ void NodeOperationBuilder::addOperation(NodeOperation *operation)
   if (m_current_node) {
     operation->set_name(m_current_node->getbNode()->name);
   }
+  operation->set_execution_model(m_context->get_execution_model());
 }
 
 void NodeOperationBuilder::mapInputSocket(NodeInput *node_socket,
@@ -133,7 +138,7 @@ void NodeOperationBuilder::mapInputSocket(NodeInput *node_socket,
   BLI_assert(m_current_node);
   BLI_assert(node_socket->getNode() == m_current_node);
 
-  /* note: this maps operation sockets to node sockets.
+  /* NOTE: this maps operation sockets to node sockets.
    * for resolving links the map will be inverted first in convertToOperations,
    * to get a list of links for each node input socket.
    */
@@ -279,7 +284,7 @@ void NodeOperationBuilder::add_datatype_conversions()
 
 void NodeOperationBuilder::add_operation_input_constants()
 {
-  /* Note: unconnected inputs cached first to avoid modifying
+  /* NOTE: unconnected inputs cached first to avoid modifying
    *       m_operations while iterating over it
    */
   Vector<NodeOperationInput *> pending_inputs;
@@ -532,7 +537,7 @@ void NodeOperationBuilder::add_output_buffers(NodeOperation *operation,
 
 void NodeOperationBuilder::add_complex_operation_buffers()
 {
-  /* note: complex ops and get cached here first, since adding operations
+  /* NOTE: complex ops and get cached here first, since adding operations
    * will invalidate iterators over the main m_operations
    */
   Vector<NodeOperation *> complex_ops;

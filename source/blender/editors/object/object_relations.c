@@ -153,8 +153,7 @@ static int vertex_parent_set_exec(bContext *C, wmOperator *op)
 
     em = me->edit_mesh;
 
-    EDBM_mesh_normals_update(em);
-    BKE_editmesh_looptri_calc(em);
+    BKE_editmesh_looptri_and_normals_calc(em);
 
     /* Make sure the evaluated mesh is updated.
      *
@@ -594,7 +593,7 @@ void ED_object_parent_clear(Object *ob, const int type)
   DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
 }
 
-/* note, poll should check for editable scene */
+/* NOTE: poll should check for editable scene. */
 static int parent_clear_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
@@ -716,7 +715,7 @@ bool ED_object_parent_set(ReportList *reports,
         cu->flag |= CU_PATH | CU_FOLLOW;
         cu_eval->flag |= CU_PATH | CU_FOLLOW;
         /* force creation of path data */
-        BKE_displist_make_curveTypes(depsgraph, scene, par, false, false);
+        BKE_displist_make_curveTypes(depsgraph, scene, par, false);
       }
       else {
         cu->flag |= CU_FOLLOW;
@@ -792,8 +791,8 @@ bool ED_object_parent_set(ReportList *reports,
        * NOTE: the old (2.4x) method was to set ob->partype = PARSKEL,
        * creating the virtual modifiers.
        */
-      ob->partype = PAROBJECT;     /* Note: DNA define, not operator property. */
-      /* ob->partype = PARSKEL; */ /* Note: DNA define, not operator property. */
+      ob->partype = PAROBJECT;     /* NOTE: DNA define, not operator property. */
+      /* ob->partype = PARSKEL; */ /* NOTE: DNA define, not operator property. */
 
       /* BUT, to keep the deforms, we need a modifier,
        * and then we need to set the object that it uses
@@ -838,14 +837,14 @@ bool ED_object_parent_set(ReportList *reports,
       }
       break;
     case PAR_BONE:
-      ob->partype = PARBONE; /* Note: DNA define, not operator property. */
+      ob->partype = PARBONE; /* NOTE: DNA define, not operator property. */
       if (pchan->bone) {
         pchan->bone->flag &= ~BONE_RELATIVE_PARENTING;
         pchan_eval->bone->flag &= ~BONE_RELATIVE_PARENTING;
       }
       break;
     case PAR_BONE_RELATIVE:
-      ob->partype = PARBONE; /* Note: DNA define, not operator property. */
+      ob->partype = PARBONE; /* NOTE: DNA define, not operator property. */
       if (pchan->bone) {
         pchan->bone->flag |= BONE_RELATIVE_PARENTING;
         pchan_eval->bone->flag |= BONE_RELATIVE_PARENTING;
@@ -861,7 +860,7 @@ bool ED_object_parent_set(ReportList *reports,
       break;
     case PAR_OBJECT:
     case PAR_FOLLOW:
-      ob->partype = PAROBJECT; /* Note: DNA define, not operator property. */
+      ob->partype = PAROBJECT; /* NOTE: DNA define, not operator property. */
       break;
   }
 
@@ -1249,7 +1248,7 @@ static int parent_noinv_set_exec(bContext *C, wmOperator *op)
 
         /* set parenting type for object - object only... */
         ob->parent = par;
-        ob->partype = PAROBJECT; /* note, dna define, not operator property */
+        ob->partype = PAROBJECT; /* NOTE: DNA define, not operator property. */
       }
     }
   }
@@ -1299,7 +1298,7 @@ static const EnumPropertyItem prop_clear_track_types[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-/* note, poll should check for editable scene */
+/* NOTE: poll should check for editable scene. */
 static int object_track_clear_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
@@ -1932,7 +1931,7 @@ static void single_object_users(
 }
 
 /* not an especially efficient function, only added so the single user
- * button can be functional.*/
+ * button can be functional. */
 void ED_object_single_user(Main *bmain, Scene *scene, Object *ob)
 {
   FOREACH_SCENE_OBJECT_BEGIN (scene, ob_iter) {
@@ -1944,7 +1943,7 @@ void ED_object_single_user(Main *bmain, Scene *scene, Object *ob)
   ob->flag |= OB_DONE;
 
   single_object_users(bmain, scene, NULL, OB_DONE, false);
-  BKE_main_id_clear_newpoins(bmain);
+  BKE_main_id_newptr_and_tag_clear(bmain);
 }
 
 static void single_obdata_users(
@@ -2237,7 +2236,7 @@ static int make_local_exec(bContext *C, wmOperator *op)
   const int mode = RNA_enum_get(op->ptr, "type");
   int a;
 
-  /* Note: we (ab)use LIB_TAG_PRE_EXISTING to cherry pick which ID to make local... */
+  /* NOTE: we (ab)use LIB_TAG_PRE_EXISTING to cherry pick which ID to make local... */
   if (mode == MAKE_LOCAL_ALL) {
     ViewLayer *view_layer = CTX_data_view_layer(C);
     Collection *collection = CTX_data_collection(C);
@@ -2454,7 +2453,7 @@ static int make_override_library_exec(bContext *C, wmOperator *op)
   BKE_main_id_tag_all(bmain, LIB_TAG_DOIT, false);
 
   const bool success = BKE_lib_override_library_create(
-      bmain, scene, view_layer, id_root, &obact->id);
+      bmain, scene, view_layer, id_root, &obact->id, NULL);
 
   /* Remove the instance empty from this scene, the items now have an overridden collection
    * instead. */
@@ -2570,14 +2569,14 @@ static int convert_proxy_to_override_exec(bContext *C, wmOperator *op)
 
   /* Remove the instance empty from this scene, the items now have an overridden collection
    * instead. */
-  if (success && is_override_instancing_object) {
+  if (is_override_instancing_object) {
     ED_object_base_free_and_unlink(bmain, scene, ob_proxy_group);
   }
 
   DEG_id_tag_update(&CTX_data_scene(C)->id, ID_RECALC_BASE_FLAGS | ID_RECALC_COPY_ON_WRITE);
   WM_event_add_notifier(C, NC_WINDOW, NULL);
 
-  return success ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+  return OPERATOR_FINISHED;
 }
 
 void OBJECT_OT_convert_proxy_to_override(wmOperatorType *ot)
@@ -2644,7 +2643,7 @@ static int make_single_user_exec(bContext *C, wmOperator *op)
     single_object_action_users(bmain, scene, view_layer, v3d, flag);
   }
 
-  BKE_main_id_clear_newpoins(bmain);
+  BKE_main_id_newptr_and_tag_clear(bmain);
 
   WM_event_add_notifier(C, NC_WINDOW, NULL);
 

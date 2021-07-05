@@ -82,6 +82,7 @@
 #  include "COM_compositor.h"
 #endif
 
+using blender::Map;
 using blender::Set;
 using blender::Span;
 using blender::Vector;
@@ -1284,7 +1285,7 @@ static void node_add_error_message_button(
                             0,
                             0,
                             nullptr);
-  UI_but_func_tooltip_set(but, node_errors_tooltip_fn, storage_pointer_alloc);
+  UI_but_func_tooltip_set(but, node_errors_tooltip_fn, storage_pointer_alloc, MEM_freeN);
   UI_block_emboss_set(node.block, UI_EMBOSS);
 }
 
@@ -1402,28 +1403,6 @@ static void node_draw_basis(const bContext *C,
                  0,
                  0,
                  "");
-    UI_block_emboss_set(node->block, UI_EMBOSS);
-  }
-  if (ntree->type == NTREE_GEOMETRY) {
-    /* Active preview toggle. */
-    iconofs -= iconbutw;
-    UI_block_emboss_set(node->block, UI_EMBOSS_NONE);
-    int icon = (node->flag & NODE_ACTIVE_PREVIEW) ? ICON_RESTRICT_VIEW_OFF : ICON_RESTRICT_VIEW_ON;
-    uiBut *but = uiDefIconBut(node->block,
-                              UI_BTYPE_BUT_TOGGLE,
-                              0,
-                              icon,
-                              iconofs,
-                              rct->ymax - NODE_DY,
-                              iconbutw,
-                              UI_UNIT_Y,
-                              nullptr,
-                              0,
-                              0,
-                              0,
-                              0,
-                              "Show this node's geometry output in the spreadsheet");
-    UI_but_func_set(but, node_toggle_button_cb, node, (void *)"NODE_OT_active_preview_toggle");
     UI_block_emboss_set(node->block, UI_EMBOSS);
   }
 
@@ -1765,28 +1744,29 @@ static void node_update(const bContext *C, bNodeTree *ntree, bNode *node)
   }
 }
 
-static void count_mutli_input_socket_links(bNodeTree *ntree, SpaceNode *snode)
+static void count_multi_input_socket_links(bNodeTree *ntree, SpaceNode *snode)
 {
+  Map<bNodeSocket *, int> counts;
+  LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
+    if (link->tosock->flag & SOCK_MULTI_INPUT) {
+      int &count = counts.lookup_or_add(link->tosock, 0);
+      count++;
+    }
+  }
+  /* Count temporary links going into this socket. */
+  LISTBASE_FOREACH (bNodeLinkDrag *, nldrag, &snode->runtime->linkdrag) {
+    LISTBASE_FOREACH (LinkData *, linkdata, &nldrag->links) {
+      bNodeLink *link = (bNodeLink *)linkdata->data;
+      if (link->tosock && (link->tosock->flag & SOCK_MULTI_INPUT)) {
+        int &count = counts.lookup_or_add(link->tosock, 0);
+        count++;
+      }
+    }
+  }
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    LISTBASE_FOREACH (struct bNodeSocket *, socket, &node->inputs) {
+    LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
       if (socket->flag & SOCK_MULTI_INPUT) {
-        Set<bNodeSocket *> visited_from_sockets;
-        socket->total_inputs = 0;
-        LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
-          if (link->tosock == socket) {
-            visited_from_sockets.add(link->fromsock);
-          }
-        }
-        /* Count temporary links going into this socket. */
-        LISTBASE_FOREACH (bNodeLinkDrag *, nldrag, &snode->runtime->linkdrag) {
-          LISTBASE_FOREACH (LinkData *, linkdata, &nldrag->links) {
-            bNodeLink *link = (bNodeLink *)linkdata->data;
-            if (link->tosock == socket) {
-              visited_from_sockets.add(link->fromsock);
-            }
-          }
-        }
-        socket->total_inputs = visited_from_sockets.size();
+        socket->total_inputs = counts.lookup_default(socket, 0);
       }
     }
   }
@@ -1798,7 +1778,7 @@ void node_update_nodetree(const bContext *C, bNodeTree *ntree)
   SpaceNode *snode = CTX_wm_space_node(C);
   ntreeTagUsedSockets(ntree);
 
-  count_mutli_input_socket_links(ntree, snode);
+  count_multi_input_socket_links(ntree, snode);
 
   /* Update nodes front to back, so children sizes get updated before parents. */
   LISTBASE_FOREACH_BACKWARD (bNode *, node, &ntree->nodes) {

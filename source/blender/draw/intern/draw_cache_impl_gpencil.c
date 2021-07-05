@@ -301,7 +301,7 @@ static void gpencil_buffer_add_point(gpStrokeVert *verts,
                                      int v,
                                      bool is_endpoint)
 {
-  /* Note: we use the sign of strength and thickness to pass cap flag. */
+  /* NOTE: we use the sign of strength and thickness to pass cap flag. */
   const bool round_cap0 = (gps->caps[0] == GP_STROKE_CAP_ROUND);
   const bool round_cap1 = (gps->caps[1] == GP_STROKE_CAP_ROUND);
   gpStrokeVert *vert = &verts[v];
@@ -405,7 +405,7 @@ static void gpencil_batches_ensure(Object *ob, GpencilBatchCache *cache, int cfr
   if (cache->vbo == NULL) {
     /* Should be discarded together. */
     BLI_assert(cache->vbo == NULL && cache->ibo == NULL);
-    BLI_assert(cache->stroke_batch == NULL && cache->stroke_batch == NULL);
+    BLI_assert(cache->fill_batch == NULL && cache->stroke_batch == NULL);
     /* TODO/PERF: Could be changed to only do it if needed.
      * For now it's simpler to assume we always need it
      * since multiple viewport could or could not need it.

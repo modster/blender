@@ -349,7 +349,7 @@ static PyObject *M_Geometry_normal(PyObject *UNUSED(self), PyObject *args)
     goto finally;
   }
 
-  normal_poly_v3(n, (const float(*)[3])coords, coords_len);
+  normal_poly_v3(n, coords, coords_len);
   ret = Vector_CreatePyObject(n, 3, NULL);
 
 finally:
@@ -1102,7 +1102,7 @@ static PyObject *M_Geometry_points_in_planes(PyObject *UNUSED(self), PyObject *a
     return NULL;
   }
 
-  /* note, this could be refactored into plain C easy - py bits are noted */
+  /* NOTE: this could be refactored into plain C easy - py bits are noted. */
 
   struct PointsInPlanes_UserData user_data = {
       .py_verts = PyList_New(0),
@@ -1213,7 +1213,7 @@ PyDoc_STRVAR(M_Geometry_tessellate_polygon_doc,
 /* PolyFill function, uses Blenders scanfill to fill multiple poly lines */
 static PyObject *M_Geometry_tessellate_polygon(PyObject *UNUSED(self), PyObject *polyLineSeq)
 {
-  PyObject *tri_list; /*return this list of tri's */
+  PyObject *tri_list; /* Return this list of tri's */
   PyObject *polyLine, *polyVec;
   int i, len_polylines, len_polypoints;
   bool list_parse_error = false;
@@ -1222,7 +1222,7 @@ static PyObject *M_Geometry_tessellate_polygon(PyObject *UNUSED(self), PyObject 
   /* Display #ListBase. */
   ListBase dispbase = {NULL, NULL};
   DispList *dl;
-  float *fp; /*pointer to the array of malloced dl->verts to set the points from the vectors */
+  float *fp; /* Pointer to the array of malloced dl->verts to set the points from the vectors. */
   int totpoints = 0;
 
   if (!PySequence_Check(polyLineSeq)) {

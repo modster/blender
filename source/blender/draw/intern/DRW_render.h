@@ -82,7 +82,7 @@ typedef struct DRWShadingGroup DRWShadingGroup;
 typedef struct DRWUniform DRWUniform;
 typedef struct DRWView DRWView;
 
-/* TODO Put it somewhere else? */
+/* TODO: Put it somewhere else? */
 typedef struct BoundSphere {
   float center[3], radius;
 } BoundSphere;
@@ -308,7 +308,7 @@ void DRW_shader_library_free(DRWShaderLibrary *lib);
  * on the differences the minimum state changes can be invoked to setup the desired render state.
  *
  * The Write Stencil, Stencil test, Depth test and Blend state options are mutual exclusive
- * therefore they aren't ordered as a bit mask.*/
+ * therefore they aren't ordered as a bit mask. */
 typedef enum {
   /** Write mask */
   DRW_STATE_WRITE_DEPTH = (1 << 0),
@@ -438,6 +438,10 @@ void DRW_shgroup_call_range(
 void DRW_shgroup_call_instance_range(
     DRWShadingGroup *shgroup, Object *ob, struct GPUBatch *geom, uint i_sta, uint i_ct);
 
+void DRW_shgroup_call_compute(DRWShadingGroup *shgroup,
+                              int groups_x_len,
+                              int groups_y_len,
+                              int groups_z_len);
 void DRW_shgroup_call_procedural_points(DRWShadingGroup *sh, Object *ob, uint point_count);
 void DRW_shgroup_call_procedural_lines(DRWShadingGroup *sh, Object *ob, uint line_count);
 void DRW_shgroup_call_procedural_triangles(DRWShadingGroup *sh, Object *ob, uint tri_count);
@@ -486,7 +490,7 @@ void DRW_shgroup_stencil_set(DRWShadingGroup *shgroup,
                              uint write_mask,
                              uint reference,
                              uint compare_mask);
-/* TODO remove this function. Obsolete version. mask is actually reference value. */
+/* TODO: remove this function. Obsolete version. mask is actually reference value. */
 void DRW_shgroup_stencil_mask(DRWShadingGroup *shgroup, uint mask);
 
 /* Issue a clear command. */
@@ -575,6 +579,9 @@ void DRW_shgroup_uniform_vec4_array_copy(DRWShadingGroup *shgroup,
                                          const char *name,
                                          const float (*value)[4],
                                          int arraysize);
+void DRW_shgroup_vertex_buffer(DRWShadingGroup *shgroup,
+                               const char *name,
+                               struct GPUVertBuf *vertex_buffer);
 
 bool DRW_shgroup_is_empty(DRWShadingGroup *shgroup);
 

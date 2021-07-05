@@ -744,62 +744,12 @@ std::ostream &operator<<(std::ostream &os, const IMesh &mesh)
   return os;
 }
 
-struct BoundingBox {
-  float3 min{FLT_MAX, FLT_MAX, FLT_MAX};
-  float3 max{-FLT_MAX, -FLT_MAX, -FLT_MAX};
-
-  BoundingBox() = default;
-  BoundingBox(const float3 &min, const float3 &max) : min(min), max(max)
-  {
-  }
-
-  void combine(const float3 &p)
-  {
-    min.x = min_ff(min.x, p.x);
-    min.y = min_ff(min.y, p.y);
-    min.z = min_ff(min.z, p.z);
-    max.x = max_ff(max.x, p.x);
-    max.y = max_ff(max.y, p.y);
-    max.z = max_ff(max.z, p.z);
-  }
-
-  void combine(const double3 &p)
-  {
-    min.x = min_ff(min.x, static_cast<float>(p.x));
-    min.y = min_ff(min.y, static_cast<float>(p.y));
-    min.z = min_ff(min.z, static_cast<float>(p.z));
-    max.x = max_ff(max.x, static_cast<float>(p.x));
-    max.y = max_ff(max.y, static_cast<float>(p.y));
-    max.z = max_ff(max.z, static_cast<float>(p.z));
-  }
-
-  void combine(const BoundingBox &bb)
-  {
-    min.x = min_ff(min.x, bb.min.x);
-    min.y = min_ff(min.y, bb.min.y);
-    min.z = min_ff(min.z, bb.min.z);
-    max.x = max_ff(max.x, bb.max.x);
-    max.y = max_ff(max.y, bb.max.y);
-    max.z = max_ff(max.z, bb.max.z);
-  }
-
-  void expand(float pad)
-  {
-    min.x -= pad;
-    min.y -= pad;
-    min.z -= pad;
-    max.x += pad;
-    max.y += pad;
-    max.z += pad;
-  }
-};
-
 /**
  * Assume bounding boxes have been expanded by a sufficient epsilon on all sides
  * so that the comparisons against the bb bounds are sufficient to guarantee that
  * if an overlap or even touching could happen, this will return true.
  */
-static bool bbs_might_intersect(const BoundingBox &bb_a, const BoundingBox &bb_b)
+bool bbs_might_intersect(const BoundingBox &bb_a, const BoundingBox &bb_b)
 {
   return isect_aabb_aabb_v3(bb_a.min, bb_a.max, bb_b.min, bb_b.max);
 }
@@ -1087,7 +1037,7 @@ static mpq2 project_3d_to_2d(const mpq3 &p3d, int proj_axis)
  * So the sign of E is the same as the sign of E_exact if
  *    |E| > supremum(E) * index(E) * DBL_EPSILON
  *
- * Note: a possible speedup would be to have a simple function
+ * NOTE: a possible speedup would be to have a simple function
  * that calculates the error bound if one knows that all values
  * are less than some global maximum - most of the function would
  * be calculated ahead of time. The global max could be passed
@@ -1165,13 +1115,19 @@ static int filter_plane_side(const double3 &p,
  * Assumes ab is not perpendicular to n.
  * This works because the ratio of the projections of ab and ac onto n is the same as
  * the ratio along the line ab of the intersection point to the whole of ab.
+ * The ab, ac, and dotbuf arguments are used as a temporaries; declaring them
+ * in the caller can avoid many allocs and frees of mpq3 and mpq_class structures.
  */
-static inline mpq3 tti_interp(const mpq3 &a, const mpq3 &b, const mpq3 &c, const mpq3 &n)
+static inline mpq3 tti_interp(
+    const mpq3 &a, const mpq3 &b, const mpq3 &c, const mpq3 &n, mpq3 &ab, mpq3 &ac, mpq3 &dotbuf)
 {
-  mpq3 ab = a - b;
-  mpq_class den = mpq3::dot(ab, n);
+  ab = a;
+  ab -= b;
+  ac = a;
+  ac -= c;
+  mpq_class den = mpq3::dot_with_buffer(ab, n, dotbuf);
   BLI_assert(den != 0);
-  mpq_class alpha = mpq3::dot(a - c, n) / den;
+  mpq_class alpha = mpq3::dot_with_buffer(ac, n, dotbuf) / den;
   return a - alpha * ab;
 }
 
@@ -1179,11 +1135,28 @@ static inline mpq3 tti_interp(const mpq3 &a, const mpq3 &b, const mpq3 &c, const
  * Return +1, 0, -1 as a + ad is above, on, or below the oriented plane containing a, b, c in CCW
  * order. This is the same as -oriented(a, b, c, a + ad), but uses fewer arithmetic operations.
  * TODO: change arguments to `const Vert *` and use floating filters.
+ * The ba, ca, n, and dotbuf arguments are used as temporaries; declaring them
+ * in the caller can avoid many allocs and frees of mpq3 and mpq_class structures.
  */
-static inline int tti_above(const mpq3 &a, const mpq3 &b, const mpq3 &c, const mpq3 &ad)
+static inline int tti_above(const mpq3 &a,
+                            const mpq3 &b,
+                            const mpq3 &c,
+                            const mpq3 &ad,
+                            mpq3 &ba,
+                            mpq3 &ca,
+                            mpq3 &n,
+                            mpq3 &dotbuf)
 {
-  mpq3 n = mpq3::cross(b - a, c - a);
-  return sgn(mpq3::dot(ad, n));
+  ba = b;
+  ba -= a;
+  ca = c;
+  ca -= a;
+
+  n.x = ba.y * ca.z - ba.z * ca.y;
+  n.y = ba.z * ca.x - ba.x * ca.z;
+  n.z = ba.x * ca.y - ba.y * ca.x;
+
+  return sgn(mpq3::dot_with_buffer(ad, n, dotbuf));
 }
 
 /**
@@ -1227,20 +1200,21 @@ static ITT_value itt_canon2(const mpq3 &p1,
   mpq3 p1p2 = p2 - p1;
   mpq3 intersect_1;
   mpq3 intersect_2;
+  mpq3 buf[4];
   bool no_overlap = false;
   /* Top test in classification tree. */
-  if (tti_above(p1, q1, r2, p1p2) > 0) {
+  if (tti_above(p1, q1, r2, p1p2, buf[0], buf[1], buf[2], buf[3]) > 0) {
     /* Middle right test in classification tree. */
-    if (tti_above(p1, r1, r2, p1p2) <= 0) {
+    if (tti_above(p1, r1, r2, p1p2, buf[0], buf[1], buf[2], buf[3]) <= 0) {
       /* Bottom right test in classification tree. */
-      if (tti_above(p1, r1, q2, p1p2) > 0) {
+      if (tti_above(p1, r1, q2, p1p2, buf[0], buf[1], buf[2], buf[3]) > 0) {
         /* Overlap is [k [i l] j]. */
         if (dbg_level > 0) {
           std::cout << "overlap [k [i l] j]\n";
         }
         /* i is intersect with p1r1. l is intersect with p2r2. */
-        intersect_1 = tti_interp(p1, r1, p2, n2);
-        intersect_2 = tti_interp(p2, r2, p1, n1);
+        intersect_1 = tti_interp(p1, r1, p2, n2, buf[0], buf[1], buf[2]);
+        intersect_2 = tti_interp(p2, r2, p1, n1, buf[0], buf[1], buf[2]);
       }
       else {
         /* Overlap is [i [k l] j]. */
@@ -1248,8 +1222,8 @@ static ITT_value itt_canon2(const mpq3 &p1,
           std::cout << "overlap [i [k l] j]\n";
         }
         /* k is intersect with p2q2. l is intersect is p2r2. */
-        intersect_1 = tti_interp(p2, q2, p1, n1);
-        intersect_2 = tti_interp(p2, r2, p1, n1);
+        intersect_1 = tti_interp(p2, q2, p1, n1, buf[0], buf[1], buf[2]);
+        intersect_2 = tti_interp(p2, r2, p1, n1, buf[0], buf[1], buf[2]);
       }
     }
     else {
@@ -1262,7 +1236,7 @@ static ITT_value itt_canon2(const mpq3 &p1,
   }
   else {
     /* Middle left test in classification tree. */
-    if (tti_above(p1, q1, q2, p1p2) < 0) {
+    if (tti_above(p1, q1, q2, p1p2, buf[0], buf[1], buf[2], buf[3]) < 0) {
       /* No overlap: [i j] [k l]. */
       if (dbg_level > 0) {
         std::cout << "no overlap: [i j] [k l]\n";
@@ -1271,14 +1245,14 @@ static ITT_value itt_canon2(const mpq3 &p1,
     }
     else {
       /* Bottom left test in classification tree. */
-      if (tti_above(p1, r1, q2, p1p2) >= 0) {
+      if (tti_above(p1, r1, q2, p1p2, buf[0], buf[1], buf[2], buf[3]) >= 0) {
         /* Overlap is [k [i j] l]. */
         if (dbg_level > 0) {
           std::cout << "overlap [k [i j] l]\n";
         }
         /* i is intersect with p1r1. j is intersect with p1q1. */
-        intersect_1 = tti_interp(p1, r1, p2, n2);
-        intersect_2 = tti_interp(p1, q1, p2, n2);
+        intersect_1 = tti_interp(p1, r1, p2, n2, buf[0], buf[1], buf[2]);
+        intersect_2 = tti_interp(p1, q1, p2, n2, buf[0], buf[1], buf[2]);
       }
       else {
         /* Overlap is [i [k j] l]. */
@@ -1286,8 +1260,8 @@ static ITT_value itt_canon2(const mpq3 &p1,
           std::cout << "overlap [i [k j] l]\n";
         }
         /* k is intersect with p2q2. j is intersect with p1q1. */
-        intersect_1 = tti_interp(p2, q2, p1, n1);
-        intersect_2 = tti_interp(p1, q1, p2, n2);
+        intersect_1 = tti_interp(p2, q2, p1, n1, buf[0], buf[1], buf[2]);
+        intersect_2 = tti_interp(p1, q1, p2, n2, buf[0], buf[1], buf[2]);
       }
     }
   }
@@ -1412,7 +1386,7 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   int sr1 = filter_plane_side(d_r1, d_r2, d_n2, abs_d_r1, abs_d_r2, abs_d_n2);
   if ((sp1 > 0 && sq1 > 0 && sr1 > 0) || (sp1 < 0 && sq1 < 0 && sr1 < 0)) {
 #  ifdef PERFDEBUG
-    incperfcount(2); /* Tri tri intersects decided by filter plane tests. */
+    incperfcount(2); /* Triangle-triangle intersects decided by filter plane tests. */
 #  endif
     if (dbg_level > 0) {
       std::cout << "no intersection, all t1's verts above or below t2\n";
@@ -1430,7 +1404,7 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   int sr2 = filter_plane_side(d_r2, d_r1, d_n1, abs_d_r2, abs_d_r1, abs_d_n1);
   if ((sp2 > 0 && sq2 > 0 && sr2 > 0) || (sp2 < 0 && sq2 < 0 && sr2 < 0)) {
 #  ifdef PERFDEBUG
-    incperfcount(2); /* Tri tri intersects decided by filter plane tests. */
+    incperfcount(2); /* Triangle-triangle intersects decided by filter plane tests. */
 #  endif
     if (dbg_level > 0) {
       std::cout << "no intersection, all t2's verts above or below t1\n";
@@ -1438,6 +1412,7 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
     return ITT_value(INONE);
   }
 
+  mpq3 buf[2];
   const mpq3 &p1 = vp1->co_exact;
   const mpq3 &q1 = vq1->co_exact;
   const mpq3 &r1 = vr1->co_exact;
@@ -1447,13 +1422,19 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
 
   const mpq3 &n2 = tri2.plane->norm_exact;
   if (sp1 == 0) {
-    sp1 = sgn(mpq3::dot(p1 - r2, n2));
+    buf[0] = p1;
+    buf[0] -= r2;
+    sp1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
   }
   if (sq1 == 0) {
-    sq1 = sgn(mpq3::dot(q1 - r2, n2));
+    buf[0] = q1;
+    buf[0] -= r2;
+    sq1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
   }
   if (sr1 == 0) {
-    sr1 = sgn(mpq3::dot(r1 - r2, n2));
+    buf[0] = r1;
+    buf[0] -= r2;
+    sr1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
   }
 
   if (dbg_level > 1) {
@@ -1465,7 +1446,7 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
       std::cout << "no intersection, all t1's verts above or below t2 (exact)\n";
     }
 #  ifdef PERFDEBUG
-    incperfcount(3); /* Tri tri intersects decided by exact plane tests. */
+    incperfcount(3); /* Triangle-triangle intersects decided by exact plane tests. */
 #  endif
     return ITT_value(INONE);
   }
@@ -1473,13 +1454,19 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   /* Repeat for signs of t2's vertices with respect to plane of t1. */
   const mpq3 &n1 = tri1.plane->norm_exact;
   if (sp2 == 0) {
-    sp2 = sgn(mpq3::dot(p2 - r1, n1));
+    buf[0] = p2;
+    buf[0] -= r1;
+    sp2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
   }
   if (sq2 == 0) {
-    sq2 = sgn(mpq3::dot(q2 - r1, n1));
+    buf[0] = q2;
+    buf[0] -= r1;
+    sq2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
   }
   if (sr2 == 0) {
-    sr2 = sgn(mpq3::dot(r2 - r1, n1));
+    buf[0] = r2;
+    buf[0] -= r1;
+    sr2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
   }
 
   if (dbg_level > 1) {
@@ -1491,7 +1478,7 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
       std::cout << "no intersection, all t2's verts above or below t1 (exact)\n";
     }
 #  ifdef PERFDEBUG
-    incperfcount(3); /* Tri tri intersects decided by exact plane tests. */
+    incperfcount(3); /* Triangle-triangle intersects decided by exact plane tests. */
 #  endif
     return ITT_value(INONE);
   }
@@ -1931,9 +1918,22 @@ static Face *cdt_tri_as_imesh_face(
   return facep;
 }
 
+/* Like BLI_math's is_quad_flip_v3_first_third_fast_with_normal, with const double3's. */
+static bool is_quad_flip_first_third(const double3 &v1,
+                                     const double3 &v2,
+                                     const double3 &v3,
+                                     const double3 &v4,
+                                     const double3 &normal)
+{
+  double3 dir_v3v1 = v3 - v1;
+  double3 tangent = double3::cross_high_precision(dir_v3v1, normal);
+  double dot = double3::dot(v1, tangent);
+  return (double3::dot(v4, tangent) >= dot) || (double3::dot(v2, tangent) <= dot);
+}
+
 /**
  * Tessellate face f into triangles and return an array of `const Face *`
- * giving that triangulation. Intended to be used when f has > 4 vertices.
+ * giving that triangulation. Intended to be used when f has => 4 vertices.
  * Care is taken so that the original edge index associated with
  * each edge in the output triangles either matches the original edge
  * for the (identical) edge of f, or else is -1. So diagonals added
@@ -1945,21 +1945,40 @@ static Face *cdt_tri_as_imesh_face(
  */
 static Array<Face *> polyfill_triangulate_poly(Face *f, IMeshArena *arena)
 {
-  /* Similar to loop body in BM_mesh_calc_tesselation. */
+  /* Similar to loop body in #BM_mesh_calc_tessellation. */
   int flen = f->size();
-  BLI_assert(flen > 4);
+  BLI_assert(flen >= 4);
   if (!f->plane_populated()) {
     f->populate_plane(false);
   }
-  /* Project along negative face normal so (x,y) can be used in 2d. */
   const double3 &poly_normal = f->plane->norm;
   float no[3] = {float(poly_normal[0]), float(poly_normal[1]), float(poly_normal[2])};
   normalize_v3(no);
-  float axis_mat[3][3];
+  if (flen == 4) {
+    const Vert *v0 = (*f)[0];
+    const Vert *v1 = (*f)[1];
+    const Vert *v2 = (*f)[2];
+    const Vert *v3 = (*f)[3];
+    int eo_01 = f->edge_orig[0];
+    int eo_12 = f->edge_orig[1];
+    int eo_23 = f->edge_orig[2];
+    int eo_30 = f->edge_orig[3];
+    Face *f0, *f1;
+    if (UNLIKELY(is_quad_flip_first_third(v0->co, v1->co, v2->co, v3->co, f->plane->norm))) {
+      f0 = arena->add_face({v0, v1, v3}, f->orig, {eo_01, -1, eo_30}, {false, false, false});
+      f1 = arena->add_face({v1, v2, v3}, f->orig, {eo_12, eo_23, -1}, {false, false, false});
+    }
+    else {
+      f0 = arena->add_face({v0, v1, v2}, f->orig, {eo_01, eo_12, -1}, {false, false, false});
+      f1 = arena->add_face({v0, v2, v3}, f->orig, {-1, eo_23, eo_30}, {false, false, false});
+    }
+    return Array<Face *>{f0, f1};
+  }
+  /* Project along negative face normal so (x,y) can be used in 2d. */ float axis_mat[3][3];
   float(*projverts)[2];
   unsigned int(*tris)[3];
   const int totfilltri = flen - 2;
-  /* Prepare projected vertices and array to receive triangles in tesselation. */
+  /* Prepare projected vertices and array to receive triangles in tessellation. */
   tris = static_cast<unsigned int(*)[3]>(MEM_malloc_arrayN(totfilltri, sizeof(*tris), __func__));
   projverts = static_cast<float(*)[2]>(MEM_malloc_arrayN(flen, sizeof(*projverts), __func__));
   axis_dominant_v3_to_m3_negate(axis_mat, no);
@@ -1969,7 +1988,7 @@ static Array<Face *> polyfill_triangulate_poly(Face *f, IMeshArena *arena)
     mul_v2_m3v3(projverts[j], axis_mat, co);
   }
   BLI_polyfill_calc(projverts, flen, 1, tris);
-  /* Put tesselation triangles into Face form. Record original edges where they exist. */
+  /* Put tessellation triangles into Face form. Record original edges where they exist. */
   Array<Face *> ans(totfilltri);
   for (int t = 0; t < totfilltri; ++t) {
     unsigned int *tri = tris[t];
@@ -1999,11 +2018,7 @@ static Array<Face *> polyfill_triangulate_poly(Face *f, IMeshArena *arena)
 
 /**
  * Tessellate face f into triangles and return an array of `const Face *`
- * giving that triangulation.
- * Care is taken so that the original edge index associated with
- * each edge in the output triangles either matches the original edge
- * for the (identical) edge of f, or else is -1. So diagonals added
- * for triangulation can later be identified by having #NO_INDEX for original.
+ * giving that triangulation, using an exact triangulation method.
  *
  * The method used is to use the CDT triangulation. Usually that triangulation
  * will only use the existing vertices. However, if the face self-intersects
@@ -2011,8 +2026,12 @@ static Array<Face *> polyfill_triangulate_poly(Face *f, IMeshArena *arena)
  * If this happens, we use the polyfill triangulator instead. We don't
  * use the polyfill triangulator by default because it can create degenerate
  * triangles (which we can handle but they'll create non-manifold meshes).
+ *
+ * While it is tempting to handle quadrilaterals specially, since that
+ * is by far the usual case, we need to know if the quad is convex when
+ * projected before doing so, and that takes a fair amount of computation by itself.
  */
-static Array<Face *> triangulate_poly(Face *f, IMeshArena *arena)
+static Array<Face *> exact_triangulate_poly(Face *f, IMeshArena *arena)
 {
   int flen = f->size();
   CDT_input<mpq_class> cdt_in;
@@ -2095,6 +2114,68 @@ static Array<Face *> triangulate_poly(Face *f, IMeshArena *arena)
   return ans;
 }
 
+static bool face_is_degenerate(const Face *f)
+{
+  const Face &face = *f;
+  const Vert *v0 = face[0];
+  const Vert *v1 = face[1];
+  const Vert *v2 = face[2];
+  if (v0 == v1 || v0 == v2 || v1 == v2) {
+    return true;
+  }
+  double3 da = v2->co - v0->co;
+  double3 db = v2->co - v1->co;
+  double3 dab = double3::cross_high_precision(da, db);
+  double dab_length_squared = dab.length_squared();
+  double err_bound = supremum_dot_cross(dab, dab) * index_dot_cross * DBL_EPSILON;
+  if (dab_length_squared > err_bound) {
+    return false;
+  }
+  mpq3 a = v2->co_exact - v0->co_exact;
+  mpq3 b = v2->co_exact - v1->co_exact;
+  mpq3 ab = mpq3::cross(a, b);
+  if (ab.x == 0 && ab.y == 0 && ab.z == 0) {
+    return true;
+  }
+
+  return false;
+}
+
+/** Fast check for degenerate tris. Only tests for when verts are identical,
+ * not cases where there are zero-length edges. */
+static bool any_degenerate_tris_fast(const Array<Face *> triangulation)
+{
+  for (const Face *f : triangulation) {
+    const Vert *v0 = (*f)[0];
+    const Vert *v1 = (*f)[1];
+    const Vert *v2 = (*f)[2];
+    if (v0 == v1 || v0 == v2 || v1 == v2) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Tessellate face f into triangles and return an array of `const Face *`
+ * giving that triangulation.
+ * Care is taken so that the original edge index associated with
+ * each edge in the output triangles either matches the original edge
+ * for the (identical) edge of f, or else is -1. So diagonals added
+ * for triangulation can later be identified by having #NO_INDEX for original.
+ */
+static Array<Face *> triangulate_poly(Face *f, IMeshArena *arena)
+{
+  /* Try the much faster method using Blender's BLI_polyfill_calc. */
+  Array<Face *> ans = polyfill_triangulate_poly(f, arena);
+
+  /* This may create degenerate triangles. If so, try the exact CDT-based triangulator. */
+  if (any_degenerate_tris_fast(ans)) {
+    return exact_triangulate_poly(f, arena);
+  }
+  return ans;
+}
+
 /**
  * Return an #IMesh that is a triangulation of a mesh with general
  * polygonal faces, #IMesh.
@@ -2107,24 +2188,10 @@ IMesh triangulate_polymesh(IMesh &imesh, IMeshArena *arena)
   constexpr int estimated_tris_per_face = 3;
   face_tris.reserve(estimated_tris_per_face * imesh.face_size());
   for (Face *f : imesh.faces()) {
-    /* Tessellate face f, following plan similar to #BM_face_calc_tesselation. */
+    /* Tessellate face f, following plan similar to #BM_face_calc_tessellation. */
     int flen = f->size();
     if (flen == 3) {
       face_tris.append(f);
-    }
-    else if (flen == 4) {
-      const Vert *v0 = (*f)[0];
-      const Vert *v1 = (*f)[1];
-      const Vert *v2 = (*f)[2];
-      const Vert *v3 = (*f)[3];
-      int eo_01 = f->edge_orig[0];
-      int eo_12 = f->edge_orig[1];
-      int eo_23 = f->edge_orig[2];
-      int eo_30 = f->edge_orig[3];
-      Face *f0 = arena->add_face({v0, v1, v2}, f->orig, {eo_01, eo_12, -1}, {false, false, false});
-      Face *f1 = arena->add_face({v0, v2, v3}, f->orig, {-1, eo_23, eo_30}, {false, false, false});
-      face_tris.append(f0);
-      face_tris.append(f1);
     }
     else {
       Array<Face *> tris = triangulate_poly(f, arena);
@@ -2259,7 +2326,7 @@ class TriOverlaps {
       }
       overlap_tot_ += overlap_tot_;
     }
-    /* Sort the overlaps to bring all the intersects with a given indexA together.  */
+    /* Sort the overlaps to bring all the intersects with a given indexA together. */
     std::sort(overlap_, overlap_ + overlap_tot_, bvhtreeverlap_cmp);
     if (dbg_level > 0) {
       std::cout << overlap_tot_ << " overlaps found:\n";
@@ -2746,33 +2813,6 @@ static CoplanarClusterInfo find_clusters(const IMesh &tm,
   }
 
   return ans;
-}
-
-static bool face_is_degenerate(const Face *f)
-{
-  const Face &face = *f;
-  const Vert *v0 = face[0];
-  const Vert *v1 = face[1];
-  const Vert *v2 = face[2];
-  if (v0 == v1 || v0 == v2 || v1 == v2) {
-    return true;
-  }
-  double3 da = v2->co - v0->co;
-  double3 db = v2->co - v1->co;
-  double3 dab = double3::cross_high_precision(da, db);
-  double dab_length_squared = dab.length_squared();
-  double err_bound = supremum_dot_cross(dab, dab) * index_dot_cross * DBL_EPSILON;
-  if (dab_length_squared > err_bound) {
-    return false;
-  }
-  mpq3 a = v2->co_exact - v0->co_exact;
-  mpq3 b = v2->co_exact - v1->co_exact;
-  mpq3 ab = mpq3::cross(a, b);
-  if (ab.x == 0 && ab.y == 0 && ab.z == 0) {
-    return true;
-  }
-
-  return false;
 }
 
 /* Data and functions to test triangle degeneracy in parallel. */

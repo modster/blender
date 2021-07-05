@@ -25,6 +25,7 @@
 
 #include "BKE_node.h"
 #include "UI_interface.h"
+#include "UI_view2d.h"
 #include <stddef.h> /* for size_t */
 
 /* internal exports only */
@@ -51,7 +52,7 @@ typedef struct bNodeLinkDrag {
   struct bNodeLinkDrag *next, *prev;
 
   /* List of links dragged by the operator.
-   * Note: This is a list of LinkData structs on top of the actual bNodeLinks.
+   * NOTE: This is a list of LinkData structs on top of the actual bNodeLinks.
    * This way the links can be added to the node tree while being stored in this list.
    */
   ListBase links;
@@ -64,6 +65,9 @@ typedef struct bNodeLinkDrag {
   /** Temporarily stores the last hovered socket for multi-input socket operator.
    *  Store it to recalculate sorting after it is no longer hovered. */
   struct bNode *last_node_hovered_while_dragging_a_link;
+
+  /* Data for edge panning */
+  View2DEdgePanData pan_data;
 } bNodeLinkDrag;
 
 typedef struct SpaceNode_Runtime {
@@ -275,7 +279,6 @@ void NODE_OT_hide_toggle(struct wmOperatorType *ot);
 void NODE_OT_hide_socket_toggle(struct wmOperatorType *ot);
 void NODE_OT_preview_toggle(struct wmOperatorType *ot);
 void NODE_OT_options_toggle(struct wmOperatorType *ot);
-void NODE_OT_active_preview_toggle(struct wmOperatorType *ot);
 void NODE_OT_node_copy_color(struct wmOperatorType *ot);
 
 void NODE_OT_read_viewlayers(struct wmOperatorType *ot);
@@ -287,7 +290,7 @@ void NODE_OT_output_file_move_active_socket(struct wmOperatorType *ot);
 
 void NODE_OT_switch_view_update(struct wmOperatorType *ot);
 
-/* Note: clipboard_cut is a simple macro of copy + delete */
+/* NOTE: clipboard_cut is a simple macro of copy + delete. */
 void NODE_OT_clipboard_copy(struct wmOperatorType *ot);
 void NODE_OT_clipboard_paste(struct wmOperatorType *ot);
 

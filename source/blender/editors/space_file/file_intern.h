@@ -62,6 +62,7 @@ void FILE_OT_bookmark_cleanup(struct wmOperatorType *ot);
 void FILE_OT_bookmark_move(struct wmOperatorType *ot);
 void FILE_OT_reset_recent(wmOperatorType *ot);
 void FILE_OT_hidedot(struct wmOperatorType *ot);
+void FILE_OT_associate_blend(struct wmOperatorType *ot);
 void FILE_OT_execute(struct wmOperatorType *ot);
 void FILE_OT_mouse_execute(struct wmOperatorType *ot);
 void FILE_OT_cancel(struct wmOperatorType *ot);
@@ -112,6 +113,13 @@ int file_select_match(struct SpaceFile *sfile, const char *pattern, char *matche
 int autocomplete_directory(struct bContext *C, char *str, void *arg_v);
 int autocomplete_file(struct bContext *C, char *str, void *arg_v);
 
+void file_params_smoothscroll_timer_clear(struct wmWindowManager *wm,
+                                          struct wmWindow *win,
+                                          SpaceFile *sfile);
+void file_params_renamefile_clear(struct FileSelectParams *params);
+void file_params_invoke_rename_postscroll(struct wmWindowManager *wm,
+                                          struct wmWindow *win,
+                                          SpaceFile *sfile);
 void file_params_renamefile_activate(struct SpaceFile *sfile, struct FileSelectParams *params);
 
 typedef void *onReloadFnData;

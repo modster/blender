@@ -36,6 +36,7 @@
 
 #include "DNA_collection_types.h"
 #include "DNA_defaults.h"
+#include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
@@ -123,6 +124,18 @@ static void addIdsUsedBySocket(const ListBase *sockets, Set<ID *> &ids)
         ids.add(&collection->id);
       }
     }
+    else if (socket->type == SOCK_MATERIAL) {
+      Material *material = ((bNodeSocketValueMaterial *)socket->default_value)->value;
+      if (material != nullptr) {
+        ids.add(&material->id);
+      }
+    }
+    else if (socket->type == SOCK_TEXTURE) {
+      Tex *texture = ((bNodeSocketValueTexture *)socket->default_value)->value;
+      if (texture != nullptr) {
+        ids.add(&texture->id);
+      }
+    }
   }
 }
 
@@ -179,7 +192,7 @@ static void add_object_relation(const ModifierUpdateDepsgraphContext *ctx, Objec
     if (object.type == OB_EMPTY && object.instance_collection != nullptr) {
       add_collection_relation(ctx, *object.instance_collection);
     }
-    else if (ELEM(object.type, OB_MESH, OB_POINTCLOUD, OB_VOLUME, OB_CURVE)) {
+    else if (DEG_object_has_geometry_component(&object)) {
       DEG_add_object_relation(ctx->node, &object, DEG_OB_COMP_GEOMETRY, "Nodes Modifier");
       DEG_add_customdata_mask(ctx->node, &object, &dependency_data_mask);
     }
@@ -197,18 +210,28 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
     find_used_ids_from_settings(nmd->settings, used_ids);
     find_used_ids_from_nodes(*nmd->node_group, used_ids);
     for (ID *id : used_ids) {
-      if (GS(id->name) == ID_OB) {
-        Object *object = reinterpret_cast<Object *>(id);
-        add_object_relation(ctx, *object);
-      }
-      if (GS(id->name) == ID_GR) {
-        Collection *collection = reinterpret_cast<Collection *>(id);
-        add_collection_relation(ctx, *collection);
+      switch ((ID_Type)GS(id->name)) {
+        case ID_OB: {
+          Object *object = reinterpret_cast<Object *>(id);
+          add_object_relation(ctx, *object);
+          break;
+        }
+        case ID_GR: {
+          Collection *collection = reinterpret_cast<Collection *>(id);
+          add_collection_relation(ctx, *collection);
+          break;
+        }
+        case ID_TE: {
+          DEG_add_generic_id_relation(ctx->node, id, "Nodes Modifier");
+        }
+        default: {
+          /* Purposefully don't add relations for materials. While there are material sockets,
+           * the pointers are only passed around as handles rather than dereferenced. */
+          break;
+        }
       }
     }
   }
-
-  /* TODO: Add dependency for adding and removing objects in collections. */
 }
 
 static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
@@ -560,6 +583,48 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
       };
       return &collection_type;
     }
+    case SOCK_TEXTURE: {
+      static const SocketPropertyType texture_type = {
+          [](const bNodeSocket &socket, const char *name) {
+            bNodeSocketValueTexture *value = (bNodeSocketValueTexture *)socket.default_value;
+            IDPropertyTemplate idprop = {0};
+            idprop.id = (ID *)value->value;
+            return IDP_New(IDP_ID, &idprop, name);
+          },
+          nullptr,
+          nullptr,
+          nullptr,
+          nullptr,
+          [](const IDProperty &property) { return property.type == IDP_ID; },
+          [](const IDProperty &property, void *r_value) {
+            ID *id = IDP_Id(&property);
+            Tex *texture = (id && GS(id->name) == ID_TE) ? (Tex *)id : nullptr;
+            *(Tex **)r_value = texture;
+          },
+      };
+      return &texture_type;
+    }
+    case SOCK_MATERIAL: {
+      static const SocketPropertyType material_type = {
+          [](const bNodeSocket &socket, const char *name) {
+            bNodeSocketValueMaterial *value = (bNodeSocketValueMaterial *)socket.default_value;
+            IDPropertyTemplate idprop = {0};
+            idprop.id = (ID *)value->value;
+            return IDP_New(IDP_ID, &idprop, name);
+          },
+          nullptr,
+          nullptr,
+          nullptr,
+          nullptr,
+          [](const IDProperty &property) { return property.type == IDP_ID; },
+          [](const IDProperty &property, void *r_value) {
+            ID *id = IDP_Id(&property);
+            Material *material = (id && GS(id->name) == ID_MA) ? (Material *)id : nullptr;
+            *(Material **)r_value = material;
+          },
+      };
+      return &material_type;
+    }
     default: {
       return nullptr;
     }
@@ -649,7 +714,7 @@ static void initialize_group_input(NodesModifierData &nmd,
 {
   const SocketPropertyType *property_type = get_socket_property_type(socket);
   if (property_type == nullptr) {
-    cpp_type.copy_to_uninitialized(cpp_type.default_value(), r_value);
+    cpp_type.copy_construct(cpp_type.default_value(), r_value);
     return;
   }
   if (nmd.settings.properties == nullptr) {
@@ -702,22 +767,6 @@ static Vector<SpaceSpreadsheet *> find_spreadsheet_editors(Main *bmain)
 }
 
 using PreviewSocketMap = blender::MultiValueMap<DSocket, uint64_t>;
-
-static DSocket try_find_preview_socket_in_node(const DNode node)
-{
-  for (const SocketRef *socket : node->outputs()) {
-    if (socket->bsocket()->type == SOCK_GEOMETRY) {
-      return {node.context(), socket};
-    }
-  }
-  for (const SocketRef *socket : node->inputs()) {
-    if (socket->bsocket()->type == SOCK_GEOMETRY &&
-        (socket->bsocket()->flag & SOCK_MULTI_INPUT) == 0) {
-      return {node.context(), socket};
-    }
-  }
-  return {};
-}
 
 static DSocket try_get_socket_to_preview_for_spreadsheet(SpaceSpreadsheet *sspreadsheet,
                                                          NodesModifierData *nmd,
@@ -774,7 +823,17 @@ static DSocket try_get_socket_to_preview_for_spreadsheet(SpaceSpreadsheet *sspre
   const NodeTreeRef &tree_ref = context->tree();
   for (const NodeRef *node_ref : tree_ref.nodes()) {
     if (node_ref->name() == last_context->node_name) {
-      return try_find_preview_socket_in_node({context, node_ref});
+      const DNode viewer_node{context, node_ref};
+      DSocket socket_to_view;
+      viewer_node.input(0).foreach_origin_socket(
+          [&](const DSocket socket) { socket_to_view = socket; });
+      if (!socket_to_view) {
+        return {};
+      }
+      bNodeSocket *bsocket = socket_to_view->bsocket();
+      if (bsocket->type == SOCK_GEOMETRY && bsocket->flag != SOCK_MULTI_INPUT) {
+        return socket_to_view;
+      }
     }
   }
   return {};
@@ -910,6 +969,8 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   blender::modifiers::geometry_nodes::GeometryNodesEvaluationParams eval_params;
   eval_params.input_values = group_inputs;
   eval_params.output_sockets = group_outputs;
+  eval_params.force_compute_sockets.extend(preview_sockets.keys().begin(),
+                                           preview_sockets.keys().end());
   eval_params.mf_by_node = &mf_by_node;
   eval_params.modifier_ = nmd;
   eval_params.depsgraph = ctx->depsgraph;
@@ -1041,7 +1102,7 @@ static void modifyGeometrySet(ModifierData *md,
 
 /* Drawing the properties manually with #uiItemR instead of #uiDefAutoButsRNA allows using
  * the node socket identifier for the property names, since they are unique, but also having
- * the correct label displayed in the UI.  */
+ * the correct label displayed in the UI. */
 static void draw_property_for_socket(uiLayout *layout,
                                      PointerRNA *bmain_ptr,
                                      PointerRNA *md_ptr,
@@ -1085,6 +1146,14 @@ static void draw_property_for_socket(uiLayout *layout,
                      "collections",
                      socket.name,
                      ICON_OUTLINER_COLLECTION);
+      break;
+    }
+    case SOCK_MATERIAL: {
+      uiItemPointerR(layout, md_ptr, rna_path, bmain_ptr, "materials", socket.name, ICON_MATERIAL);
+      break;
+    }
+    case SOCK_TEXTURE: {
+      uiItemPointerR(layout, md_ptr, rna_path, bmain_ptr, "textures", socket.name, ICON_TEXTURE);
       break;
     }
     default:

@@ -37,7 +37,7 @@ if [ $USE_DEBUG_TRAP -ne 0 ]; then
   trap 'err_report $LINENO' ERR
 fi
 
-# Noisy, show every line that runs with it's line number.
+# Noisy, show every line that runs with its line number.
 if [ $USE_DEBUG_LOG -ne 0 ]; then
   PS4='\e[0;33m$(printf %4d ${LINENO}):\e\033[0m '
   set -x
@@ -553,18 +553,18 @@ EMBREE_FORCE_BUILD=false
 EMBREE_FORCE_REBUILD=false
 EMBREE_SKIP=false
 
-OIDN_VERSION="1.3.0"
-OIDN_VERSION_SHORT="1.3"
-OIDN_VERSION_MIN="1.3.0"
-OIDN_VERSION_MAX="1.4"
+OIDN_VERSION="1.4.0"
+OIDN_VERSION_SHORT="1.4"
+OIDN_VERSION_MIN="1.4.0"
+OIDN_VERSION_MAX="1.5"
 OIDN_FORCE_BUILD=false
 OIDN_FORCE_REBUILD=false
 OIDN_SKIP=false
 
 ISPC_VERSION="1.14.1"
 
-FFMPEG_VERSION="4.2.3"
-FFMPEG_VERSION_SHORT="4.2"
+FFMPEG_VERSION="4.4"
+FFMPEG_VERSION_SHORT="4.4"
 FFMPEG_VERSION_MIN="3.0"
 FFMPEG_VERSION_MAX="5.0"
 FFMPEG_FORCE_BUILD=false
@@ -1073,7 +1073,7 @@ OPENVDB_SOURCE=( "https://github.com/AcademySoftwareFoundation/openvdb/archive/v
 #~ OPENVDB_SOURCE_REPO_BRANCH="dev"
 
 NANOVDB_USE_REPO=false
-NANOVDB_SOURCE_REPO_UID="e62f7a0bf1e27397223c61ddeaaf57edf111b77f"
+NANOVDB_SOURCE_REPO_UID="dc37d8a631922e7bef46712947dc19b755f3e841"
 NANOVDB_SOURCE=( "https://github.com/AcademySoftwareFoundation/openvdb/archive/${NANOVDB_SOURCE_REPO_UID}.tar.gz" )
 
 ALEMBIC_USE_REPO=false
