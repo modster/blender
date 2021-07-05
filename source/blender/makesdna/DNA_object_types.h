@@ -58,7 +58,6 @@ struct SoftBody;
 struct bGPdata;
 
 /* Vertex Groups - Name Info */
-/* TODO: Move this. */
 typedef struct bDeformGroup {
   struct bDeformGroup *next, *prev;
   /** MAX_VGROUP_NAME. */
@@ -279,8 +278,7 @@ typedef struct Object {
 
   ListBase constraintChannels DNA_DEPRECATED; /* XXX deprecated... old animation system */
   ListBase effect DNA_DEPRECATED;             /* XXX deprecated... keep for readfile */
-  /** List of bDeformGroup (vertex groups) names and flag only. */
-  ListBase defbase DNA_DEPRECATED;
+  ListBase defbase DNA_DEPRECATED;            /* Only for versioning, moved to object data. */
   /** List of ModifierData structures. */
   ListBase modifiers;
   /** List of GpencilModifierData structures. */

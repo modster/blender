@@ -488,28 +488,14 @@ void BKE_defvert_flip_merged(MDeformVert *dvert, const int *flip_map, const int 
   }
 }
 
-bDeformGroup *BKE_object_defgroup_find_name(const Object *ob, const char *name)
+bool BKE_object_supports_vertex_groups(const Object *ob)
 {
-  if (name == NULL || name[0] == '\0') {
-    return NULL;
+  const ID *id = (const ID *)ob->data;
+  if (id == NULL) {
+    return false;
   }
-  const ListBase *defbase = BKE_object_defgroup_list(ob);
-  return BLI_findstring(defbase, name, offsetof(bDeformGroup, name));
-}
 
-int BKE_object_defgroup_name_index(const Object *ob, const char *name)
-{
-  if (name == NULL || name[0] == '\0') {
-    return -1;
-  }
-  const ListBase *defbase = BKE_object_defgroup_list(ob);
-  return BLI_findstringindex(defbase, name, offsetof(bDeformGroup, name));
-}
-
-int BKE_id_defgroup_name_index(const ID *id, const char *name)
-{
-  const ListBase *defbase = BKE_id_defgroup_list_get(id);
-  return BLI_findstringindex(defbase, name, offsetof(bDeformGroup, name));
+  return ELEM(GS(id->name), ID_ME, ID_LT, ID_GD);
 }
 
 const ListBase *BKE_id_defgroup_list_get(const ID *id)
@@ -534,31 +520,64 @@ const ListBase *BKE_id_defgroup_list_get(const ID *id)
   return NULL;
 }
 
+static const int *object_defgroup_active_index_get_p(const Object *ob)
+{
+  BLI_assert(BKE_object_supports_vertex_groups(ob));
+  switch (ob->type) {
+    case OB_MESH: {
+      const Mesh *mesh = (const Mesh *)ob->data;
+      return &mesh->vertex_group_active_index;
+    }
+    case OB_LATTICE: {
+      const Lattice *lattice = (const Lattice *)ob->data;
+      return &lattice->vertex_group_active_index;
+    }
+    case OB_GPENCIL: {
+      const bGPdata *gpd = (const bGPdata *)ob->data;
+      return &gpd->vertex_group_active_index;
+    }
+  }
+  return NULL;
+}
+
 ListBase *BKE_id_defgroup_list_get_mutable(ID *id)
 {
   /* Cast away const just for the accessor. */
   return (ListBase *)BKE_id_defgroup_list_get(id);
 }
 
-bool BKE_object_supports_vertex_groups(const Object *ob)
+bDeformGroup *BKE_object_defgroup_find_name(const Object *ob, const char *name)
 {
-  const ID *id = (const ID *)ob->data;
-  if (id == NULL) {
-    return false;
+  if (name == NULL || name[0] == '\0') {
+    return NULL;
   }
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
+  return BLI_findstring(defbase, name, offsetof(bDeformGroup, name));
+}
 
-  return ELEM(GS(id->name), ID_ME, ID_LT, ID_GD);
+int BKE_id_defgroup_name_index(const ID *id, const char *name)
+{
+  if (name == NULL || name[0] == '\0') {
+    return -1;
+  }
+  const ListBase *defbase = BKE_id_defgroup_list_get(id);
+  return BLI_findstringindex(defbase, name, offsetof(bDeformGroup, name));
 }
 
 const ListBase *BKE_object_defgroup_list(const Object *ob)
 {
-  BLI_assert(ob->data != NULL);
+  BLI_assert(BKE_object_supports_vertex_groups(ob));
   return BKE_id_defgroup_list_get((const ID *)ob->data);
+}
+
+int BKE_object_defgroup_name_index(const Object *ob, const char *name)
+{
+  return BKE_id_defgroup_name_index((ID *)ob->data, name);
 }
 
 ListBase *BKE_object_defgroup_list_mutable(Object *ob)
 {
-  BLI_assert(ob->data != NULL);
+  BLI_assert(BKE_object_supports_vertex_groups(ob));
   return BKE_id_defgroup_list_get_mutable((ID *)ob->data);
 }
 
@@ -572,22 +591,7 @@ int BKE_object_defgroup_count(const Object *ob)
  */
 int BKE_object_defgroup_active_index_get(const Object *ob)
 {
-  switch (ob->type) {
-    case OB_MESH: {
-      const Mesh *mesh = (const Mesh *)ob->data;
-      return mesh->vertex_group_active_index;
-    }
-    case OB_LATTICE: {
-      const Lattice *lattice = (const Lattice *)ob->data;
-      return lattice->vertex_group_active_index;
-    }
-    case OB_GPENCIL: {
-      const bGPdata *gpd = (const bGPdata *)ob->data;
-      return gpd->vertex_group_active_index;
-    }
-  }
-  BLI_assert_unreachable();
-  return -1;
+  return *object_defgroup_active_index_get_p(ob);
 }
 
 /**
@@ -595,26 +599,9 @@ int BKE_object_defgroup_active_index_get(const Object *ob)
  */
 void BKE_object_defgroup_active_index_set(Object *ob, const int new_index)
 {
-  switch (ob->type) {
-    case OB_MESH: {
-      Mesh *mesh = (Mesh *)ob->data;
-      mesh->vertex_group_active_index = new_index;
-      break;
-    }
-    case OB_LATTICE: {
-      Lattice *lattice = (Lattice *)ob->data;
-      lattice->vertex_group_active_index = new_index;
-      break;
-    }
-    case OB_GPENCIL: {
-      bGPdata *gpd = (bGPdata *)ob->data;
-      gpd->vertex_group_active_index = new_index;
-      break;
-    }
-    default: {
-      BLI_assert_unreachable();
-    }
-  }
+  /* Cast away const just for the accessor. */
+  int *index = (int *)object_defgroup_active_index_get_p(ob);
+  *index = new_index;
 }
 
 /**

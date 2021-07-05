@@ -2843,9 +2843,10 @@ static bool vertex_group_vert_select_unlocked_poll(bContext *C)
     return false;
   }
 
-  if (BKE_object_defgroup_active_index_get(ob) != 0) {
+  const int def_nr = BKE_object_defgroup_active_index_get(ob);
+  if (def_nr != 0) {
     const ListBase *defbase = BKE_object_defgroup_list(ob);
-    const bDeformGroup *dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
+    const bDeformGroup *dg = BLI_findlink(defbase, def_nr - 1);
     if (dg) {
       return !(dg->flag & DG_LOCK_WEIGHT);
     }
