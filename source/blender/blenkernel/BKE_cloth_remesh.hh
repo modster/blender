@@ -66,6 +66,7 @@ Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct
 #  include <iostream>
 #  include <istream>
 #  include <limits>
+#  include <optional>
 #  include <sstream>
 #  include <string>
 #  include <tuple>
@@ -906,6 +907,37 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     }
 
     return std::nullopt;
+  }
+
+  /**
+   * Gives first vert index of face that is not part of edge.
+   * This should be called only when the face has 3 verts, will return
+   * `std::nullopt` otherwise.
+   **/
+  inline std::optional<VertIndex> get_other_vert_index(EdgeIndex edge_index, FaceIndex face_index)
+  {
+
+    auto op_face = this->faces.get(face_index);
+    BLI_assert(op_face);
+    auto &face = op_face.value().get();
+
+    if (face.verts.size() != 3) {
+      return std::nullopt;
+    }
+
+    auto [vert_1_index, vert_2_index, vert_3_index] = face.verts;
+
+    auto op_edge = this->edges.get(edge_index);
+    BLI_assert(op_edge);
+    auto &edge = op_edge.value().get();
+
+    if (edge.has_vert(vert_1_index) == false) {
+      return vert_1_index;
+    }
+    if (edge.has_vert(vert_2_index) == false) {
+      return vert_2_index;
+    }
+    return vert_3_index;
   }
 
   void read(const MeshIO &reader)
