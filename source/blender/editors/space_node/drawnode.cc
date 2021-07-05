@@ -3911,8 +3911,10 @@ static struct {
   GPUVertBuf *inst_vbo;
   uint p0_id, p1_id, p2_id, p3_id;
   uint colid_id, muted_id;
+  uint alpha_factor_id;
   GPUVertBufRaw p0_step, p1_step, p2_step, p3_step;
   GPUVertBufRaw colid_step, muted_step;
+  GPUVertBufRaw alpha_factor_step;
   uint count;
   bool enabled;
 } g_batch_link;
@@ -3927,6 +3929,8 @@ static void nodelink_batch_reset()
       g_batch_link.inst_vbo, g_batch_link.colid_id, &g_batch_link.colid_step);
   GPU_vertbuf_attr_get_raw_data(
       g_batch_link.inst_vbo, g_batch_link.muted_id, &g_batch_link.muted_step);
+  GPU_vertbuf_attr_get_raw_data(
+      g_batch_link.inst_vbo, g_batch_link.alpha_factor_id, &g_batch_link.alpha_factor_step);
   g_batch_link.count = 0;
 }
 
@@ -4044,6 +4048,8 @@ static void nodelink_batch_init()
       &format_inst, "colid_doarrow", GPU_COMP_U8, 4, GPU_FETCH_INT);
   g_batch_link.muted_id = GPU_vertformat_attr_add(
       &format_inst, "domuted", GPU_COMP_U8, 2, GPU_FETCH_INT);
+  g_batch_link.alpha_factor_id = GPU_vertformat_attr_add(
+      &format_inst, "alpha_factor", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
   g_batch_link.inst_vbo = GPU_vertbuf_create_with_format_ex(&format_inst, GPU_USAGE_STREAM);
   /* Alloc max count but only draw the range we need. */
   GPU_vertbuf_data_alloc(g_batch_link.inst_vbo, NODELINK_GROUP_SIZE);
@@ -4110,7 +4116,8 @@ void nodelink_batch_end(SpaceNode *snode)
   g_batch_link.enabled = false;
 }
 
-static void nodelink_batch_add_link(const SpaceNode *snode,
+static void nodelink_batch_add_link(const View2D *v2d,
+                                    const SpaceNode *snode,
                                     const float p0[2],
                                     const float p1[2],
                                     const float p2[2],
@@ -4126,6 +4133,16 @@ static void nodelink_batch_add_link(const SpaceNode *snode,
   BLI_assert(ELEM(th_col2, TH_WIRE_INNER, TH_WIRE, TH_ACTIVE, TH_EDGE_SELECT, TH_REDALERT));
   BLI_assert(ELEM(th_col3, TH_WIRE, TH_REDALERT, -1));
 
+  const float min_endpoint_distance = MIN2(
+      MAX2(BLI_rctf_length_x(&v2d->cur, p0[0]), BLI_rctf_length_y(&v2d->cur, p0[1])),
+      MAX2(BLI_rctf_length_x(&v2d->cur, p3[0]), BLI_rctf_length_y(&v2d->cur, p3[1])));
+
+  float alpha_factor = 1.0f;
+  if (min_endpoint_distance > 0.0f) {
+    const float viewport_width = BLI_rctf_size_x(&v2d->cur);
+    alpha_factor = clamp_f(1.0f - min_endpoint_distance / viewport_width * 10.0f, 0.1f, 1.0f);
+  }
+
   g_batch_link.count++;
   copy_v2_v2((float *)GPU_vertbuf_raw_step(&g_batch_link.p0_step), p0);
   copy_v2_v2((float *)GPU_vertbuf_raw_step(&g_batch_link.p1_step), p1);
@@ -4138,6 +4155,7 @@ static void nodelink_batch_add_link(const SpaceNode *snode,
   colid[3] = drawarrow;
   char *muted = (char *)GPU_vertbuf_raw_step(&g_batch_link.muted_step);
   muted[0] = drawmuted;
+  *(float *)GPU_vertbuf_raw_step(&g_batch_link.alpha_factor_step) = alpha_factor;
 
   if (g_batch_link.count == NODELINK_GROUP_SIZE) {
     nodelink_batch_draw(snode);
@@ -4164,8 +4182,17 @@ void node_draw_link_bezier(const View2D *v2d,
 
     if (g_batch_link.enabled && !highlighted) {
       /* Add link to batch. */
-      nodelink_batch_add_link(
-          snode, vec[0], vec[1], vec[2], vec[3], th_col1, th_col2, th_col3, drawarrow, drawmuted);
+      nodelink_batch_add_link(v2d,
+                              snode,
+                              vec[0],
+                              vec[1],
+                              vec[2],
+                              vec[3],
+                              th_col1,
+                              th_col2,
+                              th_col3,
+                              drawarrow,
+                              drawmuted);
     }
     else {
       /* Draw single link. */
@@ -4190,6 +4217,7 @@ void node_draw_link_bezier(const View2D *v2d,
       GPU_batch_uniform_1f(batch, "arrowSize", ARROW_SIZE);
       GPU_batch_uniform_1i(batch, "doArrow", drawarrow);
       GPU_batch_uniform_1i(batch, "doMuted", drawmuted);
+      GPU_batch_uniform_1f(batch, "alpha_factor", 1.0f);
       GPU_batch_draw(batch);
     }
   }
