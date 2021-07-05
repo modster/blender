@@ -463,6 +463,53 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
   return samples;
 }
 
+#ifdef DEBUG
+static void assert_sorted_array_in_range(Span<float> data, const float min, const float max)
+{
+  BLI_assert(data.first() >= min);
+  for (const int i : IndexRange(1, data.size() - 1)) {
+    BLI_assert(data[i] >= data[i - 1]);
+  }
+  BLI_assert(data.last() <= max);
+}
+#endif
+
+/**
+ * Transform an array of sorted length parameters into index factors. The result is indices
+ * and factors to the next index, encoded in floats. The logic for converting from the float
+ * values to interpolation data is in #lookup_data_from_index_factor.
+ *
+ * \param parameters: Lengths along the spline to be transformed into index factors
+ * (to save another allocation). Must be between zero and the total length of the spline.
+ *
+ * \note The implementation is similar to #sample_uniform_index_factors(), though
+ * the two loops are inverted, and obviously custom parameters are provided.
+ */
+void Spline::sample_length_parameters_to_index_factors(MutableSpan<float> parameters) const
+{
+  const Span<float> lengths = this->evaluated_lengths();
+#ifdef DEBUG
+  assert_sorted_array_in_range(parameters, 0.0f, this->length());
+#endif
+
+  /* Store the length at the previous evaluated point in a variable so it can
+   * start out at zero (the lengths array doesn't contain 0 for the first point). */
+  float prev_length = 0.0f;
+  int i_evaluated = 0;
+  for (const int i_sample : parameters.index_range()) {
+    const float sample_length = parameters[i_sample];
+
+    /* Skip over every evaluated point that fits before this sample. */
+    while (lengths[i_evaluated] < sample_length) {
+      prev_length = lengths[i_evaluated];
+      i_evaluated++;
+    }
+
+    const float factor = (sample_length - prev_length) / (lengths[i_evaluated] - prev_length);
+    parameters[i_sample] = i_evaluated + factor;
+  }
+}
+
 Spline::LookupResult Spline::lookup_data_from_index_factor(const float index_factor) const
 {
   const int eval_size = this->evaluated_points_size();

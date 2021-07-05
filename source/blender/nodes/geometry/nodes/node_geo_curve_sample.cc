@@ -76,16 +76,70 @@ static void geo_node_curve_resample_update(bNodeTree *UNUSED(ntree), bNode *node
 
 namespace blender::nodes {
 
+static AttributeDomain get_result_domain(const GeometryComponent &component,
+                                         const StringRef parameter_name,
+                                         const StringRef result_name)
+{
+  std::optional<AttributeMetaData> result_info = component.attribute_get_meta_data(result_name);
+  if (result_info) {
+    return result_info->domain;
+  }
+  std::optional<AttributeMetaData> parameter_info = component.attribute_get_meta_data(
+      parameter_name);
+  if (parameter_info) {
+    return parameter_info->domain;
+  }
+  return ATTR_DOMAIN_POINT;
+}
+
+/**
+ * 1. Sort input parameters
+ * 2. For each spline in the curve, sample the values on it.
+ */
+static void curve_sample_attributes(const CurveEval &curve,
+                                    const StringRef name,
+                                    const Span<float> parameters,
+                                    GMutableSpan result)
+{
+  Array<int> original_indices(parameters.size());
+  for (const int i : original_indices.index_range()) {
+    original_indices[i] = i;
+  }
+
+  std::sort(original_indices.begin(), original_indices.end(), [parameters](int a, int b) {
+    return parameters[a] > parameters[b];
+  });
+
+  for (const int i : range) {
+  }
+}
+
 static void execute_on_component(GeometryComponent &component,
                                  const CurveComponent &curve_component,
                                  const StringRef pararameter_name,
                                  const StringRef attribute_name,
                                  const StringRef result_name)
 {
+  const AttributeDomain domain = get_result_domain(component, pararameter_name, result_name);
+
   GVArray_Typed<float> parameters = component.attribute_get_for_read<float>(pararameter_name,
                                                                             0.0f);
-  ReadAttributeLookup attribute = curve_component.attribute_try_get_for_read(attribute_name,
-                                                                             ATTR_DOMAIN_POINT);
+  VArray_Span<float> parameters_span{parameters};
+  std::optional<AttributeMetaData> curve_meta_data = curve_component.attribute_get_meta_data(
+      attribute_name);
+
+  OutputAttribute result = component.attribute_try_get_for_output_only(
+      result_name, domain, curve_meta_data->data_type);
+  GMutableSpan result_span = result.as_span();
+
+  const CurveEval &curve = *curve_component.get_for_read();
+
+  threading::parallel_for(IndexRange(result_span.size()), 1024, [&](IndexRange range) {
+    curve_sample_attributes(curve,
+                            attribute_name,
+                            parameters_span.slice(range.start(), range.size()),
+                            result_span.slice(range.start(), range.size()));
+  });
 }
 
 static void geo_node_resample_exec(GeoNodeExecParams params)
