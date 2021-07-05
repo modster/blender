@@ -92,7 +92,7 @@ static void move_vertex_group_names_to_object_data(Main *bmain)
 {
   LISTBASE_FOREACH (Object *, object, &bmain->objects) {
     if (ELEM(object->type, OB_MESH, OB_LATTICE, OB_GPENCIL)) {
-      ListBase *new_defbase = BKE_object_defgroup_list_for_write(object);
+      ListBase *new_defbase = BKE_object_defgroup_list_mutable(object);
 
       /* Clear the list in case the it was already assigned from another object. */
       BLI_freelistN(new_defbase);

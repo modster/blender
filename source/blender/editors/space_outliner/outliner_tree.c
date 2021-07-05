@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -554,7 +554,7 @@ static void outliner_add_object_contents(SpaceOutliner *space_outliner,
 
   /* vertex groups */
   if (ELEM(ob->type, OB_MESH, OB_GPENCIL, OB_LATTICE)) {
-    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    const ListBase *defbase = BKE_object_defgroup_list(ob);
     if (!BLI_listbase_is_empty(defbase)) {
       TreeElement *tenla = outliner_add_element(
           space_outliner, &te->subtree, ob, te, TSE_DEFGROUP_BASE, 0);

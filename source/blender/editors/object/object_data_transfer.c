@@ -139,7 +139,7 @@ static const EnumPropertyItem *dt_layers_select_src_itemf(bContext *C,
 
       RNA_enum_item_add_separator(&item, &totitem);
 
-      const ListBase *defbase = BKE_object_defgroup_list_for_read(ob_src);
+      const ListBase *defbase = BKE_object_defgroup_list(ob_src);
       for (i = 0, dg = defbase->first; dg; i++, dg = dg->next) {
         tmp_item.value = i;
         tmp_item.identifier = tmp_item.name = dg->name;

@@ -195,7 +195,7 @@ void ControllerExporter::export_skin_controller(Object *ob, Object *ob_arm)
 
   add_bind_shape_mat(ob);
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   std::string joints_source_id = add_joints_source(ob_arm, defbase, controller_id);
   std::string inv_bind_mat_source_id = add_inv_bind_mats_source(ob_arm, defbase, controller_id);
 

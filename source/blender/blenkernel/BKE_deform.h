@@ -39,8 +39,8 @@ struct Object;
 struct bDeformGroup;
 struct ID;
 
-const struct ListBase *BKE_object_defgroup_list_for_read(const struct Object *ob);
-struct ListBase *BKE_object_defgroup_list_for_write(struct Object *ob);
+const struct ListBase *BKE_object_defgroup_list(const struct Object *ob);
+struct ListBase *BKE_object_defgroup_list_mutable(struct Object *ob);
 
 int BKE_object_defgroup_count(const struct Object *ob);
 int BKE_object_defgroup_active_index_get(const struct Object *ob);

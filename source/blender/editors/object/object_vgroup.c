@@ -389,8 +389,8 @@ bool ED_vgroup_array_copy(Object *ob, Object *ob_from)
   int dvert_tot_from;
   int dvert_tot;
   int i;
-  ListBase *defbase_dst = BKE_object_defgroup_list_for_write(ob);
-  const ListBase *defbase_src = BKE_object_defgroup_list_for_read(ob_from);
+  ListBase *defbase_dst = BKE_object_defgroup_list_mutable(ob);
+  const ListBase *defbase_src = BKE_object_defgroup_list(ob_from);
 
   int defbase_tot_from = BLI_listbase_count(defbase_src);
   int defbase_tot = BLI_listbase_count(defbase_dst);
@@ -887,7 +887,7 @@ void ED_vgroup_vert_add(Object *ob, bDeformGroup *dg, int vertnum, float weight,
   /* add the vert to the deform group with the
    * specified assign mode
    */
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   const int def_nr = BLI_findindex(defbase, dg);
 
   MDeformVert *dv = NULL;
@@ -919,7 +919,7 @@ void ED_vgroup_vert_remove(Object *ob, bDeformGroup *dg, int vertnum)
 
   /* TODO(campbell): This is slow in a loop, better pass def_nr directly,
    * but leave for later. */
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   const int def_nr = BLI_findindex(defbase, dg);
 
   if (def_nr != -1) {
@@ -996,7 +996,7 @@ static float get_vert_def_nr(Object *ob, const int def_nr, const int vertnum)
 
 float ED_vgroup_vert_weight(Object *ob, bDeformGroup *dg, int vertnum)
 {
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   const int def_nr = BLI_findindex(defbase, dg);
 
   if (def_nr == -1) {
@@ -1024,7 +1024,7 @@ static void vgroup_select_verts(Object *ob, int select)
 {
   const int def_nr = BKE_object_defgroup_active_index_get(ob) - 1;
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   if (!BLI_findlink(defbase, def_nr)) {
     return;
   }
@@ -1120,7 +1120,7 @@ static void vgroup_duplicate(Object *ob)
   MDeformVert **dvert_array = NULL;
   int i, idg, icdg, dvert_tot = 0;
 
-  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+  ListBase *defbase = BKE_object_defgroup_list_mutable(ob);
 
   dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
   if (!dg) {
@@ -1172,7 +1172,7 @@ static bool vgroup_normalize(Object *ob)
 
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   if (!BLI_findlink(defbase, def_nr)) {
     return false;
   }
@@ -1663,7 +1663,7 @@ static bool vgroup_normalize_all(Object *ob,
   ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, use_vert_sel);
 
   if (dvert_array) {
-    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    const ListBase *defbase = BKE_object_defgroup_list(ob);
     const int defbase_tot = BLI_listbase_count(defbase);
     bool *lock_flags = BKE_object_defgroup_lock_flags_get(ob, defbase_tot);
     bool changed = false;
@@ -1789,7 +1789,7 @@ static void vgroup_lock_all(Object *ob, int action, int mask)
   if (mask != VGROUP_MASK_ALL) {
     selected = vgroup_selected_get(ob);
   }
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
 
   if (action == VGROUP_TOGGLE) {
     action = VGROUP_LOCK;
@@ -2399,7 +2399,7 @@ void ED_vgroup_mirror(Object *ob,
 
   *r_totmirr = *r_totfail = 0;
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
 
   if ((mirror_weights == false && flip_vgroups == false) ||
       (BLI_findlink(defbase, def_nr) == NULL)) {
@@ -2586,7 +2586,7 @@ cleanup:
 
 static void vgroup_delete_active(Object *ob)
 {
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   bDeformGroup *dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
   if (!dg) {
     return;
@@ -2600,7 +2600,7 @@ static void vgroup_assign_verts(Object *ob, const float weight)
 {
   const int def_nr = BKE_object_defgroup_active_index_get(ob) - 1;
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   if (!BLI_findlink(defbase, def_nr)) {
     return;
   }
@@ -2719,7 +2719,7 @@ static bool vertex_group_poll_ex(bContext *C, Object *ob)
     return false;
   }
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   if (BLI_listbase_is_empty(defbase)) {
     CTX_wm_operator_poll_msg_set(C, "Object has no vertex groups");
     return false;
@@ -2844,7 +2844,7 @@ static bool vertex_group_vert_select_unlocked_poll(bContext *C)
   }
 
   if (BKE_object_defgroup_active_index_get(ob) != 0) {
-    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    const ListBase *defbase = BKE_object_defgroup_list(ob);
     const bDeformGroup *dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
     if (dg) {
       return !(dg->flag & DG_LOCK_WEIGHT);
@@ -3046,7 +3046,7 @@ static int vertex_group_remove_from_exec(bContext *C, wmOperator *op)
     }
   }
   else {
-    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    const ListBase *defbase = BKE_object_defgroup_list(ob);
     bDeformGroup *dg = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
     if ((dg == NULL) || (BKE_object_defgroup_clear(ob, dg, !use_all_verts) == false)) {
       return OPERATOR_CANCELLED;
@@ -3971,7 +3971,7 @@ static const EnumPropertyItem *vgroup_itemf(bContext *C,
     return DummyRNA_NULL_items;
   }
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   for (a = 0, def = defbase->first; def; def = def->next, a++) {
     tmp.value = a;
     tmp.icon = ICON_GROUP_VERTEX;
@@ -4021,7 +4021,7 @@ void OBJECT_OT_vertex_group_set_active(wmOperatorType *ot)
  * with the order of vgroups then call vgroup_do_remap after */
 static char *vgroup_init_remap(Object *ob)
 {
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   int defbase_tot = BLI_listbase_count(defbase);
   char *name_array = MEM_mallocN(MAX_VGROUP_NAME * sizeof(char) * defbase_tot, "sort vgroups");
   char *name;
@@ -4039,7 +4039,7 @@ static int vgroup_do_remap(Object *ob, const char *name_array, wmOperator *op)
 {
   MDeformVert *dvert = NULL;
   const bDeformGroup *def;
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   int defbase_tot = BLI_listbase_count(defbase);
 
   /* Needs a dummy index at the start. */
@@ -4134,7 +4134,7 @@ static void vgroup_sort_bone_hierarchy(Object *ob, ListBase *bonebase)
       bonebase = &armature->bonebase;
     }
   }
-  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+  ListBase *defbase = BKE_object_defgroup_list_mutable(ob);
 
   if (bonebase != NULL) {
     Bone *bone;
@@ -4165,7 +4165,7 @@ static int vertex_group_sort_exec(bContext *C, wmOperator *op)
   /* Init remapping. */
   name_array = vgroup_init_remap(ob);
 
-  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+  ListBase *defbase = BKE_object_defgroup_list_mutable(ob);
 
   /* Sort vgroup names. */
   switch (sort_type) {
@@ -4228,7 +4228,7 @@ static int vgroup_move_exec(bContext *C, wmOperator *op)
   int dir = RNA_enum_get(op->ptr, "direction");
   int ret = OPERATOR_FINISHED;
 
-  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+  ListBase *defbase = BKE_object_defgroup_list_mutable(ob);
 
   def = BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1);
   if (!def) {
@@ -4356,7 +4356,7 @@ static void vgroup_copy_active_to_sel_single(Object *ob, const int def_nr)
 
 static bool check_vertex_group_accessible(wmOperator *op, Object *ob, int def_nr)
 {
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   bDeformGroup *dg = BLI_findlink(defbase, def_nr);
 
   if (!dg) {

@@ -1211,7 +1211,7 @@ static void view3d_panel_vgroup(const bContext *C, Panel *panel)
 
     vgroup_validmap = BKE_object_defgroup_subset_from_select_type(
         ob, subset_type, &vgroup_tot, &subset_count);
-    const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+    const ListBase *defbase = BKE_object_defgroup_list(ob);
 
     for (i = 0, dg = defbase->first; dg; i++, dg = dg->next) {
       bool locked = (dg->flag & DG_LOCK_WEIGHT) != 0;

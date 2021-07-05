@@ -551,7 +551,7 @@ static void armature_deform_coords_impl(const Object *ob_arm,
          *
          * - Check whether keeping this consistent across frames gives speedup.
          */
-        const ListBase *defbase = BKE_object_defgroup_list_for_read(ob_target);
+        const ListBase *defbase = BKE_object_defgroup_list(ob_target);
         for (i = 0, dg = defbase->first; dg; i++, dg = dg->next) {
           pchan_from_defbase[i] = BKE_pose_channel_find_name(ob_arm->pose, dg->name);
           /* exclude non-deforming bones */

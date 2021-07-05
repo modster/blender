@@ -1091,7 +1091,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
       /* We store the names of the vertex groups, so we can select
        * vertex groups with the same name in different objects. */
 
-      const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+      const ListBase *defbase = BKE_object_defgroup_list(ob);
 
       int i = 0;
       LISTBASE_FOREACH (bDeformGroup *, dg, defbase) {
@@ -1131,7 +1131,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
       if (cd_dvert_offset == -1) {
         continue;
       }
-      const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+      const ListBase *defbase = BKE_object_defgroup_list(ob);
       defbase_len = BLI_listbase_count(defbase);
       if (defbase_len == 0) {
         continue;

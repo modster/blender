@@ -732,7 +732,7 @@ static void rna_Object_vertex_groups_begin(CollectionPropertyIterator *iter, Poi
 {
   Object *ob = (Object *)ptr->data;
 
-  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+  ListBase *defbase = BKE_object_defgroup_list_mutable(ob);
   iter->valid = defbase != NULL;
 
   rna_iterator_listbase_begin(iter, defbase, NULL);
@@ -812,14 +812,14 @@ static int rna_VertexGroup_index_get(PointerRNA *ptr)
 {
   Object *ob = (Object *)ptr->owner_id;
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   return BLI_findindex(defbase, ptr->data);
 }
 
 static PointerRNA rna_Object_active_vertex_group_get(PointerRNA *ptr)
 {
   Object *ob = (Object *)ptr->owner_id;
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
 
   return rna_pointer_inherit_refine(
       ptr, &RNA_VertexGroup, BLI_findlink(defbase, BKE_object_defgroup_active_index_get(ob) - 1));
@@ -830,7 +830,7 @@ static void rna_Object_active_vertex_group_set(PointerRNA *ptr,
                                                struct ReportList *reports)
 {
   Object *ob = (Object *)ptr->owner_id;
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   int index = BLI_findindex(defbase, value.data);
   if (index == -1) {
     BKE_reportf(reports,
@@ -862,7 +862,7 @@ static void rna_Object_active_vertex_group_index_range(
   Object *ob = (Object *)ptr->owner_id;
 
   *min = 0;
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   *max = max_ii(0, BLI_listbase_count(defbase) - 1);
 }
 
@@ -871,7 +871,7 @@ void rna_object_vgroup_name_index_get(PointerRNA *ptr, char *value, int index)
   Object *ob = (Object *)ptr->owner_id;
   bDeformGroup *dg;
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   dg = BLI_findlink(defbase, index - 1);
 
   if (dg) {
@@ -887,7 +887,7 @@ int rna_object_vgroup_name_index_length(PointerRNA *ptr, int index)
   Object *ob = (Object *)ptr->owner_id;
   bDeformGroup *dg;
 
-  const ListBase *defbase = BKE_object_defgroup_list_for_read(ob);
+  const ListBase *defbase = BKE_object_defgroup_list(ob);
   dg = BLI_findlink(defbase, index - 1);
   return (dg) ? strlen(dg->name) : 0;
 }
@@ -1977,7 +1977,7 @@ static void rna_Object_vgroup_remove(Object *ob,
                                      PointerRNA *defgroup_ptr)
 {
   bDeformGroup *defgroup = defgroup_ptr->data;
-  ListBase *defbase = BKE_object_defgroup_list_for_write(ob);
+  ListBase *defbase = BKE_object_defgroup_list_mutable(ob);
 
   if (BLI_findindex(defbase, defgroup) == -1) {
     BKE_reportf(reports,
