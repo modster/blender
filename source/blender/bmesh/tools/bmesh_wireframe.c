@@ -77,7 +77,7 @@ static void bm_vert_boundary_tangent(
   }
 
   if (e_a && e_b) {
-    /* note, with an incorrectly flushed selection this can crash */
+    /* NOTE: with an incorrectly flushed selection this can crash. */
     l_a = bm_edge_tag_faceloop(e_a);
     l_b = bm_edge_tag_faceloop(e_b);
 
@@ -195,7 +195,7 @@ void BM_mesh_wireframe(BMesh *bm,
   BMVert **verts_neg = MEM_mallocN(sizeof(BMVert *) * totvert_orig, __func__);
   BMVert **verts_pos = MEM_mallocN(sizeof(BMVert *) * totvert_orig, __func__);
 
-  /* will over-alloc, but makes for easy lookups by index to keep aligned  */
+  /* Will over-alloc, but makes for easy lookups by index to keep aligned. */
   BMVert **verts_boundary = use_boundary ? MEM_mallocN(sizeof(BMVert *) * totvert_orig, __func__) :
                                            NULL;
 

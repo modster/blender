@@ -155,6 +155,9 @@ if(WITH_HEADLESS OR WITH_GHOST_SDL)
   endif()
 
 elseif(APPLE AND NOT WITH_GHOST_X11)
+  if(WITH_INPUT_IME)
+    add_definitions(-DWITH_INPUT_IME)
+  endif()
   list(APPEND SRC
     intern/GHOST_DisplayManagerCocoa.mm
     intern/GHOST_SystemCocoa.mm
@@ -483,10 +486,17 @@ if(WITH_XR_OPENXR)
       shlwapi
     )
   elseif(UNIX AND NOT APPLE)
-    list(APPEND XR_PLATFORM_DEFINES
-      -DXR_OS_LINUX
-      -DXR_USE_PLATFORM_XLIB
-    )
+    list(APPEND XR_PLATFORM_DEFINES -DXR_OS_LINUX)
+    if (WITH_GHOST_WAYLAND)
+      list(APPEND XR_PLATFORM_DEFINES -DXR_USE_PLATFORM_WAYLAND)
+    endif()
+    if (WITH_GHOST_X11)
+      if (WITH_GL_EGL)
+        list(APPEND XR_PLATFORM_DEFINES -DXR_USE_PLATFORM_EGL)
+      else()
+        list(APPEND XR_PLATFORM_DEFINES -DXR_USE_PLATFORM_XLIB)
+      endif()
+    endif()
   endif()
 
   add_definitions(-DWITH_XR_OPENXR ${XR_PLATFORM_DEFINES})

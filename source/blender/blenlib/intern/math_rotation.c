@@ -511,7 +511,7 @@ void rotation_between_vecs_to_mat3(float m[3][3], const float v1[3], const float
   }
 }
 
-/* note: expects vectors to be normalized */
+/* NOTE: expects vectors to be normalized. */
 void rotation_between_vecs_to_quat(float q[4], const float v1[3], const float v2[3])
 {
   float axis[3];
@@ -1999,7 +1999,7 @@ void mat4_to_dquat(DualQuat *dq, const float basemat[4][4], const float mat[4][4
 
   if (!is_orthonormal_m3(mat3) || (determinant_m4(mat) < 0.0f) ||
       len_squared_v3(dscale) > square_f(1e-4f)) {
-    /* extract R and S  */
+    /* Extract R and S. */
     float tmp[4][4];
 
     /* extra orthogonalize, to avoid flipping with stretched bones */

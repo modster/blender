@@ -85,7 +85,7 @@ struct SmoothView3DState {
 };
 
 struct SmoothView3DStore {
-  /* source*/
+  /* Source. */
   struct SmoothView3DState src; /* source */
   struct SmoothView3DState dst; /* destination */
   struct SmoothView3DState org; /* original */
@@ -392,7 +392,7 @@ static void view3d_smoothview_apply(bContext *C, View3D *v3d, ARegion *region, b
     view3d_boxview_copy(CTX_wm_area(C), region);
   }
 
-  /* note: this doesn't work right because the v3d->lens is now used in ortho mode r51636,
+  /* NOTE: this doesn't work right because the v3d->lens is now used in ortho mode r51636,
    * when switching camera in quad-view the other ortho views would zoom & reset.
    *
    * For now only redraw all regions when smooth-view finishes.
@@ -1261,7 +1261,7 @@ static bool view3d_localview_init(const Depsgraph *depsgraph,
 
   if (local_view_bit == 0) {
     /* TODO(dfelinto): We can kick one of the other 3D views out of local view
-     * specially if it is not being used.  */
+     * specially if it is not being used. */
     BKE_report(reports, RPT_ERROR, "No more than 16 local views");
     ok = false;
   }
@@ -1565,7 +1565,7 @@ static uint free_localcollection_bit(Main *bmain, ushort local_collections_uuid,
 
   ushort local_view_bits = 0;
 
-  /* Check all areas: which localviews are in use? */
+  /* Check all areas: which local-views are in use? */
   for (screen = bmain->screens.first; screen; screen = screen->id.next) {
     for (area = screen->areabase.first; area; area = area->next) {
       SpaceLink *sl = area->spacedata.first;
