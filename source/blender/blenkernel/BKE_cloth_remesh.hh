@@ -1340,6 +1340,119 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     new_face.extra_data = interp(face_1.extra_data, face_2.extra_data);
     return new_face;
   }
+
+  /**
+   * Delete the node and update elements' that refer to this node.
+   *
+   * This should always be followed with a `delete_vert()`
+   * since a `Vert` without a `Node` is invalid.
+   */
+  Node<END> delete_node(NodeIndex node_index)
+  {
+    auto op_node = this->nodes.remove(node_index);
+    BLI_assert(op_node);
+    auto node = op_node.value();
+
+    /* Remove this node's references from the other verts  */
+    for (const auto &vert_index : node.verts) {
+      auto op_vert = this->verts.get(vert_index);
+      BLI_assert(op_vert);
+      auto &vert = op_vert.value().get();
+
+      vert.node = std::nullopt;
+    }
+
+    return std::move(node);
+  }
+
+  /**
+   * Delete the vert and update elements' that refer to this vert.
+   *
+   * This should always be followed with a `delete_edge()`
+   * since a `Edge` without a both it's verts is invalid.
+   */
+  Vert<EVD> delete_vert(VertIndex vert_index)
+  {
+    auto op_vert = this->verts.remove(vert_index);
+    BLI_assert(op_vert);
+    auto vert = op_vert.value();
+
+    /* Remove node's reference to this vert if the node hasn't been
+     * deleted already */
+    if (vert.node) {
+      auto op_node = this->nodes.get(vert.node);
+      BLI_assert(op_node);
+      auto &node = op_node.value().get();
+      node.verts.remove_first_occurrence_and_reorder(vert.self_index);
+    }
+
+    /* Remove this vert's references from the other edges and also
+     * the faces, this can lead to a mesh structure that isn't valid,
+     * so subsequent operations are necessary */
+    for (const auto &edge_index : verts.edges) {
+      auto op_edge = this->edges.get(edge_index);
+      BLI_assert(op_edge);
+      auto &edge = op_edge.value().get();
+
+      for (const auto face_index : edge.faces) {
+        auto op_face = this->faces.get(face_index);
+        BLI_assert(op_face);
+        auto &face = op_face.value().get();
+
+        /* The ordering of the verts within the face matters, so need
+         * to go for this more expensive method of removal */
+        BLI_assert(face.verts.contains(vert.self_index));
+        face.verts.remove(first_index_of(vert.self_index));
+      }
+
+      /* The other vert of the edge might have been deleted first */
+      if (edge.verts) {
+        edge.verts = std::nullopt;
+      }
+    }
+
+    return std::move(vert);
+  }
+
+  /**
+   * Delete the edge and update elements' that refer to this edge.
+   *
+   * This should be called only after the verts of this edge have been
+   * deleted using `delete_vert()`.
+   */
+  Edge<EED> delete_edge(EdgeIndex edge_index)
+  {
+    auto op_edge = this->edges.remove(edge_index);
+    BLI_assert(op_edge);
+    auto edge = op_edge.value();
+
+    /* The verts should have been deleted prior to calling this
+     * function otherwise, the link between the faces and verts is
+     * comprimised if not careful. */
+    BLI_assert(edge.verts.has_value() == false);
+
+    return std::move(edge);
+  }
+
+  /**
+   * Delete the face and update elements' that refer to this face.
+   */
+  Face<EFD> delete_face(FaceIndex face_index)
+  {
+    auto op_face = this->faces.remove(face_index);
+    BLI_assert(op_face);
+    auto face = op_face.value();
+
+    for (const auto &vert_index : face.verts) {
+      auto op_vert = this->verts.get(vert_index);
+      BLI_assert(op_vert);
+      auto vert = op_vert.value();
+
+      vert.faces.remove_first_occurrence_and_reorder(face.self_index);
+    }
+
+    return std::move(face);
+  }
 };
 
 template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff {
