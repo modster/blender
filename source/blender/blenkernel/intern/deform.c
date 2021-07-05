@@ -536,24 +536,8 @@ const ListBase *BKE_id_defgroup_list_get(const ID *id)
 
 ListBase *BKE_id_defgroup_list_get_mutable(ID *id)
 {
-  switch (GS(id->name)) {
-    case ID_ME: {
-      Mesh *me = (Mesh *)id;
-      return &me->vertex_group_names;
-    }
-    case ID_LT: {
-      Lattice *lt = (Lattice *)id;
-      return &lt->vertex_group_names;
-    }
-    case ID_GD: {
-      bGPdata *gpd = (bGPdata *)id;
-      return &gpd->vertex_group_names;
-    }
-    default: {
-      BLI_assert_unreachable();
-    }
-  }
-  return NULL;
+  /* Cast away const just for the accessor. */
+  return (ListBase *)BKE_id_defgroup_list_get(id);
 }
 
 const ListBase *BKE_object_defgroup_list_for_read(const Object *ob)
