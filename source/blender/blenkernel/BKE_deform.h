@@ -39,6 +39,7 @@ struct Object;
 struct bDeformGroup;
 struct ID;
 
+bool BKE_object_supports_vertex_groups(const struct Object *ob);
 const struct ListBase *BKE_object_defgroup_list(const struct Object *ob);
 struct ListBase *BKE_object_defgroup_list_mutable(struct Object *ob);
 

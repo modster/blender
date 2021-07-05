@@ -540,13 +540,25 @@ ListBase *BKE_id_defgroup_list_get_mutable(ID *id)
   return (ListBase *)BKE_id_defgroup_list_get(id);
 }
 
+bool BKE_object_supports_vertex_groups(const Object *ob)
+{
+  const ID *id = (const ID *)ob->data;
+  if (id == NULL) {
+    return false;
+  }
+
+  return ELEM(GS(id->name), ID_ME, ID_LT, ID_GD);
+}
+
 const ListBase *BKE_object_defgroup_list(const Object *ob)
 {
+  BLI_assert(ob->data != NULL);
   return BKE_id_defgroup_list_get((const ID *)ob->data);
 }
 
 ListBase *BKE_object_defgroup_list_mutable(Object *ob)
 {
+  BLI_assert(ob->data != NULL);
   return BKE_id_defgroup_list_get_mutable((ID *)ob->data);
 }
 

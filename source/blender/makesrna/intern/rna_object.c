@@ -728,16 +728,6 @@ static const EnumPropertyItem *rna_Object_parent_type_itemf(bContext *UNUSED(C),
   return item;
 }
 
-static void rna_Object_vertex_groups_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
-{
-  Object *ob = (Object *)ptr->data;
-
-  ListBase *defbase = BKE_object_defgroup_list_mutable(ob);
-  iter->valid = defbase != NULL;
-
-  rna_iterator_listbase_begin(iter, defbase, NULL);
-}
-
 static void rna_Object_empty_display_type_set(PointerRNA *ptr, int value)
 {
   Object *ob = (Object *)ptr->data;
@@ -800,9 +790,27 @@ static void rna_Object_dup_collection_set(PointerRNA *ptr,
   }
 }
 
+static void rna_Object_vertex_groups_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+  Object *ob = (Object *)ptr->data;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    iter->valid = 0;
+    return;
+  }
+
+  ListBase *defbase = BKE_object_defgroup_list_mutable(ob);
+  iter->valid = defbase != NULL;
+
+  rna_iterator_listbase_begin(iter, defbase, NULL);
+}
+
 static void rna_VertexGroup_name_set(PointerRNA *ptr, const char *value)
 {
   Object *ob = (Object *)ptr->owner_id;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    return;
+  }
+
   bDeformGroup *dg = (bDeformGroup *)ptr->data;
   BLI_strncpy_utf8(dg->name, value, sizeof(dg->name));
   BKE_object_defgroup_unique_name(dg, ob);
@@ -811,6 +819,9 @@ static void rna_VertexGroup_name_set(PointerRNA *ptr, const char *value)
 static int rna_VertexGroup_index_get(PointerRNA *ptr)
 {
   Object *ob = (Object *)ptr->owner_id;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    return -1;
+  }
 
   const ListBase *defbase = BKE_object_defgroup_list(ob);
   return BLI_findindex(defbase, ptr->data);
@@ -819,6 +830,10 @@ static int rna_VertexGroup_index_get(PointerRNA *ptr)
 static PointerRNA rna_Object_active_vertex_group_get(PointerRNA *ptr)
 {
   Object *ob = (Object *)ptr->owner_id;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    return PointerRNA_NULL;
+  }
+
   const ListBase *defbase = BKE_object_defgroup_list(ob);
 
   return rna_pointer_inherit_refine(
@@ -830,7 +845,12 @@ static void rna_Object_active_vertex_group_set(PointerRNA *ptr,
                                                struct ReportList *reports)
 {
   Object *ob = (Object *)ptr->owner_id;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    return;
+  }
+
   const ListBase *defbase = BKE_object_defgroup_list(ob);
+
   int index = BLI_findindex(defbase, value.data);
   if (index == -1) {
     BKE_reportf(reports,
@@ -847,12 +867,20 @@ static void rna_Object_active_vertex_group_set(PointerRNA *ptr,
 static int rna_Object_active_vertex_group_index_get(PointerRNA *ptr)
 {
   Object *ob = (Object *)ptr->owner_id;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    return -1;
+  }
+
   return BKE_object_defgroup_active_index_get(ob) - 1;
 }
 
 static void rna_Object_active_vertex_group_index_set(PointerRNA *ptr, int value)
 {
   Object *ob = (Object *)ptr->owner_id;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    return;
+  }
+
   BKE_object_defgroup_active_index_set(ob, value + 1);
 }
 
@@ -862,6 +890,10 @@ static void rna_Object_active_vertex_group_index_range(
   Object *ob = (Object *)ptr->owner_id;
 
   *min = 0;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    *max = 0;
+    return;
+  }
   const ListBase *defbase = BKE_object_defgroup_list(ob);
   *max = max_ii(0, BLI_listbase_count(defbase) - 1);
 }
@@ -869,10 +901,13 @@ static void rna_Object_active_vertex_group_index_range(
 void rna_object_vgroup_name_index_get(PointerRNA *ptr, char *value, int index)
 {
   Object *ob = (Object *)ptr->owner_id;
-  bDeformGroup *dg;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    value[0] = '\0';
+    return;
+  }
 
   const ListBase *defbase = BKE_object_defgroup_list(ob);
-  dg = BLI_findlink(defbase, index - 1);
+  const bDeformGroup *dg = BLI_findlink(defbase, index - 1);
 
   if (dg) {
     BLI_strncpy(value, dg->name, sizeof(dg->name));
@@ -885,22 +920,34 @@ void rna_object_vgroup_name_index_get(PointerRNA *ptr, char *value, int index)
 int rna_object_vgroup_name_index_length(PointerRNA *ptr, int index)
 {
   Object *ob = (Object *)ptr->owner_id;
-  bDeformGroup *dg;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    return 0;
+  }
 
   const ListBase *defbase = BKE_object_defgroup_list(ob);
-  dg = BLI_findlink(defbase, index - 1);
+  bDeformGroup *dg = BLI_findlink(defbase, index - 1);
   return (dg) ? strlen(dg->name) : 0;
 }
 
 void rna_object_vgroup_name_index_set(PointerRNA *ptr, const char *value, short *index)
 {
   Object *ob = (Object *)ptr->owner_id;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    *index = -1;
+    return;
+  }
+
   *index = BKE_object_defgroup_name_index(ob, value) + 1;
 }
 
 void rna_object_vgroup_name_set(PointerRNA *ptr, const char *value, char *result, int maxlen)
 {
   Object *ob = (Object *)ptr->owner_id;
+  if (!BKE_object_supports_vertex_groups(ob)) {
+    result[0] = '\0';
+    return;
+  }
+
   bDeformGroup *dg = BKE_object_defgroup_find_name(ob, value);
   if (dg) {
     /* No need for BLI_strncpy_utf8, since this matches an existing group. */
