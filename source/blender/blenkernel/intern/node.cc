@@ -5056,6 +5056,7 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_length();
   register_node_type_geo_curve_primitive_bezier_segment();
   register_node_type_geo_curve_primitive_circle();
+  register_node_type_geo_curve_primitive_line();
   register_node_type_geo_curve_primitive_quadratic_bezier();
   register_node_type_geo_curve_primitive_spiral();
   register_node_type_geo_curve_primitive_star();
@@ -5105,6 +5106,7 @@ static void registerFunctionNodes()
 {
   register_node_type_fn_boolean_math();
   register_node_type_fn_float_compare();
+  register_node_type_fn_float_to_int();
   register_node_type_fn_input_string();
   register_node_type_fn_input_vector();
   register_node_type_fn_random_float();
