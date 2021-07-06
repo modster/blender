@@ -1565,7 +1565,7 @@ void IDP_BlendReadExpand(struct BlendExpander *expander, IDProperty *prop)
   }
 }
 
-IDPropertyUIDataType IDP_ui_data_type(const IDProperty *prop)
+eIDPropertyUIDataType IDP_ui_data_type(const IDProperty *prop)
 {
   if (prop->type == IDP_STRING) {
     return IDP_UI_DATA_TYPE_STRING;
