@@ -939,9 +939,9 @@ int DRW_cache_object_material_count_get(struct Object *ob)
 
   Mesh *me = BKE_object_get_evaluated_mesh(ob);
   if (me != NULL && type != OB_POINTCLOUD) {
-    /* Some object types (e.g. curves) can have a Curve in ob->data, but will be rendered as mesh.
-     * For point clouds this never happens. Ideally this check would happen at another level and we
-     * would just have to care about ob->data here. */
+    /* Some object types can have one data type in ob->data, but will be rendered as mesh.
+     * For point clouds this never happens. Ideally this check would happen at another level
+     * and we would just have to care about ob->data here. */
     type = OB_MESH;
   }
 
@@ -3467,6 +3467,8 @@ void drw_batch_cache_validate(Object *ob)
       DRW_mesh_batch_cache_validate((Mesh *)ob->data);
       break;
     case OB_CURVE:
+      DRW_curve_batch_cache_validate((Curve *)ob->data);
+      break;
     case OB_FONT:
     case OB_SURF:
       if (mesh_eval != NULL) {
@@ -3514,8 +3516,10 @@ void drw_batch_cache_generate_requested(Object *ob)
       DRW_mesh_batch_cache_create_requested(
           DST.task_graph, ob, (Mesh *)ob->data, scene, is_paint_mode, use_hide);
       break;
-    case OB_CURVE:
     case OB_FONT:
+    case OB_CURVE:
+      DRW_curve_batch_cache_create_requested(ob, scene);
+      break;
     case OB_SURF:
       if (mesh_eval) {
         DRW_mesh_batch_cache_create_requested(
@@ -3542,8 +3546,6 @@ void DRW_batch_cache_free_old(Object *ob, int ctime)
     case OB_MESH:
       DRW_mesh_batch_cache_free_old((Mesh *)ob->data, ctime);
       break;
-    case OB_CURVE:
-    case OB_FONT:
     case OB_SURF:
       if (mesh_eval) {
         DRW_mesh_batch_cache_free_old(mesh_eval, ctime);
