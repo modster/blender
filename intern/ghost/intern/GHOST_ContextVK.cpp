@@ -31,6 +31,9 @@
 #  include <MoltenVK/vk_mvk_moltenvk.h>
 #else /* X11 */
 #  include <vulkan/vulkan_xlib.h>
+#  ifdef WITH_GHOST_WAYLAND
+#    include <vulkan/vulkan_wayland.h>
+#  endif
 #endif
 
 #include <vector>
@@ -124,9 +127,14 @@ GHOST_ContextVK::GHOST_ContextVK(bool stereoVisual,
                                  HWND hwnd,
 #elif defined(__APPLE__)
                                  CAMetalLayer *metal_layer,
-#else /* X11 */
+#else
+                                 GHOST_TVulkanPlatformType platform,
+                                 /* X11 */
                                  Window window,
                                  Display *display,
+                                 /* Wayland */
+                                 wl_surface *wayland_surface,
+                                 wl_display *wayland_display,
 #endif
                                  int contextMajorVersion,
                                  int contextMinorVersion,
@@ -136,9 +144,14 @@ GHOST_ContextVK::GHOST_ContextVK(bool stereoVisual,
       m_hwnd(hwnd),
 #elif defined(__APPLE__)
       m_metal_layer(metal_layer),
-#else /* X11 */
+#else
+      m_platform(platform),
+      /* X11 */
       m_display(display),
       m_window(window),
+      /* Wayland */
+      m_wayland_surface(wayland_surface),
+      m_wayland_display(wayland_display),
 #endif
       m_context_major_version(contextMajorVersion),
       m_context_minor_version(contextMinorVersion),
@@ -822,14 +835,45 @@ GHOST_TSuccess GHOST_ContextVK::createSwapchain(void)
   return GHOST_kSuccess;
 }
 
+const char *GHOST_ContextVK::getPlatformSpecificSurfaceExtension() const
+{
+#ifdef _WIN32
+  return VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
+#elif defined(__APPLE__)
+  return VK_EXT_METAL_SURFACE_EXTENSION_NAME;
+#else /* UNIX/Linux */
+  switch (m_platform) {
+    case GHOST_kVulkanPlatformX11:
+      return VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
+      break;
+#  ifdef WITH_GHOST_WAYLAND
+    case GHOST_kVulkanPlatformWayland:
+      return VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME;
+      break;
+#  endif
+  }
+#endif
+  return NULL;
+}
+
 GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
 {
 #ifdef _WIN32
   const bool use_window_surface = (m_hwnd != NULL);
 #elif defined(__APPLE__)
   const bool use_window_surface = (m_metal_layer != NULL);
-#else /* X11 */
-  const bool use_window_surface = (m_display != NULL) && (m_window != (Window)NULL);
+#else /* UNIX/Linux */
+  bool use_window_surface = false;
+  switch (m_platform) {
+    case GHOST_kVulkanPlatformX11:
+      use_window_surface = (m_display != NULL) && (m_window != (Window)NULL);
+      break;
+#  ifdef WITH_GHOST_WAYLAND
+    case GHOST_kVulkanPlatformWayland:
+      use_window_surface = (m_wayland_display != NULL) && (m_wayland_surface != NULL);
+      break;
+#  endif
+  }
 #endif
 
   auto layers_available = getLayersAvailable();
@@ -844,13 +888,8 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
   vector<const char *> extensions_enabled;
 
   if (use_window_surface) {
-#ifdef _WIN32
-    const char *native_surface_extension_name = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
-#elif defined(__APPLE__)
-    const char *native_surface_extension_name = VK_EXT_METAL_SURFACE_EXTENSION_NAME;
-#else /* X11 */
-    const char *native_surface_extension_name = VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
-#endif
+    const char *native_surface_extension_name = getPlatformSpecificSurfaceExtension();
+
     requireExtension(extensions_available, extensions_enabled, "VK_KHR_surface");
     requireExtension(extensions_available, extensions_enabled, native_surface_extension_name);
 
@@ -890,11 +929,27 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
     info.pLayer = m_metal_layer;
     VK_CHECK(vkCreateMetalSurfaceEXT(m_instance, &info, nullptr, &m_surface));
 #else
-    VkXlibSurfaceCreateInfoKHR surface_create_info = {};
-    surface_create_info.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
-    surface_create_info.dpy = m_display;
-    surface_create_info.window = m_window;
-    VK_CHECK(vkCreateXlibSurfaceKHR(m_instance, &surface_create_info, NULL, &m_surface));
+    switch (m_platform) {
+      case GHOST_kVulkanPlatformX11: {
+        VkXlibSurfaceCreateInfoKHR surface_create_info = {};
+        surface_create_info.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+        surface_create_info.dpy = m_display;
+        surface_create_info.window = m_window;
+        VK_CHECK(vkCreateXlibSurfaceKHR(m_instance, &surface_create_info, NULL, &m_surface));
+        break;
+      }
+#  ifdef WITH_GHOST_WAYLAND
+      case GHOST_kVulkanPlatformWayland: {
+        VkWaylandSurfaceCreateInfoKHR surface_create_info = {};
+        surface_create_info.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+        surface_create_info.display = m_wayland_display;
+        surface_create_info.surface = m_wayland_surface;
+        VK_CHECK(vkCreateWaylandSurfaceKHR(m_instance, &surface_create_info, NULL, &m_surface));
+        break;
+      }
+#  endif
+    }
+
 #endif
   }
 

@@ -406,7 +406,7 @@ GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextTyp
 #if defined(WITH_VULKAN)
   if (type == GHOST_kDrawingContextTypeVulkan) {
     GHOST_Context *context = new GHOST_ContextVK(
-        false, (Window)NULL, m_display, 1, 0, debug_context);
+        false, GHOST_kVulkanPlatformX11, 0, m_display, NULL, NULL, 1, 0, debug_context);
 
     if (context->initializeDrawingContext()) {
       return context;

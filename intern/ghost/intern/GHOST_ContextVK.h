@@ -32,6 +32,12 @@
 #  include "GHOST_SystemCocoa.h"
 #else
 #  include "GHOST_SystemX11.h"
+#  ifdef WITH_GHOST_WAYLAND
+#    include "GHOST_SystemWayland.h"
+#  else
+#    define wl_surface void
+#    define wl_display void
+#  endif
 #endif
 
 #include <vector>
@@ -51,6 +57,13 @@
 #  define GHOST_OPENGL_VK_RESET_NOTIFICATION_STRATEGY 0
 #endif
 
+typedef enum {
+  GHOST_kVulkanPlatformX11 = 0,
+#ifdef WITH_GHOST_WAYLAND
+  GHOST_kVulkanPlatformWayland,
+#endif
+} GHOST_TVulkanPlatformType;
+
 class GHOST_ContextVK : public GHOST_Context {
   /* XR code needs low level graphics data to send to OpenXR. */
   // friend class GHOST_XrGraphicsBindingOpenGL;
@@ -65,9 +78,14 @@ class GHOST_ContextVK : public GHOST_Context {
 #elif defined(__APPLE__)
                   /* FIXME CAMetalLayer but have issue with linking. */
                   void *metal_layer,
-#else /* X11 */
+#else
+                  GHOST_TVulkanPlatformType platform,
+                  /* X11 */
                   Window window,
                   Display *display,
+                  /* Wayland */
+                  wl_surface *wayland_surface,
+                  wl_display *wayland_display,
 #endif
                   int contextMajorVersion,
                   int contextMinorVersion,
@@ -155,9 +173,14 @@ class GHOST_ContextVK : public GHOST_Context {
 #elif defined(__APPLE__)
   /* FIXME CAMetalLayer but have issue with linking. */
   void *m_metal_layer;
-#else /* X11 */
+#else /* Linux */
+  GHOST_TVulkanPlatformType m_platform;
+  /* X11 */
   Display *m_display;
   Window m_window;
+  /* Wayland */
+  wl_surface *m_wayland_surface;
+  wl_display *m_wayland_display;
 #endif
 
   const int m_context_major_version;
@@ -195,6 +218,7 @@ class GHOST_ContextVK : public GHOST_Context {
   /** Used to unique framebuffer ids to return when swapchain is recreated. */
   uint32_t m_swapchain_id = 0;
 
+  const char *getPlatformSpecificSurfaceExtension()const ;
   GHOST_TSuccess pickPhysicalDevice(std::vector<const char *> required_exts);
   GHOST_TSuccess createSwapchain(void);
   GHOST_TSuccess destroySwapchain(void);

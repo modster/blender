@@ -1288,8 +1288,15 @@ GHOST_Context *GHOST_WindowX11::newDrawingContext(GHOST_TDrawingContextType type
     /* Vulkan port
      *   try vulkan
      *   fallback to OGL */
-    GHOST_Context *context = new GHOST_ContextVK(
-        m_wantStereoVisual, m_window, m_display, 1, 0, m_is_debug_context);
+    GHOST_Context *context = new GHOST_ContextVK(m_wantStereoVisual,
+                                                 GHOST_kVulkanPlatformX11,
+                                                 m_window,
+                                                 m_display,
+                                                 NULL,
+                                                 NULL,
+                                                 1,
+                                                 0,
+                                                 m_is_debug_context);
 
     if (context->initializeDrawingContext()) {
       return context;
