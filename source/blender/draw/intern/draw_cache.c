@@ -2929,7 +2929,6 @@ GPUBatch *DRW_cache_mesh_surface_mesh_analysis_get(Object *ob)
 GPUBatch *DRW_cache_curve_edge_wire_get(Object *ob)
 {
   BLI_assert(ob->type == OB_CURVE);
-
   struct Curve *cu = ob->data;
   return DRW_curve_batch_cache_get_wire_edge(cu);
 }
@@ -2937,7 +2936,6 @@ GPUBatch *DRW_cache_curve_edge_wire_get(Object *ob)
 GPUBatch *DRW_cache_curve_edge_normal_get(Object *ob)
 {
   BLI_assert(ob->type == OB_CURVE);
-
   struct Curve *cu = ob->data;
   return DRW_curve_batch_cache_get_normal_edge(cu);
 }
