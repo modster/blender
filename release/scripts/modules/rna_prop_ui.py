@@ -65,8 +65,7 @@ def rna_idprop_context_value(context, context_member, property_type):
 
 def rna_idprop_has_properties(rna_item):
     keys = rna_item.keys()
-    nbr_props = len(keys)
-    return nbr_props > 0
+    return bool(keys)
 
 
 def rna_idprop_value_to_python(value):
