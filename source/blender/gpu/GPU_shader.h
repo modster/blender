@@ -40,6 +40,12 @@ typedef enum eGPUShaderTFBType {
   GPU_SHADER_TFB_TRIANGLES = 3,
 } eGPUShaderTFBType;
 
+typedef enum GPUUniformBuiltinStructType {
+  GPU_UNIFORM_STRUCT_NONE = 0,
+  GPU_UNIFORM_STRUCT_1,
+  GPU_NUM_UNIFORM_STRUCTS, /* Special value, denotes number of structs. */
+} GPUUniformBuiltinStructType;
+
 GPUShader *GPU_shader_create(const char *vertcode,
                              const char *fragcode,
                              const char *geomcode,
@@ -64,6 +70,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
                                 const eGPUShaderTFBType tf_type,
                                 const char **tf_names,
                                 const int tf_count,
+                                const GPUUniformBuiltinStructType uniform_struct_type,
                                 const char *shname);
 
 struct GPU_ShaderCreateFromArray_Params {
@@ -118,10 +125,19 @@ typedef enum {
   GPU_NUM_UNIFORMS, /* Special value, denotes number of builtin uniforms. */
 } GPUUniformBuiltin;
 
+typedef struct GPUUniformBuiltinStruct1 {
+  float ModelMatrix[4][4];
+  float ModelViewProjectionMatrix[4][4];
+  float color[4];
+  float WorldClipPlanes[6][4];
+  int SrgbTransform;
+} GPUUniformBuiltinStruct1;
+
 typedef enum {
   GPU_UNIFORM_BLOCK_VIEW = 0, /* viewBlock */
   GPU_UNIFORM_BLOCK_MODEL,    /* modelBlock */
   GPU_UNIFORM_BLOCK_INFO,     /* infoBlock */
+  GPU_UNIFORM_BLOCK_SHADER,   /* shaderBlock */
 
   GPU_NUM_UNIFORM_BLOCKS, /* Special value, denotes number of builtin uniforms block. */
 } GPUUniformBlockBuiltin;

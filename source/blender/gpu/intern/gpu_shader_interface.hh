@@ -35,6 +35,8 @@
 
 #include "GPU_shader.h"
 
+#include <optional>
+
 namespace blender::gpu {
 
 typedef struct ShaderInput {
@@ -124,6 +126,8 @@ class ShaderInterface {
     return builtin_blocks_[builtin];
   }
 
+  std::optional<const GPUUniformBuiltinStructType> best_builtin_uniform_struct() const;
+
  protected:
   static inline const char *builtin_uniform_name(GPUUniformBuiltin u);
   static inline const char *builtin_uniform_block_name(GPUUniformBlockBuiltin u);
@@ -141,6 +145,7 @@ class ShaderInterface {
   inline const ShaderInput *input_lookup(const ShaderInput *const inputs,
                                          const uint inputs_len,
                                          const int binding) const;
+  bool has_builtin_uniforms() const;
 };
 
 inline const char *ShaderInterface::builtin_uniform_name(GPUUniformBuiltin u)
@@ -202,6 +207,8 @@ inline const char *ShaderInterface::builtin_uniform_block_name(GPUUniformBlockBu
       return "modelBlock";
     case GPU_UNIFORM_BLOCK_INFO:
       return "infoBlock";
+    case GPU_UNIFORM_BLOCK_SHADER:
+      return "shaderBlock";
     default:
       return NULL;
   }

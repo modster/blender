@@ -23,6 +23,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BKE_global.h"
+
 #include "BLI_string_utils.h"
 
 #include "GPU_capabilities.h"
@@ -32,6 +34,10 @@
 #include "gpu_backend.hh"
 #include "gpu_context_private.hh"
 #include "gpu_shader_private.hh"
+
+#include "CLG_log.h"
+
+static CLG_LogRef LOG = {"gpu.shader"};
 
 extern "C" char datatoc_gpu_shader_colorspace_lib_glsl[];
 
@@ -94,6 +100,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
                                 const eGPUShaderTFBType tf_type,
                                 const char **tf_names,
                                 const int tf_count,
+                                const GPUUniformBuiltinStructType uniform_struct_type,
                                 const char *shname)
 {
   /* At least a vertex shader and a fragment shader are required, or only a compute shader. */
@@ -175,6 +182,21 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
     return nullptr;
   };
 
+  if (G.debug & G_DEBUG_GPU) {
+    std::optional<GPUUniformBuiltinStructType> best_struct_type =
+        shader->interface->best_builtin_uniform_struct();
+    if (best_struct_type) {
+      if (/*uniform_struct_type != GPU_UNIFORM_STRUCT_NONE &&*/
+          uniform_struct_type != *best_struct_type) {
+        CLOG_WARN(&LOG,
+                  "Found better matching uniform struct for '%s'; current %d, suggested %d",
+                  shname,
+                  static_cast<int>(uniform_struct_type),
+                  static_cast<int>(*best_struct_type));
+      }
+    }
+  }
+
   return wrap(shader);
 }
 
@@ -205,6 +227,7 @@ GPUShader *GPU_shader_create(const char *vertcode,
                               GPU_SHADER_TFB_NONE,
                               nullptr,
                               0,
+                              GPU_UNIFORM_STRUCT_NONE,
                               shname);
 }
 
@@ -222,6 +245,7 @@ GPUShader *GPU_shader_create_compute(const char *computecode,
                               GPU_SHADER_TFB_NONE,
                               nullptr,
                               0,
+                              GPU_UNIFORM_STRUCT_NONE,
                               shname);
 }
 
@@ -249,6 +273,7 @@ GPUShader *GPU_shader_create_from_python(const char *vertcode,
                                        GPU_SHADER_TFB_NONE,
                                        nullptr,
                                        0,
+                                       GPU_UNIFORM_STRUCT_NONE,
                                        "pyGPUShader");
 
   MEM_SAFE_FREE(libcodecat);
