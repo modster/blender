@@ -255,7 +255,9 @@ static CurveRenderData *curve_render_data_create(Curve *cu, Object *object, cons
   rdata->actvert = cu->actvert;
 
   rdata->ob_curve_cache = object->runtime.curve_cache;
-  rdata->curve_eval = (const CurveEval *)object->runtime.curve_eval;
+  if (object->runtime.geometry_set_eval != nullptr) {
+    rdata->curve_eval = object->runtime.geometry_set_eval->get_curve_for_read();
+  }
 
   if (types & CU_DATATYPE_WIRE) {
     if (rdata->curve_eval != nullptr) {

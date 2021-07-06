@@ -1548,8 +1548,6 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
       geometry_set.get_component_for_write<CurveComponent>();
     }
 
-    ob->runtime.curve_eval = (void *)geometry_set.get_curve_for_read();
-
     ob->runtime.geometry_set_eval = new GeometrySet(std::move(geometry_set));
   }
 
