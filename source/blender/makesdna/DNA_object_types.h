@@ -335,12 +335,6 @@ typedef struct Object {
    */
   float imat[4][4];
 
-  /* Previously 'imat' was used at render time, but as other places use it too
-   * the interactive ui of 2.5 creates problems. So now only 'imat_ren' should
-   * be used when ever the inverse of ob->obmat * re->viewmat is needed! - jahka
-   */
-  float imat_ren[4][4];
-
   /** Copy of Base's layer in the scene. */
   unsigned int lay DNA_DEPRECATED;
 
@@ -386,9 +380,9 @@ typedef struct Object {
 
   /** Custom index, for renderpasses. */
   short index;
-  /** Current deformation group, note: index starts at 1. */
+  /** Current deformation group, NOTE: index starts at 1. */
   unsigned short actdef;
-  /** Current face map, note: index starts at 1. */
+  /** Current face map, NOTE: index starts at 1. */
   unsigned short actfmap;
   char _pad2[2];
   /** Object color (in most cases the material color is used for drawing). */
@@ -711,7 +705,7 @@ enum {
   /* OB_ADS_SHOWCONS = 1 << 12, */ /* UNUSED */
   /* object's material channels */
   /* OB_ADS_SHOWMATS = 1 << 13, */ /* UNUSED */
-  /* object's marticle channels */
+  /* object's particle channels */
   /* OB_ADS_SHOWPARTS = 1 << 14, */ /* UNUSED */
 };
 
