@@ -55,6 +55,7 @@ void register_node_type_geo_convex_hull(void);
 void register_node_type_geo_curve_length(void);
 void register_node_type_geo_curve_primitive_bezier_segment(void);
 void register_node_type_geo_curve_primitive_circle(void);
+void register_node_type_geo_curve_primitive_line(void);
 void register_node_type_geo_curve_primitive_quadratic_bezier(void);
 void register_node_type_geo_curve_primitive_spiral(void);
 void register_node_type_geo_curve_primitive_star(void);
@@ -99,6 +100,7 @@ void register_node_type_geo_switch(void);
 void register_node_type_geo_transform(void);
 void register_node_type_geo_triangulate(void);
 void register_node_type_geo_unsubdivide(void);
+void register_node_type_geo_viewer(void);
 void register_node_type_geo_volume_to_mesh(void);
 
 #ifdef __cplusplus

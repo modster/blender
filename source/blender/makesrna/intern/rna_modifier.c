@@ -690,6 +690,7 @@ static void rna_Modifier_is_active_set(PointerRNA *ptr, bool value)
     }
 
     md->flag |= eModifierFlag_Active;
+    WM_main_add_notifier(NC_OBJECT | ND_MODIFIER, ptr->owner_id);
   }
 }
 
@@ -2257,7 +2258,7 @@ const EnumPropertyItem modifier_decim_mode_items[] = {
 static void rna_def_modifier_decimate(BlenderRNA *brna)
 {
 
-  /* Note, keep in sync with operator 'MESH_OT_decimate' */
+  /* NOTE: keep in sync with operator 'MESH_OT_decimate'. */
 
   StructRNA *srna;
   PropertyRNA *prop;

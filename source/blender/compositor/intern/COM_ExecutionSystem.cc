@@ -64,7 +64,7 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
   this->m_context.setDisplaySettings(displaySettings);
 
   {
-    NodeOperationBuilder builder(&m_context, editingtree);
+    NodeOperationBuilder builder(&m_context, editingtree, this);
     builder.convertToOperations(this);
   }
 
