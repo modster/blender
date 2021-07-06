@@ -227,7 +227,7 @@ bool deg_iterator_components_step(BLI_Iterator *iter)
     if (component != nullptr) {
 
       /* Don't use a temporary object for this component when the owner is a curve object. */
-      if (data->geometry_component_owner->type == OB_CURVE) {
+      if (ELEM(data->geometry_component_owner->type, OB_CURVE, OB_FONT)) {
         iter->current = data->geometry_component_owner;
         return true;
       }
@@ -236,7 +236,10 @@ bool deg_iterator_components_step(BLI_Iterator *iter)
       if (curve != nullptr) {
         Object *temp_object = &data->temp_geometry_component_object;
         *temp_object = *data->geometry_component_owner;
-        temp_object->type = OB_CURVE;
+        /* Use OB_FONT when the owner is a text object, so that the text editing edit mode
+         * overlays will draw. Here it's important that text objects don't support the nodes
+         * modifier, so they always have data corresponding to their original text. */
+        temp_object->type = data->geometry_component_owner->type == OB_FONT ? OB_FONT : OB_CURVE;
         temp_object->data = (void *)curve;
         temp_object->runtime.select_id = data->geometry_component_owner->runtime.select_id;
         iter->current = temp_object;

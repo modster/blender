@@ -1546,8 +1546,8 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
 
     /* If the curve is in edit mode, make sure the output geometry set containts a
      * curve component, which is used indirectly to render the edit mode overlays. */
-    if (BKE_curve_editNurbs_get_for_read((const Curve *)ob->data) &&
-        !geometry_set.has<CurveComponent>()) {
+    const Curve *curve_orig = (const Curve *)ob->data;
+    if (BKE_curve_editNurbs_get_for_read(curve_orig) || curve_orig->editfont) {
       geometry_set.get_component_for_write<CurveComponent>();
     }
 
