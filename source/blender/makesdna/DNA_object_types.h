@@ -210,6 +210,16 @@ typedef struct Object_Runtime {
   /** Runtime evaluated curve-specific data, not stored in the file. */
   struct CurveCache *curve_cache;
 
+  /**
+   * A pointer to evaluated curve data owned by #geometry_set_eval (const CurveEval *).
+   * Stored as a `void *` because DNA doesn't support const pointers right now.
+   *
+   * This is necessary because curve object data does not use CoW. Normally we use a "fake" CoW
+   * in the geometry component, but for curve objects we must use the original #Curve in order to
+   * display edit mode data, and the evaluated data cannot be stored in the original #Curve.
+   */
+  void *curve_eval;
+
   unsigned short local_collections_bits;
   short _pad2[3];
 } Object_Runtime;

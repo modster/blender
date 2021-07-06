@@ -40,6 +40,7 @@
 #include "BLI_math.h"
 #include "BLI_memarena.h"
 #include "BLI_scanfill.h"
+#include "BLI_span.hh"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
@@ -831,6 +832,45 @@ void BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
   }
 }
 
+/**
+ * \return True if the deformed curve control point data should be implicitly
+ * converted directly to a mesh, or false it can be left as curve data via #CurveEval.
+ */
+static bool do_mesh_conversion(const Curve *curve,
+                               ModifierData *first_modifier,
+                               const Scene *scene,
+                               const ModifierMode required_mode)
+{
+  /* Do implicit conversion to mesh with the object bevel mode. */
+  if (curve->bevel_mode == CU_BEV_MODE_OBJECT && curve->bevobj != nullptr) {
+    return true;
+  }
+
+  /* 2D curves are implicitly filled and converted to a mesh. */
+  if (CU_IS_2D(curve)) {
+    return true;
+  }
+
+  /* Curve objects with implicit "tube" meshes should convert implicitly to a mesh. */
+  if (curve->ext1 != 0.0f || curve->ext2 != 0.0f) {
+    return true;
+  }
+
+  /* If a non-geometry-nodes modifier is enabled before a nodes modifier,
+   * force conversion to mesh, since it doesn't support curve data. */
+  ModifierData *md = first_modifier;
+  for (; md; md = md->next) {
+    if (BKE_modifier_is_enabled(scene, md, required_mode)) {
+      if (md->type == eModifierType_Nodes) {
+        break;
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
                                              const Scene *scene,
                                              Object *ob,
@@ -862,20 +902,18 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
                          pretessellatePoint->next;
 
   GeometrySet geometry_set;
-  if (ELEM(ob->type, OB_CURVE, OB_FONT) &&
-      (md == nullptr ||
-       (md->type == eModifierType_Nodes && BKE_modifier_is_enabled(scene, md, required_mode)))) {
-    std::unique_ptr<CurveEval> curve_eval = curve_eval_from_dna_curve(
-        *cu, ob->runtime.curve_cache->deformed_nurbs);
-    geometry_set.replace_curve(curve_eval.release());
-  }
-  else {
+  if (ELEM(ob->type, OB_CURVE, OB_FONT) && do_mesh_conversion(cu, md, scene, required_mode)) {
     Mesh *mesh = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
     /* Copy materials, since BKE_mesh_new_nomain_from_curve_displist() doesn't. */
     mesh->mat = (Material **)MEM_dupallocN(cu->mat);
     mesh->totcol = cu->totcol;
 
     geometry_set.replace_mesh(mesh);
+  }
+  else {
+    std::unique_ptr<CurveEval> curve_eval = curve_eval_from_dna_curve(
+        *cu, ob->runtime.curve_cache->deformed_nurbs);
+    geometry_set.replace_curve(curve_eval.release());
   }
 
   for (; md; md = md->next) {
@@ -1502,15 +1540,15 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
   else {
     GeometrySet geometry_set;
     evaluate_curve_type_object(depsgraph, scene, ob, for_render, dispbase, &geometry_set);
+
     if (BKE_curve_editNurbs_get_for_read((const Curve *)ob->data) &&
         !geometry_set.has<CurveComponent>()) {
       geometry_set.get_component_for_write<CurveComponent>();
     }
-    ob->runtime.geometry_set_eval = new GeometrySet(std::move(geometry_set));
 
-    if (geometry_set.has<MeshComponent>()) {
-      std::cout << "Output has mesh component\n";
-    }
+    ob->runtime.curve_eval = (void *)geometry_set.get_curve_for_read();
+
+    ob->runtime.geometry_set_eval = new GeometrySet(std::move(geometry_set));
   }
 
   boundbox_displist_object(ob);
