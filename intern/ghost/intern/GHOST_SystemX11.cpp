@@ -456,7 +456,8 @@ GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextTyp
 
     for (int minor = 5; minor >= 0; --minor) {
 #if defined(WITH_GL_EGL)
-      context = new GHOST_ContextEGL(false,
+      context = new GHOST_ContextEGL(this,
+                                     false,
                                      EGLNativeWindowType(nullptr),
                                      EGLNativeDisplayType(m_display),
                                      profile_mask,
@@ -1209,9 +1210,9 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
         else {
           printf("Bad keycode lookup. Keysym 0x%x Status: %s\n",
                  (unsigned int)key_sym,
-                 (status == XLookupNone ?
-                      "XLookupNone" :
-                      status == XLookupKeySym ? "XLookupKeySym" : "Unknown status"));
+                 (status == XLookupNone   ? "XLookupNone" :
+                  status == XLookupKeySym ? "XLookupKeySym" :
+                                            "Unknown status"));
 
           printf("'%.*s' %p %p\n", len, utf8_buf, xic, m_xim);
         }
