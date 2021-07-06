@@ -836,10 +836,10 @@ void BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
  * \return True if the deformed curve control point data should be implicitly
  * converted directly to a mesh, or false it can be left as curve data via #CurveEval.
  */
-static bool do_mesh_conversion(const Curve *curve,
-                               ModifierData *first_modifier,
-                               const Scene *scene,
-                               const ModifierMode required_mode)
+static bool do_curve_implicit_mesh_conversion(const Curve *curve,
+                                              ModifierData *first_modifier,
+                                              const Scene *scene,
+                                              const ModifierMode required_mode)
 {
   /* Do implicit conversion to mesh with the object bevel mode. */
   if (curve->bevel_mode == CU_BEV_MODE_OBJECT && curve->bevobj != nullptr) {
@@ -902,7 +902,7 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
                          pretessellatePoint->next;
 
   GeometrySet geometry_set;
-  if (ELEM(ob->type, OB_CURVE, OB_FONT) && do_mesh_conversion(cu, md, scene, required_mode)) {
+  if (ob->type == OB_SURF || do_curve_implicit_mesh_conversion(cu, md, scene, required_mode)) {
     Mesh *mesh = BKE_mesh_new_nomain_from_curve_displist(ob, dispbase);
     /* Copy materials, since BKE_mesh_new_nomain_from_curve_displist() doesn't. */
     mesh->mat = (Material **)MEM_dupallocN(cu->mat);
@@ -1084,6 +1084,9 @@ static void evaluate_surface_object(Depsgraph *depsgraph,
   curve_to_filledpoly(cu, r_dispbase);
   GeometrySet geometry_set = curve_calc_modifiers_post(
       depsgraph, scene, ob, r_dispbase, for_render);
+  if (!geometry_set.has_mesh()) {
+    geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0, 0));
+  }
   MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
   *r_final = mesh_component.release();
 }
