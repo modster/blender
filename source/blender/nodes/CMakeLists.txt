@@ -206,7 +206,7 @@ set(SRC
   geometry/nodes/node_geo_subdivide.cc
   geometry/nodes/node_geo_subdivision_surface.cc
   geometry/nodes/node_geo_switch.cc
-  geometry/nodes/node_geo_remesh.cc
+        geometry/nodes/node_geo_remesh_voxel.cc
   geometry/nodes/node_geo_transform.cc
   geometry/nodes/node_geo_triangulate.cc
   geometry/nodes/node_geo_viewer.cc

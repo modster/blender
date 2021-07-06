@@ -15,42 +15,45 @@
  */
 
 #include "UI_interface.h"
-#include "UI_resources.h"
+
 #include "BKE_mesh_remesh_voxel.h"
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_remesh_in[] = {
+static bNodeSocketTemplate geo_node_remesh_voxel_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Voxel Size"), 1.0f, 0, 0, 0, 0.01f, FLT_MAX},
+    {SOCK_FLOAT, N_("Adaptivity"), 0.0f, 0, 0, 0, 0.0f, 1.0f},
     {-1, ""},
 };
 
-static bNodeSocketTemplate geo_node_remesh_out[] = {
+static bNodeSocketTemplate geo_node_remesh_voxel_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };
 
 namespace blender::nodes {
-static void geo_node_remesh_exec(GeoNodeExecParams params)
+static void geo_node_remesh_voxel_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  float voxel_size = params.extract_input<float>("Voxel Size");
+  const float voxel_size = params.extract_input<float>("Voxel Size");
+  const float adaptivity = params.extract_input<float>("Adaptivity");
+
   if(geometry_set.has_mesh()){
     Mesh *input_mesh = geometry_set.get_mesh_for_write();
-    Mesh *output_mesh = BKE_mesh_remesh_voxel_to_mesh_nomain(input_mesh, voxel_size, 0.5f, 0.0f);
+    Mesh *output_mesh = BKE_mesh_remesh_voxel_to_mesh_nomain(input_mesh, voxel_size, adaptivity, 0.0f);
     geometry_set.replace_mesh(output_mesh);
   }
   params.set_output("Geometry", std::move(geometry_set));
 }
 }  // namespace blender::nodes
 
-void register_node_type_geo_remesh()
+void register_node_type_geo_remesh_voxel()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_REMESH, "remesh", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_remesh_in, geo_node_remesh_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_remesh_exec;
+  geo_node_type_base(&ntype, GEO_NODE_REMESH_VOXEL, "Voxel Remesh", NODE_CLASS_GEOMETRY, 0);
+  node_type_socket_templates(&ntype, geo_node_remesh_voxel_in, geo_node_remesh_voxel_out);
+  ntype.geometry_node_execute = blender::nodes::geo_node_remesh_voxel_exec;
   nodeRegisterType(&ntype);
 }

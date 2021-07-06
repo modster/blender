@@ -5096,7 +5096,7 @@ static void registerGeometryNodes()
   register_node_type_geo_subdivide();
   register_node_type_geo_subdivision_surface();
   register_node_type_geo_switch();
-  register_node_type_geo_remesh();
+  register_node_type_geo_remesh_voxel();
   register_node_type_geo_transform();
   register_node_type_geo_triangulate();
   register_node_type_geo_viewer();
