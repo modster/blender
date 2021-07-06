@@ -13,42 +13,16 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2020, Blender Foundation.
+ * Copyright 2021, Blender Foundation.
  */
 
-#pragma once
-
-#include "COM_MultiThreadedRowOperation.h"
+#include "COM_ConstantOperation.h"
 
 namespace blender::compositor {
 
-class ExposureOperation : public MultiThreadedRowOperation {
- private:
-  /**
-   * Cached reference to the inputProgram
-   */
-  SocketReader *m_inputProgram;
-  SocketReader *m_inputExposureProgram;
-
- public:
-  ExposureOperation();
-
-  /**
-   * The inner loop of this operation.
-   */
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
-
-  /**
-   * Initialize the execution
-   */
-  void initExecution() override;
-
-  /**
-   * Deinitialize the execution
-   */
-  void deinitExecution() override;
-
-  void update_memory_buffer_row(PixelCursor &p) override;
-};
+ConstantOperation::ConstantOperation()
+{
+  flags.is_constant_operation = true;
+}
 
 }  // namespace blender::compositor
