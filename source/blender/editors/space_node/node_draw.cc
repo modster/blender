@@ -870,23 +870,6 @@ static void create_inspection_string_for_generic_value(const geo_log::GenericVal
   }
 }
 
-static const char *geometry_component_type_to_string(const GeometryComponentType type)
-{
-  switch (type) {
-    case GEO_COMPONENT_TYPE_CURVE:
-      return "Curve";
-    case GEO_COMPONENT_TYPE_MESH:
-      return "Mesh";
-    case GEO_COMPONENT_TYPE_POINT_CLOUD:
-      return "Point Cloud";
-    case GEO_COMPONENT_TYPE_VOLUME:
-      return "Volume";
-    case GEO_COMPONENT_TYPE_INSTANCES:
-      return "Instances";
-  }
-  return "";
-}
-
 static void create_inspection_string_for_geometry(const geo_log::GeometryValueLog &value_log,
                                                   std::stringstream &ss)
 {
@@ -897,9 +880,9 @@ static void create_inspection_string_for_geometry(const geo_log::GeometryValueLo
   }
   ss << "Geometry Components: ";
   for (GeometryComponentType type : component_types.drop_back(1)) {
-    ss << geometry_component_type_to_string(type) << ", ";
+    ss << BKE_geometry_component_type_name(type) << ", ";
   }
-  ss << geometry_component_type_to_string(component_types.last());
+  ss << BKE_geometry_component_type_name(component_types.last());
 }
 
 static std::optional<std::string> create_socket_inspection_string(bContext *C,

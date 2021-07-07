@@ -381,4 +381,22 @@ bool BKE_geometry_set_has_instances(const GeometrySet *geometry_set)
   return geometry_set->get_component_for_read<InstancesComponent>() != nullptr;
 }
 
+const char *BKE_geometry_component_type_name(GeometryComponentType type)
+{
+  switch (type) {
+    case GEO_COMPONENT_TYPE_CURVE:
+      return "Curve";
+    case GEO_COMPONENT_TYPE_MESH:
+      return "Mesh";
+    case GEO_COMPONENT_TYPE_POINT_CLOUD:
+      return "Point Cloud";
+    case GEO_COMPONENT_TYPE_VOLUME:
+      return "Volume";
+    case GEO_COMPONENT_TYPE_INSTANCES:
+      return "Instances";
+  }
+  BLI_assert_unreachable();
+  return "";
+}
+
 /** \} */

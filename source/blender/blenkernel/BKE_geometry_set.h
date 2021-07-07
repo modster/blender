@@ -39,6 +39,8 @@ typedef enum GeometryComponentType {
   GEO_COMPONENT_TYPE_CURVE = 4,
 } GeometryComponentType;
 
+const char *BKE_geometry_component_type_name(GeometryComponentType type);
+
 void BKE_geometry_set_free(struct GeometrySet *geometry_set);
 
 bool BKE_geometry_set_has_instances(const struct GeometrySet *geometry_set);
