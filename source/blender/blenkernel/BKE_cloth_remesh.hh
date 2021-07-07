@@ -1590,6 +1590,17 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(op_face);
     return op_face.value().get();
   }
+
+  inline std::tuple<Vert<EVD> &, Vert<EVD> &> get_checked_verts_of_edge(const Edge<EED> &edge)
+  {
+    BLI_assert(edge.verts);
+    auto &edge_verts = edge.verts.value();
+
+    auto &edge_vert_1 = this->get_checked_vert(std::get<0>(edge_verts));
+    auto &edge_vert_2 = this->get_checked_vert(std::get<1>(edge_verts));
+
+    return {edge_vert_1, edge_vert_2};
+  }
 };
 
 template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff {
