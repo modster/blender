@@ -1550,6 +1550,46 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
     return std::move(face);
   }
+
+  /**
+   * Get checked node
+   */
+  inline auto &get_checked_node(NodeIndex node_index)
+  {
+    auto op_node = this->nodes.get(node_index);
+    BLI_assert(op_node);
+    return op_node.value().get();
+  }
+
+  /**
+   * Get checked vert
+   */
+  inline auto &get_checked_vert(VertIndex vert_index)
+  {
+    auto op_vert = this->verts.get(vert_index);
+    BLI_assert(op_vert);
+    return op_vert.value().get();
+  }
+
+  /**
+   * Get checked edge
+   */
+  inline auto &get_checked_edge(EdgeIndex edge_index)
+  {
+    auto op_edge = this->edges.get(edge_index);
+    BLI_assert(op_edge);
+    return op_edge.value().get();
+  }
+
+  /**
+   * Get checked face
+   */
+  inline auto &get_checked_face(FaceIndex face_index)
+  {
+    auto op_face = this->faces.get(face_index);
+    BLI_assert(op_face);
+    return op_face.value().get();
+  }
 };
 
 template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff {
