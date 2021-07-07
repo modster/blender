@@ -123,13 +123,8 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
   if (ED_asset_mark_id(C, &gpd->id)) {
   }
 
-  DEG_relations_tag_update(bmain);
   WM_main_add_notifier(NC_ID | NA_EDITED, NULL);
   WM_main_add_notifier(NC_ASSET | NA_ADDED, NULL);
-
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, NULL);
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_SELECTED, NULL);
 
   return OPERATOR_FINISHED;
 }
