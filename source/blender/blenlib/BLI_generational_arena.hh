@@ -435,22 +435,56 @@ class Arena {
 
   Iterator begin()
   {
-    return Iterator(this->data.begin(), this->data.begin(), this->data.end());
+    auto *ptr = this->data.begin();
+    auto *begin = this->data.begin();
+    auto *end = this->data.end();
+    while (true) {
+      if (ptr == end) {
+        break;
+      }
+
+      if (auto val = std::get_if<EntryExist>(ptr)) {
+        break;
+      }
+
+      ptr++;
+    }
+    return Iterator(ptr, begin, end);
   }
 
   ConstIterator begin() const
   {
-    return ConstIterator(this->data.begin(), this->data.begin(), this->data.end());
+    auto *ptr = this->data.begin();
+    auto *begin = this->data.begin();
+    auto *end = this->data.end();
+    while (true) {
+      if (ptr == end) {
+        break;
+      }
+
+      if (auto val = std::get_if<EntryExist>(ptr)) {
+        break;
+      }
+
+      ptr++;
+    }
+    return ConstIterator(ptr, begin, end);
   }
 
   Iterator end()
   {
-    return Iterator(this->data.end(), this->data.begin(), this->data.end());
+    auto *ptr = this->data.end();
+    auto *begin = this->data.begin();
+    auto *end = this->data.end();
+    return Iterator(ptr, begin, end);
   }
 
   ConstIterator end() const
   {
-    return ConstIterator(this->data.end(), this->data.begin(), this->data.end());
+    auto *ptr = this->data.end();
+    auto *begin = this->data.begin();
+    auto *end = this->data.end();
+    return ConstIterator(ptr, begin, end);
   }
 
   class Iterator {

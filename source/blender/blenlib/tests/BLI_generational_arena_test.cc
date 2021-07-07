@@ -204,6 +204,21 @@ TEST(generational_arena, Iter3)
   }
 }
 
+TEST(generational_arena, Iter4)
+{
+  Arena<int> arena;
+  auto i0 = arena.insert(0);
+  auto i1 = arena.insert(1);
+  auto i2 = arena.insert(2);
+  arena.remove(i0);
+
+  auto iter = arena.begin();
+  std::cout << *iter << std::endl;
+  EXPECT_EQ(arena.get(i0), std::nullopt);
+  EXPECT_EQ(arena.get(i1), 1);
+  EXPECT_EQ(arena.get(i2), 2);
+}
+
 TEST(generational_arena, IterIncrement)
 {
   Arena<int> arena;
