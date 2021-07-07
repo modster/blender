@@ -22,6 +22,8 @@
  * \brief lower level node drawing for nodes (boarders, headers etc), also node layout.
  */
 
+#include <algorithm>
+
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_system.h"
