@@ -24,8 +24,12 @@
 #include "BLI_string_ref.hh"
 
 #include "GPU_shader.h"
+#include "GPU_uniform_buffer_types.h"
 #include "gpu_shader_interface.hh"
+#include "gpu_uniform_buffer_private.hh"
 #include "gpu_vertex_buffer_private.hh"
+
+#include <optional>
 
 namespace blender {
 namespace gpu {
@@ -44,6 +48,8 @@ class Shader {
  protected:
   /** For debugging purpose. */
   char name[64];
+
+  std::optional<UniformBuiltinStruct> shader_struct;
 
  public:
   Shader(const char *name);
@@ -75,6 +81,12 @@ class Shader {
   {
     return name;
   };
+
+  UniformBuiltinStruct *m_shader_struct;
+  void set_shader_struct(GPUUniformBuiltinStructType struct_type)
+  {
+    m_shader_struct = new UniformBuiltinStruct(struct_type);
+  }
 
  protected:
   void print_log(Span<const char *> sources,

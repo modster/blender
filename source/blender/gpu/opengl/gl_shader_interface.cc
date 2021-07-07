@@ -145,7 +145,7 @@ static inline int ssbo_binding(int32_t program, uint32_t ssbo_index)
 /** \name Creation / Destruction
  * \{ */
 
-GLShaderInterface::GLShaderInterface(GLuint program)
+GLShaderInterface::GLShaderInterface(const UniformBuiltinStructType *type_info, GLuint program)
 {
   /* Necessary to make #glUniform works. */
   glUseProgram(program);
@@ -185,6 +185,20 @@ GLShaderInterface::GLShaderInterface(GLuint program)
   }
   if (ssbo_len > 0 && max_ssbo_name_len == 0) {
     max_ssbo_name_len = 256;
+  }
+
+  /* Perform uniform builtin structs after work around to make sure the work around is passed. */
+  if (type_info) {
+    for (int i = 0; i < GPU_NUM_UNIFORMS; i++) {
+      const GPUUniformBuiltin builtin_uniform = static_cast<const GPUUniformBuiltin>(i);
+      const UniformBuiltinStructType::AttributeBinding &binding = type_info->attribute_binding(
+          builtin_uniform);
+      if (binding.has_binding()) {
+        uniform_len++;
+        max_uniform_name_len = max_ii(max_uniform_name_len,
+                                      strlen(builtin_uniform_name(builtin_uniform)));
+      }
+    }
   }
 
   /* GL_ACTIVE_UNIFORMS lied to us! Remove the UBO uniforms from the total before
@@ -281,6 +295,24 @@ GLShaderInterface::GLShaderInterface(GLuint program)
       enabled_ima_mask_ |= (input->binding != -1) ? (1lu << input->binding) : 0lu;
     }
   }
+  if (type_info) {
+    for (int i = 0; i < GPU_NUM_UNIFORMS; i++) {
+      const GPUUniformBuiltin builtin_uniform = static_cast<const GPUUniformBuiltin>(i);
+      const UniformBuiltinStructType::AttributeBinding &binding = type_info->attribute_binding(
+          builtin_uniform);
+      if (binding.has_binding()) {
+        ShaderInput *input = &inputs_[attr_len_ + ubo_len_ + uniform_len_++];
+        input->location = binding.binding;
+        input->binding = -1;
+
+        char *name = name_buffer_ + name_buffer_offset;
+        const char *uniform_name = builtin_uniform_name(builtin_uniform);
+        size_t name_len = strlen(uniform_name);
+        strcpy(name, uniform_name);
+        name_buffer_offset += this->set_input_name(input, name, name_len);
+      }
+    }
+  }
 
   /* SSBOs */
   for (int i = 0; i < ssbo_len; i++) {
@@ -301,7 +333,8 @@ GLShaderInterface::GLShaderInterface(GLuint program)
   /* Builtin Uniforms */
   for (int32_t u_int = 0; u_int < GPU_NUM_UNIFORMS; u_int++) {
     GPUUniformBuiltin u = static_cast<GPUUniformBuiltin>(u_int);
-    builtins_[u] = glGetUniformLocation(program, builtin_uniform_name(u));
+    const ShaderInput *block = this->uniform_get(builtin_uniform_name(u));
+    builtins_[u] = (block != nullptr) ? block->binding : -1;
   }
 
   /* Builtin Uniforms Blocks */

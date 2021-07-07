@@ -35,6 +35,7 @@
 #include "glew-mx.h"
 
 #include "gpu_shader_interface.hh"
+#include "gpu_uniform_buffer_private.hh"
 
 namespace blender::gpu {
 
@@ -49,7 +50,7 @@ class GLShaderInterface : public ShaderInterface {
   Vector<GLVaoCache *> refs_;
 
  public:
-  GLShaderInterface(GLuint program);
+  GLShaderInterface(const UniformBuiltinStructType *type_info, GLuint program);
   ~GLShaderInterface();
 
   void ref_add(GLVaoCache *ref);

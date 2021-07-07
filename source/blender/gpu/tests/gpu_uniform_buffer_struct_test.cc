@@ -1,5 +1,8 @@
-#include "testing/testing.h"
+#include "gpu_testing.hh"
 
+#include "GPU_capabilities.h"
+#include "GPU_compute.h"
+#include "GPU_shader.h"
 #include "GPU_uniform_buffer_types.h"
 #include "gpu_uniform_buffer_private.hh"
 
@@ -93,5 +96,53 @@ TEST(GPUUniformStruct, struct1)
     EXPECT_EQ(struct_data->SrgbTransform, srgb_transform);
   }
 }
+
+static void test_custom_shader_with_uniform_builtin_struct()
+{
+  if (!GPU_compute_shader_support()) {
+    /* We can't test as a the platform does not support compute shaders. */
+    std::cout << "Skipping compute shader test: platform not supported";
+    return;
+  }
+
+  /* Build compute shader. */
+  const char *compute_glsl = R"(
+
+layout(local_size_x = 1, local_size_y = 1) in;
+layout(rgba32f, binding = 0) uniform image2D img_output;
+
+layout(std140) uniform shaderBlock {
+  mat4 ModelMatrix;
+  mat4 ModelViewProjectionMatrix;
+  vec4 color;
+  vec4 WorldClipPlanes[6];
+  bool SrgbTransform;
+};
+
+void main() {
+}
+
+)";
+
+  GPUShader *shader = GPU_shader_create_ex(nullptr,
+                                           nullptr,
+                                           nullptr,
+                                           compute_glsl,
+                                           nullptr,
+                                           nullptr,
+                                           GPU_SHADER_TFB_NONE,
+                                           nullptr,
+                                           0,
+                                           GPU_UNIFORM_STRUCT_1,
+                                           __func__);
+  EXPECT_NE(shader, nullptr);
+
+  float color[4] = {1.0f, 0.0f, 1.0f, 1.0f};
+  GPU_shader_uniform_4fv(shader, "color", color);
+
+  GPU_shader_free(shader);
+}
+
+GPU_TEST(custom_shader_with_uniform_builtin_struct)
 
 }  // namespace blender::gpu::tests

@@ -225,8 +225,10 @@ bool GLShader::finalize()
     this->print_log(sources, log, "Linking", true, &parser);
     return false;
   }
-
-  interface = new GLShaderInterface(shader_program_);
+  const UniformBuiltinStructType *type_info = m_shader_struct != nullptr ?
+                                                  &m_shader_struct->type_info() :
+                                                  nullptr;
+  interface = new GLShaderInterface(type_info, shader_program_);
 
   return true;
 }
@@ -308,6 +310,12 @@ void GLShader::transform_feedback_disable()
 
 void GLShader::uniform_float(int location, int comp_len, int array_size, const float *data)
 {
+  if (m_shader_struct) {
+    if (m_shader_struct->uniform_float(location, comp_len, array_size, data)) {
+      return;
+    }
+  }
+
   switch (comp_len) {
     case 1:
       glUniform1fv(location, array_size, data);
@@ -335,6 +343,12 @@ void GLShader::uniform_float(int location, int comp_len, int array_size, const f
 
 void GLShader::uniform_int(int location, int comp_len, int array_size, const int *data)
 {
+  if (m_shader_struct) {
+    if (m_shader_struct->uniform_int(location, comp_len, array_size, data)) {
+      return;
+    }
+  }
+
   switch (comp_len) {
     case 1:
       glUniform1iv(location, array_size, data);

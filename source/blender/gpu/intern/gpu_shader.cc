@@ -59,6 +59,7 @@ Shader::Shader(const char *sh_name)
 Shader::~Shader()
 {
   delete interface;
+  delete m_shader_struct;
 }
 
 static void standard_defines(Vector<const char *> &sources)
@@ -110,6 +111,9 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
               (computecode != nullptr)));
 
   Shader *shader = GPUBackend::get()->shader_alloc(shname);
+  if (uniform_struct_type != GPU_UNIFORM_STRUCT_NONE) {
+    shader->set_shader_struct(uniform_struct_type);
+  }
 
   if (vertcode) {
     Vector<const char *> sources;
@@ -211,7 +215,7 @@ void GPU_shader_free(GPUShader *shader)
 /* -------------------------------------------------------------------- */
 /** \name Creation utils
  * \{ */
-  
+
 GPUShader *GPU_shader_create(const char *vertcode,
                              const char *fragcode,
                              const char *geomcode,

@@ -125,6 +125,9 @@ class UniformBuiltinStruct {
   };
 
   UniformBuiltinStruct(const GPUUniformBuiltinStructType type);
+  UniformBuiltinStruct(const UniformBuiltinStruct &other) = default;
+  UniformBuiltinStruct(UniformBuiltinStruct &&other) = default;
+
   ~UniformBuiltinStruct();
 
   void *data() const
