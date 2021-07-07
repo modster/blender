@@ -92,7 +92,7 @@ class GHOST_XrAction {
   void applyHapticFeedback(XrSession session,
                            const char *action_name,
                            const char **subaction_path,
-                           const GHOST_TInt64 &duration,
+                           const int64_t &duration,
                            const float &frequency,
                            const float &amplitude);
   void stopHapticFeedback(XrSession session, const char *action_name, const char **subaction_path);

@@ -632,7 +632,7 @@ void wm_event_do_notifiers(bContext *C)
     CTX_wm_window_set(C, NULL);
   }
 
-  /* Autorun warning */
+  /* Auto-run warning. */
   wm_test_autorun_warning(C);
 }
 

@@ -314,7 +314,7 @@ typedef struct FileListEntryCache {
 
   int flags;
 
-  /* This one gathers all entries from both block and misc caches. Used for easy bulk-freing. */
+  /* This one gathers all entries from both block and misc caches. Used for easy bulk-freeing. */
   ListBase cached_entries;
 
   /* Block cache: all entries between start and end index.
@@ -2069,7 +2069,7 @@ void filelist_uid_unset(FileUID *r_uid)
 }
 
 /**
- * \warning: The UID will only be valid for the current session. Use as runtime data only!
+ * \warning The UID will only be valid for the current session. Use as runtime data only!
  */
 void filelist_file_cache_slidingwindow_set(FileList *filelist, size_t window_size)
 {
@@ -2924,7 +2924,7 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
   ListBase *lb;
   int a, fake, idcode, ok, totlib, totbl;
 
-  // filelist->type = FILE_MAIN; /* XXX TODO: add modes to filebrowser */
+  // filelist->type = FILE_MAIN; /* XXX TODO: add modes to file-browser */
 
   BLI_assert(filelist->filelist.entries == NULL);
 

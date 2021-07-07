@@ -501,7 +501,7 @@ bool WM_xr_haptic_action_apply(wmXrData *xr,
                                const char *action_set_name,
                                const char *action_name,
                                const char **subaction_path,
-                               const long long *duration,
+                               const int64_t *duration,
                                const float *frequency,
                                const float *amplitude)
 {

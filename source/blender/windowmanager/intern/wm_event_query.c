@@ -553,7 +553,10 @@ bool WM_event_is_xr(const struct wmEvent *event)
  * \{ */
 
 #ifdef WITH_INPUT_IME
-/* most os using ctrl/oskey + space to switch ime, avoid added space */
+/**
+ * Most OS's use `Ctrl+Space` / `OsKey+Space` to switch IME,
+ * so don't type in the space character.
+ */
 bool WM_event_is_ime_switch(const struct wmEvent *event)
 {
   return event->val == KM_PRESS && event->type == EVT_SPACEKEY &&

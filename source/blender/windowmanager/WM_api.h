@@ -31,6 +31,7 @@
 
 /* dna-savable wmStructs here */
 #include "BLI_compiler_attrs.h"
+#include "BLI_sys_types.h"
 #include "DNA_windowmanager_types.h"
 #include "WM_keymap.h"
 
@@ -1062,7 +1063,7 @@ bool WM_xr_haptic_action_apply(wmXrData *xr,
                                const char *action_set_name,
                                const char *action_name,
                                const char **subaction_path,
-                               const long long *duration,
+                               const int64_t *duration,
                                const float *frequency,
                                const float *amplitude);
 void WM_xr_haptic_action_stop(wmXrData *xr,
