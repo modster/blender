@@ -26,6 +26,7 @@
 static bNodeSocketTemplate geo_node_unsubdivide_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_INT, N_("Iterations"), 1, 0, 0, 0, 0, 10},
+    {SOCK_STRING, N_("Selection")},
     {-1, ""},
 };
 
@@ -36,20 +37,18 @@ static bNodeSocketTemplate geo_node_unsubdivide_out[] = {
 
 namespace blender::nodes {
 
-static Mesh *unsubdivideMesh(const uint iterations, Mesh *mesh)
+static Mesh *unsubdivide_mesh(const uint iterations, const Array<bool> &selection, Mesh *mesh)
 {
-  BMesh *bm;
-
   if (iterations == 0) {
     return mesh;
   }
 
-  BMeshCreateParams bmesh_create_params = {0};
-  BMeshFromMeshParams bmesh_from_mesh_params = {
+  const BMeshCreateParams bmesh_create_params = {0};
+  const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
-  bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
-
-  BM_mesh_decimate_unsubdivide(bm, iterations);
+  BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
+  BM_temporary_tag_vertices(bm, selection.data());
+  BM_mesh_decimate_unsubdivide_ex(bm, iterations, true);
 
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
   BM_mesh_free(bm);
@@ -61,10 +60,24 @@ static Mesh *unsubdivideMesh(const uint iterations, Mesh *mesh)
 static void geo_node_unsubdivide_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  int iterations = params.extract_input<int>("Iterations");
+  const int iterations = params.extract_input<int>("Iterations");
   if (geometry_set.has_mesh()) {
-    Mesh *input_mesh = geometry_set.get_mesh_for_write();
-    Mesh *result = unsubdivideMesh(iterations, input_mesh);
+    MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+    Mesh *input_mesh = mesh_component.get_for_write();
+
+    const bool default_selection = true;
+    const GVArrayPtr selection = params.get_input_attribute(
+        "Selection", mesh_component, ATTR_DOMAIN_POINT, CD_PROP_BOOL, &default_selection);
+    if (!selection) {
+      return;
+    }
+    const GVArray_Typed<bool> selection_as_typed = selection->typed<bool>();
+    Array<bool> mask(input_mesh->totvert);
+    for (const int i : selection_as_typed.index_range()) {
+      mask[i] = selection_as_typed[i];
+    }
+
+    Mesh *result = unsubdivide_mesh(iterations, mask, input_mesh);
     geometry_set.replace_mesh(result);
   }
   params.set_output("Geometry", std::move(geometry_set));

@@ -9979,7 +9979,7 @@ static void def_geo_collapse(StructRNA *srna)
   PropertyRNA *prop;
 
   static EnumPropertyItem symmetry_axis_items[] = {
-      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_NONE, "OFF", 0, "Off", "No Symmetry is applied"},
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_NONE, "NONE", 0, "None", "No Symmetry is applied"},
       {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_X, "X", 0, "X", "Symmetry is applied on X axis"},
       {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Y, "Y", 0, "Y", "Symmetry is applied on Y axis"},
       {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Z, "Z", 0, "Z", "Symmetry is applied on Z axis"},

@@ -39,25 +39,11 @@ static bNodeSocketTemplate geo_node_dissolve_out[] = {
     {-1, ""},
 };
 
-namespace blender::nodes {
-
-static Mesh *dissolveMesh(const float angle,
-                          const bool all_boundaries,
-                          const int delimiter,
-                          Mesh *mesh)
+static void geo_node_dissolve_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  BMesh *bm;
-  BMeshCreateParams bmesh_create_params = {0};
-  BMeshFromMeshParams bmesh_from_mesh_params = {
-      true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
-  bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
-
-  BM_mesh_decimate_dissolve(bm, angle, all_boundaries, (BMO_Delimit)delimiter);
-
-  Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
-  BM_mesh_free(bm);
-  result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
-  return result;
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "delimiter", 0, nullptr, ICON_NONE);
 }
 
 static void geo_node_dissolve_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -69,17 +55,29 @@ static void geo_node_dissolve_init(bNodeTree *UNUSED(tree), bNode *node)
   node_storage->delimiter = GEO_NODE_DISSOLVE_DELIMITTER_NORMAL;
 }
 
-static void geo_node_dissolve_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+namespace blender::nodes {
+static Mesh *dissolve_mesh(const float angle,
+                           const bool all_boundaries,
+                           const int delimiter,
+                           Mesh *mesh)
 {
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "delimiter", 0, nullptr, ICON_NONE);
+  BMeshCreateParams bmesh_create_params = {0};
+  BMeshFromMeshParams bmesh_from_mesh_params = {
+      true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
+  BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
+
+  BM_mesh_decimate_dissolve(bm, angle, all_boundaries, (BMO_Delimit)delimiter);
+
+  Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
+  BM_mesh_free(bm);
+  result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  return result;
 }
 
 static void geo_node_dissolve_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  float angle = params.extract_input<float>("Angle");
+  const float angle = params.extract_input<float>("Angle");
 
   if (geometry_set.has_mesh()) {
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
@@ -93,8 +91,8 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
 
     const bool all_boundaries = params.extract_input<bool>("All Boundaries");
     const bNode &node = params.node();
-    NodeGeometryDissolve &node_storage = *(NodeGeometryDissolve *)node.storage;
-    Mesh *result = dissolveMesh(angle, all_boundaries, node_storage.delimiter, input_mesh);
+    const NodeGeometryDissolve &node_storage = *(NodeGeometryDissolve *)node.storage;
+    Mesh *result = dissolve_mesh(angle, all_boundaries, node_storage.delimiter, input_mesh);
     geometry_set.replace_mesh(result);
   }
 
@@ -110,8 +108,8 @@ void register_node_type_geo_dissolve()
   node_type_socket_templates(&ntype, geo_node_dissolve_in, geo_node_dissolve_out);
   node_type_storage(
       &ntype, "NodeGeometryDissolve", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype, blender::nodes::geo_node_dissolve_init);
+  node_type_init(&ntype, geo_node_dissolve_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_dissolve_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_dissolve_layout;
+  ntype.draw_buttons = geo_node_dissolve_layout;
   nodeRegisterType(&ntype);
 }

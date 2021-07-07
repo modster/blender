@@ -40,38 +40,9 @@ static bNodeSocketTemplate geo_node_collapse_out[] = {
     {-1, ""},
 };
 
-namespace blender::nodes {
-
-static Mesh *collapseMesh(const float factor,
-                          const GVArrayPtr &selection,
-                          const bool triangulate,
-                          const int symmetry_axis,
-                          Mesh *mesh)
+static void geo_node_collapse_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  if (factor == 1.0f) {
-    return mesh;
-  }
-
-  BMesh *bm;
-
-  float *mask = (float *)MEM_malloc_arrayN(mesh->totvert, sizeof(float), __func__);
-  for (int i : selection->typed<float>().index_range()) {
-    mask[i] = selection->typed<float>()[i];
-  }
-
-  BMeshCreateParams bmesh_create_params = {0};
-  BMeshFromMeshParams bmesh_from_mesh_params = {
-      true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
-  bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
-
-  const float symmetry_eps = 0.00002f;
-  BM_mesh_decimate_collapse(bm, factor, mask, 1.0f, triangulate, symmetry_axis, symmetry_eps);
-  MEM_freeN(mask);
-  Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
-  BM_mesh_free(bm);
-
-  result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
-  return result;
+  uiItemR(layout, ptr, "symmetry_axis", 0, nullptr, ICON_NONE);
 }
 
 static void geo_node_collapse_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -83,21 +54,49 @@ static void geo_node_collapse_init(bNodeTree *UNUSED(tree), bNode *node)
   node_storage->symmetry_axis = -1;
 }
 
-static void geo_node_collapse_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+namespace blender::nodes {
+
+static Mesh *collapse_mesh(const float factor,
+                           const GVArrayPtr &selection,
+                           const bool triangulate,
+                           const int symmetry_axis,
+                           Mesh *mesh)
 {
-  uiItemR(layout, ptr, "symmetry_axis", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  if (factor == 1.0f) {
+    return mesh;
+  }
+
+  const GVArray_Typed<float> selection_as_typed = selection->typed<float>();
+  Array<float> mask(mesh->totvert);
+  for (const int i : selection_as_typed.index_range()) {
+    mask[i] = selection_as_typed[i];
+  }
+
+  const BMeshCreateParams bmesh_create_params = {0};
+  const BMeshFromMeshParams bmesh_from_mesh_params = {
+      true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
+  BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
+
+  const float symmetry_eps = 0.00002f;
+  BM_mesh_decimate_collapse(
+      bm, factor, mask.data(), 1.0f, triangulate, symmetry_axis, symmetry_eps);
+  Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
+  BM_mesh_free(bm);
+
+  result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  return result;
 }
 
 static void geo_node_collapse_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  float factor = params.extract_input<float>("Factor");
+  const float factor = params.extract_input<float>("Factor");
 
   if (geometry_set.has_mesh()) {
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
 
-    float default_factor = 1.0f;
-    GVArrayPtr selection = params.get_input_attribute(
+    const float default_factor = 1.0f;
+    const GVArrayPtr selection = params.get_input_attribute(
         "Selection", mesh_component, ATTR_DOMAIN_POINT, CD_PROP_FLOAT, &default_factor);
     if (!selection) {
       return;
@@ -112,8 +111,8 @@ static void geo_node_collapse_exec(GeoNodeExecParams params)
 
     const bool triangulate = params.extract_input<bool>("Triangulate");
     const bNode &node = params.node();
-    NodeGeometryCollapse &node_storage = *(NodeGeometryCollapse *)node.storage;
-    Mesh *result = collapseMesh(
+    const NodeGeometryCollapse &node_storage = *(NodeGeometryCollapse *)node.storage;
+    Mesh *result = collapse_mesh(
         factor, selection, triangulate, node_storage.symmetry_axis, input_mesh);
     geometry_set.replace_mesh(result);
   }
@@ -130,8 +129,8 @@ void register_node_type_geo_collapse()
   node_type_socket_templates(&ntype, geo_node_collapse_in, geo_node_collapse_out);
   node_type_storage(
       &ntype, "NodeGeometryCollapse", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype, blender::nodes::geo_node_collapse_init);
+  node_type_init(&ntype, geo_node_collapse_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_collapse_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_collapse_layout;
+  ntype.draw_buttons = geo_node_collapse_layout;
   nodeRegisterType(&ntype);
 }

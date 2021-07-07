@@ -1446,4 +1446,20 @@ void BM_mesh_vert_coords_apply_with_mat4(BMesh *bm,
   }
 }
 
+/**
+ * Use to temporary tag bmesh mesh data based on an array of bool.
+ */
+void BM_temporary_tag_vertices(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMVert *v;
+  int i = 0;
+  BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
+    if (mask[i]) {
+      BM_elem_flag_enable(v, BM_ELEM_TAG);
+    }
+    i++;
+  }
+}
+
 /** \} */

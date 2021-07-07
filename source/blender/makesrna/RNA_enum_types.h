@@ -75,8 +75,6 @@ extern const EnumPropertyItem rna_enum_modifier_triangulate_quad_method_items[];
 extern const EnumPropertyItem rna_enum_modifier_triangulate_ngon_method_items[];
 extern const EnumPropertyItem rna_enum_modifier_shrinkwrap_mode_items[];
 
-extern const EnumPropertyItem modifier_decim_mode_items[];
-
 extern const EnumPropertyItem rna_enum_image_type_items[];
 extern const EnumPropertyItem rna_enum_image_color_mode_items[];
 extern const EnumPropertyItem rna_enum_image_color_depth_items[];
