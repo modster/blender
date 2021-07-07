@@ -6554,14 +6554,14 @@ static void rna_def_fileselect_asset_params(BlenderRNA *brna)
        ICON_GROUP,
        "Objects & Collections",
        "Show objects and collections"},
-      {FILTER_ID_AR | FILTER_ID_CU | FILTER_ID_LT | FILTER_ID_MB | FILTER_ID_ME
+      {FILTER_ID_AR | FILTER_ID_CU | FILTER_ID_LT | FILTER_ID_MB | FILTER_ID_ME | FILTER_ID_GD
        /* XXX avoid warning */
        // | FILTER_ID_HA | FILTER_ID_PT | FILTER_ID_VO
        ,
        "GEOMETRY",
        ICON_MESH_DATA,
        "Geometry",
-       "Show meshes, curves, lattice, armatures and metaballs data"},
+       "Show meshes, curves, lattice, armatures, grease pencil and metaballs data"},
       {FILTER_ID_LS | FILTER_ID_MA | FILTER_ID_NT | FILTER_ID_TE,
        "SHADING",
        ICON_MATERIAL_DATA,
@@ -6577,8 +6577,8 @@ static void rna_def_fileselect_asset_params(BlenderRNA *brna)
        ICON_WORLD_DATA,
        "Environment",
        "Show worlds, lights, cameras and speakers"},
-      {FILTER_ID_BR | FILTER_ID_GD | FILTER_ID_PA | FILTER_ID_PAL | FILTER_ID_PC | FILTER_ID_TXT |
-           FILTER_ID_VF | FILTER_ID_CF | FILTER_ID_WS,
+      {FILTER_ID_BR | FILTER_ID_PA | FILTER_ID_PAL | FILTER_ID_PC | FILTER_ID_TXT | FILTER_ID_VF |
+           FILTER_ID_CF | FILTER_ID_WS,
        "MISC",
        ICON_GREASEPENCIL,
        "Miscellaneous",
