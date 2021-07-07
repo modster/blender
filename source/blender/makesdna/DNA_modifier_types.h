@@ -2346,6 +2346,10 @@ typedef enum VolumeToMeshFlag {
 
 typedef struct AdaptiveRemeshModifierData {
   ModifierData modifier;
+
+  int edge_index;
+
+  char _pad[4];
 } AdaptiveRemeshModifierData;
 
 #ifdef __cplusplus

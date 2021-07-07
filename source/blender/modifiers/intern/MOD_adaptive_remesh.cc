@@ -23,9 +23,11 @@
 
 #include "BLI_utildefines.h"
 
+#include "BKE_cloth_remesh.hh"
 #include "BKE_context.h"
 #include "BKE_modifier.h"
 
+#include "DNA_modifier_types.h"
 #include "DNA_screen_types.h"
 
 #include "RNA_access.h"
@@ -35,11 +37,34 @@
 
 #include "MOD_ui_common.h"
 
-static Mesh *modifyMesh(ModifierData *UNUSED(md),
-                        const ModifierEvalContext *UNUSED(ctx),
-                        Mesh *mesh)
+using namespace blender::bke;
+
+static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx), Mesh *mesh)
 {
-  return mesh;
+  AdaptiveRemeshModifierData *armd = (AdaptiveRemeshModifierData *)md;
+
+  auto edge_i = armd->edge_index;
+
+  internal::MeshIO reader;
+  reader.read(mesh);
+
+  internal::Mesh<internal::EmptyExtraData,
+                 internal::EmptyExtraData,
+                 internal::EmptyExtraData,
+                 internal::EmptyExtraData>
+      internal_mesh;
+  internal_mesh.read(reader);
+
+  auto op_edge_index = internal_mesh.get_edges().get_no_gen_index(edge_i);
+  if (op_edge_index) {
+    auto edge_index = op_edge_index.value();
+    std::cout << "edge_index: " << edge_index << " edge_i: " << armd->edge_index << std::endl;
+    internal_mesh.split_edge_triangulate(edge_index);
+  }
+
+  internal::MeshIO writer = internal_mesh.write();
+  auto *mesh_result = writer.write();
+  return mesh_result;
 }
 
 static bool dependsOnTime(ModifierData *UNUSED(md))
@@ -55,6 +80,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   PointerRNA *ptr = modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, ptr, "edge_index", 0, nullptr, ICON_NONE);
 
   modifier_panel_end(layout, ptr);
 }
@@ -73,7 +100,7 @@ ModifierTypeInfo modifierType_AdaptiveRemesh = {
     /* flags */ eModifierTypeFlag_AcceptsMesh,
     /* icon */ ICON_MOD_CLOTH, /* TODO(ish): Use correct icon. */
 
-    /* copyData */ nullptr,
+    /* copyData */ BKE_modifier_copydata_generic,
 
     /* deformVerts */ nullptr,
     /* deformMatrices */ nullptr,
@@ -87,7 +114,7 @@ ModifierTypeInfo modifierType_AdaptiveRemesh = {
     /* requiredDataMask */ nullptr,
     /* freeData */ nullptr,
     /* isDisabled */ nullptr,
-    /* updateDepsgraph */ NULL,
+    /* updateDepsgraph */ nullptr,
     /* dependsOnTime */ dependsOnTime,
     /* dependsOnNormals */ nullptr,
     /* foreachIDLink */ nullptr,

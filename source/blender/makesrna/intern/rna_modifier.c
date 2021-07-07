@@ -309,7 +309,7 @@ const EnumPropertyItem rna_enum_object_modifier_type_items[] = {
     {eModifierType_Softbody, "SOFT_BODY", ICON_MOD_SOFT, "Soft Body", ""},
     {eModifierType_Surface, "SURFACE", ICON_MODIFIER, "Surface", ""},
     {eModifierType_AdaptiveRemesh,
-     "ADAPTIVEREMESH",
+     "ADAPTIVE_REMESH",
      ICON_MOD_CLOTH,
      "Adaptive Remesh",
      ""}, /* TODO(ish): Use correct icon. */
@@ -7238,6 +7238,12 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
   RNA_def_struct_ui_icon(srna, ICON_MOD_CLOTH); /* TODO(ish): Use correct icon. */
 
   RNA_define_lib_overridable(true);
+
+  prop = RNA_def_property(srna, "edge_index", PROP_INT, PROP_UNSIGNED);
+  RNA_def_property_int_sdna(prop, NULL, "edge_index");
+  RNA_def_property_ui_text(prop, "Edge Index", "Edge index number for the operation");
+  RNA_def_property_range(prop, 0, INT_MAX);
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   RNA_define_lib_overridable(false);
 }

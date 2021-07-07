@@ -49,6 +49,11 @@
     .uv_offset = {0.0f, 0.0f}, \
   }
 
+#define _DNA_DEFAULT_AdaptiveRemeshModifierData \
+  { \
+    .edge_index = 0, \
+  }
+
 #define _DNA_DEFAULT_BevelModifierData \
   { \
     .value = 0.1f, \

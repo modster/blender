@@ -85,6 +85,13 @@ template<typename> class Face;
 template<typename, typename, typename, typename> class Mesh;
 class MeshIO;
 template<typename, typename, typename, typename> class MeshDiff;
+class EmptyExtraData {
+ public:
+  EmptyExtraData interp(const EmptyExtraData &other) const
+  {
+    return other;
+  }
+};
 
 namespace ga = blender::generational_arena;
 namespace fs = std::filesystem;
