@@ -211,7 +211,7 @@ void GPU_shader_free(GPUShader *shader)
 /* -------------------------------------------------------------------- */
 /** \name Creation utils
  * \{ */
-
+  
 GPUShader *GPU_shader_create(const char *vertcode,
                              const char *fragcode,
                              const char *geomcode,

@@ -29,6 +29,8 @@
 #include "GPU_shader.h"
 #include "GPU_uniform_buffer_types.h"
 
+#include <array>
+
 struct GPUUniformBuf;
 
 namespace blender {
@@ -88,14 +90,55 @@ static inline const UniformBuf *unwrap(const GPUUniformBuf *vert)
 
 class UniformBuiltinStructType {
  public:
-  UniformBuiltinStructType(const GPUUniformBuiltinStructType type);
-
-  GPUUniformBuiltinStructType type;
+  constexpr UniformBuiltinStructType(const GPUUniformBuiltinStructType type);
+  static const UniformBuiltinStructType &get(const GPUUniformBuiltinStructType type);
 
   bool has_all_builtin_uniforms(const ShaderInterface &interface) const;
 
+  GPUUniformBuiltinStructType type;
+  struct AttributeBinding {
+    int binding = -1;
+    size_t offset = -1;
+
+    bool has_binding() const;
+  };
+
+  const AttributeBinding &attribute_binding(const GPUUniformBuiltin builtin_uniform) const
+  {
+    return m_attribute_bindings[builtin_uniform];
+  }
+
+  const size_t data_size() const
+  {
+    return m_data_size;
+  }
+
  private:
-  bool has_attribute(const GPUUniformBuiltin builtin_uniform) const;
+  const std::array<const AttributeBinding, GPU_NUM_UNIFORMS> &m_attribute_bindings;
+  const size_t m_data_size;
+};
+
+class UniformBuiltinStruct {
+ public:
+  struct Flags {
+    bool is_dirty : 1;
+  };
+
+  UniformBuiltinStruct(const GPUUniformBuiltinStructType type);
+  ~UniformBuiltinStruct();
+
+  void *data() const
+  {
+    return m_data;
+  };
+
+  bool uniform_int(int location, int comp_len, int array_size, const int *data);
+  bool uniform_float(int location, int comp_len, int array_size, const float *data);
+
+ private:
+  Flags m_flags;
+  const UniformBuiltinStructType &m_type_info;
+  void *m_data;
 };
 
 std::optional<const GPUUniformBuiltinStructType> find_smallest_uniform_builtin_struct(
