@@ -93,7 +93,7 @@ set(SRC
   intern/boids.c
   intern/bpath.c
   intern/brush.c
-  intern/bvhutils.c
+  intern/bvhutils.cc
   intern/cachefile.c
   intern/callbacks.c
   intern/camera.c
@@ -184,13 +184,13 @@ set(SRC
   intern/mesh.c
   intern/mesh_boolean_convert.cc
   intern/mesh_convert.c
-  intern/mesh_evaluate.c
+  intern/mesh_evaluate.cc
   intern/mesh_fair.cc
   intern/mesh_iterators.c
   intern/mesh_mapping.c
   intern/mesh_merge.c
   intern/mesh_mirror.c
-  intern/mesh_normals.c
+  intern/mesh_normals.cc
   intern/mesh_remap.c
   intern/mesh_remesh_voxel.c
   intern/mesh_runtime.c
