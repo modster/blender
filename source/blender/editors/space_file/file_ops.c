@@ -239,7 +239,7 @@ static FileSelect file_select_do(bContext *C, int selected_idx, bool do_diropen)
 }
 
 /**
- * \warning: loops over all files so better use cautiously
+ * \warning Loops over all files so better use cautiously.
  */
 static bool file_is_any_selected(struct FileList *files)
 {
@@ -2801,6 +2801,11 @@ static int file_rename_exec(bContext *C, wmOperator *UNUSED(op))
   return OPERATOR_FINISHED;
 }
 
+static bool file_rename_poll(bContext *C)
+{
+  return ED_operator_file_active(C) && !ED_fileselect_is_asset_browser(CTX_wm_space_file(C));
+}
+
 void FILE_OT_rename(struct wmOperatorType *ot)
 {
   /* identifiers */
@@ -2811,7 +2816,7 @@ void FILE_OT_rename(struct wmOperatorType *ot)
   /* api callbacks */
   ot->invoke = file_rename_invoke;
   ot->exec = file_rename_exec;
-  ot->poll = ED_operator_file_active;
+  ot->poll = file_rename_poll;
 }
 
 /** \} */

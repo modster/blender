@@ -245,7 +245,7 @@ enum {
 #define UI_PANEL_BOX_STYLE_MARGIN (U.widget_unit * 0.2f)
 
 /* but->drawflag - these flags should only affect how the button is drawn. */
-/* NOTE: currently, these flags _are not passed_ to the widget's state() or draw() functions
+/* NOTE: currently, these flags *are not passed* to the widget's state() or draw() functions
  *       (except for the 'align' ones)!
  */
 enum {
@@ -663,7 +663,7 @@ enum {
   UI_BLOCK_THEME_STYLE_POPUP = 1,
 };
 void UI_block_theme_style_set(uiBlock *block, char theme_style);
-char UI_block_emboss_get(uiBlock *block);
+eUIEmbossType UI_block_emboss_get(uiBlock *block);
 void UI_block_emboss_set(uiBlock *block, eUIEmbossType emboss);
 bool UI_block_is_search_only(const uiBlock *block);
 void UI_block_set_search_only(uiBlock *block, bool search_only);
@@ -678,7 +678,7 @@ void UI_block_region_set(uiBlock *block, struct ARegion *region);
 void UI_block_lock_set(uiBlock *block, bool val, const char *lockstr);
 void UI_block_lock_clear(uiBlock *block);
 
-/* automatic aligning, horiz or verical */
+/* Automatic aligning, horizontal or vertical. */
 void UI_block_align_begin(uiBlock *block);
 void UI_block_align_end(uiBlock *block);
 
