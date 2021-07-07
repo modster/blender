@@ -363,6 +363,47 @@ template<typename T> class Face {
     return this->verts;
   }
 
+  bool has_vert_index(const VertIndex &vert_index) const
+  {
+    return verts.contains(vert_index);
+  }
+
+  template<typename EED> bool has_edge(const Edge<EED> &edge) const
+  {
+    BLI_assert(edge.get_verts());
+    auto &[edge_vert_1, edge_vert_2] = edge.get_verts().value();
+
+    BLI_assert(this->has_vert_index(edge_vert_1));
+    BLI_assert(this->has_vert_index(edge_vert_2));
+
+    auto vi1 = this->verts.first_index_of(edge_vert_1);
+    auto vi2 = this->verts.first_index_of(edge_vert_2);
+
+    if (std::abs(vi1 - vi2) == 1) {
+      return true;
+    }
+
+    /* TODO(ish): there probably a nicer way to check for this
+     * special case, this is way too verbose */
+    /* Need to have loop around as well, so if the face has 5 verts,
+     * verts at [0, 1, 2, 3, 4]. Then an edge (0, 4) or (4, 0) can
+     * exist. Thus an extra check is necessary */
+    if (vi1 == 0) {
+      if (vi2 == this->verts.size() - 1) {
+        return true;
+      }
+      return false;
+    }
+    if (vi2 == 0) {
+      if (vi1 == this->verts.size() - 1) {
+        return true;
+      }
+      return false;
+    }
+
+    return false;
+  }
+
   friend std::ostream &operator<<(std::ostream &stream, const Face &face)
   {
     stream << "(self_index: " << face.self_index << ", verts: " << face.verts
