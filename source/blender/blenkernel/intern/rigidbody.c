@@ -430,7 +430,7 @@ static void rigidbody_store_convex_hull_draw_data(Object *ob) {
     const int num_edges = num_verts == 2 ? 1 : num_verts < 2 ? 0 : num_loops / 2;
     hull_draw_data = BKE_mesh_new_nomain(num_verts, num_edges, 0, num_loops, num_faces);
 
-     for (int i=0; i<num_verts; i++) {
+    for (int i=0; i<num_verts; i++) {
       float co[3];
       int original_index;
       plConvexHullGetVertex(hull, i, co, &original_index);
@@ -444,21 +444,53 @@ static void rigidbody_store_convex_hull_draw_data(Object *ob) {
       }
     }
 
+   MLoop *mloop_src = MEM_mallocN(num_loops * sizeof(MLoop), __func__);
+
     uint edge_index = 0;
     for (int i=0; i<num_loops; i++) {
       int v_from;
       int v_to;
       plConvexHullGetLoop(hull, i, &v_from, &v_to);
 
-
+      mloop_src[i].v = v_from;
       if (v_from < v_to) {
         hull_draw_data->medge[edge_index].v1 = v_from;
         hull_draw_data->medge[edge_index].v2 = v_to;
         hull_draw_data->medge[edge_index].flag = ME_EDGEDRAW | ME_EDGERENDER;
+
+        int reverse_index = plConvexHullGetReversedLoopIndex(hull, i);
+        mloop_src[i].e = edge_index;
+        mloop_src[reverse_index].e = edge_index;
         edge_index++;
       }
     }
 
+    /* Copy faces. */
+    int *loops;
+    int j = 0;
+    MLoop *loop = hull_draw_data->mloop;
+    for (int i=0; i<num_faces; i++) {
+      const int len = plConvexHullGetFaceSize(hull, i);
+
+      BLI_assert(len > 2);
+
+      /* Get face loop indices. */
+      loops = MEM_mallocN(sizeof(int)*len, __func__);
+      plConvexHullGetFaceLoops(hull, i, loops);
+
+      MPoly *face = &(hull_draw_data->mpoly[i]);
+      face->loopstart = j;
+      face->totloop = len;
+      for (int k=0; k<len; k++) {
+        MLoop src_loop = mloop_src[loops[k]];
+        loop->v = src_loop.v;
+        loop->e = src_loop.e;
+        loop++;
+      }
+      j += len;
+      MEM_freeN(loops);
+    }
+    MEM_freeN(mloop_src);
     ob->rigidbody_object->col_shape_draw_data = hull_draw_data;
 
 }

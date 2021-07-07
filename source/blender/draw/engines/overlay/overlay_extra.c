@@ -37,6 +37,7 @@
 #include "BKE_tracking.h"
 
 #include "BLI_listbase.h"
+#include "BLI_task.h"
 
 #include "DNA_camera_types.h"
 #include "DNA_constraint_types.h"
@@ -58,6 +59,7 @@
 
 #include "overlay_private.h"
 
+#include "draw_cache_impl.h"
 #include "draw_common.h"
 #include "draw_manager_text.h"
 
@@ -376,13 +378,19 @@ static void OVERLAY_convex_hull_collision_shape(OVERLAY_ExtraCallBuffers *cb,
 {
 
     float color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-    GPUBatch *geom = DRW_convex_hull_batch_get(ob);
-    if(geom){
-      GPUShader *sh = OVERLAY_shader_uniform_color();
-      DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[0]);
-      DRW_shgroup_uniform_vec4_copy(grp, "color", color);
+    if(ob->rigidbody_object){
+          if(ob->rigidbody_object->col_shape_draw_data){
+              const DRWContextState *draw_ctx = DRW_context_state_get();
+              DRW_mesh_batch_cache_validate(ob->rigidbody_object->col_shape_draw_data);
 
-      DRW_shgroup_call_obmat(grp, geom, ob->obmat);
+              GPUBatch *geom = DRW_mesh_batch_cache_get_all_edges(ob->rigidbody_object->col_shape_draw_data);
+
+              if(geom){
+                  OVERLAY_extra_wire(cb, geom, ob->obmat, color);
+              }
+              struct TaskGraph *task_graph = BLI_task_graph_create();
+              DRW_mesh_batch_cache_create_requested(task_graph, ob, ob->rigidbody_object->col_shape_draw_data, draw_ctx->scene, false, false);
+          }
     }
 
 
