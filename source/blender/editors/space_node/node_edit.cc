@@ -1242,7 +1242,7 @@ float node_link_dim_factor(const View2D *v2d, const bNodeLink *link)
     return 1.0f;
   }
   const float viewport_width = BLI_rctf_size_x(&v2d->cur);
-  return clamp_f(1.0f - min_endpoint_distance / viewport_width * 10.0f, 0.1f, 1.0f);
+  return clamp_f(1.0f - min_endpoint_distance / viewport_width * 10.0f, 0.05f, 1.0f);
 }
 
 bool node_link_is_hidden_or_dimmed(const View2D *v2d, const bNodeLink *link)
