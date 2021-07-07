@@ -1271,6 +1271,124 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     this->read(reader);
   }
 
+  /**
+   * Splits the edge and keeps the triangulation of the Mesh
+   *
+   * Returns the `MeshDiff` that lead to the operation.
+   *
+   * Note, the caller must ensure the adjacent faces to the edge are
+   * triangulated. In debug mode, it will assert, in release mode, it
+   * is undefined behaviour.
+   **/
+  MeshDiff<END, EVD, EED, EFD> split_edge_triangulate(EdgeIndex edge_index)
+  {
+    /* This operation will delete the following-
+     * the edge specified, faces incident to the edge.
+     *
+     * This operation will add the following-
+     * a new vert interpolated using the edge's verts, new node
+     * interpolated using the node of the edge's verts.
+     */
+
+    blender::Vector<NodeIndex> added_nodes;
+    blender::Vector<VertIndex> added_verts;
+    blender::Vector<EdgeIndex> added_edges;
+    blender::Vector<FaceIndex> added_faces;
+    blender::Vector<Node<END>> deleted_nodes;
+    blender::Vector<Vert<EVD>> deleted_verts;
+    blender::Vector<Edge<EED>> deleted_edges;
+    blender::Vector<Face<EFD>> deleted_faces;
+
+    auto &edge_a = this->get_checked_edge(edge_index);
+    auto [edge_vert_1_a, edge_vert_2_a] = this->get_checked_verts_of_edge(edge_a);
+    auto &edge_node_1 = this->get_checked_node_of_vert(edge_vert_1_a);
+    auto &edge_node_2 = this->get_checked_node_of_vert(edge_vert_2_a);
+
+    /* Create the new vert and node by interpolating the verts and
+     * nodes of the edge */
+    auto &new_vert = this->add_empty_interp_vert(edge_vert_1_a, edge_vert_2_a);
+    auto &new_node = this->add_empty_interp_node(edge_node_1, edge_node_2);
+
+    /* Need to reinitialize edge verts because `add_empty_interp_vert()` may have
+     * reallocated `this->verts` */
+    auto [edge_vert_1, edge_vert_2] = this->get_checked_verts_of_edge(edge_a);
+
+    /* Link new_vert with new_node */
+    new_vert.node = new_node.self_index;
+    new_node.verts.append(new_vert.self_index);
+
+    /* Create edges between edge_vert_1, new_vert, edge_vert_2 */
+    {
+      auto &new_edge_1 = this->add_empty_edge();
+      new_edge_1.verts = {edge_vert_1.self_index, new_vert.self_index};
+      added_edges.append(new_edge_1.self_index);
+
+      auto &new_edge_2 = this->add_empty_edge();
+      new_edge_2.verts = {new_vert.self_index, edge_vert_2.self_index};
+      added_edges.append(new_edge_2.self_index);
+    }
+
+    /* Need to reinitialize edge because `add_empty_edge()` may have
+     * reallocated `this->edges` */
+    auto &edge_b = this->get_checked_edge(edge_index);
+    auto faces = edge_b.faces;
+
+    for (const auto &face_index : faces) {
+      auto face = this->delete_face(face_index);
+
+      /* Ensure the faces are triangulated before calling this function */
+      BLI_assert(face.verts.size() == 3);
+
+      auto &other_vert = this->get_checked_other_vert(edge_b, face);
+
+      /* TODO(ish): Ordering of the verts and nodes needs to be found correctly */
+      /* Handle new face creation */
+      {
+        auto &new_face_1 = this->add_empty_face(face.normal);
+        new_face_1.verts.append(edge_vert_1.self_index);
+        new_face_1.verts.append(other_vert.self_index);
+        new_face_1.verts.append(new_vert.self_index);
+        added_faces.append(new_face_1.self_index);
+
+        /* Here `face` doesn't need to be reinitialized because this
+         * for loop owns `face` */
+
+        auto &new_face_2 = this->add_empty_face(face.normal);
+        new_face_2.verts.append(other_vert.self_index);
+        new_face_2.verts.append(edge_vert_2.self_index);
+        new_face_2.verts.append(new_vert.self_index);
+        added_faces.append(new_face_2.self_index);
+
+        /* Here `face` doesn't need to be reinitialized because this
+         * for loop owns `face` */
+
+        deleted_faces.append(std::move(face));
+      }
+
+      /* Handle new edge creation between new_vert and other_vert */
+      {
+        /* TODO(ish): due to `this->add_empty_edge()` here, the
+         * `edge_b`'s reference becomes invalid. Need to figure out
+         * how to fix this */
+        auto &new_edge = this->add_empty_edge();
+        new_edge.verts = std::make_tuple(other_vert.self_index, new_vert.self_index);
+        added_edges.append(new_edge.self_index);
+      }
+    }
+
+    auto edge_c = this->delete_edge(edge_index);
+
+    deleted_edges.append(std::move(edge_c));
+    return MeshDiff(std::move(added_nodes),
+                    std::move(added_verts),
+                    std::move(added_edges),
+                    std::move(added_faces),
+                    std::move(deleted_nodes),
+                    std::move(deleted_verts),
+                    std::move(deleted_edges),
+                    std::move(deleted_faces));
+  }
+
  protected:
   /* all protected static methods */
   /* all protected non-static methods */
