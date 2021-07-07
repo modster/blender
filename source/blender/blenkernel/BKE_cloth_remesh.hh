@@ -1607,6 +1607,32 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(vert.node);
     return this->get_checked_node(vert.node.value());
   }
+
+  /**
+   * Gives first vert index of a triangulated face that is not part of edge.
+   *
+   * Will abort in debug mode if face is not triangulated or edge is
+   * not part of the face.
+   * Will have undefined behaviour in release mode.
+   **/
+  inline Vert<EVD> &get_checked_other_vert(const Edge<EED> &edge, const Face<EFD> &face)
+  {
+    BLI_assert(face.verts.size() == 3);
+    BLI_assert(face.has_edge(edge));
+
+    const auto vert_1_index = face.verts[0];
+    const auto vert_2_index = face.verts[1];
+    const auto vert_3_index = face.verts[2];
+
+    if (edge.has_vert(vert_1_index) == false) {
+      return this->get_checked_vert(vert_1_index);
+    }
+    if (edge.has_vert(vert_2_index) == false) {
+      return this->get_checked_vert(vert_2_index);
+    }
+
+    return this->get_checked_vert(vert_3_index);
+  }
 };
 
 template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff {
