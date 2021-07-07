@@ -58,7 +58,8 @@ static bool is_valid_location(int location)
 static constexpr UniformBuiltinStructType::AttributeBinding determine_binding_struct_1(
     const GPUUniformBuiltin builtin_uniform)
 {
-  UniformBuiltinStructType::AttributeBinding result;
+  UniformBuiltinStructType::AttributeBinding result = {-1, 0};
+
   switch (builtin_uniform) {
     case GPU_UNIFORM_MODEL:
       result.binding = to_binding_location(builtin_uniform);
@@ -228,7 +229,7 @@ UniformBuiltinStruct::~UniformBuiltinStruct()
 
 bool UniformBuiltinStruct::uniform_int(int location, int comp_len, int array_size, const int *data)
 {
-  if (is_valid_location(location)) {
+  if (!is_valid_location(location)) {
     return false;
   }
   const GPUUniformBuiltin builtin_uniform = to_builtin_uniform(location);
@@ -250,7 +251,7 @@ bool UniformBuiltinStruct::uniform_float(int location,
                                          int array_size,
                                          const float *data)
 {
-  if (is_valid_location(location)) {
+  if (!is_valid_location(location)) {
     return false;
   }
   const GPUUniformBuiltin builtin_uniform = to_builtin_uniform(location);

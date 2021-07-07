@@ -98,7 +98,7 @@ class UniformBuiltinStructType {
   GPUUniformBuiltinStructType type;
   struct AttributeBinding {
     int binding = -1;
-    size_t offset = -1;
+    size_t offset = 0;
 
     bool has_binding() const;
   };
@@ -108,7 +108,7 @@ class UniformBuiltinStructType {
     return m_attribute_bindings[builtin_uniform];
   }
 
-  const size_t data_size() const
+  size_t data_size() const
   {
     return m_data_size;
   }
@@ -131,6 +131,11 @@ class UniformBuiltinStruct {
   {
     return m_data;
   };
+
+  const UniformBuiltinStructType &type_info() const
+  {
+    return m_type_info;
+  }
 
   bool uniform_int(int location, int comp_len, int array_size, const int *data);
   bool uniform_float(int location, int comp_len, int array_size, const float *data);
