@@ -45,6 +45,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
+#include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
@@ -826,6 +827,110 @@ void node_socket_color_get(
   }
 }
 
+struct SocketTooltipData {
+  bNodeTree *ntree;
+  bNode *node;
+  bNodeSocket *socket;
+};
+
+static void create_inspection_string_for_generic_value(const geo_log::GenericValueLog &value_log,
+                                                       std::stringstream &ss)
+{
+  auto id_to_inspection_string = [&](ID *id) {
+    ss << (id ? id->name + 2 : "None") << " (" << BKE_idtype_idcode_to_name(GS(id->name)) << ")";
+  };
+
+  const GPointer value = value_log.value();
+  if (value.is_type<int>()) {
+    ss << *value.get<int>() << " (Int)";
+  }
+  if (value.is_type<float>()) {
+    ss << *value.get<float>() << " (Float)";
+  }
+  if (value.is_type<blender::float3>()) {
+    ss << *value.get<blender::float3>() << " (Vector)";
+  }
+  if (value.is_type<bool>()) {
+    ss << (*value.get<bool>() ? "True" : "False") << " (Bool)";
+  }
+  if (value.is_type<std::string>()) {
+    ss << *value.get<std::string>() << " (String)";
+  }
+  if (value.is_type<Object *>()) {
+    id_to_inspection_string((ID *)*value.get<Object *>());
+  }
+  if (value.is_type<Material *>()) {
+    id_to_inspection_string((ID *)*value.get<Material *>());
+  }
+  if (value.is_type<Tex *>()) {
+    id_to_inspection_string((ID *)*value.get<Tex *>());
+  }
+  if (value.is_type<Collection *>()) {
+    id_to_inspection_string((ID *)*value.get<Collection *>());
+  }
+}
+
+static const char *geometry_component_type_to_string(const GeometryComponentType type)
+{
+  switch (type) {
+    case GEO_COMPONENT_TYPE_CURVE:
+      return "Curve";
+    case GEO_COMPONENT_TYPE_MESH:
+      return "Mesh";
+    case GEO_COMPONENT_TYPE_POINT_CLOUD:
+      return "Point Cloud";
+    case GEO_COMPONENT_TYPE_VOLUME:
+      return "Volume";
+    case GEO_COMPONENT_TYPE_INSTANCES:
+      return "Instances";
+  }
+  return "";
+}
+
+static void create_inspection_string_for_geometry(const geo_log::GeometryValueLog &value_log,
+                                                  std::stringstream &ss)
+{
+  Span<GeometryComponentType> component_types = value_log.component_types();
+  if (component_types.is_empty()) {
+    ss << "Empty Geometry";
+    return;
+  }
+  ss << "Geometry Components: ";
+  for (GeometryComponentType type : component_types.drop_back(1)) {
+    ss << geometry_component_type_to_string(type) << ", ";
+  }
+  ss << geometry_component_type_to_string(component_types.last());
+}
+
+static std::optional<std::string> create_socket_inspection_string(bContext *C,
+                                                                  bNodeTree &UNUSED(ntree),
+                                                                  bNode &node,
+                                                                  bNodeSocket &socket)
+{
+  SpaceNode *snode = CTX_wm_space_node(C);
+  const geo_log::SocketLog *socket_log = geo_log::ModifierLog::find_socket_by_node_editor_context(
+      *snode, node, socket);
+  if (socket_log == nullptr) {
+    return {};
+  }
+  const geo_log::ValueLog *value_log = socket_log->value();
+  if (value_log == nullptr) {
+    return {};
+  }
+
+  std::stringstream ss;
+  if (const geo_log::GenericValueLog *generic_value_log =
+          dynamic_cast<const geo_log::GenericValueLog *>(value_log)) {
+    create_inspection_string_for_generic_value(*generic_value_log, ss);
+  }
+  else if (const geo_log::GeometryValueLog *geo_value_log =
+               dynamic_cast<const geo_log::GeometryValueLog *>(value_log)) {
+    create_inspection_string_for_geometry(*geo_value_log, ss);
+  }
+
+  return ss.str();
+}
+
 static void node_socket_draw_nested(const bContext *C,
                                     bNodeTree *ntree,
                                     PointerRNA *node_ptr,
@@ -855,6 +960,47 @@ static void node_socket_draw_nested(const bContext *C,
                    shape_id,
                    size_id,
                    outline_col_id);
+
+  bNode *node = (bNode *)node_ptr->data;
+  uiBlock *block = node->block;
+
+  eUIEmbossType old_emboss = (eUIEmbossType)UI_block_emboss_get(block);
+  UI_block_emboss_set(block, UI_EMBOSS_NONE);
+  uiBut *but = uiDefIconBut(block,
+                            UI_BTYPE_BUT,
+                            0,
+                            ICON_NONE,
+                            sock->locx - size / 2,
+                            sock->locy - size / 2,
+                            size,
+                            size,
+                            nullptr,
+                            0,
+                            0,
+                            0,
+                            0,
+                            nullptr);
+
+  SocketTooltipData *data = (SocketTooltipData *)MEM_mallocN(sizeof(SocketTooltipData), __func__);
+  data->ntree = ntree;
+  data->node = (bNode *)node_ptr->data;
+  data->socket = sock;
+
+  UI_but_func_tooltip_set(
+      but,
+      [](bContext *C, void *argN, const char *UNUSED(tip)) {
+        SocketTooltipData *data = (SocketTooltipData *)argN;
+        std::optional<std::string> str = create_socket_inspection_string(
+            C, *data->ntree, *data->node, *data->socket);
+        if (str.has_value()) {
+          return BLI_strdup(str->c_str());
+        }
+        return BLI_strdup("Unknown");
+      },
+      data,
+      MEM_freeN);
+  UI_but_flag_enable(but, UI_BUT_DISABLED);
+  UI_block_emboss_set(block, old_emboss);
 }
 
 /**
