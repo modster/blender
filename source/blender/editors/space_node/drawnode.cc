@@ -4118,8 +4118,7 @@ void nodelink_batch_end(SpaceNode *snode)
   g_batch_link.enabled = false;
 }
 
-static void nodelink_batch_add_link(const View2D *v2d,
-                                    const SpaceNode *snode,
+static void nodelink_batch_add_link(const SpaceNode *snode,
                                     const float p0[2],
                                     const float p1[2],
                                     const float p2[2],
@@ -4128,22 +4127,13 @@ static void nodelink_batch_add_link(const View2D *v2d,
                                     int th_col2,
                                     int th_col3,
                                     bool drawarrow,
-                                    bool drawmuted)
+                                    bool drawmuted,
+                                    float dim_factor)
 {
   /* Only allow these colors. If more is needed, you need to modify the shader accordingly. */
   BLI_assert(ELEM(th_col1, TH_WIRE_INNER, TH_WIRE, TH_ACTIVE, TH_EDGE_SELECT, TH_REDALERT));
   BLI_assert(ELEM(th_col2, TH_WIRE_INNER, TH_WIRE, TH_ACTIVE, TH_EDGE_SELECT, TH_REDALERT));
   BLI_assert(ELEM(th_col3, TH_WIRE, TH_REDALERT, -1));
-
-  const float min_endpoint_distance = std::min(
-      std::max(BLI_rctf_length_x(&v2d->cur, p0[0]), BLI_rctf_length_y(&v2d->cur, p0[1])),
-      std::max(BLI_rctf_length_x(&v2d->cur, p3[0]), BLI_rctf_length_y(&v2d->cur, p3[1])));
-
-  float dim_factor = 1.0f;
-  if (min_endpoint_distance > 0.0f) {
-    const float viewport_width = BLI_rctf_size_x(&v2d->cur);
-    dim_factor = clamp_f(1.0f - min_endpoint_distance / viewport_width * 10.0f, 0.1f, 1.0f);
-  }
 
   g_batch_link.count++;
   copy_v2_v2((float *)GPU_vertbuf_raw_step(&g_batch_link.p0_step), p0);
@@ -4172,6 +4162,8 @@ void node_draw_link_bezier(const View2D *v2d,
                            int th_col2,
                            int th_col3)
 {
+  const float dim_factor = node_link_dim_factor(v2d, link);
+
   float vec[4][2];
   const bool highlighted = link->flag & NODE_LINK_TEMP_HIGHLIGHT;
   if (node_link_bezier_handles(v2d, snode, link, vec)) {
@@ -4184,8 +4176,7 @@ void node_draw_link_bezier(const View2D *v2d,
 
     if (g_batch_link.enabled && !highlighted) {
       /* Add link to batch. */
-      nodelink_batch_add_link(v2d,
-                              snode,
+      nodelink_batch_add_link(snode,
                               vec[0],
                               vec[1],
                               vec[2],
@@ -4194,7 +4185,8 @@ void node_draw_link_bezier(const View2D *v2d,
                               th_col2,
                               th_col3,
                               drawarrow,
-                              drawmuted);
+                              drawmuted,
+                              dim_factor);
     }
     else {
       /* Draw single link. */
@@ -4219,7 +4211,7 @@ void node_draw_link_bezier(const View2D *v2d,
       GPU_batch_uniform_1f(batch, "arrowSize", ARROW_SIZE);
       GPU_batch_uniform_1i(batch, "doArrow", drawarrow);
       GPU_batch_uniform_1i(batch, "doMuted", drawmuted);
-      GPU_batch_uniform_1f(batch, "dim_factor", 1.0f);
+      GPU_batch_uniform_1f(batch, "dim_factor", dim_factor);
       GPU_batch_draw(batch);
     }
   }
