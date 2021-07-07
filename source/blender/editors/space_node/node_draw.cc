@@ -944,9 +944,16 @@ static void node_socket_draw_nested(const bContext *C,
                    size_id,
                    outline_col_id);
 
+  if (ntree->type != NTREE_GEOMETRY) {
+    /* Only geometry nodes has socket value tooltips currently. */
+    return;
+  }
+
   bNode *node = (bNode *)node_ptr->data;
   uiBlock *block = node->block;
 
+  /* Ideally sockets themselves should be buttons, but they aren't currently. So add an invisible
+   * button on top of them for the tooltip. */
   eUIEmbossType old_emboss = (eUIEmbossType)UI_block_emboss_get(block);
   UI_block_emboss_set(block, UI_EMBOSS_NONE);
   uiBut *but = uiDefIconBut(block,
@@ -982,6 +989,7 @@ static void node_socket_draw_nested(const bContext *C,
       },
       data,
       MEM_freeN);
+  /* Disable the button so that clicks on it are ignored the the link operator still works. */
   UI_but_flag_enable(but, UI_BUT_DISABLED);
   UI_block_emboss_set(block, old_emboss);
 }
