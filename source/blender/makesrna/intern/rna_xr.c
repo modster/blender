@@ -1095,6 +1095,7 @@ void rna_XrSessionState_action_state_get(bContext *C,
   };
   if (WM_xr_action_state_get(&wm->xr, action_set_name, action_name, user_path, &state)) {
     *r_state = state.state_float;
+    return;
   }
 #  else
   UNUSED_VARS(C, action_set_name, action_name, user_path);
