@@ -1340,8 +1340,21 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto pos = (node_1.pos + node_2.pos) * 0.5;
     /* The normal calculation might not be valid but good enough */
     auto normal = (node_1.normal + node_2.normal) * 0.5;
+
+    std::optional<END> extra_data = std::nullopt;
+    if (node_1.extra_data && node_2.extra_data) {
+      extra_data = node_1.extra_data.value().interp(node_2.extra_data.value());
+    }
+    else if (node_1.extra_data) {
+      extra_data = node_1.extra_data;
+    }
+    else if (node_2.extra_data) {
+      extra_data = node_2.extra_data;
+    }
+
     auto &new_node = this->add_empty_node(pos, normal);
-    new_node.extra_data = interp(node_1.extra_data, node_2.extra_data);
+    new_node.extra_data = extra_data;
+
     return new_node;
   }
 
@@ -1354,8 +1367,21 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   Vert<EVD> &add_empty_interp_vert(const Vert<EVD> &vert_1, const Vert<EVD> &vert_2)
   {
     auto uv = (vert_1.uv + vert_2.uv) * 0.5;
+
+    std::optional<EVD> extra_data = std::nullopt;
+    if (vert_1.extra_data && vert_2.extra_data) {
+      extra_data = vert_1.extra_data.value().interp(vert_2.extra_data.value());
+    }
+    else if (vert_1.extra_data) {
+      extra_data = vert_1.extra_data;
+    }
+    else if (vert_2.extra_data) {
+      extra_data = vert_2.extra_data;
+    }
+
     auto &new_vert = this->add_empty_vert(uv);
-    new_vert.extra_data = interp(vert_1.extra_data, vert_2.extra_data);
+    new_vert.extra_data = extra_data;
+
     return new_vert;
   }
 
@@ -1367,8 +1393,20 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
    */
   Edge<EED> &add_empty_interp_edge(const Edge<EED> &edge_1, const Edge<EED> &edge_2)
   {
+    std::optional<EED> extra_data = std::nullopt;
+    if (edge_1.extra_data && edge_2.extra_data) {
+      extra_data = edge_1.extra_data.value().interp(edge_2.extra_data.value());
+    }
+    else if (edge_1.extra_data) {
+      extra_data = edge_1.extra_data;
+    }
+    else if (edge_2.extra_data) {
+      extra_data = edge_2.extra_data;
+    }
+
     auto &new_edge = this->add_empty_edge();
-    new_edge.extra_data = interp(edge_1.extra_data, edge_2.extra_data);
+    new_edge.extra_data = extra_data;
+
     return new_edge;
   }
 
@@ -1382,8 +1420,21 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   {
     /* The normal calculation might not be valid but good enough */
     auto normal = (face_1.normal + face_2.normal) * 0.5;
+
+    std::optional<EFD> extra_data = std::nullopt;
+    if (face_1.extra_data && face_2.extra_data) {
+      extra_data = face_1.extra_data.value().interp(face_2.extra_data.value());
+    }
+    else if (face_1.extra_data) {
+      extra_data = face_1.extra_data;
+    }
+    else if (face_2.extra_data) {
+      extra_data = face_2.extra_data;
+    }
+
     auto &new_face = this->add_empty_face(normal);
-    new_face.extra_data = interp(face_1.extra_data, face_2.extra_data);
+    new_face.extra_data = extra_data;
+
     return new_face;
   }
 
