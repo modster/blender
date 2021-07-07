@@ -7127,6 +7127,11 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
 
             col.operator("gpencil.reproject", text="Reproject")
 
+        # Assets
+        if context.preferences.experimental.use_asset_browser:
+            col.separator()
+            col.operator_menu_enum("gpencil.asset_create", "mode", text="Create Asset")
+
 
 def draw_gpencil_layer_active(context, layout):
     gpl = context.active_gpencil_layer

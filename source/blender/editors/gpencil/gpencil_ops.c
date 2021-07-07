@@ -700,6 +700,9 @@ void ED_operatortypes_gpencil(void)
 
   /* armatures */
   WM_operatortype_append(GPENCIL_OT_generate_weights);
+
+  /* Assets. */
+  WM_operatortype_append(GPENCIL_OT_asset_create);
 }
 
 void ED_operatormacros_gpencil(void)
