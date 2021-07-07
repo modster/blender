@@ -1214,7 +1214,8 @@ static void wm_xr_navigation_teleport(bContext *C,
                                       float *ray_dist,
                                       bool selectable_only,
                                       const bool teleport_axes[3],
-                                      float teleport_t)
+                                      float teleport_t,
+                                      float teleport_ofs)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewContext vc;
@@ -1261,6 +1262,9 @@ static void wm_xr_navigation_teleport(bContext *C,
         project_v3_v3v3_normalized(v1, viewer_location, nav_axes[a]);
         sub_v3_v3(v0, v1);
         madd_v3_v3fl(projected, v0, teleport_t);
+        /* Subtract offset. */
+        project_v3_v3v3_normalized(v0, normal, nav_axes[a]);
+        madd_v3_v3fl(projected, v0, teleport_ofs);
       }
       /* Add to final location. */
       add_v3_v3(out, projected);
@@ -1310,7 +1314,7 @@ static int wm_xr_navigation_teleport_modal_3d(bContext *C, wmOperator *op, const
   else if (event->val == KM_RELEASE) {
     XrRaycastData *data = op->customdata;
     bool selectable_only, teleport_axes[3];
-    float teleport_t, ray_dist;
+    float teleport_t, teleport_ofs, ray_dist;
 
     PropertyRNA *prop = RNA_struct_find_property(op->ptr, "teleport_axes");
     if (prop) {
@@ -1322,6 +1326,9 @@ static int wm_xr_navigation_teleport_modal_3d(bContext *C, wmOperator *op, const
 
     prop = RNA_struct_find_property(op->ptr, "interpolation");
     teleport_t = prop ? RNA_property_float_get(op->ptr, prop) : 1.0f;
+
+    prop = RNA_struct_find_property(op->ptr, "offset");
+    teleport_ofs = prop ? RNA_property_float_get(op->ptr, prop) : 0.0f;
 
     prop = RNA_struct_find_property(op->ptr, "selectable_only");
     selectable_only = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
@@ -1336,7 +1343,8 @@ static int wm_xr_navigation_teleport_modal_3d(bContext *C, wmOperator *op, const
                               &ray_dist,
                               selectable_only,
                               teleport_axes,
-                              teleport_t);
+                              teleport_t,
+                              teleport_ofs);
 
     wm_xr_raycast_uninit(op);
 
@@ -1380,6 +1388,15 @@ static void WM_OT_xr_navigation_teleport(wmOperatorType *ot)
                 "Interpolation factor between viewer and hit locations",
                 0.0f,
                 1.0f);
+  RNA_def_float(ot->srna,
+                "offset",
+                0.0f,
+                0.0f,
+                FLT_MAX,
+                "Offset",
+                "Offset along hit normal to subtract from final location",
+                0.0f,
+                FLT_MAX);
   RNA_def_boolean(ot->srna,
                   "selectable_only",
                   true,
