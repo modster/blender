@@ -87,6 +87,7 @@ set(SRC
   intern/gpu_state.cc
   intern/gpu_texture.cc
   intern/gpu_uniform_buffer.cc
+  intern/gpu_uniform_buffer_structs.cc
   intern/gpu_vertex_buffer.cc
   intern/gpu_vertex_format.cc
   intern/gpu_viewport.c

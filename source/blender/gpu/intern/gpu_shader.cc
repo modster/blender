@@ -34,6 +34,7 @@
 #include "gpu_backend.hh"
 #include "gpu_context_private.hh"
 #include "gpu_shader_private.hh"
+#include "gpu_uniform_buffer_private.hh"
 
 #include "CLG_log.h"
 
@@ -184,7 +185,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
 
   if (G.debug & G_DEBUG_GPU) {
     std::optional<GPUUniformBuiltinStructType> best_struct_type =
-        shader->interface->best_builtin_uniform_struct();
+        find_smallest_uniform_builtin_struct(*shader->interface);
     if (best_struct_type) {
       if (/*uniform_struct_type != GPU_UNIFORM_STRUCT_NONE &&*/
           uniform_struct_type != *best_struct_type) {

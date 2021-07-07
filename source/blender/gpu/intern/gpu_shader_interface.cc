@@ -129,45 +129,6 @@ void ShaderInterface::debug_print()
   printf("\n");
 }
 
-/* TODO(jbakker): move to new compile unit (GPU_uniform_structs.cc). */
-
-static bool can_hold_element(const GPUUniformBuiltinStructType struct_type,
-                             const GPUUniformBuiltin builtin_uniform)
-{
-  switch (struct_type) {
-    case GPU_UNIFORM_STRUCT_NONE:
-      return false;
-      break;
-
-    case GPU_UNIFORM_STRUCT_1:
-      return ELEM(builtin_uniform,
-                  GPU_UNIFORM_MODEL,
-                  GPU_UNIFORM_MVP,
-                  GPU_UNIFORM_COLOR,
-                  GPU_UNIFORM_CLIPPLANES,
-                  GPU_UNIFORM_SRGB_TRANSFORM);
-      break;
-
-    case GPU_NUM_UNIFORM_STRUCTS:
-      return false;
-      break;
-  }
-  return false;
-}
-
-static bool can_hold_data(const ShaderInterface &interface,
-                          const GPUUniformBuiltinStructType struct_type)
-{
-  for (int i = 0; i < GPU_NUM_UNIFORMS; i++) {
-    const GPUUniformBuiltin builtin_uniform = static_cast<const GPUUniformBuiltin>(i);
-    const bool builtin_is_used = interface.builtins_[i] != -1;
-    if (builtin_is_used && !can_hold_element(struct_type, builtin_uniform)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 bool ShaderInterface::has_builtin_uniforms() const
 {
   for (int i = 0; i < GPU_NUM_UNIFORMS; i++) {
@@ -176,20 +137,6 @@ bool ShaderInterface::has_builtin_uniforms() const
     }
   }
   return false;
-}
-
-std::optional<const GPUUniformBuiltinStructType> ShaderInterface::best_builtin_uniform_struct()
-    const
-{
-  if (!this->has_builtin_uniforms()) {
-    return std::nullopt;
-  }
-
-  if (can_hold_data(*this, GPU_UNIFORM_STRUCT_1)) {
-    return std::make_optional(GPU_UNIFORM_STRUCT_1);
-  }
-
-  return std::nullopt;
 }
 
 }  // namespace blender::gpu

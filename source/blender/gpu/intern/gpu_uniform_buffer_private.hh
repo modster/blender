@@ -24,10 +24,17 @@
 
 #include "BLI_sys_types.h"
 
+#include <optional>
+
+#include "GPU_shader.h"
+#include "GPU_uniform_buffer_types.h"
+
 struct GPUUniformBuf;
 
 namespace blender {
 namespace gpu {
+
+class ShaderInterface;
 
 #ifdef DEBUG
 #  define DEBUG_NAME_LEN 64
@@ -78,6 +85,21 @@ static inline const UniformBuf *unwrap(const GPUUniformBuf *vert)
 {
   return reinterpret_cast<const UniformBuf *>(vert);
 }
+
+class UniformBuiltinStructType {
+ public:
+  UniformBuiltinStructType(const GPUUniformBuiltinStructType type);
+
+  GPUUniformBuiltinStructType type;
+
+  bool has_all_builtin_uniforms(const ShaderInterface &interface) const;
+
+ private:
+  bool has_attribute(const GPUUniformBuiltin builtin_uniform) const;
+};
+
+std::optional<const GPUUniformBuiltinStructType> find_smallest_uniform_builtin_struct(
+    const ShaderInterface &interface);
 
 #undef DEBUG_NAME_LEN
 

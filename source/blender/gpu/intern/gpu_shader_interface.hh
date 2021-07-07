@@ -77,6 +77,7 @@ class ShaderInterface {
   virtual ~ShaderInterface();
 
   void debug_print(void);
+  bool has_builtin_uniforms() const;
 
   inline const ShaderInput *attr_get(const char *name) const
   {
@@ -126,8 +127,6 @@ class ShaderInterface {
     return builtin_blocks_[builtin];
   }
 
-  std::optional<const GPUUniformBuiltinStructType> best_builtin_uniform_struct() const;
-
  protected:
   static inline const char *builtin_uniform_name(GPUUniformBuiltin u);
   static inline const char *builtin_uniform_block_name(GPUUniformBlockBuiltin u);
@@ -145,7 +144,6 @@ class ShaderInterface {
   inline const ShaderInput *input_lookup(const ShaderInput *const inputs,
                                          const uint inputs_len,
                                          const int binding) const;
-  bool has_builtin_uniforms() const;
 };
 
 inline const char *ShaderInterface::builtin_uniform_name(GPUUniformBuiltin u)
