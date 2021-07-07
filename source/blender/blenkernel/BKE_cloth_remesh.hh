@@ -1459,7 +1459,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       vert.node = std::nullopt;
     }
 
-    return std::move(node);
+    return node;
   }
 
   /**
@@ -1477,9 +1477,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     /* Remove node's reference to this vert if the node hasn't been
      * deleted already */
     if (vert.node) {
-      auto op_node = this->nodes.get(vert.node);
-      BLI_assert(op_node);
-      auto &node = op_node.value().get();
+      auto &node = this->get_checked_node_of_vert(vert);
       node.verts.remove_first_occurrence_and_reorder(vert.self_index);
     }
 
@@ -1492,9 +1490,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       auto &edge = op_edge.value().get();
 
       for (const auto face_index : edge.faces) {
-        auto op_face = this->faces.get(face_index);
-        BLI_assert(op_face);
-        auto &face = op_face.value().get();
+        auto &face = this->get_checked_face(face_index);
 
         /* The ordering of the verts within the face matters, so need
          * to go for this more expensive method of removal */
@@ -1508,14 +1504,11 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
-    return std::move(vert);
+    return vert;
   }
 
   /**
    * Delete the edge and update elements' that refer to this edge.
-   *
-   * This should be called only after the verts of this edge have been
-   * deleted using `delete_vert()`.
    */
   Edge<EED> delete_edge(EdgeIndex edge_index)
   {
@@ -1523,12 +1516,14 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(op_edge);
     auto edge = op_edge.value();
 
-    /* The verts should have been deleted prior to calling this
-     * function otherwise, the link between the faces and verts is
-     * comprimised if not careful. */
-    BLI_assert(edge.verts.has_value() == false);
+    if (edge.verts) {
+      auto &vert_1 = this->get_checked_vert(std::get<0>(edge.verts.value()));
+      vert_1.edges.remove_first_occurrence_and_reorder(edge.self_index);
+      auto &vert_2 = this->get_checked_vert(std::get<1>(edge.verts.value()));
+      vert_2.edges.remove_first_occurrence_and_reorder(edge.self_index);
+    }
 
-    return std::move(edge);
+    return edge;
   }
 
   /**
@@ -1540,15 +1535,26 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(op_face);
     auto face = op_face.value();
 
-    for (const auto &vert_index : face.verts) {
-      auto op_vert = this->verts.get(vert_index);
-      BLI_assert(op_vert);
-      auto vert = op_vert.value();
+    auto vert_1_index = face.verts[0];
+    auto vert_2_index = face.verts[1];
+    for (auto i = 1; i <= face.verts.size(); i++) {
+      vert_1_index = vert_2_index;
+      if (i == face.verts.size()) {
+        vert_2_index = face.verts[0];
+      }
+      else {
+        vert_2_index = face.verts[i];
+      }
 
-      vert.faces.remove_first_occurrence_and_reorder(face.self_index);
+      auto op_edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index);
+      BLI_assert(op_edge_index);
+      auto edge_index = op_edge_index.value();
+      auto &edge = this->get_checked_edge(edge_index);
+
+      edge.faces.remove_first_occurrence_and_reorder(face.self_index);
     }
 
-    return std::move(face);
+    return face;
   }
 
   /**
