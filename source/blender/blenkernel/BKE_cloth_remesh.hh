@@ -292,7 +292,7 @@ template<typename T> class Edge {
     this->extra_data = extra_data;
   }
 
-  bool has_vert(VertIndex vert_index)
+  bool has_vert(VertIndex vert_index) const
   {
     if (this->verts) {
       if (std::get<0>(this->verts.value()) == vert_index ||
@@ -312,6 +312,11 @@ template<typename T> class Edge {
   const auto &get_faces() const
   {
     return this->faces;
+  }
+
+  const auto &get_verts() const
+  {
+    return this->verts;
   }
 
   friend std::ostream &operator<<(std::ostream &stream, const Edge &edge)
