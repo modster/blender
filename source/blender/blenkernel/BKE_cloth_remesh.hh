@@ -1601,6 +1601,12 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
     return {edge_vert_1, edge_vert_2};
   }
+
+  inline Node<END> &get_checked_node_of_vert(const Vert<EVD> &vert)
+  {
+    BLI_assert(vert.node);
+    return this->get_checked_node(vert.node.value());
+  }
 };
 
 template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff {
