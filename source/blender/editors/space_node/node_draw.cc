@@ -985,7 +985,9 @@ static void node_socket_draw_nested(const bContext *C,
         if (str.has_value()) {
           return BLI_strdup(str->c_str());
         }
-        return BLI_strdup("Unknown");
+        return BLI_strdup(
+            "The socket value has not been computed yet because it was not necessary for the "
+            "final output");
       },
       data,
       MEM_freeN);
