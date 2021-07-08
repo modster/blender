@@ -503,6 +503,8 @@ void BKE_gpencil_free(bGPdata *gpd, bool free_all)
     /* clear cache */
     BKE_gpencil_batch_cache_free(gpd);
   }
+  /* Preview. */
+  BKE_previewimg_free(&gpd->preview);
 }
 
 /**
