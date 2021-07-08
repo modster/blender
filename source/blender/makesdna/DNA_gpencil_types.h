@@ -719,6 +719,9 @@ typedef struct bGPdata {
 
   bGPgrid grid;
 
+  /** Preview image for assets. */
+  struct PreviewImage *preview;
+
   bGPdata_Runtime runtime;
 } bGPdata;
 
