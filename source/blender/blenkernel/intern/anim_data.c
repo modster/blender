@@ -336,7 +336,7 @@ AnimData *BKE_animdata_copy(Main *bmain, AnimData *adt, const int flag)
      * BKE_id_copy_ex().
      * So in case we do copy the ID and its sub-IDs in bmain, silence the 'no usercount' flag for
      * the sub-IDs copying.
-     * Note: This is a bit weak, as usually when it comes to recursive ID copy. Should work for
+     * NOTE: This is a bit weak, as usually when it comes to recursive ID copy. Should work for
      * now, but we may have to revisit this at some point and add a proper extra flag to deal with
      * that situation. Or refactor completely the way we handle such recursion, by flattening it
      * e.g. */
@@ -444,7 +444,7 @@ void BKE_animdata_merge_copy(
     return;
   }
 
-  // TODO: we must unset all "tweakmode" flags
+  /* TODO: we must unset all "tweak-mode" flags. */
   if ((src->flag & ADT_NLA_EDIT_ON) || (dst->flag & ADT_NLA_EDIT_ON)) {
     CLOG_ERROR(
         &LOG,
@@ -1563,7 +1563,7 @@ void BKE_animdata_blend_write(BlendWriter *writer, struct AnimData *adt)
     BLO_write_string(writer, aor->rna_path);
   }
 
-  /* TODO write the remaps (if they are needed) */
+  /* TODO: write the remaps (if they are needed). */
 
   /* write NLA data */
   BKE_nla_blend_write(writer, &adt->nla_tracks);
@@ -1590,10 +1590,10 @@ void BKE_animdata_blend_read_data(BlendDataReader *reader, AnimData *adt)
 
   /* relink active track/strip - even though strictly speaking this should only be used
    * if we're in 'tweaking mode', we need to be able to have this loaded back for
-   * undo, but also since users may not exit tweakmode before saving (T24535)
+   * undo, but also since users may not exit tweak-mode before saving (T24535).
    */
   /* TODO: it's not really nice that anyone should be able to save the file in this
-   *       state, but it's going to be too hard to enforce this single case... */
+   *       state, but it's going to be too hard to enforce this single case. */
   BLO_read_data_address(reader, &adt->act_track);
   BLO_read_data_address(reader, &adt->actstrip);
 }
