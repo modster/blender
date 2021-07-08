@@ -128,28 +128,14 @@ bool RE_engine_is_opengl(RenderEngineType *render_type)
   return (render_type->draw_engine != NULL) && DRW_engine_render_support(render_type->draw_engine);
 }
 
-bool RE_engine_supports_alembic_procedural(const RenderEngineType *render_type,
-                                           struct Scene *scene,
-                                           bool *r_is_cycles)
+bool RE_engine_supports_alembic_procedural(const RenderEngineType *render_type, Scene *scene)
 {
   if ((render_type->flag & RE_USE_ALEMBIC_PROCEDURAL) == 0) {
     return false;
   }
 
-  const bool is_cycles = STREQ(render_type->idname, "CYCLES");
-
-  if (r_is_cycles) {
-    *r_is_cycles = is_cycles;
-  }
-
-  /* Cycles only supports the Alembic procedural when the experimental feature set is enabled. */
-  if (is_cycles) {
-    PointerRNA scene_ptr;
-    RNA_id_pointer_create(&scene->id, &scene_ptr);
-    PointerRNA cycles_ptr = RNA_pointer_get(&scene_ptr, "cycles");
-    if (RNA_enum_get(&cycles_ptr, "feature_set") != 1) { /* EXPERIMENTAL */
-      return false;
-    }
+  if (BKE_scene_uses_cycles(scene) && !BKE_scene_uses_cycles_experimental_features(scene)) {
+    return false;
   }
 
   return true;

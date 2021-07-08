@@ -7284,19 +7284,19 @@ void uiTemplateCacheFile(uiLayout *layout,
   /* Only enable render procedural option if the active engine supports it. */
   const struct RenderEngineType *engine_type = CTX_data_engine_type(C);
 
-  bool engine_is_cycles = false;
-  const bool engine_supports_procedural = RE_engine_supports_alembic_procedural(
-      engine_type, CTX_data_scene(C), &engine_is_cycles);
+  Scene *scene = CTX_data_scene(C);
+  const bool engine_supports_procedural = RE_engine_supports_alembic_procedural(engine_type, scene);
 
   if (!engine_supports_procedural) {
     row = uiLayoutRow(layout, false);
-    if (!engine_is_cycles) {
-      uiItemL(row, "The active render engine does not have an Alembic Procedural", ICON_INFO);
-    }
-    else {
+    /* For Cycles, verify that experimental features are enabled. */
+    if (BKE_scene_uses_cycles(scene) && !BKE_scene_uses_cycles_experimental_features(scene)) {
       uiItemL(row,
               "The Cycles Alembic Procedural is only available with the experimental feature set",
               ICON_INFO);
+    }
+    else {
+      uiItemL(row, "The active render engine does not have an Alembic Procedural", ICON_INFO);
     }
   }
 

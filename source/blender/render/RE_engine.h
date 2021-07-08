@@ -237,15 +237,10 @@ void RE_engines_register(RenderEngineType *render_type);
 bool RE_engine_is_opengl(RenderEngineType *render_type);
 
 /**
- * Return true if the RenderEngineType has native support for direct loading of Alembic data.
- *
- * Since Cycles only supports Alembic procedurals in experimental mode, the r_is_cycles parameter,
- * if not null, will be set to true if the RenderEngineType is Cycles. This can be useful to know to
- * e.g. notify users when Cycles is the RenderEngineType but experimental mode is not switched on.
+ * Return true if the RenderEngineType has native support for direct loading of Alembic data. For
+ * Cycles, this also checks that the experimental feature set is enabled.
  */
-bool RE_engine_supports_alembic_procedural(const RenderEngineType *render_type,
-                                           struct Scene *scene,
-                                           bool *r_is_cycles);
+bool RE_engine_supports_alembic_procedural(const RenderEngineType *render_type, Scene *scene);
 
 RenderEngineType *RE_engines_find(const char *idname);
 
