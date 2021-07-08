@@ -1047,7 +1047,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         auto &node = op_node.value().get();
 
         vert.node = node.self_index;
-        node.verts.append(vert.self_index);
+        node.verts.append_non_duplicates(vert.self_index);
 
         /* if vertex normals exist */
         if (normals.size() > normal_index) {
