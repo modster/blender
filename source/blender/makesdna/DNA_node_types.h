@@ -616,6 +616,11 @@ typedef struct bNodeSocketValueMaterial {
 } bNodeSocketValueMaterial;
 
 /* Data structs, for node->storage. */
+
+typedef enum eNodeGroupInputOutputFlags {
+  NODE_GROUP_USE_EXTENSION_SOCKET = 1,
+} eNodeGroupInputOutputFlags;
+
 enum {
   CMP_NODE_MASKTYPE_ADD = 0,
   CMP_NODE_MASKTYPE_SUBTRACT = 1,

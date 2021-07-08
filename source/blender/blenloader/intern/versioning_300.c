@@ -502,5 +502,15 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
     FOREACH_NODETREE_END;
+
+    /* Enable node group extension sockets by default. */
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+        if (ELEM(node->type, NODE_GROUP_INPUT, NODE_GROUP_OUTPUT)) {
+          node->custom1 |= NODE_GROUP_USE_EXTENSION_SOCKET;
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
   }
 }

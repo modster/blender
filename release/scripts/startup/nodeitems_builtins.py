@@ -136,6 +136,7 @@ def node_group_input_items(context):
     for i, iosock in enumerate(ntree.inputs):
         settings = dict()
         # settings["label"] = string_literal(iosock.name)
+        settings["use_extension_socket"] = "False"
         for k, _ in enumerate(ntree.inputs):
             settings["outputs[{}].hide".format(k)] = "False" if k == i else "True"
         yield NodeItem("NodeGroupInput", label=iosock.name, settings=settings, poll=group_input_output_item_poll)
@@ -154,6 +155,7 @@ def node_group_output_items(context):
     for i, iosock in enumerate(ntree.outputs):
         settings = dict()
         # settings["label"] = string_literal(iosock.name)
+        settings["use_extension_socket"] = "False"
         for k, _ in enumerate(ntree.outputs):
             settings["inputs[{}].hide".format(k)] = "False" if k == i else "True"
         yield NodeItem("NodeGroupOutput", label=iosock.name, settings=settings, poll=group_input_output_item_poll)

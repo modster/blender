@@ -515,19 +515,26 @@ bNodeSocket *node_group_input_find_socket(bNode *node, const char *identifier)
 
 static void node_group_input_init(bNodeTree *ntree, bNode *node)
 {
+  node->custom1 |= NODE_GROUP_USE_EXTENSION_SOCKET;
   node_group_input_update(ntree, node);
 }
 
 void node_group_input_update(bNodeTree *ntree, bNode *node)
 {
-  node_group_handle_extension(ntree, node, &node->outputs);
+  const bool use_extension_socket = node->custom1 & NODE_GROUP_USE_EXTENSION_SOCKET;
+
+  if (use_extension_socket) {
+    node_group_handle_extension(ntree, node, &node->outputs);
+  }
 
   /* Check group tree interface and remove or insert sockets as needed. */
   /* SOCK_IN/SOCK_OUT is inverted for interface nodes: Group input nodes have output sockets. */
   group_verify_socket_list(ntree, node, &ntree->inputs, &node->outputs, SOCK_OUT);
 
-  /* Add virtual extension socket. */
-  nodeAddSocket(ntree, node, SOCK_OUT, "NodeSocketVirtual", "__extend__", "");
+  if (use_extension_socket) {
+    /* Add virtual extension socket. */
+    nodeAddSocket(ntree, node, SOCK_OUT, "NodeSocketVirtual", "__extend__", "");
+  }
 }
 
 void register_node_type_group_input(void)
@@ -551,19 +558,26 @@ bNodeSocket *node_group_output_find_socket(bNode *node, const char *identifier)
 
 static void node_group_output_init(bNodeTree *ntree, bNode *node)
 {
+  node->custom1 |= NODE_GROUP_USE_EXTENSION_SOCKET;
   node_group_output_update(ntree, node);
 }
 
 void node_group_output_update(bNodeTree *ntree, bNode *node)
 {
-  node_group_handle_extension(ntree, node, &node->inputs);
+  const bool use_extension_socket = node->custom1 & NODE_GROUP_USE_EXTENSION_SOCKET;
+
+  if (use_extension_socket) {
+    node_group_handle_extension(ntree, node, &node->inputs);
+  }
 
   /* Check group tree interface and remove or insert sockets as needed. */
   /* SOCK_IN/SOCK_OUT is inverted for interface nodes: Group output nodes have input sockets. */
   group_verify_socket_list(ntree, node, &ntree->outputs, &node->inputs, SOCK_IN);
 
-  /* Add virtual extension socket */
-  nodeAddSocket(ntree, node, SOCK_IN, "NodeSocketVirtual", "__extend__", "");
+  if (use_extension_socket) {
+    /* Add virtual extension socket */
+    nodeAddSocket(ntree, node, SOCK_IN, "NodeSocketVirtual", "__extend__", "");
+  }
 }
 
 void register_node_type_group_output(void)
