@@ -74,6 +74,7 @@ Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct
 #  include "BLI_float2.hh"
 #  include "BLI_float3.hh"
 #  include "BLI_generational_arena.hh"
+#  include "BLI_map.hh"
 #  include "BLI_vector.hh"
 
 namespace blender::bke::internal {
@@ -509,9 +510,17 @@ class MeshIO {
       normals.append(normal);
     }
 
-    for (auto i = 0; i < mesh->totloop; i++) {
-      uvs.append(mesh->mloopuv[i].uv);
-    }
+    /* A UV map is needed because the UVs stored the mesh are stored
+     * per loop which means there are UVs that repeat, this leads to
+     * having 2 or more unique edges per 1 true edge. The UV map is
+     * used to combine UVs and create the correct indexing for these.
+     *
+     * The map has a key as the tuple stores the mloop::v and uv
+     * coordinates. The map has the corresponding index stored.
+     */
+    using UVMapKey = std::pair<usize, float2>;
+    blender::Map<UVMapKey, usize> uv_map;
+    usize true_uv_index = 0;
 
     for (auto i = 0; i < mesh->totpoly; i++) {
       const auto &mp = mesh->mpoly[i];
@@ -521,8 +530,15 @@ class MeshIO {
       for (auto j = 0; j < mp.totloop; j++) {
         const auto &ml = mesh->mloop[mp.loopstart + j];
         usize pos_index = ml.v;
-        usize uv_index = mp.loopstart + j;
         usize normal_index = ml.v;
+
+        const UVMapKey key = {ml.v, mesh->mloopuv[mp.loopstart + j].uv};
+        if (uv_map.contains(key) == false) {
+          uvs.append(mesh->mloopuv[mp.loopstart + j].uv);
+          uv_map.add_new(key, true_uv_index);
+          true_uv_index++;
+        }
+        usize uv_index = uv_map.lookup(key);
 
         face.append(std::make_tuple(pos_index, uv_index, normal_index));
       }
