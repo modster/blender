@@ -952,7 +952,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   std::optional<EdgeIndex> get_connecting_edge_index(VertIndex vert_1_index,
-                                                     VertIndex vert_2_index)
+                                                     VertIndex vert_2_index) const
   {
     auto op_vert_1 = this->verts.get(vert_1_index);
     if (op_vert_1 == std::nullopt) {
@@ -976,6 +976,22 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     }
 
     return std::nullopt;
+  }
+
+  blender::Vector<EdgeIndex> get_connecting_edge_indices(const Node<END> &node_1,
+                                                         const Node<END> &node_2) const
+  {
+    blender::Vector<EdgeIndex> res;
+    for (const auto &vert_index_1 : node_1.get_verts()) {
+      for (const auto &vert_index_2 : node_2.get_verts()) {
+        auto op_edge_index = this->get_connecting_edge_index(vert_index_1, vert_index_2);
+        if (op_edge_index) {
+          res.append(op_edge_index.value());
+        }
+      }
+    }
+
+    return res;
   }
 
   /**
@@ -1275,6 +1291,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
+    std::cout << "line_indices: " << line_indices << std::endl;
+
     MeshIO result;
     result.set_positions(std::move(positions));
     result.set_uvs(std::move(uvs));
@@ -1297,13 +1315,18 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   /**
    * Splits the edge and keeps the triangulation of the Mesh
    *
+   * @param across_seams If true, think of edge as world space edge
+   * and not UV space, this means, all the faces across all the edges
+   * formed between the nodes of the given edge are also split and
+   * triangulated regardless if it on a seam or not.
+   *
    * Returns the `MeshDiff` that lead to the operation.
    *
    * Note, the caller must ensure the adjacent faces to the edge are
    * triangulated. In debug mode, it will assert, in release mode, it
    * is undefined behaviour.
    **/
-  MeshDiff<END, EVD, EED, EFD> split_edge_triangulate(EdgeIndex edge_index)
+  MeshDiff<END, EVD, EED, EFD> split_edge_triangulate(EdgeIndex edge_index, bool across_seams)
   {
     /* This operation will delete the following-
      * the edge specified, faces incident to the edge.
@@ -1322,83 +1345,115 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     blender::Vector<Edge<EED>> deleted_edges;
     blender::Vector<Face<EFD>> deleted_faces;
 
-    auto &edge_a = this->get_checked_edge(edge_index);
-    auto [edge_vert_1_a, edge_vert_2_a] = this->get_checked_verts_of_edge(edge_a);
-    auto &edge_node_1 = this->get_checked_node_of_vert(edge_vert_1_a);
-    auto &edge_node_2 = this->get_checked_node_of_vert(edge_vert_2_a);
+    auto &edge_pre = this->get_checked_edge(edge_index);
+    auto [edge_vert_1_pre, edge_vert_2_pre] = this->get_checked_verts_of_edge(edge_pre);
+    auto &edge_node_1 = this->get_checked_node_of_vert(edge_vert_1_pre);
+    auto &edge_node_2 = this->get_checked_node_of_vert(edge_vert_2_pre);
 
-    /* Create the new vert and node by interpolating the verts and
-     * nodes of the edge */
-    auto &new_vert = this->add_empty_interp_vert(edge_vert_1_a, edge_vert_2_a);
+    blender::Vector<EdgeIndex> edge_indices = {edge_index};
+    if (across_seams) {
+      edge_indices = this->get_connecting_edge_indices(edge_node_1, edge_node_2);
+    }
+
+    std::cout << "edge_indices: " << edge_indices << std::endl;
+
+    /* Create the new new by interpolating the nodes of the edge */
     auto &new_node = this->add_empty_interp_node(edge_node_1, edge_node_2);
 
-    /* Need to reinitialize edge verts because `add_empty_interp_vert()` may have
-     * reallocated `this->verts` */
-    auto [edge_vert_1, edge_vert_2] = this->get_checked_verts_of_edge(edge_a);
+    for (const auto &edge_index : edge_indices) {
+      auto &edge_a = this->get_checked_edge(edge_index);
+      auto [edge_vert_1_a, edge_vert_2_a] = this->get_checked_verts_of_edge(edge_a);
 
-    /* Link new_vert with new_node */
-    new_vert.node = new_node.self_index;
-    new_node.verts.append(new_vert.self_index);
+      /* Create the new vert by interpolating the verts of the edge */
+      auto &new_vert = this->add_empty_interp_vert(edge_vert_1_a, edge_vert_2_a);
 
-    /* Create edges between edge_vert_1, new_vert, edge_vert_2 */
-    {
+      auto [edge_vert_1_b, edge_vert_2_b] = this->get_checked_verts_of_edge(edge_a);
+
+      /* Link new_vert with new_node */
+      new_vert.node = new_node.self_index;
+      new_node.verts.append(new_vert.self_index);
+
+      /* Create edges between edge_vert_1, new_vert, edge_vert_2 */
       auto &new_edge_1 = this->add_empty_edge();
-      new_edge_1.verts = {edge_vert_1.self_index, new_vert.self_index};
+      new_edge_1.verts = {edge_vert_1_b.self_index, new_vert.self_index};
       added_edges.append(new_edge_1.self_index);
+      auto &new_edge_1_index = new_edge_1.self_index;
 
       auto &new_edge_2 = this->add_empty_edge();
-      new_edge_2.verts = {new_vert.self_index, edge_vert_2.self_index};
+      new_edge_2.verts = {new_vert.self_index, edge_vert_2_b.self_index};
       added_edges.append(new_edge_2.self_index);
-    }
+      auto &new_edge_2_index = new_edge_2.self_index;
 
-    /* Need to reinitialize edge because `add_empty_edge()` may have
-     * reallocated `this->edges` */
-    auto &edge_b = this->get_checked_edge(edge_index);
-    auto faces = edge_b.faces;
+      /* Need to reinitialize edge because `add_empty_edge()` may have
+       * reallocated `this->edges` */
+      auto &edge_b = this->get_checked_edge(edge_index);
+      auto faces = edge_b.faces;
 
-    for (const auto &face_index : faces) {
-      auto face = this->delete_face(face_index);
+      for (const auto &face_index : faces) {
+        auto face = this->delete_face(face_index);
 
-      /* Ensure the faces are triangulated before calling this function */
-      BLI_assert(face.verts.size() == 3);
+        /* Ensure the faces are triangulated before calling this function */
+        BLI_assert(face.verts.size() == 3);
 
-      auto &other_vert = this->get_checked_other_vert(edge_b, face);
+        auto &other_vert = this->get_checked_other_vert(edge_b, face);
 
-      /* TODO(ish): Ordering of the verts and nodes needs to be found correctly */
-      /* Handle new face creation */
-      {
-        auto &new_face_1 = this->add_empty_face(face.normal);
-        new_face_1.verts.append(edge_vert_1.self_index);
-        new_face_1.verts.append(other_vert.self_index);
-        new_face_1.verts.append(new_vert.self_index);
-        added_faces.append(new_face_1.self_index);
+        /* TODO(ish): Ordering of the verts and nodes needs to be found correctly */
+        /* Handle new face and new edge creation */
+        {
+          /* Handle new edge creation between new_vert and other_vert */
+          auto &new_edge = this->add_empty_edge();
+          new_edge.verts = std::make_tuple(other_vert.self_index, new_vert.self_index);
+          added_edges.append(new_edge.self_index);
 
-        /* Here `face` doesn't need to be reinitialized because this
-         * for loop owns `face` */
+          auto &new_face_1 = this->add_empty_face(face.normal);
+          new_face_1.verts.append(edge_vert_1_b.self_index);
+          new_face_1.verts.append(other_vert.self_index);
+          new_face_1.verts.append(new_vert.self_index);
+          added_faces.append(new_face_1.self_index);
 
-        auto &new_face_2 = this->add_empty_face(face.normal);
-        new_face_2.verts.append(other_vert.self_index);
-        new_face_2.verts.append(edge_vert_2.self_index);
-        new_face_2.verts.append(new_vert.self_index);
-        added_faces.append(new_face_2.self_index);
+          /* link edges with new_face_1 */
+          {
+            new_edge.faces.append(new_face_1.self_index);
+            auto &new_edge_1 = this->get_checked_edge(new_edge_1_index);
+            new_edge_1.faces.append(new_face_1.self_index);
+            auto old_edge_1_index = this->get_connecting_edge_index(other_vert.self_index,
+                                                                    edge_vert_1_b.self_index)
+                                        .value();
+            auto &old_edge_1 = this->get_checked_edge(old_edge_1_index);
+            old_edge_1.faces.append(new_face_1.self_index);
+          }
 
-        /* Here `face` doesn't need to be reinitialized because this
-         * for loop owns `face` */
+          /* Here `face` doesn't need to be reinitialized because this
+           * for loop owns `face` */
 
-        deleted_faces.append(std::move(face));
+          auto &new_face_2 = this->add_empty_face(face.normal);
+          new_face_2.verts.append(other_vert.self_index);
+          new_face_2.verts.append(edge_vert_2_b.self_index);
+          new_face_2.verts.append(new_vert.self_index);
+          added_faces.append(new_face_2.self_index);
+
+          /* link edges with new_face_2 */
+          {
+            new_edge.faces.append(new_face_2.self_index);
+            auto &new_edge_2 = this->get_checked_edge(new_edge_2_index);
+            new_edge_2.faces.append(new_face_2.self_index);
+            auto old_edge_2_index = this->get_connecting_edge_index(other_vert.self_index,
+                                                                    edge_vert_2_b.self_index)
+                                        .value();
+            auto &old_edge_2 = this->get_checked_edge(old_edge_2_index);
+            old_edge_2.faces.append(new_face_2.self_index);
+          }
+
+          /* Here `face` doesn't need to be reinitialized because this
+           * for loop owns `face` */
+          deleted_faces.append(std::move(face));
+        }
       }
 
-      /* Handle new edge creation between new_vert and other_vert */
-      {
-        auto &new_edge = this->add_empty_edge();
-        new_edge.verts = std::make_tuple(other_vert.self_index, new_vert.self_index);
-        added_edges.append(new_edge.self_index);
-      }
+      auto edge_c = this->delete_edge(edge_index);
+
+      deleted_edges.append(std::move(edge_c));
     }
-
-    auto edge_c = this->delete_edge(edge_index);
-
-    deleted_edges.append(std::move(edge_c));
     return MeshDiff(std::move(added_nodes),
                     std::move(added_verts),
                     std::move(added_edges),

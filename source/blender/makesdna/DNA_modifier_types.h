@@ -2349,8 +2349,13 @@ typedef struct AdaptiveRemeshModifierData {
 
   int edge_index;
 
-  char _pad[4];
+  /* AdaptiveRemeshFlag */
+  uint32_t flag;
 } AdaptiveRemeshModifierData;
+
+typedef enum AdaptiveRemeshFlag {
+  ADAPTIVE_REMESH_SPLIT_EDGE_ACROSS_SEAMS = 1 << 0,
+} AdaptiveRemeshFlag;
 
 #ifdef __cplusplus
 }

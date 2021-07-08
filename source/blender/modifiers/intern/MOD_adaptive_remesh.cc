@@ -44,6 +44,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   AdaptiveRemeshModifierData *armd = (AdaptiveRemeshModifierData *)md;
 
   auto edge_i = armd->edge_index;
+  auto across_seams = armd->flag & ADAPTIVE_REMESH_SPLIT_EDGE_ACROSS_SEAMS;
 
   internal::MeshIO reader;
   reader.read(mesh);
@@ -58,8 +59,9 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   auto op_edge_index = internal_mesh.get_edges().get_no_gen_index(edge_i);
   if (op_edge_index) {
     auto edge_index = op_edge_index.value();
-    std::cout << "edge_index: " << edge_index << " edge_i: " << armd->edge_index << std::endl;
-    internal_mesh.split_edge_triangulate(edge_index);
+    std::cout << "edge_index: " << edge_index << " edge_i: " << armd->edge_index
+              << " across_seams: " << across_seams << std::endl;
+    internal_mesh.split_edge_triangulate(edge_index, across_seams);
   }
 
   internal::MeshIO writer = internal_mesh.write();
@@ -82,6 +84,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
 
   uiItemR(layout, ptr, "edge_index", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "use_across_seams", 0, nullptr, ICON_NONE);
 
   modifier_panel_end(layout, ptr);
 }

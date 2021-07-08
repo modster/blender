@@ -7245,6 +7245,11 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
   RNA_def_property_range(prop, 0, INT_MAX);
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
+  prop = RNA_def_property(srna, "use_across_seams", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", ADAPTIVE_REMESH_SPLIT_EDGE_ACROSS_SEAMS);
+  RNA_def_property_ui_text(prop, "Across Seams", "Run current Mesh operation across UV seams");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
   RNA_define_lib_overridable(false);
 }
 

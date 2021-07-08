@@ -52,6 +52,7 @@
 #define _DNA_DEFAULT_AdaptiveRemeshModifierData \
   { \
     .edge_index = 0, \
+    .flag = 0, \
   }
 
 #define _DNA_DEFAULT_BevelModifierData \
