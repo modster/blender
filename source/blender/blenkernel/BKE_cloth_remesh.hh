@@ -1390,9 +1390,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
       /* Handle new edge creation between new_vert and other_vert */
       {
-        /* TODO(ish): due to `this->add_empty_edge()` here, the
-         * `edge_b`'s reference becomes invalid. Need to figure out
-         * how to fix this */
         auto &new_edge = this->add_empty_edge();
         new_edge.verts = std::make_tuple(other_vert.self_index, new_vert.self_index);
         added_edges.append(new_edge.self_index);
