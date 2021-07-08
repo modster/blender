@@ -4668,6 +4668,13 @@ static void def_group_input(StructRNA *srna)
   RNA_def_property_struct_type(prop, "PropertyGroup");
   RNA_def_property_flag(prop, PROP_IDPROPERTY);
   RNA_def_property_ui_text(prop, "Interface", "Interface socket data");
+
+  prop = RNA_def_property(srna, "use_extension_socket", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "custom1", NODE_GROUP_USE_EXTENSION_SOCKET);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_ui_text(
+      prop, "Use Extension Socket", "Add a virtual socket to the node for extending the node group interface");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
 static void def_group_output(StructRNA *srna)
@@ -4680,6 +4687,15 @@ static void def_group_output(StructRNA *srna)
   RNA_def_property_struct_type(prop, "PropertyGroup");
   RNA_def_property_flag(prop, PROP_IDPROPERTY);
   RNA_def_property_ui_text(prop, "Interface", "Interface socket data");
+
+  prop = RNA_def_property(srna, "use_extension_socket", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "custom1", NODE_GROUP_USE_EXTENSION_SOCKET);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_ui_text(
+      prop,
+      "Use Extension Socket",
+      "Add a virtual socket to the node for extending the node group interface");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
   prop = RNA_def_property(srna, "is_active_output", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", NODE_DO_OUTPUT);
