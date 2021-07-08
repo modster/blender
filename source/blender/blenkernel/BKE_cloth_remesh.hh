@@ -1677,7 +1677,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto face = op_face.value();
 
     auto vert_1_index = face.verts[0];
-    auto vert_2_index = face.verts[1];
+    auto vert_2_index = face.verts[0];
     for (auto i = 1; i <= face.verts.size(); i++) {
       vert_1_index = vert_2_index;
       if (i == face.verts.size()) {
