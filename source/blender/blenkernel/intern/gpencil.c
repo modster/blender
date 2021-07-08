@@ -77,7 +77,7 @@ static CLG_LogRef LOG = {"bke.gpencil"};
 static void greasepencil_copy_data(Main *UNUSED(bmain),
                                    ID *id_dst,
                                    const ID *id_src,
-                                   const int UNUSED(flag))
+                                   const int flag)
 {
   bGPdata *gpd_dst = (bGPdata *)id_dst;
   const bGPdata *gpd_src = (const bGPdata *)id_src;
@@ -122,6 +122,13 @@ static void greasepencil_copy_data(Main *UNUSED(bmain),
     }
 
     BLI_addtail(&gpd_dst->layers, gpl_dst);
+  }
+
+  if (flag & LIB_ID_COPY_NO_PREVIEW) {
+    gpd_dst->preview = NULL;
+  }
+  else {
+    BKE_previewimg_id_copy(&gpd_dst->id, &gpd_src->id);
   }
 }
 
@@ -190,6 +197,8 @@ static void greasepencil_blend_write(BlendWriter *writer, ID *id, const void *id
         }
       }
     }
+
+    BKE_previewimg_blend_write(writer, gpd->preview);
   }
 }
 
@@ -203,6 +212,10 @@ void BKE_gpencil_blend_read_data(BlendDataReader *reader, bGPdata *gpd)
   /* Relink anim-data. */
   BLO_read_data_address(reader, &gpd->adt);
   BKE_animdata_blend_read_data(reader, gpd->adt);
+
+  /* Preview. */
+  BLO_read_data_address(reader, &gpd->preview);
+  BKE_previewimg_blend_read(reader, gpd->preview);
 
   /* Ensure full objectmode for linked grease pencil. */
   if (gpd->id.lib != NULL) {
