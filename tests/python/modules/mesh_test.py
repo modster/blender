@@ -33,13 +33,14 @@
 #    delete the duplicate object
 #
 # The words in angle brackets are parameters of the test, and are specified in
-# the main class MeshTest.
+# the abstract class MeshTest.
 #
 # If the environment variable BLENDER_TEST_UPDATE is set to 1, the <expected_object>
 # is updated with the new test result.
 # Tests are verbose when the environment variable BLENDER_VERBOSE is set.
 
 
+from abc import ABC, abstractmethod
 import bpy
 import functools
 import inspect
@@ -94,7 +95,9 @@ class ParticleSystemSpec:
 
     def __str__(self):
         return "Physics Modifier: " + self.modifier_name + " of type " + self.modifier_type + \
-               " with parameters: " + str(self.modifier_parameters) + " with frame end: " + str(self.frame_end)
+               " with parameters: " + \
+            str(self.modifier_parameters) + \
+            " with frame end: " + str(self.frame_end)
 
 
 class OperatorSpecEditMode:
@@ -113,13 +116,15 @@ class OperatorSpecEditMode:
         self.operator_name = operator_name
         self.operator_parameters = operator_parameters
         if select_mode not in ['VERT', 'EDGE', 'FACE']:
-            raise ValueError("select_mode must be either {}, {} or {}".format('VERT', 'EDGE', 'FACE'))
+            raise ValueError("select_mode must be either {}, {} or {}".format(
+                'VERT', 'EDGE', 'FACE'))
         self.select_mode = select_mode
         self.selection = selection
 
     def __str__(self):
         return "Operator: " + self.operator_name + " with parameters: " + str(self.operator_parameters) + \
-               " in selection mode: " + self.select_mode + ", selecting " + str(self.selection)
+               " in selection mode: " + self.select_mode + \
+            ", selecting " + str(self.selection)
 
 
 class OperatorSpecObjectMode:
@@ -161,121 +166,270 @@ class DeformModifierSpec:
         return "Modifier: " + str(self.modifier_list) + " with object operator " + str(self.object_operator_spec)
 
 
-class MeshTest:
+class MeshTest(ABC):
     """
-    A mesh testing class targeted at testing modifiers and operators on a single object.
-    It holds a stack of mesh operations, i.e. modifiers or operators. The test is executed using
-    the public method run_test().
+    A mesh testing Abstract class that hold common functionalities for testting operations.
     """
 
-    def __init__(
-        self,
-        test_name: str,
-        test_object_name: str,
-        expected_object_name: str,
-        operations_stack=None,
-        apply_modifiers=False,
-        do_compare=False,
-        threshold=None
-    ):
+    def __init__(self, test_object_name, exp_object_name, test_name=None, threshold=None):
         """
-        Constructs a MeshTest object. Raises a KeyError if objects with names expected_object_name
-        or test_object_name don't exist.
-        :param test_name: str - unique test name identifier.
         :param test_object_name: str - Name of object of mesh type to run the operations on.
-        :param expected_object_name: str - Name of object of mesh type that has the expected
+        :param exp_object_name: str - Name of object of mesh type that has the expected
                                 geometry after running the operations.
-        :param operations_stack: list - stack holding operations to perform on the test_object.
-        :param apply_modifiers: bool - True if we want to apply the modifiers right after adding them to the object.
-                                    - True if we want to apply the modifier to a list of modifiers, after some operation.
-                               This affects operations of type ModifierSpec and DeformModifierSpec.
-        :param do_compare: bool - True if we want to compare the test and expected objects, False otherwise.
-        :param threshold : exponent: To allow variations and accept difference to a certain degree.
-
+        :param test_name: str - Name of the test.
+        :param threshold: exponent: To allow variations and accept difference to a certain degree.
         """
-        if operations_stack is None:
-            operations_stack = []
-        for operation in operations_stack:
-            if not (isinstance(operation, ModifierSpec) or isinstance(operation, OperatorSpecEditMode)
-                    or isinstance(operation, OperatorSpecObjectMode) or isinstance(operation, DeformModifierSpec)
-                    or isinstance(operation, ParticleSystemSpec)):
-                raise ValueError("Expected operation of type {} or {} or {} or {}. Got {}".
-                                 format(type(ModifierSpec), type(OperatorSpecEditMode),
-                                        type(DeformModifierSpec), type(ParticleSystemSpec),
-                                        type(operation)))
-        self.operations_stack = operations_stack
-        self.apply_modifier = apply_modifiers
-        self.do_compare = do_compare
+        self.test_object_name = test_object_name
+        self.exp_object_name = exp_object_name
+        if test_name:
+            self.test_name = test_name
+        else:
+            filepath = bpy.data.filepath
+            self.test_name = bpy.path.display_name_from_filepath(filepath)
         self.threshold = threshold
-        self.test_name = test_name
-
-        self.verbose = os.environ.get("BLENDER_VERBOSE") is not None
-        self.update = os.getenv('BLENDER_TEST_UPDATE') is not None
-
-        # Initialize test objects.
+        self.update = os.getenv("BLENDER_TEST_UPDATE") is not None
+        self.verbose = os.getenv("BLENDER_VERBOSE") is not None
+        self.test_updated_counter = 0
         objects = bpy.data.objects
-        self.test_object = objects[test_object_name]
-        self.expected_object = objects[expected_object_name]
-        if self.verbose:
-            print("Found test object {}".format(test_object_name))
-            print("Found test object {}".format(expected_object_name))
+        self.test_object = objects[self.test_object_name]
 
-        # Private flag to indicate whether the blend file was updated after the test.
-        self._test_updated = False
+        if self.update:
+            if objects.find(exp_object_name) > -1:
+                self.expected_object = objects[self.exp_object_name]
+            else:
+                self.create_expected_object()
+        else:
+            self.expected_object = objects[self.exp_object_name]
 
-    def set_test_object(self, test_object_name):
+    def create_expected_object(self):
         """
-        Set test object for the test. Raises a KeyError if object with given name does not exist.
-        :param test_object_name: name of test object to run operations on.
+        Creates an expected object 10 units away
+        in Y direction from test object.
         """
-        objects = bpy.data.objects
-        self.test_object = objects[test_object_name]
+        print("Creating expected object...")
+        evaluated_object = self.create_evaluated_object()
+        self.expected_object = evaluated_object
+        self.expected_object.name = self.exp_object_name
+        x, y, z = self.test_object.location
+        self.expected_object.location = (x, y+10, z)
+        bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
 
-    def set_expected_object(self, expected_object_name):
+    def create_evaluated_object(self):
         """
-        Set expected object for the test. Raises a KeyError if object with given name does not exist
-        :param expected_object_name: Name of expected object.
+        Creates an evaluated object.
         """
-        objects = bpy.data.objects
-        self.expected_object = objects[expected_object_name]
+        bpy.context.view_layer.objects.active = self.test_object
 
-    def _on_failed_test(self, compare_result, validation_success, evaluated_test_object):
-        if self.update and validation_success:
+        # Duplicate test object.
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.object.select_all(action="DESELECT")
+        bpy.context.view_layer.objects.active = self.test_object
+
+        self.test_object.select_set(True)
+        bpy.ops.object.duplicate()
+        evaluated_test_object = bpy.context.active_object
+        evaluated_test_object.name = "evaluated_object"
+        return evaluated_test_object
+
+    @staticmethod
+    def _print_result(result):
+        """
+        Prints the comparison, selection and validation result.
+        """
+        comparison_result, selection_result, validation_result = result
+        print("Mesh Comparison: {}".format(comparison_result))
+        print("Selection Result: {}".format(selection_result))
+        print("Mesh Validation: {}".format(validation_result))
+        print()
+
+    def run_test(self):
+        """
+        Runs a single test, runs it again if test file is updated.
+        """
+        evaluated_test_object = self.create_evaluated_object()
+        self.apply_operations(evaluated_test_object)
+        result = self.compare_meshes(evaluated_test_object)
+
+        comparison_result, selection_result, validation_result = result
+
+        if comparison_result == "Same" and selection_result == "Same" and validation_result == "Valid":
+            self.passed_test(result)
+            # Clean up.
             if self.verbose:
-                print("Test failed expectantly. Updating expected mesh...")
-
-            # Replace expected object with object we ran operations on, i.e. evaluated_test_object.
-            evaluated_test_object.location = self.expected_object.location
-            expected_object_name = self.expected_object.name
-            evaluated_selection = {v.index for v in evaluated_test_object.data.vertices if v.select}
-
-            bpy.data.objects.remove(self.expected_object, do_unlink=True)
-            evaluated_test_object.name = expected_object_name
-            self._do_selection(evaluated_test_object.data, "VERT", evaluated_selection)
-
-            # Save file.
-            bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
-
-            self._test_updated = True
-
-            # Set new expected object.
-            self.expected_object = evaluated_test_object
+                print("Cleaning up...")
+            # Delete evaluated_test_object.
+            bpy.ops.object.delete()
             return True
 
-        else:
-            print("Test comparison result: {}".format(compare_result))
-            print("Test validation result: {}".format(validation_success))
-            print("Resulting object mesh '{}' did not match expected object '{}' from file {}".
-                  format(evaluated_test_object.name, self.expected_object.name, bpy.data.filepath))
+        elif self.update:
+            self.failed_test(result)
+            self.update_failed_test(evaluated_test_object)
+            if self.test_updated_counter == 1:
+                self.run_test()
+                return True
+            else:
+                print("The test fails consistently. Exiting...")
+                return False
 
+        else:
+            self.failed_test(result)
             return False
 
-    def is_test_updated(self):
+    def failed_test(self, result):
+        print("\nFAILED {} test with the following: ".format(self.test_name))
+        self._print_result(result)
+        # Real implementation.
+        pass
+
+    def passed_test(self, result):
+        print("\nPASSED {} test successfully.".format(self.test_name))
+        self._print_result(result)
+        # Real implementation
+        pass
+
+    def do_selection(self, mesh: bpy.types.Mesh, select_mode: str, selection: set):
         """
-        Check whether running the test with BLENDER_TEST_UPDATE actually modified the .blend test file.
-        :return: Bool - True if blend file has been updated. False otherwise.
+        Do selection on a mesh
+        :param mesh: bpy.types.Mesh - input mesh
+        :param: select_mode: str - selection mode. Must be 'VERT', 'EDGE' or 'FACE'
+        :param: selection: set - indices of selection.
+
+        Example: select_mode='VERT' and selection={1,2,3} selects veritces 1, 2 and 3 of input mesh
         """
-        return self._test_updated
+        # deselect all
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        bpy.context.tool_settings.mesh_select_mode = (select_mode == 'VERT',
+                                                      select_mode == 'EDGE',
+                                                      select_mode == 'FACE')
+
+        items = (mesh.vertices if select_mode == 'VERT'
+                 else mesh.edges if select_mode == 'EDGE'
+                 else mesh.polygons if select_mode == 'FACE'
+                 else None)
+        if items is None:
+            raise ValueError("Invalid selection mode")
+        for index in selection:
+            items[index].select = True
+
+    def update_failed_test(self, evaluated_test_object):
+        # Update expected object.
+        evaluated_test_object.location = self.expected_object.location
+        expected_object_name = self.expected_object.name
+        evaluated_selection = {
+            v.index for v in evaluated_test_object.data.vertices if v.select}
+
+        bpy.data.objects.remove(self.expected_object, do_unlink=True)
+        evaluated_test_object.name = expected_object_name
+        self.do_selection(evaluated_test_object.data,
+                          "VERT", evaluated_selection)
+
+        # Save file.
+        bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
+        self.test_updated_counter += 1
+        self.expected_object = evaluated_test_object
+
+    def compare_meshes(self, evaluated_object):
+        objects = bpy.data.objects
+        evaluated_test_mesh = objects[evaluated_object.name].data
+        expected_mesh = self.expected_object.data
+        result_codes = []
+
+        # Mesh Comparison.
+        if self.threshold:
+            result_mesh = expected_mesh.unit_test_compare(
+                mesh=evaluated_test_mesh, threshold=self.threshold)
+        else:
+            result_mesh = expected_mesh.unit_test_compare(
+                mesh=evaluated_test_mesh)
+        result_codes.append(result_mesh)
+
+        # Selection comparison.
+
+        selected_evaluated_verts = [
+            v.index for v in evaluated_test_mesh.vertices if v.select]
+        selected_expected_verts = [
+            v.index for v in expected_mesh.vertices if v.select]
+
+        if selected_evaluated_verts == selected_expected_verts:
+            result_selection = "Same"
+        else:
+            result_selection = "Selection doesn't match."
+        result_codes.append(result_selection)
+
+        # Validation check.
+        result_validation = evaluated_test_mesh.validate(verbose=True)
+        if result_validation:
+            result_validation = "Invalid Mesh"
+        else:
+            result_validation = "Valid"
+        result_codes.append(result_validation)
+
+        return result_codes
+
+    @abstractmethod
+    def apply_operations(self, evaluated_test_object):
+        pass
+
+
+class SpecMeshTest(MeshTest):
+    """
+    A mesh testing inherited from MeshTest class targeted at testing modifiers and operators  on a single object.
+    It holds a stack of mesh operations, i.e. modifiers or operators. The test is executed using MeshTest's run_test.
+    """
+
+    def __init__(self, test_name,
+                 test_object_name, exp_object_name,
+                 operations_stack=None,
+                 apply_modifier=True,
+                 do_compare=True,
+                 threshold=None):
+        """
+        :param operations_stack: list - stack holding operations to perform on the test_object.
+        :param apply_modifier: bool - True if we want to apply the modifiers right after adding them to the object.
+                                    - True if we want to apply the modifier to list of modifiers, after some operation.
+                               This affects operations of type ModifierSpec and DeformModifierSpec.
+        :param do_compare: bool - True if we want to compare the test and expected objects, False otherwise.
+        """
+
+        super().__init__(test_object_name, exp_object_name, test_name, threshold)
+        self.test_name = test_name
+        if operations_stack is None:
+            self.operations_stack = []
+        else:
+            self.operations_stack = operations_stack
+        self.apply_modifier = apply_modifier
+        self.do_compare = do_compare
+
+    def apply_operations(self, evaluated_test_object):
+        # Add modifiers and operators.
+        print("Applying operations...")
+        for operation in self.operations_stack:
+            if isinstance(operation, ModifierSpec):
+                self._add_modifier(evaluated_test_object, operation)
+                if self.apply_modifier:
+                    self._apply_modifier(
+                        evaluated_test_object, operation.modifier_name)
+
+            elif isinstance(operation, OperatorSpecEditMode):
+                self._apply_operator_edit_mode(
+                    evaluated_test_object, operation)
+
+            elif isinstance(operation, OperatorSpecObjectMode):
+                self._apply_operator_object_mode(operation)
+
+            elif isinstance(operation, DeformModifierSpec):
+                self._apply_deform_modifier(evaluated_test_object, operation)
+
+            elif isinstance(operation, ParticleSystemSpec):
+                self._apply_particle_system(evaluated_test_object, operation)
+
+            else:
+                raise ValueError("Expected operation of type {} or {} or {} or {}. Got {}".
+                                 format(type(ModifierSpec), type(OperatorSpecEditMode),
+                                        type(OperatorSpecObjectMode), type(ParticleSystemSpec), type(operation)))
 
     def _set_parameters_impl(self, modifier, modifier_parameters, nested_settings_path, modifier_name):
         """
@@ -312,18 +466,20 @@ class MeshTest:
 
         for key in modifier_parameters:
             nested_settings_path.append(key)
-            self._set_parameters_impl(modifier, modifier_parameters[key], nested_settings_path, modifier_name)
+            self._set_parameters_impl(
+                modifier, modifier_parameters[key], nested_settings_path, modifier_name)
 
         if nested_settings_path:
             nested_settings_path.pop()
 
     def set_parameters(self, modifier, modifier_parameters):
         """
-        Wrapper for _set_parameters_util
+        Wrapper for _set_parameters_impl.
         """
         settings = []
         modifier_name = modifier.name
-        self._set_parameters_impl(modifier, modifier_parameters, settings, modifier_name)
+        self._set_parameters_impl(
+            modifier, modifier_parameters, settings, modifier_name)
 
     def _add_modifier(self, test_object, modifier_spec: ModifierSpec):
         """
@@ -338,7 +494,8 @@ class MeshTest:
                                              modifier_spec.modifier_type)
 
         if modifier is None:
-            raise Exception("This modifier type is already added on the Test Object, please remove it and try again.")
+            raise Exception(
+                "This modifier type is already added on the Test Object, please remove it and try again.")
 
         if self.verbose:
             print("Created modifier '{}' of type '{}'.".
@@ -351,7 +508,8 @@ class MeshTest:
         self.set_parameters(modifier, modifier_spec.modifier_parameters)
 
         if modifier.type in bakers_list:
-            self._bake_current_simulation(test_object, modifier.name, modifier_spec.frame_end)
+            self._bake_current_simulation(
+                test_object, modifier.name, modifier_spec.frame_end)
 
         scene.frame_set(modifier_spec.frame_end)
 
@@ -379,14 +537,16 @@ class MeshTest:
                 elif modifier.type == 'CLOTH' or modifier.type == 'SOFT_BODY':
                     test_object.modifiers[test_modifier_name].point_cache.frame_end = frame_end
                     override_setting = modifier.point_cache
-                    override = {'scene': scene, 'active_object': test_object, 'point_cache': override_setting}
+                    override = {
+                        'scene': scene, 'active_object': test_object, 'point_cache': override_setting}
                     bpy.ops.ptcache.bake(override, bake=True)
                     break
 
                 elif modifier.type == 'DYNAMIC_PAINT':
                     dynamic_paint_setting = modifier.canvas_settings.canvas_surfaces.active
                     override_setting = dynamic_paint_setting.point_cache
-                    override = {'scene': scene, 'active_object': test_object, 'point_cache': override_setting}
+                    override = {
+                        'scene': scene, 'active_object': test_object, 'point_cache': override_setting}
                     bpy.ops.ptcache.bake(override, bake=True)
                     break
 
@@ -397,7 +557,8 @@ class MeshTest:
         bpy.context.scene.frame_set(1)
         bpy.ops.object.select_all(action='DESELECT')
 
-        test_object.modifiers.new(particle_sys_spec.modifier_name, particle_sys_spec.modifier_type)
+        test_object.modifiers.new(
+            particle_sys_spec.modifier_name, particle_sys_spec.modifier_type)
 
         settings_name = test_object.particle_systems.active.settings.name
         particle_setting = bpy.data.particles[settings_name]
@@ -409,9 +570,11 @@ class MeshTest:
             try:
                 if param_name == "seed":
                     system_setting = test_object.particle_systems[particle_sys_spec.modifier_name]
-                    setattr(system_setting, param_name, particle_sys_spec.modifier_parameters[param_name])
+                    setattr(system_setting, param_name,
+                            particle_sys_spec.modifier_parameters[param_name])
                 else:
-                    setattr(particle_setting, param_name, particle_sys_spec.modifier_parameters[param_name])
+                    setattr(particle_setting, param_name,
+                            particle_sys_spec.modifier_parameters[param_name])
 
                 if self.verbose:
                     print("\t set parameter '{}' with value '{}'".
@@ -430,40 +593,14 @@ class MeshTest:
         if self.apply_modifier:
             self._apply_modifier(test_object, particle_sys_spec.modifier_name)
 
-    def _do_selection(self, mesh: bpy.types.Mesh, select_mode: str, selection: set):
-        """
-        Do selection on a mesh
-        :param mesh: bpy.types.Mesh - input mesh
-        :param: select_mode: str - selection mode. Must be 'VERT', 'EDGE' or 'FACE'
-        :param: selection: set - indices of selection.
-
-        Example: select_mode='VERT' and selection={1,2,3} selects veritces 1, 2 and 3 of input mesh
-        """
-        # deselect all
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='DESELECT')
-        bpy.ops.object.mode_set(mode='OBJECT')
-
-        bpy.context.tool_settings.mesh_select_mode = (select_mode == 'VERT',
-                                                      select_mode == 'EDGE',
-                                                      select_mode == 'FACE')
-
-        items = (mesh.vertices if select_mode == 'VERT'
-                 else mesh.edges if select_mode == 'EDGE'
-                 else mesh.polygons if select_mode == 'FACE'
-                 else None)
-        if items is None:
-            raise ValueError("Invalid selection mode")
-        for index in selection:
-            items[index].select = True
-
     def _apply_operator_edit_mode(self, test_object, operator: OperatorSpecEditMode):
         """
         Apply operator on test object.
         :param test_object: bpy.types.Object - Blender object to apply operator on.
         :param operator: OperatorSpecEditMode - OperatorSpecEditMode object with parameters.
         """
-        self._do_selection(test_object.data, operator.select_mode, operator.selection)
+        self.do_selection(
+            test_object.data, operator.select_mode, operator.selection)
 
         # Apply operator in edit mode.
         bpy.ops.object.mode_set(mode='EDIT')
@@ -473,12 +610,15 @@ class MeshTest:
         try:
             retval = mesh_operator(**operator.operator_parameters)
         except AttributeError:
-            raise AttributeError("bpy.ops.mesh has no attribute {}".format(operator.operator_name))
+            raise AttributeError(
+                "bpy.ops.mesh has no attribute {}".format(operator.operator_name))
         except TypeError as ex:
-            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(operator.operator_parameters, ex))
+            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(
+                operator.operator_parameters, ex))
 
         if retval != {'FINISHED'}:
-            raise RuntimeError("Unexpected operator return value: {}".format(retval))
+            raise RuntimeError(
+                "Unexpected operator return value: {}".format(retval))
         if self.verbose:
             print("Applied {}".format(operator))
 
@@ -494,12 +634,15 @@ class MeshTest:
         try:
             retval = object_operator(**operator.operator_parameters)
         except AttributeError:
-            raise AttributeError("bpy.ops.object has no attribute {}".format(operator.operator_name))
+            raise AttributeError(
+                "bpy.ops.object has no attribute {}".format(operator.operator_name))
         except TypeError as ex:
-            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(operator.operator_parameters, ex))
+            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(
+                operator.operator_parameters, ex))
 
         if retval != {'FINISHED'}:
-            raise RuntimeError("Unexpected operator return value: {}".format(retval))
+            raise RuntimeError(
+                "Unexpected operator return value: {}".format(retval))
         if self.verbose:
             print("Applied operator {}".format(operator))
 
@@ -528,96 +671,25 @@ class MeshTest:
             for mod_name in modifier_names:
                 self._apply_modifier(test_object, mod_name)
 
-    def run_test(self):
+
+class BlendFileTest(MeshTest):
+    """
+    A mesh testing class inherited from MeshTest aimed at testing operations like modifiers loaded directly from
+    blend file i.e. without adding them from scratch or without adding specifications.
+    """
+
+    def apply_operations(self, evaluated_test_object):
         """
-        Apply operations in self.operations_stack on self.test_object and compare the
-        resulting mesh with self.expected_object.data
-        :return: bool - True if the test passed, False otherwise.
+        Apply all modifiers (Geometry Nodes for now) added to the current object [Discuss]
         """
-        self._test_updated = False
-        bpy.context.view_layer.objects.active = self.test_object
-
-        # Duplicate test object.
-        bpy.ops.object.mode_set(mode="OBJECT")
-        bpy.ops.object.select_all(action="DESELECT")
-        bpy.context.view_layer.objects.active = self.test_object
-
-        self.test_object.select_set(True)
-        bpy.ops.object.duplicate()
-        evaluated_test_object = bpy.context.active_object
-        evaluated_test_object.name = "evaluated_object"
-        if self.verbose:
-            print()
-            print(evaluated_test_object.name, "is set to active")
-
-        # Add modifiers and operators.
-        for operation in self.operations_stack:
-            if isinstance(operation, ModifierSpec):
-                self._add_modifier(evaluated_test_object, operation)
-                if self.apply_modifier:
-                    self._apply_modifier(evaluated_test_object, operation.modifier_name)
-
-            elif isinstance(operation, OperatorSpecEditMode):
-                self._apply_operator_edit_mode(evaluated_test_object, operation)
-
-            elif isinstance(operation, OperatorSpecObjectMode):
-                self._apply_operator_object_mode(operation)
-
-            elif isinstance(operation, DeformModifierSpec):
-                self._apply_deform_modifier(evaluated_test_object, operation)
-
-            elif isinstance(operation, ParticleSystemSpec):
-                self._apply_particle_system(evaluated_test_object, operation)
-
-            else:
-                raise ValueError("Expected operation of type {} or {} or {} or {}. Got {}".
-                                 format(type(ModifierSpec), type(OperatorSpecEditMode),
-                                        type(OperatorSpecObjectMode), type(ParticleSystemSpec), type(operation)))
-
-        # Compare resulting mesh with expected one.
-        # Compare only when self.do_compare is set to True, it is set to False for run-test and returns.
-        if not self.do_compare:
-            print("Meshes/objects are not compared, compare evaluated and expected object in Blender for "
-                  "visualization only.")
-            return False
-
-        if self.verbose:
-            print("Comparing expected mesh with resulting mesh...")
-        evaluated_test_mesh = evaluated_test_object.data
-        expected_mesh = self.expected_object.data
-        if self.threshold:
-            compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh, threshold=self.threshold)
-        else:
-            compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh)
-        compare_success = (compare_result == 'Same')
-
-        selected_evaluatated_verts = [v.index for v in evaluated_test_mesh.vertices if v.select]
-        selected_expected_verts = [v.index for v in expected_mesh.vertices if v.select]
-        if selected_evaluatated_verts != selected_expected_verts:
-            compare_result = "Selection doesn't match"
-            compare_success = False
-
-        # Also check if invalid geometry (which is never expected) had to be corrected...
-        validation_success = not evaluated_test_mesh.validate(verbose=True)
-
-        if compare_success and validation_success:
-            if self.verbose:
-                print("Success!")
-
-            # Clean up.
-            if self.verbose:
-                print("Cleaning up...")
-            # Delete evaluated_test_object.
-            bpy.ops.object.delete()
-            return True
-
-        else:
-            return self._on_failed_test(compare_result, validation_success, evaluated_test_object)
+        modifiers_list = evaluated_test_object.modifiers
+        for modifier in modifiers_list:
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
 
 
 class RunTest:
     """
-    Helper class that stores and executes modifier tests.
+    Helper class that stores and executes SpecMeshTest tests.
 
     Example usage:
 
@@ -629,9 +701,9 @@ class RunTest:
     >>>     OperatorSpecEditMode("delete_edgeloop", {}, "EDGE", MONKEY_LOOP_EDGE),
     >>> ]
     >>> tests = [
-    >>>     MeshTest("Test1", "testCube", "expectedCube", modifier_list),
-    >>>     MeshTest("Test2", "testCube_2", "expectedCube_2", modifier_list),
-    >>>     MeshTest("MonkeyDeleteEdge", "testMonkey","expectedMonkey", operator_list)
+    >>>     SpecMeshTest("Test1", "testCube", "expectedCube", modifier_list),
+    >>>     SpecMeshTest("Test2", "testCube_2", "expectedCube_2", modifier_list),
+    >>>     SpecMeshTest("MonkeyDeleteEdge", "testMonkey","expectedMonkey", operator_list)
     >>> ]
     >>> modifiers_test = RunTest(tests)
     >>> modifiers_test.run_all_tests()
@@ -639,7 +711,7 @@ class RunTest:
 
     def __init__(self, tests, apply_modifiers=False, do_compare=False):
         """
-        Construct a modifier test.
+        Construct a test suite.
         :param tests: list - list of modifier or operator test cases. Each element in the list must contain the
         following
          in the correct order:
@@ -668,19 +740,21 @@ class RunTest:
         seen_name = set()
         for ele in all_test_names:
             if ele in seen_name:
-                raise ValueError("{} is a duplicate, write a new unique name.".format(ele))
+                raise ValueError(
+                    "{} is a duplicate, write a new unique name.".format(ele))
             else:
                 seen_name.add(ele)
 
     def run_all_tests(self):
         """
-        Run all tests in self.tests list. Raises an exception if one the tests fails.
+        Run all tests in self.tests list. Displays all failed tests at bottom.
         """
         for test_number, each_test in enumerate(self.tests):
             test_name = each_test.test_name
             if self.verbose:
                 print()
-                print("Running test {}/{}: {}...".format(test_number+1, len(self.tests), test_name))
+                print("Running test {}/{}: {}...".format(test_number +
+                      1, len(self.tests), test_name))
             success = self.run_test(test_name)
 
             if not success:
@@ -724,8 +798,4 @@ class RunTest:
             test.do_compare = True
 
         success = test.run_test()
-        if test.is_test_updated():
-            # Run the test again if the blend file has been updated.
-            success = test.run_test()
-
         return success
