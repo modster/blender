@@ -428,6 +428,8 @@ typedef enum {
   BMO_DELIM_SEAM = 1 << 2,
   BMO_DELIM_SHARP = 1 << 3,
   BMO_DELIM_UV = 1 << 4,
+  BMO_DELIM_EDGE_TAG = 1 << 5,
+  BMO_DELIM_FACE_TAG = 1 << 6,
 } BMO_Delimit;
 
 void BMO_op_flag_enable(BMesh *bm, BMOperator *op, const int op_flag);

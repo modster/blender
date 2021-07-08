@@ -1447,7 +1447,7 @@ void BM_mesh_vert_coords_apply_with_mat4(BMesh *bm,
 }
 
 /**
- * Use to temporary tag bmesh mesh data based on an array of bool.
+ * Use to temporary tag bmesh vertex data based on an array of bool.
  */
 void BM_temporary_tag_vertices(BMesh *bm, const bool *mask)
 {
@@ -1457,6 +1457,40 @@ void BM_temporary_tag_vertices(BMesh *bm, const bool *mask)
   BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
     if (mask[i]) {
       BM_elem_flag_enable(v, BM_ELEM_TAG);
+    }
+    i++;
+  }
+}
+
+/**
+ * Use to temporary tag bmesh edge data based on an array of bool.
+ */
+void BM_temporary_tag_edges(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMEdge *e;
+  int i = 0;
+  BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+    if (mask[i]) {
+      /* BM_ELEM_SELECT is used here instead of BM_ELEM_TAG because BM_ELEM_TAG does not work for
+       * some reason. */
+      BM_elem_flag_enable(e, BM_ELEM_SELECT);
+    }
+    i++;
+  }
+}
+
+/**
+ * Use to temporary tag bmesh face data based on an array of bool.
+ */
+void BM_temporary_tag_faces(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    if (mask[i]) {
+      BM_elem_flag_enable(f, BM_ELEM_TAG);
     }
     i++;
   }

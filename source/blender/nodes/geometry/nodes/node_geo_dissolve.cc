@@ -30,6 +30,7 @@
 static bNodeSocketTemplate geo_node_dissolve_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Angle"), M_PI * 0.25, 0.0f, 0.0f, 1.0f, 0.0f, M_PI, PROP_ANGLE},
+    {SOCK_STRING, N_("Delimiter")},
     {SOCK_BOOLEAN, N_("All Boundaries"), false},
     {-1, ""},
 };
@@ -52,21 +53,27 @@ static void geo_node_dissolve_init(bNodeTree *UNUSED(tree), bNode *node)
       sizeof(NodeGeometryDissolve), __func__);
 
   node->storage = node_storage;
-  node_storage->delimiter = GEO_NODE_DISSOLVE_DELIMITTER_NORMAL;
+  node_storage->delimiter = GEO_NODE_DISSOLVE_DELIMITTER_FACE;
 }
 
 namespace blender::nodes {
 static Mesh *dissolve_mesh(const float angle,
                            const bool all_boundaries,
-                           const int delimiter,
+                           const int delimiter_type,
+                           const Array<bool> &delimiter,
                            Mesh *mesh)
 {
-  BMeshCreateParams bmesh_create_params = {0};
-  BMeshFromMeshParams bmesh_from_mesh_params = {
+  const BMeshCreateParams bmesh_create_params = {0};
+  const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
-
-  BM_mesh_decimate_dissolve(bm, angle, all_boundaries, (BMO_Delimit)delimiter);
+  if (delimiter_type & GEO_NODE_DISSOLVE_DELIMITTER_FACE) {
+    BM_temporary_tag_faces(bm, delimiter.data());
+  }
+  else {
+    BM_temporary_tag_edges(bm, delimiter.data());
+  }
+  BM_mesh_decimate_dissolve(bm, angle, all_boundaries, (BMO_Delimit)delimiter_type);
 
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
   BM_mesh_free(bm);
@@ -92,7 +99,27 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
     const bool all_boundaries = params.extract_input<bool>("All Boundaries");
     const bNode &node = params.node();
     const NodeGeometryDissolve &node_storage = *(NodeGeometryDissolve *)node.storage;
-    Mesh *result = dissolve_mesh(angle, all_boundaries, node_storage.delimiter, input_mesh);
+
+    const bool default_delimiter = true;
+    AttributeDomain delimiter_domain = ATTR_DOMAIN_FACE;
+    int delimiter_domain_size = input_mesh->totpoly;
+    if (node_storage.delimiter & GEO_NODE_DISSOLVE_DELIMITTER_EDGE) {
+      delimiter_domain = ATTR_DOMAIN_EDGE;
+      delimiter_domain_size = input_mesh->totedge;
+    };
+
+    const GVArrayPtr delimiter = params.get_input_attribute(
+        "Delimiter", mesh_component, delimiter_domain, CD_PROP_BOOL, &default_delimiter);
+    if (!delimiter) {
+      return;
+    }
+    const GVArray_Typed<bool> delimiter_as_typed = delimiter->typed<bool>();
+    Array<bool> mask(delimiter_domain_size);
+    for (const int i : delimiter_as_typed.index_range()) {
+      mask[i] = delimiter_as_typed[i];
+    }
+
+    Mesh *result = dissolve_mesh(angle, all_boundaries, node_storage.delimiter, mask, input_mesh);
     geometry_set.replace_mesh(result);
   }
 

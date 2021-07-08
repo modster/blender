@@ -10000,15 +10000,16 @@ static void def_geo_dissolve(StructRNA *srna)
   PropertyRNA *prop;
 
   static EnumPropertyItem delimiter_items[] = {
-      {GEO_NODE_DISSOLVE_DELIMITTER_NORMAL, "normal", 0, "Normal", "No Symmetry is applied"},
-      {GEO_NODE_DISSOLVE_DELIMITTER_MATERIAL,
-       "material",
+      {GEO_NODE_DISSOLVE_DELIMITTER_EDGE,
+       "edge",
        0,
-       "Material",
-       "Symmetry is applied on X axis"},
-      {GEO_NODE_DISSOLVE_DELIMITTER_SEAM, "seam", 0, "Seam", "Symmetry is applied on Y axis"},
-      {GEO_NODE_DISSOLVE_DELIMITTER_SHARP, "sharp", 0, "Sharp", "Symmetry is applied on Z axis"},
-      {GEO_NODE_DISSOLVE_DELIMITTER_UV, "uv", 0, "UV", "Symmetry is applied on Z axis"},
+       "Edge",
+       "Use edge attribute domain as delimiter"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_FACE,
+       "face",
+       0,
+       "Face",
+       "Use face attribute domain as delimiter"},
       {0, NULL, 0, NULL, NULL},
   };
 

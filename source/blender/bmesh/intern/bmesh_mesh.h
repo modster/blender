@@ -135,3 +135,5 @@ void BM_mesh_vert_coords_apply_with_mat4(BMesh *bm,
                                          const float (*vert_coords)[3],
                                          const float mat[4][4]);
 void BM_temporary_tag_vertices(BMesh *bm, const bool *mask);
+void BM_temporary_tag_edges(BMesh *bm, const bool *mask);
+void BM_temporary_tag_faces(BMesh *bm, const bool *mask);

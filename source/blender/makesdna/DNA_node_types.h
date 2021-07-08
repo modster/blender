@@ -1962,11 +1962,12 @@ typedef enum GeometryNodeCollapseSymmetryAxis {
 } GeometryNodeCollapseSymmetryAxis;
 
 typedef enum GeometryNodeDissolveDelimiter {
-  GEO_NODE_DISSOLVE_DELIMITTER_NORMAL = 1 << 0,
-  GEO_NODE_DISSOLVE_DELIMITTER_MATERIAL = 1 << 1,
-  GEO_NODE_DISSOLVE_DELIMITTER_SEAM = 1 << 2,
-  GEO_NODE_DISSOLVE_DELIMITTER_SHARP = 1 << 3,
-  GEO_NODE_DISSOLVE_DELIMITTER_UV = 1 << 4,
+  /* Keep in sync with BMO_Delimit*/
+  GEO_NODE_DISSOLVE_DELIMITTER_EDGE = 1 << 5,
+  GEO_NODE_DISSOLVE_DELIMITTER_FACE = 1 << 6,
+  // GEO_NODE_DISSOLVE_DELIMITTER_SEAM = 1 << 2,
+  // GEO_NODE_DISSOLVE_DELIMITTER_SHARP = 1 << 3,
+  // GEO_NODE_DISSOLVE_DELIMITTER_UV = 1 << 4,
 } GeometryNodeDissolveDelimiter;
 
 #ifdef __cplusplus
