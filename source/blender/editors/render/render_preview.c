@@ -45,6 +45,7 @@
 #include "DNA_brush_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_collection_types.h"
+#include "DNA_gpencil_types.h"
 #include "DNA_light_types.h"
 #include "DNA_material_types.h"
 #include "DNA_node_types.h"
@@ -322,6 +323,7 @@ static ID *duplicate_ids(ID *id, const bool allow_failure)
     case ID_MA:
     case ID_TE:
     case ID_LA:
+    case ID_GD:
     case ID_WO: {
       BLI_assert(BKE_previewimg_id_supports_jobs(id));
       ID *id_copy = BKE_id_copy_ex(
@@ -687,6 +689,8 @@ struct ObjectPreviewData {
   /* Copy of the object to create the preview for. The copy is for thread safety (and to insert it
    * into an own main). */
   Object *object;
+  /* Datablock copy. Can be NULL. */
+  void *datablock;
   int sizex;
   int sizey;
 };
@@ -764,6 +768,7 @@ static void object_preview_render(IconPreview *preview, IconPreviewSize *preview
       .pr_main = preview_main,
       /* Act on a copy. */
       .object = (Object *)preview->id_copy,
+      .datablock = NULL,
       .sizex = preview_sized->sizex,
       .sizey = preview_sized->sizey,
   };
@@ -860,6 +865,106 @@ static void action_preview_render(IconPreview *preview, IconPreviewSize *preview
   }
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Grease Pencil Preview
+ * \{ */
+
+static Scene *gpencil_preview_scene_create(const struct ObjectPreviewData *preview_data,
+                                           Depsgraph **r_depsgraph)
+{
+  Scene *scene = BKE_scene_add(preview_data->pr_main, "Object preview scene");
+  ViewLayer *view_layer = scene->view_layers.first;
+  Depsgraph *depsgraph = DEG_graph_new(
+      preview_data->pr_main, scene, view_layer, DAG_EVAL_VIEWPORT);
+
+  /* Grease pencil draw engine needs an object to draw the datablock. */
+  bGPdata *gpd = (bGPdata *)preview_data->datablock;
+  Object *ob_temp = BKE_object_add_for_data(
+      preview_data->pr_main, view_layer, OB_GPENCIL, "preview_object", &gpd->id, false);
+
+  BLI_assert(ob_temp != NULL);
+  BLI_addtail(&preview_data->pr_main->objects, ob_temp);
+
+  BKE_collection_object_add(preview_data->pr_main, scene->master_collection, ob_temp);
+
+  Object *camera_object = object_preview_camera_create(preview_data->pr_main, view_layer, ob_temp);
+
+  scene->camera = camera_object;
+  scene->r.xsch = preview_data->sizex;
+  scene->r.ysch = preview_data->sizey;
+  scene->r.size = 100;
+
+  Base *preview_base = BKE_view_layer_base_find(view_layer, ob_temp);
+  /* For 'view selected' below. */
+  preview_base->flag |= BASE_SELECTED;
+
+  DEG_graph_build_from_view_layer(depsgraph);
+  DEG_evaluate_on_refresh(depsgraph);
+
+  ED_view3d_camera_to_view_selected(preview_data->pr_main, depsgraph, scene, camera_object);
+
+  BKE_scene_graph_update_tagged(depsgraph, preview_data->pr_main);
+
+  *r_depsgraph = depsgraph;
+  return scene;
+}
+
+/* Render a grease pencil datablock. As the Draw Engine needs an object, the datablock is assigned
+ * to a temporary object, just for render. */
+static void gpencil_preview_render(IconPreview *preview, IconPreviewSize *preview_sized)
+{
+  Main *preview_main = BKE_main_new();
+  const float pixelsize_old = U.pixelsize;
+  char err_out[256] = "unknown";
+
+  BLI_assert(preview->id_copy && (preview->id_copy != preview->id));
+
+  struct ObjectPreviewData preview_data = {
+      .pr_main = preview_main,
+      /* Act on a copy. */
+      .object = NULL,
+      .datablock = (bGPdata *)preview->id_copy,
+      .sizex = preview_sized->sizex,
+      .sizey = preview_sized->sizey,
+  };
+  Depsgraph *depsgraph;
+  Scene *scene = gpencil_preview_scene_create(&preview_data, &depsgraph);
+
+  /* Ownership is now ours. */
+  preview->id_copy = NULL;
+
+  U.pixelsize = 2.0f;
+
+  View3DShading shading;
+  BKE_screen_view3d_shading_init(&shading);
+
+  ImBuf *ibuf = ED_view3d_draw_offscreen_imbuf_simple(
+      depsgraph,
+      DEG_get_evaluated_scene(depsgraph),
+      &shading,
+      OB_TEXTURE,
+      DEG_get_evaluated_object(depsgraph, scene->camera),
+      preview_sized->sizex,
+      preview_sized->sizey,
+      IB_rect,
+      V3D_OFSDRAW_OVERRIDE_SCENE_SETTINGS,
+      R_ALPHAPREMUL,
+      NULL,
+      NULL,
+      err_out);
+
+  U.pixelsize = pixelsize_old;
+
+  if (ibuf) {
+    icon_copy_rect(ibuf, preview_sized->sizex, preview_sized->sizey, preview_sized->rect);
+    IMB_freeImBuf(ibuf);
+  }
+
+  DEG_graph_free(depsgraph);
+  BKE_main_free(preview_main);
+}
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1522,6 +1627,9 @@ static void icon_preview_startjob_all_sizes(void *customdata,
           continue;
         case ID_AC:
           action_preview_render(ip, cur_size);
+          continue;
+        case ID_GD:
+          gpencil_preview_render(ip, cur_size);
           continue;
         default:
           /* Fall through to the same code as the `ip->id == NULL` case. */
