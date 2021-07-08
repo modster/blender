@@ -133,8 +133,8 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
 {
   static const EnumPropertyItem mode_types[] = {
       {GP_ASSET_MODE_LAYER, "LAYER", 0, "Active Layer", ""},
-      {GP_ASSET_MODE_FRAME, "FRAME", 0, "Active Frame", ""},
-      {GP_ASSET_MODE_FRAME_ALL_LAYERS, "FRAME_ALL", 0, "Active Frame All Layers", ""},
+      {GP_ASSET_MODE_FRAME, "FRAME", 0, "Active Frame (Active Layer)", ""},
+      {GP_ASSET_MODE_FRAME_ALL_LAYERS, "FRAME_ALL", 0, "Active Frame (All Layers)", ""},
       {GP_ASSET_MODE_SELECTED_STROKES, "SELECTED", 0, "Selected Strokes", ""},
       {0, NULL, 0, NULL, NULL},
   };

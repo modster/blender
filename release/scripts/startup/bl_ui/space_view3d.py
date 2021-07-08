@@ -5045,8 +5045,8 @@ class VIEW3D_MT_edit_gpencil_asset(Menu):
         layout = self.layout
 
         layout.operator("gpencil.asset_create", text="Active Layer").mode = 'LAYER'
-        layout.operator("gpencil.asset_create", text="Active Frame").mode = 'FRAME'
-        layout.operator("gpencil.asset_create", text="Active Frame All Layers").mode = 'FRAME_ALL'
+        layout.operator("gpencil.asset_create", text="Active Frame (Active Layer)").mode = 'FRAME'
+        layout.operator("gpencil.asset_create", text="Active Frame (All Layers)").mode = 'FRAME_ALL'
         layout.operator("gpencil.asset_create", text="Selected Strokes").mode = 'SELECTED'
 
 
