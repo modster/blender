@@ -34,6 +34,7 @@
 
 #include "BKE_node.h"
 
+#include "RNA_access.h"
 #include "RNA_types.h"
 
 #include "MEM_guardedalloc.h"
@@ -436,6 +437,13 @@ void BKE_node_tree_unlink_id(ID *id, struct bNodeTree *ntree)
 static void node_group_handle_extension(bNodeTree *ntree, bNode *node, ListBase *socket_list)
 {
   bNodeSocket *extsock = socket_list->last;
+  if (!extsock) {
+    /* Can be called during initial update before the extension socket is added. */
+    return;
+  }
+  /* This function should only be called when virtual sockets are enabled. */
+  BLI_assert(RNA_struct_is_a(extsock->typeinfo->ext_socket.srna, &RNA_NodeSocketVirtual));
+
   bNodeLink *link, *linknext;
   /* Adding a tree socket and verifying will remove the extension socket!
    * This list caches the existing links from the extension socket
