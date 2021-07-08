@@ -134,12 +134,12 @@ static void bakeModifier(Main *UNUSED(bmain),
 /* -------------------------------- */
 
 /* Generic "generateStrokes" callback */
-static void deformStroke(GpencilModifierData *md,
-                         Depsgraph *UNUSED(depsgraph),
-                         Object *ob,
-                         bGPDlayer *gpl,
-                         bGPDframe *UNUSED(gpf),
-                         bGPDstroke *gps)
+static void deformPolyline(GpencilModifierData *md,
+                           Depsgraph *UNUSED(depsgraph),
+                           Object *ob,
+                           bGPDlayer *gpl,
+                           bGPDframe *UNUSED(gpf),
+                           bGPDstroke *gps)
 {
   bGPdata *gpd = ob->data;
   LengthGpencilModifierData *lmd = (LengthGpencilModifierData *)md;
@@ -207,7 +207,8 @@ GpencilModifierTypeInfo modifierType_Gpencil_Length = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ deformStroke,
+    /* deformPolyline */ deformPolyline,
+    /* deformBezier */ NULL,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

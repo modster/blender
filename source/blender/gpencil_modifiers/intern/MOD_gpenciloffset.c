@@ -103,9 +103,9 @@ static float prepare_matrix(OffsetGpencilModifierData *mmd, float weight, float 
   return (scale[0] + scale[1] + scale[2]) / 3.0f;
 }
 
-/* Calculate random transform matrix. */
-static void prepare_random_matrix(
-    GpencilModifierData *md, Object *ob, bGPDframe *gpf, bGPDstroke *gps, float mat_rnd[4][4])
+/* Calculate random seeds. */
+static void prepare_random_seeds(
+    GpencilModifierData *md, Object *ob, bGPDframe *gpf, bGPDstroke *gps, float rand[3][3])
 {
   OffsetGpencilModifierData *mmd = (OffsetGpencilModifierData *)md;
 
@@ -114,7 +114,6 @@ static void prepare_random_matrix(
   seed += BLI_hash_string(ob->id.name + 2);
   seed += BLI_hash_string(md->name);
 
-  float rand[3][3];
   float rand_offset = BLI_hash_int_01(seed);
 
   /* Get stroke index for random offset. */
@@ -139,6 +138,7 @@ static void prepare_random_matrix(
       }
     }
   }
+}
 
 /* change stroke offsetness */
 static void deformPolyline(GpencilModifierData *md,
@@ -155,9 +155,9 @@ static void deformPolyline(GpencilModifierData *md,
     return;
   }
 
-  /* Calculate Random matrix. */
-  float mat_rnd[4][4];
-  prepare_random_matrix(md, ob, gpf, gps, mat_rnd);
+  /* Calculate Random seeds. */
+  float rand[3][3];
+  prepare_random_seeds(md, ob, gpf, gps, rand);
 
   bGPdata *gpd = ob->data;
   for (int i = 0; i < gps->totpoints; i++) {
@@ -213,9 +213,9 @@ static void deformBezier(GpencilModifierData *md,
     return;
   }
 
-  /* Calculate Random matrix. */
-  float mat_rnd[4][4];
-  prepare_random_matrix(md, ob, gpf, gps, mat_rnd);
+  /* Calculate Random seeds. */
+  float rand[3][3];
+  prepare_random_seeds(md, ob, gpf, gps, rand);
 
   bGPdata *gpd = ob->data;
   bGPDcurve *gpc = gps->editcurve;
@@ -231,6 +231,21 @@ static void deformBezier(GpencilModifierData *md,
     if (weight < 0.0f) {
       continue;
     }
+
+    /* Calculate Random matrix. */
+    float mat_rnd[4][4];
+    float rnd_loc[3], rnd_rot[3], rnd_scale_weight[3];
+    float rnd_scale[3] = {1.0f, 1.0f, 1.0f};
+
+    mul_v3_v3fl(rnd_loc, rand[0], weight);
+    mul_v3_v3fl(rnd_rot, rand[1], weight);
+    mul_v3_v3fl(rnd_scale_weight, rand[2], weight);
+
+    mul_v3_v3v3(rnd_loc, mmd->rnd_offset, rnd_loc);
+    mul_v3_v3v3(rnd_rot, mmd->rnd_rot, rnd_rot);
+    madd_v3_v3v3(rnd_scale, mmd->rnd_scale, rnd_scale_weight);
+
+    loc_eul_size_to_mat4(mat_rnd, rnd_loc, rnd_rot, rnd_scale);
     /* Apply randomness matrix. */
     for (int j = 0; j < 3; j++) {
       mul_m4_v3(mat_rnd, bezt->vec[j]);

@@ -96,12 +96,12 @@ static float calc_point_weight_by_distance(Object *ob,
 }
 
 /* change stroke thickness */
-static void deformStroke(GpencilModifierData *md,
-                         Depsgraph *UNUSED(depsgraph),
-                         Object *ob,
-                         bGPDlayer *gpl,
-                         bGPDframe *UNUSED(gpf),
-                         bGPDstroke *gps)
+static void deformPolyline(GpencilModifierData *md,
+                           Depsgraph *UNUSED(depsgraph),
+                           Object *ob,
+                           bGPDlayer *gpl,
+                           bGPDframe *UNUSED(gpf),
+                           bGPDstroke *gps)
 {
   WeightGpencilModifierData *mmd = (WeightGpencilModifierData *)md;
   const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
@@ -205,6 +205,18 @@ static void deformStroke(GpencilModifierData *md,
   }
 }
 
+/* Deform Bezier. */
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *depsgraph,
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *gpf,
+                         bGPDstroke *gps)
+{
+  /* Reuse deformPolyline. */
+  deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+}
+
 static void bakeModifier(struct Main *UNUSED(bmain),
                          Depsgraph *depsgraph,
                          GpencilModifierData *md,
@@ -215,7 +227,7 @@ static void bakeModifier(struct Main *UNUSED(bmain),
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformStroke(md, depsgraph, ob, gpl, gpf, gps);
+        deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
       }
     }
   }
@@ -319,7 +331,8 @@ GpencilModifierTypeInfo modifierType_Gpencil_Weight = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ deformStroke,
+    /* deformPolyline */ deformPolyline,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
