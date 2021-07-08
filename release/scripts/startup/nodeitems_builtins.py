@@ -94,9 +94,6 @@ def node_group_items(context):
 
     yield NodeItemCustom(draw=group_tools_draw)
 
-    yield NodeItem("NodeGroupInput", poll=group_input_output_item_poll)
-    yield NodeItem("NodeGroupOutput", poll=group_input_output_item_poll)
-
     yield NodeItemCustom(draw=lambda self, layout, context: layout.separator())
 
     def contains_group(nodetree, group):
@@ -121,6 +118,45 @@ def node_group_items(context):
         yield NodeItem(node_tree_group_type[group.bl_idname],
                        label=group.name,
                        settings={"node_tree": "bpy.data.node_groups[%r]" % group.name})
+
+
+def string_literal(s):
+    return '"' + s.replace('"','\\"') + '"'
+
+def node_group_input_items(context):
+    if context is None:
+        return
+    space = context.space_data
+    if not space:
+        return
+    ntree = space.edit_tree
+    if not ntree:
+        return
+
+    for i, iosock in enumerate(ntree.inputs):
+        settings = dict()
+        # settings["label"] = string_literal(iosock.name)
+        for k, _ in enumerate(ntree.inputs):
+            settings["outputs[{}].hide".format(k)] = "False" if k == i else "True"
+        yield NodeItem("NodeGroupInput", label=iosock.name, settings=settings, poll=group_input_output_item_poll)
+
+
+def node_group_output_items(context):
+    if context is None:
+        return
+    space = context.space_data
+    if not space:
+        return
+    ntree = space.edit_tree
+    if not ntree:
+        return
+
+    for i, iosock in enumerate(ntree.outputs):
+        settings = dict()
+        # settings["label"] = string_literal(iosock.name)
+        for k, _ in enumerate(ntree.outputs):
+            settings["inputs[{}].hide".format(k)] = "False" if k == i else "True"
+        yield NodeItem("NodeGroupOutput", label=iosock.name, settings=settings, poll=group_input_output_item_poll)
 
 
 # only show input/output nodes inside node groups
@@ -294,6 +330,8 @@ shader_node_categories = [
         NodeItem("ShaderNodeScript"),
     ]),
     ShaderNodeCategory("SH_NEW_GROUP", "Group", items=node_group_items),
+    ShaderNodeCategory("SH_NEW_GROUP_INPUTS", "Group Inputs", items=node_group_input_items),
+    ShaderNodeCategory("SH_NEW_GROUP_OUTPUTS", "Group Outputs", items=node_group_output_items),
     ShaderNodeCategory("SH_NEW_LAYOUT", "Layout", items=[
         NodeItem("NodeFrame"),
         NodeItem("NodeReroute"),
@@ -409,6 +447,8 @@ compositor_node_categories = [
         NodeItem("CompositorNodeCornerPin"),
     ]),
     CompositorNodeCategory("CMP_GROUP", "Group", items=node_group_items),
+    CompositorNodeCategory("CMP_GROUP_INPUTS", "Group Inputs", items=node_group_input_items),
+    CompositorNodeCategory("CMP_GROUP_OUTPUTS", "Group Outputs", items=node_group_output_items),
     CompositorNodeCategory("CMP_LAYOUT", "Layout", items=[
         NodeItem("NodeFrame"),
         NodeItem("NodeReroute"),
@@ -466,6 +506,8 @@ texture_node_categories = [
         NodeItem("TextureNodeAt"),
     ]),
     TextureNodeCategory("TEX_GROUP", "Group", items=node_group_items),
+    TextureNodeCategory("TEX_GROUP_INPUTS", "Group Inputs", items=node_group_input_items),
+    TextureNodeCategory("TEX_GROUP_OUTPUTS", "Group Outputs", items=node_group_output_items),
     TextureNodeCategory("TEX_LAYOUT", "Layout", items=[
         NodeItem("NodeFrame"),
         NodeItem("NodeReroute"),
@@ -592,6 +634,8 @@ geometry_node_categories = [
         NodeItem("GeometryNodeVolumeToMesh"),
     ]),
     GeometryNodeCategory("GEO_GROUP", "Group", items=node_group_items),
+    GeometryNodeCategory("GEO_GROUP_INPUTS", "Group Inputs", items=node_group_input_items),
+    GeometryNodeCategory("GEO_GROUP_OUTPUTS", "Group Outputs", items=node_group_output_items),
     GeometryNodeCategory("GEO_LAYOUT", "Layout", items=[
         NodeItem("NodeFrame"),
         NodeItem("NodeReroute"),
