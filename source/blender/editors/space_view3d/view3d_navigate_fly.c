@@ -752,10 +752,14 @@ static void flyMoveCamera(bContext *C,
 
 static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
 {
-#define FLY_ROTATE_FAC 10.0f        /* more is faster */
-#define FLY_ZUP_CORRECT_FAC 0.1f    /* amount to correct per step */
-#define FLY_ZUP_CORRECT_ACCEL 0.05f /* increase upright momentum each step */
-#define FLY_SMOOTH_FAC 20.0f        /* higher value less lag */
+  /* Higher is faster. */
+  static const float fly_rotate_factor = 10.0f;
+  /* Amount to correct per step. */
+  static const float fly_z_up_correct_factor = 0.1f;
+  /* Increase upright momentum each step. */
+  static const float fly_z_up_correct_accel = 0.05f;
+  /* Higher is less lag. */
+  static const float fly_smooth_factor = 20.0f;
 
   RegionView3D *rv3d = fly->rv3d;
 
@@ -875,7 +879,7 @@ static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
           copy_v3_fl3(upvec, 1.0f, 0.0f, 0.0f);
           mul_m3_v3(mat, upvec);
           /* Rotate about the relative up vec */
-          axis_angle_to_quat(tmp_quat, upvec, moffset[1] * time_redraw * -FLY_ROTATE_FAC);
+          axis_angle_to_quat(tmp_quat, upvec, moffset[1] * time_redraw * -fly_rotate_factor);
           mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, tmp_quat);
 
           if (fly->xlock != FLY_AXISLOCK_STATE_OFF) {
@@ -908,7 +912,7 @@ static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
           }
 
           /* Rotate about the relative up vec */
-          axis_angle_to_quat(tmp_quat, upvec, moffset[0] * time_redraw * FLY_ROTATE_FAC);
+          axis_angle_to_quat(tmp_quat, upvec, moffset[0] * time_redraw * fly_rotate_factor);
           mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, tmp_quat);
 
           if (fly->xlock != FLY_AXISLOCK_STATE_OFF) {
@@ -934,10 +938,10 @@ static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
             axis_angle_to_quat(tmp_quat,
                                upvec,
                                roll * time_redraw_clamped * fly->zlock_momentum *
-                                   FLY_ZUP_CORRECT_FAC);
+                                   fly_z_up_correct_factor);
             mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, tmp_quat);
 
-            fly->zlock_momentum += FLY_ZUP_CORRECT_ACCEL;
+            fly->zlock_momentum += fly_z_up_correct_accel;
           }
           else {
             /* don't check until the view rotates again */
@@ -996,7 +1000,7 @@ static int flyApply(bContext *C, FlyInfo *fly, bool is_confirm)
 
       /* impose a directional lag */
       interp_v3_v3v3(
-          dvec, dvec_tmp, fly->dvec_prev, (1.0f / (1.0f + (time_redraw * FLY_SMOOTH_FAC))));
+          dvec, dvec_tmp, fly->dvec_prev, (1.0f / (1.0f + (time_redraw * fly_smooth_factor))));
 
       add_v3_v3(rv3d->ofs, dvec);
 
