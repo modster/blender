@@ -432,33 +432,18 @@ void BKE_node_tree_unlink_id(ID *id, struct bNodeTree *ntree)
 /** \name Node #GROUP_INPUT / #GROUP_OUTPUT
  * \{ */
 
-static void node_group_input_init(bNodeTree *ntree, bNode *node)
+/* Check if the extension socket is connected and expose internal sockets. */
+static void node_group_handle_extension(bNodeTree *ntree, bNode *node, ListBase *socket_list)
 {
-  node_group_input_update(ntree, node);
-}
-
-bNodeSocket *node_group_input_find_socket(bNode *node, const char *identifier)
-{
-  bNodeSocket *sock;
-  for (sock = node->outputs.first; sock; sock = sock->next) {
-    if (STREQ(sock->identifier, identifier)) {
-      return sock;
-    }
-  }
-  return NULL;
-}
-
-void node_group_input_update(bNodeTree *ntree, bNode *node)
-{
-  bNodeSocket *extsock = node->outputs.last;
-  bNodeLink *link, *linknext, *exposelink;
+  bNodeSocket *extsock = socket_list->last;
+  bNodeLink *link, *linknext;
   /* Adding a tree socket and verifying will remove the extension socket!
    * This list caches the existing links from the extension socket
    * so they can be recreated after verification.
    */
   ListBase tmplinks;
 
-  /* find links from the extension socket and store them */
+  /* Find links from the extension socket and store them. */
   BLI_listbase_clear(&tmplinks);
   for (link = ntree->links.first; link; link = linknext) {
     linknext = link->next;
@@ -466,7 +451,8 @@ void node_group_input_update(bNodeTree *ntree, bNode *node)
       continue;
     }
 
-    if (link->fromsock == extsock) {
+    /* Check both fromsock and tosock so it works for input as well as outputs. */
+    if (link->fromsock == extsock || link->tosock == extsock) {
       bNodeLink *tlink = MEM_callocN(sizeof(bNodeLink), "temporary link");
       *tlink = *link;
       BLI_addtail(&tmplinks, tlink);
@@ -475,44 +461,65 @@ void node_group_input_update(bNodeTree *ntree, bNode *node)
     }
   }
 
-  /* find valid link to expose */
-  exposelink = NULL;
+  /* Find valid link to expose. */
+  bNode *expose_node = NULL;
+  bNodeSocket *expose_sock = NULL;
   for (link = tmplinks.first; link; link = link->next) {
-    /* XXX Multiple sockets can be connected to the extension socket at once,
+    /* Multiple sockets can be connected to the extension socket at once,
      * in that case the arbitrary first link determines name and type.
      * This could be improved by choosing the "best" type among all links,
      * whatever that means.
      */
-    if (link->tosock->type != SOCK_CUSTOM) {
-      exposelink = link;
+    if (link->fromsock == extsock && link->tosock->type != SOCK_CUSTOM) {
+      expose_node = link->tonode;
+      expose_sock = link->tosock;
+    }
+    else if (link->tosock == extsock && link->fromsock->type != SOCK_CUSTOM) {
+      expose_node = link->fromnode;
+      expose_sock = link->fromsock;
       break;
     }
   }
 
-  if (exposelink) {
+  if (expose_node && expose_sock) {
     bNodeSocket *gsock, *newsock;
 
-    gsock = ntreeAddSocketInterfaceFromSocket(ntree, exposelink->tonode, exposelink->tosock);
+    gsock = ntreeAddSocketInterfaceFromSocket(ntree, expose_node, expose_sock);
 
-    node_group_input_update(ntree, node);
-    newsock = node_group_input_find_socket(node, gsock->identifier);
+    if (node->typeinfo->updatefunc) {
+      node->typeinfo->updatefunc(ntree, node);
+    }
+    newsock = BLI_findstring(socket_list, gsock->identifier, offsetof(bNodeSocket, identifier));
 
     /* redirect links from the extension socket */
     for (link = tmplinks.first; link; link = link->next) {
-      nodeAddLink(ntree, node, newsock, link->tonode, link->tosock);
+      nodeAddLink(ntree, node, newsock, expose_node, expose_sock);
     }
   }
 
   BLI_freelistN(&tmplinks);
+}
 
-  /* check inputs and outputs, and remove or insert them */
-  {
-    /* value_in_out inverted for interface nodes to get correct socket value_property */
-    group_verify_socket_list(ntree, node, &ntree->inputs, &node->outputs, SOCK_OUT);
+bNodeSocket *node_group_input_find_socket(bNode *node, const char *identifier)
+{
+  return BLI_findstring(&node->outputs, identifier, offsetof(bNodeSocket, identifier));
+}
 
-    /* add virtual extension socket */
-    nodeAddSocket(ntree, node, SOCK_OUT, "NodeSocketVirtual", "__extend__", "");
-  }
+static void node_group_input_init(bNodeTree *ntree, bNode *node)
+{
+  node_group_input_update(ntree, node);
+}
+
+void node_group_input_update(bNodeTree *ntree, bNode *node)
+{
+  node_group_handle_extension(ntree, node, &node->outputs);
+
+  /* Check group tree interface and remove or insert sockets as needed. */
+  /* SOCK_IN/SOCK_OUT is inverted for interface nodes: Group input nodes have output sockets. */
+  group_verify_socket_list(ntree, node, &ntree->inputs, &node->outputs, SOCK_OUT);
+
+  /* Add virtual extension socket. */
+  nodeAddSocket(ntree, node, SOCK_OUT, "NodeSocketVirtual", "__extend__", "");
 }
 
 void register_node_type_group_input(void)
@@ -529,88 +536,26 @@ void register_node_type_group_input(void)
   nodeRegisterType(ntype);
 }
 
+bNodeSocket *node_group_output_find_socket(bNode *node, const char *identifier)
+{
+  return BLI_findstring(&node->inputs, identifier, offsetof(bNodeSocket, identifier));
+}
+
 static void node_group_output_init(bNodeTree *ntree, bNode *node)
 {
   node_group_output_update(ntree, node);
 }
 
-bNodeSocket *node_group_output_find_socket(bNode *node, const char *identifier)
-{
-  bNodeSocket *sock;
-  for (sock = node->inputs.first; sock; sock = sock->next) {
-    if (STREQ(sock->identifier, identifier)) {
-      return sock;
-    }
-  }
-  return NULL;
-}
-
 void node_group_output_update(bNodeTree *ntree, bNode *node)
 {
-  bNodeSocket *extsock = node->inputs.last;
-  bNodeLink *link, *linknext, *exposelink;
-  /* Adding a tree socket and verifying will remove the extension socket!
-   * This list caches the existing links to the extension socket
-   * so they can be recreated after verification.
-   */
-  ListBase tmplinks;
+  node_group_handle_extension(ntree, node, &node->inputs);
 
-  /* find links to the extension socket and store them */
-  BLI_listbase_clear(&tmplinks);
-  for (link = ntree->links.first; link; link = linknext) {
-    linknext = link->next;
-    if (nodeLinkIsHidden(link)) {
-      continue;
-    }
+  /* Check group tree interface and remove or insert sockets as needed. */
+  /* SOCK_IN/SOCK_OUT is inverted for interface nodes: Group output nodes have input sockets. */
+  group_verify_socket_list(ntree, node, &ntree->outputs, &node->inputs, SOCK_IN);
 
-    if (link->tosock == extsock) {
-      bNodeLink *tlink = MEM_callocN(sizeof(bNodeLink), "temporary link");
-      *tlink = *link;
-      BLI_addtail(&tmplinks, tlink);
-
-      nodeRemLink(ntree, link);
-    }
-  }
-
-  /* find valid link to expose */
-  exposelink = NULL;
-  for (link = tmplinks.first; link; link = link->next) {
-    /* XXX Multiple sockets can be connected to the extension socket at once,
-     * in that case the arbitrary first link determines name and type.
-     * This could be improved by choosing the "best" type among all links,
-     * whatever that means.
-     */
-    if (link->fromsock->type != SOCK_CUSTOM) {
-      exposelink = link;
-      break;
-    }
-  }
-
-  if (exposelink) {
-    bNodeSocket *gsock, *newsock;
-
-    /* XXX what if connecting virtual to virtual socket?? */
-    gsock = ntreeAddSocketInterfaceFromSocket(ntree, exposelink->fromnode, exposelink->fromsock);
-
-    node_group_output_update(ntree, node);
-    newsock = node_group_output_find_socket(node, gsock->identifier);
-
-    /* redirect links to the extension socket */
-    for (link = tmplinks.first; link; link = link->next) {
-      nodeAddLink(ntree, link->fromnode, link->fromsock, node, newsock);
-    }
-  }
-
-  BLI_freelistN(&tmplinks);
-
-  /* check inputs and outputs, and remove or insert them */
-  {
-    /* value_in_out inverted for interface nodes to get correct socket value_property */
-    group_verify_socket_list(ntree, node, &ntree->outputs, &node->inputs, SOCK_IN);
-
-    /* add virtual extension socket */
-    nodeAddSocket(ntree, node, SOCK_IN, "NodeSocketVirtual", "__extend__", "");
-  }
+  /* Add virtual extension socket */
+  nodeAddSocket(ntree, node, SOCK_IN, "NodeSocketVirtual", "__extend__", "");
 }
 
 void register_node_type_group_output(void)
