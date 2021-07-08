@@ -872,6 +872,7 @@ class VIEW3D_MT_editor_menus(Menu):
                 layout.menu("VIEW3D_MT_edit_gpencil")
                 layout.menu("VIEW3D_MT_edit_gpencil_stroke")
                 layout.menu("VIEW3D_MT_edit_gpencil_point")
+                layout.menu("VIEW3D_MT_edit_gpencil_asset")
             elif obj and obj.mode == 'WEIGHT_GPENCIL':
                 layout.menu("VIEW3D_MT_weight_gpencil")
             if obj and obj.mode == 'VERTEX_GPENCIL':
@@ -5037,6 +5038,18 @@ class VIEW3D_MT_edit_gpencil_point(Menu):
         layout.menu("VIEW3D_MT_gpencil_vertex_group")
 
 
+class VIEW3D_MT_edit_gpencil_asset(Menu):
+    bl_label = "Asset"
+
+    def draw(self, _context):
+        layout = self.layout
+
+        layout.operator("gpencil.asset_create", text="Active Layer").mode = 'LAYER'
+        layout.operator("gpencil.asset_create", text="Active Frame").mode = 'FRAME'
+        layout.operator("gpencil.asset_create", text="Active Frame All Layers").mode = 'FRAME_ALL'
+        layout.operator("gpencil.asset_create", text="Selected Strokes").mode = 'SELECTED'
+
+
 class VIEW3D_MT_weight_gpencil(Menu):
     bl_label = "Weights"
 
@@ -7601,6 +7614,7 @@ classes = (
     VIEW3D_MT_edit_gpencil,
     VIEW3D_MT_edit_gpencil_stroke,
     VIEW3D_MT_edit_gpencil_point,
+    VIEW3D_MT_edit_gpencil_asset,
     VIEW3D_MT_edit_gpencil_delete,
     VIEW3D_MT_edit_gpencil_showhide,
     VIEW3D_MT_weight_gpencil,
