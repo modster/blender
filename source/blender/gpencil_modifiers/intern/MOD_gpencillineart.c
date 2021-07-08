@@ -511,19 +511,18 @@ static void material_mask_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayoutSetEnabled(layout, RNA_boolean_get(ptr, "use_material_mask"));
 
-  uiLayout *row = uiLayoutRow(layout, true);
-  uiLayoutSetPropDecorate(row, false);
-  uiLayout *sub = uiLayoutRowWithHeading(row, true, IFACE_("Masks"));
-  char text[2] = "0";
+  uiLayout *col = uiLayoutColumn(layout, true);
+  uiLayout *sub = uiLayoutRowWithHeading(col, true, IFACE_("Masks"));
 
   PropertyRNA *prop = RNA_struct_find_property(ptr, "use_material_mask_bits");
-  for (int i = 0; i < 8; i++, text[0]++) {
-    uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, text, ICON_NONE);
+  for (int i = 0; i < 8; i++) {
+    uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, " ", ICON_NONE);
+    if (i == 3) {
+      sub = uiLayoutRow(col, true);
+    }
   }
-  uiItemL(row, "", ICON_BLANK1); /* Space for decorator. */
 
-  uiLayout *col = uiLayoutColumn(layout, true);
-  uiItemR(col, ptr, "use_material_mask_match", 0, IFACE_("Exact Match"), ICON_NONE);
+  uiItemR(layout, ptr, "use_material_mask_match", 0, IFACE_("Exact Match"), ICON_NONE);
 }
 
 static void intersection_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
@@ -554,19 +553,18 @@ static void intersection_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayoutSetActive(layout, use_isec && use_isec_filter);
 
-  uiLayout *row = uiLayoutRow(layout, true);
-  uiLayoutSetPropDecorate(row, false);
-  uiLayout *sub = uiLayoutRowWithHeading(row, true, IFACE_("Collection Masks"));
-  char text[2] = "0";
+  uiLayout *col = uiLayoutColumn(layout, true);
+  uiLayout *sub = uiLayoutRowWithHeading(col, true, IFACE_("Collection Masks"));
 
   PropertyRNA *prop = RNA_struct_find_property(ptr, "use_intersection_mask");
-  for (int i = 0; i < 8; i++, text[0]++) {
-    uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, text, ICON_NONE);
+  for (int i = 0; i < 8; i++) {
+    uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, " ", ICON_NONE);
+    if (i == 3) {
+      sub = uiLayoutRow(col, true);
+    }
   }
-  uiItemL(row, "", ICON_BLANK1); /* Space for decorator. */
 
-  uiLayout *col = uiLayoutColumn(layout, true);
-  uiItemR(col, ptr, "use_intersection_match", 0, IFACE_("Exact Match"), ICON_NONE);
+  uiItemR(layout, ptr, "use_intersection_match", 0, IFACE_("Exact Match"), ICON_NONE);
 }
 
 static void face_mark_panel_draw_header(const bContext *UNUSED(C), Panel *panel)

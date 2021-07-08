@@ -297,7 +297,7 @@ class MATERIAL_PT_lineart(MaterialButtonsPanel, Panel):
         col.active = lineart.use_material_mask
         row = col.row(align=True, heading="Masks")
         for i in range(8):
-            row.prop(lineart, "use_material_mask_bits", text=str(i), index=i, toggle=True)
+            row.prop(lineart, "use_material_mask_bits", text=" ", index=i, toggle=True)
             if i == 3:
                 row = col.row(align=True)
 
