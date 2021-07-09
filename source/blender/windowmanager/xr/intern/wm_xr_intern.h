@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "BLI_sys_types.h"
+
 #include "CLG_log.h"
 
 #include "wm_xr.h"
@@ -171,7 +173,7 @@ typedef struct wmXrAction {
 
   /** Haptics. */
   char *haptic_name;
-  long long haptic_duration;
+  int64_t haptic_duration;
   float haptic_frequency;
   float haptic_amplitude;
 
@@ -183,7 +185,7 @@ typedef struct wmXrHapticAction {
   struct wmXrHapticAction *next, *prev;
   wmXrAction *action;
   const char **subaction_path;
-  long long time_start;
+  int64_t time_start;
 } wmXrHapticAction;
 
 typedef struct wmXrActionSet {

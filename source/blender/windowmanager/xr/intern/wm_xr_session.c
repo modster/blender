@@ -860,7 +860,7 @@ static wmXrHapticAction *wm_xr_session_haptic_action_find(ListBase *active_hapti
 static void wm_xr_session_haptic_action_add(ListBase *active_haptic_actions,
                                             const wmXrAction *action,
                                             const char **subaction_path,
-                                            long long time_now)
+                                            int64_t time_now)
 {
   wmXrHapticAction *ha = wm_xr_session_haptic_action_find(
       active_haptic_actions, action, subaction_path);
@@ -888,7 +888,7 @@ static void wm_xr_session_haptic_action_remove(ListBase *active_haptic_actions,
   }
 }
 
-static void wm_xr_session_haptic_timers_check(ListBase *active_haptic_actions, long long time_now)
+static void wm_xr_session_haptic_timers_check(ListBase *active_haptic_actions, int64_t time_now)
 {
   wmXrHapticAction *ha = active_haptic_actions->first;
   while (ha) {
@@ -909,7 +909,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
                                                   unsigned int subaction_idx,
                                                   ListBase *active_modal_actions,
                                                   ListBase *active_haptic_actions,
-                                                  long long time_now,
+                                                  int64_t time_now,
                                                   bool modal,
                                                   bool haptic,
                                                   short *r_val,
@@ -1112,7 +1112,7 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
     return;
   }
 
-  const long long time_now = (long long)(PIL_check_seconds_timer() * 1000);
+  const int64_t time_now = (int64_t)(PIL_check_seconds_timer() * 1000);
 
   const wmXrEyeData *eye_data = &session_state->eyes[settings->selection_eye];
   ListBase *active_modal_actions = &action_set->active_modal_actions;

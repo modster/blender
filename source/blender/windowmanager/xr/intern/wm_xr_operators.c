@@ -927,7 +927,7 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
   GHOST_XrPose nav_pose;
   float nav_mat[4][4], delta[4][4], out[4][4];
 
-  const float time_now = PIL_check_seconds_timer();
+  const double time_now = PIL_check_seconds_timer();
 
   PropertyRNA *prop = RNA_struct_find_property(op->ptr, "mode");
   mode = prop ? RNA_property_enum_get(op->ptr, prop) : XR_FLY_VIEWER_FORWARD;
@@ -990,7 +990,7 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
                               (1.0f - actiondata->float_threshold) :
                           1.0f;
       if (speed_interp_cubic) {
-        float start[2], end[2], out[2];
+        float start[2], end[2], p[2];
 
         start[0] = 0.0f;
         start[1] = speed;
@@ -999,8 +999,8 @@ static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEv
         end[0] = 1.0f;
         end[1] = speed_max;
 
-        interp_v2_v2v2v2v2_cubic(out, start, speed_p0, speed_p1, end, speed_t);
-        speed = out[1];
+        interp_v2_v2v2v2v2_cubic(p, start, speed_p0, speed_p1, end, speed_t);
+        speed = p[1];
       }
       else {
         speed += speed_t * (speed_max - speed);

@@ -1017,7 +1017,7 @@ bool WM_xr_action_create(wmXrData *xr,
                          struct wmOperatorType *ot,
                          struct IDProperty *op_properties,
                          const char **haptic_name,
-                         const long long *haptic_duration,
+                         const int64_t *haptic_duration,
                          const float *haptic_frequency,
                          const float *haptic_amplitude,
                          eXrActionFlag flag);

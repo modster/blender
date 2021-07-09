@@ -903,7 +903,7 @@ static bool rna_XrSessionState_action_create(bContext *C,
   const bool is_float_action = (type == XR_FLOAT_INPUT || type == XR_VECTOR2F_INPUT);
   wmOperatorType *ot = NULL;
   IDProperty *op_properties = NULL;
-  long long haptic_duration_msec;
+  int64_t haptic_duration_msec;
   eXrActionFlag flag = 0;
 
   if (is_float_action) {
@@ -926,7 +926,7 @@ static bool rna_XrSessionState_action_create(bContext *C,
       }
     }
 
-    haptic_duration_msec = (long long)(haptic_duration * 1000.0f);
+    haptic_duration_msec = (int64_t)(haptic_duration * 1000.0f);
 
     flag |= (op_flag | axis0_flag | axis1_flag | haptic_flag);
     if (bimanual) {
@@ -1136,7 +1136,7 @@ bool rna_XrSessionState_haptic_action_apply(bContext *C,
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  long long duration_msec = (long long)(duration * 1000.0f);
+  int64_t duration_msec = (int64_t)(duration * 1000.0f);
   return WM_xr_haptic_action_apply(&wm->xr,
                                    action_set_name,
                                    action_name,
