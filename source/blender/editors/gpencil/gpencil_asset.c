@@ -88,6 +88,8 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
   bGPdata *gpd = (bGPdata *)BKE_id_copy(bmain, &gpd_src->id);
   /* Enable fake user by default. */
   id_fake_user_set(&gpd->id);
+  /* Disable Edit mode. */
+  gpd->flag &= ~GP_DATA_STROKE_EDITMODE;
 
   bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd);
 
