@@ -24,7 +24,8 @@
 #include "BLI_string_ref.hh"
 
 #include "GPU_shader.h"
-#include "GPU_uniform_buffer_types.h"
+#include "GPU_shader_block_types.h"
+#include "gpu_shader_block.hh"
 #include "gpu_shader_interface.hh"
 #include "gpu_uniform_buffer_private.hh"
 #include "gpu_vertex_buffer_private.hh"
@@ -49,7 +50,7 @@ class Shader {
   /** For debugging purpose. */
   char name[64];
 
-  std::optional<UniformBuiltinStruct> shader_struct;
+  std::optional<ShaderBlockBuffer> shader_struct;
 
  public:
   Shader(const char *name);
@@ -82,10 +83,10 @@ class Shader {
     return name;
   };
 
-  UniformBuiltinStruct *m_shader_struct = nullptr;
+  ShaderBlockBuffer *m_shader_struct = nullptr;
   void set_shader_struct(GPUShaderBlockType struct_type)
   {
-    m_shader_struct = new UniformBuiltinStruct(struct_type);
+    m_shader_struct = new ShaderBlockBuffer(struct_type);
   }
 
  protected:

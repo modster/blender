@@ -225,9 +225,8 @@ bool GLShader::finalize()
     this->print_log(sources, log, "Linking", true, &parser);
     return false;
   }
-  const UniformBuiltinStructType *type_info = m_shader_struct != nullptr ?
-                                                  &m_shader_struct->type_info() :
-                                                  nullptr;
+  const ShaderBlockType *type_info = m_shader_struct != nullptr ? &m_shader_struct->type_info() :
+                                                                  nullptr;
   interface = new GLShaderInterface(type_info, shader_program_);
 
   return true;

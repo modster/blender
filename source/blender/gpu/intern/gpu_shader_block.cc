@@ -26,7 +26,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "GPU_shader.h"
-#include "GPU_uniform_buffer_types.h"
+#include "gpu_shader_block.hh"
 #include "gpu_shader_interface.hh"
 
 namespace blender::gpu {
@@ -55,10 +55,10 @@ static bool is_valid_location(int location)
   return true;
 }
 
-static constexpr UniformBuiltinStructType::AttributeBinding determine_binding_struct_1(
+static constexpr ShaderBlockType::AttributeBinding determine_binding_struct_1(
     const GPUUniformBuiltin builtin_uniform)
 {
-  UniformBuiltinStructType::AttributeBinding result = {-1, 0};
+  ShaderBlockType::AttributeBinding result = {-1, 0};
 
   switch (builtin_uniform) {
     case GPU_UNIFORM_MODEL:
@@ -89,7 +89,7 @@ static constexpr UniformBuiltinStructType::AttributeBinding determine_binding_st
   return result;
 }
 
-static constexpr UniformBuiltinStructType::AttributeBinding determine_binding(
+static constexpr ShaderBlockType::AttributeBinding determine_binding(
     const GPUShaderBlockType struct_type, const GPUUniformBuiltin builtin_uniform)
 {
 
@@ -104,7 +104,7 @@ static constexpr UniformBuiltinStructType::AttributeBinding determine_binding(
   return {};
 }
 
-static constexpr std::array<const UniformBuiltinStructType::AttributeBinding, GPU_NUM_UNIFORMS>
+static constexpr std::array<const ShaderBlockType::AttributeBinding, GPU_NUM_UNIFORMS>
 builtin_uniforms_for_struct_type(const GPUShaderBlockType struct_type)
 {
   return {
@@ -131,7 +131,7 @@ builtin_uniforms_for_struct_type(const GPUShaderBlockType struct_type)
 }
 
 static constexpr std::array<
-    const std::array<const UniformBuiltinStructType::AttributeBinding, GPU_NUM_UNIFORMS>,
+    const std::array<const ShaderBlockType::AttributeBinding, GPU_NUM_UNIFORMS>,
     GPU_NUM_SHADER_BLOCK_TYPES>
     ATTRIBUTE_BINDINGS = {
         builtin_uniforms_for_struct_type(GPU_SHADER_BLOCK_CUSTOM),
@@ -158,17 +158,17 @@ static constexpr size_t data_size_for(const GPUShaderBlockType struct_type)
 /** \name Struct type
  * \{ */
 
-constexpr UniformBuiltinStructType::UniformBuiltinStructType(const GPUShaderBlockType type)
+constexpr ShaderBlockType::ShaderBlockType(const GPUShaderBlockType type)
     : type(type), m_attribute_bindings(ATTRIBUTE_BINDINGS[type]), m_data_size(data_size_for(type))
 {
 }
 
-bool UniformBuiltinStructType::AttributeBinding::has_binding() const
+bool ShaderBlockType::AttributeBinding::has_binding() const
 {
   return binding != -1;
 }
 
-bool UniformBuiltinStructType::has_all_builtin_uniforms(const ShaderInterface &interface) const
+bool ShaderBlockType::has_all_builtin_uniforms(const ShaderInterface &interface) const
 {
   for (int i = 0; i < GPU_NUM_UNIFORMS; i++) {
     const GPUUniformBuiltin builtin_uniform = static_cast<const GPUUniformBuiltin>(i);
@@ -182,13 +182,12 @@ bool UniformBuiltinStructType::has_all_builtin_uniforms(const ShaderInterface &i
   return true;
 }
 
-static constexpr std::array<UniformBuiltinStructType, GPU_NUM_SHADER_BLOCK_TYPES>
-    STRUCT_TYPE_INFOS = {
-        UniformBuiltinStructType(GPU_SHADER_BLOCK_CUSTOM),
-        UniformBuiltinStructType(GPU_SHADER_BLOCK_3D_COLOR),
+static constexpr std::array<ShaderBlockType, GPU_NUM_SHADER_BLOCK_TYPES> STRUCT_TYPE_INFOS = {
+    ShaderBlockType(GPU_SHADER_BLOCK_CUSTOM),
+    ShaderBlockType(GPU_SHADER_BLOCK_3D_COLOR),
 };
 
-const UniformBuiltinStructType &UniformBuiltinStructType::get(const GPUShaderBlockType type)
+const ShaderBlockType &ShaderBlockType::get(const GPUShaderBlockType type)
 {
   return STRUCT_TYPE_INFOS[type];
 }
@@ -200,8 +199,7 @@ std::optional<const GPUShaderBlockType> find_smallest_uniform_builtin_struct(
     return std::nullopt;
   }
 
-  if (UniformBuiltinStructType::get(GPU_SHADER_BLOCK_3D_COLOR)
-          .has_all_builtin_uniforms(interface)) {
+  if (ShaderBlockType::get(GPU_SHADER_BLOCK_3D_COLOR).has_all_builtin_uniforms(interface)) {
     return std::make_optional(GPU_SHADER_BLOCK_3D_COLOR);
   }
 
@@ -214,25 +212,25 @@ std::optional<const GPUShaderBlockType> find_smallest_uniform_builtin_struct(
 /** \name Struct type
  * \{ */
 
-UniformBuiltinStruct::UniformBuiltinStruct(const GPUShaderBlockType type)
-    : m_type_info(UniformBuiltinStructType::get(type))
+ShaderBlockBuffer::ShaderBlockBuffer(const GPUShaderBlockType type)
+    : m_type_info(ShaderBlockType::get(type))
 {
   m_data = MEM_mallocN(m_type_info.data_size(), __func__);
 }
 
-UniformBuiltinStruct::~UniformBuiltinStruct()
+ShaderBlockBuffer::~ShaderBlockBuffer()
 {
   MEM_freeN(m_data);
   m_data = nullptr;
 }
 
-bool UniformBuiltinStruct::uniform_int(int location, int comp_len, int array_size, const int *data)
+bool ShaderBlockBuffer::uniform_int(int location, int comp_len, int array_size, const int *data)
 {
   if (!is_valid_location(location)) {
     return false;
   }
   const GPUUniformBuiltin builtin_uniform = to_builtin_uniform(location);
-  const UniformBuiltinStructType::AttributeBinding &attribute = m_type_info.attribute_binding(
+  const ShaderBlockType::AttributeBinding &attribute = m_type_info.attribute_binding(
       builtin_uniform);
 
   if (!attribute.has_binding()) {
@@ -245,16 +243,16 @@ bool UniformBuiltinStruct::uniform_int(int location, int comp_len, int array_siz
   return true;
 }
 
-bool UniformBuiltinStruct::uniform_float(int location,
-                                         int comp_len,
-                                         int array_size,
-                                         const float *data)
+bool ShaderBlockBuffer::uniform_float(int location,
+                                      int comp_len,
+                                      int array_size,
+                                      const float *data)
 {
   if (!is_valid_location(location)) {
     return false;
   }
   const GPUUniformBuiltin builtin_uniform = to_builtin_uniform(location);
-  const UniformBuiltinStructType::AttributeBinding &attribute = m_type_info.attribute_binding(
+  const ShaderBlockType::AttributeBinding &attribute = m_type_info.attribute_binding(
       builtin_uniform);
 
   if (!attribute.has_binding()) {

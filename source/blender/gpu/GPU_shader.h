@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "GPU_uniform_buffer_types.h"
+#include "GPU_shader_block_types.h"
 
 #ifdef __cplusplus
 extern "C" {

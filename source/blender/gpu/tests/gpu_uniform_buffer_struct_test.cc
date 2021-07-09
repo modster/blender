@@ -3,8 +3,8 @@
 #include "GPU_capabilities.h"
 #include "GPU_compute.h"
 #include "GPU_shader.h"
-#include "GPU_uniform_buffer_types.h"
-#include "gpu_uniform_buffer_private.hh"
+#include "GPU_shader_block_types.h"
+#include "gpu_shader_block.hh"
 
 #include "BLI_math.h"
 
@@ -12,15 +12,15 @@ namespace blender::gpu::tests {
 
 TEST(GPUUniformStruct, struct1)
 {
-  UniformBuiltinStruct uniform_struct(GPU_SHADER_BLOCK_3D_COLOR);
-  const UniformBuiltinStructType &type_info = uniform_struct.type_info();
+  ShaderBlockBuffer uniform_struct(GPU_SHADER_BLOCK_3D_COLOR);
+  const ShaderBlockType &type_info = uniform_struct.type_info();
   const GPUShaderBlock3dColor *struct_data = static_cast<const GPUShaderBlock3dColor *>(
       uniform_struct.data());
   EXPECT_EQ(type_info.data_size(), sizeof(*struct_data));
 
   /* ModelMatrix attribute. */
   {
-    const UniformBuiltinStructType::AttributeBinding &binding = type_info.attribute_binding(
+    const ShaderBlockType::AttributeBinding &binding = type_info.attribute_binding(
         GPU_UNIFORM_MODEL);
     float m4[4][4];
     unit_m4(m4);
@@ -36,7 +36,7 @@ TEST(GPUUniformStruct, struct1)
 
   /* ModelViewProjectionMatrix attribute. */
   {
-    const UniformBuiltinStructType::AttributeBinding &binding = type_info.attribute_binding(
+    const ShaderBlockType::AttributeBinding &binding = type_info.attribute_binding(
         GPU_UNIFORM_MVP);
     float m4[4][4];
     unit_m4(m4);
@@ -52,7 +52,7 @@ TEST(GPUUniformStruct, struct1)
 
   /* Color attribute. */
   {
-    const UniformBuiltinStructType::AttributeBinding &binding = type_info.attribute_binding(
+    const ShaderBlockType::AttributeBinding &binding = type_info.attribute_binding(
         GPU_UNIFORM_COLOR);
     float color[4] = {1.0f, 0.0f, 1.0f, 1.0f};
     const bool result = uniform_struct.uniform_float(binding.binding, 4, 1, color);
@@ -64,7 +64,7 @@ TEST(GPUUniformStruct, struct1)
 
   /* WorldClipPlanes attribute. */
   {
-    const UniformBuiltinStructType::AttributeBinding &binding = type_info.attribute_binding(
+    const ShaderBlockType::AttributeBinding &binding = type_info.attribute_binding(
         GPU_UNIFORM_CLIPPLANES);
 
     float clip_planes[6][4] = {
@@ -88,7 +88,7 @@ TEST(GPUUniformStruct, struct1)
 
   /* SrgbTransform attribute. */
   {
-    const UniformBuiltinStructType::AttributeBinding &binding = type_info.attribute_binding(
+    const ShaderBlockType::AttributeBinding &binding = type_info.attribute_binding(
         GPU_UNIFORM_SRGB_TRANSFORM);
     int srgb_transform = true;
     const bool result = uniform_struct.uniform_int(binding.binding, 1, 1, &srgb_transform);

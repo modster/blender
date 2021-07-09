@@ -145,7 +145,7 @@ static inline int ssbo_binding(int32_t program, uint32_t ssbo_index)
 /** \name Creation / Destruction
  * \{ */
 
-GLShaderInterface::GLShaderInterface(const UniformBuiltinStructType *type_info, GLuint program)
+GLShaderInterface::GLShaderInterface(const ShaderBlockType *type_info, GLuint program)
 {
   /* Necessary to make #glUniform works. */
   glUseProgram(program);
@@ -191,7 +191,7 @@ GLShaderInterface::GLShaderInterface(const UniformBuiltinStructType *type_info, 
   if (type_info) {
     for (int i = 0; i < GPU_NUM_UNIFORMS; i++) {
       const GPUUniformBuiltin builtin_uniform = static_cast<const GPUUniformBuiltin>(i);
-      const UniformBuiltinStructType::AttributeBinding &binding = type_info->attribute_binding(
+      const ShaderBlockType::AttributeBinding &binding = type_info->attribute_binding(
           builtin_uniform);
       if (binding.has_binding()) {
         uniform_len++;
@@ -298,7 +298,7 @@ GLShaderInterface::GLShaderInterface(const UniformBuiltinStructType *type_info, 
   if (type_info) {
     for (int i = 0; i < GPU_NUM_UNIFORMS; i++) {
       const GPUUniformBuiltin builtin_uniform = static_cast<const GPUUniformBuiltin>(i);
-      const UniformBuiltinStructType::AttributeBinding &binding = type_info->attribute_binding(
+      const ShaderBlockType::AttributeBinding &binding = type_info->attribute_binding(
           builtin_uniform);
       if (binding.has_binding()) {
         ShaderInput *input = &inputs_[attr_len_ + ubo_len_ + uniform_len_++];

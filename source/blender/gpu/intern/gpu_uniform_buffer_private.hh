@@ -27,7 +27,7 @@
 #include <optional>
 
 #include "GPU_shader.h"
-#include "GPU_uniform_buffer_types.h"
+#include "GPU_shader_block_types.h"
 
 #include <array>
 
@@ -87,70 +87,6 @@ static inline const UniformBuf *unwrap(const GPUUniformBuf *vert)
 {
   return reinterpret_cast<const UniformBuf *>(vert);
 }
-
-class UniformBuiltinStructType {
- public:
-  constexpr UniformBuiltinStructType(const GPUShaderBlockType type);
-  static const UniformBuiltinStructType &get(const GPUShaderBlockType type);
-
-  bool has_all_builtin_uniforms(const ShaderInterface &interface) const;
-
-  GPUShaderBlockType type;
-  struct AttributeBinding {
-    int binding = -1;
-    size_t offset = 0;
-
-    bool has_binding() const;
-  };
-
-  const AttributeBinding &attribute_binding(const GPUUniformBuiltin builtin_uniform) const
-  {
-    return m_attribute_bindings[builtin_uniform];
-  }
-
-  size_t data_size() const
-  {
-    return m_data_size;
-  }
-
- private:
-  const std::array<const AttributeBinding, GPU_NUM_UNIFORMS> &m_attribute_bindings;
-  const size_t m_data_size;
-};
-
-class UniformBuiltinStruct {
- public:
-  struct Flags {
-    bool is_dirty : 1;
-  };
-
-  UniformBuiltinStruct(const GPUShaderBlockType type);
-  UniformBuiltinStruct(const UniformBuiltinStruct &other) = default;
-  UniformBuiltinStruct(UniformBuiltinStruct &&other) = default;
-
-  ~UniformBuiltinStruct();
-
-  void *data() const
-  {
-    return m_data;
-  };
-
-  const UniformBuiltinStructType &type_info() const
-  {
-    return m_type_info;
-  }
-
-  bool uniform_int(int location, int comp_len, int array_size, const int *data);
-  bool uniform_float(int location, int comp_len, int array_size, const float *data);
-
- private:
-  Flags m_flags;
-  const UniformBuiltinStructType &m_type_info;
-  void *m_data;
-};
-
-std::optional<const GPUShaderBlockType> find_smallest_uniform_builtin_struct(
-    const ShaderInterface &interface);
 
 #undef DEBUG_NAME_LEN
 

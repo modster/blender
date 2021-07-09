@@ -81,13 +81,13 @@ set(SRC
   intern/gpu_select_pick.c
   intern/gpu_select_sample_query.cc
   intern/gpu_shader.cc
+  intern/gpu_shader_block.cc
   intern/gpu_shader_builtin.c
   intern/gpu_shader_log.cc
   intern/gpu_shader_interface.cc
   intern/gpu_state.cc
   intern/gpu_texture.cc
   intern/gpu_uniform_buffer.cc
-  intern/gpu_uniform_buffer_structs.cc
   intern/gpu_vertex_buffer.cc
   intern/gpu_vertex_format.cc
   intern/gpu_viewport.c
