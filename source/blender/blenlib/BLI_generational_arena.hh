@@ -72,6 +72,7 @@
 #include <variant>
 
 #include "BLI_assert.h"
+#include "BLI_hash.hh"
 #include "BLI_vector.hh"
 
 #ifdef WITH_GTESTS
@@ -116,6 +117,12 @@ class Index {
   std::tuple<usize, usize> get_raw() const
   {
     return std::make_tuple(this->index, this->generation);
+  }
+
+  inline uint64_t hash() const
+  {
+    DefaultHash<std::pair<usize, usize>> hash;
+    return hash({this->index, this->generation});
   }
 
   friend std::ostream &operator<<(std::ostream &stream, const Index &index)

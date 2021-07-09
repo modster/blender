@@ -1204,22 +1204,21 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     blender::Vector<blender::Vector<FaceData>> face_indices;
     blender::Vector<blender::Vector<usize>> line_indices;
 
-    /* TODO(ish): drain all nodes, verts, edges, and faces into a new
-     * arena, and update the self indices. Some operations (such as
-     * collapse edges) can cause gaps in the arena which isn't
-     * acceptable here. It is more than just updating the self
-     * indices because the references would break then. There must be
-     * a simple way to do this but can't think of one right now.
-     * Maybe just go through the whole arena, assigning incrementing
-     * position data. Need to decide if drain and store in a wrapped
-     * datatype or always store or store that info in a map.
+    /* To handle gaps in the arena which can lead to wrong index
+     * values, a `blender::Map` is created between the
+     * `node.self_index` and the corresponding true index in the
+     * `positions` vector
      *
-     * As of now, using the index directly, assuming no gaps */
+     * Same for the verts/uvs as well */
 
     /* TODO(ish): this assert should change to some sort of error
      * handled thing */
     BLI_assert(this->node_normals_dirty == false);
 
+    blender::Map<NodeIndex, usize> pos_index_map;
+    blender::Map<VertIndex, usize> uv_index_map;
+
+    auto true_pos_index = 0;
     for (const auto &node : this->nodes) {
       auto pos = node.pos;
       /* dont need unkown check for position, it should always be present */
@@ -1229,14 +1228,25 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       if (float3_is_unknown(normal) == false) {
         normals.append(normal);
       }
-    }
 
+      /* add the index info to the map */
+      pos_index_map.add_new(node.self_index, true_pos_index);
+      true_pos_index++;
+    }
+    BLI_assert(true_pos_index == this->nodes.size());
+
+    auto true_uv_index = 0;
     for (const auto &vert : this->verts) {
       auto uv = vert.uv;
       if (float2_is_unknown(uv) == false) {
         uvs.append(uv);
       }
+
+      /* add the index info to the map */
+      uv_index_map.add_new(vert.self_index, true_uv_index);
+      true_uv_index++;
     }
+    BLI_assert(true_uv_index == this->verts.size());
 
     for (const auto &face : this->faces) {
       blender::Vector<FaceData> io_face;
@@ -1248,8 +1258,9 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
         BLI_assert(vert.node); /* a vert cannot exist without a node */
 
-        auto pos_index = std::get<0>(vert.node.value().get_raw());
-        auto uv_index = std::get<0>(vert.self_index.get_raw());
+        /* get the indices from the index maps */
+        auto pos_index = pos_index_map.lookup(vert.node.value());
+        auto uv_index = uv_index_map.lookup(vert.self_index);
         auto normal_index = pos_index;
 
         io_face.append(std::make_tuple(pos_index, uv_index, normal_index));
@@ -1284,8 +1295,11 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         const auto node_1_index = op_node_1_index.value();
         const auto node_2_index = op_node_2_index.value();
 
-        line.append(std::get<0>(node_1_index.get_raw()));
-        line.append(std::get<0>(node_2_index.get_raw()));
+        auto pos_index_1 = pos_index_map.lookup(node_1_index);
+        auto pos_index_2 = pos_index_map.lookup(node_2_index);
+
+        line.append(pos_index_1);
+        line.append(pos_index_2);
 
         line_indices.append(line);
       }
