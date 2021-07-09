@@ -886,8 +886,12 @@ static Scene *gpencil_preview_scene_create(const struct ObjectPreviewData *previ
                                             "preview_object",
                                             preview_data->datablock,
                                             false);
-
   BLI_assert(ob_temp != NULL);
+  /* Copy the materials to get full color previews. */
+  const short *materials_len_p = BKE_id_material_len_p(preview_data->datablock);
+  if (materials_len_p && *materials_len_p > 0) {
+    BKE_object_materials_test(preview_data->pr_main, ob_temp, preview_data->datablock);
+  }
 
   Object *camera_object = object_preview_camera_create(preview_data->pr_main, view_layer, ob_temp);
 
