@@ -238,7 +238,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
                   shname,
                   static_cast<int>(shader_block),
                   static_cast<int>(*best_struct_type));
-      }
+      
     }
   }
 
