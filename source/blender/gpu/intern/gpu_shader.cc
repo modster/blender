@@ -62,6 +62,30 @@ Shader::~Shader()
   delete m_shader_struct;
 }
 
+const bool Shader::has_shader_block() const
+{
+  return m_shader_struct;
+}
+
+const bool Shader::shader_block_dirty_get() const
+{
+  BLI_assert(m_shader_struct);
+  return m_shader_struct->flags().is_dirty;
+}
+
+void Shader::shader_block_update() const
+{
+  BLI_assert(m_shader_struct);
+  m_shader_struct->update();
+}
+
+void Shader::shader_block_bind() const
+{
+  BLI_assert(m_shader_struct);
+  const int binding = interface->ubo_builtin(GPU_UNIFORM_BLOCK_SHADER);
+  m_shader_struct->bind(binding);
+}
+
 static void standard_defines(Vector<const char *> &sources)
 {
   BLI_assert(sources.size() == 0);
@@ -394,6 +418,13 @@ void GPU_shader_bind(GPUShader *gpu_shader)
     if (GPU_matrix_dirty_get()) {
       GPU_matrix_bind(gpu_shader);
     }
+  }
+
+  if (shader->has_shader_block()) {
+    if (shader->shader_block_dirty_get()) {
+      shader->shader_block_update();
+    }
+    shader->shader_block_bind();
   }
 }
 

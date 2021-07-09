@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "BLI_assert.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -39,7 +41,10 @@ typedef struct GPUShaderBlock3dColor {
   float color[4];
   float WorldClipPlanes[6][4];
   int SrgbTransform;
+  int _pad[3];
 } GPUShaderBlock3dColor;
+
+BLI_STATIC_ASSERT_ALIGN(GPUShaderBlock3dColor, 16)
 
 #ifdef __cplusplus
 }

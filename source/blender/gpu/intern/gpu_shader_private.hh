@@ -89,6 +89,11 @@ class Shader {
     m_shader_struct = new ShaderBlockBuffer(struct_type);
   }
 
+  const bool has_shader_block() const;
+  const bool shader_block_dirty_get() const;
+  void shader_block_update() const;
+  void shader_block_bind() const;
+
  protected:
   void print_log(Span<const char *> sources,
                  char *log,

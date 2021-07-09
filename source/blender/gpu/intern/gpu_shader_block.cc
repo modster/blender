@@ -243,10 +243,13 @@ ShaderBlockBuffer::ShaderBlockBuffer(const GPUShaderBlockType type)
     : m_type_info(ShaderBlockType::get(type))
 {
   m_data = MEM_mallocN(m_type_info.data_size(), __func__);
+  m_ubo = GPUBackend::get()->uniformbuf_alloc(m_type_info.data_size(), __func__);
 }
 
 ShaderBlockBuffer::~ShaderBlockBuffer()
 {
+  delete m_ubo;
+  m_ubo = nullptr;
   MEM_freeN(m_data);
   m_data = nullptr;
 }
@@ -290,6 +293,19 @@ bool ShaderBlockBuffer::uniform_float(int location,
   m_flags.is_dirty = true;
 
   return true;
+}
+
+void ShaderBlockBuffer::update()
+{
+  if (m_flags.is_dirty) {
+    m_ubo->update(m_data);
+    m_flags.is_dirty = false;
+  }
+}
+
+void ShaderBlockBuffer::bind(int binding)
+{
+  m_ubo->bind(binding);
 }
 
 /** \} */

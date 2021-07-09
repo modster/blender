@@ -27,7 +27,9 @@
 #include <optional>
 
 #include "GPU_shader_block_types.h"
+#include "gpu_backend.hh"
 #include "gpu_shader_interface.hh"
+#include "gpu_uniform_buffer_private.hh"
 
 #include <array>
 
@@ -81,6 +83,11 @@ class ShaderBlockBuffer {
 
   ~ShaderBlockBuffer();
 
+  const Flags &flags() const
+  {
+    return m_flags;
+  }
+
   void *data() const
   {
     return m_data;
@@ -93,11 +100,14 @@ class ShaderBlockBuffer {
 
   bool uniform_int(int location, int comp_len, int array_size, const int *data);
   bool uniform_float(int location, int comp_len, int array_size, const float *data);
+  void update();
+  void bind(int binding);
 
  private:
   Flags m_flags;
   const ShaderBlockType &m_type_info;
   void *m_data;
+  UniformBuf *m_ubo;
 };
 
 std::optional<const GPUShaderBlockType> find_smallest_uniform_builtin_struct(
