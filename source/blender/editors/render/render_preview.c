@@ -888,9 +888,6 @@ static Scene *gpencil_preview_scene_create(const struct ObjectPreviewData *previ
                                             false);
 
   BLI_assert(ob_temp != NULL);
-  BLI_addtail(&preview_data->pr_main->objects, ob_temp);
-
-  BKE_collection_object_add(preview_data->pr_main, scene->master_collection, ob_temp);
 
   Object *camera_object = object_preview_camera_create(preview_data->pr_main, view_layer, ob_temp);
 
