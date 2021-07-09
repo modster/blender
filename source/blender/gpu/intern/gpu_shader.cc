@@ -151,6 +151,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
       sources.append(defines);
     }
     if (shader->m_shader_struct) {
+      sources.append("#define GPU_SHADER_BLOCK\n");
       sources.append(shader->m_shader_struct->type_info().defines());
     }
     sources.append(vertcode);
@@ -170,6 +171,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
       sources.append(defines);
     }
     if (shader->m_shader_struct) {
+      sources.append("#define GPU_SHADER_BLOCK\n");
       sources.append(shader->m_shader_struct->type_info().defines());
     }
     if (libcode) {
@@ -188,6 +190,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
       sources.append(defines);
     }
     if (shader->m_shader_struct) {
+      sources.append("#define GPU_SHADER_BLOCK\n");
       sources.append(shader->m_shader_struct->type_info().defines());
     }
     sources.append(geomcode);
@@ -206,6 +209,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
       sources.append(libcode);
     }
     if (shader->m_shader_struct) {
+      sources.append("#define GPU_SHADER_BLOCK\n");
       sources.append(shader->m_shader_struct->type_info().defines());
     }
     sources.append(computecode);
@@ -382,8 +386,17 @@ struct GPUShader *GPU_shader_create_from_arrays_impl(
   char name[64];
   BLI_snprintf(name, sizeof(name), "%s_%d", func, line);
 
-  GPUShader *sh = GPU_shader_create(
-      str_dst[0].str, str_dst[1].str, str_dst[2].str, nullptr, str_dst[3].str, name);
+  GPUShader *sh = GPU_shader_create_ex(str_dst[0].str,
+                                       str_dst[1].str,
+                                       str_dst[2].str,
+                                       nullptr,
+                                       nullptr,
+                                       str_dst[3].str,
+                                       GPU_SHADER_TFB_NONE,
+                                       nullptr,
+                                       0,
+                                       params->shader_block,
+                                       name);
 
   for (auto &i : str_dst) {
     if (i.is_alloc) {

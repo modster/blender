@@ -71,6 +71,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
 
 struct GPU_ShaderCreateFromArray_Params {
   const char **vert, **geom, **frag, **defs;
+  const GPUShaderBlockType shader_block;
 };
 struct GPUShader *GPU_shader_create_from_arrays_impl(
     const struct GPU_ShaderCreateFromArray_Params *params, const char *func, int line);

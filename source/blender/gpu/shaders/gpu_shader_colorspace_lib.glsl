@@ -2,7 +2,9 @@
 /* Undefine the macro that avoids compilation errors. */
 #undef blender_srgb_to_framebuffer_space
 
+#ifndef GPU_SHADER_BLOCK
 uniform bool srgbTarget = false;
+#endif
 
 vec4 blender_srgb_to_framebuffer_space(vec4 color)
 {

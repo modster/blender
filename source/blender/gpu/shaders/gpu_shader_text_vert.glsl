@@ -1,6 +1,4 @@
 
-uniform mat4 ModelViewProjectionMatrix;
-
 in vec4 pos; /* rect */
 in vec4 col;
 in int offset;

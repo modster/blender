@@ -157,6 +157,7 @@ typedef struct {
   const char *frag;
   /** Optional. */
   const char *defs;
+  const GPUShaderBlockType shader_block;
 } GPUShaderStages;
 
 static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
@@ -165,6 +166,7 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
             .name = "GPU_SHADER_TEXT",
             .vert = datatoc_gpu_shader_text_vert_glsl,
             .frag = datatoc_gpu_shader_text_frag_glsl,
+            .shader_block = GPU_SHADER_BLOCK_3D_COLOR,
         },
     [GPU_SHADER_KEYFRAME_DIAMOND] =
         {
@@ -532,6 +534,7 @@ GPUShader *GPU_shader_get_builtin_shader_with_config(eGPUBuiltinShader shader,
               .geom = (const char *[]){stages->geom, NULL},
               .frag = (const char *[]){datatoc_gpu_shader_colorspace_lib_glsl, stages->frag, NULL},
               .defs = (const char *[]){stages->defs, NULL},
+              .shader_block = stages->shader_block,
           });
     }
     else if (sh_cfg == GPU_SHADER_CFG_CLIPPED) {
