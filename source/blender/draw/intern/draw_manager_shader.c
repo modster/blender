@@ -401,7 +401,7 @@ GPUShader *DRW_shader_create_with_transform_feedback(const char *vert,
                               prim_type,
                               varying_names,
                               varying_count,
-                              GPU_UNIFORM_STRUCT_NONE,
+                              GPU_SHADER_BLOCK_CUSTOM,
                               __func__);
 }
 

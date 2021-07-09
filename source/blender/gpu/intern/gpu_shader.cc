@@ -102,7 +102,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
                                 const eGPUShaderTFBType tf_type,
                                 const char **tf_names,
                                 const int tf_count,
-                                const GPUUniformBuiltinStructType uniform_struct_type,
+                                const GPUShaderBlockType uniform_struct_type,
                                 const char *shname)
 {
   /* At least a vertex shader and a fragment shader are required, or only a compute shader. */
@@ -111,7 +111,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
               (computecode != nullptr)));
 
   Shader *shader = GPUBackend::get()->shader_alloc(shname);
-  if (uniform_struct_type != GPU_UNIFORM_STRUCT_NONE) {
+  if (uniform_struct_type != GPU_SHADER_BLOCK_CUSTOM) {
     shader->set_shader_struct(uniform_struct_type);
   }
 
@@ -188,10 +188,10 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
   };
 
   if (G.debug & G_DEBUG_GPU) {
-    std::optional<GPUUniformBuiltinStructType> best_struct_type =
-        find_smallest_uniform_builtin_struct(*shader->interface);
+    std::optional<GPUShaderBlockType> best_struct_type = find_smallest_uniform_builtin_struct(
+        *shader->interface);
     if (best_struct_type) {
-      if (/*uniform_struct_type != GPU_UNIFORM_STRUCT_NONE &&*/
+      if (/*uniform_struct_type != GPU_SHADER_BLOCK_CUSTOM &&*/
           uniform_struct_type != *best_struct_type) {
         CLOG_WARN(&LOG,
                   "Found better matching uniform struct for '%s'; current %d, suggested %d",
@@ -232,7 +232,7 @@ GPUShader *GPU_shader_create(const char *vertcode,
                               GPU_SHADER_TFB_NONE,
                               nullptr,
                               0,
-                              GPU_UNIFORM_STRUCT_NONE,
+                              GPU_SHADER_BLOCK_CUSTOM,
                               shname);
 }
 
@@ -250,7 +250,7 @@ GPUShader *GPU_shader_create_compute(const char *computecode,
                               GPU_SHADER_TFB_NONE,
                               nullptr,
                               0,
-                              GPU_UNIFORM_STRUCT_NONE,
+                              GPU_SHADER_BLOCK_CUSTOM,
                               shname);
 }
 
@@ -278,7 +278,7 @@ GPUShader *GPU_shader_create_from_python(const char *vertcode,
                                        GPU_SHADER_TFB_NONE,
                                        nullptr,
                                        0,
-                                       GPU_UNIFORM_STRUCT_NONE,
+                                       GPU_SHADER_BLOCK_CUSTOM,
                                        "pyGPUShader");
 
   MEM_SAFE_FREE(libcodecat);

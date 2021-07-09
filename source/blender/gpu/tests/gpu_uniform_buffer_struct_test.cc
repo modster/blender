@@ -12,9 +12,9 @@ namespace blender::gpu::tests {
 
 TEST(GPUUniformStruct, struct1)
 {
-  UniformBuiltinStruct uniform_struct(GPU_UNIFORM_STRUCT_1);
+  UniformBuiltinStruct uniform_struct(GPU_SHADER_BLOCK_3D_COLOR);
   const UniformBuiltinStructType &type_info = uniform_struct.type_info();
-  const GPUUniformBuiltinStruct1 *struct_data = static_cast<const GPUUniformBuiltinStruct1 *>(
+  const GPUShaderBlock3dColor *struct_data = static_cast<const GPUShaderBlock3dColor *>(
       uniform_struct.data());
   EXPECT_EQ(type_info.data_size(), sizeof(*struct_data));
 
@@ -133,7 +133,7 @@ void main() {
                                            GPU_SHADER_TFB_NONE,
                                            nullptr,
                                            0,
-                                           GPU_UNIFORM_STRUCT_1,
+                                           GPU_SHADER_BLOCK_3D_COLOR,
                                            __func__);
   EXPECT_NE(shader, nullptr);
 

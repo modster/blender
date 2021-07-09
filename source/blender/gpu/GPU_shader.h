@@ -66,7 +66,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
                                 const eGPUShaderTFBType tf_type,
                                 const char **tf_names,
                                 const int tf_count,
-                                const GPUUniformBuiltinStructType uniform_struct_type,
+                                const GPUShaderBlockType uniform_struct_type,
                                 const char *shname);
 
 struct GPU_ShaderCreateFromArray_Params {

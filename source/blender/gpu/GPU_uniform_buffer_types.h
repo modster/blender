@@ -27,19 +27,19 @@
 extern "C" {
 #endif
 
-typedef enum GPUUniformBuiltinStructType {
-  GPU_UNIFORM_STRUCT_NONE = 0,
-  GPU_UNIFORM_STRUCT_1,
-  GPU_NUM_UNIFORM_STRUCTS, /* Special value, denotes number of structs. */
-} GPUUniformBuiltinStructType;
+typedef enum GPUShaderBlockType {
+  GPU_SHADER_BLOCK_CUSTOM = 0,
+  GPU_SHADER_BLOCK_3D_COLOR,
+  GPU_NUM_SHADER_BLOCK_TYPES, /* Special value, denotes number of structs. */
+} GPUShaderBlockType;
 
-typedef struct GPUUniformBuiltinStruct1 {
+typedef struct GPUShaderBlock3dColor {
   float ModelMatrix[4][4];
   float ModelViewProjectionMatrix[4][4];
   float color[4];
   float WorldClipPlanes[6][4];
   int SrgbTransform;
-} GPUUniformBuiltinStruct1;
+} GPUShaderBlock3dColor;
 
 #ifdef __cplusplus
 }

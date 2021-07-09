@@ -90,12 +90,12 @@ static inline const UniformBuf *unwrap(const GPUUniformBuf *vert)
 
 class UniformBuiltinStructType {
  public:
-  constexpr UniformBuiltinStructType(const GPUUniformBuiltinStructType type);
-  static const UniformBuiltinStructType &get(const GPUUniformBuiltinStructType type);
+  constexpr UniformBuiltinStructType(const GPUShaderBlockType type);
+  static const UniformBuiltinStructType &get(const GPUShaderBlockType type);
 
   bool has_all_builtin_uniforms(const ShaderInterface &interface) const;
 
-  GPUUniformBuiltinStructType type;
+  GPUShaderBlockType type;
   struct AttributeBinding {
     int binding = -1;
     size_t offset = 0;
@@ -124,7 +124,7 @@ class UniformBuiltinStruct {
     bool is_dirty : 1;
   };
 
-  UniformBuiltinStruct(const GPUUniformBuiltinStructType type);
+  UniformBuiltinStruct(const GPUShaderBlockType type);
   UniformBuiltinStruct(const UniformBuiltinStruct &other) = default;
   UniformBuiltinStruct(UniformBuiltinStruct &&other) = default;
 
@@ -149,7 +149,7 @@ class UniformBuiltinStruct {
   void *m_data;
 };
 
-std::optional<const GPUUniformBuiltinStructType> find_smallest_uniform_builtin_struct(
+std::optional<const GPUShaderBlockType> find_smallest_uniform_builtin_struct(
     const ShaderInterface &interface);
 
 #undef DEBUG_NAME_LEN

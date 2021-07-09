@@ -83,7 +83,7 @@ class Shader {
   };
 
   UniformBuiltinStruct *m_shader_struct = nullptr;
-  void set_shader_struct(GPUUniformBuiltinStructType struct_type)
+  void set_shader_struct(GPUShaderBlockType struct_type)
   {
     m_shader_struct = new UniformBuiltinStruct(struct_type);
   }
