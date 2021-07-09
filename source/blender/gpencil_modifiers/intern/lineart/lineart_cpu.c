@@ -2712,105 +2712,12 @@ static LineartVert *lineart_triangle_share_point(const LineartTriangle *l,
   return NULL;
 }
 
-/**
- * To save time and prevent overlapping lines when computing intersection lines.
- */
-static bool lineart_vert_already_intersected_2v(LineartVertIntersection *vt,
-                                                LineartVertIntersection *v1,
-                                                LineartVertIntersection *v2)
-{
-  return ((vt->isec1 == v1->base.index && vt->isec2 == v2->base.index) ||
-          (vt->isec2 == v2->base.index && vt->isec1 == v1->base.index));
-}
-
-static void lineart_vert_set_intersection_2v(LineartVert *vt, LineartVert *v1, LineartVert *v2)
-{
-  LineartVertIntersection *irv = (LineartVertIntersection *)vt;
-  irv->isec1 = v1->index;
-  irv->isec2 = v2->index;
-}
-
-/**
- * This tests a triangle against a virtual line represented by `v1---v2`.
- * The vertices returned after repeated calls to this function
- * is then used to create a triangle/triangle intersection line.
- */
-static LineartVert *lineart_triangle_2v_intersection_test(LineartRenderBuffer *rb,
-                                                          LineartVert *v1,
-                                                          LineartVert *v2,
-                                                          LineartTriangle *tri,
-                                                          LineartTriangle *testing,
-                                                          LineartVert *last)
+static bool lineart_triangle_2v_intersection_math(
+    LineartVert *v1, LineartVert *v2, LineartTriangle *t2, float *last, float *rv)
 {
   double Lv[3];
   double Rv[3];
   double dot_l, dot_r;
-  LineartVert *result;
-  double gloc[3];
-  LineartVert *l = v1, *r = v2;
-
-  for (LinkNode *ln = (void *)testing->intersecting_verts; ln; ln = ln->next) {
-    LineartVertIntersection *vt = ln->link;
-    if (vt->intersecting_with == tri &&
-        lineart_vert_already_intersected_2v(
-            vt, (LineartVertIntersection *)l, (LineartVertIntersection *)r)) {
-      return (LineartVert *)vt;
-    }
-  }
-
-  sub_v3_v3v3_db(Lv, l->gloc, testing->v[0]->gloc);
-  sub_v3_v3v3_db(Rv, r->gloc, testing->v[0]->gloc);
-
-  dot_l = dot_v3v3_db(Lv, testing->gn);
-  dot_r = dot_v3v3_db(Rv, testing->gn);
-
-  if (dot_l * dot_r > 0 || (!dot_l && !dot_r)) {
-    return 0;
-  }
-
-  dot_l = fabs(dot_l);
-  dot_r = fabs(dot_r);
-
-  interp_v3_v3v3_db(gloc, l->gloc, r->gloc, dot_l / (dot_l + dot_r));
-
-  /* Due to precision issue, we might end up with the same point as the one we already detected.
-   */
-  if (last && LRT_DOUBLE_CLOSE_ENOUGH(last->gloc[0], gloc[0]) &&
-      LRT_DOUBLE_CLOSE_ENOUGH(last->gloc[1], gloc[1]) &&
-      LRT_DOUBLE_CLOSE_ENOUGH(last->gloc[2], gloc[2])) {
-    return NULL;
-  }
-
-  if (!(lineart_point_inside_triangle3d(
-          gloc, testing->v[0]->gloc, testing->v[1]->gloc, testing->v[2]->gloc))) {
-    return NULL;
-  }
-
-  /* This is an intersection vert, the size is bigger than LineartVert,
-   * allocated separately. */
-  result = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartVertIntersection));
-
-  /* Indicate the data structure difference. */
-  result->flag = LRT_VERT_HAS_INTERSECTION_DATA;
-
-  copy_v3_v3_db(result->gloc, gloc);
-
-  lineart_prepend_pool(&testing->intersecting_verts, &rb->render_data_pool, result);
-
-  return result;
-}
-
-static bool lineart_triangle_2v_intersection_math(LineartVert *v1,
-                                                  LineartVert *v2,
-                                                  LineartTriangle *tri,
-                                                  LineartTriangle *t2,
-                                                  float *last,
-                                                  float *rv)
-{
-  double Lv[3];
-  double Rv[3];
-  double dot_l, dot_r;
-  LineartVert *result;
   double gloc[3];
   LineartVert *l = v1, *r = v2;
 
@@ -2852,7 +2759,6 @@ static bool lineart_triangle_intersect_math(LineartTriangle *tri,
 {
   float *next = v1, *last = NULL;
   LineartVert *sv1, *sv2;
-  double cl[3];
 
   LineartVert *share = lineart_triangle_share_point(t2, tri);
 
@@ -2860,14 +2766,13 @@ static bool lineart_triangle_intersect_math(LineartTriangle *tri,
     /* If triangles have sharing points like `abc` and `acd`, then we only need to detect `bc`
      * against `acd` or `cd` against `abc`. */
 
-    LineartVert *new_share;
     lineart_triangle_get_other_verts(tri, share, &sv1, &sv2);
 
     copy_v3fl_v3db(v1, share->gloc);
 
-    if (!lineart_triangle_2v_intersection_math(sv1, sv2, tri, t2, 0, v2)) {
+    if (!lineart_triangle_2v_intersection_math(sv1, sv2, t2, 0, v2)) {
       lineart_triangle_get_other_verts(t2, share, &sv1, &sv2);
-      if (lineart_triangle_2v_intersection_math(sv1, sv2, t2, tri, 0, v2)) {
+      if (lineart_triangle_2v_intersection_math(sv1, sv2, tri, 0, v2)) {
         return true;
       }
     }
@@ -2875,19 +2780,19 @@ static bool lineart_triangle_intersect_math(LineartTriangle *tri,
   else {
     /* If not sharing any points, then we need to try all the possibilities. */
 
-    if (lineart_triangle_2v_intersection_math(tri->v[0], tri->v[1], tri, t2, 0, v1)) {
+    if (lineart_triangle_2v_intersection_math(tri->v[0], tri->v[1], t2, 0, v1)) {
       next = v2;
       last = v1;
     }
 
-    if (lineart_triangle_2v_intersection_math(tri->v[1], tri->v[2], tri, t2, last, next)) {
+    if (lineart_triangle_2v_intersection_math(tri->v[1], tri->v[2], t2, last, next)) {
       if (last) {
         return true;
       }
       next = v2;
       last = v1;
     }
-    if (lineart_triangle_2v_intersection_math(tri->v[2], tri->v[0], tri, t2, last, next)) {
+    if (lineart_triangle_2v_intersection_math(tri->v[2], tri->v[0], t2, last, next)) {
       if (last) {
         return true;
       }
@@ -2895,21 +2800,21 @@ static bool lineart_triangle_intersect_math(LineartTriangle *tri,
       last = v1;
     }
 
-    if (lineart_triangle_2v_intersection_math(t2->v[0], t2->v[1], t2, tri, last, next)) {
+    if (lineart_triangle_2v_intersection_math(t2->v[0], t2->v[1], tri, last, next)) {
       if (last) {
         return true;
       }
       next = v2;
       last = v1;
     }
-    if (lineart_triangle_2v_intersection_math(t2->v[1], t2->v[2], t2, tri, last, next)) {
+    if (lineart_triangle_2v_intersection_math(t2->v[1], t2->v[2], tri, last, next)) {
       if (last) {
         return true;
       }
       next = v2;
       last = v1;
     }
-    if (lineart_triangle_2v_intersection_math(t2->v[2], t2->v[0], t2, tri, last, next)) {
+    if (lineart_triangle_2v_intersection_math(t2->v[2], t2->v[0], tri, last, next)) {
       if (last) {
         return true;
       }
@@ -2947,7 +2852,7 @@ static void lineart_add_eln_thread(LineartIsecThread *th, LineartElementLinkNode
 {
   if (th->current_pending == th->max_pending) {
 
-    LineartElementLinkNode *new_array = MEM_mallocN(
+    LineartElementLinkNode **new_array = MEM_mallocN(
         sizeof(LineartElementLinkNode *) * th->max_pending * 2, "LineartIsecSingle");
     memcpy(
         new_array, th->pending_triangle_nodes, sizeof(LineartElementLinkNode *) * th->max_pending);
@@ -3005,162 +2910,6 @@ static void lineart_destroy_isec_thread(LineartIsecData *d)
     MEM_freeN(it->pending_triangle_nodes);
   }
   MEM_freeN(d->threads);
-}
-
-/**
- * Test if two triangles intersect. Generates one intersection line if the check succeeds.
- */
-static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
-                                               LineartTriangle *tri,
-                                               LineartTriangle *testing)
-{
-  LineartVert *v1 = 0, *v2 = 0;
-  LineartVert **next = &v1;
-  LineartEdge *result;
-  LineartVert *E0T = 0;
-  LineartVert *E1T = 0;
-  LineartVert *E2T = 0;
-  LineartVert *TE0 = 0;
-  LineartVert *TE1 = 0;
-  LineartVert *TE2 = 0;
-  LineartVert *sv1, *sv2;
-  double cl[3];
-
-  double ZMin, ZMax;
-  ZMax = rb->far_clip;
-  ZMin = rb->near_clip;
-  copy_v3_v3_db(cl, rb->camera_pos);
-  LineartVert *share = lineart_triangle_share_point(testing, tri);
-
-  if (share) {
-    /* If triangles have sharing points like `abc` and `acd`, then we only need to detect `bc`
-     * against `acd` or `cd` against `abc`. */
-
-    LineartVert *new_share;
-    lineart_triangle_get_other_verts(tri, share, &sv1, &sv2);
-
-    v1 = new_share = lineart_mem_acquire(&rb->render_data_pool, (sizeof(LineartVertIntersection)));
-
-    new_share->flag = LRT_VERT_HAS_INTERSECTION_DATA;
-
-    copy_v3_v3_db(new_share->gloc, share->gloc);
-
-    v2 = lineart_triangle_2v_intersection_test(rb, sv1, sv2, tri, testing, 0);
-
-    if (v2 == NULL) {
-      lineart_triangle_get_other_verts(testing, share, &sv1, &sv2);
-      v2 = lineart_triangle_2v_intersection_test(rb, sv1, sv2, testing, tri, 0);
-      if (v2 == NULL) {
-        return 0;
-      }
-      lineart_prepend_pool(&testing->intersecting_verts, &rb->render_data_pool, new_share);
-    }
-    else {
-      lineart_prepend_pool(&tri->intersecting_verts, &rb->render_data_pool, new_share);
-    }
-  }
-  else {
-    /* If not sharing any points, then we need to try all the possibilities. */
-
-    E0T = lineart_triangle_2v_intersection_test(rb, tri->v[0], tri->v[1], tri, testing, 0);
-    if (E0T && (!(*next))) {
-      (*next) = E0T;
-      lineart_vert_set_intersection_2v((*next), tri->v[0], tri->v[1]);
-      next = &v2;
-    }
-    E1T = lineart_triangle_2v_intersection_test(rb, tri->v[1], tri->v[2], tri, testing, v1);
-    if (E1T && (!(*next))) {
-      (*next) = E1T;
-      lineart_vert_set_intersection_2v((*next), tri->v[1], tri->v[2]);
-      next = &v2;
-    }
-    if (!(*next)) {
-      E2T = lineart_triangle_2v_intersection_test(rb, tri->v[2], tri->v[0], tri, testing, v1);
-    }
-    if (E2T && (!(*next))) {
-      (*next) = E2T;
-      lineart_vert_set_intersection_2v((*next), tri->v[2], tri->v[0]);
-      next = &v2;
-    }
-
-    if (!(*next)) {
-      TE0 = lineart_triangle_2v_intersection_test(
-          rb, testing->v[0], testing->v[1], testing, tri, v1);
-    }
-    if (TE0 && (!(*next))) {
-      (*next) = TE0;
-      lineart_vert_set_intersection_2v((*next), testing->v[0], testing->v[1]);
-      next = &v2;
-    }
-    if (!(*next)) {
-      TE1 = lineart_triangle_2v_intersection_test(
-          rb, testing->v[1], testing->v[2], testing, tri, v1);
-    }
-    if (TE1 && (!(*next))) {
-      (*next) = TE1;
-      lineart_vert_set_intersection_2v((*next), testing->v[1], testing->v[2]);
-      next = &v2;
-    }
-    if (!(*next)) {
-      TE2 = lineart_triangle_2v_intersection_test(
-          rb, testing->v[2], testing->v[0], testing, tri, v1);
-    }
-    if (TE2 && (!(*next))) {
-      (*next) = TE2;
-      lineart_vert_set_intersection_2v((*next), testing->v[2], testing->v[0]);
-      next = &v2;
-    }
-
-    if (!(*next)) {
-      return 0;
-    }
-  }
-
-  /* The intersection line has been generated only in geometry space, so we need to transform
-   * them as well. */
-  mul_v4_m4v3_db(v1->fbcoord, rb->view_projection, v1->gloc);
-  mul_v4_m4v3_db(v2->fbcoord, rb->view_projection, v2->gloc);
-  mul_v3db_db(v1->fbcoord, (1 / v1->fbcoord[3]));
-  mul_v3db_db(v2->fbcoord, (1 / v2->fbcoord[3]));
-
-  v1->fbcoord[0] -= rb->shift_x * 2;
-  v1->fbcoord[1] -= rb->shift_y * 2;
-  v2->fbcoord[0] -= rb->shift_x * 2;
-  v2->fbcoord[1] -= rb->shift_y * 2;
-
-  /* This z transformation is not the same as the rest of the part, because the data don't go
-   * through normal perspective division calls in the pipeline, but this way the 3D result and
-   * occlusion on the generated line is correct, and we don't really use 2D for viewport stroke
-   * generation anyway. */
-  v1->fbcoord[2] = ZMin * ZMax / (ZMax - fabs(v1->fbcoord[2]) * (ZMax - ZMin));
-  v2->fbcoord[2] = ZMin * ZMax / (ZMax - fabs(v2->fbcoord[2]) * (ZMax - ZMin));
-
-  ((LineartVertIntersection *)v1)->intersecting_with = tri;
-  ((LineartVertIntersection *)v2)->intersecting_with = testing;
-
-  result = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdge));
-  result->v1 = v1;
-  result->v2 = v2;
-  result->t1 = tri;
-  result->t2 = testing;
-
-  LineartEdgeSegment *es = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartEdgeSegment));
-  BLI_addtail(&result->segments, es);
-  /* Don't need to OR flags right now, just a type mark. */
-  result->flags = LRT_EDGE_FLAG_INTERSECTION;
-  result->intersection_mask = (tri->intersection_mask | testing->intersection_mask);
-
-  lineart_prepend_edge_direct(&rb->intersection.first, result);
-  int r1, r2, c1, c2, row, col;
-  if (lineart_get_edge_bounding_areas(rb, result, &r1, &r2, &c1, &c2)) {
-    for (row = r1; row != r2 + 1; row++) {
-      for (col = c1; col != c2 + 1; col++) {
-        lineart_bounding_area_link_edge(
-            rb, &rb->initial_bounding_areas[row * LRT_BA_ROWS + col], result);
-      }
-    }
-  }
-  return result;
 }
 
 static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
@@ -3442,7 +3191,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   return rb;
 }
 
-static int lineart_triangle_size_get(const Scene *scene, LineartRenderBuffer *rb)
+static int lineart_triangle_size_get(LineartRenderBuffer *rb)
 {
   return sizeof(LineartTriangle) + (sizeof(LineartEdge *) * (rb->thread_count));
 }
@@ -3699,7 +3448,6 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
   LineartBoundingArea *ba = lineart_mem_acquire_thread(&rb->render_data_pool,
                                                        sizeof(LineartBoundingArea) * 4);
   LineartTriangle *tri;
-  LineartEdge *e;
 
   ba[0].l = root->cx;
   ba[0].r = root->r;
@@ -4252,10 +4000,7 @@ static void lineart_create_edges_from_isec_data(LineartIsecData *d)
  */
 static void lineart_main_add_triangles(LineartRenderBuffer *rb)
 {
-  LineartTriangle *tri;
-  int i, lim;
-  int x1, x2, y1, y2;
-  int r, co;
+  int i;
 
   double t_start;
   if (G.debug_value == 4000) {
@@ -4586,7 +4331,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
 
   /* Triangle thread testing data size varies depending on the thread count.
    * See definition of LineartTriangleThread for details. */
-  rb->triangle_size = lineart_triangle_size_get(scene, rb);
+  rb->triangle_size = lineart_triangle_size_get(rb);
 
   /* FIXME(Yiming): See definition of int #LineartRenderBuffer::_source_type for detailed. */
   rb->_source_type = lmd->source_type;
