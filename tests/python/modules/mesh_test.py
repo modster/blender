@@ -190,7 +190,7 @@ class MeshTest(ABC):
         self.test_object = objects[self.test_object_name]
 
         if self.update:
-            if objects.find(exp_object_name) > -1:
+            if exp_object_name in objects:
                 self.expected_object = objects[self.exp_object_name]
             else:
                 self.create_expected_object()
@@ -260,6 +260,8 @@ class MeshTest(ABC):
         elif self.update:
             self.failed_test(result)
             self.update_failed_test(evaluated_test_object)
+            # Check for testing the blend file is updated and re-running.
+            # Also safety check to avoid infinite recursion loop.
             if self.test_updated_counter == 1:
                 self.run_test()
                 return True
@@ -274,14 +276,10 @@ class MeshTest(ABC):
     def failed_test(self, result):
         print("\nFAILED {} test with the following: ".format(self.test_name))
         self._print_result(result)
-        # Real implementation.
-        pass
 
     def passed_test(self, result):
         print("\nPASSED {} test successfully.".format(self.test_name))
         self._print_result(result)
-        # Real implementation
-        pass
 
     def do_selection(self, mesh: bpy.types.Mesh, select_mode: str, selection: set):
         """
@@ -292,7 +290,7 @@ class MeshTest(ABC):
 
         Example: select_mode='VERT' and selection={1,2,3} selects veritces 1, 2 and 3 of input mesh
         """
-        # deselect all
+        # Deselect all objects.
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='DESELECT')
         bpy.ops.object.mode_set(mode='OBJECT')
