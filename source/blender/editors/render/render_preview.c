@@ -690,7 +690,7 @@ struct ObjectPreviewData {
    * into an own main). */
   Object *object;
   /* Datablock copy. Can be NULL. */
-  void *datablock;
+  ID *datablock;
   int sizex;
   int sizey;
 };
@@ -925,7 +925,7 @@ static void gpencil_preview_render(IconPreview *preview, IconPreviewSize *previe
       .pr_main = preview_main,
       /* Act on a copy. */
       .object = NULL,
-      .datablock = (void *)preview->id_copy,
+      .datablock = (ID *)preview->id_copy,
       .sizex = preview_sized->sizex,
       .sizey = preview_sized->sizey,
   };
