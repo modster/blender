@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2020, Blender Foundation.
+ * Copyright 2021, Blender Foundation.
  */
 
 /** \file
@@ -42,7 +42,7 @@ class ShaderBlockType {
 
   GPUShaderBlockType type;
   struct AttributeBinding {
-    int binding = -1;
+    int location = -1;
     size_t offset = 0;
 
     bool has_binding() const;

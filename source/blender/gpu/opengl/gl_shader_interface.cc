@@ -302,7 +302,7 @@ GLShaderInterface::GLShaderInterface(const ShaderBlockType *type_info, GLuint pr
           builtin_uniform);
       if (binding.has_binding()) {
         ShaderInput *input = &inputs_[attr_len_ + ubo_len_ + uniform_len_++];
-        input->location = binding.binding;
+        input->location = binding.location;
         input->binding = -1;
 
         char *name = name_buffer_ + name_buffer_offset;

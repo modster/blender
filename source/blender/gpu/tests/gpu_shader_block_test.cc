@@ -25,7 +25,7 @@ TEST(GPUUniformStruct, struct1)
     float m4[4][4];
     unit_m4(m4);
 
-    const bool result = uniform_struct.uniform_float(binding.binding, 4, 4, (const float *)m4);
+    const bool result = uniform_struct.uniform_float(binding.location, 4, 4, (const float *)m4);
     EXPECT_TRUE(result);
     for (int i = 0; i < 4; i++) {
       for (int j = 0; j < 4; j++) {
@@ -41,7 +41,7 @@ TEST(GPUUniformStruct, struct1)
     float m4[4][4];
     unit_m4(m4);
 
-    const bool result = uniform_struct.uniform_float(binding.binding, 4, 4, (const float *)m4);
+    const bool result = uniform_struct.uniform_float(binding.location, 4, 4, (const float *)m4);
     EXPECT_TRUE(result);
     for (int i = 0; i < 4; i++) {
       for (int j = 0; j < 4; j++) {
@@ -55,7 +55,7 @@ TEST(GPUUniformStruct, struct1)
     const ShaderBlockType::AttributeBinding &binding = type_info.attribute_binding(
         GPU_UNIFORM_COLOR);
     float color[4] = {1.0f, 0.0f, 1.0f, 1.0f};
-    const bool result = uniform_struct.uniform_float(binding.binding, 4, 1, color);
+    const bool result = uniform_struct.uniform_float(binding.location, 4, 1, color);
     EXPECT_TRUE(result);
     for (int i = 0; i < 4; i++) {
       EXPECT_EQ(struct_data->color[i], color[i]);
@@ -77,7 +77,7 @@ TEST(GPUUniformStruct, struct1)
     };
 
     const bool result = uniform_struct.uniform_float(
-        binding.binding, 4, 6, (const float *)clip_planes);
+        binding.location, 4, 6, (const float *)clip_planes);
     EXPECT_TRUE(result);
     for (int i = 0; i < 6; i++) {
       for (int j = 0; j < 4; j++) {
@@ -91,7 +91,7 @@ TEST(GPUUniformStruct, struct1)
     const ShaderBlockType::AttributeBinding &binding = type_info.attribute_binding(
         GPU_UNIFORM_SRGB_TRANSFORM);
     int srgb_transform = true;
-    const bool result = uniform_struct.uniform_int(binding.binding, 1, 1, &srgb_transform);
+    const bool result = uniform_struct.uniform_int(binding.location, 1, 1, &srgb_transform);
     EXPECT_TRUE(result);
     EXPECT_EQ(struct_data->SrgbTransform, srgb_transform);
   }

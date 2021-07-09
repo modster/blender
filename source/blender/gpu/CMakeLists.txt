@@ -401,7 +401,7 @@ if(WITH_GTESTS)
       tests/gpu_index_buffer_test.cc
       tests/gpu_shader_builtin_test.cc
       tests/gpu_shader_test.cc
-      tests/gpu_uniform_buffer_struct_test.cc
+      tests/gpu_shader_block_test.cc
 
       tests/gpu_testing.hh
     )
