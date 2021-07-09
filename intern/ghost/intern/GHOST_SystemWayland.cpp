@@ -47,11 +47,21 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include <fcntl.h>
-#include <linux/input-event-codes.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
 #include <cstring>
+
+#include <linux/input-event-codes.h>
+
+/* selected input event code defines from 'linux/input-event-codes.h'
+ * We include some of the button input event codes here, since the header is
+ * only available in more recent kernel versions. The event codes are used to
+ * to differentiate from which mouse button an event comes from.
+ */
+#define BTN_LEFT 0x110
+#define BTN_RIGHT 0x111
+#define BTN_MIDDLE 0x112
 
 struct buffer_t {
   void *data;
@@ -1517,7 +1527,7 @@ char *GHOST_SystemWayland::getClipboard(bool /*selection*/) const
   return clipboard;
 }
 
-void GHOST_SystemWayland::putClipboard(char *buffer, bool /*selection*/) const
+void GHOST_SystemWayland::putClipboard(const char *buffer, bool /*selection*/) const
 {
   if (!d->data_device_manager || d->inputs.empty()) {
     return;
