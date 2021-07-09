@@ -23,6 +23,7 @@
 #include "COM_SetColorOperation.h"
 #include "COM_SetValueOperation.h"
 #include "COM_SetVectorOperation.h"
+#include "COM_WorkScheduler.h"
 
 namespace blender::compositor {
 
@@ -91,13 +92,15 @@ static ConstantOperation *create_constant_operation(DataType data_type, const fl
 ConstantOperation *ConstantFolder::fold_operation(NodeOperation *operation)
 {
   const DataType data_type = operation->getOutputSocket()->getDataType();
-  MemoryBuffer *fold_buf = create_constant_buffer(data_type);
+  MemoryBuffer fold_buf(data_type, first_elem_area_);
   Vector<MemoryBuffer *> input_bufs = get_constant_input_buffers(operation);
-  operation->render(fold_buf, {first_elem_area_}, input_bufs);
+  operation->render(&fold_buf, {first_elem_area_}, input_bufs);
 
-  ConstantOperation *constant_op = create_constant_operation(data_type, fold_buf->getBuffer());
+  MemoryBuffer *constant_buf = create_constant_buffer(data_type);
+  constant_buf->copy_from(&fold_buf, first_elem_area_);
+  ConstantOperation *constant_op = create_constant_operation(data_type, constant_buf->getBuffer());
   operations_builder_.replace_operation_with_constant(operation, constant_op);
-  constant_buffers_.add_new(constant_op, fold_buf);
+  constant_buffers_.add_new(constant_op, constant_buf);
   return constant_op;
 }
 
@@ -147,6 +150,7 @@ Vector<ConstantOperation *> ConstantFolder::try_fold_operations(Span<NodeOperati
  */
 int ConstantFolder::fold_operations()
 {
+  WorkScheduler::start(operations_builder_.context());
   Vector<ConstantOperation *> last_folds = try_fold_operations(
       operations_builder_.get_operations());
   int folds_count = last_folds.size();
@@ -158,6 +162,7 @@ int ConstantFolder::fold_operations()
     last_folds = try_fold_operations(ops_to_fold);
     folds_count += last_folds.size();
   }
+  WorkScheduler::stop();
 
   delete_constant_buffers();
 
