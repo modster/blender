@@ -74,13 +74,16 @@ typedef enum eLineartEdgeFlag {
   /* LRT_EDGE_FLAG_FOR_FUTURE = (1 << 7), */
   /* Limited to 8 bits for edge type flag, don't add anymore because BMEdge->head.eflag only has 8
      bits. So unless we changed this into a non-single-bit flag thing, we keep it this way. */
+
+  /* Shaow edge type doesn't go into BMEdge->head.eflag so we can make it higher than 1<<7. */
+  LRT_EDGE_FLAG_PROJECTED_SHADOW = (1 << 8),
   /** Also used as discarded line mark. */
-  LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 8),
-  LRT_EDGE_FLAG_CLIPPED = (1 << 9),
+  LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 9),
+  LRT_EDGE_FLAG_CLIPPED = (1 << 10),
   /** Limited to 16 bits for the entire thing. */
 } eLineartEdgeFlag;
 
-#define LRT_EDGE_FLAG_ALL_TYPE 0x7f
+#define LRT_EDGE_FLAG_ALL_TYPE 0x01ff
 #define LRT_EDGE_FLAG_INIT_TYPE 0x37 /* Without material & light contour */
 #define LRT_EDGE_FLAG_TYPE_MAX_BITS 7
 

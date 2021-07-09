@@ -974,6 +974,13 @@ typedef struct LineartGpencilModifierData {
    * the "internal" focal length become 2/3 of the actual camera. */
   float overscan;
 
+  /* Values for point light and directional (sun) light. */
+  /* For point light, fov always gonna be 120 deg horizontal, with 3 "cameras" covering 360 deg. */
+  float shadow_camera_fov;
+  float shadow_camera_size;
+  float shadow_camera_near;
+  float shadow_camera_far;
+
   float opacity;
   short thickness;
 

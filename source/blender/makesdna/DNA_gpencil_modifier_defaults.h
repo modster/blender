@@ -311,6 +311,9 @@
     .stroke_offset = 0.05,\
     .chain_smooth_tolerance = 0.0f,\
     .overscan = 0.1f,\
+    .shadow_camera_near = 0.1f, \
+    .shadow_camera_far = 200.0f, \
+    .shadow_camera_size = 200.0f, \
   }
 
 #define _DNA_DEFAULT_LengthGpencilModifierData \

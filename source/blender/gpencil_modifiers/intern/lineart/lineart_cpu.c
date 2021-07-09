@@ -385,26 +385,33 @@ static void lineart_bounding_area_line_add(LineartRenderBuffer *rb,
   ba->line_count++;
 }
 
+#define LRT_EDGE_BA_MARCHING_BEGIN \
+  double x = e->v1->fbcoord[0], y = e->v1->fbcoord[1]; \
+  LineartBoundingArea *ba = lineart_edge_first_bounding_area(rb, e); \
+  LineartBoundingArea *nba = ba; \
+  LineartTriangleThread *tri; \
+  /* These values are used for marching along the line. */ \
+  double l, r; \
+  double k = (e->v2->fbcoord[1] - e->v1->fbcoord[1]) / \
+             (e->v2->fbcoord[0] - e->v1->fbcoord[0] + 1e-30); \
+  int positive_x = (e->v2->fbcoord[0] - e->v1->fbcoord[0]) > 0 ? \
+                       1 : \
+                       (e->v2->fbcoord[0] == e->v1->fbcoord[0] ? 0 : -1); \
+  int positive_y = (e->v2->fbcoord[1] - e->v1->fbcoord[1]) > 0 ? \
+                       1 : \
+                       (e->v2->fbcoord[1] == e->v1->fbcoord[1] ? 0 : -1); \
+  while (nba)
+
+#define LRT_EDGE_BA_MARCHING_NEXT \
+  /* Marching along `e->v1` to `e->v2`, searching each possible bounding areas it may touch. */ \
+  nba = lineart_bounding_area_next(nba, e, x, y, k, positive_x, positive_y, &x, &y);
+
+#define LRT_EDGE_BA_MARCHING_END
+
 static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *e, int thread_id)
 {
-  double x = e->v1->fbcoord[0], y = e->v1->fbcoord[1];
-  LineartBoundingArea *ba = lineart_edge_first_bounding_area(rb, e);
-  LineartBoundingArea *nba = ba;
-  LineartTriangleThread *tri;
-
-  /* These values are used for marching along the line. */
-  double l, r;
-  double k = (e->v2->fbcoord[1] - e->v1->fbcoord[1]) /
-             (e->v2->fbcoord[0] - e->v1->fbcoord[0] + 1e-30);
-  int positive_x = (e->v2->fbcoord[0] - e->v1->fbcoord[0]) > 0 ?
-                       1 :
-                       (e->v2->fbcoord[0] == e->v1->fbcoord[0] ? 0 : -1);
-  int positive_y = (e->v2->fbcoord[1] - e->v1->fbcoord[1]) > 0 ?
-                       1 :
-                       (e->v2->fbcoord[1] == e->v1->fbcoord[1] ? 0 : -1);
-
-  while (nba) {
-
+  LRT_EDGE_BA_MARCHING_BEGIN
+  {
     for (int i = 0; i < nba->triangle_count; i++) {
       tri = (LineartTriangleThread *)nba->linked_triangles[i];
       /* If we are already testing the line in this thread, then don't do it. */
@@ -437,9 +444,9 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
         }
       }
     }
-    /* Marching along `e->v1` to `e->v2`, searching each possible bounding areas it may touch. */
-    nba = lineart_bounding_area_next(nba, e, x, y, k, positive_x, positive_y, &x, &y);
+    LRT_EDGE_BA_MARCHING_NEXT
   }
+  LRT_EDGE_BA_MARCHING_END
 }
 
 static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRenderTaskInfo *rti)
@@ -2161,45 +2168,40 @@ static void lineart_main_load_geometries(
     Scene *scene,
     Object *camera /* Still use camera arg for convenience. */,
     LineartRenderBuffer *rb,
-    bool allow_duplicates)
+    bool allow_duplicates,
+    bool do_shadow_casting)
 {
   double proj[4][4], view[4][4], result[4][4];
   float inv[4][4];
-  Camera *cam = camera->data;
-  float sensor = BKE_camera_sensor_size(cam->sensor_fit, cam->sensor_x, cam->sensor_y);
-  int fit = BKE_camera_sensor_fit(cam->sensor_fit, rb->w, rb->h);
-  double asp = ((double)rb->w / (double)rb->h);
 
-  int bound_box_discard_count = 0;
-
-  if (cam->type == CAM_PERSP) {
-    if (fit == CAMERA_SENSOR_FIT_VERT && asp > 1) {
-      sensor *= asp;
+  if (!do_shadow_casting) {
+    Camera *cam = camera->data;
+    float sensor = BKE_camera_sensor_size(cam->sensor_fit, cam->sensor_x, cam->sensor_y);
+    int fit = BKE_camera_sensor_fit(cam->sensor_fit, rb->w, rb->h);
+    double asp = ((double)rb->w / (double)rb->h);
+    if (cam->type == CAM_PERSP) {
+      if (fit == CAMERA_SENSOR_FIT_VERT && asp > 1) {
+        sensor *= asp;
+      }
+      if (fit == CAMERA_SENSOR_FIT_HOR && asp < 1) {
+        sensor /= asp;
+      }
+      double fov = focallength_to_fov(cam->lens / (1 + rb->overscan), sensor);
+      lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
     }
-    if (fit == CAMERA_SENSOR_FIT_HOR && asp < 1) {
-      sensor /= asp;
+    else if (cam->type == CAM_ORTHO) {
+      double w = cam->ortho_scale / 2;
+      lineart_matrix_ortho_44d(proj, -w, w, -w / asp, w / asp, cam->clip_start, cam->clip_end);
     }
-    double fov = focallength_to_fov(cam->lens / (1 + rb->overscan), sensor);
-    lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
+
+    invert_m4_m4(inv, rb->cam_obmat);
+    mul_m4db_m4db_m4fl_uniq(result, proj, inv);
+    copy_m4_m4_db(proj, result);
+    copy_m4_m4_db(rb->view_projection, proj);
+
+    unit_m4_db(view);
+    copy_m4_m4_db(rb->view, view);
   }
-  else if (cam->type == CAM_ORTHO) {
-    double w = cam->ortho_scale / 2;
-    lineart_matrix_ortho_44d(proj, -w, w, -w / asp, w / asp, cam->clip_start, cam->clip_end);
-  }
-
-  double t_start;
-
-  if (G.debug_value == 4000) {
-    t_start = PIL_check_seconds_timer();
-  }
-
-  invert_m4_m4(inv, rb->cam_obmat);
-  mul_m4db_m4db_m4fl_uniq(result, proj, inv);
-  copy_m4_m4_db(proj, result);
-  copy_m4_m4_db(rb->view_projection, proj);
-
-  unit_m4_db(view);
-  copy_m4_m4_db(rb->view, view);
 
   BLI_listbase_clear(&rb->triangle_buffer_pointers);
   BLI_listbase_clear(&rb->vertex_buffer_pointers);
@@ -2212,7 +2214,13 @@ static void lineart_main_load_geometries(
     flags |= DEG_ITER_OBJECT_FLAG_DUPLI;
   }
 
+  double t_start;
+  if (G.debug_value == 4000) {
+    t_start = PIL_check_seconds_timer();
+  }
+
   int thread_count = rb->thread_count;
+  int bound_box_discard_count = 0;
 
   /* This memory is in render buffer memory pool. So we don't need to free those after loading.
    */
@@ -4286,6 +4294,274 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
   return 0;
 }
 
+static LineartEdgeSegment *lineart_give_shadow_segment(LineartRenderBuffer *rb)
+{
+  BLI_spin_lock(&rb->lock_cuts);
+
+  /* See if there is any already allocated memory we can reuse. */
+  if (rb->wasted_shadow_cuts.first) {
+    LineartShadowSegment *es = (LineartShadowSegment *)BLI_pophead(&rb->wasted_shadow_cuts);
+    BLI_spin_unlock(&rb->lock_cuts);
+    memset(es, 0, sizeof(LineartShadowSegment));
+    return (LineartEdgeSegment *)es;
+  }
+  BLI_spin_unlock(&rb->lock_cuts);
+
+  /* Otherwise allocate some new memory. */
+  return (LineartEdgeSegment *)lineart_mem_acquire_thread(&rb->render_data_pool,
+                                                          sizeof(LineartShadowSegment));
+}
+
+static bool lineart_do_closest_segment(double *s1l,
+                                       double *s1r,
+                                       double *s2l,
+                                       double *s2r,
+                                       double *r_l,
+                                       double *r_r,
+                                       double *r_new_in_the_middle,
+                                       double *r_new_at)
+{
+  if (s1l[3] >= s2l[3] && s1r[3] >= s2r[3]) {
+    copy_v4_v4_db(r_l, s2l);
+    copy_v4_v4_db(r_r, s2r);
+    return false;
+  }
+  if (s1l[3] <= s2l[3] && s1r[3] <= s2r[3]) {
+    copy_v4_v4_db(r_l, s1l);
+    copy_v4_v4_db(r_r, s1r);
+    return false;
+  }
+
+  /* Else there must be an intersection point in the middle. Use "w" value to linearly plot the
+   * position and get image space "at" position. */
+  double dl = s1l[3] - s2l[3];
+  double dr = s1r[3] - s2r[3];
+  double ga = ratiod(dl, dr, 0);
+  *r_new_at = s2r[3] * ga / (s2l[3] * (1.0f - ga) + s2r[3] * ga);
+  interp_v3_v3v3_db(r_new_in_the_middle, s2l, s2r, ga);
+  r_new_in_the_middle[3] = interpd(s2l[3], s2r[3], ga);
+}
+
+static void lineart_get_equavalent_position()
+{
+
+  /* TOOOOOOODDDDDDOOOOOOOO */
+}
+
+static void lineart_edge_cut_casting(LineartRenderBuffer *rb,
+                                     LineartEdge *e,
+                                     double start,
+                                     double end,
+                                     double *start_gpos,
+                                     double *end_gpos)
+{
+  LineartEdgeSegment *es, *ies, *next_es, *prev_es;
+  LineartEdgeSegment *cut_start_after = 0, *cut_end_before = 0;
+  LineartEdgeSegment *ns = 0, *ns2 = 0;
+  int untouched = 0;
+
+  /* If for some reason the occlusion function may give a result that has zero length, or reversed
+   * in direction, or NAN, we take care of them here. */
+  if (LRT_DOUBLE_CLOSE_ENOUGH(start, end)) {
+    return;
+  }
+  if (LRT_DOUBLE_CLOSE_ENOUGH(start, 1) || LRT_DOUBLE_CLOSE_ENOUGH(end, 0)) {
+    return;
+  }
+  if (UNLIKELY(start != start)) {
+    start = 0;
+  }
+  if (UNLIKELY(end != end)) {
+    end = 0;
+  }
+
+  if (start > end) {
+    double t = start;
+    start = end;
+    end = t;
+  }
+
+  /* Begin looking for starting position of the segment. */
+  /* Not using a list iteration macro because of it more clear when using for loops to iterate
+   * through the segments. */
+  for (es = e->segments.first; es; es = es->next) {
+    if (LRT_DOUBLE_CLOSE_ENOUGH(es->at, start)) {
+      cut_start_after = es;
+      ns = cut_start_after;
+      break;
+    }
+    if (es->next == NULL) {
+      break;
+    }
+    ies = es->next;
+    if (ies->at > start + 1e-09 && start > es->at) {
+      cut_start_after = es;
+      ns = lineart_give_shadow_segment(rb);
+      break;
+    }
+  }
+  if (!cut_start_after && LRT_DOUBLE_CLOSE_ENOUGH(1, end)) {
+    untouched = 1;
+  }
+  for (es = cut_start_after->next; es; es = es->next) {
+    /* We tried to cut at existing cutting point (e.g. where the line's occluded by a triangle
+     * strip). */
+    if (LRT_DOUBLE_CLOSE_ENOUGH(es->at, end)) {
+      cut_end_before = es;
+      ns2 = cut_end_before;
+      break;
+    }
+    /* This check is to prevent `es->at == 1.0` (where we don't need to cut because we are at the
+     * end point). */
+    if (!es->next && LRT_DOUBLE_CLOSE_ENOUGH(1, end)) {
+      cut_end_before = es;
+      ns2 = cut_end_before;
+      untouched = 1;
+      break;
+    }
+    /* When an actual cut is needed in the line. */
+    if (es->at > end) {
+      cut_end_before = es;
+      ns2 = lineart_give_shadow_segment(rb);
+      break;
+    }
+  }
+
+  /* When we still can't find any existing cut in the line, we allocate new ones. */
+  if (ns == NULL) {
+    ns = lineart_give_shadow_segment(rb);
+  }
+  if (ns2 == NULL) {
+    if (untouched) {
+      ns2 = ns;
+      cut_end_before = ns2;
+    }
+    else {
+      ns2 = lineart_give_shadow_segment(rb);
+    }
+  }
+
+  /* do max stuff before insert */
+
+  for (es = cut_start_after; es; es = es->next) {
+  }
+
+  if (cut_start_after != ns) {
+    /* Insert cutting points for when a new cut is needed. */
+    ies = cut_start_after->prev ? cut_start_after->prev : NULL;
+    BLI_insertlinkafter(&e->segments, cut_start_after, ns);
+  }
+  /* The same manipulation as on "cut_start_before". */
+  if (cut_end_before != ns2) {
+    ies = cut_end_before->prev ? cut_end_before->prev : NULL;
+    BLI_insertlinkbefore(&e->segments, cut_end_before, ns2);
+  }
+
+  /* If we touched the cut list, we assign the new cut position based on new cut position,
+   * this way we accommodate precision lost due to multiple cut inserts. */
+  ns->at = start;
+  if (!untouched) {
+    ns2->at = end;
+  }
+}
+
+static void lineart_shadow_cast(LineartRenderBuffer *rb)
+{
+  LRT_ITER_ALL_LINES_BEGIN{
+
+      LRT_EDGE_BA_MARCHING_BEGIN{
+
+          LISTBASE_FOREACH (LineartEdgeSegment *, es, &e->segments){
+
+          }
+
+          LRT_EDGE_BA_MARCHING_NEXT
+
+      } LRT_EDGE_BA_MARCHING_END
+
+  } LRT_ITER_ALL_LINES_END
+}
+
+static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
+                                             Scene *scene,
+                                             LineartRenderBuffer *original_rb,
+                                             LineartGpencilModifierData *lmd,
+                                             LineartCache **cached_result)
+{
+  if (!original_rb->use_shadow || !lmd->light_contour_object) {
+    return false;
+  }
+
+  bool is_persp = true;
+
+  if (lmd->light_contour_object->type == OB_LAMP) {
+    Light *la = (Light *)lmd->light_contour_object->data;
+    if (la->type == LA_SUN) {
+      is_persp = false;
+    }
+  }
+
+  LineartRenderBuffer *rb = MEM_callocN(sizeof(LineartRenderBuffer),
+                                        "LineArt render buffer copied");
+  memcpy(rb, original_rb, sizeof(LineartRenderBuffer));
+
+  rb->do_shadow_cast = true;
+
+  copy_m4_m4(rb->cam_obmat, lmd->light_contour_object->obmat);
+  copy_v3db_v3fl(rb->camera_pos, rb->cam_obmat[3]);
+  rb->cam_is_persp = is_persp;
+  rb->near_clip = is_persp ? lmd->shadow_camera_near : -lmd->shadow_camera_far;
+  rb->far_clip = lmd->shadow_camera_far;
+  rb->w = lmd->shadow_camera_size;
+  rb->h = lmd->shadow_camera_size;
+  rb->tile_recursive_level = is_persp ? LRT_TILE_RECURSIVE_PERSPECTIVE : LRT_TILE_RECURSIVE_ORTHO;
+  rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
+      rb->use_light_contour = rb->use_loose = false;
+  rb->use_contour = true; /* Only contour from light viewing direction will be casted as shadow. */
+
+  rb->max_occlusion_level = 0; /* No point getting see-through projections there. */
+  rb->use_back_face_culling = true;
+
+  lineart_main_get_view_vector(rb);
+
+  /* Override matrices to light "camera". */
+  double proj[4][4], view[4][4], result[4][4];
+  float inv[4][4];
+  if (is_persp) {
+    lineart_matrix_perspective_44d(proj, DEG2RAD(120), 1, rb->near_clip, rb->far_clip);
+  }
+  else {
+    lineart_matrix_ortho_44d(proj, -rb->w, rb->w, -rb->h, rb->h, rb->near_clip, rb->far_clip);
+  }
+  invert_m4_m4(inv, rb->cam_obmat);
+  mul_m4db_m4db_m4fl_uniq(result, proj, inv);
+  copy_m4_m4_db(proj, result);
+  copy_m4_m4_db(rb->view_projection, proj);
+  unit_m4_db(view);
+  copy_m4_m4_db(rb->view, view);
+
+  lineart_main_load_geometries(
+      depsgraph, scene, NULL, rb, lmd->flags & LRT_ALLOW_DUPLI_OBJECTS, true);
+
+  if (!rb->vertex_buffer_pointers.first) {
+    /* No geometry loaded, return early. */
+    return true;
+  }
+
+  /* The exact same process as in MOD_lineart_compute_feature_lines() until occlusion finishes. */
+
+  lineart_main_bounding_area_make_initial(rb);
+  lineart_main_cull_triangles(rb, false);
+  lineart_main_cull_triangles(rb, true);
+  lineart_main_free_adjacent_data(rb);
+  lineart_main_perspective_division(rb);
+  lineart_main_discard_out_of_frame_edges(rb);
+  lineart_main_add_triangles(rb);
+  lineart_main_bounding_areas_connect_post(rb);
+  lineart_main_link_lines(rb);
+  lineart_main_occlusion_begin(rb);
+}
+
 /**
  * This is the entry point of all line art calculations.
  *
@@ -4341,7 +4617,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   /* Get view vector before loading geometries, because we detect feature lines there. */
   lineart_main_get_view_vector(rb);
   lineart_main_load_geometries(
-      depsgraph, scene, use_camera, rb, lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS);
+      depsgraph, scene, use_camera, rb, lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS, false);
 
   if (!rb->vertex_buffer_pointers.first) {
     /* No geometry loaded, return early. */

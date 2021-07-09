@@ -106,6 +106,13 @@ typedef struct LineartEdgeSegment {
   unsigned char material_mask_bits;
 } LineartEdgeSegment;
 
+typedef struct LineartShadowSegment {
+  LineartEdgeSegment base;
+  /* global left and right pos, because when casting shadows at some point there will be
+   * non-continuous cuts. */
+  double gl[4], gr[4];
+} LineartShadowSegment;
+
 typedef struct LineartVert {
   double gloc[3];
   double fbcoord[4];
@@ -216,6 +223,11 @@ enum eLineArtTileRecursiveLimit {
 #define LRT_TILE_SPLITTING_TRIANGLE_LIMIT 100
 #define LRT_TILE_EDGE_COUNT_INITIAL 32
 
+enum eLineartShadowCameraType {
+  LRT_SHADOW_CAMERA_DIRECTIONAL = 1,
+  LRT_SHADOW_CAMERA_POINT = 2,
+};
+
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
 
@@ -227,6 +239,8 @@ typedef struct LineartRenderBuffer {
   double width_per_tile, height_per_tile;
   double view_projection[4][4];
   double view[4][4];
+
+  bool do_shadow_cast;
 
   float overscan;
 
@@ -252,6 +266,7 @@ typedef struct LineartRenderBuffer {
   /** Use the one comes with Line Art. */
   LineartStaticMemPool render_data_pool;
   ListBase wasted_cuts;
+  ListBase wasted_shadow_cuts;
   SpinLock lock_cuts;
 
   /* This is just a reference to LineartCache::chain_data_pool, which is not cleared after line art
@@ -295,6 +310,7 @@ typedef struct LineartRenderBuffer {
   bool use_intersections;
   bool use_loose;
   bool use_light_contour;
+  bool use_shadow;
   bool fuzzy_intersections;
   bool fuzzy_everything;
   bool allow_boundaries;
@@ -321,6 +337,7 @@ typedef struct LineartRenderBuffer {
   double active_camera_pos[3]; /* Stroke offset calculation may use active or selected camera. */
   double near_clip, far_clip;
   float shift_x, shift_y;
+
   float crease_threshold;
   float chaining_image_threshold;
   float angle_splitting_threshold;
@@ -341,12 +358,15 @@ typedef struct LineartRenderBuffer {
 } LineartRenderBuffer;
 
 typedef struct LineartCache {
-  /** Separate memory pool for chain data, this goes to the cache, so when we free the main pool,
-   * chains will still be available. */
+  /** Separate memory pool for chain data and shadow, this goes to the cache, so when we free the
+   * main pool, chains and shadows will still be available. */
   LineartStaticMemPool chain_data_pool;
+  LineartStaticMemPool shadow_data_pool;
 
   /** A copy of rb->Chains after calculation is done, then we can destroy rb. */
   ListBase chains;
+  /** Shadow segments to be included into occlusion calculation in the second run of line art. */
+  ListBase shadow_segments;
 
   /** Cache only contains edge types specified in this variable. */
   unsigned char rb_edge_types;

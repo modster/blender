@@ -3134,6 +3134,12 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
                            "Generate light/shadow separation lines from a reference light object");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "use_shadow", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "edge_types", LRT_EDGE_FLAG_PROJECTED_SHADOW);
+  RNA_def_property_ui_text(
+      prop, "Use Shadow", "Project contour lines using a light shource object");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "use_multiple_levels", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_multiple_levels", 0);
   RNA_def_property_ui_text(
@@ -3273,6 +3279,25 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       "Back Face Culling",
       "Remove all back faces to speed up calculation, this will create edges in "
       "different occlusion levels than when disabled");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "shadow_camera_near", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Shadow Camera Near", "Near clipping distance of shadow camera");
+  RNA_def_property_ui_range(prop, 0.0f, 500.0f, 0.1f, 2);
+  RNA_def_property_range(prop, 0.0f, 10000.0f);
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "shadow_camera_far", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Shadow Camera Far", "Far clipping distance of shadow camera");
+  RNA_def_property_ui_range(prop, 0.0f, 500.0f, 0.1f, 2);
+  RNA_def_property_range(prop, 0.0f, 10000.0f);
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "shadow_camera_size", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_ui_text(
+      prop, "Shadow Camera Size", "Frame size of the shadow camera for sun light");
+  RNA_def_property_ui_range(prop, 0.0f, 500.0f, 0.1f, 2);
+  RNA_def_property_range(prop, 0.0f, 10000.0f);
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   RNA_define_lib_overridable(false);
