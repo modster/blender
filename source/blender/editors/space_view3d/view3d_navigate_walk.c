@@ -269,9 +269,6 @@ typedef struct WalkInfo {
   bool is_reversed;
 
 #ifdef USE_TABLET_SUPPORT
-  /** Check if we had a cursor event before. */
-  bool is_cursor_first;
-
   /** Tablet devices (we can't relocate the cursor). */
   bool is_cursor_absolute;
 #endif
@@ -476,7 +473,7 @@ enum {
 static float base_speed = -1.0f;
 static float userdef_speed = -1.0f;
 
-static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
+static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op, const wmEvent *event)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
   wmWindow *win = CTX_wm_window(C);
@@ -553,8 +550,6 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
   walk->is_reversed = ((U.walk_navigation.flag & USER_WALK_MOUSE_REVERSE) != 0);
 
 #ifdef USE_TABLET_SUPPORT
-  walk->is_cursor_first = true;
-
   walk->is_cursor_absolute = false;
 #endif
 
@@ -588,7 +583,6 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
   walk->v3d_camera_control = ED_view3d_cameracontrol_acquire(
       walk->depsgraph, walk->scene, walk->v3d, walk->rv3d);
 
-  /* center the mouse */
   walk->center_mval[0] = walk->region->winx * 0.5f;
   walk->center_mval[1] = walk->region->winy * 0.5f;
 
@@ -602,11 +596,7 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
   walk->center_mval[1] -= walk->region->winrct.ymin;
 #endif
 
-  copy_v2_v2_int(walk->prev_mval, walk->center_mval);
-
-  WM_cursor_warp(win,
-                 walk->region->winrct.xmin + walk->center_mval[0],
-                 walk->region->winrct.ymin + walk->center_mval[1]);
+  copy_v2_v2_int(walk->prev_mval, event->mval);
 
   /* remove the mouse cursor temporarily */
   WM_cursor_modal_set(win, WM_CURSOR_NONE);
@@ -688,33 +678,10 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
   else if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
 
 #ifdef USE_TABLET_SUPPORT
-    if (walk->is_cursor_first) {
-      /* wait until we get the 'warp' event */
-      if ((walk->center_mval[0] == event->mval[0]) && (walk->center_mval[1] == event->mval[1])) {
-        walk->is_cursor_first = false;
-      }
-      else if (event->tablet.is_motion_absolute) {
-        walk->is_cursor_first = false;
-      }
-      else {
-        /* NOTE: its possible the system isn't giving us the warp event
-         * ideally we shouldn't have to worry about this, see: T45361 */
-        wmWindow *win = CTX_wm_window(C);
-        WM_cursor_warp(win,
-                       walk->region->winrct.xmin + walk->center_mval[0],
-                       walk->region->winrct.ymin + walk->center_mval[1]);
-      }
-      return;
-    }
-
-    if (!walk->is_cursor_absolute && event->tablet.is_motion_absolute) {
-      walk->is_cursor_absolute = true;
+    if (walk->is_cursor_absolute != event->tablet.is_motion_absolute) {
+      walk->is_cursor_absolute = event->tablet.is_motion_absolute;
+      /* Reset origin of offset when switching between mouse and tablet. */
       copy_v2_v2_int(walk->prev_mval, event->mval);
-      copy_v2_v2_int(walk->center_mval, event->mval);
-    }
-    else if (walk->is_cursor_absolute && !event->tablet.is_motion_absolute) {
-      walk->is_cursor_absolute = false;
-      walk->is_cursor_first = true;
     }
 #endif /* USE_TABLET_SUPPORT */
 
@@ -1386,7 +1353,7 @@ static int walk_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   op->customdata = walk;
 
-  if (initWalkInfo(C, walk, op) == false) {
+  if (initWalkInfo(C, walk, op, event) == false) {
     MEM_freeN(op->customdata);
     return OPERATOR_CANCELLED;
   }
