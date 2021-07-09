@@ -53,7 +53,7 @@ static void geo_node_dissolve_init(bNodeTree *UNUSED(tree), bNode *node)
       sizeof(NodeGeometryDissolve), __func__);
 
   node->storage = node_storage;
-  node_storage->delimiter = GEO_NODE_DISSOLVE_DELIMITTER_FACE;
+  node_storage->delimiter = GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER;
 }
 
 namespace blender::nodes {
@@ -67,7 +67,7 @@ static Mesh *dissolve_mesh(const float angle,
   const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
-  if (delimiter_type & GEO_NODE_DISSOLVE_DELIMITTER_FACE) {
+  if (delimiter_type & GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER) {
     BM_temporary_tag_faces(bm, delimiter.data());
   }
   else {
@@ -100,10 +100,10 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
     const bNode &node = params.node();
     const NodeGeometryDissolve &node_storage = *(NodeGeometryDissolve *)node.storage;
 
-    const bool default_delimiter = true;
+    const bool default_delimiter = false;
     AttributeDomain delimiter_domain = ATTR_DOMAIN_FACE;
     int delimiter_domain_size = input_mesh->totpoly;
-    if (node_storage.delimiter & GEO_NODE_DISSOLVE_DELIMITTER_EDGE) {
+    if (node_storage.delimiter & GEO_NODE_DISSOLVE_DELIMITTER_SELECTION) {
       delimiter_domain = ATTR_DOMAIN_EDGE;
       delimiter_domain_size = input_mesh->totedge;
     };

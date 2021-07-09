@@ -10000,16 +10000,16 @@ static void def_geo_dissolve(StructRNA *srna)
   PropertyRNA *prop;
 
   static EnumPropertyItem delimiter_items[] = {
-      {GEO_NODE_DISSOLVE_DELIMITTER_EDGE,
-       "edge",
+      {GEO_NODE_DISSOLVE_DELIMITTER_SELECTION,
+       "selection",
        0,
-       "Edge",
-       "Use edge attribute domain as delimiter"},
-      {GEO_NODE_DISSOLVE_DELIMITTER_FACE,
-       "face",
+       "Selection",
+       "Use selection as delimiter"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER,
+       "border",
        0,
-       "Face",
-       "Use face attribute domain as delimiter"},
+       "Border",
+       "Use border of selection as delimiter"},
       {0, NULL, 0, NULL, NULL},
   };
 

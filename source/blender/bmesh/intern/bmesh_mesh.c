@@ -1476,6 +1476,9 @@ void BM_temporary_tag_edges(BMesh *bm, const bool *mask)
        * some reason. */
       BM_elem_flag_enable(e, BM_ELEM_SELECT);
     }
+    else {
+      BM_elem_flag_disable(e, BM_ELEM_SELECT);
+    }
     i++;
   }
 }
