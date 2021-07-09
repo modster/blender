@@ -880,9 +880,12 @@ static Scene *gpencil_preview_scene_create(const struct ObjectPreviewData *previ
       preview_data->pr_main, scene, view_layer, DAG_EVAL_VIEWPORT);
 
   /* Grease pencil draw engine needs an object to draw the datablock. */
-  bGPdata *gpd = (bGPdata *)preview_data->datablock;
-  Object *ob_temp = BKE_object_add_for_data(
-      preview_data->pr_main, view_layer, OB_GPENCIL, "preview_object", &gpd->id, false);
+  Object *ob_temp = BKE_object_add_for_data(preview_data->pr_main,
+                                            view_layer,
+                                            OB_GPENCIL,
+                                            "preview_object",
+                                            preview_data->datablock,
+                                            false);
 
   BLI_assert(ob_temp != NULL);
   BLI_addtail(&preview_data->pr_main->objects, ob_temp);
