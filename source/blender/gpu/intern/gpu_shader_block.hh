@@ -110,7 +110,7 @@ class ShaderBlockBuffer {
   UniformBuf *m_ubo;
 };
 
-std::optional<const GPUShaderBlockType> find_smallest_uniform_builtin_struct(
+std::optional<const GPUShaderBlockType> find_smallest_shader_block(
     const ShaderInterface &interface);
 
 }  // namespace blender::gpu

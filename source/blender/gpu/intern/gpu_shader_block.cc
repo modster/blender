@@ -219,7 +219,7 @@ const ShaderBlockType &ShaderBlockType::get(const GPUShaderBlockType type)
   return STRUCT_TYPE_INFOS[type];
 }
 
-std::optional<const GPUShaderBlockType> find_smallest_uniform_builtin_struct(
+std::optional<const GPUShaderBlockType> find_smallest_shader_block(
     const ShaderInterface &interface)
 {
   if (!interface.has_builtin_uniforms()) {

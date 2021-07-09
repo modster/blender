@@ -126,7 +126,7 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
                                 const eGPUShaderTFBType tf_type,
                                 const char **tf_names,
                                 const int tf_count,
-                                const GPUShaderBlockType uniform_struct_type,
+                                const GPUShaderBlockType shader_block,
                                 const char *shname)
 {
   /* At least a vertex shader and a fragment shader are required, or only a compute shader. */
@@ -135,8 +135,8 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
               (computecode != nullptr)));
 
   Shader *shader = GPUBackend::get()->shader_alloc(shname);
-  if (uniform_struct_type != GPU_SHADER_BLOCK_CUSTOM) {
-    shader->set_shader_struct(uniform_struct_type);
+  if (shader_block != GPU_SHADER_BLOCK_CUSTOM) {
+    shader->set_shader_struct(shader_block);
   }
 
   if (vertcode) {
@@ -228,15 +228,15 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
   };
 
   if (G.debug & G_DEBUG_GPU) {
-    std::optional<GPUShaderBlockType> best_struct_type = find_smallest_uniform_builtin_struct(
+    std::optional<GPUShaderBlockType> best_struct_type = find_smallest_shader_block(
         *shader->interface);
     if (best_struct_type) {
       if (/*uniform_struct_type != GPU_SHADER_BLOCK_CUSTOM &&*/
-          uniform_struct_type != *best_struct_type) {
+          shader_block != *best_struct_type) {
         CLOG_WARN(&LOG,
                   "Found better matching uniform struct for '%s'; current %d, suggested %d",
                   shname,
-                  static_cast<int>(uniform_struct_type),
+                  static_cast<int>(shader_block),
                   static_cast<int>(*best_struct_type));
       }
     }
