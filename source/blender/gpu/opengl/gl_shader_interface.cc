@@ -334,7 +334,7 @@ GLShaderInterface::GLShaderInterface(const UniformBuiltinStructType *type_info, 
   for (int32_t u_int = 0; u_int < GPU_NUM_UNIFORMS; u_int++) {
     GPUUniformBuiltin u = static_cast<GPUUniformBuiltin>(u_int);
     const ShaderInput *block = this->uniform_get(builtin_uniform_name(u));
-    builtins_[u] = (block != nullptr) ? block->binding : -1;
+    builtins_[u] = (block != nullptr) ? block->location : -1;
   }
 
   /* Builtin Uniforms Blocks */
