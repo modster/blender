@@ -97,7 +97,7 @@ TEST(GPUUniformStruct, struct1)
   }
 }
 
-static void test_custom_shader_with_uniform_builtin_struct()
+static void test_shader_block_struct()
 {
   if (!GPU_compute_shader_support()) {
     /* We can't test as a the platform does not support compute shaders. */
@@ -110,14 +110,6 @@ static void test_custom_shader_with_uniform_builtin_struct()
 
 layout(local_size_x = 1, local_size_y = 1) in;
 layout(rgba32f, binding = 0) uniform image2D img_output;
-
-layout(std140) uniform shaderBlock {
-  mat4 ModelMatrix;
-  mat4 ModelViewProjectionMatrix;
-  vec4 color;
-  vec4 WorldClipPlanes[6];
-  bool SrgbTransform;
-};
 
 void main() {
 }
@@ -137,12 +129,36 @@ void main() {
                                            __func__);
   EXPECT_NE(shader, nullptr);
 
+  int location;
+
+  location = GPU_shader_get_uniform(shader, "ModelMatrix");
+  EXPECT_NE(location, -1);
+  location = GPU_shader_get_uniform(shader, "ModelViewProjectionMatrix");
+  EXPECT_NE(location, -1);
+  location = GPU_shader_get_uniform(shader, "color");
+  EXPECT_NE(location, -1);
+  location = GPU_shader_get_uniform(shader, "WorldClipPlanes");
+  EXPECT_NE(location, -1);
+  location = GPU_shader_get_uniform(shader, "srgbTarget");
+  EXPECT_NE(location, -1);
+
+  location = GPU_shader_get_builtin_uniform(shader, GPU_UNIFORM_MODEL);
+  EXPECT_NE(location, -1);
+  location = GPU_shader_get_builtin_uniform(shader, GPU_UNIFORM_MVP);
+  EXPECT_NE(location, -1);
+  location = GPU_shader_get_builtin_uniform(shader, GPU_UNIFORM_COLOR);
+  EXPECT_NE(location, -1);
+  location = GPU_shader_get_builtin_uniform(shader, GPU_UNIFORM_CLIPPLANES);
+  EXPECT_NE(location, -1);
+  location = GPU_shader_get_builtin_uniform(shader, GPU_UNIFORM_SRGB_TRANSFORM);
+  EXPECT_NE(location, -1);
+
   float color[4] = {1.0f, 0.0f, 1.0f, 1.0f};
   GPU_shader_uniform_4fv(shader, "color", color);
 
   GPU_shader_free(shader);
 }
 
-GPU_TEST(custom_shader_with_uniform_builtin_struct)
+GPU_TEST(shader_block_struct)
 
 }  // namespace blender::gpu::tests

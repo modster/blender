@@ -29,6 +29,8 @@
 #include "gpu_shader_block.hh"
 #include "gpu_shader_interface.hh"
 
+#include "BLI_string_ref.hh"
+
 namespace blender::gpu {
 
 /* -------------------------------------------------------------------- */
@@ -140,7 +142,6 @@ static constexpr std::array<
 
 static constexpr size_t data_size_for(const GPUShaderBlockType block_type)
 {
-
   switch (block_type) {
     case GPU_SHADER_BLOCK_CUSTOM:
     case GPU_NUM_SHADER_BLOCK_TYPES:
@@ -152,6 +153,29 @@ static constexpr size_t data_size_for(const GPUShaderBlockType block_type)
   return 0;
 }
 
+static constexpr StringRef DEFINES_3D_COLOR = R"(
+  layout(std140) uniform shaderBlock {
+    mat4 ModelMatrix;
+    mat4 ModelViewProjectionMatrix;
+    vec4 color;
+    vec4 WorldClipPlanes[6];
+    bool srgbTarget;
+  };
+)";
+
+static constexpr const char *defines_for(const GPUShaderBlockType type)
+{
+  switch (type) {
+    case GPU_SHADER_BLOCK_CUSTOM:
+    case GPU_NUM_SHADER_BLOCK_TYPES:
+      return nullptr;
+
+    case GPU_SHADER_BLOCK_3D_COLOR:
+      return DEFINES_3D_COLOR.data();
+  };
+  return nullptr;
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -159,7 +183,10 @@ static constexpr size_t data_size_for(const GPUShaderBlockType block_type)
  * \{ */
 
 constexpr ShaderBlockType::ShaderBlockType(const GPUShaderBlockType type)
-    : type(type), m_attribute_bindings(ATTRIBUTE_BINDINGS[type]), m_data_size(data_size_for(type))
+    : type(type),
+      m_attribute_bindings(ATTRIBUTE_BINDINGS[type]),
+      m_data_size(data_size_for(type)),
+      m_defines(defines_for(type))
 {
 }
 

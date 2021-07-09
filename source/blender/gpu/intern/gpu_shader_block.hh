@@ -58,9 +58,15 @@ class ShaderBlockType {
     return m_data_size;
   }
 
+  const char *defines() const
+  {
+    return m_defines;
+  }
+
  private:
   const std::array<const AttributeBinding, GPU_NUM_UNIFORMS> &m_attribute_bindings;
   const size_t m_data_size;
+  const char *m_defines;
 };
 
 class ShaderBlockBuffer {

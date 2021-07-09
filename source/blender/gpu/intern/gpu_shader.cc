@@ -126,6 +126,9 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
     if (defines) {
       sources.append(defines);
     }
+    if (shader->m_shader_struct) {
+      sources.append(shader->m_shader_struct->type_info().defines());
+    }
     sources.append(vertcode);
 
     shader->vertex_shader_from_glsl(sources);
@@ -142,6 +145,9 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
     if (defines) {
       sources.append(defines);
     }
+    if (shader->m_shader_struct) {
+      sources.append(shader->m_shader_struct->type_info().defines());
+    }
     if (libcode) {
       sources.append(libcode);
     }
@@ -157,6 +163,9 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
     if (defines) {
       sources.append(defines);
     }
+    if (shader->m_shader_struct) {
+      sources.append(shader->m_shader_struct->type_info().defines());
+    }
     sources.append(geomcode);
 
     shader->geometry_shader_from_glsl(sources);
@@ -171,6 +180,9 @@ GPUShader *GPU_shader_create_ex(const char *vertcode,
     }
     if (libcode) {
       sources.append(libcode);
+    }
+    if (shader->m_shader_struct) {
+      sources.append(shader->m_shader_struct->type_info().defines());
     }
     sources.append(computecode);
 
