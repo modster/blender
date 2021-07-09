@@ -1446,6 +1446,18 @@ GHOST_TSuccess GHOST_SystemCocoa::handleTabletEvent(void *eventPtr, short eventT
             break;
         }
       }
+      else {
+        /* Send mouse event to signal end of tablet tracking to operators. */
+        int32_t x, y;
+        if (getCursorPosition(x, y)) {
+          pushEvent(new GHOST_EventCursor([event timestamp] * 1000,
+                                          GHOST_kEventCursorMove,
+                                          window,
+                                          x,
+                                          y,
+                                          GHOST_TABLET_DATA_NONE));
+        }
+      }
       break;
 
     default:

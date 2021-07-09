@@ -943,6 +943,13 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
     if (!any_proximity) {
       // printf("proximity disable\n");
       window->GetTabletData().Active = GHOST_kTabletModeNone;
+
+      /* Send mouse event to signal end of tablet tracking to operators. */
+      int32_t x, y;
+      if (getCursorPosition(x, y)) {
+        pushEvent(new GHOST_EventCursor(
+            getMilliSeconds(), GHOST_kEventCursorMove, window, x, y, GHOST_TABLET_DATA_NONE));
+      }
     }
   }
 #endif /* WITH_X11_XINPUT */
@@ -1558,6 +1565,13 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
         }
         else if (xe->type == xtablet.ProxOutEvent) {
           window->GetTabletData().Active = GHOST_kTabletModeNone;
+
+          /* Send mouse event to signal end of tablet tracking to operators. */
+          int32_t x, y;
+          if (getCursorPosition(x, y)) {
+            pushEvent(new GHOST_EventCursor(
+                getMilliSeconds(), GHOST_kEventCursorMove, window, x, y, GHOST_TABLET_DATA_NONE));
+          }
         }
       }
 #endif  // WITH_X11_XINPUT
