@@ -95,9 +95,7 @@ class ParticleSystemSpec:
 
     def __str__(self):
         return "Physics Modifier: " + self.modifier_name + " of type " + self.modifier_type + \
-               " with parameters: " + \
-            str(self.modifier_parameters) + \
-            " with frame end: " + str(self.frame_end)
+               " with parameters: " + str(self.modifier_parameters) + " with frame end: " + str(self.frame_end)
 
 
 class OperatorSpecEditMode:
@@ -116,15 +114,13 @@ class OperatorSpecEditMode:
         self.operator_name = operator_name
         self.operator_parameters = operator_parameters
         if select_mode not in ['VERT', 'EDGE', 'FACE']:
-            raise ValueError("select_mode must be either {}, {} or {}".format(
-                'VERT', 'EDGE', 'FACE'))
+            raise ValueError("select_mode must be either {}, {} or {}".format('VERT', 'EDGE', 'FACE'))
         self.select_mode = select_mode
         self.selection = selection
 
     def __str__(self):
         return "Operator: " + self.operator_name + " with parameters: " + str(self.operator_parameters) + \
-               " in selection mode: " + self.select_mode + \
-            ", selecting " + str(self.selection)
+               " in selection mode: " + self.select_mode + ", selecting " + str(self.selection)
 
 
 class OperatorSpecObjectMode:
@@ -478,8 +474,7 @@ class SpecMeshTest(MeshTest):
         """
         settings = []
         modifier_name = modifier.name
-        self._set_parameters_impl(
-            modifier, modifier_parameters, settings, modifier_name)
+        self._set_parameters_impl(modifier, modifier_parameters, settings, modifier_name)
 
     def _add_modifier(self, test_object, modifier_spec: ModifierSpec):
         """
@@ -494,8 +489,7 @@ class SpecMeshTest(MeshTest):
                                              modifier_spec.modifier_type)
 
         if modifier is None:
-            raise Exception(
-                "This modifier type is already added on the Test Object, please remove it and try again.")
+            raise Exception("This modifier type is already added on the Test Object, please remove it and try again.")
 
         if self.verbose:
             print("Created modifier '{}' of type '{}'.".
@@ -508,8 +502,7 @@ class SpecMeshTest(MeshTest):
         self.set_parameters(modifier, modifier_spec.modifier_parameters)
 
         if modifier.type in bakers_list:
-            self._bake_current_simulation(
-                test_object, modifier.name, modifier_spec.frame_end)
+            self._bake_current_simulation(test_object, modifier.name, modifier_spec.frame_end)
 
         scene.frame_set(modifier_spec.frame_end)
 
@@ -537,16 +530,14 @@ class SpecMeshTest(MeshTest):
                 elif modifier.type == 'CLOTH' or modifier.type == 'SOFT_BODY':
                     test_object.modifiers[test_modifier_name].point_cache.frame_end = frame_end
                     override_setting = modifier.point_cache
-                    override = {
-                        'scene': scene, 'active_object': test_object, 'point_cache': override_setting}
+                    override = {'scene': scene, 'active_object': test_object, 'point_cache': override_setting}
                     bpy.ops.ptcache.bake(override, bake=True)
                     break
 
                 elif modifier.type == 'DYNAMIC_PAINT':
                     dynamic_paint_setting = modifier.canvas_settings.canvas_surfaces.active
                     override_setting = dynamic_paint_setting.point_cache
-                    override = {
-                        'scene': scene, 'active_object': test_object, 'point_cache': override_setting}
+                    override = {'scene': scene, 'active_object': test_object, 'point_cache': override_setting}
                     bpy.ops.ptcache.bake(override, bake=True)
                     break
 
@@ -557,8 +548,7 @@ class SpecMeshTest(MeshTest):
         bpy.context.scene.frame_set(1)
         bpy.ops.object.select_all(action='DESELECT')
 
-        test_object.modifiers.new(
-            particle_sys_spec.modifier_name, particle_sys_spec.modifier_type)
+        test_object.modifiers.new(particle_sys_spec.modifier_name, particle_sys_spec.modifier_type)
 
         settings_name = test_object.particle_systems.active.settings.name
         particle_setting = bpy.data.particles[settings_name]
@@ -570,11 +560,9 @@ class SpecMeshTest(MeshTest):
             try:
                 if param_name == "seed":
                     system_setting = test_object.particle_systems[particle_sys_spec.modifier_name]
-                    setattr(system_setting, param_name,
-                            particle_sys_spec.modifier_parameters[param_name])
+                    setattr(system_setting, param_name, particle_sys_spec.modifier_parameters[param_name])
                 else:
-                    setattr(particle_setting, param_name,
-                            particle_sys_spec.modifier_parameters[param_name])
+                    setattr(particle_setting, param_name, particle_sys_spec.modifier_parameters[param_name])
 
                 if self.verbose:
                     print("\t set parameter '{}' with value '{}'".
@@ -610,15 +598,12 @@ class SpecMeshTest(MeshTest):
         try:
             retval = mesh_operator(**operator.operator_parameters)
         except AttributeError:
-            raise AttributeError(
-                "bpy.ops.mesh has no attribute {}".format(operator.operator_name))
+            raise AttributeError("bpy.ops.mesh has no attribute {}".format(operator.operator_name))
         except TypeError as ex:
-            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(
-                operator.operator_parameters, ex))
+            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(operator.operator_parameters, ex))
 
         if retval != {'FINISHED'}:
-            raise RuntimeError(
-                "Unexpected operator return value: {}".format(retval))
+            raise RuntimeError("Unexpected operator return value: {}".format(retval))
         if self.verbose:
             print("Applied {}".format(operator))
 
@@ -634,15 +619,12 @@ class SpecMeshTest(MeshTest):
         try:
             retval = object_operator(**operator.operator_parameters)
         except AttributeError:
-            raise AttributeError(
-                "bpy.ops.object has no attribute {}".format(operator.operator_name))
+            raise AttributeError("bpy.ops.object has no attribute {}".format(operator.operator_name))
         except TypeError as ex:
-            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(
-                operator.operator_parameters, ex))
+            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(operator.operator_parameters, ex))
 
         if retval != {'FINISHED'}:
-            raise RuntimeError(
-                "Unexpected operator return value: {}".format(retval))
+            raise RuntimeError("Unexpected operator return value: {}".format(retval))
         if self.verbose:
             print("Applied operator {}".format(operator))
 
@@ -740,8 +722,7 @@ class RunTest:
         seen_name = set()
         for ele in all_test_names:
             if ele in seen_name:
-                raise ValueError(
-                    "{} is a duplicate, write a new unique name.".format(ele))
+                raise ValueError("{} is a duplicate, write a new unique name.".format(ele))
             else:
                 seen_name.add(ele)
 
