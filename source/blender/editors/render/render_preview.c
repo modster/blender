@@ -885,7 +885,7 @@ static Scene *gpencil_preview_scene_create(const struct ObjectPreviewData *previ
                                             OB_GPENCIL,
                                             "preview_object",
                                             preview_data->datablock,
-                                            false);
+                                            true);
   BLI_assert(ob_temp != NULL);
   /* Copy the materials to get full color previews. */
   const short *materials_len_p = BKE_id_material_len_p(preview_data->datablock);
@@ -935,9 +935,6 @@ static void gpencil_preview_render(IconPreview *preview, IconPreviewSize *previe
   };
   Depsgraph *depsgraph;
   Scene *scene = gpencil_preview_scene_create(&preview_data, &depsgraph);
-
-  /* Ownership is now ours. */
-  preview->id_copy = NULL;
 
   U.pixelsize = 2.0f;
 
