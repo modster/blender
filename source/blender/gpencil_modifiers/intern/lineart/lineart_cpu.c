@@ -94,14 +94,16 @@ typedef struct LineartIsecData {
 } LineartIsecData;
 
 static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer *rb,
-                                                             LineartEdge *e);
+                                                             double *fbcoord1,
+                                                             double *fbcoord2);
 
 static void lineart_bounding_area_link_edge(LineartRenderBuffer *rb,
                                             LineartBoundingArea *root_ba,
                                             LineartEdge *e);
 
 static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this,
-                                                       LineartEdge *e,
+                                                       double *fbcoord1,
+                                                       double *fbcoord2,
                                                        double x,
                                                        double y,
                                                        double k,
@@ -385,32 +387,26 @@ static void lineart_bounding_area_line_add(LineartRenderBuffer *rb,
   ba->line_count++;
 }
 
-#define LRT_EDGE_BA_MARCHING_BEGIN \
-  double x = e->v1->fbcoord[0], y = e->v1->fbcoord[1]; \
-  LineartBoundingArea *ba = lineart_edge_first_bounding_area(rb, e); \
+#define LRT_EDGE_BA_MARCHING_BEGIN(fb1, fb2) \
+  double x = fb1[0], y = fb1[1]; \
+  LineartBoundingArea *ba = lineart_edge_first_bounding_area(rb, fb1, fb2); \
   LineartBoundingArea *nba = ba; \
-  LineartTriangleThread *tri; \
-  /* These values are used for marching along the line. */ \
-  double l, r; \
-  double k = (e->v2->fbcoord[1] - e->v1->fbcoord[1]) / \
-             (e->v2->fbcoord[0] - e->v1->fbcoord[0] + 1e-30); \
-  int positive_x = (e->v2->fbcoord[0] - e->v1->fbcoord[0]) > 0 ? \
-                       1 : \
-                       (e->v2->fbcoord[0] == e->v1->fbcoord[0] ? 0 : -1); \
-  int positive_y = (e->v2->fbcoord[1] - e->v1->fbcoord[1]) > 0 ? \
-                       1 : \
-                       (e->v2->fbcoord[1] == e->v1->fbcoord[1] ? 0 : -1); \
+  double k = (fb2[1] - fb1[1]) / (fb2[0] - fb1[0] + 1e-30); \
+  int positive_x = (fb2[0] - fb1[0]) > 0 ? 1 : (fb2[0] == fb1[0] ? 0 : -1); \
+  int positive_y = (fb2[1] - fb1[1]) > 0 ? 1 : (fb2[1] == fb1[1] ? 0 : -1); \
   while (nba)
 
-#define LRT_EDGE_BA_MARCHING_NEXT \
+#define LRT_EDGE_BA_MARCHING_NEXT(fb1, fb2) \
   /* Marching along `e->v1` to `e->v2`, searching each possible bounding areas it may touch. */ \
-  nba = lineart_bounding_area_next(nba, e, x, y, k, positive_x, positive_y, &x, &y);
+  nba = lineart_bounding_area_next(nba, fb1, fb2, x, y, k, positive_x, positive_y, &x, &y);
 
 #define LRT_EDGE_BA_MARCHING_END
 
 static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *e, int thread_id)
 {
-  LRT_EDGE_BA_MARCHING_BEGIN
+  LineartTriangleThread *tri;
+  double l, r;
+  LRT_EDGE_BA_MARCHING_BEGIN(e->v1->fbcoord, e->v2->fbcoord)
   {
     for (int i = 0; i < nba->triangle_count; i++) {
       tri = (LineartTriangleThread *)nba->linked_triangles[i];
@@ -444,7 +440,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
         }
       }
     }
-    LRT_EDGE_BA_MARCHING_NEXT
+    LRT_EDGE_BA_MARCHING_NEXT(e->v1->fbcoord, e->v2->fbcoord)
   }
   LRT_EDGE_BA_MARCHING_END
 }
@@ -4040,9 +4036,10 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
  * to get next along the way.
  */
 static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer *rb,
-                                                             LineartEdge *e)
+                                                             double *fbcoord1,
+                                                             double *fbcoord2)
 {
-  double data[2] = {e->v1->fbcoord[0], e->v1->fbcoord[1]};
+  double data[2] = {fbcoord1[0], fbcoord1[1]};
   double LU[2] = {-1, 1}, RU[2] = {1, 1}, LB[2] = {-1, -1}, RB[2] = {1, -1};
   double r = 1, sr = 1;
 
@@ -4050,23 +4047,19 @@ static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer
     return lineart_get_bounding_area(rb, data[0], data[1]);
   }
 
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LU, RU, &sr) && sr < r &&
-      sr > 0) {
+  if (lineart_LineIntersectTest2d(fbcoord1, fbcoord2, LU, RU, &sr) && sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LB, RB, &sr) && sr < r &&
-      sr > 0) {
+  if (lineart_LineIntersectTest2d(fbcoord1, fbcoord2, LB, RB, &sr) && sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LB, LU, &sr) && sr < r &&
-      sr > 0) {
+  if (lineart_LineIntersectTest2d(fbcoord1, fbcoord2, LB, LU, &sr) && sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, RB, RU, &sr) && sr < r &&
-      sr > 0) {
+  if (lineart_LineIntersectTest2d(fbcoord1, fbcoord2, RB, RU, &sr) && sr < r && sr > 0) {
     r = sr;
   }
-  interp_v2_v2v2_db(data, e->v1->fbcoord, e->v2->fbcoord, r);
+  interp_v2_v2v2_db(data, fbcoord1, fbcoord2, r);
 
   return lineart_get_bounding_area(rb, data[0], data[1]);
 }
@@ -4076,7 +4069,8 @@ static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer
  * get the next bounding area the line is crossing.
  */
 static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this,
-                                                       LineartEdge *e,
+                                                       double *fbcoord1,
+                                                       double *fbcoord2,
                                                        double x,
                                                        double y,
                                                        double k,
@@ -4098,8 +4092,8 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
     if (positive_y > 0) {
       uy = this->u;
       ux = x + (uy - y) / k;
-      r1 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], rx);
-      r2 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], ux);
+      r1 = ratiod(fbcoord1[0], fbcoord2[0], rx);
+      r2 = ratiod(fbcoord1[0], fbcoord2[0], ux);
       if (MIN2(r1, r2) > 1) {
         return 0;
       }
@@ -4131,8 +4125,8 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
     else if (positive_y < 0) {
       by = this->b;
       bx = x + (by - y) / k;
-      r1 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], rx);
-      r2 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], bx);
+      r1 = ratiod(fbcoord1[0], fbcoord2[0], rx);
+      r2 = ratiod(fbcoord1[0], fbcoord2[0], bx);
       if (MIN2(r1, r2) > 1) {
         return 0;
       }
@@ -4159,7 +4153,7 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
     }
     /* If the line is completely horizontal, in which Y difference == 0. */
     else {
-      r1 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], this->r);
+      r1 = ratiod(fbcoord1[0], fbcoord2[0], this->r);
       if (r1 > 1) {
         return 0;
       }
@@ -4183,8 +4177,8 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
     if (positive_y > 0) {
       uy = this->u;
       ux = x + (uy - y) / k;
-      r1 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], lx);
-      r2 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], ux);
+      r1 = ratiod(fbcoord1[0], fbcoord2[0], lx);
+      r2 = ratiod(fbcoord1[0], fbcoord2[0], ux);
       if (MIN2(r1, r2) > 1) {
         return 0;
       }
@@ -4214,8 +4208,8 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
     else if (positive_y < 0) {
       by = this->b;
       bx = x + (by - y) / k;
-      r1 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], lx);
-      r2 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], bx);
+      r1 = ratiod(fbcoord1[0], fbcoord2[0], lx);
+      r2 = ratiod(fbcoord1[0], fbcoord2[0], bx);
       if (MIN2(r1, r2) > 1) {
         return 0;
       }
@@ -4242,7 +4236,7 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
     }
     /* Again, horizontal. */
     else {
-      r1 = ratiod(e->v1->fbcoord[0], e->v2->fbcoord[0], this->l);
+      r1 = ratiod(fbcoord1[0], fbcoord2[0], this->l);
       if (r1 > 1) {
         return 0;
       }
@@ -4259,7 +4253,7 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
   /* If the line is completely vertical, hence X difference == 0. */
   else {
     if (positive_y > 0) {
-      r1 = ratiod(e->v1->fbcoord[1], e->v2->fbcoord[1], this->u);
+      r1 = ratiod(fbcoord1[1], fbcoord2[1], this->u);
       if (r1 > 1) {
         return 0;
       }
@@ -4273,7 +4267,7 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
       }
     }
     else if (positive_y < 0) {
-      r1 = ratiod(e->v1->fbcoord[1], e->v2->fbcoord[1], this->b);
+      r1 = ratiod(fbcoord1[1], fbcoord2[1], this->b);
       if (r1 > 1) {
         return 0;
       }
@@ -4342,21 +4336,74 @@ static bool lineart_do_closest_segment(double *s1l,
   r_new_in_the_middle[3] = interpd(s2l[3], s2r[3], ga);
 }
 
-static void lineart_get_equavalent_position()
+static void lineart_get_equavalent_position(void)
 {
 
   /* TOOOOOOODDDDDDOOOOOOOO */
 }
 
-static void lineart_edge_cut_casting(LineartRenderBuffer *rb,
-                                     LineartEdge *e,
-                                     double start,
-                                     double end,
-                                     double *start_gpos,
-                                     double *end_gpos)
+static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
+{
+#define DISCARD_NONSENSE_SEGMENTS \
+  if (es->occlusion != 0 || \
+      (es->next && LRT_DOUBLE_CLOSE_ENOUGH(es->at, ((LineartEdgeSegment *)es->next)->at))) { \
+    continue; \
+  }
+
+  /* Count and allocate at once to save time. */
+  int segment_count = 0;
+  LRT_ITER_ALL_LINES_BEGIN
+  {
+    LISTBASE_FOREACH (LineartEdgeSegment *, es, &e->segments) {
+      DISCARD_NONSENSE_SEGMENTS
+      segment_count++;
+    }
+  }
+  LRT_ITER_ALL_LINES_END
+
+  LineartShadowSegmentContainer *ssc = lineart_mem_acquire(
+      &rb->render_data_pool, sizeof(LineartShadowSegmentContainer) * segment_count);
+  LineartShadowSegment *ss = lineart_mem_acquire(&rb->render_data_pool,
+                                                 sizeof(LineartShadowSegment) * segment_count * 2);
+
+  int i = 0;
+  LRT_ITER_ALL_LINES_BEGIN
+  {
+    LISTBASE_FOREACH (LineartEdgeSegment *, es, &e->segments) {
+      DISCARD_NONSENSE_SEGMENTS
+
+      double next_at = es->next ? ((LineartEdgeSegment *)es->next)->at : 1.0f;
+      /* Get correct XYZ and W coordinates. */
+      interp_v3_v3v3_db(ssc[i].fbc1, e->v1->fbcoord, e->v2->fbcoord, es->at);
+      interp_v3_v3v3_db(ssc[i].fbc2, e->v1->fbcoord, e->v2->fbcoord, next_at);
+      ssc[i].fbc1[3] = e->v1->fbcoord[3] * es->at /
+                       (es->at * e->v1->fbcoord[3] + (1 - es->at) * e->v2->fbcoord[3]);
+      ssc[i].fbc2[3] = e->v1->fbcoord[3] * next_at /
+                       (next_at * e->v1->fbcoord[3] + (1 - next_at) * e->v2->fbcoord[3]);
+
+      /* Assign to the first segment's right and the last segment's left position */
+      copy_v4_v4_db(ss[i * 2].fbc2, ssc[i].fbc1);
+      copy_v4_v4_db(ss[i * 2 + 1].fbc1, ssc[i].fbc2);
+      ss[i * 2].at = 0.0f;
+      ss[i * 2 + 1].at = 1.0f;
+      BLI_addtail(&ssc[i].shadow_segments, &ss[i * 2]);
+      BLI_addtail(&ssc[i].shadow_segments, &ss[i * 2 + 1]);
+
+      i++;
+    }
+  }
+  LRT_ITER_ALL_LINES_END
+}
+
+static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
+                                    LineartEdge *e,
+                                    double start,
+                                    double end,
+                                    double *start_gpos,
+                                    double *end_gpos)
 {
   LineartEdgeSegment *es, *ies, *next_es, *prev_es;
-  LineartEdgeSegment *cut_start_after = 0, *cut_end_before = 0;
+  LineartEdgeSegment *cut_start_after = e->segments.first, *cut_end_before = e->segments.last;
   LineartEdgeSegment *ns = 0, *ns2 = 0;
   int untouched = 0;
 
@@ -4465,21 +4512,42 @@ static void lineart_edge_cut_casting(LineartRenderBuffer *rb,
   }
 }
 
+static bool lineart_shadow_cast_onto_triangle(LineartTriangle *t,
+                                              LineartShadowSegment *ss,
+                                              double *r_at_l,
+                                              double *r_at_r,
+                                              double *r_fb_l,
+                                              double *r_fb_r,
+                                              double *r_global_l,
+                                              double *r_global_r)
+{
+  int i[3];
+  i[0] = lineart_LineIntersectTest2d()
+}
+
 static void lineart_shadow_cast(LineartRenderBuffer *rb)
 {
-  LRT_ITER_ALL_LINES_BEGIN{
+  LineartTriangleThread *tri;
 
-      LRT_EDGE_BA_MARCHING_BEGIN{
+  lineart_shadow_create_container_array(rb);
 
-          LISTBASE_FOREACH (LineartEdgeSegment *, es, &e->segments){
-
+  LISTBASE_FOREACH (LineartShadowSegmentContainer *, ssc, &rb->shadow_segments) {
+    LRT_EDGE_BA_MARCHING_BEGIN(ssc->fbc1, ssc->fbc2)
+    {
+      LISTBASE_FOREACH (LineartShadowSegment *, ss, &ssc->shadow_segments) {
+        for (int i = 0; i < nba->triangle_count; i++) {
+          tri = (LineartTriangleThread *)nba->linked_triangles[i];
+          if (tri->testing_e[0] == (LineartEdge *)ss) {
+            continue;
           }
-
-          LRT_EDGE_BA_MARCHING_NEXT
-
-      } LRT_EDGE_BA_MARCHING_END
-
-  } LRT_ITER_ALL_LINES_END
+          tri->testing_e[0] = (LineartEdge *)ss;
+          /* TODO: Cast to triangle. */
+        }
+      }
+      LRT_EDGE_BA_MARCHING_NEXT(ssc->fbc1, ssc->fbc2);
+    }
+    LRT_EDGE_BA_MARCHING_END;
+  }
 }
 
 static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,

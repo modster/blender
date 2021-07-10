@@ -85,29 +85,30 @@ int lineart_count_intersection_segment_count(struct LineartRenderBuffer *rb);
 void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb);
 
 #define LRT_ITER_ALL_LINES_BEGIN \
-  LineartEdge *e, *next_e; \
-  void **current_head; \
-  e = rb->contour.first; \
-  if (!e) { \
-    e = rb->crease.first; \
-  } \
-  if (!e) { \
-    e = rb->material.first; \
-  } \
-  if (!e) { \
-    e = rb->edge_mark.first; \
-  } \
-  if (!e) { \
-    e = rb->intersection.first; \
-  } \
-  if (!e) { \
-    e = rb->floating.first; \
-  } \
-  if (!e) { \
-    e = rb->light_contour.first; \
-  } \
-  for (current_head = &rb->contour.first; e; e = next_e) { \
-    next_e = e->next;
+  { \
+    LineartEdge *e, *next_e; \
+    void **current_head; \
+    e = rb->contour.first; \
+    if (!e) { \
+      e = rb->crease.first; \
+    } \
+    if (!e) { \
+      e = rb->material.first; \
+    } \
+    if (!e) { \
+      e = rb->edge_mark.first; \
+    } \
+    if (!e) { \
+      e = rb->intersection.first; \
+    } \
+    if (!e) { \
+      e = rb->floating.first; \
+    } \
+    if (!e) { \
+      e = rb->light_contour.first; \
+    } \
+    for (current_head = &rb->contour.first; e; e = next_e) { \
+      next_e = e->next;
 
 #define LRT_ITER_ALL_LINES_NEXT \
   while (!next_e) { \
@@ -137,6 +138,7 @@ void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb
 
 #define LRT_ITER_ALL_LINES_END \
   LRT_ITER_ALL_LINES_NEXT \
+  } \
   }
 
 #define LRT_BOUND_AREA_CROSSES(b1, b2) \

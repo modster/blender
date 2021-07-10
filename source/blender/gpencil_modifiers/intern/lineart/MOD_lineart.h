@@ -106,11 +106,21 @@ typedef struct LineartEdgeSegment {
   unsigned char material_mask_bits;
 } LineartEdgeSegment;
 
+typedef struct LineartShadowEdge {
+  /* Two end points in framebuffer coordinates viiewed from the light source. */
+  double fbc1[4], fbc2[4];
+  ListBase shadow_segments;
+} LineartShadowSegmentContainer;
+
 typedef struct LineartShadowSegment {
-  LineartEdgeSegment base;
-  /* global left and right pos, because when casting shadows at some point there will be
+  struct LineartShadowSegment *prev, *next;
+  /* In NDC, not in global linear. */
+  double at;
+  /* Left and right pos, because when casting shadows at some point there will be
    * non-continuous cuts. */
-  double gl[4], gr[4];
+  double fbc1[4], fbc2[4];
+  /* Global position. */
+  double g1[4], g2[4];
 } LineartShadowSegment;
 
 typedef struct LineartVert {
@@ -290,6 +300,8 @@ typedef struct LineartRenderBuffer {
   ListBase light_contour;
 
   ListBase chains;
+
+  ListBase shadow_segments;
 
   /* For managing calculation tasks for multiple threads. */
   SpinLock lock_task;
