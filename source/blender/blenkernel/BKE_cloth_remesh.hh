@@ -1360,7 +1360,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     blender::Vector<Face<EFD>> deleted_faces;
 
     auto &edge_pre = this->get_checked_edge(edge_index);
-    auto [edge_vert_1_pre, edge_vert_2_pre] = this->get_checked_verts_of_edge(edge_pre);
+    auto [edge_vert_1_pre, edge_vert_2_pre] = this->get_checked_verts_of_edge(edge_pre, false);
     auto &edge_node_1 = this->get_checked_node_of_vert(edge_vert_1_pre);
     auto &edge_node_2 = this->get_checked_node_of_vert(edge_vert_2_pre);
 
@@ -1376,12 +1376,12 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
     for (const auto &edge_index : edge_indices) {
       auto &edge_a = this->get_checked_edge(edge_index);
-      auto [edge_vert_1_a, edge_vert_2_a] = this->get_checked_verts_of_edge(edge_a);
+      auto [edge_vert_1_a, edge_vert_2_a] = this->get_checked_verts_of_edge(edge_a, false);
 
       /* Create the new vert by interpolating the verts of the edge */
       auto &new_vert = this->add_empty_interp_vert(edge_vert_1_a, edge_vert_2_a);
 
-      auto [edge_vert_1_b, edge_vert_2_b] = this->get_checked_verts_of_edge(edge_a);
+      auto [edge_vert_1_b, edge_vert_2_b] = this->get_checked_verts_of_edge(edge_a, false);
 
       /* Link new_vert with new_node */
       new_vert.node = new_node.self_index;
@@ -1468,6 +1468,122 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
       deleted_edges.append(std::move(edge_c));
     }
+    return MeshDiff(std::move(added_nodes),
+                    std::move(added_verts),
+                    std::move(added_edges),
+                    std::move(added_faces),
+                    std::move(deleted_nodes),
+                    std::move(deleted_verts),
+                    std::move(deleted_edges),
+                    std::move(deleted_faces));
+  }
+
+  /**
+   * Collapses the edge from edge v1 to v2 unless `verts_swapped` is set
+   * to true and keeps the triangulation of the Mesh
+   *
+   * @param verts_swapped If true, then the edge collapsed from v2 to
+   * v1, if false, edge is collapsed from v1 to v2.
+   *
+   * @param across_seams If true, think of edge as world space edge
+   * and not UV space, this means, all the faces across all the edges
+   * formed between the nodes of the given edge are also split and
+   * triangulated regardless if it on a seam or not.
+   *
+   * Returns the `MeshDiff` that lead to the operation.
+   *
+   * Note, the caller must ensure the adjacent faces to the edge are
+   * triangulated. In debug mode, it will assert, in release mode, it
+   * is undefined behaviour.
+   **/
+  MeshDiff<END, EVD, EED, EFD> collapse_edge_triangulate(EdgeIndex edge_index,
+                                                         bool verts_swapped,
+                                                         bool across_seams)
+  {
+    /* This operation will delete the following-
+     * the edge specified, faces incident to the edge. v2, n2 if
+     * verts_swapped is true. v1, n1 if verts_swapped is false. One of the
+     * edge per face (edge vert and other vert).
+     *
+     * This operation will add the following-
+     * None
+     */
+
+    blender::Vector<NodeIndex> added_nodes;
+    blender::Vector<VertIndex> added_verts;
+    blender::Vector<EdgeIndex> added_edges;
+    blender::Vector<FaceIndex> added_faces;
+    blender::Vector<Node<END>> deleted_nodes;
+    blender::Vector<Vert<EVD>> deleted_verts;
+    blender::Vector<Edge<EED>> deleted_edges;
+    blender::Vector<Face<EFD>> deleted_faces;
+
+    auto &edge_a = this->get_checked_edge(edge_index);
+    auto [v1, v2] = this->get_checked_verts_of_edge(edge_a, verts_swapped);
+    auto v1_index = v1.self_index;
+    auto n1_index = v1.node.value();
+
+    /* This point forward, the vert to be removed is v1, v2 continues
+     * to exist */
+
+    auto faces = edge_a.faces;
+
+    for (const auto &face_index : faces) {
+      auto face = this->delete_face(face_index);
+
+      auto &edge_b = this->get_checked_edge(edge_index);
+
+      auto &other_vert = this->get_checked_other_vert(edge_b, face);
+
+      /* delete edge between v1 and other_vert */
+      {
+        auto op_e_index = this->get_connecting_edge_index(v1_index, other_vert.self_index);
+        BLI_assert(op_e_index);
+        auto e = this->delete_edge(op_e_index.value());
+
+        deleted_edges.append(std::move(e));
+      }
+
+      deleted_faces.append(std::move(face));
+    }
+
+    /* for each edge of v1, change that edge's verts to (vx, v2) */
+    for (const auto &e_index : v1.edges) {
+      Edge<EED> &e = this->get_checked_edge(e_index);
+
+      /* we don't want to mess with edge between v1 and v2 */
+      if (e.has_vert(v2.self_index)) {
+        continue;
+      }
+
+      BLI_assert(e.verts);
+      auto &verts = e.verts.value();
+      if (std::get<0>(verts) == v1_index) {
+        e.verts = {std::get<1>(verts), v2.self_index};
+      }
+      else {
+        e.verts = {std::get<0>(verts), v2.self_index};
+      }
+    }
+
+    /* delete edge */
+    {
+      auto edge = this->delete_edge(edge_index);
+      deleted_edges.append(std::move(edge));
+    }
+
+    /* delete v1 */
+    {
+      auto v1 = this->delete_vert(v1_index);
+      deleted_verts.append(std::move(v1));
+    }
+
+    /* delete n1 */
+    {
+      auto n1 = this->delete_node(n1_index);
+      deleted_nodes.append(std::move(n1));
+    }
+
     return MeshDiff(std::move(added_nodes),
                     std::move(added_verts),
                     std::move(added_edges),
@@ -1646,7 +1762,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
-   * Delete the node and update elements' that refer to this node.
+   * Delete the node and update elements that refer to this node.
    *
    * This should always be followed with a `delete_vert()`
    * since a `Vert` without a `Node` is invalid.
@@ -1670,7 +1786,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
-   * Delete the vert and update elements' that refer to this vert.
+   * Delete the vert and update elements that refer to this vert.
    *
    * This should always be followed with a `delete_edge()`
    * since a `Edge` without a both it's verts is invalid.
@@ -1691,7 +1807,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     /* Remove this vert's references from the other edges and also
      * the faces, this can lead to a mesh structure that isn't valid,
      * so subsequent operations are necessary */
-    for (const auto &edge_index : verts.edges) {
+    for (const auto &edge_index : vert.edges) {
       auto op_edge = this->edges.get(edge_index);
       BLI_assert(op_edge);
       auto &edge = op_edge.value().get();
@@ -1702,7 +1818,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         /* The ordering of the verts within the face matters, so need
          * to go for this more expensive method of removal */
         BLI_assert(face.verts.contains(vert.self_index));
-        face.verts.remove(first_index_of(vert.self_index));
+        face.verts.remove(face.verts.first_index_of(vert.self_index));
       }
 
       /* The other vert of the edge might have been deleted first */
@@ -1715,7 +1831,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
-   * Delete the edge and update elements' that refer to this edge.
+   * Delete the edge and update elements that refer to this edge.
    */
   Edge<EED> delete_edge(EdgeIndex edge_index)
   {
@@ -1804,10 +1920,17 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return op_face.value().get();
   }
 
-  inline std::tuple<Vert<EVD> &, Vert<EVD> &> get_checked_verts_of_edge(const Edge<EED> &edge)
+  inline std::tuple<Vert<EVD> &, Vert<EVD> &> get_checked_verts_of_edge(const Edge<EED> &edge,
+                                                                        bool verts_swapped)
   {
     BLI_assert(edge.verts);
     auto &edge_verts = edge.verts.value();
+
+    if (verts_swapped) {
+      auto &edge_vert_1 = this->get_checked_vert(std::get<1>(edge_verts));
+      auto &edge_vert_2 = this->get_checked_vert(std::get<0>(edge_verts));
+      return {edge_vert_1, edge_vert_2};
+    }
 
     auto &edge_vert_1 = this->get_checked_vert(std::get<0>(edge_verts));
     auto &edge_vert_2 = this->get_checked_vert(std::get<1>(edge_verts));
