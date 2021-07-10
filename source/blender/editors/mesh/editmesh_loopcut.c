@@ -209,7 +209,12 @@ static void ringsel_finish(bContext *C, wmOperator *op)
 
       /* when used in a macro the tessfaces will be recalculated anyway,
        * this is needed here because modifiers depend on updated tessellation, see T45920 */
-      EDBM_update_generic(lcd->ob->data, true, true);
+      EDBM_update(lcd->ob->data,
+                  &(const struct EDBMUpdate_Params){
+                      .calc_looptri = true,
+                      .calc_normals = false,
+                      .is_destructive = true,
+                  });
 
       if (is_single) {
         /* de-select endpoints */
@@ -218,7 +223,7 @@ static void ringsel_finish(bContext *C, wmOperator *op)
 
         EDBM_selectmode_flush_ex(lcd->em, SCE_SELECT_VERTEX);
       }
-      /* we cant slide multiple edges in vertex select mode */
+      /* we can't slide multiple edges in vertex select mode */
       else if (is_macro && (cuts > 1) && (em->selectmode & SCE_SELECT_VERTEX)) {
         EDBM_selectmode_disable(lcd->vc.scene, em, SCE_SELECT_VERTEX, SCE_SELECT_EDGE);
       }
@@ -236,7 +241,7 @@ static void ringsel_finish(bContext *C, wmOperator *op)
        *     in editmesh_select.c (around line 1000)... */
       /* sets as active, useful for other tools */
       if (em->selectmode & SCE_SELECT_VERTEX) {
-        /* low priority TODO, get vertrex close to mouse */
+        /* low priority TODO: get vertrex close to mouse. */
         BM_select_history_store(em->bm, lcd->eed->v1);
       }
       if (em->selectmode & SCE_SELECT_EDGE) {

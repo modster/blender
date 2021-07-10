@@ -94,7 +94,7 @@ static void curve_render_overlay_verts_edges_len_get(ListBase *lb,
   LISTBASE_FOREACH (Nurb *, nu, lb) {
     if (nu->bezt) {
       vert_len += nu->pntsu * 3;
-      /* 2x handles per point*/
+      /* 2x handles per point. */
       edge_len += 2 * nu->pntsu;
     }
     else if (nu->bp) {
@@ -363,7 +363,7 @@ static void curve_cd_calc_used_gpu_layers(CustomDataMask *cd_layers,
       int type = gpu_attr->type;
 
       /* Curves cannot have named layers.
-       * Note: We could relax this assumption later. */
+       * NOTE: We could relax this assumption later. */
       if (name[0] != '\0') {
         continue;
       }
@@ -843,8 +843,8 @@ static void curve_create_edit_data_and_handles(CurveRenderData *rdata,
   int edges_len_capacity = curve_render_data_overlay_edges_len_get(rdata) * 2;
   int vbo_len_used = 0;
 
-#define DRW_TEST_ASSIGN_VBO(v) (v = (DRW_vbo_requested(v) ? (v) : NULL))
-#define DRW_TEST_ASSIGN_IBO(v) (v = (DRW_ibo_requested(v) ? (v) : NULL))
+#define DRW_TEST_ASSIGN_VBO(v) (v = (DRW_vbo_requested(v) ? (v) : nullptr))
+#define DRW_TEST_ASSIGN_IBO(v) (v = (DRW_ibo_requested(v) ? (v) : nullptr))
 
   if (DRW_TEST_ASSIGN_VBO(vbo_pos)) {
     GPU_vertbuf_init_with_format(vbo_pos, &format_pos);

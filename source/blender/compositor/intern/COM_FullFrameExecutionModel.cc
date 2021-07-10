@@ -35,24 +35,13 @@ FullFrameExecutionModel::FullFrameExecutionModel(CompositorContext &context,
                                                  Span<NodeOperation *> operations)
     : ExecutionModel(context, operations),
       active_buffers_(shared_buffers),
-      num_operations_finished_(0),
-      work_mutex_(),
-      work_finished_cond_()
+      num_operations_finished_(0)
 {
   priorities_.append(eCompositorPriority::High);
   if (!context.isFastCalculation()) {
     priorities_.append(eCompositorPriority::Medium);
     priorities_.append(eCompositorPriority::Low);
   }
-
-  BLI_mutex_init(&work_mutex_);
-  BLI_condition_init(&work_finished_cond_);
-}
-
-FullFrameExecutionModel::~FullFrameExecutionModel()
-{
-  BLI_condition_end(&work_finished_cond_);
-  BLI_mutex_end(&work_mutex_);
 }
 
 void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
@@ -60,10 +49,10 @@ void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
   const bNodeTree *node_tree = this->context_.getbNodeTree();
   node_tree->stats_draw(node_tree->sdh, TIP_("Compositing | Initializing execution"));
 
-  DebugInfo::graphviz(&exec_system);
+  DebugInfo::graphviz(&exec_system, "compositor_prior_rendering");
 
   determine_areas_to_render_and_reads();
-  render_operations(exec_system);
+  render_operations();
 }
 
 void FullFrameExecutionModel::determine_areas_to_render_and_reads()
@@ -80,18 +69,6 @@ void FullFrameExecutionModel::determine_areas_to_render_and_reads()
         determine_areas_to_render(op, area);
         determine_reads(op);
       }
-    }
-  }
-}
-
-void FullFrameExecutionModel::ensure_inputs_rendered(NodeOperation *op,
-                                                     ExecutionSystem &exec_system)
-{
-  const int num_inputs = op->getNumberOfInputSockets();
-  for (int i = 0; i < num_inputs; i++) {
-    NodeOperation *input_op = op->get_input_operation(i);
-    if (!active_buffers_.is_operation_rendered(input_op)) {
-      render_operation(input_op, exec_system);
     }
   }
 }
@@ -113,25 +90,18 @@ MemoryBuffer *FullFrameExecutionModel::create_operation_buffer(NodeOperation *op
   BLI_rcti_init(&op_rect, 0, op->getWidth(), 0, op->getHeight());
 
   const DataType data_type = op->getOutputSocket(0)->getDataType();
-  /* TODO: We should check if the operation is constant instead of is_set_operation. Finding a way
-   * to know if an operation is constant has to be implemented yet. */
-  const bool is_a_single_elem = op->get_flags().is_set_operation;
+  const bool is_a_single_elem = op->get_flags().is_constant_operation;
   return new MemoryBuffer(data_type, op_rect, is_a_single_elem);
 }
 
-void FullFrameExecutionModel::render_operation(NodeOperation *op, ExecutionSystem &exec_system)
+void FullFrameExecutionModel::render_operation(NodeOperation *op)
 {
-  if (active_buffers_.is_operation_rendered(op)) {
-    return;
-  }
-
-  ensure_inputs_rendered(op, exec_system);
   Vector<MemoryBuffer *> input_bufs = get_input_buffers(op);
 
   const bool has_outputs = op->getNumberOfOutputSockets() > 0;
   MemoryBuffer *op_buf = has_outputs ? create_operation_buffer(op) : nullptr;
   Span<rcti> areas = active_buffers_.get_areas_to_render(op);
-  op->render(op_buf, areas, input_bufs, exec_system);
+  op->render(op_buf, areas, input_bufs);
   active_buffers_.set_rendered_buffer(op, std::unique_ptr<MemoryBuffer>(op_buf));
 
   operation_finished(op);
@@ -140,7 +110,7 @@ void FullFrameExecutionModel::render_operation(NodeOperation *op, ExecutionSyste
 /**
  * Render output operations in order of priority.
  */
-void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
+void FullFrameExecutionModel::render_operations()
 {
   const bool is_rendering = context_.isRendering();
 
@@ -148,7 +118,8 @@ void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
   for (eCompositorPriority priority : priorities_) {
     for (NodeOperation *op : operations_) {
       if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
-        render_operation(op, exec_system);
+        render_output_dependencies(op);
+        render_operation(op);
       }
     }
   }
@@ -156,48 +127,98 @@ void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
 }
 
 /**
- * Determines all input operations areas needed to render given operation area.
- * \param operation: Renderer operation.
- * \param render_area: Area within given operation bounds to render.
+ * Returns all dependencies from inputs to outputs. A dependency may be repeated when
+ * several operations depend on it.
  */
-void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *operation,
-                                                        const rcti &render_area)
+static Vector<NodeOperation *> get_operation_dependencies(NodeOperation *operation)
 {
-  if (active_buffers_.is_area_registered(operation, render_area)) {
-    return;
+  /* Get dependencies from outputs to inputs. */
+  Vector<NodeOperation *> dependencies;
+  Vector<NodeOperation *> next_outputs;
+  next_outputs.append(operation);
+  while (next_outputs.size() > 0) {
+    Vector<NodeOperation *> outputs(next_outputs);
+    next_outputs.clear();
+    for (NodeOperation *output : outputs) {
+      for (int i = 0; i < output->getNumberOfInputSockets(); i++) {
+        next_outputs.append(output->get_input_operation(i));
+      }
+    }
+    dependencies.extend(next_outputs);
   }
 
-  active_buffers_.register_area(operation, render_area);
+  /* Reverse to get dependencies from inputs to outputs. */
+  std::reverse(dependencies.begin(), dependencies.end());
 
-  const int num_inputs = operation->getNumberOfInputSockets();
-  for (int i = 0; i < num_inputs; i++) {
-    NodeOperation *input_op = operation->get_input_operation(i);
-    rcti input_op_rect, input_area;
-    BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
-    operation->get_area_of_interest(input_op, render_area, input_area);
+  return dependencies;
+}
 
-    /* Ensure area of interest is within operation bounds, cropping areas outside. */
-    BLI_rcti_isect(&input_area, &input_op_rect, &input_area);
-
-    determine_areas_to_render(input_op, input_area);
+void FullFrameExecutionModel::render_output_dependencies(NodeOperation *output_op)
+{
+  BLI_assert(output_op->isOutputOperation(context_.isRendering()));
+  Vector<NodeOperation *> dependencies = get_operation_dependencies(output_op);
+  for (NodeOperation *op : dependencies) {
+    if (!active_buffers_.is_operation_rendered(op)) {
+      render_operation(op);
+    }
   }
 }
 
 /**
- * Determines the reads given operation and its inputs will receive (i.e: Number of dependent
+ * Determines all operations areas needed to render given output area.
+ */
+void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *output_op,
+                                                        const rcti &output_area)
+{
+  BLI_assert(output_op->isOutputOperation(context_.isRendering()));
+
+  Vector<std::pair<NodeOperation *, const rcti>> stack;
+  stack.append({output_op, output_area});
+  while (stack.size() > 0) {
+    std::pair<NodeOperation *, rcti> pair = stack.pop_last();
+    NodeOperation *operation = pair.first;
+    const rcti &render_area = pair.second;
+    if (active_buffers_.is_area_registered(operation, render_area)) {
+      continue;
+    }
+
+    active_buffers_.register_area(operation, render_area);
+
+    const int num_inputs = operation->getNumberOfInputSockets();
+    for (int i = 0; i < num_inputs; i++) {
+      NodeOperation *input_op = operation->get_input_operation(i);
+      rcti input_op_rect, input_area;
+      BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
+      operation->get_area_of_interest(input_op, render_area, input_area);
+
+      /* Ensure area of interest is within operation bounds, cropping areas outside. */
+      BLI_rcti_isect(&input_area, &input_op_rect, &input_area);
+
+      stack.append({input_op, input_area});
+    }
+  }
+}
+
+/**
+ * Determines reads to receive by operations in output operation tree (i.e: Number of dependent
  * operations each operation has).
  */
-void FullFrameExecutionModel::determine_reads(NodeOperation *operation)
+void FullFrameExecutionModel::determine_reads(NodeOperation *output_op)
 {
-  if (active_buffers_.has_registered_reads(operation)) {
-    return;
-  }
+  BLI_assert(output_op->isOutputOperation(context_.isRendering()));
 
-  const int num_inputs = operation->getNumberOfInputSockets();
-  for (int i = 0; i < num_inputs; i++) {
-    NodeOperation *input_op = operation->get_input_operation(i);
-    determine_reads(input_op);
-    active_buffers_.register_read(input_op);
+  Vector<NodeOperation *> stack;
+  stack.append(output_op);
+  while (stack.size() > 0) {
+    NodeOperation *operation = stack.pop_last();
+    const int num_inputs = operation->getNumberOfInputSockets();
+    for (int i = 0; i < num_inputs; i++) {
+      NodeOperation *input_op = operation->get_input_operation(i);
+      if (!active_buffers_.has_registered_reads(input_op)) {
+        stack.append(input_op);
+      }
+      active_buffers_.register_read(input_op);
+    }
   }
 }
 
@@ -229,70 +250,6 @@ void FullFrameExecutionModel::get_output_render_area(NodeOperation *output_op, r
                   norm_border->ymin * op_height,
                   norm_border->ymax * op_height);
   }
-}
-
-/**
- * Multi-threadedly execute given work function passing work_rect splits as argument.
- */
-void FullFrameExecutionModel::execute_work(const rcti &work_rect,
-                                           std::function<void(const rcti &split_rect)> work_func)
-{
-  if (is_breaked()) {
-    return;
-  }
-
-  /* Split work vertically to maximize continuous memory. */
-  const int work_height = BLI_rcti_size_y(&work_rect);
-  const int num_sub_works = MIN2(WorkScheduler::get_num_cpu_threads(), work_height);
-  const int split_height = num_sub_works == 0 ? 0 : work_height / num_sub_works;
-  int remaining_height = work_height - split_height * num_sub_works;
-
-  Vector<WorkPackage> sub_works(num_sub_works);
-  int sub_work_y = work_rect.ymin;
-  int num_sub_works_finished = 0;
-  for (int i = 0; i < num_sub_works; i++) {
-    int sub_work_height = split_height;
-
-    /* Distribute remaining height between sub-works. */
-    if (remaining_height > 0) {
-      sub_work_height++;
-      remaining_height--;
-    }
-
-    WorkPackage &sub_work = sub_works[i];
-    sub_work.type = eWorkPackageType::CustomFunction;
-    sub_work.execute_fn = [=, &work_func, &work_rect]() {
-      if (is_breaked()) {
-        return;
-      }
-      rcti split_rect;
-      BLI_rcti_init(
-          &split_rect, work_rect.xmin, work_rect.xmax, sub_work_y, sub_work_y + sub_work_height);
-      work_func(split_rect);
-    };
-    sub_work.executed_fn = [&]() {
-      BLI_mutex_lock(&work_mutex_);
-      num_sub_works_finished++;
-      if (num_sub_works_finished == num_sub_works) {
-        BLI_condition_notify_one(&work_finished_cond_);
-      }
-      BLI_mutex_unlock(&work_mutex_);
-    };
-    WorkScheduler::schedule(&sub_work);
-    sub_work_y += sub_work_height;
-  }
-  BLI_assert(sub_work_y == work_rect.ymax);
-
-  WorkScheduler::finish();
-
-  /* Ensure all sub-works finished.
-   * TODO: This a workaround for WorkScheduler::finish() not waiting all works on queue threading
-   * model. Sync code should be removed once it's fixed. */
-  BLI_mutex_lock(&work_mutex_);
-  if (num_sub_works_finished < num_sub_works) {
-    BLI_condition_wait(&work_finished_cond_, &work_mutex_);
-  }
-  BLI_mutex_unlock(&work_mutex_);
 }
 
 void FullFrameExecutionModel::operation_finished(NodeOperation *operation)

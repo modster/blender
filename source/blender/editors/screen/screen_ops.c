@@ -279,6 +279,11 @@ bool ED_operator_file_active(bContext *C)
   return ed_spacetype_test(C, SPACE_FILE);
 }
 
+bool ED_operator_spreadsheet_active(bContext *C)
+{
+  return ed_spacetype_test(C, SPACE_SPREADSHEET);
+}
+
 bool ED_operator_action_active(bContext *C)
 {
   return ed_spacetype_test(C, SPACE_ACTION);
@@ -358,9 +363,24 @@ bool ED_operator_object_active(bContext *C)
   return ((ob != NULL) && !ed_object_hidden(ob));
 }
 
-bool ED_operator_object_active_editable_ex(bContext *UNUSED(C), const Object *ob)
+bool ED_operator_object_active_editable_ex(bContext *C, const Object *ob)
 {
-  return ((ob != NULL) && !ID_IS_LINKED(ob) && !ed_object_hidden(ob));
+  if (ob == NULL) {
+    CTX_wm_operator_poll_msg_set(C, "Context missing active object");
+    return false;
+  }
+
+  if (ID_IS_LINKED(ob)) {
+    CTX_wm_operator_poll_msg_set(C, "Cannot edit library linked object");
+    return false;
+  }
+
+  if (ed_object_hidden(ob)) {
+    CTX_wm_operator_poll_msg_set(C, "Cannot edit hidden obect");
+    return false;
+  }
+
+  return true;
 }
 
 bool ED_operator_object_active_editable(bContext *C)
@@ -444,26 +464,46 @@ bool ED_operator_editarmature(bContext *C)
 }
 
 /**
- * \brief check for pose mode (no mixed modes)
+ * Check for pose mode (no mixed modes).
  *
- * We want to enable most pose operations in weight paint mode,
- * when it comes to transforming bones, but managing bones layers/groups
- * can be left for pose mode only. (not weight paint mode)
+ * We want to enable most pose operations in weight paint mode, when it comes to transforming
+ * bones, but managing bones layers/groups and their constraints can be left for pose mode only
+ * (not weight paint mode).
  */
-bool ED_operator_posemode_exclusive(bContext *C)
+static bool ed_operator_posemode_exclusive_ex(bContext *C, Object *obact)
 {
-  Object *obact = CTX_data_active_object(C);
-
-  if (obact && !(obact->mode & OB_MODE_EDIT)) {
-    Object *obpose = BKE_object_pose_armature_get(obact);
-    if (obpose != NULL) {
-      if (obact == obpose) {
-        return true;
-      }
+  if (obact != NULL && !(obact->mode & OB_MODE_EDIT)) {
+    if (obact == BKE_object_pose_armature_get(obact)) {
+      return true;
     }
   }
 
+  CTX_wm_operator_poll_msg_set(C, "No object, or not exclusively in pose mode");
   return false;
+}
+
+bool ED_operator_posemode_exclusive(bContext *C)
+{
+  Object *obact = ED_object_active_context(C);
+
+  return ed_operator_posemode_exclusive_ex(C, obact);
+}
+
+/** Object must be editable, fully local (i.e. not an override), and exclusively in Pose mode. */
+bool ED_operator_object_active_local_editable_posemode_exclusive(bContext *C)
+{
+  Object *obact = ED_object_active_context(C);
+
+  if (!ed_operator_posemode_exclusive_ex(C, obact)) {
+    return false;
+  }
+
+  if (ID_IS_OVERRIDE_LIBRARY(obact)) {
+    CTX_wm_operator_poll_msg_set(C, "Object is a local library override");
+    return false;
+  }
+
+  return true;
 }
 
 /* allows for pinned pose objects to be used in the object buttons
@@ -1362,6 +1402,7 @@ static int area_dupli_invoke(bContext *C, wmOperator *op, const wmEvent *event)
                                     area->winx,
                                     area->winy,
                                     SPACE_EMPTY,
+                                    false,
                                     true,
                                     false,
                                     WIN_ALIGN_ABSOLUTE);
@@ -2076,16 +2117,16 @@ static ScrEdge *area_findsharededge(bScreen *screen, ScrArea *area, ScrArea *sb)
   ScrVert *sbv3 = sb->v3;
   ScrVert *sbv4 = sb->v4;
 
-  if (sav1 == sbv4 && sav2 == sbv3) { /* area to right of sb = W */
+  if (sav1 == sbv4 && sav2 == sbv3) { /* Area to right of sb = W. */
     return BKE_screen_find_edge(screen, sav1, sav2);
   }
-  if (sav2 == sbv1 && sav3 == sbv4) { /* area to bottom of sb = N */
+  if (sav2 == sbv1 && sav3 == sbv4) { /* Area to bottom of sb = N. */
     return BKE_screen_find_edge(screen, sav2, sav3);
   }
-  if (sav3 == sbv2 && sav4 == sbv1) { /* area to left of sb = E */
+  if (sav3 == sbv2 && sav4 == sbv1) { /* Area to left of sb = E. */
     return BKE_screen_find_edge(screen, sav3, sav4);
   }
-  if (sav1 == sbv2 && sav4 == sbv3) { /* area on top of sb = S*/
+  if (sav1 == sbv2 && sav4 == sbv3) { /* Area on top of sb = S. */
     return BKE_screen_find_edge(screen, sav1, sav4);
   }
 
@@ -2751,9 +2792,9 @@ static int region_scale_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
         CLAMP(rmd->region->sizey, 0, rmd->maxsize);
 
-        /* note, 'UI_UNIT_Y/4' means you need to drag the footer and execute region
+        /* NOTE: `UI_UNIT_Y / 4` means you need to drag the footer and execute region
          * almost all the way down for it to become hidden, this is done
-         * otherwise its too easy to do this by accident */
+         * otherwise its too easy to do this by accident. */
         if (size_no_snap < (UI_UNIT_Y / 4) / aspect) {
           rmd->region->sizey = rmd->origval;
           if (!(rmd->region->flag & RGN_FLAG_HIDDEN)) {
@@ -4446,9 +4487,17 @@ static void screen_animation_region_tag_redraw(ScrArea *area,
   /* No need to do a full redraw as the current frame indicator is only updated.
    * We do need to redraw when this area is in full screen as no other areas
    * will be tagged for redrawing. */
-  if ((region->regiontype == RGN_TYPE_WINDOW) &&
-      (ELEM(area->spacetype, SPACE_GRAPH, SPACE_NLA, SPACE_ACTION)) && !area->full) {
-    return;
+  if (region->regiontype == RGN_TYPE_WINDOW && !area->full) {
+    if (ELEM(area->spacetype, SPACE_GRAPH, SPACE_NLA, SPACE_ACTION)) {
+      return;
+    }
+
+    if (area->spacetype == SPACE_SEQ) {
+      const SpaceSeq *sseq = area->spacedata.first;
+      if (!ED_space_sequencer_has_playback_animation(sseq, scene)) {
+        return;
+      }
+    }
   }
   ED_region_tag_redraw(region);
 }
@@ -4948,6 +4997,7 @@ static int userpref_show_exec(bContext *C, wmOperator *op)
                      sizey,
                      SPACE_USERPREF,
                      false,
+                     false,
                      true,
                      WIN_ALIGN_LOCATION_CENTER) != NULL) {
     /* The header only contains the editor switcher and looks empty.
@@ -5013,6 +5063,7 @@ static int drivers_editor_show_exec(bContext *C, wmOperator *op)
                      sizex,
                      sizey,
                      SPACE_GRAPH,
+                     false,
                      false,
                      true,
                      WIN_ALIGN_LOCATION_CENTER) != NULL) {
@@ -5081,6 +5132,7 @@ static int info_log_show_exec(bContext *C, wmOperator *op)
                      sizex,
                      sizey,
                      SPACE_INFO,
+                     false,
                      false,
                      true,
                      WIN_ALIGN_LOCATION_CENTER) != NULL) {
@@ -5167,7 +5219,7 @@ static void SCREEN_OT_delete(wmOperatorType *ot)
 /* -------------------------------------------------------------------- */
 /** \name Region Alpha Blending Operator
  *
- * Implementation note: a disappearing region needs at least 1 last draw with
+ * Implementation NOTE: a disappearing region needs at least 1 last draw with
  * 100% back-buffer texture over it - then triple buffer will clear it entirely.
  * This because flag #RGN_FLAG_HIDDEN is set in end - region doesn't draw at all then.
  *
@@ -5546,13 +5598,13 @@ static void SCREEN_OT_workspace_cycle(wmOperatorType *ot)
 /* called in spacetypes.c */
 void ED_operatortypes_screen(void)
 {
-  /* generic UI stuff */
+  /* Generic UI stuff. */
   WM_operatortype_append(SCREEN_OT_actionzone);
   WM_operatortype_append(SCREEN_OT_repeat_last);
   WM_operatortype_append(SCREEN_OT_repeat_history);
   WM_operatortype_append(SCREEN_OT_redo_last);
 
-  /* screen tools */
+  /* Screen tools. */
   WM_operatortype_append(SCREEN_OT_area_move);
   WM_operatortype_append(SCREEN_OT_area_split);
   WM_operatortype_append(SCREEN_OT_area_join);
@@ -5579,7 +5631,7 @@ void ED_operatortypes_screen(void)
   WM_operatortype_append(SCREEN_OT_space_context_cycle);
   WM_operatortype_append(SCREEN_OT_workspace_cycle);
 
-  /*frame changes*/
+  /* Frame changes. */
   WM_operatortype_append(SCREEN_OT_frame_offset);
   WM_operatortype_append(SCREEN_OT_frame_jump);
   WM_operatortype_append(SCREEN_OT_keyframe_jump);
@@ -5589,7 +5641,7 @@ void ED_operatortypes_screen(void)
   WM_operatortype_append(SCREEN_OT_animation_play);
   WM_operatortype_append(SCREEN_OT_animation_cancel);
 
-  /* new/delete */
+  /* New/delete. */
   WM_operatortype_append(SCREEN_OT_new);
   WM_operatortype_append(SCREEN_OT_delete);
 }

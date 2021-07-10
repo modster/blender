@@ -155,6 +155,9 @@ if(WITH_HEADLESS OR WITH_GHOST_SDL)
   endif()
 
 elseif(APPLE AND NOT WITH_GHOST_X11)
+  if(WITH_INPUT_IME)
+    add_definitions(-DWITH_INPUT_IME)
+  endif()
   list(APPEND SRC
     intern/GHOST_DisplayManagerCocoa.mm
     intern/GHOST_SystemCocoa.mm
@@ -290,11 +293,25 @@ elseif(WITH_GHOST_X11 OR WITH_GHOST_WAYLAND)
       intern/GHOST_WindowWayland.cpp
 
       intern/GHOST_SystemWayland.h
+      intern/GHOST_WaylandCursorSettings.h
       intern/GHOST_WindowWayland.h
     )
 
     pkg_get_variable(WAYLAND_SCANNER wayland-scanner wayland_scanner)
-    pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+
+    pkg_check_modules(wayland-protocols wayland-protocols>=1.15)
+    if (${wayland-protocols_FOUND})
+      pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+    else()
+      find_path(WAYLAND_PROTOCOLS_DIR
+        NAMES unstable/xdg-decoration/xdg-decoration-unstable-v1.xml
+        PATH_SUFFIXES share/wayland-protocols
+      )
+    endif()
+
+    if (NOT EXISTS ${WAYLAND_PROTOCOLS_DIR})
+      message(FATAL_ERROR "path to wayland-protocols not found")
+    endif()
 
     # Generate protocols bindings.
     macro(generate_protocol_bindings NAME PROT_DEF)
@@ -370,6 +387,7 @@ elseif(WIN32)
     intern/GHOST_DropTargetWin32.cpp
     intern/GHOST_SystemWin32.cpp
     intern/GHOST_WindowWin32.cpp
+    intern/GHOST_Wintab.cpp
 
     intern/GHOST_ContextD3D.h
     intern/GHOST_DisplayManagerWin32.h
@@ -377,6 +395,7 @@ elseif(WIN32)
     intern/GHOST_SystemWin32.h
     intern/GHOST_TaskbarWin32.h
     intern/GHOST_WindowWin32.h
+    intern/GHOST_Wintab.h
   )
 
   if(NOT WITH_GL_EGL)
@@ -481,10 +500,17 @@ if(WITH_XR_OPENXR)
       shlwapi
     )
   elseif(UNIX AND NOT APPLE)
-    list(APPEND XR_PLATFORM_DEFINES
-      -DXR_OS_LINUX
-      -DXR_USE_PLATFORM_XLIB
-    )
+    list(APPEND XR_PLATFORM_DEFINES -DXR_OS_LINUX)
+    if (WITH_GHOST_WAYLAND)
+      list(APPEND XR_PLATFORM_DEFINES -DXR_USE_PLATFORM_WAYLAND)
+    endif()
+    if (WITH_GHOST_X11)
+      if (WITH_GL_EGL)
+        list(APPEND XR_PLATFORM_DEFINES -DXR_USE_PLATFORM_EGL)
+      else()
+        list(APPEND XR_PLATFORM_DEFINES -DXR_USE_PLATFORM_XLIB)
+      endif()
+    endif()
   endif()
 
   add_definitions(-DWITH_XR_OPENXR ${XR_PLATFORM_DEFINES})

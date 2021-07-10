@@ -43,6 +43,7 @@ Mesh *create_cube_mesh(const float size)
   const BMeshCreateParams bmcp = {true};
   const BMAllocTemplate allocsize = {8, 12, 24, 6};
   BMesh *bm = BM_mesh_create(&allocsize, &bmcp);
+  BM_data_layer_add_named(bm, &bm->ldata, CD_MLOOPUV, nullptr);
 
   BMO_op_callf(bm,
                BMO_FLAG_DEFAULTS,
@@ -54,6 +55,7 @@ Mesh *create_cube_mesh(const float size)
   BMeshToMeshParams params{};
   params.calc_object_remap = false;
   Mesh *mesh = (Mesh *)BKE_id_new_nomain(ID_ME, nullptr);
+  BKE_id_material_eval_ensure_default_slot(&mesh->id);
   BM_mesh_bm_to_me(nullptr, bm, mesh, &params);
   BM_mesh_free(bm);
 
@@ -65,7 +67,6 @@ static void geo_node_mesh_primitive_cube_exec(GeoNodeExecParams params)
   const float size = params.extract_input<float>("Size");
 
   Mesh *mesh = create_cube_mesh(size);
-  BKE_id_material_eval_ensure_default_slot(&mesh->id);
   params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
 }
 

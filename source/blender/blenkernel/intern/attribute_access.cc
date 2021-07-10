@@ -617,6 +617,16 @@ CustomDataAttributes::CustomDataAttributes(CustomDataAttributes &&other)
   CustomData_reset(&other.data);
 }
 
+CustomDataAttributes &CustomDataAttributes::operator=(const CustomDataAttributes &other)
+{
+  if (this != &other) {
+    CustomData_copy(&other.data, &data, CD_MASK_ALL, CD_DUPLICATE, other.size_);
+    size_ = other.size_;
+  }
+
+  return *this;
+}
+
 std::optional<GSpan> CustomDataAttributes::get_for_read(const StringRef name) const
 {
   BLI_assert(size_ != 0);
@@ -1187,7 +1197,7 @@ static blender::bke::OutputAttribute create_output_attribute(
       cpp_type->size() * domain_size, cpp_type->alignment(), __func__);
   if (ignore_old_values) {
     /* This does nothing for trivially constructible types, but is necessary for correctness. */
-    cpp_type->construct_default_n(data, domain);
+    cpp_type->default_construct_n(data, domain);
   }
   else {
     /* Fill the temporary array with values from the existing attribute. */

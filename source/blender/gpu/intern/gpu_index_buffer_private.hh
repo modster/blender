@@ -51,7 +51,7 @@ class IndexBuf {
  protected:
   /** Type of indices used inside this buffer. */
   GPUIndexBufType index_type_ = GPU_INDEX_U32;
-  /** Offset in this buffer to the first index to render. Is 0 if not a subrange.  */
+  /** Offset in this buffer to the first index to render. Is 0 if not a subrange. */
   uint32_t index_start_ = 0;
   /** Number of indices to render. */
   uint32_t index_len_ = 0;
@@ -73,7 +73,7 @@ class IndexBuf {
   IndexBuf(){};
   virtual ~IndexBuf();
 
-  void init(uint indices_len, uint32_t *indices);
+  void init(uint indices_len, uint32_t *indices, uint min_index, uint max_index);
   void init_subrange(IndexBuf *elem_src, uint start, uint length);
   void init_build_on_device(uint index_len);
 

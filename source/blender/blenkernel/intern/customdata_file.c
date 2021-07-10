@@ -24,13 +24,13 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_endian_defines.h"
 #include "BLI_endian_switch.h"
 #include "BLI_fileops.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_customdata_file.h"
-#include "BKE_global.h"
 
 /************************* File Format Definitions ***************************/
 
@@ -361,9 +361,9 @@ bool cdf_write_open(CDataFile *cdf, const char *filename)
 
   cdf->writef = f;
 
-  /* fill header */
+  /* Fill header. */
   header = &cdf->header;
-  /* strcpy(, "BCDF"); // terminator out of range */
+  /* Copy "BCDF" (string terminator out of range). */
   header->ID[0] = 'B';
   header->ID[1] = 'C';
   header->ID[2] = 'D';

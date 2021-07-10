@@ -120,6 +120,7 @@ static Mesh *create_circle_mesh(const float radius,
                                    0,
                                    circle_corner_total(fill_type, verts_num),
                                    circle_face_total(fill_type, verts_num));
+  BKE_id_material_eval_ensure_default_slot(&mesh->id);
   MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
   MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
@@ -215,7 +216,6 @@ static void geo_node_mesh_primitive_circle_exec(GeoNodeExecParams params)
   }
 
   Mesh *mesh = create_circle_mesh(radius, verts_num, fill_type);
-  BKE_id_material_eval_ensure_default_slot(&mesh->id);
 
   BLI_assert(BKE_mesh_is_valid(mesh));
 
@@ -228,7 +228,8 @@ void register_node_type_geo_mesh_primitive_circle()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_MESH_PRIMITIVE_CIRCLE, "Circle", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(
+      &ntype, GEO_NODE_MESH_PRIMITIVE_CIRCLE, "Mesh Circle", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(
       &ntype, geo_node_mesh_primitive_circle_in, geo_node_mesh_primitive_circle_out);
   node_type_init(&ntype, geo_node_mesh_primitive_circle_init);
