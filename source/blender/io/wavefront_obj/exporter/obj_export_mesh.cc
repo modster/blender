@@ -154,16 +154,6 @@ int OBJMesh::tot_uv_vertices() const
   return tot_uv_vertices_;
 }
 
-/**
- * \return UV vertex indices of one polygon.
- */
-Span<int> OBJMesh::uv_indices(const int poly_index) const
-{
-  BLI_assert(poly_index < export_mesh_eval_->totpoly);
-  BLI_assert(poly_index < uv_indices_.size());
-  return uv_indices_[poly_index];
-}
-
 int OBJMesh::tot_edges() const
 {
   return export_mesh_eval_->totedge;
@@ -354,6 +344,15 @@ void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coo
   BKE_mesh_uv_vert_map_free(uv_vert_map);
 }
 
+Span<int> OBJMesh::calc_poly_uv_indices(const int poly_index) const
+{
+  if (uv_indices_.size() <= 0) {
+    return {};
+  }
+  BLI_assert(poly_index < export_mesh_eval_->totpoly);
+  BLI_assert(poly_index < uv_indices_.size());
+  return uv_indices_[poly_index];
+}
 /**
  * Calculate polygon normal of a polygon at given index.
  *

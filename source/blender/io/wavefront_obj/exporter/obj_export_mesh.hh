@@ -96,7 +96,6 @@ class OBJMesh : NonCopyable {
   int tot_vertices() const;
   int tot_polygons() const;
   int tot_uv_vertices() const;
-  Span<int> uv_indices(const int poly_index) const;
   int tot_edges() const;
 
   int16_t tot_materials() const;
@@ -117,6 +116,7 @@ class OBJMesh : NonCopyable {
   float3 calc_vertex_coords(const int vert_index, const float scaling_factor) const;
   Vector<int> calc_poly_vertex_indices(const int poly_index) const;
   void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords);
+  Span<int> calc_poly_uv_indices(const int poly_index) const;
   float3 calc_poly_normal(const int poly_index) const;
   std::pair<int, Vector<int>> calc_poly_normal_indices(const int poly_index,
                                                        const int object_tot_prev_normals) const;

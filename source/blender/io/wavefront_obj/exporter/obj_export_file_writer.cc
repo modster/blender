@@ -356,11 +356,9 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data,
   /* Number of normals may not be equal to number of polygons due to smooth shading. */
   int per_object_tot_normals = 0;
   const int tot_polygons = obj_mesh_data.tot_polygons();
-  /* If we aren't exporting UVs, need an array for the ignored argument to poly_element_writer. */
-  Array<int> dummy_uvs(0);
-  Span<int> uvs = dummy_uvs.as_span();
   for (int i = 0; i < tot_polygons; i++) {
     Vector<int> poly_vertex_indices = obj_mesh_data.calc_poly_vertex_indices(i);
+    Span<int> poly_uv_indices = obj_mesh_data.calc_poly_uv_indices(i);
     /* For an Object, a normal index depends on how many of its normals have been written before
      * it. This is unknown because of smooth shading. So pass "per object total normals"
      * and update it after each call. */
@@ -373,10 +371,7 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data,
     last_poly_smooth_group = write_smooth_group(obj_mesh_data, i, last_poly_smooth_group);
     last_poly_vertex_group = write_vertex_group(obj_mesh_data, i, last_poly_vertex_group);
     last_poly_mat_nr = write_poly_material(obj_mesh_data, i, last_poly_mat_nr, matname_fn);
-    if (export_params_.export_uv) {
-      uvs = obj_mesh_data.uv_indices(i);
-    }
-    (this->*poly_element_writer)(poly_vertex_indices, uvs, poly_normal_indices);
+    (this->*poly_element_writer)(poly_vertex_indices, poly_uv_indices, poly_normal_indices);
   }
   /* Unusual: Other indices are updated in #OBJWriter::update_index_offsets. */
   index_offsets_.normal_offset += per_object_tot_normals;
