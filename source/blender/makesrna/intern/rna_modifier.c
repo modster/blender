@@ -7232,12 +7232,27 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
+  static EnumPropertyItem operation_mode_items[] = {
+      {ADAPTIVE_REMESH_SPLIT_EDGE, "SPLIT_EDGE", 0, "Split Edge", "Split edge of given index"},
+      {ADAPTIVE_REMESH_COLLAPSE_EDGE,
+       "COLLAPSE_EDGE",
+       0,
+       "Collapse Edge",
+       "Collapse edge of given index"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "AdaptiveRemeshModifier", "Modifier");
   RNA_def_struct_ui_text(srna, "Adaptive Remesh Modifier", "");
   RNA_def_struct_sdna(srna, "AdaptiveRemeshModifierData");
   RNA_def_struct_ui_icon(srna, ICON_MOD_CLOTH); /* TODO(ish): Use correct icon. */
 
   RNA_define_lib_overridable(true);
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, operation_mode_items);
+  RNA_def_property_ui_text(prop, "Operation Mode", "Which operation to do on the specified edge");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   prop = RNA_def_property(srna, "edge_index", PROP_INT, PROP_UNSIGNED);
   RNA_def_property_int_sdna(prop, NULL, "edge_index");
@@ -7246,8 +7261,13 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   prop = RNA_def_property(srna, "use_across_seams", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", ADAPTIVE_REMESH_SPLIT_EDGE_ACROSS_SEAMS);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", ADAPTIVE_REMESH_ACROSS_SEAMS);
   RNA_def_property_ui_text(prop, "Across Seams", "Run current Mesh operation across UV seams");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+  prop = RNA_def_property(srna, "is_verts_swapped", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", ADAPTIVE_REMESH_VERTS_SWAPPED);
+  RNA_def_property_ui_text(prop, "Verts Swapped", "Swap verts during the operation");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   RNA_define_lib_overridable(false);

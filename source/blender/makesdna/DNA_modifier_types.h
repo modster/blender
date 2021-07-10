@@ -2351,11 +2351,23 @@ typedef struct AdaptiveRemeshModifierData {
 
   /* AdaptiveRemeshFlag */
   uint32_t flag;
+
+  /* AdaptiveRemeshMode */
+  uint32_t mode;
+
+  char _pad[4];
+
 } AdaptiveRemeshModifierData;
 
 typedef enum AdaptiveRemeshFlag {
-  ADAPTIVE_REMESH_SPLIT_EDGE_ACROSS_SEAMS = 1 << 0,
+  ADAPTIVE_REMESH_ACROSS_SEAMS = 1 << 0,
+  ADAPTIVE_REMESH_VERTS_SWAPPED = 1 << 1,
 } AdaptiveRemeshFlag;
+
+typedef enum AdaptiveRemeshMode {
+  ADAPTIVE_REMESH_SPLIT_EDGE = 0,
+  ADAPTIVE_REMESH_COLLAPSE_EDGE = 1,
+} AdaptiveRemeshMode;
 
 #ifdef __cplusplus
 }
