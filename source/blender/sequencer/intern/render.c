@@ -2019,37 +2019,19 @@ ImBuf *SEQ_render_give_ibuf_direct(const SeqRenderData *context,
   return ibuf;
 }
 
-ImBuf *SEQ_render_thumbnail(SeqRenderData *context,
-                            Sequence *seq,
-                            float timeline_frame,
-                            float *cache_limits,
-                            rcti *crop,
-                            bool clipped)
+/* Gets the direct image from source and scales to thumbnail size */
+static ImBuf *seq_get_uncached_thumbnail(SeqRenderData *context,
+                                         SeqRenderState *state,
+                                         Sequence *seq,
+                                         float timeline_frame)
 {
-  SeqRenderState state;
-  seq_render_state_init(&state);
-  ImBuf *ibuf = NULL, *scaled_ibuf = NULL, *temp = NULL;
+  ImBuf *ibuf = NULL, *scaled_ibuf = NULL;
   bool is_proxy_image = false;
-  float rectx, recty;
+  int rectx, recty;
 
-  ibuf = seq_cache_get(context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL);
-  if (ibuf != NULL) {
-    /* Do clipping */
-    if (clipped) {
-      temp = IMB_dupImBuf(ibuf);
-      if (crop->xmin < 0 && crop->ymin < 0) {
-        crop->xmin = 0;
-        crop->ymin = 0;
-      }
-      IMB_rect_crop(temp, crop);
-      IMB_freeImBuf(ibuf);
-      if (temp != NULL)
-        return temp;
-    }
-    return ibuf;
-  }
-
-  ibuf = do_render_strip_uncached(context, &state, seq, timeline_frame, &is_proxy_image);
+  BLI_mutex_lock(&seq_render_mutex);
+  ibuf = do_render_strip_uncached(context, state, seq, timeline_frame, &is_proxy_image);
+  BLI_mutex_unlock(&seq_render_mutex);
 
   if (ibuf) {
     float aspect_ratio = (float)ibuf->x / ibuf->y;
@@ -2057,11 +2039,11 @@ ImBuf *SEQ_render_thumbnail(SeqRenderData *context,
     /* Fix the dimensions to be max 256 for x or y */
     if (ibuf->x > ibuf->y) {
       rectx = 256;
-      recty = roundf(rectx / aspect_ratio);
+      recty = round_fl_to_int(rectx / aspect_ratio);
     }
     else {
       recty = 256;
-      rectx = roundf(recty * aspect_ratio);
+      rectx = round_fl_to_int(recty * aspect_ratio);
     }
 
     /* Perform scaling of ibuf to thumb size */
@@ -2072,30 +2054,84 @@ ImBuf *SEQ_render_thumbnail(SeqRenderData *context,
     IMB_freeImBuf(ibuf);
   }
 
-  if (scaled_ibuf) {
-    seq_cache_thumbnail_put(
-        context, seq, timeline_frame, SEQ_CACHE_STORE_THUMBNAIL, scaled_ibuf, cache_limits);
-
-    /* Do clipping */
-    if (clipped) {
-      temp = IMB_dupImBuf(scaled_ibuf);
-      if (crop->xmin < 0 && crop->ymin < 0) {
-        crop->xmin = 0;
-        crop->ymin = 0;
-      }
-      IMB_rect_crop(temp, crop);
-      IMB_freeImBuf(scaled_ibuf);
-      if (temp != NULL)
-        return temp;
-    }
-  }
-
   if (scaled_ibuf == NULL) {
     scaled_ibuf = IMB_allocImBuf(rectx, recty, 32, IB_rect);
     seq_imbuf_assign_spaces(context->scene, scaled_ibuf);
   }
 
   return scaled_ibuf;
+}
+
+/* Get cached thumbnails */
+ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
+                         Sequence *seq,
+                         float timeline_frame,
+                         rcti *crop,
+                         bool clipped,
+                         bool once)
+{
+  SeqRenderState state;
+  seq_render_state_init(&state);
+  ImBuf *ibuf = NULL, *temp = NULL;
+  ibuf = seq_cache_get(context, seq, roundf(timeline_frame), SEQ_CACHE_STORE_THUMBNAIL);
+
+  /* Special scenario in case not in cache but need dimensions for thumbnail job. */
+  if (ibuf == NULL) {
+    if (once) {
+      ibuf = seq_get_uncached_thumbnail(context, &state, seq, roundf(timeline_frame));
+    }
+  }
+
+  /* Do clipping */
+  if (clipped && ibuf != NULL) {
+    temp = IMB_dupImBuf(ibuf);
+    if (crop->xmin < 0 && crop->ymin < 0) {
+      crop->xmin = 0;
+      crop->ymin = 0;
+    }
+    IMB_rect_crop(temp, crop);
+    if (temp != NULL) {
+      IMB_freeImBuf(ibuf);
+      return temp;
+    }
+  }
+
+  return ibuf;
+}
+
+/* Render the series of thumbnails and store in cache */
+void SEQ_render_thumbnails(SeqRenderData *context,
+                           Sequence *seq,
+                           float timeline_frame,
+                           float thumb_w,
+                           float *cache_limits)
+{
+  ImBuf *ibuf = NULL;
+  SeqRenderState state;
+  seq_render_state_init(&state);
+
+  /*TODO(AYJ) : Add the ability to have some extra frames also cached, for strip slip takes place
+   * so it is smooth */
+  timeline_frame = timeline_frame - 30 * thumb_w;
+  float upper_limit = cache_limits[3] + 30 * thumb_w;
+  while (timeline_frame < upper_limit) {
+    ibuf = seq_cache_get(context, seq, roundf(timeline_frame), SEQ_CACHE_STORE_THUMBNAIL);
+    if (ibuf) {
+      IMB_freeImBuf(ibuf);
+      timeline_frame += thumb_w;
+      continue;
+    }
+
+    ibuf = seq_get_uncached_thumbnail(context, &state, seq, roundf(timeline_frame));
+
+    if (ibuf) {
+      seq_cache_thumbnail_put(
+          context, seq, roundf(timeline_frame), SEQ_CACHE_STORE_THUMBNAIL, ibuf, cache_limits);
+      IMB_freeImBuf(ibuf);
+    }
+
+    timeline_frame += thumb_w;
+  }
 }
 
 /** \} */

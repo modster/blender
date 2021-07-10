@@ -1082,6 +1082,75 @@ static void draw_seq_fcurve_overlay(
   }
 }
 
+typedef struct ThumbnailDrawJob {
+  SeqRenderData context;
+  Sequence *seq;
+  Scene *scene;
+  float x1;
+  float offset;
+  float *cache_limits;
+} ThumbnailDrawJob;
+
+static void thumbnail_freejob(void *data)
+{
+  ThumbnailDrawJob *tj = data;
+  MEM_freeN(tj->cache_limits);
+  MEM_freeN(tj);
+}
+
+static void thumbnail_endjob(void *data)
+{
+  ThumbnailDrawJob *tj = data;
+  WM_main_add_notifier(NC_SCENE | ND_SEQUENCER, tj->scene);
+}
+
+static void thumbnail_startjob(void *data, short *stop, short *do_update, float *progress)
+{
+  ThumbnailDrawJob *tj = data;
+  SEQ_render_thumbnails(&tj->context, tj->seq, tj->x1, tj->offset, tj->cache_limits);
+  UNUSED_VARS(stop, do_update, progress);
+}
+
+static void sequencer_thumbnail_get_job(const bContext *C,
+                                        float x1,
+                                        float offset,
+                                        float *cache_limits,
+                                        SeqRenderData context,
+                                        Sequence *seq)
+{
+  wmJob *wm_job;
+  ThumbnailDrawJob *tj = NULL;
+  ScrArea *area = CTX_wm_area(C);
+  wm_job = WM_jobs_get(CTX_wm_manager(C),
+                       CTX_wm_window(C),
+                       CTX_data_scene(C),
+                       "Draw Thumbnails",
+                       WM_JOB_PROGRESS,
+                       WM_JOB_TYPE_SEQ_DRAW_THUMBNAIL);
+
+  /* Get the thumbnail job if it exists. */
+  tj = WM_jobs_customdata_get(wm_job);
+  if (!tj) {
+    tj = MEM_callocN(sizeof(ThumbnailDrawJob), "Thumbnail draw job");
+    tj->scene = CTX_data_scene(C);
+    tj->x1 = x1;
+    tj->offset = offset;
+    tj->cache_limits = cache_limits;
+    tj->context = context;
+    tj->seq = seq;
+    WM_jobs_customdata_set(wm_job, tj, thumbnail_freejob);
+    WM_jobs_timer(wm_job, 0.1, NC_SCENE | ND_SEQUENCER, NC_SCENE | ND_SEQUENCER);
+    WM_jobs_callbacks(wm_job, thumbnail_startjob, NULL, NULL, thumbnail_endjob);
+  }
+
+  if (!WM_jobs_is_running(wm_job)) {
+    G.is_break = false;
+    WM_jobs_start(CTX_wm_manager(C), wm_job);
+  }
+
+  ED_area_tag_redraw(area);
+}
+
 static void draw_seq_strip_thumbnail(View2D *v2d,
                                      const bContext *C,
                                      SpaceSeq *sseq,
@@ -1096,16 +1165,14 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 {
   struct Main *bmain = CTX_data_main(C);
   struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+  ScrArea *area = CTX_wm_area(C);
   SeqRenderData context = {0};
   ImBuf *ibuf;
   bool min_size, clipped = false;
   float aspect_ratio, image_y, cropx_min, cropx_max;
   rcti crop;
 
-  /* Not sending v2d directly to have Drawing and Internal code separation */
-  float cache_limits[4] = {v2d->tot.xmin, v2d->tot.xmax, v2d->cur.xmin, v2d->cur.xmax};
-
-  /* if thumbs too small ignore */
+  /* If thumbs too small ignore */
   min_size = ((y2 - y1) / pixely) > 40 * U.dpi_fac;
 
   if (!min_size)
@@ -1117,7 +1184,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.is_prefetch_render = false;
   context.is_proxy_render = false;
 
-  ibuf = SEQ_render_thumbnail(&context, seq, seq->startdisp, cache_limits, &crop, false);
+  ibuf = SEQ_get_thumbnail(&context, seq, 1.0, &crop, false, true);
   image_y = ibuf->y;
 
   /*Calculate thumb dimensions */
@@ -1136,9 +1203,12 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   float cut_off = 0;
   float upper_thumb_bound = (seq->endstill) ? (seq->start + seq->len) : seq->enddisp;
 
+  /* Start Job to get thumbnails loaded in cache :
+   * First get the value of frame to start caching
+   * from */
+
   while (x1 < upper_thumb_bound) {
     x2 = x1 + thumb_w;
-    clipped = false;
 
     /* Checks to make sure that thumbs are loaded only when in view and within the confines of the
      * strip */
@@ -1150,16 +1220,47 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
       continue;
     }
 
-    /* set the clipping bound to show the left handle moving over thumbs and not shift thumbs */
-    if (IN_RANGE_INCL(seq->startdisp, x1, x2)) {
-      cut_off = seq->startdisp - x1;
-      clipped = true;
-    }
-
     /* ignore thumbs to the left of strip */
     if (x2 < seq->startdisp) {
       x1 = x2;
       continue;
+    }
+    else
+      break;
+  }
+
+  /* TODO(AYJ) : add ability to add to a list each strip that needs thumbnail job done */
+
+  static rctf view_check = {0, 0, 0, 0};
+  static float strip_change_check = 0.0;
+
+  if (x1 != strip_change_check || BLI_rctf_compare(&view_check, &v2d->cur, 0.0)) {
+
+    /* Set the cache limits */
+    float *cache_limits = MEM_callocN(4 * sizeof(float), "cache limits");
+    cache_limits[0] = v2d->tot.xmin;
+    cache_limits[1] = v2d->tot.xmax;
+    cache_limits[2] = v2d->cur.xmin;
+    cache_limits[3] = v2d->cur.xmax;
+
+    sequencer_thumbnail_get_job(C, x1, thumb_w, cache_limits, context, seq);
+    strip_change_check = x1;
+    view_check = v2d->cur;
+  }
+
+  /* Start drawing */
+
+  while (x1 < upper_thumb_bound) {
+    x2 = x1 + thumb_w;
+    clipped = false;
+
+    if (x1 > v2d->cur.xmax)
+      break;
+
+    /* set the clipping bound to show the left handle moving over thumbs and not shift thumbs */
+    if (IN_RANGE_INCL(seq->startdisp, x1, x2)) {
+      cut_off = seq->startdisp - x1;
+      clipped = true;
     }
 
     /* clip if full thumbnail cannot be displayed */
@@ -1175,13 +1276,16 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     BLI_rcti_init(&crop, (int)(cropx_min), (int)(cropx_max)-1, 0, (int)(image_y)-1);
 
     /* Get the image */
-    ibuf = SEQ_render_thumbnail(
-        &context, seq, round_fl_to_int(x1 + (cut_off)), cache_limits, &crop, clipped);
+    ibuf = SEQ_get_thumbnail(&context, seq, roundf(x1), &crop, clipped, false);
 
     if (ibuf) {
       ED_draw_imbuf_ctx_clipping(
           C, ibuf, x1 + cut_off, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
       IMB_freeImBuf(ibuf);
+    }
+    else {
+      strip_change_check = 0;
+      BLI_rctf_init(&view_check, 0, 0, 0, 0);
     }
 
     cut_off = 0;
