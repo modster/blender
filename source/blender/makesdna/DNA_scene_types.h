@@ -1460,14 +1460,12 @@ typedef struct ToolSettings {
 
   char edge_mode_live_unwrap;
 
-  char _pad1[1];
-
   /* Transform */
   char transform_pivot_point;
   char transform_flag;
   char snap_mode, snap_node_mode;
   char snap_uv_mode;
-  char snap_flag;
+  short snap_flag;
   char snap_target;
   char snap_transform_mode_flag;
 
@@ -2048,6 +2046,7 @@ enum {
 #define SCE_SNAP_ABS_GRID (1 << 5)
 #define SCE_SNAP_BACKFACE_CULLING (1 << 6)
 #define SCE_SNAP_SEQ (1 << 7)
+#define SCE_SNAP_ABS_UV_GRID (1 << 8)
 
 /** #ToolSettings.snap_target */
 #define SCE_SNAP_TARGET_CLOSEST 0

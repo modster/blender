@@ -590,6 +590,12 @@ static void initSnappingMode(TransInfo *t)
     t->tsnap.project = 0;
 
     t->tsnap.mode = ts->snap_uv_mode;
+    /* NOTE : For now, absolute grid snap only works with translation */
+    if ((t->tsnap.mode & SCE_SNAP_MODE_INCREMENT) && (ts->snap_flag & SCE_SNAP_ABS_UV_GRID) &&
+        (t->mode == TFM_TRANSLATION)) {
+      t->tsnap.mode &= ~SCE_SNAP_MODE_INCREMENT;
+      t->tsnap.mode |= SCE_SNAP_MODE_GRID;
+    }
   }
   else if (t->spacetype == SPACE_SEQ) {
     t->tsnap.mode = SEQ_tool_settings_snap_mode_get(t->scene);
@@ -1539,7 +1545,8 @@ bool transform_snap_grid(TransInfo *t, float *val)
     return false;
   }
 
-  if (t->spacetype != SPACE_VIEW3D) {
+  /* Don't do grid snapping if not in 3D viewport or UV editor */
+  if (!((t->spacetype == SPACE_VIEW3D) || (t->spacetype == SPACE_IMAGE))) {
     return false;
   }
 
