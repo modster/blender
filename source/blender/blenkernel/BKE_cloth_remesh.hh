@@ -1404,6 +1404,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       auto faces = edge_b.faces;
 
       for (const auto &face_index : faces) {
+        this->delink_face_edges(face_index);
         auto face = this->delete_face(face_index);
 
         /* Ensure the faces are triangulated before calling this function */
