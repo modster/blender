@@ -1764,8 +1764,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   /**
    * Delete the node and update elements that refer to this node.
    *
-   * This should always be followed with a `delete_vert()`
-   * since a `Vert` without a `Node` is invalid.
+   * This should always be preceeded with `delete_vert()` on all of
+   * the `Node::verts` since a `Vert` without a `Node` is invalid.
    */
   Node<END> delete_node(NodeIndex node_index)
   {
@@ -1773,14 +1773,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(op_node);
     auto node = op_node.value();
 
-    /* Remove this node's references from the other verts  */
-    for (const auto &vert_index : node.verts) {
-      auto op_vert = this->verts.get(vert_index);
-      BLI_assert(op_vert);
-      auto &vert = op_vert.value().get();
-
-      vert.node = std::nullopt;
-    }
+    BLI_assert(node.verts.is_empty());
 
     return node;
   }
@@ -1788,8 +1781,16 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   /**
    * Delete the vert and update elements that refer to this vert.
    *
-   * This should always be followed with a `delete_edge()`
-   * since a `Edge` without a both it's verts is invalid.
+   * This should always be preceeded with `delete_edge()` on all of
+   * the `Vert::edges` since a `Edge` without a both it's verts is
+   * invalid.
+   *
+   * This may leave `Face`s that refer to this `Vert` invalid,
+   * generally when the `Face` had 3 verts to begin with.
+   *
+   * This function does not (and cannot) remove the reference to this
+   * `Vert` from the `Face`s that refer to it. `delete_edge()` should
+   * have taken care of this.
    */
   Vert<EVD> delete_vert(VertIndex vert_index)
   {
@@ -1797,41 +1798,26 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(op_vert);
     auto vert = op_vert.value();
 
-    /* Remove node's reference to this vert if the node hasn't been
-     * deleted already */
-    if (vert.node) {
-      auto &node = this->get_checked_node_of_vert(vert);
-      node.verts.remove_first_occurrence_and_reorder(vert.self_index);
-    }
+    /* `Node` should exist, never can a `Vert` exist without the
+     * `Node` but the other way round is possible
+     *
+     * Remove `Node`s reference to this vert */
+    auto &node = this->get_checked_node_of_vert(vert);
+    node.verts.remove_first_occurrence_and_reorder(vert.self_index);
 
-    /* Remove this vert's references from the other edges and also
-     * the faces, this can lead to a mesh structure that isn't valid,
-     * so subsequent operations are necessary */
-    for (const auto &edge_index : vert.edges) {
-      auto op_edge = this->edges.get(edge_index);
-      BLI_assert(op_edge);
-      auto &edge = op_edge.value().get();
-
-      for (const auto face_index : edge.faces) {
-        auto &face = this->get_checked_face(face_index);
-
-        /* The ordering of the verts within the face matters, so need
-         * to go for this more expensive method of removal */
-        BLI_assert(face.verts.contains(vert.self_index));
-        face.verts.remove(face.verts.first_index_of(vert.self_index));
-      }
-
-      /* The other vert of the edge might have been deleted first */
-      if (edge.verts) {
-        edge.verts = std::nullopt;
-      }
-    }
+    /* No `Edge` should be refering to this `Vert` */
+    BLI_assert(vert.edges.is_empty());
 
     return vert;
   }
 
   /**
    * Delete the edge and update elements that refer to this edge.
+   *
+   * Also remove the edge verts from the face.
+   *
+   * The caller should always ensure that the face is valid even after
+   * this operation.
    */
   Edge<EED> delete_edge(EdgeIndex edge_index)
   {
@@ -1839,18 +1825,52 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(op_edge);
     auto edge = op_edge.value();
 
-    if (edge.verts) {
-      auto &vert_1 = this->get_checked_vert(std::get<0>(edge.verts.value()));
-      vert_1.edges.remove_first_occurrence_and_reorder(edge.self_index);
-      auto &vert_2 = this->get_checked_vert(std::get<1>(edge.verts.value()));
-      vert_2.edges.remove_first_occurrence_and_reorder(edge.self_index);
+    /* Ensure the `Edge` has verts */
+    BLI_assert(edge.verts);
+
+    auto edge_vert_index_1 = std::get<0>(edge.verts.value());
+    auto edge_vert_index_2 = std::get<1>(edge.verts.value());
+
+    /* Remove the reference of this `Edge` from the edge verts */
+    auto remove_edge_reference = [this, &edge](auto edge_vert_index) {
+      auto &vert = this->get_checked_vert(edge_vert_index);
+      vert.edges.remove_first_occurrence_and_reorder(edge.self_index);
+    };
+    remove_edge_reference(edge_vert_index_1);
+    remove_edge_reference(edge_vert_index_2);
+
+    /* Remove the edge.verts from the edge.faces
+     *
+     * If not done here, the link is never possible to remove unless
+     * the Face itself is totally deleted.
+     */
+    for (const auto &face_index : edge.faces) {
+      auto &face = this->get_checked_face(face_index);
+
+      /* Some previous `delete_edge()` might have removed the edge
+       * vert already from the face */
+      auto maybe_remove_vert = [&face](auto &edge_vert_index) {
+        auto v_pos = face.verts.first_index_of_try(edge_vert_index);
+        if (v_pos != -1) {
+          /* Need to do more expensive remove because the order of the
+           * verts is important */
+          face.verts.remove(v_pos);
+        }
+      };
+      maybe_remove_vert(edge_vert_index_1);
+      maybe_remove_vert(edge_vert_index_2);
     }
 
     return edge;
   }
 
   /**
-   * Delete the face and update elements' that refer to this face.
+   * Delete the face and update elements that refer to this face.
+   *
+   * This should always be preceeded with `delete_edge()` on all of
+   * the `Edge`s that can be formed by the `Vert`s in the `Face`. This
+   * ensures that the `Face` no longer refers to any `Vert` and all
+   * the necessary `Edge`s have been cleaned up.
    */
   Face<EFD> delete_face(FaceIndex face_index)
   {
@@ -1858,24 +1878,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(op_face);
     auto face = op_face.value();
 
-    auto vert_1_index = face.verts[0];
-    auto vert_2_index = face.verts[0];
-    for (auto i = 1; i <= face.verts.size(); i++) {
-      vert_1_index = vert_2_index;
-      if (i == face.verts.size()) {
-        vert_2_index = face.verts[0];
-      }
-      else {
-        vert_2_index = face.verts[i];
-      }
-
-      auto op_edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index);
-      BLI_assert(op_edge_index);
-      auto edge_index = op_edge_index.value();
-      auto &edge = this->get_checked_edge(edge_index);
-
-      edge.faces.remove_first_occurrence_and_reorder(face.self_index);
-    }
+    BLI_assert(face.verts.is_empty());
 
     return face;
   }
