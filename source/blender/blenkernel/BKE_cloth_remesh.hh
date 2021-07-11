@@ -1864,13 +1864,76 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return edge;
   }
 
+  bool is_face_edges_linked(const Face<EFD> &face) const
+  {
+    auto vert_1_index = face.verts[0];
+    auto vert_2_index = face.verts[0];
+    for (auto i = 1; i <= face.verts.size(); i++) {
+      vert_1_index = vert_2_index;
+      if (i == face.verts.size()) {
+        vert_2_index = face.verts[0];
+      }
+      else {
+        vert_2_index = face.verts[i];
+      }
+
+      auto op_edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index);
+      /* TODO(ish): it might be possible to call this function once
+       * the edges have been deleted, which can cause this assertion
+       * to fail, need to figure out what the correct design decision
+       * would be */
+      BLI_assert(op_edge_index);
+      auto edge_index = op_edge_index.value();
+      auto &edge = this->get_checked_edge(edge_index);
+
+      auto pos = edge.faces.first_index_of_try(face.self_index);
+      /* this face should exist in the edge */
+      if (pos == -1) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Remove this `Face`s from the `Edge`s formed by the `Vert`s of
+   * this `Face`.
+   *
+   * This function is necessary when the `Face` must be deleted
+   * when it shares `Edge`s with other `Face`s.
+   */
+  void delink_face_edges(FaceIndex face_index)
+  {
+    auto &face = this->get_checked_face(face_index);
+
+    auto vert_1_index = face.verts[0];
+    auto vert_2_index = face.verts[0];
+    for (auto i = 1; i <= face.verts.size(); i++) {
+      vert_1_index = vert_2_index;
+      if (i == face.verts.size()) {
+        vert_2_index = face.verts[0];
+      }
+      else {
+        vert_2_index = face.verts[i];
+      }
+
+      auto op_edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index);
+      BLI_assert(op_edge_index);
+      auto edge_index = op_edge_index.value();
+      auto &edge = this->get_checked_edge(edge_index);
+
+      edge.faces.remove_first_occurrence_and_reorder(face.self_index);
+    }
+  }
+
   /**
    * Delete the face and update elements that refer to this face.
    *
    * This should always be preceeded with `delete_edge()` on all of
-   * the `Edge`s that can be formed by the `Vert`s in the `Face`. This
-   * ensures that the `Face` no longer refers to any `Vert` and all
-   * the necessary `Edge`s have been cleaned up.
+   * the `Edge`s that can be formed by the `Vert`s in the `Face` or
+   * `delink_face_edges()` should be called once when other `Face`s
+   * share `Edge`s with this `Face`.
    */
   Face<EFD> delete_face(FaceIndex face_index)
   {
@@ -1878,7 +1941,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(op_face);
     auto face = op_face.value();
 
-    BLI_assert(face.verts.is_empty());
+    BLI_assert(this->is_face_edges_linked(face) == false);
 
     return face;
   }
