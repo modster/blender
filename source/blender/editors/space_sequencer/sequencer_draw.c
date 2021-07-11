@@ -1111,12 +1111,8 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
   UNUSED_VARS(stop, do_update, progress);
 }
 
-static void sequencer_thumbnail_get_job(const bContext *C,
-                                        float x1,
-                                        float offset,
-                                        float *cache_limits,
-                                        SeqRenderData context,
-                                        Sequence *seq)
+static void sequencer_thumbnail_get_job(
+    const bContext *C, View2D *v2d, float x1, float offset, SeqRenderData context, Sequence *seq)
 {
   wmJob *wm_job;
   ThumbnailDrawJob *tj = NULL;
@@ -1132,6 +1128,14 @@ static void sequencer_thumbnail_get_job(const bContext *C,
   tj = WM_jobs_customdata_get(wm_job);
   if (!tj) {
     tj = MEM_callocN(sizeof(ThumbnailDrawJob), "Thumbnail draw job");
+
+    /* Set the cache limits */
+    float *cache_limits = MEM_callocN(4 * sizeof(float), "cache limits");
+    cache_limits[0] = v2d->tot.xmin;
+    cache_limits[1] = v2d->tot.xmax;
+    cache_limits[2] = v2d->cur.xmin;
+    cache_limits[3] = v2d->cur.xmax;
+
     tj->scene = CTX_data_scene(C);
     tj->x1 = x1;
     tj->offset = offset;
@@ -1169,7 +1173,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   SeqRenderData context = {0};
   ImBuf *ibuf;
   bool min_size, clipped = false;
-  float aspect_ratio, image_y, cropx_min, cropx_max;
+  float aspect_ratio, image_y, image_x, cropx_min, cropx_max;
   rcti crop;
 
   /* If thumbs too small ignore */
@@ -1185,17 +1189,18 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.is_proxy_render = false;
 
   ibuf = SEQ_get_thumbnail(&context, seq, 1.0, &crop, false, true);
+  image_x = ibuf->x;
   image_y = ibuf->y;
+
+  IMB_freeImBuf(ibuf);
 
   /*Calculate thumb dimensions */
   float thumb_h = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
-  aspect_ratio = ((float)ibuf->x) / ibuf->y;
+  aspect_ratio = ((float)image_x) / image_y;
   float thumb_h_px = thumb_h / pixely;
   float thumb_w = aspect_ratio * thumb_h_px * pixelx;
-  float zoom_x = thumb_w / ibuf->x;
-  float zoom_y = thumb_h / ibuf->y;
-
-  IMB_freeImBuf(ibuf);
+  float zoom_x = thumb_w / image_x;
+  float zoom_y = thumb_h / image_y;
 
   y2 = y1 + thumb_h - pixely;
   x1 = seq->start;
@@ -1235,15 +1240,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   static float strip_change_check = 0.0;
 
   if (x1 != strip_change_check || BLI_rctf_compare(&view_check, &v2d->cur, 0.0)) {
-
-    /* Set the cache limits */
-    float *cache_limits = MEM_callocN(4 * sizeof(float), "cache limits");
-    cache_limits[0] = v2d->tot.xmin;
-    cache_limits[1] = v2d->tot.xmax;
-    cache_limits[2] = v2d->cur.xmin;
-    cache_limits[3] = v2d->cur.xmax;
-
-    sequencer_thumbnail_get_job(C, x1, thumb_w, cache_limits, context, seq);
+    sequencer_thumbnail_get_job(C, v2d, x1, thumb_w, context, seq);
     strip_change_check = x1;
     view_check = v2d->cur;
   }
