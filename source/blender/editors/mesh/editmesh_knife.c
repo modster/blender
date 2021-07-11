@@ -3368,8 +3368,17 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
     }
 
     if (lastkfe) {
-      /* If the last vertex is touching any other cut edges don't remove it. */
+      /* If the first vertex is touching any other cut edges don't remove it. */
       Ref *ref;
+      for (ref = v1->edges.first; ref; ref = ref->next) {
+        kfe = ref->ref;
+        if (kfe->is_cut && !kfe->is_invalid) {
+          v1->is_invalid = false;
+          break;
+        }
+      }
+
+      /* If the second vertex is touching any other cut edges don't remove it. */
       for (ref = v2->edges.first; ref; ref = ref->next) {
         kfe = ref->ref;
         if (kfe->is_cut && !kfe->is_invalid) {
@@ -3377,6 +3386,7 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
           break;
         }
       }
+
       if (kcd->mode == MODE_DRAGGING) {
         /* Restore kcd->prev. */
         kcd->prev = undo->pos;
