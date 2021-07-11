@@ -93,22 +93,22 @@ LatticeDeformData *BKE_lattice_deform_data_create(const Object *oblatt, const Ob
 
   /* for example with a particle system: (ob == NULL) */
   if (ob == NULL) {
-    /* in deformspace, calc matrix  */
+    /* In deform-space, calc matrix. */
     invert_m4_m4(latmat, oblatt->obmat);
 
     /* back: put in deform array */
     invert_m4_m4(imat, latmat);
   }
   else {
-    /* in deformspace, calc matrix */
+    /* In deform-space, calc matrix. */
     invert_m4_m4(imat, oblatt->obmat);
     mul_m4_m4m4(latmat, imat, ob->obmat);
 
-    /* back: put in deform array */
+    /* back: put in deform array. */
     invert_m4_m4(imat, latmat);
   }
 
-  /* Prefetch latice deform group weights. */
+  /* Prefetch lattice deform group weights. */
   int defgrp_index = -1;
   const MDeformVert *dvert = BKE_lattice_deform_verts_get(oblatt);
   if (lt->vgroup[0] && dvert) {

@@ -141,7 +141,7 @@ typedef struct Mesh {
   struct MSelect *mselect;
 
   /* BMESH ONLY */
-  /*new face structures*/
+  /* New face structures. */
   struct MPoly *mpoly;
   struct MLoop *mloop;
   struct MLoopUV *mloopuv;
@@ -164,7 +164,7 @@ typedef struct Mesh {
   struct MVert *mvert;
   /** Array of edges. */
   struct MEdge *medge;
-  /** Deformgroup vertices. */
+  /** Deform-group vertices. */
   struct MDeformVert *dvert;
 
   /* array of colors for the tessellated faces, must be number of tessellated
@@ -296,7 +296,7 @@ enum {
   ME_REMESH_REPROJECT_VERTEX_COLORS = 1 << 8,
   ME_DS_EXPAND = 1 << 9,
   ME_SCULPT_DYNAMIC_TOPOLOGY = 1 << 10,
-  ME_REMESH_SMOOTH_NORMALS = 1 << 11,
+  ME_FLAG_UNUSED_8 = 1 << 11, /* cleared */
   ME_REMESH_REPROJECT_PAINT_MASK = 1 << 12,
   ME_REMESH_FIX_POLES = 1 << 13,
   ME_REMESH_REPROJECT_VOLUME = 1 << 14,

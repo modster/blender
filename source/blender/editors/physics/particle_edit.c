@@ -300,7 +300,7 @@ static void pe_update_hair_particle_edit_pointers(PTCacheEdit *edit)
 
 /* always gets at least the first particlesystem even if PSYS_CURRENT flag is not set
  *
- * note: this function runs on poll, therefore it can runs many times a second
+ * NOTE: this function runs on poll, therefore it can runs many times a second
  * keep it fast! */
 static PTCacheEdit *pe_get_current(Depsgraph *depsgraph, Scene *scene, Object *ob, bool create)
 {
@@ -537,7 +537,7 @@ static void PE_set_view3d_data(bContext *C, PEData *data)
 static bool PE_create_shape_tree(PEData *data, Object *shapeob)
 {
   Object *shapeob_eval = DEG_get_evaluated_object(data->depsgraph, shapeob);
-  Mesh *mesh = BKE_object_get_evaluated_mesh(shapeob_eval);
+  const Mesh *mesh = BKE_object_get_evaluated_mesh(shapeob_eval);
 
   memset(&data->shape_bvh, 0, sizeof(data->shape_bvh));
 
@@ -631,7 +631,7 @@ static bool key_inside_circle(const PEData *data, float rad, const float co[3], 
   float dx, dy, dist;
   int screen_co[2];
 
-  /* TODO, should this check V3D_PROJ_TEST_CLIP_BB too? */
+  /* TODO: should this check V3D_PROJ_TEST_CLIP_BB too? */
   if (ED_view3d_project_int_global(data->vc.region, co, screen_co, V3D_PROJ_TEST_CLIP_WIN) !=
       V3D_PROJ_RET_OK) {
     return 0;
@@ -1456,7 +1456,7 @@ void recalc_emitter_field(Depsgraph *UNUSED(depsgraph), Object *UNUSED(ob), Part
   BLI_kdtree_3d_free(edit->emitter_field);
 
   totface = mesh->totface;
-  /*totvert=dm->getNumVerts(dm);*/ /*UNUSED*/
+  // totvert = dm->getNumVerts(dm); /* UNUSED */
 
   edit->emitter_cosnos = MEM_callocN(sizeof(float[6]) * totface, "emitter cosnos");
 
@@ -1564,7 +1564,7 @@ void update_world_cos(Object *ob, PTCacheEdit *edit)
 }
 static void update_velocities(PTCacheEdit *edit)
 {
-  /*TODO: get frs_sec properly */
+  /* TODO: get frs_sec properly. */
   float vec1[3], vec2[3], frs_sec, dfra;
   POINT_P;
   KEY_K;
@@ -3003,7 +3003,7 @@ static void remove_tagged_keys(Depsgraph *depsgraph, Object *ob, ParticleSystem 
     LOOP_TAGGED_KEYS {
       new_totkey--;
     }
-    /* we can't have elements with less than two keys*/
+    /* We can't have elements with less than two keys. */
     if (new_totkey < 2) {
       point->flag |= PEP_TAG;
     }
@@ -3142,7 +3142,7 @@ static void subdivide_particle(PEData *data, int pa_index)
       nkey++;
     }
   }
-  /*tip still not copied*/
+  /* Tip still not copied. */
   memcpy(nkey, key, sizeof(HairKey));
   memcpy(nekey, ekey, sizeof(PTCacheEditKey));
 
@@ -3955,7 +3955,7 @@ static void brush_puff(PEData *data, int point_index, float mouse_distance)
         /* keep the same distance from the root or we get glitches T35406. */
         dist_ensure_v3_v3fl(co, co_root, length_accum);
 
-        /* re-use dco to compare before and after translation and add to the offset  */
+        /* Re-use dco to compare before and after translation and add to the offset. */
         copy_v3_v3(dco, key->co);
 
         mul_v3_m4v3(key->co, imat, co);
@@ -3974,7 +3974,7 @@ static void brush_puff(PEData *data, int point_index, float mouse_distance)
           /* this is simple but looks bad, adds annoying kinks */
           add_v3_v3(key->co, ofs);
 #else
-          /* translate (not rotate) the rest of the hair if its not selected  */
+          /* Translate (not rotate) the rest of the hair if its not selected. */
           {
 /* NOLINTNEXTLINE: readability-redundant-preprocessor */
 #  if 0 /* kindof works but looks worse than what's below */
@@ -5444,7 +5444,7 @@ void ED_object_particle_edit_mode_enter_ex(Depsgraph *depsgraph, Scene *scene, O
   edit = PE_create_current(depsgraph, scene, ob);
 
   /* Mesh may have changed since last entering editmode.
-   * note, this may have run before if the edit data was just created,
+   * NOTE: this may have run before if the edit data was just created,
    * so could avoid this and speed up a little. */
   if (edit && edit->psys) {
     /* Make sure pointer to the evaluated modifier data is up to date,

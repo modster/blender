@@ -844,7 +844,7 @@ bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
 
   /* first try to append data from exotic file formats... */
   /* it throws error box when file doesn't exist and returns -1 */
-  /* note; it should set some error message somewhere... (ton) */
+  /* NOTE(ton): it should set some error message somewhere. */
   const int retval = wm_read_exotic(filepath);
 
   /* we didn't succeed, now try to read Blender file */
@@ -1185,16 +1185,12 @@ void wm_homefile_read(bContext *C,
           .is_startup = true,
           .skip_flags = skip_flags | BLO_READ_SKIP_USERDEF,
       };
+      BlendFileReadReport bf_reports = {.reports = reports};
+      struct BlendFileData *bfd = BKE_blendfile_read(filepath_startup, &params, &bf_reports);
 
-      struct BlendFileData *bfd = BKE_blendfile_read(
-          filepath_startup, &params, &(BlendFileReadReport){NULL});
       if (bfd != NULL) {
-        BKE_blendfile_read_setup_ex(C,
-                                    bfd,
-                                    &params,
-                                    &(BlendFileReadReport){NULL},
-                                    update_defaults && use_data,
-                                    app_template);
+        BKE_blendfile_read_setup_ex(
+            C, bfd, &params, &bf_reports, update_defaults && use_data, app_template);
         success = true;
       }
     }
@@ -1610,7 +1606,7 @@ static bool wm_file_write(bContext *C,
     return ok;
   }
 
-  /* note: used to replace the file extension (to ensure '.blend'),
+  /* NOTE: used to replace the file extension (to ensure '.blend'),
    * no need to now because the operator ensures,
    * its handy for scripts to save to a predefined name without blender editing it */
 
@@ -1649,13 +1645,13 @@ static bool wm_file_write(bContext *C,
 
   ED_editors_flush_edits(bmain);
 
-  /* first time saving */
-  /* XXX temp solution to solve bug, real fix coming (ton) */
+  /* First time saving. */
+  /* XXX(ton): temp solution to solve bug, real fix coming. */
   if ((BKE_main_blendfile_path(bmain)[0] == '\0') && (use_save_as_copy == false)) {
     BLI_strncpy(bmain->name, filepath, sizeof(bmain->name));
   }
 
-  /* XXX temp solution to solve bug, real fix coming (ton) */
+  /* XXX(ton): temp solution to solve bug, real fix coming. */
   bmain->recovered = 0;
 
   if (BLO_write_file(CTX_data_main(C),

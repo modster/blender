@@ -218,7 +218,7 @@ bool WM_event_type_mask_test(const int event_type, const enum eEventType_Mask ma
 /** \name Event Motion Queries
  * \{ */
 
-/* for modal callbacks, check configuration for how to interpret exit with tweaks  */
+/* for modal callbacks, check configuration for how to interpret exit with tweaks. */
 bool WM_event_is_modal_tweak_exit(const wmEvent *event, int tweak_event)
 {
   /* if the release-confirm userpref setting is enabled,
@@ -484,7 +484,10 @@ int WM_event_absolute_delta_y(const struct wmEvent *event)
  * \{ */
 
 #ifdef WITH_INPUT_IME
-/* most os using ctrl/oskey + space to switch ime, avoid added space */
+/**
+ * Most OS's use `Ctrl+Space` / `OsKey+Space` to switch IME,
+ * so don't type in the space character.
+ */
 bool WM_event_is_ime_switch(const struct wmEvent *event)
 {
   return event->val == KM_PRESS && event->type == EVT_SPACEKEY &&
