@@ -461,7 +461,9 @@ static void rigidbody_store_convex_hull_draw_data(Object *ob) {
         int reverse_index = plConvexHullGetReversedLoopIndex(hull, i);
         mloop_src[i].e = edge_index;
         mloop_src[reverse_index].e = edge_index;
+        printf("edge verts:%d %d  loop,rev:%d,%d, edge:%d\n", v_from, v_to, i, reverse_index, (int)edge_index);
         edge_index++;
+
       }
     }
 
@@ -486,6 +488,7 @@ static void rigidbody_store_convex_hull_draw_data(Object *ob) {
         loop->v = src_loop.v;
         loop->e = src_loop.e;
         loop++;
+        printf("loop: v:%d e:%d\n", (int)src_loop.v, (int)src_loop.e);
       }
       j += len;
       MEM_freeN(loops);
@@ -494,6 +497,54 @@ static void rigidbody_store_convex_hull_draw_data(Object *ob) {
     ob->rigidbody_object->col_shape_draw_data = hull_draw_data;
 
 }
+
+static void rigidbody_store_trimesh_draw_data(Object *ob) {
+
+    Mesh *mesh = NULL;
+    Mesh *trimesh_draw_data;
+    MLoop *mloop;
+    const MLoopTri *looptri;
+    int tottri;
+
+
+    int num_verts;
+    int num_loops;
+
+    mesh = rigidbody_get_mesh(ob);
+
+    if(mesh != NULL) {
+        looptri = BKE_mesh_runtime_looptri_ensure(mesh);
+        tottri = mesh->runtime.looptris.len;
+
+        num_verts = mesh->totvert;
+        num_loops = tottri*3;
+        mloop = mesh->mloop;
+
+        trimesh_draw_data = BKE_mesh_new_nomain(num_verts, 0, tottri, num_loops, 0);
+        for(int i=0; i<num_verts; i++){
+            MVert *vert = &(trimesh_draw_data->mvert[i]);
+            copy_v3_v3(vert->co, mesh->mvert[i].co);
+        }
+
+        for (int i = 0; i < tottri; i++) {
+          /* add first triangle - verts 1,2,3 */
+          const MLoopTri *lt = &looptri[i];
+          MFace *face = &(trimesh_draw_data->mface[i]);
+
+          face->v1 = mloop[lt->tri[0]].v;
+          face->v2 = mloop[lt->tri[1]].v;
+          face->v3 = mloop[lt->tri[2]].v;
+
+        }
+        BKE_mesh_convert_mfaces_to_mpolys(trimesh_draw_data);
+        BKE_mesh_calc_edges(trimesh_draw_data, false, false);
+
+        ob->rigidbody_object->col_shape_draw_data = trimesh_draw_data;
+
+    }
+
+}
+
 /* create collision shape of mesh - triangulated mesh
  * returns NULL if creation fails.
  */
@@ -576,6 +627,7 @@ static rbCollisionShape *rigidbody_get_shape_trimesh_from_mesh(Object *ob)
     CLOG_ERROR(&LOG, "cannot make Triangular Mesh collision shape for non-Mesh object");
   }
 
+  rigidbody_store_trimesh_draw_data(ob);
   return shape;
 }
 

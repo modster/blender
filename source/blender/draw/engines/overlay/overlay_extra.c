@@ -372,19 +372,17 @@ void OVERLAY_empty_cache_populate(OVERLAY_Data *vedata, Object *ob)
 }
 
 
-static void OVERLAY_convex_hull_collision_shape(OVERLAY_ExtraCallBuffers *cb,
-                                                OVERLAY_Data *data,
-                                                Object *ob)
+static void OVERLAY_non_primitive_collision_shape(OVERLAY_ExtraCallBuffers *cb,
+                                                Object *ob,
+                                                const float *color)
 {
 
-    float color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
     if(ob->rigidbody_object){
-          if(ob->rigidbody_object->col_shape_draw_data){
+          if(ob->rigidbody_object->col_shape_draw_data != NULL){
               const DRWContextState *draw_ctx = DRW_context_state_get();
               DRW_mesh_batch_cache_validate(ob->rigidbody_object->col_shape_draw_data);
 
               GPUBatch *geom = DRW_mesh_batch_cache_get_all_edges(ob->rigidbody_object->col_shape_draw_data);
-
               if(geom){
                   OVERLAY_extra_wire(cb, geom, ob->obmat, color);
               }
@@ -511,7 +509,7 @@ static void OVERLAY_bounds(OVERLAY_ExtraCallBuffers *cb,
     copy_m4_m4(mat, tmp);
 }
 
-static void OVERLAY_collision(OVERLAY_ExtraCallBuffers *cb, OVERLAY_Data *data, Object *ob, const float *color)
+static void OVERLAY_collision(OVERLAY_ExtraCallBuffers *cb, Object *ob, const float *color)
 {
   switch (ob->rigidbody_object->shape) {
     case RB_SHAPE_BOX:
@@ -530,7 +528,11 @@ static void OVERLAY_collision(OVERLAY_ExtraCallBuffers *cb, OVERLAY_Data *data, 
       OVERLAY_bounds(cb, ob, color, OB_BOUND_CAPSULE, true, NULL);
       break;
     case RB_SHAPE_CONVEXH:
-      OVERLAY_convex_hull_collision_shape(cb, data, ob);
+      OVERLAY_non_primitive_collision_shape(cb, ob, color);
+      break;
+    case RB_SHAPE_TRIMESH:
+      OVERLAY_non_primitive_collision_shape(cb, ob, color);
+      break;
   }
 }
 
@@ -2114,7 +2116,7 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
         OVERLAY_indicate_collision(vedata, ob);
       }
       else {
-        OVERLAY_collision(cb, vedata, ob, color);
+        OVERLAY_collision(cb, ob, color);
       }
 #ifdef WITH_BULLET
       if (ob->rigidbody_object->sim_display_options & RB_SIM_FORCES)
