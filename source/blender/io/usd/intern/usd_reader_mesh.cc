@@ -538,7 +538,18 @@ void USDMeshReader::read_colors(Mesh *mesh, const double motionSampleTime)
 
 void USDMeshReader::process_normals_vertex_varying(Mesh *mesh)
 {
+  if (!mesh) {
+    return;
+  }
+
   if (normals_.empty()) {
+    BKE_mesh_calc_normals(mesh);
+    return;
+  }
+
+  if (normals_.size() != mesh->totvert) {
+    std::cerr << "WARNING: vertex varying normals count mismatch for mesh " << prim_path_
+              << std::endl;
     BKE_mesh_calc_normals(mesh);
     return;
   }
