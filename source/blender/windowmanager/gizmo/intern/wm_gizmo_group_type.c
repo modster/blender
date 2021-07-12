@@ -154,7 +154,7 @@ static void gizmogrouptype_free(wmGizmoGroupType *gzgt)
   MEM_freeN(gzgt);
 }
 
-void WM_gizmogrouptype_free_ptr(wmGizmoGroupType *gzgt)
+void WM_gizmo_group_type_free_ptr(wmGizmoGroupType *gzgt)
 {
   BLI_assert(gzgt == WM_gizmogrouptype_find(gzgt->idname, false));
 
@@ -162,10 +162,10 @@ void WM_gizmogrouptype_free_ptr(wmGizmoGroupType *gzgt)
 
   gizmogrouptype_free(gzgt);
 
-  /* XXX, TODO, update the world! */
+  /* XXX, TODO: update the world! */
 }
 
-bool WM_gizmogrouptype_free(const char *idname)
+bool WM_gizmo_group_type_free(const char *idname)
 {
   wmGizmoGroupType *gzgt = BLI_ghash_lookup(global_gizmogrouptype_hash, idname);
 
@@ -173,7 +173,7 @@ bool WM_gizmogrouptype_free(const char *idname)
     return false;
   }
 
-  WM_gizmogrouptype_free_ptr(gzgt);
+  WM_gizmo_group_type_free_ptr(gzgt);
 
   return true;
 }

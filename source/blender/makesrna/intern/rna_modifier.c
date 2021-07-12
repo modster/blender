@@ -544,7 +544,7 @@ const EnumPropertyItem rna_enum_dt_mix_mode_items[] = {
      0,
      "Multiply",
      "Multiply source value to destination one, using given threshold as factor"},
-    /* etc. etc. */
+    /* Etc. */
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -690,6 +690,7 @@ static void rna_Modifier_is_active_set(PointerRNA *ptr, bool value)
     }
 
     md->flag |= eModifierFlag_Active;
+    WM_main_add_notifier(NC_OBJECT | ND_MODIFIER, ptr->owner_id);
   }
 }
 
@@ -2226,6 +2227,14 @@ static void rna_def_modifier_mirror(BlenderRNA *brna)
       prop, "Merge Distance", "Distance within which mirrored vertices are merged");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
+  prop = RNA_def_property(srna, "bisect_threshold", PROP_FLOAT, PROP_DISTANCE);
+  RNA_def_property_float_sdna(prop, NULL, "bisect_threshold");
+  RNA_def_property_range(prop, 0, FLT_MAX);
+  RNA_def_property_ui_range(prop, 0, 1, 0.01, 6);
+  RNA_def_property_ui_text(
+      prop, "Bisect Distance", "Distance from the bisect plane within which vertices are removed");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
   prop = RNA_def_property(srna, "mirror_object", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "mirror_ob");
   RNA_def_property_ui_text(prop, "Mirror Object", "Object to use as mirror");
@@ -2248,7 +2257,7 @@ static void rna_def_modifier_decimate(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  /* Note, keep in sync with operator 'MESH_OT_decimate' */
+  /* NOTE: keep in sync with operator 'MESH_OT_decimate'. */
 
   StructRNA *srna;
   PropertyRNA *prop;
@@ -2773,7 +2782,8 @@ static void rna_def_modifier_boolean(BlenderRNA *brna)
   prop = RNA_def_property(srna, "double_threshold", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_float_sdna(prop, NULL, "double_threshold");
   RNA_def_property_range(prop, 0, 1.0f);
-  RNA_def_property_ui_range(prop, 0, 1, 0.0001, 6);
+  RNA_def_property_ui_range(prop, 0, 1, 1.0, 6);
+  RNA_def_property_ui_scale_type(prop, PROP_SCALE_LOG);
   RNA_def_property_ui_text(
       prop, "Overlap Threshold", "Threshold for checking overlapping geometry");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
@@ -5522,6 +5532,7 @@ static void rna_def_modifier_remesh(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "voxel_size");
   RNA_def_property_range(prop, 0.0001f, FLT_MAX);
   RNA_def_property_ui_range(prop, 0.0001, 2, 0.1, 3);
+  RNA_def_property_ui_scale_type(prop, PROP_SCALE_LOG);
   RNA_def_property_ui_text(prop,
                            "Voxel Size",
                            "Size of the voxel in object space used for volume evaluation. Lower "

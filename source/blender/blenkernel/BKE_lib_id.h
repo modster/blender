@@ -104,6 +104,10 @@ enum {
    * specific code in some copy cases (mostly for node trees). */
   LIB_ID_CREATE_LOCAL = 1 << 9,
 
+  /** Create for the depsgraph, when set #LIB_TAG_COPIED_ON_WRITE must be set.
+   * Internally this is used to share some pointers instead of duplicating them. */
+  LIB_ID_COPY_SET_COPIED_ON_WRITE = 1 << 10,
+
   /* *** Specific options to some ID types or usages. *** */
   /* *** May be ignored by unrelated ID copying functions. *** */
   /** Object only, needed by make_local code. */
@@ -116,6 +120,8 @@ enum {
   LIB_ID_COPY_NO_ANIMDATA = 1 << 19,
   /** Mesh: Reference CD data layers instead of doing real copy - USE WITH CAUTION! */
   LIB_ID_COPY_CD_REFERENCE = 1 << 20,
+  /** Do not copy id->override_library, used by ID datablock override routines. */
+  LIB_ID_COPY_NO_LIB_OVERRIDE = 1 << 21,
 
   /* *** XXX Hackish/not-so-nice specific behaviors needed for some corner cases. *** */
   /* *** Ideally we should not have those, but we need them for now... *** */
@@ -136,7 +142,8 @@ enum {
   LIB_ID_CREATE_LOCALIZE = LIB_ID_CREATE_NO_MAIN | LIB_ID_CREATE_NO_USER_REFCOUNT |
                            LIB_ID_CREATE_NO_DEG_TAG,
   /** Generate a local copy, outside of bmain, to work on (used by COW e.g.). */
-  LIB_ID_COPY_LOCALIZE = LIB_ID_CREATE_LOCALIZE | LIB_ID_COPY_NO_PREVIEW | LIB_ID_COPY_CACHES,
+  LIB_ID_COPY_LOCALIZE = LIB_ID_CREATE_LOCALIZE | LIB_ID_COPY_NO_PREVIEW | LIB_ID_COPY_CACHES |
+                         LIB_ID_COPY_NO_LIB_OVERRIDE,
 };
 
 void BKE_libblock_copy_ex(struct Main *bmain,
@@ -251,8 +258,10 @@ void BKE_lib_id_swap_full(struct Main *bmain, struct ID *id_a, struct ID *id_b);
 void id_sort_by_name(struct ListBase *lb, struct ID *id, struct ID *id_sorting_hint);
 void BKE_lib_id_expand_local(struct Main *bmain, struct ID *id);
 
-bool BKE_id_new_name_validate(struct ListBase *lb, struct ID *id, const char *name)
-    ATTR_NONNULL(1, 2);
+bool BKE_id_new_name_validate(struct ListBase *lb,
+                              struct ID *id,
+                              const char *name,
+                              const bool do_linked_data) ATTR_NONNULL(1, 2);
 void BKE_lib_id_clear_library_data(struct Main *bmain, struct ID *id);
 
 /* Affect whole Main database. */
@@ -266,7 +275,7 @@ void BKE_main_id_tag_all(struct Main *mainvar, const int tag, const bool value);
 void BKE_main_id_flag_listbase(struct ListBase *lb, const int flag, const bool value);
 void BKE_main_id_flag_all(struct Main *bmain, const int flag, const bool value);
 
-void BKE_main_id_clear_newpoins(struct Main *bmain);
+void BKE_main_id_newptr_and_tag_clear(struct Main *bmain);
 
 void BKE_main_id_refcount_recompute(struct Main *bmain, const bool do_linked_only);
 
@@ -305,6 +314,9 @@ void BKE_id_reorder(const struct ListBase *lb, struct ID *id, struct ID *relativ
 void BKE_id_blend_write(struct BlendWriter *writer, struct ID *id);
 
 #define IS_TAGGED(_id) ((_id) && (((ID *)_id)->tag & LIB_TAG_DOIT))
+
+/* lib_id_eval.c */
+void BKE_id_eval_properties_copy(struct ID *id_cow, struct ID *id);
 
 #ifdef __cplusplus
 }

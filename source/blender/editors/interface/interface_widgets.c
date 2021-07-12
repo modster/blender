@@ -113,6 +113,7 @@ typedef enum {
   UI_WTYPE_LISTITEM,
   UI_WTYPE_PROGRESSBAR,
   UI_WTYPE_NODESOCKET,
+  UI_WTYPE_DATASETROW,
 } uiWidgetTypeEnum;
 
 /* Button state argument shares bits with 'uiBut.flag'.
@@ -236,7 +237,7 @@ typedef struct uiWidgetTrias {
 #define WIDGET_SIZE_MAX (WIDGET_CURVE_RESOLU * 4)
 
 typedef struct uiWidgetBase {
-  /* TODO remove these completely */
+  /* TODO: remove these completely. */
   int totvert, halfwayvert;
   float outer_v[WIDGET_SIZE_MAX][2];
   float inner_v[WIDGET_SIZE_MAX][2];
@@ -398,7 +399,7 @@ static struct {
   GPUBatch *roundbox_widget;
   GPUBatch *roundbox_shadow;
 
-  /* TODO remove */
+  /* TODO: remove. */
   GPUVertFormat format;
   uint vflag_id;
 } g_ui_batch_cache = {0};
@@ -522,7 +523,7 @@ void UI_draw_anti_tria(
 
   float draw_color[4];
   copy_v4_v4(draw_color, color);
-  /* Note: This won't give back the original color. */
+  /* NOTE: This won't give back the original color. */
   draw_color[3] *= 1.0f / WIDGET_AA_JITTER;
 
   GPU_blend(GPU_BLEND_ALPHA);
@@ -767,7 +768,7 @@ static void round_box__edges(
   BLI_rctf_rcti_copy(&wt->uniform_params.rect, rect);
   BLI_rctf_init(&wt->uniform_params.recti, minxi, maxxi, minyi, maxyi);
 
-  /* mult */
+  /* Multiply by radius. */
   for (int a = 0; a < WIDGET_CURVE_RESOLU; a++) {
     veci[a][0] = radi * cornervec[a][0];
     veci[a][1] = radi * cornervec[a][1];
@@ -1225,12 +1226,6 @@ static bool draw_widgetbase_batch_skip_draw_cache(void)
     return true;
   }
 
-  /* There are also reports that some AMD and Mesa driver configuration suffer from the
-   * same issue, T78803. */
-  if (GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_UNIX, GPU_DRIVER_OPENSOURCE)) {
-    return true;
-  }
-
   return false;
 }
 
@@ -1537,14 +1532,14 @@ static void ui_text_clip_right_ex(const uiFontStyle *fstyle,
   int l_end = BLF_width_to_strlen(fstyle->uifont_id, str, max_len, okwidth - sep_strwidth, NULL);
 
   if (l_end > 0) {
-    /* At least one character, so clip and add the ellipsis.  */
+    /* At least one character, so clip and add the ellipsis. */
     memcpy(str + l_end, sep, sep_len + 1); /* +1 for trailing '\0'. */
     if (r_final_len) {
       *r_final_len = (size_t)(l_end) + sep_len;
     }
   }
   else {
-    /* Otherwise fit as much as we can without adding an ellipsis.  */
+    /* Otherwise fit as much as we can without adding an ellipsis. */
     l_end = BLF_width_to_strlen(fstyle->uifont_id, str, max_len, okwidth, NULL);
     str[l_end] = '\0';
     if (r_final_len) {
@@ -1646,7 +1641,7 @@ float UI_text_clip_middle_ex(const uiFontStyle *fstyle,
         /* Corner case, the str already takes all available mem,
          * and the ellipsis chars would actually add more chars.
          * Better to just trim one or two letters to the right in this case...
-         * Note: with a single-char ellipsis, this should never happen! But better be safe
+         * NOTE: with a single-char ellipsis, this should never happen! But better be safe
          * here...
          */
         ui_text_clip_right_ex(
@@ -1936,19 +1931,27 @@ static void widget_draw_text_ime_underline(const uiFontStyle *fstyle,
 }
 #endif /* WITH_INPUT_IME */
 
-static bool widget_draw_text_underline_calc_center_x(const char *UNUSED(str),
+struct UnderlineData {
+  size_t str_offset;  /* The string offset of the underlined character. */
+  int width_px;       /* The underline width in pixels. */
+  int r_offset_px[2]; /* Write the X,Y offset here. */
+};
+
+static bool widget_draw_text_underline_calc_position(const char *UNUSED(str),
                                                      const size_t str_step_ofs,
                                                      const rcti *glyph_step_bounds,
                                                      const int UNUSED(glyph_advance_x),
                                                      const rctf *glyph_bounds,
-                                                     const int glyph_bearing[2],
+                                                     const int UNUSED(glyph_bearing[2]),
                                                      void *user_data)
 {
-  /* The index of the character to get, set to the x-position. */
-  int *ul_data = user_data;
-  if (ul_data[0] == (int)str_step_ofs) {
-    ul_data[1] = glyph_step_bounds->xmin + glyph_bearing[0] +
-                 (BLI_rctf_size_x(glyph_bounds) / 2.0f);
+  struct UnderlineData *ul_data = user_data;
+  if (ul_data->str_offset == str_step_ofs) {
+    /* Full width of this glyph including both bearings. */
+    const float width = glyph_bounds->xmin + BLI_rctf_size_x(glyph_bounds) + glyph_bounds->xmin;
+    ul_data->r_offset_px[0] = glyph_step_bounds->xmin + ((width - ul_data->width_px) * 0.5f);
+    /* One line-width below the lower glyph bounds. */
+    ul_data->r_offset_px[1] = glyph_bounds->ymin - U.pixelsize;
     /* Early exit. */
     return false;
   }
@@ -2003,14 +2006,15 @@ static void widget_draw_text(const uiFontStyle *fstyle,
       drawstr_left_len = INT_MAX;
 
 #ifdef WITH_INPUT_IME
-      /* FIXME, IME is modifying 'const char *drawstr! */
+      /* FIXME: IME is modifying `const char *drawstr`! */
       ime_data = ui_but_ime_data_get(but);
 
       if (ime_data && ime_data->composite_len) {
         /* insert composite string into cursor pos */
         BLI_snprintf((char *)drawstr,
                      UI_MAX_DRAW_STR,
-                     "%s%s%s",
+                     "%.*s%s%s",
+                     but->pos,
                      but->editstr,
                      ime_data->str_composite,
                      but->editstr + but->pos);
@@ -2026,8 +2030,11 @@ static void widget_draw_text(const uiFontStyle *fstyle,
   /* text button selection, cursor, composite underline */
   if (but->editstr && but->pos != -1) {
     int but_pos_ofs;
-    /* Shape of the cursor for drawing. */
-    rcti but_cursor_shape;
+
+#ifdef WITH_INPUT_IME
+    bool ime_reposition_window = false;
+    int ime_win_x, ime_win_y;
+#endif
 
     /* text button selection */
     if ((but->selend - but->selsta) > 0) {
@@ -2052,14 +2059,28 @@ static void widget_draw_text(const uiFontStyle *fstyle,
             immVertexFormat(), "pos", GPU_COMP_I32, 2, GPU_FETCH_INT_TO_FLOAT);
         immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
+        rcti selection_shape;
+        selection_shape.xmin = rect->xmin + selsta_draw;
+        selection_shape.xmax = min_ii(rect->xmin + selwidth_draw, rect->xmax - 2);
+        selection_shape.ymin = rect->ymin + U.pixelsize;
+        selection_shape.ymax = rect->ymax - U.pixelsize;
         immUniformColor4ubv(wcol->item);
         immRecti(pos,
-                 rect->xmin + selsta_draw,
-                 rect->ymin + U.pixelsize,
-                 min_ii(rect->xmin + selwidth_draw, rect->xmax - 2),
-                 rect->ymax - U.pixelsize);
+                 selection_shape.xmin,
+                 selection_shape.ymin,
+                 selection_shape.xmax,
+                 selection_shape.ymax);
 
         immUnbindProgram();
+
+#ifdef WITH_INPUT_IME
+        /* IME candidate window uses selection position. */
+        if (!ime_reposition_window) {
+          ime_reposition_window = true;
+          ime_win_x = selection_shape.xmin;
+          ime_win_y = selection_shape.ymin;
+        }
+#endif
       }
     }
 
@@ -2067,7 +2088,7 @@ static void widget_draw_text(const uiFontStyle *fstyle,
     but_pos_ofs = but->pos;
 
 #ifdef WITH_INPUT_IME
-    /* if is ime compositing, move the cursor */
+    /* If is IME compositing, move the cursor. */
     if (ime_data && ime_data->composite_len && ime_data->cursor_pos != -1) {
       but_pos_ofs += ime_data->cursor_pos;
     }
@@ -2092,6 +2113,8 @@ static void widget_draw_text(const uiFontStyle *fstyle,
 
       immUniformThemeColor(TH_WIDGET_TEXT_CURSOR);
 
+      /* Shape of the cursor for drawing. */
+      rcti but_cursor_shape;
       but_cursor_shape.xmin = (rect->xmin + t) - U.pixelsize;
       but_cursor_shape.ymin = rect->ymin + U.pixelsize;
       but_cursor_shape.xmax = (rect->xmin + t) + U.pixelsize;
@@ -2105,16 +2128,24 @@ static void widget_draw_text(const uiFontStyle *fstyle,
                but_cursor_shape.ymax);
 
       immUnbindProgram();
+
+#ifdef WITH_INPUT_IME
+      /* IME candidate window uses cursor position. */
+      if (!ime_reposition_window) {
+        ime_reposition_window = true;
+        ime_win_x = but_cursor_shape.xmax + 5;
+        ime_win_y = but_cursor_shape.ymin + 3;
+      }
+#endif
     }
 
 #ifdef WITH_INPUT_IME
+    /* IME cursor following. */
+    if (ime_reposition_window) {
+      ui_but_ime_reposition(but, ime_win_x, ime_win_y, false);
+    }
     if (ime_data && ime_data->composite_len) {
-      /* ime cursor following */
-      if (but->pos >= but->ofs) {
-        ui_but_ime_reposition(but, but_cursor_shape.xmax + 5, but_cursor_shape.ymin + 3, false);
-      }
-
-      /* composite underline */
+      /* Composite underline. */
       widget_draw_text_ime_underline(fstyle, wcol, but, rect, ime_data, drawstr);
     }
 #endif
@@ -2129,14 +2160,15 @@ static void widget_draw_text(const uiFontStyle *fstyle,
   transopts = ui_translate_buttons();
 #endif
 
+  bool use_drawstr_right_as_hint = false;
+
   /* cut string in 2 parts - only for menu entries */
-  if ((but->drawflag & UI_BUT_HAS_SHORTCUT) && (but->editstr == NULL)) {
-    if (but->flag & UI_BUT_HAS_SEP_CHAR) {
-      drawstr_right = strrchr(drawstr, UI_SEP_CHAR);
-      if (drawstr_right) {
-        drawstr_left_len = (drawstr_right - drawstr);
-        drawstr_right++;
-      }
+  if (but->flag & UI_BUT_HAS_SEP_CHAR && (but->editstr == NULL)) {
+    drawstr_right = strrchr(drawstr, UI_SEP_CHAR);
+    if (drawstr_right) {
+      use_drawstr_right_as_hint = true;
+      drawstr_left_len = (drawstr_right - drawstr);
+      drawstr_right++;
     }
   }
 
@@ -2204,21 +2236,24 @@ static void widget_draw_text(const uiFontStyle *fstyle,
             BLF_enable(fstyle->uifont_id, BLF_KERNING_DEFAULT);
           }
 
-          int ul_data[2] = {
-              ul_index, /* Character index to test. */
-              0,        /* Write the x-offset here. */
+          int ul_width = round_fl_to_int(BLF_width(fstyle->uifont_id, "_", 2));
+
+          struct UnderlineData ul_data = {
+              .str_offset = ul_index,
+              .width_px = ul_width,
           };
+
           BLF_boundbox_foreach_glyph(fstyle->uifont_id,
                                      drawstr_ofs,
                                      ul_index + 1,
-                                     widget_draw_text_underline_calc_center_x,
-                                     ul_data);
-          ul_data[1] -= BLF_width(fstyle->uifont_id, "_", 2) / 2.0f;
+                                     widget_draw_text_underline_calc_position,
+                                     &ul_data);
 
-          BLF_position(fstyle->uifont_id,
-                       rect->xmin + font_xofs + ul_data[1],
-                       rect->ymin + font_yofs,
-                       0.0f);
+          const int pos_x = rect->xmin + font_xofs + ul_data.r_offset_px[0];
+          const int pos_y = rect->ymin + font_yofs + ul_data.r_offset_px[1];
+
+          /* Use text output because direct drawing doesn't always work. See T89246. */
+          BLF_position(fstyle->uifont_id, pos_x, pos_y, 0.0f);
           BLF_color4ubv(fstyle->uifont_id, wcol->text);
           BLF_draw(fstyle->uifont_id, "_", 2);
 
@@ -2234,7 +2269,7 @@ static void widget_draw_text(const uiFontStyle *fstyle,
   if (drawstr_right) {
     uchar col[4];
     copy_v4_v4_uchar(col, wcol->text);
-    if (but->drawflag & UI_BUT_HAS_SHORTCUT) {
+    if (use_drawstr_right_as_hint) {
       col[3] *= 0.5f;
     }
 
@@ -2422,11 +2457,12 @@ static void widget_draw_text_icon(const uiFontStyle *fstyle,
     but->block->aspect = aspect_orig;
 #endif
 
-    rect->xmin += icon_size + icon_padding;
+    rect->xmin += round_fl_to_int(icon_size + icon_padding);
   }
 
   if (!no_text_padding) {
-    const int text_padding = (UI_TEXT_MARGIN_X * U.widget_unit) / but->block->aspect;
+    const int text_padding = round_fl_to_int((UI_TEXT_MARGIN_X * U.widget_unit) /
+                                             but->block->aspect);
     if (but->editstr) {
       rect->xmin += text_padding;
     }
@@ -2485,7 +2521,7 @@ static void widget_draw_text_icon(const uiFontStyle *fstyle,
     ui_text_clip_middle(fstyle, but, rect);
   }
 
-  /* always draw text for textbutton cursor */
+  /* Always draw text for text-button cursor. */
   widget_draw_text(fstyle, wcol, but, rect);
 
   ui_but_text_password_hide(password_str, but, true);
@@ -3481,7 +3517,7 @@ static void widget_menubut(uiWidgetColors *wcol, rcti *rect, int UNUSED(state), 
 /**
  * Draw menu buttons still with triangles when field is not embossed
  */
-static void widget_menubut_embossn(uiBut *UNUSED(but),
+static void widget_menubut_embossn(const uiBut *UNUSED(but),
                                    uiWidgetColors *wcol,
                                    rcti *rect,
                                    int UNUSED(state),
@@ -3504,7 +3540,7 @@ static void widget_menubut_embossn(uiBut *UNUSED(but),
  * Draw number buttons still with triangles when field is not embossed
  */
 static void widget_numbut_embossn(
-    uiBut *UNUSED(but), uiWidgetColors *wcol, rcti *rect, int state, int roundboxalign)
+    const uiBut *UNUSED(but), uiWidgetColors *wcol, rcti *rect, int state, int roundboxalign)
 {
   widget_numbut_draw(wcol, rect, state, roundboxalign, true);
 }
@@ -3684,10 +3720,28 @@ static void widget_progressbar(
   /* "slider" bar color */
   copy_v3_v3_uchar(wcol->inner, wcol->item);
   widgetbase_draw(&wtb_bar, wcol);
+}
 
-  /* raise text a bit */
-  rect->xmin += (BLI_rcti_size_x(&rect_prog) / 2);
-  rect->xmax += (BLI_rcti_size_x(&rect_prog) / 2);
+static void widget_datasetrow(
+    uiBut *but, uiWidgetColors *wcol, rcti *rect, int state, int UNUSED(roundboxalign))
+{
+  uiButDatasetRow *but_componentrow = (uiButDatasetRow *)but;
+  uiWidgetBase wtb;
+  widget_init(&wtb);
+
+  /* no outline */
+  wtb.draw_outline = false;
+  const float rad = wcol->roundness * U.widget_unit;
+  round_box_edges(&wtb, UI_CNR_ALL, rect, rad);
+
+  if ((state & UI_ACTIVE) || (state & UI_SELECT)) {
+    widgetbase_draw(&wtb, wcol);
+  }
+
+  BLI_rcti_resize(rect,
+                  BLI_rcti_size_x(rect) - UI_UNIT_X * but_componentrow->indentation,
+                  BLI_rcti_size_y(rect));
+  BLI_rcti_translate(rect, 0.5f * UI_UNIT_X * but_componentrow->indentation, 0);
 }
 
 static void widget_nodesocket(
@@ -3757,12 +3811,35 @@ static void widget_numslider(
     float factor, factor_ui;
     float factor_discard = 1.0f; /* No discard. */
     const float value = (float)ui_but_value_get(but);
+    const float softmin = but->softmin;
+    const float softmax = but->softmax;
+    const float softrange = softmax - softmin;
+    const PropertyScaleType scale_type = ui_but_scale_type(but);
 
-    if (but->rnaprop && (RNA_property_subtype(but->rnaprop) == PROP_PERCENTAGE)) {
-      factor = value / but->softmax;
-    }
-    else {
-      factor = (value - but->softmin) / (but->softmax - but->softmin);
+    switch (scale_type) {
+      case PROP_SCALE_LINEAR: {
+        if (but->rnaprop && (RNA_property_subtype(but->rnaprop) == PROP_PERCENTAGE)) {
+          factor = value / softmax;
+        }
+        else {
+          factor = (value - softmin) / softrange;
+        }
+        break;
+      }
+      case PROP_SCALE_LOG: {
+        const float logmin = fmaxf(softmin, 0.5e-8f);
+        const float base = softmax / logmin;
+        factor = logf(value / logmin) / logf(base);
+        break;
+      }
+      case PROP_SCALE_CUBIC: {
+        const float cubicmin = cube_f(softmin);
+        const float cubicmax = cube_f(softmax);
+        const float cubicrange = cubicmax - cubicmin;
+        const float f = (value - softmin) * cubicrange / softrange + cubicmin;
+        factor = (cbrtf(f) - softmin) / softrange;
+        break;
+      }
     }
 
     const float width = (float)BLI_rcti_size_x(rect);
@@ -4253,7 +4330,7 @@ static void widget_draw_extra_mask(const bContext *C, uiBut *but, uiWidgetType *
   widget_init(&wtb);
 
   if (but->block->drawextra) {
-    /* note: drawextra can change rect +1 or -1, to match round errors of existing previews */
+    /* NOTE: drawextra can change rect +1 or -1, to match round errors of existing previews. */
     but->block->drawextra(
         C, but->poin, but->block->drawextra_arg1, but->block->drawextra_arg2, rect);
 
@@ -4437,6 +4514,10 @@ static uiWidgetType *widget_type(uiWidgetTypeEnum type)
     case UI_WTYPE_PROGRESSBAR:
       wt.wcol_theme = &btheme->tui.wcol_progress;
       wt.custom = widget_progressbar;
+      break;
+
+    case UI_WTYPE_DATASETROW:
+      wt.custom = widget_datasetrow;
       break;
 
     case UI_WTYPE_NODESOCKET:
@@ -4762,6 +4843,11 @@ void ui_draw_but(const bContext *C, struct ARegion *region, uiStyle *style, uiBu
         fstyle = &style->widgetlabel;
         break;
 
+      case UI_BTYPE_DATASETROW:
+        wt = widget_type(UI_WTYPE_DATASETROW);
+        fstyle = &style->widgetlabel;
+        break;
+
       case UI_BTYPE_SCROLL:
         wt = widget_type(UI_WTYPE_SCROLL);
         break;
@@ -4894,7 +4980,7 @@ void ui_draw_menu_back(uiStyle *UNUSED(style), uiBlock *block, rcti *rect)
 }
 
 /**
- * Uses the widget base drawing and colors from from the box widget, but ensures an opaque
+ * Uses the widget base drawing and colors from the box widget, but ensures an opaque
  * inner color.
  */
 void ui_draw_box_opaque(rcti *rect, int roundboxalign)

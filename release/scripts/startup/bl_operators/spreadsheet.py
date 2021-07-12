@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from bpy.types import Operator
 
+
 class SPREADSHEET_OT_toggle_pin(Operator):
     '''Turn on or off pinning'''
     bl_idname = "spreadsheet.toggle_pin"
@@ -34,12 +35,33 @@ class SPREADSHEET_OT_toggle_pin(Operator):
     def execute(self, context):
         space = context.space_data
 
-        if space.pinned_id:
-            space.pinned_id = None
+        if space.is_pinned:
+            self.unpin(context)
         else:
-            space.pinned_id = context.active_object
-
+            self.pin(context)
         return {'FINISHED'}
+
+    def pin(self, context):
+        space = context.space_data
+        space.is_pinned = True
+
+    def unpin(self, context):
+        space = context.space_data
+        space.is_pinned = False
+        space.context_path.guess()
+
+    def find_geometry_node_editors(self, context):
+        editors = []
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                space = area.spaces.active
+                if space.type != 'NODE_EDITOR':
+                    continue
+                if space.edit_tree is None:
+                    continue
+                if space.edit_tree.type == 'GEOMETRY':
+                    editors.append(space)
+        return editors
 
 
 classes = (

@@ -141,7 +141,10 @@ typedef void *SocketGetCPPValueFunction;
  * Defines the appearance and behavior of a socket in the UI.
  */
 typedef struct bNodeSocketType {
-  char idname[64]; /* identifier name */
+  /* Identifier name */
+  char idname[64];
+  /* Type label */
+  char label[64];
 
   void (*draw)(struct bContext *C,
                struct uiLayout *layout,
@@ -289,10 +292,22 @@ typedef struct bNodeType {
   void (*freefunc_api)(struct PointerRNA *ptr);
   void (*copyfunc_api)(struct PointerRNA *ptr, const struct bNode *src_node);
 
-  /* can this node type be added to a node tree */
-  bool (*poll)(struct bNodeType *ntype, struct bNodeTree *nodetree);
-  /* can this node be added to a node tree */
-  bool (*poll_instance)(struct bNode *node, struct bNodeTree *nodetree);
+  /**
+   * Can this node type be added to a node tree?
+   * \param r_disabled_hint: Optional hint to display in the UI when the poll fails.
+   *                         The callback can set this to a static string without having to
+   *                         null-check it (or without setting it to null if it's not used).
+   *                         The caller must pass a valid `const char **` and null-initialize it
+   *                         when it's not just a dummy, that is, if it actually wants to access
+   *                         the returned disabled-hint (null-check needed!).
+   */
+  bool (*poll)(struct bNodeType *ntype, struct bNodeTree *nodetree, const char **r_disabled_hint);
+  /** Can this node be added to a node tree?
+   * \param r_disabled_hint: See `poll()`.
+   */
+  bool (*poll_instance)(struct bNode *node,
+                        struct bNodeTree *nodetree,
+                        const char **r_disabled_hint);
 
   /* optional handling of link insertion */
   void (*insert_link)(struct bNodeTree *ntree, struct bNode *node, struct bNodeLink *link);
@@ -313,6 +328,7 @@ typedef struct bNodeType {
 
   /* Execute a geometry node. */
   NodeGeometryExecFunction geometry_node_execute;
+  bool geometry_node_execute_supports_laziness;
 
   /* RNA integration */
   ExtensionRNA rna_ext;
@@ -397,6 +413,9 @@ typedef struct bNodeTreeType {
   bool (*validate_link)(struct bNodeTree *ntree, struct bNodeLink *link);
 
   void (*node_add_init)(struct bNodeTree *ntree, struct bNode *bnode);
+
+  /* Check if the socket type is valid for this tree type. */
+  bool (*valid_socket_type)(struct bNodeTreeType *ntreetype, struct bNodeSocketType *socket_type);
 
   /* RNA integration */
   ExtensionRNA rna_ext;
@@ -538,8 +557,12 @@ void nodeRegisterSocketType(struct bNodeSocketType *stype);
 void nodeUnregisterSocketType(struct bNodeSocketType *stype);
 bool nodeSocketIsRegistered(struct bNodeSocket *sock);
 struct GHashIterator *nodeSocketTypeGetIterator(void);
+const char *nodeSocketTypeLabel(const bNodeSocketType *stype);
+
+bool nodeIsStaticSocketType(const struct bNodeSocketType *stype);
 const char *nodeStaticSocketType(int type, int subtype);
 const char *nodeStaticSocketInterfaceType(int type, int subtype);
+const char *nodeStaticSocketLabel(int type, int subtype);
 
 /* helper macros for iterating over node types */
 #define NODE_SOCKET_TYPES_BEGIN(stype) \
@@ -589,7 +612,11 @@ struct bNodeSocket *nodeInsertStaticSocket(struct bNodeTree *ntree,
                                            const char *name);
 void nodeRemoveSocket(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock);
 void nodeRemoveAllSockets(struct bNodeTree *ntree, struct bNode *node);
-void nodeModifySocketType(
+void nodeModifySocketType(struct bNodeTree *ntree,
+                          struct bNode *node,
+                          struct bNodeSocket *sock,
+                          const char *idname);
+void nodeModifySocketTypeStatic(
     struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock, int type, int subtype);
 
 struct bNode *nodeAddNode(const struct bContext *C, struct bNodeTree *ntree, const char *idname);
@@ -804,7 +831,9 @@ void BKE_node_preview_set_pixel(
 void nodeLabel(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen);
 const char *nodeSocketLabel(const struct bNodeSocket *sock);
 
-int nodeGroupPoll(struct bNodeTree *nodetree, struct bNodeTree *grouptree);
+bool nodeGroupPoll(struct bNodeTree *nodetree,
+                   struct bNodeTree *grouptree,
+                   const char **r_disabled_hint);
 
 /* Init a new node type struct with default values and callbacks */
 void node_type_base(struct bNodeType *ntype, int type, const char *name, short nclass, short flag);
@@ -947,7 +976,7 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree,
 /** \name Shader Nodes
  * \{ */
 
-/* note: types are needed to restore callbacks, don't change values */
+/* NOTE: types are needed to restore callbacks, don't change values. */
 /* range 1 - 100 is reserved for common nodes */
 /* using toolbox, we add node groups by assuming the values below
  * don't exceed NODE_GROUP_MENU for now. */
@@ -1114,7 +1143,7 @@ void ntreeGPUMaterialNodes(struct bNodeTree *localtree,
 // #define RRES_OUT_SUBSURFACE_COLOR 30
 // #define RRES_OUT_DEBUG 31
 
-/* note: types are needed to restore callbacks, don't change values */
+/* NOTE: types are needed to restore callbacks, don't change values. */
 #define CMP_NODE_VIEWER 201
 #define CMP_NODE_RGB 202
 #define CMP_NODE_VALUE 203
@@ -1287,15 +1316,18 @@ void ntreeCompositOutputFileUniqueLayer(struct ListBase *list,
 void ntreeCompositColorBalanceSyncFromLGG(bNodeTree *ntree, bNode *node);
 void ntreeCompositColorBalanceSyncFromCDL(bNodeTree *ntree, bNode *node);
 
-void ntreeCompositCryptomatteSyncFromAdd(bNode *node);
+void ntreeCompositCryptomatteSyncFromAdd(const Scene *scene, bNode *node);
 void ntreeCompositCryptomatteSyncFromRemove(bNode *node);
 bNodeSocket *ntreeCompositCryptomatteAddSocket(bNodeTree *ntree, bNode *node);
 int ntreeCompositCryptomatteRemoveSocket(bNodeTree *ntree, bNode *node);
-void ntreeCompositCryptomatteLayerPrefix(const bNode *node, char *r_prefix, size_t prefix_len);
+void ntreeCompositCryptomatteLayerPrefix(const Scene *scene,
+                                         const bNode *node,
+                                         char *r_prefix,
+                                         size_t prefix_len);
 /* Update the runtime layer names with the cryptomatte layer names of the references
  * render layer or image. */
-void ntreeCompositCryptomatteUpdateLayerNames(bNode *node);
-struct CryptomatteSession *ntreeCompositCryptomatteSession(bNode *node);
+void ntreeCompositCryptomatteUpdateLayerNames(const Scene *scene, bNode *node);
+struct CryptomatteSession *ntreeCompositCryptomatteSession(const Scene *scene, bNode *node);
 
 /** \} */
 
@@ -1385,7 +1417,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_VOLUME_TO_MESH 1026
 #define GEO_NODE_ATTRIBUTE_COMBINE_XYZ 1027
 #define GEO_NODE_ATTRIBUTE_SEPARATE_XYZ 1028
-#define GEO_NODE_SUBDIVIDE 1029
+#define GEO_NODE_MESH_SUBDIVIDE 1029
 #define GEO_NODE_ATTRIBUTE_REMOVE 1030
 #define GEO_NODE_ATTRIBUTE_CONVERT 1031
 #define GEO_NODE_MESH_PRIMITIVE_CUBE 1032
@@ -1399,6 +1431,33 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_ATTRIBUTE_MAP_RANGE 1040
 #define GEO_NODE_ATTRIBUTE_CLAMP 1041
 #define GEO_NODE_BOUNDING_BOX 1042
+#define GEO_NODE_SWITCH 1043
+#define GEO_NODE_ATTRIBUTE_TRANSFER 1044
+#define GEO_NODE_CURVE_TO_MESH 1045
+#define GEO_NODE_ATTRIBUTE_CURVE_MAP 1046
+#define GEO_NODE_CURVE_RESAMPLE 1047
+#define GEO_NODE_ATTRIBUTE_VECTOR_ROTATE 1048
+#define GEO_NODE_MATERIAL_ASSIGN 1049
+#define GEO_NODE_INPUT_MATERIAL 1050
+#define GEO_NODE_MATERIAL_REPLACE 1051
+#define GEO_NODE_MESH_TO_CURVE 1052
+#define GEO_NODE_DELETE_GEOMETRY 1053
+#define GEO_NODE_CURVE_LENGTH 1054
+#define GEO_NODE_SELECT_BY_MATERIAL 1055
+#define GEO_NODE_CONVEX_HULL 1056
+#define GEO_NODE_CURVE_TO_POINTS 1057
+#define GEO_NODE_CURVE_REVERSE 1058
+#define GEO_NODE_SEPARATE_COMPONENTS 1059
+#define GEO_NODE_CURVE_SUBDIVIDE 1060
+#define GEO_NODE_RAYCAST 1061
+#define GEO_NODE_CURVE_PRIMITIVE_STAR 1062
+#define GEO_NODE_CURVE_PRIMITIVE_SPIRAL 1063
+#define GEO_NODE_CURVE_PRIMITIVE_QUADRATIC_BEZIER 1064
+#define GEO_NODE_CURVE_PRIMITIVE_BEZIER_SEGMENT 1065
+#define GEO_NODE_CURVE_PRIMITIVE_CIRCLE 1066
+#define GEO_NODE_VIEWER 1067
+#define GEO_NODE_CURVE_PRIMITIVE_LINE 1068
+#define GEO_NODE_CURVE_ENDPOINTS 1069
 
 /** \} */
 
@@ -1411,6 +1470,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define FN_NODE_RANDOM_FLOAT 1206
 #define FN_NODE_INPUT_VECTOR 1207
 #define FN_NODE_INPUT_STRING 1208
+#define FN_NODE_FLOAT_TO_INT 1209
 
 /** \} */
 

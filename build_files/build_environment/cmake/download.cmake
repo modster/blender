@@ -12,7 +12,7 @@ function(download_source dep)
   if(NOT EXISTS ${TARGET_FILE})
     message("Checking source : ${dep} - source not found downloading from ${TARGET_URI}")
     file(DOWNLOAD ${TARGET_URI} ${TARGET_FILE}
-         TIMEOUT 60  # seconds
+         TIMEOUT 1800  # seconds
          EXPECTED_HASH ${TARGET_HASH_TYPE}=${TARGET_HASH}
          TLS_VERIFY ON
          SHOW_PROGRESS
@@ -87,6 +87,7 @@ download_source(LIBGLU)
 download_source(MESA)
 download_source(NASM)
 download_source(XR_OPENXR_SDK)
+download_source(WL_PROTOCOLS)
 download_source(ISPC)
 download_source(GMP)
 download_source(POTRACE)

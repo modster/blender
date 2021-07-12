@@ -49,6 +49,8 @@ set(SRC
   COM_compositor.h
   COM_defines.h
 
+  intern/COM_BufferOperation.cc
+  intern/COM_BufferOperation.h
   intern/COM_CPUDevice.cc
   intern/COM_CPUDevice.h
   intern/COM_ChunkOrder.cc
@@ -57,23 +59,34 @@ set(SRC
   intern/COM_ChunkOrderHotspot.h
   intern/COM_CompositorContext.cc
   intern/COM_CompositorContext.h
+  intern/COM_ConstantFolder.cc
+  intern/COM_ConstantFolder.h
   intern/COM_Converter.cc
   intern/COM_Converter.h
-  intern/COM_Enums.cc
   intern/COM_Debug.cc
   intern/COM_Debug.h
   intern/COM_Device.cc
   intern/COM_Device.h
+  intern/COM_Enums.cc
+  intern/COM_Enums.h
   intern/COM_ExecutionGroup.cc
   intern/COM_ExecutionGroup.h
+  intern/COM_ExecutionModel.cc
+  intern/COM_ExecutionModel.h
   intern/COM_ExecutionSystem.cc
   intern/COM_ExecutionSystem.h
+  intern/COM_FullFrameExecutionModel.cc
+  intern/COM_FullFrameExecutionModel.h
   intern/COM_MemoryBuffer.cc
   intern/COM_MemoryBuffer.h
   intern/COM_MemoryProxy.cc
   intern/COM_MemoryProxy.h
   intern/COM_MetaData.cc
   intern/COM_MetaData.h
+  intern/COM_MultiThreadedOperation.cc
+  intern/COM_MultiThreadedOperation.h
+  intern/COM_MultiThreadedRowOperation.cc
+  intern/COM_MultiThreadedRowOperation.h
   intern/COM_Node.cc
   intern/COM_Node.h
   intern/COM_NodeConverter.cc
@@ -86,8 +99,12 @@ set(SRC
   intern/COM_NodeOperationBuilder.h
   intern/COM_OpenCLDevice.cc
   intern/COM_OpenCLDevice.h
+  intern/COM_SharedOperationBuffers.cc
+  intern/COM_SharedOperationBuffers.h
   intern/COM_SingleThreadedOperation.cc
   intern/COM_SingleThreadedOperation.h
+  intern/COM_TiledExecutionModel.cc
+  intern/COM_TiledExecutionModel.h
   intern/COM_WorkPackage.cc
   intern/COM_WorkPackage.h
   intern/COM_WorkScheduler.cc
@@ -279,6 +296,8 @@ set(SRC
   nodes/COM_VectorBlurNode.h
   operations/COM_VectorBlurOperation.cc
   operations/COM_VectorBlurOperation.h
+  nodes/COM_AntiAliasingNode.cc
+  nodes/COM_AntiAliasingNode.h
   nodes/COM_BlurNode.cc
   nodes/COM_BlurNode.h
   nodes/COM_BokehBlurNode.cc
@@ -295,8 +314,6 @@ set(SRC
   nodes/COM_FilterNode.h
   nodes/COM_InpaintNode.cc
   nodes/COM_InpaintNode.h
-  nodes/COM_AntiAliasingNode.cc
-  nodes/COM_AntiAliasingNode.h
 
   operations/COM_BlurBaseOperation.cc
   operations/COM_BlurBaseOperation.h
@@ -322,10 +339,10 @@ set(SRC
   operations/COM_MovieClipAttributeOperation.h
   operations/COM_MovieDistortionOperation.cc
   operations/COM_MovieDistortionOperation.h
-  operations/COM_VariableSizeBokehBlurOperation.cc
-  operations/COM_VariableSizeBokehBlurOperation.h
   operations/COM_SMAAOperation.cc
   operations/COM_SMAAOperation.h
+  operations/COM_VariableSizeBokehBlurOperation.cc
+  operations/COM_VariableSizeBokehBlurOperation.h
 
   # Matte nodes
   nodes/COM_BoxMaskNode.cc
@@ -430,6 +447,8 @@ set(SRC
   operations/COM_BrightnessOperation.h
   operations/COM_ColorCorrectionOperation.cc
   operations/COM_ColorCorrectionOperation.h
+  operations/COM_ConstantOperation.cc
+  operations/COM_ConstantOperation.h
   operations/COM_GammaOperation.cc
   operations/COM_GammaOperation.h
   operations/COM_MixOperation.cc
@@ -608,7 +627,7 @@ endif()
 
 blender_add_lib(bf_compositor "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
-if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+if(CXX_WARN_NO_SUGGEST_OVERRIDE)
   target_compile_options(bf_compositor PRIVATE "-Wsuggest-override")
 endif()
 

@@ -64,7 +64,8 @@ class Object : public Node {
   NODE_SOCKET_API(bool, hide_on_missing_motion)
   NODE_SOCKET_API(bool, use_holdout)
   NODE_SOCKET_API(bool, is_shadow_catcher)
-  NODE_SOCKET_API(float, shadow_terminator_offset)
+  NODE_SOCKET_API(float, shadow_terminator_shading_offset)
+  NODE_SOCKET_API(float, shadow_terminator_geometry_offset)
 
   NODE_SOCKET_API(float3, dupli_generated)
   NODE_SOCKET_API(float2, dupli_uv)
@@ -134,6 +135,7 @@ class ObjectManager {
     OBJECT_MODIFIED = (1 << 5),
     HOLDOUT_MODIFIED = (1 << 6),
     TRANSFORM_MODIFIED = (1 << 7),
+    VISIBILITY_MODIFIED = (1 << 8),
 
     /* tag everything in the manager for an update */
     UPDATE_ALL = ~0u,

@@ -76,6 +76,7 @@ struct Collection *BKE_collection_duplicate(struct Main *bmain,
 
 /* Master Collection for Scene */
 
+#define BKE_SCENE_COLLECTION_NAME "Scene Collection"
 struct Collection *BKE_collection_master_add(void);
 
 /* Collection Objects */
@@ -112,7 +113,9 @@ bool BKE_scene_collections_object_remove(struct Main *bmain,
                                          struct Object *object,
                                          const bool free_us);
 void BKE_collections_object_remove_nulls(struct Main *bmain);
-void BKE_collections_child_remove_nulls(struct Main *bmain, struct Collection *old_collection);
+void BKE_collections_child_remove_nulls(struct Main *bmain,
+                                        struct Collection *parent_collection,
+                                        struct Collection *child_collection);
 
 /* Dependencies. */
 
@@ -162,7 +165,8 @@ bool BKE_collection_move(struct Main *bmain,
 bool BKE_collection_cycle_find(struct Collection *new_ancestor, struct Collection *collection);
 bool BKE_collection_cycles_fix(struct Main *bmain, struct Collection *collection);
 
-bool BKE_collection_has_collection(struct Collection *parent, struct Collection *collection);
+bool BKE_collection_has_collection(const struct Collection *parent,
+                                   const struct Collection *collection);
 
 void BKE_collection_parent_relations_rebuild(struct Collection *collection);
 void BKE_main_collections_parent_relations_rebuild(struct Main *bmain);

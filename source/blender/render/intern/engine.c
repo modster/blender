@@ -124,7 +124,7 @@ bool RE_engine_is_external(const Render *re)
 
 bool RE_engine_is_opengl(RenderEngineType *render_type)
 {
-  /* TODO refine? Can we have ogl render engine without ogl render pipeline? */
+  /* TODO: refine? Can we have ogl render engine without ogl render pipeline? */
   return (render_type->draw_engine != NULL) && DRW_engine_render_support(render_type->draw_engine);
 }
 
@@ -143,12 +143,9 @@ RenderEngine *RE_engine_create(RenderEngineType *type)
 static void engine_depsgraph_free(RenderEngine *engine)
 {
   if (engine->depsgraph) {
-    /* Need GPU context since this might free GPU buffers. This function can
-     * only be called from a render thread. We do not currently support
-     * persistent data with GPU contexts for that reason. */
+    /* Need GPU context since this might free GPU buffers. */
     const bool use_gpu_context = (engine->type->flag & RE_USE_GPU_CONTEXT);
     if (use_gpu_context) {
-      BLI_assert(!BLI_thread_is_main());
       DRW_render_context_enable(engine->re);
     }
 
@@ -313,7 +310,7 @@ RenderResult *RE_engine_begin_result(
 
   result = render_result_new(re, &disprect, RR_USE_MEM, layername, viewname);
 
-  /* todo: make this thread safe */
+  /* TODO: make this thread safe. */
 
   /* can be NULL if we CLAMP the width or height to 0 */
   if (result) {
@@ -549,7 +546,7 @@ float RE_engine_get_camera_shift_x(RenderEngine *engine, Object *camera, bool us
 void RE_engine_get_camera_model_matrix(RenderEngine *engine,
                                        Object *camera,
                                        bool use_spherical_stereo,
-                                       float *r_modelmat)
+                                       float r_modelmat[16])
 {
   /* When using spherical stereo, get model matrix without multiview,
    * leaving stereo to be handled by the engine. */
@@ -623,8 +620,8 @@ RenderData *RE_engine_get_render_data(Render *re)
 
 bool RE_engine_use_persistent_data(RenderEngine *engine)
 {
-  /* See engine_depsgraph_free() for why preserving the depsgraph for
-   * re-renders is not supported with GPU contexts. */
+  /* Re-rendering is not supported with GPU contexts, since the GPU context
+   * is destroyed when the render thread exists. */
   return (engine->re->r.mode & R_PERSISTENT_DATA) && !(engine->type->flag & RE_USE_GPU_CONTEXT);
 }
 
@@ -690,7 +687,7 @@ static void engine_depsgraph_init(RenderEngine *engine, ViewLayer *view_layer)
   }
   else {
     /* Go through update with full Python callbacks for regular render. */
-    BKE_scene_graph_update_for_newframe(engine->depsgraph);
+    BKE_scene_graph_update_for_newframe_ex(engine->depsgraph, false);
   }
 
   engine->has_grease_pencil = DRW_render_check_grease_pencil(engine->depsgraph);
@@ -702,7 +699,7 @@ static void engine_depsgraph_exit(RenderEngine *engine)
     if (engine_keep_depsgraph(engine)) {
       /* Clear recalc flags since the engine should have handled the updates for the currently
        * rendered framed by now. */
-      DEG_ids_clear_recalc(engine->depsgraph);
+      DEG_ids_clear_recalc(engine->depsgraph, false);
     }
     else {
       /* Free immediately to save memory. */
@@ -717,12 +714,15 @@ void RE_engine_frame_set(RenderEngine *engine, int frame, float subframe)
     return;
   }
 
+  /* Clear recalc flags before update so engine can detect what changed. */
+  DEG_ids_clear_recalc(engine->depsgraph, false);
+
   Render *re = engine->re;
   double cfra = (double)frame + (double)subframe;
 
   CLAMP(cfra, MINAFRAME, MAXFRAME);
   BKE_scene_frame_set(re->scene, cfra);
-  BKE_scene_graph_update_for_newframe(engine->depsgraph);
+  BKE_scene_graph_update_for_newframe_ex(engine->depsgraph, false);
 
   BKE_scene_camera_switch_update(re->scene);
 }
@@ -735,9 +735,9 @@ void RE_bake_engine_set_engine_parameters(Render *re, Main *bmain, Scene *scene)
   render_copy_renderdata(&re->r, &scene->r);
 }
 
-bool RE_bake_has_engine(Render *re)
+bool RE_bake_has_engine(const Render *re)
 {
-  RenderEngineType *type = RE_engines_find(re->r.engine);
+  const RenderEngineType *type = RE_engines_find(re->r.engine);
   return (type->bake != NULL);
 }
 
@@ -812,7 +812,7 @@ bool RE_bake_engine(Render *re,
   engine->flag &= ~RE_ENGINE_RENDERING;
 
   /* Free depsgraph outside of parts mutex lock, since this locks OpenGL context
-   * while the the UI drawing might also lock the OpenGL context and parts mutex. */
+   * while the UI drawing might also lock the OpenGL context and parts mutex. */
   engine_depsgraph_free(engine);
   BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);
 
@@ -1037,7 +1037,7 @@ bool RE_engine_render(Render *re, bool do_all)
   /* re->engine becomes zero if user changed active render engine during render */
   if (!engine_keep_depsgraph(engine) || !re->engine) {
     /* Free depsgraph outside of parts mutex lock, since this locks OpenGL context
-     * while the the UI drawing might also lock the OpenGL context and parts mutex. */
+     * while the UI drawing might also lock the OpenGL context and parts mutex. */
     BLI_rw_mutex_unlock(&re->partsmutex);
     engine_depsgraph_free(engine);
     BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);

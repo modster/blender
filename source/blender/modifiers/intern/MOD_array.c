@@ -121,7 +121,7 @@ BLI_INLINE float sum_v3(const float v[3])
 typedef struct SortVertsElem {
   int vertex_num; /* The original index of the vertex, prior to sorting */
   float co[3];    /* Its coordinates */
-  float sum_co;   /* sum_v3(co), just so we don't do the sum many times.  */
+  float sum_co;   /* `sum_v3(co)`: just so we don't do the sum many times. */
 } SortVertsElem;
 
 static int svert_sum_cmp(const void *e1, const void *e2)
@@ -427,7 +427,7 @@ static Mesh *arrayModifier_doArray(ArrayModifierData *amd,
     }
   }
 
-  /* Build up offset array, cumulating all settings options */
+  /* Build up offset array, accumulating all settings options. */
 
   unit_m4(offset);
   src_mvert = mesh->mvert;
@@ -1021,7 +1021,6 @@ ModifierTypeInfo modifierType_Array = {
     /* modifyMesh */ modifyMesh,
     /* modifyHair */ NULL,
     /* modifyGeometrySet */ NULL,
-    /* modifyVolume */ NULL,
 
     /* initData */ initData,
     /* requiredDataMask */ NULL,

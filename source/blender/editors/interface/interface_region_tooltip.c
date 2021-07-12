@@ -188,11 +188,11 @@ static void ui_tooltip_region_draw_cb(const bContext *UNUSED(C), ARegion *region
   /* tone_fg = rgb_to_grayscale(main_color); */
 
   /* mix the colors */
-  rgb_tint(value_color, 0.0f, 0.0f, tone_bg, 0.2f);  /* light gray */
-  rgb_tint(active_color, 0.6f, 0.2f, tone_bg, 0.2f); /* light blue */
-  rgb_tint(normal_color, 0.0f, 0.0f, tone_bg, 0.4f); /* gray       */
-  rgb_tint(python_color, 0.0f, 0.0f, tone_bg, 0.5f); /* dark gray  */
-  rgb_tint(alert_color, 0.0f, 0.8f, tone_bg, 0.1f);  /* red        */
+  rgb_tint(value_color, 0.0f, 0.0f, tone_bg, 0.2f);  /* Light gray. */
+  rgb_tint(active_color, 0.6f, 0.2f, tone_bg, 0.2f); /* Light blue. */
+  rgb_tint(normal_color, 0.0f, 0.0f, tone_bg, 0.4f); /* Gray. */
+  rgb_tint(python_color, 0.0f, 0.0f, tone_bg, 0.5f); /* Dark gray. */
+  rgb_tint(alert_color, 0.0f, 0.8f, tone_bg, 0.1f);  /* Red. */
 
   /* draw text */
   BLF_wordwrap(data->fstyle.uifont_id, data->wrap_width);
@@ -428,14 +428,14 @@ static uiTooltipData *ui_tooltip_data_from_tool(bContext *C, uiBut *but, bool is
     if (has_valid_context == false) {
       expr_result = BLI_strdup(has_valid_context_error);
     }
-    else if (BPY_run_string_as_string(C, expr_imports, expr, __func__, &expr_result)) {
+    else if (BPY_run_string_as_string(C, expr_imports, expr, NULL, &expr_result)) {
       if (STREQ(expr_result, "")) {
         MEM_freeN(expr_result);
         expr_result = NULL;
       }
     }
     else {
-      /* Note, this is an exceptional case, we could even remove it
+      /* NOTE: this is an exceptional case, we could even remove it
        * however there have been reports of tooltips failing, so keep it for now. */
       expr_result = BLI_strdup(IFACE_("Internal error!"));
       is_error = true;
@@ -485,14 +485,14 @@ static uiTooltipData *ui_tooltip_data_from_tool(bContext *C, uiBut *but, bool is
     if (has_valid_context == false) {
       expr_result = BLI_strdup(has_valid_context_error);
     }
-    else if (BPY_run_string_as_string(C, expr_imports, expr, __func__, &expr_result)) {
+    else if (BPY_run_string_as_string(C, expr_imports, expr, NULL, &expr_result)) {
       if (STREQ(expr_result, ".")) {
         MEM_freeN(expr_result);
         expr_result = NULL;
       }
     }
     else {
-      /* Note, this is an exceptional case, we could even remove it
+      /* NOTE: this is an exceptional case, we could even remove it
        * however there have been reports of tooltips failing, so keep it for now. */
       expr_result = BLI_strdup(TIP_("Internal error!"));
       is_error = true;
@@ -574,7 +574,7 @@ static uiTooltipData *ui_tooltip_data_from_tool(bContext *C, uiBut *but, bool is
                                        shortcut_toolbar,
                                        ARRAY_SIZE(shortcut_toolbar))) {
         /* Generate keymap in order to inspect it.
-         * Note, we could make a utility to avoid the keymap generation part of this. */
+         * NOTE: we could make a utility to avoid the keymap generation part of this. */
         const char *expr_imports[] = {
             "bpy", "bl_keymap_utils", "bl_keymap_utils.keymap_from_toolbar", NULL};
         const char *expr =
@@ -589,7 +589,7 @@ static uiTooltipData *ui_tooltip_data_from_tool(bContext *C, uiBut *but, bool is
         if (has_valid_context == false) {
           shortcut = BLI_strdup(has_valid_context_error);
         }
-        else if (BPY_run_string_as_intptr(C, expr_imports, expr, __func__, &expr_result)) {
+        else if (BPY_run_string_as_intptr(C, expr_imports, expr, NULL, &expr_result)) {
           if (expr_result != 0) {
             wmKeyMap *keymap = (wmKeyMap *)expr_result;
             LISTBASE_FOREACH (wmKeyMapItem *, kmi, &keymap->items) {
@@ -654,7 +654,7 @@ static uiTooltipData *ui_tooltip_data_from_tool(bContext *C, uiBut *but, bool is
         /* pass */
       }
       else if (BPY_run_string_as_string_and_size(
-                   C, expr_imports, expr, __func__, &expr_result, &expr_result_len)) {
+                   C, expr_imports, expr, NULL, &expr_result, &expr_result_len)) {
         /* pass. */
       }
     }
@@ -731,7 +731,7 @@ static uiTooltipData *ui_tooltip_data_from_tool(bContext *C, uiBut *but, bool is
     if (has_valid_context == false) {
       /* pass */
     }
-    else if (BPY_run_string_as_intptr(C, expr_imports, expr, __func__, &expr_result)) {
+    else if (BPY_run_string_as_intptr(C, expr_imports, expr, NULL, &expr_result)) {
       if (expr_result != 0) {
         {
           uiTooltipField *field = text_field_add(data,
@@ -947,12 +947,13 @@ static uiTooltipData *ui_tooltip_data_from_button(bContext *C, uiBut *but)
   /* button is disabled, we may be able to tell user why */
   if (but->flag & UI_BUT_DISABLED) {
     const char *disabled_msg = NULL;
+    bool disabled_msg_free = false;
 
     /* if operator poll check failed, it can give pretty precise info why */
     if (but->optype) {
-      CTX_wm_operator_poll_msg_set(C, NULL);
+      CTX_wm_operator_poll_msg_clear(C);
       WM_operator_poll_context(C, but->optype, but->opcontext);
-      disabled_msg = CTX_wm_operator_poll_msg_get(C);
+      disabled_msg = CTX_wm_operator_poll_msg_get(C, &disabled_msg_free);
     }
     /* alternatively, buttons can store some reasoning too */
     else if (but->disabled_info) {
@@ -966,6 +967,9 @@ static uiTooltipData *ui_tooltip_data_from_button(bContext *C, uiBut *but)
                                                  .color_id = UI_TIP_LC_ALERT,
                                              });
       field->text = BLI_sprintfN(TIP_("Disabled: %s"), disabled_msg);
+    }
+    if (disabled_msg_free) {
+      MEM_freeN((void *)disabled_msg);
     }
   }
 
@@ -1469,9 +1473,10 @@ ARegion *UI_tooltip_create_from_gizmo(bContext *C, wmGizmo *gz)
    */
   if (gz->type->screen_bounds_get) {
     rcti bounds;
-    gz->type->screen_bounds_get(C, gz, &bounds);
-    init_position[0] = bounds.xmin;
-    init_position[1] = bounds.ymin;
+    if (gz->type->screen_bounds_get(C, gz, &bounds)) {
+      init_position[0] = bounds.xmin;
+      init_position[1] = bounds.ymin;
+    }
   }
 
   return ui_tooltip_create_with_data(C, data, init_position, NULL, aspect);

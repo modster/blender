@@ -33,6 +33,8 @@ extern "C" {
 
 struct BMLoop;
 struct BMesh;
+struct BMPartialUpdate;
+struct BMeshCalcTessellation_Params;
 struct BoundBox;
 struct Depsgraph;
 struct Mesh;
@@ -51,12 +53,8 @@ struct Scene;
 typedef struct BMEditMesh {
   struct BMesh *bm;
 
-  /*this is for undoing failed operations*/
-  struct BMEditMesh *emcopy;
-  int emcopyusers;
-
   /* we store tessellations as triplets of three loops,
-   * which each define a triangle.*/
+   * which each define a triangle. */
   struct BMLoop *(*looptris)[3];
   int tottri;
 
@@ -65,14 +63,14 @@ typedef struct BMEditMesh {
   /** Cached cage bounding box for selection. */
   struct BoundBox *bb_cage;
 
-  /*derivedmesh stuff*/
+  /** Evaluated mesh data-mask. */
   CustomData_MeshMasks lastDataMask;
 
-  /*selection mode*/
+  /* Selection mode. */
   short selectmode;
   short mat_nr;
 
-  /*temp variables for x-mirror editing*/
+  /* Temp variables for x-mirror editing. */
   int mirror_cdlayer; /* -1 is invalid */
 
   /**
@@ -84,7 +82,18 @@ typedef struct BMEditMesh {
 } BMEditMesh;
 
 /* editmesh.c */
+void BKE_editmesh_looptri_calc_ex(BMEditMesh *em,
+                                  const struct BMeshCalcTessellation_Params *params);
 void BKE_editmesh_looptri_calc(BMEditMesh *em);
+void BKE_editmesh_looptri_calc_with_partial_ex(BMEditMesh *em,
+                                               struct BMPartialUpdate *bmpinfo,
+                                               const struct BMeshCalcTessellation_Params *params);
+void BKE_editmesh_looptri_calc_with_partial(BMEditMesh *em, struct BMPartialUpdate *bmpinfo);
+void BKE_editmesh_looptri_and_normals_calc_with_partial(BMEditMesh *em,
+                                                        struct BMPartialUpdate *bmpinfo);
+
+void BKE_editmesh_looptri_and_normals_calc(BMEditMesh *em);
+
 BMEditMesh *BKE_editmesh_create(BMesh *bm, const bool do_tessellate);
 BMEditMesh *BKE_editmesh_copy(BMEditMesh *em);
 BMEditMesh *BKE_editmesh_from_object(struct Object *ob);

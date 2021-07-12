@@ -309,6 +309,7 @@ static uiBlock *template_common_search_menu(const bContext *C,
                          ui_searchbox_create_generic,
                          search_update_fn,
                          search_arg,
+                         false,
                          NULL,
                          search_exec_fn,
                          active_item);
@@ -343,7 +344,7 @@ typedef struct TemplateID {
   float scale;
 } TemplateID;
 
-/* Search browse menu, assign  */
+/* Search browse menu, assign. */
 static void template_ID_set_property_exec_fn(bContext *C, void *arg_template, void *item)
 {
   TemplateID *template_ui = (TemplateID *)arg_template;
@@ -652,7 +653,7 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
             /* Only remap that specific ID usage to overriding local data-block. */
             ID *override_id = BKE_lib_override_library_create_from_id(bmain, id, false);
             if (override_id != NULL) {
-              BKE_main_id_clear_newpoins(bmain);
+              BKE_main_id_newptr_and_tag_clear(bmain);
 
               if (GS(override_id->name) == ID_OB) {
                 Scene *scene = CTX_data_scene(C);
@@ -671,9 +672,9 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
         }
         else {
           if (BKE_lib_id_make_local(bmain, id, false, 0)) {
-            BKE_main_id_clear_newpoins(bmain);
+            BKE_main_id_newptr_and_tag_clear(bmain);
 
-            /* reassign to get get proper updates/notifiers */
+            /* Reassign to get proper updates/notifiers. */
             idptr = RNA_property_pointer_get(&template_ui->ptr, template_ui->prop);
             undo_push_label = "Make Local";
           }
@@ -686,8 +687,8 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
       break;
     case UI_ID_OVERRIDE:
       if (id && ID_IS_OVERRIDE_LIBRARY(id)) {
-        BKE_lib_override_library_free(&id->override_library, true);
-        /* reassign to get get proper updates/notifiers */
+        BKE_lib_override_library_make_local(id);
+        /* Reassign to get proper updates/notifiers. */
         idptr = RNA_property_pointer_get(&template_ui->ptr, template_ui->prop);
         RNA_property_pointer_set(&template_ui->ptr, template_ui->prop, idptr, NULL);
         RNA_property_update(C, &template_ui->ptr, template_ui->prop);
@@ -876,7 +877,7 @@ static uiBut *template_id_def_new_but(uiBlock *block,
                             BLT_I18NCONTEXT_ID_POINTCLOUD,
                             BLT_I18NCONTEXT_ID_VOLUME,
                             BLT_I18NCONTEXT_ID_SIMULATION, );
-  /* Note: BLT_I18N_MSGID_MULTI_CTXT takes a maximum number of parameters,
+  /* NOTE: BLT_I18N_MSGID_MULTI_CTXT takes a maximum number of parameters,
    * check the definition to see if a new call must be added when the limit
    * is exceeded. */
 
@@ -1077,7 +1078,7 @@ static void template_ID(const bContext *C,
       char numstr[32];
       short numstr_len;
 
-      numstr_len = BLI_snprintf(numstr, sizeof(numstr), "%d", ID_REAL_USERS(id));
+      numstr_len = BLI_snprintf_rlen(numstr, sizeof(numstr), "%d", ID_REAL_USERS(id));
 
       but = uiDefBut(
           block,
@@ -1109,7 +1110,7 @@ static void template_ID(const bContext *C,
       UI_but_flag_enable(but, UI_BUT_REDALERT);
     }
 
-    if (id->lib == NULL && !(ELEM(GS(id->name), ID_GR, ID_SCE, ID_SCR, ID_TXT, ID_OB, ID_WS)) &&
+    if (id->lib == NULL && !(ELEM(GS(id->name), ID_GR, ID_SCE, ID_SCR, ID_OB, ID_WS)) &&
         (hide_buttons == false)) {
       uiDefIconButR(block,
                     UI_BTYPE_ICON_TOGGLE,
@@ -2398,8 +2399,8 @@ static eAutoPropButsReturn template_operator_property_buts_draw_single(
     op->type->ui((bContext *)C, op);
     op->layout = NULL;
 
-    /* UI_LAYOUT_OP_SHOW_EMPTY ignored. retun_info is ignored too. We could
-     * allow ot.ui callback to return this, but not needed right now. */
+    /* #UI_LAYOUT_OP_SHOW_EMPTY ignored. retun_info is ignored too.
+     * We could allow #wmOperatorType.ui callback to return this, but not needed right now. */
   }
   else {
     wmWindowManager *wm = CTX_wm_manager(C);
@@ -2555,7 +2556,7 @@ void uiTemplateOperatorPropertyButs(
   wmWindowManager *wm = CTX_wm_manager(C);
 
   /* If there are only checkbox items, don't use split layout by default. It looks weird if the
-   * checkboxes only use half the width. */
+   * check-boxes only use half the width. */
   if (ui_layout_operator_properties_only_booleans(C, wm, op, flag)) {
     flag |= UI_TEMPLATE_OP_PROPS_NO_SPLIT_LAYOUT;
   }
@@ -3049,7 +3050,7 @@ static void colorband_flip_cb(bContext *C, ColorBand *coba)
     coba->data[a] = data_tmp[a];
   }
 
-  /* may as well flip the cur*/
+  /* May as well flip the `cur`. */
   coba->cur = coba->tot - (coba->cur + 1);
 
   ED_undo_push(C, "Flip Color Ramp");
@@ -4014,23 +4015,23 @@ static void curvemap_tools_dofunc(bContext *C, void *cumap_v, int event)
     case UICURVE_FUNC_RESET_VIEW:
       BKE_curvemapping_reset_view(cumap);
       break;
-    case UICURVE_FUNC_HANDLE_VECTOR: /* set vector */
+    case UICURVE_FUNC_HANDLE_VECTOR: /* Set vector. */
       BKE_curvemap_handle_set(cuma, HD_VECT);
       BKE_curvemapping_changed(cumap, false);
       break;
-    case UICURVE_FUNC_HANDLE_AUTO: /* set auto */
+    case UICURVE_FUNC_HANDLE_AUTO: /* Set auto. */
       BKE_curvemap_handle_set(cuma, HD_AUTO);
       BKE_curvemapping_changed(cumap, false);
       break;
-    case UICURVE_FUNC_HANDLE_AUTO_ANIM: /* set auto-clamped */
+    case UICURVE_FUNC_HANDLE_AUTO_ANIM: /* Set auto-clamped. */
       BKE_curvemap_handle_set(cuma, HD_AUTO_ANIM);
       BKE_curvemapping_changed(cumap, false);
       break;
-    case UICURVE_FUNC_EXTEND_HOZ: /* extend horiz */
+    case UICURVE_FUNC_EXTEND_HOZ: /* Extend horizontal. */
       cumap->flag &= ~CUMA_EXTEND_EXTRAPOLATE;
       BKE_curvemapping_changed(cumap, false);
       break;
-    case UICURVE_FUNC_EXTEND_EXP: /* extend extrapolate */
+    case UICURVE_FUNC_EXTEND_EXP: /* Extend extrapolate. */
       cumap->flag |= CUMA_EXTEND_EXTRAPOLATE;
       BKE_curvemapping_changed(cumap, false);
       break;
@@ -5804,7 +5805,7 @@ static void uilist_filter_items_default(struct uiList *ui_list,
 
     if (order_by_name) {
       int new_idx;
-      /* note: order_idx equals either to ui_list->items_len if no filtering done,
+      /* NOTE: order_idx equals either to ui_list->items_len if no filtering done,
        *       or to ui_list->items_shown if filter is enabled,
        *       or to (ui_list->items_len - ui_list->items_shown) if filtered items are excluded.
        *       This way, we only sort items we actually intend to draw!
@@ -5882,7 +5883,7 @@ static void uilist_prepare(uiList *ui_list,
   }
 
   /* If list length changes or list is tagged to check this,
-   * and active is out of view, scroll to it .*/
+   * and active is out of view, scroll to it. */
   if (ui_list->list_last_len != len || ui_list->flag & UILST_SCROLL_TO_ACTIVE_ITEM) {
     if (activei_row < ui_list->list_scroll) {
       ui_list->list_scroll = activei_row;
@@ -6204,7 +6205,7 @@ void uiTemplateList(uiLayout *layout,
                                0,
                                TIP_("Double click to rename"));
           if ((dyntip_data = uilist_item_use_dynamic_tooltip(itemptr, item_dyntip_propname))) {
-            UI_but_func_tooltip_set(but, uilist_item_tooltip_func, dyntip_data);
+            UI_but_func_tooltip_set(but, uilist_item_tooltip_func, dyntip_data, MEM_freeN);
           }
 
           sub = uiLayoutRow(overlap, false);
@@ -6761,7 +6762,7 @@ void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
                                                                             NULL);
 
       but_progress->progress = progress;
-      UI_but_func_tooltip_set(&but_progress->but, progress_tooltip_func, tip_arg);
+      UI_but_func_tooltip_set(&but_progress->but, progress_tooltip_func, tip_arg, MEM_freeN);
     }
 
     if (!wm->is_interface_locked) {
@@ -6829,6 +6830,7 @@ void uiTemplateReportsBanner(uiLayout *layout, bContext *C)
 
   uiLayout *ui_abs = uiLayoutAbsolute(layout, false);
   uiBlock *block = uiLayoutGetBlock(ui_abs);
+  eUIEmbossType previous_emboss = UI_block_emboss_get(block);
 
   UI_fontstyle_set(&style->widgetlabel);
   int width = BLF_width(style->widgetlabel.uifont_id, report->message, report->len);
@@ -6903,6 +6905,8 @@ void uiTemplateReportsBanner(uiLayout *layout, bContext *C)
                   width + UI_UNIT_X,
                   UI_UNIT_Y,
                   "Show in Info Log");
+
+  UI_block_emboss_set(block, previous_emboss);
 }
 
 void uiTemplateInputStatus(uiLayout *layout, struct bContext *C)
@@ -7191,7 +7195,7 @@ void uiTemplateComponentMenu(uiLayout *layout,
 /** \name Node Socket Icon Template
  * \{ */
 
-void uiTemplateNodeSocket(uiLayout *layout, bContext *UNUSED(C), float *color)
+void uiTemplateNodeSocket(uiLayout *layout, bContext *UNUSED(C), float color[4])
 {
   uiBlock *block = uiLayoutGetBlock(layout);
   UI_block_align_begin(block);

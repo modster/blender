@@ -71,7 +71,7 @@ def rtl_process_po(args, settings):
     po.write(kind="PO", dest=args.dst)
 
 
-def language_menu(args, settings):
+def language_menu(_args, settings):
     # 'DEFAULT' and en_US are always valid, fully-translated "languages"!
     stats = {"DEFAULT": 1.0, "en_US": 1.0}
 
@@ -139,6 +139,7 @@ def main():
         settings.FILE_NAME_POT = args.template
 
     args.func(args=args, settings=settings)
+
 
 if __name__ == "__main__":
     print("\n\n *** Running {} *** \n".format(__file__))

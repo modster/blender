@@ -93,7 +93,7 @@ set(SRC
   intern/boids.c
   intern/bpath.c
   intern/brush.c
-  intern/bvhutils.c
+  intern/bvhutils.cc
   intern/cachefile.c
   intern/callbacks.c
   intern/camera.c
@@ -112,12 +112,13 @@ set(SRC
   intern/curve_convert.c
   intern/curve_decimate.c
   intern/curve_deform.c
+  intern/curve_eval.cc
   intern/curveprofile.c
   intern/customdata.c
   intern/customdata_file.c
   intern/data_transfer.c
   intern/deform.c
-  intern/displist.c
+  intern/displist.cc
   intern/displist_tangent.c
   intern/dynamicpaint.c
   intern/editlattice.c
@@ -133,6 +134,7 @@ set(SRC
   intern/fmodifier.c
   intern/font.c
   intern/freestyle.c
+  intern/geometry_component_curve.cc
   intern/geometry_component_instances.cc
   intern/geometry_component_mesh.cc
   intern/geometry_component_pointcloud.cc
@@ -163,6 +165,7 @@ set(SRC
   intern/layer_utils.c
   intern/lib_id.c
   intern/lib_id_delete.c
+  intern/lib_id_eval.c
   intern/lib_override.c
   intern/lib_query.c
   intern/lib_remap.c
@@ -181,16 +184,19 @@ set(SRC
   intern/mesh.c
   intern/mesh_boolean_convert.cc
   intern/mesh_convert.c
-  intern/mesh_evaluate.c
+  intern/mesh_evaluate.cc
   intern/mesh_fair.cc
   intern/mesh_iterators.c
   intern/mesh_mapping.c
   intern/mesh_merge.c
   intern/mesh_mirror.c
+  intern/mesh_normals.cc
   intern/mesh_remap.c
   intern/mesh_remesh_voxel.c
   intern/mesh_runtime.c
+  intern/mesh_sample.cc
   intern/mesh_tangent.c
+  intern/mesh_tessellate.c
   intern/mesh_validate.c
   intern/mesh_validate.cc
   intern/mesh_wrapper.c
@@ -209,7 +215,6 @@ set(SRC
   intern/multires_versioning.c
   intern/nla.c
   intern/node.cc
-  intern/node_ui_storage.cc
   intern/object.c
   intern/object_deform.c
   intern/object_dupli.cc
@@ -240,6 +245,10 @@ set(SRC
   intern/softbody.c
   intern/sound.c
   intern/speaker.c
+  intern/spline_base.cc
+  intern/spline_bezier.cc
+  intern/spline_nurbs.cc
+  intern/spline_poly.cc
   intern/studiolight.c
   intern/subdiv.c
   intern/subdiv_ccg.c
@@ -379,6 +388,7 @@ set(SRC
   BKE_mesh_remap.h
   BKE_mesh_remesh_voxel.h
   BKE_mesh_runtime.h
+  BKE_mesh_sample.hh
   BKE_mesh_tangent.h
   BKE_mesh_types.h
   BKE_mesh_wrapper.h
@@ -387,7 +397,6 @@ set(SRC
   BKE_multires.h
   BKE_nla.h
   BKE_node.h
-  BKE_node_ui_storage.hh
   BKE_object.h
   BKE_object_deform.h
   BKE_object_facemap.h
@@ -397,7 +406,6 @@ set(SRC
   BKE_paint.h
   BKE_particle.h
   BKE_pbvh.h
-  BKE_persistent_data_handle.hh
   BKE_pointcache.h
   BKE_pointcloud.h
   BKE_preferences.h
@@ -412,6 +420,7 @@ set(SRC
   BKE_softbody.h
   BKE_sound.h
   BKE_speaker.h
+  BKE_spline.hh
   BKE_studiolight.h
   BKE_subdiv.h
   BKE_subdiv_ccg.h
@@ -583,10 +592,6 @@ if(WITH_CODEC_FFMPEG)
     ${FFMPEG_LIBRARIES}
   )
   add_definitions(-DWITH_FFMPEG)
-
-  remove_strict_c_flags_file(
-    intern/writeffmpeg.c
-  )
 endif()
 
 if(WITH_PYTHON)
@@ -767,11 +772,13 @@ add_dependencies(bf_blenkernel bf_dna)
 
 if(WITH_GTESTS)
   set(TEST_SRC
+    intern/action_test.cc
     intern/armature_test.cc
     intern/cryptomatte_test.cc
     intern/fcurve_test.cc
     intern/lattice_deform_test.cc
     intern/layer_test.cc
+    intern/lib_id_test.cc
     intern/tracking_test.cc
   )
   set(TEST_INC

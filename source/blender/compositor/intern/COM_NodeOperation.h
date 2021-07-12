@@ -39,9 +39,17 @@ namespace blender::compositor {
 class OpenCLDevice;
 class ReadBufferOperation;
 class WriteBufferOperation;
+class ExecutionSystem;
 
 class NodeOperation;
 typedef NodeOperation SocketReader;
+
+/**
+ * RESOLUTION_INPUT_ANY is a wildcard when any resolution of an input can be used.
+ * This solves the issue that the FileInputNode in a group node cannot find the
+ * correct resolution.
+ */
+static constexpr unsigned int RESOLUTION_INPUT_ANY = 999999;
 
 /**
  * \brief Resize modes of inputsockets
@@ -183,6 +191,10 @@ struct NodeOperationFlags {
    */
   bool open_cl : 1;
 
+  /**
+   * TODO: Remove this flag and #SingleThreadedOperation if tiled implementation is removed.
+   * Full-frame implementation doesn't need it.
+   */
   bool single_threaded : 1;
 
   /**
@@ -209,6 +221,7 @@ struct NodeOperationFlags {
 
   /**
    * Is this a set operation (value, color, vector).
+   * TODO: To be replaced by is_constant_operation flag once tiled implementation is removed.
    */
   bool is_set_operation : 1;
   bool is_write_buffer_operation : 1;
@@ -225,6 +238,22 @@ struct NodeOperationFlags {
    */
   bool use_datatype_conversion : 1;
 
+  /**
+   * Has this operation fullframe implementation.
+   */
+  bool is_fullframe_operation : 1;
+
+  /**
+   * Whether operation is a primitive constant operation (Color/Vector/Value).
+   */
+  bool is_constant_operation : 1;
+
+  /**
+   * Whether operation have constant elements/pixels values when all its inputs are constant
+   * operations.
+   */
+  bool can_be_constant : 1;
+
   NodeOperationFlags()
   {
     complex = false;
@@ -240,6 +269,9 @@ struct NodeOperationFlags {
     is_viewer_operation = false;
     is_preview_operation = false;
     use_datatype_conversion = true;
+    is_fullframe_operation = false;
+    is_constant_operation = false;
+    can_be_constant = false;
   }
 };
 
@@ -279,6 +311,11 @@ class NodeOperation {
 
  protected:
   /**
+   * Compositor execution model.
+   */
+  eExecutionModel execution_model_;
+
+  /**
    * Width of the output of this operation.
    */
   unsigned int m_width;
@@ -293,9 +330,16 @@ class NodeOperation {
    */
   NodeOperationFlags flags;
 
+  ExecutionSystem *exec_system_;
+
  public:
   virtual ~NodeOperation()
   {
+  }
+
+  void set_execution_model(const eExecutionModel model)
+  {
+    execution_model_ = model;
   }
 
   void set_name(const std::string name)
@@ -334,6 +378,13 @@ class NodeOperation {
   NodeOperationOutput *getOutputSocket(unsigned int index = 0);
   NodeOperationInput *getInputSocket(unsigned int index);
 
+  NodeOperation *get_input_operation(int index)
+  {
+    /* TODO: Rename protected getInputOperation to get_input_operation and make it public replacing
+     * this method. */
+    return getInputOperation(index);
+  }
+
   /**
    * \brief determine the resolution of this node
    * \note this method will not set the resolution, this is the responsibility of the caller
@@ -367,6 +418,12 @@ class NodeOperation {
   {
     this->m_btree = tree;
   }
+
+  void set_execution_system(ExecutionSystem *system)
+  {
+    exec_system_ = system;
+  }
+
   virtual void initExecution();
 
   /**
@@ -530,6 +587,29 @@ class NodeOperation {
     return std::unique_ptr<MetaData>();
   }
 
+  /* -------------------------------------------------------------------- */
+  /** \name Full Frame Methods
+   * \{ */
+
+  void render(MemoryBuffer *output_buf, Span<rcti> areas, Span<MemoryBuffer *> inputs_bufs);
+
+  /**
+   * Executes operation updating output memory buffer. Single-threaded calls.
+   */
+  virtual void update_memory_buffer(MemoryBuffer *UNUSED(output),
+                                    const rcti &UNUSED(area),
+                                    Span<MemoryBuffer *> UNUSED(inputs))
+  {
+  }
+
+  /**
+   * Get input operation area being read by this operation on rendering given output area.
+   */
+  virtual void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area);
+  void get_area_of_interest(NodeOperation *input_op, const rcti &output_area, rcti &r_input_area);
+
+  /** \} */
+
  protected:
   NodeOperation();
 
@@ -608,6 +688,25 @@ class NodeOperation {
       float /*output*/[4], float /*x*/, float /*y*/, float /*dx*/[2], float /*dy*/[2])
   {
   }
+
+ private:
+  /* -------------------------------------------------------------------- */
+  /** \name Full Frame Methods
+   * \{ */
+
+  void render_full_frame(MemoryBuffer *output_buf,
+                         Span<rcti> areas,
+                         Span<MemoryBuffer *> inputs_bufs);
+
+  void render_full_frame_fallback(MemoryBuffer *output_buf,
+                                  Span<rcti> areas,
+                                  Span<MemoryBuffer *> inputs);
+  void render_tile(MemoryBuffer *output_buf, rcti *tile_rect);
+  Vector<NodeOperationOutput *> replace_inputs_with_buffers(Span<MemoryBuffer *> inputs_bufs);
+  void remove_buffers_and_restore_original_inputs(
+      Span<NodeOperationOutput *> original_inputs_links);
+
+  /** \} */
 
   /* allow the DebugInfo class to look at internals */
   friend class DebugInfo;

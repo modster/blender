@@ -57,7 +57,8 @@ typedef struct MTex {
   short colormodel, pmapto, pmaptoneg;
   short normapspace, which_output;
   float r, g, b, k;
-  float def_var, rt;
+  float def_var;
+  char _pad1[4];
 
   /* common */
   float colfac, varfac;
@@ -218,10 +219,12 @@ typedef struct Tex {
 
 } Tex;
 
-/* used for mapping and texture nodes. note: rot is now in radians */
-
+/** Used for mapping and texture nodes. */
 typedef struct TexMapping {
-  float loc[3], rot[3], size[3];
+  float loc[3];
+  /** Rotation in radians. */
+  float rot[3];
+  float size[3];
   int flag;
   char projx, projy, projz, mapping;
   int type;

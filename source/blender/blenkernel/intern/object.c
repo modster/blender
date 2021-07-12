@@ -251,7 +251,7 @@ static void object_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const in
 
   BLI_listbase_clear(&ob_dst->modifiers);
   BLI_listbase_clear(&ob_dst->greasepencil_modifiers);
-  /* Note: Also takes care of softbody and particle systems copying. */
+  /* NOTE: Also takes care of softbody and particle systems copying. */
   BKE_object_modifier_stack_copy(ob_dst, ob_src, true, flag_subdata);
 
   BLI_listbase_clear((ListBase *)&ob_dst->drawdata);
@@ -262,7 +262,7 @@ static void object_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const in
 
   /* Do not copy object's preview
    * (mostly due to the fact renderers create temp copy of objects). */
-  if ((flag & LIB_ID_COPY_NO_PREVIEW) == 0 && false) { /* XXX TODO temp hack */
+  if ((flag & LIB_ID_COPY_NO_PREVIEW) == 0 && false) { /* XXX TODO: temp hack. */
     BKE_previewimg_id_copy(&ob_dst->id, &ob_src->id);
   }
   else {
@@ -957,8 +957,8 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
         ob, eModifierType_Fluidsim);
 
     if (fluidmd && fluidmd->fss) {
-      BLO_read_id_address(
-          reader, ob->id.lib, &fluidmd->fss->ipo); /* XXX deprecated - old animation system */
+      /* XXX: deprecated - old animation system. */
+      BLO_read_id_address(reader, ob->id.lib, &fluidmd->fss->ipo);
     }
   }
 
@@ -1040,6 +1040,8 @@ static void object_blend_read_expand(BlendExpander *expander, ID *id)
   Object *ob = (Object *)id;
 
   BLO_expand(expander, ob->data);
+
+  BLO_expand(expander, ob->parent);
 
   /* expand_object_expandModifier() */
   if (ob->modifiers.first) {
@@ -1332,11 +1334,8 @@ bool BKE_object_support_modifier_type_check(const Object *ob, int modifier_type)
   if (ob->type == OB_HAIR) {
     return (mti->modifyHair != NULL) || (mti->flags & eModifierTypeFlag_AcceptsVertexCosOnly);
   }
-  if (ob->type == OB_POINTCLOUD) {
+  if (ELEM(ob->type, OB_POINTCLOUD, OB_VOLUME)) {
     return (mti->modifyGeometrySet != NULL);
-  }
-  if (ob->type == OB_VOLUME) {
-    return (mti->modifyVolume != NULL);
   }
   if (ELEM(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_LATTICE)) {
     if (ob->type == OB_LATTICE && (mti->flags & eModifierTypeFlag_AcceptsVertexCosOnly) == 0) {
@@ -1761,10 +1760,6 @@ void BKE_object_free_derived_caches(Object *ob)
     BKE_geometry_set_free(ob->runtime.geometry_set_eval);
     ob->runtime.geometry_set_eval = NULL;
   }
-  if (ob->runtime.geometry_set_preview != NULL) {
-    BKE_geometry_set_free(ob->runtime.geometry_set_preview);
-    ob->runtime.geometry_set_preview = NULL;
-  }
 }
 
 void BKE_object_free_caches(Object *object)
@@ -1813,18 +1808,6 @@ void BKE_object_free_caches(Object *object)
   if (update_flag != 0) {
     DEG_id_tag_update(&object->id, update_flag);
   }
-}
-
-/* Can be called from multiple threads. */
-void BKE_object_set_preview_geometry_set(Object *ob, struct GeometrySet *geometry_set)
-{
-  static ThreadMutex mutex = BLI_MUTEX_INITIALIZER;
-  BLI_mutex_lock(&mutex);
-  if (ob->runtime.geometry_set_preview != NULL) {
-    BKE_geometry_set_free(ob->runtime.geometry_set_preview);
-  }
-  ob->runtime.geometry_set_preview = geometry_set;
-  BLI_mutex_unlock(&mutex);
 }
 
 /**
@@ -2286,7 +2269,7 @@ Object *BKE_object_add_for_data(
 void BKE_object_copy_softbody(Object *ob_dst, const Object *ob_src, const int flag)
 {
   SoftBody *sb = ob_src->soft;
-  bool tagged_no_main = ob_dst->id.tag & LIB_TAG_NO_MAIN;
+  const bool is_orig = (flag & LIB_ID_COPY_SET_COPIED_ON_WRITE) == 0;
 
   ob_dst->softflag = ob_src->softflag;
   if (sb == NULL) {
@@ -2327,7 +2310,7 @@ void BKE_object_copy_softbody(Object *ob_dst, const Object *ob_src, const int fl
 
   sbn->scratch = NULL;
 
-  if (!tagged_no_main) {
+  if (is_orig) {
     sbn->shared = MEM_dupallocN(sb->shared);
     sbn->shared->pointcache = BKE_ptcache_copy_list(
         &sbn->shared->ptcaches, &sb->shared->ptcaches, flag);
@@ -2366,7 +2349,7 @@ ParticleSystem *BKE_object_copy_particlesystem(ParticleSystem *psys, const int f
   BLI_listbase_clear(&psysn->pathcachebufs);
   BLI_listbase_clear(&psysn->childcachebufs);
 
-  if (flag & LIB_ID_CREATE_NO_MAIN) {
+  if (flag & LIB_ID_COPY_SET_COPIED_ON_WRITE) {
     /* XXX Disabled, fails when evaluating depsgraph after copying ID with no main for preview
      * creation. */
     // BLI_assert((psys->flag & PSYS_SHARED_CACHES) == 0);
@@ -2377,8 +2360,8 @@ ParticleSystem *BKE_object_copy_particlesystem(ParticleSystem *psys, const int f
     psysn->pointcache = BKE_ptcache_copy_list(&psysn->ptcaches, &psys->ptcaches, flag);
   }
 
-  /* XXX - from reading existing code this seems correct but intended usage of
-   * pointcache should /w cloth should be added in 'ParticleSystem' - campbell */
+  /* XXX(campbell): from reading existing code this seems correct but intended usage of
+   * pointcache should /w cloth should be added in 'ParticleSystem'. */
   if (psysn->clmd) {
     psysn->clmd->point_cache = psysn->pointcache;
   }
@@ -2436,7 +2419,7 @@ void BKE_object_copy_particlesystems(Object *ob_dst, const Object *ob_src, const
 
 static void copy_object_pose(Object *obn, const Object *ob, const int flag)
 {
-  /* note: need to clear obn->pose pointer first,
+  /* NOTE: need to clear obn->pose pointer first,
    * so that BKE_pose_copy_data works (otherwise there's a crash) */
   obn->pose = NULL;
   BKE_pose_copy_data_ex(&obn->pose, ob->pose, flag, true); /* true = copy constraints */
@@ -2619,8 +2602,8 @@ void BKE_object_transform_copy(Object *ob_tar, const Object *ob_src)
  *
  * \note This function does not do any remapping to new IDs, caller must do it
  * (\a #BKE_libblock_relink_to_newid()).
- * \note Caller MUST free \a newid pointers itself (#BKE_main_id_clear_newpoins()) and call updates
- * of DEG too (#DAG_relations_tag_update()).
+ * \note Caller MUST free \a newid pointers itself (#BKE_main_id_newptr_and_tag_clear()) and call
+ * updates of DEG too (#DAG_relations_tag_update()).
  */
 Object *BKE_object_duplicate(Main *bmain,
                              Object *ob,
@@ -2630,8 +2613,7 @@ Object *BKE_object_duplicate(Main *bmain,
   const bool is_subprocess = (duplicate_options & LIB_ID_DUPLICATE_IS_SUBPROCESS) != 0;
 
   if (!is_subprocess) {
-    BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-    BKE_main_id_clear_newpoins(bmain);
+    BKE_main_id_newptr_and_tag_clear(bmain);
     /* In case root duplicated ID is linked, assume we want to get a local copy of it and duplicate
      * all expected linked data. */
     if (ID_IS_LINKED(ob)) {
@@ -2757,7 +2739,7 @@ Object *BKE_object_duplicate(Main *bmain,
   }
 
   if (!is_subprocess) {
-    /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW.*/
+    /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW. */
     BKE_libblock_relink_to_newid(&obn->id);
 
 #ifndef NDEBUG
@@ -2770,8 +2752,7 @@ Object *BKE_object_duplicate(Main *bmain,
 #endif
 
     /* Cleanup. */
-    BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-    BKE_main_id_clear_newpoins(bmain);
+    BKE_main_id_newptr_and_tag_clear(bmain);
   }
 
   if (obn->type == OB_ARMATURE) {
@@ -2832,7 +2813,7 @@ void BKE_object_copy_proxy_drivers(Object *ob, Object *target)
 
     /* add new animdata block */
     if (!ob->adt) {
-      ob->adt = BKE_animdata_add_id(&ob->id);
+      ob->adt = BKE_animdata_ensure_id(&ob->id);
     }
 
     /* make a copy of all the drivers (for now), then correct any links that need fixing */
@@ -2853,7 +2834,7 @@ void BKE_object_copy_proxy_drivers(Object *ob, Object *target)
             else {
               /* only on local objects because this causes indirect links
                * 'a -> b -> c', blend to point directly to a.blend
-               * when a.blend has a proxy that's linked into c.blend  */
+               * when a.blend has a proxy that's linked into `c.blend`. */
               if (!ID_IS_LINKED(ob)) {
                 id_lib_extern((ID *)dtar->id);
               }
@@ -2889,7 +2870,7 @@ void BKE_object_make_proxy(Main *bmain, Object *ob, Object *target, Object *cob)
 
   /* copy transform
    * - cob means this proxy comes from a collection, just apply the matrix
-   *   so the object wont move from its dupli-transform.
+   *   so the object won't move from its dupli-transform.
    *
    * - no cob means this is being made from a linked object,
    *   this is closer to making a copy of the object - in-place. */
@@ -3211,12 +3192,11 @@ void BKE_object_to_mat3(Object *ob, float r_mat[3][3]) /* no parent */
 {
   float smat[3][3];
   float rmat[3][3];
-  /*float q1[4];*/
 
-  /* scale */
+  /* Scale. */
   BKE_object_scale_to_mat3(ob, smat);
 
-  /* rot */
+  /* Rotation. */
   BKE_object_rot_to_mat3(ob, rmat, true);
   mul_m3_m3m3(r_mat, rmat, smat);
 }
@@ -3280,6 +3260,10 @@ static bool ob_parcurve(Object *ob, Object *par, float r_mat[4][4])
   }
   else {
     ctime = cu->ctime;
+  }
+
+  if (cu->flag & CU_PATH_CLAMP) {
+    CLAMP(ctime, 0.0f, 1.0f);
   }
 
   unit_m4(r_mat);
@@ -3856,7 +3840,7 @@ void BKE_object_boundbox_flag(Object *ob, int flag, const bool set)
   }
 }
 
-void BKE_object_boundbox_calc_from_mesh(struct Object *ob, struct Mesh *me_eval)
+void BKE_object_boundbox_calc_from_mesh(struct Object *ob, const struct Mesh *me_eval)
 {
   float min[3], max[3];
 
@@ -4085,7 +4069,7 @@ bool BKE_object_empty_image_data_is_visible_in_view3d(const Object *ob, const Re
   if ((visibility_flag & (OB_EMPTY_IMAGE_HIDE_BACK | OB_EMPTY_IMAGE_HIDE_FRONT)) != 0) {
     float eps, dot;
     if (rv3d->is_persp) {
-      /* Note, we could normalize the 'view_dir' then use 'eps'
+      /* NOTE: we could normalize the 'view_dir' then use 'eps'
        * however the issue with empty objects being visible when viewed from the side
        * is only noticeable in orthographic views. */
       float view_dir[3];
@@ -4129,7 +4113,7 @@ bool BKE_object_minmax_dupli(Depsgraph *depsgraph,
                              const bool use_hidden)
 {
   bool ok = false;
-  if ((ob->transflag & OB_DUPLI) == 0) {
+  if ((ob->transflag & OB_DUPLI) == 0 && ob->runtime.geometry_set_eval == NULL) {
     return ok;
   }
 
@@ -4159,13 +4143,37 @@ bool BKE_object_minmax_dupli(Depsgraph *depsgraph,
   return ok;
 }
 
+struct GPencilStrokePointIterData {
+  const float (*obmat)[4];
+
+  void (*point_func_cb)(const float co[3], void *user_data);
+  void *user_data;
+};
+
+static void foreach_display_point_gpencil_stroke_fn(bGPDlayer *UNUSED(layer),
+                                                    bGPDframe *UNUSED(frame),
+                                                    bGPDstroke *stroke,
+                                                    void *thunk)
+{
+  struct GPencilStrokePointIterData *iter_data = thunk;
+  {
+    bGPDspoint *pt;
+    int i;
+    for (i = 0, pt = stroke->points; i < stroke->totpoints; i++, pt++) {
+      float co[3];
+      mul_v3_m4v3(co, iter_data->obmat, &pt->x);
+      iter_data->point_func_cb(co, iter_data->user_data);
+    }
+  }
+}
+
 void BKE_object_foreach_display_point(Object *ob,
                                       const float obmat[4][4],
                                       void (*func_cb)(const float[3], void *),
                                       void *user_data)
 {
   /* TODO: pointcloud and hair objects support */
-  Mesh *mesh_eval = BKE_object_get_evaluated_mesh(ob);
+  const Mesh *mesh_eval = BKE_object_get_evaluated_mesh(ob);
   float co[3];
 
   if (mesh_eval != NULL) {
@@ -4175,6 +4183,13 @@ void BKE_object_foreach_display_point(Object *ob,
       mul_v3_m4v3(co, obmat, mv->co);
       func_cb(co, user_data);
     }
+  }
+  else if (ob->type == OB_GPENCIL) {
+    struct GPencilStrokePointIterData iter_data = {
+        .obmat = obmat, .point_func_cb = func_cb, .user_data = user_data};
+
+    BKE_gpencil_visible_stroke_iter(
+        ob->data, NULL, foreach_display_point_gpencil_stroke_fn, &iter_data);
   }
   else if (ob->runtime.curve_cache && ob->runtime.curve_cache->disp.first) {
     DispList *dl;
@@ -4340,7 +4355,7 @@ void BKE_object_handle_update_ex(Depsgraph *depsgraph,
   }
   /* Speed optimization for animation lookups. */
   if (ob->pose != NULL) {
-    BKE_pose_channels_hash_make(ob->pose);
+    BKE_pose_channels_hash_ensure(ob->pose);
     if (ob->pose->flag & POSE_CONSTRAINTS_NEED_UPDATE_FLAGS) {
       BKE_pose_update_constraint_flags(ob->pose);
     }
@@ -4442,7 +4457,7 @@ bool BKE_object_obdata_texspace_get(Object *ob, short **r_texflag, float **r_loc
 }
 
 /** Get evaluated mesh for given object. */
-Mesh *BKE_object_get_evaluated_mesh(Object *object)
+Mesh *BKE_object_get_evaluated_mesh(const Object *object)
 {
   ID *data_eval = object->runtime.data_eval;
   return (data_eval && GS(data_eval->name) == ID_ME) ? (Mesh *)data_eval : NULL;
@@ -4455,7 +4470,7 @@ Mesh *BKE_object_get_evaluated_mesh(Object *object)
  * - For copied-on-write objects it will give pointer to a copied-on-write
  *   mesh which corresponds to original object's mesh.
  */
-Mesh *BKE_object_get_pre_modified_mesh(Object *object)
+Mesh *BKE_object_get_pre_modified_mesh(const Object *object)
 {
   if (object->type == OB_MESH && object->runtime.data_orig != NULL) {
     BLI_assert(object->id.tag & LIB_TAG_COPIED_ON_WRITE);
@@ -4471,12 +4486,12 @@ Mesh *BKE_object_get_pre_modified_mesh(Object *object)
 }
 
 /**
- * Get a mesh which corresponds to very very original mesh from #Main.
+ * Get a mesh which corresponds to the very original mesh from #Main.
  * - For original objects it will be object->data.
  * - For evaluated objects it will be same mesh as corresponding original
  *   object uses as data.
  */
-Mesh *BKE_object_get_original_mesh(Object *object)
+Mesh *BKE_object_get_original_mesh(const Object *object)
 {
   Mesh *result = NULL;
   if (object->id.orig_id == NULL) {
@@ -5111,6 +5126,20 @@ void BKE_object_runtime_reset_on_copy(Object *object, const int UNUSED(flag))
 }
 
 /**
+ * The function frees memory used by the runtime data, but not the runtime field itself.
+ *
+ * All runtime data is cleared to ensure it's not used again,
+ * in keeping with other `_free_data(..)` functions.
+ */
+void BKE_object_runtime_free_data(Object *object)
+{
+  /* Currently this is all that's needed. */
+  BKE_object_free_derived_caches(object);
+
+  BKE_object_runtime_reset(object);
+}
+
+/**
  * Find an associated armature object.
  */
 static Object *obrel_armature_find(Object *ob)
@@ -5285,7 +5314,7 @@ KDTree_3d *BKE_object_as_kdtree(Object *ob, int *r_tot)
         tot = 0;
         tree = BLI_kdtree_3d_new(totvert);
 
-        /* we don't how how many verts from the DM we can use */
+        /* We don't how many verts from the DM we can use. */
         for (i = 0; i < totvert; i++) {
           if (index[i] != ORIGINDEX_NONE) {
             float co[3];
@@ -5598,7 +5627,7 @@ bool BKE_object_modifier_update_subframe(Depsgraph *depsgraph,
     }
   }
 
-  /* was originally ID_RECALC_ALL - TODO - which flags are really needed??? */
+  /* was originally ID_RECALC_ALL - TODO: which flags are really needed??? */
   /* TODO(sergey): What about animation? */
   const AnimationEvalContext anim_eval_context = BKE_animsys_eval_context_construct(depsgraph,
                                                                                     frame);
@@ -5651,7 +5680,7 @@ Mesh *BKE_object_to_mesh(Depsgraph *depsgraph, Object *object, bool preserve_all
 {
   BKE_object_to_mesh_clear(object);
 
-  Mesh *mesh = BKE_mesh_new_from_object(depsgraph, object, preserve_all_data_layers);
+  Mesh *mesh = BKE_mesh_new_from_object(depsgraph, object, preserve_all_data_layers, false);
   object->runtime.object_as_temp_mesh = mesh;
   return mesh;
 }

@@ -25,6 +25,7 @@
 
 #include "BKE_node.h"
 #include "UI_interface.h"
+#include "UI_view2d.h"
 #include <stddef.h> /* for size_t */
 
 /* internal exports only */
@@ -51,17 +52,22 @@ typedef struct bNodeLinkDrag {
   struct bNodeLinkDrag *next, *prev;
 
   /* List of links dragged by the operator.
-   * Note: This is a list of LinkData structs on top of the actual bNodeLinks.
+   * NOTE: This is a list of LinkData structs on top of the actual bNodeLinks.
    * This way the links can be added to the node tree while being stored in this list.
    */
   ListBase links;
   bool from_multi_input_socket;
   int in_out;
 
-  /** Temporarily stores the last picked link from multi input socket operator. */
+  /** Temporarily stores the last picked link from multi-input socket operator. */
   struct bNodeLink *last_picked_multi_input_socket_link;
 
+  /** Temporarily stores the last hovered socket for multi-input socket operator.
+   *  Store it to recalculate sorting after it is no longer hovered. */
   struct bNode *last_node_hovered_while_dragging_a_link;
+
+  /* Data for edge panning */
+  View2DEdgePanData pan_data;
 } bNodeLinkDrag;
 
 typedef struct SpaceNode_Runtime {
@@ -133,9 +139,6 @@ void node_set_cursor(struct wmWindow *win, struct SpaceNode *snode, float cursor
 void node_to_view(const struct bNode *node, float x, float y, float *rx, float *ry);
 void node_to_updated_rect(const struct bNode *node, rctf *r_rect);
 void node_from_view(const struct bNode *node, float x, float y, float *rx, float *ry);
-
-/* node_buttons.c */
-void node_buttons_register(struct ARegionType *art);
 
 /* node_toolbar.c */
 void node_toolbar_register(struct ARegionType *art);
@@ -273,7 +276,6 @@ void NODE_OT_hide_toggle(struct wmOperatorType *ot);
 void NODE_OT_hide_socket_toggle(struct wmOperatorType *ot);
 void NODE_OT_preview_toggle(struct wmOperatorType *ot);
 void NODE_OT_options_toggle(struct wmOperatorType *ot);
-void NODE_OT_active_preview_toggle(struct wmOperatorType *ot);
 void NODE_OT_node_copy_color(struct wmOperatorType *ot);
 
 void NODE_OT_read_viewlayers(struct wmOperatorType *ot);
@@ -285,12 +287,13 @@ void NODE_OT_output_file_move_active_socket(struct wmOperatorType *ot);
 
 void NODE_OT_switch_view_update(struct wmOperatorType *ot);
 
-/* Note: clipboard_cut is a simple macro of copy + delete */
+/* NOTE: clipboard_cut is a simple macro of copy + delete. */
 void NODE_OT_clipboard_copy(struct wmOperatorType *ot);
 void NODE_OT_clipboard_paste(struct wmOperatorType *ot);
 
 void NODE_OT_tree_socket_add(struct wmOperatorType *ot);
 void NODE_OT_tree_socket_remove(struct wmOperatorType *ot);
+void NODE_OT_tree_socket_change_type(struct wmOperatorType *ot);
 void NODE_OT_tree_socket_move(struct wmOperatorType *ot);
 
 void NODE_OT_shader_script_update(struct wmOperatorType *ot);
@@ -308,7 +311,8 @@ void NODE_OT_cryptomatte_layer_add(struct wmOperatorType *ot);
 void NODE_OT_cryptomatte_layer_remove(struct wmOperatorType *ot);
 
 /* node_geometry_attribute_search.cc */
-void node_geometry_add_attribute_search_button(const struct bNodeTree *node_tree,
+void node_geometry_add_attribute_search_button(const struct bContext *C,
+                                               const struct bNodeTree *node_tree,
                                                const struct bNode *node,
                                                struct PointerRNA *socket_ptr,
                                                struct uiLayout *layout);

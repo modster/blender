@@ -25,7 +25,7 @@ namespace blender::ed::spreadsheet {
 
 /**
  * This class is subclassed to implement different data sources for the spreadsheet. A data source
- * provides the information that should be displayed. It is not concerned with how data is layed
+ * provides the information that should be displayed. It is not concerned with how data is laid
  * out in the spreadsheet editor exactly.
  */
 class DataSource {
@@ -51,6 +51,15 @@ class DataSource {
   {
     UNUSED_VARS(column_id);
     return {};
+  }
+
+  /**
+   * Returns true if the data source has the ability to limit visible rows
+   * by user interface selection status.
+   */
+  virtual bool has_selection_filter() const
+  {
+    return false;
   }
 
   /**

@@ -153,7 +153,7 @@ static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
     if (win->workspace_hook != NULL) {
       /* We need to restore a pointer to this later when reading workspaces,
        * so store in global oldnew-map.
-       * Note that this is only needed for versioning of older .blend files now.. */
+       * Note that this is only needed for versioning of older .blend files now. */
       BLO_read_data_globmap_add(reader, hook, win->workspace_hook);
       /* Cleanup pointers to data outside of this data-block scope. */
       win->workspace_hook->act_layout = NULL;
@@ -168,7 +168,7 @@ static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
     win->eventstate = NULL;
     win->cursor_keymap_status = NULL;
     win->tweak = NULL;
-#ifdef WIN32
+#if defined(WIN32) || defined(__APPLE__)
     win->ime_data = NULL;
 #endif
 
@@ -186,6 +186,7 @@ static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
     win->addmousemove = true;
     win->event_queue_check_click = 0;
     win->event_queue_check_drag = 0;
+    win->event_queue_check_drag_handled = 0;
     BLO_read_data_address(reader, &win->stereo3d_format);
 
     /* Multi-view always fallback to anaglyph at file opening
@@ -515,7 +516,7 @@ void WM_check(bContext *C)
   }
 
   /* Case: fileread. */
-  /* Note: this runs in background mode to set the screen context cb. */
+  /* NOTE: this runs in background mode to set the screen context cb. */
   if ((wm->initialized & WM_WINDOW_IS_INIT) == 0) {
     ED_screens_init(bmain, wm);
     wm->initialized |= WM_WINDOW_IS_INIT;

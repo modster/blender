@@ -149,7 +149,7 @@ static void join_mesh_single(Depsgraph *depsgraph,
       mul_m4_m4m4(cmat, imat, ob_src->obmat);
 
       /* transform vertex coordinates into new space */
-      for (a = 0, mvert = *mvert_pp; a < me->totvert; a++, mvert++) {
+      for (a = 0; a < me->totvert; a++, mvert++) {
         mul_m4_v3(cmat, mvert->co);
       }
 
@@ -390,7 +390,7 @@ int ED_mesh_join_objects_exec(bContext *C, wmOperator *op)
   CTX_DATA_END;
 
   /* Apply parent transform if the active object's parent was joined to it.
-   * Note: This doesn't apply recursive parenting. */
+   * NOTE: This doesn't apply recursive parenting. */
   if (join_parent) {
     ob->parent = NULL;
     BKE_object_apply_mat4_ex(ob, ob->obmat, ob->parent, ob->parentinv, false);
@@ -1060,7 +1060,7 @@ static float *editmesh_get_mirror_uv(
     cent_vec[1] = face_cent[1];
   }
 
-  /* TODO - Optimize */
+  /* TODO: Optimize. */
   {
     BMIter iter;
     BMFace *efa;

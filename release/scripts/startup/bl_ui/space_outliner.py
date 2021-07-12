@@ -162,12 +162,12 @@ class OUTLINER_MT_collection_view_layer(Menu):
         layout.operator("outliner.collection_exclude_set")
         layout.operator("outliner.collection_exclude_clear")
 
+        layout.operator("outliner.collection_holdout_set")
+        layout.operator("outliner.collection_holdout_clear")
+
         if context.engine == 'CYCLES':
             layout.operator("outliner.collection_indirect_only_set")
             layout.operator("outliner.collection_indirect_only_clear")
-
-            layout.operator("outliner.collection_holdout_set")
-            layout.operator("outliner.collection_holdout_clear")
 
 
 class OUTLINER_MT_collection_visibility(Menu):
@@ -370,6 +370,10 @@ class OUTLINER_PT_filter(Panel):
         col = layout.column(align=True)
 
         row = col.row()
+        row.label(icon='RENDERLAYERS')
+        row.prop(space, "use_filter_view_layers", text="All View Layers")
+
+        row = col.row()
         row.label(icon='OUTLINER_COLLECTION')
         row.prop(space, "use_filter_collection", text="Collections")
 
@@ -436,7 +440,6 @@ class OUTLINER_PT_filter(Panel):
             row = col.row()
             row.label(icon='LIBRARY_DATA_OVERRIDE')
             row.prop(space, "use_filter_lib_override_system", text="System Overrides")
-
 
 
 classes = (

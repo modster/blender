@@ -1189,9 +1189,7 @@ static SculptUndoNode *sculpt_undo_geometry_push(Object *object, SculptUndoType 
 static SculptUndoNode *sculpt_undo_face_sets_push(Object *ob, SculptUndoType type)
 {
   UndoSculpt *usculpt = sculpt_undo_get_nodes();
-  SculptUndoNode *unode = usculpt->nodes.first;
-
-  unode = MEM_callocN(sizeof(*unode), __func__);
+  SculptUndoNode *unode = MEM_callocN(sizeof(*unode), __func__);
 
   BLI_strncpy(unode->idname, ob->id.name, sizeof(unode->idname));
   unode->type = type;
@@ -1434,7 +1432,7 @@ void SCULPT_undo_push_end_ex(const bool use_nested_undo)
 
 typedef struct SculptUndoStep {
   UndoStep step;
-  /* Note: will split out into list for multi-object-sculpt-mode. */
+  /* NOTE: will split out into list for multi-object-sculpt-mode. */
   UndoSculpt data;
 } SculptUndoStep;
 
@@ -1551,7 +1549,7 @@ static void sculpt_undosys_step_decode(
         ED_object_mode_generic_exit(bmain, depsgraph, scene, ob);
 
         /* Sculpt needs evaluated state.
-         * Note: needs to be done here, as #ED_object_mode_generic_exit will usually invalidate
+         * NOTE: needs to be done here, as #ED_object_mode_generic_exit will usually invalidate
          * (some) evaluated data. */
         BKE_scene_graph_evaluated_ensure(depsgraph, bmain);
 

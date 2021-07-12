@@ -80,6 +80,13 @@ class Texture {
   int refcount = 1;
   /** Width & Height (of source data), optional. */
   int src_w = 0, src_h = 0;
+#ifndef GPU_NO_USE_PY_REFERENCES
+  /**
+   * Reference of a pointer that needs to be cleaned when deallocating the texture.
+   * Points to #BPyGPUTexture.tex
+   */
+  void **py_ref = nullptr;
+#endif
 
  protected:
   /* ---- Texture format (immutable after init). ---- */
@@ -148,7 +155,7 @@ class Texture {
 
   void mip_size_get(int mip, int r_size[3]) const
   {
-    /* TODO assert if lvl is below the limit of 1px in each dimension. */
+    /* TODO: assert if lvl is below the limit of 1px in each dimension. */
     int div = 1 << mip;
     r_size[0] = max_ii(1, w_ / div);
 
@@ -552,7 +559,7 @@ static inline eGPUTextureFormat to_texture_format(const GPUVertFormat *format)
         case GPU_COMP_I16:
           return GPU_RGBA16I;
         case GPU_COMP_U16:
-          /* Note: Checking the fetch mode to select the right GPU texture format. This can be
+          /* NOTE: Checking the fetch mode to select the right GPU texture format. This can be
            * added to other formats as well. */
           switch (format->attrs[0].fetch_mode) {
             case GPU_FETCH_INT:

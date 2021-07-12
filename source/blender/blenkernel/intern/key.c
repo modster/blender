@@ -105,6 +105,11 @@ static void shapekey_foreach_id(ID *id, LibraryForeachIDData *data)
   BKE_LIB_FOREACHID_PROCESS_ID(data, key->from, IDWALK_CB_LOOPBACK);
 }
 
+static ID *shapekey_owner_get(Main *UNUSED(bmain), ID *id)
+{
+  return ((Key *)id)->from;
+}
+
 static void shapekey_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   Key *key = (Key *)id;
@@ -216,7 +221,9 @@ IDTypeInfo IDType_ID_KE = {
     .make_local = NULL,
     .foreach_id = shapekey_foreach_id,
     .foreach_cache = NULL,
-    .owner_get = NULL, /* Could have one actually? */
+    /* A bit weird, due to shapekeys not being strictly speaking embedded data... But they also
+     * share a lot with those (non linkable, only ever used by one owner ID, etc.). */
+    .owner_get = shapekey_owner_get,
 
     .blend_write = shapekey_blend_write,
     .blend_read_data = shapekey_blend_read_data,
@@ -308,11 +315,11 @@ Key *BKE_key_add(Main *bmain, ID *id) /* common function */
   return key;
 }
 
-/* Sort shape keys and Ipo curves after a change.  This assumes that at most
- * one key was moved, which is a valid assumption for the places it's
- * currently being called.
+/**
+ * Sort shape keys after a change.
+ * This assumes that at most one key was moved,
+ * which is a valid assumption for the places it's currently being called.
  */
-
 void BKE_key_sort(Key *key)
 {
   KeyBlock *kb;
@@ -2041,9 +2048,9 @@ void BKE_keyblock_convert_to_lattice(KeyBlock *kb, Lattice *lt)
 
 /************************* Curve ************************/
 
-int BKE_keyblock_curve_element_count(ListBase *nurb)
+int BKE_keyblock_curve_element_count(const ListBase *nurb)
 {
-  Nurb *nu;
+  const Nurb *nu;
   int tot = 0;
 
   nu = nurb->first;

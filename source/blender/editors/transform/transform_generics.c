@@ -353,13 +353,11 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     t->around = V3D_AROUND_CENTER_BOUNDS;
   }
 
-  BLI_assert(is_zero_v4(t->values_modal_offset));
-
   bool t_values_set_is_array = false;
 
   if (op && (prop = RNA_struct_find_property(op->ptr, "value")) &&
       RNA_property_is_set(op->ptr, prop)) {
-    float values[4] = {0}; /* in case value isn't length 4, avoid uninitialized memory  */
+    float values[4] = {0}; /* in case value isn't length 4, avoid uninitialized memory. */
     if (RNA_property_array_check(prop)) {
       RNA_float_get_array(op->ptr, "value", values);
       t_values_set_is_array = true;
@@ -368,7 +366,6 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
       values[0] = RNA_float_get(op->ptr, "value");
     }
 
-    copy_v4_v4(t->values, values);
     if (t->flag & T_MODAL) {
       /* Run before init functions so 'values_modal_offset' can be applied on mouse input. */
       copy_v4_v4(t->values_modal_offset, values);
@@ -409,11 +406,10 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     short orient_types[3];
     float custom_matrix[3][3];
 
-    short orient_type_scene = V3D_ORIENT_GLOBAL;
-    short orient_type_set = V3D_ORIENT_GLOBAL;
-    short orient_type_matrix_set = -1;
-
-    bool use_orient_axis = false;
+    int orient_type_scene = V3D_ORIENT_GLOBAL;
+    int orient_type_default = -1;
+    int orient_type_set = -1;
+    int orient_type_matrix_set = -1;
 
     if ((t->spacetype == SPACE_VIEW3D) && (t->region->regiontype == RGN_TYPE_WINDOW)) {
       TransformOrientationSlot *orient_slot = &t->scene->orientation_slots[SCE_ORIENT_DEFAULT];
@@ -424,40 +420,20 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
       }
     }
 
-    short orient_type_default = orient_type_scene;
-
-    if (op && (prop = RNA_struct_find_property(op->ptr, "orient_axis"))) {
-      t->orient_axis = RNA_property_enum_get(op->ptr, prop);
-      use_orient_axis = true;
-    }
-
-    if (op && (prop = RNA_struct_find_property(op->ptr, "orient_axis_ortho"))) {
-      t->orient_axis_ortho = RNA_property_enum_get(op->ptr, prop);
-    }
-
     if (op && ((prop = RNA_struct_find_property(op->ptr, "orient_type")) &&
                RNA_property_is_set(op->ptr, prop))) {
       orient_type_set = RNA_property_enum_get(op->ptr, prop);
       if (orient_type_set >= V3D_ORIENT_CUSTOM + BIF_countTransformOrientation(C)) {
         orient_type_set = V3D_ORIENT_GLOBAL;
       }
-
-      /* Change the default orientation to be used when redoing. */
-      orient_type_default = orient_type_set;
     }
-    else if (t->con.mode & CON_APPLY) {
-      orient_type_set = orient_type_scene;
-    }
-    else {
-      if (orient_type_set == orient_type_scene) {
-        BLI_assert(orient_type_set == V3D_ORIENT_GLOBAL);
-        orient_type_set = V3D_ORIENT_LOCAL;
-      }
 
-      if ((t->flag & T_MODAL) && (use_orient_axis || transform_mode_is_changeable(t->mode)) &&
-          (t->mode != TFM_ALIGN)) {
-        orient_type_default = V3D_ORIENT_VIEW;
-      }
+    if (op && (prop = RNA_struct_find_property(op->ptr, "orient_axis"))) {
+      t->orient_axis = RNA_property_enum_get(op->ptr, prop);
+    }
+
+    if (op && (prop = RNA_struct_find_property(op->ptr, "orient_axis_ortho"))) {
+      t->orient_axis_ortho = RNA_property_enum_get(op->ptr, prop);
     }
 
     if (op && ((prop = RNA_struct_find_property(op->ptr, "orient_matrix")) &&
@@ -468,19 +444,41 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
           RNA_property_is_set(op->ptr, prop)) {
         orient_type_matrix_set = RNA_property_enum_get(op->ptr, prop);
       }
-      else {
-        orient_type_matrix_set = orient_type_set;
-      }
-
-      if (orient_type_matrix_set == orient_type_set) {
-        /* Constraints are forced to use the custom matrix when redoing. */
+      else if (orient_type_set == -1) {
         orient_type_set = V3D_ORIENT_CUSTOM_MATRIX;
       }
     }
 
-    orient_types[0] = orient_type_default;
-    orient_types[1] = orient_type_scene;
-    orient_types[2] = orient_type_set;
+    if (orient_type_set != -1) {
+      orient_type_default = orient_type_set;
+      t->is_orient_set = true;
+    }
+    else if (orient_type_matrix_set != -1) {
+      orient_type_default = orient_type_set = orient_type_matrix_set;
+      t->is_orient_set = true;
+    }
+    else if (t->con.mode & CON_APPLY) {
+      orient_type_default = orient_type_set = orient_type_scene;
+    }
+    else {
+      orient_type_default = orient_type_scene;
+      if (orient_type_scene == V3D_ORIENT_GLOBAL) {
+        orient_type_set = V3D_ORIENT_LOCAL;
+      }
+      else {
+        orient_type_set = V3D_ORIENT_GLOBAL;
+      }
+    }
+
+    BLI_assert(!ELEM(-1, orient_type_default, orient_type_set));
+    if (orient_type_matrix_set == orient_type_set) {
+      /* Constraints are forced to use the custom matrix when redoing. */
+      orient_type_set = V3D_ORIENT_CUSTOM_MATRIX;
+    }
+
+    orient_types[O_DEFAULT] = (short)orient_type_default;
+    orient_types[O_SCENE] = (short)orient_type_scene;
+    orient_types[O_SET] = (short)orient_type_set;
 
     for (int i = 0; i < 3; i++) {
       /* For efficiency, avoid calculating the same orientation twice. */
@@ -497,9 +495,6 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
       }
     }
 
-    /* Set orient_curr to -1 in order to force the update in
-     * `transform_orientations_current_set`. */
-    t->orient_curr = -1;
     transform_orientations_current_set(t, (t->con.mode & CON_APPLY) ? 2 : 0);
   }
 
@@ -529,7 +524,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   }
   else {
     /* Avoid mirroring for unsupported contexts. */
-    t->options |= CTX_NO_MIRROR;
+    t->flag |= T_NO_MIRROR;
   }
 
   /* setting PET flag only if property exist in operator. Otherwise, assume it's not supported */
@@ -861,8 +856,8 @@ void calculateCenter2D(TransInfo *t)
 
 void calculateCenterLocal(TransInfo *t, const float center_global[3])
 {
-  /* setting constraint center */
-  /* note, init functions may over-ride t->center */
+  /* Setting constraint center. */
+  /* NOTE: init functions may over-ride `t->center`. */
   FOREACH_TRANS_DATA_CONTAINER (t, tc) {
     if (tc->use_local_mat) {
       mul_v3_m4v3(tc->center_local, tc->imat, center_global);

@@ -31,6 +31,7 @@ set(INC
   ../depsgraph
   ../editors/include
   ../editors/space_view3d
+  ../functions
   ../gpu
   ../imbuf
   ../makesdna
@@ -50,8 +51,37 @@ set(INC
 
 set(SRC
   intern/draw_cache.c
-  intern/draw_cache_extract_mesh.c
-  intern/draw_cache_impl_curve.c
+  intern/draw_cache_extract_mesh.cc
+  intern/draw_cache_extract_mesh_extractors.c
+  intern/draw_cache_extract_mesh_render_data.c
+  intern/mesh_extractors/extract_mesh_ibo_edituv.cc
+  intern/mesh_extractors/extract_mesh_ibo_fdots.cc
+  intern/mesh_extractors/extract_mesh_ibo_lines.cc
+  intern/mesh_extractors/extract_mesh_ibo_lines_adjacency.cc
+  intern/mesh_extractors/extract_mesh_ibo_lines_paint_mask.cc
+  intern/mesh_extractors/extract_mesh_ibo_points.cc
+  intern/mesh_extractors/extract_mesh_ibo_tris.cc
+  intern/mesh_extractors/extract_mesh_vbo_edge_fac.cc
+  intern/mesh_extractors/extract_mesh_vbo_edit_data.cc
+  intern/mesh_extractors/extract_mesh_vbo_edituv_data.cc
+  intern/mesh_extractors/extract_mesh_vbo_edituv_stretch_angle.cc
+  intern/mesh_extractors/extract_mesh_vbo_edituv_stretch_area.cc
+  intern/mesh_extractors/extract_mesh_vbo_fdots_edituv_data.cc
+  intern/mesh_extractors/extract_mesh_vbo_fdots_nor.cc
+  intern/mesh_extractors/extract_mesh_vbo_fdots_pos.cc
+  intern/mesh_extractors/extract_mesh_vbo_fdots_uv.cc
+  intern/mesh_extractors/extract_mesh_vbo_lnor.cc
+  intern/mesh_extractors/extract_mesh_vbo_mesh_analysis.cc
+  intern/mesh_extractors/extract_mesh_vbo_orco.cc
+  intern/mesh_extractors/extract_mesh_vbo_pos_nor.cc
+  intern/mesh_extractors/extract_mesh_vbo_sculpt_data.cc
+  intern/mesh_extractors/extract_mesh_vbo_select_idx.cc
+  intern/mesh_extractors/extract_mesh_vbo_skin_roots.cc
+  intern/mesh_extractors/extract_mesh_vbo_tan.cc
+  intern/mesh_extractors/extract_mesh_vbo_uv.cc
+  intern/mesh_extractors/extract_mesh_vbo_vcol.cc
+  intern/mesh_extractors/extract_mesh_vbo_weights.cc
+  intern/draw_cache_impl_curve.cc
   intern/draw_cache_impl_displist.c
   intern/draw_cache_impl_gpencil.c
   intern/draw_cache_impl_hair.c
@@ -75,6 +105,7 @@ set(SRC
   intern/draw_manager_text.c
   intern/draw_manager_texture.c
   intern/draw_select_buffer.c
+  intern/draw_shader.c
   intern/draw_view.c
   engines/basic/basic_engine.c
   engines/image/image_engine.c
@@ -146,6 +177,7 @@ set(SRC
   engines/overlay/overlay_image.c
   engines/overlay/overlay_lattice.c
   engines/overlay/overlay_metaball.c
+  engines/overlay/overlay_mode_transfer.c
   engines/overlay/overlay_motion_path.c
   engines/overlay/overlay_outline.c
   engines/overlay/overlay_paint.c
@@ -161,6 +193,7 @@ set(SRC
   intern/DRW_render.h
   intern/draw_cache.h
   intern/draw_cache_extract.h
+  intern/draw_cache_extract_mesh_private.h
   intern/draw_cache_impl.h
   intern/draw_cache_inline.h
   intern/draw_color_management.h
@@ -172,6 +205,7 @@ set(SRC
   intern/draw_manager_profiling.h
   intern/draw_manager_testing.h
   intern/draw_manager_text.h
+  intern/draw_shader.h
   intern/draw_view.h
   intern/smaa_textures.h
   engines/basic/basic_engine.h
@@ -321,6 +355,7 @@ data_to_c_simple(intern/shaders/common_globals_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_pointcloud_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_hair_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_hair_refine_vert.glsl SRC)
+data_to_c_simple(intern/shaders/common_hair_refine_comp.glsl SRC)
 data_to_c_simple(intern/shaders/common_math_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_math_geom_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_view_lib.glsl SRC)
@@ -478,7 +513,10 @@ add_dependencies(bf_draw bf_dna)
 if(WITH_GTESTS)
   if(WITH_OPENGL_DRAW_TESTS)
     set(TEST_SRC
+      tests/draw_testing.cc
       tests/shaders_test.cc
+
+      tests/draw_testing.hh
     )
     set(TEST_INC
       "../../../intern/ghost/"

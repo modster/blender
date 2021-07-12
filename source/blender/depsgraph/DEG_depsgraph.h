@@ -109,11 +109,11 @@ void DEG_free_node_types(void);
 
 /* Update Tagging -------------------------------- */
 
-/* Update dependency graph when visible scenes/layers changes. */
-void DEG_graph_on_visible_update(struct Main *bmain, Depsgraph *depsgraph, const bool do_time);
+/* Tag dependency graph for updates when visible scenes/layers changes. */
+void DEG_graph_tag_on_visible_update(Depsgraph *depsgraph, const bool do_time);
 
-/* Update all dependency graphs when visible scenes/layers changes. */
-void DEG_on_visible_update(struct Main *bmain, const bool do_time);
+/* Tag all dependency graphs for update when visible scenes/layers changes. */
+void DEG_tag_on_visible_update(struct Main *bmain, const bool do_time);
 
 /* NOTE: Will return NULL if the flag is not known, allowing to gracefully handle situations
  * when recalc flag has been removed. */
@@ -143,16 +143,15 @@ void DEG_id_type_tag(struct Main *bmain, short id_type);
  * for viewport depsgraphs, but not render or export depsgraph for example. */
 void DEG_enable_editors_update(struct Depsgraph *depsgraph);
 
-/* Check if something was changed in the database and inform editors about this,
- * then clear recalc flags. */
-void DEG_editors_update(struct Main *bmain,
-                        struct Depsgraph *depsgraph,
-                        struct Scene *scene,
-                        struct ViewLayer *view_layer,
-                        bool time);
+/* Check if something was changed in the database and inform editors about this. */
+void DEG_editors_update(struct Depsgraph *depsgraph, bool time);
 
 /* Clear recalc flags after editors or renderers have handled updates. */
-void DEG_ids_clear_recalc(Depsgraph *depsgraph);
+void DEG_ids_clear_recalc(Depsgraph *depsgraph, const bool backup);
+
+/* Restore recalc flags, backed up by a previous call to DEG_ids_clear_recalc.
+ * This also clears the backup. */
+void DEG_ids_restore_recalc(Depsgraph *depsgraph);
 
 /* ************************************************ */
 /* Evaluation Engine API */

@@ -47,7 +47,7 @@ struct Curve;
 #define GP_DEFAULT_CURVE_EDIT_CORNER_ANGLE M_PI_2
 
 #define GPENCIL_MIN_FILL_FAC 0.05f
-#define GPENCIL_MAX_FILL_FAC 5.0f
+#define GPENCIL_MAX_FILL_FAC 8.0f
 
 /* ***************************************** */
 /* GP Stroke Points */
@@ -112,6 +112,8 @@ typedef enum eGPDspoint_Flag {
   GP_SPOINT_TAG = (1 << 1),
   /* stroke point is temp tagged (for some editing operation) */
   GP_SPOINT_TEMP_TAG = (1 << 2),
+  /* stroke point is temp tagged (for some editing operation) */
+  GP_SPOINT_TEMP_TAG2 = (1 << 3),
 } eGPSPoint_Flag;
 
 /* ***************************************** */
@@ -244,11 +246,11 @@ typedef struct bGPDstroke_Runtime {
   /** Runtime falloff factor (only for transform). */
   float multi_frame_falloff;
 
-  /** Vertex offset in the vbo where this stroke starts. */
+  /** Vertex offset in the VBO where this stroke starts. */
   int stroke_start;
   /** Triangle offset in the ibo where this fill starts. */
   int fill_start;
-  /** Curve Handles offset in the ibo where this handle starts. */
+  /** Curve Handles offset in the IBO where this handle starts. */
   int curve_start;
 
   /** Original stroke (used to dereference evaluated data) */
@@ -307,7 +309,7 @@ typedef struct bGPDstroke {
   float uv_translation[2];
   float uv_scale;
 
-  /** Stroke selection index.*/
+  /** Stroke selection index. */
   int select_index;
   char _pad4[4];
 
@@ -555,9 +557,11 @@ typedef enum eGPDlayer_Flag {
   /* Unlock color */
   GP_LAYER_UNLOCK_COLOR = (1 << 12),
   /* Mask Layer */
-  GP_LAYER_USE_MASK = (1 << 13), /*TODO: DEPRECATED */
+  GP_LAYER_USE_MASK = (1 << 13), /* TODO: DEPRECATED */
   /* Ruler Layer */
   GP_LAYER_IS_RULER = (1 << 14),
+  /* Disable masks in viewlayer render */
+  GP_LAYER_DISABLE_MASKS_IN_VIEWLAYER = (1 << 15),
 } eGPDlayer_Flag;
 
 /** #bGPDlayer.onion_flag */
@@ -610,7 +614,7 @@ typedef struct bGPdata_Runtime {
   /** Vertex Color applied to Fill (while drawing). */
   float vert_color_fill[4];
 
-  /** Arrow points for stroke corners **/
+  /** Arrow points for stroke corners. */
   float arrow_start[8];
   float arrow_end[8];
   /* Arrow style for each corner */
@@ -625,6 +629,7 @@ typedef struct bGPdata_Runtime {
   /** Brush pointer */
   Brush *sbuffer_brush;
   struct GpencilBatchCache *gpencil_cache;
+  struct LineartCache *lineart_cache;
 } bGPdata_Runtime;
 
 /* grid configuration */

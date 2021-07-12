@@ -350,8 +350,7 @@ static bool object_hook_index_array(Main *bmain,
 
       em = me->edit_mesh;
 
-      EDBM_mesh_normals_update(em);
-      BKE_editmesh_looptri_calc(em);
+      BKE_editmesh_looptri_and_normals_calc(em);
 
       /* check selected vertices first */
       if (return_editmesh_indexar(em, r_tot, r_indexar, r_cent) == 0) {
@@ -773,7 +772,7 @@ void OBJECT_OT_hook_remove(wmOperatorType *ot)
 
   /* flags */
   /* this operator removes modifier which isn't stored in local undo stack,
-   * so redoing it from redo panel gives totally weird results  */
+   * so redoing it from redo panel gives totally weird results. */
   ot->flag = /*OPTYPE_REGISTER|*/ OPTYPE_UNDO;
 
   /* properties */
@@ -932,7 +931,7 @@ void OBJECT_OT_hook_assign(wmOperatorType *ot)
 
   /* flags */
   /* this operator changes data stored in modifier which doesn't get pushed to undo stack,
-   * so redoing it from redo panel gives totally weird results  */
+   * so redoing it from redo panel gives totally weird results. */
   ot->flag = /*OPTYPE_REGISTER|*/ OPTYPE_UNDO;
 
   /* properties */

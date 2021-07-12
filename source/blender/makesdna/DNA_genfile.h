@@ -44,7 +44,7 @@ extern const int DNAlen;
 /**
  * Primitive (non-struct, non-pointer/function/array) types,
  * \warning Don't change these values!
- * Currently changes here here will work on native endianness,
+ * Currently changes here will work on native endianness,
  * however #DNA_struct_switch_endian currently checks these
  * hard-coded values against those from old files.
  */
@@ -63,6 +63,7 @@ typedef enum eSDNA_Type {
 #define SDNA_TYPE_VOID 9
   SDNA_TYPE_INT64 = 10,
   SDNA_TYPE_UINT64 = 11,
+  SDNA_TYPE_INT8 = 12,
 } eSDNA_Type;
 
 /**
@@ -89,7 +90,7 @@ struct SDNA *DNA_sdna_from_data(const void *data,
                                 const char **r_error_message);
 void DNA_sdna_free(struct SDNA *sdna);
 
-/* Access for current Blender versions SDNA*/
+/* Access for current Blender versions SDNA. */
 void DNA_sdna_current_init(void);
 /* borrowed reference */
 const struct SDNA *DNA_sdna_current_get(void);

@@ -349,7 +349,7 @@ mark_as_advanced(WITH_SYSTEM_GLOG)
 option(WITH_FREESTYLE     "Enable Freestyle (advanced edges rendering)" ON)
 
 # Misc
-if(WIN32)
+if(WIN32 OR APPLE)
   option(WITH_INPUT_IME "Enable Input Method Editor (IME) for complex Asian character input" ON)
 endif()
 option(WITH_INPUT_NDOF "Enable NDOF input devices (SpaceNavigator and friends)" ON)
@@ -836,7 +836,7 @@ if(WITH_PYTHON)
   # because UNIX will search for the old Python paths which may not exist.
   # giving errors about missing paths before this case is met.
   if(DEFINED PYTHON_VERSION AND "${PYTHON_VERSION}" VERSION_LESS "3.9")
-    message(FATAL_ERROR "At least Python 3.9 is required to build")
+    message(FATAL_ERROR "At least Python 3.9 is required to build, but found Python ${PYTHON_VERSION}")
   endif()
 
   file(GLOB RESULT "${CMAKE_SOURCE_DIR}/release/scripts/addons")
@@ -1526,6 +1526,7 @@ if(CMAKE_COMPILER_IS_GNUCC)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_UNDEF -Wundef)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_FORMAT_SIGN -Wformat-signedness)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_RESTRICT -Wrestrict)
+  ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_SUGGEST_OVERRIDE  -Wno-suggest-override)
 
   # gcc 4.2 gives annoying warnings on every file with this
   if(NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS "4.3")
@@ -1589,6 +1590,8 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_OVERLOADED_VIRTUAL  -Wno-overloaded-virtual)  # we get a lot of these, if its a problem a dev needs to look into it.
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_SIGN_COMPARE        -Wno-sign-compare)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_INVALID_OFFSETOF    -Wno-invalid-offsetof)
+  # Apple Clang (tested on version 12) doesn't support this flag while LLVM Clang 11 does.
+  ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_SUGGEST_OVERRIDE    -Wno-suggest-override)
 
   # gives too many unfixable warnings
   # ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_UNUSED_MACROS      -Wunused-macros)
@@ -1912,6 +1915,7 @@ if(FIRST_RUN)
   info_cfg_option(WITH_IK_ITASC)
   info_cfg_option(WITH_IK_SOLVER)
   info_cfg_option(WITH_INPUT_NDOF)
+  info_cfg_option(WITH_INPUT_IME)
   info_cfg_option(WITH_INTERNATIONAL)
   info_cfg_option(WITH_OPENCOLLADA)
   info_cfg_option(WITH_OPENCOLORIO)

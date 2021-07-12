@@ -543,6 +543,38 @@ bool gpencil_stroke_inside_circle(const float mval[2], int rad, int x0, int y0, 
 }
 
 /* ******************************************************** */
+/* Selection Validity Testing */
+
+bool ED_gpencil_frame_has_selected_stroke(const bGPDframe *gpf)
+{
+  LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+    if (gps->flag & GP_STROKE_SELECT) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool ED_gpencil_layer_has_selected_stroke(const bGPDlayer *gpl, const bool is_multiedit)
+{
+  bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
+  for (bGPDframe *gpf = init_gpf; gpf; gpf = gpf->next) {
+    if ((gpf == gpl->actframe) || ((gpf->flag & GP_FRAME_SELECT) && (is_multiedit))) {
+      if (ED_gpencil_frame_has_selected_stroke(gpf)) {
+        return true;
+      }
+    }
+    /* If not multi-edit, exit loop. */
+    if (!is_multiedit) {
+      break;
+    }
+  }
+
+  return false;
+}
+
+/* ******************************************************** */
 /* Stroke Validity Testing */
 
 /* Check whether given stroke can be edited given the supplied context */
@@ -648,7 +680,7 @@ void gpencil_point_conversion_init(bContext *C, GP_SpaceConversion *r_gsc)
     view3d_operator_needs_opengl(C);
 
     view3d_region_operator_needs_opengl(win, region);
-    ED_view3d_depth_override(depsgraph, region, v3d, NULL, V3D_DEPTH_NO_GPENCIL, false);
+    ED_view3d_depth_override(depsgraph, region, v3d, NULL, V3D_DEPTH_NO_GPENCIL, NULL);
 
     /* for camera view set the subrect */
     if (rv3d->persp == RV3D_CAMOB) {
@@ -1195,7 +1227,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
     float xy[2];
 
     /* 3D to Screen-space */
-    /* Note: We can't use gpencil_point_to_xy() here because that uses ints for the screen-space
+    /* NOTE: We can't use gpencil_point_to_xy() here because that uses ints for the screen-space
      * coordinates, resulting in lost precision, which in turn causes stair-stepping
      * artifacts in the final points. */
 
@@ -1253,7 +1285,11 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
       float location[3] = {0.0f, 0.0f, 0.0f};
       float normal[3] = {0.0f, 0.0f, 0.0f};
 
-      ED_view3d_win_to_ray(region, xy, &ray_start[0], &ray_normal[0]);
+      BLI_assert(gps->flag & GP_STROKE_3DSPACE);
+      BLI_assert(gsc->area && gsc->area->spacetype == SPACE_VIEW3D);
+      const View3D *v3d = gsc->area->spacedata.first;
+      ED_view3d_win_to_ray_clipped(
+          depsgraph, region, v3d, xy, &ray_start[0], &ray_normal[0], true);
       if (ED_transform_snap_object_project_ray(sctx,
                                                depsgraph,
                                                &(const struct SnapObjectParams){
@@ -1604,7 +1640,7 @@ void ED_gpencil_vgroup_assign(bContext *C, Object *ob, float weight)
         }
       }
 
-      /* if not multiedit, exit loop*/
+      /* If not multi-edit, exit loop. */
       if (!is_multiedit) {
         break;
       }
@@ -1657,7 +1693,7 @@ void ED_gpencil_vgroup_remove(bContext *C, Object *ob)
         }
       }
 
-      /* if not multiedit, exit loop*/
+      /* If not multi-edit, exit loop. */
       if (!is_multiedit) {
         break;
       }
@@ -1712,7 +1748,7 @@ void ED_gpencil_vgroup_select(bContext *C, Object *ob)
         }
       }
 
-      /* if not multiedit, exit loop*/
+      /* If not multi-edit, exit loop. */
       if (!is_multiedit) {
         break;
       }
@@ -1762,7 +1798,7 @@ void ED_gpencil_vgroup_deselect(bContext *C, Object *ob)
         }
       }
 
-      /* if not multiedit, exit loop*/
+      /* If not multi-edit, exit loop. */
       if (!is_multiedit) {
         break;
       }
@@ -2179,7 +2215,7 @@ void ED_gpencil_tpoint_to_point(ARegion *region,
 void ED_gpencil_update_color_uv(Main *bmain, Material *mat)
 {
   Material *gps_ma = NULL;
-  /* read all strokes  */
+  /* Read all strokes. */
   for (Object *ob = bmain->objects.first; ob; ob = ob->id.next) {
     if (ob->type == OB_GPENCIL) {
       bGPdata *gpd = ob->data;
@@ -2442,7 +2478,7 @@ int ED_gpencil_select_stroke_segment(bGPdata *gpd,
     return 0;
   }
 
-  /* convert all gps points to 2d and save in a hash to avoid recalculation  */
+  /* Convert all gps points to 2d and save in a hash to avoid recalculation. */
   int direction = 0;
   float(*points2d)[2] = MEM_mallocN(sizeof(*points2d) * gps->totpoints,
                                     "GP Stroke temp 2d points");
@@ -3070,8 +3106,8 @@ void ED_gpencil_sbuffer_vertex_color_set(Depsgraph *depsgraph,
 }
 
 /* Get the bigger 2D bound box points. */
-void ED_gpencil_projected_2d_bound_box(GP_SpaceConversion *gsc,
-                                       bGPDstroke *gps,
+void ED_gpencil_projected_2d_bound_box(const GP_SpaceConversion *gsc,
+                                       const bGPDstroke *gps,
                                        const float diff_mat[4][4],
                                        float r_min[2],
                                        float r_max[2])
@@ -3104,7 +3140,7 @@ void ED_gpencil_projected_2d_bound_box(GP_SpaceConversion *gsc,
 }
 
 /* Check if the stroke collides with brush. */
-bool ED_gpencil_stroke_check_collision(GP_SpaceConversion *gsc,
+bool ED_gpencil_stroke_check_collision(const GP_SpaceConversion *gsc,
                                        bGPDstroke *gps,
                                        const float mouse[2],
                                        const int radius,
@@ -3139,9 +3175,9 @@ bool ED_gpencil_stroke_check_collision(GP_SpaceConversion *gsc,
  * \param diff_mat: View matrix.
  * \return True if the point is inside.
  */
-bool ED_gpencil_stroke_point_is_inside(bGPDstroke *gps,
-                                       GP_SpaceConversion *gsc,
-                                       int mouse[2],
+bool ED_gpencil_stroke_point_is_inside(const bGPDstroke *gps,
+                                       const GP_SpaceConversion *gsc,
+                                       const int mouse[2],
                                        const float diff_mat[4][4])
 {
   bool hit = false;
@@ -3154,7 +3190,7 @@ bool ED_gpencil_stroke_point_is_inside(bGPDstroke *gps,
   mcoords = MEM_mallocN(sizeof(int[2]) * len, __func__);
 
   /* Convert stroke to 2D array of points. */
-  bGPDspoint *pt;
+  const bGPDspoint *pt;
   int i;
   for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
     bGPDspoint pt2;
@@ -3178,7 +3214,7 @@ bool ED_gpencil_stroke_point_is_inside(bGPDstroke *gps,
 }
 
 bGPDstroke *ED_gpencil_stroke_nearest_to_ends(bContext *C,
-                                              GP_SpaceConversion *gsc,
+                                              const GP_SpaceConversion *gsc,
                                               bGPDlayer *gpl,
                                               bGPDframe *gpf,
                                               bGPDstroke *gps,
@@ -3266,7 +3302,7 @@ bGPDstroke *ED_gpencil_stroke_nearest_to_ends(bContext *C,
   return gps_rtn;
 }
 
-/* Join two stroke using a contact point index and trimming the rest.  */
+/* Join two stroke using a contact point index and trimming the rest. */
 bGPDstroke *ED_gpencil_stroke_join_and_trim(
     bGPdata *gpd, bGPDframe *gpf, bGPDstroke *gps, bGPDstroke *gps_dst, const int pt_index)
 {

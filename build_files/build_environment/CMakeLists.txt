@@ -113,7 +113,7 @@ include(cmake/expat.cmake)
 include(cmake/yamlcpp.cmake)
 include(cmake/opencolorio.cmake)
 
-if(APPLE AND ("${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64"))
+if(BLENDER_PLATFORM_ARM)
   include(cmake/sse2neon.cmake)
 endif()
 
@@ -164,6 +164,7 @@ endif()
 if(UNIX AND NOT APPLE)
   include(cmake/libglu.cmake)
   include(cmake/mesa.cmake)
+  include(cmake/wayland_protocols.cmake)
 endif()
 
 include(cmake/harvest.cmake)

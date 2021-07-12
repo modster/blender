@@ -445,7 +445,7 @@ int BIF_countTransformOrientation(const bContext *C)
   return BLI_listbase_count(transform_orientations);
 }
 
-void applyTransformOrientation(const TransformOrientation *ts, float r_mat[3][3], char *r_name)
+void applyTransformOrientation(const TransformOrientation *ts, float r_mat[3][3], char r_name[64])
 {
   if (r_name) {
     BLI_strncpy(r_name, ts->name, MAX_NAME);
@@ -455,7 +455,7 @@ void applyTransformOrientation(const TransformOrientation *ts, float r_mat[3][3]
 
 /* Updates all `BONE_TRANSFORM` flags.
  * Returns total number of bones with `BONE_TRANSFORM`.
- * Note: `transform_convert_pose_transflags_update` has a similar logic. */
+ * NOTE: `transform_convert_pose_transflags_update` has a similar logic. */
 static int armature_bone_transflags_update_recursive(bArmature *arm,
                                                      ListBase *lb,
                                                      const bool do_it)
@@ -671,10 +671,6 @@ const char *transform_orientations_spacename_get(TransInfo *t, const short orien
 
 void transform_orientations_current_set(TransInfo *t, const short orient_index)
 {
-  if (t->orient_curr == orient_index) {
-    return;
-  }
-
   const short orientation = t->orient[orient_index].type;
   const char *spacename = transform_orientations_spacename_get(t, orientation);
 

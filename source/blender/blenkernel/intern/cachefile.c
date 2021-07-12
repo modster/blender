@@ -217,6 +217,9 @@ void BKE_cachefile_reader_open(CacheFile *cache_file,
 void BKE_cachefile_reader_free(CacheFile *cache_file, struct CacheReader **reader)
 {
 #if defined(WITH_ALEMBIC) || defined(WITH_USD)
+  /* Multiple modifiers and constraints can call this function concurrently, and
+   * cachefile_handle_free() can also be called at the same time. */
+  BLI_spin_lock(&spin);
   if (*reader != NULL) {
     if (cache_file) {
       BLI_assert(cache_file->id.tag & LIB_TAG_COPIED_ON_WRITE);
@@ -239,13 +242,11 @@ void BKE_cachefile_reader_free(CacheFile *cache_file, struct CacheReader **reade
 
     *reader = NULL;
 
-    /* Multiple modifiers and constraints can call this function concurrently. */
-    BLI_spin_lock(&spin);
     if (cache_file && cache_file->handle_readers) {
       BLI_gset_remove(cache_file->handle_readers, reader, NULL);
     }
-    BLI_spin_unlock(&spin);
   }
+  BLI_spin_unlock(&spin);
 #else
   UNUSED_VARS(cache_file, reader);
 #endif

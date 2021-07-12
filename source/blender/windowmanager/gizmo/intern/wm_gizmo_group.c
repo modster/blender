@@ -592,7 +592,7 @@ static int gizmo_tweak_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   const int highlight_part_init = gz->highlight_part;
 
   if (gz->drag_part != -1) {
-    if (ISTWEAK(event->type) || (event->val == KM_CLICK_DRAG)) {
+    if (WM_event_is_mouse_drag(event)) {
       gz->highlight_part = gz->drag_part;
     }
   }
@@ -981,10 +981,10 @@ void WM_gizmomaptype_group_unlink(bContext *C,
     WM_gizmomaptype_group_free(gzgt_ref);
   }
 
-  /* TODO(campbell): Gizmos may share keymaps, for now don't
+  /* TODO(campbell): Gizmos may share key-maps, for now don't
    * remove however we could flag them as temporary/owned by the gizmo. */
 #if 0
-  /* Note, we may want to keep this keymap for editing */
+  /* NOTE: we may want to keep this key-map for editing. */
   WM_keymap_remove(gzgt->keyconf, gzgt->keymap);
 #endif
 
@@ -1058,12 +1058,14 @@ bool WM_gizmo_group_type_ensure(const char *idname)
   return WM_gizmo_group_type_ensure_ptr(gzgt);
 }
 
+/**
+ * Call #WM_gizmo_group_type_free_ptr after to remove & free.
+ */
 void WM_gizmo_group_type_remove_ptr_ex(struct Main *bmain,
                                        wmGizmoGroupType *gzgt,
                                        wmGizmoMapType *gzmap_type)
 {
   WM_gizmomaptype_group_unlink(NULL, bmain, gzmap_type, gzgt);
-  WM_gizmogrouptype_free_ptr(gzgt);
 }
 void WM_gizmo_group_type_remove_ptr(struct Main *bmain, wmGizmoGroupType *gzgt)
 {

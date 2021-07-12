@@ -99,27 +99,23 @@ CCL_NAMESPACE_BEGIN
 #define __AO__
 #define __PASSES__
 #define __HAIR__
-
-/* Without these we get an AO render, used by OpenCL preview kernel. */
-#ifndef __KERNEL_AO_PREVIEW__
-#  define __SVM__
-#  define __EMISSION__
-#  define __HOLDOUT__
-#  define __MULTI_CLOSURE__
-#  define __TRANSPARENT_SHADOWS__
-#  define __BACKGROUND_MIS__
-#  define __LAMP_MIS__
-#  define __CAMERA_MOTION__
-#  define __OBJECT_MOTION__
-#  define __BAKING__
-#  define __PRINCIPLED__
-#  define __SUBSURFACE__
-#  define __VOLUME__
-#  define __VOLUME_SCATTER__
-#  define __CMJ__
-#  define __SHADOW_RECORD_ALL__
-#  define __BRANCHED_PATH__
-#endif
+#define __SVM__
+#define __EMISSION__
+#define __HOLDOUT__
+#define __MULTI_CLOSURE__
+#define __TRANSPARENT_SHADOWS__
+#define __BACKGROUND_MIS__
+#define __LAMP_MIS__
+#define __CAMERA_MOTION__
+#define __OBJECT_MOTION__
+#define __BAKING__
+#define __PRINCIPLED__
+#define __SUBSURFACE__
+#define __VOLUME__
+#define __VOLUME_SCATTER__
+#define __CMJ__
+#define __SHADOW_RECORD_ALL__
+#define __BRANCHED_PATH__
 
 /* Device specific features */
 #ifdef __KERNEL_CPU__
@@ -306,7 +302,7 @@ enum PathRayFlag {
   PATH_RAY_DIFFUSE_ANCESTOR = (1 << 15),
   /* Single pass has been written. */
   PATH_RAY_SINGLE_PASS_DONE = (1 << 16),
-  /* Ray is behind a shadow catcher .*/
+  /* Ray is behind a shadow catcher. */
   PATH_RAY_SHADOW_CATCHER = (1 << 17),
   /* Store shadow data for shadow catcher or denoising. */
   PATH_RAY_STORE_SHADOW_INFO = (1 << 18),
@@ -693,22 +689,24 @@ typedef enum PrimitiveType {
   PRIMITIVE_MOTION_CURVE_THICK = (1 << 3),
   PRIMITIVE_CURVE_RIBBON = (1 << 4),
   PRIMITIVE_MOTION_CURVE_RIBBON = (1 << 5),
+  PRIMITIVE_VOLUME = (1 << 6),
   /* Lamp primitive is not included below on purpose,
    * since it is no real traceable primitive.
    */
-  PRIMITIVE_LAMP = (1 << 6),
+  PRIMITIVE_LAMP = (1 << 7),
 
   PRIMITIVE_ALL_TRIANGLE = (PRIMITIVE_TRIANGLE | PRIMITIVE_MOTION_TRIANGLE),
   PRIMITIVE_ALL_CURVE = (PRIMITIVE_CURVE_THICK | PRIMITIVE_MOTION_CURVE_THICK |
                          PRIMITIVE_CURVE_RIBBON | PRIMITIVE_MOTION_CURVE_RIBBON),
+  PRIMITIVE_ALL_VOLUME = (PRIMITIVE_VOLUME),
   PRIMITIVE_ALL_MOTION = (PRIMITIVE_MOTION_TRIANGLE | PRIMITIVE_MOTION_CURVE_THICK |
                           PRIMITIVE_MOTION_CURVE_RIBBON),
-  PRIMITIVE_ALL = (PRIMITIVE_ALL_TRIANGLE | PRIMITIVE_ALL_CURVE),
+  PRIMITIVE_ALL = (PRIMITIVE_ALL_TRIANGLE | PRIMITIVE_ALL_CURVE | PRIMITIVE_ALL_VOLUME),
 
   /* Total number of different traceable primitives.
    * NOTE: This is an actual value, not a bitflag.
    */
-  PRIMITIVE_NUM_TOTAL = 6,
+  PRIMITIVE_NUM_TOTAL = 7,
 } PrimitiveType;
 
 #define PRIMITIVE_PACK_SEGMENT(type, segment) ((segment << PRIMITIVE_NUM_TOTAL) | (type))
@@ -895,6 +893,8 @@ enum ShaderDataFlag {
   SD_HAS_CONSTANT_EMISSION = (1 << 27),
   /* Needs to access attributes for volume rendering */
   SD_NEED_VOLUME_ATTRIBUTES = (1 << 28),
+  /* Shader has emission */
+  SD_HAS_EMISSION = (1 << 29),
 
   SD_SHADER_FLAGS = (SD_USE_MIS | SD_HAS_TRANSPARENT_SHADOW | SD_HAS_VOLUME | SD_HAS_ONLY_VOLUME |
                      SD_HETEROGENEOUS_VOLUME | SD_HAS_BSSRDF_BUMP | SD_VOLUME_EQUIANGULAR |
@@ -1481,7 +1481,8 @@ typedef struct KernelObject {
   float cryptomatte_object;
   float cryptomatte_asset;
 
-  float shadow_terminator_offset;
+  float shadow_terminator_shading_offset;
+  float shadow_terminator_geometry_offset;
   float pad1, pad2, pad3;
 } KernelObject;
 static_assert_align(KernelObject, 16);

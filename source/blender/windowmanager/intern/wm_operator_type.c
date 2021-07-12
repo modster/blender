@@ -229,7 +229,7 @@ void wm_operatortype_free(void)
 void WM_operatortype_props_advanced_begin(wmOperatorType *ot)
 {
   if (ot_prop_basic_count == -1) {
-    /* Don't do anything if _begin was called before, but not _end  */
+    /* Don't do anything if _begin was called before, but not _end. */
     ot_prop_basic_count = RNA_struct_count_properties(ot->srna);
   }
 }
@@ -252,7 +252,7 @@ void WM_operatortype_props_advanced_end(wmOperatorType *ot)
     return;
   }
 
-  RNA_pointer_create(NULL, ot->srna, NULL, &struct_ptr);
+  WM_operator_properties_create_ptr(&struct_ptr, ot);
 
   RNA_STRUCT_BEGIN (&struct_ptr, prop) {
     counter++;
@@ -343,7 +343,7 @@ static int wm_macro_exec(bContext *C, wmOperator *op)
       }
     }
     else {
-      CLOG_WARN(WM_LOG_OPERATORS, "'%s' cant exec macro", opm->type->idname);
+      CLOG_WARN(WM_LOG_OPERATORS, "'%s' can't exec macro", opm->type->idname);
     }
   }
 

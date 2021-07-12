@@ -399,7 +399,7 @@ static void ui_but_user_menu_add(bContext *C, uiBut *but, bUserMenu *um)
                    "'%s').label",
                    idname);
           char *expr_result = NULL;
-          if (BPY_run_string_as_string(C, expr_imports, expr, __func__, &expr_result)) {
+          if (BPY_run_string_as_string(C, expr_imports, expr, NULL, &expr_result)) {
             STRNCPY(drawstr, expr_result);
             MEM_freeN(expr_result);
           }
@@ -417,7 +417,7 @@ static void ui_but_user_menu_add(bContext *C, uiBut *but, bUserMenu *um)
         &um->items, drawstr, but->optype, but->opptr ? but->opptr->data : NULL, but->opcontext);
   }
   else if (but->rnaprop) {
-    /* Note: 'member_id' may be a path. */
+    /* NOTE: 'member_id' may be a path. */
     const char *member_id = WM_context_member_from_ptr(C, &but->rnapoin);
     const char *data_path = RNA_path_from_ID_to_struct(&but->rnapoin);
     const char *member_id_data_path = member_id;
@@ -425,7 +425,7 @@ static void ui_but_user_menu_add(bContext *C, uiBut *but, bUserMenu *um)
       member_id_data_path = BLI_sprintfN("%s.%s", member_id, data_path);
     }
     const char *prop_id = RNA_property_identifier(but->rnaprop);
-    /* Note, ignore 'drawstr', use property idname always. */
+    /* NOTE: ignore 'drawstr', use property idname always. */
     ED_screen_user_menu_item_add_prop(&um->items, "", member_id_data_path, prop_id, but->rnaindex);
     if (data_path) {
       MEM_freeN((void *)data_path);
@@ -560,7 +560,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
     const bool is_overridable = (override_status & RNA_OVERRIDE_STATUS_OVERRIDABLE) != 0;
 
     /* Set the (button_pointer, button_prop)
-     * and pointer data for Python access to the hovered ui element. */
+     * and pointer data for Python access to the hovered UI element. */
     uiLayoutSetContextFromBut(layout, but);
 
     /* Keyframes */
@@ -1280,7 +1280,6 @@ void ui_popup_context_menu_for_panel(bContext *C, ARegion *region, Panel *panel)
       uiBlock *block = uiLayoutGetBlock(layout);
       uiBut *but = block->buttons.last;
       but->flag |= UI_BUT_HAS_SEP_CHAR;
-      but->drawflag |= UI_BUT_HAS_SHORTCUT;
     }
   }
   UI_popup_menu_end(C, pup);

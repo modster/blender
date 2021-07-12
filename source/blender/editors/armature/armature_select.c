@@ -1426,7 +1426,7 @@ static void armature_select_more_less(Object *ob, bool more)
   bArmature *arm = (bArmature *)ob->data;
   EditBone *ebone;
 
-  /* XXX, eventually we shouldn't need this - campbell */
+  /* XXX(campbell): eventually we shouldn't need this. */
   ED_armature_edit_sync_selection(arm->edbo);
 
   /* count bones & store selection state */
@@ -2141,7 +2141,7 @@ static int armature_select_mirror_exec(bContext *C, wmOperator *op)
 void ARMATURE_OT_select_mirror(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Flip Active/Selected Bone";
+  ot->name = "Select Mirror";
   ot->idname = "ARMATURE_OT_select_mirror";
   ot->description = "Mirror the bone selection";
 

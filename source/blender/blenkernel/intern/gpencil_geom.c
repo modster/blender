@@ -530,14 +530,23 @@ bool BKE_gpencil_stroke_sample(bGPdata *gpd, bGPDstroke *gps, const float dist, 
 
 /**
  * Backbone stretch similar to Freestyle.
- * \param gps: Stroke to sample
- * \param dist: Distance of one segment
- * \param tip_length: Ignore tip jittering, set zero to use default value.
+ * \param gps: Stroke to sample.
+ * \param dist: Distance of one segment.
+ * \param overshoot_fac: How exact is the follow curve algorithm.
+ * \param mode: Affect to Start, End or Both extremes (0->Both, 1->Start, 2->End)
  */
-bool BKE_gpencil_stroke_stretch(bGPDstroke *gps, const float dist, const float tip_length)
+bool BKE_gpencil_stroke_stretch(bGPDstroke *gps,
+                                const float dist,
+                                const float overshoot_fac,
+                                const short mode)
 {
+#define BOTH 0
+#define START 1
+#define END 2
+
   bGPDspoint *pt = gps->points, *last_pt, *second_last, *next_pt;
-  float threshold = (tip_length == 0 ? 0.001f : tip_length);
+  int i;
+  float threshold = (overshoot_fac == 0 ? 0.001f : overshoot_fac);
 
   if (gps->totpoints < 2 || dist < FLT_EPSILON) {
     return false;
@@ -547,33 +556,36 @@ bool BKE_gpencil_stroke_stretch(bGPDstroke *gps, const float dist, const float t
   second_last = &pt[gps->totpoints - 2];
   next_pt = &pt[1];
 
-  float len1 = 0.0f;
-  float len2 = 0.0f;
+  if (mode == BOTH || mode == START) {
+    float len1 = 0.0f;
+    i = 1;
+    while (len1 < threshold && gps->totpoints > i) {
+      next_pt = &pt[i];
+      len1 = len_v3v3(&next_pt->x, &pt->x);
+      i++;
+    }
+    float extend1 = (len1 + dist) / len1;
+    float result1[3];
 
-  int i = 1;
-  while (len1 < threshold && gps->totpoints > i) {
-    next_pt = &pt[i];
-    len1 = len_v3v3(&next_pt->x, &pt->x);
-    i++;
+    interp_v3_v3v3(result1, &next_pt->x, &pt->x, extend1);
+    copy_v3_v3(&pt->x, result1);
   }
 
-  i = 2;
-  while (len2 < threshold && gps->totpoints >= i) {
-    second_last = &pt[gps->totpoints - i];
-    len2 = len_v3v3(&last_pt->x, &second_last->x);
-    i++;
+  if (mode == BOTH || mode == END) {
+    float len2 = 0.0f;
+    i = 2;
+    while (len2 < threshold && gps->totpoints >= i) {
+      second_last = &pt[gps->totpoints - i];
+      len2 = len_v3v3(&last_pt->x, &second_last->x);
+      i++;
+    }
+
+    float extend2 = (len2 + dist) / len2;
+    float result2[3];
+    interp_v3_v3v3(result2, &second_last->x, &last_pt->x, extend2);
+
+    copy_v3_v3(&last_pt->x, result2);
   }
-
-  float extend1 = (len1 + dist) / len1;
-  float extend2 = (len2 + dist) / len2;
-
-  float result1[3], result2[3];
-
-  interp_v3_v3v3(result1, &next_pt->x, &pt->x, extend1);
-  interp_v3_v3v3(result2, &second_last->x, &last_pt->x, extend2);
-
-  copy_v3_v3(&pt->x, result1);
-  copy_v3_v3(&last_pt->x, result2);
 
   return true;
 }
@@ -622,6 +634,7 @@ bool BKE_gpencil_stroke_trim_points(bGPDstroke *gps, const int index_from, const
         new_dv[i].dw[j].weight = dv->dw[j].weight;
         new_dv[i].dw[j].def_nr = dv->dw[j].def_nr;
       }
+      BKE_defvert_clear(dv);
     }
     MEM_freeN(gps->dvert);
     gps->dvert = new_dv;
@@ -684,6 +697,7 @@ bool BKE_gpencil_stroke_split(bGPdata *gpd,
         new_dv[i].dw[j].weight = dv->dw[j].weight;
         new_dv[i].dw[j].def_nr = dv->dw[j].def_nr;
       }
+      BKE_defvert_clear(dv);
     }
     new_gps->dvert = new_dv;
   }
@@ -702,48 +716,64 @@ bool BKE_gpencil_stroke_split(bGPdata *gpd,
  * Shrink the stroke by length.
  * \param gps: Stroke to shrink
  * \param dist: delta length
+ * \param mode: 1->Start, 2->End
  */
-bool BKE_gpencil_stroke_shrink(bGPDstroke *gps, const float dist)
+bool BKE_gpencil_stroke_shrink(bGPDstroke *gps, const float dist, const short mode)
 {
+#define START 1
+#define END 2
+
   bGPDspoint *pt = gps->points, *second_last;
   int i;
 
-  if (gps->totpoints < 2 || dist < FLT_EPSILON) {
+  if (gps->totpoints < 2) {
+    if (gps->totpoints == 1) {
+      second_last = &pt[1];
+      if (len_v3v3(&second_last->x, &pt->x) < dist) {
+        BKE_gpencil_stroke_trim_points(gps, 0, 0);
+        return true;
+      }
+    }
+
     return false;
   }
 
   second_last = &pt[gps->totpoints - 2];
 
-  float len1, this_len1, cut_len1;
-  float len2, this_len2, cut_len2;
-  int index_start, index_end;
+  float len1, cut_len1;
+  float len2, cut_len2;
+  len1 = len2 = cut_len1 = cut_len2 = 0.0f;
 
-  len1 = len2 = this_len1 = this_len2 = cut_len1 = cut_len2 = 0.0f;
-
-  i = 1;
-  while (len1 < dist && gps->totpoints > i - 1) {
-    this_len1 = len_v3v3(&pt[i].x, &pt[i + 1].x);
-    len1 += this_len1;
-    cut_len1 = len1 - dist;
-    i++;
+  int index_start = 0;
+  int index_end = 0;
+  if (mode == START) {
+    i = 0;
+    index_end = gps->totpoints - 1;
+    while (len1 < dist && gps->totpoints > i + 1) {
+      len1 += len_v3v3(&pt[i].x, &pt[i + 1].x);
+      cut_len1 = len1 - dist;
+      i++;
+    }
+    index_start = i - 1;
   }
-  index_start = i - 2;
 
-  i = 2;
-  while (len2 < dist && gps->totpoints >= i) {
-    second_last = &pt[gps->totpoints - i];
-    this_len2 = len_v3v3(&second_last[1].x, &second_last->x);
-    len2 += this_len2;
-    cut_len2 = len2 - dist;
-    i++;
+  if (mode == END) {
+    index_start = 0;
+    i = 2;
+    while (len2 < dist && gps->totpoints >= i) {
+      second_last = &pt[gps->totpoints - i];
+      len2 += len_v3v3(&second_last[1].x, &second_last->x);
+      cut_len2 = len2 - dist;
+      i++;
+    }
+    index_end = gps->totpoints - i + 2;
   }
-  index_end = gps->totpoints - i + 2;
 
-  if (len1 < dist || len2 < dist || index_end <= index_start) {
+  if (index_end <= index_start) {
     index_start = index_end = 0; /* empty stroke */
   }
 
-  if ((index_end == index_start + 1) && (cut_len1 + cut_len2 > 1.0f)) {
+  if ((index_end == index_start + 1) && (cut_len1 + cut_len2 < dist)) {
     index_start = index_end = 0; /* no length left to cut */
   }
 
@@ -753,22 +783,8 @@ bool BKE_gpencil_stroke_shrink(bGPDstroke *gps, const float dist)
     return false;
   }
 
-  pt = gps->points;
-
-  float cut1 = cut_len1 / this_len1;
-  float cut2 = cut_len2 / this_len2;
-
-  float result1[3], result2[3];
-
-  interp_v3_v3v3(result1, &pt[1].x, &pt[0].x, cut1);
-  interp_v3_v3v3(result2, &pt[gps->totpoints - 2].x, &pt[gps->totpoints - 1].x, cut2);
-
-  copy_v3_v3(&pt[0].x, result1);
-  copy_v3_v3(&pt[gps->totpoints - 1].x, result2);
-
   return true;
 }
-
 /**
  * Apply smooth position to stroke point.
  * \param gps: Stroke to smooth
@@ -779,6 +795,7 @@ bool BKE_gpencil_stroke_smooth(bGPDstroke *gps, int i, float inf)
 {
   bGPDspoint *pt = &gps->points[i];
   float sco[3] = {0.0f};
+  const bool is_cyclic = (gps->flag & GP_STROKE_CYCLIC) != 0;
 
   /* Do nothing if not enough points to smooth out */
   if (gps->totpoints <= 2) {
@@ -788,7 +805,7 @@ bool BKE_gpencil_stroke_smooth(bGPDstroke *gps, int i, float inf)
   /* Only affect endpoints by a fraction of the normal strength,
    * to prevent the stroke from shrinking too much
    */
-  if (ELEM(i, 0, gps->totpoints - 1)) {
+  if (!is_cyclic && ELEM(i, 0, gps->totpoints - 1)) {
     inf *= 0.1f;
   }
 
@@ -814,8 +831,22 @@ bool BKE_gpencil_stroke_smooth(bGPDstroke *gps, int i, float inf)
       int before = i - step;
       int after = i + step;
 
-      CLAMP_MIN(before, 0);
-      CLAMP_MAX(after, gps->totpoints - 1);
+      if (is_cyclic) {
+        if (before < 0) {
+          /* Sub to end point (before is already negative). */
+          before = gps->totpoints + before;
+          CLAMP(before, 0, gps->totpoints - 1);
+        }
+        if (after > gps->totpoints - 1) {
+          /* Add to start point. */
+          after = after - gps->totpoints;
+          CLAMP(after, 0, gps->totpoints - 1);
+        }
+      }
+      else {
+        CLAMP_MIN(before, 0);
+        CLAMP_MAX(after, gps->totpoints - 1);
+      }
 
       pt1 = &gps->points[before];
       pt2 = &gps->points[after];
@@ -841,6 +872,7 @@ bool BKE_gpencil_stroke_smooth(bGPDstroke *gps, int i, float inf)
 bool BKE_gpencil_stroke_smooth_strength(bGPDstroke *gps, int point_index, float influence)
 {
   bGPDspoint *ptb = &gps->points[point_index];
+  const bool is_cyclic = (gps->flag & GP_STROKE_CYCLIC) != 0;
 
   /* Do nothing if not enough points */
   if ((gps->totpoints <= 2) || (point_index < 1)) {
@@ -848,7 +880,7 @@ bool BKE_gpencil_stroke_smooth_strength(bGPDstroke *gps, int point_index, float 
   }
   /* Only affect endpoints by a fraction of the normal influence */
   float inf = influence;
-  if (ELEM(point_index, 0, gps->totpoints - 1)) {
+  if (!is_cyclic && ELEM(point_index, 0, gps->totpoints - 1)) {
     inf *= 0.01f;
   }
   /* Limit max influence to reduce pop effect. */
@@ -870,9 +902,22 @@ bool BKE_gpencil_stroke_smooth_strength(bGPDstroke *gps, int point_index, float 
     int before = point_index - step;
     int after = point_index + step;
 
-    CLAMP_MIN(before, 0);
-    CLAMP_MAX(after, gps->totpoints - 1);
-
+    if (is_cyclic) {
+      if (before < 0) {
+        /* Sub to end point (before is already negative). */
+        before = gps->totpoints + before;
+        CLAMP(before, 0, gps->totpoints - 1);
+      }
+      if (after > gps->totpoints - 1) {
+        /* Add to start point. */
+        after = after - gps->totpoints;
+        CLAMP(after, 0, gps->totpoints - 1);
+      }
+    }
+    else {
+      CLAMP_MIN(before, 0);
+      CLAMP_MAX(after, gps->totpoints - 1);
+    }
     pt1 = &gps->points[before];
     pt2 = &gps->points[after];
 
@@ -905,6 +950,7 @@ bool BKE_gpencil_stroke_smooth_strength(bGPDstroke *gps, int point_index, float 
 bool BKE_gpencil_stroke_smooth_thickness(bGPDstroke *gps, int point_index, float influence)
 {
   bGPDspoint *ptb = &gps->points[point_index];
+  const bool is_cyclic = (gps->flag & GP_STROKE_CYCLIC) != 0;
 
   /* Do nothing if not enough points */
   if ((gps->totpoints <= 2) || (point_index < 1)) {
@@ -912,7 +958,7 @@ bool BKE_gpencil_stroke_smooth_thickness(bGPDstroke *gps, int point_index, float
   }
   /* Only affect endpoints by a fraction of the normal influence */
   float inf = influence;
-  if (ELEM(point_index, 0, gps->totpoints - 1)) {
+  if (!is_cyclic && ELEM(point_index, 0, gps->totpoints - 1)) {
     inf *= 0.01f;
   }
   /* Limit max influence to reduce pop effect. */
@@ -934,9 +980,22 @@ bool BKE_gpencil_stroke_smooth_thickness(bGPDstroke *gps, int point_index, float
     int before = point_index - step;
     int after = point_index + step;
 
-    CLAMP_MIN(before, 0);
-    CLAMP_MAX(after, gps->totpoints - 1);
-
+    if (is_cyclic) {
+      if (before < 0) {
+        /* Sub to end point (before is already negative). */
+        before = gps->totpoints + before;
+        CLAMP(before, 0, gps->totpoints - 1);
+      }
+      if (after > gps->totpoints - 1) {
+        /* Add to start point. */
+        after = after - gps->totpoints;
+        CLAMP(after, 0, gps->totpoints - 1);
+      }
+    }
+    else {
+      CLAMP_MIN(before, 0);
+      CLAMP_MAX(after, gps->totpoints - 1);
+    }
     pt1 = &gps->points[before];
     pt2 = &gps->points[after];
 
@@ -968,6 +1027,7 @@ bool BKE_gpencil_stroke_smooth_thickness(bGPDstroke *gps, int point_index, float
 bool BKE_gpencil_stroke_smooth_uv(bGPDstroke *gps, int point_index, float influence)
 {
   bGPDspoint *ptb = &gps->points[point_index];
+  const bool is_cyclic = (gps->flag & GP_STROKE_CYCLIC) != 0;
 
   /* Do nothing if not enough points */
   if (gps->totpoints <= 2) {
@@ -979,9 +1039,22 @@ bool BKE_gpencil_stroke_smooth_uv(bGPDstroke *gps, int point_index, float influe
   int before = point_index - 1;
   int after = point_index + 1;
 
-  CLAMP_MIN(before, 0);
-  CLAMP_MAX(after, gps->totpoints - 1);
-
+  if (is_cyclic) {
+    if (before < 0) {
+      /* Sub to end point (before is already negative). */
+      before = gps->totpoints + before;
+      CLAMP(before, 0, gps->totpoints - 1);
+    }
+    if (after > gps->totpoints - 1) {
+      /* Add to start point. */
+      after = after - gps->totpoints;
+      CLAMP(after, 0, gps->totpoints - 1);
+    }
+  }
+  else {
+    CLAMP_MIN(before, 0);
+    CLAMP_MAX(after, gps->totpoints - 1);
+  }
   pta = &gps->points[before];
   ptc = &gps->points[after];
 
@@ -1050,8 +1123,21 @@ void BKE_gpencil_stroke_2d_flat(const bGPDspoint *points,
   normalize_v3(locx);
   normalize_v3(locy);
 
+  /* Calculate last point first. */
+  const bGPDspoint *pt_last = &points[totpoints - 1];
+  float tmp[3];
+  sub_v3_v3v3(tmp, &pt_last->x, &pt0->x);
+
+  points2d[totpoints - 1][0] = dot_v3v3(tmp, locx);
+  points2d[totpoints - 1][1] = dot_v3v3(tmp, locy);
+
+  /* Calculate the scalar cross product of the 2d points. */
+  float cross = 0.0f;
+  float *co_curr;
+  float *co_prev = (float *)&points2d[totpoints - 1];
+
   /* Get all points in local space */
-  for (int i = 0; i < totpoints; i++) {
+  for (int i = 0; i < totpoints - 1; i++) {
     const bGPDspoint *pt = &points[i];
     float loc[3];
 
@@ -1060,10 +1146,15 @@ void BKE_gpencil_stroke_2d_flat(const bGPDspoint *points,
 
     points2d[i][0] = dot_v3v3(loc, locx);
     points2d[i][1] = dot_v3v3(loc, locy);
+
+    /* Calculate cross product. */
+    co_curr = (float *)&points2d[i][0];
+    cross += (co_curr[0] - co_prev[0]) * (co_curr[1] + co_prev[1]);
+    co_prev = (float *)&points2d[i][0];
   }
 
-  /* Concave (-1), Convex (1), or Auto-detect (0)? */
-  *r_direction = (int)locy[2];
+  /* Concave (-1), Convex (1) */
+  *r_direction = (cross >= 0.0f) ? 1 : -1;
 }
 
 /**
@@ -1961,7 +2052,7 @@ void BKE_gpencil_stroke_subdivide(bGPdata *gpd, bGPDstroke *gps, int level, int 
     MEM_SAFE_FREE(temp_points);
     MEM_SAFE_FREE(temp_dverts);
 
-    /* move points to smooth stroke (not simple type )*/
+    /* Move points to smooth stroke (not simple type). */
     if (type != GP_SUBDIV_SIMPLE) {
       /* duplicate points in a temp area with the new subdivide data */
       temp_points = MEM_dupallocN(gps->points);
@@ -2044,7 +2135,7 @@ void BKE_gpencil_stroke_merge_distance(bGPdata *gpd,
       else {
         pt->flag |= GP_SPOINT_TAG;
       }
-      /* Jump to next pair of points, keeping first point segment equals.*/
+      /* Jump to next pair of points, keeping first point segment equals. */
       step++;
     }
     else {
@@ -2391,9 +2482,9 @@ bool BKE_gpencil_convert_mesh(Main *bmain,
 
   /* Use evaluated data to get mesh with all modifiers on top. */
   Object *ob_eval = (Object *)DEG_get_evaluated_object(depsgraph, ob_mesh);
-  Mesh *me_eval = BKE_object_get_evaluated_mesh(ob_eval);
-  MPoly *mp, *mpoly = me_eval->mpoly;
-  MLoop *mloop = me_eval->mloop;
+  const Mesh *me_eval = BKE_object_get_evaluated_mesh(ob_eval);
+  const MPoly *mpoly = me_eval->mpoly;
+  const MLoop *mloop = me_eval->mloop;
   int mpoly_len = me_eval->totpoly;
   char element_name[200];
 
@@ -2421,19 +2512,20 @@ bool BKE_gpencil_convert_mesh(Main *bmain,
       /* Create Layer and Frame. */
       bGPDlayer *gpl_fill = BKE_gpencil_layer_named_get(gpd, element_name);
       if (gpl_fill == NULL) {
-        gpl_fill = BKE_gpencil_layer_addnew(gpd, element_name, true);
+        gpl_fill = BKE_gpencil_layer_addnew(gpd, element_name, true, false);
       }
       bGPDframe *gpf_fill = BKE_gpencil_layer_frame_get(
           gpl_fill, CFRA + frame_offset, GP_GETFRAME_ADD_NEW);
       int i;
-      for (i = 0, mp = mpoly; i < mpoly_len; i++, mp++) {
-        MLoop *ml = &mloop[mp->loopstart];
+      for (i = 0; i < mpoly_len; i++) {
+        const MPoly *mp = &mpoly[i];
+
         /* Find material. */
         int mat_idx = 0;
         Material *ma = BKE_object_material_get(ob_mesh, mp->mat_nr + 1);
         make_element_name(
             ob_mesh->id.name + 2, (ma != NULL) ? ma->id.name + 2 : "Fill", 64, element_name);
-        mat_idx = gpencil_material_find_index_by_name(ob_gp, element_name);
+        mat_idx = BKE_gpencil_material_find_index_by_name_prefix(ob_gp, element_name);
         if (mat_idx == -1) {
           float color[4];
           if (ma != NULL) {
@@ -2450,8 +2542,10 @@ bool BKE_gpencil_convert_mesh(Main *bmain,
         gps_fill->flag |= GP_STROKE_CYCLIC;
 
         /* Add points to strokes. */
-        for (int j = 0; j < mp->totloop; j++, ml++) {
-          MVert *mv = &me_eval->mvert[ml->v];
+        for (int j = 0; j < mp->totloop; j++) {
+          const MLoop *ml = &mloop[mp->loopstart + j];
+          const MVert *mv = &me_eval->mvert[ml->v];
+
           bGPDspoint *pt = &gps_fill->points[j];
           copy_v3_v3(&pt->x, mv->co);
           mul_m4_v3(matrix, &pt->x);
@@ -2474,7 +2568,7 @@ bool BKE_gpencil_convert_mesh(Main *bmain,
   /* Create Layer and Frame. */
   bGPDlayer *gpl_stroke = BKE_gpencil_layer_named_get(gpd, element_name);
   if (gpl_stroke == NULL) {
-    gpl_stroke = BKE_gpencil_layer_addnew(gpd, element_name, true);
+    gpl_stroke = BKE_gpencil_layer_addnew(gpd, element_name, true, false);
   }
   bGPDframe *gpf_stroke = BKE_gpencil_layer_frame_get(
       gpl_stroke, CFRA + frame_offset, GP_GETFRAME_ADD_NEW);
@@ -2527,7 +2621,7 @@ void BKE_gpencil_transform(bGPdata *gpd, const float mat[4][4])
 }
 
 /* Used for "move only origins" in object_data_transform.c */
-int BKE_gpencil_stroke_point_count(bGPdata *gpd)
+int BKE_gpencil_stroke_point_count(const bGPdata *gpd)
 {
   int total_points = 0;
 
@@ -2535,7 +2629,7 @@ int BKE_gpencil_stroke_point_count(bGPdata *gpd)
     return 0;
   }
 
-  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+  LISTBASE_FOREACH (const bGPDlayer *, gpl, &gpd->layers) {
     /* FIXME: For now, we just skip parented layers.
      * Otherwise, we have to update each frame to find
      * the current parent position/effects.
@@ -2544,7 +2638,7 @@ int BKE_gpencil_stroke_point_count(bGPdata *gpd)
       continue;
     }
 
-    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+    LISTBASE_FOREACH (const bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         total_points += gps->totpoints;
       }
@@ -2779,7 +2873,7 @@ static void gpencil_stroke_join_islands(bGPdata *gpd,
     MDeformVert *dvert_src = NULL;
     MDeformVert *dvert_dst = NULL;
 
-    /* Copy weights (last before)*/
+    /* Copy weights (last before). */
     e1 = 0;
     e2 = 0;
     for (int i = 0; i < totpoints; i++) {
@@ -2952,6 +3046,9 @@ bGPDstroke *BKE_gpencil_stroke_delete_tagged_points(bGPdata *gpd,
 
       /* Add new stroke to the frame or delete if below limit */
       if ((limit > 0) && (new_stroke->totpoints <= limit)) {
+        if (gps_first == new_stroke) {
+          gps_first = NULL;
+        }
         BKE_gpencil_free_stroke(new_stroke);
       }
       else {
@@ -3466,7 +3563,7 @@ void BKE_gpencil_stroke_uniform_subdivide(bGPdata *gpd,
  * Stroke to view space
  * Transforms a stroke to view space. This allows for manipulations in 2D but also easy conversion
  * back to 3D.
- * Note: also takes care of parent space transform
+ * NOTE: also takes care of parent space transform
  */
 void BKE_gpencil_stroke_to_view_space(RegionView3D *rv3d,
                                       bGPDstroke *gps,
@@ -3485,7 +3582,7 @@ void BKE_gpencil_stroke_to_view_space(RegionView3D *rv3d,
  * Stroke from view space
  * Transforms a stroke from view space back to world space. Inverse of
  * BKE_gpencil_stroke_to_view_space
- * Note: also takes care of parent space transform
+ * NOTE: also takes care of parent space transform
  */
 void BKE_gpencil_stroke_from_view_space(RegionView3D *rv3d,
                                         bGPDstroke *gps,
@@ -3716,11 +3813,11 @@ static ListBase *gpencil_stroke_perimeter_ex(const bGPdata *gpd,
     last_prev_pt[0] -= 1.0f;
   }
 
-  /* generate points for start cap */
+  /* Generate points for start cap. */
   num_perimeter_points += generate_perimeter_cap(
       first_pt, first_next_pt, first_radius, perimeter_right_side, subdivisions, gps->caps[0]);
 
-  /* generate perimeter points  */
+  /* Generate perimeter points. */
   float curr_pt[3], next_pt[3], prev_pt[3];
   float vec_next[2], vec_prev[2];
   float nvec_next[2], nvec_prev[2];

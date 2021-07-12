@@ -125,7 +125,7 @@ typedef struct tGPDfill {
   struct bGPDframe *gpf;
   /** Temp mouse position stroke. */
   struct bGPDstroke *gps_mouse;
-  /** Pointer to report messages.  */
+  /** Pointer to report messages. */
   struct ReportList *reports;
   /** flags */
   short flag;
@@ -810,7 +810,7 @@ static bool is_leak_narrow(ImBuf *ibuf, const int maxpixel, int limit, int index
       }
     }
     else {
-      /* edge of image*/
+      /* Edge of image. */
       t_a = true;
     }
     /* pixels on bottom */
@@ -822,7 +822,7 @@ static bool is_leak_narrow(ImBuf *ibuf, const int maxpixel, int limit, int index
       }
     }
     else {
-      /* edge of image*/
+      /* Edge of image. */
       t_b = true;
     }
   }
@@ -846,7 +846,7 @@ static bool is_leak_narrow(ImBuf *ibuf, const int maxpixel, int limit, int index
       }
     }
     else {
-      t_a = true; /* edge of image*/
+      t_a = true; /* Edge of image. */
     }
     /* pixels to left */
     pt = index + extreme;
@@ -1029,9 +1029,15 @@ static void gpencil_invert_image(tGPDfill *tgpf)
     /* Red->Green */
     else if (color[0] == 1.0f) {
       set_pixel(ibuf, v, fill_col[1]);
-      /* Add thickness of 2 pixels to avoid too thin lines. */
-      int offset = (v % ibuf->x < center) ? 1 : -1;
-      set_pixel(ibuf, v + offset, fill_col[1]);
+      /* Add thickness of 2 pixels to avoid too thin lines, but avoid extremes of the pixel line.
+       */
+      int row = v / ibuf->x;
+      int lowpix = row * ibuf->x;
+      int highpix = lowpix + ibuf->x - 1;
+      if ((v > lowpix) && (v < highpix)) {
+        int offset = (v % ibuf->x < center) ? 1 : -1;
+        set_pixel(ibuf, v + offset, fill_col[1]);
+      }
     }
     else {
       /* Set to Transparent. */
@@ -1241,6 +1247,7 @@ static bool dilate_shape(ImBuf *ibuf)
 static void gpencil_get_outline_points(tGPDfill *tgpf, const bool dilate)
 {
   ImBuf *ibuf;
+  Brush *brush = tgpf->brush;
   float rgba[4];
   void *lock;
   int v[2];
@@ -1273,7 +1280,9 @@ static void gpencil_get_outline_points(tGPDfill *tgpf, const bool dilate)
 
   /* Dilate. */
   if (dilate) {
-    dilate_shape(ibuf);
+    for (int i = 0; i < brush->gpencil_settings->dilate_pixels; i++) {
+      dilate_shape(ibuf);
+    }
   }
 
   for (int idx = imagesize - 1; idx != 0; idx--) {
@@ -1364,7 +1373,7 @@ static void gpencil_get_depth_array(tGPDfill *tgpf)
     /* need to restore the original projection settings before packing up */
     view3d_region_operator_needs_opengl(tgpf->win, tgpf->region);
     ED_view3d_depth_override(
-        tgpf->depsgraph, tgpf->region, tgpf->v3d, NULL, V3D_DEPTH_NO_GPENCIL, false);
+        tgpf->depsgraph, tgpf->region, tgpf->v3d, NULL, V3D_DEPTH_NO_GPENCIL, NULL);
 
     /* Since strokes are so fine, when using their depth we need a margin
      * otherwise they might get missed. */
@@ -1616,7 +1625,7 @@ static void gpencil_draw_boundary_lines(const bContext *UNUSED(C), tGPDfill *tgp
 static void gpencil_fill_draw_3d(const bContext *C, ARegion *UNUSED(region), void *arg)
 {
   tGPDfill *tgpf = (tGPDfill *)arg;
-  /* draw only in the region that originated operator. This is required for multiwindow */
+  /* Draw only in the region that originated operator. This is required for multi-window. */
   ARegion *region = CTX_wm_region(C);
   if (region != tgpf->region) {
     return;
@@ -1680,7 +1689,7 @@ static tGPDfill *gpencil_session_init_fill(bContext *C, wmOperator *op)
   tgpf->gpd = gpd;
   tgpf->gpl = BKE_gpencil_layer_active_get(gpd);
   if (tgpf->gpl == NULL) {
-    tgpf->gpl = BKE_gpencil_layer_addnew(tgpf->gpd, DATA_("GP_Layer"), true);
+    tgpf->gpl = BKE_gpencil_layer_addnew(tgpf->gpd, DATA_("GP_Layer"), true, false);
   }
 
   tgpf->lock_axis = ts->gp_sculpt.lock_axis;
@@ -1860,7 +1869,7 @@ static int gpencil_fill_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSE
   DEG_id_tag_update(&tgpf->gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
   WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
 
-  /* add a modal handler for this operator*/
+  /* Add a modal handler for this operator. */
   WM_event_add_modal_handler(C, op);
 
   return OPERATOR_RUNNING_MODAL;
@@ -2114,7 +2123,7 @@ static int gpencil_fill_modal(bContext *C, wmOperator *op, const wmEvent *event)
             gpencil_stroke_convertcoords_tpoint(
                 tgpf->scene, tgpf->region, tgpf->ob, &point2D, NULL, &pt->x);
 
-            /* Hash of selected frames.*/
+            /* Hash of selected frames. */
             GHash *frame_list = BLI_ghash_int_new_ex(__func__, 64);
 
             /* If not multiframe and there is no frame in CFRA for the active layer, create

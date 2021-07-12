@@ -47,7 +47,7 @@
 /**
  * \section dna_genfile Overview
  *
- * - please note: no builtin security to detect input of double structs
+ * - please NOTE: no builtin security to detect input of double structs
  * - if you want a struct not to be in DNA file: add two hash marks above it `(#<enter>#<enter>)`.
  *
  * Structure DNA data is added to each blender file and to each executable, this to detect
@@ -792,6 +792,9 @@ static void cast_primitive_type(const eSDNA_Type old_type,
         old_value_i = *((uint64_t *)old_data);
         old_value_f = (double)old_value_i;
         break;
+      case SDNA_TYPE_INT8:
+        old_value_i = (uint64_t) * ((int8_t *)old_data);
+        old_value_f = (double)old_value_i;
     }
 
     switch (new_type) {
@@ -828,6 +831,9 @@ static void cast_primitive_type(const eSDNA_Type old_type,
       case SDNA_TYPE_UINT64:
         *((uint64_t *)new_data) = old_value_i;
         break;
+      case SDNA_TYPE_INT8:
+        *((int8_t *)new_data) = (int8_t)old_value_i;
+        break;
     }
 
     old_data += oldlen;
@@ -849,7 +855,7 @@ static void cast_pointer_64_to_32(const int array_len,
                                   uint32_t *new_data)
 {
   /* WARNING: 32-bit Blender trying to load file saved by 64-bit Blender,
-   * pointers may lose uniqueness on truncation! (Hopefully this wont
+   * pointers may lose uniqueness on truncation! (Hopefully this won't
    * happen unless/until we ever get to multi-gigabyte .blend files...) */
   for (int a = 0; a < array_len; a++) {
     new_data[a] = old_data[a] >> 3;
@@ -1054,7 +1060,7 @@ void DNA_struct_switch_endian(const SDNA *sdna, int struct_nr, char *data)
           }
           case SDNA_TYPE_INT:
           case SDNA_TYPE_FLOAT: {
-            /* Note, intentionally ignore long/ulong, because these could be 4 or 8 bytes.
+            /* NOTE: intentionally ignore long/ulong, because these could be 4 or 8 bytes.
              * Fortunately, we only use these types for runtime variables and only once for a
              * struct type that is no longer used. */
             BLI_endian_switch_int32_array((int32_t *)member_data, member_array_length);
@@ -1558,9 +1564,8 @@ DNA_ReconstructInfo *DNA_reconstruct_info_create(const SDNA *oldsdna,
     ReconstructStep *steps = create_reconstruct_steps_for_struct(
         oldsdna, newsdna, compare_flags, old_struct, new_struct);
 
-    int steps_len = new_struct->members_len;
     /* Comment the line below to skip the compression for debugging purposes. */
-    steps_len = compress_reconstruct_steps(steps, new_struct->members_len);
+    const int steps_len = compress_reconstruct_steps(steps, new_struct->members_len);
 
     reconstruct_info->steps[new_struct_nr] = steps;
     reconstruct_info->step_counts[new_struct_nr] = steps_len;
@@ -1655,6 +1660,7 @@ int DNA_elem_type_size(const eSDNA_Type elem_nr)
   switch (elem_nr) {
     case SDNA_TYPE_CHAR:
     case SDNA_TYPE_UCHAR:
+    case SDNA_TYPE_INT8:
       return 1;
     case SDNA_TYPE_SHORT:
     case SDNA_TYPE_USHORT:
