@@ -24,6 +24,7 @@
 
 #include "BKE_mesh_types.h"
 #include "BLI_utildefines.h"
+#include "DNA_customdata_types.h"
 
 struct BLI_Stack;
 struct BMesh;

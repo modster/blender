@@ -193,6 +193,7 @@ set(SRC
   intern/mesh_normals.cc
   intern/mesh_remap.c
   intern/mesh_remesh_voxel.c
+  intern/mesh_remesh_blocks.c
   intern/mesh_runtime.c
   intern/mesh_sample.cc
   intern/mesh_tangent.c
@@ -386,6 +387,7 @@ set(SRC
   BKE_mesh_mapping.h
   BKE_mesh_mirror.h
   BKE_mesh_remap.h
+  BKE_mesh_remesh_blocks.h
   BKE_mesh_remesh_voxel.h
   BKE_mesh_runtime.h
   BKE_mesh_sample.hh
@@ -486,6 +488,16 @@ set(LIB
   bf_shader_fx
   bf_simulation
 )
+
+if(WITH_MOD_REMESH)
+  list(APPEND INC
+          ../../../intern/dualcon
+          )
+  list(APPEND LIB
+          bf_intern_dualcon
+          )
+  add_definitions(-DWITH_MOD_REMESH)
+endif()
 
 if(WITH_BINRELOC)
   list(APPEND INC_SYS

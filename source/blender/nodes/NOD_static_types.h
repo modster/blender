@@ -334,7 +334,7 @@ DefNode(GeometryNode, GEO_NODE_SEPARATE_COMPONENTS, 0, "SEPARATE_COMPONENTS", Se
 DefNode(GeometryNode, GEO_NODE_MESH_SUBDIVIDE, 0, "MESH_SUBDIVIDE", MeshSubdivide, "Mesh Subdivide", "")
 DefNode(GeometryNode, GEO_NODE_SUBDIVISION_SURFACE, 0, "SUBDIVISION_SURFACE", SubdivisionSurface, "Subdivision Surface", "")
 DefNode(GeometryNode, GEO_NODE_SWITCH, def_geo_switch, "SWITCH", Switch, "Switch", "")
-DefNode(GeometryNode, GEO_NODE_REMESH, 0, "REMESH", Remesh, "Remesh", "")
+DefNode(GeometryNode, GEO_NODE_REMESH_BLOCKS, 0, "REMESH_BLOCKS", RemeshBlocks, "Remesh Blocks", "")
 DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform", "")
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
 DefNode(GeometryNode, GEO_NODE_VIEWER, 0, "VIEWER", Viewer, "Viewer", "")
