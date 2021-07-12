@@ -167,7 +167,7 @@ void invert_qt_qt_normalized(float q1[4], const float q2[4])
   invert_qt_normalized(q1);
 }
 
-/* simple mult */
+/* Simple multiply. */
 void mul_qt_fl(float q[4], const float f)
 {
   q[0] *= f;
@@ -511,7 +511,7 @@ void rotation_between_vecs_to_mat3(float m[3][3], const float v1[3], const float
   }
 }
 
-/* note: expects vectors to be normalized */
+/* NOTE: expects vectors to be normalized. */
 void rotation_between_vecs_to_quat(float q[4], const float v1[3], const float v2[3])
 {
   float axis[3];
