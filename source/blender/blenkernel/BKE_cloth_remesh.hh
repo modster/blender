@@ -928,6 +928,14 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   /* copy assignment operator */
   /* move assignment operator */
   /* other operator overloads */
+  friend std::ostream &operator<<(std::ostream &stream, const Mesh &mesh)
+  {
+    stream << "nodes: " << mesh.nodes << std::endl;
+    stream << "verts: " << mesh.verts << std::endl;
+    stream << "edges: " << mesh.edges << std::endl;
+    stream << "faces: " << mesh.faces << std::endl;
+    return stream;
+  }
 
   /* all public static methods */
   /* all public non-static methods */
@@ -1193,10 +1201,14 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     /* TODO(ish): ensure normal information properly, right now need
      * to just assume it is not dirty for faster development */
     this->node_normals_dirty = false;
+
+    std::cout << __func__ << " mesh:" << std::endl << *this << std::endl;
   }
 
   MeshIO write() const
   {
+    std::cout << __func__ << " mesh:" << std::endl << *this << std::endl;
+
     using FaceData = std::tuple<usize, usize, usize>;
     blender::Vector<float3> positions;
     blender::Vector<float2> uvs;
@@ -1305,7 +1317,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
-    std::cout << "line_indices: " << line_indices << std::endl;
+    /* std::cout << "line_indices: " << line_indices << std::endl; */
 
     MeshIO result;
     result.set_positions(std::move(positions));
@@ -1313,6 +1325,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     result.set_normals(std::move(normals));
     result.set_face_indices(std::move(face_indices));
     result.set_line_indices(std::move(line_indices));
+
+    std::cout << "MeshIO result: " << std::endl << result << std::endl;
 
     return result;
   }
@@ -1501,10 +1515,22 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
                                                          bool verts_swapped,
                                                          bool across_seams)
   {
+    /* Let the vert remove be `v1`, node to remove be `n1`, the other
+     * vert, node be `v2`, `n2`.
+     *
+     * Let `e` be the edge to collapse.
+     *
+     * Let `f` be any face of `e`.
+     *
+     * Let `ov` be the other vert of `e`, `f`.
+     *
+     * Let `vx` be other vert of the edges of `v1`.
+     */
     /* This operation will delete the following-
-     * the edge specified, faces incident to the edge. v2, n2 if
-     * verts_swapped is true. v1, n1 if verts_swapped is false. One of the
-     * edge per face (edge vert and other vert).
+     * `v1`
+     * `n1`
+     * `f`
+     * edge between `ov` and `v1`
      *
      * This operation will add the following-
      * None
@@ -1519,66 +1545,89 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     blender::Vector<Edge<EED>> deleted_edges;
     blender::Vector<Face<EFD>> deleted_faces;
 
-    auto &edge_a = this->get_checked_edge(edge_index);
-    auto [v1, v2] = this->get_checked_verts_of_edge(edge_a, verts_swapped);
-    auto v1_index = v1.self_index;
-    auto n1_index = v1.node.value();
+    auto &e = this->get_checked_edge(edge_index);
+    auto [v1_a, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
+    auto v1_index = v1_a.self_index;
+    auto v2_index = v2.self_index;
+    {
+      std::cout << "v1_index: " << v1_index << std::endl;
+      std::cout << "v2_index: " << v2_index << std::endl;
+    }
+    BLI_assert(v1_a.node); /* ensure v1 has a node */
+    auto n1_index = v1_a.node.value();
 
-    /* This point forward, the vert to be removed is v1, v2 continues
-     * to exist */
-
-    auto faces = edge_a.faces;
-
-    for (const auto &face_index : faces) {
+    /* delete all the faces that `e` refers to */
+    auto e_faces = e.faces;
+    for (const auto &face_index : e_faces) {
+      auto &e = this->get_checked_edge(edge_index);
+      this->delink_face_edges(face_index);
       auto face = this->delete_face(face_index);
 
-      auto &edge_b = this->get_checked_edge(edge_index);
+      std::cout << "face_edges: " << this->get_edge_indices_of_face(face) << std::endl;
 
-      auto &other_vert = this->get_checked_other_vert(edge_b, face);
+      auto &ov = this->get_checked_other_vert(e, face);
 
-      /* delete edge between v1 and other_vert */
-      {
-        auto op_e_index = this->get_connecting_edge_index(v1_index, other_vert.self_index);
-        BLI_assert(op_e_index);
-        auto e = this->delete_edge(op_e_index.value());
-
-        deleted_edges.append(std::move(e));
-      }
+      auto op_v1_ov_edge_index = this->get_connecting_edge_index(v1_index, ov.self_index);
+      BLI_assert(op_v1_ov_edge_index);
+      auto v1_ov_edge = this->delete_edge(op_v1_ov_edge_index.value());
 
       deleted_faces.append(std::move(face));
+      deleted_edges.append(std::move(v1_ov_edge));
     }
 
-    /* for each edge of v1, change that edge's verts to (vx, v2) */
-    for (const auto &e_index : v1.edges) {
-      Edge<EED> &e = this->get_checked_edge(e_index);
+    auto &v1 = this->get_checked_vert(v1_index);
+    auto v1_edge_indices = v1.edges;
+    std::cout << "v1_edge_indices: " << v1_edge_indices << std::endl;
 
-      /* we don't want to mess with edge between v1 and v2 */
-      if (e.has_vert(v2.self_index)) {
+    /* edges should have verts (v2, vx) instead of (v1, vx) and the
+     * face should have (v2, vx, vy) instead of (v1, vx, vy) */
+    for (const auto &v1_vx_edge_index : v1_edge_indices) {
+      Edge<EED> &v1_vx_edge = this->get_checked_edge(v1_vx_edge_index);
+
+      BLI_assert(v1_vx_edge.verts);
+      auto &verts = v1_vx_edge.verts.value();
+
+      std::cout << "v1_vx_edge.verts: " << verts << std::endl;
+
+      if (v1_vx_edge.has_vert(v2_index)) {
+        /* don't need to mess with (v1, v2), only (v1, vx) */
         continue;
       }
 
-      BLI_assert(e.verts);
-      auto &verts = e.verts.value();
       if (std::get<0>(verts) == v1_index) {
-        e.verts = {std::get<1>(verts), v2.self_index};
+        v1_vx_edge.verts = {std::get<1>(verts), v2_index};
       }
       else {
-        e.verts = {std::get<0>(verts), v2.self_index};
+        v1_vx_edge.verts = {std::get<0>(verts), v2_index};
+      }
+
+      /* TODO(ish): this particular `v1_vx_edge_index` should be
+       * removed from v1, cannot just clear out `v1.edges` */
+      /* since the edge no longer refers to `v1`, we should remove the
+       * edge from `v1.edges` */
+      v1.edges.remove_first_occurrence_and_reorder(v1_vx_edge_index);
+
+      /* replace `v1` with `v2` in the face  */
+      for (const auto face_index : v1_vx_edge.faces) {
+        Face<EFD> &face = this->get_checked_face(face_index);
+        /* the face may not contain `v1` */
+        auto pos = face.verts.first_index_of_try(v1_index);
+        if (pos != -1) {
+          face.verts[pos] = v2_index;
+        }
       }
     }
 
-    /* delete edge */
+    /* delete e */
     {
-      auto edge = this->delete_edge(edge_index);
-      deleted_edges.append(std::move(edge));
+      auto e = this->delete_edge(edge_index);
+      deleted_edges.append(std::move(e));
     }
-
     /* delete v1 */
     {
       auto v1 = this->delete_vert(v1_index);
       deleted_verts.append(std::move(v1));
     }
-
     /* delete n1 */
     {
       auto n1 = this->delete_node(n1_index);
@@ -1898,6 +1947,33 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * Get the edge indices of the `Face`
+   */
+  blender::Vector<EdgeIndex> get_edge_indices_of_face(const Face<EFD> &face) const
+  {
+    blender::Vector<EdgeIndex> edge_indices;
+    auto vert_1_index = face.verts[0];
+    auto vert_2_index = face.verts[0];
+    for (auto i = 1; i <= face.verts.size(); i++) {
+      vert_1_index = vert_2_index;
+      if (i == face.verts.size()) {
+        vert_2_index = face.verts[0];
+      }
+      else {
+        vert_2_index = face.verts[i];
+      }
+
+      auto op_edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index);
+      BLI_assert(op_edge_index);
+      auto edge_index = op_edge_index.value();
+
+      edge_indices.append(std::move(edge_index));
+    }
+
+    return edge_indices;
+  }
+
+  /**
    * Remove this `Face`s from the `Edge`s formed by the `Vert`s of
    * this `Face`.
    *
@@ -1908,6 +1984,9 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   {
     auto &face = this->get_checked_face(face_index);
 
+    /* Would want to use `get_edges_of_face()` but that can lead to 2
+     * loops, so duplicating that code here. (note: this needs to be
+     * benchmarked to see if this duplication is necessary) */
     auto vert_1_index = face.verts[0];
     auto vert_2_index = face.verts[0];
     for (auto i = 1; i <= face.verts.size(); i++) {
