@@ -54,8 +54,6 @@ static void initData(ModifierData *md)
   MEMCPY_STRUCT_AFTER(rmd, DNA_struct_default_get(RemeshModifierData), modifier);
 }
 
-#ifdef WITH_MOD_REMESH
-
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx), Mesh *mesh)
 {
   RemeshModifierData *rmd;
@@ -95,21 +93,9 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   return result;
 }
 
-#else /* !WITH_MOD_REMESH */
-
-static Mesh *modifyMesh(ModifierData *UNUSED(md),
-                        const ModifierEvalContext *UNUSED(ctx),
-                        Mesh *mesh)
-{
-  return mesh;
-}
-
-#endif /* !WITH_MOD_REMESH */
-
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
-#ifdef WITH_MOD_REMESH
   uiLayout *row, *col;
 
   PointerRNA ob_ptr;
@@ -142,10 +128,6 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_smooth_shade", 0, NULL, ICON_NONE);
 
   modifier_panel_end(layout, ptr);
-
-#else  /* WITH_MOD_REMESH */
-  uiItemL(layout, IFACE_("Built without Remesh modifier"), ICON_NONE);
-#endif /* WITH_MOD_REMESH */
 }
 
 static void panelRegister(ARegionType *region_type)

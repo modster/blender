@@ -268,7 +268,7 @@ endif()
 
 # Modifiers
 option(WITH_MOD_FLUID           "Enable Mantaflow Fluid Simulation Framework" ON)
-option(WITH_MOD_REMESH          "Enable Remesh Modifier" ON)
+option(WITH_REMESH_DUALCON          "Enable Remesh Modifier" ON)
 option(WITH_MOD_OCEANSIM        "Enable Ocean Modifier" ON)
 
 # Image format support
@@ -1981,7 +1981,7 @@ if(FIRST_RUN)
   info_cfg_text("Modifiers:")
   info_cfg_option(WITH_MOD_FLUID)
   info_cfg_option(WITH_MOD_OCEANSIM)
-  info_cfg_option(WITH_MOD_REMESH)
+  info_cfg_option(WITH_REMESH_DUALCON)
 
   info_cfg_text("OpenGL:")
   if(WIN32)

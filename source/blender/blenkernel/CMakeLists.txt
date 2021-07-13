@@ -489,14 +489,14 @@ set(LIB
   bf_simulation
 )
 
-if(WITH_MOD_REMESH)
+if(WITH_REMESH_DUALCON)
   list(APPEND INC
           ../../../intern/dualcon
           )
   list(APPEND LIB
           bf_intern_dualcon
           )
-  add_definitions(-DWITH_MOD_REMESH)
+  add_definitions(-DWITH_REMESH_DUALCON)
 endif()
 
 if(WITH_BINRELOC)

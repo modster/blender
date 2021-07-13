@@ -302,8 +302,8 @@ if(WITH_MOD_OCEANSIM)
   add_definitions(-DWITH_OCEANSIM)
 endif()
 
-if(WITH_MOD_REMESH)
-  add_definitions(-DWITH_MOD_REMESH)
+if(WITH_REMESH_DUALCON)
+  add_definitions(-DWITH_REMESH_DUALCON)
 endif()
 
 if(WITH_MOD_FLUID)

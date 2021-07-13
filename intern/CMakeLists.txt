@@ -37,7 +37,7 @@ if(WITH_AUDASPACE)
   add_subdirectory(audaspace)
 endif()
 
-if(WITH_MOD_REMESH)
+if(WITH_REMESH_DUALCON)
   add_subdirectory(dualcon)
 endif()
 
