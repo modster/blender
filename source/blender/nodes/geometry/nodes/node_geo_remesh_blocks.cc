@@ -49,11 +49,14 @@ static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
   const float scale = params.extract_input<float>("Scale");
   const float threshold = params.extract_input<float>("Threshold");
 
-  if(geometry_set.has_mesh()){
+  if (geometry_set.has_mesh()) {
     Mesh *input_mesh = geometry_set.get_mesh_for_write();
 
     Mesh *output_mesh = BKE_mesh_remesh_blocks_to_mesh_nomain(
         input_mesh, flag, mode, threshold, hermite_num, scale, depth);
+    for(int i = 0; i < output_mesh->totpoly; i++){
+      printf("flag: %i\n",output_mesh->mpoly[i].flag);
+    }
     BKE_mesh_copy_parameters_for_eval(output_mesh, input_mesh);
     BKE_mesh_calc_edges(input_mesh, true, false);
     output_mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
