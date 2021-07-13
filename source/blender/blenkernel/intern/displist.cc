@@ -834,7 +834,7 @@ void BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
 
 /**
  * \return True if the deformed curve control point data should be implicitly
- * converted directly to a mesh, or false it can be left as curve data via #CurveEval.
+ * converted directly to a mesh, or false if it can be left as curve data via #CurveEval.
  */
 static bool do_curve_implicit_mesh_conversion(const Curve *curve,
                                               ModifierData *first_modifier,
@@ -857,7 +857,7 @@ static bool do_curve_implicit_mesh_conversion(const Curve *curve,
   }
 
   /* If a non-geometry-nodes modifier is enabled before a nodes modifier,
-   * force conversion to mesh, since it doesn't support curve data. */
+   * force conversion to mesh, since only the nodes modifier supports curve data. */
   ModifierData *md = first_modifier;
   for (; md; md = md->next) {
     if (BKE_modifier_is_enabled(scene, md, required_mode)) {
