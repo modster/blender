@@ -475,6 +475,7 @@ static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRend
   LRT_ASSIGN_OCCLUSION_TASK(edge_mark);
   LRT_ASSIGN_OCCLUSION_TASK(floating);
   LRT_ASSIGN_OCCLUSION_TASK(light_contour);
+  LRT_ASSIGN_OCCLUSION_TASK(shadow);
 
 #undef LRT_ASSIGN_OCCLUSION_TASK
 
@@ -517,6 +518,10 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
     for (eip = rti->light_contour.first; eip && eip != rti->light_contour.last; eip = eip->next) {
       lineart_occlusion_single_line(rb, eip, rti->thread_id);
     }
+
+    for (eip = rti->shadow.first; eip && eip != rti->shadow.last; eip = eip->next) {
+      lineart_occlusion_single_line(rb, eip, rti->thread_id);
+    }
   }
 }
 
@@ -541,6 +546,7 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   rb->edge_mark.last = rb->edge_mark.first;
   rb->floating.last = rb->floating.first;
   rb->light_contour.last = rb->light_contour.first;
+  rb->shadow.last = rb->shadow.first;
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
@@ -1683,6 +1689,9 @@ static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e)
     case LRT_EDGE_FLAG_LIGHT_CONTOUR:
       lineart_prepend_edge_direct(&rb->light_contour.first, e);
       break;
+    case LRT_EDGE_FLAG_PROJECTED_SHADOW:
+      lineart_prepend_edge_direct(&rb->shadow.first, e);
+      break;
   }
 }
 
@@ -1715,6 +1724,9 @@ static void lineart_add_edge_to_list_thread(LineartObjectInfo *obi, LineartEdge 
       break;
     case LRT_EDGE_FLAG_LIGHT_CONTOUR:
       LRT_ASSIGN_EDGE(light_contour);
+      break;
+    case LRT_EDGE_FLAG_PROJECTED_SHADOW:
+      LRT_ASSIGN_EDGE(shadow);
       break;
   }
 #undef LRT_ASSIGN_EDGE
@@ -3012,6 +3024,7 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   memset(&rb->material, 0, sizeof(ListBase));
   memset(&rb->floating, 0, sizeof(ListBase));
   memset(&rb->light_contour, 0, sizeof(ListBase));
+  memset(&rb->shadow, 0, sizeof(ListBase));
 
   BLI_listbase_clear(&rb->chains);
   BLI_listbase_clear(&rb->wasted_cuts);
@@ -3024,9 +3037,36 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   BLI_spin_end(&rb->lock_cuts);
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
+  MEM_freeN((void *)rb->lock_bounding_areas);
+
   for (int i = 0; i < rb->thread_count; i++) {
     BLI_spin_end(&rb->lock_bounding_areas[i]);
   }
+
+  lineart_mem_destroy(&rb->render_data_pool);
+}
+
+static void lineart_destroy_render_data_keep_init(LineartRenderBuffer *rb)
+{
+  if (rb == NULL) {
+    return;
+  }
+
+  memset(&rb->contour, 0, sizeof(ListBase));
+  memset(&rb->crease, 0, sizeof(ListBase));
+  memset(&rb->intersection, 0, sizeof(ListBase));
+  memset(&rb->edge_mark, 0, sizeof(ListBase));
+  memset(&rb->material, 0, sizeof(ListBase));
+  memset(&rb->floating, 0, sizeof(ListBase));
+  memset(&rb->light_contour, 0, sizeof(ListBase));
+  memset(&rb->shadow, 0, sizeof(ListBase));
+
+  BLI_listbase_clear(&rb->chains);
+  BLI_listbase_clear(&rb->wasted_cuts);
+
+  BLI_listbase_clear(&rb->vertex_buffer_pointers);
+  BLI_listbase_clear(&rb->line_buffer_pointers);
+  BLI_listbase_clear(&rb->triangle_buffer_pointers);
 
   lineart_mem_destroy(&rb->render_data_pool);
 }
@@ -3171,6 +3211,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->use_loose = (edge_types & LRT_EDGE_FLAG_LOOSE) != 0;
   rb->use_light_contour = ((edge_types & LRT_EDGE_FLAG_LIGHT_CONTOUR) != 0 &&
                            (lmd->light_contour_object != NULL));
+  rb->use_shadow = ((edge_types & LRT_EDGE_FLAG_PROJECTED_SHADOW) != 0 &&
+                    (lmd->light_contour_object != NULL));
 
   rb->filter_face_mark_invert = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_INVERT) != 0;
   rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;
@@ -3187,8 +3229,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
 
   rb->thread_count = BKE_render_num_threads(&scene->r);
 
-  rb->lock_bounding_areas = lineart_mem_acquire(&rb->render_data_pool,
-                                                sizeof(SpinLock) * rb->thread_count);
+  rb->lock_bounding_areas = MEM_callocN(sizeof(SpinLock) * rb->thread_count, "ba spin locks");
   for (int i = 0; i < rb->thread_count; i++) {
     BLI_spin_init(&rb->lock_bounding_areas[i]);
   }
@@ -4021,7 +4062,9 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
   BLI_task_pool_work_and_wait(tp);
   BLI_task_pool_free(tp);
 
-  lineart_create_edges_from_isec_data(&d);
+  if (rb->use_intersections) {
+    lineart_create_edges_from_isec_data(&d);
+  }
 
   lineart_destroy_isec_thread(&d);
 
@@ -4288,7 +4331,7 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
   return 0;
 }
 
-static LineartEdgeSegment *lineart_give_shadow_segment(LineartRenderBuffer *rb)
+static LineartShadowSegment *lineart_give_shadow_segment(LineartRenderBuffer *rb)
 {
   BLI_spin_lock(&rb->lock_cuts);
 
@@ -4297,49 +4340,88 @@ static LineartEdgeSegment *lineart_give_shadow_segment(LineartRenderBuffer *rb)
     LineartShadowSegment *es = (LineartShadowSegment *)BLI_pophead(&rb->wasted_shadow_cuts);
     BLI_spin_unlock(&rb->lock_cuts);
     memset(es, 0, sizeof(LineartShadowSegment));
-    return (LineartEdgeSegment *)es;
+    return (LineartShadowSegment *)es;
   }
   BLI_spin_unlock(&rb->lock_cuts);
 
   /* Otherwise allocate some new memory. */
-  return (LineartEdgeSegment *)lineart_mem_acquire_thread(&rb->render_data_pool,
-                                                          sizeof(LineartShadowSegment));
+  return (LineartShadowSegment *)lineart_mem_acquire_thread(&rb->render_data_pool,
+                                                            sizeof(LineartShadowSegment));
 }
 
-static bool lineart_do_closest_segment(double *s1l,
-                                       double *s1r,
-                                       double *s2l,
-                                       double *s2r,
-                                       double *r_l,
-                                       double *r_r,
+static void lineart_shadow_segment_slice_get(double *fbl,
+                                             double *fbr,
+                                             double *gl,
+                                             double *gr,
+                                             double at,
+                                             double at_l,
+                                             double at_r,
+                                             double *r_fb,
+                                             double *r_g)
+{
+  double real_at = (at - at_l) / (at_r - at_l);
+  double ga = fbl[3] * real_at / (fbr[3] * (1.0f - real_at) + fbl[3] * real_at);
+  interp_v3_v3v3_db(r_fb, fbl, fbr, real_at);
+  r_fb[3] = interpd(fbr[3], fbl[3], ga);
+  interp_v3_v3v3_db(r_g, gl, gr, ga);
+}
+
+/* Returns true when a new cut is needed in the middle, otherwise `*r_new_xxx` are not touched. */
+static bool lineart_do_closest_segment(double *s1fbl,
+                                       double *s1fbr,
+                                       double *s2fbl,
+                                       double *s2fbr,
+                                       double *s1gl,
+                                       double *s1gr,
+                                       double *s2gl,
+                                       double *s2gr,
+                                       double *r_fbl,
+                                       double *r_fbr,
+                                       double *r_gl,
+                                       double *r_gr,
                                        double *r_new_in_the_middle,
+                                       double *r_new_in_the_middle_global,
                                        double *r_new_at)
 {
-  if (s1l[3] >= s2l[3] && s1r[3] >= s2r[3]) {
-    copy_v4_v4_db(r_l, s2l);
-    copy_v4_v4_db(r_r, s2r);
-    return false;
+  int side = 0;
+  /* Always use the closest point to the light camera. */
+  if (s1fbl[3] >= s2fbl[3]) {
+    copy_v4_v4_db(r_fbl, s2fbl);
+    copy_v3_v3_db(r_gl, s2gl);
+    side++;
   }
-  if (s1l[3] <= s2l[3] && s1r[3] <= s2r[3]) {
-    copy_v4_v4_db(r_l, s1l);
-    copy_v4_v4_db(r_r, s1r);
+  if (s1fbr[3] >= s2fbr[3]) {
+    copy_v4_v4_db(r_fbr, s2fbr);
+    copy_v3_v3_db(r_gr, s2gr);
+    side++;
+  }
+  if (s1fbl[3] <= s2fbl[3]) {
+    copy_v4_v4_db(r_fbl, s1fbl);
+    copy_v3_v3_db(r_gl, s1gl);
+    side--;
+  }
+  if (s1fbr[3] <= s2fbr[3]) {
+    copy_v4_v4_db(r_fbr, s1fbr);
+    copy_v3_v3_db(r_gr, s1gr);
+    side--;
+  }
+
+  /* No need to cut in the middle, because one segment completely overlaps the other. */
+  if (side) {
     return false;
   }
 
   /* Else there must be an intersection point in the middle. Use "w" value to linearly plot the
    * position and get image space "at" position. */
-  double dl = s1l[3] - s2l[3];
-  double dr = s1r[3] - s2r[3];
+  double dl = s1fbl[3] - s2fbl[3];
+  double dr = s1fbr[3] - s2fbr[3];
   double ga = ratiod(dl, dr, 0);
-  *r_new_at = s2r[3] * ga / (s2l[3] * (1.0f - ga) + s2r[3] * ga);
-  interp_v3_v3v3_db(r_new_in_the_middle, s2l, s2r, ga);
-  r_new_in_the_middle[3] = interpd(s2l[3], s2r[3], ga);
-}
+  *r_new_at = s2fbr[3] * ga / (s2fbl[3] * (1.0f - ga) + s2fbr[3] * ga);
+  interp_v3_v3v3_db(r_new_in_the_middle, s2fbl, s2fbr, *r_new_at);
+  r_new_in_the_middle[3] = interpd(s2fbr[3], s2fbl[3], ga);
+  interp_v3_v3v3_db(r_new_in_the_middle_global, s1gl, s1gr, ga);
 
-static void lineart_get_equavalent_position(void)
-{
-
-  /* TOOOOOOODDDDDDOOOOOOOO */
+  return true;
 }
 
 static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
@@ -4347,6 +4429,7 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
 #define DISCARD_NONSENSE_SEGMENTS \
   if (es->occlusion != 0 || \
       (es->next && LRT_DOUBLE_CLOSE_ENOUGH(es->at, ((LineartEdgeSegment *)es->next)->at))) { \
+    LRT_ITER_ALL_LINES_NEXT; \
     continue; \
   }
 
@@ -4376,10 +4459,15 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
       /* Get correct XYZ and W coordinates. */
       interp_v3_v3v3_db(ssc[i].fbc1, e->v1->fbcoord, e->v2->fbcoord, es->at);
       interp_v3_v3v3_db(ssc[i].fbc2, e->v1->fbcoord, e->v2->fbcoord, next_at);
-      ssc[i].fbc1[3] = e->v1->fbcoord[3] * es->at /
-                       (es->at * e->v1->fbcoord[3] + (1 - es->at) * e->v2->fbcoord[3]);
-      ssc[i].fbc2[3] = e->v1->fbcoord[3] * next_at /
-                       (next_at * e->v1->fbcoord[3] + (1 - next_at) * e->v2->fbcoord[3]);
+      double ga1 = e->v1->fbcoord[3] * es->at /
+                   (es->at * e->v1->fbcoord[3] + (1 - es->at) * e->v2->fbcoord[3]);
+      double ga2 = e->v1->fbcoord[3] * next_at /
+                   (next_at * e->v1->fbcoord[3] + (1 - next_at) * e->v2->fbcoord[3]);
+      /* Assign an absurdly big W for initial distance so when triangles show up to catch the
+       * shadow, their w must certainlly be smaller than this value so the shadow catches
+       * successfully. */
+      ssc[i].fbc1[3] = 1e30;
+      ssc[i].fbc2[3] = 1e30;
 
       /* Assign to the first segment's right and the last segment's left position */
       copy_v4_v4_db(ss[i * 2].fbc2, ssc[i].fbc1);
@@ -4389,22 +4477,32 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
       BLI_addtail(&ssc[i].shadow_segments, &ss[i * 2]);
       BLI_addtail(&ssc[i].shadow_segments, &ss[i * 2 + 1]);
 
+      ssc[i].e_ref = e;
+      BLI_addtail(&rb->shadow_containers, &ssc[i]);
+
       i++;
     }
   }
   LRT_ITER_ALL_LINES_END
+
+  if (G.debug_value == 4000) {
+    printf("Shadow: Added %d raw containers\n", segment_count);
+  }
 }
 
 static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
-                                    LineartEdge *e,
+                                    LineartShadowSegmentContainer *e,
                                     double start,
                                     double end,
                                     double *start_gpos,
-                                    double *end_gpos)
+                                    double *end_gpos,
+                                    double *start_fbc,
+                                    double *end_fbc)
 {
-  LineartEdgeSegment *es, *ies, *next_es, *prev_es;
-  LineartEdgeSegment *cut_start_after = e->segments.first, *cut_end_before = e->segments.last;
-  LineartEdgeSegment *ns = 0, *ns2 = 0;
+  LineartShadowSegment *es, *ies;
+  LineartShadowSegment *cut_start_after = e->shadow_segments.first,
+                       *cut_end_before = e->shadow_segments.last;
+  LineartShadowSegment *ns = NULL, *ns2 = NULL, *sl = NULL, *sr = NULL, *ns_middle = NULL;
   int untouched = 0;
 
   /* If for some reason the occlusion function may give a result that has zero length, or reversed
@@ -4431,7 +4529,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
   /* Begin looking for starting position of the segment. */
   /* Not using a list iteration macro because of it more clear when using for loops to iterate
    * through the segments. */
-  for (es = e->segments.first; es; es = es->next) {
+  for (es = e->shadow_segments.first; es; es = es->next) {
     if (LRT_DOUBLE_CLOSE_ENOUGH(es->at, start)) {
       cut_start_after = es;
       ns = cut_start_after;
@@ -4488,32 +4586,89 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
     }
   }
 
-  /* do max stuff before insert */
-
-  for (es = cut_start_after; es; es = es->next) {
-  }
-
-  if (cut_start_after != ns) {
-    /* Insert cutting points for when a new cut is needed. */
-    ies = cut_start_after->prev ? cut_start_after->prev : NULL;
-    BLI_insertlinkafter(&e->segments, cut_start_after, ns);
-  }
-  /* The same manipulation as on "cut_start_before". */
-  if (cut_end_before != ns2) {
-    ies = cut_end_before->prev ? cut_end_before->prev : NULL;
-    BLI_insertlinkbefore(&e->segments, cut_end_before, ns2);
-  }
-
   /* If we touched the cut list, we assign the new cut position based on new cut position,
    * this way we accommodate precision lost due to multiple cut inserts. */
   ns->at = start;
   if (!untouched) {
     ns2->at = end;
   }
+
+  double r_fbl[4], r_fbr[4], r_gl[3], r_gr[3];
+  double r_new_in_the_middle[4], r_new_in_the_middle_global[3], r_new_at;
+
+  double *s1fbl, *s1fbr, *s1gl, *s1gr;
+  double tg1[3], tg2[3], tfbc1[4], tfbc2[4], mg1[3], mfbc1[4], mg2[3], mfbc2[4];
+  copy_v4_v4_db(tfbc1, start_fbc);
+  copy_v3_v3_db(tg1, start_gpos);
+
+  /* do max stuff before insert */
+  LineartShadowSegment *nes;
+  for (es = cut_start_after; es != cut_end_before; es = nes) {
+    nes = es->next;
+
+    s1fbl = es->fbc2, s1fbr = nes->fbc1;
+    s1gl = es->g2, s1gr = nes->g1;
+    sl = es, sr = nes;
+    if (es == cut_start_after) {
+      lineart_shadow_segment_slice_get(
+          es->fbc2, nes->fbc1, es->g2, nes->g1, ns->at, es->at, nes->at, mfbc1, mg1);
+      s1fbl = mfbc1, s1gl = mg1;
+      sl = ns;
+      if (cut_start_after != ns) {
+        BLI_insertlinkafter(&e->shadow_segments, cut_start_after, ns);
+        copy_v4_v4_db(ns->fbc1, mfbc1);
+        copy_v3_v3_db(ns->g1, mg1);
+      }
+    }
+    if (nes == cut_end_before) {
+      lineart_shadow_segment_slice_get(
+          es->fbc2, nes->fbc1, es->g2, nes->g1, ns2->at, es->at, nes->at, mfbc2, mg2);
+      s1fbr = mfbc2, s1gr = mg2;
+      sr = ns2;
+      if (cut_end_before != ns2) {
+        BLI_insertlinkbefore(&e->shadow_segments, cut_end_before, ns2);
+        copy_v4_v4_db(ns2->fbc2, mfbc2);
+        copy_v3_v3_db(ns2->g2, mg2);
+      }
+    }
+
+    sl->flag |= LRT_SHADOW_CASTED;
+
+    lineart_shadow_segment_slice_get(
+        start_fbc, end_fbc, start_gpos, end_gpos, sr->at, start, end, tfbc2, tg2);
+
+    if (lineart_do_closest_segment(s1fbl,
+                                   s1fbr,
+                                   tfbc1,
+                                   tfbc2,
+                                   s1gl,
+                                   s1gr,
+                                   tg1,
+                                   tg2,
+                                   r_fbl,
+                                   r_fbr,
+                                   r_gl,
+                                   r_gr,
+                                   r_new_in_the_middle,
+                                   r_new_in_the_middle_global,
+                                   &r_new_at)) {
+    }
+    /* Always assign the "closest" value to the segment. */
+    copy_v4_v4_db(sl->fbc2, r_fbl);
+    copy_v3_v3_db(sl->g2, r_gl);
+    copy_v4_v4_db(sr->fbc1, r_fbr);
+    copy_v3_v3_db(sr->g1, r_gr);
+
+    copy_v4_v4_db(tfbc1, tfbc2);
+    copy_v3_v3_db(tg1, tg2);
+  }
 }
 
-static bool lineart_shadow_cast_onto_triangle(LineartTriangle *t,
-                                              LineartShadowSegment *ss,
+/* Because we have already done occlusion in the shadow camera, so any visual intersection found
+ * here must mean that the triangle is behind the given line so it will always project a shadow. */
+static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
+                                              LineartTriangle *tri,
+                                              LineartShadowSegmentContainer *ssc,
                                               double *r_at_l,
                                               double *r_at_r,
                                               double *r_fb_l,
@@ -4521,27 +4676,150 @@ static bool lineart_shadow_cast_onto_triangle(LineartTriangle *t,
                                               double *r_global_l,
                                               double *r_global_r)
 {
-  int i[3];
-  i[0] = lineart_LineIntersectTest2d()
+
+  double *LFBC = ssc->fbc1, *RFBC = ssc->fbc2, *FBC0 = tri->v[0]->fbcoord,
+         *FBC1 = tri->v[1]->fbcoord, *FBC2 = tri->v[2]->fbcoord;
+
+  /* Bound box check. */
+  if ((MAX3(FBC0[0], FBC1[0], FBC2[0]) < MIN2(LFBC[0], RFBC[0])) ||
+      (MIN3(FBC0[0], FBC1[0], FBC2[0]) > MAX2(LFBC[0], RFBC[0])) ||
+      (MAX3(FBC0[1], FBC1[1], FBC2[1]) < MIN2(LFBC[1], RFBC[1])) ||
+      (MIN3(FBC0[1], FBC1[1], FBC2[1]) > MAX2(LFBC[1], RFBC[1]))) {
+    return false;
+  }
+
+  double ratio[2];
+  int trie[2];
+  int pi = 0;
+  if (lineart_line_isec_2d_ignore_line2pos(FBC0, FBC1, LFBC, RFBC, &ratio[pi])) {
+    trie[pi] = 0;
+    pi++;
+  }
+  if (lineart_line_isec_2d_ignore_line2pos(FBC1, FBC2, LFBC, RFBC, &ratio[pi])) {
+    trie[pi] = 1;
+    pi++;
+  }
+  if (!pi) {
+    return false;
+  }
+  else if (lineart_line_isec_2d_ignore_line2pos(FBC2, FBC0, LFBC, RFBC, &ratio[pi])) {
+    trie[pi] = 2;
+    pi++;
+  }
+
+  if (pi != 2) {
+    return false;
+  }
+
+  /* Get projected global position. */
+
+  double gpos1[3], gpos2[3];
+  double *v1 = (trie[0] == 0 ? FBC0 : (trie[0] == 1 ? FBC1 : FBC2));
+  double *v2 = (trie[0] == 0 ? FBC1 : (trie[0] == 1 ? FBC2 : FBC0));
+  double *v3 = (trie[1] == 0 ? FBC0 : (trie[1] == 1 ? FBC1 : FBC2));
+  double *v4 = (trie[1] == 0 ? FBC1 : (trie[1] == 1 ? FBC2 : FBC0));
+  double *gv1 = (trie[0] == 0 ? tri->v[0]->gloc :
+                                (trie[0] == 1 ? tri->v[1]->gloc : tri->v[2]->gloc));
+  double *gv2 = (trie[0] == 0 ? tri->v[1]->gloc :
+                                (trie[0] == 1 ? tri->v[2]->gloc : tri->v[0]->gloc));
+  double *gv3 = (trie[1] == 0 ? tri->v[0]->gloc :
+                                (trie[1] == 1 ? tri->v[1]->gloc : tri->v[2]->gloc));
+  double *gv4 = (trie[1] == 0 ? tri->v[1]->gloc :
+                                (trie[1] == 1 ? tri->v[2]->gloc : tri->v[0]->gloc));
+  double gr1 = v1[3] * ratio[0] / (ratio[0] * v1[3] + (1 - ratio[0]) * v2[3]);
+  double gr2 = v3[3] * ratio[1] / (ratio[1] * v3[3] + (1 - ratio[1]) * v4[3]);
+  interp_v3_v3v3_db(gpos1, gv1, gv2, gr1);
+  interp_v3_v3v3_db(gpos2, gv3, gv4, gr2);
+
+  double fbc1[4], fbc2[4];
+
+  mul_v4_m4v3_db(fbc1, rb->view_projection, gpos1);
+  mul_v4_m4v3_db(fbc2, rb->view_projection, gpos2);
+  if (rb->cam_is_persp) {
+    mul_v3db_db(fbc1, 1.0f / fbc1[3]);
+    mul_v3db_db(fbc2, 1.0f / fbc2[3]);
+  }
+
+  int use = (fabs(LFBC[0] - RFBC[0]) > fabs(LFBC[1] - RFBC[1])) ? 0 : 1;
+  double at1 = ratiod(LFBC[use], RFBC[use], fbc1[use]);
+  double at2 = ratiod(LFBC[use], RFBC[use], fbc2[use]);
+  if (at1 > at2) {
+    swap_v3_v3_db(gpos1, gpos2);
+    swap_v4_v4_db(fbc1, fbc2);
+    SWAP(double, at1, at2);
+  }
+
+  /* Not effectively projecting anything. */
+
+  if (at1 > (1.0f - FLT_EPSILON) || at2 < FLT_EPSILON) {
+    return false;
+  }
+
+  /* Trim to edge's end points. */
+
+  double t_fbc1[4], t_fbc2[4], t_gpos1[3], t_gpos2[3];
+  bool trimmed1 = false, trimmed2 = false;
+  if (at1 < 0 || at2 > 1) {
+    double rat1 = (-at1) / (at2 - at1);
+    double rat2 = (1.0f - at1) / (at2 - at1);
+    double gat1 = fbc1[3] * rat1 / (rat1 * fbc1[3] + (1 - rat1) * fbc2[3]);
+    double gat2 = fbc1[3] * rat2 / (rat2 * fbc1[3] + (1 - rat2) * fbc2[3]);
+    if (at1 < 0) {
+      interp_v3_v3v3_db(t_gpos1, gpos1, gpos2, gat1);
+      interp_v3_v3v3_db(t_fbc1, fbc1, fbc2, rat1);
+      t_fbc1[3] = interpd(fbc2[3], fbc1[3], gat1);
+      at1 = 0, trimmed1 = true;
+    }
+    if (at2 > 1) {
+      interp_v3_v3v3_db(t_gpos2, gpos1, gpos2, gat2);
+      interp_v3_v3v3_db(t_fbc2, fbc1, fbc2, rat2);
+      t_fbc2[3] = interpd(fbc2[3], fbc1[3], gat2);
+      at2 = 1, trimmed2 = true;
+    }
+  }
+  if (trimmed1) {
+    copy_v4_v4_db(fbc1, t_fbc1);
+    copy_v3_v3_db(gpos1, t_gpos1);
+  }
+  if (trimmed2) {
+    copy_v4_v4_db(fbc2, t_fbc2);
+    copy_v3_v3_db(gpos2, t_gpos2);
+  }
+
+  *r_at_l = at1;
+  *r_at_r = at2;
+  copy_v4_v4_db(r_fb_l, fbc1);
+  copy_v4_v4_db(r_fb_r, fbc2);
+  copy_v3_v3_db(r_global_l, gpos1);
+  copy_v3_v3_db(r_global_r, gpos2);
+
+  return true;
 }
 
 static void lineart_shadow_cast(LineartRenderBuffer *rb)
 {
   LineartTriangleThread *tri;
+  double at_l, at_r;
+  double fb_l[4], fb_r[4];
+  double global_l[3], global_r[3];
 
   lineart_shadow_create_container_array(rb);
 
-  LISTBASE_FOREACH (LineartShadowSegmentContainer *, ssc, &rb->shadow_segments) {
+  LISTBASE_FOREACH (LineartShadowSegmentContainer *, ssc, &rb->shadow_containers) {
     LRT_EDGE_BA_MARCHING_BEGIN(ssc->fbc1, ssc->fbc2)
     {
-      LISTBASE_FOREACH (LineartShadowSegment *, ss, &ssc->shadow_segments) {
-        for (int i = 0; i < nba->triangle_count; i++) {
-          tri = (LineartTriangleThread *)nba->linked_triangles[i];
-          if (tri->testing_e[0] == (LineartEdge *)ss) {
-            continue;
-          }
-          tri->testing_e[0] = (LineartEdge *)ss;
-          /* TODO: Cast to triangle. */
+      for (int i = 0; i < nba->triangle_count; i++) {
+        tri = (LineartTriangleThread *)nba->linked_triangles[i];
+        if (tri->testing_e[0] == (LineartEdge *)ssc ||
+            lineart_edge_from_triangle(
+                (LineartTriangle *)tri, ssc->e_ref, rb->allow_overlapping_edges)) {
+          continue;
+        }
+        tri->testing_e[0] = (LineartEdge *)ssc;
+
+        if (lineart_shadow_cast_onto_triangle(
+                rb, (LineartTriangle *)tri, ssc, &at_l, &at_r, fb_l, fb_r, global_l, global_r)) {
+          lineart_shadow_edge_cut(rb, ssc, at_l, at_r, global_l, global_r, fb_l, fb_r);
         }
       }
       LRT_EDGE_BA_MARCHING_NEXT(ssc->fbc1, ssc->fbc2);
@@ -4550,11 +4828,71 @@ static void lineart_shadow_cast(LineartRenderBuffer *rb)
   }
 }
 
+static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
+                                               LineartElementLinkNode **r_veln,
+                                               LineartElementLinkNode **r_eeln)
+{
+  int tot_edges = 0;
+  LISTBASE_FOREACH (LineartShadowSegmentContainer *, ssc, &rb->shadow_containers) {
+    LISTBASE_FOREACH (LineartShadowSegment *, ss, &ssc->shadow_segments) {
+      if (!(ss->flag & LRT_SHADOW_CASTED)) {
+        continue;
+      }
+      tot_edges++;
+    }
+  }
+
+  if (G.debug_value == 4000) {
+    printf("Line art shadow segments total: %d\n", tot_edges);
+  }
+
+  if (!tot_edges) {
+    return false;
+  }
+  LineartElementLinkNode *veln = lineart_mem_acquire(rb->shadow_data_pool,
+                                                     sizeof(LineartElementLinkNode));
+  LineartElementLinkNode *eeln = lineart_mem_acquire(rb->shadow_data_pool,
+                                                     sizeof(LineartElementLinkNode));
+  veln->pointer = lineart_mem_acquire(rb->shadow_data_pool, sizeof(LineartVert) * tot_edges * 2);
+  eeln->pointer = lineart_mem_acquire(rb->shadow_data_pool, sizeof(LineartEdge) * tot_edges);
+  LineartEdgeSegment *es = lineart_mem_acquire(rb->shadow_data_pool,
+                                               sizeof(LineartEdgeSegment) * tot_edges);
+  *r_veln = veln;
+  *r_eeln = eeln;
+
+  veln->element_count = tot_edges * 2;
+  eeln->element_count = tot_edges;
+
+  LineartVert *vlist = veln->pointer;
+  LineartEdge *elist = eeln->pointer;
+
+  int i = 0;
+  LISTBASE_FOREACH (LineartShadowSegmentContainer *, ssc, &rb->shadow_containers) {
+    LISTBASE_FOREACH (LineartShadowSegment *, ss, &ssc->shadow_segments) {
+      if (!(ss->flag & LRT_SHADOW_CASTED)) {
+        continue;
+      }
+      LineartEdge *e = &elist[i];
+      BLI_addtail(&e->segments, &es[i]);
+      LineartVert *v1 = &vlist[i * 2], *v2 = &vlist[i * 2 + 1];
+      copy_v3_v3_db(v1->gloc, ss->g2);
+      copy_v3_v3_db(v2->gloc, ((LineartShadowSegment *)ss->next)->g1);
+      e->v1 = v1;
+      e->v2 = v2;
+      e->flags = LRT_EDGE_FLAG_PROJECTED_SHADOW;
+      i++;
+    }
+  }
+  return true;
+}
+
 static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
                                              Scene *scene,
                                              LineartRenderBuffer *original_rb,
                                              LineartGpencilModifierData *lmd,
-                                             LineartCache **cached_result)
+                                             LineartStaticMemPool *shadow_data_pool,
+                                             LineartElementLinkNode **r_veln,
+                                             LineartElementLinkNode **r_eeln)
 {
   if (!original_rb->use_shadow || !lmd->light_contour_object) {
     return false;
@@ -4574,6 +4912,7 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   memcpy(rb, original_rb, sizeof(LineartRenderBuffer));
 
   rb->do_shadow_cast = true;
+  rb->shadow_data_pool = shadow_data_pool;
 
   copy_m4_m4(rb->cam_obmat, lmd->light_contour_object->obmat);
   copy_v3db_v3fl(rb->camera_pos, rb->cam_obmat[3]);
@@ -4588,15 +4927,13 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   rb->use_contour = true; /* Only contour from light viewing direction will be casted as shadow. */
 
   rb->max_occlusion_level = 0; /* No point getting see-through projections there. */
-  rb->use_back_face_culling = true;
-
-  lineart_main_get_view_vector(rb);
+  rb->use_back_face_culling = false;
 
   /* Override matrices to light "camera". */
   double proj[4][4], view[4][4], result[4][4];
   float inv[4][4];
   if (is_persp) {
-    lineart_matrix_perspective_44d(proj, DEG2RAD(120), 1, rb->near_clip, rb->far_clip);
+    lineart_matrix_perspective_44d(proj, DEG2RAD(160), 1, rb->near_clip, rb->far_clip);
   }
   else {
     lineart_matrix_ortho_44d(proj, -rb->w, rb->w, -rb->h, rb->h, rb->near_clip, rb->far_clip);
@@ -4608,15 +4945,20 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   unit_m4_db(view);
   copy_m4_m4_db(rb->view, view);
 
+  lineart_main_get_view_vector(rb);
+
   lineart_main_load_geometries(
       depsgraph, scene, NULL, rb, lmd->flags & LRT_ALLOW_DUPLI_OBJECTS, true);
 
   if (!rb->vertex_buffer_pointers.first) {
     /* No geometry loaded, return early. */
-    return true;
+    lineart_destroy_render_data_keep_init(rb);
+    MEM_freeN(rb);
+    return false;
   }
 
-  /* The exact same process as in MOD_lineart_compute_feature_lines() until occlusion finishes. */
+  /* The exact same process as in MOD_lineart_compute_feature_lines() until occlusion finishes.
+   */
 
   lineart_main_bounding_area_make_initial(rb);
   lineart_main_cull_triangles(rb, false);
@@ -4628,6 +4970,31 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   lineart_main_bounding_areas_connect_post(rb);
   lineart_main_link_lines(rb);
   lineart_main_occlusion_begin(rb);
+
+  /* Do shadow cast stuff then get generated vert/edge data. */
+  lineart_shadow_cast(rb);
+  bool any_generated = lineart_shadow_cast_generate_edges(rb, r_veln, r_eeln);
+
+  lineart_destroy_render_data_keep_init(rb);
+  MEM_freeN(rb);
+
+  return any_generated;
+}
+
+static void lineart_transform_and_add_shadow(LineartRenderBuffer *rb,
+                                             LineartElementLinkNode *veln,
+                                             LineartElementLinkNode *eeln)
+{
+  LineartVert *v = veln->pointer;
+  for (int i = 0; i < veln->element_count; i++) {
+    mul_v4_m4v3_db(v[i].fbcoord, rb->view_projection, v[i].gloc);
+  }
+  LineartEdge *e = eeln->pointer;
+  for (int i = 0; i < eeln->element_count; i++) {
+    lineart_add_edge_to_list(rb, &e[i]);
+  }
+  BLI_addtail(&rb->vertex_buffer_pointers, veln);
+  BLI_addtail(&rb->line_buffer_pointers, eeln);
 }
 
 /**
@@ -4646,7 +5013,6 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   Object *use_camera;
 
   double t_start;
-
   if (G.debug_value == 4000) {
     t_start = PIL_check_seconds_timer();
   }
@@ -4682,10 +5048,19 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
   rb->_source_collection = lmd->source_collection;
   rb->_source_object = lmd->source_object;
 
+  LineartElementLinkNode *shadow_veln, *shadow_eeln;
+  bool shadow_generated = lineart_main_try_generate_shadow(
+      depsgraph, scene, rb, lmd, &lc->shadow_data_pool, &shadow_veln, &shadow_eeln);
+
   /* Get view vector before loading geometries, because we detect feature lines there. */
   lineart_main_get_view_vector(rb);
+
   lineart_main_load_geometries(
       depsgraph, scene, use_camera, rb, lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS, false);
+
+  if (shadow_generated) {
+    lineart_transform_and_add_shadow(rb, shadow_veln, shadow_eeln);
+  }
 
   if (!rb->vertex_buffer_pointers.first) {
     /* No geometry loaded, return early. */
@@ -4772,6 +5147,8 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
     /* At last, we need to clear flags so we don't confuse GPencil generation calls. */
     MOD_lineart_chain_clear_picked_flag(lc);
   }
+
+  lineart_mem_destroy(&lc->shadow_data_pool);
 
   if (G.debug_value == 4000) {
     lineart_count_and_print_render_buffer_memory(rb);

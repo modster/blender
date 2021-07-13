@@ -390,7 +390,7 @@ static void edge_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(entry, ptr, "light_contour_object", 0, "", ICON_NONE);
   }
 
-  uiItemR(col, ptr, "use_shadow", 0, "", ICON_NONE);
+  uiItemR(col, ptr, "use_shadow", 0, IFACE_("Casted Shadow"), ICON_NONE);
 
   uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, IFACE_("Allow Overlap"), ICON_NONE);
 }

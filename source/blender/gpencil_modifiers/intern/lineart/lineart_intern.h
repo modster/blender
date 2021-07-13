@@ -89,25 +89,36 @@ void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb
     LineartEdge *e, *next_e; \
     void **current_head; \
     e = rb->contour.first; \
+    current_head = &rb->contour.first; \
     if (!e) { \
       e = rb->crease.first; \
+      current_head = &rb->crease.first; \
     } \
     if (!e) { \
       e = rb->material.first; \
+      current_head = &rb->material.first; \
     } \
     if (!e) { \
       e = rb->edge_mark.first; \
+      current_head = &rb->edge_mark.first; \
     } \
     if (!e) { \
       e = rb->intersection.first; \
+      current_head = &rb->intersection.first; \
     } \
     if (!e) { \
       e = rb->floating.first; \
+      current_head = &rb->floating.first; \
     } \
     if (!e) { \
       e = rb->light_contour.first; \
+      current_head = &rb->light_contour.first; \
     } \
-    for (current_head = &rb->contour.first; e; e = next_e) { \
+    if (!e) { \
+      e = rb->shadow.first; \
+      current_head = &rb->shadow.first; \
+    } \
+    for (; e; e = next_e) { \
       next_e = e->next;
 
 #define LRT_ITER_ALL_LINES_NEXT \
@@ -129,6 +140,9 @@ void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb
     } \
     else if (current_head == &rb->floating.first) { \
       current_head = &rb->light_contour.first; \
+    } \
+    else if (current_head == &rb->light_contour.first) { \
+      current_head = &rb->shadow.first; \
     } \
     else { \
       break; \

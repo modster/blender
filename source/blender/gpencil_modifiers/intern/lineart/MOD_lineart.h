@@ -106,14 +106,22 @@ typedef struct LineartEdgeSegment {
   unsigned char material_mask_bits;
 } LineartEdgeSegment;
 
-typedef struct LineartShadowEdge {
-  /* Two end points in framebuffer coordinates viiewed from the light source. */
+typedef struct LineartShadowSegmentContainer {
+  struct LineartShadowSegmentContainer *next, *prev;
+  /* Two end points in framebuffer coordinates viewed from the light source. */
   double fbc1[4], fbc2[4];
+  struct LineartEdge *e_ref;
   ListBase shadow_segments;
 } LineartShadowSegmentContainer;
 
+enum eLineartShadowSegmentFlag {
+  LRT_SHADOW_CASTED = 1,
+};
+
 typedef struct LineartShadowSegment {
-  struct LineartShadowSegment *prev, *next;
+  struct LineartShadowSegment *next, *prev;
+  /* eLineartShadowSegmentFlag */
+  int flag;
   /* In NDC, not in global linear. */
   double at;
   /* Left and right pos, because when casting shadows at some point there will be
@@ -283,6 +291,10 @@ typedef struct LineartRenderBuffer {
    * completes which serves as a cache. */
   LineartStaticMemPool *chain_data_pool;
 
+  /* Reference to LineartCache::shadow_data_pool, stay available until the final round of line art
+   * calculation is finished. */
+  LineartStaticMemPool *shadow_data_pool;
+
   /*  Render status */
   double view_vector[3];
 
@@ -298,10 +310,12 @@ typedef struct LineartRenderBuffer {
   ListBase edge_mark;
   ListBase floating;
   ListBase light_contour;
+  ListBase shadow;
 
   ListBase chains;
 
-  ListBase shadow_segments;
+  /* Intermediate shadow results, list of LineartShadowSegmentContainer */
+  ListBase shadow_containers;
 
   /* For managing calculation tasks for multiple threads. */
   SpinLock lock_task;
@@ -378,10 +392,10 @@ typedef struct LineartCache {
   /** A copy of rb->Chains after calculation is done, then we can destroy rb. */
   ListBase chains;
   /** Shadow segments to be included into occlusion calculation in the second run of line art. */
-  ListBase shadow_segments;
+  ListBase shadow_edges;
 
   /** Cache only contains edge types specified in this variable. */
-  unsigned char rb_edge_types;
+  uint16_t rb_edge_types;
 } LineartCache;
 
 #define DBL_TRIANGLE_LIM 1e-8
@@ -419,6 +433,7 @@ typedef struct LineartRenderTaskInfo {
   ListBase edge_mark;
   ListBase floating;
   ListBase light_contour;
+  ListBase shadow;
 
 } LineartRenderTaskInfo;
 
@@ -445,6 +460,7 @@ typedef struct LineartObjectInfo {
   ListBase edge_mark;
   ListBase floating;
   ListBase light_contour;
+  ListBase shadow;
 
 } LineartObjectInfo;
 
@@ -622,6 +638,90 @@ BLI_INLINE int lineart_LineIntersectTest2d(
   else if (ratio <= 0 || ratio > 1 || (b1[0] > b2[0] && x > b1[0]) ||
            (b1[0] < b2[0] && x < b1[0]) || (b2[0] > b1[0] && x > b2[0]) ||
            (b2[0] < b1[0] && x < b2[0]))
+    return 0;
+
+  return 1;
+#endif
+}
+
+BLI_INLINE int lineart_line_isec_2d_ignore_line2pos(
+    const double *a1, const double *a2, const double *b1, const double *b2, double *aRatio)
+{
+#define USE_VECTOR_LINE_INTERSECTION
+#ifdef USE_VECTOR_LINE_INTERSECTION
+
+  /* from isect_line_line_v2_point() */
+
+  double s10[2], s32[2];
+  double div;
+
+  sub_v2_v2v2_db(s10, a2, a1);
+  sub_v2_v2v2_db(s32, b2, b1);
+
+  div = cross_v2v2_db(s10, s32);
+  if (div != 0.0f) {
+    const double u = cross_v2v2_db(a2, a1);
+    const double v = cross_v2v2_db(b2, b1);
+
+    const double rx = ((s32[0] * u) - (s10[0] * v)) / div;
+    const double ry = ((s32[1] * u) - (s10[1] * v)) / div;
+
+    if (fabs(a2[0] - a1[0]) > fabs(a2[1] - a1[1])) {
+      *aRatio = ratiod(a1[0], a2[0], rx);
+      if ((*aRatio) > 0 && (*aRatio) < 1) {
+        return 1;
+      }
+      return 0;
+    }
+
+    *aRatio = ratiod(a1[1], a2[1], ry);
+    if ((*aRatio) > 0 && (*aRatio) < 1) {
+      return 1;
+    }
+    return 0;
+  }
+  return 0;
+
+#else
+  double k1, k2;
+  double x;
+  double y;
+  double ratio;
+  double x_diff = (a2[0] - a1[0]);
+  double x_diff2 = (b2[0] - b1[0]);
+
+  if (LRT_DOUBLE_CLOSE_ENOUGH(x_diff, 0)) {
+    if (LRT_DOUBLE_CLOSE_ENOUGH(x_diff2, 0)) {
+      *aRatio = 0;
+      return 0;
+    }
+    double r2 = ratiod(b1[0], b2[0], a1[0]);
+    x = interpd(b2[0], b1[0], r2);
+    y = interpd(b2[1], b1[1], r2);
+    *aRatio = ratio = ratiod(a1[1], a2[1], y);
+  }
+  else {
+    if (LRT_DOUBLE_CLOSE_ENOUGH(x_diff2, 0)) {
+      ratio = ratiod(a1[0], a2[0], b1[0]);
+      x = interpd(a2[0], a1[0], ratio);
+      *aRatio = ratio;
+    }
+    else {
+      k1 = (a2[1] - a1[1]) / x_diff;
+      k2 = (b2[1] - b1[1]) / x_diff2;
+
+      if ((k1 == k2))
+        return 0;
+
+      x = (a1[1] - b1[1] - k1 * a1[0] + k2 * b1[0]) / (k2 - k1);
+
+      ratio = (x - a1[0]) / x_diff;
+
+      *aRatio = ratio;
+    }
+  }
+
+  if (ratio <= 0 || ratio > 1)
     return 0;
 
   return 1;
