@@ -345,7 +345,7 @@ void StereoProjection(float left,
                       float zero_plane,
                       float dist,
                       float eye)
-/* Perform the perspective projection for one eye's subfield.
+/* Perform the perspective projection for one eye's sub-field.
  * The projection is in the direction of the negative z axis.
  *
  * -6.0, 6.0, -4.8, 4.8,
@@ -365,8 +365,8 @@ void StereoProjection(float left,
  * of zero parallax.
  *
  * -0.31
- * eye = half the eye separation; positive for the right eye subfield,
- * negative for the left eye subfield.
+ * eye = half the eye separation; positive for the right eye sub-field,
+ * negative for the left eye sub-field.
  */
 {
   float xmid, ymid, clip_near, clip_far, topw, bottomw, leftw, rightw, dx, dy, n_over_d;
@@ -392,8 +392,7 @@ void StereoProjection(float left,
   glFrustum(leftw, rightw, bottomw, topw, clip_near, clip_far);
 
   glTranslatef(-xmid - eye, -ymid, -zero_plane - dist);
-  return;
-} /* stereoproj */
+}
 
 class Application : public GHOST_IEventConsumer {
  public:
