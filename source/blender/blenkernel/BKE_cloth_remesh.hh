@@ -1201,14 +1201,10 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     /* TODO(ish): ensure normal information properly, right now need
      * to just assume it is not dirty for faster development */
     this->node_normals_dirty = false;
-
-    std::cout << __func__ << " mesh:" << std::endl << *this << std::endl;
   }
 
   MeshIO write() const
   {
-    std::cout << __func__ << " mesh:" << std::endl << *this << std::endl;
-
     using FaceData = std::tuple<usize, usize, usize>;
     blender::Vector<float3> positions;
     blender::Vector<float2> uvs;
@@ -1317,16 +1313,12 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
-    /* std::cout << "line_indices: " << line_indices << std::endl; */
-
     MeshIO result;
     result.set_positions(std::move(positions));
     result.set_uvs(std::move(uvs));
     result.set_normals(std::move(normals));
     result.set_face_indices(std::move(face_indices));
     result.set_line_indices(std::move(line_indices));
-
-    std::cout << "MeshIO result: " << std::endl << result << std::endl;
 
     return result;
   }
@@ -1382,8 +1374,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     if (across_seams) {
       edge_indices = this->get_connecting_edge_indices(edge_node_1, edge_node_2);
     }
-
-    std::cout << "edge_indices: " << edge_indices << std::endl;
 
     /* Create the new new by interpolating the nodes of the edge */
     auto &new_node = this->add_empty_interp_node(edge_node_1, edge_node_2);
@@ -1549,10 +1539,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto [v1_a, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
     auto v1_index = v1_a.self_index;
     auto v2_index = v2.self_index;
-    {
-      std::cout << "v1_index: " << v1_index << std::endl;
-      std::cout << "v2_index: " << v2_index << std::endl;
-    }
     BLI_assert(v1_a.node); /* ensure v1 has a node */
     auto n1_index = v1_a.node.value();
 
@@ -1563,21 +1549,21 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       this->delink_face_edges(face_index);
       auto face = this->delete_face(face_index);
 
-      std::cout << "face_edges: " << this->get_edge_indices_of_face(face) << std::endl;
-
       auto &ov = this->get_checked_other_vert(e, face);
 
       auto op_v1_ov_edge_index = this->get_connecting_edge_index(v1_index, ov.self_index);
       BLI_assert(op_v1_ov_edge_index);
-      auto v1_ov_edge = this->delete_edge(op_v1_ov_edge_index.value());
-
+      auto v1_ov_edge = this->get_checked_edge(op_v1_ov_edge_index.value());
+      /* delete `v1_ov_edge` only if it doesn't have any faces */
+      if (v1_ov_edge.faces.is_empty()) {
+        auto v1_ov_edge = this->delete_edge(op_v1_ov_edge_index.value());
+        deleted_edges.append(std::move(v1_ov_edge));
+      }
       deleted_faces.append(std::move(face));
-      deleted_edges.append(std::move(v1_ov_edge));
     }
 
     auto &v1 = this->get_checked_vert(v1_index);
     auto v1_edge_indices = v1.edges;
-    std::cout << "v1_edge_indices: " << v1_edge_indices << std::endl;
 
     /* edges should have verts (v2, vx) instead of (v1, vx) and the
      * face should have (v2, vx, vy) instead of (v1, vx, vy) */
@@ -1586,8 +1572,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
       BLI_assert(v1_vx_edge.verts);
       auto &verts = v1_vx_edge.verts.value();
-
-      std::cout << "v1_vx_edge.verts: " << verts << std::endl;
 
       if (v1_vx_edge.has_vert(v2_index)) {
         /* don't need to mess with (v1, v2), only (v1, vx) */
@@ -1601,8 +1585,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         v1_vx_edge.verts = {std::get<0>(verts), v2_index};
       }
 
-      /* TODO(ish): this particular `v1_vx_edge_index` should be
-       * removed from v1, cannot just clear out `v1.edges` */
       /* since the edge no longer refers to `v1`, we should remove the
        * edge from `v1.edges` */
       v1.edges.remove_first_occurrence_and_reorder(v1_vx_edge_index);
