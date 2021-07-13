@@ -232,10 +232,9 @@ class MeshTest(ABC):
         """
         Prints the comparison, selection and validation result.
         """
-        comparison_result, selection_result, validation_result = result
-        print("Mesh Comparison: {}".format(comparison_result))
-        print("Selection Result: {}".format(selection_result))
-        print("Mesh Validation: {}".format(validation_result))
+        print("Results:")
+        for key in result:
+            print("{} : {}".format(key, result[key][1]))
         print()
 
     def run_test(self):
@@ -244,12 +243,24 @@ class MeshTest(ABC):
         """
         evaluated_test_object = self.create_evaluated_object()
         self.apply_operations(evaluated_test_object)
-        result = self.compare_meshes(evaluated_test_object)
+        result = self.compare_meshes(evaluated_test_object, self.expected_object, self.threshold)
 
         comparison_result, selection_result, validation_result = result
 
-        if comparison_result == "Same" and selection_result == "Same" and validation_result == "Valid":
-            self.passed_test(result)
+        # Initializing with True to get correct resultant of result_code booleans.
+        success = True
+        inside_loop_flag = False
+        for key in result:
+            inside_loop_flag = True
+            success = success and result[key][0]
+
+        # Check "success" is actually evaluated and is not the default True value.
+        if not inside_loop_flag:
+            success = False
+
+
+        if success:
+            self.print_passed_test_result(result)
             # Clean up.
             if self.verbose:
                 print("Cleaning up...")
@@ -258,32 +269,37 @@ class MeshTest(ABC):
             return True
 
         elif self.update:
-            self.failed_test(result)
+            self.print_failed_test_result(result)
             self.update_failed_test(evaluated_test_object)
             # Check for testing the blend file is updated and re-running.
             # Also safety check to avoid infinite recursion loop.
             if self.test_updated_counter == 1:
                 self.run_test()
-                return True
             else:
                 print("The test fails consistently. Exiting...")
                 return False
 
         else:
-            self.failed_test(result)
+            self.print_failed_test_result(result)
             return False
 
-    def failed_test(self, result):
+    def print_failed_test_result(self, result):
+        """
+        Print results for failed test.
+        """
         print("\nFAILED {} test with the following: ".format(self.test_name))
         self._print_result(result)
 
-    def passed_test(self, result):
+    def print_passed_test_result(self, result):
+        """
+        Print results for passing test.
+        """
         print("\nPASSED {} test successfully.".format(self.test_name))
         self._print_result(result)
 
     def do_selection(self, mesh: bpy.types.Mesh, select_mode: str, selection: set):
         """
-        Do selection on a mesh
+        Do selection on a mesh.
         :param mesh: bpy.types.Mesh - input mesh
         :param: select_mode: str - selection mode. Must be 'VERT', 'EDGE' or 'FACE'
         :param: selection: set - indices of selection.
@@ -325,20 +341,32 @@ class MeshTest(ABC):
         self.test_updated_counter += 1
         self.expected_object = evaluated_test_object
 
-    def compare_meshes(self, evaluated_object):
+    @staticmethod
+    def compare_meshes(evaluated_object, expected_object, threshold):
+        """
+        Compares evaluated object mesh with expected object mesh.
+        :param evaluated_object: first object for comparison.
+        :param expected_object: second object for comparison.
+        :param threshold: exponent: To allow variations and accept difference to a certain degree.
+        :return: dict: Contains results of different comparisons.
+        """
         objects = bpy.data.objects
         evaluated_test_mesh = objects[evaluated_object.name].data
-        expected_mesh = self.expected_object.data
-        result_codes = []
+        expected_mesh = expected_object.data
+        result_codes = {}
 
         # Mesh Comparison.
-        if self.threshold:
+        if threshold:
             result_mesh = expected_mesh.unit_test_compare(
-                mesh=evaluated_test_mesh, threshold=self.threshold)
+                mesh=evaluated_test_mesh, threshold=threshold)
         else:
             result_mesh = expected_mesh.unit_test_compare(
                 mesh=evaluated_test_mesh)
-        result_codes.append(result_mesh)
+
+        if result_mesh == "Same":
+            result_codes['Mesh Comparison'] = (True, result_mesh)
+        else:
+            result_codes['Mesh Comparison'] = (False, result_mesh)
 
         # Selection comparison.
 
@@ -349,17 +377,19 @@ class MeshTest(ABC):
 
         if selected_evaluated_verts == selected_expected_verts:
             result_selection = "Same"
+            result_codes['Selection Comparison'] = (True, result_selection)
         else:
             result_selection = "Selection doesn't match."
-        result_codes.append(result_selection)
+            result_codes['Selection Comparison'] = (False, result_selection)
 
         # Validation check.
         result_validation = evaluated_test_mesh.validate(verbose=True)
         if result_validation:
             result_validation = "Invalid Mesh"
+            result_codes['Mesh Validation'] = (False, result_validation)
         else:
             result_validation = "Valid"
-        result_codes.append(result_validation)
+            result_codes['Mesh Validation'] = (True, result_validation)
 
         return result_codes
 
@@ -375,17 +405,25 @@ class SpecMeshTest(MeshTest):
     """
 
     def __init__(self, test_name,
-                 test_object_name, exp_object_name,
+                 test_object_name,
+                 exp_object_name,
                  operations_stack=None,
                  apply_modifier=True,
                  do_compare=True,
                  threshold=None):
         """
+        Constructor for SpecMeshTest.
+
+        :param test_name: str - Name of the test.
+        :param test_object_name: str - Name of object of mesh type to run the operations on.
+        :param exp_object_name: str - Name of object of mesh type that has the expected
+                                geometry after running the operations.
         :param operations_stack: list - stack holding operations to perform on the test_object.
         :param apply_modifier: bool - True if we want to apply the modifiers right after adding them to the object.
                                     - True if we want to apply the modifier to list of modifiers, after some operation.
                                This affects operations of type ModifierSpec and DeformModifierSpec.
         :param do_compare: bool - True if we want to compare the test and expected objects, False otherwise.
+        :param threshold: exponent: To allow variations and accept difference to a certain degree.
         """
 
         super().__init__(test_object_name, exp_object_name, test_name, threshold)
