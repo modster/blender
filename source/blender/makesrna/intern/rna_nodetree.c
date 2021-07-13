@@ -799,7 +799,7 @@ const EnumPropertyItem *rna_node_socket_type_itemf(void *data,
     tmp.value = i;
     tmp.identifier = stype->idname;
     tmp.icon = RNA_struct_ui_icon(srna);
-    tmp.name = RNA_struct_ui_name(srna);
+    tmp.name = nodeSocketTypeLabel(stype);
     tmp.description = RNA_struct_ui_description(srna);
 
     RNA_enum_item_add(&item, &totitem, &tmp);
@@ -1025,8 +1025,7 @@ static void rna_NodeTree_get_from_context(
   RNA_parameter_list_free(&list);
 }
 
-static bool rna_NodeTree_valid_socket_type(eNodeSocketDatatype socket_type,
-                                           bNodeTreeType *ntreetype)
+static bool rna_NodeTree_valid_socket_type(bNodeTreeType *ntreetype, bNodeSocketType *socket_type)
 {
   extern FunctionRNA rna_NodeTree_valid_socket_type_func;
 
@@ -1040,7 +1039,7 @@ static bool rna_NodeTree_valid_socket_type(eNodeSocketDatatype socket_type,
   func = &rna_NodeTree_valid_socket_type_func;
 
   RNA_parameter_list_create(&list, &ptr, func);
-  RNA_parameter_set_lookup(&list, "type", &socket_type);
+  RNA_parameter_set_lookup(&list, "idname", &socket_type->idname);
   ntreetype->rna_ext.call(NULL, &ptr, func, &list);
 
   RNA_parameter_get_lookup(&list, "valid", &ret);
@@ -2866,7 +2865,7 @@ static void rna_NodeSocket_type_set(PointerRNA *ptr, int value)
   bNodeSocket *sock = (bNodeSocket *)ptr->data;
   bNode *node;
   nodeFindNode(ntree, sock, &node, NULL);
-  nodeModifySocketType(ntree, node, sock, value, 0);
+  nodeModifySocketTypeStatic(ntree, node, sock, value, 0);
 }
 
 static void rna_NodeSocket_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
@@ -3206,7 +3205,7 @@ static void rna_NodeSocketInterfaceStandard_draw(ID *id,
                                                  struct uiLayout *layout)
 {
   PointerRNA ptr;
-  RNA_pointer_create(id, &RNA_NodeSocket, sock, &ptr);
+  RNA_pointer_create(id, &RNA_NodeSocketInterface, sock, &ptr);
   sock->typeinfo->interface_draw(C, layout, &ptr);
 }
 
@@ -3216,7 +3215,7 @@ static void rna_NodeSocketInterfaceStandard_draw_color(ID *id,
                                                        float r_color[4])
 {
   PointerRNA ptr;
-  RNA_pointer_create(id, &RNA_NodeSocket, sock, &ptr);
+  RNA_pointer_create(id, &RNA_NodeSocketInterface, sock, &ptr);
   sock->typeinfo->interface_draw_color(C, &ptr, r_color);
 }
 
@@ -9948,6 +9947,45 @@ static void def_geo_switch(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_curve_primitive_quadrilateral(StructRNA *srna)
+{
+  PropertyRNA *prop;
+  
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE,
+       "RECTANGLE",
+       0,
+       "Rectangle",
+       "Create a rectangle"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM,
+       "PARALLELOGRAM",
+       0,
+       "Parallelogram",
+       "Create a parallelogram"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID,
+       "TRAPEZOID",
+       0,
+       "Trapezoid",
+       "Create a trapezoid"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_KITE, "KITE", 0, "Kite", "Create a Kite / Dart"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS,
+       "POINTS",
+       0,
+       "Points",
+       "Create a quadrilateral from four points"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurvePrimitiveQuad", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "mode");
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_enum_default(prop, GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE);
+  RNA_def_property_ui_text(prop, "Mode", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_curve_resample(StructRNA *srna)
 {
   PropertyRNA *prop;
@@ -10176,7 +10214,7 @@ static void rna_def_node_socket(BlenderRNA *brna)
   RNA_def_struct_ui_text(srna, "Node Socket", "Input or output socket of a node");
   RNA_def_struct_sdna(srna, "bNodeSocket");
   RNA_def_struct_refine_func(srna, "rna_NodeSocket_refine");
-  RNA_def_struct_ui_icon(srna, ICON_PLUGIN);
+  RNA_def_struct_ui_icon(srna, ICON_NONE);
   RNA_def_struct_path_func(srna, "rna_NodeSocket_path");
   RNA_def_struct_register_funcs(
       srna, "rna_NodeSocket_register", "rna_NodeSocket_unregister", NULL);
@@ -10281,6 +10319,11 @@ static void rna_def_node_socket(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(prop, "ID Name", "");
 
+  prop = RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "typeinfo->label");
+  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
+  RNA_def_property_ui_text(prop, "Type Label", "Label to display for the socket type in the UI");
+
   /* draw socket */
   func = RNA_def_function(srna, "draw", NULL);
   RNA_def_function_ui_description(func, "Draw socket");
@@ -10368,6 +10411,11 @@ static void rna_def_node_socket_interface(BlenderRNA *brna)
   RNA_def_property_string_sdna(prop, NULL, "typeinfo->idname");
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(prop, "ID Name", "");
+
+  prop = RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "typeinfo->label");
+  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
+  RNA_def_property_ui_text(prop, "Type Label", "Label to display for the socket type in the UI");
 
   func = RNA_def_function(srna, "draw", NULL);
   RNA_def_function_ui_description(func, "Draw template settings");
@@ -11879,11 +11927,12 @@ static void rna_def_nodetree(BlenderRNA *brna)
       func, "result_3", "ID", "From ID", "Original ID data-block selected from the context");
   RNA_def_function_output(func, parm);
 
-  /* Check for support of a socket type. */
+  /* Check for support of a socket type with a type identifier. */
   func = RNA_def_function(srna, "valid_socket_type", NULL);
   RNA_def_function_ui_description(func, "Check if the socket type is valid for the node tree");
   RNA_def_function_flag(func, FUNC_NO_SELF | FUNC_REGISTER_OPTIONAL);
-  parm = RNA_def_enum(func, "type", node_socket_type_items, 0, "", "");
+  parm = RNA_def_string(
+      func, "idname", "NodeSocket", MAX_NAME, "Socket Type", "Identifier of the socket type");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   RNA_def_function_return(func, RNA_def_boolean(func, "valid", false, "", ""));
 }

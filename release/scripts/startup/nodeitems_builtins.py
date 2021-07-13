@@ -506,6 +506,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveResample"),
         NodeItem("GeometryNodeMeshToCurve"),
         NodeItem("GeometryNodeCurveToPoints"),
+        NodeItem("GeometryNodeCurveEndpoints"),
         NodeItem("GeometryNodeCurveLength"),
         NodeItem("GeometryNodeCurveReverse"),
     ]),
@@ -515,6 +516,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveStar"),
         NodeItem("GeometryNodeCurveSpiral"),
         NodeItem("GeometryNodeCurveQuadraticBezier"),
+        NodeItem("GeometryNodeCurvePrimitiveQuadrilateral"),
         NodeItem("GeometryNodeCurvePrimitiveBezierSegment"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
@@ -546,7 +548,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeTriangulate"),
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeSubdivisionSurface"),
-        NodeItem("GeometryNodeSubdivide"),
+        NodeItem("GeometryNodeMeshSubdivide"),
         NodeItem("GeometryNodeRemesh"),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_MESH", "Mesh Primitives", items=[
@@ -559,6 +561,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshLine"),
         NodeItem("GeometryNodeMeshUVSphere"),
     ]),
+
     GeometryNodeCategory("GEO_POINT", "Point", items=[
         NodeItem("GeometryNodePointDistribute"),
         NodeItem("GeometryNodePointInstance"),
