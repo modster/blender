@@ -90,7 +90,7 @@ typedef struct tGPDasset {
 
 } tGPDasset;
 
-static bool gpencil_asset_create_poll(bContext *C)
+static bool gpencil_asset_generic_poll(bContext *C)
 {
   if (U.experimental.use_asset_browser == false) {
     return false;
@@ -192,7 +192,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
   /* callbacks */
   ot->invoke = WM_menu_invoke;
   ot->exec = gpencil_asset_create_exec;
-  ot->poll = gpencil_asset_create_poll;
+  ot->poll = gpencil_asset_generic_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -455,17 +455,6 @@ static void gpencil_asset_import_cancel(bContext *C, wmOperator *op)
   gpencil_asset_import_exit(C, op);
 }
 
-static bool gpencil_asset_import_poll(bContext *C)
-{
-  /* edit only supported with grease pencil objects */
-  Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
-    return false;
-  }
-
-  return true;
-}
-
 void GPENCIL_OT_asset_import(wmOperatorType *ot)
 {
 
@@ -480,7 +469,7 @@ void GPENCIL_OT_asset_import(wmOperatorType *ot)
   ot->invoke = gpencil_asset_import_invoke;
   ot->modal = gpencil_asset_import_modal;
   ot->cancel = gpencil_asset_import_cancel;
-  ot->poll = gpencil_asset_import_poll;
+  ot->poll = gpencil_asset_generic_poll;
 
   /* flags */
   ot->flag = OPTYPE_UNDO | OPTYPE_BLOCKING;
