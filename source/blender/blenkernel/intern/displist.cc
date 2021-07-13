@@ -846,8 +846,8 @@ static bool do_curve_implicit_mesh_conversion(const Curve *curve,
     return true;
   }
 
-  /* 2D curves are implicitly filled and converted to a mesh. */
-  if (CU_IS_2D(curve)) {
+  /* 2D curves are sometimes implicitly filled and converted to a mesh. */
+  if (CU_DO_2DFILL(curve)) {
     return true;
   }
 
