@@ -358,6 +358,47 @@ static int gpencil_asset_import_init(bContext *C, wmOperator *op)
   return 1;
 }
 
+/* Helper: Load all strokes in the target datablock. */
+static void gpencil_asset_add_strokes(tGPDasset *tgpa)
+{
+  bGPdata *gpd_target = tgpa->gpd;
+  bGPdata *gpd_asset = tgpa->gpd_asset;
+
+  LISTBASE_FOREACH (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
+    /* Check if Layer is in target datablock. */
+    bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
+    if (gpl_target == NULL) {
+      gpl_target = BKE_gpencil_layer_addnew(gpd_target, gpl_asset->info, false, false);
+      BLI_assert(gpl_target != NULL);
+
+      /* Add to the hash to remove if operator is canceled. */
+      BLI_ghash_insert(tgpa->used_layers, gpl_target, gpl_target);
+    }
+
+    LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
+      /* Check if frame is in target layer. */
+      bGPDframe *gpf_target = BKE_gpencil_layer_frame_get(
+          gpl_target, gpf_asset->framenum, GP_GETFRAME_USE_PREV);
+      if (gpf_target == NULL) {
+        gpf_target = BKE_gpencil_layer_frame_get(
+            gpl_target, gpf_asset->framenum, GP_GETFRAME_ADD_NEW);
+        BLI_assert(gpf_target != NULL);
+
+        /* Add to the hash to remove if operator is canceled. */
+        if (!BLI_ghash_haskey(tgpa->used_frames, gpf_target)) {
+          BLI_ghash_insert(tgpa->used_frames, gpf_target, gpf_target);
+        }
+      }
+      /* Loop all strokes and duplicate. */
+      LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
+        bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
+        BLI_addtail(&gpf_target->strokes, gps_target);
+        BLI_ghash_insert(tgpa->used_strokes, gps_target, gps_target);
+      }
+    }
+  }
+}
+
 /* ----------------------- */
 
 /* Invoke handler: Initialize the operator */
@@ -379,6 +420,9 @@ static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEven
   /* Save initial position of drop.  */
   tgpa->drop_x = event->x;
   tgpa->drop_y = event->y;
+
+  /* Do an initial load of the strokes in the target datablock. */
+  gpencil_asset_add_strokes(tgpa);
 
   /* set cursor to indicate modal */
   WM_cursor_modal_set(win, WM_CURSOR_EW_SCROLL);
