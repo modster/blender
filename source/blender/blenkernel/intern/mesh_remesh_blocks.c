@@ -35,7 +35,7 @@
 #include "MEM_guardedalloc.h"
 
 #ifdef WITH_REMESH_DUALCON
-#include "dualcon.h"
+#  include "dualcon.h"
 #endif
 
 static void init_dualcon_mesh(DualConInput *input, Mesh *mesh)
@@ -119,7 +119,7 @@ Mesh *BKE_mesh_remesh_blocks_to_mesh_nomain(Mesh *mesh,
                                             const float scale,
                                             const int depth)
 {
-  #ifdef WITH_REMESH_DUALCON
+#ifdef WITH_REMESH_DUALCON
 
   DualConOutput *output;
   DualConInput input;
@@ -166,7 +166,7 @@ Mesh *BKE_mesh_remesh_blocks_to_mesh_nomain(Mesh *mesh,
   MEM_freeN(output);
 
   return result;
-  #else
+#else
   return mesh;
-  #endif
+#endif
 }

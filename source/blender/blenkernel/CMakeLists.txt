@@ -496,7 +496,7 @@ if(WITH_REMESH_DUALCON)
   list(APPEND LIB
           bf_intern_dualcon
           )
-  add_definitions(-DWITH_REMESH_DUALCON)
+  add_definitions(-DWITH_MOD_REMESH)
 endif()
 
 if(WITH_BINRELOC)
