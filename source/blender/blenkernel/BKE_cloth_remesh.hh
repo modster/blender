@@ -1610,10 +1610,13 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       auto v1 = this->delete_vert(v1_index);
       deleted_verts.append(std::move(v1));
     }
-    /* delete n1 */
+    /* delete n1 if it doesn't have any `Vert`s */
     {
-      auto n1 = this->delete_node(n1_index);
-      deleted_nodes.append(std::move(n1));
+      auto n1 = this->get_checked_node(n1_index);
+      if (n1.verts.is_empty()) {
+        auto n1 = this->delete_node(n1_index);
+        deleted_nodes.append(std::move(n1));
+      }
     }
 
     return MeshDiff(std::move(added_nodes),
