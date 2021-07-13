@@ -61,7 +61,7 @@ static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
 namespace blender::nodes {
 
 struct FilletModeParam {
-  GeometryNodeCurveFilletMode mode;
+  GeometryNodeCurveFilletMode mode{};
 
   /* Minimum angle between two adjust control points. */
   std::optional<float> angle;
@@ -69,13 +69,15 @@ struct FilletModeParam {
   /* Number of points to be added. */
   std::optional<int> count;
 
-  GeometryNodeCurveFilletRadiusMode radius_mode;
+  GeometryNodeCurveFilletRadiusMode radius_mode{};
 
   /* The radius of the formed circle */
   std::optional<float> radius;
 
   /* Distribution of radii on the curve. */
   std::optional<std::string> radii_dist;
+
+  GVArray_Typed<float> *radii;
 };
 
 struct FilletData {
@@ -183,7 +185,8 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
   Span<float3> positions = bez_spline.positions();
 
   std::string radii_name = mode_param.radii_dist.value();
-  GVArray_Typed<float> radii_dist = spline.attributes.get_for_read<float>(radii_name, 1.0f);
+  GVArray_Typed<float> *radii_dist =
+      mode_param.radii;  // spline.attributes.get_for_read<float>(radii_name, 1.0f);
 
   Vector<FilletData> fds;
 
@@ -207,7 +210,7 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
       radius = mode_param.radius.value();
     }
     else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE) {
-      radius = radii_dist[start + i];
+      radius = (*radii_dist)[start + i];
     }
 
     calculate_fillet_data(
@@ -218,7 +221,7 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
       continue;
     }
 
-    int count;
+    int count = 0;
     if (mode_param.mode == GEO_NODE_CURVE_FILLET_ADAPTIVE) {
       // temp
       count = get_point_count(prev_pos, pos, next_pos, mode_param.angle.value());
@@ -350,6 +353,11 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
     mode_param.radius.emplace(params.extract_input<float>("Radius"));
   }
   else {
+    GVArray_Typed<float> arr = params.get_input_attribute<float>(
+        "Radii", geometry_set.get_component_for_write<CurveComponent>(), ATTR_DOMAIN_AUTO, 0.0f);
+
+    mode_param.radii = &arr;
+
     std::string radii = params.extract_input<std::string>("Radii");
     mode_param.radii_dist.emplace(radii);
   }
