@@ -42,7 +42,7 @@ namespace blender::nodes {
 static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  const char flag = MOD_REMESH_FLOOD_FILL;
+  const char flag = 0;
   const char mode = 0;
   const int hermite_num = 1;
   const int depth = params.extract_input<int>("Depth");
@@ -54,11 +54,9 @@ static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
 
     Mesh *output_mesh = BKE_mesh_remesh_blocks_to_mesh_nomain(
         input_mesh, flag, mode, threshold, hermite_num, scale, depth);
-    for(int i = 0; i < output_mesh->totpoly; i++){
-      printf("flag: %i\n",output_mesh->mpoly[i].flag);
-    }
+
     BKE_mesh_copy_parameters_for_eval(output_mesh, input_mesh);
-    BKE_mesh_calc_edges(input_mesh, true, false);
+    BKE_mesh_calc_edges(output_mesh, true, false);
     output_mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
 
     geometry_set.replace_mesh(output_mesh);
