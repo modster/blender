@@ -19,7 +19,7 @@
  *
  * BM mesh normal calculation functions.
  *
- * \see mesh_normals.c for the equivalent #Mesh functionality.
+ * \see mesh_normals.cc for the equivalent #Mesh functionality.
  */
 
 #include "MEM_guardedalloc.h"
@@ -33,6 +33,7 @@
 #include "BLI_task.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_customdata.h"
 #include "BKE_editmesh.h"
 #include "BKE_global.h"
 #include "BKE_mesh.h"
@@ -525,7 +526,7 @@ bool BM_loop_check_cyclic_smooth_fan(BMLoop *l_curr)
 }
 
 /**
- * BMesh version of BKE_mesh_normals_loop_split() in mesh_evaluate.c
+ * BMesh version of BKE_mesh_normals_loop_split() in `mesh_evaluate.cc`
  * Will use first clnors_data array, and fallback to cd_loop_clnors_offset
  * (use NULL and -1 to not use clnors).
  *
