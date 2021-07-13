@@ -69,6 +69,7 @@ struct ImBuf *SEQ_render_give_ibuf_direct(const SeqRenderData *context,
                                           struct Sequence *seq);
 void SEQ_render_thumbnails(struct SeqRenderData *context,
                            struct Sequence *seq,
+                           struct Sequence *seq_orig,
                            float timeline_frame,
                            float thumb_w,
                            float *cache_limits);

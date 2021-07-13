@@ -1085,6 +1085,7 @@ static void draw_seq_fcurve_overlay(
 typedef struct ThumbnailDrawJob {
   SeqRenderData context;
   Sequence *seq;
+  Sequence *seq_orig;
   Scene *scene;
   float x1;
   float offset;
@@ -1094,6 +1095,7 @@ typedef struct ThumbnailDrawJob {
 static void thumbnail_freejob(void *data)
 {
   ThumbnailDrawJob *tj = data;
+  SEQ_sequence_free(tj->scene, tj->seq, false);
   MEM_freeN(tj->cache_limits);
   MEM_freeN(tj);
 }
@@ -1107,7 +1109,7 @@ static void thumbnail_endjob(void *data)
 static void thumbnail_startjob(void *data, short *stop, short *do_update, float *progress)
 {
   ThumbnailDrawJob *tj = data;
-  SEQ_render_thumbnails(&tj->context, tj->seq, tj->x1, tj->offset, tj->cache_limits);
+  SEQ_render_thumbnails(&tj->context, tj->seq, tj->seq_orig, tj->x1, tj->offset, tj->cache_limits);
   UNUSED_VARS(stop, do_update, progress);
 }
 
@@ -1141,7 +1143,8 @@ static void sequencer_thumbnail_get_job(
     tj->offset = offset;
     tj->cache_limits = cache_limits;
     tj->context = context;
-    tj->seq = seq;
+    tj->seq = SEQ_sequence_dupli_recursive(tj->scene, tj->scene, NULL, seq, 0);
+    tj->seq_orig = seq;
     WM_jobs_customdata_set(wm_job, tj, thumbnail_freejob);
     WM_jobs_timer(wm_job, 0.1, NC_SCENE | ND_SEQUENCER, NC_SCENE | ND_SEQUENCER);
     WM_jobs_callbacks(wm_job, thumbnail_startjob, NULL, NULL, thumbnail_endjob);
@@ -1169,11 +1172,10 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 {
   struct Main *bmain = CTX_data_main(C);
   struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
-  ScrArea *area = CTX_wm_area(C);
   SeqRenderData context = {0};
   ImBuf *ibuf;
   bool min_size, clipped = false;
-  float aspect_ratio, image_y, image_x, cropx_min, cropx_max;
+  float image_y, image_x, cropx_min, cropx_max;
   rcti crop;
 
   /* If thumbs too small ignore */
@@ -1188,11 +1190,19 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.is_prefetch_render = false;
   context.is_proxy_render = false;
 
-  ibuf = SEQ_get_thumbnail(&context, seq, 1.0, &crop, false, true);
-  image_x = ibuf->x;
-  image_y = ibuf->y;
+  image_x = seq->strip->stripdata->orig_width;
+  image_y = seq->strip->stripdata->orig_height;
 
-  IMB_freeImBuf(ibuf);
+  /* Fix the dimensions to be max 256 for x or y */
+  float aspect_ratio = (float)image_x / image_y;
+  if (image_x > image_y) {
+    image_x = 256;
+    image_y = round_fl_to_int(image_x / aspect_ratio);
+  }
+  else {
+    image_y = 256;
+    image_x = round_fl_to_int(image_y * aspect_ratio);
+  }
 
   /*Calculate thumb dimensions */
   float thumb_h = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
@@ -1281,8 +1291,8 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
       IMB_freeImBuf(ibuf);
     }
     else {
-      strip_change_check = 0;
-      BLI_rctf_init(&view_check, 0, 0, 0, 0);
+      sequencer_thumbnail_get_job(C, v2d, x1, thumb_w, context, seq);
+      break;
     }
 
     cut_off = 0;

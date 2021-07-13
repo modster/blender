@@ -2029,9 +2029,7 @@ static ImBuf *seq_get_uncached_thumbnail(SeqRenderData *context,
   bool is_proxy_image = false;
   int rectx, recty;
 
-  BLI_mutex_lock(&seq_render_mutex);
   ibuf = do_render_strip_uncached(context, state, seq, timeline_frame, &is_proxy_image);
-  BLI_mutex_unlock(&seq_render_mutex);
 
   if (ibuf) {
     float aspect_ratio = (float)ibuf->x / ibuf->y;
@@ -2102,6 +2100,7 @@ ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
 /* Render the series of thumbnails and store in cache */
 void SEQ_render_thumbnails(SeqRenderData *context,
                            Sequence *seq,
+                           Sequence *seq_orig,
                            float timeline_frame,
                            float thumb_w,
                            float *cache_limits)
@@ -2115,7 +2114,7 @@ void SEQ_render_thumbnails(SeqRenderData *context,
   timeline_frame = timeline_frame - 30 * thumb_w;
   float upper_limit = cache_limits[3] + 30 * thumb_w;
   while (timeline_frame < upper_limit) {
-    ibuf = seq_cache_get(context, seq, roundf(timeline_frame), SEQ_CACHE_STORE_THUMBNAIL);
+    ibuf = seq_cache_get(context, seq_orig, roundf(timeline_frame), SEQ_CACHE_STORE_THUMBNAIL);
     if (ibuf) {
       IMB_freeImBuf(ibuf);
       timeline_frame += thumb_w;
@@ -2125,8 +2124,12 @@ void SEQ_render_thumbnails(SeqRenderData *context,
     ibuf = seq_get_uncached_thumbnail(context, &state, seq, roundf(timeline_frame));
 
     if (ibuf) {
-      seq_cache_thumbnail_put(
-          context, seq, roundf(timeline_frame), SEQ_CACHE_STORE_THUMBNAIL, ibuf, cache_limits);
+      seq_cache_thumbnail_put(context,
+                              seq_orig,
+                              roundf(timeline_frame),
+                              SEQ_CACHE_STORE_THUMBNAIL,
+                              ibuf,
+                              cache_limits);
       IMB_freeImBuf(ibuf);
     }
 
