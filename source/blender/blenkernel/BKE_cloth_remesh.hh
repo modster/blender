@@ -1518,9 +1518,9 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
      */
     /* This operation will delete the following-
      * `v1`
-     * `n1`
+     * `n1` if needed
      * `f`
-     * edge between `ov` and `v1`
+     * edge between `ov` and `v1` if needed
      *
      * This operation will add the following-
      * None
@@ -1536,80 +1536,97 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     blender::Vector<Face<EFD>> deleted_faces;
 
     auto &e = this->get_checked_edge(edge_index);
-    auto [v1_a, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
-    auto v1_index = v1_a.self_index;
-    auto v2_index = v2.self_index;
-    BLI_assert(v1_a.node); /* ensure v1 has a node */
-    auto n1_index = v1_a.node.value();
+    auto [v1_a, v2_a] = this->get_checked_verts_of_edge(e, verts_swapped);
+    auto &n1 = this->get_checked_node_of_vert(v1_a);
+    auto &n2 = this->get_checked_node_of_vert(v2_a);
+    auto n1_index = n1.self_index;
 
-    /* delete all the faces that `e` refers to */
-    auto e_faces = e.faces;
-    for (const auto &face_index : e_faces) {
-      auto &e = this->get_checked_edge(edge_index);
-      this->delink_face_edges(face_index);
-      auto face = this->delete_face(face_index);
-
-      auto &ov = this->get_checked_other_vert(e, face);
-
-      auto op_v1_ov_edge_index = this->get_connecting_edge_index(v1_index, ov.self_index);
-      BLI_assert(op_v1_ov_edge_index);
-      auto v1_ov_edge = this->get_checked_edge(op_v1_ov_edge_index.value());
-      /* delete `v1_ov_edge` only if it doesn't have any faces */
-      if (v1_ov_edge.faces.is_empty()) {
-        auto v1_ov_edge = this->delete_edge(op_v1_ov_edge_index.value());
-        deleted_edges.append(std::move(v1_ov_edge));
-      }
-      deleted_faces.append(std::move(face));
+    blender::Vector<EdgeIndex> edge_indices = {edge_index};
+    if (across_seams) {
+      edge_indices = this->get_connecting_edge_indices(n1, n2);
     }
 
-    auto &v1 = this->get_checked_vert(v1_index);
-    auto v1_edge_indices = v1.edges;
+    for (const auto &edge_index : edge_indices) {
+      auto &e = this->get_checked_edge(edge_index);
+      auto [v1_b, v2_b] = this->get_checked_verts_of_edge(e, verts_swapped);
+      auto v1_index = v1_b.self_index;
+      auto v2_index = v2_b.self_index;
+      /* Need to swap the verts if v1 does not point to n1 */
+      if (v1_b.node.value() != n1_index) {
+        std::swap(v1_index, v2_index);
+      }
+      BLI_assert(this->get_checked_vert(v1_index).node.value() == n1_index);
 
-    /* edges should have verts (v2, vx) instead of (v1, vx) and the
-     * face should have (v2, vx, vy) instead of (v1, vx, vy) */
-    for (const auto &v1_vx_edge_index : v1_edge_indices) {
-      Edge<EED> &v1_vx_edge = this->get_checked_edge(v1_vx_edge_index);
+      /* delete all the faces that `e` refers to */
+      auto e_faces = e.faces;
+      for (const auto &face_index : e_faces) {
+        auto &e = this->get_checked_edge(edge_index);
+        this->delink_face_edges(face_index);
+        auto face = this->delete_face(face_index);
 
-      BLI_assert(v1_vx_edge.verts);
-      auto &verts = v1_vx_edge.verts.value();
+        auto &ov = this->get_checked_other_vert(e, face);
 
-      if (v1_vx_edge.has_vert(v2_index)) {
-        /* don't need to mess with (v1, v2), only (v1, vx) */
-        continue;
+        auto op_v1_ov_edge_index = this->get_connecting_edge_index(v1_index, ov.self_index);
+        BLI_assert(op_v1_ov_edge_index);
+        auto v1_ov_edge = this->get_checked_edge(op_v1_ov_edge_index.value());
+        /* delete `v1_ov_edge` only if it doesn't have any faces */
+        if (v1_ov_edge.faces.is_empty()) {
+          auto v1_ov_edge = this->delete_edge(op_v1_ov_edge_index.value());
+          deleted_edges.append(std::move(v1_ov_edge));
+        }
+        deleted_faces.append(std::move(face));
       }
 
-      if (std::get<0>(verts) == v1_index) {
-        v1_vx_edge.verts = {std::get<1>(verts), v2_index};
-      }
-      else {
-        v1_vx_edge.verts = {std::get<0>(verts), v2_index};
-      }
+      auto &v1_c = this->get_checked_vert(v1_index);
+      auto v1_edge_indices = v1_c.edges;
 
-      /* since the edge no longer refers to `v1`, we should remove the
-       * edge from `v1.edges` */
-      v1.edges.remove_first_occurrence_and_reorder(v1_vx_edge_index);
+      /* edges should have verts (v2, vx) instead of (v1, vx) and the
+       * face should have (v2, vx, vy) instead of (v1, vx, vy) */
+      for (const auto &v1_vx_edge_index : v1_edge_indices) {
+        Edge<EED> &v1_vx_edge = this->get_checked_edge(v1_vx_edge_index);
 
-      /* replace `v1` with `v2` in the face  */
-      for (const auto face_index : v1_vx_edge.faces) {
-        Face<EFD> &face = this->get_checked_face(face_index);
-        /* the face may not contain `v1` */
-        auto pos = face.verts.first_index_of_try(v1_index);
-        if (pos != -1) {
-          face.verts[pos] = v2_index;
+        BLI_assert(v1_vx_edge.verts);
+        auto &verts = v1_vx_edge.verts.value();
+
+        if (v1_vx_edge.has_vert(v2_index)) {
+          /* don't need to mess with (v1, v2), only (v1, vx) */
+          continue;
+        }
+
+        if (std::get<0>(verts) == v1_index) {
+          v1_vx_edge.verts = {std::get<1>(verts), v2_index};
+        }
+        else {
+          v1_vx_edge.verts = {std::get<0>(verts), v2_index};
+        }
+
+        /* since the edge no longer refers to `v1`, we should remove the
+         * edge from `v1.edges` */
+        v1_c.edges.remove_first_occurrence_and_reorder(v1_vx_edge_index);
+
+        /* replace `v1` with `v2` in the face  */
+        for (const auto face_index : v1_vx_edge.faces) {
+          Face<EFD> &face = this->get_checked_face(face_index);
+          /* the face may not contain `v1` */
+          auto pos = face.verts.first_index_of_try(v1_index);
+          if (pos != -1) {
+            face.verts[pos] = v2_index;
+          }
         }
       }
+
+      /* delete e */
+      {
+        auto e = this->delete_edge(edge_index);
+        deleted_edges.append(std::move(e));
+      }
+      /* delete v1 */
+      {
+        auto v1 = this->delete_vert(v1_index);
+        deleted_verts.append(std::move(v1));
+      }
     }
 
-    /* delete e */
-    {
-      auto e = this->delete_edge(edge_index);
-      deleted_edges.append(std::move(e));
-    }
-    /* delete v1 */
-    {
-      auto v1 = this->delete_vert(v1_index);
-      deleted_verts.append(std::move(v1));
-    }
     /* delete n1 if it doesn't have any `Vert`s */
     {
       auto n1 = this->get_checked_node(n1_index);

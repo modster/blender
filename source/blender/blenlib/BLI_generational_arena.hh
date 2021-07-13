@@ -109,6 +109,11 @@ class Index {
     return (this->index == other.index) && (this->generation == other.generation);
   }
 
+  inline bool operator!=(const Index &other) const
+  {
+    return (this->index != other.index) || (this->generation != other.generation);
+  }
+
   static inline Index invalid()
   {
     return Index(std::numeric_limits<usize>::max(), std::numeric_limits<usize>::max());
