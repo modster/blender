@@ -1544,6 +1544,16 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
     GeometrySet geometry_set;
     evaluate_curve_type_object(depsgraph, scene, ob, for_render, dispbase, &geometry_set);
 
+    /* Assign the object's "data_eval" so that selection and other existing code knows how to
+     * access this. This isn't ideal since it gives special handling to the mesh, which should
+     * change eventually. */
+    if (geometry_set.has_mesh()) {
+      MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+      Mesh *mesh_eval = mesh_component.release();
+      BKE_object_eval_assign_data(ob, &mesh_eval->id, true);
+      mesh_component.replace(mesh_eval, GeometryOwnershipType::ReadOnly);
+    }
+
     /* If the curve is in edit mode, make sure the output geometry set containts a
      * curve component, which is used indirectly to render the edit mode overlays. */
     const Curve *curve_orig = (const Curve *)ob->data;
