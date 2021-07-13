@@ -191,7 +191,11 @@ class _defs_annotate:
                 row.prop(tool_settings.gpencil_sculpt, "lockaxis")
             elif tool_settings.gpencil_stroke_placement_view3d in {'SURFACE', 'STROKE'}:
                 row.prop(tool_settings, "use_gpencil_stroke_endpoints")
-
+        if space_type == 'CLIP_EDITOR':
+            layout.separator()
+            row = layout.row(align=True)
+            row.label(text="Data Source:")
+            row.prop(context.space_data, "annotation_source", expand=True)
         if tool.idname == "builtin.annotate_line":
             layout.separator()
 
@@ -2315,6 +2319,222 @@ class _defs_gpencil_vertex:
         )
 
 
+class _defs_clip_select:
+
+    @ToolDef.from_fn
+    def select():
+        return dict(
+            idname="builtin.select",
+            label="Tweak",
+            icon="ops.generic.select",
+            widget=None,
+            keymap="Clip Editor: Tweak",
+        )
+
+    @ToolDef.from_fn
+    def box():
+        def draw_settings(_context, layout, tool):
+            props = tool.operator_properties("clip.select_box")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
+        return dict(
+            idname="builtin.select_box",
+            label="Select Box",
+            icon="ops.generic.select_box",
+            widget=None,
+            keymap="Clip Editor: Select Box",
+            draw_settings=draw_settings,
+        )
+
+    @ToolDef.from_fn
+    def lasso():
+        def draw_settings(_context, layout, tool):
+            props = tool.operator_properties("clip.select_lasso")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
+        return dict(
+            idname="builtin.select_lasso",
+            label="Select Lasso",
+            icon="ops.generic.select_lasso",
+            widget=None,
+            keymap="Clip Editor: Select Lasso",
+            draw_settings=draw_settings,
+        )
+
+    @ToolDef.from_fn
+    def circle():
+        def draw_settings(_context, layout, tool):
+            props = tool.operator_properties("clip.select_circle")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
+            layout.prop(props, "radius")
+
+        def draw_cursor(_context, tool, xy):
+            from gpu_extras.presets import draw_circle_2d
+            props = tool.operator_properties("clip.select_circle")
+            radius = props.radius
+            draw_circle_2d(xy, (1.0,) * 4, radius, 32)
+
+        return dict(
+            idname="builtin.select_circle",
+            label="Select Circle",
+            icon="ops.generic.select_circle",
+            widget=None,
+            keymap="Clip Editor: Select Circle",
+            draw_settings=draw_settings,
+            draw_cursor=draw_cursor,
+        )
+
+class _defs_clip_tracking_tools:
+
+    @ToolDef.from_fn
+    def add_marker_tweak():
+        def draw_settings(_context, layout, tool):
+            # props = tool.operator_properties("sequencer.split")
+            props = _context.space_data.clip.tracking.settings
+            # layout.use_property_split = True
+            row = layout.row(align=True)
+            row.prop(props, "default_pattern_size", text="")
+            row.prop(props, "default_search_size", text="")
+            row = layout.row()
+            row.ui_units_x = 5
+            row.prop(props, "default_motion_model", text="")
+            row = layout.row()
+            row.ui_units_x = 5
+            row.prop(props, "default_pattern_match", text="")
+            row = layout.row()
+            row.prop(props, "use_default_brute")
+            row.prop(props, "use_default_normalization")
+            row = layout.row(align=True)
+            row.prop(props, "use_default_red_channel", text="R", toggle=True)
+            row.prop(props, "use_default_green_channel", text="G", toggle=True)
+            row.prop(props, "use_default_blue_channel", text="B", toggle=True)
+            row = layout.row()
+            row.popover(panel="CLIP_PT_track_settings_tool")
+
+        return dict(
+            idname="builtin.add_marker_tweak",
+            label="Add Marker and Tweak",
+            icon="ops.generic.select",
+            cursor='CROSSHAIR',
+            widget=None,
+            draw_settings=draw_settings,
+            keymap="Clip Editor: Add Marker and Tweak"
+        )
+
+
+class _defs_mask_select:
+
+    @ToolDef.from_fn
+    def select():
+        return dict(
+            idname="builtin.select",
+            label="Tweak",
+            icon="ops.generic.select",
+            widget=None,
+            keymap="Mask Editing: Select Box",
+        )
+
+    @ToolDef.from_fn
+    def box():
+        def draw_settings(_context, layout, tool):
+            props = tool.operator_properties("mask.select_box")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
+        return dict(
+            idname="builtin.select_box",
+            label="Select Box",
+            icon="ops.generic.select_box",
+            widget=None,
+            keymap="Mask Editing: Select Box",
+            draw_settings=draw_settings,
+        )
+
+    @ToolDef.from_fn
+    def lasso():
+        def draw_settings(_context, layout, tool):
+            props = tool.operator_properties("mask.select_lasso")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
+        return dict(
+            idname="builtin.select_lasso",
+            label="Select Lasso",
+            icon="ops.generic.select_lasso",
+            widget=None,
+            keymap="Mask Editing: Select Lasso",
+            draw_settings=draw_settings,
+        )
+
+    @ToolDef.from_fn
+    def circle():
+        def draw_settings(_context, layout, tool):
+            props = tool.operator_properties("mask.select_circle")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
+            layout.prop(props, "radius")
+
+        def draw_cursor(_context, tool, xy):
+            from gpu_extras.presets import draw_circle_2d
+            props = tool.operator_properties("mask.select_circle")
+            radius = props.radius
+            draw_circle_2d(xy, (1.0,) * 4, radius, 32)
+
+        return dict(
+            idname="builtin.select_circle",
+            label="Select Circle",
+            icon="ops.generic.select_circle",
+            widget=None,
+            keymap="Mask Editing: Select Circle",
+            draw_settings=draw_settings,
+            draw_cursor=draw_cursor,
+        )
+
+
+class _defs_mask_tools:
+    @ToolDef.from_fn
+    def add_vertex_slide():
+        def draw_settings(_context, layout, tool):
+            row = layout.row()
+            row.label(text="Mask Settings")
+            # props = tool.operator_properties("mask.add_vertex_slide")
+        return dict(
+            idname="builtin.add_vertex_slide",
+            label="Draw a Mask",
+            icon="ops.curve.extrude_move",
+            widget=None,
+            draw_settings=draw_settings,
+            keymap="Mask Editing: Add Vertex and Slide"
+        )
+    @ToolDef.from_fn
+    def add_feather_vertex_slide():
+        def draw_settings(_context, layout, tool):
+            row = layout.row()
+            row.label(text="Feather Vertex")
+            # props = tool.operator_properties("mask.add_vertex_slide")
+        return dict(
+            idname="builtin.add_feather_vertex_slide",
+            label="Add a Feather Vertex",
+            icon="ops.curve.radius",
+            widget=None,
+            keymap="Mask Editing: Add Feather Vertex and Slide"
+        )
+    @ToolDef.from_fn
+    def delete_vertex():
+        return dict(
+            idname="builtin.delete",
+            label="Delete a Feather Vertex",
+            icon="ops.curve.vertex_random",
+            widget=None,
+            keymap="Mask Editing: Delete"
+        )
+
+
 class _defs_node_select:
 
     @ToolDef.from_fn
@@ -2547,6 +2767,87 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
             None,
             *_tools_annotate,
         ],
+    }
+
+
+class CLIP_PT_tools_active(ToolSelectPanelHelper, Panel):
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'TOOLS'
+    bl_label = "Tools"  # not visible
+    bl_options = {'HIDE_HEADER'}
+
+    # Satisfy the 'ToolSelectPanelHelper' API.
+    keymap_prefix = "Clip Editor Tool:"
+
+    # Default group to use as a fallback.
+    tool_fallback_id = "builtin.box_select"
+
+    @classmethod
+    def tools_from_context(cls, context, mode=None):
+        if mode is None:
+            if context.space_data is None:
+                mode = 'TRACKING'
+            else:
+                mode = context.space_data.mode
+        for tools in (cls._tools[None], cls._tools.get(mode, ())):
+            for item in tools:
+                if not (type(item) is ToolDef) and callable(item):
+                    yield from item(context)
+                else:
+                    yield item
+
+    @classmethod
+    def tools_all(cls):
+        yield from cls._tools.items()
+
+    _tools_clip_select = (
+        (
+            _defs_clip_select.select,
+            _defs_clip_select.box,
+            _defs_clip_select.lasso,
+            _defs_clip_select.circle,
+        ),
+    )
+    _tools_mask_select = (
+        (
+            _defs_mask_select.select,
+            _defs_mask_select.box,
+            _defs_mask_select.lasso,
+            _defs_mask_select.circle,
+        ),
+    )
+
+    _tools_annotate = (
+        (
+            _defs_annotate.scribble,
+            _defs_annotate.line,
+            _defs_annotate.poly,
+            _defs_annotate.eraser,
+        ),
+    )
+
+    _tools = {
+        None: [
+            None,
+        ],
+        'TRACKING': [
+            _defs_clip_tracking_tools.add_marker_tweak,
+            None,
+            *_tools_clip_select,
+            None,
+            *_tools_annotate,
+            None,
+        ],
+        'MASK': [
+            _defs_mask_tools.add_vertex_slide,
+            _defs_mask_tools.add_feather_vertex_slide,
+            _defs_mask_tools.delete_vertex,
+            None,
+            *_tools_mask_select,
+            None,
+            *_tools_annotate,
+            None
+        ]
     }
 
 
@@ -3039,6 +3340,7 @@ class SEQUENCER_PT_tools_active(ToolSelectPanelHelper, Panel):
 classes = (
     IMAGE_PT_tools_active,
     NODE_PT_tools_active,
+    CLIP_PT_tools_active,
     VIEW3D_PT_tools_active,
     SEQUENCER_PT_tools_active,
 )

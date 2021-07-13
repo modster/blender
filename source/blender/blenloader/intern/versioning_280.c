@@ -3905,7 +3905,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
                                                                  &sl->regionbase;
           /* All spaces that use tools must be eventually added. */
           ARegion *region = NULL;
-          if (ELEM(sl->spacetype, SPACE_VIEW3D, SPACE_IMAGE, SPACE_SEQ) &&
+          if (ELEM(sl->spacetype, SPACE_VIEW3D, SPACE_IMAGE, SPACE_SEQ, SPACE_CLIP) &&
               ((region = do_versions_find_region_or_null(regionbase, RGN_TYPE_TOOL_HEADER)) ==
                NULL)) {
             /* Add tool header. */

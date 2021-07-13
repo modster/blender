@@ -1381,8 +1381,8 @@ def km_mask_editing(params):
         op_menu("MASK_MT_add", {"type": 'A', "value": 'PRESS', "shift": True}),
         *_template_items_proportional_editing(
             params, connected=False, toggle_data_path='tool_settings.use_proportional_edit_mask'),
-        ("mask.add_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
-        ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "ctrl": True}, None),
+        # ("mask.add_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+        # ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "ctrl": True}, None),
         ("mask.delete", {"type": 'X', "value": 'PRESS'}, None),
         ("mask.delete", {"type": 'DEL', "value": 'PRESS'}, None),
         ("mask.select", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
@@ -1409,8 +1409,8 @@ def km_mask_editing(params):
         ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "ctrl": True},
          {"properties": [("extend", False)]}),
         ("mask.cyclic_toggle", {"type": 'C', "value": 'PRESS', "alt": True}, None),
-        ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        # ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        # ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ("mask.handle_type_set", {"type": 'V', "value": 'PRESS'}, None),
         ("mask.normals_make_consistent", {"type": 'N', "value": 'PRESS', "ctrl" if params.legacy else "shift": True}, None),
         ("mask.parent_set", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
@@ -2876,17 +2876,17 @@ def km_clip_editor(params):
         ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
          {"properties": [("extend", True)]}),
         *_template_items_select_actions(params, "clip.select_all"),
-        ("clip.select_box", {"type": 'B', "value": 'PRESS'}, None),
-        ("clip.select_circle", {"type": 'C', "value": 'PRESS'}, None),
-        op_menu("CLIP_MT_select_grouped", {"type": 'G', "value": 'PRESS', "shift": True}),
-        ("clip.select_lasso", {"type": params.action_tweak, "value": 'ANY', "ctrl": True, "alt": True},
-         {"properties": [("mode", 'ADD')]}),
-        ("clip.select_lasso", {"type": params.action_tweak, "value": 'ANY', "shift": True, "ctrl": True, "alt": True},
-         {"properties": [("mode", 'SUB')]}),
-        ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+        # ("clip.select_box", {"type": 'B', "value": 'PRESS'}, None),
+        # ("clip.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+        # op_menu("CLIP_MT_select_grouped", {"type": 'G', "value": 'PRESS', "shift": True}),
+        # ("clip.select_lasso", {"type": params.action_tweak, "value": 'ANY', "ctrl": True, "alt": True},
+         # {"properties": [("mode", 'ADD')]}),
+        # ("clip.select_lasso", {"type": params.action_tweak, "value": 'ANY', "shift": True, "ctrl": True, "alt": True},
+         # {"properties": [("mode", 'SUB')]}),
+        # ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
         ("clip.delete_marker", {"type": 'X', "value": 'PRESS', "shift": True}, None),
         ("clip.delete_marker", {"type": 'DEL', "value": 'PRESS', "shift": True}, None),
-        ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        # ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ("clip.disable_markers", {"type": 'D', "value": 'PRESS', "shift": True},
          {"properties": [("action", 'TOGGLE')]}),
         ("clip.delete_track", {"type": 'X', "value": 'PRESS'}, None),
@@ -5942,6 +5942,144 @@ def km_image_editor_tool_uv_scale(params):
     )
 
 
+def km_clip_editor_tool_select(params):
+    return (
+        "Clip Editor: Tweak",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
+             {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
+        ]},
+    )
+
+
+def km_clip_editor_tool_select_box(params):
+    return (
+        "Clip Editor: Select Box",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "clip.select_box", type=params.tool_tweak, value='ANY',
+        )},
+    )
+
+def km_clip_editor_tool_select_lasso(params):
+    return (
+        "Clip Editor: Select Lasso",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "clip.select_lasso", type=params.tool_mouse, value='PRESS',
+        )},
+    )
+
+def km_clip_editor_tool_select_circle(params):
+    return (
+        "Clip Editor: Select Circle",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "clip.select_circle", type=params.tool_mouse, value='PRESS',
+            properties=[("wait_for_input", False)],
+        )},
+    )
+
+def km_clip_editor_tool_add_marker_tweak(params):
+    return (
+        "Clip Editor: Add Marker and Tweak",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
+             {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
+            ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
+             {"properties": [("extend", True)]}),
+            ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+            ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
+        ]},
+    )
+
+def km_clip_editor_tool_add_marker_slide(params):
+    return (
+        "Clip Editor: Add Marker and Slide",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            # ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
+             # {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
+            # ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
+             # {"properties": [("extend", True)]}),
+            ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
+        ]},
+    )
+
+def km_clip_editor_tool_mask_select(params):
+    return (
+        "Mask Editing: Tweak",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("mask.select", {"type": params.select_mouse, "value": 'PRESS'},
+             {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
+        ]},
+    )
+
+
+def km_clip_editor_tool_mask_select_box(params):
+    return (
+        "Mask Editing: Select Box",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "mask.select_box", type=params.tool_tweak, value='ANY',
+        )},
+    )
+
+def km_clip_editor_tool_mask_select_lasso(params):
+    return (
+        "Mask Editing: Select Lasso",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "mask.select_lasso", type=params.tool_mouse, value='PRESS',
+        )},
+    )
+
+def km_clip_editor_tool_mask_select_circle(params):
+    return (
+        "Mask Editing: Select Circle",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "mask.select_circle", type=params.tool_mouse, value='PRESS',
+            properties=[("wait_for_input", False)],
+        )},
+    )
+def km_clip_editor_tool_mask_add_vertex(params):
+    return (
+        "Mask Editing: Add Vertex and Slide",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("mask.add_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+            ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ]},
+    )
+
+def km_clip_editor_tool_mask_delete_vertex(params):
+    return (
+        "Mask Editing: Delete",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("mask.delete", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ]},
+    )
+
+def km_clip_editor_tool_mask_add_feather_vertex(params):
+    return (
+        "Mask Editing: Add Feather Vertex and Slide",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+            ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ]},
+    )
+
 def km_node_editor_tool_select(params):
     return (
         "Node Tool: Tweak",
@@ -7212,6 +7350,19 @@ def generate_keymaps(params=None):
         km_image_editor_tool_uv_sculpt_stroke(params),
         km_image_editor_tool_uv_move(params),
         km_image_editor_tool_uv_rotate(params),
+        km_clip_editor_tool_select(params),
+        km_clip_editor_tool_select_box(params),
+        km_clip_editor_tool_select_lasso(params),
+        km_clip_editor_tool_select_circle(params),
+        km_clip_editor_tool_add_marker_slide(params),
+        km_clip_editor_tool_add_marker_tweak(params),
+        km_clip_editor_tool_mask_select(params),
+        km_clip_editor_tool_mask_select_box(params),
+        km_clip_editor_tool_mask_select_lasso(params),
+        km_clip_editor_tool_mask_select_circle(params),
+        km_clip_editor_tool_mask_add_vertex(params),
+        km_clip_editor_tool_mask_add_feather_vertex(params),
+        km_clip_editor_tool_mask_delete_vertex(params),
         km_image_editor_tool_uv_scale(params),
         km_node_editor_tool_select(params),
         km_node_editor_tool_select_box(params),

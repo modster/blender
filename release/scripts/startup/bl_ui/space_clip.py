@@ -27,6 +27,9 @@ from bl_ui.properties_grease_pencil_common import (
     AnnotationDataPanel,
 )
 
+from bl_ui.space_toolsystem_common import (
+    ToolActivePanelHelper,
+)
 
 class CLIP_UL_tracking_objects(UIList):
     def draw_item(self, _context, layout, _data, item, _icon,
@@ -125,22 +128,92 @@ class CLIP_PT_clip_display(Panel):
             col.prop(clip, "display_aspect", text="Display Aspect Ratio")
 
 
+class CLIP_PT_active_tool(ToolActivePanelHelper, Panel):
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Tool"
+
+
+class CLIP_HT_tool_header(Header):
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'TOOL_HEADER'
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.template_header()
+
+        self.draw_tool_settings(context)
+
+        layout.separator_spacer()
+
+        CLIP_HT_header.draw_xform_template(layout, context)
+
+        layout.separator_spacer()
+
+        self.draw_mode_settings(context)
+
+    def draw_tool_settings(self, context):
+        layout = self.layout
+        # Active Tool
+        # -----------
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool = ToolSelectPanelHelper.draw_active_tool_header(context, layout)
+        tool_mode = context.mode if tool is None else tool.mode
+
+    def draw_mode_settings(self, context):
+        layout = self.layout
+
+        # Active Tool
+        # -----------
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool = ToolSelectPanelHelper.tool_active_from_context(context)
+        tool_mode = context.mode if tool is None else tool.mode
+
+
 class CLIP_HT_header(Header):
     bl_space_type = 'CLIP_EDITOR'
+
+    @staticmethod
+    def draw_xform_template(layout, context):
+        sc = context.space_data
+        tool_settings = context.tool_settings
+
+        layout.prop(sc, "pivot_point", text="", icon_only=True)
+
+        row = layout.row(align=True)
+        row.prop(tool_settings, "use_proportional_edit_mask", text="", icon_only=True)
+        sub = row.row(align=True)
+        sub.active = tool_settings.use_proportional_edit_mask
+        sub.prop(tool_settings, "proportional_edit_falloff", text="", icon_only=True)
 
     def _draw_tracking(self, context):
         layout = self.layout
 
         sc = context.space_data
         clip = sc.clip
+        show_region_tool_header = sc.show_region_tool_header
+
+        if not sc.view == 'CLIP':
+            sc.show_region_tool_header = False
+
+        if not show_region_tool_header:
+            layout.template_header()
 
         CLIP_MT_tracking_editor_menus.draw_collapsible(context, layout)
 
         layout.separator_spacer()
 
+        if not show_region_tool_header:
+            if not sc.view == 'CLIP':
+                CLIP_HT_header.draw_xform_template(layout, context)
+
         row = layout.row()
         if sc.view == 'CLIP':
             row.template_ID(sc, "clip", open="clip.open")
+            row = layout.row(align=True)
+            row.popover(panel='CLIP_PT_solve_panel')
+            row.operator("clip.solve_camera", text="", icon='PLAY')
         else:
             row = layout.row(align=True)
             props = row.operator("clip.refine_markers", text="", icon='TRACKING_REFINE_BACKWARDS')
@@ -181,13 +254,10 @@ class CLIP_HT_header(Header):
 
             if sc.view == 'CLIP':
                 r = active_object.reconstruction
-
                 if r.is_valid and sc.view == 'CLIP':
                     layout.label(text="Solve error: %.2f px" %
                                  (r.average_error))
 
-                row = layout.row()
-                row.prop(sc, "pivot_point", text="", icon_only=True)
                 row = layout.row(align=True)
                 icon = 'LOCKED' if sc.lock_selection else 'UNLOCKED'
                 row.operator("clip.lock_selection_toggle", icon=icon, text="", depress=sc.lock_selection)
@@ -230,21 +300,15 @@ class CLIP_HT_header(Header):
 
         layout.separator_spacer()
 
+        if not sc.show_region_tool_header:
+            CLIP_HT_header.draw_xform_template(layout, context)
+
         row = layout.row()
         row.template_ID(sc, "clip", open="clip.open")
 
         layout.separator_spacer()
 
         if clip:
-
-            layout.prop(sc, "pivot_point", text="", icon_only=True)
-
-            row = layout.row(align=True)
-            row.prop(tool_settings, "use_proportional_edit_mask", text="", icon_only=True)
-            sub = row.row(align=True)
-            sub.active = tool_settings.use_proportional_edit_mask
-            sub.prop(tool_settings, "proportional_edit_falloff", text="", icon_only=True)
-
             row = layout.row()
             row.template_ID(sc, "mask", new="mask.new")
             row.popover(panel='CLIP_PT_mask_display')
@@ -258,7 +322,8 @@ class CLIP_HT_header(Header):
 
         sc = context.space_data
 
-        layout.template_header()
+        if not sc.show_region_tool_header:
+            layout.template_header()
 
         layout.prop(sc, "mode", text="")
         if sc.mode == 'TRACKING':
@@ -519,11 +584,19 @@ class CLIP_PT_tools_plane_tracking(CLIP_PT_tracking_panel, Panel):
         layout.operator("clip.create_plane_track")
 
 
-class CLIP_PT_tools_solve(CLIP_PT_tracking_panel, Panel):
+class CLIP_PT_solve_panel(Panel):
     bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'HEADER'
     bl_label = "Solve"
-    bl_category = "Solve"
+
+    def draw(self, _context):
+        pass
+
+class CLIP_PT_tools_solve(Panel):
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'HEADER'
+    bl_label = "Solve"
+    bl_parent_id = 'CLIP_PT_solve_panel'
 
     def draw(self, context):
         layout = self.layout
@@ -534,7 +607,7 @@ class CLIP_PT_tools_solve(CLIP_PT_tracking_panel, Panel):
         tracking = clip.tracking
         settings = tracking.settings
         tracking_object = tracking.objects.active
-        camera = clip.tracking.camera
+        camera = tracking.camera
 
         col = layout.column()
         col.prop(settings, "use_tripod_solver", text="Tripod")
@@ -562,17 +635,21 @@ class CLIP_PT_tools_solve(CLIP_PT_tracking_panel, Panel):
         col = layout.column(align=True)
         col.scale_y = 2.0
 
-        col.operator("clip.solve_camera",
-                     text="Solve Camera Motion" if tracking_object.is_camera
-                     else "Solve Object Motion")
 
-
-class CLIP_PT_tools_cleanup(CLIP_PT_tracking_panel, Panel):
+class CLIP_PT_cleanup(CLIP_PT_tracking_panel, Panel):
     bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'UI'
     bl_label = "Clean Up"
-    bl_options = {'DEFAULT_CLOSED'}
-    bl_category = "Solve"
+    bl_category = "Reconstruction"
+
+    @classmethod
+    def poll(cls, context):
+        if CLIP_PT_clip_view_panel.poll(context):
+            sc = context.space_data
+
+            return sc.mode == 'TRACKING' and sc.clip
+
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -591,12 +668,21 @@ class CLIP_PT_tools_cleanup(CLIP_PT_tracking_panel, Panel):
         col.operator("clip.filter_tracks")
 
 
-class CLIP_PT_tools_geometry(CLIP_PT_tracking_panel, Panel):
+class CLIP_PT_geometry(CLIP_PT_tracking_panel, Panel):
     bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'UI'
     bl_label = "Geometry"
     bl_options = {'DEFAULT_CLOSED'}
-    bl_category = "Solve"
+    bl_category = "Reconstruction"
+
+    @classmethod
+    def poll(cls, context):
+        if CLIP_PT_clip_view_panel.poll(context):
+            sc = context.space_data
+
+            return sc.mode == 'TRACKING' and sc.clip
+
+        return False
 
     def draw(self, _context):
         layout = self.layout
@@ -605,11 +691,20 @@ class CLIP_PT_tools_geometry(CLIP_PT_tracking_panel, Panel):
         layout.operator("clip.track_to_empty")
 
 
-class CLIP_PT_tools_orientation(CLIP_PT_tracking_panel, Panel):
+class CLIP_PT_orientation(CLIP_PT_reconstruction_panel, Panel):
     bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'UI'
     bl_label = "Orientation"
-    bl_category = "Solve"
+    bl_category = "Reconstruction"
+
+    @classmethod
+    def poll(cls, context):
+        if CLIP_PT_clip_view_panel.poll(context):
+            sc = context.space_data
+
+            return sc.mode == 'TRACKING' and sc.clip
+
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -781,14 +876,22 @@ class CLIP_PT_plane_track(CLIP_PT_tracking_panel, Panel):
         clip = context.space_data.clip
         active_track = clip.tracking.plane_tracks.active
 
+        row = layout.row()
+        col = row.column()
+
+        col.separator()
+        col.operator("clip.create_plane_track")
+
+        row = layout.row()
         if not active_track:
-            layout.active = False
-            layout.label(text="No active plane track")
+            row.active = False
+            row.label(text="No active plane track")
             return
 
-        layout.prop(active_track, "name")
-        layout.prop(active_track, "use_auto_keying")
-        layout.template_ID(
+        row.prop(active_track, "name")
+        row.prop(active_track, "use_auto_keying", text="")
+        row = layout.row()
+        row.template_ID(
             active_track, "image", new="image.new", open="image.open")
 
         row = layout.row()
@@ -822,6 +925,36 @@ class CLIP_PT_track_settings(CLIP_PT_tracking_panel, Panel):
 
         col.prop(active, "use_brute")
         col.prop(active, "use_normalization")
+
+
+class CLIP_PT_track_settings_tool(CLIP_PT_tracking_panel, Panel):
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'HEADER'
+    bl_label = "Extras"
+
+    @classmethod
+    def poll(cls, context):
+        clip = context.space_data.clip
+
+        return clip.tracking.tracks.active
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        clip = context.space_data.clip
+        active = clip.tracking.tracks.active
+        settings = clip.tracking.settings
+
+        col = layout.column(align=True)
+        col.prop(active, "correlation_min")
+        col.prop(active, "margin")
+
+        col = layout.column()
+        col.prop(active, "use_mask")
+        col.prop(active, "frames_limit")
+        col.prop(settings, "speed")
 
 
 class CLIP_PT_track_settings_extras(CLIP_PT_tracking_panel, Panel):
@@ -1145,51 +1278,35 @@ from bl_ui.properties_mask_common import (
     MASK_PT_spline,
     MASK_PT_point,
     MASK_PT_display,
-    MASK_PT_transforms,
-    MASK_PT_tools
 )
 
 
 class CLIP_PT_mask_layers(MASK_PT_layers, Panel):
     bl_space_type = 'CLIP_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Mask"
+    bl_category = 'Mask'
 
 
 class CLIP_PT_mask_display(MASK_PT_display, Panel):
     bl_space_type = 'CLIP_EDITOR'
     bl_region_type = 'HEADER'
-    bl_category = "Mask"
 
 
 class CLIP_PT_active_mask_spline(MASK_PT_spline, Panel):
     bl_space_type = 'CLIP_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Mask"
-
+    bl_category = 'Mask'
 
 class CLIP_PT_active_mask_point(MASK_PT_point, Panel):
     bl_space_type = 'CLIP_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Mask"
+    bl_category = 'Mask'
 
 
 class CLIP_PT_mask(MASK_PT_mask, Panel):
     bl_space_type = 'CLIP_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Mask"
-
-
-class CLIP_PT_tools_mask_transforms(MASK_PT_transforms, Panel):
-    bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
-    bl_category = "Mask"
-
-
-class CLIP_PT_tools_mask_tools(MASK_PT_tools, Panel):
-    bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
-    bl_category = "Mask"
+    bl_category = 'Mask'
 
 # --- end mask ---
 
@@ -1215,12 +1332,12 @@ class CLIP_PT_footage(CLIP_PT_clip_view_panel, Panel):
         col.template_movieclip_information(sc, "clip", sc.clip_user)
 
 
-class CLIP_PT_tools_scenesetup(Panel):
+class CLIP_PT_scenesetup(Panel):
     bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'UI'
     bl_label = "Scene Setup"
     bl_translation_context = bpy.app.translations.contexts.id_movieclip
-    bl_category = "Solve"
+    bl_category = "Reconstruction"
 
     @classmethod
     def poll(cls, context):
@@ -1283,6 +1400,7 @@ class CLIP_MT_view(Menu):
         if sc.view == 'CLIP':
             layout.prop(sc, "show_region_ui")
             layout.prop(sc, "show_region_toolbar")
+            layout.prop(sc, "show_region_toolbar_header")
             layout.prop(sc, "show_region_hud")
 
             layout.separator()
@@ -1836,27 +1954,25 @@ class CLIP_MT_reconstruction_pie(Menu):
 classes = (
     CLIP_UL_tracking_objects,
     CLIP_HT_header,
+    CLIP_HT_tool_header,
     CLIP_PT_display,
     CLIP_PT_clip_display,
     CLIP_PT_marker_display,
     CLIP_MT_tracking_editor_menus,
     CLIP_MT_masking_editor_menus,
+    CLIP_PT_active_tool,
     CLIP_PT_track,
-    CLIP_PT_tools_clip,
-    CLIP_PT_tools_marker,
-    CLIP_PT_tracking_settings,
-    CLIP_PT_tracking_settings_extras,
-    CLIP_PT_tools_tracking,
-    CLIP_PT_tools_plane_tracking,
+    CLIP_PT_solve_panel,
     CLIP_PT_tools_solve,
-    CLIP_PT_tools_cleanup,
-    CLIP_PT_tools_geometry,
-    CLIP_PT_tools_orientation,
-    CLIP_PT_tools_object,
     CLIP_PT_objects,
     CLIP_PT_plane_track,
+    CLIP_PT_track_settings_tool,
     CLIP_PT_track_settings,
     CLIP_PT_track_settings_extras,
+    CLIP_PT_orientation,
+    CLIP_PT_scenesetup,
+    CLIP_PT_geometry,
+    CLIP_PT_cleanup,
     CLIP_PT_tracking_camera,
     CLIP_PT_tracking_lens,
     CLIP_PT_marker,
@@ -1868,11 +1984,10 @@ classes = (
     CLIP_PT_mask_display,
     CLIP_PT_active_mask_spline,
     CLIP_PT_active_mask_point,
-    CLIP_PT_tools_mask_transforms,
-    CLIP_PT_tools_mask_tools,
-    CLIP_PT_tools_scenesetup,
     CLIP_PT_annotation,
-    CLIP_PT_tools_grease_pencil_draw,
+    CLIP_PT_camera_presets,
+    CLIP_PT_track_color_presets,
+    CLIP_PT_tracking_settings_presets,
     CLIP_MT_view_zoom,
     CLIP_MT_view,
     CLIP_MT_clip,
@@ -1889,9 +2004,6 @@ classes = (
     CLIP_MT_select,
     CLIP_MT_select_grouped,
     CLIP_MT_tracking_context_menu,
-    CLIP_PT_camera_presets,
-    CLIP_PT_track_color_presets,
-    CLIP_PT_tracking_settings_presets,
     CLIP_MT_stabilize_2d_context_menu,
     CLIP_MT_stabilize_2d_rotation_context_menu,
     CLIP_MT_pivot_pie,

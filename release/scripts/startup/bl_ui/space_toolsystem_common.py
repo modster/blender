@@ -445,6 +445,17 @@ class ToolSelectPanelHelper:
             if tool is not None:
                 tool.refresh_from_context()
                 return tool
+        elif space_type == 'CLIP_EDITOR':
+            space_data = context.space_data
+            if mode is None:
+                if space_data is None:
+                    mode = 'TRACKING'
+                else:
+                    mode = space_data.mode
+            tool = context.workspace.tools.from_space_clip_mode(mode, create=create)
+            if tool is not None:
+                tool.refresh_from_context()
+                return tool
         elif space_type == 'NODE_EDITOR':
             space_data = context.space_data
             tool = context.workspace.tools.from_space_node(create=create)
@@ -721,6 +732,10 @@ class ToolSelectPanelHelper:
         if space_type == 'VIEW_3D':
             return space_type, context.mode
         elif space_type == 'IMAGE_EDITOR':
+            if space_data is None:
+                space_data = context.space_data
+            return space_type, space_data.mode
+        elif space_type == 'CLIP_EDITOR':
             if space_data is None:
                 space_data = context.space_data
             return space_type, space_data.mode

@@ -51,7 +51,8 @@ struct wmOperatorType;
 
 /* clip_buttons.c */
 void ED_clip_buttons_register(struct ARegionType *art);
-
+/* clip_toolbar.c */
+void clip_toolbar_register(struct ARegionType *art);
 /* clip_dopesheet_draw.c */
 void clip_draw_dopesheet_main(struct SpaceClip *sc, struct ARegion *region, struct Scene *scene);
 void clip_draw_dopesheet_channels(const struct bContext *C, struct ARegion *region);

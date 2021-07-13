@@ -446,6 +446,11 @@ static bool toolsystem_key_ensure_check(const bToolKey *tkey)
       return true;
     case SPACE_SEQ:
       return true;
+    case SPACE_CLIP:
+      if (ELEM(tkey->mode, SC_MODE_TRACKING, SC_MODE_MASKEDIT)) {
+        return true;
+      }
+      break;
   }
   return false;
 }
@@ -478,6 +483,11 @@ int WM_toolsystem_mode_from_spacetype(ViewLayer *view_layer, ScrArea *area, int 
     case SPACE_SEQ: {
       SpaceSeq *sseq = area->spacedata.first;
       mode = sseq->view;
+      break;
+    }
+    case SPACE_CLIP: {
+      SpaceClip *sc = area->spacedata.first;
+      mode = sc->mode;
       break;
     }
   }
@@ -713,10 +723,13 @@ static const char *toolsystem_default_tool(const bToolKey *tkey)
       }
       return "builtin.select_box";
     }
+    case SPACE_CLIP: {
+      return "builtin.select_box";
+    }
   }
 
   return "builtin.select_box";
-}
+  }
 
 /**
  * Run after changing modes.

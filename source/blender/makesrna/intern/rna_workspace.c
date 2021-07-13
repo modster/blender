@@ -152,6 +152,17 @@ static bToolRef *rna_WorkSpace_tools_from_space_node(WorkSpace *workspace, bool 
                                        },
                                        create);
 }
+static bToolRef *rna_WorkSpace_tools_from_space_clip_mode(WorkSpace *workspace,
+                                                          int mode,
+                                                          bool create)
+{
+  return rna_WorkSpace_tools_from_tkey(workspace,
+                                       &(bToolKey){
+                                           .space_type = SPACE_CLIP,
+                                           .mode = mode,
+                                       },
+                                       create);
+}
 static bToolRef *rna_WorkSpace_tools_from_space_sequencer(WorkSpace *workspace,
                                                           int mode,
                                                           bool create)
@@ -176,6 +187,8 @@ const EnumPropertyItem *rna_WorkSpace_tools_mode_itemf(bContext *UNUSED(C),
       return rna_enum_space_image_mode_all_items;
     case SPACE_SEQ:
       return rna_enum_space_sequencer_view_type_items;
+    case SPACE_CLIP:
+      return rna_enum_clip_editor_mode_items;
   }
   return DummyRNA_DEFAULT_items;
 }
@@ -356,7 +369,17 @@ static void rna_def_workspace_tools(BlenderRNA *brna, PropertyRNA *cprop)
   /* return type */
   parm = RNA_def_pointer(func, "result", "WorkSpaceTool", "", "");
   RNA_def_function_return(func, parm);
-}
+
+  func = RNA_def_function(
+      srna, "from_space_clip_mode", "rna_WorkSpace_tools_from_space_clip_mode");
+  RNA_def_function_ui_description(func, "");
+  parm = RNA_def_enum(func, "mode", rna_enum_clip_editor_mode_items, 0, "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  RNA_def_boolean(func, "create", false, "Create", "");
+   /*return type */
+  parm = RNA_def_pointer(func, "result", "WorkSpaceTool", "", "");
+  RNA_def_function_return(func, parm);
+	}
 
 static void rna_def_workspace(BlenderRNA *brna)
 {

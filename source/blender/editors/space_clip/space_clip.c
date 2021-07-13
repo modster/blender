@@ -248,6 +248,15 @@ static SpaceLink *clip_create(const ScrArea *area, const Scene *scene)
   sc->scopes.track_preview_height = 120;
   sc->around = V3D_AROUND_CENTER_MEDIAN;
 
+  /* tool header */
+  region = MEM_callocN(sizeof(ARegion), "tool header for clip");
+
+  BLI_addtail(&sc->regionbase, region);
+  region->regiontype = RGN_TYPE_TOOL_HEADER;
+  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+  region->flag = RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER;
+
+
   /* header */
   region = MEM_callocN(sizeof(ARegion), "header for clip");
 
@@ -1242,6 +1251,11 @@ static void clip_tools_region_draw(const bContext *C, ARegion *region)
 {
   ED_region_panels(C, region);
 }
+static void clip_tools_region_listener(const wmRegionListenerParams *params)
+{
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+}
 
 /****************** tool properties region ******************/
 
@@ -1366,7 +1380,7 @@ void ED_spacetype_clip(void)
   art->init = clip_main_region_init;
   art->draw = clip_main_region_draw;
   art->listener = clip_main_region_listener;
-  art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL;
+  art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL | ED_KEYMAP_TOOL;
 
   BLI_addhead(&st->regiontypes, art);
 
@@ -1393,7 +1407,7 @@ void ED_spacetype_clip(void)
   ED_clip_buttons_register(art);
 
   /* regions: tools */
-  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region tools");
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region tool");
   art->regionid = RGN_TYPE_TOOLS;
   art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
   art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
@@ -1401,6 +1415,30 @@ void ED_spacetype_clip(void)
   art->init = clip_tools_region_init;
   art->draw = clip_tools_region_draw;
 
+  BLI_addhead(&st->regiontypes, art);
+
+    /* regions: tool(bar) */
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region tools");
+  art->regionid = RGN_TYPE_TOOLS;
+  art->prefsizex = 58;
+  art->prefsizey = 50;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FRAMES;
+  art->listener = clip_tools_region_listener;
+  art->message_subscribe = ED_region_generic_tools_region_message_subscribe;
+  art->snap_size = ED_region_generic_tools_region_snap_size;
+  art->init = clip_tools_region_init;
+  art->draw = clip_tools_region_draw;
+  BLI_addhead(&st->regiontypes, art);
+
+  /* regions: tool header */
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip tool header region");
+  art->regionid = RGN_TYPE_TOOL_HEADER;
+  art->prefsizey = HEADERY;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_FRAMES | ED_KEYMAP_HEADER;
+  art->listener = clip_header_region_listener;
+  art->message_subscribe = ED_area_do_mgs_subscribe_for_tool_header;
+  art->init = clip_header_region_init;
+  art->draw = clip_header_region_draw;
   BLI_addhead(&st->regiontypes, art);
 
   /* regions: header */
