@@ -62,6 +62,7 @@ void register_node_type_geo_curve_primitive_star(void);
 void register_node_type_geo_curve_resample(void);
 void register_node_type_geo_curve_reverse(void);
 void register_node_type_geo_curve_subdivide(void);
+void register_node_type_geo_curve_fillet(void);
 void register_node_type_geo_curve_to_mesh(void);
 void register_node_type_geo_curve_to_points(void);
 void register_node_type_geo_delete_geometry(void);
