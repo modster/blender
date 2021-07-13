@@ -140,7 +140,7 @@ static void calculate_fillet_data(const float3 prev_pos,
   normalize_v3_v3(fd->next_dir, vec_pos2next);
   fd->pos = pos;
   cross_v3_v3v3(fd->axis, vec_pos2prev, vec_pos2next);
-  fd->angle = angle_v3v3v3(prev_pos, pos, next_pos);
+  fd->angle = M_PI - angle_v3v3v3(prev_pos, pos, next_pos);
   fd->count = count.has_value() ? count.value() : fd->angle / arc_angle.value();
   fd->center = get_center(vec_pos2prev, pos, fd->axis, fd->angle);
   fd->radius = radius;
@@ -246,8 +246,10 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
     int fillet_i = i - start;
     FilletData fd = fds[fillet_i];
 
+    float displacement = fd.radius * tanf(fd.angle / 2);
+
     copy_bezier_vertex_data(&new_spline, &bez_spline, next_i, i);
-    new_spline.positions()[next_i] = fd.pos + fd.radius * fd.prev_dir;
+    new_spline.positions()[next_i] = fd.pos + displacement * fd.prev_dir;
     next_i++;
 
     if (!fd.radius) {
@@ -255,8 +257,9 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
     }
 
     float handle_length = 4.0f * fd.radius / 3 * tanf(fd.angle / 4);
+
     copy_bezier_vertex_data(&new_spline, &bez_spline, next_i, i);
-    new_spline.positions()[next_i] = fd.pos + fd.radius * fd.next_dir;
+    new_spline.positions()[next_i] = fd.pos + displacement * fd.next_dir;
     new_spline.handle_types_right()[next_i - 1] = new_spline.handle_types_left()[next_i] =
         BezierSpline::HandleType::Align;
     new_spline.handle_positions_right()[next_i - 1] = new_spline.positions()[next_i - 1] -
