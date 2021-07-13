@@ -23,9 +23,9 @@
 
 static bNodeSocketTemplate geo_node_curve_primitive_line_in[] = {
     {SOCK_VECTOR, N_("Start"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("End"), 0.0f, 2.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("Direction"), 0.0f, 1.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_FLOAT, N_("Length"), 2.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
+    {SOCK_VECTOR, N_("End"), 0.0f, 0.0f, 1.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR, N_("Direction"), 0.0f, 0.0f, 1.0f, 0.0f, -FLT_MAX, FLT_MAX},
+    {SOCK_FLOAT, N_("Length"), 1.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
     {-1, ""},
 };
 
@@ -95,7 +95,7 @@ static std::unique_ptr<CurveEval> create_direction_line_curve(const float3 start
   spline->resize(2);
   MutableSpan<float3> positions = spline->positions();
   positions[0] = start;
-  positions[1] = direction.normalized() * length;
+  positions[1] = direction.normalized() * length + start;
 
   spline->radii().fill(1.0f);
   spline->tilts().fill(0.0f);
