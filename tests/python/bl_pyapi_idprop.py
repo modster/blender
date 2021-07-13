@@ -251,7 +251,7 @@ class TestRNAData(TestHelper, unittest.TestCase):
     def test_custom_properties_none(self):
         bpy.data.objects.new("test", None)
         test_object = bpy.data.objects["test"]
-        props = test_object.id_properties_create()
+        props = test_object.id_properties_ensure()
         self.assertEqual(len(props), 0)
 
         # Access default RNA data values
@@ -282,7 +282,7 @@ class TestRNAData(TestHelper, unittest.TestCase):
         bpy.data.objects.new("test_2", None)
         test_object_2 = bpy.data.objects["test_2"]
         test_object_2["test_prop_3"] = 20.1
-        props_2 = test_object_2.id_properties_create()
+        props_2 = test_object_2.id_properties_ensure()
         props_2.ui_data_copy(props, "test_prop", "test_prop_3")
         rna_data = props_2.ui_data("test_prop_3")
         self.assertEqual(rna_data["min"], 0)
@@ -292,14 +292,14 @@ class TestRNAData(TestHelper, unittest.TestCase):
 
         # Test RNA data for string property
         test_object["test_string_prop"] = "Hello there!"
-        props = test_object.id_properties_create()
+        props = test_object.id_properties_ensure()
         props.ui_data_update("test_string_prop", default="Goodbye where?")
         rna_data = props.ui_data("test_string_prop")
         self.assertEqual(rna_data["default"], "Goodbye where?")
 
         # Test RNA data for array property
         test_object["test_array_prop"] = [1, 2, 3]
-        props = test_object.id_properties_create()
+        props = test_object.id_properties_ensure()
         props.ui_data_update("test_array_prop", default=[1, 2])
         rna_data = props.ui_data("test_array_prop")
         self.assertEqual(rna_data["default"], [1, 2])

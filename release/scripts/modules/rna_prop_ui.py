@@ -42,7 +42,7 @@ def rna_idprop_ui_prop_update(item, prop):
 
 
 def rna_idprop_ui_prop_clear(item, prop):
-    props = item.id_properties_create()
+    props = item.id_properties_ensure()
     props.ui_data_clear(prop)
 
 
@@ -115,7 +115,7 @@ def rna_idprop_ui_create(
     rna_idprop_ui_prop_update(item, prop)
 
     # Update the UI settings
-    props = item.id_properties_create()
+    props = item.id_properties_ensure()
     props.ui_data_update(
         prop, 
         subtype=subtype, 

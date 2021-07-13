@@ -1429,7 +1429,7 @@ class WM_OT_properties_edit(Operator):
         prop_type_new = type(prop_value)
         prop_type, is_array = rna_idprop_value_item_type(prop_value)
 
-        props = item.id_properties_create()
+        props = item.id_properties_ensure()
         props.ui_data_update(
             prop,
             subtype=self.subtype,
@@ -1537,7 +1537,7 @@ class WM_OT_properties_edit(Operator):
             self.default = ""
 
         # setup defaults
-        props = item.id_properties_create()
+        props = item.id_properties_ensure()
         rna_data = props.ui_data(prop)
         self.subtype =  rna_data["subtype"]
         if prop_type in {int, float}:
