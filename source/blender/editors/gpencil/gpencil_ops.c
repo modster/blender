@@ -703,6 +703,7 @@ void ED_operatortypes_gpencil(void)
 
   /* Assets. */
   WM_operatortype_append(GPENCIL_OT_asset_create);
+  WM_operatortype_append(GPENCIL_OT_asset_import);
 }
 
 void ED_operatormacros_gpencil(void)
