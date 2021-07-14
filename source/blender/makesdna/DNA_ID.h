@@ -65,7 +65,7 @@ typedef struct IDPropertyUIData {
   /** RNA subtype, used for every type except string properties (PropertySubType). */
   int rna_subtype;
 
-  int _pad;
+  char _pad[4];
 } IDPropertyUIData;
 
 /* IDP_UI_DATA_TYPE_INT */

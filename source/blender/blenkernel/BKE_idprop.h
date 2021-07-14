@@ -143,7 +143,6 @@ struct IDProperty *IDP_New(const char type,
                            const IDPropertyTemplate *val,
                            const char *name) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 
-void IDP_free_ui_data(struct IDProperty *prop);
 void IDP_FreePropertyContent_ex(struct IDProperty *prop, const bool do_id_user);
 void IDP_FreePropertyContent(struct IDProperty *prop);
 void IDP_FreeProperty_ex(struct IDProperty *prop, const bool do_id_user);
@@ -230,6 +229,7 @@ typedef enum eIDPropertyUIDataType {
 
 bool IDP_ui_data_supported(const struct IDProperty *prop);
 eIDPropertyUIDataType IDP_ui_data_type(const struct IDProperty *prop);
+void IDP_free_ui_data(struct IDProperty *prop);
 struct IDPropertyUIData *IDP_ui_data_ensure(struct IDProperty *prop);
 struct IDPropertyUIData *IDP_ui_data_copy(const struct IDProperty *prop);
 
