@@ -24,6 +24,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_ghash.h"
+#include "BLI_math.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -86,13 +87,15 @@ typedef struct tGPDasset {
 
   /* Drop initial position. */
   int drop_x, drop_y;
+  /* Mouse last click position. */
+  int mouse[2];
 
   /* Hash of new created layers. */
-  struct GHash *used_layers;
+  struct GHash *asset_layers;
   /* Hash of new created frames. */
-  struct GHash *used_frames;
+  struct GHash *asset_frames;
   /* Hash of new created strokes. */
-  struct GHash *used_strokes;
+  struct GHash *asset_strokes;
 
 } tGPDasset;
 
@@ -233,18 +236,26 @@ static void gpencil_asset_import_update_strokes(bContext *C, tGPDasset *tgpa)
 }
 
 /* Helper: Draw status message while the user is running the operator */
-static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *p)
+static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *tgpa)
 {
   char status_str[UI_MAX_DRAW_STR];
   char msg_str[UI_MAX_DRAW_STR];
-  bGPdata *gpd_asset = p->gpd_asset;
+  bGPdata *gpd_asset = tgpa->gpd_asset;
+  const char *mode_txt[] = {"Location", "Rotation", "Scale"};
 
-  BLI_strncpy(msg_str, TIP_("Importing Grease Pencil Asset"), UI_MAX_DRAW_STR);
+  BLI_strncpy(msg_str, TIP_("Importing Asset"), UI_MAX_DRAW_STR);
 
-  BLI_snprintf(status_str, sizeof(status_str), "%s %s", msg_str, gpd_asset->id.name + 2);
+  BLI_snprintf(status_str,
+               sizeof(status_str),
+               "%s %s (%s)",
+               msg_str,
+               gpd_asset->id.name + 2,
+               mode_txt[tgpa->mode]);
 
-  ED_area_status_text(p->area, status_str);
-  ED_workspace_status_text(C, TIP_("ESC/RMB to cancel, Enter/LMB to confirm"));
+  ED_area_status_text(tgpa->area, status_str);
+  ED_workspace_status_text(C,
+                           TIP_("ESC/RMB to cancel, Enter to confirm, LMB to Move, "
+                                "Shift+LMB to Rotate, Wheelmouse to Scale "));
 }
 
 /* Update screen and stroke */
@@ -274,14 +285,14 @@ static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
     // TODO
 
     /* Free Hash tablets. */
-    if (tgpa->used_layers != NULL) {
-      BLI_ghash_free(tgpa->used_layers, NULL, NULL);
+    if (tgpa->asset_layers != NULL) {
+      BLI_ghash_free(tgpa->asset_layers, NULL, NULL);
     }
-    if (tgpa->used_frames != NULL) {
-      BLI_ghash_free(tgpa->used_frames, NULL, NULL);
+    if (tgpa->asset_frames != NULL) {
+      BLI_ghash_free(tgpa->asset_frames, NULL, NULL);
     }
-    if (tgpa->used_strokes != NULL) {
-      BLI_ghash_free(tgpa->used_strokes, NULL, NULL);
+    if (tgpa->asset_strokes != NULL) {
+      BLI_ghash_free(tgpa->asset_strokes, NULL, NULL);
     }
 
     MEM_SAFE_FREE(tgpa);
@@ -317,13 +328,12 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   /* Asset GP datablock. */
   tgpa->gpd_asset = (bGPdata *)id;
 
-  /* Create Hash tables. */
-  tgpa->used_layers = BLI_ghash_ptr_new(__func__);
-  tgpa->used_frames = BLI_ghash_ptr_new(__func__);
-  tgpa->used_strokes = BLI_ghash_ptr_new(__func__);
-
-  /* Set transformation mode to Location by default. */
   tgpa->mode = GP_ASSET_TRANSFORM_LOC;
+
+  /* Create Hash tables. */
+  tgpa->asset_layers = BLI_ghash_ptr_new(__func__);
+  tgpa->asset_frames = BLI_ghash_ptr_new(__func__);
+  tgpa->asset_strokes = BLI_ghash_ptr_new(__func__);
 
   return true;
 }
@@ -393,7 +403,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
       BLI_assert(gpl_target != NULL);
 
       /* Add to the hash to remove if operator is canceled. */
-      BLI_ghash_insert(tgpa->used_layers, gpl_target, gpl_target);
+      BLI_ghash_insert(tgpa->asset_layers, gpl_target, gpl_target);
     }
 
     LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
@@ -406,15 +416,15 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
         BLI_assert(gpf_target != NULL);
 
         /* Add to the hash to remove if operator is canceled. */
-        if (!BLI_ghash_haskey(tgpa->used_frames, gpf_target)) {
-          BLI_ghash_insert(tgpa->used_frames, gpf_target, gpf_target);
+        if (!BLI_ghash_haskey(tgpa->asset_frames, gpf_target)) {
+          BLI_ghash_insert(tgpa->asset_frames, gpf_target, gpf_target);
         }
       }
       /* Loop all strokes and duplicate. */
       LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
         bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
         BLI_addtail(&gpf_target->strokes, gps_target);
-        BLI_ghash_insert(tgpa->used_strokes, gps_target, gps_target);
+        BLI_ghash_insert(tgpa->asset_strokes, gps_target, gps_target);
       }
     }
   }
@@ -466,7 +476,17 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
   wmWindow *win = CTX_wm_window(C);
 
   switch (event->type) {
-    case LEFTMOUSE: /* confirm */
+    case LEFTMOUSE: {
+      if (event->shift) {
+        tgpa->mode = GP_ASSET_TRANSFORM_ROT;
+      }
+      else {
+        tgpa->mode = GP_ASSET_TRANSFORM_LOC;
+      }
+      copy_v2_v2_int(tgpa->mouse, event->mval);
+      break;
+    }
+      /* Confirm */
     case EVT_PADENTER:
     case EVT_RETKEY: {
       /* return to normal cursor and header status */
@@ -502,7 +522,24 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 
       /* Update screen. */
       gpencil_asset_import_update(C, op, tgpa);
-    } break;
+      break;
+    }
+    case WHEELUPMOUSE: {
+      // Scale
+      // TODO
+
+      /* Update screen. */
+      gpencil_asset_import_update(C, op, tgpa);
+      break;
+    }
+    case WHEELDOWNMOUSE: {
+      // Scale
+      // TODO
+
+      /* Update screen. */
+      gpencil_asset_import_update(C, op, tgpa);
+      break;
+    }
 
     default: {
       /* Unhandled event - allow to pass through. */
