@@ -4502,7 +4502,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
   LineartShadowSegment *es, *ies;
   LineartShadowSegment *cut_start_after = e->shadow_segments.first,
                        *cut_end_before = e->shadow_segments.last;
-  LineartShadowSegment *ns = NULL, *ns2 = NULL, *sl = NULL, *sr = NULL, *ns_middle = NULL;
+  LineartShadowSegment *ns = NULL, *ns2 = NULL, *sl = NULL, *sr = NULL;
   int untouched = 0;
 
   /* If for some reason the occlusion function may give a result that has zero length, or reversed
@@ -4601,7 +4601,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
   copy_v4_v4_db(tfbc1, start_fbc);
   copy_v3_v3_db(tg1, start_gpos);
 
-  /* do max stuff before insert */
+  /* Do max stuff before insert. */
   LineartShadowSegment *nes;
   for (es = cut_start_after; es != cut_end_before; es = nes) {
     nes = es->next;
@@ -4629,6 +4629,8 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
         BLI_insertlinkbefore(&e->shadow_segments, cut_end_before, ns2);
         copy_v4_v4_db(ns2->fbc2, mfbc2);
         copy_v3_v3_db(ns2->g2, mg2);
+        /* Need to restore the flag for next segment's reference. */
+        sr->flag = es->flag;
       }
     }
 
@@ -4652,6 +4654,13 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
                                    r_new_in_the_middle,
                                    r_new_in_the_middle_global,
                                    &r_new_at)) {
+      LineartShadowSegment *ss_middle = lineart_give_shadow_segment(rb);
+      ss_middle->at = r_new_at;
+      copy_v3_v3_db(ss_middle->g1, r_new_in_the_middle_global);
+      copy_v3_v3_db(ss_middle->g2, r_new_in_the_middle_global);
+      copy_v4_v4_db(ss_middle->fbc1, r_new_in_the_middle);
+      copy_v4_v4_db(ss_middle->fbc2, r_new_in_the_middle);
+      BLI_insertlinkafter(&e->shadow_segments, sl, ss_middle);
     }
     /* Always assign the "closest" value to the segment. */
     copy_v4_v4_db(sl->fbc2, r_fbl);
@@ -4696,13 +4705,26 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
     pi++;
   }
   if (lineart_line_isec_2d_ignore_line2pos(FBC1, FBC2, LFBC, RFBC, &ratio[pi])) {
-    trie[pi] = 1;
-    pi++;
+    /* ratio[0] == 1 && ratio[1] == 0 means we found a intersection at the same point of the edge
+     * (FBC1), ignore this one and try get the intersection point from the other side of the edge
+     */
+    if (!(pi && LRT_DOUBLE_CLOSE_ENOUGH(ratio[0], 1.0f) &&
+          LRT_DOUBLE_CLOSE_ENOUGH(ratio[1], 0.0f))) {
+      trie[pi] = 1;
+      pi++;
+    }
   }
   if (!pi) {
     return false;
   }
-  else if (lineart_line_isec_2d_ignore_line2pos(FBC2, FBC0, LFBC, RFBC, &ratio[pi])) {
+  else if (pi == 1 && lineart_line_isec_2d_ignore_line2pos(FBC2, FBC0, LFBC, RFBC, &ratio[pi])) {
+
+    if ((trie[0] == 0 && LRT_DOUBLE_CLOSE_ENOUGH(ratio[0], 0.0f) &&
+         LRT_DOUBLE_CLOSE_ENOUGH(ratio[1], 1.0f)) ||
+        (trie[0] == 1 && LRT_DOUBLE_CLOSE_ENOUGH(ratio[0], 1.0f) &&
+         LRT_DOUBLE_CLOSE_ENOUGH(ratio[1], 0.0f))) {
+      return false;
+    }
     trie[pi] = 2;
     pi++;
   }
@@ -4838,6 +4860,9 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
       if (!(ss->flag & LRT_SHADOW_CASTED)) {
         continue;
       }
+      if (!ss->next) {
+        break;
+      }
       tot_edges++;
     }
   }
@@ -4871,6 +4896,9 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
     LISTBASE_FOREACH (LineartShadowSegment *, ss, &ssc->shadow_segments) {
       if (!(ss->flag & LRT_SHADOW_CASTED)) {
         continue;
+      }
+      if (!ss->next) {
+        break;
       }
       LineartEdge *e = &elist[i];
       BLI_addtail(&e->segments, &es[i]);

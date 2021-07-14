@@ -647,8 +647,8 @@ BLI_INLINE int lineart_LineIntersectTest2d(
 BLI_INLINE int lineart_line_isec_2d_ignore_line2pos(
     const double *a1, const double *a2, const double *b1, const double *b2, double *aRatio)
 {
-#define USE_VECTOR_LINE_INTERSECTION
-#ifdef USE_VECTOR_LINE_INTERSECTION
+#define USE_VECTOR_LINE_INTERSECTION_IGN
+#ifdef USE_VECTOR_LINE_INTERSECTION_IGN
 
   /* from isect_line_line_v2_point() */
 
@@ -668,14 +668,14 @@ BLI_INLINE int lineart_line_isec_2d_ignore_line2pos(
 
     if (fabs(a2[0] - a1[0]) > fabs(a2[1] - a1[1])) {
       *aRatio = ratiod(a1[0], a2[0], rx);
-      if ((*aRatio) > 0 && (*aRatio) < 1) {
+      if ((*aRatio) >= -DBL_EDGE_LIM && (*aRatio) <= 1 + DBL_EDGE_LIM) {
         return 1;
       }
       return 0;
     }
 
     *aRatio = ratiod(a1[1], a2[1], ry);
-    if ((*aRatio) > 0 && (*aRatio) < 1) {
+    if ((*aRatio) >= -DBL_EDGE_LIM && (*aRatio) <= 1 + DBL_EDGE_LIM) {
       return 1;
     }
     return 0;
@@ -721,7 +721,7 @@ BLI_INLINE int lineart_line_isec_2d_ignore_line2pos(
     }
   }
 
-  if (ratio <= 0 || ratio > 1)
+  if (ratio <= 0 || ratio >= 1)
     return 0;
 
   return 1;

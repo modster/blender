@@ -213,7 +213,8 @@ static void bakeModifier(Main *UNUSED(bmain),
     lmd->edge_types_override = lmd->edge_types;
     lmd->level_end_override = lmd->level_end;
 
-    MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
+    MOD_lineart_compute_feature_lines(
+        depsgraph, lmd, &gpd->runtime.lineart_cache, (!(ob->dtx & OB_DRAW_IN_FRONT)));
     MOD_lineart_destroy_render_data(lmd);
   }
 
