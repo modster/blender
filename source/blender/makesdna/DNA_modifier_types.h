@@ -2367,6 +2367,7 @@ typedef enum AdaptiveRemeshFlag {
 typedef enum AdaptiveRemeshMode {
   ADAPTIVE_REMESH_SPLIT_EDGE = 0,
   ADAPTIVE_REMESH_COLLAPSE_EDGE = 1,
+  ADAPTIVE_REMESH_FLIP_EDGE = 2,
 } AdaptiveRemeshMode;
 
 #ifdef __cplusplus

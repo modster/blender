@@ -69,6 +69,13 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     else if (mode == ADAPTIVE_REMESH_COLLAPSE_EDGE) {
       internal_mesh.collapse_edge_triangulate(edge_index, verts_swapped, across_seams);
     }
+    else if (mode == ADAPTIVE_REMESH_FLIP_EDGE) {
+      auto flippable = internal_mesh.is_edge_flippable(edge_index, across_seams);
+      std::cout << "flippable: " << flippable << std::endl;
+      if (flippable) {
+        internal_mesh.flip_edge_triangulate(edge_index, across_seams);
+      }
+    }
   }
 
   internal::MeshIO writer = internal_mesh.write();

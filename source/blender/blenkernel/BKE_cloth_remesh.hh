@@ -1646,6 +1646,85 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
                     std::move(deleted_faces));
   }
 
+  /**
+   * An edge is flippable only if the edge has exactly 2 faces, and
+   * both faces are triangulated.
+   */
+  bool is_edge_flippable(EdgeIndex edge_index, bool across_seams) const
+  {
+    /* TODO(ish): handle across_seams */
+    const auto &edge = this->get_checked_edge(edge_index);
+    if (edge.faces.size() != 2) {
+      return false;
+    }
+
+    for (const auto &face_index : edge.faces) {
+      const auto &face = this->get_checked_face(face_index);
+      if (face.verts.size() != 3) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Flips the edge specified and ensures triangulation of the Mesh.
+   *
+   * @param across_seams If true, think of edge as world space edge
+   * and not UV space, this means, all the faces across all the edges
+   * formed between the nodes of the given edge are used for flipping
+   * regardless if it on a seam or not.
+   *
+   * Returns the `MeshDiff` that lead to the operation.
+   *
+   * Note, the caller must ensure the adjacent faces to the edge are
+   * triangulated and that they are flippable using
+   * `is_edge_flippable()`. In debug mode, it will assert, in release
+   * mode, it is undefined behaviour.
+   **/
+  MeshDiff<END, EVD, EED, EFD> flip_edge_triangulate(EdgeIndex edge_index, bool across_seams)
+  {
+    BLI_assert(this->is_edge_flippable(edge_index, across_seams));
+
+    /* This operation deletes the following:
+     * None
+     *
+     * This operation adds the following:
+     * None
+     */
+
+    /* Let `e` be the edge of `edge_index`
+     * Let `v1` be the first vert of `e`
+     * Let `v2` be the second vert of `e`
+     * Let `f1` be the first face of `e`
+     * Let `f2` be the second face of `e`
+     * Let `ov1` be the other vert of `f1`
+     * Let `ov2` be the other vert of `f2`
+     */
+
+    auto &e = this->get_checked_edge(edge_index);
+    auto [v1, v2] = this->get_checked_verts_of_edge(e, false);
+    auto v1_index = v1.self_index;
+    auto v2_index = v2.self_index;
+    auto &f1 = this->get_checked_face(e.faces[0]);
+    auto &f2 = this->get_checked_face(e.faces[1]);
+    auto &ov1 = this->get_checked_other_vert(e, f1);
+    auto &ov2 = this->get_checked_other_vert(e, f2);
+    auto ov1_index = ov1.self_index;
+    auto ov2_index = ov2.self_index;
+    e.verts = {ov1_index, ov2_index};
+    f1.verts = {v1_index, ov2_index, ov1_index};
+    f2.verts = {v2_index, ov1_index, ov2_index};
+
+    v1.edges.remove_first_occurrence_and_reorder(edge_index);
+    v2.edges.remove_first_occurrence_and_reorder(edge_index);
+    ov1.edges.append(edge_index);
+    ov2.edges.append(edge_index);
+
+    return MeshDiff<END, EVD, EED, EFD>();
+  }
+
  protected:
   /* all protected static methods */
   /* all protected non-static methods */

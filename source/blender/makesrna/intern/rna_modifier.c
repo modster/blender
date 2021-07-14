@@ -7239,6 +7239,7 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
        0,
        "Collapse Edge",
        "Collapse edge of given index"},
+      {ADAPTIVE_REMESH_FLIP_EDGE, "FLIP_EDGE", 0, "Flip Edge", "Flip edge of given index"},
       {0, NULL, 0, NULL, NULL},
   };
 
