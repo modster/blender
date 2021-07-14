@@ -255,7 +255,9 @@ class TestRNAData(TestHelper, unittest.TestCase):
         self.assertEqual(len(props), 0)
 
         # Access default RNA data values
+        test_object.id_properties_clear()
         test_object["test_prop"] = 0.5
+        props = test_object.id_properties_ensure()
         rna_data = props.ui_data("test_prop")
         self.assertTrue("min" in rna_data)
         self.assertLess(rna_data["min"], -10000.0)
@@ -291,6 +293,7 @@ class TestRNAData(TestHelper, unittest.TestCase):
         self.assertGreater(rna_data["soft_max"], 10000.0)
 
         # Test RNA data for string property
+        test_object.id_properties_clear()
         test_object["test_string_prop"] = "Hello there!"
         props = test_object.id_properties_ensure()
         props.ui_data_update("test_string_prop", default="Goodbye where?")
@@ -298,6 +301,7 @@ class TestRNAData(TestHelper, unittest.TestCase):
         self.assertEqual(rna_data["default"], "Goodbye where?")
 
         # Test RNA data for array property
+        test_object.id_properties_clear()
         test_object["test_array_prop"] = [1, 2, 3]
         props = test_object.id_properties_ensure()
         props.ui_data_update("test_array_prop", default=[1, 2])
