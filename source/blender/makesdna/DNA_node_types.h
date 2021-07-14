@@ -1972,7 +1972,7 @@ typedef enum GeometryNodeCollapseSymmetryAxis {
 } GeometryNodeCollapseSymmetryAxis;
 
 typedef enum GeometryNodeDissolveDelimiter {
-  /* Keep in sync with BMO_Delimit*/
+  /* Keep bits in sync with BMO_Delimit. */
   GEO_NODE_DISSOLVE_DELIMITTER_SELECTION = 1 << 5,
   GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER = 1 << 6,
 } GeometryNodeDissolveDelimiter;

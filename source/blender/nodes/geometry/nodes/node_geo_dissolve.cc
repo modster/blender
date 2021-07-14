@@ -29,9 +29,9 @@
 
 static bNodeSocketTemplate geo_node_dissolve_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Angle"), M_PI * 0.25, 0.0f, 0.0f, 1.0f, 0.0f, M_PI, PROP_ANGLE},
-    {SOCK_STRING, N_("Delimiter")},
+    {SOCK_FLOAT, N_("Angle"), 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, M_PI, PROP_ANGLE},
     {SOCK_BOOLEAN, N_("All Boundaries"), false},
+    {SOCK_STRING, N_("Delimiter")},
     {-1, ""},
 };
 
@@ -60,8 +60,8 @@ namespace blender::nodes {
 static Mesh *dissolve_mesh(const float angle,
                            const bool all_boundaries,
                            const int delimiter_type,
-                           const Array<bool> &delimiter,
-                           Mesh *mesh)
+                           const Span<bool> &delimiter,
+                           const Mesh *mesh)
 {
   const BMeshCreateParams bmesh_create_params = {0};
   const BMeshFromMeshParams bmesh_from_mesh_params = {
@@ -86,15 +86,9 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const float angle = params.extract_input<float>("Angle");
 
-  if (geometry_set.has_mesh()) {
-    MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-
-    Mesh *input_mesh = mesh_component.get_for_write();
-
-    if (input_mesh->totvert <= 3) {
-      params.error_message_add(NodeWarningType::Error,
-                               TIP_("Node requires mesh with more than 3 input faces"));
-    }
+  if (angle > 0.0f && geometry_set.has_mesh()) {
+    const MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+    const Mesh *input_mesh = mesh_component.get_for_read();
 
     const bool all_boundaries = params.extract_input<bool>("All Boundaries");
     const bNode &node = params.node();
@@ -102,24 +96,17 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
 
     const bool default_delimiter = false;
     AttributeDomain delimiter_domain = ATTR_DOMAIN_FACE;
-    int delimiter_domain_size = input_mesh->totpoly;
+
     if (node_storage.delimiter & GEO_NODE_DISSOLVE_DELIMITTER_SELECTION) {
       delimiter_domain = ATTR_DOMAIN_EDGE;
-      delimiter_domain_size = input_mesh->totedge;
     };
 
-    const GVArrayPtr delimiter = params.get_input_attribute(
-        "Delimiter", mesh_component, delimiter_domain, CD_PROP_BOOL, &default_delimiter);
-    if (!delimiter) {
-      return;
-    }
-    const GVArray_Typed<bool> delimiter_as_typed = delimiter->typed<bool>();
-    Array<bool> mask(delimiter_domain_size);
-    for (const int i : delimiter_as_typed.index_range()) {
-      mask[i] = delimiter_as_typed[i];
-    }
+    GVArray_Typed<bool> delimiter_attribute = params.get_input_attribute<bool>(
+        "Delimiter", mesh_component, delimiter_domain, default_delimiter);
+    VArray_Span<bool> delimiter{delimiter_attribute};
 
-    Mesh *result = dissolve_mesh(angle, all_boundaries, node_storage.delimiter, mask, input_mesh);
+    Mesh *result = dissolve_mesh(
+        angle, all_boundaries, node_storage.delimiter, delimiter, input_mesh);
     geometry_set.replace_mesh(result);
   }
 
@@ -138,5 +125,6 @@ void register_node_type_geo_dissolve()
   node_type_init(&ntype, geo_node_dissolve_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_dissolve_exec;
   ntype.draw_buttons = geo_node_dissolve_layout;
+  ntype.width = 165;
   nodeRegisterType(&ntype);
 }

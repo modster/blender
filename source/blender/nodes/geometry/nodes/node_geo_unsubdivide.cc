@@ -37,12 +37,8 @@ static bNodeSocketTemplate geo_node_unsubdivide_out[] = {
 
 namespace blender::nodes {
 
-static Mesh *unsubdivide_mesh(const uint iterations, const Array<bool> &selection, Mesh *mesh)
+static Mesh *unsubdivide_mesh(const int iterations, const Array<bool> &selection, const Mesh *mesh)
 {
-  if (iterations == 0) {
-    return mesh;
-  }
-
   const BMeshCreateParams bmesh_create_params = {0};
   const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
@@ -61,24 +57,19 @@ static void geo_node_unsubdivide_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const int iterations = params.extract_input<int>("Iterations");
-  if (geometry_set.has_mesh()) {
-    MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-    Mesh *input_mesh = mesh_component.get_for_write();
+  if (iterations > 0 && geometry_set.has_mesh()) {
+    const MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+    const Mesh *input_mesh = mesh_component.get_for_read();
 
     const bool default_selection = true;
-    const GVArrayPtr selection = params.get_input_attribute(
-        "Selection", mesh_component, ATTR_DOMAIN_POINT, CD_PROP_BOOL, &default_selection);
-    if (!selection) {
-      return;
-    }
-    const GVArray_Typed<bool> selection_as_typed = selection->typed<bool>();
-    Array<bool> mask(input_mesh->totvert);
-    for (const int i : selection_as_typed.index_range()) {
-      mask[i] = selection_as_typed[i];
-    }
+    GVArray_Typed<bool> selection_attribute = params.get_input_attribute<bool>(
+        "Selection", mesh_component, ATTR_DOMAIN_POINT, default_selection);
+    VArray_Span<bool> selection{selection_attribute};
 
-    Mesh *result = unsubdivide_mesh(iterations, mask, input_mesh);
-    geometry_set.replace_mesh(result);
+    Mesh *result = unsubdivide_mesh(iterations, selection, input_mesh);
+    if (result != input_mesh) {
+      geometry_set.replace_mesh(result);
+    }
   }
   params.set_output("Geometry", std::move(geometry_set));
 }
@@ -91,5 +82,6 @@ void register_node_type_geo_unsubdivide()
   geo_node_type_base(&ntype, GEO_NODE_UNSUBDIVIDE, "Unsubdivide", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_unsubdivide_in, geo_node_unsubdivide_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_unsubdivide_exec;
+  ntype.width = 165;
   nodeRegisterType(&ntype);
 }

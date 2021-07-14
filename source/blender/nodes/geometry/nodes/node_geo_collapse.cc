@@ -29,7 +29,7 @@
 
 static bNodeSocketTemplate geo_node_collapse_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Factor"), 0.5f, 0.0f, 0.0f, 0.0f, 0, 1.0f, PROP_FACTOR},
+    {SOCK_FLOAT, N_("Factor"), 1.0f, 0.0f, 0.0f, 0.0f, 0, 1.0f, PROP_FACTOR},
     {SOCK_BOOLEAN, N_("Triangulate"), false},
     {SOCK_STRING, N_("Selection")},
     {-1, ""},
@@ -42,6 +42,8 @@ static bNodeSocketTemplate geo_node_collapse_out[] = {
 
 static void geo_node_collapse_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "symmetry_axis", 0, nullptr, ICON_NONE);
 }
 
@@ -57,27 +59,21 @@ static void geo_node_collapse_init(bNodeTree *UNUSED(tree), bNode *node)
 namespace blender::nodes {
 
 static Mesh *collapse_mesh(const float factor,
-                           const GVArrayPtr &selection,
+                           const VArray_Span<float> &selection,
                            const bool triangulate,
                            const int symmetry_axis,
-                           Mesh *mesh)
+                           const Mesh *mesh)
 {
-  if (factor == 1.0f) {
-    return mesh;
-  }
-
-  const GVArray_Typed<float> selection_as_typed = selection->typed<float>();
-  Array<float> mask(mesh->totvert);
-  for (const int i : selection_as_typed.index_range()) {
-    mask[i] = selection_as_typed[i];
-  }
-
   const BMeshCreateParams bmesh_create_params = {0};
   const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
 
   const float symmetry_eps = 0.00002f;
+  Array<float> mask(selection.size());
+  for (const int i : selection.index_range()) {
+    mask[i] = selection[i];
+  }
   BM_mesh_decimate_collapse(
       bm, factor, mask.data(), 1.0f, triangulate, symmetry_axis, symmetry_eps);
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
@@ -92,22 +88,14 @@ static void geo_node_collapse_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const float factor = params.extract_input<float>("Factor");
 
-  if (geometry_set.has_mesh()) {
+  if (factor < 1.0f && geometry_set.has_mesh()) {
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
 
     const float default_factor = 1.0f;
-    const GVArrayPtr selection = params.get_input_attribute(
-        "Selection", mesh_component, ATTR_DOMAIN_POINT, CD_PROP_FLOAT, &default_factor);
-    if (!selection) {
-      return;
-    }
-
-    Mesh *input_mesh = mesh_component.get_for_write();
-
-    if (input_mesh->totvert <= 3) {
-      params.error_message_add(NodeWarningType::Error,
-                               TIP_("Node requires mesh with more than 3 input faces"));
-    }
+    GVArray_Typed<float> selection_attribute = params.get_input_attribute<float>(
+        "Selection", mesh_component, ATTR_DOMAIN_POINT, default_factor);
+    VArray_Span<float> selection{selection_attribute};
+    const Mesh *input_mesh = mesh_component.get_for_read();
 
     const bool triangulate = params.extract_input<bool>("Triangulate");
     const bNode &node = params.node();
@@ -132,5 +120,6 @@ void register_node_type_geo_collapse()
   node_type_init(&ntype, geo_node_collapse_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_collapse_exec;
   ntype.draw_buttons = geo_node_collapse_layout;
+  ntype.width = 180;
   nodeRegisterType(&ntype);
 }

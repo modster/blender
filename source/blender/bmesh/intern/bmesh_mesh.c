@@ -1458,6 +1458,9 @@ void BM_temporary_tag_vertices(BMesh *bm, const bool *mask)
     if (mask[i]) {
       BM_elem_flag_enable(v, BM_ELEM_TAG);
     }
+    else {
+      BM_elem_flag_disable(v, BM_ELEM_TAG);
+    }
     i++;
   }
 }
@@ -1494,6 +1497,9 @@ void BM_temporary_tag_faces(BMesh *bm, const bool *mask)
   BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
     if (mask[i]) {
       BM_elem_flag_enable(f, BM_ELEM_TAG);
+    }
+    else {
+      BM_elem_flag_disable(f, BM_ELEM_TAG);
     }
     i++;
   }
