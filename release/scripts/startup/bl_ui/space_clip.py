@@ -160,8 +160,11 @@ class CLIP_HT_tool_header(Header):
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool = ToolSelectPanelHelper.draw_active_tool_header(context, layout)
         tool_mode = context.mode if tool is None else tool.mode
-        layout.separator()
-        CLIP_PT_tracking_settings_presets.draw_menu(self.layout)
+        if tool_mode == 'TRACKING':
+            clip = context.space_data.clip
+            if clip:
+                layout.separator()
+                CLIP_PT_tracking_settings_presets.draw_menu(self.layout)
 
     def draw_mode_settings(self, context):
         layout = self.layout
@@ -171,14 +174,14 @@ class CLIP_HT_tool_header(Header):
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool = ToolSelectPanelHelper.tool_active_from_context(context)
         tool_mode = context.mode if tool is None else tool.mode
-        if tool_mode == 'TRACKING':
-            clip = context.space_data.clip
-            active = clip.tracking.tracks.active
-            settings = clip.tracking.settings
-            # Expand panels from the side-bar as popovers.
-            layout.popover(panel="CLIP_PT_track_settings")
-            layout.popover(panel="CLIP_PT_objects")
-            layout.prop(settings, "speed", text="")
+        clip = context.space_data.clip
+        if clip:
+            if tool_mode == 'TRACKING':
+                layout.popover(panel='CLIP_PT_track_settings')
+                settings = clip.tracking.settings
+                layout.prop(settings, "speed", text="")
+
+            layout.popover(panel='CLIP_PT_objects')
 
 
 class CLIP_HT_header(Header):
