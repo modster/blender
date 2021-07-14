@@ -1748,10 +1748,16 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(this->is_edge_flippable(edge_index, across_seams));
 
     /* This operation deletes the following:
-     * None
+     * when across_seams is true:
+     *
+     * when across_seams is false:
+     * f1, f2, e
      *
      * This operation adds the following:
-     * None
+     * when across_seams is true:
+     *
+     * when across_seams is false:
+     * 2 faces, 1 edge
      */
 
     /* Let `e` be the edge of `edge_index`
@@ -1763,26 +1769,74 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
      * Let `ov2` be the other vert of `f2`
      */
 
+    blender::Vector<NodeIndex> added_nodes;
+    blender::Vector<VertIndex> added_verts;
+    blender::Vector<EdgeIndex> added_edges;
+    blender::Vector<FaceIndex> added_faces;
+    blender::Vector<Node<END>> deleted_nodes;
+    blender::Vector<Vert<EVD>> deleted_verts;
+    blender::Vector<Edge<EED>> deleted_edges;
+    blender::Vector<Face<EFD>> deleted_faces;
+
     auto &e = this->get_checked_edge(edge_index);
-    auto [v1, v2] = this->get_checked_verts_of_edge(e, false);
-    auto v1_index = v1.self_index;
-    auto v2_index = v2.self_index;
-    auto &f1 = this->get_checked_face(e.faces[0]);
-    auto &f2 = this->get_checked_face(e.faces[1]);
-    auto &ov1 = this->get_checked_other_vert(e, f1);
-    auto &ov2 = this->get_checked_other_vert(e, f2);
-    auto ov1_index = ov1.self_index;
-    auto ov2_index = ov2.self_index;
-    e.verts = {ov1_index, ov2_index};
-    f1.verts = {v1_index, ov2_index, ov1_index};
-    f2.verts = {v2_index, ov1_index, ov2_index};
+    BLI_assert(e.faces.size() == 1 || e.faces.size() == 2);
+    if (e.faces.size() == 2) {
+      auto f1_index = e.faces[0];
+      auto f2_index = e.faces[1];
 
-    v1.edges.remove_first_occurrence_and_reorder(edge_index);
-    v2.edges.remove_first_occurrence_and_reorder(edge_index);
-    ov1.edges.append(edge_index);
-    ov2.edges.append(edge_index);
+      this->delink_face_edges(f1_index);
+      this->delink_face_edges(f2_index);
 
-    return MeshDiff<END, EVD, EED, EFD>();
+      auto f1 = this->delete_face(f1_index);
+      auto f2 = this->delete_face(f2_index);
+
+      auto e = this->delete_edge(edge_index);
+      auto [v1, v2] = this->get_checked_verts_of_edge(e, false);
+      auto v1_index = v1.self_index;
+      auto v2_index = v2.self_index;
+
+      auto &ov1 = this->get_checked_other_vert(e, f1);
+      auto &ov2 = this->get_checked_other_vert(e, f2);
+      auto ov1_index = ov1.self_index;
+      auto ov2_index = ov2.self_index;
+
+      auto &new_e = this->add_empty_edge();
+      new_e.verts = {ov1_index, ov2_index};
+      this->add_edge_ref_to_verts(new_e);
+
+      auto &new_f1 = this->add_empty_face(f1.normal);
+      new_f1.verts = {v1_index, ov2_index, ov1_index};
+      added_faces.append(new_f1.self_index);
+      this->add_face_ref_to_edges(new_f1);
+
+      auto &new_f2 = this->add_empty_face(f2.normal);
+      new_f2.verts = {v2_index, ov1_index, ov2_index};
+      added_faces.append(new_f2.self_index);
+      this->add_face_ref_to_edges(new_f2);
+
+      deleted_edges.append(std::move(e));
+      deleted_faces.append(std::move(f1));
+      deleted_faces.append(std::move(f2));
+      added_edges.append(new_e.self_index);
+    }
+    else {
+      /* Do more expensive operation only if needed */
+      auto [n1, n2] = this->get_checked_nodes_of_edge(e, false);
+      auto edge_indices = this->get_connecting_edge_indices(n1, n2);
+      BLI_assert(edge_indices.size() == 2);
+      /* TODO(ish): implement this when it is necessary, edge flips
+       * should actually be allowed only when the edges is not at a
+       * seam or boundary */
+    }
+
+    return MeshDiff(std::move(added_nodes),
+                    std::move(added_verts),
+                    std::move(added_edges),
+                    std::move(added_faces),
+                    std::move(deleted_nodes),
+                    std::move(deleted_verts),
+                    std::move(deleted_edges),
+                    std::move(deleted_faces));
   }
 
  protected:
@@ -1953,6 +2007,45 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * Adds the edge reference to the verts in `edge.verts`
+   *
+   * Caller should ensure edge.verts has been set
+   *
+   * note: this function should be called only once per edge
+   */
+  void add_edge_ref_to_verts(const Edge<EED> &edge)
+  {
+    BLI_assert(edge.verts);
+
+    auto &v1 = this->get_checked_vert(std::get<0>(edge.verts.value()));
+    BLI_assert(v1.edges.contains(edge.self_index) == false);
+    v1.edges.append(edge.self_index);
+
+    auto &v2 = this->get_checked_vert(std::get<1>(edge.verts.value()));
+    BLI_assert(v2.edges.contains(edge.self_index) == false);
+    v2.edges.append(edge.self_index);
+  }
+
+  /**
+   * Adds the face reference to the edges created by `face.verts`
+   *
+   * Caller should ensure that `face.verts` has been set and edges
+   * between the `face.verts` exist.
+   *
+   * note: this function should be called only once per face
+   */
+  void add_face_ref_to_edges(const Face<EFD> &face)
+  {
+    auto edge_indices = this->get_edge_indices_of_face(face);
+    for (const auto &edge_index : edge_indices) {
+      auto &edge = this->get_checked_edge(edge_index);
+
+      BLI_assert(edge.faces.contains(face.self_index) == false);
+      edge.faces.append(face.self_index);
+    }
+  }
+
+  /**
    * Delete the node and update elements that refer to this node.
    *
    * This should always be preceeded with `delete_vert()` on all of
@@ -2110,6 +2203,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
       edge_indices.append(std::move(edge_index));
     }
+
+    BLI_assert(edge_indices.size() == face.verts.size());
 
     return edge_indices;
   }
