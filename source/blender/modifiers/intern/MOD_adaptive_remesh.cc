@@ -65,6 +65,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
               << " across_seams: " << across_seams << " mode: " << mode << std::endl;
     bool is_on_boundary = internal_mesh.is_edge_on_boundary(edge_index);
     std::cout << "is_on_boundary: " << is_on_boundary << std::endl;
+    auto flippable = internal_mesh.is_edge_flippable(edge_index, across_seams);
+    std::cout << "flippable: " << flippable << std::endl;
     if (mode == ADAPTIVE_REMESH_SPLIT_EDGE) {
       internal_mesh.split_edge_triangulate(edge_index, across_seams);
     }
@@ -72,8 +74,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
       internal_mesh.collapse_edge_triangulate(edge_index, verts_swapped, across_seams);
     }
     else if (mode == ADAPTIVE_REMESH_FLIP_EDGE) {
-      auto flippable = internal_mesh.is_edge_flippable(edge_index, across_seams);
-      std::cout << "flippable: " << flippable << std::endl;
       if (flippable) {
         internal_mesh.flip_edge_triangulate(edge_index, across_seams);
       }

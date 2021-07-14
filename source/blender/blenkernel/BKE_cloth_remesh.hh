@@ -1659,6 +1659,9 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     for (const auto &edge_index : edge_indices) {
       const auto &e = this->get_checked_edge(edge_index);
       num_face += e.faces.size();
+      if (num_face >= 1) {
+        break;
+      }
     }
 
     return num_face == 1;
@@ -1679,12 +1682,42 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
    */
   bool is_edge_flippable(EdgeIndex edge_index, bool across_seams) const
   {
-    /* TODO(ish): handle across_seams */
+    /* Do more expensive test only if needed */
+    if (across_seams) {
+      const auto &edge = this->get_checked_edge(edge_index);
+      if (is_edge_on_boundary(edge)) {
+        return false;
+      }
+      const auto [n1, n2] = this->get_checked_nodes_of_edge(edge, false);
+      auto edge_indices = this->get_connecting_edge_indices(n1, n2);
+
+      auto num_faces = 0;
+      for (const auto &edge_index : edge_indices) {
+        const auto &e = this->get_checked_edge(edge_index);
+        num_faces += e.faces.size();
+
+        /* ensure triangulation */
+        for (const auto &face_index : e.faces) {
+          const auto &face = this->get_checked_face(face_index);
+          if (face.verts.size() != 3) {
+            return false;
+          }
+        }
+      }
+      /* ensure only 2 faces exist for the "3D edge" */
+      if (num_faces != 2) {
+        return false;
+      }
+      return true;
+    }
+
     const auto &edge = this->get_checked_edge(edge_index);
+    /* Ensure only 2 faces exist for the edge */
     if (edge.faces.size() != 2) {
       return false;
     }
 
+    /* ensure triangulation */
     for (const auto &face_index : edge.faces) {
       const auto &face = this->get_checked_face(face_index);
       if (face.verts.size() != 3) {
