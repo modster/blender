@@ -63,6 +63,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     auto edge_index = op_edge_index.value();
     std::cout << "edge_index: " << edge_index << " edge_i: " << armd->edge_index
               << " across_seams: " << across_seams << " mode: " << mode << std::endl;
+    bool is_on_boundary = internal_mesh.is_edge_on_boundary(edge_index);
+    std::cout << "is_on_boundary: " << is_on_boundary << std::endl;
     if (mode == ADAPTIVE_REMESH_SPLIT_EDGE) {
       internal_mesh.split_edge_triangulate(edge_index, across_seams);
     }

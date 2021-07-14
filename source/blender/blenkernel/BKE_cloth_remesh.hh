@@ -1647,6 +1647,33 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * Boundary is the set of "3D edges" that have only a single
+   * face. Not all meshes will have a boundary.
+   */
+  bool is_edge_on_boundary(const Edge<EED> &edge) const
+  {
+    const auto [n1, n2] = this->get_checked_nodes_of_edge(edge, false);
+    auto edge_indices = this->get_connecting_edge_indices(n1, n2);
+
+    auto num_face = 0;
+    for (const auto &edge_index : edge_indices) {
+      const auto &e = this->get_checked_edge(edge_index);
+      num_face += e.faces.size();
+    }
+
+    return num_face == 1;
+  }
+
+  /**
+   * Easy call when only `edge_index` is available.
+   */
+  bool is_edge_on_boundary(EdgeIndex edge_index) const
+  {
+    const auto &edge = this->get_checked_edge(edge_index);
+    return is_edge_on_boundary(edge);
+  }
+
+  /**
    * An edge is flippable only if the edge has exactly 2 faces, and
    * both faces are triangulated.
    */
@@ -2203,6 +2230,50 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto &edge_vert_2 = this->get_checked_vert(std::get<1>(edge_verts));
 
     return {edge_vert_1, edge_vert_2};
+  }
+
+  inline std::tuple<const Vert<EVD> &, const Vert<EVD> &> get_checked_verts_of_edge(
+      const Edge<EED> &edge, bool verts_swapped) const
+  {
+    BLI_assert(edge.verts);
+    const auto &edge_verts = edge.verts.value();
+
+    if (verts_swapped) {
+      const auto &edge_vert_1 = this->get_checked_vert(std::get<1>(edge_verts));
+      const auto &edge_vert_2 = this->get_checked_vert(std::get<0>(edge_verts));
+      return {edge_vert_1, edge_vert_2};
+    }
+
+    const auto &edge_vert_1 = this->get_checked_vert(std::get<0>(edge_verts));
+    const auto &edge_vert_2 = this->get_checked_vert(std::get<1>(edge_verts));
+
+    return {edge_vert_1, edge_vert_2};
+  }
+
+  inline std::tuple<Node<END> &, Node<END> &> get_checked_nodes_of_edge(const Edge<EED> &edge,
+                                                                        bool nodes_swapped)
+  {
+    auto [v1, v2] = this->get_checked_verts_of_edge(edge, nodes_swapped);
+
+    BLI_assert(v1.node);
+    BLI_assert(v2.node);
+    auto &n1 = this->get_checked_node(v1.node.value());
+    auto &n2 = this->get_checked_node(v2.node.value());
+
+    return {n1, n2};
+  }
+
+  inline std::tuple<const Node<END> &, const Node<END> &> get_checked_nodes_of_edge(
+      const Edge<EED> &edge, bool nodes_swapped) const
+  {
+    const auto [v1, v2] = this->get_checked_verts_of_edge(edge, nodes_swapped);
+
+    BLI_assert(v1.node);
+    BLI_assert(v2.node);
+    const auto &n1 = this->get_checked_node(v1.node.value());
+    const auto &n2 = this->get_checked_node(v2.node.value());
+
+    return {n1, n2};
   }
 
   inline Node<END> &get_checked_node_of_vert(const Vert<EVD> &vert)
