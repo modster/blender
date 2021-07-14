@@ -1041,16 +1041,10 @@ static bool rna_RegionView3D_is_orthographic_side_view_get(PointerRNA *ptr)
   return RV3D_VIEW_IS_AXIS(rv3d->view);
 }
 
-static IDProperty *rna_View3DShading_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_View3DShading_idprops(PointerRNA *ptr)
 {
   View3DShading *shading = ptr->data;
-
-  if (create && !shading->prop) {
-    IDPropertyTemplate val = {0};
-    shading->prop = IDP_New(IDP_GROUP, &val, "View3DShading ID properties");
-  }
-
-  return shading->prop;
+  return &shading->prop;
 }
 
 static void rna_3DViewShading_type_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -2106,7 +2100,7 @@ static void rna_SpaceDopeSheetEditor_action_update(bContext *C, PointerRNA *ptr)
   switch (saction->mode) {
     case SACTCONT_ACTION:
       /* TODO: context selector could help decide this with more control? */
-      adt = BKE_animdata_add_id(&obact->id);
+      adt = BKE_animdata_ensure_id(&obact->id);
       id = &obact->id;
       break;
     case SACTCONT_SHAPEKEY: {
@@ -2114,7 +2108,7 @@ static void rna_SpaceDopeSheetEditor_action_update(bContext *C, PointerRNA *ptr)
       if (key == NULL) {
         return;
       }
-      adt = BKE_animdata_add_id(&key->id);
+      adt = BKE_animdata_ensure_id(&key->id);
       id = &key->id;
       break;
     }

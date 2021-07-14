@@ -165,11 +165,12 @@ set(SRC
   geometry/nodes/node_geo_common.cc
   geometry/nodes/node_geo_convex_hull.cc
   geometry/nodes/node_geo_curve_endpoints.cc
-  geometry/nodes/node_geo_curve_length.cc  
+  geometry/nodes/node_geo_curve_length.cc
   geometry/nodes/node_geo_curve_primitive_bezier_segment.cc
   geometry/nodes/node_geo_curve_primitive_circle.cc
   geometry/nodes/node_geo_curve_primitive_line.cc
   geometry/nodes/node_geo_curve_primitive_quadratic_bezier.cc
+  geometry/nodes/node_geo_curve_primitive_quadrilateral.cc
   geometry/nodes/node_geo_curve_primitive_spiral.cc
   geometry/nodes/node_geo_curve_primitive_star.cc
   geometry/nodes/node_geo_curve_sample.cc
@@ -338,6 +339,7 @@ set(SRC
   texture/node_texture_util.c
 
   intern/derived_node_tree.cc
+  intern/geometry_nodes_eval_log.cc
   intern/math_functions.cc
   intern/node_common.c
   intern/node_exec.cc
@@ -361,6 +363,7 @@ set(SRC
   NOD_function.h
   NOD_geometry.h
   NOD_geometry_exec.hh
+  NOD_geometry_nodes_eval_log.hh
   NOD_math_functions.hh
   NOD_node_tree_multi_function.hh
   NOD_node_tree_ref.hh
@@ -421,6 +424,11 @@ if(WITH_TBB)
     ${TBB_INCLUDE_DIRS}
   )
   add_definitions(-DWITH_TBB)
+  if(WIN32)
+    # TBB includes Windows.h which will define min/max macros
+    # that will collide with the stl versions.
+    add_definitions(-DNOMINMAX)
+  endif()
 endif()
 
 if(WITH_IMAGE_OPENEXR)
