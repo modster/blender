@@ -41,6 +41,7 @@
 #include "BKE_action.h"
 #include "BKE_animsys.h"
 #include "BKE_collection.h"
+#include "BKE_deform.h"
 #include "BKE_fcurve_driver.h"
 #include "BKE_idprop.h"
 #include "BKE_lib_id.h"
@@ -330,6 +331,19 @@ static void assert_sorted_ids(Main *bmain)
 #endif
 }
 
+static void move_vertex_group_names_to_object_data(Main *bmain)
+{
+  LISTBASE_FOREACH (Object *, object, &bmain->objects) {
+    if (ELEM(object->type, OB_MESH, OB_LATTICE, OB_GPENCIL)) {
+      ListBase *new_defbase = BKE_object_defgroup_list_mutable(object);
+
+      /* Clear the list in case the it was already assigned from another object. */
+      BLI_freelistN(new_defbase);
+      *new_defbase = object->defbase;
+    }
+  }
+}
+
 void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
 {
   if (MAIN_VERSION_ATLEAST(bmain, 300, 0) && !MAIN_VERSION_ATLEAST(bmain, 300, 1)) {
@@ -372,6 +386,10 @@ void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
 
   if (MAIN_VERSION_ATLEAST(bmain, 300, 3)) {
     assert_sorted_ids(bmain);
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 11)) {
+    move_vertex_group_names_to_object_data(bmain);
   }
 
   /**
@@ -740,6 +758,16 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
     FOREACH_NODETREE_END;
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 10)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *tool_settings = scene->toolsettings;
+      if (tool_settings->snap_uv_mode & (1 << 4)) {
+        tool_settings->snap_uv_mode |= (1 << 6); /* SCE_SNAP_MODE_INCREMENT */
+        tool_settings->snap_uv_mode &= ~(1 << 4);
+      }
+    }
   }
 
   /**

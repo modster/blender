@@ -51,7 +51,7 @@ typedef void (*ContextPropUpdateFunc)(struct bContext *C,
 typedef void (*ContextUpdateFunc)(struct bContext *C, struct PointerRNA *ptr);
 typedef int (*EditableFunc)(struct PointerRNA *ptr, const char **r_info);
 typedef int (*ItemEditableFunc)(struct PointerRNA *ptr, int index);
-typedef struct IDProperty *(*IDPropertiesFunc)(struct PointerRNA *ptr, bool create);
+typedef struct IDProperty **(*IDPropertiesFunc)(struct PointerRNA *ptr);
 typedef struct StructRNA *(*StructRefineFunc)(struct PointerRNA *ptr);
 typedef char *(*StructPathFunc)(struct PointerRNA *ptr);
 
@@ -556,7 +556,7 @@ struct StructRNA {
    */
   StructInstanceFunc instance;
 
-  /* callback to get id properties */
+  /** Return the location of the struct's pointer to the root group IDProperty. */
   IDPropertiesFunc idproperties;
 
   /* functions of this struct */
