@@ -27,9 +27,9 @@
 
 static bNodeSocketTemplate geo_node_curve_fillet_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_FLOAT, N_("Angle"), M_PI_2, 0.0f, 0.0f, 0.0f, 0.001f, FLT_MAX},
+    {SOCK_FLOAT, N_("Angle"), M_PI_2, 0.0f, 0.0f, 0.0f, 0.001f, FLT_MAX, PROP_ANGLE},
     {SOCK_INT, N_("Count"), 1, 0, 0, 0, 1, 1000},
-    {SOCK_FLOAT, N_("Radius"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
+    {SOCK_FLOAT, N_("Radius"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_STRING, N_("Radii")},
     {-1, ""},
 };
@@ -81,7 +81,7 @@ struct FilletModeParam {
 };
 
 struct FilletData {
-  float3 prev_dir, pos, next_dir, center, axis;
+  float3 prev_dir, pos, next_dir, axis;
   float radius;
   float angle;
   float count;
@@ -128,38 +128,63 @@ static float3 get_center(const float3 vec_pos2prev,
   return vec_pos2center + pos;
 }
 
-static void calculate_fillet_data(const float3 prev_pos,
-                                  const float3 pos,
-                                  const float3 next_pos,
-                                  const std::optional<float> arc_angle,
-                                  const std::optional<int> count,
-                                  const float radius,
-                                  FilletData *fd)
+static FilletData calculate_fillet_data(const float3 prev_pos,
+                                        const float3 pos,
+                                        const float3 next_pos,
+                                        const std::optional<float> arc_angle,
+                                        const std::optional<int> count,
+                                        const float radius)
 {
+  FilletData fd;
   float3 vec_pos2prev = prev_pos - pos;
   float3 vec_pos2next = next_pos - pos;
-  normalize_v3_v3(fd->prev_dir, vec_pos2prev);
-  normalize_v3_v3(fd->next_dir, vec_pos2next);
-  fd->pos = pos;
-  cross_v3_v3v3(fd->axis, vec_pos2prev, vec_pos2next);
-  fd->angle = M_PI - angle_v3v3v3(prev_pos, pos, next_pos);
-  fd->count = count.has_value() ? count.value() : fd->angle / arc_angle.value();
-  fd->center = get_center(vec_pos2prev, pos, fd->axis, fd->angle);
-  fd->radius = radius;
+  normalize_v3_v3(fd.prev_dir, vec_pos2prev);
+  normalize_v3_v3(fd.next_dir, vec_pos2next);
+  fd.pos = pos;
+  cross_v3_v3v3(fd.axis, vec_pos2prev, vec_pos2next);
+  fd.angle = M_PI - angle_v3v3v3(prev_pos, pos, next_pos);
+  fd.count = count.has_value() ? count.value() : fd.angle / arc_angle.value();
+  fd.radius = radius;
+
+  return fd;
 }
 
-static void copy_bezier_vertex_data(BezierSpline *dst,
-                                    BezierSpline *src,
-                                    int dst_index,
-                                    int src_index)
+static Array<int> create_dst_to_src_map(const Array<int> point_counts, const int total_points)
 {
-  dst->positions()[dst_index] = src->positions()[src_index];
-  dst->handle_positions_left()[dst_index] = src->handle_positions_left()[src_index];
-  dst->handle_positions_right()[dst_index] = src->handle_positions_right()[src_index];
-  dst->handle_types_left()[dst_index] = src->handle_types_left()[src_index];
-  dst->handle_types_right()[dst_index] = src->handle_types_right()[src_index];
-  dst->radii()[dst_index] = src->radii()[src_index];
-  dst->tilts()[dst_index] = src->tilts()[src_index];
+  Array<int> map(total_points);
+  int index = 0;
+
+  for (int i = 0; i < point_counts.size(); i++) {
+    for (int j = 0; j < point_counts[i]; j++) {
+      map[index] = i;
+      index++;
+    }
+  }
+
+  BLI_assert(index == total_points);
+
+  return map;
+}
+
+template<typename T>
+static void copy_attribute_by_mapping(Span<T> src, MutableSpan<T> dst, Array<int> mapping)
+{
+  for (const int i : dst.index_range()) {
+    dst[i] = src[mapping[i]];
+  }
+}
+
+static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
+                                              BezierSpline &dst,
+                                              Array<int> mapping)
+{
+  copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
+  copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
+  copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
+  copy_attribute_by_mapping(src.handle_types_left(), dst.handle_types_left(), mapping);
+  copy_attribute_by_mapping(src.handle_types_right(), dst.handle_types_right(), mapping);
+  copy_attribute_by_mapping(src.handle_positions_left(), dst.handle_positions_left(), mapping);
+  copy_attribute_by_mapping(src.handle_positions_right(), dst.handle_positions_right(), mapping);
 }
 
 static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModeParam &mode_param)
@@ -180,42 +205,44 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
     return bez_spline_ptr;
   }
 
-  Array<int> point_counts(fillet_count);
-  BezierSpline bez_spline = static_cast<BezierSpline &>(*bez_spline_ptr);
-  Span<float3> positions = bez_spline.positions();
+  // Array<int> point_counts(fillet_count);
+  Array<int> point_counts(size, {1});
+  BezierSpline src_spline = static_cast<BezierSpline &>(*bez_spline_ptr);
+  Span<float3> positions = src_spline.positions();
 
   std::string radii_name = mode_param.radii_dist.value();
-  GVArray_Typed<float> *radii_dist =
-      mode_param.radii;  // spline.attributes.get_for_read<float>(radii_name, 1.0f);
-
+  GVArray_Typed<float> *radii_dist = mode_param.radii;
   Vector<FilletData> fds;
 
   int added_count = 0;
   for (const int i : IndexRange(fillet_count)) {
     float3 prev_pos, pos, next_pos;
-    if (!cyclic) {
-      prev_pos = positions[i];
-      pos = positions[i + 1];
-      next_pos = positions[i + 2];
-    }
-    else {
+    if (cyclic) {
       prev_pos = positions[i == 0 ? positions.size() - 1 : i - 1];
       pos = positions[i];
       next_pos = positions[i == positions.size() - 1 ? 0 : i + 1];
     }
+    else {
+      prev_pos = positions[i];
+      pos = positions[i + 1];
+      next_pos = positions[i + 2];
+    }
 
-    FilletData fd;
     float radius = 0.0f;
     if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
       radius = mode_param.radius.value();
     }
     else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE) {
-      radius = (*radii_dist)[start + i];
+      if (radii_dist->size() != size) {
+        radius = 0;
+      }
+      else {
+        radius = (*radii_dist)[start + i];
+      }
     }
 
-    calculate_fillet_data(
-        prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius, &fd);
-    fds.append(fd);
+    fds.append(calculate_fillet_data(
+        prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius));
 
     if (!radius) {
       continue;
@@ -231,48 +258,44 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
     }
 
     added_count += count;
-    point_counts[i] = count;
+    point_counts[start + i] = count + 1;
   }
 
   int total_points = added_count + size;
-  SplinePtr new_spline_ptr = spline.copy_only_settings();
-  BezierSpline &new_spline = static_cast<BezierSpline &>(*new_spline_ptr);
-  new_spline.resize(total_points);
+  Array<int> dst_to_src = create_dst_to_src_map(point_counts, total_points);
+  SplinePtr dst_spline_ptr = spline.copy_only_settings();
+  BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
+  dst_spline.resize(total_points);
 
-  if (!cyclic) {
-    copy_bezier_vertex_data(&new_spline, &bez_spline, 0, 0);
-    copy_bezier_vertex_data(&new_spline, &bez_spline, total_points - 1, size - 1);
-  }
+  copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
+
   int next_i = start;
   for (const int i : IndexRange(start, fillet_count)) {
-    // This implementation is temporary and works only for one added point
-    int fillet_i = i - start;
-    FilletData fd = fds[fillet_i];
-
-    float displacement = fd.radius * tanf(fd.angle / 2);
-
-    copy_bezier_vertex_data(&new_spline, &bez_spline, next_i, i);
-    new_spline.positions()[next_i] = fd.pos + displacement * fd.prev_dir;
-    next_i++;
-
-    if (!fd.radius) {
+    FilletData fd = fds[i - start];
+    int count = point_counts[i];
+    if (count == 1) {
+      next_i++;
       continue;
     }
 
-    float handle_length = 4.0f * fd.radius / 3 * tanf(fd.angle / 4);
+    float segment_angle = fd.angle / (count - 1);
+    float handle_length = 4.0f * fd.radius / 3 * tanf(segment_angle / 4);
+    float displacement = fd.radius * tanf(fd.angle / 2);
 
-    copy_bezier_vertex_data(&new_spline, &bez_spline, next_i, i);
-    new_spline.positions()[next_i] = fd.pos + displacement * fd.next_dir;
-    new_spline.handle_types_right()[next_i - 1] = new_spline.handle_types_left()[next_i] =
+    int end_i = next_i + count - 1;
+    dst_spline.positions()[next_i] = fd.pos + displacement * fd.prev_dir;
+    dst_spline.positions()[end_i] = fd.pos + displacement * fd.next_dir;
+    dst_spline.handle_types_right()[next_i] = dst_spline.handle_types_right()[end_i] =
         BezierSpline::HandleType::Align;
-    new_spline.handle_positions_right()[next_i - 1] = new_spline.positions()[next_i - 1] -
-                                                      handle_length * fd.prev_dir;
-    new_spline.handle_positions_left()[next_i] = new_spline.positions()[next_i] -
-                                                 handle_length * fd.next_dir;
-    next_i++;
+    dst_spline.handle_positions_right()[next_i] = dst_spline.positions()[next_i] -
+                                                  handle_length * fd.prev_dir;
+    dst_spline.handle_positions_left()[end_i] = dst_spline.positions()[end_i] -
+                                                handle_length * fd.next_dir;
+
+    next_i += count;
   }
 
-  return new_spline_ptr;
+  return dst_spline_ptr;
 }
 
 static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode_param)
@@ -353,13 +376,11 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
     mode_param.radius.emplace(params.extract_input<float>("Radius"));
   }
   else {
-    GVArray_Typed<float> arr = params.get_input_attribute<float>(
+    GVArray_Typed<float> radii_array = params.get_input_attribute<float>(
         "Radii", geometry_set.get_component_for_write<CurveComponent>(), ATTR_DOMAIN_AUTO, 0.0f);
 
-    mode_param.radii = &arr;
-
-    std::string radii = params.extract_input<std::string>("Radii");
-    mode_param.radii_dist.emplace(radii);
+    mode_param.radii = &radii_array;
+    mode_param.radii_dist.emplace(params.extract_input<std::string>("Radii"));
   }
 
   std::unique_ptr<CurveEval> output_curve = fillet_curve(input_curve, mode_param);
