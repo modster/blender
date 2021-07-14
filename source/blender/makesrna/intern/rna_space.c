@@ -1041,16 +1041,10 @@ static bool rna_RegionView3D_is_orthographic_side_view_get(PointerRNA *ptr)
   return RV3D_VIEW_IS_AXIS(rv3d->view);
 }
 
-static IDProperty *rna_View3DShading_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_View3DShading_idprops(PointerRNA *ptr)
 {
   View3DShading *shading = ptr->data;
-
-  if (create && !shading->prop) {
-    IDPropertyTemplate val = {0};
-    shading->prop = IDP_New(IDP_GROUP, &val, "View3DShading ID properties");
-  }
-
-  return shading->prop;
+  return &shading->prop;
 }
 
 static void rna_3DViewShading_type_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -1839,7 +1833,7 @@ static void rna_SpaceTextEditor_updateEdited(Main *UNUSED(bmain),
 
 /* Space Properties */
 
-/* note: this function exists only to avoid id refcounting */
+/* NOTE: this function exists only to avoid id refcounting. */
 static void rna_SpaceProperties_pin_id_set(PointerRNA *ptr,
                                            PointerRNA value,
                                            struct ReportList *UNUSED(reports))
@@ -2106,7 +2100,7 @@ static void rna_SpaceDopeSheetEditor_action_update(bContext *C, PointerRNA *ptr)
   switch (saction->mode) {
     case SACTCONT_ACTION:
       /* TODO: context selector could help decide this with more control? */
-      adt = BKE_animdata_add_id(&obact->id);
+      adt = BKE_animdata_ensure_id(&obact->id);
       id = &obact->id;
       break;
     case SACTCONT_SHAPEKEY: {
@@ -2114,7 +2108,7 @@ static void rna_SpaceDopeSheetEditor_action_update(bContext *C, PointerRNA *ptr)
       if (key == NULL) {
         return;
       }
-      adt = BKE_animdata_add_id(&key->id);
+      adt = BKE_animdata_ensure_id(&key->id);
       id = &key->id;
       break;
     }
@@ -2136,7 +2130,7 @@ static void rna_SpaceDopeSheetEditor_action_update(bContext *C, PointerRNA *ptr)
     return;
   }
 
-  /* Exit editmode first - we cannot change actions while in tweakmode. */
+  /* Exit editmode first - we cannot change actions while in tweak-mode. */
   BKE_nla_tweakmode_exit(adt);
 
   /* To prevent data loss (i.e. if users flip between actions using the Browse menu),
@@ -2756,7 +2750,7 @@ static void rna_FileBrowser_FSMenuEntry_path_set(PointerRNA *ptr, const char *va
 {
   FSMenuEntry *fsm = ptr->data;
 
-  /* Note: this will write to file immediately.
+  /* NOTE: this will write to file immediately.
    * Not nice (and to be fixed ultimately), but acceptable in this case for now. */
   ED_fsmenu_entry_set_path(fsm, value);
 }
@@ -2775,7 +2769,7 @@ static void rna_FileBrowser_FSMenuEntry_name_set(PointerRNA *ptr, const char *va
 {
   FSMenuEntry *fsm = ptr->data;
 
-  /* Note: this will write to file immediately.
+  /* NOTE: this will write to file immediately.
    * Not nice (and to be fixed ultimately), but acceptable in this case for now. */
   ED_fsmenu_entry_set_name(fsm, value);
 }
@@ -2980,7 +2974,7 @@ static void rna_FileBrowser_FSMenu_active_range(PointerRNA *UNUSED(ptr),
 static void rna_FileBrowser_FSMenu_active_update(struct bContext *C, PointerRNA *ptr)
 {
   ScrArea *area = rna_area_from_space(ptr);
-  ED_file_change_dir_ex(C, (bScreen *)ptr->owner_id, area);
+  ED_file_change_dir_ex(C, area);
 }
 
 static int rna_FileBrowser_FSMenuSystem_active_get(PointerRNA *ptr)
@@ -3177,11 +3171,9 @@ static void rna_spreadsheet_context_update(Main *UNUSED(bmain),
   }
 }
 
-static void rna_spreadsheet_set_geometry_node_context(SpaceSpreadsheet *sspreadsheet,
-                                                      SpaceNode *snode,
-                                                      bNode *node)
+static void rna_SpaceSpreadsheet_context_path_guess(SpaceSpreadsheet *sspreadsheet, bContext *C)
 {
-  ED_spreadsheet_set_geometry_node_context(sspreadsheet, snode, node);
+  ED_spreadsheet_context_path_guess(C, sspreadsheet);
   ED_spreadsheet_context_path_update_tag(sspreadsheet);
   WM_main_add_notifier(NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 }
@@ -3438,7 +3430,7 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "UV Opacity", "Opacity of UV overlays");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 
-  /* todo: move edge and face drawing options here from G.f */
+  /* TODO: move edge and face drawing options here from `G.f`. */
 
   prop = RNA_def_property(srna, "pixel_snap_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, pixel_snap_mode_items);
@@ -3622,6 +3614,11 @@ static void rna_def_space_outliner(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_filter_collection", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_negative_sdna(prop, NULL, "filter", SO_FILTER_NO_COLLECTION);
   RNA_def_property_ui_text(prop, "Show Collections", "Show collections");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
+
+  prop = RNA_def_property(srna, "use_filter_view_layers", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "filter", SO_FILTER_NO_VIEW_LAYERS);
+  RNA_def_property_ui_text(prop, "Show All View Layers", "Show all the view layers");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
 
   /* Filters object state. */
@@ -5068,7 +5065,7 @@ static void rna_def_space_properties(BlenderRNA *brna)
   prop = RNA_def_property(srna, "pin_id", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "pinid");
   RNA_def_property_struct_type(prop, "ID");
-  /* note: custom set function is ONLY to avoid rna setting a user for this. */
+  /* NOTE: custom set function is ONLY to avoid rna setting a user for this. */
   RNA_def_property_pointer_funcs(
       prop, NULL, "rna_SpaceProperties_pin_id_set", "rna_SpaceProperties_pin_id_typef", NULL);
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_NEVER_UNLINK);
@@ -7641,13 +7638,16 @@ static void rna_def_space_spreadsheet_context_path(BlenderRNA *brna, PropertyRNA
 
   func = RNA_def_function(srna, "clear", "rna_SpaceSpreadsheet_context_path_clear");
   RNA_def_function_ui_description(func, "Clear entire context path");
+
+  func = RNA_def_function(srna, "guess", "rna_SpaceSpreadsheet_context_path_guess");
+  RNA_def_function_ui_description(func, "Guess the context path from the current context");
+  RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 }
 
 static void rna_def_space_spreadsheet(BlenderRNA *brna)
 {
-  PropertyRNA *prop, *parm;
+  PropertyRNA *prop;
   StructRNA *srna;
-  FunctionRNA *func;
 
   static const EnumPropertyItem geometry_component_type_items[] = {
       {GEO_COMPONENT_TYPE_MESH,
@@ -7684,6 +7684,11 @@ static void rna_def_space_spreadsheet(BlenderRNA *brna)
        ICON_NONE,
        "Original",
        "Use data from original object without any modifiers applied"},
+      {SPREADSHEET_OBJECT_EVAL_STATE_VIEWER_NODE,
+       "VIEWER_NODE",
+       ICON_NONE,
+       "Viewer Node",
+       "Use intermediate data from viewer node"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -7695,7 +7700,8 @@ static void rna_def_space_spreadsheet(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "SpaceSpreadsheet", "Space");
   RNA_def_struct_ui_text(srna, "Space Spreadsheet", "Spreadsheet space data");
 
-  rna_def_space_generic_show_region_toggles(srna, (1 << RGN_TYPE_UI) | (1 << RGN_TYPE_CHANNELS) | (1 << RGN_TYPE_FOOTER) );
+  rna_def_space_generic_show_region_toggles(
+      srna, (1 << RGN_TYPE_UI) | (1 << RGN_TYPE_CHANNELS) | (1 << RGN_TYPE_FOOTER));
 
   prop = RNA_def_property(srna, "is_pinned", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SPREADSHEET_FLAG_PINNED);
@@ -7758,16 +7764,6 @@ static void rna_def_space_spreadsheet(BlenderRNA *brna)
   RNA_def_property_struct_type(prop, "SpreadsheetRowFilter");
   RNA_def_property_ui_text(prop, "Row Filters", "Filters to remove rows from the displayed data");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
-
-  func = RNA_def_function(
-      srna, "set_geometry_node_context", "rna_spreadsheet_set_geometry_node_context");
-  RNA_def_function_ui_description(
-      func, "Update context_path to point to a specific node in a node editor");
-  parm = RNA_def_pointer(
-      func, "node_editor", "SpaceNodeEditor", "", "Editor to take the context from");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_pointer(func, "node", "Node", "", "");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 }
 
 void RNA_def_space(BlenderRNA *brna)

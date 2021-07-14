@@ -384,7 +384,7 @@ short RNA_type_to_ID_code(const StructRNA *type)
 
 StructRNA *ID_code_to_RNA_type(short idcode)
 {
-  /* Note, this switch doesn't use a 'default',
+  /* NOTE: this switch doesn't use a 'default',
    * so adding new ID's causes a warning. */
   switch ((ID_Type)idcode) {
     case ID_AC:
@@ -493,9 +493,10 @@ StructRNA *rna_ID_refine(PointerRNA *ptr)
   return ID_code_to_RNA_type(GS(id->name));
 }
 
-IDProperty *rna_ID_idprops(PointerRNA *ptr, bool create)
+IDProperty **rna_ID_idprops(PointerRNA *ptr)
 {
-  return IDP_GetProperties(ptr->data, create);
+  ID *id = (ID *)ptr->data;
+  return &id->properties;
 }
 
 void rna_ID_fake_user_set(PointerRNA *ptr, bool value)
@@ -510,9 +511,9 @@ void rna_ID_fake_user_set(PointerRNA *ptr, bool value)
   }
 }
 
-IDProperty *rna_PropertyGroup_idprops(PointerRNA *ptr, bool UNUSED(create))
+IDProperty **rna_PropertyGroup_idprops(PointerRNA *ptr)
 {
-  return ptr->data;
+  return (IDProperty **)&ptr->data;
 }
 
 void rna_PropertyGroup_unregister(Main *UNUSED(bmain), StructRNA *type)
@@ -538,7 +539,7 @@ StructRNA *rna_PropertyGroup_register(Main *UNUSED(bmain),
     return NULL;
   }
 
-  /* note: it looks like there is no length limit on the srna id since its
+  /* NOTE: it looks like there is no length limit on the srna id since its
    * just a char pointer, but take care here, also be careful that python
    * owns the string pointer which it could potentially free while blender
    * is running. */
@@ -772,7 +773,7 @@ static struct ID *rna_ID_make_local(struct ID *self, Main *bmain, bool clear_pro
 
 static AnimData *rna_ID_animation_data_create(ID *id, Main *bmain)
 {
-  AnimData *adt = BKE_animdata_add_id(id);
+  AnimData *adt = BKE_animdata_ensure_id(id);
   DEG_relations_tag_update(bmain);
   return adt;
 }
@@ -1162,12 +1163,12 @@ static PointerRNA rna_IDPreview_get(PointerRNA *ptr)
   return rna_pointer_inherit_refine(ptr, &RNA_ImagePreview, prv_img);
 }
 
-static IDProperty *rna_IDPropertyWrapPtr_idprops(PointerRNA *ptr, bool UNUSED(create))
+static IDProperty **rna_IDPropertyWrapPtr_idprops(PointerRNA *ptr)
 {
   if (ptr == NULL) {
     return NULL;
   }
-  return ptr->data;
+  return (IDProperty **)&ptr->data;
 }
 
 static void rna_Library_version_get(PointerRNA *ptr, int *value)

@@ -676,10 +676,10 @@ LayerCollection *BKE_layer_collection_activate_parent(ViewLayer *view_layer, Lay
 /**
  * Recursively get the count of collections
  */
-static int collection_count(ListBase *lb)
+static int collection_count(const ListBase *lb)
 {
   int i = 0;
-  LISTBASE_FOREACH (LayerCollection *, lc, lb) {
+  LISTBASE_FOREACH (const LayerCollection *, lc, lb) {
     i += collection_count(&lc->layer_collections) + 1;
   }
   return i;
@@ -689,7 +689,7 @@ static int collection_count(ListBase *lb)
  * Get the total number of collections
  * (including all the nested collections)
  */
-int BKE_layer_collection_count(ViewLayer *view_layer)
+int BKE_layer_collection_count(const ViewLayer *view_layer)
 {
   return collection_count(&view_layer->layer_collections);
 }
@@ -736,6 +736,73 @@ int BKE_layer_collection_findindex(ViewLayer *view_layer, const LayerCollection 
  * The view layer also contains a list of bases for each object that exists
  * in at least one layer collection. That list is also synchronized here, and
  * stores state like selection. */
+
+static void layer_collection_objects_sync(ViewLayer *view_layer,
+                                          LayerCollection *layer,
+                                          ListBase *new_object_bases,
+                                          const short collection_restrict,
+                                          const short layer_restrict,
+                                          const ushort local_collections_bits)
+{
+  /* No need to sync objects if the collection is excluded. */
+  if ((layer->flag & LAYER_COLLECTION_EXCLUDE) != 0) {
+    return;
+  }
+
+  LISTBASE_FOREACH (CollectionObject *, cob, &layer->collection->gobject) {
+    if (cob->ob == NULL) {
+      continue;
+    }
+
+    /* Tag linked object as a weak reference so we keep the object
+     * base pointer on file load and remember hidden state. */
+    id_lib_indirect_weak_link(&cob->ob->id);
+
+    void **base_p;
+    Base *base;
+    if (BLI_ghash_ensure_p(view_layer->object_bases_hash, cob->ob, &base_p)) {
+      /* Move from old base list to new base list. Base might have already
+       * been moved to the new base list and the first/last test ensure that
+       * case also works. */
+      base = *base_p;
+      if (!ELEM(base, new_object_bases->first, new_object_bases->last)) {
+        BLI_remlink(&view_layer->object_bases, base);
+        BLI_addtail(new_object_bases, base);
+      }
+    }
+    else {
+      /* Create new base. */
+      base = object_base_new(cob->ob);
+      base->local_collections_bits = local_collections_bits;
+      *base_p = base;
+      BLI_addtail(new_object_bases, base);
+    }
+
+    if ((collection_restrict & COLLECTION_RESTRICT_VIEWPORT) == 0) {
+      base->flag_from_collection |= (BASE_ENABLED_VIEWPORT | BASE_VISIBLE_DEPSGRAPH);
+      if ((layer_restrict & LAYER_COLLECTION_HIDE) == 0) {
+        base->flag_from_collection |= BASE_VISIBLE_VIEWLAYER;
+      }
+      if (((collection_restrict & COLLECTION_RESTRICT_SELECT) == 0)) {
+        base->flag_from_collection |= BASE_SELECTABLE;
+      }
+    }
+
+    if ((collection_restrict & COLLECTION_RESTRICT_RENDER) == 0) {
+      base->flag_from_collection |= BASE_ENABLED_RENDER;
+    }
+
+    /* Holdout and indirect only */
+    if (layer->flag & LAYER_COLLECTION_HOLDOUT) {
+      base->flag_from_collection |= BASE_HOLDOUT;
+    }
+    if (layer->flag & LAYER_COLLECTION_INDIRECT_ONLY) {
+      base->flag_from_collection |= BASE_INDIRECT_ONLY;
+    }
+
+    layer->runtime_flag |= LAYER_COLLECTION_HAS_OBJECTS;
+  }
+}
 
 static void layer_collection_sync(ViewLayer *view_layer,
                                   const ListBase *lb_collections,
@@ -812,14 +879,15 @@ static void layer_collection_sync(ViewLayer *view_layer,
                           child_layer_restrict,
                           local_collections_bits);
 
-    /* Layer collection exclude is not inherited. */
+    /* Layer collection exclude is not inherited, we can skip the remaining process, including
+     * object bases synchronization. */
     lc->runtime_flag = 0;
     if (lc->flag & LAYER_COLLECTION_EXCLUDE) {
       continue;
     }
 
     /* We separate restrict viewport and visible view layer because a layer collection can be
-     * hidden in the view layer yet (locally) visible in a viewport (if it is not restricted).*/
+     * hidden in the view layer yet (locally) visible in a viewport (if it is not restricted). */
     if (child_restrict & COLLECTION_RESTRICT_VIEWPORT) {
       lc->runtime_flag |= LAYER_COLLECTION_RESTRICT_VIEWPORT;
     }
@@ -829,60 +897,12 @@ static void layer_collection_sync(ViewLayer *view_layer,
       lc->runtime_flag |= LAYER_COLLECTION_VISIBLE_VIEW_LAYER;
     }
 
-    /* Sync objects, except if collection was excluded. */
-    LISTBASE_FOREACH (CollectionObject *, cob, &collection->gobject) {
-      if (cob->ob == NULL) {
-        continue;
-      }
-
-      /* Tag linked object as a weak reference so we keep the object
-       * base pointer on file load and remember hidden state. */
-      id_lib_indirect_weak_link(&cob->ob->id);
-
-      void **base_p;
-      Base *base;
-      if (BLI_ghash_ensure_p(view_layer->object_bases_hash, cob->ob, &base_p)) {
-        /* Move from old base list to new base list. Base might have already
-         * been moved to the new base list and the first/last test ensure that
-         * case also works. */
-        base = *base_p;
-        if (!ELEM(base, new_object_bases->first, new_object_bases->last)) {
-          BLI_remlink(&view_layer->object_bases, base);
-          BLI_addtail(new_object_bases, base);
-        }
-      }
-      else {
-        /* Create new base. */
-        base = object_base_new(cob->ob);
-        base->local_collections_bits = local_collections_bits;
-        *base_p = base;
-        BLI_addtail(new_object_bases, base);
-      }
-
-      if ((child_restrict & COLLECTION_RESTRICT_VIEWPORT) == 0) {
-        base->flag_from_collection |= (BASE_ENABLED_VIEWPORT | BASE_VISIBLE_DEPSGRAPH);
-        if ((child_layer_restrict & LAYER_COLLECTION_HIDE) == 0) {
-          base->flag_from_collection |= BASE_VISIBLE_VIEWLAYER;
-        }
-        if (((child_restrict & COLLECTION_RESTRICT_SELECT) == 0)) {
-          base->flag_from_collection |= BASE_SELECTABLE;
-        }
-      }
-
-      if ((child_restrict & COLLECTION_RESTRICT_RENDER) == 0) {
-        base->flag_from_collection |= BASE_ENABLED_RENDER;
-      }
-
-      /* Holdout and indirect only */
-      if (lc->flag & LAYER_COLLECTION_HOLDOUT) {
-        base->flag_from_collection |= BASE_HOLDOUT;
-      }
-      if (lc->flag & LAYER_COLLECTION_INDIRECT_ONLY) {
-        base->flag_from_collection |= BASE_INDIRECT_ONLY;
-      }
-
-      lc->runtime_flag |= LAYER_COLLECTION_HAS_OBJECTS;
-    }
+    layer_collection_objects_sync(view_layer,
+                                  lc,
+                                  new_object_bases,
+                                  child_restrict,
+                                  child_layer_restrict,
+                                  local_collections_bits);
   }
 
   /* Free potentially remaining unused layer collections in old list.
@@ -1504,7 +1524,7 @@ static LayerCollection *find_layer_collection_by_scene_collection(LayerCollectio
 /**
  * Return the first matching LayerCollection in the ViewLayer for the Collection.
  */
-LayerCollection *BKE_layer_collection_first_from_scene_collection(ViewLayer *view_layer,
+LayerCollection *BKE_layer_collection_first_from_scene_collection(const ViewLayer *view_layer,
                                                                   const Collection *collection)
 {
   LISTBASE_FOREACH (LayerCollection *, layer_collection, &view_layer->layer_collections) {
@@ -1520,7 +1540,7 @@ LayerCollection *BKE_layer_collection_first_from_scene_collection(ViewLayer *vie
 /**
  * See if view layer has the scene collection linked directly, or indirectly (nested)
  */
-bool BKE_view_layer_has_collection(ViewLayer *view_layer, const Collection *collection)
+bool BKE_view_layer_has_collection(const ViewLayer *view_layer, const Collection *collection)
 {
   return BKE_layer_collection_first_from_scene_collection(view_layer, collection) != NULL;
 }

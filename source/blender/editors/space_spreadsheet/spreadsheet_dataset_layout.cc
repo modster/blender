@@ -35,12 +35,12 @@ namespace blender::ed::spreadsheet {
   }
 
 /**
- * Definion for the component->attribute-domain hierarchy.
+ * Definition for the component->attribute-domain hierarchy.
  * Constructed at compile time.
  *
- * \warning: Order of attribute-domains matters! It __must__ match the #AttributeDomain definition
- *           and fill gaps with unset optionals (i.e. `std::nullopt`). Would be nice to use array
- *           designators for this (which C++ doesn't support).
+ * \warning Order of attribute-domains matters! It __must__ match the #AttributeDomain
+ * definition and fill gaps with unset optionals (i.e. `std::nullopt`). Would be nice to use
+ * array designators for this (which C++ doesn't support).
  */
 constexpr DatasetComponentLayoutInfo DATASET_layout_hierarchy[] = {
     {

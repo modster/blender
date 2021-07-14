@@ -123,7 +123,7 @@ void BKE_object_eval_parent(Depsgraph *depsgraph, Object *ob)
 void BKE_object_eval_constraints(Depsgraph *depsgraph, Scene *scene, Object *ob)
 {
   bConstraintOb *cob;
-  float ctime = BKE_scene_frame_get(scene);
+  float ctime = BKE_scene_ctime_get(scene);
 
   DEG_debug_print_eval(depsgraph, __func__, ob->id.name, ob);
 
@@ -224,7 +224,7 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
     case OB_SURF:
     case OB_FONT: {
       bool for_render = (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER);
-      BKE_displist_make_curveTypes(depsgraph, scene, ob, for_render, false);
+      BKE_displist_make_curveTypes(depsgraph, scene, ob, for_render);
       break;
     }
 
@@ -388,12 +388,31 @@ void BKE_object_batch_cache_dirty_tag(Object *ob)
   BKE_object_data_batch_cache_dirty_tag(ob->data);
 }
 
+void BKE_object_data_eval_batch_cache_dirty_tag(Depsgraph *depsgraph, ID *object_data)
+{
+  DEG_debug_print_eval(depsgraph, __func__, object_data->name, object_data);
+  BKE_object_data_batch_cache_dirty_tag(object_data);
+}
+
+void BKE_object_data_eval_batch_cache_deform_tag(Depsgraph *depsgraph, ID *object_data)
+{
+  DEG_debug_print_eval(depsgraph, __func__, object_data->name, object_data);
+  switch (GS(object_data->name)) {
+    case ID_ME:
+      BKE_mesh_batch_cache_dirty_tag((Mesh *)object_data, BKE_MESH_BATCH_DIRTY_DEFORM);
+      break;
+    default:
+      /* Only mesh is currently supported. Fallback to dirty all for other datablocks types. */
+      BKE_object_data_batch_cache_dirty_tag(object_data);
+      break;
+  }
+}
+
 void BKE_object_eval_uber_data(Depsgraph *depsgraph, Scene *scene, Object *ob)
 {
   DEG_debug_print_eval(depsgraph, __func__, ob->id.name, ob);
   BLI_assert(ob->type != OB_ARMATURE);
   BKE_object_handle_data_update(depsgraph, scene, ob);
-  BKE_object_batch_cache_dirty_tag(ob);
 }
 
 void BKE_object_eval_ptcache_reset(Depsgraph *depsgraph, Scene *scene, Object *object)

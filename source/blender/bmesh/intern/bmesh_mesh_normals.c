@@ -18,6 +18,8 @@
  * \ingroup bmesh
  *
  * BM mesh normal calculation functions.
+ *
+ * \see mesh_normals.cc for the equivalent #Mesh functionality.
  */
 
 #include "MEM_guardedalloc.h"
@@ -31,6 +33,7 @@
 #include "BLI_task.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_customdata.h"
 #include "BKE_editmesh.h"
 #include "BKE_global.h"
 #include "BKE_mesh.h"
@@ -65,8 +68,8 @@ BLI_INLINE void bm_vert_calc_normals_accum_loop(const BMLoop *l_iter,
                                                 float v_no[3])
 {
   /* Calculate the dot product of the two edges that meet at the loop's vertex. */
-  /* Edge vectors are calculated from e->v1 to e->v2, so adjust the dot product if one but not
-   * both loops actually runs from from e->v2 to e->v1. */
+  /* Edge vectors are calculated from `e->v1` to `e->v2`, so adjust the dot product if one but not
+   * both loops actually runs from `e->v2` to `e->v1`. */
   float dotprod = dot_v3v3(e1diff, e2diff);
   if ((l_iter->prev->e->v1 == l_iter->prev->v) ^ (l_iter->e->v1 == l_iter->v)) {
     dotprod = -dotprod;
@@ -292,6 +295,10 @@ void BM_mesh_normals_update_with_partial_ex(BMesh *UNUSED(bm),
                                             const struct BMeshNormalsUpdate_Params *params)
 {
   BLI_assert(bmpinfo->params.do_normals);
+  /* While harmless, exit early if there is nothing to do. */
+  if (UNLIKELY((bmpinfo->verts_len == 0) && (bmpinfo->faces_len == 0))) {
+    return;
+  }
 
   BMVert **verts = bmpinfo->verts;
   BMFace **faces = bmpinfo->faces;
@@ -519,7 +526,7 @@ bool BM_loop_check_cyclic_smooth_fan(BMLoop *l_curr)
 }
 
 /**
- * BMesh version of BKE_mesh_normals_loop_split() in mesh_evaluate.c
+ * BMesh version of BKE_mesh_normals_loop_split() in `mesh_evaluate.cc`
  * Will use first clnors_data array, and fallback to cd_loop_clnors_offset
  * (use NULL and -1 to not use clnors).
  *
@@ -598,7 +605,7 @@ static void bm_mesh_loops_calc_normals(BMesh *bm,
        * If we find a new, never-processed cyclic smooth fan, we can do it now using that loop/edge
        * as 'entry point', otherwise we can skip it. */
 
-      /* Note: In theory, we could make bm_mesh_loop_check_cyclic_smooth_fan() store
+      /* NOTE: In theory, we could make bm_mesh_loop_check_cyclic_smooth_fan() store
        * mlfan_pivot's in a stack, to avoid having to fan again around
        * the vert during actual computation of clnor & clnorspace. However, this would complicate
        * the code, add more memory usage, and
@@ -624,10 +631,13 @@ static void bm_mesh_loops_calc_normals(BMesh *bm,
           {
             const BMVert *v_pivot = l_curr->v;
             const float *co_pivot = vcos ? vcos[BM_elem_index_get(v_pivot)] : v_pivot->co;
-            const BMVert *v_1 = BM_edge_other_vert(l_curr->e, v_pivot);
+            const BMVert *v_1 = l_curr->next->v;
             const float *co_1 = vcos ? vcos[BM_elem_index_get(v_1)] : v_1->co;
-            const BMVert *v_2 = BM_edge_other_vert(l_curr->prev->e, v_pivot);
+            const BMVert *v_2 = l_curr->prev->v;
             const float *co_2 = vcos ? vcos[BM_elem_index_get(v_2)] : v_2->co;
+
+            BLI_assert(v_1 == BM_edge_other_vert(l_curr->e, v_pivot));
+            BLI_assert(v_2 == BM_edge_other_vert(l_curr->prev->e, v_pivot));
 
             sub_v3_v3v3(vec_curr, co_1, co_pivot);
             normalize_v3(vec_curr);
@@ -694,8 +704,10 @@ static void bm_mesh_loops_calc_normals(BMesh *bm,
         /* Only need to compute previous edge's vector once,
          * then we can just reuse old current one! */
         {
-          const BMVert *v_2 = BM_edge_other_vert(e_next, v_pivot);
+          const BMVert *v_2 = lfan_pivot->next->v;
           const float *co_2 = vcos ? vcos[BM_elem_index_get(v_2)] : v_2->co;
+
+          BLI_assert(v_2 == BM_edge_other_vert(e_next, v_pivot));
 
           sub_v3_v3v3(vec_org, co_2, co_pivot);
           normalize_v3(vec_org);
@@ -1275,7 +1287,7 @@ void BM_lnorspace_invalidate(BMesh *bm, const bool do_invalidate_all)
   BMVert *v;
   BMLoop *l;
   BMIter viter, liter;
-  /* Note: we could use temp tag of BMItem for that,
+  /* NOTE: we could use temp tag of BMItem for that,
    * but probably better not use it in such a low-level func?
    * --mont29 */
   BLI_bitmap *done_verts = BLI_BITMAP_NEW(bm->totvert, __func__);
@@ -1542,7 +1554,7 @@ static int bm_loop_normal_mark_indiv(BMesh *bm, BLI_bitmap *loops, const bool do
     /* Using face history allows to select a single loop from a single face...
      * Note that this is O(n^2) piece of code,
      * but it is not designed to be used with huge selection sets,
-     * rather with only a few items selected at most.*/
+     * rather with only a few items selected at most. */
     /* Goes from last selected to the first selected element. */
     for (ese = bm->selected.last; ese; ese = ese->prev) {
       if (ese->htype == BM_FACE) {

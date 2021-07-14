@@ -217,7 +217,7 @@ typedef struct LatticeModifierData {
   char _pad[2];
 } LatticeModifierData;
 
-/*Lattice modifier flags */
+/* Lattice modifier flags. */
 enum {
   MOD_LATTICE_INVERT_VGROUP = (1 << 0),
 };
@@ -1842,7 +1842,7 @@ typedef struct CorrectiveSmoothModifierData {
    * use for MOD_CORRECTIVESMOOTH_RESTSOURCE_BIND */
   float (*bind_coords)[3];
 
-  /* note: -1 is used to bind */
+  /* NOTE: -1 is used to bind. */
   unsigned int bind_coords_num;
 
   float lambda, scale;
@@ -2258,6 +2258,10 @@ typedef struct NodesModifierData {
   ModifierData modifier;
   struct bNodeTree *node_group;
   struct NodesModifierSettings settings;
+
+  /* Contains logged information from the last evaluation. This can be used to help the user to
+   * debug a node tree. */
+  void *runtime_eval_log;
 } NodesModifierData;
 
 typedef struct MeshToVolumeModifierData {

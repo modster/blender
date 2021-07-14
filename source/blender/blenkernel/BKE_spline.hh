@@ -32,6 +32,7 @@
 #include "BKE_attribute_math.hh"
 
 struct Curve;
+struct ListBase;
 
 class Spline;
 using SplinePtr = std::unique_ptr<Spline>;
@@ -336,6 +337,18 @@ class BezierSpline final : public Spline {
                         blender::MutableSpan<blender::float3> positions) const;
   bool segment_is_vector(const int start_index) const;
 
+  /** See comment and diagram for #calculate_segment_insertion. */
+  struct InsertResult {
+    blender::float3 handle_prev;
+    blender::float3 left_handle;
+    blender::float3 position;
+    blender::float3 right_handle;
+    blender::float3 handle_next;
+  };
+  InsertResult calculate_segment_insertion(const int index,
+                                           const int next_index,
+                                           const float parameter);
+
  private:
   void correct_end_tangents() const final;
   void copy_settings(Spline &dst) const final;
@@ -546,4 +559,6 @@ struct CurveEval {
   void assert_valid_point_attributes() const;
 };
 
-std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &curve);
+std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &curve,
+                                                     const ListBase &nurbs_list);
+std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve);
