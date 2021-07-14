@@ -56,6 +56,8 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
+#include "gpencil_intern.h"
+
 /* Temporary Asset import operation data */
 typedef struct tGPDasset {
   /** Current depsgraph from context. */
@@ -72,11 +74,15 @@ typedef struct tGPDasset {
   struct bGPdata *gpd;
   /** Asset GP datablock. */
   struct bGPdata *gpd_asset;
+  /* Space Conversion Data */
+  struct GP_SpaceConversion gsc;
 
   /** Current frame number. */
   int cframe;
   /** General Flag. */
   int flag;
+  /** Transform mode. */
+  short mode;
 
   /* Drop initial position. */
   int drop_x, drop_y;
@@ -89,6 +95,15 @@ typedef struct tGPDasset {
   struct GHash *used_strokes;
 
 } tGPDasset;
+
+typedef enum eGP_AssetTransformMode {
+  /* Location. */
+  GP_ASSET_TRANSFORM_LOC = 0,
+  /* Rotation. */
+  GP_ASSET_TRANSFORM_ROT = 1,
+  /* Scale. */
+  GP_ASSET_TRANSFORM_SCALE = 2,
+} eGP_AssetTransformMode;
 
 static bool gpencil_asset_generic_poll(bContext *C)
 {
@@ -284,14 +299,17 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
                                                  ID *id,
                                                  tGPDasset *tgpa)
 {
-  /* set current scene and window */
+  /* Save current settings. */
   tgpa->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   tgpa->scene = CTX_data_scene(C);
   tgpa->area = CTX_wm_area(C);
   tgpa->region = CTX_wm_region(C);
   tgpa->ob = CTX_data_active_object(C);
 
-  /* set current frame number */
+  /* Setup space conversions data. */
+  gpencil_point_conversion_init(C, &tgpa->gsc);
+
+  /* Save current frame number. */
   tgpa->cframe = tgpa->scene->r.cfra;
 
   /* Target GP datablock. */
@@ -303,6 +321,9 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   tgpa->used_layers = BLI_ghash_ptr_new(__func__);
   tgpa->used_frames = BLI_ghash_ptr_new(__func__);
   tgpa->used_strokes = BLI_ghash_ptr_new(__func__);
+
+  /* Set transformation mode to Location by default. */
+  tgpa->mode = GP_ASSET_TRANSFORM_LOC;
 
   return true;
 }
@@ -522,8 +543,5 @@ void GPENCIL_OT_asset_import(wmOperatorType *ot)
   RNA_def_string(ot->srna, "name", "Name", MAX_ID_NAME - 2, "Name", "ID name to add");
   prop = RNA_def_enum(ot->srna, "type", rna_enum_id_type_items, 0, "Type", "");
   RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_ID);
-
-  prop = RNA_def_boolean(ot->srna, "release_confirm", 0, "Confirm on Release", "");
-  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 /** \} */
