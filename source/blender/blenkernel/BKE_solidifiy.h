@@ -28,15 +28,15 @@ typedef struct SolidifyData {
 
   float merge_tolerance;
   float bevel_convex;
-  float *distance;
+  const float *distance;
 } SolidifyData;
 
 struct Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
-                           struct Mesh *mesh,
-                           bool **r_shell_verts,
-                           bool **r_rim_verts,
-                           bool **r_shell_faces,
-                           bool **r_rim_faces);
+                                  struct Mesh *mesh,
+                                  bool **r_shell_verts,
+                                  bool **r_rim_verts,
+                                  bool **r_shell_faces,
+                                  bool **r_rim_faces);
 
 #ifdef __cplusplus
 }

@@ -33,8 +33,8 @@
 static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_STRING, N_("Thickness")},
-    {SOCK_FLOAT, N_("Thickness"), 0.1f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Clamp"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f},
+    {SOCK_FLOAT, N_("Thickness"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
+    {SOCK_FLOAT, N_("Clamp"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f, PROP_FACTOR},
     {SOCK_FLOAT, N_("Offset"), -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, PROP_FACTOR},
     {SOCK_BOOLEAN, N_("Fill"), true},
     {SOCK_BOOLEAN, N_("Rim"), true},
@@ -50,15 +50,6 @@ static bNodeSocketTemplate geo_node_solidify_out[] = {
 
 namespace blender::nodes {
 
-static void geo_node_solidify_init(bNodeTree *UNUSED(tree), bNode *node)
-{
-  NodeGeometrySolidify *node_storage = (NodeGeometrySolidify *)MEM_callocN(
-      sizeof(NodeGeometrySolidify), __func__);
-
-  node->storage = node_storage;
-  node_storage->thickness_mode = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
-}
-
 static void geo_node_solidify_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
@@ -66,6 +57,15 @@ static void geo_node_solidify_layout(uiLayout *layout, bContext *UNUSED(C), Poin
   uiItemR(layout, ptr, "thickness_mode", 0, nullptr, ICON_NONE);
   uiItemR(layout, ptr, "nonmanifold_offset_mode", 0, nullptr, ICON_NONE);
   uiItemR(layout, ptr, "nonmanifold_boundary_mode", 0, nullptr, ICON_NONE);
+}
+
+static void geo_node_solidify_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  NodeGeometrySolidify *node_storage = (NodeGeometrySolidify *)MEM_callocN(
+      sizeof(NodeGeometrySolidify), __func__);
+
+  node->storage = node_storage;
+  node_storage->thickness_mode = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
 }
 
 static void geo_node_solidify_update(bNodeTree *UNUSED(ntree), bNode *node)
@@ -104,19 +104,12 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
   if (geometry_set.has<MeshComponent>()) {
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
     Mesh *input_mesh = mesh_component.get_for_write();
-    Mesh *output_mesh;
 
-    GVArrayPtr thickness = params.get_input_attribute(
-        "Thickness", mesh_component, ATTR_DOMAIN_POINT, CD_PROP_FLOAT, nullptr);
-    if (!thickness) {
-      return;
-    }
-    float *distance = (float *)MEM_callocN(sizeof(float) * (unsigned long)input_mesh->totvert,
-                                           __func__);
+    const float default_thickness = 0;
+    GVArray_Typed<float> thickness_attribute = params.get_input_attribute<float>(
 
-    for (int i : thickness->typed<float>().index_range()) {
-      distance[i] = thickness->typed<float>()[i];
-    }
+        "Thickness", mesh_component, ATTR_DOMAIN_POINT, default_thickness);
+    VArray_Span<float> thickness{thickness_attribute};
 
     SolidifyData solidify_node_data = {
         self_object,
@@ -129,7 +122,7 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
         flag,
         0.01f,
         0.0f,
-        distance,
+        thickness.data(),
     };
 
     bool *shell_verts = nullptr;
@@ -137,10 +130,12 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
     bool *shell_faces = nullptr;
     bool *rim_faces = nullptr;
 
-    output_mesh = solidify_nonmanifold(
+    Mesh *output_mesh = solidify_nonmanifold(
         &solidify_node_data, input_mesh, &shell_verts, &rim_verts, &shell_faces, &rim_faces);
 
-    geometry_set.replace_mesh(output_mesh);
+    if (output_mesh != input_mesh) {
+      geometry_set.replace_mesh(output_mesh);
+    }
 
     const AttributeDomain result_face_domain = ATTR_DOMAIN_FACE;
 
@@ -169,7 +164,6 @@ static void geo_node_solidify_exec(GeoNodeExecParams params)
       }
     }
 
-    MEM_freeN(distance);
     MEM_freeN(shell_verts);
     MEM_freeN(rim_verts);
     MEM_freeN(shell_faces);

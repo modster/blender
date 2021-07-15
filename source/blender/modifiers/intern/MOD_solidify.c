@@ -86,39 +86,29 @@ static void requiredDataMask(Object *UNUSED(ob),
   }
 }
 
-static float *get_distance_factor(Mesh *mesh, Object *ob, const char *name, bool invert)
+static void get_distance_factor(
+    Mesh *mesh, Object *ob, const char *name, bool invert, float *r_selection)
 {
   int defgrp_index = BKE_object_defgroup_name_index(ob, name);
-  MDeformVert *dvert = mesh->dvert;
 
-  float *selection = MEM_callocN(sizeof(float) * (unsigned long)mesh->totvert, __func__);
-
-  if (defgrp_index != -1) {
-    if (ob->type == OB_LATTICE) {
-      dvert = BKE_lattice_deform_verts_get(ob);
-    }
-    else if (mesh) {
-      dvert = mesh->dvert;
-      for (int i = 0; i < mesh->totvert; i++) {
-        MDeformVert *dv = &dvert[i];
-        printf("sel: %i\n", defgrp_index);
-        selection[i] = BKE_defvert_find_weight(dv, defgrp_index);
-      }
+  if (mesh && defgrp_index != -1) {
+    MDeformVert *dvert = mesh->dvert;
+    for (int i = 0; i < mesh->totvert; i++) {
+      MDeformVert *dv = &dvert[i];
+      r_selection[i] = BKE_defvert_find_weight(dv, defgrp_index);
     }
   }
   else {
     for (int i = 0; i < mesh->totvert; i++) {
-      selection[i] = 1.0f;
+      r_selection[i] = 1.0f;
     }
   }
 
   if (invert) {
     for (int i = 0; i < mesh->totvert; i++) {
-      selection[i] = 1.0f - selection[i];
+      r_selection[i] = 1.0f - r_selection[i];
     }
   }
-
-  return selection;
 }
 
 static SolidifyData solidify_data_from_modifier_data(ModifierData *md,
@@ -147,14 +137,16 @@ static SolidifyData solidify_data_from_modifier_data(ModifierData *md,
 }
 
 static Mesh *solidify_nonmanifold_modify_mesh(ModifierData *md,
-                                      const ModifierEvalContext *ctx,
-                                      Mesh *mesh,
-                                      const SolidifyModifierData *smd)
+                                              const ModifierEvalContext *ctx,
+                                              Mesh *mesh,
+                                              const SolidifyModifierData *smd)
 {
   SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
 
   const bool defgrp_invert = (solidify_data.flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
-  solidify_data.distance = get_distance_factor(mesh, ctx->object, smd->defgrp_name, defgrp_invert);
+  float *selection = MEM_callocN(sizeof(float) * (uint64_t)mesh->totvert, __func__);
+  get_distance_factor(mesh, ctx->object, smd->defgrp_name, defgrp_invert, selection);
+  solidify_data.distance = selection;
 
   bool *shell_verts = NULL;
   bool *rim_verts = NULL;
@@ -224,7 +216,7 @@ static Mesh *solidify_nonmanifold_modify_mesh(ModifierData *md,
     }
   }
 
-  MEM_freeN(solidify_data.distance);
+  MEM_freeN(selection);
   MEM_freeN(shell_verts);
   MEM_freeN(rim_verts);
   MEM_freeN(shell_faces);
