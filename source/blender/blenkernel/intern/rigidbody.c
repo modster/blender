@@ -461,7 +461,6 @@ static void rigidbody_store_convex_hull_draw_data(Object *ob) {
         int reverse_index = plConvexHullGetReversedLoopIndex(hull, i);
         mloop_src[i].e = edge_index;
         mloop_src[reverse_index].e = edge_index;
-        printf("edge verts:%d %d  loop,rev:%d,%d, edge:%d\n", v_from, v_to, i, reverse_index, (int)edge_index);
         edge_index++;
 
       }
@@ -488,7 +487,6 @@ static void rigidbody_store_convex_hull_draw_data(Object *ob) {
         loop->v = src_loop.v;
         loop->e = src_loop.e;
         loop++;
-        printf("loop: v:%d e:%d\n", (int)src_loop.v, (int)src_loop.e);
       }
       j += len;
       MEM_freeN(loops);
@@ -2409,19 +2407,29 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
     const float interp_step = 1.0f / rbw->substeps_per_frame;
     float cur_interp_val = interp_step;
 
-    /* Set all Objects normal forces to zero. */
+    /* Set all contact forces and their locations to zero. (for drawing debug info) */
     for (int i = 0; i < rbw->numbodies; i++) {
         Object *ob = rbw->objects[i];
-        zero_v3(ob->rigidbody_object->norm_forces[0].vector);
-        zero_v3(ob->rigidbody_object->norm_forces[1].vector);
-        zero_v3(ob->rigidbody_object->norm_forces[2].vector);
+        for(int j=0; j<3; j++) {
+          zero_v3(ob->rigidbody_object->norm_forces[j].vector);
+          zero_v3(ob->rigidbody_object->vec_locations[j].vector);
+          zero_v3(ob->rigidbody_object->fric_forces[j].vector);
+        }
     }
 
     for (int i = 0; i < rbw->substeps_per_frame; i++) {
       rigidbody_update_kinematic_obj_substep(&substep_targets, cur_interp_val);
       RB_dworld_step_simulation(rbw->shared->physics_world, substep, 0, substep);
       cur_interp_val += interp_step;
+
+      /*Loop through all rigid bodies and get the forces being applied in the substep (for drawing debug info).
+       * Store average force acting on objects during all substeps.
+       * We store the average of the forces and not the forces themselves, because storing forces
+       * would mean that only the force applied in the last substep is displayed on the screen.
+       * Average is a better representation of what happened during the whole timestep.*/
       for (int j = 0; j < rbw->numbodies; j++) {
+
+        float num_substeps = (float)rbw->substeps_per_frame;
 
         float norm_forces[3][3] = {{0.0f}};
         float fric_forces[3][3] = {{0.0f}};
@@ -2429,10 +2437,10 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
         Object *ob = rbw->objects[j];
         if (ob->rigidbody_object != NULL) {
           rbRigidBody *rbo = (rbRigidBody *)(ob->rigidbody_object->shared->physics_object);
-          int norm_flag = (ob->rigidbody_object->display_force_types & RB_SIM_NORMAL) ||
+          bool norm_flag = (ob->rigidbody_object->display_force_types & RB_SIM_NORMAL) ||
                           (ob->rigidbody_object->display_force_types & RB_SIM_NET_FORCE) ||
                           (ob->rigidbody_object->sim_display_options & RB_SIM_COLLISIONS);
-          int fric_flag = (ob->rigidbody_object->display_force_types & RB_SIM_FRICTION) ||
+          bool fric_flag = (ob->rigidbody_object->display_force_types & RB_SIM_FRICTION) ||
                           (ob->rigidbody_object->display_force_types & RB_SIM_NET_FORCE);
           if (norm_flag || fric_flag) {
             RB_dworld_get_impulse(rbw->shared->physics_world,
@@ -2444,20 +2452,30 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
                                   norm_flag,
                                   fric_flag);
             for(int k=0; k<3; k++){
-              if(len_v3(norm_forces[k])>len_v3(ob->rigidbody_object->norm_forces[k].vector)){
-                copy_v3_v3(ob->rigidbody_object->vec_locations[k].vector, vec_locations[k]);
-                if (norm_flag) {
-                  copy_v3_v3(ob->rigidbody_object->norm_forces[k].vector, norm_forces[k]);
+                 if (norm_flag || fric_flag) {
+
+                   //printf("loc0:%f %f %f\n", ob->rigidbody_object->vec_locations[k].vector[0], ob->rigidbody_object->vec_locations[k].vector[1], ob->rigidbody_object->vec_locations[k].vector[2]);
+                   //printf("loc1:%f %f %f\n", ob->rigidbody_object->vec_locations[k].vector[0], ob->rigidbody_object->vec_locations[k].vector[1], ob->rigidbody_object->vec_locations[k].vector[2]);
+
+                  mul_v3_fl(norm_forces[k], 1/num_substeps);
+                  add_v3_v3(ob->rigidbody_object->norm_forces[k].vector, norm_forces[k]);
+                  mul_v3_fl(vec_locations[k], len_v3(norm_forces[k]));
+                  add_v3_v3(ob->rigidbody_object->vec_locations[k].vector, vec_locations[k]);
                 }
                 if (fric_flag) {
-                  copy_v3_v3(ob->rigidbody_object->fric_forces[k].vector, fric_forces[k]);
+                  mul_v3_fl(fric_forces[k], 1/num_substeps);
+                  add_v3_v3(ob->rigidbody_object->fric_forces[k].vector, fric_forces[k]);
                 }
-              }
+
+                if(i == (int)num_substeps-1 && fabsf(len_v3(ob->rigidbody_object->norm_forces[k].vector))>0.0f) {
+                    mul_v3_fl(ob->rigidbody_object->vec_locations[k].vector, (1.0f/(float)(len_v3(ob->rigidbody_object->norm_forces[k].vector))));
+                }
             }
           }
         }
       }
     }
+
     rigidbody_free_substep_data(&substep_targets);
 
     rigidbody_update_simulation_post_step(depsgraph, rbw);

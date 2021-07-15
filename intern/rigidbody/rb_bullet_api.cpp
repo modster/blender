@@ -213,36 +213,44 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
                            float norm_forces[3][3],
                            float fric_forces[3][3],
                            float vec_locations[3][3],
-                           int norm_flag,
-                           int fric_flag)
+                           bool norm_flag,
+                           bool fric_flag)
 {
   int numManifolds = world->dispatcher->getNumManifolds();
   int num_norm_forces = 0;
   int num_fric_forces = 0;
+
+  /*Loop thrhough all persisent contact manifolds. */
   for (int i = 0; i < numManifolds; i++) {
     btPersistentManifold *contactManifold = world->dispatcher->getManifoldByIndexInternal(i);
     const void *obA = contactManifold->getBody0();
     const void *obB = contactManifold->getBody1();
-    if (num_norm_forces > 2)
+
+    /* Break if we cannot store any more forces. */
+    /* Friction cannot exist without a normal force, so counting number of normal forces stored is enough. */
+    if (num_norm_forces > 2) {
       break;
-        if (obA != rbo->body && obB != rbo->body) {
-          continue;
-        }
-        else {
+    }
+    /* Continue to next manifold if this one does not invlove the current rigid body. */
+    if (obA != rbo->body && obB != rbo->body) {
+      continue;
+    }
+    else {
       btVector3 tot_impulse = btVector3(0.0, 0.0, 0.0);
       btVector3 final_loc = btVector3(0.0, 0.0, 0.0);
       btScalar tot_impulse_magnitude = 0.f;
       btVector3 tot_lat_impulse = btVector3(0.0, 0.0, 0.0);
       int numContacts = contactManifold->getNumContacts();
       int num_impulse_points = 0;
+      /* Find points where impulse was appplied. */
       for (int j = 0; j < numContacts; j++) {
-        /* Find points where impulse was appplied. */
         btManifoldPoint &pt = contactManifold->getContactPoint(j);
         if (pt.getAppliedImpulse() > 0.f || -pt.getAppliedImpulse() > 0.f) {
           num_impulse_points++;
         }
       }
 
+      /* Loop throught contact points and add impulses applied at each point. */
       for (int j = 0; j < numContacts; j++) {
         btManifoldPoint &pt = contactManifold->getContactPoint(j);
         if (pt.getAppliedImpulse() > 0.f || -pt.getAppliedImpulse() > 0.f) {
@@ -250,7 +258,7 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
           const btVector3 imp = (rbo->body == obB) ?
                                     -pt.m_normalWorldOnB * pt.getAppliedImpulse() / timeSubStep :
                                     pt.m_normalWorldOnB * pt.getAppliedImpulse() / timeSubStep;
-          tot_impulse_magnitude += pt.getAppliedImpulse();
+          tot_impulse_magnitude += pt.getAppliedImpulse() > 0.f? pt.getAppliedImpulse() : -pt.getAppliedImpulse();
           tot_impulse += imp;
           final_loc += num_impulse_points > 1 ? loc * pt.getAppliedImpulse() : loc;
           if (fric_flag) {
@@ -268,9 +276,14 @@ void RB_dworld_get_impulse(rbDynamicsWorld *world,
           }
         }
       }
-
-      if (num_impulse_points > 1)
+      /* If impulse was applied at more than one point, the location of the force is taken as average of points
+       * weighted by magnitude of impulse applied at each point. */
+      if(fabsf(tot_impulse_magnitude)==0.0f){
+          continue;
+      }
+      if (num_impulse_points > 1) {
         final_loc = final_loc / tot_impulse_magnitude;
+      }
       copy_v3_btvec3(vec_locations[num_norm_forces], final_loc);
       if (norm_flag) {
         copy_v3_btvec3(norm_forces[num_norm_forces], tot_impulse);
@@ -935,10 +948,6 @@ rbCollisionShape *RB_shape_new_gimpact_mesh(rbMeshData *mesh)
   shape->compoundChilds = 0;
   shape->compoundChildShapes = NULL;
   return shape;
-}
-
-void RB_mesh_collision_shape_draw_data(rbCollisionShape *shape) {
-
 }
 
 /* Compound Shape ---------------- */
