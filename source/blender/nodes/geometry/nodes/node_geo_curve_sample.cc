@@ -57,7 +57,7 @@ static void geo_node_curve_sample_init(bNodeTree *UNUSED(tree), bNode *node)
   NodeGeometryCurveSample *data = (NodeGeometryCurveSample *)MEM_callocN(
       sizeof(NodeGeometryCurveSample), __func__);
 
-  data->mode = GEO_NODE_CURVE_RESAMPLE_COUNT;
+  data->mode = GEO_NODE_CURVE_SAMPLE_FACTOR;
   node->storage = data;
 }
 
