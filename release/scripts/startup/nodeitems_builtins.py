@@ -504,6 +504,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveSubdivide"),
         NodeItem("GeometryNodeCurveToMesh"),
         NodeItem("GeometryNodeCurveResample"),
+        NodeItem("GeometryNodeCurveSample"),
         NodeItem("GeometryNodeMeshToCurve"),
         NodeItem("GeometryNodeCurveToPoints"),
         NodeItem("GeometryNodeCurveEndpoints"),

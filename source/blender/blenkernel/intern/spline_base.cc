@@ -484,13 +484,18 @@ static void assert_sorted_array_in_range(Span<float> data, const float min, cons
  *
  * \note The implementation is similar to #sample_uniform_index_factors(), though
  * the two loops are inverted, and obviously custom parameters are provided.
+ *
+ * \note This could have a result data argument instead of returning a span in the future.
  */
-void Spline::sample_length_parameters_to_index_factors(MutableSpan<float> parameters) const
+Array<float> Spline::sample_lengths_to_index_factors(const Span<float> parameters) const
 {
   const Span<float> lengths = this->evaluated_lengths();
+  const float total_length = this->length();
 #ifdef DEBUG
-  assert_sorted_array_in_range(parameters, 0.0f, this->length());
+  // assert_sorted_array_in_range(parameters, 0.0f, this->length());
 #endif
+
+  Array<float> index_factors(parameters.size());
 
   /* Store the length at the previous evaluated point in a variable so it can
    * start out at zero (the lengths array doesn't contain 0 for the first point). */
@@ -506,8 +511,10 @@ void Spline::sample_length_parameters_to_index_factors(MutableSpan<float> parame
     }
 
     const float factor = (sample_length - prev_length) / (lengths[i_evaluated] - prev_length);
-    parameters[i_sample] = i_evaluated + factor;
+    index_factors[i_sample] = i_evaluated + factor;
   }
+
+  return index_factors;
 }
 
 Spline::LookupResult Spline::lookup_data_from_index_factor(const float index_factor) const
@@ -542,6 +549,13 @@ void Spline::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) 
 GVArrayPtr Spline::interpolate_to_evaluated(GSpan data) const
 {
   return this->interpolate_to_evaluated(GVArray_For_GSpan(data));
+}
+
+void Spline::sample_with_index_factors(GSpan src,
+                                       Span<float> index_factors,
+                                       GMutableSpan dst) const
+{
+  return this->sample_with_index_factors(GVArray_For_GSpan(src), index_factors, dst);
 }
 
 /**

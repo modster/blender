@@ -56,7 +56,7 @@ using SplinePtr = std::unique_ptr<Spline>;
  *     along the length of a curve.
  *  3. #sample_uniform_index_factors returns an array that stores uniform-length samples
  *     along the spline which can be used to interpolate data from method 1.
- *  4. #sample_length_parameters_to_index_factors does the same, but uses arbitrary parameter
+ *  4. #sample_lengths_to_index_factors does the same, but uses arbitrary parameter
  *     inputs, instead of sampling uniformly.
  *
  * Commonly used evaluated data is stored in caches on the spline itself so that operations on
@@ -172,11 +172,14 @@ class Spline {
   LookupResult lookup_evaluated_length(const float length) const;
 
   blender::Array<float> sample_uniform_index_factors(const int samples_size) const;
-  void sample_length_parameters_to_index_factors(blender::MutableSpan<float> parameters) const;
+  blender::Array<float> sample_lengths_to_index_factors(blender::Span<float> parameters) const;
 
   LookupResult lookup_data_from_index_factor(const float index_factor) const;
 
   void sample_with_index_factors(const blender::fn::GVArray &src,
+                                 blender::Span<float> index_factors,
+                                 blender::fn::GMutableSpan dst) const;
+  void sample_with_index_factors(blender::fn::GSpan src,
                                  blender::Span<float> index_factors,
                                  blender::fn::GMutableSpan dst) const;
   template<typename T>
@@ -208,8 +211,6 @@ class Spline {
   {
     return blender::fn::GVArray_Typed<T>(this->interpolate_to_evaluated(blender::fn::GSpan(data)));
   }
-
-  blender::fn::GVArrayPtr get_evaluated_attribute(const blender::StringRef name) const;
 
  protected:
   virtual void correct_end_tangents() const = 0;

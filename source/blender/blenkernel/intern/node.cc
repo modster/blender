@@ -5116,8 +5116,6 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_primitive_spiral();
   register_node_type_geo_curve_primitive_star();
   register_node_type_geo_curve_sample();
-  register_node_type_geo_curve_to_mesh();
-  register_node_type_geo_curve_to_points();
   register_node_type_geo_curve_resample();
   register_node_type_geo_curve_reverse();
   register_node_type_geo_curve_subdivide();

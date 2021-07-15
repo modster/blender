@@ -180,18 +180,6 @@ class GeometryComponent {
     return blender::fn::GVArray_Typed<T>(std::move(varray));
   }
 
-  /* Should be used instead of the method above when the requested data type is known at compile
-   * time for better type safety. */
-  template<typename T>
-  blender::fn::GVArray_Typed<T> attribute_get_for_read(const blender::StringRef attribute_name,
-                                                       const T &default_value) const
-  {
-    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
-    const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
-    std::unique_ptr varray = this->attribute_get_for_read(attribute_name, type, &default_value);
-    return blender::fn::GVArray_Typed<T>(std::move(varray));
-  }
-
   /**
    * Returns an "output attribute", which is essentially a mutable virtual array with some commonly
    * used convince features. The returned output attribute might be empty if requested attribute
