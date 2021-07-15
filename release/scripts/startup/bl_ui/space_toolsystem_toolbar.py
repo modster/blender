@@ -2413,6 +2413,7 @@ class _defs_clip_tracking_tools:
             row.prop(props, "use_default_green_channel", text="G", toggle=True)
             row.prop(props, "use_default_blue_channel", text="B", toggle=True)
             row = layout.row()
+            row.prop(props, "default_weight")
             row.popover(panel="CLIP_PT_track_settings_tool")
 
         return dict(

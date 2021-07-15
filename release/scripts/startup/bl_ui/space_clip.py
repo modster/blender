@@ -949,7 +949,7 @@ class CLIP_PT_track_settings_tool(CLIP_PT_tracking_panel, Panel):
     def poll(cls, context):
         clip = context.space_data.clip
 
-        return clip.tracking.tracks.active
+        return clip
 
     def draw(self, context):
         layout = self.layout
@@ -957,16 +957,15 @@ class CLIP_PT_track_settings_tool(CLIP_PT_tracking_panel, Panel):
         layout.use_property_decorate = False
 
         clip = context.space_data.clip
-        active = clip.tracking.tracks.active
         settings = clip.tracking.settings
 
         col = layout.column(align=True)
-        col.prop(active, "correlation_min")
-        col.prop(active, "margin")
+        col.prop(settings, "default_correlation_min")
+        col.prop(settings, "default_margin")
 
         col = layout.column()
-        col.prop(active, "use_mask")
-        col.prop(active, "frames_limit")
+        col.prop(settings, "default_frames_limit")
+        col.prop(settings, "use_default_mask")
 
 
 class CLIP_PT_track_settings_extras(CLIP_PT_tracking_panel, Panel):
@@ -997,8 +996,8 @@ class CLIP_PT_track_settings_extras(CLIP_PT_tracking_panel, Panel):
         col.prop(active, "margin")
 
         col = layout.column()
-        col.prop(active, "use_mask")
         col.prop(active, "frames_limit")
+        col.prop(active, "use_mask")
 
 
 class CLIP_PT_tracking_camera(Panel):
