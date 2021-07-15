@@ -452,15 +452,10 @@ static unsigned int rna_UIList_filter_const_FILTER_ITEM_get(PointerRNA *UNUSED(p
   return UILST_FLT_ITEM;
 }
 
-static IDProperty *rna_UIList_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_UIList_idprops(PointerRNA *ptr)
 {
   uiList *ui_list = (uiList *)ptr->data;
-  if (create && !ui_list->properties) {
-    IDPropertyTemplate val = {0};
-    ui_list->properties = IDP_New(IDP_GROUP, &val, "RNA_UIList IDproperties group");
-  }
-
-  return ui_list->properties;
+  return &ui_list->properties;
 }
 
 static void uilist_draw_item(uiList *ui_list,
@@ -553,7 +548,7 @@ static void uilist_filter_items(uiList *ui_list,
            RNA_parameter_dynamic_length_get(&list, parm),
            "filter_flags",
            len);
-    /* Note: we cannot return here, we would let flt_data in inconsistent state... see T38356. */
+    /* NOTE: we cannot return here, we would let flt_data in inconsistent state... see T38356. */
     filter_flags = NULL;
   }
   else {
@@ -569,7 +564,7 @@ static void uilist_filter_items(uiList *ui_list,
            RNA_parameter_dynamic_length_get(&list, parm),
            "filter_neworder",
            len);
-    /* Note: we cannot return here, we would let flt_data in inconsistent state... see T38356. */
+    /* NOTE: we cannot return here, we would let flt_data in inconsistent state... see T38356. */
     filter_neworder = NULL;
   }
   else {
@@ -599,7 +594,7 @@ static void uilist_filter_items(uiList *ui_list,
         items_shown = flt_data->items_shown = shown_idx;
         flt_data->items_filter_neworder = MEM_mallocN(sizeof(int) * items_shown, __func__);
         /* And now, bring back new indices into the [0, items_shown[ range!
-         * XXX This is O(N²)... :/
+         * XXX This is O(N^2). :/
          */
         for (shown_idx = 0, prev_ni = -1; shown_idx < items_shown; shown_idx++) {
           for (i = 0, t_ni = len, t_idx = -1; i < items_shown; i++) {
@@ -1019,7 +1014,7 @@ static void rna_Panel_bl_description_set(PointerRNA *ptr, const char *value)
     BLI_strncpy(str, value, RNA_DYN_DESCR_MAX); /* utf8 already ensured */
   }
   else {
-    BLI_assert(!"setting the bl_description on a non-builtin panel");
+    BLI_assert_msg(0, "setting the bl_description on a non-builtin panel");
   }
 }
 
@@ -1031,7 +1026,7 @@ static void rna_Menu_bl_description_set(PointerRNA *ptr, const char *value)
     BLI_strncpy(str, value, RNA_DYN_DESCR_MAX); /* utf8 already ensured */
   }
   else {
-    BLI_assert(!"setting the bl_description on a non-builtin menu");
+    BLI_assert_msg(0, "setting the bl_description on a non-builtin menu");
   }
 }
 
@@ -1231,7 +1226,7 @@ static void rna_def_ui_layout(BlenderRNA *brna)
       {UI_EMBOSS_PULLDOWN, "PULLDOWN_MENU", 0, "Pulldown Menu", "Draw pulldown menu style"},
       {UI_EMBOSS_RADIAL, "RADIAL_MENU", 0, "Radial Menu", "Draw radial menu style"},
       {UI_EMBOSS_NONE_OR_STATUS,
-       "UI_EMBOSS_NONE_OR_STATUS",
+       "NONE_OR_STATUS",
        0,
        "None or Status",
        "Draw with no emboss unless the button has a coloring status like an animation state"},

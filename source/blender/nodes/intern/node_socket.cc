@@ -37,6 +37,7 @@
 #include "BKE_node.h"
 
 #include "DNA_collection_types.h"
+#include "DNA_material_types.h"
 
 #include "RNA_access.h"
 #include "RNA_types.h"
@@ -116,7 +117,7 @@ static bNodeSocket *verify_socket_template(bNodeTree *ntree,
   }
   if (sock) {
     if (sock->type != stemp->type) {
-      nodeModifySocketType(ntree, node, sock, stemp->type, stemp->subtype);
+      nodeModifySocketTypeStatic(ntree, node, sock, stemp->type, stemp->subtype);
     }
     sock->flag |= stemp->flag;
   }
@@ -396,6 +397,13 @@ void node_socket_copy_default_value(bNodeSocket *to, const bNodeSocket *from)
       id_us_plus(&toval->value->id);
       break;
     }
+    case SOCK_MATERIAL: {
+      bNodeSocketValueMaterial *toval = (bNodeSocketValueMaterial *)to->default_value;
+      bNodeSocketValueMaterial *fromval = (bNodeSocketValueMaterial *)from->default_value;
+      *toval = *fromval;
+      id_us_plus(&toval->value->id);
+      break;
+    }
   }
 
   to->flag |= (from->flag & SOCK_HIDE_VALUE);
@@ -525,12 +533,14 @@ static bNodeSocketType *make_standard_socket_type(int type, int subtype)
 {
   const char *socket_idname = nodeStaticSocketType(type, subtype);
   const char *interface_idname = nodeStaticSocketInterfaceType(type, subtype);
+  const char *socket_label = nodeStaticSocketLabel(type, subtype);
   bNodeSocketType *stype;
   StructRNA *srna;
 
   stype = (bNodeSocketType *)MEM_callocN(sizeof(bNodeSocketType), "node socket C type");
   stype->free_self = (void (*)(bNodeSocketType * stype)) MEM_freeN;
   BLI_strncpy(stype->idname, socket_idname, sizeof(stype->idname));
+  BLI_strncpy(stype->label, socket_label, sizeof(stype->label));
 
   /* set the RNA type
    * uses the exact same identifier as the socket type idname */
@@ -637,9 +647,9 @@ static bNodeSocketType *make_socket_type_vector(PropertySubType subtype)
 static bNodeSocketType *make_socket_type_rgba()
 {
   bNodeSocketType *socktype = make_standard_socket_type(SOCK_RGBA, PROP_NONE);
-  socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<blender::Color4f>(); };
+  socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<blender::ColorGeometry4f>(); };
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
-    *(blender::Color4f *)r_value = ((bNodeSocketValueRGBA *)socket.default_value)->value;
+    *(blender::ColorGeometry4f *)r_value = ((bNodeSocketValueRGBA *)socket.default_value)->value;
   };
   return socktype;
 }
@@ -654,10 +664,10 @@ static bNodeSocketType *make_socket_type_string()
   return socktype;
 }
 
-MAKE_CPP_TYPE(Object, Object *)
-MAKE_CPP_TYPE(Collection, Collection *)
-MAKE_CPP_TYPE(Texture, Tex *)
-MAKE_CPP_TYPE(Material, Material *)
+MAKE_CPP_TYPE(Object, Object *, CPPTypeFlags::BasicType)
+MAKE_CPP_TYPE(Collection, Collection *, CPPTypeFlags::BasicType)
+MAKE_CPP_TYPE(Texture, Tex *, CPPTypeFlags::BasicType)
+MAKE_CPP_TYPE(Material, Material *, CPPTypeFlags::BasicType)
 
 static bNodeSocketType *make_socket_type_object()
 {
@@ -719,6 +729,7 @@ void register_standard_node_socket_types(void)
   nodeRegisterSocketType(make_socket_type_float(PROP_FACTOR));
   nodeRegisterSocketType(make_socket_type_float(PROP_ANGLE));
   nodeRegisterSocketType(make_socket_type_float(PROP_TIME));
+  nodeRegisterSocketType(make_socket_type_float(PROP_TIME_ABSOLUTE));
   nodeRegisterSocketType(make_socket_type_float(PROP_DISTANCE));
 
   nodeRegisterSocketType(make_socket_type_int(PROP_NONE));

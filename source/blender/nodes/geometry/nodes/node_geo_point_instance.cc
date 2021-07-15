@@ -26,8 +26,17 @@
 
 static bNodeSocketTemplate geo_node_point_instance_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_OBJECT, N_("Object")},
-    {SOCK_COLLECTION, N_("Collection")},
+    {SOCK_OBJECT, N_("Object"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, PROP_NONE, SOCK_HIDE_LABEL},
+    {SOCK_COLLECTION,
+     N_("Collection"),
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     PROP_NONE,
+     SOCK_HIDE_LABEL},
     {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000},
     {-1, ""},
 };
@@ -46,6 +55,15 @@ static void geo_node_point_instance_layout(uiLayout *layout, bContext *UNUSED(C)
 }
 
 namespace blender::nodes {
+
+static void geo_node_point_instance_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  NodeGeometryPointInstance *data = (NodeGeometryPointInstance *)MEM_callocN(
+      sizeof(NodeGeometryPointInstance), __func__);
+  data->instance_type = GEO_NODE_POINT_INSTANCE_TYPE_OBJECT;
+  data->flag |= GEO_NODE_POINT_INSTANCE_WHOLE_COLLECTION;
+  node->storage = data;
+}
 
 static void geo_node_point_instance_update(bNodeTree *UNUSED(tree), bNode *node)
 {
@@ -171,7 +189,7 @@ static void add_instances_from_component(InstancesComponent &instances,
    * (anything except for collection mode with "Whole Collection" turned off). */
   if (possible_handles.size() == 1) {
     const int handle = possible_handles.first();
-    parallel_for(IndexRange(domain_size), 1024, [&](IndexRange range) {
+    threading::parallel_for(IndexRange(domain_size), 1024, [&](IndexRange range) {
       for (const int i : range) {
         handles[i] = handle;
         transforms[i] = float4x4::from_loc_eul_scale(positions[i], rotations[i], scales[i]);
@@ -182,7 +200,7 @@ static void add_instances_from_component(InstancesComponent &instances,
   else {
     const int seed = params.get_input<int>("Seed");
     Array<uint32_t> ids = get_geometry_element_ids_as_uints(src_geometry, ATTR_DOMAIN_POINT);
-    parallel_for(IndexRange(domain_size), 1024, [&](IndexRange range) {
+    threading::parallel_for(IndexRange(domain_size), 1024, [&](IndexRange range) {
       for (const int i : range) {
         const int index = BLI_hash_int_2d(ids[i], seed) % possible_handles.size();
         const int handle = possible_handles[index];
@@ -232,15 +250,6 @@ static void geo_node_point_instance_exec(GeoNodeExecParams params)
   }
 
   params.set_output("Geometry", std::move(geometry_set_out));
-}
-
-static void geo_node_point_instance_init(bNodeTree *UNUSED(tree), bNode *node)
-{
-  NodeGeometryPointInstance *data = (NodeGeometryPointInstance *)MEM_callocN(
-      sizeof(NodeGeometryPointInstance), __func__);
-  data->instance_type = GEO_NODE_POINT_INSTANCE_TYPE_OBJECT;
-  data->flag |= GEO_NODE_POINT_INSTANCE_WHOLE_COLLECTION;
-  node->storage = data;
 }
 
 }  // namespace blender::nodes

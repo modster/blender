@@ -70,8 +70,10 @@ bool SEQ_iterator_ensure(SeqCollection *collection,
                          struct Sequence **r_seq);
 struct Sequence *SEQ_iterator_yield(SeqIterator *iterator);
 
-SeqCollection *SEQ_collection_create(void);
+SeqCollection *SEQ_collection_create(const char *name);
+uint SEQ_collection_len(const SeqCollection *collection);
 bool SEQ_collection_append_strip(struct Sequence *seq, SeqCollection *data);
+bool SEQ_collection_remove_strip(struct Sequence *seq, SeqCollection *data);
 void SEQ_collection_free(SeqCollection *collection);
 void SEQ_collection_merge(SeqCollection *collection_dst, SeqCollection *collection_src);
 void SEQ_collection_expand(struct ListBase *seqbase,
@@ -85,7 +87,11 @@ SeqCollection *SEQ_query_by_reference(struct Sequence *seq_reference,
                                                           struct ListBase *seqbase,
                                                           SeqCollection *collection));
 SeqCollection *SEQ_query_selected_strips(struct ListBase *seqbase);
+SeqCollection *SEQ_query_all_strips(ListBase *seqbase);
 SeqCollection *SEQ_query_all_strips_recursive(ListBase *seqbase);
+void SEQ_query_strip_effect_chain(struct Sequence *seq_reference,
+                                  struct ListBase *seqbase,
+                                  SeqCollection *collection);
 
 #ifdef __cplusplus
 }

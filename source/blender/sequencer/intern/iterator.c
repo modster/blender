@@ -106,12 +106,20 @@ void SEQ_collection_free(SeqCollection *collection)
  *
  * \return empty strip collection.
  */
-SeqCollection *SEQ_collection_create(void)
+SeqCollection *SEQ_collection_create(const char *name)
 {
-  SeqCollection *collection = MEM_callocN(sizeof(SeqCollection), "SeqCollection");
+  SeqCollection *collection = MEM_callocN(sizeof(SeqCollection), name);
   collection->set = BLI_gset_new(
       BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "SeqCollection GSet");
   return collection;
+}
+
+/**
+ * Return number of items in collection.
+ */
+uint SEQ_collection_len(const SeqCollection *collection)
+{
+  return BLI_gset_len(collection->set);
 }
 
 /**
@@ -128,7 +136,7 @@ SeqCollection *SEQ_query_by_reference(Sequence *seq_reference,
                                                           ListBase *seqbase,
                                                           SeqCollection *collection))
 {
-  SeqCollection *collection = SEQ_collection_create();
+  SeqCollection *collection = SEQ_collection_create(__func__);
   seq_query_func(seq_reference, seqbase, collection);
   return collection;
 }
@@ -146,6 +154,18 @@ bool SEQ_collection_append_strip(Sequence *seq, SeqCollection *collection)
   }
   BLI_gset_insert(collection->set, seq);
   return true;
+}
+
+/**
+ * Remove strip from collection.
+ *
+ * \param seq: strip to be removed
+ * \param collection: collection from which strip will be removed
+ * \return true if strip exists in set and it was removed from set, otherwise false
+ */
+bool SEQ_collection_remove_strip(Sequence *seq, SeqCollection *collection)
+{
+  return BLI_gset_remove(collection->set, seq, NULL);
 }
 
 /**
@@ -203,11 +223,26 @@ void SEQ_collection_expand(ListBase *seqbase,
  */
 SeqCollection *SEQ_query_all_strips_recursive(ListBase *seqbase)
 {
-  SeqCollection *collection = SEQ_collection_create();
+  SeqCollection *collection = SEQ_collection_create(__func__);
   LISTBASE_FOREACH (Sequence *, seq, seqbase) {
     if (seq->type == SEQ_TYPE_META) {
       SEQ_collection_merge(collection, SEQ_query_all_strips_recursive(&seq->seqbase));
     }
+    SEQ_collection_append_strip(seq, collection);
+  }
+  return collection;
+}
+
+/**
+ * Query all strips in seqbase. This does not include strips nested in meta strips.
+ *
+ * \param seqbase: ListBase in which strips are queried
+ * \return strip collection
+ */
+SeqCollection *SEQ_query_all_strips(ListBase *seqbase)
+{
+  SeqCollection *collection = SEQ_collection_create(__func__);
+  LISTBASE_FOREACH (Sequence *, seq, seqbase) {
     SEQ_collection_append_strip(seq, collection);
   }
   return collection;
@@ -221,7 +256,7 @@ SeqCollection *SEQ_query_all_strips_recursive(ListBase *seqbase)
  */
 SeqCollection *SEQ_query_selected_strips(ListBase *seqbase)
 {
-  SeqCollection *collection = SEQ_collection_create();
+  SeqCollection *collection = SEQ_collection_create(__func__);
   LISTBASE_FOREACH (Sequence *, seq, seqbase) {
     if ((seq->flag & SELECT) == 0) {
       continue;
@@ -229,4 +264,43 @@ SeqCollection *SEQ_query_selected_strips(ListBase *seqbase)
     SEQ_collection_append_strip(seq, collection);
   }
   return collection;
+}
+
+/**
+ * Query all effect strips that are directly or indirectly connected to seq_reference.
+ * This includes all effects of seq_reference, strips used by another inputs and their effects, so
+ * that whole chain is fully independent of other strips.
+ *
+ * \param seq_reference: reference strip
+ * \param seqbase: ListBase in which strips are queried
+ * \param collection: collection to be filled
+ */
+void SEQ_query_strip_effect_chain(Sequence *seq_reference,
+                                  ListBase *seqbase,
+                                  SeqCollection *collection)
+{
+  if (!SEQ_collection_append_strip(seq_reference, collection)) {
+    return; /* Strip is already in set, so all effects connected to it are as well. */
+  }
+
+  /* Find all strips that seq_reference is connected to. */
+  if (seq_reference->type & SEQ_TYPE_EFFECT) {
+    if (seq_reference->seq1) {
+      SEQ_query_strip_effect_chain(seq_reference->seq1, seqbase, collection);
+    }
+    if (seq_reference->seq2) {
+      SEQ_query_strip_effect_chain(seq_reference->seq2, seqbase, collection);
+    }
+    if (seq_reference->seq3) {
+      SEQ_query_strip_effect_chain(seq_reference->seq3, seqbase, collection);
+    }
+  }
+
+  /* Find all strips connected to seq_reference. */
+  LISTBASE_FOREACH (Sequence *, seq_test, seqbase) {
+    if (seq_test->seq1 == seq_reference || seq_test->seq2 == seq_reference ||
+        seq_test->seq3 == seq_reference) {
+      SEQ_query_strip_effect_chain(seq_test, seqbase, collection);
+    }
+  }
 }

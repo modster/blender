@@ -22,10 +22,20 @@
 using blender::float3;
 using blender::MutableSpan;
 using blender::Span;
+using blender::fn::GVArray;
+using blender::fn::GVArrayPtr;
 
-SplinePtr PolySpline::copy() const
+void PolySpline::copy_settings(Spline &UNUSED(dst)) const
 {
-  return std::make_unique<PolySpline>(*this);
+  /* Poly splines have no settings not covered by the base class. */
+}
+
+void PolySpline::copy_data(Spline &dst) const
+{
+  PolySpline &poly = static_cast<PolySpline &>(dst);
+  poly.positions_ = positions_;
+  poly.radii_ = radii_;
+  poly.tilts_ = tilts_;
 }
 
 int PolySpline::size() const
@@ -36,6 +46,9 @@ int PolySpline::size() const
   return size;
 }
 
+/**
+ * \warning Call #reallocate on the spline's attributes after adding all points.
+ */
 void PolySpline::add_point(const float3 position, const float radius, const float tilt)
 {
   positions_.append(position);
@@ -50,6 +63,7 @@ void PolySpline::resize(const int size)
   radii_.resize(size);
   tilts_.resize(size);
   this->mark_cache_invalid();
+  attributes.reallocate(size);
 }
 
 MutableSpan<float3> PolySpline::positions()
@@ -104,10 +118,9 @@ Span<float3> PolySpline::evaluated_positions() const
  * the original data. Therefore the lifetime of the returned virtual array must not be longer than
  * the source data.
  */
-blender::fn::GVArrayPtr PolySpline::interpolate_to_evaluated_points(
-    const blender::fn::GVArray &source_data) const
+GVArrayPtr PolySpline::interpolate_to_evaluated(const GVArray &src) const
 {
-  BLI_assert(source_data.size() == this->size());
+  BLI_assert(src.size() == this->size());
 
-  return source_data.shallow_copy();
+  return src.shallow_copy();
 }

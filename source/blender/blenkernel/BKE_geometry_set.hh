@@ -39,7 +39,8 @@ struct Mesh;
 struct Object;
 struct PointCloud;
 struct Volume;
-class CurveEval;
+struct Curve;
+struct CurveEval;
 
 enum class GeometryOwnershipType {
   /* The geometry is owned. This implies that it can be changed. */
@@ -279,8 +280,6 @@ struct GeometrySet {
   void compute_boundbox_without_instances(blender::float3 *r_min, blender::float3 *r_max) const;
 
   friend std::ostream &operator<<(std::ostream &stream, const GeometrySet &geometry_set);
-  friend bool operator==(const GeometrySet &a, const GeometrySet &b);
-  uint64_t hash() const;
 
   void clear();
 
@@ -326,10 +325,6 @@ class MeshComponent : public GeometryComponent {
  private:
   Mesh *mesh_ = nullptr;
   GeometryOwnershipType ownership_ = GeometryOwnershipType::Owned;
-  /* Due to historical design choices, vertex group data is stored in the mesh, but the vertex
-   * group names are stored on an object. Since we don't have an object here, we copy over the
-   * names into this map. */
-  blender::Map<std::string, int> vertex_group_names_;
 
  public:
   MeshComponent();
@@ -339,13 +334,7 @@ class MeshComponent : public GeometryComponent {
   void clear();
   bool has_mesh() const;
   void replace(Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
-  void replace_mesh_but_keep_vertex_group_names(
-      Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   Mesh *release();
-
-  void copy_vertex_group_names_from_object(const struct Object &object);
-  const blender::Map<std::string, int> &vertex_group_names() const;
-  blender::Map<std::string, int> &vertex_group_names();
 
   const Mesh *get_for_read() const;
   Mesh *get_for_write();
@@ -406,6 +395,15 @@ class CurveComponent : public GeometryComponent {
   CurveEval *curve_ = nullptr;
   GeometryOwnershipType ownership_ = GeometryOwnershipType::Owned;
 
+  /**
+   * Curve data necessary to hold the draw cache for rendering, consistent over multiple redraws.
+   * This is necessary because Blender assumes that objects evaluate to an object data type, and
+   * we use #CurveEval rather than #Curve here. It also allows us to mostly reuse the same
+   * batch cache implementation.
+   */
+  mutable Curve *curve_for_render_ = nullptr;
+  mutable std::mutex curve_for_render_mutex_;
+
  public:
   CurveComponent();
   ~CurveComponent();
@@ -420,11 +418,17 @@ class CurveComponent : public GeometryComponent {
   CurveEval *get_for_write();
 
   int attribute_domain_size(const AttributeDomain domain) const final;
+  std::unique_ptr<blender::fn::GVArray> attribute_try_adapt_domain(
+      std::unique_ptr<blender::fn::GVArray> varray,
+      const AttributeDomain from_domain,
+      const AttributeDomain to_domain) const final;
 
   bool is_empty() const final;
 
   bool owns_direct_data() const override;
   void ensure_owns_direct_data() override;
+
+  const Curve *get_curve_for_render() const;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_CURVE;
 

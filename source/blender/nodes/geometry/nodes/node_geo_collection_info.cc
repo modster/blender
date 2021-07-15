@@ -24,7 +24,16 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_collection_info_in[] = {
-    {SOCK_COLLECTION, N_("Collection")},
+    {SOCK_COLLECTION,
+     N_("Collection"),
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     PROP_NONE,
+     SOCK_HIDE_LABEL},
     {-1, ""},
 };
 
@@ -39,6 +48,14 @@ static void geo_node_collection_info_layout(uiLayout *layout, bContext *UNUSED(C
 }
 
 namespace blender::nodes {
+
+static void geo_node_collection_info_node_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  NodeGeometryCollectionInfo *data = (NodeGeometryCollectionInfo *)MEM_callocN(
+      sizeof(NodeGeometryCollectionInfo), __func__);
+  data->transform_space = GEO_NODE_TRANSFORM_SPACE_ORIGINAL;
+  node->storage = data;
+}
 
 static void geo_node_collection_info_exec(GeoNodeExecParams params)
 {
@@ -72,14 +89,6 @@ static void geo_node_collection_info_exec(GeoNodeExecParams params)
   instances.add_instance(handle, transform_mat, -1);
 
   params.set_output("Geometry", geometry_set_out);
-}
-
-static void geo_node_collection_info_node_init(bNodeTree *UNUSED(tree), bNode *node)
-{
-  NodeGeometryCollectionInfo *data = (NodeGeometryCollectionInfo *)MEM_callocN(
-      sizeof(NodeGeometryCollectionInfo), __func__);
-  data->transform_space = GEO_NODE_TRANSFORM_SPACE_ORIGINAL;
-  node->storage = data;
 }
 
 }  // namespace blender::nodes

@@ -51,12 +51,34 @@ static void geo_node_align_rotation_to_vector_layout(uiLayout *layout,
 
 namespace blender::nodes {
 
+static void geo_node_align_rotation_to_vector_init(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  NodeGeometryAlignRotationToVector *node_storage = (NodeGeometryAlignRotationToVector *)
+      MEM_callocN(sizeof(NodeGeometryAlignRotationToVector), __func__);
+
+  node_storage->axis = GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_X;
+  node_storage->input_type_factor = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
+  node_storage->input_type_vector = GEO_NODE_ATTRIBUTE_INPUT_VECTOR;
+
+  node->storage = node_storage;
+}
+
+static void geo_node_align_rotation_to_vector_update(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  NodeGeometryAlignRotationToVector *node_storage = (NodeGeometryAlignRotationToVector *)
+                                                        node->storage;
+  update_attribute_input_socket_availabilities(
+      *node, "Factor", (GeometryNodeAttributeInputMode)node_storage->input_type_factor);
+  update_attribute_input_socket_availabilities(
+      *node, "Vector", (GeometryNodeAttributeInputMode)node_storage->input_type_vector);
+}
+
 static void align_rotations_auto_pivot(const VArray<float3> &vectors,
                                        const VArray<float> &factors,
                                        const float3 local_main_axis,
                                        const MutableSpan<float3> rotations)
 {
-  parallel_for(IndexRange(vectors.size()), 128, [&](IndexRange range) {
+  threading::parallel_for(IndexRange(vectors.size()), 128, [&](IndexRange range) {
     for (const int i : range) {
       const float3 vector = vectors[i];
       if (is_zero_v3(vector)) {
@@ -107,7 +129,7 @@ static void align_rotations_fixed_pivot(const VArray<float3> &vectors,
     return;
   }
 
-  parallel_for(IndexRange(vectors.size()), 128, [&](IndexRange range) {
+  threading::parallel_for(IndexRange(vectors.size()), 128, [&](IndexRange range) {
     for (const int i : range) {
       const float3 vector = vectors[i];
       if (is_zero_v3(vector)) {
@@ -193,28 +215,6 @@ static void geo_node_align_rotation_to_vector_exec(GeoNodeExecParams params)
   }
 
   params.set_output("Geometry", geometry_set);
-}
-
-static void geo_node_align_rotation_to_vector_init(bNodeTree *UNUSED(ntree), bNode *node)
-{
-  NodeGeometryAlignRotationToVector *node_storage = (NodeGeometryAlignRotationToVector *)
-      MEM_callocN(sizeof(NodeGeometryAlignRotationToVector), __func__);
-
-  node_storage->axis = GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_X;
-  node_storage->input_type_factor = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
-  node_storage->input_type_vector = GEO_NODE_ATTRIBUTE_INPUT_VECTOR;
-
-  node->storage = node_storage;
-}
-
-static void geo_node_align_rotation_to_vector_update(bNodeTree *UNUSED(ntree), bNode *node)
-{
-  NodeGeometryAlignRotationToVector *node_storage = (NodeGeometryAlignRotationToVector *)
-                                                        node->storage;
-  update_attribute_input_socket_availabilities(
-      *node, "Factor", (GeometryNodeAttributeInputMode)node_storage->input_type_factor);
-  update_attribute_input_socket_availabilities(
-      *node, "Vector", (GeometryNodeAttributeInputMode)node_storage->input_type_vector);
 }
 
 }  // namespace blender::nodes

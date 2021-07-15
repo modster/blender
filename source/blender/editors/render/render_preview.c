@@ -70,6 +70,7 @@
 #include "BKE_node.h"
 #include "BKE_object.h"
 #include "BKE_scene.h"
+#include "BKE_screen.h"
 #include "BKE_texture.h"
 #include "BKE_world.h"
 
@@ -252,7 +253,7 @@ static const char *preview_collection_name(const char pr_type)
     case MA_ATMOS:
       return "Atmosphere";
     default:
-      BLI_assert(!"Unknown preview type");
+      BLI_assert_msg(0, "Unknown preview type");
       return "";
   }
 }
@@ -334,7 +335,7 @@ static ID *duplicate_ids(ID *id, const bool allow_failure)
       return NULL;
     default:
       if (!allow_failure) {
-        BLI_assert(!"ID type preview not supported.");
+        BLI_assert_msg(0, "ID type preview not supported.");
       }
       return NULL;
   }
@@ -610,9 +611,7 @@ static bool ed_preview_draw_rect(ScrArea *area, int split, int first, rcti *rect
         float fy = rect->ymin;
 
         /* material preview only needs monoscopy (view 0) */
-        if (re) {
-          RE_AcquiredResultGet32(re, &rres, (uint *)rect_byte, 0);
-        }
+        RE_AcquiredResultGet32(re, &rres, (uint *)rect_byte, 0);
 
         IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
         immDrawPixelsTex(
@@ -776,21 +775,26 @@ static void object_preview_render(IconPreview *preview, IconPreviewSize *preview
 
   U.pixelsize = 2.0f;
 
+  View3DShading shading;
+  BKE_screen_view3d_shading_init(&shading);
+  /* Enable shadows, makes it a bit easier to see the shape. */
+  shading.flag |= V3D_SHADING_SHADOW;
+
   ImBuf *ibuf = ED_view3d_draw_offscreen_imbuf_simple(
       depsgraph,
       DEG_get_evaluated_scene(depsgraph),
-      NULL,
-      OB_SOLID,
+      &shading,
+      OB_TEXTURE,
       DEG_get_evaluated_object(depsgraph, scene->camera),
       preview_sized->sizex,
       preview_sized->sizey,
       IB_rect,
-      V3D_OFSDRAW_NONE,
+      V3D_OFSDRAW_OVERRIDE_SCENE_SETTINGS,
       R_ALPHAPREMUL,
       NULL,
       NULL,
       err_out);
-  /* TODO color-management? */
+  /* TODO: color-management? */
 
   U.pixelsize = pixelsize_old;
 
@@ -951,7 +955,7 @@ static void shader_preview_texture(ShaderPreview *sp, Tex *tex, Scene *sce, Rend
     for (int x = 0; x < width; x++) {
       tex_coord[0] = ((float)x / (float)height) * 2.0f - 1.0f;
 
-      /* Evaluate texture at tex_coord .*/
+      /* Evaluate texture at tex_coord. */
       TexResult texres = {0};
       BKE_texture_get_value_ex(sce, tex, tex_coord, &texres, img_pool, color_manage);
 
@@ -1465,7 +1469,7 @@ static int icon_previewimg_size_index_get(const IconPreviewSize *icon_size,
     }
   }
 
-  BLI_assert(!"The searched icon size does not match any in the preview image");
+  BLI_assert_msg(0, "The searched icon size does not match any in the preview image");
   return -1;
 }
 

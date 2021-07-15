@@ -21,11 +21,11 @@
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_geometry_set_instances.hh"
-#include "BKE_node_ui_storage.hh"
 
 #include "DNA_node_types.h"
 
 #include "NOD_derived_node_tree.hh"
+#include "NOD_geometry_nodes_eval_log.hh"
 
 struct Depsgraph;
 struct ModifierData;
@@ -52,10 +52,11 @@ using fn::GVMutableArray;
 using fn::GVMutableArray_GSpan;
 using fn::GVMutableArray_Typed;
 using fn::GVMutableArrayPtr;
+using geometry_nodes_eval_log::NodeWarningType;
 
 /**
- * This class exists to separate the memory management details of the geometry nodes evaluator from
- * the node execution functions and related utilities.
+ * This class exists to separate the memory management details of the geometry nodes evaluator
+ * from the node execution functions and related utilities.
  */
 class GeoNodeExecParamsProvider {
  public:
@@ -63,6 +64,7 @@ class GeoNodeExecParamsProvider {
   const Object *self_object = nullptr;
   const ModifierData *modifier = nullptr;
   Depsgraph *depsgraph = nullptr;
+  geometry_nodes_eval_log::GeoLogger *logger = nullptr;
 
   /**
    * Returns true when the node is allowed to get/extract the input value. The identifier is
@@ -96,7 +98,18 @@ class GeoNodeExecParamsProvider {
    * Prepare a memory buffer for an output value of the node. The returned memory has to be
    * initialized by the caller. The identifier and type are expected to be correct.
    */
-  virtual GMutablePointer alloc_output_value(StringRef identifier, const CPPType &type) = 0;
+  virtual GMutablePointer alloc_output_value(const CPPType &type) = 0;
+
+  /**
+   * The value has been allocated with #alloc_output_value.
+   */
+  virtual void set_output(StringRef identifier, GMutablePointer value) = 0;
+
+  /* A description for these methods is provided in GeoNodeExecParams. */
+  virtual void set_input_unused(StringRef identifier) = 0;
+  virtual bool output_is_required(StringRef identifier) const = 0;
+  virtual bool lazy_require_input(StringRef identifier) = 0;
+  virtual bool lazy_output_is_required(StringRef identifier) const = 0;
 };
 
 class GeoNodeExecParams {
@@ -174,8 +187,48 @@ class GeoNodeExecParams {
 #ifdef DEBUG
     this->check_output_access(identifier, type);
 #endif
-    GMutablePointer gvalue = provider_->alloc_output_value(identifier, type);
+    GMutablePointer gvalue = provider_->alloc_output_value(type);
     new (gvalue.get()) StoredT(std::forward<T>(value));
+    provider_->set_output(identifier, gvalue);
+  }
+
+  /**
+   * Tell the evaluator that a specific input won't be used anymore.
+   */
+  void set_input_unused(StringRef identifier)
+  {
+    provider_->set_input_unused(identifier);
+  }
+
+  /**
+   * Returns true when the output has to be computed.
+   * Nodes that support laziness could use the #lazy_output_is_required variant to possibly avoid
+   * some computations.
+   */
+  bool output_is_required(StringRef identifier) const
+  {
+    return provider_->output_is_required(identifier);
+  }
+
+  /**
+   * Tell the evaluator that a specific input is required.
+   * This returns true when the input will only be available in the next execution.
+   * False is returned if the input is available already.
+   * This can only be used when the node supports laziness.
+   */
+  bool lazy_require_input(StringRef identifier)
+  {
+    return provider_->lazy_require_input(identifier);
+  }
+
+  /**
+   * Asks the evaluator if a specific output is required right now. If this returns false, the
+   * value might still need to be computed later.
+   * This can only be used when the node supports laziness.
+   */
+  bool lazy_output_is_required(StringRef identifier)
+  {
+    return provider_->lazy_output_is_required(identifier);
   }
 
   /**
@@ -243,7 +296,7 @@ class GeoNodeExecParams {
   void check_input_access(StringRef identifier, const CPPType *requested_type = nullptr) const;
   void check_output_access(StringRef identifier, const CPPType &value_type) const;
 
-  /* Find the active socket socket with the input name (not the identifier). */
+  /* Find the active socket with the input name (not the identifier). */
   const bNodeSocket *find_available_socket(const StringRef name) const;
 };
 

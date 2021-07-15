@@ -333,7 +333,7 @@ static M44d get_interpolated_matrix_for_time(const MatrixSampleMap &samples, chr
 
   chrono_t t = (time - prev_time) / (next_time - prev_time);
 
-  /* ensure rotation around the shortest angle  */
+  /* Ensure rotation around the shortest angle. */
   if ((prev_rotation ^ next_rotation) < 0) {
     next_rotation = -next_rotation;
   }
@@ -654,8 +654,7 @@ static void update_attributes(AttributeSet &attributes, CachedData &cached_data,
   list<Attribute>::iterator it;
   for (it = attributes.attributes.begin(); it != attributes.attributes.end();) {
     if (cached_attributes.find(&(*it)) == cached_attributes.end()) {
-      attributes.attributes.erase(it++);
-      attributes.modified = true;
+      attributes.remove(it++);
       continue;
     }
 

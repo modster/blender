@@ -75,7 +75,7 @@ void DEG_graph_tag_relations_update(struct Depsgraph *graph);
 /* Create or update relations in the specified graph. */
 void DEG_graph_relations_update(struct Depsgraph *graph);
 
-/* Tag all relations in the database for update.*/
+/* Tag all relations in the database for update. */
 void DEG_relations_tag_update(struct Main *bmain);
 
 /* Add Dependencies  ----------------------------- */
@@ -92,7 +92,7 @@ typedef enum eDepsSceneComponentType {
    * (i.e. just SDNA property setting). */
   DEG_SCENE_COMP_PARAMETERS,
   /* Animation Component
-   * TODO(sergey): merge in with parameters?  */
+   * TODO(sergey): merge in with parameters? */
   DEG_SCENE_COMP_ANIMATION,
   /* Sequencer Component (Scene Only). */
   DEG_SCENE_COMP_SEQUENCER,
@@ -188,6 +188,8 @@ void DEG_add_customdata_mask(struct DepsNodeHandle *handle,
 
 struct ID *DEG_get_id_from_handle(struct DepsNodeHandle *node_handle);
 struct Depsgraph *DEG_get_graph_from_handle(struct DepsNodeHandle *node_handle);
+
+bool DEG_object_has_geometry_component(struct Object *object);
 
 /* ************************************************ */
 

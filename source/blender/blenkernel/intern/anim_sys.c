@@ -852,7 +852,7 @@ NlaEvalStrip *nlastrips_ctime_get_strip(ListBase *list,
 
   /* loop over strips, checking if they fall within the range */
   for (strip = strips->first; strip; strip = strip->next) {
-    /* check if current time occurs within this strip  */
+    /* Check if current time occurs within this strip. */
     if (IN_RANGE_INCL(ctime, strip->start, strip->end) ||
         (strip->flag & NLASTRIP_FLAG_NO_TIME_MAP)) {
       /* this strip is active, so try to use it */
@@ -1457,7 +1457,7 @@ static float nla_blend_value(const int blendmode,
       return influence * (lower_value * strip_value) + (1 - influence) * lower_value;
 
     case NLASTRIP_MODE_COMBINE:
-      BLI_assert(!"combine mode");
+      BLI_assert_msg(0, "combine mode");
       ATTR_FALLTHROUGH;
 
     default:
@@ -1495,7 +1495,7 @@ static float nla_combine_value(const int mix_mode,
       return lower_value * powf(strip_value / base_value, influence);
 
     default:
-      BLI_assert(!"invalid mix mode");
+      BLI_assert_msg(0, "invalid mix mode");
       return lower_value;
   }
 }
@@ -1546,7 +1546,7 @@ static bool nla_blend_get_inverted_strip_value(const int blendmode,
       return true;
 
     case NLASTRIP_MODE_COMBINE:
-      BLI_assert(!"combine mode");
+      BLI_assert_msg(0, "combine mode");
       ATTR_FALLTHROUGH;
 
     default:
@@ -1564,7 +1564,7 @@ static bool nla_blend_get_inverted_strip_value(const int blendmode,
   }
 }
 
-/** \returns true if solution exists and output is written to.  */
+/** \returns true if solution exists and output is written to. */
 static bool nla_combine_get_inverted_strip_value(const int mix_mode,
                                                  float base_value,
                                                  const float lower_value,
@@ -1602,7 +1602,7 @@ static bool nla_combine_get_inverted_strip_value(const int mix_mode,
       return true;
 
     default:
-      BLI_assert(!"invalid mix mode");
+      BLI_assert_msg(0, "invalid mix mode");
       return false;
   }
 }
@@ -2017,7 +2017,7 @@ static void nlaeval_fmodifiers_join_stacks(ListBase *result, ListBase *list1, Li
 {
   FModifier *fcm1, *fcm2;
 
-  /* if list1 is invalid...  */
+  /* if list1 is invalid... */
   if (ELEM(NULL, list1, list1->first)) {
     if (list2 && list2->first) {
       result->first = list2->first;
@@ -2746,7 +2746,7 @@ static void animsys_evaluate_nla_for_keyframing(PointerRNA *ptr,
     }
   }
 
-  /** Note: Although we early out, we can still keyframe to the non-pushed action since the
+  /** NOTE: Although we early out, we can still keyframe to the non-pushed action since the
    * keyframe remap function detects (r_context->strip.act == NULL) and will keyframe without
    * remapping.
    */
@@ -3033,7 +3033,7 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
   NlaEvalChannel *nec = nlaevalchan_verify_key(eval_data, NULL, &key);
   BLI_assert(nec);
   if (nec->base_snapshot.length != count) {
-    BLI_assert(!"invalid value count");
+    BLI_assert_msg(0, "invalid value count");
     nlaeval_snapshot_free_data(&blended_snapshot);
     return false;
   }
@@ -3126,7 +3126,7 @@ static void animsys_evaluate_overrides(PointerRNA *ptr, AnimData *adt)
  *
  * 3) Drivers/expressions are evaluated on top of this, in an order where dependencies are
  *    resolved nicely.
- *    Note: it may be necessary to have some tools to handle the cases where some higher-level
+ *    NOTE: it may be necessary to have some tools to handle the cases where some higher-level
  *          drivers are added and cause some problematic dependencies that
  *          didn't exist in the local levels...
  *
