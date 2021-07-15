@@ -1414,7 +1414,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         /* Ensure the faces are triangulated before calling this function */
         BLI_assert(face.verts.size() == 3);
 
-        auto &other_vert = this->get_checked_other_vert(edge_b, face);
+        auto &edge_c = this->get_checked_edge(edge_index);
+        auto &other_vert = this->get_checked_other_vert(edge_c, face);
 
         /* TODO(ish): Ordering of the verts and nodes needs to be found correctly */
         /* Handle new face and new edge creation */
