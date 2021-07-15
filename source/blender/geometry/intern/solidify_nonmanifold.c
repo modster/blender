@@ -20,7 +20,6 @@
 
 #include "BKE_customdata.h"
 #include "BKE_mesh.h"
-#include "BKE_solidifiy.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -28,6 +27,8 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
+
+#include "GEO_solidifiy.h"
 
 #include "MEM_guardedalloc.h"
 

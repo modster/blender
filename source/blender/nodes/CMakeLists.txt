@@ -33,6 +33,7 @@ set(INC
   ../bmesh
   ../depsgraph
   ../functions
+  ../geometry
   ../gpu
   ../imbuf
   ../makesdna
@@ -379,6 +380,7 @@ set(SRC
 set(LIB
   bf_bmesh
   bf_functions
+  bf_geometry
   bf_intern_sky
 )
 

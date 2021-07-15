@@ -15,11 +15,12 @@
  */
 
 #include "BKE_node.h"
-#include "BKE_solidifiy.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_node_types.h"
+
+#include "GEO_solidifiy.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"

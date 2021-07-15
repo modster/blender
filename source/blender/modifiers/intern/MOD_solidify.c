@@ -36,7 +36,8 @@
 #include "BKE_context.h"
 #include "BKE_deform.h"
 #include "BKE_screen.h"
-#include "BKE_solidifiy.h"
+
+#include "GEO_solidifiy.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
