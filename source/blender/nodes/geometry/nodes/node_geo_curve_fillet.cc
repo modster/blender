@@ -120,12 +120,19 @@ static float3 get_center(const float3 vec_pos2prev,
                          const float angle)
 {
   float3 vec_pos2center;
-  float len_pos2prev = vec_pos2prev.length();
-  float len_pos2center = len_pos2prev / cos(angle / 2);
-  rotate_v3_v3v3fl(vec_pos2center, vec_pos2prev, axis, angle);
-  vec_pos2center *= len_pos2center / len_pos2prev;
+  rotate_v3_v3v3fl(vec_pos2center, vec_pos2prev, axis, M_PI_2 - angle / 2);
+  vec_pos2center *= 1 / sinf(angle / 2);
 
   return vec_pos2center + pos;
+}
+
+static float3 get_center(const float3 vec_pos2prev, const FilletData &fd)
+{
+  float angle = fd.angle;
+  float3 axis = fd.axis;
+  float3 pos = fd.pos;
+
+  return get_center(vec_pos2prev, pos, axis, angle);
 }
 
 static FilletData calculate_fillet_data(const float3 prev_pos,
@@ -282,15 +289,40 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
     float handle_length = 4.0f * fd.radius / 3 * tanf(segment_angle / 4);
     float displacement = fd.radius * tanf(fd.angle / 2);
 
+    /* Position the end points of the arc. */
     int end_i = next_i + count - 1;
+    float3 left_handle = dst_spline.handle_positions_left()[next_i] -
+                         dst_spline.positions()[next_i];
+    float3 right_handle = dst_spline.handle_positions_right()[next_i] -
+                          dst_spline.positions()[next_i];
     dst_spline.positions()[next_i] = fd.pos + displacement * fd.prev_dir;
     dst_spline.positions()[end_i] = fd.pos + displacement * fd.next_dir;
-    dst_spline.handle_types_right()[next_i] = dst_spline.handle_types_right()[end_i] =
-        BezierSpline::HandleType::Align;
     dst_spline.handle_positions_right()[next_i] = dst_spline.positions()[next_i] -
                                                   handle_length * fd.prev_dir;
     dst_spline.handle_positions_left()[end_i] = dst_spline.positions()[end_i] -
                                                 handle_length * fd.next_dir;
+
+    dst_spline.handle_types_right()[next_i] = dst_spline.handle_types_left()[end_i] =
+        BezierSpline::HandleType::Align;
+
+    float3 center = get_center(dst_spline.positions()[next_i] - fd.pos, fd);
+    float3 radius_vec = dst_spline.positions()[next_i] - center;
+
+    for (int j = 1; j < count - 1; j++) {
+      int index = next_i + j;
+      float3 new_radius_vec, tangent_vec;
+      rotate_v3_v3v3fl(new_radius_vec, radius_vec, -fd.axis, segment_angle);
+      rotate_v3_v3v3fl(tangent_vec, new_radius_vec, fd.axis, M_PI_2);
+      radius_vec = new_radius_vec;
+
+      normalize_v3_length(tangent_vec, handle_length);
+
+      dst_spline.positions()[index] = center + new_radius_vec;
+      dst_spline.handle_types_right()[index] = dst_spline.handle_types_right()[index] =
+          BezierSpline::HandleType::Align;
+      dst_spline.handle_positions_left()[index] = dst_spline.positions()[index] + tangent_vec;
+      dst_spline.handle_positions_right()[index] = dst_spline.positions()[index] - tangent_vec;
+    }
 
     next_i += count;
   }
