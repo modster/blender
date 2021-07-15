@@ -26,10 +26,6 @@
 
 #include "node_geometry_util.hh"
 
-/*extern "C" {    // another way
-  Mesh *solidify_extrude_modifyMesh( Mesh *mesh);
-};*/
-
 static bNodeSocketTemplate geo_node_solidify_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_STRING, N_("Thickness")},
