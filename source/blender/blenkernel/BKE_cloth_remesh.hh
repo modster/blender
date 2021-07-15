@@ -1541,6 +1541,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto &n1 = this->get_checked_node_of_vert(v1_a);
     auto &n2 = this->get_checked_node_of_vert(v2_a);
     auto n1_index = n1.self_index;
+    auto n2_index = n2.self_index;
 
     blender::Vector<EdgeIndex> edge_indices = {edge_index};
     if (across_seams) {
@@ -1628,11 +1629,20 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
-    /* delete n1 if it doesn't have any `Vert`s */
+    /* if `n1` has any verts, make them point to `v2` and then delete `n1` */
     {
-      auto n1 = this->get_checked_node(n1_index);
-      if (n1.verts.is_empty()) {
+      auto &n1 = this->get_checked_node(n1_index);
+
+      auto n1_verts = n1.verts;
+      for (const auto &vert_index : n1_verts) {
+        auto &v1 = this->get_checked_vert(vert_index);
+        v1.node = n2_index;
+        n1.verts.remove_first_occurrence_and_reorder(v1.self_index);
+      }
+
+      {
         auto n1 = this->delete_node(n1_index);
+        BLI_assert(n1.verts.is_empty());
         deleted_nodes.append(std::move(n1));
       }
     }
