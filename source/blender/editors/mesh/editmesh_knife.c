@@ -1684,6 +1684,9 @@ static void knife_add_single_cut(KnifeTool_OpData *kcd,
   if (kfe->basef && !find_ref(&kfe->faces, kfe->basef)) {
     knife_edge_append_face(kcd, kfe, kfe->basef);
   }
+
+  /* Update current undo frame cut count. */
+  kcd->undo->cuts++;
 }
 
 /* Given a list of KnifeLineHits for one face, sorted by l
@@ -2017,7 +2020,6 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
   BLI_ghash_free(facehits, NULL, NULL);
   MEM_freeN(kcd->linehits);
   kcd->linehits = NULL;
-  kcd->undo->cuts = kcd->totlinehit - 1;
   kcd->totlinehit = 0;
 }
 
