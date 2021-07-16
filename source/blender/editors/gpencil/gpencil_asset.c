@@ -68,16 +68,12 @@
 
 /* Temporary Asset import operation data */
 typedef struct tGPDasset {
-  /** Current window from context. */
   struct wmWindow *win;
-  /** Current depsgraph from context. */
   struct Depsgraph *depsgraph;
-  /** current scene from context. */
   struct Scene *scene;
-  /** area where painting originated. */
   struct ScrArea *area;
-  /** region where painting originated. */
   struct ARegion *region;
+  struct RegionView3D *rv3d;
   /** Current object. */
   struct Object *ob;
   /** Current GP datablock. */
@@ -377,6 +373,7 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   tgpa->scene = CTX_data_scene(C);
   tgpa->area = CTX_wm_area(C);
   tgpa->region = CTX_wm_region(C);
+  tgpa->rv3d = CTX_wm_region_view3d(C);
   tgpa->ob = CTX_data_active_object(C);
 
   /* Setup space conversions data. */
@@ -544,28 +541,43 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
 /* Helper: Transfrom the stroke with mouse movements. */
 static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
 {
-  switch (tgpa->mode) {
-    case GP_ASSET_TRANSFORM_LOC: {
-      float vec[3];
-      vec[0] = (mouse[0] - tgpa->mouse[0]) / 100.0f;
-      vec[1] = 0.0f;
-      vec[2] = (mouse[1] - tgpa->mouse[1]) / 100.0f;
-      GHashIterator gh_iter;
-      GHASH_ITER (gh_iter, tgpa->asset_strokes) {
-        bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-        const bGPDspoint *pt;
-        int i;
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+  /* Get the vector with the movement done by the mouse since last event. */
+  float origin_pt[3], dest_pt[3];
+  float mousef[2];
+  copy_v2fl_v2i(mousef, tgpa->mouse);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, origin_pt);
+
+  copy_v2fl_v2i(mousef, mouse);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, dest_pt);
+
+  float vec[3];
+  sub_v3_v3v3(vec, dest_pt, origin_pt);
+
+  GHashIterator gh_iter;
+  GHASH_ITER (gh_iter, tgpa->asset_strokes) {
+    bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
+    const bGPDspoint *pt;
+    int i;
+    for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+      switch (tgpa->mode) {
+        case GP_ASSET_TRANSFORM_LOC: {
           add_v3_v3(&pt->x, vec);
+          break;
         }
-        BKE_gpencil_stroke_boundingbox_calc(gps);
+        case GP_ASSET_TRANSFORM_ROT: {
+          break;
+        }
+        case GP_ASSET_TRANSFORM_SCALE: {
+          break;
+        }
+        default:
+          break;
       }
-      copy_v2_v2_int(tgpa->mouse, mouse);
-      break;
     }
-    default:
-      break;
+
+    BKE_gpencil_stroke_boundingbox_calc(gps);
   }
+  copy_v2_v2_int(tgpa->mouse, mouse);
 }
 
 /* Helper: Load all strokes in the target datablock. */
