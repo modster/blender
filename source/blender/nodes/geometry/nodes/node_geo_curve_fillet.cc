@@ -135,12 +135,12 @@ static float3 get_center(const float3 vec_pos2prev, const FilletData &fd)
   return get_center(vec_pos2prev, pos, axis, angle);
 }
 
-static FilletData calculate_fillet_data(const float3 prev_pos,
-                                        const float3 pos,
-                                        const float3 next_pos,
-                                        const std::optional<float> arc_angle,
-                                        const std::optional<int> count,
-                                        const float radius)
+static FilletData calculate_fillet_data_per_vertex(const float3 prev_pos,
+                                                   const float3 pos,
+                                                   const float3 next_pos,
+                                                   const std::optional<float> arc_angle,
+                                                   const std::optional<int> count,
+                                                   const float radius)
 {
   FilletData fd;
   float3 vec_pos2prev = prev_pos - pos;
@@ -156,50 +156,17 @@ static FilletData calculate_fillet_data(const float3 prev_pos,
   return fd;
 }
 
-static Array<int> create_dst_to_src_map(const Array<int> point_counts, const int total_points)
+static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
+                                               const FilletModeParam &mode_param,
+                                               int &added_count,
+                                               Array<int> &point_counts)
 {
-  Array<int> map(total_points);
-  int index = 0;
+  Span<float3> positions = spline->positions();
+  std::string radii_name = mode_param.radii_dist.value();
+  GVArray_Typed<float> *radii_dist = mode_param.radii;
+  int fillet_count, start = 0, size = spline->size();
 
-  for (int i = 0; i < point_counts.size(); i++) {
-    for (int j = 0; j < point_counts[i]; j++) {
-      map[index] = i;
-      index++;
-    }
-  }
-
-  BLI_assert(index == total_points);
-
-  return map;
-}
-
-template<typename T>
-static void copy_attribute_by_mapping(Span<T> src, MutableSpan<T> dst, Array<int> mapping)
-{
-  for (const int i : dst.index_range()) {
-    dst[i] = src[mapping[i]];
-  }
-}
-
-static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
-                                              BezierSpline &dst,
-                                              Array<int> mapping)
-{
-  copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
-  copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
-  copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
-  copy_attribute_by_mapping(src.handle_types_left(), dst.handle_types_left(), mapping);
-  copy_attribute_by_mapping(src.handle_types_right(), dst.handle_types_right(), mapping);
-  copy_attribute_by_mapping(src.handle_positions_left(), dst.handle_positions_left(), mapping);
-  copy_attribute_by_mapping(src.handle_positions_right(), dst.handle_positions_right(), mapping);
-}
-
-static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModeParam &mode_param)
-{
-  int fillet_count, start = 0, size = spline.size();
-  bool cyclic = spline.is_cyclic();
-  SplinePtr bez_spline_ptr = spline.copy();
-
+  bool cyclic = spline->is_cyclic();
   if (!cyclic) {
     fillet_count = size - 2;
     start = 1;
@@ -208,20 +175,8 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
     fillet_count = size;
   }
 
-  if (fillet_count <= 0) {
-    return bez_spline_ptr;
-  }
+  Array<FilletData> fds(fillet_count);
 
-  // Array<int> point_counts(fillet_count);
-  Array<int> point_counts(size, {1});
-  BezierSpline src_spline = static_cast<BezierSpline &>(*bez_spline_ptr);
-  Span<float3> positions = src_spline.positions();
-
-  std::string radii_name = mode_param.radii_dist.value();
-  GVArray_Typed<float> *radii_dist = mode_param.radii;
-  Vector<FilletData> fds;
-
-  int added_count = 0;
   for (const int i : IndexRange(fillet_count)) {
     float3 prev_pos, pos, next_pos;
     if (cyclic) {
@@ -248,8 +203,8 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
       }
     }
 
-    fds.append(calculate_fillet_data(
-        prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius));
+    fds[i] = calculate_fillet_data_per_vertex(
+        prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius);
 
     if (!radius) {
       continue;
@@ -268,14 +223,62 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
     point_counts[start + i] = count + 1;
   }
 
-  int total_points = added_count + size;
-  Array<int> dst_to_src = create_dst_to_src_map(point_counts, total_points);
-  SplinePtr dst_spline_ptr = spline.copy_only_settings();
-  BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
-  dst_spline.resize(total_points);
+  return fds;
+}
 
-  copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
+static Array<int> create_dst_to_src_map(const Array<int> point_counts, const int total_points)
+{
+  Array<int> map(total_points);
+  int index = 0;
 
+  for (int i = 0; i < point_counts.size(); i++) {
+    for (int j = 0; j < point_counts[i]; j++) {
+      map[index] = i;
+      index++;
+    }
+  }
+
+  BLI_assert(index == total_points);
+
+  return map;
+}
+
+template<typename T>
+static void copy_attribute_by_mapping(const Span<T> src, MutableSpan<T> dst, Array<int> mapping)
+{
+  for (const int i : dst.index_range()) {
+    dst[i] = src[mapping[i]];
+  }
+}
+
+static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
+                                              BezierSpline &dst,
+                                              Array<int> mapping)
+{
+  copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
+  copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
+  copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
+  copy_attribute_by_mapping(src.handle_types_left(), dst.handle_types_left(), mapping);
+  copy_attribute_by_mapping(src.handle_types_right(), dst.handle_types_right(), mapping);
+  copy_attribute_by_mapping(src.handle_positions_left(), dst.handle_positions_left(), mapping);
+  copy_attribute_by_mapping(src.handle_positions_right(), dst.handle_positions_right(), mapping);
+}
+
+static void copy_poly_attributes_by_mapping(const PolySpline &src,
+                                            PolySpline &dst,
+                                            Array<int> mapping)
+{
+  copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
+  copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
+  copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
+}
+
+static void update_bezier_positions(Array<FilletData> &fds,
+                                    Array<int> &point_counts,
+                                    BezierSpline &dst_spline,
+                                    int start,
+                                    int fillet_count)
+{
   int next_i = start;
   for (const int i : IndexRange(start, fillet_count)) {
     FilletData fd = fds[i - start];
@@ -291,10 +294,6 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
 
     /* Position the end points of the arc. */
     int end_i = next_i + count - 1;
-    float3 left_handle = dst_spline.handle_positions_left()[next_i] -
-                         dst_spline.positions()[next_i];
-    float3 right_handle = dst_spline.handle_positions_right()[next_i] -
-                          dst_spline.positions()[next_i];
     dst_spline.positions()[next_i] = fd.pos + displacement * fd.prev_dir;
     dst_spline.positions()[end_i] = fd.pos + displacement * fd.next_dir;
     dst_spline.handle_positions_right()[next_i] = dst_spline.positions()[next_i] -
@@ -326,6 +325,94 @@ static SplinePtr fillet_bezier_spline(const Spline &spline, const FilletModePara
 
     next_i += count;
   }
+}
+
+static void update_poly_positions(Array<FilletData> &fds,
+                                  Array<int> &point_counts,
+                                  PolySpline &dst_spline,
+                                  int start,
+                                  int fillet_count)
+{
+  int next_i = start;
+  for (const int i : IndexRange(start, fillet_count)) {
+    FilletData fd = fds[i - start];
+    int count = point_counts[i];
+    if (count == 1) {
+      next_i++;
+      continue;
+    }
+
+    float segment_angle = fd.angle / (count - 1);
+    float displacement = fd.radius * tanf(fd.angle / 2);
+
+    /* Position the end points of the arc. */
+    int end_i = next_i + count - 1;
+    dst_spline.positions()[next_i] = fd.pos + displacement * fd.prev_dir;
+    dst_spline.positions()[end_i] = fd.pos + displacement * fd.next_dir;
+
+    float3 center = get_center(dst_spline.positions()[next_i] - fd.pos, fd);
+    float3 radius_vec = dst_spline.positions()[next_i] - center;
+
+    for (int j = 1; j < count - 1; j++) {
+      int index = next_i + j;
+      float3 new_radius_vec;
+      rotate_v3_v3v3fl(new_radius_vec, radius_vec, -fd.axis, segment_angle);
+      radius_vec = new_radius_vec;
+
+      dst_spline.positions()[index] = center + new_radius_vec;
+    }
+
+    next_i += count;
+  }
+}
+
+static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletModeParam &mode_param)
+{
+  int fillet_count, start = 0, size = spline.size();
+  bool cyclic = spline.is_cyclic();
+  bool is_bez = spline.type() == Spline::Type::Bezier;
+  SplinePtr src_spline_ptr = spline.copy();
+
+  if (!cyclic) {
+    fillet_count = size - 2;
+    start = 1;
+  }
+  else {
+    fillet_count = size;
+  }
+
+  if (fillet_count <= 0) {
+    return src_spline_ptr;
+  }
+
+  Array<int> point_counts(size, {1});
+  Span<float3> positions = src_spline_ptr->positions();
+
+  std::string radii_name = mode_param.radii_dist.value();
+  GVArray_Typed<float> *radii_dist = mode_param.radii;
+
+  int added_count = 0;
+  Array<FilletData> fds = calculate_fillet_data(
+      src_spline_ptr, mode_param, added_count, point_counts);
+
+  int total_points = added_count + size;
+  Array<int> dst_to_src = create_dst_to_src_map(point_counts, total_points);
+  SplinePtr dst_spline_ptr = spline.copy_only_settings();
+
+  if (is_bez) {
+    BezierSpline src_spline = static_cast<BezierSpline &>(*src_spline_ptr);
+    BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
+    dst_spline.resize(total_points);
+    copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
+    update_bezier_positions(fds, point_counts, dst_spline, start, fillet_count);
+  }
+  else {
+    PolySpline src_spline = static_cast<PolySpline &>(*src_spline_ptr);
+    PolySpline &dst_spline = static_cast<PolySpline &>(*dst_spline_ptr);
+    dst_spline.resize(total_points);
+    copy_poly_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
+    update_poly_positions(fds, point_counts, dst_spline, start, fillet_count);
+  }
 
   return dst_spline_ptr;
 }
@@ -334,7 +421,10 @@ static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode
 {
   switch (spline.type()) {
     case Spline::Type::Bezier: {
-      return fillet_bezier_spline(spline, mode_param);
+      return fillet_bez_or_poly_spline(spline, mode_param);
+    }
+    case Spline::Type::Poly: {
+      return fillet_bez_or_poly_spline(spline, mode_param);
     }
   }
   SplinePtr new_spline = spline.copy();
