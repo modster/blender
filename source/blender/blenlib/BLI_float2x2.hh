@@ -82,6 +82,18 @@ struct float2x2 {
     return m * float2(v);
   }
 
+  friend float2x2 operator+(const float2x2 &m1, const float2x2 &m2)
+  {
+    float2x2 res;
+
+    res.ptr()[0][0] = m1.ptr()[0][0] + m2.ptr()[0][0];
+    res.ptr()[0][1] = m1.ptr()[0][1] + m2.ptr()[0][1];
+    res.ptr()[1][0] = m1.ptr()[1][0] + m2.ptr()[1][0];
+    res.ptr()[1][1] = m1.ptr()[1][1] + m2.ptr()[1][1];
+
+    return float2x2(res);
+  }
+
   uint64_t hash() const
   {
     uint64_t h = 435109;
