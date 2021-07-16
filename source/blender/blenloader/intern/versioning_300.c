@@ -33,9 +33,11 @@
 #include "DNA_listBase.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
+#include "DNA_workspace_types.h"
 
 #include "BKE_action.h"
 #include "BKE_animsys.h"
+#include "BKE_asset.h"
 #include "BKE_collection.h"
 #include "BKE_deform.h"
 #include "BKE_fcurve_driver.h"
@@ -517,6 +519,15 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
     FOREACH_NODETREE_END;
+
+    {
+      if (!DNA_struct_elem_find(
+              fd->filesdna, "WorkSpace", "AssetLibraryReference", "active_asset_library")) {
+        LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
+          BKE_asset_library_reference_init_default(&workspace->active_asset_library);
+        }
+      }
+    }
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 300, 10)) {
@@ -540,5 +551,24 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+
+    /* Convert Surface Deform to sparse-capable bind structure. */
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "SurfaceDeformModifierData", "int", "num_mesh_verts")) {
+      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+        LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
+          if (md->type == eModifierType_SurfaceDeform) {
+            SurfaceDeformModifierData *smd = (SurfaceDeformModifierData *)md;
+            if (smd->num_bind_verts && smd->verts) {
+              smd->num_mesh_verts = smd->num_bind_verts;
+
+              for (unsigned int i = 0; i < smd->num_bind_verts; i++) {
+                smd->verts[i].vertex_idx = i;
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
