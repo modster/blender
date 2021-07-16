@@ -167,13 +167,14 @@ class MeshTest(ABC):
     A mesh testing Abstract class that hold common functionalities for testting operations.
     """
 
-    def __init__(self, test_object_name, exp_object_name, test_name=None, threshold=None):
+    def __init__(self, test_object_name, exp_object_name, test_name=None, threshold=None, do_compare=True):
         """
         :param test_object_name: str - Name of object of mesh type to run the operations on.
         :param exp_object_name: str - Name of object of mesh type that has the expected
                                 geometry after running the operations.
         :param test_name: str - Name of the test.
         :param threshold: exponent: To allow variations and accept difference to a certain degree.
+        :param do_compare: bool - True if we want to compare the test and expected objects, False otherwise.
         """
         self.test_object_name = test_object_name
         self.exp_object_name = exp_object_name
@@ -183,10 +184,12 @@ class MeshTest(ABC):
             filepath = bpy.data.filepath
             self.test_name = bpy.path.display_name_from_filepath(filepath)
         self.threshold = threshold
+        self.do_compare = do_compare
         self.update = os.getenv("BLENDER_TEST_UPDATE") is not None
         self.verbose = os.getenv("BLENDER_VERBOSE") is not None
         self.test_updated_counter = 0
         objects = bpy.data.objects
+        self.evaluated_object = None
         self.test_object = objects[self.test_object_name]
 
         if self.update:
@@ -223,9 +226,8 @@ class MeshTest(ABC):
 
         self.test_object.select_set(True)
         bpy.ops.object.duplicate()
-        evaluated_test_object = bpy.context.active_object
-        evaluated_test_object.name = "evaluated_object"
-        return evaluated_test_object
+        self.evaluated_object = bpy.context.active_object
+        self.evaluated_object.name = "evaluated_object"
 
     @staticmethod
     def _print_result(result):
@@ -241,11 +243,16 @@ class MeshTest(ABC):
         """
         Runs a single test, runs it again if test file is updated.
         """
-        evaluated_test_object = self.create_evaluated_object()
-        self.apply_operations(evaluated_test_object)
-        result = self.compare_meshes(evaluated_test_object, self.expected_object, self.threshold)
 
-        comparison_result, selection_result, validation_result = result
+        self.create_evaluated_object()
+        self.apply_operations(self.evaluated_object)
+
+        if not self.do_compare:
+            print("\nVisualization purpose only: Open Blender in GUI mode")
+            print("Compare evaluated and expected object in Blender.\n")
+            return False
+
+        result = self.compare_meshes(self.evaluated_object, self.expected_object, self.threshold)
 
         # Initializing with True to get correct resultant of result_code booleans.
         success = True
@@ -270,7 +277,7 @@ class MeshTest(ABC):
 
         elif self.update:
             self.print_failed_test_result(result)
-            self.update_failed_test(evaluated_test_object)
+            self.update_failed_test()
             # Check for testing the blend file is updated and re-running.
             # Also safety check to avoid infinite recursion loop.
             if self.test_updated_counter == 1:
@@ -324,22 +331,22 @@ class MeshTest(ABC):
         for index in selection:
             items[index].select = True
 
-    def update_failed_test(self, evaluated_test_object):
+    def update_failed_test(self):
         # Update expected object.
-        evaluated_test_object.location = self.expected_object.location
+        self.evaluated_object.location = self.expected_object.location
         expected_object_name = self.expected_object.name
         evaluated_selection = {
-            v.index for v in evaluated_test_object.data.vertices if v.select}
+            v.index for v in self.evaluated_object.data.vertices if v.select}
 
         bpy.data.objects.remove(self.expected_object, do_unlink=True)
-        evaluated_test_object.name = expected_object_name
-        self.do_selection(evaluated_test_object.data,
+        self.evaluated_object.name = expected_object_name
+        self.do_selection(self.evaluated_object.data,
                           "VERT", evaluated_selection)
 
         # Save file.
         bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
         self.test_updated_counter += 1
-        self.expected_object = evaluated_test_object
+        self.expected_object = self.evaluated_object
 
     @staticmethod
     def compare_meshes(evaluated_object, expected_object, threshold):
@@ -394,7 +401,7 @@ class MeshTest(ABC):
         return result_codes
 
     @abstractmethod
-    def apply_operations(self, evaluated_test_object):
+    def apply_operations(self, any_object):
         pass
 
 
@@ -409,7 +416,6 @@ class SpecMeshTest(MeshTest):
                  exp_object_name,
                  operations_stack=None,
                  apply_modifier=True,
-                 do_compare=True,
                  threshold=None):
         """
         Constructor for SpecMeshTest.
@@ -423,7 +429,6 @@ class SpecMeshTest(MeshTest):
                                     - True if we want to apply the modifier to list of modifiers, after some operation.
                                This affects operations of type ModifierSpec and DeformModifierSpec.
         :param do_compare: bool - True if we want to compare the test and expected objects, False otherwise.
-        :param threshold: exponent: To allow variations and accept difference to a certain degree.
         """
 
         super().__init__(test_object_name, exp_object_name, test_name, threshold)
@@ -433,7 +438,6 @@ class SpecMeshTest(MeshTest):
         else:
             self.operations_stack = operations_stack
         self.apply_modifier = apply_modifier
-        self.do_compare = do_compare
 
     def apply_operations(self, evaluated_test_object):
         # Add modifiers and operators.
@@ -698,7 +702,7 @@ class BlendFileTest(MeshTest):
 
     def apply_operations(self, evaluated_test_object):
         """
-        Apply all modifiers (Geometry Nodes for now) added to the current object [Discuss]
+        Apply all modifiers added to the current object.
         """
         modifiers_list = evaluated_test_object.modifiers
         for modifier in modifiers_list:
@@ -809,9 +813,13 @@ class RunTest:
         test = case
         if self.apply_modifiers:
             test.apply_modifier = True
+        else:
+            test.apply_modifier = False
 
         if self.do_compare:
             test.do_compare = True
+        else:
+            test.do_compare = False
 
         success = test.run_test()
         return success
