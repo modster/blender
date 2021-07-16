@@ -946,7 +946,17 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return this->nodes;
   }
 
+  auto &get_nodes_mut()
+  {
+    return this->nodes;
+  }
+
   const auto &get_verts() const
+  {
+    return this->verts;
+  }
+
+  auto &get_verts_mut()
   {
     return this->verts;
   }
@@ -956,7 +966,17 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return this->edges;
   }
 
+  auto &get_edges_mut()
+  {
+    return this->edges;
+  }
+
   const auto &get_faces() const
+  {
+    return this->faces;
+  }
+
+  auto &get_faces_mut()
   {
     return this->faces;
   }
