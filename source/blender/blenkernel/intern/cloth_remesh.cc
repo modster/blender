@@ -21,26 +21,25 @@
  * \ingroup bke
  */
 
-#include "BLI_math_vector.h"
 #include "DNA_cloth_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 
+#include "BLI_assert.h"
 #include "BLI_float2x2.hh"
+#include "BLI_math_vector.h"
 #include "BLI_utildefines.h"
+
+#include "MEM_guardedalloc.h"
 
 #include "BKE_cloth.h"
 #include "BKE_cloth_remesh.hh"
 
-#include <cstdio>
-
-namespace blender::bke {
+namespace blender::bke::internal {
 class NodeData;
 class VertData;
 class Sizing;
-
-using AdaptiveMesh =
-    internal::Mesh<NodeData, VertData, internal::EmptyExtraData, internal::EmptyExtraData>;
 
 template<typename T> static inline T simple_interp(const T &a, const T &b)
 {
@@ -51,14 +50,12 @@ class NodeData {
   ClothVertex cloth_node_data; /* The cloth simulation calls it
                                 * Vertex, internal::Mesh calls it Node */
  public:
-  NodeData() = default;
-  NodeData(ClothVertex &&cloth_node_data) : cloth_node_data(cloth_node_data)
+  NodeData(const ClothVertex &cloth_node_data) : cloth_node_data(cloth_node_data)
   {
   }
 
-  void set_cloth_node_data(ClothVertex &&cloth_node_data)
+  NodeData(ClothVertex &&cloth_node_data) : cloth_node_data(cloth_node_data)
   {
-    this->cloth_node_data = std::move(cloth_node_data);
   }
 
   const auto &get_cloth_node_data() const
@@ -169,6 +166,51 @@ class VertData {
   }
 };
 
+class AdaptiveMesh
+    : public Mesh<NodeData, VertData, internal::EmptyExtraData, internal::EmptyExtraData> {
+ public:
+  void set_nodes_extra_data(const Cloth &cloth)
+  {
+    /* The layout of the `this->get_nodes()` and `cloth.verts` should
+     * be the same, so just directly copy it over */
+    BLI_assert(cloth.mvert_num == this->get_nodes().size());
+
+    auto i = 0;
+    for (auto &node : this->get_nodes_mut()) {
+      node.set_extra_data(NodeData(cloth.verts[i]));
+      i++;
+    }
+  }
+};
+
+static void cloth_delete_verts(Cloth &cloth)
+{
+  BLI_assert(cloth.verts);
+  MEM_freeN(cloth.verts);
+  cloth.verts = nullptr;
+}
+
+static void cloth_set_verts_from_adaptive_mesh(Cloth &cloth, const AdaptiveMesh &mesh)
+{
+  /* caller should have deleted the verts earlier */
+  BLI_assert(cloth.verts == nullptr);
+
+  cloth.verts = static_cast<ClothVertex *>(
+      MEM_callocN(sizeof(ClothVertex) * mesh.get_nodes().size(), __func__));
+
+  auto i = 0;
+  for (const auto &node : mesh.get_nodes()) {
+    const auto &op_extra_data = node.get_extra_data();
+    BLI_assert(op_extra_data);
+    cloth.verts[i] = op_extra_data.value().get_cloth_node_data();
+    i++;
+  }
+}
+
+}  // namespace blender::bke::internal
+
+namespace blender::bke {
+
 Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
   auto *cloth_to_object_res = cloth_to_object(ob, clmd, mesh, false);
@@ -177,8 +219,15 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
   internal::MeshIO meshio_input;
   meshio_input.read(mesh);
 
-  AdaptiveMesh adaptive_mesh;
+  internal::AdaptiveMesh adaptive_mesh;
   adaptive_mesh.read(meshio_input);
+
+  {
+    adaptive_mesh.set_nodes_extra_data(*clmd->clothObject);
+    internal::cloth_delete_verts(*clmd->clothObject);
+  }
+
+  internal::cloth_set_verts_from_adaptive_mesh(*clmd->clothObject, adaptive_mesh);
 
   auto meshio_output = adaptive_mesh.write();
   return meshio_output.write();

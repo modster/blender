@@ -206,6 +206,11 @@ template<typename T> class Node {
     this->extra_data = extra_data;
   }
 
+  const auto &get_extra_data() const
+  {
+    return this->extra_data;
+  }
+
   const auto &get_verts() const
   {
     return this->verts;
