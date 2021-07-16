@@ -625,7 +625,9 @@ static bool transform_modal_item_poll(const wmOperator *op, int value)
       }
       break;
     }
-    case TFM_MODAL_INSERTOFS_TOGGLE_DIR: {
+    case TFM_MODAL_INSERTOFS_TOGGLE_DIR:
+    case TFM_MODAL_NODE_UNLINK_ON:
+    case TFM_MODAL_NODE_UNLINK_OFF: {
       if (t->spacetype != SPACE_NODE) {
         return false;
       }
@@ -696,6 +698,8 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
       {TFM_MODAL_AUTOCONSTRAINT, "AUTOCONSTRAIN", 0, "Automatic Constraint", ""},
       {TFM_MODAL_AUTOCONSTRAINTPLANE, "AUTOCONSTRAINPLANE", 0, "Automatic Constraint Plane", ""},
       {TFM_MODAL_PRECISION, "PRECISION", 0, "Precision Mode", ""},
+      {TFM_MODAL_NODE_UNLINK_ON, "NODE_UNLINK_ON", 0, "Unlink nodes", ""},
+      {TFM_MODAL_NODE_UNLINK_OFF, "NODE_UNLINK_OFF", 0, "Unlink nodes (Off)", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -1064,6 +1068,16 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 
           t->redraw |= TREDRAW_SOFT;
         }
+        break;
+      case TFM_MODAL_NODE_UNLINK_ON:
+        t->flag |= T_NODE_UNLINK;
+        t->redraw |= TREDRAW_HARD;
+        handled = true;
+        break;
+      case TFM_MODAL_NODE_UNLINK_OFF:
+        t->flag &= ~T_NODE_UNLINK;
+        t->redraw |= TREDRAW_HARD;
+        handled = true;
         break;
       case TFM_MODAL_AUTOCONSTRAINT:
       case TFM_MODAL_AUTOCONSTRAINTPLANE:

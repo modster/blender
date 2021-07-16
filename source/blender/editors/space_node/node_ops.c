@@ -185,21 +185,6 @@ void ED_operatormacros_node(void)
   mot = WM_operatortype_macro_define(ot, "NODE_OT_duplicate");
   RNA_boolean_set(mot->ptr, "keep_inputs", true);
   WM_operatortype_macro_define(ot, "NODE_OT_translate_attach");
-
-  ot = WM_operatortype_append_macro("NODE_OT_move_detach_links",
-                                    "Detach",
-                                    "Move a node to detach links",
-                                    OPTYPE_UNDO | OPTYPE_REGISTER);
-  WM_operatortype_macro_define(ot, "NODE_OT_links_detach");
-  WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");
-  WM_operatortype_macro_define(ot, "NODE_OT_insert_offset");
-
-  ot = WM_operatortype_append_macro("NODE_OT_move_detach_links_release",
-                                    "Detach",
-                                    "Move a node to detach links",
-                                    OPTYPE_UNDO | OPTYPE_REGISTER);
-  WM_operatortype_macro_define(ot, "NODE_OT_links_detach");
-  WM_operatortype_macro_define(ot, "NODE_OT_translate_attach");
 }
 
 void node_keymap(struct wmKeyConfig *keyconf)

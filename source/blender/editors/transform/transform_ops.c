@@ -694,10 +694,10 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 
   if (flags & P_NODES) {
     RNA_def_boolean(ot->srna,
-                    "node_links_intersect",
-                    true,
-                    "Intersect Node Links",
-                    "Insert transformed nodes on node links they intersect with");
+                    "node_unlink",
+                    false,
+                    "Unlink Nodes",
+                    "Detach nodes from links and don't insert on intersected links");
   }
 
   if (flags & P_CENTER) {

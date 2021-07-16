@@ -635,9 +635,10 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   }
 
   if (t->spacetype == SPACE_NODE) {
-    if (op && (prop = RNA_struct_find_property(op->ptr, "node_links_intersect"))) {
+    if (op && (prop = RNA_struct_find_property(op->ptr, "node_unlink")) &&
+        RNA_property_is_set(op->ptr, prop)) {
       if (RNA_property_boolean_get(op->ptr, prop)) {
-        t->flag |= T_NODE_LINKS_INTERSECT;
+        t->flag |= T_NODE_UNLINK;
       }
     }
   }

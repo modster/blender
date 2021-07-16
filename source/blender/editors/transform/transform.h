@@ -153,8 +153,8 @@ typedef enum {
   /** No cursor wrapping on region bounds */
   T_NO_CURSOR_WRAP = 1 << 23,
 
-  /** Node insert into intersected links. */
-  T_NODE_LINKS_INTERSECT = 1 << 24,
+  /** Nodes detach from existing links and don't insert on intersected links. */
+  T_NODE_UNLINK = 1 << 24,
 } eTFlag;
 
 /** #TransInfo.modifiers */
@@ -292,6 +292,10 @@ enum {
   TFM_MODAL_AUTOCONSTRAINTPLANE = 29,
 
   TFM_MODAL_PRECISION = 30,
+
+  /** Node link intersect toggle. */
+  TFM_MODAL_NODE_UNLINK_ON = 31,
+  TFM_MODAL_NODE_UNLINK_OFF = 32,
 };
 
 /** \} */
