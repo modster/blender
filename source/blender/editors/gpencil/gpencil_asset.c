@@ -174,7 +174,8 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd_src = ob->data;
 
-  eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
+  const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
+  const int set_origin = RNA_boolean_get(op->ptr, "set_origin");
 
   /* Create a copy of selected datablock. */
   bGPdata *gpd = (bGPdata *)BKE_id_copy(bmain, &gpd_src->id);
@@ -209,6 +210,25 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
             BKE_gpencil_free_stroke(gps);
             continue;
           }
+        }
+      }
+    }
+  }
+
+  /* Set origin to bounding box of  strokes. */
+  if (set_origin) {
+    float gpcenter[3];
+    BKE_gpencil_centroid_3d(gpd, gpcenter);
+
+    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+      LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+          bGPDspoint *pt;
+          int i;
+          for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+            sub_v3_v3(&pt->x, gpcenter);
+          }
+          BKE_gpencil_stroke_boundingbox_calc(gps);
         }
       }
     }
@@ -249,6 +269,11 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
   /* properties */
   ot->prop = RNA_def_enum(
       ot->srna, "mode", mode_types, GP_ASSET_MODE_SELECTED_STROKES, "Mode", "");
+  RNA_def_boolean(ot->srna,
+                  "set_origin",
+                  0,
+                  "Set Origin to Strokes",
+                  "Set origin of the strokes in the center of the bounding box");
 }
 
 /** \} */
