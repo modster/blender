@@ -101,6 +101,9 @@ typedef struct Cloth {
 
 /**
  * The definition of a cloth vertex.
+ *
+ * When adding a new element to this structure, ensure that
+ * `NodeData::interp()` in `cloth_remesh.cc` has been updated.
  */
 typedef struct ClothVertex {
   int flags;                  /* General flags per vertex.        */
