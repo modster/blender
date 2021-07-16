@@ -748,7 +748,7 @@ set(geo_node_tests
 
 foreach(geo_node_test ${geo_node_tests})
 
-  file(GLOB files "${TEST_SRC_DIR}/geometry_nodes/${geo_node_test}/*.blend")
+  file(GLOB files "${TEST_SRC_DIR}/modeling/geometry_nodes/${geo_node_test}/*.blend")
   foreach(file ${files})
     get_filename_component(filename ${file} NAME_WE)  
     add_blender_test(
