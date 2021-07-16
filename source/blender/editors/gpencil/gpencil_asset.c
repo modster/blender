@@ -68,6 +68,8 @@
 
 /* Temporary Asset import operation data */
 typedef struct tGPDasset {
+  /** Current window from context. */
+  struct wmWindow *win;
   /** Current depsgraph from context. */
   struct Depsgraph *depsgraph;
   /** current scene from context. */
@@ -119,13 +121,22 @@ typedef struct tGPDasset {
 
 } tGPDasset;
 
+typedef enum eGP_AssetFlag {
+  /* Waiting for doing something. */
+  GP_ASSET_FLAG_IDLE = (1 << 0),
+  /* Doing a transform. */
+  GP_ASSET_FLAG_RUNNING = (1 << 1),
+} eGP_AssetFlag;
+
 typedef enum eGP_AssetTransformMode {
+  /* NO action. */
+  GP_ASSET_TRANSFORM_NONE = 0,
   /* Location. */
-  GP_ASSET_TRANSFORM_LOC = 0,
+  GP_ASSET_TRANSFORM_LOC = 1,
   /* Rotation. */
-  GP_ASSET_TRANSFORM_ROT = 1,
+  GP_ASSET_TRANSFORM_ROT = 2,
   /* Scale. */
-  GP_ASSET_TRANSFORM_SCALE = 2,
+  GP_ASSET_TRANSFORM_SCALE = 3,
 } eGP_AssetTransformMode;
 
 static bool gpencil_asset_generic_poll(bContext *C)
@@ -261,13 +272,13 @@ static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *tgpa)
   char status_str[UI_MAX_DRAW_STR];
   char msg_str[UI_MAX_DRAW_STR];
   bGPdata *gpd_asset = tgpa->gpd_asset;
-  const char *mode_txt[] = {"Location", "Rotation", "Scale"};
+  const char *mode_txt[] = {"", "(Location)", "(Rotation)", "(Scale)"};
 
   BLI_strncpy(msg_str, TIP_("Importing Asset"), UI_MAX_DRAW_STR);
 
   BLI_snprintf(status_str,
                sizeof(status_str),
-               "%s %s (%s)",
+               "%s %s %s",
                msg_str,
                gpd_asset->id.name + 2,
                mode_txt[tgpa->mode]);
@@ -336,6 +347,7 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
                                                  tGPDasset *tgpa)
 {
   /* Save current settings. */
+  tgpa->win = CTX_wm_window(C);
   tgpa->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   tgpa->scene = CTX_data_scene(C);
   tgpa->area = CTX_wm_area(C);
@@ -354,6 +366,7 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   tgpa->gpd_asset = (bGPdata *)id;
 
   tgpa->mode = GP_ASSET_TRANSFORM_LOC;
+  tgpa->flag |= GP_ASSET_FLAG_IDLE;
 
   tgpa->asset_layers = NULL;
   tgpa->asset_frames = NULL;
@@ -414,7 +427,7 @@ static int gpencil_asset_import_init(bContext *C, wmOperator *op)
 }
 
 /* Helper: Compute 2D cage size in screen pixels. */
-static void gpencil_2d_cage_prepare(tGPDasset *tgpa)
+static void gpencil_2d_cage_calc(tGPDasset *tgpa)
 {
   /* Add some oversize. */
   const float oversize = 5.0f;
@@ -475,6 +488,61 @@ static void gpencil_2d_cage_prepare(tGPDasset *tgpa)
                             ((tgpa->rect_cage.ymax - tgpa->rect_cage.ymin) * 0.5f);
 }
 
+/* Helper: Detect mouse over cage areas. */
+static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
+{
+  const float gap = 5.0f;
+
+  /* Check if over any of the corners for scale with a small gap. */
+  rctf rect_mouse = {
+      (float)mouse[0] - gap, (float)mouse[0] + gap, (float)mouse[1] - gap, (float)mouse[1] + gap};
+
+  for (int i = 0; i < 8; i++) {
+    if (BLI_rctf_isect_pt(&rect_mouse, tgpa->manipulator[i][0], tgpa->manipulator[i][1])) {
+      tgpa->mode = GP_ASSET_TRANSFORM_SCALE;
+      WM_cursor_modal_set(tgpa->win, WM_CURSOR_EW_SCROLL);
+      return;
+    }
+  }
+
+  /* Check if mouse is inside cage for Location. */
+  if (BLI_rctf_isect_pt(&tgpa->rect_cage, (float)mouse[0], (float)mouse[1])) {
+    tgpa->mode = GP_ASSET_TRANSFORM_LOC;
+    WM_cursor_modal_set(tgpa->win, WM_CURSOR_HAND);
+    return;
+  }
+
+  tgpa->mode = GP_ASSET_TRANSFORM_NONE;
+  WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
+}
+
+/* Helper: Transfrom the stroke with mouse movements. */
+static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
+{
+  switch (tgpa->mode) {
+    case GP_ASSET_TRANSFORM_LOC: {
+      float vec[3];
+      vec[0] = (mouse[0] - tgpa->mouse[0]) / 100.0f;
+      vec[1] = 0.0f;
+      vec[2] = (mouse[1] - tgpa->mouse[1]) / 100.0f;
+      GHashIterator gh_iter;
+      GHASH_ITER (gh_iter, tgpa->asset_strokes) {
+        bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
+        const bGPDspoint *pt;
+        int i;
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          add_v3_v3(&pt->x, vec);
+        }
+        BKE_gpencil_stroke_boundingbox_calc(gps);
+      }
+      copy_v2_v2_int(tgpa->mouse, mouse);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 /* Helper: Load all strokes in the target datablock. */
 static void gpencil_asset_add_strokes(tGPDasset *tgpa)
 {
@@ -527,7 +595,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
     }
   }
   /* Prepare 2D cage. */
-  gpencil_2d_cage_prepare(tgpa);
+  gpencil_2d_cage_calc(tgpa);
 }
 
 /* Draw a cage for manipulate asset */
@@ -578,33 +646,6 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   GPU_blend(GPU_BLEND_NONE);
 }
 
-// TODO
-#if 0
-static void draw_mouse_position(tGPDfill *tgpf)
-{
-  if (tgpf->gps_mouse == NULL) {
-    return;
-  }
-  uchar mouse_color[4] = {0, 0, 255, 255};
-
-  bGPDspoint *pt = &tgpf->gps_mouse->points[0];
-  float point_size = (tgpf->zoom == 1.0f) ? 4.0f * tgpf->fill_factor :
-                                            (0.5f * tgpf->zoom) + tgpf->fill_factor;
-  GPUVertFormat *format = immVertexFormat();
-  uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-  uint col = GPU_vertformat_attr_add(format, "color", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
-
-  /* Draw mouse click position in Blue. */
-  immBindBuiltinProgram(GPU_SHADER_3D_POINT_FIXED_SIZE_VARYING_COLOR);
-  GPU_point_size(point_size);
-  immBegin(GPU_PRIM_POINTS, 1);
-  immAttr4ubv(col, mouse_color);
-  immVertex3fv(pos, &pt->x);
-  immEnd();
-  immUnbindProgram();
-}
-#endif
-
 /* Drawing callback for modal operator. */
 static void gpencil_asset_draw(const bContext *C, ARegion *UNUSED(region), void *arg)
 {
@@ -621,7 +662,6 @@ static void gpencil_asset_draw(const bContext *C, ARegion *UNUSED(region), void 
 /* Invoke handler: Initialize the operator */
 static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  wmWindow *win = CTX_wm_window(C);
   bGPdata *gpd = CTX_data_gpencil_data(C);
   tGPDasset *tgpa = NULL;
 
@@ -644,9 +684,6 @@ static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEven
   tgpa->draw_handle_3d = ED_region_draw_cb_activate(
       tgpa->region->type, gpencil_asset_draw, tgpa, REGION_DRAW_POST_PIXEL);
 
-  /* set cursor to indicate modal */
-  WM_cursor_modal_set(win, WM_CURSOR_EW_SCROLL);
-
   /* update shift indicator in header */
   gpencil_asset_import_status_indicators(C, tgpa);
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
@@ -666,13 +703,19 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 
   switch (event->type) {
     case LEFTMOUSE: {
-      if (event->shift) {
-        tgpa->mode = GP_ASSET_TRANSFORM_ROT;
+      if (event->val == KM_RELEASE) {
+        tgpa->flag |= GP_ASSET_FLAG_IDLE;
+        tgpa->flag &= ~GP_ASSET_FLAG_RUNNING;
+        tgpa->mode = GP_ASSET_TRANSFORM_NONE;
+        WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
+        break;
       }
-      else {
-        tgpa->mode = GP_ASSET_TRANSFORM_LOC;
+
+      if (tgpa->flag & GP_ASSET_FLAG_IDLE) {
+        copy_v2_v2_int(tgpa->mouse, event->mval);
+        tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
+        tgpa->flag |= GP_ASSET_FLAG_RUNNING;
       }
-      copy_v2_v2_int(tgpa->mouse, event->mval);
       break;
     }
       /* Confirm */
@@ -706,9 +749,16 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 
     case MOUSEMOVE: /* calculate new position */
     {
-      /* Update shift based on position of mouse. */
-      // TODO
-
+      /* Apply transform. */
+      if (tgpa->flag & GP_ASSET_FLAG_RUNNING) {
+        gpencil_asset_transform_strokes(tgpa, event->mval);
+        gpencil_2d_cage_calc(tgpa);
+        ED_area_tag_redraw(tgpa->area);
+      }
+      else {
+        /* Check cage manipulators. */
+        gpencil_2d_cage_area_detect(tgpa, event->mval);
+      }
       /* Update screen. */
       gpencil_asset_import_update(C, op, tgpa);
       break;
