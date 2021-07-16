@@ -515,7 +515,6 @@ bNodeSocket *node_group_input_find_socket(bNode *node, const char *identifier)
 
 static void node_group_input_init(bNodeTree *ntree, bNode *node)
 {
-  node->custom1 |= NODE_GROUP_USE_EXTENSION_SOCKET;
   node_group_input_update(ntree, node);
 }
 
@@ -558,7 +557,6 @@ bNodeSocket *node_group_output_find_socket(bNode *node, const char *identifier)
 
 static void node_group_output_init(bNodeTree *ntree, bNode *node)
 {
-  node->custom1 |= NODE_GROUP_USE_EXTENSION_SOCKET;
   node_group_output_update(ntree, node);
 }
 
