@@ -191,6 +191,7 @@ set(SRC
   BLI_fileops.h
   BLI_fileops_types.h
   BLI_float2.hh
+  BLI_float2x2.hh
   BLI_float3.hh
   BLI_float4x4.hh
   BLI_fnmatch.h

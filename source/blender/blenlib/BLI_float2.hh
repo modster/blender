@@ -29,6 +29,10 @@ struct float2 {
   {
   }
 
+  float2(const float (*ptr)[2]) : float2(static_cast<const float *>(ptr[0]))
+  {
+  }
+
   explicit float2(float value) : x(value), y(value)
   {
   }

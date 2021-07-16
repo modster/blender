@@ -25,6 +25,7 @@
 
 #include "BLI_math.h"
 
+#include "BLI_math_matrix.h"
 #include "BLI_strict_flags.h"
 
 #ifndef MATH_STANDALONE
@@ -258,6 +259,46 @@ void shuffle_m4(float R[4][4], const int index[4])
 }
 
 /******************************** Arithmetic *********************************/
+
+void mul_m2_m2m2(float R[2][2], const float A[2][2], const float B[2][2])
+{
+  if (A == R) {
+    mul_m2_m2_post(R, B);
+  }
+  else if (B == R) {
+    mul_m2_m2_pre(R, A);
+  }
+  else {
+    mul_m2_m2m2_uniq(R, A, B);
+  }
+}
+
+void mul_m2_m2_pre(float R[2][2], const float A[2][2])
+{
+  BLI_assert(A != R);
+  float B[2][2];
+  copy_m2_m2(B, R);
+  mul_m2_m2m2_uniq(R, A, B);
+}
+
+void mul_m2_m2_post(float R[2][2], const float B[2][2])
+{
+  BLI_assert(B != R);
+  float A[2][2];
+  copy_m2_m2(A, R);
+  mul_m2_m2m2_uniq(R, A, B);
+}
+
+void mul_m2_m2m2_uniq(float R[2][2], const float A[2][2], const float B[2][2])
+{
+  BLI_assert(!ELEM(R, A, B));
+
+  R[0][0] = B[0][0] * A[0][0] + B[0][1] * A[1][0];
+  R[0][1] = B[0][0] * A[0][1] + B[0][1] * A[1][1];
+
+  R[1][0] = B[1][0] * A[0][0] + B[1][1] * A[1][0];
+  R[1][1] = B[1][0] * A[0][1] + B[1][1] * A[1][1];
+}
 
 void mul_m4_m4m4(float R[4][4], const float A[4][4], const float B[4][4])
 {

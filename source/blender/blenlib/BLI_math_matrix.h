@@ -76,6 +76,7 @@ void madd_m4_m4m4fl(float R[4][4], const float A[4][4], const float B[4][4], con
 void sub_m3_m3m3(float R[3][3], const float A[3][3], const float B[3][3]);
 void sub_m4_m4m4(float R[4][4], const float A[4][4], const float B[4][4]);
 
+void mul_m2_m2m2(float R[2][2], const float A[2][2], const float B[2][2]);
 void mul_m3_m3m3(float R[3][3], const float A[3][3], const float B[3][3]);
 void mul_m4_m3m4(float R[4][4], const float A[3][3], const float B[4][4]);
 void mul_m4_m4m3(float R[4][4], const float A[4][4], const float B[3][3]);
@@ -89,6 +90,10 @@ void mul_m3_m4m4(float R[3][3], const float A[4][4], const float B[4][4]);
  * pre:  R <-- AR
  * post: R <-- RB
  */
+
+void mul_m2_m2m2_uniq(float R[2][2], const float A[2][2], const float B[2][2]);
+void mul_m2_m2_pre(float R[2][2], const float A[2][2]);
+void mul_m2_m2_post(float R[2][2], const float B[2][2]);
 void mul_m3_m3m3_uniq(float R[3][3], const float A[3][3], const float B[3][3]);
 void mul_m3_m3_pre(float R[3][3], const float A[3][3]);
 void mul_m3_m3_post(float R[3][3], const float B[3][3]);
