@@ -281,6 +281,7 @@ class MeshTest(ABC):
             # Check for testing the blend file is updated and re-running.
             # Also safety check to avoid infinite recursion loop.
             if self.test_updated_counter == 1:
+                print("Re-running test...")
                 self.run_test()
             else:
                 print("The test fails consistently. Exiting...")
