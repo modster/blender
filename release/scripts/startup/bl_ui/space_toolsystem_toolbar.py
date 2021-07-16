@@ -2501,9 +2501,12 @@ class _defs_mask_tools:
     @ToolDef.from_fn
     def add_vertex_slide():
         def draw_settings(_context, layout, tool):
+            tool_settings = _context.tool_settings
+            props = tool.operator_properties("mask.add_vertex")
             row = layout.row()
             row.label(text="Mask Settings")
-            # props = tool.operator_properties("mask.add_vertex_slide")
+            row.prop(props, "type")
+
         return dict(
             idname="builtin.add_vertex_slide",
             label="Draw a Mask",
@@ -2517,7 +2520,6 @@ class _defs_mask_tools:
         def draw_settings(_context, layout, tool):
             row = layout.row()
             row.label(text="Feather Vertex")
-            # props = tool.operator_properties("mask.add_vertex_slide")
         return dict(
             idname="builtin.add_feather_vertex_slide",
             label="Add a Feather Vertex",

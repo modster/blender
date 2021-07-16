@@ -56,7 +56,8 @@ static void setup_vertex_point(Mask *mask,
                                const float u,
                                const float ctime,
                                const MaskSplinePoint *reference_point,
-                               const bool reference_adjacent)
+                               const bool reference_adjacent,
+                               int handle_type)
 {
   const MaskSplinePoint *reference_parent_point = NULL;
   BezTriple *bezt;
@@ -68,7 +69,7 @@ static void setup_vertex_point(Mask *mask,
   /* point coordinate */
   bezt = &new_point->bezt;
 
-  bezt->h1 = bezt->h2 = HD_ALIGN;
+  bezt->h1 = bezt->h2 = handle_type;
 
   if (reference_point) {
     if (reference_point->bezt.h1 == HD_VECT && reference_point->bezt.h2 == HD_VECT) {
@@ -133,14 +134,14 @@ static void setup_vertex_point(Mask *mask,
       }
 
       /* handle type */
-      char handle_type = 0;
+      char handle_type_referenced = 0;
       if (prev_point) {
-        handle_type = prev_point->bezt.h2;
+        handle_type_referenced = prev_point->bezt.h2;
       }
       if (next_point) {
-        handle_type = MAX2(next_point->bezt.h2, handle_type);
+        handle_type_referenced = MAX2(next_point->bezt.h2, handle_type_referenced);
       }
-      bezt->h1 = bezt->h2 = handle_type;
+      bezt->h1 = bezt->h2 = handle_type_referenced;
 
       /* parent */
       reference_parent_point = close_point;
@@ -241,7 +242,7 @@ static void mask_spline_add_point_at_index(MaskSpline *spline, int point_index)
   spline->tot_point++;
 }
 
-static bool add_vertex_subdivide(const bContext *C, Mask *mask, const float co[2])
+static bool add_vertex_subdivide(const bContext *C, Mask *mask, const float co[2], int handle_type)
 {
   MaskLayer *mask_layer;
   MaskSpline *spline;
@@ -275,7 +276,7 @@ static bool add_vertex_subdivide(const bContext *C, Mask *mask, const float co[2
 
     new_point = &spline->points[point_index + 1];
 
-    setup_vertex_point(mask, spline, new_point, co, u, ctime, NULL, true);
+    setup_vertex_point(mask, spline, new_point, co, u, ctime, NULL, true, handle_type);
 
     /* TODO: we could pass the spline! */
     BKE_mask_layer_shape_changed_add(mask_layer,
@@ -298,7 +299,7 @@ static bool add_vertex_subdivide(const bContext *C, Mask *mask, const float co[2
 static bool add_vertex_extrude(const bContext *C,
                                Mask *mask,
                                MaskLayer *mask_layer,
-                               const float co[2])
+                               const float co[2], int handle_type)
 {
   Scene *scene = CTX_data_scene(C);
   const float ctime = CFRA;
@@ -379,7 +380,7 @@ static bool add_vertex_extrude(const bContext *C,
 
   mask_layer->act_point = new_point;
 
-  setup_vertex_point(mask, spline, new_point, co, 0.5f, ctime, ref_point, false);
+  setup_vertex_point(mask, spline, new_point, co, 0.5f, ctime, ref_point, false, handle_type);
 
   if (mask_layer->splines_shapes.first) {
     point_index = (((int)(new_point - spline->points) + 0) % spline->tot_point);
@@ -395,7 +396,7 @@ static bool add_vertex_extrude(const bContext *C,
   return true;
 }
 
-static bool add_vertex_new(const bContext *C, Mask *mask, MaskLayer *mask_layer, const float co[2])
+static bool add_vertex_new(const bContext *C, Mask *mask, MaskLayer *mask_layer, const float co[2], int handle_type)
 {
   Scene *scene = CTX_data_scene(C);
   const float ctime = CFRA;
@@ -418,7 +419,7 @@ static bool add_vertex_new(const bContext *C, Mask *mask, MaskLayer *mask_layer,
 
   mask_layer->act_point = new_point;
 
-  setup_vertex_point(mask, spline, new_point, co, 0.5f, ctime, ref_point, false);
+  setup_vertex_point(mask, spline, new_point, co, 0.5f, ctime, ref_point, false, handle_type);
 
   {
     int point_index = (((int)(new_point - spline->points) + 0) % spline->tot_point);
@@ -510,6 +511,7 @@ static int add_vertex_exec(bContext *C, wmOperator *op)
 {
   MaskViewLockState lock_state;
   ED_mask_view_lock_state_store(C, &lock_state);
+  const int handle_type = RNA_enum_get(op->ptr, "type");
 
   Mask *mask = CTX_data_edit_mask(C);
   if (mask == NULL) {
@@ -536,15 +538,15 @@ static int add_vertex_exec(bContext *C, wmOperator *op)
       return cyclic_result;
     }
 
-    if (!add_vertex_subdivide(C, mask, co)) {
-      if (!add_vertex_extrude(C, mask, mask_layer, co)) {
+    if (!add_vertex_subdivide(C, mask, co, handle_type)) {
+      if (!add_vertex_extrude(C, mask, mask_layer, co, handle_type)) {
         return OPERATOR_CANCELLED;
       }
     }
   }
   else {
-    if (!add_vertex_subdivide(C, mask, co)) {
-      if (!add_vertex_new(C, mask, mask_layer, co)) {
+    if (!add_vertex_subdivide(C, mask, co, handle_type)) {
+      if (!add_vertex_new(C, mask, mask_layer, co, handle_type)) {
         return OPERATOR_CANCELLED;
       }
     }
@@ -568,11 +570,20 @@ static int add_vertex_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   RNA_float_set_array(op->ptr, "location", co);
 
-  return add_vertex_exec(C, op);
+return add_vertex_exec(C, op);
 }
 
 void MASK_OT_add_vertex(wmOperatorType *ot)
 {
+ 	static const EnumPropertyItem editcurve_handle_type_items[] = {
+	    {HD_AUTO, "AUTO", 0, "Auto", ""},
+	    {HD_VECT, "VECTOR", 0, "Vector", ""},
+	    {HD_ALIGN, "ALIGNED", 0, "Aligned Single", ""},
+	    {HD_ALIGN_DOUBLESIDE, "ALIGNED_DOUBLESIDE", 0, "Aligned", ""},
+	    {HD_FREE, "FREE", 0, "Free", ""},
+	    {0, NULL, 0, NULL, NULL},
+	};
+
   /* identifiers */
   ot->name = "Add Vertex";
   ot->description = "Add vertex to active spline";
@@ -597,6 +608,8 @@ void MASK_OT_add_vertex(wmOperatorType *ot)
                        "Location of vertex in normalized space",
                        -1.0f,
                        1.0f);
+
+  ot->prop = RNA_def_enum(ot->srna, "type", editcurve_handle_type_items, 1, "Type", "Spline type");
 }
 
 /******************** add feather vertex *********************/
