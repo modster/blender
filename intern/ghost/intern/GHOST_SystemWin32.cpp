@@ -997,15 +997,20 @@ void GHOST_SystemWin32::processWintabEvent(GHOST_WindowWin32 *window)
     }
   }
 
-  /* Fallback cursor movement if Wintab position were never trusted while processing this event. */
+  /* Fallback cursor movement if Wintab position were never trusted while processing this event.
+   * This may happen if the tablet coordinate scaling is off, hasn't yet been verified, or if the
+   * tablet is in mouse mode. */
   if (!mouseMoveHandled) {
-    DWORD pos = GetMessagePos();
-    int x = GET_X_LPARAM(pos);
-    int y = GET_Y_LPARAM(pos);
+    /* Use current cursor position, cursor position when first tablet event was issued is likely
+     * pre-cursor jump from absolute tablet position. */
+    int x, y;
+    system->getCursorPosition(x, y);
 
     /* TODO supply tablet data */
+    GHOST_TabletData td = wt->getLastTabletData();
+    td.Pressure = 1.0f;
     system->pushEvent(new GHOST_EventCursor(
-        system->getMilliSeconds(), GHOST_kEventCursorMove, window, x, y, GHOST_TABLET_DATA_NONE));
+        system->getMilliSeconds(), GHOST_kEventCursorMove, window, x, y, td));
   }
 }
 
