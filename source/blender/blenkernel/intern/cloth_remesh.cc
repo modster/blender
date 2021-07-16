@@ -39,6 +39,9 @@ class NodeData;
 class VertData;
 class Sizing;
 
+using AdaptiveMesh =
+    internal::Mesh<NodeData, VertData, internal::EmptyExtraData, internal::EmptyExtraData>;
+
 template<typename T> static inline T simple_interp(const T &a, const T &b)
 {
   return (a + b) * 0.5;
@@ -171,11 +174,14 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
   auto *cloth_to_object_res = cloth_to_object(ob, clmd, mesh, false);
   BLI_assert(cloth_to_object_res == nullptr);
 
-  internal::MeshIO meshio;
+  internal::MeshIO meshio_input;
+  meshio_input.read(mesh);
 
-  meshio.read(mesh);
+  AdaptiveMesh adaptive_mesh;
+  adaptive_mesh.read(meshio_input);
 
-  return meshio.write();
+  auto meshio_output = adaptive_mesh.write();
+  return meshio_output.write();
 }
 
 }  // namespace blender::bke
