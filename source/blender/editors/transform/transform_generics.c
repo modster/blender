@@ -634,6 +634,14 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     t->flag |= T_OVERRIDE_CENTER;
   }
 
+  if (t->spacetype == SPACE_NODE) {
+    if (op && (prop = RNA_struct_find_property(op->ptr, "node_links_intersect"))) {
+      if (RNA_property_boolean_get(op->ptr, prop)) {
+        t->flag |= T_NODE_LINKS_INTERSECT;
+      }
+    }
+  }
+
   setTransformViewMatrices(t);
   initNumInput(&t->num);
 }

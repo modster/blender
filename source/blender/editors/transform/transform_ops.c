@@ -692,6 +692,14 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
         ot->srna, "correct_uv", true, "Correct UVs", "Correct UV coordinates when transforming");
   }
 
+  if (flags & P_NODES) {
+    RNA_def_boolean(ot->srna,
+                    "node_links_intersect",
+                    true,
+                    "Intersect Node Links",
+                    "Insert transformed nodes on node links they intersect with");
+  }
+
   if (flags & P_CENTER) {
     /* For gizmos that define their own center. */
     prop = RNA_def_property(ot->srna, "center_override", PROP_FLOAT, PROP_XYZ);
@@ -745,7 +753,8 @@ static void TRANSFORM_OT_translate(struct wmOperatorType *ot)
 
   Transform_Properties(ot,
                        P_ORIENT_MATRIX | P_CONSTRAINT | P_PROPORTIONAL | P_MIRROR | P_ALIGN_SNAP |
-                           P_OPTIONS | P_GPENCIL_EDIT | P_CURSOR_EDIT | P_POST_TRANSFORM);
+                           P_OPTIONS | P_GPENCIL_EDIT | P_CURSOR_EDIT | P_NODES |
+                           P_POST_TRANSFORM);
 }
 
 static void TRANSFORM_OT_resize(struct wmOperatorType *ot)

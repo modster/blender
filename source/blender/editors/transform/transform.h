@@ -152,6 +152,9 @@ typedef enum {
 
   /** No cursor wrapping on region bounds */
   T_NO_CURSOR_WRAP = 1 << 23,
+
+  /** Node insert into intersected links. */
+  T_NODE_LINKS_INTERSECT = 1 << 24,
 } eTFlag;
 
 /** #TransInfo.modifiers */
