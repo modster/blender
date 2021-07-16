@@ -36,6 +36,8 @@
 
 namespace blender::bke {
 class NodeData;
+class VertData;
+class Sizing;
 
 template<typename T> static inline T simple_interp(const T &a, const T &b)
 {
@@ -108,6 +110,34 @@ class NodeData {
                                          other.cloth_node_data.pressure_factor);
     }
     return NodeData(std::move(cn));
+  }
+};
+
+class Sizing {
+  float2x2 m; /* in [1], the "sizing" tensor field given as `M` */
+
+ public:
+  Sizing(float2x2 &&m) : m(m)
+  {
+  }
+
+  const auto &get_m() const
+  {
+    return this->m;
+  }
+};
+
+class VertData {
+  Sizing sizing; /* in [1], this is the "sizing" of the verts */
+
+ public:
+  VertData(Sizing &&sizing) : sizing(sizing)
+  {
+  }
+
+  const auto &get_sizing() const
+  {
+    return this->sizing;
   }
 };
 
