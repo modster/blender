@@ -959,8 +959,6 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
     /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
     BKE_mesh_ensure_normals(final_mesh);
 
-    /* Set flag which makes it easier to see what's going on in a debugger. */
-    final_mesh->id.tag |= LIB_TAG_COPIED_ON_WRITE_EVAL_RESULT;
     BLI_strncpy(final_mesh->id.name, cu->id.name, sizeof(final_mesh->id.name));
     *((short *)final_mesh->id.name) = ID_ME;
   }
