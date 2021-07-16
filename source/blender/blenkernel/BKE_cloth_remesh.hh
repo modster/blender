@@ -44,17 +44,19 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct ClothModifierData;
 struct Object;
+
+#ifdef __cplusplus
+namespace blender::bke {
+extern "C" {
+#endif
 
 Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct Mesh *mesh);
 
 #ifdef __cplusplus
 }
+} /* namespace blender::bke */
 #endif
 
 #ifdef __cplusplus

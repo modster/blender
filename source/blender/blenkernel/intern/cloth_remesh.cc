@@ -32,7 +32,7 @@
 
 #include <cstdio>
 
-using namespace blender::bke;
+namespace blender::bke {
 
 Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
@@ -45,3 +45,5 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 
   return meshio.write();
 }
+
+}  // namespace blender::bke
