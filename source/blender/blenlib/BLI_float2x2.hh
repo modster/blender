@@ -82,6 +82,21 @@ struct float2x2 {
     return m * float2(v);
   }
 
+  /**
+   * Multiplies all the elements of `m` with `val`
+   */
+  friend float2x2 operator*(const float2x2 &m, const float val)
+  {
+    float2x2 res;
+
+    res.ptr()[0][0] = m.ptr()[0][0] * val;
+    res.ptr()[0][1] = m.ptr()[0][1] * val;
+    res.ptr()[1][0] = m.ptr()[1][0] * val;
+    res.ptr()[1][1] = m.ptr()[1][1] * val;
+
+    return res;
+  }
+
   friend float2x2 operator+(const float2x2 &m1, const float2x2 &m2)
   {
     float2x2 res;
