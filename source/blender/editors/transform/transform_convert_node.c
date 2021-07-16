@@ -224,7 +224,7 @@ void flushTransNodes(TransInfo *t)
 
     /* handle intersection with noodles */
     if (tc->data_len == 1) {
-      ED_node_link_intersect_test(t->area, 1);
+      ED_node_link_hilite_intersected(t->area);
     }
   }
 }
@@ -256,11 +256,11 @@ void special_aftertrans_update__node(bContext *C, TransInfo *t)
 
   if (!canceled) {
     ED_node_post_apply_transform(C, snode->edittree);
-    ED_node_link_insert(bmain, t->area);
+    ED_node_link_hilite_insert(bmain, t->area);
   }
 
-  /* clear link line */
-  ED_node_link_intersect_test(t->area, 0);
+  /* Clear link hilites. */
+  ED_node_link_hilite_clear(t->area);
 }
 
 /** \} */

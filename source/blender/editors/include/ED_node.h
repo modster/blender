@@ -98,8 +98,9 @@ void ED_node_sort(struct bNodeTree *ntree);
 float ED_node_grid_size(void);
 
 /* node_relationships.c */
-void ED_node_link_intersect_test(struct ScrArea *area, int test);
-void ED_node_link_insert(struct Main *bmain, struct ScrArea *area);
+void ED_node_link_hilite_clear(struct ScrArea *area);
+void ED_node_link_hilite_intersected(struct ScrArea *area);
+void ED_node_link_hilite_insert(struct Main *bmain, struct ScrArea *area);
 
 /* node_edit.c */
 void ED_node_set_tree_type(struct SpaceNode *snode, struct bNodeTreeType *typeinfo);

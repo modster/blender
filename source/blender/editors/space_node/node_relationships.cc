@@ -1856,7 +1856,6 @@ void NODE_OT_detach(wmOperatorType *ot)
 
 /* prevent duplicate testing code below */
 static bool ed_node_link_conditions(ScrArea *area,
-                                    bool test,
                                     SpaceNode **r_snode,
                                     bNode **r_select)
 {
@@ -1868,11 +1867,6 @@ static bool ed_node_link_conditions(ScrArea *area,
   /* no unlucky accidents */
   if (area == nullptr || area->spacetype != SPACE_NODE) {
     return false;
-  }
-
-  if (!test) {
-    /* no need to look for a node */
-    return true;
   }
 
   bNode *node;
@@ -1912,22 +1906,31 @@ static bool ed_node_link_conditions(ScrArea *area,
   return true;
 }
 
-/* test == 0, clear all intersect flags */
-void ED_node_link_intersect_test(ScrArea *area, int test)
+/* Clear NODE_LINKFLAG_HILITE flags. */
+void ED_node_link_hilite_clear(ScrArea *area)
+{
+  if (area == nullptr || area->spacetype != SPACE_NODE) {
+    return;
+  }
+  SpaceNode *snode = (SpaceNode *)area->spacedata.first;
+
+  LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
+    link->flag &= ~NODE_LINKFLAG_HILITE;
+  }
+}
+
+/* Sets NODE_LINKFLAG_HILITE on all links intersected by selected nodes. */
+void ED_node_link_hilite_intersected(ScrArea *area)
 {
   bNode *select;
   SpaceNode *snode;
-  if (!ed_node_link_conditions(area, test, &snode, &select)) {
+  if (!ed_node_link_conditions(area, &snode, &select)) {
     return;
   }
 
   /* clear flags */
   LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
     link->flag &= ~NODE_LINKFLAG_HILITE;
-  }
-
-  if (test == 0) {
-    return;
   }
 
   ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
@@ -2371,11 +2374,11 @@ void NODE_OT_insert_offset(wmOperatorType *ot)
  * \{ */
 
 /* assumes link with NODE_LINKFLAG_HILITE set */
-void ED_node_link_insert(Main *bmain, ScrArea *area)
+void ED_node_link_hilite_insert(Main *bmain, ScrArea *area)
 {
   bNode *select;
   SpaceNode *snode;
-  if (!ed_node_link_conditions(area, true, &snode, &select)) {
+  if (!ed_node_link_conditions(area, &snode, &select)) {
     return;
   }
 
