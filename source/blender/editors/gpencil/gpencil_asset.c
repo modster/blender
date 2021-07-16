@@ -105,7 +105,7 @@ typedef struct tGPDasset {
    *   |         |
    *   6----5----4
    */
-  float manipulator[7][2];
+  float manipulator[8][2];
 
   /** Hash of new created layers. */
   struct GHash *asset_layers;
@@ -355,10 +355,9 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
 
   tgpa->mode = GP_ASSET_TRANSFORM_LOC;
 
-  /* Create Hash tables. */
-  tgpa->asset_layers = BLI_ghash_ptr_new(__func__);
-  tgpa->asset_frames = BLI_ghash_ptr_new(__func__);
-  tgpa->asset_strokes = BLI_ghash_ptr_new(__func__);
+  tgpa->asset_layers = NULL;
+  tgpa->asset_frames = NULL;
+  tgpa->asset_strokes = NULL;
 
   return true;
 }
@@ -489,6 +488,9 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
       gpl_target = BKE_gpencil_layer_addnew(gpd_target, gpl_asset->info, false, false);
       BLI_assert(gpl_target != NULL);
 
+      if (tgpa->asset_layers == NULL) {
+        tgpa->asset_layers = BLI_ghash_ptr_new(__func__);
+      }
       /* Add to the hash to remove if operator is canceled. */
       BLI_ghash_insert(tgpa->asset_layers, gpl_target, gpl_target);
     }
@@ -502,6 +504,9 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
             gpl_target, gpf_asset->framenum, GP_GETFRAME_ADD_NEW);
         BLI_assert(gpf_target != NULL);
 
+        if (tgpa->asset_frames == NULL) {
+          tgpa->asset_frames = BLI_ghash_ptr_new(__func__);
+        }
         /* Add to the hash to remove if operator is canceled. */
         if (!BLI_ghash_haskey(tgpa->asset_frames, gpf_target)) {
           /* Add the hash key with a reference to the layer. */
@@ -509,6 +514,10 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
         }
       }
       /* Loop all strokes and duplicate. */
+      if (tgpa->asset_strokes == NULL) {
+        tgpa->asset_strokes = BLI_ghash_ptr_new(__func__);
+      }
+
       LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
         bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
         BLI_addtail(&gpf_target->strokes, gps_target);
