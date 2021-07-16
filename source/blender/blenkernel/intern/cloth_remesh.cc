@@ -125,6 +125,31 @@ class Sizing {
   {
     return this->m;
   }
+
+  /**
+   * Returns the squared edge size
+   *
+   * @param other Sizing of the other vertex along the edge
+   * @param u_i Material space coorindates (uv coords) of the `this`
+   * vert
+   * @param u_j Material space coorindates (uv coords) of the `other`
+   * vert
+   */
+  float get_edge_size_sq(const Sizing &other, const float2 &u_i, const float2 &u_j) const
+  {
+    /* The edge size is given by
+     * s(i, j)^2 = transpose(uv_ij) * ((m_i + m_j) / 2) * uv_ij
+     *
+     * This means that the "size" requires a sqrt but since the "size" of
+     * the edge is generally used only to check against 1.0, it is more
+     * performant to not do the sqrt operation.
+     */
+    const float2 u_ij = u_i - u_j;
+
+    const float2x2 m_avg = (this->m + other.m) * 0.5;
+
+    return float2::dot(u_ij, m_avg * u_ij);
+  }
 };
 
 class VertData {
