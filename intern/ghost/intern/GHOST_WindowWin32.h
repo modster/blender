@@ -307,6 +307,10 @@ class GHOST_WindowWin32 : public GHOST_Window {
 
   /** True if the mouse is either over or captured by the window. */
   bool m_mousePresent;
+  /** Active cursor warp in x axis. */
+  int32_t m_activeWarpX;
+  /** Active cursor warp in y axis. */
+  int32_t m_activeWarpY;
 
   /** True if the window currently resizing. */
   bool m_inLiveResize;

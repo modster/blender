@@ -75,6 +75,8 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
       m_isDialog(dialog),
       m_hasMouseCaptured(false),
       m_hasGrabMouse(false),
+      m_activeWarpX(0),
+      m_activeWarpY(0),
       m_nPressedButtons(0),
       m_customCursor(0),
       m_wantAlphaBackground(alphaBackground),
@@ -820,6 +822,8 @@ GHOST_TSuccess GHOST_WindowWin32::setWindowCursorGrab(GHOST_TGrabCursorMode mode
     if (mode != GHOST_kGrabNormal) {
       m_system->getCursorPosition(m_cursorGrabInitPos[0], m_cursorGrabInitPos[1]);
       setCursorGrabAccum(0, 0);
+      m_activeWarpX = 0;
+      m_activeWarpY = 0;
 
       if (mode == GHOST_kGrabHide)
         setWindowCursorVisibility(false);
@@ -843,6 +847,8 @@ GHOST_TSuccess GHOST_WindowWin32::setWindowCursorGrab(GHOST_TGrabCursorMode mode
     /* Almost works without but important otherwise the mouse GHOST location
      * can be incorrect on exit. */
     setCursorGrabAccum(0, 0);
+    m_activeWarpX = 0;
+    m_activeWarpY = 0;
     m_cursorGrabBounds.m_l = m_cursorGrabBounds.m_r = -1; /* disable */
     updateMouseCapture(OperatorUngrab);
   }

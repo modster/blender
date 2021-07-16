@@ -1094,10 +1094,12 @@ GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *wind
 
   system->getCursorPosition(x_screen, y_screen);
 
+  int32_t x_accum = 0;
+  int32_t y_accum = 0;
+
   if (window->getCursorGrabModeIsWarp()) {
     int32_t x_new = x_screen;
     int32_t y_new = y_screen;
-    int32_t x_accum, y_accum;
     GHOST_Rect bounds;
 
     /* Fallback to window bounds. */
@@ -1111,29 +1113,41 @@ GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *wind
 
     window->getCursorGrabAccum(x_accum, y_accum);
     if (x_new != x_screen || y_new != y_screen) {
-      /* When wrapping we don't need to add an event because the setCursorPosition call will cause
-       * a new event after. */
       system->setCursorPosition(x_new, y_new); /* wrap */
-      window->setCursorGrabAccum(x_accum + (x_screen - x_new), y_accum + (y_screen - y_new));
+
+      /* We may be in an event before cursor wrap has taken effect */
+      if (window->m_activeWarpX >= 0 && x_new - x_screen < 0 ||
+          window->m_activeWarpX <= 0 && x_new - x_screen > 0) {
+        x_accum = x_accum + (x_screen - x_new);
+      }
+
+      if (window->m_activeWarpY >= 0 && y_new - y_screen < 0 ||
+          window->m_activeWarpY <= 0 && y_new - y_screen > 0) {
+        y_accum = y_accum + (y_screen - y_new);
+      }
+
+      window->setCursorGrabAccum(x_accum, y_accum);
+
+      window->m_activeWarpX = x_new - x_screen;
+      window->m_activeWarpY = y_new - y_screen;
+
+      /* When wrapping we don't need to add an event because the setCursorPosition call will cause
+       * a new event after. We also need to skip outdated messages while warp is active to prevent
+       * applying cursor accumulation to old coordinates. */
+      return NULL;
     }
     else {
-      return new GHOST_EventCursor(system->getMilliSeconds(),
-                                   GHOST_kEventCursorMove,
-                                   window,
-                                   x_screen + x_accum,
-                                   y_screen + y_accum,
-                                   GHOST_TABLET_DATA_NONE);
+      window->m_activeWarpX = 0;
+      window->m_activeWarpY = 0;
     }
   }
-  else {
-    return new GHOST_EventCursor(system->getMilliSeconds(),
-                                 GHOST_kEventCursorMove,
-                                 window,
-                                 x_screen,
-                                 y_screen,
-                                 GHOST_TABLET_DATA_NONE);
-  }
-  return NULL;
+
+  return new GHOST_EventCursor(system->getMilliSeconds(),
+                               GHOST_kEventCursorMove,
+                               window,
+                               x_screen + x_accum,
+                               y_screen + y_accum,
+                               GHOST_TABLET_DATA_NONE);
 }
 
 void GHOST_SystemWin32::processWheelEvent(GHOST_WindowWin32 *window, WPARAM wParam, LPARAM lParam)
