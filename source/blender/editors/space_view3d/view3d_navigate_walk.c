@@ -1007,14 +1007,16 @@ static float getVelocityZeroTime(const float gravity, const float velocity)
 
 static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 {
-#define WALK_ROTATE_TABLET_FAC 8.8f             /* Higher is faster, relative to region size. */
-#define WALK_ROTATE_CONSTANT_FAC DEG2RAD(0.15f) /* Higher is faster, radians per-pixel. */
-#define WALK_TOP_LIMIT DEG2RADF(85.0f)
-#define WALK_BOTTOM_LIMIT DEG2RADF(-80.0f)
-#define WALK_MOVE_SPEED base_speed
-#define WALK_BOOST_FACTOR ((void)0, walk->speed_factor)
-#define WALK_ZUP_CORRECT_FAC 0.1f    /* Amount to correct per step. */
-#define WALK_ZUP_CORRECT_ACCEL 0.05f /* Increase upright momentum each step. */
+  /* Higher is faster, relative to region size. */
+  static const float walk_rotate_tablet_factor = 8.8f;
+  /* Higher is faster, radians per-pixel. */
+  static const float walk_rotate_constant_factor = DEG2RAD(0.15f);
+  static const float walk_top_limit = DEG2RADF(85.0f);
+  static const float walk_bottom_limit = DEG2RADF(-80.0f);
+  /* Amount to correct per step. */
+  static const float walk_zup_correct_fac = 0.1f;
+  /* Increase upright momentum each step. */
+  static const float walk_zup_correct_accel = 0.05f;
 
   RegionView3D *rv3d = walk->rv3d;
   ARegion *region = walk->region;
@@ -1071,13 +1073,13 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
       walk->time_lastdraw = time_current;
 
       /* base speed in m/s */
-      walk->speed = WALK_MOVE_SPEED;
+      walk->speed = base_speed;
 
       if (walk->is_fast) {
-        walk->speed *= WALK_BOOST_FACTOR;
+        walk->speed *= walk->speed_factor;
       }
       else if (walk->is_slow) {
-        walk->speed *= 1.0f / WALK_BOOST_FACTOR;
+        walk->speed *= 1.0f / walk->speed_factor;
       }
 
       copy_m3_m4(mat, rv3d->viewinv);
@@ -1096,12 +1098,12 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 #ifdef USE_TABLET_SUPPORT
           if (walk->is_cursor_absolute) {
             y /= region->winy;
-            y *= WALK_ROTATE_TABLET_FAC;
+            y *= walk_rotate_tablet_factor;
           }
           else
 #endif
           {
-            y *= WALK_ROTATE_CONSTANT_FAC;
+            y *= walk_rotate_constant_factor;
           }
 
           /* user adjustment factor */
@@ -1111,10 +1113,10 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
           /* it ranges from 90.0f to -90.0f */
           angle = -asinf(rv3d->viewmat[2][2]);
 
-          if (angle > WALK_TOP_LIMIT && y > 0.0f) {
+          if (angle > walk_top_limit && y > 0.0f) {
             y = 0.0f;
           }
-          else if (angle < WALK_BOTTOM_LIMIT && y < 0.0f) {
+          else if (angle < walk_bottom_limit && y < 0.0f) {
             y = 0.0f;
           }
 
@@ -1145,12 +1147,12 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 #ifdef USE_TABLET_SUPPORT
           if (walk->is_cursor_absolute) {
             x /= region->winx;
-            x *= WALK_ROTATE_TABLET_FAC;
+            x *= walk_rotate_tablet_factor;
           }
           else
 #endif
           {
-            x *= WALK_ROTATE_CONSTANT_FAC;
+            x *= walk_rotate_constant_factor;
           }
 
           /* user adjustment factor */
@@ -1176,10 +1178,10 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
             axis_angle_to_quat(tmp_quat,
                                upvec,
                                roll * time_redraw_clamped * walk->zlock_momentum *
-                                   WALK_ZUP_CORRECT_FAC);
+                                   walk_zup_correct_fac);
             mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, tmp_quat);
 
-            walk->zlock_momentum += WALK_ZUP_CORRECT_ACCEL;
+            walk->zlock_momentum += walk_zup_correct_accel;
           }
           else {
             /* Lock fixed, don't need to check it ever again. */
@@ -1279,7 +1281,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 
         /* the distance we would fall naturally smoothly enough that we
          * can manually drop the object without activating gravity */
-        fall_distance = time_redraw * walk->speed * WALK_BOOST_FACTOR;
+        fall_distance = time_redraw * walk->speed * walk->speed_factor;
 
         if (fabsf(difference) < fall_distance) {
           /* slope/stairs */
@@ -1392,11 +1394,6 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
   }
 
   return OPERATOR_FINISHED;
-#undef WALK_ROTATE_TABLET_FAC
-#undef WALK_TOP_LIMIT
-#undef WALK_BOTTOM_LIMIT
-#undef WALK_MOVE_SPEED
-#undef WALK_BOOST_FACTOR
 }
 
 #ifdef WITH_INPUT_NDOF
