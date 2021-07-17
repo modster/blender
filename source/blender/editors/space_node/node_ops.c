@@ -148,16 +148,6 @@ void ED_operatormacros_node(void)
   WM_operatortype_macro_define(ot, "NODE_OT_attach");
   WM_operatortype_macro_define(ot, "NODE_OT_insert_offset");
 
-  /* NODE_OT_translate_attach with remove_on_canel set to true */
-  ot = WM_operatortype_append_macro("NODE_OT_translate_attach_remove_on_cancel",
-                                    "Move and Attach",
-                                    "Move nodes and attach to frame",
-                                    OPTYPE_UNDO | OPTYPE_REGISTER);
-  mot = WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");
-  RNA_boolean_set(mot->ptr, "remove_on_cancel", true);
-  WM_operatortype_macro_define(ot, "NODE_OT_attach");
-  WM_operatortype_macro_define(ot, "NODE_OT_insert_offset");
-
   /* NOTE: Currently not in a default keymap or menu due to messy keymaps
    * and tricky invoke functionality.
    * Kept around in case users want to make own shortcuts.
