@@ -4656,6 +4656,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
                                    &r_new_at)) {
       LineartShadowSegment *ss_middle = lineart_give_shadow_segment(rb);
       ss_middle->at = r_new_at;
+      ss_middle->flag = LRT_SHADOW_CASTED;
       copy_v3_v3_db(ss_middle->g1, r_new_in_the_middle_global);
       copy_v3_v3_db(ss_middle->g2, r_new_in_the_middle_global);
       copy_v4_v4_db(ss_middle->fbc1, r_new_in_the_middle);
@@ -4814,6 +4815,8 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
   copy_v4_v4_db(r_fb_r, fbc2);
   copy_v3_v3_db(r_global_l, gpos1);
   copy_v3_v3_db(r_global_r, gpos2);
+
+  printf("%f %f\n", at1, at2);
 
   return true;
 }
