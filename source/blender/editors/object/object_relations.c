@@ -2022,7 +2022,7 @@ static void single_obdata_users(
             break;
           default:
             printf("ERROR %s: can't copy %s\n", __func__, id->name);
-            BLI_assert(!"This should never happen.");
+            BLI_assert_msg(0, "This should never happen.");
 
             /* We need to end the FOREACH_OBJECT_FLAG_BEGIN iterator to prevent memory leak. */
             BKE_scene_objects_iterator_end(&iter_macro);
@@ -2056,6 +2056,23 @@ static void single_object_action_users(
     if (!ID_IS_LINKED(ob)) {
       DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
       BKE_animdata_copy_id_action(bmain, &ob->id);
+    }
+  }
+  FOREACH_OBJECT_FLAG_END;
+}
+
+static void single_objectdata_action_users(
+    Main *bmain, Scene *scene, ViewLayer *view_layer, View3D *v3d, const int flag)
+{
+  FOREACH_OBJECT_FLAG_BEGIN (scene, view_layer, v3d, flag, ob) {
+    if (!ID_IS_LINKED(ob) && ob->data != NULL) {
+      ID *id_obdata = (ID *)ob->data;
+      AnimData *adt = BKE_animdata_from_id(id_obdata);
+      ID *id_act = (ID *)adt->action;
+      if (id_act && id_act->us > 1) {
+        DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
+        BKE_animdata_copy_id_action(bmain, id_obdata);
+      }
     }
   }
   FOREACH_OBJECT_FLAG_END;
@@ -2643,6 +2660,10 @@ static int make_single_user_exec(bContext *C, wmOperator *op)
     single_object_action_users(bmain, scene, view_layer, v3d, flag);
   }
 
+  if (RNA_boolean_get(op->ptr, "obdata_animation")) {
+    single_objectdata_action_users(bmain, scene, view_layer, v3d, flag);
+  }
+
   BKE_main_id_newptr_and_tag_clear(bmain);
 
   WM_event_add_notifier(C, NC_WINDOW, NULL);
@@ -2684,8 +2705,16 @@ void OBJECT_OT_make_single_user(wmOperatorType *ot)
   RNA_def_boolean(ot->srna, "object", 0, "Object", "Make single user objects");
   RNA_def_boolean(ot->srna, "obdata", 0, "Object Data", "Make single user object data");
   RNA_def_boolean(ot->srna, "material", 0, "Materials", "Make materials local to each data-block");
-  RNA_def_boolean(
-      ot->srna, "animation", 0, "Object Animation", "Make animation data local to each object");
+  RNA_def_boolean(ot->srna,
+                  "animation",
+                  0,
+                  "Object Animation",
+                  "Make object animation data local to each object");
+  RNA_def_boolean(ot->srna,
+                  "obdata_animation",
+                  0,
+                  "Object Data Animation",
+                  "Make object data (mesh, curve etc.) animation data local to each object");
 }
 
 /** \} */

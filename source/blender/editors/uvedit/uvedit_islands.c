@@ -37,6 +37,7 @@
 #include "BLI_math.h"
 #include "BLI_rect.h"
 
+#include "BKE_customdata.h"
 #include "BKE_editmesh.h"
 #include "BKE_image.h"
 

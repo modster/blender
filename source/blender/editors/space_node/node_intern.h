@@ -140,9 +140,6 @@ void node_to_view(const struct bNode *node, float x, float y, float *rx, float *
 void node_to_updated_rect(const struct bNode *node, rctf *r_rect);
 void node_from_view(const struct bNode *node, float x, float y, float *rx, float *ry);
 
-/* node_buttons.c */
-void node_buttons_register(struct ARegionType *art);
-
 /* node_toolbar.c */
 void node_toolbar_register(struct ARegionType *art);
 
@@ -268,6 +265,8 @@ int node_find_indicated_socket(struct SpaceNode *snode,
                                struct bNodeSocket **sockp,
                                const float cursor[2],
                                int in_out);
+float node_link_dim_factor(const struct View2D *v2d, const struct bNodeLink *link);
+bool node_link_is_hidden_or_dimmed(const struct View2D *v2d, const struct bNodeLink *link);
 
 void NODE_OT_duplicate(struct wmOperatorType *ot);
 void NODE_OT_delete(struct wmOperatorType *ot);

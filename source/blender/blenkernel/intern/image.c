@@ -1780,7 +1780,7 @@ static bool do_add_image_extension(char *string,
         }
       }
       else {
-        BLI_assert(!"Unsupported jp2 codec was specified in im_format->jp2_codec");
+        BLI_assert_msg(0, "Unsupported jp2 codec was specified in im_format->jp2_codec");
       }
     }
     else {
@@ -1951,7 +1951,7 @@ void BKE_imbuf_to_image_format(struct ImageFormatData *im_format, const ImBuf *i
       im_format->jp2_codec = R_IMF_JP2_CODEC_J2K;
     }
     else {
-      BLI_assert(!"Unsupported jp2 codec was specified in file type");
+      BLI_assert_msg(0, "Unsupported jp2 codec was specified in file type");
     }
   }
 #endif
@@ -3019,7 +3019,7 @@ void BKE_imbuf_write_prepare(ImBuf *ibuf, const ImageFormatData *imf)
       ibuf->foptions.flag |= JP2_J2K;
     }
     else {
-      BLI_assert(!"Unsupported jp2 codec was specified in im_format->jp2_codec");
+      BLI_assert_msg(0, "Unsupported jp2 codec was specified in im_format->jp2_codec");
     }
   }
 #endif
