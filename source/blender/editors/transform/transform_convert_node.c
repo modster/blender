@@ -223,7 +223,11 @@ void flushTransNodes(TransInfo *t)
     }
 
     /* handle intersection with noodles */
-    if (!(t->flag & T_NODE_UNLINK) && tc->data_len == 1) {
+    if (t->flag & T_NODE_UNLINK) {
+      /* Clear link hilites. */
+      ED_node_link_hilite_clear(t->area);
+    }
+    else if (tc->data_len == 1) {
       ED_node_link_hilite_intersected(t->area);
     }
   }
@@ -258,13 +262,11 @@ void special_aftertrans_update__node(bContext *C, TransInfo *t)
     ED_node_post_apply_transform(C, snode->edittree);
   }
 
-  if (!(t->flag & T_NODE_UNLINK)) {
-    if (!canceled) {
-      ED_node_link_hilite_insert(bmain, t->area);
-    }
-    /* Clear link hilites. */
-    ED_node_link_hilite_clear(t->area);
+  if (!canceled && !(t->flag & T_NODE_UNLINK)) {
+    ED_node_link_hilite_insert(bmain, t->area);
   }
+  /* Clear link hilites. */
+  ED_node_link_hilite_clear(t->area);
 }
 
 /** \} */
