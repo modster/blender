@@ -66,6 +66,8 @@
 
 #include "gpencil_intern.h"
 
+#define ROTATION_CONTROL_GAP 15.0f
+
 /* Temporary Asset import operation data */
 typedef struct tGPDasset {
   struct wmWindow *win;
@@ -102,13 +104,16 @@ typedef struct tGPDasset {
   /** 2D Cage vertices. */
   rctf rect_cage;
   /** 2D cage manipulator points *
+   *
+   *               8 (Rotation)
+   *              /
    *   0----1----2
    *   |         |
    *   7         3
    *   |         |
    *   6----5----4
    */
-  float manipulator[8][2];
+  float manipulator[9][2];
   /** Manipulator index (-1 means not set). */
   int manipulator_index;
   /** Manipulator vector used to determine the effect. */
@@ -520,6 +525,9 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   tgpa->manipulator[7][0] = tgpa->rect_cage.xmin;
   tgpa->manipulator[7][1] = tgpa->rect_cage.ymin +
                             ((tgpa->rect_cage.ymax - tgpa->rect_cage.ymin) * 0.5f);
+  /* Rotation */
+  tgpa->manipulator[8][0] = tgpa->rect_cage.xmax + ROTATION_CONTROL_GAP;
+  tgpa->manipulator[8][1] = tgpa->rect_cage.ymax + ROTATION_CONTROL_GAP;
 }
 
 /* Helper: Detect mouse over cage areas. */
@@ -533,10 +541,17 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
 
   tgpa->manipulator_index = -1;
   float co1[3], co2[3];
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 9; i++) {
     if (BLI_rctf_isect_pt(&rect_mouse, tgpa->manipulator[i][0], tgpa->manipulator[i][1])) {
-      tgpa->mode = GP_ASSET_TRANSFORM_SCALE;
       tgpa->manipulator_index = i;
+      tgpa->mode = (tgpa->manipulator_index < 8) ? GP_ASSET_TRANSFORM_SCALE :
+                                                   GP_ASSET_TRANSFORM_ROT;
+
+      if (tgpa->mode == GP_ASSET_TRANSFORM_ROT) {
+        WM_cursor_modal_set(tgpa->win, WM_CURSOR_NW_ARROW);
+        return;
+      }
+
       WM_cursor_modal_set(tgpa->win, WM_CURSOR_EW_SCROLL);
       /* Determine the vector of the cage effect. For corners is always full effect. */
       if (ELEM(tgpa->manipulator_index, 0, 2, 4, 6)) {
@@ -609,9 +624,27 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
           break;
         }
         case GP_ASSET_TRANSFORM_SCALE: {
-          sub_v3_v3(&pt->x, tgpa->asset_center);
+          /* Determine pivot point. */
+          float pivot[3];
+          copy_v3_v3(pivot, tgpa->asset_center);
+          if (tgpa->manipulator_index == 1) {
+            gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[5], pivot);
+          }
+          else if (tgpa->manipulator_index == 3) {
+            gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[7], pivot);
+          }
+          else if (tgpa->manipulator_index == 5) {
+            gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[1], pivot);
+          }
+          else if (tgpa->manipulator_index == 7) {
+            gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[3], pivot);
+          }
+
+          /* Apply scale. */
+          sub_v3_v3(&pt->x, pivot);
           mul_v3_v3(&pt->x, scale_vector);
-          add_v3_v3(&pt->x, tgpa->asset_center);
+          add_v3_v3(&pt->x, pivot);
+
           /* Thickness change only in full scale. */
           if (ELEM(tgpa->manipulator_index, 0, 2, 4, 6)) {
             pt->pressure *= scale_factor;
@@ -719,6 +752,15 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   immUniformColor4fv(box_color);
   imm_draw_box_wire_2d(
       pos, tgpa->rect_cage.xmin, tgpa->rect_cage.ymin, tgpa->rect_cage.xmax, tgpa->rect_cage.ymax);
+
+  /* Rotation box */
+  const float gap = 5.0f;
+  imm_draw_box_wire_2d(pos,
+                       tgpa->manipulator[8][0] - gap,
+                       tgpa->manipulator[8][1] - gap,
+                       tgpa->manipulator[8][0] + gap,
+                       tgpa->manipulator[8][1] + gap);
+
   immUnbindProgram();
 
   /* Draw Points. */
@@ -731,8 +773,8 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   immUniformColor4fv(point_color);
 
   immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.5f * U.dpi_fac);
-  immBegin(GPU_PRIM_POINTS, 8);
-  for (int i = 0; i < 8; i++) {
+  immBegin(GPU_PRIM_POINTS, 9);
+  for (int i = 0; i < 9; i++) {
     immVertex2fv(pos, tgpa->manipulator[i]);
   }
   immEnd();
