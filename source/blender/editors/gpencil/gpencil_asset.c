@@ -94,6 +94,11 @@ typedef struct tGPDasset {
   int drop_x, drop_y;
   /** Mouse last click position. */
   int mouse[2];
+  /** Initial distance to asset center from mouse location. */
+  float initial_dist;
+  /** Asset center. */
+  float asset_center[3];
+
   /** 2D Cage vertices. */
   rctf rect_cage;
   /** 2D cage manipulator points *
@@ -104,6 +109,10 @@ typedef struct tGPDasset {
    *   6----5----4
    */
   float manipulator[8][2];
+  /** Manipulator index (-1 means not set). */
+  int manipulator_index;
+  /** Manipulator vector used to determine the effect. */
+  float manipulator_vector[3];
 
   /** Hash of new created layers. */
   struct GHash *asset_layers;
@@ -390,6 +399,9 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   tgpa->mode = GP_ASSET_TRANSFORM_LOC;
   tgpa->flag |= GP_ASSET_FLAG_IDLE;
 
+  /* Manipulator point is not set yet. */
+  tgpa->manipulator_index = -1;
+
   tgpa->asset_layers = NULL;
   tgpa->asset_frames = NULL;
   tgpa->asset_strokes = NULL;
@@ -519,10 +531,37 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
   rctf rect_mouse = {
       (float)mouse[0] - gap, (float)mouse[0] + gap, (float)mouse[1] - gap, (float)mouse[1] + gap};
 
+  tgpa->manipulator_index = -1;
+  float co1[3], co2[3];
   for (int i = 0; i < 8; i++) {
     if (BLI_rctf_isect_pt(&rect_mouse, tgpa->manipulator[i][0], tgpa->manipulator[i][1])) {
       tgpa->mode = GP_ASSET_TRANSFORM_SCALE;
+      tgpa->manipulator_index = i;
       WM_cursor_modal_set(tgpa->win, WM_CURSOR_EW_SCROLL);
+      /* Determine the vector of the cage effect. For corners is always full effect. */
+      if (ELEM(tgpa->manipulator_index, 0, 2, 4, 6)) {
+        zero_v3(tgpa->manipulator_vector);
+        add_v3_fl(tgpa->manipulator_vector, 1.0f);
+        return;
+      }
+      else if (tgpa->manipulator_index == 1) {
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[5], co1);
+      }
+      else if (tgpa->manipulator_index == 3) {
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[7], co1);
+      }
+      else if (tgpa->manipulator_index == 5) {
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[1], co1);
+      }
+      else if (tgpa->manipulator_index == 7) {
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[3], co1);
+      }
+
+      gpencil_point_xy_to_3d(
+          &tgpa->gsc, tgpa->scene, tgpa->manipulator[tgpa->manipulator_index], co2);
+      sub_v3_v3v3(tgpa->manipulator_vector, co2, co1);
+      normalize_v3(tgpa->manipulator_vector);
+
       return;
     }
   }
@@ -553,10 +592,22 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
   float vec[3];
   sub_v3_v3v3(vec, dest_pt, origin_pt);
 
+  float mouse3d[3];
+  sub_v3_v3v3(mouse3d, dest_pt, tgpa->asset_center);
+  float dist = len_v3(mouse3d);
+  float scale_factor = dist / tgpa->initial_dist;
+  float scale_vector[3];
+  mul_v3_v3fl(scale_vector, tgpa->manipulator_vector, scale_factor);
+  print_v3_id(tgpa->manipulator_vector);
+  print_v3_id(scale_vector);
+  // TODO: Scale does not work in mid points
+  // add_v3_fl(scale_vector, 1.0f);
+  // print_v3_id(scale_vector);
+
   GHashIterator gh_iter;
   GHASH_ITER (gh_iter, tgpa->asset_strokes) {
     bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-    const bGPDspoint *pt;
+    bGPDspoint *pt;
     int i;
     for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
       switch (tgpa->mode) {
@@ -568,6 +619,12 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
           break;
         }
         case GP_ASSET_TRANSFORM_SCALE: {
+          sub_v3_v3(&pt->x, tgpa->asset_center);
+          mul_v3_v3(&pt->x, scale_vector);
+          add_v3_v3(&pt->x, tgpa->asset_center);
+
+          pt->pressure *= scale_factor;
+          CLAMP_MIN(pt->pressure, 0.01f);
           break;
         }
         default:
@@ -575,9 +632,18 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
       }
     }
 
+    /* Recalc stroke bounding box. */
     BKE_gpencil_stroke_boundingbox_calc(gps);
   }
+
+  /* In ocation mode move the asset center. */
+  if (tgpa->mode == GP_ASSET_TRANSFORM_LOC) {
+    add_v3_v3(tgpa->asset_center, vec);
+  }
+
+  /* Update mouse position and distance to calc the factor to transform. */
   copy_v2_v2_int(tgpa->mouse, mouse);
+  tgpa->initial_dist = dist;
 }
 
 /* Helper: Load all strokes in the target datablock. */
@@ -633,6 +699,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
   }
   /* Prepare 2D cage. */
   gpencil_2d_cage_calc(tgpa);
+  BKE_gpencil_centroid_3d(tgpa->gpd_asset, tgpa->asset_center);
 }
 
 /* Draw a cage for manipulate asset */
@@ -750,6 +817,14 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 
       if (tgpa->flag & GP_ASSET_FLAG_IDLE) {
         copy_v2_v2_int(tgpa->mouse, event->mval);
+
+        /* Distance to asset center. */
+        float mousef[2], mouse3d[3];
+        copy_v2fl_v2i(mousef, tgpa->mouse);
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, mouse3d);
+        sub_v3_v3v3(mouse3d, mouse3d, tgpa->asset_center);
+        tgpa->initial_dist = len_v3(mouse3d);
+
         tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
         tgpa->flag |= GP_ASSET_FLAG_RUNNING;
       }
