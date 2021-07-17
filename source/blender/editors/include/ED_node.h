@@ -56,6 +56,18 @@ typedef enum {
 #define NODE_EDGE_PAN_MAX_SPEED 40 /* In UI units per second, slower than default. */
 #define NODE_EDGE_PAN_DELAY 1.0f
 
+/* Result of the dissolve operation on node links.
+ * Note: this data becomes invalid if nodes or links are removed from the tree.
+ */
+typedef struct NodeEditDissolveLinksData {
+  /* Links that have been removed (not part of the tree any longer). */
+  struct bNodeLink *removed_links;
+  /* Links that have been added to replace old links. */
+  struct bNodeLink **added_links;
+  int tot_removed_links;
+  int tot_added_links;
+} NodeEditDissolveLinksData;
+
 /* space_node.c */
 
 void ED_node_cursor_location_get(const struct SpaceNode *snode, float value[2]);
@@ -101,6 +113,14 @@ float ED_node_grid_size(void);
 void ED_node_link_hilite_clear(struct ScrArea *area);
 void ED_node_link_hilite_intersected(struct ScrArea *area);
 void ED_node_link_hilite_insert(struct Main *bmain, struct ScrArea *area);
+
+void ED_node_dissolve_links(struct Main *bmain,
+                            struct bNodeTree *ntree,
+                            struct NodeEditDissolveLinksData *data);
+void ED_node_dissolve_undo(struct Main *bmain,
+                           struct bNodeTree *ntree,
+                           const struct NodeEditDissolveLinksData *data);
+void ED_node_dissolve_free_data(struct NodeEditDissolveLinksData *data);
 
 /* node_edit.c */
 void ED_node_set_tree_type(struct SpaceNode *snode, struct bNodeTreeType *typeinfo);

@@ -29,6 +29,10 @@
 #include "BLI_blenlib.h"
 #include "BLI_easing.h"
 #include "BLI_math.h"
+#include "BLI_multi_value_map.hh"
+#include "BLI_set.hh"
+#include "BLI_stack.hh"
+#include "BLI_vector.hh"
 
 #include "BKE_anim_data.h"
 #include "BKE_context.h"
@@ -1855,9 +1859,7 @@ void NODE_OT_detach(wmOperatorType *ot)
  * \{ */
 
 /* prevent duplicate testing code below */
-static bool ed_node_link_conditions(ScrArea *area,
-                                    SpaceNode **r_snode,
-                                    bNode **r_select)
+static bool ed_node_link_conditions(ScrArea *area, SpaceNode **r_snode, bNode **r_select)
 {
   SpaceNode *snode = area ? (SpaceNode *)area->spacedata.first : nullptr;
 
@@ -2427,6 +2429,169 @@ void ED_node_link_hilite_insert(Main *bmain, ScrArea *area)
       ED_node_tag_update_id((ID *)snode->edittree);
       ED_node_tag_update_id(snode->id);
     }
+  }
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Node Dissolve Links
+ * \{ */
+
+namespace blender {
+
+typedef MultiValueMap<bNodeSocket *, bNodeLink *> NodeEditDissolveLinkMap;
+
+NodeEditDissolveLinkMap node_dissolve_build_link_map(bNodeTree *ntree)
+{
+  NodeEditDissolveLinkMap socket_links;
+
+  /* Map all links to a selected node. */
+  LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
+    if (link->tonode->flag & NODE_SELECT) {
+      socket_links.add(link->tosock, link);
+    }
+  }
+  /* Map internal links that connect node inputs to outputs. */
+  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+    if (node->flag & NODE_SELECT) {
+      LISTBASE_FOREACH (bNodeLink *, link, &node->internal_links) {
+        socket_links.add(link->tosock, link);
+      }
+    }
+  }
+
+  return socket_links;
+}
+
+Vector<bNodeLink *> node_dissolve_find_incoming_links(const NodeEditDissolveLinkMap &socket_links,
+                                                      bNodeLink *out_link)
+{
+  Stack<bNodeLink *> link_stack;
+  Set<bNodeSocket *> visited;
+  Vector<bNodeLink *> result;
+
+  /* Depth-first search to find links that have no fromsock in the map. */
+  link_stack.push(out_link);
+  do {
+    bNodeLink *link = link_stack.pop();
+    if (visited.contains(link->fromsock)) {
+      continue;
+    }
+    visited.add(link->fromsock);
+
+    const Span<bNodeLink *> in_links = socket_links.lookup(link->fromsock);
+    if (in_links.is_empty()) {
+      /* Place incoming links from unselected nodes in the result. */
+      if (!(link->fromnode->flag & NODE_SELECT)) {
+        /* Should only have actual tree links from unselected nodes, never internal links. */
+        BLI_assert(link->fromsock->in_out == SOCK_OUT && link->tosock->in_out == SOCK_IN);
+        result.append(link);
+      }
+    }
+    else {
+      link_stack.push_multiple(in_links);
+    }
+  } while (!link_stack.is_empty());
+
+  return result;
+}
+
+}  // namespace blender
+
+/* Replace links to and from selected nodes.
+ * Appropriate direct connections are created to replace connections if possible.
+ * Data about replaced links is returned and can be used to undo the dissolve.
+ * Note: Dissolve data becomes invalid if nodes or links are removed from the tree.
+ */
+void ED_node_dissolve_links(Main *bmain, bNodeTree *ntree, NodeEditDissolveLinksData *data)
+{
+  /* Links that are being removed, for output data. */
+  blender::Vector<bNodeLink> removed_links;
+  /* Replacement links that have been added, for output data. */
+  blender::Vector<bNodeLink *> added_links;
+
+  /* Incoming links for sockets.
+   * Most node systems only allow one incoming socket link,
+   * but the map allows for more than one link if needed. */
+  blender::NodeEditDissolveLinkMap socket_links = blender::node_dissolve_build_link_map(ntree);
+
+  /* Find outgoing links from the selected nodes and replace them. */
+  LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &ntree->links) {
+    const bool from_selected = link->fromnode->flag & NODE_SELECT;
+    const bool to_selected = link->tonode->flag & NODE_SELECT;
+    if (from_selected && !to_selected) {
+      /* Find all incoming links connected to the outgoing link. */
+      blender::Vector<bNodeLink *> in_links = blender::node_dissolve_find_incoming_links(
+          socket_links, link);
+      for (bNodeLink *in_link : in_links) {
+        bNodeLink *replace_link = nodeAddLink(
+            ntree, in_link->fromnode, in_link->fromsock, link->tonode, link->tosock);
+        /* Remember for output. */
+        if (data) {
+          added_links.append(replace_link);
+        }
+      }
+
+      /* Remember for output. */
+      if (data) {
+        removed_links.append(*link);
+      }
+      /* This link has been replaced. */
+      nodeRemLink(ntree, link);
+    }
+  }
+  /* Find incoming links from the selected nodes and remove them.
+   * Note: this must happen after all outgoing links have been replaced.
+   */
+  LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &ntree->links) {
+    const bool from_selected = link->fromnode->flag & NODE_SELECT;
+    const bool to_selected = link->tonode->flag & NODE_SELECT;
+    if (!from_selected && to_selected) {
+      /* Remember for output. */
+      if (data) {
+        removed_links.append(*link);
+      }
+      /* This link has been replaced. */
+      nodeRemLink(ntree, link);
+    }
+  }
+
+  if (data) {
+    data->tot_removed_links = removed_links.size();
+    data->tot_added_links = added_links.size();
+    data->removed_links = (bNodeLink *)MEM_mallocN(sizeof(bNodeLink) * removed_links.size(),
+                                                   "removed links");
+    memcpy(data->removed_links, removed_links.data(), sizeof(bNodeLink) * removed_links.size());
+    data->added_links = (bNodeLink **)MEM_mallocN(sizeof(bNodeLink *) * added_links.size(),
+                                                  "removed links");
+    memcpy(data->added_links, added_links.data(), sizeof(bNodeLink *) * added_links.size());
+  }
+
+  ntreeUpdateTree(bmain, ntree);
+}
+
+/* Restore links stored in the dissolve data. */
+void ED_node_dissolve_undo(Main *bmain, bNodeTree *ntree, const NodeEditDissolveLinksData *data)
+{
+  for (bNodeLink *link : blender::Span<bNodeLink *>(data->added_links, data->tot_added_links)) {
+    nodeRemLink(ntree, link);
+  }
+  for (const bNodeLink &link :
+       blender::Span<bNodeLink>(data->removed_links, data->tot_removed_links)) {
+    nodeAddLink(ntree, link.fromnode, link.fromsock, link.tonode, link.tosock);
+  }
+
+  ntreeUpdateTree(bmain, ntree);
+}
+
+/* Free node dissolve data. */
+void ED_node_dissolve_free_data(NodeEditDissolveLinksData *data)
+{
+  if (data) {
+    MEM_freeN(data->removed_links);
+    MEM_freeN(data->added_links);
+    MEM_freeN(data);
   }
 }
 

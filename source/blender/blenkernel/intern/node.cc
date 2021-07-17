@@ -2357,6 +2357,10 @@ bNodeLink *nodeAddLink(
     link->tonode = fromnode;
     link->tosock = fromsock;
   }
+  else {
+    /* Should never happen, incorrect socket in_out types. */
+    BLI_assert_unreachable();
+  }
 
   if (ntree) {
     ntree->update |= NTREE_UPDATE_LINKS;

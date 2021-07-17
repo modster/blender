@@ -50,6 +50,7 @@ typedef struct NodeTransCustomData {
   /* Initial rect of the view2d, used for computing offset during edge panning */
   rctf initial_v2d_cur;
   View2DEdgePanData edge_pan;
+  NodeEditDissolveLinksData *dissolve_links_data;
 } NodeTransCustomData;
 
 /* transcribe given node into TransData2D for Transforming */
@@ -174,9 +175,9 @@ void createTransNodeData(TransInfo *t)
 
 void flushTransNodes(TransInfo *t)
 {
-  const float dpi_fac = UI_DPI_FAC;
-
+  struct Main *bmain = CTX_data_main(t->context);
   NodeTransCustomData *customdata = (NodeTransCustomData *)t->custom.type.data;
+  const float dpi_fac = UI_DPI_FAC;
 
   if (t->mode == TFM_TRANSLATION) {
     /* Edge panning functions expect window coordinates, mval is relative to region */
@@ -222,10 +223,19 @@ void flushTransNodes(TransInfo *t)
       node->locy = loc[1];
     }
 
-    /* handle intersection with noodles */
+    /* Handle intersection with links. */
     if (t->flag & T_NODE_UNLINK) {
-      /* Clear link hilites. */
       ED_node_link_hilite_clear(t->area);
+
+      if (customdata->dissolve_links_data == NULL) {
+        /* Unlink transformed nodes. */
+        SpaceNode *snode = t->area->spacedata.first;
+        bNodeTree *ntree = snode->edittree;
+
+        customdata->dissolve_links_data = MEM_callocN(sizeof(NodeEditDissolveLinksData),
+                                           "node link dissolve data");
+        ED_node_dissolve_links(bmain, ntree, customdata->dissolve_links_data);
+      }
     }
     else if (tc->data_len == 1) {
       ED_node_link_hilite_intersected(t->area);
@@ -242,30 +252,37 @@ void flushTransNodes(TransInfo *t)
 void special_aftertrans_update__node(bContext *C, TransInfo *t)
 {
   struct Main *bmain = CTX_data_main(C);
+  NodeTransCustomData *customdata = (NodeTransCustomData *)t->custom.type.data;
   const bool canceled = (t->state == TRANS_CANCEL);
 
   SpaceNode *snode = (SpaceNode *)t->area->spacedata.first;
-  if (canceled && t->remove_on_cancel) {
-    /* remove selected nodes on cancel */
-    bNodeTree *ntree = snode->edittree;
-    if (ntree) {
-      LISTBASE_FOREACH_MUTABLE (bNode *, node, &ntree->nodes) {
-        if (node->flag & NODE_SELECT) {
-          nodeRemoveNode(bmain, ntree, node, true);
+  bNodeTree *ntree = snode->edittree;
+
+  if (canceled) {
+    if (t->remove_on_cancel) {
+      /* remove selected nodes on cancel */
+      if (ntree) {
+        LISTBASE_FOREACH_MUTABLE (bNode *, node, &ntree->nodes) {
+          if (node->flag & NODE_SELECT) {
+            nodeRemoveNode(bmain, ntree, node, true);
+          }
         }
+        ntreeUpdateTree(bmain, ntree);
       }
-      ntreeUpdateTree(bmain, ntree);
+    }
+    else if (customdata->dissolve_links_data) {
+      ED_node_dissolve_undo(bmain, ntree, customdata->dissolve_links_data);
+    }
+  }
+  else {
+    ED_node_post_apply_transform(C, snode->edittree);
+
+    if (!(t->flag & T_NODE_UNLINK)) {
+      ED_node_link_hilite_insert(bmain, t->area);
     }
   }
 
-  if (!canceled) {
-    ED_node_post_apply_transform(C, snode->edittree);
-  }
-
-  if (!canceled && !(t->flag & T_NODE_UNLINK)) {
-    ED_node_link_hilite_insert(bmain, t->area);
-  }
-  /* Clear link hilites. */
+  ED_node_dissolve_free_data(customdata->dissolve_links_data);
   ED_node_link_hilite_clear(t->area);
 }
 
