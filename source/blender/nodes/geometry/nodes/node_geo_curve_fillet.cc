@@ -77,7 +77,7 @@ struct FilletModeParam {
   /* Distribution of radii on the curve. */
   std::optional<std::string> radii_dist;
 
-  GVArray_Typed<float> *radii;
+  GVArray_Typed<float> *radii{};
 };
 
 struct FilletData {
@@ -142,7 +142,7 @@ static FilletData calculate_fillet_data_per_vertex(const float3 prev_pos,
                                                    const std::optional<int> count,
                                                    const float radius)
 {
-  FilletData fd;
+  FilletData fd{};
   float3 vec_pos2prev = prev_pos - pos;
   float3 vec_pos2next = next_pos - pos;
   normalize_v3_v3(fd.prev_dir, vec_pos2prev);
