@@ -295,6 +295,7 @@ typedef struct KnifeTool_OpData {
   KnifeMeasureData mdata; /* Data for distance and angle drawing calculations. */
 
   KnifeUndoFrame *undo; /* Current undo frame. */
+  bool is_drag_undo;
 } KnifeTool_OpData;
 
 enum {
@@ -1953,12 +1954,15 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
   GHashIterator giter;
   ListBase *list;
 
-  /* Allocate new undo frame on stack. */
-  kcd->undo = BLI_stack_push_r(kcd->undostack);
-  kcd->undo->pos = kcd->prev;
-  kcd->undo->cuts = 0;
-  kcd->undo->splits = 0;
-  kcd->undo->mdata = kcd->mdata;
+  /* Allocate new undo frame on stack, unless cut is being dragged. */
+  if (!kcd->is_drag_undo) {
+    kcd->undo = BLI_stack_push_r(kcd->undostack);
+    kcd->undo->pos = kcd->prev;
+    kcd->undo->cuts = 0;
+    kcd->undo->splits = 0;
+    kcd->undo->mdata = kcd->mdata;
+    kcd->is_drag_undo = true;
+  }
 
   /* Save values for angle drawing calculations. */
   copy_v3_v3(kcd->mdata.cage, kcd->mdata.corr_prev_cage);
@@ -3336,6 +3340,7 @@ static bool knife_snap_update_from_mval(bContext *C, KnifeTool_OpData *kcd, cons
 
 static void knifetool_undo(KnifeTool_OpData *kcd)
 {
+  Ref *ref;
   KnifeEdge *kfe, *newkfe;
   KnifeEdge *lastkfe = NULL;
   KnifeVert *v1, *v2;
@@ -3344,6 +3349,13 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
 
   if (!BLI_stack_is_empty(kcd->undostack)) {
     undo = BLI_stack_peek(kcd->undostack);
+
+    /* Undo edge splitting. */
+    for (int i = 0; i < undo->splits; i++) {
+      BLI_stack_pop(kcd->splitstack, &newkfe);
+      BLI_stack_pop(kcd->splitstack, &kfe);
+      knife_join_edge(kcd, newkfe, kfe);
+    }
 
     for (int i = 0; i < undo->cuts; i++) {
 
@@ -3363,51 +3375,41 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
         v2 = lastkfe->v2;
 
         /* Only remove first vertex if it is the start segment of the cut. */
-        if (!v1->is_splitting) {
+        if (!v1->is_invalid && !v1->is_splitting) {
           v1->is_invalid = true;
+          /* If the first vertex is touching any other cut edges don't remove it. */
+          for (ref = v1->edges.first; ref; ref = ref->next) {
+            kfe = ref->ref;
+            if (kfe->is_cut && !kfe->is_invalid) {
+              v1->is_invalid = false;
+              break;
+            }
+          }
         }
 
         /* Only remove second vertex if it is the end segment of the cut. */
-        if (!v2->is_splitting) {
+        if (!v2->is_invalid && !v2->is_splitting) {
           v2->is_invalid = true;
+          /* If the second vertex is touching any other cut edges don't remove it. */
+          for (ref = v2->edges.first; ref; ref = ref->next) {
+            kfe = ref->ref;
+            if (kfe->is_cut && !kfe->is_invalid) {
+              v2->is_invalid = false;
+              break;
+            }
+          }
         }
       }
     }
 
     if (lastkfe) {
-      /* If the first vertex is touching any other cut edges don't remove it. */
-      Ref *ref;
-      for (ref = v1->edges.first; ref; ref = ref->next) {
-        kfe = ref->ref;
-        if (kfe->is_cut && !kfe->is_invalid) {
-          v1->is_invalid = false;
-          break;
-        }
-      }
-
-      /* If the second vertex is touching any other cut edges don't remove it. */
-      for (ref = v2->edges.first; ref; ref = ref->next) {
-        kfe = ref->ref;
-        if (kfe->is_cut && !kfe->is_invalid) {
-          v2->is_invalid = false;
-          break;
-        }
-      }
+      /* Restore data for distance and angle measurements. */
+      kcd->mdata = undo->mdata;
 
       if (kcd->mode == MODE_DRAGGING) {
         /* Restore kcd->prev. */
         kcd->prev = undo->pos;
       }
-
-      /* Restore data for distance and angle measurements. */
-      kcd->mdata = undo->mdata;
-    }
-
-    /* Undo edge splitting. */
-    for (int i = 0; i < undo->splits; i++) {
-      BLI_stack_pop(kcd->splitstack, &newkfe);
-      BLI_stack_pop(kcd->splitstack, &kfe);
-      knife_join_edge(kcd, newkfe, kfe);
     }
 
     BLI_stack_discard(kcd->undostack);
@@ -3922,6 +3924,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         else {
           kcd->is_drag_hold = false;
           kcd->ignore_edge_snapping = false;
+          kcd->is_drag_undo = false;
 
           /* Needed because the last face 'hit' is ignored when dragging. */
           knifetool_update_mval(C, kcd, kcd->curr.mval);
@@ -3936,6 +3939,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
           /* Shouldn't be possible with default key-layout, just in case. */
           if (kcd->is_drag_hold) {
             kcd->is_drag_hold = false;
+            kcd->is_drag_undo = false;
             knifetool_update_mval(C, kcd, kcd->curr.mval);
           }
 
