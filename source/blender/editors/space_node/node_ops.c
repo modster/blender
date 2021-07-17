@@ -166,15 +166,6 @@ void ED_operatormacros_node(void)
                                     OPTYPE_UNDO | OPTYPE_REGISTER);
   WM_operatortype_macro_define(ot, "NODE_OT_duplicate");
   WM_operatortype_macro_define(ot, "NODE_OT_translate_attach");
-
-  /* modified operator call for duplicating with input links */
-  ot = WM_operatortype_append_macro("NODE_OT_duplicate_move_keep_inputs",
-                                    "Duplicate",
-                                    "Duplicate selected nodes keeping input links and move them",
-                                    OPTYPE_UNDO | OPTYPE_REGISTER);
-  mot = WM_operatortype_macro_define(ot, "NODE_OT_duplicate");
-  RNA_boolean_set(mot->ptr, "keep_inputs", true);
-  WM_operatortype_macro_define(ot, "NODE_OT_translate_attach");
 }
 
 void node_keymap(struct wmKeyConfig *keyconf)
