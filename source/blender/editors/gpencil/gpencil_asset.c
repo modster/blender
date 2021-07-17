@@ -544,21 +544,15 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
         add_v3_fl(tgpa->manipulator_vector, 1.0f);
         return;
       }
-      else if (tgpa->manipulator_index == 1) {
+      if (ELEM(tgpa->manipulator_index, 1, 5)) {
         gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[5], co1);
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[1], co2);
       }
-      else if (tgpa->manipulator_index == 3) {
+      else if (ELEM(tgpa->manipulator_index, 3, 7)) {
         gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[7], co1);
-      }
-      else if (tgpa->manipulator_index == 5) {
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[1], co1);
-      }
-      else if (tgpa->manipulator_index == 7) {
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[3], co1);
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[3], co2);
       }
 
-      gpencil_point_xy_to_3d(
-          &tgpa->gsc, tgpa->scene, tgpa->manipulator[tgpa->manipulator_index], co2);
       sub_v3_v3v3(tgpa->manipulator_vector, co2, co1);
       normalize_v3(tgpa->manipulator_vector);
 
@@ -597,12 +591,8 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
   float dist = len_v3(mouse3d);
   float scale_factor = dist / tgpa->initial_dist;
   float scale_vector[3];
-  mul_v3_v3fl(scale_vector, tgpa->manipulator_vector, scale_factor);
-  print_v3_id(tgpa->manipulator_vector);
-  print_v3_id(scale_vector);
-  // TODO: Scale does not work in mid points
-  // add_v3_fl(scale_vector, 1.0f);
-  // print_v3_id(scale_vector);
+  mul_v3_v3fl(scale_vector, tgpa->manipulator_vector, scale_factor - 1.0f);
+  add_v3_fl(scale_vector, 1.0f);
 
   GHashIterator gh_iter;
   GHASH_ITER (gh_iter, tgpa->asset_strokes) {
@@ -622,9 +612,11 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
           sub_v3_v3(&pt->x, tgpa->asset_center);
           mul_v3_v3(&pt->x, scale_vector);
           add_v3_v3(&pt->x, tgpa->asset_center);
-
-          pt->pressure *= scale_factor;
-          CLAMP_MIN(pt->pressure, 0.01f);
+          /* Thickness change only in full scale. */
+          if (ELEM(tgpa->manipulator_index, 0, 2, 4, 6)) {
+            pt->pressure *= scale_factor;
+            CLAMP_MIN(pt->pressure, 0.01f);
+          }
           break;
         }
         default:
