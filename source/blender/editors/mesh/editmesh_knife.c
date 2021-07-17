@@ -168,10 +168,19 @@ typedef struct KnifePosData {
   float mval[2]; /* Mouse screen position (may be non-integral if snapped to something). */
 } KnifePosData;
 
+typedef struct KnifeMeasureData {
+  float cage[3];
+  float mval[2];
+  bool is_stored;
+  float corr_prev_cage[3]; /* "knife_start_cut" updates prev.cage breaking angle calculations,
+                            * store correct version. */
+} KnifeMeasureData;
+
 typedef struct KnifeUndoFrame {
   int cuts;         /* Line hits cause multiple edges/cuts to be created at once. */
   int splits;       /* Number of edges split. */
   KnifePosData pos; /* Store previous KnifePosData. */
+  KnifeMeasureData mdata;
 
 } KnifeUndoFrame;
 
@@ -283,12 +292,7 @@ typedef struct KnifeTool_OpData {
 
   short dist_angle_mode;
   bool show_dist_angle;
-  /* Save the second most recent point for angle drawing calculations. */
-  float old_cage[3];
-  float old_mval[2];
-  bool old_stored;
-  float corr_prev_cage[3]; /* "knife_start_cut" updates prev.cage breaking angle calculations,
-                            * store correct version. */
+  KnifeMeasureData mdata; /* Data for distance and angle drawing calculations. */
 
   KnifeUndoFrame *undo; /* Current undo frame. */
 } KnifeTool_OpData;
@@ -475,7 +479,7 @@ static void knifetool_draw_visible_distances(const KnifeTool_OpData *kcd)
   /* Calculate distance and convert to string. */
   float prev_cage_world[3];
   float curr_cage_world[3];
-  copy_v3_v3(prev_cage_world, kcd->corr_prev_cage);
+  copy_v3_v3(prev_cage_world, kcd->mdata.corr_prev_cage);
   copy_v3_v3(curr_cage_world, kcd->curr.cage);
   mul_m4_v3(kcd->ob->obmat, prev_cage_world);
   mul_m4_v3(kcd->ob->obmat, curr_cage_world);
@@ -663,11 +667,11 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
   if (kcd->curr.edge) {
     KnifeEdge *kfe = kcd->curr.edge;
     /* Check for most recent cut (if cage is part of previous cut). */
-    if (!compare_v3v3(kfe->v1->cageco, kcd->corr_prev_cage, KNIFE_FLT_EPSBIG) &&
-        !compare_v3v3(kfe->v2->cageco, kcd->corr_prev_cage, KNIFE_FLT_EPSBIG)) {
+    if (!compare_v3v3(kfe->v1->cageco, kcd->mdata.corr_prev_cage, KNIFE_FLT_EPSBIG) &&
+        !compare_v3v3(kfe->v2->cageco, kcd->mdata.corr_prev_cage, KNIFE_FLT_EPSBIG)) {
       /* Determine acute angle. */
-      float angle1 = angle_v3v3v3(kcd->corr_prev_cage, kcd->curr.cage, kfe->v1->cageco);
-      float angle2 = angle_v3v3v3(kcd->corr_prev_cage, kcd->curr.cage, kfe->v2->cageco);
+      float angle1 = angle_v3v3v3(kcd->mdata.corr_prev_cage, kcd->curr.cage, kfe->v1->cageco);
+      float angle2 = angle_v3v3v3(kcd->mdata.corr_prev_cage, kcd->curr.cage, kfe->v2->cageco);
 
       float angle;
       float *end;
@@ -685,7 +689,7 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
       ED_view3d_project_float_v2_m4(kcd->region, end, end_ss, (float(*)[4])kcd->projmat);
 
       knifetool_draw_angle(kcd,
-                           kcd->corr_prev_cage,
+                           kcd->mdata.corr_prev_cage,
                            kcd->curr.cage,
                            end,
                            kcd->prev.mval,
@@ -731,15 +735,15 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
     knifetool_draw_angle(
         kcd, kcd->curr.cage, kcd->prev.cage, end, kcd->curr.mval, kcd->prev.mval, end_ss, angle);
   }
-  else if (kcd->old_stored && !kcd->prev.is_space) {
-    float angle = angle_v3v3v3(kcd->curr.cage, kcd->corr_prev_cage, kcd->old_cage);
+  else if (kcd->mdata.is_stored && !kcd->prev.is_space) {
+    float angle = angle_v3v3v3(kcd->curr.cage, kcd->mdata.corr_prev_cage, kcd->mdata.cage);
     knifetool_draw_angle(kcd,
                          kcd->curr.cage,
-                         kcd->corr_prev_cage,
-                         kcd->old_cage,
+                         kcd->mdata.corr_prev_cage,
+                         kcd->mdata.cage,
                          kcd->curr.mval,
                          kcd->prev.mval,
-                         kcd->old_mval,
+                         kcd->mdata.mval,
                          angle);
   }
 
@@ -1428,7 +1432,7 @@ static void knife_start_cut(KnifeTool_OpData *kcd)
 {
   kcd->prev = kcd->curr;
   kcd->curr.is_space = 0; /* TODO: Why do we do this? */
-  kcd->old_stored = false;
+  kcd->mdata.is_stored = false;
 
   if (kcd->prev.vert == NULL && kcd->prev.edge == NULL) {
     float origin[3], origin_ofs[3];
@@ -1954,11 +1958,12 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
   kcd->undo->pos = kcd->prev;
   kcd->undo->cuts = 0;
   kcd->undo->splits = 0;
+  kcd->undo->mdata = kcd->mdata;
 
   /* Save values for angle drawing calculations. */
-  copy_v3_v3(kcd->old_cage, kcd->corr_prev_cage);
-  copy_v2_v2(kcd->old_mval, kcd->prev.mval);
-  kcd->old_stored = true;
+  copy_v3_v3(kcd->mdata.cage, kcd->mdata.corr_prev_cage);
+  copy_v2_v2(kcd->mdata.mval, kcd->prev.mval);
+  kcd->mdata.is_stored = true;
 
   prepare_linehits_for_cut(kcd);
   if (kcd->totlinehit == 0) {
@@ -1970,7 +1975,7 @@ static void knife_add_cut(KnifeTool_OpData *kcd)
 
   /* Consider most recent linehit in angle drawing calculations. */
   if (kcd->totlinehit >= 2) {
-    copy_v3_v3(kcd->old_cage, kcd->linehits[kcd->totlinehit - 2].cagehit);
+    copy_v3_v3(kcd->mdata.cage, kcd->linehits[kcd->totlinehit - 2].cagehit);
   }
 
   /* Make facehits: map face -> list of linehits touching it. */
@@ -3099,8 +3104,8 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
 {
   /* Calculate a reference vector using previous cut segment. If none exists then exit. */
   float ref[3];
-  if (kcd->old_stored && !kcd->prev.is_space) {
-    sub_v3_v3v3(ref, kcd->old_cage, kcd->prev.cage);
+  if (kcd->mdata.is_stored && !kcd->prev.is_space) {
+    sub_v3_v3v3(ref, kcd->mdata.cage, kcd->prev.cage);
   }
   else {
     return false;
@@ -3393,6 +3398,9 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
         /* Restore kcd->prev. */
         kcd->prev = undo->pos;
       }
+
+      /* Restore data for distance and angle measurements. */
+      kcd->mdata = undo->mdata;
     }
 
     /* Undo edge splitting. */
@@ -3898,10 +3906,10 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
           if (kcd->prev.edge == NULL && kcd->prev.vert == NULL) {
             /* "knife_start_cut" moves prev.cage so needs to be recalculated. */
             /* Only occurs if prev was started on a face. */
-            knifetool_recast_cageco(kcd, kcd->prev.mval, kcd->corr_prev_cage);
+            knifetool_recast_cageco(kcd, kcd->prev.mval, kcd->mdata.corr_prev_cage);
           }
           else {
-            copy_v3_v3(kcd->corr_prev_cage, kcd->prev.cage);
+            copy_v3_v3(kcd->mdata.corr_prev_cage, kcd->prev.cage);
           }
 
           /* Freehand drawing is incompatible with cut-through. */
