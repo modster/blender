@@ -296,6 +296,8 @@ typedef struct KnifeTool_OpData {
 
   KnifeUndoFrame *undo; /* Current undo frame. */
   bool is_drag_undo;
+
+  bool depth_test;
 } KnifeTool_OpData;
 
 enum {
@@ -311,6 +313,7 @@ enum {
   KNF_MODAL_ANGLE_SNAP_TOGGLE,
   KNF_MODAL_CUT_THROUGH_TOGGLE,
   KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE,
+  KNF_MODAL_DEPTH_TEST_TOGGLE,
   KNF_MODAL_PANNING,
   KNF_MODAL_ADD_CUT_CLOSED,
 };
@@ -851,6 +854,10 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     immEnd();
   }
 
+  if (kcd->depth_test) {
+    GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
+  }
+
   if (kcd->totlinehit > 0) {
     KnifeLineHit *lh;
     int i, snapped_verts_count, other_verts_count;
@@ -946,6 +953,8 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   immUnbindProgram();
 
+  GPU_depth_test(GPU_DEPTH_NONE);
+
   if (kcd->mode == MODE_DRAGGING) {
     if (kcd->show_dist_angle) {
       knifetool_draw_dist_angle(kcd);
@@ -985,7 +994,8 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
            "%s: midpoint snap (%s), %s: ignore snap (%s), "
            "%s: angle constraint %.2f(%.2f) (%s), %s: cut through (%s), "
            "%s: panning, XYZ: orientation lock (%s), "
-           "%s: distance/angle measurements (%s)"),
+           "%s: distance/angle measurements (%s), "
+           "%s: depth check (%s)"),
       WM_MODALKEY(KNF_MODAL_CONFIRM),
       WM_MODALKEY(KNF_MODAL_CANCEL),
       WM_MODALKEY(KNF_MODAL_UNDO),
@@ -1010,7 +1020,9 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
       WM_MODALKEY(KNF_MODAL_PANNING),
       (kcd->axis_constrained ? kcd->axis_string : WM_bool_as_string(kcd->axis_constrained)),
       WM_MODALKEY(KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE),
-      WM_bool_as_string(kcd->show_dist_angle));
+      WM_bool_as_string(kcd->show_dist_angle),
+      WM_MODALKEY(KNF_MODAL_DEPTH_TEST_TOGGLE),
+      WM_bool_as_string(kcd->depth_test));
 
 #undef WM_MODALKEY
 
@@ -3709,6 +3721,7 @@ wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
        0,
        "Toggle Distance and Angle Measurements",
        ""},
+      {KNF_MODAL_DEPTH_TEST_TOGGLE, "DEPTH_TEST_TOGGLE", 0, "Toggle Depth Testing", ""},
       {KNF_MODAL_NEW_CUT, "NEW_CUT", 0, "End Current Cut", ""},
       {KNF_MODAL_ADD_CUT, "ADD_CUT", 0, "Add Cut", ""},
       {KNF_MODAL_ADD_CUT_CLOSED, "ADD_CUT_CLOSED", 0, "Add Cut Closed", ""},
@@ -3880,6 +3893,13 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
           kcd->dist_angle_mode = KNF_MEASUREMENT_NONE;
         }
         kcd->show_dist_angle = (kcd->dist_angle_mode != KNF_MEASUREMENT_NONE);
+        knife_update_header(C, op, kcd);
+        do_refresh = true;
+        handled = true;
+        break;
+      case KNF_MODAL_DEPTH_TEST_TOGGLE:
+        kcd->depth_test = !kcd->depth_test;
+        ED_region_tag_redraw(kcd->region);
         knife_update_header(C, op, kcd);
         do_refresh = true;
         handled = true;
