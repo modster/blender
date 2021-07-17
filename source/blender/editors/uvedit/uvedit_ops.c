@@ -1339,6 +1339,176 @@ static void UV_OT_snap_selected(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name UV offset Operator
+ * \{ */
+
+/* Pixel offset (defined in T78405) is currently not implemented in the operator */
+enum {
+  UDIM_OFFSET_UP = 0,
+  UDIM_OFFSET_DOWN,
+  UDIM_OFFSET_LEFT,
+  UDIM_OFFSET_RIGHT,
+  DYNAMIC_GRID_OFFSET_UP,
+  DYNAMIC_GRID_OFFSET_DOWN,
+  DYNAMIC_GRID_OFFSET_LEFT,
+  DYNAMIC_GRID_OFFSET_RIGHT,
+};
+
+static int uv_offset_exec(bContext *C, wmOperator *op)
+{
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  const SpaceImage *sima = CTX_wm_space_image(C);
+  const ToolSettings *ts = scene->toolsettings;
+  // const bool synced_selection = (ts->uv_flag & UV_SYNC_SELECTION) != 0;
+  int dynamic_grid_size = (sima->flag & SI_DYNAMIC_GRID) ? sima->dynamic_grid_size : 0;
+
+  const int offset_direction = RNA_enum_get(op->ptr, "offset_direction");
+  float uv_offset[2] = {0.0f, 0.0f};
+
+  /* Assign offset based on the keymap input */
+  switch (offset_direction) {
+    case UDIM_OFFSET_UP: {
+      uv_offset[1] = 1.0f;
+      break;
+    }
+    case UDIM_OFFSET_DOWN: {
+      uv_offset[1] = -1.0f;
+      break;
+    }
+    case UDIM_OFFSET_LEFT: {
+      uv_offset[0] = -1.0f;
+      break;
+    }
+    case UDIM_OFFSET_RIGHT: {
+      uv_offset[0] = 1.0f;
+      break;
+    }
+    case DYNAMIC_GRID_OFFSET_UP: {
+      if (dynamic_grid_size) {
+        uv_offset[1] = 1.0f / ((float)dynamic_grid_size);
+      }
+      else { /* Dynamic Grid not in use */
+        return OPERATOR_CANCELLED;
+      }
+      break;
+    }
+    case DYNAMIC_GRID_OFFSET_DOWN: {
+      if (dynamic_grid_size) {
+        uv_offset[1] = (-1.0f) / ((float)dynamic_grid_size);
+      }
+      else { /* Dynamic Grid not in use */
+        return OPERATOR_CANCELLED;
+      }
+      break;
+    }
+    case DYNAMIC_GRID_OFFSET_RIGHT: {
+      if (dynamic_grid_size) {
+        uv_offset[0] = 1.0f / ((float)dynamic_grid_size);
+      }
+      else { /* Dynamic Grid not in use */
+        return OPERATOR_CANCELLED;
+      }
+      break;
+    }
+    case DYNAMIC_GRID_OFFSET_LEFT: {
+      if (dynamic_grid_size) {
+        uv_offset[0] = (-1.0f) / ((float)dynamic_grid_size);
+      }
+      else { /* Dynamic Grid not in use */
+        return OPERATOR_CANCELLED;
+      }
+      break;
+    }
+    default: {
+      /* No valid use case */
+      return OPERATOR_CANCELLED;
+    }
+  }
+
+  BMFace *efa;
+  BMLoop *l;
+  BMIter iter, liter;
+  MLoopUV *luv;
+
+  uint objects_len = 0;
+  Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data_with_uvs(
+      view_layer, ((View3D *)NULL), &objects_len);
+
+  for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
+    Object *obedit = objects[ob_index];
+    BMEditMesh *em = BKE_editmesh_from_object(obedit);
+    const int cd_loop_uv_offset = CustomData_get_offset(&em->bm->ldata, CD_MLOOPUV);
+
+    if ((ts->uv_flag & UV_SYNC_SELECTION) && (em->bm->totvertsel == 0)) {
+      continue;
+    }
+
+    BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
+      if (!uvedit_face_visible_test(scene, efa)) {
+        continue;
+      }
+
+      BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
+        luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
+        if (luv->flag & MLOOPUV_VERTSEL) {
+          add_v2_v2(luv->uv, uv_offset);
+        }
+        /* FAILS in some cases with UV sync selection. Find out why??? */
+      }
+    }
+    /* if uv_offset is not zero, then UV elements were updated */
+    if (!is_zero_v2(uv_offset)) {
+      DEG_id_tag_update(obedit->data, ID_RECALC_GEOMETRY);
+      WM_main_add_notifier(NC_GEOM | ND_DATA, obedit->data);
+    }
+  }
+  MEM_freeN(objects);
+
+  return OPERATOR_FINISHED;
+}
+
+/* Refer Task description given in T78405 */
+static void UV_OT_offset(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Offset UVs";
+  ot->idname = "UV_OT_offset";
+  ot->description = "Offset selected UVs by a fixed distance in a specified direction";
+
+  /* api callbacks */
+  ot->exec = uv_offset_exec;
+  ot->poll = ED_operator_uvedit_space_image;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  /* RNA properties */
+  static const EnumPropertyItem offset_direction[] = {
+      {UDIM_OFFSET_UP, "UDIM_UP", 0, "Udim Up", ""},
+      {UDIM_OFFSET_DOWN, "UDIM_DOWN", 0, "Udim Down", ""},
+      {UDIM_OFFSET_LEFT, "UDIM_LEFT", 0, "Udim Left", ""},
+      {UDIM_OFFSET_RIGHT, "UDIM_RIGHT", 0, "Udim Right", ""},
+      {DYNAMIC_GRID_OFFSET_UP, "DYNAMIC_GRID_UP", 0, "Dynamic grid Up", ""},
+      {DYNAMIC_GRID_OFFSET_DOWN, "DYNAMIC_GRID_DOWN", 0, "Dynamic grid Down", ""},
+      {DYNAMIC_GRID_OFFSET_LEFT, "DYNAMIC_GRID_LEFT", 0, "Dynamic grid Left", ""},
+      {DYNAMIC_GRID_OFFSET_RIGHT, "DYNAMIC_GRID_RIGHT", 0, "Dynamic grid Right", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  PropertyRNA *prop;
+  prop = RNA_def_enum(ot->srna,
+                      "offset_direction",
+                      offset_direction,
+                      0,
+                      "UV Offset Direction",
+                      "Offset and direction for moving selected UVs");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE | PROP_HIDDEN);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Pin UV's Operator
  * \{ */
 
@@ -2056,6 +2226,7 @@ void ED_operatortypes_uvedit(void)
   WM_operatortype_append(UV_OT_weld);
   WM_operatortype_append(UV_OT_remove_doubles);
   WM_operatortype_append(UV_OT_pin);
+  WM_operatortype_append(UV_OT_offset);
 
   WM_operatortype_append(UV_OT_average_islands_scale);
   WM_operatortype_append(UV_OT_cube_project);
