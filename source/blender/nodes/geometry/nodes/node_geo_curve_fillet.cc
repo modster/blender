@@ -162,8 +162,6 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
                                                Array<int> &point_counts)
 {
   Span<float3> positions = spline->positions();
-  std::string radii_name = mode_param.radii_dist.value();
-  GVArray_Typed<float> *radii_dist = mode_param.radii;
   int fillet_count, start = 0, size = spline->size();
 
   bool cyclic = spline->is_cyclic();
@@ -195,11 +193,11 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
       radius = mode_param.radius.value();
     }
     else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE) {
-      if (radii_dist->size() != size) {
+      if (mode_param.radii->size() != size) {
         radius = 0;
       }
       else {
-        radius = (*radii_dist)[start + i];
+        radius = (*mode_param.radii)[start + i];
       }
     }
 
@@ -213,7 +211,7 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
     int count = 0;
     if (mode_param.mode == GEO_NODE_CURVE_FILLET_ADAPTIVE) {
       // temp
-      count = get_point_count(prev_pos, pos, next_pos, mode_param.angle.value());
+      count = ceil(fds[i].angle / mode_param.angle.value());
     }
     else if (mode_param.mode == GEO_NODE_CURVE_FILLET_USER_DEFINED) {
       count = mode_param.count.value();
@@ -386,10 +384,6 @@ static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletMod
   }
 
   Array<int> point_counts(size, {1});
-  Span<float3> positions = src_spline_ptr->positions();
-
-  std::string radii_name = mode_param.radii_dist.value();
-  GVArray_Typed<float> *radii_dist = mode_param.radii;
 
   int added_count = 0;
   Array<FilletData> fds = calculate_fillet_data(
