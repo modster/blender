@@ -1246,13 +1246,12 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 
   /* TODO(AYJ) : add ability to add to a list each strip that needs thumbnail job done */
 
-  static rctf view_check = {0, 0, 0, 0};
-  static float strip_change_check = 0.0;
+  static rctf check_view = {0, 0, 0, 0};
+  float cache_start_frame = x1;
 
-  if (x1 != strip_change_check || BLI_rctf_compare(&view_check, &v2d->cur, 0.0)) {
-    sequencer_thumbnail_get_job(C, v2d, x1, thumb_w, context, seq);
-    strip_change_check = x1;
-    view_check = v2d->cur;
+  if (!BLI_rctf_compare(&check_view, &v2d->cur, 0.1)) {
+    sequencer_thumbnail_get_job(C, v2d, cache_start_frame, thumb_w, context, seq);
+    check_view = v2d->cur;
   }
 
   /* Start drawing */
@@ -1291,7 +1290,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
       IMB_freeImBuf(ibuf);
     }
     else {
-      sequencer_thumbnail_get_job(C, v2d, x1, thumb_w, context, seq);
+      sequencer_thumbnail_get_job(C, v2d, cache_start_frame, thumb_w, context, seq);
       break;
     }
 
