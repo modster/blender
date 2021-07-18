@@ -427,6 +427,10 @@ bool USD_import(struct bContext *C,
   return import_ok;
 }
 
+/* TODO(makowalski): Extend this function with basic validation that the
+ * USD reader is compatible with the type of the given (currently unused) 'ob'
+ * Object parameter, similar to the logic in get_abc_reader() in the
+ * Alembic importer code. */
 static USDPrimReader *get_usd_reader(CacheReader *reader, Object * /* ob */, const char **err_str)
 {
   USDPrimReader *usd_reader = reinterpret_cast<USDPrimReader *>(reader);
