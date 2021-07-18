@@ -515,7 +515,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "import_usd_preview",
                   false,
                   "Import USD Preview",
-                  "Convert UsdPreviewSurface shaders to Principled BSD shader networks");
+                  "Convert UsdPreviewSurface shaders to Principled BSDF shader networks");
 
   RNA_def_boolean(ot->srna,
                   "set_material_blend",
