@@ -78,7 +78,7 @@ static void initSnapSpatial(TransInfo *t, float r_snap[2]);
 
 bool transdata_check_local_islands(TransInfo *t, short around)
 {
-  return ((around == V3D_AROUND_LOCAL_ORIGINS) && ((ELEM(t->obedit_type, OB_MESH, OB_GPENCIL))));
+  return ((around == V3D_AROUND_LOCAL_ORIGINS) && (ELEM(t->obedit_type, OB_MESH, OB_GPENCIL)));
 }
 
 /* ************************** SPACE DEPENDENT CODE **************************** */
@@ -536,7 +536,7 @@ static void viewRedrawPost(bContext *C, TransInfo *t)
       WM_event_add_notifier(C, NC_GEOM | ND_DATA, NULL);
     }
 
-    /* XXX temp, first hack to get auto-render in compositor work (ton) */
+    /* XXX(ton): temp, first hack to get auto-render in compositor work. */
     WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, CTX_data_scene(C));
   }
 
@@ -1937,7 +1937,7 @@ int transformEnd(bContext *C, TransInfo *t)
   return exit_code;
 }
 
-/* TODO, move to: transform_query.c */
+/* TODO: move to: `transform_query.c`. */
 bool checkUseAxisMatrix(TransInfo *t)
 {
   /* currently only checks for editmode */

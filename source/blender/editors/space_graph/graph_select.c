@@ -167,7 +167,7 @@ static void nearest_fcurve_vert_store(ListBase *matches,
     }
   }
   else if (fpt) {
-    /* TODO... */
+    /* TODO: support #FPoint. */
   }
 }
 
@@ -257,7 +257,7 @@ static void get_nearest_fcurve_verts_list(bAnimContext *ac, const int mval[2], L
       }
     }
     else if (fcu->fpt) {
-      /* TODO; do this for samples too */
+      /* TODO: do this for samples too. */
     }
 
     /* un-apply NLA mapping from all the keyframes */
@@ -736,7 +736,7 @@ static bool rectf_curve_intersection(
  * to select a curve by sampling it at various points instead of trying to select the
  * keyframes directly.
  * The selection actions done to a curve are actually done on all the keyframes of the curve.
- * Note: This function is only called if no keyframe is in the selection area.
+ * NOTE: This function is only called if no keyframe is in the selection area.
  */
 static void box_select_graphcurves(bAnimContext *ac,
                                    const rctf *rectf_view,
@@ -859,7 +859,7 @@ static int graphkeys_box_select_exec(bContext *C, wmOperator *op)
      *   as frame-range one is often used for tweaking timing when "blocking",
      *   while channels is not that useful.
      */
-    if ((BLI_rcti_size_x(&rect)) >= (BLI_rcti_size_y(&rect))) {
+    if (BLI_rcti_size_x(&rect) >= BLI_rcti_size_y(&rect)) {
       mode = BEZT_OK_FRAMERANGE;
     }
     else {
@@ -1131,8 +1131,8 @@ static const EnumPropertyItem prop_column_select_types[] = {
 /* ------------------- */
 
 /* Selects all visible keyframes between the specified markers */
-/* TODO, this is almost an _exact_ duplicate of a function of the same name in action_select.c
- * should de-duplicate - campbell */
+/* TODO(campbell): this is almost an _exact_ duplicate of a function of the same name in
+ * action_select.c should de-duplicate. */
 static void markers_selectkeys_between(bAnimContext *ac)
 {
   ListBase anim_data = {NULL, NULL};

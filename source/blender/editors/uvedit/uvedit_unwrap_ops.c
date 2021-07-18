@@ -315,7 +315,7 @@ static ParamHandle *construct_param_handle(const Scene *scene,
 
   BM_ITER_MESH_INDEX (efa, &iter, bm, BM_FACES_OF_MESH, i) {
 
-    if ((BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) ||
+    if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN) ||
         (options->only_selected_faces && BM_elem_flag_test(efa, BM_ELEM_SELECT) == 0)) {
       continue;
     }
@@ -404,7 +404,7 @@ static ParamHandle *construct_param_handle_multi(const Scene *scene,
 
     BM_ITER_MESH_INDEX (efa, &iter, bm, BM_FACES_OF_MESH, i) {
 
-      if ((BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) ||
+      if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN) ||
           (options->only_selected_faces && BM_elem_flag_test(efa, BM_ELEM_SELECT) == 0)) {
         continue;
       }
@@ -2319,7 +2319,7 @@ static int uv_from_view_exec(bContext *C, wmOperator *op)
 
   const bool use_orthographic = RNA_boolean_get(op->ptr, "orthographic");
 
-  /* Note: objects that aren't touched are set to NULL (to skip clipping). */
+  /* NOTE: objects that aren't touched are set to NULL (to skip clipping). */
   uint objects_len = 0;
   Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data(
       view_layer, v3d, &objects_len);

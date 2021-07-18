@@ -21,12 +21,12 @@
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_geometry_set_instances.hh"
-#include "BKE_node_ui_storage.hh"
 
 #include "DNA_node_types.h"
 
 #include "NOD_attribute_ref.hh"
 #include "NOD_derived_node_tree.hh"
+#include "NOD_geometry_nodes_eval_log.hh"
 
 struct Depsgraph;
 struct ModifierData;
@@ -53,10 +53,11 @@ using fn::GVMutableArray;
 using fn::GVMutableArray_GSpan;
 using fn::GVMutableArray_Typed;
 using fn::GVMutableArrayPtr;
+using geometry_nodes_eval_log::NodeWarningType;
 
 /**
- * This class exists to separate the memory management details of the geometry nodes evaluator from
- * the node execution functions and related utilities.
+ * This class exists to separate the memory management details of the geometry nodes evaluator
+ * from the node execution functions and related utilities.
  */
 class GeoNodeExecParamsProvider {
  public:
@@ -64,6 +65,7 @@ class GeoNodeExecParamsProvider {
   const Object *self_object = nullptr;
   const ModifierData *modifier = nullptr;
   Depsgraph *depsgraph = nullptr;
+  geometry_nodes_eval_log::GeoLogger *logger = nullptr;
 
   /**
    * Returns true when the node is allowed to get/extract the input value. The identifier is

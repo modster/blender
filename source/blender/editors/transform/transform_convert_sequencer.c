@@ -262,8 +262,16 @@ static void free_transform_custom_data(TransCustomData *custom_data)
 /* Canceled, need to update the strips display. */
 static void seq_transform_cancel(TransInfo *t, SeqCollection *transformed_strips)
 {
+  ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(t->scene, false));
+
   Sequence *seq;
   SEQ_ITERATOR_FOREACH (seq, transformed_strips) {
+    /* Handle pre-existing overlapping strips even when operator is canceled.
+     * This is necessary for SEQUENCER_OT_duplicate_move macro for example. */
+    if (SEQ_transform_test_overlap(seqbase, seq)) {
+      SEQ_transform_seqbase_shuffle(seqbase, seq, t->scene);
+    }
+
     SEQ_time_update_sequence_bounds(t->scene, seq);
   }
 }
@@ -281,7 +289,7 @@ static bool seq_transform_check_overlap(SeqCollection *transformed_strips)
 
 static SeqCollection *extract_standalone_strips(SeqCollection *transformed_strips)
 {
-  SeqCollection *collection = SEQ_collection_create();
+  SeqCollection *collection = SEQ_collection_create(__func__);
   Sequence *seq;
   SEQ_ITERATOR_FOREACH (seq, transformed_strips) {
     if ((seq->type & SEQ_TYPE_EFFECT) == 0 || seq->seq1 == NULL) {
@@ -302,7 +310,7 @@ static SeqCollection *query_right_side_strips(ListBase *seqbase, SeqCollection *
     }
   }
 
-  SeqCollection *collection = SEQ_collection_create();
+  SeqCollection *collection = SEQ_collection_create(__func__);
   LISTBASE_FOREACH (Sequence *, seq, seqbase) {
     if ((seq->flag & SELECT) == 0 && seq->startdisp >= minframe) {
       SEQ_collection_append_strip(seq, collection);
@@ -407,7 +415,7 @@ static void seq_transform_handle_overlap(TransInfo *t, SeqCollection *transforme
 
 static SeqCollection *seq_transform_collection_from_transdata(TransDataContainer *tc)
 {
-  SeqCollection *collection = SEQ_collection_create();
+  SeqCollection *collection = SEQ_collection_create(__func__);
   TransData *td = tc->data;
   for (int a = 0; a < tc->data_len; a++, td++) {
     Sequence *seq = ((TransDataSeq *)td->extra)->seq;
@@ -428,6 +436,7 @@ static void freeSeqData(TransInfo *t, TransDataContainer *tc, TransCustomData *c
 
   if (t->state == TRANS_CANCEL) {
     seq_transform_cancel(t, transformed_strips);
+    SEQ_collection_free(transformed_strips);
     free_transform_custom_data(custom_data);
     return;
   }
