@@ -449,7 +449,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "set_frame_range",
                   true,
                   "Set Frame Range",
-                  "Update scene's start and end frame to match those of the USD archive");
+                  "Update the scene's start and end frame to match those of the USD archive");
 
   RNA_def_boolean(ot->srna, "import_cameras", true, "Import Cameras", "");
   RNA_def_boolean(ot->srna, "import_curves", true, "Import Curves", "");
@@ -461,8 +461,8 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
   RNA_def_boolean(ot->srna,
                   "import_subdiv",
                   false,
-                  "Import Subdiv Scheme",
-                  "Subdiv surface modifiers will be created based on USD "
+                  "Import Subdivision Scheme",
+                  "Create subdivision surface modifiers based on the USD "
                   "SubdivisionScheme attribute");
 
   RNA_def_boolean(ot->srna,
@@ -476,8 +476,8 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   true,
                   "Visible Primitives Only",
                   "Do not import invisible USD primitives. "
-                  "Only applies to primitives with a non-animating visibility attribute. "
-                  "Primitives with animating visibility will always be imported");
+                  "Only applies to primitives with a non-animated visibility attribute. "
+                  "Primitives with animated visibility will always be imported");
 
   RNA_def_boolean(ot->srna,
                   "create_collection",
@@ -491,7 +491,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                       0,
                       "Flags",
                       "Set the Read Data flag for all mesh sequence cache modifiers applied "
-                      "to imported animating meshes, specifying the cache data to read. Note "
+                      "to imported animated meshes, specifying the cache data to read. Note "
                       "that the UV and Color options apply to static meshes as well");
 
   /* Specify that the flag contains multiple enums. */
@@ -534,7 +534,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                 0.0001f,
                 10000.0f,
                 "Light Intensity Scale",
-                "Value by which to scale the intensity of imported lights",
+                "Scale for the intensity of imported lights",
                 0.0001f,
                 1000.0f);
 }
