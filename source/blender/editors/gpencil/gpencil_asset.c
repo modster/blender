@@ -606,7 +606,9 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
 }
 
 /* Helper: Transfrom the stroke with mouse movements. */
-static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
+static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
+                                            const int mouse[2],
+                                            const bool shift_key)
 {
   /* Get the vector with the movement done by the mouse since last event. */
   float origin_pt[3], dest_pt[3];
@@ -631,17 +633,19 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
   /* Determine pivot point. */
   float pivot[3];
   copy_v3_v3(pivot, tgpa->asset_center);
-  if (tgpa->manipulator_index == CAGE_CORNER_N) {
-    gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], pivot);
-  }
-  else if (tgpa->manipulator_index == CAGE_CORNER_E) {
-    gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], pivot);
-  }
-  else if (tgpa->manipulator_index == CAGE_CORNER_S) {
-    gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], pivot);
-  }
-  else if (tgpa->manipulator_index == CAGE_CORNER_W) {
-    gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], pivot);
+  if (!shift_key) {
+    if (tgpa->manipulator_index == CAGE_CORNER_N) {
+      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], pivot);
+    }
+    else if (tgpa->manipulator_index == CAGE_CORNER_E) {
+      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], pivot);
+    }
+    else if (tgpa->manipulator_index == CAGE_CORNER_S) {
+      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], pivot);
+    }
+    else if (tgpa->manipulator_index == CAGE_CORNER_W) {
+      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], pivot);
+    }
   }
 
   GHashIterator gh_iter;
@@ -979,7 +983,7 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
     {
       /* Apply transform. */
       if (tgpa->flag & GP_ASSET_FLAG_RUNNING) {
-        gpencil_asset_transform_strokes(tgpa, event->mval);
+        gpencil_asset_transform_strokes(tgpa, event->mval, event->shift);
         gpencil_2d_cage_calc(tgpa);
         ED_area_tag_redraw(tgpa->area);
       }
