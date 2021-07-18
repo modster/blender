@@ -503,7 +503,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                  NULL,
                  1024,
                  "",
-                 "If set, specifies the path of the USD primitive to load from the stage");
+                 "If set, only the subset of the USD scene rooted at the given prim will be imported");
 
   RNA_def_boolean(ot->srna, "import_guide", false, "Guide", "Import guide geometry");
 
