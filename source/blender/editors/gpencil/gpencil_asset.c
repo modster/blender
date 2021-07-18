@@ -943,8 +943,9 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   immUniformColor4fv(point_color);
 
   immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.5f * U.dpi_fac);
-  immBegin(GPU_PRIM_POINTS, 9);
-  for (int i = 0; i < 9; i++) {
+  /* Draw only box corners. */
+  immBegin(GPU_PRIM_POINTS, 8);
+  for (int i = 0; i < 8; i++) {
     immVertex2fv(pos, tgpa->manipulator[i]);
   }
   immEnd();
