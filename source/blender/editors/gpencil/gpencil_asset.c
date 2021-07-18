@@ -32,12 +32,14 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_gpencil_types.h"
+#include "DNA_material_types.h"
 
 #include "BKE_context.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
+#include "BKE_material.h"
 #include "BKE_object.h"
 #include "BKE_report.h"
 
@@ -71,6 +73,7 @@
 /* Temporary Asset import operation data */
 typedef struct tGPDasset {
   struct wmWindow *win;
+  struct Main *bmain;
   struct Depsgraph *depsgraph;
   struct Scene *scene;
   struct ScrArea *area;
@@ -394,6 +397,7 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
 {
   /* Save current settings. */
   tgpa->win = CTX_wm_window(C);
+  tgpa->bmain = CTX_data_main(C);
   tgpa->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   tgpa->scene = CTX_data_scene(C);
   tgpa->area = CTX_wm_area(C);
@@ -690,6 +694,21 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
   tgpa->initial_dist = dist;
 }
 
+static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index)
+{
+  const short *tot_slots_data_ptr = BKE_id_material_len_p(id);
+  const int tot_slots_data = tot_slots_data_ptr ? *tot_slots_data_ptr : 0;
+  if (slot_index >= tot_slots_data) {
+    return NULL;
+  }
+
+  Material ***materials_data_ptr = BKE_id_material_array_p(id);
+  Material **materials_data = materials_data_ptr ? *materials_data_ptr : NULL;
+  Material *material = materials_data[slot_index];
+
+  return material;
+}
+
 /* Helper: Load all strokes in the target datablock. */
 static void gpencil_asset_add_strokes(tGPDasset *tgpa)
 {
@@ -736,6 +755,18 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
       LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
         bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
         BLI_addtail(&gpf_target->strokes, gps_target);
+
+        /* Add the material. */
+        Material *ma_src = gpencil_asset_material_get_from_id(&tgpa->gpd_asset->id,
+                                                              gps_asset->mat_nr);
+
+        int mat_index = BKE_gpencil_object_material_index_get_by_name(tgpa->ob,
+                                                                      ma_src->id.name + 2);
+        if (mat_index == -1) {
+          mat_index = BKE_gpencil_object_material_ensure(tgpa->bmain, tgpa->ob, ma_src);
+        }
+
+        gps_target->mat_nr = mat_index;
         /* Add the hash key with a reference to the frame. */
         BLI_ghash_insert(tgpa->asset_strokes, gps_target, gpf_target);
       }
