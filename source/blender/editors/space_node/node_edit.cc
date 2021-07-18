@@ -1876,9 +1876,10 @@ static int node_delete_reconnect_exec(bContext *C, wmOperator *UNUSED(op))
 
   ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 
+  ED_node_dissolve_links(bmain, snode->edittree, NULL);
+
   LISTBASE_FOREACH_MUTABLE (bNode *, node, &snode->edittree->nodes) {
     if (node->flag & SELECT) {
-      nodeInternalRelink(snode->edittree, node);
       nodeRemoveNode(bmain, snode->edittree, node, true);
     }
   }

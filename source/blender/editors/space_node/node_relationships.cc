@@ -1519,11 +1519,7 @@ static int detach_links_exec(bContext *C, wmOperator *UNUSED(op))
 
   ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 
-  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    if (node->flag & SELECT) {
-      nodeInternalRelink(ntree, node);
-    }
-  }
+  ED_node_dissolve_links(CTX_data_main(C), ntree, NULL);
 
   ntreeUpdateTree(CTX_data_main(C), ntree);
 
