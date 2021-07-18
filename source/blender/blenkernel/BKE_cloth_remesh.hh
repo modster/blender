@@ -211,6 +211,23 @@ template<typename T> class Node {
     return this->extra_data;
   }
 
+  auto &get_extra_data_mut()
+  {
+    return this->extra_data;
+  }
+
+  const auto &get_checked_extra_data() const
+  {
+    BLI_assert(this->extra_data);
+    return this->extra_data.value();
+  }
+
+  auto &get_checked_extra_data_mut()
+  {
+    BLI_assert(this->extra_data);
+    return this->extra_data.value();
+  }
+
   const auto &get_verts() const
   {
     return this->verts;
@@ -254,6 +271,28 @@ template<typename T> class Vert {
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
+  }
+
+  const auto &get_extra_data() const
+  {
+    return this->extra_data;
+  }
+
+  auto &get_extra_data_mut()
+  {
+    return this->extra_data;
+  }
+
+  const auto &get_checked_extra_data() const
+  {
+    BLI_assert(this->extra_data);
+    return this->extra_data.value();
+  }
+
+  auto &get_checked_extra_data_mut()
+  {
+    BLI_assert(this->extra_data);
+    return this->extra_data.value();
   }
 
   const auto &get_edges() const
@@ -305,6 +344,28 @@ template<typename T> class Edge {
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
+  }
+
+  const auto &get_extra_data() const
+  {
+    return this->extra_data;
+  }
+
+  auto &get_extra_data_mut()
+  {
+    return this->extra_data;
+  }
+
+  const auto &get_checked_extra_data() const
+  {
+    BLI_assert(this->extra_data);
+    return this->extra_data.value();
+  }
+
+  auto &get_checked_extra_data_mut()
+  {
+    BLI_assert(this->extra_data);
+    return this->extra_data.value();
   }
 
   bool has_vert(VertIndex vert_index) const
@@ -371,6 +432,28 @@ template<typename T> class Face {
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
+  }
+
+  const auto &get_extra_data() const
+  {
+    return this->extra_data;
+  }
+
+  auto &get_extra_data_mut()
+  {
+    return this->extra_data;
+  }
+
+  const auto &get_checked_extra_data() const
+  {
+    BLI_assert(this->extra_data);
+    return this->extra_data.value();
+  }
+
+  auto &get_checked_extra_data_mut()
+  {
+    BLI_assert(this->extra_data);
+    return this->extra_data.value();
   }
 
   const auto &get_verts() const
