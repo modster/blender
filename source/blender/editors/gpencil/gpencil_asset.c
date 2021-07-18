@@ -149,6 +149,18 @@ typedef enum eGP_AssetTransformMode {
   GP_ASSET_TRANSFORM_SCALE = 3,
 } eGP_AssetTransformMode;
 
+enum eGP_CageCorners {
+  CAGE_CORNER_NW = 0,
+  CAGE_CORNER_N = 1,
+  CAGE_CORNER_NE = 2,
+  CAGE_CORNER_E = 3,
+  CAGE_CORNER_SE = 4,
+  CAGE_CORNER_S = 5,
+  CAGE_CORNER_SW = 6,
+  CAGE_CORNER_W = 7,
+  CAGE_CORNER_ROT = 8,
+};
+
 static bool gpencil_asset_generic_poll(bContext *C)
 {
   if (U.experimental.use_asset_browser == false) {
@@ -296,7 +308,6 @@ static void gpencil_asset_import_update_strokes(bContext *C, tGPDasset *tgpa)
 {
   bGPdata *gpd = tgpa->gpd;
 
-  // TODO
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
   WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
 }
@@ -327,9 +338,9 @@ static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *tgpa)
 /* Update screen and stroke */
 static void gpencil_asset_import_update(bContext *C, wmOperator *op, tGPDasset *tgpa)
 {
-  /* update shift indicator in header */
+  /* Update shift indicator in header. */
   gpencil_asset_import_status_indicators(C, tgpa);
-  /* update points position */
+  /* Update points position. */
   gpencil_asset_import_update_strokes(C, tgpa);
 }
 
@@ -554,18 +565,22 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
 
       WM_cursor_modal_set(tgpa->win, WM_CURSOR_EW_SCROLL);
       /* Determine the vector of the cage effect. For corners is always full effect. */
-      if (ELEM(tgpa->manipulator_index, 0, 2, 4, 6)) {
+      if (ELEM(tgpa->manipulator_index,
+               CAGE_CORNER_NW,
+               CAGE_CORNER_NE,
+               CAGE_CORNER_SE,
+               CAGE_CORNER_SW)) {
         zero_v3(tgpa->manipulator_vector);
         add_v3_fl(tgpa->manipulator_vector, 1.0f);
         return;
       }
-      if (ELEM(tgpa->manipulator_index, 1, 5)) {
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[5], co1);
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[1], co2);
+      if (ELEM(tgpa->manipulator_index, CAGE_CORNER_N, CAGE_CORNER_S)) {
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], co1);
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], co2);
       }
-      else if (ELEM(tgpa->manipulator_index, 3, 7)) {
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[7], co1);
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[3], co2);
+      else if (ELEM(tgpa->manipulator_index, CAGE_CORNER_E, CAGE_CORNER_W)) {
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], co1);
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], co2);
       }
 
       sub_v3_v3v3(tgpa->manipulator_vector, co2, co1);
@@ -609,6 +624,22 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
   mul_v3_v3fl(scale_vector, tgpa->manipulator_vector, scale_factor - 1.0f);
   add_v3_fl(scale_vector, 1.0f);
 
+  /* Determine pivot point. */
+  float pivot[3];
+  copy_v3_v3(pivot, tgpa->asset_center);
+  if (tgpa->manipulator_index == CAGE_CORNER_N) {
+    gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], pivot);
+  }
+  else if (tgpa->manipulator_index == CAGE_CORNER_E) {
+    gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], pivot);
+  }
+  else if (tgpa->manipulator_index == CAGE_CORNER_S) {
+    gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], pivot);
+  }
+  else if (tgpa->manipulator_index == CAGE_CORNER_W) {
+    gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], pivot);
+  }
+
   GHashIterator gh_iter;
   GHASH_ITER (gh_iter, tgpa->asset_strokes) {
     bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
@@ -624,29 +655,17 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa, const int mouse[2])
           break;
         }
         case GP_ASSET_TRANSFORM_SCALE: {
-          /* Determine pivot point. */
-          float pivot[3];
-          copy_v3_v3(pivot, tgpa->asset_center);
-          if (tgpa->manipulator_index == 1) {
-            gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[5], pivot);
-          }
-          else if (tgpa->manipulator_index == 3) {
-            gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[7], pivot);
-          }
-          else if (tgpa->manipulator_index == 5) {
-            gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[1], pivot);
-          }
-          else if (tgpa->manipulator_index == 7) {
-            gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[3], pivot);
-          }
-
           /* Apply scale. */
           sub_v3_v3(&pt->x, pivot);
           mul_v3_v3(&pt->x, scale_vector);
           add_v3_v3(&pt->x, pivot);
 
           /* Thickness change only in full scale. */
-          if (ELEM(tgpa->manipulator_index, 0, 2, 4, 6)) {
+          if (ELEM(tgpa->manipulator_index,
+                   CAGE_CORNER_NW,
+                   CAGE_CORNER_NE,
+                   CAGE_CORNER_SE,
+                   CAGE_CORNER_SW)) {
             pt->pressure *= scale_factor;
             CLAMP_MIN(pt->pressure, 0.01f);
           }
@@ -725,6 +744,36 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
   /* Prepare 2D cage. */
   gpencil_2d_cage_calc(tgpa);
   BKE_gpencil_centroid_3d(tgpa->gpd_asset, tgpa->asset_center);
+}
+
+/* Helper: Clean any temp data. */
+static void gpencil_asset_clean_data(tGPDasset *tgpa)
+{
+  GHashIterator gh_iter;
+  /* Clean Strokes. */
+  if (tgpa->asset_strokes != NULL) {
+    GHASH_ITER (gh_iter, tgpa->asset_strokes) {
+      bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
+      bGPDframe *gpf = (bGPDframe *)BLI_ghashIterator_getValue(&gh_iter);
+      BLI_remlink(&gpf->strokes, gps);
+      BKE_gpencil_free_stroke(gps);
+    }
+  }
+  /* Clean Frames. */
+  if (tgpa->asset_frames != NULL) {
+    GHASH_ITER (gh_iter, tgpa->asset_frames) {
+      bGPDframe *gpf = (bGPDframe *)BLI_ghashIterator_getKey(&gh_iter);
+      bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getValue(&gh_iter);
+      BLI_remlink(&gpl->frames, gpf);
+    }
+  }
+  /* Clean Layers. */
+  if (tgpa->asset_layers != NULL) {
+    GHASH_ITER (gh_iter, tgpa->asset_layers) {
+      bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getKey(&gh_iter);
+      BKE_gpencil_layer_delete(tgpa->gpd, gpl);
+    }
+  }
 }
 
 /* Draw a cage for manipulate asset */
@@ -881,7 +930,9 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 
     case EVT_ESCKEY: /* cancel */
     case RIGHTMOUSE: {
-      /* return to normal cursor and header status */
+      /* Delete temp strokes. */
+      gpencil_asset_clean_data(tgpa);
+      /* Return to normal cursor and header status */
       ED_area_status_text(tgpa->area, NULL);
       ED_workspace_status_text(C, NULL);
       WM_cursor_modal_restore(win);
