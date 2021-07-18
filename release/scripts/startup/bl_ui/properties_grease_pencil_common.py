@@ -23,40 +23,6 @@ from bpy.types import Menu, UIList, Operator
 from bpy.app.translations import pgettext_iface as iface_
 
 
-# XXX: To be replaced with active tools
-# Currently only used by the clip editor
-class AnnotationDrawingToolsPanel:
-    # subclass must set
-    # bl_space_type = 'IMAGE_EDITOR'
-    bl_label = "Annotation"
-    bl_category = "Annotation"
-    bl_region_type = 'TOOLS'
-
-    def draw(self, context):
-        layout = self.layout
-
-        tool_settings = context.tool_settings
-
-        col = layout.column(align=True)
-
-        col.label(text="Draw:")
-        row = col.row(align=True)
-        row.operator("gpencil.annotate", icon='GREASEPENCIL', text="Draw").mode = 'DRAW'
-        # XXX: Needs a dedicated icon
-        row.operator("gpencil.annotate", icon='FORCE_CURVE', text="Erase").mode = 'ERASER'
-
-        row = col.row(align=True)
-        row.operator("gpencil.annotate", icon='LINE_DATA', text="Line").mode = 'DRAW_STRAIGHT'
-        row.operator("gpencil.annotate", icon='MESH_DATA', text="Poly").mode = 'DRAW_POLY'
-
-        col.separator()
-
-        col.label(text="Stroke Placement:")
-        row = col.row(align=True)
-        row.prop_enum(tool_settings, "annotation_stroke_placement_view2d", 'VIEW')
-        row.prop_enum(tool_settings, "annotation_stroke_placement_view2d", 'CURSOR', text="Cursor")
-
-
 class GreasePencilSculptOptionsPanel:
     bl_label = "Sculpt Strokes"
 
@@ -399,18 +365,9 @@ class AnnotationDataPanel:
         layout = self.layout
         layout.use_property_decorate = False
 
-        is_clip_editor = context.space_data.type == 'CLIP_EDITOR'
-
         # Grease Pencil owner.
         gpd_owner = context.annotation_data_owner
         gpd = context.annotation_data
-
-        # Owner selector.
-        if is_clip_editor:
-            col = layout.column()
-            col.label(text="Data Source:")
-            row = col.row()
-            row.prop(context.space_data, "annotation_source", expand=True)
 
         # Only allow adding annotation ID if its owner exist
         if context.annotation_data_owner is None:
