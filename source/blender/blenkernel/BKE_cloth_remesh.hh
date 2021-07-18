@@ -1972,10 +1972,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
  protected:
   /* all protected static methods */
-  /* all protected non-static methods */
-
- private:
-  /* all private static methods */
   static constexpr inline float3 float3_unknown()
   {
     return float3(std::numeric_limits<float>::signaling_NaN());
@@ -1996,6 +1992,183 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return std::isnan(f2[0]) && std::isnan(f2[1]);
   }
 
+  /* all protected non-static methods */
+  /**
+   * Get checked node
+   */
+  inline auto &get_checked_node(NodeIndex node_index)
+  {
+    auto op_node = this->nodes.get(node_index);
+    BLI_assert(op_node);
+    return op_node.value().get();
+  }
+
+  /**
+   * Get const checked node
+   */
+  inline const auto &get_checked_node(NodeIndex node_index) const
+  {
+    auto op_node = this->nodes.get(node_index);
+    BLI_assert(op_node);
+    return op_node.value().get();
+  }
+
+  /**
+   * Get checked vert
+   */
+  inline auto &get_checked_vert(VertIndex vert_index)
+  {
+    auto op_vert = this->verts.get(vert_index);
+    BLI_assert(op_vert);
+    return op_vert.value().get();
+  }
+
+  /**
+   * Get const checked vert
+   */
+  inline const auto &get_checked_vert(VertIndex vert_index) const
+  {
+    auto op_vert = this->verts.get(vert_index);
+    BLI_assert(op_vert);
+    return op_vert.value().get();
+  }
+
+  /**
+   * Get checked edge
+   */
+  inline auto &get_checked_edge(EdgeIndex edge_index)
+  {
+    auto op_edge = this->edges.get(edge_index);
+    BLI_assert(op_edge);
+    return op_edge.value().get();
+  }
+
+  /**
+   * Get const checked edge
+   */
+  inline const auto &get_checked_edge(EdgeIndex edge_index) const
+  {
+    auto op_edge = this->edges.get(edge_index);
+    BLI_assert(op_edge);
+    return op_edge.value().get();
+  }
+
+  /**
+   * Get checked face
+   */
+  inline auto &get_checked_face(FaceIndex face_index)
+  {
+    auto op_face = this->faces.get(face_index);
+    BLI_assert(op_face);
+    return op_face.value().get();
+  }
+
+  /**
+   * Get const checked face
+   */
+  inline const auto &get_checked_face(FaceIndex face_index) const
+  {
+    auto op_face = this->faces.get(face_index);
+    BLI_assert(op_face);
+    return op_face.value().get();
+  }
+
+  inline std::tuple<Vert<EVD> &, Vert<EVD> &> get_checked_verts_of_edge(const Edge<EED> &edge,
+                                                                        bool verts_swapped)
+  {
+    BLI_assert(edge.verts);
+    auto &edge_verts = edge.verts.value();
+
+    if (verts_swapped) {
+      auto &edge_vert_1 = this->get_checked_vert(std::get<1>(edge_verts));
+      auto &edge_vert_2 = this->get_checked_vert(std::get<0>(edge_verts));
+      return {edge_vert_1, edge_vert_2};
+    }
+
+    auto &edge_vert_1 = this->get_checked_vert(std::get<0>(edge_verts));
+    auto &edge_vert_2 = this->get_checked_vert(std::get<1>(edge_verts));
+
+    return {edge_vert_1, edge_vert_2};
+  }
+
+  inline std::tuple<const Vert<EVD> &, const Vert<EVD> &> get_checked_verts_of_edge(
+      const Edge<EED> &edge, bool verts_swapped) const
+  {
+    BLI_assert(edge.verts);
+    const auto &edge_verts = edge.verts.value();
+
+    if (verts_swapped) {
+      const auto &edge_vert_1 = this->get_checked_vert(std::get<1>(edge_verts));
+      const auto &edge_vert_2 = this->get_checked_vert(std::get<0>(edge_verts));
+      return {edge_vert_1, edge_vert_2};
+    }
+
+    const auto &edge_vert_1 = this->get_checked_vert(std::get<0>(edge_verts));
+    const auto &edge_vert_2 = this->get_checked_vert(std::get<1>(edge_verts));
+
+    return {edge_vert_1, edge_vert_2};
+  }
+
+  inline std::tuple<Node<END> &, Node<END> &> get_checked_nodes_of_edge(const Edge<EED> &edge,
+                                                                        bool nodes_swapped)
+  {
+    auto [v1, v2] = this->get_checked_verts_of_edge(edge, nodes_swapped);
+
+    BLI_assert(v1.node);
+    BLI_assert(v2.node);
+    auto &n1 = this->get_checked_node(v1.node.value());
+    auto &n2 = this->get_checked_node(v2.node.value());
+
+    return {n1, n2};
+  }
+
+  inline std::tuple<const Node<END> &, const Node<END> &> get_checked_nodes_of_edge(
+      const Edge<EED> &edge, bool nodes_swapped) const
+  {
+    const auto [v1, v2] = this->get_checked_verts_of_edge(edge, nodes_swapped);
+
+    BLI_assert(v1.node);
+    BLI_assert(v2.node);
+    const auto &n1 = this->get_checked_node(v1.node.value());
+    const auto &n2 = this->get_checked_node(v2.node.value());
+
+    return {n1, n2};
+  }
+
+  inline Node<END> &get_checked_node_of_vert(const Vert<EVD> &vert)
+  {
+    BLI_assert(vert.node);
+    return this->get_checked_node(vert.node.value());
+  }
+
+  /**
+   * Gives first vert index of a triangulated face that is not part of edge.
+   *
+   * Will abort in debug mode if face is not triangulated or edge is
+   * not part of the face.
+   * Will have undefined behaviour in release mode.
+   **/
+  inline Vert<EVD> &get_checked_other_vert(const Edge<EED> &edge, const Face<EFD> &face)
+  {
+    BLI_assert(face.verts.size() == 3);
+    BLI_assert(face.has_edge(edge));
+
+    const auto vert_1_index = face.verts[0];
+    const auto vert_2_index = face.verts[1];
+    const auto vert_3_index = face.verts[2];
+
+    if (edge.has_vert(vert_1_index) == false) {
+      return this->get_checked_vert(vert_1_index);
+    }
+    if (edge.has_vert(vert_2_index) == false) {
+      return this->get_checked_vert(vert_2_index);
+    }
+
+    return this->get_checked_vert(vert_3_index);
+  }
+
+ private:
+  /* all private static methods */
   /* all private non-static methods */
   Node<END> &add_empty_node(float3 pos, float3 normal)
   {
@@ -2391,180 +2564,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     BLI_assert(this->is_face_edges_linked(face) == false);
 
     return face;
-  }
-
-  /**
-   * Get checked node
-   */
-  inline auto &get_checked_node(NodeIndex node_index)
-  {
-    auto op_node = this->nodes.get(node_index);
-    BLI_assert(op_node);
-    return op_node.value().get();
-  }
-
-  /**
-   * Get const checked node
-   */
-  inline const auto &get_checked_node(NodeIndex node_index) const
-  {
-    auto op_node = this->nodes.get(node_index);
-    BLI_assert(op_node);
-    return op_node.value().get();
-  }
-
-  /**
-   * Get checked vert
-   */
-  inline auto &get_checked_vert(VertIndex vert_index)
-  {
-    auto op_vert = this->verts.get(vert_index);
-    BLI_assert(op_vert);
-    return op_vert.value().get();
-  }
-
-  /**
-   * Get const checked vert
-   */
-  inline const auto &get_checked_vert(VertIndex vert_index) const
-  {
-    auto op_vert = this->verts.get(vert_index);
-    BLI_assert(op_vert);
-    return op_vert.value().get();
-  }
-
-  /**
-   * Get checked edge
-   */
-  inline auto &get_checked_edge(EdgeIndex edge_index)
-  {
-    auto op_edge = this->edges.get(edge_index);
-    BLI_assert(op_edge);
-    return op_edge.value().get();
-  }
-
-  /**
-   * Get const checked edge
-   */
-  inline const auto &get_checked_edge(EdgeIndex edge_index) const
-  {
-    auto op_edge = this->edges.get(edge_index);
-    BLI_assert(op_edge);
-    return op_edge.value().get();
-  }
-
-  /**
-   * Get checked face
-   */
-  inline auto &get_checked_face(FaceIndex face_index)
-  {
-    auto op_face = this->faces.get(face_index);
-    BLI_assert(op_face);
-    return op_face.value().get();
-  }
-
-  /**
-   * Get const checked face
-   */
-  inline const auto &get_checked_face(FaceIndex face_index) const
-  {
-    auto op_face = this->faces.get(face_index);
-    BLI_assert(op_face);
-    return op_face.value().get();
-  }
-
-  inline std::tuple<Vert<EVD> &, Vert<EVD> &> get_checked_verts_of_edge(const Edge<EED> &edge,
-                                                                        bool verts_swapped)
-  {
-    BLI_assert(edge.verts);
-    auto &edge_verts = edge.verts.value();
-
-    if (verts_swapped) {
-      auto &edge_vert_1 = this->get_checked_vert(std::get<1>(edge_verts));
-      auto &edge_vert_2 = this->get_checked_vert(std::get<0>(edge_verts));
-      return {edge_vert_1, edge_vert_2};
-    }
-
-    auto &edge_vert_1 = this->get_checked_vert(std::get<0>(edge_verts));
-    auto &edge_vert_2 = this->get_checked_vert(std::get<1>(edge_verts));
-
-    return {edge_vert_1, edge_vert_2};
-  }
-
-  inline std::tuple<const Vert<EVD> &, const Vert<EVD> &> get_checked_verts_of_edge(
-      const Edge<EED> &edge, bool verts_swapped) const
-  {
-    BLI_assert(edge.verts);
-    const auto &edge_verts = edge.verts.value();
-
-    if (verts_swapped) {
-      const auto &edge_vert_1 = this->get_checked_vert(std::get<1>(edge_verts));
-      const auto &edge_vert_2 = this->get_checked_vert(std::get<0>(edge_verts));
-      return {edge_vert_1, edge_vert_2};
-    }
-
-    const auto &edge_vert_1 = this->get_checked_vert(std::get<0>(edge_verts));
-    const auto &edge_vert_2 = this->get_checked_vert(std::get<1>(edge_verts));
-
-    return {edge_vert_1, edge_vert_2};
-  }
-
-  inline std::tuple<Node<END> &, Node<END> &> get_checked_nodes_of_edge(const Edge<EED> &edge,
-                                                                        bool nodes_swapped)
-  {
-    auto [v1, v2] = this->get_checked_verts_of_edge(edge, nodes_swapped);
-
-    BLI_assert(v1.node);
-    BLI_assert(v2.node);
-    auto &n1 = this->get_checked_node(v1.node.value());
-    auto &n2 = this->get_checked_node(v2.node.value());
-
-    return {n1, n2};
-  }
-
-  inline std::tuple<const Node<END> &, const Node<END> &> get_checked_nodes_of_edge(
-      const Edge<EED> &edge, bool nodes_swapped) const
-  {
-    const auto [v1, v2] = this->get_checked_verts_of_edge(edge, nodes_swapped);
-
-    BLI_assert(v1.node);
-    BLI_assert(v2.node);
-    const auto &n1 = this->get_checked_node(v1.node.value());
-    const auto &n2 = this->get_checked_node(v2.node.value());
-
-    return {n1, n2};
-  }
-
-  inline Node<END> &get_checked_node_of_vert(const Vert<EVD> &vert)
-  {
-    BLI_assert(vert.node);
-    return this->get_checked_node(vert.node.value());
-  }
-
-  /**
-   * Gives first vert index of a triangulated face that is not part of edge.
-   *
-   * Will abort in debug mode if face is not triangulated or edge is
-   * not part of the face.
-   * Will have undefined behaviour in release mode.
-   **/
-  inline Vert<EVD> &get_checked_other_vert(const Edge<EED> &edge, const Face<EFD> &face)
-  {
-    BLI_assert(face.verts.size() == 3);
-    BLI_assert(face.has_edge(edge));
-
-    const auto vert_1_index = face.verts[0];
-    const auto vert_2_index = face.verts[1];
-    const auto vert_3_index = face.verts[2];
-
-    if (edge.has_vert(vert_1_index) == false) {
-      return this->get_checked_vert(vert_1_index);
-    }
-    if (edge.has_vert(vert_2_index) == false) {
-      return this->get_checked_vert(vert_2_index);
-    }
-
-    return this->get_checked_vert(vert_3_index);
   }
 };
 
