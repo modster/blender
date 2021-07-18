@@ -1464,9 +1464,10 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_CURVE_PRIMITIVE_LINE 1068
 #define GEO_NODE_CURVE_ENDPOINTS 1069
 #define GEO_NODE_CURVE_PRIMITIVE_QUADRILATERAL 1070
-#define GEO_NODE_COLLAPSE 1071
-#define GEO_NODE_UNSUBDIVIDE 1072
-#define GEO_NODE_DISSOLVE 1073
+#define GEO_NODE_CURVE_TRIM 1071
+#define GEO_NODE_COLLAPSE 1072
+#define GEO_NODE_UNSUBDIVIDE 1073
+#define GEO_NODE_DISSOLVE 1074
 /** \} */
 
 /* -------------------------------------------------------------------- */
