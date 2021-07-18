@@ -15,13 +15,14 @@
  */
 
 #include "BKE_mesh.h"
-#include "BKE_mesh_remesh_blocks.h"
-
-#include "UI_interface.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
+
+#include "GEO_mesh_remesh_blocks.h"
+
+#include "UI_interface.h"
 
 #include "node_geometry_util.hh"
 
@@ -52,7 +53,7 @@ static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
   if (geometry_set.has_mesh()) {
     Mesh *input_mesh = geometry_set.get_mesh_for_write();
 
-    Mesh *output_mesh = BKE_mesh_remesh_blocks_to_mesh_nomain(
+    Mesh *output_mesh = GEO_mesh_remesh_blocks_to_mesh_nomain(
         input_mesh, flag, mode, threshold, hermite_num, scale, depth);
 
     BKE_mesh_copy_parameters_for_eval(output_mesh, input_mesh);

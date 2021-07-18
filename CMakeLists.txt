@@ -265,10 +265,11 @@ if(UNIX AND NOT APPLE)
   option(WITH_SYSTEM_EIGEN3 "Use the systems Eigen3 library" OFF)
 endif()
 
+# Geometry
+option(WITH_REMESH_DUALCON          "Enable Remesh Algorithm using Dualcon" ON)
 
 # Modifiers
 option(WITH_MOD_FLUID           "Enable Mantaflow Fluid Simulation Framework" ON)
-option(WITH_REMESH_DUALCON          "Enable Remesh Modifier" ON)
 option(WITH_MOD_OCEANSIM        "Enable Ocean Modifier" ON)
 
 # Image format support

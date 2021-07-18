@@ -22,7 +22,6 @@
  */
 
 #include "BKE_mesh.h"
-#include "BKE_mesh_remesh_blocks.h" /* own include */
 #include "BKE_mesh_runtime.h"
 
 #include "BLI_math_vector.h"
@@ -31,6 +30,8 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
+
+#include "GEO_mesh_remesh_blocks.h" /* own include */
 
 #include "MEM_guardedalloc.h"
 
@@ -111,7 +112,7 @@ static void dualcon_add_quad(void *output_v, const int vert_indices[4])
   output->curface++;
 }
 
-Mesh *BKE_mesh_remesh_blocks_to_mesh_nomain(Mesh *mesh,
+Mesh *GEO_mesh_remesh_blocks_to_mesh_nomain(Mesh *mesh,
                                             const char remesh_flag,
                                             const char remesh_mode,
                                             const float threshold,

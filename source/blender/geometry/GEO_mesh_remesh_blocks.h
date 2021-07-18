@@ -38,7 +38,7 @@ typedef enum eRemeshBlocksMode {
   REMESH_BLOCKS_SHARP_FEATURES = 2,
 } eRemeshBlocksMode;
 
-struct Mesh *BKE_mesh_remesh_blocks_to_mesh_nomain(struct Mesh *mesh,
+struct Mesh *GEO_mesh_remesh_blocks_to_mesh_nomain(struct Mesh *mesh,
                                                    const char remesh_flag,
                                                    const char remesh_mode,
                                                    const float threshold,
