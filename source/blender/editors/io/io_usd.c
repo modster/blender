@@ -498,12 +498,13 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
   RNA_def_property_enum_default(
       prop, (MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV));
 
-  RNA_def_string(ot->srna,
-                 "prim_path_mask",
-                 NULL,
-                 1024,
-                 "",
-                 "If set, only the subset of the USD scene rooted at the given prim will be imported");
+  RNA_def_string(
+      ot->srna,
+      "prim_path_mask",
+      NULL,
+      1024,
+      "",
+      "If set, only the subset of the USD scene rooted at the given prim will be imported");
 
   RNA_def_boolean(ot->srna, "import_guide", false, "Guide", "Import guide geometry");
 
