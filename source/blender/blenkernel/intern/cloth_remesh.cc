@@ -156,6 +156,10 @@ class VertData {
   Sizing sizing; /* in [1], this is the "sizing" of the verts */
 
  public:
+  VertData(Sizing sizing) : sizing(sizing)
+  {
+  }
+
   VertData(Sizing &&sizing) : sizing(sizing)
   {
   }
@@ -164,10 +168,34 @@ class VertData {
   {
     return this->sizing;
   }
+
+  void set_sizing(Sizing sizing)
+  {
+    this->sizing = sizing;
+  }
 };
 
-class AdaptiveMesh
-    : public Mesh<NodeData, VertData, internal::EmptyExtraData, internal::EmptyExtraData> {
+class EdgeData {
+  float size; /* from [1], the size calculated by the `Vert`s of the
+               * `Edge` */
+
+ public:
+  EdgeData(float size) : size(size)
+  {
+  }
+
+  const auto &get_size() const
+  {
+    return this->size;
+  }
+
+  void set_sizing(float size)
+  {
+    this->size = size;
+  }
+};
+
+class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyExtraData> {
  public:
   void set_nodes_extra_data(const Cloth &cloth)
   {
@@ -179,6 +207,34 @@ class AdaptiveMesh
     for (auto &node : this->get_nodes_mut()) {
       node.set_extra_data(NodeData(cloth.verts[i]));
       i++;
+    }
+  }
+
+  /**
+   * Sets the "size" of the `Edge`s of the mesh by running
+   * `get_edge_size_sq()` on the `Sizing` stored in the `Vert`s of the
+   * `Edge`.
+   *
+   * `Sizing` has to be set for the `Vert`s before calling this function.
+   */
+  void set_edge_sizes()
+  {
+    for (auto &edge : this->get_edges_mut()) {
+      const auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
+      const auto &v1_uv = v1.get_uv();
+      const auto &v2_uv = v2.get_uv();
+      const auto v1_sizing = v1.get_checked_extra_data().get_sizing();
+      const auto v2_sizing = v2.get_checked_extra_data().get_sizing();
+
+      auto edge_size = v1_sizing.get_edge_size_sq(v2_sizing, v1_uv, v2_uv);
+      auto op_edge_data = edge.get_extra_data_mut();
+      if (op_edge_data) {
+        auto &edge_data = edge.get_checked_extra_data_mut();
+        edge_data.set_sizing(edge_size);
+      }
+      else {
+        edge.set_extra_data(EdgeData(edge_size));
+      }
     }
   }
 };
