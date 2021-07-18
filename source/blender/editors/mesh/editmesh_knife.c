@@ -1639,12 +1639,9 @@ static void knife_add_single_cut(KnifeTool_OpData *kcd,
     return;
   }
 
-  /* If the cut is on an edge, just tag that its a cut and return. */
+  /* If the cut is on an edge. */
   if ((lh1->v && lh2->v) && (lh1->v->v && lh2->v && lh2->v->v) &&
       (e_base = BM_edge_exists(lh1->v->v, lh2->v->v))) {
-    kfe = get_bm_knife_edge(kcd, e_base);
-    kfe->is_cut = true;
-    kfe->e = e_base;
     return;
   }
   if (knife_add_single_cut__is_linehit_outside_face(f, lh1, lh2->hit) ||
@@ -3414,15 +3411,13 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
       }
     }
 
-    if (lastkfe) {
-      /* Restore data for distance and angle measurements. */
-      kcd->mdata = undo->mdata;
-
-      if (kcd->mode == MODE_DRAGGING) {
-        /* Restore kcd->prev. */
-        kcd->prev = undo->pos;
-      }
+    if (kcd->mode == MODE_DRAGGING) {
+      /* Restore kcd->prev. */
+      kcd->prev = undo->pos;
     }
+
+    /* Restore data for distance and angle measurements. */
+    kcd->mdata = undo->mdata;
 
     BLI_stack_discard(kcd->undostack);
   }
