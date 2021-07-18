@@ -121,6 +121,10 @@ typedef struct tGPDasset {
   int manipulator_index;
   /** Manipulator vector used to determine the effect. */
   float manipulator_vector[3];
+  /** Normal vector for cage. */
+  float normal_vec[3];
+  /** Vector with the original orientation for rotation. */
+  float vinit_rotation[2];
 
   /** Hash of new created layers. */
   struct GHash *asset_layers;
@@ -543,6 +547,17 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   /* Rotation */
   tgpa->manipulator[8][0] = tgpa->rect_cage.xmax + ROTATION_CONTROL_GAP;
   tgpa->manipulator[8][1] = tgpa->rect_cage.ymax + ROTATION_CONTROL_GAP;
+
+  /* Normal vector. */
+  float co1[3], co2[3], co3[3], vec1[3], vec2[3];
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_NE], co1);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_NW], co2);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_SW], co3);
+  sub_v3_v3v3(vec1, co2, co1);
+  sub_v3_v3v3(vec2, co3, co2);
+  /* Vector orthogonal to polygon plane. */
+  cross_v3_v3v3(tgpa->normal_vec, vec1, vec2);
+  normalize_v3(tgpa->normal_vec);
 }
 
 /* Helper: Detect mouse over cage areas. */
@@ -605,6 +620,52 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
   WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
 }
 
+/* Helper: Get the rotation matrix for the angle using an arbitrary vector as axis. */
+static void gpencil_asset_rotation_matrix_get(float angle,
+                                              float axis[3],
+                                              float rotation_matrix[4][4])
+{
+  float u2 = axis[0] * axis[0];
+  float v2 = axis[1] * axis[1];
+  float w2 = axis[2] * axis[2];
+  const float length = (u2 + v2 + w2);
+  const float length_sqr = sqrt(length);
+  const float cos_value = cos(angle);
+  const float sin_value = sin(angle);
+
+  rotation_matrix[0][0] = (u2 + (v2 + w2) * cos_value) / length;
+  rotation_matrix[0][1] = (axis[0] * axis[1] * (1.0f - cos_value) -
+                           axis[2] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[0][2] = (axis[0] * axis[2] * (1.0f - cos_value) +
+                           axis[1] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[0][3] = 0.0;
+
+  rotation_matrix[1][0] = (axis[0] * axis[1] * (1.0f - cos_value) +
+                           axis[2] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[1][1] = (v2 + (u2 + w2) * cos_value) / length;
+  rotation_matrix[1][2] = (axis[1] * axis[2] * (1.0f - cos_value) -
+                           axis[0] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[1][3] = 0.0f;
+
+  rotation_matrix[2][0] = (axis[0] * axis[2] * (1.0f - cos_value) -
+                           axis[1] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[2][1] = (axis[1] * axis[2] * (1.0f - cos_value) +
+                           axis[0] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[2][2] = (w2 + (u2 + v2) * cos_value) / length;
+  rotation_matrix[2][3] = 0.0f;
+
+  rotation_matrix[3][0] = 0.0f;
+  rotation_matrix[3][1] = 0.0f;
+  rotation_matrix[3][2] = 0.0f;
+  rotation_matrix[3][3] = 1.0f;
+}
+
 /* Helper: Transfrom the stroke with mouse movements. */
 static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
                                             const int mouse[2],
@@ -648,6 +709,14 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
     }
   }
 
+  /* Create rotation matrix. */
+  float rot_matrix[4][4];
+  float vr[2];
+  copy_v2fl_v2i(vr, mouse);
+  normalize_v2(vr);
+  float angle = angle_signed_v2v2(tgpa->vinit_rotation, vr);
+  gpencil_asset_rotation_matrix_get(angle, tgpa->normal_vec, rot_matrix);
+
   GHashIterator gh_iter;
   GHASH_ITER (gh_iter, tgpa->asset_strokes) {
     bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
@@ -660,6 +729,9 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
           break;
         }
         case GP_ASSET_TRANSFORM_ROT: {
+          sub_v3_v3(&pt->x, pivot);
+          mul_v3_m4v3(&pt->x, rot_matrix, &pt->x);
+          add_v3_v3(&pt->x, pivot);
           break;
         }
         case GP_ASSET_TRANSFORM_SCALE: {
@@ -684,11 +756,17 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
       }
     }
 
-    /* Recalc stroke bounding box. */
-    BKE_gpencil_stroke_boundingbox_calc(gps);
+    /* In scale mode recal geometry. */
+    if (tgpa->mode == GP_ASSET_TRANSFORM_SCALE) {
+      BKE_gpencil_stroke_geometry_update(tgpa->gpd, gps);
+    }
+    else {
+      /* Recalc stroke bounding box. */
+      BKE_gpencil_stroke_boundingbox_calc(gps);
+    }
   }
 
-  /* In ocation mode move the asset center. */
+  /* In location mode move the asset center. */
   if (tgpa->mode == GP_ASSET_TRANSFORM_LOC) {
     add_v3_v3(tgpa->asset_center, vec);
   }
@@ -771,6 +849,9 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
         }
 
         gps_target->mat_nr = mat_index;
+
+        BKE_gpencil_stroke_geometry_update(gpd_target, gps_target);
+
         /* Add the hash key with a reference to the frame. */
         BLI_ghash_insert(tgpa->asset_strokes, gps_target, gpf_target);
       }
@@ -834,16 +915,21 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   float box_color[4];
   UI_GetThemeColor4fv(TH_VERTEX_SELECT, box_color);
   immUniformColor4fv(box_color);
-  imm_draw_box_wire_2d(
-      pos, tgpa->rect_cage.xmin, tgpa->rect_cage.ymin, tgpa->rect_cage.xmax, tgpa->rect_cage.ymax);
+
+  immBegin(GPU_PRIM_LINE_LOOP, 4);
+  immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_NW][0], tgpa->manipulator[CAGE_CORNER_NW][1]);
+  immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_NE][0], tgpa->manipulator[CAGE_CORNER_NE][1]);
+  immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_SE][0], tgpa->manipulator[CAGE_CORNER_SE][1]);
+  immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_SW][0], tgpa->manipulator[CAGE_CORNER_SW][1]);
+  immEnd();
 
   /* Rotation box */
   const float gap = 5.0f;
   imm_draw_box_wire_2d(pos,
-                       tgpa->manipulator[8][0] - gap,
-                       tgpa->manipulator[8][1] - gap,
-                       tgpa->manipulator[8][0] + gap,
-                       tgpa->manipulator[8][1] + gap);
+                       tgpa->manipulator[CAGE_CORNER_ROT][0] - gap,
+                       tgpa->manipulator[CAGE_CORNER_ROT][1] - gap,
+                       tgpa->manipulator[CAGE_CORNER_ROT][0] + gap,
+                       tgpa->manipulator[CAGE_CORNER_ROT][1] + gap);
 
   immUnbindProgram();
 
@@ -942,6 +1028,10 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
         gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, mouse3d);
         sub_v3_v3v3(mouse3d, mouse3d, tgpa->asset_center);
         tgpa->initial_dist = len_v3(mouse3d);
+
+        /* Initial orientation for rotation. */
+        copy_v2fl_v2i(tgpa->vinit_rotation, tgpa->mouse);
+        normalize_v2(tgpa->vinit_rotation);
 
         tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
         tgpa->flag |= GP_ASSET_FLAG_RUNNING;
