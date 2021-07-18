@@ -268,6 +268,16 @@ template<typename T> class Vert {
   {
   }
 
+  const auto &get_uv() const
+  {
+    return this->uv;
+  }
+
+  auto &get_uv_mut()
+  {
+    return this->uv;
+  }
+
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
