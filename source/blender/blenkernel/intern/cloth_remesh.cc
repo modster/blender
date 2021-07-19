@@ -71,7 +71,7 @@ class NodeData {
        * ClothVertex is also updated here. After adding the
        * interpolated value for the element (if needed), set the
        * correct sizeof(ClothVertex) in the assertion below. */
-      BLI_assert(sizeof(ClothVertex) == 125);
+      BLI_assert(sizeof(ClothVertex) == 168);
     }
 
     ClothVertex cn;
@@ -359,6 +359,28 @@ static void cloth_set_verts_from_adaptive_mesh(Cloth &cloth, const AdaptiveMesh 
   }
 }
 
+static void static_remesh(AdaptiveMesh &mesh, const Sizing &sizing)
+{
+  /* Set sizing for all verts */
+  for (auto &vert : mesh.get_verts_mut()) {
+    auto &op_vert_data = vert.get_extra_data_mut();
+    if (op_vert_data) {
+      auto &vert_data = op_vert_data.value();
+      vert_data.set_sizing(sizing);
+    }
+    else {
+      vert.set_extra_data(VertData(sizing));
+    }
+  }
+
+  mesh.set_edge_sizes();
+
+  /* Split the edges */
+  mesh.split_edges();
+
+  /* Collapse the edges */
+}
+
 }  // namespace blender::bke::internal
 
 namespace blender::bke {
@@ -377,6 +399,15 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
   {
     adaptive_mesh.set_nodes_extra_data(*clmd->clothObject);
     internal::cloth_delete_verts(*clmd->clothObject);
+  }
+
+  /* Actual remeshing part */
+  {
+    float size_min = 0.1;
+    auto m = float2x2::identity();
+    m = m * (1.0 / size_min);
+    internal::Sizing vert_sizing(std::move(m));
+    internal::static_remesh(adaptive_mesh, vert_sizing);
   }
 
   internal::cloth_set_verts_from_adaptive_mesh(*clmd->clothObject, adaptive_mesh);
