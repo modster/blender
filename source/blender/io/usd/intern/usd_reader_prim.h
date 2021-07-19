@@ -25,9 +25,7 @@
 
 #include <vector>
 
-extern "C" {
 #include "DNA_ID.h"
-}
 
 struct CacheFile;
 struct Main;

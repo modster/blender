@@ -18,7 +18,7 @@
 #include "usd_reader_prim.h"
 
 #include "MEM_guardedalloc.h"
-extern "C" {
+
 #include "DNA_cachefile_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_constraint_types.h"
@@ -46,7 +46,6 @@ extern "C" {
 
 #include "WM_api.h"
 #include "WM_types.h"
-}
 
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/types.h>

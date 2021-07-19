@@ -16,7 +16,6 @@
 
 #include "usd_reader_prim.h"
 
-extern "C" {
 #include "DNA_cachefile_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_modifier_types.h"
@@ -34,7 +33,6 @@ extern "C" {
 
 #include "WM_api.h"
 #include "WM_types.h"
-}
 
 namespace blender::io::usd {
 

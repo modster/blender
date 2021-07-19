@@ -16,7 +16,6 @@
 
 #include "usd_reader_light.h"
 
-extern "C" {
 #include "DNA_light_types.h"
 #include "DNA_object_types.h"
 
@@ -25,7 +24,6 @@ extern "C" {
 
 #include "WM_api.h"
 #include "WM_types.h"
-}
 
 #include <pxr/pxr.h>
 #include <pxr/usd/usd/prim.h>
