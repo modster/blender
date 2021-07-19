@@ -20,7 +20,6 @@
 
 #include <string.h>
 
-#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -38,7 +37,6 @@
 
 #include "BKE_cachefile.h"
 #include "BKE_context.h"
-#include "BKE_customdata.h"
 #include "BKE_lib_query.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
@@ -57,8 +55,6 @@
 
 #include "MOD_modifiertypes.h"
 #include "MOD_ui_common.h"
-
-#include "MEM_guardedalloc.h"
 
 #if defined(WITH_USD) || defined(WITH_ALEMBIC)
 #  include "BKE_global.h"
