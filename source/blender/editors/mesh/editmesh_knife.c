@@ -3347,6 +3347,12 @@ static bool knife_snap_update_from_mval(bContext *C, KnifeTool_OpData *kcd, cons
   return kcd->curr.vert || kcd->curr.edge || (kcd->curr.bmface && !kcd->curr.is_space);
 }
 
+/**
+ * TODO: Undo currently assumes that the most recent cut segment added is
+ * the last valid KnifeEdge in the kcd->kedges mempool. This could break in
+ * the future so it may be better to store the KnifeEdges for each KnifeUndoFrame
+ * on a stack. This stack could then be used instead of iterating over the mempool.
+ */
 static void knifetool_undo(KnifeTool_OpData *kcd)
 {
   Ref *ref;
