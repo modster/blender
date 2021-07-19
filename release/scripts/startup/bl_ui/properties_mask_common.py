@@ -260,64 +260,6 @@ class MASK_PT_display:
         sub.prop(space_data, "mask_overlay_mode", text="")
 
 
-class MASK_PT_transforms:
-    # subclasses must define...
-    # ~ bl_space_type = 'CLIP_EDITOR'
-    # ~ bl_region_type = 'TOOLS'
-    bl_label = "Transforms"
-    bl_category = "Mask"
-
-    @classmethod
-    def poll(cls, context):
-        space_data = context.space_data
-        return space_data.mask and space_data.mode == 'MASK'
-
-    def draw(self, _context):
-        layout = self.layout
-
-        col = layout.column(align=True)
-        col.label(text="Transform:")
-        col.operator("transform.translate")
-        col.operator("transform.rotate")
-        col.operator("transform.resize", text="Scale")
-        col.operator("transform.transform", text="Scale Feather").mode = 'MASK_SHRINKFATTEN'
-
-
-class MASK_PT_tools:
-    bl_label = "Mask Tools"
-    bl_category = "Mask"
-
-    @classmethod
-    def poll(cls, context):
-        space_data = context.space_data
-        return space_data.mask and space_data.mode == 'MASK'
-
-    def draw(self, _context):
-        layout = self.layout
-
-        col = layout.column(align=True)
-        col.label(text="Spline:")
-        col.operator("mask.delete")
-        col.operator("mask.cyclic_toggle")
-        col.operator("mask.switch_direction")
-        col.operator("mask.handle_type_set").type = 'VECTOR'
-        col.operator("mask.feather_weight_clear")
-
-        col = layout.column(align=True)
-        col.label(text="Parenting:")
-        row = col.row(align=True)
-        row.operator("mask.parent_set", text="Parent")
-        row.operator("mask.parent_clear", text="Clear")
-
-        col = layout.column(align=True)
-        col.label(text="Animation:")
-        row = col.row(align=True)
-        row.operator("mask.shape_key_insert", text="Insert Key")
-        row.operator("mask.shape_key_clear", text="Clear Key")
-        col.operator("mask.shape_key_feather_reset", text="Reset Feather Animation")
-        col.operator("mask.shape_key_rekey", text="Re-Key Shape Points")
-
-
 class MASK_MT_mask(Menu):
     bl_label = "Mask"
 
