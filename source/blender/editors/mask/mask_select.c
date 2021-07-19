@@ -251,41 +251,37 @@ void MASK_OT_select_all(wmOperatorType *ot)
 /** \name Select (Cursor Pick) Operator
  * \{ */
 
-static int select_exec(bContext *C, wmOperator *op)
+bool ED_mask_select_mouse_pick(bContext *C,
+                               float co[2],
+                               const MaskMouseSelectProperties *properties)
 {
   Mask *mask = CTX_data_edit_mask(C);
   MaskLayer *mask_layer;
   MaskSpline *spline;
   MaskSplinePoint *point = NULL;
-  float co[2];
-  bool extend = RNA_boolean_get(op->ptr, "extend");
-  bool deselect = RNA_boolean_get(op->ptr, "deselect");
-  bool toggle = RNA_boolean_get(op->ptr, "toggle");
-  const bool deselect_all = RNA_boolean_get(op->ptr, "deselect_all");
   eMaskWhichHandle which_handle;
   const float threshold = 19;
 
   MaskViewLockState lock_state;
   ED_mask_view_lock_state_store(C, &lock_state);
 
-  RNA_float_get_array(op->ptr, "location", co);
-
   point = ED_mask_point_find_nearest(
       C, mask, co, threshold, &mask_layer, &spline, &which_handle, NULL);
 
-  if (extend == false && deselect == false && toggle == false) {
+  if (properties->extend == false && properties->deselect == false &&
+      properties->toggle == false) {
     ED_mask_select_toggle_all(mask, SEL_DESELECT);
   }
 
   if (point) {
     if (which_handle != MASK_WHICH_HANDLE_NONE) {
-      if (extend) {
+      if (properties->extend) {
         mask_layer->act_spline = spline;
         mask_layer->act_point = point;
 
         BKE_mask_point_select_set_handle(point, which_handle, true);
       }
-      else if (deselect) {
+      else if (properties->deselect) {
         BKE_mask_point_select_set_handle(point, which_handle, false);
       }
       else {
@@ -295,19 +291,19 @@ static int select_exec(bContext *C, wmOperator *op)
         if (!MASKPOINT_ISSEL_HANDLE(point, which_handle)) {
           BKE_mask_point_select_set_handle(point, which_handle, true);
         }
-        else if (toggle) {
+        else if (properties->toggle) {
           BKE_mask_point_select_set_handle(point, which_handle, false);
         }
       }
     }
     else {
-      if (extend) {
+      if (properties->extend) {
         mask_layer->act_spline = spline;
         mask_layer->act_point = point;
 
         BKE_mask_point_select_set(point, true);
       }
-      else if (deselect) {
+      else if (properties->deselect) {
         BKE_mask_point_select_set(point, false);
       }
       else {
@@ -317,7 +313,7 @@ static int select_exec(bContext *C, wmOperator *op)
         if (!MASKPOINT_ISSEL_ANY(point)) {
           BKE_mask_point_select_set(point, true);
         }
-        else if (toggle) {
+        else if (properties->toggle) {
           BKE_mask_point_select_set(point, false);
         }
       }
@@ -333,7 +329,7 @@ static int select_exec(bContext *C, wmOperator *op)
 
     ED_mask_view_lock_state_restore_no_jump(C, &lock_state);
 
-    return OPERATOR_FINISHED;
+    return true;
   }
 
   MaskSplinePointUW *uw;
@@ -341,7 +337,7 @@ static int select_exec(bContext *C, wmOperator *op)
   if (ED_mask_feather_find_nearest(
           C, mask, co, threshold, &mask_layer, &spline, &point, &uw, NULL)) {
 
-    if (extend) {
+    if (properties->extend) {
       mask_layer->act_spline = spline;
       mask_layer->act_point = point;
 
@@ -349,7 +345,7 @@ static int select_exec(bContext *C, wmOperator *op)
         uw->flag |= SELECT;
       }
     }
-    else if (deselect) {
+    else if (properties->deselect) {
       if (uw) {
         uw->flag &= ~SELECT;
       }
@@ -362,7 +358,7 @@ static int select_exec(bContext *C, wmOperator *op)
         if (!(uw->flag & SELECT)) {
           uw->flag |= SELECT;
         }
-        else if (toggle) {
+        else if (properties->toggle) {
           uw->flag &= ~SELECT;
         }
       }
@@ -375,15 +371,34 @@ static int select_exec(bContext *C, wmOperator *op)
 
     ED_mask_view_lock_state_restore_no_jump(C, &lock_state);
 
-    return OPERATOR_FINISHED;
+    return true;
   }
-  if (deselect_all) {
+  if (properties->deselect_all) {
     /* For clip editor tracks, leave deselect all to clip editor. */
     if (!ED_clip_can_select(C)) {
       ED_mask_deselect_all(C);
       ED_mask_view_lock_state_restore_no_jump(C, &lock_state);
-      return OPERATOR_FINISHED;
+      return true;
     }
+  }
+
+  return false;
+}
+
+static int select_exec(bContext *C, wmOperator *op)
+{
+  MaskMouseSelectProperties properties;
+
+  properties.extend = RNA_boolean_get(op->ptr, "extend");
+  properties.deselect = RNA_boolean_get(op->ptr, "deselect");
+  properties.toggle = RNA_boolean_get(op->ptr, "toggle");
+  properties.deselect_all = RNA_boolean_get(op->ptr, "deselect_all");
+
+  float co[2];
+  RNA_float_get_array(op->ptr, "location", co);
+
+  if (ED_mask_select_mouse_pick(C, co, &properties)) {
+    return OPERATOR_FINISHED;
   }
 
   return OPERATOR_PASS_THROUGH;

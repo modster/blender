@@ -297,10 +297,8 @@ static bool add_vertex_subdivide(const bContext *C, Mask *mask, const float co[2
   return false;
 }
 
-static bool add_vertex_extrude(const bContext *C,
-                               Mask *mask,
-                               MaskLayer *mask_layer,
-                               const float co[2], int handle_type)
+static bool add_vertex_extrude(
+    const bContext *C, Mask *mask, MaskLayer *mask_layer, const float co[2], int handle_type)
 {
   Scene *scene = CTX_data_scene(C);
   const float ctime = CFRA;
@@ -397,7 +395,8 @@ static bool add_vertex_extrude(const bContext *C,
   return true;
 }
 
-static bool add_vertex_new(const bContext *C, Mask *mask, MaskLayer *mask_layer, const float co[2], int handle_type)
+static bool add_vertex_new(
+    const bContext *C, Mask *mask, MaskLayer *mask_layer, const float co[2], int handle_type)
 {
   Scene *scene = CTX_data_scene(C);
   const float ctime = CFRA;
@@ -529,6 +528,23 @@ static int add_vertex_exec(bContext *C, wmOperator *op)
   float co[2];
   RNA_float_get_array(op->ptr, "location", co);
 
+  /* TODO(sergey): This is to get a quick proof-of-concept behavior fer the "Draw a Mask" tool.
+   * The idea is to add new vertex unless clicking on an existing one. When clicking on the
+   * existing one select it, and let it to be slid.
+   * For the final implementation we'd either need to introduce new operator, or a new property
+   * to enable this behavior. */
+  if (mask_layer != NULL) {
+    MaskMouseSelectProperties properties;
+    properties.extend = false;
+    properties.deselect = true;
+    properties.deselect_all = false;
+    properties.toggle = false;
+
+    if (ED_mask_select_mouse_pick(C, co, &properties)) {
+      return OPERATOR_FINISHED;
+    }
+  }
+
   /* TODO: having an active point but no active spline is possible, why? */
   if (mask_layer && mask_layer->act_spline && mask_layer->act_point &&
       MASKPOINT_ISSEL_ANY(mask_layer->act_point)) {
@@ -571,19 +587,19 @@ static int add_vertex_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   RNA_float_set_array(op->ptr, "location", co);
 
-return add_vertex_exec(C, op);
+  return add_vertex_exec(C, op);
 }
 
 void MASK_OT_add_vertex(wmOperatorType *ot)
 {
- 	static const EnumPropertyItem editcurve_handle_type_items[] = {
-	    {HD_AUTO, "AUTO", 0, "Auto", ""},
-	    {HD_VECT, "VECTOR", 0, "Vector", ""},
-	    {HD_ALIGN, "ALIGNED", 0, "Aligned Single", ""},
-	    {HD_ALIGN_DOUBLESIDE, "ALIGNED_DOUBLESIDE", 0, "Aligned", ""},
-	    {HD_FREE, "FREE", 0, "Free", ""},
-	    {0, NULL, 0, NULL, NULL},
-	};
+  static const EnumPropertyItem editcurve_handle_type_items[] = {
+      {HD_AUTO, "AUTO", 0, "Auto", ""},
+      {HD_VECT, "VECTOR", 0, "Vector", ""},
+      {HD_ALIGN, "ALIGNED", 0, "Aligned Single", ""},
+      {HD_ALIGN_DOUBLESIDE, "ALIGNED_DOUBLESIDE", 0, "Aligned", ""},
+      {HD_FREE, "FREE", 0, "Free", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
 
   /* identifiers */
   ot->name = "Add Vertex";

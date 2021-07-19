@@ -35,6 +35,7 @@ _modules = [
     "file",
     "geometry_nodes",
     "image",
+    "mask",
     "mesh",
     "node",
     "object",

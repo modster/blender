@@ -6042,9 +6042,8 @@ def km_clip_editor_tool_mask_add_vertex(params):
         "Mask Editing: Add Vertex and Slide",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("mask.add_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
-            ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("mask.draw_mask", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
         ]},
     )
 

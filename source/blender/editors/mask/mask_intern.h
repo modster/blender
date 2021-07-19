@@ -90,6 +90,24 @@ void ED_mask_layer_select_set(struct MaskLayer *mask_layer, const bool do_select
 void ED_mask_select_toggle_all(struct Mask *mask, int action);
 void ED_mask_select_flush_all(struct Mask *mask);
 
+typedef struct MaskMouseSelectProperties {
+  /* Extend selection instead of deselecting everything first. */
+  bool extend;
+
+  /* Remove from selection. */
+  bool deselect;
+
+  /* Deselect all when nothing under the cursor. */
+  bool deselect_all;
+
+  /* Toggle the selection. */
+  bool toggle;
+} MaskMouseSelectProperties;
+
+bool ED_mask_select_mouse_pick(struct bContext *C,
+                               float co[2],
+                               const MaskMouseSelectProperties *properties);
+
 /* mask_editor.c */
 bool ED_maskedit_poll(struct bContext *C);
 bool ED_maskedit_mask_poll(struct bContext *C);

@@ -2505,13 +2505,13 @@ class _defs_mask_tools:
     def add_vertex_slide():
         def draw_settings(_context, layout, tool):
             tool_settings = _context.tool_settings
-            props = tool.operator_properties("mask.add_vertex")
+            props = tool.operator_properties("mask.draw_mask")
             row = layout.row()
             row.label(text="Mask Settings")
             row.prop(props, "type")
 
         return dict(
-            idname="builtin.add_vertex_slide",
+            idname="builtin.draw_mask",
             label="Draw a Mask",
             icon="ops.curve.extrude_move",
             widget=None,
