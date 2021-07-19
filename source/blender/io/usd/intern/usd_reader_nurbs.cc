@@ -158,14 +158,16 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
       nu->orderv = 4;
     }
 
-    // TODO: Not needed at present, left for future dev
-    // if (knots.size() > 3) {
-    //   if ((knots[0] == knots[1]) && (knots[knots.size()] == knots[knots.size() - 1])) {
-    //     nu->flagu |= CU_NURB_ENDPOINT;
-    //   } else {
-    //     nu->flagu |= CU_NURB_CYCLIC;
-    //   }
-    // }
+  /* TODO(makowalski): investigate setting Cyclic U and Endpoint U options. */
+#if 0
+     if (knots.size() > 3) {
+       if ((knots[0] == knots[1]) && (knots[knots.size()] == knots[knots.size() - 1])) {
+         nu->flagu |= CU_NURB_ENDPOINT;
+       } else {
+         nu->flagu |= CU_NURB_CYCLIC;
+       }
+     }
+#endif
 
     float weight = 1.0f;
 
