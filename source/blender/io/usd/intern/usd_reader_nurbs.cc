@@ -108,9 +108,7 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
   pxr::UsdAttribute pointsAttr = curve_prim_.GetPointsAttr();
 
   pxr::VtIntArray usdCounts;
-
   vertexAttr.Get(&usdCounts, motionSampleTime);
-  int num_subcurves = usdCounts.size();
 
   pxr::VtVec3fArray usdPoints;
   pointsAttr.Get(&usdPoints, motionSampleTime);
@@ -139,7 +137,7 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
   }
 
   size_t idx = 0;
-  for (size_t i = 0; i < num_subcurves; i++) {
+  for (size_t i = 0; i < usdCounts.size(); i++) {
     const int num_verts = usdCounts[i];
 
     Nurb *nu = static_cast<Nurb *>(MEM_callocN(sizeof(Nurb), __func__));
@@ -183,8 +181,9 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
       bp->weight = weight;
 
       float radius = 0.1f;
-      if (idx < usdWidths.size())
+      if (idx < usdWidths.size()) {
         radius = usdWidths[idx];
+      }
 
       bp->radius = radius;
     }
