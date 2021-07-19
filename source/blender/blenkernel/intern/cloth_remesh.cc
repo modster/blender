@@ -269,6 +269,30 @@ class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyEx
     }
   }
 
+  /**
+   * Splits edges whose "size" is greater than 1.0
+   *
+   * Based on [1]
+   *
+   * Here "size" is determined by `Sizing` stores in `Vert`s of the
+   * `Edge`, using the function `Sizing::get_edge_size_sq()`.
+   */
+  void split_edges()
+  {
+    auto splittable_edges_set = this->get_splittable_edge_indices_set();
+    do {
+      for (const auto &edge_index : splittable_edges_set) {
+        auto &edge = this->get_checked_edge(edge_index);
+        this->split_edge_triangulate(edge.get_self_index(), true);
+
+        /* TODO(ish): Need to flip edges of those faces that have been
+         * affected by the split edge operation. */
+      }
+
+      splittable_edges_set = this->get_splittable_edge_indices_set();
+    } while (splittable_edges_set.size() == 0);
+  }
+
  private:
   /**
    * Gets the maximal independent set of splittable edge indices in
