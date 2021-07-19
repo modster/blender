@@ -158,12 +158,19 @@ class Sizing {
   }
 };
 
+enum VertFlags {
+  VERT_NONE = 0,
+  VERT_SELECTED = 1 << 0,
+};
+
 class VertData {
   Sizing sizing; /* in [1], this is the "sizing" of the verts */
+  int flag;
 
  public:
   VertData(Sizing sizing) : sizing(sizing)
   {
+    this->flag = VERT_NONE;
   }
 
   const auto &get_sizing() const
@@ -176,9 +183,20 @@ class VertData {
     this->sizing = sizing;
   }
 
+  const auto &get_flag() const
+  {
+    return this->flag;
+  }
+
+  auto &get_flag_mut()
+  {
+    return this->flag;
+  }
+
   VertData interp(const VertData &other) const
   {
     VertData res(this->get_sizing().interp(other.get_sizing()));
+    res.flag = VERT_NONE;
     return res;
   }
 };
