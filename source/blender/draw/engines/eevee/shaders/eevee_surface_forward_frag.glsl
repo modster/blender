@@ -79,6 +79,7 @@ void main(void)
 
   float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   g_data.closure_rand = fract(noise + sampling_rng_1D_get(sampling, SAMPLING_CLOSURE));
+  g_data.transmit_rand = -1.0;
 
   nodetree_surface();
 

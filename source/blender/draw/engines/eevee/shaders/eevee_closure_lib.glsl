@@ -2,7 +2,6 @@
 struct ClosureDiffuse {
   vec3 color;
   vec3 N;
-  float thickness;
   vec3 sss_radius;
   uint sss_id;
 };
@@ -75,38 +74,31 @@ void closure_weight_randomize(inout ClosureRefraction closure, float randu)
 
 bool closure_weight_threshold(inout ClosureDiffuse closure, inout float weight)
 {
-  /* Check if closure has not yet been evaluated. */
-  if (closure.color.r < 0.0) {
-    /* Decrement weight from random threshold. */
-    closure.color.g += weight;
-    /* Evaluate this closure if threshold reaches 0. */
-    if (closure.color.g >= 0.0) {
-      /* Returns the sum of all weights. */
-      weight = abs(closure.color.r);
-      return true;
-    }
+  /* Decrement weight from random threshold. */
+  closure.color.g += weight;
+  /* Evaluate this closure if threshold reaches 0. */
+  if (closure.color.g >= 0.0) {
+    /* Returns the sum of all weights. */
+    weight = abs(closure.color.r);
+    return true;
   }
   return false;
 }
 bool closure_weight_threshold(inout ClosureReflection closure, inout float weight)
 {
-  if (closure.color.r < 0.0) {
-    closure.color.g += weight;
-    if (closure.color.g >= 0.0) {
-      weight = abs(closure.color.r);
-      return true;
-    }
+  closure.color.g += weight;
+  if (closure.color.g >= 0.0) {
+    weight = abs(closure.color.r);
+    return true;
   }
   return false;
 }
 bool closure_weight_threshold(inout ClosureRefraction closure, inout float weight)
 {
-  if (closure.color.r < 0.0) {
-    closure.color.g += weight;
-    if (closure.color.g >= 0.0) {
-      weight = abs(closure.color.r);
-      return true;
-    }
+  closure.color.g += weight;
+  if (closure.color.g >= 0.0) {
+    weight = abs(closure.color.r);
+    return true;
   }
   return false;
 }

@@ -264,7 +264,7 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
     return;
   }
 
-  gbuffer.bind(CLOSURE_DIFFUSE);
+  gbuffer.bind((eClosureBits)0xFFFFFFFF);
 
   if (!no_surfaces) {
     DRW_draw_pass(prepass_ps_);
@@ -274,9 +274,11 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
   DeferredPass &deferred_pass = inst_.shading_passes.deferred;
   deferred_pass.input_combined_tx = gbuffer.combined_tx;
   deferred_pass.input_emission_data_tx_ = gbuffer.emission_tx;
-  deferred_pass.input_diffuse_data_tx_ = gbuffer.diffuse_tx;
-  deferred_pass.input_reflection_data_tx_ = gbuffer.reflection_tx;
-  deferred_pass.input_refraction_data_tx_ = gbuffer.refraction_tx;
+  deferred_pass.input_transmit_color_tx_ = gbuffer.transmit_color_tx;
+  deferred_pass.input_transmit_normal_tx_ = gbuffer.transmit_normal_tx;
+  deferred_pass.input_transmit_data_tx_ = gbuffer.transmit_data_tx;
+  deferred_pass.input_reflect_color_tx_ = gbuffer.reflect_color_tx;
+  deferred_pass.input_reflect_normal_tx_ = gbuffer.reflect_normal_tx;
   deferred_pass.input_transparency_data_tx_ = gbuffer.transparency_tx;
   deferred_pass.input_volume_data_tx_ = gbuffer.volume_tx;
   deferred_pass.input_depth_tx_ = gbuffer.depth_copy_tx;
@@ -335,6 +337,8 @@ void DeferredPass::sync(void)
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
 
+  eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
+
   {
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL | DRW_STATE_BLEND_ADD_FULL;
     eval_diffuse_ps_ = DRW_pass_create("DeferredDirect", state);
@@ -352,10 +356,18 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
     DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
     DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
-    DRW_shgroup_uniform_texture_ref(grp, "emission_data_tx", &input_emission_data_tx_);
-    DRW_shgroup_uniform_texture_ref(grp, "diffuse_data_tx", &input_diffuse_data_tx_);
-    DRW_shgroup_uniform_texture_ref(grp, "reflection_data_tx", &input_reflection_data_tx_);
-    DRW_shgroup_uniform_texture_ref(grp, "refraction_data_tx", &input_refraction_data_tx_);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "emission_data_tx", &input_emission_data_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_color_tx", &input_transmit_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_normal_tx", &input_transmit_normal_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_data_tx", &input_transmit_data_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "reflect_color_tx", &input_reflect_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "reflect_normal_tx", &input_reflect_normal_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_stencil_set(
         grp, 0x0, 0x0, CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_EMISSION);
@@ -372,8 +384,9 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
     DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
     DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
-    DRW_shgroup_uniform_texture_ref(grp, "transparency_data_tx", &input_transparency_data_tx_);
-    DRW_shgroup_uniform_texture_ref(grp, "volume_data_tx", &input_volume_data_tx_);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transparency_data_tx", &input_transparency_data_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "volume_data_tx", &input_volume_data_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_VOLUME);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
@@ -384,7 +397,7 @@ void DeferredPass::sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(DEFERRED_EVAL_TRANSPARENT);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_transparency_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "transparency_data_tx", &input_transparency_data_tx_);
-    DRW_shgroup_uniform_texture_ref(grp, "volume_data_tx", &input_volume_data_tx_);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "volume_data_tx", &input_volume_data_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_TRANSPARENCY);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);

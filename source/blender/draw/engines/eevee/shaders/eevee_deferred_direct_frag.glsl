@@ -48,9 +48,11 @@ layout(std140) uniform lightprobes_info_block
 
 uniform sampler2D depth_tx;
 uniform sampler2D emission_data_tx;
-uniform usampler2D diffuse_data_tx;
-uniform usampler2D reflection_data_tx;
-uniform usampler2D refraction_data_tx;
+uniform sampler2D transmit_color_tx;
+uniform sampler2D transmit_normal_tx;
+uniform sampler2D transmit_data_tx;
+uniform sampler2D reflect_color_tx;
+uniform sampler2D reflect_normal_tx;
 uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
@@ -84,10 +86,16 @@ void main(void)
   vec3 P = point_view_to_world(vP);
   vec3 V = cameraVec(P);
 
+  vec4 tra_col_in = texture(transmit_color_tx, uvcoordsvar.xy);
+  vec4 tra_nor_in = texture(transmit_normal_tx, uvcoordsvar.xy);
+  vec4 tra_dat_in = texture(transmit_data_tx, uvcoordsvar.xy);
+  vec4 ref_col_in = texture(reflect_color_tx, uvcoordsvar.xy);
+  vec4 ref_nor_in = texture(reflect_normal_tx, uvcoordsvar.xy);
+
   ClosureEmission emission = gbuffer_load_emission_data(emission_data_tx, uvcoordsvar.xy);
-  ClosureDiffuse diffuse = gbuffer_load_diffuse_data(diffuse_data_tx, uvcoordsvar.xy);
-  ClosureReflection reflection = gbuffer_load_reflection_data(reflection_data_tx, uvcoordsvar.xy);
-  ClosureRefraction refraction = gbuffer_load_refraction_data(refraction_data_tx, uvcoordsvar.xy);
+  ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
+  ClosureReflection reflection = gbuffer_load_reflection_data(ref_col_in, ref_nor_in);
+  ClosureRefraction refraction = gbuffer_load_refraction_data(tra_col_in, tra_nor_in, tra_dat_in);
 
   float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE);
   float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;

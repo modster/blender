@@ -118,9 +118,11 @@ enum eClosureBits {
 };
 
 struct GBuffer {
-  Texture diffuse_tx = Texture("GbufferDiffuse");
-  Texture reflection_tx = Texture("GbufferReflection");
-  Texture refraction_tx = Texture("GbufferRefraction");
+  Texture transmit_color_tx = Texture("GbufferTransmitColor");
+  Texture transmit_normal_tx = Texture("GbufferTransmitNormal");
+  Texture transmit_data_tx = Texture("GbufferTransmitData");
+  Texture reflect_color_tx = Texture("GbufferReflectionColor");
+  Texture reflect_normal_tx = Texture("GbufferReflectionNormal");
   Texture volume_tx = Texture("GbufferVolume");
   Texture emission_tx = Texture("GbufferEmission");
   Texture transparency_tx = Texture("GbufferTransparency");
@@ -152,9 +154,11 @@ struct GBuffer {
     depth_tx = depth_tx_;
     combined_tx = combined_tx_;
     layer = layer_;
-    diffuse_tx.sync_tmp();
-    reflection_tx.sync_tmp();
-    refraction_tx.sync_tmp();
+    transmit_color_tx.sync_tmp();
+    transmit_normal_tx.sync_tmp();
+    transmit_data_tx.sync_tmp();
+    reflect_color_tx.sync_tmp();
+    reflect_normal_tx.sync_tmp();
     volume_tx.sync_tmp();
     emission_tx.sync_tmp();
     transparency_tx.sync_tmp();
@@ -165,18 +169,39 @@ struct GBuffer {
 
   void bind(eClosureBits closures_used)
   {
-    UNUSED_VARS(closures_used);
     ivec2 extent = {GPU_texture_width(depth_tx), GPU_texture_height(depth_tx)};
 
-    /* TODO Allocate only the one we need. */
     /* TODO Reuse for different config. */
-    /* TODO Allocate only GPU_RG32UI for diffuse if no sss is needed. */
-    diffuse_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, owner);
-    reflection_tx.acquire_tmp(UNPACK2(extent), GPU_RG32UI, owner);
-    refraction_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, owner);
-    volume_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, owner);
-    emission_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
-    transparency_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, owner);
+    if (closures_used & (CLOSURE_DIFFUSE | CLOSURE_SSS | CLOSURE_REFRACTION)) {
+      transmit_color_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
+    }
+    if (closures_used & (CLOSURE_SSS | CLOSURE_REFRACTION)) {
+      transmit_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
+      transmit_data_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
+    }
+    else if (closures_used & CLOSURE_DIFFUSE) {
+      transmit_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RG16F, owner);
+    }
+
+    if (closures_used & CLOSURE_DIFFUSE) {
+      reflect_color_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
+      reflect_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, owner);
+    }
+
+    if (closures_used & CLOSURE_VOLUME) {
+      /* TODO(fclem): This is killing performance.
+       * Idea: use interleaved data pattern to fill only a 32bpp buffer. */
+      volume_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, owner);
+    }
+
+    if (closures_used & CLOSURE_EMISSION) {
+      emission_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
+    }
+
+    if (closures_used & CLOSURE_TRANSPARENCY) {
+      /* TODO(fclem): Speedup by using Dithered holdout and GPU_RGB10_A2. */
+      transparency_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, owner);
+    }
 
     holdout_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
     depth_behind_tx.acquire_tmp(UNPACK2(extent), GPU_DEPTH24_STENCIL8, owner);
@@ -184,9 +209,11 @@ struct GBuffer {
 
     /* Layer attachement also works with cubemap. */
     gbuffer_fb.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer),
-                      GPU_ATTACHMENT_TEXTURE(diffuse_tx),
-                      GPU_ATTACHMENT_TEXTURE(reflection_tx),
-                      GPU_ATTACHMENT_TEXTURE(refraction_tx),
+                      GPU_ATTACHMENT_TEXTURE(transmit_color_tx),
+                      GPU_ATTACHMENT_TEXTURE(transmit_normal_tx),
+                      GPU_ATTACHMENT_TEXTURE(transmit_data_tx),
+                      GPU_ATTACHMENT_TEXTURE(reflect_color_tx),
+                      GPU_ATTACHMENT_TEXTURE(reflect_normal_tx),
                       GPU_ATTACHMENT_TEXTURE(volume_tx),
                       GPU_ATTACHMENT_TEXTURE(emission_tx),
                       GPU_ATTACHMENT_TEXTURE(transparency_tx));
@@ -226,9 +253,11 @@ struct GBuffer {
 
   void render_end(void)
   {
-    diffuse_tx.release_tmp();
-    reflection_tx.release_tmp();
-    refraction_tx.release_tmp();
+    transmit_color_tx.release_tmp();
+    transmit_normal_tx.release_tmp();
+    transmit_data_tx.release_tmp();
+    reflect_color_tx.release_tmp();
+    reflect_normal_tx.release_tmp();
     volume_tx.release_tmp();
     emission_tx.release_tmp();
     transparency_tx.release_tmp();
@@ -285,9 +314,11 @@ class DeferredPass {
   GPUTexture *input_depth_behind_tx_ = nullptr;
   GPUTexture *input_depth_tx_ = nullptr;
   GPUTexture *input_emission_data_tx_ = nullptr;
-  GPUTexture *input_diffuse_data_tx_ = nullptr;
-  GPUTexture *input_reflection_data_tx_ = nullptr;
-  GPUTexture *input_refraction_data_tx_ = nullptr;
+  GPUTexture *input_transmit_color_tx_ = nullptr;
+  GPUTexture *input_transmit_normal_tx_ = nullptr;
+  GPUTexture *input_transmit_data_tx_ = nullptr;
+  GPUTexture *input_reflect_color_tx_ = nullptr;
+  GPUTexture *input_reflect_normal_tx_ = nullptr;
   GPUTexture *input_transparency_data_tx_ = nullptr;
   GPUTexture *input_volume_data_tx_ = nullptr;
   GPUTexture *input_volume_radiance_tx_ = nullptr;

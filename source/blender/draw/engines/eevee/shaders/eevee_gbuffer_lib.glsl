@@ -1,6 +1,7 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
+#pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_closure_lib.glsl)
 
 /* -------------------------------------------------------------------- */
@@ -22,37 +23,20 @@ float gbuffer_decode_unit_float_from_uint(uint packed_scalar, const uint bit_siz
 }
 
 /* Expects input to be normalized. */
-uint gbuffer_encode_normal(vec3 normal)
+vec2 gbuffer_encode_normal(vec3 normal)
 {
-  normal = normal_world_to_view(normal);
-  /* TODO spheremap transformation */
-  normal = normal * 0.5 + 0.5;
-
-  uint encoded_normal;
-  encoded_normal = gbuffer_encode_unit_float_to_uint(normal.x, 10u) << 10u;
-  encoded_normal |= gbuffer_encode_unit_float_to_uint(normal.y, 10u);
-  return encoded_normal;
+  return normal_encode(normal_world_to_view(normal));
 }
 
-vec3 gbuffer_decode_normal(uint packed_normal)
+vec3 gbuffer_decode_normal(vec2 packed_normal)
 {
-  vec3 decoded_normal;
-  decoded_normal.x = gbuffer_decode_unit_float_from_uint(packed_normal >> 10u, 10u);
-  decoded_normal.y = gbuffer_decode_unit_float_from_uint(packed_normal, 10u);
-
-  decoded_normal.xy = decoded_normal.xy * 2.0 - 1.0;
-  decoded_normal.z = sqrt(1.0 - clamp(dot(decoded_normal.xy, decoded_normal.xy), 0.0, 1.0));
-
-  /* TODO spheremap transformation */
-
-  decoded_normal = normal_view_to_world(decoded_normal);
-  return decoded_normal;
+  return normal_view_to_world(normal_decode(packed_normal));
 }
 
 /* Note: does not handle negative colors. */
 uint gbuffer_encode_color(vec3 color)
 {
-  color *= 0.5; /* Test */
+  color *= 1.0; /* Test */
   float intensity = length(color);
   /* Normalize to store it like a normal vector. */
   // color *= safe_rcp(intensity);
@@ -62,9 +46,9 @@ uint gbuffer_encode_color(vec3 color)
   // encoded_color |= gbuffer_encode_unit_float_to_uint(saturate(color.y), 10u);
   // encoded_color |= gbuffer_encode_unit_float_to_uint(saturate(intensity), 12u) << 20u;
 
-  encoded_color = gbuffer_encode_unit_float_to_uint(saturate(color.x), 10u);
-  encoded_color |= gbuffer_encode_unit_float_to_uint(saturate(color.y), 10u) << 10u;
-  encoded_color |= gbuffer_encode_unit_float_to_uint(saturate(color.z), 10u) << 20u;
+  encoded_color = gbuffer_encode_unit_float_to_uint(saturate(color.x), 11u);
+  encoded_color |= gbuffer_encode_unit_float_to_uint(saturate(color.y), 11u) << 11u;
+  encoded_color |= gbuffer_encode_unit_float_to_uint(saturate(color.z), 10u) << 21u;
   return encoded_color;
 }
 
@@ -76,10 +60,10 @@ vec3 gbuffer_decode_color(uint packed_data)
   // color.z = sqrt(1.0 - clamp(dot(color.xy, color.xy), 0.0, 1.0));
   // color *= gbuffer_decode_unit_float_from_uint(packed_data >> 20u, 12u);
 
-  color.x = gbuffer_decode_unit_float_from_uint(packed_data, 10u);
-  color.y = gbuffer_decode_unit_float_from_uint(packed_data >> 10u, 10u);
-  color.z = gbuffer_decode_unit_float_from_uint(packed_data >> 20u, 10u);
-  color *= 2.0; /* Test */
+  color.x = gbuffer_decode_unit_float_from_uint(packed_data, 11u);
+  color.y = gbuffer_decode_unit_float_from_uint(packed_data >> 11u, 11u);
+  color.z = gbuffer_decode_unit_float_from_uint(packed_data >> 21u, 10u);
+  color *= 1.0; /* Test */
   return color;
 }
 
@@ -88,32 +72,22 @@ vec3 gbuffer_decode_color(uint packed_data)
 /* -------------------------------------------------------------------- */
 /** \name Diffuse data
  *
- * Pack either a Diffuse BSDF, a Subsurface BSSSDF, or a Translucent BSDF.
- *
  * \{ */
 
-uvec4 gbuffer_store_diffuse_data(ClosureDiffuse data_in)
+ClosureDiffuse gbuffer_load_diffuse_data(vec4 color_in, vec4 normal_in, vec4 data_in)
 {
-  uvec4 data_out;
-  data_out.x = gbuffer_encode_color(data_in.color);
-  data_out.y = gbuffer_encode_normal(data_in.N);
-  /* TODO(fclem) High dynamic range. */
-  data_out.y |= gbuffer_encode_unit_float_to_uint(saturate(data_in.thickness), 12u) << 20u;
-  data_out.z = gbuffer_encode_color(data_in.sss_radius);
-  data_out.w = data_in.sss_id;
-  return data_out;
-}
-
-ClosureDiffuse gbuffer_load_diffuse_data(usampler2D gbuffer_tx, vec2 uv)
-{
-  uvec4 data_in = texture(gbuffer_tx, uv);
-
   ClosureDiffuse data_out;
-  data_out.color = gbuffer_decode_color(data_in.x);
-  data_out.N = gbuffer_decode_normal(data_in.y);
-  data_out.thickness = gbuffer_decode_unit_float_from_uint(data_in.y >> 20u, 12u);
-  data_out.sss_radius = gbuffer_decode_color(data_in.z);
-  data_out.sss_id = data_in.w;
+  if (normal_in.x > 0.0) {
+    data_out.color = color_in.rgb;
+    data_out.N = gbuffer_decode_normal(normal_in.xy);
+  }
+  else {
+    data_out.color = vec3(0.0);
+    data_out.N = vec3(1.0);
+  }
+  // data_out.thickness = normal_in.w;
+  data_out.sss_radius = data_in.rgb;
+  data_out.sss_id = uint(normal_in.z * 1024.0);
   return data_out;
 }
 
@@ -122,27 +96,15 @@ ClosureDiffuse gbuffer_load_diffuse_data(usampler2D gbuffer_tx, vec2 uv)
 /* -------------------------------------------------------------------- */
 /** \name Glossy data
  *
- * Pack a Glossy BSDF.
- *
  * \{ */
 
-uvec2 gbuffer_store_reflection_data(ClosureReflection data_in)
+ClosureReflection gbuffer_load_reflection_data(vec4 color_in, vec4 normal_in)
 {
-  uvec2 data_out;
-  data_out.x = gbuffer_encode_color(data_in.color);
-  data_out.y = gbuffer_encode_normal(data_in.N);
-  data_out.y |= gbuffer_encode_unit_float_to_uint(saturate(data_in.roughness), 12u) << 20u;
-  return data_out;
-}
-
-ClosureReflection gbuffer_load_reflection_data(usampler2D gbuffer_tx, vec2 uv)
-{
-  uvec2 data_in = texture(gbuffer_tx, uv).rg;
-
   ClosureReflection data_out;
-  data_out.color = gbuffer_decode_color(data_in.x);
-  data_out.N = gbuffer_decode_normal(data_in.y);
-  data_out.roughness = gbuffer_decode_unit_float_from_uint(data_in.y >> 20u, 12u);
+  data_out.color = color_in.rgb;
+  data_out.N = gbuffer_decode_normal(normal_in.xy);
+  // data_out.thickness = normal_in.w;
+  data_out.roughness = normal_in.z;
   return data_out;
 }
 
@@ -151,29 +113,21 @@ ClosureReflection gbuffer_load_reflection_data(usampler2D gbuffer_tx, vec2 uv)
 /* -------------------------------------------------------------------- */
 /** \name Refraction data
  *
- * Pack a Refraction BSDF.
- *
  * \{ */
 
-uvec4 gbuffer_store_refraction_data(ClosureRefraction data_in)
+ClosureRefraction gbuffer_load_refraction_data(vec4 color_in, vec4 normal_in, vec4 data_in)
 {
-  uvec4 data_out;
-  data_out.x = gbuffer_encode_color(data_in.color);
-  data_out.y = gbuffer_encode_normal(data_in.N);
-  data_out.y |= gbuffer_encode_unit_float_to_uint(saturate(data_in.roughness), 12u) << 20u;
-  data_out.w = floatBitsToUint(data_in.ior);
-  return data_out;
-}
-
-ClosureRefraction gbuffer_load_refraction_data(usampler2D gbuffer_tx, vec2 uv)
-{
-  uvec4 data_in = texture(gbuffer_tx, uv);
-
   ClosureRefraction data_out;
-  data_out.color = gbuffer_decode_color(data_in.x);
-  data_out.N = gbuffer_decode_normal(data_in.y);
-  data_out.roughness = gbuffer_decode_unit_float_from_uint(data_in.y >> 20u, 12u);
-  data_out.ior = uintBitsToFloat(data_in.w);
+  if (normal_in.x < 0.0) {
+    data_out.color = color_in.rgb;
+    data_out.N = gbuffer_decode_normal(-normal_in.xy);
+  }
+  else {
+    data_out.color = vec3(0.0);
+    data_out.N = vec3(1.0);
+  }
+  data_out.ior = data_in.x;
+  data_out.roughness = data_in.y;
   return data_out;
 }
 
@@ -217,12 +171,9 @@ ClosureVolume gbuffer_load_volume_data(usampler2D gbuffer_tx, vec2 uv)
  *
  * \{ */
 
-vec4 gbuffer_store_emission_data(ClosureEmission data_in)
+vec3 gbuffer_store_emission_data(ClosureEmission data_in)
 {
-  vec4 data_out;
-  data_out.xyz = data_in.emission;
-  data_out.w = 0.0;
-  return data_out;
+  return data_in.emission;
 }
 
 ClosureEmission gbuffer_load_emission_data(sampler2D gbuffer_tx, vec2 uv)

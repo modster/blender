@@ -106,13 +106,13 @@ void make_orthonormal_basis(vec3 N, out vec3 T, out vec3 B)
 /* ---- Encode / Decode Normal buffer data ---- */
 /* From http://aras-p.info/texts/CompactNormalStorage.html
  * Using Method #4: Spheremap Transform */
-vec2 normal_encode(vec3 n, vec3 view)
+vec2 normal_encode(vec3 n)
 {
   float p = sqrt(n.z * 8.0 + 8.0);
   return n.xy / p + 0.5;
 }
 
-vec3 normal_decode(vec2 enc, vec3 view)
+vec3 normal_decode(vec2 enc)
 {
   vec2 fenc = enc * 4.0 - 2.0;
   float f = dot(fenc, fenc);

@@ -27,6 +27,7 @@ struct GlobalData {
   float ray_length;
   /** Random number to sample a closure. */
   float closure_rand;
+  float transmit_rand;
   /** Hair time along hair length. 0 at base 1 at tip. */
   float hair_time;
   /** Hair time along width of the hair. */
@@ -45,7 +46,6 @@ void ntree_eval_init()
 {
   g_diffuse_data.color = vec3(0.0);
   g_diffuse_data.N = vec3(1.0, 0.0, 0.0);
-  g_diffuse_data.thickness = 0.0;
   g_diffuse_data.sss_radius = vec3(0);
   g_diffuse_data.sss_id = 0u;
 
@@ -70,7 +70,28 @@ void ntree_eval_init()
 
 void ntree_eval_weights()
 {
+  float transmit_total = g_diffuse_data.color.r + g_refraction_data.color.r;
+  if (g_data.transmit_rand >= 0.0) {
+    float transmit_threshold = g_diffuse_data.color.r * safe_rcp(transmit_total);
+    if (g_data.transmit_rand > transmit_threshold) {
+      /* Signal that we will use the transmition closure. */
+      g_data.transmit_rand = 0.0;
+    }
+    else {
+      /* Signal that we will use the diffuse closure. */
+      g_data.transmit_rand = 1.0;
+    }
+  }
+
   closure_weight_randomize(g_diffuse_data, g_data.closure_rand);
   closure_weight_randomize(g_reflection_data, g_data.closure_rand);
   closure_weight_randomize(g_refraction_data, g_data.closure_rand);
+
+  /* Amend total weight to avoid loosing energy. */
+  if (g_data.transmit_rand > 0.0) {
+    g_diffuse_data.color.r += g_refraction_data.color.r;
+  }
+  else if (g_data.transmit_rand == 0.0) {
+    g_refraction_data.color.r += g_diffuse_data.color.r;
+  }
 }
