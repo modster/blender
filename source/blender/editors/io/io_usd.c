@@ -451,12 +451,12 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "Set Frame Range",
                   "Update the scene's start and end frame to match those of the USD archive");
 
-  RNA_def_boolean(ot->srna, "import_cameras", true, "Import Cameras", "");
-  RNA_def_boolean(ot->srna, "import_curves", true, "Import Curves", "");
-  RNA_def_boolean(ot->srna, "import_lights", true, "Import Lights", "");
-  RNA_def_boolean(ot->srna, "import_materials", true, "Import Materials", "");
-  RNA_def_boolean(ot->srna, "import_meshes", true, "Import Meshes", "");
-  RNA_def_boolean(ot->srna, "import_volumes", true, "Import Volumes", "");
+  RNA_def_boolean(ot->srna, "import_cameras", true, "Cameras", "");
+  RNA_def_boolean(ot->srna, "import_curves", true, "Curves", "");
+  RNA_def_boolean(ot->srna, "import_lights", true, "Lights", "");
+  RNA_def_boolean(ot->srna, "import_materials", true, "Materials", "");
+  RNA_def_boolean(ot->srna, "import_meshes", true, "Meshes", "");
+  RNA_def_boolean(ot->srna, "import_volumes", true, "Volumes", "");
 
   RNA_def_boolean(ot->srna,
                   "import_subdiv",
