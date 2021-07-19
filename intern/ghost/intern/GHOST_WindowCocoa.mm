@@ -1072,8 +1072,6 @@ GHOST_TSuccess GHOST_WindowCocoa::setWindowCursorVisibility(bool visible)
 
 GHOST_TSuccess GHOST_WindowCocoa::setWindowCursorGrab(GHOST_TGrabCursorMode mode)
 {
-  GHOST_TSuccess err = GHOST_kSuccess;
-
   if (mode != GHOST_kGrabDisable) {
     // No need to perform grab without warp as it is always on in OS X
     if (mode != GHOST_kGrabNormal) {
@@ -1103,7 +1101,8 @@ GHOST_TSuccess GHOST_WindowCocoa::setWindowCursorGrab(GHOST_TGrabCursorMode mode
     setCursorGrabAccum(0, 0);
     m_cursorGrabBounds.m_l = m_cursorGrabBounds.m_r = -1; /* disable */
   }
-  return err;
+
+  return GHOST_kSuccess;
 }
 
 GHOST_TSuccess GHOST_WindowCocoa::setWindowCursorShape(GHOST_TStandardCursor shape)
