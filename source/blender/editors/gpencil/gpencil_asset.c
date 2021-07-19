@@ -718,6 +718,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   /* Get the scale factor. */
   float mouse3d[3];
   sub_v3_v3v3(mouse3d, dest_pt, tgpa->asset_center);
+
   float dist = len_v3(mouse3d);
   float scale_factor = dist / tgpa->initial_dist;
   float scale_vector[3];
@@ -1081,14 +1082,33 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
         rect_big.xmax = tgpa->rect_cage.xmax + (ROTATION_CONTROL_GAP * 2.0f);
         rect_big.ymax = tgpa->rect_cage.ymax + (ROTATION_CONTROL_GAP * 2.0f);
 
-        if ((tgpa->flag & GP_ASSET_FLAG_IDLE) &&
-            (!BLI_rctf_isect_pt(&rect_big, (float)event->mval[0], (float)event->mval[1]))) {
-          ED_area_status_text(tgpa->area, NULL);
-          ED_workspace_status_text(C, NULL);
-          WM_cursor_modal_restore(win);
-          gpencil_asset_import_exit(C, op);
-          return OPERATOR_FINISHED;
+        if (tgpa->flag & GP_ASSET_FLAG_IDLE) {
+
+          if (!BLI_rctf_isect_pt(&rect_big, (float)event->mval[0], (float)event->mval[1])) {
+            ED_area_status_text(tgpa->area, NULL);
+            ED_workspace_status_text(C, NULL);
+            WM_cursor_modal_restore(win);
+            gpencil_asset_import_exit(C, op);
+            return OPERATOR_FINISHED;
+          }
+          copy_v2_v2_int(tgpa->mouse, event->mval);
+
+          /* Distance to asset center. */
+          float mousef[2], mouse3d[3];
+          copy_v2fl_v2i(mousef, tgpa->mouse);
+          gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, mouse3d);
+          sub_v3_v3v3(mouse3d, mouse3d, tgpa->asset_center);
+          tgpa->initial_dist = len_v3(mouse3d);
+
+          /* Initial orientation for rotation. */
+          copy_v2fl_v2i(tgpa->vinit_rotation, tgpa->mouse);
+          sub_v2_v2v2(tgpa->vinit_rotation, tgpa->vinit_rotation, tgpa->cage_center);
+          normalize_v2(tgpa->vinit_rotation);
+
+          tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
+          tgpa->flag |= GP_ASSET_FLAG_TRANSFORMING;
         }
+        break;
       }
 
       if (event->val == KM_RELEASE) {
@@ -1098,26 +1118,6 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
         WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
         break;
       }
-
-      if (tgpa->flag & GP_ASSET_FLAG_IDLE) {
-        copy_v2_v2_int(tgpa->mouse, event->mval);
-
-        /* Distance to asset center. */
-        float mousef[2], mouse3d[3];
-        copy_v2fl_v2i(mousef, tgpa->mouse);
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, mouse3d);
-        sub_v3_v3v3(mouse3d, mouse3d, tgpa->asset_center);
-        tgpa->initial_dist = len_v3(mouse3d);
-
-        /* Initial orientation for rotation. */
-        copy_v2fl_v2i(tgpa->vinit_rotation, tgpa->mouse);
-        sub_v2_v2v2(tgpa->vinit_rotation, tgpa->vinit_rotation, tgpa->cage_center);
-        normalize_v2(tgpa->vinit_rotation);
-
-        tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
-        tgpa->flag |= GP_ASSET_FLAG_TRANSFORMING;
-      }
-      break;
     }
       /* Confirm */
     case EVT_PADENTER:
