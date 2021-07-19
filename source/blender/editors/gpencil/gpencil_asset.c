@@ -106,6 +106,8 @@ typedef struct tGPDasset {
 
   /** 2D Cage vertices. */
   rctf rect_cage;
+  /** 2D cage center. */
+  float cage_center[2];
   /** 2D cage manipulator points *
    *
    *               8 (Rotation)
@@ -521,6 +523,10 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   tgpa->rect_cage.xmax = cage_max[0] + oversize;
   tgpa->rect_cage.ymax = cage_max[1] + oversize;
 
+  /* Cage center. */
+  tgpa->cage_center[0] = 0.5f * (tgpa->rect_cage.xmin + tgpa->rect_cage.xmax);
+  tgpa->cage_center[1] = 0.5f * (tgpa->rect_cage.ymin + tgpa->rect_cage.ymax);
+
   /* Manipulator points */
   tgpa->manipulator[0][0] = tgpa->rect_cage.xmin;
   tgpa->manipulator[0][1] = tgpa->rect_cage.ymax;
@@ -583,7 +589,7 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
                                                    GP_ASSET_TRANSFORM_ROT;
 
       if (tgpa->mode == GP_ASSET_TRANSFORM_ROT) {
-        WM_cursor_modal_set(tgpa->win, WM_CURSOR_NW_ARROW);
+        WM_cursor_modal_set(tgpa->win, WM_CURSOR_HAND);
         return;
       }
 
@@ -736,6 +742,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   float rot_matrix[4][4];
   float vr[2];
   copy_v2fl_v2i(vr, mouse);
+  sub_v2_v2v2(vr, vr, tgpa->cage_center);
   normalize_v2(vr);
   float angle = angle_signed_v2v2(tgpa->vinit_rotation, vr);
   gpencil_asset_rotation_matrix_get(angle, tgpa->normal_vec, rot_matrix);
@@ -1100,6 +1107,7 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 
         /* Initial orientation for rotation. */
         copy_v2fl_v2i(tgpa->vinit_rotation, tgpa->mouse);
+        sub_v2_v2v2(tgpa->vinit_rotation, tgpa->vinit_rotation, tgpa->cage_center);
         normalize_v2(tgpa->vinit_rotation);
 
         tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
