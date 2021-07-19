@@ -172,6 +172,8 @@
     .internal_compression = 15.0f, \
     .max_internal_tension = 15.0f, \
     .max_internal_compression = 15.0f, \
+    /* TODO(ish): setup better remeshing defaults */ \
+    .remeshing_size_min = 0.01f, \
   }
 
 #define _DNA_DEFAULT_ClothCollSettings \

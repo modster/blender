@@ -403,7 +403,7 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 
   /* Actual remeshing part */
   {
-    float size_min = 0.1;
+    float size_min = clmd->sim_parms->remeshing_size_min;
     auto m = float2x2::identity();
     m = m * (1.0 / size_min);
     internal::Sizing vert_sizing(std::move(m));

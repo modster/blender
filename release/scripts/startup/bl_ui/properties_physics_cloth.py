@@ -330,6 +330,10 @@ class PHYSICS_PT_cloth_remesh(PhysicButtonsPanel, Panel):
 
         flow = layout.grid_flow(row_major=False, columns=0, even_columns=True, even_rows=False, align=True)
 
+        # TODO(ish): setup better ui
+        col = flow.column(align=True)
+        col.prop(cloth, "remeshing_size_min", text="Remeshing Sizing Min")
+
 
 class PHYSICS_PT_cloth_collision(PhysicButtonsPanel, Panel):
     bl_label = "Collisions"

@@ -180,7 +180,10 @@ typedef struct ClothSimSettings {
   float internal_compression;
   float max_internal_tension;
   float max_internal_compression;
-  char _pad0[4];
+
+  /* Remeshing parameters */
+  /* TODO(ish): need to write docs for this */
+  float remeshing_size_min;
 
 } ClothSimSettings;
 
