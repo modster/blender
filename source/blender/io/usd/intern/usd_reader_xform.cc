@@ -28,8 +28,8 @@
 
 #include "DNA_cachefile_types.h"
 #include "DNA_constraint_types.h"
-#include "DNA_object_types.h"
 #include "DNA_modifier_types.h"
+#include "DNA_object_types.h"
 #include "DNA_space_types.h" /* for FILE_MAX */
 
 #include <pxr/base/gf/math.h>

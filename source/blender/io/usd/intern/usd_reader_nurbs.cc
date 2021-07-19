@@ -136,7 +136,7 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
       nu->orderv = 4;
     }
 
-  /* TODO(makowalski): investigate setting Cyclic U and Endpoint U options. */
+    /* TODO(makowalski): investigate setting Cyclic U and Endpoint U options. */
 #if 0
      if (knots.size() > 3) {
        if ((knots[0] == knots[1]) && (knots[knots.size()] == knots[knots.size() - 1])) {

@@ -23,8 +23,8 @@ struct Main;
 #include "usd.h"
 #include "usd_reader_prim.h"
 
-#include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usd/stage.h>
+#include <pxr/usd/usdGeom/imageable.h>
 
 #include <vector>
 
