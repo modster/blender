@@ -201,6 +201,11 @@ template<typename T> class Node {
   {
   }
 
+  const auto &get_self_index() const
+  {
+    return this->self_index;
+  }
+
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
@@ -266,6 +271,11 @@ template<typename T> class Vert {
  public:
   Vert(VertIndex self_index, float2 uv) : self_index(self_index), uv(uv)
   {
+  }
+
+  const auto &get_self_index() const
+  {
+    return this->self_index;
   }
 
   const auto &get_uv() const
@@ -349,6 +359,11 @@ template<typename T> class Edge {
  public:
   Edge(EdgeIndex self_index) : self_index(self_index)
   {
+  }
+
+  const auto &get_self_index() const
+  {
+    return this->self_index;
   }
 
   void set_extra_data(T extra_data)
@@ -437,6 +452,11 @@ template<typename T> class Face {
  public:
   Face(FaceIndex self_index, float3 normal) : self_index(self_index), normal(normal)
   {
+  }
+
+  const auto &get_self_index() const
+  {
+    return this->self_index;
   }
 
   void set_extra_data(T extra_data)
