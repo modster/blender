@@ -141,7 +141,7 @@ typedef struct Mesh {
   struct MSelect *mselect;
 
   /* BMESH ONLY */
-  /*new face structures*/
+  /* New face structures. */
   struct MPoly *mpoly;
   struct MLoop *mloop;
   struct MLoopUV *mloopuv;
@@ -164,8 +164,10 @@ typedef struct Mesh {
   struct MVert *mvert;
   /** Array of edges. */
   struct MEdge *medge;
-  /** Deformgroup vertices. */
+  /** Deform-group vertices. */
   struct MDeformVert *dvert;
+  /** List of bDeformGroup names and flag only. */
+  ListBase vertex_group_names;
 
   /* array of colors for the tessellated faces, must be number of tessellated
    * faces * 4 in length */
@@ -189,7 +191,7 @@ typedef struct Mesh {
   /* END BMESH ONLY */
 
   int attributes_active_index;
-  int _pad3;
+  int vertex_group_active_index;
 
   /* the last selected vertex/edge/face are used for the active face however
    * this means the active face must always be selected, this is to keep track
@@ -263,7 +265,7 @@ enum {
 
 /* me->editflag */
 enum {
-  ME_EDIT_VERTEX_GROUPS_X_SYMMETRY = 1 << 0,
+  ME_EDIT_MIRROR_VERTEX_GROUPS = 1 << 0,
   ME_EDIT_MIRROR_Y = 1 << 1, /* unused so far */
   ME_EDIT_MIRROR_Z = 1 << 2, /* unused so far */
 
@@ -272,7 +274,11 @@ enum {
   ME_EDIT_PAINT_VERT_SEL = 1 << 5,
 };
 
-/* we cant have both flags enabled at once,
+/* Helper macro to see if vertex group X mirror is on. */
+#define ME_USING_MIRROR_X_VERTEX_GROUPS(_me) \
+  (((_me)->editflag & ME_EDIT_MIRROR_VERTEX_GROUPS) && ((_me)->symmetry & ME_SYMMETRY_X))
+
+/* We can't have both flags enabled at once,
  * flags defined in DNA_scene_types.h */
 #define ME_EDIT_PAINT_SEL_MODE(_me) \
   (((_me)->editflag & ME_EDIT_PAINT_FACE_SEL) ? \
@@ -292,7 +298,7 @@ enum {
   ME_REMESH_REPROJECT_VERTEX_COLORS = 1 << 8,
   ME_DS_EXPAND = 1 << 9,
   ME_SCULPT_DYNAMIC_TOPOLOGY = 1 << 10,
-  ME_REMESH_SMOOTH_NORMALS = 1 << 11,
+  ME_FLAG_UNUSED_8 = 1 << 11, /* cleared */
   ME_REMESH_REPROJECT_PAINT_MASK = 1 << 12,
   ME_REMESH_FIX_POLES = 1 << 13,
   ME_REMESH_REPROJECT_VOLUME = 1 << 14,

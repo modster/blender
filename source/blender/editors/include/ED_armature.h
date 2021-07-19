@@ -23,6 +23,10 @@
 
 #pragma once
 
+#include <stdbool.h>
+
+#include "BLI_listbase.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,6 +45,7 @@ struct Scene;
 struct UndoType;
 struct View3D;
 struct ViewLayer;
+struct bAction;
 struct bArmature;
 struct bContext;
 struct bPoseChannel;
@@ -125,6 +130,13 @@ bool ED_armature_edit_deselect_all_visible(struct Object *obedit);
 bool ED_armature_edit_deselect_all_multi_ex(struct Base **bases, uint bases_len);
 bool ED_armature_edit_deselect_all_visible_multi_ex(struct Base **bases, uint bases_len);
 bool ED_armature_edit_deselect_all_visible_multi(struct bContext *C);
+bool ED_armature_edit_select_pick_bone(struct bContext *C,
+                                       struct Base *basact,
+                                       struct EditBone *ebone,
+                                       int selmask,
+                                       bool extend,
+                                       bool deselect,
+                                       bool toggle);
 bool ED_armature_edit_select_pick(
     struct bContext *C, const int mval[2], bool extend, bool deselect, bool toggle);
 bool ED_armature_edit_select_op_from_tagged(struct bArmature *arm, const int sel_op);
@@ -201,6 +213,13 @@ void ED_pose_recalculate_paths(struct bContext *C,
                                ePosePathCalcRange range);
 
 /* pose_select.c */
+void ED_armature_pose_select_pick_bone(struct ViewLayer *view_layer,
+                                       struct View3D *v3d,
+                                       struct Object *ob,
+                                       struct Bone *bone,
+                                       bool extend,
+                                       bool deselect,
+                                       bool toggle);
 bool ED_armature_pose_select_pick_with_buffer(struct ViewLayer *view_layer,
                                               struct View3D *v3d,
                                               struct Base *base,
@@ -227,6 +246,17 @@ void ED_mesh_deform_bind_callback(struct MeshDeformModifierData *mmd,
                                   float *vertexcos,
                                   int totvert,
                                   float cagemat[4][4]);
+
+/* Pose backups, pose_backup.c */
+struct PoseBackup;
+/* Create a backup of those bones that are animated in the given action. */
+struct PoseBackup *ED_pose_backup_create_selected_bones(
+    const struct Object *ob, const struct bAction *action) ATTR_WARN_UNUSED_RESULT;
+struct PoseBackup *ED_pose_backup_create_all_bones(
+    const struct Object *ob, const struct bAction *action) ATTR_WARN_UNUSED_RESULT;
+bool ED_pose_backup_is_selection_relevant(const struct PoseBackup *pose_backup);
+void ED_pose_backup_restore(const struct PoseBackup *pbd);
+void ED_pose_backup_free(struct PoseBackup *pbd);
 
 #ifdef __cplusplus
 }

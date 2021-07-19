@@ -35,10 +35,6 @@ ABCInstanceWriter::ABCInstanceWriter(const ABCWriterConstructorArgs &args)
 {
 }
 
-ABCInstanceWriter::~ABCInstanceWriter()
-{
-}
-
 void ABCInstanceWriter::create_alembic_objects(const HierarchyContext *context)
 {
   OObject original = args_.hierarchy_iterator->get_alembic_object(context->original_export_path);
@@ -63,7 +59,7 @@ Alembic::Abc::OCompoundProperty ABCInstanceWriter::abc_prop_for_custom_props()
 OObject ABCInstanceWriter::get_alembic_object() const
 {
   /* There is no OObject for an instance. */
-  BLI_assert(!"ABCInstanceWriter cannot return its Alembic OObject");
+  BLI_assert_msg(0, "ABCInstanceWriter cannot return its Alembic OObject");
   return OObject();
 }
 

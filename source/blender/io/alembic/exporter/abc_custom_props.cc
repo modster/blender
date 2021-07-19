@@ -51,10 +51,6 @@ CustomPropertiesExporter::CustomPropertiesExporter(ABCAbstractWriter *owner) : o
 {
 }
 
-CustomPropertiesExporter::~CustomPropertiesExporter()
-{
-}
-
 void CustomPropertiesExporter::write_all(const IDProperty *group)
 {
   if (group == nullptr) {
@@ -145,7 +141,7 @@ void CustomPropertiesExporter::write_idparray(const IDProperty *idp_array)
       continue;
     }
     std::cerr << "Custom property " << idp_array->name << " has elements of varying type";
-    BLI_assert(!"Mixed type IDP_ARRAY custom property found");
+    BLI_assert_msg(0, "Mixed type IDP_ARRAY custom property found");
   }
 #endif
 

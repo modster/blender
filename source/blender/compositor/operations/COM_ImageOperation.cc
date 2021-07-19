@@ -31,6 +31,8 @@
 #include "RE_pipeline.h"
 #include "RE_texture.h"
 
+namespace blender::compositor {
+
 BaseImageOperation::BaseImageOperation()
 {
   this->m_image = nullptr;
@@ -42,6 +44,7 @@ BaseImageOperation::BaseImageOperation()
   this->m_imageheight = 0;
   this->m_framenumber = 0;
   this->m_depthBuffer = nullptr;
+  depth_buffer_ = nullptr;
   this->m_numberOfChannels = 0;
   this->m_rd = nullptr;
   this->m_viewName = nullptr;
@@ -89,6 +92,9 @@ void BaseImageOperation::initExecution()
     this->m_imageFloatBuffer = stackbuf->rect_float;
     this->m_imageByteBuffer = stackbuf->rect;
     this->m_depthBuffer = stackbuf->zbuf_float;
+    if (stackbuf->zbuf_float) {
+      depth_buffer_ = new MemoryBuffer(stackbuf->zbuf_float, 1, stackbuf->x, stackbuf->y);
+    }
     this->m_imagewidth = stackbuf->x;
     this->m_imageheight = stackbuf->y;
     this->m_numberOfChannels = stackbuf->channels;
@@ -100,6 +106,10 @@ void BaseImageOperation::deinitExecution()
   this->m_imageFloatBuffer = nullptr;
   this->m_imageByteBuffer = nullptr;
   BKE_image_release_ibuf(this->m_image, this->m_buffer, nullptr);
+  if (depth_buffer_) {
+    delete depth_buffer_;
+    depth_buffer_ = nullptr;
+  }
 }
 
 void BaseImageOperation::determineResolution(unsigned int resolution[2],
@@ -123,13 +133,13 @@ static void sampleImageAtLocation(
 {
   if (ibuf->rect_float) {
     switch (sampler) {
-      case COM_PS_NEAREST:
+      case PixelSampler::Nearest:
         nearest_interpolation_color(ibuf, nullptr, color, x, y);
         break;
-      case COM_PS_BILINEAR:
+      case PixelSampler::Bilinear:
         bilinear_interpolation_color(ibuf, nullptr, color, x, y);
         break;
-      case COM_PS_BICUBIC:
+      case PixelSampler::Bicubic:
         bicubic_interpolation_color(ibuf, nullptr, color, x, y);
         break;
     }
@@ -137,13 +147,13 @@ static void sampleImageAtLocation(
   else {
     unsigned char byte_color[4];
     switch (sampler) {
-      case COM_PS_NEAREST:
+      case PixelSampler::Nearest:
         nearest_interpolation_color(ibuf, byte_color, nullptr, x, y);
         break;
-      case COM_PS_BILINEAR:
+      case PixelSampler::Bilinear:
         bilinear_interpolation_color(ibuf, byte_color, nullptr, x, y);
         break;
-      case COM_PS_BICUBIC:
+      case PixelSampler::Bicubic:
         bicubic_interpolation_color(ibuf, byte_color, nullptr, x, y);
         break;
     }
@@ -168,6 +178,13 @@ void ImageOperation::executePixelSampled(float output[4], float x, float y, Pixe
   }
 }
 
+void ImageOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                  const rcti &area,
+                                                  Span<MemoryBuffer *> UNUSED(inputs))
+{
+  output->copy_from(m_buffer, area, true);
+}
+
 void ImageAlphaOperation::executePixelSampled(float output[4],
                                               float x,
                                               float y,
@@ -183,6 +200,13 @@ void ImageAlphaOperation::executePixelSampled(float output[4],
     sampleImageAtLocation(this->m_buffer, x, y, sampler, false, tempcolor);
     output[0] = tempcolor[3];
   }
+}
+
+void ImageAlphaOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                       const rcti &area,
+                                                       Span<MemoryBuffer *> UNUSED(inputs))
+{
+  output->copy_from(m_buffer, area, 3, COM_DATA_TYPE_VALUE_CHANNELS, 0);
 }
 
 void ImageDepthOperation::executePixelSampled(float output[4],
@@ -203,3 +227,17 @@ void ImageDepthOperation::executePixelSampled(float output[4],
     }
   }
 }
+
+void ImageDepthOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                       const rcti &area,
+                                                       Span<MemoryBuffer *> UNUSED(inputs))
+{
+  if (depth_buffer_) {
+    output->copy_from(depth_buffer_, area);
+  }
+  else {
+    output->fill(area, COM_VALUE_ZERO);
+  }
+}
+
+}  // namespace blender::compositor

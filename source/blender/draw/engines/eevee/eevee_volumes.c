@@ -129,7 +129,7 @@ void EEVEE_volumes_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
   common_data->vol_coord_scale[2] = 1.0f / viewport_size[0];
   common_data->vol_coord_scale[3] = 1.0f / viewport_size[1];
 
-  /* TODO compute snap to maxZBuffer for clustered rendering */
+  /* TODO: compute snap to maxZBuffer for clustered rendering. */
   if ((common_data->vol_tex_size[0] != tex_size[0]) ||
       (common_data->vol_tex_size[1] != tex_size[1]) ||
       (common_data->vol_tex_size[2] != tex_size[2])) {
@@ -332,7 +332,7 @@ static bool eevee_volume_object_grids_init(Object *ob, ListBase *gpu_grids, DRWS
   bool multiple_transforms = true;
 
   LISTBASE_FOREACH (GPUMaterialVolumeGrid *, gpu_grid, gpu_grids) {
-    VolumeGrid *volume_grid = BKE_volume_grid_find(volume, gpu_grid->name);
+    const VolumeGrid *volume_grid = BKE_volume_grid_find_for_read(volume, gpu_grid->name);
     DRWVolumeGrid *drw_grid = (volume_grid) ?
                                   DRW_volume_batch_cache_get_grid(volume, volume_grid) :
                                   NULL;
@@ -385,7 +385,7 @@ static bool eevee_volume_object_grids_init(Object *ob, ListBase *gpu_grids, DRWS
 
   /* Bind volume grid textures. */
   LISTBASE_FOREACH (GPUMaterialVolumeGrid *, gpu_grid, gpu_grids) {
-    VolumeGrid *volume_grid = BKE_volume_grid_find(volume, gpu_grid->name);
+    const VolumeGrid *volume_grid = BKE_volume_grid_find_for_read(volume, gpu_grid->name);
     DRWVolumeGrid *drw_grid = (volume_grid) ?
                                   DRW_volume_batch_cache_get_grid(volume, volume_grid) :
                                   NULL;
@@ -501,7 +501,7 @@ void EEVEE_volumes_cache_object_add(EEVEE_ViewLayerData *sldata,
                                     Scene *scene,
                                     Object *ob)
 {
-  Material *ma = BKE_object_material_get(ob, 1);
+  Material *ma = BKE_object_material_get_eval(ob, 1);
 
   if (ma == NULL) {
     if (ob->type == OB_VOLUME) {
@@ -554,8 +554,8 @@ void EEVEE_volumes_cache_object_add(EEVEE_ViewLayerData *sldata,
     }
   }
 
-  /* TODO Reduce to number of slices intersecting. */
-  /* TODO Preemptive culling. */
+  /* TODO: Reduce to number of slices intersecting. */
+  /* TODO: Preemptive culling. */
   DRW_shgroup_call_procedural_triangles(grp, ob, sldata->common_data.vol_tex_size[2]);
 
   vedata->stl->effects->enabled_effects |= (EFFECT_VOLUMETRIC | EFFECT_POST_BUFFER);
@@ -709,7 +709,7 @@ void EEVEE_volumes_compute(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     DRW_stats_group_start("Volumetrics");
 
     /* We sample the shadow-maps using shadow sampler. We need to enable Comparison mode.
-     * TODO(fclem): avoid this by using sampler objects.*/
+     * TODO(fclem): avoid this by using sampler objects. */
     GPU_texture_compare_mode(sldata->shadow_cube_pool, true);
     GPU_texture_compare_mode(sldata->shadow_cascade_pool, true);
 
@@ -800,8 +800,6 @@ void EEVEE_volumes_output_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata, 
   EEVEE_PassList *psl = vedata->psl;
   EEVEE_EffectsInfo *effects = stl->effects;
 
-  const float clear[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-
   /* Create FrameBuffer. */
 
   /* Should be enough precision for many samples. */
@@ -813,12 +811,6 @@ void EEVEE_volumes_output_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata, 
                                 {GPU_ATTACHMENT_NONE,
                                  GPU_ATTACHMENT_TEXTURE(txl->volume_scatter_accum),
                                  GPU_ATTACHMENT_TEXTURE(txl->volume_transmittance_accum)});
-
-  /* Clear texture. */
-  if (effects->taa_current_sample == 1) {
-    GPU_framebuffer_bind(fbl->volumetric_accum_fb);
-    GPU_framebuffer_clear_color(fbl->volumetric_accum_fb, clear);
-  }
 
   /* Create Pass and shgroup. */
   DRW_PASS_CREATE(psl->volumetric_accum_ps, DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
@@ -843,10 +835,18 @@ void EEVEE_volumes_output_accumulate(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
 {
   EEVEE_FramebufferList *fbl = vedata->fbl;
   EEVEE_PassList *psl = vedata->psl;
+  EEVEE_EffectsInfo *effects = vedata->stl->effects;
 
   if (fbl->volumetric_accum_fb != NULL) {
     /* Accum pass */
     GPU_framebuffer_bind(fbl->volumetric_accum_fb);
+
+    /* Clear texture. */
+    if (effects->taa_current_sample == 1) {
+      const float clear[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+      GPU_framebuffer_clear_color(fbl->volumetric_accum_fb, clear);
+    }
+
     DRW_draw_pass(psl->volumetric_accum_ps);
 
     /* Restore */

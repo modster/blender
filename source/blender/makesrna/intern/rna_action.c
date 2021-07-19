@@ -89,7 +89,7 @@ static void rna_Action_groups_remove(bAction *act, ReportList *reports, PointerR
     return;
   }
 
-  /* move every one one of the group's F-Curves out into the Action again */
+  /* Move every one of the group's F-Curves out into the Action again. */
   for (fcu = agrp->channels.first; (fcu) && (fcu->grp == agrp); fcu = fcn) {
     fcn = fcu->next;
 
@@ -407,8 +407,10 @@ static void rna_def_dopesheet(BlenderRNA *brna)
   /* Multi-word fuzzy search option for name/text filters */
   prop = RNA_def_property(srna, "use_multi_word_filter", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", ADS_FLAG_FUZZY_NAMES);
-  RNA_def_property_ui_text(
-      prop, "Multi-Word Fuzzy Filter", "Perform fuzzy/multi-word matching (WARNING: May be slow)");
+  RNA_def_property_ui_text(prop,
+                           "Multi-Word Fuzzy Filter",
+                           "Perform fuzzy/multi-word matching.\n"
+                           "Warning: May be slow");
   RNA_def_property_ui_icon(prop, ICON_SORTALPHA, 0);
   RNA_def_property_update(prop, NC_ANIMATION | ND_ANIMCHAN | NA_EDITED, NULL);
 

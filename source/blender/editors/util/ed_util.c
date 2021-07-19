@@ -27,9 +27,6 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "DNA_armature_types.h"
-#include "DNA_mesh_types.h"
-
 #include "BLI_listbase.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
@@ -49,6 +46,7 @@
 #include "DEG_depsgraph.h"
 
 #include "ED_armature.h"
+#include "ED_asset.h"
 #include "ED_image.h"
 #include "ED_mesh.h"
 #include "ED_object.h"
@@ -146,7 +144,7 @@ void ED_editors_init(bContext *C)
             ED_object_wpaintmode_enter_ex(bmain, depsgraph, scene, ob);
           }
           else {
-            BLI_assert(0);
+            BLI_assert_unreachable();
           }
         }
         else {
@@ -171,6 +169,8 @@ void ED_editors_init(bContext *C)
   if (scene) {
     ED_space_image_paint_update(bmain, wm, scene);
   }
+
+  ED_assetlist_storage_tag_main_data_dirty();
 
   SWAP(int, reports->flag, reports_flag_prev);
   wm->op_undo_depth--;
@@ -206,24 +206,9 @@ void ED_editors_exit(Main *bmain, bool do_undo_system)
    *
    * To reproduce the problem where stale data is used, see: T84920. */
   for (Object *ob = bmain->objects.first; ob; ob = ob->id.next) {
-    if (ob->type == OB_MESH) {
-      Mesh *me = ob->data;
-      if (me->edit_mesh) {
-        EDBM_mesh_free(me->edit_mesh);
-        MEM_freeN(me->edit_mesh);
-        me->edit_mesh = NULL;
-        if (do_undo_system == false) {
-          DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-        }
-      }
-    }
-    else if (ob->type == OB_ARMATURE) {
-      bArmature *arm = ob->data;
-      if (arm->edbo) {
-        ED_armature_edit_free(ob->data);
-        if (do_undo_system == false) {
-          DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-        }
+    if (ED_object_editmode_free_ex(bmain, ob)) {
+      if (do_undo_system == false) {
+        DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
       }
     }
   }
@@ -313,8 +298,11 @@ bool ED_editors_flush_edits(Main *bmain)
 
 /* ***** XXX: functions are using old blender names, cleanup later ***** */
 
-/* now only used in 2d spaces, like time, ipo, nla, sima... */
-/* XXX shift/ctrl not configurable */
+/**
+ * Now only used in 2D spaces, like time, f-curve, NLA, image, etc.
+ *
+ * \note Shift/Control are not configurable key-bindings.
+ */
 void apply_keyb_grid(
     int shift, int ctrl, float *val, float fac1, float fac2, float fac3, int invert)
 {

@@ -34,6 +34,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
+#include "BKE_customdata.h"
 #include "BKE_editmesh.h"
 #include "BKE_mesh.h"
 #include "BKE_report.h"
@@ -61,7 +62,6 @@ static CustomData *mesh_customdata_get_type(Mesh *me, const char htype, int *r_t
   BMesh *bm = (me->edit_mesh) ? me->edit_mesh->bm : NULL;
   int tot;
 
-  /* this  */
   switch (htype) {
     case BM_VERT:
       if (bm) {
@@ -167,7 +167,7 @@ static void mesh_uv_reset_array(float **fuv, const int len)
 
     fuv[3][0] = 0.0;
     fuv[3][1] = 1.0;
-    /*make sure we ignore 2-sided faces*/
+    /* Make sure we ignore 2-sided faces. */
   }
   else if (len > 2) {
     float fac = 0.0f, dfac = 1.0f / (float)len;
@@ -253,7 +253,7 @@ void ED_mesh_uv_loop_reset(struct bContext *C, struct Mesh *me)
   WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
 }
 
-/* note: keep in sync with ED_mesh_color_add */
+/* NOTE: keep in sync with #ED_mesh_color_add. */
 int ED_mesh_uv_texture_add(Mesh *me, const char *name, const bool active_set, const bool do_init)
 {
   BMEditMesh *em;
@@ -378,7 +378,7 @@ bool ED_mesh_uv_texture_remove_named(Mesh *me, const char *name)
   return false;
 }
 
-/* note: keep in sync with ED_mesh_uv_texture_add */
+/* NOTE: keep in sync with #ED_mesh_uv_texture_add. */
 int ED_mesh_color_add(Mesh *me, const char *name, const bool active_set, const bool do_init)
 {
   BMEditMesh *em;
@@ -484,7 +484,7 @@ bool ED_mesh_color_remove_named(Mesh *me, const char *name)
 
 /*********************** Sculpt Vertex colors operators ************************/
 
-/* note: keep in sync with ED_mesh_uv_texture_add */
+/* NOTE: keep in sync with #ED_mesh_uv_texture_add. */
 int ED_mesh_sculpt_color_add(Mesh *me, const char *name, const bool active_set, const bool do_init)
 {
   BMEditMesh *em;
@@ -1097,7 +1097,7 @@ static void mesh_add_edges(Mesh *mesh, int len)
 
   totedge = mesh->totedge + len;
 
-  /* update customdata  */
+  /* Update custom-data. */
   CustomData_copy(&mesh->edata, &edata, CD_MASK_MESH.emask, CD_DEFAULT, totedge);
   CustomData_copy_data(&mesh->edata, &edata, 0, 0, mesh->totedge);
 

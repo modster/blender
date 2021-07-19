@@ -84,7 +84,8 @@ typedef struct tGPDinterpolate_layer {
   /** interpolate factor */
   float factor;
 
-  /* Hash tablets to create temp relationship between strokes. */
+  /* List of strokes and Hash tablets to create temp relationship between strokes. */
+  struct ListBase selected_strokes;
   struct GHash *used_strokes;
   struct GHash *pair_strokes;
 
@@ -277,11 +278,12 @@ static void gpencil_stroke_pair_table(bContext *C,
                                       tGPDinterpolate_layer *tgpil)
 {
   bGPdata *gpd = tgpi->gpd;
-  const bool only_selected = ((GPENCIL_EDIT_MODE(gpd)) &&
+  const bool only_selected = (GPENCIL_EDIT_MODE(gpd) &&
                               ((tgpi->flag & GP_TOOLFLAG_INTERPOLATE_ONLY_SELECTED) != 0));
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
 
   /* Create hash tablets with relationship between strokes. */
+  BLI_listbase_clear(&tgpil->selected_strokes);
   tgpil->used_strokes = BLI_ghash_ptr_new(__func__);
   tgpil->pair_strokes = BLI_ghash_ptr_new(__func__);
 
@@ -289,8 +291,7 @@ static void gpencil_stroke_pair_table(bContext *C,
   LISTBASE_FOREACH (bGPDstroke *, gps_from, &tgpil->prevFrame->strokes) {
     bGPDstroke *gps_to = NULL;
     /* only selected */
-    if ((GPENCIL_EDIT_MODE(gpd)) && (only_selected) &&
-        ((gps_from->flag & GP_STROKE_SELECT) == 0)) {
+    if (GPENCIL_EDIT_MODE(gpd) && (only_selected) && ((gps_from->flag & GP_STROKE_SELECT) == 0)) {
       continue;
     }
     /* skip strokes that are invalid for current view */
@@ -315,7 +316,8 @@ static void gpencil_stroke_pair_table(bContext *C,
     if (ELEM(NULL, gps_from, gps_to)) {
       continue;
     }
-    /* Insert the pair entry in the hash table. */
+    /* Insert the pair entry in the hash table and the list of strokes to keep order. */
+    BLI_addtail(&tgpil->selected_strokes, BLI_genericNodeN(gps_from));
     BLI_ghash_insert(tgpil->pair_strokes, gps_from, gps_to);
   }
 }
@@ -405,10 +407,13 @@ static void gpencil_interpolate_update_strokes(bContext *C, tGPDinterpolate *tgp
     /* Clear previous interpolations. */
     gpencil_interpolate_free_tagged_strokes(tgpil->interFrame);
 
-    GHashIterator gh_iter;
-    GHASH_ITER (gh_iter, tgpil->pair_strokes) {
-      bGPDstroke *gps_from = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-      bGPDstroke *gps_to = (bGPDstroke *)BLI_ghashIterator_getValue(&gh_iter);
+    LISTBASE_FOREACH (LinkData *, link, &tgpil->selected_strokes) {
+      bGPDstroke *gps_from = link->data;
+      if (!BLI_ghash_haskey(tgpil->pair_strokes, gps_from)) {
+        continue;
+      }
+      bGPDstroke *gps_to = (bGPDstroke *)BLI_ghash_lookup(tgpil->pair_strokes, gps_from);
+
       /* Create new stroke. */
       bGPDstroke *new_stroke = BKE_gpencil_stroke_duplicate(gps_from, true, true);
       new_stroke->flag |= GP_STROKE_TAG;
@@ -527,10 +532,12 @@ static void gpencil_interpolate_set_points(bContext *C, tGPDinterpolate *tgpi)
     gpencil_stroke_pair_table(C, tgpi, tgpil);
 
     /* Create new strokes data with interpolated points reading original stroke. */
-    GHashIterator gh_iter;
-    GHASH_ITER (gh_iter, tgpil->pair_strokes) {
-      bGPDstroke *gps_from = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-      bGPDstroke *gps_to = (bGPDstroke *)BLI_ghashIterator_getValue(&gh_iter);
+    LISTBASE_FOREACH (LinkData *, link, &tgpil->selected_strokes) {
+      bGPDstroke *gps_from = link->data;
+      if (!BLI_ghash_haskey(tgpil->pair_strokes, gps_from)) {
+        continue;
+      }
+      bGPDstroke *gps_to = (bGPDstroke *)BLI_ghash_lookup(tgpil->pair_strokes, gps_from);
 
       /* If destination stroke is smaller, resize new_stroke to size of gps_to stroke. */
       if (gps_from->totpoints > gps_to->totpoints) {
@@ -658,6 +665,9 @@ static void gpencil_interpolate_exit(bContext *C, wmOperator *op)
       MEM_SAFE_FREE(tgpil->nextFrame);
       MEM_SAFE_FREE(tgpil->interFrame);
 
+      /* Free list of strokes. */
+      BLI_freelistN(&tgpil->selected_strokes);
+
       /* Free Hash tablets. */
       if (tgpil->used_strokes != NULL) {
         BLI_ghash_free(tgpil->used_strokes, NULL, NULL);
@@ -701,7 +711,7 @@ static bool gpencil_interpolate_set_init_values(bContext *C, wmOperator *op, tGP
       tgpi->flag, (RNA_enum_get(op->ptr, "layers") == 1), GP_TOOLFLAG_INTERPOLATE_ALL_LAYERS);
   SET_FLAG_FROM_TEST(
       tgpi->flag,
-      ((GPENCIL_EDIT_MODE(tgpi->gpd)) && (RNA_boolean_get(op->ptr, "interpolate_selected_only"))),
+      (GPENCIL_EDIT_MODE(tgpi->gpd) && (RNA_boolean_get(op->ptr, "interpolate_selected_only"))),
       GP_TOOLFLAG_INTERPOLATE_ONLY_SELECTED);
 
   tgpi->flipmode = RNA_enum_get(op->ptr, "flip");
@@ -1238,7 +1248,7 @@ static int gpencil_interpolate_seq_exec(bContext *C, wmOperator *op)
   const int step = RNA_int_get(op->ptr, "step");
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const bool all_layers = (bool)(RNA_enum_get(op->ptr, "layers") == 1);
-  const bool only_selected = ((GPENCIL_EDIT_MODE(gpd)) &&
+  const bool only_selected = (GPENCIL_EDIT_MODE(gpd) &&
                               (RNA_boolean_get(op->ptr, "interpolate_selected_only") != 0));
 
   eGP_InterpolateFlipMode flipmode = RNA_enum_get(op->ptr, "flip");
@@ -1292,13 +1302,13 @@ static int gpencil_interpolate_seq_exec(bContext *C, wmOperator *op)
     bGPDframe *nextFrame = BKE_gpencil_frame_duplicate(gpf_next, true);
 
     /* Create a table with source and target pair of strokes. */
+    ListBase selected_strokes = {NULL};
     GHash *used_strokes = BLI_ghash_ptr_new(__func__);
     GHash *pair_strokes = BLI_ghash_ptr_new(__func__);
-
     LISTBASE_FOREACH (bGPDstroke *, gps_from, &prevFrame->strokes) {
       bGPDstroke *gps_to = NULL;
       /* Only selected. */
-      if ((GPENCIL_EDIT_MODE(gpd)) && (only_selected) &&
+      if (GPENCIL_EDIT_MODE(gpd) && (only_selected) &&
           ((gps_from->flag & GP_STROKE_SELECT) == 0)) {
         continue;
       }
@@ -1342,7 +1352,9 @@ static int gpencil_interpolate_seq_exec(bContext *C, wmOperator *op)
         }
       }
 
-      /* Insert the pair entry in the hash table. */
+      /* Insert the pair entry in the hash table and in the list of strokes to keep same order.
+       */
+      BLI_addtail(&selected_strokes, BLI_genericNodeN(gps_from));
       BLI_ghash_insert(pair_strokes, gps_from, gps_to);
     }
 
@@ -1369,11 +1381,12 @@ static int gpencil_interpolate_seq_exec(bContext *C, wmOperator *op)
       }
 
       /* Apply the factor to all pair of strokes. */
-      GHashIterator gh_iter;
-      GHASH_ITER (gh_iter, pair_strokes) {
-        bGPDstroke *gps_from = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-        bGPDstroke *gps_to = (bGPDstroke *)BLI_ghashIterator_getValue(&gh_iter);
-
+      LISTBASE_FOREACH (LinkData *, link, &selected_strokes) {
+        bGPDstroke *gps_from = link->data;
+        if (!BLI_ghash_haskey(pair_strokes, gps_from)) {
+          continue;
+        }
+        bGPDstroke *gps_to = (bGPDstroke *)BLI_ghash_lookup(pair_strokes, gps_from);
         /* Create new stroke. */
         bGPDstroke *new_stroke = BKE_gpencil_stroke_duplicate(gps_from, true, true);
         new_stroke->flag |= GP_STROKE_TAG;
@@ -1393,6 +1406,8 @@ static int gpencil_interpolate_seq_exec(bContext *C, wmOperator *op)
         BLI_addtail(&interFrame->strokes, new_stroke);
       }
     }
+
+    BLI_freelistN(&selected_strokes);
 
     /* Free Hash tablets. */
     if (used_strokes != NULL) {
@@ -1419,34 +1434,31 @@ static void gpencil_interpolate_seq_ui(bContext *C, wmOperator *op)
 {
   uiLayout *layout = op->layout;
   uiLayout *col, *row;
-  PointerRNA ptr;
-
-  RNA_pointer_create(NULL, op->type->srna, op->properties, &ptr);
 
   const eGP_Interpolate_Type type = RNA_enum_get(op->ptr, "type");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   row = uiLayoutRow(layout, true);
-  uiItemR(row, &ptr, "step", 0, NULL, ICON_NONE);
+  uiItemR(row, op->ptr, "step", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, true);
-  uiItemR(row, &ptr, "layers", 0, NULL, ICON_NONE);
+  uiItemR(row, op->ptr, "layers", 0, NULL, ICON_NONE);
 
   if (CTX_data_mode_enum(C) == CTX_MODE_EDIT_GPENCIL) {
     row = uiLayoutRow(layout, true);
-    uiItemR(row, &ptr, "interpolate_selected_only", 0, NULL, ICON_NONE);
+    uiItemR(row, op->ptr, "interpolate_selected_only", 0, NULL, ICON_NONE);
   }
 
   row = uiLayoutRow(layout, true);
-  uiItemR(row, &ptr, "flip", 0, NULL, ICON_NONE);
+  uiItemR(row, op->ptr, "flip", 0, NULL, ICON_NONE);
 
   col = uiLayoutColumn(layout, true);
-  uiItemR(col, &ptr, "smooth_factor", 0, NULL, ICON_NONE);
-  uiItemR(col, &ptr, "smooth_steps", 0, NULL, ICON_NONE);
+  uiItemR(col, op->ptr, "smooth_factor", 0, NULL, ICON_NONE);
+  uiItemR(col, op->ptr, "smooth_steps", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, true);
-  uiItemR(row, &ptr, "type", 0, NULL, ICON_NONE);
+  uiItemR(row, op->ptr, "type", 0, NULL, ICON_NONE);
 
   if (type == GP_IPO_CURVEMAP) {
     /* Get an RNA pointer to ToolSettings to give to the custom curve. */
@@ -1460,16 +1472,16 @@ static void gpencil_interpolate_seq_ui(bContext *C, wmOperator *op)
   }
   else if (type != GP_IPO_LINEAR) {
     row = uiLayoutRow(layout, false);
-    uiItemR(row, &ptr, "easing", 0, NULL, ICON_NONE);
+    uiItemR(row, op->ptr, "easing", 0, NULL, ICON_NONE);
     if (type == GP_IPO_BACK) {
       row = uiLayoutRow(layout, false);
-      uiItemR(row, &ptr, "back", 0, NULL, ICON_NONE);
+      uiItemR(row, op->ptr, "back", 0, NULL, ICON_NONE);
     }
     else if (type == GP_IPO_ELASTIC) {
       row = uiLayoutRow(layout, false);
-      uiItemR(row, &ptr, "amplitude", 0, NULL, ICON_NONE);
+      uiItemR(row, op->ptr, "amplitude", 0, NULL, ICON_NONE);
       row = uiLayoutRow(layout, false);
-      uiItemR(row, &ptr, "period", 0, NULL, ICON_NONE);
+      uiItemR(row, op->ptr, "period", 0, NULL, ICON_NONE);
     }
   }
 }
@@ -1690,7 +1702,7 @@ static bool gpencil_interpolate_reverse_poll(bContext *C)
   if (area == NULL) {
     return false;
   }
-  if ((area->spacetype != SPACE_VIEW3D) && (area->spacetype != SPACE_ACTION)) {
+  if (!ELEM(area->spacetype, SPACE_VIEW3D, SPACE_ACTION)) {
     return false;
   }
 

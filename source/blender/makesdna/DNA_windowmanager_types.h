@@ -217,8 +217,8 @@ enum {
 
 #define WM_KEYCONFIG_STR_DEFAULT "Blender"
 
-/* IME is win32 only! */
-#if !defined(WIN32) && !defined(DNA_DEPRECATED)
+/* IME is win32 and apple only! */
+#if !(defined(WIN32) || defined(__APPLE__)) && !defined(DNA_DEPRECATED)
 #  ifdef __GNUC__
 #    define ime_data ime_data __attribute__((deprecated))
 #  endif
@@ -278,8 +278,14 @@ typedef struct wmWindow {
   char event_queue_check_click;
   /** Enable when #KM_PRESS events are not handled (keyboard/mouse-buttons only). */
   char event_queue_check_drag;
+  /**
+   * Enable when the drag was handled,
+   * to avoid mouse-motion continually triggering drag events which are not handled
+   * but add overhead to gizmo handling (for example), see T87511.
+   */
+  char event_queue_check_drag_handled;
 
-  char _pad0[2];
+  char _pad0[1];
 
   /** Internal, lock pie creation from this event until released. */
   short pie_event_type_lock;
@@ -296,7 +302,7 @@ typedef struct wmWindow {
   struct wmGesture *tweak;
 
   /* Input Method Editor data - complex character input (especially for Asian character input)
-   * Currently WIN32, runtime-only data. */
+   * Currently WIN32 and APPLE, runtime-only data. */
   struct wmIMEData *ime_data;
 
   /** All events #wmEvent (ghost level events were handled). */
@@ -360,7 +366,7 @@ typedef struct wmKeyMapItem {
   short type;
   /** KM_ANY, KM_PRESS, KM_NOTHING etc. */
   short val;
-  /** Oskey is apple or windowskey, value denotes order of pressed. */
+  /** `oskey` also known as apple, windows-key or super, value denotes order of pressed. */
   short shift, ctrl, alt, oskey;
   /** Raw-key modifier. */
   short keymodifier;
@@ -374,7 +380,12 @@ typedef struct wmKeyMapItem {
   /** Unique identifier. Positive for kmi that override builtins, negative otherwise. */
   short id;
   char _pad[2];
-  /** Rna pointer to access properties. */
+  /**
+   * RNA pointer to access properties.
+   *
+   * \note The `ptr.owner_id` value must be NULL, as a signal not to use the context
+   * when running property callbacks such as ENUM item functions.
+   */
   struct PointerRNA *ptr;
 } wmKeyMapItem;
 
@@ -542,7 +553,7 @@ enum {
   /* in case operator got executed outside WM code... like via fileselect */
   OPERATOR_HANDLED = (1 << 4),
   /* used for operators that act indirectly (eg. popup menu)
-   * note: this isn't great design (using operators to trigger UI) avoid where possible. */
+   * NOTE: this isn't great design (using operators to trigger UI) avoid where possible. */
   OPERATOR_INTERFACE = (1 << 5),
 };
 #define OPERATOR_FLAGS_ALL \

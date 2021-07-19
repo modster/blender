@@ -23,6 +23,7 @@
 
 #include <limits.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -244,7 +245,7 @@ void UI_fontstyle_draw_rotated(const uiFontStyle *fs,
 
   /* ignore UI_STYLE, always aligned to top */
 
-  /* rotate counter-clockwise for now (assumes left-to-right language)*/
+  /* Rotate counter-clockwise for now (assumes left-to-right language). */
   xofs += height;
   yofs = BLF_width(fs->uifont_id, str, BLF_DRAW_STR_DUMMY_MAX) + 5;
   angle = M_PI_2;

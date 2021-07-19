@@ -120,10 +120,6 @@ class IMemStream : public Imf::IStream {
     _exrbuf = exrbuf;
   }
 
-  ~IMemStream() override
-  {
-  }
-
   bool read(char c[], int n) override
   {
     if (n + _exrpos <= _exrsize) {
@@ -934,7 +930,7 @@ void IMB_exrtile_begin_write(
   exr_printf("%s %-6s %-22s \"%s\"\n", "p", "view", "name", "internal_name");
   exr_printf("---------------------------------------------------------------\n");
 
-  /* assign channels  */
+  /* Assign channels. */
   for (echan = (ExrChannel *)data->channels.first; echan; echan = echan->next) {
     /* Tiles are expected to be saved with full float currently. */
     BLI_assert(echan->use_half_float == 0);

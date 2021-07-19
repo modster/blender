@@ -469,6 +469,8 @@ class TOPBAR_MT_file_import(Menu):
         if bpy.app.build_options.alembic:
             self.layout.operator("wm.alembic_import", text="Alembic (.abc)")
 
+        self.layout.operator("wm.gpencil_import_svg", text="SVG as Grease Pencil")
+
 
 class TOPBAR_MT_file_export(Menu):
     bl_idname = "TOPBAR_MT_file_export"
@@ -485,6 +487,13 @@ class TOPBAR_MT_file_export(Menu):
             self.layout.operator(
                 "wm.usd_export", text="Universal Scene Description (.usd, .usdc, .usda)")
 
+        # Pugixml lib dependency
+        if bpy.app.build_options.pugixml:
+            self.layout.operator("wm.gpencil_export_svg", text="Grease Pencil as SVG")
+        # Haru lib dependency
+        if bpy.app.build_options.haru:
+            self.layout.operator("wm.gpencil_export_pdf", text="Grease Pencil as PDF")
+
 
 class TOPBAR_MT_file_external_data(Menu):
     bl_label = "External Data"
@@ -494,8 +503,6 @@ class TOPBAR_MT_file_external_data(Menu):
 
         icon = 'CHECKBOX_HLT' if bpy.data.use_autopack else 'CHECKBOX_DEHLT'
         layout.operator("file.autopack_toggle", icon=icon)
-
-        layout.separator()
 
         pack_all = layout.row()
         pack_all.operator("file.pack_all")
@@ -507,8 +514,16 @@ class TOPBAR_MT_file_external_data(Menu):
 
         layout.separator()
 
+        layout.operator("file.pack_libraries")
+        layout.operator("file.unpack_libraries")
+
+        layout.separator()
+
         layout.operator("file.make_paths_relative")
         layout.operator("file.make_paths_absolute")
+
+        layout.separator()
+
         layout.operator("file.report_missing_files")
         layout.operator("file.find_missing_files")
 

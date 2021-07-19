@@ -139,6 +139,13 @@ static int voxel_remesh_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
+  if (mesh->totpoly == 0) {
+    return OPERATOR_CANCELLED;
+  }
+
+  /* Output mesh will be all smooth or all flat shading. */
+  const bool smooth_normals = mesh->mpoly[0].flag & ME_SMOOTH;
+
   float isovalue = 0.0f;
   if (mesh->flag & ME_REMESH_REPROJECT_VOLUME) {
     isovalue = mesh->remesh_voxel_size * 0.3f;
@@ -185,7 +192,7 @@ static int voxel_remesh_exec(bContext *C, wmOperator *op)
 
   BKE_mesh_nomain_to_mesh(new_mesh, mesh, ob, &CD_MASK_MESH, true);
 
-  if (mesh->flag & ME_REMESH_SMOOTH_NORMALS) {
+  if (smooth_normals) {
     BKE_mesh_smooth_flag_set(ob->data, true);
   }
 
@@ -525,7 +532,7 @@ static int voxel_size_edit_invoke(bContext *C, wmOperator *op, const wmEvent *ev
 
   float d_a[3], d_b[3];
   float d_a_proj[2], d_b_proj[2];
-  float preview_plane_proj[4][3];
+  float preview_plane_proj[4][2];
   const float y_axis_proj[2] = {0.0f, 1.0f};
 
   mid_v3_v3v3(text_pos, cd->preview_plane[0], cd->preview_plane[2]);
@@ -534,7 +541,7 @@ static int voxel_size_edit_invoke(bContext *C, wmOperator *op, const wmEvent *ev
   for (int i = 0; i < 4; i++) {
     float preview_plane_world_space[3];
     mul_v3_m4v3(preview_plane_world_space, active_object->obmat, cd->preview_plane[i]);
-    ED_view3d_project(region, preview_plane_world_space, preview_plane_proj[i]);
+    ED_view3d_project_v2(region, preview_plane_world_space, preview_plane_proj[i]);
   }
 
   /* Get the initial X and Y axis of the basis from the edges of the Bounding Box face. */
@@ -581,7 +588,7 @@ static int voxel_size_edit_invoke(bContext *C, wmOperator *op, const wmEvent *ev
   /* Write the text position into the matrix. */
   copy_v3_v3(cd->text_mat[3], text_pos);
 
-  /* Scale the text.  */
+  /* Scale the text. */
   float text_pos_word_space[3];
   mul_v3_m4v3(text_pos_word_space, active_object->obmat, text_pos);
   const float pixelsize = ED_view3d_pixel_size(rv3d, text_pos_word_space);

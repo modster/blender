@@ -236,9 +236,7 @@ option(WITH_SYSTEM_AUDASPACE "Build with external audaspace library installed on
 mark_as_advanced(WITH_AUDASPACE)
 mark_as_advanced(WITH_SYSTEM_AUDASPACE)
 
-if(NOT WITH_AUDASPACE)
-  set(WITH_SYSTEM_AUDASPACE OFF)
-endif()
+set_and_warn_dependency(WITH_AUDASPACE WITH_SYSTEM_AUDASPACE OFF)
 
 option(WITH_OPENMP        "Enable OpenMP (has to be supported by the compiler)" ON)
 if(UNIX AND NOT APPLE)
@@ -351,7 +349,7 @@ mark_as_advanced(WITH_SYSTEM_GLOG)
 option(WITH_FREESTYLE     "Enable Freestyle (advanced edges rendering)" ON)
 
 # Misc
-if(WIN32)
+if(WIN32 OR APPLE)
   option(WITH_INPUT_IME "Enable Input Method Editor (IME) for complex Asian character input" ON)
 endif()
 option(WITH_INPUT_NDOF "Enable NDOF input devices (SpaceNavigator and friends)" ON)
@@ -522,10 +520,10 @@ if(CMAKE_COMPILER_IS_GNUCC)
   mark_as_advanced(WITH_LINKER_LLD)
 endif()
 
-if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
-  option(WITH_COMPILER_ASAN "Build and link against address sanitizer (only for Debug & RelWithDebInfo targets)." OFF)
-  mark_as_advanced(WITH_COMPILER_ASAN)
+option(WITH_COMPILER_ASAN "Build and link against address sanitizer (only for Debug & RelWithDebInfo targets)." OFF)
+mark_as_advanced(WITH_COMPILER_ASAN)
 
+if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
   if(WITH_COMPILER_ASAN)
     set(_asan_defaults "\
 -fsanitize=address \
@@ -704,10 +702,8 @@ if(WITH_PYTHON_MODULE AND WITH_PYTHON_INSTALL)
   message(FATAL_ERROR "WITH_PYTHON_MODULE requires WITH_PYTHON_INSTALL to be OFF")
 endif()
 
-if(NOT WITH_PYTHON)
-  set(WITH_CYCLES OFF)
-  set(WITH_DRACO OFF)
-endif()
+set_and_warn_dependency(WITH_PYTHON WITH_CYCLES        OFF)
+set_and_warn_dependency(WITH_PYTHON WITH_DRACO         OFF)
 
 if(WITH_DRACO AND NOT WITH_PYTHON_INSTALL)
   message(STATUS "WITH_DRACO requires WITH_PYTHON_INSTALL to be ON, disabling WITH_DRACO for now")
@@ -779,6 +775,7 @@ if(WITH_INSTALL_PORTABLE)
 endif()
 
 if(WITH_GHOST_SDL OR WITH_HEADLESS)
+  message(STATUS "Disabling Ghost Wayland, X11, Input IME, and OpenXR")
   set(WITH_GHOST_WAYLAND OFF)
   set(WITH_GHOST_X11     OFF)
   set(WITH_X11_XINPUT    OFF)
@@ -809,7 +806,7 @@ endif()
 if(NOT WITH_CUDA_DYNLOAD)
   find_package(CUDA)
   if(NOT CUDA_FOUND)
-    message("CUDA toolkit not found, using dynamic runtime loading of libraries instead")
+    message(STATUS "CUDA toolkit not found, using dynamic runtime loading of libraries (WITH_CUDA_DYNLOAD) instead")
     set(WITH_CUDA_DYNLOAD ON)
   endif()
 endif()
@@ -839,7 +836,7 @@ if(WITH_PYTHON)
   # because UNIX will search for the old Python paths which may not exist.
   # giving errors about missing paths before this case is met.
   if(DEFINED PYTHON_VERSION AND "${PYTHON_VERSION}" VERSION_LESS "3.9")
-    message(FATAL_ERROR "At least Python 3.9 is required to build")
+    message(FATAL_ERROR "At least Python 3.9 is required to build, but found Python ${PYTHON_VERSION}")
   endif()
 
   file(GLOB RESULT "${CMAKE_SOURCE_DIR}/release/scripts/addons")
@@ -1235,6 +1232,7 @@ if(WITH_OPENMP)
       string(APPEND CMAKE_C_FLAGS " ${OpenMP_C_FLAGS}")
       string(APPEND CMAKE_CXX_FLAGS " ${OpenMP_CXX_FLAGS}")
       string(APPEND CMAKE_EXE_LINKER_FLAGS " ${OpenMP_LINKER_FLAGS}")
+      string(APPEND CMAKE_MODULE_LINKER_FLAGS " ${OpenMP_LINKER_FLAGS}")
     else()
       # Typically avoid adding flags as defines but we can't
       # pass OpenMP flags to the linker for static builds, meaning
@@ -1245,6 +1243,7 @@ if(WITH_OPENMP)
       find_library_static(OpenMP_LIBRARIES gomp ${CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES})
     endif()
   else()
+    message(STATUS "OpenMP not found, disabling WITH_OPENMP")
     set(WITH_OPENMP OFF)
   endif()
 
@@ -1320,6 +1319,7 @@ list(APPEND GL_DEFINITIONS -DGLEW_NO_GLU)
 if(WITH_BULLET AND WITH_SYSTEM_BULLET)
   find_package(Bullet)
   if(NOT BULLET_FOUND)
+    message(STATUS "Bullet not found, disabling WITH_BULLET")
     set(WITH_BULLET OFF)
   endif()
 else()
@@ -1526,6 +1526,7 @@ if(CMAKE_COMPILER_IS_GNUCC)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_UNDEF -Wundef)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_FORMAT_SIGN -Wformat-signedness)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_RESTRICT -Wrestrict)
+  ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_SUGGEST_OVERRIDE  -Wno-suggest-override)
 
   # gcc 4.2 gives annoying warnings on every file with this
   if(NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS "4.3")
@@ -1589,6 +1590,8 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_OVERLOADED_VIRTUAL  -Wno-overloaded-virtual)  # we get a lot of these, if its a problem a dev needs to look into it.
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_SIGN_COMPARE        -Wno-sign-compare)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_INVALID_OFFSETOF    -Wno-invalid-offsetof)
+  # Apple Clang (tested on version 12) doesn't support this flag while LLVM Clang 11 does.
+  ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_SUGGEST_OVERRIDE    -Wno-suggest-override)
 
   # gives too many unfixable warnings
   # ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_UNUSED_MACROS      -Wunused-macros)
@@ -1702,22 +1705,18 @@ if(WITH_PYTHON)
   endif()
 endif()
 
-if(MSVC)
-  string(APPEND CMAKE_CXX_FLAGS " /std:c++17")
-  # Make MSVC properly report the value of the __cplusplus preprocessor macro
-  # Available MSVC 15.7 (1914) and up, without this it reports 199711L regardless
-  # of the C++ standard chosen above
-  if(MSVC_VERSION GREATER 1913)
-    string(APPEND CMAKE_CXX_FLAGS " /Zc:__cplusplus")
-  endif()
-elseif(
-  CMAKE_COMPILER_IS_GNUCC OR
-  CMAKE_C_COMPILER_ID MATCHES "Clang" OR
-  CMAKE_C_COMPILER_ID MATCHES "Intel"
-)
-  string(APPEND CMAKE_CXX_FLAGS " -std=c++17")
-else()
-  message(FATAL_ERROR "Unknown compiler ${CMAKE_C_COMPILER_ID}, can't enable C++17 build")
+# Select C++17 as the standard for C++ projects.
+set(CMAKE_CXX_STANDARD 17)
+# If C++17 is not available, downgrading to an earlier standard is NOT OK.
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Do not enable compiler specific language extentions.
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Make MSVC properly report the value of the __cplusplus preprocessor macro
+# Available MSVC 15.7 (1914) and up, without this it reports 199711L regardless
+# of the C++ standard chosen above.
+if(MSVC AND MSVC_VERSION GREATER 1913)
+  string(APPEND CMAKE_CXX_FLAGS " /Zc:__cplusplus")
 endif()
 
 # Visual Studio has all standards it supports available by default
@@ -1912,6 +1911,7 @@ if(FIRST_RUN)
   info_cfg_option(WITH_IK_ITASC)
   info_cfg_option(WITH_IK_SOLVER)
   info_cfg_option(WITH_INPUT_NDOF)
+  info_cfg_option(WITH_INPUT_IME)
   info_cfg_option(WITH_INTERNATIONAL)
   info_cfg_option(WITH_OPENCOLLADA)
   info_cfg_option(WITH_OPENCOLORIO)
@@ -1955,10 +1955,10 @@ if(FIRST_RUN)
   info_cfg_option(WITH_JACK)
   info_cfg_option(WITH_JACK_DYNLOAD)
   info_cfg_option(WITH_OPENAL)
-  info_cfg_option(WITH_SDL)
-  info_cfg_option(WITH_SDL_DYNLOAD)
   info_cfg_option(WITH_PULSEAUDIO)
   info_cfg_option(WITH_PULSEAUDIO_DYNLOAD)
+  info_cfg_option(WITH_SDL)
+  info_cfg_option(WITH_SDL_DYNLOAD)
   info_cfg_option(WITH_WASAPI)
 
   info_cfg_text("Compression:")

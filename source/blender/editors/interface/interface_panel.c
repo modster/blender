@@ -258,7 +258,7 @@ static Panel *panel_add_instanced(ARegion *region,
   /* Make sure the panel is added to the end of the display-order as well. This is needed for
    * loading existing files.
    *
-   * Note: We could use special behavior to place it after the panel that starts the list of
+   * NOTE: We could use special behavior to place it after the panel that starts the list of
    * instanced panels, but that would add complexity that isn't needed for now. */
   int max_sortorder = 0;
   LISTBASE_FOREACH (Panel *, existing_panel, panels) {
@@ -437,15 +437,21 @@ static void reorder_instanced_panel_list(bContext *C, ARegion *region, Panel *dr
 
   /* Find how many instanced panels with this context string. */
   int list_panels_len = 0;
+  int start_index = -1;
   LISTBASE_FOREACH (const Panel *, panel, &region->panels) {
     if (panel->type) {
       if (panel->type->flag & PANEL_TYPE_INSTANCED) {
         if (panel_type_context_poll(region, panel->type, context)) {
+          if (panel == drag_panel) {
+            BLI_assert(start_index == -1); /* This panel should only appear once. */
+            start_index = list_panels_len;
+          }
           list_panels_len++;
         }
       }
     }
   }
+  BLI_assert(start_index != -1); /* The drag panel should definitely be in the list. */
 
   /* Sort the matching instanced panels by their display order. */
   PanelSort *panel_sort = MEM_callocN(list_panels_len * sizeof(*panel_sort), __func__);
@@ -471,6 +477,11 @@ static void reorder_instanced_panel_list(bContext *C, ARegion *region, Panel *dr
   }
 
   MEM_freeN(panel_sort);
+
+  if (move_to_index == start_index) {
+    /* In this case, the reorder was not changed, so don't do any updates or call the callback. */
+    return;
+  }
 
   /* Set the bit to tell the interface to instanced the list. */
   drag_panel->flag |= PNL_INSTANCED_LIST_ORDER_CHANGED;
@@ -663,7 +674,7 @@ static bool panel_type_context_poll(ARegion *region,
                                     const PanelType *panel_type,
                                     const char *context)
 {
-  if (UI_panel_category_is_visible(region)) {
+  if (!BLI_listbase_is_empty(&region->panels_category)) {
     return STREQ(panel_type->category, UI_panel_category_active_get(region, false));
   }
 
@@ -1177,7 +1188,6 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
 
   /* Draw text label. */
   if (panel->drawname[0] != '\0') {
-    /* + 0.001f to avoid flirting with float inaccuracy .*/
     const rcti title_rect = {
         .xmin = widget_rect.xmin + (panel->labelofs / aspect) + scaled_unit * 1.1f,
         .xmax = widget_rect.xmax,
@@ -1882,7 +1892,7 @@ static void ui_do_animate(bContext *C, Panel *panel)
   }
   else {
     if (UI_panel_is_dragging(panel)) {
-      /* Note: doing this in #panel_activate_state would require
+      /* NOTE: doing this in #panel_activate_state would require
        * removing `const` for context in many other places. */
       reorder_instanced_panel_list(C, region, panel);
     }
@@ -2529,9 +2539,8 @@ PointerRNA *UI_region_panel_custom_data_under_cursor(const bContext *C, const wm
 {
   ARegion *region = CTX_wm_region(C);
 
-  Panel *panel = NULL;
   LISTBASE_FOREACH (uiBlock *, block, &region->uiblocks) {
-    panel = block->panel;
+    Panel *panel = block->panel;
     if (panel == NULL) {
       continue;
     }
@@ -2541,15 +2550,11 @@ PointerRNA *UI_region_panel_custom_data_under_cursor(const bContext *C, const wm
     ui_window_to_block(region, block, &mx, &my);
     const int mouse_state = ui_panel_mouse_state_get(block, panel, mx, my);
     if (ELEM(mouse_state, PANEL_MOUSE_INSIDE_CONTENT, PANEL_MOUSE_INSIDE_HEADER)) {
-      break;
+      return UI_panel_custom_data_get(panel);
     }
   }
 
-  if (panel == NULL) {
-    return NULL;
-  }
-
-  return UI_panel_custom_data_get(panel);
+  return NULL;
 }
 
 /** \} */
@@ -2558,7 +2563,7 @@ PointerRNA *UI_region_panel_custom_data_under_cursor(const bContext *C, const wm
 /** \name Window Level Modal Panel Interaction
  * \{ */
 
-/* Note, this is modal handler and should not swallow events for animation. */
+/* NOTE: this is modal handler and should not swallow events for animation. */
 static int ui_handler_panel(bContext *C, const wmEvent *event, void *userdata)
 {
   Panel *panel = userdata;
@@ -2648,7 +2653,7 @@ static void panel_activate_state(const bContext *C, Panel *panel, const uiHandle
 
     /* Initiate edge panning during drags for scrolling beyond the initial region view. */
     wmOperatorType *ot = WM_operatortype_find("VIEW2D_OT_edge_pan", true);
-    ui_handle_afterfunc_add_operator(ot, WM_OP_INVOKE_DEFAULT, true);
+    ui_handle_afterfunc_add_operator(ot, WM_OP_INVOKE_DEFAULT);
   }
   else if (state == PANEL_STATE_ANIMATION) {
     panel_set_flag_recursive(panel, PNL_SELECT, false);

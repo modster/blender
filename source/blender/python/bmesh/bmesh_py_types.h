@@ -53,38 +53,45 @@ extern PyTypeObject BPy_BMIter_Type;
 
 /* cast from _any_ bmesh type - they all have BMesh first */
 typedef struct BPy_BMGeneric {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
 } BPy_BMGeneric;
 
 /* BPy_BMVert/BPy_BMEdge/BPy_BMFace/BPy_BMLoop can cast to this */
 typedef struct BPy_BMElem {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
   struct BMElem *ele;
 } BPy_BMElem;
 
 typedef struct BPy_BMesh {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
   int flag;
 } BPy_BMesh;
 
 /* element types */
 typedef struct BPy_BMVert {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
   struct BMVert *v;
 } BPy_BMVert;
 
 typedef struct BPy_BMEdge {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
   struct BMEdge *e;
 } BPy_BMEdge;
 
 typedef struct BPy_BMFace {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
   struct BMFace *f;
 } BPy_BMFace;
 
 typedef struct BPy_BMLoop {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
   struct BMLoop *l;
 } BPy_BMLoop;
 
@@ -98,7 +105,8 @@ typedef struct BPy_BMLoop {
  * - BPy_BMLoopSeq_Type
  */
 typedef struct BPy_BMElemSeq {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
 
   /* if this is a sequence on an existing element,
    * loops of faces for eg.
@@ -106,7 +114,7 @@ typedef struct BPy_BMElemSeq {
 
   /* we hold a reference to this.
    * check in case the owner becomes invalid on access */
-  /* TODO - make this a GC'd object!, will function OK without this though */
+  /* TODO: make this a GC'd object!, will function OK without this though. */
   BPy_BMElem *py_ele;
 
   /* iterator type */
@@ -114,7 +122,8 @@ typedef struct BPy_BMElemSeq {
 } BPy_BMElemSeq;
 
 typedef struct BPy_BMIter {
-  PyObject_VAR_HEAD struct BMesh *bm; /* keep first */
+  PyObject_VAR_HEAD
+  struct BMesh *bm; /* keep first */
   BMIter iter;
 } BPy_BMIter;
 

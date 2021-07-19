@@ -46,7 +46,7 @@
  * </pre>
  *
  * This function can also collapse edges too
- * in cases when it cant merge into faces.
+ * in cases when it can't merge into faces.
  *
  * \par Example:
  * <pre>
@@ -72,7 +72,7 @@ bool BM_vert_dissolve(BMesh *bm, BMVert *v)
     }
     if (!v->e->l) {
       if (len == 2) {
-        return (BM_vert_collapse_edge(bm, v->e, v, true, true) != NULL);
+        return (BM_vert_collapse_edge(bm, v->e, v, true, true, true) != NULL);
       }
       /* used to kill the vertex here, but it may be connected to faces.
        * so better do nothing */
@@ -82,7 +82,7 @@ bool BM_vert_dissolve(BMesh *bm, BMVert *v)
   }
   if (len == 2 && BM_vert_face_count_is_equal(v, 1)) {
     /* boundary vertex on a face */
-    return (BM_vert_collapse_edge(bm, v->e, v, true, true) != NULL);
+    return (BM_vert_collapse_edge(bm, v->e, v, true, true, true) != NULL);
   }
   return BM_disk_dissolve(bm, v);
 }
@@ -118,7 +118,7 @@ bool BM_disk_dissolve(BMesh *bm, BMVert *v)
   if (keepedge == NULL && len == 3) {
 #if 0
     /* handle specific case for three-valence.  solve it by
-     * increasing valence to four.  this may be hackish. .  */
+     * increasing valence to four.  this may be hackish. */
     BMLoop *l_a = BM_face_vert_share_loop(e->l->f, v);
     BMLoop *l_b = (e->l->v == v) ? e->l->next : e->l;
 
@@ -133,7 +133,7 @@ bool BM_disk_dissolve(BMesh *bm, BMVert *v)
     if (UNLIKELY(!BM_faces_join_pair(bm, e->l, e->l->radial_next, true))) {
       return false;
     }
-    if (UNLIKELY(!BM_vert_collapse_faces(bm, v->e, v, 1.0, true, false, true))) {
+    if (UNLIKELY(!BM_vert_collapse_faces(bm, v->e, v, 1.0, true, false, true, true))) {
       return false;
     }
 #endif
@@ -141,7 +141,7 @@ bool BM_disk_dissolve(BMesh *bm, BMVert *v)
   }
   if (keepedge == NULL && len == 2) {
     /* collapse the vertex */
-    e = BM_vert_collapse_faces(bm, v->e, v, 1.0, true, true, true);
+    e = BM_vert_collapse_faces(bm, v->e, v, 1.0, true, true, true, true);
 
     if (!e) {
       return false;
@@ -183,8 +183,9 @@ bool BM_disk_dissolve(BMesh *bm, BMVert *v)
     }
 
     /* collapse the vertex */
-    /* note, the baseedge can be a boundary of manifold, use this as join_faces arg */
-    e = BM_vert_collapse_faces(bm, baseedge, v, 1.0, true, !BM_edge_is_boundary(baseedge), true);
+    /* NOTE: the baseedge can be a boundary of manifold, use this as join_faces arg. */
+    e = BM_vert_collapse_faces(
+        bm, baseedge, v, 1.0, true, !BM_edge_is_boundary(baseedge), true, true);
 
     if (!e) {
       return false;
@@ -245,8 +246,8 @@ BMFace *BM_faces_join_pair(BMesh *bm, BMLoop *l_a, BMLoop *l_b, const bool do_de
  * \param no_double: Use an existing edge if found
  *
  * \return Pointer to the newly created face representing one side of the split
- * if the split is successful (and the original original face will be the
- * other side). NULL if the split fails.
+ * if the split is successful (and the original face will be the other side).
+ * NULL if the split fails.
  */
 BMFace *BM_face_split(BMesh *bm,
                       BMFace *f,
@@ -327,8 +328,8 @@ BMFace *BM_face_split(BMesh *bm,
  * \param example: Edge used for attributes of splitting edge, if non-NULL.
  *
  * \return Pointer to the newly created face representing one side of the split
- * if the split is successful (and the original original face will be the
- * other side). NULL if the split fails.
+ * if the split is successful (and the original face will be the other side).
+ * NULL if the split fails.
  */
 BMFace *BM_face_split_n(BMesh *bm,
                         BMFace *f,
@@ -368,7 +369,7 @@ BMFace *BM_face_split_n(BMesh *bm,
 #endif
   /* bmesh_kernel_split_face_make_edge returns in 'l_new'
    * a Loop for f_new going from 'v_a' to 'v_b'.
-   * The radial_next is for 'f' and goes from 'v_b' to 'v_a'  */
+   * The radial_next is for 'f' and goes from 'v_b' to 'v_a'. */
 
   if (f_new) {
     e = l_new->e;
@@ -432,7 +433,8 @@ BMEdge *BM_vert_collapse_faces(BMesh *bm,
                                float fac,
                                const bool do_del,
                                const bool join_faces,
-                               const bool kill_degenerate_faces)
+                               const bool kill_degenerate_faces,
+                               const bool kill_duplicate_faces)
 {
   BMEdge *e_new = NULL;
   BMVert *tv = BM_edge_other_vert(e_kill, v_kill);
@@ -503,7 +505,8 @@ BMEdge *BM_vert_collapse_faces(BMesh *bm,
     /* same as BM_vert_collapse_edge() however we already
      * have vars to perform this operation so don't call. */
     e_new = bmesh_kernel_join_edge_kill_vert(
-        bm, e_kill, v_kill, do_del, true, kill_degenerate_faces);
+        bm, e_kill, v_kill, do_del, true, kill_degenerate_faces, kill_duplicate_faces);
+
     /* e_new = BM_edge_exists(tv, tv2); */ /* same as return above */
   }
 
@@ -517,8 +520,12 @@ BMEdge *BM_vert_collapse_faces(BMesh *bm,
  *
  * \return The New Edge
  */
-BMEdge *BM_vert_collapse_edge(
-    BMesh *bm, BMEdge *e_kill, BMVert *v_kill, const bool do_del, const bool kill_degenerate_faces)
+BMEdge *BM_vert_collapse_edge(BMesh *bm,
+                              BMEdge *e_kill,
+                              BMVert *v_kill,
+                              const bool do_del,
+                              const bool kill_degenerate_faces,
+                              const bool kill_duplicate_faces)
 {
   /* nice example implementation but we want loops to have their customdata
    * accounted for */
@@ -546,7 +553,8 @@ BMEdge *BM_vert_collapse_edge(
 #else
   /* with these args faces are never joined, same as above
    * but account for loop customdata */
-  return BM_vert_collapse_faces(bm, e_kill, v_kill, 1.0f, do_del, false, kill_degenerate_faces);
+  return BM_vert_collapse_faces(
+      bm, e_kill, v_kill, 1.0f, do_del, false, kill_degenerate_faces, kill_duplicate_faces);
 #endif
 }
 
@@ -865,7 +873,7 @@ bool BM_edge_rotate_check(BMEdge *e)
  */
 bool BM_edge_rotate_check_degenerate(BMEdge *e, BMLoop *l1, BMLoop *l2)
 {
-  /* note: for these vars 'old' just means initial edge state. */
+  /* NOTE: for these vars 'old' just means initial edge state. */
 
   float ed_dir_old[3];      /* edge vector */
   float ed_dir_new[3];      /* edge vector */
@@ -954,7 +962,7 @@ bool BM_edge_rotate_check_beauty(BMEdge *e, BMLoop *l1, BMLoop *l2)
 {
   /* Stupid check for now:
    * Could compare angles of surrounding edges
-   * before & after, but this is OK.*/
+   * before & after, but this is OK. */
   return (len_squared_v3v3(e->v1->co, e->v2->co) > len_squared_v3v3(l1->v->co, l2->v->co));
 }
 
@@ -1046,7 +1054,7 @@ BMEdge *BM_edge_rotate(BMesh *bm, BMEdge *e, const bool ccw, const short check_f
     return NULL;
   }
 
-  /* note, this assumes joining the faces _didnt_ also remove the verts.
+  /* NOTE: this assumes joining the faces _didnt_ also remove the verts.
    * the #BM_edge_rotate_check will ensure this, but its possibly corrupt state or future edits
    * break this */
   if ((l1 = BM_face_vert_share_loop(f, v1)) && (l2 = BM_face_vert_share_loop(f, v2)) &&

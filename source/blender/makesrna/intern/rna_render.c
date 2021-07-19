@@ -298,13 +298,13 @@ static void rna_RenderEngine_unregister(Main *bmain, StructRNA *type)
     return;
   }
 
+  /* Stop all renders in case we were using this one. */
+  ED_render_engine_changed(bmain, false);
   RE_FreeAllPersistentData();
+
   RNA_struct_free_extension(type, &et->rna_ext);
   RNA_struct_free(&BLENDER_RNA, type);
   BLI_freelinkN(&R_engines, et);
-
-  /* Stop all renders in case we were using this one. */
-  ED_render_engine_changed(bmain, false);
 }
 
 static StructRNA *rna_RenderEngine_register(Main *bmain,
@@ -855,6 +855,16 @@ static void rna_def_render_engine(BlenderRNA *brna)
       prop,
       "Use Custom Freestyle",
       "Handles freestyle rendering on its own, instead of delegating it to EEVEE");
+
+  prop = RNA_def_property(srna, "bl_use_image_save", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "type->flag", RE_USE_NO_IMAGE_SAVE);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
+  RNA_def_property_ui_text(
+      prop,
+      "Use Image Save",
+      "Save images/movie to disk while rendering an animation. "
+      "Disabling image saving is only supported when bl_use_postprocess is also disabled");
 
   prop = RNA_def_property(srna, "bl_use_gpu_context", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "type->flag", RE_USE_GPU_CONTEXT);

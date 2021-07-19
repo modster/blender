@@ -17,6 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 import bpy
+from bpy.types import Operator
 
 
 def geometry_node_group_empty_new():
@@ -41,14 +42,14 @@ def geometry_node_group_empty_new():
 def geometry_modifier_poll(context):
     ob = context.object
 
-    # Test object support for geometry node modifier (No volume, curve, or hair object support yet)
-    if not ob or ob.type not in {'MESH', 'POINTCLOUD'}:
+    # Test object support for geometry node modifier (No curve, or hair object support yet)
+    if not ob or ob.type not in {'MESH', 'POINTCLOUD', 'VOLUME'}:
         return False
 
     return True
 
 
-class NewGeometryNodesModifier(bpy.types.Operator):
+class NewGeometryNodesModifier(Operator):
     """Create a new modifier with a new geometry node group"""
 
     bl_idname = "node.new_geometry_nodes_modifier"
@@ -68,7 +69,7 @@ class NewGeometryNodesModifier(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class NewGeometryNodeTreeAssign(bpy.types.Operator):
+class NewGeometryNodeTreeAssign(Operator):
     """Create a new geometry node group and assign it to the active modifier"""
 
     bl_idname = "node.new_geometry_node_group_assign"
@@ -91,7 +92,7 @@ class NewGeometryNodeTreeAssign(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class CopyGeometryNodeTreeAssign(bpy.types.Operator):
+class CopyGeometryNodeTreeAssign(Operator):
     """Copy the active geometry node group and assign it to the active modifier"""
 
     bl_idname = "node.copy_geometry_node_group_assign"

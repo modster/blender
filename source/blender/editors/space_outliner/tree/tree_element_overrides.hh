@@ -27,6 +27,7 @@ namespace blender::ed::outliner {
 struct TreeElementOverridesData {
   ID &id;
   IDOverrideLibraryProperty &override_property;
+  bool is_rna_path_valid;
 };
 
 class TreeElementOverridesBase final : public AbstractTreeElement {
@@ -39,7 +40,6 @@ class TreeElementOverridesBase final : public AbstractTreeElement {
 };
 
 class TreeElementOverridesProperty final : public AbstractTreeElement {
-  ID &id_;
   IDOverrideLibraryProperty &override_prop_;
 
  public:

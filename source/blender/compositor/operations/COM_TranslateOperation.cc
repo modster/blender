@@ -18,12 +18,17 @@
 
 #include "COM_TranslateOperation.h"
 
-TranslateOperation::TranslateOperation()
+namespace blender::compositor {
+
+TranslateOperation::TranslateOperation() : TranslateOperation(DataType::Color)
 {
-  this->addInputSocket(DataType::Color);
+}
+TranslateOperation::TranslateOperation(DataType data_type)
+{
+  this->addInputSocket(data_type);
   this->addInputSocket(DataType::Value);
   this->addInputSocket(DataType::Value);
-  this->addOutputSocket(DataType::Color);
+  this->addOutputSocket(data_type);
   this->setResolutionInputSocketIndex(0);
   this->m_inputOperation = nullptr;
   this->m_inputXOperation = nullptr;
@@ -31,6 +36,8 @@ TranslateOperation::TranslateOperation()
   this->m_isDeltaSet = false;
   this->m_factorX = 1.0f;
   this->m_factorY = 1.0f;
+  this->x_extend_mode_ = MemoryBufferExtend::Clip;
+  this->y_extend_mode_ = MemoryBufferExtend::Clip;
 }
 void TranslateOperation::initExecution()
 {
@@ -56,7 +63,7 @@ void TranslateOperation::executePixelSampled(float output[4],
   float originalXPos = x - this->getDeltaX();
   float originalYPos = y - this->getDeltaY();
 
-  this->m_inputOperation->readSampled(output, originalXPos, originalYPos, COM_PS_BILINEAR);
+  this->m_inputOperation->readSampled(output, originalXPos, originalYPos, PixelSampler::Bilinear);
 }
 
 bool TranslateOperation::determineDependingAreaOfInterest(rcti *input,
@@ -80,3 +87,59 @@ void TranslateOperation::setFactorXY(float factorX, float factorY)
   m_factorX = factorX;
   m_factorY = factorY;
 }
+
+void TranslateOperation::set_wrapping(int wrapping_type)
+{
+  switch (wrapping_type) {
+    case CMP_NODE_WRAP_X:
+      x_extend_mode_ = MemoryBufferExtend::Repeat;
+      break;
+    case CMP_NODE_WRAP_Y:
+      y_extend_mode_ = MemoryBufferExtend::Repeat;
+      break;
+    case CMP_NODE_WRAP_XY:
+      x_extend_mode_ = MemoryBufferExtend::Repeat;
+      y_extend_mode_ = MemoryBufferExtend::Repeat;
+      break;
+    default:
+      break;
+  }
+}
+
+void TranslateOperation::get_area_of_interest(const int input_idx,
+                                              const rcti &output_area,
+                                              rcti &r_input_area)
+{
+  if (input_idx == 0) {
+    ensureDelta();
+    r_input_area = output_area;
+    if (x_extend_mode_ == MemoryBufferExtend::Clip) {
+      const int delta_x = this->getDeltaX();
+      BLI_rcti_translate(&r_input_area, -delta_x, 0);
+    }
+    if (y_extend_mode_ == MemoryBufferExtend::Clip) {
+      const int delta_y = this->getDeltaY();
+      BLI_rcti_translate(&r_input_area, 0, -delta_y);
+    }
+  }
+}
+
+void TranslateOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                      const rcti &area,
+                                                      Span<MemoryBuffer *> inputs)
+{
+  MemoryBuffer *input = inputs[0];
+  const int delta_x = this->getDeltaX();
+  const int delta_y = this->getDeltaY();
+  for (int y = area.ymin; y < area.ymax; y++) {
+    float *out = output->get_elem(area.xmin, y);
+    for (int x = area.xmin; x < area.xmax; x++) {
+      const int input_x = x - delta_x;
+      const int input_y = y - delta_y;
+      input->read(out, input_x, input_y, x_extend_mode_, y_extend_mode_);
+      out += output->elem_stride;
+    }
+  }
+}
+
+}  // namespace blender::compositor

@@ -39,6 +39,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
+#include "BKE_anim_path.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
 #include "BKE_displist.h"
@@ -120,7 +121,7 @@ BLI_INLINE float sum_v3(const float v[3])
 typedef struct SortVertsElem {
   int vertex_num; /* The original index of the vertex, prior to sorting */
   float co[3];    /* Its coordinates */
-  float sum_co;   /* sum_v3(co), just so we don't do the sum many times.  */
+  float sum_co;   /* `sum_v3(co)`: just so we don't do the sum many times. */
 } SortVertsElem;
 
 static int svert_sum_cmp(const void *e1, const void *e2)
@@ -426,7 +427,7 @@ static Mesh *arrayModifier_doArray(ArrayModifierData *amd,
     }
   }
 
-  /* Build up offset array, cumulating all settings options */
+  /* Build up offset array, accumulating all settings options. */
 
   unit_m4(offset);
   src_mvert = mesh->mvert;
@@ -471,9 +472,9 @@ static Mesh *arrayModifier_doArray(ArrayModifierData *amd,
   if (amd->fit_type == MOD_ARR_FITCURVE && amd->curve_ob != NULL) {
     Object *curve_ob = amd->curve_ob;
     CurveCache *curve_cache = curve_ob->runtime.curve_cache;
-    if (curve_cache != NULL && curve_cache->path != NULL) {
+    if (curve_cache != NULL && curve_cache->anim_path_accum_length != NULL) {
       float scale_fac = mat4_to_scale(curve_ob->obmat);
-      length = scale_fac * curve_cache->path->totdist;
+      length = scale_fac * BKE_anim_path_get_length(curve_cache);
     }
   }
 
@@ -1020,7 +1021,6 @@ ModifierTypeInfo modifierType_Array = {
     /* modifyMesh */ modifyMesh,
     /* modifyHair */ NULL,
     /* modifyGeometrySet */ NULL,
-    /* modifyVolume */ NULL,
 
     /* initData */ initData,
     /* requiredDataMask */ NULL,

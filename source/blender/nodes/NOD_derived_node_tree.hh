@@ -59,6 +59,7 @@ class DTreeContext {
   const NodeTreeRef *tree_;
   /* All the children contexts of this context. */
   Map<const NodeRef *, DTreeContext *> children_;
+  DerivedNodeTree *derived_tree_;
 
   friend DerivedNodeTree;
 
@@ -67,6 +68,7 @@ class DTreeContext {
   const DTreeContext *parent_context() const;
   const NodeRef *parent_node() const;
   const DTreeContext *child_context(const NodeRef &node) const;
+  const DerivedNodeTree &derived_tree() const;
   bool is_root() const;
 };
 
@@ -90,13 +92,19 @@ class DNode {
   operator bool() const;
 
   uint64_t hash() const;
+
+  DInputSocket input(int index) const;
+  DOutputSocket output(int index) const;
+
+  DInputSocket input_by_identifier(StringRef identifier) const;
+  DOutputSocket output_by_identifier(StringRef identifier) const;
 };
 
 /* A (nullable) reference to a socket and the context it is in. It is unique within an entire
  * nested node group hierarchy. This type is small and can be passed around by value.
  *
  * A #DSocket can represent an input or an output socket. If the type of a socket is known at
- * compile time is is preferable to use #DInputSocket or #DOutputSocket instead. */
+ * compile time is preferable to use #DInputSocket or #DOutputSocket instead. */
 class DSocket {
  protected:
   const DTreeContext *context_ = nullptr;
@@ -117,6 +125,8 @@ class DSocket {
   operator bool() const;
 
   uint64_t hash() const;
+
+  DNode node() const;
 };
 
 /* A (nullable) reference to an input socket and the context it is in. */
@@ -132,7 +142,7 @@ class DInputSocket : public DSocket {
   DOutputSocket get_corresponding_group_node_output() const;
   Vector<DOutputSocket, 4> get_corresponding_group_input_sockets() const;
 
-  void foreach_origin_socket(FunctionRef<void(DSocket)> callback) const;
+  void foreach_origin_socket(FunctionRef<void(DSocket)> origin_fn) const;
 };
 
 /* A (nullable) reference to an output socket and the context it is in. */
@@ -148,7 +158,8 @@ class DOutputSocket : public DSocket {
   DInputSocket get_corresponding_group_node_input() const;
   DInputSocket get_active_corresponding_group_output_socket() const;
 
-  void foreach_target_socket(FunctionRef<void(DInputSocket)> callback) const;
+  void foreach_target_socket(FunctionRef<void(DInputSocket)> target_fn,
+                             FunctionRef<void(DSocket)> skipped_fn) const;
 };
 
 class DerivedNodeTree {
@@ -165,6 +176,7 @@ class DerivedNodeTree {
   Span<const NodeTreeRef *> used_node_tree_refs() const;
 
   bool has_link_cycles() const;
+  bool has_undefined_nodes_or_sockets() const;
   void foreach_node(FunctionRef<void(DNode)> callback) const;
 
   std::string to_dot() const;
@@ -214,6 +226,11 @@ inline const DTreeContext *DTreeContext::child_context(const NodeRef &node) cons
   return children_.lookup_default(&node, nullptr);
 }
 
+inline const DerivedNodeTree &DTreeContext::derived_tree() const
+{
+  return *derived_tree_;
+}
+
 inline bool DTreeContext::is_root() const
 {
   return parent_context_ == nullptr;
@@ -261,7 +278,27 @@ inline const NodeRef *DNode::operator->() const
 
 inline uint64_t DNode::hash() const
 {
-  return DefaultHash<const DTreeContext *>{}(context_) ^ DefaultHash<const NodeRef *>{}(node_ref_);
+  return get_default_hash_2(context_, node_ref_);
+}
+
+inline DInputSocket DNode::input(int index) const
+{
+  return {context_, &node_ref_->input(index)};
+}
+
+inline DOutputSocket DNode::output(int index) const
+{
+  return {context_, &node_ref_->output(index)};
+}
+
+inline DInputSocket DNode::input_by_identifier(StringRef identifier) const
+{
+  return {context_, &node_ref_->input_by_identifier(identifier)};
+}
+
+inline DOutputSocket DNode::output_by_identifier(StringRef identifier) const
+{
+  return {context_, &node_ref_->output_by_identifier(identifier)};
 }
 
 /* --------------------------------------------------------------------
@@ -316,8 +353,13 @@ inline const SocketRef *DSocket::operator->() const
 
 inline uint64_t DSocket::hash() const
 {
-  return DefaultHash<const DTreeContext *>{}(context_) ^
-         DefaultHash<const SocketRef *>{}(socket_ref_);
+  return get_default_hash_2(context_, socket_ref_);
+}
+
+inline DNode DSocket::node() const
+{
+  BLI_assert(socket_ref_ != nullptr);
+  return {context_, &socket_ref_->node()};
 }
 
 /* --------------------------------------------------------------------

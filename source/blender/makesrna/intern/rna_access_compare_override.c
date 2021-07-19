@@ -132,7 +132,7 @@ bool RNA_property_overridable_get(PointerRNA *ptr, PropertyRNA *prop)
 {
   if (prop->magic == RNA_MAGIC) {
     /* Special handling for insertions of constraints or modifiers... */
-    /* TODO Note We may want to add a more generic system to RNA
+    /* TODO: Note We may want to add a more generic system to RNA
      * (like a special property in struct of items)
      * if we get more overridable collections,
      * for now we can live with those special-cases handling I think. */
@@ -234,7 +234,7 @@ bool RNA_property_copy(
   prop_src = rna_ensure_property_realdata(&prop_src, fromptr);
 
   /* IDprops: destination may not exist, if source does and is set, try to create it. */
-  /* Note: this is sort of quick hack/bandage to fix the issue,
+  /* NOTE: this is sort of quick hack/bandage to fix the issue,
    * we need to rethink how IDProps are handled in 'diff' RNA code completely, imho... */
   if (prop_src != NULL && prop_dst == NULL && RNA_property_is_set(fromptr, prop)) {
     BLI_assert(prop_src->magic != RNA_MAGIC);
@@ -422,7 +422,9 @@ static int rna_property_override_diff(Main *bmain,
 
   bool override_changed = false;
   eRNAOverrideMatch diff_flags = flags;
-  if (!RNA_property_overridable_get(&prop_a->ptr, prop_a->rawprop)) {
+  if (!RNA_property_overridable_get(&prop_a->ptr, prop_a->rawprop) ||
+      (!ELEM(RNA_property_type(prop_a->rawprop), PROP_POINTER, PROP_COLLECTION) &&
+       !RNA_property_editable_flag(&prop_a->ptr, prop_a->rawprop))) {
     diff_flags &= ~RNA_OVERRIDE_COMPARE_CREATE;
   }
   const int diff = override_diff(bmain,
@@ -681,7 +683,7 @@ bool RNA_struct_override_matches(Main *bmain,
      * ensure this is valid, but in some situations (like hidden collections etc.) this won't
      * be the case, so we need to take care of this ourselves.
      *
-     * Note: Typically callers of this function (from BKE_lib_override area) will already have
+     * NOTE: Typically callers of this function (from BKE_lib_override area) will already have
      * ensured this. However, studio is still reporting sporadic, unreproducible crashes due to
      * invalid pose data, so think there are still some cases where some armatures are somehow
      * missing updates (possibly due to dependencies?). Since calling this function on same ID
@@ -741,14 +743,14 @@ bool RNA_struct_override_matches(Main *bmain,
     char *rna_path = rna_path_buffer;
     size_t rna_path_len = 0;
 
-    /* XXX TODO this will have to be refined to handle collections insertions, and array items */
+    /* XXX TODO: this will have to be refined to handle collections insertions, and array items. */
     if (root_path) {
       BLI_assert(strlen(root_path) == root_path_len);
 
       const char *prop_name = prop_local.identifier;
       const size_t prop_name_len = strlen(prop_name);
 
-      /* Inlined building, much much more efficient. */
+      /* Inlined building (significantly more efficient). */
       if (!prop_local.is_idprop) {
         rna_path_len = root_path_len + 1 + prop_name_len;
         if (rna_path_len >= RNA_PATH_BUFFSIZE) {
@@ -865,7 +867,7 @@ bool RNA_struct_override_matches(Main *bmain,
           else {
             /* Too noisy for now, this triggers on runtime props like transform matrices etc. */
 #if 0
-            BLI_assert(!"We have differences between reference and "
+            BLI_assert_msg(0, "We have differences between reference and "
                        "overriding data on non-editable property.");
 #endif
             matching = false;
@@ -971,6 +973,150 @@ bool RNA_struct_override_store(Main *bmain,
   return changed;
 }
 
+static void rna_porperty_override_collection_subitem_lookup(
+    PointerRNA *ptr_dst,
+    PointerRNA *ptr_src,
+    PointerRNA *ptr_storage,
+    PropertyRNA *prop_dst,
+    PropertyRNA *prop_src,
+    PropertyRNA *prop_storage,
+    PointerRNA **r_ptr_item_dst,
+    PointerRNA **r_ptr_item_src,
+    PointerRNA **r_ptr_item_storage,
+    PointerRNA *private_ptr_item_dst,
+    PointerRNA *private_ptr_item_src,
+    PointerRNA *private_ptr_item_storage,
+    IDOverrideLibraryProperty *op,
+    IDOverrideLibraryPropertyOperation *opop)
+{
+  if ((RNA_property_type(prop_dst) != PROP_COLLECTION ||
+       RNA_property_type(prop_src) != PROP_COLLECTION ||
+       (prop_storage != NULL && RNA_property_type(prop_storage) != PROP_COLLECTION)) ||
+      (opop->subitem_local_name == NULL && opop->subitem_reference_name == NULL &&
+       opop->subitem_local_index == -1 && opop->subitem_reference_index == -1)) {
+    return;
+  }
+
+  RNA_POINTER_INVALIDATE(private_ptr_item_dst);
+  RNA_POINTER_INVALIDATE(private_ptr_item_src);
+  if (prop_storage != NULL) {
+    RNA_POINTER_INVALIDATE(private_ptr_item_storage);
+  }
+  if (opop->subitem_local_name != NULL) {
+    RNA_property_collection_lookup_string(
+        ptr_src, prop_src, opop->subitem_local_name, private_ptr_item_src);
+    if (opop->subitem_reference_name != NULL &&
+        RNA_property_collection_lookup_string(
+            ptr_dst, prop_dst, opop->subitem_reference_name, private_ptr_item_dst)) {
+      /* This is rather fragile, but the fact that local override IDs may have a different name
+       * than their linked reference makes it necessary.
+       * Basically, here we are considering that if we cannot find the original linked ID in
+       * the local override we are (re-)applying the operations, then it may be because some of
+       * those operations have already been applied, and we may already have the local ID
+       * pointer we want to set.
+       * This happens e.g. during re-sync of an override, since we have already remapped all ID
+       * pointers to their expected values.
+       * In that case we simply try to get the property from the local expected name. */
+    }
+    else {
+      RNA_property_collection_lookup_string(
+          ptr_dst, prop_dst, opop->subitem_local_name, private_ptr_item_dst);
+    }
+  }
+  else if (opop->subitem_reference_name != NULL) {
+    RNA_property_collection_lookup_string(
+        ptr_src, prop_src, opop->subitem_reference_name, private_ptr_item_src);
+    RNA_property_collection_lookup_string(
+        ptr_dst, prop_dst, opop->subitem_reference_name, private_ptr_item_dst);
+  }
+  else if (opop->subitem_local_index != -1) {
+    RNA_property_collection_lookup_int(
+        ptr_src, prop_src, opop->subitem_local_index, private_ptr_item_src);
+    if (opop->subitem_reference_index != -1) {
+      RNA_property_collection_lookup_int(
+          ptr_dst, prop_dst, opop->subitem_reference_index, private_ptr_item_dst);
+    }
+    else {
+      RNA_property_collection_lookup_int(
+          ptr_dst, prop_dst, opop->subitem_local_index, private_ptr_item_dst);
+    }
+  }
+  else if (opop->subitem_reference_index != -1) {
+    RNA_property_collection_lookup_int(
+        ptr_src, prop_src, opop->subitem_reference_index, private_ptr_item_src);
+    RNA_property_collection_lookup_int(
+        ptr_dst, prop_dst, opop->subitem_reference_index, private_ptr_item_dst);
+  }
+  if (prop_storage != NULL) {
+    if (opop->subitem_local_name != NULL) {
+      RNA_property_collection_lookup_string(
+          ptr_storage, prop_storage, opop->subitem_local_name, private_ptr_item_storage);
+    }
+    else if (opop->subitem_reference_name != NULL) {
+      RNA_property_collection_lookup_string(
+          ptr_storage, prop_storage, opop->subitem_reference_name, private_ptr_item_storage);
+    }
+    else if (opop->subitem_local_index != -1) {
+      RNA_property_collection_lookup_int(
+          ptr_storage, prop_storage, opop->subitem_local_index, private_ptr_item_storage);
+    }
+    else if (opop->subitem_reference_index != -1) {
+      RNA_property_collection_lookup_int(
+          ptr_storage, prop_storage, opop->subitem_reference_index, private_ptr_item_storage);
+    }
+  }
+  *r_ptr_item_dst = private_ptr_item_dst;
+  *r_ptr_item_src = private_ptr_item_src;
+  if (prop_storage != NULL) {
+    *r_ptr_item_storage = private_ptr_item_storage;
+  }
+
+  if ((*r_ptr_item_dst)->type == NULL) {
+    CLOG_INFO(&LOG,
+              2,
+              "Failed to find destination sub-item '%s' (%d) of '%s' in new override data '%s'",
+              opop->subitem_reference_name,
+              opop->subitem_reference_index,
+              op->rna_path,
+              ptr_dst->owner_id->name);
+  }
+  if ((*r_ptr_item_src)->type == NULL) {
+    CLOG_INFO(&LOG,
+              2,
+              "Failed to find source sub-item '%s' (%d) of '%s' in old override data '%s'",
+              opop->subitem_local_name,
+              opop->subitem_local_index,
+              op->rna_path,
+              ptr_src->owner_id->name);
+  }
+}
+
+static void rna_property_override_check_resync(Main *bmain,
+                                               PointerRNA *ptr_dst,
+                                               PointerRNA *ptr_item_dst,
+                                               PointerRNA *ptr_item_src)
+{
+  ID *id_src = rna_property_override_property_real_id_owner(bmain, ptr_item_src, NULL, NULL);
+  ID *id_dst = rna_property_override_property_real_id_owner(bmain, ptr_item_dst, NULL, NULL);
+
+  BLI_assert(id_src == NULL || ID_IS_OVERRIDE_LIBRARY_REAL(id_src));
+  /* Work around file corruption on writing, see T86853. */
+  if (id_src != NULL && !ID_IS_OVERRIDE_LIBRARY_REAL(id_src)) {
+    return;
+  }
+
+  if (/* We might be in a case where id_dst has already been processed and its usages
+       * remapped to its new local override. In that case overrides and linked data
+       * are always properly matching. */
+      id_src != id_dst &&
+      /* If one of the pointers is NULL and not the other, or if linked reference ID
+       * of `id_src` is not `id_dst`,  we are in a non-matching case. */
+      (ELEM(NULL, id_src, id_dst) || id_src->override_library->reference != id_dst)) {
+    ptr_dst->owner_id->tag |= LIB_TAG_LIB_OVERRIDE_NEED_RESYNC;
+    CLOG_INFO(&LOG, 3, "Local override %s detected as needing resync", ptr_dst->owner_id->name);
+  }
+}
+
 static void rna_property_override_apply_ex(Main *bmain,
                                            PointerRNA *ptr_dst,
                                            PointerRNA *ptr_src,
@@ -994,106 +1140,25 @@ static void rna_property_override_apply_ex(Main *bmain,
       continue;
     }
 
-    /* Note: will have to think about putting that logic into its own function maybe?
+    /* NOTE: will have to think about putting that logic into its own function maybe?
      * Would be nice to have it in a single place...
      * Note that here, src is the local saved ID, and dst is a copy of the linked ID (since we use
      * local ID as storage to apply local changes on top of a clean copy of the linked data). */
     PointerRNA private_ptr_item_dst, private_ptr_item_src, private_ptr_item_storage;
-    if ((RNA_property_type(prop_dst) == PROP_COLLECTION &&
-         RNA_property_type(prop_src) == PROP_COLLECTION &&
-         (prop_storage == NULL || RNA_property_type(prop_storage) == PROP_COLLECTION)) &&
-        (opop->subitem_local_name != NULL || opop->subitem_reference_name != NULL ||
-         opop->subitem_local_index != -1 || opop->subitem_reference_index != -1)) {
-      RNA_POINTER_INVALIDATE(&private_ptr_item_dst);
-      RNA_POINTER_INVALIDATE(&private_ptr_item_src);
-      RNA_POINTER_INVALIDATE(&private_ptr_item_storage);
-      if (opop->subitem_local_name != NULL) {
-        RNA_property_collection_lookup_string(
-            ptr_src, prop_src, opop->subitem_local_name, &private_ptr_item_src);
-        if (opop->subitem_reference_name != NULL &&
-            RNA_property_collection_lookup_string(
-                ptr_dst, prop_dst, opop->subitem_reference_name, &private_ptr_item_dst)) {
-          /* This is rather fragile, but the fact that local override IDs may have a different name
-           * than their linked reference makes it necessary.
-           * Basically, here we are considering that if we cannot find the original linked ID in
-           * the local override we are (re-)applying the operations, then it may be because some of
-           * those operations have already been applied, and we may already have the local ID
-           * pointer we want to set.
-           * This happens e.g. during re-sync of an override, since we have already remapped all ID
-           * pointers to their expected values.
-           * In that case we simply try to get the property from the local expected name. */
-        }
-        else {
-          RNA_property_collection_lookup_string(
-              ptr_dst, prop_dst, opop->subitem_local_name, &private_ptr_item_dst);
-        }
-      }
-      else if (opop->subitem_reference_name != NULL) {
-        RNA_property_collection_lookup_string(
-            ptr_src, prop_src, opop->subitem_reference_name, &private_ptr_item_src);
-        RNA_property_collection_lookup_string(
-            ptr_dst, prop_dst, opop->subitem_reference_name, &private_ptr_item_dst);
-      }
-      else if (opop->subitem_local_index != -1) {
-        RNA_property_collection_lookup_int(
-            ptr_src, prop_src, opop->subitem_local_index, &private_ptr_item_src);
-        if (opop->subitem_reference_index != -1) {
-          RNA_property_collection_lookup_int(
-              ptr_dst, prop_dst, opop->subitem_reference_index, &private_ptr_item_dst);
-        }
-        else {
-          RNA_property_collection_lookup_int(
-              ptr_dst, prop_dst, opop->subitem_local_index, &private_ptr_item_dst);
-        }
-      }
-      else if (opop->subitem_reference_index != -1) {
-        RNA_property_collection_lookup_int(
-            ptr_src, prop_src, opop->subitem_reference_index, &private_ptr_item_src);
-        RNA_property_collection_lookup_int(
-            ptr_dst, prop_dst, opop->subitem_reference_index, &private_ptr_item_dst);
-      }
-      if (prop_storage != NULL) {
-        if (opop->subitem_local_name != NULL) {
-          RNA_property_collection_lookup_string(
-              ptr_storage, prop_storage, opop->subitem_local_name, &private_ptr_item_storage);
-        }
-        else if (opop->subitem_reference_name != NULL) {
-          RNA_property_collection_lookup_string(
-              ptr_storage, prop_storage, opop->subitem_reference_name, &private_ptr_item_storage);
-        }
-        else if (opop->subitem_local_index != -1) {
-          RNA_property_collection_lookup_int(
-              ptr_storage, prop_storage, opop->subitem_local_index, &private_ptr_item_storage);
-        }
-        else if (opop->subitem_reference_index != -1) {
-          RNA_property_collection_lookup_int(
-              ptr_storage, prop_storage, opop->subitem_reference_index, &private_ptr_item_storage);
-        }
-      }
-      ptr_item_dst = &private_ptr_item_dst;
-      ptr_item_src = &private_ptr_item_src;
-      ptr_item_storage = &private_ptr_item_storage;
-
-      if (ptr_item_dst->type == NULL) {
-        CLOG_INFO(
-            &LOG,
-            2,
-            "Failed to find destination sub-item '%s' (%d) of '%s' in new override data '%s'",
-            opop->subitem_reference_name,
-            opop->subitem_reference_index,
-            op->rna_path,
-            ptr_dst->owner_id->name);
-      }
-      if (ptr_item_src->type == NULL) {
-        CLOG_INFO(&LOG,
-                  2,
-                  "Failed to find source sub-item '%s' (%d) of '%s' in old override data '%s'",
-                  opop->subitem_local_name,
-                  opop->subitem_local_index,
-                  op->rna_path,
-                  ptr_src->owner_id->name);
-      }
-    }
+    rna_porperty_override_collection_subitem_lookup(ptr_dst,
+                                                    ptr_src,
+                                                    ptr_storage,
+                                                    prop_dst,
+                                                    prop_src,
+                                                    prop_storage,
+                                                    &ptr_item_dst,
+                                                    &ptr_item_src,
+                                                    &ptr_item_storage,
+                                                    &private_ptr_item_dst,
+                                                    &private_ptr_item_src,
+                                                    &private_ptr_item_storage,
+                                                    op,
+                                                    opop);
 
     if (!rna_property_override_operation_apply(bmain,
                                                ptr_dst,
@@ -1129,7 +1194,7 @@ void RNA_struct_override_apply(Main *bmain,
 #ifdef DEBUG_OVERRIDE_TIMEIT
   TIMEIT_START_AVERAGED(RNA_struct_override_apply);
 #endif
-  /* Note: Applying insert operations in a separate pass is mandatory.
+  /* NOTE: Applying insert operations in a separate pass is mandatory.
    * We could optimize this later, but for now, as inefficient as it is,
    * don't think this is a critical point.
    */
@@ -1157,34 +1222,52 @@ void RNA_struct_override_apply(Main *bmain,
 
         /* Check if an overridden ID pointer supposed to be in sync with linked data gets out of
          * sync. */
-        if ((ptr_dst->owner_id->tag & LIB_TAG_LIB_OVERRIDE_NEED_RESYNC) == 0 &&
-            op->rna_prop_type == PROP_POINTER &&
-            (((IDOverrideLibraryPropertyOperation *)op->operations.first)->flag &
-             IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE) != 0) {
-          BLI_assert(ptr_src->owner_id ==
-                     rna_property_override_property_real_id_owner(bmain, &data_src, NULL, NULL));
-          BLI_assert(ptr_dst->owner_id ==
-                     rna_property_override_property_real_id_owner(bmain, &data_dst, NULL, NULL));
+        if ((ptr_dst->owner_id->tag & LIB_TAG_LIB_OVERRIDE_NEED_RESYNC) == 0) {
+          if (op->rna_prop_type == PROP_POINTER &&
+              (((IDOverrideLibraryPropertyOperation *)op->operations.first)->flag &
+               IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE) != 0) {
+            BLI_assert(RNA_struct_is_ID(RNA_property_pointer_type(&data_src, prop_src)));
+            BLI_assert(ptr_src->owner_id ==
+                       rna_property_override_property_real_id_owner(bmain, &data_src, NULL, NULL));
+            BLI_assert(ptr_dst->owner_id ==
+                       rna_property_override_property_real_id_owner(bmain, &data_dst, NULL, NULL));
 
-          PointerRNA prop_ptr_src = RNA_property_pointer_get(&data_src, prop_src);
-          PointerRNA prop_ptr_dst = RNA_property_pointer_get(&data_dst, prop_dst);
-          ID *id_src = rna_property_override_property_real_id_owner(
-              bmain, &prop_ptr_src, NULL, NULL);
-          ID *id_dst = rna_property_override_property_real_id_owner(
-              bmain, &prop_ptr_dst, NULL, NULL);
+            PointerRNA prop_ptr_src = RNA_property_pointer_get(&data_src, prop_src);
+            PointerRNA prop_ptr_dst = RNA_property_pointer_get(&data_dst, prop_dst);
+            rna_property_override_check_resync(bmain, ptr_dst, &prop_ptr_dst, &prop_ptr_src);
+          }
+          else if (op->rna_prop_type == PROP_COLLECTION) {
+            if (RNA_struct_is_ID(RNA_property_pointer_type(&data_src, prop_src))) {
+              BLI_assert(ptr_src->owner_id == rna_property_override_property_real_id_owner(
+                                                  bmain, &data_src, NULL, NULL));
+              BLI_assert(ptr_dst->owner_id == rna_property_override_property_real_id_owner(
+                                                  bmain, &data_dst, NULL, NULL));
 
-          BLI_assert(id_src == NULL || ID_IS_OVERRIDE_LIBRARY_REAL(id_src));
+              LISTBASE_FOREACH (IDOverrideLibraryPropertyOperation *, opop, &op->operations) {
+                if ((opop->flag & IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE) == 0) {
+                  continue;
+                }
 
-          if (/* We might be in a case where id_dst has already been processed and its usages
-               * remapped to its new local override. In that case overrides and linked data are
-               * always properly matching. */
-              id_src != id_dst &&
-              /* If one of the pointers is NULL and not the other, or if linked reference ID of
-               * `id_src` is not `id_dst`,  we are in a non-matching case. */
-              (ELEM(NULL, id_src, id_dst) || id_src->override_library->reference != id_dst)) {
-            ptr_dst->owner_id->tag |= LIB_TAG_LIB_OVERRIDE_NEED_RESYNC;
-            CLOG_INFO(
-                &LOG, 3, "Local override %s detected as needing resync", ptr_dst->owner_id->name);
+                PointerRNA *ptr_item_dst, *ptr_item_src;
+                PointerRNA private_ptr_item_dst, private_ptr_item_src;
+                rna_porperty_override_collection_subitem_lookup(ptr_dst,
+                                                                ptr_src,
+                                                                NULL,
+                                                                prop_dst,
+                                                                prop_src,
+                                                                NULL,
+                                                                &ptr_item_dst,
+                                                                &ptr_item_src,
+                                                                NULL,
+                                                                &private_ptr_item_dst,
+                                                                &private_ptr_item_src,
+                                                                NULL,
+                                                                op,
+                                                                opop);
+
+                rna_property_override_check_resync(bmain, ptr_dst, ptr_item_dst, ptr_item_src);
+              }
+            }
           }
         }
 

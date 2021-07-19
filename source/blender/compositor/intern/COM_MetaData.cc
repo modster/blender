@@ -24,6 +24,8 @@
 
 #include <string_view>
 
+namespace blender::compositor {
+
 void MetaData::add(const blender::StringRef key, const blender::StringRef value)
 {
   entries_.add(key, value);
@@ -39,7 +41,7 @@ void MetaData::addCryptomatteEntry(const blender::StringRef layer_name,
 /* Replace the hash neutral cryptomatte keys with hashed versions.
  *
  * When a conversion happens it will also add the cryptomatte name key with the given
- * `layer_name`.*/
+ * `layer_name`. */
 void MetaData::replaceHashNeutralCryptomatteKeys(const blender::StringRef layer_name)
 {
   std::string cryptomatte_hash = entries_.pop_default(META_DATA_KEY_CRYPTOMATTE_HASH, "");
@@ -64,7 +66,7 @@ void MetaData::replaceHashNeutralCryptomatteKeys(const blender::StringRef layer_
 
 void MetaData::addToRenderResult(RenderResult *render_result) const
 {
-  for (blender::Map<std::string, std::string>::Item entry : entries_.items()) {
+  for (Map<std::string, std::string>::Item entry : entries_.items()) {
     BKE_render_result_stamp_data(render_result, entry.key.c_str(), entry.value.c_str());
   }
 }
@@ -104,3 +106,5 @@ void MetaDataExtractCallbackData::extract_cryptomatte_meta_data(void *_data,
     data->addMetaData(META_DATA_KEY_CRYPTOMATTE_MANIFEST, propvalue);
   }
 }
+
+}  // namespace blender::compositor

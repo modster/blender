@@ -55,19 +55,8 @@ static int gpencil_lineart_material(Main *bmain,
                                     const ColorTemplate *pct,
                                     const bool fill)
 {
-  short *totcol = BKE_object_material_len_p(ob);
-  Material *ma = NULL;
-  for (short i = 0; i < *totcol; i++) {
-    ma = BKE_gpencil_material(ob, i + 1);
-    if (STREQ(ma->id.name, pct->name)) {
-      return i;
-    }
-  }
-
-  int idx;
-
-  /* create a new one */
-  ma = BKE_gpencil_object_material_new(bmain, ob, pct->name, &idx);
+  int index;
+  Material *ma = BKE_gpencil_object_material_ensure_by_name(bmain, ob, pct->name, &index);
 
   copy_v4_v4(ma->gp_style->stroke_rgba, pct->line);
   srgb_to_linearrgb_v4(ma->gp_style->stroke_rgba, ma->gp_style->stroke_rgba);
@@ -79,7 +68,7 @@ static int gpencil_lineart_material(Main *bmain,
     ma->gp_style->flag |= GP_MATERIAL_FILL_SHOW;
   }
 
-  return idx;
+  return index;
 }
 
 /* ***************************************************************** */
@@ -107,7 +96,7 @@ void ED_gpencil_create_lineart(bContext *C, Object *ob)
   ob->actcol = color_black + 1;
 
   /* layers */
-  bGPDlayer *lines = BKE_gpencil_layer_addnew(gpd, "Lines", true);
+  bGPDlayer *lines = BKE_gpencil_layer_addnew(gpd, "Lines", true, false);
 
   /* frames */
   BKE_gpencil_frame_addnew(lines, 0);

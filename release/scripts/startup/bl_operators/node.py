@@ -20,7 +20,6 @@
 from __future__ import annotations
 
 import bpy
-import nodeitems_utils
 from bpy.types import (
     Operator,
     PropertyGroup,
@@ -121,7 +120,7 @@ class NodeAddOperator:
     def poll(cls, context):
         space = context.space_data
         # needs active node editor and a tree to add nodes to
-        return ((space.type == 'NODE_EDITOR') and
+        return (space and (space.type == 'NODE_EDITOR') and
                 space.edit_tree and not space.edit_tree.library)
 
     # Default execute simply adds a node
@@ -195,6 +194,8 @@ class NODE_OT_add_search(NodeAddOperator, Operator):
 
     # Create an enum list from node items
     def node_enum_items(self, context):
+        import nodeitems_utils
+
         enum_items = NODE_OT_add_search._enum_item_hack
         enum_items.clear()
 
@@ -210,6 +211,8 @@ class NODE_OT_add_search(NodeAddOperator, Operator):
 
     # Look up the item based on index
     def find_node_item(self, context):
+        import nodeitems_utils
+
         node_item = int(self.node_item)
         for index, item in enumerate(nodeitems_utils.node_items_iter(context)):
             if index == node_item:
@@ -262,7 +265,7 @@ class NODE_OT_collapse_hide_unused_toggle(Operator):
     def poll(cls, context):
         space = context.space_data
         # needs active node editor and a tree
-        return ((space.type == 'NODE_EDITOR') and
+        return (space and (space.type == 'NODE_EDITOR') and
                 (space.edit_tree and not space.edit_tree.library))
 
     def execute(self, context):
@@ -293,7 +296,7 @@ class NODE_OT_tree_path_parent(Operator):
     def poll(cls, context):
         space = context.space_data
         # needs active node editor and a tree
-        return (space.type == 'NODE_EDITOR' and len(space.path) > 1)
+        return (space and (space.type == 'NODE_EDITOR') and len(space.path) > 1)
 
     def execute(self, context):
         space = context.space_data

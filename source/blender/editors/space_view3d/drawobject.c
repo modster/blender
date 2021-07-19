@@ -117,10 +117,10 @@ void ED_draw_object_facemap(Depsgraph *depsgraph,
     return;
   }
 
-  Mesh *me = ob->data;
+  const Mesh *me = ob->data;
   {
     Object *ob_eval = DEG_get_evaluated_object(depsgraph, ob);
-    Mesh *me_eval = BKE_object_get_evaluated_mesh(ob_eval);
+    const Mesh *me_eval = BKE_object_get_evaluated_mesh(ob_eval);
     if (me_eval != NULL) {
       me = me_eval;
     }
@@ -128,7 +128,7 @@ void ED_draw_object_facemap(Depsgraph *depsgraph,
 
   GPU_front_facing(ob->transflag & OB_NEG_SCALE);
 
-  /* Just to create the data to pass to immediate mode, grr! */
+  /* Just to create the data to pass to immediate mode! (sigh) */
   const int *facemap_data = CustomData_get_layer(&me->pdata, CD_FACEMAP);
   if (facemap_data) {
     GPU_blend(GPU_BLEND_ALPHA);
@@ -160,7 +160,7 @@ void ED_draw_object_facemap(Depsgraph *depsgraph,
     const MPoly *mp;
     int i;
     if (me->runtime.looptris.array) {
-      MLoopTri *mlt = me->runtime.looptris.array;
+      const MLoopTri *mlt = me->runtime.looptris.array;
       for (mp = mpoly, i = 0; i < mpoly_len; i++, mp++) {
         if (facemap_data[i] == facemap) {
           for (int j = 2; j < mp->totloop; j++) {

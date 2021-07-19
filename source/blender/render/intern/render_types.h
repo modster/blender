@@ -79,7 +79,7 @@ struct Render {
   RenderResult *result;
   /* if render with single-layer option, other rendered layers are stored here */
   RenderResult *pushedresult;
-  /* a list of RenderResults, for fullsample */
+  /** A list of #RenderResults, for full-samples. */
   ListBase fullresult;
   /* read/write mutex, all internal code that writes to re->result must use a
    * write lock, all external code must use a read lock. internal code is assumed
@@ -153,7 +153,7 @@ struct Render {
   void **movie_ctx_arr;
   char viewname[MAX_NAME];
 
-  /* TODO replace by a whole draw manager. */
+  /* TODO: replace by a whole draw manager. */
   void *gl_context;
   void *gpu_context;
 };

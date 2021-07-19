@@ -191,6 +191,24 @@ struct float3 {
     return result;
   }
 
+  static float3 refract(const float3 &incident, const float3 &normal, const float eta)
+  {
+    float3 result;
+    float k = 1.0f - eta * eta * (1.0f - dot(normal, incident) * dot(normal, incident));
+    if (k < 0.0f) {
+      result = float3(0.0f);
+    }
+    else {
+      result = eta * incident - (eta * dot(normal, incident) + sqrt(k)) * normal;
+    }
+    return result;
+  }
+
+  static float3 faceforward(const float3 &vector, const float3 &incident, const float3 &reference)
+  {
+    return dot(reference, incident) < 0.0f ? vector : -vector;
+  }
+
   static float3 safe_divide(const float3 &a, const float3 &b)
   {
     float3 result;
@@ -224,6 +242,13 @@ struct float3 {
   {
     float3 result;
     cross_v3_v3v3_hi_prec(result, a, b);
+    return result;
+  }
+
+  static float3 cross(const float3 &a, const float3 &b)
+  {
+    float3 result;
+    cross_v3_v3v3(result, a, b);
     return result;
   }
 

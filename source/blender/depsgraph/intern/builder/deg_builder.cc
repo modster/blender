@@ -77,10 +77,6 @@ DepsgraphBuilder::DepsgraphBuilder(Main *bmain, Depsgraph *graph, DepsgraphBuild
 {
 }
 
-DepsgraphBuilder::~DepsgraphBuilder()
-{
-}
-
 bool DepsgraphBuilder::need_pull_base_into_graph(Base *base)
 {
   /* Simple check: enabled bases are always part of dependency graph. */
@@ -101,7 +97,7 @@ bool DepsgraphBuilder::need_pull_base_into_graph(Base *base)
     property_id = AnimatedPropertyID(&object->id, &RNA_Object, "hide_render");
   }
   else {
-    BLI_assert(!"Unknown evaluation mode.");
+    BLI_assert_msg(0, "Unknown evaluation mode.");
     return false;
   }
   return cache_->isPropertyAnimated(&object->id, property_id);

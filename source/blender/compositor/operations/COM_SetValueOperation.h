@@ -18,13 +18,15 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_ConstantOperation.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class SetValueOperation : public NodeOperation {
+class SetValueOperation : public ConstantOperation {
  private:
   float m_value;
 
@@ -33,6 +35,11 @@ class SetValueOperation : public NodeOperation {
    * Default constructor
    */
   SetValueOperation();
+
+  const float *get_constant_elem() override
+  {
+    return &m_value;
+  }
 
   float getValue()
   {
@@ -46,11 +53,12 @@ class SetValueOperation : public NodeOperation {
   /**
    * The inner loop of this operation.
    */
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-  void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
-
-  bool isSetOperation() const
-  {
-    return true;
-  }
+  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+  void determineResolution(unsigned int resolution[2],
+                           unsigned int preferredResolution[2]) override;
+  void update_memory_buffer(MemoryBuffer *output,
+                            const rcti &area,
+                            Span<MemoryBuffer *> inputs) override;
 };
+
+}  // namespace blender::compositor

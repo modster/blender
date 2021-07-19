@@ -70,10 +70,9 @@ class FitCurveWrapper {
   std::vector<Vector2> _vertices;
 
  public:
-  FitCurveWrapper();
   ~FitCurveWrapper();
 
-  /*! Fits a set of 2D data points to a set of Bezier Curve segments
+  /** Fits a set of 2D data points to a set of Bezier Curve segments
    *    data
    *      Input data points
    *    oCurve
@@ -91,7 +90,7 @@ class FitCurveWrapper {
    */
   void FitCurve(Vector2 *d, int nPts, double error);
 
-  /*! Draws a Bezier curve segment
+  /** Draws a Bezier curve segment
    *  n
    *    degree of curve (=3)
    *  curve

@@ -22,18 +22,20 @@
 
 #include "RE_pipeline.h"
 
+namespace blender::compositor {
+
 VariableSizeBokehBlurOperation::VariableSizeBokehBlurOperation()
 {
   this->addInputSocket(DataType::Color);
-  this->addInputSocket(DataType::Color, COM_SC_NO_RESIZE);  // do not resize the bokeh image.
+  this->addInputSocket(DataType::Color, ResizeMode::None);  // do not resize the bokeh image.
   this->addInputSocket(DataType::Value);                    // radius
 #ifdef COM_DEFOCUS_SEARCH
   this->addInputSocket(DataType::Color,
-                       COM_SC_NO_RESIZE);  // inverse search radius optimization structure.
+                       ResizeMode::None);  // inverse search radius optimization structure.
 #endif
   this->addOutputSocket(DataType::Color);
-  this->setComplex(true);
-  this->setOpenCL(true);
+  flags.complex = true;
+  flags.open_cl = true;
 
   this->m_inputProgram = nullptr;
   this->m_inputBokehProgram = nullptr;
@@ -135,14 +137,14 @@ void VariableSizeBokehBlurOperation::executePixel(float output[4], int x, int y,
 
     const int addXStepValue = QualityStepHelper::getStep();
     const int addYStepValue = addXStepValue;
-    const int addXStepColor = addXStepValue * COM_NUM_CHANNELS_COLOR;
+    const int addXStepColor = addXStepValue * COM_DATA_TYPE_COLOR_CHANNELS;
 
     if (size_center > this->m_threshold) {
       for (int ny = miny; ny < maxy; ny += addYStepValue) {
         float dy = ny - y;
         int offsetValueNy = ny * inputSizeBuffer->getWidth();
         int offsetValueNxNy = offsetValueNy + (minx);
-        int offsetColorNxNy = offsetValueNxNy * COM_NUM_CHANNELS_COLOR;
+        int offsetColorNxNy = offsetValueNxNy * COM_DATA_TYPE_COLOR_CHANNELS;
         for (int nx = minx; nx < maxx; nx += addXStepValue) {
           if (nx != x || ny != y) {
             float size = MIN2(inputSizeFloatBuffer[offsetValueNxNy] * scalar, size_center);
@@ -278,9 +280,9 @@ bool VariableSizeBokehBlurOperation::determineDependingAreaOfInterest(
 // InverseSearchRadiusOperation
 InverseSearchRadiusOperation::InverseSearchRadiusOperation()
 {
-  this->addInputSocket(DataType::Value, COM_SC_NO_RESIZE);  // radius
+  this->addInputSocket(DataType::Value, ResizeMode::None);  // radius
   this->addOutputSocket(DataType::Color);
-  this->setComplex(true);
+  this->flags.complex = true;
   this->m_inputRadius = nullptr;
 }
 
@@ -319,7 +321,7 @@ void *InverseSearchRadiusOperation::initializeTileData(rcti *rect)
 
   //          for (int x2 = 0 ; x2 < DIVIDER ; x2 ++) {
   //              for (int y2 = 0 ; y2 < DIVIDER ; y2 ++) {
-  //                  this->m_inputRadius->read(temp, rx+x2, ry+y2, COM_PS_NEAREST);
+  //                  this->m_inputRadius->read(temp, rx+x2, ry+y2, PixelSampler::Nearest);
   //                  if (radius < temp[0]) {
   //                      radius = temp[0];
   //                      maxx = x2;
@@ -381,3 +383,5 @@ bool InverseSearchRadiusOperation::determineDependingAreaOfInterest(
   return NodeOperation::determineDependingAreaOfInterest(&newRect, readOperation, output);
 }
 #endif
+
+}  // namespace blender::compositor

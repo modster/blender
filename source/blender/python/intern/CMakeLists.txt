@@ -79,6 +79,7 @@ set(SRC
   bpy_rna_driver.c
   bpy_rna_gizmo.c
   bpy_rna_id_collection.c
+  bpy_rna_operator.c
   bpy_rna_types_capi.c
   bpy_rna_ui.c
   bpy_traceback.c
@@ -118,6 +119,7 @@ set(SRC
   bpy_rna_driver.h
   bpy_rna_gizmo.h
   bpy_rna_id_collection.h
+  bpy_rna_operator.h
   bpy_rna_types_capi.h
   bpy_rna_ui.h
   bpy_traceback.h
@@ -361,6 +363,14 @@ endif()
 
 if(WITH_POTRACE)
   add_definitions(-DWITH_POTRACE)
+endif()
+
+if(WITH_PUGIXML)
+  add_definitions(-DWITH_PUGIXML)
+endif()
+
+if(WITH_HARU)
+  add_definitions(-DWITH_HARU)
 endif()
 
 blender_add_lib(bf_python "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

@@ -29,7 +29,7 @@ BlenderImageLoader::BlenderImageLoader(BL::Image b_image, int frame)
 {
 }
 
-bool BlenderImageLoader::load_metadata(ImageMetaData &metadata)
+bool BlenderImageLoader::load_metadata(const ImageDeviceFeatures &, ImageMetaData &metadata)
 {
   metadata.width = b_image.size()[0];
   metadata.height = b_image.size()[1];
@@ -137,9 +137,9 @@ bool BlenderImageLoader::load_pixels(const ImageMetaData &metadata,
       /* Premultiply, byte images are always straight for Blender. */
       unsigned char *cp = (unsigned char *)pixels;
       for (size_t i = 0; i < num_pixels; i++, cp += channels) {
-        cp[0] = (cp[0] * cp[3]) >> 8;
-        cp[1] = (cp[1] * cp[3]) >> 8;
-        cp[2] = (cp[2] * cp[3]) >> 8;
+        cp[0] = (cp[0] * cp[3]) / 255;
+        cp[1] = (cp[1] * cp[3]) / 255;
+        cp[2] = (cp[2] * cp[3]) / 255;
       }
     }
   }
@@ -171,7 +171,7 @@ BlenderPointDensityLoader::BlenderPointDensityLoader(BL::Depsgraph b_depsgraph,
 {
 }
 
-bool BlenderPointDensityLoader::load_metadata(ImageMetaData &metadata)
+bool BlenderPointDensityLoader::load_metadata(const ImageDeviceFeatures &, ImageMetaData &metadata)
 {
   metadata.channels = 4;
   metadata.width = b_node.resolution();
