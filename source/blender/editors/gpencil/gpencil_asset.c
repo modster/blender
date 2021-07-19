@@ -142,7 +142,7 @@ typedef enum eGP_AssetFlag {
   /* Waiting for doing something. */
   GP_ASSET_FLAG_IDLE = (1 << 0),
   /* Doing a transform. */
-  GP_ASSET_FLAG_RUNNING = (1 << 1),
+  GP_ASSET_FLAG_TRANSFORMING = (1 << 1),
 } eGP_AssetFlag;
 
 typedef enum eGP_AssetTransformMode {
@@ -1012,9 +1012,27 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 
   switch (event->type) {
     case LEFTMOUSE: {
+      /* If click ouside cage, confirm. */
+      if (event->val == KM_PRESS) {
+        rctf rect_big;
+        rect_big.xmin = tgpa->rect_cage.xmin - (ROTATION_CONTROL_GAP * 2.0f);
+        rect_big.ymin = tgpa->rect_cage.ymin - (ROTATION_CONTROL_GAP * 2.0f);
+        rect_big.xmax = tgpa->rect_cage.xmax + (ROTATION_CONTROL_GAP * 2.0f);
+        rect_big.ymax = tgpa->rect_cage.ymax + (ROTATION_CONTROL_GAP * 2.0f);
+
+        if ((tgpa->flag & GP_ASSET_FLAG_IDLE) &&
+            (!BLI_rctf_isect_pt(&rect_big, (float)event->mval[0], (float)event->mval[1]))) {
+          ED_area_status_text(tgpa->area, NULL);
+          ED_workspace_status_text(C, NULL);
+          WM_cursor_modal_restore(win);
+          gpencil_asset_import_exit(C, op);
+          return OPERATOR_FINISHED;
+        }
+      }
+
       if (event->val == KM_RELEASE) {
         tgpa->flag |= GP_ASSET_FLAG_IDLE;
-        tgpa->flag &= ~GP_ASSET_FLAG_RUNNING;
+        tgpa->flag &= ~GP_ASSET_FLAG_TRANSFORMING;
         tgpa->mode = GP_ASSET_TRANSFORM_NONE;
         WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
         break;
@@ -1035,7 +1053,7 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
         normalize_v2(tgpa->vinit_rotation);
 
         tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
-        tgpa->flag |= GP_ASSET_FLAG_RUNNING;
+        tgpa->flag |= GP_ASSET_FLAG_TRANSFORMING;
       }
       break;
     }
@@ -1073,7 +1091,7 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
     case MOUSEMOVE: /* calculate new position */
     {
       /* Apply transform. */
-      if (tgpa->flag & GP_ASSET_FLAG_RUNNING) {
+      if (tgpa->flag & GP_ASSET_FLAG_TRANSFORMING) {
         gpencil_asset_transform_strokes(tgpa, event->mval, event->shift);
         gpencil_2d_cage_calc(tgpa);
         ED_area_tag_redraw(tgpa->area);
