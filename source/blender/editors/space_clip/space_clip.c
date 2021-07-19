@@ -256,7 +256,6 @@ static SpaceLink *clip_create(const ScrArea *area, const Scene *scene)
   region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
   region->flag = RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER;
 
-
   /* header */
   region = MEM_callocN(sizeof(ARegion), "header for clip");
 
@@ -1380,7 +1379,8 @@ void ED_spacetype_clip(void)
   art->init = clip_main_region_init;
   art->draw = clip_main_region_draw;
   art->listener = clip_main_region_listener;
-  art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL | ED_KEYMAP_TOOL;
+  art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL |
+                    ED_KEYMAP_TOOL;
 
   BLI_addhead(&st->regiontypes, art);
 
@@ -1417,7 +1417,7 @@ void ED_spacetype_clip(void)
 
   BLI_addhead(&st->regiontypes, art);
 
-    /* regions: tool(bar) */
+  /* regions: tool(bar) */
   art = MEM_callocN(sizeof(ARegionType), "spacetype clip region tools");
   art->regionid = RGN_TYPE_TOOLS;
   art->prefsizex = 58;

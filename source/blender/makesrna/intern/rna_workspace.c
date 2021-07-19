@@ -388,10 +388,10 @@ static void rna_def_workspace_tools(BlenderRNA *brna, PropertyRNA *cprop)
   parm = RNA_def_enum(func, "mode", rna_enum_clip_editor_mode_items, 0, "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   RNA_def_boolean(func, "create", false, "Create", "");
-   /*return type */
+  /*return type */
   parm = RNA_def_pointer(func, "result", "WorkSpaceTool", "", "");
   RNA_def_function_return(func, parm);
-	}
+}
 
 static void rna_def_workspace(BlenderRNA *brna)
 {

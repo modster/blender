@@ -729,7 +729,7 @@ static const char *toolsystem_default_tool(const bToolKey *tkey)
   }
 
   return "builtin.select_box";
-  }
+}
 
 /**
  * Run after changing modes.
