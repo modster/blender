@@ -668,8 +668,54 @@ static void knifetool_draw_angle(const KnifeTool_OpData *kcd,
 
 static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
 {
-  if (kcd->curr.edge) {
-    KnifeEdge *kfe = kcd->curr.edge;
+  Ref *ref;
+  KnifeVert *kfv;
+  KnifeVert *tempkfv;
+  KnifeEdge *kfe;
+  KnifeEdge *tempkfe;
+
+  if (kcd->curr.vert) {
+    kfv = kcd->curr.vert;
+
+    float min_angle = FLT_MAX;
+    float angle = 0.0f;
+    float *end;
+
+    kfe = ((Ref *)kfv->edges.first)->ref;
+    for (ref = kfv->edges.first; ref; ref = ref->next) {
+      tempkfe = ref->ref;
+      if (tempkfe->v1 != kfv) {
+        tempkfv = tempkfe->v1;
+      }
+      else {
+        tempkfv = tempkfe->v2;
+      }
+      angle = angle_v3v3v3(kcd->mdata.corr_prev_cage, kcd->curr.cage, tempkfv->cageco);
+      if (angle < min_angle) {
+        min_angle = angle;
+        kfe = tempkfe;
+        end = tempkfv->cageco;
+      }
+    }
+
+    if (min_angle > KNIFE_FLT_EPSBIG) {
+      /* Last vertex in screen space. */
+      float end_ss[2];
+      ED_view3d_project_float_v2_m4(kcd->region, end, end_ss, (float(*)[4])kcd->projmat);
+
+      knifetool_draw_angle(kcd,
+                           kcd->mdata.corr_prev_cage,
+                           kcd->curr.cage,
+                           end,
+                           kcd->prev.mval,
+                           kcd->curr.mval,
+                           end_ss,
+                           min_angle);
+    }
+  }
+  else if (kcd->curr.edge) {
+    kfe = kcd->curr.edge;
+
     /* Check for most recent cut (if cage is part of previous cut). */
     if (!compare_v3v3(kfe->v1->cageco, kcd->mdata.corr_prev_cage, KNIFE_FLT_EPSBIG) &&
         !compare_v3v3(kfe->v2->cageco, kcd->mdata.corr_prev_cage, KNIFE_FLT_EPSBIG)) {
@@ -703,9 +749,47 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
     }
   }
 
-  if (kcd->prev.edge) {
+  if (kcd->prev.vert) {
+    kfv = kcd->prev.vert;
+    float min_angle = FLT_MAX;
+    float angle = 0.0f;
+    float *end;
+
+    kfe = ((Ref *)kfv->edges.first)->ref;
+    for (ref = kfv->edges.first; ref; ref = ref->next) {
+      tempkfe = ref->ref;
+      if (tempkfe->v1 != kfv) {
+        tempkfv = tempkfe->v1;
+      }
+      else {
+        tempkfv = tempkfe->v2;
+      }
+      angle = angle_v3v3v3(kcd->curr.cage, kcd->prev.cage, tempkfv->cageco);
+      if (angle < min_angle) {
+        min_angle = angle;
+        kfe = tempkfe;
+        end = tempkfv->cageco;
+      }
+    }
+
+    if (min_angle > KNIFE_FLT_EPSBIG) {
+      /* Last vertex in screen space. */
+      float end_ss[2];
+      ED_view3d_project_float_v2_m4(kcd->region, end, end_ss, (float(*)[4])kcd->projmat);
+
+      knifetool_draw_angle(kcd,
+                           kcd->curr.cage,
+                           kcd->prev.cage,
+                           end,
+                           kcd->curr.mval,
+                           kcd->prev.mval,
+                           end_ss,
+                           min_angle);
+    }
+  }
+  else if (kcd->prev.edge) {
     /* Determine acute angle. */
-    KnifeEdge *kfe = kcd->prev.edge;
+    kfe = kcd->prev.edge;
     float angle1 = angle_v3v3v3(kcd->curr.cage, kcd->prev.cage, kfe->v1->cageco);
     float angle2 = angle_v3v3v3(kcd->curr.cage, kcd->prev.cage, kfe->v2->cageco);
 
@@ -750,8 +834,6 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
                          kcd->mdata.mval,
                          angle);
   }
-
-  /* TODO: Better vertices handling. */
 }
 
 static void knifetool_draw_dist_angle(const KnifeTool_OpData *kcd)
