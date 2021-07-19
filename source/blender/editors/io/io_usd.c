@@ -74,10 +74,10 @@ const EnumPropertyItem rna_enum_usd_export_evaluation_mode_items[] = {
 };
 
 const EnumPropertyItem rna_enum_usd_import_read_flags[] = {
-    {MOD_MESHSEQ_READ_VERT, "VERT", 0, "Vertex", ""},
-    {MOD_MESHSEQ_READ_POLY, "POLY", 0, "Faces", ""},
-    {MOD_MESHSEQ_READ_UV, "UV", 0, "UV", ""},
-    {MOD_MESHSEQ_READ_COLOR, "COLOR", 0, "Color", ""},
+    {MOD_MESHSEQ_READ_VERT, "VERT", 0, "Vertex Animation", ""},
+    {MOD_MESHSEQ_READ_POLY, "POLY", 0, "Face Animation", ""},
+    {MOD_MESHSEQ_READ_UV, "UV", 0, "UV Coordinates", ""},
+    {MOD_MESHSEQ_READ_COLOR, "COLOR", 0, "Mesh Color", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
