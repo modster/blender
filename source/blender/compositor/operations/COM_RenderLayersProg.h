@@ -20,18 +20,20 @@
 
 #include "BLI_listbase.h"
 #include "BLI_utildefines.h"
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 #include "DNA_scene_types.h"
 #include "MEM_guardedalloc.h"
 
 #include "RE_pipeline.h"
 
+namespace blender::compositor {
+
 /**
  * Base class for all renderlayeroperations
  *
- * \todo: rename to operation.
+ * \todo Rename to operation.
  */
-class RenderLayersProg : public NodeOperation {
+class RenderLayersProg : public MultiThreadedOperation {
  protected:
   /**
    * Reference to the scene object.
@@ -48,8 +50,11 @@ class RenderLayersProg : public NodeOperation {
    */
   const char *m_viewName;
 
+  const MemoryBuffer *layer_buffer_;
+
   /**
-   * cached instance to the float buffer inside the layer
+   * Cached instance to the float buffer inside the layer.
+   * TODO: To be removed with tiled implementation.
    */
   float *m_inputBuffer;
 
@@ -123,7 +128,11 @@ class RenderLayersProg : public NodeOperation {
   void deinitExecution() override;
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
 
-  std::unique_ptr<MetaData> getMetaData() const override;
+  std::unique_ptr<MetaData> getMetaData() override;
+
+  virtual void update_memory_buffer_partial(MemoryBuffer *output,
+                                            const rcti &area,
+                                            Span<MemoryBuffer *> inputs) override;
 };
 
 class RenderLayersAOOperation : public RenderLayersProg {
@@ -132,7 +141,11 @@ class RenderLayersAOOperation : public RenderLayersProg {
       : RenderLayersProg(passName, type, elementsize)
   {
   }
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 class RenderLayersAlphaProg : public RenderLayersProg {
@@ -141,7 +154,11 @@ class RenderLayersAlphaProg : public RenderLayersProg {
       : RenderLayersProg(passName, type, elementsize)
   {
   }
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 class RenderLayersDepthProg : public RenderLayersProg {
@@ -150,5 +167,11 @@ class RenderLayersDepthProg : public RenderLayersProg {
       : RenderLayersProg(passName, type, elementsize)
   {
   }
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
+
+}  // namespace blender::compositor

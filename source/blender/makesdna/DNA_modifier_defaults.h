@@ -414,7 +414,8 @@
   { \
     .cache_file = NULL, \
     .object_path = "", \
-    .read_flag = MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV | MOD_MESHSEQ_READ_COLOR, \
+    .read_flag = MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV | \
+                 MOD_MESHSEQ_READ_COLOR | MOD_MESHSEQ_INTERPOLATE_VERTICES, \
     .velocity_scale = 1.0f, \
     .reader = NULL, \
     .reader_object_path = "", \
@@ -428,6 +429,7 @@
   { \
     .flag = MOD_MIR_AXIS_X | MOD_MIR_VGROUP, \
     .tolerance = 0.001f, \
+    .bisect_threshold = 0.001f, \
     .uv_offset = {0.0f, 0.0f}, \
     .uv_offset_copy = {0.0f, 0.0f}, \
     .mirror_ob = NULL, \
@@ -645,7 +647,8 @@
     .target = NULL, \
     .verts = NULL, \
     .falloff = 4.0f, \
-    .numverts = 0, \
+    .num_mesh_verts = 0, \
+    .num_bind_verts = 0, \
     .numpoly = 0, \
     .flags = 0, \
     .mat = _DNA_DEFAULT_UNIT_M4, \

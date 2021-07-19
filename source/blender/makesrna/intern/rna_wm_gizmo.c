@@ -244,7 +244,7 @@ static void rna_Gizmo_bl_idname_set(PointerRNA *ptr, const char *value)
     BLI_strncpy(str, value, MAX_NAME); /* utf8 already ensured */
   }
   else {
-    BLI_assert(!"setting the bl_idname on a non-builtin operator");
+    BLI_assert_msg(0, "setting the bl_idname on a non-builtin operator");
   }
 }
 
@@ -293,14 +293,9 @@ static StructRNA *rna_GizmoProperties_refine(PointerRNA *ptr)
   }
 }
 
-static IDProperty *rna_GizmoProperties_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_GizmoProperties_idprops(PointerRNA *ptr)
 {
-  if (create && !ptr->data) {
-    IDPropertyTemplate val = {0};
-    ptr->data = IDP_New(IDP_GROUP, &val, "RNA_GizmoProperties group");
-  }
-
-  return ptr->data;
+  return (IDProperty **)&ptr->data;
 }
 
 static PointerRNA rna_Gizmo_properties_get(PointerRNA *ptr)
@@ -534,12 +529,16 @@ static void rna_Gizmo_unregister(struct Main *bmain, StructRNA *type)
     return;
   }
 
+  WM_gizmotype_remove_ptr(NULL, bmain, gzt);
+
+  /* Free extension after removing instances so `__del__` doesn't crash, see: T85567. */
   RNA_struct_free_extension(type, &gzt->rna_ext);
   RNA_struct_free(&BLENDER_RNA, type);
 
-  WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);
+  /* Free gizmo group after the extension as it owns the identifier memory. */
+  WM_gizmotype_free_ptr(gzt);
 
-  WM_gizmotype_remove_ptr(NULL, bmain, gzt);
+  WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);
 }
 
 static void **rna_Gizmo_instance(PointerRNA *ptr)
@@ -581,14 +580,9 @@ static StructRNA *rna_GizmoGroupProperties_refine(PointerRNA *ptr)
   }
 }
 
-static IDProperty *rna_GizmoGroupProperties_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_GizmoGroupProperties_idprops(PointerRNA *ptr)
 {
-  if (create && !ptr->data) {
-    IDPropertyTemplate val = {0};
-    ptr->data = IDP_New(IDP_GROUP, &val, "RNA_GizmoGroupProperties group");
-  }
-
-  return ptr->data;
+  return (IDProperty **)&ptr->data;
 }
 
 static wmGizmo *rna_GizmoGroup_gizmo_new(wmGizmoGroup *gzgroup,
@@ -649,7 +643,7 @@ static void rna_GizmoGroup_bl_idname_set(PointerRNA *ptr, const char *value)
     BLI_strncpy(str, value, MAX_NAME); /* utf8 already ensured */
   }
   else {
-    BLI_assert(!"setting the bl_idname on a non-builtin operator");
+    BLI_assert_msg(0, "setting the bl_idname on a non-builtin operator");
   }
 }
 
@@ -661,7 +655,7 @@ static void rna_GizmoGroup_bl_label_set(PointerRNA *ptr, const char *value)
     BLI_strncpy(str, value, MAX_NAME); /* utf8 already ensured */
   }
   else {
-    BLI_assert(!"setting the bl_label on a non-builtin operator");
+    BLI_assert_msg(0, "setting the bl_label on a non-builtin operator");
   }
 }
 
@@ -934,12 +928,16 @@ static void rna_GizmoGroup_unregister(struct Main *bmain, StructRNA *type)
     return;
   }
 
+  WM_gizmo_group_type_remove_ptr(bmain, gzgt);
+
+  /* Free extension after removing instances so `__del__` doesn't crash, see: T85567. */
   RNA_struct_free_extension(type, &gzgt->rna_ext);
   RNA_struct_free(&BLENDER_RNA, type);
 
-  WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);
+  /* Free gizmo group after the extension as it owns the identifier memory. */
+  WM_gizmo_group_type_free_ptr(gzgt);
 
-  WM_gizmo_group_type_remove_ptr(bmain, gzgt);
+  WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);
 }
 
 static void **rna_GizmoGroup_instance(PointerRNA *ptr)
@@ -1089,7 +1087,7 @@ static void rna_def_gizmo(BlenderRNA *brna, PropertyRNA *cprop)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_pointer(func, "event", "Event", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  /* TODO, should be a enum-flag */
+  /* TODO: should be a enum-flag. */
   parm = RNA_def_enum_flag(func, "tweak", tweak_actions, 0, "Tweak", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_enum_flag(

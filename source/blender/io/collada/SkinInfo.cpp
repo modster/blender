@@ -36,6 +36,7 @@
 #include "DNA_scene_types.h"
 
 #include "BKE_action.h"
+#include "BKE_deform.h"
 #include "BKE_object.h"
 #include "BKE_object_deform.h"
 
@@ -55,10 +56,7 @@ template<class T> static const char *bc_get_joint_name(T *node)
 /* This is used to store data passed in write_controller_data.
  * Arrays from COLLADAFW::SkinControllerData lose ownership, so do this class members
  * so that arrays don't get freed until we free them explicitly. */
-SkinInfo::SkinInfo()
-{
-  /* pass */
-}
+SkinInfo::SkinInfo() = default;
 
 SkinInfo::SkinInfo(const SkinInfo &skin)
     : weights(skin.weights),
@@ -234,7 +232,7 @@ void SkinInfo::link_armature(bContext *C,
   amd->object = ob_arm;
 
 #if 1
-  /* XXX Why do we enforce objects to be children of Armatures if they weren't so before ?*/
+  /* XXX Why do we enforce objects to be children of Armatures if they weren't so before? */
   if (!BKE_object_is_child_recursive(ob_arm, ob)) {
     bc_set_parent(ob, ob_arm, C);
   }
@@ -292,7 +290,8 @@ void SkinInfo::link_armature(bContext *C,
 
       /* -1 means "weight towards the bind shape", we just don't assign it to any group */
       if (joint != -1) {
-        bDeformGroup *def = (bDeformGroup *)BLI_findlink(&ob->defbase, joint);
+        const ListBase *defbase = BKE_object_defgroup_list(ob);
+        bDeformGroup *def = (bDeformGroup *)BLI_findlink(defbase, joint);
 
         ED_vgroup_vert_add(ob, def, vertex, weights[joint_weight], WEIGHT_REPLACE);
       }

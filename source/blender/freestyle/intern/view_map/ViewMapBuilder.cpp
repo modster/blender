@@ -2285,7 +2285,7 @@ struct less_SVertex2D {
     Vec3r A = x->point2D();
     Vec3r B = y->point2D();
     for (unsigned int i = 0; i < 3; i++) {
-      if ((fabs(A[i] - B[i])) < epsilon) {
+      if (fabs(A[i] - B[i]) < epsilon) {
         continue;
       }
       if (A[i] < B[i]) {
@@ -2322,10 +2322,6 @@ struct less_Intersection {
 };
 
 struct silhouette_binary_rule : public binary_rule<segment, segment> {
-  silhouette_binary_rule()
-  {
-  }
-
   bool operator()(segment &s1, segment &s2) override
   {
     FEdge *f1 = s1.edge();

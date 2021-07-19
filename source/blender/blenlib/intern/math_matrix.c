@@ -1290,6 +1290,9 @@ bool invert_m4_m4(float inverse[4][4], const float mat[4][4])
  * Combines transformations, handling scale separately in a manner equivalent
  * to the Aligned Inherit Scale mode, in order to avoid creating shear.
  * If A scale is uniform, the result is equivalent to ordinary multiplication.
+ *
+ * NOTE: this effectively takes output location from simple multiplication,
+ *       and uses mul_m4_m4m4_split_channels for rotation and scale.
  */
 void mul_m4_m4m4_aligned_scale(float R[4][4], const float A[4][4], const float B[4][4])
 {
@@ -1301,6 +1304,25 @@ void mul_m4_m4m4_aligned_scale(float R[4][4], const float A[4][4], const float B
   mat4_to_loc_rot_size(loc_b, rot_b, size_b, B);
 
   mul_v3_m4v3(loc_r, A, loc_b);
+  mul_m3_m3m3_uniq(rot_r, rot_a, rot_b);
+  mul_v3_v3v3(size_r, size_a, size_b);
+
+  loc_rot_size_to_mat4(R, loc_r, rot_r, size_r);
+}
+
+/**
+ * Separately combines location, rotation and scale of the input matrices.
+ */
+void mul_m4_m4m4_split_channels(float R[4][4], const float A[4][4], const float B[4][4])
+{
+  float loc_a[3], rot_a[3][3], size_a[3];
+  float loc_b[3], rot_b[3][3], size_b[3];
+  float loc_r[3], rot_r[3][3], size_r[3];
+
+  mat4_to_loc_rot_size(loc_a, rot_a, size_a, A);
+  mat4_to_loc_rot_size(loc_b, rot_b, size_b, B);
+
+  add_v3_v3v3(loc_r, loc_a, loc_b);
   mul_m3_m3m3_uniq(rot_r, rot_a, rot_b);
   mul_v3_v3v3(size_r, size_a, size_b);
 
@@ -1699,6 +1721,89 @@ void orthogonalize_m4_stable(float R[4][4], int axis, bool normalize)
       break;
   }
 }
+
+/* -------------------------------------------------------------------- */
+/** \name Orthogonalize Matrix Zeroed Axes
+ *
+ * Set any zeroed axes to an orthogonal vector in relation to the other axes.
+ *
+ * Typically used so matrix inversion can be performed.
+ *
+ * \note If an object has a zero scaled axis, this function can be used to "clean" the matrix
+ * to behave as if the scale on that axis was `unit_length`. So it can be inverted
+ * or used in matrix multiply without creating degenerate matrices, see: T50103
+ * \{ */
+
+/**
+ * \return true if any axis needed to be modified.
+ */
+static bool orthogonalize_m3_zero_axes_impl(float *mat[3], const float unit_length)
+{
+  enum { X = 1 << 0, Y = 1 << 1, Z = 1 << 2 };
+  int flag = 0;
+  for (int i = 0; i < 3; i++) {
+    flag |= (len_squared_v3(mat[i]) == 0.0f) ? (1 << i) : 0;
+  }
+
+  /* Either all or none are zero, either way we can't properly resolve this
+   * since we need to fill invalid axes from valid ones. */
+  if (ELEM(flag, 0, X | Y | Z)) {
+    return false;
+  }
+
+  switch (flag) {
+    case X | Y: {
+      ortho_v3_v3(mat[1], mat[2]);
+      ATTR_FALLTHROUGH;
+    }
+    case X: {
+      cross_v3_v3v3(mat[0], mat[1], mat[2]);
+      break;
+    }
+
+    case Y | Z: {
+      ortho_v3_v3(mat[2], mat[0]);
+      ATTR_FALLTHROUGH;
+    }
+    case Y: {
+      cross_v3_v3v3(mat[1], mat[0], mat[2]);
+      break;
+    }
+
+    case Z | X: {
+      ortho_v3_v3(mat[0], mat[1]);
+      ATTR_FALLTHROUGH;
+    }
+    case Z: {
+      cross_v3_v3v3(mat[2], mat[0], mat[1]);
+      break;
+    }
+    default: {
+      BLI_assert(0); /* Unreachable! */
+    }
+  }
+
+  for (int i = 0; i < 3; i++) {
+    if (flag & (1 << i)) {
+      if (UNLIKELY(normalize_v3_length(mat[i], unit_length) == 0.0f)) {
+        mat[i][i] = unit_length;
+      }
+    }
+  }
+
+  return true;
+}
+
+bool orthogonalize_m3_zero_axes(float m[3][3], const float unit_length)
+{
+  return orthogonalize_m3_zero_axes_impl((float *[3]){UNPACK3(m)}, unit_length);
+}
+bool orthogonalize_m4_zero_axes(float m[4][4], const float unit_length)
+{
+  return orthogonalize_m3_zero_axes_impl((float *[3]){UNPACK3(m)}, unit_length);
+}
+
+/** \} */
 
 bool is_orthogonal_m3(const float m[3][3])
 {
@@ -2169,8 +2274,8 @@ void mat4_to_loc_quat(float loc[3], float quat[4], const float wmat[4][4])
   copy_m3_m4(mat3, wmat);
   normalize_m3_m3(mat3_n, mat3);
 
-  /* so scale doesn't interfere with rotation T24291. */
-  /* note: this is a workaround for negative matrix not working for rotation conversion, FIXME */
+  /* So scale doesn't interfere with rotation T24291. */
+  /* FIXME: this is a workaround for negative matrix not working for rotation conversion. */
   if (is_negative_m3(mat3)) {
     negate_m3(mat3_n);
   }
@@ -2582,7 +2687,7 @@ void loc_eul_size_to_mat4(float R[4][4],
   size_to_mat3(smat, size);
   mul_m3_m3m3(tmat, rmat, smat);
 
-  /* copy rot/scale part to output matrix*/
+  /* Copy rot/scale part to output matrix. */
   copy_m4_m3(R, tmat);
 
   /* copy location to matrix */
@@ -2603,18 +2708,18 @@ void loc_eulO_size_to_mat4(float R[4][4],
 {
   float rmat[3][3], smat[3][3], tmat[3][3];
 
-  /* initialize new matrix */
+  /* Initialize new matrix. */
   unit_m4(R);
 
-  /* make rotation + scaling part */
+  /* Make rotation + scaling part. */
   eulO_to_mat3(rmat, eul, rotOrder);
   size_to_mat3(smat, size);
   mul_m3_m3m3(tmat, rmat, smat);
 
-  /* copy rot/scale part to output matrix*/
+  /* Copy rot/scale part to output matrix. */
   copy_m4_m3(R, tmat);
 
-  /* copy location to matrix */
+  /* Copy location to matrix. */
   R[3][0] = loc[0];
   R[3][1] = loc[1];
   R[3][2] = loc[2];
@@ -2639,7 +2744,7 @@ void loc_quat_size_to_mat4(float R[4][4],
   size_to_mat3(smat, size);
   mul_m3_m3m3(tmat, rmat, smat);
 
-  /* copy rot/scale part to output matrix*/
+  /* Copy rot/scale part to output matrix. */
   copy_m4_m3(R, tmat);
 
   /* copy location to matrix */
@@ -3196,68 +3301,6 @@ void invert_m4_m4_safe(float Ainv[4][4], const float A[4][4])
  * \{ */
 
 /**
- * Return true if invert should be attempted again.
- *
- * \note Takes an array of points to be usable from 3x3 and 4x4 matrices.
- */
-static bool invert_m3_m3_safe_ortho_prepare(float *mat[3])
-{
-  enum { X = 1 << 0, Y = 1 << 1, Z = 1 << 2 };
-  int flag = 0;
-  for (int i = 0; i < 3; i++) {
-    flag |= (len_squared_v3(mat[i]) == 0.0f) ? (1 << i) : 0;
-  }
-
-  /* Either all or none are zero, either way we can't properly resolve this
-   * since we need to fill invalid axes from valid ones. */
-  if (ELEM(flag, 0, X | Y | Z)) {
-    return false;
-  }
-
-  switch (flag) {
-    case X | Y: {
-      ortho_v3_v3(mat[1], mat[2]);
-      ATTR_FALLTHROUGH;
-    }
-    case X: {
-      cross_v3_v3v3(mat[0], mat[1], mat[2]);
-      break;
-    }
-
-    case Y | Z: {
-      ortho_v3_v3(mat[2], mat[0]);
-      ATTR_FALLTHROUGH;
-    }
-    case Y: {
-      cross_v3_v3v3(mat[1], mat[0], mat[2]);
-      break;
-    }
-
-    case Z | X: {
-      ortho_v3_v3(mat[0], mat[1]);
-      ATTR_FALLTHROUGH;
-    }
-    case Z: {
-      cross_v3_v3v3(mat[2], mat[0], mat[1]);
-      break;
-    }
-    default: {
-      BLI_assert(0); /* Unreachable! */
-    }
-  }
-
-  for (int i = 0; i < 3; i++) {
-    if (flag & (1 << i)) {
-      if (UNLIKELY(normalize_v3(mat[i]) == 0.0f)) {
-        mat[i][i] = 1.0f;
-      }
-    }
-  }
-
-  return true;
-}
-
-/**
  * A safe version of invert that uses valid axes, calculating the zero'd axis
  * based on the non-zero ones.
  *
@@ -3268,8 +3311,7 @@ void invert_m4_m4_safe_ortho(float Ainv[4][4], const float A[4][4])
   if (UNLIKELY(!invert_m4_m4(Ainv, A))) {
     float Atemp[4][4];
     copy_m4_m4(Atemp, A);
-    if (UNLIKELY(!(invert_m3_m3_safe_ortho_prepare((float *[3]){UNPACK3(Atemp)}) &&
-                   invert_m4_m4(Ainv, Atemp)))) {
+    if (UNLIKELY(!(orthogonalize_m4_zero_axes(Atemp, 1.0f) && invert_m4_m4(Ainv, Atemp)))) {
       unit_m4(Ainv);
     }
   }
@@ -3280,8 +3322,7 @@ void invert_m3_m3_safe_ortho(float Ainv[3][3], const float A[3][3])
   if (UNLIKELY(!invert_m3_m3(Ainv, A))) {
     float Atemp[3][3];
     copy_m3_m3(Atemp, A);
-    if (UNLIKELY(!(invert_m3_m3_safe_ortho_prepare((float *[3]){UNPACK3(Atemp)}) &&
-                   invert_m3_m3(Ainv, Atemp)))) {
+    if (UNLIKELY(!(orthogonalize_m3_zero_axes(Atemp, 1.0f) && invert_m3_m3(Ainv, Atemp)))) {
       unit_m3(Ainv);
     }
   }

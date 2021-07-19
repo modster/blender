@@ -140,8 +140,7 @@ void Instance::gpencil_sync(Object *ob, ObjectHandle &ob_handle)
 {
   gpIterData iter(*this, ob);
 
-  BKE_gpencil_visible_stroke_iter(
-      view_layer, ob, nullptr, gpencil_stroke_sync, &iter, false, iter.cfra);
+  BKE_gpencil_visible_stroke_iter((bGPdata *)ob->data, nullptr, gpencil_stroke_sync, &iter);
 
   gpencil_drawcall_flush(iter);
 

@@ -69,8 +69,8 @@ static void get_domains(ID *id, DomainInfo info[ATTR_DOMAIN_NUM])
       info[ATTR_DOMAIN_EDGE].length = mesh->totedge;
       info[ATTR_DOMAIN_CORNER].customdata = &mesh->ldata;
       info[ATTR_DOMAIN_CORNER].length = mesh->totloop;
-      info[ATTR_DOMAIN_POLYGON].customdata = &mesh->pdata;
-      info[ATTR_DOMAIN_POLYGON].length = mesh->totpoly;
+      info[ATTR_DOMAIN_FACE].customdata = &mesh->pdata;
+      info[ATTR_DOMAIN_FACE].length = mesh->totpoly;
       break;
     }
     case ID_HA: {
@@ -119,7 +119,7 @@ bool BKE_id_attribute_rename(ID *id,
                              ReportList *reports)
 {
   if (BKE_id_attribute_required(id, layer)) {
-    BLI_assert(!"Required attribute name is not editable");
+    BLI_assert_msg(0, "Required attribute name is not editable");
     return false;
   }
 
@@ -202,7 +202,7 @@ AttributeDomain BKE_id_attribute_domain(ID *id, CustomDataLayer *layer)
     }
   }
 
-  BLI_assert(!"Custom data layer not found in geometry");
+  BLI_assert_msg(0, "Custom data layer not found in geometry");
   return ATTR_DOMAIN_NUM;
 }
 
@@ -218,7 +218,7 @@ int BKE_id_attribute_data_length(ID *id, CustomDataLayer *layer)
     }
   }
 
-  BLI_assert(!"Custom data layer not found in geometry");
+  BLI_assert_msg(0, "Custom data layer not found in geometry");
   return 0;
 }
 

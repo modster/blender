@@ -21,6 +21,7 @@
  * Accessed via the #WM_OT_search_menu operator.
  */
 
+#include <stdio.h>
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
@@ -509,11 +510,19 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
   const char *global_menu_prefix = NULL;
 
   if (include_all_areas) {
+    bScreen *screen = WM_window_get_active_screen(win);
+
     /* First create arrays for ui_type. */
     PropertyRNA *prop_ui_type = NULL;
     {
+      /* This must be a valid pointer, with only it's type checked. */
+      ScrArea area_dummy = {
+          /* Anything besides #SPACE_EMPTY is fine,
+           * as this value is only included in the enum when set. */
+          .spacetype = SPACE_TOPBAR,
+      };
       PointerRNA ptr;
-      RNA_pointer_create(NULL, &RNA_Area, NULL, &ptr);
+      RNA_pointer_create(&screen->id, &RNA_Area, &area_dummy, &ptr);
       prop_ui_type = RNA_struct_find_property(&ptr, "ui_type");
       RNA_property_enum_items(C,
                               &ptr,
@@ -528,7 +537,6 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
       }
     }
 
-    bScreen *screen = WM_window_get_active_screen(win);
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
       if (region != NULL) {
@@ -865,7 +873,7 @@ static struct MenuSearch_Data *menu_items_from_ui_create(
 
   /* Finally sort menu items.
    *
-   * Note: we might want to keep the in-menu order, for now sort all. */
+   * NOTE: we might want to keep the in-menu order, for now sort all. */
   BLI_listbase_sort(&data->items, menu_item_sort_by_drawstr_full);
 
   BLI_ghash_free(menu_parent_map, NULL, NULL);
@@ -1029,7 +1037,7 @@ static void menu_search_update_fn(const bContext *UNUSED(C),
 static bool ui_search_menu_create_context_menu(struct bContext *C,
                                                void *arg,
                                                void *active,
-                                               const struct wmEvent *UNUSED(event))
+                                               const struct wmEvent *event)
 {
   struct MenuSearch_Data *data = arg;
   struct MenuSearch_Item *item = active;
@@ -1050,7 +1058,7 @@ static bool ui_search_menu_create_context_menu(struct bContext *C,
       CTX_wm_region_set(C, item->wm_context->region);
     }
 
-    if (ui_popup_context_menu_for_button(C, but)) {
+    if (ui_popup_context_menu_for_button(C, but, event)) {
       has_menu = true;
     }
 
@@ -1140,6 +1148,7 @@ void UI_but_func_menu_search(uiBut *but)
                          ui_searchbox_create_menu,
                          menu_search_update_fn,
                          data,
+                         false,
                          menu_search_arg_free_fn,
                          menu_search_exec_fn,
                          NULL);

@@ -63,6 +63,7 @@
 #include "ED_screen.h"
 
 #include "WM_api.h"
+#include "WM_message.h"
 #include "WM_types.h"
 
 #include "GPU_immediate.h"
@@ -354,7 +355,7 @@ static void outliner_base_or_object_pointer_create(
   }
 }
 
-/* Note: Collection is only valid when we want to change the collection data, otherwise we get it
+/* NOTE: Collection is only valid when we want to change the collection data, otherwise we get it
  * from layer collection. Layer collection is valid whenever we are looking at a view layer. */
 static void outliner_collection_set_flag_recursive(Scene *scene,
                                                    ViewLayer *view_layer,
@@ -373,7 +374,7 @@ static void outliner_collection_set_flag_recursive(Scene *scene,
 
   /* Set the same flag for the nested objects as well. */
   if (base_or_object_prop) {
-    /* Note: We can't use BKE_collection_object_cache_get()
+    /* NOTE: We can't use BKE_collection_object_cache_get()
      * otherwise we would not take collection exclusion into account. */
     LISTBASE_FOREACH (CollectionObject *, cob, &layer_collection->collection->gobject) {
 
@@ -413,7 +414,7 @@ static void outliner_collection_set_flag_recursive(Scene *scene,
  * A collection is isolated if all its parents and children are "visible".
  * All the other collections must be "invisible".
  *
- * Note: We could/should boost performance by iterating over the tree twice.
+ * NOTE: We could/should boost performance by iterating over the tree twice.
  * First tagging all the children/parent collections, then getting their values and comparing.
  * To run BKE_collection_has_collection() so many times is silly and slow.
  */
@@ -663,6 +664,7 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
 {
   Main *bmain = CTX_data_main(C);
   SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
+  struct wmMsgBus *mbus = CTX_wm_message_bus(C);
   BLI_mempool *ts = space_outliner->treestore;
   TreeStoreElem *tselem = tsep;
 
@@ -671,6 +673,8 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
 
     if (tselem->type == TSE_SOME_ID) {
       BLI_libblock_ensure_unique_name(bmain, tselem->id->name);
+
+      WM_msg_publish_rna_prop(mbus, tselem->id, tselem->id, ID, name);
 
       switch (GS(tselem->id->name)) {
         case ID_MA:
@@ -724,12 +728,19 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
     }
     else {
       switch (tselem->type) {
-        case TSE_DEFGROUP:
-          BKE_object_defgroup_unique_name(te->directdata, (Object *)tselem->id); /* id = object. */
+        case TSE_DEFGROUP: {
+          Object *ob = (Object *)tselem->id;
+          bDeformGroup *vg = te->directdata;
+          BKE_object_defgroup_unique_name(vg, ob);
+          WM_msg_publish_rna_prop(mbus, &ob->id, vg, VertexGroup, name);
           break;
-        case TSE_NLA_ACTION:
-          BLI_libblock_ensure_unique_name(bmain, tselem->id->name);
+        }
+        case TSE_NLA_ACTION: {
+          bAction *act = (bAction *)tselem->id;
+          BLI_libblock_ensure_unique_name(bmain, act->id.name);
+          WM_msg_publish_rna_prop(mbus, &act->id, &act->id, ID, name);
           break;
+        }
         case TSE_EBONE: {
           bArmature *arm = (bArmature *)tselem->id;
           if (arm->edbo) {
@@ -740,6 +751,7 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
             BLI_strncpy(newname, ebone->name, sizeof(ebone->name));
             BLI_strncpy(ebone->name, oldname, sizeof(ebone->name));
             ED_armature_bone_rename(bmain, arm, oldname, newname);
+            WM_msg_publish_rna_prop(mbus, &arm->id, ebone, EditBone, name);
             WM_event_add_notifier(C, NC_OBJECT | ND_POSE, NULL);
           }
           break;
@@ -760,6 +772,7 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
           BLI_strncpy(newname, bone->name, sizeof(bone->name));
           BLI_strncpy(bone->name, oldname, sizeof(bone->name));
           ED_armature_bone_rename(bmain, arm, oldname, newname);
+          WM_msg_publish_rna_prop(mbus, &arm->id, bone, Bone, name);
           WM_event_add_notifier(C, NC_OBJECT | ND_POSE, NULL);
           break;
         }
@@ -768,6 +781,7 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
           outliner_viewcontext_init(C, &tvc);
 
           Object *ob = (Object *)tselem->id;
+          bArmature *arm = (bArmature *)ob->data;
           bPoseChannel *pchan = te->directdata;
           char newname[sizeof(pchan->name)];
 
@@ -780,6 +794,7 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
           BLI_strncpy(newname, pchan->name, sizeof(pchan->name));
           BLI_strncpy(pchan->name, oldname, sizeof(pchan->name));
           ED_armature_bone_rename(bmain, ob->data, oldname, newname);
+          WM_msg_publish_rna_prop(mbus, &arm->id, pchan->bone, Bone, name);
           WM_event_add_notifier(C, NC_OBJECT | ND_POSE, NULL);
           break;
         }
@@ -793,6 +808,7 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
                          '.',
                          offsetof(bActionGroup, name),
                          sizeof(grp->name));
+          WM_msg_publish_rna_prop(mbus, &ob->id, grp, ActionGroup, name);
           WM_event_add_notifier(C, NC_OBJECT | ND_POSE, ob);
           break;
         }
@@ -807,6 +823,7 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
           BLI_uniquename(
               &gpd->layers, gpl, "GP Layer", '.', offsetof(bGPDlayer, info), sizeof(gpl->info));
 
+          WM_msg_publish_rna_prop(mbus, &gpd->id, gpl, GPencilLayer, info);
           DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
           WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_SELECTED, gpd);
           break;
@@ -822,11 +839,15 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
 
           /* Rename, preserving animation and compositing data. */
           BKE_view_layer_rename(bmain, scene, view_layer, newname);
+          WM_msg_publish_rna_prop(mbus, &scene->id, view_layer, ViewLayer, name);
           WM_event_add_notifier(C, NC_ID | NA_RENAME, NULL);
           break;
         }
         case TSE_LAYER_COLLECTION: {
-          BLI_libblock_ensure_unique_name(bmain, tselem->id->name);
+          /* The ID is a #Collection, not a #LayerCollection */
+          Collection *collection = (Collection *)tselem->id;
+          BLI_libblock_ensure_unique_name(bmain, collection->id.name);
+          WM_msg_publish_rna_prop(mbus, &collection->id, &collection->id, ID, name);
           WM_event_add_notifier(C, NC_ID | NA_RENAME, NULL);
           break;
         }
@@ -1069,7 +1090,8 @@ static void outliner_draw_restrictbuts(uiBlock *block,
     RestrictPropertiesActive props_active = props_active_parent;
 
     if (te->ys + 2 * UI_UNIT_Y >= region->v2d.cur.ymin && te->ys <= region->v2d.cur.ymax) {
-      if (tselem->type == TSE_R_LAYER && (space_outliner->outlinevis == SO_SCENES)) {
+      if (tselem->type == TSE_R_LAYER &&
+          ELEM(space_outliner->outlinevis, SO_SCENES, SO_VIEW_LAYER)) {
         if (space_outliner->show_restrict_flags & SO_RESTRICT_RENDER) {
           /* View layer render toggle. */
           ViewLayer *layer = te->directdata;
@@ -1754,6 +1776,87 @@ static void outliner_draw_userbuts(uiBlock *block,
   }
 }
 
+static bool outliner_draw_overrides_buts(uiBlock *block,
+                                         ARegion *region,
+                                         SpaceOutliner *space_outliner,
+                                         ListBase *lb,
+                                         const bool is_open)
+{
+  bool any_item_has_warnings = false;
+
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    bool item_has_warnings = false;
+    const bool do_draw = (te->ys + 2 * UI_UNIT_Y >= region->v2d.cur.ymin &&
+                          te->ys <= region->v2d.cur.ymax);
+    int but_flag = UI_BUT_DRAG_LOCK;
+    const char *tip = NULL;
+
+    TreeStoreElem *tselem = TREESTORE(te);
+    switch (tselem->type) {
+      case TSE_LIBRARY_OVERRIDE_BASE: {
+        ID *id = tselem->id;
+
+        if (id->flag & LIB_LIB_OVERRIDE_RESYNC_LEFTOVER) {
+          item_has_warnings = true;
+          if (do_draw) {
+            tip = TIP_(
+                "This override data-block is not needed anymore, but was detected as user-edited");
+          }
+        }
+        else if (ID_IS_OVERRIDE_LIBRARY_REAL(id) && ID_REAL_USERS(id) == 0) {
+          item_has_warnings = true;
+          if (do_draw) {
+            tip = TIP_("This override data-block is unused");
+          }
+        }
+        break;
+      }
+      case TSE_LIBRARY_OVERRIDE: {
+        const bool is_rna_path_valid = (bool)(POINTER_AS_UINT(te->directdata));
+        if (!is_rna_path_valid) {
+          item_has_warnings = true;
+          if (do_draw) {
+            tip = TIP_(
+                "This override property does not exist in current data, it will be removed on "
+                "next .blend file save");
+          }
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    const bool any_child_has_warnings = outliner_draw_overrides_buts(
+        block,
+        region,
+        space_outliner,
+        &te->subtree,
+        is_open && TSELEM_OPEN(tselem, space_outliner));
+
+    if (do_draw &&
+        (item_has_warnings || (any_child_has_warnings && !TSELEM_OPEN(tselem, space_outliner)))) {
+      if (tip == NULL) {
+        tip = TIP_("Some sub-items require attention");
+      }
+      uiBut *bt = uiDefIconBlockBut(block,
+                                    NULL,
+                                    NULL,
+                                    1,
+                                    ICON_ERROR,
+                                    (int)(region->v2d.cur.xmax - OL_TOG_USER_BUTS_STATUS),
+                                    te->ys,
+                                    UI_UNIT_X,
+                                    UI_UNIT_Y,
+                                    tip);
+      UI_but_flag_enable(bt, but_flag);
+    }
+    any_item_has_warnings = any_item_has_warnings || item_has_warnings || any_child_has_warnings;
+  }
+
+  return any_item_has_warnings;
+}
+
 static void outliner_draw_rnacols(ARegion *region, int sizex)
 {
   View2D *v2d = &region->v2d;
@@ -2004,7 +2107,7 @@ static void outliner_draw_mode_column_toggle(uiBlock *block,
                             tip);
   UI_but_func_set(but, outliner_mode_toggle_fn, tselem, NULL);
   UI_but_flag_enable(but, UI_BUT_DRAG_LOCK);
-  /* Mode toggling handles it's own undo state because undo steps need to be grouped. */
+  /* Mode toggling handles its own undo state because undo steps need to be grouped. */
   UI_but_flag_disable(but, UI_BUT_UNDO);
 
   if (ID_IS_LINKED(&ob->id)) {
@@ -2252,6 +2355,9 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
               break;
             case eGpencilModifierType_Texture:
               data.icon = ICON_TEXTURE;
+              break;
+            case eGpencilModifierType_Weight:
+              data.icon = ICON_MOD_VERTEX_WEIGHT;
               break;
 
               /* Default */
@@ -2858,7 +2964,8 @@ static void outliner_draw_iconrow(bContext *C,
     te->flag &= ~(TE_ICONROW | TE_ICONROW_MERGED);
 
     /* object hierarchy always, further constrained on level */
-    if ((level < 1) || ((tselem->type == TSE_SOME_ID) && (te->idcode == ID_OB))) {
+    if ((level < 1) || ((tselem->type == TSE_SOME_ID) && (te->idcode == ID_OB)) ||
+        ELEM(tselem->type, TSE_BONE, TSE_EBONE, TSE_POSE_CHANNEL)) {
       /* active blocks get white circle */
       if (tselem->type == TSE_SOME_ID) {
         if (te->idcode == ID_OB) {
@@ -2875,7 +2982,19 @@ static void outliner_draw_iconrow(bContext *C,
         active = tree_element_type_active_state_get(C, tvc, te, tselem);
       }
 
-      if (!ELEM(tselem->type, TSE_SOME_ID, TSE_LAYER_COLLECTION, TSE_R_LAYER, TSE_GP_LAYER)) {
+      if (!ELEM(tselem->type,
+                TSE_ID_BASE,
+                TSE_SOME_ID,
+                TSE_LAYER_COLLECTION,
+                TSE_R_LAYER,
+                TSE_GP_LAYER,
+                TSE_LIBRARY_OVERRIDE_BASE,
+                TSE_LIBRARY_OVERRIDE,
+                TSE_BONE,
+                TSE_EBONE,
+                TSE_POSE_CHANNEL,
+                TSE_POSEGRP,
+                TSE_DEFGROUP)) {
         outliner_draw_iconrow_doit(block, te, fstyle, xmax, offsx, ys, alpha_fac, active, 1);
       }
       else {
@@ -3011,7 +3130,7 @@ static void outliner_draw_tree_element(bContext *C,
       *te_edit = te;
     }
 
-    /* Icons can be ui buts, we don't want it to overlap with restrict .*/
+    /* Icons can be UI buts, we don't want it to overlap with restrict. */
     if (restrict_column_width > 0) {
       xmax -= restrict_column_width + UI_UNIT_X;
     }
@@ -3613,7 +3732,7 @@ static void outliner_update_viewable_area(ARegion *region,
 }
 
 /* ****************************************************** */
-/* Main Entrypoint - Draw contents of Outliner editor */
+/* Main Entry-point - Draw contents of Outliner editor */
 
 void draw_outliner(const bContext *C)
 {
@@ -3635,7 +3754,11 @@ void draw_outliner(const bContext *C)
   }
 
   /* Sync selection state from view layer. */
-  if (!ELEM(space_outliner->outlinevis, SO_LIBRARIES, SO_DATA_API, SO_ID_ORPHANS) &&
+  if (!ELEM(space_outliner->outlinevis,
+            SO_LIBRARIES,
+            SO_OVERRIDES_LIBRARY,
+            SO_DATA_API,
+            SO_ID_ORPHANS) &&
       space_outliner->flag & SO_SYNC_SELECT) {
     outliner_sync_selection(C, space_outliner);
   }
@@ -3681,6 +3804,10 @@ void draw_outliner(const bContext *C)
   else if (space_outliner->outlinevis == SO_ID_ORPHANS) {
     /* draw user toggle columns */
     outliner_draw_userbuts(block, region, space_outliner, &space_outliner->tree);
+  }
+  else if (space_outliner->outlinevis == SO_OVERRIDES_LIBRARY) {
+    /* Draw overrides status columns. */
+    outliner_draw_overrides_buts(block, region, space_outliner, &space_outliner->tree, true);
   }
   else if (restrict_column_width > 0.0f) {
     /* draw restriction columns */

@@ -237,10 +237,10 @@ static void test_endian_zbuf(struct ImBuf *ibuf)
   }
 }
 
-/* from misc_util: flip the bytes from x  */
+/* From misc_util: flip the bytes from x. */
 #define GS(x) (((uchar *)(x))[0] << 8 | ((uchar *)(x))[1])
 
-/* this one is only def-ed once, strangely... */
+/* This one is only def-ed once, strangely... */
 #define GSS(x) (((uchar *)(x))[1] << 8 | ((uchar *)(x))[0])
 
 bool imb_is_a_iris(const uchar *mem, size_t size)
@@ -270,11 +270,13 @@ struct ImBuf *imb_loadiris(const uchar *mem, size_t size, int flags, char colors
   ImBuf *ibuf = NULL;
   uchar dirty_flag = 0;
 
-  if (size < HEADER_SIZE) {
+  if (!imb_is_a_iris(mem, size)) {
     return NULL;
   }
 
-  if (!imb_is_a_iris(mem, size)) {
+  /* Could pe part of the magic check above,
+   * by convention this check only requests the size needed to read it's magic though. */
+  if (size < HEADER_SIZE) {
     return NULL;
   }
 

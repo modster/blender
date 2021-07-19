@@ -18,13 +18,15 @@
 
 #include "COM_NormalizeOperation.h"
 
+namespace blender::compositor {
+
 NormalizeOperation::NormalizeOperation()
 {
   this->addInputSocket(DataType::Value);
   this->addOutputSocket(DataType::Value);
   this->m_imageReader = nullptr;
   this->m_cachedInstance = nullptr;
-  this->setComplex(true);
+  this->flags.complex = true;
 }
 void NormalizeOperation::initExecution()
 {
@@ -34,7 +36,7 @@ void NormalizeOperation::initExecution()
 
 void NormalizeOperation::executePixel(float output[4], int x, int y, void *data)
 {
-  /* using generic two floats struct to store x: min  y: mult */
+  /* using generic two floats struct to store `x: min`, `y: multiply` */
   NodeTwoFloats *minmult = (NodeTwoFloats *)data;
 
   this->m_imageReader->read(output, x, y, nullptr);
@@ -87,7 +89,7 @@ void *NormalizeOperation::initializeTileData(rcti *rect)
   lockMutex();
   if (this->m_cachedInstance == nullptr) {
     MemoryBuffer *tile = (MemoryBuffer *)this->m_imageReader->initializeTileData(rect);
-    /* using generic two floats struct to store x: min  y: mult */
+    /* using generic two floats struct to store `x: min`, `y: multiply`. */
     NodeTwoFloats *minmult = new NodeTwoFloats();
 
     float *buffer = tile->getBuffer();
@@ -124,3 +126,5 @@ void NormalizeOperation::deinitializeTileData(rcti * /*rect*/, void * /*data*/)
 {
   /* pass */
 }
+
+}  // namespace blender::compositor

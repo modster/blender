@@ -688,18 +688,35 @@ static void rna_def_material_lineart(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "MaterialLineArt");
   RNA_def_struct_ui_text(srna, "Material Line Art", "");
 
-  prop = RNA_def_property(srna, "use_transparency", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_material_mask", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_default(prop, 0);
-  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_MATERIAL_TRANSPARENCY_ENABLED);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_MATERIAL_MASK_ENABLED);
   RNA_def_property_ui_text(
-      prop, "Use Transparency", "Use transparency mask from this material in line art");
+      prop, "Use Material Mask", "Use material masks to filter out occluded strokes");
   RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
 
-  prop = RNA_def_property(srna, "use_transparency_mask", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_material_mask_bits", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_default(prop, 0);
-  RNA_def_property_boolean_sdna(prop, NULL, "transparency_mask", 1);
+  RNA_def_property_boolean_sdna(prop, NULL, "material_mask_bits", 1);
   RNA_def_property_array(prop, 8);
   RNA_def_property_ui_text(prop, "Mask", "");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
+
+  prop = RNA_def_property(srna, "use_mat_occlusion", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_default(prop, 0);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS);
+  RNA_def_property_ui_text(prop,
+                           "Custom Occlusion Effectiveness",
+                           "Use custom occlusion effectiveness for this material");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
+
+  prop = RNA_def_property(srna, "mat_occlusion", PROP_INT, PROP_NONE);
+  RNA_def_property_int_default(prop, 1);
+  RNA_def_property_ui_range(prop, 0.0f, 5.0f, 1.0f, 1);
+  RNA_def_property_ui_text(
+      prop,
+      "Effectiveness",
+      "Faces with this material will behave as if it has set number of layers in occlusion");
   RNA_def_property_update(prop, NC_GPENCIL | ND_SHADING, "rna_MaterialLineArt_update");
 }
 
@@ -840,6 +857,8 @@ void RNA_def_material(BlenderRNA *brna)
   prop = RNA_def_property(srna, "node_tree", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "nodetree");
   RNA_def_property_clear_flag(prop, PROP_PTR_NO_OWNERSHIP);
+  /* XXX: remove once overrides in material node trees are supported. */
+  RNA_def_property_override_flag(prop, PROPOVERRIDE_IGNORE);
   RNA_def_property_ui_text(prop, "Node Tree", "Node tree for node based materials");
 
   prop = RNA_def_property(srna, "use_nodes", PROP_BOOLEAN, PROP_NONE);

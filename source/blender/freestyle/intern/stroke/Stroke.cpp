@@ -383,10 +383,6 @@ StrokeVertex::StrokeVertex(SVertex *iSVertex, const StrokeAttribute &iAttribute)
   _StrokeLength = 0.0f;
 }
 
-StrokeVertex::~StrokeVertex()
-{
-}
-
 StrokeVertex &StrokeVertex::operator=(const StrokeVertex &iBrother)
 {
   ((CurvePoint *)this)->operator=(iBrother);
@@ -629,7 +625,7 @@ int Stroke::Resample(int iNPoints)
   // add last:
   ++it;
   ++next;
-  if ((it != itend) && (next == itend) /* && (t == 0.0f)*/) {
+  if ((it != itend) && (next == itend) /* && (t == 0.0f) */) {
     newVertices.push_back(&(*it));
   }
 
@@ -691,7 +687,7 @@ int Stroke::Resample(float iSampling)
     ++next;
   }
   // add last:
-  if ((it != itend) && (next == itend) /* && (t == 0.0f)*/) {
+  if ((it != itend) && (next == itend) /* && (t == 0.0f) */) {
     newVertices.push_back(&(*it));
   }
 

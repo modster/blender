@@ -18,6 +18,18 @@
 
 #pragma once
 
+namespace blender::compositor {
+
+enum class eExecutionModel {
+  /**
+   * Operations are executed from outputs to inputs grouped in execution groups and rendered
+   * in tiles.
+   */
+  Tiled,
+  /** Operations are fully rendered in order from inputs to outputs. */
+  FullFrame
+};
+
 /**
  * \brief possible data types for sockets
  * \ingroup Model
@@ -32,56 +44,49 @@ enum class DataType {
 };
 
 /**
- * \brief Possible quality settings
- * \see CompositorContext.quality
- * \ingroup Execution
+ * Utility to get the number of channels of the given data type.
  */
-enum class CompositorQuality {
-  /** \brief High quality setting */
-  High = 0,
-  /** \brief Medium quality setting */
-  Medium = 1,
-  /** \brief Low quality setting */
-  Low = 2,
-};
+constexpr int COM_data_type_num_channels(const DataType datatype)
+{
+  switch (datatype) {
+    case DataType::Value:
+      return 1;
+    case DataType::Vector:
+      return 3;
+    case DataType::Color:
+    default:
+      return 4;
+  }
+}
+
+constexpr int COM_DATA_TYPE_VALUE_CHANNELS = COM_data_type_num_channels(DataType::Value);
+constexpr int COM_DATA_TYPE_VECTOR_CHANNELS = COM_data_type_num_channels(DataType::Vector);
+constexpr int COM_DATA_TYPE_COLOR_CHANNELS = COM_data_type_num_channels(DataType::Color);
+
+constexpr float COM_VECTOR_ZERO[3] = {0.0f, 0.0f, 0.0f};
+constexpr float COM_VALUE_ZERO[1] = {0.0f};
+constexpr float COM_VALUE_ONE[1] = {1.0f};
 
 /**
- * \brief Possible priority settings
- * \ingroup Execution
+ * Utility to get data type for given number of channels.
  */
-enum class CompositorPriority {
-  /** \brief High quality setting */
-  High = 2,
-  /** \brief Medium quality setting */
-  Medium = 1,
-  /** \brief Low quality setting */
-  Low = 0,
-};
+constexpr DataType COM_num_channels_data_type(const int num_channels)
+{
+  switch (num_channels) {
+    case 1:
+      return DataType::Value;
+    case 3:
+      return DataType::Vector;
+    case 4:
+    default:
+      return DataType::Color;
+  }
+}
 
 // configurable items
 
 // chunk size determination
-#define COM_PREVIEW_SIZE 140.0f
-#define COM_OPENCL_ENABLED
-//#define COM_DEBUG
 
-// workscheduler threading models
-/**
- * COM_TM_QUEUE is a multi-threaded model, which uses the BLI_thread_queue pattern.
- * This is the default option.
- */
-#define COM_TM_QUEUE 1
-
-/**
- * COM_TM_NOTHREAD is a single threading model, everything is executed in the caller thread.
- * easy for debugging
- */
-#define COM_TM_NOTHREAD 0
-
-/**
- * COM_CURRENT_THREADING_MODEL can be one of the above, COM_TM_QUEUE is currently default.
- */
-#define COM_CURRENT_THREADING_MODEL COM_TM_QUEUE
 // chunk order
 /**
  * \brief The order of chunks to be scheduled
@@ -100,10 +105,8 @@ enum class ChunkOrdering {
   Default = ChunkOrdering::CenterOut,
 };
 
-#define COM_RULE_OF_THIRDS_DIVIDER 100.0f
+constexpr float COM_PREVIEW_SIZE = 140.f;
+constexpr float COM_RULE_OF_THIRDS_DIVIDER = 100.0f;
+constexpr float COM_BLUR_BOKEH_PIXELS = 512;
 
-#define COM_NUM_CHANNELS_VALUE 1
-#define COM_NUM_CHANNELS_VECTOR 3
-#define COM_NUM_CHANNELS_COLOR 4
-
-#define COM_BLUR_BOKEH_PIXELS 512
+}  // namespace blender::compositor

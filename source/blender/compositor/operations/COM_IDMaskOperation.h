@@ -18,20 +18,28 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
-class IDMaskOperation : public NodeOperation {
+namespace blender::compositor {
+
+class IDMaskOperation : public MultiThreadedOperation {
  private:
   float m_objectIndex;
 
  public:
   IDMaskOperation();
 
-  void *initializeTileData(rcti *rect);
-  void executePixel(float output[4], int x, int y, void *data);
+  void *initializeTileData(rcti *rect) override;
+  void executePixel(float output[4], int x, int y, void *data) override;
 
   void setObjectIndex(float objectIndex)
   {
     this->m_objectIndex = objectIndex;
   }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
+
+}  // namespace blender::compositor

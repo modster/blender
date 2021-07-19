@@ -192,7 +192,7 @@ static void scene_init_data(ID *id)
 
   BLI_strncpy(scene->r.pic, U.renderdir, sizeof(scene->r.pic));
 
-  /* Note; in header_info.c the scene copy happens...,
+  /* NOTE: in header_info.c the scene copy happens...,
    * if you add more to renderdata it has to be checked there. */
 
   /* multiview - stereo */
@@ -228,7 +228,10 @@ static void scene_init_data(ID *id)
 
   /* Curve Profile */
   scene->toolsettings->custom_bevel_profile_preset = BKE_curveprofile_add(PROF_PRESET_LINE);
+
+  /* Sequencer */
   scene->toolsettings->sequencer_tool_settings = SEQ_tool_settings_init();
+  scene->toolsettings->snap_flag |= SCE_SNAP_SEQ;
 
   for (size_t i = 0; i < ARRAY_SIZE(scene->orientation_slots); i++) {
     scene->orientation_slots[i].index_custom = -1;
@@ -742,7 +745,8 @@ static void scene_foreach_id(ID *id, LibraryForeachIDData *data)
     BKE_LIB_FOREACHID_PROCESS(data, view_layer->mat_override, IDWALK_CB_USER);
 
     LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
-      BKE_LIB_FOREACHID_PROCESS(data, base->object, IDWALK_CB_NOP);
+      BKE_LIB_FOREACHID_PROCESS(
+          data, base->object, IDWALK_CB_NOP | IDWALK_CB_OVERRIDE_LIBRARY_NOT_OVERRIDABLE);
     }
 
     scene_foreach_layer_collection(data, &view_layer->layer_collections);
@@ -1041,7 +1045,7 @@ static void scene_blend_write(BlendWriter *writer, ID *id, const void *id_addres
 
 static void direct_link_paint_helper(BlendDataReader *reader, const Scene *scene, Paint **paint)
 {
-  /* TODO. is this needed */
+  /* TODO: is this needed. */
   BLO_read_data_address(reader, paint);
 
   if (*paint) {
@@ -1144,6 +1148,7 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
     BLO_read_data_address(reader, &ed->act_seq);
     ed->cache = NULL;
     ed->prefetch_job = NULL;
+    ed->runtime.sequence_lookup = NULL;
 
     /* recursive link sequences, lb will be correctly initialized */
     link_recurs_seq(reader, &ed->seqbase);
@@ -1464,8 +1469,8 @@ static void scene_blend_read_lib(BlendLibReader *reader, ID *id)
     IDP_BlendReadLib(reader, seq->prop);
 
     if (seq->ipo) {
-      BLO_read_id_address(
-          reader, sce->id.lib, &seq->ipo); /* XXX deprecated - old animation system */
+      /* XXX: deprecated - old animation system. */
+      BLO_read_id_address(reader, sce->id.lib, &seq->ipo);
     }
     seq->scene_sound = NULL;
     if (seq->scene) {
@@ -1894,14 +1899,14 @@ void BKE_scene_copy_data_eevee(Scene *sce_dst, const Scene *sce_src)
   sce_dst->eevee = sce_src->eevee;
   sce_dst->eevee.light_cache_data = NULL;
   sce_dst->eevee.light_cache_info[0] = '\0';
-  /* TODO Copy the cache. */
+  /* TODO: Copy the cache. */
 }
 
 Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
 {
   Scene *sce_copy;
 
-  /* TODO this should/could most likely be replaced by call to more generic code at some point...
+  /* TODO: this should/could most likely be replaced by call to more generic code at some point...
    * But for now, let's keep it well isolated here. */
   if (type == SCE_COPY_EMPTY) {
     ListBase rv;
@@ -1984,8 +1989,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
     const bool is_subprocess = false;
 
     if (!is_subprocess) {
-      BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-      BKE_main_id_clear_newpoins(bmain);
+      BKE_main_id_newptr_and_tag_clear(bmain);
       /* In case root duplicated ID is linked, assume we want to get a local copy of it and
        * duplicate all expected linked data. */
       if (ID_IS_LINKED(sce)) {
@@ -2012,7 +2016,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
         bmain, NULL, sce_copy->master_collection, duplicate_flags, LIB_ID_DUPLICATE_IS_SUBPROCESS);
 
     if (!is_subprocess) {
-      /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW.*/
+      /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW. */
       BKE_libblock_relink_to_newid(&sce_copy->id);
 
 #ifndef NDEBUG
@@ -2026,8 +2030,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
 #endif
 
       /* Cleanup. */
-      BKE_main_id_tag_all(bmain, LIB_TAG_NEW, false);
-      BKE_main_id_clear_newpoins(bmain);
+      BKE_main_id_newptr_and_tag_clear(bmain);
 
       BKE_main_collection_sync(bmain);
     }
@@ -2296,10 +2299,7 @@ Object *BKE_scene_camera_switch_find(Scene *scene)
     return NULL;
   }
 
-  const int cfra = ((scene->r.images == scene->r.framapto) ?
-                        scene->r.cfra :
-                        (int)(scene->r.cfra *
-                              ((float)scene->r.framapto / (float)scene->r.images)));
+  const int ctime = (int)BKE_scene_ctime_get(scene);
   int frame = -(MAXFRAME + 1);
   int min_frame = MAXFRAME + 1;
   Object *camera = NULL;
@@ -2307,11 +2307,11 @@ Object *BKE_scene_camera_switch_find(Scene *scene)
 
   LISTBASE_FOREACH (TimeMarker *, m, &scene->markers) {
     if (m->camera && (m->camera->restrictflag & OB_RESTRICT_RENDER) == 0) {
-      if ((m->frame <= cfra) && (m->frame > frame)) {
+      if ((m->frame <= ctime) && (m->frame > frame)) {
         camera = m->camera;
         frame = m->frame;
 
-        if (frame == cfra) {
+        if (frame == ctime) {
           break;
         }
       }
@@ -2393,13 +2393,13 @@ const char *BKE_scene_find_last_marker_name(const Scene *scene, int frame)
   return best_marker ? best_marker->name : NULL;
 }
 
-int BKE_scene_frame_snap_by_seconds(Scene *scene, double interval_in_seconds, int cfra)
+int BKE_scene_frame_snap_by_seconds(Scene *scene, double interval_in_seconds, int frame)
 {
   const int fps = round_db_to_int(FPS * interval_in_seconds);
-  const int second_prev = cfra - mod_i(cfra, fps);
+  const int second_prev = frame - mod_i(frame, fps);
   const int second_next = second_prev + fps;
-  const int delta_prev = cfra - second_prev;
-  const int delta_next = second_next - cfra;
+  const int delta_prev = frame - second_prev;
+  const int delta_next = second_next - frame;
   return (delta_prev < delta_next) ? second_prev : second_next;
 }
 
@@ -2441,16 +2441,17 @@ bool BKE_scene_validate_setscene(Main *bmain, Scene *sce)
   return true;
 }
 
-/**
- * This function is needed to cope with fractional frames, needed for motion blur & physics.
- */
-float BKE_scene_frame_get(const Scene *scene)
+/* Return fractional frame number taking into account subframes and time
+ * remapping. This the time value used by animation, modifiers and physics
+ * evaluation. */
+float BKE_scene_ctime_get(const Scene *scene)
 {
   return BKE_scene_frame_to_ctime(scene, scene->r.cfra);
 }
 
-/* This function is used to obtain arbitrary fractional frames */
-float BKE_scene_frame_to_ctime(const Scene *scene, const float frame)
+/* Convert integer frame number to fractional frame number taking into account
+ * subframes and time remapping. */
+float BKE_scene_frame_to_ctime(const Scene *scene, const int frame)
 {
   float ctime = frame;
   ctime += scene->r.subframe;
@@ -2458,13 +2459,18 @@ float BKE_scene_frame_to_ctime(const Scene *scene, const float frame)
 
   return ctime;
 }
-/**
- * Sets the frame int/float components.
- */
-void BKE_scene_frame_set(struct Scene *scene, double cfra)
+
+/* Get current fractional frame based on frame and subframe. */
+float BKE_scene_frame_get(const Scene *scene)
+{
+  return scene->r.cfra + scene->r.subframe;
+}
+
+/* Set current frame and subframe based on a fractional frame. */
+void BKE_scene_frame_set(Scene *scene, float frame)
 {
   double intpart;
-  scene->r.subframe = modf(cfra, &intpart);
+  scene->r.subframe = modf((double)frame, &intpart);
   scene->r.cfra = (int)intpart;
 }
 
@@ -2515,6 +2521,18 @@ int BKE_scene_orientation_slot_get_index(const TransformOrientationSlot *orient_
   return (orient_slot->type == V3D_ORIENT_CUSTOM) ?
              (orient_slot->type + orient_slot->index_custom) :
              orient_slot->type;
+}
+
+int BKE_scene_orientation_get_index(Scene *scene, int slot_index)
+{
+  TransformOrientationSlot *orient_slot = BKE_scene_orientation_slot_get(scene, slot_index);
+  return BKE_scene_orientation_slot_get_index(orient_slot);
+}
+
+int BKE_scene_orientation_get_index_from_flag(Scene *scene, int flag)
+{
+  TransformOrientationSlot *orient_slot = BKE_scene_orientation_slot_get_from_flag(scene, flag);
+  return BKE_scene_orientation_slot_get_index(orient_slot);
 }
 
 /** \} */
@@ -2624,6 +2642,7 @@ static void scene_graph_update_tagged(Depsgraph *depsgraph, Main *bmain, bool on
 
   Scene *scene = DEG_get_input_scene(depsgraph);
   ViewLayer *view_layer = DEG_get_input_view_layer(depsgraph);
+  bool used_multiple_passes = false;
 
   bool run_callbacks = DEG_id_type_any_updated(depsgraph);
   if (run_callbacks) {
@@ -2648,7 +2667,7 @@ static void scene_graph_update_tagged(Depsgraph *depsgraph, Main *bmain, bool on
           bmain, &scene->id, depsgraph, BKE_CB_EVT_DEPSGRAPH_UPDATE_POST);
 
       /* It is possible that the custom callback modified scene and removed some IDs from the main
-       * database. In this case DEG_ids_clear_recalc() will crash because it iterates over all IDs
+       * database. In this case DEG_editors_update() will crash because it iterates over all IDs
        * which depsgraph was built for.
        *
        * The solution is to update relations prior to this call, avoiding access to freed IDs.
@@ -2660,10 +2679,6 @@ static void scene_graph_update_tagged(Depsgraph *depsgraph, Main *bmain, bool on
        * If there are no relations changed by the callback this call will do nothing. */
       DEG_graph_relations_update(depsgraph);
     }
-    /* Inform editors about possible changes. */
-    DEG_ids_check_recalc(bmain, depsgraph, scene, view_layer, false);
-    /* Clear recalc flags. */
-    DEG_ids_clear_recalc(bmain, depsgraph);
 
     /* If user callback did not tag anything for update we can skip second iteration.
      * Otherwise we update scene once again, but without running callbacks to bring
@@ -2672,8 +2687,22 @@ static void scene_graph_update_tagged(Depsgraph *depsgraph, Main *bmain, bool on
       break;
     }
 
+    /* Clear recalc flags for second pass, but back them up for editors update. */
+    const bool backup = true;
+    DEG_ids_clear_recalc(depsgraph, backup);
+    used_multiple_passes = true;
     run_callbacks = false;
   }
+
+  /* Inform editors about changes, using recalc flags from both passes. */
+  if (used_multiple_passes) {
+    DEG_ids_restore_recalc(depsgraph);
+  }
+  const bool is_time_update = false;
+  DEG_editors_update(depsgraph, is_time_update);
+
+  const bool backup = false;
+  DEG_ids_clear_recalc(depsgraph, backup);
 }
 
 void BKE_scene_graph_update_tagged(Depsgraph *depsgraph, Main *bmain)
@@ -2687,11 +2716,11 @@ void BKE_scene_graph_evaluated_ensure(Depsgraph *depsgraph, Main *bmain)
 }
 
 /* applies changes right away, does all sets too */
-void BKE_scene_graph_update_for_newframe(Depsgraph *depsgraph)
+void BKE_scene_graph_update_for_newframe_ex(Depsgraph *depsgraph, const bool clear_recalc)
 {
   Scene *scene = DEG_get_input_scene(depsgraph);
-  ViewLayer *view_layer = DEG_get_input_view_layer(depsgraph);
   Main *bmain = DEG_get_bmain(depsgraph);
+  bool used_multiple_passes = false;
 
   /* Keep this first. */
   BKE_callback_exec_id(bmain, &scene->id, BKE_CB_EVT_FRAME_CHANGE_PRE);
@@ -2710,8 +2739,8 @@ void BKE_scene_graph_update_for_newframe(Depsgraph *depsgraph)
      * edits from callback are properly taken into account. Doing a time update on those would
      * lose any possible unkeyed changes made by the handler. */
     if (pass == 0) {
-      const float ctime = BKE_scene_frame_get(scene);
-      DEG_evaluate_on_framechange(depsgraph, ctime);
+      const float frame = BKE_scene_frame_get(scene);
+      DEG_evaluate_on_framechange(depsgraph, frame);
     }
     else {
       DEG_evaluate_on_refresh(depsgraph);
@@ -2724,14 +2753,9 @@ void BKE_scene_graph_update_for_newframe(Depsgraph *depsgraph)
       BKE_callback_exec_id_depsgraph(bmain, &scene->id, depsgraph, BKE_CB_EVT_FRAME_CHANGE_POST);
 
       /* NOTE: Similar to this case in scene_graph_update_tagged(). Need to ensure that
-       * DEG_ids_clear_recalc() doesn't access freed memory of possibly removed ID. */
+       * DEG_editors_update() doesn't access freed memory of possibly removed ID. */
       DEG_graph_relations_update(depsgraph);
     }
-
-    /* Inform editors about possible changes. */
-    DEG_ids_check_recalc(bmain, depsgraph, scene, view_layer, true);
-    /* clear recalc flags */
-    DEG_ids_clear_recalc(bmain, depsgraph);
 
     /* If user callback did not tag anything for update we can skip second iteration.
      * Otherwise we update scene once again, but without running callbacks to bring
@@ -2739,7 +2763,32 @@ void BKE_scene_graph_update_for_newframe(Depsgraph *depsgraph)
     if (DEG_is_fully_evaluated(depsgraph)) {
       break;
     }
+
+    /* Clear recalc flags for second pass, but back them up for editors update. */
+    const bool backup = true;
+    DEG_ids_clear_recalc(depsgraph, backup);
+    used_multiple_passes = true;
   }
+
+  /* Inform editors about changes, using recalc flags from both passes. */
+  if (used_multiple_passes) {
+    DEG_ids_restore_recalc(depsgraph);
+  }
+
+  const bool is_time_update = true;
+  DEG_editors_update(depsgraph, is_time_update);
+
+  /* Clear recalc flags, can be skipped for e.g. renderers that will read these
+   * and clear the flags later. */
+  if (clear_recalc) {
+    const bool backup = false;
+    DEG_ids_clear_recalc(depsgraph, backup);
+  }
+}
+
+void BKE_scene_graph_update_for_newframe(Depsgraph *depsgraph)
+{
+  BKE_scene_graph_update_for_newframe_ex(depsgraph, true);
 }
 
 /**
@@ -3336,7 +3385,7 @@ static bool depsgraph_key_compare(const void *key_a_v, const void *key_b_v)
 {
   const DepsgraphKey *key_a = key_a_v;
   const DepsgraphKey *key_b = key_b_v;
-  /* TODO(sergey): Compare rest of  */
+  /* TODO(sergey): Compare rest of. */
   return !(key_a->view_layer == key_b->view_layer);
 }
 
@@ -3450,6 +3499,9 @@ static Depsgraph **scene_ensure_depsgraph_p(Main *bmain, Scene *scene, ViewLayer
   BLI_snprintf(name, sizeof(name), "%s :: %s", scene->id.name, view_layer->name);
   DEG_debug_name_set(*depsgraph_ptr, name);
 
+  /* These viewport depsgraphs communicate changes to the editors. */
+  DEG_enable_editors_update(*depsgraph_ptr);
+
   return depsgraph_ptr;
 }
 
@@ -3496,8 +3548,8 @@ GHash *BKE_scene_undo_depsgraphs_extract(Main *bmain)
 
   for (Scene *scene = bmain->scenes.first; scene != NULL; scene = scene->id.next) {
     if (scene->depsgraph_hash == NULL) {
-      /* In some cases, e.g. when undo has to perform multiple steps at once, no depsgraph will be
-       * built so this pointer may be NULL. */
+      /* In some cases, e.g. when undo has to perform multiple steps at once, no depsgraph will
+       * be built so this pointer may be NULL. */
       continue;
     }
     for (ViewLayer *view_layer = scene->view_layers.first; view_layer != NULL;
@@ -3742,9 +3794,7 @@ void BKE_scene_eval_sequencer_sequences(Depsgraph *depsgraph, Scene *scene)
   SEQ_ALL_BEGIN (scene->ed, seq) {
     if (seq->scene_sound == NULL) {
       if (seq->sound != NULL) {
-        if (seq->scene_sound == NULL) {
-          seq->scene_sound = BKE_sound_add_scene_sound_defaults(scene, seq);
-        }
+        seq->scene_sound = BKE_sound_add_scene_sound_defaults(scene, seq);
       }
       else if (seq->type == SEQ_TYPE_SCENE) {
         if (seq->scene != NULL) {

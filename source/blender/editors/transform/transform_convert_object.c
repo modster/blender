@@ -153,7 +153,7 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 
   if (t->mode != TFM_DUMMY && ob->rigidbody_object) {
     float rot[3][3], scale[3];
-    float ctime = BKE_scene_frame_get(scene);
+    float ctime = BKE_scene_ctime_get(scene);
 
     /* only use rigid body transform if simulation is running,
      * avoids problems with initial setup of rigid bodies */
@@ -282,9 +282,17 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
      */
     BKE_object_to_mat3(ob, obmtx);
     copy_m3_m4(totmat, ob->obmat);
-    invert_m3_m3(obinv, totmat);
+
+    /* If the object scale is zero on any axis, this might result in a zero matrix.
+     * In this case, the transformation would not do anything, see: T50103. */
+    orthogonalize_m3_zero_axes(obmtx, 1.0f);
+    orthogonalize_m3_zero_axes(totmat, 1.0f);
+
+    /* Use safe invert even though the input matrices have had zero axes set to unit length,
+     * in the unlikely case of failure (float precision for eg) this uses unit matrix fallback. */
+    invert_m3_m3_safe_ortho(obinv, totmat);
     mul_m3_m3m3(td->smtx, obmtx, obinv);
-    invert_m3_m3(td->mtx, td->smtx);
+    invert_m3_m3_safe_ortho(td->mtx, td->smtx);
   }
   else {
     /* no conversion to/from dataspace */
@@ -970,7 +978,7 @@ void special_aftertrans_update__object(bContext *C, TransInfo *t)
 
     /* restore rigid body transform */
     if (ob->rigidbody_object && canceled) {
-      float ctime = BKE_scene_frame_get(t->scene);
+      float ctime = BKE_scene_ctime_get(t->scene);
       if (BKE_rigidbody_check_sim_running(t->scene->rigidbody_world, ctime)) {
         BKE_rigidbody_aftertrans_update(ob,
                                         td->ext->oloc,

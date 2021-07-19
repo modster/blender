@@ -384,7 +384,7 @@ template<typename T> class CustomMF_Constant : public MultiFunction {
 
   uint64_t hash() const override
   {
-    return DefaultHash<T>{}(value_);
+    return get_default_hash(value_);
   }
 
   bool equals(const MultiFunction &other) const override
@@ -398,7 +398,7 @@ template<typename T> class CustomMF_Constant : public MultiFunction {
     if (other2 != nullptr) {
       const CPPType &type = CPPType::get<T>();
       if (type == other2->type_) {
-        return type.is_equal(static_cast<const void *>(&value_), other2->value_);
+        return type.is_equal_or_false(static_cast<const void *>(&value_), other2->value_);
       }
     }
     return false;

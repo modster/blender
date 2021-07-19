@@ -20,6 +20,8 @@
 
 #include "COM_PlaneCornerPinOperation.h"
 
+namespace blender::compositor {
+
 CornerPinNode::CornerPinNode(bNode *editorNode) : Node(editorNode)
 {
 }
@@ -28,7 +30,7 @@ void CornerPinNode::convertToOperations(NodeConverter &converter,
                                         const CompositorContext & /*context*/) const
 {
   NodeInput *input_image = this->getInputSocket(0);
-  /* note: socket order differs between UI node and operations:
+  /* NOTE: socket order differs between UI node and operations:
    * bNode uses intuitive order following top-down layout:
    *   upper-left, upper-right, lower-left, lower-right
    * Operations use same order as the tracking blenkernel functions expect:
@@ -53,3 +55,5 @@ void CornerPinNode::convertToOperations(NodeConverter &converter,
   converter.mapOutputSocket(output_warped_image, warp_image_operation->getOutputSocket());
   converter.mapOutputSocket(output_plane, plane_mask_operation->getOutputSocket());
 }
+
+}  // namespace blender::compositor

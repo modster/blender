@@ -73,6 +73,12 @@ template<typename Key, typename Value> class MultiValueMap {
     vector.append(std::forward<ForwardValue>(value));
   }
 
+  void add_non_duplicates(const Key &key, const Value &value)
+  {
+    Vector<Value> &vector = map_.lookup_or_add_default_as(key);
+    vector.append_non_duplicates(value);
+  }
+
   /**
    * Add all given values to the key.
    */
@@ -123,7 +129,7 @@ template<typename Key, typename Value> class MultiValueMap {
   }
 
   /**
-   * Note: This signature will change when the implementation changes.
+   * NOTE: This signature will change when the implementation changes.
    */
   typename MapType::ItemIterator items() const
   {
@@ -131,7 +137,7 @@ template<typename Key, typename Value> class MultiValueMap {
   }
 
   /**
-   * Note: This signature will change when the implementation changes.
+   * NOTE: This signature will change when the implementation changes.
    */
   typename MapType::KeyIterator keys() const
   {
@@ -139,7 +145,7 @@ template<typename Key, typename Value> class MultiValueMap {
   }
 
   /**
-   * Note: This signature will change when the implementation changes.
+   * NOTE: This signature will change when the implementation changes.
    */
   typename MapType::ValueIterator values() const
   {

@@ -120,7 +120,7 @@ struct DDSHeader {
   void setHasAlphaFlag(bool b);
   void setUserVersion(int version);
 
-  /*void swapBytes();*/
+  // void swapBytes();
 
   bool hasDX10Header() const;
   uint signature() const;
@@ -136,7 +136,6 @@ struct DDSHeader {
 class DirectDrawSurface {
  public:
   DirectDrawSurface(unsigned char *mem, uint size);
-  ~DirectDrawSurface();
 
   bool isValid() const;
   bool isSupported() const;

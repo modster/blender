@@ -23,6 +23,11 @@
 #include "DNA_mask_types.h"
 #include "IMB_imbuf_types.h"
 
+/* Forward declarations. */
+struct MaskRasterHandle;
+
+namespace blender::compositor {
+
 /**
  * Class with implementation of mask rasterization
  */
@@ -30,12 +35,12 @@ class MaskOperation : public NodeOperation {
  protected:
   Mask *m_mask;
 
-  /* note, these are used more like aspect,
+  /* NOTE: these are used more like aspect,
    * but they _do_ impact on mask detail */
   int m_maskWidth;
   int m_maskHeight;
-  float m_maskWidthInv;  /* 1 / m_maskWidth  */
-  float m_maskHeightInv; /* 1 / m_maskHeight */
+  float m_maskWidthInv;  /* `1 / m_maskWidth` */
+  float m_maskHeightInv; /* `1 / m_maskHeight` */
   float m_mask_px_ofs[2];
 
   float m_frame_shutter;
@@ -49,13 +54,14 @@ class MaskOperation : public NodeOperation {
   /**
    * Determine the output resolution. The resolution is retrieved from the Renderer
    */
-  void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
+  void determineResolution(unsigned int resolution[2],
+                           unsigned int preferredResolution[2]) override;
 
  public:
   MaskOperation();
 
-  void initExecution();
-  void deinitExecution();
+  void initExecution() override;
+  void deinitExecution() override;
 
   void setMask(Mask *mask)
   {
@@ -91,5 +97,7 @@ class MaskOperation : public NodeOperation {
     this->m_frame_shutter = shutter;
   }
 
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
 };
+
+}  // namespace blender::compositor

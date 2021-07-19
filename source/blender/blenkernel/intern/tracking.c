@@ -1525,7 +1525,7 @@ MovieTrackingMarker *BKE_tracking_marker_get(MovieTrackingTrack *track, int fram
   const int num_markers = track->markersnr;
 
   if (num_markers == 0) {
-    BLI_assert(!"Detected degenerated track, should never happen.");
+    BLI_assert_msg(0, "Detected degenerated track, should never happen.");
     return NULL;
   }
 
@@ -3249,6 +3249,11 @@ static void tracking_dopesheet_calc_coverage(MovieTracking *tracking)
   LISTBASE_FOREACH (MovieTrackingTrack *, track, tracksbase) {
     start_frame = min_ii(start_frame, track->markers[0].framenr);
     end_frame = max_ii(end_frame, track->markers[track->markersnr - 1].framenr);
+  }
+
+  if (start_frame > end_frame) {
+    /* There are no markers at all, nothing to calculate coverage from. */
+    return;
   }
 
   frames = end_frame - start_frame + 1;

@@ -49,16 +49,39 @@ const EnumPropertyItem rna_enum_attribute_type_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+const EnumPropertyItem rna_enum_attribute_type_with_auto_items[] = {
+    {CD_AUTO_FROM_NAME, "AUTO", 0, "Auto", ""},
+    {CD_PROP_FLOAT, "FLOAT", 0, "Float", "Floating-point value"},
+    {CD_PROP_INT32, "INT", 0, "Integer", "32-bit integer"},
+    {CD_PROP_FLOAT3, "FLOAT_VECTOR", 0, "Vector", "3D vector with floating-point values"},
+    {CD_PROP_COLOR, "FLOAT_COLOR", 0, "Color", "RGBA color with floating-point precisions"},
+    {CD_MLOOPCOL, "BYTE_COLOR", 0, "Byte Color", "RGBA color with 8-bit precision"},
+    {CD_PROP_STRING, "STRING", 0, "String", "Text string"},
+    {CD_PROP_BOOL, "BOOLEAN", 0, "Boolean", "True or false"},
+    {CD_PROP_FLOAT2, "FLOAT2", 0, "2D Vector", "2D vector with floating-point values"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 const EnumPropertyItem rna_enum_attribute_domain_items[] = {
     /* Not implement yet */
     // {ATTR_DOMAIN_GEOMETRY, "GEOMETRY", 0, "Geometry", "Attribute on (whole) geometry"},
     {ATTR_DOMAIN_POINT, "POINT", 0, "Point", "Attribute on point"},
     {ATTR_DOMAIN_EDGE, "EDGE", 0, "Edge", "Attribute on mesh edge"},
-    {ATTR_DOMAIN_CORNER, "CORNER", 0, "Corner", "Attribute on mesh polygon corner"},
-    {ATTR_DOMAIN_POLYGON, "POLYGON", 0, "Polygon", "Attribute on mesh polygons"},
+    {ATTR_DOMAIN_FACE, "FACE", 0, "Face", "Attribute on mesh faces"},
+    {ATTR_DOMAIN_CORNER, "CORNER", 0, "Face Corner", "Attribute on mesh face corner"},
     /* Not implement yet */
     // {ATTR_DOMAIN_GRIDS, "GRIDS", 0, "Grids", "Attribute on mesh multires grids"},
-    {ATTR_DOMAIN_CURVE, "CURVE", 0, "Curve", "Attribute on hair curve"},
+    {ATTR_DOMAIN_CURVE, "CURVE", 0, "Spline", "Attribute on spline"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+const EnumPropertyItem rna_enum_attribute_domain_with_auto_items[] = {
+    {ATTR_DOMAIN_AUTO, "AUTO", 0, "Auto", ""},
+    {ATTR_DOMAIN_POINT, "POINT", 0, "Point", "Attribute on point"},
+    {ATTR_DOMAIN_EDGE, "EDGE", 0, "Edge", "Attribute on mesh edge"},
+    {ATTR_DOMAIN_FACE, "FACE", 0, "Face", "Attribute on mesh faces"},
+    {ATTR_DOMAIN_CORNER, "CORNER", 0, "Face Corner", "Attribute on mesh face corner"},
+    {ATTR_DOMAIN_CURVE, "CURVE", 0, "Spline", "Attribute on spline"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -139,6 +162,9 @@ const EnumPropertyItem *rna_enum_attribute_domain_itemf(ID *id, bool *r_free)
   const ID_Type id_type = GS(id->name);
   int totitem = 0, a;
 
+  static EnumPropertyItem mesh_vertex_domain_item = {
+      ATTR_DOMAIN_POINT, "POINT", 0, "Vertex", "Attribute per point/vertex"};
+
   for (a = 0; rna_enum_attribute_domain_items[a].identifier; a++) {
     domain_item = &rna_enum_attribute_domain_items[a];
 
@@ -152,7 +178,12 @@ const EnumPropertyItem *rna_enum_attribute_domain_itemf(ID *id, bool *r_free)
       continue;
     }
 
-    RNA_enum_item_add(&item, &totitem, domain_item);
+    if (domain_item->value == ATTR_DOMAIN_POINT && id_type == ID_ME) {
+      RNA_enum_item_add(&item, &totitem, &mesh_vertex_domain_item);
+    }
+    else {
+      RNA_enum_item_add(&item, &totitem, domain_item);
+    }
   }
   RNA_enum_item_end(&item, &totitem);
 

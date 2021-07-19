@@ -378,7 +378,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
      * But this is not exactly trivial change, better to keep this optimization for later...
      */
     if (!has_vgroup) {
-      /* Note: in theory, we could avoid this extra allocation & copying...
+      /* NOTE: in theory, we could avoid this extra allocation & copying...
        * But think we can live with it for now,
        * and it makes code simpler & cleaner. */
       float(*vert_normals)[3] = MEM_calloc_arrayN(
@@ -764,7 +764,6 @@ ModifierTypeInfo modifierType_WeightedNormal = {
     /* modifyMesh */ modifyMesh,
     /* modifyHair */ NULL,
     /* modifyGeometrySet */ NULL,
-    /* modifyVolume */ NULL,
 
     /* initData */ initData,
     /* requiredDataMask */ requiredDataMask,

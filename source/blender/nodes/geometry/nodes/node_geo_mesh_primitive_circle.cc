@@ -17,6 +17,7 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
+#include "BKE_material.h"
 #include "BKE_mesh.h"
 
 #include "UI_interface.h"
@@ -65,7 +66,7 @@ static int circle_vert_total(const GeometryNodeMeshCircleFillType fill_type, con
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
       return verts_num + 1;
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return 0;
 }
 
@@ -78,7 +79,7 @@ static int circle_edge_total(const GeometryNodeMeshCircleFillType fill_type, con
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
       return verts_num * 2;
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return 0;
 }
 
@@ -92,7 +93,7 @@ static int circle_corner_total(const GeometryNodeMeshCircleFillType fill_type, c
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
       return verts_num * 3;
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return 0;
 }
 
@@ -106,7 +107,7 @@ static int circle_face_total(const GeometryNodeMeshCircleFillType fill_type, con
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
       return verts_num;
   }
-  BLI_assert(false);
+  BLI_assert_unreachable();
   return 0;
 }
 
@@ -119,6 +120,7 @@ static Mesh *create_circle_mesh(const float radius,
                                    0,
                                    circle_corner_total(fill_type, verts_num),
                                    circle_face_total(fill_type, verts_num));
+  BKE_id_material_eval_ensure_default_slot(&mesh->id);
   MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
   MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
@@ -161,6 +163,7 @@ static Mesh *create_circle_mesh(const float radius,
       MEdge &edge = edges[verts_num + i];
       edge.v1 = verts_num;
       edge.v2 = i;
+      edge.flag = ME_EDGEDRAW | ME_EDGERENDER;
     }
   }
 
@@ -225,7 +228,8 @@ void register_node_type_geo_mesh_primitive_circle()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_MESH_PRIMITIVE_CIRCLE, "Circle", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(
+      &ntype, GEO_NODE_MESH_PRIMITIVE_CIRCLE, "Mesh Circle", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(
       &ntype, geo_node_mesh_primitive_circle_in, geo_node_mesh_primitive_circle_out);
   node_type_init(&ntype, geo_node_mesh_primitive_circle_init);

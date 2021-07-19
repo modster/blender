@@ -4374,7 +4374,7 @@ NODE_DEFINE(HairInfoNode)
   SOCKET_OUT_FLOAT(intercept, "Intercept");
   SOCKET_OUT_FLOAT(thickness, "Thickness");
   SOCKET_OUT_NORMAL(tangent_normal, "Tangent Normal");
-#if 0 /*output for minimum hair width transparency - deactivated */
+#if 0 /* Output for minimum hair width transparency - deactivated. */
   SOCKET_OUT_FLOAT(fade, "Fade");
 #endif
   SOCKET_OUT_FLOAT(index, "Random");
@@ -4425,12 +4425,12 @@ void HairInfoNode::compile(SVMCompiler &compiler)
   if (!out->links.empty()) {
     compiler.add_node(NODE_HAIR_INFO, NODE_INFO_CURVE_TANGENT_NORMAL, compiler.stack_assign(out));
   }
-
-  /*out = output("Fade");
+#if 0
+  out = output("Fade");
   if(!out->links.empty()) {
     compiler.add_node(NODE_HAIR_INFO, NODE_INFO_CURVE_FADE, compiler.stack_assign(out));
-  }*/
-
+  }
+#endif
   out = output("Random");
   if (!out->links.empty()) {
     int attr = compiler.attribute(ATTR_STD_CURVE_RANDOM);
@@ -6091,6 +6091,10 @@ NODE_DEFINE(VectorMathNode)
   type_enum.insert("cross_product", NODE_VECTOR_MATH_CROSS_PRODUCT);
   type_enum.insert("project", NODE_VECTOR_MATH_PROJECT);
   type_enum.insert("reflect", NODE_VECTOR_MATH_REFLECT);
+  type_enum.insert("refract", NODE_VECTOR_MATH_REFRACT);
+  type_enum.insert("faceforward", NODE_VECTOR_MATH_FACEFORWARD);
+  type_enum.insert("multiply_add", NODE_VECTOR_MATH_MULTIPLY_ADD);
+
   type_enum.insert("dot_product", NODE_VECTOR_MATH_DOT_PRODUCT);
 
   type_enum.insert("distance", NODE_VECTOR_MATH_DISTANCE);
@@ -6151,24 +6155,25 @@ void VectorMathNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *vector1_in = input("Vector1");
   ShaderInput *vector2_in = input("Vector2");
-  ShaderInput *scale_in = input("Scale");
+  ShaderInput *param1_in = input("Scale");
   ShaderOutput *value_out = output("Value");
   ShaderOutput *vector_out = output("Vector");
 
   int vector1_stack_offset = compiler.stack_assign(vector1_in);
   int vector2_stack_offset = compiler.stack_assign(vector2_in);
-  int scale_stack_offset = compiler.stack_assign(scale_in);
+  int param1_stack_offset = compiler.stack_assign(param1_in);
   int value_stack_offset = compiler.stack_assign_if_linked(value_out);
   int vector_stack_offset = compiler.stack_assign_if_linked(vector_out);
 
   /* 3 Vector Operators */
-  if (math_type == NODE_VECTOR_MATH_WRAP) {
+  if (math_type == NODE_VECTOR_MATH_WRAP || math_type == NODE_VECTOR_MATH_FACEFORWARD ||
+      math_type == NODE_VECTOR_MATH_MULTIPLY_ADD) {
     ShaderInput *vector3_in = input("Vector3");
     int vector3_stack_offset = compiler.stack_assign(vector3_in);
     compiler.add_node(
         NODE_VECTOR_MATH,
         math_type,
-        compiler.encode_uchar4(vector1_stack_offset, vector2_stack_offset, scale_stack_offset),
+        compiler.encode_uchar4(vector1_stack_offset, vector2_stack_offset, param1_stack_offset),
         compiler.encode_uchar4(value_stack_offset, vector_stack_offset));
     compiler.add_node(vector3_stack_offset);
   }
@@ -6176,7 +6181,7 @@ void VectorMathNode::compile(SVMCompiler &compiler)
     compiler.add_node(
         NODE_VECTOR_MATH,
         math_type,
-        compiler.encode_uchar4(vector1_stack_offset, vector2_stack_offset, scale_stack_offset),
+        compiler.encode_uchar4(vector1_stack_offset, vector2_stack_offset, param1_stack_offset),
         compiler.encode_uchar4(value_stack_offset, vector_stack_offset));
   }
 }

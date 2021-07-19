@@ -161,13 +161,13 @@ static void precalculate_effector(struct Depsgraph *depsgraph, EffectorCache *ef
   if (eff->pd->forcefield == PFIELD_GUIDE && eff->ob->type == OB_CURVE) {
     Curve *cu = eff->ob->data;
     if (cu->flag & CU_PATH) {
-      if (eff->ob->runtime.curve_cache == NULL || eff->ob->runtime.curve_cache->path == NULL ||
-          eff->ob->runtime.curve_cache->path->data == NULL) {
-        BKE_displist_make_curveTypes(depsgraph, eff->scene, eff->ob, false, false);
+      if (eff->ob->runtime.curve_cache == NULL ||
+          eff->ob->runtime.curve_cache->anim_path_accum_length == NULL) {
+        BKE_displist_make_curveTypes(depsgraph, eff->scene, eff->ob, false);
       }
 
-      if (eff->ob->runtime.curve_cache->path && eff->ob->runtime.curve_cache->path->data) {
-        where_on_path(
+      if (eff->ob->runtime.curve_cache->anim_path_accum_length) {
+        BKE_where_on_path(
             eff->ob, 0.0, eff->guide_loc, eff->guide_dir, NULL, &eff->guide_radius, NULL);
         mul_m4_v3(eff->ob->obmat, eff->guide_loc);
         mul_mat3_m4_v3(eff->ob->obmat, eff->guide_dir);
@@ -716,7 +716,7 @@ int get_effector_data(EffectorCache *eff,
   }
   else if (eff->pd && eff->pd->shape == PFIELD_SHAPE_POINTS) {
     /* TODO: hair and points object support */
-    Mesh *me_eval = BKE_object_get_evaluated_mesh(eff->ob);
+    const Mesh *me_eval = BKE_object_get_evaluated_mesh(eff->ob);
     if (me_eval != NULL) {
       copy_v3_v3(efd->loc, me_eval->mvert[*efd->index].co);
       normal_short_to_float_v3(efd->nor, me_eval->mvert[*efd->index].no);
@@ -773,7 +773,7 @@ int get_effector_data(EffectorCache *eff,
     /* use center of object for distance calculus */
     const Object *ob = eff->ob;
 
-    /* use z-axis as normal*/
+    /* Use z-axis as normal. */
     normalize_v3_v3(efd->nor, ob->obmat[2]);
 
     if (eff->pd && ELEM(eff->pd->shape, PFIELD_SHAPE_PLANE, PFIELD_SHAPE_LINE)) {
@@ -830,7 +830,7 @@ static void get_effector_tot(
 
   if (eff->pd->shape == PFIELD_SHAPE_POINTS) {
     /* TODO: hair and points object support */
-    Mesh *me_eval = BKE_object_get_evaluated_mesh(eff->ob);
+    const Mesh *me_eval = BKE_object_get_evaluated_mesh(eff->ob);
     *tot = me_eval != NULL ? me_eval->totvert : 1;
 
     if (*tot && eff->pd->forcefield == PFIELD_HARMONIC && point->index >= 0) {

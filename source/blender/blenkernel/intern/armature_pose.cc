@@ -26,6 +26,7 @@
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
 
+#include "BLI_function_ref.hh"
 #include "BLI_set.hh"
 
 #include "DNA_action_types.h"
@@ -38,23 +39,70 @@
 namespace {
 using BoneNameSet = blender::Set<std::string>;
 
+using ActionApplier =
+    blender::FunctionRef<void(PointerRNA *, bAction *, const AnimationEvalContext *)>;
+
 // Forward declarations.
-BoneNameSet pose_apply_find_selected_bones(const bPose *pose);
+BoneNameSet pose_apply_find_selected_bones(const bArmature *armature, const bPose *pose);
 void pose_apply_disable_fcurves_for_unselected_bones(bAction *action,
                                                      const BoneNameSet &selected_bone_names);
 void pose_apply_restore_fcurves(bAction *action);
+
+void pose_apply(struct Object *ob,
+                struct bAction *action,
+                struct AnimationEvalContext *anim_eval_context,
+                ActionApplier applier);
+
 }  // namespace
 
-void BKE_pose_apply_action(struct Object *ob,
-                           struct bAction *action,
-                           struct AnimationEvalContext *anim_eval_context)
+void BKE_pose_apply_action_selected_bones(struct Object *ob,
+                                          struct bAction *action,
+                                          struct AnimationEvalContext *anim_eval_context)
+{
+  auto evaluate_and_apply =
+      [](PointerRNA *ptr, bAction *act, const AnimationEvalContext *anim_eval_context) {
+        animsys_evaluate_action(ptr, act, anim_eval_context, false);
+      };
+
+  pose_apply(ob, action, anim_eval_context, evaluate_and_apply);
+}
+
+void BKE_pose_apply_action_all_bones(struct Object *ob,
+                                     struct bAction *action,
+                                     struct AnimationEvalContext *anim_eval_context)
+{
+  PointerRNA pose_owner_ptr;
+  RNA_id_pointer_create(&ob->id, &pose_owner_ptr);
+  animsys_evaluate_action(&pose_owner_ptr, action, anim_eval_context, false);
+}
+
+void BKE_pose_apply_action_blend(struct Object *ob,
+                                 struct bAction *action,
+                                 struct AnimationEvalContext *anim_eval_context,
+                                 const float blend_factor)
+{
+  auto evaluate_and_blend = [blend_factor](PointerRNA *ptr,
+                                           bAction *act,
+                                           const AnimationEvalContext *anim_eval_context) {
+    animsys_blend_in_action(ptr, act, anim_eval_context, blend_factor);
+  };
+
+  pose_apply(ob, action, anim_eval_context, evaluate_and_blend);
+}
+
+namespace {
+void pose_apply(struct Object *ob,
+                struct bAction *action,
+                struct AnimationEvalContext *anim_eval_context,
+                ActionApplier applier)
 {
   bPose *pose = ob->pose;
   if (pose == nullptr) {
     return;
   }
 
-  const BoneNameSet selected_bone_names = pose_apply_find_selected_bones(pose);
+  const bArmature *armature = (bArmature *)ob->data;
+  const BoneNameSet selected_bone_names = pose_apply_find_selected_bones(armature, pose);
   const bool limit_to_selected_bones = !selected_bone_names.is_empty();
 
   if (limit_to_selected_bones) {
@@ -66,23 +114,22 @@ void BKE_pose_apply_action(struct Object *ob,
   /* Apply the Action. */
   PointerRNA pose_owner_ptr;
   RNA_id_pointer_create(&ob->id, &pose_owner_ptr);
-  animsys_evaluate_action(&pose_owner_ptr, action, anim_eval_context, false);
+
+  applier(&pose_owner_ptr, action, anim_eval_context);
 
   if (limit_to_selected_bones) {
     pose_apply_restore_fcurves(action);
   }
 }
 
-namespace {
-BoneNameSet pose_apply_find_selected_bones(const bPose *pose)
+BoneNameSet pose_apply_find_selected_bones(const bArmature *armature, const bPose *pose)
 {
   BoneNameSet selected_bone_names;
   bool all_bones_selected = true;
   bool no_bones_selected = true;
 
   LISTBASE_FOREACH (bPoseChannel *, pchan, &pose->chanbase) {
-    const bool is_selected = (pchan->bone->flag & BONE_SELECTED) != 0 &&
-                             (pchan->bone->flag & BONE_HIDDEN_P) == 0;
+    const bool is_selected = PBONE_SELECTED(armature, pchan->bone);
     all_bones_selected &= is_selected;
     no_bones_selected &= !is_selected;
 

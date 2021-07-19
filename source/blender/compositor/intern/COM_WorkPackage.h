@@ -18,14 +18,30 @@
 
 #pragma once
 
+#ifdef WITH_CXX_GUARDEDALLOC
+#  include "MEM_guardedalloc.h"
+#endif
+
+#include "COM_Enums.h"
+
+#include "BLI_rect.h"
+
+#include <functional>
+#include <ostream>
+
+namespace blender::compositor {
+// Forward Declarations.
 class ExecutionGroup;
-#include "COM_ExecutionGroup.h"
 
 /**
  * \brief contains data about work that can be scheduled
  * \see WorkScheduler
  */
 struct WorkPackage {
+  eWorkPackageType type;
+
+  eWorkPackageState state = eWorkPackageState::NotScheduled;
+
   /**
    * \brief executionGroup with the operations-setup to be evaluated
    */
@@ -37,13 +53,25 @@ struct WorkPackage {
   unsigned int chunk_number;
 
   /**
-   * constructor
-   * \param group: the ExecutionGroup
-   * \param chunk_number: the number of the chunk
+   * Area of the execution group that the work package calculates.
    */
-  WorkPackage(ExecutionGroup *group, unsigned int chunk_number);
+  rcti rect;
+
+  /**
+   * Custom function to execute when work package type is CustomFunction.
+   */
+  std::function<void()> execute_fn;
+
+  /**
+   * Called when work execution is finished.
+   */
+  std::function<void()> executed_fn;
 
 #ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:WorkPackage")
 #endif
 };
+
+std::ostream &operator<<(std::ostream &os, const WorkPackage &work_package);
+
+}  // namespace blender::compositor

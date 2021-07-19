@@ -2414,19 +2414,19 @@ static void transform_image(int x,
 
   for (int yi = start_line; yi < start_line + total_lines; yi++) {
     for (int xi = 0; xi < x; xi++) {
-      /* translate point */
+      /* Translate point. */
       float xt = xi - translate_x;
       float yt = yi - translate_y;
 
-      /* rotate point with center ref */
+      /* Rotate point with center ref. */
       float xr = c * xt + s * yt;
       float yr = -s * xt + c * yt;
 
-      /* scale point with center ref */
+      /* Scale point with center ref. */
       xt = xr / scale_x;
       yt = yr / scale_y;
 
-      /* undo reference center point  */
+      /* Undo reference center point. */
       xt += (x / 2.0f);
       yt += (y / 2.0f);
 
@@ -2651,7 +2651,7 @@ static void RVBlurBitmap2_float(float *map, int width, int height, float blur, i
   swap = temp;
   temp = map; /* map = swap; */ /* UNUSED */
 
-  /* Tidy up   */
+  /* Tidy up. */
   MEM_freeN(filter);
   MEM_freeN(temp);
 }
@@ -3033,10 +3033,9 @@ static ImBuf *do_adjustment_impl(const SeqRenderData *context, Sequence *seq, fl
     i = seq_render_give_ibuf_seqbase(context, timeline_frame, seq->machine - 1, seqbasep);
   }
 
-  /* found nothing? so let's work the way up the metastrip stack, so
+  /* Found nothing? so let's work the way up the meta-strip stack, so
    * that it is possible to group a bunch of adjustment strips into
-   * a metastrip and have that work on everything below the metastrip
-   */
+   * a meta-strip and have that work on everything below the meta-strip. */
 
   if (!i) {
     Sequence *meta;
@@ -3188,8 +3187,8 @@ void seq_effect_speed_rebuild_map(Scene *scene, Sequence *seq, bool force)
     return;
   }
 
-  /* XXX - new in 2.5x. should we use the animation system this way?
-   * The fcurve is needed because many frames need evaluating at once - campbell */
+  /* XXX(campbell): new in 2.5x. should we use the animation system this way?
+   * The fcurve is needed because many frames need evaluating at once. */
   fcu = id_data_find_fcurve(&scene->id, seq, &RNA_Sequence, "speed_factor", 0, NULL);
   if (!v->frameMap || v->length != seq->len) {
     if (v->frameMap) {
@@ -3215,7 +3214,7 @@ void seq_effect_speed_rebuild_map(Scene *scene, Sequence *seq, bool force)
   else {
     /* if there is no fcurve, use value as simple multiplier */
     if (!fcu) {
-      fallback_fac = seq->speed_fader; /* same as speed_factor in rna*/
+      fallback_fac = seq->speed_fader; /* Same as speed_factor in RNA. */
     }
   }
 
@@ -3945,18 +3944,13 @@ static ImBuf *do_text_effect(const SeqRenderData *context,
     proxy_size_comp = SEQ_rendersize_to_scale_factor(context->preview_render_size);
   }
 
-  BLF_disable(font, BLF_ITALIC | BLF_BOLD);
-  if (data->flag & SEQ_TEXT_BOLD) {
-    BLF_enable(font, BLF_BOLD);
-  }
-  if (data->flag & SEQ_TEXT_ITALIC) {
-    BLF_enable(font, BLF_ITALIC);
-  }
-
   /* set before return */
   BLF_size(font, proxy_size_comp * data->text_size, 72);
 
-  BLF_enable(font, BLF_WORD_WRAP);
+  const int font_flags = BLF_WORD_WRAP | /* Always allow wrapping. */
+                         ((data->flag & SEQ_TEXT_BOLD) ? BLF_BOLD : 0) |
+                         ((data->flag & SEQ_TEXT_ITALIC) ? BLF_ITALIC : 0);
+  BLF_enable(font, font_flags);
 
   /* use max width to enable newlines only */
   BLF_wordwrap(font, (data->wrap_width != 0.0f) ? data->wrap_width * width : -1);
@@ -4027,7 +4021,7 @@ static ImBuf *do_text_effect(const SeqRenderData *context,
 
   BLF_buffer(font, NULL, NULL, 0, 0, 0, NULL);
 
-  BLF_disable(font, BLF_WORD_WRAP);
+  BLF_disable(font, font_flags);
 
   return out;
 }

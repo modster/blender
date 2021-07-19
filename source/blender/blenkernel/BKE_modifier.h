@@ -258,10 +258,6 @@ typedef struct ModifierTypeInfo {
                             const struct ModifierEvalContext *ctx,
                             struct GeometrySet *geometry_set);
 
-  struct Volume *(*modifyVolume)(struct ModifierData *md,
-                                 const struct ModifierEvalContext *ctx,
-                                 struct Volume *volume);
-
   /********************* Optional functions *********************/
 
   /**
@@ -328,7 +324,7 @@ typedef struct ModifierTypeInfo {
 
   /**
    * True when a deform modifier uses normals, the requiredDataMask
-   * cant be used here because that refers to a normal layer whereas
+   * can't be used here because that refers to a normal layer whereas
    * in this case we need to know if the deform modifier uses normals.
    *
    * this is needed because applying 2 deform modifiers will give the
@@ -450,8 +446,8 @@ bool BKE_modifier_is_preview(struct ModifierData *md);
 void BKE_modifiers_foreach_ID_link(struct Object *ob, IDWalkFunc walk, void *userData);
 void BKE_modifiers_foreach_tex_link(struct Object *ob, TexWalkFunc walk, void *userData);
 
-struct ModifierData *BKE_modifiers_findby_type(struct Object *ob, ModifierType type);
-struct ModifierData *BKE_modifiers_findby_name(struct Object *ob, const char *name);
+struct ModifierData *BKE_modifiers_findby_type(const struct Object *ob, ModifierType type);
+struct ModifierData *BKE_modifiers_findby_name(const struct Object *ob, const char *name);
 void BKE_modifiers_clear_errors(struct Object *ob);
 int BKE_modifiers_get_cage_index(const struct Scene *scene,
                                  struct Object *ob,

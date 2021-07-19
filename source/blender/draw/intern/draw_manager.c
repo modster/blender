@@ -87,6 +87,7 @@
 #include "draw_manager_profiling.h"
 #include "draw_manager_testing.h"
 #include "draw_manager_text.h"
+#include "draw_shader.h"
 #include "draw_texture_pool.h"
 
 /* only for callbacks */
@@ -1486,6 +1487,14 @@ void DRW_draw_callbacks_post_scene(void)
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
+  else {
+    if (v3d && ((v3d->flag2 & V3D_SHOW_ANNOTATION) != 0)) {
+      GPU_depth_test(GPU_DEPTH_NONE);
+      /* XXX: as scene->gpd is not copied for COW yet */
+      ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
+      GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
+    }
+  }
 }
 
 struct DRWTextStore *DRW_text_cache_ensure(void)
@@ -1647,7 +1656,7 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
 
   drw_engines_draw_scene();
 
-  /* Fix 3D view being "laggy" on macos and win+nvidia. (See T56996, T61474) */
+  /* Fix 3D view "lagging" on APPLE and WIN32+NVIDIA. (See T56996, T61474) */
   GPU_flush();
 
   DRW_stats_reset();
@@ -2058,7 +2067,7 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
   drw_viewport_colormanagement_set();
 
   /* TODO(jbakker): Only populate when editor needs to draw object.
-   * for the image editor this is when showing UV's.*/
+   * for the image editor this is when showing UV's. */
   const bool do_populate_loop = (DST.draw_ctx.space_data->spacetype == SPACE_IMAGE);
   const bool do_annotations = drw_draw_show_annotation();
   const bool do_draw_gizmos = (DST.draw_ctx.space_data->spacetype != SPACE_IMAGE);
@@ -2278,7 +2287,7 @@ void DRW_draw_select_loop(struct Depsgraph *depsgraph,
   }
   if (v3d->overlay.flag & V3D_OVERLAY_BONE_SELECT) {
     if (!(v3d->flag2 & V3D_HIDE_OVERLAYS)) {
-      /* Note: don't use "BKE_object_pose_armature_get" here, it breaks selection. */
+      /* NOTE: don't use "BKE_object_pose_armature_get" here, it breaks selection. */
       Object *obpose = OBPOSE_FROM_OBACT(obact);
       if (obpose == NULL) {
         Object *obweight = OBWEIGHTPAINT_FROM_OBACT(obact);
@@ -2562,8 +2571,7 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
 void DRW_draw_depth_loop(struct Depsgraph *depsgraph,
                          ARegion *region,
                          View3D *v3d,
-                         GPUViewport *viewport,
-                         bool use_opengl_context)
+                         GPUViewport *viewport)
 {
   /* Reset before using it. */
   drw_state_prepare_clean_for_draw(&DST);
@@ -2584,7 +2592,7 @@ void DRW_draw_depth_loop(struct Depsgraph *depsgraph,
     }
   }
 
-  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, use_opengl_context);
+  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, false);
 }
 
 /**
@@ -2605,7 +2613,7 @@ void DRW_draw_depth_loop_gpencil(struct Depsgraph *depsgraph,
 
   use_drw_engine(&draw_engine_gpencil_type);
 
-  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, true);
+  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, false);
 }
 
 void DRW_draw_select_id(Depsgraph *depsgraph, ARegion *region, View3D *v3d, const rcti *rect)
@@ -2689,7 +2697,6 @@ void DRW_draw_depth_object(
 {
   RegionView3D *rv3d = region->regiondata;
 
-  DRW_opengl_context_enable();
   GPU_matrix_projection_set(rv3d->winmat);
   GPU_matrix_set(rv3d->viewmat);
   GPU_matrix_mul(object->obmat);
@@ -2957,6 +2964,7 @@ void DRW_engines_free(void)
   DRW_TEXTURE_FREE_SAFE(g_select_buffer.texture_depth);
   GPU_FRAMEBUFFER_FREE_SAFE(g_select_buffer.framebuffer_depth_only);
 
+  DRW_shaders_free();
   DRW_hair_free();
   DRW_shape_cache_free();
   DRW_stats_free();
@@ -3115,7 +3123,7 @@ void DRW_opengl_render_context_enable(void *re_gl_context)
   /* If thread is main you should use DRW_opengl_context_enable(). */
   BLI_assert(!BLI_thread_is_main());
 
-  /* TODO get rid of the blocking. Only here because of the static global DST. */
+  /* TODO: get rid of the blocking. Only here because of the static global DST. */
   BLI_ticket_mutex_lock(DST.gl_context_mutex);
   WM_opengl_context_activate(re_gl_context);
 }
@@ -3123,7 +3131,7 @@ void DRW_opengl_render_context_enable(void *re_gl_context)
 void DRW_opengl_render_context_disable(void *re_gl_context)
 {
   WM_opengl_context_release(re_gl_context);
-  /* TODO get rid of the blocking. */
+  /* TODO: get rid of the blocking. */
   BLI_ticket_mutex_unlock(DST.gl_context_mutex);
 }
 

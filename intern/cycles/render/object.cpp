@@ -93,7 +93,8 @@ NODE_DEFINE(Object)
   SOCKET_POINT(dupli_generated, "Dupli Generated", zero_float3());
   SOCKET_POINT2(dupli_uv, "Dupli UV", zero_float2());
   SOCKET_TRANSFORM_ARRAY(motion, "Motion", array<Transform>());
-  SOCKET_FLOAT(shadow_terminator_offset, "Terminator Offset", 0.0f);
+  SOCKET_FLOAT(shadow_terminator_shading_offset, "Shadow Terminator Shading Offset", 0.0f);
+  SOCKET_FLOAT(shadow_terminator_geometry_offset, "Shadow Terminator Geometry Offset", 0.1f);
   SOCKET_STRING(asset_name, "Asset Name", ustring());
 
   SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
@@ -153,10 +154,6 @@ void Object::update_motion()
 
 void Object::compute_bounds(bool motion_blur)
 {
-  if (!is_modified() && !geometry->is_modified()) {
-    return;
-  }
-
   BoundBox mbounds = geometry->bounds;
 
   if (motion_blur && use_motion()) {
@@ -221,16 +218,11 @@ void Object::tag_update(Scene *scene)
 
   if (geometry) {
     if (tfm_is_modified()) {
-      /* tag the geometry as modified so the BVH is updated, but do not tag everything as modified
-       */
-      if (geometry->is_mesh() || geometry->is_volume()) {
-        Mesh *mesh = static_cast<Mesh *>(geometry);
-        mesh->tag_verts_modified();
-      }
-      else if (geometry->is_hair()) {
-        Hair *hair = static_cast<Hair *>(geometry);
-        hair->tag_curve_keys_modified();
-      }
+      flag |= ObjectManager::TRANSFORM_MODIFIED;
+    }
+
+    if (visibility_is_modified()) {
+      flag |= ObjectManager::VISIBILITY_MODIFIED;
     }
 
     foreach (Node *node, geometry->get_used_shaders()) {
@@ -516,7 +508,9 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
     kobject.cryptomatte_asset = util_hash_to_float(hash_asset);
   }
 
-  kobject.shadow_terminator_offset = 1.0f / (1.0f - 0.5f * ob->shadow_terminator_offset);
+  kobject.shadow_terminator_shading_offset = 1.0f /
+                                             (1.0f - 0.5f * ob->shadow_terminator_shading_offset);
+  kobject.shadow_terminator_geometry_offset = ob->shadow_terminator_geometry_offset;
 
   /* Object flag. */
   if (ob->use_holdout) {
@@ -921,6 +915,14 @@ void ObjectManager::tag_update(Scene *scene, uint32_t flag)
      * added or removed, but the BVH still needs to updated. */
     if ((flag & (OBJECT_ADDED | OBJECT_REMOVED)) != 0) {
       geometry_flag |= (GeometryManager::GEOMETRY_ADDED | GeometryManager::GEOMETRY_REMOVED);
+    }
+
+    if ((flag & TRANSFORM_MODIFIED) != 0) {
+      geometry_flag |= GeometryManager::TRANSFORM_MODIFIED;
+    }
+
+    if ((flag & VISIBILITY_MODIFIED) != 0) {
+      geometry_flag |= GeometryManager::VISIBILITY_MODIFIED;
     }
 
     scene->geometry_manager->tag_update(scene, geometry_flag);

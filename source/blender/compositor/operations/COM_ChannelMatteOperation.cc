@@ -19,6 +19,8 @@
 #include "COM_ChannelMatteOperation.h"
 #include "BLI_math.h"
 
+namespace blender::compositor {
+
 ChannelMatteOperation::ChannelMatteOperation()
 {
   addInputSocket(DataType::Color);
@@ -102,12 +104,12 @@ void ChannelMatteOperation::executePixelSampled(float output[4],
 
   /* test range */
   if (alpha > limit_max) {
-    alpha = inColor[3]; /*whatever it was prior */
+    alpha = inColor[3]; /* Whatever it was prior. */
   }
   else if (alpha < limit_min) {
     alpha = 0.0f;
   }
-  else { /*blend */
+  else { /* Blend. */
     alpha = (alpha - limit_min) / limit_range;
   }
 
@@ -118,3 +120,5 @@ void ChannelMatteOperation::executePixelSampled(float output[4],
   /* Don't make something that was more transparent less transparent. */
   output[0] = MIN2(alpha, inColor[3]);
 }
+
+}  // namespace blender::compositor

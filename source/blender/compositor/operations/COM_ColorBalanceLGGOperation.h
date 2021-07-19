@@ -18,13 +18,15 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedRowOperation.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class ColorBalanceLGGOperation : public NodeOperation {
+class ColorBalanceLGGOperation : public MultiThreadedRowOperation {
  protected:
   /**
    * Prefetched reference to the inputProgram
@@ -45,17 +47,17 @@ class ColorBalanceLGGOperation : public NodeOperation {
   /**
    * The inner loop of this operation.
    */
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
 
   /**
    * Initialize the execution
    */
-  void initExecution();
+  void initExecution() override;
 
   /**
    * Deinitialize the execution
    */
-  void deinitExecution();
+  void deinitExecution() override;
 
   void setGain(const float gain[3])
   {
@@ -69,4 +71,8 @@ class ColorBalanceLGGOperation : public NodeOperation {
   {
     copy_v3_v3(this->m_gamma_inv, gamma_inv);
   }
+
+  void update_memory_buffer_row(PixelCursor &p) override;
 };
+
+}  // namespace blender::compositor

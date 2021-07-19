@@ -48,7 +48,8 @@
 #define BPy_BMLoopUV_Check(v) (Py_TYPE(v) == &BPy_BMLoopUV_Type)
 
 typedef struct BPy_BMLoopUV {
-  PyObject_VAR_HEAD MLoopUV *data;
+  PyObject_VAR_HEAD
+  MLoopUV *data;
 } BPy_BMLoopUV;
 
 PyDoc_STRVAR(bpy_bmloopuv_uv_doc,
@@ -96,7 +97,7 @@ static int bpy_bmloopuv_flag_set(BPy_BMLoopUV *self, PyObject *value, void *flag
 }
 
 static PyGetSetDef bpy_bmloopuv_getseters[] = {
-    /* attributes match rna_def_mloopuv  */
+    /* attributes match rna_def_mloopuv. */
     {"uv", (getter)bpy_bmloopuv_uv_get, (setter)bpy_bmloopuv_uv_set, bpy_bmloopuv_uv_doc, NULL},
     {"pin_uv",
      (getter)bpy_bmloopuv_flag_get,
@@ -155,7 +156,8 @@ PyObject *BPy_BMLoopUV_CreatePyObject(struct MLoopUV *mloopuv)
 #define BPy_BMVertSkin_Check(v) (Py_TYPE(v) == &BPy_BMVertSkin_Type)
 
 typedef struct BPy_BMVertSkin {
-  PyObject_VAR_HEAD MVertSkin *data;
+  PyObject_VAR_HEAD
+  MVertSkin *data;
 } BPy_BMVertSkin;
 
 PyDoc_STRVAR(bpy_bmvertskin_radius_doc,
@@ -205,7 +207,7 @@ static int bpy_bmvertskin_flag_set(BPy_BMVertSkin *self, PyObject *value, void *
 }
 
 static PyGetSetDef bpy_bmvertskin_getseters[] = {
-    /* attributes match rna_mesh_gen  */
+    /* attributes match rna_mesh_gen. */
     {"radius",
      (getter)bpy_bmvertskin_radius_get,
      (setter)bpy_bmvertskin_radius_set,
@@ -392,7 +394,8 @@ PyObject *BPy_BMLoopColor_CreatePyObject(struct MLoopCol *mloopcol)
 #define BPy_BMDeformVert_Check(v) (Py_TYPE(v) == &BPy_BMDeformVert_Type)
 
 typedef struct BPy_BMDeformVert {
-  PyObject_VAR_HEAD MDeformVert *data;
+  PyObject_VAR_HEAD
+  MDeformVert *data;
 } BPy_BMDeformVert;
 
 /* Mapping Protocols
@@ -497,7 +500,7 @@ static PySequenceMethods bpy_bmdeformvert_as_sequence = {
     NULL,                          /* sq_concat */
     NULL,                          /* sq_repeat */
 
-    /* Note: if this is set #PySequence_Check() returns True,
+    /* NOTE: if this is set #PySequence_Check() returns True,
      * but in this case we don't want to be treated as a seq. */
     NULL, /* sq_item */
 

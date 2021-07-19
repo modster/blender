@@ -113,11 +113,11 @@ extern "C" {
  *
  * When the chunk-order is determined, the first few chunks will be checked if they can be scheduled.
  * Chunks can have three states:
- *  - [@ref eChunkExecutionState.NOT_SCHEDULED]:
+ *  - [@ref eWorkPackageState.NotScheduled]:
  *    Chunk is not yet scheduled, or dependencies are not met.
- *  - [@ref eChunkExecutionState.SCHEDULED]:
+ *  - [@ref eWorkPackageState.Scheduled]:
  *    All dependencies are met, chunk is scheduled, but not finished.
- *  - [@ref eChunkExecutionState.EXECUTED]:
+ *  - [@ref eWorkPackageState.Executed]:
  *    Chunk is finished.
  *
  * \see ExecutionGroup.execute
@@ -250,8 +250,8 @@ extern "C" {
  *
  * \subsection singlethread Single threaded
  * For debugging reasons the multi-threading can be disabled.
- * This is done by changing the COM_CURRENT_THREADING_MODEL
- * to COM_TM_NOTHREAD. When compiling the work-scheduler
+ * This is done by changing the `COM_threading_model`
+ * to `ThreadingModel::SingleThreaded`. When compiling the work-scheduler
  * will be changes to support no threading and run everything on the CPU.
  *
  * \section devices Devices

@@ -97,10 +97,6 @@ void AbcObjectReader::determine_inherits_xform()
   }
 }
 
-AbcObjectReader::~AbcObjectReader()
-{
-}
-
 const IObject &AbcObjectReader::iobject() const
 {
   return m_iobject;
@@ -214,7 +210,7 @@ void AbcObjectReader::setupObjectTransform(const float time)
 
 Alembic::AbcGeom::IXform AbcObjectReader::xform()
 {
-  /* Check that we have an empty object (locator, bone head/tail...).  */
+  /* Check that we have an empty object (locator, bone head/tail...). */
   if (IXform::matches(m_iobject.getMetaData())) {
     try {
       return IXform(m_iobject, Alembic::AbcGeom::kWrapExisting);

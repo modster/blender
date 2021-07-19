@@ -123,13 +123,15 @@ class View3DPanel:
 # **************** standard tool clusters ******************
 
 # Used by vertex & weight paint
-def draw_vpaint_symmetry(layout, vpaint, mesh):
+def draw_vpaint_symmetry(layout, vpaint, obj):
     col = layout.column()
     row = col.row(heading="Mirror", align=True)
-    row.prop(mesh, "use_mirror_x", text="X", toggle=True)
-    row.prop(mesh, "use_mirror_y", text="Y", toggle=True)
-    row.prop(mesh, "use_mirror_z", text="Z", toggle=True)
+    row.prop(obj, "use_mesh_mirror_x", text="X", toggle=True)
+    row.prop(obj, "use_mesh_mirror_y", text="Y", toggle=True)
+    row.prop(obj, "use_mesh_mirror_z", text="Z", toggle=True)
 
+    col = layout.column()
+    col.active = not obj.data.use_mirror_vertex_groups
     col.prop(vpaint, "radial_symmetry", text="Radial")
 
 
@@ -622,9 +624,15 @@ class VIEW3D_PT_tools_brush_texture(Panel, View3DPaintPanel):
 
     @classmethod
     def poll(cls, context):
-        settings = cls.paint_settings(context)
-        return (settings and settings.brush and
-                (context.sculpt_object or context.image_paint_object or context.vertex_paint_object))
+        if (
+                (settings := cls.paint_settings(context)) and
+                (brush := settings.brush)
+        ):
+            if context.sculpt_object or context.vertex_paint_object:
+                return True
+            elif context.image_paint_object:
+                return (brush.image_tool == 'DRAW')
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -824,7 +832,6 @@ class VIEW3D_PT_sculpt_voxel_remesh(Panel, View3DPaintPanel):
         props.mode = 'VOXEL'
         col.prop(mesh, "remesh_voxel_adaptivity")
         col.prop(mesh, "use_remesh_fix_poles")
-        col.prop(mesh, "use_remesh_smooth_normals")
 
         col = layout.column(heading="Preserve", align=True)
         col.prop(mesh, "use_remesh_preserve_volume", text="Volume")
@@ -971,12 +978,12 @@ class VIEW3D_PT_tools_weightpaint_symmetry(Panel, View3DPaintPanel):
         wpaint = tool_settings.weight_paint
         mesh = context.object.data
 
-        draw_vpaint_symmetry(layout, wpaint, mesh)
+        layout.prop(mesh, 'use_mirror_vertex_groups')
 
-        col = layout.column(align=True)
-        col.prop(mesh, 'use_mirror_vertex_group_x', text="Vertex Group X")
-        row = col.row()
-        row.active = mesh.use_mirror_vertex_group_x
+        draw_vpaint_symmetry(layout, wpaint, context.object)
+
+        row = layout.row()
+        row.active = mesh.use_mirror_vertex_groups
         row.prop(mesh, "use_mirror_topology")
 
 
@@ -1051,7 +1058,7 @@ class VIEW3D_PT_tools_vertexpaint_symmetry(Panel, View3DPaintPanel):
         tool_settings = context.tool_settings
         vpaint = tool_settings.vertex_paint
 
-        draw_vpaint_symmetry(layout, vpaint, context.object.data)
+        draw_vpaint_symmetry(layout, vpaint, context.object)
 
 
 class VIEW3D_PT_tools_vertexpaint_symmetry_for_topbar(Panel):
@@ -1314,6 +1321,14 @@ class VIEW3D_PT_tools_particlemode_options_display(View3DPanel, Panel):
 
 # Grease Pencil drawing brushes
 
+def tool_use_brush(context):
+    from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+    tool = ToolSelectPanelHelper.tool_active_from_context(context)
+    if tool and tool.has_datablock is False:
+        return False
+
+    return True
+
 
 class GreasePencilPaintPanel:
     bl_context = ".greasepencil_paint"
@@ -1323,6 +1338,10 @@ class GreasePencilPaintPanel:
     def poll(cls, context):
         if context.space_data.type in {'VIEW_3D', 'PROPERTIES'}:
             if context.gpencil_data is None:
+                return False
+
+            # Hide for tools not using bruhses
+            if tool_use_brush(context) is False:
                 return False
 
             gpd = context.gpencil_data
@@ -1448,7 +1467,12 @@ class VIEW3D_PT_tools_grease_pencil_brush_advanced(View3DPanel, Panel):
             elif brush.gpencil_tool == 'FILL':
                 row = col.row(align=True)
                 row.prop(gp_settings, "fill_draw_mode", text="Boundary")
-                row.prop(gp_settings, "show_fill_boundary", text="", icon='GRID')
+                row.prop(
+                    gp_settings,
+                    "show_fill_boundary",
+                    icon='HIDE_OFF' if gp_settings.show_fill_boundary else 'HIDE_ON',
+                    text="",
+                )
 
                 col.separator()
                 row = col.row(align=True)
@@ -1457,7 +1481,15 @@ class VIEW3D_PT_tools_grease_pencil_brush_advanced(View3DPanel, Panel):
                 col.separator()
                 row = col.row(align=True)
                 row.prop(gp_settings, "extend_stroke_factor")
-                row.prop(gp_settings, "show_fill_extend", text="", icon='GRID')
+                row.prop(
+                    gp_settings,
+                    "show_fill_extend",
+                    icon='HIDE_OFF' if gp_settings.show_fill_extend else 'HIDE_ON',
+                    text="",
+                )
+
+                col.separator()
+                col.prop(gp_settings, "fill_leak", text="Leak Size")
 
                 col.separator()
                 col.prop(gp_settings, "fill_simplify_level", text="Simplify")
@@ -1697,9 +1729,14 @@ class VIEW3D_PT_tools_grease_pencil_brush_paint_falloff(GreasePencilBrushFalloff
         if brush is None:
             return False
 
-        tool = brush.gpencil_tool
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool = ToolSelectPanelHelper.tool_active_from_context(context)
+        if tool and tool.idname != 'builtin_brush.Tint':
+            return False
 
-        return (settings and settings.brush and settings.brush.curve and tool == 'TINT')
+        gptool = brush.gpencil_tool
+
+        return (settings and settings.brush and settings.brush.curve and gptool == 'TINT')
 
 
 # Grease Pencil stroke sculpting tools
@@ -1848,7 +1885,7 @@ class VIEW3D_PT_tools_grease_pencil_brush_weight_falloff(GreasePencilBrushFallof
         ts = context.tool_settings
         settings = ts.gpencil_weight_paint
         brush = settings.brush
-        return (settings and settings.brush and settings.brush.curve)
+        return (brush and brush.curve)
 
 
 # Grease Pencil vertex painting tools
@@ -1940,7 +1977,6 @@ class VIEW3D_PT_tools_grease_pencil_brush_vertex_color(View3DPanel, Panel):
         ts = context.tool_settings
         settings = ts.gpencil_vertex_paint
         brush = settings.brush
-        gp_settings = brush.gpencil_settings
 
         col = layout.column()
 
@@ -2019,6 +2055,11 @@ class VIEW3D_PT_tools_grease_pencil_brush_mixcolor(View3DPanel, Panel):
         if context.region.type == 'TOOL_HEADER':
             return False
 
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool = ToolSelectPanelHelper.tool_active_from_context(context)
+        if tool and tool.idname in {'builtin.cutter', 'builtin.eyedropper', 'builtin.interpolate'}:
+            return False
+
         if brush.gpencil_tool == 'TINT':
             return True
 
@@ -2073,6 +2114,11 @@ class VIEW3D_PT_tools_grease_pencil_brush_mix_palette(View3DPanel, Panel):
         brush = settings.brush
 
         if ob is None or brush is None:
+            return False
+
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool = ToolSelectPanelHelper.tool_active_from_context(context)
+        if tool and tool.idname in {'builtin.cutter', 'builtin.eyedropper', 'builtin.interpolate'}:
             return False
 
         if brush.gpencil_tool == 'TINT':

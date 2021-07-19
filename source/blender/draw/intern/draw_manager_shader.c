@@ -396,6 +396,7 @@ GPUShader *DRW_shader_create_with_transform_feedback(const char *vert,
                               datatoc_gpu_shader_depth_only_frag_glsl,
                               geom,
                               NULL,
+                              NULL,
                               defines,
                               prim_type,
                               varying_names,
@@ -574,8 +575,8 @@ static uint64_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
     if (dep == -1) {
       char dbg_name[MAX_NAME];
       int i = 0;
-      while ((haystack[0] != ')') && (i < MAX_NAME - 1)) {
-        dbg_name[i] = haystack[0];
+      while ((*haystack != ')') && (i < (sizeof(dbg_name) - 2))) {
+        dbg_name[i] = *haystack;
         haystack++;
         i++;
       }

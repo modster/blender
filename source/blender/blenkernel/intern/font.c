@@ -216,15 +216,15 @@ void BKE_vfont_free_data(struct VFont *vfont)
   }
 }
 
-static void *builtin_font_data = NULL;
+static const void *builtin_font_data = NULL;
 static int builtin_font_size = 0;
 
-bool BKE_vfont_is_builtin(struct VFont *vfont)
+bool BKE_vfont_is_builtin(const struct VFont *vfont)
 {
   return STREQ(vfont->filepath, FO_BUILTIN_NAME);
 }
 
-void BKE_vfont_builtin_register(void *mem, int size)
+void BKE_vfont_builtin_register(const void *mem, int size)
 {
   builtin_font_data = mem;
   builtin_font_size = size;
@@ -447,7 +447,6 @@ static void build_underline(Curve *cu,
   nu2->resolu = cu->resolu;
   nu2->bezt = NULL;
   nu2->knotsu = nu2->knotsv = NULL;
-  nu2->flag = CU_2D;
   nu2->charidx = charidx + 1000;
   if (mat_nr > 0) {
     nu2->mat_nr = mat_nr - 1;
@@ -985,7 +984,7 @@ static bool vfont_to_curve(Object *ob,
         }
         if (dobreak) {
           if (tb_scale.h == 0.0f) {
-            /* Note: If underlined text is truncated away, the extra space is also truncated. */
+            /* NOTE: If underlined text is truncated away, the extra space is also truncated. */
             custrinfo[i + 1].flag |= CU_CHINFO_OVERFLOW;
           }
           goto makebreak;
@@ -1033,7 +1032,7 @@ static bool vfont_to_curve(Object *ob,
         current_line_length = 0.0f;
       }
 
-      /* XXX, has been unused for years, need to check if this is useful, r4613 r5282 - campbell */
+      /* XXX(campbell): has been unused for years, need to check if this is useful, r4613 r5282. */
 #if 0
       if (ascii == '\n') {
         xof = xof_scale;
@@ -1272,11 +1271,11 @@ static bool vfont_to_curve(Object *ob,
   MEM_freeN(i_textbox_array);
 
   /* TEXT ON CURVE */
-  /* Note: Only OB_CURVE objects could have a path  */
+  /* NOTE: Only OB_CURVE objects could have a path. */
   if (cu->textoncurve && cu->textoncurve->type == OB_CURVE) {
     BLI_assert(cu->textoncurve->runtime.curve_cache != NULL);
     if (cu->textoncurve->runtime.curve_cache != NULL &&
-        cu->textoncurve->runtime.curve_cache->path != NULL) {
+        cu->textoncurve->runtime.curve_cache->anim_path_accum_length != NULL) {
       float distfac, imat[4][4], imat3[3][3], cmat[3][3];
       float minx, maxx;
       float timeofs, sizefac;
@@ -1310,7 +1309,8 @@ static bool vfont_to_curve(Object *ob,
       /* length correction */
       const float chartrans_size_x = maxx - minx;
       if (chartrans_size_x != 0.0f) {
-        const float totdist = cu->textoncurve->runtime.curve_cache->path->totdist;
+        const CurveCache *cc = cu->textoncurve->runtime.curve_cache;
+        const float totdist = BKE_anim_path_get_length(cc);
         distfac = (sizefac * totdist) / chartrans_size_x;
         distfac = (distfac > 1.0f) ? (1.0f / distfac) : 1.0f;
       }
@@ -1364,8 +1364,8 @@ static bool vfont_to_curve(Object *ob,
 
         /* calc the right loc AND the right rot separately */
         /* vec, tvec need 4 items */
-        where_on_path(cu->textoncurve, ctime, vec, tvec, NULL, NULL, NULL);
-        where_on_path(cu->textoncurve, ctime + dtime, tvec, rotvec, NULL, NULL, NULL);
+        BKE_where_on_path(cu->textoncurve, ctime, vec, tvec, NULL, NULL, NULL);
+        BKE_where_on_path(cu->textoncurve, ctime + dtime, tvec, rotvec, NULL, NULL, NULL);
 
         mul_v3_fl(vec, sizefac);
 
@@ -1746,7 +1746,7 @@ void BKE_vfont_clipboard_set(const char32_t *text_buf, const CharInfo *info_buf,
   char32_t *text;
   CharInfo *info;
 
-  /* clean previous buffers*/
+  /* Clean previous buffers. */
   BKE_vfont_clipboard_free();
 
   text = MEM_malloc_arrayN((len + 1), sizeof(*text), __func__);

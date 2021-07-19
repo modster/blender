@@ -18,29 +18,35 @@
 
 #include "COM_ScaleOperation.h"
 
+namespace blender::compositor {
+
 #define USE_FORCE_BILINEAR
-/* XXX - ignore input and use default from old compositor,
- * could become an option like the transform node - campbell
+/* XXX(campbell): ignore input and use default from old compositor,
+ * could become an option like the transform node.
  *
- * note: use bilinear because bicubic makes fuzzy even when not scaling at all (1:1)
+ * NOTE: use bilinear because bicubic makes fuzzy even when not scaling at all (1:1)
  */
 
 BaseScaleOperation::BaseScaleOperation()
 {
 #ifdef USE_FORCE_BILINEAR
-  m_sampler = (int)COM_PS_BILINEAR;
+  m_sampler = (int)PixelSampler::Bilinear;
 #else
   m_sampler = -1;
 #endif
   m_variable_size = false;
 }
 
-ScaleOperation::ScaleOperation() : BaseScaleOperation()
+ScaleOperation::ScaleOperation() : ScaleOperation(DataType::Color)
 {
-  this->addInputSocket(DataType::Color);
+}
+
+ScaleOperation::ScaleOperation(DataType data_type) : BaseScaleOperation()
+{
+  this->addInputSocket(data_type);
   this->addInputSocket(DataType::Value);
   this->addInputSocket(DataType::Value);
-  this->addOutputSocket(DataType::Color);
+  this->addOutputSocket(data_type);
   this->setResolutionInputSocketIndex(0);
   this->m_inputOperation = nullptr;
   this->m_inputXOperation = nullptr;
@@ -89,8 +95,8 @@ bool ScaleOperation::determineDependingAreaOfInterest(rcti *input,
     float scaleX[4];
     float scaleY[4];
 
-    this->m_inputXOperation->readSampled(scaleX, 0, 0, COM_PS_NEAREST);
-    this->m_inputYOperation->readSampled(scaleY, 0, 0, COM_PS_NEAREST);
+    this->m_inputXOperation->readSampled(scaleX, 0, 0, PixelSampler::Nearest);
+    this->m_inputYOperation->readSampled(scaleY, 0, 0, PixelSampler::Nearest);
 
     const float scx = scaleX[0];
     const float scy = scaleY[0];
@@ -174,8 +180,8 @@ bool ScaleAbsoluteOperation::determineDependingAreaOfInterest(rcti *input,
     float scaleX[4];
     float scaleY[4];
 
-    this->m_inputXOperation->readSampled(scaleX, 0, 0, COM_PS_NEAREST);
-    this->m_inputYOperation->readSampled(scaleY, 0, 0, COM_PS_NEAREST);
+    this->m_inputXOperation->readSampled(scaleX, 0, 0, PixelSampler::Nearest);
+    this->m_inputYOperation->readSampled(scaleY, 0, 0, PixelSampler::Nearest);
 
     const float scx = scaleX[0];
     const float scy = scaleY[0];
@@ -203,7 +209,7 @@ bool ScaleAbsoluteOperation::determineDependingAreaOfInterest(rcti *input,
 // Absolute fixed size
 ScaleFixedSizeOperation::ScaleFixedSizeOperation() : BaseScaleOperation()
 {
-  this->addInputSocket(DataType::Color, COM_SC_NO_RESIZE);
+  this->addInputSocket(DataType::Color, ResizeMode::None);
   this->addOutputSocket(DataType::Color);
   this->setResolutionInputSocketIndex(0);
   this->m_inputOperation = nullptr;
@@ -308,3 +314,5 @@ void ScaleFixedSizeOperation::determineResolution(unsigned int resolution[2],
   resolution[0] = this->m_newWidth;
   resolution[1] = this->m_newHeight;
 }
+
+}  // namespace blender::compositor

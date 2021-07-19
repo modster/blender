@@ -24,6 +24,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_math.h"
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #ifdef WITH_INTERNATIONAL
@@ -261,17 +262,7 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     FROM_DEFAULT_V4_UCHAR(space_node.nodeclass_shader);
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - #blo_do_versions_userdef in this file.
-   * - "versioning_{BLENDER_VERSION}.c"
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
-    /* Keep this block, even when empty. */
+  if (!USER_VERSION_ATLEAST(293, 15)) {
     FROM_DEFAULT_V4_UCHAR(space_properties.active);
 
     FROM_DEFAULT_V4_UCHAR(space_info.info_error);
@@ -284,6 +275,28 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     FROM_DEFAULT_V4_UCHAR(space_info.info_operator);
 
     btheme->space_spreadsheet = btheme->space_outliner;
+  }
+
+  if (!USER_VERSION_ATLEAST(300, 5)) {
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.active);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.list);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.list_text);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.list_text_hi);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.hilite);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.selected_highlight);
+  }
+
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - #blo_do_versions_userdef in this file.
+   * - "versioning_{BLENDER_VERSION}.c"
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
+    /* Keep this block, even when empty. */
   }
 
 #undef FROM_DEFAULT_V4_UCHAR
@@ -838,6 +851,23 @@ void blo_do_versions_userdef(UserDef *userdef)
     }
   }
 
+  if (!USER_VERSION_ATLEAST(293, 1)) {
+    /* This rename was made after 2.93.0, harmless to run when it's not needed. */
+    const char *replace_table[][2] = {
+        {"blender", "Blender"},
+        {"blender_27x", "Blender_27x"},
+        {"industry_compatible", "Industry_Compatible"},
+    };
+    const int replace_table_len = ARRAY_SIZE(replace_table);
+
+    BLI_str_replace_table_exact(
+        userdef->keyconfigstr, sizeof(userdef->keyconfigstr), replace_table, replace_table_len);
+    LISTBASE_FOREACH (wmKeyConfigPref *, kpt, &userdef->user_keyconfig_prefs) {
+      BLI_str_replace_table_exact(
+          kpt->idname, sizeof(kpt->idname), replace_table, replace_table_len);
+    }
+  }
+
   if (!USER_VERSION_ATLEAST(293, 2)) {
     /* Enable asset browser features by default for alpha testing.
      * BLO_sanitize_experimental_features_userpref_blend() will disable it again for non-alpha
@@ -864,6 +894,7 @@ void blo_do_versions_userdef(UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
+    BKE_addon_ensure(&userdef->addons, "pose_library");
   }
 
   LISTBASE_FOREACH (bTheme *, btheme, &userdef->themes) {

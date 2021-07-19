@@ -578,6 +578,19 @@ static int graphkeys_paste_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+static char *graphkeys_paste_description(bContext *UNUSED(C),
+                                         wmOperatorType *UNUSED(op),
+                                         PointerRNA *ptr)
+{
+  /* Custom description if the 'flipped' option is used. */
+  if (RNA_boolean_get(ptr, "flipped")) {
+    return BLI_strdup("Paste keyframes from mirrored bones if they exist");
+  }
+
+  /* Use the default description in the other cases. */
+  return NULL;
+}
+
 void GRAPH_OT_paste(wmOperatorType *ot)
 {
   PropertyRNA *prop;
@@ -592,6 +605,7 @@ void GRAPH_OT_paste(wmOperatorType *ot)
   /* API callbacks */
 
   // ot->invoke = WM_operator_props_popup; /* better wait for graph redo panel */
+  ot->get_description = graphkeys_paste_description;
   ot->exec = graphkeys_paste_exec;
   ot->poll = graphop_editable_keyframes_poll;
 
@@ -1467,7 +1481,7 @@ static void setipo_graph_keys(bAnimContext *ac, short mode)
   ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
   /* Loop through setting BezTriple interpolation
-   * Note: we do not supply KeyframeEditData to the looper yet.
+   * NOTE: we do not supply KeyframeEditData to the looper yet.
    * Currently that's not necessary here.
    */
   for (ale = anim_data.first; ale; ale = ale->next) {
@@ -1544,7 +1558,7 @@ static void seteasing_graph_keys(bAnimContext *ac, short mode)
   ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
   /* Loop through setting BezTriple easing.
-   * Note: we do not supply KeyframeEditData to the looper yet.
+   * NOTE: we do not supply KeyframeEditData to the looper yet.
    * Currently that's not necessary here.
    */
   for (ale = anim_data.first; ale; ale = ale->next) {
@@ -1622,7 +1636,7 @@ static void sethandles_graph_keys(bAnimContext *ac, short mode)
   ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
   /* Loop through setting flags for handles.
-   * Note: we do not supply KeyframeEditData to the looper yet.
+   * NOTE: we do not supply KeyframeEditData to the looper yet.
    * Currently that's not necessary here.
    */
   for (ale = anim_data.first; ale; ale = ale->next) {
@@ -2993,7 +3007,7 @@ static int graph_driver_delete_invalid_exec(bContext *C, wmOperator *op)
     WM_report(RPT_INFO, "No drivers deleted");
   }
 
-  /* Successful or not?*/
+  /* Successful or not? */
   if (!ok) {
     return OPERATOR_CANCELLED;
   }

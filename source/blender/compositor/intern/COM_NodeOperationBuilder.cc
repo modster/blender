@@ -36,16 +36,17 @@
 #include "COM_ViewerOperation.h"
 #include "COM_WriteBufferOperation.h"
 
+#include "COM_ConstantFolder.h"
 #include "COM_NodeOperationBuilder.h" /* own include */
 
-NodeOperationBuilder::NodeOperationBuilder(const CompositorContext *context, bNodeTree *b_nodetree)
-    : m_context(context), m_current_node(nullptr), m_active_viewer(nullptr)
+namespace blender::compositor {
+
+NodeOperationBuilder::NodeOperationBuilder(const CompositorContext *context,
+                                           bNodeTree *b_nodetree,
+                                           ExecutionSystem *system)
+    : m_context(context), exec_system_(system), m_current_node(nullptr), m_active_viewer(nullptr)
 {
   m_graph.from_bNodeTree(*context, b_nodetree);
-}
-
-NodeOperationBuilder::~NodeOperationBuilder()
-{
 }
 
 void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
@@ -53,9 +54,7 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
   /* interface handle for nodes */
   NodeConverter converter(this);
 
-  for (int index = 0; index < m_graph.nodes().size(); index++) {
-    Node *node = (Node *)m_graph.nodes()[index];
-
+  for (Node *node : m_graph.nodes()) {
     m_current_node = node;
 
     DebugInfo::node_to_operations(node);
@@ -69,7 +68,7 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
    * so multiple operations can use the same node input.
    */
   blender::MultiValueMap<NodeInput *, NodeOperationInput *> inverse_input_map;
-  for (blender::Map<NodeOperationInput *, NodeInput *>::MutableItem item : m_input_map.items()) {
+  for (Map<NodeOperationInput *, NodeInput *>::MutableItem item : m_input_map.items()) {
     inverse_input_map.add(item.value, item.key);
   }
 
@@ -83,7 +82,7 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
     if (!op_from || op_to_list.is_empty()) {
       /* XXX allow this? error/debug message? */
       // BLI_assert(false);
-      /* XXX note: this can happen with certain nodes (e.g. OutputFile)
+      /* XXX NOTE: this can happen with certain nodes (e.g. OutputFile)
        * which only generate operations in certain circumstances (rendering)
        * just let this pass silently for now ...
        */
@@ -101,10 +100,21 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
 
   add_datatype_conversions();
 
+  if (m_context->get_execution_model() == eExecutionModel::FullFrame) {
+    /* Copy operations to system. Needed for graphviz. */
+    system->set_operations(m_operations, {});
+
+    DebugInfo::graphviz(system, "compositor_prior_folding");
+    ConstantFolder folder(*this);
+    folder.fold_operations();
+  }
+
   determineResolutions();
 
-  /* surround complex ops with read/write buffer */
-  add_complex_operation_buffers();
+  if (m_context->get_execution_model() == eExecutionModel::Tiled) {
+    /* surround complex ops with read/write buffer */
+    add_complex_operation_buffers();
+  }
 
   /* links not available from here on */
   /* XXX make m_links a local variable to avoid confusion! */
@@ -115,8 +125,10 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
   /* ensure topological (link-based) order of nodes */
   /*sort_operations();*/ /* not needed yet */
 
-  /* create execution groups */
-  group_operations();
+  if (m_context->get_execution_model() == eExecutionModel::Tiled) {
+    /* create execution groups */
+    group_operations();
+  }
 
   /* transfer resulting operations to the system */
   system->set_operations(m_operations, m_groups);
@@ -124,7 +136,35 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
 
 void NodeOperationBuilder::addOperation(NodeOperation *operation)
 {
+  operation->set_id(m_operations.size());
   m_operations.append(operation);
+  if (m_current_node) {
+    operation->set_name(m_current_node->getbNode()->name);
+  }
+  operation->set_execution_model(m_context->get_execution_model());
+  operation->set_execution_system(exec_system_);
+}
+
+void NodeOperationBuilder::replace_operation_with_constant(NodeOperation *operation,
+                                                           ConstantOperation *constant_operation)
+{
+  BLI_assert(constant_operation->getNumberOfInputSockets() == 0);
+  int i = 0;
+  while (i < m_links.size()) {
+    Link &link = m_links[i];
+    if (&link.to()->getOperation() == operation) {
+      link.to()->setLink(nullptr);
+      m_links.remove(i);
+      continue;
+    }
+
+    if (&link.from()->getOperation() == operation) {
+      link.to()->setLink(constant_operation->getOutputSocket());
+      m_links[i] = Link(constant_operation->getOutputSocket(), link.to());
+    }
+    i++;
+  }
+  addOperation(constant_operation);
 }
 
 void NodeOperationBuilder::mapInputSocket(NodeInput *node_socket,
@@ -133,7 +173,7 @@ void NodeOperationBuilder::mapInputSocket(NodeInput *node_socket,
   BLI_assert(m_current_node);
   BLI_assert(node_socket->getNode() == m_current_node);
 
-  /* note: this maps operation sockets to node sockets.
+  /* NOTE: this maps operation sockets to node sockets.
    * for resolving links the map will be inverted first in convertToOperations,
    * to get a list of links for each node input socket.
    */
@@ -195,7 +235,9 @@ PreviewOperation *NodeOperationBuilder::make_preview_operation() const
   bNodeInstanceHash *previews = m_context->getPreviewHash();
   if (previews) {
     PreviewOperation *operation = new PreviewOperation(m_context->getViewSettings(),
-                                                       m_context->getDisplaySettings());
+                                                       m_context->getDisplaySettings(),
+                                                       m_current_node->getbNode()->preview_xsize,
+                                                       m_current_node->getbNode()->preview_ysize);
     operation->setbNodeTree(m_context->getbNodeTree());
     operation->verifyPreview(previews, m_current_node->getInstanceKey());
     return operation;
@@ -249,12 +291,13 @@ void NodeOperationBuilder::registerViewer(ViewerOperation *viewer)
 
 void NodeOperationBuilder::add_datatype_conversions()
 {
-  blender::Vector<Link> convert_links;
+  Vector<Link> convert_links;
   for (const Link &link : m_links) {
     /* proxy operations can skip data type conversion */
     NodeOperation *from_op = &link.from()->getOperation();
     NodeOperation *to_op = &link.to()->getOperation();
-    if (!(from_op->useDatatypeConversion() || to_op->useDatatypeConversion())) {
+    if (!(from_op->get_flags().use_datatype_conversion ||
+          to_op->get_flags().use_datatype_conversion)) {
       continue;
     }
 
@@ -276,10 +319,10 @@ void NodeOperationBuilder::add_datatype_conversions()
 
 void NodeOperationBuilder::add_operation_input_constants()
 {
-  /* Note: unconnected inputs cached first to avoid modifying
+  /* NOTE: unconnected inputs cached first to avoid modifying
    *       m_operations while iterating over it
    */
-  blender::Vector<NodeOperationInput *> pending_inputs;
+  Vector<NodeOperationInput *> pending_inputs;
   for (NodeOperation *op : m_operations) {
     for (int k = 0; k < op->getNumberOfInputSockets(); ++k) {
       NodeOperationInput *input = op->getInputSocket(k);
@@ -347,11 +390,11 @@ void NodeOperationBuilder::add_input_constant_value(NodeOperationInput *input,
 
 void NodeOperationBuilder::resolve_proxies()
 {
-  blender::Vector<Link> proxy_links;
+  Vector<Link> proxy_links;
   for (const Link &link : m_links) {
     /* don't replace links from proxy to proxy, since we may need them for replacing others! */
-    if (link.from()->getOperation().isProxyOperation() &&
-        !link.to()->getOperation().isProxyOperation()) {
+    if (link.from()->getOperation().get_flags().is_proxy_operation &&
+        !link.to()->getOperation().get_flags().is_proxy_operation) {
       proxy_links.append(link);
     }
   }
@@ -362,7 +405,7 @@ void NodeOperationBuilder::resolve_proxies()
     do {
       /* walk upstream bypassing the proxy operation */
       from = from->getOperation().getInputSocket(0)->getLink();
-    } while (from && from->getOperation().isProxyOperation());
+    } while (from && from->getOperation().get_flags().is_proxy_operation);
 
     removeInputLink(to);
     /* we may not have a final proxy input link,
@@ -378,7 +421,7 @@ void NodeOperationBuilder::determineResolutions()
 {
   /* determine all resolutions of the operations (Width/Height) */
   for (NodeOperation *op : m_operations) {
-    if (op->isOutputOperation(m_context->isRendering()) && !op->isPreviewOperation()) {
+    if (op->isOutputOperation(m_context->isRendering()) && !op->get_flags().is_preview_operation) {
       unsigned int resolution[2] = {0, 0};
       unsigned int preferredResolution[2] = {0, 0};
       op->determineResolution(resolution, preferredResolution);
@@ -387,7 +430,7 @@ void NodeOperationBuilder::determineResolutions()
   }
 
   for (NodeOperation *op : m_operations) {
-    if (op->isOutputOperation(m_context->isRendering()) && op->isPreviewOperation()) {
+    if (op->isOutputOperation(m_context->isRendering()) && op->get_flags().is_preview_operation) {
       unsigned int resolution[2] = {0, 0};
       unsigned int preferredResolution[2] = {0, 0};
       op->determineResolution(resolution, preferredResolution);
@@ -397,9 +440,9 @@ void NodeOperationBuilder::determineResolutions()
 
   /* add convert resolution operations when needed */
   {
-    blender::Vector<Link> convert_links;
+    Vector<Link> convert_links;
     for (const Link &link : m_links) {
-      if (link.to()->getResizeMode() != COM_SC_NO_RESIZE) {
+      if (link.to()->getResizeMode() != ResizeMode::None) {
         NodeOperation &from_op = link.from()->getOperation();
         NodeOperation &to_op = link.to()->getOperation();
         if (from_op.getWidth() != to_op.getWidth() || from_op.getHeight() != to_op.getHeight()) {
@@ -413,10 +456,10 @@ void NodeOperationBuilder::determineResolutions()
   }
 }
 
-blender::Vector<NodeOperationInput *> NodeOperationBuilder::cache_output_links(
+Vector<NodeOperationInput *> NodeOperationBuilder::cache_output_links(
     NodeOperationOutput *output) const
 {
-  blender::Vector<NodeOperationInput *> inputs;
+  Vector<NodeOperationInput *> inputs;
   for (const Link &link : m_links) {
     if (link.from() == output) {
       inputs.append(link.to());
@@ -431,7 +474,7 @@ WriteBufferOperation *NodeOperationBuilder::find_attached_write_buffer_operation
   for (const Link &link : m_links) {
     if (link.from() == output) {
       NodeOperation &op = link.to()->getOperation();
-      if (op.isWriteBufferOperation()) {
+      if (op.get_flags().is_write_buffer_operation) {
         return (WriteBufferOperation *)(&op);
       }
     }
@@ -447,7 +490,7 @@ void NodeOperationBuilder::add_input_buffers(NodeOperation * /*operation*/,
   }
 
   NodeOperationOutput *output = input->getLink();
-  if (output->getOperation().isReadBufferOperation()) {
+  if (output->getOperation().get_flags().is_read_buffer_operation) {
     /* input is already buffered, no need to add another */
     return;
   }
@@ -481,7 +524,7 @@ void NodeOperationBuilder::add_output_buffers(NodeOperation *operation,
                                               NodeOperationOutput *output)
 {
   /* cache connected sockets, so we can safely remove links first before replacing them */
-  blender::Vector<NodeOperationInput *> targets = cache_output_links(output);
+  Vector<NodeOperationInput *> targets = cache_output_links(output);
   if (targets.is_empty()) {
     return;
   }
@@ -489,7 +532,7 @@ void NodeOperationBuilder::add_output_buffers(NodeOperation *operation,
   WriteBufferOperation *writeOperation = nullptr;
   for (NodeOperationInput *target : targets) {
     /* try to find existing write buffer operation */
-    if (target->getOperation().isWriteBufferOperation()) {
+    if (target->getOperation().get_flags().is_write_buffer_operation) {
       BLI_assert(writeOperation == nullptr); /* there should only be one write op connected */
       writeOperation = (WriteBufferOperation *)(&target->getOperation());
     }
@@ -529,12 +572,12 @@ void NodeOperationBuilder::add_output_buffers(NodeOperation *operation,
 
 void NodeOperationBuilder::add_complex_operation_buffers()
 {
-  /* note: complex ops and get cached here first, since adding operations
+  /* NOTE: complex ops and get cached here first, since adding operations
    * will invalidate iterators over the main m_operations
    */
-  blender::Vector<NodeOperation *> complex_ops;
+  Vector<NodeOperation *> complex_ops;
   for (NodeOperation *operation : m_operations) {
-    if (operation->isComplex()) {
+    if (operation->get_flags().complex) {
       complex_ops.append(operation);
     }
   }
@@ -569,7 +612,7 @@ static void find_reachable_operations_recursive(Tags &reachable, NodeOperation *
   }
 
   /* associated write-buffer operations are executed as well */
-  if (op->isReadBufferOperation()) {
+  if (op->get_flags().is_read_buffer_operation) {
     ReadBufferOperation *read_op = (ReadBufferOperation *)op;
     MemoryProxy *memproxy = read_op->getMemoryProxy();
     find_reachable_operations_recursive(reachable, memproxy->getWriteBufferOperation());
@@ -587,7 +630,7 @@ void NodeOperationBuilder::prune_operations()
   }
 
   /* delete unreachable operations */
-  blender::Vector<NodeOperation *> reachable_ops;
+  Vector<NodeOperation *> reachable_ops;
   for (NodeOperation *op : m_operations) {
     if (reachable.find(op) != reachable.end()) {
       reachable_ops.append(op);
@@ -601,7 +644,7 @@ void NodeOperationBuilder::prune_operations()
 }
 
 /* topological (depth-first) sorting of operations */
-static void sort_operations_recursive(blender::Vector<NodeOperation *> &sorted,
+static void sort_operations_recursive(Vector<NodeOperation *> &sorted,
                                       Tags &visited,
                                       NodeOperation *op)
 {
@@ -622,7 +665,7 @@ static void sort_operations_recursive(blender::Vector<NodeOperation *> &sorted,
 
 void NodeOperationBuilder::sort_operations()
 {
-  blender::Vector<NodeOperation *> sorted;
+  Vector<NodeOperation *> sorted;
   sorted.reserve(m_operations.size());
   Tags visited;
 
@@ -655,7 +698,7 @@ static void add_group_operations_recursive(Tags &visited, NodeOperation *op, Exe
 
 ExecutionGroup *NodeOperationBuilder::make_group(NodeOperation *op)
 {
-  ExecutionGroup *group = new ExecutionGroup();
+  ExecutionGroup *group = new ExecutionGroup(this->m_groups.size());
   m_groups.append(group);
 
   Tags visited;
@@ -673,7 +716,7 @@ void NodeOperationBuilder::group_operations()
     }
 
     /* add new groups for associated memory proxies where needed */
-    if (op->isReadBufferOperation()) {
+    if (op->get_flags().is_read_buffer_operation) {
       ReadBufferOperation *read_op = (ReadBufferOperation *)op;
       MemoryProxy *memproxy = read_op->getMemoryProxy();
 
@@ -684,3 +727,42 @@ void NodeOperationBuilder::group_operations()
     }
   }
 }
+
+/** Create a graphviz representation of the NodeOperationBuilder. */
+std::ostream &operator<<(std::ostream &os, const NodeOperationBuilder &builder)
+{
+  os << "# Builder start\n";
+  os << "digraph  G {\n";
+  os << "    rankdir=LR;\n";
+  os << "    node [shape=box];\n";
+  for (const NodeOperation *operation : builder.get_operations()) {
+    os << "    op" << operation->get_id() << " [label=\"" << *operation << "\"];\n";
+  }
+
+  os << "\n";
+  for (const NodeOperationBuilder::Link &link : builder.get_links()) {
+    os << "    op" << link.from()->getOperation().get_id() << " -> op"
+       << link.to()->getOperation().get_id() << ";\n";
+  }
+  for (const NodeOperation *operation : builder.get_operations()) {
+    if (operation->get_flags().is_read_buffer_operation) {
+      const ReadBufferOperation &read_operation = static_cast<const ReadBufferOperation &>(
+          *operation);
+      const WriteBufferOperation &write_operation =
+          *read_operation.getMemoryProxy()->getWriteBufferOperation();
+      os << "    op" << write_operation.get_id() << " -> op" << read_operation.get_id() << ";\n";
+    }
+  }
+
+  os << "}\n";
+  os << "# Builder end\n";
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const NodeOperationBuilder::Link &link)
+{
+  os << link.from()->getOperation().get_id() << " -> " << link.to()->getOperation().get_id();
+  return os;
+}
+
+}  // namespace blender::compositor

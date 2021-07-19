@@ -218,13 +218,6 @@ static bool wm_draw_region_stereo_set(Main *bmain,
   return false;
 }
 
-static void wm_area_mark_invalid_backbuf(ScrArea *area)
-{
-  if (area->spacetype == SPACE_VIEW3D) {
-    ((View3D *)area->spacedata.first)->flag |= V3D_INVALID_BACKBUF;
-  }
-}
-
 static void wm_region_test_gizmo_do_draw(bContext *C,
                                          ScrArea *area,
                                          ARegion *region,
@@ -464,6 +457,7 @@ static void wm_draw_region_buffer_create(ARegion *region, bool stereo, bool use_
       GPUOffScreen *offscreen = GPU_offscreen_create(
           region->winx, region->winy, false, false, NULL);
       if (!offscreen) {
+        WM_report(RPT_ERROR, "Region could not be drawn!");
         return;
       }
 
@@ -739,7 +733,6 @@ static void wm_draw_window_offscreen(bContext *C, wmWindow *win, bool stereo)
       }
     }
 
-    wm_area_mark_invalid_backbuf(area);
     CTX_wm_area_set(C, NULL);
 
     GPU_debug_group_end();

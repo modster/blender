@@ -124,14 +124,16 @@ bool BKE_scene_camera_switch_update(struct Scene *scene);
 const char *BKE_scene_find_marker_name(const struct Scene *scene, int frame);
 const char *BKE_scene_find_last_marker_name(const struct Scene *scene, int frame);
 
-int BKE_scene_frame_snap_by_seconds(struct Scene *scene, double interval_in_seconds, int cfra);
+int BKE_scene_frame_snap_by_seconds(struct Scene *scene, double interval_in_seconds, int frame);
 
 /* checks for cycle, returns 1 if it's all OK */
 bool BKE_scene_validate_setscene(struct Main *bmain, struct Scene *sce);
 
+float BKE_scene_ctime_get(const struct Scene *scene);
+float BKE_scene_frame_to_ctime(const struct Scene *scene, const int frame);
+
 float BKE_scene_frame_get(const struct Scene *scene);
-float BKE_scene_frame_to_ctime(const struct Scene *scene, const float frame);
-void BKE_scene_frame_set(struct Scene *scene, double cfra);
+void BKE_scene_frame_set(struct Scene *scene, float frame);
 
 struct TransformOrientationSlot *BKE_scene_orientation_slot_get_from_flag(struct Scene *scene,
                                                                           int flag);
@@ -140,6 +142,8 @@ struct TransformOrientationSlot *BKE_scene_orientation_slot_get(struct Scene *sc
 void BKE_scene_orientation_slot_set_index(struct TransformOrientationSlot *orient_slot,
                                           int orientation);
 int BKE_scene_orientation_slot_get_index(const struct TransformOrientationSlot *orient_slot);
+int BKE_scene_orientation_get_index(struct Scene *scene, int slot_index);
+int BKE_scene_orientation_get_index_from_flag(struct Scene *scene, int flag);
 
 /* **  Scene evaluation ** */
 
@@ -150,6 +154,7 @@ void BKE_scene_graph_update_tagged(struct Depsgraph *depsgraph, struct Main *bma
 void BKE_scene_graph_evaluated_ensure(struct Depsgraph *depsgraph, struct Main *bmain);
 
 void BKE_scene_graph_update_for_newframe(struct Depsgraph *depsgraph);
+void BKE_scene_graph_update_for_newframe_ex(struct Depsgraph *depsgraph, const bool clear_recalc);
 
 void BKE_scene_view_layer_graph_evaluated_ensure(struct Main *bmain,
                                                  struct Scene *scene,

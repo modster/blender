@@ -54,7 +54,7 @@ struct CryptomatteSession {
   /* Layer names in order of creation. */
   blender::Vector<std::string> layer_names;
 
-  CryptomatteSession();
+  CryptomatteSession() = default;
   CryptomatteSession(const Main *bmain);
   CryptomatteSession(StampData *stamp_data);
   CryptomatteSession(const Scene *scene);
@@ -66,10 +66,6 @@ struct CryptomatteSession {
   MEM_CXX_CLASS_ALLOC_FUNCS("cryptomatte:CryptomatteSession")
 #endif
 };
-
-CryptomatteSession::CryptomatteSession()
-{
-}
 
 CryptomatteSession::CryptomatteSession(const Main *bmain)
 {
@@ -425,6 +421,9 @@ static bool from_manifest(CryptomatteLayer &layer, blender::StringRefNull manife
       }
 
       const int quoted_hash_len = quoted_string_len_(ref);
+      if (quoted_hash_len < 2) {
+        return false;
+      }
       const int hash_len = quoted_hash_len - 2;
       CryptomatteHash hash = CryptomatteHash::from_hex_encoded(ref.substr(1, hash_len));
       ref = ref.drop_prefix(quoted_hash_len);

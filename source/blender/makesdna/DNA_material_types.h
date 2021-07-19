@@ -40,7 +40,7 @@ struct Image;
 struct Ipo;
 struct bNodeTree;
 
-/* WATCH IT: change type? also make changes in ipo.h  */
+/* WATCH IT: change type? also make changes in ipo.h */
 
 typedef struct TexPaintSlot {
   /** Image to be painted on. */
@@ -146,13 +146,21 @@ typedef enum eMaterialGPencilStyle_Mode {
 } eMaterialGPencilStyle_Mode;
 
 typedef struct MaterialLineArt {
-  int flags; /* eMaterialLineArtFlags */
-  unsigned char transparency_mask;
-  unsigned char _pad[3];
+  /* eMaterialLineArtFlags */
+  int flags;
+
+  /* Used to filter line art occlusion edges */
+  unsigned char material_mask_bits;
+
+  /** Maximum 255 levels of equivalent occlusion. */
+  unsigned char mat_occlusion;
+
+  unsigned char _pad[2];
 } MaterialLineArt;
 
 typedef enum eMaterialLineArtFlags {
-  LRT_MATERIAL_TRANSPARENCY_ENABLED = (1 << 0),
+  LRT_MATERIAL_MASK_ENABLED = (1 << 0),
+  LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS = (1 << 1),
 } eMaterialLineArtFlags;
 
 typedef struct Material {
@@ -286,24 +294,6 @@ typedef struct Material {
 /* mapto */
 #define MAP_COL (1 << 0)
 #define MAP_ALPHA (1 << 7)
-
-/* pmapto */
-/* init */
-#define MAP_PA_INIT ((1 << 5) - 1)
-#define MAP_PA_TIME (1 << 0)
-#define MAP_PA_LIFE (1 << 1)
-#define MAP_PA_DENS (1 << 2)
-#define MAP_PA_SIZE (1 << 3)
-#define MAP_PA_LENGTH (1 << 4)
-/* reset */
-#define MAP_PA_IVEL (1 << 5)
-/* physics */
-#define MAP_PA_PVEL (1 << 6)
-/* path cache */
-#define MAP_PA_CLUMP (1 << 7)
-#define MAP_PA_KINK (1 << 8)
-#define MAP_PA_ROUGH (1 << 9)
-#define MAP_PA_FREQ (1 << 10)
 
 /* pr_type */
 #define MA_FLAT 0

@@ -18,7 +18,6 @@
 
 # <pep8 compliant>
 import bpy
-import nodeitems_utils
 from bpy.types import Header, Menu, Panel
 from bpy.app.translations import pgettext_iface as iface_
 from bpy.app.translations import contexts as i18n_contexts
@@ -163,7 +162,7 @@ class NODE_HT_header(Header):
                 row.template_ID(snode, "node_tree", new="node.new_geometry_node_group_assign")
             elif ob:
                 active_modifier = ob.modifiers.active
-                if active_modifier and active_modifier.type == "NODES":
+                if active_modifier and active_modifier.type == 'NODES':
                     if active_modifier.node_group:
                         row.template_ID(active_modifier, "node_group", new="node.copy_geometry_node_group_assign")
                     else:
@@ -225,6 +224,8 @@ class NODE_MT_add(bpy.types.Menu):
     bl_translation_context = i18n_contexts.operator_default
 
     def draw(self, context):
+        import nodeitems_utils
+
         layout = self.layout
 
         layout.operator_context = 'INVOKE_DEFAULT'
@@ -481,7 +482,7 @@ class NODE_MT_context_menu(Menu):
 class NODE_PT_active_node_generic(Panel):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Item"
+    bl_category = "Node"
     bl_label = "Node"
 
     @classmethod
@@ -499,7 +500,7 @@ class NODE_PT_active_node_generic(Panel):
 class NODE_PT_active_node_color(Panel):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Item"
+    bl_category = "Node"
     bl_label = "Color"
     bl_options = {'DEFAULT_CLOSED'}
     bl_parent_id = 'NODE_PT_active_node_generic'
@@ -529,7 +530,7 @@ class NODE_PT_active_node_color(Panel):
 class NODE_PT_active_node_properties(Panel):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Item"
+    bl_category = "Node"
     bl_label = "Properties"
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -570,7 +571,7 @@ class NODE_PT_active_node_properties(Panel):
 class NODE_PT_texture_mapping(Panel):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Item"
+    bl_category = "Node"
     bl_label = "Texture Mapping"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
@@ -659,8 +660,12 @@ class NODE_PT_quality(bpy.types.Panel):
 
         snode = context.space_data
         tree = snode.node_tree
+        prefs = bpy.context.preferences
 
         col = layout.column()
+        if prefs.experimental.use_full_frame_compositor:
+            col.prop(tree, "execution_mode")
+
         col.prop(tree, "render_quality", text="Render")
         col.prop(tree, "edit_quality", text="Edit")
         col.prop(tree, "chunk_size")
@@ -687,6 +692,97 @@ class NODE_UL_interface_sockets(bpy.types.UIList):
         elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
             layout.template_node_socket(color=color)
+
+
+class NodeTreeInterfacePanel:
+    def draw_socket_list(self, context, in_out, sockets_propname, active_socket_propname):
+        layout = self.layout
+
+        snode = context.space_data
+        tree = snode.edit_tree
+        sockets = getattr(tree, sockets_propname)
+        active_socket_index = getattr(tree, active_socket_propname)
+        active_socket = sockets[active_socket_index] if active_socket_index >= 0 else None
+
+        split = layout.row()
+
+        split.template_list("NODE_UL_interface_sockets", in_out, tree, sockets_propname, tree, active_socket_propname)
+
+        ops_col = split.column()
+
+        add_remove_col = ops_col.column(align=True)
+        props = add_remove_col.operator("node.tree_socket_add", icon='ADD', text="")
+        props.in_out = in_out
+        props = add_remove_col.operator("node.tree_socket_remove", icon='REMOVE', text="")
+        props.in_out = in_out
+
+        ops_col.separator()
+
+        up_down_col = ops_col.column(align=True)
+        props = up_down_col.operator("node.tree_socket_move", icon='TRIA_UP', text="")
+        props.in_out = in_out
+        props.direction = 'UP'
+        props = up_down_col.operator("node.tree_socket_move", icon='TRIA_DOWN', text="")
+        props.in_out = in_out
+        props.direction = 'DOWN'
+
+        if active_socket is not None:
+            # Mimicking property split.
+            layout.use_property_split = False
+            layout.use_property_decorate = False
+            layout_row = layout.row(align=True)
+            layout_split = layout_row.split(factor=0.4, align=True)
+
+            label_column = layout_split.column(align=True)
+            label_column.alignment = 'RIGHT'
+            # Menu to change the socket type.
+            label_column.label(text="Type")
+
+            property_row = layout_split.row(align=True)
+            props = property_row.operator_menu_enum(
+                "node.tree_socket_change_type",
+                "socket_type",
+                text=active_socket.bl_label if active_socket.bl_label else active_socket.bl_idname
+                )
+            props.in_out = in_out
+
+            layout.use_property_split = True
+            layout.use_property_decorate = False
+
+            layout.prop(active_socket, "name")
+            # Display descriptions only for Geometry Nodes, since it's only used in the modifier panel.
+            if tree.type == 'GEOMETRY':
+                layout.prop(active_socket, "description")
+            active_socket.draw(context, layout)
+
+
+class NODE_PT_node_tree_interface_inputs(NodeTreeInterfacePanel, Panel):
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Group"
+    bl_label = "Inputs"
+
+    @classmethod
+    def poll(cls, context):
+        snode = context.space_data
+        return snode.edit_tree is not None
+
+    def draw(self, context):
+        self.draw_socket_list(context, "IN", "inputs", "active_input")
+
+class NODE_PT_node_tree_interface_outputs(NodeTreeInterfacePanel, Panel):
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Group"
+    bl_label = "Outputs"
+
+    @classmethod
+    def poll(cls, context):
+        snode = context.space_data
+        return snode.edit_tree is not None
+
+    def draw(self, context):
+        self.draw_socket_list(context, "OUT", "outputs", "active_output")
 
 
 # Grease Pencil properties
@@ -747,6 +843,8 @@ classes = (
     NODE_PT_quality,
     NODE_PT_annotation,
     NODE_UL_interface_sockets,
+    NODE_PT_node_tree_interface_inputs,
+    NODE_PT_node_tree_interface_outputs,
 
     node_panel(EEVEE_MATERIAL_PT_settings),
     node_panel(MATERIAL_PT_viewport),

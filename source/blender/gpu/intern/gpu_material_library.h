@@ -66,7 +66,7 @@ char *gpu_material_library_generate_code(struct GSet *used_libraries);
 
 /* Code Parsing */
 
-char *gpu_str_skip_token(char *str, char *token, int max);
+const char *gpu_str_skip_token(const char *str, char *token, int max);
 const char *gpu_data_type_to_string(const eGPUType type);
 
 #ifdef __cplusplus

@@ -399,7 +399,7 @@ static void ui_but_user_menu_add(bContext *C, uiBut *but, bUserMenu *um)
                    "'%s').label",
                    idname);
           char *expr_result = NULL;
-          if (BPY_run_string_as_string(C, expr_imports, expr, __func__, &expr_result)) {
+          if (BPY_run_string_as_string(C, expr_imports, expr, NULL, &expr_result)) {
             STRNCPY(drawstr, expr_result);
             MEM_freeN(expr_result);
           }
@@ -417,7 +417,7 @@ static void ui_but_user_menu_add(bContext *C, uiBut *but, bUserMenu *um)
         &um->items, drawstr, but->optype, but->opptr ? but->opptr->data : NULL, but->opcontext);
   }
   else if (but->rnaprop) {
-    /* Note: 'member_id' may be a path. */
+    /* NOTE: 'member_id' may be a path. */
     const char *member_id = WM_context_member_from_ptr(C, &but->rnapoin);
     const char *data_path = RNA_path_from_ID_to_struct(&but->rnapoin);
     const char *member_id_data_path = member_id;
@@ -425,7 +425,7 @@ static void ui_but_user_menu_add(bContext *C, uiBut *but, bUserMenu *um)
       member_id_data_path = BLI_sprintfN("%s.%s", member_id, data_path);
     }
     const char *prop_id = RNA_property_identifier(but->rnaprop);
-    /* Note, ignore 'drawstr', use property idname always. */
+    /* NOTE: ignore 'drawstr', use property idname always. */
     ED_screen_user_menu_item_add_prop(&um->items, "", member_id_data_path, prop_id, but->rnaindex);
     if (data_path) {
       MEM_freeN((void *)data_path);
@@ -494,7 +494,7 @@ static void ui_but_menu_add_path_operators(uiLayout *layout, PointerRNA *ptr, Pr
   RNA_string_set(&props_ptr, "filepath", dir);
 }
 
-bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
+bool ui_popup_context_menu_for_button(bContext *C, uiBut *but, const wmEvent *event)
 {
   /* ui_but_is_interactive() may let some buttons through that should not get a context menu - it
    * doesn't make sense for them. */
@@ -542,9 +542,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
     const PropertyType type = RNA_property_type(prop);
     const PropertySubType subtype = RNA_property_subtype(prop);
     bool is_anim = RNA_property_animateable(ptr, prop);
-    const bool is_editable = RNA_property_editable(ptr, prop);
     const bool is_idprop = RNA_property_is_idprop(prop);
-    const bool is_set = RNA_property_is_set(ptr, prop);
 
     /* second slower test,
      * saved people finding keyframe items in menus when its not possible */
@@ -562,7 +560,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
     const bool is_overridable = (override_status & RNA_OVERRIDE_STATUS_OVERRIDABLE) != 0;
 
     /* Set the (button_pointer, button_prop)
-     * and pointer data for Python access to the hovered ui element. */
+     * and pointer data for Python access to the hovered UI element. */
     uiLayoutSetContextFromBut(layout, but);
 
     /* Keyframes */
@@ -892,12 +890,6 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
                      "UI_OT_reset_default_button",
                      "all",
                      1);
-    }
-    if (is_editable /*&& is_idprop*/ && is_set) {
-      uiItemO(layout,
-              CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Unset"),
-              ICON_NONE,
-              "UI_OT_unset_property_button");
     }
 
     if (is_idprop && !is_array && ELEM(type, PROP_INT, PROP_FLOAT)) {
@@ -1234,6 +1226,20 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
     }
   }
 
+  /* UI List item context menu. Scripts can add items to it, by default there's nothing shown. */
+  ARegion *region = CTX_wm_region(C);
+  const bool is_inside_listbox = ui_list_find_mouse_over(region, event) != NULL;
+  const bool is_inside_listrow = is_inside_listbox ?
+                                     ui_list_row_find_mouse_over(region, event->x, event->y) !=
+                                         NULL :
+                                     false;
+  if (is_inside_listrow) {
+    MenuType *mt = WM_menutype_find("UI_MT_list_item_context_menu", true);
+    if (mt) {
+      UI_menutype_draw(C, mt, uiLayoutColumn(layout, false));
+    }
+  }
+
   MenuType *mt = WM_menutype_find("WM_MT_button_context", true);
   if (mt) {
     UI_menutype_draw(C, mt, uiLayoutColumn(layout, false));
@@ -1288,7 +1294,6 @@ void ui_popup_context_menu_for_panel(bContext *C, ARegion *region, Panel *panel)
       uiBlock *block = uiLayoutGetBlock(layout);
       uiBut *but = block->buttons.last;
       but->flag |= UI_BUT_HAS_SEP_CHAR;
-      but->drawflag |= UI_BUT_HAS_SHORTCUT;
     }
   }
   UI_popup_menu_end(C, pup);

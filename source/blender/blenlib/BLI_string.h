@@ -68,6 +68,11 @@ char *BLI_str_replaceN(const char *__restrict str,
 
 void BLI_str_replace_char(char *string, char src, char dst) ATTR_NONNULL();
 
+bool BLI_str_replace_table_exact(char *string,
+                                 const size_t string_len,
+                                 const char *replace_table[][2],
+                                 int replace_table_len);
+
 size_t BLI_snprintf(char *__restrict dst, size_t maxncpy, const char *__restrict format, ...)
     ATTR_NONNULL(1, 3) ATTR_PRINTF_FORMAT(3, 4);
 size_t BLI_snprintf_rlen(char *__restrict dst, size_t maxncpy, const char *__restrict format, ...)
@@ -95,7 +100,7 @@ size_t BLI_str_format_int_grouped(char dst[16], int num) ATTR_NONNULL();
 size_t BLI_str_format_uint64_grouped(char dst[16], uint64_t num) ATTR_NONNULL();
 void BLI_str_format_byte_unit(char dst[15], long long int bytes, const bool base_10)
     ATTR_NONNULL();
-
+void BLI_str_format_attribute_domain_size(char dst[7], int number_to_format) ATTR_NONNULL();
 int BLI_strcaseeq(const char *a, const char *b) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 char *BLI_strcasestr(const char *s, const char *find) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 char *BLI_strncasestr(const char *s, const char *find, size_t len) ATTR_WARN_UNUSED_RESULT

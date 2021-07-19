@@ -33,9 +33,10 @@ struct Scene;
 struct Sequence;
 
 int SEQ_edit_sequence_swap(struct Sequence *seq_a, struct Sequence *seq_b, const char **error_str);
-int SEQ_edit_move_strip_to_meta(struct Scene *scene,
-                                struct Sequence *src_seq,
-                                struct Sequence *dst_seqm);
+bool SEQ_edit_move_strip_to_meta(struct Scene *scene,
+                                 struct Sequence *src_seq,
+                                 struct Sequence *dst_seqm,
+                                 const char **error_str);
 void SEQ_edit_flag_for_removal(struct Scene *scene,
                                struct ListBase *seqbase,
                                struct Sequence *seq);
@@ -57,6 +58,8 @@ bool SEQ_edit_remove_gaps(struct Scene *scene,
                           struct ListBase *seqbase,
                           const int initial_frame,
                           const bool remove_all_gaps);
+void SEQ_edit_sequence_name_set(struct Scene *scene, struct Sequence *seq, const char *new_name);
+
 #ifdef __cplusplus
 }
 #endif
