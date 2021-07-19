@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "BLI_assert.h"
 #include "BLI_float2.hh"
 #include "BLI_math_matrix.h"
 
@@ -105,6 +106,20 @@ struct float2x2 {
     res.ptr()[0][1] = m1.ptr()[0][1] + m2.ptr()[0][1];
     res.ptr()[1][0] = m1.ptr()[1][0] + m2.ptr()[1][0];
     res.ptr()[1][1] = m1.ptr()[1][1] + m2.ptr()[1][1];
+
+    return float2x2(res);
+  }
+
+  float2x2 linear_blend(const float2x2 &other, float factor) const
+  {
+    BLI_assert(factor >= 0.0 && factor <= 1.0);
+    const float inv_factor = 1.0 - factor;
+    float2x2 res;
+
+    res.ptr()[0][0] = this->ptr()[0][0] * factor + other.ptr()[0][0] * inv_factor;
+    res.ptr()[0][1] = this->ptr()[0][1] * factor + other.ptr()[0][1] * inv_factor;
+    res.ptr()[1][0] = this->ptr()[1][0] * factor + other.ptr()[1][0] * inv_factor;
+    res.ptr()[1][1] = this->ptr()[1][1] * factor + other.ptr()[1][1] * inv_factor;
 
     return float2x2(res);
   }
