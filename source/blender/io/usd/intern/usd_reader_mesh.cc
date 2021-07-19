@@ -308,8 +308,8 @@ void USDMeshReader::read_mpolys(Mesh *mesh)
     poly.totloop = face_size;
     poly.mat_nr = 0;
 
-    /* Polygons are always assumed to be smooth-shaded. If the Alembic mesh should be flat-shaded,
-     * this is encoded in custom loop normals. See T71246. */
+    /* Polygons are always assumed to be smooth-shaded. If the mesh should be flat-shaded,
+     * this is encoded in custom loop normals. */
     poly.flag |= ME_SMOOTH;
 
     rev_loop_index = loop_index + (face_size - 1);
