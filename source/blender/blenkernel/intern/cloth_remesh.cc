@@ -35,6 +35,7 @@
 
 #include "BKE_cloth.h"
 #include "BKE_cloth_remesh.hh"
+#include <limits>
 
 namespace blender::bke::internal {
 class NodeData;
@@ -150,6 +151,11 @@ class Sizing {
 
     return float2::dot(u_ij, m_avg * u_ij);
   }
+
+  Sizing interp(const Sizing &other) const
+  {
+    return Sizing(this->m.linear_blend(other.get_m(), 0.5));
+  }
 };
 
 class VertData {
@@ -157,10 +163,6 @@ class VertData {
 
  public:
   VertData(Sizing sizing) : sizing(sizing)
-  {
-  }
-
-  VertData(Sizing &&sizing) : sizing(sizing)
   {
   }
 
@@ -172,6 +174,12 @@ class VertData {
   void set_sizing(Sizing sizing)
   {
     this->sizing = sizing;
+  }
+
+  VertData interp(const VertData &other) const
+  {
+    VertData res(this->get_sizing().interp(other.get_sizing()));
+    return res;
   }
 };
 
@@ -192,6 +200,11 @@ class EdgeData {
   void set_sizing(float size)
   {
     this->size = size;
+  }
+
+  EdgeData interp(const EdgeData &UNUSED(other)) const
+  {
+    return EdgeData(std::numeric_limits<float>::signaling_NaN());
   }
 };
 
