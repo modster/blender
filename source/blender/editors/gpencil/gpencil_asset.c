@@ -252,7 +252,7 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
     }
   }
 
-  /* Set origin to bounding box of  strokes. */
+  /* Set origin to bounding box of strokes. */
   if (reset_origin) {
     float gpcenter[3];
     BKE_gpencil_centroid_3d(gpd, gpcenter);
