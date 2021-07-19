@@ -204,6 +204,7 @@ set(SRC
   geometry/nodes/node_geo_point_separate.cc
   geometry/nodes/node_geo_point_translate.cc
   geometry/nodes/node_geo_points_to_volume.cc
+  geometry/nodes/node_geo_remesh_quads.cc
   geometry/nodes/node_geo_raycast.cc
   geometry/nodes/node_geo_select_by_material.cc
   geometry/nodes/node_geo_separate_components.cc
@@ -381,6 +382,20 @@ set(LIB
   bf_functions
   bf_intern_sky
 )
+
+if(WITH_OPENVDB)
+  list(APPEND INC
+          ../../../intern/openvdb
+          )
+  list(APPEND INC_SYS
+          ${OPENVDB_INCLUDE_DIRS}
+          )
+  list(APPEND LIB
+          bf_intern_openvdb
+          ${OPENVDB_LIBRARIES}
+          )
+  add_definitions(-DWITH_OPENVDB ${OPENVDB_DEFINITIONS})
+endif()
 
 if(WITH_BULLET)
   list(APPEND INC_SYS
