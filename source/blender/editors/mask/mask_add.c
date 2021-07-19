@@ -59,6 +59,7 @@ static void setup_vertex_point(Mask *mask,
                                const bool reference_adjacent,
                                int handle_type)
 {
+  reference_point = NULL;
   const MaskSplinePoint *reference_parent_point = NULL;
   BezTriple *bezt;
   float co[3];
