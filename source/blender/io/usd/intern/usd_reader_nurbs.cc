@@ -127,14 +127,14 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
   pxr::VtVec3fArray usdNormals;
   curve_prim_.GetNormalsAttr().Get(&usdNormals, motionSampleTime);
 
-  // If normals, extrude, else bevel
-  // Perhaps to be replaced by Blender/USD Schema
+  /* If normals, extrude, else bevel.
+   * Perhaps to be replaced by Blender USD Schema. */
   if (usdNormals.size() > 0) {
-    // Set extrusion to 1.0f;
+    /* Set extrusion to 1. */
     curve_->ext1 = 1.0f;
   }
   else {
-    // Set bevel depth to 1.0f;
+    /* Set bevel depth to 1. */
     curve_->ext2 = 1.0f;
   }
 
