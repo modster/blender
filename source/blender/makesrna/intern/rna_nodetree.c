@@ -10000,16 +10000,16 @@ static void def_geo_curve_sample(StructRNA *srna)
   PropertyRNA *prop;
 
   static EnumPropertyItem mode_items[] = {
-      {GEO_NODE_CURVE_SAMPLE_FACTOR,
-       "COUNT",
+      {GEO_NODE_CURVE_INTERPOLATE_FACTOR,
+       "FACTOR",
        0,
-       "Count",
+       "Factor",
        "Choose sample points on the curve based on the portion of the total length"},
-      {GEO_NODE_CURVE_SAMPLE_LENGTH,
+      {GEO_NODE_CURVE_INTERPOLATE_LENGTH,
        "LENGTH",
        0,
        "Length",
-       "Choose sample points on the curve based on the assumulated length at that point"},
+       "Choose sample points on the curve based on the accumulated length at that point"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -10017,7 +10017,7 @@ static void def_geo_curve_sample(StructRNA *srna)
 
   prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, mode_items);
-  RNA_def_property_ui_text(prop, "Mode", "How to specify the amount of samples");
+  RNA_def_property_ui_text(prop, "Mode", "How to specify the sample positions on the curve");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 

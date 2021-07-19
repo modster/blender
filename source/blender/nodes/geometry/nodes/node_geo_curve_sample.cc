@@ -57,22 +57,23 @@ static void geo_node_curve_sample_init(bNodeTree *UNUSED(tree), bNode *node)
   NodeGeometryCurveSample *data = (NodeGeometryCurveSample *)MEM_callocN(
       sizeof(NodeGeometryCurveSample), __func__);
 
-  data->mode = GEO_NODE_CURVE_SAMPLE_FACTOR;
+  data->mode = GEO_NODE_CURVE_INTERPOLATE_FACTOR;
   node->storage = data;
 }
 
 static void geo_node_curve_sample_update(bNodeTree *UNUSED(ntree), bNode *node)
 {
   const NodeGeometryCurveSample &node_storage = *(NodeGeometryCurveSample *)node->storage;
-  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)node_storage.mode;
+  const GeometryNodeCurveInterpolateMode mode = (GeometryNodeCurveInterpolateMode)
+                                                    node_storage.mode;
 
   bNodeSocket *parameter_socket = ((bNodeSocket *)node->inputs.first)->next;
 
-  if (mode == GEO_NODE_CURVE_SAMPLE_FACTOR) {
+  if (mode == GEO_NODE_CURVE_INTERPOLATE_FACTOR) {
     node_sock_label(parameter_socket, "Factor");
   }
   else {
-    BLI_assert(mode == GEO_NODE_CURVE_SAMPLE_LENGTH);
+    BLI_assert(mode == GEO_NODE_CURVE_INTERPOLATE_LENGTH);
     node_sock_label(parameter_socket, "Length");
   }
 }
@@ -103,39 +104,31 @@ static CustomDataType get_result_type(const CurveComponent &curve_component,
   return curve_meta_data->data_type;
 }
 
-using SamplePair = std::pair<GSpan, GMutableSpan>;
+struct SamplePair {
+  GSpan src;
+  GMutableSpan dst;
+};
 
-/** TODO: Investigate chunkifying the first part,
- * since #sample_lengths_to_index_factors is single threaded. */
-static void spline_sample_attributes(const Spline &spline,
-                                     Span<float> lengths,
-                                     Span<SamplePair> samples_extrapolated,
-                                     Span<SamplePair> samples)
+static void sample_with_lookups(const SamplePair &sample, Span<Spline::LookupResult> lookups)
 {
-  Array<int> original_indices(lengths.size());
-  for (const int i : original_indices.index_range()) {
-    original_indices[i] = i;
-  }
+  blender::attribute_math::convert_to_static_type(sample.src.type(), [&](auto dummy) {
+    using T = decltype(dummy);
+    Span<T> src = sample.src.typed<T>();
+    MutableSpan<T> dst = sample.dst.typed<T>();
 
-  std::sort(original_indices.begin(), original_indices.end(), [lengths](int a, int b) {
-    return lengths[a] > lengths[b];
+    threading::parallel_for(lookups.index_range(), 1024, [&](IndexRange range) {
+      for (const int i : range) {
+        dst[i] = attribute_math::mix2<T>(lookups[i].factor,
+                                         src[lookups[i].evaluated_index],
+                                         src[lookups[i].next_evaluated_index]);
+      }
+    });
   });
-
-  const Array<float> index_factors = spline.sample_lengths_to_index_factors(lengths);
-
-  for (const SamplePair &sample : samples_extrapolated) {
-    spline.sample_with_index_factors(sample.first, index_factors, sample.second);
-  }
-
-  /* TODO: Clamp index factors. */
-
-  for (const SamplePair &sample : samples) {
-    spline.sample_with_index_factors(sample.first, index_factors, sample.second);
-  }
 }
 
 static void execute_on_component(GeometryComponent &component,
                                  const CurveComponent &curve_component,
+                                 const GeometryNodeCurveInterpolateMode mode,
                                  const StringRef pararameter_name,
                                  const StringRef position_name,
                                  const StringRef tangent_name,
@@ -145,58 +138,73 @@ static void execute_on_component(GeometryComponent &component,
 {
   const CurveEval &curve = *curve_component.get_for_read();
   const Spline &spline = *curve.splines().first();
+  const float length = spline.length();
 
   const AttributeDomain domain = get_result_domain(component, pararameter_name, result_name);
 
   GVArray_Typed<float> parameters = component.attribute_get_for_read<float>(
       pararameter_name, domain, 0.0f);
-  VArray_Span<float> parameters_span{parameters};
-  /* TODO: Multiply by length if in factor mode. */
 
-  Vector<OutputAttribute> output_attributes;
-  Vector<GVArrayPtr> owned_curve_attributes;
-  Vector<SamplePair> sample_data;
-  Vector<SamplePair> sample_data_extrapolated;
+  Array<Spline::LookupResult> lookups(parameters.size());
+  if (mode == GEO_NODE_CURVE_INTERPOLATE_LENGTH) {
+    threading::parallel_for(lookups.index_range(), 1024, [&](IndexRange range) {
+      for (const int i : range) {
+        lookups[i] = spline.lookup_evaluated_length(std::clamp(parameters[i], 0.0f, length));
+      }
+    });
+  }
+  else {
+    threading::parallel_for(lookups.index_range(), 1024, [&](IndexRange range) {
+      for (const int i : range) {
+        lookups[i] = spline.lookup_evaluated_factor(std::clamp(parameters[i], 0.0f, 1.0f));
+      }
+    });
+  }
 
   if (!position_name.is_empty()) {
-    OutputAttribute result = component.attribute_try_get_for_output_only(
+    OutputAttribute positions = component.attribute_try_get_for_output_only(
         position_name, domain, CD_PROP_FLOAT3);
-    sample_data_extrapolated.append({spline.evaluated_positions(), result.as_span()});
-    output_attributes.append(std::move(result));
-  }
-  if (!tangent_name.is_empty()) {
-    OutputAttribute result = component.attribute_try_get_for_output_only(
-        tangent_name, domain, CD_PROP_FLOAT3);
-    sample_data.append({spline.evaluated_tangents(), result.as_span()});
-    output_attributes.append(std::move(result));
-  }
-  if (!normal_name.is_empty()) {
-    OutputAttribute result = component.attribute_try_get_for_output_only(
-        normal_name, domain, CD_PROP_FLOAT3);
-    sample_data.append({spline.evaluated_normals(), result.as_span()});
-    output_attributes.append(std::move(result));
-  }
-  if (!attribute_name.is_empty() && !result_name.is_empty()) {
-    OutputAttribute result = component.attribute_try_get_for_output_only(
-        result_name, domain, get_result_type(curve_component, attribute_name));
-    std::optional<GSpan> attribute = spline.attributes.get_for_read(attribute_name);
-    if (attribute) {
-      GVArrayPtr attribute_interpolated = spline.interpolate_to_evaluated(*attribute);
-      sample_data.append({attribute_interpolated->get_internal_span(), result.as_span()});
-      output_attributes.append(std::move(result));
-      owned_curve_attributes.append(std::move(attribute_interpolated));
+    if (positions) {
+      sample_with_lookups({spline.evaluated_positions(), positions.as_span()}, lookups);
+      positions.save();
     }
   }
-
-  spline_sample_attributes(spline, parameters_span, sample_data_extrapolated, sample_data);
-
-  for (OutputAttribute &output_attribute : output_attributes) {
-    output_attribute.save();
+  if (!tangent_name.is_empty()) {
+    OutputAttribute tangents = component.attribute_try_get_for_output_only(
+        tangent_name, domain, CD_PROP_FLOAT3);
+    if (tangents) {
+      sample_with_lookups({spline.evaluated_tangents(), tangents.as_span()}, lookups);
+      tangents.save();
+    }
+  }
+  if (!normal_name.is_empty()) {
+    OutputAttribute normals = component.attribute_try_get_for_output_only(
+        normal_name, domain, CD_PROP_FLOAT3);
+    if (normals) {
+      sample_with_lookups({spline.evaluated_normals(), normals.as_span()}, lookups);
+      normals.save();
+    }
+  }
+  if (!attribute_name.is_empty() && !result_name.is_empty()) {
+    OutputAttribute dst = component.attribute_try_get_for_output_only(
+        result_name, domain, get_result_type(curve_component, attribute_name));
+    if (dst) {
+      std::optional<GSpan> src = spline.attributes.get_for_read(attribute_name);
+      if (src) {
+        GVArrayPtr attribute_interpolated = spline.interpolate_to_evaluated(*src);
+        sample_with_lookups({attribute_interpolated->get_internal_span(), dst.as_span()}, lookups);
+        dst.save();
+      }
+    }
   }
 }
 
 static void geo_node_sample_exec(GeoNodeExecParams params)
 {
+  const NodeGeometryCurveSample &node_storage = *(NodeGeometryCurveSample *)params.node().storage;
+  const GeometryNodeCurveInterpolateMode mode = (GeometryNodeCurveInterpolateMode)
+                                                    node_storage.mode;
+
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   GeometrySet curve_set = params.extract_input<GeometrySet>("Curve");
 
@@ -233,6 +241,7 @@ static void geo_node_sample_exec(GeoNodeExecParams params)
     if (geometry_set.has(type)) {
       execute_on_component(geometry_set.get_component_for_write(type),
                            curve_component,
+                           mode,
                            pararameter_name,
                            position_name,
                            tangent_name,

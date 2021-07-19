@@ -463,17 +463,6 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
   return samples;
 }
 
-#ifdef DEBUG
-static void assert_sorted_array_in_range(Span<float> data, const float min, const float max)
-{
-  BLI_assert(data.first() >= min);
-  for (const int i : IndexRange(1, data.size() - 1)) {
-    BLI_assert(data[i] >= data[i - 1]);
-  }
-  BLI_assert(data.last() <= max);
-}
-#endif
-
 /**
  * Transform an array of sorted length parameters into index factors. The result is indices
  * and factors to the next index, encoded in floats. The logic for converting from the float
@@ -486,15 +475,22 @@ static void assert_sorted_array_in_range(Span<float> data, const float min, cons
  * the two loops are inverted, and obviously custom parameters are provided.
  *
  * \note This could have a result data argument instead of returning a span in the future.
+ *
+ * \todo Investigate running the single threaded loop over evaluated points in chunks.
  */
 Array<float> Spline::sample_lengths_to_index_factors(const Span<float> parameters) const
 {
+  Array<int> original_indices(parameters.size());
+  for (const int i : original_indices.index_range()) {
+    original_indices[i] = i;
+  }
+
+  std::sort(original_indices.begin(), original_indices.end(), [parameters](int a, int b) {
+    return parameters[a] > parameters[b];
+  });
+
   const Span<float> lengths = this->evaluated_lengths();
   const float total_length = this->length();
-#ifdef DEBUG
-  // assert_sorted_array_in_range(parameters, 0.0f, this->length());
-#endif
-
   Array<float> index_factors(parameters.size());
 
   /* Store the length at the previous evaluated point in a variable so it can
@@ -502,7 +498,7 @@ Array<float> Spline::sample_lengths_to_index_factors(const Span<float> parameter
   float prev_length = 0.0f;
   int i_evaluated = 0;
   for (const int i_sample : parameters.index_range()) {
-    const float sample_length = parameters[i_sample];
+    const float sample_length = std::clamp(parameters[i_sample], 0.0f, total_length);
 
     /* Skip over every evaluated point that fits before this sample. */
     while (lengths[i_evaluated] < sample_length) {
@@ -511,7 +507,7 @@ Array<float> Spline::sample_lengths_to_index_factors(const Span<float> parameter
     }
 
     const float factor = (sample_length - prev_length) / (lengths[i_evaluated] - prev_length);
-    index_factors[i_sample] = i_evaluated + factor;
+    index_factors[original_indices[i_sample]] = i_evaluated + factor;
   }
 
   return index_factors;

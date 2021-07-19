@@ -1381,7 +1381,7 @@ typedef struct NodeGeometryCurveResample {
 } NodeGeometryCurveResample;
 
 typedef struct NodeGeometryCurveSample {
-  /* GeometryNodeCurveSampleMode. */
+  /* GeometryNodeCurveInterpolateMode. */
   uint8_t mode;
 } NodeGeometryCurveSample;
 
@@ -1953,11 +1953,6 @@ typedef enum GeometryNodeCurveResampleMode {
   GEO_NODE_CURVE_RESAMPLE_LENGTH = 1,
   GEO_NODE_CURVE_RESAMPLE_EVALUATED = 2,
 } GeometryNodeCurveResampleMode;
-
-typedef enum GeometryNodeCurveSampleMode {
-  GEO_NODE_CURVE_SAMPLE_FACTOR = 0,
-  GEO_NODE_CURVE_SAMPLE_LENGTH = 1,
-} GeometryNodeCurveSampleMode;
 
 typedef enum GeometryNodeCurveInterpolateMode {
   GEO_NODE_CURVE_INTERPOLATE_FACTOR = 0,
