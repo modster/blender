@@ -278,7 +278,6 @@ void USDMeshReader::read_mpolys(Mesh *mesh)
   MLoop *mloops = mesh->mloop;
 
   int loop_index = 0;
-  int rev_loop_index = 0;
 
   for (int i = 0; i < face_counts_.size(); i++) {
     const int face_size = face_counts_[i];
@@ -292,14 +291,16 @@ void USDMeshReader::read_mpolys(Mesh *mesh)
      * this is encoded in custom loop normals. */
     poly.flag |= ME_SMOOTH;
 
-    rev_loop_index = loop_index + (face_size - 1);
-
-    for (int f = 0; f < face_size; f++, loop_index++, rev_loop_index--) {
-      MLoop &loop = mloops[loop_index];
-      if (is_left_handed_)
-        loop.v = face_indices_[rev_loop_index];
-      else
-        loop.v = face_indices_[loop_index];
+    if (is_left_handed_) {
+      int loop_end_index = loop_index + (face_size - 1);
+      for (int f = 0; f < face_size; ++f, ++loop_index) {
+        mloops[loop_index].v = face_indices_[loop_end_index - f];
+      }
+    }
+    else {
+      for (int f = 0; f < face_size; ++f, ++loop_index) {
+        mloops[loop_index].v = face_indices_[loop_index];
+      }
     }
   }
 
