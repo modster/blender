@@ -15,9 +15,10 @@
  */
 #pragma once
 
-#include "pxr/usd/usdGeom/mesh.h"
 #include "usd.h"
 #include "usd_reader_geom.h"
+
+#include "pxr/usd/usdGeom/mesh.h"
 
 struct MPoly;
 

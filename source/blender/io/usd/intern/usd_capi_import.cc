@@ -21,39 +21,15 @@
 #include "usd.h"
 #include "usd_common.h"
 #include "usd_hierarchy_iterator.h"
-#include "usd_reader_instance.h"
-#include "usd_reader_mesh.h"
+#include "usd_reader_geom.h"
 #include "usd_reader_prim.h"
 #include "usd_reader_stage.h"
-
-#include <pxr/base/plug/registry.h>
-#include <pxr/pxr.h>
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usdGeom/metrics.h>
-#include <pxr/usd/usdGeom/scope.h>
-#include <pxr/usd/usdGeom/tokens.h>
-#include <pxr/usd/usdGeom/xformCommonAPI.h>
-#include <pxr/usd/usdLux/domeLight.h>
-#include <pxr/usd/usdShade/materialBindingAPI.h>
-
-#include "MEM_guardedalloc.h"
-
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_build.h"
-#include "DEG_depsgraph_query.h"
-
-#include "DNA_cachefile_types.h"
-#include "DNA_collection_types.h"
-#include "DNA_node_types.h"
-#include "DNA_scene_types.h"
-#include "DNA_world_types.h"
 
 #include "BKE_appdir.h"
 #include "BKE_blender_version.h"
 #include "BKE_cachefile.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_context.h"
-#include "BKE_curve.h"
 #include "BKE_global.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
@@ -71,11 +47,26 @@
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 
+#include "DEG_depsgraph.h"
+#include "DEG_depsgraph_build.h"
+#include "DEG_depsgraph_query.h"
+
+#include "DNA_cachefile_types.h"
+#include "DNA_collection_types.h"
+#include "DNA_node_types.h"
+#include "DNA_scene_types.h"
+#include "DNA_world_types.h"
+
+#include "MEM_guardedalloc.h"
+
 #include "WM_api.h"
 #include "WM_types.h"
 
-#include "usd_reader_geom.h"
-#include "usd_reader_prim.h"
+#include <pxr/usd/usd/stage.h>
+#include <pxr/usd/usdGeom/metrics.h>
+#include <pxr/usd/usdGeom/scope.h>
+#include <pxr/usd/usdGeom/tokens.h>
+#include <pxr/usd/usdGeom/xformCommonAPI.h>
 
 #include <iostream>
 

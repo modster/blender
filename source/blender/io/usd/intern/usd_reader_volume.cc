@@ -16,37 +16,12 @@
 
 #include "usd_reader_volume.h"
 
-#include "DNA_cachefile_types.h"
-#include "DNA_camera_types.h"
-#include "DNA_constraint_types.h"
-#include "DNA_modifier_types.h"
-#include "DNA_object_force_types.h"
-#include "DNA_object_types.h"
-#include "DNA_space_types.h" /* for FILE_MAX */
-#include "DNA_volume_types.h"
-
-#include "BKE_constraint.h"
-#include "BKE_lib_id.h"
-#include "BKE_library.h"
-#include "BKE_material.h"
-#include "BKE_mesh.h"
-#include "BKE_modifier.h"
-#include "BKE_node.h"
 #include "BKE_object.h"
 #include "BKE_volume.h"
 
-#include "BLI_listbase.h"
-#include "BLI_math.h"
-#include "BLI_math_geom.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
+#include "DNA_object_types.h"
+#include "DNA_volume_types.h"
 
-#include "RNA_access.h"
-
-#include "WM_api.h"
-#include "WM_types.h"
-
-#include <pxr/pxr.h>
 #include <pxr/usd/usdVol/openVDBAsset.h>
 #include <pxr/usd/usdVol/volume.h>
 

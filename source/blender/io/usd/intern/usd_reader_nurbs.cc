@@ -15,45 +15,23 @@
  */
 
 #include "usd_reader_nurbs.h"
-#include "usd_reader_prim.h"
 
-#include "MEM_guardedalloc.h"
-
-#include "DNA_cachefile_types.h"
-#include "DNA_camera_types.h"
-#include "DNA_constraint_types.h"
-#include "DNA_curve_types.h"
-#include "DNA_modifier_types.h"
-#include "DNA_object_types.h"
-#include "DNA_space_types.h" /* for FILE_MAX */
-
-#include "BKE_camera.h"
-#include "BKE_constraint.h"
 #include "BKE_curve.h"
-#include "BKE_library.h"
 #include "BKE_mesh.h"
-#include "BKE_modifier.h"
 #include "BKE_object.h"
 
 #include "BLI_listbase.h"
-#include "BLI_math.h"
-#include "BLI_math_geom.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
 
-#include "WM_api.h"
-#include "WM_types.h"
+#include "DNA_curve_types.h"
+#include "DNA_object_types.h"
+
+#include "MEM_guardedalloc.h"
 
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/types.h>
 #include <pxr/base/vt/value.h>
-#include <pxr/pxr.h>
-#include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/sdf/types.h>
-#include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/primRange.h>
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usdGeom/basisCurves.h>
+
 #include <pxr/usd/usdGeom/curves.h>
 
 static bool set_knots(const pxr::VtDoubleArray &knots, float *&nu_knots)

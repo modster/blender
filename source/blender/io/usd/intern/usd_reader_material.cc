@@ -19,22 +19,15 @@
 
 #include "usd_reader_material.h"
 
-#include "DNA_material_types.h"
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-#include "DNA_object_types.h"
-
 #include "BKE_image.h"
-#include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
-#include "BKE_mesh.h"
 #include "BKE_node.h"
-#include "BKE_object.h"
 
-#include "BLI_listbase.h"
 #include "BLI_math_vector.h"
 #include "BLI_string.h"
+
+#include "DNA_material_types.h"
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/usd/usdShade/material.h>

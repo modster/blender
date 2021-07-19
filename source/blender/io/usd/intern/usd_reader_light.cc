@@ -16,19 +16,11 @@
 
 #include "usd_reader_light.h"
 
-#include "DNA_light_types.h"
-#include "DNA_object_types.h"
-
 #include "BKE_light.h"
 #include "BKE_object.h"
 
-#include "WM_api.h"
-#include "WM_types.h"
-
-#include <pxr/pxr.h>
-#include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/primRange.h>
-#include <pxr/usd/usd/stage.h>
+#include "DNA_light_types.h"
+#include "DNA_object_types.h"
 
 #include <pxr/usd/usdLux/light.h>
 

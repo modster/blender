@@ -15,26 +15,8 @@
  */
 
 #include "usd_reader_geom.h"
-#include "usd_reader_prim.h"
 
-#include "MEM_guardedalloc.h"
-
-#include "DNA_cachefile_types.h"
-#include "DNA_camera_types.h"
-#include "DNA_constraint_types.h"
-#include "DNA_curve_types.h"
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-#include "DNA_modifier_types.h"
-#include "DNA_object_types.h"
-#include "DNA_space_types.h" /* for FILE_MAX */
-
-#include "BKE_camera.h"
-#include "BKE_constraint.h"
-#include "BKE_curve.h"
 #include "BKE_lib_id.h"
-#include "BKE_library.h"
-#include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_object.h"
 
@@ -44,19 +26,10 @@
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
-#include "WM_api.h"
-#include "WM_types.h"
-
-#include <pxr/base/vt/array.h>
-#include <pxr/base/vt/types.h>
-#include <pxr/base/vt/value.h>
-#include <pxr/pxr.h>
-#include <pxr/usd/sdf/assetPath.h>
-#include <pxr/usd/sdf/types.h>
-#include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/primRange.h>
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usdGeom/mesh.h>
+#include "DNA_cachefile_types.h"
+#include "DNA_modifier_types.h"
+#include "DNA_object_types.h"
+#include "DNA_space_types.h" /* for FILE_MAX */
 
 namespace blender::io::usd {
 

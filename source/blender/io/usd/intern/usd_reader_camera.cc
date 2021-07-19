@@ -15,33 +15,16 @@
  */
 
 #include "usd_reader_camera.h"
-#include "usd_reader_prim.h"
 
-#include "DNA_cachefile_types.h"
 #include "DNA_camera_types.h"
-#include "DNA_constraint_types.h"
-#include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
-#include "DNA_space_types.h" /* for FILE_MAX */
 
 #include "BKE_camera.h"
-#include "BKE_constraint.h"
-#include "BKE_modifier.h"
 #include "BKE_object.h"
 
-#include "BLI_listbase.h"
 #include "BLI_math.h"
-#include "BLI_math_geom.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
-
-#include "WM_api.h"
-#include "WM_types.h"
 
 #include <pxr/pxr.h>
-#include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/primRange.h>
-#include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/camera.h>
 
 namespace blender::io::usd {

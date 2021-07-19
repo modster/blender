@@ -17,19 +17,9 @@
 
 #include "usd.h"
 
-#include <pxr/usd/sdf/path.h>
 #include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usdShade/material.h>
-#include <pxr/usd/usdUtils/sparseValueWriter.h>
 
-#include <vector>
-
-#include "DNA_ID.h"
-
-struct CacheFile;
 struct Main;
-struct Mesh;
 struct Object;
 
 namespace blender::io::usd {

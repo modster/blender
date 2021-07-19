@@ -19,15 +19,13 @@
 #pragma once
 
 struct Main;
-struct Scene;
 
 #include "usd.h"
 #include "usd_reader_prim.h"
 
-#include <pxr/pxr.h>
+#include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usd/stage.h>
 
-#include <map>
 #include <vector>
 
 struct ImportSettings;
