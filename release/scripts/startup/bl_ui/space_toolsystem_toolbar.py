@@ -196,6 +196,9 @@ class _defs_annotate:
             row = layout.row(align=True)
             row.label(text="Data Source:")
             row.prop(context.space_data, "annotation_source", expand=True)
+
+            row = layout.row(align=True)
+            row.prop(tool_settings, "annotation_stroke_placement_view2d", text="Placement")
         if tool.idname == "builtin.annotate_line":
             layout.separator()
 

@@ -23,7 +23,6 @@ from bpy.types import Panel, Header, Menu, UIList
 from bpy.app.translations import pgettext_iface as iface_
 from bl_ui.utils import PresetPanel
 from bl_ui.properties_grease_pencil_common import (
-    AnnotationDrawingToolsPanel,
     AnnotationDataPanel,
 )
 
@@ -725,7 +724,9 @@ class CLIP_PT_orientation(CLIP_PT_reconstruction_panel, Panel):
         layout.use_property_decorate = False
 
         sc = context.space_data
-        settings = sc.clip.tracking.settings
+        clip = sc.clip
+        tracking_object = clip.tracking.objects.active
+        settings = clip.tracking.settings
 
         col = layout.column(align=True)
 
@@ -744,46 +745,14 @@ class CLIP_PT_orientation(CLIP_PT_reconstruction_panel, Panel):
         col = layout.column()
 
         row = col.row(align=True)
-        row.operator("clip.set_scale")
+        if tracking_object.is_camera:
+            row.operator("clip.set_scale")
+            col.prop(settings, "distance")
+        else:
+            row.operator("clip.set_solution_scale", text="Set Scale")
+            col.prop(settings, "object_distance")
+
         row.operator("clip.apply_solution_scale", text="Apply Scale")
-
-        col.prop(settings, "distance")
-
-
-class CLIP_PT_tools_object(CLIP_PT_reconstruction_panel, Panel):
-    bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
-    bl_label = "Object"
-    bl_category = "Solve"
-
-    @classmethod
-    def poll(cls, context):
-        sc = context.space_data
-        if CLIP_PT_reconstruction_panel.poll(context) and sc.mode == 'TRACKING':
-            clip = sc.clip
-
-            tracking_object = clip.tracking.objects.active
-
-            return not tracking_object.is_camera
-
-        return False
-
-    def draw(self, context):
-        layout = self.layout
-
-        sc = context.space_data
-        clip = sc.clip
-        tracking_object = clip.tracking.objects.active
-        settings = sc.clip.tracking.settings
-
-        col = layout.column()
-
-        col.prop(tracking_object, "scale")
-
-        col.separator()
-
-        col.operator("clip.set_solution_scale", text="Set Scale")
-        col.prop(settings, "object_distance")
 
 
 class CLIP_PT_objects(CLIP_PT_clip_view_panel, Panel):
@@ -795,9 +764,12 @@ class CLIP_PT_objects(CLIP_PT_clip_view_panel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
 
         sc = context.space_data
         tracking = sc.clip.tracking
+        tracking_object = sc.clip.tracking.objects.active
 
         row = layout.row()
         row.template_list("CLIP_UL_tracking_objects", "", tracking, "objects",
@@ -807,6 +779,10 @@ class CLIP_PT_objects(CLIP_PT_clip_view_panel, Panel):
 
         sub.operator("clip.tracking_object_new", icon='ADD', text="")
         sub.operator("clip.tracking_object_remove", icon='REMOVE', text="")
+
+        if not tracking_object.is_camera:
+            row = layout.row()
+            row.prop(tracking_object, "scale")
 
 
 class CLIP_PT_track(CLIP_PT_tracking_panel, Panel):
@@ -1372,12 +1348,6 @@ class CLIP_PT_annotation(AnnotationDataPanel, CLIP_PT_clip_view_panel, Panel):
 
     # NOTE: this is just a wrapper around the generic GP Panel
     # But, this should only be visible in "clip" view
-
-
-# Grease Pencil drawing tools
-class CLIP_PT_tools_grease_pencil_draw(AnnotationDrawingToolsPanel, Panel):
-    bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
 
 
 class CLIP_MT_view_zoom(Menu):
