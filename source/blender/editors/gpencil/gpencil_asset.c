@@ -96,7 +96,7 @@ typedef struct tGPDasset {
   short mode;
 
   /** Drop initial position. */
-  int drop_x, drop_y;
+  int drop[2];
   /** Mouse last click position. */
   int mouse[2];
   /** Initial distance to asset center from mouse location. */
@@ -132,6 +132,8 @@ typedef struct tGPDasset {
   struct GHash *asset_frames;
   /** Hash of new created strokes. */
   struct GHash *asset_strokes;
+  /** Hash of new created strokes linked to layer. */
+  struct GHash *asset_strokes_layer;
 
   /** Handle for drawing while operator is running. */
   void *draw_handle_3d;
@@ -204,7 +206,7 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
   bGPdata *gpd_src = ob->data;
 
   const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
-  const int set_origin = RNA_boolean_get(op->ptr, "set_origin");
+  const int reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
 
   /* Create a copy of selected datablock. */
   bGPdata *gpd = (bGPdata *)BKE_id_copy(bmain, &gpd_src->id);
@@ -245,7 +247,7 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
   }
 
   /* Set origin to bounding box of  strokes. */
-  if (set_origin) {
+  if (reset_origin) {
     float gpcenter[3];
     BKE_gpencil_centroid_3d(gpd, gpcenter);
 
@@ -299,9 +301,9 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
   ot->prop = RNA_def_enum(
       ot->srna, "mode", mode_types, GP_ASSET_MODE_SELECTED_STROKES, "Mode", "");
   RNA_def_boolean(ot->srna,
-                  "set_origin",
-                  0,
-                  "Set Origin to Strokes",
+                  "reset_origin",
+                  1,
+                  "Reset Origin to Strokes",
                   "Set origin of the strokes in the center of the bounding box");
 }
 
@@ -377,6 +379,7 @@ static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
     }
     if (tgpa->asset_strokes != NULL) {
       BLI_ghash_free(tgpa->asset_strokes, NULL, NULL);
+      BLI_ghash_free(tgpa->asset_strokes_layer, NULL, NULL);
     }
 
     /* Remove drawing handler. */
@@ -429,6 +432,7 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   tgpa->asset_layers = NULL;
   tgpa->asset_frames = NULL;
   tgpa->asset_strokes = NULL;
+  tgpa->asset_strokes_layer = NULL;
 
   return true;
 }
@@ -491,16 +495,17 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   const float oversize = 5.0f;
 
   float diff_mat[4][4];
-  unit_m4(diff_mat);
-
   float cage_min[2];
   float cage_max[2];
   INIT_MINMAX2(cage_min, cage_max);
 
   GHashIterator gh_iter;
-  GHASH_ITER (gh_iter, tgpa->asset_strokes) {
+  GHASH_ITER (gh_iter, tgpa->asset_strokes_layer) {
     // TODO: All strokes or only active frame?
     bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
+    bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getValue(&gh_iter);
+    BKE_gpencil_layer_transform_matrix_get(tgpa->depsgraph, tgpa->ob, gpl, diff_mat);
+
     if (is_zero_v3(gps->boundbox_min)) {
       BKE_gpencil_stroke_boundingbox_calc(gps);
     }
@@ -582,7 +587,24 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
         return;
       }
 
-      WM_cursor_modal_set(tgpa->win, WM_CURSOR_EW_SCROLL);
+      switch (i) {
+        case CAGE_CORNER_NW:
+        case CAGE_CORNER_SW:
+        case CAGE_CORNER_NE:
+        case CAGE_CORNER_SE:
+          WM_cursor_modal_set(tgpa->win, WM_CURSOR_NSEW_SCROLL);
+          break;
+        case CAGE_CORNER_N:
+        case CAGE_CORNER_S:
+          WM_cursor_modal_set(tgpa->win, WM_CURSOR_NS_ARROW);
+          break;
+        case CAGE_CORNER_E:
+        case CAGE_CORNER_W:
+          WM_cursor_modal_set(tgpa->win, WM_CURSOR_EW_ARROW);
+          break;
+        default:
+          break;
+      }
       /* Determine the vector of the cage effect. For corners is always full effect. */
       if (ELEM(tgpa->manipulator_index,
                CAGE_CORNER_NW,
@@ -612,7 +634,7 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
   /* Check if mouse is inside cage for Location. */
   if (BLI_rctf_isect_pt(&tgpa->rect_cage, (float)mouse[0], (float)mouse[1])) {
     tgpa->mode = GP_ASSET_TRANSFORM_LOC;
-    WM_cursor_modal_set(tgpa->win, WM_CURSOR_HAND);
+    WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
     return;
   }
 
@@ -683,6 +705,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   float vec[3];
   sub_v3_v3v3(vec, dest_pt, origin_pt);
 
+  /* Get the scale factor. */
   float mouse3d[3];
   sub_v3_v3v3(mouse3d, dest_pt, tgpa->asset_center);
   float dist = len_v3(mouse3d);
@@ -797,6 +820,15 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
   bGPdata *gpd_target = tgpa->gpd;
   bGPdata *gpd_asset = tgpa->gpd_asset;
 
+  /* Get the vector from origin to drop position. */
+  float dest_pt[3];
+  float loc2d[2];
+  copy_v2fl_v2i(loc2d, tgpa->drop);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, loc2d, dest_pt);
+
+  float vec[3];
+  sub_v3_v3v3(vec, dest_pt, tgpa->ob->loc);
+
   LISTBASE_FOREACH (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
     /* Check if Layer is in target datablock. */
     bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
@@ -832,10 +864,12 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
       /* Loop all strokes and duplicate. */
       if (tgpa->asset_strokes == NULL) {
         tgpa->asset_strokes = BLI_ghash_ptr_new(__func__);
+        tgpa->asset_strokes_layer = BLI_ghash_ptr_new(__func__);
       }
 
       LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
         bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
+        gps_target->flag &= ~GP_STROKE_SELECT;
         BLI_addtail(&gpf_target->strokes, gps_target);
 
         /* Add the material. */
@@ -850,16 +884,27 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
 
         gps_target->mat_nr = mat_index;
 
+        /* Apply the offset to drop position. */
+        bGPDspoint *pt;
+        int i;
+        for (i = 0, pt = gps_target->points; i < gps_target->totpoints; i++, pt++) {
+          add_v3_v3(&pt->x, vec);
+          pt->flag &= ~GP_SPOINT_SELECT;
+        }
+
+        /* Update geometry. */
         BKE_gpencil_stroke_geometry_update(gpd_target, gps_target);
 
         /* Add the hash key with a reference to the frame. */
         BLI_ghash_insert(tgpa->asset_strokes, gps_target, gpf_target);
+        BLI_ghash_insert(tgpa->asset_strokes_layer, gps_target, gpl_target);
       }
     }
   }
   /* Prepare 2D cage. */
   gpencil_2d_cage_calc(tgpa);
   BKE_gpencil_centroid_3d(tgpa->gpd_asset, tgpa->asset_center);
+  add_v3_v3(tgpa->asset_center, vec);
 }
 
 /* Helper: Clean any temp data. */
@@ -924,12 +969,17 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   immEnd();
 
   /* Rotation box */
-  const float gap = 5.0f;
+  /*const float gap = 5.0f;
   imm_draw_box_wire_2d(pos,
                        tgpa->manipulator[CAGE_CORNER_ROT][0] - gap,
                        tgpa->manipulator[CAGE_CORNER_ROT][1] - gap,
                        tgpa->manipulator[CAGE_CORNER_ROT][0] + gap,
-                       tgpa->manipulator[CAGE_CORNER_ROT][1] + gap);
+                       tgpa->manipulator[CAGE_CORNER_ROT][1] + gap);*/
+
+  immBegin(GPU_PRIM_LINES, 2);
+  immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_NE][0], tgpa->manipulator[CAGE_CORNER_NE][1]);
+  immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_ROT][0], tgpa->manipulator[CAGE_CORNER_ROT][1]);
+  immEnd();
 
   immUnbindProgram();
 
@@ -943,9 +993,9 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   immUniformColor4fv(point_color);
 
   immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.5f * U.dpi_fac);
-  /* Draw only box corners. */
-  immBegin(GPU_PRIM_POINTS, 8);
-  for (int i = 0; i < 8; i++) {
+  /* Draw points. */
+  immBegin(GPU_PRIM_POINTS, 9);
+  for (int i = 0; i < 9; i++) {
     immVertex2fv(pos, tgpa->manipulator[i]);
   }
   immEnd();
@@ -984,8 +1034,8 @@ static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEven
   tgpa = op->customdata;
 
   /* Save initial position of drop.  */
-  tgpa->drop_x = event->x;
-  tgpa->drop_y = event->y;
+  tgpa->drop[0] = event->mval[0];
+  tgpa->drop[1] = event->mval[1];
 
   /* Do an initial load of the strokes in the target datablock. */
   gpencil_asset_add_strokes(tgpa);
