@@ -225,6 +225,10 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
       BKE_gpencil_layer_delete(gpd, gpl);
       continue;
     }
+    /* Remove parenting data. */
+    gpl->parent = NULL;
+    gpl->parsubstr[0] = 0;
+    gpl->partype = 0;
 
     bGPDframe *gpf_active = gpl->actframe;
 
