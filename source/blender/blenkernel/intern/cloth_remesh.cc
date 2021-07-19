@@ -268,6 +268,47 @@ class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyEx
       }
     }
   }
+
+ private:
+  /**
+   * Gets the maximal independent set of splittable edge indices in
+   * the `AdaptiveMesh`.
+   *
+   * Reference [1]
+   */
+  blender::Vector<EdgeIndex> get_splittable_edge_indices_set()
+  {
+    /* Deselect all verts */
+    for (auto &vert : this->get_verts_mut()) {
+      auto &vert_data = vert.get_checked_extra_data_mut();
+      auto &flag = vert_data.get_flag_mut();
+      flag &= ~VERT_SELECTED;
+    }
+
+    blender::Vector<EdgeIndex> splittable_edge_indices;
+    /* It is assumed that the edges sizes have been computed earlier
+     * and stored in the extra data of the edges */
+    for (const auto &edge : this->get_edges()) {
+      auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
+      if (v1.get_checked_extra_data().get_flag() & VERT_SELECTED ||
+          v2.get_checked_extra_data().get_flag() & VERT_SELECTED) {
+        continue;
+      }
+      const auto &edge_data = edge.get_checked_extra_data();
+      auto edge_size = edge_data.get_size();
+      if (edge_size > 1.0) {
+        splittable_edge_indices.append(edge.get_self_index());
+        auto &v1_data = v1.get_checked_extra_data_mut();
+        auto &v1_flag = v1_data.get_flag_mut();
+        v1_flag |= VERT_SELECTED;
+        auto &v2_data = v2.get_checked_extra_data_mut();
+        auto &v2_flag = v2_data.get_flag_mut();
+        v2_flag |= VERT_SELECTED;
+      }
+    }
+
+    return splittable_edge_indices;
+  }
 };
 
 static void cloth_delete_verts(Cloth &cloth)
