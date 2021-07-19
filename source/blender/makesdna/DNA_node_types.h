@@ -1392,6 +1392,11 @@ typedef struct NodeGeometryCurveFillet {
   uint8_t radius_mode;
 } NodeGeometryCurveFillet;
 
+typedef struct NodeGeometryCurveTrim {
+  /* GeometryNodeCurveInterpolateMode. */
+  uint8_t mode;
+} NodeGeometryCurveTrim;
+
 typedef struct NodeGeometryCurveToPoints {
   /* GeometryNodeCurveSampleMode. */
   uint8_t mode;
@@ -1950,6 +1955,11 @@ typedef enum GeometryNodeCurveSampleMode {
   GEO_NODE_CURVE_SAMPLE_LENGTH = 1,
   GEO_NODE_CURVE_SAMPLE_EVALUATED = 2,
 } GeometryNodeCurveSampleMode;
+
+typedef enum GeometryNodeCurveInterpolateMode {
+  GEO_NODE_CURVE_INTERPOLATE_FACTOR = 0,
+  GEO_NODE_CURVE_INTERPOLATE_LENGTH = 1,
+} GeometryNodeCurveInterpolateMode;
 
 typedef enum GeometryNodeCurveFilletMode {
   GEO_NODE_CURVE_FILLET_ADAPTIVE = 0,
