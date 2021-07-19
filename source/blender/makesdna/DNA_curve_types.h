@@ -35,6 +35,7 @@ extern "C" {
 #define MAXTEXTBOX 256 /* used in readfile.c and editfont.c */
 
 struct AnimData;
+struct CurveEval;
 struct CurveProfile;
 struct EditFont;
 struct GHash;
