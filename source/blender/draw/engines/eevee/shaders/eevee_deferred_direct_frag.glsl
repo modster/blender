@@ -59,8 +59,8 @@ uniform sampler2DShadow shadow_atlas_tx;
 uniform sampler2DArray lightprobe_grid_tx;
 uniform samplerCubeArray lightprobe_cube_tx;
 
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
+utility_tx_fetch_define(utility_tx)
+utility_tx_sample_define(utility_tx)
 
 in vec4 uvcoordsvar;
 

@@ -36,8 +36,8 @@ uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
 
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
+utility_tx_fetch_define(utility_tx)
+utility_tx_sample_define(utility_tx)
 
 in vec4 uvcoordsvar;
 

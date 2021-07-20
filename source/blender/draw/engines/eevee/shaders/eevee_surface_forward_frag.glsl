@@ -56,8 +56,8 @@ uniform sampler2DShadow shadow_atlas_tx;
 uniform sampler2DArray lightprobe_grid_tx;
 uniform samplerCubeArray lightprobe_cube_tx;
 
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
+utility_tx_fetch_define(utility_tx)
+utility_tx_sample_define(utility_tx)
 
 layout(location = 0, index = 0) out vec4 out_radiance;
 layout(location = 0, index = 1) out vec4 out_transmittance;

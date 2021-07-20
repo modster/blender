@@ -15,8 +15,8 @@ layout(std140) uniform sampling_block
 
 uniform sampler2DArray utility_tx;
 
-utility_tx_fetch_define(utility_tx);
-utility_tx_sample_define(utility_tx);
+utility_tx_fetch_define(utility_tx)
+utility_tx_sample_define(utility_tx)
 
 /* Diffuse or Transmission Color. */
 layout(location = 0) out vec3 out_transmit_color;

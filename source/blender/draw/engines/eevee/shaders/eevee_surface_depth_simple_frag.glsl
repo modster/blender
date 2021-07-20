@@ -16,7 +16,7 @@ layout(std140) uniform sampling_block
   SamplingData sampling;
 };
 
-utility_tx_sample_define_stub(utility_tx);
+utility_tx_sample_define_stub(utility_tx)
 
 void main(void)
 {
