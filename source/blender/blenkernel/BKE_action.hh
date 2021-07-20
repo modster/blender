@@ -13,34 +13,23 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
+#pragma once
 
 /** \file
- * \ingroup bli
- * \brief Generic memory manipulation API.
- *
- * This is to extend on existing functions
- * such as `memcpy` & `memcmp`.
+ * \ingroup bke
  */
-#include <string.h>
+#ifndef __cplusplus
+#  error This is a C++ only header.
+#endif
 
-#include "BLI_sys_types.h"
-#include "BLI_utildefines.h"
+#include "BLI_function_ref.hh"
 
-#include "BLI_memory_utils.h"
+struct bAction;
+struct FCurve;
 
-#include "BLI_strict_flags.h"
+namespace blender::bke {
 
-/**
- * Check if memory is zeroed, as with `memset(arr, 0, arr_size)`.
- */
-bool BLI_memory_is_zero(const void *arr, const size_t arr_size)
-{
-  const char *arr_byte = arr;
-  const char *arr_end = (const char *)arr + arr_size;
+using FoundFCurveCallback = blender::FunctionRef<void(FCurve *fcurve, const char *bone_name)>;
+void BKE_action_find_fcurves_with_bones(const bAction *action, FoundFCurveCallback callback);
 
-  while ((arr_byte != arr_end) && (*arr_byte == 0)) {
-    arr_byte++;
-  }
-
-  return (arr_byte == arr_end);
-}
+};  // namespace blender::bke
