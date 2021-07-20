@@ -745,15 +745,19 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   if (!shift_key) {
     if (tgpa->manipulator_index == CAGE_CORNER_N) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], pivot);
+      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
     }
     else if (tgpa->manipulator_index == CAGE_CORNER_E) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], pivot);
+      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
     }
     else if (tgpa->manipulator_index == CAGE_CORNER_S) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], pivot);
+      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
     }
     else if (tgpa->manipulator_index == CAGE_CORNER_W) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], pivot);
+      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
     }
   }
 
@@ -1004,11 +1008,6 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
                          tgpa->manipulator[CAGE_CORNER_ROT_NW + i][0] + gap,
                          tgpa->manipulator[CAGE_CORNER_ROT_NW + i][1] + gap);
   }
-
-  // immBegin(GPU_PRIM_LINES, 2);
-  // immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_NE][0], tgpa->manipulator[CAGE_CORNER_NE][1]);
-  // immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_ROT][0],
-  // tgpa->manipulator[CAGE_CORNER_ROT][1]); immEnd();
 
   /* Draw a line while is doing a transform. */
   if ((tgpa->flag & GP_ASSET_FLAG_TRANSFORMING) && (tgpa->mode == GP_ASSET_TRANSFORM_ROT)) {
