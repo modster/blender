@@ -482,8 +482,25 @@ static int mesh_nurbs_displist_to_mdata(const Curve *cu,
   return 0;
 }
 
+/**
+ * Copy evaluated texture space from curve to mesh.
+ *
+ * \note We disable auto texture space feature since that will cause
+ * texture space to evaluate differently for curve and mesh, since curve
+ * uses CV to calculate bounding box, and mesh uses what is coming from
+ * tessellated curve.
+ */
+static void mesh_copy_texture_space_from_curve_type(const Curve *cu, Mesh *me)
+{
+  me->texflag = cu->texflag & ~CU_AUTOSPACE;
+  copy_v3_v3(me->loc, cu->loc);
+  copy_v3_v3(me->size, cu->size);
+  BKE_mesh_texspace_calc(me);
+}
+
 Mesh *BKE_mesh_new_nomain_from_curve_displist(const Object *ob, const ListBase *dispbase)
 {
+  const Curve *cu = ob->data;
   Mesh *mesh;
   MVert *allvert;
   MEdge *alledge;
@@ -492,7 +509,7 @@ Mesh *BKE_mesh_new_nomain_from_curve_displist(const Object *ob, const ListBase *
   MLoopUV *alluv = NULL;
   int totvert, totedge, totloop, totpoly;
 
-  if (mesh_nurbs_displist_to_mdata(ob->data,
+  if (mesh_nurbs_displist_to_mdata(cu,
                                    dispbase,
                                    &allvert,
                                    &totvert,
@@ -527,6 +544,8 @@ Mesh *BKE_mesh_new_nomain_from_curve_displist(const Object *ob, const ListBase *
     const char *uvname = "UVMap";
     CustomData_add_layer_named(&mesh->ldata, CD_MLOOPUV, CD_ASSIGN, alluv, totloop, uvname);
   }
+
+  mesh_copy_texture_space_from_curve_type(cu, mesh);
 
   MEM_freeN(allvert);
   MEM_freeN(alledge);
@@ -620,17 +639,7 @@ void BKE_mesh_from_nurbs_displist(
   me->totcol = cu->totcol;
   me->mat = cu->mat;
 
-  /* Copy evaluated texture space from curve to mesh.
-   *
-   * Note that we disable auto texture space feature since that will cause
-   * texture space to evaluate differently for curve and mesh, since curve
-   * uses CV to calculate bounding box, and mesh uses what is coming from
-   * tessellated curve.
-   */
-  me->texflag = cu->texflag & ~CU_AUTOSPACE;
-  copy_v3_v3(me->loc, cu->loc);
-  copy_v3_v3(me->size, cu->size);
-  BKE_mesh_texspace_calc(me);
+  mesh_copy_texture_space_from_curve_type(cu, me);
 
   cu->mat = NULL;
   cu->totcol = 0;
