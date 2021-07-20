@@ -1690,6 +1690,7 @@ static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e)
       lineart_prepend_edge_direct(&rb->light_contour.first, e);
       break;
     case LRT_EDGE_FLAG_PROJECTED_SHADOW:
+    case LRT_EDGE_FLAG_PROJECTED_SHADOW | LRT_EDGE_FLAG_SHADOW_FACING_LIGHT:
       lineart_prepend_edge_direct(&rb->shadow.first, e);
       break;
   }
@@ -2487,6 +2488,19 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
   dot_l = dot_v3v3_db(Lv, tri->gn);
   dot_r = dot_v3v3_db(Rv, tri->gn);
   dot_f = dot_v3v3_db(Cv, tri->gn);
+
+  if (e->flags & LRT_EDGE_FLAG_PROJECTED_SHADOW && LRT_SHADOW_CLOSE_ENOUGH(dot_l, 0) &&
+      LRT_SHADOW_CLOSE_ENOUGH(dot_r, 0)) {
+    /* Currently unable to precisely determine if the edge is really from this triangle. */
+    /*if ((dot_f > 0 && (e->flags & LRT_EDGE_FLAG_SHADOW_FACING_LIGHT)) ||
+        (dot_f < 0 && (!(e->flags & LRT_EDGE_FLAG_SHADOW_FACING_LIGHT)))) {
+      *from = 0.0f;
+      *to = 1.0f;
+      return true;
+    }
+    */
+    return false;
+  }
 
   /* NOTE(Yiming): When we don't use `dot_f==0` here, it's theoretically possible that _some_
    * faces in perspective mode would get erroneously caught in this condition where they really are
@@ -4367,7 +4381,8 @@ static void lineart_shadow_segment_slice_get(double *fbl,
 }
 
 /* Returns true when a new cut is needed in the middle, otherwise `*r_new_xxx` are not touched. */
-static bool lineart_do_closest_segment(double *s1fbl,
+static bool lineart_do_closest_segment(bool is_persp,
+                                       double *s1fbl,
                                        double *s1fbr,
                                        double *s2fbl,
                                        double *s2fbr,
@@ -4381,42 +4396,52 @@ static bool lineart_do_closest_segment(double *s1fbl,
                                        double *r_gr,
                                        double *r_new_in_the_middle,
                                        double *r_new_in_the_middle_global,
-                                       double *r_new_at)
+                                       double *r_new_at,
+                                       bool *is_side_2r)
 {
   int side = 0;
+  int zid = is_persp ? 3 : 2;
   /* Always use the closest point to the light camera. */
-  if (s1fbl[3] >= s2fbl[3]) {
+  if (s1fbl[zid] >= s2fbl[zid]) {
     copy_v4_v4_db(r_fbl, s2fbl);
     copy_v3_v3_db(r_gl, s2gl);
     side++;
   }
-  if (s1fbr[3] >= s2fbr[3]) {
+  if (s1fbr[zid] >= s2fbr[zid]) {
     copy_v4_v4_db(r_fbr, s2fbr);
     copy_v3_v3_db(r_gr, s2gr);
+    *is_side_2r = true;
     side++;
   }
-  if (s1fbl[3] <= s2fbl[3]) {
+  if (s1fbl[zid] < s2fbl[zid]) {
     copy_v4_v4_db(r_fbl, s1fbl);
     copy_v3_v3_db(r_gl, s1gl);
     side--;
   }
-  if (s1fbr[3] <= s2fbr[3]) {
+  if (s1fbr[zid] < s2fbr[zid]) {
     copy_v4_v4_db(r_fbr, s1fbr);
     copy_v3_v3_db(r_gr, s1gr);
+    *is_side_2r = false;
     side--;
   }
 
   /* No need to cut in the middle, because one segment completely overlaps the other. */
   if (side) {
+    if (side > 0) {
+      *is_side_2r = true;
+    }
+    else if (side < 0) {
+      *is_side_2r = false;
+    }
     return false;
   }
 
   /* Else there must be an intersection point in the middle. Use "w" value to linearly plot the
    * position and get image space "at" position. */
-  double dl = s1fbl[3] - s2fbl[3];
-  double dr = s1fbr[3] - s2fbr[3];
+  double dl = s1fbl[zid] - s2fbl[zid];
+  double dr = s1fbr[zid] - s2fbr[zid];
   double ga = ratiod(dl, dr, 0);
-  *r_new_at = s2fbr[3] * ga / (s2fbl[3] * (1.0f - ga) + s2fbr[3] * ga);
+  *r_new_at = is_persp ? s2fbr[3] * ga / (s2fbl[3] * (1.0f - ga) + s2fbr[3] * ga) : ga;
   interp_v3_v3v3_db(r_new_in_the_middle, s2fbl, s2fbr, *r_new_at);
   r_new_in_the_middle[3] = interpd(s2fbr[3], s2fbl[3], ga);
   interp_v3_v3v3_db(r_new_in_the_middle_global, s1gl, s1gr, ga);
@@ -4459,15 +4484,21 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
       /* Get correct XYZ and W coordinates. */
       interp_v3_v3v3_db(ssc[i].fbc1, e->v1->fbcoord, e->v2->fbcoord, es->at);
       interp_v3_v3v3_db(ssc[i].fbc2, e->v1->fbcoord, e->v2->fbcoord, next_at);
-      double ga1 = e->v1->fbcoord[3] * es->at /
+
+      /* We don't need global coordinates of shadow contour, but if we need them for some reason,
+       * the following lines transform them correctly */
+      /* double ga1 = e->v1->fbcoord[3] * es->at /
                    (es->at * e->v1->fbcoord[3] + (1 - es->at) * e->v2->fbcoord[3]);
       double ga2 = e->v1->fbcoord[3] * next_at /
-                   (next_at * e->v1->fbcoord[3] + (1 - next_at) * e->v2->fbcoord[3]);
+                   (next_at * e->v1->fbcoord[3] + (1 - next_at) * e->v2->fbcoord[3]); */
+
       /* Assign an absurdly big W for initial distance so when triangles show up to catch the
        * shadow, their w must certainlly be smaller than this value so the shadow catches
        * successfully. */
       ssc[i].fbc1[3] = 1e30;
       ssc[i].fbc2[3] = 1e30;
+      ssc[i].fbc1[2] = 1e30;
+      ssc[i].fbc2[2] = 1e30;
 
       /* Assign to the first segment's right and the last segment's left position */
       copy_v4_v4_db(ss[i * 2].fbc2, ssc[i].fbc1);
@@ -4497,7 +4528,8 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
                                     double *start_gpos,
                                     double *end_gpos,
                                     double *start_fbc,
-                                    double *end_fbc)
+                                    double *end_fbc,
+                                    bool facing_light)
 {
   LineartShadowSegment *es, *ies;
   LineartShadowSegment *cut_start_after = e->shadow_segments.first,
@@ -4598,6 +4630,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
 
   double *s1fbl, *s1fbr, *s1gl, *s1gr;
   double tg1[3], tg2[3], tfbc1[4], tfbc2[4], mg1[3], mfbc1[4], mg2[3], mfbc2[4];
+  bool is_side_2r, has_middle = false;
   copy_v4_v4_db(tfbc1, start_fbc);
   copy_v3_v3_db(tg1, start_gpos);
 
@@ -4634,29 +4667,31 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
       }
     }
 
-    sl->flag |= LRT_SHADOW_CASTED;
-
     lineart_shadow_segment_slice_get(
         start_fbc, end_fbc, start_gpos, end_gpos, sr->at, start, end, tfbc2, tg2);
 
-    if (lineart_do_closest_segment(s1fbl,
-                                   s1fbr,
-                                   tfbc1,
-                                   tfbc2,
-                                   s1gl,
-                                   s1gr,
-                                   tg1,
-                                   tg2,
-                                   r_fbl,
-                                   r_fbr,
-                                   r_gl,
-                                   r_gr,
-                                   r_new_in_the_middle,
-                                   r_new_in_the_middle_global,
-                                   &r_new_at)) {
+    if ((has_middle = lineart_do_closest_segment(rb->cam_is_persp,
+                                                 s1fbl,
+                                                 s1fbr,
+                                                 tfbc1,
+                                                 tfbc2,
+                                                 s1gl,
+                                                 s1gr,
+                                                 tg1,
+                                                 tg2,
+                                                 r_fbl,
+                                                 r_fbr,
+                                                 r_gl,
+                                                 r_gr,
+                                                 r_new_in_the_middle,
+                                                 r_new_in_the_middle_global,
+                                                 &r_new_at,
+                                                 &is_side_2r))) {
       LineartShadowSegment *ss_middle = lineart_give_shadow_segment(rb);
-      ss_middle->at = r_new_at;
-      ss_middle->flag = LRT_SHADOW_CASTED;
+      ss_middle->at = interpf(sr->at, sl->at, r_new_at);
+      ss_middle->flag = is_side_2r ?
+                            (LRT_SHADOW_CASTED | (facing_light ? LRT_SHADOW_FACING_LIGHT : 0)) :
+                            LRT_SHADOW_CASTED;
       copy_v3_v3_db(ss_middle->g1, r_new_in_the_middle_global);
       copy_v3_v3_db(ss_middle->g2, r_new_in_the_middle_global);
       copy_v4_v4_db(ss_middle->fbc1, r_new_in_the_middle);
@@ -4668,6 +4703,15 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
     copy_v3_v3_db(sl->g2, r_gl);
     copy_v4_v4_db(sr->fbc1, r_fbr);
     copy_v3_v3_db(sr->g1, r_gr);
+
+    if (has_middle) {
+      sl->flag = LRT_SHADOW_CASTED |
+                 (is_side_2r ? 0 : (facing_light ? LRT_SHADOW_FACING_LIGHT : 0));
+    }
+    else {
+      sl->flag = LRT_SHADOW_CASTED |
+                 (is_side_2r ? (facing_light ? LRT_SHADOW_FACING_LIGHT : 0) : 0);
+    }
 
     copy_v4_v4_db(tfbc1, tfbc2);
     copy_v3_v3_db(tg1, tg2);
@@ -4684,7 +4728,8 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
                                               double *r_fb_l,
                                               double *r_fb_r,
                                               double *r_global_l,
-                                              double *r_global_r)
+                                              double *r_global_r,
+                                              bool *r_facing_light)
 {
 
   double *LFBC = ssc->fbc1, *RFBC = ssc->fbc2, *FBC0 = tri->v[0]->fbcoord,
@@ -4698,6 +4743,7 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
     return false;
   }
 
+  bool is_persp = rb->cam_is_persp;
   double ratio[2];
   int trie[2];
   int pi = 0;
@@ -4749,8 +4795,10 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
                                 (trie[1] == 1 ? tri->v[1]->gloc : tri->v[2]->gloc));
   double *gv4 = (trie[1] == 0 ? tri->v[1]->gloc :
                                 (trie[1] == 1 ? tri->v[2]->gloc : tri->v[0]->gloc));
-  double gr1 = v1[3] * ratio[0] / (ratio[0] * v1[3] + (1 - ratio[0]) * v2[3]);
-  double gr2 = v3[3] * ratio[1] / (ratio[1] * v3[3] + (1 - ratio[1]) * v4[3]);
+  double gr1 = is_persp ? v1[3] * ratio[0] / (ratio[0] * v1[3] + (1 - ratio[0]) * v2[3]) :
+                          ratio[0];
+  double gr2 = is_persp ? v3[3] * ratio[1] / (ratio[1] * v3[3] + (1 - ratio[1]) * v4[3]) :
+                          ratio[1];
   interp_v3_v3v3_db(gpos1, gv1, gv2, gr1);
   interp_v3_v3v3_db(gpos2, gv3, gv4, gr2);
 
@@ -4758,7 +4806,7 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
 
   mul_v4_m4v3_db(fbc1, rb->view_projection, gpos1);
   mul_v4_m4v3_db(fbc2, rb->view_projection, gpos2);
-  if (rb->cam_is_persp) {
+  if (is_persp) {
     mul_v3db_db(fbc1, 1.0f / fbc1[3]);
     mul_v3db_db(fbc2, 1.0f / fbc2[3]);
   }
@@ -4785,8 +4833,8 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
   if (at1 < 0 || at2 > 1) {
     double rat1 = (-at1) / (at2 - at1);
     double rat2 = (1.0f - at1) / (at2 - at1);
-    double gat1 = fbc1[3] * rat1 / (rat1 * fbc1[3] + (1 - rat1) * fbc2[3]);
-    double gat2 = fbc1[3] * rat2 / (rat2 * fbc1[3] + (1 - rat2) * fbc2[3]);
+    double gat1 = is_persp ? fbc1[3] * rat1 / (rat1 * fbc1[3] + (1 - rat1) * fbc2[3]) : rat1;
+    double gat2 = is_persp ? fbc1[3] * rat2 / (rat2 * fbc1[3] + (1 - rat2) * fbc2[3]) : rat2;
     if (at1 < 0) {
       interp_v3_v3v3_db(t_gpos1, gpos1, gpos2, gat1);
       interp_v3_v3v3_db(t_fbc1, fbc1, fbc2, rat1);
@@ -4816,7 +4864,17 @@ static bool lineart_shadow_cast_onto_triangle(LineartRenderBuffer *rb,
   copy_v3_v3_db(r_global_l, gpos1);
   copy_v3_v3_db(r_global_r, gpos2);
 
-  printf("%f %f\n", at1, at2);
+  double cv[3];
+
+  if (is_persp) {
+    sub_v3_v3v3_db(cv, rb->camera_pos, tri->v[0]->gloc);
+  }
+  else {
+    copy_v3_v3_db(cv, rb->view_vector);
+  }
+
+  double dot_f = dot_v3v3_db(cv, tri->gn);
+  *r_facing_light = (dot_f < 0);
 
   return true;
 }
@@ -4827,6 +4885,7 @@ static void lineart_shadow_cast(LineartRenderBuffer *rb)
   double at_l, at_r;
   double fb_l[4], fb_r[4];
   double global_l[3], global_r[3];
+  bool facing_light;
 
   lineart_shadow_create_container_array(rb);
 
@@ -4842,9 +4901,18 @@ static void lineart_shadow_cast(LineartRenderBuffer *rb)
         }
         tri->testing_e[0] = (LineartEdge *)ssc;
 
-        if (lineart_shadow_cast_onto_triangle(
-                rb, (LineartTriangle *)tri, ssc, &at_l, &at_r, fb_l, fb_r, global_l, global_r)) {
-          lineart_shadow_edge_cut(rb, ssc, at_l, at_r, global_l, global_r, fb_l, fb_r);
+        if (lineart_shadow_cast_onto_triangle(rb,
+                                              (LineartTriangle *)tri,
+                                              ssc,
+                                              &at_l,
+                                              &at_r,
+                                              fb_l,
+                                              fb_r,
+                                              global_l,
+                                              global_r,
+                                              &facing_light)) {
+          lineart_shadow_edge_cut(
+              rb, ssc, at_l, at_r, global_l, global_r, fb_l, fb_r, facing_light);
         }
       }
       LRT_EDGE_BA_MARCHING_NEXT(ssc->fbc1, ssc->fbc2);
@@ -4910,7 +4978,8 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
       copy_v3_v3_db(v2->gloc, ((LineartShadowSegment *)ss->next)->g1);
       e->v1 = v1;
       e->v2 = v2;
-      e->flags = LRT_EDGE_FLAG_PROJECTED_SHADOW;
+      e->flags = (LRT_EDGE_FLAG_PROJECTED_SHADOW |
+                  ((ss->flag & LRT_SHADOW_FACING_LIGHT) ? LRT_EDGE_FLAG_SHADOW_FACING_LIGHT : 0));
       i++;
     }
   }
@@ -5301,6 +5370,10 @@ static void lineart_gpencil_generate(LineartCache *cache,
     // ec->picked = 1;
 
     const int count = MOD_lineart_chain_count(ec);
+    if (count < 2) {
+      continue;
+    }
+
     bGPDstroke *gps = BKE_gpencil_stroke_add(gpf, color_idx, count, thickness, false);
 
     int i;

@@ -116,6 +116,7 @@ typedef struct LineartShadowSegmentContainer {
 
 enum eLineartShadowSegmentFlag {
   LRT_SHADOW_CASTED = 1,
+  LRT_SHADOW_FACING_LIGHT = 2,
 };
 
 typedef struct LineartShadowSegment {
@@ -400,6 +401,7 @@ typedef struct LineartCache {
 
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
+#define DBL_SHADOW_LIM 1e-7
 
 #define LRT_MEMORY_POOL_1MB (1 << 20)
 
@@ -539,6 +541,9 @@ typedef struct LineartBoundingArea {
 #define LRT_ABC(index) (index == 0 ? a : (index == 1 ? b : c))
 
 #define LRT_DOUBLE_CLOSE_ENOUGH(a, b) (((a) + DBL_EDGE_LIM) >= (b) && ((a)-DBL_EDGE_LIM) <= (b))
+
+#define LRT_SHADOW_CLOSE_ENOUGH(a, b) \
+  (((a) + DBL_SHADOW_LIM) >= (b) && ((a)-DBL_SHADOW_LIM) <= (b))
 
 BLI_INLINE int lineart_LineIntersectTest2d(
     const double *a1, const double *a2, const double *b1, const double *b2, double *aRatio)

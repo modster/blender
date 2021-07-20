@@ -77,9 +77,11 @@ typedef enum eLineartEdgeFlag {
 
   /* Shaow edge type doesn't go into BMEdge->head.eflag so we can make it higher than 1<<7. */
   LRT_EDGE_FLAG_PROJECTED_SHADOW = (1 << 8),
+  /* To determine an edge to be occluded from the front or back face it's lying on. */
+  LRT_EDGE_FLAG_SHADOW_FACING_LIGHT = (1 << 9),
   /** Also used as discarded line mark. */
-  LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 9),
-  LRT_EDGE_FLAG_CLIPPED = (1 << 10),
+  LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 10),
+  LRT_EDGE_FLAG_CLIPPED = (1 << 11),
   /** Limited to 16 bits for the entire thing. */
 } eLineartEdgeFlag;
 

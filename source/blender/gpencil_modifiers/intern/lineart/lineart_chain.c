@@ -815,7 +815,7 @@ void MOD_lineart_chain_connect(LineartRenderBuffer *rb)
 
   while ((ec = BLI_pophead(&swap)) != NULL) {
     ec->next = ec->prev = NULL;
-    if (ec->picked) {
+    if (ec->picked || ec->chain.first == ec->chain.last) {
       continue;
     }
     BLI_addtail(&rb->chains, ec);
