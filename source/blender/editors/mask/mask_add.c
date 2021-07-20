@@ -541,7 +541,24 @@ static int add_vertex_exec(bContext *C, wmOperator *op)
     properties.toggle = false;
 
     if (ED_mask_select_mouse_pick(C, co, &properties)) {
+      ED_mask_view_lock_state_restore_no_jump(C, &lock_state);
       return OPERATOR_FINISHED;
+    }
+
+    MaskLayer *mask_layer_under_mouse;
+    MaskSpline *spline_under_mouse;
+    if (ED_mask_spline_under_mouse_get(
+            C, mask, co, &mask_layer_under_mouse, &spline_under_mouse)) {
+      if (mask_layer_under_mouse == mask_layer) {
+        mask_layer->act_spline = spline_under_mouse;
+
+        DEG_id_tag_update(&mask->id, ID_RECALC_SELECT);
+        WM_event_add_notifier(C, NC_MASK | ND_SELECT, mask);
+
+        ED_mask_view_lock_state_restore_no_jump(C, &lock_state);
+
+        return OPERATOR_FINISHED;
+      }
     }
   }
 

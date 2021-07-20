@@ -40,6 +40,11 @@ void MASK_OT_primitive_square_add(struct wmOperatorType *ot);
 /* mask_ops.c */
 struct Mask *ED_mask_new(struct bContext *C, const char *name);
 struct MaskLayer *ED_mask_layer_ensure(struct bContext *C, bool *r_added_mask);
+bool ED_mask_spline_under_mouse_get(const struct bContext *C,
+                                    struct Mask *mask,
+                                    const float co[2],
+                                    MaskLayer **r_mask_layer,
+                                    MaskSpline **r_mask_spline);
 
 void MASK_OT_new(struct wmOperatorType *ot);
 void MASK_OT_layer_new(struct wmOperatorType *ot);

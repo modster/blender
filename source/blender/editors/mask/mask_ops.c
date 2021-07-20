@@ -261,11 +261,11 @@ static void mask_point_undistort_pos(SpaceClip *sc, float r_co[2], const float c
   BKE_mask_coord_from_movieclip(sc->clip, &sc->user, r_co, r_co);
 }
 
-static bool spline_under_mouse_get(const bContext *C,
-                                   Mask *mask,
-                                   const float co[2],
-                                   MaskLayer **r_mask_layer,
-                                   MaskSpline **r_mask_spline)
+bool ED_mask_spline_under_mouse_get(const bContext *C,
+                                    Mask *mask,
+                                    const float co[2],
+                                    MaskLayer **r_mask_layer,
+                                    MaskSpline **r_mask_spline)
 {
   const float threshold = 19.0f;
   ScrArea *area = CTX_wm_area(C);
@@ -480,7 +480,7 @@ static void *slide_point_customdata(bContext *C, wmOperator *op, const wmEvent *
   }
 
   if (action == SLIDE_ACTION_NONE) {
-    if (spline_under_mouse_get(C, mask, co, &mask_layer, &spline)) {
+    if (ED_mask_spline_under_mouse_get(C, mask, co, &mask_layer, &spline)) {
       action = SLIDE_ACTION_SPLINE;
       point = NULL;
     }
@@ -498,7 +498,9 @@ static void *slide_point_customdata(bContext *C, wmOperator *op, const wmEvent *
     customdata->action = action;
     customdata->uw = uw;
 
-    customdata->is_sliding_new_point = RNA_boolean_get(op->ptr, "is_new_point");
+    if (point != NULL) {
+      customdata->is_sliding_new_point = RNA_boolean_get(op->ptr, "is_new_point");
+    }
 
     if (customdata->action != SLIDE_ACTION_SPLINE) {
       customdata->old_h1 = point->bezt.h1;
