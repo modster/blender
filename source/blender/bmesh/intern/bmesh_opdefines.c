@@ -724,7 +724,7 @@ static BMOpDefine bmo_edgenet_fill_def = {
 };
 
 /*
- * Edgenet Prepare.
+ * Edge-net Prepare.
  *
  * Identifies several useful edge loop cases and modifies them so
  * they'll become a face when edgenet_fill is called.  The cases covered are:
@@ -1942,7 +1942,7 @@ static BMOpDefine bmo_inset_region_def = {
 };
 
 /*
- * Edgeloop Offset.
+ * Edge-loop Offset.
  *
  * Creates edge loops based on simple edge-outset method.
  */

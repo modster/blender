@@ -143,7 +143,7 @@ set(SRC
   intern/geometry_set_instances.cc
   intern/gpencil.c
   intern/gpencil_curve.c
-  intern/gpencil_geom.c
+  intern/gpencil_geom.cc
   intern/gpencil_modifier.c
   intern/hair.c
   intern/icons.cc
@@ -765,6 +765,7 @@ add_dependencies(bf_blenkernel bf_dna)
 
 if(WITH_GTESTS)
   set(TEST_SRC
+    intern/action_test.cc
     intern/armature_test.cc
     intern/cryptomatte_test.cc
     intern/fcurve_test.cc
