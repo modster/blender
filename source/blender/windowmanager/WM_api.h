@@ -31,6 +31,7 @@
 
 /* dna-savable wmStructs here */
 #include "BLI_compiler_attrs.h"
+#include "BLI_sys_types.h"
 #include "DNA_windowmanager_types.h"
 #include "WM_keymap.h"
 
@@ -617,8 +618,13 @@ void WM_operator_type_modal_from_exec_for_object_edit_coords(struct wmOperatorTy
 void WM_uilisttype_init(void);
 struct uiListType *WM_uilisttype_find(const char *idname, bool quiet);
 bool WM_uilisttype_add(struct uiListType *ult);
-void WM_uilisttype_freelink(struct uiListType *ult);
+void WM_uilisttype_remove_ptr(struct Main *bmain, struct uiListType *ult);
 void WM_uilisttype_free(void);
+
+void WM_uilisttype_to_full_list_id(const struct uiListType *ult,
+                                   const char *list_id,
+                                   char r_full_list_id[]);
+const char *WM_uilisttype_list_id_get(const struct uiListType *ult, struct uiList *list);
 
 /* wm_menu_type.c */
 void WM_menutype_init(void);
@@ -775,20 +781,20 @@ enum {
 
 struct wmJob *WM_jobs_get(struct wmWindowManager *wm,
                           struct wmWindow *win,
-                          void *owner,
+                          const void *owner,
                           const char *name,
                           int flag,
                           int job_type);
 
-bool WM_jobs_test(struct wmWindowManager *wm, void *owner, int job_type);
-float WM_jobs_progress(struct wmWindowManager *wm, void *owner);
-char *WM_jobs_name(struct wmWindowManager *wm, void *owner);
-double WM_jobs_starttime(struct wmWindowManager *wm, void *owner);
-void *WM_jobs_customdata(struct wmWindowManager *wm, void *owner);
+bool WM_jobs_test(const struct wmWindowManager *wm, const void *owner, int job_type);
+float WM_jobs_progress(const struct wmWindowManager *wm, const void *owner);
+const char *WM_jobs_name(const struct wmWindowManager *wm, const void *owner);
+double WM_jobs_starttime(const struct wmWindowManager *wm, const void *owner);
+void *WM_jobs_customdata(struct wmWindowManager *wm, const void *owner);
 void *WM_jobs_customdata_from_type(struct wmWindowManager *wm, int job_type);
 
-bool WM_jobs_is_running(struct wmJob *);
-bool WM_jobs_is_stopped(wmWindowManager *wm, void *owner);
+bool WM_jobs_is_running(const struct wmJob *wm_job);
+bool WM_jobs_is_stopped(const wmWindowManager *wm, const void *owner);
 void *WM_jobs_customdata_get(struct wmJob *);
 void WM_jobs_customdata_set(struct wmJob *, void *customdata, void (*free)(void *));
 void WM_jobs_timer(struct wmJob *, double timestep, unsigned int note, unsigned int endnote);
@@ -805,15 +811,15 @@ void WM_jobs_callbacks(struct wmJob *,
                        void (*endjob)(void *));
 
 void WM_jobs_start(struct wmWindowManager *wm, struct wmJob *);
-void WM_jobs_stop(struct wmWindowManager *wm, void *owner, void *startjob);
+void WM_jobs_stop(struct wmWindowManager *wm, const void *owner, void *startjob);
 void WM_jobs_kill(struct wmWindowManager *wm,
                   void *owner,
                   void (*)(void *, short int *, short int *, float *));
 void WM_jobs_kill_all(struct wmWindowManager *wm);
-void WM_jobs_kill_all_except(struct wmWindowManager *wm, void *owner);
-void WM_jobs_kill_type(struct wmWindowManager *wm, void *owner, int job_type);
+void WM_jobs_kill_all_except(struct wmWindowManager *wm, const void *owner);
+void WM_jobs_kill_type(struct wmWindowManager *wm, const void *owner, int job_type);
 
-bool WM_jobs_has_running(struct wmWindowManager *wm);
+bool WM_jobs_has_running(const struct wmWindowManager *wm);
 
 void WM_job_main_thread_lock_acquire(struct wmJob *job);
 void WM_job_main_thread_lock_release(struct wmJob *job);
@@ -961,7 +967,7 @@ bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
 
 /* wm_xr_actions.c */
 /* XR action functions to be called pre-XR session start.
- * Note: The "destroy" functions can also be called post-session start. */
+ * NOTE: The "destroy" functions can also be called post-session start. */
 bool WM_xr_action_set_create(wmXrData *xr, const char *action_set_name);
 void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name);
 bool WM_xr_action_create(wmXrData *xr,
@@ -999,9 +1005,9 @@ void WM_xr_action_binding_destroy(wmXrData *xr,
                                   unsigned int count_interaction_paths,
                                   const char **interaction_paths);
 
-bool WM_xr_active_action_set_set(
-    wmXrData *xr, const char *action_set_name); /* If action_set_name is NULL, then
-                                                 * all action sets will be treated as active. */
+/* If action_set_name is NULL, then all action sets will be treated as active. */
+bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name);
+
 bool WM_xr_controller_pose_action_set(wmXrData *xr,
                                       const char *action_set_name,
                                       const char *action_name);
@@ -1015,7 +1021,7 @@ bool WM_xr_action_state_get(const wmXrData *xr,
 bool WM_xr_haptic_action_apply(wmXrData *xr,
                                const char *action_set_name,
                                const char *action_name,
-                               const long long *duration,
+                               const int64_t *duration,
                                const float *frequency,
                                const float *amplitude);
 void WM_xr_haptic_action_stop(wmXrData *xr, const char *action_set_name, const char *action_name);

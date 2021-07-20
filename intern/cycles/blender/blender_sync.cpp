@@ -281,7 +281,6 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
 
 void BlenderSync::sync_integrator()
 {
-  BL::RenderSettings r = b_scene.render();
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
 
   experimental = (get_enum(cscene, "feature_set") != 0);
@@ -325,7 +324,7 @@ void BlenderSync::sync_integrator()
   integrator->set_sample_clamp_direct(get_float(cscene, "sample_clamp_direct"));
   integrator->set_sample_clamp_indirect(get_float(cscene, "sample_clamp_indirect"));
   if (!preview) {
-    integrator->set_motion_blur(r.use_motion_blur());
+    integrator->set_motion_blur(view_layer.use_motion_blur);
   }
 
   integrator->set_method((Integrator::Method)get_enum(
@@ -405,8 +404,6 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
 
   Film *film = scene->film;
 
-  vector<Pass> prevpasses = scene->passes;
-
   if (b_v3d) {
     film->set_display_pass(update_viewport_display_passes(b_v3d, scene->passes));
   }
@@ -436,11 +433,6 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
         break;
     }
   }
-
-  if (!Pass::equals(prevpasses, scene->passes)) {
-    film->tag_passes_update(scene, prevpasses, false);
-    film->tag_modified();
-  }
 }
 
 /* Render Layer */
@@ -456,6 +448,8 @@ void BlenderSync::sync_view_layer(BL::ViewLayer &b_view_layer)
   view_layer.use_surfaces = b_view_layer.use_solid() || scene->bake_manager->get_baking();
   view_layer.use_hair = b_view_layer.use_strand();
   view_layer.use_volumes = b_view_layer.use_volumes();
+  view_layer.use_motion_blur = b_view_layer.use_motion_blur() &&
+                               b_scene.render().use_motion_blur();
 
   /* Material override. */
   view_layer.material_override = b_view_layer.material_override();
@@ -602,8 +596,10 @@ vector<Pass> BlenderSync::sync_render_passes(BL::Scene &b_scene,
   for (BL::RenderPass &b_pass : b_rlay.passes) {
     PassType pass_type = get_pass_type(b_pass);
 
-    if (pass_type == PASS_MOTION && b_scene.render().use_motion_blur())
+    if (pass_type == PASS_MOTION &&
+        (b_view_layer.use_motion_blur() && b_scene.render().use_motion_blur())) {
       continue;
+    }
     if (pass_type != PASS_NONE)
       Pass::add(pass_type, passes, b_pass.name().c_str());
   }
@@ -746,10 +742,13 @@ vector<Pass> BlenderSync::sync_render_passes(BL::Scene &b_scene,
                                         DENOISING_CLEAN_ALL_PASSES);
   scene->film->set_denoising_prefiltered_pass(denoising.store_passes &&
                                               denoising.type == DENOISER_NLM);
-
   scene->film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
-  scene->film->tag_passes_update(scene, passes);
-  scene->integrator->tag_update(scene, Integrator::UPDATE_ALL);
+
+  if (!Pass::equals(passes, scene->passes)) {
+    scene->film->tag_passes_update(scene, passes);
+    scene->film->tag_modified();
+    scene->integrator->tag_update(scene, Integrator::UPDATE_ALL);
+  }
 
   return passes;
 }

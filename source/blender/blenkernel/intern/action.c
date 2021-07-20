@@ -120,7 +120,7 @@ static void action_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_src, 
   for (fcurve_src = action_src->curves.first; fcurve_src; fcurve_src = fcurve_src->next) {
     /* Duplicate F-Curve. */
 
-    /* XXX TODO pass subdata flag?
+    /* XXX TODO: pass subdata flag?
      * But surprisingly does not seem to be doing any ID refcounting... */
     fcurve_dst = BKE_fcurve_copy(fcurve_src);
 
@@ -370,7 +370,7 @@ void set_active_action_group(bAction *act, bActionGroup *agrp, short select)
 /* Sync colors used for action/bone group with theme settings */
 void action_group_colors_sync(bActionGroup *grp, const bActionGroup *ref_grp)
 {
-  /* only do color copying if using a custom color (i.e. not default color)  */
+  /* Only do color copying if using a custom color (i.e. not default color). */
   if (grp->customCol) {
     if (grp->customCol > 0) {
       /* copy theme colors on-to group's custom color in case user tries to edit color */
@@ -486,8 +486,7 @@ void action_groups_add_channel(bAction *act, bActionGroup *agrp, FCurve *fcurve)
 
     /* If grp is NULL, that means we fell through, and this F-Curve should be added as the new
      * first since group is (effectively) the first group. Thus, the existing first F-Curve becomes
-     * the second in the chain, etc. etc.
-     */
+     * the second in the chain, etc. */
     if (grp == NULL) {
       BLI_insertlinkbefore(&act->curves, act->curves.first, fcurve);
     }
@@ -498,9 +497,8 @@ void action_groups_add_channel(bAction *act, bActionGroup *agrp, FCurve *fcurve)
 }
 
 /* Reconstruct group channel pointers.
- * Assumes that the channels are still in the proper order, i.e. that channels of the same group
- * are adjacent in the act->channels list. It also assumes that the groups
- * referred to by the FCurves are already in act->groups.
+ * Assumes that the groups referred to by the FCurves are already in act->groups.
+ * Reorders the main channel list to match group order.
  */
 void BKE_action_groups_reconstruct(bAction *act)
 {
@@ -515,23 +513,30 @@ void BKE_action_groups_reconstruct(bAction *act)
     BLI_listbase_clear(&group->channels);
   }
 
-  bActionGroup *grp;
-  bActionGroup *last_grp = NULL;
-  LISTBASE_FOREACH (FCurve *, fcurve, &act->curves) {
-    if (fcurve->grp == NULL) {
-      continue;
-    }
+  /* Sort the channels into the group lists, destroying the act->curves list. */
+  ListBase ungrouped = {NULL, NULL};
 
-    grp = fcurve->grp;
-    if (last_grp != grp) {
-      /* If this is the first time we see this group, this must be the first channel. */
-      grp->channels.first = fcurve;
-    }
+  LISTBASE_FOREACH_MUTABLE (FCurve *, fcurve, &act->curves) {
+    if (fcurve->grp) {
+      BLI_assert(BLI_findindex(&act->groups, fcurve->grp) >= 0);
 
-    /* This is the last channel, until it's overwritten by a later iteration. */
-    grp->channels.last = fcurve;
-    last_grp = grp;
+      BLI_addtail(&fcurve->grp->channels, fcurve);
+    }
+    else {
+      BLI_addtail(&ungrouped, fcurve);
+    }
   }
+
+  /* Recombine into the main list. */
+  BLI_listbase_clear(&act->curves);
+
+  LISTBASE_FOREACH (bActionGroup *, group, &act->groups) {
+    /* Copy the list header to preserve the pointers in the group. */
+    ListBase tmp = group->channels;
+    BLI_movelisttolist(&act->curves, &tmp);
+  }
+
+  BLI_movelisttolist(&act->curves, &ungrouped);
 }
 
 /* Remove the given channel from all groups */
@@ -846,8 +851,9 @@ void BKE_pose_copy_data_ex(bPose **dst,
     }
 
     if (copy_constraints) {
-      BKE_constraints_copy_ex(
-          &listb, &pchan->constraints, flag, true); /* BKE_constraints_copy NULLs listb */
+      /* #BKE_constraints_copy NULL's `listb` */
+      BKE_constraints_copy_ex(&listb, &pchan->constraints, flag, true);
+
       pchan->constraints = listb;
 
       /* XXX: This is needed for motionpath drawing to work.
@@ -1855,7 +1861,7 @@ void BKE_pose_blend_write(BlendWriter *writer, bPose *pose, bArmature *arm)
   /* Write channels */
   LISTBASE_FOREACH (bPoseChannel *, chan, &pose->chanbase) {
     /* Write ID Properties -- and copy this comment EXACTLY for easy finding
-     * of library blocks that implement this.*/
+     * of library blocks that implement this. */
     if (chan->prop) {
       IDP_BlendWrite(writer, chan->prop);
     }

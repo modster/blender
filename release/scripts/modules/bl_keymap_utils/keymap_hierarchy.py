@@ -55,13 +55,11 @@ _km_hierarchy = [
     ('Window', 'EMPTY', 'WINDOW', []),  # file save, window change, exit
     ('Screen', 'EMPTY', 'WINDOW', [     # full screen, undo, screenshot
         ('Screen Editing', 'EMPTY', 'WINDOW', []),    # re-sizing, action corners
-        # header/footer/navigation_bar stuff (per region)
-        ('Region Context Menu', 'EMPTY', 'WINDOW', []),
+        ('Region Context Menu', 'EMPTY', 'WINDOW', []),      # header/footer/navigation_bar stuff (per region)
     ]),
 
     ('View2D', 'EMPTY', 'WINDOW', []),    # view 2d navigation (per region)
-    # view 2d with buttons navigation
-    ('View2D Buttons List', 'EMPTY', 'WINDOW', []),
+    ('View2D Buttons List', 'EMPTY', 'WINDOW', []),  # view 2d with buttons navigation
 
     ('User Interface', 'EMPTY', 'WINDOW', []),
 
@@ -225,8 +223,7 @@ _km_hierarchy = [
     ('Mask Editing', 'EMPTY', 'WINDOW', []),
     ('Frames', 'EMPTY', 'WINDOW', []),    # frame navigation (per region)
     ('Markers', 'EMPTY', 'WINDOW', []),    # markers (per region)
-    # frame change on click, preview range (per region)
-    ('Animation', 'EMPTY', 'WINDOW', []),
+    ('Animation', 'EMPTY', 'WINDOW', []),    # frame change on click, preview range (per region)
     ('Animation Channels', 'EMPTY', 'WINDOW', []),
 
     ('View3D Gesture Circle', 'EMPTY', 'WINDOW', []),

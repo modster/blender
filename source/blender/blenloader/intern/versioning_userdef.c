@@ -277,6 +277,15 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     btheme->space_spreadsheet = btheme->space_outliner;
   }
 
+  if (!USER_VERSION_ATLEAST(300, 5)) {
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.active);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.list);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.list_text);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.list_text_hi);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.hilite);
+    FROM_DEFAULT_V4_UCHAR(space_spreadsheet.selected_highlight);
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -885,6 +894,7 @@ void blo_do_versions_userdef(UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
+    BKE_addon_ensure(&userdef->addons, "pose_library");
   }
 
   LISTBASE_FOREACH (bTheme *, btheme, &userdef->themes) {

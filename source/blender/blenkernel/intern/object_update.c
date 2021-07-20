@@ -123,7 +123,7 @@ void BKE_object_eval_parent(Depsgraph *depsgraph, Object *ob)
 void BKE_object_eval_constraints(Depsgraph *depsgraph, Scene *scene, Object *ob)
 {
   bConstraintOb *cob;
-  float ctime = BKE_scene_frame_get(scene);
+  float ctime = BKE_scene_ctime_get(scene);
 
   DEG_debug_print_eval(depsgraph, __func__, ob->id.name, ob);
 
@@ -224,7 +224,7 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
     case OB_SURF:
     case OB_FONT: {
       bool for_render = (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER);
-      BKE_displist_make_curveTypes(depsgraph, scene, ob, for_render, false);
+      BKE_displist_make_curveTypes(depsgraph, scene, ob, for_render);
       break;
     }
 
@@ -349,34 +349,61 @@ void BKE_object_eval_uber_transform(Depsgraph *depsgraph, Object *object)
   BKE_object_eval_proxy_copy(depsgraph, object);
 }
 
+void BKE_object_data_batch_cache_dirty_tag(ID *object_data)
+{
+  switch (GS(object_data->name)) {
+    case ID_ME:
+      BKE_mesh_batch_cache_dirty_tag((struct Mesh *)object_data, BKE_MESH_BATCH_DIRTY_ALL);
+      break;
+    case ID_LT:
+      BKE_lattice_batch_cache_dirty_tag((struct Lattice *)object_data,
+                                        BKE_LATTICE_BATCH_DIRTY_ALL);
+      break;
+    case ID_CU:
+      BKE_curve_batch_cache_dirty_tag((struct Curve *)object_data, BKE_CURVE_BATCH_DIRTY_ALL);
+      break;
+    case ID_MB:
+      BKE_mball_batch_cache_dirty_tag((struct MetaBall *)object_data, BKE_MBALL_BATCH_DIRTY_ALL);
+      break;
+    case ID_GD:
+      BKE_gpencil_batch_cache_dirty_tag((struct bGPdata *)object_data);
+      break;
+    case ID_HA:
+      BKE_hair_batch_cache_dirty_tag((struct Hair *)object_data, BKE_HAIR_BATCH_DIRTY_ALL);
+      break;
+    case ID_PT:
+      BKE_pointcloud_batch_cache_dirty_tag((struct PointCloud *)object_data,
+                                           BKE_POINTCLOUD_BATCH_DIRTY_ALL);
+      break;
+    case ID_VO:
+      BKE_volume_batch_cache_dirty_tag((struct Volume *)object_data, BKE_VOLUME_BATCH_DIRTY_ALL);
+      break;
+    default:
+      break;
+  }
+}
+
 void BKE_object_batch_cache_dirty_tag(Object *ob)
 {
-  switch (ob->type) {
-    case OB_MESH:
-      BKE_mesh_batch_cache_dirty_tag(ob->data, BKE_MESH_BATCH_DIRTY_ALL);
+  BKE_object_data_batch_cache_dirty_tag(ob->data);
+}
+
+void BKE_object_data_eval_batch_cache_dirty_tag(Depsgraph *depsgraph, ID *object_data)
+{
+  DEG_debug_print_eval(depsgraph, __func__, object_data->name, object_data);
+  BKE_object_data_batch_cache_dirty_tag(object_data);
+}
+
+void BKE_object_data_eval_batch_cache_deform_tag(Depsgraph *depsgraph, ID *object_data)
+{
+  DEG_debug_print_eval(depsgraph, __func__, object_data->name, object_data);
+  switch (GS(object_data->name)) {
+    case ID_ME:
+      BKE_mesh_batch_cache_dirty_tag((Mesh *)object_data, BKE_MESH_BATCH_DIRTY_DEFORM);
       break;
-    case OB_LATTICE:
-      BKE_lattice_batch_cache_dirty_tag(ob->data, BKE_LATTICE_BATCH_DIRTY_ALL);
-      break;
-    case OB_CURVE:
-    case OB_FONT:
-    case OB_SURF:
-      BKE_curve_batch_cache_dirty_tag(ob->data, BKE_CURVE_BATCH_DIRTY_ALL);
-      break;
-    case OB_MBALL:
-      BKE_mball_batch_cache_dirty_tag(ob->data, BKE_MBALL_BATCH_DIRTY_ALL);
-      break;
-    case OB_GPENCIL:
-      BKE_gpencil_batch_cache_dirty_tag(ob->data);
-      break;
-    case OB_HAIR:
-      BKE_hair_batch_cache_dirty_tag(ob->data, BKE_HAIR_BATCH_DIRTY_ALL);
-      break;
-    case OB_POINTCLOUD:
-      BKE_pointcloud_batch_cache_dirty_tag(ob->data, BKE_POINTCLOUD_BATCH_DIRTY_ALL);
-      break;
-    case OB_VOLUME:
-      BKE_volume_batch_cache_dirty_tag(ob->data, BKE_VOLUME_BATCH_DIRTY_ALL);
+    default:
+      /* Only mesh is currently supported. Fallback to dirty all for other datablocks types. */
+      BKE_object_data_batch_cache_dirty_tag(object_data);
       break;
   }
 }
@@ -386,7 +413,6 @@ void BKE_object_eval_uber_data(Depsgraph *depsgraph, Scene *scene, Object *ob)
   DEG_debug_print_eval(depsgraph, __func__, ob->id.name, ob);
   BLI_assert(ob->type != OB_ARMATURE);
   BKE_object_handle_data_update(depsgraph, scene, ob);
-  BKE_object_batch_cache_dirty_tag(ob);
 }
 
 void BKE_object_eval_ptcache_reset(Depsgraph *depsgraph, Scene *scene, Object *object)

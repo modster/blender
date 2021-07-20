@@ -79,7 +79,7 @@ enum class OperationCode {
   TRANSFORM_PARENT,
   /* Constraints */
   TRANSFORM_CONSTRAINTS,
-  /* Handle object-level updates, mainly proxies hacks and recalc flags.  */
+  /* Handle object-level updates, mainly proxies hacks and recalc flags. */
   TRANSFORM_EVAL,
   /* Initializes transformation for simulation.
    * For example, ensures point cache is properly reset before doing rigid
@@ -100,9 +100,13 @@ enum class OperationCode {
   /* Initialize evaluation of the geometry. Is an entry operation of geometry
    * component. */
   GEOMETRY_EVAL_INIT,
-  /* Evaluate the whole geometry, including modifiers. */
+  /* Evaluate the geometry, including modifiers, and update only batches that
+   * are affected by deform operations. */
+  GEOMETRY_EVAL_DEFORM,
+  /* Evaluate the geometry, including modifiers, but don't update the batch
+   * cache. */
   GEOMETRY_EVAL,
-  /* Evaluation of geometry is completely done.. */
+  /* Evaluation of geometry is completely done. */
   GEOMETRY_EVAL_DONE,
   /* Evaluation of a shape key.
    * NOTE: Currently only for object data data-blocks. */
@@ -178,7 +182,9 @@ enum class OperationCode {
   WORLD_UPDATE,
 
   /* Batch caches. -------------------------------------------------------- */
-  GEOMETRY_SELECT_UPDATE,
+  BATCH_UPDATE_SELECT,
+  BATCH_UPDATE_DEFORM,
+  BATCH_UPDATE_ALL,
 
   /* Masks. --------------------------------------------------------------- */
   MASK_ANIMATION,
