@@ -655,25 +655,22 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
 
   /* Determine pivot point. */
   float pivot[3];
-  copy_v3_v3(pivot, tgpa->asset_center);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->transform_center, pivot);
   if (!shift_key) {
     if (tgpa->manipulator_index == CAGE_CORNER_N) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], pivot);
-      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
     }
     else if (tgpa->manipulator_index == CAGE_CORNER_E) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], pivot);
-      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
     }
     else if (tgpa->manipulator_index == CAGE_CORNER_S) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], pivot);
-      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
     }
     else if (tgpa->manipulator_index == CAGE_CORNER_W) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], pivot);
-      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
     }
   }
+  sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
 
   /* Create rotation matrix. */
   float rot_matrix[4][4];
