@@ -2396,28 +2396,29 @@ class _defs_clip_tracking_tools:
     @ToolDef.from_fn
     def add_marker_tweak():
         def draw_settings(_context, layout, tool):
-            # props = tool.operator_properties("sequencer.split")
-            props = _context.space_data.clip.tracking.settings
-            # layout.use_property_split = True
-            row = layout.row(align=True)
-            row.prop(props, "default_pattern_size", text="")
-            row.prop(props, "default_search_size", text="")
-            row = layout.row()
-            row.ui_units_x = 5
-            row.prop(props, "default_motion_model", text="")
-            row = layout.row()
-            row.ui_units_x = 5
-            row.prop(props, "default_pattern_match", text="")
-            row = layout.row()
-            row.prop(props, "use_default_brute")
-            row.prop(props, "use_default_normalization")
-            row = layout.row(align=True)
-            row.prop(props, "use_default_red_channel", text="R", toggle=True)
-            row.prop(props, "use_default_green_channel", text="G", toggle=True)
-            row.prop(props, "use_default_blue_channel", text="B", toggle=True)
-            row = layout.row()
-            row.prop(props, "default_weight")
-            row.popover(panel="CLIP_PT_track_settings_tool")
+            clip = _context.space_data.clip
+            if clip:
+                settings = clip.tracking.settings
+                # layout.use_property_split = True
+                row = layout.row(align=True)
+                row.prop(settings, "default_pattern_size", text="")
+                row.prop(settings, "default_search_size", text="")
+                row = layout.row()
+                row.ui_units_x = 5
+                row.prop(settings, "default_motion_model", text="")
+                row = layout.row()
+                row.ui_units_x = 5
+                row.prop(settings, "default_pattern_match", text="")
+                row = layout.row()
+                row.prop(settings, "use_default_brute")
+                row.prop(settings, "use_default_normalization")
+                row = layout.row(align=True)
+                row.prop(settings, "use_default_red_channel", text="R", toggle=True)
+                row.prop(settings, "use_default_green_channel", text="G", toggle=True)
+                row.prop(settings, "use_default_blue_channel", text="B", toggle=True)
+                row = layout.row()
+                row.prop(settings, "default_weight")
+                row.popover(panel="CLIP_PT_track_settings_tool")
 
         return dict(
             idname="builtin.add_marker_tweak",
