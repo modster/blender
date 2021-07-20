@@ -724,6 +724,12 @@ static const char *toolsystem_default_tool(const bToolKey *tkey)
       return "builtin.select_box";
     }
     case SPACE_CLIP: {
+      switch (tkey->mode) {
+        case SC_MODE_TRACKING:
+          return "builtin.add_marker_tweak";
+        case SC_MODE_MASKEDIT:
+          return "builtin.draw_mask";
+      }
       return "builtin.select_box";
     }
   }
