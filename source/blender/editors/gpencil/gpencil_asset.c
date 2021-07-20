@@ -969,7 +969,7 @@ static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
     MEM_SAFE_FREE(tgpa);
   }
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-  WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
+  WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED | ND_DATA, NULL);
 
   /* Clear pointer. */
   op->customdata = NULL;
