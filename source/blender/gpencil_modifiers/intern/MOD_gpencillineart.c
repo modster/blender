@@ -452,7 +452,6 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
-  uiItemR(layout, ptr, "use_loose_as_contour", 0, IFACE_("Loose Edges As Contour"), ICON_NONE);
   uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_crease_on_smooth", 0, IFACE_("Crease On Smooth"), ICON_NONE);
@@ -676,6 +675,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_fuzzy_all", 0, NULL, ICON_NONE);
 
   uiItemR(col, ptr, "use_loose_edge_chain", 0, IFACE_("Loose Edges"), ICON_NONE);
+  uiItemR(col, ptr, "use_loose_as_contour", 0, IFACE_("Loose Edges As Contour"), ICON_NONE);
   uiItemR(col, ptr, "use_geometry_space_chain", 0, IFACE_("Geometry Space"), ICON_NONE);
 
   uiItemR(layout,
