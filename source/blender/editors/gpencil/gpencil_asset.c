@@ -13,9 +13,6 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2021, Blender Foundation
- * This is a new part of Blender
- * Operators for editing Grease Pencil strokes
  */
 
 /** \file
@@ -108,36 +105,40 @@ typedef struct tGPDasset {
   rctf rect_cage;
   /** 2D cage center. */
   float cage_center[2];
-  /** Transform centerr. */
+  /** Normal vector for cage. */
+  float cage_normal[3];
+  /** Transform center. */
   float transform_center[2];
+
   /** 2D cage manipulator points *
    *
-   *   8             9 (Rotation)
+   * NW-R             NE-R (Rotation)
    *    \           /
-   *     0----1----2
-   *     |         |
-   *     7         3
-   *     |         |
-   *     6----5----4
+   *     NW----N----NE
+   *     |          |
+   *     W          E
+   *     |          |
+   *     SW----S----SE
    *    /           \
-   *   11            10
+   * SW-R             SE-R
    */
   float manipulator[12][2];
   /** Manipulator index (-1 means not set). */
   int manipulator_index;
   /** Manipulator vector used to determine the effect. */
   float manipulator_vector[3];
-  /** Normal vector for cage. */
-  float normal_vec[3];
   /** Vector with the original orientation for rotation. */
   float vinit_rotation[2];
+
+  /* All the hash below are used to keep a reference of the asset data inserted in the target
+   * object. */
 
   /** Hash of new created layers. */
   struct GHash *asset_layers;
   /** Hash of new created frames. */
   struct GHash *asset_frames;
-  /** Hash of new created strokes. */
-  struct GHash *asset_strokes;
+  /** Hash of new created strokes linked to frame. */
+  struct GHash *asset_strokes_frame;
   /** Hash of new created strokes linked to layer. */
   struct GHash *asset_strokes_layer;
   /** Hash of new created materials. */
@@ -318,8 +319,8 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
   RNA_def_boolean(ot->srna,
                   "reset_origin",
                   1,
-                  "Reset Origin to Strokes",
-                  "Set origin of the strokes in the center of the bounding box");
+                  "Reset Origin to Geometry",
+                  "Set origin of the asset in the center of the strokes bounding box");
 }
 
 /** \} */
@@ -334,177 +335,6 @@ static void gpencil_asset_import_update_strokes(bContext *C, tGPDasset *tgpa)
 
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
   WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
-}
-
-/* Helper: Draw status message while the user is running the operator */
-static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *tgpa)
-{
-  char status_str[UI_MAX_DRAW_STR];
-  char msg_str[UI_MAX_DRAW_STR];
-  bGPdata *gpd_asset = tgpa->gpd_asset;
-  const char *mode_txt[] = {"", "(Location)", "(Rotation)", "(Scale)"};
-
-  BLI_strncpy(msg_str, TIP_("Importing Asset"), UI_MAX_DRAW_STR);
-
-  BLI_snprintf(status_str,
-               sizeof(status_str),
-               "%s %s %s",
-               msg_str,
-               gpd_asset->id.name + 2,
-               mode_txt[tgpa->mode]);
-
-  ED_area_status_text(tgpa->area, status_str);
-  ED_workspace_status_text(
-      C, TIP_("ESC/RMB to cancel, Enter/LMB(outside cage) to confirm, Shift to Scale uniform"));
-}
-
-/* Update screen and stroke */
-static void gpencil_asset_import_update(bContext *C, wmOperator *op, tGPDasset *tgpa)
-{
-  /* Update shift indicator in header. */
-  gpencil_asset_import_status_indicators(C, tgpa);
-  /* Update points position. */
-  gpencil_asset_import_update_strokes(C, tgpa);
-}
-
-/* ----------------------- */
-
-/* Exit and free memory */
-static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
-{
-  tGPDasset *tgpa = op->customdata;
-  bGPdata *gpd = tgpa->gpd;
-
-  /* don't assume that operator data exists at all */
-  if (tgpa) {
-    /* clear status message area */
-    ED_area_status_text(tgpa->area, NULL);
-    ED_workspace_status_text(C, NULL);
-
-    /* Clear any temp stroke. */
-    // TODO
-
-    /* Free Hash tablets. */
-    if (tgpa->asset_layers != NULL) {
-      BLI_ghash_free(tgpa->asset_layers, NULL, NULL);
-    }
-    if (tgpa->asset_frames != NULL) {
-      BLI_ghash_free(tgpa->asset_frames, NULL, NULL);
-    }
-    if (tgpa->asset_strokes != NULL) {
-      BLI_ghash_free(tgpa->asset_strokes, NULL, NULL);
-      BLI_ghash_free(tgpa->asset_strokes_layer, NULL, NULL);
-    }
-
-    if (tgpa->asset_materials != NULL) {
-      BLI_ghash_free(tgpa->asset_materials, NULL, NULL);
-    }
-
-    /* Remove drawing handler. */
-    if (tgpa->draw_handle_3d) {
-      ED_region_draw_cb_exit(tgpa->region->type, tgpa->draw_handle_3d);
-    }
-
-    MEM_SAFE_FREE(tgpa);
-  }
-  DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-  WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
-
-  /* clear pointer */
-  op->customdata = NULL;
-}
-
-/* Init new temporary interpolation data */
-static bool gpencil_asset_import_set_init_values(bContext *C,
-                                                 wmOperator *op,
-                                                 ID *id,
-                                                 tGPDasset *tgpa)
-{
-  /* Save current settings. */
-  tgpa->win = CTX_wm_window(C);
-  tgpa->bmain = CTX_data_main(C);
-  tgpa->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  tgpa->scene = CTX_data_scene(C);
-  tgpa->area = CTX_wm_area(C);
-  tgpa->region = CTX_wm_region(C);
-  tgpa->rv3d = CTX_wm_region_view3d(C);
-  tgpa->ob = CTX_data_active_object(C);
-
-  /* Setup space conversions data. */
-  gpencil_point_conversion_init(C, &tgpa->gsc);
-
-  /* Save current frame number. */
-  tgpa->cframe = tgpa->scene->r.cfra;
-
-  /* Target GP datablock. */
-  tgpa->gpd = tgpa->ob->data;
-  /* Asset GP datablock. */
-  tgpa->gpd_asset = (bGPdata *)id;
-
-  tgpa->mode = GP_ASSET_TRANSFORM_LOC;
-  tgpa->flag |= GP_ASSET_FLAG_IDLE;
-
-  /* Manipulator point is not set yet. */
-  tgpa->manipulator_index = -1;
-
-  tgpa->asset_layers = NULL;
-  tgpa->asset_frames = NULL;
-  tgpa->asset_strokes = NULL;
-  tgpa->asset_strokes_layer = NULL;
-  tgpa->asset_materials = NULL;
-
-  return true;
-}
-
-/* Allocate memory and initialize values */
-static tGPDasset *gpencil_session_init_asset_import(bContext *C, wmOperator *op)
-{
-  Main *bmain = CTX_data_main(C);
-  ID *id = NULL;
-
-  PropertyRNA *prop_name = RNA_struct_find_property(op->ptr, "name");
-  PropertyRNA *prop_type = RNA_struct_find_property(op->ptr, "type");
-
-  /* These shouldn't fail when created by outliner dropping as it checks the ID is valid. */
-  if (!RNA_property_is_set(op->ptr, prop_name) || !RNA_property_is_set(op->ptr, prop_type)) {
-    return NULL;
-  }
-  const short id_type = RNA_property_enum_get(op->ptr, prop_type);
-  char name[MAX_ID_NAME - 2];
-  RNA_property_string_get(op->ptr, prop_name, name);
-  id = BKE_libblock_find_name(bmain, id_type, name);
-  if (id == NULL) {
-    return NULL;
-  }
-  const int object_type = BKE_object_obdata_to_type(id);
-  if (object_type == -1) {
-    return NULL;
-  }
-
-  tGPDasset *tgpa = MEM_callocN(sizeof(tGPDasset), "GPencil Asset Import Data");
-
-  /* Save initial values. */
-  gpencil_asset_import_set_init_values(C, op, id, tgpa);
-
-  /* return context data for running operator */
-  return tgpa;
-}
-
-/* Init interpolation: Allocate memory and set init values */
-static int gpencil_asset_import_init(bContext *C, wmOperator *op)
-{
-  tGPDasset *tgpa;
-
-  /* check context */
-  tgpa = op->customdata = gpencil_session_init_asset_import(C, op);
-  if (tgpa == NULL) {
-    /* something wasn't set correctly in context */
-    gpencil_asset_import_exit(C, op);
-    return 0;
-  }
-
-  /* everything is now setup ok */
-  return 1;
 }
 
 /* Helper: Compute 2D cage size in screen pixels. */
@@ -592,409 +422,14 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_SW], co3);
   sub_v3_v3v3(vec1, co2, co1);
   sub_v3_v3v3(vec2, co3, co2);
+
   /* Vector orthogonal to polygon plane. */
-  cross_v3_v3v3(tgpa->normal_vec, vec1, vec2);
-  normalize_v3(tgpa->normal_vec);
-}
-
-/* Helper: Detect mouse over cage areas. */
-static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
-{
-  const float gap = 5.0f;
-
-  /* Check if over any of the corners for scale with a small gap. */
-  rctf rect_mouse = {
-      (float)mouse[0] - gap, (float)mouse[0] + gap, (float)mouse[1] - gap, (float)mouse[1] + gap};
-
-  tgpa->manipulator_index = -1;
-  float co1[3], co2[3];
-  for (int i = 0; i < 12; i++) {
-    if (BLI_rctf_isect_pt(&rect_mouse, tgpa->manipulator[i][0], tgpa->manipulator[i][1])) {
-      tgpa->manipulator_index = i;
-      tgpa->mode = (tgpa->manipulator_index < 8) ? GP_ASSET_TRANSFORM_SCALE :
-                                                   GP_ASSET_TRANSFORM_ROT;
-
-      if (tgpa->mode == GP_ASSET_TRANSFORM_ROT) {
-        WM_cursor_modal_set(tgpa->win, WM_CURSOR_HAND);
-        return;
-      }
-
-      switch (i) {
-        case CAGE_CORNER_NW:
-        case CAGE_CORNER_SW:
-        case CAGE_CORNER_NE:
-        case CAGE_CORNER_SE:
-          WM_cursor_modal_set(tgpa->win, WM_CURSOR_NSEW_SCROLL);
-          break;
-        case CAGE_CORNER_N:
-        case CAGE_CORNER_S:
-          WM_cursor_modal_set(tgpa->win, WM_CURSOR_NS_ARROW);
-          break;
-        case CAGE_CORNER_E:
-        case CAGE_CORNER_W:
-          WM_cursor_modal_set(tgpa->win, WM_CURSOR_EW_ARROW);
-          break;
-        default:
-          break;
-      }
-      /* Determine the vector of the cage effect. For corners is always full effect. */
-      if (ELEM(tgpa->manipulator_index,
-               CAGE_CORNER_NW,
-               CAGE_CORNER_NE,
-               CAGE_CORNER_SE,
-               CAGE_CORNER_SW)) {
-        zero_v3(tgpa->manipulator_vector);
-        add_v3_fl(tgpa->manipulator_vector, 1.0f);
-        return;
-      }
-      if (ELEM(tgpa->manipulator_index, CAGE_CORNER_N, CAGE_CORNER_S)) {
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], co1);
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], co2);
-      }
-      else if (ELEM(tgpa->manipulator_index, CAGE_CORNER_E, CAGE_CORNER_W)) {
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], co1);
-        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], co2);
-      }
-
-      sub_v3_v3v3(tgpa->manipulator_vector, co2, co1);
-      normalize_v3(tgpa->manipulator_vector);
-
-      return;
-    }
-  }
-
-  /* Check if mouse is inside cage for Location. */
-  if (BLI_rctf_isect_pt(&tgpa->rect_cage, (float)mouse[0], (float)mouse[1])) {
-    tgpa->mode = GP_ASSET_TRANSFORM_LOC;
-    WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
-    return;
-  }
-
-  tgpa->mode = GP_ASSET_TRANSFORM_NONE;
-  WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
-}
-
-/* Helper: Get the rotation matrix for the angle using an arbitrary vector as axis. */
-static void gpencil_asset_rotation_matrix_get(float angle,
-                                              float axis[3],
-                                              float rotation_matrix[4][4])
-{
-  float u2 = axis[0] * axis[0];
-  float v2 = axis[1] * axis[1];
-  float w2 = axis[2] * axis[2];
-  const float length = (u2 + v2 + w2);
-  const float length_sqr = sqrt(length);
-  const float cos_value = cos(angle);
-  const float sin_value = sin(angle);
-
-  rotation_matrix[0][0] = (u2 + (v2 + w2) * cos_value) / length;
-  rotation_matrix[0][1] = (axis[0] * axis[1] * (1.0f - cos_value) -
-                           axis[2] * length_sqr * sin_value) /
-                          length;
-  rotation_matrix[0][2] = (axis[0] * axis[2] * (1.0f - cos_value) +
-                           axis[1] * length_sqr * sin_value) /
-                          length;
-  rotation_matrix[0][3] = 0.0;
-
-  rotation_matrix[1][0] = (axis[0] * axis[1] * (1.0f - cos_value) +
-                           axis[2] * length_sqr * sin_value) /
-                          length;
-  rotation_matrix[1][1] = (v2 + (u2 + w2) * cos_value) / length;
-  rotation_matrix[1][2] = (axis[1] * axis[2] * (1.0f - cos_value) -
-                           axis[0] * length_sqr * sin_value) /
-                          length;
-  rotation_matrix[1][3] = 0.0f;
-
-  rotation_matrix[2][0] = (axis[0] * axis[2] * (1.0f - cos_value) -
-                           axis[1] * length_sqr * sin_value) /
-                          length;
-  rotation_matrix[2][1] = (axis[1] * axis[2] * (1.0f - cos_value) +
-                           axis[0] * length_sqr * sin_value) /
-                          length;
-  rotation_matrix[2][2] = (w2 + (u2 + v2) * cos_value) / length;
-  rotation_matrix[2][3] = 0.0f;
-
-  rotation_matrix[3][0] = 0.0f;
-  rotation_matrix[3][1] = 0.0f;
-  rotation_matrix[3][2] = 0.0f;
-  rotation_matrix[3][3] = 1.0f;
-}
-
-/* Helper: Transfrom the stroke with mouse movements. */
-static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
-                                            const int mouse[2],
-                                            const bool shift_key)
-{
-  /* Get the vector with the movement done by the mouse since last event. */
-  float origin_pt[3], dest_pt[3];
-  float mousef[2];
-  copy_v2fl_v2i(mousef, tgpa->mouse);
-  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, origin_pt);
-
-  copy_v2fl_v2i(mousef, mouse);
-  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, dest_pt);
-
-  float vec[3];
-  sub_v3_v3v3(vec, dest_pt, origin_pt);
-
-  /* Get the scale factor. */
-  sub_v2_v2v2(mousef, mousef, tgpa->transform_center);
-  float dist = len_v2(mousef);
-  float scale_factor = dist / tgpa->initial_dist;
-  float scale_vector[3];
-  mul_v3_v3fl(scale_vector, tgpa->manipulator_vector, scale_factor - 1.0f);
-  add_v3_fl(scale_vector, 1.0f);
-
-  /* Determine pivot point. */
-  float pivot[3];
-  copy_v3_v3(pivot, tgpa->asset_center);
-  if (!shift_key) {
-    if (tgpa->manipulator_index == CAGE_CORNER_N) {
-      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], pivot);
-      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
-    }
-    else if (tgpa->manipulator_index == CAGE_CORNER_E) {
-      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], pivot);
-      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
-    }
-    else if (tgpa->manipulator_index == CAGE_CORNER_S) {
-      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], pivot);
-      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
-    }
-    else if (tgpa->manipulator_index == CAGE_CORNER_W) {
-      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], pivot);
-      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
-    }
-  }
-
-  /* Create rotation matrix. */
-  float rot_matrix[4][4];
-  float vr[2];
-  copy_v2fl_v2i(vr, mouse);
-  sub_v2_v2v2(vr, vr, tgpa->transform_center);
-  normalize_v2(vr);
-  float angle = angle_signed_v2v2(tgpa->vinit_rotation, vr);
-  gpencil_asset_rotation_matrix_get(angle, tgpa->normal_vec, rot_matrix);
-
-  GHashIterator gh_iter;
-  GHASH_ITER (gh_iter, tgpa->asset_strokes) {
-    bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-    bGPDspoint *pt;
-    int i;
-    for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-      switch (tgpa->mode) {
-        case GP_ASSET_TRANSFORM_LOC: {
-          add_v3_v3(&pt->x, vec);
-          break;
-        }
-        case GP_ASSET_TRANSFORM_ROT: {
-          sub_v3_v3(&pt->x, pivot);
-          mul_v3_m4v3(&pt->x, rot_matrix, &pt->x);
-          add_v3_v3(&pt->x, pivot);
-          break;
-        }
-        case GP_ASSET_TRANSFORM_SCALE: {
-          /* Apply scale. */
-          sub_v3_v3(&pt->x, pivot);
-          mul_v3_v3(&pt->x, scale_vector);
-          add_v3_v3(&pt->x, pivot);
-
-          /* Thickness change only in full scale. */
-          if (ELEM(tgpa->manipulator_index,
-                   CAGE_CORNER_NW,
-                   CAGE_CORNER_NE,
-                   CAGE_CORNER_SE,
-                   CAGE_CORNER_SW)) {
-            pt->pressure *= scale_factor;
-            CLAMP_MIN(pt->pressure, 0.01f);
-          }
-          break;
-        }
-        default:
-          break;
-      }
-    }
-
-    /* In scale mode recal geometry. */
-    if (tgpa->mode == GP_ASSET_TRANSFORM_SCALE) {
-      BKE_gpencil_stroke_geometry_update(tgpa->gpd, gps);
-    }
-    else {
-      /* Recalc stroke bounding box. */
-      BKE_gpencil_stroke_boundingbox_calc(gps);
-    }
-  }
-
-  /* In location mode move the asset center. */
-  if (tgpa->mode == GP_ASSET_TRANSFORM_LOC) {
-    add_v3_v3(tgpa->asset_center, vec);
-  }
-
-  /* Update mouse position and transform data to avoid acumulation. */
-  copy_v2_v2_int(tgpa->mouse, mouse);
-  tgpa->initial_dist = dist;
-  copy_v2_v2(tgpa->vinit_rotation, vr);
-}
-
-static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index)
-{
-  const short *tot_slots_data_ptr = BKE_id_material_len_p(id);
-  const int tot_slots_data = tot_slots_data_ptr ? *tot_slots_data_ptr : 0;
-  if (slot_index >= tot_slots_data) {
-    return NULL;
-  }
-
-  Material ***materials_data_ptr = BKE_id_material_array_p(id);
-  Material **materials_data = materials_data_ptr ? *materials_data_ptr : NULL;
-  Material *material = materials_data[slot_index];
-
-  return material;
-}
-
-/* Helper: Load all strokes in the target datablock. */
-static void gpencil_asset_add_strokes(tGPDasset *tgpa)
-{
-  bGPdata *gpd_target = tgpa->gpd;
-  bGPdata *gpd_asset = tgpa->gpd_asset;
-
-  /* Get the vector from origin to drop position. */
-  float dest_pt[3];
-  float loc2d[2];
-  copy_v2fl_v2i(loc2d, tgpa->drop);
-  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, loc2d, dest_pt);
-
-  float vec[3];
-  sub_v3_v3v3(vec, dest_pt, tgpa->ob->loc);
-
-  /* Layers must be added inverse to keep strokes order. */
-  LISTBASE_FOREACH_BACKWARD (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
-    /* Check if Layer is in target datablock. */
-    bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
-    if (gpl_target == NULL) {
-      gpl_target = BKE_gpencil_layer_addnew(gpd_target, gpl_asset->info, false, false);
-      BLI_assert(gpl_target != NULL);
-
-      if (tgpa->asset_layers == NULL) {
-        tgpa->asset_layers = BLI_ghash_ptr_new(__func__);
-      }
-      /* Add to the hash to remove if operator is canceled. */
-      BLI_ghash_insert(tgpa->asset_layers, gpl_target, gpl_target);
-    }
-
-    LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
-      /* Check if frame is in target layer. */
-      bGPDframe *gpf_target = BKE_gpencil_layer_frame_get(
-          gpl_target, gpf_asset->framenum, GP_GETFRAME_USE_PREV);
-      if (gpf_target == NULL) {
-        gpf_target = BKE_gpencil_layer_frame_get(
-            gpl_target, gpf_asset->framenum, GP_GETFRAME_ADD_NEW);
-        BLI_assert(gpf_target != NULL);
-
-        if (tgpa->asset_frames == NULL) {
-          tgpa->asset_frames = BLI_ghash_ptr_new(__func__);
-        }
-        /* Add to the hash to remove if operator is canceled. */
-        if (!BLI_ghash_haskey(tgpa->asset_frames, gpf_target)) {
-          /* Add the hash key with a reference to the layer. */
-          BLI_ghash_insert(tgpa->asset_frames, gpf_target, gpl_target);
-        }
-      }
-      /* Loop all strokes and duplicate. */
-      if (tgpa->asset_strokes == NULL) {
-        tgpa->asset_strokes = BLI_ghash_ptr_new(__func__);
-        tgpa->asset_strokes_layer = BLI_ghash_ptr_new(__func__);
-      }
-
-      LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
-        bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
-        gps_target->flag &= ~GP_STROKE_SELECT;
-        BLI_addtail(&gpf_target->strokes, gps_target);
-
-        /* Add the material. */
-        Material *ma_src = gpencil_asset_material_get_from_id(&tgpa->gpd_asset->id,
-                                                              gps_asset->mat_nr);
-
-        int mat_index = BKE_gpencil_object_material_index_get_by_name(tgpa->ob,
-                                                                      ma_src->id.name + 2);
-        if (mat_index == -1) {
-          if (tgpa->asset_materials == NULL) {
-            tgpa->asset_materials = BLI_ghash_ptr_new(__func__);
-          }
-          const int totcolors = tgpa->ob->totcol;
-          mat_index = BKE_gpencil_object_material_ensure(tgpa->bmain, tgpa->ob, ma_src);
-          if (tgpa->ob->totcol > totcolors) {
-            BLI_ghash_insert(tgpa->asset_materials, ma_src, POINTER_FROM_INT(mat_index + 1));
-          }
-        }
-
-        gps_target->mat_nr = mat_index;
-
-        /* Apply the offset to drop position. */
-        bGPDspoint *pt;
-        int i;
-        for (i = 0, pt = gps_target->points; i < gps_target->totpoints; i++, pt++) {
-          add_v3_v3(&pt->x, vec);
-          pt->flag &= ~GP_SPOINT_SELECT;
-        }
-
-        /* Update geometry. */
-        BKE_gpencil_stroke_geometry_update(gpd_target, gps_target);
-
-        /* Add the hash key with a reference to the frame. */
-        BLI_ghash_insert(tgpa->asset_strokes, gps_target, gpf_target);
-        BLI_ghash_insert(tgpa->asset_strokes_layer, gps_target, gpl_target);
-      }
-    }
-  }
-  /* Prepare 2D cage. */
-  gpencil_2d_cage_calc(tgpa);
-  BKE_gpencil_centroid_3d(tgpa->gpd_asset, tgpa->asset_center);
-  add_v3_v3(tgpa->asset_center, vec);
-}
-
-/* Helper: Clean any temp data. */
-static void gpencil_asset_clean_data(tGPDasset *tgpa)
-{
-  GHashIterator gh_iter;
-  /* Clean Strokes. */
-  if (tgpa->asset_strokes != NULL) {
-    GHASH_ITER (gh_iter, tgpa->asset_strokes) {
-      bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-      bGPDframe *gpf = (bGPDframe *)BLI_ghashIterator_getValue(&gh_iter);
-      BLI_remlink(&gpf->strokes, gps);
-      BKE_gpencil_free_stroke(gps);
-    }
-  }
-  /* Clean Frames. */
-  if (tgpa->asset_frames != NULL) {
-    GHASH_ITER (gh_iter, tgpa->asset_frames) {
-      bGPDframe *gpf = (bGPDframe *)BLI_ghashIterator_getKey(&gh_iter);
-      bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getValue(&gh_iter);
-      BLI_remlink(&gpl->frames, gpf);
-    }
-  }
-  /* Clean Layers. */
-  if (tgpa->asset_layers != NULL) {
-    GHASH_ITER (gh_iter, tgpa->asset_layers) {
-      bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getKey(&gh_iter);
-      BKE_gpencil_layer_delete(tgpa->gpd, gpl);
-    }
-  }
-  /* Clean Materials. */
-  if (tgpa->asset_materials != NULL) {
-    int actcol = tgpa->ob->actcol;
-    GHASH_ITER (gh_iter, tgpa->asset_materials) {
-      const int slot = POINTER_AS_INT(BLI_ghashIterator_getValue(&gh_iter));
-      tgpa->ob->actcol = slot;
-      BKE_object_material_slot_remove(tgpa->bmain, tgpa->ob);
-    }
-
-    tgpa->ob->actcol = (actcol > tgpa->ob->totcol) ? tgpa->ob->totcol : actcol;
-  }
+  cross_v3_v3v3(tgpa->cage_normal, vec1, vec2);
+  normalize_v3(tgpa->cage_normal);
 }
 
 /* Draw a cage for manipulate asset */
-static void gpencil_draw_cage(tGPDasset *tgpa)
+static void gpencil_2d_cage_draw(tGPDasset *tgpa)
 {
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
@@ -1056,7 +491,7 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   immUniformColor4fv(point_color);
 
   immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.5f * U.dpi_fac);
-  /* Draw points. */
+
   immBegin(GPU_PRIM_POINTS, 8);
   for (int i = 0; i < 8; i++) {
     immVertex2fv(pos, tgpa->manipulator[i]);
@@ -1068,6 +503,573 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   GPU_blend(GPU_BLEND_NONE);
 }
 
+/* Helper: Detect mouse over cage areas. */
+static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
+{
+  const float gap = 5.0f;
+
+  /* Check if mouse is over any of the manipualtor points with a small gap. */
+  rctf rect_mouse = {
+      (float)mouse[0] - gap, (float)mouse[0] + gap, (float)mouse[1] - gap, (float)mouse[1] + gap};
+
+  tgpa->manipulator_index = -1;
+  float co1[3], co2[3];
+  for (int i = 0; i < 12; i++) {
+    if (BLI_rctf_isect_pt(&rect_mouse, tgpa->manipulator[i][0], tgpa->manipulator[i][1])) {
+      tgpa->manipulator_index = i;
+      tgpa->mode = (tgpa->manipulator_index < 8) ? GP_ASSET_TRANSFORM_SCALE :
+                                                   GP_ASSET_TRANSFORM_ROT;
+
+      /* For rotation don't need to do more. */
+      if (tgpa->mode == GP_ASSET_TRANSFORM_ROT) {
+        WM_cursor_modal_set(tgpa->win, WM_CURSOR_HAND);
+        return;
+      }
+
+      switch (i) {
+        case CAGE_CORNER_NW:
+        case CAGE_CORNER_SW:
+        case CAGE_CORNER_NE:
+        case CAGE_CORNER_SE:
+          WM_cursor_modal_set(tgpa->win, WM_CURSOR_NSEW_SCROLL);
+          break;
+        case CAGE_CORNER_N:
+        case CAGE_CORNER_S:
+          WM_cursor_modal_set(tgpa->win, WM_CURSOR_NS_ARROW);
+          break;
+        case CAGE_CORNER_E:
+        case CAGE_CORNER_W:
+          WM_cursor_modal_set(tgpa->win, WM_CURSOR_EW_ARROW);
+          break;
+        default:
+          break;
+      }
+
+      /* Determine the vector of the cage effect. For corners is always full effect. */
+      if (ELEM(tgpa->manipulator_index,
+               CAGE_CORNER_NW,
+               CAGE_CORNER_NE,
+               CAGE_CORNER_SE,
+               CAGE_CORNER_SW)) {
+        zero_v3(tgpa->manipulator_vector);
+        add_v3_fl(tgpa->manipulator_vector, 1.0f);
+        return;
+      }
+      if (ELEM(tgpa->manipulator_index, CAGE_CORNER_N, CAGE_CORNER_S)) {
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], co1);
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], co2);
+      }
+      else if (ELEM(tgpa->manipulator_index, CAGE_CORNER_E, CAGE_CORNER_W)) {
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], co1);
+        gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], co2);
+      }
+
+      sub_v3_v3v3(tgpa->manipulator_vector, co2, co1);
+      normalize_v3(tgpa->manipulator_vector);
+
+      return;
+    }
+  }
+
+  /* Check if mouse is inside cage for Location transform. */
+  if (BLI_rctf_isect_pt(&tgpa->rect_cage, (float)mouse[0], (float)mouse[1])) {
+    tgpa->mode = GP_ASSET_TRANSFORM_LOC;
+    WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
+    return;
+  }
+
+  tgpa->mode = GP_ASSET_TRANSFORM_NONE;
+  WM_cursor_modal_set(tgpa->win, WM_CURSOR_DEFAULT);
+}
+
+/* Helper: Get the rotation matrix for the angle using an arbitrary vector as axis. */
+static void gpencil_asset_rotation_matrix_get(float angle,
+                                              float axis[3],
+                                              float rotation_matrix[4][4])
+{
+  const float u2 = axis[0] * axis[0];
+  const float v2 = axis[1] * axis[1];
+  const float w2 = axis[2] * axis[2];
+  const float length = (u2 + v2 + w2);
+  const float length_sqr = sqrt(length);
+  const float cos_value = cos(angle);
+  const float sin_value = sin(angle);
+
+  rotation_matrix[0][0] = (u2 + (v2 + w2) * cos_value) / length;
+  rotation_matrix[0][1] = (axis[0] * axis[1] * (1.0f - cos_value) -
+                           axis[2] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[0][2] = (axis[0] * axis[2] * (1.0f - cos_value) +
+                           axis[1] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[0][3] = 0.0;
+
+  rotation_matrix[1][0] = (axis[0] * axis[1] * (1.0f - cos_value) +
+                           axis[2] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[1][1] = (v2 + (u2 + w2) * cos_value) / length;
+  rotation_matrix[1][2] = (axis[1] * axis[2] * (1.0f - cos_value) -
+                           axis[0] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[1][3] = 0.0f;
+
+  rotation_matrix[2][0] = (axis[0] * axis[2] * (1.0f - cos_value) -
+                           axis[1] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[2][1] = (axis[1] * axis[2] * (1.0f - cos_value) +
+                           axis[0] * length_sqr * sin_value) /
+                          length;
+  rotation_matrix[2][2] = (w2 + (u2 + v2) * cos_value) / length;
+  rotation_matrix[2][3] = 0.0f;
+
+  rotation_matrix[3][0] = 0.0f;
+  rotation_matrix[3][1] = 0.0f;
+  rotation_matrix[3][2] = 0.0f;
+  rotation_matrix[3][3] = 1.0f;
+}
+
+/* Helper: Transform the stroke with mouse movements. */
+static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
+                                            const int mouse[2],
+                                            const bool shift_key)
+{
+  /* Get the vector with the movement done by the mouse since last event. */
+  float origin_pt[3], dest_pt[3];
+  float mousef[2];
+  copy_v2fl_v2i(mousef, tgpa->mouse);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, origin_pt);
+
+  copy_v2fl_v2i(mousef, mouse);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, dest_pt);
+
+  float vec[3];
+  sub_v3_v3v3(vec, dest_pt, origin_pt);
+
+  /* Get the scale factor. */
+  sub_v2_v2v2(mousef, mousef, tgpa->transform_center);
+  float dist = len_v2(mousef);
+  float scale_factor = dist / tgpa->initial_dist;
+  float scale_vector[3];
+  mul_v3_v3fl(scale_vector, tgpa->manipulator_vector, scale_factor - 1.0f);
+  add_v3_fl(scale_vector, 1.0f);
+
+  /* Determine pivot point. */
+  float pivot[3];
+  copy_v3_v3(pivot, tgpa->asset_center);
+  if (!shift_key) {
+    if (tgpa->manipulator_index == CAGE_CORNER_N) {
+      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], pivot);
+      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
+    }
+    else if (tgpa->manipulator_index == CAGE_CORNER_E) {
+      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_W], pivot);
+      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
+    }
+    else if (tgpa->manipulator_index == CAGE_CORNER_S) {
+      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], pivot);
+      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
+    }
+    else if (tgpa->manipulator_index == CAGE_CORNER_W) {
+      gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], pivot);
+      sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
+    }
+  }
+
+  /* Create rotation matrix. */
+  float rot_matrix[4][4];
+  float vr[2];
+  copy_v2fl_v2i(vr, mouse);
+  sub_v2_v2v2(vr, vr, tgpa->transform_center);
+  normalize_v2(vr);
+  float angle = angle_signed_v2v2(tgpa->vinit_rotation, vr);
+  gpencil_asset_rotation_matrix_get(angle, tgpa->cage_normal, rot_matrix);
+
+  /* Loop all strokes and apply transformation. */
+  GHashIterator gh_iter;
+  GHASH_ITER (gh_iter, tgpa->asset_strokes_frame) {
+    bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
+    bGPDspoint *pt;
+    int i;
+    for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+      switch (tgpa->mode) {
+        case GP_ASSET_TRANSFORM_LOC: {
+          add_v3_v3(&pt->x, vec);
+          break;
+        }
+        case GP_ASSET_TRANSFORM_ROT: {
+          sub_v3_v3(&pt->x, pivot);
+          mul_v3_m4v3(&pt->x, rot_matrix, &pt->x);
+          add_v3_v3(&pt->x, pivot);
+          break;
+        }
+        case GP_ASSET_TRANSFORM_SCALE: {
+          /* Apply scale. */
+          sub_v3_v3(&pt->x, pivot);
+          mul_v3_v3(&pt->x, scale_vector);
+          add_v3_v3(&pt->x, pivot);
+
+          /* Thickness change only in full scale. */
+          if (ELEM(tgpa->manipulator_index,
+                   CAGE_CORNER_NW,
+                   CAGE_CORNER_NE,
+                   CAGE_CORNER_SE,
+                   CAGE_CORNER_SW)) {
+            pt->pressure *= scale_factor;
+            CLAMP_MIN(pt->pressure, 0.01f);
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    /* In scale mode recal stroke geometry because fill triangulation can change. */
+    if (tgpa->mode == GP_ASSET_TRANSFORM_SCALE) {
+      BKE_gpencil_stroke_geometry_update(tgpa->gpd, gps);
+    }
+    else {
+      /* Recalc stroke bounding box. */
+      BKE_gpencil_stroke_boundingbox_calc(gps);
+    }
+  }
+
+  /* In location mode move the asset center. */
+  if (tgpa->mode == GP_ASSET_TRANSFORM_LOC) {
+    add_v3_v3(tgpa->asset_center, vec);
+  }
+
+  /* Update mouse position and transform data to avoid acumulation for next transformation. */
+  copy_v2_v2_int(tgpa->mouse, mouse);
+  tgpa->initial_dist = dist;
+  copy_v2_v2(tgpa->vinit_rotation, vr);
+}
+
+/* Helper: Get a material from the datablock */
+static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index)
+{
+  const short *tot_slots_data_ptr = BKE_id_material_len_p(id);
+  const int tot_slots_data = tot_slots_data_ptr ? *tot_slots_data_ptr : 0;
+  if (slot_index >= tot_slots_data) {
+    return NULL;
+  }
+
+  Material ***materials_data_ptr = BKE_id_material_array_p(id);
+  Material **materials_data = materials_data_ptr ? *materials_data_ptr : NULL;
+  Material *material = materials_data[slot_index];
+
+  return material;
+}
+
+/* Helper: Add all strokes from the asset in the target datablock. */
+static void gpencil_asset_add_strokes(tGPDasset *tgpa)
+{
+  bGPdata *gpd_target = tgpa->gpd;
+  bGPdata *gpd_asset = tgpa->gpd_asset;
+
+  /* Get the vector from origin to drop position. */
+  float dest_pt[3];
+  float loc2d[2];
+  copy_v2fl_v2i(loc2d, tgpa->drop);
+  gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, loc2d, dest_pt);
+
+  float vec[3];
+  sub_v3_v3v3(vec, dest_pt, tgpa->ob->loc);
+
+  /* Layers must be added inverse to keep strokes order. */
+  LISTBASE_FOREACH_BACKWARD (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
+    /* Check if Layer is in target datablock. */
+    bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
+    if (gpl_target == NULL) {
+      gpl_target = BKE_gpencil_layer_addnew(gpd_target, gpl_asset->info, false, false);
+      BLI_assert(gpl_target != NULL);
+
+      if (tgpa->asset_layers == NULL) {
+        tgpa->asset_layers = BLI_ghash_ptr_new(__func__);
+      }
+      /* Add layer to the hash to remove if operator is canceled. */
+      BLI_ghash_insert(tgpa->asset_layers, gpl_target, gpl_target);
+    }
+
+    LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
+      /* Check if frame is in target layer. */
+      bGPDframe *gpf_target = BKE_gpencil_layer_frame_get(
+          gpl_target, gpf_asset->framenum, GP_GETFRAME_USE_PREV);
+      if (gpf_target == NULL) {
+        gpf_target = BKE_gpencil_layer_frame_get(
+            gpl_target, gpf_asset->framenum, GP_GETFRAME_ADD_NEW);
+        BLI_assert(gpf_target != NULL);
+
+        if (tgpa->asset_frames == NULL) {
+          tgpa->asset_frames = BLI_ghash_ptr_new(__func__);
+        }
+        /* Add frame to the hash to remove if operator is canceled. */
+        if (!BLI_ghash_haskey(tgpa->asset_frames, gpf_target)) {
+          /* Add the hash key with a reference to the layer. */
+          BLI_ghash_insert(tgpa->asset_frames, gpf_target, gpl_target);
+        }
+      }
+      /* Loop all strokes and duplicate. */
+      if (tgpa->asset_strokes_frame == NULL) {
+        tgpa->asset_strokes_frame = BLI_ghash_ptr_new(__func__);
+        tgpa->asset_strokes_layer = BLI_ghash_ptr_new(__func__);
+      }
+
+      LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
+        bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
+        gps_target->flag &= ~GP_STROKE_SELECT;
+        BLI_addtail(&gpf_target->strokes, gps_target);
+
+        /* Add the material. */
+        Material *ma_src = gpencil_asset_material_get_from_id(&tgpa->gpd_asset->id,
+                                                              gps_asset->mat_nr);
+
+        int mat_index = BKE_gpencil_object_material_index_get_by_name(tgpa->ob,
+                                                                      ma_src->id.name + 2);
+        if (mat_index == -1) {
+          if (tgpa->asset_materials == NULL) {
+            tgpa->asset_materials = BLI_ghash_ptr_new(__func__);
+          }
+          const int totcolors = tgpa->ob->totcol;
+          mat_index = BKE_gpencil_object_material_ensure(tgpa->bmain, tgpa->ob, ma_src);
+          if (tgpa->ob->totcol > totcolors) {
+            BLI_ghash_insert(tgpa->asset_materials, ma_src, POINTER_FROM_INT(mat_index + 1));
+          }
+        }
+
+        gps_target->mat_nr = mat_index;
+
+        /* Apply the offset to drop position. */
+        bGPDspoint *pt;
+        int i;
+        for (i = 0, pt = gps_target->points; i < gps_target->totpoints; i++, pt++) {
+          add_v3_v3(&pt->x, vec);
+          pt->flag &= ~GP_SPOINT_SELECT;
+        }
+
+        /* Update geometry. */
+        BKE_gpencil_stroke_geometry_update(gpd_target, gps_target);
+
+        /* Add the hash key with a reference to the frame and layer. */
+        BLI_ghash_insert(tgpa->asset_strokes_frame, gps_target, gpf_target);
+        BLI_ghash_insert(tgpa->asset_strokes_layer, gps_target, gpl_target);
+      }
+    }
+  }
+
+  /* Prepare 2D cage. */
+  gpencil_2d_cage_calc(tgpa);
+  BKE_gpencil_centroid_3d(tgpa->gpd_asset, tgpa->asset_center);
+  add_v3_v3(tgpa->asset_center, vec);
+}
+
+/* Helper: Clean any temp added data when the operator is canceled. */
+static void gpencil_asset_clean_temp_data(tGPDasset *tgpa)
+{
+  GHashIterator gh_iter;
+  /* Clean Strokes. */
+  if (tgpa->asset_strokes_frame != NULL) {
+    GHASH_ITER (gh_iter, tgpa->asset_strokes_frame) {
+      bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
+      bGPDframe *gpf = (bGPDframe *)BLI_ghashIterator_getValue(&gh_iter);
+      BLI_remlink(&gpf->strokes, gps);
+      BKE_gpencil_free_stroke(gps);
+    }
+  }
+  /* Clean Frames. */
+  if (tgpa->asset_frames != NULL) {
+    GHASH_ITER (gh_iter, tgpa->asset_frames) {
+      bGPDframe *gpf = (bGPDframe *)BLI_ghashIterator_getKey(&gh_iter);
+      bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getValue(&gh_iter);
+      BLI_remlink(&gpl->frames, gpf);
+    }
+  }
+  /* Clean Layers. */
+  if (tgpa->asset_layers != NULL) {
+    GHASH_ITER (gh_iter, tgpa->asset_layers) {
+      bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getKey(&gh_iter);
+      BKE_gpencil_layer_delete(tgpa->gpd, gpl);
+    }
+  }
+  /* Clean Materials. */
+  if (tgpa->asset_materials != NULL) {
+    int actcol = tgpa->ob->actcol;
+    GHASH_ITER (gh_iter, tgpa->asset_materials) {
+      const int slot = POINTER_AS_INT(BLI_ghashIterator_getValue(&gh_iter));
+      tgpa->ob->actcol = slot;
+      BKE_object_material_slot_remove(tgpa->bmain, tgpa->ob);
+    }
+
+    tgpa->ob->actcol = (actcol > tgpa->ob->totcol) ? tgpa->ob->totcol : actcol;
+  }
+}
+
+/* Helper: Draw status message while the user is running the operator. */
+static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *tgpa)
+{
+  char status_str[UI_MAX_DRAW_STR];
+  char msg_str[UI_MAX_DRAW_STR];
+  bGPdata *gpd_asset = tgpa->gpd_asset;
+  const char *mode_txt[] = {"", "(Location)", "(Rotation)", "(Scale)"};
+
+  BLI_strncpy(msg_str, TIP_("Importing Asset"), UI_MAX_DRAW_STR);
+
+  BLI_snprintf(status_str,
+               sizeof(status_str),
+               "%s %s %s",
+               msg_str,
+               gpd_asset->id.name + 2,
+               mode_txt[tgpa->mode]);
+
+  ED_area_status_text(tgpa->area, status_str);
+  ED_workspace_status_text(
+      C, TIP_("ESC/RMB to cancel, Enter/LMB(outside cage) to confirm, Shift to Scale uniform"));
+}
+
+/* Update screen and stroke. */
+static void gpencil_asset_import_update(bContext *C, wmOperator *op, tGPDasset *tgpa)
+{
+  /* Update shift indicator in header. */
+  gpencil_asset_import_status_indicators(C, tgpa);
+  /* Update points position. */
+  gpencil_asset_import_update_strokes(C, tgpa);
+}
+
+/* ----------------------- */
+
+/* Exit and free memory */
+static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
+{
+  tGPDasset *tgpa = op->customdata;
+  bGPdata *gpd = tgpa->gpd;
+
+  if (tgpa) {
+    /* Clear status message area. */
+    ED_area_status_text(tgpa->area, NULL);
+    ED_workspace_status_text(C, NULL);
+
+    /* Free Hash tablets. */
+    if (tgpa->asset_layers != NULL) {
+      BLI_ghash_free(tgpa->asset_layers, NULL, NULL);
+    }
+    if (tgpa->asset_frames != NULL) {
+      BLI_ghash_free(tgpa->asset_frames, NULL, NULL);
+    }
+    if (tgpa->asset_strokes_frame != NULL) {
+      BLI_ghash_free(tgpa->asset_strokes_frame, NULL, NULL);
+      BLI_ghash_free(tgpa->asset_strokes_layer, NULL, NULL);
+    }
+
+    if (tgpa->asset_materials != NULL) {
+      BLI_ghash_free(tgpa->asset_materials, NULL, NULL);
+    }
+
+    /* Remove drawing handler. */
+    if (tgpa->draw_handle_3d) {
+      ED_region_draw_cb_exit(tgpa->region->type, tgpa->draw_handle_3d);
+    }
+
+    MEM_SAFE_FREE(tgpa);
+  }
+  DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+  WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
+
+  /* Clear pointer. */
+  op->customdata = NULL;
+}
+
+/* Init new temporary data. */
+static bool gpencil_asset_import_set_init_values(bContext *C,
+                                                 wmOperator *op,
+                                                 ID *id,
+                                                 tGPDasset *tgpa)
+{
+  /* Save current settings. */
+  tgpa->win = CTX_wm_window(C);
+  tgpa->bmain = CTX_data_main(C);
+  tgpa->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  tgpa->scene = CTX_data_scene(C);
+  tgpa->area = CTX_wm_area(C);
+  tgpa->region = CTX_wm_region(C);
+  tgpa->rv3d = CTX_wm_region_view3d(C);
+  tgpa->ob = CTX_data_active_object(C);
+
+  /* Setup space conversions data. */
+  gpencil_point_conversion_init(C, &tgpa->gsc);
+
+  /* Save current frame number. */
+  tgpa->cframe = tgpa->scene->r.cfra;
+
+  /* Target GP datablock. */
+  tgpa->gpd = tgpa->ob->data;
+  /* Asset GP datablock. */
+  tgpa->gpd_asset = (bGPdata *)id;
+
+  tgpa->mode = GP_ASSET_TRANSFORM_LOC;
+  tgpa->flag |= GP_ASSET_FLAG_IDLE;
+
+  /* Manipulator point is not set yet. */
+  tgpa->manipulator_index = -1;
+
+  tgpa->asset_layers = NULL;
+  tgpa->asset_frames = NULL;
+  tgpa->asset_strokes_frame = NULL;
+  tgpa->asset_strokes_layer = NULL;
+  tgpa->asset_materials = NULL;
+
+  return true;
+}
+
+/* Allocate memory and initialize values */
+static tGPDasset *gpencil_session_init_asset_import(bContext *C, wmOperator *op)
+{
+  Main *bmain = CTX_data_main(C);
+  ID *id = NULL;
+
+  PropertyRNA *prop_name = RNA_struct_find_property(op->ptr, "name");
+  PropertyRNA *prop_type = RNA_struct_find_property(op->ptr, "type");
+
+  /* These shouldn't fail when created by outliner dropping as it checks the ID is valid. */
+  if (!RNA_property_is_set(op->ptr, prop_name) || !RNA_property_is_set(op->ptr, prop_type)) {
+    return NULL;
+  }
+  const short id_type = RNA_property_enum_get(op->ptr, prop_type);
+  char name[MAX_ID_NAME - 2];
+  RNA_property_string_get(op->ptr, prop_name, name);
+  id = BKE_libblock_find_name(bmain, id_type, name);
+  if (id == NULL) {
+    return NULL;
+  }
+  const int object_type = BKE_object_obdata_to_type(id);
+  if (object_type == -1) {
+    return NULL;
+  }
+
+  tGPDasset *tgpa = MEM_callocN(sizeof(tGPDasset), "GPencil Asset Import Data");
+
+  /* Save initial values. */
+  gpencil_asset_import_set_init_values(C, op, id, tgpa);
+
+  /* return context data for running operator */
+  return tgpa;
+}
+
+/* Init: Allocate memory and set init values */
+static bool gpencil_asset_import_init(bContext *C, wmOperator *op)
+{
+  tGPDasset *tgpa;
+
+  /* check context */
+  tgpa = op->customdata = gpencil_session_init_asset_import(C, op);
+  if (tgpa == NULL) {
+    /* something wasn't set correctly in context */
+    gpencil_asset_import_exit(C, op);
+    return false;
+  }
+
+  return true;
+}
+
 /* Drawing callback for modal operator. */
 static void gpencil_asset_draw(const bContext *C, ARegion *UNUSED(region), void *arg)
 {
@@ -1077,17 +1079,16 @@ static void gpencil_asset_draw(const bContext *C, ARegion *UNUSED(region), void 
   if (region != tgpa->region) {
     return;
   }
-  gpencil_draw_cage(tgpa);
+  gpencil_2d_cage_draw(tgpa);
 }
-/* ----------------------- */
 
-/* Invoke handler: Initialize the operator */
+/* Invoke handler: Initialize the operator. */
 static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   bGPdata *gpd = CTX_data_gpencil_data(C);
   tGPDasset *tgpa = NULL;
 
-  /* try to initialize context data needed */
+  /* Try to initialize context data needed. */
   if (!gpencil_asset_import_init(C, op)) {
     if (op->customdata) {
       MEM_freeN(op->customdata);
@@ -1106,18 +1107,19 @@ static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEven
   tgpa->draw_handle_3d = ED_region_draw_cb_activate(
       tgpa->region->type, gpencil_asset_draw, tgpa, REGION_DRAW_POST_PIXEL);
 
-  /* update shift indicator in header */
+  /* Update screen. */
   gpencil_asset_import_status_indicators(C, tgpa);
+
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
   WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
 
-  /* add a modal handler for this operator */
+  /* Add a modal handler for this operator. */
   WM_event_add_modal_handler(C, op);
 
   return OPERATOR_RUNNING_MODAL;
 }
 
-/* Modal handler: Events handling during interactive part */
+/* Modal handler: Events handling during interactive part. */
 static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   tGPDasset *tgpa = op->customdata;
@@ -1170,10 +1172,10 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
         break;
       }
     }
-      /* Confirm */
+      /* Confirm. */
     case EVT_PADENTER:
     case EVT_RETKEY: {
-      /* return to normal cursor and header status */
+      /* Return to normal cursor and header status. */
       ED_area_status_text(tgpa->area, NULL);
       ED_workspace_status_text(C, NULL);
       WM_cursor_modal_restore(win);
@@ -1181,15 +1183,15 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
       /* Clean up temp data. */
       gpencil_asset_import_exit(C, op);
 
-      /* done! */
+      /* Done! */
       return OPERATOR_FINISHED;
     }
 
-    case EVT_ESCKEY: /* cancel */
+    case EVT_ESCKEY: /* Cancel */
     case RIGHTMOUSE: {
       /* Delete temp strokes. */
-      gpencil_asset_clean_data(tgpa);
-      /* Return to normal cursor and header status */
+      gpencil_asset_clean_temp_data(tgpa);
+      /* Return to normal cursor and header status. */
       ED_area_status_text(tgpa->area, NULL);
       ED_workspace_status_text(C, NULL);
       WM_cursor_modal_restore(win);
@@ -1197,12 +1199,10 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
       /* Clean up temp data. */
       gpencil_asset_import_exit(C, op);
 
-      /* canceled! */
+      /* Canceled! */
       return OPERATOR_CANCELLED;
     }
-
-    case MOUSEMOVE: /* calculate new position */
-    {
+    case MOUSEMOVE: {
       /* Apply transform. */
       if (tgpa->flag & GP_ASSET_FLAG_TRANSFORMING) {
         gpencil_asset_transform_strokes(tgpa, event->mval, event->shift);
@@ -1217,33 +1217,16 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
       gpencil_asset_import_update(C, op, tgpa);
       break;
     }
-    case WHEELUPMOUSE: {
-      // Scale
-      // TODO
-
-      /* Update screen. */
-      gpencil_asset_import_update(C, op, tgpa);
-      break;
-    }
-    case WHEELDOWNMOUSE: {
-      // Scale
-      // TODO
-
-      /* Update screen. */
-      gpencil_asset_import_update(C, op, tgpa);
-      break;
-    }
-
     default: {
       /* Unhandled event - allow to pass through. */
       return OPERATOR_RUNNING_MODAL | OPERATOR_PASS_THROUGH;
     }
   }
-  /* still running... */
+  /* Still running... */
   return OPERATOR_RUNNING_MODAL;
 }
 
-/* Cancel handler */
+/* Cancel handler. */
 static void gpencil_asset_import_cancel(bContext *C, wmOperator *op)
 {
   /* this is just a wrapper around exit() */
