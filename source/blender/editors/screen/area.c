@@ -1979,7 +1979,6 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
   if ((G.moving & G_TRANSFORM_WM) == 0) {
     if ((1 << area->spacetype) & WM_TOOLSYSTEM_SPACE_MASK) {
       WM_toolsystem_refresh_screen_area(workspace, view_layer, area);
-      area->flag |= AREA_FLAG_ACTIVE_TOOL_UPDATE;
     }
     else {
       area->runtime.tool = NULL;

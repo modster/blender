@@ -76,6 +76,8 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
+#include "WM_message.h"
+
 #include "clip_intern.h" /* own include */
 
 /* -------------------------------------------------------------------- */
@@ -1603,6 +1605,9 @@ static int mode_set_exec(bContext *C, wmOperator *op)
   }
 
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_CLIP, NULL);
+
+  struct wmMsgBus *mbus = CTX_wm_message_bus(C);
+  WM_msg_publish_rna_prop(mbus, (ID *)CTX_wm_screen(C), sc, SpaceClipEditor, mode);
 
   return OPERATOR_FINISHED;
 }

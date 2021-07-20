@@ -577,6 +577,8 @@ void WM_toolsystem_refresh_screen_area(WorkSpace *workspace, ViewLayer *view_lay
       }
     }
   }
+
+  area->flag |= AREA_FLAG_ACTIVE_TOOL_UPDATE;
 }
 
 void WM_toolsystem_refresh_screen_all(Main *bmain)

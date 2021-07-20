@@ -56,6 +56,8 @@
 #include "GPU_matrix.h"
 
 #include "WM_api.h"
+#include "WM_message.h"
+#include "WM_toolsystem.h"
 #include "WM_types.h"
 
 #include "UI_interface.h"
@@ -1036,6 +1038,20 @@ static void clip_main_region_listener(const wmRegionListenerParams *params)
   }
 }
 
+static void clip_main_region_message_subscribe(const wmRegionMessageSubscribeParams *params)
+{
+  struct wmMsgBus *mbus = params->message_bus;
+  ScrArea *area = params->area;
+  ARegion *region = params->region;
+
+  wmMsgSubscribeValue msg_sub_value_region_tag_refresh = {
+      .owner = region,
+      .user_data = area,
+      .notify = WM_toolsystem_do_msg_notify_tag_refresh,
+  };
+  WM_msg_subscribe_rna_anon_prop(mbus, SpaceClipEditor, mode, &msg_sub_value_region_tag_refresh);
+}
+
 /****************** preview region ******************/
 
 static void clip_preview_region_init(wmWindowManager *wm, ARegion *region)
@@ -1347,6 +1363,7 @@ void ED_spacetype_clip(void)
   art->init = clip_main_region_init;
   art->draw = clip_main_region_draw;
   art->listener = clip_main_region_listener;
+  art->message_subscribe = clip_main_region_message_subscribe;
   art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL |
                     ED_KEYMAP_TOOL;
 
