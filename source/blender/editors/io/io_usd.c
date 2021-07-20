@@ -77,7 +77,7 @@ const EnumPropertyItem rna_enum_usd_import_read_flags[] = {
     {MOD_MESHSEQ_READ_VERT, "VERT", 0, "Vertex Animation", ""},
     {MOD_MESHSEQ_READ_POLY, "POLY", 0, "Face Animation", ""},
     {MOD_MESHSEQ_READ_UV, "UV", 0, "UV Coordinates", ""},
-    {MOD_MESHSEQ_READ_COLOR, "COLOR", 0, "Mesh Color", ""},
+    {MOD_MESHSEQ_READ_COLOR, "COLOR", 0, "Vertex Colors", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -369,7 +369,6 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
   uiLayout *box = uiLayoutBox(layout);
   uiItemL(box, IFACE_("USD Import"), ICON_NONE);
-  uiItemL(box, IFACE_("Global Mesh Read Data Flag:"), ICON_NONE);
   uiItemR(box, ptr, "global_read_flag", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
   uiItemL(box, IFACE_("Manual Transform:"), ICON_NONE);
   uiItemR(box, ptr, "scale", 0, NULL, ICON_NONE);
@@ -489,10 +488,8 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                       "global_read_flag",
                       rna_enum_usd_import_read_flags,
                       0,
-                      "Flags",
-                      "Set the Read Data flag for all mesh sequence cache modifiers applied "
-                      "to imported animated meshes, specifying the cache data to read. Note "
-                      "that the UV and Color options apply to static meshes as well");
+                      "Mesh Data",
+                      "Mesh data to read");
 
   /* Specify that the flag contains multiple enums. */
   RNA_def_property_flag(prop, PROP_ENUM_FLAG);
