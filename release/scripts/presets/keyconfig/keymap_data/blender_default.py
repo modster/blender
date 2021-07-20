@@ -5984,21 +5984,6 @@ def km_clip_editor_tool_add_marker_tweak(params):
         ]},
     )
 
-def km_clip_editor_tool_add_marker_slide(params):
-    return (
-        "Clip Editor: Add Marker and Slide",
-        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            # ("clip.select", {"type": params.select_mouse, "value": 'PRESS'},
-             # {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
-            # ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
-             # {"properties": [("extend", True)]}),
-            ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
-        ]},
-    )
-
 def km_clip_editor_tool_mask_select(params):
     return (
         "Mask Editing: Tweak",
@@ -6061,8 +6046,9 @@ def km_clip_editor_tool_mask_add_feather_vertex(params):
         "Mask Editing: Add Feather Vertex and Slide",
         {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
             ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("mask.draw_mask", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True}, None),
+            ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
             ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ]},
     )
@@ -7341,7 +7327,6 @@ def generate_keymaps(params=None):
         km_clip_editor_tool_select_box(params),
         km_clip_editor_tool_select_lasso(params),
         km_clip_editor_tool_select_circle(params),
-        km_clip_editor_tool_add_marker_slide(params),
         km_clip_editor_tool_add_marker_tweak(params),
         km_clip_editor_tool_mask_select(params),
         km_clip_editor_tool_mask_select_box(params),
