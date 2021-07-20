@@ -352,9 +352,8 @@ static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *tgpa)
                mode_txt[tgpa->mode]);
 
   ED_area_status_text(tgpa->area, status_str);
-  ED_workspace_status_text(C,
-                           TIP_("ESC/RMB to cancel, Enter to confirm, LMB to Move, "
-                                "Shift+LMB to Rotate, Wheelmouse to Scale "));
+  ED_workspace_status_text(
+      C, TIP_("ESC/RMB to cancel, Enter/LMB(outside cage) to confirm, Shift to Scale uniform"));
 }
 
 /* Update screen and stroke */
@@ -1000,7 +999,7 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   immEnd();
 
   /* Rotation box */
-  const float gap = 3.0f;
+  const float gap = 2.0f;
   for (int i = 0; i < 4; i++) {
     imm_draw_box_wire_2d(pos,
                          tgpa->manipulator[CAGE_CORNER_ROT_NW + i][0] - gap,
