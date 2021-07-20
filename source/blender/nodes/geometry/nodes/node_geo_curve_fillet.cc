@@ -74,12 +74,13 @@ struct FilletModeParam {
   /* The radius of the formed circle */
   std::optional<float> radius;
 
-  /* Distribution of radii on the curve. */
+  /* Distribution of radii on the spline. */
   std::optional<std::string> radii_dist;
 
   GVArray_Typed<float> *radii{};
 };
 
+/* A data structure used to store fillet data about a vertex in the source spline. */
 struct FilletData {
   float3 prev_dir, pos, next_dir, axis;
   float radius;
@@ -109,11 +110,7 @@ static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
                             radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE);
 }
 
-static int get_point_count(float3 prev_pos, float3 pos, float3 next_pos, float arc_angle)
-{
-  return 1;
-}
-
+/* Function to get the center of a fillet. */
 static float3 get_center(const float3 vec_pos2prev,
                          const float3 pos,
                          const float3 axis,
@@ -126,6 +123,7 @@ static float3 get_center(const float3 vec_pos2prev,
   return vec_pos2center + pos;
 }
 
+/* Function to get the center of the fillet using fillet data */
 static float3 get_center(const float3 vec_pos2prev, const FilletData &fd)
 {
   float angle = fd.angle;
@@ -135,6 +133,7 @@ static float3 get_center(const float3 vec_pos2prev, const FilletData &fd)
   return get_center(vec_pos2prev, pos, axis, angle);
 }
 
+/* Function to calculate fillet data for each vertex. */
 static FilletData calculate_fillet_data_per_vertex(const float3 prev_pos,
                                                    const float3 pos,
                                                    const float3 next_pos,
@@ -156,6 +155,7 @@ static FilletData calculate_fillet_data_per_vertex(const float3 prev_pos,
   return fd;
 }
 
+/* Function to calculate and obtain the fillet data for the entire spline. */
 static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
                                                const FilletModeParam &mode_param,
                                                int &added_count,
@@ -164,6 +164,7 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
   Span<float3> positions = spline->positions();
   int fillet_count, start = 0, size = spline->size();
 
+  /* Determine the number of vertices that can be filleted. */
   bool cyclic = spline->is_cyclic();
   if (!cyclic) {
     fillet_count = size - 2;
@@ -176,6 +177,7 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
   Array<FilletData> fds(fillet_count);
 
   for (const int i : IndexRange(fillet_count)) {
+    /* Find the positions of the adjacent vertices. */
     float3 prev_pos, pos, next_pos;
     if (cyclic) {
       prev_pos = positions[i == 0 ? positions.size() - 1 : i - 1];
@@ -188,6 +190,7 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
       next_pos = positions[i + 2];
     }
 
+    /* Define the radius. */
     float radius = 0.0f;
     if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
       radius = mode_param.radius.value();
@@ -201,16 +204,18 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
       }
     }
 
+    /* Calculate fillet data for the vertex. */
     fds[i] = calculate_fillet_data_per_vertex(
         prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius);
 
+    /* Exit from here if the radius is zero */
     if (!radius) {
       continue;
     }
 
+    /* Calculate number of points to be added for the vertex. */
     int count = 0;
     if (mode_param.mode == GEO_NODE_CURVE_FILLET_ADAPTIVE) {
-      // temp
       count = ceil(fds[i].angle / mode_param.angle.value());
     }
     else if (mode_param.mode == GEO_NODE_CURVE_FILLET_USER_DEFINED) {
@@ -224,6 +229,8 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
   return fds;
 }
 
+/* Create a mapping from each vertex in the resulting spline to that of the source spline.
+Used for copying the data from the source spline.*/
 static Array<int> create_dst_to_src_map(const Array<int> point_counts, const int total_points)
 {
   Array<int> map(total_points);
@@ -241,6 +248,7 @@ static Array<int> create_dst_to_src_map(const Array<int> point_counts, const int
   return map;
 }
 
+/* Copy attribute data from source spline's Span to destination spline's Span. */
 template<typename T>
 static void copy_attribute_by_mapping(const Span<T> src, MutableSpan<T> dst, Array<int> mapping)
 {
@@ -249,6 +257,7 @@ static void copy_attribute_by_mapping(const Span<T> src, MutableSpan<T> dst, Arr
   }
 }
 
+/* Copy all attributes in Bezier curves. */
 static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
                                               BezierSpline &dst,
                                               Array<int> mapping)
@@ -262,6 +271,7 @@ static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
   copy_attribute_by_mapping(src.handle_positions_right(), dst.handle_positions_right(), mapping);
 }
 
+/* Copy all attributes in Poly curves. */
 static void copy_poly_attributes_by_mapping(const PolySpline &src,
                                             PolySpline &dst,
                                             Array<int> mapping)
@@ -271,49 +281,60 @@ static void copy_poly_attributes_by_mapping(const PolySpline &src,
   copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
 }
 
+/* Update the positions and handle positions of a Bezier spline based on fillet data. */
 static void update_bezier_positions(Array<FilletData> &fds,
                                     Array<int> &point_counts,
                                     BezierSpline &dst_spline,
                                     int start,
                                     int fillet_count)
 {
-  int next_i = start;
+  int cur_i = start;
   for (const int i : IndexRange(start, fillet_count)) {
     FilletData fd = fds[i - start];
     int count = point_counts[i];
+
+    /* Skip if the point count for the vertex is 1. */
     if (count == 1) {
-      next_i++;
+      cur_i++;
       continue;
     }
 
+    /* Calculate the angle to be formed between any 2 adjacent vertices within the fillet. */
     float segment_angle = fd.angle / (count - 1);
+    /* Calculate the handle length for each added vertex. Equation: L = 4R/3 * tan(A/4) */
     float handle_length = 4.0f * fd.radius / 3 * tanf(segment_angle / 4);
+    /* Calculate the distance by which each vertex should be displaced from their initial position.
+     */
     float displacement = fd.radius * tanf(fd.angle / 2);
 
-    /* Position the end points of the arc. */
-    int end_i = next_i + count - 1;
-    dst_spline.positions()[next_i] = fd.pos + displacement * fd.prev_dir;
+    /* Position the end points of the arc and their handles. */
+    int end_i = cur_i + count - 1;
+    dst_spline.positions()[cur_i] = fd.pos + displacement * fd.prev_dir;
     dst_spline.positions()[end_i] = fd.pos + displacement * fd.next_dir;
-    dst_spline.handle_positions_right()[next_i] = dst_spline.positions()[next_i] -
-                                                  handle_length * fd.prev_dir;
+    dst_spline.handle_positions_right()[cur_i] = dst_spline.positions()[cur_i] -
+                                                 handle_length * fd.prev_dir;
     dst_spline.handle_positions_left()[end_i] = dst_spline.positions()[end_i] -
                                                 handle_length * fd.next_dir;
-
-    dst_spline.handle_types_right()[next_i] = dst_spline.handle_types_left()[end_i] =
+    dst_spline.handle_types_right()[cur_i] = dst_spline.handle_types_left()[end_i] =
         BezierSpline::HandleType::Align;
 
-    float3 center = get_center(dst_spline.positions()[next_i] - fd.pos, fd);
-    float3 radius_vec = dst_spline.positions()[next_i] - center;
+    /* Calculate the center of the radius to be formed. */
+    float3 center = get_center(dst_spline.positions()[cur_i] - fd.pos, fd);
+    /* Calculate the vector of the radius formed by the first vertex. */
+    float3 radius_vec = dst_spline.positions()[cur_i] - center;
 
+    /* For each of the vertices in between the end points. */
     for (int j = 1; j < count - 1; j++) {
-      int index = next_i + j;
+      int index = cur_i + j;
+      /* Rotate the radius by the segment angle and determine its tangent (used for getting handle
+       * directions). */
       float3 new_radius_vec, tangent_vec;
       rotate_v3_v3v3fl(new_radius_vec, radius_vec, -fd.axis, segment_angle);
       rotate_v3_v3v3fl(tangent_vec, new_radius_vec, fd.axis, M_PI_2);
       radius_vec = new_radius_vec;
-
       normalize_v3_length(tangent_vec, handle_length);
 
+      /* Adjust the positions of the respective vertex and its handles. */
       dst_spline.positions()[index] = center + new_radius_vec;
       dst_spline.handle_types_right()[index] = dst_spline.handle_types_right()[index] =
           BezierSpline::HandleType::Align;
@@ -321,22 +342,25 @@ static void update_bezier_positions(Array<FilletData> &fds,
       dst_spline.handle_positions_right()[index] = dst_spline.positions()[index] - tangent_vec;
     }
 
-    next_i += count;
+    cur_i += count;
   }
 }
 
+/* Update the positions of a Poly spline based on fillet data. */
 static void update_poly_positions(Array<FilletData> &fds,
                                   Array<int> &point_counts,
                                   PolySpline &dst_spline,
                                   int start,
                                   int fillet_count)
 {
-  int next_i = start;
+  int cur_i = start;
   for (const int i : IndexRange(start, fillet_count)) {
     FilletData fd = fds[i - start];
     int count = point_counts[i];
+
+    /* Skip if the point count for the vertex is 1. */
     if (count == 1) {
-      next_i++;
+      cur_i++;
       continue;
     }
 
@@ -344,26 +368,31 @@ static void update_poly_positions(Array<FilletData> &fds,
     float displacement = fd.radius * tanf(fd.angle / 2);
 
     /* Position the end points of the arc. */
-    int end_i = next_i + count - 1;
-    dst_spline.positions()[next_i] = fd.pos + displacement * fd.prev_dir;
+    int end_i = cur_i + count - 1;
+    dst_spline.positions()[cur_i] = fd.pos + displacement * fd.prev_dir;
     dst_spline.positions()[end_i] = fd.pos + displacement * fd.next_dir;
 
-    float3 center = get_center(dst_spline.positions()[next_i] - fd.pos, fd);
-    float3 radius_vec = dst_spline.positions()[next_i] - center;
+    /* Calculate the center of the radius to be formed. */
+    float3 center = get_center(dst_spline.positions()[cur_i] - fd.pos, fd);
+    /* Calculate the vector of the radius formed by the first vertex. */
+    float3 radius_vec = dst_spline.positions()[cur_i] - center;
 
     for (int j = 1; j < count - 1; j++) {
-      int index = next_i + j;
+      /* Rotate the radius by the segment angle */
       float3 new_radius_vec;
       rotate_v3_v3v3fl(new_radius_vec, radius_vec, -fd.axis, segment_angle);
       radius_vec = new_radius_vec;
 
-      dst_spline.positions()[index] = center + new_radius_vec;
+      dst_spline.positions()[cur_i + j] = center + new_radius_vec;
     }
 
-    next_i += count;
+    cur_i += count;
   }
 }
 
+/* Function to fillet either Bezier splines or Poly splines.
+Added under the same function because the only difference is that Bezier curves have handle data.
+*/
 static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletModeParam &mode_param)
 {
   int fillet_count, start = 0, size = spline.size();
@@ -371,6 +400,7 @@ static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletMod
   bool is_bez = spline.type() == Spline::Type::Bezier;
   SplinePtr src_spline_ptr = spline.copy();
 
+  /* Determine the number of vertices that can be filleted. */
   if (!cyclic) {
     fillet_count = size - 2;
     start = 1;
@@ -383,9 +413,11 @@ static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletMod
     return src_spline_ptr;
   }
 
+  /* Initialize the point_counts with 1s (at least one vertex on dst for each vertex on src). */
   Array<int> point_counts(size, {1});
 
   int added_count = 0;
+  /* Update point_counts array and added_count. */
   Array<FilletData> fds = calculate_fillet_data(
       src_spline_ptr, mode_param, added_count, point_counts);
 
@@ -393,6 +425,7 @@ static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletMod
   Array<int> dst_to_src = create_dst_to_src_map(point_counts, total_points);
   SplinePtr dst_spline_ptr = spline.copy_only_settings();
 
+  /* Update positions based on spline type and fillet data. */
   if (is_bez) {
     BezierSpline src_spline = static_cast<BezierSpline &>(*src_spline_ptr);
     BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
@@ -411,6 +444,7 @@ static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletMod
   return dst_spline_ptr;
 }
 
+/* Function to fillet a spline. Appropriate function is called based on spline type. */
 static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode_param)
 {
   switch (spline.type()) {
@@ -425,6 +459,7 @@ static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode
   return new_spline;
 }
 
+/* Function to fillet a curve */
 static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
                                                const FilletModeParam &mode_param)
 {
