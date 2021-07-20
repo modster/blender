@@ -206,9 +206,6 @@ class CLIP_HT_header(Header):
         clip = sc.clip
         show_region_tool_header = sc.show_region_tool_header
 
-        if not sc.view == 'CLIP':
-            sc.show_region_tool_header = False
-
         if not show_region_tool_header:
             layout.template_header()
 
