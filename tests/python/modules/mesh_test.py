@@ -205,7 +205,8 @@ class MeshTest(ABC):
         Creates an expected object 10 units away
         in Y direction from test object.
         """
-        print("Creating expected object...")
+        if self.verbose:
+            print("Creating expected object...")
         evaluated_object = self.create_evaluated_object()
         self.expected_object = evaluated_object
         self.expected_object.name = self.exp_object_name
@@ -245,7 +246,7 @@ class MeshTest(ABC):
         """
 
         self.create_evaluated_object()
-        self.apply_operations(self.evaluated_object)
+        self.apply_operations(self.evaluated_object.name)
 
         if not self.do_compare:
             print("\nVisualization purpose only: Open Blender in GUI mode")
@@ -333,7 +334,9 @@ class MeshTest(ABC):
             items[index].select = True
 
     def update_failed_test(self):
-        # Update expected object.
+        """
+        Updates expected object.
+        """
         self.evaluated_object.location = self.expected_object.location
         expected_object_name = self.expected_object.name
         evaluated_selection = {
@@ -402,13 +405,18 @@ class MeshTest(ABC):
         return result_codes
 
     @abstractmethod
-    def apply_operations(self, any_object):
+    def apply_operations(self, object_name):
+        """
+        Apply operations on this object.
+
+        object_name (str): Name of the test object on which operations will be applied.
+        """
         pass
 
 
 class SpecMeshTest(MeshTest):
     """
-    A mesh testing inherited from MeshTest class targeted at testing modifiers and operators  on a single object.
+    A mesh testing class inherited from MeshTest class targeted at testing modifiers and operators on a single object.
     It holds a stack of mesh operations, i.e. modifiers or operators. The test is executed using MeshTest's run_test.
     """
 
@@ -429,7 +437,6 @@ class SpecMeshTest(MeshTest):
         :param apply_modifier: bool - True if we want to apply the modifiers right after adding them to the object.
                                     - True if we want to apply the modifier to list of modifiers, after some operation.
                                This affects operations of type ModifierSpec and DeformModifierSpec.
-        :param do_compare: bool - True if we want to compare the test and expected objects, False otherwise.
         """
 
         super().__init__(test_object_name, exp_object_name, test_name, threshold)
@@ -440,9 +447,12 @@ class SpecMeshTest(MeshTest):
             self.operations_stack = operations_stack
         self.apply_modifier = apply_modifier
 
-    def apply_operations(self, evaluated_test_object):
+    def apply_operations(self, evaluated_test_object_name):
         # Add modifiers and operators.
-        print("Applying operations...")
+        SpecMeshTest.apply_operations.__doc__ = MeshTest.apply_operations.__doc__
+        evaluated_test_object = bpy.data.objects[evaluated_test_object_name]
+        if self.verbose:
+            print("Applying operations...")
         for operation in self.operations_stack:
             if isinstance(operation, ModifierSpec):
                 self._add_modifier(evaluated_test_object, operation)
@@ -701,11 +711,13 @@ class BlendFileTest(MeshTest):
     blend file i.e. without adding them from scratch or without adding specifications.
     """
 
-    def apply_operations(self, evaluated_test_object):
-        """
-        Apply all modifiers added to the current object.
-        """
+    def apply_operations(self, evaluated_test_object_name):
+
+        BlendFileTest.apply_operations.__doc__ = MeshTest.apply_operations.__doc__
+        evaluated_test_object = bpy.data.objects[evaluated_test_object_name]
         modifiers_list = evaluated_test_object.modifiers
+        if not modifiers_list:
+            raise Exception("No modifiers are added to test object.")
         for modifier in modifiers_list:
             bpy.ops.object.modifier_apply(modifier=modifier.name)
 
@@ -812,15 +824,8 @@ class RunTest:
             raise Exception('No test called {} found!'.format(test_name))
 
         test = case
-        if self.apply_modifiers:
-            test.apply_modifier = True
-        else:
-            test.apply_modifier = False
-
-        if self.do_compare:
-            test.do_compare = True
-        else:
-            test.do_compare = False
+        test.apply_modifier = self.apply_modifiers
+        test.do_compare = self.do_compare
 
         success = test.run_test()
         return success
