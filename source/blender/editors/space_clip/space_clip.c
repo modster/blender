@@ -1256,38 +1256,6 @@ static void clip_tools_region_listener(const wmRegionListenerParams *params)
   wmNotifier *wmn = params->notifier;
 }
 
-/****************** tool properties region ******************/
-
-static void clip_props_region_listener(const wmRegionListenerParams *params)
-{
-  ARegion *region = params->region;
-  wmNotifier *wmn = params->notifier;
-
-  /* context changes */
-  switch (wmn->category) {
-    case NC_WM:
-      if (wmn->data == ND_HISTORY) {
-        ED_region_tag_redraw(region);
-      }
-      break;
-    case NC_SCENE:
-      if (wmn->data == ND_MODE) {
-        ED_region_tag_redraw(region);
-      }
-      break;
-    case NC_SPACE:
-      if (wmn->data == ND_SPACE_CLIP) {
-        ED_region_tag_redraw(region);
-      }
-      break;
-    case NC_GPENCIL:
-      if (wmn->action == NA_EDITED) {
-        ED_region_tag_redraw(region);
-      }
-      break;
-  }
-}
-
 /****************** properties region ******************/
 
 /* add handlers, stuff you only do once or on area/region changes */
@@ -1405,17 +1373,6 @@ void ED_spacetype_clip(void)
   art->listener = clip_properties_region_listener;
   BLI_addhead(&st->regiontypes, art);
   ED_clip_buttons_register(art);
-
-  /* regions: tools */
-  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region tool");
-  art->regionid = RGN_TYPE_TOOLS;
-  art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
-  art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
-  art->listener = clip_props_region_listener;
-  art->init = clip_tools_region_init;
-  art->draw = clip_tools_region_draw;
-
-  BLI_addhead(&st->regiontypes, art);
 
   /* regions: tool(bar) */
   art = MEM_callocN(sizeof(ARegionType), "spacetype clip region tools");
