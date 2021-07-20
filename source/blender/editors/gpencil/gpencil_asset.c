@@ -866,7 +866,8 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
   float vec[3];
   sub_v3_v3v3(vec, dest_pt, tgpa->ob->loc);
 
-  LISTBASE_FOREACH (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
+  /* Layers must be added inverse to keep strokes order. */
+  LISTBASE_FOREACH_BACKWARD (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
     /* Check if Layer is in target datablock. */
     bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
     if (gpl_target == NULL) {
