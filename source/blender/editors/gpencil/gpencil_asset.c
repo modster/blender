@@ -140,6 +140,8 @@ typedef struct tGPDasset {
   struct GHash *asset_strokes;
   /** Hash of new created strokes linked to layer. */
   struct GHash *asset_strokes_layer;
+  /** Hash of new created materials. */
+  struct GHash *asset_materials;
 
   /** Handle for drawing while operator is running. */
   void *draw_handle_3d;
@@ -394,6 +396,10 @@ static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
       BLI_ghash_free(tgpa->asset_strokes_layer, NULL, NULL);
     }
 
+    if (tgpa->asset_materials != NULL) {
+      BLI_ghash_free(tgpa->asset_materials, NULL, NULL);
+    }
+
     /* Remove drawing handler. */
     if (tgpa->draw_handle_3d) {
       ED_region_draw_cb_exit(tgpa->region->type, tgpa->draw_handle_3d);
@@ -445,6 +451,7 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   tgpa->asset_frames = NULL;
   tgpa->asset_strokes = NULL;
   tgpa->asset_strokes_layer = NULL;
+  tgpa->asset_materials = NULL;
 
   return true;
 }
@@ -909,7 +916,14 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
         int mat_index = BKE_gpencil_object_material_index_get_by_name(tgpa->ob,
                                                                       ma_src->id.name + 2);
         if (mat_index == -1) {
+          if (tgpa->asset_materials == NULL) {
+            tgpa->asset_materials = BLI_ghash_ptr_new(__func__);
+          }
+          const int totcolors = tgpa->ob->totcol;
           mat_index = BKE_gpencil_object_material_ensure(tgpa->bmain, tgpa->ob, ma_src);
+          if (tgpa->ob->totcol > totcolors) {
+            BLI_ghash_insert(tgpa->asset_materials, ma_src, POINTER_FROM_INT(mat_index + 1));
+          }
         }
 
         gps_target->mat_nr = mat_index;
@@ -964,6 +978,17 @@ static void gpencil_asset_clean_data(tGPDasset *tgpa)
       bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getKey(&gh_iter);
       BKE_gpencil_layer_delete(tgpa->gpd, gpl);
     }
+  }
+  /* Clean Materials. */
+  if (tgpa->asset_materials != NULL) {
+    int actcol = tgpa->ob->actcol;
+    GHASH_ITER (gh_iter, tgpa->asset_materials) {
+      const int slot = POINTER_AS_INT(BLI_ghashIterator_getValue(&gh_iter));
+      tgpa->ob->actcol = slot;
+      BKE_object_material_slot_remove(tgpa->bmain, tgpa->ob);
+    }
+
+    tgpa->ob->actcol = (actcol > tgpa->ob->totcol) ? tgpa->ob->totcol : actcol;
   }
 }
 
