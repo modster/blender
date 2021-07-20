@@ -108,17 +108,21 @@ typedef struct tGPDasset {
   rctf rect_cage;
   /** 2D cage center. */
   float cage_center[2];
+  /** Transform centerr. */
+  float transform_center[2];
   /** 2D cage manipulator points *
    *
-   *               8 (Rotation)
-   *              /
-   *   0----1----2
-   *   |         |
-   *   7         3
-   *   |         |
-   *   6----5----4
+   *   8             9 (Rotation)
+   *    \           /
+   *     0----1----2
+   *     |         |
+   *     7         3
+   *     |         |
+   *     6----5----4
+   *    /           \
+   *   11            10
    */
-  float manipulator[9][2];
+  float manipulator[12][2];
   /** Manipulator index (-1 means not set). */
   int manipulator_index;
   /** Manipulator vector used to determine the effect. */
@@ -169,7 +173,10 @@ enum eGP_CageCorners {
   CAGE_CORNER_S = 5,
   CAGE_CORNER_SW = 6,
   CAGE_CORNER_W = 7,
-  CAGE_CORNER_ROT = 8,
+  CAGE_CORNER_ROT_NW = 8,
+  CAGE_CORNER_ROT_NE = 9,
+  CAGE_CORNER_ROT_SW = 10,
+  CAGE_CORNER_ROT_SE = 11,
 };
 
 static bool gpencil_asset_generic_poll(bContext *C)
@@ -560,8 +567,17 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   tgpa->manipulator[7][1] = tgpa->rect_cage.ymin +
                             ((tgpa->rect_cage.ymax - tgpa->rect_cage.ymin) * 0.5f);
   /* Rotation */
-  tgpa->manipulator[8][0] = tgpa->rect_cage.xmax + ROTATION_CONTROL_GAP;
-  tgpa->manipulator[8][1] = tgpa->rect_cage.ymax + ROTATION_CONTROL_GAP;
+  tgpa->manipulator[CAGE_CORNER_ROT_NW][0] = tgpa->rect_cage.xmin - ROTATION_CONTROL_GAP;
+  tgpa->manipulator[CAGE_CORNER_ROT_NW][1] = tgpa->rect_cage.ymax + ROTATION_CONTROL_GAP;
+
+  tgpa->manipulator[CAGE_CORNER_ROT_NE][0] = tgpa->rect_cage.xmax + ROTATION_CONTROL_GAP;
+  tgpa->manipulator[CAGE_CORNER_ROT_NE][1] = tgpa->rect_cage.ymax + ROTATION_CONTROL_GAP;
+
+  tgpa->manipulator[CAGE_CORNER_ROT_SW][0] = tgpa->rect_cage.xmin - ROTATION_CONTROL_GAP;
+  tgpa->manipulator[CAGE_CORNER_ROT_SW][1] = tgpa->rect_cage.ymin - ROTATION_CONTROL_GAP;
+
+  tgpa->manipulator[CAGE_CORNER_ROT_SE][0] = tgpa->rect_cage.xmax + ROTATION_CONTROL_GAP;
+  tgpa->manipulator[CAGE_CORNER_ROT_SE][1] = tgpa->rect_cage.ymin - ROTATION_CONTROL_GAP;
 
   /* Normal vector. */
   float co1[3], co2[3], co3[3], vec1[3], vec2[3];
@@ -586,7 +602,7 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
 
   tgpa->manipulator_index = -1;
   float co1[3], co2[3];
-  for (int i = 0; i < 9; i++) {
+  for (int i = 0; i < 12; i++) {
     if (BLI_rctf_isect_pt(&rect_mouse, tgpa->manipulator[i][0], tgpa->manipulator[i][1])) {
       tgpa->manipulator_index = i;
       tgpa->mode = (tgpa->manipulator_index < 8) ? GP_ASSET_TRANSFORM_SCALE :
@@ -716,10 +732,8 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   sub_v3_v3v3(vec, dest_pt, origin_pt);
 
   /* Get the scale factor. */
-  float mouse3d[3];
-  sub_v3_v3v3(mouse3d, dest_pt, tgpa->asset_center);
-
-  float dist = len_v3(mouse3d);
+  sub_v2_v2v2(mousef, mousef, tgpa->transform_center);
+  float dist = len_v2(mousef);
   float scale_factor = dist / tgpa->initial_dist;
   float scale_vector[3];
   mul_v3_v3fl(scale_vector, tgpa->manipulator_vector, scale_factor - 1.0f);
@@ -747,7 +761,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   float rot_matrix[4][4];
   float vr[2];
   copy_v2fl_v2i(vr, mouse);
-  sub_v2_v2v2(vr, vr, tgpa->cage_center);
+  sub_v2_v2v2(vr, vr, tgpa->transform_center);
   normalize_v2(vr);
   float angle = angle_signed_v2v2(tgpa->vinit_rotation, vr);
   gpencil_asset_rotation_matrix_get(angle, tgpa->normal_vec, rot_matrix);
@@ -806,9 +820,10 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
     add_v3_v3(tgpa->asset_center, vec);
   }
 
-  /* Update mouse position and distance to calc the factor to transform. */
+  /* Update mouse position and transform data to avoid acumulation. */
   copy_v2_v2_int(tgpa->mouse, mouse);
   tgpa->initial_dist = dist;
+  copy_v2_v2(tgpa->vinit_rotation, vr);
 }
 
 static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index)
@@ -981,17 +996,29 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
   immEnd();
 
   /* Rotation box */
-  /*const float gap = 5.0f;
-  imm_draw_box_wire_2d(pos,
-                       tgpa->manipulator[CAGE_CORNER_ROT][0] - gap,
-                       tgpa->manipulator[CAGE_CORNER_ROT][1] - gap,
-                       tgpa->manipulator[CAGE_CORNER_ROT][0] + gap,
-                       tgpa->manipulator[CAGE_CORNER_ROT][1] + gap);*/
+  const float gap = 3.0f;
+  for (int i = 0; i < 4; i++) {
+    imm_draw_box_wire_2d(pos,
+                         tgpa->manipulator[CAGE_CORNER_ROT_NW + i][0] - gap,
+                         tgpa->manipulator[CAGE_CORNER_ROT_NW + i][1] - gap,
+                         tgpa->manipulator[CAGE_CORNER_ROT_NW + i][0] + gap,
+                         tgpa->manipulator[CAGE_CORNER_ROT_NW + i][1] + gap);
+  }
 
-  immBegin(GPU_PRIM_LINES, 2);
-  immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_NE][0], tgpa->manipulator[CAGE_CORNER_NE][1]);
-  immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_ROT][0], tgpa->manipulator[CAGE_CORNER_ROT][1]);
-  immEnd();
+  // immBegin(GPU_PRIM_LINES, 2);
+  // immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_NE][0], tgpa->manipulator[CAGE_CORNER_NE][1]);
+  // immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_ROT][0],
+  // tgpa->manipulator[CAGE_CORNER_ROT][1]); immEnd();
+
+  /* Draw a line while is doing a transform. */
+  if ((tgpa->flag & GP_ASSET_FLAG_TRANSFORMING) && (tgpa->mode == GP_ASSET_TRANSFORM_ROT)) {
+    const float line_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    immUniformColor4fv(line_color);
+    immBegin(GPU_PRIM_LINES, 2);
+    immVertex2f(pos, tgpa->transform_center[0], tgpa->transform_center[1]);
+    immVertex2f(pos, tgpa->mouse[0], tgpa->mouse[1]);
+    immEnd();
+  }
 
   immUnbindProgram();
 
@@ -1006,8 +1033,8 @@ static void gpencil_draw_cage(tGPDasset *tgpa)
 
   immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.5f * U.dpi_fac);
   /* Draw points. */
-  immBegin(GPU_PRIM_POINTS, 9);
-  for (int i = 0; i < 9; i++) {
+  immBegin(GPU_PRIM_POINTS, 8);
+  for (int i = 0; i < 8; i++) {
     immVertex2fv(pos, tgpa->manipulator[i]);
   }
   immEnd();
@@ -1094,15 +1121,15 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
           copy_v2_v2_int(tgpa->mouse, event->mval);
 
           /* Distance to asset center. */
-          float mousef[2], mouse3d[3];
+          copy_v2_v2(tgpa->transform_center, tgpa->cage_center);
+          float mousef[2];
           copy_v2fl_v2i(mousef, tgpa->mouse);
-          gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, mousef, mouse3d);
-          sub_v3_v3v3(mouse3d, mouse3d, tgpa->asset_center);
-          tgpa->initial_dist = len_v3(mouse3d);
+          sub_v2_v2v2(mousef, mousef, tgpa->transform_center);
+          tgpa->initial_dist = len_v2(mousef);
 
           /* Initial orientation for rotation. */
           copy_v2fl_v2i(tgpa->vinit_rotation, tgpa->mouse);
-          sub_v2_v2v2(tgpa->vinit_rotation, tgpa->vinit_rotation, tgpa->cage_center);
+          sub_v2_v2v2(tgpa->vinit_rotation, tgpa->vinit_rotation, tgpa->transform_center);
           normalize_v2(tgpa->vinit_rotation);
 
           tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
