@@ -2787,7 +2787,7 @@ class CLIP_PT_tools_active(ToolSelectPanelHelper, Panel):
     keymap_prefix = "Clip Editor Tool:"
 
     # Default group to use as a fallback.
-    tool_fallback_id = "builtin.box_select"
+    tool_fallback_id = "builtin.select_box"
 
     @classmethod
     def tools_from_context(cls, context, mode=None):
