@@ -3384,9 +3384,9 @@ void drw_batch_cache_validate(Object *ob)
       DRW_mesh_batch_cache_validate((Mesh *)ob->data);
       break;
     case OB_CURVE:
+    case OB_FONT:
       DRW_curve_batch_cache_validate((Curve *)ob->data);
       break;
-    case OB_FONT:
     case OB_SURF:
       if (mesh_eval != NULL) {
         DRW_mesh_batch_cache_validate(mesh_eval);
@@ -3433,8 +3433,8 @@ void drw_batch_cache_generate_requested(Object *ob)
       DRW_mesh_batch_cache_create_requested(
           DST.task_graph, ob, (Mesh *)ob->data, scene, is_paint_mode, use_hide);
       break;
-    case OB_FONT:
     case OB_CURVE:
+    case OB_FONT:
       DRW_curve_batch_cache_create_requested(ob, scene);
       break;
     case OB_SURF:
