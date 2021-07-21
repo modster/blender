@@ -203,6 +203,10 @@ static bool gpencil_asset_generic_poll(bContext *C)
 typedef enum eGP_AssetModes {
   /* Active Layer. */
   GP_ASSET_MODE_LAYER = 0,
+  /* All Layers. */
+  GP_ASSET_MODE_ALL_LAYERS,
+  /* All Layers in separated assets. */
+  GP_ASSET_MODE_ALL_LAYERS_SPLIT,
   /* Active Frame. */
   GP_ASSET_MODE_FRAME,
   /* Active Frame All Layers. */
@@ -211,15 +215,15 @@ typedef enum eGP_AssetModes {
   GP_ASSET_MODE_SELECTED_STROKES,
 } eGP_AssetModes;
 
-static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
+/* Helper: Create an asset for datablock. */
+static void gpencil_asset_create(bContext *C,
+                                 bGPdata *gpd_src,
+                                 bGPDlayer *gpl_filter,
+                                 const eGP_AssetModes mode,
+                                 const int reset_origin,
+                                 const int merge_layers)
 {
   Main *bmain = CTX_data_main(C);
-  Object *ob = CTX_data_active_object(C);
-  bGPdata *gpd_src = ob->data;
-
-  const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
-  const int reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
-  const int merge_layers = RNA_boolean_get(op->ptr, "merge_layers");
 
   /* Create a copy of selected datablock. */
   bGPdata *gpd = (bGPdata *)BKE_id_copy(bmain, &gpd_src->id);
@@ -236,6 +240,14 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
       BKE_gpencil_layer_delete(gpd, gpl);
       continue;
     }
+    /* Remove if layer is not equals to parameter. */
+    if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
+      if (!STREQ(gpl_filter->info, gpl->info)) {
+        BKE_gpencil_layer_delete(gpd, gpl);
+        continue;
+      }
+    }
+
     /* Remove parenting data. */
     gpl->parent = NULL;
     gpl->parsubstr[0] = 0;
@@ -305,6 +317,25 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
 
   if (ED_asset_mark_id(C, &gpd->id)) {
   }
+}
+
+static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = CTX_data_active_object(C);
+  bGPdata *gpd_src = ob->data;
+
+  const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
+  const int reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
+  const int merge_layers = RNA_boolean_get(op->ptr, "merge_layers");
+
+  if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
+    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_src->layers) {
+      gpencil_asset_create(C, gpd_src, gpl, mode, reset_origin, merge_layers);
+    }
+  }
+  else {
+    gpencil_asset_create(C, gpd_src, NULL, mode, reset_origin, merge_layers);
+  }
 
   WM_main_add_notifier(NC_ID | NA_EDITED, NULL);
   WM_main_add_notifier(NC_ASSET | NA_ADDED, NULL);
@@ -316,6 +347,12 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
 {
   static const EnumPropertyItem mode_types[] = {
       {GP_ASSET_MODE_LAYER, "LAYER", 0, "Active Layer", ""},
+      {GP_ASSET_MODE_ALL_LAYERS, "LAYERS_ALL", 0, "All Layers", ""},
+      {GP_ASSET_MODE_ALL_LAYERS_SPLIT,
+       "LAYERS_SPLIT",
+       0,
+       "All Layers Separated",
+       "Create an asset by layer."},
       {GP_ASSET_MODE_FRAME, "FRAME", 0, "Active Frame (Active Layer)", ""},
       {GP_ASSET_MODE_FRAME_ALL_LAYERS, "FRAME_ALL", 0, "Active Frame (All Layers)", ""},
       {GP_ASSET_MODE_SELECTED_STROKES, "SELECTED", 0, "Selected Strokes", ""},
