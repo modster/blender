@@ -12,35 +12,37 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
+ * All rights reserved.
  */
 
 /** \file
- * \ingroup bli
- * \brief Generic memory manipulation API.
- *
- * This is to extend on existing functions
- * such as `memcpy` & `memcmp`.
+ * \ingroup bke
  */
-#include <string.h>
 
-#include "BLI_sys_types.h"
-#include "BLI_utildefines.h"
+#include "BKE_action.hh"
 
-#include "BLI_memory_utils.h"
+#include "BLI_listbase.h"
+#include "BLI_string.h"
 
-#include "BLI_strict_flags.h"
+#include "DNA_action_types.h"
+#include "DNA_anim_types.h"
 
-/**
- * Check if memory is zeroed, as with `memset(arr, 0, arr_size)`.
- */
-bool BLI_memory_is_zero(const void *arr, const size_t arr_size)
+#include "MEM_guardedalloc.h"
+
+namespace blender::bke {
+
+void BKE_action_find_fcurves_with_bones(const bAction *action, FoundFCurveCallback callback)
 {
-  const char *arr_byte = arr;
-  const char *arr_end = (const char *)arr + arr_size;
-
-  while ((arr_byte != arr_end) && (*arr_byte == 0)) {
-    arr_byte++;
+  LISTBASE_FOREACH (FCurve *, fcu, &action->curves) {
+    char *bone_name = BLI_str_quoted_substrN(fcu->rna_path, "pose.bones[");
+    if (!bone_name) {
+      continue;
+    }
+    callback(fcu, bone_name);
+    MEM_freeN(bone_name);
   }
-
-  return (arr_byte == arr_end);
 }
+
+}  // namespace blender::bke
