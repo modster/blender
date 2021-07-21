@@ -27,6 +27,11 @@ class MASK_OT_draw_mask(Operator):
     bl_label = "Draw a mask"
     bl_idname = "mask.draw_mask"
 
+    @classmethod
+    def poll(cls, context):
+        clip = context.space_data.clip
+        return clip
+
     type: EnumProperty(
         name="Type",
         items=(
