@@ -65,6 +65,7 @@ Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct
 #  include <cmath>
 #  include <filesystem>
 #  include <fstream>
+#  include <functional>
 #  include <iostream>
 #  include <istream>
 #  include <limits>
@@ -78,6 +79,60 @@ Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct
 #  include "BLI_generational_arena.hh"
 #  include "BLI_map.hh"
 #  include "BLI_vector.hh"
+
+/* Public C++ code */
+namespace blender::bke {
+
+/**
+ * @param END Extra Node Data
+ *
+ * @param ExtraData Extra Data that might be needed to get the `Extra
+ * "Element" Data`
+ */
+template<typename END, typename ExtraData> struct AdaptiveRemeshParams {
+  float size_min;
+
+  /* For handling Extra Node Data */
+  /**
+   * function that takes `ExtraData` along with the index for the
+   * `Node` as input and returns the `END` to be stored in that
+   * `Node`.
+   */
+  std::function<END(const ExtraData &, size_t)> extra_data_to_end;
+  /**
+   * function that is run after `extra_data_to_end` for every `Node` of
+   * the `Mesh`.
+   *
+   * useful for cleanup. (memory management of resources within `ExtraData`)
+   */
+  std::function<void(ExtraData &)> post_extra_data_to_end;
+  /**
+   * function that takes `ExtraData` along with the `END` and
+   * corresponding index of the `Node`
+   *
+   * useful to store `END` into `ExtraData`
+   */
+  std::function<void(ExtraData &, END, size_t)> end_to_extra_data;
+  /**
+   * function that takes `ExtraData` along with the number of `Node`s
+   * in `Mesh`.
+   *
+   * is run before `end_to_extra_data` is run for every `Node` of the
+   * `Mesh`.
+   *
+   * useful for memory management of resources within `ExtraData`.
+   */
+  std::function<void(ExtraData &, size_t)> pre_end_to_extra_data;
+};
+
+/* `mesh` cannot be made const because function defined on `struct
+ * Mesh` do not take `struct Mesh` as const even when they can be const */
+template<typename END, typename ExtraData>
+Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
+                      Mesh *mesh,
+                      const ExtraData &extra_data);
+
+} /* namespace blender::bke */
 
 namespace blender::bke::internal {
 

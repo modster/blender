@@ -35,11 +35,19 @@
 
 #include "BKE_cloth.h"
 #include "BKE_cloth_remesh.hh"
+
+#include <cstddef>
+#include <functional>
 #include <limits>
 
 namespace blender::bke::internal {
-class NodeData;
+class ClothNodeData;
+
+template<typename T> class NodeData;
+/* TODO(ish): make the other "XData" generic */
 class VertData;
+class EdgeData;
+
 class Sizing;
 
 template<typename T> static inline T simple_interp(const T &a, const T &b)
@@ -47,15 +55,46 @@ template<typename T> static inline T simple_interp(const T &a, const T &b)
   return (a + b) * 0.5;
 }
 
-class NodeData {
-  ClothVertex cloth_node_data; /* The cloth simulation calls it
-                                * Vertex, internal::Mesh calls it Node */
+template<typename T> class NodeData {
+  T extra_data;
+
  public:
-  NodeData(const ClothVertex &cloth_node_data) : cloth_node_data(cloth_node_data)
+  /* NodeData can be created only if `extra_data` is provided for so
+   * it is fine to not store `extra_data` as an optional */
+  NodeData(T extra_data) : extra_data(extra_data)
   {
   }
 
-  NodeData(ClothVertex &&cloth_node_data) : cloth_node_data(cloth_node_data)
+  void set_extra_data(T extra_data)
+  {
+    this->extra_data = extra_data;
+  }
+
+  const auto &get_extra_data() const
+  {
+    return this->extra_data;
+  }
+
+  auto &get_extra_data_mut()
+  {
+    return this->extra_data;
+  }
+
+  NodeData interp(const NodeData &other) const
+  {
+    return NodeData(this->extra_data.interp(other.get_extra_data()));
+  }
+};
+
+class ClothNodeData {
+  ClothVertex cloth_node_data; /* The cloth simulation calls it
+                                * Vertex, internal::Mesh calls it Node */
+ public:
+  ClothNodeData(const ClothVertex &cloth_node_data) : cloth_node_data(cloth_node_data)
+  {
+  }
+
+  ClothNodeData(ClothVertex &&cloth_node_data) : cloth_node_data(cloth_node_data)
   {
   }
 
@@ -64,7 +103,7 @@ class NodeData {
     return this->cloth_node_data;
   }
 
-  NodeData interp(const NodeData &other) const
+  ClothNodeData interp(const ClothNodeData &other) const
   {
     {
       /* This check is to ensure that any new element added to
@@ -110,7 +149,7 @@ class NodeData {
       cn.pressure_factor = simple_interp(this->cloth_node_data.pressure_factor,
                                          other.cloth_node_data.pressure_factor);
     }
-    return NodeData(std::move(cn));
+    return ClothNodeData(std::move(cn));
   }
 };
 
@@ -226,26 +265,14 @@ class EdgeData {
   }
 };
 
-using AdaptiveNode = Node<NodeData>;
+template<typename T> using AdaptiveNode = Node<NodeData<T>>;
 using AdaptiveVert = Vert<VertData>;
 using AdaptiveEdge = Edge<EdgeData>;
 using AdaptiveFace = Face<internal::EmptyExtraData>;
 
-class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyExtraData> {
+template<typename END>
+class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::EmptyExtraData> {
  public:
-  void set_nodes_extra_data(const Cloth &cloth)
-  {
-    /* The layout of the `this->get_nodes()` and `cloth.verts` should
-     * be the same, so just directly copy it over */
-    BLI_assert(cloth.mvert_num == this->get_nodes().size());
-
-    auto i = 0;
-    for (auto &node : this->get_nodes_mut()) {
-      node.set_extra_data(NodeData(cloth.verts[i]));
-      i++;
-    }
-  }
-
   void edge_set_size(AdaptiveEdge &edge)
   {
     const auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
@@ -295,7 +322,6 @@ class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyEx
         auto &edge = this->get_checked_edge(edge_index);
         auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
 
-
         /* For each new edge added, set it's sizing */
         for (const auto &edge_index : mesh_diff.get_added_edges()) {
           auto &edge = this->get_checked_edge(edge_index);
@@ -308,6 +334,28 @@ class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyEx
 
       splittable_edges_set = this->get_splittable_edge_indices_set();
     } while (splittable_edges_set.size() != 0);
+  }
+
+  void static_remesh(const Sizing &sizing)
+  {
+    /* Set sizing for all verts */
+    for (auto &vert : this->get_verts_mut()) {
+      auto &op_vert_data = vert.get_extra_data_mut();
+      if (op_vert_data) {
+        auto &vert_data = op_vert_data.value();
+        vert_data.set_sizing(sizing);
+      }
+      else {
+        vert.set_extra_data(VertData(sizing));
+      }
+    }
+
+    this->set_edge_sizes();
+
+    /* Split the edges */
+    this->split_edges();
+
+    /* Collapse the edges */
   }
 
  private:
@@ -352,85 +400,108 @@ class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyEx
   }
 };
 
-static void cloth_delete_verts(Cloth &cloth)
-{
-  BLI_assert(cloth.verts);
-  MEM_freeN(cloth.verts);
-  cloth.verts = nullptr;
-}
-
-static void cloth_set_verts_from_adaptive_mesh(Cloth &cloth, const AdaptiveMesh &mesh)
-{
-  /* caller should have deleted the verts earlier */
-  BLI_assert(cloth.verts == nullptr);
-
-  cloth.verts = static_cast<ClothVertex *>(
-      MEM_callocN(sizeof(ClothVertex) * mesh.get_nodes().size(), __func__));
-
-  auto i = 0;
-  for (const auto &node : mesh.get_nodes()) {
-    const auto &op_extra_data = node.get_extra_data();
-    BLI_assert(op_extra_data);
-    cloth.verts[i] = op_extra_data.value().get_cloth_node_data();
-    i++;
-  }
-}
-
-static void static_remesh(AdaptiveMesh &mesh, const Sizing &sizing)
-{
-  /* Set sizing for all verts */
-  for (auto &vert : mesh.get_verts_mut()) {
-    auto &op_vert_data = vert.get_extra_data_mut();
-    if (op_vert_data) {
-      auto &vert_data = op_vert_data.value();
-      vert_data.set_sizing(sizing);
-    }
-    else {
-      vert.set_extra_data(VertData(sizing));
-    }
-  }
-
-  mesh.set_edge_sizes();
-
-  /* Split the edges */
-  mesh.split_edges();
-
-  /* Collapse the edges */
-}
-
 }  // namespace blender::bke::internal
 
 namespace blender::bke {
+
+template<typename END, typename ExtraData>
+Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
+                      Mesh *mesh,
+                      ExtraData &extra_data)
+{
+  internal::MeshIO meshio_input;
+  meshio_input.read(mesh);
+
+  internal::AdaptiveMesh<END> adaptive_mesh;
+  adaptive_mesh.read(meshio_input);
+
+  /* Load up the `NodeData`'s extra_data */
+  {
+    auto i = 0;
+    for (auto &node : adaptive_mesh.get_nodes_mut()) {
+      node.set_extra_data(internal::NodeData(params.extra_data_to_end(extra_data, i)));
+      i++;
+    }
+
+    params.post_extra_data_to_end(extra_data);
+  }
+
+  /* Actual Remeshing Part */
+  {
+    float size_min = params.size_min;
+    auto m = float2x2::identity();
+    m = m * (1.0 / size_min);
+    internal::Sizing vert_sizing(std::move(m));
+    adaptive_mesh.static_remesh(vert_sizing);
+  }
+
+  /* set back data from `AdaptiveMesh` to whatever needs it */
+  {
+    params.pre_end_to_extra_data(extra_data, adaptive_mesh.get_nodes().size());
+
+    auto i = 0;
+    for (const auto &node : adaptive_mesh.get_nodes()) {
+      const auto &op_extra_data = node.get_extra_data();
+      BLI_assert(op_extra_data);
+      params.end_to_extra_data(extra_data, op_extra_data.value().get_extra_data(), i);
+      i++;
+    }
+  }
+
+  auto meshio_output = adaptive_mesh.write();
+  return meshio_output.write();
+}
+
+/* This is needed because the compiler needs to know which
+ * instantiations to make while compiling a templated function's .cpp
+ * file
+ *
+ * reference:
+ * https://isocpp.org/wiki/faq/templates#separate-template-fn-defn-from-decl
+ */
+template Mesh *adaptive_remesh<internal::ClothNodeData, Cloth>(
+    const AdaptiveRemeshParams<internal::ClothNodeData, Cloth> &params,
+    Mesh *mesh,
+    Cloth &extra_data);
 
 Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
   auto *cloth_to_object_res = cloth_to_object(ob, clmd, mesh, false);
   BLI_assert(cloth_to_object_res == nullptr);
 
-  internal::MeshIO meshio_input;
-  meshio_input.read(mesh);
+  AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
+  params.size_min = clmd->sim_parms->remeshing_size_min;
+  params.extra_data_to_end = [](const Cloth &cloth, size_t index) {
+    BLI_assert(index < cloth.mvert_num);
+    BLI_assert(cloth.verts);
+    return internal::ClothNodeData(cloth.verts[index]);
+  };
+  params.post_extra_data_to_end = [](Cloth &cloth) {
+    /* Delete the cloth.verts since it is stored within the `AdaptiveMesh` */
+    BLI_assert(cloth.verts);
+    MEM_freeN(cloth.verts);
+    cloth.verts = nullptr;
+    cloth.mvert_num = 0;
+  };
 
-  internal::AdaptiveMesh adaptive_mesh;
-  adaptive_mesh.read(meshio_input);
+  params.end_to_extra_data = [](Cloth &cloth, internal::ClothNodeData node_data, size_t index) {
+    BLI_assert(index < cloth.mvert_num);
+    BLI_assert(cloth.verts);
+    cloth.verts[index] = node_data.get_cloth_node_data();
+  };
+  params.pre_end_to_extra_data = [](Cloth &cloth, size_t num_nodes) {
+    /* caller should have deleted the verts earlier */
+    BLI_assert(cloth.verts == nullptr);
+    BLI_assert(cloth.mvert_num == 0);
 
-  {
-    adaptive_mesh.set_nodes_extra_data(*clmd->clothObject);
-    internal::cloth_delete_verts(*clmd->clothObject);
-  }
+    cloth.verts = static_cast<ClothVertex *>(
+        MEM_callocN(sizeof(ClothVertex) * num_nodes, "cloth pre_end_to_extra_data"));
+    BLI_assert(cloth.verts);
 
-  /* Actual remeshing part */
-  {
-    float size_min = clmd->sim_parms->remeshing_size_min;
-    auto m = float2x2::identity();
-    m = m * (1.0 / size_min);
-    internal::Sizing vert_sizing(std::move(m));
-    internal::static_remesh(adaptive_mesh, vert_sizing);
-  }
+    cloth.mvert_num = num_nodes;
+  };
 
-  internal::cloth_set_verts_from_adaptive_mesh(*clmd->clothObject, adaptive_mesh);
-
-  auto meshio_output = adaptive_mesh.write();
-  return meshio_output.write();
+  return adaptive_remesh(params, mesh, *clmd->clothObject);
 }
 
 }  // namespace blender::bke
