@@ -459,10 +459,15 @@ Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
  * reference:
  * https://isocpp.org/wiki/faq/templates#separate-template-fn-defn-from-decl
  */
-template Mesh *adaptive_remesh<internal::ClothNodeData, Cloth>(
-    const AdaptiveRemeshParams<internal::ClothNodeData, Cloth> &params,
-    Mesh *mesh,
-    Cloth &extra_data);
+template<>
+Mesh *adaptive_remesh<internal::ClothNodeData, Cloth>(
+    const AdaptiveRemeshParams<internal::ClothNodeData, Cloth> &, Mesh *, Cloth const &);
+
+template<>
+Mesh *adaptive_remesh<internal::EmptyExtraData, internal::EmptyExtraData>(
+    AdaptiveRemeshParams<internal::EmptyExtraData, internal::EmptyExtraData> const &,
+    Mesh *,
+    internal::EmptyExtraData const &);
 
 Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
@@ -502,6 +507,26 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
   };
 
   return adaptive_remesh(params, mesh, *clmd->clothObject);
+}
+
+Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &input_params, Mesh *mesh)
+{
+  using EmptyData = internal::EmptyExtraData;
+
+  EmptyData empty_data;
+
+  AdaptiveRemeshParams<EmptyData, EmptyData> params;
+  params.size_min = input_params.size_min;
+  params.extra_data_to_end = [](const EmptyData &UNUSED(data), size_t UNUSED(index)) {
+    return internal::EmptyExtraData();
+  };
+  params.post_extra_data_to_end = [](EmptyData &UNUSED(cloth)) {};
+
+  params.end_to_extra_data =
+      [](EmptyData &UNUSED(data), EmptyData UNUSED(node_data), size_t UNUSED(index)) {};
+  params.pre_end_to_extra_data = [](EmptyData &UNUSED(data), size_t UNUSED(num_nodes)) {};
+
+  return adaptive_remesh(params, mesh, empty_data);
 }
 
 }  // namespace blender::bke

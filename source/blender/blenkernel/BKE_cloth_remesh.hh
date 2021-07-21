@@ -2737,4 +2737,16 @@ template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff 
 
 } /* namespace blender::bke::internal */
 
+/* TODO(ish): Probably want to remove this later since it is mainly
+ * for testing */
+namespace blender::bke {
+
+struct TempEmptyAdaptiveRemeshParams {
+  float size_min;
+};
+
+Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &params, Mesh *mesh);
+
+} /* namespace blender::bke */
+
 #endif /* __cplusplus */
