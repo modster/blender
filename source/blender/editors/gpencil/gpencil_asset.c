@@ -863,8 +863,9 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
     /* Check if Layer is in target datablock. */
     bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
     if (gpl_target == NULL) {
-      gpl_target = BKE_gpencil_layer_addnew(gpd_target, gpl_asset->info, false, false);
+      gpl_target = BKE_gpencil_layer_duplicate(gpl_asset, false, false);
       BLI_assert(gpl_target != NULL);
+      BLI_addtail(&gpd_target->layers, gpl_target);
 
       if (tgpa->asset_layers == NULL) {
         tgpa->asset_layers = BLI_ghash_ptr_new(__func__);
