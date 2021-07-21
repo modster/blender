@@ -741,6 +741,7 @@ if(WITH_COMPOSITOR)
 endif()
 
 set(geo_node_tests
+  curves
   geometry
   mesh
   points
