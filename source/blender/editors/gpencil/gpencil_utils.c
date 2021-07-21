@@ -3441,5 +3441,7 @@ void ED_gpencil_layer_merge(bGPdata *gpd, bGPDlayer *gpl_src, bGPDlayer *gpl_dst
   BLI_ghash_free(gh_frames_dst, NULL, NULL);
 
   /* Reorder masking. */
-  BKE_gpencil_layer_mask_sort(gpd, gpl_dst);
+  if (gpl_dst->mask_layers.first) {
+    BKE_gpencil_layer_mask_sort(gpd, gpl_dst);
+  }
 }

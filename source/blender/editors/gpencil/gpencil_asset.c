@@ -219,6 +219,7 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
 
   const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
   const int reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
+  const int merge_layers = RNA_boolean_get(op->ptr, "merge_layers");
 
   /* Create a copy of selected datablock. */
   bGPdata *gpd = (bGPdata *)BKE_id_copy(bmain, &gpd_src->id);
@@ -239,6 +240,15 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
     gpl->parent = NULL;
     gpl->parsubstr[0] = 0;
     gpl->partype = 0;
+
+    /* Remove masking. */
+    bGPDlayer_Mask *mask_next;
+    for (bGPDlayer_Mask *mask = gpl->mask_layers.first; mask; mask = mask_next) {
+      mask_next = mask->next;
+      BKE_gpencil_layer_mask_remove(gpl, mask);
+    }
+    gpl->mask_layers.first = NULL;
+    gpl->mask_layers.last = NULL;
 
     bGPDframe *gpf_active = gpl->actframe;
 
@@ -281,6 +291,18 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
     }
   }
 
+  /* Merge layers. */
+  if ((merge_layers) && (gpd->layers.first)) {
+    bGPDlayer *gpl_dst = gpd->layers.first;
+    LISTBASE_FOREACH_MUTABLE (bGPDlayer *, gpl_src, &gpd->layers) {
+      if (gpl_dst == gpl_src) {
+        continue;
+      }
+      ED_gpencil_layer_merge(gpd, gpl_src, gpl_dst);
+    }
+    strcpy(gpl_dst->info, "Asset_Layer");
+  }
+
   if (ED_asset_mark_id(C, &gpd->id)) {
   }
 
@@ -321,6 +343,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
                   1,
                   "Reset Origin to Geometry",
                   "Set origin of the asset in the center of the strokes bounding box");
+  RNA_def_boolean(ot->srna, "merge_layers", 0, "Merge Layers", "Merge all layers in only one");
 }
 
 /** \} */
