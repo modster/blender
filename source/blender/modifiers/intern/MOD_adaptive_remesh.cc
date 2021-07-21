@@ -21,12 +21,14 @@
  * \ingroup modifiers
  */
 
+#include "BLI_assert.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_cloth_remesh.hh"
 #include "BKE_context.h"
 #include "BKE_modifier.h"
 
+#include "DNA_defaults.h"
 #include "DNA_modifier_types.h"
 #include "DNA_screen_types.h"
 
@@ -38,6 +40,14 @@
 #include "MOD_ui_common.h"
 
 using namespace blender::bke;
+
+static void initData(ModifierData *md)
+{
+  AdaptiveRemeshModifierData *armd = reinterpret_cast<AdaptiveRemeshModifierData *>(md);
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(armd, modifier));
+
+  MEMCPY_STRUCT_AFTER(armd, DNA_struct_default_get(AdaptiveRemeshModifierData), modifier);
+}
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx), Mesh *mesh)
 {
@@ -131,7 +141,7 @@ ModifierTypeInfo modifierType_AdaptiveRemesh = {
     /* modifyHair */ nullptr,
     /* modifyGeometrySet */ nullptr,
 
-    /* initData */ nullptr,
+    /* initData */ initData,
     /* requiredDataMask */ nullptr,
     /* freeData */ nullptr,
     /* isDisabled */ nullptr,

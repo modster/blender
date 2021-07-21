@@ -238,6 +238,7 @@ SDNA_DEFAULT_DECL_STRUCT(Volume);
 SDNA_DEFAULT_DECL_STRUCT(World);
 
 /* DNA_modifier_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(AdaptiveRemeshModifierData);
 SDNA_DEFAULT_DECL_STRUCT(ArmatureModifierData);
 SDNA_DEFAULT_DECL_STRUCT(ArrayModifierData);
 SDNA_DEFAULT_DECL_STRUCT(BevelModifierData);
@@ -464,6 +465,7 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL(World),
 
     /* DNA_modifier_defaults.h */
+    SDNA_DEFAULT_DECL(AdaptiveRemeshModifierData),
     SDNA_DEFAULT_DECL(ArmatureModifierData),
     SDNA_DEFAULT_DECL(ArrayModifierData),
     SDNA_DEFAULT_DECL(BevelModifierData),
