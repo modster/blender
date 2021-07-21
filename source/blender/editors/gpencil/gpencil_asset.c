@@ -211,7 +211,9 @@ typedef enum eGP_AssetModes {
   GP_ASSET_MODE_FRAME,
   /* Active Frame All Layers. */
   GP_ASSET_MODE_FRAME_ALL_LAYERS,
-  /* Selected Strokesd. */
+  /* Selected Frames. */
+  GP_ASSET_MODE_SELECTED_FRAMES,
+  /* Selected Strokes. */
   GP_ASSET_MODE_SELECTED_STROKES,
 } eGP_AssetModes;
 
@@ -235,12 +237,12 @@ static void gpencil_asset_create(bContext *C,
   bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd);
 
   LISTBASE_FOREACH_MUTABLE (bGPDlayer *, gpl, &gpd->layers) {
-    /* If Layer o Active Frame mode, delete non active layers. */
+    /* If Layer or Active Frame mode, delete non active layers. */
     if ((ELEM(mode, GP_ASSET_MODE_LAYER, GP_ASSET_MODE_FRAME)) && (gpl != gpl_active)) {
       BKE_gpencil_layer_delete(gpd, gpl);
       continue;
     }
-    /* Remove if layer is not equals to parameter. */
+    /* For splitting, remove if layer is not equals to parameter. */
     if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
       if (!STREQ(gpl_filter->info, gpl->info)) {
         BKE_gpencil_layer_delete(gpd, gpl);
@@ -271,6 +273,12 @@ static void gpencil_asset_create(bContext *C,
         BKE_gpencil_layer_frame_delete(gpl, gpf);
         continue;
       }
+
+      if ((mode == GP_ASSET_MODE_SELECTED_FRAMES) && ((gpf->flag & GP_FRAME_SELECT) == 0)) {
+        BKE_gpencil_layer_frame_delete(gpl, gpf);
+        continue;
+      }
+
       /* Remove any unselected stroke if SELECTED mode. */
       if (mode == GP_ASSET_MODE_SELECTED_STROKES) {
         LISTBASE_FOREACH_MUTABLE (bGPDstroke *, gps, &gpf->strokes) {
@@ -355,6 +363,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
        "Create an asset by layer."},
       {GP_ASSET_MODE_FRAME, "FRAME", 0, "Active Frame (Active Layer)", ""},
       {GP_ASSET_MODE_FRAME_ALL_LAYERS, "FRAME_ALL", 0, "Active Frame (All Layers)", ""},
+      {GP_ASSET_MODE_SELECTED_FRAMES, "FRAME_SELECTED", 0, "Selected Frames", ""},
       {GP_ASSET_MODE_SELECTED_STROKES, "SELECTED", 0, "Selected Strokes", ""},
       {0, NULL, 0, NULL, NULL},
   };
