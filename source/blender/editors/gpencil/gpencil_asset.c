@@ -743,6 +743,20 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
 }
 
 /* Helper: Get a material from the datablock */
+static int gpencil_asset_get_first_franum(bGPdata *gpd)
+{
+  int first_fra = INT_MAX;
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+      if (gpf->framenum < first_fra) {
+        first_fra = gpf->framenum;
+      }
+    }
+  }
+  return first_fra;
+}
+
+/* Helper: Get a material from the datablock */
 static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index)
 {
   const short *tot_slots_data_ptr = BKE_id_material_len_p(id);
@@ -772,6 +786,8 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
 
   float vec[3];
   sub_v3_v3v3(vec, dest_pt, tgpa->ob->loc);
+  /* Get the first frame in the asset. */
+  int const first_fra = gpencil_asset_get_first_franum(gpd_asset);
 
   /* Layers must be added inverse to keep strokes order. */
   LISTBASE_FOREACH_BACKWARD (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
@@ -790,11 +806,11 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
 
     LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
       /* Check if frame is in target layer. */
-      bGPDframe *gpf_target = BKE_gpencil_layer_frame_get(
-          gpl_target, gpf_asset->framenum, GP_GETFRAME_USE_PREV);
-      if (gpf_target == NULL) {
-        gpf_target = BKE_gpencil_layer_frame_get(
-            gpl_target, gpf_asset->framenum, GP_GETFRAME_ADD_NEW);
+      int fra = tgpa->cframe + (gpf_asset->framenum - first_fra);
+      bGPDframe *gpf_target = BKE_gpencil_layer_frame_get(gpl_target, fra, GP_GETFRAME_USE_PREV);
+
+      if ((gpf_target == NULL) || (gpf_target->framenum != fra)) {
+        gpf_target = BKE_gpencil_layer_frame_get(gpl_target, fra, GP_GETFRAME_ADD_NEW);
         BLI_assert(gpf_target != NULL);
 
         if (tgpa->asset_frames == NULL) {
