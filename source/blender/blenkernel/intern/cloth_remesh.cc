@@ -226,6 +226,11 @@ class EdgeData {
   }
 };
 
+using AdaptiveNode = Node<NodeData>;
+using AdaptiveVert = Vert<VertData>;
+using AdaptiveEdge = Edge<EdgeData>;
+using AdaptiveFace = Face<internal::EmptyExtraData>;
+
 class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyExtraData> {
  public:
   void set_nodes_extra_data(const Cloth &cloth)
@@ -241,6 +246,25 @@ class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyEx
     }
   }
 
+  void edge_set_size(AdaptiveEdge &edge)
+  {
+    const auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
+    const auto &v1_uv = v1.get_uv();
+    const auto &v2_uv = v2.get_uv();
+    const auto v1_sizing = v1.get_checked_extra_data().get_sizing();
+    const auto v2_sizing = v2.get_checked_extra_data().get_sizing();
+
+    auto edge_size = v1_sizing.get_edge_size_sq(v2_sizing, v1_uv, v2_uv);
+    auto op_edge_data = edge.get_extra_data_mut();
+    if (op_edge_data) {
+      auto &edge_data = edge.get_checked_extra_data_mut();
+      edge_data.set_sizing(edge_size);
+    }
+    else {
+      edge.set_extra_data(EdgeData(edge_size));
+    }
+  }
+
   /**
    * Sets the "size" of the `Edge`s of the mesh by running
    * `get_edge_size_sq()` on the `Sizing` stored in the `Vert`s of the
@@ -251,21 +275,7 @@ class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyEx
   void set_edge_sizes()
   {
     for (auto &edge : this->get_edges_mut()) {
-      const auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
-      const auto &v1_uv = v1.get_uv();
-      const auto &v2_uv = v2.get_uv();
-      const auto v1_sizing = v1.get_checked_extra_data().get_sizing();
-      const auto v2_sizing = v2.get_checked_extra_data().get_sizing();
-
-      auto edge_size = v1_sizing.get_edge_size_sq(v2_sizing, v1_uv, v2_uv);
-      auto op_edge_data = edge.get_extra_data_mut();
-      if (op_edge_data) {
-        auto &edge_data = edge.get_checked_extra_data_mut();
-        edge_data.set_sizing(edge_size);
-      }
-      else {
-        edge.set_extra_data(EdgeData(edge_size));
-      }
+      this->edge_set_size(edge);
     }
   }
 
@@ -283,14 +293,21 @@ class AdaptiveMesh : public Mesh<NodeData, VertData, EdgeData, internal::EmptyEx
     do {
       for (const auto &edge_index : splittable_edges_set) {
         auto &edge = this->get_checked_edge(edge_index);
-        this->split_edge_triangulate(edge.get_self_index(), true);
+        auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
+
+
+        /* For each new edge added, set it's sizing */
+        for (const auto &edge_index : mesh_diff.get_added_edges()) {
+          auto &edge = this->get_checked_edge(edge_index);
+          this->edge_set_size(edge);
+        }
 
         /* TODO(ish): Need to flip edges of those faces that have been
          * affected by the split edge operation. */
       }
 
       splittable_edges_set = this->get_splittable_edge_indices_set();
-    } while (splittable_edges_set.size() == 0);
+    } while (splittable_edges_set.size() != 0);
   }
 
  private:
