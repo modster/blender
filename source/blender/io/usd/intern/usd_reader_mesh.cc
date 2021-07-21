@@ -63,7 +63,7 @@ static void build_mat_map(const Main *bmain, std::map<std::string, Material *> &
 
   for (; material; material = static_cast<Material *>(material->id.next)) {
     // We have to do this because the stored material name is coming directly from usd
-    mat_map[pxr::TfMakeValidIdentifier(material->id.name + 2).c_str()] = material;
+    mat_map[pxr::TfMakeValidIdentifier(material->id.name + 2)] = material;
   }
 }
 
@@ -155,19 +155,19 @@ static void *add_customdata_cb(Mesh *mesh, const char *name, const int data_type
 
   /* unsupported custom data type -- don't do anything. */
   if (!ELEM(cd_data_type, CD_MLOOPUV, CD_MLOOPCOL)) {
-    return NULL;
+    return nullptr;
   }
 
   loopdata = &mesh->ldata;
   cd_ptr = CustomData_get_layer_named(loopdata, cd_data_type, name);
-  if (cd_ptr != NULL) {
+  if (cd_ptr != nullptr) {
     /* layer already exists, so just return it. */
     return cd_ptr;
   }
 
   /* Create a new layer. */
   numloops = mesh->totloop;
-  cd_ptr = CustomData_add_layer_named(loopdata, cd_data_type, CD_DEFAULT, NULL, numloops, name);
+  cd_ptr = CustomData_add_layer_named(loopdata, cd_data_type, CD_DEFAULT, nullptr, numloops, name);
   return cd_ptr;
 }
 
@@ -199,7 +199,7 @@ void USDMeshReader::read_object_data(Main *bmain, const double motionSampleTime)
   Mesh *mesh = (Mesh *)object_->data;
 
   is_initial_load_ = true;
-  Mesh *read_mesh = this->read_mesh(mesh, motionSampleTime, import_params_.global_read_flag, NULL);
+  Mesh *read_mesh = this->read_mesh(mesh, motionSampleTime, import_params_.global_read_flag, nullptr);
 
   is_initial_load_ = false;
   if (read_mesh != mesh) {
@@ -337,8 +337,9 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
         uv_token = pxr::TfToken(layer_name);
         uv_token_map_.insert(std::make_pair(layer_name, uv_token));
       }
-      else
+      else {
         uv_token = uv_token_map_.at(layer_name);
+      }
 
       // Early out if no token found, this should never happen
       if (uv_token.IsEmpty()) {
@@ -686,7 +687,7 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
       mesh_prim_);
 
   int current_mat = 0;
-  if (subsets.size() > 0) {
+  if (!subsets.empty()) {
     for (const pxr::UsdGeomSubset &subset : subsets) {
       pxr::UsdShadeMaterialBindingAPI subset_api = pxr::UsdShadeMaterialBindingAPI(
           subset.GetPrim());

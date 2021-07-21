@@ -36,7 +36,7 @@
 
 static bool set_knots(const pxr::VtDoubleArray &knots, float *&nu_knots)
 {
-  if (knots.size() == 0) {
+  if (knots.empty()) {
     return false;
   }
 
@@ -105,7 +105,7 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
 
   /* If normals, extrude, else bevel.
    * Perhaps to be replaced by Blender USD Schema. */
-  if (usdNormals.size() > 0) {
+  if (!usdNormals.empty()) {
     /* Set extrusion to 1. */
     curve_->ext1 = 1.0f;
   }

@@ -172,7 +172,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
     DEG_id_tag_update(&import_collection->id, ID_RECALC_COPY_ON_WRITE);
     DEG_relations_tag_update(data->bmain);
 
-    WM_main_add_notifier(NC_SCENE | ND_LAYER, NULL);
+    WM_main_add_notifier(NC_SCENE | ND_LAYER, nullptr);
 
     data->view_layer->active_collection = BKE_layer_collection_first_from_scene_collection(
         data->view_layer, import_collection);
@@ -248,8 +248,8 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
 
     USDPrimReader *parent = reader->parent();
 
-    if (parent == NULL) {
-      ob->parent = NULL;
+    if (parent == nullptr) {
+      ob->parent = nullptr;
     }
     else {
       ob->parent = parent->object();
@@ -381,7 +381,7 @@ bool USD_import(struct bContext *C,
   job->settings.sequence_len = params->sequence_len;
   job->error_code = USD_NO_ERROR;
   job->was_canceled = false;
-  job->archive = NULL;
+  job->archive = nullptr;
 
   job->params = *params;
 
@@ -399,7 +399,7 @@ bool USD_import(struct bContext *C,
     /* setup job */
     WM_jobs_customdata_set(wm_job, job, import_freejob);
     WM_jobs_timer(wm_job, 0.1, NC_SCENE, NC_SCENE);
-    WM_jobs_callbacks(wm_job, import_startjob, NULL, NULL, import_endjob);
+    WM_jobs_callbacks(wm_job, import_startjob, nullptr, nullptr, import_endjob);
 
     WM_jobs_start(CTX_wm_manager(C), wm_job);
   }
@@ -429,23 +429,23 @@ static USDPrimReader *get_usd_reader(CacheReader *reader, Object * /* ob */, con
 
   if (!iobject.IsValid()) {
     *err_str = "Invalid object: verify object path";
-    return NULL;
+    return nullptr;
   }
 
   return usd_reader;
 }
 
-Mesh *USD_read_mesh(CacheReader *reader,
-                    Object *ob,
-                    Mesh *existing_mesh,
-                    const float time,
-                    const char **err_str,
-                    const int read_flag)
+struct Mesh *USD_read_mesh(struct CacheReader *reader,
+                           struct Object *ob,
+                           struct Mesh *existing_mesh,
+                           const float time,
+                           const char **err_str,
+                           const int read_flag)
 {
   USDGeomReader *usd_reader = dynamic_cast<USDGeomReader *>(get_usd_reader(reader, ob, err_str));
 
-  if (usd_reader == NULL) {
-    return NULL;
+  if (usd_reader == nullptr) {
+    return nullptr;
   }
 
   return usd_reader->read_mesh(existing_mesh, time, read_flag, err_str);
@@ -456,7 +456,7 @@ bool USD_mesh_topology_changed(
 {
   USDGeomReader *usd_reader = dynamic_cast<USDGeomReader *>(get_usd_reader(reader, ob, err_str));
 
-  if (usd_reader == NULL) {
+  if (usd_reader == nullptr) {
     return false;
   }
 
@@ -493,9 +493,9 @@ CacheReader *CacheReader_open_usd_object(CacheArchiveHandle *handle,
   /* TODO(makowalski): The handle does not have the proper import params or settings. */
   USDPrimReader *usd_reader = archive->create_reader(prim);
 
-  if (usd_reader == NULL) {
+  if (usd_reader == nullptr) {
     /* This object is not supported */
-    return NULL;
+    return nullptr;
   }
   usd_reader->object(object);
   usd_reader->incref();

@@ -34,9 +34,7 @@ USDPrimReader::USDPrimReader(const pxr::UsdPrim &prim,
 {
 }
 
-USDPrimReader::~USDPrimReader()
-{
-}
+USDPrimReader::~USDPrimReader() = default;
 
 const pxr::UsdPrim &USDPrimReader::prim() const
 {

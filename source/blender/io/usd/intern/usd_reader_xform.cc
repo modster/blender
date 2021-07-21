@@ -43,7 +43,7 @@ void USDXformReader::create_object(Main *bmain, const double /* motionSampleTime
 {
   object_ = BKE_object_add_only_object(bmain, OB_EMPTY, name_.c_str());
   object_->empty_drawsize = 0.1f;
-  object_->data = NULL;
+  object_->data = nullptr;
 }
 
 void USDXformReader::read_object_data(Main * /* bmain */, const double motionSampleTime)
@@ -55,7 +55,7 @@ void USDXformReader::read_object_data(Main * /* bmain */, const double motionSam
 
   if (!is_constant) {
     bConstraint *con = BKE_constraint_add_for_object(
-        object_, NULL, CONSTRAINT_TYPE_TRANSFORM_CACHE);
+        object_, nullptr, CONSTRAINT_TYPE_TRANSFORM_CACHE);
     bTransformCacheConstraint *data = static_cast<bTransformCacheConstraint *>(con->data);
 
     std::string prim_path = use_parent_xform_ ? prim_.GetParent().GetPath().GetAsString() :

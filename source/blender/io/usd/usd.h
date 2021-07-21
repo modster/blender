@@ -105,7 +105,7 @@ void USD_get_transform(struct CacheReader *reader, float r_mat[4][4], float time
 /* Either modifies current_mesh in-place or constructs a new mesh. */
 struct Mesh *USD_read_mesh(struct CacheReader *reader,
                            struct Object *ob,
-                           struct Mesh *current_mesh,
+                           struct Mesh *existing_mesh,
                            const float time,
                            const char **err_str,
                            int flags);

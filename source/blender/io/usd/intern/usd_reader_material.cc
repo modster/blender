@@ -260,7 +260,7 @@ Material *USDMaterialReader::add_material(const pxr::UsdShadeMaterial &usd_mater
     return nullptr;
   }
 
-  std::string mtl_name = usd_material.GetPrim().GetName().GetString().c_str();
+  std::string mtl_name = usd_material.GetPrim().GetName().GetString();
 
   /* Create the material. */
   Material *mtl = BKE_material_add(bmain_, mtl_name.c_str());
@@ -293,12 +293,12 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
    * and output shaders. */
 
   /* Add the node tree. */
-  bNodeTree *ntree = ntreeAddTree(NULL, "Shader Nodetree", "ShaderNodeTree");
+  bNodeTree *ntree = ntreeAddTree(nullptr, "Shader Nodetree", "ShaderNodeTree");
   mtl->nodetree = ntree;
   mtl->use_nodes = true;
 
   /* Create the Principled BSDF shader node. */
-  bNode *principled = add_node(NULL, ntree, SH_NODE_BSDF_PRINCIPLED, 0.0f, 300.0f);
+  bNode *principled = add_node(nullptr, ntree, SH_NODE_BSDF_PRINCIPLED, 0.0f, 300.0f);
 
   if (!principled) {
     std::cerr << "ERROR: Couldn't create SH_NODE_BSDF_PRINCIPLED node for USD shader "
@@ -307,7 +307,7 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
   }
 
   /* Create the material output node. */
-  bNode *output = add_node(NULL, ntree, SH_NODE_OUTPUT_MATERIAL, 300.0f, 300.0f);
+  bNode *output = add_node(nullptr, ntree, SH_NODE_OUTPUT_MATERIAL, 300.0f, 300.0f);
 
   if (!output) {
     std::cerr << "ERROR: Couldn't create SH_NODE_OUTPUT_MATERIAL node for USD shader "
@@ -513,7 +513,7 @@ void USDMaterialReader::follow_connection(const pxr::UsdShadeInput &usd_input,
       float locy = 0.0f;
       compute_node_loc(column + 1, locx, locy, r_ctx);
 
-      bNode *normal_map = add_node(NULL, ntree, SH_NODE_NORMAL_MAP, locx, locy);
+      bNode *normal_map = add_node(nullptr, ntree, SH_NODE_NORMAL_MAP, locx, locy);
 
       // Currently, the Normal Map node has Tangent Space as the default,
       // which is what we need, so we don't need to explicitly set it.
@@ -553,7 +553,7 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
   compute_node_loc(column, locx, locy, r_ctx);
 
   // Create the Texture Image node.
-  bNode *tex_image = add_node(NULL, ntree, SH_NODE_TEX_IMAGE, locx, locy);
+  bNode *tex_image = add_node(nullptr, ntree, SH_NODE_TEX_IMAGE, locx, locy);
 
   if (!tex_image) {
     std::cerr << "ERROR: Couldn't create SH_NODE_TEX_IMAGE for node input " << dest_socket_name
@@ -658,7 +658,7 @@ void USDMaterialReader::convert_usd_primvar_reader_float2(
   compute_node_loc(column, locx, locy, r_ctx);
 
   // Create the UV Map node.
-  bNode *uv_map = add_node(NULL, ntree, SH_NODE_UVMAP, locx, locy);
+  bNode *uv_map = add_node(nullptr, ntree, SH_NODE_UVMAP, locx, locy);
 
   if (!uv_map) {
     std::cerr << "ERROR: Couldn't create SH_NODE_UVMAP for node input " << dest_socket_name
