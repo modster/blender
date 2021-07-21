@@ -1536,11 +1536,13 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       new_edge_1.verts = {edge_vert_1_b.self_index, new_vert.self_index};
       added_edges.append(new_edge_1.self_index);
       auto new_edge_1_index = new_edge_1.self_index;
+      this->add_edge_ref_to_verts(new_edge_1);
 
       auto &new_edge_2 = this->add_empty_edge();
       new_edge_2.verts = {new_vert.self_index, edge_vert_2_b.self_index};
       added_edges.append(new_edge_2.self_index);
       auto new_edge_2_index = new_edge_2.self_index;
+      this->add_edge_ref_to_verts(new_edge_2);
 
       /* Need to reinitialize edge because `add_empty_edge()` may have
        * reallocated `this->edges` */
@@ -1564,6 +1566,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
           auto &new_edge = this->add_empty_edge();
           new_edge.verts = std::make_tuple(other_vert.self_index, new_vert.self_index);
           added_edges.append(new_edge.self_index);
+          this->add_edge_ref_to_verts(new_edge);
 
           auto &new_face_1 = this->add_empty_face(face.normal);
           new_face_1.verts.append(edge_vert_1_b.self_index);
