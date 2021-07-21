@@ -207,8 +207,8 @@ class MeshTest(ABC):
         """
         if self.verbose:
             print("Creating expected object...")
-        evaluated_object = self.create_evaluated_object()
-        self.expected_object = evaluated_object
+        self.create_evaluated_object()
+        self.expected_object = self.evaluated_object
         self.expected_object.name = self.exp_object_name
         x, y, z = self.test_object.location
         self.expected_object.location = (x, y+10, z)
