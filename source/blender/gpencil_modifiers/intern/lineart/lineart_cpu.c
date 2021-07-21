@@ -4373,7 +4373,7 @@ static void lineart_shadow_segment_slice_get(double *fbl,
                                              double *r_fb,
                                              double *r_g)
 {
-  double real_at = (at - at_l) / (at_r - at_l);
+  double real_at = ((at_r - at_l) == 0) ? 0 : ((at - at_l) / (at_r - at_l));
   double ga = fbl[3] * real_at / (fbr[3] * (1.0f - real_at) + fbl[3] * real_at);
   interp_v3_v3v3_db(r_fb, fbl, fbr, real_at);
   r_fb[3] = interpd(fbr[3], fbl[3], ga);
@@ -4413,12 +4413,12 @@ static bool lineart_do_closest_segment(bool is_persp,
     *is_side_2r = true;
     side++;
   }
-  if (s1fbl[zid] < s2fbl[zid]) {
+  if (s1fbl[zid] <= s2fbl[zid]) {
     copy_v4_v4_db(r_fbl, s1fbl);
     copy_v3_v3_db(r_gl, s1gl);
     side--;
   }
-  if (s1fbr[zid] < s2fbr[zid]) {
+  if (s1fbr[zid] <= s2fbr[zid]) {
     copy_v4_v4_db(r_fbr, s1fbr);
     copy_v3_v3_db(r_gr, s1gr);
     *is_side_2r = false;
