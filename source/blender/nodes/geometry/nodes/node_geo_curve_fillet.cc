@@ -274,7 +274,7 @@ static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
 /* Copy all attributes in Poly curves. */
 static void copy_poly_attributes_by_mapping(const PolySpline &src,
                                             PolySpline &dst,
-                                            Array<int> mapping)
+                                            const Array<int> mapping)
 {
   copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
   copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
@@ -283,10 +283,10 @@ static void copy_poly_attributes_by_mapping(const PolySpline &src,
 
 /* Update the positions and handle positions of a Bezier spline based on fillet data. */
 static void update_bezier_positions(Array<FilletData> &fds,
-                                    Array<int> &point_counts,
                                     BezierSpline &dst_spline,
-                                    int start,
-                                    int fillet_count)
+                                    const Array<int> point_counts,
+                                    const int start,
+                                    const int fillet_count)
 {
   int cur_i = start;
   for (const int i : IndexRange(start, fillet_count)) {
@@ -348,10 +348,10 @@ static void update_bezier_positions(Array<FilletData> &fds,
 
 /* Update the positions of a Poly spline based on fillet data. */
 static void update_poly_positions(Array<FilletData> &fds,
-                                  Array<int> &point_counts,
                                   PolySpline &dst_spline,
-                                  int start,
-                                  int fillet_count)
+                                  const Array<int> point_counts,
+                                  const int start,
+                                  const int fillet_count)
 {
   int cur_i = start;
   for (const int i : IndexRange(start, fillet_count)) {
@@ -431,14 +431,14 @@ static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletMod
     BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
     dst_spline.resize(total_points);
     copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
-    update_bezier_positions(fds, point_counts, dst_spline, start, fillet_count);
+    update_bezier_positions(fds, dst_spline, point_counts, start, fillet_count);
   }
   else {
     PolySpline src_spline = static_cast<PolySpline &>(*src_spline_ptr);
     PolySpline &dst_spline = static_cast<PolySpline &>(*dst_spline_ptr);
     dst_spline.resize(total_points);
     copy_poly_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
-    update_poly_positions(fds, point_counts, dst_spline, start, fillet_count);
+    update_poly_positions(fds, dst_spline, point_counts, start, fillet_count);
   }
 
   return dst_spline_ptr;
