@@ -2664,6 +2664,20 @@ template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff 
   {
     return this->deleted_faces;
   }
+
+  friend std::ostream &operator<<(std::ostream &stream,
+                                  const MeshDiff<END, EVD, EED, EFD> &mesh_diff)
+  {
+    stream << "added_nodes: " << mesh_diff.get_added_nodes() << std::endl;
+    stream << "added_verts: " << mesh_diff.get_added_verts() << std::endl;
+    stream << "added_edges: " << mesh_diff.get_added_edges() << std::endl;
+    stream << "added_faces: " << mesh_diff.get_added_faces() << std::endl;
+    stream << "deleted_nodes: " << mesh_diff.get_deleted_nodes() << std::endl;
+    stream << "deleted_verts: " << mesh_diff.get_deleted_verts() << std::endl;
+    stream << "deleted_edges: " << mesh_diff.get_deleted_edges() << std::endl;
+    stream << "deleted_faces: " << mesh_diff.get_deleted_faces() << std::endl;
+    return stream;
+  }
 };
 
 } /* namespace blender::bke::internal */
