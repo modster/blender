@@ -157,14 +157,7 @@ struct GPUBatch *DRW_cache_curve_edge_overlay_get(struct Object *ob);
 struct GPUBatch *DRW_cache_curve_vert_overlay_get(struct Object *ob);
 
 /* Font */
-struct GPUBatch *DRW_cache_text_surface_get(struct Object *ob);
-struct GPUBatch *DRW_cache_text_edge_detection_get(struct Object *ob, bool *r_is_manifold);
-struct GPUBatch *DRW_cache_text_loose_edges_get(struct Object *ob);
 struct GPUBatch *DRW_cache_text_edge_wire_get(struct Object *ob);
-struct GPUBatch **DRW_cache_text_surface_shaded_get(struct Object *ob,
-                                                    struct GPUMaterial **gpumat_array,
-                                                    uint gpumat_array_len);
-struct GPUBatch *DRW_cache_text_face_wireframe_get(struct Object *ob);
 
 /* Surface */
 struct GPUBatch *DRW_cache_surf_surface_get(struct Object *ob);
