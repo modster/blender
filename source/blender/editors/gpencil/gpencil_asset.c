@@ -742,7 +742,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   copy_v2_v2(tgpa->vinit_rotation, vr);
 }
 
-/* Helper: Get a material from the datablock */
+/* Helper: Get lower frame number from asset strokes. */
 static int gpencil_asset_get_first_franum(bGPdata *gpd)
 {
   int first_fra = INT_MAX;
