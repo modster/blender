@@ -1503,7 +1503,7 @@ static KnifeVert *knife_split_edge(KnifeTool_OpData *kcd,
 }
 
 /* Rejoin two edges split by #knife_split_edge. */
-static void knife_join_edge(KnifeTool_OpData *kcd, KnifeEdge *newkfe, KnifeEdge *kfe)
+static void knife_join_edge(KnifeEdge *newkfe, KnifeEdge *kfe)
 {
   newkfe->is_invalid = true;
   newkfe->v2->is_invalid = true;
@@ -3198,9 +3198,9 @@ static float snap_v3_angle_plane(
 static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
 {
   /* Calculate a reference vector using previous cut segment. If none exists then exit. */
-  float ref[3];
+  float refv[3];
   if (kcd->mdata.is_stored && !kcd->prev.is_space) {
-    sub_v3_v3v3(ref, kcd->mdata.cage, kcd->prev.cage);
+    sub_v3_v3v3(refv, kcd->mdata.cage, kcd->prev.cage);
   }
   else {
     return false;
@@ -3228,9 +3228,9 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
   }
 
   /* Choose best face for plane. */
+  Ref *ref;
   BMFace *fprev = NULL;
   if (kcd->prev.vert && kcd->prev.vert->v) {
-    Ref *ref;
     for (ref = kcd->prev.vert->faces.first; ref; ref = ref->next) {
       BMFace *f = ((BMFace *)(ref->ref));
       if (f == fcurr) {
@@ -3239,7 +3239,6 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
     }
   }
   else if (kcd->prev.edge) {
-    Ref *ref;
     for (ref = kcd->prev.edge->faces.first; ref; ref = ref->next) {
       BMFace *f = ((BMFace *)(ref->ref));
       if (f == fcurr) {
@@ -3288,7 +3287,7 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
     float rotated_vec[3];
     /* Maybe check for vectors being zero here? */
     sub_v3_v3v3(v1, ray_hit, kcd->prev.cage);
-    copy_v3_v3(v2, ref);
+    copy_v3_v3(v2, refv);
     kcd->angle = snap_v3_angle_plane(rotated_vec, v1, v2, fprev->no, snap_step);
     add_v3_v3(rotated_vec, kcd->prev.cage);
 
@@ -3451,7 +3450,7 @@ static void knifetool_undo(KnifeTool_OpData *kcd)
     for (int i = 0; i < undo->splits; i++) {
       BLI_stack_pop(kcd->splitstack, &newkfe);
       BLI_stack_pop(kcd->splitstack, &kfe);
-      knife_join_edge(kcd, newkfe, kfe);
+      knife_join_edge(newkfe, kfe);
     }
 
     for (int i = 0; i < undo->cuts; i++) {
