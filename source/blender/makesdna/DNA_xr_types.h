@@ -132,6 +132,12 @@ typedef enum eXrActionFlag {
   XR_ACTION_HAPTIC_REPEAT = (1 << 11),
 } eXrActionFlag;
 
+typedef enum eXrPoseFlag {
+  /* Pose represents controller grip/aim. */
+  XR_POSE_GRIP = (1 << 0),
+  XR_POSE_AIM = (1 << 1),
+} eXrPoseFlag;
+
 /* -------------------------------------------------------------------- */
 
 typedef struct XrActionMapItem {
@@ -165,8 +171,7 @@ typedef struct XrActionMapItem {
   short action_flag; /* eXrActionFlag */
 
   /** Pose action properties. */
-  char pose_is_controller;
-  char _pad2[1];
+  short pose_flag; /* eXrPoseFlag */
   float pose_location[3];
   float pose_rotation[3];
 

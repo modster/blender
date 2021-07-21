@@ -2540,19 +2540,17 @@ static void rna_def_event(BlenderRNA *brna)
   RNA_def_property_array(prop, 3);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_float_funcs(prop, "rna_Event_xr_controller_location_get", NULL, NULL);
-  RNA_def_property_ui_text(
-      prop,
-      "XR Controller Location",
-      "Location of the action's corresponding controller pose in world space");
+  RNA_def_property_ui_text(prop,
+                           "XR Controller Location",
+                           "Location of the action's corresponding controller aim in world space");
 
   prop = RNA_def_property(srna, "xr_controller_rotation", PROP_FLOAT, PROP_QUATERNION);
   RNA_def_property_array(prop, 4);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_float_funcs(prop, "rna_Event_xr_controller_rotation_get", NULL, NULL);
-  RNA_def_property_ui_text(
-      prop,
-      "XR Controller Rotation",
-      "Rotation of the action's corresponding controller pose in world space");
+  RNA_def_property_ui_text(prop,
+                           "XR Controller Rotation",
+                           "Rotation of the action's corresponding controller aim in world space");
 
   prop = RNA_def_property(srna, "xr_controller_location_other", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);
@@ -2560,7 +2558,7 @@ static void rna_def_event(BlenderRNA *brna)
   RNA_def_property_float_funcs(prop, "rna_Event_xr_controller_location_other_get", NULL, NULL);
   RNA_def_property_ui_text(prop,
                            "XR Controller Location Other",
-                           "Controller location of the other user path for bimanual actions");
+                           "Controller aim location of the other user path for bimanual actions");
 
   prop = RNA_def_property(srna, "xr_controller_rotation_other", PROP_FLOAT, PROP_QUATERNION);
   RNA_def_property_array(prop, 4);
@@ -2568,7 +2566,7 @@ static void rna_def_event(BlenderRNA *brna)
   RNA_def_property_float_funcs(prop, "rna_Event_xr_controller_rotation_other_get", NULL, NULL);
   RNA_def_property_ui_text(prop,
                            "XR Controller Rotation Other",
-                           "Controller rotation of the other user path for bimanual actions");
+                           "Controller aim rotation of the other user path for bimanual actions");
 
   prop = RNA_def_property(srna, "xr_focal_length", PROP_FLOAT, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);

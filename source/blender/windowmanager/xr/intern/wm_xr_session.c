@@ -391,8 +391,8 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const float viewmat_base[4][4],
                                 wmXrSessionState *state)
 {
-  const unsigned int view_idx = (unsigned int)min_ii((int)ARRAY_SIZE(state->eyes),
-                                                     (int)draw_view->view_idx);
+  const unsigned int view_idx = (unsigned int)min_ii((int)draw_view->view_idx,
+                                                     (int)ARRAY_SIZE(state->eyes));
   wmXrEyeData *eye = &state->eyes[view_idx];
   GHOST_XrPose viewer_pose;
   float viewer_mat[4][4], base_mat[4][4], nav_mat[4][4];
@@ -496,7 +496,7 @@ bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
   return true;
 }
 
-bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
+bool WM_xr_session_state_controller_grip_location_get(const wmXrData *xr,
                                                       unsigned int subaction_idx,
                                                       float r_location[3])
 {
@@ -506,11 +506,11 @@ bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
     return false;
   }
 
-  copy_v3_v3(r_location, xr->runtime->session_state.controllers[subaction_idx].pose.position);
+  copy_v3_v3(r_location, xr->runtime->session_state.controllers[subaction_idx].grip_pose.position);
   return true;
 }
 
-bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
+bool WM_xr_session_state_controller_grip_rotation_get(const wmXrData *xr,
                                                       unsigned int subaction_idx,
                                                       float r_rotation[4])
 {
@@ -521,7 +521,36 @@ bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
   }
 
   copy_qt_qt(r_rotation,
-             xr->runtime->session_state.controllers[subaction_idx].pose.orientation_quat);
+             xr->runtime->session_state.controllers[subaction_idx].grip_pose.orientation_quat);
+  return true;
+}
+
+bool WM_xr_session_state_controller_aim_location_get(const wmXrData *xr,
+                                                     unsigned int subaction_idx,
+                                                     float r_location[3])
+{
+  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
+      subaction_idx >= ARRAY_SIZE(xr->runtime->session_state.controllers)) {
+    zero_v3(r_location);
+    return false;
+  }
+
+  copy_v3_v3(r_location, xr->runtime->session_state.controllers[subaction_idx].aim_pose.position);
+  return true;
+}
+
+bool WM_xr_session_state_controller_aim_rotation_get(const wmXrData *xr,
+                                                     unsigned int subaction_idx,
+                                                     float r_rotation[4])
+{
+  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
+      subaction_idx >= ARRAY_SIZE(xr->runtime->session_state.controllers)) {
+    unit_qt(r_rotation);
+    return false;
+  }
+
+  copy_qt_qt(r_rotation,
+             xr->runtime->session_state.controllers[subaction_idx].aim_pose.orientation_quat);
   return true;
 }
 
@@ -622,7 +651,7 @@ void WM_xr_session_state_controller_object_get(const wmXrData *xr,
                                       ob);
         break;
       default:
-        BLI_assert(false);
+        BLI_assert_unreachable();
         break;
     }
   }
@@ -643,7 +672,7 @@ void WM_xr_session_state_controller_object_set(wmXrData *xr,
                                       &xr->runtime->session_state.controller1_object_orig_pose);
         break;
       default:
-        BLI_assert(false);
+        BLI_assert_unreachable();
         break;
     }
   }
@@ -665,22 +694,46 @@ void wm_xr_session_actions_init(wmXrData *xr)
   GHOST_XrAttachActionSets(xr->runtime->context);
 }
 
-static void wm_xr_session_controller_mats_update(const bContext *C,
+static void wm_xr_session_controller_pose_calc(const GHOST_XrPose *raw_pose,
+                                               const float view_ofs[3],
+                                               const float base_mat[4][4],
+                                               const float nav_mat[4][4],
+                                               GHOST_XrPose *r_pose,
+                                               float r_mat[4][4],
+                                               float r_mat_base[4][4])
+{
+  float m[4][4];
+  /* Calculate controller matrix in world space. */
+  wm_xr_pose_to_mat(raw_pose, m);
+
+  /* Apply eye position offset. */
+  sub_v3_v3(m[3], view_ofs);
+
+  /* Apply base pose and navigation. */
+  mul_m4_m4m4(r_mat_base, base_mat, m);
+  mul_m4_m4m4(r_mat, nav_mat, r_mat_base);
+
+  /* Save final pose. */
+  mat4_to_loc_quat(r_pose->position, r_pose->orientation_quat, r_mat);
+}
+
+static void wm_xr_session_controller_data_update(const bContext *C,
                                                  const XrSessionSettings *settings,
-                                                 const wmXrAction *controller_pose_action,
+                                                 const wmXrAction *grip_action,
+                                                 const wmXrAction *aim_action,
                                                  wmXrSessionState *state,
                                                  wmWindow *win)
 {
-  const unsigned int count = (unsigned int)min_ii(
-      (int)controller_pose_action->count_subaction_paths, (int)ARRAY_SIZE(state->controllers));
-
+  BLI_assert(grip_action->count_subaction_paths == aim_action->count_subaction_paths);
+  const unsigned int count = (unsigned int)min_ii((int)grip_action->count_subaction_paths,
+                                                  (int)ARRAY_SIZE(state->controllers));
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
   wmWindowManager *wm = CTX_wm_manager(C);
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   Object *ob_constraint = NULL;
   char ob_flag;
-  float view_ofs[3], base_mat[4][4], nav_mat[4][4], m[4][4];
+  float view_ofs[3], base_mat[4][4], nav_mat[4][4];
 
   if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
     copy_v3_v3(view_ofs, state->prev_local_pose.position);
@@ -712,22 +765,23 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
         break;
     }
 
-    /* Calculate controller matrix in world space. */
-    wm_xr_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], m);
-
-    /* Apply eye position offset. */
-    sub_v3_v3(m[3], view_ofs);
-
-    /* Apply base pose and navigation. */
-    mul_m4_m4m4(controller->mat_base, base_mat, m);
-    mul_m4_m4m4(controller->mat, nav_mat, controller->mat_base);
-
-    /* Save final pose. */
-    mat4_to_loc_quat(
-        controller->pose.position, controller->pose.orientation_quat, controller->mat);
+    wm_xr_session_controller_pose_calc(&((GHOST_XrPose *)grip_action->states)[i],
+                                       view_ofs,
+                                       base_mat,
+                                       nav_mat,
+                                       &controller->grip_pose,
+                                       controller->grip_mat,
+                                       controller->grip_mat_base);
+    wm_xr_session_controller_pose_calc(&((GHOST_XrPose *)aim_action->states)[i],
+                                       view_ofs,
+                                       base_mat,
+                                       nav_mat,
+                                       &controller->aim_pose,
+                                       controller->aim_mat,
+                                       controller->aim_mat_base);
 
     if (ob_constraint && ((ob_flag & XR_OBJECT_ENABLE) != 0)) {
-      wm_xr_session_object_pose_set(&controller->pose, ob_constraint);
+      wm_xr_session_object_pose_set(&controller->grip_pose, ob_constraint);
 
       if (((ob_flag & XR_OBJECT_AUTOKEY) != 0) && screen_anim &&
           autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
@@ -738,12 +792,12 @@ static void wm_xr_session_controller_mats_update(const bContext *C,
   }
 }
 
-static const GHOST_XrPose *wm_xr_session_controller_pose_find(const wmXrSessionState *state,
-                                                              const char *subaction_path)
+static const GHOST_XrPose *wm_xr_session_controller_aim_pose_find(const wmXrSessionState *state,
+                                                                  const char *subaction_path)
 {
   for (unsigned int i = 0; i < (unsigned int)ARRAY_SIZE(state->controllers); ++i) {
     if (STREQ(state->controllers[i].subaction_path, subaction_path)) {
-      return &state->controllers[i].pose;
+      return &state->controllers[i].aim_pose;
     }
   }
 
@@ -1048,7 +1102,7 @@ static bool wm_xr_session_action_test_bimanual(const wmXrSessionState *session_s
                                                wmXrAction *action,
                                                unsigned int subaction_idx,
                                                unsigned int *r_subaction_idx_other,
-                                               const GHOST_XrPose **r_pose_other)
+                                               const GHOST_XrPose **r_aim_pose_other)
 {
   if ((action->flag & XR_ACTION_BIMANUAL) == 0) {
     return false;
@@ -1089,7 +1143,7 @@ static bool wm_xr_session_action_test_bimanual(const wmXrSessionState *session_s
   }
 
   if (bimanual) {
-    *r_pose_other = wm_xr_session_controller_pose_find(
+    *r_aim_pose_other = wm_xr_session_controller_aim_pose_find(
         session_state, action->subaction_paths[*r_subaction_idx_other]);
   }
 
@@ -1154,19 +1208,19 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
             (!modal || (wm_xr_session_modal_action_test(active_modal_actions, action, NULL) &&
                         (!action->active_modal_path || (&action->subaction_paths[subaction_idx] ==
                                                         action->active_modal_path))))) {
-          const GHOST_XrPose *pose = wm_xr_session_controller_pose_find(
+          const GHOST_XrPose *aim_pose = wm_xr_session_controller_aim_pose_find(
               session_state, action->subaction_paths[subaction_idx]);
-          const GHOST_XrPose *pose_other = NULL;
+          const GHOST_XrPose *aim_pose_other = NULL;
           unsigned int subaction_idx_other;
 
           /* Test for bimanual interaction. */
           const bool bimanual = wm_xr_session_action_test_bimanual(
-              session_state, action, subaction_idx, &subaction_idx_other, &pose_other);
+              session_state, action, subaction_idx, &subaction_idx_other, &aim_pose_other);
 
           wm_event_add_xrevent(action_set_name,
                                action,
-                               pose,
-                               pose_other,
+                               aim_pose,
+                               aim_pose_other,
                                eye_data,
                                surface,
                                win,
@@ -1243,9 +1297,13 @@ void wm_xr_session_actions_update(const bContext *C)
 
   /* Only update controller mats and dispatch events for active action set. */
   if (active_action_set) {
-    if (active_action_set->controller_pose_action) {
-      wm_xr_session_controller_mats_update(
-          C, &xr->session_settings, active_action_set->controller_pose_action, state, win);
+    if (active_action_set->controller_grip_action && active_action_set->controller_aim_action) {
+      wm_xr_session_controller_data_update(C,
+                                           &xr->session_settings,
+                                           active_action_set->controller_grip_action,
+                                           active_action_set->controller_aim_action,
+                                           state,
+                                           win);
     }
 
     if (surface && win) {
@@ -1260,18 +1318,20 @@ void wm_xr_session_actions_uninit(wmXrData *xr)
   wm_xr_session_controller_data_clear(&xr->runtime->session_state);
 }
 
-void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action, wmXrData *xr)
+void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
+                                            const wmXrAction *aim_action,
+                                            wmXrData *xr)
 {
   wmXrSessionState *state = &xr->runtime->session_state;
+  BLI_assert(grip_action->count_subaction_paths == aim_action->count_subaction_paths);
+  const unsigned int count = (unsigned int)min_ii((int)grip_action->count_subaction_paths,
+                                                  (int)ARRAY_SIZE(state->controllers));
 
-  const unsigned int count = (unsigned int)min_ii(
-      (int)ARRAY_SIZE(state->controllers), (int)controller_pose_action->count_subaction_paths);
+  memset(state->controllers, 0, sizeof(state->controllers));
 
   for (unsigned int i = 0; i < count; ++i) {
-    wmXrControllerData *c = &state->controllers[i];
-    strcpy(c->subaction_path, controller_pose_action->subaction_paths[i]);
-    memset(&c->pose, 0, sizeof(c->pose));
-    zero_m4(c->mat);
+    BLI_assert(STREQ(grip_action->subaction_paths[i], aim_action->subaction_paths[i]));
+    strcpy(state->controllers[i].subaction_path, grip_action->subaction_paths[i]);
   }
 
   /* Activate draw callback. */
@@ -1388,8 +1448,8 @@ static void wm_xr_session_surface_draw(bContext *C)
 bool wm_xr_session_surface_offscreen_ensure(wmXrSurfaceData *surface_data,
                                             const GHOST_XrDrawViewInfo *draw_view)
 {
-  const unsigned int view_idx = (unsigned int)min_ii((int)ARRAY_SIZE(surface_data->offscreen),
-                                                     (int)draw_view->view_idx);
+  const unsigned int view_idx = (unsigned int)min_ii((int)draw_view->view_idx,
+                                                     (int)ARRAY_SIZE(surface_data->offscreen));
   GPUOffScreen *offscreen = surface_data->offscreen[view_idx];
   GPUViewport *viewport = surface_data->viewport[view_idx];
   const bool size_changed = offscreen && (GPU_offscreen_width(offscreen) != draw_view->width) &&

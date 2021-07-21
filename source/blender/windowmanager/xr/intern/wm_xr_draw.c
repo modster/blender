@@ -226,26 +226,27 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
       GPU_line_width(3.0f);
 
       for (int i = 0; i < 2; ++i) {
-        const float(*mat)[4] = state->controllers[i].mat;
-        madd_v3_v3v3fl(x_axis, mat[3], mat[0], scale);
-        madd_v3_v3v3fl(y_axis, mat[3], mat[1], scale);
-        madd_v3_v3v3fl(z_axis, mat[3], mat[2], scale);
+        const float(*grip_mat)[4] = state->controllers[i].grip_mat;
+        const float(*aim_mat)[4] = state->controllers[i].aim_mat;
+        madd_v3_v3v3fl(x_axis, grip_mat[3], aim_mat[0], scale);
+        madd_v3_v3v3fl(y_axis, grip_mat[3], aim_mat[1], scale);
+        madd_v3_v3v3fl(z_axis, grip_mat[3], aim_mat[2], scale);
 
         immBegin(GPU_PRIM_LINES, 2);
         immUniformColor4fv(r);
-        immVertex3fv(pos, mat[3]);
+        immVertex3fv(pos, grip_mat[3]);
         immVertex3fv(pos, x_axis);
         immEnd();
 
         immBegin(GPU_PRIM_LINES, 2);
         immUniformColor4fv(g);
-        immVertex3fv(pos, mat[3]);
+        immVertex3fv(pos, grip_mat[3]);
         immVertex3fv(pos, y_axis);
         immEnd();
 
         immBegin(GPU_PRIM_LINES, 2);
         immUniformColor4fv(b);
-        immVertex3fv(pos, mat[3]);
+        immVertex3fv(pos, grip_mat[3]);
         immVertex3fv(pos, z_axis);
         immEnd();
       }
@@ -268,7 +269,7 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
 
         for (int i = 0; i < 2; ++i) {
           GPU_matrix_push();
-          GPU_matrix_mul(state->controllers[i].mat);
+          GPU_matrix_mul(state->controllers[i].grip_mat);
           GPU_matrix_scale_1f(scale);
           GPU_batch_draw(sphere);
           GPU_matrix_pop();
@@ -290,11 +291,11 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
         GPU_line_width(3.0f);
 
         for (int i = 0; i < 2; ++i) {
-          const float(*mat)[4] = state->controllers[i].mat;
-          madd_v3_v3v3fl(ray, mat[3], mat[2], -scale);
+          const float(*aim_mat)[4] = state->controllers[i].aim_mat;
+          madd_v3_v3v3fl(ray, aim_mat[3], aim_mat[2], -scale);
 
           immBegin(GPU_PRIM_LINES, 2);
-          immVertex3fv(pos, mat[3]);
+          immVertex3fv(pos, aim_mat[3]);
           immVertex3fv(pos, ray);
           immEnd();
         }

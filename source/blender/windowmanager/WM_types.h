@@ -722,10 +722,10 @@ typedef struct wmXrActionData {
   /** Input threshold for float/vector2f actions. */
   float float_threshold;
 
-  /** Controller pose corresponding to the action's subaction path. */
+  /** Controller aim pose corresponding to the action's subaction path. */
   float controller_loc[3];
   float controller_rot[4];
-  /** Controller pose of the other subaction path for bimanual actions. */
+  /** Controller aim pose of the other subaction path for bimanual actions. */
   float controller_loc_other[3];
   float controller_rot_other[4];
 

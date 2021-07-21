@@ -199,9 +199,9 @@ void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name)
   wmXrSessionState *session_state = &xr->runtime->session_state;
 
   if (action_set == session_state->active_action_set) {
-    if (action_set->controller_pose_action) {
+    if (action_set->controller_grip_action || action_set->controller_aim_action) {
       wm_xr_session_controller_data_clear(session_state);
-      action_set->controller_pose_action = NULL;
+      action_set->controller_grip_action = action_set->controller_aim_action = NULL;
     }
 
     BLI_freelistN(&action_set->active_modal_actions);
@@ -286,12 +286,14 @@ void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char 
     return;
   }
 
-  if (action_set->controller_pose_action &&
-      STREQ(action_set->controller_pose_action->name, action_name)) {
+  if ((action_set->controller_grip_action &&
+       STREQ(action_set->controller_grip_action->name, action_name)) ||
+      (action_set->controller_aim_action &&
+       STREQ(action_set->controller_aim_action->name, action_name))) {
     if (action_set == xr->runtime->session_state.active_action_set) {
       wm_xr_session_controller_data_clear(&xr->runtime->session_state);
     }
-    action_set->controller_pose_action = NULL;
+    action_set->controller_grip_action = action_set->controller_aim_action = NULL;
   }
 
   LISTBASE_FOREACH (LinkData *, ld, &action_set->active_modal_actions) {
@@ -421,8 +423,9 @@ bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name)
 
   xr->runtime->session_state.active_action_set = action_set;
 
-  if (action_set->controller_pose_action) {
-    wm_xr_session_controller_data_populate(action_set->controller_pose_action, xr);
+  if (action_set->controller_grip_action && action_set->controller_aim_action) {
+    wm_xr_session_controller_data_populate(
+        action_set->controller_grip_action, action_set->controller_aim_action, xr);
   }
   else {
     wm_xr_session_controller_data_clear(&xr->runtime->session_state);
@@ -431,24 +434,43 @@ bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name)
   return true;
 }
 
-bool WM_xr_controller_pose_action_set(wmXrData *xr,
-                                      const char *action_set_name,
-                                      const char *action_name)
+bool WM_xr_controller_pose_actions_set(wmXrData *xr,
+                                       const char *action_set_name,
+                                       const char *grip_action_name,
+                                       const char *aim_action_name)
 {
   wmXrActionSet *action_set = action_set_find(xr, action_set_name);
   if (!action_set) {
     return false;
   }
 
-  wmXrAction *action = action_find(xr, action_set_name, action_name);
-  if (!action) {
+  wmXrAction *grip_action = action_find(xr, action_set_name, grip_action_name);
+  if (!grip_action) {
     return false;
   }
 
-  action_set->controller_pose_action = action;
+  wmXrAction *aim_action = action_find(xr, action_set_name, aim_action_name);
+  if (!aim_action) {
+    return false;
+  }
+
+  /* Ensure consistent subaction paths. */
+  const unsigned int count = grip_action->count_subaction_paths;
+  if (count != aim_action->count_subaction_paths) {
+    return false;
+  }
+
+  for (unsigned int i = 0; i < count; ++i) {
+    if (!STREQ(grip_action->subaction_paths[i], aim_action->subaction_paths[i])) {
+      return false;
+    }
+  }
+
+  action_set->controller_grip_action = grip_action;
+  action_set->controller_aim_action = aim_action;
 
   if (action_set == xr->runtime->session_state.active_action_set) {
-    wm_xr_session_controller_data_populate(action, xr);
+    wm_xr_session_controller_data_populate(grip_action, aim_action, xr);
   }
 
   return true;

@@ -978,12 +978,18 @@ bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
                                                      float *r_focal_len,
                                                      float *r_clip_start,
                                                      float *r_clip_end);
-bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
+bool WM_xr_session_state_controller_grip_location_get(const wmXrData *xr,
                                                       unsigned int subaction_idx,
                                                       float r_location[3]);
-bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
+bool WM_xr_session_state_controller_grip_rotation_get(const wmXrData *xr,
                                                       unsigned int subaction_idx,
                                                       float r_rotation[4]);
+bool WM_xr_session_state_controller_aim_location_get(const wmXrData *xr,
+                                                     unsigned int subaction_idx,
+                                                     float r_location[3]);
+bool WM_xr_session_state_controller_aim_rotation_get(const wmXrData *xr,
+                                                     unsigned int subaction_idx,
+                                                     float r_rotation[4]);
 bool WM_xr_session_state_nav_location_get(const wmXrData *xr, float r_location[3]);
 void WM_xr_session_state_nav_location_set(wmXrData *xr, const float location[3]);
 bool WM_xr_session_state_nav_rotation_get(const wmXrData *xr, float r_rotation[4]);
@@ -1049,9 +1055,10 @@ void WM_xr_action_binding_destroy(wmXrData *xr,
 /* If action_set_name is NULL, then all action sets will be treated as active. */
 bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name);
 
-bool WM_xr_controller_pose_action_set(wmXrData *xr,
-                                      const char *action_set_name,
-                                      const char *action_name);
+bool WM_xr_controller_pose_actions_set(wmXrData *xr,
+                                       const char *action_set_name,
+                                       const char *grip_action_name,
+                                       const char *aim_action_name);
 
 /* XR action functions to be called post-XR session start. */
 bool WM_xr_action_state_get(const wmXrData *xr,

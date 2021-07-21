@@ -42,12 +42,14 @@ typedef struct wmXrControllerData {
   /input/trigger/value, interaction_path = /user/hand/left/input/trigger/value).
   */
   char subaction_path[64];
-  /** Last known controller pose (in world space) stored for queries. */
-  GHOST_XrPose pose;
-  /** The last known controller matrix, calculated from above's controller pose. */
-  float mat[4][4];
-  /** Controller matrix without navigation applied. */
-  float mat_base[4][4];
+  /* Pose (in world space) that represents the user's hand when holding the controller.*/
+  GHOST_XrPose grip_pose;
+  float grip_mat[4][4];
+  float grip_mat_base[4][4];
+  /* Pose (in world space) that represents the controller's aiming source. */
+  GHOST_XrPose aim_pose;
+  float aim_mat[4][4];
+  float aim_mat_base[4][4];
 } wmXrControllerData;
 
 typedef struct wmXrSessionState {
@@ -190,10 +192,9 @@ typedef struct wmXrHapticAction {
 
 typedef struct wmXrActionSet {
   char *name;
-  /** The XR pose action that determines the controller
-   * transforms. This is usually identified by the OpenXR path "/grip/pose" or "/aim/pose",
-   * although it could differ depending on the specification and hardware. */
-  wmXrAction *controller_pose_action;
+  /** XR pose actions that determine the controller grip/aim transforms. */
+  wmXrAction *controller_grip_action;
+  wmXrAction *controller_aim_action;
   /** Currently active modal actions. */
   ListBase active_modal_actions;
   /** Currently active haptic actions. */
@@ -223,7 +224,8 @@ void wm_xr_session_gpu_binding_context_destroy(GHOST_ContextHandle context);
 void wm_xr_session_actions_init(wmXrData *xr);
 void wm_xr_session_actions_update(const struct bContext *C);
 void wm_xr_session_actions_uninit(wmXrData *xr);
-void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
+void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
+                                            const wmXrAction *aim_action,
                                             wmXrData *xr);
 void wm_xr_session_controller_data_clear(wmXrSessionState *state);
 void wm_xr_session_object_autokey(struct bContext *C,

@@ -5031,8 +5031,8 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 #ifdef WITH_XR_OPENXR
 void wm_event_add_xrevent(const char *action_set_name,
                           const wmXrAction *action,
-                          const GHOST_XrPose *controller_pose,
-                          const GHOST_XrPose *controller_pose_other,
+                          const GHOST_XrPose *controller_aim_pose,
+                          const GHOST_XrPose *controller_aim_pose_other,
                           const wmXrEyeData *eye_data,
                           wmSurface *surface,
                           wmWindow *win,
@@ -5087,13 +5087,13 @@ void wm_event_add_xrevent(const char *action_set_name,
 
   data->float_threshold = action->float_threshold;
 
-  if (controller_pose) {
-    copy_v3_v3(data->controller_loc, controller_pose->position);
-    copy_qt_qt(data->controller_rot, controller_pose->orientation_quat);
+  if (controller_aim_pose) {
+    copy_v3_v3(data->controller_loc, controller_aim_pose->position);
+    copy_qt_qt(data->controller_rot, controller_aim_pose->orientation_quat);
 
-    if (bimanual && controller_pose_other) {
-      copy_v3_v3(data->controller_loc_other, controller_pose_other->position);
-      copy_qt_qt(data->controller_rot_other, controller_pose_other->orientation_quat);
+    if (bimanual && controller_aim_pose_other) {
+      copy_v3_v3(data->controller_loc_other, controller_aim_pose_other->position);
+      copy_qt_qt(data->controller_rot_other, controller_aim_pose_other->orientation_quat);
     }
     else {
       data->controller_rot_other[0] = 1.0f;

@@ -312,6 +312,62 @@ static void rna_XrActionMapItem_haptic_flag_set(PointerRNA *ptr, int value)
 #  endif
 }
 
+static bool rna_XrActionMapItem_pose_is_controller_grip_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if ((ami->pose_flag & XR_POSE_GRIP) != 0) {
+    return true;
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  return false;
+}
+
+static void rna_XrActionMapItem_pose_is_controller_grip_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (value) {
+    ami->pose_flag |= XR_POSE_GRIP;
+  }
+  else {
+    ami->pose_flag &= ~XR_POSE_GRIP;
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+static bool rna_XrActionMapItem_pose_is_controller_aim_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if ((ami->pose_flag & XR_POSE_AIM) != 0) {
+    return true;
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  return false;
+}
+
+static void rna_XrActionMapItem_pose_is_controller_aim_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (value) {
+    ami->pose_flag |= XR_POSE_AIM;
+  }
+  else {
+    ami->pose_flag &= ~XR_POSE_AIM;
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
 static void rna_XrActionMapItem_name_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -1069,15 +1125,17 @@ bool rna_XrSessionState_active_action_set_set(bContext *C, const char *action_se
 #  endif
 }
 
-bool rna_XrSessionState_controller_pose_action_set(bContext *C,
-                                                   const char *action_set_name,
-                                                   const char *action_name)
+bool rna_XrSessionState_controller_pose_actions_set(bContext *C,
+                                                    const char *action_set_name,
+                                                    const char *grip_action_name,
+                                                    const char *aim_action_name)
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  return WM_xr_controller_pose_action_set(&wm->xr, action_set_name, action_name);
+  return WM_xr_controller_pose_actions_set(
+      &wm->xr, action_set_name, grip_action_name, aim_action_name);
 #  else
-  UNUSED_VARS(C, action_set_name, action_name);
+  UNUSED_VARS(C, action_set_name, grip_action_name, aim_action_name);
   return false;
 #  endif
 }
@@ -1186,44 +1244,88 @@ static void rna_XrSessionState_viewer_pose_rotation_get(PointerRNA *ptr, float *
 #  endif
 }
 
-static void rna_XrSessionState_controller_pose0_location_get(PointerRNA *ptr, float *r_values)
+static void rna_XrSessionState_controller0_grip_location_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_pose_location_get(xr, 0, r_values);
+  WM_xr_session_state_controller_grip_location_get(xr, 0, r_values);
 #  else
   UNUSED_VARS(ptr);
   zero_v3(r_values);
 #  endif
 }
 
-static void rna_XrSessionState_controller_pose0_rotation_get(PointerRNA *ptr, float *r_values)
+static void rna_XrSessionState_controller0_grip_rotation_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_pose_rotation_get(xr, 0, r_values);
+  WM_xr_session_state_controller_grip_rotation_get(xr, 0, r_values);
 #  else
   UNUSED_VARS(ptr);
   unit_qt(r_values);
 #  endif
 }
 
-static void rna_XrSessionState_controller_pose1_location_get(PointerRNA *ptr, float *r_values)
+static void rna_XrSessionState_controller0_aim_location_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_pose_location_get(xr, 1, r_values);
+  WM_xr_session_state_controller_aim_location_get(xr, 0, r_values);
 #  else
   UNUSED_VARS(ptr);
   zero_v3(r_values);
 #  endif
 }
 
-static void rna_XrSessionState_controller_pose1_rotation_get(PointerRNA *ptr, float *r_values)
+static void rna_XrSessionState_controller0_aim_rotation_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_pose_rotation_get(xr, 1, r_values);
+  WM_xr_session_state_controller_aim_rotation_get(xr, 0, r_values);
+#  else
+  UNUSED_VARS(ptr);
+  unit_qt(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_controller1_grip_location_get(PointerRNA *ptr, float *r_values)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_controller_grip_location_get(xr, 1, r_values);
+#  else
+  UNUSED_VARS(ptr);
+  zero_v3(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_controller1_grip_rotation_get(PointerRNA *ptr, float *r_values)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_controller_grip_rotation_get(xr, 1, r_values);
+#  else
+  UNUSED_VARS(ptr);
+  unit_qt(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_controller1_aim_location_get(PointerRNA *ptr, float *r_values)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_controller_aim_location_get(xr, 1, r_values);
+#  else
+  UNUSED_VARS(ptr);
+  zero_v3(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_controller1_aim_rotation_get(PointerRNA *ptr, float *r_values)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  WM_xr_session_state_controller_aim_rotation_get(xr, 1, r_values);
 #  else
   UNUSED_VARS(ptr);
   unit_qt(r_values);
@@ -1686,8 +1788,19 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Bimanual", "Action depends on the states/poses of both user paths");
 
-  prop = RNA_def_property(srna, "pose_is_controller", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Is Controller", "Pose will be used for the VR controllers");
+  prop = RNA_def_property(srna, "pose_is_controller_grip", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrActionMapItem_pose_is_controller_grip_get",
+                                 "rna_XrActionMapItem_pose_is_controller_grip_set");
+  RNA_def_property_ui_text(
+      prop, "Is Controller Grip", "Pose will be used for the VR controller grips");
+
+  prop = RNA_def_property(srna, "pose_is_controller_aim", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrActionMapItem_pose_is_controller_aim_get",
+                                 "rna_XrActionMapItem_pose_is_controller_aim_set");
+  RNA_def_property_ui_text(
+      prop, "Is Controller Aim", "Pose will be used for the VR controller aims");
 
   prop = RNA_def_property(srna, "pose_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_ui_text(prop, "Pose Location Offset", "Pose location offset");
@@ -1838,7 +1951,7 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   prop = RNA_def_property(srna, "show_controllers", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "draw_flags", V3D_OFSDRAW_XR_SHOW_CONTROLLERS);
   RNA_def_property_ui_text(
-      prop, "Show Controllers", "Show VR controllers (requires VR action for controller poses)");
+      prop, "Show Controllers", "Show VR controllers (requires VR actions for controller poses)");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "show_custom_overlays", PROP_BOOLEAN, PROP_NONE);
@@ -2218,14 +2331,26 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_function_return(func, parm);
 
   func = RNA_def_function(
-      srna, "set_controller_pose_action", "rna_XrSessionState_controller_pose_action_set");
-  RNA_def_function_ui_description(func, "Set the action that determines the VR controller poses");
+      srna, "set_controller_pose_actions", "rna_XrSessionState_controller_pose_actions_set");
+  RNA_def_function_ui_description(func, "Set the actions that determine the VR controller poses");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set", NULL, 64, "Action Set", "Action set name");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "action", NULL, 64, "Action", "Action name");
+  parm = RNA_def_string(func,
+                        "grip_action",
+                        NULL,
+                        64,
+                        "Grip Action",
+                        "Action (name) representing the controller grips");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_string(func,
+                        "aim_action",
+                        NULL,
+                        64,
+                        "Aim Action",
+                        "Action (name) representing the controller aims");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
@@ -2345,41 +2470,77 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
       "Viewer Pose Rotation",
       "Last known rotation of the viewer pose (center between the eyes) in world space");
 
-  prop = RNA_def_property(srna, "controller_pose0_location", PROP_FLOAT, PROP_TRANSLATION);
+  prop = RNA_def_property(srna, "controller0_grip_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);
   RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller_pose0_location_get", NULL, NULL);
+      prop, "rna_XrSessionState_controller0_grip_location_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop,
-                           "Controller Pose 0 Location",
-                           "Last known location of the first controller pose in world space");
+                           "Controller 0 Grip Location",
+                           "Last known location of the first controller grip in world space");
 
-  prop = RNA_def_property(srna, "controller_pose0_rotation", PROP_FLOAT, PROP_QUATERNION);
+  prop = RNA_def_property(srna, "controller0_grip_rotation", PROP_FLOAT, PROP_QUATERNION);
   RNA_def_property_array(prop, 4);
   RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller_pose0_rotation_get", NULL, NULL);
+      prop, "rna_XrSessionState_controller0_grip_rotation_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop,
-                           "Controller Pose 0 Rotation",
-                           "Last known rotation of the first controller pose in world space");
+                           "Controller 0 Grip Rotation",
+                           "Last known rotation of the first controller grip in world space");
 
-  prop = RNA_def_property(srna, "controller_pose1_location", PROP_FLOAT, PROP_TRANSLATION);
+  prop = RNA_def_property(srna, "controller0_aim_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);
   RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller_pose1_location_get", NULL, NULL);
+      prop, "rna_XrSessionState_controller0_aim_location_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop,
-                           "Controller Pose Location 1",
-                           "Last known location of the second controller pose in world space");
+                           "Controller 0 Aim Location",
+                           "Last known location of the first controller aim in world space");
 
-  prop = RNA_def_property(srna, "controller_pose1_rotation", PROP_FLOAT, PROP_QUATERNION);
+  prop = RNA_def_property(srna, "controller0_aim_rotation", PROP_FLOAT, PROP_QUATERNION);
   RNA_def_property_array(prop, 4);
   RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller_pose1_rotation_get", NULL, NULL);
+      prop, "rna_XrSessionState_controller0_aim_rotation_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop,
-                           "Controller Pose 1 Rotation",
-                           "Last known rotation of the second controller pose in world space");
+                           "Controller 0 Aim Rotation",
+                           "Last known rotation of the first controller aim in world space");
+
+  prop = RNA_def_property(srna, "controller1_grip_location", PROP_FLOAT, PROP_TRANSLATION);
+  RNA_def_property_array(prop, 3);
+  RNA_def_property_float_funcs(
+      prop, "rna_XrSessionState_controller1_grip_location_get", NULL, NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop,
+                           "Controller 1 Grip Location",
+                           "Last known location of the second controller grip in world space");
+
+  prop = RNA_def_property(srna, "controller1_grip_rotation", PROP_FLOAT, PROP_QUATERNION);
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_float_funcs(
+      prop, "rna_XrSessionState_controller1_grip_rotation_get", NULL, NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop,
+                           "Controller 1 Grip Rotation",
+                           "Last known rotation of the second controller grip in world space");
+
+  prop = RNA_def_property(srna, "controller1_aim_location", PROP_FLOAT, PROP_TRANSLATION);
+  RNA_def_property_array(prop, 3);
+  RNA_def_property_float_funcs(
+      prop, "rna_XrSessionState_controller1_aim_location_get", NULL, NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop,
+                           "Controller 1 Aim Location",
+                           "Last known location of the second controller aim in world space");
+
+  prop = RNA_def_property(srna, "controller1_aim_rotation", PROP_FLOAT, PROP_QUATERNION);
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_float_funcs(
+      prop, "rna_XrSessionState_controller1_aim_rotation_get", NULL, NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop,
+                           "Controller 1 Aim Rotation",
+                           "Last known rotation of the second controller aim in world space");
 
   prop = RNA_def_property(srna, "navigation_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);

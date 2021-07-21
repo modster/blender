@@ -158,8 +158,8 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 #ifdef WITH_XR_OPENXR
 void wm_event_add_xrevent(const char *action_set_name,
                           const struct wmXrAction *action,
-                          const struct GHOST_XrPose *controller_pose,
-                          const struct GHOST_XrPose *controller_pose_other,
+                          const struct GHOST_XrPose *controller_aim_pose,
+                          const struct GHOST_XrPose *controller_aim_pose_other,
                           const struct wmXrEyeData *eye_data,
                           struct wmSurface *surface,
                           wmWindow *win,
