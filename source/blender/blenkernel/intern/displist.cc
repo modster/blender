@@ -841,6 +841,11 @@ static bool do_curve_implicit_mesh_conversion(const Curve *curve,
                                               const Scene *scene,
                                               const ModifierMode required_mode)
 {
+  /* Skip implicit filling and conversion to mesh when using "fast text editing". */
+  if (curve->flag & CU_FAST) {
+    return false;
+  }
+
   /* Do implicit conversion to mesh with the object bevel mode. */
   if (curve->bevel_mode == CU_BEV_MODE_OBJECT && curve->bevobj != nullptr) {
     return true;
