@@ -485,10 +485,9 @@ static int mesh_nurbs_displist_to_mdata(const Curve *cu,
 /**
  * Copy evaluated texture space from curve to mesh.
  *
- * \note We disable auto texture space feature since that will cause
- * texture space to evaluate differently for curve and mesh, since curve
- * uses CV to calculate bounding box, and mesh uses what is coming from
- * tessellated curve.
+ * \note We disable auto texture space feature since that will cause texture space to evaluate
+ * differently for curve and mesh, since curves use control points and handles to calculate the
+ * bounding box, and mesh uses the tessellated curve.
  */
 static void mesh_copy_texture_space_from_curve_type(const Curve *cu, Mesh *me)
 {
