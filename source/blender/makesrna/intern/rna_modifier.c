@@ -7240,6 +7240,11 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
        "Collapse Edge",
        "Collapse edge of given index"},
       {ADAPTIVE_REMESH_FLIP_EDGE, "FLIP_EDGE", 0, "Flip Edge", "Flip edge of given index"},
+      {ADAPTIVE_REMESH_STATIC_REMESHING,
+       "STATIC_REMESHING",
+       0,
+       "Static Remeshing",
+       "Static Remeshing"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -7269,6 +7274,12 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
   prop = RNA_def_property(srna, "is_verts_swapped", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", ADAPTIVE_REMESH_VERTS_SWAPPED);
   RNA_def_property_ui_text(prop, "Verts Swapped", "Swap verts during the operation");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+  prop = RNA_def_property(srna, "size_min", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "size_min");
+  RNA_def_property_ui_range(prop, 0.0001f, 2.0f, 0.005f, 4);
+  RNA_def_property_ui_text(prop, "Remeshing Size Min", "");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   RNA_define_lib_overridable(false);

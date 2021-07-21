@@ -53,10 +53,20 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
 {
   AdaptiveRemeshModifierData *armd = (AdaptiveRemeshModifierData *)md;
 
+  auto mode = armd->mode;
+
+  if (mode == ADAPTIVE_REMESH_STATIC_REMESHING) {
+    auto size_min = armd->size_min;
+
+    TempEmptyAdaptiveRemeshParams params;
+    params.size_min = size_min;
+
+    return __temp_empty_adaptive_remesh(params, mesh);
+  }
+
   auto edge_i = armd->edge_index;
   auto across_seams = armd->flag & ADAPTIVE_REMESH_ACROSS_SEAMS;
   auto verts_swapped = armd->flag & ADAPTIVE_REMESH_VERTS_SWAPPED;
-  auto mode = armd->mode;
 
   internal::MeshIO reader;
   reader.read(mesh);
@@ -106,13 +116,23 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   PointerRNA ob_ptr;
   PointerRNA *ptr = modifier_panel_get_property_pointers(panel, &ob_ptr);
+  AdaptiveRemeshModifierData *armd = static_cast<AdaptiveRemeshModifierData *>(ptr->data);
 
   uiLayoutSetPropSep(layout, true);
 
   uiItemR(layout, ptr, "mode", 0, nullptr, ICON_NONE);
-  uiItemR(layout, ptr, "edge_index", 0, nullptr, ICON_NONE);
-  uiItemR(layout, ptr, "use_across_seams", 0, nullptr, ICON_NONE);
-  uiItemR(layout, ptr, "is_verts_swapped", 0, nullptr, ICON_NONE);
+  if (armd->mode == ADAPTIVE_REMESH_SPLIT_EDGE || armd->mode == ADAPTIVE_REMESH_COLLAPSE_EDGE ||
+      armd->mode == ADAPTIVE_REMESH_FLIP_EDGE) {
+    uiItemR(layout, ptr, "edge_index", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "use_across_seams", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "is_verts_swapped", 0, nullptr, ICON_NONE);
+  }
+  else if (armd->mode == ADAPTIVE_REMESH_STATIC_REMESHING) {
+    uiItemR(layout, ptr, "size_min", 0, nullptr, ICON_NONE);
+  }
+  else {
+    BLI_assert_unreachable();
+  }
 
   modifier_panel_end(layout, ptr);
 }
