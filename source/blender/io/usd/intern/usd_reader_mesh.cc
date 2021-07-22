@@ -763,43 +763,47 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
 
   std::vector<pxr::TfToken> uv_tokens;
 
-  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim_.GetPrimvars();
+  /* Currently we only handle UV primvars. */
+  if (read_flag & MOD_MESHSEQ_READ_UV) {
 
-  for (pxr::UsdGeomPrimvar p : primvars) {
+    std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim_.GetPrimvars();
 
-    pxr::TfToken name = p.GetPrimvarName();
-    pxr::SdfValueTypeName type = p.GetTypeName();
+    for (pxr::UsdGeomPrimvar p : primvars) {
 
-    bool is_uv = false;
+      pxr::TfToken name = p.GetPrimvarName();
+      pxr::SdfValueTypeName type = p.GetTypeName();
 
-    /* Assume all uvs are stored in one of these primvar types */
-    if (type == pxr::SdfValueTypeNames->TexCoord2hArray ||
-        type == pxr::SdfValueTypeNames->TexCoord2fArray ||
-        type == pxr::SdfValueTypeNames->TexCoord2dArray) {
-      is_uv = true;
-    }
-    /* In some cases, the st primvar is stored as float2 values. */
-    else if (name == usdtokens::st && type == pxr::SdfValueTypeNames->Float2Array) {
-      is_uv = true;
-    }
+      bool is_uv = false;
 
-    if (is_uv) {
-
-      pxr::TfToken interp = p.GetInterpolation();
-
-      if (!(interp == pxr::UsdGeomTokens->faceVarying || interp == pxr::UsdGeomTokens->vertex)) {
-        continue;
+      /* Assume all uvs are stored in one of these primvar types */
+      if (type == pxr::SdfValueTypeNames->TexCoord2hArray ||
+          type == pxr::SdfValueTypeNames->TexCoord2fArray ||
+          type == pxr::SdfValueTypeNames->TexCoord2dArray) {
+        is_uv = true;
+      }
+      /* In some cases, the st primvar is stored as float2 values. */
+      else if (name == usdtokens::st && type == pxr::SdfValueTypeNames->Float2Array) {
+        is_uv = true;
       }
 
-      uv_tokens.push_back(p.GetBaseName());
-      has_uvs_ = true;
+      if (is_uv) {
 
-      /* Record whether the UVs might be time varying. */
-      if (primvar_varying_map_.find(name) == primvar_varying_map_.end()) {
-        bool might_be_time_varying = p.ValueMightBeTimeVarying();
-        primvar_varying_map_.insert(std::make_pair(name, might_be_time_varying));
-        if (might_be_time_varying) {
-          is_time_varying_ = true;
+        pxr::TfToken interp = p.GetInterpolation();
+
+        if (!(interp == pxr::UsdGeomTokens->faceVarying || interp == pxr::UsdGeomTokens->vertex)) {
+          continue;
+        }
+
+        uv_tokens.push_back(p.GetBaseName());
+        has_uvs_ = true;
+
+        /* Record whether the UVs might be time varying. */
+        if (primvar_varying_map_.find(name) == primvar_varying_map_.end()) {
+          bool might_be_time_varying = p.ValueMightBeTimeVarying();
+          primvar_varying_map_.insert(std::make_pair(name, might_be_time_varying));
+          if (might_be_time_varying) {
+            is_time_varying_ = true;
+          }
         }
       }
     }
