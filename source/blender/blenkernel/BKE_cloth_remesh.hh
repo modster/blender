@@ -2169,6 +2169,54 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
   /* all protected non-static methods */
   /**
+   * Checks if `Node` with the given `node_index` exists in the mesh anymore.
+   */
+  inline bool does_node_exist(NodeIndex node_index) const
+  {
+    const auto op_node = this->nodes.get(node_index);
+    if (op_node) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Checks if `Vert` with the given `vert_index` exists in the mesh anymore.
+   */
+  inline bool does_vert_exist(VertIndex vert_index) const
+  {
+    const auto op_vert = this->verts.get(vert_index);
+    if (op_vert) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Checks if `Edge` with the given `edge_index` exists in the mesh anymore.
+   */
+  inline bool does_edge_exist(EdgeIndex edge_index) const
+  {
+    const auto op_edge = this->edges.get(edge_index);
+    if (op_edge) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Checks if `Face` with the given `face_index` exists in the mesh anymore.
+   */
+  inline bool does_face_exist(FaceIndex face_index) const
+  {
+    const auto op_face = this->faces.get(face_index);
+    if (op_face) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Get checked node
    */
   inline auto &get_checked_node(NodeIndex node_index)
