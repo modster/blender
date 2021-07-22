@@ -229,8 +229,10 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
   return fds;
 }
 
-/* Create a mapping from each vertex in the resulting spline to that of the source spline.
-Used for copying the data from the source spline.*/
+/*
+ * Create a mapping from each vertex in the resulting spline to that of the source spline.
+ * Used for copying the data from the source spline.
+ */
 static Array<int> create_dst_to_src_map(const Array<int> point_counts, const int total_points)
 {
   Array<int> map(total_points);
@@ -431,8 +433,9 @@ static void update_poly_positions(Array<FilletData> &fds,
   }
 }
 
-/* Function to fillet either Bezier splines or Poly splines.
-Added under the same function because the only difference is that Bezier curves have handle data.
+/*
+ * Function to fillet either Bezier splines or Poly splines. Added under the same function because
+ * the only difference is that Bezier curves have handle data.
  */
 static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletModeParam &mode_param)
 {
