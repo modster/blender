@@ -379,8 +379,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
           this->edge_set_size(edge);
         }
 
-        /* TODO(ish): Need to flip edges of those faces that have been
-         * affected by the split edge operation. */
+        /* Flip edges of those faces that were created during the
+         * split edge operation */
+        this->flip_edges(mesh_diff.get_added_faces());
       }
 
       splittable_edges_set = this->get_splittable_edge_indices_set();
