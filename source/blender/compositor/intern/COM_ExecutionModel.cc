@@ -20,9 +20,7 @@
 
 namespace blender::compositor {
 
-ExecutionModel::ExecutionModel(eExecutionModel model,
-                               CompositorContext &context,
-                               Vector<NodeOperation *> &operations)
+ExecutionModel::ExecutionModel(CompositorContext &context, Span<NodeOperation *> operations)
     : context_(context), operations_(operations)
 {
   const bNodeTree *node_tree = context_.getbNodeTree();
@@ -39,10 +37,6 @@ ExecutionModel::ExecutionModel(eExecutionModel model,
   border_.use_render_border = context.isRendering() && (rd->mode & R_BORDER) &&
                               !(rd->mode & R_CROP);
   border_.render_border = &rd->border;
-
-  for (NodeOperation *op : operations) {
-    op->set_execution_model(model);
-  }
 }
 
 }  // namespace blender::compositor

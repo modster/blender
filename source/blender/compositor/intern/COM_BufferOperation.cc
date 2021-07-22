@@ -20,7 +20,7 @@
 
 namespace blender::compositor {
 
-BufferOperation::BufferOperation(MemoryBuffer *buffer, DataType data_type) : ConstantOperation()
+BufferOperation::BufferOperation(MemoryBuffer *buffer, DataType data_type)
 {
   buffer_ = buffer;
   inflated_buffer_ = nullptr;

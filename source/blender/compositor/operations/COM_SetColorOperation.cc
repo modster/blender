@@ -35,16 +35,6 @@ void SetColorOperation::executePixelSampled(float output[4],
   copy_v4_v4(output, this->m_color);
 }
 
-void SetColorOperation::update_memory_buffer(MemoryBuffer *output,
-                                             const rcti &output_rect,
-                                             Span<MemoryBuffer *> inputs,
-                                             ExecutionSystem &exec_system)
-{
-  BLI_assert(output->is_a_single_elem());
-  float *out_elem = output->get_elem(output_rect.xmin, output_rect.ymin);
-  copy_v4_v4(out_elem, m_color);
-}
-
 void SetColorOperation::determineResolution(unsigned int resolution[2],
                                             unsigned int preferredResolution[2])
 {

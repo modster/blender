@@ -20,9 +20,6 @@
 
 #include "COM_ExecutionModel.h"
 
-#include "BLI_map.hh"
-#include "BLI_set.hh"
-
 #ifdef WITH_CXX_GUARDEDALLOC
 #  include "MEM_guardedalloc.h"
 #endif

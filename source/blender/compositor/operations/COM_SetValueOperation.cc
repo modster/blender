@@ -35,16 +35,6 @@ void SetValueOperation::executePixelSampled(float output[4],
   output[0] = this->m_value;
 }
 
-void SetValueOperation::update_memory_buffer(MemoryBuffer *output,
-                                             const rcti &output_rect,
-                                             Span<MemoryBuffer *> inputs,
-                                             ExecutionSystem &exec_system)
-{
-  BLI_assert(output->is_a_single_elem());
-  float &out = output->get_value(output_rect.xmin, output_rect.ymin, 0);
-  out = m_value;
-}
-
 void SetValueOperation::determineResolution(unsigned int resolution[2],
                                             unsigned int preferredResolution[2])
 {

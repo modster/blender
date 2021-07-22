@@ -56,12 +56,10 @@ class ExecutionModel {
   /**
    * All operations being executed.
    */
-  Vector<NodeOperation *> &operations_;
+  Span<NodeOperation *> operations_;
 
  public:
-  ExecutionModel(eExecutionModel model,
-                 CompositorContext &context,
-                 Vector<NodeOperation *> &operations);
+  ExecutionModel(CompositorContext &context, Span<NodeOperation *> operations);
 
   virtual ~ExecutionModel()
   {

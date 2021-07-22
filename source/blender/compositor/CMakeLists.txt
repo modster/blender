@@ -458,8 +458,6 @@ set(SRC
   operations/COM_MixOperation.h
   operations/COM_ReadBufferOperation.cc
   operations/COM_ReadBufferOperation.h
-  operations/COM_ConstantOperation.cc
-  operations/COM_ConstantOperation.h
   operations/COM_SetColorOperation.cc
   operations/COM_SetColorOperation.h
   operations/COM_SetValueOperation.cc

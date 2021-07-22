@@ -131,13 +131,6 @@ class MemoryBuffer {
   MemoryBuffer(float *buffer, int num_channels, const rcti &rect, bool is_a_single_elem = false);
 
   /**
-   * Construct MemoryBuffer from an existent float buffer. MemoryBuffer is not responsible for
-   * freeing given buffer.
-   */
-  MemoryBuffer(
-      float *buffer, int num_channels, int width, int height, bool is_a_single_elem = false);
-
-  /**
    * Copy constructor
    */
   MemoryBuffer(const MemoryBuffer &src);

@@ -17,7 +17,6 @@
  */
 
 #include "COM_MultilayerImageOperation.h"
-#include "COM_buffer_util.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"

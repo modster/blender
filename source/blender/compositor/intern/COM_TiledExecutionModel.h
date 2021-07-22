@@ -38,7 +38,7 @@ class TiledExecutionModel : public ExecutionModel {
 
  public:
   TiledExecutionModel(CompositorContext &context,
-                      Vector<NodeOperation *> &operations,
+                      Span<NodeOperation *> operations,
                       Span<ExecutionGroup *> groups);
 
   void execute(ExecutionSystem &exec_system) override;

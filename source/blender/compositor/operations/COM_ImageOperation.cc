@@ -17,7 +17,6 @@
  */
 
 #include "COM_ImageOperation.h"
-#include "COM_buffer_util.h"
 
 #include "BKE_image.h"
 #include "BKE_scene.h"

@@ -17,15 +17,11 @@
  */
 
 #include "COM_FullFrameExecutionModel.h"
-#include "COM_ConstantFolder.h"
 #include "COM_Debug.h"
 #include "COM_ExecutionGroup.h"
 #include "COM_ReadBufferOperation.h"
 #include "COM_ViewerOperation.h"
 #include "COM_WorkScheduler.h"
-
-#include "BLI_map.hh"
-#include "BLI_set.hh"
 
 #include "BLT_translation.h"
 
@@ -37,8 +33,8 @@ namespace blender::compositor {
 
 FullFrameExecutionModel::FullFrameExecutionModel(CompositorContext &context,
                                                  SharedOperationBuffers &shared_buffers,
-                                                 Vector<NodeOperation *> &operations)
-    : ExecutionModel(eExecutionModel::FullFrame, context, operations),
+                                                 Span<NodeOperation *> operations)
+    : ExecutionModel(context, operations),
       active_buffers_(shared_buffers),
       num_operations_finished_(0)
 {
@@ -91,6 +87,9 @@ Vector<MemoryBuffer *> FullFrameExecutionModel::get_input_buffers(NodeOperation 
 
 MemoryBuffer *FullFrameExecutionModel::create_operation_buffer(NodeOperation *op)
 {
+  rcti op_rect;
+  BLI_rcti_init(&op_rect, 0, op->getWidth(), 0, op->getHeight());
+
   const DataType data_type = op->getOutputSocket(0)->getDataType();
   const bool is_a_single_elem = op->get_flags().is_constant_operation;
   return new MemoryBuffer(data_type, op_rect, is_a_single_elem);

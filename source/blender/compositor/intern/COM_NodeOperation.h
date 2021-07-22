@@ -192,8 +192,8 @@ struct NodeOperationFlags {
   bool open_cl : 1;
 
   /**
-   * TODO: Remove this flag and SingleThreadedOperation if tiled implemention is removed.
-   * Full-frame implemention doesn't need it.
+   * TODO: Remove this flag and #SingleThreadedOperation if tiled implementation is removed.
+   * Full-frame implementation doesn't need it.
    */
   bool single_threaded : 1;
 
@@ -310,8 +310,6 @@ class NodeOperation {
   const bNodeTree *m_btree;
 
  protected:
-  eExecutionModel execution_model_;
-
   /**
    * Compositor execution model.
    */
@@ -326,16 +324,6 @@ class NodeOperation {
    * Height of the output of this operation.
    */
   unsigned int m_height;
-
-  /**
-   * Operation canvas x coordinate within whole compositing canvas.
-   */
-  int offset_x_;
-
-  /**
-   * Operation canvas y coordinate within whole compositing canvas.
-   */
-  int offset_y_;
 
   /**
    * Flags how to evaluate this operation.
@@ -378,19 +366,6 @@ class NodeOperation {
   {
     return flags;
   }
-
-  eExecutionModel get_execution_model() const
-  {
-    return execution_model_;
-  }
-
-  void set_execution_model(eExecutionModel model)
-  {
-    execution_model_ = model;
-  }
-
-  rcti get_canvas_area() const;
-  void set_canvas_area(const rcti &rect);
 
   unsigned int getNumberOfInputSockets() const
   {
