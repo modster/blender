@@ -74,10 +74,8 @@ class GHOST_XrSession {
                              const GHOST_XrActionProfileInfo *infos);
   bool attachActionSets();
 
-  /**
-   * Action functions to be called post-session start.
-   * \param action_set_name: When `nullptr`, all attached action sets will be synced.
-   */
+  /** Action functions to be called post-session start. */
+  /** param action_set_name : When `nullptr`, all attached action sets will be synced. */
   bool syncActions(const char *action_set_name = nullptr);
   bool applyHapticAction(const char *action_set_name,
                          const char *action_name,
@@ -94,6 +92,11 @@ class GHOST_XrSession {
   void *getActionCustomdata(const char *action_set_name, const char *action_name);
   uint32_t getActionCount(const char *action_set_name);
   void getActionCustomdatas(const char *action_set_name, void **r_customdatas);
+
+  /** Controller model functions. */
+  bool loadControllerModel(const char *subaction_path);
+  void unloadControllerModel(const char *subaction_path);
+  bool getControllerModelData(const char *subaction_path, GHOST_XrControllerModelData &r_data);
 
  private:
   /** Pointer back to context managing this session. Would be nice to avoid, but needed to access

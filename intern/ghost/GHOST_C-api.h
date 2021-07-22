@@ -1155,6 +1155,24 @@ void GHOST_XrGetActionCustomdatas(GHOST_XrContextHandle xr_context,
                                   const char *action_set_name,
                                   void **r_customdatas);
 
+/* controller model */
+/**
+ * Load the OpenXR controller model.
+ */
+int GHOST_XrLoadControllerModel(GHOST_XrContextHandle xr_context, const char *subaction_path);
+
+/**
+ * Unload the OpenXR controller model.
+ */
+void GHOST_XrUnloadControllerModel(GHOST_XrContextHandle xr_context, const char *subaction_path);
+
+/**
+ * Get vertex data for the OpenXR controller model.
+ */
+int GHOST_XrGetControllerModelData(GHOST_XrContextHandle xr_context,
+                                   const char *subaction_path,
+                                   GHOST_XrControllerModelData *r_data);
+
 #endif /* WITH_XR_OPENXR */
 
 #ifdef __cplusplus

@@ -1871,8 +1871,18 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   };
 
   static const EnumPropertyItem controller_draw_styles[] = {
-      {XR_CONTROLLER_DRAW_AXES, "AXES", 0, "Axes", "Draw controller's local axes"},
-      {XR_CONTROLLER_DRAW_RAY, "RAY", 0, "Ray", "Draw a ray along controller's -Z axis"},
+      {XR_CONTROLLER_DRAW_DARK, "DARK", 0, "Dark", "Draw dark controller"},
+      {XR_CONTROLLER_DRAW_LIGHT, "LIGHT", 0, "Light", "Draw light controller"},
+      {XR_CONTROLLER_DRAW_DARK_RAY,
+       "DARK_RAY",
+       0,
+       "Dark + Ray",
+       "Draw dark controller with aiming axis ray"},
+      {XR_CONTROLLER_DRAW_LIGHT_RAY,
+       "LIGHT_RAY",
+       0,
+       "Light + Ray",
+       "Draw light controller with aiming axis ray"},
       {0, NULL, 0, NULL, NULL},
   };
 

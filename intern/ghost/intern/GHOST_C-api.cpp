@@ -1087,4 +1087,30 @@ void GHOST_XrGetActionCustomdatas(GHOST_XrContextHandle xr_contexthandle,
   GHOST_XR_CAPI_CALL(xr_session->getActionCustomdatas(action_set_name, r_customdatas), xr_context);
 }
 
+int GHOST_XrLoadControllerModel(GHOST_XrContextHandle xr_contexthandle, const char *subaction_path)
+{
+  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
+  GHOST_XrSession *xr_session = xr_context->getSession();
+  GHOST_XR_CAPI_CALL_RET(xr_session->loadControllerModel(subaction_path), xr_context);
+  return 0;
+}
+
+void GHOST_XrUnloadControllerModel(GHOST_XrContextHandle xr_contexthandle,
+                                   const char *subaction_path)
+{
+  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
+  GHOST_XrSession *xr_session = xr_context->getSession();
+  GHOST_XR_CAPI_CALL(xr_session->unloadControllerModel(subaction_path), xr_context);
+}
+
+int GHOST_XrGetControllerModelData(GHOST_XrContextHandle xr_contexthandle,
+                                   const char *subaction_path,
+                                   GHOST_XrControllerModelData *r_data)
+{
+  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
+  GHOST_XrSession *xr_session = xr_context->getSession();
+  GHOST_XR_CAPI_CALL_RET(xr_session->getControllerModelData(subaction_path, *r_data), xr_context);
+  return 0;
+}
+
 #endif /* WITH_XR_OPENXR */

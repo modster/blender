@@ -26,6 +26,7 @@
 
 #include "wm_xr.h"
 
+struct GPUBatch;
 struct wmXrActionSet;
 
 typedef struct wmXrEyeData {
@@ -42,6 +43,7 @@ typedef struct wmXrControllerData {
   /input/trigger/value, interaction_path = /user/hand/left/input/trigger/value).
   */
   char subaction_path[64];
+
   /* Pose (in world space) that represents the user's hand when holding the controller.*/
   GHOST_XrPose grip_pose;
   float grip_mat[4][4];
@@ -50,6 +52,9 @@ typedef struct wmXrControllerData {
   GHOST_XrPose aim_pose;
   float aim_mat[4][4];
   float aim_mat_base[4][4];
+
+  /** Controller model. */
+  struct GPUBatch *model;
 } wmXrControllerData;
 
 typedef struct wmXrSessionState {

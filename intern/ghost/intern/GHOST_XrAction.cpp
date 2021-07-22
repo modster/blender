@@ -22,7 +22,6 @@
 #include <cstring>
 
 #include "GHOST_Types.h"
-
 #include "GHOST_XrException.h"
 #include "GHOST_Xr_intern.h"
 

@@ -87,8 +87,10 @@ typedef enum eXrSessionBasePoseType {
 } eXrSessionBasePoseType;
 
 typedef enum eXrSessionControllerDrawStyle {
-  XR_CONTROLLER_DRAW_AXES = 0,
-  XR_CONTROLLER_DRAW_RAY = 1,
+  XR_CONTROLLER_DRAW_DARK = 0,
+  XR_CONTROLLER_DRAW_LIGHT = 1,
+  XR_CONTROLLER_DRAW_DARK_RAY = 2,
+  XR_CONTROLLER_DRAW_LIGHT_RAY = 3,
 } eXrSessionControllerDrawStyle;
 
 typedef enum eXrSessionEye {

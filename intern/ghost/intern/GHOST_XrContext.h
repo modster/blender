@@ -93,6 +93,7 @@ class GHOST_XrContext : public GHOST_IXrContext {
   XrInstance getInstance() const;
   bool isDebugMode() const;
   bool isDebugTimeMode() const;
+  bool isControllerModelExtensionEnabled() const;
 
  private:
   static GHOST_XrErrorHandlerFn s_error_handler;

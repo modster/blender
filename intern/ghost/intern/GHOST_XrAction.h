@@ -18,14 +18,15 @@
  * \ingroup GHOST
  */
 
-/* Note: Requires OpenXR headers to be included before this one for OpenXR types (XrSpace, XrPath,
- * etc). */
+/* Note: Requires OpenXR headers to be included before this one for OpenXR types (XrInstance,
+ * XrSession, etc.). */
 
 #pragma once
 
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "GHOST_Util.h"
 

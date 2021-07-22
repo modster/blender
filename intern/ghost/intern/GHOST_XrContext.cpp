@@ -421,6 +421,11 @@ void GHOST_XrContext::getExtensionsToEnable(
   try_ext.push_back(XR_HUAWEI_CONTROLLER_INTERACTION_EXTENSION_NAME);
 #endif
 
+  /* Try enabling controller model extension. */
+#ifdef XR_MSFT_controller_model
+  try_ext.push_back(XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME);
+#endif
+
   r_ext_names.reserve(try_ext.size() + graphics_binding_types.size());
 
   /* Add graphics binding extensions (may be multiple ones, we'll settle for one to use later, once
@@ -617,6 +622,18 @@ bool GHOST_XrContext::isDebugMode() const
 bool GHOST_XrContext::isDebugTimeMode() const
 {
   return m_debug_time;
+}
+
+bool GHOST_XrContext::isControllerModelExtensionEnabled() const
+{
+#ifdef XR_MSFT_controller_model
+  for (const char *ext_name : m_enabled_extensions) {
+    if (std::strcmp(ext_name, XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME) == 0) {
+      return true;
+    }
+  }
+#endif
+  return false;
 }
 
 /** \} */ /* Ghost Internal Accessors and Mutators */
