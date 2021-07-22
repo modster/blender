@@ -2299,6 +2299,35 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return this->get_checked_vert(vert_3_index);
   }
 
+  /**
+   * Get the edge indices of the `Face`
+   */
+  blender::Vector<EdgeIndex> get_edge_indices_of_face(const Face<EFD> &face) const
+  {
+    blender::Vector<EdgeIndex> edge_indices;
+    auto vert_1_index = face.verts[0];
+    auto vert_2_index = face.verts[0];
+    for (auto i = 1; i <= face.verts.size(); i++) {
+      vert_1_index = vert_2_index;
+      if (i == face.verts.size()) {
+        vert_2_index = face.verts[0];
+      }
+      else {
+        vert_2_index = face.verts[i];
+      }
+
+      auto op_edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index);
+      BLI_assert(op_edge_index);
+      auto edge_index = op_edge_index.value();
+
+      edge_indices.append(std::move(edge_index));
+    }
+
+    BLI_assert(edge_indices.size() == face.verts.size());
+
+    return edge_indices;
+  }
+
  private:
   /* all private static methods */
   /* all private non-static methods */
@@ -2614,35 +2643,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     }
 
     return true;
-  }
-
-  /**
-   * Get the edge indices of the `Face`
-   */
-  blender::Vector<EdgeIndex> get_edge_indices_of_face(const Face<EFD> &face) const
-  {
-    blender::Vector<EdgeIndex> edge_indices;
-    auto vert_1_index = face.verts[0];
-    auto vert_2_index = face.verts[0];
-    for (auto i = 1; i <= face.verts.size(); i++) {
-      vert_1_index = vert_2_index;
-      if (i == face.verts.size()) {
-        vert_2_index = face.verts[0];
-      }
-      else {
-        vert_2_index = face.verts[i];
-      }
-
-      auto op_edge_index = this->get_connecting_edge_index(vert_1_index, vert_2_index);
-      BLI_assert(op_edge_index);
-      auto edge_index = op_edge_index.value();
-
-      edge_indices.append(std::move(edge_index));
-    }
-
-    BLI_assert(edge_indices.size() == face.verts.size());
-
-    return edge_indices;
   }
 
   /**
