@@ -628,7 +628,7 @@ bool GHOST_XrContext::isControllerModelExtensionEnabled() const
 {
 #ifdef XR_MSFT_controller_model
   for (const char *ext_name : m_enabled_extensions) {
-    if (std::strcmp(ext_name, XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME) == 0) {
+    if (strcmp(ext_name, XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME) == 0) {
       return true;
     }
   }

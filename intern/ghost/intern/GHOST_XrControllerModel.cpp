@@ -20,17 +20,18 @@
 
 #include <cassert>
 
+#include <Eigen/Core>
+
 #include "GHOST_Types.h"
 #include "GHOST_XrException.h"
 #include "GHOST_Xr_intern.h"
 
 #include "GHOST_XrControllerModel.h"
 
-#include <Eigen/Core>
-
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBIWDEF static inline
 #include "tiny_gltf.h"
 
 using Eigen::Matrix4f; /* For matrix multiplication. */
@@ -49,11 +50,11 @@ struct GHOST_XrPrimitive {
 
 /* Validate that an accessor does not go out of bounds of the buffer view that it references and
    that the buffer view does not exceed the bounds of the buffer that it references. */
-void validate_accessor(const tinygltf::Accessor &accessor,
-                       const tinygltf::BufferView &buffer_view,
-                       const tinygltf::Buffer &buffer,
-                       size_t byte_stride,
-                       size_t element_size)
+static void validate_accessor(const tinygltf::Accessor &accessor,
+                              const tinygltf::BufferView &buffer_view,
+                              const tinygltf::Buffer &buffer,
+                              size_t byte_stride,
+                              size_t element_size)
 {
   /* Make sure the accessor does not go out of range of the buffer view. */
   if (accessor.byteOffset + (accessor.count - 1) * byte_stride + element_size >
@@ -133,10 +134,10 @@ static void load_attribute_accessor(const tinygltf::Model &gltf_model,
    16bit or 32bit integers. This will coalesce indices from the source type(s) into a 32bit
    integer. */
 template<typename TSrcIndex>
-void read_indices(const tinygltf::Accessor &accessor,
-                  const tinygltf::BufferView &buffer_view,
-                  const tinygltf::Buffer &buffer,
-                  GHOST_XrPrimitive &primitive)
+static void read_indices(const tinygltf::Accessor &accessor,
+                         const tinygltf::BufferView &buffer_view,
+                         const tinygltf::Buffer &buffer,
+                         GHOST_XrPrimitive &primitive)
 {
   if (buffer_view.target != TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER &&
       buffer_view.target != 0) { /* Allow 0 (not specified) even though spec doesn't seem to allow
@@ -264,7 +265,7 @@ static void load_node(tinygltf::Model gltf_model,
     const tinygltf::Mesh &gltf_mesh = gltf_model.meshes.at(gltf_node.mesh);
 
     GHOST_XrControllerModelComponent &component = components.emplace_back();
-    std::memcpy(component.transform, transform, sizeof(component.transform));
+    memcpy(component.transform, transform, sizeof(component.transform));
     component.vertex_offset = vertices.size();
     component.index_offset = indices.size();
 

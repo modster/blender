@@ -421,6 +421,7 @@ static void stbiw__write_pixel(stbi__write_context *s, int rgb_dir, int comp, in
             stbiw__write3(s, px[1 - rgb_dir], px[1], px[1 + rgb_dir]);
             break;
          }
+         [[fallthrough]];
          /* FALLTHROUGH */
       case 3:
          stbiw__write3(s, d[1 - rgb_dir], d[1], d[1 + rgb_dir]);
@@ -649,7 +650,7 @@ static void stbiw__write_hdr_scanline(stbi__write_context *s, int width, int nco
    if (width < 8 || width >= 32768) {
       for (x=0; x < width; x++) {
          switch (ncomp) {
-            case 4: /* fallthrough */
+            case 4: [[fallthrough]]; /* fallthrough */
             case 3: linear[2] = scanline[x*ncomp + 2];
                     linear[1] = scanline[x*ncomp + 1];
                     linear[0] = scanline[x*ncomp + 0];
@@ -666,7 +667,7 @@ static void stbiw__write_hdr_scanline(stbi__write_context *s, int width, int nco
       /* encode into scratch buffer */
       for (x=0; x < width; x++) {
          switch(ncomp) {
-            case 4: /* fallthrough */
+            case 4: [[fallthrough]]; /* fallthrough */
             case 3: linear[2] = scanline[x*ncomp + 2];
                     linear[1] = scanline[x*ncomp + 1];
                     linear[0] = scanline[x*ncomp + 0];
