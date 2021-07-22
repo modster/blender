@@ -31,11 +31,16 @@
 #include "DNA_collection_types.h"
 #include "DNA_genfile.h"
 #include "DNA_listBase.h"
+#include "DNA_material_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
+#include "DNA_workspace_types.h"
 
+#include "BKE_action.h"
 #include "BKE_animsys.h"
+#include "BKE_asset.h"
 #include "BKE_collection.h"
+#include "BKE_deform.h"
 #include "BKE_fcurve_driver.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -89,6 +94,25 @@ static void assert_sorted_ids(Main *bmain)
 #endif
 }
 
+static void move_vertex_group_names_to_object_data(Main *bmain)
+{
+  LISTBASE_FOREACH (Object *, object, &bmain->objects) {
+    if (ELEM(object->type, OB_MESH, OB_LATTICE, OB_GPENCIL)) {
+      ListBase *new_defbase = BKE_object_defgroup_list_mutable(object);
+
+      /* Choose the longest vertex group name list among all linked duplicates. */
+      if (BLI_listbase_count(&object->defbase) < BLI_listbase_count(new_defbase)) {
+        BLI_freelistN(&object->defbase);
+      }
+      else {
+        /* Clear the list in case the it was already assigned from another object. */
+        BLI_freelistN(new_defbase);
+        *new_defbase = object->defbase;
+      }
+    }
+  }
+}
+
 void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
 {
   if (MAIN_VERSION_ATLEAST(bmain, 300, 0) && !MAIN_VERSION_ATLEAST(bmain, 300, 1)) {
@@ -131,6 +155,10 @@ void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
 
   if (MAIN_VERSION_ATLEAST(bmain, 300, 3)) {
     assert_sorted_ids(bmain);
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 11)) {
+    move_vertex_group_names_to_object_data(bmain);
   }
 
   /**
@@ -486,6 +514,41 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
                     sizeof(scene->master_collection->id.name) - 2);
       }
     }
+    LISTBASE_FOREACH (Material *, mat, &bmain->materials) {
+      if (!(mat->lineart.flags & LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) {
+        mat->lineart.mat_occlusion = 1;
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 9)) {
+    /* Fix a bug where reordering FCurves and bActionGroups could cause some corruption. Just
+     * reconstruct all the action groups & ensure that the FCurves of a group are continuously
+     * stored (i.e. not mixed with other groups) to be sure. See T89435. */
+    LISTBASE_FOREACH (bAction *, act, &bmain->actions) {
+      BKE_action_groups_reconstruct(act);
+    }
+
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (node->type == GEO_NODE_MESH_SUBDIVIDE) {
+            strcpy(node->idname, "GeometryNodeMeshSubdivide");
+          }
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 10)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *tool_settings = scene->toolsettings;
+      if (tool_settings->snap_uv_mode & (1 << 4)) {
+        tool_settings->snap_uv_mode |= (1 << 6); /* SCE_SNAP_MODE_INCREMENT */
+        tool_settings->snap_uv_mode &= ~(1 << 4);
+      }
+    }
   }
 
   /**
@@ -500,15 +563,47 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
   {
     /* Keep this block, even when empty. */
 
-    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
-      if (ntree->type == NTREE_GEOMETRY) {
-        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-          if (node->type == GEO_NODE_MESH_SUBDIVIDE) {
-            strcpy(node->idname, "GeometryNodeMeshSubdivide");
+    /* Convert Surface Deform to sparse-capable bind structure. */
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "SurfaceDeformModifierData", "int", "num_mesh_verts")) {
+      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+        LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
+          if (md->type == eModifierType_SurfaceDeform) {
+            SurfaceDeformModifierData *smd = (SurfaceDeformModifierData *)md;
+            if (smd->num_bind_verts && smd->verts) {
+              smd->num_mesh_verts = smd->num_bind_verts;
+
+              for (unsigned int i = 0; i < smd->num_bind_verts; i++) {
+                smd->verts[i].vertex_idx = i;
+              }
+            }
           }
         }
       }
     }
-    FOREACH_NODETREE_END;
+
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "WorkSpace", "AssetLibraryReference", "asset_library")) {
+      LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
+        BKE_asset_library_reference_init_default(&workspace->asset_library);
+      }
+    }
+
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "FileAssetSelectParams", "AssetLibraryReference", "asset_library")) {
+      LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+            if (space->spacetype == SPACE_FILE) {
+              SpaceFile *sfile = (SpaceFile *)space;
+              if (sfile->browse_mode != FILE_BROWSE_MODE_ASSETS) {
+                continue;
+              }
+              BKE_asset_library_reference_init_default(&sfile->asset_params->asset_library);
+            }
+          }
+        }
+      }
+    }
   }
 }

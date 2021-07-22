@@ -2366,16 +2366,10 @@ static StructRNA *rna_FunctionNode_register(Main *bmain,
   return nt->rna_ext.srna;
 }
 
-static IDProperty *rna_Node_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_Node_idprops(PointerRNA *ptr)
 {
   bNode *node = ptr->data;
-
-  if (create && !node->prop) {
-    IDPropertyTemplate val = {0};
-    node->prop = IDP_New(IDP_GROUP, &val, "RNA_Node ID properties");
-  }
-
-  return node->prop;
+  return &node->prop;
 }
 
 static void rna_Node_parent_set(PointerRNA *ptr,
@@ -2834,16 +2828,10 @@ static char *rna_NodeSocket_path(PointerRNA *ptr)
   }
 }
 
-static IDProperty *rna_NodeSocket_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_NodeSocket_idprops(PointerRNA *ptr)
 {
   bNodeSocket *sock = ptr->data;
-
-  if (create && !sock->prop) {
-    IDPropertyTemplate val = {0};
-    sock->prop = IDP_New(IDP_GROUP, &val, "RNA_NodeSocket ID properties");
-  }
-
-  return sock->prop;
+  return &sock->prop;
 }
 
 static PointerRNA rna_NodeSocket_node_get(PointerRNA *ptr)
@@ -3150,16 +3138,10 @@ static char *rna_NodeSocketInterface_path(PointerRNA *ptr)
   return NULL;
 }
 
-static IDProperty *rna_NodeSocketInterface_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_NodeSocketInterface_idprops(PointerRNA *ptr)
 {
   bNodeSocket *sock = ptr->data;
-
-  if (create && !sock->prop) {
-    IDPropertyTemplate val = {0};
-    sock->prop = IDP_New(IDP_GROUP, &val, "RNA_NodeSocketInterface ID properties");
-  }
-
-  return sock->prop;
+  return &sock->prop;
 }
 
 static void rna_NodeSocketInterface_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
@@ -3205,7 +3187,7 @@ static void rna_NodeSocketInterfaceStandard_draw(ID *id,
                                                  struct uiLayout *layout)
 {
   PointerRNA ptr;
-  RNA_pointer_create(id, &RNA_NodeSocket, sock, &ptr);
+  RNA_pointer_create(id, &RNA_NodeSocketInterface, sock, &ptr);
   sock->typeinfo->interface_draw(C, layout, &ptr);
 }
 
@@ -3215,7 +3197,7 @@ static void rna_NodeSocketInterfaceStandard_draw_color(ID *id,
                                                        float r_color[4])
 {
   PointerRNA ptr;
-  RNA_pointer_create(id, &RNA_NodeSocket, sock, &ptr);
+  RNA_pointer_create(id, &RNA_NodeSocketInterface, sock, &ptr);
   sock->typeinfo->interface_draw_color(C, &ptr, r_color);
 }
 
@@ -4406,7 +4388,7 @@ static int point_density_particle_color_source_from_shader(
     case SHD_POINTDENSITY_COLOR_PARTVEL:
       return TEX_PD_COLOR_PARTVEL;
     default:
-      BLI_assert(!"Unknown color source");
+      BLI_assert_msg(0, "Unknown color source");
       return TEX_PD_COLOR_CONSTANT;
   }
 }
@@ -4422,7 +4404,7 @@ static int point_density_vertex_color_source_from_shader(
     case SHD_POINTDENSITY_COLOR_VERTNOR:
       return TEX_PD_COLOR_VERTNOR;
     default:
-      BLI_assert(!"Unknown color source");
+      BLI_assert_msg(0, "Unknown color source");
       return TEX_PD_COLOR_CONSTANT;
   }
 }
@@ -6640,10 +6622,9 @@ static void def_cmp_image(StructRNA *srna)
                            "Put node output buffer to straight alpha instead of premultiplied");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
-  /* NB: image user properties used in the UI are redefined in def_node_image_user,
+  /* NOTE: Image user properties used in the UI are redefined in def_node_image_user,
    * to trigger correct updates of the node editor. RNA design problem that prevents
-   * updates from nested structs ...
-   */
+   * updates from nested structs. */
   RNA_def_struct_sdna_from(srna, "ImageUser", "storage");
   def_node_image_user(srna);
 }
@@ -6740,9 +6721,8 @@ static void rna_def_cmp_output_file_slots_api(BlenderRNA *brna,
   parm = RNA_def_pointer(func, "socket", "NodeSocket", "", "New socket");
   RNA_def_function_return(func, parm);
 
-  /* NB: methods below can use the standard node socket API functions,
-   * included here for completeness.
-   */
+  /* NOTE: methods below can use the standard node socket API functions,
+   * included here for completeness. */
 
   func = RNA_def_function(srna, "remove", "rna_Node_socket_remove");
   RNA_def_function_ui_description(func, "Remove a file slot from this node");
@@ -9947,6 +9927,45 @@ static void def_geo_switch(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_curve_primitive_quadrilateral(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE,
+       "RECTANGLE",
+       0,
+       "Rectangle",
+       "Create a rectangle"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM,
+       "PARALLELOGRAM",
+       0,
+       "Parallelogram",
+       "Create a parallelogram"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID,
+       "TRAPEZOID",
+       0,
+       "Trapezoid",
+       "Create a trapezoid"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_KITE, "KITE", 0, "Kite", "Create a Kite / Dart"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS,
+       "POINTS",
+       0,
+       "Points",
+       "Create a quadrilateral from four points"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurvePrimitiveQuad", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "mode");
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_enum_default(prop, GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE);
+  RNA_def_property_ui_text(prop, "Mode", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_curve_resample(StructRNA *srna)
 {
   PropertyRNA *prop;
@@ -10015,6 +10034,32 @@ static void def_geo_curve_to_points(StructRNA *srna)
   prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, mode_items);
   RNA_def_property_ui_text(prop, "Mode", "How to generate points from the input curve");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_curve_trim(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_INTERPOLATE_FACTOR,
+       "FACTOR",
+       0,
+       "Factor",
+       "Find the endpoint positions using a factor of each spline's length"},
+      {GEO_NODE_CURVE_INTERPOLATE_LENGTH,
+       "LENGTH",
+       0,
+       "Length",
+       "Find the endpoint positions using a length from the start of each spline"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveTrim", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "How to find endpoint positions for the trimmed spline");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
@@ -10254,11 +10299,11 @@ static void rna_def_node_socket(BlenderRNA *brna)
   RNA_def_property_override_flag(prop, PROPOVERRIDE_NO_COMPARISON);
   RNA_def_property_ui_text(prop, "Node", "Node owning this socket");
 
-  /* NB: the type property is used by standard sockets.
+  /* NOTE: The type property is used by standard sockets.
    * Ideally should be defined only for the registered subclass,
    * but to use the existing DNA is added in the base type here.
-   * Future socket types can ignore or override this if needed.
-   */
+   * Future socket types can ignore or override this if needed. */
+
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "type");
   RNA_def_property_enum_items(prop, node_socket_type_items);

@@ -151,7 +151,7 @@ class TriMeshTopology : NonCopyable {
    * Else return NO_INDEX. */
   int other_tri_if_manifold(Edge e, int t) const
   {
-    auto p = edge_tri_.lookup_ptr(e);
+    const auto *p = edge_tri_.lookup_ptr(e);
     if (p != nullptr && (*p)->size() == 2) {
       return ((**p)[0] == t) ? (**p)[1] : (**p)[0];
     }
@@ -204,7 +204,7 @@ TriMeshTopology::TriMeshTopology(const IMesh &tm)
       }
       edges->append_non_duplicates(e);
 
-      auto p = edge_tri_.lookup_ptr(Edge(v, vnext));
+      auto *p = edge_tri_.lookup_ptr(Edge(v, vnext));
       if (p == nullptr) {
         edge_tri_.add_new(e, new Vector<int>{t});
       }
@@ -238,7 +238,7 @@ TriMeshTopology::~TriMeshTopology()
   Vector<Vector<int> *> values;
 
   /* Deconstructing is faster in parallel, so it is worth building an array of things to delete. */
-  for (auto item : edge_tri_.values()) {
+  for (auto *item : edge_tri_.values()) {
     values.append(item);
   }
 
@@ -1460,11 +1460,6 @@ static int find_cell_for_point_near_edge(mpq3 p,
   return c;
 }
 
-static const Vert *max_x_vert(const Vert *a, const Vert *b)
-{
-  return (a->co_exact.x > b->co_exact.x) ? a : b;
-}
-
 /**
  * Find the ambient cell -- that is, the cell that is outside
  * all other cells.
@@ -1492,7 +1487,9 @@ static int find_ambient_cell(const IMesh &tm,
   /* First find a vertex with the maximum x value. */
   /* Prefer not to populate the verts in the #IMesh just for this. */
   const Vert *v_extreme;
-
+  auto max_x_vert = [](const Vert *a, const Vert *b) {
+    return (a->co_exact.x > b->co_exact.x) ? a : b;
+  };
   if (component_patches == nullptr) {
     v_extreme = threading::parallel_reduce(
         tm.face_index_range(),

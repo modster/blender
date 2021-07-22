@@ -570,14 +570,9 @@ static StructRNA *rna_OperatorProperties_refine(PointerRNA *ptr)
   }
 }
 
-static IDProperty *rna_OperatorProperties_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_OperatorProperties_idprops(PointerRNA *ptr)
 {
-  if (create && !ptr->data) {
-    IDPropertyTemplate val = {0};
-    ptr->data = IDP_New(IDP_GROUP, &val, "RNA_OperatorProperties group");
-  }
-
-  return ptr->data;
+  return (IDProperty **)&ptr->data;
 }
 
 static void rna_Operator_name_get(PointerRNA *ptr, char *value)
@@ -1354,13 +1349,9 @@ static PointerRNA rna_wmKeyConfig_preferences_get(PointerRNA *ptr)
   }
 }
 
-static IDProperty *rna_wmKeyConfigPref_idprops(PointerRNA *ptr, bool create)
+static IDProperty **rna_wmKeyConfigPref_idprops(PointerRNA *ptr)
 {
-  if (create && !ptr->data) {
-    IDPropertyTemplate val = {0};
-    ptr->data = IDP_New(IDP_GROUP, &val, "RNA_KeyConfigPreferences group");
-  }
-  return ptr->data;
+  return (IDProperty **)&ptr->data;
 }
 
 static void rna_wmKeyConfigPref_unregister(Main *UNUSED(bmain), StructRNA *type)
@@ -2008,7 +1999,7 @@ static void rna_Operator_bl_idname_set(PointerRNA *ptr, const char *value)
     BLI_strncpy(str, value, OP_MAX_TYPENAME); /* utf8 already ensured */
   }
   else {
-    BLI_assert(!"setting the bl_idname on a non-builtin operator");
+    BLI_assert_msg(0, "setting the bl_idname on a non-builtin operator");
   }
 }
 
@@ -2020,7 +2011,7 @@ static void rna_Operator_bl_label_set(PointerRNA *ptr, const char *value)
     BLI_strncpy(str, value, OP_MAX_TYPENAME); /* utf8 already ensured */
   }
   else {
-    BLI_assert(!"setting the bl_label on a non-builtin operator");
+    BLI_assert_msg(0, "setting the bl_label on a non-builtin operator");
   }
 }
 
@@ -2068,7 +2059,7 @@ static void rna_KeyMapItem_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Poi
 #else /* RNA_RUNTIME */
 
 /**
- * expose ``Operator.options`` as its own type so we can control each flags use
+ * expose `Operator.options` as its own type so we can control each flags use
  * (some are read-only).
  */
 static void rna_def_operator_options_runtime(BlenderRNA *brna)
