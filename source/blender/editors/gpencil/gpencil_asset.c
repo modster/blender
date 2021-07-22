@@ -865,6 +865,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
     if (gpl_target == NULL) {
       gpl_target = BKE_gpencil_layer_duplicate(gpl_asset, false, false);
       BLI_assert(gpl_target != NULL);
+      BLI_listbase_clear(&gpl_target->frames);
       BLI_addtail(&gpd_target->layers, gpl_target);
 
       if (tgpa->asset_layers == NULL) {
@@ -873,6 +874,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
       /* Add layer to the hash to remove if operator is canceled. */
       BLI_ghash_insert(tgpa->asset_layers, gpl_target, gpl_target);
     }
+    gpl_target->actframe = NULL;
 
     LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
       /* Check if frame is in target layer. */
@@ -882,6 +884,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
       if ((gpf_target == NULL) || (gpf_target->framenum != fra)) {
         gpf_target = BKE_gpencil_layer_frame_get(gpl_target, fra, GP_GETFRAME_ADD_NEW);
         BLI_assert(gpf_target != NULL);
+        BLI_listbase_clear(&gpf_target->strokes);
 
         if (tgpa->asset_frames == NULL) {
           tgpa->asset_frames = BLI_ghash_ptr_new(__func__);
@@ -892,6 +895,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
           BLI_ghash_insert(tgpa->asset_frames, gpf_target, gpl_target);
         }
       }
+
       /* Loop all strokes and duplicate. */
       if (tgpa->asset_strokes_frame == NULL) {
         tgpa->asset_strokes_frame = BLI_ghash_ptr_new(__func__);
@@ -900,6 +904,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
 
       LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
         bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
+        gps_target->next = gps_target->prev = NULL;
         gps_target->flag &= ~GP_STROKE_SELECT;
         BLI_addtail(&gpf_target->strokes, gps_target);
 
@@ -930,8 +935,8 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
           pt->flag &= ~GP_SPOINT_SELECT;
         }
 
-        /* Update geometry. */
-        BKE_gpencil_stroke_geometry_update(gpd_target, gps_target);
+        /* Calc stroke bounding box. */
+        BKE_gpencil_stroke_boundingbox_calc(gps_target);
 
         /* Add the hash key with a reference to the frame and layer. */
         BLI_ghash_insert(tgpa->asset_strokes_frame, gps_target, gpf_target);
