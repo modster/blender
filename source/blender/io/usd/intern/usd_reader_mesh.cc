@@ -199,7 +199,8 @@ void USDMeshReader::read_object_data(Main *bmain, const double motionSampleTime)
   Mesh *mesh = (Mesh *)object_->data;
 
   is_initial_load_ = true;
-  Mesh *read_mesh = this->read_mesh(mesh, motionSampleTime, import_params_.global_read_flag, nullptr);
+  Mesh *read_mesh = this->read_mesh(
+      mesh, motionSampleTime, import_params_.global_read_flag, nullptr);
 
   is_initial_load_ = false;
   if (read_mesh != mesh) {
