@@ -214,7 +214,7 @@ class Sizing {
 
 enum VertFlags {
   VERT_NONE = 0,
-  VERT_SELECTED = 1 << 0,
+  VERT_SELECTED_FOR_SPLIT = 1 << 0,
 };
 
 class VertData {
@@ -386,7 +386,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     for (auto &vert : this->get_verts_mut()) {
       auto &vert_data = vert.get_checked_extra_data_mut();
       auto &flag = vert_data.get_flag_mut();
-      flag &= ~VERT_SELECTED;
+      flag &= ~VERT_SELECTED_FOR_SPLIT;
     }
 
     blender::Vector<EdgeIndex> splittable_edge_indices;
@@ -394,8 +394,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
      * and stored in the extra data of the edges */
     for (const auto &edge : this->get_edges()) {
       auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
-      if (v1.get_checked_extra_data().get_flag() & VERT_SELECTED ||
-          v2.get_checked_extra_data().get_flag() & VERT_SELECTED) {
+      if (v1.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT ||
+          v2.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT) {
         continue;
       }
       const auto &edge_data = edge.get_checked_extra_data();
@@ -404,10 +404,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         splittable_edge_indices.append(edge.get_self_index());
         auto &v1_data = v1.get_checked_extra_data_mut();
         auto &v1_flag = v1_data.get_flag_mut();
-        v1_flag |= VERT_SELECTED;
+        v1_flag |= VERT_SELECTED_FOR_SPLIT;
         auto &v2_data = v2.get_checked_extra_data_mut();
         auto &v2_flag = v2_data.get_flag_mut();
-        v2_flag |= VERT_SELECTED;
+        v2_flag |= VERT_SELECTED_FOR_SPLIT;
       }
     }
 
