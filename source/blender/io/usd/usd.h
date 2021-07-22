@@ -50,7 +50,7 @@ struct USDImportParams {
   int sequence_len;
   int offset;
   bool validate_meshes;
-  char global_read_flag;
+  char mesh_read_flag;
   bool import_cameras;
   bool import_curves;
   bool import_lights;

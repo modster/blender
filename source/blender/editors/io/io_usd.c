@@ -287,7 +287,7 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   const float scale = RNA_float_get(op->ptr, "scale");
 
   const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
-  const char global_read_flag = RNA_enum_get(op->ptr, "global_read_flag");
+  const char mesh_read_flag = RNA_enum_get(op->ptr, "mesh_read_flag");
   const bool import_cameras = RNA_boolean_get(op->ptr, "import_cameras");
   const bool import_curves = RNA_boolean_get(op->ptr, "import_curves");
   const bool import_lights = RNA_boolean_get(op->ptr, "import_lights");
@@ -335,7 +335,7 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
                                    .sequence_len = sequence_len,
                                    .offset = offset,
                                    .validate_meshes = validate_meshes,
-                                   .global_read_flag = global_read_flag,
+                                   .mesh_read_flag = mesh_read_flag,
                                    .import_cameras = import_cameras,
                                    .import_curves = import_curves,
                                    .import_lights = import_lights,
@@ -380,7 +380,7 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(box, ptr, "scale", 0, NULL, ICON_NONE);
 
   box = uiLayoutBox(layout);
-  uiItemR(box, ptr, "global_read_flag", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "mesh_read_flag", 0, NULL, ICON_NONE);
   col = uiLayoutColumnWithHeading(box, true, IFACE_("Include"));
   uiItemR(col, ptr, "import_subdiv", 0, IFACE_("Subdivision"), ICON_NONE);
   uiItemR(col, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
@@ -479,7 +479,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "Add all imported objects to a new collection");
 
   prop = RNA_def_enum(ot->srna,
-                      "global_read_flag",
+                      "mesh_read_flag",
                       rna_enum_usd_import_read_flags,
                       0,
                       "Mesh Data",
