@@ -858,8 +858,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
   /* Get the first frame in the asset. */
   int const first_fra = gpencil_asset_get_first_franum(gpd_asset);
 
-  /* Layers must be added inverse to keep strokes order. */
-  LISTBASE_FOREACH_BACKWARD (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
+  LISTBASE_FOREACH (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
     /* Check if Layer is in target datablock. */
     bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
     if (gpl_target == NULL) {
