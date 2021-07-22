@@ -323,6 +323,41 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   }
 
   /**
+   * Flip edges of the `active_faces` if needed.
+   *
+   * Might make sense to take `active_faces` by move semantics later.
+   */
+  void flip_edges(blender::Vector<FaceIndex> active_faces)
+  {
+    auto flippable_edge_indices_set = this->get_flippable_edge_indices_set(active_faces);
+    do {
+      for (const auto &edge_index : flippable_edge_indices_set) {
+        auto &edge = this->get_checked_edge(edge_index);
+
+        auto mesh_diff = this->flip_edge_triangulate(edge.get_self_index(), false);
+
+        /* Update `active_faces` */
+        {
+          /* Update `active_faces` to contain only face indices that
+           * still exist in the mesh */
+          blender::Vector<FaceIndex> new_active_faces;
+          for (const auto &face_index : active_faces) {
+            if (this->does_face_exist(face_index)) {
+              new_active_faces.append(face_index);
+            }
+          }
+          active_faces = std::move(new_active_faces);
+
+          /* Add the newly created faces */
+          active_faces.extend(mesh_diff.get_added_faces().as_span());
+        }
+      }
+
+      flippable_edge_indices_set = this->get_flippable_edge_indices_set(active_faces);
+    } while (flippable_edge_indices_set.size() != 0);
+  }
+
+  /**
    * Splits edges whose "size" is greater than 1.0
    *
    * Based on [1]
