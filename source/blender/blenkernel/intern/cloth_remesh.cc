@@ -215,6 +215,7 @@ class Sizing {
 enum VertFlags {
   VERT_NONE = 0,
   VERT_SELECTED_FOR_SPLIT = 1 << 0,
+  VERT_SELECTED_FOR_FLIP = 1 << 1,
 };
 
 class VertData {
@@ -461,6 +462,61 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     return cross_2d(u_jk, u_ik) * float2::dot(u_il, m_avg * u_jl) +
                float2::dot(u_jk, m_avg * u_ik) * cross_2d(u_il, u_jl) <
            0.0;
+  }
+
+  /**
+   * Gets the maximal independent set of flippable edge indices in
+   * `active_faces`.
+   *
+   * Reference [1]
+   */
+  blender::Vector<EdgeIndex> get_flippable_edge_indices_set(
+      const blender::Vector<FaceIndex> &active_faces)
+  {
+    /* Deselect all verts of `active_faces` for flips */
+    for (const auto &face_index : active_faces) {
+      const auto &face = this->get_checked_face(face_index);
+
+      for (const auto &vert_index : face.get_verts()) {
+        auto &vert = this->get_checked_vert(vert_index);
+
+        auto &vert_data = vert.get_checked_extra_data_mut();
+        auto &flag = vert_data.get_flag_mut();
+        flag &= ~VERT_SELECTED_FOR_FLIP;
+      }
+    }
+
+    /* TODO(ish): Need to store a set of the edge indices and use
+     * those because it is most likely that the `active_face` have
+     * overlapping edges */
+
+    blender::Vector<EdgeIndex> flippable_edge_indices;
+    for (const auto &face_index : active_faces) {
+      const auto &face = this->get_checked_face(face_index);
+
+      const auto edge_indices = this->get_edge_indices_of_face(face);
+      for (const auto &edge_index : edge_indices) {
+        const auto &edge = this->get_checked_edge(edge_index);
+        auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
+        if (v1.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_FLIP ||
+            v2.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_FLIP) {
+          continue;
+        }
+
+        if (this->is_edge_flippable_anisotropic_aware(edge)) {
+          flippable_edge_indices.append(edge.get_self_index());
+
+          auto &v1_data = v1.get_checked_extra_data_mut();
+          auto &v1_flag = v1_data.get_flag_mut();
+          v1_flag |= VERT_SELECTED_FOR_FLIP;
+          auto &v2_data = v2.get_checked_extra_data_mut();
+          auto &v2_flag = v2_data.get_flag_mut();
+          v2_flag |= VERT_SELECTED_FOR_FLIP;
+        }
+      }
+    }
+
+    return flippable_edge_indices;
   }
 };
 
