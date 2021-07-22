@@ -281,6 +281,45 @@ static void copy_poly_attributes_by_mapping(const PolySpline &src,
   copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
 }
 
+/*
+ * Update the handle types to get a smoother curve.
+ * Required when handles are not of type `Vector`.
+ */
+static void update_bezier_handle_types(BezierSpline &dst,
+                                       const Array<int> mapping,
+                                       const Array<int> point_counts)
+{
+  MutableSpan<BezierSpline::HandleType> left_handle_types = dst.handle_types_left();
+  MutableSpan<BezierSpline::HandleType> right_handle_types = dst.handle_types_right();
+  bool is_cyclic = dst.is_cyclic();
+  for (int i = 0; i < mapping.size(); i++) {
+    if (point_counts[mapping[i]] > 1) {
+      /* There will always be a prev and next if point count > 1. */
+      int prev = 0, next = 0;
+      if (i == 0) {
+        prev = mapping.size() - 1;
+        next = i + 1;
+      }
+      else if (i < mapping.size() - 1) {
+        prev = i - 1;
+        next = i + 1;
+      }
+      else {
+        prev = i - 1;
+        next = 0;
+      }
+
+      /* Update handle types of adjacent points. */
+      if (mapping[i] != mapping[prev]) {
+        right_handle_types[prev] = BezierSpline::HandleType::Vector;
+      }
+      if (mapping[i] != mapping[next]) {
+        left_handle_types[next] = BezierSpline::HandleType::Vector;
+      }
+    }
+  }
+}
+
 /* Update the positions and handle positions of a Bezier spline based on fillet data. */
 static void update_bezier_positions(Array<FilletData> &fds,
                                     BezierSpline &dst_spline,
@@ -317,6 +356,8 @@ static void update_bezier_positions(Array<FilletData> &fds,
                                                 handle_length * fd.next_dir;
     dst_spline.handle_types_right()[cur_i] = dst_spline.handle_types_left()[end_i] =
         BezierSpline::HandleType::Align;
+    dst_spline.handle_types_left()[cur_i] = dst_spline.handle_types_right()[end_i] =
+        BezierSpline::HandleType::Vector;
 
     /* Calculate the center of the radius to be formed. */
     float3 center = get_center(dst_spline.positions()[cur_i] - fd.pos, fd);
@@ -392,7 +433,7 @@ static void update_poly_positions(Array<FilletData> &fds,
 
 /* Function to fillet either Bezier splines or Poly splines.
 Added under the same function because the only difference is that Bezier curves have handle data.
-*/
+ */
 static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletModeParam &mode_param)
 {
   int fillet_count, start = 0, size = spline.size();
@@ -431,6 +472,7 @@ static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletMod
     BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
     dst_spline.resize(total_points);
     copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
+    update_bezier_handle_types(dst_spline, dst_to_src, point_counts);
     update_bezier_positions(fds, dst_spline, point_counts, start, fillet_count);
   }
   else {
