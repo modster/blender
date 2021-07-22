@@ -1873,6 +1873,25 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * Seam is the edge in UV space that has only one face.
+   *
+   * Note: A loose edge cannot be considered to be on a seam.
+   */
+  bool is_edge_on_seam(const Edge<EED> &edge) const
+  {
+    return edge.get_faces().size() == 1;
+  }
+
+  /**
+   * Easy call when only `edge_index` is available.
+   */
+  bool is_edge_on_seam(EdgeIndex edge_index) const
+  {
+    const auto &edge = this->get_checked_edge(edge_index);
+    return is_edge_on_boundary(edge);
+  }
+
+  /**
    * Boundary is the set of "3D edges" that have only a single
    * face. Not all meshes will have a boundary.
    */
