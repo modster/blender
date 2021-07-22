@@ -1208,22 +1208,25 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
    * This should be called only when the face has 3 verts, will return
    * `std::nullopt` otherwise.
    **/
-  inline std::optional<VertIndex> get_other_vert_index(EdgeIndex edge_index, FaceIndex face_index)
+  inline std::optional<VertIndex> get_other_vert_index(EdgeIndex edge_index,
+                                                       FaceIndex face_index) const
   {
-
-    auto op_face = this->faces.get(face_index);
-    BLI_assert(op_face);
-    auto &face = op_face.value().get();
+    const auto &face = this->get_checked_face(face_index);
 
     if (face.verts.size() != 3) {
       return std::nullopt;
     }
 
-    auto [vert_1_index, vert_2_index, vert_3_index] = face.verts;
+    const auto vert_1_index = face.verts[0];
+    const auto vert_2_index = face.verts[1];
+    const auto vert_3_index = face.verts[2];
 
-    auto op_edge = this->edges.get(edge_index);
-    BLI_assert(op_edge);
-    auto &edge = op_edge.value().get();
+    const auto &edge = this->get_checked_edge(edge_index);
+
+    /* The edge must contain the face */
+    if (edge.faces.contains(face_index) == false) {
+      return std::nullopt;
+    }
 
     if (edge.has_vert(vert_1_index) == false) {
       return vert_1_index;
@@ -1231,6 +1234,40 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     if (edge.has_vert(vert_2_index) == false) {
       return vert_2_index;
     }
+
+    /* Since the edge constains the face, and since v1 and v2 are
+     * part of the edge, v3 has to not be in the edge */
+    BLI_assert(edge.has_vert(vert_3_index) == false);
+    return vert_3_index;
+  }
+
+  /**
+   * Same as unchecked version but instead of returning `std::nullopt`
+   * when it fails, the checks are asserted so in debug mode, it will
+   * assert and abort but in release mode it will have undefined
+   * behavior.
+   */
+  inline VertIndex get_checked_other_vert_index(EdgeIndex edge_index, FaceIndex face_index) const
+  {
+    const auto &face = this->get_checked_face(face_index);
+    BLI_assert(face.verts.size() == 3);
+
+    const auto vert_1_index = face.verts[0];
+    const auto vert_2_index = face.verts[1];
+    const auto vert_3_index = face.verts[2];
+
+    const auto &edge = this->get_checked_edge(edge_index);
+
+    BLI_assert(edge.faces.contains(face_index));
+
+    if (edge.has_vert(vert_1_index) == false) {
+      return vert_1_index;
+    }
+    if (edge.has_vert(vert_2_index) == false) {
+      return vert_2_index;
+    }
+
+    BLI_assert(edge.has_vert(vert_3_index) == false);
     return vert_3_index;
   }
 
