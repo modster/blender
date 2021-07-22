@@ -413,6 +413,55 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     return splittable_edge_indices;
   }
+
+  /**
+   * Checks if the edge is flippable nor not.
+   *
+   * Note: this is not the same as `Mesh::is_edge_flippable`, this is
+   * specific to `AdaptiveMesh`.
+   *
+   * Reference [1]
+   */
+  bool is_edge_flippable_anisotropic_aware(const AdaptiveEdge &edge) const
+  {
+    if (this->is_edge_loose_or_on_seam_or_boundary(edge)) {
+      return false;
+    }
+    if (this->is_edge_flippable(edge.get_self_index(), false) == false) {
+      return false;
+    }
+
+    const auto cross_2d = [](const float2 &a, const float2 &b) { return a.x * b.y - a.y * b.x; };
+
+    /* Now the actual anisotropic aware critereon */
+    /* Using the same convention as reference [1] */
+    const auto [v_i_index, v_j_index] = edge.get_checked_verts();
+    const auto v_k_index = this->get_checked_other_vert_index(edge.get_self_index(),
+                                                              edge.get_faces()[0]);
+    const auto v_l_index = this->get_checked_other_vert_index(edge.get_self_index(),
+                                                              edge.get_faces()[1]);
+
+    const auto &v_i = this->get_checked_vert(v_i_index);
+    const auto &v_j = this->get_checked_vert(v_j_index);
+    const auto &v_k = this->get_checked_vert(v_k_index);
+    const auto &v_l = this->get_checked_vert(v_l_index);
+
+    const auto &m_i = v_i.get_checked_extra_data().get_sizing();
+    const auto &m_j = v_j.get_checked_extra_data().get_sizing();
+    const auto &m_k = v_k.get_checked_extra_data().get_sizing();
+    const auto &m_l = v_l.get_checked_extra_data().get_sizing();
+
+    const auto u_jk = v_j.get_uv() - v_k.get_uv();
+    const auto u_ik = v_i.get_uv() - v_k.get_uv();
+    const auto u_il = v_i.get_uv() - v_l.get_uv();
+    const auto u_jl = v_j.get_uv() - v_l.get_uv();
+
+    const auto m_avg = (m_i + m_j + m_k + m_l) * 0.25;
+
+    return cross_2d(u_jk, u_ik) * float2::dot(u_il, m_avg * u_jl) +
+               float2::dot(u_jk, m_avg * u_ik) * cross_2d(u_il, u_jl) <
+           0.0;
+  }
 };
 
 }  // namespace blender::bke::internal
