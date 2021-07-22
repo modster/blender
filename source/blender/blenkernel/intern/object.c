@@ -205,7 +205,8 @@ static void object_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const in
   }
   else if (ob_dst->mat != NULL || ob_dst->matbits != NULL) {
     /* This shall not be needed, but better be safe than sorry. */
-    BLI_assert(!"Object copy: non-NULL material pointers with zero counter, should not happen.");
+    BLI_assert_msg(
+        0, "Object copy: non-NULL material pointers with zero counter, should not happen.");
     ob_dst->mat = NULL;
     ob_dst->matbits = NULL;
   }
@@ -1532,7 +1533,8 @@ bool BKE_object_modifier_stack_copy(Object *ob_dst,
                                     const int flag_subdata)
 {
   if ((ob_dst->type == OB_GPENCIL) != (ob_src->type == OB_GPENCIL)) {
-    BLI_assert(!"Trying to copy a modifier stack between a GPencil object and another type.");
+    BLI_assert_msg(0,
+                   "Trying to copy a modifier stack between a GPencil object and another type.");
     return false;
   }
 
@@ -1651,7 +1653,7 @@ static void object_update_from_subsurf_ccg(Object *object)
    *
    * All this is defeating all the designs we need to follow to allow safe
    * threaded evaluation, but this is as good as we can make it within the
-   * current sculpt//evaluated mesh design. This is also how we've survived
+   * current sculpt/evaluated mesh design. This is also how we've survived
    * with old DerivedMesh based solutions. So, while this is all wrong and
    * needs reconsideration, doesn't seem to be a big stopper for real
    * production artists.
@@ -3335,7 +3337,7 @@ static void give_parvert(Object *par, int nr, float vec[3])
           }
           BLI_mutex_unlock(&vparent_lock);
 #else
-          BLI_assert(!"Not safe for threading");
+          BLI_assert_msg(0, "Not safe for threading");
           BM_mesh_elem_table_ensure(em->bm, BM_VERT);
 #endif
         }
