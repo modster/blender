@@ -1856,6 +1856,23 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * An edge is loose when it doesn't have any faces.
+   */
+  bool is_edge_loose(const Edge<EED> &edge) const
+  {
+    return edge.get_faces().size() == 0;
+  }
+
+  /**
+   * Easy call when only `edge_index` is available.
+   */
+  bool is_edge_loose(EdgeIndex edge_index) const
+  {
+    const auto &edge = this->get_checked_edge(edge_index);
+    return is_edge_loose(edge);
+  }
+
+  /**
    * Boundary is the set of "3D edges" that have only a single
    * face. Not all meshes will have a boundary.
    */
