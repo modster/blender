@@ -366,48 +366,42 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   struct PointerRNA *ptr = op->ptr;
 
   uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
 
   uiLayout *box = uiLayoutBox(layout);
-  uiItemL(box, IFACE_("USD Import"), ICON_NONE);
-  uiItemR(box, ptr, "global_read_flag", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
-  uiItemL(box, IFACE_("Manual Transform:"), ICON_NONE);
+  uiLayout *col = uiLayoutColumnWithHeading(box, true, IFACE_("Data Types"));
+  uiItemR(col, ptr, "import_cameras", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_curves", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_lights", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_materials", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_meshes", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_volumes", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "prim_path_mask", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "scale", 0, NULL, ICON_NONE);
 
   box = uiLayoutBox(layout);
-  uiItemL(box, IFACE_("Options:"), ICON_NONE);
-  uiItemR(box, ptr, "relative_path", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "set_frame_range", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_subdiv", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_visible_only", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "create_collection", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "global_read_flag", 0, NULL, ICON_NONE);
+  col = uiLayoutColumnWithHeading(box, true, IFACE_("Include"));
+  uiItemR(col, ptr, "import_subdiv", 0, IFACE_("Subdivision"), ICON_NONE);
+  uiItemR(col, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_visible_only", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_guide", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_proxy", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_render", 0, NULL, ICON_NONE);
+
+  col = uiLayoutColumnWithHeading(box, true, IFACE_("Options"));
+  uiItemR(col, ptr, "set_frame_range", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "relative_path", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "create_collection", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "light_intensity_scale", 0, NULL, ICON_NONE);
-
-  uiLayout *prim_path_mask_box = uiLayoutBox(box);
-  uiItemL(prim_path_mask_box, IFACE_("Prim Path Mask:"), ICON_NONE);
-  uiItemR(prim_path_mask_box, ptr, "prim_path_mask", 0, NULL, ICON_NONE);
-
-  box = uiLayoutBox(layout);
-  uiItemL(box, IFACE_("Primitive Types:"), ICON_OBJECT_DATA);
-  uiItemR(box, ptr, "import_cameras", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_curves", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_lights", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_materials", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_meshes", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_volumes", 0, NULL, ICON_NONE);
-
-  box = uiLayoutBox(layout);
-  uiItemL(box, IFACE_("Purpose"), ICON_NONE);
-  uiItemR(box, ptr, "import_guide", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_proxy", 0, NULL, ICON_NONE);
-  uiItemR(box, ptr, "import_render", 0, NULL, ICON_NONE);
 
   if (RNA_boolean_get(ptr, "import_materials")) {
     box = uiLayoutBox(layout);
     uiItemL(box, IFACE_("Experimental"), ICON_NONE);
-    uiItemR(box, ptr, "import_usd_preview", 0, NULL, ICON_NONE);
+    col = uiLayoutColumn(box, true);
+    uiItemR(col, ptr, "import_usd_preview", 0, NULL, ICON_NONE);
     if (RNA_boolean_get(ptr, "import_usd_preview")) {
-      uiItemR(box, ptr, "set_material_blend", 0, NULL, ICON_NONE);
+      uiItemR(col, ptr, "set_material_blend", 0, NULL, ICON_NONE);
     }
   }
 }
@@ -497,13 +491,12 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
   RNA_def_property_enum_default(
       prop, (MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV));
 
-  RNA_def_string(
-      ot->srna,
-      "prim_path_mask",
-      NULL,
-      1024,
-      "",
-      "If set, only the subset of the USD scene rooted at the given prim will be imported");
+  RNA_def_string(ot->srna,
+                 "prim_path_mask",
+                 NULL,
+                 1024,
+                 "Path Mask",
+                 "Import only the subset of the USD scene rooted at the given primitive");
 
   RNA_def_boolean(ot->srna, "import_guide", false, "Guide", "Import guide geometry");
 
