@@ -73,14 +73,6 @@ const EnumPropertyItem rna_enum_usd_export_evaluation_mode_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-const EnumPropertyItem rna_enum_usd_import_read_flags[] = {
-    {MOD_MESHSEQ_READ_VERT, "VERT", 0, "Vertex Animation", ""},
-    {MOD_MESHSEQ_READ_POLY, "POLY", 0, "Face Animation", ""},
-    {MOD_MESHSEQ_READ_UV, "UV", 0, "UV Coordinates", ""},
-    {MOD_MESHSEQ_READ_COLOR, "COLOR", 0, "Vertex Colors", ""},
-    {0, NULL, 0, NULL, NULL},
-};
-
 /* Stored in the wmOperator's customdata field to indicate it should run as a background job.
  * This is set when the operator is invoked, and not set when it is only executed. */
 enum { AS_BACKGROUND_JOB = 1 };
@@ -287,7 +279,18 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   const float scale = RNA_float_get(op->ptr, "scale");
 
   const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
-  const char mesh_read_flag = RNA_enum_get(op->ptr, "mesh_read_flag");
+
+  const bool read_mesh_uvs = RNA_boolean_get(op->ptr, "read_mesh_uvs");
+  const bool read_mesh_colors = RNA_boolean_get(op->ptr, "read_mesh_colors");
+
+  char mesh_read_flag = MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY;
+  if (read_mesh_uvs) {
+    mesh_read_flag |= MOD_MESHSEQ_READ_UV;
+  }
+  if (read_mesh_colors) {
+    mesh_read_flag |= MOD_MESHSEQ_READ_COLOR;
+  }
+
   const bool import_cameras = RNA_boolean_get(op->ptr, "import_cameras");
   const bool import_curves = RNA_boolean_get(op->ptr, "import_curves");
   const bool import_lights = RNA_boolean_get(op->ptr, "import_lights");
@@ -380,7 +383,9 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(box, ptr, "scale", 0, NULL, ICON_NONE);
 
   box = uiLayoutBox(layout);
-  uiItemR(box, ptr, "mesh_read_flag", 0, NULL, ICON_NONE);
+  col = uiLayoutColumnWithHeading(box, true, IFACE_("Mesh Data"));
+  uiItemR(col, ptr, "read_mesh_uvs", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "read_mesh_colors", 0, NULL, ICON_NONE);
   col = uiLayoutColumnWithHeading(box, true, IFACE_("Include"));
   uiItemR(col, ptr, "import_subdiv", 0, IFACE_("Subdivision"), ICON_NONE);
   uiItemR(col, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
@@ -478,18 +483,9 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "Create Collection",
                   "Add all imported objects to a new collection");
 
-  prop = RNA_def_enum(ot->srna,
-                      "mesh_read_flag",
-                      rna_enum_usd_import_read_flags,
-                      0,
-                      "Mesh Data",
-                      "Mesh data to read");
+  RNA_def_boolean(ot->srna, "read_mesh_uvs", true, "UV Coordinates", "Read mesh UV coordinates");
 
-  /* Specify that the flag contains multiple enums. */
-  RNA_def_property_flag(prop, PROP_ENUM_FLAG);
-  /* Set the flag bits enabled by default. */
-  RNA_def_property_enum_default(
-      prop, (MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV));
+  RNA_def_boolean(ot->srna, "read_mesh_colors", false, "Vertex Colors", "Read mesh vertex colors");
 
   RNA_def_string(ot->srna,
                  "prim_path_mask",
