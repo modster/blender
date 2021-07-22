@@ -195,6 +195,21 @@ class Sizing {
   {
     return Sizing(this->m.linear_blend(other.get_m(), 0.5));
   }
+
+  friend Sizing operator+(const Sizing &a, const Sizing &b)
+  {
+    return Sizing(a.get_m() + b.get_m());
+  }
+
+  friend Sizing operator*(const Sizing &a, float val)
+  {
+    return Sizing(a.get_m() * val);
+  }
+
+  friend float2 operator*(const Sizing &sizing, const float2 &v)
+  {
+    return sizing.get_m() * v;
+  }
 };
 
 enum VertFlags {
