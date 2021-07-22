@@ -1922,6 +1922,24 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * Easy call for checking all three conditions of the edge.
+   */
+  bool is_edge_loose_or_on_seam_or_boundary(const Edge<EED> &edge) const
+  {
+    return this->is_edge_on_seam(edge) || this->is_edge_on_boundary(edge) ||
+           this->is_edge_loose(edge);
+  }
+
+  /**
+   * Easy call when only `edge_index` is available.
+   */
+  bool is_edge_loose_or_on_seam_or_boundary(EdgeIndex edge_index) const
+  {
+    const auto &edge = this->get_checked_edge(edge_index);
+    return is_edge_loose_or_on_seam_or_boundary(edge);
+  }
+
+  /**
    * An edge is flippable only if the edge has exactly 2 faces, and
    * both faces are triangulated.
    */
