@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include "COM_BufferArea.h"
+#include "COM_BufferRange.h"
+#include "COM_BuffersIterator.h"
 #include "COM_ExecutionGroup.h"
 #include "COM_MemoryProxy.h"
 
@@ -34,7 +37,7 @@ enum class MemoryBufferState {
   /** \brief memory has been allocated on creator device and CPU machine,
    * but kernel has not been executed */
   Default = 0,
-  /** \brief chunk is consolidated from other chunks. special state.*/
+  /** \brief chunk is consolidated from other chunks. special state. */
   Temporary = 6,
 };
 
@@ -109,7 +112,7 @@ class MemoryBuffer {
   /**
    * Whether MemoryBuffer owns buffer data.
    */
-  bool is_owner_;
+  bool owns_data_;
 
  public:
   /**
@@ -121,6 +124,11 @@ class MemoryBuffer {
    * \brief construct new temporarily MemoryBuffer for an area
    */
   MemoryBuffer(DataType datatype, const rcti &rect, bool is_a_single_elem = false);
+
+  MemoryBuffer(
+      float *buffer, int num_channels, int width, int height, bool is_a_single_elem = false);
+
+  MemoryBuffer(float *buffer, int num_channels, const rcti &rect, bool is_a_single_elem = false);
 
   /**
    * Construct MemoryBuffer from an existent float buffer. MemoryBuffer is not responsible for
@@ -235,10 +243,36 @@ class MemoryBuffer {
     return is_a_single_elem() ? 1 : getHeight();
   }
 
-  uint8_t get_num_channels()
+  uint8_t get_num_channels() const
   {
     return this->m_num_channels;
   }
+
+  /**
+   * Get all buffer elements as a range with no offsets.
+   */
+  BufferRange<float> as_range()
+  {
+    return BufferRange<float>(m_buffer, 0, buffer_len(), elem_stride);
+  }
+
+  BufferRange<const float> as_range() const
+  {
+    return BufferRange<const float>(m_buffer, 0, buffer_len(), elem_stride);
+  }
+
+  BufferArea<float> get_buffer_area(const rcti &area)
+  {
+    return BufferArea<float>(m_buffer, getWidth(), area, elem_stride);
+  }
+
+  BufferArea<const float> get_buffer_area(const rcti &area) const
+  {
+    return BufferArea<const float>(m_buffer, getWidth(), area, elem_stride);
+  }
+
+  BuffersIterator<float> iterate_with(Span<MemoryBuffer *> inputs);
+  BuffersIterator<float> iterate_with(Span<MemoryBuffer *> inputs, const rcti &area);
 
   /**
    * \brief get the data of this MemoryBuffer
@@ -248,6 +282,8 @@ class MemoryBuffer {
   {
     return this->m_buffer;
   }
+
+  MemoryBuffer *inflate() const;
 
   inline void wrap_pixel(int &x, int &y, MemoryBufferExtend extend_x, MemoryBufferExtend extend_y)
   {
@@ -264,11 +300,14 @@ class MemoryBuffer {
           x = 0;
         }
         if (x >= w) {
-          x = w;
+          x = w - 1;
         }
         break;
       case MemoryBufferExtend::Repeat:
-        x = (x >= 0.0f ? (x % w) : (x % w) + w);
+        x %= w;
+        if (x < 0) {
+          x += w;
+        }
         break;
     }
 
@@ -280,13 +319,19 @@ class MemoryBuffer {
           y = 0;
         }
         if (y >= h) {
-          y = h;
+          y = h - 1;
         }
         break;
       case MemoryBufferExtend::Repeat:
-        y = (y >= 0.0f ? (y % h) : (y % h) + h);
+        y %= h;
+        if (y < 0) {
+          y += h;
+        }
         break;
     }
+
+    x = x + m_rect.xmin;
+    y = y + m_rect.ymin;
   }
 
   inline void wrap_pixel(float &x,
@@ -307,11 +352,14 @@ class MemoryBuffer {
           x = 0.0f;
         }
         if (x >= w) {
-          x = w;
+          x = w - 1;
         }
         break;
       case MemoryBufferExtend::Repeat:
         x = fmodf(x, w);
+        if (x < 0.0f) {
+          x += w;
+        }
         break;
     }
 
@@ -323,13 +371,19 @@ class MemoryBuffer {
           y = 0.0f;
         }
         if (y >= h) {
-          y = h;
+          y = h - 1;
         }
         break;
       case MemoryBufferExtend::Repeat:
         y = fmodf(y, h);
+        if (y < 0.0f) {
+          y += h;
+        }
         break;
     }
+
+    x = x + m_rect.xmin;
+    y = y + m_rect.ymin;
   }
 
   inline void read(float *result,
@@ -416,11 +470,58 @@ class MemoryBuffer {
     return this->m_state == MemoryBufferState::Temporary;
   }
 
+  void copy_from(const MemoryBuffer *src, const rcti &area);
+  void copy_from(const MemoryBuffer *src, const rcti &area, int to_x, int to_y);
+  void copy_from(const MemoryBuffer *src,
+                 const rcti &area,
+                 int channel_offset,
+                 int elem_size,
+                 int to_channel_offset);
+  void copy_from(const MemoryBuffer *src,
+                 const rcti &area,
+                 int channel_offset,
+                 int elem_size,
+                 int to_x,
+                 int to_y,
+                 int to_channel_offset);
+  void copy_from(const uchar *src, const rcti &area);
+  void copy_from(const uchar *src,
+                 const rcti &area,
+                 int channel_offset,
+                 int elem_size,
+                 int elem_stride,
+                 int to_channel_offset);
+  void copy_from(const uchar *src,
+                 const rcti &area,
+                 int channel_offset,
+                 int elem_size,
+                 int elem_stride,
+                 int to_x,
+                 int to_y,
+                 int to_channel_offset);
+  void copy_from(const struct ImBuf *src, const rcti &area, bool ensure_linear_space = false);
+  void copy_from(const struct ImBuf *src,
+                 const rcti &area,
+                 int channel_offset,
+                 int elem_size,
+                 int to_channel_offset,
+                 bool ensure_linear_space = false);
+  void copy_from(const struct ImBuf *src,
+                 const rcti &src_area,
+                 int channel_offset,
+                 int elem_size,
+                 int to_x,
+                 int to_y,
+                 int to_channel_offset,
+                 bool ensure_linear_space = false);
+
+  void fill(const rcti &area, const float *value);
+  void fill(const rcti &area, int channel_offset, const float *value, int value_size);
   /**
    * \brief add the content from otherBuffer to this MemoryBuffer
    * \param otherBuffer: source buffer
    *
-   * \note take care when running this on a new buffer since it wont fill in
+   * \note take care when running this on a new buffer since it won't fill in
    *       uninitialized values in areas where the buffers don't overlap.
    */
   void fill_from(const MemoryBuffer &src);
@@ -463,6 +564,22 @@ class MemoryBuffer {
   {
     return get_memory_width() * get_memory_height();
   }
+
+  void copy_single_elem_from(const MemoryBuffer *src,
+                             int channel_offset,
+                             int elem_size,
+                             const int to_channel_offset);
+  void copy_rows_from(const MemoryBuffer *src,
+                      const rcti &src_area,
+                      const int to_x,
+                      const int to_y);
+  void copy_elems_from(const MemoryBuffer *src,
+                       const rcti &area,
+                       const int channel_offset,
+                       const int elem_size,
+                       const int to_x,
+                       const int to_y,
+                       const int to_channel_offset);
 
 #ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:MemoryBuffer")

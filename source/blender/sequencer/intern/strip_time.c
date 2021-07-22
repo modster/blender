@@ -60,7 +60,7 @@ float seq_give_frame_index(Sequence *seq, float timeline_frame)
   }
 
   if (seq->flag & SEQ_REVERSE_FRAMES) {
-    /*reverse frame in this sequence */
+    /* Reverse frame in this sequence. */
     if (timeline_frame <= sta) {
       frame_index = end - sta;
     }
@@ -184,7 +184,7 @@ static void seq_time_update_meta_strip(Scene *scene, Sequence *seq_meta)
   seq_update_sound_bounds_recursive(scene, seq_meta);
 }
 
-static void seq_time_update_meta_strip_range(Scene *scene, Sequence *seq_meta)
+void SEQ_time_update_meta_strip_range(Scene *scene, Sequence *seq_meta)
 {
   seq_time_update_meta_strip(scene, seq_meta);
 
@@ -223,7 +223,7 @@ void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
         seq->start = seq->startdisp = seq->seq1->startdisp;
         seq->enddisp = seq->seq1->enddisp;
       }
-      /* we cant help if strips don't overlap, it wont give useful results.
+      /* we can't help if strips don't overlap, it won't give useful results.
        * but at least ensure 'len' is never negative which causes bad bugs elsewhere. */
       if (seq->enddisp < seq->startdisp) {
         /* simple start/end swap */
@@ -250,20 +250,11 @@ void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
     Editing *ed = SEQ_editing_get(scene, false);
     MetaStack *ms = SEQ_meta_stack_active_get(ed);
     if (ms != NULL) {
-      seq_time_update_meta_strip_range(scene, ms->parseq);
+      SEQ_time_update_meta_strip_range(scene, ms->parseq);
     }
 
     SEQ_time_update_sequence_bounds(scene, seq);
   }
-}
-
-/** Comparison function suitable to be used with BLI_listbase_sort()... */
-int SEQ_time_cmp_time_startdisp(const void *a, const void *b)
-{
-  const Sequence *seq_a = a;
-  const Sequence *seq_b = b;
-
-  return (seq_a->startdisp > seq_b->startdisp);
 }
 
 int SEQ_time_find_next_prev_edit(Scene *scene,
@@ -471,7 +462,7 @@ void seq_time_gap_info_get(const Scene *scene,
 
 /**
  * Test if strip intersects with timeline frame.
- * Note: This checks if strip would be rendered at this frame. For rendering it is assumed, that
+ * NOTE: This checks if strip would be rendered at this frame. For rendering it is assumed, that
  * timeline frame has width of 1 frame and therefore ends at timeline_frame + 1
  *
  * \param seq: Sequence to be checked

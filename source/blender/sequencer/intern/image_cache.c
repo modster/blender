@@ -35,6 +35,7 @@
 #include "IMB_imbuf_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_endian_defines.h"
 #include "BLI_endian_switch.h"
 #include "BLI_fileops.h"
 #include "BLI_fileops_types.h"
@@ -44,7 +45,6 @@
 #include "BLI_path_util.h"
 #include "BLI_threads.h"
 
-#include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_scene.h"
 
@@ -521,7 +521,7 @@ static bool seq_disk_cache_read_header(FILE *file, DiskCacheHeader *header)
   BLI_fseek(file, 0LL, SEEK_SET);
   const size_t num_items_read = fread(header, sizeof(*header), 1, file);
   if (num_items_read < 1) {
-    BLI_assert(!"unable to read disk cache header");
+    BLI_assert_msg(0, "unable to read disk cache header");
     perror("unable to read disk cache header");
     return false;
   }

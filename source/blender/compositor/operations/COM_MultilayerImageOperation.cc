@@ -53,12 +53,10 @@ ImBuf *MultilayerBaseOperation::getImBuf()
 }
 
 void MultilayerBaseOperation::update_memory_buffer_partial(MemoryBuffer *output,
-                                                           const rcti &output_rect,
-                                                           Span<MemoryBuffer *> UNUSED(inputs),
-                                                           ExecutionSystem &UNUSED(exec_system),
-                                                           int UNUSED(current_pass))
+                                                           const rcti &area,
+                                                           Span<MemoryBuffer *> UNUSED(inputs))
 {
-  copy_buffer_rect(output, m_buffer, output_rect);
+  output->copy_from(m_buffer, area);
 }
 
 std::unique_ptr<MetaData> MultilayerColorOperation::getMetaData()

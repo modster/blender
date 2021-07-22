@@ -165,6 +165,16 @@ def gen_events_type_text(text):
         yield dict(type=type, value='RELEASE', **kw_extra)
 
 
+def repr_action(name, args, kwargs):
+    return "%s(%s)" % (
+        name,
+        ", ".join(
+            [repr(value) for value in args] +
+            [("%s=%r" % (key, value)) for key, value in kwargs.items()]
+        )
+    )
+
+
 # -----------------------------------------------------------------------------
 # Simulate Events
 
@@ -175,7 +185,7 @@ def mouse_location_get():
     )
 
 
-def run_event_simulate(*, event_iter):
+def run_event_simulate(*, event_iter, exit_fn):
     """
     Pass events from event_iter into Blender.
     """
@@ -188,8 +198,7 @@ def run_event_simulate(*, event_iter):
         if val is Ellipsis:
             bpy.app.use_event_simulate = False
             print("Finished simulation")
-
-            sys.exit(0)
+            exit_fn()
             return None
 
         # Run event simulation.
@@ -494,6 +503,30 @@ def argparse_create():
         formatter_class=argparse.RawTextHelpFormatter,
     )
 
+    parser.add_argument(
+        "--keep-open",
+        dest="keep_open",
+        default=False,
+        action="store_true",
+        help=(
+            "Keep the window open instead of exiting once event simulation is complete.\n"
+            "This can be useful to inspect the state of the file once the simulation is complete."
+        ),
+        required=False,
+    )
+
+    parser.add_argument(
+        "--time-actions",
+        dest="time_actions",
+        default=False,
+        action="store_true",
+        help=(
+            "Display the time each action takes\n"
+            "(useful for measuring delay between key-presses)."
+        ),
+        required=False,
+    )
+
     # Collect doc-strings from static methods in `actions`.
     actions_docstring = []
     for action_key in ACTION_DIR:
@@ -543,7 +576,7 @@ def setup_default_preferences(prefs):
 # Main Function
 
 
-def main_event_iter(*, action_list):
+def main_event_iter(*, action_list, time_actions):
     """
     Yield all events from action handlers.
     """
@@ -554,8 +587,17 @@ def main_event_iter(*, action_list):
 
     yield dict(type='MOUSEMOVE', value='NOTHING', x=x_init, y=y_init)
 
+    if time_actions:
+        import time
+        t_prev = time.time()
+
     for (op, args, kwargs) in action_list:
         yield from handle_action(op, args, kwargs)
+
+        if time_actions:
+            t = time.time()
+            print("%.4f: %s" % ((t - t_prev), repr_action(op, args, kwargs)))
+            t_prev = t
 
 
 def main():
@@ -570,7 +612,16 @@ def main():
 
     setup_default_preferences(bpy.context.preferences)
 
-    run_event_simulate(event_iter=main_event_iter(action_list=args.actions))
+    def exit_fn():
+        if not args.keep_open:
+            sys.exit(0)
+        else:
+            bpy.app.use_event_simulate = False
+
+    run_event_simulate(
+        event_iter=main_event_iter(action_list=args.actions, time_actions=args.time_actions),
+        exit_fn=exit_fn,
+    )
 
 
 if __name__ == "__main__":

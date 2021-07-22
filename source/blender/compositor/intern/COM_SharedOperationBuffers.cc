@@ -26,7 +26,7 @@ SharedOperationBuffers::SharedOperationBuffers() : buffers_()
 {
 }
 SharedOperationBuffers::BufferData::BufferData()
-    : buffer(nullptr), render_areas(), render_bounds({0}), registered_reads(0), received_reads(0)
+    : buffer(nullptr), registered_reads(0), received_reads(0), is_rendered(false)
 {
 }
 
@@ -99,7 +99,7 @@ const rcti &SharedOperationBuffers::get_render_bounds(NodeOperation *op)
  */
 bool SharedOperationBuffers::is_operation_rendered(NodeOperation *op)
 {
-  return get_buffer_data(op).buffer != nullptr;
+  return get_buffer_data(op).is_rendered;
 }
 
 /**
@@ -112,6 +112,7 @@ void SharedOperationBuffers::set_rendered_buffer(NodeOperation *op,
   BLI_assert(buf_data.received_reads == 0);
   BLI_assert(buf_data.buffer == nullptr);
   buf_data.buffer = std::move(buffer);
+  buf_data.is_rendered = true;
 }
 
 /**

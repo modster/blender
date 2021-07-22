@@ -1317,6 +1317,7 @@ static int arg_handle_register_extension(int UNUSED(argc), const char **UNUSED(a
     G.background = 1;
   }
   BLI_windows_register_blend_extension(G.background);
+  TerminateProcess(GetCurrentProcess(), 0);
 #  else
   (void)data; /* unused */
 #  endif
@@ -1953,13 +1954,15 @@ static int arg_handle_load_file(int UNUSED(argc), const char **argv, void *data)
   /* Make the path absolute because its needed for relative linked blends to be found */
   char filename[FILE_MAX];
 
-  /* note, we could skip these, but so far we always tried to load these files */
+  /* NOTE: we could skip these, but so far we always tried to load these files. */
   if (argv[0][0] == '-') {
     fprintf(stderr, "unknown argument, loading as file: %s\n", argv[0]);
   }
 
   BLI_strncpy(filename, argv[0], sizeof(filename));
+  BLI_path_slash_native(filename);
   BLI_path_abs_from_cwd(filename, sizeof(filename));
+  BLI_path_normalize(NULL, filename);
 
   /* load the file */
   BKE_reports_init(&reports, RPT_PRINT);

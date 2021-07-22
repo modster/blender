@@ -20,8 +20,8 @@
  * This file defines the framebuffer functionalities of the 'gpu' module
  * used for off-screen OpenGL rendering.
  *
- * - Use ``bpygpu_`` for local API.
- * - Use ``BPyGPU`` for public API.
+ * - Use `bpygpu_` for local API.
+ * - Use `BPyGPU` for public API.
  */
 
 #include <Python.h>
@@ -130,8 +130,8 @@ static bool pygpu_framebuffer_stack_pop_and_restore_or_error(GPUFrameBuffer *fb)
  * \{ */
 
 typedef struct {
-  PyObject_HEAD /* required python macro */
-      BPyGPUFrameBuffer *py_fb;
+  PyObject_HEAD /* Required Python macro. */
+  BPyGPUFrameBuffer *py_fb;
   int level;
 } PyFrameBufferStackContext;
 

@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2011, Blender Foundation.
+ * Copyright 2021, Blender Foundation.
  */
 
 #pragma once
@@ -23,19 +23,14 @@
 namespace blender::compositor {
 
 /**
- * Base class for primitive (Color/Vector/Value) constant operations. Constant folding is done
- * prior rendering converting all operations that can be constant into Color/Vector/Value
- * operations.
+ * Base class for primitive constant operations (Color/Vector/Value). The rest of operations that
+ * can be constant are evaluated into primitives during constant folding.
  */
 class ConstantOperation : public NodeOperation {
  public:
   ConstantOperation();
-  virtual float *get_constant_elem() = 0;
 
-  /* Intentionally non virtual. Constant operations shouldn't need initialization/deinitialization
-   * as they are values set beforehand. */
-  void initExecution() override;
-  void deinitExecution() override;
+  virtual const float *get_constant_elem() = 0;
 };
 
 }  // namespace blender::compositor

@@ -200,7 +200,7 @@ static void OVERLAY_cache_init(void *vedata)
     case CTX_MODE_OBJECT:
       break;
     default:
-      BLI_assert(!"Draw mode invalid");
+      BLI_assert_msg(0, "Draw mode invalid");
       break;
   }
   OVERLAY_antialiasing_cache_init(vedata);
@@ -324,7 +324,7 @@ static void OVERLAY_cache_populate(void *vedata, Object *ob)
                            !is_select;
   const bool draw_fade = draw_surface && (pd->overlay.flag & V3D_OVERLAY_FADE_INACTIVE) &&
                          overlay_should_fade_object(ob, draw_ctx->obact);
-  const bool draw_mode_transfer = draw_surface && (pd->overlay.flag & V3D_OVERLAY_MODE_TRANSFER);
+  const bool draw_mode_transfer = draw_surface;
   const bool draw_bones = (pd->overlay.flag & V3D_OVERLAY_HIDE_BONES) == 0;
   const bool draw_wires = draw_surface && has_surface &&
                           (pd->wireframe_mode || !pd->hide_overlays);

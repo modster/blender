@@ -180,12 +180,10 @@ void ImageOperation::executePixelSampled(float output[4], float x, float y, Pixe
 }
 
 void ImageOperation::update_memory_buffer_partial(MemoryBuffer *output,
-                                                  const rcti &output_rect,
-                                                  Span<MemoryBuffer *> UNUSED(inputs),
-                                                  ExecutionSystem &UNUSED(exec_system),
-                                                  int UNUSED(current_pass))
+                                                  const rcti &area,
+                                                  Span<MemoryBuffer *> UNUSED(inputs))
 {
-  copy_buffer_rect(output, m_buffer, output_rect, true);
+  output->copy_from(m_buffer, area, true);
 }
 
 void ImageAlphaOperation::executePixelSampled(float output[4],
@@ -206,12 +204,10 @@ void ImageAlphaOperation::executePixelSampled(float output[4],
 }
 
 void ImageAlphaOperation::update_memory_buffer_partial(MemoryBuffer *output,
-                                                       const rcti &output_rect,
-                                                       Span<MemoryBuffer *> UNUSED(inputs),
-                                                       ExecutionSystem &UNUSED(exec_system),
-                                                       int UNUSED(current_pass))
+                                                       const rcti &area,
+                                                       Span<MemoryBuffer *> UNUSED(inputs))
 {
-  copy_buffer_rect(output, output_rect.xmin, output_rect.ymin, 0, m_buffer, output_rect, 3, 1);
+  output->copy_from(m_buffer, area, 3, COM_DATA_TYPE_VALUE_CHANNELS, 0);
 }
 
 void ImageDepthOperation::executePixelSampled(float output[4],
@@ -234,17 +230,14 @@ void ImageDepthOperation::executePixelSampled(float output[4],
 }
 
 void ImageDepthOperation::update_memory_buffer_partial(MemoryBuffer *output,
-                                                       const rcti &output_rect,
-                                                       Span<MemoryBuffer *> UNUSED(inputs),
-                                                       ExecutionSystem &UNUSED(exec_system),
-                                                       int UNUSED(current_pass))
+                                                       const rcti &area,
+                                                       Span<MemoryBuffer *> UNUSED(inputs))
 {
   if (depth_buffer_) {
-    copy_buffer_rect(output, depth_buffer_, output_rect);
+    output->copy_from(depth_buffer_, area);
   }
   else {
-    float depth = 0;
-    fill_buffer_rect(output, output_rect, &depth);
+    output->fill(area, COM_VALUE_ZERO);
   }
 }
 

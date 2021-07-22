@@ -26,6 +26,7 @@
 #include <string.h>
 
 #include "DNA_screen_types.h"
+#include "DNA_space_types.h"
 #include "DNA_windowmanager_types.h"
 
 #include "MEM_guardedalloc.h"
@@ -40,6 +41,8 @@
 #include "BKE_global.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
+
+#include "ED_asset.h"
 
 #include "GPU_shader.h"
 #include "GPU_state.h"
@@ -143,7 +146,7 @@ wmDrag *WM_event_start_drag(
   wmWindowManager *wm = CTX_wm_manager(C);
   wmDrag *drag = MEM_callocN(sizeof(struct wmDrag), "new drag");
 
-  /* keep track of future multitouch drag too, add a mousepointer id or so */
+  /* Keep track of future multi-touch drag too, add a mouse-pointer id or so. */
   /* if multiple drags are added, they're drawn as list */
 
   BLI_addtail(&wm->drags, drag);
@@ -153,7 +156,7 @@ wmDrag *WM_event_start_drag(
   switch (type) {
     case WM_DRAG_PATH:
       BLI_strncpy(drag->path, poin, FILE_MAX);
-      /* As the path is being copied, free it immediately as `drag` wont "own" the data. */
+      /* As the path is being copied, free it immediately as `drag` won't "own" the data. */
       if (flags & WM_DRAG_FREE_DATA) {
         MEM_freeN(poin);
       }
@@ -195,6 +198,7 @@ void WM_drag_data_free(int dragtype, void *poin)
   /* Not too nice, could become a callback. */
   if (dragtype == WM_DRAG_ASSET) {
     wmDragAsset *asset_drag = poin;
+    MEM_SAFE_FREE(asset_drag->asset_handle);
     MEM_freeN((void *)asset_drag->path);
   }
   MEM_freeN(poin);
@@ -320,7 +324,7 @@ void WM_drag_add_local_ID(wmDrag *drag, ID *id, ID *from_parent)
       return;
     }
     if (GS(drag_id->id->name) != GS(id->name)) {
-      BLI_assert(!"All dragged IDs must have the same type");
+      BLI_assert_msg(0, "All dragged IDs must have the same type");
       return;
     }
   }
@@ -372,14 +376,24 @@ wmDragAsset *WM_drag_get_asset_data(const wmDrag *drag, int idcode)
   }
 
   wmDragAsset *asset_drag = drag->poin;
-  return (ELEM(idcode, 0, asset_drag->id_type)) ? asset_drag : NULL;
+  ID_Type idtype = ED_asset_handle_get_id_type(asset_drag->asset_handle);
+  return (ELEM(idcode, 0, (int)idtype)) ? asset_drag : NULL;
 }
 
 static ID *wm_drag_asset_id_import(wmDragAsset *asset_drag)
 {
-  /* Append only for now, wmDragAsset could have a `link` bool. */
-  return WM_file_append_datablock(
-      G_MAIN, NULL, NULL, NULL, asset_drag->path, asset_drag->id_type, asset_drag->name);
+  const char *name = ED_asset_handle_get_name(asset_drag->asset_handle);
+  ID_Type idtype = ED_asset_handle_get_id_type(asset_drag->asset_handle);
+
+  switch ((eFileAssetImportType)asset_drag->import_type) {
+    case FILE_ASSET_IMPORT_LINK:
+      return WM_file_link_datablock(G_MAIN, NULL, NULL, NULL, asset_drag->path, idtype, name);
+    case FILE_ASSET_IMPORT_APPEND:
+      return WM_file_append_datablock(G_MAIN, NULL, NULL, NULL, asset_drag->path, idtype, name);
+  }
+
+  BLI_assert_unreachable();
+  return NULL;
 }
 
 /**
@@ -435,7 +449,8 @@ void WM_drag_free_imported_drag_ID(struct Main *bmain, wmDrag *drag, wmDropBox *
     return;
   }
 
-  ID *id = BKE_libblock_find_name(bmain, asset_drag->id_type, name);
+  ID_Type idtype = ED_asset_handle_get_id_type(asset_drag->asset_handle);
+  ID *id = BKE_libblock_find_name(bmain, idtype, name);
   if (id) {
     BKE_id_delete(bmain, id);
   }
@@ -469,7 +484,7 @@ static const char *wm_drag_name(wmDrag *drag)
     }
     case WM_DRAG_ASSET: {
       const wmDragAsset *asset_drag = WM_drag_get_asset_data(drag, 0);
-      return asset_drag->name;
+      return ED_asset_handle_get_name(asset_drag->asset_handle);
     }
     case WM_DRAG_PATH:
     case WM_DRAG_NAME:
@@ -509,7 +524,7 @@ void wm_drags_draw(bContext *C, wmWindow *win, rcti *rect)
     rect->ymin = rect->ymax = cursory;
   }
 
-  /* Should we support multi-line drag draws? Maybe not, more types mixed wont work well. */
+  /* Should we support multi-line drag draws? Maybe not, more types mixed won't work well. */
   GPU_blend(GPU_BLEND_ALPHA);
   LISTBASE_FOREACH (wmDrag *, drag, &wm->drags) {
     const uchar text_col[] = {255, 255, 255, 255};

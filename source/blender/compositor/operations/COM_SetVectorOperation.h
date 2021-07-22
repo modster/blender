@@ -41,7 +41,7 @@ class SetVectorOperation : public ConstantOperation {
    */
   SetVectorOperation();
 
-  float *get_constant_elem() override
+  const float *get_constant_elem() override
   {
     return reinterpret_cast<float *>(&vector_);
   }

@@ -92,10 +92,8 @@ class ImageOperation : public BaseImageOperation {
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
 
   void update_memory_buffer_partial(MemoryBuffer *output,
-                                    const rcti &output_rect,
-                                    Span<MemoryBuffer *> inputs,
-                                    ExecutionSystem &exec_system,
-                                    int current_pass) override;
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 class ImageAlphaOperation : public BaseImageOperation {
  public:
@@ -106,10 +104,8 @@ class ImageAlphaOperation : public BaseImageOperation {
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
 
   void update_memory_buffer_partial(MemoryBuffer *output,
-                                    const rcti &output_rect,
-                                    Span<MemoryBuffer *> inputs,
-                                    ExecutionSystem &exec_system,
-                                    int current_pass) override;
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 class ImageDepthOperation : public BaseImageOperation {
  public:
@@ -120,10 +116,8 @@ class ImageDepthOperation : public BaseImageOperation {
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
 
   void update_memory_buffer_partial(MemoryBuffer *output,
-                                    const rcti &output_rect,
-                                    Span<MemoryBuffer *> inputs,
-                                    ExecutionSystem &exec_system,
-                                    int current_pass) override;
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor

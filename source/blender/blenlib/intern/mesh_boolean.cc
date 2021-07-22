@@ -21,6 +21,7 @@
 #ifdef WITH_GMP
 
 #  include <algorithm>
+#  include <atomic>
 #  include <fstream>
 #  include <iostream>
 
@@ -50,6 +51,7 @@
 #  include "BLI_mesh_boolean.hh"
 
 #  ifdef WITH_TBB
+#    include "tbb/parallel_reduce.h"
 #    include "tbb/spin_mutex.h"
 #  endif
 
@@ -149,7 +151,7 @@ class TriMeshTopology : NonCopyable {
    * Else return NO_INDEX. */
   int other_tri_if_manifold(Edge e, int t) const
   {
-    auto p = edge_tri_.lookup_ptr(e);
+    const auto *p = edge_tri_.lookup_ptr(e);
     if (p != nullptr && (*p)->size() == 2) {
       return ((**p)[0] == t) ? (**p)[1] : (**p)[0];
     }
@@ -201,9 +203,14 @@ TriMeshTopology::TriMeshTopology(const IMesh &tm)
         BLI_assert(edges != nullptr);
       }
       edges->append_non_duplicates(e);
-      auto createf = [t](Vector<int> **pvec) { *pvec = new Vector<int>{t}; };
-      auto modifyf = [t](Vector<int> **pvec) { (*pvec)->append_non_duplicates(t); };
-      this->edge_tri_.add_or_modify(Edge(v, vnext), createf, modifyf);
+
+      auto *p = edge_tri_.lookup_ptr(Edge(v, vnext));
+      if (p == nullptr) {
+        edge_tri_.add_new(e, new Vector<int>{t});
+      }
+      else {
+        (*p)->append_non_duplicates(t);
+      }
     }
   }
   /* Debugging. */
@@ -228,9 +235,18 @@ TriMeshTopology::TriMeshTopology(const IMesh &tm)
 
 TriMeshTopology::~TriMeshTopology()
 {
-  for (const Vector<int> *vec : edge_tri_.values()) {
-    delete vec;
+  Vector<Vector<int> *> values;
+
+  /* Deconstructing is faster in parallel, so it is worth building an array of things to delete. */
+  for (auto *item : edge_tri_.values()) {
+    values.append(item);
   }
+
+  threading::parallel_for(values.index_range(), 256, [&](IndexRange range) {
+    for (int i : range) {
+      delete values[i];
+    }
+  });
 }
 
 /** A Patch is a maximal set of triangles that share manifold edges only. */
@@ -719,6 +735,18 @@ static PatchesInfo find_patches(const IMesh &tm, const TriMeshTopology &tmtopo)
   PatchesInfo pinfo(ntri);
   /* Algorithm: Grow patches across manifold edges as long as there are unassigned triangles. */
   Stack<int> cur_patch_grow;
+
+  /* Create an Array containing indices of adjacent faces. */
+  Array<std::array<int, 3>> t_others(tm.face_size());
+  threading::parallel_for(tm.face_index_range(), 2048, [&](IndexRange range) {
+    for (int t : range) {
+      const Face &tri = *tm.face(t);
+      for (int i = 0; i < 3; ++i) {
+        Edge e(tri[i], tri[(i + 1) % 3]);
+        t_others[t][i] = tmtopo.other_tri_if_manifold(e, t);
+      }
+    }
+  });
   for (int t : tm.face_index_range()) {
     if (pinfo.tri_patch(t) == -1) {
       cur_patch_grow.push(t);
@@ -739,7 +767,7 @@ static PatchesInfo find_patches(const IMesh &tm, const TriMeshTopology &tmtopo)
         const Face &tri = *tm.face(tcand);
         for (int i = 0; i < 3; ++i) {
           Edge e(tri[i], tri[(i + 1) % 3]);
-          int t_other = tmtopo.other_tri_if_manifold(e, tcand);
+          int t_other = t_others[tcand][i];
           if (dbg_level > 1) {
             std::cout << "  edge " << e << " generates t_other=" << t_other << "\n";
           }
@@ -953,12 +981,8 @@ static void sort_by_signed_triangle_index(Vector<int> &g,
  * To accommodate this:
  * If extra_tri is non-null, then an index of EXTRA_TRI_INDEX should use it for the triangle.
  */
-static Array<int> sort_tris_around_edge(const IMesh &tm,
-                                        const TriMeshTopology &tmtopo,
-                                        const Edge e,
-                                        const Span<int> tris,
-                                        const int t0,
-                                        const Face *extra_tri)
+static Array<int> sort_tris_around_edge(
+    const IMesh &tm, const Edge e, const Span<int> tris, const int t0, const Face *extra_tri)
 {
   /* Divide and conquer, quick-sort-like sort.
    * Pick a triangle t0, then partition into groups:
@@ -1023,14 +1047,14 @@ static Array<int> sort_tris_around_edge(const IMesh &tm,
     }
   }
   if (g3.size() > 1) {
-    Array<int> g3sorted = sort_tris_around_edge(tm, tmtopo, e, g3, t0, extra_tri);
+    Array<int> g3sorted = sort_tris_around_edge(tm, e, g3, t0, extra_tri);
     std::copy(g3sorted.begin(), g3sorted.end(), g3.begin());
     if (dbg_level > 1) {
       std::cout << "g3 sorted: " << g3 << "\n";
     }
   }
   if (g4.size() > 1) {
-    Array<int> g4sorted = sort_tris_around_edge(tm, tmtopo, e, g4, t0, extra_tri);
+    Array<int> g4sorted = sort_tris_around_edge(tm, e, g4, t0, extra_tri);
     std::copy(g4sorted.begin(), g4sorted.end(), g4.begin());
     if (dbg_level > 1) {
       std::cout << "g4 sorted: " << g4 << "\n";
@@ -1076,7 +1100,7 @@ static void find_cells_from_edge(const IMesh &tm,
   const Vector<int> *edge_tris = tmtopo.edge_tris(e);
   BLI_assert(edge_tris != nullptr);
   Array<int> sorted_tris = sort_tris_around_edge(
-      tm, tmtopo, e, Span<int>(*edge_tris), (*edge_tris)[0], nullptr);
+      tm, e, Span<int>(*edge_tris), (*edge_tris)[0], nullptr);
 
   int n_edge_tris = edge_tris->size();
   Array<int> edge_patches(n_edge_tris);
@@ -1338,34 +1362,46 @@ static bool patch_cell_graph_ok(const CellsInfo &cinfo, const PatchesInfo &pinfo
 static bool is_pwn(const IMesh &tm, const TriMeshTopology &tmtopo)
 {
   constexpr int dbg_level = 0;
+  std::atomic<bool> is_pwn = true;
+  Vector<std::pair<Edge, Vector<int> *>> tris;
+
   for (auto item : tmtopo.edge_tri_map_items()) {
-    const Edge &edge = item.key;
-    int tot_orient = 0;
-    /* For each face t attached to edge, add +1 if the edge
-     * is positively in t, and -1 if negatively in t. */
-    for (int t : *item.value) {
-      const Face &face = *tm.face(t);
-      BLI_assert(face.size() == 3);
-      for (int i : face.index_range()) {
-        if (face[i] == edge.v0()) {
-          if (face[(i + 1) % 3] == edge.v1()) {
-            ++tot_orient;
-          }
-          else {
-            BLI_assert(face[(i + 3 - 1) % 3] == edge.v1());
-            --tot_orient;
+    tris.append(std::pair<Edge, Vector<int> *>(item.key, item.value));
+  }
+
+  threading::parallel_for(tris.index_range(), 2048, [&](IndexRange range) {
+    for (int j : range) {
+      const Edge &edge = tris[j].first;
+      int tot_orient = 0;
+      /* For each face t attached to edge, add +1 if the edge
+       * is positively in t, and -1 if negatively in t. */
+      for (int t : *tris[j].second) {
+        const Face &face = *tm.face(t);
+        BLI_assert(face.size() == 3);
+        for (int i : face.index_range()) {
+          if (face[i] == edge.v0()) {
+            if (face[(i + 1) % 3] == edge.v1()) {
+              ++tot_orient;
+            }
+            else {
+              BLI_assert(face[(i + 3 - 1) % 3] == edge.v1());
+              --tot_orient;
+            }
           }
         }
       }
-    }
-    if (tot_orient != 0) {
-      if (dbg_level > 0) {
-        std::cout << "edge causing non-pwn: " << edge << "\n";
+      if (tot_orient != 0) {
+        if (dbg_level > 0) {
+          std::cout << "edge causing non-pwn: " << edge << "\n";
+        }
+        is_pwn = false;
+#  ifdef WITH_TBB
+        tbb::task::self().cancel_group_execution();
+#  endif
       }
-      return false;
     }
-  }
-  return true;
+  });
+  return is_pwn.load();
 }
 
 /**
@@ -1396,8 +1432,7 @@ static int find_cell_for_point_near_edge(mpq3 p,
   Array<int> edge_tris(etris->size() + 1);
   std::copy(etris->begin(), etris->end(), edge_tris.begin());
   edge_tris[edge_tris.size() - 1] = EXTRA_TRI_INDEX;
-  Array<int> sorted_tris = sort_tris_around_edge(
-      tm, tmtopo, e, edge_tris, edge_tris[0], dummy_tri);
+  Array<int> sorted_tris = sort_tris_around_edge(tm, e, edge_tris, edge_tris[0], dummy_tri);
   if (dbg_level > 0) {
     std::cout << "sorted tris = " << sorted_tris << "\n";
   }
@@ -1406,9 +1441,9 @@ static int find_cell_for_point_near_edge(mpq3 p,
   int dummy_index = p_sorted_dummy - sorted_tris.begin();
   int prev_tri = (dummy_index == 0) ? sorted_tris[sorted_tris.size() - 1] :
                                       sorted_tris[dummy_index - 1];
-  int next_tri = (dummy_index == sorted_tris.size() - 1) ? sorted_tris[0] :
-                                                           sorted_tris[dummy_index + 1];
   if (dbg_level > 0) {
+    int next_tri = (dummy_index == sorted_tris.size() - 1) ? sorted_tris[0] :
+                                                             sorted_tris[dummy_index + 1];
     std::cout << "prev tri to dummy = " << prev_tri << ";  next tri to dummy = " << next_tri
               << "\n";
   }
@@ -1452,39 +1487,66 @@ static int find_ambient_cell(const IMesh &tm,
   /* First find a vertex with the maximum x value. */
   /* Prefer not to populate the verts in the #IMesh just for this. */
   const Vert *v_extreme;
-  mpq_class extreme_x;
+  auto max_x_vert = [](const Vert *a, const Vert *b) {
+    return (a->co_exact.x > b->co_exact.x) ? a : b;
+  };
   if (component_patches == nullptr) {
-    v_extreme = (*tm.face(0))[0];
-    extreme_x = v_extreme->co_exact.x;
-    for (const Face *f : tm.faces()) {
-      for (const Vert *v : *f) {
-        const mpq_class &x = v->co_exact.x;
-        if (x > extreme_x) {
-          v_extreme = v;
-          extreme_x = x;
-        }
-      }
-    }
+    v_extreme = threading::parallel_reduce(
+        tm.face_index_range(),
+        2048,
+        (*tm.face(0))[0],
+        [&](IndexRange range, const Vert *init) {
+          const Vert *ans = init;
+          for (int i : range) {
+            const Face *f = tm.face(i);
+            for (const Vert *v : *f) {
+              if (v->co_exact.x > ans->co_exact.x) {
+                ans = v;
+              }
+            }
+          }
+          return ans;
+        },
+        max_x_vert);
   }
   else {
     if (dbg_level > 0) {
       std::cout << "restrict to patches " << *component_patches << "\n";
     }
     int p0 = (*component_patches)[0];
-    v_extreme = (*tm.face(pinfo.patch(p0).tri(0)))[0];
-    extreme_x = v_extreme->co_exact.x;
-    for (int p : *component_patches) {
-      for (int t : pinfo.patch(p).tris()) {
-        const Face *f = tm.face(t);
-        for (const Vert *v : *f) {
-          const mpq_class &x = v->co_exact.x;
-          if (x > extreme_x) {
-            v_extreme = v;
-            extreme_x = x;
+    v_extreme = threading::parallel_reduce(
+        component_patches->index_range(),
+        2048,
+        (*tm.face(pinfo.patch(p0).tri(0)))[0],
+        [&](IndexRange range, const Vert *init) {
+          const Vert *ans = init;
+          for (int pi : range) {
+            int p = (*component_patches)[pi];
+            const Vert *tris_ans = threading::parallel_reduce(
+                IndexRange(pinfo.patch(p).tot_tri()),
+                2048,
+                init,
+                [&](IndexRange tris_range, const Vert *t_init) {
+                  const Vert *v_ans = t_init;
+                  for (int i : tris_range) {
+                    int t = pinfo.patch(p).tri(i);
+                    const Face *f = tm.face(t);
+                    for (const Vert *v : *f) {
+                      if (v->co_exact.x > v_ans->co_exact.x) {
+                        v_ans = v;
+                      }
+                    }
+                  }
+                  return v_ans;
+                },
+                max_x_vert);
+            if (tris_ans->co_exact.x > ans->co_exact.x) {
+              ans = tris_ans;
+            }
           }
-        }
-      }
-    }
+          return ans;
+        },
+        max_x_vert);
   }
   if (dbg_level > 0) {
     std::cout << "v_extreme = " << v_extreme << "\n";
@@ -1493,7 +1555,8 @@ static int find_ambient_cell(const IMesh &tm,
    * when projected onto the XY plane. That edge is guaranteed to
    * be on the convex hull of the mesh. */
   const Vector<Edge> &edges = tmtopo.vert_edges(v_extreme);
-  const mpq_class extreme_y = v_extreme->co_exact.y;
+  const mpq_class &extreme_x = v_extreme->co_exact.x;
+  const mpq_class &extreme_y = v_extreme->co_exact.y;
   Edge ehull;
   mpq_class max_abs_slope = -1;
   for (Edge e : edges) {
@@ -1514,8 +1577,8 @@ static int find_ambient_cell(const IMesh &tm,
   if (dbg_level > 0) {
     std::cout << "ehull = " << ehull << " slope = " << max_abs_slope << "\n";
   }
-  /* Sort triangles around ehull, including a dummy triangle that include a known point in ambient
-   * cell. */
+  /* Sort triangles around ehull, including a dummy triangle that include a known point in
+   * ambient cell. */
   mpq3 p_in_ambient = v_extreme->co_exact;
   p_in_ambient.x += 1;
   int c_ambient = find_cell_for_point_near_edge(p_in_ambient, ehull, tm, tmtopo, pinfo, arena);
@@ -1863,6 +1926,7 @@ static Vector<ComponentContainer> find_component_containers(int comp,
                                                             const IMesh &tm,
                                                             const PatchesInfo &pinfo,
                                                             const TriMeshTopology &tmtopo,
+                                                            Array<BoundingBox> &comp_bb,
                                                             IMeshArena *arena)
 {
   constexpr int dbg_level = 0;
@@ -1887,6 +1951,12 @@ static Vector<ComponentContainer> find_component_containers(int comp,
     }
     if (dbg_level > 0) {
       std::cout << "comp_other = " << comp_other << "\n";
+    }
+    if (!bbs_might_intersect(comp_bb[comp], comp_bb[comp_other])) {
+      if (dbg_level > 0) {
+        std::cout << "bounding boxes don't overlap\n";
+      }
+      continue;
     }
     int nearest_tri = NO_INDEX;
     int nearest_tri_close_vert = -1;
@@ -1962,6 +2032,51 @@ static Vector<ComponentContainer> find_component_containers(int comp,
 }
 
 /**
+ * Populate the per-component bounding boxes, expanding them
+ * by an appropriate epsilon so that we conservatively will say
+ * that components could intersect if the BBs overlap.
+ */
+static void populate_comp_bbs(const Vector<Vector<int>> &components,
+                              const PatchesInfo &pinfo,
+                              const IMesh &im,
+                              Array<BoundingBox> &comp_bb)
+{
+  const int comp_grainsize = 16;
+  /* To get a good expansion epsilon, we need to find the maximum
+   * absolute value of any coordinate. Do it first per component,
+   * then get the overall max. */
+  Array<double> max_abs(components.size(), 0.0);
+  threading::parallel_for(components.index_range(), comp_grainsize, [&](IndexRange comp_range) {
+    for (int c : comp_range) {
+      BoundingBox &bb = comp_bb[c];
+      double &maxa = max_abs[c];
+      for (int p : components[c]) {
+        const Patch &patch = pinfo.patch(p);
+        for (int t : patch.tris()) {
+          const Face &tri = *im.face(t);
+          for (const Vert *v : tri) {
+            bb.combine(v->co);
+            for (int i = 0; i < 3; ++i) {
+              maxa = max_dd(maxa, fabs(v->co[i]));
+            }
+          }
+        }
+      }
+    }
+  });
+  double all_max_abs = 0.0;
+  for (int c : components.index_range()) {
+    all_max_abs = max_dd(all_max_abs, max_abs[c]);
+  }
+  constexpr float pad_factor = 10.0f;
+  float pad = all_max_abs == 0.0 ? FLT_EPSILON : 2 * FLT_EPSILON * all_max_abs;
+  pad *= pad_factor;
+  for (int c : components.index_range()) {
+    comp_bb[c].expand(pad);
+  }
+}
+
+/**
  * The cells and patches are supposed to form a bipartite graph.
  * The graph may be disconnected (if parts of meshes are nested or side-by-side
  * without intersection with other each other).
@@ -2003,19 +2118,23 @@ static void finish_patch_cell_graph(const IMesh &tm,
   }
   int tot_components = components.size();
   Array<Vector<ComponentContainer>> comp_cont(tot_components);
-  for (int comp : components.index_range()) {
-    comp_cont[comp] = find_component_containers(
-        comp, components, ambient_cell, tm, pinfo, tmtopo, arena);
-  }
-  if (dbg_level > 0) {
-    std::cout << "component containers:\n";
-    for (int comp : comp_cont.index_range()) {
-      std::cout << comp << ": ";
-      for (const ComponentContainer &cc : comp_cont[comp]) {
-        std::cout << "[containing_comp=" << cc.containing_component
-                  << ", nearest_cell=" << cc.nearest_cell << ", d2=" << cc.dist_to_cell << "] ";
+  if (tot_components > 1) {
+    Array<BoundingBox> comp_bb(tot_components);
+    populate_comp_bbs(components, pinfo, tm, comp_bb);
+    for (int comp : components.index_range()) {
+      comp_cont[comp] = find_component_containers(
+          comp, components, ambient_cell, tm, pinfo, tmtopo, comp_bb, arena);
+    }
+    if (dbg_level > 0) {
+      std::cout << "component containers:\n";
+      for (int comp : comp_cont.index_range()) {
+        std::cout << comp << ": ";
+        for (const ComponentContainer &cc : comp_cont[comp]) {
+          std::cout << "[containing_comp=" << cc.containing_component
+                    << ", nearest_cell=" << cc.nearest_cell << ", d2=" << cc.dist_to_cell << "] ";
+        }
+        std::cout << "\n";
       }
-      std::cout << "\n";
     }
   }
   if (dbg_level > 1) {
@@ -2635,7 +2754,7 @@ static IMesh raycast_tris_boolean(const IMesh &tm,
   tbb::spin_mutex mtx;
 #  endif
   const int grainsize = 256;
-  parallel_for(IndexRange(tm.face_size()), grainsize, [&](IndexRange range) {
+  threading::parallel_for(IndexRange(tm.face_size()), grainsize, [&](IndexRange range) {
     Array<float> in_shape(nshapes, 0);
     Array<int> winding(nshapes, 0);
     for (int t : range) {
@@ -2760,7 +2879,8 @@ static IMesh raycast_patches_boolean(const IMesh &tm,
 }
 /**
  * If \a tri1 and \a tri2 have a common edge (in opposite orientation),
- * return the indices into \a tri1 and \a tri2 where that common edge starts. Else return (-1,-1).
+ * return the indices into \a tri1 and \a tri2 where that common edge starts. Else return
+ * (-1,-1).
  */
 static std::pair<int, int> find_tris_common_edge(const Face &tri1, const Face &tri2)
 {
@@ -3322,8 +3442,8 @@ static void dissolve_verts(IMesh *imesh, const Array<bool> dissolve, IMeshArena 
  * will have an original edge that is NO_INDEX.
  * Not all triangulation edges can be removed: if they ended up non-trivially overlapping a real
  * input edge, then we need to keep it. Also, some are necessary to make the output satisfy
- * the "valid #BMesh" property: we can't produce output faces that have repeated vertices in them,
- * or have several disconnected boundaries (e.g., faces with holes).
+ * the "valid #BMesh" property: we can't produce output faces that have repeated vertices in
+ * them, or have several disconnected boundaries (e.g., faces with holes).
  */
 static IMesh polymesh_from_trimesh_with_dissolve(const IMesh &tm_out,
                                                  const IMesh &imesh_in,
@@ -3335,7 +3455,7 @@ static IMesh polymesh_from_trimesh_with_dissolve(const IMesh &tm_out,
   }
   /* For now: need plane normals for all triangles. */
   const int grainsize = 1024;
-  parallel_for(tm_out.face_index_range(), grainsize, [&](IndexRange range) {
+  threading::parallel_for(tm_out.face_index_range(), grainsize, [&](IndexRange range) {
     for (int i : range) {
       Face *tri = tm_out.face(i);
       tri->populate_plane(false);

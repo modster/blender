@@ -49,10 +49,11 @@ set(SRC
   COM_compositor.h
   COM_defines.h
 
-  intern/COM_buffer_util.cc
-  intern/COM_buffer_util.h
+  intern/COM_BufferArea.h
   intern/COM_BufferOperation.cc
   intern/COM_BufferOperation.h
+  intern/COM_BufferRange.h
+  intern/COM_BuffersIterator.h
   intern/COM_CPUDevice.cc
   intern/COM_CPUDevice.h
   intern/COM_ChunkOrder.cc
@@ -70,6 +71,7 @@ set(SRC
   intern/COM_Device.cc
   intern/COM_Device.h
   intern/COM_Enums.cc
+  intern/COM_Enums.h
   intern/COM_ExecutionGroup.cc
   intern/COM_ExecutionGroup.h
   intern/COM_ExecutionModel.cc
@@ -86,6 +88,8 @@ set(SRC
   intern/COM_MetaData.h
   intern/COM_MultiThreadedOperation.cc
   intern/COM_MultiThreadedOperation.h
+  intern/COM_MultiThreadedRowOperation.cc
+  intern/COM_MultiThreadedRowOperation.h
   intern/COM_Node.cc
   intern/COM_Node.h
   intern/COM_NodeConverter.cc
@@ -446,6 +450,8 @@ set(SRC
   operations/COM_BrightnessOperation.h
   operations/COM_ColorCorrectionOperation.cc
   operations/COM_ColorCorrectionOperation.h
+  operations/COM_ConstantOperation.cc
+  operations/COM_ConstantOperation.h
   operations/COM_GammaOperation.cc
   operations/COM_GammaOperation.h
   operations/COM_MixOperation.cc
