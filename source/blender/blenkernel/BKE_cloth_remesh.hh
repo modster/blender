@@ -475,6 +475,12 @@ template<typename T> class Edge {
     return this->verts;
   }
 
+  const auto &get_checked_verts() const
+  {
+    BLI_assert(this->verts);
+    return this->verts.value();
+  }
+
   friend std::ostream &operator<<(std::ostream &stream, const Edge &edge)
   {
     stream << "(self_index: " << edge.self_index << ", faces: " << edge.faces
