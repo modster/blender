@@ -67,7 +67,7 @@
 
 #define ROTATION_CONTROL_GAP 15.0f
 
-/* Temporary Asset import operation data */
+/* Temporary Asset import operation data. */
 typedef struct tGPDasset {
   struct wmWindow *win;
   struct Main *bmain;
