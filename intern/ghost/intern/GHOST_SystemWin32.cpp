@@ -1092,7 +1092,9 @@ GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *wind
     return NULL;
   }
 
-  system->getCursorPosition(x_screen, y_screen);
+  DWORD pos = ::GetMessagePos();
+  x_screen = GET_X_LPARAM(pos);
+  y_screen = GET_Y_LPARAM(pos);
 
   int32_t x_accum = 0;
   int32_t y_accum = 0;
