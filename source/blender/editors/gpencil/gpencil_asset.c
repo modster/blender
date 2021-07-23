@@ -356,15 +356,18 @@ static bool gpencil_asset_create(const bContext *C,
     strcpy(gpl_dst->info, "Asset_Layer");
   }
 
+  /* Ensure preview is done with first available frame. */
+  const int first_franum = gpencil_asset_get_first_franum(gpd);
+  CFRA = first_franum;
+
   /* Mark as asset. */
   ED_asset_mark_id(C, &gpd->id);
 
   /* Retime frame number to start by 1. Must be done after generate the render preview. */
   if (retime_frames) {
-    const int first_franum = gpencil_asset_get_first_franum(gpd) - 1;
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
       LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-        gpf->framenum -= first_franum;
+        gpf->framenum -= first_franum - 1;
       }
     }
   }
