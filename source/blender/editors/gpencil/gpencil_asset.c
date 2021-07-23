@@ -223,7 +223,7 @@ static bool gpencil_asset_create(const bContext *C,
                                  const bGPDlayer *gpl_filter,
                                  const eGP_AssetModes mode,
                                  const bool reset_origin,
-                                 const bool merge_layers)
+                                 const bool flatten_layers)
 {
   Main *bmain = CTX_data_main(C);
   bool non_supported_feature = false;
@@ -328,8 +328,8 @@ static bool gpencil_asset_create(const bContext *C,
     }
   }
 
-  /* Merge layers. */
-  if ((merge_layers) && (gpd->layers.first)) {
+  /* Flatten layers. */
+  if ((flatten_layers) && (gpd->layers.first)) {
     bGPDlayer *gpl_dst = gpd->layers.first;
     LISTBASE_FOREACH_MUTABLE (bGPDlayer *, gpl_src, &gpd->layers) {
       if (gpl_dst == gpl_src) {
@@ -353,18 +353,18 @@ static int gpencil_asset_create_exec(const bContext *C, const wmOperator *op)
 
   const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
   const bool reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
-  const bool merge_layers = RNA_boolean_get(op->ptr, "merge_layers");
+  const bool flatten_layers = RNA_boolean_get(op->ptr, "flatten_layers");
 
   bool non_supported_feature = false;
   if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_src->layers) {
       non_supported_feature |= gpencil_asset_create(
-          C, gpd_src, gpl, mode, reset_origin, merge_layers);
+          C, gpd_src, gpl, mode, reset_origin, flatten_layers);
     }
   }
   else {
     non_supported_feature = gpencil_asset_create(
-        C, gpd_src, NULL, mode, reset_origin, merge_layers);
+        C, gpd_src, NULL, mode, reset_origin, flatten_layers);
   }
 
   /* Warnings for non supported features in the created asset. */
@@ -419,7 +419,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
                   0,
                   "Reset Origin to Geometry",
                   "Set origin of the asset in the center of the strokes bounding box");
-  RNA_def_boolean(ot->srna, "merge_layers", 0, "Merge Layers", "Merge all layers in only one");
+  RNA_def_boolean(ot->srna, "flatten_layers", 0, "Flatten Layers", "Merge all layers in only one");
 }
 
 /** \} */
