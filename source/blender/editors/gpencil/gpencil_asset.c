@@ -237,6 +237,11 @@ static void gpencil_asset_create(bContext *C,
   bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd);
 
   LISTBASE_FOREACH_MUTABLE (bGPDlayer *, gpl, &gpd->layers) {
+    /* If layer is hidden, remove. */
+    if (gpl->flag & GP_LAYER_HIDE) {
+      BKE_gpencil_layer_delete(gpd, gpl);
+      continue;
+    }
     /* If Layer or Active Frame mode, delete non active layers. */
     if ((ELEM(mode, GP_ASSET_MODE_LAYER, GP_ASSET_MODE_FRAME)) && (gpl != gpl_active)) {
       BKE_gpencil_layer_delete(gpd, gpl);
