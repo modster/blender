@@ -218,9 +218,9 @@ typedef enum eGP_AssetModes {
 } eGP_AssetModes;
 
 /* Helper: Create an asset for datablock. */
-static void gpencil_asset_create(bContext *C,
-                                 bGPdata *gpd_src,
-                                 bGPDlayer *gpl_filter,
+static void gpencil_asset_create(const bContext *C,
+                                 const bGPdata *gpd_src,
+                                 const bGPDlayer *gpl_filter,
                                  const eGP_AssetModes mode,
                                  const bool reset_origin,
                                  const bool merge_layers)
@@ -332,7 +332,7 @@ static void gpencil_asset_create(bContext *C,
   }
 }
 
-static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
+static int gpencil_asset_create_exec(const bContext *C, const wmOperator *op)
 {
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd_src = ob->data;
@@ -403,7 +403,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
  * \{ */
 
 /* Helper: Update all imported strokes */
-static void gpencil_asset_import_update_strokes(bContext *C, tGPDasset *tgpa)
+static void gpencil_asset_import_update_strokes(const bContext *C, const tGPDasset *tgpa)
 {
   bGPdata *gpd = tgpa->gpd;
 
@@ -503,7 +503,7 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
 }
 
 /* Draw a cage for manipulate asset */
-static void gpencil_2d_cage_draw(tGPDasset *tgpa)
+static void gpencil_2d_cage_draw(const tGPDasset *tgpa)
 {
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
@@ -657,8 +657,8 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
 }
 
 /* Helper: Get the rotation matrix for the angle using an arbitrary vector as axis. */
-static void gpencil_asset_rotation_matrix_get(float angle,
-                                              float axis[3],
+static void gpencil_asset_rotation_matrix_get(const float angle,
+                                              const float axis[3],
                                               float rotation_matrix[4][4])
 {
   const float u2 = axis[0] * axis[0];
@@ -817,7 +817,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
 }
 
 /* Helper: Get lower frame number from asset strokes. */
-static int gpencil_asset_get_first_franum(bGPdata *gpd)
+static int gpencil_asset_get_first_franum(const bGPdata *gpd)
 {
   int first_fra = INT_MAX;
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
@@ -997,7 +997,7 @@ static void gpencil_asset_clean_temp_data(tGPDasset *tgpa)
 }
 
 /* Helper: Draw status message while the user is running the operator. */
-static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *tgpa)
+static void gpencil_asset_import_status_indicators(bContext *C, const tGPDasset *tgpa)
 {
   char status_str[UI_MAX_DRAW_STR];
   char msg_str[UI_MAX_DRAW_STR];
@@ -1019,7 +1019,7 @@ static void gpencil_asset_import_status_indicators(bContext *C, tGPDasset *tgpa)
 }
 
 /* Update screen and stroke. */
-static void gpencil_asset_import_update(bContext *C, wmOperator *op, tGPDasset *tgpa)
+static void gpencil_asset_import_update(bContext *C, const wmOperator *op, tGPDasset *tgpa)
 {
   /* Update shift indicator in header. */
   gpencil_asset_import_status_indicators(C, tgpa);
@@ -1072,7 +1072,7 @@ static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
 
 /* Init new temporary data. */
 static bool gpencil_asset_import_set_init_values(bContext *C,
-                                                 wmOperator *op,
+                                                 const wmOperator *op,
                                                  ID *id,
                                                  tGPDasset *tgpa)
 {
