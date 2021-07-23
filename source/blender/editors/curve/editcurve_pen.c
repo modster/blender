@@ -544,6 +544,11 @@ static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
     next_bezt = new_bezt + 1;
   }
 
+  /* Interpolate radius, tilt, weight */
+  new_bezt->tilt = interpf(next_bezt->tilt, (new_bezt - 1)->tilt, data->parameter);
+  new_bezt->radius = interpf(next_bezt->radius, (new_bezt - 1)->radius, data->parameter);
+  new_bezt->weight = interpf(next_bezt->weight, (new_bezt - 1)->weight, data->parameter);
+
   free_up_handles_for_movement(new_bezt, true, true);
   free_up_handles_for_movement(new_bezt - 1, false, true);
   free_up_handles_for_movement(next_bezt, true, false);
