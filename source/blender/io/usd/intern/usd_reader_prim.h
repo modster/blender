@@ -61,7 +61,7 @@ struct ImportSettings {
   }
 };
 
-// Most generic USD Reader
+/* Most generic USD Reader. */
 
 class USDPrimReader {
 

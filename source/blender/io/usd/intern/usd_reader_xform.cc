@@ -88,7 +88,7 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
   }
 
   if (!xformable) {
-    // This might happen if the prim is a Scope.
+    /* This might happen if the prim is a Scope. */
     return;
   }
 
@@ -98,7 +98,7 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
   bool reset_xform_stack;
   xformable.GetLocalTransformation(&usd_local_xf, &reset_xform_stack, time);
 
-  // Convert the result to a float matrix.
+  /* Convert the result to a float matrix. */
   pxr::GfMatrix4f mat4f = pxr::GfMatrix4f(usd_local_xf);
   mat4f.Get(r_mat);
 
@@ -123,7 +123,7 @@ bool USDXformReader::prim_has_xform_ops() const
   pxr::UsdGeomXformable xformable(prim_);
 
   if (!xformable) {
-    // This might happen if the prim is a Scope.
+    /* This might happen if the prim is a Scope. */
     return false;
   }
 
@@ -139,9 +139,9 @@ bool USDXformReader::is_root_xform_prim() const
   }
 
   if (prim_.IsInMaster()) {
-    // We don't consider prototypes to be root prims,
-    // because we never want to apply global scaling
-    // or rotations to the prototypes themselves.
+    /* We don't consider prototypes to be root prims,
+     * because we never want to apply global scaling
+     * or rotations to the prototypes themselves. */
     return false;
   }
 
