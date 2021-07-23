@@ -77,9 +77,9 @@ typedef struct tGPDasset {
   struct ARegion *region;
   /** Current object. */
   struct Object *ob;
-  /** Current GP datablock. */
+  /** Current GP data block. */
   struct bGPdata *gpd;
-  /** Asset GP datablock. */
+  /** Asset GP data block. */
   struct bGPdata *gpd_asset;
   /* Space Conversion Data */
   struct GP_SpaceConversion gsc;
@@ -196,7 +196,7 @@ static bool gpencil_asset_generic_poll(bContext *C)
 }
 
 /* -------------------------------------------------------------------- */
-/** \name Create Grease Pencil Datablock Asset operator
+/** \name Create Grease Pencil data block Asset operator
  * \{ */
 
 typedef enum eGP_AssetModes {
@@ -216,7 +216,7 @@ typedef enum eGP_AssetModes {
   GP_ASSET_MODE_SELECTED_STROKES,
 } eGP_AssetModes;
 
-/* Helper: Create an asset for datablock.
+/* Helper: Create an asset for data block.
  * return: False if there are features non supported. */
 static bool gpencil_asset_create(const bContext *C,
                                  const bGPdata *gpd_src,
@@ -228,7 +228,7 @@ static bool gpencil_asset_create(const bContext *C,
   Main *bmain = CTX_data_main(C);
   bool non_supported_feature = false;
 
-  /* Create a copy of selected datablock. */
+  /* Create a copy of selected data block. */
   bGPdata *gpd = (bGPdata *)BKE_id_copy(bmain, &gpd_src->id);
   /* Enable fake user by default. */
   id_fake_user_set(&gpd->id);
@@ -425,7 +425,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Import Grease Pencil Asset into existing datablock operator
+/** \name Import Grease Pencil Asset into existing data block operator
  * \{ */
 
 /* Helper: Update all imported strokes */
@@ -857,7 +857,7 @@ static int gpencil_asset_get_first_franum(const bGPdata *gpd)
   return first_fra;
 }
 
-/* Helper: Get a material from the datablock array. */
+/* Helper: Get a material from the data block array. */
 static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index)
 {
   const short *tot_slots_data_ptr = BKE_id_material_len_p(id);
@@ -873,7 +873,7 @@ static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index
   return material;
 }
 
-/* Helper: Append all strokes from the asset in the target datablock. */
+/* Helper: Append all strokes from the asset in the target data block. */
 static void gpencil_asset_append_strokes(tGPDasset *tgpa)
 {
   bGPdata *gpd_target = tgpa->gpd;
@@ -891,7 +891,7 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
   int const first_fra = gpencil_asset_get_first_franum(gpd_asset);
 
   LISTBASE_FOREACH (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
-    /* Check if Layer is in target datablock. */
+    /* Check if Layer is in target data block. */
     bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
     if (gpl_target == NULL) {
       gpl_target = BKE_gpencil_layer_duplicate(gpl_asset, false, false);
@@ -1123,9 +1123,9 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   /* Save current frame number. */
   tgpa->cframe = tgpa->scene->r.cfra;
 
-  /* Target GP datablock. */
+  /* Target GP data block. */
   tgpa->gpd = tgpa->ob->data;
-  /* Asset GP datablock. */
+  /* Asset GP data block. */
   tgpa->gpd_asset = (bGPdata *)id;
 
   tgpa->mode = GP_ASSET_TRANSFORM_LOC;
@@ -1224,7 +1224,7 @@ static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEven
   tgpa->drop[0] = event->mval[0];
   tgpa->drop[1] = event->mval[1];
 
-  /* Do an initial load of the strokes in the target datablock. */
+  /* Do an initial load of the strokes in the target data block. */
   gpencil_asset_append_strokes(tgpa);
 
   tgpa->draw_handle_3d = ED_region_draw_cb_activate(
