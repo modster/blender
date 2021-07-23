@@ -201,15 +201,15 @@ static bool gpencil_asset_generic_poll(bContext *C)
 
 typedef enum eGP_AssetModes {
   /* Active Layer. */
-  GP_ASSET_MODE_LAYER = 0,
+  GP_ASSET_MODE_ACTIVE_LAYER = 0,
   /* All Layers. */
   GP_ASSET_MODE_ALL_LAYERS,
   /* All Layers in separated assets. */
   GP_ASSET_MODE_ALL_LAYERS_SPLIT,
   /* Active Frame. */
-  GP_ASSET_MODE_FRAME,
+  GP_ASSET_MODE_ACTIVE_FRAME,
   /* Active Frame All Layers. */
-  GP_ASSET_MODE_FRAME_ALL_LAYERS,
+  GP_ASSET_MODE_ACTIVE_FRAME_ALL_LAYERS,
   /* Selected Frames. */
   GP_ASSET_MODE_SELECTED_FRAMES,
   /* Selected Strokes. */
@@ -242,7 +242,8 @@ static void gpencil_asset_create(const bContext *C,
       continue;
     }
     /* If Layer or Active Frame mode, delete non active layers. */
-    if ((ELEM(mode, GP_ASSET_MODE_LAYER, GP_ASSET_MODE_FRAME)) && (gpl != gpl_active)) {
+    if ((ELEM(mode, GP_ASSET_MODE_ACTIVE_LAYER, GP_ASSET_MODE_ACTIVE_FRAME)) &&
+        (gpl != gpl_active)) {
       BKE_gpencil_layer_delete(gpd, gpl);
       continue;
     }
@@ -272,7 +273,7 @@ static void gpencil_asset_create(const bContext *C,
 
     LISTBASE_FOREACH_MUTABLE (bGPDframe *, gpf, &gpl->frames) {
       /* If Active Frame mode, delete non active frames. */
-      if ((ELEM(mode, GP_ASSET_MODE_FRAME, GP_ASSET_MODE_FRAME_ALL_LAYERS)) &&
+      if ((ELEM(mode, GP_ASSET_MODE_ACTIVE_FRAME, GP_ASSET_MODE_ACTIVE_FRAME_ALL_LAYERS)) &&
           (gpf != gpf_active)) {
         BKE_gpencil_layer_frame_delete(gpl, gpf);
         continue;
@@ -358,15 +359,15 @@ static int gpencil_asset_create_exec(const bContext *C, const wmOperator *op)
 void GPENCIL_OT_asset_create(wmOperatorType *ot)
 {
   static const EnumPropertyItem mode_types[] = {
-      {GP_ASSET_MODE_LAYER, "LAYER", 0, "Active Layer", ""},
+      {GP_ASSET_MODE_ACTIVE_LAYER, "LAYER", 0, "Active Layer", ""},
       {GP_ASSET_MODE_ALL_LAYERS, "LAYERS_ALL", 0, "All Layers", ""},
       {GP_ASSET_MODE_ALL_LAYERS_SPLIT,
        "LAYERS_SPLIT",
        0,
        "All Layers Separated",
        "Create an asset by layer."},
-      {GP_ASSET_MODE_FRAME, "FRAME", 0, "Active Frame (Active Layer)", ""},
-      {GP_ASSET_MODE_FRAME_ALL_LAYERS, "FRAME_ALL", 0, "Active Frame (All Layers)", ""},
+      {GP_ASSET_MODE_ACTIVE_FRAME, "FRAME", 0, "Active Frame (Active Layer)", ""},
+      {GP_ASSET_MODE_ACTIVE_FRAME_ALL_LAYERS, "FRAME_ALL", 0, "Active Frame (All Layers)", ""},
       {GP_ASSET_MODE_SELECTED_FRAMES, "FRAME_SELECTED", 0, "Selected Frames", ""},
       {GP_ASSET_MODE_SELECTED_STROKES, "SELECTED", 0, "Selected Strokes", ""},
       {0, NULL, 0, NULL, NULL},
