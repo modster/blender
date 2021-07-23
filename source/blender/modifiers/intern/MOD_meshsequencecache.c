@@ -20,6 +20,7 @@
 
 #include <string.h>
 
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -47,8 +48,6 @@
 #include "RNA_access.h"
 
 #include "BLO_read_write.h"
-
-#include "BLI_string.h"
 
 #include "DEG_depsgraph_build.h"
 #include "DEG_depsgraph_query.h"
