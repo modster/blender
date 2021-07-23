@@ -52,7 +52,7 @@ std::string DebugInfo::m_current_node_name;
 std::string DebugInfo::m_current_op_name;
 DebugInfo::GroupStateMap DebugInfo::m_group_states;
 
-static std::string operation_class_name(NodeOperation *op)
+static std::string operation_class_name(const NodeOperation *op)
 {
   std::string full_name = typeid(*op).name();
   /* Remove name-spaces. */

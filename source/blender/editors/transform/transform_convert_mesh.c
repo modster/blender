@@ -1964,242 +1964,204 @@ static void tc_mesh_partial_types_calc(TransInfo *t, struct PartialTypeState *r_
       partial_for_normals = PARTIAL_TYPE_ALL;
     }
   }
+
+  r_partial_state->for_looptri = partial_for_looptri;
+  r_partial_state->for_normals = partial_for_normals;
+}
+
+static void tc_mesh_partial_update(TransInfo *t,
+                                   TransDataContainer *tc,
+                                   const struct PartialTypeState *partial_state)
+{
+  BMEditMesh *em = BKE_editmesh_from_object(tc->obedit);
+
+  struct TransCustomDataMesh *tcmd = tc_mesh_customdata_ensure(tc);
+
+  const struct PartialTypeState *partial_state_prev = &tcmd->partial_update_state_prev;
+
+  /* Promote the partial update types based on the previous state
+   * so the values that no longer modified are reset before being left as-is.
+   * Needed for translation which can toggle snap-to-normal during transform. */
+  const enum ePartialType partial_for_looptri = MAX2(partial_state->for_looptri,
+                                                     partial_state_prev->for_looptri);
+  const enum ePartialType partial_for_normals = MAX2(partial_state->for_normals,
+                                                     partial_state_prev->for_normals);
+
+  if ((partial_for_looptri == PARTIAL_TYPE_ALL) && (partial_for_normals == PARTIAL_TYPE_ALL) &&
+      (em->bm->totvert == em->bm->totvertsel)) {
+    /* The additional cost of generating the partial connectivity data isn't justified
+     * when all data needs to be updated.
+     *
+     * While proportional editing can cause all geometry to need updating with a partial
+     * selection. It's impractical to calculate this ahead of time. Further, the down side of
+     * using partial updates when their not needed is negligible. */
+    BKE_editmesh_looptri_and_normals_calc(em);
+  }
   else {
-    /* See the body of the comments in the previous block for details. */
-    verts_mask = BLI_BITMAP_NEW(em->bm->totvert, __func__);
+    if (partial_for_looptri != PARTIAL_NONE) {
+      BMPartialUpdate *bmpinfo = tc_mesh_partial_ensure(t, tc, partial_for_looptri);
+      BKE_editmesh_looptri_calc_with_partial_ex(em,
+                                                bmpinfo,
+                                                &(const struct BMeshCalcTessellation_Params){
+                                                    .face_normals = true,
+                                                });
+    }
+
+    if (partial_for_normals != PARTIAL_NONE) {
+      BMPartialUpdate *bmpinfo = tc_mesh_partial_ensure(t, tc, partial_for_normals);
+      /* While not a large difference, take advantage of existing normals where possible. */
+      const bool face_normals = !((partial_for_looptri == PARTIAL_TYPE_ALL) ||
+                                  ((partial_for_looptri == PARTIAL_TYPE_GROUP) &&
+                                   (partial_for_normals == PARTIAL_TYPE_GROUP)));
+      BM_mesh_normals_update_with_partial_ex(em->bm,
+                                             bmpinfo,
+                                             &(const struct BMeshNormalsUpdate_Params){
+                                                 .face_normals = face_normals,
+                                             });
+    }
+  }
+
+  /* Store the previous requested (not the previous used),
+   * since the values used may have been promoted based on the previous types. */
+  tcmd->partial_update_state_prev = *partial_state;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Recalc Mesh Data
+ * \{ */
+
+static void tc_mesh_transdata_mirror_apply(TransDataContainer *tc)
+{
+  if (tc->use_mirror_axis_any) {
     int i;
     TransData *td;
     for (i = 0, td = tc->data; i < tc->data_len; i++, td++) {
-      if (td->factor == 0.0f) {
-        continue;
-      }
-      const BMVert *v = (BMVert *)td->extra;
-      const int v_index = BM_elem_index_get(v);
-      BLI_assert(!BLI_BITMAP_TEST(verts_mask, v_index));
-      BLI_BITMAP_ENABLE(verts_mask, v_index);
-      verts_mask_count += 1;
-    }
-
-    r_partial_state->for_looptri = partial_for_looptri;
-    r_partial_state->for_normals = partial_for_normals;
-  }
-
-  static void tc_mesh_partial_update(
-      TransInfo * t, TransDataContainer * tc, const struct PartialTypeState *partial_state)
-  {
-    BMEditMesh *em = BKE_editmesh_from_object(tc->obedit);
-
-    struct TransCustomDataMesh *tcmd = tc_mesh_customdata_ensure(tc);
-
-    const struct PartialTypeState *partial_state_prev = &tcmd->partial_update_state_prev;
-
-    /* Promote the partial update types based on the previous state
-     * so the values that no longer modified are reset before being left as-is.
-     * Needed for translation which can toggle snap-to-normal during transform.  */
-    const enum ePartialType partial_for_looptri = MAX2(partial_state->for_looptri,
-                                                       partial_state_prev->for_looptri);
-    const enum ePartialType partial_for_normals = MAX2(partial_state->for_normals,
-                                                       partial_state_prev->for_normals);
-
-    if ((partial_for_looptri == PARTIAL_TYPE_ALL) && (partial_for_normals == PARTIAL_TYPE_ALL) &&
-        (em->bm->totvert == em->bm->totvertsel)) {
-      /* The additional cost of generating the partial connectivity data isn't justified
-       * when all data needs to be updated.
-       *
-       * While proportional editing can cause all geometry to need updating with a partial
-       * selection. It's impractical to calculate this ahead of time. Further, the down side of
-       * using partial updates when their not needed is negligible. */
-      BKE_editmesh_looptri_and_normals_calc(em);
-    }
-    else {
-      if (partial_for_looptri != PARTIAL_NONE) {
-        BMPartialUpdate *bmpinfo = tc_mesh_partial_ensure(t, tc, partial_for_looptri);
-        BKE_editmesh_looptri_calc_with_partial_ex(em,
-                                                  bmpinfo,
-                                                  &(const struct BMeshCalcTessellation_Params){
-                                                      .face_normals = true,
-                                                  });
-      }
-
-      if (partial_for_normals != PARTIAL_NONE) {
-        BMPartialUpdate *bmpinfo = tc_mesh_partial_ensure(t, tc, partial_for_normals);
-        /* While not a large difference, take advantage of existing normals where possible. */
-        const bool face_normals = !((partial_for_looptri == PARTIAL_TYPE_ALL) ||
-                                    ((partial_for_looptri == PARTIAL_TYPE_GROUP) &&
-                                     (partial_for_normals == PARTIAL_TYPE_GROUP)));
-        BM_mesh_normals_update_with_partial_ex(em->bm,
-                                               bmpinfo,
-                                               &(const struct BMeshNormalsUpdate_Params){
-                                                   .face_normals = face_normals,
-                                               });
+      if (td->flag & (TD_MIRROR_EDGE_X | TD_MIRROR_EDGE_Y | TD_MIRROR_EDGE_Z)) {
+        if (td->flag & TD_MIRROR_EDGE_X) {
+          td->loc[0] = 0.0f;
+        }
+        if (td->flag & TD_MIRROR_EDGE_Y) {
+          td->loc[1] = 0.0f;
+        }
+        if (td->flag & TD_MIRROR_EDGE_Z) {
+          td->loc[2] = 0.0f;
+        }
       }
     }
 
-    /* Store the previous requested (not the previous used),
-     * since the values used may have been promoted based on the previous types. */
-    tcmd->partial_update_state_prev = *partial_state;
-  }
-
-  /** \} */
-
-  /* -------------------------------------------------------------------- */
-  /** \name Recalc Mesh Data
-   * \{ */
-
-  static void tc_mesh_transdata_mirror_apply(TransDataContainer * tc)
-  {
-    if (tc->use_mirror_axis_any) {
-      int i;
-      TransData *td;
-      for (i = 0, td = tc->data; i < tc->data_len; i++, td++) {
-        if (td->flag & (TD_MIRROR_EDGE_X | TD_MIRROR_EDGE_Y | TD_MIRROR_EDGE_Z)) {
-          if (td->flag & TD_MIRROR_EDGE_X) {
-            td->loc[0] = 0.0f;
-          }
-          if (td->flag & TD_MIRROR_EDGE_Y) {
-            td->loc[1] = 0.0f;
-          }
-          if (td->flag & TD_MIRROR_EDGE_Z) {
-            td->loc[2] = 0.0f;
-          }
-        }
+    TransDataMirror *td_mirror = tc->data_mirror;
+    for (i = 0; i < tc->data_mirror_len; i++, td_mirror++) {
+      copy_v3_v3(td_mirror->loc, td_mirror->loc_src);
+      if (td_mirror->flag & TD_MIRROR_X) {
+        td_mirror->loc[0] *= -1;
       }
-
-      TransDataMirror *td_mirror = tc->data_mirror;
-      for (i = 0; i < tc->data_mirror_len; i++, td_mirror++) {
-        copy_v3_v3(td_mirror->loc, td_mirror->loc_src);
-        if (td_mirror->flag & TD_MIRROR_X) {
-          td_mirror->loc[0] *= -1;
-        }
-        if (td_mirror->flag & TD_MIRROR_Y) {
-          td_mirror->loc[1] *= -1;
-        }
-        if (td_mirror->flag & TD_MIRROR_Z) {
-          td_mirror->loc[2] *= -1;
-        }
+      if (td_mirror->flag & TD_MIRROR_Y) {
+        td_mirror->loc[1] *= -1;
+      }
+      if (td_mirror->flag & TD_MIRROR_Z) {
+        td_mirror->loc[2] *= -1;
       }
     }
   }
+}
 
-  static bool tc_mesh_is_deform_only_update(TransInfo * t, TransDataContainer * tc)
-  {
-    if (tc->custom.type.data &&
-        ((struct TransCustomDataMesh *)tc->custom.type.data)->cd_layer_correct) {
-      return false;
-    }
+void recalcData_mesh(TransInfo *t)
+{
+  bool is_canceling = t->state == TRANS_CANCEL;
+  /* Apply corrections. */
+  if (!is_canceling) {
+    applyProject(t);
 
-    Mesh *me_eval = (Mesh *)DEG_get_evaluated_id(t->depsgraph, (ID *)tc->obedit->data);
-    Mesh *mesh_eval_cage = me_eval->edit_mesh->mesh_eval_cage;
-    Mesh *mesh_eval_final = me_eval->edit_mesh->mesh_eval_final;
-    if (mesh_eval_cage && !mesh_eval_cage->runtime.is_original) {
-      return false;
-    }
-    if (mesh_eval_final && mesh_eval_final != mesh_eval_cage &&
-        !mesh_eval_final->runtime.is_original) {
-      return false;
-    }
-
-    return me_eval->runtime.deformed_only;
-  }
-
-  void recalcData_mesh(TransInfo * t)
-  {
-    bool is_canceling = t->state == TRANS_CANCEL;
-    /* Apply corrections. */
-    if (!is_canceling) {
-      applyProject(t);
-
-      bool do_mirror = !(t->flag & T_NO_MIRROR);
-      FOREACH_TRANS_DATA_CONTAINER (t, tc) {
-        /* Apply clipping after so we never project past the clip plane T25423. */
-        transform_convert_clip_mirror_modifier_apply(tc);
-
-        if (do_mirror) {
-          tc_mesh_transdata_mirror_apply(tc);
-        }
-
-        tc_mesh_customdatacorrect_apply(tc, false);
-      }
-    }
-    else {
-      tc_mesh_customdatacorrect_restore(t);
-    }
-
-    struct PartialTypeState partial_state;
-    tc_mesh_partial_types_calc(t, &partial_state);
-
+    bool do_mirror = !(t->flag & T_NO_MIRROR);
     FOREACH_TRANS_DATA_CONTAINER (t, tc) {
-      const bool is_deform_only = tc_mesh_is_deform_only_update(t, tc);
+      /* Apply clipping after so we never project past the clip plane T25423. */
+      transform_convert_clip_mirror_modifier_apply(tc);
 
-      DEG_id_tag_update(tc->obedit->data,
-                        is_deform_only ? ID_RECALC_GEOMETRY_DEFORM : ID_RECALC_GEOMETRY);
+      if (do_mirror) {
+        tc_mesh_transdata_mirror_apply(tc);
+      }
 
-      tc_mesh_partial_update(t, tc, &partial_state);
+      tc_mesh_customdatacorrect_apply(tc, false);
     }
   }
-  /** \} */
+  else {
+    tc_mesh_customdatacorrect_restore(t);
+  }
 
-  /* -------------------------------------------------------------------- */
-  /** \name Special After Transform Mesh
-   * \{ */
+  struct PartialTypeState partial_state;
+  tc_mesh_partial_types_calc(t, &partial_state);
 
-  void special_aftertrans_update__mesh(bContext * UNUSED(C), TransInfo * t)
-  {
-    const bool is_canceling = (t->state == TRANS_CANCEL);
-    const bool use_automerge = !is_canceling && (t->flag & (T_AUTOMERGE | T_AUTOSPLIT)) != 0;
+  FOREACH_TRANS_DATA_CONTAINER (t, tc) {
+    DEG_id_tag_update(tc->obedit->data, ID_RECALC_GEOMETRY);
 
-    if (!is_canceling && ELEM(t->mode, TFM_EDGE_SLIDE, TFM_VERT_SLIDE)) {
-      /* NOTE(joeedh): Handle multi-res re-projection,
-       * done on transform completion since it's really slow. */
-      FOREACH_TRANS_DATA_CONTAINER (t, tc) {
-        tc_mesh_customdatacorrect_apply(tc, true);
-      }
-    }
+    tc_mesh_partial_update(t, tc, &partial_state);
+  }
+}
+/** \} */
 
-    if (use_automerge) {
-      FOREACH_TRANS_DATA_CONTAINER (t, tc) {
-        BMEditMesh *em = BKE_editmesh_from_object(tc->obedit);
-        BMesh *bm = em->bm;
-        char hflag;
-        bool has_face_sel = (bm->totfacesel != 0);
+/* -------------------------------------------------------------------- */
+/** \name Special After Transform Mesh
+ * \{ */
 
-        if (tc->use_mirror_axis_any) {
-          /* Rather than adjusting the selection (which the user would notice)
-           * tag all mirrored verts, then auto-merge those. */
-          BM_mesh_elem_hflag_disable_all(bm, BM_VERT, BM_ELEM_TAG, false);
+void special_aftertrans_update__mesh(bContext *UNUSED(C), TransInfo *t)
+{
+  const bool is_canceling = (t->state == TRANS_CANCEL);
+  const bool use_automerge = !is_canceling && (t->flag & (T_AUTOMERGE | T_AUTOSPLIT)) != 0;
 
-          TransDataMirror *td_mirror = tc->data_mirror;
-          for (int i = tc->data_mirror_len; i--; td_mirror++) {
-            BM_elem_flag_enable((BMVert *)td_mirror->extra, BM_ELEM_TAG);
-          }
-
-          hflag = BM_ELEM_SELECT | BM_ELEM_TAG;
-        }
-        else {
-          hflag = BM_ELEM_SELECT;
-        }
-
-        if (t->flag & T_AUTOSPLIT) {
-          EDBM_automerge_and_split(
-              tc->obedit, true, true, true, hflag, t->scene->toolsettings->doublimit);
-        }
-        else {
-          EDBM_automerge(tc->obedit, true, hflag, t->scene->toolsettings->doublimit);
-        }
-
-        /* Special case, this is needed or faces won't re-select.
-         * Flush selected edges to faces. */
-        if (has_face_sel && (em->selectmode == SCE_SELECT_FACE)) {
-          EDBM_selectmode_flush_ex(em, SCE_SELECT_EDGE);
-        }
-      }
-    }
-
+  if (!is_canceling && ELEM(t->mode, TFM_EDGE_SLIDE, TFM_VERT_SLIDE)) {
+    /* NOTE(joeedh): Handle multi-res re-projection,
+     * done on transform completion since it's really slow. */
     FOREACH_TRANS_DATA_CONTAINER (t, tc) {
-      /* table needs to be created for each edit command, since vertices can move etc */
-      ED_mesh_mirror_spatial_table_end(tc->obedit);
-      /* TODO(campbell): xform: We need support for many mirror objects at once! */
-      break;
+      tc_mesh_customdatacorrect_apply(tc, true);
     }
   }
-  /** \} */
+
+  if (use_automerge) {
+    FOREACH_TRANS_DATA_CONTAINER (t, tc) {
+      BMEditMesh *em = BKE_editmesh_from_object(tc->obedit);
+      BMesh *bm = em->bm;
+      char hflag;
+      bool has_face_sel = (bm->totfacesel != 0);
+
+      if (tc->use_mirror_axis_any) {
+        /* Rather than adjusting the selection (which the user would notice)
+         * tag all mirrored verts, then auto-merge those. */
+        BM_mesh_elem_hflag_disable_all(bm, BM_VERT, BM_ELEM_TAG, false);
+
+        TransDataMirror *td_mirror = tc->data_mirror;
+        for (int i = tc->data_mirror_len; i--; td_mirror++) {
+          BM_elem_flag_enable((BMVert *)td_mirror->extra, BM_ELEM_TAG);
+        }
+
+        hflag = BM_ELEM_SELECT | BM_ELEM_TAG;
+      }
+      else {
+        hflag = BM_ELEM_SELECT;
+      }
+
+      if (t->flag & T_AUTOSPLIT) {
+        EDBM_automerge_and_split(
+            tc->obedit, true, true, true, hflag, t->scene->toolsettings->doublimit);
+      }
+      else {
+        EDBM_automerge(tc->obedit, true, hflag, t->scene->toolsettings->doublimit);
+      }
+
+      /* Special case, this is needed or faces won't re-select.
+       * Flush selected edges to faces. */
+      if (has_face_sel && (em->selectmode == SCE_SELECT_FACE)) {
+        EDBM_selectmode_flush_ex(em, SCE_SELECT_EDGE);
+      }
+    }
+  }
+
+  FOREACH_TRANS_DATA_CONTAINER (t, tc) {
+    /* table needs to be created for each edit command, since vertices can move etc */
+    ED_mesh_mirror_spatial_table_end(tc->obedit);
+    /* TODO(campbell): xform: We need support for many mirror objects at once! */
+    break;
+  }
+}
+/** \} */

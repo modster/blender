@@ -213,19 +213,18 @@ static void make_edges_mdata_extend(
 
 /* Initialize mverts, medges and, faces for converting nurbs to mesh and derived mesh */
 /* use specified dispbase */
-int BKE_mesh_nurbs_displist_to_mdata(const Object *ob,
-                                     const ListBase *dispbase,
-                                     MVert **r_allvert,
-                                     int *r_totvert,
-                                     MEdge **r_alledge,
-                                     int *r_totedge,
-                                     MLoop **r_allloop,
-                                     MPoly **r_allpoly,
-                                     MLoopUV **r_alluv,
-                                     int *r_totloop,
-                                     int *r_totpoly)
+static int mesh_nurbs_displist_to_mdata(const Curve *cu,
+                                        const ListBase *dispbase,
+                                        MVert **r_allvert,
+                                        int *r_totvert,
+                                        MEdge **r_alledge,
+                                        int *r_totedge,
+                                        MLoop **r_allloop,
+                                        MPoly **r_allpoly,
+                                        MLoopUV **r_alluv,
+                                        int *r_totloop,
+                                        int *r_totpoly)
 {
-  const Curve *cu = ob->data;
   MVert *mvert;
   MPoly *mpoly;
   MLoop *mloop;
