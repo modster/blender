@@ -30,6 +30,7 @@ set(INC
   ../depsgraph
   ../editors/include
   ../functions
+  ../geometry
   ../makesdna
   ../makesrna
   ../nodes
@@ -129,6 +130,7 @@ set(SRC
 set(LIB
   bf_blenkernel
   bf_blenlib
+  bf_geometry
 )
 
 if(WITH_ALEMBIC)

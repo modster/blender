@@ -6237,16 +6237,16 @@ static void rna_def_modifier_laplaciandeform(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
+const EnumPropertyItem rna_enum_weld_mode_items[] = {
+    {0, "ALL", 0, "All", "Full merge by distance"},
+    {1, "CONNECTED", 0, "Connected", "Only merge along the edges"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 static void rna_def_modifier_weld(BlenderRNA *brna)
 {
   StructRNA *srna;
   PropertyRNA *prop;
-
-  static const EnumPropertyItem mode_items[] = {
-      {MOD_WELD_MODE_ALL, "ALL", 0, "All", "Full merge by distance"},
-      {MOD_WELD_MODE_CONNECTED, "CONNECTED", 0, "Connected", "Only merge along the edges"},
-      {0, NULL, 0, NULL, NULL},
-  };
 
   srna = RNA_def_struct(brna, "WeldModifier", "Modifier");
   RNA_def_struct_ui_text(srna, "Weld Modifier", "Weld modifier");
@@ -6256,7 +6256,7 @@ static void rna_def_modifier_weld(BlenderRNA *brna)
   RNA_define_lib_overridable(true);
 
   prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_enum_items(prop, rna_enum_weld_mode_items);
   RNA_def_property_ui_text(prop, "Mode", "Mode defines the merge rule");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 

@@ -2025,12 +2025,6 @@ enum {
   MOD_WELD_INVERT_VGROUP = (1 << 0),
 };
 
-/* #WeldModifierData.mode */
-enum {
-  MOD_WELD_MODE_ALL = 0,
-  MOD_WELD_MODE_CONNECTED = 1,
-};
-
 typedef struct DataTransferModifierData {
   ModifierData modifier;
 
