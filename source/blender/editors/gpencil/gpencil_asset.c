@@ -196,7 +196,7 @@ static bool gpencil_asset_generic_poll(bContext *C)
 }
 
 /* -------------------------------------------------------------------- */
-/** \name Create Grease Pencil Asset operator
+/** \name Create Grease Pencil Datablock Asset operator
  * \{ */
 
 typedef enum eGP_AssetModes {
@@ -235,7 +235,7 @@ static bool gpencil_asset_create(const bContext *C,
   /* Disable Edit mode. */
   gpd->flag &= ~GP_DATA_STROKE_EDITMODE;
 
-  bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd);
+  const bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd);
 
   LISTBASE_FOREACH_MUTABLE (bGPDlayer *, gpl, &gpd->layers) {
     /* If layer is hidden, remove. */
@@ -243,13 +243,15 @@ static bool gpencil_asset_create(const bContext *C,
       BKE_gpencil_layer_delete(gpd, gpl);
       continue;
     }
-    /* If Layer or Active Frame mode, delete non active layers. */
+
+    /* If Active Layer or Active Frame mode, delete non active layers. */
     if ((ELEM(mode, GP_ASSET_MODE_ACTIVE_LAYER, GP_ASSET_MODE_ACTIVE_FRAME)) &&
         (gpl != gpl_active)) {
       BKE_gpencil_layer_delete(gpd, gpl);
       continue;
     }
-    /* For splitting, remove if layer is not equals to parameter. */
+
+    /* For splitting, remove if layer is not equals to filter parameter. */
     if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
       if (!STREQ(gpl_filter->info, gpl->info)) {
         BKE_gpencil_layer_delete(gpd, gpl);
@@ -257,7 +259,7 @@ static bool gpencil_asset_create(const bContext *C,
       }
     }
 
-    /* Remove parenting data. */
+    /* Remove parenting data (feature non supported in data block). */
     if (gpl->parent != NULL) {
       gpl->parent = NULL;
       gpl->parsubstr[0] = 0;
@@ -265,7 +267,7 @@ static bool gpencil_asset_create(const bContext *C,
       non_supported_feature = true;
     }
 
-    /* Remove masking. */
+    /* Remove masking (feature non supported in data block). */
     if (gpl->mask_layers.first) {
       bGPDlayer_Mask *mask_next;
       for (bGPDlayer_Mask *mask = gpl->mask_layers.first; mask; mask = mask_next) {
@@ -278,7 +280,7 @@ static bool gpencil_asset_create(const bContext *C,
       non_supported_feature = true;
     }
 
-    bGPDframe *gpf_active = gpl->actframe;
+    const bGPDframe *gpf_active = gpl->actframe;
 
     LISTBASE_FOREACH_MUTABLE (bGPDframe *, gpf, &gpl->frames) {
       /* If Active Frame mode, delete non active frames. */
@@ -288,12 +290,13 @@ static bool gpencil_asset_create(const bContext *C,
         continue;
       }
 
+      /* Remove if Selected frames mode and frame is not selected. */
       if ((mode == GP_ASSET_MODE_SELECTED_FRAMES) && ((gpf->flag & GP_FRAME_SELECT) == 0)) {
         BKE_gpencil_layer_frame_delete(gpl, gpf);
         continue;
       }
 
-      /* Remove any unselected stroke if SELECTED mode. */
+      /* Remove any unselected stroke if selected strokes mode. */
       if (mode == GP_ASSET_MODE_SELECTED_STROKES) {
         LISTBASE_FOREACH_MUTABLE (bGPDstroke *, gps, &gpf->strokes) {
           if ((gps->flag & GP_STROKE_SELECT) == 0) {
@@ -337,8 +340,8 @@ static bool gpencil_asset_create(const bContext *C,
     strcpy(gpl_dst->info, "Asset_Layer");
   }
 
-  if (ED_asset_mark_id(C, &gpd->id)) {
-  }
+  /* Mark as asset. */
+  ED_asset_mark_id(C, &gpd->id);
 
   return non_supported_feature;
 }
@@ -420,6 +423,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
 }
 
 /** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Import Grease Pencil Asset into existing datablock operator
  * \{ */
@@ -446,7 +450,6 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
 
   GHashIterator gh_iter;
   GHASH_ITER (gh_iter, tgpa->asset_strokes_layer) {
-    // TODO: All strokes or only active frame?
     bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
     bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getValue(&gh_iter);
     BKE_gpencil_layer_transform_matrix_get(tgpa->depsgraph, tgpa->ob, gpl, diff_mat);
@@ -498,7 +501,7 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   tgpa->manipulator[7][0] = tgpa->rect_cage.xmin;
   tgpa->manipulator[7][1] = tgpa->rect_cage.ymin +
                             ((tgpa->rect_cage.ymax - tgpa->rect_cage.ymin) * 0.5f);
-  /* Rotation */
+  /* Rotation points. */
   tgpa->manipulator[CAGE_CORNER_ROT_NW][0] = tgpa->rect_cage.xmin - ROTATION_CONTROL_GAP;
   tgpa->manipulator[CAGE_CORNER_ROT_NW][1] = tgpa->rect_cage.ymax + ROTATION_CONTROL_GAP;
 
@@ -519,16 +522,15 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   sub_v3_v3v3(vec1, co2, co1);
   sub_v3_v3v3(vec2, co3, co2);
 
-  /* Vector orthogonal to polygon plane. */
   cross_v3_v3v3(tgpa->cage_normal, vec1, vec2);
   normalize_v3(tgpa->cage_normal);
 }
 
-/* Draw a cage for manipulate asset */
+/* Draw a cage to manipulate asset. */
 static void gpencil_2d_cage_draw(const tGPDasset *tgpa)
 {
   GPUVertFormat *format = immVertexFormat();
-  uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
+  const uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
 
   GPU_blend(GPU_BLEND_ALPHA);
 
@@ -555,7 +557,7 @@ static void gpencil_2d_cage_draw(const tGPDasset *tgpa)
   immVertex2f(pos, tgpa->manipulator[CAGE_CORNER_SW][0], tgpa->manipulator[CAGE_CORNER_SW][1]);
   immEnd();
 
-  /* Rotation box */
+  /* Rotation boxes. */
   const float gap = 2.0f;
   for (int i = 0; i < 4; i++) {
     imm_draw_box_wire_2d(pos,
@@ -588,18 +590,20 @@ static void gpencil_2d_cage_draw(const tGPDasset *tgpa)
 
   immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * 1.5f * U.dpi_fac);
 
+  /* Draw only the points of the cage, but not the rotation points. */
   immBegin(GPU_PRIM_POINTS, 8);
   for (int i = 0; i < 8; i++) {
     immVertex2fv(pos, tgpa->manipulator[i]);
   }
   immEnd();
+
   immUnbindProgram();
   GPU_program_point_size(false);
 
   GPU_blend(GPU_BLEND_NONE);
 }
 
-/* Helper: Detect mouse over cage areas. */
+/* Helper: Detect mouse over cage action areas. */
 static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
 {
   const float gap = 5.0f;
@@ -609,7 +613,6 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
       (float)mouse[0] - gap, (float)mouse[0] + gap, (float)mouse[1] - gap, (float)mouse[1] + gap};
 
   tgpa->manipulator_index = -1;
-  float co1[3], co2[3];
   for (int i = 0; i < 12; i++) {
     if (BLI_rctf_isect_pt(&rect_mouse, tgpa->manipulator[i][0], tgpa->manipulator[i][1])) {
       tgpa->manipulator_index = i;
@@ -651,6 +654,8 @@ static void gpencil_2d_cage_area_detect(tGPDasset *tgpa, const int mouse[2])
         add_v3_fl(tgpa->manipulator_vector, 1.0f);
         return;
       }
+
+      float co1[3], co2[3];
       if (ELEM(tgpa->manipulator_index, CAGE_CORNER_N, CAGE_CORNER_S)) {
         gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], co1);
         gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_N], co2);
@@ -817,7 +822,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
       }
     }
 
-    /* In scale mode recal stroke geometry because fill triangulation can change. */
+    /* In scale mode, recalculate stroke geometry because fill triangulation can change. */
     if (tgpa->mode == GP_ASSET_TRANSFORM_SCALE) {
       BKE_gpencil_stroke_geometry_update(tgpa->gpd, gps);
     }
@@ -832,7 +837,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
     add_v3_v3(tgpa->asset_center, vec);
   }
 
-  /* Update mouse position and transform data to avoid acumulation for next transformation. */
+  /* Update mouse position and transform data to avoid accumulation for the next transformation. */
   copy_v2_v2_int(tgpa->mouse, mouse);
   tgpa->initial_dist = dist;
   copy_v2_v2(tgpa->vinit_rotation, vr);
@@ -852,7 +857,7 @@ static int gpencil_asset_get_first_franum(const bGPdata *gpd)
   return first_fra;
 }
 
-/* Helper: Get a material from the datablock */
+/* Helper: Get a material from the datablock array. */
 static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index)
 {
   const short *tot_slots_data_ptr = BKE_id_material_len_p(id);
@@ -868,8 +873,8 @@ static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index
   return material;
 }
 
-/* Helper: Add all strokes from the asset in the target datablock. */
-static void gpencil_asset_add_strokes(tGPDasset *tgpa)
+/* Helper: Append all strokes from the asset in the target datablock. */
+static void gpencil_asset_append_strokes(tGPDasset *tgpa)
 {
   bGPdata *gpd_target = tgpa->gpd;
   bGPdata *gpd_asset = tgpa->gpd_asset;
@@ -894,14 +899,16 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
       BLI_listbase_clear(&gpl_target->frames);
       BLI_addtail(&gpd_target->layers, gpl_target);
 
+      /* Ensure layers hash is ready. */
       if (tgpa->asset_layers == NULL) {
         tgpa->asset_layers = BLI_ghash_ptr_new(__func__);
       }
-      /* Add layer to the hash to remove if operator is canceled. */
+
+      /* Add layer to the hash to remove it if the operator is canceled. */
       BLI_ghash_insert(tgpa->asset_layers, gpl_target, gpl_target);
     }
-    gpl_target->actframe = NULL;
 
+    gpl_target->actframe = NULL;
     LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
       /* Check if frame is in target layer. */
       int fra = tgpa->cframe + (gpf_asset->framenum - first_fra);
@@ -912,22 +919,25 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
         BLI_assert(gpf_target != NULL);
         BLI_listbase_clear(&gpf_target->strokes);
 
+        /* Ensure frames hash is ready. */
         if (tgpa->asset_frames == NULL) {
           tgpa->asset_frames = BLI_ghash_ptr_new(__func__);
         }
-        /* Add frame to the hash to remove if operator is canceled. */
+
+        /* Add frame to the hash to remove it if the operator is canceled. */
         if (!BLI_ghash_haskey(tgpa->asset_frames, gpf_target)) {
           /* Add the hash key with a reference to the layer. */
           BLI_ghash_insert(tgpa->asset_frames, gpf_target, gpl_target);
         }
       }
 
-      /* Loop all strokes and duplicate. */
+      /* Preapre hashes for strokes. */
       if (tgpa->asset_strokes_frame == NULL) {
         tgpa->asset_strokes_frame = BLI_ghash_ptr_new(__func__);
         tgpa->asset_strokes_layer = BLI_ghash_ptr_new(__func__);
       }
 
+      /* Loop all strokes and duplicate. */
       LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
         bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
         gps_target->next = gps_target->prev = NULL;
@@ -953,7 +963,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
 
         gps_target->mat_nr = mat_index;
 
-        /* Apply the offset to drop position. */
+        /* Apply the offset to drop position and unselect points. */
         bGPDspoint *pt;
         int i;
         for (i = 0, pt = gps_target->points; i < gps_target->totpoints; i++, pt++) {
@@ -964,7 +974,7 @@ static void gpencil_asset_add_strokes(tGPDasset *tgpa)
         /* Calc stroke bounding box. */
         BKE_gpencil_stroke_boundingbox_calc(gps_target);
 
-        /* Add the hash key with a reference to the frame and layer. */
+        /* Add the hash key with a reference by frame and layer. */
         BLI_ghash_insert(tgpa->asset_strokes_frame, gps_target, gpf_target);
         BLI_ghash_insert(tgpa->asset_strokes_layer, gps_target, gpl_target);
       }
@@ -1154,7 +1164,7 @@ static tGPDasset *gpencil_session_init_asset_import(bContext *C, wmOperator *op)
     return NULL;
   }
   const int object_type = BKE_object_obdata_to_type(id);
-  if (object_type == -1) {
+  if (object_type != OB_GPENCIL) {
     return NULL;
   }
 
@@ -1215,7 +1225,7 @@ static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEven
   tgpa->drop[1] = event->mval[1];
 
   /* Do an initial load of the strokes in the target datablock. */
-  gpencil_asset_add_strokes(tgpa);
+  gpencil_asset_append_strokes(tgpa);
 
   tgpa->draw_handle_3d = ED_region_draw_cb_activate(
       tgpa->region->type, gpencil_asset_draw, tgpa, REGION_DRAW_POST_PIXEL);
