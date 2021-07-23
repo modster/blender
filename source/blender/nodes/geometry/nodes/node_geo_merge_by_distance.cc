@@ -25,7 +25,7 @@
 
 static bNodeSocketTemplate geo_node_merge_by_distance_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Distance"), 0.0f, 0, 0, 0, 0, 10000.0f,PROP_DISTANCE},
+    {SOCK_FLOAT, N_("Distance"), 0.0f, 0, 0, 0, 0, 10000.0f, PROP_DISTANCE},
     {SOCK_STRING, N_("Selection")},
     {-1, ""},
 };
@@ -35,7 +35,9 @@ static bNodeSocketTemplate geo_node_merge_by_distance_out[] = {
     {-1, ""},
 };
 
-static void geo_node_merge_by_distance_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+static void geo_node_merge_by_distance_layout(uiLayout *layout,
+                                              bContext *UNUSED(C),
+                                              PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "merge_mode", 0, "", ICON_NONE);
 }
@@ -75,8 +77,10 @@ static void geo_node_merge_by_distance_exec(GeoNodeExecParams params)
 void register_node_type_geo_merge_by_distance()
 {
   static bNodeType ntype;
-  geo_node_type_base(&ntype, GEO_NODE_MERGE_BY_DISTANCE, "Merge By Distance", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_merge_by_distance_in, geo_node_merge_by_distance_out);
+  geo_node_type_base(
+      &ntype, GEO_NODE_MERGE_BY_DISTANCE, "Merge By Distance", NODE_CLASS_GEOMETRY, 0);
+  node_type_socket_templates(
+      &ntype, geo_node_merge_by_distance_in, geo_node_merge_by_distance_out);
   node_type_init(&ntype, geo_merge_by_distance_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_merge_by_distance_exec;
   ntype.draw_buttons = geo_node_merge_by_distance_layout;

@@ -21,7 +21,7 @@
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 
-#include "GEO_weld.h" // Own include.
+#include "GEO_weld.h"  // Own include.
 
 /* Indicates when the element was not computed. */
 #define OUT_OF_CONTEXT (uint)(-1)
@@ -884,7 +884,7 @@ static void weld_poly_loop_ctx_alloc(const MPoly *mpoly,
 
 static void weld_poly_split_recursive(const uint *vert_dest_map,
 #ifdef USE_WELD_DEBUG
-    const MLoop *mloop,
+                                      const MLoop *mloop,
 #endif
                                       uint ctx_verts_len,
                                       WeldPoly *r_wp,
@@ -909,7 +909,7 @@ static void weld_poly_split_recursive(const uint *vert_dest_map,
     }
     const uint la_len = ctx_loops_len - 1;
     for (uint la = 0; la < la_len; la++, wla++) {
-      wa_continue:
+    wa_continue:
       if (wla->flag == ELEM_COLLAPSED) {
         continue;
       }
@@ -980,7 +980,7 @@ static void weld_poly_split_recursive(const uint *vert_dest_map,
                 new_wp->len = dist_a;
                 weld_poly_split_recursive(vert_dest_map,
 #ifdef USE_WELD_DEBUG
-                    mloop,
+                                          mloop,
 #endif
                                           ctx_verts_len,
                                           new_wp,
@@ -1024,7 +1024,7 @@ static void weld_poly_split_recursive(const uint *vert_dest_map,
 
 static void weld_poly_loop_ctx_setup(const MLoop *mloop,
 #ifdef USE_WELD_DEBUG
-    const MPoly *mpoly,
+                                     const MPoly *mpoly,
                                      const uint mpoly_len,
                                      const uint mloop_len,
 #endif
@@ -1091,7 +1091,7 @@ static void weld_poly_loop_ctx_setup(const MLoop *mloop,
 
         weld_poly_split_recursive(vert_dest_map,
 #ifdef USE_WELD_DEBUG
-            mloop,
+                                  mloop,
 #endif
                                   ctx_verts_len,
                                   wp,
@@ -1307,7 +1307,7 @@ static void weld_mesh_context_create(const Mesh *mesh,
 
   weld_poly_loop_ctx_setup(mloop,
 #ifdef USE_WELD_DEBUG
-      mpoly,
+                           mpoly,
                            mpoly_len,
                            mloop_len,
 #endif
@@ -1547,7 +1547,7 @@ Mesh *GEO_weld(const Mesh *mesh, const bool *mask, const float merge_distance, c
   uint vert_kill_len = 0;
   if (weld_mode == WELD_MODE_ALL)
 #ifdef USE_BVHTREEKDOP
-    {
+  {
     /* Get overlap map. */
     struct BVHTreeFromMesh treedata;
     BVHTree *bvhtree = bvhtree_from_mesh_verts_ex(&treedata,
@@ -1839,7 +1839,7 @@ Mesh *GEO_weld(const Mesh *mesh, const bool *mask, const float merge_distance, c
         WeldPoly *wp = &weld_mesh.wpoly[poly_ctx];
         WeldLoopOfPolyIter iter;
         if (!weld_iter_loop_of_poly_begin(
-            &iter, wp, weld_mesh.wloop, mloop, weld_mesh.loop_map, group_buffer)) {
+                &iter, wp, weld_mesh.wloop, mloop, weld_mesh.loop_map, group_buffer)) {
           continue;
         }
 
@@ -1873,7 +1873,7 @@ Mesh *GEO_weld(const Mesh *mesh, const bool *mask, const float merge_distance, c
       int loop_start = loop_cur;
       WeldLoopOfPolyIter iter;
       if (!weld_iter_loop_of_poly_begin(
-          &iter, wp, weld_mesh.wloop, mloop, weld_mesh.loop_map, group_buffer)) {
+              &iter, wp, weld_mesh.wloop, mloop, weld_mesh.loop_map, group_buffer)) {
         continue;
       }
 

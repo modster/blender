@@ -31,7 +31,10 @@ enum {
   WELD_MODE_CONNECTED = 1,
 };
 
-Mesh *GEO_weld(const Mesh *mesh, const bool *mask, const float merge_distance, const int weld_mode);
+Mesh *GEO_weld(const Mesh *mesh,
+               const bool *mask,
+               const float merge_distance,
+               const int weld_mode);
 
 #ifdef __cplusplus
 }
