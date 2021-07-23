@@ -1114,24 +1114,26 @@ GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *wind
     bounds.wrapPoint(x_new, y_new, 2, window->getCursorGrabAxis());
 
     window->getCursorGrabAccum(x_accum, y_accum);
+    int32_t warpX = x_new - x_screen;
+    int32_t warpY = y_new - y_screen;
     if (x_new != x_screen || y_new != y_screen) {
       system->setCursorPosition(x_new, y_new); /* wrap */
 
       /* We may be in an event before cursor wrap has taken effect */
-      if (window->m_activeWarpX >= 0 && x_new - x_screen < 0 ||
-          window->m_activeWarpX <= 0 && x_new - x_screen > 0) {
-        x_accum = x_accum + (x_screen - x_new);
+      if (window->m_activeWarpX >= 0 && warpX < 0 ||
+          window->m_activeWarpX <= 0 && warpX > 0) {
+        x_accum -= warpX;
       }
 
-      if (window->m_activeWarpY >= 0 && y_new - y_screen < 0 ||
-          window->m_activeWarpY <= 0 && y_new - y_screen > 0) {
-        y_accum = y_accum + (y_screen - y_new);
+      if (window->m_activeWarpY >= 0 && warpY < 0 ||
+          window->m_activeWarpY <= 0 && warpY > 0) {
+        y_accum -= warpY;
       }
 
       window->setCursorGrabAccum(x_accum, y_accum);
 
-      window->m_activeWarpX = x_new - x_screen;
-      window->m_activeWarpY = y_new - y_screen;
+      window->m_activeWarpX = warpX;
+      window->m_activeWarpY = warpY;
 
       /* When wrapping we don't need to add an event because the setCursorPosition call will cause
        * a new event after. We also need to skip outdated messages while warp is active to prevent
