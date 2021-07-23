@@ -123,7 +123,7 @@ void MixBaseOperation::update_memory_buffer_partial(MemoryBuffer *output,
 
 void MixBaseOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -133,7 +133,6 @@ void MixBaseOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[1] = value_m * p.color1[1] + value * p.color2[1];
     p.out[2] = value_m * p.color1[2] + value * p.color2[2];
     p.out[3] = p.color1[3];
-    p.next();
   }
 }
 
@@ -163,7 +162,7 @@ void MixAddOperation::executePixelSampled(float output[4], float x, float y, Pix
 
 void MixAddOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -174,7 +173,6 @@ void MixAddOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -209,7 +207,7 @@ void MixBlendOperation::executePixelSampled(float output[4],
 
 void MixBlendOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -221,7 +219,6 @@ void MixBlendOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -305,7 +302,7 @@ void MixColorBurnOperation::executePixelSampled(float output[4],
 
 void MixColorBurnOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -341,7 +338,6 @@ void MixColorBurnOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -387,7 +383,7 @@ void MixColorOperation::executePixelSampled(float output[4],
 
 void MixColorOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -411,7 +407,6 @@ void MixColorOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -445,7 +440,7 @@ void MixDarkenOperation::executePixelSampled(float output[4],
 
 void MixDarkenOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -457,7 +452,6 @@ void MixDarkenOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -491,7 +485,7 @@ void MixDifferenceOperation::executePixelSampled(float output[4],
 
 void MixDifferenceOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -503,7 +497,6 @@ void MixDifferenceOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -554,7 +547,7 @@ void MixDivideOperation::executePixelSampled(float output[4],
 
 void MixDivideOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -583,7 +576,6 @@ void MixDivideOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -672,7 +664,7 @@ void MixDodgeOperation::executePixelSampled(float output[4],
 
 void MixDodgeOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -724,7 +716,6 @@ void MixDodgeOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -765,7 +756,7 @@ void MixGlareOperation::executePixelSampled(float output[4],
 
 void MixGlareOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     const float value = p.value[0];
     /* Linear interpolation between 3 cases:
      *  value=-1:output=input    value=0:output=input+glare   value=1:output=glare
@@ -786,7 +777,6 @@ void MixGlareOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -829,7 +819,7 @@ void MixHueOperation::executePixelSampled(float output[4], float x, float y, Pix
 
 void MixHueOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -853,7 +843,6 @@ void MixHueOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -905,7 +894,7 @@ void MixLightenOperation::executePixelSampled(float output[4],
 
 void MixLightenOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -923,7 +912,6 @@ void MixLightenOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -972,7 +960,7 @@ void MixLinearLightOperation::executePixelSampled(float output[4],
 
 void MixLinearLightOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -999,7 +987,6 @@ void MixLinearLightOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -1033,7 +1020,7 @@ void MixMultiplyOperation::executePixelSampled(float output[4],
 
 void MixMultiplyOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -1046,7 +1033,6 @@ void MixMultiplyOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -1097,7 +1083,7 @@ void MixOverlayOperation::executePixelSampled(float output[4],
 
 void MixOverlayOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -1125,7 +1111,6 @@ void MixOverlayOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -1168,7 +1153,7 @@ void MixSaturationOperation::executePixelSampled(float output[4],
 
 void MixSaturationOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -1189,7 +1174,6 @@ void MixSaturationOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -1224,7 +1208,7 @@ void MixScreenOperation::executePixelSampled(float output[4],
 
 void MixScreenOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -1237,7 +1221,6 @@ void MixScreenOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -1284,7 +1267,7 @@ void MixSoftLightOperation::executePixelSampled(float output[4],
 
 void MixSoftLightOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -1306,7 +1289,6 @@ void MixSoftLightOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -1339,7 +1321,7 @@ void MixSubtractOperation::executePixelSampled(float output[4],
 
 void MixSubtractOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -1350,7 +1332,6 @@ void MixSubtractOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
@@ -1387,7 +1368,7 @@ void MixValueOperation::executePixelSampled(float output[4],
 
 void MixValueOperation::update_memory_buffer_row(PixelCursor &p)
 {
-  while (p.out < p.row_end) {
+  for (; p.out < p.row_end; p.next()) {
     float value = p.value[0];
     if (this->useValueAlphaMultiply()) {
       value *= p.color2[3];
@@ -1402,7 +1383,6 @@ void MixValueOperation::update_memory_buffer_row(PixelCursor &p)
     p.out[3] = p.color1[3];
 
     clampIfNeeded(p.out);
-    p.next();
   }
 }
 
