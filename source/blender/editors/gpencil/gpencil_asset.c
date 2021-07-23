@@ -195,6 +195,20 @@ static bool gpencil_asset_generic_poll(bContext *C)
   return ED_operator_view3d_active(C);
 }
 
+/* Helper: Get lower frame number from asset strokes. */
+static int gpencil_asset_get_first_franum(const bGPdata *gpd)
+{
+  int first_fra = INT_MAX;
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+      if (gpf->framenum < first_fra) {
+        first_fra = gpf->framenum;
+      }
+    }
+  }
+  return first_fra;
+}
+
 /* -------------------------------------------------------------------- */
 /** \name Create Grease Pencil data block Asset operator
  * \{ */
@@ -223,9 +237,11 @@ static bool gpencil_asset_create(const bContext *C,
                                  const bGPDlayer *gpl_filter,
                                  const eGP_AssetModes mode,
                                  const bool reset_origin,
-                                 const bool flatten_layers)
+                                 const bool flatten_layers,
+                                 const bool retime_frames)
 {
   Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
   bool non_supported_feature = false;
 
   /* Create a copy of selected data block. */
@@ -343,6 +359,16 @@ static bool gpencil_asset_create(const bContext *C,
   /* Mark as asset. */
   ED_asset_mark_id(C, &gpd->id);
 
+  /* Retime frame number to start by 1. Must be done after generate the render preview. */
+  if (retime_frames) {
+    const int first_franum = gpencil_asset_get_first_franum(gpd) - 1;
+    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+      LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+        gpf->framenum -= first_franum;
+      }
+    }
+  }
+
   return non_supported_feature;
 }
 
@@ -354,17 +380,18 @@ static int gpencil_asset_create_exec(const bContext *C, const wmOperator *op)
   const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
   const bool reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
   const bool flatten_layers = RNA_boolean_get(op->ptr, "flatten_layers");
+  const bool retime_frames = RNA_boolean_get(op->ptr, "retime_frames");
 
   bool non_supported_feature = false;
   if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_src->layers) {
       non_supported_feature |= gpencil_asset_create(
-          C, gpd_src, gpl, mode, reset_origin, flatten_layers);
+          C, gpd_src, gpl, mode, reset_origin, flatten_layers, retime_frames);
     }
   }
   else {
     non_supported_feature = gpencil_asset_create(
-        C, gpd_src, NULL, mode, reset_origin, flatten_layers);
+        C, gpd_src, NULL, mode, reset_origin, flatten_layers, retime_frames);
   }
 
   /* Warnings for non supported features in the created asset. */
@@ -420,6 +447,8 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
                   "Origin to Geometry",
                   "Set origin of the asset in the center of the strokes bounding box");
   RNA_def_boolean(ot->srna, "flatten_layers", 0, "Flatten Layers", "Merge all layers in only one");
+  RNA_def_boolean(
+      ot->srna, "retime_frames", 1, "Retime Frames", "Retime frame number to start at frame 1");
 }
 
 /** \} */
@@ -843,20 +872,6 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   copy_v2_v2(tgpa->vinit_rotation, vr);
 }
 
-/* Helper: Get lower frame number from asset strokes. */
-static int gpencil_asset_get_first_franum(const bGPdata *gpd)
-{
-  int first_fra = INT_MAX;
-  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-      if (gpf->framenum < first_fra) {
-        first_fra = gpf->framenum;
-      }
-    }
-  }
-  return first_fra;
-}
-
 /* Helper: Get a material from the data block array. */
 static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index)
 {
@@ -887,8 +902,6 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
 
   float vec[3];
   sub_v3_v3v3(vec, dest_pt, tgpa->ob->loc);
-  /* Get the first frame in the asset. */
-  int const first_fra = gpencil_asset_get_first_franum(gpd_asset);
 
   LISTBASE_FOREACH (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
     /* Check if Layer is in target data block. */
@@ -911,7 +924,7 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
     gpl_target->actframe = NULL;
     LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
       /* Check if frame is in target layer. */
-      int fra = tgpa->cframe + (gpf_asset->framenum - first_fra);
+      int fra = tgpa->cframe + (gpf_asset->framenum - 1);
       bGPDframe *gpf_target = BKE_gpencil_layer_frame_get(gpl_target, fra, GP_GETFRAME_USE_PREV);
 
       if ((gpf_target == NULL) || (gpf_target->framenum != fra)) {
