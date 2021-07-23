@@ -269,9 +269,9 @@ bool SEQ_transform_seqbase_shuffle_ex(ListBase *seqbasep,
     }
 
     test->machine += channel_delta;
-
-    /* XXX: I don't think this is needed since were only moving vertically, Campbell. */
-    SEQ_time_update_sequence(evil_scene, test);
+    SEQ_time_update_sequence(
+        evil_scene,
+        test);  // XXX: I don't think this is needed since were only moving vertically, Campbell.
   }
 
   if ((test->machine < 1) || (test->machine > MAXSEQ)) {

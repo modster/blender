@@ -114,7 +114,8 @@ class EEVEE_MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
 
             row = layout.row()
 
-            row.template_list("MATERIAL_UL_matslots", "", ob, "material_slots", ob, "active_material_index", rows=rows)
+            row.template_list("MATERIAL_UL_matslots", "", ob,
+                              "material_slots", ob, "active_material_index", rows=rows)
 
             col = row.column(align=True)
             col.operator("object.material_slot_add", icon='ADD', text="")
@@ -127,8 +128,10 @@ class EEVEE_MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
             if is_sortable:
                 col.separator()
 
-                col.operator("object.material_slot_move", icon='TRIA_UP', text="").direction = 'UP'
-                col.operator("object.material_slot_move", icon='TRIA_DOWN', text="").direction = 'DOWN'
+                col.operator("object.material_slot_move",
+                             icon='TRIA_UP', text="").direction = 'UP'
+                col.operator("object.material_slot_move",
+                             icon='TRIA_DOWN', text="").direction = 'DOWN'
 
         row = layout.row()
 
@@ -178,7 +181,8 @@ class EEVEE_MATERIAL_PT_surface(MaterialButtonsPanel, Panel):
         layout.use_property_split = True
 
         if mat.use_nodes:
-            panel_node_draw(layout, mat.node_tree, 'OUTPUT_MATERIAL', "Surface")
+            panel_node_draw(layout, mat.node_tree,
+                            'OUTPUT_MATERIAL', "Surface")
         else:
             layout.prop(mat, "diffuse_color", text="Base Color")
             layout.prop(mat, "metallic")
@@ -220,7 +224,8 @@ def draw_material_settings(self, context):
     layout.prop(mat, "shadow_method")
 
     row = layout.row()
-    row.active = ((mat.blend_method == 'CLIP') or (mat.shadow_method == 'CLIP'))
+    row.active = ((mat.blend_method == 'CLIP')
+                  or (mat.shadow_method == 'CLIP'))
     row.prop(mat, "alpha_threshold")
 
     if mat.blend_method not in {'OPAQUE', 'CLIP', 'HASHED'}:
@@ -291,18 +296,19 @@ class MATERIAL_PT_lineart(MaterialButtonsPanel, Panel):
         mat = context.material
         lineart = mat.lineart
 
-        layout.prop(lineart, "use_material_mask", text="Material Mask")
+        layout.prop(lineart, "use_material_mask")
 
-        col = layout.column(align=True)
-        col.active = lineart.use_material_mask
-        row = col.row(align=True, heading="Masks")
+        row = layout.row(align=True, heading="Masks")
+        row.active = lineart.use_material_mask
         for i in range(8):
-            row.prop(lineart, "use_material_mask_bits", text=" ", index=i, toggle=True)
-            if i == 3:
-                row = col.row(align=True)
+            row.prop(lineart, "use_material_mask_bits",
+                     text=str(i), index=i, toggle=True)
 
         row = layout.row(align=True, heading="Custom Occlusion")
-        row.prop(lineart, "mat_occlusion", text="Levels")
+        row.prop(lineart, "use_mat_occlusion", text="")
+        sub = row.row(align=False)
+        sub.active = lineart.use_mat_occlusion
+        sub.prop(lineart, "mat_occlusion", slider=True, text="Levels")
 
 
 classes = (

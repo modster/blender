@@ -33,7 +33,7 @@ void GHOST_Rect::inset(int32_t i)
     m_b += i;
   }
   else if (i < 0) {
-    /* Shrink the rectangle, check for insets larger than half the size. */
+    // Shrink the rectangle, check for insets larger than half the size
     int32_t i2 = i * 2;
     if (getWidth() > i2) {
       m_l += i;

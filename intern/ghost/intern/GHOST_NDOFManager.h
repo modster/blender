@@ -127,33 +127,26 @@ class GHOST_NDOFManager {
    */
   void setDeadZone(float);
 
-  /**
-   * The latest raw axis data from the device.
-   *
-   * \note axis data should be in blender view coordinates
-   * - +X is to the right.
-   * - +Y is up.
-   * - +Z is out of the screen.
-   * - for rotations, look from origin to each +axis.
-   * - rotations are + when CCW, - when CW.
-   * Each platform is responsible for getting axis data into this form
-   * these values should not be scaled (just shuffled or flipped).
-   */
+  // the latest raw axis data from the device
+  // NOTE: axis data should be in blender view coordinates
+  //       +X is to the right
+  //       +Y is up
+  //       +Z is out of the screen
+  //       for rotations, look from origin to each +axis
+  //       rotations are + when CCW, - when CW
+  // each platform is responsible for getting axis data into this form
+  // these values should not be scaled (just shuffled or flipped)
   void updateTranslation(const int t[3], uint64_t time);
   void updateRotation(const int r[3], uint64_t time);
 
-  /**
-   * The latest raw button data from the device
-   * use HID button encoding (not #NDOF_ButtonT).
-   */
+  // the latest raw button data from the device
+  // use HID button encoding (not NDOF_ButtonT)
   void updateButton(int button_number, bool press, uint64_t time);
   void updateButtons(int button_bits, uint64_t time);
-  /* #NDOFButton events are sent immediately */
+  // NDOFButton events are sent immediately
 
-  /**
-   * Processes and sends most recent raw data as an #NDOFMotion event
-   * returns whether an event was sent.
-   */
+  // processes and sends most recent raw data as an NDOFMotion event
+  // returns whether an event was sent
   bool sendMotionEvent();
 
  protected:
@@ -172,8 +165,8 @@ class GHOST_NDOFManager {
   int m_rotation[3];
   int m_buttons; /* Bit field. */
 
-  uint64_t m_motionTime;     /* In milliseconds. */
-  uint64_t m_prevMotionTime; /* Time of most recent motion event sent. */
+  uint64_t m_motionTime;      // in milliseconds
+  uint64_t m_prevMotionTime;  // time of most recent Motion event sent
 
   GHOST_TProgress m_motionState;
   bool m_motionEventPending;

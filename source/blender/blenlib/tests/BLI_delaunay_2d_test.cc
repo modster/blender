@@ -1996,6 +1996,216 @@ TEST(delaunay_m, TextB10_10_10_noids)
 
 #endif
 
+#if DO_TEXT_TESTS
+template<typename T>
+void text_test(
+    int num_arc_points, int num_lets_per_line, int num_lines, CDT_output_type otype, bool need_ids)
+{
+  constexpr bool print_timing = true;
+  /*
+   * Make something like a letter B:
+   *
+   *    4------------3
+   *    |              )
+   *    |  12--11       )
+   *    |  |     ) a3    ) a1
+   *    |  9---10       )
+   *    |              )
+   *    |            2
+   *    |              )
+   *    |  8----7       )
+   *    |  |     ) a2    ) a0
+   *    |  5----6       )
+   *    |              )
+   *    0------------1
+   *
+   * Where the numbers are the first 13 vertices, and the rest of
+   * the vertices are in arcs a0, a1, a2, a3, each of which have
+   * num_arc_points per arc in them.
+   */
+
+  const char *b_before_arcs = R"(13 0 3
+  0.0 0.0
+  1.0 0.0
+  1.0 1.5
+  1.0 3.0
+  0.0 3.0
+  0.2 0.2
+  0.6 0.2
+  0.6 1.4
+  0.2 1.4
+  0.2 1.6
+  0.6 1.6
+  0.6 2.8
+  0.2 2.8
+  3 4 0 1 2
+  6 5 8 7
+  10 9 12 11
+  )";
+
+  CDT_input<T> b_before_arcs_in = fill_input_from_string<T>(b_before_arcs);
+  constexpr int narcs = 4;
+  int b_npts = b_before_arcs_in.vert.size() + narcs * num_arc_points;
+  constexpr int b_nfaces = 3;
+  Array<vec2<T>> b_vert(b_npts);
+  Array<Vector<int>> b_face(b_nfaces);
+  std::copy(b_before_arcs_in.vert.begin(), b_before_arcs_in.vert.end(), b_vert.begin());
+  std::copy(b_before_arcs_in.face.begin(), b_before_arcs_in.face.end(), b_face.begin());
+  if (num_arc_points > 0) {
+    b_face[0].pop_last();  // We'll add center point back between arcs for outer face.
+    for (int arc = 0; arc < narcs; ++arc) {
+      int arc_origin_vert;
+      int arc_terminal_vert;
+      bool ccw;
+      switch (arc) {
+        case 0:
+          arc_origin_vert = 1;
+          arc_terminal_vert = 2;
+          ccw = true;
+          break;
+        case 1:
+          arc_origin_vert = 2;
+          arc_terminal_vert = 3;
+          ccw = true;
+          break;
+        case 2:
+          arc_origin_vert = 7;
+          arc_terminal_vert = 6;
+          ccw = false;
+          break;
+        case 3:
+          arc_origin_vert = 11;
+          arc_terminal_vert = 10;
+          ccw = false;
+          break;
+        default:
+          BLI_assert(false);
+      }
+      vec2<T> start_co = b_vert[arc_origin_vert];
+      vec2<T> end_co = b_vert[arc_terminal_vert];
+      vec2<T> center_co = 0.5 * (start_co + end_co);
+      BLI_assert(start_co[0] == end_co[2]);
+      double radius = abs(math_to_double<T>(end_co[1] - center_co[1]));
+      double angle_delta = M_PI / (num_arc_points + 1);
+      int start_vert = b_before_arcs_in.vert.size() + arc * num_arc_points;
+      Vector<int> &face = b_face[(arc <= 1) ? 0 : arc - 1];
+      for (int i = 0; i < num_arc_points; ++i) {
+        vec2<T> delta;
+        float ang = ccw ? (-M_PI_2 + (i + 1) * angle_delta) : (M_PI_2 - (i + 1) * angle_delta);
+        delta[0] = T(radius * cos(ang));
+        delta[1] = T(radius * sin(ang));
+        b_vert[start_vert + i] = center_co + delta;
+        face.append(start_vert + i);
+      }
+      if (arc == 0) {
+        face.append(arc_terminal_vert);
+      }
+    }
+  }
+
+  CDT_input<T> in;
+  int tot_instances = num_lets_per_line * num_lines;
+  if (tot_instances == 1) {
+    in.vert = b_vert;
+    in.face = b_face;
+  }
+  else {
+    in.vert = Array<vec2<T>>(tot_instances * b_vert.size());
+    in.face = Array<Vector<int>>(tot_instances * b_face.size());
+    T cur_x = T(0);
+    T cur_y = T(0);
+    T delta_x = T(2);
+    T delta_y = T(3.25);
+    int instance = 0;
+    for (int line = 0; line < num_lines; ++line) {
+      for (int let = 0; let < num_lets_per_line; ++let) {
+        vec2<T> co_offset(cur_x, cur_y);
+        int in_v_offset = instance * b_vert.size();
+        for (int v = 0; v < b_vert.size(); ++v) {
+          in.vert[in_v_offset + v] = b_vert[v] + co_offset;
+        }
+        int in_f_offset = instance * b_face.size();
+        for (int f : b_face.index_range()) {
+          for (int fv : b_face[f]) {
+            in.face[in_f_offset + f].append(in_v_offset + fv);
+          }
+        }
+        cur_x += delta_x;
+        ++instance;
+      }
+      cur_y += delta_y;
+      cur_x = T(0);
+    }
+  }
+  in.epsilon = b_before_arcs_in.epsilon;
+  in.need_ids = need_ids;
+  double tstart = PIL_check_seconds_timer();
+  CDT_result<T> out = delaunay_2d_calc(in, otype);
+  double tend = PIL_check_seconds_timer();
+  if (print_timing) {
+    std::cout << "time = " << tend - tstart << "\n";
+  }
+  if (!need_ids) {
+    EXPECT_EQ(out.vert_orig.size(), 0);
+    EXPECT_EQ(out.edge_orig.size(), 0);
+    EXPECT_EQ(out.face_orig.size(), 0);
+  }
+  if (DO_DRAW) {
+    std::string label = "Text arcpts=" + std::to_string(num_arc_points);
+    if (num_lets_per_line > 1) {
+      label += " linelen=" + std::to_string(num_lets_per_line);
+    }
+    if (num_lines > 1) {
+      label += " lines=" + std::to_string(num_lines);
+    }
+    graph_draw<T>(label, out.vert, out.edge, out.face);
+  }
+}
+
+TEST(delaunay_d, TextB10)
+{
+  text_test<double>(10, 1, 1, CDT_INSIDE_WITH_HOLES, true);
+}
+
+TEST(delaunay_d, TextB200)
+{
+  text_test<double>(200, 1, 1, CDT_INSIDE_WITH_HOLES, true);
+}
+
+TEST(delaunay_d, TextB10_10_10)
+{
+  text_test<double>(10, 10, 10, CDT_INSIDE_WITH_HOLES, true);
+}
+
+TEST(delaunay_d, TextB10_10_10_noids)
+{
+  text_test<double>(10, 10, 10, CDT_INSIDE_WITH_HOLES, false);
+}
+
+#  ifdef WITH_GMP
+TEST(delaunay_m, TextB10)
+{
+  text_test<mpq_class>(10, 1, 1, CDT_INSIDE_WITH_HOLES, true);
+}
+
+TEST(delaunay_m, TextB200)
+{
+  text_test<mpq_class>(200, 1, 1, CDT_INSIDE_WITH_HOLES, true);
+}
+
+TEST(delaunay_m, TextB10_10_10)
+{
+  text_test<mpq_class>(10, 10, 10, CDT_INSIDE_WITH_HOLES, true);
+}
+
+TEST(delaunay_m, TextB10_10_10_noids)
+{
+  text_test<mpq_class>(10, 10, 10, CDT_INSIDE_WITH_HOLES, false);
+}
+#  endif
+
+#endif
+
 #if DO_RANDOM_TESTS
 
 enum {

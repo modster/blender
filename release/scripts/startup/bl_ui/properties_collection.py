@@ -52,7 +52,8 @@ class COLLECTION_PT_collection_flags(CollectionButtonsPanel, Panel):
         vlc = vl.active_layer_collection
 
         col = layout.column(align=True)
-        col.prop(collection, "hide_select", text="Selectable", toggle=False, invert_checkbox=True)
+        col.prop(collection, "hide_select", text="Selectable",
+                 toggle=False, invert_checkbox=True)
         col.prop(collection, "hide_render", toggle=False)
 
         col = layout.column(align=True)
@@ -86,15 +87,13 @@ class COLLECTION_PT_lineart_collection(CollectionButtonsPanel, Panel):
         row = layout.row()
         row.prop(collection, "lineart_usage")
 
-        layout.prop(collection, "lineart_use_intersection_mask", text="Collection Mask")
+        layout.prop(collection, "lineart_use_intersection_mask")
 
-        col = layout.column(align=True)
-        col.active = collection.lineart_use_intersection_mask
-        row = col.row(align=True, heading="Masks")
+        row = layout.row(align=True, heading="Masks")
+        row.active = collection.lineart_use_intersection_mask
         for i in range(8):
-            row.prop(collection, "lineart_intersection_mask", index=i, text=" ", toggle=True)
-            if i == 3:
-                row = col.row(align=True)
+            row.prop(collection, "lineart_intersection_mask",
+                     index=i, text=str(i), toggle=True)
 
 
 classes = (
