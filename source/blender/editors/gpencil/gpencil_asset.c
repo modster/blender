@@ -417,7 +417,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
   RNA_def_boolean(ot->srna,
                   "reset_origin",
                   0,
-                  "Reset Origin to Geometry",
+                  "Origin to Geometry",
                   "Set origin of the asset in the center of the strokes bounding box");
   RNA_def_boolean(ot->srna, "flatten_layers", 0, "Flatten Layers", "Merge all layers in only one");
 }
