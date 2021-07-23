@@ -220,12 +220,19 @@ static void delete_bp_from_nurb(BPoint *bp, Nurb *nu)
 /* Get a measure of how zoomed in the current view is. */
 static float get_view_zoom(const float depth[3], const ViewContext *vc)
 {
+  /*
+   * Get worldspace coordinates of two fixed points and compare them.
+   * Get the length between the worldspace coordinates.
+   * Larger the length, the more zoomed out the view is.
+   */
+
   int p1[2] = {0, 0};
   int p2[2] = {100, 0};
   float p1_3d[3], p2_3d[3];
   mouse_location_to_worldspace(p1, depth, vc, p1_3d);
   mouse_location_to_worldspace(p2, depth, vc, p2_3d);
-  return 10 / len_v2v2(p1_3d, p2_3d);
+
+  return 15.0f / len_v2v2(p1_3d, p2_3d);
 }
 
 /* Get the closest point on an edge to a given point based on perpendicular distance. */
