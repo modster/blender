@@ -33,8 +33,8 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_utildefines.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
 
@@ -80,12 +80,14 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
         const bool found = BKE_defvert_find_weight(dv, defgrp_index) > 0.0f;
         if (found != invert_vgroup) {
           mask[i] = true;
-        }else{
+        }
+        else {
           mask[i] = false;
         }
       }
     }
-  }else{
+  }
+  else {
     for (int i = 0; i < totvert; i++) {
       mask[i] = true;
     }
@@ -95,8 +97,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   MEM_freeN(mask);
 
   return result;
-
-
 }
 
 static void initData(ModifierData *md)
