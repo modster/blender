@@ -216,8 +216,9 @@ typedef enum eGP_AssetModes {
   GP_ASSET_MODE_SELECTED_STROKES,
 } eGP_AssetModes;
 
-/* Helper: Create an asset for datablock. */
-static void gpencil_asset_create(const bContext *C,
+/* Helper: Create an asset for datablock.
+ * return: False if there are features non supported. */
+static bool gpencil_asset_create(const bContext *C,
                                  const bGPdata *gpd_src,
                                  const bGPDlayer *gpl_filter,
                                  const eGP_AssetModes mode,
@@ -225,6 +226,7 @@ static void gpencil_asset_create(const bContext *C,
                                  const bool merge_layers)
 {
   Main *bmain = CTX_data_main(C);
+  bool non_supported_feature = false;
 
   /* Create a copy of selected datablock. */
   bGPdata *gpd = (bGPdata *)BKE_id_copy(bmain, &gpd_src->id);
@@ -256,18 +258,25 @@ static void gpencil_asset_create(const bContext *C,
     }
 
     /* Remove parenting data. */
-    gpl->parent = NULL;
-    gpl->parsubstr[0] = 0;
-    gpl->partype = 0;
+    if (gpl->parent != NULL) {
+      gpl->parent = NULL;
+      gpl->parsubstr[0] = 0;
+      gpl->partype = 0;
+      non_supported_feature = true;
+    }
 
     /* Remove masking. */
-    bGPDlayer_Mask *mask_next;
-    for (bGPDlayer_Mask *mask = gpl->mask_layers.first; mask; mask = mask_next) {
-      mask_next = mask->next;
-      BKE_gpencil_layer_mask_remove(gpl, mask);
+    if (gpl->mask_layers.first) {
+      bGPDlayer_Mask *mask_next;
+      for (bGPDlayer_Mask *mask = gpl->mask_layers.first; mask; mask = mask_next) {
+        mask_next = mask->next;
+        BKE_gpencil_layer_mask_remove(gpl, mask);
+      }
+      gpl->mask_layers.first = NULL;
+      gpl->mask_layers.last = NULL;
+
+      non_supported_feature = true;
     }
-    gpl->mask_layers.first = NULL;
-    gpl->mask_layers.last = NULL;
 
     bGPDframe *gpf_active = gpl->actframe;
 
@@ -330,6 +339,8 @@ static void gpencil_asset_create(const bContext *C,
 
   if (ED_asset_mark_id(C, &gpd->id)) {
   }
+
+  return non_supported_feature;
 }
 
 static int gpencil_asset_create_exec(const bContext *C, const wmOperator *op)
@@ -341,13 +352,24 @@ static int gpencil_asset_create_exec(const bContext *C, const wmOperator *op)
   const bool reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
   const bool merge_layers = RNA_boolean_get(op->ptr, "merge_layers");
 
+  bool non_supported_feature = false;
   if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_src->layers) {
-      gpencil_asset_create(C, gpd_src, gpl, mode, reset_origin, merge_layers);
+      non_supported_feature |= gpencil_asset_create(
+          C, gpd_src, gpl, mode, reset_origin, merge_layers);
     }
   }
   else {
-    gpencil_asset_create(C, gpd_src, NULL, mode, reset_origin, merge_layers);
+    non_supported_feature = gpencil_asset_create(
+        C, gpd_src, NULL, mode, reset_origin, merge_layers);
+  }
+
+  /* Warnings for non supported features in the created asset. */
+  if ((non_supported_feature) || (ob->greasepencil_modifiers.first) || (ob->shader_fx.first)) {
+    BKE_report(op->reports,
+               RPT_WARNING,
+               "Object has layer parenting, masking, modifiers or effects not supported in this "
+               "asset type. These features have been omitted in the asset.");
   }
 
   WM_main_add_notifier(NC_ID | NA_EDITED, NULL);
