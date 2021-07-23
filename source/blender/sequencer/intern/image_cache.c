@@ -1339,15 +1339,12 @@ void seq_cache_cleanup_sequence(Scene *scene,
   seq_cache_unlock(scene);
 }
 
-void seq_cache_thumbnail_cleanup(Scene *scene, Sequence *seq_changed)
+void seq_cache_thumbnail_cleanup(Scene *scene, rctf *view_area)
 {
   SeqCache *cache = seq_cache_get_from_scene(scene);
   if (!cache) {
     return;
   }
-
-  int range_start = seq_changed->startdisp;
-  int range_end = seq_changed->enddisp;
 
   int invalidate_composite = SEQ_CACHE_STORE_THUMBNAIL;
 
@@ -1357,8 +1354,9 @@ void seq_cache_thumbnail_cleanup(Scene *scene, Sequence *seq_changed)
     SeqCacheKey *key = BLI_ghashIterator_getKey(&gh_iter);
     BLI_ghashIterator_step(&gh_iter);
 
-    if ((key->type & invalidate_composite) && key->timeline_frame >= range_start &&
-        key->timeline_frame <= range_end) {
+    if ((key->type & invalidate_composite) &&
+        (key->timeline_frame > view_area->xmax || key->timeline_frame < view_area->xmin ||
+         key->seq->machine > view_area->ymax || key->seq->machine < view_area->ymin)) {
       if (key->link_next || key->link_prev) {
         seq_cache_relink_keys(key->link_next, key->link_prev);
       }
@@ -1465,7 +1463,7 @@ void seq_cache_thumbnail_put(const SeqRenderData *context,
                              float timeline_frame,
                              int type,
                              ImBuf *i,
-                             float *cache_limits)
+                             rctf *view_area)
 {
   if (i == NULL || context->skip_cache || context->is_proxy_render || !seq) {
     return;
@@ -1497,21 +1495,12 @@ void seq_cache_thumbnail_put(const SeqRenderData *context,
 
   /* Limit cache to 5000 images stored. */
   if (cache->count >= 5000) {
-    float safe_ofs = 200;
-    Sequence cut = *seq;
-
-    /* Frames to the left */
-    cut.startdisp = (int)cache_limits[0];
-    cut.enddisp = (int)cache_limits[2] - (int)safe_ofs;
-    if (cut.startdisp < cut.enddisp) {
-      seq_cache_thumbnail_cleanup(scene, &cut);
-    }
-    /* Frames to the right */
-    cut.startdisp = cache_limits[3] + safe_ofs;
-    cut.enddisp = cache_limits[1];
-    if (cut.startdisp < cut.enddisp) {
-      seq_cache_thumbnail_cleanup(scene, &cut);
-    }
+    rctf view_area_safe = *view_area;
+    view_area_safe.xmax += 200;
+    view_area_safe.xmin -= 200;
+    view_area_safe.ymin -= 1;
+    view_area_safe.ymax += 1;
+    seq_cache_thumbnail_cleanup(scene, &view_area_safe);
   }
 
   seq_cache_put_ex(scene, key, i);

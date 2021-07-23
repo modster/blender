@@ -2101,39 +2101,33 @@ ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
 void SEQ_render_thumbnails(SeqRenderData *context,
                            Sequence *seq,
                            Sequence *seq_orig,
-                           float timeline_frame,
-                           float thumb_w,
-                           float *cache_limits)
+                           float start_frame,
+                           float frame_step,
+                           rctf *view_area)
 {
   ImBuf *ibuf = NULL;
   SeqRenderState state;
   seq_render_state_init(&state);
 
-  /*TODO(AYJ) : Add the ability to have some extra frames also cached, for strip slip takes place
-   * so it is smooth */
-  timeline_frame = timeline_frame - 30 * thumb_w;
-  float upper_limit = cache_limits[3] + 30 * thumb_w;
-  while (timeline_frame < upper_limit) {
-    ibuf = seq_cache_get(context, seq_orig, roundf(timeline_frame), SEQ_CACHE_STORE_THUMBNAIL);
+  start_frame = start_frame - 3 * frame_step;
+  float upper_limit = view_area->xmax + 3 * frame_step;
+  while (start_frame < upper_limit) {
+    ibuf = seq_cache_get(context, seq_orig, roundf(start_frame), SEQ_CACHE_STORE_THUMBNAIL);
     if (ibuf) {
       IMB_freeImBuf(ibuf);
-      timeline_frame += thumb_w;
+      start_frame += frame_step;
       continue;
     }
 
-    ibuf = seq_get_uncached_thumbnail(context, &state, seq, roundf(timeline_frame));
+    ibuf = seq_get_uncached_thumbnail(context, &state, seq, roundf(start_frame));
 
     if (ibuf) {
-      seq_cache_thumbnail_put(context,
-                              seq_orig,
-                              roundf(timeline_frame),
-                              SEQ_CACHE_STORE_THUMBNAIL,
-                              ibuf,
-                              cache_limits);
+      seq_cache_thumbnail_put(
+          context, seq_orig, roundf(start_frame), SEQ_CACHE_STORE_THUMBNAIL, ibuf, view_area);
       IMB_freeImBuf(ibuf);
     }
 
-    timeline_frame += thumb_w;
+    start_frame += frame_step;
   }
 }
 

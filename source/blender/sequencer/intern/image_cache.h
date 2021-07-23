@@ -51,7 +51,7 @@ void seq_cache_thumbnail_put(const struct SeqRenderData *context,
                              float timeline_frame,
                              int type,
                              struct ImBuf *i,
-                             float *cache_limits);
+                             rctf *view_area);
 bool seq_cache_put_if_possible(const struct SeqRenderData *context,
                                struct Sequence *seq,
                                float timeline_frame,
@@ -66,7 +66,7 @@ void seq_cache_cleanup_sequence(struct Scene *scene,
                                 struct Sequence *seq_changed,
                                 int invalidate_types,
                                 bool force_seq_changed_range);
-void seq_cache_thumbnail_cleanup(Scene *scene, Sequence *seq_changed);
+void seq_cache_thumbnail_cleanup(Scene *scene, rctf *view_area);
 bool seq_cache_is_full(void);
 
 #ifdef __cplusplus
