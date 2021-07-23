@@ -75,7 +75,6 @@ typedef struct tGPDasset {
   struct Scene *scene;
   struct ScrArea *area;
   struct ARegion *region;
-  struct RegionView3D *rv3d;
   /** Current object. */
   struct Object *ob;
   /** Current GP datablock. */
@@ -1083,7 +1082,6 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   tgpa->scene = CTX_data_scene(C);
   tgpa->area = CTX_wm_area(C);
   tgpa->region = CTX_wm_region(C);
-  tgpa->rv3d = CTX_wm_region_view3d(C);
   tgpa->ob = CTX_data_active_object(C);
 
   /* Setup space conversions data. */
