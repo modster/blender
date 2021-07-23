@@ -101,7 +101,7 @@ void USDCurvesReader::read_curve_sample(Curve *cu, const double motionSampleTime
   /* If normals, extrude, else bevel.
    * Perhaps to be replaced by Blender/USD Schema. */
   if (!usdNormals.empty()) {
-    // Set extrusion to 1.0f.
+    /* Set extrusion to 1.0f. */
     curve_->ext1 = 1.0f;
   }
   else {

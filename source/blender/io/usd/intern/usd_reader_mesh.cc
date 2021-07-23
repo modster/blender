@@ -47,7 +47,7 @@
 #include <iostream>
 
 namespace usdtokens {
-// Materials
+/* Materials */
 static const pxr::TfToken st("st", pxr::TfToken::Immortal);
 static const pxr::TfToken UVMap("UVMap", pxr::TfToken::Immortal);
 static const pxr::TfToken Cd("Cd", pxr::TfToken::Immortal);
@@ -56,13 +56,13 @@ static const pxr::TfToken normalsPrimvar("normals", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
 namespace utils {
-// Very similar to abc mesh utils
+/* Very similar to abc mesh utils. */
 static void build_mat_map(const Main *bmain, std::map<std::string, Material *> &mat_map)
 {
   Material *material = static_cast<Material *>(bmain->materials.first);
 
   for (; material; material = static_cast<Material *>(material->id.next)) {
-    // We have to do this because the stored material name is coming directly from usd
+    /* We have to do this because the stored material name is coming directly from usd. */
     mat_map[pxr::TfMakeValidIdentifier(material->id.name + 2)] = material;
   }
 }
@@ -251,7 +251,7 @@ bool USDMeshReader::topology_changed(Mesh * /* existing_mesh */, const double mo
   faceVertCountsAttr.Get(&face_counts_, motionSampleTime);
   pointsAttr.Get(&positions_, motionSampleTime);
 
-  // If 'normals' and 'primvars:normals' are both specified, the latter has precedence.
+  /* If 'normals' and 'primvars:normals' are both specified, the latter has precedence. */
   pxr::UsdGeomPrimvar primvar = mesh_prim_.GetPrimvar(usdtokens::normalsPrimvar);
   if (primvar.HasValue()) {
     primvar.ComputeFlattened(&normals_, motionSampleTime);
@@ -333,7 +333,7 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
 
       pxr::TfToken uv_token;
 
-      // If first time seeing uv token, store in map of <layer->uid, TfToken>
+      /* If first time seeing uv token, store in map of <layer->uid, TfToken> */
       if (uv_token_map_.find(layer_name) == uv_token_map_.end()) {
         uv_token = pxr::TfToken(layer_name);
         uv_token_map_.insert(std::make_pair(layer_name, uv_token));
@@ -342,17 +342,17 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
         uv_token = uv_token_map_.at(layer_name);
       }
 
-      // Early out if no token found, this should never happen
+      /* Early out if no token found, this should never happen */
       if (uv_token.IsEmpty()) {
         continue;
       }
-      // Early out if not first load and uvs arent animated
+      /* Early out if not first load and uvs arent animated. */
       if (!load_uvs && primvar_varying_map_.find(uv_token) != primvar_varying_map_.end() &&
           !primvar_varying_map_.at(uv_token)) {
         continue;
       }
 
-      // Early out if mesh doesn't have primvar
+      /* Early out if mesh doesn't have primvar. */
       if (!mesh_prim_.HasPrimvar(uv_token)) {
         continue;
       }
@@ -377,12 +377,12 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
           continue;
         }
 
-        // Early out if mismatched layer sizes
+        /* Early out if mismatched layer sizes. */
         if (layer_idx > uv_primvars.size()) {
           continue;
         }
 
-        // Early out if no uvs loaded
+        /* Early out if no uvs loaded. */
         if (uv_primvars[layer_idx].uvs.empty()) {
           continue;
         }
@@ -391,13 +391,12 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
 
         if (!(sample.interpolation == pxr::UsdGeomTokens->faceVarying ||
               sample.interpolation == pxr::UsdGeomTokens->vertex)) {
-          /* Shouldn't happen. */
           std::cerr << "WARNING: unexpected interpolation type " << sample.interpolation
                     << " for uv " << layer->name << std::endl;
           continue;
         }
 
-        // For Vertex interpolation, use the vertex index.
+        /* For Vertex interpolation, use the vertex index. */
         int usd_uv_index = sample.interpolation == pxr::UsdGeomTokens->vertex ?
                                mesh->mloop[loop_index].v :
                                loop_index;
@@ -487,7 +486,8 @@ void USDMeshReader::read_colors(Mesh *mesh, const double motionSampleTime)
     for (int j = 0; j < poly->totloop; ++j) {
       int loop_index = poly->loopstart + j;
 
-      int usd_index = 0;  // Default for constant varying interpolation.
+      /* Default for constant varying interpolation. */
+      int usd_index = 0;
 
       if (interp == pxr::UsdGeomTokens->vertex) {
         usd_index = mesh->mloop[loop_index].v;
@@ -502,7 +502,7 @@ void USDMeshReader::read_colors(Mesh *mesh, const double motionSampleTime)
         }
       }
       else if (interp == pxr::UsdGeomTokens->uniform) {
-        // Uniform varying uses the poly index.
+        /* Uniform varying uses the poly index. */
         usd_index = i;
       }
 
@@ -549,7 +549,7 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
     return;
   }
 
-  // Check for normals count mismatches to prevent crashes.
+  /* Check for normals count mismatches to prevent crashes. */
   if (normals_.size() != mesh->totloop) {
     std::cerr << "WARNING: loop normal count mismatch for mesh " << mesh->id.name << std::endl;
     BKE_mesh_calc_normals(mesh);
@@ -587,7 +587,7 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
   MEM_freeN(lnors);
 }
 
-// Set USD uniform (per-face) normals as Blender loop normals.
+/* Set USD uniform (per-face) normals as Blender loop normals. */
 void USDMeshReader::process_normals_uniform(Mesh *mesh)
 {
   if (normals_.empty()) {
@@ -595,7 +595,7 @@ void USDMeshReader::process_normals_uniform(Mesh *mesh)
     return;
   }
 
-  // Check for normals count mismatches to prevent crashes.
+  /* Check for normals count mismatches to prevent crashes. */
   if (normals_.size() != mesh->totpoly) {
     std::cerr << "WARNING: uniform normal count mismatch for mesh " << mesh->id.name << std::endl;
     BKE_mesh_calc_normals(mesh);
@@ -628,9 +628,9 @@ void USDMeshReader::read_mesh_sample(ImportSettings *settings,
                                      const double motionSampleTime,
                                      const bool new_mesh)
 {
-  // Note that for new meshes we always want to read verts and polys,
-  // regradless of the value of the read_flag, to avoid a crash downstream
-  // in code that expect this data to be there.
+  /* Note that for new meshes we always want to read verts and polys,
+   * regradless of the value of the read_flag, to avoid a crash downstream
+   * in code that expect this data to be there. */
 
   if (new_mesh || (settings->read_flag & MOD_MESHSEQ_READ_VERT) != 0) {
     for (int i = 0; i < positions_.size(); i++) {
@@ -650,15 +650,15 @@ void USDMeshReader::read_mesh_sample(ImportSettings *settings,
       process_normals_uniform(mesh);
     }
     else {
-      // Default
+      /* Default */
       BKE_mesh_calc_normals(mesh);
     }
   }
 
-  // Process point normals after reading polys.  This
-  // is important in the case where the normals are empty
-  // and we invoke BKE_mesh_calc_normals(mesh), which requires
-  // edges to be defined.
+  /* Process point normals after reading polys.  This
+   * is important in the case where the normals are empty
+   * and we invoke BKE_mesh_calc_normals(mesh), which requires
+   * edges to be defined. */
   if ((settings->read_flag & MOD_MESHSEQ_READ_VERT) != 0 &&
       normal_interpolation_ == pxr::UsdGeomTokens->vertex) {
     process_normals_vertex_varying(mesh);

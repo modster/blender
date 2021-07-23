@@ -38,7 +38,7 @@
 
 namespace usdtokens {
 
-// Parameter names
+/* Parameter names. */
 static const pxr::TfToken a("a", pxr::TfToken::Immortal);
 static const pxr::TfToken b("b", pxr::TfToken::Immortal);
 static const pxr::TfToken clearcoat("clearcoat", pxr::TfToken::Immortal);
@@ -63,11 +63,11 @@ static const pxr::TfToken specularColor("specularColor", pxr::TfToken::Immortal)
 static const pxr::TfToken st("st", pxr::TfToken::Immortal);
 static const pxr::TfToken varname("varname", pxr::TfToken::Immortal);
 
-// Color space names
+/* Color space names. */
 static const pxr::TfToken raw("raw", pxr::TfToken::Immortal);
 static const pxr::TfToken RAW("RAW", pxr::TfToken::Immortal);
 
-// USD shader names.
+/* USD shader names. */
 static const pxr::TfToken UsdPreviewSurface("UsdPreviewSurface", pxr::TfToken::Immortal);
 static const pxr::TfToken UsdPrimvarReader_float2("UsdPrimvarReader_float2",
                                                   pxr::TfToken::Immortal);
@@ -109,9 +109,9 @@ static void link_nodes(
   nodeAddLink(ntree, source, source_socket, dest, dest_socket);
 }
 
-// Returns true if the given shader may have opacity < 1.0, based
-// on heuristics.  Also returns the shader's opacityThreshold input
-// in r_opacity_threshold, if this input has an authored value.
+/* Returns true if the given shader may have opacity < 1.0, based
+ * on heuristics.  Also returns the shader's opacityThreshold input
+ * in r_opacity_threshold, if this input has an authored value. */
 static bool needs_blend(const pxr::UsdShadeShader &usd_shader, float &r_opacity_threshold)
 {
   if (!usd_shader) {
@@ -229,9 +229,9 @@ namespace blender::io::usd {
 
 namespace {
 
-// Compute the x- and y-coordinates for placing a new node in an unoccupied region of
-// the column with the given index.  Returns the coordinates in r_locx and r_locy and
-// updates the column-occupancy information in r_ctx.
+/* Compute the x- and y-coordinates for placing a new node in an unoccupied region of
+ * the column with the given index.  Returns the coordinates in r_locx and r_locy and
+ * updates the column-occupancy information in r_ctx. */
 void compute_node_loc(const int column, float &r_locx, float &r_locy, NodePlacementContext &r_ctx)
 {
   r_locx = r_ctx.origx - column * r_ctx.horizontal_step;
@@ -242,12 +242,12 @@ void compute_node_loc(const int column, float &r_locx, float &r_locy, NodePlacem
 
   r_locy = r_ctx.origy - r_ctx.column_offsets[column];
 
-  // Record the y-offset of the occupied region in
-  // the column, including padding.
+  /* Record the y-offset of the occupied region in
+   * the column, including padding. */
   r_ctx.column_offsets[column] += r_ctx.vertical_step + 10.0f;
 }
 
-}  // namespace
+}  // End anonymous namespace.
 
 USDMaterialReader::USDMaterialReader(const USDImportParams &params, Main *bmain)
     : params_(params), bmain_(bmain)
@@ -508,20 +508,20 @@ void USDMaterialReader::follow_connection(const pxr::UsdShadeInput &usd_input,
 
     if (strcmp(dest_socket_name, "Normal") == 0) {
 
-      // The normal texture input requires creating a normal map node.
+      /* The normal texture input requires creating a normal map node. */
       float locx = 0.0f;
       float locy = 0.0f;
       compute_node_loc(column + 1, locx, locy, r_ctx);
 
       bNode *normal_map = add_node(nullptr, ntree, SH_NODE_NORMAL_MAP, locx, locy);
 
-      // Currently, the Normal Map node has Tangent Space as the default,
-      // which is what we need, so we don't need to explicitly set it.
+      /* Currently, the Normal Map node has Tangent Space as the default,
+       * which is what we need, so we don't need to explicitly set it. */
 
-      // Connect the Normal Map to the Normal input.
+      /* Connect the Normal Map to the Normal input. */
       link_nodes(ntree, normal_map, "Normal", dest_node, "Normal");
 
-      // Now, create the Texture Image node input to the Normal Map "Color" input.
+      /* Now, create the Texture Image node input to the Normal Map "Color" input. */
       convert_usd_uv_texture(
           source_shader, source_name, normal_map, "Color", ntree, column + 2, r_ctx);
     }
@@ -552,7 +552,7 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
   float locy = 0.0f;
   compute_node_loc(column, locx, locy, r_ctx);
 
-  // Create the Texture Image node.
+  /* Create the Texture Image node. */
   bNode *tex_image = add_node(nullptr, ntree, SH_NODE_TEX_IMAGE, locx, locy);
 
   if (!tex_image) {
@@ -561,17 +561,17 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
     return;
   }
 
-  // Load the texture image.
+  /* Load the texture image. */
   load_tex_image(usd_shader, tex_image);
 
-  // Connect to destination node input.
+  /* Connect to destination node input. */
 
-  // Get the source socket name.
+  /* Get the source socket name. */
   std::string source_socket_name = usd_source_name == usdtokens::a ? "Alpha" : "Color";
 
   link_nodes(ntree, tex_image, source_socket_name.c_str(), dest_node, dest_socket_name);
 
-  // Connect the texture image node "Vector" input.
+  /* Connect the texture image node "Vector" input. */
   if (pxr::UsdShadeInput st_input = usd_shader.GetInput(usdtokens::st)) {
     set_node_input(st_input, tex_image, "Vector", ntree, column, r_ctx);
   }
@@ -586,7 +586,7 @@ void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
     return;
   }
 
-  // Try to load the texture image.
+  /* Try to load the texture image. */
   pxr::UsdShadeInput file_input = usd_shader.GetInput(usdtokens::file);
 
   if (!file_input) {
@@ -620,10 +620,10 @@ void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
 
   tex_image->id = &image->id;
 
-  // Set texture color space.
-  // TODO(makowalski): For now, just checking for RAW color space,
-  // assuming sRGB otherwise, but more complex logic might be
-  // required if the color space is "auto".
+  /* Set texture color space.
+   * TODO(makowalski): For now, just checking for RAW color space,
+   * assuming sRGB otherwise, but more complex logic might be
+   * required if the color space is "auto". */
 
   pxr::TfToken color_space = get_source_color_space(usd_shader);
 
@@ -657,7 +657,7 @@ void USDMaterialReader::convert_usd_primvar_reader_float2(
   float locy = 0.0f;
   compute_node_loc(column, locx, locy, r_ctx);
 
-  // Create the UV Map node.
+  /* Create the UV Map node. */
   bNode *uv_map = add_node(nullptr, ntree, SH_NODE_UVMAP, locx, locy);
 
   if (!uv_map) {
@@ -666,7 +666,7 @@ void USDMaterialReader::convert_usd_primvar_reader_float2(
     return;
   }
 
-  // Set the texmap name.
+  /* Set the texmap name. */
   pxr::UsdShadeInput varname_input = usd_shader.GetInput(usdtokens::varname);
   if (varname_input) {
     pxr::VtValue varname_val;
@@ -679,7 +679,7 @@ void USDMaterialReader::convert_usd_primvar_reader_float2(
     }
   }
 
-  // Connect to destination node input.
+  /* Connect to destination node input. */
   link_nodes(ntree, uv_map, "UV", dest_node, dest_socket_name);
 }
 

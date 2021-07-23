@@ -67,16 +67,18 @@ void USDCameraReader::read_object_data(Main *bmain, const double motionSampleTim
   cam_prim.GetHorizontalApertureAttr().Get(&horAp, motionSampleTime);
 
   bcam->lens = val.Get<float>();
-  // TODO(makowalski)
-  // bcam->sensor_x = 0.0f;
-  // bcam->sensor_y = 0.0f;
+  /* TODO(makowalski) */
+#if 0
+   bcam->sensor_x = 0.0f;
+   bcam->sensor_y = 0.0f;
+#endif
   bcam->shiftx = verApOffset.Get<float>();
   bcam->shifty = horApOffset.Get<float>();
 
   bcam->type = (projectionVal.Get<pxr::TfToken>().GetString() == "perspective") ? CAM_PERSP :
                                                                                   CAM_ORTHO;
 
-  // Calling UncheckedGet() to silence compiler warnings.
+  /* Calling UncheckedGet() to silence compiler warnings. */
   bcam->clip_start = max_ff(0.1f, clippingRangeVal.UncheckedGet<pxr::GfVec2f>()[0]);
   bcam->clip_end = clippingRangeVal.UncheckedGet<pxr::GfVec2f>()[1];
 

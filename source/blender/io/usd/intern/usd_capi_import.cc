@@ -101,18 +101,17 @@ static bool gather_objects_paths(const pxr::UsdPrim &object, ListBase *object_pa
   return true;
 }
 
-// Update the given import settings with the global rotation matrix to orient
-// imported objects with Z-up, if necessary
+/* Update the given import settings with the global rotation matrix to orient
+ * imported objects with Z-up, if necessary */
 static void convert_to_z_up(pxr::UsdStageRefPtr stage, ImportSettings &r_settings)
 {
   if (!stage || pxr::UsdGeomGetStageUpAxis(stage) == pxr::UsdGeomTokens->z) {
-    // Nothing to do.
     return;
   }
 
   r_settings.do_convert_mat = true;
 
-  // Rotate 90 degrees about the X-axis.
+  /* Rotate 90 degrees about the X-axis. */
   float rmat[3][3];
   float axis[3] = {1.0f, 0.0f, 0.0f};
   axis_angle_normalized_to_mat3(rmat, axis, M_PI / 2.0f);
@@ -157,7 +156,6 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
   data->was_canceled = false;
   data->archive = nullptr;
 
-  // G.is_rendering = true;
   WM_set_locked_interface(data->wm, true);
   G.is_break = false;
 
@@ -215,7 +213,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
 
   convert_to_z_up(stage, data->settings);
 
-  // Set up the stage for animated data.
+  /* Set up the stage for animated data. */
   if (data->params.set_frame_range) {
     data->scene->r.sfra = stage->GetStartTimeCode();
     data->scene->r.efra = stage->GetEndTimeCode();

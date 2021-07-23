@@ -92,7 +92,7 @@ bool USD_import(struct bContext *C,
 
 int USD_get_version(void);
 
-// ----- USD Import and Mesh Cache interface
+/* USD Import and Mesh Cache interface. */
 
 struct CacheArchiveHandle *USD_create_handle(struct Main *bmain,
                                              const char *filename,
