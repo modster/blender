@@ -23,6 +23,7 @@
 #include "GEO_mesh_remesh_blocks.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "node_geometry_util.hh"
 
@@ -39,12 +40,22 @@ static bNodeSocketTemplate geo_node_remesh_blocks_out[] = {
     {-1, ""},
 };
 
+static void geo_node_remesh_blocks_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "remesh_blocks_mode", 0, "", ICON_NONE);
+}
+
+static void geo_remesh_blocks_init(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  node->custom1 = 0;
+}
+
 namespace blender::nodes {
 static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const char flag = 0;
-  const char mode = 0;
+  const char mode = params.node().custom1;
   const int hermite_num = 1;
   const int depth = params.extract_input<int>("Depth");
   const float scale = params.extract_input<float>("Scale");
@@ -72,6 +83,8 @@ void register_node_type_geo_remesh_blocks()
 
   geo_node_type_base(&ntype, GEO_NODE_REMESH_BLOCKS, "Remesh Blocks", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_remesh_blocks_in, geo_node_remesh_blocks_out);
+  node_type_init(&ntype, geo_remesh_blocks_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_remesh_blocks_exec;
+  ntype.draw_buttons = geo_node_remesh_blocks_layout;
   nodeRegisterType(&ntype);
 }
