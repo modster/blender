@@ -222,8 +222,8 @@ static void gpencil_asset_create(bContext *C,
                                  bGPdata *gpd_src,
                                  bGPDlayer *gpl_filter,
                                  const eGP_AssetModes mode,
-                                 const int reset_origin,
-                                 const int merge_layers)
+                                 const bool reset_origin,
+                                 const bool merge_layers)
 {
   Main *bmain = CTX_data_main(C);
 
@@ -333,8 +333,8 @@ static int gpencil_asset_create_exec(bContext *C, wmOperator *op)
   bGPdata *gpd_src = ob->data;
 
   const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
-  const int reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
-  const int merge_layers = RNA_boolean_get(op->ptr, "merge_layers");
+  const bool reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
+  const bool merge_layers = RNA_boolean_get(op->ptr, "merge_layers");
 
   if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_src->layers) {
@@ -386,7 +386,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
       ot->srna, "mode", mode_types, GP_ASSET_MODE_SELECTED_STROKES, "Mode", "");
   RNA_def_boolean(ot->srna,
                   "reset_origin",
-                  1,
+                  0,
                   "Reset Origin to Geometry",
                   "Set origin of the asset in the center of the strokes bounding box");
   RNA_def_boolean(ot->srna, "merge_layers", 0, "Merge Layers", "Merge all layers in only one");
