@@ -110,9 +110,8 @@ static void link_nodes(
 }
 
 /* Returns true if the given shader may have opacity < 1.0, based
- * on heuristics.  Also returns the shader's opacityThreshold input
- * in r_opacity_threshold, if this input has an authored value. */
-static bool needs_blend(const pxr::UsdShadeShader &usd_shader, float &r_opacity_threshold)
+ * on heuristics. */
+static bool needs_blend(const pxr::UsdShadeShader &usd_shader)
 {
   if (!usd_shader) {
     return false;
@@ -134,17 +133,31 @@ static bool needs_blend(const pxr::UsdShadeShader &usd_shader, float &r_opacity_
     }
   }
 
-  if (pxr::UsdShadeInput opacity_threshold_input = usd_shader.GetInput(
-          usdtokens::opacityThreshold)) {
+  return needs_blend;
+}
 
-    pxr::VtValue val;
-    if (opacity_threshold_input.GetAttr().HasAuthoredValue() &&
-        opacity_threshold_input.GetAttr().Get(&val)) {
-      r_opacity_threshold = val.Get<float>();
-    }
+/* Returns the given shader's opacityThreshold input value, if this input has an
+ * authored value. Otherwise, returns the given default value. */
+static float get_opacity_threshold(const pxr::UsdShadeShader &usd_shader,
+                                   float default_value = 0.0f)
+{
+  if (!usd_shader) {
+    return default_value;
   }
 
-  return needs_blend;
+  pxr::UsdShadeInput opacity_threshold_input = usd_shader.GetInput(usdtokens::opacityThreshold);
+
+  if (!opacity_threshold_input) {
+    return default_value;
+  }
+
+  pxr::VtValue val;
+  if (opacity_threshold_input.GetAttr().HasAuthoredValue() &&
+      opacity_threshold_input.GetAttr().Get(&val)) {
+    return val.Get<float>();
+  }
+
+  return default_value;
 }
 
 static pxr::TfToken get_source_color_space(const pxr::UsdShadeShader &usd_shader)
@@ -328,8 +341,8 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
   /* Optionally, set the material blend mode. */
 
   if (params_.set_material_blend) {
-    float opacity_threshold = 0.0f;
-    if (needs_blend(usd_shader, opacity_threshold)) {
+    if (needs_blend(usd_shader)) {
+      float opacity_threshold = get_opacity_threshold(usd_shader, 0.0f);
       if (opacity_threshold > 0.0f) {
         mtl->blend_method = MA_BM_CLIP;
         mtl->alpha_threshold = opacity_threshold;
