@@ -120,7 +120,7 @@ bool GHOST_TimerManager::fireTimer(uint64_t time, GHOST_TimerTask *task)
     uint64_t start = task->getStart();
     timerProc(task, time - start);
 
-    // Update the time at which we will fire it again
+    /* Update the time at which we will fire it again. */
     uint64_t interval = task->getInterval();
     uint64_t numCalls = (next - start) / interval;
     numCalls++;

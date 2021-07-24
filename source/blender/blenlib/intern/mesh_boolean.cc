@@ -204,7 +204,7 @@ TriMeshTopology::TriMeshTopology(const IMesh &tm)
       }
       edges->append_non_duplicates(e);
 
-      auto p = edge_tri_.lookup_ptr(Edge(v, vnext));
+      auto *p = edge_tri_.lookup_ptr(Edge(v, vnext));
       if (p == nullptr) {
         edge_tri_.add_new(e, new Vector<int>{t});
       }
@@ -238,7 +238,7 @@ TriMeshTopology::~TriMeshTopology()
   Vector<Vector<int> *> values;
 
   /* Deconstructing is faster in parallel, so it is worth building an array of things to delete. */
-  for (auto item : edge_tri_.values()) {
+  for (auto *item : edge_tri_.values()) {
     values.append(item);
   }
 

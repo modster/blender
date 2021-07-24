@@ -2277,7 +2277,7 @@ static void gpencil_generate_edgeloops(Object *ob,
   }
 
   /* Arrays for all edge vertices (forward and backward) that form a edge loop.
-   * This is reused for each edgeloop to create gpencil stroke. */
+   * This is reused for each edge-loop to create gpencil stroke. */
   uint *stroke = (uint *)MEM_callocN(sizeof(uint) * me->totedge * 2, __func__);
   uint *stroke_fw = (uint *)MEM_callocN(sizeof(uint) * me->totedge, __func__);
   uint *stroke_bw = (uint *)MEM_callocN(sizeof(uint) * me->totedge, __func__);
