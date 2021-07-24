@@ -413,8 +413,6 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
 void WM_OT_usd_import(struct wmOperatorType *ot)
 {
-  PropertyRNA *prop;
-
   ot->name = "Import USD";
   ot->description = "Import USD stage into current scene";
   ot->idname = "WM_OT_usd_import";
