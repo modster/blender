@@ -149,7 +149,7 @@ static void wm_xr_session_controller_data_free(wmXrSessionState *state)
   ListBase *lb = &state->controllers;
   wmXrController *c;
 
-  while (c = BLI_pophead(lb)) {
+  while ((c = BLI_pophead(lb))) {
     if (c->model) {
       GPU_batch_discard(c->model);
     }
@@ -1559,7 +1559,7 @@ static void wm_xr_session_surface_free_data(wmSurface *surface)
   ListBase *lb = &data->viewports;
   wmXrViewportPair *vp;
 
-  while (vp = BLI_pophead(lb)) {
+  while ((vp = BLI_pophead(lb))) {
     if (vp->viewport) {
       GPU_viewport_free(vp->viewport);
     }
