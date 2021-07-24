@@ -223,8 +223,7 @@ static bool gpencil_asset_create(const bContext *C,
                                  const bGPDlayer *gpl_filter,
                                  const eGP_AssetModes mode,
                                  const bool reset_origin,
-                                 const bool flatten_layers,
-                                 const bool retime_frames)
+                                 const bool flatten_layers)
 {
   Main *bmain = CTX_data_main(C);
   bool non_supported_feature = false;
@@ -348,11 +347,9 @@ static bool gpencil_asset_create(const bContext *C,
   ED_asset_mark_id(C, &gpd->id);
 
   /* Retime frame number to start by 1. Must be done after generate the render preview. */
-  if (retime_frames) {
-    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-      LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-        gpf->framenum -= f_min - 1;
-      }
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+      gpf->framenum -= f_min - 1;
     }
   }
 
@@ -367,18 +364,17 @@ static int gpencil_asset_create_exec(const bContext *C, const wmOperator *op)
   const eGP_AssetModes mode = RNA_enum_get(op->ptr, "mode");
   const bool reset_origin = RNA_boolean_get(op->ptr, "reset_origin");
   const bool flatten_layers = RNA_boolean_get(op->ptr, "flatten_layers");
-  const bool retime_frames = RNA_boolean_get(op->ptr, "retime_frames");
 
   bool non_supported_feature = false;
   if (mode == GP_ASSET_MODE_ALL_LAYERS_SPLIT) {
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_src->layers) {
       non_supported_feature |= gpencil_asset_create(
-          C, gpd_src, gpl, mode, reset_origin, flatten_layers, retime_frames);
+          C, gpd_src, gpl, mode, reset_origin, flatten_layers);
     }
   }
   else {
     non_supported_feature = gpencil_asset_create(
-        C, gpd_src, NULL, mode, reset_origin, flatten_layers, retime_frames);
+        C, gpd_src, NULL, mode, reset_origin, flatten_layers);
   }
 
   /* Warnings for non supported features in the created asset. */
@@ -434,8 +430,6 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
                   "Origin to Geometry",
                   "Set origin of the asset in the center of the strokes bounding box");
   RNA_def_boolean(ot->srna, "flatten_layers", 0, "Flatten Layers", "Merge all layers in only one");
-  RNA_def_boolean(
-      ot->srna, "retime_frames", 1, "Retime Frames", "Retime frame number to start at frame 1");
 }
 
 /** \} */
