@@ -136,14 +136,31 @@ static void wm_xr_session_exit_cb(void *customdata)
                                   settings->controller1_object);
   }
 
-  wm_xr_session_actions_uninit(xr_data);
-
   if (xr_data->runtime->exit_fn) {
     xr_data->runtime->exit_fn(xr_data);
   }
 
   /* Free the entire runtime data (including session state and context), to play safe. */
   wm_xr_runtime_data_free(&xr_data->runtime);
+}
+
+static void wm_xr_session_controller_data_free(wmXrSessionState *state)
+{
+  ListBase *lb = &state->controllers;
+  wmXrController *c;
+
+  while (c = BLI_pophead(lb)) {
+    if (c->model) {
+      GPU_batch_discard(c->model);
+    }
+    BLI_freelinkN(lb, c);
+  }
+}
+
+void wm_xr_session_data_free(wmXrSessionState *state)
+{
+  BLI_freelistN(&state->eyes);
+  wm_xr_session_controller_data_free(state);
 }
 
 static void wm_xr_session_begin_info_create(wmXrData *xr_data,
@@ -392,11 +409,18 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const float viewmat_base[4][4],
                                 wmXrSessionState *state)
 {
-  const unsigned int view_idx = (unsigned int)min_ii((int)draw_view->view_idx,
-                                                     (int)ARRAY_SIZE(state->eyes));
-  wmXrEyeData *eye = &state->eyes[view_idx];
   GHOST_XrPose viewer_pose;
   float viewer_mat[4][4], base_mat[4][4], nav_mat[4][4];
+
+  wmXrEye *eye = NULL;
+  if (draw_view->view_idx >= BLI_listbase_count(&state->eyes)) {
+    eye = MEM_callocN(sizeof(*eye), __func__);
+    BLI_addtail(&state->eyes, eye);
+  }
+  else {
+    eye = BLI_findlink(&state->eyes, draw_view->view_idx);
+  }
+  BLI_assert(eye);
 
   /* Calculate viewer matrix. */
   copy_qt_qt(viewer_pose.orientation_quat, draw_view->local_pose.orientation_quat);
@@ -476,13 +500,17 @@ bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
                                                      float *r_clip_start,
                                                      float *r_clip_end)
 {
-  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set) {
+  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
+      (xr->session_settings.selection_eye >=
+       BLI_listbase_count(&xr->runtime->session_state.eyes))) {
     unit_m4(r_viewmat);
     *r_focal_len = *r_clip_start = *r_clip_end = 0.0f;
     return false;
   }
 
-  const wmXrEyeData *eye = &xr->runtime->session_state.eyes[xr->session_settings.selection_eye];
+  const wmXrEye *eye = BLI_findlink(&xr->runtime->session_state.eyes,
+                                    xr->session_settings.selection_eye);
+  BLI_assert(eye);
   if (from_selection_eye) {
     copy_m4_m4(r_viewmat, eye->viewmat);
   }
@@ -502,12 +530,15 @@ bool WM_xr_session_state_controller_grip_location_get(const wmXrData *xr,
                                                       float r_location[3])
 {
   if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
-      subaction_idx >= ARRAY_SIZE(xr->runtime->session_state.controllers)) {
+      (subaction_idx >= BLI_listbase_count(&xr->runtime->session_state.controllers))) {
     zero_v3(r_location);
     return false;
   }
 
-  copy_v3_v3(r_location, xr->runtime->session_state.controllers[subaction_idx].grip_pose.position);
+  const wmXrController *controller = BLI_findlink(&xr->runtime->session_state.controllers,
+                                                  subaction_idx);
+  BLI_assert(controller);
+  copy_v3_v3(r_location, controller->grip_pose.position);
   return true;
 }
 
@@ -516,13 +547,15 @@ bool WM_xr_session_state_controller_grip_rotation_get(const wmXrData *xr,
                                                       float r_rotation[4])
 {
   if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
-      subaction_idx >= ARRAY_SIZE(xr->runtime->session_state.controllers)) {
+      (subaction_idx >= BLI_listbase_count(&xr->runtime->session_state.controllers))) {
     unit_qt(r_rotation);
     return false;
   }
 
-  copy_qt_qt(r_rotation,
-             xr->runtime->session_state.controllers[subaction_idx].grip_pose.orientation_quat);
+  const wmXrController *controller = BLI_findlink(&xr->runtime->session_state.controllers,
+                                                  subaction_idx);
+  BLI_assert(controller);
+  copy_qt_qt(r_rotation, controller->grip_pose.orientation_quat);
   return true;
 }
 
@@ -531,12 +564,15 @@ bool WM_xr_session_state_controller_aim_location_get(const wmXrData *xr,
                                                      float r_location[3])
 {
   if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
-      subaction_idx >= ARRAY_SIZE(xr->runtime->session_state.controllers)) {
+      (subaction_idx >= BLI_listbase_count(&xr->runtime->session_state.controllers))) {
     zero_v3(r_location);
     return false;
   }
 
-  copy_v3_v3(r_location, xr->runtime->session_state.controllers[subaction_idx].aim_pose.position);
+  const wmXrController *controller = BLI_findlink(&xr->runtime->session_state.controllers,
+                                                  subaction_idx);
+  BLI_assert(controller);
+  copy_v3_v3(r_location, controller->aim_pose.position);
   return true;
 }
 
@@ -545,13 +581,15 @@ bool WM_xr_session_state_controller_aim_rotation_get(const wmXrData *xr,
                                                      float r_rotation[4])
 {
   if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
-      subaction_idx >= ARRAY_SIZE(xr->runtime->session_state.controllers)) {
+      (subaction_idx >= BLI_listbase_count(&xr->runtime->session_state.controllers))) {
     unit_qt(r_rotation);
     return false;
   }
 
-  copy_qt_qt(r_rotation,
-             xr->runtime->session_state.controllers[subaction_idx].aim_pose.orientation_quat);
+  const wmXrController *controller = BLI_findlink(&xr->runtime->session_state.controllers,
+                                                  subaction_idx);
+  BLI_assert(controller);
+  copy_qt_qt(r_rotation, controller->aim_pose.orientation_quat);
   return true;
 }
 
@@ -726,15 +764,17 @@ static void wm_xr_session_controller_data_update(const bContext *C,
                                                  wmXrSessionState *state,
                                                  wmWindow *win)
 {
+
   BLI_assert(grip_action->count_subaction_paths == aim_action->count_subaction_paths);
-  const unsigned int count = (unsigned int)min_ii((int)grip_action->count_subaction_paths,
-                                                  (int)ARRAY_SIZE(state->controllers));
+  BLI_assert(grip_action->count_subaction_paths == BLI_listbase_count(&state->controllers));
+
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
   wmWindowManager *wm = CTX_wm_manager(C);
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   Object *ob_constraint = NULL;
-  char ob_flag;
+  char ob_flag = 0;
+  unsigned int subaction_idx = 0;
   float view_ofs[3], base_mat[4][4], nav_mat[4][4];
 
   if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
@@ -750,9 +790,8 @@ static void wm_xr_session_controller_data_update(const bContext *C,
   wm_xr_pose_scale_to_mat(&state->prev_base_pose, state->prev_base_scale, base_mat);
   wm_xr_pose_scale_to_mat(&state->nav_pose, state->nav_scale, nav_mat);
 
-  for (unsigned int i = 0; i < count; ++i) {
-    wmXrControllerData *controller = &state->controllers[i];
-    switch (i) {
+  LISTBASE_FOREACH (wmXrController *, controller, &state->controllers) {
+    switch (subaction_idx) {
       case 0:
         ob_constraint = settings->controller0_object;
         ob_flag = settings->controller0_flag;
@@ -767,14 +806,14 @@ static void wm_xr_session_controller_data_update(const bContext *C,
         break;
     }
 
-    wm_xr_session_controller_pose_calc(&((GHOST_XrPose *)grip_action->states)[i],
+    wm_xr_session_controller_pose_calc(&((GHOST_XrPose *)grip_action->states)[subaction_idx],
                                        view_ofs,
                                        base_mat,
                                        nav_mat,
                                        &controller->grip_pose,
                                        controller->grip_mat,
                                        controller->grip_mat_base);
-    wm_xr_session_controller_pose_calc(&((GHOST_XrPose *)aim_action->states)[i],
+    wm_xr_session_controller_pose_calc(&((GHOST_XrPose *)aim_action->states)[subaction_idx],
                                        view_ofs,
                                        base_mat,
                                        nav_mat,
@@ -787,8 +826,12 @@ static void wm_xr_session_controller_data_update(const bContext *C,
 
       if (((ob_flag & XR_OBJECT_AUTOKEY) != 0) && screen_anim &&
           autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
-        wm_xr_session_object_autokey(
-            (bContext *)C, scene, view_layer, win, ob_constraint, (i == 0) ? true : false);
+        wm_xr_session_object_autokey((bContext *)C,
+                                     scene,
+                                     view_layer,
+                                     win,
+                                     ob_constraint,
+                                     (subaction_idx == 0) ? true : false);
       }
     }
 
@@ -798,18 +841,19 @@ static void wm_xr_session_controller_data_update(const bContext *C,
        * be created in wm_xr_draw_controllers(). */
       GHOST_XrLoadControllerModel(xr_context, controller->subaction_path);
     }
+
+    ++subaction_idx;
   }
 }
 
 static const GHOST_XrPose *wm_xr_session_controller_aim_pose_find(const wmXrSessionState *state,
                                                                   const char *subaction_path)
 {
-  for (unsigned int i = 0; i < (unsigned int)ARRAY_SIZE(state->controllers); ++i) {
-    if (STREQ(state->controllers[i].subaction_path, subaction_path)) {
-      return &state->controllers[i].aim_pose;
+  LISTBASE_FOREACH (wmXrController *, controller, &state->controllers) {
+    if (STREQ(controller->subaction_path, subaction_path)) {
+      return &controller->aim_pose;
     }
   }
-
   return NULL;
 }
 
@@ -1171,13 +1215,13 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
   const char *action_set_name = action_set->name;
 
   const unsigned int count = GHOST_XrGetActionCount(xr_context, action_set_name);
-  if (count < 1) {
+  if (count < 1 || (settings->selection_eye >= BLI_listbase_count(&session_state->eyes))) {
     return;
   }
 
   const int64_t time_now = (int64_t)(PIL_check_seconds_timer() * 1000);
 
-  const wmXrEyeData *eye_data = &session_state->eyes[settings->selection_eye];
+  const wmXrEye *selection_eye = BLI_findlink(&session_state->eyes, settings->selection_eye);
   ListBase *active_modal_actions = &action_set->active_modal_actions;
   ListBase *active_haptic_actions = &action_set->active_haptic_actions;
 
@@ -1230,7 +1274,7 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
                                action,
                                aim_pose,
                                aim_pose_other,
-                               eye_data,
+                               selection_eye,
                                surface,
                                win,
                                subaction_idx,
@@ -1276,8 +1320,8 @@ void wm_xr_session_actions_update(const bContext *C)
         &state->viewer_pose, settings->base_scale * state->nav_scale, state->viewer_viewmat);
 
     wm_xr_pose_scale_to_imat(&state->nav_pose, state->nav_scale, m);
-    for (unsigned int i = 0; i < (unsigned int)ARRAY_SIZE(state->eyes); ++i) {
-      mul_m4_m4m4(state->eyes[i].viewmat, state->eyes[i].viewmat_base, m);
+    LISTBASE_FOREACH (wmXrEye *, eye, &state->eyes) {
+      mul_m4_m4m4(eye->viewmat, eye->viewmat_base, m);
     }
   }
 
@@ -1323,11 +1367,6 @@ void wm_xr_session_actions_update(const bContext *C)
   }
 }
 
-void wm_xr_session_actions_uninit(wmXrData *xr)
-{
-  wm_xr_session_controller_data_clear(&xr->runtime->session_state);
-}
-
 void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
                                             const wmXrAction *aim_action,
                                             wmXrData *xr)
@@ -1335,19 +1374,20 @@ void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
   UNUSED_VARS(aim_action); /* Only used for asserts. */
 
   wmXrSessionState *state = &xr->runtime->session_state;
+  ListBase *controllers = &state->controllers;
+
   BLI_assert(grip_action->count_subaction_paths == aim_action->count_subaction_paths);
-  const unsigned int count = (unsigned int)min_ii((int)grip_action->count_subaction_paths,
-                                                  (int)ARRAY_SIZE(state->controllers));
+  const unsigned int count = grip_action->count_subaction_paths;
+
+  wm_xr_session_controller_data_free(state);
 
   for (unsigned int i = 0; i < count; ++i) {
-    wmXrControllerData *controller = &state->controllers[i];
-    if (controller->model) {
-      /* Free controller model batch. */
-      GPU_batch_discard(controller->model);
-    }
-    memset(controller, 0, sizeof(*controller));
+    wmXrController *controller = MEM_callocN(sizeof(*controller), __func__);
+
     BLI_assert(STREQ(grip_action->subaction_paths[i], aim_action->subaction_paths[i]));
     strcpy(controller->subaction_path, grip_action->subaction_paths[i]);
+
+    BLI_addtail(controllers, controller);
   }
 
   /* Activate draw callback. */
@@ -1364,14 +1404,7 @@ void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
 
 void wm_xr_session_controller_data_clear(wmXrSessionState *state)
 {
-  /* Free controller model batches. */
-  for (unsigned int i = 0; i < (unsigned int)ARRAY_SIZE(state->controllers); ++i) {
-    if (state->controllers[i].model) {
-      GPU_batch_discard(state->controllers[i].model);
-    }
-  }
-
-  memset(state->controllers, 0, sizeof(state->controllers));
+  wm_xr_session_controller_data_free(state);
 
   /* Deactivate draw callback. */
   if (g_xr_surface) {

@@ -5035,7 +5035,7 @@ void wm_event_add_xrevent(const char *action_set_name,
                           const wmXrAction *action,
                           const GHOST_XrPose *controller_aim_pose,
                           const GHOST_XrPose *controller_aim_pose_other,
-                          const wmXrEyeData *eye_data,
+                          const wmXrEye *selection_eye,
                           wmSurface *surface,
                           wmWindow *win,
                           unsigned int subaction_idx,
@@ -5106,9 +5106,9 @@ void wm_event_add_xrevent(const char *action_set_name,
     data->controller_rot_other[0] = 1.0f;
   }
 
-  if (eye_data) {
-    copy_m4_m4(data->eye_viewmat, eye_data->viewmat);
-    data->eye_lens = eye_data->focal_len;
+  if (selection_eye) {
+    copy_m4_m4(data->eye_viewmat, selection_eye->viewmat);
+    data->eye_lens = selection_eye->focal_len;
   }
 
   data->ot = action->ot;

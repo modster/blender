@@ -37,7 +37,7 @@ struct ScrArea;
 struct GHOST_XrPose;
 struct wmSurface;
 struct wmXrAction;
-struct wmXrEyeData;
+struct wmXrEye;
 #endif
 
 #ifdef __cplusplus
@@ -160,7 +160,7 @@ void wm_event_add_xrevent(const char *action_set_name,
                           const struct wmXrAction *action,
                           const struct GHOST_XrPose *controller_aim_pose,
                           const struct GHOST_XrPose *controller_aim_pose_other,
-                          const struct wmXrEyeData *eye_data,
+                          const struct wmXrEye *selection_eye,
                           struct wmSurface *surface,
                           wmWindow *win,
                           unsigned int subaction_idx,

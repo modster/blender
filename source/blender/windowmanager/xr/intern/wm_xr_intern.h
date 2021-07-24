@@ -29,34 +29,6 @@
 struct GPUBatch;
 struct wmXrActionSet;
 
-typedef struct wmXrEyeData {
-  float focal_len;
-  float viewmat[4][4];
-  /** Viewmat without navigation applied. */
-  float viewmat_base[4][4];
-} wmXrEyeData;
-
-typedef struct wmXrControllerData {
-  /** OpenXR path identifier. Length is dependent on OpenXR's XR_MAX_PATH_LENGTH (256).
-  This subaction path will later be combined with a component path, and that combined path should
-  also have a max of XR_MAX_PATH_LENGTH (e.g. subaction_path = /user/hand/left, component_path =
-  /input/trigger/value, interaction_path = /user/hand/left/input/trigger/value).
-  */
-  char subaction_path[64];
-
-  /* Pose (in world space) that represents the user's hand when holding the controller.*/
-  GHOST_XrPose grip_pose;
-  float grip_mat[4][4];
-  float grip_mat_base[4][4];
-  /* Pose (in world space) that represents the controller's aiming source. */
-  GHOST_XrPose aim_pose;
-  float aim_mat[4][4];
-  float aim_mat_base[4][4];
-
-  /** Controller model. */
-  struct GPUBatch *model;
-} wmXrControllerData;
-
 typedef struct wmXrSessionState {
   bool is_started;
 
@@ -67,10 +39,9 @@ typedef struct wmXrSessionState {
   /** The last known viewer matrix, without navigation applied. */
   float viewer_mat_base[4][4];
   /** Last known eye data. */
-  wmXrEyeData eyes[2];
-
+  ListBase eyes; /* wmXrEye */
   /** Last known controller data. */
-  wmXrControllerData controllers[2];
+  ListBase controllers; /* wmXrController */
 
   /** Copy of XrSessionSettings.base_pose_ data to detect changes that need
    * resetting to base pose. */
@@ -163,6 +134,36 @@ typedef struct wmXrDrawData {
   float eye_position_ofs[3]; /* Local/view space. */
 } wmXrDrawData;
 
+typedef struct wmXrEye {
+  struct wmXrEye *next, *prev;
+  float focal_len;
+  float viewmat[4][4];
+  /** Viewmat without navigation applied. */
+  float viewmat_base[4][4];
+} wmXrEye;
+
+typedef struct wmXrController {
+  struct wmXrController *next, *prev;
+  /** OpenXR path identifier. Length is dependent on OpenXR's XR_MAX_PATH_LENGTH (256).
+  This subaction path will later be combined with a component path, and that combined path should
+  also have a max of XR_MAX_PATH_LENGTH (e.g. subaction_path = /user/hand/left, component_path =
+  /input/trigger/value, interaction_path = /user/hand/left/input/trigger/value).
+  */
+  char subaction_path[64];
+
+  /* Pose (in world space) that represents the user's hand when holding the controller.*/
+  GHOST_XrPose grip_pose;
+  float grip_mat[4][4];
+  float grip_mat_base[4][4];
+  /* Pose (in world space) that represents the controller's aiming source. */
+  GHOST_XrPose aim_pose;
+  float aim_mat[4][4];
+  float aim_mat_base[4][4];
+
+  /** Controller model. */
+  struct GPUBatch *model;
+} wmXrController;
+
 typedef struct wmXrAction {
   char *name;
   eXrActionType type;
@@ -213,6 +214,7 @@ typedef struct wmXrActionSet {
 
 wmXrRuntimeData *wm_xr_runtime_data_create(void);
 void wm_xr_runtime_data_free(wmXrRuntimeData **runtime);
+void wm_xr_session_data_free(wmXrSessionState *state);
 
 wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
                                                     const wmXrRuntimeData *runtime_data);
@@ -233,7 +235,6 @@ void wm_xr_session_gpu_binding_context_destroy(GHOST_ContextHandle context);
 
 void wm_xr_session_actions_init(wmXrData *xr);
 void wm_xr_session_actions_update(const struct bContext *C);
-void wm_xr_session_actions_uninit(wmXrData *xr);
 void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
                                             const wmXrAction *aim_action,
                                             wmXrData *xr);
