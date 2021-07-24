@@ -1207,9 +1207,6 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
                                    tj->pixelx,
                                    tj->pixely);
       seq_thumbnail_get_start_frame(val->seq_dupli, frame_step, &start_frame, tj->view_area);
-
-      printf("in job : %f %f %f \n", roundf(frame_step), frame_step, start_frame);
-
       SEQ_render_thumbnails(
           &tj->context, val->seq_dupli, seq_orig, start_frame, frame_step, tj->view_area);
     }
@@ -1254,6 +1251,10 @@ static void sequencer_thumbnail_get_job(const bContext *C,
     WM_jobs_customdata_set(wm_job, tj, thumbnail_freejob);
     WM_jobs_timer(wm_job, 0.1, NC_SCENE | ND_SEQUENCER, NC_SCENE | ND_SEQUENCER);
     WM_jobs_callbacks(wm_job, thumbnail_startjob, NULL, NULL, thumbnail_endjob);
+  }
+  else {
+    BLI_ghash_free(seqs, NULL, thumbnail_hash_data_free);
+    // Workaround for now
   }
 
   // TODO(AYJ) : add the new data to the existing thread if new information has come in (calls this
