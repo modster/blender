@@ -126,13 +126,18 @@ typedef struct wmXrRuntimeData {
   wmXrSessionExitFn exit_fn;
 } wmXrRuntimeData;
 
+typedef struct wmXrViewportPair {
+  struct wmXrViewportPair *next, *prev;
+  struct GPUOffScreen *offscreen;
+  struct GPUViewport *viewport;
+} wmXrViewportPair;
+
 typedef struct {
   /* Offscreen buffers/viewports for each view. */
-  struct GPUOffScreen *offscreen[2];
-  struct GPUViewport *viewport[2];
+  ListBase viewports; /* wmXrViewportPair */
 
   /** XR events. */
-  ListBase events;
+  ListBase events; /* wmEvent */
 
   /** Dummy region type for controller draw callback. */
   struct ARegionType *controller_art;

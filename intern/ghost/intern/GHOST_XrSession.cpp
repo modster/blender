@@ -423,6 +423,7 @@ void GHOST_XrSession::drawView(GHOST_XrSwapchain &swapchain,
   r_proj_layer_view.fov = view.fov;
   swapchain.updateCompositionLayerProjectViewSubImage(r_proj_layer_view.subImage);
 
+  assert(view_idx < 256);
   draw_view_info.view_idx = (char)view_idx;
   draw_view_info.expects_srgb_buffer = swapchain.isBufferSRGB();
   draw_view_info.ofsx = r_proj_layer_view.subImage.imageRect.offset.x;

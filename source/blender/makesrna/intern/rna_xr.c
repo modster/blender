@@ -243,12 +243,7 @@ static void rna_XrActionMapItem_bimanual_set(PointerRNA *ptr, bool value)
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ptr->data;
-  if (value) {
-    ami->action_flag |= XR_ACTION_BIMANUAL;
-  }
-  else {
-    ami->action_flag &= ~XR_ACTION_BIMANUAL;
-  }
+  SET_FLAG_FROM_TEST(ami->action_flag, value, XR_ACTION_BIMANUAL);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -271,12 +266,7 @@ static void rna_XrActionMapItem_haptic_match_user_paths_set(PointerRNA *ptr, boo
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ptr->data;
-  if (value) {
-    ami->action_flag |= XR_ACTION_HAPTIC_MATCHUSERPATHS;
-  }
-  else {
-    ami->action_flag &= ~XR_ACTION_HAPTIC_MATCHUSERPATHS;
-  }
+  SET_FLAG_FROM_TEST(ami->action_flag, value, XR_ACTION_HAPTIC_MATCHUSERPATHS);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -329,12 +319,7 @@ static void rna_XrActionMapItem_pose_is_controller_grip_set(PointerRNA *ptr, boo
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ptr->data;
-  if (value) {
-    ami->pose_flag |= XR_POSE_GRIP;
-  }
-  else {
-    ami->pose_flag &= ~XR_POSE_GRIP;
-  }
+  SET_FLAG_FROM_TEST(ami->pose_flag, value, XR_POSE_GRIP);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -357,12 +342,7 @@ static void rna_XrActionMapItem_pose_is_controller_aim_set(PointerRNA *ptr, bool
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ptr->data;
-  if (value) {
-    ami->pose_flag |= XR_POSE_AIM;
-  }
-  else {
-    ami->pose_flag &= ~XR_POSE_AIM;
-  }
+  SET_FLAG_FROM_TEST(ami->pose_flag, value, XR_POSE_AIM);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -567,12 +547,7 @@ static void rna_XrSessionSettings_use_positional_tracking_set(PointerRNA *ptr, b
 {
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  if (value) {
-    xr->session_settings.flag |= XR_SESSION_USE_POSITION_TRACKING;
-  }
-  else {
-    xr->session_settings.flag &= (~XR_SESSION_USE_POSITION_TRACKING);
-  }
+  SET_FLAG_FROM_TEST(xr->session_settings.flag, value, XR_SESSION_USE_POSITION_TRACKING);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -593,12 +568,7 @@ static void rna_XrSessionSettings_use_absolute_tracking_set(PointerRNA *ptr, boo
 {
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  if (value) {
-    xr->session_settings.flag |= XR_SESSION_USE_ABSOLUTE_TRACKING;
-  }
-  else {
-    xr->session_settings.flag &= (~XR_SESSION_USE_ABSOLUTE_TRACKING);
-  }
+  SET_FLAG_FROM_TEST(xr->session_settings.flag, value, XR_SESSION_USE_ABSOLUTE_TRACKING);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -642,12 +612,7 @@ static void rna_XrSessionSettings_headset_object_enable_set(PointerRNA *ptr, boo
 {
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  if (value) {
-    xr->session_settings.headset_flag |= XR_OBJECT_ENABLE;
-  }
-  else {
-    xr->session_settings.headset_flag &= (~XR_OBJECT_ENABLE);
-  }
+  SET_FLAG_FROM_TEST(xr->session_settings.headset_flag, value, XR_OBJECT_ENABLE);
 
   /* Store/restore object's original pose. */
   Object *ob = xr->session_settings.headset_object;
@@ -679,12 +644,7 @@ static void rna_XrSessionSettings_headset_object_autokey_set(PointerRNA *ptr, bo
 {
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  if (value) {
-    xr->session_settings.headset_flag |= XR_OBJECT_AUTOKEY;
-  }
-  else {
-    xr->session_settings.headset_flag &= (~XR_OBJECT_AUTOKEY);
-  }
+  SET_FLAG_FROM_TEST(xr->session_settings.headset_flag, value, XR_OBJECT_AUTOKEY);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -728,12 +688,7 @@ static void rna_XrSessionSettings_controller0_object_enable_set(PointerRNA *ptr,
 {
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  if (value) {
-    xr->session_settings.controller0_flag |= XR_OBJECT_ENABLE;
-  }
-  else {
-    xr->session_settings.controller0_flag &= (~XR_OBJECT_ENABLE);
-  }
+  SET_FLAG_FROM_TEST(xr->session_settings.controller0_flag, value, XR_OBJECT_ENABLE);
 
   /* Store/restore object's original pose. */
   Object *ob = xr->session_settings.controller0_object;
@@ -765,12 +720,7 @@ static void rna_XrSessionSettings_controller0_object_autokey_set(PointerRNA *ptr
 {
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  if (value) {
-    xr->session_settings.controller0_flag |= XR_OBJECT_AUTOKEY;
-  }
-  else {
-    xr->session_settings.controller0_flag &= (~XR_OBJECT_AUTOKEY);
-  }
+  SET_FLAG_FROM_TEST(xr->session_settings.controller0_flag, value, XR_OBJECT_AUTOKEY);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -814,12 +764,7 @@ static void rna_XrSessionSettings_controller1_object_enable_set(PointerRNA *ptr,
 {
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  if (value) {
-    xr->session_settings.controller1_flag |= XR_OBJECT_ENABLE;
-  }
-  else {
-    xr->session_settings.controller1_flag &= (~XR_OBJECT_ENABLE);
-  }
+  SET_FLAG_FROM_TEST(xr->session_settings.controller1_flag, value, XR_OBJECT_ENABLE);
 
   /* Store/restore object's original pose. */
   Object *ob = xr->session_settings.controller1_object;
@@ -851,12 +796,7 @@ static void rna_XrSessionSettings_controller1_object_autokey_set(PointerRNA *ptr
 {
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  if (value) {
-    xr->session_settings.controller1_flag |= XR_OBJECT_AUTOKEY;
-  }
-  else {
-    xr->session_settings.controller1_flag &= (~XR_OBJECT_AUTOKEY);
-  }
+  SET_FLAG_FROM_TEST(xr->session_settings.controller1_flag, value, XR_OBJECT_AUTOKEY);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
