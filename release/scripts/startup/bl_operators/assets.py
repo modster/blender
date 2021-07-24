@@ -94,8 +94,7 @@ class ASSET_OT_open_containing_blend_file(Operator):
             cls.poll_message_set("No asset selected")
             return False
         if asset_file_handle.local_id:
-            cls.poll_message_set(
-                "Selected asset is contained in the current file")
+            cls.poll_message_set("Selected asset is contained in the current file")
             return False
         return True
 
@@ -104,12 +103,10 @@ class ASSET_OT_open_containing_blend_file(Operator):
         asset_library = context.asset_library
 
         if asset_file_handle.local_id:
-            self.report(
-                {'WARNING'}, "This asset is stored in the current blend file")
+            self.report({'WARNING'}, "This asset is stored in the current blend file")
             return {'CANCELLED'}
 
-        asset_lib_path = bpy.types.AssetHandle.get_full_library_path(
-            asset_file_handle, asset_library)
+        asset_lib_path = bpy.types.AssetHandle.get_full_library_path(asset_file_handle, asset_library)
         self.open_in_new_blender(asset_lib_path)
 
         wm = context.window_manager
@@ -133,8 +130,7 @@ class ASSET_OT_open_containing_blend_file(Operator):
             return {'RUNNING_MODAL'}
 
         if returncode:
-            self.report(
-                {'WARNING'}, "Blender subprocess exited with error code %d" % returncode)
+            self.report({'WARNING'}, "Blender subprocess exited with error code %d" % returncode)
 
         # TODO(Sybren): Replace this with a generic "reload assets" operator
         # that can run outside of the Asset Browser context.

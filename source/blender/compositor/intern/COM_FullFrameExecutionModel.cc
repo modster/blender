@@ -110,7 +110,6 @@ void FullFrameExecutionModel::render_operation(NodeOperation *op)
    * TranslateOperation from convert resolutions if linked to an operation with resolution. */
   active_buffers_.set_rendered_buffer(op, std::unique_ptr<MemoryBuffer>(op_buf));
 
-  DebugInfo::operation_rendered(op, op_buf);
   operation_finished(op);
 }
 
