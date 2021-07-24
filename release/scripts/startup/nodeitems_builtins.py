@@ -529,6 +529,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeJoinGeometry"),
         NodeItem("GeometryNodeSeparateComponents"),
         NodeItem("GeometryNodeRaycast"),
+        NodeItem("GeometryNodeMergeByDistance"),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
         NodeItem("GeometryNodeObjectInfo"),
@@ -551,7 +552,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeSubdivisionSurface"),
         NodeItem("GeometryNodeMeshSubdivide"),
-        NodeItem("GeometryNodeMergeByDistance"),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_MESH", "Mesh Primitives", items=[
         NodeItem("GeometryNodeMeshCircle"),

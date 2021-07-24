@@ -32,8 +32,8 @@
          )
 
  set(SRC
-         intern/weld.c
-         GEO_weld.h
+         intern/mesh_merge_by_distance.c
+         GEO_mesh_merge_by_distance.h
          )
 
  set(LIB
