@@ -1118,7 +1118,6 @@ static void thumbnail_endjob(void *data)
   WM_main_add_notifier(NC_SCENE | ND_SEQUENCER, tj->scene);
 }
 
-// TODO(AYJ) : Check this
 static bool check_seq_need_thumbnails(Sequence *seq, rctf *view_area)
 {
   if (min_ii(seq->startdisp, seq->start) > view_area->xmax) {
@@ -1130,7 +1129,7 @@ static bool check_seq_need_thumbnails(Sequence *seq, rctf *view_area)
   else if (seq->machine + 1.0f < view_area->ymin) {
     return false;
   }
-  else if (seq->machine > view_area->ymin) {
+  else if (seq->machine > view_area->ymax) {
     return false;
   }
   return true;
@@ -1175,15 +1174,15 @@ static void seq_thumbnail_get_start_frame(Sequence *seq,
                                           float *start_frame,
                                           rctf *view_area)
 {
-  if (seq->start >= view_area->xmin && seq->start <= view_area->xmax) {
+  if (seq->start > view_area->xmin && seq->start < view_area->xmax) {
     *start_frame = seq->start;
     return;
   }
   /* Drawing and caching both check to see if strip is in view area or not before calling this
    * function so assuming strip/part of strip in view */
 
-  int no_invisible_thumbs = floor((view_area->xmin - seq->start)) / frame_step;
-  *start_frame = no_invisible_thumbs * frame_step;
+  int no_invisible_thumbs = (view_area->xmin - seq->start) / frame_step;
+  *start_frame = ((no_invisible_thumbs - 1) * frame_step) + seq->start;
 }
 
 static void thumbnail_startjob(void *data, short *stop, short *do_update, float *progress)
@@ -1198,9 +1197,8 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
   while (!BLI_ghashIterator_done(&gh_iter)) {
     seq_orig = BLI_ghashIterator_getKey(&gh_iter);
     val = BLI_ghash_lookup(tj->seqs, seq_orig);
-    // TODO(AYJ) : Check below condition
-    // if (check_seq_need_thumbnails(val->seq_dupli, tj->view_area)) {
-    if (true) {
+
+    if (check_seq_need_thumbnails(seq_orig, tj->view_area)) {
       seq_thumbnail_get_frame_step(val->seq_dupli,
                                    &frame_step,
                                    &temp_dummy,
@@ -1210,7 +1208,7 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
                                    tj->pixely);
       seq_thumbnail_get_start_frame(val->seq_dupli, frame_step, &start_frame, tj->view_area);
 
-      printf("in job : %d %f %d \n", val->seq_dupli->machine, start_frame, 100);
+      printf("in job : %f %f %f \n", roundf(frame_step), frame_step, start_frame);
 
       SEQ_render_thumbnails(
           &tj->context, val->seq_dupli, seq_orig, start_frame, frame_step, tj->view_area);
@@ -1266,6 +1264,37 @@ static void sequencer_thumbnail_get_job(const bContext *C,
   }
 
   ED_area_tag_redraw(area);
+}
+
+static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, bool leftover)
+{
+  struct Main *bmain = CTX_data_main(C);
+  struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+  Scene *scene = CTX_data_scene(C);
+  SpaceSeq *sseq = CTX_wm_space_seq(C);
+
+  /* Set the data for thumbnail caching job */
+  static rctf check_view = {0, 0, 0, 0};
+  GHash *thumb_data_hash;
+
+  // leftover is set to true if missing image in strip. false when normal call to all strips done
+  if (!BLI_rctf_compare(&check_view, &v2d->cur, 0.1) || leftover) {
+    thumb_data_hash = BLI_ghash_ptr_new("seq_duplicates_and_origs");
+
+    LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
+      ThumbDataItem *val = MEM_callocN(sizeof(ThumbDataItem), "Thumbnail Hash Values");
+      val->seq_dupli = SEQ_sequence_dupli_recursive(scene, scene, NULL, seq, 0);
+      val->scene = scene;
+      BLI_ghash_insert(thumb_data_hash, seq, val);
+    }
+
+    SeqRenderData context = {0};
+    SEQ_render_new_render_data(bmain, depsgraph, scene, 0, 0, sseq->render_size, false, &context);
+    context.view_id = BKE_scene_multiview_view_id_get(&scene->r, STEREO_LEFT_NAME);
+    context.use_proxies = false;
+    sequencer_thumbnail_get_job(C, v2d, context, thumb_data_hash);
+    check_view = v2d->cur;
+  }
 }
 
 // TODO(AYJ) : Add operator to choose whether thumbnails required by user or not in overlay menu
@@ -1360,6 +1389,10 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
       ED_draw_imbuf_ctx_clipping(
           C, ibuf, x1 + cut_off, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
       IMB_freeImBuf(ibuf);
+    }
+    else {
+      thumbnail_call_for_job(C, scene->ed, v2d, true);
+      break;
     }
 
     cut_off = 0;
@@ -2291,27 +2324,7 @@ static void draw_seq_strips(const bContext *C, Editing *ed, ARegion *region)
   int sel = 0, j;
   float pixelx = BLI_rctf_size_x(&v2d->cur) / BLI_rcti_size_x(&v2d->mask);
 
-  // TODO(AYJ) : replace with separate function with own loop to add strips to the hash.
-  /* Set the data for thumbnail caching job */
-  static rctf check_view = {0, 0, 0, 0};
-  GHash *thumb_data_hash;
-  if (!BLI_rctf_compare(&check_view, &v2d->cur, 0.1)) {
-    thumb_data_hash = BLI_ghash_ptr_new("seq_duplicates_and_origs");
-
-    LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
-      ThumbDataItem *val = MEM_callocN(sizeof(ThumbDataItem), "Thumbnail Hash Values");
-      val->seq_dupli = SEQ_sequence_dupli_recursive(scene, scene, NULL, seq, 0);
-      val->scene = scene;
-      BLI_ghash_insert(thumb_data_hash, seq, val);
-    }
-
-    SeqRenderData context = {0};
-    SEQ_render_new_render_data(bmain, depsgraph, scene, 0, 0, sseq->render_size, false, &context);
-    context.view_id = BKE_scene_multiview_view_id_get(&scene->r, STEREO_LEFT_NAME);
-    context.use_proxies = false;
-    sequencer_thumbnail_get_job(C, v2d, context, thumb_data_hash);
-    check_view = v2d->cur;
-  }
+  thumbnail_call_for_job(C, ed, v2d, false);
 
   /* Loop through twice, first unselected, then selected. */
   for (j = 0; j < 2; j++) {
