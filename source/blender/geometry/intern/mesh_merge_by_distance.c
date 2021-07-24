@@ -21,7 +21,7 @@
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 
-#include "GEO_weld.h"  // Own include.
+#include "GEO_mesh_merge_by_distance.h"  // Own include.
 
 /* Indicates when the element was not computed. */
 #define OUT_OF_CONTEXT (uint)(-1)
@@ -1499,10 +1499,6 @@ static void customdata_weld(
 
 /** \} */
 
-/* -------------------------------------------------------------------- */
-/** \name Weld Modifier Main
- * \{ */
-
 #ifdef USE_BVHTREEKDOP
 struct WeldOverlapData {
   const MVert *mvert;
@@ -1527,7 +1523,7 @@ struct WeldVertexCluster {
   uint merged_verts;
 };
 
-Mesh *GEO_weld(const Mesh *mesh, const bool *mask, const float merge_distance, const int weld_mode)
+Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh, const bool *mask, const float merge_distance, const int weld_mode)
 {
   Mesh *result = mesh;
 

@@ -54,7 +54,7 @@
 #include "BKE_modifier.h"
 #include "BKE_screen.h"
 
-#include "GEO_weld.h"
+#include "GEO_mesh_merge_by_distance.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -93,7 +93,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     }
   }
 
-  Mesh *result = GEO_weld(mesh, mask, wmd->merge_dist, wmd->mode);
+  Mesh *result = GEO_mesh_merge_by_distance(mesh, mask, wmd->merge_dist, wmd->mode);
   MEM_freeN(mask);
 
   return result;
@@ -132,7 +132,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "merge_threshold", 0, IFACE_("Distance"), ICON_NONE);
-  if (weld_mode == MOD_WELD_MODE_CONNECTED) {
+  if (weld_mode == WELD_MODE_CONNECTED) {
     uiItemR(layout, ptr, "loose_edges", 0, NULL, ICON_NONE);
   }
   modifier_vgroup_ui(layout, ptr, &ob_ptr, "vertex_group", "invert_vertex_group", NULL);
