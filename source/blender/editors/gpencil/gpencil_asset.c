@@ -195,20 +195,6 @@ static bool gpencil_asset_generic_poll(bContext *C)
   return ED_operator_view3d_active(C);
 }
 
-/* Helper: Get lower frame number from asset strokes. */
-static int gpencil_asset_get_first_franum(const bGPdata *gpd)
-{
-  int first_fra = INT_MAX;
-  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-      if (gpf->framenum < first_fra) {
-        first_fra = gpf->framenum;
-      }
-    }
-  }
-  return first_fra;
-}
-
 /* -------------------------------------------------------------------- */
 /** \name Create Grease Pencil data block Asset operator
  * \{ */
@@ -241,7 +227,6 @@ static bool gpencil_asset_create(const bContext *C,
                                  const bool retime_frames)
 {
   Main *bmain = CTX_data_main(C);
-  Scene *scene = CTX_data_scene(C);
   bool non_supported_feature = false;
 
   /* Create a copy of selected data block. */
@@ -356,9 +341,8 @@ static bool gpencil_asset_create(const bContext *C,
     strcpy(gpl_dst->info, "Asset_Layer");
   }
 
-  /* Ensure preview is done with first available frame. */
-  const int first_franum = gpencil_asset_get_first_franum(gpd);
-  CFRA = first_franum;
+  int f_min, f_max;
+  BKE_gpencil_frame_min_max(gpd, &f_min, &f_max);
 
   /* Mark as asset. */
   ED_asset_mark_id(C, &gpd->id);
@@ -367,7 +351,7 @@ static bool gpencil_asset_create(const bContext *C,
   if (retime_frames) {
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
       LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-        gpf->framenum -= first_franum - 1;
+        gpf->framenum -= f_min - 1;
       }
     }
   }

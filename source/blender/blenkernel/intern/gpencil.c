@@ -3163,4 +3163,20 @@ void BKE_gpencil_frame_selected_hash(bGPdata *gpd, struct GHash *r_list)
   }
 }
 
+/* Get min and max frame number for all layers. */
+void BKE_gpencil_frame_min_max(const bGPdata *gpd, int *r_min, int *r_max)
+{
+  *r_min = INT_MAX;
+  *r_max = INT_MIN;
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+      if (gpf->framenum < *r_min) {
+        *r_min = gpf->framenum;
+      }
+      if (gpf->framenum > *r_max) {
+        *r_max = gpf->framenum;
+      }
+    }
+  }
+}
 /** \} */

@@ -62,6 +62,7 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_gpencil.h"
 #include "BKE_icons.h"
 #include "BKE_idprop.h"
 #include "BKE_image.h"
@@ -1017,12 +1018,20 @@ static void gpencil_preview_render(IconPreview *preview, IconPreviewSize *previe
 
   BLI_assert(preview->id_copy && (preview->id_copy != preview->id));
 
+  /* Find the frame number to make preview visible. */
+  int f_min, f_max;
+  bGPdata *gpd = (bGPdata *)preview->id_copy;
+  BKE_gpencil_frame_min_max(gpd, &f_min, &f_max);
+  const int framenum = ((preview->scene->r.cfra < f_min) || (preview->scene->r.cfra > f_max)) ?
+                           f_min :
+                           preview->scene->r.cfra;
+
   struct ObjectPreviewData preview_data = {
       .pr_main = preview_main,
       /* Act on a copy. */
       .object = NULL,
       .datablock = (ID *)preview->id_copy,
-      .cfra = preview->scene->r.cfra,
+      .cfra = framenum,
       .sizex = preview_sized->sizex,
       .sizey = preview_sized->sizey,
   };
