@@ -112,14 +112,14 @@ typedef struct tGPDasset {
   /** 2D cage manipulator points *
    *
    * NW-R             NE-R (Rotation)
-   *    \           /
+   *    \            /
    *     NW----N----NE
    *     |          |
    *     W          E
    *     |          |
    *     SW----S----SE
    *    /           \
-   * SW-R             SE-R
+   * SW-R            SE-R
    */
   float manipulator[12][2];
   /** Manipulator index (-1 means not set). */
