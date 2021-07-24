@@ -122,8 +122,12 @@ bool nodeGroupPoll(bNodeTree *nodetree, bNodeTree *grouptree, const char **r_dis
 }
 
 /* used for both group nodes and interface nodes */
-static bNodeSocket *group_verify_socket(
-    bNodeTree *ntree, bNode *gnode, bNodeSocket *iosock, ListBase *verify_lb, int in_out)
+static bNodeSocket *group_verify_socket(bNodeTree *ntree,
+                                        bNode *gnode,
+                                        bNodeSocket *iosock,
+                                        ListBase *verify_lb,
+                                        int in_out,
+                                        bool hide_new)
 {
   bNodeSocket *sock;
 
@@ -152,6 +156,9 @@ static bNodeSocket *group_verify_socket(
   else {
     sock = nodeAddSocket(ntree, gnode, in_out, iosock->idname, iosock->identifier, iosock->name);
 
+    if (hide_new) {
+      sock->flag |= SOCK_HIDDEN;
+    }
     if (iosock->typeinfo->interface_init_socket) {
       iosock->typeinfo->interface_init_socket(ntree, iosock, gnode, sock, "interface");
     }
@@ -164,8 +171,12 @@ static bNodeSocket *group_verify_socket(
 }
 
 /* used for both group nodes and interface nodes */
-static void group_verify_socket_list(
-    bNodeTree *ntree, bNode *gnode, ListBase *iosock_lb, ListBase *verify_lb, int in_out)
+static void group_verify_socket_list(bNodeTree *ntree,
+                                     bNode *gnode,
+                                     ListBase *iosock_lb,
+                                     ListBase *verify_lb,
+                                     int in_out,
+                                     bool hide_new)
 {
   bNodeSocket *iosock, *sock, *nextsock;
 
@@ -174,7 +185,7 @@ static void group_verify_socket_list(
   iosock = iosock_lb->first;
   for (; iosock; iosock = iosock->next) {
     /* abusing new_sock pointer for verification here! only used inside this function */
-    iosock->new_sock = group_verify_socket(ntree, gnode, iosock, verify_lb, in_out);
+    iosock->new_sock = group_verify_socket(ntree, gnode, iosock, verify_lb, in_out, hide_new);
   }
   /* leftovers are removed */
   for (sock = verify_lb->first; sock; sock = nextsock) {
@@ -204,8 +215,8 @@ void node_group_update(struct bNodeTree *ntree, struct bNode *node)
   }
   else {
     bNodeTree *ngroup = (bNodeTree *)node->id;
-    group_verify_socket_list(ntree, node, &ngroup->inputs, &node->inputs, SOCK_IN);
-    group_verify_socket_list(ntree, node, &ngroup->outputs, &node->outputs, SOCK_OUT);
+    group_verify_socket_list(ntree, node, &ngroup->inputs, &node->inputs, SOCK_IN, false);
+    group_verify_socket_list(ntree, node, &ngroup->outputs, &node->outputs, SOCK_OUT, false);
   }
 }
 
@@ -528,7 +539,7 @@ void node_group_input_update(bNodeTree *ntree, bNode *node)
 
   /* Check group tree interface and remove or insert sockets as needed. */
   /* SOCK_IN/SOCK_OUT is inverted for interface nodes: Group input nodes have output sockets. */
-  group_verify_socket_list(ntree, node, &ntree->inputs, &node->outputs, SOCK_OUT);
+  group_verify_socket_list(ntree, node, &ntree->inputs, &node->outputs, SOCK_OUT, true);
 
   if (use_extension_socket) {
     /* Add virtual extension socket. */
@@ -570,7 +581,7 @@ void node_group_output_update(bNodeTree *ntree, bNode *node)
 
   /* Check group tree interface and remove or insert sockets as needed. */
   /* SOCK_IN/SOCK_OUT is inverted for interface nodes: Group output nodes have input sockets. */
-  group_verify_socket_list(ntree, node, &ntree->outputs, &node->inputs, SOCK_IN);
+  group_verify_socket_list(ntree, node, &ntree->outputs, &node->inputs, SOCK_IN, false);
 
   if (use_extension_socket) {
     /* Add virtual extension socket */
