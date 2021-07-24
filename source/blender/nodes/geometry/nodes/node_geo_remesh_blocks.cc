@@ -64,7 +64,7 @@ static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
   if (geometry_set.has_mesh()) {
     Mesh *input_mesh = geometry_set.get_mesh_for_write();
 
-    Mesh *output_mesh = GEO_mesh_remesh_blocks_to_mesh_nomain(
+    Mesh *output_mesh = GEO_mesh_remesh_blocks(
         input_mesh, flag, mode, threshold, hermite_num, scale, depth);
 
     BKE_mesh_copy_parameters_for_eval(output_mesh, input_mesh);

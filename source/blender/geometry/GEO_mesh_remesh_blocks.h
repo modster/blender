@@ -12,15 +12,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 by Blender Foundation
- * All rights reserved.
  */
 
 #pragma once
 
 /** \file
- * \ingroup bke
+ * \ingroup geo
  */
 
 #ifdef __cplusplus
@@ -38,7 +35,7 @@ typedef enum eRemeshBlocksMode {
   REMESH_BLOCKS_SHARP_FEATURES = 2,
 } eRemeshBlocksMode;
 
-struct Mesh *GEO_mesh_remesh_blocks_to_mesh_nomain(struct Mesh *mesh,
+struct Mesh *GEO_mesh_remesh_blocks(struct Mesh *mesh,
                                                    const char remesh_flag,
                                                    const char remesh_mode,
                                                    const float threshold,

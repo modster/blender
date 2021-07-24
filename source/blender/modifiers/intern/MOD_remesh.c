@@ -29,11 +29,12 @@
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
 
-#include "../../geometry/GEO_mesh_remesh_blocks.h"
 #include "BKE_context.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_remesh_voxel.h"
 #include "BKE_screen.h"
+
+#include "GEO_mesh_remesh_blocks.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -72,7 +73,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     }
   }
   else {
-    result = GEO_mesh_remesh_blocks_to_mesh_nomain(
+    result = GEO_mesh_remesh_blocks(
         mesh, rmd->flag, rmd->mode, rmd->threshold, rmd->hermite_num, rmd->scale, rmd->depth);
   }
 

@@ -12,13 +12,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 by Blender Foundation
- * All rights reserved.
  */
 
 /** \file
- * \ingroup bke
+ * \ingroup geo
  */
 
 #include "BKE_mesh.h"
@@ -112,7 +109,7 @@ static void dualcon_add_quad(void *output_v, const int vert_indices[4])
   output->curface++;
 }
 
-Mesh *GEO_mesh_remesh_blocks_to_mesh_nomain(Mesh *mesh,
+Mesh *GEO_mesh_remesh_blocks(Mesh *mesh,
                                             const char remesh_flag,
                                             const char remesh_mode,
                                             const float threshold,

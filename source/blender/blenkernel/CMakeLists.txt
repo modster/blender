@@ -390,7 +390,6 @@ set(SRC
   BKE_mesh_mapping.h
   BKE_mesh_mirror.h
   BKE_mesh_remap.h
-        ../geometry/GEO_mesh_remesh_blocks.h
   BKE_mesh_remesh_voxel.h
   BKE_mesh_runtime.h
   BKE_mesh_sample.hh
