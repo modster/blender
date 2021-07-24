@@ -718,45 +718,6 @@ static void wm_xr_session_controller_pose_calc(const GHOST_XrPose *raw_pose,
   mat4_to_loc_quat(r_pose->position, r_pose->orientation_quat, r_mat);
 }
 
-static void wm_xr_session_controller_model_batch_create(GHOST_XrContextHandle xr_context,
-                                                        wmXrControllerData *controller)
-{
-  GHOST_XrControllerModelData model_data;
-
-  if (GHOST_XrGetControllerModelData(xr_context, controller->subaction_path, &model_data) &&
-      model_data.count_vertices > 0) {
-    GPUVertFormat format = {0};
-    GPU_vertformat_attr_add(&format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-    GPU_vertformat_attr_add(&format, "nor", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-
-    GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
-    GPU_vertbuf_data_alloc(vbo, model_data.count_vertices);
-    void *vbo_data = GPU_vertbuf_get_data(vbo);
-    memcpy(
-        vbo_data, model_data.vertices, model_data.count_vertices * sizeof(model_data.vertices[0]));
-
-    GPUIndexBuf *ibo = NULL;
-    if (model_data.count_indices > 0 && ((model_data.count_indices % 3) == 0)) {
-      GPUIndexBufBuilder ibo_builder;
-      const unsigned int prim_len = model_data.count_indices / 3;
-      GPU_indexbuf_init(&ibo_builder, GPU_PRIM_TRIS, prim_len, model_data.count_vertices);
-      for (unsigned int i = 0; i < prim_len; ++i) {
-        const uint32_t *idx = &model_data.indices[i * 3];
-        GPU_indexbuf_add_tri_verts(&ibo_builder, idx[0], idx[1], idx[2]);
-      }
-      ibo = GPU_indexbuf_build(&ibo_builder);
-    }
-
-    controller->model = GPU_batch_create_ex(
-        GPU_PRIM_TRIS, vbo, ibo, GPU_BATCH_OWNS_VBO | GPU_BATCH_OWNS_INDEX);
-  }
-  else {
-    /* Load controller model. This can be called more than once since the model may not be
-     * available from the runtime yet. */
-    GHOST_XrLoadControllerModel(xr_context, controller->subaction_path);
-  }
-}
-
 static void wm_xr_session_controller_data_update(const bContext *C,
                                                  const XrSessionSettings *settings,
                                                  const wmXrAction *grip_action,
@@ -831,9 +792,11 @@ static void wm_xr_session_controller_data_update(const bContext *C,
       }
     }
 
-    /* Create controller model batch if necessary. */
     if (!controller->model) {
-      wm_xr_session_controller_model_batch_create(xr_context, controller);
+      /* Notify ghost to load/continue loading the controller model data. This can be called more
+       * than once since the model may not be available from the runtime yet. The batch itself will
+       * be created in wm_xr_draw_controllers(). */
+      GHOST_XrLoadControllerModel(xr_context, controller->subaction_path);
     }
   }
 }
@@ -1376,11 +1339,15 @@ void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
   const unsigned int count = (unsigned int)min_ii((int)grip_action->count_subaction_paths,
                                                   (int)ARRAY_SIZE(state->controllers));
 
-  memset(state->controllers, 0, sizeof(state->controllers));
-
   for (unsigned int i = 0; i < count; ++i) {
+    wmXrControllerData *controller = &state->controllers[i];
+    if (controller->model) {
+      /* Free controller model batch. */
+      GPU_batch_discard(controller->model);
+    }
+    memset(controller, 0, sizeof(*controller));
     BLI_assert(STREQ(grip_action->subaction_paths[i], aim_action->subaction_paths[i]));
-    strcpy(state->controllers[i].subaction_path, grip_action->subaction_paths[i]);
+    strcpy(controller->subaction_path, grip_action->subaction_paths[i]);
   }
 
   /* Activate draw callback. */

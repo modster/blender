@@ -209,11 +209,46 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
   wm_xr_draw_viewport_buffers_to_active_framebuffer(xr_data->runtime, surface_data, draw_view);
 }
 
+static GPUBatch *wm_xr_controller_model_batch_create(GHOST_XrContextHandle xr_context,
+                                                     const char *subaction_path)
+{
+  GHOST_XrControllerModelData model_data;
+
+  if (!GHOST_XrGetControllerModelData(xr_context, subaction_path, &model_data) ||
+      model_data.count_vertices < 1) {
+    return NULL;
+  }
+
+  GPUVertFormat format = {0};
+  GPU_vertformat_attr_add(&format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+  GPU_vertformat_attr_add(&format, "nor", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+
+  GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
+  GPU_vertbuf_data_alloc(vbo, model_data.count_vertices);
+  void *vbo_data = GPU_vertbuf_get_data(vbo);
+  memcpy(
+      vbo_data, model_data.vertices, model_data.count_vertices * sizeof(model_data.vertices[0]));
+
+  GPUIndexBuf *ibo = NULL;
+  if (model_data.count_indices > 0 && ((model_data.count_indices % 3) == 0)) {
+    GPUIndexBufBuilder ibo_builder;
+    const unsigned int prim_len = model_data.count_indices / 3;
+    GPU_indexbuf_init(&ibo_builder, GPU_PRIM_TRIS, prim_len, model_data.count_vertices);
+    for (unsigned int i = 0; i < prim_len; ++i) {
+      const uint32_t *idx = &model_data.indices[i * 3];
+      GPU_indexbuf_add_tri_verts(&ibo_builder, idx[0], idx[1], idx[2]);
+    }
+    ibo = GPU_indexbuf_build(&ibo_builder);
+  }
+
+  return GPU_batch_create_ex(GPU_PRIM_TRIS, vbo, ibo, GPU_BATCH_OWNS_VBO | GPU_BATCH_OWNS_INDEX);
+}
+
 void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), void *customdata)
 {
   const wmXrData *xr = customdata;
   const XrSessionSettings *settings = &xr->session_settings;
-  const wmXrSessionState *state = &xr->runtime->session_state;
+  wmXrSessionState *state = &xr->runtime->session_state;
   const unsigned int count_controllers = (unsigned int)ARRAY_SIZE(state->controllers);
 
   /* Model. */
@@ -237,8 +272,13 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
     GPU_blend(GPU_BLEND_ALPHA);
 
     for (unsigned int controller_idx = 0; controller_idx < count_controllers; ++controller_idx) {
-      const wmXrControllerData *controller = &state->controllers[controller_idx];
+      wmXrControllerData *controller = &state->controllers[controller_idx];
       GPUBatch *model = controller->model;
+      if (!model) {
+        model = controller->model = wm_xr_controller_model_batch_create(
+            xr_context, controller->subaction_path);
+      }
+
       if (model &&
           GHOST_XrGetControllerModelData(xr_context, controller->subaction_path, &model_data) &&
           model_data.count_components > 0) {
