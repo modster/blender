@@ -100,14 +100,14 @@ class USDMaterialReader {
                       const char *dest_socket_name,
                       bNodeTree *ntree,
                       int column,
-                      NodePlacementContext &r_ctx) const;
+                      NodePlacementContext *r_ctx) const;
 
   void follow_connection(const pxr::UsdShadeInput &usd_input,
                          bNode *dest_node,
                          const char *dest_socket_name,
                          bNodeTree *ntree,
                          int column,
-                         NodePlacementContext &r_ctx) const;
+                         NodePlacementContext *r_ctx) const;
 
   void convert_usd_uv_texture(const pxr::UsdShadeShader &usd_shader,
                               const pxr::TfToken &usd_source_name,
@@ -115,7 +115,7 @@ class USDMaterialReader {
                               const char *dest_socket_name,
                               bNodeTree *ntree,
                               int column,
-                              NodePlacementContext &r_ctx) const;
+                              NodePlacementContext *r_ctx) const;
 
   void load_tex_image(const pxr::UsdShadeShader &usd_shader, bNode *tex_image) const;
 
@@ -125,7 +125,7 @@ class USDMaterialReader {
                                          const char *dest_socket_name,
                                          bNodeTree *ntree,
                                          int column,
-                                         NodePlacementContext &r_ctx) const;
+                                         NodePlacementContext *r_ctx) const;
 };
 
 }  // namespace blender::io::usd

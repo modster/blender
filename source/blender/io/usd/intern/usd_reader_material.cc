@@ -245,19 +245,23 @@ namespace {
 /* Compute the x- and y-coordinates for placing a new node in an unoccupied region of
  * the column with the given index.  Returns the coordinates in r_locx and r_locy and
  * updates the column-occupancy information in r_ctx. */
-void compute_node_loc(const int column, float &r_locx, float &r_locy, NodePlacementContext &r_ctx)
+void compute_node_loc(const int column, float *r_locx, float *r_locy, NodePlacementContext *r_ctx)
 {
-  r_locx = r_ctx.origx - column * r_ctx.horizontal_step;
-
-  if (column >= r_ctx.column_offsets.size()) {
-    r_ctx.column_offsets.push_back(0.0f);
+  if (!(r_locx && r_locy && r_ctx)) {
+    return;
   }
 
-  r_locy = r_ctx.origy - r_ctx.column_offsets[column];
+  (*r_locx) = r_ctx->origx - column * r_ctx->horizontal_step;
+
+  if (column >= r_ctx->column_offsets.size()) {
+    r_ctx->column_offsets.push_back(0.0f);
+  }
+
+  (*r_locy) = r_ctx->origy - r_ctx->column_offsets[column];
 
   /* Record the y-offset of the occupied region in
    * the column, including padding. */
-  r_ctx.column_offsets[column] += r_ctx.vertical_step + 10.0f;
+  r_ctx->column_offsets[column] += r_ctx->vertical_step + 10.0f;
 }
 
 }  // End anonymous namespace.
@@ -369,46 +373,46 @@ void USDMaterialReader::set_principled_node_inputs(bNode *principled,
   /* Recursively set the principled shader inputs. */
 
   if (pxr::UsdShadeInput diffuse_input = usd_shader.GetInput(usdtokens::diffuseColor)) {
-    set_node_input(diffuse_input, principled, "Base Color", ntree, column, context);
+    set_node_input(diffuse_input, principled, "Base Color", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput emissive_input = usd_shader.GetInput(usdtokens::emissiveColor)) {
-    set_node_input(emissive_input, principled, "Emission", ntree, column, context);
+    set_node_input(emissive_input, principled, "Emission", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput specular_input = usd_shader.GetInput(usdtokens::specularColor)) {
-    set_node_input(specular_input, principled, "Specular", ntree, column, context);
+    set_node_input(specular_input, principled, "Specular", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput metallic_input = usd_shader.GetInput(usdtokens::metallic)) {
     ;
-    set_node_input(metallic_input, principled, "Metallic", ntree, column, context);
+    set_node_input(metallic_input, principled, "Metallic", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput roughness_input = usd_shader.GetInput(usdtokens::roughness)) {
-    set_node_input(roughness_input, principled, "Roughness", ntree, column, context);
+    set_node_input(roughness_input, principled, "Roughness", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput clearcoat_input = usd_shader.GetInput(usdtokens::clearcoat)) {
-    set_node_input(clearcoat_input, principled, "Clearcoat", ntree, column, context);
+    set_node_input(clearcoat_input, principled, "Clearcoat", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput clearcoat_roughness_input = usd_shader.GetInput(
           usdtokens::clearcoatRoughness)) {
     set_node_input(
-        clearcoat_roughness_input, principled, "Clearcoat Roughness", ntree, column, context);
+        clearcoat_roughness_input, principled, "Clearcoat Roughness", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput opacity_input = usd_shader.GetInput(usdtokens::opacity)) {
-    set_node_input(opacity_input, principled, "Alpha", ntree, column, context);
+    set_node_input(opacity_input, principled, "Alpha", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput ior_input = usd_shader.GetInput(usdtokens::ior)) {
-    set_node_input(ior_input, principled, "IOR", ntree, column, context);
+    set_node_input(ior_input, principled, "IOR", ntree, column, &context);
   }
 
   if (pxr::UsdShadeInput normal_input = usd_shader.GetInput(usdtokens::normal)) {
-    set_node_input(normal_input, principled, "Normal", ntree, column, context);
+    set_node_input(normal_input, principled, "Normal", ntree, column, &context);
   }
 }
 
@@ -418,9 +422,9 @@ void USDMaterialReader::set_node_input(const pxr::UsdShadeInput &usd_input,
                                        const char *dest_socket_name,
                                        bNodeTree *ntree,
                                        const int column,
-                                       NodePlacementContext &r_ctx) const
+                                       NodePlacementContext *r_ctx) const
 {
-  if (!(usd_input && dest_node)) {
+  if (!(usd_input && dest_node && r_ctx)) {
     return;
   }
 
@@ -487,9 +491,9 @@ void USDMaterialReader::follow_connection(const pxr::UsdShadeInput &usd_input,
                                           const char *dest_socket_name,
                                           bNodeTree *ntree,
                                           int column,
-                                          NodePlacementContext &r_ctx) const
+                                          NodePlacementContext *r_ctx) const
 {
-  if (!(usd_input && dest_node && dest_socket_name && ntree)) {
+  if (!(usd_input && dest_node && dest_socket_name && ntree && r_ctx)) {
     return;
   }
 
@@ -524,7 +528,7 @@ void USDMaterialReader::follow_connection(const pxr::UsdShadeInput &usd_input,
       /* The normal texture input requires creating a normal map node. */
       float locx = 0.0f;
       float locy = 0.0f;
-      compute_node_loc(column + 1, locx, locy, r_ctx);
+      compute_node_loc(column + 1, &locx, &locy, r_ctx);
 
       bNode *normal_map = add_node(nullptr, ntree, SH_NODE_NORMAL_MAP, locx, locy);
 
@@ -555,15 +559,15 @@ void USDMaterialReader::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_sh
                                                const char *dest_socket_name,
                                                bNodeTree *ntree,
                                                const int column,
-                                               NodePlacementContext &r_ctx) const
+                                               NodePlacementContext *r_ctx) const
 {
-  if (!usd_shader || !dest_node || !ntree || !dest_socket_name || !bmain_) {
+  if (!usd_shader || !dest_node || !ntree || !dest_socket_name || !bmain_ || !r_ctx) {
     return;
   }
 
   float locx = 0.0f;
   float locy = 0.0f;
-  compute_node_loc(column, locx, locy, r_ctx);
+  compute_node_loc(column, &locx, &locy, r_ctx);
 
   /* Create the Texture Image node. */
   bNode *tex_image = add_node(nullptr, ntree, SH_NODE_TEX_IMAGE, locx, locy);
@@ -660,15 +664,15 @@ void USDMaterialReader::convert_usd_primvar_reader_float2(
     const char *dest_socket_name,
     bNodeTree *ntree,
     const int column,
-    NodePlacementContext &r_ctx) const
+    NodePlacementContext *r_ctx) const
 {
-  if (!usd_shader || !dest_node || !ntree || !dest_socket_name || !bmain_) {
+  if (!usd_shader || !dest_node || !ntree || !dest_socket_name || !bmain_ || !r_ctx) {
     return;
   }
 
   float locx = 0.0f;
   float locy = 0.0f;
-  compute_node_loc(column, locx, locy, r_ctx);
+  compute_node_loc(column, &locx, &locy, r_ctx);
 
   /* Create the UV Map node. */
   bNode *uv_map = add_node(nullptr, ntree, SH_NODE_UVMAP, locx, locy);

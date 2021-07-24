@@ -57,13 +57,17 @@ static const pxr::TfToken normalsPrimvar("normals", pxr::TfToken::Immortal);
 
 namespace utils {
 /* Very similar to abc mesh utils. */
-static void build_mat_map(const Main *bmain, std::map<std::string, Material *> &mat_map)
+static void build_mat_map(const Main *bmain, std::map<std::string, Material *> *r_mat_map)
 {
+  if (r_mat_map == nullptr) {
+    return;
+  }
+
   Material *material = static_cast<Material *>(bmain->materials.first);
 
   for (; material; material = static_cast<Material *>(material->id.next)) {
     /* We have to do this because the stored material name is coming directly from usd. */
-    mat_map[pxr::TfMakeValidIdentifier(material->id.name + 2)] = material;
+    (*r_mat_map)[pxr::TfMakeValidIdentifier(material->id.name + 2)] = material;
   }
 }
 
@@ -94,7 +98,7 @@ static void assign_materials(Main *bmain,
 
   /* TODO(kevin): use global map? */
   std::map<std::string, Material *> mat_map;
-  build_mat_map(bmain, mat_map);
+  build_mat_map(bmain, &mat_map);
 
   blender::io::usd::USDMaterialReader mat_reader(params, bmain);
 
@@ -676,8 +680,12 @@ void USDMeshReader::read_mesh_sample(ImportSettings *settings,
 void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
                                              MPoly *mpoly,
                                              const int /* totpoly */,
-                                             std::map<pxr::SdfPath, int> &r_mat_map)
+                                             std::map<pxr::SdfPath, int> *r_mat_map)
 {
+  if (r_mat_map == nullptr) {
+    return;
+  }
+
   /* Find the geom subsets that have bound materials.
    * We don't call pxr::UsdShadeMaterialBindingAPI::GetMaterialBindSubsets()
    * because this function returns only those subsets that are in the 'materialBind'
@@ -705,11 +713,11 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
         continue;
       }
 
-      if (r_mat_map.find(subset_mtl_path) == r_mat_map.end()) {
-        r_mat_map[subset_mtl_path] = 1 + current_mat++;
+      if (r_mat_map->find(subset_mtl_path) == r_mat_map->end()) {
+        (*r_mat_map)[subset_mtl_path] = 1 + current_mat++;
       }
 
-      const int mat_idx = r_mat_map[subset_mtl_path] - 1;
+      const int mat_idx = (*r_mat_map)[subset_mtl_path] - 1;
 
       pxr::UsdAttribute indicesAttribute = subset.GetIndicesAttr();
       pxr::VtIntArray indices;
@@ -722,7 +730,7 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
     }
   }
 
-  if (r_mat_map.empty()) {
+  if (r_mat_map->empty()) {
     pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(prim_);
 
     if (pxr::UsdShadeMaterial mtl = api.ComputeBoundMaterial()) {
@@ -730,7 +738,7 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
       pxr::SdfPath mtl_path = mtl.GetPath();
 
       if (!mtl_path.IsEmpty()) {
-        r_mat_map.insert(std::make_pair(mtl.GetPath(), 1));
+        r_mat_map->insert(std::make_pair(mtl.GetPath(), 1));
       }
     }
   }
@@ -743,7 +751,7 @@ void USDMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, const double mot
   }
 
   std::map<pxr::SdfPath, int> mat_map;
-  assign_facesets_to_mpoly(motionSampleTime, mesh->mpoly, mesh->totpoly, mat_map);
+  assign_facesets_to_mpoly(motionSampleTime, mesh->mpoly, mesh->totpoly, &mat_map);
   utils::assign_materials(bmain, object_, mat_map, this->import_params_, this->prim_.GetStage());
 }
 
@@ -836,7 +844,7 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
     size_t num_polys = active_mesh->totpoly;
     if (num_polys > 0 && import_params_.import_materials) {
       std::map<pxr::SdfPath, int> mat_map;
-      assign_facesets_to_mpoly(motionSampleTime, active_mesh->mpoly, num_polys, mat_map);
+      assign_facesets_to_mpoly(motionSampleTime, active_mesh->mpoly, num_polys, &mat_map);
     }
   }
 

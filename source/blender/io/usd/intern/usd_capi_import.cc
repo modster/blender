@@ -103,21 +103,25 @@ static bool gather_objects_paths(const pxr::UsdPrim &object, ListBase *object_pa
 
 /* Update the given import settings with the global rotation matrix to orient
  * imported objects with Z-up, if necessary */
-static void convert_to_z_up(pxr::UsdStageRefPtr stage, ImportSettings &r_settings)
+static void convert_to_z_up(pxr::UsdStageRefPtr stage, ImportSettings *r_settings)
 {
   if (!stage || pxr::UsdGeomGetStageUpAxis(stage) == pxr::UsdGeomTokens->z) {
     return;
   }
 
-  r_settings.do_convert_mat = true;
+  if (!r_settings) {
+    return;
+  }
+
+  r_settings->do_convert_mat = true;
 
   /* Rotate 90 degrees about the X-axis. */
   float rmat[3][3];
   float axis[3] = {1.0f, 0.0f, 0.0f};
   axis_angle_normalized_to_mat3(rmat, axis, M_PI / 2.0f);
 
-  unit_m4(r_settings.conversion_mat);
-  copy_m4_m3(r_settings.conversion_mat, rmat);
+  unit_m4(r_settings->conversion_mat);
+  copy_m4_m3(r_settings->conversion_mat, rmat);
 }
 
 enum {
@@ -211,7 +215,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
     return;
   }
 
-  convert_to_z_up(stage, data->settings);
+  convert_to_z_up(stage, &data->settings);
 
   /* Set up the stage for animated data. */
   if (data->params.set_frame_range) {
@@ -524,7 +528,7 @@ CacheArchiveHandle *USD_create_handle(struct Main * /*bmain*/,
   USDImportParams params{};
 
   blender::io::usd::ImportSettings settings{};
-  convert_to_z_up(stage, settings);
+  convert_to_z_up(stage, &settings);
 
   USDStageReader *stage_reader = new USDStageReader(stage, params, settings);
 
@@ -560,7 +564,7 @@ void USD_get_transform(struct CacheReader *reader,
   Object *object = usd_reader->object();
   if (object->parent == nullptr) {
     /* No parent, so local space is the same as world space. */
-    usd_reader->read_matrix(r_mat_world, time, scale, is_constant);
+    usd_reader->read_matrix(r_mat_world, time, scale, &is_constant);
     return;
   }
 
@@ -568,7 +572,7 @@ void USD_get_transform(struct CacheReader *reader,
   BKE_object_get_parent_matrix(object, object->parent, mat_parent);
 
   float mat_local[4][4];
-  usd_reader->read_matrix(mat_local, time, scale, is_constant);
+  usd_reader->read_matrix(mat_local, time, scale, &is_constant);
   mul_m4_m4m4(r_mat_world, mat_parent, object->parentinv);
   mul_m4_m4m4(r_mat_world, r_mat_world, mat_local);
 }

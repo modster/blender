@@ -51,7 +51,7 @@ void USDXformReader::read_object_data(Main * /* bmain */, const double motionSam
   bool is_constant;
   float transform_from_usd[4][4];
 
-  read_matrix(transform_from_usd, motionSampleTime, import_params_.scale, is_constant);
+  read_matrix(transform_from_usd, motionSampleTime, import_params_.scale, &is_constant);
 
   if (!is_constant) {
     bConstraint *con = BKE_constraint_add_for_object(
@@ -73,9 +73,12 @@ void USDXformReader::read_object_data(Main * /* bmain */, const double motionSam
 void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
                                  const float time,
                                  const float scale,
-                                 bool &is_constant)
+                                 bool *r_is_constant)
 {
-  is_constant = true;
+  if (r_is_constant) {
+    *r_is_constant = true;
+  }
+
   unit_m4(r_mat);
 
   pxr::UsdGeomXformable xformable;
@@ -92,7 +95,9 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
     return;
   }
 
-  is_constant = !xformable.TransformMightBeTimeVarying();
+  if (r_is_constant) {
+    *r_is_constant = !xformable.TransformMightBeTimeVarying();
+  }
 
   pxr::GfMatrix4d usd_local_xf;
   bool reset_xform_stack;
