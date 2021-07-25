@@ -510,6 +510,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveTrim"),
         NodeItem("GeometryNodeCurveLength"),
         NodeItem("GeometryNodeCurveReverse"),
+        NodeItem("GeometryNodeCurveSetHandles"),
         NodeItem("GeometryNodeCurveFillet"),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_CURVE", "Curve Primitives", items=[
