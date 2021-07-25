@@ -402,8 +402,7 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
   if (RNA_boolean_get(ptr, "import_materials")) {
     box = uiLayoutBox(layout);
-    uiItemL(box, IFACE_("Experimental"), ICON_NONE);
-    col = uiLayoutColumn(box, true);
+    col = uiLayoutColumnWithHeading(box, true, IFACE_("Experimental"));
     uiItemR(col, ptr, "import_usd_preview", 0, NULL, ICON_NONE);
     if (RNA_boolean_get(ptr, "import_usd_preview")) {
       uiItemR(col, ptr, "set_material_blend", 0, NULL, ICON_NONE);
