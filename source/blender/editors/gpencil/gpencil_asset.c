@@ -20,7 +20,6 @@
  */
 
 #include "BLI_blenlib.h"
-#include "BLI_ghash.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
@@ -66,6 +65,15 @@
 #include "gpencil_intern.h"
 
 #define ROTATION_CONTROL_GAP 15.0f
+
+typedef struct tGPDAssetStroke {
+  bGPDlayer *gpl;
+  bGPDframe *gpf;
+  bGPDstroke *gps;
+  int slot_index;
+  bool is_new_gpl;
+  bool is_new_gpf;
+} tGPDAssetStroke;
 
 /* Temporary Asset import operation data. */
 typedef struct tGPDasset {
@@ -129,19 +137,11 @@ typedef struct tGPDasset {
   /** Vector with the original orientation for rotation. */
   float vinit_rotation[2];
 
-  /* All the hash below are used to keep a reference of the asset data inserted in the target
-   * object. */
-
-  /** Hash of new created layers. */
-  struct GHash *asset_layers;
-  /** Hash of new created frames. */
-  struct GHash *asset_frames;
-  /** Hash of new created strokes linked to frame. */
-  struct GHash *asset_strokes_frame;
-  /** Hash of new created strokes linked to layer. */
-  struct GHash *asset_strokes_layer;
-  /** Hash of new created materials. */
-  struct GHash *asset_materials;
+  /* Data to keep a reference of the asset data inserted in the target object. */
+  /** Number of elements in data. */
+  int data_len;
+  /** Array of data with all strokes append. */
+  tGPDAssetStroke *data;
 
   /** Handle for drawing while operator is running. */
   void *draw_handle_3d;
@@ -458,10 +458,10 @@ static void gpencil_2d_cage_calc(tGPDasset *tgpa)
   float cage_max[2];
   INIT_MINMAX2(cage_min, cage_max);
 
-  GHashIterator gh_iter;
-  GHASH_ITER (gh_iter, tgpa->asset_strokes_layer) {
-    bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-    bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getValue(&gh_iter);
+  for (int index = 0; index < tgpa->data_len; index++) {
+    tGPDAssetStroke *data = &tgpa->data[index];
+    bGPDstroke *gps = data->gps;
+    bGPDlayer *gpl = data->gpl;
     BKE_gpencil_layer_transform_matrix_get(tgpa->depsgraph, tgpa->ob, gpl, diff_mat);
 
     if (is_zero_v3(gps->boundbox_min)) {
@@ -793,9 +793,9 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   gpencil_asset_rotation_matrix_get(angle, tgpa->cage_normal, rot_matrix);
 
   /* Loop all strokes and apply transformation. */
-  GHashIterator gh_iter;
-  GHASH_ITER (gh_iter, tgpa->asset_strokes_frame) {
-    bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
+  for (int index = 0; index < tgpa->data_len; index++) {
+    tGPDAssetStroke *data = &tgpa->data[index];
+    bGPDstroke *gps = data->gps;
     bGPDspoint *pt;
     int i;
     for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
@@ -884,51 +884,49 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
   float vec[3];
   sub_v3_v3v3(vec, dest_pt, tgpa->ob->loc);
 
+  /* Count total of strokes. */
+  tgpa->data_len = 0;
+  LISTBASE_FOREACH (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
+    LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
+      tgpa->data_len += BLI_listbase_count(&gpf_asset->strokes);
+    }
+  }
+  /* Alloc array of strokes. */
+  tgpa->data = MEM_calloc_arrayN(tgpa->data_len, sizeof(tGPDAssetStroke), __func__);
+  int data_index = 0;
+
   LISTBASE_FOREACH (bGPDlayer *, gpl_asset, &gpd_asset->layers) {
     /* Check if Layer is in target data block. */
     bGPDlayer *gpl_target = BKE_gpencil_layer_get_by_name(gpd_target, gpl_asset->info, false);
+
+    bool is_new_gpl = false;
     if (gpl_target == NULL) {
       gpl_target = BKE_gpencil_layer_duplicate(gpl_asset, false, false);
       BLI_assert(gpl_target != NULL);
       BLI_listbase_clear(&gpl_target->frames);
       BLI_addtail(&gpd_target->layers, gpl_target);
-
-      /* Ensure layers hash is ready. */
-      if (tgpa->asset_layers == NULL) {
-        tgpa->asset_layers = BLI_ghash_ptr_new(__func__);
-      }
-
-      /* Add layer to the hash to remove it if the operator is canceled. */
-      BLI_ghash_insert(tgpa->asset_layers, gpl_target, gpl_target);
+      is_new_gpl = true;
     }
 
-    gpl_target->actframe = NULL;
     LISTBASE_FOREACH (bGPDframe *, gpf_asset, &gpl_asset->frames) {
       /* Check if frame is in target layer. */
       int fra = tgpa->cframe + (gpf_asset->framenum - 1);
-      bGPDframe *gpf_target = BKE_gpencil_layer_frame_get(gpl_target, fra, GP_GETFRAME_USE_PREV);
-
-      if ((gpf_target == NULL) || (gpf_target->framenum != fra)) {
-        gpf_target = BKE_gpencil_layer_frame_get(gpl_target, fra, GP_GETFRAME_ADD_NEW);
-        BLI_assert(gpf_target != NULL);
-        BLI_listbase_clear(&gpf_target->strokes);
-
-        /* Ensure frames hash is ready. */
-        if (tgpa->asset_frames == NULL) {
-          tgpa->asset_frames = BLI_ghash_ptr_new(__func__);
-        }
-
-        /* Add frame to the hash to remove it if the operator is canceled. */
-        if (!BLI_ghash_haskey(tgpa->asset_frames, gpf_target)) {
-          /* Add the hash key with a reference to the layer. */
-          BLI_ghash_insert(tgpa->asset_frames, gpf_target, gpl_target);
+      bGPDframe *gpf_target = NULL;
+      /* Find a frame in same frame number. */
+      LISTBASE_FOREACH (bGPDframe *, gpf_find, &gpl_target->frames) {
+        if (gpf_find->framenum == fra) {
+          gpf_target = gpf_find;
+          break;
         }
       }
 
-      /* Preapre hashes for strokes. */
-      if (tgpa->asset_strokes_frame == NULL) {
-        tgpa->asset_strokes_frame = BLI_ghash_ptr_new(__func__);
-        tgpa->asset_strokes_layer = BLI_ghash_ptr_new(__func__);
+      bool is_new_gpf = false;
+      if (gpf_target == NULL) {
+        gpf_target = BKE_gpencil_frame_addnew(gpl_target, fra);
+        gpl_target->actframe = gpf_target;
+        BLI_assert(gpf_target != NULL);
+        BLI_listbase_clear(&gpf_target->strokes);
+        is_new_gpf = true;
       }
 
       /* Loop all strokes and duplicate. */
@@ -944,14 +942,12 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
 
         int mat_index = BKE_gpencil_object_material_index_get_by_name(tgpa->ob,
                                                                       ma_src->id.name + 2);
+        bool is_new_mat = false;
         if (mat_index == -1) {
-          if (tgpa->asset_materials == NULL) {
-            tgpa->asset_materials = BLI_ghash_ptr_new(__func__);
-          }
           const int totcolors = tgpa->ob->totcol;
           mat_index = BKE_gpencil_object_material_ensure(tgpa->bmain, tgpa->ob, ma_src);
           if (tgpa->ob->totcol > totcolors) {
-            BLI_ghash_insert(tgpa->asset_materials, ma_src, POINTER_FROM_INT(mat_index + 1));
+            is_new_mat = true;
           }
         }
 
@@ -968,9 +964,19 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
         /* Calc stroke bounding box. */
         BKE_gpencil_stroke_boundingbox_calc(gps_target);
 
-        /* Add the hash key with a reference by frame and layer. */
-        BLI_ghash_insert(tgpa->asset_strokes_frame, gps_target, gpf_target);
-        BLI_ghash_insert(tgpa->asset_strokes_layer, gps_target, gpl_target);
+        /* Add the reference to the stroke. */
+        tGPDAssetStroke *data = &tgpa->data[data_index];
+        data->gpl = gpl_target;
+        data->gpf = gpf_target;
+        data->gps = gps_target;
+        data->is_new_gpl = is_new_gpl;
+        data->is_new_gpf = is_new_gpf;
+        data->slot_index = (is_new_mat) ? gps_target->mat_nr + 1 : -1;
+        data_index++;
+
+        /* Reset flags. */
+        is_new_gpl = false;
+        is_new_gpf = false;
       }
     }
   }
@@ -984,41 +990,37 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
 /* Helper: Clean any temp added data when the operator is canceled. */
 static void gpencil_asset_clean_temp_data(tGPDasset *tgpa)
 {
-  GHashIterator gh_iter;
-  /* Clean Strokes. */
-  if (tgpa->asset_strokes_frame != NULL) {
-    GHASH_ITER (gh_iter, tgpa->asset_strokes_frame) {
-      bGPDstroke *gps = (bGPDstroke *)BLI_ghashIterator_getKey(&gh_iter);
-      bGPDframe *gpf = (bGPDframe *)BLI_ghashIterator_getValue(&gh_iter);
-      BLI_remlink(&gpf->strokes, gps);
-      BKE_gpencil_free_stroke(gps);
+  /* Clean Strokes and materials. */
+  int actcol = tgpa->ob->actcol;
+  for (int index = 0; index < tgpa->data_len; index++) {
+    tGPDAssetStroke *data = &tgpa->data[index];
+    bGPDstroke *gps = data->gps;
+    bGPDframe *gpf = data->gpf;
+    BLI_remlink(&gpf->strokes, gps);
+    BKE_gpencil_free_stroke(gps);
+    if (data->slot_index >= 0) {
+      tgpa->ob->actcol = data->slot_index;
+      BKE_object_material_slot_remove(tgpa->bmain, tgpa->ob);
     }
   }
+  tgpa->ob->actcol = (actcol > tgpa->ob->totcol) ? tgpa->ob->totcol : actcol;
+
   /* Clean Frames. */
-  if (tgpa->asset_frames != NULL) {
-    GHASH_ITER (gh_iter, tgpa->asset_frames) {
-      bGPDframe *gpf = (bGPDframe *)BLI_ghashIterator_getKey(&gh_iter);
-      bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getValue(&gh_iter);
-      BLI_remlink(&gpl->frames, gpf);
+  for (int index = 0; index < tgpa->data_len; index++) {
+    tGPDAssetStroke *data = &tgpa->data[index];
+    if (data->is_new_gpf) {
+      bGPDframe *gpf = data->gpf;
+      bGPDlayer *gpl = data->gpl;
+      BLI_freelinkN(&gpl->frames, gpf);
     }
   }
   /* Clean Layers. */
-  if (tgpa->asset_layers != NULL) {
-    GHASH_ITER (gh_iter, tgpa->asset_layers) {
-      bGPDlayer *gpl = (bGPDlayer *)BLI_ghashIterator_getKey(&gh_iter);
+  for (int index = 0; index < tgpa->data_len; index++) {
+    tGPDAssetStroke *data = &tgpa->data[index];
+    if (data->is_new_gpl) {
+      bGPDlayer *gpl = data->gpl;
       BKE_gpencil_layer_delete(tgpa->gpd, gpl);
     }
-  }
-  /* Clean Materials. */
-  if (tgpa->asset_materials != NULL) {
-    int actcol = tgpa->ob->actcol;
-    GHASH_ITER (gh_iter, tgpa->asset_materials) {
-      const int slot = POINTER_AS_INT(BLI_ghashIterator_getValue(&gh_iter));
-      tgpa->ob->actcol = slot;
-      BKE_object_material_slot_remove(tgpa->bmain, tgpa->ob);
-    }
-
-    tgpa->ob->actcol = (actcol > tgpa->ob->totcol) ? tgpa->ob->totcol : actcol;
   }
 }
 
@@ -1066,21 +1068,8 @@ static void gpencil_asset_import_exit(bContext *C, wmOperator *op)
     ED_area_status_text(tgpa->area, NULL);
     ED_workspace_status_text(C, NULL);
 
-    /* Free Hash tablets. */
-    if (tgpa->asset_layers != NULL) {
-      BLI_ghash_free(tgpa->asset_layers, NULL, NULL);
-    }
-    if (tgpa->asset_frames != NULL) {
-      BLI_ghash_free(tgpa->asset_frames, NULL, NULL);
-    }
-    if (tgpa->asset_strokes_frame != NULL) {
-      BLI_ghash_free(tgpa->asset_strokes_frame, NULL, NULL);
-      BLI_ghash_free(tgpa->asset_strokes_layer, NULL, NULL);
-    }
-
-    if (tgpa->asset_materials != NULL) {
-      BLI_ghash_free(tgpa->asset_materials, NULL, NULL);
-    }
+    /* Free data. */
+    MEM_SAFE_FREE(tgpa->data);
 
     /* Remove drawing handler. */
     if (tgpa->draw_handle_3d) {
@@ -1128,11 +1117,8 @@ static bool gpencil_asset_import_set_init_values(bContext *C,
   /* Manipulator point is not set yet. */
   tgpa->manipulator_index = -1;
 
-  tgpa->asset_layers = NULL;
-  tgpa->asset_frames = NULL;
-  tgpa->asset_strokes_frame = NULL;
-  tgpa->asset_strokes_layer = NULL;
-  tgpa->asset_materials = NULL;
+  tgpa->data_len = 0;
+  tgpa->data = NULL;
 
   return true;
 }
