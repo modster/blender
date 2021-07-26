@@ -400,14 +400,13 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(col, ptr, "create_collection", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "light_intensity_scale", 0, NULL, ICON_NONE);
 
-  if (RNA_boolean_get(ptr, "import_materials")) {
-    box = uiLayoutBox(layout);
-    col = uiLayoutColumnWithHeading(box, true, IFACE_("Experimental"));
-    uiItemR(col, ptr, "import_usd_preview", 0, NULL, ICON_NONE);
-    if (RNA_boolean_get(ptr, "import_usd_preview")) {
-      uiItemR(col, ptr, "set_material_blend", 0, NULL, ICON_NONE);
-    }
-  }
+  box = uiLayoutBox(layout);
+  col = uiLayoutColumnWithHeading(box, true, IFACE_("Experimental"));
+  uiItemR(col, ptr, "import_usd_preview", 0, NULL, ICON_NONE);
+  uiLayoutSetEnabled(col, RNA_boolean_get(ptr, "import_materials"));
+  uiLayout *row = uiLayoutRow(col, true);
+  uiItemR(row, ptr, "set_material_blend", 0, NULL, ICON_NONE);
+  uiLayoutSetEnabled(row, RNA_boolean_get(ptr, "import_usd_preview"));
 }
 
 void WM_OT_usd_import(struct wmOperatorType *ot)
