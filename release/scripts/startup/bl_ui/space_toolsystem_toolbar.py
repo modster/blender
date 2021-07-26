@@ -191,15 +191,18 @@ class _defs_annotate:
                 row.prop(tool_settings.gpencil_sculpt, "lockaxis")
             elif tool_settings.gpencil_stroke_placement_view3d in {'SURFACE', 'STROKE'}:
                 row.prop(tool_settings, "use_gpencil_stroke_endpoints")
+        elif space_type in {'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR'}:
+            layout.separator()
+
+            row = layout.row(align=True)
+            row.prop(tool_settings, "annotation_stroke_placement_view2d", text="Placement")
+        
         if space_type == 'CLIP_EDITOR':
             layout.separator()
             row = layout.row(align=True)
             row.label(text="Data Source:")
             row.prop(context.space_data, "annotation_source", expand=True)
 
-            if context.space_data.annotation_source == 'CLIP':
-                row = layout.row(align=True)
-                row.prop(tool_settings, "annotation_stroke_placement_view2d", text="Placement")
         if tool.idname == "builtin.annotate_line":
             layout.separator()
 
