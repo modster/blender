@@ -86,11 +86,13 @@ bool uv_find_nearest_vert_multi(struct Scene *scene,
 bool uv_find_nearest_edge(struct Scene *scene,
                           struct Object *obedit,
                           const float co[2],
+                          const float penalty,
                           struct UvNearestHit *hit);
 bool uv_find_nearest_edge_multi(struct Scene *scene,
                                 struct Object **objects,
                                 const uint objects_len,
                                 const float co[2],
+                                const float penalty,
                                 struct UvNearestHit *hit);
 
 bool uv_find_nearest_face_ex(struct Scene *scene,

@@ -627,7 +627,7 @@ static int uv_shortest_path_pick_invoke(bContext *C, wmOperator *op, const wmEve
 
   else if (uv_selectmode & UV_SELECT_EDGE) {
     UvNearestHit hit = UV_NEAREST_HIT_INIT_MAX(&region->v2d);
-    if (!uv_find_nearest_edge(scene, obedit, co, &hit)) {
+    if (!uv_find_nearest_edge(scene, obedit, co, 0.0f, &hit)) {
       return OPERATOR_CANCELLED;
     }
 
