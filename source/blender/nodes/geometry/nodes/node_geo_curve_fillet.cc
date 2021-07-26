@@ -444,11 +444,8 @@ static void update_poly_or_NURBS_positions(Array<FilletData> &fds,
   }
 }
 
-/*
- * Function to fillet either Bezier splines or Poly splines. Added under the same function because
- * the only difference is that Bezier curves have handle data.
- */
-static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletModeParam &mode_param)
+/* Function to fillet a spline. */
+static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode_param)
 {
   int fillet_count, start = 0, size = spline.size();
   bool cyclic = spline.is_cyclic();
@@ -508,24 +505,6 @@ static SplinePtr fillet_bez_or_poly_spline(const Spline &spline, const FilletMod
   }
 
   return dst_spline_ptr;
-}
-
-/* Function to fillet a spline. Appropriate function is called based on spline type. */
-static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode_param)
-{
-  switch (spline.type()) {
-    case Spline::Type::Bezier: {
-      return fillet_bez_or_poly_spline(spline, mode_param);
-    }
-    case Spline::Type::Poly: {
-      return fillet_bez_or_poly_spline(spline, mode_param);
-    }
-    case Spline::Type::NURBS: {
-      return fillet_bez_or_poly_spline(spline, mode_param);
-    }
-  }
-  SplinePtr new_spline = spline.copy();
-  return new_spline;
 }
 
 /* Function to fillet a curve */
