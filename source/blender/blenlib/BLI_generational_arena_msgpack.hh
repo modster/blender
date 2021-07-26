@@ -20,6 +20,7 @@
  * \ingroup bli
  *
  * msgpack implementation for `blender::generational_arena::Arena<T>`
+ * and `blender::generational_arena::Index`.
  */
 
 #include "BLI_generational_arena.hh"
@@ -30,6 +31,20 @@ namespace msgpack {
 MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
 {
   namespace adaptor {
+
+  template<> struct pack<blender::generational_arena::Index> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        const blender::generational_arena::Index &v) const
+    {
+      o.pack_array(2);
+
+      o.pack(std::get<0>(v.get_raw()));
+      o.pack(std::get<1>(v.get_raw()));
+
+      return o;
+    }
+  };
 
   template<typename T> struct pack<blender::generational_arena::Arena<T>> {
     template<typename Stream>
