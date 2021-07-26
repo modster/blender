@@ -40,6 +40,8 @@
 #include <functional>
 #include <limits>
 
+#include "msgpack.hpp"
+
 namespace blender::bke::internal {
 class ClothNodeData;
 
