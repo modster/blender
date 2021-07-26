@@ -866,7 +866,7 @@ static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index
 }
 
 /* Helper: Append all strokes from the asset in the target data block. */
-static void gpencil_asset_append_strokes(tGPDasset *tgpa)
+static bool gpencil_asset_append_strokes(tGPDasset *tgpa)
 {
   bGPdata *gpd_target = tgpa->gpd;
   bGPdata *gpd_asset = tgpa->gpd_asset;
@@ -887,6 +887,12 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
       tgpa->data_len += BLI_listbase_count(&gpf_asset->strokes);
     }
   }
+
+  /* If the asset is empty, exit. */
+  if (tgpa->data_len == 0) {
+    return false;
+  }
+
   /* Alloc array of strokes. */
   tgpa->data = MEM_calloc_arrayN(tgpa->data_len, sizeof(tGPDAssetStroke), __func__);
   int data_index = 0;
@@ -981,6 +987,8 @@ static void gpencil_asset_append_strokes(tGPDasset *tgpa)
   gpencil_2d_cage_calc(tgpa);
   BKE_gpencil_centroid_3d(tgpa->gpd_asset, tgpa->asset_center);
   add_v3_v3(tgpa->asset_center, vec);
+
+  return true;
 }
 
 /* Helper: Clean any temp added data when the operator is canceled. */
@@ -1201,7 +1209,12 @@ static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEven
   tgpa->drop[1] = event->mval[1];
 
   /* Do an initial load of the strokes in the target data block. */
-  gpencil_asset_append_strokes(tgpa);
+  if (!gpencil_asset_append_strokes(tgpa)) {
+    if (op->customdata) {
+      MEM_freeN(op->customdata);
+    }
+    return OPERATOR_CANCELLED;
+  }
 
   tgpa->draw_handle_3d = ED_region_draw_cb_activate(
       tgpa->region->type, gpencil_asset_draw, tgpa, REGION_DRAW_POST_PIXEL);
