@@ -228,6 +228,7 @@ set(SRC
   BLI_listbase.h
   BLI_listbase_wrapper.hh
   BLI_map.hh
+  BLI_map_msgpack.hh
   BLI_map_slots.hh
   BLI_math.h
   BLI_math_base.h
