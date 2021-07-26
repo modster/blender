@@ -49,10 +49,7 @@
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 
-#include "GPU_framebuffer.h"
 #include "GPU_immediate.h"
-#include "GPU_matrix.h"
-#include "GPU_state.h"
 
 #include "ED_asset.h"
 #include "ED_gpencil.h"
@@ -60,7 +57,6 @@
 #include "ED_space_api.h"
 
 #include "DEG_depsgraph.h"
-#include "DEG_depsgraph_build.h"
 
 #include "gpencil_intern.h"
 
