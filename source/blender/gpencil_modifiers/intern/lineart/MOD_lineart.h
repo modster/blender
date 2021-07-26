@@ -110,6 +110,7 @@ typedef struct LineartShadowSegmentContainer {
   struct LineartShadowSegmentContainer *next, *prev;
   /* Two end points in framebuffer coordinates viewed from the light source. */
   double fbc1[4], fbc2[4];
+  double g1[3], g2[3];
   struct LineartEdge *e_ref;
   ListBase shadow_segments;
 } LineartShadowSegmentContainer;
@@ -401,7 +402,7 @@ typedef struct LineartCache {
 
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
-#define DBL_SHADOW_LIM 1e-7
+#define DBL_SHADOW_LIM 1e-2
 
 #define LRT_MEMORY_POOL_1MB (1 << 20)
 

@@ -4485,12 +4485,13 @@ static void lineart_shadow_create_container_array(LineartRenderBuffer *rb)
       interp_v3_v3v3_db(ssc[i].fbc1, e->v1->fbcoord, e->v2->fbcoord, es->at);
       interp_v3_v3v3_db(ssc[i].fbc2, e->v1->fbcoord, e->v2->fbcoord, next_at);
 
-      /* We don't need global coordinates of shadow contour, but if we need them for some reason,
-       * the following lines transform them correctly */
-      /* double ga1 = e->v1->fbcoord[3] * es->at /
+      /* Global coord for light-shadow separation line (occlusion-corrected light contour). */
+      double ga1 = e->v1->fbcoord[3] * es->at /
                    (es->at * e->v1->fbcoord[3] + (1 - es->at) * e->v2->fbcoord[3]);
       double ga2 = e->v1->fbcoord[3] * next_at /
-                   (next_at * e->v1->fbcoord[3] + (1 - next_at) * e->v2->fbcoord[3]); */
+                   (next_at * e->v1->fbcoord[3] + (1 - next_at) * e->v2->fbcoord[3]);
+      interp_v3_v3v3_db(ssc[i].g1, e->v1->gloc, e->v2->gloc, ga1);
+      interp_v3_v3v3_db(ssc[i].g2, e->v1->gloc, e->v2->gloc, ga2);
 
       /* Assign an absurdly big W for initial distance so when triangles show up to catch the
        * shadow, their w must certainlly be smaller than this value so the shadow catches
@@ -4926,6 +4927,7 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
                                                LineartElementLinkNode **r_eeln)
 {
   int tot_edges = 0;
+  int tot_orig_edges = 0;
   LISTBASE_FOREACH (LineartShadowSegmentContainer *, ssc, &rb->shadow_containers) {
     LISTBASE_FOREACH (LineartShadowSegment *, ss, &ssc->shadow_segments) {
       if (!(ss->flag & LRT_SHADOW_CASTED)) {
@@ -4936,7 +4938,10 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
       }
       tot_edges++;
     }
+    tot_orig_edges++;
   }
+
+  int edge_alloc = tot_orig_edges + tot_edges;
 
   if (G.debug_value == 4000) {
     printf("Line art shadow segments total: %d\n", tot_edges);
@@ -4949,15 +4954,15 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
                                                      sizeof(LineartElementLinkNode));
   LineartElementLinkNode *eeln = lineart_mem_acquire(rb->shadow_data_pool,
                                                      sizeof(LineartElementLinkNode));
-  veln->pointer = lineart_mem_acquire(rb->shadow_data_pool, sizeof(LineartVert) * tot_edges * 2);
-  eeln->pointer = lineart_mem_acquire(rb->shadow_data_pool, sizeof(LineartEdge) * tot_edges);
+  veln->pointer = lineart_mem_acquire(rb->shadow_data_pool, sizeof(LineartVert) * edge_alloc * 2);
+  eeln->pointer = lineart_mem_acquire(rb->shadow_data_pool, sizeof(LineartEdge) * edge_alloc);
   LineartEdgeSegment *es = lineart_mem_acquire(rb->shadow_data_pool,
-                                               sizeof(LineartEdgeSegment) * tot_edges);
+                                               sizeof(LineartEdgeSegment) * edge_alloc);
   *r_veln = veln;
   *r_eeln = eeln;
 
-  veln->element_count = tot_edges * 2;
-  eeln->element_count = tot_edges;
+  veln->element_count = edge_alloc * 2;
+  eeln->element_count = edge_alloc;
 
   LineartVert *vlist = veln->pointer;
   LineartEdge *elist = eeln->pointer;
@@ -4982,6 +4987,16 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
                   ((ss->flag & LRT_SHADOW_FACING_LIGHT) ? LRT_EDGE_FLAG_SHADOW_FACING_LIGHT : 0));
       i++;
     }
+    /* Occlusion-corrected light contour. */
+    LineartEdge *e = &elist[i];
+    BLI_addtail(&e->segments, &es[i]);
+    LineartVert *v1 = &vlist[i * 2], *v2 = &vlist[i * 2 + 1];
+    copy_v3_v3_db(v1->gloc, ssc->g1);
+    copy_v3_v3_db(v2->gloc, ssc->g2);
+    e->v1 = v1;
+    e->v2 = v2;
+    e->flags = LRT_EDGE_FLAG_PROJECTED_SHADOW;
+    i++;
   }
   return true;
 }
