@@ -195,6 +195,7 @@ set(SRC
   BLI_float2_msgpack.hh
   BLI_float2x2.hh
   BLI_float3.hh
+  BLI_float3_msgpack.hh
   BLI_float4x4.hh
   BLI_fnmatch.h
   BLI_function_ref.hh
