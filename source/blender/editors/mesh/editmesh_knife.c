@@ -3832,6 +3832,24 @@ static void knifetool_finish_ex(KnifeTool_OpData *kcd)
   knifetool_free_bmbvh(kcd);
 }
 
+static void knifetool_finish_single_ex(KnifeTool_OpData *kcd, Object *ob)
+{
+  knife_switch_object(kcd, ob);
+
+  knife_make_cuts(kcd);
+
+  EDBM_selectmode_flush(kcd->em);
+  EDBM_update(kcd->ob->data,
+              &(const struct EDBMUpdate_Params){
+                  .calc_looptri = true,
+                  .calc_normals = true,
+                  .is_destructive = true,
+              });
+
+  /* Re-tessellating makes this invalid, don't use again by accident. */
+  knifetool_free_bmbvh(kcd);
+}
+
 static void knifetool_finish(wmOperator *op)
 {
   KnifeTool_OpData *kcd = op->customdata;
@@ -4410,102 +4428,106 @@ void EDBM_mesh_knife(bContext *C, LinkNode *polys, bool use_tag, bool cut_throug
 
   /* Finish. */
   {
-    knifetool_finish_ex(kcd);
+    Object *ob;
+    for (int b = 0; b < kcd->bases_len; b++) {
+      ob = kcd->bases[b]->object;
+      knifetool_finish_single_ex(kcd, ob);
 
-    /* Tag faces inside! */
-    if (use_tag) {
-      BMesh *bm = kcd->em->bm;
-      float projmat[4][4];
+      /* Tag faces inside! */
+      if (use_tag) {
+        BMesh *bm = kcd->em->bm;
+        float projmat[4][4];
 
-      BMEdge *e;
-      BMIter iter;
+        BMEdge *e;
+        BMIter iter;
 
-      bool keep_search;
+        bool keep_search;
 
-      /* Freed on knifetool_finish_ex, but we need again to check if points are visible. */
-      if (kcd->cut_through == false) {
-        knifetool_init_bmbvh(kcd);
-      }
+        /* Freed on knifetool_finish_ex, but we need again to check if points are visible. */
+        if (kcd->cut_through == false) {
+          knifetool_init_bmbvh(kcd);
+        }
 
-      ED_view3d_ob_project_mat_get(kcd->region->regiondata, kcd->ob, projmat);
+        ED_view3d_ob_project_mat_get(kcd->region->regiondata, kcd->ob, projmat);
 
-      /* Use face-loop tag to store if we have intersected. */
+        /* Use face-loop tag to store if we have intersected. */
 #define F_ISECT_IS_UNKNOWN(f) BM_elem_flag_test(BM_FACE_FIRST_LOOP(f), BM_ELEM_TAG)
 #define F_ISECT_SET_UNKNOWN(f) BM_elem_flag_enable(BM_FACE_FIRST_LOOP(f), BM_ELEM_TAG)
 #define F_ISECT_SET_OUTSIDE(f) BM_elem_flag_disable(BM_FACE_FIRST_LOOP(f), BM_ELEM_TAG)
-      {
-        BMFace *f;
-        BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
-          F_ISECT_SET_UNKNOWN(f);
-          BM_elem_flag_disable(f, BM_ELEM_TAG);
-        }
-      }
-
-      /* Tag all faces linked to cut edges. */
-      BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
-        /* Check are we tagged?, then we are an original face. */
-        if (BM_elem_flag_test(e, BM_ELEM_TAG) == false) {
+        {
           BMFace *f;
-          BMIter fiter;
-          BM_ITER_ELEM (f, &fiter, e, BM_FACES_OF_EDGE) {
-            float cent[3], cent_ss[2];
-            BM_face_calc_point_in_face(f, cent);
-            knife_project_v2(kcd, cent, cent_ss);
-            if (edbm_mesh_knife_point_isect(polys, cent_ss)) {
-              BM_elem_flag_enable(f, BM_ELEM_TAG);
-            }
+          BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+            F_ISECT_SET_UNKNOWN(f);
+            BM_elem_flag_disable(f, BM_ELEM_TAG);
           }
         }
-      }
 
-      /* Expand tags for faces which are not cut, but are inside the polys. */
-      do {
-        BMFace *f;
-        keep_search = false;
-        BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
-          if (BM_elem_flag_test(f, BM_ELEM_TAG) == false && (F_ISECT_IS_UNKNOWN(f))) {
-            /* Am I connected to a tagged face via an un-tagged edge
-             * (ie, not across a cut)? */
-            BMLoop *l_first = BM_FACE_FIRST_LOOP(f);
-            BMLoop *l_iter = l_first;
-            bool found = false;
-
-            do {
-              if (BM_elem_flag_test(l_iter->e, BM_ELEM_TAG) != false) {
-                /* Now check if the adjacent faces is tagged. */
-                BMLoop *l_radial_iter = l_iter->radial_next;
-                if (l_radial_iter != l_iter) {
-                  do {
-                    if (BM_elem_flag_test(l_radial_iter->f, BM_ELEM_TAG)) {
-                      found = true;
-                    }
-                  } while ((l_radial_iter = l_radial_iter->radial_next) != l_iter &&
-                           (found == false));
-                }
-              }
-            } while ((l_iter = l_iter->next) != l_first && (found == false));
-
-            if (found) {
+        /* Tag all faces linked to cut edges. */
+        BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+          /* Check are we tagged?, then we are an original face. */
+          if (BM_elem_flag_test(e, BM_ELEM_TAG) == false) {
+            BMFace *f;
+            BMIter fiter;
+            BM_ITER_ELEM (f, &fiter, e, BM_FACES_OF_EDGE) {
               float cent[3], cent_ss[2];
               BM_face_calc_point_in_face(f, cent);
               knife_project_v2(kcd, cent, cent_ss);
-              if ((kcd->cut_through || point_is_visible(kcd, cent, cent_ss, (BMElem *)f)) &&
-                  edbm_mesh_knife_point_isect(polys, cent_ss)) {
+              if (edbm_mesh_knife_point_isect(polys, cent_ss)) {
                 BM_elem_flag_enable(f, BM_ELEM_TAG);
-                keep_search = true;
-              }
-              else {
-                /* Don't lose time on this face again, set it as outside. */
-                F_ISECT_SET_OUTSIDE(f);
               }
             }
           }
         }
-      } while (keep_search);
+
+        /* Expand tags for faces which are not cut, but are inside the polys. */
+        do {
+          BMFace *f;
+          keep_search = false;
+          BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+            if (BM_elem_flag_test(f, BM_ELEM_TAG) == false && (F_ISECT_IS_UNKNOWN(f))) {
+              /* Am I connected to a tagged face via an un-tagged edge
+               * (ie, not across a cut)? */
+              BMLoop *l_first = BM_FACE_FIRST_LOOP(f);
+              BMLoop *l_iter = l_first;
+              bool found = false;
+
+              do {
+                if (BM_elem_flag_test(l_iter->e, BM_ELEM_TAG) != false) {
+                  /* Now check if the adjacent faces is tagged. */
+                  BMLoop *l_radial_iter = l_iter->radial_next;
+                  if (l_radial_iter != l_iter) {
+                    do {
+                      if (BM_elem_flag_test(l_radial_iter->f, BM_ELEM_TAG)) {
+                        found = true;
+                      }
+                    } while ((l_radial_iter = l_radial_iter->radial_next) != l_iter &&
+                             (found == false));
+                  }
+                }
+              } while ((l_iter = l_iter->next) != l_first && (found == false));
+
+              if (found) {
+                float cent[3], cent_ss[2];
+                BM_face_calc_point_in_face(f, cent);
+                knife_project_v2(kcd, cent, cent_ss);
+                if ((kcd->cut_through || point_is_visible(kcd, cent, cent_ss, (BMElem *)f)) &&
+                    edbm_mesh_knife_point_isect(polys, cent_ss)) {
+                  BM_elem_flag_enable(f, BM_ELEM_TAG);
+                  keep_search = true;
+                }
+                else {
+                  /* Don't lose time on this face again, set it as outside. */
+                  F_ISECT_SET_OUTSIDE(f);
+                }
+              }
+            }
+          }
+        } while (keep_search);
 
 #undef F_ISECT_IS_UNKNOWN
 #undef F_ISECT_SET_UNKNOWN
 #undef F_ISECT_SET_OUTSIDE
+      }
     }
 
     knifetool_exit_ex(C, kcd);
