@@ -781,7 +781,6 @@ static int ptcache_rigidbody_write(int index, void *rb_v, void **data, int UNUSE
 #ifdef WITH_BULLET
       RB_body_get_position(rbo->shared->physics_object, rbo->pos);
       RB_body_get_orientation(rbo->shared->physics_object, rbo->orn);
-      RB_body_get_linear_velocity(rbo->shared->physics_object, rbo->vel);
 #endif
       PTCACHE_DATA_FROM(data, BPHYS_DATA_LOCATION, rbo->pos);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_ROTATION, rbo->orn);

@@ -211,7 +211,6 @@ typedef struct OVERLAY_ExtraCallBuffers {
 
   DRWCallBuffer *speaker;
 
-  DRWShadingGroup *collision_shape;
   DRWShadingGroup *extra_wire;
   DRWShadingGroup *extra_loose_points;
 } OVERLAY_ExtraCallBuffers;

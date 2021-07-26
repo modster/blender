@@ -319,12 +319,13 @@ class PHYSICS_PT_rigid_body_display_options(PHYSICS_PT_rigidbody_panel, Panel):
             rigid_body_warning(layout, "Object does not have a Rigid Body")
             return
 
-        col = layout.column()
-        col.prop(rbo, "display_data_text")
-        col.prop(rbo, "display_acceleration")
-        col.prop(rbo, "display_velocity")
-        col.prop(rbo, "display_collisions")
-        col.prop(rbo, "display_state")
+        if rbo.type == ACTIVE
+          col = layout.column()
+          col.prop(rbo, "display_data_text")
+          col.prop(rbo, "display_acceleration")
+          col.prop(rbo, "display_velocity")
+          col.prop(rbo, "display_collisions")
+          col.prop(rbo, "display_state")
 
 class PHYSICS_PT_rigid_body_display_force_types(PHYSICS_PT_rigidbody_panel, Panel):
     bl_label = "Forces"
@@ -351,7 +352,6 @@ class PHYSICS_PT_rigid_body_display_force_types(PHYSICS_PT_rigidbody_panel, Pane
 
         ob = context.object
         rbo = ob.rigid_body
-
         col = layout.column()
         col.active = rbo.display_forces
         col.prop(rbo, "show_gravity")

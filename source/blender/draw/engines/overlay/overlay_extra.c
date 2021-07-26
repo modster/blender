@@ -240,12 +240,6 @@ void OVERLAY_extra_cache_init(OVERLAY_Data *vedata)
       DRW_shgroup_uniform_vec4_copy(grp_sub, "color", G_draw.block.colorLibrary);
       cb->center_deselected_lib = BUF_POINT(grp_sub, format);
     }
-    {
-        sh = OVERLAY_shader_uniform_color();
-        cb->collision_shape = grp = DRW_shgroup_create(sh, extra_ps);
-        DRW_shgroup_uniform_vec4_copy(grp, "color", G_draw.block.colorLibrary);
-
-    }
   }
 }
 
@@ -427,6 +421,7 @@ static void OVERLAY_bounds(OVERLAY_ExtraCallBuffers *cb,
               mat4_to_size(parent_size, ob->parent->obmat);
               float transformed_obmat[4][4];
               copy_m4_m4(transformed_obmat, ob->parent->obmat);
+              /* Remove arent scale factor and add object's scale. */
               for(int i=0; i<3; i++){
                   for(int j=0; j<3; j++){
                       transformed_obmat[i][j] = transformed_obmat[i][j] * (ob_size[j]/parent_size[j]);
@@ -1777,12 +1772,15 @@ static void OVERLAY_velocity_extra(OVERLAY_Data *data, RigidBodyOb *rbo)
 
   int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
 
-  rbRigidBody *rb = (rbRigidBody *)rbo->shared->physics_object;
+ // rbRigidBody *rb = (rbRigidBody *)rbo->shared->physics_object;
   float vel[3] = {0.0f};
-  if (rb != NULL && is_zero_v3(rbo->vel))
-    RB_body_get_linear_velocity(rbo->shared->physics_object, vel);
-  else
+ // if (rb != NULL && is_zero_v3(rbo->vel)) {
+   // RB_body_get_linear_velocity(rbo->shared->physics_object, rbo->vel);
+  //}
+  //else {
     copy_v3_v3(vel, rbo->vel);
+    printf("vel: %f %f %f\n", vel[0], vel[1], vel[2]);
+  //}
   OVERLAY_vector_extra(data, vel, rbo->pos, scale, min_clamp, color, text_flag);
 }
 
@@ -2015,7 +2013,7 @@ static void OVERLAY_indicate_collision(OVERLAY_Data *data, Object *ob)
   copy_v3_v3(dir, ob->rigidbody_object->norm_forces[0].vector);
   normalize_v3(dir);
   if (!is_zero_v3(ob->rigidbody_object->norm_forces[0].vector)) {
-    float color[4] = {0.5, 0.7, 0.1, 1.0};
+    float color[4] = {0.5f, 0.7f, 0.1f, 1.0f};
     switch (ob->rigidbody_object->shape) {
       case RB_SHAPE_BOX:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_BOX, true, mat);
@@ -2044,6 +2042,291 @@ static void OVERLAY_indicate_collision(OVERLAY_Data *data, Object *ob)
         break;
     }
   }
+}
+
+static void OVERLAY_linear_limits_single_object_rod(RigidBodyCon *rbc,
+                                             Object *rb_ob,
+                                             Object *constraint_ob,
+                                             int axis,
+                                             OVERLAY_ExtraCallBuffers *cb) {
+    float translation_range;
+    float x_dir_color[4] = {1.0f, 0.0f, 0.0f, 1.0f};
+    float line_start[3] = {0};
+    float line_end[3] = {0};
+
+    switch(axis){
+       case 0:
+        translation_range = (rbc->limit_lin_x_upper - rbc->limit_lin_x_lower);
+        line_start[axis] += rbc->limit_lin_x_lower;
+        line_end[axis] += rbc->limit_lin_x_upper;
+        break;
+       case 1:
+        translation_range = (rbc->limit_lin_y_upper - rbc->limit_lin_y_lower);
+        line_start[axis] += rbc->limit_lin_y_lower;
+        line_end[axis] += rbc->limit_lin_y_upper;
+        break;
+       case 2:
+        translation_range = (rbc->limit_lin_z_upper - rbc->limit_lin_z_lower);
+        line_start[axis] += rbc->limit_lin_z_lower;
+        line_end[axis] += rbc->limit_lin_z_upper;
+        break;
+    }
+    if(fabsf(translation_range)>0.0f){
+        float mat[3][3];
+        mat4_to_rot(mat, constraint_ob->obmat);
+        mul_m3_v3(mat,  line_start);
+        mul_m3_v3(mat, line_end);
+        add_v3_v3(line_start, rb_ob->loc);
+        add_v3_v3(line_end, rb_ob->loc);
+        OVERLAY_extra_line_dashed(cb, line_start, line_end, x_dir_color);
+    }
+}
+
+/* Draw walls for ob1 if it lies close to the walls. */
+static void OVERLAY_linear_limits_walls(RigidBodyCon *rbc,
+                                             Object *ob1,
+                                             Object *ob2,
+                                             Object *constraint_ob,
+                                             int axis,
+                                             OVERLAY_Data *data) {
+    float translation_range;
+    float color[4];
+    copy_v4_v4(color, G_draw.block.colorLibrary);
+    float limit_start[3] = {0.0f};
+    float limit_end[3] = {0.0f};
+    float initial_offset[3];
+    float current_offset[3];
+    float distance_from_first_wall[3];
+    float distance_from_second_wall[3];
+    float *wall_pos;
+
+    sub_v3_v3v3(initial_offset, ob1->loc, ob2->loc);
+    sub_v3_v3v3(current_offset, ob1->rigidbody_object->pos, ob2->rigidbody_object->pos);
+
+    printf("woop");
+
+    /* rotate wall to correct initial orientation */
+    float rot1[3][3] = {{0}};
+    /* Constraint object rotation. */
+    float rot2[3][3] = {{0}};
+    /* Constrained object(ob2) rotation. */
+    float rot3[3][3] = {{0}};
+    /* Constrained object(ob2) initial rotation inverse. */
+    float rot4[3][3] = {{0}};
+
+    /* Get rotation from object matrices. */
+    float size[3];
+    float loc[3];
+
+    BKE_object_rot_to_mat3(constraint_ob, rot2, false);
+    mat4_to_rot(rot3, ob2->obmat);
+    /* Rigid body transforms are not stored in ob->rot.
+     * So this is the rotation at the start of the simulation. */
+    BKE_object_rot_to_mat3(ob2, rot4, false);
+    invert_m3(rot4);
+    /* Remove initial rotation of ob2. */
+    mul_m3_m3m3(rot3, rot4, rot3);
+
+    float ax[3] = {0.0f};
+
+    switch(axis){
+       case 0:
+        translation_range = (rbc->limit_lin_x_upper - rbc->limit_lin_x_lower);
+        limit_start[0] += rbc->limit_lin_x_lower;
+        limit_end[0] += rbc->limit_lin_x_upper;
+        ax[1] = 1.0f;
+        axis_angle_to_mat3(rot1, ax, M_PI_2);
+        break;
+       case 1:
+        translation_range = (rbc->limit_lin_y_upper - rbc->limit_lin_y_lower);
+        limit_start[1] += rbc->limit_lin_y_lower;
+        limit_end[1] += rbc->limit_lin_y_upper;
+        ax[0] = 1.0f;
+        axis_angle_to_mat3(rot1, ax, M_PI_2);
+        break;
+       case 2:
+        translation_range = (rbc->limit_lin_z_upper - rbc->limit_lin_z_lower);
+        limit_start[2] += rbc->limit_lin_z_lower;
+        limit_end[2] += rbc->limit_lin_z_upper;
+        /* Artbitrary axis so that the matrix(rot1) doesn't remain empty. */
+        ax[0] = 1.0f;
+        axis_angle_to_mat3(rot1, ax, 0.0f);
+        break;
+    }
+
+    /* Scale the walls based on the size of ob1. */
+    mat4_to_size(size, ob1->obmat);
+    mul_v3_fl(size, 1.5f);
+    mul_v3_fl(rot1[0], size[0]);
+    mul_v3_fl(rot1[1], size[1]);
+    mul_v3_fl(rot1[2], size[2]);
+
+    mul_m3_v3(rot2, limit_start);
+    mul_m3_v3(rot2, limit_end);
+
+    add_v3_v3(limit_start, initial_offset);
+    add_v3_v3(limit_end, initial_offset);
+    mul_m3_v3(rot3, limit_start);
+    mul_m3_v3(rot3, limit_end);
+//    mul_m3_v3(rot4, limit_start);
+//    mul_m3_v3(rot4, limit_end);
+
+    add_v3_v3(limit_start, ob2->rigidbody_object->pos);
+    add_v3_v3(limit_end, ob2->rigidbody_object->pos);
+
+    sub_v3_v3v3(distance_from_first_wall, ob1->rigidbody_object->pos, limit_start);
+    sub_v3_v3v3(distance_from_second_wall, ob1->rigidbody_object->pos, limit_end);
+
+    float d1 = fabsf(len_v3(distance_from_first_wall));
+    float d2 = fabsf(len_v3(distance_from_second_wall));
+
+    float draw_range = translation_range < 6.0f ? (translation_range/2.0f)*0.5f : 3.0f;
+
+    bool draw_wall = (d1 <= draw_range) || (d2 <= draw_range);
+
+     if(fabsf(translation_range)>0.0f && draw_wall) {
+         wall_pos = (d1 <= draw_range) ? limit_start : limit_end;
+         float distance = (d1 <= draw_range) ? d1 : d2;
+         mul_v4_fl(color, (draw_range - distance)/draw_range);
+
+         GPUBatch *geom = DRW_cache_quad_get();
+         float final_mat[4][4] = {{0.0f}};
+         copy_m4_m3(final_mat, rot1);
+         mul_m4_m3m4(final_mat, rot2, final_mat);
+         mul_m4_m3m4(final_mat, rot3, final_mat);
+         // mul_m4_m3m4(final_mat, rot4, final_mat);
+         copy_v3_v3(final_mat[3], wall_pos);
+         final_mat[3][3] = 1.0f;
+
+         GPUShader *sh = OVERLAY_shader_uniform_color();
+         DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[0]);
+         DRW_shgroup_uniform_vec4_copy(grp, "color", color);
+         DRW_shgroup_call_obmat(grp, geom, final_mat);
+     }
+}
+
+static void OVERLAY_linear_limits_rod(RigidBodyCon *rbc,
+                                             Object *ob1,
+                                             Object *ob2,
+                                             Object *constraint_ob,
+                                             int axis,
+                                             OVERLAY_ExtraCallBuffers *cb) {
+
+    float color[4];
+    copy_v4_v4(color, G_draw.block.colorLibrary);
+
+    float distance_vec[3];
+    float initial_distance_vec[3];
+    float line_start[3] = {0.0f};
+    float line_end[3] = {0.0f};
+    sub_v3_v3v3(initial_distance_vec, ob1->loc, ob2->loc);
+    sub_v3_v3v3(distance_vec, ob1->rigidbody_object->pos, ob2->rigidbody_object->pos);
+    float constrained_axis[3] = {0.0f};
+    constrained_axis[axis] = 1.0f;
+    /* Constraint ob rotation. */
+    float rot1[3][3] = {{0.0f}};
+    /* Ob1 rotation. */
+    float rot2[3][3] = {{0.0f}};
+    /* Ob1 initial rotation inverse. */
+    float rot3[3][3] = {{0.0f}};
+    BKE_object_rot_to_mat3(constraint_ob, rot1, false);
+    mat4_to_rot(rot2, ob1->obmat);
+    BKE_object_rot_to_mat3(ob1, rot3, false);
+    invert_m3(rot3);
+    mul_m3_m3m3(rot2, rot3, rot2);
+    mul_m3_v3(rot1, constrained_axis);
+    mul_m3_v3(rot2, constrained_axis);
+
+    mul_m3_v3(rot2, initial_distance_vec);
+    sub_v3_v3(distance_vec, initial_distance_vec);
+
+    float cross_product[3];
+    cross_v3_v3v3(cross_product, distance_vec, constrained_axis);
+
+    bool draw_rod = fabsf(len_v3(cross_product)) < 0.01f;
+    printf("gah:%f ax: %f %f %f\n", fabsf(len_v3(cross_product)), constrained_axis[0], constrained_axis[1], constrained_axis[2]);
+    printf("dist: %f %f %f\n", distance_vec[0], distance_vec[1], distance_vec[2]);
+
+
+
+    if(draw_rod) {
+
+
+        line_start[0] += rbc->limit_lin_x_upper;
+        line_end[0] -= rbc->limit_lin_x_upper;
+        mul_m3_v3(rot1, line_start);
+        mul_m3_v3(rot1, line_end);
+        mul_m3_v3(rot2, line_start);
+        mul_m3_v3(rot2, line_end);
+        sub_v3_v3(line_start, initial_distance_vec);
+        add_v3_v3(line_end, initial_distance_vec);
+        add_v3_v3(line_start, ob1->rigidbody_object->pos);
+        add_v3_v3(line_end, ob2->rigidbody_object->pos);
+
+        OVERLAY_extra_line_dashed(cb, line_start, line_end, color);
+
+    }
+
+}
+
+static void OVERLAY_rb_constraint_linear_limits(OVERLAY_ExtraCallBuffers *cb, OVERLAY_Data *data, Object *ob){
+    RigidBodyCon *rbc = ob->rigidbody_constraint;
+    Object *rb_ob;
+    Object *ob1 = rbc->ob1;
+    Object *ob2 = rbc->ob2;
+
+    if(rbc->ob1==NULL || rbc->ob2==NULL) {
+        return;
+    }
+
+    bool is_rod_type_constraint = (ob1->rigidbody_object->type == RBO_TYPE_ACTIVE &&
+                                  (ob2->rigidbody_object->type == RBO_TYPE_PASSIVE && ob2->rigidbody_object->flag != RBO_FLAG_KINEMATIC)) ||
+                                  (ob2->rigidbody_object->type == RBO_TYPE_ACTIVE &&
+                                  (ob1->rigidbody_object->type == RBO_TYPE_PASSIVE && ob1->rigidbody_object->flag != RBO_FLAG_KINEMATIC));
+
+    //float x_dir_color[4] = {1.0f, 0.0f, 0.0f, 1.0f};
+    //float y_dir_color[4] = {0.0f, 1.0f, 0.0f, 1.0f};
+    //float z_dir_color[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+
+    if(is_rod_type_constraint) {
+      rb_ob = rbc->ob1->rigidbody_object->type == RBO_TYPE_ACTIVE ? rbc->ob1 : rbc->ob2;
+
+      switch(rbc->type) {
+        case RBC_TYPE_SLIDER:
+          OVERLAY_linear_limits_single_object_rod(rbc, rb_ob, ob, 0, cb);
+          break;
+        case RBC_TYPE_6DOF:
+          break;
+        case RBC_TYPE_6DOF_SPRING:
+          break;
+      }
+    }
+    else {
+        if(ob1->rigidbody_object->type == RBO_TYPE_ACTIVE) {
+            switch(rbc->type) {
+              case RBC_TYPE_SLIDER:
+                OVERLAY_linear_limits_walls(rbc, ob1, ob2, ob, 0, data);
+                OVERLAY_linear_limits_rod(rbc, ob1, ob2, ob, 0, cb);
+                break;
+              case RBC_TYPE_6DOF:
+                break;
+              case RBC_TYPE_6DOF_SPRING:
+                break;
+            }
+        }
+        if(ob2->rigidbody_object->type == RBO_TYPE_ACTIVE) {
+            switch(rbc->type) {
+              case RBC_TYPE_SLIDER:
+                OVERLAY_linear_limits_walls(rbc, ob2, ob1, ob, 0, data);
+                break;
+              case RBC_TYPE_6DOF:
+                break;
+              case RBC_TYPE_6DOF_SPRING:
+                break;
+            }
+
+        }
+    }
 }
 
 void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
@@ -2128,6 +2411,11 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
         OVERLAY_velocity_extra(vedata, ob->rigidbody_object);
 #endif
     }
+
+    if(ob->rigidbody_constraint != NULL) {
+        OVERLAY_rb_constraint_linear_limits(cb, vedata, ob);
+    }
+
     if (ob->dtx & OB_AXIS) {
       DRW_buffer_add_entry(cb->empty_axes, color, ob->obmat);
     }
