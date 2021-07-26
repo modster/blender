@@ -198,6 +198,7 @@ set(SRC
   BLI_fnmatch.h
   BLI_function_ref.hh
   BLI_generational_arena.hh
+  BLI_generational_arena_msgpack.hh
   BLI_ghash.h
   BLI_gsqueue.h
   BLI_hash.h
