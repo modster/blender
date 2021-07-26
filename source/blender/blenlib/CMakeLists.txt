@@ -27,6 +27,7 @@ set(INC
   ../../../intern/guardedalloc
   ../../../intern/numaapi/include
   ../../../extern/wcwidth
+  ../../../extern/msgpack/include
 )
 
 set(INC_SYS
@@ -298,6 +299,7 @@ set(SRC
   BLI_uvproject.h
   BLI_vector.hh
   BLI_vector_adaptor.hh
+  BLI_vector_msgpack.hh
   BLI_vector_set.hh
   BLI_vector_set_slots.hh
   BLI_vfontdata.h
