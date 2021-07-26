@@ -402,7 +402,7 @@ typedef struct LineartCache {
 
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
-#define DBL_SHADOW_LIM 1e-2
+#define DBL_SHADOW_LIM 1e-6
 
 #define LRT_MEMORY_POOL_1MB (1 << 20)
 
@@ -549,7 +549,7 @@ typedef struct LineartBoundingArea {
 BLI_INLINE int lineart_LineIntersectTest2d(
     const double *a1, const double *a2, const double *b1, const double *b2, double *aRatio)
 {
-#define USE_VECTOR_LINE_INTERSECTION
+//#define USE_VECTOR_LINE_INTERSECTION
 #ifdef USE_VECTOR_LINE_INTERSECTION
 
   /* from isect_line_line_v2_point() */

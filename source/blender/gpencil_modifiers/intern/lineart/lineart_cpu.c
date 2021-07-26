@@ -2489,7 +2489,7 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
   dot_r = dot_v3v3_db(Rv, tri->gn);
   dot_f = dot_v3v3_db(Cv, tri->gn);
 
-  if (e->flags & LRT_EDGE_FLAG_PROJECTED_SHADOW && LRT_SHADOW_CLOSE_ENOUGH(dot_l, 0) &&
+  if ((e->flags & LRT_EDGE_FLAG_PROJECTED_SHADOW) && LRT_SHADOW_CLOSE_ENOUGH(dot_l, 0) &&
       LRT_SHADOW_CLOSE_ENOUGH(dot_r, 0)) {
     /* Currently unable to precisely determine if the edge is really from this triangle. */
     /*if ((dot_f > 0 && (e->flags & LRT_EDGE_FLAG_SHADOW_FACING_LIGHT)) ||
@@ -2615,8 +2615,8 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
       }
     }
     else if (st_r == 0) {
-      INTERSECT_JUST_GREATER(is, order, 0, LCross);
-      if (LRT_ABC(LCross) && is[LCross] > 0) {
+      INTERSECT_JUST_GREATER(is, order, DBL_TRIANGLE_LIM, LCross);
+      if (LRT_ABC(LCross) && is[LCross] > DBL_TRIANGLE_LIM) {
         INTERSECT_JUST_GREATER(is, order, is[LCross], RCross);
       }
       else {
@@ -4991,8 +4991,10 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
     LineartEdge *e = &elist[i];
     BLI_addtail(&e->segments, &es[i]);
     LineartVert *v1 = &vlist[i * 2], *v2 = &vlist[i * 2 + 1];
+    // if (ssc->e_ref->t1 && ssc->e_ref->t2) {
     copy_v3_v3_db(v1->gloc, ssc->g1);
     copy_v3_v3_db(v2->gloc, ssc->g2);
+    //}
     e->v1 = v1;
     e->v2 = v2;
     e->flags = LRT_EDGE_FLAG_PROJECTED_SHADOW;
