@@ -759,7 +759,7 @@ foreach(geo_node_test ${geo_node_tests})
       )
       endforeach()
   else()
-    MESSAGE(STATUS "No directory called ${TEST_SRC_DIR}/modeling/geometry_nodes/${geo_node_test}/ found!")
+    MESSAGE(STATUS "No directory named ${TEST_SRC_DIR}/modeling/geometry_nodes/${geo_node_test}/ found, disabling test.")
   endif()
 endforeach()
 
