@@ -74,11 +74,19 @@ Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct
 #  include <string>
 #  include <tuple>
 
+#  include "msgpack.hpp"
+#  include "msgpack/adaptor/define_decl.hpp"
+
 #  include "BLI_float2.hh"
+#  include "BLI_float2_msgpack.hh"
 #  include "BLI_float3.hh"
+#  include "BLI_float3_msgpack.hh"
 #  include "BLI_generational_arena.hh"
+#  include "BLI_generational_arena_msgpack.hh"
 #  include "BLI_map.hh"
+#  include "BLI_map_msgpack.hh"
 #  include "BLI_vector.hh"
+#  include "BLI_vector_msgpack.hh"
 
 /* Public C++ code */
 namespace blender::bke {
@@ -149,6 +157,8 @@ class EmptyExtraData {
   {
     return other;
   }
+
+  MSGPACK_DEFINE_ARRAY();
 };
 
 namespace ga = blender::generational_arena;
@@ -300,6 +310,8 @@ template<typename T> class Node {
     return stream;
   }
 
+  MSGPACK_DEFINE(self_index, verts, pos, normal, extra_data);
+
   template<typename, typename, typename, typename> friend class Mesh;
 };
 
@@ -386,6 +398,8 @@ template<typename T> class Vert {
            << ", node: " << vert.node << ", uv: " << vert.uv << ")";
     return stream;
   }
+
+  MSGPACK_DEFINE(self_index, edges, node, uv, extra_data);
 
   template<typename, typename, typename, typename> friend class Mesh;
 };
@@ -487,6 +501,8 @@ template<typename T> class Edge {
            << ", verts: " << edge.verts << ")";
     return stream;
   }
+
+  MSGPACK_DEFINE(self_index, faces, verts, extra_data);
 
   template<typename, typename, typename, typename> friend class Mesh;
 };
@@ -599,6 +615,8 @@ template<typename T> class Face {
            << ", normal: " << face.normal << ")";
     return stream;
   }
+
+  MSGPACK_DEFINE(self_index, verts, normal, extra_data);
 
   template<typename, typename, typename, typename> friend class Mesh;
 };
