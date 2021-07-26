@@ -40,8 +40,6 @@
 #include <functional>
 #include <limits>
 
-#include "msgpack.hpp"
-
 namespace blender::bke::internal {
 class ClothNodeData;
 
@@ -559,6 +557,150 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 };
 
 }  // namespace blender::bke::internal
+
+namespace msgpack {
+MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
+{
+  namespace adaptor {
+
+  template<> struct pack<float[3]> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o, const float (&v)[3]) const
+    {
+      o.pack_array(3);
+
+      o.pack(v[0]);
+      o.pack(v[1]);
+      o.pack(v[2]);
+
+      return o;
+    }
+  };
+
+  template<> struct pack<ClothVertex> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o, const ClothVertex &v) const
+    {
+      /* This check is to ensure that any new element added to
+       * ClothVertex is also updated here. After adding the
+       * interpolated value for the element (if needed), set the
+       * correct sizeof(ClothVertex) in the assertion below. */
+      BLI_assert(sizeof(ClothVertex) == 168);
+
+      o.pack_array(22);
+
+      o.pack(v.flags);
+      o.pack(v.v);
+      o.pack(v.xconst);
+      o.pack(v.x);
+      o.pack(v.xold);
+      o.pack(v.tx);
+      o.pack(v.txold);
+      o.pack(v.tv);
+      o.pack(v.mass);
+      o.pack(v.goal);
+      o.pack(v.impulse);
+      o.pack(v.xrest);
+      o.pack(v.dcvel);
+      o.pack(v.impulse_count);
+      o.pack(v.avg_spring_len);
+      o.pack(v.struct_stiff);
+      o.pack(v.bend_stiff);
+      o.pack(v.shear_stiff);
+      o.pack(v.spring_count);
+      o.pack(v.shrink_factor);
+      o.pack(v.internal_stiff);
+      o.pack(v.pressure_factor);
+
+      return o;
+    }
+  };
+
+  template<typename T> struct pack<blender::bke::internal::NodeData<T>> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        const blender::bke::internal::NodeData<T> &v) const
+    {
+      o.pack_array(1);
+
+      o.pack(v.get_extra_data());
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::bke::internal::ClothNodeData> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        const blender::bke::internal::ClothNodeData &v) const
+    {
+      o.pack_array(1);
+
+      o.pack(v.get_cloth_node_data());
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::bke::internal::VertData> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        const blender::bke::internal::VertData &v) const
+    {
+      o.pack_array(2);
+
+      o.pack(v.get_sizing());
+      o.pack(v.get_flag());
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::bke::internal::EdgeData> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        const blender::bke::internal::EdgeData &v) const
+    {
+      o.pack_array(1);
+
+      o.pack(v.get_size());
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::float2x2> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        const blender::float2x2 &v) const
+    {
+      o.pack_array(4);
+
+      o.pack(v.ptr()[0][0]);
+      o.pack(v.ptr()[0][1]);
+      o.pack(v.ptr()[1][0]);
+      o.pack(v.ptr()[1][1]);
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::bke::internal::Sizing> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        const blender::bke::internal::Sizing &v) const
+    {
+      o.pack_array(1);
+
+      o.pack(v.get_m());
+
+      return o;
+    }
+  };
+
+  }  // namespace adaptor
+}  // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
+}  // namespace msgpack
 
 namespace blender::bke {
 
