@@ -2725,12 +2725,21 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
         _defs_image_uv_transform.transform,
     )
 
-    _tools_select = (
+    _tools_select_uv = (
         (
             _defs_image_uv_select.select,
             _defs_image_uv_select.box,
             _defs_image_uv_select.circle,
             _defs_image_uv_select.lasso,
+        ),
+    )
+
+    _tools_select_mask = (
+        (
+            _defs_mask_select.select,
+            _defs_mask_select.box,
+            _defs_mask_select.lasso,
+            _defs_mask_select.circle,
         ),
     )
 
@@ -2752,7 +2761,7 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
             *_tools_annotate,
         ],
         'UV': [
-            *_tools_select,
+            *_tools_select_uv,
             _defs_image_generic.cursor,
             None,
             *_tools_transform,
@@ -2768,7 +2777,13 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
             ),
         ],
         'MASK': [
-            None,
+            # _defs_mask_tools.add_vertex_slide,
+            # _defs_mask_tools.add_feather_vertex_slide,
+            # _defs_mask_tools.delete_vertex,
+            # None,
+            # *_tools_select_mask,
+            # None,
+            *_tools_annotate,
         ],
         'PAINT': [
             _defs_texture_paint.generate_from_brushes,
