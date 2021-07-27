@@ -334,13 +334,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayoutSetRedAlert(row, !material_valid);
-  uiItemPointerR(row,
-                 ptr,
-                 "target_material",
-                 &obj_data_ptr,
-                 "materials",
-                 NULL,
-                 material_valid ? ICON_SHADING_TEXTURE : ICON_ERROR);
+  uiItemPointerR(
+      row, ptr, "target_material", &obj_data_ptr, "materials", NULL, ICON_SHADING_TEXTURE);
 
   gpencil_modifier_panel_end(layout, ptr);
 }
@@ -484,9 +479,7 @@ static bool anything_showing_through(PointerRNA *ptr)
   if (use_multiple_levels) {
     return (MAX2(level_start, level_end) > 0);
   }
-  else {
-    return (level_start > 0);
-  }
+  return (level_start > 0);
 }
 
 static void material_mask_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
@@ -693,7 +686,7 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
 }
 
-static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void bake_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA ob_ptr;
@@ -777,7 +770,7 @@ static void panelRegister(ARegionType *region_type)
   gpencil_modifier_subpanel_register(
       region_type, "composition", "Composition", NULL, composition_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
-      region_type, "baking", "Baking", NULL, baking_panel_draw, panel_type);
+      region_type, "bake", "Bake", NULL, bake_panel_draw, panel_type);
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {
