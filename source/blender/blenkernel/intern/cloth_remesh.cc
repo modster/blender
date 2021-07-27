@@ -714,6 +714,16 @@ Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
 
   internal::AdaptiveMesh<END> adaptive_mesh;
   adaptive_mesh.read(meshio_input);
+  {
+    const auto serialized = adaptive_mesh.serialize();
+    const auto *filepath = "/tmp/test.msgpack";
+    std::fstream fout;
+    fout.open(filepath, std::ios::out);
+    if (fout.is_open()) {
+      fout << serialized;
+      fout.close();
+    }
+  }
 
   /* Load up the `NodeData`'s extra_data */
   {

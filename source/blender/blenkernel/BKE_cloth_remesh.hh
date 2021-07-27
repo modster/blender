@@ -2163,6 +2163,14 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
                     std::move(deleted_faces));
   }
 
+  std::string serialize() const
+  {
+    std::stringstream ss;
+    msgpack::pack(ss, *this);
+
+    return ss.str();
+  }
+
  protected:
   /* all protected static methods */
   static constexpr inline float3 float3_unknown()
