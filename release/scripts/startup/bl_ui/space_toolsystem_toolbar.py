@@ -196,12 +196,9 @@ class _defs_annotate:
 
             row = layout.row(align=True)
             row.prop(tool_settings, "annotation_stroke_placement_view2d", text="Placement")
-        
-        if space_type == 'CLIP_EDITOR':
-            layout.separator()
-            row = layout.row(align=True)
-            row.label(text="Data Source:")
-            row.prop(context.space_data, "annotation_source", expand=True)
+            if (space_type == 'CLIP_EDITOR') and (tool_settings.annotation_stroke_placement_view2d == 'IMAGE'):
+                row = layout.row(align=True)
+                row.prop(context.space_data, "annotation_source", text="Data Source", expand=True)
 
         if tool.idname == "builtin.annotate_line":
             layout.separator()
