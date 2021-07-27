@@ -194,19 +194,63 @@ class MemoryBuffer {
     memcpy(out, get_elem(x, y), m_num_channels * sizeof(float));
   }
 
+  void read_elem_checked(int x, int y, float *out) const
+  {
+    if (x < m_rect.xmin || x >= m_rect.xmax || y < m_rect.ymin || y >= m_rect.ymax) {
+      clear_elem(out);
+    }
+    else {
+      read_elem(x, y, out);
+    }
+  }
+
+  void read_elem_checked(float x, float y, float *out) const
+  {
+    if (x < m_rect.xmin || x >= m_rect.xmax || y < m_rect.ymin || y >= m_rect.ymax) {
+      clear_elem(out);
+    }
+    else {
+      read_elem(floor(x), floor(y), out);
+    }
+  }
+
+  void read_elem_bilinear(float x, float y, float *out) const
+  {
+    if (x <= m_rect.xmin - 1.0f || x >= m_rect.xmax || y <= m_rect.ymin - 1.0f ||
+        y >= m_rect.ymax) {
+      clear_elem(out);
+      return;
+    }
+
+    if (m_is_a_single_elem) {
+      read_elem_checked(x, y, out);
+    }
+    else {
+      BLI_bilinear_interpolation_fl(m_buffer,
+                                    out,
+                                    getWidth(),
+                                    getHeight(),
+                                    m_num_channels,
+                                    get_relative_x(x),
+                                    get_relative_y(y));
+    }
+  }
+
   void read_elem_sampled(float x, float y, PixelSampler sampler, float *out) const
   {
     switch (sampler) {
       case PixelSampler::Nearest:
-        this->read_elem(x, y, out);
+        read_elem_checked(x, y, out);
         break;
       case PixelSampler::Bilinear:
       case PixelSampler::Bicubic:
         /* No bicubic. Current implementation produces fuzzy results. */
-        this->readBilinear(out, x, y);
+        read_elem_bilinear(x, y, out);
         break;
     }
   }
+
+  void read_elem_filtered(const float x, const float y, float dx[2], float dy[2], float *out);
 
   /**
    * Get channel value at given coordinates.
@@ -398,6 +442,8 @@ class MemoryBuffer {
     y = y + m_rect.ymin;
   }
 
+  /* TODO(manzanilla): To be removed with tiled implementation. For applying `MemoryBufferExtend`
+   * use `wrap_pixel`. */
   inline void read(float *result,
                    int x,
                    int y,
@@ -420,6 +466,7 @@ class MemoryBuffer {
     }
   }
 
+  /* TODO(manzanilla): To be removed with tiled implementation. */
   inline void readNoCheck(float *result,
                           int x,
                           int y,
@@ -575,6 +622,21 @@ class MemoryBuffer {
   const int buffer_len() const
   {
     return get_memory_width() * get_memory_height();
+  }
+
+  void clear_elem(float *out) const
+  {
+    memset(out, 0, this->m_num_channels * sizeof(float));
+  }
+
+  template<typename T> T get_relative_x(T x) const
+  {
+    return x - m_rect.xmin;
+  }
+
+  template<typename T> T get_relative_y(T y) const
+  {
+    return y - m_rect.ymin;
   }
 
   void copy_single_elem_from(const MemoryBuffer *src,
