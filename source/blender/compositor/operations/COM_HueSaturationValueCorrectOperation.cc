@@ -78,7 +78,6 @@ void HueSaturationValueCorrectOperation::update_memory_buffer_partial(MemoryBuff
                                                                       Span<MemoryBuffer *> inputs)
 {
   float hsv[4];
-  float f;
   for (BuffersIterator<float> it = output->iterate_with(inputs, area); !it.is_end(); ++it) {
     copy_v4_v4(hsv, it.in(0));
 

@@ -419,7 +419,6 @@ void MemoryBuffer::read_elem_filtered(
     read_elem_checked(x, y, out);
   }
   else {
-    const float uv[2] = {get_relative_x(x), get_relative_y(y)};
     const float deriv[2][2] = {{dx[0], dx[1]}, {dy[0], dy[1]}};
 
     float inv_width = 1.0f / (float)this->getWidth(), inv_height = 1.0f / (float)this->getHeight();
@@ -427,7 +426,7 @@ void MemoryBuffer::read_elem_filtered(
      * but compositor uses pixel space. For now let's just divide the values and
      * switch compositor to normalized space for EWA later.
      */
-    float uv_normal[2] = {x * inv_width, y * inv_height};
+    float uv_normal[2] = {get_relative_x(x) * inv_width, get_relative_y(y) * inv_height};
     float du_normal[2] = {deriv[0][0] * inv_width, deriv[0][1] * inv_height};
     float dv_normal[2] = {deriv[1][0] * inv_width, deriv[1][1] * inv_height};
 
