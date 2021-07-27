@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
 namespace blender::compositor {
 
-class RotateOperation : public NodeOperation {
+class RotateOperation : public MultiThreadedOperation {
  private:
   SocketReader *m_imageSocket;
   SocketReader *m_degreeSocket;
@@ -32,6 +32,7 @@ class RotateOperation : public NodeOperation {
   float m_sine;
   bool m_doDegree2RadConversion;
   bool m_isDegreeSet;
+  PixelSampler sampler_;
 
  public:
   RotateOperation();
@@ -39,14 +40,24 @@ class RotateOperation : public NodeOperation {
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+  void init_data() override;
   void initExecution() override;
   void deinitExecution() override;
   void setDoDegree2RadConversion(bool abool)
   {
     this->m_doDegree2RadConversion = abool;
   }
+  void set_sampler(PixelSampler sampler)
+  {
+    sampler_ = sampler;
+  }
 
   void ensureDegree();
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor

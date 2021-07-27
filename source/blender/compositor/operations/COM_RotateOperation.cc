@@ -17,6 +17,8 @@
  */
 
 #include "COM_RotateOperation.h"
+#include "COM_ConstantOperation.h"
+
 #include "BLI_math.h"
 
 namespace blender::compositor {
@@ -31,13 +33,19 @@ RotateOperation::RotateOperation()
   this->m_degreeSocket = nullptr;
   this->m_doDegree2RadConversion = false;
   this->m_isDegreeSet = false;
+  sampler_ = PixelSampler::Nearest;
 }
+
+void RotateOperation::init_data()
+{
+  this->m_centerX = (getWidth() - 1) / 2.0;
+  this->m_centerY = (getHeight() - 1) / 2.0;
+}
+
 void RotateOperation::initExecution()
 {
   this->m_imageSocket = this->getInputSocketReader(0);
   this->m_degreeSocket = this->getInputSocketReader(1);
-  this->m_centerX = (getWidth() - 1) / 2.0;
-  this->m_centerY = (getHeight() - 1) / 2.0;
 }
 
 void RotateOperation::deinitExecution()
@@ -50,7 +58,19 @@ inline void RotateOperation::ensureDegree()
 {
   if (!this->m_isDegreeSet) {
     float degree[4];
-    this->m_degreeSocket->readSampled(degree, 0, 0, PixelSampler::Nearest);
+    switch (execution_model_) {
+      case eExecutionModel::Tiled:
+        this->m_degreeSocket->readSampled(degree, 0, 0, PixelSampler::Nearest);
+        break;
+      case eExecutionModel::FullFrame:
+        NodeOperation *degree_op = getInputOperation(1);
+        const bool is_constant_degree = degree_op->get_flags().is_constant_operation;
+        degree[0] = is_constant_degree ?
+                        static_cast<ConstantOperation *>(degree_op)->get_constant_elem()[0] :
+                        0.0f;
+        break;
+    }
+
     double rad;
     if (this->m_doDegree2RadConversion) {
       rad = DEG2RAD((double)degree[0]);
@@ -106,6 +126,56 @@ bool RotateOperation::determineDependingAreaOfInterest(rcti *input,
   newInput.ymin = floor(miny) - 1;
 
   return NodeOperation::determineDependingAreaOfInterest(&newInput, readOperation, output);
+}
+
+void RotateOperation::get_area_of_interest(const int input_idx,
+                                           const rcti &output_area,
+                                           rcti &r_input_area)
+{
+  if (input_idx != 0) {
+    r_input_area = output_area;
+    return;
+  }
+
+  ensureDegree();
+  const float dxmin = output_area.xmin - this->m_centerX;
+  const float dymin = output_area.ymin - this->m_centerY;
+  const float dxmax = output_area.xmax - this->m_centerX;
+  const float dymax = output_area.ymax - this->m_centerY;
+
+  const float x1 = this->m_centerX + (this->m_cosine * dxmin + this->m_sine * dymin);
+  const float x2 = this->m_centerX + (this->m_cosine * dxmax + this->m_sine * dymin);
+  const float x3 = this->m_centerX + (this->m_cosine * dxmin + this->m_sine * dymax);
+  const float x4 = this->m_centerX + (this->m_cosine * dxmax + this->m_sine * dymax);
+  const float y1 = this->m_centerY + (-this->m_sine * dxmin + this->m_cosine * dymin);
+  const float y2 = this->m_centerY + (-this->m_sine * dxmax + this->m_cosine * dymin);
+  const float y3 = this->m_centerY + (-this->m_sine * dxmin + this->m_cosine * dymax);
+  const float y4 = this->m_centerY + (-this->m_sine * dxmax + this->m_cosine * dymax);
+  const float minx = MIN2(x1, MIN2(x2, MIN2(x3, x4)));
+  const float maxx = MAX2(x1, MAX2(x2, MAX2(x3, x4)));
+  const float miny = MIN2(y1, MIN2(y2, MIN2(y3, y4)));
+  const float maxy = MAX2(y1, MAX2(y2, MAX2(y3, y4)));
+
+  r_input_area.xmin = floor(minx);
+  r_input_area.xmax = ceil(maxx);
+  r_input_area.ymin = floor(miny);
+  r_input_area.ymax = ceil(maxy);
+  expand_area_for_sampler(r_input_area, sampler_);
+}
+
+void RotateOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                   const rcti &area,
+                                                   Span<MemoryBuffer *> inputs)
+{
+  ensureDegree();
+  const MemoryBuffer *input_img = inputs[0];
+  for (BuffersIterator<float> it = output->iterate_with({}, area); !it.is_end(); ++it) {
+    const float dy = it.y - this->m_centerY;
+    const float dx = it.x - this->m_centerX;
+    const float nx = this->m_centerX + (this->m_cosine * dx + this->m_sine * dy);
+    const float ny = this->m_centerY + (-this->m_sine * dx + this->m_cosine * dy);
+    input_img->read_elem_sampled(nx, ny, sampler_, it.out);
+  }
 }
 
 }  // namespace blender::compositor
