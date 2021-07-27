@@ -5808,6 +5808,81 @@ def km_generic_tool_annotate_eraser(params):
     )
 
 
+def km_generic_tool_mask_select(params):
+    return (
+        "Mask Editing: Tweak",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("mask.select", {"type": params.select_mouse, "value": 'PRESS'},
+             {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
+        ]},
+    )
+
+
+def km_generic_tool_mask_select_box(params):
+    return (
+        "Mask Editing: Select Box",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "mask.select_box", type=params.tool_tweak, value='ANY',
+        )},
+    )
+
+
+def km_generic_tool_mask_select_lasso(params):
+    return (
+        "Mask Editing: Select Lasso",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "mask.select_lasso", type=params.tool_mouse, value='PRESS',
+        )},
+    )
+
+
+def km_generic_tool_mask_select_circle(params):
+    return (
+        "Mask Editing: Select Circle",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": _template_items_tool_select_actions_simple(
+            "mask.select_circle", type=params.tool_mouse, value='PRESS',
+            properties=[("wait_for_input", False)],
+        )},
+    )
+
+
+def km_generic_tool_mask_add_vertex(params):
+    return (
+        "Mask Editing: Add Vertex and Slide",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("mask.draw_mask", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+        ]},
+    )
+
+
+def km_generic_tool_mask_delete_vertex(params):
+    return (
+        "Mask Editing: Delete",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("mask.delete", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ]},
+    )
+
+
+def km_generic_tool_mask_add_feather_vertex(params):
+    return (
+        "Mask Editing: Add Feather Vertex and Slide",
+        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
+        {"items": [
+            ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+            ("mask.draw_mask", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True}, None),
+            ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
+            ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
+        ]},
+    )
+
 def km_image_editor_tool_generic_sample(params):
     return (
         "Image Editor Tool: Sample",
@@ -5975,75 +6050,6 @@ def km_clip_editor_tool_add_marker_tweak(params):
             ("clip.add_marker_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
             ("clip.slide_marker", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
             ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
-        ]},
-    )
-
-def km_clip_editor_tool_mask_select(params):
-    return (
-        "Mask Editing: Tweak",
-        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("mask.select", {"type": params.select_mouse, "value": 'PRESS'},
-             {"properties": [("extend", False), ("deselect_all", not params.legacy)]}),
-        ]},
-    )
-
-
-def km_clip_editor_tool_mask_select_box(params):
-    return (
-        "Mask Editing: Select Box",
-        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select_actions_simple(
-            "mask.select_box", type=params.tool_tweak, value='ANY',
-        )},
-    )
-
-def km_clip_editor_tool_mask_select_lasso(params):
-    return (
-        "Mask Editing: Select Lasso",
-        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select_actions_simple(
-            "mask.select_lasso", type=params.tool_mouse, value='PRESS',
-        )},
-    )
-
-def km_clip_editor_tool_mask_select_circle(params):
-    return (
-        "Mask Editing: Select Circle",
-        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select_actions_simple(
-            "mask.select_circle", type=params.tool_mouse, value='PRESS',
-            properties=[("wait_for_input", False)],
-        )},
-    )
-def km_clip_editor_tool_mask_add_vertex(params):
-    return (
-        "Mask Editing: Add Vertex and Slide",
-        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("mask.draw_mask", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
-        ]},
-    )
-
-def km_clip_editor_tool_mask_delete_vertex(params):
-    return (
-        "Mask Editing: Delete",
-        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("mask.delete", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-        ]},
-    )
-
-def km_clip_editor_tool_mask_add_feather_vertex(params):
-    return (
-        "Mask Editing: Add Feather Vertex and Slide",
-        {"space_type": 'CLIP_EDITOR', "region_type": 'WINDOW'},
-        {"items": [
-            ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
-            ("mask.draw_mask", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True}, None),
-            ("mask.add_feather_vertex_slide", {"type": 'LEFTMOUSE', "value": 'PRESS', "ctrl": True}, None),
-            ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ]},
     )
 
@@ -7307,6 +7313,14 @@ def generate_keymaps(params=None):
         km_generic_tool_annotate_polygon(params),
         km_generic_tool_annotate_eraser(params),
 
+        km_generic_tool_mask_select(params),
+        km_generic_tool_mask_select_box(params),
+        km_generic_tool_mask_select_lasso(params),
+        km_generic_tool_mask_select_circle(params),
+        km_generic_tool_mask_add_vertex(params),
+        km_generic_tool_mask_add_feather_vertex(params),
+        km_generic_tool_mask_delete_vertex(params),
+
         km_image_editor_tool_generic_sample(params),
         km_image_editor_tool_uv_cursor(params),
         km_image_editor_tool_uv_select(params),
@@ -7322,13 +7336,6 @@ def generate_keymaps(params=None):
         km_clip_editor_tool_select_lasso(params),
         km_clip_editor_tool_select_circle(params),
         km_clip_editor_tool_add_marker_tweak(params),
-        km_clip_editor_tool_mask_select(params),
-        km_clip_editor_tool_mask_select_box(params),
-        km_clip_editor_tool_mask_select_lasso(params),
-        km_clip_editor_tool_mask_select_circle(params),
-        km_clip_editor_tool_mask_add_vertex(params),
-        km_clip_editor_tool_mask_add_feather_vertex(params),
-        km_clip_editor_tool_mask_delete_vertex(params),
         km_image_editor_tool_uv_scale(params),
         km_node_editor_tool_select(params),
         km_node_editor_tool_select_box(params),
