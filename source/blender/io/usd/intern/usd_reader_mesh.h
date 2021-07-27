@@ -42,7 +42,6 @@ class USDMeshReader : public USDGeomReader {
   pxr::TfToken normal_interpolation_;
   pxr::TfToken orientation_;
   bool is_left_handed_;
-  int last_num_positions_;
   bool has_uvs_;
   bool is_time_varying_;
 

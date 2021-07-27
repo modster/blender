@@ -183,7 +183,6 @@ USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim,
     : USDGeomReader(prim, import_params, settings),
       mesh_prim_(prim),
       is_left_handed_(false),
-      last_num_positions_(-1),
       has_uvs_(false),
       is_time_varying_(false),
       is_initial_load_(false)
@@ -242,18 +241,14 @@ bool USDMeshReader::valid() const
   return static_cast<bool>(mesh_prim_);
 }
 
-bool USDMeshReader::topology_changed(Mesh * /* existing_mesh */, const double motionSampleTime)
+bool USDMeshReader::topology_changed(Mesh *existing_mesh, const double motionSampleTime)
 {
   /* TODO(makowalski): Is it the best strategy to cache the mesh
    * geometry in this function?  This needs to be revisited. */
-  pxr::UsdAttribute faceVertCountsAttr = mesh_prim_.GetFaceVertexCountsAttr();
-  pxr::UsdAttribute faceVertIndicesAttr = mesh_prim_.GetFaceVertexIndicesAttr();
-  pxr::UsdAttribute pointsAttr = mesh_prim_.GetPointsAttr();
-  pxr::UsdAttribute normalsAttr = mesh_prim_.GetNormalsAttr();
 
-  faceVertIndicesAttr.Get(&face_indices_, motionSampleTime);
-  faceVertCountsAttr.Get(&face_counts_, motionSampleTime);
-  pointsAttr.Get(&positions_, motionSampleTime);
+  mesh_prim_.GetFaceVertexIndicesAttr().Get(&face_indices_, motionSampleTime);
+  mesh_prim_.GetFaceVertexCountsAttr().Get(&face_counts_, motionSampleTime);
+  mesh_prim_.GetPointsAttr().Get(&positions_, motionSampleTime);
 
   /* If 'normals' and 'primvars:normals' are both specified, the latter has precedence. */
   pxr::UsdGeomPrimvar primvar = mesh_prim_.GetPrimvar(usdtokens::normalsPrimvar);
@@ -266,15 +261,9 @@ bool USDMeshReader::topology_changed(Mesh * /* existing_mesh */, const double mo
     normal_interpolation_ = mesh_prim_.GetNormalsInterpolation();
   }
 
-  /* TODO(makowalski): Why aren't we comparing positions_.size()
-   * against the number of points of the existing_mesh?
-   * Why keep track of the last_num_positons_ at all? */
-  if (last_num_positions_ != positions_.size()) {
-    last_num_positions_ = positions_.size();
-    return true;
-  }
-
-  return false;
+  return positions_.size() != existing_mesh->totvert ||
+         face_counts_.size() != existing_mesh->totpoly ||
+         face_indices_.size() != existing_mesh->totloop;
 }
 
 void USDMeshReader::read_mpolys(Mesh *mesh)
