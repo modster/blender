@@ -86,6 +86,11 @@ struct TempBeztData {
   float mval[2];
 } TempBeztData;
 
+struct MoveSegmentData {
+  Nurb *nu;
+  int bezt_index;
+} MoveSegmentData;
+
 /* Convert mouse location to worldspace coordinates. */
 static void mouse_location_to_worldspace(const int mouse_loc[2],
                                          const float depth[3],
@@ -634,6 +639,94 @@ static void add_point_connected_to_selected_point(ViewContext *vc,
   }
 }
 
+/* Check if a spline segment is nearby. */
+static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *event)
+{
+  Curve *cu = vc->obedit->data;
+  ListBase *nurbs = BKE_curve_editNurbs_get(cu);
+  float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
+
+  struct TempBeztData data = {.bezt_index = 0,
+                              .min_dist = 10000,
+                              .parameter = 0.5f,
+                              .has_prev = false,
+                              .has_next = false,
+                              .mval[0] = event->mval[0],
+                              .mval[1] = event->mval[1]};
+
+  update_data_for_all_nurbs(nurbs, vc, &data);
+
+  struct MoveSegmentData *seg_data;
+  op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), "MoveSegmentData");
+  seg_data->bezt_index = data.bezt_index;
+  seg_data->nu = data.nurb;
+
+  float threshold_distance = get_view_zoom(data.cut_loc, vc);
+
+  return data.min_dist < threshold_distance;
+}
+
+/* Move segment to mouse pointer. */
+static void move_segment(struct MoveSegmentData *seg_data, const wmEvent *event, ViewContext *vc)
+{
+  Nurb *nu = seg_data->nu;
+  BezTriple *bezt1 = nu->bezt + seg_data->bezt_index;
+  BezTriple *bezt2;
+
+  /* Define the next BezTriple based on cyclicity. */
+  if ((nu->flagu & CU_NURB_CYCLIC) && (nu->pntsu == seg_data->bezt_index + 1)) {
+    bezt2 = nu->bezt;
+  }
+  else {
+    bezt2 = bezt1 + 1;
+  }
+
+  float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
+  float mouse_3d[3];
+  mouse_location_to_worldspace(event->mval, bezt1->vec[1], vc, mouse_3d);
+
+  /*
+   * Equation of Bezier Curve
+   *      => B(t) = (1-t)^3 * P0 + 3(1-t)^2 * t * P1 + 3(1-t) * t^2 * P2 + t^3 * P3
+   * Mouse location (Say Pm) should satisfy this equation.
+   * Substituting t = 0.5 => Pm = 0.5^3 * (P0 + 3P1 + 3P2 + P3)
+   * Therefore => P1 + P2 = (8 * Pm - P0 - P3) / 3
+   *
+   * Another constraint is required to identify P1 and P2.
+   * The constraint is to minimize the distance between new points and initial points.
+   * The minima can be found by differentiating the total distance.
+   */
+
+  float p1_plus_p2_div_2[3];
+  p1_plus_p2_div_2[0] = (8 * mouse_3d[0] - bezt1->vec[1][0] - bezt2->vec[1][0]) / 6;
+  p1_plus_p2_div_2[1] = (8 * mouse_3d[1] - bezt1->vec[1][1] - bezt2->vec[1][1]) / 6;
+  p1_plus_p2_div_2[2] = (8 * mouse_3d[2] - bezt1->vec[1][2] - bezt2->vec[1][2]) / 6;
+
+  float p1_minus_p2_div_2[3];
+  sub_v3_v3v3(p1_minus_p2_div_2, bezt1->vec[2], bezt2->vec[0]);
+  mul_v3_fl(p1_minus_p2_div_2, 0.5f);
+
+  add_v3_v3v3(bezt1->vec[2], p1_plus_p2_div_2, p1_minus_p2_div_2);
+  sub_v3_v3v3(bezt2->vec[0], p1_plus_p2_div_2, p1_minus_p2_div_2);
+
+  free_up_handles_for_movement(bezt1, true, true);
+  free_up_handles_for_movement(bezt2, true, true);
+
+  /* Move opposite handle as well if type is align. */
+  if (bezt1->h1 == HD_ALIGN) {
+    float handle_vec[3];
+    sub_v3_v3v3(handle_vec, bezt1->vec[1], bezt1->vec[2]);
+    normalize_v3_length(handle_vec, len_v3v3(bezt1->vec[1], bezt1->vec[0]));
+    add_v3_v3v3(bezt1->vec[0], bezt1->vec[1], handle_vec);
+  }
+  if (bezt2->h2 == HD_ALIGN) {
+    float handle_vec[3];
+    sub_v3_v3v3(handle_vec, bezt2->vec[1], bezt2->vec[0]);
+    normalize_v3_length(handle_vec, len_v3v3(bezt2->vec[1], bezt2->vec[2]));
+    add_v3_v3v3(bezt2->vec[2], bezt2->vec[1], handle_vec);
+  }
+}
+
 enum {
   PEN_MODAL_CANCEL = 1,
   PEN_MODAL_FREE_MOVE_HANDLE,
@@ -686,6 +779,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   bool dragging = RNA_boolean_get(op->ptr, "dragging");
   bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
   bool is_new_point = RNA_boolean_get(op->ptr, "new");
+  bool moving_segment = RNA_boolean_get(op->ptr, "moving_segment");
 
   bool picked = false;
   if (event->type == EVT_MODAL_MAP) {
@@ -706,8 +800,13 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       dragging = true;
     }
     if (dragging) {
+      if (moving_segment) {
+        struct MoveSegmentData *seg_data = op->customdata;
+        nu = seg_data->nu;
+        move_segment(seg_data, event, &vc);
+      }
       /* Move handle point with mouse cursor if dragging a new control point. */
-      if (is_new_point) {
+      else if (is_new_point) {
         if (!picked) {
           select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
         }
@@ -767,13 +866,23 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         RNA_boolean_set(op->ptr, "new", !retval);
 
         if (!retval) {
-          add_point_connected_to_selected_point(&vc, obedit, event);
+          if (is_curve_nearby(&vc, op, event)) {
+            RNA_boolean_set(op->ptr, "moving_segment", true);
+            moving_segment = true;
+          }
+          else {
+            add_point_connected_to_selected_point(&vc, obedit, event);
+          }
         }
       }
     }
     if (event->val == KM_RELEASE) {
       RNA_boolean_set(op->ptr, "dragging", false);
       RNA_boolean_set(op->ptr, "new", false);
+      if (moving_segment) {
+        MEM_freeN(op->customdata);
+      }
+      RNA_boolean_set(op->ptr, "moving_segment", false);
       ret = OPERATOR_FINISHED;
     }
   }
@@ -819,6 +928,8 @@ void CURVE_OT_pen(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   prop = RNA_def_boolean(
       ot->srna, "new", 0, "New Point Drag", "The point was added with the press before drag");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna, "moving_segment", 0, "Moving Segment", "");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   prop = RNA_def_boolean(ot->srna, "wait_for_input", true, "Wait for Input", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
