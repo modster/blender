@@ -84,9 +84,9 @@ static void geo_node_object_info_exec(GeoNodeExecParams params)
     }
   }
 
-  params.set_output("Location", location);
-  params.set_output("Rotation", rotation);
-  params.set_output("Scale", scale);
+  params.set_output("Location", bke::FieldRef<float3>(new bke::ConstantField<float3>(location)));
+  params.set_output("Rotation", bke::FieldRef<float3>(new bke::ConstantField<float3>(rotation)));
+  params.set_output("Scale", bke::FieldRef<float3>(new bke::ConstantField<float3>(scale)));
   params.set_output("Geometry", geometry_set);
 }
 

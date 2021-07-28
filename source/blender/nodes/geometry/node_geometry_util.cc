@@ -60,6 +60,7 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
                           const AttributeDomain domain,
                           Vector<std::unique_ptr<bke::FieldInputValue>> &r_values)
 {
+  const int domain_size = component.attribute_domain_size(domain);
   for (const bke::FieldInputKey &key : field_inputs) {
     if (const bke::AttributeFieldInputKey *attribute_key =
             dynamic_cast<const bke::AttributeFieldInputKey *>(&key)) {
@@ -68,6 +69,16 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
       const CustomDataType type = bke::cpp_type_to_custom_data_type(cpp_type);
       GVArrayPtr attribute = component.attribute_get_for_read(name, domain, type);
       auto value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(attribute));
+      field_inputs.set_input(key, *value);
+      r_values.append(std::move(value));
+    }
+    else if (dynamic_cast<const bke::IndexFieldInputKey *>(&key) != nullptr) {
+      auto index_func = [](int i) { return i; };
+      VArrayPtr<int> index_varray = std::make_unique<VArray_For_Func<int, decltype(index_func)>>(
+          domain_size, index_func);
+      GVArrayPtr index_gvarray = std::make_unique<fn::GVArray_For_VArray<int>>(
+          std::move(index_varray));
+      auto value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(index_gvarray));
       field_inputs.set_input(key, *value);
       r_values.append(std::move(value));
     }

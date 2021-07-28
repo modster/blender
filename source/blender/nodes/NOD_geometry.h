@@ -70,6 +70,7 @@ void register_node_type_geo_curve_to_points(void);
 void register_node_type_geo_curve_trim(void);
 void register_node_type_geo_delete_geometry(void);
 void register_node_type_geo_edge_split(void);
+void register_node_type_geo_index(void);
 void register_node_type_geo_input_material(void);
 void register_node_type_geo_is_viewport(void);
 void register_node_type_geo_join_geometry(void);

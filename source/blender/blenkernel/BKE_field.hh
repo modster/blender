@@ -65,6 +65,26 @@ class FieldInputValue {
   virtual ~FieldInputValue() = default;
 };
 
+class IndexFieldInputKey : public FieldInputKey {
+ public:
+  uint64_t hash() const override
+  {
+    /* Arbitrary number. */
+    return 78582029;
+  }
+
+  const CPPType &type() const override
+  {
+    return CPPType::get<int>();
+  }
+
+ private:
+  bool is_same_as(const FieldInputKey &other) const override
+  {
+    return dynamic_cast<const IndexFieldInputKey *>(&other) != nullptr;
+  }
+};
+
 class AttributeFieldInputKey : public FieldInputKey {
  private:
   std::string name_;
@@ -92,7 +112,7 @@ class AttributeFieldInputKey : public FieldInputKey {
   }
 
  private:
-  bool is_same_as(const FieldInputKey &other) const
+  bool is_same_as(const FieldInputKey &other) const override
   {
     if (const AttributeFieldInputKey *other_typed = dynamic_cast<const AttributeFieldInputKey *>(
             &other)) {
@@ -347,6 +367,9 @@ class AttributeField : public GVArrayInputField<AttributeFieldInputKey> {
       : GVArrayInputField<AttributeFieldInputKey>(std::move(name), type)
   {
   }
+};
+
+class IndexField : public GVArrayInputField<IndexFieldInputKey> {
 };
 
 class FieldRefBase {

@@ -964,7 +964,7 @@ class GeometryNodesEvaluator {
       if (!socket_ref.is_available()) {
         continue;
       }
-      const int output_param_index = input_fields.size() + i;
+      const int output_param_index = input_fields.size() + output_index;
       OutputState &output_state = node_state.outputs[i];
       const DOutputSocket socket{node.context(), &socket_ref};
       bke::FieldPtr out_field = new bke::MultiFunctionField(input_fields, fn, output_param_index);
