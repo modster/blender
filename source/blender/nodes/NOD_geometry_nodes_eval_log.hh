@@ -299,6 +299,7 @@ class ModifierLog {
   static const NodeLog *find_node_by_spreadsheet_editor_context(
       const SpaceSpreadsheet &sspreadsheet);
   void foreach_node_log(FunctionRef<void(const NodeLog &)> fn) const;
+  Vector<const GeometryAttributeInfo *> lookup_available_attributes() const;
 
  private:
   using LogByTreeContext = Map<const DTreeContext *, TreeLog *>;

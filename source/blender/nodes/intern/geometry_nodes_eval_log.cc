@@ -106,6 +106,26 @@ void ModifierLog::foreach_node_log(FunctionRef<void(const NodeLog &)> fn) const
   }
 }
 
+Vector<const GeometryAttributeInfo *> ModifierLog::lookup_available_attributes() const
+{
+  Vector<const GeometryAttributeInfo *> attributes;
+  Set<StringRef> names;
+  this->foreach_node_log([&](const NodeLog &node_log) {
+    for (const SocketLog &socket_log : node_log.input_logs()) {
+      const ValueLog *value_log = socket_log.value();
+      if (const GeometryValueLog *geo_value_log = dynamic_cast<const GeometryValueLog *>(
+              value_log)) {
+        for (const GeometryAttributeInfo &attribute : geo_value_log->attributes()) {
+          if (names.add(attribute.name)) {
+            attributes.append(&attribute);
+          }
+        }
+      }
+    }
+  });
+  return attributes;
+}
+
 const NodeLog *TreeLog::lookup_node_log(StringRef node_name) const
 {
   const destruct_ptr<NodeLog> *node_log = node_logs_.lookup_ptr_as(node_name);

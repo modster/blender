@@ -99,12 +99,23 @@ static void attribute_search_update_fn(
   AttributeSearchData *data = static_cast<AttributeSearchData *>(arg);
 
   SpaceNode *snode = CTX_wm_space_node(C);
-  const geo_log::NodeLog *node_log = geo_log::ModifierLog::find_node_by_node_editor_context(
-      *snode, *data->node);
-  if (node_log == nullptr) {
-    return;
+  blender::Vector<const GeometryAttributeInfo *> infos;
+  if (data->node->type == GEO_NODE_ATTRIBUTE) {
+    const geo_log::ModifierLog *modifier_log =
+        geo_log::ModifierLog::find_root_by_node_editor_context(*snode);
+    if (modifier_log == nullptr) {
+      return;
+    }
+    infos = modifier_log->lookup_available_attributes();
   }
-  blender::Vector<const GeometryAttributeInfo *> infos = node_log->lookup_available_attributes();
+  else {
+    const geo_log::NodeLog *node_log = geo_log::ModifierLog::find_node_by_node_editor_context(
+        *snode, *data->node);
+    if (node_log == nullptr) {
+      return;
+    }
+    infos = node_log->lookup_available_attributes();
+  }
 
   GeometryAttributeInfo &dummy_info = get_dummy_item_info();
 
