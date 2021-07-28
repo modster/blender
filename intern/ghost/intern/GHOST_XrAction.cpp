@@ -32,8 +32,7 @@
  *
  * \{ */
 
-GHOST_XrActionSpace::GHOST_XrActionSpace(XrInstance instance,
-                                         XrSession session,
+GHOST_XrActionSpace::GHOST_XrActionSpace(XrSession session,
                                          XrAction action,
                                          const char *action_name,
                                          const char *profile_path,
@@ -139,8 +138,7 @@ GHOST_XrActionProfile::GHOST_XrActionProfile(XrInstance instance,
       }
       else if (is_pose_action) {
         /* Create action space for pose bindings. */
-        subaction.space = std::make_unique<GHOST_XrActionSpace>(instance,
-                                                                session,
+        subaction.space = std::make_unique<GHOST_XrActionSpace>(session,
                                                                 action,
                                                                 info.action_name,
                                                                 info.profile_path,

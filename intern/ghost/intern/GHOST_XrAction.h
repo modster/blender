@@ -35,8 +35,7 @@
 class GHOST_XrActionSpace {
  public:
   GHOST_XrActionSpace() = delete; /* Default constructor for map storage. */
-  GHOST_XrActionSpace(XrInstance instance,
-                      XrSession session,
+  GHOST_XrActionSpace(XrSession session,
                       XrAction action,
                       const char *action_name,
                       const char *profile_path,

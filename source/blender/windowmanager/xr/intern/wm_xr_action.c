@@ -309,8 +309,8 @@ void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char 
   }
 
   LISTBASE_FOREACH (LinkData *, ld, &action_set->active_modal_actions) {
-    wmXrAction *action = ld->data;
-    if (STREQ(action->name, action_name)) {
+    wmXrAction *active_modal_action = ld->data;
+    if (STREQ(active_modal_action->name, action_name)) {
       BLI_freelinkN(&action_set->active_modal_actions, ld);
       break;
     }

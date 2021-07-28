@@ -957,7 +957,7 @@ static wmXrHapticAction *wm_xr_session_haptic_action_find(ListBase *active_hapti
                                                           const char **subaction_path)
 {
   LISTBASE_FOREACH (wmXrHapticAction *, ha, active_haptic_actions) {
-    if (action == ha->action && subaction_path == ha->subaction_path) {
+    if ((action == ha->action) && (subaction_path == ha->subaction_path)) {
       return ha;
     }
   }
