@@ -36,6 +36,37 @@ RotateOperation::RotateOperation()
   sampler_ = PixelSampler::Nearest;
 }
 
+void RotateOperation::get_area_rotation_bounds(const rcti &area,
+                                               const float center_x,
+                                               const float center_y,
+                                               const float sine,
+                                               const float cosine,
+                                               rcti &r_bounds)
+{
+  const float dxmin = area.xmin - center_x;
+  const float dymin = area.ymin - center_y;
+  const float dxmax = area.xmax - center_x;
+  const float dymax = area.ymax - center_y;
+
+  const float x1 = center_x + (cosine * dxmin + sine * dymin);
+  const float x2 = center_x + (cosine * dxmax + sine * dymin);
+  const float x3 = center_x + (cosine * dxmin + sine * dymax);
+  const float x4 = center_x + (cosine * dxmax + sine * dymax);
+  const float y1 = center_y + (-sine * dxmin + cosine * dymin);
+  const float y2 = center_y + (-sine * dxmax + cosine * dymin);
+  const float y3 = center_y + (-sine * dxmin + cosine * dymax);
+  const float y4 = center_y + (-sine * dxmax + cosine * dymax);
+  const float minx = MIN2(x1, MIN2(x2, MIN2(x3, x4)));
+  const float maxx = MAX2(x1, MAX2(x2, MAX2(x3, x4)));
+  const float miny = MIN2(y1, MIN2(y2, MIN2(y3, y4)));
+  const float maxy = MAX2(y1, MAX2(y2, MAX2(y3, y4)));
+
+  r_bounds.xmin = floor(minx);
+  r_bounds.xmax = ceil(maxx);
+  r_bounds.ymin = floor(miny);
+  r_bounds.ymax = ceil(maxy);
+}
+
 void RotateOperation::init_data()
 {
   this->m_centerX = (getWidth() - 1) / 2.0;
@@ -138,28 +169,7 @@ void RotateOperation::get_area_of_interest(const int input_idx,
   }
 
   ensureDegree();
-  const float dxmin = output_area.xmin - this->m_centerX;
-  const float dymin = output_area.ymin - this->m_centerY;
-  const float dxmax = output_area.xmax - this->m_centerX;
-  const float dymax = output_area.ymax - this->m_centerY;
-
-  const float x1 = this->m_centerX + (this->m_cosine * dxmin + this->m_sine * dymin);
-  const float x2 = this->m_centerX + (this->m_cosine * dxmax + this->m_sine * dymin);
-  const float x3 = this->m_centerX + (this->m_cosine * dxmin + this->m_sine * dymax);
-  const float x4 = this->m_centerX + (this->m_cosine * dxmax + this->m_sine * dymax);
-  const float y1 = this->m_centerY + (-this->m_sine * dxmin + this->m_cosine * dymin);
-  const float y2 = this->m_centerY + (-this->m_sine * dxmax + this->m_cosine * dymin);
-  const float y3 = this->m_centerY + (-this->m_sine * dxmin + this->m_cosine * dymax);
-  const float y4 = this->m_centerY + (-this->m_sine * dxmax + this->m_cosine * dymax);
-  const float minx = MIN2(x1, MIN2(x2, MIN2(x3, x4)));
-  const float maxx = MAX2(x1, MAX2(x2, MAX2(x3, x4)));
-  const float miny = MIN2(y1, MIN2(y2, MIN2(y3, y4)));
-  const float maxy = MAX2(y1, MAX2(y2, MAX2(y3, y4)));
-
-  r_input_area.xmin = floor(minx);
-  r_input_area.xmax = ceil(maxx);
-  r_input_area.ymin = floor(miny);
-  r_input_area.ymax = ceil(maxy);
+  get_area_rotation_bounds(output_area, m_centerX, m_centerY, m_sine, m_cosine, r_input_area);
   expand_area_for_sampler(r_input_area, sampler_);
 }
 
@@ -170,11 +180,10 @@ void RotateOperation::update_memory_buffer_partial(MemoryBuffer *output,
   ensureDegree();
   const MemoryBuffer *input_img = inputs[0];
   for (BuffersIterator<float> it = output->iterate_with({}, area); !it.is_end(); ++it) {
-    const float dy = it.y - this->m_centerY;
-    const float dx = it.x - this->m_centerX;
-    const float nx = this->m_centerX + (this->m_cosine * dx + this->m_sine * dy);
-    const float ny = this->m_centerY + (-this->m_sine * dx + this->m_cosine * dy);
-    input_img->read_elem_sampled(nx, ny, sampler_, it.out);
+    float x = it.x;
+    float y = it.y;
+    rotate_coords(x, y, m_centerX, m_centerY, m_sine, m_cosine);
+    input_img->read_elem_sampled(x, y, sampler_, it.out);
   }
 }
 

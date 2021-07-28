@@ -36,6 +36,22 @@ class RotateOperation : public MultiThreadedOperation {
 
  public:
   RotateOperation();
+
+  static void rotate_coords(
+      float &x, float &y, float center_x, float center_y, float sine, float cosine)
+  {
+    const float dx = x - center_x;
+    const float dy = y - center_y;
+    x = center_x + (cosine * dx + sine * dy);
+    y = center_y + (-sine * dx + cosine * dy);
+  }
+  static void get_area_rotation_bounds(const rcti &area,
+                                       const float center_x,
+                                       const float center_y,
+                                       const float sine,
+                                       const float cosine,
+                                       rcti &r_bounds);
+
   bool determineDependingAreaOfInterest(rcti *input,
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
