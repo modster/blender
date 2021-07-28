@@ -215,7 +215,6 @@ typedef struct wmXrActionSet {
 
 wmXrRuntimeData *wm_xr_runtime_data_create(void);
 void wm_xr_runtime_data_free(wmXrRuntimeData **runtime);
-void wm_xr_session_data_free(wmXrSessionState *state);
 
 wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
                                                     const wmXrRuntimeData *runtime_data);

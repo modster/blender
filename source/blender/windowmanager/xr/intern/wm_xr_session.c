@@ -115,6 +115,25 @@ static void wm_xr_session_create_cb(void)
   state->prev_base_scale = settings->base_scale;
 }
 
+static void wm_xr_session_controller_data_free(wmXrSessionState *state)
+{
+  ListBase *lb = &state->controllers;
+  wmXrController *c;
+
+  while ((c = BLI_pophead(lb))) {
+    if (c->model) {
+      GPU_batch_discard(c->model);
+    }
+    BLI_freelinkN(lb, c);
+  }
+}
+
+static void wm_xr_session_data_free(wmXrSessionState *state)
+{
+  BLI_freelistN(&state->eyes);
+  wm_xr_session_controller_data_free(state);
+}
+
 static void wm_xr_session_exit_cb(void *customdata)
 {
   wmXrData *xr_data = customdata;
@@ -141,26 +160,8 @@ static void wm_xr_session_exit_cb(void *customdata)
   }
 
   /* Free the entire runtime data (including session state and context), to play safe. */
+  wm_xr_session_data_free(state);
   wm_xr_runtime_data_free(&xr_data->runtime);
-}
-
-static void wm_xr_session_controller_data_free(wmXrSessionState *state)
-{
-  ListBase *lb = &state->controllers;
-  wmXrController *c;
-
-  while ((c = BLI_pophead(lb))) {
-    if (c->model) {
-      GPU_batch_discard(c->model);
-    }
-    BLI_freelinkN(lb, c);
-  }
-}
-
-void wm_xr_session_data_free(wmXrSessionState *state)
-{
-  BLI_freelistN(&state->eyes);
-  wm_xr_session_controller_data_free(state);
 }
 
 static void wm_xr_session_begin_info_create(wmXrData *xr_data,
