@@ -484,6 +484,13 @@ void WM_operator_handlers_clear(wmWindowManager *wm, wmOperatorType *ot)
   }
 }
 
+void WM_xr_actionmap_item_bindings_clear(XrActionMapItem *ami)
+{
+  BLI_freelistN(&ami->bindings);
+
+  ami->selbinding = 0;
+}
+
 void WM_xr_actionmap_item_properties_free(XrActionMapItem *ami)
 {
   if (ami->op_properties_ptr) {
@@ -500,6 +507,7 @@ void WM_xr_actionmap_item_properties_free(XrActionMapItem *ami)
 void WM_xr_actionmap_clear(XrActionMap *actionmap)
 {
   LISTBASE_FOREACH (XrActionMapItem *, ami, &actionmap->items) {
+    WM_xr_actionmap_item_bindings_clear(ami);
     WM_xr_actionmap_item_properties_free(ami);
   }
 

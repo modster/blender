@@ -857,14 +857,14 @@ static const GHOST_XrPose *wm_xr_session_controller_aim_pose_find(const wmXrSess
   return NULL;
 }
 
-BLI_INLINE bool test_float_state(const float *state, float threshold, eXrActionFlag flag)
+BLI_INLINE bool test_float_state(const float *state, float threshold, eXrAxisFlag flag)
 {
-  if ((flag & XR_ACTION_AXIS0_POS) != 0) {
+  if ((flag & XR_AXIS0_POS) != 0) {
     if (*state > threshold) {
       return true;
     }
   }
-  else if ((flag & XR_ACTION_AXIS0_NEG) != 0) {
+  else if ((flag & XR_AXIS0_NEG) != 0) {
     if (*state < -threshold) {
       return true;
     }
@@ -877,24 +877,24 @@ BLI_INLINE bool test_float_state(const float *state, float threshold, eXrActionF
   return false;
 }
 
-BLI_INLINE bool test_vec2f_state(const float state[2], float threshold, eXrActionFlag flag)
+BLI_INLINE bool test_vec2f_state(const float state[2], float threshold, eXrAxisFlag flag)
 {
-  if ((flag & XR_ACTION_AXIS0_POS) != 0) {
+  if ((flag & XR_AXIS0_POS) != 0) {
     if (state[0] < 0.0f) {
       return false;
     }
   }
-  else if ((flag & XR_ACTION_AXIS0_NEG) != 0) {
+  else if ((flag & XR_AXIS0_NEG) != 0) {
     if (state[0] > 0.0f) {
       return false;
     }
   }
-  if ((flag & XR_ACTION_AXIS1_POS) != 0) {
+  if ((flag & XR_AXIS1_POS) != 0) {
     if (state[1] < 0.0f) {
       return false;
     }
   }
-  else if ((flag & XR_ACTION_AXIS1_NEG) != 0) {
+  else if ((flag & XR_AXIS1_NEG) != 0) {
     if (state[1] > 0.0f) {
       return false;
     }
@@ -1044,10 +1044,13 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
     case XR_FLOAT_INPUT: {
       const float *state = &((float *)action->states)[subaction_idx];
       float *state_prev = &((float *)action->states_prev)[subaction_idx];
-      if (test_float_state(state, action->float_threshold, action->flag)) {
+      if (test_float_state(
+              state, action->float_thresholds[subaction_idx], action->axis_flags[subaction_idx])) {
         curr = true;
       }
-      if (test_float_state(state_prev, action->float_threshold, action->flag)) {
+      if (test_float_state(state_prev,
+                           action->float_thresholds[subaction_idx],
+                           action->axis_flags[subaction_idx])) {
         prev = true;
       }
       *state_prev = *state;
@@ -1056,10 +1059,14 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
     case XR_VECTOR2F_INPUT: {
       const float(*state)[2] = &((float(*)[2])action->states)[subaction_idx];
       float(*state_prev)[2] = &((float(*)[2])action->states_prev)[subaction_idx];
-      if (test_vec2f_state(*state, action->float_threshold, action->flag)) {
+      if (test_vec2f_state(*state,
+                           action->float_thresholds[subaction_idx],
+                           action->axis_flags[subaction_idx])) {
         curr = true;
       }
-      if (test_vec2f_state(*state_prev, action->float_threshold, action->flag)) {
+      if (test_vec2f_state(*state_prev,
+                           action->float_thresholds[subaction_idx],
+                           action->axis_flags[subaction_idx])) {
         prev = true;
       }
       copy_v2_v2(*state_prev, *state);
@@ -1177,14 +1184,18 @@ static bool wm_xr_session_action_test_bimanual(const wmXrSessionState *session_s
     }
     case XR_FLOAT_INPUT: {
       const float *state = &((float *)action->states)[*r_subaction_idx_other];
-      if (test_float_state(state, action->float_threshold, action->flag)) {
+      if (test_float_state(state,
+                           action->float_thresholds[*r_subaction_idx_other],
+                           action->axis_flags[*r_subaction_idx_other])) {
         bimanual = true;
       }
       break;
     }
     case XR_VECTOR2F_INPUT: {
       const float(*state)[2] = &((float(*)[2])action->states)[*r_subaction_idx_other];
-      if (test_vec2f_state(*state, action->float_threshold, action->flag)) {
+      if (test_vec2f_state(*state,
+                           action->float_thresholds[*r_subaction_idx_other],
+                           action->axis_flags[*r_subaction_idx_other])) {
         bimanual = true;
       }
       break;

@@ -1024,7 +1024,6 @@ bool WM_xr_action_create(wmXrData *xr,
                          eXrActionType type,
                          unsigned int count_subaction_paths,
                          const char **subaction_paths,
-                         const float *float_threshold,
                          struct wmOperatorType *ot,
                          struct IDProperty *op_properties,
                          const char **haptic_name,
@@ -1033,29 +1032,20 @@ bool WM_xr_action_create(wmXrData *xr,
                          const float *haptic_amplitude,
                          eXrActionFlag flag);
 void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char *action_name);
-bool WM_xr_action_space_create(wmXrData *xr,
-                               const char *action_set_name,
-                               const char *action_name,
-                               unsigned int count_subaction_paths,
-                               const char **subaction_paths,
-                               const struct wmXrPose *poses);
-void WM_xr_action_space_destroy(wmXrData *xr,
-                                const char *action_set_name,
-                                const char *action_name,
-                                unsigned int count_subaction_paths,
-                                const char **subaction_paths);
 bool WM_xr_action_binding_create(wmXrData *xr,
                                  const char *action_set_name,
-                                 const char *profile_path,
                                  const char *action_name,
-                                 unsigned int count_interaction_paths,
-                                 const char **interaction_paths);
+                                 const char *profile_path,
+                                 unsigned int count_subaction_paths,
+                                 const char **subaction_paths,
+                                 const char **component_paths,
+                                 const float *float_thresholds,
+                                 const eXrAxisFlag *axis_flags,
+                                 const struct wmXrPose *poses);
 void WM_xr_action_binding_destroy(wmXrData *xr,
                                   const char *action_set_name,
-                                  const char *profile_path,
                                   const char *action_name,
-                                  unsigned int count_interaction_paths,
-                                  const char **interaction_paths);
+                                  const char *profile_path);
 
 /* If action_set_name is NULL, then all action sets will be treated as active. */
 bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name);
@@ -1111,6 +1101,15 @@ XrActionMapItem *WM_xr_actionmap_item_add_copy(XrActionMap *actionmap, XrActionM
 bool WM_xr_actionmap_item_remove(XrActionMap *actionmap, XrActionMapItem *ami);
 XrActionMapItem *WM_xr_actionmap_item_list_find(ListBase *lb, const char *idname);
 void WM_xr_actionmap_item_properties_update_ot(XrActionMapItem *ami);
+
+XrActionMapBinding *WM_xr_actionmap_binding_new(XrActionMapItem *ami,
+                                                const char *idname,
+                                                bool replace_existing);
+void WM_xr_actionmap_binding_ensure_unique(XrActionMapItem *ami, XrActionMapBinding *amb);
+XrActionMapBinding *WM_xr_actionmap_binding_add_copy(XrActionMapItem *ami,
+                                                     XrActionMapBinding *amb_src);
+bool WM_xr_actionmap_binding_remove(XrActionMapItem *ami, XrActionMapBinding *amb);
+XrActionMapBinding *WM_xr_actionmap_binding_list_find(ListBase *lb, const char *idname);
 #endif /* WITH_XR_OPENXR */
 
 /* wm.c */
@@ -1120,6 +1119,7 @@ void WM_xr_actionconfig_free(XrActionConfig *actionconf);
 void WM_xr_actionconfig_clear(XrActionConfig *actionconf);
 void WM_xr_actionmap_clear(XrActionMap *actionmap);
 void WM_xr_actionmap_item_properties_free(XrActionMapItem *ami);
+void WM_xr_actionmap_item_bindings_clear(XrActionMapItem *ami);
 
 #ifdef __cplusplus
 }

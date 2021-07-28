@@ -174,8 +174,9 @@ typedef struct wmXrAction {
   /** Previous states, stored to determine XR events. */
   void *states_prev;
 
-  /** Input threshold for float/vector2f actions. */
-  float float_threshold;
+  /** Input thresholds/regions for each subaction path. */
+  float *float_thresholds;
+  eXrAxisFlag *axis_flags;
 
   /** The currently active subaction path (if any) for modal actions. */
   char **active_modal_path;
@@ -207,9 +208,9 @@ typedef struct wmXrActionSet {
   wmXrAction *controller_grip_action;
   wmXrAction *controller_aim_action;
   /** Currently active modal actions. */
-  ListBase active_modal_actions;
+  ListBase active_modal_actions; /* wmXrAction */
   /** Currently active haptic actions. */
-  ListBase active_haptic_actions;
+  ListBase active_haptic_actions; /* wmXrHapticAction */
 } wmXrActionSet;
 
 wmXrRuntimeData *wm_xr_runtime_data_create(void);

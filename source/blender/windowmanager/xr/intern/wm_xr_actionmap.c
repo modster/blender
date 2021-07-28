@@ -40,6 +40,7 @@
 #define XR_ACTIONCONF_STR_DEFAULT "blender"
 #define XR_ACTIONMAP_STR_DEFAULT "actionmap"
 #define XR_AMI_STR_DEFAULT "action"
+#define XR_AMB_STR_DEFAULT "binding"
 
 /* Replacement for U.keyconfigstr for actionconfigs. */
 static char g_xr_actionconfigstr[64];
@@ -85,6 +86,129 @@ static void wm_xr_actionconfig_update_all(bool ensure)
   }
 }
 #endif
+
+/* -------------------------------------------------------------------- */
+/** \name Actionmap Binding
+ *
+ * Binding in a XR actionmap item, that maps an action to an XR input.
+ * \{ */
+
+XrActionMapBinding *WM_xr_actionmap_binding_new(XrActionMapItem *ami,
+                                                const char *idname,
+                                                bool replace_existing)
+{
+  XrActionMapBinding *amb_prev = WM_xr_actionmap_binding_list_find(&ami->bindings, idname);
+  if (amb_prev && replace_existing) {
+    return amb_prev;
+  }
+
+  /* Create new binding. */
+  XrActionMapBinding *amb = MEM_callocN(sizeof(XrActionMapBinding), __func__);
+  BLI_strncpy(amb->idname, idname, XR_AMB_MAX_NAME);
+  if (amb_prev) {
+    WM_xr_actionmap_binding_ensure_unique(ami, amb);
+  }
+
+  BLI_addtail(&ami->bindings, amb);
+
+  /* Set non-zero threshold by default. */
+  amb->float_threshold = 0.3f;
+
+  return amb;
+}
+
+static XrActionMapBinding *wm_xr_actionmap_binding_list_find_except(ListBase *lb,
+                                                                    const char *idname,
+                                                                    XrActionMapBinding *ambexcept)
+{
+  LISTBASE_FOREACH (XrActionMapBinding *, amb, lb) {
+    if (STREQLEN(idname, amb->idname, XR_AMB_MAX_NAME) && (amb != ambexcept)) {
+      return amb;
+    }
+  }
+
+  return NULL;
+}
+
+void WM_xr_actionmap_binding_ensure_unique(XrActionMapItem *ami, XrActionMapBinding *amb)
+{
+  /* Ensure unique name. */
+  char name[XR_AMB_MAX_NAME];
+  char *suffix;
+  size_t baselen;
+  size_t idx = 0;
+
+  BLI_strncpy(name, amb->idname, XR_AMB_MAX_NAME);
+  baselen = BLI_strnlen(name, XR_AMB_MAX_NAME);
+  suffix = &name[baselen];
+
+  while (wm_xr_actionmap_binding_list_find_except(&ami->bindings, name, amb)) {
+    if ((baselen + 1) + (log10(++idx) + 1) > XR_AMB_MAX_NAME) {
+      /* Use default base name. */
+      BLI_strncpy(name, XR_AMB_STR_DEFAULT, XR_AMB_MAX_NAME);
+      baselen = BLI_strnlen(name, XR_AMB_MAX_NAME);
+      suffix = &name[baselen];
+      idx = 0;
+    }
+    else {
+      BLI_snprintf(suffix, XR_AMB_MAX_NAME, "%zu", idx);
+    }
+  }
+
+  BLI_strncpy(amb->idname, name, XR_AMB_MAX_NAME);
+}
+
+static XrActionMapBinding *wm_xr_actionmap_binding_copy(XrActionMapBinding *amb_src)
+{
+  XrActionMapBinding *amb_dst = MEM_dupallocN(amb_src);
+
+  amb_dst->prev = amb_dst->next = NULL;
+
+  return amb_dst;
+}
+
+XrActionMapBinding *WM_xr_actionmap_binding_add_copy(XrActionMapItem *ami,
+                                                     XrActionMapBinding *amb_src)
+{
+  XrActionMapBinding *amb_dst = wm_xr_actionmap_binding_copy(amb_src);
+
+  WM_xr_actionmap_binding_ensure_unique(ami, amb_dst);
+
+  BLI_addtail(&ami->bindings, amb_dst);
+
+  return amb_dst;
+}
+
+bool WM_xr_actionmap_binding_remove(XrActionMapItem *ami, XrActionMapBinding *amb)
+{
+  int idx = BLI_findindex(&ami->bindings, amb);
+
+  if (idx != -1) {
+    BLI_freelinkN(&ami->bindings, amb);
+
+    if (idx <= ami->selbinding) {
+      if (--ami->selbinding < 0) {
+        ami->selbinding = 0;
+      }
+    }
+
+    return true;
+  }
+  return false;
+}
+
+XrActionMapBinding *WM_xr_actionmap_binding_list_find(ListBase *lb, const char *idname)
+{
+  LISTBASE_FOREACH (XrActionMapBinding *, amb, lb) {
+    if (STREQLEN(idname, amb->idname, XR_AMB_MAX_NAME)) {
+      return amb;
+    }
+  }
+
+  return NULL;
+}
+
+/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Actionmap Item
@@ -189,7 +313,6 @@ XrActionMapItem *WM_xr_actionmap_item_new(XrActionMap *actionmap,
 
   /* Set type to float (button) input by default. */
   ami->type = XR_FLOAT_INPUT;
-  ami->threshold = 0.3f;
 
   WM_xr_actionconfig_update_tag(actionmap, ami);
 
@@ -237,26 +360,32 @@ void WM_xr_actionmap_item_ensure_unique(XrActionMap *actionmap, XrActionMapItem 
   BLI_strncpy(ami->idname, name, XR_AMI_MAX_NAME);
 }
 
-static XrActionMapItem *wm_xr_actionmap_item_copy(XrActionMapItem *ami)
+static XrActionMapItem *wm_xr_actionmap_item_copy(XrActionMapItem *ami_src)
 {
-  XrActionMapItem *amin = MEM_dupallocN(ami);
+  XrActionMapItem *ami_dst = MEM_dupallocN(ami_src);
 
-  amin->prev = amin->next = NULL;
-  amin->flag &= ~XR_AMI_UPDATE;
+  ami_dst->prev = ami_dst->next = NULL;
+  BLI_listbase_clear(&ami_dst->bindings);
+  ami_dst->flag &= ~XR_AMI_UPDATE;
 
-  if (amin->op_properties) {
-    amin->op_properties_ptr = MEM_callocN(sizeof(PointerRNA), "wmOpItemPtr");
-    WM_operator_properties_create(amin->op_properties_ptr, amin->op);
+  LISTBASE_FOREACH (XrActionMapBinding *, amb, &ami_src->bindings) {
+    XrActionMapBinding *amb_new = wm_xr_actionmap_binding_copy(amb);
+    BLI_addtail(&ami_dst->bindings, amb_new);
+  }
 
-    amin->op_properties = IDP_CopyProperty(amin->op_properties);
-    amin->op_properties_ptr->data = amin->op_properties;
+  if (ami_dst->op_properties) {
+    ami_dst->op_properties_ptr = MEM_callocN(sizeof(PointerRNA), "wmOpItemPtr");
+    WM_operator_properties_create(ami_dst->op_properties_ptr, ami_dst->op);
+
+    ami_dst->op_properties = IDP_CopyProperty(ami_dst->op_properties);
+    ami_dst->op_properties_ptr->data = ami_dst->op_properties;
   }
   else {
-    amin->op_properties = NULL;
-    amin->op_properties_ptr = NULL;
+    ami_dst->op_properties = NULL;
+    ami_dst->op_properties_ptr = NULL;
   }
 
-  return amin;
+  return ami_dst;
 }
 
 XrActionMapItem *WM_xr_actionmap_item_add_copy(XrActionMap *actionmap, XrActionMapItem *ami_src)
@@ -277,10 +406,8 @@ bool WM_xr_actionmap_item_remove(XrActionMap *actionmap, XrActionMapItem *ami)
   int idx = BLI_findindex(&actionmap->items, ami);
 
   if (idx != -1) {
-    if (ami->op_properties_ptr) {
-      WM_operator_properties_free(ami->op_properties_ptr);
-      MEM_freeN(ami->op_properties_ptr);
-    }
+    WM_xr_actionmap_item_bindings_clear(ami);
+    WM_xr_actionmap_item_properties_free(ami);
     BLI_freelinkN(&actionmap->items, ami);
 
     if (idx <= actionmap->selitem) {
@@ -384,6 +511,7 @@ static XrActionMap *wm_xr_actionmap_copy(XrActionMap *am_src)
 {
   XrActionMap *am_dst = MEM_dupallocN(am_src);
 
+  am_dst->prev = am_dst->next = NULL;
   BLI_listbase_clear(&am_dst->items);
   am_dst->flag &= ~(XR_ACTIONMAP_UPDATE);
 
@@ -414,8 +542,7 @@ bool WM_xr_actionmap_remove(XrActionConfig *actionconf, XrActionMap *actionmap)
 
   if (idx != -1) {
     WM_xr_actionmap_clear(actionmap);
-    BLI_remlink(&actionconf->actionmaps, actionmap);
-    MEM_freeN(actionmap);
+    BLI_freelinkN(&actionconf->actionmaps, actionmap);
 
     if (idx <= actionconf->actactionmap) {
       if (--actionconf->actactionmap < 0) {

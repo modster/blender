@@ -5074,20 +5074,20 @@ void wm_event_add_xrevent(const char *action_set_name,
       if (bimanual) {
         data->state_other[0] = ((float *)action->states)[subaction_idx_other];
       }
+      data->float_threshold = action->float_thresholds[subaction_idx];
       break;
     case XR_VECTOR2F_INPUT:
       copy_v2_v2(data->state, ((float(*)[2])action->states)[subaction_idx]);
       if (bimanual) {
         copy_v2_v2(data->state_other, ((float(*)[2])action->states)[subaction_idx_other]);
       }
+      data->float_threshold = action->float_thresholds[subaction_idx];
       break;
     case XR_POSE_INPUT:
     case XR_VIBRATION_OUTPUT:
       BLI_assert_unreachable();
       return;
   }
-
-  data->float_threshold = action->float_threshold;
 
   if (controller_aim_pose) {
     copy_v3_v3(data->controller_loc, controller_aim_pose->position);
