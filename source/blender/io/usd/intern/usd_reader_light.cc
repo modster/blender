@@ -236,7 +236,7 @@ void USDLightReader::read_object_data(Main *bmain, const double motionSampleTime
         if (pxr::UsdAttribute angle_attr = distant_light.GetAngleAttr()) {
           float angle = 0.0f;
           if (angle_attr.Get(&angle, motionSampleTime)) {
-            blight->sun_angle = angle;
+            blight->sun_angle = angle * (float)M_PI / 180.0f;
           }
         }
       }
