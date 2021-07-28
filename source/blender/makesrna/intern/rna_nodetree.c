@@ -10192,6 +10192,101 @@ static void def_geo_raycast(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_attribute_range_query(StructRNA *srna)
+{
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_AVERAGE,
+       "AVERAGE",
+       0,
+       "Average",
+       "Average of all elements inside search range"},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_SUM,
+       "SUM",
+       0,
+       "Sum",
+       "Sum of all elements inside search range"},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF,
+       "FALLOFF",
+       0,
+       "Falloff",
+       "Weighted sum based on distance relative to search range"},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_CLOSEST,
+       "NEAREST",
+       0,
+       "Nearest",
+       "Transfer the element from the closest element inside search range"},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_MINIMUM,
+       "MINIMUM",
+       0,
+       "Minimum",
+       "Smallest element inside search range"},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_MAXIMUM,
+       "MAXIMUM",
+       0,
+       "Maximum",
+       "Largest element inside search range"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static const EnumPropertyItem falloff_type_items[] = {
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_LINEAR, "LINEAR", ICON_LINCURVE, "Linear", ""},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_SHARP, "SHARP", ICON_SHARPCURVE, "Sharp", ""},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_SMOOTH, "SMOOTH", ICON_SMOOTHCURVE, "Smooth", ""},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_ROOT, "ROOT", ICON_ROOTCURVE, "Root", ""},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_SPHERE,
+       "ICON_SPHERECURVE",
+       ICON_SPHERECURVE,
+       "Sphere",
+       ""},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_STEP,
+       "STEP",
+       ICON_IPO_CONSTANT,
+       "Median Step",
+       "Map all values below 0.5 to 0.0, and all others to 1.0"},
+      {GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_CURVE, "CURVE", ICON_RNDCURVE, "Custom Curve", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  PropertyRNA *prop;
+
+  prop = RNA_def_property(srna, "invert_falloff", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(
+      prop, NULL, "custom1", GEO_NODE_ATTRIBUTE_RANGE_QUERY_INVERT_FALLOFF);
+  RNA_def_property_ui_text(prop, "Invert Falloff", "Invert the falloff weight");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryAttributeRangeQuery", "storage");
+
+  prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_attribute_domain_with_auto_items);
+  RNA_def_property_enum_default(prop, ATTR_DOMAIN_AUTO);
+  RNA_def_property_ui_text(prop, "Domain", "The geometry domain to save the result attribute in");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(
+      prop, "Mode", "Mode for combining element values inside the search range");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "input_type_radius", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_bitflag_sdna(prop, NULL, "input_type_radius");
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
+  RNA_def_property_ui_text(prop, "Input Type Radius", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "falloff_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, falloff_type_items);
+  RNA_def_property_ui_text(prop, "Falloff Type", "How values are weighted based on distance to the center");
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "falloff_curve", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "CurveMapping");
+  RNA_def_property_ui_text(prop, "Falloff Curve", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 /* -------------------------------------------------------------------------- */
 
 static void rna_def_shader_node(BlenderRNA *brna)

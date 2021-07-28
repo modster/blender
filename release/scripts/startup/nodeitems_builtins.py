@@ -493,6 +493,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeRemove"),
         NodeItem("GeometryNodeAttributeMapRange"),
         NodeItem("GeometryNodeAttributeTransfer"),
+        NodeItem("GeometryNodeAttributeRangeQuery"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
         NodeItem("ShaderNodeRGBCurve"),

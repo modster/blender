@@ -516,6 +516,11 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
         BKE_curvemapping_blend_write(writer, (const CurveMapping *)data->curve_vec);
         BKE_curvemapping_blend_write(writer, (const CurveMapping *)data->curve_rgb);
       }
+      else if ((ntree->type == NTREE_GEOMETRY) && (node->type == GEO_NODE_ATTRIBUTE_RANGE_QUERY)) {
+        BLO_write_struct_by_name(writer, node->typeinfo->storagename, node->storage);
+        NodeGeometryAttributeRangeQuery *data = (NodeGeometryAttributeRangeQuery *)node->storage;
+        BKE_curvemapping_blend_write(writer, (const CurveMapping *)data->falloff_curve);
+      }
       else if (ntree->type == NTREE_SHADER && (node->type == SH_NODE_SCRIPT)) {
         NodeShaderScript *nss = (NodeShaderScript *)node->storage;
         if (nss->bytecode) {
@@ -698,6 +703,14 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
           BLO_read_data_address(reader, &data->curve_rgb);
           if (data->curve_rgb) {
             BKE_curvemapping_blend_read(reader, data->curve_rgb);
+          }
+          break;
+        }
+        case GEO_NODE_ATTRIBUTE_RANGE_QUERY: {
+          NodeGeometryAttributeRangeQuery *data = (NodeGeometryAttributeRangeQuery *)node->storage;
+          BLO_read_data_address(reader, &data->falloff_curve);
+          if (data->falloff_curve) {
+            BKE_curvemapping_blend_read(reader, data->falloff_curve);
           }
           break;
         }
@@ -5099,6 +5112,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_mix();
   register_node_type_geo_attribute_proximity();
   register_node_type_geo_attribute_randomize();
+  register_node_type_geo_attribute_range_query();
   register_node_type_geo_attribute_remove();
   register_node_type_geo_attribute_separate_xyz();
   register_node_type_geo_attribute_transfer();

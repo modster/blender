@@ -1418,6 +1418,20 @@ typedef struct NodeGeometryRaycast {
   char _pad[1];
 } NodeGeometryRaycast;
 
+typedef struct NodeGeometryAttributeRangeQuery {
+  /* AttributeDomain. */
+  int8_t domain;
+  /* GeometryNodeAttributeRangeQueryMode. */
+  uint8_t mode;
+  /* GeometryNodeAttributeRangeQueryFalloffType. */
+  uint8_t falloff_type;
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_radius;
+  char _pad[4];
+  /* Curve mapping used in curve falloff mode. */
+  CurveMapping *falloff_curve;
+} NodeGeometryAttributeRangeQuery;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
@@ -1982,6 +1996,29 @@ typedef enum GeometryNodeRaycastMapMode {
   GEO_NODE_RAYCAST_INTERPOLATED = 0,
   GEO_NODE_RAYCAST_NEAREST = 1,
 } GeometryNodeRaycastMapMode;
+
+typedef enum GeometryNodeAttributeRangeQueryFlag {
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_INVERT_FALLOFF = (1 << 0),
+} GeometryNodeAttributeRangeQueryFlag;
+
+typedef enum GeometryNodeAttributeRangeQueryMode {
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_AVERAGE = 1,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_SUM = 2,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF = 3,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_CLOSEST = 0,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_MINIMUM = 4,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_MAXIMUM = 5,
+} GeometryNodeAttributeRangeQueryMode;
+
+typedef enum GeometryNodeAttributeRangeQueryFalloffType {
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_LINEAR = 0,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_SHARP = 1,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_SMOOTH = 2,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_ROOT = 3,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_SPHERE = 4,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_STEP = 5,
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_CURVE = 6,
+} GeometryNodeAttributeRangeQueryFalloffType;
 
 #ifdef __cplusplus
 }
