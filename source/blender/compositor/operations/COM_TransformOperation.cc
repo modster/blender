@@ -23,8 +23,6 @@
 
 #include "BLI_math.h"
 
-#include <cmath>
-
 namespace blender::compositor {
 
 TransformOperation::TransformOperation()
