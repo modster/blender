@@ -69,7 +69,7 @@
 #include "RNA_enum_types.h"
 
 /* Data structure to keep track of details about the cut location */
-struct TempBeztData {
+typedef struct CutBeztData {
   /* Index of the last bez triple before the cut. */
   int bezt_index;
   /* Nurb to which the cut belongs to. */
@@ -84,9 +84,9 @@ struct TempBeztData {
   float prev_loc[3], cut_loc[3], next_loc[3];
   /* Mouse location as floats. */
   float mval[2];
-} TempBeztData;
+} CutBeztData;
 
-struct MoveSegmentData {
+typedef struct MoveSegmentData {
   Nurb *nu;
   int bezt_index;
 } MoveSegmentData;
@@ -364,7 +364,7 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
                                                     void *op_data)
 {
 
-  struct TempBeztData *data = op_data;
+  CutBeztData *data = op_data;
 
   float resolu = nu->resolu;
   float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), "makeCut_bezier");
@@ -416,7 +416,7 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
 /* Update the closest point in the data structure. */
 static void update_closest_point_in_data(void *op_data, int resolution, ViewContext *vc)
 {
-  struct TempBeztData *data = op_data;
+  CutBeztData *data = op_data;
   bool found_min = false;
   float point[3];
   float factor;
@@ -487,7 +487,7 @@ static void calculate_new_bezier_point(const float point_prev[3],
 /* Update the nearest point data for all nurbs. */
 static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op_data)
 {
-  struct TempBeztData *data = op_data;
+  CutBeztData *data = op_data;
 
   for (Nurb *nu = nurbs->first; nu; nu = nu->next) {
     if (nu->type == CU_BEZIER) {
@@ -520,7 +520,7 @@ static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op
 static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
-  struct TempBeztData *data = op_data;
+  CutBeztData *data = op_data;
 
   BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
                                               "new_bezt_nurb");
@@ -576,13 +576,13 @@ static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
 /* Make a cut on the nearest nurb at the closest point. */
 static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *vc)
 {
-  struct TempBeztData data = {.bezt_index = 0,
-                              .min_dist = 10000,
-                              .parameter = 0.5f,
-                              .has_prev = false,
-                              .has_next = false,
-                              .mval[0] = event->mval[0],
-                              .mval[1] = event->mval[1]};
+  CutBeztData data = {.bezt_index = 0,
+                      .min_dist = 10000,
+                      .parameter = 0.5f,
+                      .has_prev = false,
+                      .has_next = false,
+                      .mval[0] = event->mval[0],
+                      .mval[1] = event->mval[1]};
 
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
 
@@ -646,17 +646,17 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
   float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
 
-  struct TempBeztData data = {.bezt_index = 0,
-                              .min_dist = 10000,
-                              .parameter = 0.5f,
-                              .has_prev = false,
-                              .has_next = false,
-                              .mval[0] = event->mval[0],
-                              .mval[1] = event->mval[1]};
+  CutBeztData data = {.bezt_index = 0,
+                      .min_dist = 10000,
+                      .parameter = 0.5f,
+                      .has_prev = false,
+                      .has_next = false,
+                      .mval[0] = event->mval[0],
+                      .mval[1] = event->mval[1]};
 
   update_data_for_all_nurbs(nurbs, vc, &data);
 
-  struct MoveSegmentData *seg_data;
+  MoveSegmentData *seg_data;
   op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), "MoveSegmentData");
   seg_data->bezt_index = data.bezt_index;
   seg_data->nu = data.nurb;
@@ -667,7 +667,7 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
 }
 
 /* Move segment to mouse pointer. */
-static void move_segment(struct MoveSegmentData *seg_data, const wmEvent *event, ViewContext *vc)
+static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewContext *vc)
 {
   Nurb *nu = seg_data->nu;
   BezTriple *bezt1 = nu->bezt + seg_data->bezt_index;
@@ -801,7 +801,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
     if (dragging) {
       if (moving_segment) {
-        struct MoveSegmentData *seg_data = op->customdata;
+        MoveSegmentData *seg_data = op->customdata;
         nu = seg_data->nu;
         move_segment(seg_data, event, &vc);
       }
