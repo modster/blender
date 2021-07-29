@@ -407,12 +407,12 @@ void MemoryBuffer::addPixel(int x, int y, const float color[4])
 
 static void read_ewa_elem(void *userdata, int x, int y, float result[4])
 {
-  MemoryBuffer *buffer = (MemoryBuffer *)userdata;
+  const MemoryBuffer *buffer = static_cast<const MemoryBuffer *>(userdata);
   buffer->read_elem_checked(x, y, result);
 }
 
 void MemoryBuffer::read_elem_filtered(
-    const float x, const float y, float dx[2], float dy[2], float *out)
+    const float x, const float y, float dx[2], float dy[2], float *out) const
 {
   BLI_assert(this->m_datatype == DataType::Color);
   if (m_is_a_single_elem) {
@@ -438,7 +438,7 @@ void MemoryBuffer::read_elem_filtered(
                    du_normal,
                    dv_normal,
                    read_ewa_elem,
-                   this,
+                   const_cast<MemoryBuffer *>(this),
                    out);
   }
 }

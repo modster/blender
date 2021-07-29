@@ -250,7 +250,8 @@ class MemoryBuffer {
     }
   }
 
-  void read_elem_filtered(const float x, const float y, float dx[2], float dy[2], float *out);
+  void read_elem_filtered(
+      const float x, const float y, float dx[2], float dy[2], float *out) const;
 
   /**
    * Get channel value at given coordinates.
