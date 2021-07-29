@@ -282,19 +282,53 @@ void uvedit_face_select_set_with_sticky(const SpaceImage *sima,
     case SI_STICKY_LOC:
     case SI_STICKY_VERTEX:
     default: {
-      /* Sticky location and vertex modes. */
-      /* Fallback, in case sima->sticky is invalid */
-      BMLoop *l_iter, *l_first;
-      l_iter = l_first = BM_FACE_FIRST_LOOP(efa);
-      do {
-        uvedit_edge_select_shared_location(
-            scene, em, l_iter, select, false, do_history, cd_loop_uv_offset);
+      if (uvedit_face_visible_test(scene, efa)) {
+        /* Sticky location and vertex modes. */
+        /* Fallback, in case sima->sticky is invalid */
+        BMLoop *l_iter, *l_first;
+        l_iter = l_first = BM_FACE_FIRST_LOOP(efa);
+        do {
+          MLoopUV *luv = BM_ELEM_CD_GET_VOID_P(l_iter, cd_loop_uv_offset);
+          if (select) {
+            /* Set selection flag for the internal edges of the face that is being selected */
+            luv->flag |= MLOOPUV_EDGESEL;
+            /* Select all shared vertices */
+            uvedit_uv_select_shared_location(
+                scene, em, l_iter, select, false, do_history, cd_loop_uv_offset);
+          }
+          else {
+            luv->flag &= ~MLOOPUV_EDGESEL;
 
-        uvedit_uv_select_shared_location(
-            scene, em, l_iter, select, false, do_history, cd_loop_uv_offset);
-        uvedit_uv_select_shared_location(
-            scene, em, l_iter->next, select, false, do_history, cd_loop_uv_offset);
-      } while ((l_iter = l_iter->next) != l_first);
+            bool do_vert_deselect = true;
+            BMEdge *e_first = l_iter->e, *e_iter;
+            e_iter = e_first;
+            do {
+              /* If any surrounding UV face is selected then don't deselect the shared UV vertices
+               * Deselcting the shared UV vertices could deselect the surrounding UV faces as
+               * well*/
+              BMLoop *l_radial_iter = e_iter->l;
+              do {
+                MLoopUV *luv_radial_other = BM_ELEM_CD_GET_VOID_P(l_radial_iter,
+                                                                  cd_loop_uv_offset);
+                if ((l_radial_iter->f != l_iter->f) &&
+                    uvedit_face_select_test(scene, l_radial_iter->f, cd_loop_uv_offset) &&
+                    equals_v2v2(luv->uv, luv_radial_other->uv)) {
+                  do_vert_deselect = false;
+                  break;
+                }
+              } while ((l_radial_iter = l_radial_iter->radial_next) != e_iter->l);
+              if (!do_vert_deselect) {
+                break;
+              }
+            } while ((e_iter = BM_DISK_EDGE_NEXT(e_iter, l_iter->v)) != e_first);
+
+            if (do_vert_deselect) {
+              uvedit_uv_select_shared_location(
+                  scene, em, l_iter, select, false, do_history, cd_loop_uv_offset);
+            }
+          }
+        } while ((l_iter = l_iter->next) != l_first);
+      }
       break;
     }
   }
@@ -438,10 +472,10 @@ void uvedit_edge_select_set_with_sticky(const struct SpaceImage *sima,
       uvedit_edge_select_shared_location(
           scene, em, l, select, false, do_history, cd_loop_uv_offset);
 
-      /* NOTE: This is a case where we deviate from the logic of: "EDGE SELECTION MODE SHOULD
-       * IMPLY ONLY EDGES MUST BE SELECTED".
-       * The UV vertex selections done below are to avoid the cases of edge selections breaking
-       * away (/become separate entities) from the vertices/edges they were connected to */
+      /* NOTE (Design tradeoff): This is a case where we deviate from the logic of: "EDGE
+       * SELECTION MODE SHOULD IMPLY ONLY EDGES MUST BE SELECTED". The UV vertex selections done
+       * below are to avoid the cases of edge selections breaking away (/become separate
+       * entities) from the vertices/edges they were connected to */
       uvedit_uv_select_shared_location(scene, em, l, select, false, do_history, cd_loop_uv_offset);
       uvedit_uv_select_shared_location(
           scene, em, l->next, select, false, do_history, cd_loop_uv_offset);
@@ -2980,7 +3014,7 @@ static void uv_select_flush_from_tag_sticky_loc_internal(Scene *scene,
 /**
  * Flush the selection from face tags based on sticky and selection modes.
  *
- * needed because settings the selection a face is done in a number of places but it also
+ * needed because setting the selection of a face is done in a number of places but it also
  * needs to respect the sticky modes for the UV verts, so dealing with the sticky modes
  * is best done in a separate function.
  *
@@ -3063,11 +3097,11 @@ static void uv_select_flush_from_tag_face(SpaceImage *sima,
 /**
  * Flush the selection from loop tags based on sticky and selection modes.
  *
- * needed because settings the selection a face is done in a number of places but it also needs
+ * needed because setting the selection of a face is done in a number of places but it also needs
  * to respect the sticky modes for the UV verts, so dealing with the sticky modes is best done
  * in a separate function.
  *
- * \note This function is very similar to #uv_select_flush_from_tag_loop,
+ * \note This function is very similar to #uv_select_flush_from_tag_face,
  * be sure to update both upon changing.
  */
 static void uv_select_flush_from_tag_loop(SpaceImage *sima,
