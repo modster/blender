@@ -253,6 +253,9 @@ bool USDMeshReader::topology_changed(Mesh *existing_mesh, const double motionSam
   mesh_prim_.GetFaceVertexCountsAttr().Get(&face_counts_, motionSampleTime);
   mesh_prim_.GetPointsAttr().Get(&positions_, motionSampleTime);
 
+  /* TODO(makowalski): Reading normals probably doesn't belong in this function,
+   * as this is not required to determine if the topology has changed. */
+
   /* If 'normals' and 'primvars:normals' are both specified, the latter has precedence. */
   pxr::UsdGeomPrimvar primvar = mesh_prim_.GetPrimvar(usdtokens::normalsPrimvar);
   if (primvar.HasValue()) {
@@ -812,7 +815,9 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
   Mesh *active_mesh = existing_mesh;
   bool new_mesh = false;
 
-  /* Only read point data when streaming meshes, unless we need to create new ones. */
+  /* TODO(makowalski): inmplement the optimization of only updating the mesh points when
+   * the topology is consistent, as in the Alembic importer. */
+
   ImportSettings settings;
   settings.read_flag |= read_flag;
 
