@@ -5728,7 +5728,7 @@ void CURVE_OT_extrude(wmOperatorType *ot)
 /** \name Make Cyclic Operator
  * \{ */
 
-static bool curve_toggle_cyclic(View3D *v3d, ListBase *editnurb, int direction)
+bool curve_toggle_cyclic(View3D *v3d, ListBase *editnurb, int direction)
 {
   BezTriple *bezt;
   BPoint *bp;

@@ -727,6 +727,35 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   }
 }
 
+/* Close the spline if endpoints are selected consecutively. Returns true if endpoints selected. */
+static bool close_loop_if_endpoints(
+    Nurb *sel_nu, BezTriple *sel_bezt, BPoint *sel_bp, ViewContext *vc, bContext *C)
+{
+  if (sel_bezt || sel_bp) {
+    bool is_bezt_endpoint = (sel_nu->bezt && (sel_bezt == sel_nu->bezt ||
+                                              sel_bezt == sel_nu->bezt + sel_nu->pntsu - 1));
+    bool is_bp_endpoint = (sel_nu->bp &&
+                           (sel_bp == sel_nu->bp || sel_bp == sel_nu->bp + sel_nu->pntsu - 1));
+    if (!(is_bezt_endpoint || is_bp_endpoint)) {
+      return;
+    }
+
+    short hand;
+    Nurb *nu = NULL;
+    BezTriple *bezt = NULL;
+    BPoint *bp = NULL;
+    Base *basact = NULL;
+    ED_curve_pick_vert(vc, 1, &nu, &bezt, &bp, &hand, &basact);
+
+    if (nu == sel_nu && ((nu->bezt && (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
+                         (nu->bp && (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
+      View3D *v3d = CTX_wm_view3d(C);
+      ListBase *editnurb = object_editcurve_get(vc->obedit);
+      curve_toggle_cyclic(v3d, editnurb, 0);
+    }
+  }
+}
+
 enum {
   PEN_MODAL_CANCEL = 1,
   PEN_MODAL_FREE_MOVE_HANDLE,
@@ -811,7 +840,9 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
         }
         if (bezt) {
-          move_bezt_handles_to_mouse(bezt, nu->bezt + nu->pntsu - 1 == bezt, event, &vc);
+          bool invert = (nu->bezt + nu->pntsu - 1 == bezt && !(nu->flagu & CU_NURB_CYCLIC)) ||
+                        (nu->bezt == bezt && (nu->flagu & CU_NURB_CYCLIC));
+          move_bezt_handles_to_mouse(bezt, invert, event, &vc);
         }
       }
       /* Move entire control point with mouse cursor if dragging an existing control point. */
@@ -861,7 +892,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else {
-        /* Check if point underneath mouse. Get point if any. */
+        /* Get currently selected point if any. Used for making spline cyclic. */
+        Curve *cu = vc.obedit->data;
+        ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
+
+        /* Select a point if it's underneath the mouse. */
         retval = ED_curve_editnurb_select_pick(C, event->mval, false, false, false);
         RNA_boolean_set(op->ptr, "new", !retval);
 
@@ -872,6 +907,15 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           }
           else {
             add_point_connected_to_selected_point(&vc, obedit, event);
+          }
+        }
+        else {
+          copy_v2_v2_int(vc.mval, event->mval);
+          if (nu && !(nu->flagu & CU_NURB_CYCLIC)) {
+            bool is_endpoints = close_loop_if_endpoints(nu, bezt, bp, &vc, C);
+
+            /* Set "new" to true to be able to click and drag to control handles when added. */
+            RNA_boolean_set(op->ptr, "new", true);
           }
         }
       }
