@@ -42,8 +42,8 @@ using blender::bke::GeometryInstanceGroup;
 static bNodeSocketTemplate geo_node_point_distribute_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Distance Min"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Density Max"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
-    {SOCK_STRING, N_("Density Attribute")},
+    {SOCK_FLOAT, N_("Density Max"), 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
+    {SOCK_FLOAT, N_("Density Factor"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
     {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000},
     {-1, ""},
 };
@@ -94,7 +94,7 @@ static Span<MLoopTri> get_mesh_looptris(const Mesh &mesh)
 static void sample_mesh_surface(const Mesh &mesh,
                                 const float4x4 &transform,
                                 const float base_density,
-                                const VArray<float> *density_factors,
+                                const VArray<float> &density,
                                 const int seed,
                                 Vector<float3> &r_positions,
                                 Vector<float3> &r_bary_coords,
@@ -114,19 +114,16 @@ static void sample_mesh_surface(const Mesh &mesh,
     const float3 v1_pos = transform * float3(mesh.mvert[v1_index].co);
     const float3 v2_pos = transform * float3(mesh.mvert[v2_index].co);
 
-    float looptri_density_factor = 1.0f;
-    if (density_factors != nullptr) {
-      const float v0_density_factor = std::max(0.0f, density_factors->get(v0_loop));
-      const float v1_density_factor = std::max(0.0f, density_factors->get(v1_loop));
-      const float v2_density_factor = std::max(0.0f, density_factors->get(v2_loop));
-      looptri_density_factor = (v0_density_factor + v1_density_factor + v2_density_factor) / 3.0f;
-    }
+    const float v0_density = std::max(0.0f, density[v0_loop]);
+    const float v1_density = std::max(0.0f, density[v1_loop]);
+    const float v2_density = std::max(0.0f, density[v2_loop]);
+    float looptri_density = (v0_density + v1_density + v2_density) / 3.0f;
     const float area = area_tri_v3(v0_pos, v1_pos, v2_pos);
 
     const int looptri_seed = BLI_hash_int(looptri_index + seed);
     RandomNumberGenerator looptri_rng(looptri_seed);
 
-    const float points_amount_fl = area * base_density * looptri_density_factor;
+    const float points_amount_fl = area * base_density * looptri_density;
     const float add_point_probability = fractf(points_amount_fl);
     const bool add_point = add_point_probability > looptri_rng.get_float();
     const int point_amount = (int)points_amount_fl + (int)add_point;
@@ -471,45 +468,41 @@ BLI_NOINLINE static void add_remaining_point_attributes(
 }
 
 static void distribute_points_random(Span<GeometryInstanceGroup> set_groups,
-                                     const StringRef density_attribute_name,
-                                     const float density,
+                                     const float base_density,
+                                     const bke::FieldRef<float> &density_field,
                                      const int seed,
                                      MutableSpan<Vector<float3>> positions_all,
                                      MutableSpan<Vector<float3>> bary_coords_all,
                                      MutableSpan<Vector<int>> looptri_indices_all)
 {
-  /* If there is an attribute name, the default value for the densities should be zero so that
-   * points are only scattered where the attribute exists. Otherwise, just "ignore" the density
-   * factors. */
-  const bool use_one_default = density_attribute_name.is_empty();
-
   int i_instance = 0;
   for (const GeometryInstanceGroup &set_group : set_groups) {
     const GeometrySet &set = set_group.geometry_set;
     const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
-    GVArray_Typed<float> density_factors = component.attribute_get_for_read<float>(
-        density_attribute_name, ATTR_DOMAIN_CORNER, use_one_default ? 1.0f : 0.0f);
     const Mesh &mesh = *component.get_for_read();
+
+    bke::FieldInputs density_field_inputs = density_field->prepare_inputs();
+    Vector<std::unique_ptr<bke::FieldInputValue>> density_field_input_values;
+    prepare_field_inputs(
+        density_field_inputs, component, ATTR_DOMAIN_CORNER, density_field_input_values);
+    bke::FieldOutput density_field_output = density_field->evaluate(IndexRange(mesh.totloop),
+                                                                    density_field_inputs);
+    GVArray_Typed<float> density{density_field_output.varray_ref()};
+
     for (const float4x4 &transform : set_group.transforms) {
       Vector<float3> &positions = positions_all[i_instance];
       Vector<float3> &bary_coords = bary_coords_all[i_instance];
       Vector<int> &looptri_indices = looptri_indices_all[i_instance];
-      sample_mesh_surface(mesh,
-                          transform,
-                          density,
-                          &*density_factors,
-                          seed,
-                          positions,
-                          bary_coords,
-                          looptri_indices);
+      sample_mesh_surface(
+          mesh, transform, base_density, density, seed, positions, bary_coords, looptri_indices);
       i_instance++;
     }
   }
 }
 
 static void distribute_points_poisson_disk(Span<GeometryInstanceGroup> set_groups,
-                                           const StringRef density_attribute_name,
-                                           const float density,
+                                           const float max_density,
+                                           const bke::FieldRef<float> &density_field,
                                            const int seed,
                                            const float minimum_distance,
                                            MutableSpan<Vector<float3>> positions_all,
@@ -527,19 +520,20 @@ static void distribute_points_poisson_disk(Span<GeometryInstanceGroup> set_group
       Vector<float3> &positions = positions_all[i_instance];
       Vector<float3> &bary_coords = bary_coords_all[i_instance];
       Vector<int> &looptri_indices = looptri_indices_all[i_instance];
-      sample_mesh_surface(
-          mesh, transform, density, nullptr, seed, positions, bary_coords, looptri_indices);
+      sample_mesh_surface(mesh,
+                          transform,
+                          max_density,
+                          VArray_For_Single<float>(1.0f, mesh.totloop),
+                          seed,
+                          positions,
+                          bary_coords,
+                          looptri_indices);
 
       instance_start_offsets[i_instance] = initial_points_len;
       initial_points_len += positions.size();
       i_instance++;
     }
   }
-
-  /* If there is an attribute name, the default value for the densities should be zero so that
-   * points are only scattered where the attribute exists. Otherwise, just "ignore" the density
-   * factors. */
-  const bool use_one_default = density_attribute_name.is_empty();
 
   /* Unlike the other result arrays, the elimination mask in stored as a flat array for every
    * point, in order to simplify culling points from the KDTree (which needs to know about all
@@ -556,8 +550,14 @@ static void distribute_points_poisson_disk(Span<GeometryInstanceGroup> set_group
     const GeometrySet &set = set_group.geometry_set;
     const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
     const Mesh &mesh = *component.get_for_read();
-    const GVArray_Typed<float> density_factors = component.attribute_get_for_read<float>(
-        density_attribute_name, ATTR_DOMAIN_CORNER, use_one_default ? 1.0f : 0.0f);
+
+    bke::FieldInputs density_field_inputs = density_field->prepare_inputs();
+    Vector<std::unique_ptr<bke::FieldInputValue>> density_field_input_values;
+    prepare_field_inputs(
+        density_field_inputs, component, ATTR_DOMAIN_CORNER, density_field_input_values);
+    bke::FieldOutput density_field_output = density_field->evaluate(IndexRange(mesh.totloop),
+                                                                    density_field_inputs);
+    GVArray_Typed<float> density{density_field_output.varray_ref()};
 
     for (const int UNUSED(i_set_instance) : set_group.transforms.index_range()) {
       Vector<float3> &positions = positions_all[i_instance];
@@ -567,7 +567,7 @@ static void distribute_points_poisson_disk(Span<GeometryInstanceGroup> set_group
       const int offset = instance_start_offsets[i_instance];
       update_elimination_mask_based_on_density_factors(
           mesh,
-          density_factors,
+          density,
           bary_coords,
           looptri_indices,
           elimination_mask.as_mutable_span().slice(offset, positions.size()));
@@ -590,11 +590,10 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       static_cast<GeometryNodePointDistributeMode>(params.node().custom1);
 
   const int seed = params.get_input<int>("Seed") * 5383843;
-  const float density = params.extract_input<float>("Density Max");
-  const std::string density_attribute_name = params.extract_input<std::string>(
-      "Density Attribute");
+  const float density_max = params.extract_input<float>("Density Max");
+  bke::FieldRef<float> density_field = params.get_input_field<float>("Density Factor");
 
-  if (density <= 0.0f) {
+  if (density_max <= 0.0f) {
     params.set_output("Geometry", GeometrySet());
     return;
   }
@@ -635,8 +634,8 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   switch (distribute_method) {
     case GEO_NODE_POINT_DISTRIBUTE_RANDOM: {
       distribute_points_random(set_groups,
-                               density_attribute_name,
-                               density,
+                               density_max,
+                               density_field,
                                seed,
                                positions_all,
                                bary_coords_all,
@@ -646,8 +645,8 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     case GEO_NODE_POINT_DISTRIBUTE_POISSON: {
       const float minimum_distance = params.extract_input<float>("Distance Min");
       distribute_points_poisson_disk(set_groups,
-                                     density_attribute_name,
-                                     density,
+                                     density_max,
+                                     density_field,
                                      seed,
                                      minimum_distance,
                                      positions_all,
