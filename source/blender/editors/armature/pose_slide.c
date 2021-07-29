@@ -1046,10 +1046,9 @@ static int pose_slide_invoke_common(bContext *C, wmOperator *op, const wmEvent *
   /* Add a modal handler for this operator. */
   WM_event_add_modal_handler(C, op);
 
-  /* Hide Bone Overlay. */
+  /* Save current bone visibility. */
   View3D *v3d = pso->area->spacedata.first;
   pso->overlay_flag = v3d->overlay.flag;
-  v3d->overlay.flag |= V3D_OVERLAY_HIDE_BONES;
 
   return OPERATOR_RUNNING_MODAL;
 }
@@ -1254,6 +1253,7 @@ static int pose_slide_modal(bContext *C, wmOperator *op, const wmEvent *event)
           case EVT_HKEY: {
             View3D *v3d = pso->area->spacedata.first;
             v3d->overlay.flag ^= V3D_OVERLAY_HIDE_BONES;
+            ED_region_tag_redraw(pso->region);
           }
 
           default: /* Some other unhandled key... */
