@@ -5049,11 +5049,10 @@ void CustomData_data_transfer(const MeshPairRemap *me_remap,
   MEM_SAFE_FREE(tmp_data_src);
 }
 
-/** Takes ownership of `debug_name`. */
 AnonymousCustomDataLayerID *CustomData_anonymous_id_new(const char *debug_name)
 {
   AnonymousCustomDataLayerID *layer_id = MEM_callocN(sizeof(AnonymousCustomDataLayerID), __func__);
-  layer_id->debug_name = debug_name;
+  layer_id->debug_name = BLI_strdup(debug_name);
   return layer_id;
 }
 
@@ -5065,40 +5064,44 @@ static void CustomData_anonymous_id_free(AnonymousCustomDataLayerID *layer_id)
   MEM_freeN(layer_id);
 }
 
-void CustomData_anonymous_id_strong_decrement(AnonymousCustomDataLayerID *layer_id)
+void CustomData_anonymous_id_strong_decrement(const AnonymousCustomDataLayerID *layer_id)
 {
-  int strong_references = atomic_sub_and_fetch_int32(&layer_id->strong_references, 1);
+  AnonymousCustomDataLayerID *mutable_layer_id = (AnonymousCustomDataLayerID *)layer_id;
+  int strong_references = atomic_sub_and_fetch_int32(&mutable_layer_id->strong_references, 1);
   BLI_assert(strong_references >= 0);
   UNUSED_VARS_NDEBUG(strong_references);
 
-  int tot_references = atomic_sub_and_fetch_int32(&layer_id->tot_references, 1);
+  int tot_references = atomic_sub_and_fetch_int32(&mutable_layer_id->tot_references, 1);
   BLI_assert(tot_references >= 0);
   if (tot_references == 0) {
-    CustomData_anonymous_id_free(layer_id);
+    CustomData_anonymous_id_free(mutable_layer_id);
   }
 }
 
-void CustomData_anonymous_id_strong_increment(AnonymousCustomDataLayerID *layer_id)
+void CustomData_anonymous_id_strong_increment(const AnonymousCustomDataLayerID *layer_id)
 {
-  atomic_add_and_fetch_int32(&layer_id->tot_references, 1);
-  atomic_add_and_fetch_int32(&layer_id->strong_references, 1);
+  AnonymousCustomDataLayerID *mutable_layer_id = (AnonymousCustomDataLayerID *)layer_id;
+  atomic_add_and_fetch_int32(&mutable_layer_id->tot_references, 1);
+  atomic_add_and_fetch_int32(&mutable_layer_id->strong_references, 1);
 }
 
-void CustomData_anonymous_id_weak_decrement(AnonymousCustomDataLayerID *layer_id)
+void CustomData_anonymous_id_weak_decrement(const AnonymousCustomDataLayerID *layer_id)
 {
-  int tot_references = atomic_sub_and_fetch_int32(&layer_id->tot_references, 1);
+  AnonymousCustomDataLayerID *mutable_layer_id = (AnonymousCustomDataLayerID *)layer_id;
+  int tot_references = atomic_sub_and_fetch_int32(&mutable_layer_id->tot_references, 1);
   BLI_assert(tot_references >= 0);
   if (tot_references == 0) {
-    CustomData_anonymous_id_free(layer_id);
+    CustomData_anonymous_id_free(mutable_layer_id);
   }
 }
 
-void CustomData_anonymous_id_weak_increment(AnonymousCustomDataLayerID *layer_id)
+void CustomData_anonymous_id_weak_increment(const AnonymousCustomDataLayerID *layer_id)
 {
-  atomic_add_and_fetch_int32(&layer_id->tot_references, 1);
+  AnonymousCustomDataLayerID *mutable_layer_id = (AnonymousCustomDataLayerID *)layer_id;
+  atomic_add_and_fetch_int32(&mutable_layer_id->tot_references, 1);
 }
 
-bool CustomData_layer_is_unused_anonymous(CustomDataLayer *layer)
+bool CustomData_layer_is_unused_anonymous(const CustomDataLayer *layer)
 {
   if (layer->flag & CD_FLAG_ANONYMOUS) {
     if (layer->anonymous_id->strong_references == 0) {

@@ -128,10 +128,10 @@ class GeometryComponent {
                             const CustomDataType data_type,
                             const AttributeInit &initializer);
 
-  AnonymousCustomDataLayerID *attribute_try_create_anonymous(const blender::StringRef debug_name,
-                                                             const AttributeDomain domain,
-                                                             const CustomDataType data_type,
-                                                             const AttributeInit &initializer);
+  bool attribute_try_create_anonymous(const AnonymousCustomDataLayerID &layer_id,
+                                      const AttributeDomain domain,
+                                      const CustomDataType data_type,
+                                      const AttributeInit &initializer);
 
   blender::bke::ReadAttributeLookup attribute_try_get_anonymous_for_read(
       const AnonymousCustomDataLayerID &layer_id) const;

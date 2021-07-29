@@ -59,7 +59,7 @@ typedef struct CustomDataLayer {
   char name[64];
   /** Layer data. */
   void *data;
-  struct AnonymousCustomDataLayerID *anonymous_id;
+  const struct AnonymousCustomDataLayerID *anonymous_id;
 } CustomDataLayer;
 
 #define MAX_CUSTOMDATA_LAYER_NAME 64

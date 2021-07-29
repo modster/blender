@@ -484,11 +484,11 @@ void CustomData_external_reload(struct CustomData *data,
 
 /* Anonymous layers. */
 struct AnonymousCustomDataLayerID *CustomData_anonymous_id_new(const char *debug_name);
-void CustomData_anonymous_id_strong_decrement(struct AnonymousCustomDataLayerID *layer_id);
-void CustomData_anonymous_id_strong_increment(struct AnonymousCustomDataLayerID *layer_id);
-void CustomData_anonymous_id_weak_decrement(struct AnonymousCustomDataLayerID *layer_id);
-void CustomData_anonymous_id_weak_increment(struct AnonymousCustomDataLayerID *layer_id);
-bool CustomData_layer_is_unused_anonymous(struct CustomDataLayer *layer);
+void CustomData_anonymous_id_strong_decrement(const struct AnonymousCustomDataLayerID *layer_id);
+void CustomData_anonymous_id_strong_increment(const struct AnonymousCustomDataLayerID *layer_id);
+void CustomData_anonymous_id_weak_decrement(const struct AnonymousCustomDataLayerID *layer_id);
+void CustomData_anonymous_id_weak_increment(const struct AnonymousCustomDataLayerID *layer_id);
+bool CustomData_layer_is_unused_anonymous(const struct CustomDataLayer *layer);
 
 /* Mesh-to-mesh transfer data. */
 

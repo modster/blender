@@ -131,14 +131,13 @@ class DynamicAttributesProvider {
   };
 
   /** Returns the id of the new anonymous or null if no new attribute was created. */
-  virtual AnonymousCustomDataLayerID *try_create_anonymous(
-      GeometryComponent &UNUSED(component),
-      const StringRef UNUSED(debug_name),
-      const AttributeDomain UNUSED(domain),
-      const CustomDataType UNUSED(data_type),
-      const AttributeInit &UNUSED(initializer)) const
+  virtual bool try_create_anonymous(GeometryComponent &UNUSED(component),
+                                    const AnonymousCustomDataLayerID &UNUSED(layer_id),
+                                    const AttributeDomain UNUSED(domain),
+                                    const CustomDataType UNUSED(data_type),
+                                    const AttributeInit &UNUSED(initializer)) const
   {
-    return nullptr;
+    return false;
   }
 
   virtual ReadAttributeLookup try_get_anonymous_for_read(
@@ -192,11 +191,11 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
                   const CustomDataType data_type,
                   const AttributeInit &initializer) const final;
 
-  AnonymousCustomDataLayerID *try_create_anonymous(GeometryComponent &component,
-                                                   const StringRef debug_name,
-                                                   const AttributeDomain domain,
-                                                   const CustomDataType data_type,
-                                                   const AttributeInit &initializer) const final;
+  bool try_create_anonymous(GeometryComponent &component,
+                            const AnonymousCustomDataLayerID &layer_id,
+                            const AttributeDomain domain,
+                            const CustomDataType data_type,
+                            const AttributeInit &initializer) const final;
 
   ReadAttributeLookup try_get_anonymous_for_read(
       const GeometryComponent &component, const AnonymousCustomDataLayerID &layer_id) const final;

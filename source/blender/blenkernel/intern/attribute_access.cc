@@ -506,22 +506,27 @@ static std::string get_anonymous_attribute_name()
   return "anonymous_attribute_" + std::to_string(next_index);
 }
 
-AnonymousCustomDataLayerID *CustomDataAttributeProvider::try_create_anonymous(
-    GeometryComponent &component,
-    const StringRef debug_name,
-    const AttributeDomain domain,
-    const CustomDataType data_type,
-    const AttributeInit &initializer) const
+bool CustomDataAttributeProvider::try_create_anonymous(GeometryComponent &component,
+                                                       const AnonymousCustomDataLayerID &layer_id,
+                                                       const AttributeDomain domain,
+                                                       const CustomDataType data_type,
+                                                       const AttributeInit &initializer) const
 {
   if (domain_ != domain) {
-    return nullptr;
+    return false;
   }
   if (!this->type_is_supported(data_type)) {
-    return nullptr;
+    return false;
   }
   CustomData *custom_data = custom_data_access_.get_custom_data(component);
   if (custom_data == nullptr) {
-    return nullptr;
+    return false;
+  }
+  for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
+    if (layer.anonymous_id == &layer_id) {
+      /* Don't create two layers with the same id. */
+      return false;
+    }
   }
 
   const int domain_size = component.attribute_domain_size(domain_);
@@ -532,10 +537,9 @@ AnonymousCustomDataLayerID *CustomDataAttributeProvider::try_create_anonymous(
       custom_data, data_type, attribute_name.c_str());
   CustomDataLayer *layer = &custom_data->layers[layer_index];
   layer->flag |= CD_FLAG_ANONYMOUS;
-  layer->anonymous_id = CustomData_anonymous_id_new(
-      BLI_strdupn(debug_name.data(), debug_name.size()));
-  CustomData_anonymous_id_weak_increment(layer->anonymous_id);
-  return layer->anonymous_id;
+  layer->anonymous_id = &layer_id;
+  CustomData_anonymous_id_weak_increment(&layer_id);
+  return true;
 }
 
 ReadAttributeLookup CustomDataAttributeProvider::try_get_anonymous_for_read(
@@ -961,23 +965,20 @@ bool GeometryComponent::attribute_try_create(const StringRef attribute_name,
   return false;
 }
 
-AnonymousCustomDataLayerID *GeometryComponent::attribute_try_create_anonymous(
-    const blender::StringRef debug_name,
-    const AttributeDomain domain,
-    const CustomDataType data_type,
-    const AttributeInit &initializer)
+bool GeometryComponent::attribute_try_create_anonymous(const AnonymousCustomDataLayerID &layer_id,
+                                                       const AttributeDomain domain,
+                                                       const CustomDataType data_type,
+                                                       const AttributeInit &initializer)
 {
   using namespace blender::bke;
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   for (const DynamicAttributesProvider *dynamic_provider :
        providers->dynamic_attribute_providers()) {
-    AnonymousCustomDataLayerID *layer_id = dynamic_provider->try_create_anonymous(
-        *this, debug_name, domain, data_type, initializer);
-    if (layer_id != nullptr) {
-      return layer_id;
+    if (dynamic_provider->try_create_anonymous(*this, layer_id, domain, data_type, initializer)) {
+      return true;
     }
   }
-  return nullptr;
+  return false;
 }
 
 blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_anonymous_for_read(
