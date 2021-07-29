@@ -182,6 +182,9 @@ GeometryValueLog::GeometryValueLog(const GeometrySet &geometry_set, bool log_ful
   bke::geometry_set_instances_attribute_foreach(
       geometry_set,
       [&](StringRefNull attribute_name, const AttributeMetaData &meta_data) {
+        if (meta_data.anonymous_layer_id != nullptr) {
+          return true;
+        }
         this->attributes_.append({attribute_name, meta_data.domain, meta_data.data_type});
         return true;
       },
