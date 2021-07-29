@@ -10255,6 +10255,20 @@ static void def_geo_attribute_range_query(StructRNA *srna)
   RNA_def_property_ui_text(prop, "Invert Falloff", "Invert the falloff weight");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
+  prop = RNA_def_property(srna, "use_same_geometry", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(
+      prop, NULL, "custom1", GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_SAME_GEOMETRY);
+  RNA_def_property_ui_text(
+      prop, "Use Same Geometry", "Use the same geometry for center points and for querying");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "use_center_point", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(
+      prop, NULL, "custom1", GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_CENTER_POINT);
+  RNA_def_property_ui_text(
+      prop, "Use Center Point", "Include the center point when querying the same geometry");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
   RNA_def_struct_sdna_from(srna, "NodeGeometryAttributeRangeQuery", "storage");
 
   prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
@@ -10277,7 +10291,8 @@ static void def_geo_attribute_range_query(StructRNA *srna)
 
   prop = RNA_def_property(srna, "falloff_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, falloff_type_items);
-  RNA_def_property_ui_text(prop, "Falloff Type", "How values are weighted based on distance to the center");
+  RNA_def_property_ui_text(
+      prop, "Falloff Type", "How values are weighted based on distance to the center");
   RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 

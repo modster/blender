@@ -62,10 +62,14 @@ static void geo_node_attribute_range_query_layout(uiLayout *layout,
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
-  uiItemR(layout, ptr, "mode", 0, IFACE_("Mode"), ICON_NONE);
+  uiItemR(layout, ptr, "use_same_geometry", 0, IFACE_("Same Geometry"), ICON_NONE);
+  if (node->custom1 & GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_SAME_GEOMETRY) {
+    uiItemR(layout, ptr, "use_center_point", 0, IFACE_("Use Center Point"), ICON_NONE);
+  }
 
   uiItemR(layout, ptr, "input_type_radius", 0, IFACE_("Radius"), ICON_NONE);
 
+  uiItemR(layout, ptr, "mode", 0, IFACE_("Mode"), ICON_NONE);
   if (node_storage.mode == GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF) {
     uiItemR(layout, ptr, "falloff_type", 0, IFACE_("Invert Type"), ICON_NONE);
     uiItemR(layout, ptr, "invert_falloff", 0, IFACE_("Invert Falloff"), ICON_NONE);
@@ -108,18 +112,56 @@ static void geo_node_attribute_range_query_copy_storage(bNodeTree *UNUSED(dest_n
   dest_data->falloff_curve = BKE_curvemapping_copy(src_data->falloff_curve);
 }
 
-static void geo_node_attribute_range_query_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void geo_node_attribute_range_query_update(bNodeTree *ntree, bNode *node)
 {
   NodeGeometryAttributeRangeQuery &node_storage = *(NodeGeometryAttributeRangeQuery *)
                                                        node->storage;
 
   blender::nodes::update_attribute_input_socket_availabilities(
       *node, "Radius", (GeometryNodeAttributeInputMode)node_storage.input_type_radius);
+
+  /* Disable the source geometry socket when usign the same geometry for points and queries. */
+  bNodeSocket *source_geo_socket = nodeFindSocket(node, SOCK_IN, "Source Geometry");
+  bool use_same_geometry = (node->custom1 & GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_SAME_GEOMETRY);
+  if (use_same_geometry) {
+    nodeRemSocketLinks(ntree, source_geo_socket);
+  }
+  nodeSetSocketAvailability(source_geo_socket, !use_same_geometry);
 }
 
 namespace blender::nodes {
 
 struct TypeDetails {
+  static void set_zero(float &value)
+  {
+    value = 0.0f;
+  }
+
+  static void set_zero(float2 &value)
+  {
+    value = float2(0.0f);
+  }
+
+  static void set_zero(float3 &value)
+  {
+    value = float3(0.0f);
+  }
+
+  static void set_zero(int &value)
+  {
+    value = 0;
+  }
+
+  static void set_zero(bool &value)
+  {
+    value = false;
+  }
+
+  static void set_zero(ColorGeometry4f &value)
+  {
+    value = ColorGeometry4f(0.0f, 0.0f, 0.0f, 0.0f);
+  }
+
   static void add(float &sum, float value)
   {
     sum += value;
@@ -285,39 +327,12 @@ struct TypeDetails {
 template<typename ValueType> struct RangeQueryData {
   ValueType result_;
   float total_weight_;
+  int count_;
 
   /* For relative distance in falloff mode. */
   float radius_;
   /* For closest-point mode. */
   float min_dist_sq_;
-};
-
-template<typename ValueType, typename AccumulatorType> struct RangeQueryUserData {
-  const AccumulatorType accum_;
-  const GVArray_Typed<ValueType> *values_;
-
-  RangeQueryData<ValueType> data_;
-
-  RangeQueryUserData(const AccumulatorType &accum,
-                     const GVArray_Typed<ValueType> &values,
-                     float radius)
-      : accum_(accum), values_(&values)
-  {
-    BLI_assert(radius > 0.0f);
-    data_.radius_ = radius;
-    data_.result_ = ValueType(0);
-    data_.total_weight_ = 0.0f;
-    data_.min_dist_sq_ = FLT_MAX;
-  }
-
-  static void callback(void *userdata, int index, const float co[3], float dist_sq)
-  {
-    RangeQueryUserData<ValueType, AccumulatorType> &calldata = *(
-        RangeQueryUserData<ValueType, AccumulatorType> *)userdata;
-
-    ValueType value = (*calldata.values_)[index];
-    calldata.accum_.add_point(calldata.data_, float3(co), dist_sq, value);
-  }
 };
 
 struct RangeQueryAccumulator_Average {
@@ -446,11 +461,48 @@ struct RangeQueryAccumulator_Max {
   };
 };
 
+template<typename ValueType, typename AccumulatorType> struct RangeQueryUserData {
+  const AccumulatorType accum_;
+  const GVArray_Typed<ValueType> *values_;
+  const int excluded_index_;
+
+  RangeQueryData<ValueType> data_;
+
+  RangeQueryUserData(const AccumulatorType &accum,
+                     const GVArray_Typed<ValueType> &values,
+                     float radius,
+                     int excluded_index)
+      : accum_(accum), values_(&values), excluded_index_(excluded_index)
+  {
+    BLI_assert(radius > 0.0f);
+    data_.radius_ = radius;
+    TypeDetails::set_zero(data_.result_);
+    data_.total_weight_ = 0.0f;
+    data_.count_ = 0;
+    data_.min_dist_sq_ = FLT_MAX;
+  }
+
+  static void callback(void *userdata, int index, const float co[3], float dist_sq)
+  {
+    RangeQueryUserData<ValueType, AccumulatorType> &calldata = *(
+        RangeQueryUserData<ValueType, AccumulatorType> *)userdata;
+
+    if (index == calldata.excluded_index_) {
+      return;
+    }
+
+    ValueType value = (*calldata.values_)[index];
+    calldata.accum_.add_point(calldata.data_, float3(co), dist_sq, value);
+    ++calldata.data_.count_;
+  }
+};
+
 /* Cumulative range query: values, weights and counts are added to current.
  * Caller must ensure these arrays are initialized to zero!
  */
 template<typename ValueType, typename AccumulatorType>
 static void range_query_bvhtree_typed(const AccumulatorType &accum,
+                                      bool use_center_point,
                                       BVHTree *tree,
                                       const VArray<float3> &positions,
                                       const VArray<float> &radii,
@@ -473,18 +525,23 @@ static void range_query_bvhtree_typed(const AccumulatorType &accum,
         continue;
       }
 
-      RangeQueryUserData<ValueType, AccumulatorType> userdata(accum, values, radius);
-      int count = BLI_bvhtree_range_query(tree,
-                                          position,
-                                          radius,
-                                          RangeQueryUserData<ValueType, AccumulatorType>::callback,
-                                          &userdata);
+      const int excluded_index = use_center_point ? -1 : i;
+      RangeQueryUserData<ValueType, AccumulatorType> userdata(
+          accum, values, radius, excluded_index);
+      /* Note: query function returns number of hits, but this can differ from actual count if points are ignored.
+       * Used points are counted explicitly in the callback function instead.
+       */
+      BLI_bvhtree_range_query(tree,
+                              position,
+                              radius,
+                              RangeQueryUserData<ValueType, AccumulatorType>::callback,
+                              &userdata);
 
       if (!r_weighted_sums.is_empty()) {
         TypeDetails::add(r_weighted_sums[i], userdata.data_.result_);
       }
       if (!r_counts.is_empty()) {
-        r_counts[i] += count;
+        r_counts[i] += userdata.data_.count_;
       }
       if (!r_total_weights.is_empty()) {
         r_total_weights[i] += userdata.data_.total_weight_;
@@ -495,6 +552,7 @@ static void range_query_bvhtree_typed(const AccumulatorType &accum,
 
 template<typename AccumulatorType>
 static void range_query_bvhtree(const AccumulatorType &accum,
+                                bool use_center_point,
                                 BVHTree *tree,
                                 const VArray<float3> &positions,
                                 const VArray<float> &radii,
@@ -506,6 +564,7 @@ static void range_query_bvhtree(const AccumulatorType &accum,
   attribute_math::convert_to_static_type(r_weighted_sums.type(), [&](auto dummy) {
     using T = decltype(dummy);
     range_query_bvhtree_typed<T>(accum,
+                                 use_center_point,
                                  tree,
                                  positions,
                                  radii,
@@ -518,6 +577,7 @@ static void range_query_bvhtree(const AccumulatorType &accum,
 
 template<typename AccumulatorType>
 static void range_query_add_components(const AccumulatorType &accum,
+                                       bool use_center_point,
                                        const GeometrySet &src_geometry,
                                        const StringRef src_name,
                                        CustomDataType data_type,
@@ -539,6 +599,7 @@ static void range_query_add_components(const AccumulatorType &accum,
       BVHTreeFromPointCloud tree_data;
       BKE_bvhtree_from_pointcloud_get(&tree_data, pointcloud, 2);
       range_query_bvhtree(accum,
+                          use_center_point,
                           tree_data.tree,
                           positions,
                           radii,
@@ -563,6 +624,7 @@ static void range_query_add_components(const AccumulatorType &accum,
           if (mesh->totvert > 0) {
             BKE_bvhtree_from_mesh_get(&tree_data, mesh, BVHTREE_FROM_VERTS, 2);
             range_query_bvhtree(accum,
+                                use_center_point,
                                 tree_data.tree,
                                 positions,
                                 radii,
@@ -578,6 +640,7 @@ static void range_query_add_components(const AccumulatorType &accum,
           if (mesh->totedge > 0) {
             BKE_bvhtree_from_mesh_get(&tree_data, mesh, BVHTREE_FROM_EDGES, 2);
             range_query_bvhtree(accum,
+                                use_center_point,
                                 tree_data.tree,
                                 positions,
                                 radii,
@@ -591,9 +654,11 @@ static void range_query_add_components(const AccumulatorType &accum,
         }
         case ATTR_DOMAIN_FACE: {
           if (mesh->totpoly > 0) {
-            /* TODO implement triangle merging or only support triangles. This currently crashes without triangulated faces. */
-            //BKE_bvhtree_from_mesh_get(&tree_data, mesh, BVHTREE_FROM_FACES, 2);
-            //range_query_bvhtree(accum,
+            /* TODO implement triangle merging or only support triangles. This currently crashes
+             * without triangulated faces. */
+            // BKE_bvhtree_from_mesh_get(&tree_data, mesh, BVHTREE_FROM_FACES, 2);
+            // range_query_bvhtree(accum,
+            //                    use_center_point,
             //                    tree_data.tree,
             //                    positions,
             //                    radii,
@@ -601,7 +666,7 @@ static void range_query_add_components(const AccumulatorType &accum,
             //                    r_weighted_sums,
             //                    r_total_weights,
             //                    r_counts);
-            //free_bvhtree_from_mesh(&tree_data);
+            // free_bvhtree_from_mesh(&tree_data);
           }
           break;
         }
@@ -683,6 +748,8 @@ static void range_query_attribute(const GeoNodeExecParams &params,
   const GeometryNodeAttributeRangeQueryMode mode = (GeometryNodeAttributeRangeQueryMode)
                                                        storage.mode;
   const AttributeDomain input_domain = (AttributeDomain)storage.domain;
+  const bool use_center_point = (params.node().custom1 &
+                                 GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_CENTER_POINT);
 
   CustomDataType data_type;
   AttributeDomain auto_domain;
@@ -716,7 +783,8 @@ static void range_query_attribute(const GeoNodeExecParams &params,
     total_weighs_internal.reinitialize(tot_samples);
   }
   MutableSpan<int> counts_span = dst_counts ? dst_counts.as_span<int>() : counts_internal;
-  MutableSpan<float> total_weights_span = dst_total_weights ? dst_total_weights.as_span<float>() : total_weighs_internal;
+  MutableSpan<float> total_weights_span = dst_total_weights ? dst_total_weights.as_span<float>() :
+                                                              total_weighs_internal;
 
   void *output_buffer = MEM_mallocN_aligned(
       tot_samples * cpp_type.size(), cpp_type.alignment(), "weighted_sums");
@@ -724,7 +792,8 @@ static void range_query_attribute(const GeoNodeExecParams &params,
 
   attribute_math::convert_to_static_type(cpp_type, [&](auto dummy) {
     using T = decltype(dummy);
-    static const T zero(0);
+    T zero;
+    TypeDetails::set_zero(zero);
     output_span.typed<T>().fill(zero);
   });
   total_weights_span.fill(0.0f);
@@ -732,6 +801,7 @@ static void range_query_attribute(const GeoNodeExecParams &params,
 
   auto do_range_query = [&](auto accum) {
     range_query_add_components(accum,
+                               use_center_point,
                                src_geometry,
                                src_name,
                                data_type,
@@ -781,8 +851,13 @@ static void range_query_attribute(const GeoNodeExecParams &params,
 
 static void geo_node_attribute_range_query_exec(GeoNodeExecParams params)
 {
+  const bool use_same_geometry = (params.node().custom1 &
+                                  GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_SAME_GEOMETRY);
+
   GeometrySet dst_geometry_set = params.extract_input<GeometrySet>("Geometry");
-  GeometrySet src_geometry_set = params.extract_input<GeometrySet>("Source Geometry");
+  GeometrySet src_geometry_set = use_same_geometry ?
+                                     dst_geometry_set :
+                                     params.extract_input<GeometrySet>("Source Geometry");
   const std::string src_attribute_name = params.extract_input<std::string>("Source");
   const std::string dst_attribute_name = params.extract_input<std::string>("Destination");
   const std::string dst_count_name = params.extract_input<std::string>("Count");

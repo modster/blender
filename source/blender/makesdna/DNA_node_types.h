@@ -1999,6 +1999,8 @@ typedef enum GeometryNodeRaycastMapMode {
 
 typedef enum GeometryNodeAttributeRangeQueryFlag {
   GEO_NODE_ATTRIBUTE_RANGE_QUERY_INVERT_FALLOFF = (1 << 0),
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_SAME_GEOMETRY = (1 << 1),
+  GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_CENTER_POINT = (1 << 2),
 } GeometryNodeAttributeRangeQueryFlag;
 
 typedef enum GeometryNodeAttributeRangeQueryMode {
