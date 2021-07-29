@@ -656,14 +656,15 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
 
   update_data_for_all_nurbs(nurbs, vc, &data);
 
-  MoveSegmentData *seg_data;
-  op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), "MoveSegmentData");
-  seg_data->bezt_index = data.bezt_index;
-  seg_data->nu = data.nurb;
-
   float threshold_distance = get_view_zoom(data.cut_loc, vc);
-
-  return data.min_dist < threshold_distance;
+  if (data.min_dist < threshold_distance) {
+    MoveSegmentData *seg_data;
+    op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), "MoveSegmentData");
+    seg_data->bezt_index = data.bezt_index;
+    seg_data->nu = data.nurb;
+    return true;
+  }
+  return false;
 }
 
 /* Move segment to mouse pointer. */
