@@ -386,7 +386,7 @@ WriteAttributeLookup CustomDataAttributeProvider::try_get_for_write(
       continue;
     }
     CustomData_duplicate_referenced_layer_named(custom_data, layer.type, layer.name, domain_size);
-    this->layer_to_write_attribute(layer, domain_size);
+    return this->layer_to_write_attribute(layer, domain_size);
   }
   return {};
 }

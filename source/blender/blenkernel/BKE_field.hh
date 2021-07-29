@@ -126,6 +126,7 @@ class AnonymousAttributeFieldInputKey : public FieldInputKey {
             dynamic_cast<const AnonymousAttributeFieldInputKey *>(&other)) {
       return layer_id_ == other_typed->layer_id_ && type_ == other_typed->type_;
     }
+    return false;
   }
 };
 

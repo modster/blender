@@ -50,6 +50,9 @@ static bNodeSocketTemplate geo_node_point_distribute_in[] = {
 
 static bNodeSocketTemplate geo_node_point_distribute_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_VECTOR, N_("Rotation")},
+    {SOCK_VECTOR, N_("Normal")},
+    {SOCK_INT, N_("ID")},
     {-1, ""},
 };
 
@@ -343,22 +346,53 @@ BLI_NOINLINE static void interpolate_existing_attributes(
   }
 }
 
-BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> sets,
-                                                    Span<int> instance_start_offsets,
-                                                    GeometryComponent &component,
-                                                    Span<Vector<float3>> bary_coords_array,
-                                                    Span<Vector<int>> looptri_indices_array)
-{
-  OutputAttribute_Typed<int> id_attribute = component.attribute_try_get_for_output_only<int>(
-      "id", ATTR_DOMAIN_POINT);
-  OutputAttribute_Typed<float3> normal_attribute =
-      component.attribute_try_get_for_output_only<float3>("normal", ATTR_DOMAIN_POINT);
-  OutputAttribute_Typed<float3> rotation_attribute =
-      component.attribute_try_get_for_output_only<float3>("rotation", ATTR_DOMAIN_POINT);
+namespace {
+struct AnonymousAttributeIDs {
+  AnonymousCustomDataLayerID *rotation = nullptr;
+  AnonymousCustomDataLayerID *normal = nullptr;
+  AnonymousCustomDataLayerID *id = nullptr;
+};
+}  // namespace
 
-  MutableSpan<int> result_ids = id_attribute.as_span();
-  MutableSpan<float3> result_normals = normal_attribute.as_span();
-  MutableSpan<float3> result_rotations = rotation_attribute.as_span();
+BLI_NOINLINE static void compute_special_attributes(
+    Span<GeometryInstanceGroup> sets,
+    Span<int> instance_start_offsets,
+    GeometryComponent &component,
+    Span<Vector<float3>> bary_coords_array,
+    Span<Vector<int>> looptri_indices_array,
+    const AnonymousAttributeIDs &anonymous_attribute_ids)
+{
+  MutableSpan<float3> result_rotations;
+  MutableSpan<float3> result_normals;
+  MutableSpan<int> result_ids;
+
+  if (anonymous_attribute_ids.rotation != nullptr) {
+    component.attribute_try_create_anonymous(*anonymous_attribute_ids.rotation,
+                                             ATTR_DOMAIN_POINT,
+                                             CD_PROP_FLOAT3,
+                                             AttributeInitDefault());
+    WriteAttributeLookup rotation_attribute = component.attribute_try_get_anonymous_for_write(
+        *anonymous_attribute_ids.rotation);
+    result_rotations = rotation_attribute.varray->get_internal_span().typed<float3>();
+  }
+
+  if (anonymous_attribute_ids.normal != nullptr) {
+    component.attribute_try_create_anonymous(*anonymous_attribute_ids.normal,
+                                             ATTR_DOMAIN_POINT,
+                                             CD_PROP_FLOAT3,
+                                             AttributeInitDefault());
+    WriteAttributeLookup normal_attribute = component.attribute_try_get_anonymous_for_write(
+        *anonymous_attribute_ids.normal);
+    result_normals = normal_attribute.varray->get_internal_span().typed<float3>();
+  }
+
+  if (anonymous_attribute_ids.id != nullptr) {
+    component.attribute_try_create_anonymous(
+        *anonymous_attribute_ids.id, ATTR_DOMAIN_POINT, CD_PROP_INT32, AttributeInitDefault());
+    WriteAttributeLookup id_attribute = component.attribute_try_get_anonymous_for_write(
+        *anonymous_attribute_ids.id);
+    result_ids = id_attribute.varray->get_internal_span().typed<int>();
+  }
 
   int i_instance = 0;
   for (const GeometryInstanceGroup &set_group : sets) {
@@ -392,19 +426,25 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
         const float3 v1_pos = float3(mesh.mvert[v1_index].co);
         const float3 v2_pos = float3(mesh.mvert[v2_index].co);
 
-        ids[i] = (int)(bary_coord.hash() + (uint64_t)looptri_index);
-        normal_tri_v3(normals[i], v0_pos, v1_pos, v2_pos);
-        mul_m3_v3(rotation_matrix, normals[i]);
-        rotations[i] = normal_to_euler_rotation(normals[i]);
+        if (!result_ids.is_empty()) {
+          ids[i] = (int)(bary_coord.hash() + (uint64_t)looptri_index);
+        }
+        float3 normal;
+        if (!result_normals.is_empty() || !result_rotations.is_empty()) {
+          normal_tri_v3(normal, v0_pos, v1_pos, v2_pos);
+          mul_m3_v3(rotation_matrix, normal);
+        }
+        if (!result_normals.is_empty()) {
+          normals[i] = normal;
+        }
+        if (!result_rotations.is_empty()) {
+          rotations[i] = normal_to_euler_rotation(normal);
+        }
       }
 
       i_instance++;
     }
   }
-
-  id_attribute.save();
-  normal_attribute.save();
-  rotation_attribute.save();
 }
 
 BLI_NOINLINE static void add_remaining_point_attributes(
@@ -413,7 +453,8 @@ BLI_NOINLINE static void add_remaining_point_attributes(
     const Map<std::string, AttributeKind> &attributes,
     GeometryComponent &component,
     Span<Vector<float3>> bary_coords_array,
-    Span<Vector<int>> looptri_indices_array)
+    Span<Vector<int>> looptri_indices_array,
+    const AnonymousAttributeIDs &anonymous_attribute_ids)
 {
   interpolate_existing_attributes(set_groups,
                                   instance_start_offsets,
@@ -421,8 +462,12 @@ BLI_NOINLINE static void add_remaining_point_attributes(
                                   component,
                                   bary_coords_array,
                                   looptri_indices_array);
-  compute_special_attributes(
-      set_groups, instance_start_offsets, component, bary_coords_array, looptri_indices_array);
+  compute_special_attributes(set_groups,
+                             instance_start_offsets,
+                             component,
+                             bary_coords_array,
+                             looptri_indices_array,
+                             anonymous_attribute_ids);
 }
 
 static void distribute_points_random(Span<GeometryInstanceGroup> set_groups,
@@ -633,6 +678,17 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   PointCloudComponent &point_component =
       geometry_set_out.get_component_for_write<PointCloudComponent>();
 
+  AnonymousAttributeIDs anonymous_attribute_ids;
+  if (params.output_is_required("Rotation")) {
+    anonymous_attribute_ids.rotation = CustomData_anonymous_id_new("Rotation");
+  }
+  if (params.output_is_required("Normal")) {
+    anonymous_attribute_ids.normal = CustomData_anonymous_id_new("Normal");
+  }
+  if (params.output_is_required("ID")) {
+    anonymous_attribute_ids.id = CustomData_anonymous_id_new("ID");
+  }
+
   Map<std::string, AttributeKind> attributes;
   bke::geometry_set_gather_instances_attribute_info(
       set_groups, {GEO_COMPONENT_TYPE_MESH}, {"position", "normal", "id"}, attributes);
@@ -641,9 +697,26 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
                                  attributes,
                                  point_component,
                                  bary_coords_all,
-                                 looptri_indices_all);
+                                 looptri_indices_all,
+                                 anonymous_attribute_ids);
 
   params.set_output("Geometry", std::move(geometry_set_out));
+
+  if (anonymous_attribute_ids.rotation != nullptr) {
+    params.set_output("Rotation",
+                      bke::FieldRef<float3>(new bke::AnonymousAttributeField(
+                          *anonymous_attribute_ids.rotation, CPPType::get<float3>())));
+  }
+  if (anonymous_attribute_ids.normal != nullptr) {
+    params.set_output("Normal",
+                      bke::FieldRef<float3>(new bke::AnonymousAttributeField(
+                          *anonymous_attribute_ids.normal, CPPType::get<float3>())));
+  }
+  if (anonymous_attribute_ids.id != nullptr) {
+    params.set_output("ID",
+                      bke::FieldRef<int>(new bke::AnonymousAttributeField(
+                          *anonymous_attribute_ids.id, CPPType::get<int>())));
+  }
 }
 
 }  // namespace blender::nodes
