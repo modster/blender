@@ -545,7 +545,7 @@ static void range_query_add_components(const AccumulatorType &accum,
                           src_attribute.varray,
                           r_weighted_sums,
                           r_total_weights,
-                          {});
+                          r_counts);
       free_bvhtree_from_pointcloud(&tree_data);
     }
   }
@@ -569,7 +569,7 @@ static void range_query_add_components(const AccumulatorType &accum,
                                 src_attribute.varray,
                                 r_weighted_sums,
                                 r_total_weights,
-                                {});
+                                r_counts);
             free_bvhtree_from_mesh(&tree_data);
           }
           break;
@@ -584,7 +584,7 @@ static void range_query_add_components(const AccumulatorType &accum,
                                 src_attribute.varray,
                                 r_weighted_sums,
                                 r_total_weights,
-                                {});
+                                r_counts);
             free_bvhtree_from_mesh(&tree_data);
           }
           break;
@@ -600,7 +600,7 @@ static void range_query_add_components(const AccumulatorType &accum,
             //                    src_attribute.varray,
             //                    r_weighted_sums,
             //                    r_total_weights,
-            //                    {});
+            //                    r_counts);
             //free_bvhtree_from_mesh(&tree_data);
           }
           break;
