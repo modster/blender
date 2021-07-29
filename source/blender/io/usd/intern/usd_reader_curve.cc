@@ -123,9 +123,7 @@ void USDCurvesReader::read_curve_sample(Curve *cu, const double motionSampleTime
     }
     else if (basis == pxr::UsdGeomTokens->bezier) {
       /* TODO(makowalski): Beziers are not properly imported as beziers. */
-      nu->type = CU_NURBS;
-      nu->flag |= CU_SMOOTH;
-      nu->flagu |= CU_NURB_ENDPOINT;
+      nu->type = CU_POLY;
     }
     else if (basis.IsEmpty()) {
       nu->type = CU_POLY;
