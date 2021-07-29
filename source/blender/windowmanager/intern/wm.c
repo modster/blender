@@ -120,6 +120,10 @@ static void write_wm_xr_data(BlendWriter *writer, wmXrData *xr_data)
           if (ami->op[0] && ami->op_properties) {
             IDP_BlendWrite(writer, ami->op_properties);
           }
+
+          LISTBASE_FOREACH (XrActionMapBinding *, amb, &ami->bindings) {
+            BLO_write_struct(writer, XrActionMapBinding, amb);
+          }
         }
       }
     }
@@ -174,6 +178,8 @@ static void direct_link_wm_xr_data(BlendDataReader *reader, wmXrData *xr_data)
           ami->op_properties = NULL;
           ami->op_properties_ptr = NULL;
         }
+
+        BLO_read_list(reader, &ami->bindings);
       }
     }
   }
