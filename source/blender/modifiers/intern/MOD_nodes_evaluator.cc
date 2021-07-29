@@ -364,7 +364,7 @@ static void get_socket_value(const SocketRef &socket, void *r_value)
     case SOCK_VECTOR: {
       if (socket.is_input() && (socket.bsocket()->flag & SOCK_HIDE_VALUE)) {
         new (r_value) bke::FieldRef<float3>(
-            FieldPtr{new bke::AttributeField("position", CPPType::get<float3>())});
+            FieldPtr{new bke::PersistentAttributeField("position", CPPType::get<float3>())});
       }
       else {
         float3 value;

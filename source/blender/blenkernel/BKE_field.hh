@@ -33,6 +33,8 @@
 #include "FN_cpp_type_make.hh"
 #include "FN_multi_function.hh"
 
+#include "BKE_customdata.h"
+
 namespace blender::bke {
 
 using fn::CPPType;
@@ -85,13 +87,55 @@ class IndexFieldInputKey : public FieldInputKey {
   }
 };
 
-class AttributeFieldInputKey : public FieldInputKey {
+class AnonymousAttributeFieldInputKey : public FieldInputKey {
+ private:
+  AnonymousCustomDataLayerID *layer_id_;
+  const CPPType &type_;
+
+ public:
+  AnonymousAttributeFieldInputKey(AnonymousCustomDataLayerID &layer_id, const CPPType &type)
+      : layer_id_(&layer_id), type_(type)
+  {
+    CustomData_anonymous_id_strong_increment(layer_id_);
+  }
+
+  ~AnonymousAttributeFieldInputKey()
+  {
+    CustomData_anonymous_id_strong_decrement(layer_id_);
+  }
+
+  const CPPType &type() const override
+  {
+    return type_;
+  }
+
+  uint64_t hash() const override
+  {
+    return get_default_hash(layer_id_);
+  }
+
+  const AnonymousCustomDataLayerID &layer_id() const
+  {
+    return *layer_id_;
+  }
+
+ private:
+  bool is_same_as(const FieldInputKey &other) const override
+  {
+    if (const AnonymousAttributeFieldInputKey *other_typed =
+            dynamic_cast<const AnonymousAttributeFieldInputKey *>(&other)) {
+      return layer_id_ == other_typed->layer_id_ && type_ == other_typed->type_;
+    }
+  }
+};
+
+class PersistentAttributeFieldInputKey : public FieldInputKey {
  private:
   std::string name_;
   const CPPType *type_;
 
  public:
-  AttributeFieldInputKey(std::string name, const CPPType &type)
+  PersistentAttributeFieldInputKey(std::string name, const CPPType &type)
       : name_(std::move(name)), type_(&type)
   {
   }
@@ -114,8 +158,8 @@ class AttributeFieldInputKey : public FieldInputKey {
  private:
   bool is_same_as(const FieldInputKey &other) const override
   {
-    if (const AttributeFieldInputKey *other_typed = dynamic_cast<const AttributeFieldInputKey *>(
-            &other)) {
+    if (const PersistentAttributeFieldInputKey *other_typed =
+            dynamic_cast<const PersistentAttributeFieldInputKey *>(&other)) {
       return other_typed->type_ == type_ && other_typed->name_ == name_;
     }
     return false;
@@ -361,10 +405,18 @@ class MultiFunctionField : public Field {
   }
 };
 
-class AttributeField : public GVArrayInputField<AttributeFieldInputKey> {
+class PersistentAttributeField : public GVArrayInputField<PersistentAttributeFieldInputKey> {
  public:
-  AttributeField(std::string name, const CPPType &type)
-      : GVArrayInputField<AttributeFieldInputKey>(std::move(name), type)
+  PersistentAttributeField(std::string name, const CPPType &type)
+      : GVArrayInputField<PersistentAttributeFieldInputKey>(std::move(name), type)
+  {
+  }
+};
+
+class AnonymousAttributeField : public GVArrayInputField<AnonymousAttributeFieldInputKey> {
+ public:
+  AnonymousAttributeField(AnonymousCustomDataLayerID &layer_id, const CPPType &type)
+      : GVArrayInputField<AnonymousAttributeFieldInputKey>(layer_id, type)
   {
   }
 };

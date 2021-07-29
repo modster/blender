@@ -62,8 +62,8 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
 {
   const int domain_size = component.attribute_domain_size(domain);
   for (const bke::FieldInputKey &key : field_inputs) {
-    if (const bke::AttributeFieldInputKey *attribute_key =
-            dynamic_cast<const bke::AttributeFieldInputKey *>(&key)) {
+    if (const bke::PersistentAttributeFieldInputKey *attribute_key =
+            dynamic_cast<const bke::PersistentAttributeFieldInputKey *>(&key)) {
       const StringRef name = attribute_key->name();
       const CPPType &cpp_type = attribute_key->type();
       const CustomDataType type = bke::cpp_type_to_custom_data_type(cpp_type);
