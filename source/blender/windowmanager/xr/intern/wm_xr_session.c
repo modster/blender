@@ -765,7 +765,6 @@ static void wm_xr_session_controller_data_update(const bContext *C,
                                                  wmXrSessionState *state,
                                                  wmWindow *win)
 {
-
   BLI_assert(grip_action->count_subaction_paths == aim_action->count_subaction_paths);
   BLI_assert(grip_action->count_subaction_paths == BLI_listbase_count(&state->controllers));
 
@@ -791,7 +790,7 @@ static void wm_xr_session_controller_data_update(const bContext *C,
   wm_xr_pose_scale_to_mat(&state->prev_base_pose, state->prev_base_scale, base_mat);
   wm_xr_pose_scale_to_mat(&state->nav_pose, state->nav_scale, nav_mat);
 
-  LISTBASE_FOREACH (wmXrController *, controller, &state->controllers) {
+  LISTBASE_FOREACH_INDEX (wmXrController *, controller, &state->controllers, subaction_idx) {
     switch (subaction_idx) {
       case 0:
         ob_constraint = settings->controller0_object;
@@ -842,8 +841,6 @@ static void wm_xr_session_controller_data_update(const bContext *C,
        * be created in wm_xr_draw_controllers(). */
       GHOST_XrLoadControllerModel(xr_context, controller->subaction_path);
     }
-
-    ++subaction_idx;
   }
 }
 
