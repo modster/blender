@@ -37,10 +37,12 @@
 struct AttributeMetaData {
   AttributeDomain domain;
   CustomDataType data_type;
+  const AnonymousCustomDataLayerID *anonymous_layer_id = nullptr;
 
   constexpr friend bool operator==(AttributeMetaData a, AttributeMetaData b)
   {
-    return (a.domain == b.domain) && (a.data_type == b.data_type);
+    return (a.domain == b.domain) && (a.data_type == b.data_type) &&
+           (a.anonymous_layer_id == b.anonymous_layer_id);
   }
 };
 

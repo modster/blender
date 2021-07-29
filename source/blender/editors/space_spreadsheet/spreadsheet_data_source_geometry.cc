@@ -49,6 +49,9 @@ void GeometryDataSource::foreach_default_column_ids(
     if (meta_data.domain != domain_) {
       return true;
     }
+    if (meta_data.anonymous_layer_id != nullptr) {
+      return true;
+    }
     SpreadsheetColumnID column_id;
     column_id.name = (char *)name.c_str();
     fn(column_id);

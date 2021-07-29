@@ -587,7 +587,7 @@ bool CustomDataAttributeProvider::foreach_attribute(const GeometryComponent &com
   for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
     const CustomDataType data_type = (CustomDataType)layer.type;
     if (this->type_is_supported(data_type)) {
-      AttributeMetaData meta_data{domain_, data_type};
+      AttributeMetaData meta_data{domain_, data_type, layer.anonymous_id};
       if (!callback(layer.name, meta_data)) {
         return false;
       }
@@ -811,7 +811,7 @@ bool CustomDataAttributes::foreach_attribute(const AttributeForeachCallback call
                                              const AttributeDomain domain) const
 {
   for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
-    AttributeMetaData meta_data{domain, (CustomDataType)layer.type};
+    AttributeMetaData meta_data{domain, (CustomDataType)layer.type, layer.anonymous_id};
     if (!callback(layer.name, meta_data)) {
       return false;
     }
