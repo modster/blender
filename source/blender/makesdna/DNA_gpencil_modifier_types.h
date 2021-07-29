@@ -946,7 +946,8 @@ typedef struct LineartGpencilModifierData {
 
   uint16_t edge_types; /* line type enable flags, bits in eLineartEdgeFlag */
 
-  char source_type; /* Object or Collection, from eLineartGpencilModifierSource */
+  /** Object or Collection, from #eLineartGpencilModifierSource. */
+  char source_type;
 
   char use_multiple_levels;
   short level_start;
@@ -984,7 +985,7 @@ typedef struct LineartGpencilModifierData {
   float opacity;
   short thickness;
 
-  unsigned char mask_switches; /* eLineartGpencilMaskSwitches */
+  unsigned char mask_switches; /* #eLineartGpencilMaskSwitches */
   unsigned char material_mask_bits;
   unsigned char intersection_mask;
 
@@ -1005,7 +1006,7 @@ typedef struct LineartGpencilModifierData {
   /* eLineartMainFlags, for one time calculation. */
   int calculation_flags;
 
-  /* eLineArtGPencilModifierFlags, modifier internal state. */
+  /* #eLineArtGPencilModifierFlags, modifier internal state. */
   int flags;
 
   /* Move strokes towards camera to avoid clipping while preserve depth for the viewport. */

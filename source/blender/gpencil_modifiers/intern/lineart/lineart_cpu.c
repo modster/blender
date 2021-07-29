@@ -2137,7 +2137,10 @@ static void lineart_geometry_load_assign_thread(LineartObjectLoadTaskInfo *olti_
   use_olti->pending = obi;
 }
 
-static bool lineart_geometry_check_visible(double (*model_view_proj)[4], Object *use_ob)
+static bool lineart_geometry_check_visible(double (*model_view_proj)[4],
+                                           double shift_x,
+                                           double shift_y,
+                                           Object *use_ob)
 {
   BoundBox *bb = BKE_object_boundbox_get(use_ob);
   if (!bb) {
@@ -2151,6 +2154,8 @@ static bool lineart_geometry_check_visible(double (*model_view_proj)[4], Object 
     copy_v3db_v3fl(co[i], bb->vec[i]);
     copy_v3_v3_db(tmp, co[i]);
     mul_v4_m4v3_db(co[i], model_view_proj, tmp);
+    co[i][0] -= shift_x * 2 * co[i][3];
+    co[i][1] -= shift_y * 2 * co[i][3];
   }
 
   bool cond[6] = {true, true, true, true, true, true};
@@ -2257,7 +2262,7 @@ static void lineart_main_load_geometries(
       continue;
     }
 
-    if (!lineart_geometry_check_visible(obi->model_view_proj, use_ob)) {
+    if (!lineart_geometry_check_visible(obi->model_view_proj, rb->shift_x, rb->shift_y, use_ob)) {
       if (G.debug_value == 4000) {
         bound_box_discard_count++;
       }
