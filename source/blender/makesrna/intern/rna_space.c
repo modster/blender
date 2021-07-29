@@ -359,7 +359,7 @@ static const EnumPropertyItem display_channels_items[] = {
      "Color and Alpha",
      "Display image with RGB colors and alpha transparency"},
     {0, "COLOR", ICON_IMAGE_RGB, "Color", "Display image with RGB colors"},
-    {SI_SHOW_ALPHA, "ALPHA", ICON_IMAGE_ALPHA, "Alpha", "Display  alpha transparency channel"},
+    {SI_SHOW_ALPHA, "ALPHA", ICON_IMAGE_ALPHA, "Alpha", "Display alpha transparency channel"},
     {SI_SHOW_ZBUF,
      "Z_BUFFER",
      ICON_IMAGE_ZDEPTH,
@@ -5518,6 +5518,11 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
   prop = RNA_def_property(srna, "show_transform_preview", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "draw_flag", SEQ_DRAW_TRANSFORM_PREVIEW);
   RNA_def_property_ui_text(prop, "Transform Preview", "Show preview of the transformed frames");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "show_grid", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_SHOW_GRID);
+  RNA_def_property_ui_text(prop, "Show Grid", "Show vertical grid lines");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
 }
 

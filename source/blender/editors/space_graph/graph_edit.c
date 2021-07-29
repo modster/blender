@@ -261,7 +261,7 @@ static int graphkeys_insertkey_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  /* Which channels to affect?. */
+  /* Which channels to affect? */
   mode = RNA_enum_get(op->ptr, "type");
 
   /* Insert keyframes. */
@@ -2447,7 +2447,7 @@ static void mirror_graph_keys(bAnimContext *ac, short mode)
       float unit_scale = ANIM_unit_mapping_get_factor(
           ac->scene, ale->id, ale->key_data, mapping_flag | ANIM_UNITCONV_ONLYKEYS, &offset);
 
-      ked.f1 = (cursor_value + offset) * unit_scale;
+      ked.f1 = (cursor_value - offset) / unit_scale;
     }
 
     /* Perform actual mirroring. */
@@ -2814,7 +2814,7 @@ static int graph_fmodifier_paste_exec(bContext *C, wmOperator *op)
   }
   ANIM_animdata_freelist(&anim_data);
 
-  /* Successful or not?. */
+  /* Successful or not? */
   if (ok) {
     /* Set notifier that keyframes have changed. */
     WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
@@ -2873,7 +2873,7 @@ static int graph_driver_vars_copy_exec(bContext *C, wmOperator *op)
     ok = ANIM_driver_vars_copy(op->reports, fcu);
   }
 
-  /* Successful or not?. */
+  /* Successful or not? */
   if (ok) {
     return OPERATOR_FINISHED;
   }
@@ -2915,7 +2915,7 @@ static int graph_driver_vars_paste_exec(bContext *C, wmOperator *op)
     ok = ANIM_driver_vars_paste(op->reports, fcu, replace);
   }
 
-  /* Successful or not?. */
+  /* Successful or not? */
   if (ok) {
     /* Rebuild depsgraph, now that there are extra deps here. */
     DEG_relations_tag_update(CTX_data_main(C));
