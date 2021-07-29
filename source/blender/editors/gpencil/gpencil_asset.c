@@ -342,10 +342,19 @@ static bool gpencil_asset_create(const bContext *C,
   /* Mark as asset. */
   ED_asset_mark_id(C, &gpd->id);
 
-  /* Retime frame number to start by 1. Must be done after generate the render preview. */
+  /* Retime frame number to start by 1. Must be done after generate the render preview.
+   * Use same loop to deselect all. */
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       gpf->framenum -= f_min - 1;
+      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        gps->flag &= ~GP_STROKE_SELECT;
+        bGPDspoint *pt;
+        int i;
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          pt->flag &= ~GP_SPOINT_SELECT;
+        }
+      }
     }
   }
 
@@ -865,6 +874,34 @@ static Material *gpencil_asset_material_get_from_id(ID *id, const int slot_index
   return material;
 }
 
+/* Helper: Set the selection of the imported strokes. */
+static void gpencil_asset_set_selection(tGPDasset *tgpa, const bool enable)
+{
+
+  for (int index = 0; index < tgpa->data_len; index++) {
+    tGPDAssetStroke *data = &tgpa->data[index];
+    bGPDstroke *gps = data->gps;
+    if (enable) {
+      gps->flag |= GP_STROKE_SELECT;
+    }
+    else {
+      gps->flag &= ~GP_STROKE_SELECT;
+    }
+
+    bGPDspoint *pt;
+    int i;
+
+    for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+      if (enable) {
+        pt->flag |= GP_SPOINT_SELECT;
+      }
+      else {
+        pt->flag &= ~GP_SPOINT_SELECT;
+      }
+    }
+  }
+}
+
 /* Helper: Append all strokes from the asset in the target data block. */
 static bool gpencil_asset_append_strokes(tGPDasset *tgpa)
 {
@@ -979,6 +1016,20 @@ static bool gpencil_asset_append_strokes(tGPDasset *tgpa)
         /* Reset flags. */
         is_new_gpl = false;
         is_new_gpf = false;
+      }
+    }
+  }
+
+  /* Unselect any stroke. */
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_target->layers) {
+    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        gps->flag &= ~GP_STROKE_SELECT;
+        bGPDspoint *pt;
+        int i;
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          pt->flag &= ~GP_SPOINT_SELECT;
+        }
       }
     }
   }
@@ -1253,6 +1304,9 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
             ED_area_status_text(tgpa->area, NULL);
             ED_workspace_status_text(C, NULL);
             WM_cursor_modal_restore(win);
+            /* Apply selection depending of mode. */
+            gpencil_asset_set_selection(tgpa, GPENCIL_EDIT_MODE(tgpa->gpd));
+
             gpencil_asset_import_exit(C, op);
             return OPERATOR_FINISHED;
           }
@@ -1291,6 +1345,8 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
       ED_area_status_text(tgpa->area, NULL);
       ED_workspace_status_text(C, NULL);
       WM_cursor_modal_restore(win);
+      /* Apply selection depending of mode. */
+      gpencil_asset_set_selection(tgpa, GPENCIL_EDIT_MODE(tgpa->gpd));
 
       /* Clean up temp data. */
       gpencil_asset_import_exit(C, op);
