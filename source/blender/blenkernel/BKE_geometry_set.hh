@@ -128,6 +128,17 @@ class GeometryComponent {
                             const CustomDataType data_type,
                             const AttributeInit &initializer);
 
+  AnonymousCustomDataLayerID *attribute_try_create_anonymous(const blender::StringRef debug_name,
+                                                             const AttributeDomain domain,
+                                                             const CustomDataType data_type,
+                                                             const AttributeInit &initializer);
+
+  blender::bke::ReadAttributeLookup attribute_try_get_anonymous_for_read(
+      const AnonymousCustomDataLayerID &layer_id) const;
+
+  blender::bke::WriteAttributeLookup attribute_try_get_anonymous_for_write(
+      const AnonymousCustomDataLayerID &layer_id);
+
   /* Try to create the builtin attribute with the given name. No data type or domain has to be
    * provided, because those are fixed for builtin attributes. */
   bool attribute_try_create_builtin(const blender::StringRef attribute_name,

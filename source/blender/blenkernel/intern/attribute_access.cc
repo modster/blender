@@ -346,25 +346,31 @@ ReadAttributeLookup CustomDataAttributeProvider::try_get_for_read(
     if (layer.name != attribute_name) {
       continue;
     }
-    const CustomDataType data_type = (CustomDataType)layer.type;
-    switch (data_type) {
-      case CD_PROP_FLOAT:
-        return this->layer_to_read_attribute<float>(layer, domain_size);
-      case CD_PROP_FLOAT2:
-        return this->layer_to_read_attribute<float2>(layer, domain_size);
-      case CD_PROP_FLOAT3:
-        return this->layer_to_read_attribute<float3>(layer, domain_size);
-      case CD_PROP_INT32:
-        return this->layer_to_read_attribute<int>(layer, domain_size);
-      case CD_PROP_COLOR:
-        return this->layer_to_read_attribute<ColorGeometry4f>(layer, domain_size);
-      case CD_PROP_BOOL:
-        return this->layer_to_read_attribute<bool>(layer, domain_size);
-      default:
-        break;
-    }
+    return this->layer_to_read_attribute(layer, domain_size);
   }
   return {};
+}
+
+ReadAttributeLookup CustomDataAttributeProvider::layer_to_read_attribute(
+    const CustomDataLayer &layer, const int domain_size) const
+{
+  const CustomDataType data_type = (CustomDataType)layer.type;
+  switch (data_type) {
+    case CD_PROP_FLOAT:
+      return this->layer_to_read_attribute<float>(layer, domain_size);
+    case CD_PROP_FLOAT2:
+      return this->layer_to_read_attribute<float2>(layer, domain_size);
+    case CD_PROP_FLOAT3:
+      return this->layer_to_read_attribute<float3>(layer, domain_size);
+    case CD_PROP_INT32:
+      return this->layer_to_read_attribute<int>(layer, domain_size);
+    case CD_PROP_COLOR:
+      return this->layer_to_read_attribute<ColorGeometry4f>(layer, domain_size);
+    case CD_PROP_BOOL:
+      return this->layer_to_read_attribute<bool>(layer, domain_size);
+    default:
+      return {};
+  }
 }
 
 WriteAttributeLookup CustomDataAttributeProvider::try_get_for_write(
@@ -380,25 +386,31 @@ WriteAttributeLookup CustomDataAttributeProvider::try_get_for_write(
       continue;
     }
     CustomData_duplicate_referenced_layer_named(custom_data, layer.type, layer.name, domain_size);
-    const CustomDataType data_type = (CustomDataType)layer.type;
-    switch (data_type) {
-      case CD_PROP_FLOAT:
-        return this->layer_to_write_attribute<float>(layer, domain_size);
-      case CD_PROP_FLOAT2:
-        return this->layer_to_write_attribute<float2>(layer, domain_size);
-      case CD_PROP_FLOAT3:
-        return this->layer_to_write_attribute<float3>(layer, domain_size);
-      case CD_PROP_INT32:
-        return this->layer_to_write_attribute<int>(layer, domain_size);
-      case CD_PROP_COLOR:
-        return this->layer_to_write_attribute<ColorGeometry4f>(layer, domain_size);
-      case CD_PROP_BOOL:
-        return this->layer_to_write_attribute<bool>(layer, domain_size);
-      default:
-        break;
-    }
+    this->layer_to_write_attribute(layer, domain_size);
   }
   return {};
+}
+
+WriteAttributeLookup CustomDataAttributeProvider::layer_to_write_attribute(
+    CustomDataLayer &layer, const int domain_size) const
+{
+  const CustomDataType data_type = (CustomDataType)layer.type;
+  switch (data_type) {
+    case CD_PROP_FLOAT:
+      return this->layer_to_write_attribute<float>(layer, domain_size);
+    case CD_PROP_FLOAT2:
+      return this->layer_to_write_attribute<float2>(layer, domain_size);
+    case CD_PROP_FLOAT3:
+      return this->layer_to_write_attribute<float3>(layer, domain_size);
+    case CD_PROP_INT32:
+      return this->layer_to_write_attribute<int>(layer, domain_size);
+    case CD_PROP_COLOR:
+      return this->layer_to_write_attribute<ColorGeometry4f>(layer, domain_size);
+    case CD_PROP_BOOL:
+      return this->layer_to_write_attribute<bool>(layer, domain_size);
+    default:
+      return {};
+  }
 }
 
 bool CustomDataAttributeProvider::try_delete(GeometryComponent &component,
@@ -485,6 +497,80 @@ bool CustomDataAttributeProvider::try_create(GeometryComponent &component,
   add_named_custom_data_layer_from_attribute_init(
       attribute_name, *custom_data, data_type, domain_size, initializer);
   return true;
+}
+
+static std::string get_anonymous_attribute_name()
+{
+  static std::atomic<int> index = 0;
+  const int next_index = index.fetch_add(1);
+  return "anonymous_attribute_" + std::to_string(next_index);
+}
+
+AnonymousCustomDataLayerID *CustomDataAttributeProvider::try_create_anonymous(
+    GeometryComponent &component,
+    const StringRef debug_name,
+    const AttributeDomain domain,
+    const CustomDataType data_type,
+    const AttributeInit &initializer) const
+{
+  if (domain_ != domain) {
+    return nullptr;
+  }
+  if (!this->type_is_supported(data_type)) {
+    return nullptr;
+  }
+  CustomData *custom_data = custom_data_access_.get_custom_data(component);
+  if (custom_data == nullptr) {
+    return nullptr;
+  }
+
+  const int domain_size = component.attribute_domain_size(domain_);
+  const std::string attribute_name = get_anonymous_attribute_name();
+  add_named_custom_data_layer_from_attribute_init(
+      attribute_name, *custom_data, data_type, domain_size, initializer);
+  const int layer_index = CustomData_get_named_layer_index(
+      custom_data, data_type, attribute_name.c_str());
+  CustomDataLayer *layer = &custom_data->layers[layer_index];
+  layer->flag |= CD_FLAG_ANONYMOUS;
+  layer->anonymous_id = CustomData_anonymous_id_new(
+      BLI_strdupn(debug_name.data(), debug_name.size()));
+  CustomData_anonymous_id_weak_increment(layer->anonymous_id);
+  return layer->anonymous_id;
+}
+
+ReadAttributeLookup CustomDataAttributeProvider::try_get_anonymous_for_read(
+    const GeometryComponent &component, const AnonymousCustomDataLayerID &layer_id) const
+{
+  const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
+  if (custom_data == nullptr) {
+    return {};
+  }
+  const int domain_size = component.attribute_domain_size(domain_);
+  for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
+    if (layer.anonymous_id != &layer_id) {
+      continue;
+    }
+    return this->layer_to_read_attribute(layer, domain_size);
+  }
+  return {};
+}
+
+WriteAttributeLookup CustomDataAttributeProvider::try_get_anonymous_for_write(
+    GeometryComponent &component, const AnonymousCustomDataLayerID &layer_id) const
+{
+  CustomData *custom_data = custom_data_access_.get_custom_data(component);
+  if (custom_data == nullptr) {
+    return {};
+  }
+  const int domain_size = component.attribute_domain_size(domain_);
+  for (CustomDataLayer &layer : MutableSpan(custom_data->layers, custom_data->totlayer)) {
+    if (layer.anonymous_id != &layer_id) {
+      continue;
+    }
+    CustomData_duplicate_referenced_layer_named(custom_data, layer.type, layer.name, domain_size);
+    return this->layer_to_write_attribute(layer, domain_size);
+  }
+  return {};
 }
 
 bool CustomDataAttributeProvider::foreach_attribute(const GeometryComponent &component,
@@ -873,6 +959,56 @@ bool GeometryComponent::attribute_try_create(const StringRef attribute_name,
     }
   }
   return false;
+}
+
+AnonymousCustomDataLayerID *GeometryComponent::attribute_try_create_anonymous(
+    const blender::StringRef debug_name,
+    const AttributeDomain domain,
+    const CustomDataType data_type,
+    const AttributeInit &initializer)
+{
+  using namespace blender::bke;
+  const ComponentAttributeProviders *providers = this->get_attribute_providers();
+  for (const DynamicAttributesProvider *dynamic_provider :
+       providers->dynamic_attribute_providers()) {
+    AnonymousCustomDataLayerID *layer_id = dynamic_provider->try_create_anonymous(
+        *this, debug_name, domain, data_type, initializer);
+    if (layer_id != nullptr) {
+      return layer_id;
+    }
+  }
+  return nullptr;
+}
+
+blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_anonymous_for_read(
+    const AnonymousCustomDataLayerID &layer_id) const
+{
+  using namespace blender::bke;
+  const ComponentAttributeProviders *providers = this->get_attribute_providers();
+  for (const DynamicAttributesProvider *dynamic_provider :
+       providers->dynamic_attribute_providers()) {
+    ReadAttributeLookup attribute = dynamic_provider->try_get_anonymous_for_read(*this, layer_id);
+    if (attribute) {
+      return attribute;
+    }
+  }
+  return {};
+}
+
+blender::bke::WriteAttributeLookup GeometryComponent::attribute_try_get_anonymous_for_write(
+    const AnonymousCustomDataLayerID &layer_id)
+{
+  using namespace blender::bke;
+  const ComponentAttributeProviders *providers = this->get_attribute_providers();
+  for (const DynamicAttributesProvider *dynamic_providers :
+       providers->dynamic_attribute_providers()) {
+    WriteAttributeLookup attribute = dynamic_providers->try_get_anonymous_for_write(*this,
+                                                                                    layer_id);
+    if (attribute) {
+      return attribute;
+    }
+  }
+  return {};
 }
 
 bool GeometryComponent::attribute_try_create_builtin(const blender::StringRef attribute_name,

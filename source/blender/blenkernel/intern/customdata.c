@@ -57,6 +57,8 @@
 
 #include "BLO_read_write.h"
 
+#include "atomic_ops.h"
+
 #include "bmesh.h"
 
 #include "CLG_log.h"
@@ -2130,6 +2132,9 @@ bool CustomData_merge(const struct CustomData *source,
     if (flag & CD_FLAG_NOCOPY) {
       continue;
     }
+    if (CustomData_layer_is_unused_anonymous(layer)) {
+      continue;
+    }
     if (!(mask & CD_TYPE_AS_MASK(type))) {
       continue;
     }
@@ -2167,8 +2172,13 @@ bool CustomData_merge(const struct CustomData *source,
       newlayer->active_rnd = lastrender;
       newlayer->active_clone = lastclone;
       newlayer->active_mask = lastmask;
-      newlayer->flag |= flag & (CD_FLAG_EXTERNAL | CD_FLAG_IN_MEMORY);
+      newlayer->flag |= flag & (CD_FLAG_EXTERNAL | CD_FLAG_IN_MEMORY | CD_FLAG_ANONYMOUS);
       changed = true;
+
+      if (layer->flag & CD_FLAG_ANONYMOUS) {
+        CustomData_anonymous_id_weak_increment(layer->anonymous_id);
+        newlayer->anonymous_id = layer->anonymous_id;
+      }
     }
   }
 
@@ -2209,6 +2219,10 @@ static void customData_free_layer__internal(CustomDataLayer *layer, int totelem)
 {
   const LayerTypeInfo *typeInfo;
 
+  if (layer->flag & CD_FLAG_ANONYMOUS) {
+    CustomData_anonymous_id_weak_decrement(layer->anonymous_id);
+    layer->anonymous_id = NULL;
+  }
   if (!(layer->flag & CD_FLAG_NOFREE) && layer->data) {
     typeInfo = layerType_getInfo(layer->type);
 
@@ -4247,7 +4261,8 @@ void CustomData_blend_write_prepare(CustomData *data,
 
   for (i = 0, j = 0; i < totlayer; i++) {
     CustomDataLayer *layer = &data->layers[i];
-    if (layer->flag & CD_FLAG_NOCOPY) { /* Layers with this flag set are not written to file. */
+    /* Layers with this flag set are not written to file. */
+    if (layer->flag & (CD_FLAG_NOCOPY | CD_FLAG_ANONYMOUS)) {
       data->totlayer--;
       /* CLOG_WARN(&LOG, "skipping layer %p (%s)", layer, layer->name); */
     }
@@ -5032,6 +5047,65 @@ void CustomData_data_transfer(const MeshPairRemap *me_remap,
   }
 
   MEM_SAFE_FREE(tmp_data_src);
+}
+
+/** Takes ownership of `debug_name`. */
+AnonymousCustomDataLayerID *CustomData_anonymous_id_new(const char *debug_name)
+{
+  AnonymousCustomDataLayerID *layer_id = MEM_callocN(sizeof(AnonymousCustomDataLayerID), __func__);
+  layer_id->debug_name = debug_name;
+  return layer_id;
+}
+
+static void CustomData_anonymous_id_free(AnonymousCustomDataLayerID *layer_id)
+{
+  BLI_assert(layer_id->strong_references == 0);
+  BLI_assert(layer_id->tot_references == 0);
+  MEM_freeN(layer_id->debug_name);
+  MEM_freeN(layer_id);
+}
+
+void CustomData_anonymous_id_strong_decrement(AnonymousCustomDataLayerID *layer_id)
+{
+  int strong_references = atomic_sub_and_fetch_int32(&layer_id->strong_references, 1);
+  BLI_assert(strong_references >= 0);
+  UNUSED_VARS_NDEBUG(strong_references);
+
+  int tot_references = atomic_sub_and_fetch_int32(&layer_id->tot_references, 1);
+  BLI_assert(tot_references >= 0);
+  if (tot_references == 0) {
+    CustomData_anonymous_id_free(layer_id);
+  }
+}
+
+void CustomData_anonymous_id_strong_increment(AnonymousCustomDataLayerID *layer_id)
+{
+  atomic_add_and_fetch_int32(&layer_id->tot_references, 1);
+  atomic_add_and_fetch_int32(&layer_id->strong_references, 1);
+}
+
+void CustomData_anonymous_id_weak_decrement(AnonymousCustomDataLayerID *layer_id)
+{
+  int tot_references = atomic_sub_and_fetch_int32(&layer_id->tot_references, 1);
+  BLI_assert(tot_references >= 0);
+  if (tot_references == 0) {
+    CustomData_anonymous_id_free(layer_id);
+  }
+}
+
+void CustomData_anonymous_id_weak_increment(AnonymousCustomDataLayerID *layer_id)
+{
+  atomic_add_and_fetch_int32(&layer_id->tot_references, 1);
+}
+
+bool CustomData_layer_is_unused_anonymous(CustomDataLayer *layer)
+{
+  if (layer->flag & CD_FLAG_ANONYMOUS) {
+    if (layer->anonymous_id->strong_references == 0) {
+      return true;
+    }
+  }
+  return false;
 }
 
 static void write_mdisps(BlendWriter *writer, int count, MDisps *mdlist, int external)

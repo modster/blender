@@ -31,6 +31,12 @@
 extern "C" {
 #endif
 
+typedef struct AnonymousCustomDataLayerID {
+  int strong_references;
+  int tot_references;
+  char *debug_name;
+} AnonymousCustomDataLayerID;
+
 /** Descriptor and storage for a custom data layer. */
 typedef struct CustomDataLayer {
   /** Type of data in layer. */
@@ -53,6 +59,7 @@ typedef struct CustomDataLayer {
   char name[64];
   /** Layer data. */
   void *data;
+  struct AnonymousCustomDataLayerID *anonymous_id;
 } CustomDataLayer;
 
 #define MAX_CUSTOMDATA_LAYER_NAME 64
@@ -242,6 +249,9 @@ enum {
   CD_FLAG_EXTERNAL = (1 << 3),
   /* Indicates external data is read into memory */
   CD_FLAG_IN_MEMORY = (1 << 4),
+  /* An anonymous custom data layer can be deleted when its identifier is not referenced
+   * anymore. */
+  CD_FLAG_ANONYMOUS = (1 << 5),
 };
 
 /* Limits */

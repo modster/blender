@@ -130,6 +130,31 @@ class DynamicAttributesProvider {
     return false;
   };
 
+  /** Returns the id of the new anonymous or null if no new attribute was created. */
+  virtual AnonymousCustomDataLayerID *try_create_anonymous(
+      GeometryComponent &UNUSED(component),
+      const StringRef UNUSED(debug_name),
+      const AttributeDomain UNUSED(domain),
+      const CustomDataType UNUSED(data_type),
+      const AttributeInit &UNUSED(initializer)) const
+  {
+    return nullptr;
+  }
+
+  virtual ReadAttributeLookup try_get_anonymous_for_read(
+      const GeometryComponent &UNUSED(component),
+      const AnonymousCustomDataLayerID &UNUSED(layer_id)) const
+  {
+    return {};
+  }
+
+  virtual WriteAttributeLookup try_get_anonymous_for_write(
+      GeometryComponent &UNUSED(component),
+      const AnonymousCustomDataLayerID &UNUSED(layer_id)) const
+  {
+    return {};
+  }
+
   virtual bool foreach_attribute(const GeometryComponent &component,
                                  const AttributeForeachCallback callback) const = 0;
   virtual void foreach_domain(const FunctionRef<void(AttributeDomain)> callback) const = 0;
@@ -167,6 +192,18 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
                   const CustomDataType data_type,
                   const AttributeInit &initializer) const final;
 
+  AnonymousCustomDataLayerID *try_create_anonymous(GeometryComponent &component,
+                                                   const StringRef debug_name,
+                                                   const AttributeDomain domain,
+                                                   const CustomDataType data_type,
+                                                   const AttributeInit &initializer) const final;
+
+  ReadAttributeLookup try_get_anonymous_for_read(
+      const GeometryComponent &component, const AnonymousCustomDataLayerID &layer_id) const final;
+
+  WriteAttributeLookup try_get_anonymous_for_write(
+      GeometryComponent &component, const AnonymousCustomDataLayerID &layer_id) const final;
+
   bool foreach_attribute(const GeometryComponent &component,
                          const AttributeForeachCallback callback) const final;
 
@@ -176,6 +213,9 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
   }
 
  private:
+  ReadAttributeLookup layer_to_read_attribute(const CustomDataLayer &layer,
+                                              const int domain_size) const;
+
   template<typename T>
   ReadAttributeLookup layer_to_read_attribute(const CustomDataLayer &layer,
                                               const int domain_size) const
@@ -184,6 +224,9 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
                 Span(static_cast<const T *>(layer.data), domain_size)),
             domain_};
   }
+
+  WriteAttributeLookup layer_to_write_attribute(CustomDataLayer &layer,
+                                                const int domain_size) const;
 
   template<typename T>
   WriteAttributeLookup layer_to_write_attribute(CustomDataLayer &layer,
