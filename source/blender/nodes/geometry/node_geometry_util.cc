@@ -24,6 +24,8 @@
 #include "BKE_mesh_runtime.h"
 #include "BKE_pointcloud.h"
 
+#include "NOD_type_conversions.hh"
+
 namespace blender::nodes {
 
 using bke::GeometryInstanceGroup;
@@ -62,15 +64,14 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
 {
   const int domain_size = component.attribute_domain_size(domain);
   for (const bke::FieldInputKey &key : field_inputs) {
-    if (const bke::PersistentAttributeFieldInputKey *attribute_key =
+    std::unique_ptr<bke::FieldInputValue> input_value;
+    if (const bke::PersistentAttributeFieldInputKey *persistent_attribute_key =
             dynamic_cast<const bke::PersistentAttributeFieldInputKey *>(&key)) {
-      const StringRef name = attribute_key->name();
-      const CPPType &cpp_type = attribute_key->type();
+      const StringRef name = persistent_attribute_key->name();
+      const CPPType &cpp_type = persistent_attribute_key->type();
       const CustomDataType type = bke::cpp_type_to_custom_data_type(cpp_type);
       GVArrayPtr attribute = component.attribute_get_for_read(name, domain, type);
-      auto value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(attribute));
-      field_inputs.set_input(key, *value);
-      r_values.append(std::move(value));
+      input_value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(attribute));
     }
     else if (dynamic_cast<const bke::IndexFieldInputKey *>(&key) != nullptr) {
       auto index_func = [](int i) { return i; };
@@ -78,10 +79,29 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
           domain_size, index_func);
       GVArrayPtr index_gvarray = std::make_unique<fn::GVArray_For_VArray<int>>(
           std::move(index_varray));
-      auto value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(index_gvarray));
-      field_inputs.set_input(key, *value);
-      r_values.append(std::move(value));
+      input_value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(index_gvarray));
     }
+    else if (const bke::AnonymousAttributeFieldInputKey *anonymous_attribute_key =
+                 dynamic_cast<const bke::AnonymousAttributeFieldInputKey *>(&key)) {
+      const AnonymousCustomDataLayerID &layer_id = anonymous_attribute_key->layer_id();
+      ReadAttributeLookup attribute = component.attribute_try_get_anonymous_for_read(layer_id);
+      if (!attribute) {
+        continue;
+      }
+      GVArrayPtr varray = std::move(attribute.varray);
+      if (attribute.domain != domain) {
+        varray = component.attribute_try_adapt_domain(std::move(varray), attribute.domain, domain);
+      }
+      const CPPType &type = anonymous_attribute_key->type();
+      if (varray->type() != type) {
+        const blender::nodes::DataTypeConversions &conversions = get_implicit_type_conversions();
+        varray = conversions.try_convert(std::move(varray), type);
+      }
+      input_value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(varray));
+    }
+
+    field_inputs.set_input(key, *input_value);
+    r_values.append(std::move(input_value));
   }
 }
 
