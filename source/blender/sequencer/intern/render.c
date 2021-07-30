@@ -2109,8 +2109,8 @@ void SEQ_render_thumbnails(SeqRenderData *context,
   SeqRenderState state;
   seq_render_state_init(&state);
 
-  start_frame = start_frame - 3 * frame_step;
-  float upper_limit = view_area->xmax + 3 * frame_step;
+  start_frame = start_frame - 5 * frame_step;
+  float upper_limit = view_area->xmax + 5 * frame_step;
   while (start_frame < upper_limit) {
     ibuf = seq_cache_get(context, seq_orig, roundf(start_frame), SEQ_CACHE_STORE_THUMBNAIL);
     if (ibuf) {
