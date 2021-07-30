@@ -50,6 +50,7 @@
 
 #include "BKE_attribute_math.hh"
 #include "BKE_customdata.h"
+#include "BKE_field.hh"
 #include "BKE_geometry_set_instances.hh"
 #include "BKE_global.h"
 #include "BKE_idprop.h"
@@ -401,12 +402,15 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
           },
           [](const IDProperty &property) { return ELEM(property.type, IDP_FLOAT, IDP_DOUBLE); },
           [](const IDProperty &property, void *r_value) {
+            float value;
             if (property.type == IDP_FLOAT) {
-              *(float *)r_value = IDP_Float(&property);
+              value = IDP_Float(&property);
             }
             else if (property.type == IDP_DOUBLE) {
-              *(float *)r_value = (float)IDP_Double(&property);
+              value = (float)IDP_Double(&property);
             }
+            new (r_value) blender::bke::FieldRef<float>(
+                blender::bke::FieldPtr{new blender::bke::ConstantField<float>(value)});
           },
       };
       return &float_type;
@@ -441,7 +445,11 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
             return (PropertyType)((bNodeSocketValueInt *)socket.default_value)->subtype;
           },
           [](const IDProperty &property) { return property.type == IDP_INT; },
-          [](const IDProperty &property, void *r_value) { *(int *)r_value = IDP_Int(&property); },
+          [](const IDProperty &property, void *r_value) {
+            int value = IDP_Int(&property);
+            new (r_value) blender::bke::FieldRef<int>(
+                blender::bke::FieldPtr{new blender::bke::ConstantField<int>(value)});
+          },
       };
       return &int_type;
     }
@@ -485,7 +493,10 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
                    property.len == 3;
           },
           [](const IDProperty &property, void *r_value) {
-            copy_v3_v3((float *)r_value, (const float *)IDP_Array(&property));
+            blender::float3 value;
+            copy_v3_v3(value, (const float *)IDP_Array(&property));
+            new (r_value) blender::bke::FieldRef<blender::float3>(
+                blender::bke::FieldPtr{new blender::bke::ConstantField<blender::float3>(value)});
           },
       };
       return &vector_type;
@@ -517,7 +528,9 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
           nullptr,
           [](const IDProperty &property) { return property.type == IDP_INT; },
           [](const IDProperty &property, void *r_value) {
-            *(bool *)r_value = IDP_Int(&property) != 0;
+            bool value = IDP_Int(&property) != 0;
+            new (r_value) blender::bke::FieldRef<bool>(
+                blender::bke::FieldPtr{new blender::bke::ConstantField<bool>(value)});
           },
       };
       return &boolean_type;
