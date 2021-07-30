@@ -29,6 +29,7 @@ static bNodeSocketTemplate geo_node_curve_fillet_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
     {SOCK_FLOAT, N_("Angle"), M_PI_2, 0.0f, 0.0f, 0.0f, 0.001f, FLT_MAX, PROP_ANGLE},
     {SOCK_INT, N_("Count"), 1, 0, 0, 0, 1, 1000},
+    {SOCK_BOOLEAN, N_("Limit Radius")},
     {SOCK_FLOAT, N_("Radius"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_STRING, N_("Radii")},
     {-1, ""},
@@ -71,6 +72,9 @@ struct FilletModeParam {
 
   GeometryNodeCurveFilletRadiusMode radius_mode{};
 
+  /* Whether or not fillets are allowed to overlap. */
+  bool limit_radius;
+
   /* The radius of the formed circle */
   std::optional<float> radius;
 
@@ -83,9 +87,7 @@ struct FilletModeParam {
 /* A data structure used to store fillet data about a vertex in the source spline. */
 struct FilletData {
   float3 prev_dir, pos, next_dir, axis;
-  float radius;
-  float angle;
-  float count;
+  float radius, angle, count;
 };
 
 static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
@@ -102,7 +104,7 @@ static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
   const GeometryNodeCurveFilletMode radius_mode = (GeometryNodeCurveFilletMode)
                                                       node_storage.radius_mode;
 
-  bNodeSocket *float_socket = user_socket->next;
+  bNodeSocket *float_socket = user_socket->next->next;
   bNodeSocket *attribute_socket = float_socket->next;
 
   nodeSetSocketAvailability(float_socket, radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT);
@@ -139,7 +141,8 @@ static FilletData calculate_fillet_data_per_vertex(const float3 prev_pos,
                                                    const float3 next_pos,
                                                    const std::optional<float> arc_angle,
                                                    const std::optional<int> count,
-                                                   const float radius)
+                                                   const float radius,
+                                                   const bool limit_radius)
 {
   FilletData fd{};
   float3 vec_pos2prev = prev_pos - pos;
@@ -150,9 +153,76 @@ static FilletData calculate_fillet_data_per_vertex(const float3 prev_pos,
   cross_v3_v3v3(fd.axis, vec_pos2prev, vec_pos2next);
   fd.angle = M_PI - angle_v3v3v3(prev_pos, pos, next_pos);
   fd.count = count.has_value() ? count.value() : fd.angle / arc_angle.value();
-  fd.radius = radius;
+  if (limit_radius) {
+    float max_radius = min_ff(len_v3v3(pos, prev_pos), len_v3v3(pos, next_pos)) /
+                       tanf(fd.angle / 2);
+    fd.radius = min_ff(radius, max_radius);
+  }
+  else {
+    fd.radius = radius;
+  }
 
   return fd;
+}
+
+static void limit_radii(Array<FilletData> &fds, const int size, const bool cyclic)
+{
+  int fillet_count, start = 0;
+  Array<float> max_radii(size, {-1});
+
+  /* Handle the corner cases if cyclic. */
+  if (cyclic) {
+    fillet_count = size;
+
+    float len_prev, len_next, radius, radius_next, radius_prev, max_radius_prev, max_radius_next;
+
+    /* Distance to previous and next control points. */
+    len_prev = len_v3v3(fds[0].pos, fds[size - 1].pos);
+    len_next = len_v3v3(fds[0].pos, fds[1].pos);
+
+    /* Radii of adjacent control points. */
+    radius = fds[0].radius;
+    radius_next = fds[1].radius;
+    radius_prev = fds[size - 1].radius;
+
+    /* Max distance the fillet can expand to based on radii. */
+    max_radius_prev = len_prev * radius / (radius + radius_prev);
+    max_radius_next = len_next * radius / (radius + radius_next);
+
+    /* Max radius of index 0 and 1. */
+    max_radii[0] = min_ff(max_radius_prev, max_radius_next);
+    max_radii[1] = len_next * radius_next / (radius + radius_next);
+
+    /* Max radius of index size - 2 (one before the last) */
+    float len_prev_end = len_v3v3(fds[size - 2].pos, fds[size - 1].pos);
+    float radius_prev_end = fds[size - 2].radius;
+    max_radii[size - 1] = min_ff(len_prev_end * radius_prev / (radius_prev + radius_prev_end),
+                                 len_prev * radius_prev / (radius + radius_prev));
+  }
+  else {
+    fillet_count = size - 2;
+    start = 1;
+  }
+
+  /* Max radii calculations of the remaining indices. */
+  for (const int i : IndexRange(1, fillet_count - start)) {
+    float len_next = len_v3v3(fds[i - start].pos, fds[i - start + 1].pos);
+    float radius = fds[i - start].radius;
+    float radius_next = fds[i - start + 1].radius;
+    if (max_radii[i] < 0) {
+      max_radii[i] = len_next * radius / (radius + radius_next);
+    }
+    else {
+      max_radii[i] = min_ff(max_radii[i], len_next * radius / (radius + radius_next));
+    }
+    max_radii[i + 1] = len_next * radius_next / (radius + radius_next);
+  }
+
+  /* Divide each max_radius by ran of angle/2 because the current lengths are the lengths of
+   * tangents. */
+  for (const int i : IndexRange(fillet_count)) {
+    fds[i].radius = min_ff(fds[i].radius, max_radii[start + i] / tanf(fds[i].angle / 2));
+  }
 }
 
 /* Function to calculate and obtain the fillet data for the entire spline. */
@@ -205,8 +275,13 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
     }
 
     /* Calculate fillet data for the vertex. */
-    fds[i] = calculate_fillet_data_per_vertex(
-        prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius);
+    fds[i] = calculate_fillet_data_per_vertex(prev_pos,
+                                              pos,
+                                              next_pos,
+                                              mode_param.angle,
+                                              mode_param.count,
+                                              radius,
+                                              mode_param.limit_radius);
 
     /* Exit from here if the radius is zero */
     if (!radius) {
@@ -471,6 +546,9 @@ static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode
   /* Update point_counts array and added_count. */
   Array<FilletData> fds = calculate_fillet_data(
       src_spline_ptr, mode_param, added_count, point_counts);
+  if (mode_param.limit_radius) {
+    limit_radii(fds, spline.size(), cyclic);
+  }
 
   int total_points = added_count + size;
   Array<int> dst_to_src = create_dst_to_src_map(point_counts, total_points);
@@ -570,6 +648,8 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
     }
     mode_param.count.emplace(count);
   }
+
+  mode_param.limit_radius = params.extract_input<bool>("Limit Radius");
 
   if (radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
     mode_param.radius.emplace(params.extract_input<float>("Radius"));
