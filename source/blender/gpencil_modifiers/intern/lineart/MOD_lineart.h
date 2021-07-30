@@ -57,6 +57,10 @@ typedef struct LineartTriangle {
   unsigned char mat_occlusion;
   unsigned char flags; /* #eLineartTriangleFlags */
 
+  /* target_reference = (obi->obindex | triangle_index) */
+  /*        higher 12 bits-------^         ^-----index in object, lower 20 bits */
+  int target_reference;
+
   /**
    * Only use single link list, because we don't need to go back in order.
    * This variable is also reused to store the pointer to adjacent lines of this triangle before
@@ -131,6 +135,7 @@ typedef struct LineartShadowSegment {
   double fbc1[4], fbc2[4];
   /* Global position. */
   double g1[4], g2[4];
+  int target_reference;
 } LineartShadowSegment;
 
 typedef struct LineartVert {
@@ -177,6 +182,8 @@ typedef struct LineartEdge {
   /** Also for line type determination on chaining. */
   uint16_t flags;
   uint8_t intersection_mask;
+
+  int target_reference;
 
   /**
    * Still need this entry because culled lines will not add to object
@@ -440,6 +447,9 @@ typedef struct LineartRenderTaskInfo {
 
 } LineartRenderTaskInfo;
 
+#define LRT_OBINDEX_SHIFT 20
+#define LRT_OBINDEX_LOWER 0x0fffff /* Lower 20 bits. */
+
 typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
   struct Object *original_ob;
@@ -451,6 +461,9 @@ typedef struct LineartObjectInfo {
   int usage;
   uint8_t override_intersection_mask;
   int global_i_offset;
+
+  /* Shifted LRT_OBINDEX_SHIFT bits to be combined with object triangle index. */
+  int obindex;
 
   bool free_use_mesh;
 

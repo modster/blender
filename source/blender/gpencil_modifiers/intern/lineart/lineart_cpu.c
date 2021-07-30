@@ -1937,6 +1937,8 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
 
     tri->intersection_mask = obi->override_intersection_mask;
 
+    tri->target_reference = (obi->obindex | (i & LRT_OBINDEX_LOWER));
+
     double gn[3];
     copy_v3db_v3fl(gn, f->no);
     mul_v3_mat3_m4v3_db(tri->gn, normal, gn);
@@ -2235,6 +2237,7 @@ static void lineart_main_load_geometries(
 
   int thread_count = rb->thread_count;
   int bound_box_discard_count = 0;
+  int obindex = 0;
 
   /* This memory is in render buffer memory pool. So we don't need to free those after loading.
    */
@@ -2242,6 +2245,10 @@ static void lineart_main_load_geometries(
       &rb->render_data_pool, sizeof(LineartObjectLoadTaskInfo) * thread_count);
 
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
+    /* Do the increment even for discarded objects, so that in different culling conditions we can
+     * get the same reference to the same object. */
+    obindex++;
+
     LineartObjectInfo *obi = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
     obi->usage = lineart_usage_check(scene->master_collection, ob);
     obi->override_intersection_mask = lineart_intersection_mask_check(scene->master_collection,
@@ -2252,6 +2259,8 @@ static void lineart_main_load_geometries(
     if (obi->usage == OBJECT_LRT_EXCLUDE) {
       continue;
     }
+
+    obi->obindex = obindex << LRT_OBINDEX_SHIFT;
 
     /* Prepare the matrix used for transforming this specific object (instance). This has to be
      * done before mesh boundbox check because the function needs that. */
@@ -2494,16 +2503,18 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
   dot_r = dot_v3v3_db(Rv, tri->gn);
   dot_f = dot_v3v3_db(Cv, tri->gn);
 
-  if ((e->flags & LRT_EDGE_FLAG_PROJECTED_SHADOW) && LRT_SHADOW_CLOSE_ENOUGH(dot_l, 0) &&
-      LRT_SHADOW_CLOSE_ENOUGH(dot_r, 0)) {
+  if ((e->flags & LRT_EDGE_FLAG_PROJECTED_SHADOW) &&
+      (e->target_reference == tri->target_reference || !e->target_reference) &&
+      LRT_SHADOW_CLOSE_ENOUGH(dot_l, 0) && LRT_SHADOW_CLOSE_ENOUGH(dot_r, 0)) {
     /* Currently unable to precisely determine if the edge is really from this triangle. */
-    /*if ((dot_f > 0 && (e->flags & LRT_EDGE_FLAG_SHADOW_FACING_LIGHT)) ||
-        (dot_f < 0 && (!(e->flags & LRT_EDGE_FLAG_SHADOW_FACING_LIGHT)))) {
+    if (e->target_reference &&
+        (((dot_f > 0) && (e->flags & LRT_EDGE_FLAG_SHADOW_FACING_LIGHT)) ||
+         ((dot_f < 0) && (!(e->flags & LRT_EDGE_FLAG_SHADOW_FACING_LIGHT))))) {
       *from = 0.0f;
       *to = 1.0f;
       return true;
     }
-    */
+
     return false;
   }
 
@@ -3212,7 +3223,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->max_occlusion_level = lmd->level_end_override;
 
   rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
-  if (rb->max_occlusion_level < 1) {
+  if (rb->max_occlusion_level < 1 && !rb->use_shadow) {
     rb->use_back_face_culling = true;
     if (G.debug_value == 4000) {
       printf("Backface culling enabled automatically.\n");
@@ -4402,7 +4413,8 @@ static bool lineart_do_closest_segment(bool is_persp,
                                        double *r_new_in_the_middle,
                                        double *r_new_in_the_middle_global,
                                        double *r_new_at,
-                                       bool *is_side_2r)
+                                       bool *is_side_2r,
+                                       bool *use_new_ref)
 {
   int side = 0;
   int zid = is_persp ? 3 : 2;
@@ -4434,9 +4446,11 @@ static bool lineart_do_closest_segment(bool is_persp,
   if (side) {
     if (side > 0) {
       *is_side_2r = true;
+      *use_new_ref = true;
     }
     else if (side < 0) {
       *is_side_2r = false;
+      *use_new_ref = false;
     }
     return false;
   }
@@ -4450,6 +4464,7 @@ static bool lineart_do_closest_segment(bool is_persp,
   interp_v3_v3v3_db(r_new_in_the_middle, s2fbl, s2fbr, *r_new_at);
   r_new_in_the_middle[3] = interpd(s2fbr[3], s2fbl[3], ga);
   interp_v3_v3v3_db(r_new_in_the_middle_global, s1gl, s1gr, ga);
+  *use_new_ref = true;
 
   return true;
 }
@@ -4535,7 +4550,8 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
                                     double *end_gpos,
                                     double *start_fbc,
                                     double *end_fbc,
-                                    bool facing_light)
+                                    bool facing_light,
+                                    int target_reference)
 {
   LineartShadowSegment *es, *ies;
   LineartShadowSegment *cut_start_after = e->shadow_segments.first,
@@ -4636,7 +4652,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
 
   double *s1fbl, *s1fbr, *s1gl, *s1gr;
   double tg1[3], tg2[3], tfbc1[4], tfbc2[4], mg1[3], mfbc1[4], mg2[3], mfbc2[4];
-  bool is_side_2r, has_middle = false;
+  bool is_side_2r, has_middle = false, use_new_ref;
   copy_v4_v4_db(tfbc1, start_fbc);
   copy_v3_v3_db(tg1, start_gpos);
 
@@ -4670,6 +4686,7 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
         copy_v3_v3_db(ns2->g2, mg2);
         /* Need to restore the flag for next segment's reference. */
         sr->flag = es->flag;
+        sr->target_reference = es->target_reference;
       }
     }
 
@@ -4692,12 +4709,14 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
                                                  r_new_in_the_middle,
                                                  r_new_in_the_middle_global,
                                                  &r_new_at,
-                                                 &is_side_2r))) {
+                                                 &is_side_2r,
+                                                 &use_new_ref))) {
       LineartShadowSegment *ss_middle = lineart_give_shadow_segment(rb);
       ss_middle->at = interpf(sr->at, sl->at, r_new_at);
       ss_middle->flag = is_side_2r ?
                             (LRT_SHADOW_CASTED | (facing_light ? LRT_SHADOW_FACING_LIGHT : 0)) :
                             LRT_SHADOW_CASTED;
+      ss_middle->target_reference = (is_side_2r ? (target_reference) : sl->target_reference);
       copy_v3_v3_db(ss_middle->g1, r_new_in_the_middle_global);
       copy_v3_v3_db(ss_middle->g2, r_new_in_the_middle_global);
       copy_v4_v4_db(ss_middle->fbc1, r_new_in_the_middle);
@@ -4713,10 +4732,12 @@ static void lineart_shadow_edge_cut(LineartRenderBuffer *rb,
     if (has_middle) {
       sl->flag = LRT_SHADOW_CASTED |
                  (is_side_2r ? 0 : (facing_light ? LRT_SHADOW_FACING_LIGHT : 0));
+      sl->target_reference = is_side_2r ? es->target_reference : target_reference;
     }
     else {
       sl->flag = LRT_SHADOW_CASTED |
                  (is_side_2r ? (facing_light ? LRT_SHADOW_FACING_LIGHT : 0) : 0);
+      sl->target_reference = (use_new_ref ? target_reference : es->target_reference);
     }
 
     copy_v4_v4_db(tfbc1, tfbc2);
@@ -4917,8 +4938,16 @@ static void lineart_shadow_cast(LineartRenderBuffer *rb)
                                               global_l,
                                               global_r,
                                               &facing_light)) {
-          lineart_shadow_edge_cut(
-              rb, ssc, at_l, at_r, global_l, global_r, fb_l, fb_r, facing_light);
+          lineart_shadow_edge_cut(rb,
+                                  ssc,
+                                  at_l,
+                                  at_r,
+                                  global_l,
+                                  global_r,
+                                  fb_l,
+                                  fb_r,
+                                  facing_light,
+                                  tri->base.target_reference);
         }
       }
       LRT_EDGE_BA_MARCHING_NEXT(ssc->fbc1, ssc->fbc2);
@@ -4988,6 +5017,7 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
       copy_v3_v3_db(v2->gloc, ((LineartShadowSegment *)ss->next)->g1);
       e->v1 = v1;
       e->v2 = v2;
+      e->target_reference = ss->target_reference;
       e->flags = (LRT_EDGE_FLAG_PROJECTED_SHADOW |
                   ((ss->flag & LRT_SHADOW_FACING_LIGHT) ? LRT_EDGE_FLAG_SHADOW_FACING_LIGHT : 0));
       i++;
