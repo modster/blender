@@ -125,13 +125,14 @@ class NoiseTextureFunction : public blender::fn::MultiFunction {
     for (int i : mask) {
       const blender::float3 vector = vectors[i];
       const float scale = scales[i];
+      const float noise_size = safe_divide(1.0f, scale);
       const float detail = details[i];
       const float noise1 = BLI_noise_generic_turbulence(
-          scale, vector.x, vector.y, vector.z, detail, false, 1);
+          noise_size, vector.x, vector.y, vector.z, detail, false, 1);
       const float noise2 = BLI_noise_generic_turbulence(
-          scale, vector.y, vector.x + 100.0f, vector.z, detail, false, 1);
+          noise_size, vector.y, vector.x + 100.0f, vector.z, detail, false, 1);
       const float noise3 = BLI_noise_generic_turbulence(
-          scale, vector.z + 100.0f, vector.y, vector.x, detail, false, 1);
+          noise_size, vector.z + 100.0f, vector.y, vector.x, detail, false, 1);
       r_values[i] = noise1;
       r_colors[i] = {noise1, noise2, noise3, 1.0f};
     }
