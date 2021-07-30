@@ -53,7 +53,6 @@
 #include "BKE_screen.h"
 #include "BKE_workspace.h"
 
-#include "ED_asset.h"
 #include "ED_render.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"

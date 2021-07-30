@@ -83,7 +83,6 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
       BLI_assert_msg(0, "Non implemented execution model");
       break;
   }
-  num_work_threads_ = WorkScheduler::get_num_cpu_threads();
 }
 
 ExecutionSystem::~ExecutionSystem()
