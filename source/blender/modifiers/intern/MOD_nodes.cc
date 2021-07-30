@@ -787,7 +787,8 @@ static void initialize_group_input(NodesModifierData &nmd,
     return;
   }
   const bool use_attribute = IDP_Int(property_use_attribute) != 0;
-  if (use_attribute) {
+  if (use_attribute &&
+      ELEM(socket.type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_INT, SOCK_BOOLEAN)) {
     const char *attribute_name = IDP_String(property_attribute_name);
     blender::bke::FieldPtr attribute_field = new blender::bke::PersistentAttributeField(
         attribute_name, *socket.typeinfo->get_base_cpp_type());
@@ -1178,7 +1179,11 @@ static void draw_property_for_socket(uiLayout *layout,
       uiItemPointerR(layout, md_ptr, rna_path, bmain_ptr, "textures", socket.name, ICON_TEXTURE);
       break;
     }
-    default: {
+    case SOCK_FLOAT:
+    case SOCK_VECTOR:
+    case SOCK_RGBA:
+    case SOCK_INT:
+    case SOCK_BOOLEAN: {
       uiLayout *col = uiLayoutColumn(layout, false);
       const int use_attribute = RNA_int_get(md_ptr, rna_path_use_attribute) != 0;
       if (use_attribute) {
@@ -1188,6 +1193,11 @@ static void draw_property_for_socket(uiLayout *layout,
         uiItemR(col, md_ptr, rna_path, 0, socket.name, ICON_NONE);
       }
       uiItemR(col, md_ptr, rna_path_use_attribute, 0, "Use Attribute", ICON_NONE);
+      break;
+    }
+    default: {
+      uiItemR(layout, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+      break;
     }
   }
 }
