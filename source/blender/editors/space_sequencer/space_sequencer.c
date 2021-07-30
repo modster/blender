@@ -101,8 +101,7 @@ static SpaceLink *sequencer_create(const ScrArea *UNUSED(area), const Scene *sce
   sseq->flag = SEQ_SHOW_GPENCIL | SEQ_USE_ALPHA | SEQ_SHOW_MARKERS | SEQ_SHOW_FCURVES |
                SEQ_ZOOM_TO_FIT | SEQ_SHOW_STRIP_OVERLAY | SEQ_SHOW_STRIP_NAME |
                SEQ_SHOW_STRIP_SOURCE | SEQ_SHOW_STRIP_DURATION;
-  struct rctf temp = {0, 0, 0, 0};
-  sseq->check_view_area = temp;
+
   /* Tool header. */
   region = MEM_callocN(sizeof(ARegion), "tool header for sequencer");
 

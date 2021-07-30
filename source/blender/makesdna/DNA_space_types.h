@@ -616,10 +616,6 @@ typedef struct SpaceSeq {
   /** Multiview current eye - for internal use. */
   char multiview_eye;
   char _pad2[7];
-
-  /** Required for Thumbnail caching job call condition */ 
-  struct rctf check_view_area;
-
 } SpaceSeq;
 
 /* SpaceSeq.mainb */

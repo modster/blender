@@ -1253,10 +1253,12 @@ static void sequencer_thumbnail_get_job(const bContext *C,
     WM_jobs_callbacks(wm_job, thumbnail_startjob, NULL, NULL, thumbnail_endjob);
   }
   else {
-    /* Free the hash input */
     BLI_ghash_free(seqs, NULL, thumbnail_hash_data_free);
+    // Workaround for now
   }
 
+  // TODO(AYJ) : add the new data to the existing thread if new information has come in (calls this
+  // function twice)
   if (!WM_jobs_is_running(wm_job)) {
     G.is_break = false;
     WM_jobs_start(CTX_wm_manager(C), wm_job);
@@ -1273,11 +1275,11 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   SpaceSeq *sseq = CTX_wm_space_seq(C);
 
   /* Set the data for thumbnail caching job */
+  static rctf check_view = {0, 0, 0, 0};
   GHash *thumb_data_hash;
 
   // leftover is set to true if missing image in strip. false when normal call to all strips done
-  if (v2d->cur.xmax != sseq->check_view_area.xmax || v2d->cur.ymax != sseq->check_view_area.ymax ||
-      leftover) {
+  if (!BLI_rctf_compare(&check_view, &v2d->cur, 0.1) || leftover) {
     thumb_data_hash = BLI_ghash_ptr_new("seq_duplicates_and_origs");
 
     LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
@@ -1292,7 +1294,7 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
     context.view_id = BKE_scene_multiview_view_id_get(&scene->r, STEREO_LEFT_NAME);
     context.use_proxies = false;
     sequencer_thumbnail_get_job(C, v2d, context, thumb_data_hash);
-    sseq->check_view_area = v2d->cur;
+    check_view = v2d->cur;
   }
 }
 
@@ -2314,6 +2316,8 @@ static void draw_seq_backdrop(View2D *v2d)
 
 static void draw_seq_strips(const bContext *C, Editing *ed, ARegion *region)
 {
+  struct Main *bmain = CTX_data_main(C);
+  struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   Scene *scene = CTX_data_scene(C);
   View2D *v2d = &region->v2d;
   SpaceSeq *sseq = CTX_wm_space_seq(C);
