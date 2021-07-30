@@ -148,8 +148,11 @@ KeyingSet *BKE_keyingset_add(
   /* allocate new KeyingSet */
   ks = MEM_callocN(sizeof(KeyingSet), "KeyingSet");
 
-  BLI_strncpy(
-      ks->idname, (idname) ? idname : (name) ? name : DATA_("KeyingSet"), sizeof(ks->idname));
+  BLI_strncpy(ks->idname,
+              (idname) ? idname :
+              (name)   ? name :
+                         DATA_("KeyingSet"),
+              sizeof(ks->idname));
   BLI_strncpy(ks->name, (name) ? name : (idname) ? idname : DATA_("Keying Set"), sizeof(ks->name));
 
   ks->flag = flag;
@@ -1947,7 +1950,7 @@ static void nlaevalchan_blendOrcombine(NlaEvalChannelSnapshot *lower_necs,
           return;
         }
         default:
-          BLI_assert("Mix mode should've been handled");
+          BLI_assert_msg(0, "Mix mode should've been handled");
       }
       return;
     }
@@ -1960,7 +1963,7 @@ static void nlaevalchan_blendOrcombine(NlaEvalChannelSnapshot *lower_necs,
       return;
     }
     default:
-      BLI_assert("Blend mode should've been handled");
+      BLI_assert_msg(0, "Blend mode should've been handled");
   }
 }
 
@@ -2110,7 +2113,7 @@ static void nlaevalchan_blendOrcombine_get_inverted_upper_evalchan(
           return;
         }
         default:
-          BLI_assert("Mix mode should've been handled");
+          BLI_assert_msg(0, "Mix mode should've been handled");
       }
       return;
     }
@@ -2123,7 +2126,7 @@ static void nlaevalchan_blendOrcombine_get_inverted_upper_evalchan(
       return;
     }
     default:
-      BLI_assert("Blend mode should've been handled");
+      BLI_assert_msg(0, "Blend mode should've been handled");
   }
 }
 

@@ -685,7 +685,6 @@ static void file_operatortypes(void)
   WM_operatortype_append(FILE_OT_bookmark_move);
   WM_operatortype_append(FILE_OT_reset_recent);
   WM_operatortype_append(FILE_OT_hidedot);
-  WM_operatortype_append(FILE_OT_associate_blend);
   WM_operatortype_append(FILE_OT_filenum);
   WM_operatortype_append(FILE_OT_directory_new);
   WM_operatortype_append(FILE_OT_delete);
@@ -909,13 +908,6 @@ static int /*eContextResult*/ file_context(const bContext *C,
     if (!asset_params) {
       return CTX_RESULT_NO_DATA;
     }
-
-    BLI_STATIC_ASSERT(offsetof(FileSelectAssetLibraryUID, type) ==
-                          offsetof(AssetLibraryReference, type),
-                      "Expected FileSelectAssetLibraryUID to match AssetLibraryReference");
-    BLI_STATIC_ASSERT(offsetof(FileSelectAssetLibraryUID, custom_library_index) ==
-                          offsetof(AssetLibraryReference, custom_library_index),
-                      "Expected FileSelectAssetLibraryUID to match AssetLibraryReference");
 
     CTX_data_pointer_set(
         result, &screen->id, &RNA_AssetLibraryReference, &asset_params->asset_library);

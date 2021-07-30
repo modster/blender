@@ -49,8 +49,11 @@ set(SRC
   COM_compositor.h
   COM_defines.h
 
+  intern/COM_BufferArea.h
   intern/COM_BufferOperation.cc
   intern/COM_BufferOperation.h
+  intern/COM_BufferRange.h
+  intern/COM_BuffersIterator.h
   intern/COM_CPUDevice.cc
   intern/COM_CPUDevice.h
   intern/COM_ChunkOrder.cc
@@ -632,3 +635,19 @@ if(CXX_WARN_NO_SUGGEST_OVERRIDE)
 endif()
 
 add_dependencies(bf_compositor smaa_areatex_header)
+
+if(WITH_GTESTS)
+  set(TEST_SRC
+    tests/COM_BufferArea_test.cc
+    tests/COM_BufferRange_test.cc
+    tests/COM_BuffersIterator_test.cc
+  )
+  set(TEST_INC
+  )
+  set(TEST_LIB
+    bf_compositor
+  )
+  include(GTestTesting)
+  blender_add_test_lib(bf_compositor_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+endif()
+
