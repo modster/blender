@@ -176,6 +176,35 @@ static void attribute_search_exec_fn(bContext *C, void *data_v, void *item_v)
   bNodeSocketValueString *value = static_cast<bNodeSocketValueString *>(socket.default_value);
   BLI_strncpy(value->value, item->name.c_str(), MAX_NAME);
 
+  if (data->node->type == GEO_NODE_ATTRIBUTE) {
+    NodeGeometryAttribute *storage = (NodeGeometryAttribute *)data->node->storage;
+    switch (item->data_type) {
+      case CD_PROP_FLOAT: {
+        storage->output_type = SOCK_FLOAT;
+        break;
+      }
+      case CD_PROP_INT32: {
+        storage->output_type = SOCK_INT;
+        break;
+      }
+      case CD_PROP_FLOAT2:
+      case CD_PROP_FLOAT3: {
+        storage->output_type = SOCK_VECTOR;
+        break;
+      }
+      case CD_PROP_BOOL: {
+        storage->output_type = SOCK_BOOLEAN;
+        break;
+      }
+      case CD_PROP_COLOR: {
+        storage->output_type = SOCK_RGBA;
+        break;
+      }
+    }
+    snode_update(CTX_wm_space_node(C), (bNode *)data->node);
+    ntreeUpdateTree(CTX_data_main(C), (bNodeTree *)data->tree);
+  }
+
   ED_undo_push(C, "Assign Attribute Name");
 }
 
