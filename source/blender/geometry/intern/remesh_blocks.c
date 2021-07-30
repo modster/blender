@@ -18,15 +18,16 @@
  * \ingroup geo
  */
 
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+#include "DNA_modifier_types.h"
+#include "DNA_customdata_types.h"
+
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
 
 #include "BLI_math_vector.h"
 #include "BLI_threads.h"
-
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-#include "DNA_modifier_types.h"
 
 #include "GEO_mesh_remesh_blocks.h" /* own include */
 
@@ -36,7 +37,7 @@
 #  include "dualcon.h"
 #endif
 
-static void init_dualcon_mesh(DualConInput *input, Mesh *mesh)
+static void init_dualcon_mesh(DualConInput *input, const Mesh *mesh)
 {
   memset(input, 0, sizeof(DualConInput));
 
@@ -109,13 +110,13 @@ static void dualcon_add_quad(void *output_v, const int vert_indices[4])
   output->curface++;
 }
 
-Mesh *GEO_mesh_remesh_blocks(Mesh *mesh,
-                                            const char remesh_flag,
-                                            const char remesh_mode,
-                                            const float threshold,
-                                            const int hermite_num,
-                                            const float scale,
-                                            const int depth)
+Mesh *GEO_mesh_remesh_blocks(const Mesh *mesh,
+                             const char remesh_flag,
+                             const char remesh_mode,
+                             const float threshold,
+                             const int hermite_num,
+                             const float scale,
+                             const int depth)
 {
 #ifdef WITH_REMESH_DUALCON
 
@@ -165,6 +166,6 @@ Mesh *GEO_mesh_remesh_blocks(Mesh *mesh,
 
   return result;
 #else
-  return mesh;
+  return BKE_mesh_new_nomain(0,0,0,0,0);
 #endif
 }

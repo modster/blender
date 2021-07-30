@@ -58,11 +58,11 @@ static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
   const char mode = params.node().custom1;
   const int hermite_num = 1;
   const int depth = params.extract_input<int>("Depth");
-  const float scale = params.extract_input<float>("Scale");
+  const float scale = min_ff(params.extract_input<float>("Scale"), 0.9999f);
   const float threshold = params.extract_input<float>("Threshold");
 
   if (geometry_set.has_mesh()) {
-    Mesh *input_mesh = geometry_set.get_mesh_for_write();
+    const Mesh *input_mesh = geometry_set.get_mesh_for_read();
 
     Mesh *output_mesh = GEO_mesh_remesh_blocks(
         input_mesh, flag, mode, threshold, hermite_num, scale, depth);

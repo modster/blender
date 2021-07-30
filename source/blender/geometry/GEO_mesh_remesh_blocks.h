@@ -27,21 +27,21 @@ extern "C" {
 struct Mesh;
 
 typedef enum eRemeshBlocksMode {
-  /* blocky */
+  /* Blocks. */
   REMESH_BLOCKS_CENTROID = 0,
-  /* smooth */
+  /* Smooth. */
   REMESH_BLOCKS_MASS_POINT = 1,
-  /* keeps sharp edges */
+  /* Smooth with sharp edges. */
   REMESH_BLOCKS_SHARP_FEATURES = 2,
 } eRemeshBlocksMode;
 
-struct Mesh *GEO_mesh_remesh_blocks(struct Mesh *mesh,
-                                                   const char remesh_flag,
-                                                   const char remesh_mode,
-                                                   const float threshold,
-                                                   const int hermite_num,
-                                                   const float scale,
-                                                   const int depth);
+struct Mesh *GEO_mesh_remesh_blocks(const struct Mesh *mesh,
+                                    const char remesh_flag,
+                                    const char remesh_mode,
+                                    const float threshold,
+                                    const int hermite_num,
+                                    const float scale,
+                                    const int depth);
 
 #ifdef __cplusplus
 }
