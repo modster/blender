@@ -93,6 +93,10 @@ class TrackPositionOperation : public NodeOperation {
   void initExecution() override;
 
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer(MemoryBuffer *output,
+                            const rcti &area,
+                            Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor

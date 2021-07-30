@@ -42,6 +42,8 @@ TrackPositionOperation::TrackPositionOperation()
   this->m_relativeFrame = 0;
   this->m_speed_output = false;
   flags.is_set_operation = true;
+  flags.is_fullframe_operation = true;
+  flags.can_be_constant = true;
 }
 
 void TrackPositionOperation::initExecution()
@@ -128,6 +130,23 @@ void TrackPositionOperation::executePixelSampled(float output[4],
   }
   else {
     output[0] *= this->m_height;
+  }
+}
+
+void TrackPositionOperation::update_memory_buffer(MemoryBuffer *output,
+                                                  const rcti &area,
+                                                  Span<MemoryBuffer *> UNUSED(inputs))
+{
+  /* Should always be folded into a constant operation because there are no inputs and
+   * can_be_constant flag is enabled. */
+  BLI_assert(BLI_rcti_size_x(&area) == 1 && BLI_rcti_size_y(&area) == 1);
+  float *out = output->get_elem(area.xmin, area.ymin);
+  out[0] = this->m_markerPos[this->m_axis] - this->m_relativePos[this->m_axis];
+  if (this->m_axis == 0) {
+    out[0] *= this->m_width;
+  }
+  else {
+    out[0] *= this->m_height;
   }
 }
 

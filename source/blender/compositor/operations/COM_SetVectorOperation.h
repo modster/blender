@@ -93,6 +93,10 @@ class SetVectorOperation : public ConstantOperation {
     setY(vector[1]);
     setZ(vector[2]);
   }
+
+  void update_memory_buffer(MemoryBuffer *output,
+                            const rcti &area,
+                            Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor
