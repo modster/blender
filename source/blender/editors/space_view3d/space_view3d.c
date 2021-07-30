@@ -495,7 +495,7 @@ static ID_Type view3d_drop_id_in_main_region_poll_get_id_type(bContext *C,
 
   wmDragAsset *asset_drag = WM_drag_get_asset_data(drag, 0);
   if (asset_drag) {
-    return ED_asset_handle_get_id_type(asset_drag->asset_handle);
+    return asset_drag->id_type;
   }
 
   return 0;
