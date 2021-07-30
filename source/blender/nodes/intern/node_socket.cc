@@ -32,6 +32,7 @@
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_field.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_lib_id.h"
 #include "BKE_node.h"
@@ -611,6 +612,15 @@ static bNodeSocketType *make_socket_type_bool()
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(bool *)r_value = ((bNodeSocketValueBoolean *)socket.default_value)->value;
   };
+  socktype->get_geometry_nodes_cpp_type = []() {
+    return &blender::fn::CPPType::get<blender::bke::FieldRef<bool>>();
+  };
+  socktype->get_geometry_nodes_cpp_value = [](const bNodeSocket &socket, void *r_value) {
+    bool value;
+    socket.typeinfo->get_cpp_value(socket, &value);
+    new (r_value) blender::bke::FieldRef<bool>(
+        blender::bke::FieldPtr{new blender::bke::ConstantField<bool>(value)});
+  };
   return socktype;
 }
 
@@ -620,6 +630,15 @@ static bNodeSocketType *make_socket_type_float(PropertySubType subtype)
   socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<float>(); };
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(float *)r_value = ((bNodeSocketValueFloat *)socket.default_value)->value;
+  };
+  socktype->get_geometry_nodes_cpp_type = []() {
+    return &blender::fn::CPPType::get<blender::bke::FieldRef<float>>();
+  };
+  socktype->get_geometry_nodes_cpp_value = [](const bNodeSocket &socket, void *r_value) {
+    float value;
+    socket.typeinfo->get_cpp_value(socket, &value);
+    new (r_value) blender::bke::FieldRef<float>(
+        blender::bke::FieldPtr{new blender::bke::ConstantField<float>(value)});
   };
   return socktype;
 }
@@ -631,6 +650,15 @@ static bNodeSocketType *make_socket_type_int(PropertySubType subtype)
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(int *)r_value = ((bNodeSocketValueInt *)socket.default_value)->value;
   };
+  socktype->get_geometry_nodes_cpp_type = []() {
+    return &blender::fn::CPPType::get<blender::bke::FieldRef<int>>();
+  };
+  socktype->get_geometry_nodes_cpp_value = [](const bNodeSocket &socket, void *r_value) {
+    int value;
+    socket.typeinfo->get_cpp_value(socket, &value);
+    new (r_value) blender::bke::FieldRef<int>(
+        blender::bke::FieldPtr{new blender::bke::ConstantField<int>(value)});
+  };
   return socktype;
 }
 
@@ -640,6 +668,22 @@ static bNodeSocketType *make_socket_type_vector(PropertySubType subtype)
   socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<blender::float3>(); };
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(blender::float3 *)r_value = ((bNodeSocketValueVector *)socket.default_value)->value;
+  };
+  socktype->get_geometry_nodes_cpp_type = []() {
+    return &blender::fn::CPPType::get<blender::bke::FieldRef<blender::float3>>();
+  };
+  socktype->get_geometry_nodes_cpp_value = [](const bNodeSocket &socket, void *r_value) {
+    if (socket.in_out == SOCK_IN && (socket.flag & SOCK_HIDE_VALUE)) {
+      new (r_value) blender::bke::FieldRef<blender::float3>(
+          blender::bke::FieldPtr{new blender::bke::PersistentAttributeField(
+              "position", blender::fn::CPPType::get<blender::float3>())});
+    }
+    else {
+      blender::float3 value;
+      socket.typeinfo->get_cpp_value(socket, &value);
+      new (r_value) blender::bke::FieldRef<blender::float3>(
+          blender::bke::FieldPtr{new blender::bke::ConstantField<blender::float3>(value)});
+    }
   };
   return socktype;
 }
@@ -651,6 +695,15 @@ static bNodeSocketType *make_socket_type_rgba()
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(blender::ColorGeometry4f *)r_value = ((bNodeSocketValueRGBA *)socket.default_value)->value;
   };
+  socktype->get_geometry_nodes_cpp_type = []() {
+    return &blender::fn::CPPType::get<blender::bke::FieldRef<blender::ColorGeometry4f>>();
+  };
+  socktype->get_geometry_nodes_cpp_value = [](const bNodeSocket &socket, void *r_value) {
+    blender::ColorGeometry4f value;
+    socket.typeinfo->get_cpp_value(socket, &value);
+    new (r_value) blender::bke::FieldRef<blender::ColorGeometry4f>(
+        blender::bke::FieldPtr{new blender::bke::ConstantField<blender::ColorGeometry4f>(value)});
+  };
   return socktype;
 }
 
@@ -661,6 +714,8 @@ static bNodeSocketType *make_socket_type_string()
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     new (r_value) std::string(((bNodeSocketValueString *)socket.default_value)->value);
   };
+  socktype->get_geometry_nodes_cpp_type = socktype->get_cpp_type;
+  socktype->get_geometry_nodes_cpp_value = socktype->get_cpp_value;
   return socktype;
 }
 
@@ -676,6 +731,8 @@ static bNodeSocketType *make_socket_type_object()
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(Object **)r_value = ((bNodeSocketValueObject *)socket.default_value)->value;
   };
+  socktype->get_geometry_nodes_cpp_type = socktype->get_cpp_type;
+  socktype->get_geometry_nodes_cpp_value = socktype->get_cpp_value;
   return socktype;
 }
 
@@ -686,6 +743,8 @@ static bNodeSocketType *make_socket_type_geometry()
   socktype->get_cpp_value = [](const bNodeSocket &UNUSED(socket), void *r_value) {
     new (r_value) GeometrySet();
   };
+  socktype->get_geometry_nodes_cpp_type = socktype->get_cpp_type;
+  socktype->get_geometry_nodes_cpp_value = socktype->get_cpp_value;
   return socktype;
 }
 
@@ -696,6 +755,8 @@ static bNodeSocketType *make_socket_type_collection()
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(Collection **)r_value = ((bNodeSocketValueCollection *)socket.default_value)->value;
   };
+  socktype->get_geometry_nodes_cpp_type = socktype->get_cpp_type;
+  socktype->get_geometry_nodes_cpp_value = socktype->get_cpp_value;
   return socktype;
 }
 
@@ -706,6 +767,8 @@ static bNodeSocketType *make_socket_type_texture()
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(Tex **)r_value = ((bNodeSocketValueTexture *)socket.default_value)->value;
   };
+  socktype->get_geometry_nodes_cpp_type = socktype->get_cpp_type;
+  socktype->get_geometry_nodes_cpp_value = socktype->get_cpp_value;
   return socktype;
 }
 
@@ -716,6 +779,8 @@ static bNodeSocketType *make_socket_type_material()
   socktype->get_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     *(Material **)r_value = ((bNodeSocketValueMaterial *)socket.default_value)->value;
   };
+  socktype->get_geometry_nodes_cpp_type = socktype->get_cpp_type;
+  socktype->get_geometry_nodes_cpp_value = socktype->get_cpp_value;
   return socktype;
 }
 
