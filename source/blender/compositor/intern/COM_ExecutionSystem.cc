@@ -43,6 +43,7 @@ ExecutionSystem::ExecutionSystem(RenderData *rd,
                                  const ColorManagedDisplaySettings *displaySettings,
                                  const char *viewName)
 {
+  num_work_threads_ = WorkScheduler::get_num_cpu_threads();
   this->m_context.setViewName(viewName);
   this->m_context.setScene(scene);
   this->m_context.setbNodeTree(editingtree);
