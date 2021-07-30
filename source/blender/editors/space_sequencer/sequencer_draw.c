@@ -101,11 +101,7 @@
 #define SEQ_HANDLE_SIZE 8.0f
 #define SEQ_SCROLLER_TEXT_OFFSET 8
 #define MUTE_ALPHA 120
-
-/* NOTE: Don't use SEQ_ALL_BEGIN/SEQ_ALL_END while drawing!
- * it messes up transform. */
-#undef SEQ_ALL_BEGIN
-#undef SEQ_ALL_END
+#define OVERLAP_ALPHA 180
 
 static Sequence *special_seq_update = NULL;
 
@@ -803,10 +799,16 @@ static void draw_color_strip_band(Sequence *seq, uint pos, float text_margin_y, 
   uchar col[4];
   SolidColorVars *colvars = (SolidColorVars *)seq->effectdata;
 
+  GPU_blend(GPU_BLEND_ALPHA);
   rgb_float_to_uchar(col, colvars->col);
+
+  /* Draw muted strips semi-transparent. */
   if (seq->flag & SEQ_MUTE) {
-    GPU_blend(GPU_BLEND_ALPHA);
     col[3] = MUTE_ALPHA;
+  }
+  /* Draw background semi-transparent when overlapping strips. */
+  else if (seq->flag & SEQ_OVERLAP) {
+    col[3] = OVERLAP_ALPHA;
   }
   else {
     col[3] = 255;
@@ -825,9 +827,7 @@ static void draw_color_strip_band(Sequence *seq, uint pos, float text_margin_y, 
   immVertex2f(pos, seq->enddisp, text_margin_y);
   immEnd();
 
-  if (seq->flag & SEQ_MUTE) {
-    GPU_blend(GPU_BLEND_NONE);
-  }
+  GPU_blend(GPU_BLEND_NONE);
 }
 
 static void draw_seq_background(Scene *scene,
@@ -840,6 +840,7 @@ static void draw_seq_background(Scene *scene,
                                 bool is_single_image)
 {
   uchar col[4];
+  GPU_blend(GPU_BLEND_ALPHA);
 
   /* Get the correct color per strip type, transitions use their inputs ones. */
   if (ELEM(seq->type, SEQ_TYPE_CROSS, SEQ_TYPE_GAMCROSS, SEQ_TYPE_WIPE)) {
@@ -856,14 +857,18 @@ static void draw_seq_background(Scene *scene,
     color3ubv_from_seq(scene, seq, col);
   }
 
+  /* Draw muted strips semi-transparent. */
   if (seq->flag & SEQ_MUTE) {
-    GPU_blend(GPU_BLEND_ALPHA);
-
     col[3] = MUTE_ALPHA;
+  }
+  /* Draw background semi-transparent when overlapping strips. */
+  else if (seq->flag & SEQ_OVERLAP) {
+    col[3] = OVERLAP_ALPHA;
   }
   else {
     col[3] = 255;
   }
+
   immUniformColor4ubv(col);
 
   /* Draw the main strip body. */
@@ -923,9 +928,7 @@ static void draw_seq_background(Scene *scene,
     immEnd();
   }
 
-  if (seq->flag & SEQ_MUTE) {
-    GPU_blend(GPU_BLEND_NONE);
-  }
+  GPU_blend(GPU_BLEND_NONE);
 }
 
 static void draw_seq_locked(float x1, float y1, float x2, float y2)
@@ -2302,7 +2305,7 @@ static void draw_seq_backdrop(View2D *v2d)
   /* Lines separating the horizontal bands. */
   i = max_ii(1, ((int)v2d->cur.ymin) - 1);
   int line_len = (int)v2d->cur.ymax - i + 1;
-  immUniformThemeColor(TH_GRID);
+  immUniformThemeColorShade(TH_GRID, 10);
   immBegin(GPU_PRIM_LINES, line_len * 2);
   while (line_len--) {
     immVertex2f(pos, v2d->cur.xmax, i);
@@ -2743,7 +2746,12 @@ void draw_timeline_seq(const bContext *C, ARegion *region)
   /* Get timeline bound-box, needed for the scroll-bars. */
   SEQ_timeline_boundbox(scene, SEQ_active_seqbase_get(ed), &v2d->tot);
   draw_seq_backdrop(v2d);
-  UI_view2d_constant_grid_draw(v2d, FPS);
+  if ((sseq->flag & SEQ_SHOW_STRIP_OVERLAY) && (sseq->flag & SEQ_SHOW_GRID)) {
+    U.v2d_min_gridsize *= 3;
+    UI_view2d_draw_lines_x__discrete_frames_or_seconds(
+        v2d, scene, (sseq->flag & SEQ_DRAWFRAMES) == 0, false);
+    U.v2d_min_gridsize /= 3;
+  }
 
   /* Only draw backdrop in timeline view. */
   if (sseq->view == SEQ_VIEW_SEQUENCE && sseq->draw_flag & SEQ_DRAW_BACKDROP) {

@@ -12,30 +12,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
  */
 
 /** \file
- * \ingroup editor/io
+ * \ingroup edasset
  */
 
 #pragma once
 
-struct ARegion;
-struct View3D;
-struct bContext;
-struct wmOperatorType;
-
-void WM_OT_gpencil_import_svg(struct wmOperatorType *ot);
-
-#ifdef WITH_PUGIXML
-void WM_OT_gpencil_export_svg(struct wmOperatorType *ot);
-#endif
-#ifdef WITH_HARU
-void WM_OT_gpencil_export_pdf(struct wmOperatorType *ot);
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-struct ARegion *get_invoke_region(struct bContext *C);
-struct View3D *get_invoke_view3d(struct bContext *C);
+struct AssetHandle;
+struct AssetFilterSettings;
+
+bool ED_asset_filter_matches_asset(const struct AssetFilterSettings *filter,
+                                   const struct AssetHandle *asset);
+
+#ifdef __cplusplus
+}
+#endif
