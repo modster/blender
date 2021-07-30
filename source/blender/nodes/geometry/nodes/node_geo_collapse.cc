@@ -30,7 +30,6 @@
 static bNodeSocketTemplate geo_node_collapse_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Factor"), 1.0f, 0.0f, 0.0f, 0.0f, 0, 1.0f, PROP_FACTOR},
-    {SOCK_BOOLEAN, N_("Triangulate"), false},
     {SOCK_STRING, N_("Selection")},
     {-1, ""},
 };
@@ -53,7 +52,7 @@ static void geo_node_collapse_init(bNodeTree *UNUSED(tree), bNode *node)
       sizeof(NodeGeometryCollapse), __func__);
 
   node->storage = node_storage;
-  node_storage->symmetry_axis = -1;
+  node_storage->symmetry_axis = GEO_NODE_COLLAPSE_SYMMETRY_AXIS_NONE;
 }
 
 namespace blender::nodes {
@@ -97,11 +96,9 @@ static void geo_node_collapse_exec(GeoNodeExecParams params)
     VArray_Span<float> selection{selection_attribute};
     const Mesh *input_mesh = mesh_component.get_for_read();
 
-    const bool triangulate = params.extract_input<bool>("Triangulate");
     const bNode &node = params.node();
     const NodeGeometryCollapse &node_storage = *(NodeGeometryCollapse *)node.storage;
-    Mesh *result = collapse_mesh(
-        factor, selection, triangulate, node_storage.symmetry_axis, input_mesh);
+    Mesh *result = collapse_mesh(factor, selection, false, node_storage.symmetry_axis, input_mesh);
     geometry_set.replace_mesh(result);
   }
 

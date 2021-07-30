@@ -31,7 +31,7 @@ static bNodeSocketTemplate geo_node_dissolve_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Angle"), 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, M_PI, PROP_ANGLE},
     {SOCK_BOOLEAN, N_("All Boundaries"), false},
-    {SOCK_STRING, N_("Delimiter")},
+    {SOCK_STRING, N_("Selection")},
     {-1, ""},
 };
 
@@ -44,7 +44,7 @@ static void geo_node_dissolve_layout(uiLayout *layout, bContext *UNUSED(C), Poin
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "delimiter", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "selection_type", 0, nullptr, ICON_NONE);
 }
 
 static void geo_node_dissolve_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -53,27 +53,28 @@ static void geo_node_dissolve_init(bNodeTree *UNUSED(tree), bNode *node)
       sizeof(NodeGeometryDissolve), __func__);
 
   node->storage = node_storage;
-  node_storage->delimiter = GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER;
+  node_storage->selection_type = GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER;
 }
 
 namespace blender::nodes {
 static Mesh *dissolve_mesh(const float angle,
                            const bool all_boundaries,
-                           const int delimiter_type,
-                           const Span<bool> &delimiter,
+                           const int delimiter,
+                           const Span<bool> selection,
                            const Mesh *mesh)
 {
   const BMeshCreateParams bmesh_create_params = {0};
   const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
-  if (delimiter_type & GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER) {
-    BM_temporary_tag_faces(bm, delimiter.data());
+  if (delimiter & BMO_DELIM_FACE_SELECTION) {
+    BM_select_faces(bm, selection.data());
   }
   else {
-    BM_temporary_tag_edges(bm, delimiter.data());
+    BM_select_edges(bm, selection.data());
   }
-  BM_mesh_decimate_dissolve(bm, angle, all_boundaries, (BMO_Delimit)delimiter_type);
+
+  BM_mesh_decimate_dissolve(bm, angle, all_boundaries, (BMO_Delimit)delimiter);
 
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
   BM_mesh_free(bm);
@@ -94,19 +95,25 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
     const bNode &node = params.node();
     const NodeGeometryDissolve &node_storage = *(NodeGeometryDissolve *)node.storage;
 
-    const bool default_delimiter = false;
-    AttributeDomain delimiter_domain = ATTR_DOMAIN_FACE;
+    bool default_selection = false;
+    AttributeDomain selection_domain = ATTR_DOMAIN_FACE;
+    BMO_Delimit delimiter = BMO_DELIM_FACE_SELECTION;
 
-    if (node_storage.delimiter & GEO_NODE_DISSOLVE_DELIMITTER_SELECTION) {
-      delimiter_domain = ATTR_DOMAIN_EDGE;
+    if (node_storage.selection_type == GEO_NODE_DISSOLVE_DELIMITTER_UNSELECTED) {
+      selection_domain = ATTR_DOMAIN_EDGE;
+      delimiter = BMO_DELIM_EDGE_SELECTION_INVSE;
+    }
+    else if (node_storage.selection_type == GEO_NODE_DISSOLVE_DELIMITTER_LIMIT) {
+      selection_domain = ATTR_DOMAIN_EDGE;
+      delimiter = BMO_DELIM_EDGE_SELECTION;
+      default_selection = true;
     };
 
-    GVArray_Typed<bool> delimiter_attribute = params.get_input_attribute<bool>(
-        "Delimiter", mesh_component, delimiter_domain, default_delimiter);
-    VArray_Span<bool> delimiter{delimiter_attribute};
+    GVArray_Typed<bool> selection_attribute = params.get_input_attribute<bool>(
+        "Selection", mesh_component, selection_domain, default_selection);
+    VArray_Span<bool> selection{selection_attribute};
 
-    Mesh *result = dissolve_mesh(
-        angle, all_boundaries, node_storage.delimiter, delimiter, input_mesh);
+    Mesh *result = dissolve_mesh(angle, all_boundaries, delimiter, selection, input_mesh);
     geometry_set.replace_mesh(result);
   }
 

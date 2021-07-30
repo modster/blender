@@ -104,16 +104,19 @@ static bool bm_edge_is_delimiter(const BMEdge *e,
   BLI_assert(BM_edge_is_manifold(e));
 
   if (delimit != 0) {
-    if (delimit & BMO_DELIM_EDGE_TAG) {
-      /* BM_ELEM_SELECT is used here instead of BM_ELEM_TAG because BM_ELEM_TAG does not work for
-       * some reason. */
+    if (delimit & BMO_DELIM_EDGE_SELECTION_INVSE) {
+      if (!BM_elem_flag_test(e, BM_ELEM_SELECT)) {
+        return true;
+      }
+    }
+    if (delimit & BMO_DELIM_EDGE_SELECTION) {
       if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
         return true;
       }
     }
-    if (delimit & BMO_DELIM_FACE_TAG) {
-      if (BM_elem_flag_test(e->l->f, BM_ELEM_TAG) !=
-          BM_elem_flag_test(e->l->radial_next->f, BM_ELEM_TAG)) {
+    if (delimit & BMO_DELIM_FACE_SELECTION) {
+      if (BM_elem_flag_test(e->l->f, BM_ELEM_SELECT) !=
+          BM_elem_flag_test(e->l->radial_next->f, BM_ELEM_SELECT)) {
         return true;
       }
     }
@@ -347,7 +350,6 @@ void BM_mesh_decimate_dissolve_ex(BMesh *bm,
       BM_elem_index_set(e_iter, -1); /* set dirty */
     }
     bm->elem_index_dirty |= BM_EDGE;
-
     /* build heap */
     for (i = 0; i < einput_len; i++) {
       BMEdge *e = einput_arr[i];

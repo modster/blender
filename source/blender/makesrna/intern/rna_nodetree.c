@@ -10065,25 +10065,29 @@ static void def_geo_dissolve(StructRNA *srna)
   PropertyRNA *prop;
 
   static EnumPropertyItem delimiter_items[] = {
-      {GEO_NODE_DISSOLVE_DELIMITTER_SELECTION,
+      {GEO_NODE_DISSOLVE_DELIMITTER_UNSELECTED,
        "selection",
        0,
        "Selection",
-       "Use selection as delimiter"},
+       "Only dissolve selected"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_LIMIT,
+       "limit",
+       0,
+       "Limit",
+       "Only dissolve unselected. Use e.g. for crease as delimiter"},
       {GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER,
        "border",
        0,
-       "Border",
+       "Border as Limit",
        "Use border of selection as delimiter"},
       {0, NULL, 0, NULL, NULL},
   };
 
   RNA_def_struct_sdna_from(srna, "NodeGeometryDissolve", "storage");
 
-  prop = RNA_def_property(srna, "delimiter", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "selection_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, delimiter_items);
-  RNA_def_property_ui_text(
-      prop, "Limit", "Sets if and on what axis symmetry is applied by the operation");
+  RNA_def_property_ui_text(prop, "Selection", "Defines how selection is applied");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 

@@ -1419,12 +1419,14 @@ typedef struct NodeGeometryRaycast {
 } NodeGeometryRaycast;
 
 typedef struct NodeGeometryCollapse {
+  /* GeometryNodeCollapseSymmetryAxis. */
   int symmetry_axis;
   char _pad[4];
 } NodeGeometryCollapse;
 
 typedef struct NodeGeometryDissolve {
-  int delimiter;
+  /* GeometryNodeDissolveDelimiter */
+  int selection_type;
   char _pad[4];
 } NodeGeometryDissolve;
 
@@ -2001,9 +2003,9 @@ typedef enum GeometryNodeCollapseSymmetryAxis {
 } GeometryNodeCollapseSymmetryAxis;
 
 typedef enum GeometryNodeDissolveDelimiter {
-  /* Keep bits in sync with BMO_Delimit. */
-  GEO_NODE_DISSOLVE_DELIMITTER_SELECTION = 1 << 5,
-  GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER = 1 << 6,
+  GEO_NODE_DISSOLVE_DELIMITTER_UNSELECTED = 0,
+  GEO_NODE_DISSOLVE_DELIMITTER_LIMIT = 1,
+  GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER = 2,
 } GeometryNodeDissolveDelimiter;
 
 #ifdef __cplusplus

@@ -43,7 +43,7 @@ static Mesh *unsubdivide_mesh(const int iterations, const Array<bool> &selection
   const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
-  BM_temporary_tag_vertices(bm, selection.data());
+  BM_tag_vertices(bm, selection.data());
   BM_mesh_decimate_unsubdivide_ex(bm, iterations, true);
 
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
