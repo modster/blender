@@ -71,7 +71,7 @@ static void geo_node_attribute_range_query_layout(uiLayout *layout,
 
   uiItemR(layout, ptr, "mode", 0, IFACE_("Mode"), ICON_NONE);
   if (node_storage.mode == GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF) {
-    uiItemR(layout, ptr, "falloff_type", 0, IFACE_("Invert Type"), ICON_NONE);
+    uiItemR(layout, ptr, "falloff_type", 0, IFACE_("Falloff Type"), ICON_NONE);
     uiItemR(layout, ptr, "invert_falloff", 0, IFACE_("Invert Falloff"), ICON_NONE);
 
     if (node_storage.falloff_type == GEO_NODE_ATTRIBUTE_RANGE_QUERY_FALLOFF_CURVE) {
