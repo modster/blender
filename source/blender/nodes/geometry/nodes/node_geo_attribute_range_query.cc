@@ -123,9 +123,6 @@ static void geo_node_attribute_range_query_update(bNodeTree *ntree, bNode *node)
   /* Disable the source geometry socket when usign the same geometry for points and queries. */
   bNodeSocket *source_geo_socket = nodeFindSocket(node, SOCK_IN, "Source Geometry");
   bool use_same_geometry = (node->custom1 & GEO_NODE_ATTRIBUTE_RANGE_QUERY_USE_SAME_GEOMETRY);
-  if (use_same_geometry) {
-    nodeRemSocketLinks(ntree, source_geo_socket);
-  }
   nodeSetSocketAvailability(source_geo_socket, !use_same_geometry);
 }
 
