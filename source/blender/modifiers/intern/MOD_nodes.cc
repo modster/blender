@@ -311,15 +311,31 @@ struct SocketPropertyType {
   void (*init_cpp_value)(const IDProperty &property, void *r_value);
 };
 
+static const std::string use_attribute_suffix = "_use_attribute";
+static const std::string attribute_name_suffix = "_attribute_name";
+
 static IDProperty *socket_add_property(IDProperty *settings_prop_group,
                                        IDProperty *ui_container,
                                        const SocketPropertyType &property_type,
                                        const bNodeSocket &socket)
 {
-  const char *new_prop_name = socket.identifier;
+  StringRefNull new_prop_name = socket.identifier;
   /* Add the property actually storing the data to the modifier's group. */
-  IDProperty *prop = property_type.create_prop(socket, new_prop_name);
+  IDProperty *prop = property_type.create_prop(socket, new_prop_name.c_str());
   IDP_AddToGroup(settings_prop_group, prop);
+
+  {
+    IDPropertyTemplate idprop = {0};
+    IDProperty *is_attribute_prop = IDP_New(
+        IDP_INT, &idprop, (new_prop_name + use_attribute_suffix).c_str());
+    IDP_AddToGroup(settings_prop_group, is_attribute_prop);
+  }
+  {
+    IDPropertyTemplate idprop = {0};
+    IDProperty *attribute_prop = IDP_New(
+        IDP_STRING, &idprop, (new_prop_name + attribute_name_suffix).c_str());
+    IDP_AddToGroup(settings_prop_group, attribute_prop);
+  }
 
   prop->flag |= IDP_FLAG_OVERRIDABLE_LIBRARY;
 
@@ -327,7 +343,7 @@ static IDProperty *socket_add_property(IDProperty *settings_prop_group,
   IDProperty *prop_ui_group;
   {
     IDPropertyTemplate idprop = {0};
-    prop_ui_group = IDP_New(IDP_GROUP, &idprop, new_prop_name);
+    prop_ui_group = IDP_New(IDP_GROUP, &idprop, new_prop_name.c_str());
     IDP_AddToGroup(ui_container, prop_ui_group);
   }
 
@@ -686,6 +702,24 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
       if (old_prop != nullptr && property_type->is_correct_type(*old_prop)) {
         IDP_CopyPropertyContent(new_prop, old_prop);
       }
+
+      std::string use_attribute_identifier = socket->identifier + use_attribute_suffix;
+      IDProperty *new_prop_use_attribute = IDP_GetPropertyFromGroup(
+          nmd->settings.properties, use_attribute_identifier.c_str());
+      IDProperty *old_prop_use_attribute = IDP_GetPropertyFromGroup(
+          old_properties, use_attribute_identifier.c_str());
+      if (old_prop_use_attribute != nullptr) {
+        IDP_CopyPropertyContent(new_prop_use_attribute, old_prop_use_attribute);
+      }
+
+      std::string attribute_name_identifier = socket->identifier + attribute_name_suffix;
+      IDProperty *new_prop_attribute_name = IDP_GetPropertyFromGroup(
+          nmd->settings.properties, attribute_name_identifier.c_str());
+      IDProperty *old_prop_attribute_name = IDP_GetPropertyFromGroup(
+          old_properties, attribute_name_identifier.c_str());
+      if (old_prop_attribute_name != nullptr) {
+        IDP_CopyPropertyContent(new_prop_attribute_name, old_prop_attribute_name);
+      }
     }
   }
 
@@ -739,7 +773,12 @@ static void initialize_group_input(NodesModifierData &nmd,
   }
   const IDProperty *property = IDP_GetPropertyFromGroup(nmd.settings.properties,
                                                         socket.identifier);
-  if (property == nullptr) {
+  const IDProperty *property_use_attribute = IDP_GetPropertyFromGroup(
+      nmd.settings.properties, (socket.identifier + use_attribute_suffix).c_str());
+  const IDProperty *property_attribute_name = IDP_GetPropertyFromGroup(
+      nmd.settings.properties, (socket.identifier + attribute_name_suffix).c_str());
+  if (property == nullptr || property_use_attribute == nullptr ||
+      property_attribute_name == nullptr) {
     socket.typeinfo->get_geometry_nodes_cpp_value(socket, r_value);
     return;
   }
@@ -747,7 +786,18 @@ static void initialize_group_input(NodesModifierData &nmd,
     socket.typeinfo->get_geometry_nodes_cpp_value(socket, r_value);
     return;
   }
-  property_type->init_cpp_value(*property, r_value);
+  const bool use_attribute = IDP_Int(property_use_attribute) != 0;
+  if (use_attribute) {
+    const char *attribute_name = IDP_String(property_attribute_name);
+    blender::bke::FieldPtr attribute_field = new blender::bke::PersistentAttributeField(
+        attribute_name, *socket.typeinfo->get_base_cpp_type());
+    const blender::bke::FieldRefCPPType &field_cpp_type =
+        dynamic_cast<const blender::bke::FieldRefCPPType &>(cpp_type);
+    field_cpp_type.construct(r_value, std::move(attribute_field));
+  }
+  else {
+    property_type->init_cpp_value(*property, r_value);
+  }
 }
 
 static Vector<SpaceSpreadsheet *> find_spreadsheet_editors(Main *bmain)
@@ -1077,11 +1127,29 @@ static void draw_property_for_socket(uiLayout *layout,
     return;
   }
 
+  IDProperty *is_attribute_property = IDP_GetPropertyFromGroup(
+      modifier_props, (socket.identifier + use_attribute_suffix).c_str());
+  if (is_attribute_property == nullptr) {
+    return;
+  }
+
   char socket_id_esc[sizeof(socket.identifier) * 2];
   BLI_str_escape(socket_id_esc, socket.identifier, sizeof(socket_id_esc));
 
   char rna_path[sizeof(socket_id_esc) + 4];
   BLI_snprintf(rna_path, ARRAY_SIZE(rna_path), "[\"%s\"]", socket_id_esc);
+
+  char rna_path_use_attribute[1024];
+  BLI_snprintf(rna_path_use_attribute,
+               ARRAY_SIZE(rna_path_use_attribute),
+               "[\"%s\"]",
+               (socket_id_esc + use_attribute_suffix).c_str());
+
+  char rna_path_attribute[1024];
+  BLI_snprintf(rna_path_attribute,
+               ARRAY_SIZE(rna_path_attribute),
+               "[\"%s\"]",
+               (socket_id_esc + attribute_name_suffix).c_str());
 
   /* Use #uiItemPointerR to draw pointer properties because #uiItemR would not have enough
    * information about what type of ID to select for editing the values. This is because
@@ -1110,8 +1178,17 @@ static void draw_property_for_socket(uiLayout *layout,
       uiItemPointerR(layout, md_ptr, rna_path, bmain_ptr, "textures", socket.name, ICON_TEXTURE);
       break;
     }
-    default:
-      uiItemR(layout, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+    default: {
+      uiLayout *col = uiLayoutColumn(layout, false);
+      const int use_attribute = RNA_int_get(md_ptr, rna_path_use_attribute) != 0;
+      if (use_attribute) {
+        uiItemR(col, md_ptr, rna_path_attribute, 0, socket.name, ICON_NONE);
+      }
+      else {
+        uiItemR(col, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+      }
+      uiItemR(col, md_ptr, rna_path_use_attribute, 0, "Use Attribute", ICON_NONE);
+    }
   }
 }
 
