@@ -33,7 +33,6 @@ static bNodeSocketTemplate geo_node_points_to_volume_in[] = {
     {SOCK_FLOAT, N_("Density"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
     {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
     {SOCK_FLOAT, N_("Voxel Amount"), 64.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
-    {SOCK_STRING, N_("Radius")},
     {SOCK_FLOAT, N_("Radius"), 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
     {-1, ""},
 };
@@ -50,7 +49,6 @@ static void geo_node_points_to_volume_layout(uiLayout *layout,
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "resolution_mode", 0, IFACE_("Resolution"), ICON_NONE);
-  uiItemR(layout, ptr, "input_type_radius", 0, IFACE_("Radius"), ICON_NONE);
 }
 
 namespace blender::nodes {
@@ -178,8 +176,15 @@ static void gather_point_data_from_component(const GeoNodeExecParams &params,
 {
   GVArray_Typed<float3> positions = component.attribute_get_for_read<float3>(
       "position", ATTR_DOMAIN_POINT, {0, 0, 0});
-  GVArray_Typed<float> radii = params.get_input_attribute<float>(
-      "Radius", component, ATTR_DOMAIN_POINT, 0.0f);
+
+  bke::FieldRef<float> field = params.get_input_field<float>("Radius");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, component, ATTR_DOMAIN_POINT, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(component.attribute_domain_size(ATTR_DOMAIN_POINT)), field_inputs);
+
+  GVArray_Typed<float> radii{field_output.varray_ref()};
 
   for (const int i : IndexRange(positions.size())) {
     r_positions.append(positions[i]);
