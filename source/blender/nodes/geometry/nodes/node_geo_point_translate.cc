@@ -21,7 +21,6 @@
 
 static bNodeSocketTemplate geo_node_point_translate_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Translation")},
     {SOCK_VECTOR, N_("Translation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
     {-1, ""},
 };
@@ -30,13 +29,6 @@ static bNodeSocketTemplate geo_node_point_translate_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };
-
-static void geo_node_point_translate_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "input_type", 0, IFACE_("Type"), ICON_NONE);
-}
 
 namespace blender::nodes {
 
@@ -47,11 +39,18 @@ static void execute_on_component(GeoNodeExecParams params, GeometryComponent &co
   if (!position_attribute) {
     return;
   }
-  GVArray_Typed<float3> attribute = params.get_input_attribute<float3>(
-      "Translation", component, ATTR_DOMAIN_POINT, {0, 0, 0});
 
-  for (const int i : IndexRange(attribute.size())) {
-    position_attribute->set(i, position_attribute->get(i) + attribute[i]);
+  bke::FieldRef<float3> field = params.get_input_field<float3>("Translation");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, component, ATTR_DOMAIN_POINT, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(component.attribute_domain_size(ATTR_DOMAIN_POINT)), field_inputs);
+
+  GVArray_Typed<float3> translation{field_output.varray_ref()};
+
+  for (const int i : IndexRange(translation.size())) {
+    position_attribute->set(i, position_attribute->get(i) + translation[i]);
   }
 
   position_attribute.save();
@@ -108,6 +107,5 @@ void register_node_type_geo_point_translate()
                     node_free_standard_storage,
                     node_copy_standard_storage);
   ntype.geometry_node_execute = blender::nodes::geo_node_point_translate_exec;
-  ntype.draw_buttons = geo_node_point_translate_layout;
   nodeRegisterType(&ntype);
 }
