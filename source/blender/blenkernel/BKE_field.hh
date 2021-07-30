@@ -200,6 +200,11 @@ class FieldInputs {
     return inputs_.keys().end();
   }
 
+  int tot_inputs() const
+  {
+    return inputs_.size();
+  }
+
   void set_input(const FieldInputKey &key, const FieldInputValue &value)
   {
     *inputs_.lookup_ptr(key) = &value;

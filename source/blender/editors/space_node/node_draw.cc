@@ -45,6 +45,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
+#include "BKE_field.hh"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -842,31 +843,68 @@ static void create_inspection_string_for_generic_value(const geo_log::GenericVal
   };
 
   const GPointer value = value_log.value();
-  if (value.is_type<int>()) {
-    ss << *value.get<int>() << TIP_(" (Integer)");
+  const CPPType &type = *value.type();
+  if (const blender::bke::FieldRefCPPType *field_ref_type =
+          dynamic_cast<const blender::bke::FieldRefCPPType *>(&type)) {
+    const CPPType &base_type = field_ref_type->field_type();
+    blender::bke::FieldPtr field = field_ref_type->get_field(value.get());
+    blender::bke::FieldInputs field_inputs = field->prepare_inputs();
+    const int tot_inputs = field_inputs.tot_inputs();
+    if (tot_inputs > 0) {
+      ss << "Field Inputs:\n";
+      int i = 0;
+      for (const blender::bke::FieldInputKey &key : field_inputs) {
+        ss << "\u2022 ";
+        if (const blender::bke::PersistentAttributeFieldInputKey *persistent_attribute_key =
+                dynamic_cast<const blender::bke::PersistentAttributeFieldInputKey *>(&key)) {
+          ss << "Persistent attribute: '" << persistent_attribute_key->name() << "'";
+        }
+        else if (const blender::bke::AnonymousAttributeFieldInputKey *anonymous_attribute_key =
+                     dynamic_cast<const blender::bke::AnonymousAttributeFieldInputKey *>(&key)) {
+          ss << "Anonymous attribute: '" << anonymous_attribute_key->layer_id().debug_name << "'";
+        }
+        else if (dynamic_cast<const blender::bke::IndexFieldInputKey *>(&key)) {
+          ss << "Index";
+        }
+        if (++i < tot_inputs) {
+          ss << ".\n";
+        }
+      }
+    }
+    else {
+      blender::bke::FieldOutput field_output = field->evaluate({0}, field_inputs);
+      BUFFER_FOR_CPP_TYPE_VALUE(base_type, buffer);
+      field_output.varray_ref().get(0, buffer);
+      if (base_type.is<int>()) {
+        ss << *(int *)buffer << TIP_(" (Integer)");
+      }
+      else if (base_type.is<float>()) {
+        ss << *(float *)buffer << TIP_(" (Float)");
+      }
+      else if (base_type.is<blender::float3>()) {
+        ss << *(blender::float3 *)buffer << TIP_(" (Vector)");
+      }
+      else if (base_type.is<bool>()) {
+        ss << (*(bool *)buffer ? TIP_("True") : TIP_("False")) << TIP_(" (Boolean)");
+      }
+      else if (base_type.is<blender::ColorGeometry4f>()) {
+        ss << *(blender::ColorGeometry4f *)buffer << TIP_(" (Color)");
+      }
+    }
   }
-  else if (value.is_type<float>()) {
-    ss << *value.get<float>() << TIP_(" (Float)");
-  }
-  else if (value.is_type<blender::float3>()) {
-    ss << *value.get<blender::float3>() << TIP_(" (Vector)");
-  }
-  else if (value.is_type<bool>()) {
-    ss << (*value.get<bool>() ? TIP_("True") : TIP_("False")) << TIP_(" (Boolean)");
-  }
-  else if (value.is_type<std::string>()) {
+  else if (type.is<std::string>()) {
     ss << *value.get<std::string>() << TIP_(" (String)");
   }
-  else if (value.is_type<Object *>()) {
+  else if (type.is<Object *>()) {
     id_to_inspection_string((ID *)*value.get<Object *>());
   }
-  else if (value.is_type<Material *>()) {
+  else if (type.is<Material *>()) {
     id_to_inspection_string((ID *)*value.get<Material *>());
   }
-  else if (value.is_type<Tex *>()) {
+  else if (type.is<Tex *>()) {
     id_to_inspection_string((ID *)*value.get<Tex *>());
   }
-  else if (value.is_type<Collection *>()) {
+  else if (type.is<Collection *>()) {
     id_to_inspection_string((ID *)*value.get<Collection *>());
   }
 }
