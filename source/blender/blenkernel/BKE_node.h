@@ -199,9 +199,9 @@ typedef struct bNodeSocketType {
   /* Expands the socket into a multi-function node that outputs the socket value. */
   SocketExpandInMFNetworkFunction expand_in_mf_network;
   /* Return the CPPType of this socket. */
-  SocketGetCPPTypeFunction get_cpp_type;
+  SocketGetCPPTypeFunction get_base_cpp_type;
   /* Get the value of this socket in a generic way. */
-  SocketGetCPPValueFunction get_cpp_value;
+  SocketGetCPPValueFunction get_base_cpp_value;
   /* Get geometry nodes cpp type. */
   SocketGetGeometryNodesCPPTypeFunction get_geometry_nodes_cpp_type;
   /* Get geometry nodes cpp value. */
