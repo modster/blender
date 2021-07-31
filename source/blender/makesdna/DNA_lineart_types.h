@@ -25,11 +25,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __DNA_LRT_TYPES_H__
-#define __DNA_LRT_TYPES_H__
+#pragma once
 
-/** \file DNA_lineart_types.h
- *  \ingroup DNA
+/** \file
+ * \ingroup DNA
  */
 
 #include "DNA_ID.h"
@@ -83,5 +82,3 @@ typedef enum eLineartEdgeFlag {
 #define LRT_EDGE_FLAG_ALL_TYPE 0x7f
 #define LRT_EDGE_FLAG_INIT_TYPE 0x37 /* Without material & light contour */
 #define LRT_EDGE_FLAG_TYPE_MAX_BITS 7
-
-#endif
