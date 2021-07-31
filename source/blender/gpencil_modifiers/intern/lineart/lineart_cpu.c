@@ -1504,6 +1504,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
                                               LineartTriangle *rt_array,
                                               LineartVert *rv_array,
                                               float crease_threshold,
+                                              bool use_auto_smooth,
                                               bool use_freestyle_edge,
                                               bool use_freestyle_face,
                                               BMesh *bm_if_freestyle)
@@ -1648,7 +1649,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     }
     else {
       bool do_crease = true;
-      if (!rb->force_crease &&
+      if (!rb->force_crease && !use_auto_smooth &&
           (BM_elem_flag_test(ll->f, BM_ELEM_SMOOTH) && BM_elem_flag_test(lr->f, BM_ELEM_SMOOTH))) {
         do_crease = false;
       }
@@ -1876,8 +1877,13 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   eln->object_ref = orig_ob;
   obi->eln = eln;
 
+  bool use_auto_smooth = false;
   if (orig_ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
     use_crease = cosf(M_PI - orig_ob->lineart.crease_threshold);
+  }
+  if (obi->original_me->flag & ME_AUTOSMOOTH) {
+    use_crease = cosf(obi->original_me->smoothresh);
+    use_auto_smooth = true;
   }
   else {
     use_crease = rb->crease_threshold;
@@ -1964,8 +1970,15 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     e = BM_edge_at_index(bm, i);
 
     /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
-    uint16_t eflag = lineart_identify_feature_line(
-        rb, e, ort, orv, use_crease, can_find_freestyle_edge, can_find_freestyle_face, bm);
+    uint16_t eflag = lineart_identify_feature_line(rb,
+                                                   e,
+                                                   ort,
+                                                   orv,
+                                                   use_crease,
+                                                   use_auto_smooth,
+                                                   can_find_freestyle_edge,
+                                                   can_find_freestyle_face,
+                                                   bm);
     if (eflag) {
       /* Only allocate for feature lines (instead of all lines) to save memory.
        * If allow duplicated edges, one edge gets added multiple times if it has multiple types. */
