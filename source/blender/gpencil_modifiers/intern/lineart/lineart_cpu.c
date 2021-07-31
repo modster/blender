@@ -415,7 +415,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
           /* Ignore this triangle if an intersection line directly comes from it, */
           lineart_occlusion_is_adjacent_intersection(e, (LineartTriangle *)tri) ||
           /* Or if this triangle isn't effectively occluding anything nor it's providing a
-            material flag. */
+           * material flag. */
           ((!tri->base.mat_occlusion) && (!tri->base.material_mask_bits))) {
         continue;
       }
@@ -2202,11 +2202,11 @@ static void lineart_main_load_geometries(
       if (fit == CAMERA_SENSOR_FIT_HOR && asp < 1) {
         sensor /= asp;
       }
-      double fov = focallength_to_fov(cam->lens / (1 + rb->overscan), sensor);
+      const double fov = focallength_to_fov(cam->lens / (1 + rb->overscan), sensor);
       lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
     }
     else if (cam->type == CAM_ORTHO) {
-      double w = cam->ortho_scale / 2;
+      const double w = cam->ortho_scale / 2;
       lineart_matrix_ortho_44d(proj, -w, w, -w / asp, w / asp, cam->clip_start, cam->clip_end);
     }
 
