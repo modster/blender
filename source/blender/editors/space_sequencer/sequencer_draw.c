@@ -103,6 +103,7 @@
 #define MUTE_ALPHA 120
 #define OVERLAP_ALPHA 180
 
+struct GHash *thumb_data_hash;
 static Sequence *special_seq_update = NULL;
 
 void color3ubv_from_seq(Scene *curscene, Sequence *seq, uchar col[3])
@@ -1110,7 +1111,7 @@ static void thumbnail_hash_data_free(void *val)
 static void thumbnail_freejob(void *data)
 {
   ThumbnailDrawJob *tj = data;
-  BLI_ghash_free(tj->seqs, NULL, thumbnail_hash_data_free);
+  // BLI_ghash_free(tj->seqs, NULL, thumbnail_hash_data_free);
   MEM_freeN(tj->view_area);
   MEM_freeN(tj);
 }
@@ -1257,7 +1258,7 @@ static void sequencer_thumbnail_get_job(const bContext *C,
   }
   else {
     /* Free the hash input */
-    BLI_ghash_free(seqs, NULL, thumbnail_hash_data_free);
+    // BLI_ghash_free(seqs, NULL, thumbnail_hash_data_free);
   }
 
   if (!WM_jobs_is_running(wm_job)) {
@@ -1276,18 +1277,20 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   SpaceSeq *sseq = CTX_wm_space_seq(C);
 
   /* Set the data for thumbnail caching job */
-  GHash *thumb_data_hash;
+  if (thumb_data_hash == NULL)
+    thumb_data_hash = BLI_ghash_ptr_new("seq_duplicates_and_origs");
 
   // leftover is set to true if missing image in strip. false when normal call to all strips done
   if (v2d->cur.xmax != sseq->check_view_area.xmax || v2d->cur.ymax != sseq->check_view_area.ymax ||
       leftover) {
-    thumb_data_hash = BLI_ghash_ptr_new("seq_duplicates_and_origs");
 
     LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
-      ThumbDataItem *val = MEM_callocN(sizeof(ThumbDataItem), "Thumbnail Hash Values");
-      val->seq_dupli = SEQ_sequence_dupli_recursive(scene, scene, NULL, seq, 0);
-      val->scene = scene;
-      BLI_ghash_insert(thumb_data_hash, seq, val);
+      if (BLI_ghash_lookup(thumb_data_hash, seq) == NULL) {
+        ThumbDataItem *val = MEM_callocN(sizeof(ThumbDataItem), "Thumbnail Hash Values");
+        val->seq_dupli = SEQ_sequence_dupli_recursive(scene, scene, NULL, seq, 0);
+        val->scene = scene;
+        BLI_ghash_insert(thumb_data_hash, seq, val);
+      }
     }
 
     SeqRenderData context = {0};

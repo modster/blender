@@ -2087,6 +2087,10 @@ ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
       crop->xmin = 0;
       crop->ymin = 0;
     }
+    if (crop->xmax > ibuf->x && crop->ymax > ibuf->y) {
+      crop->xmax = ibuf->x;
+      crop->ymax = ibuf->y;
+    }
     IMB_rect_crop(temp, crop);
     if (temp != NULL) {
       IMB_freeImBuf(ibuf);
