@@ -2083,13 +2083,13 @@ ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
   /* Do clipping */
   if (clipped && ibuf != NULL) {
     temp = IMB_dupImBuf(ibuf);
-    if (crop->xmin < 0 && crop->ymin < 0) {
+    if (crop->xmin < 0 || crop->ymin < 0) {
       crop->xmin = 0;
       crop->ymin = 0;
     }
-    if (crop->xmax > ibuf->x && crop->ymax > ibuf->y) {
-      crop->xmax = ibuf->x;
-      crop->ymax = ibuf->y;
+    if (crop->xmax >= ibuf->x || crop->ymax >= ibuf->y) {
+      crop->xmax = ibuf->x - 1;
+      crop->ymax = ibuf->y - 1;
     }
     IMB_rect_crop(temp, crop);
     if (temp != NULL) {

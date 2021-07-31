@@ -1203,14 +1203,9 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
     val = BLI_ghash_lookup(tj->seqs, seq_orig);
 
     if (check_seq_need_thumbnails(seq_orig, tj->view_area)) {
-      seq_thumbnail_get_frame_step(val->seq_dupli,
-                                   &frame_step,
-                                   &temp_dummy,
-                                   &temp_dummy,
-                                   &temp_dummy,
-                                   tj->pixelx,
-                                   tj->pixely);
-      seq_thumbnail_get_start_frame(val->seq_dupli, frame_step, &start_frame, tj->view_area);
+      seq_thumbnail_get_frame_step(
+          seq_orig, &frame_step, &temp_dummy, &temp_dummy, &temp_dummy, tj->pixelx, tj->pixely);
+      seq_thumbnail_get_start_frame(seq_orig, frame_step, &start_frame, tj->view_area);
       SEQ_render_thumbnails(
           &tj->context, val->seq_dupli, seq_orig, start_frame, frame_step, tj->view_area);
     }
@@ -1266,7 +1261,7 @@ static void sequencer_thumbnail_get_job(const bContext *C,
     WM_jobs_start(CTX_wm_manager(C), wm_job);
   }
 
-  ED_area_tag_redraw(area);
+  // ED_area_tag_redraw(area);
 }
 
 static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, bool leftover)
@@ -1279,17 +1274,21 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   /* Set the data for thumbnail caching job */
   if (thumb_data_hash == NULL)
     thumb_data_hash = BLI_ghash_ptr_new("seq_duplicates_and_origs");
-
+  ThumbDataItem *val_need_update;
   // leftover is set to true if missing image in strip. false when normal call to all strips done
   if (v2d->cur.xmax != sseq->check_view_area.xmax || v2d->cur.ymax != sseq->check_view_area.ymax ||
       leftover) {
 
     LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
-      if (BLI_ghash_lookup(thumb_data_hash, seq) == NULL) {
+      if ((val_need_update = BLI_ghash_lookup(thumb_data_hash, seq)) == NULL) {
         ThumbDataItem *val = MEM_callocN(sizeof(ThumbDataItem), "Thumbnail Hash Values");
         val->seq_dupli = SEQ_sequence_dupli_recursive(scene, scene, NULL, seq, 0);
         val->scene = scene;
         BLI_ghash_insert(thumb_data_hash, seq, val);
+      }
+      else {
+        val_need_update->seq_dupli->start = seq->start;
+        val_need_update->seq_dupli->startdisp = seq->startdisp;
       }
     }
 
@@ -1302,7 +1301,10 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   }
 }
 
-// TODO(AYJ) : Add operator to choose whether thumbnails required by user or not in overlay menu
+/* TODO(AYJ) : Add operator to choose whether thumbnails required by user or not in overlay menu
+ *             Decrease Opacity of images when overlay over another strip
+ */
+
 static void draw_seq_strip_thumbnail(View2D *v2d,
                                      const bContext *C,
                                      SpaceSeq *sseq,
@@ -1397,7 +1399,6 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
     else {
       thumbnail_call_for_job(C, scene->ed, v2d, true);
-      break;
     }
 
     cut_off = 0;
