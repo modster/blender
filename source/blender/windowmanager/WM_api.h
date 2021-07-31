@@ -263,8 +263,9 @@ struct wmEventHandler_Keymap *WM_event_add_keymap_handler_priority(ListBase *han
                                                                    wmKeyMap *keymap,
                                                                    int priority);
 
-typedef struct wmKeyMap *(wmEventHandler_KeymapDynamicFn)(
-    wmWindowManager *wm, struct wmEventHandler_Keymap *handler)ATTR_WARN_UNUSED_RESULT;
+typedef struct wmKeyMap *(wmEventHandler_KeymapDynamicFn)(wmWindowManager *wm,
+                                                          struct wmEventHandler_Keymap *handler)
+    ATTR_WARN_UNUSED_RESULT;
 
 struct wmKeyMap *WM_event_get_keymap_from_toolsystem_fallback(
     struct wmWindowManager *wm, struct wmEventHandler_Keymap *handler);
@@ -618,8 +619,13 @@ void WM_operator_type_modal_from_exec_for_object_edit_coords(struct wmOperatorTy
 void WM_uilisttype_init(void);
 struct uiListType *WM_uilisttype_find(const char *idname, bool quiet);
 bool WM_uilisttype_add(struct uiListType *ult);
-void WM_uilisttype_freelink(struct uiListType *ult);
+void WM_uilisttype_remove_ptr(struct Main *bmain, struct uiListType *ult);
 void WM_uilisttype_free(void);
+
+void WM_uilisttype_to_full_list_id(const struct uiListType *ult,
+                                   const char *list_id,
+                                   char r_full_list_id[]);
+const char *WM_uilisttype_list_id_get(const struct uiListType *ult, struct uiList *list);
 
 /* wm_menu_type.c */
 void WM_menutype_init(void);

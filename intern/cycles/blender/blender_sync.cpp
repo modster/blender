@@ -404,8 +404,6 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
 
   Film *film = scene->film;
 
-  vector<Pass> prevpasses = scene->passes;
-
   if (b_v3d) {
     film->set_display_pass(update_viewport_display_passes(b_v3d, scene->passes));
   }
@@ -434,11 +432,6 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
         film->set_mist_falloff(0.5f);
         break;
     }
-  }
-
-  if (!Pass::equals(prevpasses, scene->passes)) {
-    film->tag_passes_update(scene, prevpasses, false);
-    film->tag_modified();
   }
 }
 
@@ -545,12 +538,6 @@ PassType BlenderSync::get_pass_type(BL::RenderPass &b_pass)
   MAP_PASS("BakePrimitive", PASS_BAKE_PRIMITIVE);
   MAP_PASS("BakeDifferential", PASS_BAKE_DIFFERENTIAL);
 
-#ifdef __KERNEL_DEBUG__
-  MAP_PASS("Debug BVH Traversed Nodes", PASS_BVH_TRAVERSED_NODES);
-  MAP_PASS("Debug BVH Traversed Instances", PASS_BVH_TRAVERSED_INSTANCES);
-  MAP_PASS("Debug BVH Intersections", PASS_BVH_INTERSECTIONS);
-  MAP_PASS("Debug Ray Bounces", PASS_RAY_BOUNCES);
-#endif
   MAP_PASS("Debug Render Time", PASS_RENDER_TIME);
   MAP_PASS("AdaptiveAuxBuffer", PASS_ADAPTIVE_AUX_BUFFER);
   MAP_PASS("Debug Sample Count", PASS_SAMPLE_COUNT);
@@ -648,24 +635,6 @@ vector<Pass> BlenderSync::sync_render_passes(BL::Scene &b_scene,
     }
   }
 
-#ifdef __KERNEL_DEBUG__
-  if (get_boolean(crl, "pass_debug_bvh_traversed_nodes")) {
-    b_engine.add_pass("Debug BVH Traversed Nodes", 1, "X", b_view_layer.name().c_str());
-    Pass::add(PASS_BVH_TRAVERSED_NODES, passes, "Debug BVH Traversed Nodes");
-  }
-  if (get_boolean(crl, "pass_debug_bvh_traversed_instances")) {
-    b_engine.add_pass("Debug BVH Traversed Instances", 1, "X", b_view_layer.name().c_str());
-    Pass::add(PASS_BVH_TRAVERSED_INSTANCES, passes, "Debug BVH Traversed Instances");
-  }
-  if (get_boolean(crl, "pass_debug_bvh_intersections")) {
-    b_engine.add_pass("Debug BVH Intersections", 1, "X", b_view_layer.name().c_str());
-    Pass::add(PASS_BVH_INTERSECTIONS, passes, "Debug BVH Intersections");
-  }
-  if (get_boolean(crl, "pass_debug_ray_bounces")) {
-    b_engine.add_pass("Debug Ray Bounces", 1, "X", b_view_layer.name().c_str());
-    Pass::add(PASS_RAY_BOUNCES, passes, "Debug Ray Bounces");
-  }
-#endif
   if (get_boolean(crl, "pass_debug_render_time")) {
     b_engine.add_pass("Debug Render Time", 1, "X", b_view_layer.name().c_str());
     Pass::add(PASS_RENDER_TIME, passes, "Debug Render Time");
@@ -749,10 +718,13 @@ vector<Pass> BlenderSync::sync_render_passes(BL::Scene &b_scene,
                                         DENOISING_CLEAN_ALL_PASSES);
   scene->film->set_denoising_prefiltered_pass(denoising.store_passes &&
                                               denoising.type == DENOISER_NLM);
-
   scene->film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
-  scene->film->tag_passes_update(scene, passes);
-  scene->integrator->tag_update(scene, Integrator::UPDATE_ALL);
+
+  if (!Pass::equals(passes, scene->passes)) {
+    scene->film->tag_passes_update(scene, passes);
+    scene->film->tag_modified();
+    scene->integrator->tag_update(scene, Integrator::UPDATE_ALL);
+  }
 
   return passes;
 }

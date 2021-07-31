@@ -151,7 +151,7 @@ static int asset_mark_exec(bContext *C, wmOperator *op)
 
 static void ASSET_OT_mark(wmOperatorType *ot)
 {
-  ot->name = "Mark Asset";
+  ot->name = "Mark as Asset";
   ot->description =
       "Enable easier reuse of selected data-blocks through the Asset Browser, with the help of "
       "customizable metadata (like previews, descriptions and tags)";
@@ -169,7 +169,7 @@ class AssetClearHelper {
  public:
   void operator()(PointerRNAVec &ids);
 
-  void reportResults(ReportList &reports) const;
+  void reportResults(const bContext *C, ReportList &reports) const;
   bool wasSuccessful() const;
 
  private:
@@ -198,10 +198,22 @@ void AssetClearHelper::operator()(PointerRNAVec &ids)
   }
 }
 
-void AssetClearHelper::reportResults(ReportList &reports) const
+void AssetClearHelper::reportResults(const bContext *C, ReportList &reports) const
 {
   if (!wasSuccessful()) {
-    BKE_report(&reports, RPT_ERROR, "No asset data-blocks selected/focused");
+    bool is_valid;
+    /* Dedicated error message for when there is an active asset detected, but it's not an ID local
+     * to this file. Helps users better understanding what's going on. */
+    if (AssetHandle active_asset = CTX_wm_asset_handle(C, &is_valid);
+        is_valid && !ED_asset_handle_get_local_id(&active_asset)) {
+      BKE_report(&reports,
+                 RPT_ERROR,
+                 "No asset data-blocks from the current file selected (assets must be stored in "
+                 "the current file to be able to edit or clear them)");
+    }
+    else {
+      BKE_report(&reports, RPT_ERROR, "No asset data-blocks selected/focused");
+    }
   }
   else if (stats.tot_cleared == 1) {
     /* If only one data-block: Give more useful message by printing asset name. */
@@ -224,7 +236,7 @@ static int asset_clear_exec(bContext *C, wmOperator *op)
 
   AssetClearHelper clear_helper;
   clear_helper(ids);
-  clear_helper.reportResults(*op->reports);
+  clear_helper.reportResults(C, *op->reports);
 
   if (!clear_helper.wasSuccessful()) {
     return OPERATOR_CANCELLED;
@@ -252,8 +264,41 @@ static void ASSET_OT_clear(wmOperatorType *ot)
 
 /* -------------------------------------------------------------------- */
 
+static bool asset_list_refresh_poll(bContext *C)
+{
+  const AssetLibraryReference *library = CTX_wm_asset_library(C);
+  if (!library) {
+    return false;
+  }
+
+  return ED_assetlist_storage_has_list_for_library(library);
+}
+
+static int asset_list_refresh_exec(bContext *C, wmOperator *UNUSED(unused))
+{
+  const AssetLibraryReference *library = CTX_wm_asset_library(C);
+  ED_assetlist_clear(library, C);
+  return OPERATOR_FINISHED;
+}
+
+static void ASSET_OT_list_refresh(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Refresh Asset List";
+  ot->description = "Trigger a reread of the assets";
+  ot->idname = "ASSET_OT_list_refresh";
+
+  /* api callbacks */
+  ot->exec = asset_list_refresh_exec;
+  ot->poll = asset_list_refresh_poll;
+}
+
+/* -------------------------------------------------------------------- */
+
 void ED_operatortypes_asset(void)
 {
   WM_operatortype_append(ASSET_OT_mark);
   WM_operatortype_append(ASSET_OT_clear);
+
+  WM_operatortype_append(ASSET_OT_list_refresh);
 }
