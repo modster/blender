@@ -41,6 +41,8 @@
 #include <limits>
 
 namespace blender::bke::internal {
+static FilenameGen static_remesh_name_gen("/tmp/static_remesh/remesh", ".mesh");
+
 class ClothNodeData;
 
 template<typename T> class NodeData;
@@ -336,6 +338,11 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
         auto mesh_diff = this->flip_edge_triangulate(edge.get_self_index(), false);
 
+        auto after_flip_msgpack = this->serialize();
+        auto after_flip_filename = static_remesh_name_gen.get_curr("after_flip");
+        static_remesh_name_gen.gen_next();
+        dump_file(after_flip_filename, after_flip_msgpack);
+
         /* Update `active_faces` */
         {
           /* Update `active_faces` to contain only face indices that
@@ -373,6 +380,11 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         auto &edge = this->get_checked_edge(edge_index);
         auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
 
+        auto after_split_msgpack = this->serialize();
+        auto after_split_filename = static_remesh_name_gen.get_curr("after_split");
+        static_remesh_name_gen.gen_next();
+        dump_file(after_split_filename, after_split_msgpack);
+
         /* For each new edge added, set it's sizing */
         for (const auto &edge_index : mesh_diff.get_added_edges()) {
           auto &edge = this->get_checked_edge(edge_index);
@@ -390,6 +402,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
   void static_remesh(const Sizing &sizing)
   {
+    auto static_remesh_start_msgpack = this->serialize();
+    auto static_remesh_start_filename = static_remesh_name_gen.get_curr("static_remesh_start");
+    static_remesh_name_gen.gen_next();
+    dump_file(static_remesh_start_filename, static_remesh_start_msgpack);
     /* Set sizing for all verts */
     for (auto &vert : this->get_verts_mut()) {
       auto &op_vert_data = vert.get_extra_data_mut();
@@ -408,6 +424,11 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     this->split_edges();
 
     /* Collapse the edges */
+
+    auto static_remesh_end_msgpack = this->serialize();
+    auto static_remesh_end_filename = static_remesh_name_gen.get_curr("static_remesh_end");
+    static_remesh_name_gen.gen_next();
+    dump_file(static_remesh_end_filename, static_remesh_end_msgpack);
   }
 
  private:
