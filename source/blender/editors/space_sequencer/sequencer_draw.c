@@ -1136,6 +1136,9 @@ static bool check_seq_need_thumbnails(Sequence *seq, rctf *view_area)
   else if (seq->machine > view_area->ymax) {
     return false;
   }
+  if (seq->type != SEQ_TYPE_MOVIE && seq->type != SEQ_TYPE_IMAGE) {
+    return false;
+  }
   return true;
 }
 
@@ -1196,6 +1199,8 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
   Sequence *seq_orig;
   float start_frame, frame_step, temp_dummy = 0;
 
+  *do_update = true;
+
   GHashIterator gh_iter;
   BLI_ghashIterator_init(&gh_iter, tj->seqs);
   while (!BLI_ghashIterator_done(&gh_iter)) {
@@ -1211,7 +1216,7 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
     }
     BLI_ghashIterator_step(&gh_iter);
   }
-  UNUSED_VARS(stop, do_update, progress);
+  UNUSED_VARS(stop, progress);
 }
 
 static void sequencer_thumbnail_get_job(const bContext *C,
@@ -1261,7 +1266,7 @@ static void sequencer_thumbnail_get_job(const bContext *C,
     WM_jobs_start(CTX_wm_manager(C), wm_job);
   }
 
-  // ED_area_tag_redraw(area);
+  ED_area_tag_redraw(area);
 }
 
 static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, bool leftover)
@@ -1280,7 +1285,8 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
       leftover) {
 
     LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
-      if ((val_need_update = BLI_ghash_lookup(thumb_data_hash, seq)) == NULL) {
+      if ((val_need_update = BLI_ghash_lookup(thumb_data_hash, seq)) == NULL &&
+          check_seq_need_thumbnails(seq, v2d)) {
         ThumbDataItem *val = MEM_callocN(sizeof(ThumbDataItem), "Thumbnail Hash Values");
         val->seq_dupli = SEQ_sequence_dupli_recursive(scene, scene, NULL, seq, 0);
         val->scene = scene;
@@ -1301,8 +1307,8 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   }
 }
 
-/* TODO(AYJ) : Add operator to choose whether thumbnails required by user or not in overlay menu
- *             Decrease Opacity of images when overlay over another strip
+/* TODO(AYJ) : 1) Add operator to choose whether thumbnails required by user or not in overlay menu
+ *             2) Decrease Opacity of images when overlay over another strip
  */
 
 static void draw_seq_strip_thumbnail(View2D *v2d,
