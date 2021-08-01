@@ -201,12 +201,18 @@ class FilenameGen {
 
   std::string get_curr()
   {
-    return this->prefix + "_" + std::to_string(this->number) + this->suffix;
+    char number_str_c[16];
+    BLI_snprintf(number_str_c, 16, "%03lu", this->number);
+    std::string number_str(number_str_c);
+    return this->prefix + "_" + number_str + this->suffix;
   }
 
   std::string get_curr(const std::string pre_suffix)
   {
-    return this->prefix + "_" + std::to_string(this->number) + "_" + pre_suffix + this->suffix;
+    char number_str_c[16];
+    BLI_snprintf(number_str_c, 16, "%03lu", this->number);
+    std::string number_str(number_str_c);
+    return this->prefix + "_" + number_str + "_" + pre_suffix + this->suffix;
   }
 };
 
