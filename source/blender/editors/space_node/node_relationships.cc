@@ -36,6 +36,7 @@
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+#include "BKE_screen.h"
 
 #include "ED_node.h" /* own include */
 #include "ED_render.h"
@@ -298,7 +299,7 @@ static void pick_input_link_by_link_intersect(const bContext *C,
 
   /* If no linked was picked in this call, try using the one picked in the previous call.
    * Not essential for the basic behavior, but can make interaction feel a bit better if
-   * the  mouse moves to the right and loses the "selection." */
+   * the mouse moves to the right and loses the "selection." */
   if (!link_to_pick) {
     bNodeLink *last_picked_link = nldrag->last_picked_multi_input_socket_link;
     if (last_picked_link) {
@@ -663,9 +664,19 @@ static int node_link_viewer(const bContext *C, bNode *tonode)
       nodeRemLink(snode->edittree, link);
 
       /* find a socket after the previously connected socket */
-      for (sock = sock->next; sock; sock = sock->next) {
-        if (!nodeSocketIsHidden(sock)) {
-          break;
+      if (ED_node_is_geometry(snode)) {
+        /* Geometry nodes viewer only supports geometry sockets for now. */
+        for (sock = sock->next; sock; sock = sock->next) {
+          if (sock->type == SOCK_GEOMETRY && !nodeSocketIsHidden(sock)) {
+            break;
+          }
+        }
+      }
+      else {
+        for (sock = sock->next; sock; sock = sock->next) {
+          if (!nodeSocketIsHidden(sock)) {
+            break;
+          }
         }
       }
     }
@@ -673,19 +684,40 @@ static int node_link_viewer(const bContext *C, bNode *tonode)
 
   if (tonode) {
     /* Find a selected socket that overrides the socket to connect to */
-    LISTBASE_FOREACH (bNodeSocket *, sock2, &tonode->outputs) {
-      if (!nodeSocketIsHidden(sock2) && sock2->flag & SELECT) {
-        sock = sock2;
-        break;
+    if (ED_node_is_geometry(snode)) {
+      /* Geometry nodes viewer only supports geometry sockets for now. */
+      LISTBASE_FOREACH (bNodeSocket *, sock2, &tonode->outputs) {
+        if (sock2->type == SOCK_GEOMETRY && !nodeSocketIsHidden(sock2) && sock2->flag & SELECT) {
+          sock = sock2;
+          break;
+        }
+      }
+    }
+    else {
+      LISTBASE_FOREACH (bNodeSocket *, sock2, &tonode->outputs) {
+        if (!nodeSocketIsHidden(sock2) && sock2->flag & SELECT) {
+          sock = sock2;
+          break;
+        }
       }
     }
   }
 
   /* find a socket starting from the first socket */
   if (!sock) {
-    for (sock = (bNodeSocket *)tonode->outputs.first; sock; sock = sock->next) {
-      if (!nodeSocketIsHidden(sock)) {
-        break;
+    if (ED_node_is_geometry(snode)) {
+      /* Geometry nodes viewer only supports geometry sockets for now. */
+      for (sock = (bNodeSocket *)tonode->outputs.first; sock; sock = sock->next) {
+        if (sock->type == SOCK_GEOMETRY && !nodeSocketIsHidden(sock)) {
+          break;
+        }
+      }
+    }
+    else {
+      for (sock = (bNodeSocket *)tonode->outputs.first; sock; sock = sock->next) {
+        if (!nodeSocketIsHidden(sock)) {
+          break;
+        }
       }
     }
   }
@@ -1332,7 +1364,7 @@ static int cut_links_exec(bContext *C, wmOperator *op)
     ED_preview_kill_jobs(CTX_wm_manager(C), bmain);
 
     LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &snode->edittree->links) {
-      if (nodeLinkIsHidden(link)) {
+      if (node_link_is_hidden_or_dimmed(&region->v2d, link)) {
         continue;
       }
 
@@ -1429,7 +1461,7 @@ static int mute_links_exec(bContext *C, wmOperator *op)
     /* Count intersected links and clear test flag. */
     int tot = 0;
     LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
-      if (nodeLinkIsHidden(link)) {
+      if (node_link_is_hidden_or_dimmed(&region->v2d, link)) {
         continue;
       }
       link->flag &= ~NODE_LINK_TEST;
@@ -1443,7 +1475,7 @@ static int mute_links_exec(bContext *C, wmOperator *op)
 
     /* Mute links. */
     LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
-      if (nodeLinkIsHidden(link) || (link->flag & NODE_LINK_TEST)) {
+      if (node_link_is_hidden_or_dimmed(&region->v2d, link) || (link->flag & NODE_LINK_TEST)) {
         continue;
       }
 
@@ -1458,7 +1490,7 @@ static int mute_links_exec(bContext *C, wmOperator *op)
 
     /* Clear remaining test flags. */
     LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
-      if (nodeLinkIsHidden(link)) {
+      if (node_link_is_hidden_or_dimmed(&region->v2d, link)) {
         continue;
       }
       link->flag &= ~NODE_LINK_TEST;
@@ -1894,9 +1926,11 @@ static bool ed_node_link_conditions(ScrArea *area,
     return false;
   }
 
+  ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+
   /* test node for links */
   LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
-    if (nodeLinkIsHidden(link)) {
+    if (node_link_is_hidden_or_dimmed(&region->v2d, link)) {
       continue;
     }
 
@@ -1927,13 +1961,15 @@ void ED_node_link_intersect_test(ScrArea *area, int test)
     return;
   }
 
+  ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+
   /* find link to select/highlight */
   bNodeLink *selink = nullptr;
   float dist_best = FLT_MAX;
   LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
     float coord_array[NODE_LINK_RESOL + 1][2];
 
-    if (nodeLinkIsHidden(link)) {
+    if (node_link_is_hidden_or_dimmed(&region->v2d, link)) {
       continue;
     }
 

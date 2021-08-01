@@ -34,9 +34,9 @@ struct ListBase;
 
 struct ARegion;
 struct ARegionType;
+struct FModifier;
 struct Main;
 struct NlaStrip;
-struct FModifier;
 struct PanelType;
 struct ReportList;
 struct ScrArea;
@@ -290,7 +290,7 @@ typedef enum eAnimFilter_Flags {
    * (i.e. scene visibility criteria).
    *
    * XXX: it's hard to think of any examples where this *ISN'T* the case...
-   * perhaps becomes implicit?.
+   * perhaps becomes implicit?
    */
   ANIMFILTER_DATA_VISIBLE = (1 << 0),
   /** channel is visible within the channel-list hierarchy

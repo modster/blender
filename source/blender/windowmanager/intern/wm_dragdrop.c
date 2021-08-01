@@ -321,7 +321,7 @@ void WM_drag_add_local_ID(wmDrag *drag, ID *id, ID *from_parent)
       return;
     }
     if (GS(drag_id->id->name) != GS(id->name)) {
-      BLI_assert(!"All dragged IDs must have the same type");
+      BLI_assert_msg(0, "All dragged IDs must have the same type");
       return;
     }
   }
@@ -378,13 +378,14 @@ wmDragAsset *WM_drag_get_asset_data(const wmDrag *drag, int idcode)
 
 static ID *wm_drag_asset_id_import(wmDragAsset *asset_drag)
 {
+  const char *name = asset_drag->name;
+  ID_Type idtype = asset_drag->id_type;
+
   switch ((eFileAssetImportType)asset_drag->import_type) {
     case FILE_ASSET_IMPORT_LINK:
-      return WM_file_link_datablock(
-          G_MAIN, NULL, NULL, NULL, asset_drag->path, asset_drag->id_type, asset_drag->name);
+      return WM_file_link_datablock(G_MAIN, NULL, NULL, NULL, asset_drag->path, idtype, name);
     case FILE_ASSET_IMPORT_APPEND:
-      return WM_file_append_datablock(
-          G_MAIN, NULL, NULL, NULL, asset_drag->path, asset_drag->id_type, asset_drag->name);
+      return WM_file_append_datablock(G_MAIN, NULL, NULL, NULL, asset_drag->path, idtype, name);
   }
 
   BLI_assert_unreachable();

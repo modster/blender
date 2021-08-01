@@ -4867,7 +4867,7 @@ static char *rna_path_token(const char **path, char *fixedbuf, int fixedlen, int
     }
   }
   else {
-    /* get data until . or [ */
+    /* Get data until `.` or `[`. */
     p = *path;
 
     while (*p && *p != '.' && *p != '[') {
@@ -5700,12 +5700,12 @@ ID *RNA_find_real_ID_and_path(Main *bmain, ID *id, const char **r_path)
         *r_path = "collection";
         break;
       default:
-        BLI_assert(!"Missing handling of embedded id type.");
+        BLI_assert_msg(0, "Missing handling of embedded id type.");
     }
   }
 
   if (id_type->owner_get == NULL) {
-    BLI_assert(!"Missing handling of embedded id type.");
+    BLI_assert_msg(0, "Missing handling of embedded id type.");
     return id;
   }
   return id_type->owner_get(bmain, id);
@@ -5834,7 +5834,7 @@ static void rna_path_array_multi_string_from_flat_index(PointerRNA *ptr,
 
 /**
  * \param index_dim: The dimension to show, 0 disables. 1 for 1d array, 2 for 2d. etc.
- * \param index: The *flattened* index to use when \a ``index_dim > 0``,
+ * \param index: The *flattened* index to use when \a `index_dim > 0`,
  * this is expanded when used with multi-dimensional arrays.
  */
 char *RNA_path_from_ID_to_property_index(PointerRNA *ptr,
