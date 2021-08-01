@@ -204,6 +204,9 @@ const char *operationCodeAsString(OperationCode opcode)
       return "DUPLI";
     case OperationCode::SIMULATION_EVAL:
       return "SIMULATION_EVAL";
+    /* Node tree*/
+    case OperationCode::NODETREE_UPDATE:
+      return "NODETREE_UPDATE";
   }
   BLI_assert_msg(0, "Unhandled operation code, should never happen.");
   return "UNKNOWN";
