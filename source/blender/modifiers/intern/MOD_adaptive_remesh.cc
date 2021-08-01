@@ -41,6 +41,10 @@
 
 using namespace blender::bke;
 
+static internal::FilenameGen split_edge_name_gen("/tmp/adaptive_cloth/split_edge", ".mesh");
+static internal::FilenameGen collapse_edge_name_gen("/tmp/adaptive_cloth/collapse_edge", ".mesh");
+static internal::FilenameGen flip_edge_name_gen("/tmp/adaptive_cloth/flip_edge", ".mesh");
+
 static void initData(ModifierData *md)
 {
   AdaptiveRemeshModifierData *armd = reinterpret_cast<AdaptiveRemeshModifierData *>(md);
@@ -88,14 +92,46 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     auto flippable = internal_mesh.is_edge_flippable(edge_index, across_seams);
     std::cout << "flippable: " << flippable << std::endl;
     if (mode == ADAPTIVE_REMESH_SPLIT_EDGE) {
+      auto pre_split_msgpack = internal_mesh.serialize();
+      auto pre_split_filename = split_edge_name_gen.get_curr(std::to_string(edge_i) + "_pre");
+
       internal_mesh.split_edge_triangulate(edge_index, across_seams);
+
+      auto post_split_msgpack = internal_mesh.serialize();
+      auto post_split_filename = split_edge_name_gen.get_curr(std::to_string(edge_i) + "_post");
+      /* split_edge_name_gen.gen_next(); */
+
+      internal::dump_file(pre_split_filename, pre_split_msgpack);
+      internal::dump_file(post_split_filename, post_split_msgpack);
     }
     else if (mode == ADAPTIVE_REMESH_COLLAPSE_EDGE) {
+      auto pre_collapse_msgpack = internal_mesh.serialize();
+      auto pre_collapse_filename = collapse_edge_name_gen.get_curr(std::to_string(edge_i) +
+                                                                   "_pre");
+
       internal_mesh.collapse_edge_triangulate(edge_index, verts_swapped, across_seams);
+
+      auto post_collapse_msgpack = internal_mesh.serialize();
+      auto post_collapse_filename = collapse_edge_name_gen.get_curr(std::to_string(edge_i) +
+                                                                    "_post");
+      /* collapse_edge_name_gen.gen_next(); */
+
+      internal::dump_file(pre_collapse_filename, pre_collapse_msgpack);
+      internal::dump_file(post_collapse_filename, post_collapse_msgpack);
     }
     else if (mode == ADAPTIVE_REMESH_FLIP_EDGE) {
       if (flippable) {
+        auto pre_flip_msgpack = internal_mesh.serialize();
+        auto pre_flip_filename = flip_edge_name_gen.get_curr(std::to_string(edge_i) + "_pre");
+
         internal_mesh.flip_edge_triangulate(edge_index, across_seams);
+
+        auto post_flip_msgpack = internal_mesh.serialize();
+        auto post_flip_filename = flip_edge_name_gen.get_curr(std::to_string(edge_i) + "_post");
+        /* flip_edge_name_gen.gen_next(); */
+
+        internal::dump_file(pre_flip_filename, pre_flip_msgpack);
+        internal::dump_file(post_flip_filename, post_flip_msgpack);
       }
     }
   }

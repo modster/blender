@@ -176,6 +176,53 @@ using EdgeVerts = std::tuple<VertIndex, VertIndex>;
 
 using usize = uint64_t;
 
+class FilenameGen {
+  usize number;
+  std::string prefix;
+  std::string suffix;
+
+ public:
+  FilenameGen(const std::string prefix, const std::string suffix)
+      : number(0), prefix(prefix), suffix(suffix)
+  {
+  }
+
+  std::string gen_next()
+  {
+    this->number += 1;
+    return this->get_curr();
+  }
+
+  std::string gen_next(const std::string pre_suffix)
+  {
+    this->number += 1;
+    return this->get_curr(pre_suffix);
+  }
+
+  std::string get_curr()
+  {
+    return this->prefix + "_" + std::to_string(this->number) + this->suffix;
+  }
+
+  std::string get_curr(const std::string pre_suffix)
+  {
+    return this->prefix + "_" + std::to_string(this->number) + "_" + pre_suffix + this->suffix;
+  }
+};
+
+inline void dump_file(const fs::path &filepath, const std::string &info)
+{
+  std::fstream fout;
+  fout.open(filepath, std::ios::out);
+  if (fout.is_open()) {
+    fout << info;
+    fout.close();
+  }
+  else {
+    std::cerr << "Couldn't open file " << filepath.c_str() << std::endl;
+  }
+}
+
 inline void copy_v2_float2(float *res, const float2 &v2)
 {
   res[0] = v2[0];
