@@ -1711,6 +1711,14 @@ void DepsgraphNodeBuilder::build_nodetree(bNodeTree *ntree)
   /* General parameters. */
   build_parameters(&ntree->id);
   build_idproperties(ntree->id.properties);
+  add_operation_node(&ntree->id,
+                     NodeType::PARAMETERS,
+                     OperationCode::NODETREE_UPDATE,
+                     [ntree](::Depsgraph *depsgraph) {
+                       LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+                         node->flag &= ~NODE_DEPSGRAPH_UPDATED;
+                       }
+                     });
   /* Animation, */
   build_animdata(&ntree->id);
   /* Shading update. */

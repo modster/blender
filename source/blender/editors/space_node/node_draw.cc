@@ -177,6 +177,8 @@ void ED_node_tag_update_nodetree(Main *bmain, bNodeTree *ntree, bNode *node)
     if (!node_connected_to_output(bmain, ntree, node)) {
       do_tag_update = false;
     }
+
+    node->flag |= NODE_DEPSGRAPH_UPDATED;
   }
 
   /* Look through all datablocks to support groups. */

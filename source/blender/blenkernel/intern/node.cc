@@ -4500,6 +4500,7 @@ void nodeUpdate(bNodeTree *ntree, bNode *node)
   }
   ntree->is_updating = true;
 
+  node->flag |= NODE_DEPSGRAPH_UPDATED;
   if (node->typeinfo->updatefunc) {
     node->typeinfo->updatefunc(ntree, node);
   }

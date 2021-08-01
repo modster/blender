@@ -361,6 +361,9 @@ typedef struct bNode {
 /* A preview for the data in this node can be displayed in the spreadsheet editor. */
 #define __NODE_ACTIVE_PREVIEW (1 << 18) /* deprecated */
 
+/* Read-only flag to indicate that changes to the node have triggered a depsgraph update. */
+#define NODE_DEPSGRAPH_UPDATED (1 << 19)
+
 /* node->update */
 /* XXX NODE_UPDATE is a generic update flag. More fine-grained updates
  * might be used in the future, but currently all work the same way.

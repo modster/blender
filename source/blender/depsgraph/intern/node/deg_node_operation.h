@@ -206,6 +206,9 @@ enum class OperationCode {
 
   /* Simulation. ---------------------------------------------------------- */
   SIMULATION_EVAL,
+
+  /* Nodes. --------------------------------------------------------------- */
+  NODETREE_UPDATE,
 };
 const char *operationCodeAsString(OperationCode opcode);
 
