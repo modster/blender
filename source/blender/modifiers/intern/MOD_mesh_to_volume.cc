@@ -258,7 +258,7 @@ static Volume *mesh_to_volume(ModifierData *md,
   Volume *volume = BKE_volume_new_for_eval(input_volume);
   VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);
   openvdb::FloatGrid::Ptr density_grid = openvdb::gridPtrCast<openvdb::FloatGrid>(
-      BKE_volume_grid_openvdb_for_write(volume, c_density_grid, false));
+      BKE_volume_grid_openvdb_for_write(volume, c_density_grid));
 
   /* Merge the generated grid into the density grid. Should be cheap because density_grid has just
    * been created as well. */

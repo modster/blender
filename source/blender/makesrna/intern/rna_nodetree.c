@@ -9845,6 +9845,67 @@ static void def_geo_volume_to_mesh(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_level_set_boolean(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem operation_items[] = {
+      {GEO_NODE_BOOLEAN_INTERSECT,
+       "INTERSECT",
+       0,
+       "Intersect",
+       "The output is the volume contained by both inputs"},
+      {GEO_NODE_BOOLEAN_UNION,
+       "UNION",
+       0,
+       "Union",
+       "The output is the volume contained by either the first input or the second"},
+      {GEO_NODE_BOOLEAN_DIFFERENCE,
+       "DIFFERENCE",
+       0,
+       "Difference",
+       "The output is the volume contained by the first input but not the second"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryLevelSetBoolean", "storage");
+
+  prop = RNA_def_property(srna, "operation", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, operation_items);
+  RNA_def_property_ui_text(prop, "Operation", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_level_set_filter(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem operation_items[] = {
+      {GEO_NODE_LEVEL_SET_FILTER_OFFSET,
+       "OFFSET",
+       0,
+       "Offset",
+       "Expand or contract the level set surface"},
+      {GEO_NODE_LEVEL_SET_FILTER_GAUSSIAN,
+       "GAUSSIAN",
+       0,
+       "Gaussian",
+       "Smooth the level set surface"},
+      {GEO_NODE_LEVEL_SET_FILTER_MEDIAN, "MEDIAN", 0, "median", "???"},
+      {GEO_NODE_LEVEL_SET_FILTER_MEAN, "MEAN", 0, "Mean", "???"},
+      {GEO_NODE_LEVEL_SET_FILTER_MEAN_CURVATURE, "MEAN_CURVATURE", 0, "Mean Curvature", "???"},
+      {GEO_NODE_LEVEL_SET_FILTER_LAPLACIAN, "LAPLACIAN", 0, "Laplacian", "???"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryLevelSetFilter", "storage");
+
+  prop = RNA_def_property(srna, "operation", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, operation_items);
+  RNA_def_property_ui_text(prop, "Operation", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_attribute_combine_xyz(StructRNA *srna)
 {
   PropertyRNA *prop;

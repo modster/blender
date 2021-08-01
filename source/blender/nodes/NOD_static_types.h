@@ -341,6 +341,9 @@ DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform"
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
 DefNode(GeometryNode, GEO_NODE_VIEWER, 0, "VIEWER", Viewer, "Viewer", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
+DefNode(GeometryNode, GEO_NODE_MESH_TO_LEVEL_SET , 0, "MESH_TO_LEVEL_SET", MeshToLevelSet, "Mesh to Level Set", "")
+DefNode(GeometryNode, GEO_NODE_LEVEL_SET_BOOLEAN , def_geo_level_set_boolean, "LEVEL_SET_BOOLEAN", LevelSetBoolean, "Level Set Boolean", "")
+DefNode(GeometryNode, GEO_NODE_LEVEL_SET_FILTER , def_geo_level_set_filter, "LEVEL_SET_FILTER", LevelSetFilter, "Level Set Filter", "")
 
 /* undefine macros */
 #undef DefNode

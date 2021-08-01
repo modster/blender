@@ -146,7 +146,7 @@ static void transform_volume(Volume *volume,
   for (const int i : IndexRange(num_grids)) {
     VolumeGrid *volume_grid = BKE_volume_grid_get_for_write(volume, i);
 
-    openvdb::GridBase::Ptr grid = BKE_volume_grid_openvdb_for_write(volume, volume_grid, false);
+    openvdb::GridBase::Ptr grid = BKE_volume_grid_openvdb_for_write(volume, volume_grid);
     openvdb::math::Transform &grid_transform = grid->transform();
     grid_transform.postMult(vdb_matrix_d);
   }

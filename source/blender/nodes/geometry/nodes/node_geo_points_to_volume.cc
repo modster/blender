@@ -231,7 +231,7 @@ static void initialize_volume_component_from_points(const GeometrySet &geometry_
 
   VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);
   openvdb::FloatGrid::Ptr density_grid = openvdb::gridPtrCast<openvdb::FloatGrid>(
-      BKE_volume_grid_openvdb_for_write(volume, c_density_grid, false));
+      BKE_volume_grid_openvdb_for_write(volume, c_density_grid));
 
   const float density = params.get_input<float>("Density");
   convert_to_grid_index_space(voxel_size, positions, radii);

@@ -1238,6 +1238,19 @@ const VolumeGrid *BKE_volume_grid_find_for_read(const Volume *volume, const char
   return nullptr;
 }
 
+const VolumeGrid *BKE_volume_grid_find_for_write(struct Volume *volume, const char *name)
+{
+  int num_grids = BKE_volume_num_grids(volume);
+  for (int i = 0; i < num_grids; i++) {
+    const VolumeGrid *grid = BKE_volume_grid_get_for_read(volume, i);
+    if (STREQ(BKE_volume_grid_name(grid), name)) {
+      return grid;
+    }
+  }
+
+  return nullptr;
+}
+
 /* Grid Loading */
 
 bool BKE_volume_grid_load(const Volume *volume, const VolumeGrid *grid)
@@ -1452,6 +1465,24 @@ VolumeGrid *BKE_volume_grid_add(Volume *volume, const char *name, VolumeGridType
 #endif
 }
 
+VolumeGrid *BKE_volume_grid_add_vdb(Volume *volume,
+                                    const char *name,
+                                    openvdb::FloatGrid::Ptr vdb_grid)
+{
+#ifdef WITH_OPENVDB
+  VolumeGridVector &grids = *volume->runtime.grids;
+  BLI_assert(BKE_volume_grid_find_for_read(volume, name) == nullptr);
+  BLI_assert(BKE_volume_grid_type_openvdb(*vdb_grid) != VOLUME_GRID_UNKNOWN);
+
+  vdb_grid->setName(name);
+  grids.emplace_back(vdb_grid);
+  return &grids.back();
+#else
+  UNUSED_VARS(volume, name, type);
+  return nullptr;
+#endif
+}
+
 void BKE_volume_grid_remove(Volume *volume, VolumeGrid *grid)
 {
 #ifdef WITH_OPENVDB
@@ -1541,18 +1572,11 @@ openvdb::GridBase::ConstPtr BKE_volume_grid_openvdb_for_read(const Volume *volum
   return grid->grid();
 }
 
-openvdb::GridBase::Ptr BKE_volume_grid_openvdb_for_write(const Volume *volume,
-                                                         VolumeGrid *grid,
-                                                         const bool clear)
+openvdb::GridBase::Ptr BKE_volume_grid_openvdb_for_write(const Volume *volume, VolumeGrid *grid)
 {
   const char *volume_name = volume->id.name + 2;
-  if (clear) {
-    grid->clear_reference(volume_name);
-  }
-  else {
-    VolumeGridVector &grids = *volume->runtime.grids;
-    grid->duplicate_reference(volume_name, grids.filepath);
-  }
+  VolumeGridVector &grids = *volume->runtime.grids;
+  grid->duplicate_reference(volume_name, grids.filepath);
 
   return grid->grid();
 }

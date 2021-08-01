@@ -89,6 +89,7 @@ const VolumeGrid *BKE_volume_grid_get_for_read(const struct Volume *volume, int 
 VolumeGrid *BKE_volume_grid_get_for_write(struct Volume *volume, int grid_index);
 const VolumeGrid *BKE_volume_grid_active_get_for_read(const struct Volume *volume);
 const VolumeGrid *BKE_volume_grid_find_for_read(const struct Volume *volume, const char *name);
+const VolumeGrid *BKE_volume_grid_find_for_write(struct Volume *volume, const char *name);
 
 /* Grid
  *
@@ -167,6 +168,10 @@ bool BKE_volume_min_max(const Volume *volume, blender::float3 &r_min, blender::f
 #    include <openvdb/openvdb.h>
 #    include <openvdb/points/PointDataGrid.h>
 
+VolumeGrid *BKE_volume_grid_add_vdb(struct Volume *volume,
+                                    const char *name,
+                                    openvdb::FloatGrid::Ptr vdb_grid);
+
 bool BKE_volume_grid_bounds(openvdb::GridBase::ConstPtr grid,
                             blender::float3 &r_min,
                             blender::float3 &r_max);
@@ -178,8 +183,7 @@ openvdb::GridBase::ConstPtr BKE_volume_grid_openvdb_for_metadata(const struct Vo
 openvdb::GridBase::ConstPtr BKE_volume_grid_openvdb_for_read(const struct Volume *volume,
                                                              const struct VolumeGrid *grid);
 openvdb::GridBase::Ptr BKE_volume_grid_openvdb_for_write(const struct Volume *volume,
-                                                         struct VolumeGrid *grid,
-                                                         const bool clear);
+                                                         struct VolumeGrid *grid);
 
 VolumeGridType BKE_volume_grid_type_openvdb(const openvdb::GridBase &grid);
 

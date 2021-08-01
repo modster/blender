@@ -309,6 +309,15 @@ GeometrySet GeometrySet::create_with_curve(CurveEval *curve, GeometryOwnershipTy
   return geometry_set;
 }
 
+/* Create a new geometry set that only contains the given volume. */
+GeometrySet GeometrySet::create_with_volume(Volume *volume, GeometryOwnershipType ownership)
+{
+  GeometrySet geometry_set;
+  VolumeComponent &component = geometry_set.get_component_for_write<VolumeComponent>();
+  component.replace(volume, ownership);
+  return geometry_set;
+}
+
 /* Clear the existing mesh and replace it with the given one. */
 void GeometrySet::replace_mesh(Mesh *mesh, GeometryOwnershipType ownership)
 {

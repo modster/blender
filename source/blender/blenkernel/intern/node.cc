@@ -5158,6 +5158,8 @@ static void registerGeometryNodes()
   register_node_type_geo_input_material();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
+  register_node_type_geo_level_set_boolean();
+  register_node_type_geo_level_set_filter();
   register_node_type_geo_material_assign();
   register_node_type_geo_material_replace();
   register_node_type_geo_mesh_primitive_circle();
@@ -5170,6 +5172,7 @@ static void registerGeometryNodes()
   register_node_type_geo_mesh_primitive_uv_sphere();
   register_node_type_geo_mesh_subdivide();
   register_node_type_geo_mesh_to_curve();
+  register_node_type_geo_mesh_to_level_set();
   register_node_type_geo_object_info();
   register_node_type_geo_point_distribute();
   register_node_type_geo_point_instance();

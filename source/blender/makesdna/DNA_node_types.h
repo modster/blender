@@ -1307,6 +1307,16 @@ typedef struct NodeGeometryVolumeToMesh {
   uint8_t resolution_mode;
 } NodeGeometryVolumeToMesh;
 
+typedef struct NodeGeometryLevelSetBoolean {
+  /* GeometryNodeBooleanOperation */
+  uint8_t operation;
+} NodeGeometryLevelSetBoolean;
+
+typedef struct NodeGeometryLevelSetFilter {
+  /* GeometryNodeFilterOperation */
+  uint8_t operation;
+} NodeGeometryLevelSetFilter;
+
 typedef struct NodeAttributeCombineXYZ {
   /* GeometryNodeAttributeInputMode. */
   uint8_t input_type_x;
@@ -1972,6 +1982,15 @@ typedef enum GeometryNodeCurveInterpolateMode {
   GEO_NODE_CURVE_INTERPOLATE_FACTOR = 0,
   GEO_NODE_CURVE_INTERPOLATE_LENGTH = 1,
 } GeometryNodeCurveInterpolateMode;
+
+typedef enum GeometryNodeFilterOperation {
+  GEO_NODE_LEVEL_SET_FILTER_GAUSSIAN = 0,
+  GEO_NODE_LEVEL_SET_FILTER_OFFSET = 1,
+  GEO_NODE_LEVEL_SET_FILTER_MEDIAN = 2,
+  GEO_NODE_LEVEL_SET_FILTER_MEAN = 3,
+  GEO_NODE_LEVEL_SET_FILTER_MEAN_CURVATURE = 4,
+  GEO_NODE_LEVEL_SET_FILTER_LAPLACIAN = 5,
+} GeometryNodeFilterOperation;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,

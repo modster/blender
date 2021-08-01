@@ -185,6 +185,8 @@ set(SRC
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
+  geometry/nodes/node_geo_level_set_boolean.cc
+  geometry/nodes/node_geo_level_set_filter.cc
   geometry/nodes/node_geo_material_assign.cc
   geometry/nodes/node_geo_material_replace.cc
   geometry/nodes/node_geo_mesh_primitive_circle.cc
@@ -197,6 +199,7 @@ set(SRC
   geometry/nodes/node_geo_mesh_primitive_uv_sphere.cc
   geometry/nodes/node_geo_mesh_subdivide.cc
   geometry/nodes/node_geo_mesh_to_curve.cc
+  geometry/nodes/node_geo_mesh_to_level_set.cc
   geometry/nodes/node_geo_object_info.cc
   geometry/nodes/node_geo_point_distribute.cc
   geometry/nodes/node_geo_point_instance.cc

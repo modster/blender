@@ -292,6 +292,8 @@ struct GeometrySet {
       PointCloud *pointcloud, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   static GeometrySet create_with_curve(
       CurveEval *curve, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+  static GeometrySet create_with_volume(
+      Volume *volume, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
 
   /* Utility methods for access. */
   bool has_mesh() const;
