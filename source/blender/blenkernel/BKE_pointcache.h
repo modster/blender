@@ -108,6 +108,7 @@ typedef struct PTCacheData {
   struct sim_data_vec norm_forces[3];
   struct sim_data_vec fric_forces[3];
   struct sim_data_vec vec_locations[3];
+  float pvel[3];
 } PTCacheData;
 
 typedef struct PTCacheFile {

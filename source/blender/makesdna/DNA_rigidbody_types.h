@@ -171,11 +171,13 @@ typedef struct RigidBodyOb {
   char _pad1[4];
   /** This pointer is shared between all evaluated copies. */
   struct RigidBodyOb_Shared *shared;
-  /** Options for display simulation data. */
+
+  /** Options for debug drawing. */
   short sim_display_options;
   short display_force_types;
   char _pad2[4];
 
+  /** Force vectors. */
   sim_data_vec eff_forces[3];
   char _pad3[4];
   sim_data_vec norm_forces[3];
@@ -184,8 +186,11 @@ typedef struct RigidBodyOb {
   char _pad5[4];
   sim_data_vec vec_locations[3];
 
-  /** Velocity, to display sim data */
+  /** Velocity */
   float vel[3];
+  /** Previous velocity, to calculate acceleration. */
+  float pvel[3];
+  char _pad6[4];
 
   Mesh *col_shape_draw_data;
 

@@ -2438,6 +2438,7 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
         if (ob->rigidbody_object != NULL) {
           rbRigidBody *rbo = (rbRigidBody *)(ob->rigidbody_object->shared->physics_object);
           /* Get velocity. */
+          copy_v3_v3(ob->rigidbody_object->pvel, ob->rigidbody_object->vel);
           RB_body_get_linear_velocity(rbo, ob->rigidbody_object->vel);
 
           bool norm_flag = (ob->rigidbody_object->display_force_types & RB_SIM_NORMAL) ||

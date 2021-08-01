@@ -131,6 +131,7 @@ static int ptcache_data_size[] = {
     sizeof(sim_data_vec[3]), /* BPHYS_DATA_NORM_FORCES */
     sizeof(sim_data_vec[3]), /* BPHYS_DATA_FRIC_FORCES */
     sizeof(sim_data_vec[3]), /* BPHYS_DATA_VEC_LOCATIONS */
+    sizeof(float[3]),        /* BHYS_DATA_PREV_VELOCITY */
 };
 
 static int ptcache_extra_datasize[] = {
@@ -789,6 +790,8 @@ static int ptcache_rigidbody_write(int index, void *rb_v, void **data, int UNUSE
       PTCACHE_DATA_FROM(data, BPHYS_DATA_NORM_FORCES, rbo->norm_forces);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_FRIC_FORCES, rbo->fric_forces);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_VEC_LOCATIONS, rbo->vec_locations);
+      PTCACHE_DATA_FROM(data, BPHYS_DATA_PREV_VELOCITY, rbo->pvel);
+
     }
   }
 
@@ -814,9 +817,10 @@ static void ptcache_rigidbody_read(
         memcpy(rbo->orn, data + 3, sizeof(float[4]));
         memcpy(rbo->vel, data + 7, sizeof(float[3]));
         memcpy(rbo->eff_forces, data + 10, sizeof(sim_data_vec[3]));
-        memcpy(rbo->norm_forces, data + 13, sizeof(sim_data_vec[3]));
-        memcpy(rbo->fric_forces, data + 16, sizeof(sim_data_vec[3]));
-        memcpy(rbo->vec_locations, data + 19, sizeof(sim_data_vec[3]));
+        memcpy(rbo->norm_forces, data + 19, sizeof(sim_data_vec[3]));
+        memcpy(rbo->fric_forces, data + 28, sizeof(sim_data_vec[3]));
+        memcpy(rbo->vec_locations, data + 37, sizeof(sim_data_vec[3]));
+        memcpy(rbo->pvel, data + 46, sizeof(float[3]));
       }
       else {
         PTCACHE_DATA_TO(data, BPHYS_DATA_LOCATION, 0, rbo->pos);
@@ -826,6 +830,7 @@ static void ptcache_rigidbody_read(
         PTCACHE_DATA_TO(data, BPHYS_DATA_NORM_FORCES, 0, rbo->norm_forces);
         PTCACHE_DATA_TO(data, BPHYS_DATA_FRIC_FORCES, 0, rbo->fric_forces);
         PTCACHE_DATA_TO(data, BPHYS_DATA_VEC_LOCATIONS, 0, rbo->vec_locations);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_PREV_VELOCITY, 0, rbo->pvel);
       }
     }
   }
@@ -1116,7 +1121,7 @@ void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, Object *ob, RigidBodyWorld *r
   pid->data_types = (1 << BPHYS_DATA_LOCATION) | (1 << BPHYS_DATA_ROTATION) |
                     (1 << BPHYS_DATA_VELOCITY) | (1 << BPHYS_DATA_EFF_FORCES) |
                     (1 << BPHYS_DATA_NORM_FORCES) | (1 << BPHYS_DATA_FRIC_FORCES) |
-                    (1 << BPHYS_DATA_VEC_LOCATIONS);
+                    (1 << BPHYS_DATA_VEC_LOCATIONS) | (1<<BPHYS_DATA_PREV_VELOCITY);
   pid->info_types = 0;
 
   pid->stack_index = pid->cache->index;
@@ -1765,6 +1770,9 @@ static void ptcache_file_pointers_init(PTCacheFile *pf)
                                         NULL;
   pf->cur[BPHYS_DATA_VEC_LOCATIONS] = (data_types & (1 << BPHYS_DATA_VEC_LOCATIONS)) ?
                                           &pf->data.vec_locations :
+                                          NULL;
+  pf->cur[BPHYS_DATA_PREV_VELOCITY] = (data_types & (1 << BPHYS_DATA_PREV_VELOCITY)) ?
+                                          &pf->data.pvel :
                                           NULL;
 }
 

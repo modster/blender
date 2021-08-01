@@ -1800,11 +1800,8 @@ static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
   const float frame_diff = ctime - scene->rigidbody_world->ltime;
   const float timestep = 1.0f / (float)FPS * frame_diff * scene->rigidbody_world->time_scale;
 
-  rbRigidBody *rb = rbo->shared->physics_object;
   float acc[3];
-  RB_body_get_linear_velocity(rb, acc);
-  sub_v3_v3(acc, rbo->vel);
-  RB_body_get_linear_velocity(rb, rbo->vel);
+  sub_v3_v3v3(acc, rbo->pvel, rbo->vel);
   mul_v3_fl(acc, 1 / timestep);
   OVERLAY_vector_extra(data, acc, rbo->pos, scale, min_clamp, color, text_flag);
 }
