@@ -48,6 +48,7 @@
 #include "ED_anim_api.h"
 #include "ED_keyframes_draw.h"
 #include "ED_keyframes_edit.h"
+#include "ED_keyframes_keylist.h"
 
 #include "RNA_access.h"
 
@@ -89,7 +90,7 @@ void ANIM_draw_cfra(const bContext *C, View2D *v2d, short flag)
 
 /* *************************************************** */
 /* PREVIEW RANGE 'CURTAINS' */
-/* Note: 'Preview Range' tools are defined in anim_ops.c */
+/* NOTE: 'Preview Range' tools are defined in `anim_ops.c`. */
 
 /* Draw preview range 'curtains' for highlighting where the animation data is */
 void ANIM_draw_previewrange(const bContext *C, View2D *v2d, int end_frame_width)

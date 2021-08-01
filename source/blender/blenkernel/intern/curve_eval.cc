@@ -48,6 +48,22 @@ blender::MutableSpan<SplinePtr> CurveEval::splines()
   return splines_;
 }
 
+/**
+ * \return True if the curve contains a spline with the given type.
+ *
+ * \note If you are looping over all of the splines in the same scope anyway,
+ * it's better to avoid calling this function, in case there are many splines.
+ */
+bool CurveEval::has_spline_with_type(const Spline::Type type) const
+{
+  for (const SplinePtr &spline : this->splines()) {
+    if (spline->type() == type) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void CurveEval::resize(const int size)
 {
   splines_.resize(size);
@@ -257,9 +273,10 @@ static SplinePtr spline_from_dna_poly(const Nurb &nurb)
   return spline;
 }
 
-std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve)
+std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve,
+                                                     const ListBase &nurbs_list)
 {
-  Vector<const Nurb *> nurbs(*BKE_curve_nurbs_get(&const_cast<Curve &>(dna_curve)));
+  Vector<const Nurb *> nurbs(nurbs_list);
 
   std::unique_ptr<CurveEval> curve = std::make_unique<CurveEval>();
   curve->resize(nurbs.size());
@@ -293,6 +310,11 @@ std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve)
   }
 
   return curve;
+}
+
+std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &dna_curve)
+{
+  return curve_eval_from_dna_curve(dna_curve, *BKE_curve_nurbs_get_for_read(&dna_curve));
 }
 
 /**

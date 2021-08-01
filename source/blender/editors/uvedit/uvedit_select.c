@@ -1126,7 +1126,7 @@ static void uv_select_edgeloop_single_side_tag(const Scene *scene,
     while (l_step != NULL) {
 
       if (!uvedit_face_visible_test(scene, l_step->f) ||
-          /* Check the boundary is still a  boundary. */
+          /* Check the boundary is still a boundary. */
           (uvedit_loop_find_other_radial_loop_with_visible_face(
                scene, l_step, cd_loop_uv_offset) != NULL)) {
         break;
@@ -1351,7 +1351,7 @@ static void uv_select_linked_multi(Scene *scene,
 
     BM_mesh_elem_table_ensure(em->bm, BM_FACE); /* we can use this too */
 
-    /* Note, we had 'use winding' so we don't consider overlapping islands as connected, see T44320
+    /* NOTE: we had 'use winding' so we don't consider overlapping islands as connected, see T44320
      * this made *every* projection split the island into front/back islands.
      * Keep 'use_winding' to false, see: T50970.
      *

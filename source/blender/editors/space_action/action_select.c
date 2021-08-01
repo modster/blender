@@ -51,8 +51,8 @@
 
 #include "ED_anim_api.h"
 #include "ED_gpencil.h"
-#include "ED_keyframes_draw.h"
 #include "ED_keyframes_edit.h"
+#include "ED_keyframes_keylist.h"
 #include "ED_markers.h"
 #include "ED_mask.h"
 #include "ED_screen.h"
@@ -933,8 +933,8 @@ static const EnumPropertyItem prop_column_select_types[] = {
 /* ------------------- */
 
 /* Selects all visible keyframes between the specified markers */
-/* TODO, this is almost an _exact_ duplicate of a function of the same name in graph_select.c
- * should de-duplicate - campbell */
+/* TODO(campbell): this is almost an _exact_ duplicate of a function of the same name in
+ * graph_select.c should de-duplicate. */
 static void markers_selectkeys_between(bAnimContext *ac)
 {
   ListBase anim_data = {NULL, NULL};

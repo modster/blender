@@ -232,7 +232,7 @@ size_t BLI_vsnprintf(char *__restrict buffer,
 }
 
 /**
- * A version of #BLI_vsnprintf that returns ``strlen(buffer)``
+ * A version of #BLI_vsnprintf that returns `strlen(buffer)`
  */
 size_t BLI_vsnprintf_rlen(char *__restrict buffer,
                           size_t maxncpy,
@@ -278,7 +278,7 @@ size_t BLI_snprintf(char *__restrict dst, size_t maxncpy, const char *__restrict
 }
 
 /**
- * A version of #BLI_snprintf that returns ``strlen(dst)``
+ * A version of #BLI_snprintf that returns `strlen(dst)`
  */
 size_t BLI_snprintf_rlen(char *__restrict dst, size_t maxncpy, const char *__restrict format, ...)
 {
@@ -370,7 +370,7 @@ size_t BLI_str_escape(char *__restrict dst, const char *__restrict src, const si
  * \param src: The escaped source string.
  * \param dst_maxncpy: The maximum number of bytes allowable to copy.
  *
- * \note This is used for for parsing animation paths in blend files.
+ * \note This is used for parsing animation paths in blend files.
  */
 size_t BLI_str_unescape(char *__restrict dst, const char *__restrict src, const size_t src_maxncpy)
 {

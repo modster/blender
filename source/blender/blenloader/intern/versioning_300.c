@@ -28,12 +28,21 @@
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_brush_types.h"
+#include "DNA_collection_types.h"
+#include "DNA_curve_types.h"
 #include "DNA_genfile.h"
 #include "DNA_listBase.h"
+#include "DNA_material_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
+#include "DNA_workspace_types.h"
 
+#include "BKE_action.h"
 #include "BKE_animsys.h"
+#include "BKE_asset.h"
+#include "BKE_collection.h"
+#include "BKE_deform.h"
+#include "BKE_fcurve.h"
 #include "BKE_fcurve_driver.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -42,9 +51,10 @@
 #include "BLO_readfile.h"
 #include "MEM_guardedalloc.h"
 #include "readfile.h"
-#include "versioning_common.h"
 
-#include "MEM_guardedalloc.h"
+#include "SEQ_sequencer.h"
+
+#include "RNA_access.h"
 
 #include "versioning_common.h"
 
@@ -83,6 +93,93 @@ static void assert_sorted_ids(Main *bmain)
 #else
   UNUSED_VARS_NDEBUG(bmain);
 #endif
+}
+
+static void move_vertex_group_names_to_object_data(Main *bmain)
+{
+  LISTBASE_FOREACH (Object *, object, &bmain->objects) {
+    if (ELEM(object->type, OB_MESH, OB_LATTICE, OB_GPENCIL)) {
+      ListBase *new_defbase = BKE_object_defgroup_list_mutable(object);
+
+      /* Choose the longest vertex group name list among all linked duplicates. */
+      if (BLI_listbase_count(&object->defbase) < BLI_listbase_count(new_defbase)) {
+        BLI_freelistN(&object->defbase);
+      }
+      else {
+        /* Clear the list in case the it was already assigned from another object. */
+        BLI_freelistN(new_defbase);
+        *new_defbase = object->defbase;
+      }
+    }
+  }
+}
+
+static void do_versions_sequencer_speed_effect_recursive(Scene *scene, const ListBase *seqbase)
+{
+  /* Old SpeedControlVars->flags. */
+#define SEQ_SPEED_INTEGRATE (1 << 0)
+#define SEQ_SPEED_COMPRESS_IPO_Y (1 << 2)
+
+  LISTBASE_FOREACH (Sequence *, seq, seqbase) {
+    if (seq->type == SEQ_TYPE_SPEED) {
+      SpeedControlVars *v = (SpeedControlVars *)seq->effectdata;
+      const char *substr = NULL;
+      float globalSpeed = v->globalSpeed;
+      if (seq->flag & SEQ_USE_EFFECT_DEFAULT_FADE) {
+        if (globalSpeed == 1.0f) {
+          v->speed_control_type = SEQ_SPEED_STRETCH;
+        }
+        else {
+          v->speed_control_type = SEQ_SPEED_MULTIPLY;
+          v->speed_fader = globalSpeed *
+                           ((float)seq->seq1->len /
+                            max_ff((float)(seq->seq1->enddisp - seq->seq1->start), 1.0f));
+        }
+      }
+      else if (v->flags & SEQ_SPEED_INTEGRATE) {
+        v->speed_control_type = SEQ_SPEED_MULTIPLY;
+        v->speed_fader = seq->speed_fader * globalSpeed;
+      }
+      else if (v->flags & SEQ_SPEED_COMPRESS_IPO_Y) {
+        globalSpeed *= 100.0f;
+        v->speed_control_type = SEQ_SPEED_LENGTH;
+        v->speed_fader_length = seq->speed_fader * globalSpeed;
+        substr = "speed_length";
+      }
+      else {
+        v->speed_control_type = SEQ_SPEED_FRAME_NUMBER;
+        v->speed_fader_frame_number = (int)(seq->speed_fader * globalSpeed);
+        substr = "speed_frame_number";
+      }
+
+      v->flags &= ~(SEQ_SPEED_INTEGRATE | SEQ_SPEED_COMPRESS_IPO_Y);
+
+      if (substr || globalSpeed != 1.0f) {
+        FCurve *fcu = id_data_find_fcurve(&scene->id, seq, &RNA_Sequence, "speed_factor", 0, NULL);
+        if (fcu) {
+          if (globalSpeed != 1.0f) {
+            for (int i = 0; i < fcu->totvert; i++) {
+              BezTriple *bezt = &fcu->bezt[i];
+              bezt->vec[0][1] *= globalSpeed;
+              bezt->vec[1][1] *= globalSpeed;
+              bezt->vec[2][1] *= globalSpeed;
+            }
+          }
+          if (substr) {
+            char *new_path = BLI_str_replaceN(fcu->rna_path, "speed_factor", substr);
+            MEM_freeN(fcu->rna_path);
+            fcu->rna_path = new_path;
+          }
+        }
+      }
+    }
+    else if (seq->type == SEQ_TYPE_META) {
+      do_versions_sequencer_speed_effect_recursive(scene, &seq->seqbase);
+    }
+  }
+
+#undef SEQ_SPEED_INTEGRATE
+#undef SEQ_SPEED_COMPRESS_IPO_Y
 }
 
 void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
@@ -127,6 +224,18 @@ void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
 
   if (MAIN_VERSION_ATLEAST(bmain, 300, 3)) {
     assert_sorted_ids(bmain);
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 11)) {
+    move_vertex_group_names_to_object_data(bmain);
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 13)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      if (scene->ed != NULL) {
+        do_versions_sequencer_speed_effect_recursive(scene, &scene->ed->seqbase);
+      }
+    }
   }
 
   /**
@@ -415,6 +524,173 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
   }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 6)) {
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+          /* Disable View Layers filter. */
+          if (space->spacetype == SPACE_OUTLINER) {
+            SpaceOutliner *space_outliner = (SpaceOutliner *)space;
+            space_outliner->filter |= SO_FILTER_NO_VIEW_LAYERS;
+          }
+        }
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 7)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *tool_settings = scene->toolsettings;
+      tool_settings->snap_flag |= SCE_SNAP_SEQ;
+      short snap_mode = tool_settings->snap_mode;
+      short snap_node_mode = tool_settings->snap_node_mode;
+      short snap_uv_mode = tool_settings->snap_uv_mode;
+      tool_settings->snap_mode &= ~((1 << 4) | (1 << 5) | (1 << 6));
+      tool_settings->snap_node_mode &= ~((1 << 5) | (1 << 6));
+      tool_settings->snap_uv_mode &= ~(1 << 4);
+      if (snap_mode & (1 << 4)) {
+        tool_settings->snap_mode |= (1 << 6); /* SCE_SNAP_MODE_INCREMENT */
+      }
+      if (snap_mode & (1 << 5)) {
+        tool_settings->snap_mode |= (1 << 4); /* SCE_SNAP_MODE_EDGE_MIDPOINT */
+      }
+      if (snap_mode & (1 << 6)) {
+        tool_settings->snap_mode |= (1 << 5); /* SCE_SNAP_MODE_EDGE_PERPENDICULAR */
+      }
+      if (snap_node_mode & (1 << 5)) {
+        tool_settings->snap_node_mode |= (1 << 0); /* SCE_SNAP_MODE_NODE_X */
+      }
+      if (snap_node_mode & (1 << 6)) {
+        tool_settings->snap_node_mode |= (1 << 1); /* SCE_SNAP_MODE_NODE_Y */
+      }
+      if (snap_uv_mode & (1 << 4)) {
+        tool_settings->snap_uv_mode |= (1 << 6); /* SCE_SNAP_MODE_INCREMENT */
+      }
+
+      SequencerToolSettings *sequencer_tool_settings = SEQ_tool_settings_ensure(scene);
+      sequencer_tool_settings->snap_mode = SEQ_SNAP_TO_STRIPS | SEQ_SNAP_TO_CURRENT_FRAME |
+                                           SEQ_SNAP_TO_STRIP_HOLD;
+      sequencer_tool_settings->snap_distance = 15;
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 8)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      if (scene->master_collection != NULL) {
+        BLI_strncpy(scene->master_collection->id.name + 2,
+                    BKE_SCENE_COLLECTION_NAME,
+                    sizeof(scene->master_collection->id.name) - 2);
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 9)) {
+    /* Fix a bug where reordering FCurves and bActionGroups could cause some corruption. Just
+     * reconstruct all the action groups & ensure that the FCurves of a group are continuously
+     * stored (i.e. not mixed with other groups) to be sure. See T89435. */
+    LISTBASE_FOREACH (bAction *, act, &bmain->actions) {
+      BKE_action_groups_reconstruct(act);
+    }
+
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (node->type == GEO_NODE_MESH_SUBDIVIDE) {
+            strcpy(node->idname, "GeometryNodeMeshSubdivide");
+          }
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 10)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *tool_settings = scene->toolsettings;
+      if (tool_settings->snap_uv_mode & (1 << 4)) {
+        tool_settings->snap_uv_mode |= (1 << 6); /* SCE_SNAP_MODE_INCREMENT */
+        tool_settings->snap_uv_mode &= ~(1 << 4);
+      }
+    }
+    LISTBASE_FOREACH (Material *, mat, &bmain->materials) {
+      if (!(mat->lineart.flags & LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) {
+        mat->lineart.mat_occlusion = 1;
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 13)) {
+    /* Convert Surface Deform to sparse-capable bind structure. */
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "SurfaceDeformModifierData", "int", "num_mesh_verts")) {
+      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+        LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
+          if (md->type == eModifierType_SurfaceDeform) {
+            SurfaceDeformModifierData *smd = (SurfaceDeformModifierData *)md;
+            if (smd->num_bind_verts && smd->verts) {
+              smd->num_mesh_verts = smd->num_bind_verts;
+
+              for (unsigned int i = 0; i < smd->num_bind_verts; i++) {
+                smd->verts[i].vertex_idx = i;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "WorkSpace", "AssetLibraryReference", "asset_library")) {
+      LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
+        BKE_asset_library_reference_init_default(&workspace->asset_library);
+      }
+    }
+
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "FileAssetSelectParams", "AssetLibraryReference", "asset_library")) {
+      LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+            if (space->spacetype == SPACE_FILE) {
+              SpaceFile *sfile = (SpaceFile *)space;
+              if (sfile->browse_mode != FILE_BROWSE_MODE_ASSETS) {
+                continue;
+              }
+              BKE_asset_library_reference_init_default(&sfile->asset_params->asset_library);
+            }
+          }
+        }
+      }
+    }
+
+    /* Set default 2D annotation placement. */
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *ts = scene->toolsettings;
+      ts->gpencil_v2d_align = GP_PROJECT_VIEWSPACE | GP_PROJECT_CURSOR;
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 14)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *tool_settings = scene->toolsettings;
+      tool_settings->snap_flag &= ~SCE_SNAP_SEQ;
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 15)) {
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_SEQ) {
+            SpaceSeq *sseq = (SpaceSeq *)sl;
+            sseq->flag |= SEQ_SHOW_GRID;
+          }
+        }
+      }
+    }
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *

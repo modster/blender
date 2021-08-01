@@ -48,7 +48,6 @@ static void add_final_mesh_as_geometry_component(const Object &object, GeometryS
 
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
     mesh_component.replace(mesh, GeometryOwnershipType::ReadOnly);
-    mesh_component.copy_vertex_group_names_from_object(object);
   }
 }
 
@@ -56,7 +55,7 @@ static void add_curve_data_as_geometry_component(const Object &object, GeometryS
 {
   BLI_assert(object.type == OB_CURVE);
   if (object.data != nullptr) {
-    std::unique_ptr<CurveEval> curve = curve_eval_from_dna_curve(*(Curve *)object.data);
+    std::unique_ptr<CurveEval> curve = curve_eval_from_dna_curve(*(const Curve *)object.data);
     CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
     curve_component.replace(curve.release(), GeometryOwnershipType::Owned);
   }
@@ -264,7 +263,7 @@ static bool instances_attribute_foreach_recursive(const GeometrySet &geometry_se
     }
   }
 
-  /* Now that this this geometry set is visited, increase the count and check with the limit. */
+  /* Now that this geometry set is visited, increase the count and check with the limit. */
   if (limit > 0 && count++ > limit) {
     return false;
   }
@@ -535,7 +534,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
             const void *src_buffer = src_span.data();
             for (const int UNUSED(i) : set_group.transforms.index_range()) {
               void *dst_buffer = dst_span[offset];
-              cpp_type->copy_to_initialized_n(src_buffer, dst_buffer, domain_size);
+              cpp_type->copy_assign_n(src_buffer, dst_buffer, domain_size);
               offset += domain_size;
             }
           }
@@ -566,6 +565,7 @@ static PointCloud *join_pointcloud_position_attribute(Span<GeometryInstanceGroup
   }
 
   PointCloud *new_pointcloud = BKE_pointcloud_new_nomain(totpoint);
+  MutableSpan new_positions{(float3 *)new_pointcloud->co, new_pointcloud->totpoint};
 
   /* Transform each instance's point locations into the new point cloud. */
   int offset = 0;
@@ -577,9 +577,7 @@ static PointCloud *join_pointcloud_position_attribute(Span<GeometryInstanceGroup
     }
     for (const float4x4 &transform : set_group.transforms) {
       for (const int i : IndexRange(pointcloud->totpoint)) {
-        const float3 old_position = pointcloud->co[i];
-        const float3 new_position = transform * old_position;
-        copy_v3_v3(new_pointcloud->co[offset + i], new_position);
+        new_positions[offset + i] = transform * float3(pointcloud->co[i]);
       }
       offset += pointcloud->totpoint;
     }

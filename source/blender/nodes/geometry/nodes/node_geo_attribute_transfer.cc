@@ -162,7 +162,7 @@ static void get_closest_mesh_points(const Mesh &mesh,
 {
   BLI_assert(mesh.totvert > 0);
   BVHTreeFromMesh tree_data;
-  BKE_bvhtree_from_mesh_get(&tree_data, const_cast<Mesh *>(&mesh), BVHTREE_FROM_VERTS, 2);
+  BKE_bvhtree_from_mesh_get(&tree_data, &mesh, BVHTREE_FROM_VERTS, 2);
   get_closest_in_bvhtree(tree_data, positions, r_point_indices, r_distances_sq, r_positions);
   free_bvhtree_from_mesh(&tree_data);
 }
@@ -175,7 +175,7 @@ static void get_closest_mesh_edges(const Mesh &mesh,
 {
   BLI_assert(mesh.totedge > 0);
   BVHTreeFromMesh tree_data;
-  BKE_bvhtree_from_mesh_get(&tree_data, const_cast<Mesh *>(&mesh), BVHTREE_FROM_EDGES, 2);
+  BKE_bvhtree_from_mesh_get(&tree_data, &mesh, BVHTREE_FROM_EDGES, 2);
   get_closest_in_bvhtree(tree_data, positions, r_edge_indices, r_distances_sq, r_positions);
   free_bvhtree_from_mesh(&tree_data);
 }
@@ -188,7 +188,7 @@ static void get_closest_mesh_looptris(const Mesh &mesh,
 {
   BLI_assert(mesh.totpoly > 0);
   BVHTreeFromMesh tree_data;
-  BKE_bvhtree_from_mesh_get(&tree_data, const_cast<Mesh *>(&mesh), BVHTREE_FROM_LOOPTRI, 2);
+  BKE_bvhtree_from_mesh_get(&tree_data, &mesh, BVHTREE_FROM_LOOPTRI, 2);
   get_closest_in_bvhtree(tree_data, positions, r_looptri_indices, r_distances_sq, r_positions);
   free_bvhtree_from_mesh(&tree_data);
 }
@@ -204,7 +204,8 @@ static void get_closest_mesh_polygons(const Mesh &mesh,
   Array<int> looptri_indices(positions.size());
   get_closest_mesh_looptris(mesh, positions, looptri_indices, r_distances_sq, r_positions);
 
-  Span<MLoopTri> looptris = bke::mesh_surface_sample::get_mesh_looptris(mesh);
+  const Span<MLoopTri> looptris{BKE_mesh_runtime_looptri_ensure(&mesh),
+                                BKE_mesh_runtime_looptri_len(&mesh)};
   for (const int i : positions.index_range()) {
     const MLoopTri &looptri = looptris[looptri_indices[i]];
     r_poly_indices[i] = looptri.poly;
@@ -370,10 +371,12 @@ static void transfer_attribute_nearest(const GeometrySet &src_geometry,
           break;
         }
         case ATTR_DOMAIN_CORNER: {
-          use_mesh = true;
-          mesh_indices.reinitialize(tot_samples);
-          mesh_distances_sq.reinitialize(tot_samples);
-          get_closest_mesh_corners(*mesh, dst_positions, mesh_indices, mesh_distances_sq, {});
+          if (mesh->totloop > 0) {
+            use_mesh = true;
+            mesh_indices.reinitialize(tot_samples);
+            mesh_distances_sq.reinitialize(tot_samples);
+            get_closest_mesh_corners(*mesh, dst_positions, mesh_indices, mesh_distances_sq, {});
+          }
           break;
         }
         default: {

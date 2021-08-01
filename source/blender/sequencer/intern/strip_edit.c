@@ -112,8 +112,8 @@ static void seq_update_muting_recursive(ListBase *seqbasep, Sequence *metaseq, i
   Sequence *seq;
   int seqmute;
 
-  /* for sound we go over full meta tree to update muted state,
-   * since sound is played outside of evaluating the imbufs, */
+  /* For sound we go over full meta tree to update muted state,
+   * since sound is played outside of evaluating the imbufs. */
   for (seq = seqbasep->first; seq; seq = seq->next) {
     seqmute = (mute || (seq->flag & SEQ_MUTE));
 
@@ -255,7 +255,7 @@ bool SEQ_edit_move_strip_to_meta(Scene *scene,
     return false;
   }
 
-  SeqCollection *collection = SEQ_collection_create();
+  SeqCollection *collection = SEQ_collection_create(__func__);
   SEQ_collection_append_strip(src_seq, collection);
   SEQ_collection_expand(seqbase, collection, SEQ_query_strip_effect_chain);
 
@@ -396,7 +396,7 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
     return NULL;
   }
 
-  SeqCollection *collection = SEQ_collection_create();
+  SeqCollection *collection = SEQ_collection_create(__func__);
   SEQ_collection_append_strip(seq, collection);
   SEQ_collection_expand(seqbase, collection, SEQ_query_strip_effect_chain);
 
@@ -406,6 +406,8 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
     BLI_remlink(seqbase, seq);
     BLI_addtail(&left_strips, seq);
   }
+
+  SEQ_collection_free(collection);
 
   /* Sort list, so that no strip can depend on next strip in list.
    * This is important for SEQ_time_update_sequence functionality. */

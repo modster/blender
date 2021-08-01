@@ -67,10 +67,11 @@
 #include "ED_uvedit.h"
 
 #include "draw_cache_extract.h"
-#include "draw_cache_extract_mesh_private.h"
 #include "draw_cache_inline.h"
 
 #include "draw_cache_impl.h" /* own include */
+
+#include "mesh_extractors/extract_mesh.h"
 
 /* ---------------------------------------------------------------------- */
 /** \name Dependencies between buffer and batch
@@ -544,8 +545,8 @@ static void drw_mesh_weight_state_extract(Object *ob,
   /* Extract complete vertex weight group selection state and mode flags. */
   memset(wstate, 0, sizeof(*wstate));
 
-  wstate->defgroup_active = ob->actdef - 1;
-  wstate->defgroup_len = BLI_listbase_count(&ob->defbase);
+  wstate->defgroup_active = me->vertex_group_active_index - 1;
+  wstate->defgroup_len = BLI_listbase_count(&me->vertex_group_names);
 
   wstate->alert_mode = ts->weightuser;
 
@@ -856,7 +857,9 @@ static void mesh_buffer_extraction_cache_clear(MeshBufferExtractionCache *extrac
   extraction_cache->loose_geom.edge_len = 0;
   extraction_cache->loose_geom.vert_len = 0;
 
-  MEM_SAFE_FREE(extraction_cache->mat_offsets.tri);
+  MEM_SAFE_FREE(extraction_cache->poly_sorted.tri_first_index);
+  MEM_SAFE_FREE(extraction_cache->poly_sorted.mat_tri_len);
+  extraction_cache->poly_sorted.visible_tri_len = 0;
 }
 
 static void mesh_batch_cache_clear(Mesh *me)
@@ -1052,7 +1055,7 @@ GPUBatch *DRW_mesh_batch_cache_get_surface_sculpt(Mesh *me)
   return cache->batch.surface;
 }
 
-int DRW_mesh_material_count_get(Mesh *me)
+int DRW_mesh_material_count_get(const Mesh *me)
 {
   return mesh_render_mat_len_get(me);
 }
@@ -1278,7 +1281,7 @@ GPUBatch *DRW_mesh_batch_cache_get_surface_edges(Mesh *me)
  * \{ */
 
 /* Thread safety need to be assured by caller. Don't call this during drawing.
- * Note: For now this only free the shading batches / vbo if any cd layers is
+ * NOTE: For now this only free the shading batches / vbo if any cd layers is
  * not needed anymore. */
 void DRW_mesh_batch_cache_free_old(Mesh *me, int ctime)
 {
@@ -1305,7 +1308,7 @@ static void drw_mesh_batch_cache_check_available(struct TaskGraph *task_graph, M
 {
   MeshBatchCache *cache = mesh_batch_cache_get(me);
   /* Make sure all requested batches have been setup. */
-  /* Note: The next line creates a different scheduling than during release builds what can lead to
+  /* NOTE: The next line creates a different scheduling than during release builds what can lead to
    * some issues (See T77867 where we needed to disable this function in order to debug what was
    * happening in release builds). */
   BLI_task_graph_work_and_wait(task_graph);

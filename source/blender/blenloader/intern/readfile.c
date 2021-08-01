@@ -464,6 +464,13 @@ void blo_join_main(ListBase *mainlist)
   Main *tojoin, *mainl;
 
   mainl = mainlist->first;
+
+  if (mainl->id_map != NULL) {
+    /* Cannot keep this since we add some IDs from joined mains. */
+    BKE_main_idmap_destroy(mainl->id_map);
+    mainl->id_map = NULL;
+  }
+
   while ((tojoin = mainl->next)) {
     add_main_to_main(mainl, tojoin);
     BLI_remlink(mainlist, tojoin);
@@ -500,6 +507,12 @@ void blo_split_main(ListBase *mainlist, Main *main)
 
   if (BLI_listbase_is_empty(&main->libraries)) {
     return;
+  }
+
+  if (main->id_map != NULL) {
+    /* Cannot keep this since we remove some IDs from given main. */
+    BKE_main_idmap_destroy(main->id_map);
+    main->id_map = NULL;
   }
 
   /* (Library.temp_index -> Main), lookup table */
@@ -729,7 +742,7 @@ static void bh4_from_bh8(BHead *bhead, BHead8 *bhead8, bool do_endian_swap)
       BLI_endian_switch_uint64(&bhead8->old);
     }
 
-    /* this patch is to avoid a long long being read from not-eight aligned positions
+    /* this patch is to avoid `intptr_t` being read from not-eight aligned positions
      * is necessary on any modern 64bit architecture) */
     memcpy(&old, &bhead8->old, 8);
     bhead4->old = (int)(old >> 3);
@@ -2311,7 +2324,7 @@ static void lib_link_id_embedded_id(BlendLibReader *reader, ID *id)
 
 static void lib_link_id(BlendLibReader *reader, ID *id)
 {
-  /* Note: WM IDProperties are never written to file, hence they should always be NULL here. */
+  /* NOTE: WM IDProperties are never written to file, hence they should always be NULL here. */
   BLI_assert((GS(id->name) != ID_WM) || id->properties == NULL);
   IDP_BlendReadLib(reader, id->properties);
 
@@ -2444,7 +2457,7 @@ static void direct_link_id_common(
     BlendDataReader *reader, Library *current_library, ID *id, ID *id_old, const int tag)
 {
   if (!BLO_read_data_is_undo(reader)) {
-    /* When actually reading a file , we do want to reset/re-generate session uuids.
+    /* When actually reading a file, we do want to reset/re-generate session uuids.
      * In undo case, we want to re-use existing ones. */
     id->session_uuid = MAIN_ID_SESSION_UUID_UNSET;
   }
@@ -2728,7 +2741,7 @@ static int lib_link_main_data_restore_cb(LibraryIDLinkCallbackData *cb_data)
 
   struct IDNameLib_Map *id_map = cb_data->user_data;
 
-  /* Note: Handling of usercount here is really bad, defining its own system...
+  /* NOTE: Handling of usercount here is really bad, defining its own system...
    * Will have to be refactored at some point, but that is not top priority task for now.
    * And all user-counts are properly recomputed at the end of the undo management code anyway. */
   *id_pointer = restore_pointer_by_name(
@@ -3067,7 +3080,7 @@ void blo_lib_link_restore(Main *oldmain,
     /* keep cursor location through undo */
     memcpy(&win->scene->cursor, &oldscene->cursor, sizeof(win->scene->cursor));
 
-    /* Note: even though that function seems to redo part of what is done by
+    /* NOTE: even though that function seems to redo part of what is done by
      * `lib_link_workspace_layout_restore()` above, it seems to have a slightly different scope:
      * while the former updates the whole UI pointers from Main db (going over all layouts of
      * all workspaces), that one only focuses one current active screen, takes care of
@@ -3208,6 +3221,10 @@ static ID *create_placeholder(Main *mainvar, const short idcode, const char *idn
 
   BLI_addtail(lb, ph_id);
   id_sort_by_name(lb, ph_id, NULL);
+
+  if (mainvar->id_map != NULL) {
+    BKE_main_idmap_insert_id(mainvar->id_map, ph_id);
+  }
 
   if ((tag & LIB_TAG_TEMP_MAIN) == 0) {
     BKE_lib_libblock_session_uuid_ensure(ph_id);
@@ -3667,6 +3684,10 @@ static BHead *read_libblock(FileData *fd,
       if (r_id) {
         *r_id = id_old;
       }
+      if (main->id_map != NULL) {
+        BKE_main_idmap_insert_id(main->id_map, id_old);
+      }
+
       return blo_bhead_next(fd, bhead);
     }
   }
@@ -3725,6 +3746,11 @@ static BHead *read_libblock(FileData *fd,
     }
 
     direct_link_id(fd, main, id_tag, id, id_old);
+
+    if (main->id_map != NULL) {
+      BKE_main_idmap_insert_id(main->id_map, id);
+    }
+
     return blo_bhead_next(fd, bhead);
   }
 
@@ -3748,6 +3774,13 @@ static BHead *read_libblock(FileData *fd,
   else if (id_old) {
     /* For undo, store contents read into id at id_old. */
     read_libblock_undo_restore_at_old_address(fd, main, id, id_old);
+
+    if (main->id_map != NULL) {
+      BKE_main_idmap_insert_id(main->id_map, id_old);
+    }
+  }
+  else if (main->id_map != NULL) {
+    BKE_main_idmap_insert_id(main->id_map, id);
   }
 
   return bhead;
@@ -3780,7 +3813,7 @@ BHead *blo_read_asset_data_block(FileData *fd, BHead *bhead, AssetMetaData **r_a
 /** \name Read Global Data
  * \{ */
 
-/* note, this has to be kept for reading older files... */
+/* NOTE: this has to be kept for reading older files... */
 /* also version info is written here */
 static BHead *read_global(BlendFileData *bfd, FileData *fd, BHead *bhead)
 {
@@ -3828,7 +3861,7 @@ static BHead *read_global(BlendFileData *bfd, FileData *fd, BHead *bhead)
   return blo_bhead_next(fd, bhead);
 }
 
-/* note, this has to be kept for reading older files... */
+/* NOTE: this has to be kept for reading older files... */
 static void link_global(FileData *fd, BlendFileData *bfd)
 {
   bfd->cur_view_layer = blo_read_get_new_globaldata_address(fd, bfd->cur_view_layer);
@@ -4299,6 +4332,8 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
 
   fd->mainlist = NULL; /* Safety, this is local variable, shall not be used afterward. */
 
+  BLI_assert(bfd->main->id_map == NULL);
+
   return bfd;
 }
 
@@ -4443,9 +4478,16 @@ static BHead *find_bhead_from_idname(FileData *fd, const char *idname)
 
 static ID *is_yet_read(FileData *fd, Main *mainvar, BHead *bhead)
 {
+  if (mainvar->id_map == NULL) {
+    mainvar->id_map = BKE_main_idmap_create(mainvar, false, NULL, MAIN_IDMAP_TYPE_NAME);
+  }
+  BLI_assert(BKE_main_idmap_main_get(mainvar->id_map) == mainvar);
+
   const char *idname = blo_bhead_id_name(fd, bhead);
-  /* which_libbase can be NULL, intentionally not using idname+2 */
-  return BLI_findstring(which_libbase(mainvar, GS(idname)), idname, offsetof(ID, name));
+
+  ID *id = BKE_main_idmap_lookup_name(mainvar->id_map, GS(idname), idname + 2, mainvar->curlib);
+  BLI_assert(id == BLI_findstring(which_libbase(mainvar, GS(idname)), idname, offsetof(ID, name)));
+  return id;
 }
 
 /** \} */
@@ -5196,6 +5238,10 @@ static void library_link_end(Main *mainl,
   Main *mainvar;
   Library *curlib;
 
+  if (mainl->id_map == NULL) {
+    mainl->id_map = BKE_main_idmap_create(mainl, false, NULL, MAIN_IDMAP_TYPE_NAME);
+  }
+
   /* expander now is callback function */
   BLO_main_expander(expand_doit_library);
 
@@ -5401,6 +5447,9 @@ static void read_library_linked_ids(FileData *basefd,
       ID *id_next = id->next;
       if ((id->tag & LIB_TAG_ID_LINK_PLACEHOLDER) && !(id->flag & LIB_INDIRECT_WEAK_LINK)) {
         BLI_remlink(lbarray[a], id);
+        if (mainvar->id_map != NULL) {
+          BKE_main_idmap_remove_id(mainvar->id_map, id);
+        }
 
         /* When playing with lib renaming and such, you may end with cases where
          * you have more than one linked ID of the same data-block from same
@@ -5569,6 +5618,10 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 
         if (fd) {
           do_it = true;
+
+          if (mainptr->id_map == NULL) {
+            mainptr->id_map = BKE_main_idmap_create(mainptr, false, NULL, MAIN_IDMAP_TYPE_NAME);
+          }
         }
 
         /* Read linked data-locks for each link placeholder, and replace
@@ -5611,7 +5664,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
       lib_link_all(mainptr->curlib->filedata, mainptr);
     }
 
-    /* Note: No need to call #do_versions_after_linking() or #BKE_main_id_refcount_recompute()
+    /* NOTE: No need to call #do_versions_after_linking() or #BKE_main_id_refcount_recompute()
      * here, as this function is only called for library 'subset' data handling, as part of
      * either full blendfile reading (#blo_read_file_internal()), or library-data linking
      * (#library_link_end()). */

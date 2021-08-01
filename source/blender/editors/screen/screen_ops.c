@@ -70,8 +70,9 @@
 #include "ED_anim_api.h"
 #include "ED_armature.h"
 #include "ED_clip.h"
+#include "ED_fileselect.h"
 #include "ED_image.h"
-#include "ED_keyframes_draw.h"
+#include "ED_keyframes_keylist.h"
 #include "ED_mesh.h"
 #include "ED_object.h"
 #include "ED_screen.h"
@@ -274,9 +275,35 @@ bool ED_operator_outliner_active_no_editobject(bContext *C)
   return false;
 }
 
+/**
+ * \note Will return true for file spaces in either file or asset browsing mode! See
+ *       #ED_operator_file_browsing_active() (file browsing only) and
+ *       #ED_operator_asset_browsing_active() (asset browsing only).
+ */
 bool ED_operator_file_active(bContext *C)
 {
   return ed_spacetype_test(C, SPACE_FILE);
+}
+
+/**
+ * \note Will only return true if the file space is in file browsing mode, not asset browsing! See
+ *       #ED_operator_file_active() (file or asset browsing) and
+ *       #ED_operator_asset_browsing_active() (asset browsing only).
+ */
+bool ED_operator_file_browsing_active(bContext *C)
+{
+  if (ed_spacetype_test(C, SPACE_FILE)) {
+    return ED_fileselect_is_file_browser(CTX_wm_space_file(C));
+  }
+  return false;
+}
+
+bool ED_operator_asset_browsing_active(bContext *C)
+{
+  if (ed_spacetype_test(C, SPACE_FILE)) {
+    return ED_fileselect_is_asset_browser(CTX_wm_space_file(C));
+  }
+  return false;
 }
 
 bool ED_operator_spreadsheet_active(bContext *C)
@@ -2792,9 +2819,9 @@ static int region_scale_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
         CLAMP(rmd->region->sizey, 0, rmd->maxsize);
 
-        /* note, 'UI_UNIT_Y/4' means you need to drag the footer and execute region
+        /* NOTE: `UI_UNIT_Y / 4` means you need to drag the footer and execute region
          * almost all the way down for it to become hidden, this is done
-         * otherwise its too easy to do this by accident */
+         * otherwise its too easy to do this by accident. */
         if (size_no_snap < (UI_UNIT_Y / 4) / aspect) {
           rmd->region->sizey = rmd->origval;
           if (!(rmd->region->flag & RGN_FLAG_HIDDEN)) {
@@ -5219,7 +5246,7 @@ static void SCREEN_OT_delete(wmOperatorType *ot)
 /* -------------------------------------------------------------------- */
 /** \name Region Alpha Blending Operator
  *
- * Implementation note: a disappearing region needs at least 1 last draw with
+ * Implementation NOTE: a disappearing region needs at least 1 last draw with
  * 100% back-buffer texture over it - then triple buffer will clear it entirely.
  * This because flag #RGN_FLAG_HIDDEN is set in end - region doesn't draw at all then.
  *

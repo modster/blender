@@ -51,7 +51,7 @@ enum eView2D_CommonViewTypes {
   V2D_COMMONVIEW_STANDARD,
   /* listview (i.e. Outliner) */
   V2D_COMMONVIEW_LIST,
-  /* stackview (this is basically a list where new items are added at the top) */
+  /* Stack-view (this is basically a list where new items are added at the top). */
   V2D_COMMONVIEW_STACK,
   /* headers (this is basically the same as listview, but no y-panning) */
   V2D_COMMONVIEW_HEADER,
@@ -143,17 +143,19 @@ void UI_view2d_view_orthoSpecial(struct ARegion *region, struct View2D *v2d, con
 void UI_view2d_view_restore(const struct bContext *C);
 
 /* grid drawing */
-void UI_view2d_constant_grid_draw(const struct View2D *v2d, float step);
 void UI_view2d_multi_grid_draw(
     const struct View2D *v2d, int colorid, float step, int level_size, int totlevels);
 
 void UI_view2d_draw_lines_y__values(const struct View2D *v2d);
 void UI_view2d_draw_lines_x__values(const struct View2D *v2d);
-void UI_view2d_draw_lines_x__discrete_values(const struct View2D *v2d);
-void UI_view2d_draw_lines_x__discrete_time(const struct View2D *v2d, const struct Scene *scene);
+void UI_view2d_draw_lines_x__discrete_values(const struct View2D *v2d, bool display_minor_lines);
+void UI_view2d_draw_lines_x__discrete_time(const struct View2D *v2d,
+                                           const struct Scene *scene,
+                                           bool display_minor_lines);
 void UI_view2d_draw_lines_x__discrete_frames_or_seconds(const struct View2D *v2d,
                                                         const struct Scene *scene,
-                                                        bool display_seconds);
+                                                        bool display_seconds,
+                                                        bool display_minor_lines);
 void UI_view2d_draw_lines_x__frames_or_seconds(const struct View2D *v2d,
                                                const struct Scene *scene,
                                                bool display_seconds);

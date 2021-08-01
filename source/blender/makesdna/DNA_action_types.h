@@ -135,7 +135,7 @@ typedef struct bAnimVizSettings {
 
 /* bAnimVizSettings->recalc */
 typedef enum eAnimViz_RecalcFlags {
-  /* motionpaths need recalculating */
+  /* Motion-paths need recalculating. */
   ANIMVIZ_RECALC_PATHS = (1 << 0),
 } eAnimViz_RecalcFlags;
 
@@ -419,7 +419,7 @@ typedef enum ePchan_DrawFlag {
   PCHAN_DRAW_NO_CUSTOM_BONE_SIZE = (1 << 0),
 } ePchan_DrawFlag;
 
-/* Note: It doesn't take custom_scale_xyz into account */
+/* NOTE: It doesn't take custom_scale_xyz into account. */
 #define PCHAN_CUSTOM_BONE_LENGTH(pchan) \
   (((pchan)->drawflag & PCHAN_DRAW_NO_CUSTOM_BONE_SIZE) ? 1.0f : (pchan)->bone->length)
 
@@ -602,7 +602,7 @@ typedef struct bActionGroup {
   struct bActionGroup *next, *prev;
 
   /**
-   * Note: this must not be touched by standard listbase functions
+   * NOTE: this must not be touched by standard listbase functions
    * which would clear links to other channels.
    */
   ListBase channels;
@@ -830,7 +830,7 @@ typedef struct SpaceAction {
   /** The currently active context (when not showing action). */
   bDopeSheet ads;
 
-  /** For Time-Slide transform mode drawing - current frame?. */
+  /** For Time-Slide transform mode drawing - current frame? */
   float timeslide;
 
   short flag;
@@ -838,7 +838,7 @@ typedef struct SpaceAction {
   char mode;
   /* Storage for sub-space types. */
   char mode_prev;
-  /** Automatic keyframe snapping mode  . */
+  /** Automatic keyframe snapping mode. */
   char autosnap;
   /** (eTimeline_Cache_Flag). */
   char cache_display;

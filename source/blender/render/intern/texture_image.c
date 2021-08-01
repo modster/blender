@@ -634,11 +634,11 @@ static void boxsample(ImBuf *ibuf,
    * If variable 'imaprepeat' has been set, the
    * clipped-away parts are sampled as well.
    */
-  /* note: actually minx etc isn't in the proper range...
-   *       this due to filter size and offset vectors for bump */
-  /* note: talpha must be initialized */
-  /* note: even when 'imaprepeat' is set, this can only repeat once in any direction.
-   * the point which min/max is derived from is assumed to be wrapped */
+  /* NOTE: actually minx etc isn't in the proper range...
+   *       this due to filter size and offset vectors for bump. */
+  /* NOTE: talpha must be initialized. */
+  /* NOTE: even when 'imaprepeat' is set, this can only repeat once in any direction.
+   * the point which min/max is derived from is assumed to be wrapped. */
   TexResult texr;
   rctf *rf, stack[8];
   float opp, tot, alphaclip = 1.0;
@@ -932,8 +932,8 @@ static void feline_eval(TexResult *texr, ImBuf *ibuf, float fx, float fy, afdata
 #endif
     /* `const int out =` */ ibuf_get_color_clip_bilerp(
         tc, ibuf, ibuf->x * u, ibuf->y * v, AFD->intpol, AFD->extflag);
-    /* TXF alpha: clip |= out;
-     * TXF alpha: cw += out ? 0.0f : wt; */
+    /* TXF alpha: `clip |= out;`
+     * TXF alpha: `cw += out ? 0.0f : wt;` */
     texr->tr += tc[0] * wt;
     texr->tg += tc[1] * wt;
     texr->tb += tc[2] * wt;

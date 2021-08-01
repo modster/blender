@@ -107,7 +107,7 @@ int bone_looper(Object *ob, Bone *bone, void *data, int (*bone_func)(Object *, B
 {
   /* We want to apply the function bone_func to every bone
    * in an armature -- feed bone_looper the first bone and
-   * a pointer to the bone_func and watch it go!. The int count
+   * a pointer to the bone_func and watch it go! The int count
    * can be useful for counting bones with a certain property
    * (e.g. skinnable)
    */
@@ -391,7 +391,7 @@ void armature_tag_unselect(bArmature *arm)
 
 void ED_armature_ebone_transform_mirror_update(bArmature *arm, EditBone *ebo, bool check_select)
 {
-  /* TODO When this function is called by property updates,
+  /* TODO: When this function is called by property updates,
    * canceling the value change will not restore mirrored bone correctly. */
 
   /* Currently check_select==true when this function is called from a transform operator,

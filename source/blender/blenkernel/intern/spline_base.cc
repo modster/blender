@@ -410,7 +410,7 @@ Spline::LookupResult Spline::lookup_evaluated_length(const float length) const
 
   const float *offset = std::lower_bound(lengths.begin(), lengths.end(), length);
   const int index = offset - lengths.begin();
-  const int next_index = (index == this->size() - 1) ? 0 : index + 1;
+  const int next_index = (index == this->evaluated_points_size() - 1) ? 0 : index + 1;
 
   const float previous_length = (index == 0) ? 0.0f : lengths[index - 1];
   const float factor = (length - previous_length) / (lengths[index] - previous_length);
@@ -512,6 +512,10 @@ void Spline::sample_with_index_factors(const GVArray &src,
     using T = decltype(dummy);
     const GVArray_Typed<T> src_typed = src.typed<T>();
     MutableSpan<T> dst_typed = dst.typed<T>();
+    if (src.size() == 1) {
+      dst_typed.fill(src_typed[0]);
+      return;
+    }
     blender::threading::parallel_for(dst_typed.index_range(), 1024, [&](IndexRange range) {
       for (const int i : range) {
         const LookupResult interp = this->lookup_data_from_index_factor(index_factors[i]);

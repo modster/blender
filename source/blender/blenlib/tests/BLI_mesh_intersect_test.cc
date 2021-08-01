@@ -459,7 +459,7 @@ TEST(mesh_intersect, TwoTris)
       {4, 13, 6, 2}, /* 11: non-parallel planes, not intersecting, all one side. */
       {0, 14, 6, 2}, /* 12: non-paralel planes, not intersecting, alternate sides. */
       /* Following are all coplanar cases. */
-      {15, 16, 6, 8},   /* 13: T16 inside T15. Note: dup'd tri is expected. */
+      {15, 16, 6, 8},   /* 13: T16 inside T15. NOTE: dup'd tri is expected. */
       {15, 17, 8, 8},   /* 14: T17 intersects one edge of T15 at (1,1,0)(3,3,0). */
       {15, 18, 10, 12}, /* 15: T18 intersects T15 at (1,1,0)(3,3,0)(3,15/4,1/2)(0,3,2). */
       {15, 19, 8, 10},  /* 16: T19 intersects T15 at (3,3,0)(0,3,2). */
@@ -866,11 +866,11 @@ static void fill_sphere_data(int nrings,
   };
   Array<int> eid = {0, 0, 0, 0}; /* Don't care about edge ids. */
   /*
-   * (x, y , z) is given from inclination theta and azimuth phi,
-   * where 0 <= theta <= pi;  0 <= phi <= 2pi.
-   * x = radius * sin(theta) cos(phi)
-   * y = radius * sin(theta) sin(phi)
-   * z = radius * cos(theta)
+   * (x, y, z) is given from inclination theta and azimuth phi,
+   * where: `0 <= theta <= pi;  0 <= phi <= 2pi`.
+   * `x = radius * sin(theta) cos(phi)`
+   * `y = radius * sin(theta) sin(phi)`
+   * `z = radius * cos(theta)`
    */
   for (int s = 0; s < nsegs; ++s) {
     double phi = s * delta_phi;

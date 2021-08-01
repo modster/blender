@@ -57,6 +57,8 @@
 #include "BKE_screen.h"
 #include "BKE_unit.h"
 
+#include "ED_asset.h"
+
 #include "GPU_matrix.h"
 #include "GPU_state.h"
 
@@ -131,12 +133,10 @@ static bool ui_but_is_unit_radians(const uiBut *but)
 
 /* ************* window matrix ************** */
 
-void ui_block_to_window_fl(const ARegion *region, uiBlock *block, float *r_x, float *r_y)
+void ui_block_to_region_fl(const ARegion *region, uiBlock *block, float *r_x, float *r_y)
 {
   const int getsizex = BLI_rcti_size_x(&region->winrct) + 1;
   const int getsizey = BLI_rcti_size_y(&region->winrct) + 1;
-  const int sx = region->winrct.xmin;
-  const int sy = region->winrct.ymin;
 
   float gx = *r_x;
   float gy = *r_y;
@@ -146,12 +146,17 @@ void ui_block_to_window_fl(const ARegion *region, uiBlock *block, float *r_x, fl
     gy += block->panel->ofsy;
   }
 
-  *r_x = ((float)sx) +
-         ((float)getsizex) * (0.5f + 0.5f * (gx * block->winmat[0][0] + gy * block->winmat[1][0] +
+  *r_x = ((float)getsizex) * (0.5f + 0.5f * (gx * block->winmat[0][0] + gy * block->winmat[1][0] +
                                              block->winmat[3][0]));
-  *r_y = ((float)sy) +
-         ((float)getsizey) * (0.5f + 0.5f * (gx * block->winmat[0][1] + gy * block->winmat[1][1] +
+  *r_y = ((float)getsizey) * (0.5f + 0.5f * (gx * block->winmat[0][1] + gy * block->winmat[1][1] +
                                              block->winmat[3][1]));
+}
+
+void ui_block_to_window_fl(const ARegion *region, uiBlock *block, float *r_x, float *r_y)
+{
+  ui_block_to_region_fl(region, block, r_x, r_y);
+  *r_x += region->winrct.xmin;
+  *r_y += region->winrct.ymin;
 }
 
 void ui_block_to_window(const ARegion *region, uiBlock *block, int *r_x, int *r_y)
@@ -163,6 +168,16 @@ void ui_block_to_window(const ARegion *region, uiBlock *block, int *r_x, int *r_
 
   *r_x = (int)(fx + 0.5f);
   *r_y = (int)(fy + 0.5f);
+}
+
+void ui_block_to_region_rctf(const ARegion *region,
+                             uiBlock *block,
+                             rctf *rct_dst,
+                             const rctf *rct_src)
+{
+  *rct_dst = *rct_src;
+  ui_block_to_region_fl(region, block, &rct_dst->xmin, &rct_dst->ymin);
+  ui_block_to_region_fl(region, block, &rct_dst->xmax, &rct_dst->ymax);
 }
 
 void ui_block_to_window_rctf(const ARegion *region,
@@ -242,6 +257,14 @@ void ui_window_to_region(const ARegion *region, int *r_x, int *r_y)
 }
 
 void ui_window_to_region_rcti(const ARegion *region, rcti *rect_dst, const rcti *rct_src)
+{
+  rect_dst->xmin = rct_src->xmin - region->winrct.xmin;
+  rect_dst->xmax = rct_src->xmax - region->winrct.xmin;
+  rect_dst->ymin = rct_src->ymin - region->winrct.ymin;
+  rect_dst->ymax = rct_src->ymax - region->winrct.ymin;
+}
+
+void ui_window_to_region_rctf(const ARegion *region, rctf *rect_dst, const rctf *rct_src)
 {
   rect_dst->xmin = rct_src->xmin - region->winrct.xmin;
   rect_dst->xmax = rct_src->xmax - region->winrct.xmin;
@@ -476,7 +499,7 @@ void ui_block_bounds_calc(uiBlock *block)
 
 static void ui_block_bounds_calc_centered(wmWindow *window, uiBlock *block)
 {
-  /* note: this is used for the splash where window bounds event has not been
+  /* NOTE: this is used for the splash where window bounds event has not been
    * updated by ghost, get the window bounds from ghost directly */
 
   const int xmax = WM_window_pixels_x(window);
@@ -587,7 +610,7 @@ void UI_block_bounds_set_normal(uiBlock *block, int addval)
   block->bounds_type = UI_BLOCK_BOUNDS;
 }
 
-/* used for pulldowns */
+/* Used for pull-downs. */
 void UI_block_bounds_set_text(uiBlock *block, int addval)
 {
   block->bounds = addval;
@@ -811,7 +834,8 @@ static void ui_but_update_old_active_from_new(uiBut *oldbut, uiBut *but)
 
   /* Move tooltip from new to old. */
   SWAP(uiButToolTipFunc, oldbut->tip_func, but->tip_func);
-  SWAP(void *, oldbut->tip_argN, but->tip_argN);
+  SWAP(void *, oldbut->tip_arg, but->tip_arg);
+  SWAP(uiFreeArgFunc, oldbut->tip_arg_free, but->tip_arg_free);
 
   oldbut->flag = (oldbut->flag & ~flag_copy) | (but->flag & flag_copy);
   oldbut->drawflag = (oldbut->drawflag & ~drawflag_copy) | (but->drawflag & drawflag_copy);
@@ -822,7 +846,7 @@ static void ui_but_update_old_active_from_new(uiBut *oldbut, uiBut *but)
   if (oldbut->type == UI_BTYPE_SEARCH_MENU) {
     uiButSearch *search_oldbut = (uiButSearch *)oldbut, *search_but = (uiButSearch *)but;
 
-    SWAP(uiButSearchArgFreeFn, search_oldbut->arg_free_fn, search_but->arg_free_fn);
+    SWAP(uiFreeArgFunc, search_oldbut->arg_free_fn, search_but->arg_free_fn);
     SWAP(void *, search_oldbut->arg, search_but->arg);
   }
 
@@ -861,7 +885,7 @@ static void ui_but_update_old_active_from_new(uiBut *oldbut, uiBut *but)
     SWAP(void *, but->dragpoin, oldbut->dragpoin);
   }
 
-  /* note: if layout hasn't been applied yet, it uses old button pointers... */
+  /* NOTE: if layout hasn't been applied yet, it uses old button pointers... */
 }
 
 /**
@@ -1381,11 +1405,11 @@ static bool ui_but_event_property_operator_string(const bContext *C,
       else {
         /* special exceptions for common nested data in editors... */
         if (RNA_struct_is_a(ptr->type, &RNA_DopeSheet)) {
-          /* dopesheet filtering options... */
+          /* Dope-sheet filtering options. */
           data_path = BLI_sprintfN("space_data.dopesheet.%s", RNA_property_identifier(prop));
         }
         else if (RNA_struct_is_a(ptr->type, &RNA_FileSelectParams)) {
-          /* Filebrowser options... */
+          /* File-browser options. */
           data_path = BLI_sprintfN("space_data.params.%s", RNA_property_identifier(prop));
         }
       }
@@ -1944,8 +1968,8 @@ void ui_fontscale(short *points, float aspect)
   if (aspect < 0.9f || aspect > 1.1f) {
     float pointsf = *points;
 
-    /* for some reason scaling fonts goes too fast compared to widget size */
-    /* XXX not true anymore? (ton) */
+    /* For some reason scaling fonts goes too fast compared to widget size. */
+    /* XXX(ton): not true anymore? */
     // aspect = sqrt(aspect);
     pointsf /= aspect;
 
@@ -2108,7 +2132,8 @@ int ui_but_is_pushed_ex(uiBut *but, double *value)
   if (but->pushed_state_func) {
     return but->pushed_state_func(but, but->pushed_state_arg);
   }
-  else if (but->bit) {
+
+  if (but->bit) {
     const bool state = !ELEM(
         but->type, UI_BTYPE_TOGGLE_N, UI_BTYPE_ICON_TOGGLE_N, UI_BTYPE_CHECKBOX_N);
     int lvalue;
@@ -2430,7 +2455,7 @@ bool ui_but_is_rna_valid(uiBut *but)
  */
 bool ui_but_supports_cycling(const uiBut *but)
 {
-  return ((ELEM(but->type, UI_BTYPE_ROW, UI_BTYPE_NUM, UI_BTYPE_NUM_SLIDER, UI_BTYPE_LISTBOX)) ||
+  return (ELEM(but->type, UI_BTYPE_ROW, UI_BTYPE_NUM, UI_BTYPE_NUM_SLIDER, UI_BTYPE_LISTBOX) ||
           (but->type == UI_BTYPE_MENU && ui_but_menu_step_poll(but)) ||
           (but->type == UI_BTYPE_COLOR && ((uiButColor *)but)->is_pallete_color) ||
           (but->menu_step_func != NULL));
@@ -2627,7 +2652,7 @@ static double ui_get_but_scale_unit(uiBut *but, double value)
   const int unit_type = UI_but_unit_type_get(but);
 
   /* Time unit is a bit special, not handled by BKE_scene_unit_scale() for now. */
-  if (unit_type == PROP_UNIT_TIME) { /* WARNING - using evil_C :| */
+  if (unit_type == PROP_UNIT_TIME) { /* WARNING: using evil_C :| */
     Scene *scene = CTX_data_scene(but->block->evil_C);
     return FRA2TIME(value);
   }
@@ -3138,7 +3163,7 @@ bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
     return true;
   }
   else if (str[0] == '#') {
-    /* shortcut to create new driver expression (versus immediate Py-execution) */
+    /* Shortcut to create new driver expression (versus immediate Python-execution). */
     return ui_but_anim_expression_create(but, str + 1);
   }
   else {
@@ -3221,7 +3246,7 @@ void ui_but_range_set_hard(uiBut *but)
   }
 }
 
-/* note: this could be split up into functions which handle arrays and not */
+/* NOTE: this could be split up into functions which handle arrays and not. */
 void ui_but_range_set_soft(uiBut *but)
 {
   /* Ideally we would not limit this, but practically it's more than
@@ -3357,8 +3382,8 @@ static void ui_but_free(const bContext *C, uiBut *but)
     MEM_freeN(but->func_argN);
   }
 
-  if (but->tip_argN) {
-    MEM_freeN(but->tip_argN);
+  if (but->tip_arg_free) {
+    but->tip_arg_free(but->tip_arg);
   }
 
   if (but->hold_argN) {
@@ -3434,6 +3459,15 @@ void UI_blocklist_update_window_matrix(const bContext *C, const ListBase *lb)
   LISTBASE_FOREACH (uiBlock *, block, lb) {
     if (block->active) {
       ui_update_window_matrix(window, region, block);
+    }
+  }
+}
+
+void UI_blocklist_update_view_for_buttons(const bContext *C, const ListBase *lb)
+{
+  LISTBASE_FOREACH (uiBlock *, block, lb) {
+    if (block->active) {
+      ui_but_update_view_for_active(C, block);
     }
   }
 }
@@ -3540,7 +3574,7 @@ uiBlock *UI_block_begin(const bContext *C, ARegion *region, const char *name, eU
   return block;
 }
 
-char UI_block_emboss_get(uiBlock *block)
+eUIEmbossType UI_block_emboss_get(uiBlock *block)
 {
   return block->emboss;
 }
@@ -4104,7 +4138,6 @@ static uiBut *ui_def_but(uiBlock *block,
                 UI_BTYPE_BLOCK,
                 UI_BTYPE_BUT_MENU,
                 UI_BTYPE_SEARCH_MENU,
-                UI_BTYPE_PROGRESS_BAR,
                 UI_BTYPE_DATASETROW,
                 UI_BTYPE_POPOVER)) {
     but->drawflag |= (UI_BUT_TEXT_LEFT | UI_BUT_ICON_LEFT);
@@ -4245,7 +4278,7 @@ static void ui_def_but_rna__menu(bContext *UNUSED(C), uiLayout *layout, void *bu
     uiItemS(layout);
   }
 
-  /* note, item_array[...] is reversed on access */
+  /* NOTE: `item_array[...]` is reversed on access. */
 
   /* create items */
   uiLayout *split = uiLayoutSplit(layout, 0.0f, false);
@@ -4548,7 +4581,7 @@ static uiBut *ui_def_but_rna(uiBlock *block,
     else if (proptype == PROP_STRING) {
       min = 0;
       max = RNA_property_string_maxlength(prop);
-      /* note, 'max' may be zero (code for dynamically resized array) */
+      /* NOTE: 'max' may be zero (code for dynamically resized array). */
     }
   }
 
@@ -6145,10 +6178,12 @@ void UI_but_drag_set_id(uiBut *but, ID *id)
   but->dragpoin = (void *)id;
 }
 
+/**
+ * \param asset: May be passed from a temporary variable, drag data only stores a copy of this.
+ */
 void UI_but_drag_set_asset(uiBut *but,
-                           const char *name,
+                           const AssetHandle *asset,
                            const char *path,
-                           int id_type,
                            int import_type,
                            int icon,
                            struct ImBuf *imb,
@@ -6156,9 +6191,9 @@ void UI_but_drag_set_asset(uiBut *but,
 {
   wmDragAsset *asset_drag = MEM_mallocN(sizeof(*asset_drag), "wmDragAsset");
 
-  BLI_strncpy(asset_drag->name, name, sizeof(asset_drag->name));
+  BLI_strncpy(asset_drag->name, ED_asset_handle_get_name(asset), sizeof(asset_drag->name));
   asset_drag->path = path;
-  asset_drag->id_type = id_type;
+  asset_drag->id_type = ED_asset_handle_get_id_type(asset);
   asset_drag->import_type = import_type;
 
   but->dragtype = WM_DRAG_ASSET;
@@ -6333,13 +6368,14 @@ void UI_but_func_menu_step_set(uiBut *but, uiMenuStepFunc func)
   but->menu_step_func = func;
 }
 
-void UI_but_func_tooltip_set(uiBut *but, uiButToolTipFunc func, void *argN)
+void UI_but_func_tooltip_set(uiBut *but, uiButToolTipFunc func, void *arg, uiFreeArgFunc free_arg)
 {
   but->tip_func = func;
-  if (but->tip_argN) {
-    MEM_freeN(but->tip_argN);
+  if (but->tip_arg_free) {
+    but->tip_arg_free(but->tip_arg);
   }
-  but->tip_argN = argN;
+  but->tip_arg = arg;
+  but->tip_arg_free = free_arg;
 }
 
 void UI_but_func_pushed_state_set(uiBut *but, uiButPushedStateFunc func, const void *arg)
@@ -6629,7 +6665,7 @@ void UI_but_func_search_set(uiBut *but,
                             uiButSearchUpdateFn search_update_fn,
                             void *arg,
                             const bool free_arg,
-                            uiButSearchArgFreeFn search_arg_free_fn,
+                            uiFreeArgFunc search_arg_free_fn,
                             uiButHandleFunc search_exec_fn,
                             void *active)
 {
@@ -6754,7 +6790,7 @@ static void operator_enum_search_update_fn(const struct bContext *C,
 
     for (int i = 0; i < filtered_amount; i++) {
       const EnumPropertyItem *item = filtered_items[i];
-      /* note: need to give the index rather than the
+      /* NOTE: need to give the index rather than the
        * identifier because the enum can be freed */
       if (!UI_search_item_add(
               items, item->name, POINTER_FROM_INT(item->value), item->icon, 0, 0)) {
@@ -6964,7 +7000,7 @@ void UI_but_string_info_get(bContext *C, uiBut *but, ...)
     }
     else if (type == BUT_GET_TIP) {
       if (but->tip_func) {
-        tmp = but->tip_func(C, but->tip_argN, but->tip);
+        tmp = but->tip_func(C, but->tip_arg, but->tip);
       }
       else if (but->tip && but->tip[0]) {
         tmp = BLI_strdup(but->tip);

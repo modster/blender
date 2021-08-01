@@ -123,7 +123,7 @@ void BKE_object_eval_parent(Depsgraph *depsgraph, Object *ob)
 void BKE_object_eval_constraints(Depsgraph *depsgraph, Scene *scene, Object *ob)
 {
   bConstraintOb *cob;
-  float ctime = BKE_scene_frame_get(scene);
+  float ctime = BKE_scene_ctime_get(scene);
 
   DEG_debug_print_eval(depsgraph, __func__, ob->id.name, ob);
 
@@ -224,7 +224,7 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
     case OB_SURF:
     case OB_FONT: {
       bool for_render = (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER);
-      BKE_displist_make_curveTypes(depsgraph, scene, ob, for_render, false);
+      BKE_displist_make_curveTypes(depsgraph, scene, ob, for_render);
       break;
     }
 

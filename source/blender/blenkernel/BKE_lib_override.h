@@ -42,8 +42,8 @@
 extern "C" {
 #endif
 
-struct Collection;
 struct BlendFileReadReport;
+struct Collection;
 struct ID;
 struct IDOverrideLibrary;
 struct IDOverrideLibraryProperty;
@@ -98,6 +98,8 @@ void BKE_lib_override_library_main_resync(struct Main *bmain,
                                           struct BlendFileReadReport *reports);
 
 void BKE_lib_override_library_delete(struct Main *bmain, struct ID *id_root);
+
+void BKE_lib_override_library_make_local(struct ID *id);
 
 struct IDOverrideLibraryProperty *BKE_lib_override_library_property_find(
     struct IDOverrideLibrary *override, const char *rna_path);

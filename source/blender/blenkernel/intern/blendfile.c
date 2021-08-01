@@ -128,7 +128,7 @@ static void setup_app_userdef(BlendFileData *bfd)
 }
 
 /**
- * Context matching, handle no-ui case
+ * Context matching, handle no-UI case.
  *
  * \note this is called on Undo so any slow conversion functions here
  * should be avoided or check (mode != LOAD_UNDO).
@@ -622,6 +622,7 @@ UserDef *BKE_blendfile_userdef_from_defaults(void)
         "io_scene_obj",
         "io_scene_x3d",
         "cycles",
+        "pose_library",
     };
     for (int i = 0; i < ARRAY_SIZE(addons); i++) {
       bAddon *addon = BKE_addon_new();
@@ -735,10 +736,12 @@ bool BKE_blendfile_userdef_write_all(ReportList *reports)
 
     if (ok_write) {
       printf("ok\n");
+      BKE_report(reports, RPT_INFO, "Preferences saved");
     }
     else {
       printf("fail\n");
       ok = false;
+      BKE_report(reports, RPT_ERROR, "Saving preferences failed");
     }
   }
   else {

@@ -619,7 +619,7 @@ class USERPREF_PT_system_os_settings(SystemPanel, CenterAlignMixIn, Panel):
         split = layout.split(factor=0.4)
         split.alignment = 'RIGHT'
         split.label(text="")
-        split.operator("file.associate_blend", text="Make Default")
+        split.operator("preferences.associate_blend", text="Make Default")
 
 
 class USERPREF_PT_system_memory(SystemPanel, CenterAlignMixIn, Panel):
@@ -1390,7 +1390,6 @@ class USERPREF_PT_file_paths_asset_libraries(FilePathsPanel, Panel):
         row = path_col.row(align=True)  # Padding
         row.separator()
         row.label(text="Path")
-
 
         for i, library in enumerate(paths.asset_libraries):
             name_col.prop(library, "name", text="")

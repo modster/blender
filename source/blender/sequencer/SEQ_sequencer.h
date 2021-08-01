@@ -32,8 +32,8 @@ extern "C" {
 struct Editing;
 struct Scene;
 struct Sequence;
-struct SequencerToolSettings;
 struct SequenceLookup;
+struct SequencerToolSettings;
 
 /* RNA enums, just to be more readable */
 enum {
@@ -55,6 +55,9 @@ struct SequencerToolSettings *SEQ_tool_settings_ensure(struct Scene *scene);
 void SEQ_tool_settings_free(struct SequencerToolSettings *tool_settings);
 eSeqImageFitMethod SEQ_tool_settings_fit_method_get(struct Scene *scene);
 void SEQ_tool_settings_fit_method_set(struct Scene *scene, eSeqImageFitMethod fit_method);
+short SEQ_tool_settings_snap_flag_get(struct Scene *scene);
+short SEQ_tool_settings_snap_mode_get(struct Scene *scene);
+int SEQ_tool_settings_snap_distance_get(struct Scene *scene);
 struct SequencerToolSettings *SEQ_tool_settings_copy(struct SequencerToolSettings *tool_settings);
 struct Editing *SEQ_editing_get(struct Scene *scene, bool alloc);
 struct Editing *SEQ_editing_ensure(struct Scene *scene);

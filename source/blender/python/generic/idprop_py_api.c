@@ -1051,7 +1051,7 @@ static PyObject *BPy_IDGroup_IterItems_CreatePyObject(BPy_IDProperty *group, con
 /** \name ID-Property Group View Types (Keys/Values/Items)
  *
  * This view types is a thin wrapper on keys/values/items, this matches Python's `dict_view` type.
- * The is returned by `property.keys()` and is separate from the iterator that loops over keys.
+ * This is returned by `property.keys()` and is separate from the iterator that loops over keys.
  *
  * There are some less common features this type could support (matching Python's `dict_view`)
  *
@@ -1547,7 +1547,7 @@ static PySequenceMethods BPy_IDGroup_Seq = {
     NULL,                         /* binaryfunc sq_concat */
     NULL,                         /* ssizeargfunc sq_repeat */
     NULL,
-    /* ssizeargfunc sq_item */ /* TODO - setting this will allow PySequence_Check to return True */
+    /* ssizeargfunc sq_item */ /* TODO: setting this will allow PySequence_Check to return True. */
     NULL,                      /* intintargfunc ***was_sq_slice*** */
     NULL,                      /* intobjargproc sq_ass_item */
     NULL,                      /* ssizeobjargproc ***was_sq_ass_slice*** */
@@ -1836,7 +1836,7 @@ static int BPy_IDArray_ass_slice(BPy_IDArray *self, int begin, int end, PyObject
   /* NOTE: we count on int/float being the same size here */
   vec = MEM_mallocN(alloc_len, "array assignment");
 
-  if (PyC_AsArray(vec, seq, size, py_type, is_double, "slice assignment: ") == -1) {
+  if (PyC_AsArray(vec, elem_size, seq, size, py_type, "slice assignment: ") == -1) {
     MEM_freeN(vec);
     return -1;
   }
