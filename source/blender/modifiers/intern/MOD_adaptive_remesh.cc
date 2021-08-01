@@ -22,6 +22,7 @@
  */
 
 #include "BLI_assert.h"
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_cloth_remesh.hh"
@@ -84,6 +85,10 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
 
   auto op_edge_index = internal_mesh.get_edges().get_no_gen_index(edge_i);
   if (op_edge_index) {
+    char filename_pre_suffix_c[16];
+    BLI_snprintf(filename_pre_suffix_c, 16, "%03d", edge_i);
+    std::string filename_pre_suffix(filename_pre_suffix_c);
+
     auto edge_index = op_edge_index.value();
     std::cout << "edge_index: " << edge_index << " edge_i: " << armd->edge_index
               << " across_seams: " << across_seams << " mode: " << mode << std::endl;
@@ -93,12 +98,12 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     std::cout << "flippable: " << flippable << std::endl;
     if (mode == ADAPTIVE_REMESH_SPLIT_EDGE) {
       auto pre_split_msgpack = internal_mesh.serialize();
-      auto pre_split_filename = split_edge_name_gen.get_curr(std::to_string(edge_i) + "_pre");
+      auto pre_split_filename = split_edge_name_gen.get_curr(filename_pre_suffix + "_pre");
 
       internal_mesh.split_edge_triangulate(edge_index, across_seams);
 
       auto post_split_msgpack = internal_mesh.serialize();
-      auto post_split_filename = split_edge_name_gen.get_curr(std::to_string(edge_i) + "_post");
+      auto post_split_filename = split_edge_name_gen.get_curr(filename_pre_suffix + "_post");
       /* split_edge_name_gen.gen_next(); */
 
       internal::dump_file(pre_split_filename, pre_split_msgpack);
@@ -106,14 +111,12 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     }
     else if (mode == ADAPTIVE_REMESH_COLLAPSE_EDGE) {
       auto pre_collapse_msgpack = internal_mesh.serialize();
-      auto pre_collapse_filename = collapse_edge_name_gen.get_curr(std::to_string(edge_i) +
-                                                                   "_pre");
+      auto pre_collapse_filename = collapse_edge_name_gen.get_curr(filename_pre_suffix + "_pre");
 
       internal_mesh.collapse_edge_triangulate(edge_index, verts_swapped, across_seams);
 
       auto post_collapse_msgpack = internal_mesh.serialize();
-      auto post_collapse_filename = collapse_edge_name_gen.get_curr(std::to_string(edge_i) +
-                                                                    "_post");
+      auto post_collapse_filename = collapse_edge_name_gen.get_curr(filename_pre_suffix + "_post");
       /* collapse_edge_name_gen.gen_next(); */
 
       internal::dump_file(pre_collapse_filename, pre_collapse_msgpack);
@@ -122,12 +125,12 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     else if (mode == ADAPTIVE_REMESH_FLIP_EDGE) {
       if (flippable) {
         auto pre_flip_msgpack = internal_mesh.serialize();
-        auto pre_flip_filename = flip_edge_name_gen.get_curr(std::to_string(edge_i) + "_pre");
+        auto pre_flip_filename = flip_edge_name_gen.get_curr(filename_pre_suffix + "_pre");
 
         internal_mesh.flip_edge_triangulate(edge_index, across_seams);
 
         auto post_flip_msgpack = internal_mesh.serialize();
-        auto post_flip_filename = flip_edge_name_gen.get_curr(std::to_string(edge_i) + "_post");
+        auto post_flip_filename = flip_edge_name_gen.get_curr(filename_pre_suffix + "_post");
         /* flip_edge_name_gen.gen_next(); */
 
         internal::dump_file(pre_flip_filename, pre_flip_msgpack);
