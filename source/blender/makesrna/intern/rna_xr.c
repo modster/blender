@@ -1094,7 +1094,7 @@ static bool rna_XrSessionState_action_set_create(bContext *C,
 
   return true;
 #  else
-  UNUSED_VARS(C, actionmap);
+  UNUSED_VARS(C, actionmap, set_active);
   return false;
 #  endif
 }
