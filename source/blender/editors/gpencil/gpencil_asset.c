@@ -30,6 +30,7 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_material_types.h"
 
+#include "BKE_asset.h"
 #include "BKE_context.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
@@ -340,19 +341,23 @@ static bool gpencil_asset_create(const bContext *C,
   BKE_gpencil_frame_min_max(gpd, &f_min, &f_max);
 
   /* Mark as asset. */
-  ED_asset_mark_id(C, &gpd->id);
+  if (ED_asset_mark_id(C, &gpd->id)) {
 
-  /* Retime frame number to start by 1. Must be done after generate the render preview.
-   * Use same loop to deselect all. */
-  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-      gpf->framenum -= f_min - 1;
-      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        gps->flag &= ~GP_STROKE_SELECT;
-        bGPDspoint *pt;
-        int i;
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-          pt->flag &= ~GP_SPOINT_SELECT;
+    /* Add tag to asset. */
+    BKE_asset_metadata_tag_ensure(gpd->id.asset_data, "Grease Pencil Stroke");
+
+    /* Retime frame number to start by 1. Must be done after generate the render preview.
+     * Use same loop to deselect all. */
+    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+      LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+        gpf->framenum -= f_min - 1;
+        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+          gps->flag &= ~GP_STROKE_SELECT;
+          bGPDspoint *pt;
+          int i;
+          for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+            pt->flag &= ~GP_SPOINT_SELECT;
+          }
         }
       }
     }
