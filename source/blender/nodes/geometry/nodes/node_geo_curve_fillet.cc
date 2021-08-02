@@ -153,80 +153,85 @@ static FilletData calculate_fillet_data_per_vertex(const float3 prev_pos,
   cross_v3_v3v3(fd.axis, vec_pos2prev, vec_pos2next);
   fd.angle = M_PI - angle_v3v3v3(prev_pos, pos, next_pos);
   fd.count = count.has_value() ? count.value() : fd.angle / arc_angle.value();
-  if (limit_radius) {
-    float max_radius = min_ff(len_v3v3(pos, prev_pos), len_v3v3(pos, next_pos)) /
-                       tanf(fd.angle / 2);
-    fd.radius = min_ff(radius, max_radius);
-  }
-  else {
-    fd.radius = radius;
-  }
+  fd.radius = radius;
 
   return fd;
 }
 
-static void limit_radii(Array<FilletData> &fds, const int size, const bool cyclic)
+/* Limit the radius based on angle and radii to prevent overlap. */
+static void limit_radii(Array<FilletData> &fds,
+                        const Span<float3> &positions,
+                        const int size,
+                        const bool cyclic)
 {
-  int fillet_count, start = 0, radii_calc_count = 0;
+  int fillet_count, start = 0;
   Array<float> max_radii(size, {-1});
 
   /* Handle the corner cases if cyclic. */
   if (cyclic) {
     fillet_count = size;
-    radii_calc_count = fillet_count - 2;
 
-    float len_prev, tan_len, tan_len_prev, max_radius_prev;
+    float len_prev, len_next, tan_len, tan_len_prev, tan_len_next;
 
+    /* Calculate lengths between adjacent control points. */
     len_prev = len_v3v3(fds[0].pos, fds[size - 1].pos);
+    len_next = len_v3v3(fds[0].pos, fds[1].pos);
+
+    /* Calculate tangent lengths of fillets in control points. */
     tan_len = fds[0].radius * tanf(fds[0].angle / 2);
     tan_len_prev = fds[size - 1].radius * tanf(fds[size - 1].angle / 2);
+    tan_len_next = fds[1].radius * tanf(fds[1].angle / 2);
 
     max_radii[0] = fds[0].radius;
+    max_radii[1] = fds[1].radius;
     max_radii[size - 1] = fds[size - 1].radius;
 
+    float factor_prev = 1, factor_next = 1;
     if (tan_len + tan_len_prev > len_prev) {
-      float factor = len_prev / (tan_len + tan_len_prev);
-      max_radii[0] *= factor;
-      max_radii[size - 1] *= factor;
+      factor_prev = len_prev / (tan_len + tan_len_prev);
     }
+    if (tan_len + tan_len_next > len_next) {
+      factor_next = len_next / (tan_len + tan_len_next);
+    }
+
+    /* Scale max radii by calculated factors. */
+    max_radii[0] *= min_ff(factor_next, factor_prev);
+    max_radii[1] *= factor_next;
+    max_radii[size - 1] *= factor_prev;
   }
   else {
     fillet_count = size - 2;
-    radii_calc_count = fillet_count - 1;
     start = 1;
   }
 
-  /* Max radii calculations of the remaining indices. */
-  for (const int i : IndexRange(start, fillet_count - 1)) {
-    int fillet_i = i - start;
-    float len = len_v3v3(fds[fillet_i].pos, fds[fillet_i + 1].pos);
-    float tan_len_1 = fds[fillet_i].radius * tanf(fds[fillet_i].angle / 2);
-    float tan_len_2 = fds[fillet_i + 1].radius * tanf(fds[fillet_i + 1].angle / 2);
-
-    if (max_radii[i] < 0) {
-      max_radii[i] = fds[fillet_i].radius;
-    }
-    else {
-      max_radii[i] = min_ff(max_radii[i], fds[fillet_i].radius);
-    }
-
-    if (max_radii[i + 1] < 0) {
-      max_radii[i + 1] = fds[fillet_i + 1].radius;
-    }
-    else {
-      max_radii[i + 1] = min_ff(max_radii[i + 1], fds[fillet_i + 1].radius);
-    }
-    if (tan_len_1 + tan_len_2 > len) {
-      float factor = len / (tan_len_1 + tan_len_2);
-      max_radii[i] *= factor;
-      max_radii[i + 1] *= factor;
+  /* Initialize max_radii to largest possible radii. */
+  for (const int i : IndexRange(start, fillet_count)) {
+    if (i > 0 && i < size - 1) {
+      max_radii[i] = min_ff(len_v3v3(positions[i], positions[i - 1]),
+                            len_v3v3(positions[i], positions[i + 1])) /
+                     tanf(fds[i - start].angle / 2);
     }
   }
 
-  /* Divide each max_radius by tan of angle/2 because the current lengths are the lengths of
-   * tangents. */
+  /* Max radii calculations for each index. */
+  for (const int i : IndexRange(start, fillet_count - 1)) {
+    int fillet_i = i - start;
+    float len_next = len_v3v3(fds[fillet_i].pos, fds[fillet_i + 1].pos);
+    float tan_len = fds[fillet_i].radius * tanf(fds[fillet_i].angle / 2);
+    float tan_len_next = fds[fillet_i + 1].radius * tanf(fds[fillet_i + 1].angle / 2);
+
+    /* Scale down radii if too large for segment. */
+    float factor = 1;
+    if (tan_len + tan_len_next > len_next) {
+      factor = len_next / (tan_len + tan_len_next);
+    }
+    max_radii[i] = min_ff(max_radii[i], fds[fillet_i].radius * factor);
+    max_radii[i + 1] = min_ff(max_radii[i + 1], fds[fillet_i + 1].radius * factor);
+  }
+
+  /* Assign the max_radii to the fillet data's radii. */
   for (const int i : IndexRange(fillet_count)) {
-    fds[i].radius = min_ff(fds[i].radius, max_radii[start + i]);
+    fds[i].radius = max_radii[start + i];
   }
 }
 
@@ -552,7 +557,7 @@ static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode
   Array<FilletData> fds = calculate_fillet_data(
       src_spline_ptr, mode_param, added_count, point_counts);
   if (mode_param.limit_radius) {
-    limit_radii(fds, spline.size(), cyclic);
+    limit_radii(fds, spline.positions(), spline.size(), cyclic);
   }
 
   int total_points = added_count + size;
