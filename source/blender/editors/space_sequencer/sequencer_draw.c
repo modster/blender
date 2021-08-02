@@ -1208,8 +1208,13 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
     val = BLI_ghash_lookup(tj->seqs, seq_orig);
 
     if (check_seq_need_thumbnails(seq_orig, tj->view_area)) {
-      seq_thumbnail_get_frame_step(
-          seq_orig, &frame_step, &temp_dummy, &temp_dummy, &temp_dummy, tj->pixelx, tj->pixely);
+      seq_thumbnail_get_frame_step(val->seq_dupli,
+                                   &frame_step,
+                                   &temp_dummy,
+                                   &temp_dummy,
+                                   &temp_dummy,
+                                   tj->pixelx,
+                                   tj->pixely);
       seq_thumbnail_get_start_frame(seq_orig, frame_step, &start_frame, tj->view_area);
       SEQ_render_thumbnails(
           &tj->context, val->seq_dupli, seq_orig, start_frame, frame_step, tj->view_area);
@@ -1265,6 +1270,9 @@ static void sequencer_thumbnail_get_job(const bContext *C,
     G.is_break = false;
     WM_jobs_start(CTX_wm_manager(C), wm_job);
   }
+  else {
+    WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, NULL);
+  }
 
   ED_area_tag_redraw(area);
 }
@@ -1283,6 +1291,11 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   // leftover is set to true if missing image in strip. false when normal call to all strips done
   if (v2d->cur.xmax != sseq->check_view_area.xmax || v2d->cur.ymax != sseq->check_view_area.ymax ||
       leftover) {
+
+    if (v2d->cur.xmax != sseq->check_view_area.xmax ||
+        v2d->cur.ymax != sseq->check_view_area.ymax) {
+      WM_jobs_stop(CTX_wm_manager(C), NULL, thumbnail_startjob);
+    }
 
     LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
       if ((val_need_update = BLI_ghash_lookup(thumb_data_hash, seq)) == NULL &&
