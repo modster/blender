@@ -35,6 +35,8 @@
 
 #ifdef RNA_RUNTIME
 
+#  include "BLI_listbase.h"
+
 #  include "WM_api.h"
 
 /* -------------------------------------------------------------------- */
@@ -918,214 +920,181 @@ static void rna_XrSessionState_reset_navigation(bContext *C)
 #  endif
 }
 
-static bool rna_XrSessionState_action_set_create(bContext *C, const char *action_set_name)
+static bool rna_XrSessionState_action_set_create(bContext *C,
+                                                 XrActionMap *actionmap,
+                                                 bool set_active)
 {
 #  ifdef WITH_XR_OPENXR
-  wmWindowManager *wm = CTX_wm_manager(C);
-  return WM_xr_action_set_create(&wm->xr, action_set_name);
-#  else
-  UNUSED_VARS(C, action_set_name);
-  return false;
-#  endif
-}
-
-static bool rna_XrSessionState_action_create(bContext *C,
-                                             const char *action_set_name,
-                                             const char *action_name,
-                                             int type,
-                                             const char *user_path0,
-                                             const char *user_path1,
-                                             const char *op,
-                                             int op_flag,
-                                             bool bimanual,
-                                             const char *haptic_name,
-                                             bool haptic_match_user_paths,
-                                             float haptic_duration,
-                                             float haptic_frequency,
-                                             float haptic_amplitude,
-                                             int haptic_flag)
-{
-#  ifdef WITH_XR_OPENXR
-  wmWindowManager *wm = CTX_wm_manager(C);
-  unsigned int count_subaction_paths = 0;
-  const char *subaction_paths[2];
-
-  if (user_path0[0]) {
-    subaction_paths[0] = user_path0;
-    ++count_subaction_paths;
-
-    if (user_path1[0]) {
-      subaction_paths[1] = user_path1;
-      ++count_subaction_paths;
-    }
+  if (BLI_listbase_count(&actionmap->items) < 1) {
+    return false;
   }
-  else {
-    if (user_path1[0]) {
-      subaction_paths[0] = user_path1;
+
+  /* Create action set. */
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmXrData *xr = &wm->xr;
+  const char *action_set_name = actionmap->idname;
+
+  if (!WM_xr_action_set_create(xr, action_set_name)) {
+    return false;
+  }
+
+  /* Create actions. */
+  const char *controller_grip_name = NULL;
+  const char *controller_aim_name = NULL;
+
+  LISTBASE_FOREACH (XrActionMapItem *, ami, &actionmap->items) {
+    if (BLI_listbase_count(&ami->bindings) < 1) {
+      continue;
+    }
+
+    unsigned int count_subaction_paths = 0;
+    const char *subaction_paths[2];
+
+    if (ami->user_path0[0]) {
+      subaction_paths[0] = ami->user_path0;
       ++count_subaction_paths;
+
+      if (ami->user_path1[0]) {
+        subaction_paths[1] = ami->user_path1;
+        ++count_subaction_paths;
+      }
     }
     else {
-      return false;
-    }
-  }
-
-  const bool is_button_action = (type == XR_BOOLEAN_INPUT || type == XR_FLOAT_INPUT ||
-                                 type == XR_VECTOR2F_INPUT);
-  wmOperatorType *ot = NULL;
-  IDProperty *op_properties = NULL;
-  int64_t haptic_duration_msec;
-  eXrActionFlag flag = 0;
-
-  if (is_button_action) {
-    if (op[0]) {
-      char idname[OP_MAX_TYPENAME];
-      WM_operator_bl_idname(idname, op);
-      ot = WM_operatortype_find(idname, true);
-      if (ot) {
-        /* Get properties from active XR actionmap. */
-        XrActionConfig *ac = WM_xr_actionconfig_active_get(&wm->xr.session_settings);
-        if (ac) {
-          XrActionMap *am = WM_xr_actionmap_list_find(&ac->actionmaps, action_set_name);
-          if (am) {
-            XrActionMapItem *ami = WM_xr_actionmap_item_list_find(&am->items, action_name);
-            if (ami && STREQ(ami->op, op)) {
-              op_properties = ami->op_properties;
-            }
-          }
-        }
+      if (ami->user_path1[0]) {
+        subaction_paths[0] = ami->user_path1;
+        ++count_subaction_paths;
+      }
+      else {
+        return false;
       }
     }
 
-    haptic_duration_msec = (int64_t)(haptic_duration * 1000.0f);
+    const char *action_name = ami->idname;
+    const bool is_float_action = (ami->type == XR_FLOAT_INPUT || ami->type == XR_VECTOR2F_INPUT);
+    const bool is_button_action = (is_float_action || ami->type == XR_BOOLEAN_INPUT);
+    const bool is_pose_action = (ami->type == XR_POSE_INPUT);
+    wmOperatorType *ot = NULL;
+    IDProperty *op_properties = NULL;
+    const char *haptic_name = NULL;
+    int64_t haptic_duration_msec;
 
-    flag |= (op_flag | haptic_flag);
-    if (bimanual) {
-      flag |= XR_ACTION_BIMANUAL;
-    }
-    if (haptic_match_user_paths) {
-      flag |= XR_ACTION_HAPTIC_MATCHUSERPATHS;
-    }
-  }
+    if (is_button_action) {
+      if (ami->op[0]) {
+        char idname[OP_MAX_TYPENAME];
+        WM_operator_bl_idname(idname, ami->op);
+        ot = WM_operatortype_find(idname, true);
+        if (ot) {
+          op_properties = ami->op_properties;
+        }
+      }
 
-  return WM_xr_action_create(&wm->xr,
+      haptic_name = &ami->haptic_idname[0];
+      haptic_duration_msec = (int64_t)(ami->haptic_duration * 1000.0f);
+    }
+
+    if (!WM_xr_action_create(xr,
                              action_set_name,
                              action_name,
-                             type,
+                             ami->type,
                              count_subaction_paths,
                              subaction_paths,
                              ot,
                              op_properties,
                              is_button_action ? &haptic_name : NULL,
                              is_button_action ? &haptic_duration_msec : NULL,
-                             is_button_action ? &haptic_frequency : NULL,
-                             is_button_action ? &haptic_amplitude : NULL,
-                             flag);
-#  else
-  UNUSED_VARS(C,
-              action_set_name,
-              action_name,
-              type,
-              user_path0,
-              user_path1,
-              op,
-              op_flag,
-              bimanual,
-              haptic_name,
-              haptic_match_user_paths,
-              haptic_duration,
-              haptic_frequency,
-              haptic_amplitude);
-  return false;
-#  endif
-}
+                             is_button_action ? &ami->haptic_frequency : NULL,
+                             is_button_action ? &ami->haptic_amplitude : NULL,
+                             ami->action_flag)) {
+      return false;
+    }
 
-bool rna_XrSessionState_action_binding_create(bContext *C,
-                                              const char *action_set_name,
-                                              const char *action_name,
-                                              int type,
-                                              const char *profile,
-                                              const char *user_path0,
-                                              const char *user_path1,
-                                              const char *component_path0,
-                                              const char *component_path1,
-                                              float threshold,
-                                              int axis0_flag,
-                                              int axis1_flag,
-                                              float location[3],
-                                              float rotation[3])
-{
-#  ifdef WITH_XR_OPENXR
-  wmWindowManager *wm = CTX_wm_manager(C);
-  unsigned int count_subaction_paths = 0;
-  const char *subaction_paths[2];
-  const char *component_paths[2];
+    if ((ami->pose_flag & XR_POSE_GRIP) != 0) {
+      BLI_assert(is_pose_action);
+      controller_grip_name = action_name;
+    }
+    if ((ami->pose_flag & XR_POSE_AIM) != 0) {
+      BLI_assert(is_pose_action);
+      controller_aim_name = action_name;
+    }
 
-  if (user_path0[0]) {
-    subaction_paths[0] = user_path0;
-    component_paths[0] = component_path0;
-    ++count_subaction_paths;
+    /* Create action bindings. */
+    LISTBASE_FOREACH (XrActionMapBinding *, amb, &ami->bindings) {
+      unsigned int count_component_paths = 0;
+      const char *component_paths[2];
 
-    if (user_path1[0]) {
-      subaction_paths[1] = user_path1;
-      component_paths[1] = component_path1;
-      ++count_subaction_paths;
+      if (amb->component_path0[0]) {
+        component_paths[0] = amb->component_path0;
+        ++count_component_paths;
+
+        if (amb->component_path1[0]) {
+          component_paths[1] = amb->component_path1;
+          ++count_component_paths;
+        }
+      }
+      else {
+        if (amb->component_path1[0]) {
+          component_paths[0] = amb->component_path1;
+          ++count_component_paths;
+        }
+        else {
+          return false;
+        }
+      }
+
+      if (count_component_paths != count_subaction_paths) {
+        return false;
+      }
+
+      float float_thresholds[2];
+      eXrAxisFlag axis_flags[2];
+      wmXrPose poses[2];
+
+      if (is_float_action) {
+        float_thresholds[0] = float_thresholds[1] = amb->float_threshold;
+      }
+      if (is_button_action) {
+        axis_flags[0] = axis_flags[1] = amb->axis_flag;
+      }
+      if (is_pose_action) {
+        copy_v3_v3(poses[0].position, amb->pose_location);
+        eul_to_quat(poses[0].orientation_quat, amb->pose_rotation);
+        normalize_qt(poses[0].orientation_quat);
+        memcpy(&poses[1], &poses[0], sizeof(poses[1]));
+      }
+
+      if (!WM_xr_action_binding_create(xr,
+                                       action_set_name,
+                                       action_name,
+                                       amb->profile,
+                                       count_subaction_paths,
+                                       subaction_paths,
+                                       component_paths,
+                                       is_float_action ? float_thresholds : NULL,
+                                       is_button_action ? axis_flags : NULL,
+                                       is_pose_action ? poses : NULL)) {
+        return false;
+      }
     }
   }
-  else {
-    if (user_path1[0]) {
-      subaction_paths[0] = user_path1;
-      component_paths[0] = component_path1;
-      ++count_subaction_paths;
-    }
-    else {
+
+  /* Set controller pose actions. */
+  if (controller_grip_name && controller_aim_name) {
+    if (!WM_xr_controller_pose_actions_set(
+            xr, action_set_name, controller_grip_name, controller_aim_name)) {
       return false;
     }
   }
 
-  const bool is_float_action = (type == XR_FLOAT_INPUT || type == XR_VECTOR2F_INPUT);
-  const bool is_button_action = (is_float_action || type == XR_BOOLEAN_INPUT);
-  const bool is_pose_action = (type == XR_POSE_INPUT);
-  float float_thresholds[2];
-  eXrAxisFlag axis_flags[2];
-  wmXrPose poses[2];
+  /* Set active action set. */
+  if (set_active) {
+    if (!WM_xr_active_action_set_set(xr, action_set_name)) {
+      return false;
+    }
+  }
 
-  if (is_float_action) {
-    float_thresholds[0] = float_thresholds[1] = threshold;
-  }
-  if (is_button_action) {
-    axis_flags[0] = axis_flags[1] = (axis0_flag | axis1_flag);
-  }
-  if (is_pose_action) {
-    copy_v3_v3(poses[0].position, location);
-    eul_to_quat(poses[0].orientation_quat, rotation);
-    normalize_qt(poses[0].orientation_quat);
-    memcpy(&poses[1], &poses[0], sizeof(poses[1]));
-  }
-  return WM_xr_action_binding_create(&wm->xr,
-                                     action_set_name,
-                                     action_name,
-                                     profile,
-                                     count_subaction_paths,
-                                     subaction_paths,
-                                     component_paths,
-                                     is_float_action ? float_thresholds : NULL,
-                                     is_button_action ? axis_flags : NULL,
-                                     is_pose_action ? poses : NULL);
+  return true;
 #  else
-  UNUSED_VARS(C,
-              action_set_name,
-              action_name,
-              type,
-              profile,
-              user_path0,
-              user_path1,
-              component_path0,
-              component_path1,
-              threshold,
-              axis0_flag,
-              axis1_flag,
-              location,
-              rotation);
+  UNUSED_VARS(C, actionmap);
   return false;
 #  endif
 }
@@ -2226,173 +2195,14 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func,
-                        "action_set_name",
-                        NULL,
-                        64,
-                        "Action Set",
-                        "Action set name (must not contain upper case letters or special "
-                        "characters other than '-', '_', or '.'");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_boolean(func, "result", 0, "Result", "");
-  RNA_def_function_return(func, parm);
-
-  func = RNA_def_function(srna, "create_action", "rna_XrSessionState_action_create");
-  RNA_def_function_ui_description(func, "Create a VR action");
-  RNA_def_function_flag(func, FUNC_NO_SELF);
-  parm = RNA_def_pointer(func, "context", "Context", "", "");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func,
-                        "action_name",
-                        NULL,
-                        64,
-                        "Action",
-                        "Action name (must not contain upper case letters or special characters "
-                        "other than '-', '_', or '.'");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_enum(func, "type", rna_enum_xr_action_types, 0, "Type", "Action type");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_string(func, "user_path0", NULL, 64, "User Path 0", "User path 0");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "User path 1");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "op", NULL, OP_MAX_TYPENAME, "Operator", "Operator to execute");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_enum(func,
-                      "op_flag",
-                      rna_enum_xr_op_flags,
-                      0,
-                      "Operator Flag",
-                      "When to execute the operator (press, release, or modal)");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_boolean(
-      func, "bimanual", false, "Bimanual", "Action depends on states/poses of both user paths");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_boolean(func, "result", 0, "Result", "");
-  RNA_def_function_return(func, parm);
-  parm = RNA_def_string(func,
-                        "haptic_name",
-                        NULL,
-                        64,
-                        "Haptic Name",
-                        "Name of the haptic action to apply when executing this action");
+  parm = RNA_def_pointer(func, "actionmap", "XrActionMap", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func,
-                         "haptic_match_user_paths",
+                         "set_active",
                          false,
-                         "Haptic Match User Paths",
-                         "Whether to apply haptics to matching user paths");
+                         "Set Active",
+                         "Set newly created action set as active one for the session");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_float(func,
-                       "haptic_duration",
-                       0.3f,
-                       0.0f,
-                       FLT_MAX,
-                       "Haptic Duration",
-                       "Haptic duration in seconds, 0 = minimum supported duration",
-                       0.0f,
-                       FLT_MAX);
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_float(func,
-                       "haptic_frequency",
-                       3000.0f,
-                       0.0f,
-                       FLT_MAX,
-                       "Haptic Frequency",
-                       "Haptic frequency, 0 = default frequency",
-                       0.0f,
-                       FLT_MAX);
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_float(func,
-                       "haptic_amplitude",
-                       0.5f,
-                       0.0f,
-                       1.0f,
-                       "Haptic Amplitude",
-                       "Haptic amplitude (0 ~ 1)",
-                       0.0f,
-                       1.0f);
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_enum(func,
-                      "haptic_flag",
-                      rna_enum_xr_haptic_flags,
-                      0,
-                      "Haptic Flag",
-                      "How to apply haptics on button interaction");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-
-  func = RNA_def_function(
-      srna, "create_action_binding", "rna_XrSessionState_action_binding_create");
-  RNA_def_function_ui_description(func, "Create a VR action binding");
-  RNA_def_function_flag(func, FUNC_NO_SELF);
-  parm = RNA_def_pointer(func, "context", "Context", "", "");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_enum(func, "type", rna_enum_xr_action_types, 0, "Type", "Action type");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_string(func, "profile", NULL, 256, "Profile", "OpenXR interaction profile path");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "user_path0", NULL, 64, "User Path 0", "OpenXR user path 0");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "OpenXR user path 1");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(
-      func, "component_path0", NULL, 192, "Component Path 0", "OpenXR component path 0");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(
-      func, "component_path1", NULL, 192, "Component Path 1", "OpenXR component path 1");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_float(func,
-                       "threshold",
-                       0.3f,
-                       0.0f,
-                       1.0f,
-                       "Threshold",
-                       "Input threshold for button/axis actions",
-                       0.0f,
-                       1.0f);
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_enum(func,
-                      "axis0_flag",
-                      rna_enum_xr_axis0_flags,
-                      0,
-                      "Axis 0 Flag",
-                      "Valid region for axis-based actions (first axis)");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_enum(func,
-                      "axis1_flag",
-                      rna_enum_xr_axis1_flags,
-                      0,
-                      "Axis 1 Flag",
-                      "Valid region for axis-based actions (second axis)");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_float_translation(func,
-                                   "location",
-                                   3,
-                                   NULL,
-                                   -FLT_MAX,
-                                   FLT_MAX,
-                                   "Location Offset",
-                                   "Location offset",
-                                   -FLT_MAX,
-                                   FLT_MAX);
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_float_rotation(func,
-                                "rotation",
-                                3,
-                                NULL,
-                                -2 * M_PI,
-                                2 * M_PI,
-                                "Rotation Offset",
-                                "Rotation offset",
-                                -2 * M_PI,
-                                2 * M_PI);
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
