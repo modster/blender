@@ -642,8 +642,9 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
     msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
                                         const blender::bke::internal::NodeData<T> &v) const
     {
-      o.pack_array(1);
+      o.pack_array(2);
 
+      o.pack(std::string("node_data"));
       o.pack(v.get_extra_data());
 
       return o;
@@ -655,8 +656,9 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
     msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
                                         const blender::bke::internal::ClothNodeData &v) const
     {
-      o.pack_array(1);
+      o.pack_array(2);
 
+      o.pack(std::string("cloth_node_data"));
       o.pack(v.get_cloth_node_data());
 
       return o;
@@ -668,8 +670,9 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
     msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
                                         const blender::bke::internal::VertData &v) const
     {
-      o.pack_array(2);
+      o.pack_array(3);
 
+      o.pack(std::string("vert_data"));
       o.pack(v.get_sizing());
       o.pack(v.get_flag());
 
@@ -682,8 +685,9 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
     msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
                                         const blender::bke::internal::EdgeData &v) const
     {
-      o.pack_array(1);
+      o.pack_array(2);
 
+      o.pack(std::string("edge_data"));
       o.pack(v.get_size());
 
       return o;
@@ -711,8 +715,9 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
     msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
                                         const blender::bke::internal::Sizing &v) const
     {
-      o.pack_array(1);
+      o.pack_array(2);
 
+      o.pack(std::string("sizing"));
       o.pack(v.get_m());
 
       return o;

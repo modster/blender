@@ -157,8 +157,6 @@ class EmptyExtraData {
   {
     return other;
   }
-
-  MSGPACK_DEFINE_ARRAY();
 };
 
 namespace ga = blender::generational_arena;
@@ -3019,17 +3017,38 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
 
       /* Need to store the arenas and the corresponding mappings
        * between the arena index and positional index of that element */
-      o.pack_array(8);
+      o.pack_array(16);
 
+      o.pack(std::string("nodes"));
       o.pack(mesh.get_nodes());
+      o.pack(std::string("verts"));
       o.pack(mesh.get_verts());
+      o.pack(std::string("edges"));
       o.pack(mesh.get_edges());
+      o.pack(std::string("faces"));
       o.pack(mesh.get_faces());
 
+      o.pack(std::string("node_map"));
       o.pack(node_pos_index_map);
+      o.pack(std::string("vert_map"));
       o.pack(vert_pos_index_map);
+      o.pack(std::string("edge_map"));
       o.pack(edge_pos_index_map);
+      o.pack(std::string("face_map"));
       o.pack(face_pos_index_map);
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::bke::internal::EmptyExtraData> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        blender::bke::internal::EmptyExtraData /*unused*/) const
+    {
+      o.pack_array(1);
+
+      o.pack("EmptyExtraData");
 
       return o;
     }
