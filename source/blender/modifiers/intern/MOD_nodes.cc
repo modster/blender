@@ -557,17 +557,17 @@ static void initialize_group_input(NodesModifierData &nmd,
                                    void *r_value)
 {
   if (nmd.settings.properties == nullptr) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+    socket.typeinfo->get_geometry_nodes_cpp_value(socket, r_value);
     return;
   }
   const IDProperty *property = IDP_GetPropertyFromGroup(nmd.settings.properties,
                                                         socket.identifier);
   if (property == nullptr) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+    socket.typeinfo->get_geometry_nodes_cpp_value(socket, r_value);
     return;
   }
   if (!id_property_type_matches_socket(socket, *property)) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+    socket.typeinfo->get_geometry_nodes_cpp_value(socket, r_value);
     return;
   }
 
@@ -721,7 +721,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
 
     /* Initialize remaining group inputs. */
     for (const OutputSocketRef *socket : remaining_input_sockets) {
-      const CPPType &cpp_type = *blender::nodes::socket_cpp_type_get(*socket->typeinfo());
+      const CPPType &cpp_type = *socket->typeinfo()->get_geometry_nodes_cpp_type();
       void *value_in = allocator.allocate(cpp_type.size(), cpp_type.alignment());
       initialize_group_input(*nmd, *socket->bsocket(), value_in);
       group_inputs.add_new({root_context, socket}, {cpp_type, value_in});
