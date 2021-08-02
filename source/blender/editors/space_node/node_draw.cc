@@ -78,6 +78,9 @@
 
 #include "NOD_geometry_nodes_eval_log.hh"
 
+#include "FN_array_cpp_type.hh"
+#include "FN_generic_span.hh"
+
 #include "node_intern.h" /* own include */
 
 #ifdef WITH_COMPOSITOR
@@ -88,6 +91,7 @@ using blender::Map;
 using blender::Set;
 using blender::Span;
 using blender::Vector;
+using blender::fn::ArrayCPPType;
 using blender::fn::CPPType;
 using blender::fn::GPointer;
 namespace geo_log = blender::nodes::geometry_nodes_eval_log;
@@ -842,17 +846,21 @@ static void create_inspection_string_for_generic_value(const geo_log::GenericVal
   };
 
   const GPointer value = value_log.value();
-  if (value.is_type<int>()) {
-    ss << *value.get<int>() << TIP_(" (Integer)");
-  }
-  else if (value.is_type<float>()) {
-    ss << *value.get<float>() << TIP_(" (Float)");
-  }
-  else if (value.is_type<blender::float3>()) {
-    ss << *value.get<blender::float3>() << TIP_(" (Vector)");
-  }
-  else if (value.is_type<bool>()) {
-    ss << (*value.get<bool>() ? TIP_("True") : TIP_("False")) << TIP_(" (Boolean)");
+  const ArrayCPPType *array_cpp_type = dynamic_cast<const ArrayCPPType *>(value.type());
+  if (array_cpp_type != nullptr) {
+    const CPPType &element_type = array_cpp_type->element_type();
+    blender::fn::GSpan span = array_cpp_type->array_span(value.get());
+    const int max_elements = 10;
+    const int num_elements = std::min<int>(max_elements, span.size());
+    for (const int i : blender::IndexRange(num_elements)) {
+      ss << "\u2022 ";
+      element_type.print(span[i], ss);
+      ss << "\n";
+    }
+    if (num_elements < span.size()) {
+      ss << "\u2022 ...\n";
+    }
+    ss << "Length: " << span.size();
   }
   else if (value.is_type<std::string>()) {
     ss << *value.get<std::string>() << TIP_(" (String)");
