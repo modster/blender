@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Adpated from the Blender Alembic importer implementation.
+ * Adapted from the Blender Alembic importer implementation.
  *
  * Modifications Copyright (C) 2021 Tangent Animation and
  * NVIDIA Corporation.  All rights reserved.
