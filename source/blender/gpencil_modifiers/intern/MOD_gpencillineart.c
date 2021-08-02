@@ -373,25 +373,16 @@ static void edge_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(entry, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
   }
 
-  sub = uiLayoutRowWithHeading(col, false, IFACE_("Light Contour"));
-  uiItemR(sub, ptr, "use_light_contour", 0, "", ICON_NONE);
-  entry = uiLayoutRow(sub, false);
-  uiLayoutSetActive(entry,
-                    (RNA_boolean_get(ptr, "use_light_contour")) ||
-                        (RNA_boolean_get(ptr, "use_light_contour")) || is_first);
-  if (use_cache && !is_first) {
-    uiItemL(entry, IFACE_("Reference Cached"), ICON_INFO);
-  }
-  else {
-    uiItemR(entry, ptr, "light_contour_object", 0, "", ICON_NONE);
-  }
+  sub = uiLayoutColumn(col, false);
+  uiLayoutSetActive(sub, RNA_pointer_get(ptr, "light_contour_object").data != NULL);
 
-  uiItemR(col, ptr, "use_shadow", 0, IFACE_("Casted Shadow"), ICON_NONE);
+  uiItemR(sub, ptr, "use_light_contour", 0, NULL, ICON_NONE);
+  uiItemR(sub, ptr, "use_shadow", 0, IFACE_("Casted Shadow"), ICON_NONE);
 
   uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, IFACE_("Allow Overlap"), ICON_NONE);
 }
 
-static void options_shadow_camera_draw(const bContext *UNUSED(C), Panel *panel)
+static void options_light_reference_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA ob_ptr;
@@ -404,20 +395,22 @@ static void options_shadow_camera_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
-  uiLayoutSetActive(layout, use_shadow);
 
   if (use_cache && !is_first) {
     uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
     return;
   }
 
-  uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "light_contour_object", 0, NULL, ICON_NONE);
 
-  uiItemR(layout, ptr, "shadow_camera_size", 0, NULL, ICON_NONE);
+  uiLayout *remaining = uiLayoutColumn(layout, false);
+  uiLayoutSetActive(remaining, use_shadow);
 
-  uiLayout *col = uiLayoutColumn(layout, true);
-  uiItemR(col, ptr, "shadow_camera_near", 0, NULL, ICON_NONE);
-  uiItemR(col, ptr, "shadow_camera_far", 0, NULL, ICON_NONE);
+  uiItemR(remaining, ptr, "shadow_camera_size", 0, NULL, ICON_NONE);
+
+  uiLayout *col = uiLayoutColumn(remaining, true);
+  uiItemR(col, ptr, "shadow_camera_near", 0, "Near", ICON_NONE);
+  uiItemR(col, ptr, "shadow_camera_far", 0, "Far", ICON_NONE);
 }
 
 static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -776,8 +769,12 @@ static void panelRegister(ARegionType *region_type)
 
   gpencil_modifier_subpanel_register(
       region_type, "edge_types", "Edge Types", NULL, edge_types_panel_draw, panel_type);
-  gpencil_modifier_subpanel_register(
-      region_type, "shadow_camera", "Shadow Camera", NULL, options_shadow_camera_draw, panel_type);
+  gpencil_modifier_subpanel_register(region_type,
+                                     "light_reference",
+                                     "Light Referecne",
+                                     NULL,
+                                     options_light_reference_draw,
+                                     panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "geometry", "Geometry Processing", NULL, options_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
