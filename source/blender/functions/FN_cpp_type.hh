@@ -70,64 +70,73 @@
 #include "BLI_string_ref.hh"
 #include "BLI_utility_mixins.hh"
 
+/**
+ * Different types support different features. Features like copy constructability can be detected
+ * automatically easily. For some features this is harder as of C++17. Those have flags in this
+ * enum and need to be determined by the programmer.
+ */
+enum class CPPTypeFlags {
+  None = 0,
+  Hashable = 1 << 0,
+  Printable = 1 << 1,
+  EqualityComparable = 1 << 2,
+
+  BasicType = Hashable | Printable | EqualityComparable,
+};
+ENUM_OPERATORS(CPPTypeFlags, CPPTypeFlags::EqualityComparable)
+
 namespace blender::fn {
 
-struct CPPTypeMembers {
-  int64_t size = 0;
-  int64_t alignment = 0;
-  uintptr_t alignment_mask = 0;
-  bool is_trivially_destructible = false;
-  bool has_special_member_functions = false;
-
-  void (*default_construct)(void *ptr) = nullptr;
-  void (*default_construct_indices)(void *ptr, IndexMask mask) = nullptr;
-
-  void (*destruct)(void *ptr) = nullptr;
-  void (*destruct_indices)(void *ptr, IndexMask mask) = nullptr;
-
-  void (*copy_assign)(const void *src, void *dst) = nullptr;
-  void (*copy_assign_indices)(const void *src, void *dst, IndexMask mask) = nullptr;
-
-  void (*copy_construct)(const void *src, void *dst) = nullptr;
-  void (*copy_construct_indices)(const void *src, void *dst, IndexMask mask) = nullptr;
-
-  void (*move_assign)(void *src, void *dst) = nullptr;
-  void (*move_assign_indices)(void *src, void *dst, IndexMask mask) = nullptr;
-
-  void (*move_construct)(void *src, void *dst) = nullptr;
-  void (*move_construct_indices)(void *src, void *dst, IndexMask mask) = nullptr;
-
-  void (*relocate_assign)(void *src, void *dst) = nullptr;
-  void (*relocate_assign_indices)(void *src, void *dst, IndexMask mask) = nullptr;
-
-  void (*relocate_construct)(void *src, void *dst) = nullptr;
-  void (*relocate_construct_indices)(void *src, void *dst, IndexMask mask) = nullptr;
-
-  void (*fill_assign_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
-
-  void (*fill_construct_indices)(const void *value, void *dst, IndexMask mask) = nullptr;
-
-  void (*print)(const void *value, std::stringstream &ss) = nullptr;
-  bool (*is_equal)(const void *a, const void *b) = nullptr;
-  uint64_t (*hash)(const void *value) = nullptr;
-
-  const void *default_value = nullptr;
-  std::string name;
+/** Utility class to pass template parameters to constructor of `CPPType`. */
+template<typename T, CPPTypeFlags Flags> struct CPPTypeParam {
 };
 
 class CPPType : NonCopyable, NonMovable {
  private:
-  CPPTypeMembers m_;
+  int64_t size_ = 0;
+  int64_t alignment_ = 0;
+  uintptr_t alignment_mask_ = 0;
+  bool is_trivially_destructible_ = false;
+  bool has_special_member_functions_ = false;
+
+  void (*default_construct_)(void *ptr) = nullptr;
+  void (*default_construct_indices_)(void *ptr, IndexMask mask) = nullptr;
+
+  void (*destruct_)(void *ptr) = nullptr;
+  void (*destruct_indices_)(void *ptr, IndexMask mask) = nullptr;
+
+  void (*copy_assign_)(const void *src, void *dst) = nullptr;
+  void (*copy_assign_indices_)(const void *src, void *dst, IndexMask mask) = nullptr;
+
+  void (*copy_construct_)(const void *src, void *dst) = nullptr;
+  void (*copy_construct_indices_)(const void *src, void *dst, IndexMask mask) = nullptr;
+
+  void (*move_assign_)(void *src, void *dst) = nullptr;
+  void (*move_assign_indices_)(void *src, void *dst, IndexMask mask) = nullptr;
+
+  void (*move_construct_)(void *src, void *dst) = nullptr;
+  void (*move_construct_indices_)(void *src, void *dst, IndexMask mask) = nullptr;
+
+  void (*relocate_assign_)(void *src, void *dst) = nullptr;
+  void (*relocate_assign_indices_)(void *src, void *dst, IndexMask mask) = nullptr;
+
+  void (*relocate_construct_)(void *src, void *dst) = nullptr;
+  void (*relocate_construct_indices_)(void *src, void *dst, IndexMask mask) = nullptr;
+
+  void (*fill_assign_indices_)(const void *value, void *dst, IndexMask mask) = nullptr;
+
+  void (*fill_construct_indices_)(const void *value, void *dst, IndexMask mask) = nullptr;
+
+  void (*print_)(const void *value, std::stringstream &ss) = nullptr;
+  bool (*is_equal_)(const void *a, const void *b) = nullptr;
+  uint64_t (*hash_)(const void *value) = nullptr;
+
+  const void *default_value_ = nullptr;
+  std::string debug_name_;
 
  public:
-  CPPType(CPPTypeMembers members) : m_(std::move(members))
-  {
-    BLI_assert(is_power_of_2_i(m_.alignment));
-    m_.alignment_mask = (uintptr_t)members.alignment - (uintptr_t)1;
-    m_.has_special_member_functions = (m_.default_construct && m_.copy_construct &&
-                                       m_.copy_assign && m_.move_construct && m_.move_assign &&
-                                       m_.destruct);
-  }
+  template<typename T, CPPTypeFlags Flags> CPPType(CPPTypeParam<T, Flags>, StringRef debug_name);
+  virtual ~CPPType() = default;
 
   virtual ~CPPType() = default;
 
@@ -162,7 +171,7 @@ class CPPType : NonCopyable, NonMovable {
    */
   StringRefNull name() const
   {
-    return m_.name;
+    return debug_name_;
   }
 
   /**
@@ -173,7 +182,7 @@ class CPPType : NonCopyable, NonMovable {
    */
   int64_t size() const
   {
-    return m_.size;
+    return size_;
   }
 
   /**
@@ -184,7 +193,7 @@ class CPPType : NonCopyable, NonMovable {
    */
   int64_t alignment() const
   {
-    return m_.alignment;
+    return alignment_;
   }
 
   /**
@@ -196,52 +205,52 @@ class CPPType : NonCopyable, NonMovable {
    */
   bool is_trivially_destructible() const
   {
-    return m_.is_trivially_destructible;
+    return is_trivially_destructible_;
   }
 
   bool is_default_constructible() const
   {
-    return m_.default_construct != nullptr;
+    return default_construct_ != nullptr;
   }
 
   bool is_copy_constructible() const
   {
-    return m_.copy_assign != nullptr;
+    return copy_assign_ != nullptr;
   }
 
   bool is_move_constructible() const
   {
-    return m_.move_assign != nullptr;
+    return move_assign_ != nullptr;
   }
 
   bool is_destructible() const
   {
-    return m_.destruct != nullptr;
+    return destruct_ != nullptr;
   }
 
   bool is_copy_assignable() const
   {
-    return m_.copy_assign != nullptr;
+    return copy_assign_ != nullptr;
   }
 
   bool is_move_assignable() const
   {
-    return m_.copy_construct != nullptr;
+    return copy_construct_ != nullptr;
   }
 
   bool is_printable() const
   {
-    return m_.print != nullptr;
+    return print_ != nullptr;
   }
 
   bool is_equality_comparable() const
   {
-    return m_.is_equal != nullptr;
+    return is_equal_ != nullptr;
   }
 
   bool is_hashable() const
   {
-    return m_.hash != nullptr;
+    return hash_ != nullptr;
   }
 
   /**
@@ -255,7 +264,7 @@ class CPPType : NonCopyable, NonMovable {
    */
   bool has_special_member_functions() const
   {
-    return m_.has_special_member_functions;
+    return has_special_member_functions_;
   }
 
   /**
@@ -263,7 +272,7 @@ class CPPType : NonCopyable, NonMovable {
    */
   bool pointer_has_valid_alignment(const void *ptr) const
   {
-    return ((uintptr_t)ptr & m_.alignment_mask) == 0;
+    return ((uintptr_t)ptr & alignment_mask_) == 0;
   }
 
   bool pointer_can_point_to_instance(const void *ptr) const
@@ -283,7 +292,7 @@ class CPPType : NonCopyable, NonMovable {
   {
     BLI_assert(this->pointer_can_point_to_instance(ptr));
 
-    m_.default_construct(ptr);
+    default_construct_(ptr);
   }
 
   void default_construct_n(void *ptr, int64_t n) const
@@ -295,7 +304,7 @@ class CPPType : NonCopyable, NonMovable {
   {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(ptr));
 
-    m_.default_construct_indices(ptr, mask);
+    default_construct_indices_(ptr, mask);
   }
 
   /**
@@ -310,7 +319,7 @@ class CPPType : NonCopyable, NonMovable {
   {
     BLI_assert(this->pointer_can_point_to_instance(ptr));
 
-    m_.destruct(ptr);
+    destruct_(ptr);
   }
 
   void destruct_n(void *ptr, int64_t n) const
@@ -322,7 +331,7 @@ class CPPType : NonCopyable, NonMovable {
   {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(ptr));
 
-    m_.destruct_indices(ptr, mask);
+    destruct_indices_(ptr, mask);
   }
 
   /**
@@ -337,7 +346,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.copy_assign(src, dst);
+    copy_assign_(src, dst);
   }
 
   void copy_assign_n(const void *src, void *dst, int64_t n) const
@@ -351,7 +360,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.copy_assign_indices(src, dst, mask);
+    copy_assign_indices_(src, dst, mask);
   }
 
   /**
@@ -368,7 +377,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.copy_construct(src, dst);
+    copy_construct_(src, dst);
   }
 
   void copy_construct_n(const void *src, void *dst, int64_t n) const
@@ -382,7 +391,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.copy_construct_indices(src, dst, mask);
+    copy_construct_indices_(src, dst, mask);
   }
 
   /**
@@ -399,7 +408,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.move_assign(src, dst);
+    move_assign_(src, dst);
   }
 
   void move_assign_n(void *src, void *dst, int64_t n) const
@@ -413,7 +422,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.move_assign_indices(src, dst, mask);
+    move_assign_indices_(src, dst, mask);
   }
 
   /**
@@ -430,7 +439,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.move_construct(src, dst);
+    move_construct_(src, dst);
   }
 
   void move_construct_n(void *src, void *dst, int64_t n) const
@@ -444,7 +453,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.move_construct_indices(src, dst, mask);
+    move_construct_indices_(src, dst, mask);
   }
 
   /**
@@ -461,7 +470,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.relocate_assign(src, dst);
+    relocate_assign_(src, dst);
   }
 
   void relocate_assign_n(void *src, void *dst, int64_t n) const
@@ -475,7 +484,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.relocate_assign_indices(src, dst, mask);
+    relocate_assign_indices_(src, dst, mask);
   }
 
   /**
@@ -492,7 +501,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(this->pointer_can_point_to_instance(src));
     BLI_assert(this->pointer_can_point_to_instance(dst));
 
-    m_.relocate_construct(src, dst);
+    relocate_construct_(src, dst);
   }
 
   void relocate_construct_n(void *src, void *dst, int64_t n) const
@@ -506,7 +515,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(src));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.relocate_construct_indices(src, dst, mask);
+    relocate_construct_indices_(src, dst, mask);
   }
 
   /**
@@ -524,7 +533,7 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(value));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.fill_assign_indices(value, dst, mask);
+    fill_assign_indices_(value, dst, mask);
   }
 
   /**
@@ -542,13 +551,13 @@ class CPPType : NonCopyable, NonMovable {
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(value));
     BLI_assert(mask.size() == 0 || this->pointer_can_point_to_instance(dst));
 
-    m_.fill_construct_indices(value, dst, mask);
+    fill_construct_indices_(value, dst, mask);
   }
 
   void print(const void *value, std::stringstream &ss) const
   {
     BLI_assert(this->pointer_can_point_to_instance(value));
-    m_.print(value, ss);
+    print_(value, ss);
   }
 
   std::string to_string(const void *value) const
@@ -572,7 +581,7 @@ class CPPType : NonCopyable, NonMovable {
   {
     BLI_assert(this->pointer_can_point_to_instance(a));
     BLI_assert(this->pointer_can_point_to_instance(b));
-    return m_.is_equal(a, b);
+    return is_equal_(a, b);
   }
 
   bool is_equal_or_false(const void *a, const void *b) const
@@ -586,7 +595,7 @@ class CPPType : NonCopyable, NonMovable {
   uint64_t hash(const void *value) const
   {
     BLI_assert(this->pointer_can_point_to_instance(value));
-    return m_.hash(value);
+    return hash_(value);
   }
 
   uint64_t hash_or_fallback(const void *value, uint64_t fallback_hash) const
@@ -603,7 +612,7 @@ class CPPType : NonCopyable, NonMovable {
    */
   const void *default_value() const
   {
-    return m_.default_value;
+    return default_value_;
   }
 
   uint64_t hash() const
@@ -611,12 +620,9 @@ class CPPType : NonCopyable, NonMovable {
     return get_default_hash(this);
   }
 
-  /**
-   * Low level access to the callbacks for this CPPType.
-   */
-  const CPPTypeMembers &members() const
+  void (*destruct_fn() const)(void *)
   {
-    return m_;
+    return destruct_;
   }
 
   template<typename T> bool is() const
