@@ -1418,6 +1418,18 @@ typedef struct NodeGeometryRaycast {
   char _pad[1];
 } NodeGeometryRaycast;
 
+typedef struct GeometryExpanderOutput {
+  int8_t domain;
+  int8_t component_type;
+  char _pad[6];
+  char *data_identifier;
+  char *socket_identifier;
+} GeometryExpanderOutput;
+
+typedef struct NodeGeometryGeometryExpander {
+  ListBase outputs;
+} NodeGeometryExpander;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
