@@ -18,12 +18,16 @@
  * \ingroup pygen
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Use a define instead of `#pragma once` because of `bmesh_py_types.h` */
 #ifndef __PY_CAPI_UTILS_H__
-#define __PY_CAPI_UTILS_H__
+#  define __PY_CAPI_UTILS_H__
 
-#include "BLI_sys_types.h"
-#include "BLI_utildefines_variadic.h"
+#  include "BLI_sys_types.h"
+#  include "BLI_utildefines_variadic.h"
 
 void PyC_ObSpit(const char *name, PyObject *var);
 void PyC_ObSpitStr(char *result, size_t result_len, PyObject *var);
@@ -76,16 +80,16 @@ PyObject *PyC_Tuple_PackArray_I32(const int *array, uint len);
 PyObject *PyC_Tuple_PackArray_I32FromBool(const int *array, uint len);
 PyObject *PyC_Tuple_PackArray_Bool(const bool *array, uint len);
 
-#define PyC_Tuple_Pack_F32(...) \
-  PyC_Tuple_PackArray_F32(((const float[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
-#define PyC_Tuple_Pack_F64(...) \
-  PyC_Tuple_PackArray_F64(((const double[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
-#define PyC_Tuple_Pack_I32(...) \
-  PyC_Tuple_PackArray_I32(((const int[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
-#define PyC_Tuple_Pack_I32FromBool(...) \
-  PyC_Tuple_PackArray_I32FromBool(((const int[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
-#define PyC_Tuple_Pack_Bool(...) \
-  PyC_Tuple_PackArray_Bool(((const bool[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
+#  define PyC_Tuple_Pack_F32(...) \
+    PyC_Tuple_PackArray_F32(((const float[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
+#  define PyC_Tuple_Pack_F64(...) \
+    PyC_Tuple_PackArray_F64(((const double[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
+#  define PyC_Tuple_Pack_I32(...) \
+    PyC_Tuple_PackArray_I32(((const int[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
+#  define PyC_Tuple_Pack_I32FromBool(...) \
+    PyC_Tuple_PackArray_I32FromBool(((const int[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
+#  define PyC_Tuple_Pack_Bool(...) \
+    PyC_Tuple_PackArray_Bool(((const bool[]){__VA_ARGS__}), VA_NARGS_COUNT(__VA_ARGS__))
 
 PyObject *PyC_Tuple_PackArray_Multi_F32(const float *array, const int dims[], const int dims_len);
 PyObject *PyC_Tuple_PackArray_Multi_F64(const double *array, const int dims[], const int dims_len);
@@ -170,17 +174,17 @@ int PyC_CheckArgs_DeepCopy(PyObject *args);
 int PyC_Long_AsBool(PyObject *value);
 int8_t PyC_Long_AsI8(PyObject *value);
 int16_t PyC_Long_AsI16(PyObject *value);
-#if 0 /* inline */
+#  if 0 /* inline */
 int32_t PyC_Long_AsI32(PyObject *value);
 int64_t PyC_Long_AsI64(PyObject *value);
-#endif
+#  endif
 
 uint8_t PyC_Long_AsU8(PyObject *value);
 uint16_t PyC_Long_AsU16(PyObject *value);
 uint32_t PyC_Long_AsU32(PyObject *value);
-#if 0 /* inline */
+#  if 0 /* inline */
 uint64_t PyC_Long_AsU64(PyObject *value);
-#endif
+#  endif
 
 /* inline so type signatures match as expected */
 Py_LOCAL_INLINE(int32_t) PyC_Long_AsI32(PyObject *value)
@@ -204,3 +208,7 @@ bool PyC_StructFmt_type_is_byte(char format);
 bool PyC_StructFmt_type_is_bool(char format);
 
 #endif /* __PY_CAPI_UTILS_H__ */
+
+#ifdef __cplusplus
+}
+#endif

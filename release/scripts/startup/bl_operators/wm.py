@@ -1429,20 +1429,16 @@ class WM_OT_properties_edit(Operator):
         prop_type_new = type(prop_value)
         prop_type, is_array = rna_idprop_value_item_type(prop_value)
 
-        props = item.id_properties_ensure()
-        props.ui_data_update(
-            prop,
-            subtype=self.subtype,
-            description=self.description,
-        )
+        ui_data = item.id_properties_ui(prop)
+        ui_data.update(subtype=self.subtype, description=self.description)
+
         if prop_type == int:
             if type(default_eval) == str:
                 self.report({'WARNING'}, "Could not evaluate number from default")
                 default_eval = None
             elif hasattr(default_eval, "__len__"):
                 default_eval = [int(round(value)) for value in default_eval]
-            props.ui_data_update(
-                prop,
+            ui_data.update(
                 min=int(round(self.min)),
                 max=int(round(self.max)),
                 soft_min=int(round(self.soft_min)),
@@ -1453,8 +1449,7 @@ class WM_OT_properties_edit(Operator):
             if type(default_eval) == str:
                 self.report({'WARNING'}, "Could not evaluate number from default")
                 default_eval = None
-            props.ui_data_update(
-                prop,
+            ui_data.update(
                 min=self.min,
                 max=self.max,
                 soft_min=self.soft_min,
@@ -1462,8 +1457,7 @@ class WM_OT_properties_edit(Operator):
                 default=default_eval,
             )
         elif prop_type == str:
-            props.ui_data_update(prop, default=self.default)
-            
+            ui_data.update(default=self.default)
 
         # If we have changed the type of the property, update its potential anim curves!
         if prop_type_old != prop_type_new:
@@ -1537,8 +1531,8 @@ class WM_OT_properties_edit(Operator):
             self.default = ""
 
         # setup defaults
-        props = item.id_properties_ensure()
-        rna_data = props.ui_data(prop)
+        ui_data = item.id_properties_ui(prop)
+        rna_data = ui_data.as_dict()
         self.subtype =  rna_data["subtype"]
         if prop_type in {int, float}:
             self.min = rna_data["min"]
