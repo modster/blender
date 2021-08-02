@@ -1627,7 +1627,7 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
     }
     case IDP_UI_DATA_TYPE_UNSUPPORTED: {
       /* UI data not supported for remaining types, this shouldn't be called in those cases. */
-      BLI_assert(false);
+      BLI_assert_unreachable();
       break;
     }
   }
