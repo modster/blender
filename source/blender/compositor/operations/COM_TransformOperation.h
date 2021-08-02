@@ -39,6 +39,7 @@ class TransformOperation : public MultiThreadedOperation {
   bool convert_degree_to_rad_;
   float translate_factor_x_;
   float translate_factor_y_;
+  bool invert_;
 
  public:
   TransformOperation();
@@ -56,11 +57,21 @@ class TransformOperation : public MultiThreadedOperation {
   {
     sampler_ = sampler;
   }
+  void set_invert(bool value)
+  {
+    invert_ = value;
+  }
   void init_data() override;
   void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
   void update_memory_buffer_partial(MemoryBuffer *output,
                                     const rcti &area,
                                     Span<MemoryBuffer *> inputs) override;
+
+ private:
+  /** Translate -> Rotate -> Scale. */
+  void transform(BuffersIterator<float> &it, const MemoryBuffer *input_img);
+  /** Scale -> Rotate -> Translate. */
+  void transform_inverted(BuffersIterator<float> &it, const MemoryBuffer *input_img);
 };
 
 }  // namespace blender::compositor

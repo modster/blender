@@ -104,14 +104,40 @@ void TransformOperation::update_memory_buffer_partial(MemoryBuffer *output,
 {
   const MemoryBuffer *input_img = inputs[0];
   MemoryBuffer *input_scale = inputs[4];
-  for (BuffersIterator<float> it = output->iterate_with({input_scale}, area); !it.is_end(); ++it) {
+  BuffersIterator<float> it = output->iterate_with({input_scale}, area);
+  if (invert_) {
+    transform_inverted(it, input_img);
+  }
+  else {
+    transform(it, input_img);
+  }
+}
+
+void TransformOperation::transform(BuffersIterator<float> &it, const MemoryBuffer *input_img)
+{
+  for (; !it.is_end(); ++it) {
     const float scale = *it.in(0);
     float x = it.x - translate_x_;
     float y = it.y - translate_y_;
-    x = ScaleOperation::scale_coord(x, scale_center_x_, scale);
-    y = ScaleOperation::scale_coord(y, scale_center_y_, scale);
     RotateOperation::rotate_coords(
         x, y, rotate_center_x_, rotate_center_y_, rotate_sine_, rotate_cosine_);
+    x = ScaleOperation::scale_coord(x, scale_center_x_, scale);
+    y = ScaleOperation::scale_coord(y, scale_center_y_, scale);
+    input_img->read_elem_sampled(x, y, sampler_, it.out);
+  }
+}
+
+void TransformOperation::transform_inverted(BuffersIterator<float> &it,
+                                            const MemoryBuffer *input_img)
+{
+  for (; !it.is_end(); ++it) {
+    const float scale = *it.in(0);
+    float x = ScaleOperation::scale_coord(it.x, scale_center_x_, scale);
+    float y = ScaleOperation::scale_coord(it.y, scale_center_y_, scale);
+    RotateOperation::rotate_coords(
+        x, y, rotate_center_x_, rotate_center_y_, rotate_sine_, rotate_cosine_);
+    x -= translate_x_;
+    y -= translate_y_;
     input_img->read_elem_sampled(x, y, sampler_, it.out);
   }
 }
