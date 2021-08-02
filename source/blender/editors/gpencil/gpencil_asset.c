@@ -234,6 +234,8 @@ static bool gpencil_asset_create(const bContext *C,
 
   const bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd);
 
+  bool is_animation = false;
+
   LISTBASE_FOREACH_MUTABLE (bGPDlayer *, gpl, &gpd->layers) {
     /* If layer is hidden, remove. */
     if (gpl->flag & GP_LAYER_HIDE) {
@@ -303,7 +305,14 @@ static bool gpencil_asset_create(const bContext *C,
           }
         }
       }
+      /* If Frame is empty, remove. */
+      if (BLI_listbase_count(&gpf->strokes) == 0) {
+        BKE_gpencil_layer_frame_delete(gpl, gpf);
+      }
     }
+
+    /* If there are more than one frame in the same layer, then is an animation. */
+    is_animation |= (BLI_listbase_count(&gpl->frames) > 1);
   }
 
   /* Set origin to bounding box of strokes. */
@@ -342,9 +351,10 @@ static bool gpencil_asset_create(const bContext *C,
 
   /* Mark as asset. */
   if (ED_asset_mark_id(C, &gpd->id)) {
-
+    const char *tags[] = {"Grease Pencil Strokes", "Grease Pencil Animation"};
     /* Add tag to asset. */
-    BKE_asset_metadata_tag_ensure(gpd->id.asset_data, "Grease Pencil Stroke");
+    int index = (is_animation) ? 1 : 0;
+    BKE_asset_metadata_tag_ensure(gpd->id.asset_data, tags[index]);
 
     /* Retime frame number to start by 1. Must be done after generate the render preview.
      * Use same loop to deselect all. */
