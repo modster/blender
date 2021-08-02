@@ -861,7 +861,7 @@ class GeometryNodesEvaluator {
                                    NodeState &node_state)
   {
     /* Compute output array length. */
-    int output_size = 0;
+    int output_size = -1;
     for (const int i : node->inputs().index_range()) {
       const InputSocketRef &socket_ref = node->input(i);
       if (!socket_ref.is_available()) {
@@ -876,6 +876,10 @@ class GeometryNodesEvaluator {
       BLI_assert(array_cpp_type != nullptr);
       const int input_size = array_cpp_type->array_size(single_value.value);
       output_size = std::max(output_size, input_size);
+    }
+    /* If there is no input, output a single value. */
+    if (output_size == -1) {
+      output_size = 1;
     }
 
     MFContextBuilder fn_context;
@@ -1272,7 +1276,26 @@ class GeometryNodesEvaluator {
     void *buffer = allocator.allocate(to_type.size(), to_type.alignment());
     GMutablePointer value{to_type, buffer};
 
-    if (conversions_.is_convertible(from_type, to_type)) {
+    const ArrayCPPType *from_array_type = dynamic_cast<const ArrayCPPType *>(&from_type);
+    const ArrayCPPType *to_array_type = dynamic_cast<const ArrayCPPType *>(&to_type);
+
+    if (from_array_type != nullptr && to_array_type != nullptr &&
+        conversions_.is_convertible(from_array_type->element_type(),
+                                    to_array_type->element_type())) {
+      const MultiFunction &fn = *conversions_.get_conversion_multi_function(
+          MFDataType::ForSingle(from_array_type->element_type()),
+          MFDataType::ForSingle(to_array_type->element_type()));
+      GSpan from_span = from_array_type->array_span(value_to_forward.get());
+      const int array_size = from_span.size();
+      GMutableSpan to_span = to_array_type->array_construct_uninitialized(buffer, array_size);
+
+      MFParamsBuilder params{fn, array_size};
+      params.add_readonly_single_input(from_span);
+      params.add_uninitialized_single_output(to_span);
+      MFContextBuilder context;
+      fn.call(IndexRange(array_size), params, context);
+    }
+    else if (conversions_.is_convertible(from_type, to_type)) {
       /* Do the conversion if possible. */
       conversions_.convert_to_uninitialized(from_type, to_type, value_to_forward.get(), buffer);
     }

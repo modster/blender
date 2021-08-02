@@ -51,6 +51,11 @@ class ArrayCPPType : public CPPType {
     };
   }
 
+  const CPPType &element_type() const
+  {
+    return element_type_;
+  }
+
   int64_t array_size(const void *value) const
   {
     return get_span_(value).size();
