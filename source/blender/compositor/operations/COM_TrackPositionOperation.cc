@@ -42,16 +42,24 @@ TrackPositionOperation::TrackPositionOperation()
   this->m_relativeFrame = 0;
   this->m_speed_output = false;
   flags.is_set_operation = true;
-  flags.is_fullframe_operation = true;
-  flags.can_be_constant = true;
+  is_track_position_calculated_ = false;
 }
 
 void TrackPositionOperation::initExecution()
 {
+  if (!is_track_position_calculated_) {
+    calc_track_position();
+  }
+}
+
+void TrackPositionOperation::calc_track_position()
+{
+  is_track_position_calculated_ = true;
   MovieTracking *tracking = nullptr;
   MovieClipUser user = {0};
   MovieTrackingObject *object;
 
+  track_position_ = 0;
   zero_v2(this->m_markerPos);
   zero_v2(this->m_relativePos);
 
@@ -116,6 +124,14 @@ void TrackPositionOperation::initExecution()
       }
     }
   }
+
+  track_position_ = this->m_markerPos[this->m_axis] - this->m_relativePos[this->m_axis];
+  if (this->m_axis == 0) {
+    track_position_ *= this->m_width;
+  }
+  else {
+    track_position_ *= this->m_height;
+  }
 }
 
 void TrackPositionOperation::executePixelSampled(float output[4],
@@ -133,21 +149,12 @@ void TrackPositionOperation::executePixelSampled(float output[4],
   }
 }
 
-void TrackPositionOperation::update_memory_buffer(MemoryBuffer *output,
-                                                  const rcti &area,
-                                                  Span<MemoryBuffer *> UNUSED(inputs))
+const float *TrackPositionOperation::get_constant_elem()
 {
-  /* Should always be folded into a constant operation because there are no inputs and
-   * can_be_constant flag is enabled. */
-  BLI_assert(BLI_rcti_size_x(&area) == 1 && BLI_rcti_size_y(&area) == 1);
-  float *out = output->get_elem(area.xmin, area.ymin);
-  out[0] = this->m_markerPos[this->m_axis] - this->m_relativePos[this->m_axis];
-  if (this->m_axis == 0) {
-    out[0] *= this->m_width;
+  if (!is_track_position_calculated_) {
+    calc_track_position();
   }
-  else {
-    out[0] *= this->m_height;
-  }
+  return &track_position_;
 }
 
 void TrackPositionOperation::determineResolution(unsigned int resolution[2],

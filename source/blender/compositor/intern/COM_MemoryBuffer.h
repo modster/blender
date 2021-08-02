@@ -305,6 +305,11 @@ class MemoryBuffer {
     return this->m_num_channels;
   }
 
+  uint8_t get_elem_bytes_len() const
+  {
+    return this->m_num_channels * sizeof(float);
+  }
+
   /**
    * Get all buffer elements as a range with no offsets.
    */
