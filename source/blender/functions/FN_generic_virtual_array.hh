@@ -588,6 +588,32 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
   }
 };
 
+class GVArray_For_RepeatedGSpan : public GVArray {
+ private:
+  GSpan span_;
+  const void *default_value_;
+
+ public:
+  GVArray_For_RepeatedGSpan(int64_t size, GSpan span, const void *default_value = nullptr)
+      : GVArray(span.type(), size),
+        span_(span),
+        default_value_(default_value ? default_value : span.type().default_value())
+  {
+  }
+
+ private:
+  void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
+  {
+    if (span_.is_empty()) {
+      type_->copy_construct(default_value_, r_value);
+    }
+    else {
+      const int64_t repeated_index = index % span_.size();
+      type_->copy_construct(span_[repeated_index], r_value);
+    }
+  }
+};
+
 /* A generic version of VArray_Span. */
 class GVArray_GSpan : public GSpan {
  private:

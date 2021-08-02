@@ -41,7 +41,8 @@ class GMutablePointer {
   {
   }
 
-  template<typename T> GMutablePointer(T *data) : GMutablePointer(&CPPType::get<T>(), data)
+  template<typename T, typename std::enable_if_t<!std::is_void_v<T>> * = nullptr>
+  GMutablePointer(T *data) : GMutablePointer(&CPPType::get<T>(), data)
   {
   }
 

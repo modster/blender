@@ -21,6 +21,7 @@
 
 #include "DEG_depsgraph_query.h"
 
+#include "FN_array_cpp_type.hh"
 #include "FN_generic_value_map.hh"
 #include "FN_multi_function.hh"
 
@@ -32,6 +33,7 @@
 
 namespace blender::modifiers::geometry_nodes {
 
+using fn::ArrayCPPType;
 using fn::CPPType;
 using fn::GValueMap;
 using nodes::GeoNodeExecParams;
@@ -858,11 +860,8 @@ class GeometryNodesEvaluator {
                                    const MultiFunction &fn,
                                    NodeState &node_state)
   {
-    MFContextBuilder fn_context;
-    MFParamsBuilder fn_params{fn, 1};
-    LinearAllocator<> &allocator = local_allocators_.local();
-
-    /* Prepare the inputs for the multi function. */
+    /* Compute output array length. */
+    int output_size = 0;
     for (const int i : node->inputs().index_range()) {
       const InputSocketRef &socket_ref = node->input(i);
       if (!socket_ref.is_available()) {
@@ -873,8 +872,33 @@ class GeometryNodesEvaluator {
       BLI_assert(input_state.was_ready_for_execution);
       SingleInputValue &single_value = *input_state.value.single;
       BLI_assert(single_value.value != nullptr);
-      fn_params.add_readonly_single_input(GPointer{*input_state.type, single_value.value});
+      const ArrayCPPType *array_cpp_type = dynamic_cast<const ArrayCPPType *>(input_state.type);
+      BLI_assert(array_cpp_type != nullptr);
+      const int input_size = array_cpp_type->array_size(single_value.value);
+      output_size = std::max(output_size, input_size);
     }
+
+    MFContextBuilder fn_context;
+    MFParamsBuilder fn_params{fn, output_size};
+    LinearAllocator<> &allocator = local_allocators_.local();
+
+    Vector<std::unique_ptr<fn::GVArray>> input_varrays;
+
+    /* Prepare the inputs for the multi function. */
+    for (const int i : node->inputs().index_range()) {
+      const InputSocketRef &socket_ref = node->input(i);
+      if (!socket_ref.is_available()) {
+        continue;
+      }
+      InputState &input_state = node_state.inputs[i];
+      SingleInputValue &single_value = *input_state.value.single;
+      const ArrayCPPType *array_cpp_type = dynamic_cast<const ArrayCPPType *>(input_state.type);
+      GSpan span = array_cpp_type->array_span(single_value.value);
+      auto varray = std::make_unique<fn::GVArray_For_RepeatedGSpan>(output_size, span);
+      fn_params.add_readonly_single_input(*varray);
+      input_varrays.append(std::move(varray));
+    }
+
     /* Prepare the outputs for the multi function. */
     Vector<GMutablePointer> outputs;
     for (const int i : node->outputs().index_range()) {
@@ -882,13 +906,16 @@ class GeometryNodesEvaluator {
       if (!socket_ref.is_available()) {
         continue;
       }
-      const CPPType &type = *get_socket_cpp_type(socket_ref);
-      void *buffer = allocator.allocate(type.size(), type.alignment());
-      fn_params.add_uninitialized_single_output(GMutableSpan{type, buffer, 1});
+      const ArrayCPPType *type = dynamic_cast<const ArrayCPPType *>(
+          get_socket_cpp_type(socket_ref));
+      BLI_assert(type != nullptr);
+      void *buffer = allocator.allocate(type->size(), type->alignment());
+      GMutableSpan span = type->array_construct_uninitialized(buffer, output_size);
+      fn_params.add_uninitialized_single_output(span);
       outputs.append({type, buffer});
     }
 
-    fn.call(IndexRange(1), fn_params, fn_context);
+    fn.call(IndexRange(output_size), fn_params, fn_context);
 
     /* Forward the computed outputs. */
     int output_index = 0;
