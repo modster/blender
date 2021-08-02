@@ -55,13 +55,13 @@ static bool args_contain_key(PyObject *kwargs, const char *name)
 }
 
 /**
- * \return False when parsing fails, in which case caller should return nullptr.
+ * \return False when parsing fails, in which case caller should return NULL.
  */
 static bool idprop_ui_data_update_base(IDProperty *idprop,
                                        const char *rna_subtype,
                                        const char *description)
 {
-  if (rna_subtype != nullptr) {
+  if (rna_subtype != NULL) {
     int result = PROP_NONE;
     if (!RNA_enum_value_from_id(rna_enum_property_subtype_items, rna_subtype, &result)) {
       PyErr_SetString(PyExc_KeyError, "RNA subtype not found");
@@ -70,7 +70,7 @@ static bool idprop_ui_data_update_base(IDProperty *idprop,
     idprop->ui_data->rna_subtype = result;
   }
 
-  if (description != nullptr) {
+  if (description != NULL) {
     idprop->ui_data->description = BLI_strdup(description);
   }
 
@@ -78,16 +78,16 @@ static bool idprop_ui_data_update_base(IDProperty *idprop,
 }
 
 /**
- * \return False when parsing fails, in which case caller should return nullptr.
+ * \return False when parsing fails, in which case caller should return NULL.
  */
 static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  const char *rna_subtype = nullptr;
-  const char *description = nullptr;
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
   int min, max, soft_min, soft_max, step;
-  PyObject *default_value = nullptr;
+  PyObject *default_value = NULL;
   const char *kwlist[] = {
-      "min", "max", "soft_min", "soft_max", "step", "default", "subtype", "description", nullptr};
+      "min", "max", "soft_min", "soft_max", "step", "default", "subtype", "description", NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
                                    "|$iiiiiOzz:update",
@@ -135,7 +135,7 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
 
   /* The default value needs special handling because for array IDProperties it can be a single
    * value or an array, but for non-array properties it can only be a value. */
-  if (!ELEM(default_value, nullptr, Py_None)) {
+  if (!ELEM(default_value, NULL, Py_None)) {
     if (PySequence_Check(default_value)) {
       if (idprop->type != IDP_ARRAY) {
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
@@ -172,15 +172,15 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
 }
 
 /**
- * \return False when parsing fails, in which case caller should return nullptr.
+ * \return False when parsing fails, in which case caller should return NULL.
  */
 static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  const char *rna_subtype = nullptr;
-  const char *description = nullptr;
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
   int precision;
   double min, max, soft_min, soft_max, step;
-  PyObject *default_value = nullptr;
+  PyObject *default_value = NULL;
   const char *kwlist[] = {"min",
                           "max",
                           "soft_min",
@@ -190,7 +190,7 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
                           "default",
                           "subtype",
                           "description",
-                          nullptr};
+                          NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
                                    "|$dddddiOzz:update",
@@ -242,7 +242,7 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
 
   /* The default value needs special handling because for array IDProperties it can be a single
    * value or an array, but for non-array properties it can only be a value. */
-  if (!ELEM(default_value, nullptr, Py_None)) {
+  if (!ELEM(default_value, NULL, Py_None)) {
     if (PySequence_Check(default_value)) {
       if (idprop->type != IDP_ARRAY) {
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
@@ -279,14 +279,14 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
 }
 
 /**
- * \return False when parsing fails, in which case caller should return nullptr.
+ * \return False when parsing fails, in which case caller should return NULL.
  */
 static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  const char *rna_subtype = nullptr;
-  const char *description = nullptr;
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
   const char *default_value;
-  const char *kwlist[] = {"default", "subtype", "description", nullptr};
+  const char *kwlist[] = {"default", "subtype", "description", NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
                                    "|$zzz:update",
@@ -303,7 +303,7 @@ static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyO
 
   IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
 
-  if (default_value != nullptr) {
+  if (default_value != NULL) {
     MEM_SAFE_FREE(ui_data->default_value);
     ui_data->default_value = BLI_strdup(default_value);
   }
@@ -312,13 +312,13 @@ static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyO
 }
 
 /**
- * \return False when parsing fails, in which case caller should return nullptr.
+ * \return False when parsing fails, in which case caller should return NULL.
  */
 static bool idprop_ui_data_update_id(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  const char *rna_subtype = nullptr;
-  const char *description = nullptr;
-  const char *kwlist[] = {"subtype", "description", nullptr};
+  const char *rna_subtype = NULL;
+  const char *description = NULL;
+  const char *kwlist[] = {"subtype", "description", NULL};
   if (!PyArg_ParseTupleAndKeywords(
           args, kwargs, "|$zz:update", (char **)kwlist, &rna_subtype, &description)) {
     return false;
@@ -357,34 +357,34 @@ static PyObject *BPy_IDPropertyUIManager_update(BPy_IDPropertyUIManager *self,
     case IDP_UI_DATA_TYPE_INT: {
       IDP_ui_data_ensure(property);
       if (!idprop_ui_data_update_int(property, args, kwargs)) {
-        return nullptr;
+        return NULL;
       }
       Py_RETURN_NONE;
     }
     case IDP_UI_DATA_TYPE_FLOAT: {
       IDP_ui_data_ensure(property);
       if (!idprop_ui_data_update_float(property, args, kwargs)) {
-        return nullptr;
+        return NULL;
       }
       Py_RETURN_NONE;
     }
     case IDP_UI_DATA_TYPE_STRING: {
       IDP_ui_data_ensure(property);
       if (!idprop_ui_data_update_string(property, args, kwargs)) {
-        return nullptr;
+        return NULL;
       }
       Py_RETURN_NONE;
     }
     case IDP_UI_DATA_TYPE_ID: {
       IDP_ui_data_ensure(property);
       if (!idprop_ui_data_update_id(property, args, kwargs)) {
-        return nullptr;
+        return NULL;
       }
       Py_RETURN_NONE;
     }
     case IDP_UI_DATA_TYPE_UNSUPPORTED: {
       PyErr_Format(PyExc_TypeError, "IDProperty \"%s\" does not support RNA data", property->name);
-      return nullptr;
+      return NULL;
     }
   }
 
@@ -463,7 +463,7 @@ static void idprop_ui_data_to_dict_string(IDProperty *property, PyObject *dict)
   IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)property->ui_data;
   PyObject *item;
 
-  const char *default_value = (ui_data->default_value == nullptr) ? "" : ui_data->default_value;
+  const char *default_value = (ui_data->default_value == NULL) ? "" : ui_data->default_value;
 
   PyDict_SetItemString(dict, "default", item = PyUnicode_FromString(default_value));
   Py_DECREF(item);
@@ -485,7 +485,7 @@ static PyObject *BPy_IDIDPropertyUIManager_as_dict(BPy_IDPropertyUIManager *self
 
   /* RNA subtype. */
   {
-    const char *subtype_id = nullptr;
+    const char *subtype_id = NULL;
     RNA_enum_identifier(rna_enum_property_subtype_items, ui_data->rna_subtype, &subtype_id);
     PyObject *item = PyUnicode_FromString(subtype_id);
     PyDict_SetItemString(dict, "subtype", item);
@@ -493,7 +493,7 @@ static PyObject *BPy_IDIDPropertyUIManager_as_dict(BPy_IDPropertyUIManager *self
   }
 
   /* Description. */
-  if (ui_data->description != nullptr) {
+  if (ui_data->description != NULL) {
     PyObject *item = PyUnicode_FromString(ui_data->description);
     PyDict_SetItemString(dict, "description", item);
     Py_DECREF(item);
@@ -535,13 +535,13 @@ static PyObject *BPy_IDPropertyUIManager_clear(BPy_IDPropertyUIManager *self)
   IDProperty *property = self->property;
   BLI_assert(IDP_ui_data_supported(property));
 
-  if (property == nullptr) {
+  if (property == NULL) {
     PyErr_SetString(PyExc_RuntimeError, "IDPropertyUIManager missing property");
     BLI_assert_unreachable();
-    return nullptr;
+    return NULL;
   }
 
-  if (property->ui_data != nullptr) {
+  if (property->ui_data != NULL) {
     IDP_free_ui_data(property);
   }
 
@@ -569,10 +569,10 @@ static PyObject *BPy_IDPropertyUIManager_update_from(BPy_IDPropertyUIManager *se
 
   BPy_IDPropertyUIManager *ui_manager_src;
   if (!PyArg_ParseTuple(args, "O!:update_from", &BPy_IDPropertyUIManager_Type, &ui_manager_src)) {
-    return nullptr;
+    return NULL;
   }
 
-  if (property->ui_data != nullptr) {
+  if (property->ui_data != NULL) {
     IDP_free_ui_data(property);
   }
 
@@ -604,7 +604,7 @@ static struct PyMethodDef BPy_IDPropertyUIManager_methods[] = {
      (PyCFunction)BPy_IDPropertyUIManager_update_from,
      METH_VARARGS,
      BPy_IDPropertyUIManager_update_from_doc},
-    {nullptr, nullptr, 0, nullptr},
+    {NULL, NULL, 0, NULL},
 };
 
 static PyObject *BPy_IDPropertyUIManager_repr(BPy_IDPropertyUIManager *self)
@@ -618,9 +618,8 @@ static Py_hash_t BPy_IDPropertyUIManager_hash(BPy_IDPropertyUIManager *self)
   return _Py_HashPointer(self->property);
 }
 
-extern "C" {
 PyTypeObject BPy_IDPropertyUIManager_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0)
+    PyVarObject_HEAD_INIT(NULL, 0)
     /*  For printing, in format "<module>.<name>" */
     "IDPropertyUIManager",           /* char *tp_name; */
     sizeof(BPy_IDPropertyUIManager), /* int tp_basicsize; */
@@ -628,58 +627,57 @@ PyTypeObject BPy_IDPropertyUIManager_Type = {
 
     /* Methods to implement standard operations */
 
-    nullptr,                                /* destructor tp_dealloc; */
+    NULL,                                   /* destructor tp_dealloc; */
     0,                                      /* tp_vectorcall_offset */
-    nullptr,                                /* getattrfunc tp_getattr; */
-    nullptr,                                /* setattrfunc tp_setattr; */
-    nullptr,                                /* cmpfunc tp_compare; */
+    NULL,                                   /* getattrfunc tp_getattr; */
+    NULL,                                   /* setattrfunc tp_setattr; */
+    NULL,                                   /* cmpfunc tp_compare; */
     (reprfunc)BPy_IDPropertyUIManager_repr, /* reprfunc tp_repr; */
 
     /* Method suites for standard classes */
 
-    nullptr, /* PyNumberMethods *tp_as_number; */
-    nullptr, /* PySequenceMethods *tp_as_sequence; */
-    nullptr, /* PyMappingMethods *tp_as_mapping; */
+    NULL, /* PyNumberMethods *tp_as_number; */
+    NULL, /* PySequenceMethods *tp_as_sequence; */
+    NULL, /* PyMappingMethods *tp_as_mapping; */
 
     /* More standard operations (here for binary compatibility) */
 
     (hashfunc)BPy_IDPropertyUIManager_hash, /* hashfunc tp_hash; */
-    nullptr,                                /* ternaryfunc tp_call; */
-    nullptr,                                /* reprfunc tp_str; */
-    nullptr,                                /* getattrofunc tp_getattro; */
-    nullptr,                                /* setattrofunc tp_setattro; */
+    NULL,                                   /* ternaryfunc tp_call; */
+    NULL,                                   /* reprfunc tp_str; */
+    NULL,                                   /* getattrofunc tp_getattro; */
+    NULL,                                   /* setattrofunc tp_setattro; */
 
     /* Functions to access object as input/output buffer */
-    nullptr, /* PyBufferProcs *tp_as_buffer; */
+    NULL, /* PyBufferProcs *tp_as_buffer; */
 
     /*** Flags to define presence of optional/expanded features ***/
     Py_TPFLAGS_DEFAULT, /* long tp_flags; */
 
-    nullptr, /*  char *tp_doc;  Documentation string */
+    NULL, /*  char *tp_doc;  Documentation string */
     /*** Assigned meaning in release 2.0 ***/
     /* call function for all accessible objects */
-    nullptr, /* traverseproc tp_traverse; */
+    NULL, /* traverseproc tp_traverse; */
 
     /* delete references to contained objects */
-    nullptr, /* inquiry tp_clear; */
+    NULL, /* inquiry tp_clear; */
 
     /***  Assigned meaning in release 2.1 ***/
     /*** rich comparisons ***/
-    nullptr, /* richcmpfunc tp_richcompare; */
+    NULL, /* richcmpfunc tp_richcompare; */
 
     /***  weak reference enabler ***/
     0, /* long tp_weaklistoffset; */
 
     /*** Added in release 2.2 ***/
     /*   Iterators */
-    nullptr, /* getiterfunc tp_iter; */
-    nullptr, /* iternextfunc tp_iternext; */
+    NULL, /* getiterfunc tp_iter; */
+    NULL, /* iternextfunc tp_iternext; */
     /*** Attribute descriptor and subclassing stuff ***/
     BPy_IDPropertyUIManager_methods, /* struct PyMethodDef *tp_methods; */
-    nullptr,                         /* struct PyMemberDef *tp_members; */
-    nullptr,                         /* struct PyGetSetDef *tp_getset; */
+    NULL,                            /* struct PyMemberDef *tp_members; */
+    NULL,                            /* struct PyGetSetDef *tp_getset; */
 };
-}
 
 void IDPropertyUIData_Init_Types()
 {

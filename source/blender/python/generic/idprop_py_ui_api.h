@@ -20,10 +20,6 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct ID;
 struct IDProperty;
 
@@ -35,7 +31,3 @@ typedef struct BPy_IDPropertyUIManager {
 } BPy_IDPropertyUIManager;
 
 void IDPropertyUIData_Init_Types(void);
-
-#ifdef __cplusplus
-}
-#endif
