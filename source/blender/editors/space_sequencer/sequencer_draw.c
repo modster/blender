@@ -1286,15 +1286,17 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
 
     LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
       if ((val_need_update = BLI_ghash_lookup(thumb_data_hash, seq)) == NULL &&
-          check_seq_need_thumbnails(seq, v2d)) {
+          check_seq_need_thumbnails(seq, &v2d->cur)) {
         ThumbDataItem *val = MEM_callocN(sizeof(ThumbDataItem), "Thumbnail Hash Values");
         val->seq_dupli = SEQ_sequence_dupli_recursive(scene, scene, NULL, seq, 0);
         val->scene = scene;
         BLI_ghash_insert(thumb_data_hash, seq, val);
       }
       else {
-        val_need_update->seq_dupli->start = seq->start;
-        val_need_update->seq_dupli->startdisp = seq->startdisp;
+        if (val_need_update != NULL) {
+          val_need_update->seq_dupli->start = seq->start;
+          val_need_update->seq_dupli->startdisp = seq->startdisp;
+        }
       }
     }
 
