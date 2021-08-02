@@ -13,7 +13,10 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2021 Tangent Animation.
+ * Adapted from the Blender Alembic importer implementation,
+ * Copyright (C) 2016 Kévin Dietrich.
+ *
+ * Modifications Copyright (C) 2021 Tangent Animation.
  * All rights reserved.
  */
 #pragma once
