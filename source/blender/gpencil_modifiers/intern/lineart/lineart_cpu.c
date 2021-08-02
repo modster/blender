@@ -5092,6 +5092,14 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   rb->far_clip = lmd->shadow_camera_far;
   rb->w = lmd->shadow_camera_size;
   rb->h = lmd->shadow_camera_size;
+  /* Need to prevent wrong camera configuration so that shadow computation won't stall. */
+  if (!rb->w || !rb->h) {
+    rb->w = rb->h = 200;
+  }
+  if (!rb->near_clip || !rb->far_clip) {
+    rb->near_clip = 0.1f;
+    rb->far_clip = 200.0f;
+  }
   rb->tile_recursive_level = is_persp ? LRT_TILE_RECURSIVE_PERSPECTIVE : LRT_TILE_RECURSIVE_ORTHO;
   rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
       rb->use_light_contour = rb->use_loose = false;

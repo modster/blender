@@ -704,6 +704,16 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
     }
+    LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+      LISTBASE_FOREACH (GpencilModifierData *, gpd, &ob->greasepencil_modifiers) {
+        if (gpd->type == eGpencilModifierType_Lineart) {
+          LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)gpd;
+          lmd->shadow_camera_near = 0.1f;
+          lmd->shadow_camera_far = 200.0f;
+          lmd->shadow_camera_size = 200.0f;
+        }
+      }
+    }
   }
 
   /**
