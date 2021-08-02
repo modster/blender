@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "FN_array_cpp_type.hh"
 #include "FN_generic_value_map.hh"
 
 #include "BKE_attribute_access.hh"
@@ -37,6 +38,7 @@ using bke::OutputAttribute;
 using bke::OutputAttribute_Typed;
 using bke::ReadAttributeLookup;
 using bke::WriteAttributeLookup;
+using fn::ArrayCPPType;
 using fn::CPPType;
 using fn::GMutablePointer;
 using fn::GMutableSpan;
@@ -142,11 +144,23 @@ class GeoNodeExecParams {
    */
   template<typename T> T extract_input(StringRef identifier)
   {
+    if constexpr (std::is_same_v<T, int> || std::is_same_v<T, float> ||
+                  std::is_same_v<T, float3> || std::is_same_v<T, ColorGeometry4f> ||
+                  std::is_same_v<T, bool>) {
+      Array<T> array = this->extract_input<Array<T>>(identifier);
+      if (array.is_empty()) {
+        static T default_value{};
+        return default_value;
+      }
+      return array[0];
+    }
+    else {
 #ifdef DEBUG
-    this->check_input_access(identifier, &CPPType::get<T>());
+      this->check_input_access(identifier, &CPPType::get<T>());
 #endif
-    GMutablePointer gvalue = this->extract_input(identifier);
-    return gvalue.relocate_out<T>();
+      GMutablePointer gvalue = this->extract_input(identifier);
+      return gvalue.relocate_out<T>();
+    }
   }
 
   /**
@@ -169,12 +183,24 @@ class GeoNodeExecParams {
    */
   template<typename T> const T &get_input(StringRef identifier) const
   {
+    if constexpr (std::is_same_v<T, int> || std::is_same_v<T, float> ||
+                  std::is_same_v<T, float3> || std::is_same_v<T, ColorGeometry4f> ||
+                  std::is_same_v<T, bool>) {
+      const Array<T> &array = this->get_input<Array<T>>(identifier);
+      if (array.is_empty()) {
+        static const T default_value{};
+        return default_value;
+      }
+      return array[0];
+    }
+    else {
 #ifdef DEBUG
-    this->check_input_access(identifier, &CPPType::get<T>());
+      this->check_input_access(identifier, &CPPType::get<T>());
 #endif
-    GPointer gvalue = provider_->get_input(identifier);
-    BLI_assert(gvalue.is_type<T>());
-    return *(const T *)gvalue.get();
+      GPointer gvalue = provider_->get_input(identifier);
+      BLI_assert(gvalue.is_type<T>());
+      return *(const T *)gvalue.get();
+    }
   }
 
   /**
@@ -183,13 +209,20 @@ class GeoNodeExecParams {
   template<typename T> void set_output(StringRef identifier, T &&value)
   {
     using StoredT = std::decay_t<T>;
-    const CPPType &type = CPPType::get<std::decay_t<T>>();
+    if constexpr (std::is_same_v<StoredT, int> || std::is_same_v<StoredT, float> ||
+                  std::is_same_v<StoredT, float3> || std::is_same_v<StoredT, ColorGeometry4f> ||
+                  std::is_same_v<StoredT, bool>) {
+      this->set_output(identifier, Array<StoredT>({value}));
+    }
+    else {
+      const CPPType &type = CPPType::get<std::decay_t<T>>();
 #ifdef DEBUG
-    this->check_output_access(identifier, type);
+      this->check_output_access(identifier, type);
 #endif
-    GMutablePointer gvalue = provider_->alloc_output_value(type);
-    new (gvalue.get()) StoredT(std::forward<T>(value));
-    provider_->set_output(identifier, gvalue);
+      GMutablePointer gvalue = provider_->alloc_output_value(type);
+      new (gvalue.get()) StoredT(std::forward<T>(value));
+      provider_->set_output(identifier, gvalue);
+    }
   }
 
   /**
