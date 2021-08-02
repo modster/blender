@@ -773,6 +773,7 @@ static void initialize_group_input(NodesModifierData &nmd,
   }
   const IDProperty *property = IDP_GetPropertyFromGroup(nmd.settings.properties,
                                                         socket.identifier);
+
   const IDProperty *property_use_attribute = IDP_GetPropertyFromGroup(
       nmd.settings.properties, (socket.identifier + use_attribute_suffix).c_str());
   const IDProperty *property_attribute_name = IDP_GetPropertyFromGroup(
