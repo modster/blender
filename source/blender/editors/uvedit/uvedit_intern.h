@@ -125,6 +125,14 @@ BMLoop *uv_find_nearest_loop_from_edge(struct Scene *scene,
                                        struct BMEdge *e,
                                        const float co[2]);
 
+/* flush uv selection */
+void uv_flush_vert_to_edge(struct Scene *scene,
+                           struct Object *obedit,
+                           const int cd_loop_uv_offset);
+void uv_flush_edge_to_vert(struct Scene *scene,
+                           struct Object *obedit,
+                           const int cd_loop_uv_offset);
+
 /* utility tool functions */
 
 void uvedit_live_unwrap_update(struct SpaceImage *sima,
