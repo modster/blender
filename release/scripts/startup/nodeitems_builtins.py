@@ -529,6 +529,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeJoinGeometry"),
         NodeItem("GeometryNodeSeparateComponents"),
         NodeItem("GeometryNodeRaycast"),
+        NodeItem("GeometryNodeGeometryExpander"),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
         NodeItem("GeometryNodeObjectInfo"),

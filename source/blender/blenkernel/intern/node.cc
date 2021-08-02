@@ -5155,6 +5155,7 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_trim();
   register_node_type_geo_delete_geometry();
   register_node_type_geo_edge_split();
+  register_node_type_geo_geometry_expander();
   register_node_type_geo_input_material();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
