@@ -4325,7 +4325,7 @@ static PyObject *pyrna_struct_id_properties_ensure(BPy_StructRNA *self)
 
 PyDoc_STRVAR(pyrna_struct_id_properties_ui_doc,
              ".. method:: id_properties_ui()\n\n"
-             "   :return: Return an object used to manage a property's UI data.\n"
+             "   :return: Return an object used to manage an IDProperty's UI data.\n"
              "   :rtype: :class:`bpy.types.IDPropertyUIManager`\n");
 static PyObject *pyrna_struct_id_properties_ui(BPy_StructRNA *self, PyObject *args)
 {
@@ -4362,9 +4362,7 @@ static PyObject *pyrna_struct_id_properties_ui(BPy_StructRNA *self, PyObject *ar
 
   BPy_IDPropertyUIManager *ui_manager = PyObject_New(BPy_IDPropertyUIManager,
                                                      &BPy_IDPropertyUIManager_Type);
-  ui_manager->owner_id = self->ptr.owner_id;
   ui_manager->property = property;
-  ui_manager->parent = parent_group;
   return (PyObject *)ui_manager;
 }
 

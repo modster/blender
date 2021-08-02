@@ -82,10 +82,8 @@ static bool idprop_ui_data_update_base(IDProperty *idprop,
  */
 static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  /* Base class data included here to allow parsing all arguments at once. */
   const char *rna_subtype = nullptr;
   const char *description = nullptr;
-
   int min, max, soft_min, soft_max, step;
   PyObject *default_value = nullptr;
   const char *kwlist[] = {
@@ -178,10 +176,8 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
  */
 static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  /* Base class data included here to allow parsing all arguments at once. */
   const char *rna_subtype = nullptr;
   const char *description = nullptr;
-
   int precision;
   double min, max, soft_min, soft_max, step;
   PyObject *default_value = nullptr;
@@ -287,10 +283,8 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
  */
 static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  /* Base class data included here to allow parsing all arguments at once. */
   const char *rna_subtype = nullptr;
   const char *description = nullptr;
-
   const char *default_value;
   const char *kwlist[] = {"default", "subtype", "description", nullptr};
   if (!PyArg_ParseTupleAndKeywords(args,
@@ -322,10 +316,8 @@ static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyO
  */
 static bool idprop_ui_data_update_id(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  /* Base class data included here to allow parsing all arguments at once. */
   const char *rna_subtype = nullptr;
   const char *description = nullptr;
-
   const char *kwlist[] = {"subtype", "description", nullptr};
   if (!PyArg_ParseTupleAndKeywords(
           args, kwargs, "|$zz:update", (char **)kwlist, &rna_subtype, &description)) {
@@ -617,10 +609,8 @@ static struct PyMethodDef BPy_IDPropertyUIManager_methods[] = {
 
 static PyObject *BPy_IDPropertyUIManager_repr(BPy_IDPropertyUIManager *self)
 {
-  return PyUnicode_FromFormat("<bpy id prop ui manager: owner=\"%s\", name=\"%s\", address=%p>",
-                              self->owner_id ? self->owner_id->name : "<NONE>",
-                              self->property->name,
-                              self->property);
+  return PyUnicode_FromFormat(
+      "<bpy id prop ui manager: name=\"%s\", address=%p>", self->property->name, self->property);
 }
 
 static Py_hash_t BPy_IDPropertyUIManager_hash(BPy_IDPropertyUIManager *self)

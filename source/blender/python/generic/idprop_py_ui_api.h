@@ -31,9 +31,7 @@ extern PyTypeObject BPy_IDPropertyUIManager_Type;
 
 typedef struct BPy_IDPropertyUIManager {
   PyObject_VAR_HEAD
-  struct ID *owner_id;
   struct IDProperty *property;
-  struct IDProperty *parent;
 } BPy_IDPropertyUIManager;
 
 void IDPropertyUIData_Init_Types(void);

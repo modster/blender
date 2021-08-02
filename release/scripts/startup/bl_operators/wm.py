@@ -1434,7 +1434,7 @@ class WM_OT_properties_edit(Operator):
 
         if prop_type == int:
             if type(default_eval) == str:
-                self.report({'WARNING'}, "Could not evaluate number from default")
+                self.report({'WARNING'}, "Could not evaluate number from default value")
                 default_eval = None
             elif hasattr(default_eval, "__len__"):
                 default_eval = [int(round(value)) for value in default_eval]
@@ -1447,7 +1447,7 @@ class WM_OT_properties_edit(Operator):
             )
         elif prop_type == float:
             if type(default_eval) == str:
-                self.report({'WARNING'}, "Could not evaluate number from default")
+                self.report({'WARNING'}, "Could not evaluate number from default value")
                 default_eval = None
             ui_data.update(
                 min=self.min,

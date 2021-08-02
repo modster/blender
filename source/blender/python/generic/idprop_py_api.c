@@ -22,7 +22,6 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "idprop_py_api.h"
@@ -31,9 +30,6 @@
 #include "BKE_idprop.h"
 
 #include "DNA_ID.h" /* ID property definitions. */
-
-#include "RNA_access.h"
-#include "RNA_enum_types.h"
 
 #define USE_STRING_COERCE
 
