@@ -34,6 +34,8 @@
 #include "RNA_access.h"
 #include "RNA_enum_types.h"
 
+#include "../intern/bpy_rna.h"
+
 #define USE_STRING_COERCE
 
 #ifdef USE_STRING_COERCE
@@ -58,16 +60,11 @@ static bool args_contain_key(PyObject *kwargs, const char *name)
  * \return False when parsing fails, in which case caller should return NULL.
  */
 static bool idprop_ui_data_update_base(IDProperty *idprop,
-                                       const char *rna_subtype,
+                                       const struct BPy_EnumProperty_Parse *rna_subtype,
                                        const char *description)
 {
-  if (rna_subtype != NULL) {
-    int result = PROP_NONE;
-    if (!RNA_enum_value_from_id(rna_enum_property_subtype_items, rna_subtype, &result)) {
-      PyErr_SetString(PyExc_KeyError, "RNA subtype not found");
-      return false;
-    }
-    idprop->ui_data->rna_subtype = result;
+  if (rna_subtype->is_set) {
+    idprop->ui_data->rna_subtype = rna_subtype->value;
   }
 
   if (description != NULL) {
@@ -82,7 +79,8 @@ static bool idprop_ui_data_update_base(IDProperty *idprop,
  */
 static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  const char *rna_subtype = NULL;
+  struct BPy_EnumProperty_Parse rna_subtype = {.items = rna_enum_property_subtype_items,
+                                               .value = PROP_NONE};
   const char *description = NULL;
   int min, max, soft_min, soft_max, step;
   PyObject *default_value = NULL;
@@ -90,7 +88,7 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
       "min", "max", "soft_min", "soft_max", "step", "default", "subtype", "description", NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
-                                   "|$iiiiiOzz:update",
+                                   "|$iiiiiOO&z:update",
                                    (char **)kwlist,
                                    &min,
                                    &max,
@@ -98,12 +96,13 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
                                    &soft_max,
                                    &step,
                                    &default_value,
+                                   pyrna_enum_value_parse_string,
                                    &rna_subtype,
                                    &description)) {
     return false;
   }
 
-  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+  if (!idprop_ui_data_update_base(idprop, &rna_subtype, description)) {
     return false;
   }
 
@@ -176,7 +175,8 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
  */
 static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  const char *rna_subtype = NULL;
+  struct BPy_EnumProperty_Parse rna_subtype = {.items = rna_enum_property_subtype_items,
+                                               .value = PROP_NONE};
   const char *description = NULL;
   int precision;
   double min, max, soft_min, soft_max, step;
@@ -193,7 +193,7 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
                           NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
-                                   "|$dddddiOzz:update",
+                                   "|$dddddiOO&z:update",
                                    (char **)kwlist,
                                    &min,
                                    &max,
@@ -202,12 +202,13 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
                                    &step,
                                    &precision,
                                    &default_value,
+                                   pyrna_enum_value_parse_string,
                                    &rna_subtype,
                                    &description)) {
     return false;
   }
 
-  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+  if (!idprop_ui_data_update_base(idprop, &rna_subtype, description)) {
     return false;
   }
 
@@ -283,21 +284,23 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
  */
 static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  const char *rna_subtype = NULL;
+  struct BPy_EnumProperty_Parse rna_subtype = {.items = rna_enum_property_subtype_items,
+                                               .value = PROP_NONE};
   const char *description = NULL;
   const char *default_value;
   const char *kwlist[] = {"default", "subtype", "description", NULL};
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
-                                   "|$zzz:update",
+                                   "|$zO&z:update",
                                    (char **)kwlist,
                                    &default_value,
+                                   pyrna_enum_value_parse_string,
                                    &rna_subtype,
                                    &description)) {
     return false;
   }
 
-  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+  if (!idprop_ui_data_update_base(idprop, &rna_subtype, description)) {
     return false;
   }
 
@@ -316,15 +319,21 @@ static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyO
  */
 static bool idprop_ui_data_update_id(IDProperty *idprop, PyObject *args, PyObject *kwargs)
 {
-  const char *rna_subtype = NULL;
+  struct BPy_EnumProperty_Parse rna_subtype = {.items = rna_enum_property_subtype_items,
+                                               .value = PROP_NONE};
   const char *description = NULL;
   const char *kwlist[] = {"subtype", "description", NULL};
-  if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "|$zz:update", (char **)kwlist, &rna_subtype, &description)) {
+  if (!PyArg_ParseTupleAndKeywords(args,
+                                   kwargs,
+                                   "|$O&z:update",
+                                   (char **)kwlist,
+                                   pyrna_enum_value_parse_string,
+                                   &rna_subtype,
+                                   &description)) {
     return false;
   }
 
-  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+  if (!idprop_ui_data_update_base(idprop, &rna_subtype, description)) {
     return false;
   }
 
