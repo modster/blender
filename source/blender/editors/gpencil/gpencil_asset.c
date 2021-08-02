@@ -305,6 +305,16 @@ static bool gpencil_asset_create(const bContext *C,
           }
         }
       }
+      /* Unselect all strokes and points. */
+      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        gps->flag &= ~GP_STROKE_SELECT;
+        bGPDspoint *pt;
+        int i;
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          pt->flag &= ~GP_SPOINT_SELECT;
+        }
+      }
+
       /* If Frame is empty, remove. */
       if (BLI_listbase_count(&gpf->strokes) == 0) {
         BKE_gpencil_layer_frame_delete(gpl, gpf);
@@ -356,19 +366,10 @@ static bool gpencil_asset_create(const bContext *C,
     int index = (is_animation) ? 1 : 0;
     BKE_asset_metadata_tag_ensure(gpd->id.asset_data, tags[index]);
 
-    /* Retime frame number to start by 1. Must be done after generate the render preview.
-     * Use same loop to deselect all. */
+    /* Retime frame number to start by 1. Must be done after generate the render preview. */
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
       LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
         gpf->framenum -= f_min - 1;
-        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-          gps->flag &= ~GP_STROKE_SELECT;
-          bGPDspoint *pt;
-          int i;
-          for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-            pt->flag &= ~GP_SPOINT_SELECT;
-          }
-        }
       }
     }
   }
