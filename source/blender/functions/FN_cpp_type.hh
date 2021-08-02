@@ -138,8 +138,6 @@ class CPPType : NonCopyable, NonMovable {
   template<typename T, CPPTypeFlags Flags> CPPType(CPPTypeParam<T, Flags>, StringRef debug_name);
   virtual ~CPPType() = default;
 
-  virtual ~CPPType() = default;
-
   /**
    * Two types only compare equal when their pointer is equal. No two instances of CPPType for the
    * same C++ type should be created.

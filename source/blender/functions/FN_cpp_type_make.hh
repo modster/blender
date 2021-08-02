@@ -253,15 +253,6 @@ CPPType::CPPType(CPPTypeParam<T, Flags> /* unused */, StringRef debug_name)
                                    move_construct_ && move_assign_ && destruct_);
 }
 
-class StandardCPPType : public CPPType {
- public:
-  template<typename T, CPPTypeFlags flags>
-  StandardCPPType(std::string debug_name)
-      : CPPType(create_cpp_type_members<T, flags>(std::move(debug_name)))
-  {
-  }
-};
-
 }  // namespace blender::fn
 
 #define MAKE_CPP_TYPE(IDENTIFIER, TYPE_NAME, FLAGS) \

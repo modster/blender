@@ -476,19 +476,27 @@ template<typename T> class FieldRef : public FieldRefBase {
   }
 };
 
+template<typename T> struct FieldRefCPPTypeParam {
+};
+
 class FieldRefCPPType : public CPPType {
  private:
+  const CPPType &field_type_;
   FieldPtr (*get_field_)(const void *field_ref);
   void (*construct_)(void *dst, FieldPtr field);
-  const CPPType &field_type_;
 
  public:
-  FieldRefCPPType(fn::CPPTypeMembers members,
-                  FieldPtr (*get_field)(const void *field_ref),
-                  void (*construct)(void *dst, FieldPtr field),
-                  const CPPType &field_type)
-      : CPPType(members), get_field_(get_field), construct_(construct), field_type_(field_type)
+  template<typename T>
+  FieldRefCPPType(FieldRefCPPTypeParam<FieldRef<T>> /* unused */, StringRef debug_name)
+      : CPPType(fn::CPPTypeParam<FieldRef<T>, CPPTypeFlags::BasicType>(), debug_name),
+        field_type_(CPPType::get<T>())
   {
+    get_field_ = [](const void *field_ref) {
+      return ((const blender::bke::FieldRef<T> *)field_ref)->field();
+    };
+    construct_ = [](void *dst, blender::bke::FieldPtr field) {
+      new (dst) blender::bke::FieldRef<T>(std::move(field));
+    };
   }
 
   const CPPType &field_type() const
@@ -515,14 +523,7 @@ class FieldRefCPPType : public CPPType {
   blender::fn::CPPType::get_impl<blender::bke::FieldRef<FIELD_TYPE>>() \
   { \
     static blender::bke::FieldRefCPPType cpp_type{ \
-        blender::fn::create_cpp_type_members<blender::bke::FieldRef<FIELD_TYPE>, \
-                                             CPPTypeFlags::BasicType>(#DEBUG_NAME), \
-        [](const void *field_ref) { \
-          return ((const blender::bke::FieldRef<FIELD_TYPE> *)field_ref)->field(); \
-        }, \
-        [](void *dst, blender::bke::FieldPtr field) { \
-          new (dst) blender::bke::FieldRef<FIELD_TYPE>(std::move(field)); \
-        }, \
-        blender::fn::CPPType::get<FIELD_TYPE>()}; \
+        blender::bke::FieldRefCPPTypeParam<blender::bke::FieldRef<FIELD_TYPE>>(), \
+        STRINGIFY(DEBUG_NAME)}; \
     return cpp_type; \
   }
