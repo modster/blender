@@ -29,7 +29,7 @@ using blender::Array;
 
 static bNodeSocketTemplate geo_node_mesh_to_curve_in[] = {
     {SOCK_GEOMETRY, N_("Mesh")},
-    {SOCK_STRING, N_("Selection")},
+    {SOCK_BOOLEAN, N_("Selection"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 
@@ -258,15 +258,16 @@ static CurveFromEdgesOutput mesh_to_curve(Span<MVert> verts, Span<std::pair<int,
 static Vector<std::pair<int, int>> get_selected_edges(GeoNodeExecParams params,
                                                       const MeshComponent &component)
 {
-  const Mesh &mesh = *component.get_for_read();
-  const std::string selection_name = params.extract_input<std::string>("Selection");
-  if (!selection_name.empty() && !component.attribute_exists(selection_name)) {
-    params.error_message_add(NodeWarningType::Error,
-                             TIP_("No attribute with name \"") + selection_name + "\"");
-  }
-  GVArray_Typed<bool> selection = component.attribute_get_for_read<bool>(
-      selection_name, ATTR_DOMAIN_EDGE, true);
+  bke::FieldRef<bool> field = params.get_input_field<bool>("Selection");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, component, ATTR_DOMAIN_EDGE, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(component.attribute_domain_size(ATTR_DOMAIN_EDGE)), field_inputs);
 
+  GVArray_Typed<bool> selection{field_output.varray_ref()};
+
+  const Mesh &mesh = *component.get_for_read();
   Vector<std::pair<int, int>> selected_edges;
   for (const int i : IndexRange(mesh.totedge)) {
     if (selection[i]) {
