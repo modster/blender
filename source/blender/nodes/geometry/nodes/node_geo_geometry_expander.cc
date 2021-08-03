@@ -40,8 +40,12 @@ static void geo_node_geometry_expander_layout(uiLayout *layout,
 
 static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
 {
-  NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)params.node().storage;
-  UNUSED_VARS(storage);
+  const bNode &bnode = params.node();
+  const NodeGeometryGeometryExpander *storage = (const NodeGeometryGeometryExpander *)
+                                                    bnode.storage;
+  LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
+    params.set_output(expander_output->socket_identifier, 0.0f);
+  }
 }
 
 static void geo_node_geometry_expander_init(bNodeTree *UNUSED(ntree), bNode *node)
@@ -54,19 +58,35 @@ static void geo_node_geometry_expander_init(bNodeTree *UNUSED(ntree), bNode *nod
 static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
 {
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
-  LISTBASE_FOREACH_MUTABLE (bNodeSocket *, socket, &node->outputs) {
-    nodeRemoveSocket(ntree, node, socket);
+
+  Map<StringRef, bNodeSocket *> old_outputs;
+
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+    old_outputs.add(socket->identifier, socket);
   }
+  VectorSet<bNodeSocket *> new_sockets;
   LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
-    const char *idname = nodeStaticSocketType(expander_output->socket_type, PROP_NONE);
-    nodeAddSocket(ntree,
-                  node,
-                  SOCK_OUT,
-                  idname,
-                  expander_output->socket_identifier,
-                  expander_output->data_identifier);
+    bNodeSocket *socket = old_outputs.lookup_default(expander_output->socket_identifier, nullptr);
+    if (socket == nullptr) {
+      const char *idname = nodeStaticSocketType(expander_output->socket_type, PROP_NONE);
+      socket = nodeAddSocket(ntree,
+                             node,
+                             SOCK_OUT,
+                             idname,
+                             expander_output->socket_identifier,
+                             expander_output->data_identifier);
+    }
+    new_sockets.add_new(socket);
   }
-  // nodeAddSocket(ntree, node, SOCK_OUT, "NodeSocketFloat", "")
+  LISTBASE_FOREACH_MUTABLE (bNodeSocket *, socket, &node->outputs) {
+    if (!new_sockets.contains(socket)) {
+      nodeRemoveSocket(ntree, node, socket);
+    }
+  }
+  BLI_listbase_clear(&node->outputs);
+  for (bNodeSocket *socket : new_sockets) {
+    BLI_addtail(&node->outputs, socket);
+  }
 }
 
 static void geo_node_geometry_expander_storage_free(bNode *node)
