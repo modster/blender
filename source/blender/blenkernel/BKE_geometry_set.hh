@@ -136,6 +136,17 @@ class GeometryComponent {
   blender::bke::ReadAttributeLookup attribute_try_get_anonymous_for_read(
       const AnonymousCustomDataLayerID &layer_id) const;
 
+  blender::fn::GVArrayPtr attribute_try_get_anonymous_for_read(
+      const AnonymousCustomDataLayerID &id,
+      const AttributeDomain domain,
+      const CustomDataType data_type) const;
+
+  blender::fn::GVArrayPtr attribute_try_get_anonymous_for_read(
+      const AnonymousCustomDataLayerID &id,
+      const AttributeDomain domain,
+      const CustomDataType data_type,
+      const void *default_value) const;
+
   blender::bke::WriteAttributeLookup attribute_try_get_anonymous_for_write(
       const AnonymousCustomDataLayerID &layer_id);
 
@@ -150,8 +161,8 @@ class GeometryComponent {
   virtual bool is_empty() const;
 
   /* Get a virtual array to read the data of an attribute on the given domain and data type.
-   * Returns null when the attribute does not exist or cannot be converted to the requested domain
-   * and data type. */
+   * Returns null when the attribute does not exist or cannot be converted to the requested
+   * domain and data type. */
   std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
       const blender::StringRef attribute_name,
       const AttributeDomain domain,
@@ -192,14 +203,14 @@ class GeometryComponent {
   }
 
   /**
-   * Returns an "output attribute", which is essentially a mutable virtual array with some commonly
-   * used convince features. The returned output attribute might be empty if requested attribute
-   * cannot exist on the geometry.
+   * Returns an "output attribute", which is essentially a mutable virtual array with some
+   * commonly used convince features. The returned output attribute might be empty if requested
+   * attribute cannot exist on the geometry.
    *
    * The included convenience features are:
    * - Implicit type conversion when writing to builtin attributes.
-   * - If the attribute name exists already, but has a different type/domain, a temporary attribute
-   *   is created that will overwrite the existing attribute in the end.
+   * - If the attribute name exists already, but has a different type/domain, a temporary
+   * attribute is created that will overwrite the existing attribute in the end.
    */
   blender::bke::OutputAttribute attribute_try_get_for_output(
       const blender::StringRef attribute_name,
@@ -208,8 +219,8 @@ class GeometryComponent {
       const void *default_value = nullptr);
 
   /* Same as attribute_try_get_for_output, but should be used when the original values in the
-   * attributes are not read, i.e. the attribute is used only for output. Since values are not read
-   * from this attribute, no default value is necessary. */
+   * attributes are not read, i.e. the attribute is used only for output. Since values are not
+   * read from this attribute, no default value is necessary. */
   blender::bke::OutputAttribute attribute_try_get_for_output_only(
       const blender::StringRef attribute_name,
       const AttributeDomain domain,
@@ -235,6 +246,35 @@ class GeometryComponent {
     return this->attribute_try_get_for_output_only(attribute_name, domain, data_type);
   }
 
+  blender::bke::OutputAttribute attribute_try_get_anonymous_for_output(
+      const AnonymousCustomDataLayerID &id,
+      const AttributeDomain domain,
+      const CustomDataType data_type,
+      const void *default_value = nullptr);
+
+  blender::bke::OutputAttribute attribute_try_get_anonymous_for_output_only(
+      const AnonymousCustomDataLayerID &id,
+      const AttributeDomain domain,
+      const CustomDataType data_type);
+
+  template<typename T>
+  blender::bke::OutputAttribute_Typed<T> attribute_try_get_anonymous_for_output(
+      const AnonymousCustomDataLayerID &id, const AttributeDomain domain, const T default_value)
+  {
+    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
+    const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
+    return this->attribute_try_get_anonymous_for_output(id, domain, data_type, &default_value);
+  }
+
+  template<typename T>
+  blender::bke::OutputAttribute_Typed<T> attribute_try_get_anonymous_for_output_only(
+      const AnonymousCustomDataLayerID &id, const AttributeDomain domain)
+  {
+    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
+    const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
+    return this->attribute_try_get_anonymous_for_output_only(id, domain, data_type);
+  }
+
  private:
   virtual const blender::bke::ComponentAttributeProviders *get_attribute_providers() const;
 };
@@ -243,12 +283,12 @@ template<typename T>
 inline constexpr bool is_geometry_component_v = std::is_base_of_v<GeometryComponent, T>;
 
 /**
- * A geometry set contains zero or more geometry components. There is at most one component of each
- * type. Individual components might be shared between multiple geometries. Shared components are
- * copied automatically when write access is requested.
+ * A geometry set contains zero or more geometry components. There is at most one component of
+ * each type. Individual components might be shared between multiple geometries. Shared
+ * components are copied automatically when write access is requested.
  *
- * Copying a geometry set is a relatively cheap operation, because it does not copy the referenced
- * geometry components.
+ * Copying a geometry set is a relatively cheap operation, because it does not copy the
+ * referenced geometry components.
  */
 struct GeometrySet {
  private:
@@ -452,8 +492,8 @@ class InstanceReference {
   enum class Type {
     /**
      * An empty instance. This allows an `InstanceReference` to be default constructed without
-     * being in an invalid state. There might also be other use cases that we haven't explored much
-     * yet (such as changing the instance later on, and "disabling" some instances).
+     * being in an invalid state. There might also be other use cases that we haven't explored
+     * much yet (such as changing the instance later on, and "disabling" some instances).
      */
     None,
     Object,
@@ -524,8 +564,8 @@ class InstancesComponent : public GeometryComponent {
   blender::Vector<int> instance_ids_;
 
   /* These almost unique ids are generated based on `ids_`, which might not contain unique ids at
-   * all. They are *almost* unique, because under certain very unlikely circumstances, they are not
-   * unique. Code using these ids should not crash when they are not unique but can generally
+   * all. They are *almost* unique, because under certain very unlikely circumstances, they are
+   * not unique. Code using these ids should not crash when they are not unique but can generally
    * expect them to be unique. */
   mutable std::mutex almost_unique_ids_mutex_;
   mutable blender::Array<int> almost_unique_ids_;

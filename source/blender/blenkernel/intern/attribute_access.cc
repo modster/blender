@@ -788,6 +788,56 @@ bool CustomDataAttributes::create_by_move(const blender::StringRef name,
   return result != nullptr;
 }
 
+bool CustomDataAttributes::create_anonymous(const AnonymousCustomDataLayerID &id,
+                                            const CustomDataType data_type)
+{
+  for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
+    if (layer.anonymous_id == &id) {
+      /* Don't create two layers with the same id. */
+      return false;
+    }
+  }
+
+  const std::string name = get_anonymous_attribute_name();
+  if (!this->create(name, data_type)) {
+    return false;
+  }
+
+  const int layer_index = CustomData_get_named_layer_index(&data, data_type, name.c_str());
+  CustomDataLayer &layer = data.layers[layer_index];
+  layer.flag |= CD_FLAG_ANONYMOUS;
+  layer.anonymous_id = &id;
+  CustomData_anonymous_id_weak_increment(&id);
+
+  return true;
+}
+
+std::optional<GSpan> CustomDataAttributes::get_anonymous_for_read(
+    const AnonymousCustomDataLayerID &id) const
+{
+  for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
+    if (layer.anonymous_id == &id) {
+      const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
+      BLI_assert(cpp_type != nullptr);
+      return GSpan(*cpp_type, layer.data, size_);
+    }
+  }
+  return {};
+}
+
+std::optional<GMutableSpan> CustomDataAttributes::get_anonymous_for_write(
+    const AnonymousCustomDataLayerID &id)
+{
+  for (CustomDataLayer &layer : MutableSpan(data.layers, data.totlayer)) {
+    if (layer.anonymous_id == &id) {
+      const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
+      BLI_assert(cpp_type != nullptr);
+      return GMutableSpan(*cpp_type, layer.data, size_);
+    }
+  }
+  return {};
+}
+
 bool CustomDataAttributes::remove(const blender::StringRef name)
 {
   bool result = false;
@@ -824,6 +874,14 @@ bool CustomDataAttributes::foreach_attribute(const AttributeForeachCallback call
 /* -------------------------------------------------------------------- */
 /** \name Geometry Component
  * \{ */
+
+static std::unique_ptr<blender::fn::GVArray> try_adapt_data_type(
+    std::unique_ptr<blender::fn::GVArray> varray, const blender::fn::CPPType &to_type)
+{
+  const blender::nodes::DataTypeConversions &conversions =
+      blender::nodes::get_implicit_type_conversions();
+  return conversions.try_convert(std::move(varray), to_type);
+}
 
 const blender::bke::ComponentAttributeProviders *GeometryComponent::get_attribute_providers() const
 {
@@ -996,6 +1054,55 @@ blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_anonymous
   return {};
 }
 
+blender::fn::GVArrayPtr GeometryComponent::attribute_try_get_anonymous_for_read(
+    const AnonymousCustomDataLayerID &id,
+    const AttributeDomain domain,
+    const CustomDataType data_type) const
+{
+  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_anonymous_for_read(id);
+  if (!attribute) {
+    return {};
+  }
+
+  std::unique_ptr<blender::fn::GVArray> varray = std::move(attribute.varray);
+  if (domain != ATTR_DOMAIN_AUTO && attribute.domain != domain) {
+    varray = this->attribute_try_adapt_domain(std::move(varray), attribute.domain, domain);
+    if (!varray) {
+      return {};
+    }
+  }
+
+  const blender::fn::CPPType *cpp_type = blender::bke::custom_data_type_to_cpp_type(data_type);
+  BLI_assert(cpp_type != nullptr);
+  if (varray->type() != *cpp_type) {
+    varray = try_adapt_data_type(std::move(varray), *cpp_type);
+    if (!varray) {
+      return {};
+    }
+  }
+
+  return varray;
+}
+
+blender::fn::GVArrayPtr GeometryComponent::attribute_try_get_anonymous_for_read(
+    const AnonymousCustomDataLayerID &id,
+    const AttributeDomain domain,
+    const CustomDataType data_type,
+    const void *default_value) const
+{
+  blender::fn::GVArrayPtr varray = this->attribute_try_get_anonymous_for_read(
+      id, domain, data_type);
+  if (varray) {
+    return varray;
+  }
+  const blender::fn::CPPType *type = blender::bke::custom_data_type_to_cpp_type(data_type);
+  if (default_value == nullptr) {
+    default_value = type->default_value();
+  }
+  const int domain_size = this->attribute_domain_size(domain);
+  return std::make_unique<blender::fn::GVArray_For_SingleValue>(*type, domain_size, default_value);
+}
+
 blender::bke::WriteAttributeLookup GeometryComponent::attribute_try_get_anonymous_for_write(
     const AnonymousCustomDataLayerID &layer_id)
 {
@@ -1103,14 +1210,6 @@ std::optional<AttributeMetaData> GeometryComponent::attribute_get_meta_data(
     return true;
   });
   return result;
-}
-
-static std::unique_ptr<blender::fn::GVArray> try_adapt_data_type(
-    std::unique_ptr<blender::fn::GVArray> varray, const blender::fn::CPPType &to_type)
-{
-  const blender::nodes::DataTypeConversions &conversions =
-      blender::nodes::get_implicit_type_conversions();
-  return conversions.try_convert(std::move(varray), to_type);
 }
 
 std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_read(
@@ -1363,4 +1462,123 @@ blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_on
     const CustomDataType data_type)
 {
   return create_output_attribute(*this, attribute_name, domain, data_type, true, nullptr);
+}
+
+class GVMutableAttribute_For_AnonymousOutputAttribute
+    : public blender::fn::GVMutableArray_For_GMutableSpan {
+ public:
+  GeometryComponent *component;
+  const AnonymousCustomDataLayerID &final_id;
+
+  GVMutableAttribute_For_AnonymousOutputAttribute(GMutableSpan data,
+                                                  GeometryComponent &component,
+                                                  const AnonymousCustomDataLayerID &final_id)
+
+      : blender::fn::GVMutableArray_For_GMutableSpan(data),
+        component(&component),
+        final_id(final_id)
+  {
+  }
+
+  ~GVMutableAttribute_For_AnonymousOutputAttribute() override
+  {
+    type_->destruct_n(data_, size_);
+    MEM_freeN(data_);
+  }
+};
+
+static void save_output_anonymous_attribute(blender::bke::OutputAttribute &output_attribute)
+{
+  using namespace blender;
+  using namespace blender::fn;
+  using namespace blender::bke;
+
+  GVMutableAttribute_For_AnonymousOutputAttribute &varray =
+      dynamic_cast<GVMutableAttribute_For_AnonymousOutputAttribute &>(output_attribute.varray());
+
+  GeometryComponent &component = *varray.component;
+  WriteAttributeLookup write_attribute = component.attribute_try_get_anonymous_for_write(
+      varray.final_id);
+  BUFFER_FOR_CPP_TYPE_VALUE(varray.type(), buffer);
+  for (const int i : IndexRange(varray.size())) {
+    varray.get(i, buffer);
+    write_attribute.varray->set_by_relocate(i, buffer);
+  }
+}
+
+static blender::bke::OutputAttribute create_output_attribute_anonymous(
+    GeometryComponent &component,
+    const AnonymousCustomDataLayerID &id,
+    const AttributeDomain domain,
+    const CustomDataType data_type,
+    const bool ignore_old_values,
+    const void *default_value)
+{
+  using namespace blender;
+  using namespace blender::fn;
+  using namespace blender::bke;
+
+  const CPPType *cpp_type = custom_data_type_to_cpp_type(data_type);
+  BLI_assert(cpp_type != nullptr);
+
+  const int domain_size = component.attribute_domain_size(domain);
+
+  WriteAttributeLookup attribute = component.attribute_try_get_anonymous_for_write(id);
+  if (!attribute) {
+    if (default_value) {
+      const GVArray_For_SingleValueRef default_varray{*cpp_type, domain_size, default_value};
+      component.attribute_try_create_anonymous(
+          id, domain, data_type, AttributeInitVArray(&default_varray));
+    }
+    else {
+      component.attribute_try_create_anonymous(id, domain, data_type, AttributeInitDefault());
+    }
+
+    attribute = component.attribute_try_get_anonymous_for_write(id);
+    if (!attribute) {
+      /* Can't create the attribute. */
+      return {};
+    }
+  }
+  if (attribute.domain == domain && attribute.varray->type() == *cpp_type) {
+    /* Existing generic attribute matches exactly. */
+    return OutputAttribute(std::move(attribute.varray), domain, {}, ignore_old_values);
+  }
+
+  /* Allocate a new array that lives next to the existing attribute. It will overwrite the existing
+   * attribute after processing is done. */
+  void *data = MEM_mallocN_aligned(
+      cpp_type->size() * domain_size, cpp_type->alignment(), __func__);
+  if (ignore_old_values) {
+    /* This does nothing for trivially constructible types, but is necessary for correctness. */
+    cpp_type->default_construct_n(data, domain);
+  }
+  else {
+    BLI_assert_unreachable();
+    /* Fill the temporary array with values from the existing attribute. */
+    GVArrayPtr old_varray = component.attribute_try_get_anonymous_for_read(
+        id, domain, data_type, default_value);
+    old_varray->materialize_to_uninitialized(IndexRange(domain_size), data);
+  }
+  GVMutableArrayPtr varray = std::make_unique<GVMutableAttribute_For_AnonymousOutputAttribute>(
+      GMutableSpan{*cpp_type, data, domain_size}, component, id);
+
+  return OutputAttribute(std::move(varray), domain, save_output_anonymous_attribute, true);
+}
+
+blender::bke::OutputAttribute GeometryComponent::attribute_try_get_anonymous_for_output(
+    const AnonymousCustomDataLayerID &id,
+    const AttributeDomain domain,
+    const CustomDataType data_type,
+    const void *default_value)
+{
+  return create_output_attribute_anonymous(*this, id, domain, data_type, false, default_value);
+}
+
+blender::bke::OutputAttribute GeometryComponent::attribute_try_get_anonymous_for_output_only(
+    const AnonymousCustomDataLayerID &id,
+    const AttributeDomain domain,
+    const CustomDataType data_type)
+{
+  return create_output_attribute_anonymous(*this, id, domain, data_type, true, nullptr);
 }

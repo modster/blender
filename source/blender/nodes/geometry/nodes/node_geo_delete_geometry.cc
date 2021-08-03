@@ -115,14 +115,21 @@ static void copy_dynamic_attributes(const CustomDataAttributes &src,
         std::optional<GSpan> src_attribute = src.get_for_read(name);
         BLI_assert(src_attribute);
 
-        if (!dst.create(name, meta_data.data_type)) {
-          /* Since the source spline of the same type had the attribute, adding it should work. */
-          BLI_assert_unreachable();
+        std::optional<GMutableSpan> new_attribute;
+        if (meta_data.anonymous_layer_id) {
+          if (!dst.create_anonymous(*meta_data.anonymous_layer_id, meta_data.data_type)) {
+            BLI_assert_unreachable();
+          }
+          new_attribute = dst.get_anonymous_for_write(*meta_data.anonymous_layer_id);
+        }
+        else {
+          if (!dst.create(name, meta_data.data_type)) {
+            BLI_assert_unreachable();
+          }
+          new_attribute = dst.get_for_write(name);
         }
 
-        std::optional<GMutableSpan> new_attribute = dst.get_for_write(name);
         BLI_assert(new_attribute);
-
         attribute_math::convert_to_static_type(new_attribute->type(), [&](auto dummy) {
           using T = decltype(dummy);
           copy_data(src_attribute->typed<T>(), new_attribute->typed<T>(), mask);

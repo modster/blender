@@ -339,7 +339,11 @@ void CurveEval::assert_valid_point_attributes() const
               name,
               [&](AttributeMetaData *map_data) {
                 /* All unique attribute names should be added on the first spline. */
-                BLI_assert(spline == splines_.first());
+                /* TODO(Hans/Jacques): This check seems very bad, anonymous attributes with have
+                 * different names on different splines. */
+                if (meta_data.anonymous_layer_id == nullptr) {
+                  BLI_assert(spline == splines_.first());
+                }
                 *map_data = meta_data;
               },
               [&](AttributeMetaData *map_data) {

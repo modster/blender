@@ -198,41 +198,28 @@ static void raycast_from_points(const GeoNodeExecParams &params,
       IndexRange(ray_origins->size()), ray_length_field_inputs);
   GVArray_Typed<float> ray_lengths{ray_length_field_output.varray_ref()};
 
-  MutableSpan<bool> is_hit{};
+  std::optional<OutputAttribute_Typed<bool>> is_hit_attribute;
+  std::optional<OutputAttribute_Typed<float3>> hit_position_attribute;
+  std::optional<OutputAttribute_Typed<float3>> hit_normal_attribute;
+  std::optional<OutputAttribute_Typed<float>> hit_distance_attribute;
+
   if (hit_id != nullptr) {
-    dst_component.attribute_try_create_anonymous(
-        *hit_id, ATTR_DOMAIN_POINT, CD_PROP_BOOL, AttributeInitDefault());
-    WriteAttributeLookup attribute = dst_component.attribute_try_get_anonymous_for_write(*hit_id);
-    is_hit = attribute.varray->get_internal_span().typed<bool>();
+    is_hit_attribute.emplace(dst_component.attribute_try_get_anonymous_for_output_only<bool>(
+        *hit_id, ATTR_DOMAIN_POINT));
   }
-  Array<float3> hit_positions_internal;
-  MutableSpan<float3> hit_positions{};
   if (hit_position_id != nullptr) {
-    dst_component.attribute_try_create_anonymous(
-        *hit_position_id, ATTR_DOMAIN_POINT, CD_PROP_FLOAT3, AttributeInitDefault());
-    WriteAttributeLookup attribute = dst_component.attribute_try_get_anonymous_for_write(
-        *hit_position_id);
-    hit_positions = attribute.varray->get_internal_span().typed<float3>();
+    hit_position_attribute.emplace(
+        dst_component.attribute_try_get_anonymous_for_output_only<float3>(*hit_position_id,
+                                                                          ATTR_DOMAIN_POINT));
   }
-  else {
-    hit_positions_internal.reinitialize(ray_origins->size());
-    hit_positions = hit_positions_internal;
-  }
-  MutableSpan<float3> hit_normals{};
   if (hit_normal_id != nullptr) {
-    dst_component.attribute_try_create_anonymous(
-        *hit_normal_id, ATTR_DOMAIN_POINT, CD_PROP_FLOAT3, AttributeInitDefault());
-    WriteAttributeLookup attribute = dst_component.attribute_try_get_anonymous_for_write(
-        *hit_normal_id);
-    hit_normals = attribute.varray->get_internal_span().typed<float3>();
+    hit_normal_attribute.emplace(dst_component.attribute_try_get_anonymous_for_output_only<float3>(
+        *hit_normal_id, ATTR_DOMAIN_POINT));
   }
-  MutableSpan<float> hit_distances{};
   if (hit_distance_id != nullptr) {
-    dst_component.attribute_try_create_anonymous(
-        *hit_distance_id, ATTR_DOMAIN_POINT, CD_PROP_FLOAT, AttributeInitDefault());
-    WriteAttributeLookup attribute = dst_component.attribute_try_get_anonymous_for_write(
-        *hit_distance_id);
-    hit_distances = attribute.varray->get_internal_span().typed<float>();
+    hit_distance_attribute.emplace(
+        dst_component.attribute_try_get_anonymous_for_output_only<float>(*hit_distance_id,
+                                                                         ATTR_DOMAIN_POINT));
   }
 
   Array<int> hit_indices;
@@ -240,15 +227,39 @@ static void raycast_from_points(const GeoNodeExecParams &params,
     hit_indices.reinitialize(ray_origins->size());
   }
 
+  MutableSpan<float3> hit_positions;
+  Array<float3> hit_positions_internal;
+  if (hit_position_attribute) {
+    hit_positions = hit_position_attribute->as_span();
+  }
+  else {
+    hit_positions_internal.reinitialize(ray_origins->size());
+    hit_positions = hit_positions_internal;
+  }
+
   raycast_to_mesh(src_mesh,
                   ray_origins,
                   ray_directions,
                   ray_lengths,
-                  is_hit,
+                  is_hit_attribute ? is_hit_attribute->as_span() : MutableSpan<bool>(),
                   hit_indices,
                   hit_positions,
-                  hit_normals,
-                  hit_distances);
+                  hit_normal_attribute ? hit_normal_attribute->as_span() : MutableSpan<float3>(),
+                  hit_distance_attribute ? hit_distance_attribute->as_span() :
+                                           MutableSpan<float>());
+
+  if (is_hit_attribute) {
+    is_hit_attribute->save();
+  }
+  if (hit_position_attribute) {
+    hit_position_attribute->save();
+  }
+  if (hit_normal_attribute) {
+    hit_normal_attribute->save();
+  }
+  if (hit_distance_attribute) {
+    hit_distance_attribute->save();
+  }
 
   /* Custom interpolated attributes */
   bke::mesh_surface_sample::MeshAttributeInterpolator interp(src_mesh, hit_positions, hit_indices);

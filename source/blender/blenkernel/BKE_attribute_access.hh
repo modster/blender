@@ -356,6 +356,12 @@ class CustomDataAttributes {
   bool create_by_move(const blender::StringRef name, const CustomDataType data_type, void *buffer);
   bool remove(const blender::StringRef name);
 
+  bool create_anonymous(const AnonymousCustomDataLayerID &id, const CustomDataType data_type);
+  std::optional<blender::fn::GSpan> get_anonymous_for_read(
+      const AnonymousCustomDataLayerID &id) const;
+  std::optional<blender::fn::GMutableSpan> get_anonymous_for_write(
+      const AnonymousCustomDataLayerID &id);
+
   bool foreach_attribute(const AttributeForeachCallback callback,
                          const AttributeDomain domain) const;
 };

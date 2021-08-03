@@ -1094,6 +1094,165 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
     return true;
   }
 
+  bool try_create_anonymous(GeometryComponent &component,
+                            const AnonymousCustomDataLayerID &layer_id,
+                            const AttributeDomain domain,
+                            const CustomDataType data_type,
+                            const AttributeInit &initializer) const
+  {
+    BLI_assert(this->type_is_supported(data_type));
+    if (domain != ATTR_DOMAIN_POINT) {
+      return false;
+    }
+
+    CurveEval *curve = get_curve_from_component_for_write(component);
+    if (curve == nullptr || curve->splines().size() == 0) {
+      return false;
+    }
+
+    MutableSpan<SplinePtr> splines = curve->splines();
+
+    /* Otherwise just create a custom data layer on each of the splines. */
+    for (const int i : splines.index_range()) {
+      if (!splines[i]->attributes.create_anonymous(layer_id, data_type)) {
+        /* If attribute creation fails on one of the splines, we cannot leave the custom data
+         * layers in the previous splines around, so delete them before returning. However,
+         * this is not an expected case. */
+        BLI_assert_unreachable();
+        return false;
+      }
+    }
+
+    /* With a default initializer type, we can keep the values at their initial values. */
+    if (initializer.type == AttributeInit::Type::Default) {
+      return true;
+    }
+
+    WriteAttributeLookup write_attribute = this->try_get_anonymous_for_write(component, layer_id);
+    /* We just created the attribute, it should exist. */
+    BLI_assert(write_attribute);
+
+    const int total_size = curve->control_point_offsets().last();
+    GVArrayPtr source_varray = varray_from_initializer(initializer, data_type, total_size);
+    /* TODO: When we can call a variant of #set_all with a virtual array argument,
+     * this theoretically unnecessary materialize step could be removed. */
+    GVArray_GSpan source_varray_span{*source_varray};
+    write_attribute.varray->set_all(source_varray_span.data());
+
+    if (initializer.type == AttributeInit::Type::MoveArray) {
+      MEM_freeN(static_cast<const AttributeInitMove &>(initializer).data);
+    }
+
+    curve->assert_valid_point_attributes();
+
+    return true;
+  }
+
+  ReadAttributeLookup try_get_anonymous_for_read(const GeometryComponent &component,
+                                                 const AnonymousCustomDataLayerID &layer_id) const
+  {
+    const CurveEval *curve = get_curve_from_component_for_read(component);
+    if (curve == nullptr || curve->splines().size() == 0) {
+      return {};
+    }
+
+    Span<SplinePtr> splines = curve->splines();
+    Vector<GSpan> spans; /* GSpan has no default constructor. */
+    spans.reserve(splines.size());
+    std::optional<GSpan> first_span = splines[0]->attributes.get_anonymous_for_read(layer_id);
+    if (!first_span) {
+      return {};
+    }
+    spans.append(*first_span);
+    for (const int i : IndexRange(1, splines.size() - 1)) {
+      std::optional<GSpan> span = splines[i]->attributes.get_anonymous_for_read(layer_id);
+      if (!span) {
+        /* All splines should have the same set of data layers. It would be possible to recover
+         * here and return partial data instead, but that would add a lot of complexity for a
+         * situation we don't even expect to encounter. */
+        BLI_assert_unreachable();
+        return {};
+      }
+      if (span->type() != spans.last().type()) {
+        /* Data layer types on separate splines do not match. */
+        BLI_assert_unreachable();
+        return {};
+      }
+      spans.append(*span);
+    }
+
+    /* First check for the simpler situation when we can return a simpler span virtual array. */
+    if (spans.size() == 1) {
+      return {std::make_unique<GVArray_For_GSpan>(spans.first()), ATTR_DOMAIN_POINT};
+    }
+
+    ReadAttributeLookup attribute = {};
+    Array<int> offsets = curve->control_point_offsets();
+    attribute_math::convert_to_static_type(spans[0].type(), [&](auto dummy) {
+      using T = decltype(dummy);
+      Array<Span<T>> data(splines.size());
+      for (const int i : splines.index_range()) {
+        data[i] = spans[i].typed<T>();
+        BLI_assert(data[i].data() != nullptr);
+      }
+      attribute = {point_data_gvarray(data, offsets), ATTR_DOMAIN_POINT};
+    });
+    return attribute;
+  }
+
+  WriteAttributeLookup try_get_anonymous_for_write(
+      GeometryComponent &component, const AnonymousCustomDataLayerID &layer_id) const
+  {
+    CurveEval *curve = get_curve_from_component_for_write(component);
+    if (curve == nullptr || curve->splines().size() == 0) {
+      return {};
+    }
+
+    MutableSpan<SplinePtr> splines = curve->splines();
+    Vector<GMutableSpan> spans; /* GMutableSpan has no default constructor. */
+    spans.reserve(splines.size());
+    std::optional<GMutableSpan> first_span = splines[0]->attributes.get_anonymous_for_write(
+        layer_id);
+    if (!first_span) {
+      return {};
+    }
+    spans.append(*first_span);
+    for (const int i : IndexRange(1, splines.size() - 1)) {
+      std::optional<GMutableSpan> span = splines[i]->attributes.get_anonymous_for_write(layer_id);
+      if (!span) {
+        /* All splines should have the same set of data layers. It would be possible to recover
+         * here and return partial data instead, but that would add a lot of complexity for a
+         * situation we don't even expect to encounter. */
+        BLI_assert_unreachable();
+        return {};
+      }
+      if (span->type() != spans.last().type()) {
+        /* Data layer types on separate splines do not match. */
+        BLI_assert_unreachable();
+        return {};
+      }
+      spans.append(*span);
+    }
+
+    /* First check for the simpler situation when we can return a simpler span virtual array. */
+    if (spans.size() == 1) {
+      return {std::make_unique<GVMutableArray_For_GMutableSpan>(spans.first()), ATTR_DOMAIN_POINT};
+    }
+
+    WriteAttributeLookup attribute = {};
+    Array<int> offsets = curve->control_point_offsets();
+    attribute_math::convert_to_static_type(spans[0].type(), [&](auto dummy) {
+      using T = decltype(dummy);
+      Array<MutableSpan<T>> data(splines.size());
+      for (const int i : splines.index_range()) {
+        data[i] = spans[i].typed<T>();
+        BLI_assert(data[i].data() != nullptr);
+      }
+      attribute = {point_data_gvarray(data, offsets), ATTR_DOMAIN_POINT};
+    });
+    return attribute;
+  }
+
   bool foreach_attribute(const GeometryComponent &component,
                          const AttributeForeachCallback callback) const final
   {
