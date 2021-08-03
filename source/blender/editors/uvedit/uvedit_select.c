@@ -70,14 +70,24 @@
 
 #include "uvedit_intern.h"
 
-static void uv_select_all_perform(Scene *scene, Object *obedit, int action);
+static void uv_select_all_perform(Scene *scene, SpaceImage *sima, Object *obedit, int action);
 
-static void uv_select_all_perform_multi_ex(
-    Scene *scene, Object **objects, const uint objects_len, int action, const Object *ob_exclude);
-static void uv_select_all_perform_multi(Scene *scene,
-                                        Object **objects,
-                                        const uint objects_len,
-                                        int action);
+static void uv_select_all_perform_multi_ex(Scene *scene,
+                                           SpaceImage *sima,
+                                           Object **objects,
+                                           const uint objects_len,
+                                           int action,
+                                           const Object *ob_exclude);
+static void uv_select_all_perform_multi(
+    Scene *scene, SpaceImage *sima, Object **objects, const uint objects_len, int action);
+
+static void uv_select_flush_from_tag_sticky_loc_internal(Scene *scene,
+                                                         BMEditMesh *em,
+                                                         UvVertMap *vmap,
+                                                         const uint efa_index,
+                                                         BMLoop *l,
+                                                         const bool select,
+                                                         const int cd_loop_uv_offset);
 
 static void uv_select_flush_from_tag_face(SpaceImage *sima,
                                           Scene *scene,
@@ -1333,6 +1343,47 @@ void uv_flush_edge_to_vert(Scene *scene, Object *obedit, const int cd_loop_uv_of
   }
 }
 
+/**
+ * Select shared vertices (vertex selection with sticky location) for all edges that are marked
+ * using MLOOPUV_EDGESEL flag as a tag
+ */
+void uv_flush_edge_to_vert_with_sticky_loc(Scene *scene,
+                                           Object *obedit,
+                                           const int cd_loop_uv_offset)
+{
+  BMEditMesh *em = BKE_editmesh_from_object(obedit);
+  BMFace *efa;
+  BMLoop *l;
+  BMIter iter, liter;
+  struct UvVertMap *vmap;
+  uint efa_index;
+
+  vmap = BM_uv_vert_map_create(em->bm, false, false);
+  if (vmap == NULL) {
+    return;
+  }
+
+  BM_ITER_MESH_INDEX (efa, &iter, em->bm, BM_FACES_OF_MESH, efa_index) {
+    if (!uvedit_face_visible_test(scene, efa)) {
+      continue;
+    }
+
+    BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
+      MLoopUV *luv;
+      luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
+
+      if (luv->flag & MLOOPUV_EDGESEL) {
+        uv_select_flush_from_tag_sticky_loc_internal(
+            scene, em, vmap, efa_index, l, true, cd_loop_uv_offset);
+        uv_select_flush_from_tag_sticky_loc_internal(
+            scene, em, vmap, efa_index, l->next, true, cd_loop_uv_offset);
+      }
+    }
+  }
+
+  BM_uv_vert_map_free(vmap);
+}
+
 /** \} */
 
 /* NOTE : UV Selection mode flushing NOT implemented for now
@@ -1618,7 +1669,7 @@ static int uv_select_edgeloop(
 
   /* Apply the selection. */
   if (!extend) {
-    uv_select_all_perform(scene, obedit, SEL_DESELECT);
+    uv_select_all_perform(scene, NULL, obedit, SEL_DESELECT);
   }
 
   /* Select all tagged loops. */
@@ -1659,7 +1710,7 @@ static int uv_select_edgering(
   const int cd_loop_uv_offset = CustomData_get_offset(&em->bm->ldata, CD_MLOOPUV);
 
   if (!extend) {
-    uv_select_all_perform(scene, obedit, SEL_DESELECT);
+    uv_select_all_perform(scene, NULL, obedit, SEL_DESELECT);
   }
 
   BM_mesh_elem_hflag_disable_all(em->bm, BM_EDGE, BM_ELEM_TAG, false);
@@ -2193,7 +2244,7 @@ bool uvedit_select_is_any_selected_multi(Scene *scene, Object **objects, const u
   return found;
 }
 
-static void uv_select_all_perform(Scene *scene, Object *obedit, int action)
+static void uv_select_all_perform(Scene *scene, SpaceImage *sima, Object *obedit, int action)
 {
   const ToolSettings *ts = scene->toolsettings;
   BMEditMesh *em = BKE_editmesh_from_object(obedit);
@@ -2265,11 +2316,14 @@ static void uv_select_all_perform(Scene *scene, Object *obedit, int action)
               luv->flag &= ~MLOOPUV_VERTSEL;
               break;
             }
+            case UV_SELECT_FACE: {
+              luv->flag ^= MLOOPUV_EDGESEL;
+              luv->flag &= ~MLOOPUV_VERTSEL;
+              break;
+            }
             /* Invert MLOOPUV_VERTSEL flag for all uv elements if in vertex selection mode
              * This will mark all vertices that need to be selected */
             case UV_SELECT_VERTEX:
-            case UV_SELECT_FACE:
-            /* TEMPORARY: Fallback to vertex selection mode logic */
             case UV_SELECT_ISLAND:
             /* TEMPORARY: Fallback to vertex selection mode logic */
             default: {
@@ -2286,9 +2340,16 @@ static void uv_select_all_perform(Scene *scene, Object *obedit, int action)
           uv_flush_edge_to_vert(scene, obedit, cd_loop_uv_offset);
           break;
         }
+        case UV_SELECT_FACE: {
+          if (sima->sticky == SI_STICKY_DISABLE) {
+            uv_flush_edge_to_vert(scene, obedit, cd_loop_uv_offset);
+          }
+          else {
+            uv_flush_edge_to_vert_with_sticky_loc(scene, obedit, cd_loop_uv_offset);
+          }
+          break;
+        }
         case UV_SELECT_VERTEX:
-        case UV_SELECT_FACE:
-        /* TEMPORARY: Fallback to vertex selection mode logic */
         case UV_SELECT_ISLAND:
         /* TEMPORARY: Fallback to vertex selection mode logic */
         default: {
@@ -2300,8 +2361,12 @@ static void uv_select_all_perform(Scene *scene, Object *obedit, int action)
   }
 }
 
-static void uv_select_all_perform_multi_ex(
-    Scene *scene, Object **objects, const uint objects_len, int action, const Object *ob_exclude)
+static void uv_select_all_perform_multi_ex(Scene *scene,
+                                           SpaceImage *sima,
+                                           Object **objects,
+                                           const uint objects_len,
+                                           int action,
+                                           const Object *ob_exclude)
 {
   if (action == SEL_TOGGLE) {
     action = uvedit_select_is_any_selected_multi(scene, objects, objects_len) ? SEL_DESELECT :
@@ -2313,22 +2378,21 @@ static void uv_select_all_perform_multi_ex(
     if (ob_exclude && (obedit == ob_exclude)) {
       continue;
     }
-    uv_select_all_perform(scene, obedit, action);
+    uv_select_all_perform(scene, sima, obedit, action);
   }
 }
 
-static void uv_select_all_perform_multi(Scene *scene,
-                                        Object **objects,
-                                        const uint objects_len,
-                                        int action)
+static void uv_select_all_perform_multi(
+    Scene *scene, SpaceImage *sima, Object **objects, const uint objects_len, int action)
 {
-  uv_select_all_perform_multi_ex(scene, objects, objects_len, action, NULL);
+  uv_select_all_perform_multi_ex(scene, sima, objects, objects_len, action, NULL);
 }
 
 static int uv_select_all_exec(bContext *C, wmOperator *op)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
+  SpaceImage *sima = CTX_wm_space_image(C);
   const ToolSettings *ts = scene->toolsettings;
   ViewLayer *view_layer = CTX_data_view_layer(C);
 
@@ -2338,7 +2402,7 @@ static int uv_select_all_exec(bContext *C, wmOperator *op)
   Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data_with_uvs(
       view_layer, ((View3D *)NULL), &objects_len);
 
-  uv_select_all_perform_multi(scene, objects, objects_len, action);
+  uv_select_all_perform_multi(scene, sima, objects, objects_len, action);
 
   for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
     Object *obedit = objects[ob_index];
@@ -2463,7 +2527,7 @@ static int uv_mouse_select_multi(bContext *C,
 
   if (!found_item) {
     if (deselect_all) {
-      uv_select_all_perform_multi(scene, objects, objects_len, SEL_DESELECT);
+      uv_select_all_perform_multi(scene, NULL, objects, objects_len, SEL_DESELECT);
 
       for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
         Object *obedit = objects[ob_index];
@@ -2482,7 +2546,7 @@ static int uv_mouse_select_multi(bContext *C,
   /* do selection */
   if (selectmode == UV_SELECT_ISLAND) {
     if (!extend) {
-      uv_select_all_perform_multi_ex(scene, objects, objects_len, SEL_DESELECT, obedit);
+      uv_select_all_perform_multi_ex(scene, NULL, objects, objects_len, SEL_DESELECT, obedit);
     }
     /* Current behavior of 'extend'
      * is actually toggling, so pass extend flag as 'toggle' here */
@@ -2525,7 +2589,7 @@ static int uv_mouse_select_multi(bContext *C,
   else {
     const bool select = true;
     /* deselect all */
-    uv_select_all_perform_multi(scene, objects, objects_len, SEL_DESELECT);
+    uv_select_all_perform_multi(scene, NULL, objects, objects_len, SEL_DESELECT);
 
     if (selectmode == UV_SELECT_VERTEX) {
       /* select vertex */
@@ -2675,7 +2739,7 @@ static int uv_mouse_select_loop_generic_multi(bContext *C,
 
   /* Do selection. */
   if (!extend) {
-    uv_select_all_perform_multi_ex(scene, objects, objects_len, SEL_DESELECT, obedit);
+    uv_select_all_perform_multi_ex(scene, NULL, objects, objects_len, SEL_DESELECT, obedit);
   }
 
   if (loop_type == UV_LOOP_SELECT) {
@@ -2892,7 +2956,7 @@ static int uv_select_linked_internal(bContext *C, wmOperator *op, const wmEvent 
   }
 
   if (!extend && !deselect) {
-    uv_select_all_perform_multi(scene, objects, objects_len, SEL_DESELECT);
+    uv_select_all_perform_multi(scene, NULL, objects, objects_len, SEL_DESELECT);
   }
 
   uv_select_linked_multi(
@@ -3348,6 +3412,7 @@ static void uv_select_flush_from_tag_loop(SpaceImage *sima,
         }
       }
     }
+    BM_uv_vert_map_free(vmap);
 
     /* If UV edge selection mode then flush selection */
     if (ts->uv_selectmode == UV_SELECT_EDGE) {
@@ -3415,7 +3480,7 @@ static int uv_box_select_exec(bContext *C, wmOperator *op)
       view_layer, ((View3D *)NULL), &objects_len);
 
   if (use_pre_deselect) {
-    uv_select_all_perform_multi(scene, objects, objects_len, SEL_DESELECT);
+    uv_select_all_perform_multi(scene, NULL, objects, objects_len, SEL_DESELECT);
   }
 
   /* don't indent to avoid diff noise! */
@@ -3638,7 +3703,7 @@ static int uv_circle_select_exec(bContext *C, wmOperator *op)
   const bool use_pre_deselect = SEL_OP_USE_PRE_DESELECT(sel_op);
 
   if (use_pre_deselect) {
-    uv_select_all_perform_multi(scene, objects, objects_len, SEL_DESELECT);
+    uv_select_all_perform_multi(scene, NULL, objects, objects_len, SEL_DESELECT);
   }
 
   for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
@@ -3817,7 +3882,7 @@ static bool do_lasso_select_mesh_uv(bContext *C,
       view_layer, ((View3D *)NULL), &objects_len);
 
   if (use_pre_deselect) {
-    uv_select_all_perform_multi(scene, objects, objects_len, SEL_DESELECT);
+    uv_select_all_perform_multi(scene, NULL, objects, objects_len, SEL_DESELECT);
   }
 
   for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
@@ -4117,7 +4182,7 @@ static int uv_select_overlap(bContext *C, const bool extend)
     BM_mesh_elem_index_ensure(em->bm, BM_VERT | BM_FACE);
     BM_mesh_elem_hflag_disable_all(em->bm, BM_FACE, BM_ELEM_TAG, false);
     if (!extend) {
-      uv_select_all_perform(scene, obedit, SEL_DESELECT);
+      uv_select_all_perform(scene, NULL, obedit, SEL_DESELECT);
     }
 
     BMIter iter;

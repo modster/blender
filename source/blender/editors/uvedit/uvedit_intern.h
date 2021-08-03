@@ -132,6 +132,9 @@ void uv_flush_vert_to_edge(struct Scene *scene,
 void uv_flush_edge_to_vert(struct Scene *scene,
                            struct Object *obedit,
                            const int cd_loop_uv_offset);
+void uv_flush_edge_to_vert_with_sticky_loc(Scene *scene,
+                                           Object *obedit,
+                                           const int cd_loop_uv_offset);
 
 /* utility tool functions */
 
