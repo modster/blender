@@ -43,8 +43,20 @@ static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
   const bNode &bnode = params.node();
   const NodeGeometryGeometryExpander *storage = (const NodeGeometryGeometryExpander *)
                                                     bnode.storage;
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
-    params.set_output(expander_output->socket_identifier, 0.0f);
+    const GeometryComponent *component = geometry_set.get_component_for_read(
+        (GeometryComponentType)expander_output->component_type);
+    if (component == nullptr) {
+      params.set_output(expander_output->socket_identifier, Array<float>());
+      continue;
+    }
+
+    GVArray_Typed<float> attribute = component->attribute_get_for_read<float>(
+        expander_output->data_identifier, (AttributeDomain)expander_output->domain, 0.0f);
+    Array<float> values(attribute.size());
+    attribute->materialize(values);
+    params.set_output(expander_output->socket_identifier, std::move(values));
   }
 }
 

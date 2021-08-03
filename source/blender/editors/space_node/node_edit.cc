@@ -36,6 +36,7 @@
 #include "BLI_math.h"
 
 #include "BKE_context.h"
+#include "BKE_geometry_set.hh"
 #include "BKE_global.h"
 #include "BKE_image.h"
 #include "BKE_lib_id.h"
@@ -3022,6 +3023,8 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
   expander_output->data_identifier = BLI_strdup("position");
   expander_output->socket_identifier = BLI_strdup(identifier.c_str());
   expander_output->socket_type = SOCK_FLOAT;
+  expander_output->component_type = (int)GEO_COMPONENT_TYPE_MESH;
+  expander_output->domain = ATTR_DOMAIN_POINT;
   BLI_addtail(&storage->outputs, expander_output);
 
   nodeUpdate(ntree, node);
