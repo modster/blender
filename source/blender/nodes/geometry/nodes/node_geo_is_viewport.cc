@@ -31,7 +31,8 @@ static void geo_node_is_viewport_exec(GeoNodeExecParams params)
   const eEvaluationMode mode = DEG_get_mode(depsgraph);
   const bool is_viewport = mode == DAG_EVAL_VIEWPORT;
 
-  params.set_output("Is Viewport", is_viewport);
+  /* This is a field just to avoid a crash, it doesn't seem like it should need to be a field. */
+  params.set_output("Is Viewport", bke::FieldRef<bool>(new bke::ConstantField(is_viewport)));
 }
 
 }  // namespace blender::nodes
