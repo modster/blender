@@ -1290,28 +1290,8 @@ class GeometryNodesEvaluator {
     void *buffer = allocator.allocate(to_type.size(), to_type.alignment());
     GMutablePointer value{to_type, buffer};
 
-    const bke::FieldRefCPPType *from_field_type = dynamic_cast<const bke::FieldRefCPPType *>(
-        &from_type);
-    const bke::FieldRefCPPType *to_field_type = dynamic_cast<const bke::FieldRefCPPType *>(
-        &to_type);
+    this->convert_value(from_type, to_type, value_to_forward.get(), buffer);
 
-    if (from_field_type != nullptr && to_field_type != nullptr &&
-        conversions_.is_convertible(from_field_type->field_type(), to_field_type->field_type())) {
-      const MultiFunction &fn = *conversions_.get_conversion_multi_function(
-          MFDataType::ForSingle(from_field_type->field_type()),
-          MFDataType::ForSingle(to_field_type->field_type()));
-      FieldPtr old_field = from_field_type->get_field(value_to_forward.get());
-      FieldPtr new_field = new bke::MultiFunctionField({old_field}, fn, 1);
-      to_field_type->construct(buffer, std::move(new_field));
-    }
-    else if (conversions_.is_convertible(from_type, to_type)) {
-      /* Do the conversion if possible. */
-      conversions_.convert_to_uninitialized(from_type, to_type, value_to_forward.get(), buffer);
-    }
-    else {
-      /* Cannot convert, use default value instead. */
-      to_type.copy_construct(to_type.default_value(), buffer);
-    }
     /* Multi input socket values are logged once all values are available. */
     if (!to_socket->is_multi_input_socket()) {
       this->log_socket_value({to_socket}, value);
@@ -1439,17 +1419,43 @@ class GeometryNodesEvaluator {
     if (type == required_type) {
       return {type, buffer};
     }
-    if (conversions_.is_convertible(type, required_type)) {
-      /* Convert the loaded value to the required type if possible. */
-      void *converted_buffer = allocator.allocate(required_type.size(), required_type.alignment());
-      conversions_.convert_to_uninitialized(type, required_type, buffer, converted_buffer);
-      type.destruct(buffer);
-      return {required_type, converted_buffer};
+    void *converted_buffer = allocator.allocate(required_type.size(), required_type.alignment());
+    this->convert_value(type, required_type, buffer, converted_buffer);
+    return {required_type, converted_buffer};
+  }
+
+  void convert_value(const CPPType &from_type,
+                     const CPPType &to_type,
+                     const void *from_value,
+                     void *to_value)
+  {
+    if (from_type == to_type) {
+      from_type.copy_construct(from_value, to_value);
+      return;
     }
-    /* Use a default fallback value when the loaded type is not compatible. */
-    void *default_buffer = allocator.allocate(required_type.size(), required_type.alignment());
-    required_type.copy_construct(required_type.default_value(), default_buffer);
-    return {required_type, default_buffer};
+
+    const bke::FieldRefCPPType *from_field_type = dynamic_cast<const bke::FieldRefCPPType *>(
+        &from_type);
+    const bke::FieldRefCPPType *to_field_type = dynamic_cast<const bke::FieldRefCPPType *>(
+        &to_type);
+
+    if (from_field_type != nullptr && to_field_type != nullptr &&
+        conversions_.is_convertible(from_field_type->field_type(), to_field_type->field_type())) {
+      const MultiFunction &fn = *conversions_.get_conversion_multi_function(
+          MFDataType::ForSingle(from_field_type->field_type()),
+          MFDataType::ForSingle(to_field_type->field_type()));
+      FieldPtr old_field = from_field_type->get_field(from_value);
+      FieldPtr new_field = new bke::MultiFunctionField({old_field}, fn, 1);
+      to_field_type->construct(to_value, std::move(new_field));
+    }
+    else if (conversions_.is_convertible(from_type, to_type)) {
+      /* Do the conversion if possible. */
+      conversions_.convert_to_uninitialized(from_type, to_type, from_value, to_value);
+    }
+    else {
+      /* Cannot convert, use default value instead. */
+      to_type.copy_construct(to_type.default_value(), to_value);
+    }
   }
 
   NodeState &get_node_state(const DNode node)
