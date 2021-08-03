@@ -311,11 +311,11 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
 
   static const Array<GeometryComponentType> types = {
       GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
-  for (GeometryComponentType geo_type : types) {
-    if (geometry_set.has(geo_type)) {
+  for (const GeometryComponentType type : types) {
+    if (geometry_set.has(type)) {
       raycast_from_points(params,
                           cast_geometry_set,
-                          geometry_set.get_component_for_write(geo_type),
+                          geometry_set.get_component_for_write(type),
                           hit_id,
                           hit_position_id,
                           hit_normal_id,

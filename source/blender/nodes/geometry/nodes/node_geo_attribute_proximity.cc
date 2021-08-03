@@ -31,13 +31,13 @@
 static bNodeSocketTemplate geo_node_attribute_proximity_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_GEOMETRY, N_("Target")},
-    {SOCK_STRING, N_("Distance")},
-    {SOCK_STRING, N_("Position")},
     {-1, ""},
 };
 
 static bNodeSocketTemplate geo_node_attribute_proximity_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_FLOAT, N_("Distance")},
+    {SOCK_VECTOR, N_("Position")},
     {-1, ""},
 };
 
@@ -66,9 +66,7 @@ static void proximity_calc(MutableSpan<float> distance_span,
                            BVHTreeFromMesh &tree_data_mesh,
                            BVHTreeFromPointCloud &tree_data_pointcloud,
                            const bool bvh_mesh_success,
-                           const bool bvh_pointcloud_success,
-                           const bool store_distances,
-                           const bool store_locations)
+                           const bool bvh_pointcloud_success)
 {
   IndexRange range = positions.index_range();
   threading::parallel_for(range, 512, [&](IndexRange range) {
@@ -107,18 +105,18 @@ static void proximity_calc(MutableSpan<float> distance_span,
       }
 
       if (nearest_from_pointcloud.dist_sq < nearest_from_mesh.dist_sq) {
-        if (store_distances) {
+        if (!distance_span.is_empty()) {
           distance_span[i] = sqrtf(nearest_from_pointcloud.dist_sq);
         }
-        if (store_locations) {
+        if (!location_span.is_empty()) {
           location_span[i] = nearest_from_pointcloud.co;
         }
       }
       else {
-        if (store_distances) {
+        if (!distance_span.is_empty()) {
           distance_span[i] = sqrtf(nearest_from_mesh.dist_sq);
         }
-        if (store_locations) {
+        if (!location_span.is_empty()) {
           location_span[i] = nearest_from_mesh.co;
         }
       }
@@ -161,25 +159,24 @@ static bool bvh_from_pointcloud(const PointCloud *target_pointcloud,
 }
 
 static void attribute_calc_proximity(GeometryComponent &component,
-                                     GeometrySet &geometry_set_target,
-                                     GeoNodeExecParams &params)
+                                     const GeometrySet &geometry_set_target,
+                                     const AnonymousCustomDataLayerID *distance_id,
+                                     const AnonymousCustomDataLayerID *location_id,
+                                     const GeoNodeExecParams &params)
 {
-  /* This node works on the "point" domain, since that is where positions are stored. */
-  const AttributeDomain result_domain = ATTR_DOMAIN_POINT;
+  GVArray_Typed<float3> positions = component.attribute_get_for_read<float3>(
+      "position", ATTR_DOMAIN_POINT, {0, 0, 0});
 
-  const std::string distance_attribute_name = params.get_input<std::string>("Distance");
-  OutputAttribute_Typed<float> distance_attribute =
-      component.attribute_try_get_for_output_only<float>(distance_attribute_name, result_domain);
-
-  const std::string location_attribute_name = params.get_input<std::string>("Position");
-  OutputAttribute_Typed<float3> location_attribute =
-      component.attribute_try_get_for_output_only<float3>(location_attribute_name, result_domain);
-
-  ReadAttributeLookup position_attribute = component.attribute_try_get_for_read("position");
-  if (!position_attribute || (!distance_attribute && !location_attribute)) {
-    return;
+  std::optional<OutputAttribute_Typed<float3>> location_attribute;
+  std::optional<OutputAttribute_Typed<float>> distance_attribute;
+  if (location_id != nullptr) {
+    location_attribute.emplace(component.attribute_try_get_anonymous_for_output_only<float3>(
+        *location_id, ATTR_DOMAIN_POINT));
   }
-  BLI_assert(position_attribute.varray->type().is<float3>());
+  if (distance_id != nullptr) {
+    distance_attribute.emplace(component.attribute_try_get_anonymous_for_output_only<float>(
+        *distance_id, ATTR_DOMAIN_POINT));
+  }
 
   const bNode &node = params.node();
   const NodeGeometryAttributeProximity &storage = *(const NodeGeometryAttributeProximity *)
@@ -202,21 +199,13 @@ static void attribute_calc_proximity(GeometryComponent &component,
                                                  tree_data_pointcloud);
   }
 
-  GVArray_Typed<float3> positions{*position_attribute.varray};
-  MutableSpan<float> distance_span = distance_attribute ? distance_attribute.as_span() :
-                                                          MutableSpan<float>();
-  MutableSpan<float3> location_span = location_attribute ? location_attribute.as_span() :
-                                                           MutableSpan<float3>();
-
-  proximity_calc(distance_span,
-                 location_span,
+  proximity_calc(distance_attribute ? distance_attribute->as_span() : MutableSpan<float>(),
+                 location_attribute ? location_attribute->as_span() : MutableSpan<float3>(),
                  positions,
                  tree_data_mesh,
                  tree_data_pointcloud,
                  bvh_mesh_success,
-                 bvh_pointcloud_success,
-                 distance_attribute,  /* Boolean. */
-                 location_attribute); /* Boolean. */
+                 bvh_pointcloud_success);
 
   if (bvh_mesh_success) {
     free_bvhtree_from_mesh(&tree_data_mesh);
@@ -225,11 +214,14 @@ static void attribute_calc_proximity(GeometryComponent &component,
     free_bvhtree_from_pointcloud(&tree_data_pointcloud);
   }
 
-  if (distance_attribute) {
-    distance_attribute.save();
-  }
   if (location_attribute) {
-    location_attribute.save();
+    location_attribute->save();
+  }
+  if (distance_attribute) {
+    for (const int i : IndexRange(distance_attribute->as_span().size())) {
+      std::cout << distance_attribute->as_span()[i] << "\n";
+    }
+    distance_attribute->save();
   }
 }
 
@@ -244,20 +236,41 @@ static void geo_node_attribute_proximity_exec(GeoNodeExecParams params)
    * for the target geometry set. However, the generic BVH API complicates this. */
   geometry_set_target = geometry_set_realize_instances(geometry_set_target);
 
-  if (geometry_set.has<MeshComponent>()) {
-    attribute_calc_proximity(
-        geometry_set.get_component_for_write<MeshComponent>(), geometry_set_target, params);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    attribute_calc_proximity(
-        geometry_set.get_component_for_write<PointCloudComponent>(), geometry_set_target, params);
-  }
-  if (geometry_set.has<CurveComponent>()) {
-    attribute_calc_proximity(
-        geometry_set.get_component_for_write<CurveComponent>(), geometry_set_target, params);
+  AnonymousCustomDataLayerID *distance = params.output_is_required("Distance") ?
+                                             CustomData_anonymous_id_new("Distance") :
+                                             nullptr;
+  AnonymousCustomDataLayerID *location = params.output_is_required("Position") ?
+                                             CustomData_anonymous_id_new("Position") :
+                                             nullptr;
+  if (!distance && !location) {
+    params.set_output("Geometry", std::move(geometry_set));
+    return;
   }
 
-  params.set_output("Geometry", geometry_set);
+  static const Array<GeometryComponentType> types = {
+      GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
+  for (const GeometryComponentType type : types) {
+    if (geometry_set.has(type)) {
+      attribute_calc_proximity(geometry_set.get_component_for_write(type),
+                               geometry_set_target,
+                               distance,
+                               location,
+                               params);
+    }
+  }
+
+  if (distance != nullptr) {
+    params.set_output(
+        "Distance",
+        bke::FieldRef<float>(new bke::AnonymousAttributeField(*distance, CPPType::get<float>())));
+  }
+  if (location != nullptr) {
+    params.set_output("Position",
+                      bke::FieldRef<float3>(
+                          new bke::AnonymousAttributeField(*location, CPPType::get<float3>())));
+  }
+
+  params.set_output("Geometry", std::move(geometry_set));
 }
 
 }  // namespace blender::nodes
@@ -266,8 +279,7 @@ void register_node_type_geo_attribute_proximity()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_ATTRIBUTE_PROXIMITY, "Attribute Proximity", NODE_CLASS_ATTRIBUTE, 0);
+  geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_PROXIMITY, "Proximity", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(
       &ntype, geo_node_attribute_proximity_in, geo_node_attribute_proximity_out);
   node_type_init(&ntype, geo_attribute_proximity_init);

@@ -483,7 +483,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeCurveMap"),
         NodeItem("GeometryNodeAttributeFill"),
         NodeItem("GeometryNodeAttributeMix"),
-        NodeItem("GeometryNodeAttributeProximity"),
         NodeItem("GeometryNodeAttributeColorRamp"),
         NodeItem("GeometryNodeAttributeVectorMath"),
         NodeItem("GeometryNodeAttributeVectorRotate"),
@@ -529,6 +528,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeJoinGeometry"),
         NodeItem("GeometryNodeSeparateComponents"),
         NodeItem("GeometryNodeRaycast"),
+        NodeItem("GeometryNodeAttributeProximity"),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
         NodeItem("GeometryNodeObjectInfo"),
