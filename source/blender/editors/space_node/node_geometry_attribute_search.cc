@@ -200,6 +200,9 @@ static void attribute_search_exec_fn(bContext *C, void *data_v, void *item_v)
         storage->output_type = SOCK_RGBA;
         break;
       }
+      default:
+        BLI_assert_unreachable();
+        break;
     }
     snode_update(CTX_wm_space_node(C), (bNode *)data->node);
     ntreeUpdateTree(CTX_data_main(C), (bNodeTree *)data->tree);
