@@ -23,7 +23,7 @@
 
 static bNodeSocketTemplate geo_node_curve_set_handles_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_STRING, N_("Selection")},
+    {SOCK_BOOLEAN, N_("Selection"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 
@@ -87,9 +87,14 @@ static void geo_node_curve_set_handles_exec(GeoNodeExecParams params)
   CurveEval &curve = *curve_component.get_for_write();
   MutableSpan<SplinePtr> splines = curve.splines();
 
-  const std::string selection_name = params.extract_input<std::string>("Selection");
-  GVArray_Typed<bool> selection = curve_component.attribute_get_for_read(
-      selection_name, ATTR_DOMAIN_POINT, true);
+  bke::FieldRef<bool> field = params.get_input_field<bool>("Selection");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, curve_component, ATTR_DOMAIN_POINT, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(curve_component.attribute_domain_size(ATTR_DOMAIN_POINT)), field_inputs);
+
+  GVArray_Typed<bool> selection{field_output.varray_ref()};
 
   const BezierSpline::HandleType new_handle_type = handle_type_from_input_type(type);
   int point_index = 0;
