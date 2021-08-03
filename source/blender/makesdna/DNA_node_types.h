@@ -1412,10 +1412,6 @@ typedef struct NodeGeometryAttributeTransfer {
 typedef struct NodeGeometryRaycast {
   /* GeometryNodeRaycastMapMode. */
   uint8_t mapping;
-
-  uint8_t input_type_ray_direction;
-  uint8_t input_type_ray_length;
-  char _pad[1];
 } NodeGeometryRaycast;
 
 typedef struct NodeGeometryAttribute {
