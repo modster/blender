@@ -433,7 +433,7 @@ static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  uiItemR(layout, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "thickness", 0, NULL, ICON_NONE);
 
   uiItemR(layout, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
