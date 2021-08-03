@@ -239,7 +239,8 @@ static void limit_radii(Array<FilletData> &fds,
 static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
                                                const FilletModeParam &mode_param,
                                                int &added_count,
-                                               Array<int> &point_counts)
+                                               Array<int> &point_counts,
+                                               const int spline_index)
 {
   Span<float3> positions = spline->positions();
   int fillet_count, start = 0, size = spline->size();
@@ -276,12 +277,7 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
       radius = mode_param.radius.value();
     }
     else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE) {
-      if (mode_param.radii->size() != size) {
-        radius = 0;
-      }
-      else {
-        radius = (*mode_param.radii)[start + i];
-      }
+      radius = (*mode_param.radii)[spline_index + start + i];
     }
 
     /* Calculate fillet data for the vertex. */
@@ -530,7 +526,9 @@ static void update_poly_or_NURBS_positions(Array<FilletData> &fds,
 }
 
 /* Function to fillet a spline. */
-static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode_param)
+static SplinePtr fillet_spline(const Spline &spline,
+                               const FilletModeParam &mode_param,
+                               const int spline_index)
 {
   int fillet_count, start = 0, size = spline.size();
   bool cyclic = spline.is_cyclic();
@@ -555,7 +553,7 @@ static SplinePtr fillet_spline(const Spline &spline, const FilletModeParam &mode
   int added_count = 0;
   /* Update point_counts array and added_count. */
   Array<FilletData> fds = calculate_fillet_data(
-      src_spline_ptr, mode_param, added_count, point_counts);
+      src_spline_ptr, mode_param, added_count, point_counts, spline_index);
   if (mode_param.limit_radius) {
     limit_radii(fds, spline.positions(), spline.size(), cyclic);
   }
@@ -602,8 +600,15 @@ static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
   Span<SplinePtr> input_splines = input_curve.splines();
 
   std::unique_ptr<CurveEval> output_curve = std::make_unique<CurveEval>();
-  output_curve->resize(input_splines.size());
+  int num_splines = input_splines.size();
+  output_curve->resize(num_splines);
   MutableSpan<SplinePtr> output_splines = output_curve->splines();
+
+  Array<int> spline_indices(input_splines.size());
+  spline_indices[0] = 0;
+  for (const int i : IndexRange(1, num_splines - 1)) {
+    spline_indices[i] = spline_indices[i - 1] + input_splines[i]->size();
+  }
 
   if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE) {
     threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
@@ -611,14 +616,14 @@ static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
         const Spline &spline = *input_splines[i];
         std::string radii_name = mode_param.radii_dist.value();
         GVArray_Typed<float> radii_dist = spline.attributes.get_for_read<float>(radii_name, 1.0f);
-        output_splines[i] = fillet_spline(spline, mode_param);
+        output_splines[i] = fillet_spline(spline, mode_param, spline_indices[i]);
       }
     });
   }
   else {
     threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
       for (const int i : range) {
-        output_splines[i] = fillet_spline(*input_splines[i], mode_param);
+        output_splines[i] = fillet_spline(*input_splines[i], mode_param, spline_indices[i]);
       }
     });
   }
@@ -661,8 +666,10 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
 
   mode_param.limit_radius = params.extract_input<bool>("Limit Radius");
 
+  std::unique_ptr<CurveEval> output_curve;
   if (radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
     mode_param.radius.emplace(params.extract_input<float>("Radius"));
+    output_curve = fillet_curve(input_curve, mode_param);
   }
   else {
     GVArray_Typed<float> radii_array = params.get_input_attribute<float>(
@@ -670,9 +677,8 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
 
     mode_param.radii = &radii_array;
     mode_param.radii_dist.emplace(params.extract_input<std::string>("Radii"));
+    output_curve = fillet_curve(input_curve, mode_param);
   }
-
-  std::unique_ptr<CurveEval> output_curve = fillet_curve(input_curve, mode_param);
 
   params.set_output("Curve", GeometrySet::create_with_curve(output_curve.release()));
 }
