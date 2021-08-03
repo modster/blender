@@ -353,7 +353,7 @@ class MultiFunctionField : public Field {
     }
   }
 
-  FieldOutput evaluate(IndexMask mask, const FieldInputs &inputs) const
+  FieldOutput evaluate(IndexMask mask, const FieldInputs &inputs) const final
   {
     fn::MFParamsBuilder params{*fn_, mask.min_array_size()};
     fn::MFContextBuilder context;
