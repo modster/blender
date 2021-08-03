@@ -29,6 +29,8 @@ void register_node_tree_type_geo(void);
 void register_node_type_geo_group(void);
 void register_node_type_geo_custom_group(bNodeType *ntype);
 
+void register_node_type_geo_extrude(void);
+
 void register_node_type_geo_attribute(void);
 void register_node_type_geo_attribute_clamp(void);
 void register_node_type_geo_attribute_color_ramp(void);
