@@ -572,7 +572,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodePointScale"),
         NodeItem("GeometryNodePointTranslate"),
         NodeItem("GeometryNodeRotatePoints"),
-        NodeItem("GeometryNodeAlignRotationToVector"),
     ]),
     GeometryNodeCategory("GEO_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),
@@ -590,6 +589,7 @@ geometry_node_categories = [
         NodeItem("ShaderNodeCombineXYZ"),
         NodeItem("ShaderNodeVectorMath"),
         NodeItem("ShaderNodeVectorRotate"),
+        NodeItem("FunctionNodeAlignRotationToVector"),
     ]),
     GeometryNodeCategory("GEO_OUTPUT", "Output", items=[
         NodeItem("GeometryNodeViewer"),

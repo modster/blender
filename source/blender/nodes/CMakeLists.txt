@@ -138,9 +138,9 @@ set(SRC
   function/nodes/node_fn_input_string.cc
   function/nodes/node_fn_input_vector.cc
   function/nodes/node_fn_random_float.cc
+  function/nodes/node_fn_align_rotation_to_vector.cc
   function/node_function_util.cc
 
-  geometry/nodes/node_geo_align_rotation_to_vector.cc
   geometry/nodes/node_geo_attribute.cc
   geometry/nodes/node_geo_attribute_clamp.cc
   geometry/nodes/node_geo_attribute_color_ramp.cc

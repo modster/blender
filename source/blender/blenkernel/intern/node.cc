@@ -5115,7 +5115,6 @@ static void registerGeometryNodes()
 {
   register_node_type_geo_group();
 
-  register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute();
   register_node_type_geo_attribute_clamp();
   register_node_type_geo_attribute_color_ramp();
@@ -5199,6 +5198,7 @@ static void registerFunctionNodes()
   register_node_type_fn_float_to_int();
   register_node_type_fn_input_string();
   register_node_type_fn_input_vector();
+  register_node_type_fn_align_rotation_to_vector();
   register_node_type_fn_random_float();
 }
 

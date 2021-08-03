@@ -26,6 +26,7 @@ void register_node_type_fn_float_to_int(void);
 void register_node_type_fn_input_string(void);
 void register_node_type_fn_input_vector(void);
 void register_node_type_fn_random_float(void);
+void register_node_type_fn_align_rotation_to_vector(void);
 
 #ifdef __cplusplus
 }

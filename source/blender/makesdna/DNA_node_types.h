@@ -1252,16 +1252,12 @@ typedef struct NodeGeometryRotatePoints {
   char _pad[3];
 } NodeGeometryRotatePoints;
 
-typedef struct NodeGeometryAlignRotationToVector {
+typedef struct FunctionNodeAlignRotationToVector {
   /* GeometryNodeAlignRotationToVectorAxis */
   uint8_t axis;
   /* GeometryNodeAlignRotationToVectorPivotAxis */
   uint8_t pivot_axis;
-
-  /* GeometryNodeAttributeInputMode */
-  uint8_t input_type_factor;
-  uint8_t input_type_vector;
-} NodeGeometryAlignRotationToVector;
+} FunctionNodeAlignRotationToVector;
 
 typedef struct NodeGeometryPointScale {
   /* GeometryNodeAttributeInputMode */

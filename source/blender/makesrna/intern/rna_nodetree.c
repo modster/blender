@@ -9627,7 +9627,7 @@ static void def_geo_point_rotate(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
-static void def_geo_align_rotation_to_vector(StructRNA *srna)
+static void def_fn_align_rotation_to_vector(StructRNA *srna)
 {
   static const EnumPropertyItem axis_items[] = {
       {GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_X,
@@ -9674,7 +9674,7 @@ static void def_geo_align_rotation_to_vector(StructRNA *srna)
 
   PropertyRNA *prop;
 
-  RNA_def_struct_sdna_from(srna, "NodeGeometryAlignRotationToVector", "storage");
+  RNA_def_struct_sdna_from(srna, "FunctionNodeAlignRotationToVector", "storage");
 
   prop = RNA_def_property(srna, "axis", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, axis_items);
@@ -9685,16 +9685,6 @@ static void def_geo_align_rotation_to_vector(StructRNA *srna)
   RNA_def_property_enum_items(prop, pivot_axis_items);
   RNA_def_property_ui_text(prop, "Pivot Axis", "Axis to rotate around");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
-
-  prop = RNA_def_property(srna, "input_type_factor", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
-  RNA_def_property_ui_text(prop, "Input Type Factor", "");
-  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
-
-  prop = RNA_def_property(srna, "input_type_vector", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_vector);
-  RNA_def_property_ui_text(prop, "Input Type Vector", "");
-  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
 static void def_geo_point_scale(StructRNA *srna)
