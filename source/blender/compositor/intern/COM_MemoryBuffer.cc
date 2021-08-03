@@ -415,32 +415,28 @@ void MemoryBuffer::read_elem_filtered(
     const float x, const float y, float dx[2], float dy[2], float *out) const
 {
   BLI_assert(this->m_datatype == DataType::Color);
-  if (m_is_a_single_elem) {
-    read_elem_checked(x, y, out);
-  }
-  else {
-    const float deriv[2][2] = {{dx[0], dx[1]}, {dy[0], dy[1]}};
 
-    float inv_width = 1.0f / (float)this->getWidth(), inv_height = 1.0f / (float)this->getHeight();
-    /* TODO(sergey): Render pipeline uses normalized coordinates and derivatives,
-     * but compositor uses pixel space. For now let's just divide the values and
-     * switch compositor to normalized space for EWA later.
-     */
-    float uv_normal[2] = {get_relative_x(x) * inv_width, get_relative_y(y) * inv_height};
-    float du_normal[2] = {deriv[0][0] * inv_width, deriv[0][1] * inv_height};
-    float dv_normal[2] = {deriv[1][0] * inv_width, deriv[1][1] * inv_height};
+  const float deriv[2][2] = {{dx[0], dx[1]}, {dy[0], dy[1]}};
 
-    BLI_ewa_filter(this->getWidth(),
-                   this->getHeight(),
-                   false,
-                   true,
-                   uv_normal,
-                   du_normal,
-                   dv_normal,
-                   read_ewa_elem,
-                   const_cast<MemoryBuffer *>(this),
-                   out);
-  }
+  float inv_width = 1.0f / (float)this->getWidth(), inv_height = 1.0f / (float)this->getHeight();
+  /* TODO(sergey): Render pipeline uses normalized coordinates and derivatives,
+   * but compositor uses pixel space. For now let's just divide the values and
+   * switch compositor to normalized space for EWA later.
+   */
+  float uv_normal[2] = {get_relative_x(x) * inv_width, get_relative_y(y) * inv_height};
+  float du_normal[2] = {deriv[0][0] * inv_width, deriv[0][1] * inv_height};
+  float dv_normal[2] = {deriv[1][0] * inv_width, deriv[1][1] * inv_height};
+
+  BLI_ewa_filter(this->getWidth(),
+                 this->getHeight(),
+                 false,
+                 true,
+                 uv_normal,
+                 du_normal,
+                 dv_normal,
+                 read_ewa_elem,
+                 const_cast<MemoryBuffer *>(this),
+                 out);
 }
 
 /* TODO(manzanilla): To be removed with tiled implementation. */

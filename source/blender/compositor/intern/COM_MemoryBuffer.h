@@ -216,6 +216,7 @@ class MemoryBuffer {
 
   void read_elem_bilinear(float x, float y, float *out) const
   {
+    /* Only clear past +/-1 borders to be able to smooth edges. */
     if (x <= m_rect.xmin - 1.0f || x >= m_rect.xmax || y <= m_rect.ymin - 1.0f ||
         y >= m_rect.ymax) {
       clear_elem(out);
@@ -223,17 +224,44 @@ class MemoryBuffer {
     }
 
     if (m_is_a_single_elem) {
-      read_elem_checked(x, y, out);
+      if (x >= m_rect.xmin && x < m_rect.xmax - 1.0f && y >= m_rect.ymin &&
+          y < m_rect.ymax - 1.0f) {
+        memcpy(out, m_buffer, get_elem_bytes_len());
+        return;
+      }
+
+      /* Do sampling at borders to smooth edges. */
+      const float last_x = getWidth() - 1.0f;
+      const float rel_x = get_relative_x(x);
+      float single_x = 0.0f;
+      if (rel_x < 0.0f) {
+        single_x = rel_x;
+      }
+      else if (rel_x > last_x) {
+        single_x = rel_x - last_x;
+      }
+
+      const float last_y = getHeight() - 1.0f;
+      const float rel_y = get_relative_y(y);
+      float single_y = 0.0f;
+      if (rel_y < 0.0f) {
+        single_y = rel_y;
+      }
+      else if (rel_y > last_y) {
+        single_y = rel_y - last_y;
+      }
+
+      BLI_bilinear_interpolation_fl(m_buffer, out, 1, 1, m_num_channels, single_x, single_y);
+      return;
     }
-    else {
-      BLI_bilinear_interpolation_fl(m_buffer,
-                                    out,
-                                    getWidth(),
-                                    getHeight(),
-                                    m_num_channels,
-                                    get_relative_x(x),
-                                    get_relative_y(y));
-    }
+
+    BLI_bilinear_interpolation_fl(m_buffer,
+                                  out,
+                                  getWidth(),
+                                  getHeight(),
+                                  m_num_channels,
+                                  get_relative_x(x),
+                                  get_relative_y(y));
   }
 
   void read_elem_sampled(float x, float y, PixelSampler sampler, float *out) const
