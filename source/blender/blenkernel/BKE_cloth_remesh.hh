@@ -77,6 +77,7 @@ Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct
 #  include "msgpack.hpp"
 #  include "msgpack/adaptor/define_decl.hpp"
 
+#  include "BLI_array.hh"
 #  include "BLI_float2.hh"
 #  include "BLI_float2_msgpack.hh"
 #  include "BLI_float3.hh"
@@ -85,6 +86,7 @@ Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct
 #  include "BLI_generational_arena_msgpack.hh"
 #  include "BLI_map.hh"
 #  include "BLI_map_msgpack.hh"
+#  include "BLI_set.hh"
 #  include "BLI_vector.hh"
 #  include "BLI_vector_msgpack.hh"
 
@@ -1816,6 +1818,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
                                                          bool verts_swapped,
                                                          bool across_seams)
   {
+    /* TODO(ish): write the below thing */
     /* Let the vert remove be `v1`, node to remove be `n1`, the other
      * vert, node be `v2`, `n2`.
      *
@@ -1846,114 +1849,108 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     blender::Vector<Edge<EED>> deleted_edges;
     blender::Vector<Face<EFD>> deleted_faces;
 
+    /* TODO(ish): add support for across seams */
+    BLI_assert(across_seams == false);
+
     auto &e = this->get_checked_edge(edge_index);
-    auto [v1_a, v2_a] = this->get_checked_verts_of_edge(e, verts_swapped);
-    auto &n1 = this->get_checked_node_of_vert(v1_a);
-    auto &n2 = this->get_checked_node_of_vert(v2_a);
+    auto [v1, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
+    auto v1_index = v1.self_index;
+    auto v2_index = v2.self_index;
+    auto &n1 = this->get_checked_node_of_vert(v1);
+    auto &n2 = this->get_checked_node_of_vert(v2);
     auto n1_index = n1.self_index;
     auto n2_index = n2.self_index;
 
-    blender::Vector<EdgeIndex> edge_indices = {edge_index};
-    if (across_seams) {
-      edge_indices = this->get_connecting_edge_indices(n1, n2);
-    }
+    auto v1_face_indices = this->get_checked_face_indices_of_vert(v1);
 
-    for (const auto &edge_index : edge_indices) {
-      auto &e = this->get_checked_edge(edge_index);
-      auto [v1_b, v2_b] = this->get_checked_verts_of_edge(e, verts_swapped);
-      auto v1_index = v1_b.self_index;
-      auto v2_index = v2_b.self_index;
-      /* Need to swap the verts if v1 does not point to n1 */
-      if (v1_b.node.value() != n1_index) {
-        std::swap(v1_index, v2_index);
-      }
-      BLI_assert(this->get_checked_vert(v1_index).node.value() == n1_index);
+    /* Create the new faces by swapping v1 with v2 */
+    {
+      for (const auto &face_index : v1_face_indices) {
+        auto &f = this->get_checked_face(face_index);
 
-      /* delete all the faces that `e` refers to */
-      auto e_faces = e.faces;
-      for (const auto &face_index : e_faces) {
-        auto &e = this->get_checked_edge(edge_index);
-        this->delink_face_edges(face_index);
-        auto face = this->delete_face(face_index);
-
-        auto &ov = this->get_checked_other_vert(e, face);
-
-        auto op_v1_ov_edge_index = this->get_connecting_edge_index(v1_index, ov.self_index);
-        BLI_assert(op_v1_ov_edge_index);
-        auto v1_ov_edge = this->get_checked_edge(op_v1_ov_edge_index.value());
-        /* delete `v1_ov_edge` only if it doesn't have any faces */
-        if (v1_ov_edge.faces.is_empty()) {
-          auto v1_ov_edge = this->delete_edge(op_v1_ov_edge_index.value());
-          deleted_edges.append(std::move(v1_ov_edge));
-        }
-        deleted_faces.append(std::move(face));
-      }
-
-      auto &v1_c = this->get_checked_vert(v1_index);
-      auto v1_edge_indices = v1_c.edges;
-
-      /* edges should have verts (v2, vx) instead of (v1, vx) and the
-       * face should have (v2, vx, vy) instead of (v1, vx, vy) */
-      for (const auto &v1_vx_edge_index : v1_edge_indices) {
-        Edge<EED> &v1_vx_edge = this->get_checked_edge(v1_vx_edge_index);
-
-        BLI_assert(v1_vx_edge.verts);
-        auto &verts = v1_vx_edge.verts.value();
-
-        if (v1_vx_edge.has_vert(v2_index)) {
-          /* don't need to mess with (v1, v2), only (v1, vx) */
+        /* Cannot create face between v2, v2, ov */
+        if (f.has_vert_index(v2_index)) {
           continue;
         }
 
-        if (std::get<0>(verts) == v1_index) {
-          v1_vx_edge.verts = {std::get<1>(verts), v2_index};
-        }
-        else {
-          v1_vx_edge.verts = {std::get<0>(verts), v2_index};
-        }
+        BLI_assert(f.get_verts().size() == 3);
 
-        /* since the edge no longer refers to `v1`, we should remove the
-         * edge from `v1.edges` */
-        v1_c.edges.remove_first_occurrence_and_reorder(v1_vx_edge_index);
+        blender::Array<VertIndex> vert_indices(f.get_verts().as_span());
 
-        /* replace `v1` with `v2` in the face  */
-        for (const auto face_index : v1_vx_edge.faces) {
-          Face<EFD> &face = this->get_checked_face(face_index);
-          /* the face may not contain `v1` */
-          auto pos = face.verts.first_index_of_try(v1_index);
-          if (pos != -1) {
-            face.verts[pos] = v2_index;
+        bool v2_exists = false;
+        for (auto &vert_index : vert_indices) {
+          if (vert_index == v2_index) {
+            v2_exists = true;
+            break;
+          }
+          if (vert_index == v1_index) {
+            vert_index = v2_index;
+            break;
           }
         }
-      }
 
-      /* delete e */
-      {
-        auto e = this->delete_edge(edge_index);
-        deleted_edges.append(std::move(e));
-      }
-      /* delete v1 */
-      {
-        auto v1 = this->delete_vert(v1_index);
-        deleted_verts.append(std::move(v1));
+        if (v2_exists) {
+          continue;
+        }
+
+        // Create the edges between v2 and the other verts
+        {
+          for (const auto &vert_index : vert_indices) {
+            if (vert_index == v2_index) {
+              continue;
+            }
+            /* It is possible to have a connecting edge between
+             * vert_index and v2_index, in case of this, don't create
+             * a new edge */
+            if (this->get_connecting_edge_index(vert_index, v2_index)) {
+              continue;
+            }
+            auto &new_e = this->add_empty_edge();
+            new_e.verts = {v2_index, vert_index};
+            this->add_edge_ref_to_verts(new_e);
+
+            added_edges.append(new_e.self_index);
+          }
+        }
+
+        auto &new_f = this->add_face_triangulated(
+            vert_indices[0], vert_indices[1], vert_indices[2], f.normal);
+
+        added_faces.append(new_f.self_index);
       }
     }
 
-    /* if `n1` has any verts, make them point to `v2` and then delete `n1` */
+    /* Delete all the faces around v1 */
+    for (const auto &face_index : v1_face_indices) {
+      this->delink_face_edges(face_index);
+      auto f = this->delete_face(face_index);
+
+      deleted_faces.append(f);
+    }
+
+    /* Delete all the edges around v1 */
+    for (const auto &e_index : v1.get_edges()) {
+      auto e = this->delete_edge(e_index);
+
+      deleted_edges.append(e);
+    }
+
+    /* delete the Vert v1 */
     {
-      auto &n1 = this->get_checked_node(n1_index);
+      auto v1 = this->delete_vert(v1_index);
 
-      auto n1_verts = n1.verts;
-      for (const auto &vert_index : n1_verts) {
-        auto &v1 = this->get_checked_vert(vert_index);
-        v1.node = n2_index;
-        n1.verts.remove_first_occurrence_and_reorder(v1.self_index);
-      }
+      deleted_verts.append(v1);
+    }
 
-      {
+    /* delete the Node n1 */
+    {
+      /* TODO(ish): ensure that nothing refers to this anymore when
+       * across_seams is true */
+      auto n1 = this->get_checked_node(n1_index);
+      if (n1.get_verts().is_empty()) {
         auto n1 = this->delete_node(n1_index);
-        BLI_assert(n1.verts.is_empty());
-        deleted_nodes.append(std::move(n1));
+
+        deleted_nodes.append(n1);
       }
     }
 
@@ -2373,6 +2370,21 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return op_face.value().get();
   }
 
+  blender::Set<FaceIndex> get_checked_face_indices_of_vert(const Vert<EVD> &vert) const
+  {
+    blender::Set<FaceIndex> face_indices;
+
+    for (const auto &edge_index : vert.get_edges()) {
+      const auto &edge = this->get_checked_edge(edge_index);
+
+      for (const auto &face_index : edge.get_faces()) {
+        face_indices.add(face_index);
+      }
+    }
+
+    return face_indices;
+  }
+
   inline std::tuple<Vert<EVD> &, Vert<EVD> &> get_checked_verts_of_edge(const Edge<EED> &edge,
                                                                         bool verts_swapped)
   {
@@ -2528,6 +2540,22 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         [=](FaceIndex index) { return Face<EFD>(index, normal); });
 
     return this->faces.get(face_index).value().get();
+  }
+
+  Face<EFD> &add_face_triangulated(const VertIndex v1_index,
+                                   const VertIndex v2_index,
+                                   const VertIndex v3_index,
+                                   float3 normal)
+  {
+    auto &f = this->add_empty_face(normal);
+
+    f.verts.append(v1_index);
+    f.verts.append(v2_index);
+    f.verts.append(v3_index);
+
+    this->add_face_ref_to_edges(f);
+
+    return f;
   }
 
   /**
