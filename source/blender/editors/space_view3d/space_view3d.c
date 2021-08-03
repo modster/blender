@@ -513,57 +513,38 @@ static bool view3d_drop_id_in_main_region_poll(bContext *C,
   return WM_drag_is_ID_type(drag, id_type);
 }
 
-static bool view3d_ob_drop_poll(bContext *C,
-                                wmDrag *drag,
-                                const wmEvent *event,
-                                const char **UNUSED(r_tooltip))
+static bool view3d_ob_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   return view3d_drop_id_in_main_region_poll(C, drag, event, ID_OB);
 }
 
-static bool view3d_collection_drop_poll(bContext *C,
-                                        wmDrag *drag,
-                                        const wmEvent *event,
-                                        const char **UNUSED(r_tooltip))
+static bool view3d_collection_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   return view3d_drop_id_in_main_region_poll(C, drag, event, ID_GR);
 }
 
-static bool view3d_mat_drop_poll(bContext *C,
-                                 wmDrag *drag,
-                                 const wmEvent *event,
-                                 const char **UNUSED(r_tooltip))
+static bool view3d_mat_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   return view3d_drop_id_in_main_region_poll(C, drag, event, ID_MA);
 }
 
-static bool view3d_object_data_drop_poll(bContext *C,
-                                         wmDrag *drag,
-                                         const wmEvent *event,
-                                         const char **r_tooltip)
+static bool view3d_object_data_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   ID_Type id_type = view3d_drop_id_in_main_region_poll_get_id_type(C, drag, event);
-  if (id_type) {
-    if (OB_DATA_SUPPORT_ID(id_type) && (id_type != ID_GD)) {
-      *r_tooltip = TIP_("Create object instance from object-data");
-      return true;
-    }
+  if (id_type && OB_DATA_SUPPORT_ID(id_type)) {
+    return true;
   }
   return false;
 }
 
-static bool view3d_gpencil_data_drop_poll(bContext *C,
-                                          wmDrag *drag,
-                                          const wmEvent *event,
-                                          const char **r_tooltip)
+static char *view3d_object_data_drop_tooltip(bContext *UNUSED(C),
+                                             wmDrag *UNUSED(drag),
+                                             const wmEvent *UNUSED(event))
 {
-  return view3d_drop_id_in_main_region_poll(C, drag, event, ID_GD);
+  return BLI_strdup(TIP_("Create object instance from object-data"));
 }
 
-static bool view3d_ima_drop_poll(bContext *C,
-                                 wmDrag *drag,
-                                 const wmEvent *event,
-                                 const char **UNUSED(r_tooltip))
+static bool view3d_ima_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   if (ED_region_overlap_isect_any_xy(CTX_wm_area(C), &event->x)) {
     return false;
@@ -588,12 +569,9 @@ static bool view3d_ima_bg_is_camera_view(bContext *C)
   return false;
 }
 
-static bool view3d_ima_bg_drop_poll(bContext *C,
-                                    wmDrag *drag,
-                                    const wmEvent *event,
-                                    const char **r_tooltip)
+static bool view3d_ima_bg_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
-  if (!view3d_ima_drop_poll(C, drag, event, r_tooltip)) {
+  if (!view3d_ima_drop_poll(C, drag, event)) {
     return false;
   }
 
@@ -604,12 +582,9 @@ static bool view3d_ima_bg_drop_poll(bContext *C,
   return view3d_ima_bg_is_camera_view(C);
 }
 
-static bool view3d_ima_empty_drop_poll(bContext *C,
-                                       wmDrag *drag,
-                                       const wmEvent *event,
-                                       const char **r_tooltip)
+static bool view3d_ima_empty_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
-  if (!view3d_ima_drop_poll(C, drag, event, r_tooltip)) {
+  if (!view3d_ima_drop_poll(C, drag, event)) {
     return false;
   }
 
@@ -628,8 +603,7 @@ static bool view3d_ima_empty_drop_poll(bContext *C,
 
 static bool view3d_volume_drop_poll(bContext *UNUSED(C),
                                     wmDrag *drag,
-                                    const wmEvent *UNUSED(event),
-                                    const char **UNUSED(r_tooltip))
+                                    const wmEvent *UNUSED(event))
 {
   return (drag->type == WM_DRAG_PATH) && (drag->icon == ICON_FILE_VOLUME);
 }
@@ -708,43 +682,51 @@ static void view3d_dropboxes(void)
                  "OBJECT_OT_add_named",
                  view3d_ob_drop_poll,
                  view3d_ob_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_material",
                  view3d_mat_drop_poll,
                  view3d_id_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "VIEW3D_OT_background_image_add",
                  view3d_ima_bg_drop_poll,
                  view3d_id_path_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_image",
                  view3d_ima_empty_drop_poll,
                  view3d_id_path_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_volume_import",
                  view3d_volume_drop_poll,
                  view3d_id_path_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_collection_instance_add",
                  view3d_collection_drop_poll,
                  view3d_collection_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_data_instance_add",
                  view3d_object_data_drop_poll,
                  view3d_id_drop_copy_with_type,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 view3d_object_data_drop_tooltip);
   WM_dropbox_add(lb,
                  "GPENCIL_OT_asset_import",
                  view3d_gpencil_data_drop_poll,
                  // TODO: Change to use a temp copy using BLO_library_temp_load_id ()
                  view3d_id_drop_copy_with_type,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 view3d_object_data_drop_tooltip);
 }
 
 static void view3d_widgets(void)
