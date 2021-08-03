@@ -438,6 +438,7 @@ static void knifetool_draw_orientation_locking(const KnifeTool_OpData *kcd)
   if (!compare_v3v3(kcd->prev.cage, kcd->curr.cage, KNIFE_FLT_EPSBIG)) {
     float v1[3], v2[3];
 
+    /* This is causing buggyness when prev.cage and curr.cage are too close together. */
     knifetool_raycast_planes(kcd, v1, v2);
 
     uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
