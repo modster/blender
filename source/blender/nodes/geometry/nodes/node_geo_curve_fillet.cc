@@ -610,23 +610,11 @@ static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
     spline_indices[i] = spline_indices[i - 1] + input_splines[i]->size();
   }
 
-  if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE) {
-    threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
-      for (const int i : range) {
-        const Spline &spline = *input_splines[i];
-        std::string radii_name = mode_param.radii_dist.value();
-        GVArray_Typed<float> radii_dist = spline.attributes.get_for_read<float>(radii_name, 1.0f);
-        output_splines[i] = fillet_spline(spline, mode_param, spline_indices[i]);
-      }
-    });
-  }
-  else {
-    threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
-      for (const int i : range) {
-        output_splines[i] = fillet_spline(*input_splines[i], mode_param, spline_indices[i]);
-      }
-    });
-  }
+  threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
+    for (const int i : range) {
+      output_splines[i] = fillet_spline(*input_splines[i], mode_param, spline_indices[i]);
+    }
+  });
 
   return output_curve;
 }
