@@ -22,6 +22,7 @@
  */
 
 #include <algorithm>
+#include <string>
 
 #include "MEM_guardedalloc.h"
 
@@ -2972,6 +2973,55 @@ void NODE_OT_cryptomatte_layer_remove(wmOperatorType *ot)
   /* callbacks */
   ot->exec = node_cryptomatte_remove_socket_exec;
   ot->poll = composite_node_editable;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/* ****************** Geometry Expander Add Output  ******************* */
+
+static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  SpaceNode *snode = CTX_wm_space_node(C);
+  PointerRNA ptr = CTX_data_pointer_get(C, "node");
+  bNode *node = (bNode *)ptr.data;
+  bNodeTree *ntree = (bNodeTree *)ptr.owner_id;
+  NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
+
+  auto to_identifier = [](int id) { return "out_" + std::to_string(id); };
+
+  int id = 0;
+  while (nodeFindSocket(node, SOCK_OUT, to_identifier(id).c_str()) != nullptr) {
+    id++;
+  }
+  const std::string identifier = to_identifier(id);
+
+  GeometryExpanderOutput *expander_output = (GeometryExpanderOutput *)MEM_callocN(
+      sizeof(GeometryExpanderOutput), __func__);
+  expander_output->data_identifier = BLI_strdup("position");
+  expander_output->socket_identifier = BLI_strdup(identifier.c_str());
+  expander_output->socket_type = SOCK_FLOAT;
+  BLI_addtail(&storage->outputs, expander_output);
+
+  nodeUpdate(ntree, node);
+  ntreeUpdateTree(CTX_data_main(C), ntree);
+
+  snode_notify(C, snode);
+  snode_dag_update(C, snode);
+
+  return OPERATOR_FINISHED;
+}
+
+void NODE_OT_geometry_expander_output_add(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Add Geometry Expander Output";
+  ot->description = "Add geometry expander output";
+  ot->idname = "NODE_OT_geometry_expander_output_add";
+
+  /* callbacks */
+  ot->exec = node_geometry_expander_output_add_exec;
+  ot->poll = ED_operator_node_editable;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

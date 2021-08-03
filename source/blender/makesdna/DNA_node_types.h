@@ -1419,9 +1419,14 @@ typedef struct NodeGeometryRaycast {
 } NodeGeometryRaycast;
 
 typedef struct GeometryExpanderOutput {
+  struct GeometryExpanderOutput *next, *prev;
+  /* AttributeDomain. */
   int8_t domain;
+  /* GeometryComponentType. */
   int8_t component_type;
-  char _pad[6];
+  /* eNodeSocketDatatype. */
+  int8_t socket_type;
+  char _pad[5];
   char *data_identifier;
   char *socket_identifier;
 } GeometryExpanderOutput;

@@ -312,6 +312,8 @@ void NODE_GGT_backdrop_corner_pin(struct wmGizmoGroupType *gzgt);
 void NODE_OT_cryptomatte_layer_add(struct wmOperatorType *ot);
 void NODE_OT_cryptomatte_layer_remove(struct wmOperatorType *ot);
 
+void NODE_OT_geometry_expander_output_add(struct wmOperatorType *ot);
+
 /* node_geometry_attribute_search.cc */
 void node_geometry_add_attribute_search_button(const struct bContext *C,
                                                const struct bNodeTree *node_tree,

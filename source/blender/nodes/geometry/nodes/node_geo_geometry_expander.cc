@@ -31,10 +31,11 @@ static bNodeSocketTemplate geo_node_geometry_expander_in[] = {
 
 namespace blender::nodes {
 
-static void geo_node_geometry_expander_layout(uiLayout *UNUSED(layout),
+static void geo_node_geometry_expander_layout(uiLayout *layout,
                                               bContext *UNUSED(C),
                                               PointerRNA *UNUSED(ptr))
 {
+  uiItemO(layout, "Add", ICON_ADD, "node.geometry_expander_output_add");
 }
 
 static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
@@ -48,6 +49,24 @@ static void geo_node_geometry_expander_init(bNodeTree *UNUSED(ntree), bNode *nod
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)MEM_callocN(
       sizeof(NodeGeometryGeometryExpander), __func__);
   node->storage = storage;
+}
+
+static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
+{
+  NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
+  LISTBASE_FOREACH_MUTABLE (bNodeSocket *, socket, &node->outputs) {
+    nodeRemoveSocket(ntree, node, socket);
+  }
+  LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
+    const char *idname = nodeStaticSocketType(expander_output->socket_type, PROP_NONE);
+    nodeAddSocket(ntree,
+                  node,
+                  SOCK_OUT,
+                  idname,
+                  expander_output->socket_identifier,
+                  expander_output->data_identifier);
+  }
+  // nodeAddSocket(ntree, node, SOCK_OUT, "NodeSocketFloat", "")
 }
 
 static void geo_node_geometry_expander_storage_free(bNode *node)
@@ -74,7 +93,7 @@ static void geo_node_geometry_expander_storage_copy(bNodeTree *UNUSED(dest_ntree
     *dst_output = *src_output;
     dst_output->data_identifier = (char *)MEM_dupallocN(src_output->data_identifier);
     dst_output->socket_identifier = (char *)MEM_dupallocN(src_output->socket_identifier);
-    BLI_addtail(&dst_storage->outputs, src_output);
+    BLI_addtail(&dst_storage->outputs, dst_output);
   }
   dst_node->storage = dst_storage;
 }
@@ -93,6 +112,7 @@ void register_node_type_geo_geometry_expander()
                     "NodeGeometryGeometryExpander",
                     blender::nodes::geo_node_geometry_expander_storage_free,
                     blender::nodes::geo_node_geometry_expander_storage_copy);
+  node_type_update(&ntype, blender::nodes::geo_node_geometry_expander_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_geometry_expander_exec;
   ntype.draw_buttons = blender::nodes::geo_node_geometry_expander_layout;
   nodeRegisterType(&ntype);
