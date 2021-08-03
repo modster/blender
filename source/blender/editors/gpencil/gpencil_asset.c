@@ -361,10 +361,12 @@ static bool gpencil_asset_create(const bContext *C,
 
   /* Mark as asset. */
   if (ED_asset_mark_id(C, &gpd->id)) {
-    const char *tags[] = {"Grease Pencil Strokes", "Grease Pencil Animation"};
-    /* Add tag to asset. */
-    int index = (is_animation) ? 1 : 0;
-    BKE_asset_metadata_tag_ensure(gpd->id.asset_data, tags[index]);
+    const char *tags[] = {"Grease Pencil", "Animation"};
+    /* Add tags to asset. */
+    BKE_asset_metadata_tag_ensure(gpd->id.asset_data, tags[0]);
+    if (is_animation) {
+      BKE_asset_metadata_tag_ensure(gpd->id.asset_data, tags[1]);
+    }
 
     /* Retime frame number to start by 1. Must be done after generate the render preview. */
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
