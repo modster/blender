@@ -2980,12 +2980,33 @@ void NODE_OT_cryptomatte_layer_remove(wmOperatorType *ot)
 
 /* ****************** Geometry Expander Add Output  ******************* */
 
-static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *UNUSED(op))
+static const EnumPropertyItem *node_geometry_expander_output_add_items(bContext *UNUSED(C),
+                                                                       PointerRNA *UNUSED(ptr),
+                                                                       PropertyRNA *UNUSED(prop),
+                                                                       bool *r_free)
+{
+  EnumPropertyItem *items = NULL;
+  int totitem = 0;
+  EnumPropertyItem item = {0};
+  item.identifier = "HELLO";
+  item.name = "Hello";
+
+  RNA_enum_item_add(&items, &totitem, &item);
+  RNA_enum_item_end(&items, &totitem);
+  *r_free = true;
+  return items;
+}
+
+static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
 {
   SpaceNode *snode = CTX_wm_space_node(C);
-  PointerRNA ptr = CTX_data_pointer_get(C, "node");
-  bNode *node = (bNode *)ptr.data;
-  bNodeTree *ntree = (bNodeTree *)ptr.owner_id;
+  bNodeTree *ntree = snode->edittree;
+  char *node_name = RNA_string_get_alloc(op->ptr, "node_name", nullptr, 0);
+  bNode *node = nodeFindNodebyName(ntree, node_name);
+  MEM_freeN(node_name);
+  if (node == nullptr) {
+    return OPERATOR_CANCELLED;
+  }
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
 
   auto to_identifier = [](int id) { return "out_" + std::to_string(id); };
@@ -3012,6 +3033,16 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *UNUSE
   return OPERATOR_FINISHED;
 }
 
+static int node_geometry_expander_output_add_invoke(bContext *C,
+                                                    wmOperator *op,
+                                                    const wmEvent *event)
+{
+  PointerRNA ptr = CTX_data_pointer_get(C, "node");
+  bNode *node = (bNode *)ptr.data;
+  RNA_string_set(op->ptr, "node_name", node->name);
+  return WM_enum_search_invoke(C, op, event);
+}
+
 void NODE_OT_geometry_expander_output_add(wmOperatorType *ot)
 {
   /* identifiers */
@@ -3020,9 +3051,18 @@ void NODE_OT_geometry_expander_output_add(wmOperatorType *ot)
   ot->idname = "NODE_OT_geometry_expander_output_add";
 
   /* callbacks */
+  ot->invoke = node_geometry_expander_output_add_invoke;
   ot->exec = node_geometry_expander_output_add_exec;
   ot->poll = ED_operator_node_editable;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  PropertyRNA *prop;
+
+  prop = RNA_def_string(ot->srna, "node_name", nullptr, 0, "Node Name", "Node name");
+
+  prop = RNA_def_enum(ot->srna, "item", DummyRNA_NULL_items, 0, "Item", "");
+  RNA_def_enum_funcs(prop, node_geometry_expander_output_add_items);
+  ot->prop = prop;
 }
