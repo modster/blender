@@ -36,7 +36,7 @@ static bNodeSocketTemplate geo_node_material_assign_in[] = {
      0.0f,
      PROP_NONE,
      SOCK_HIDE_LABEL},
-    {SOCK_STRING, N_("Selection")},
+    {SOCK_BOOLEAN, N_("Selection"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 
@@ -75,8 +75,6 @@ static void assign_material_to_faces(Mesh &mesh, const VArray<bool> &face_mask, 
 static void geo_node_material_assign_exec(GeoNodeExecParams params)
 {
   Material *material = params.extract_input<Material *>("Material");
-  const std::string mask_name = params.extract_input<std::string>("Selection");
-
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = geometry_set_realize_instances(geometry_set);
@@ -85,9 +83,17 @@ static void geo_node_material_assign_exec(GeoNodeExecParams params)
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
     Mesh *mesh = mesh_component.get_for_write();
     if (mesh != nullptr) {
-      GVArray_Typed<bool> face_mask = mesh_component.attribute_get_for_read<bool>(
-          mask_name, ATTR_DOMAIN_FACE, true);
-      assign_material_to_faces(*mesh, face_mask, material);
+
+      bke::FieldRef<bool> field = params.get_input_field<bool>("Selection");
+      bke::FieldInputs field_inputs = field->prepare_inputs();
+      Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+      prepare_field_inputs(field_inputs, mesh_component, ATTR_DOMAIN_FACE, field_input_values);
+      bke::FieldOutput field_output = field->evaluate(
+          IndexRange(mesh_component.attribute_domain_size(ATTR_DOMAIN_FACE)), field_inputs);
+
+      GVArray_Typed<bool> selection{field_output.varray_ref()};
+
+      assign_material_to_faces(*mesh, *selection, material);
     }
   }
 
