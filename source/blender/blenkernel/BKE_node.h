@@ -223,6 +223,11 @@ typedef int (*NodeGPUExecFunction)(struct GPUMaterial *mat,
                                    struct bNodeExecData *execdata,
                                    struct GPUNodeStack *in,
                                    struct GPUNodeStack *out);
+typedef bool (*NodeDrawSocketFunction)(const struct bContext *C,
+                                       struct uiLayout *layout,
+                                       struct bNodeTree *ntree,
+                                       struct bNode *node,
+                                       struct bNodeSocket *socket);
 
 /**
  * \brief Defines a node type.
@@ -338,6 +343,10 @@ typedef struct bNodeType {
   /* Execute a geometry node. */
   NodeGeometryExecFunction geometry_node_execute;
   bool geometry_node_execute_supports_laziness;
+
+  /* Draws a socket in a way specific to this node. If false is returned, the socket will be drawn
+   * as usual. */
+  NodeDrawSocketFunction draw_socket;
 
   /* RNA integration */
   ExtensionRNA rna_ext;

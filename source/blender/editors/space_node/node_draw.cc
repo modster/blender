@@ -353,6 +353,27 @@ void node_from_view(const bNode *node, float x, float y, float *rx, float *ry)
   nodeFromView(node, x, y, rx, ry);
 }
 
+static void draw_socket_layout(
+    const bContext *C, uiLayout *layout, bNodeTree *ntree, bNode *node, bNodeSocket *socket)
+{
+  if (node->typeinfo->draw_socket) {
+    if (node->typeinfo->draw_socket(C, layout, ntree, node, socket)) {
+      return;
+    }
+  }
+  uiLayout *row = uiLayoutRow(layout, true);
+  if (socket->in_out == SOCK_OUT) {
+    uiLayoutSetAlignment(row, UI_LAYOUT_ALIGN_RIGHT);
+  }
+
+  PointerRNA nodeptr;
+  RNA_pointer_create(&ntree->id, &RNA_Node, node, &nodeptr);
+  PointerRNA sockptr;
+  RNA_pointer_create(&ntree->id, &RNA_NodeSocket, socket, &sockptr);
+  const char *socket_label = nodeSocketLabel(socket);
+  socket->typeinfo->draw((bContext *)C, row, &sockptr, &nodeptr, IFACE_(socket_label));
+}
+
 /**
  * Based on settings and sockets in node, set drawing rect info.
  */
@@ -404,11 +425,7 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     uiLayoutSetContextPointer(layout, "node", &nodeptr);
     uiLayoutSetContextPointer(layout, "socket", &sockptr);
 
-    /* Align output buttons to the right. */
-    uiLayout *row = uiLayoutRow(layout, true);
-    uiLayoutSetAlignment(row, UI_LAYOUT_ALIGN_RIGHT);
-    const char *socket_label = nodeSocketLabel(nsock);
-    nsock->typeinfo->draw((bContext *)C, row, &sockptr, &nodeptr, IFACE_(socket_label));
+    draw_socket_layout(C, layout, ntree, node, nsock);
 
     UI_block_align_end(node->block);
     UI_block_layout_resolve(node->block, nullptr, &buty);
@@ -541,10 +558,7 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     uiLayoutSetContextPointer(layout, "node", &nodeptr);
     uiLayoutSetContextPointer(layout, "socket", &sockptr);
 
-    uiLayout *row = uiLayoutRow(layout, true);
-
-    const char *socket_label = nodeSocketLabel(nsock);
-    nsock->typeinfo->draw((bContext *)C, row, &sockptr, &nodeptr, IFACE_(socket_label));
+    draw_socket_layout(C, layout, ntree, node, nsock);
 
     UI_block_align_end(node->block);
     UI_block_layout_resolve(node->block, nullptr, &buty);

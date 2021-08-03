@@ -38,6 +38,13 @@ static void geo_node_geometry_expander_layout(uiLayout *layout,
   uiItemO(layout, "Add", ICON_ADD, "node.geometry_expander_output_add");
 }
 
+static bool geo_node_geometry_expande_socket_layout(
+    const bContext *C, uiLayout *layout, bNodeTree *ntree, bNode *node, bNodeSocket *socket)
+{
+  uiItemL(layout, "Hello World", ICON_NONE);
+  return true;
+}
+
 static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
 {
   const bNode &bnode = params.node();
@@ -147,5 +154,6 @@ void register_node_type_geo_geometry_expander()
   node_type_update(&ntype, blender::nodes::geo_node_geometry_expander_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_geometry_expander_exec;
   ntype.draw_buttons = blender::nodes::geo_node_geometry_expander_layout;
+  ntype.draw_socket = blender::nodes::geo_node_geometry_expande_socket_layout;
   nodeRegisterType(&ntype);
 }
