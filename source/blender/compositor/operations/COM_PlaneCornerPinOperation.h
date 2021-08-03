@@ -31,11 +31,13 @@ namespace blender::compositor {
 
 class PlaneCornerPinMaskOperation : public PlaneDistortMaskOperation {
  private:
+  /* TODO(manzanilla): to be removed with tiled implementation. */
   bool m_corners_ready;
 
  public:
   PlaneCornerPinMaskOperation();
 
+  void init_data() override;
   void initExecution() override;
   void deinitExecution() override;
 
@@ -52,6 +54,7 @@ class PlaneCornerPinWarpImageOperation : public PlaneDistortWarpImageOperation {
  public:
   PlaneCornerPinWarpImageOperation();
 
+  void init_data() override;
   void initExecution() override;
   void deinitExecution() override;
 
