@@ -10192,6 +10192,33 @@ static void def_geo_raycast(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_geometry_expander_output(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "GeometryExpanderOutput", NULL);
+
+  prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_attribute_domain_items);
+  RNA_def_property_ui_text(prop, "Domain", "");
+  /* TODO: Update callback. */
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, NULL);
+}
+
+static void def_geo_geometry_expander(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryGeometryExpander", "storage");
+
+  prop = RNA_def_property(srna, "outputs", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, NULL, "outputs", NULL);
+  RNA_def_property_struct_type(prop, "GeometryExpanderOutput");
+  RNA_def_property_ui_text(prop, "Expander Outputs", "");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+}
+
 /* -------------------------------------------------------------------------- */
 
 static void rna_def_shader_node(BlenderRNA *brna)
@@ -10239,6 +10266,8 @@ static void rna_def_geometry_node(BlenderRNA *brna)
   RNA_def_struct_ui_text(srna, "Geometry Node", "");
   RNA_def_struct_sdna(srna, "bNode");
   RNA_def_struct_register_funcs(srna, "rna_GeometryNode_register", "rna_Node_unregister", NULL);
+
+  def_geo_geometry_expander_output(brna);
 }
 
 static void rna_def_function_node(BlenderRNA *brna)

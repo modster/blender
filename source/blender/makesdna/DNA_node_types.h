@@ -1433,7 +1433,7 @@ typedef struct GeometryExpanderOutput {
 
 typedef struct NodeGeometryGeometryExpander {
   ListBase outputs;
-} NodeGeometryExpander;
+} NodeGeometryGeometryExpander;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0

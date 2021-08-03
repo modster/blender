@@ -41,7 +41,25 @@ static void geo_node_geometry_expander_layout(uiLayout *layout,
 static bool geo_node_geometry_expande_socket_layout(
     const bContext *C, uiLayout *layout, bNodeTree *ntree, bNode *node, bNodeSocket *socket)
 {
-  uiItemL(layout, "Hello World", ICON_NONE);
+  if (socket->in_out == SOCK_IN) {
+    return false;
+  }
+
+  const NodeGeometryGeometryExpander *storage = (const NodeGeometryGeometryExpander *)
+                                                    node->storage;
+  const int socket_index = BLI_findindex(&node->outputs, socket);
+
+  GeometryExpanderOutput *expander_output = (GeometryExpanderOutput *)BLI_findlink(
+      &storage->outputs, socket_index);
+
+  PointerRNA expander_output_ptr;
+  RNA_pointer_create(
+      &ntree->id, &RNA_GeometryExpanderOutput, expander_output, &expander_output_ptr);
+
+  uiLayout *row = uiLayoutRow(layout, true);
+  uiItemL(row, socket->name, ICON_NONE);
+  uiItemR(row, &expander_output_ptr, "domain", 0, "", ICON_NONE);
+
   return true;
 }
 
