@@ -31,7 +31,6 @@ using blender::fn::GVArray_Typed;
 
 static bNodeSocketTemplate geo_node_curve_subdivide_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Cuts")},
     {SOCK_INT, N_("Cuts"), 1, 0, 0, 0, 0, 1000},
     {-1, ""},
 };
@@ -41,31 +40,7 @@ static bNodeSocketTemplate geo_node_curve_subdivide_out[] = {
     {-1, ""},
 };
 
-static void geo_node_curve_subdivide_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "cuts_type", 0, IFACE_("Cuts"), ICON_NONE);
-}
-
-static void geo_node_curve_subdivide_init(bNodeTree *UNUSED(tree), bNode *node)
-{
-  NodeGeometryCurveSubdivide *data = (NodeGeometryCurveSubdivide *)MEM_callocN(
-      sizeof(NodeGeometryCurveSubdivide), __func__);
-
-  data->cuts_type = GEO_NODE_ATTRIBUTE_INPUT_INTEGER;
-  node->storage = data;
-}
-
 namespace blender::nodes {
-
-static void geo_node_curve_subdivide_update(bNodeTree *UNUSED(ntree), bNode *node)
-{
-  NodeGeometryPointTranslate &node_storage = *(NodeGeometryPointTranslate *)node->storage;
-
-  update_attribute_input_socket_availabilities(
-      *node, "Cuts", (GeometryNodeAttributeInputMode)node_storage.input_type);
-}
 
 static Array<int> get_subdivided_offsets(const Spline &spline,
                                          const VArray<int> &cuts,
@@ -363,10 +338,18 @@ static void geo_node_subdivide_exec(GeoNodeExecParams params)
   }
 
   const CurveComponent &component = *geometry_set.get_component_for_read<CurveComponent>();
-  GVArray_Typed<int> cuts = params.get_input_attribute<int>(
-      "Cuts", component, ATTR_DOMAIN_POINT, 0);
+
+  bke::FieldRef<int> field = params.get_input_field<int>("Cuts");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, component, ATTR_DOMAIN_POINT, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(component.attribute_domain_size(ATTR_DOMAIN_POINT)), field_inputs);
+
+  GVArray_Typed<int> cuts{field_output.varray_ref()};
+
   if (cuts->is_single() && cuts->get_internal_single() < 1) {
-    params.set_output("Geometry", geometry_set);
+    params.set_output("Geometry", std::move(geometry_set));
     return;
   }
 
@@ -383,13 +366,6 @@ void register_node_type_geo_curve_subdivide()
 
   geo_node_type_base(&ntype, GEO_NODE_CURVE_SUBDIVIDE, "Curve Subdivide", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_curve_subdivide_in, geo_node_curve_subdivide_out);
-  ntype.draw_buttons = geo_node_curve_subdivide_layout;
-  node_type_storage(&ntype,
-                    "NodeGeometryCurveSubdivide",
-                    node_free_standard_storage,
-                    node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_curve_subdivide_init);
-  node_type_update(&ntype, blender::nodes::geo_node_curve_subdivide_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_subdivide_exec;
   nodeRegisterType(&ntype);
 }

@@ -1387,11 +1387,6 @@ typedef struct NodeGeometryCurveResample {
   uint8_t mode;
 } NodeGeometryCurveResample;
 
-typedef struct NodeGeometryCurveSubdivide {
-  /* GeometryNodeAttributeInputMode (integer or attribute). */
-  uint8_t cuts_type;
-} NodeGeometryCurveSubdivide;
-
 typedef struct NodeGeometryCurveTrim {
   /* GeometryNodeCurveInterpolateMode. */
   uint8_t mode;
