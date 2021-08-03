@@ -38,12 +38,12 @@ static bNodeSocketTemplate geo_node_select_by_material_in[] = {
      0.0f,
      PROP_NONE,
      SOCK_HIDE_LABEL},
-    {SOCK_STRING, N_("Selection")},
     {-1, ""},
 };
 
 static bNodeSocketTemplate geo_node_select_by_material_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_BOOLEAN, N_("Selection")},
     {-1, ""},
 };
 
@@ -60,6 +60,7 @@ static void select_mesh_by_material(const Mesh &mesh,
       material_indices.append(i);
     }
   }
+
   threading::parallel_for(r_selection.index_range(), 1024, [&](IndexRange range) {
     for (const int i : range) {
       r_selection[i] = material_indices.contains(mesh.mpoly[i].mat_nr);
@@ -70,25 +71,35 @@ static void select_mesh_by_material(const Mesh &mesh,
 static void geo_node_select_by_material_exec(GeoNodeExecParams params)
 {
   Material *material = params.extract_input<Material *>("Material");
-  const std::string selection_name = params.extract_input<std::string>("Selection");
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   geometry_set = geometry_set_realize_instances(geometry_set);
+
+  AnonymousCustomDataLayerID *id = params.output_is_required("Selection") ?
+                                       CustomData_anonymous_id_new("Selection") :
+                                       nullptr;
+  if (id == nullptr) {
+    params.set_output("Geometry", std::move(geometry_set));
+    return;
+  }
 
   if (geometry_set.has<MeshComponent>()) {
     MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
     const Mesh *mesh = mesh_component.get_for_read();
     if (mesh != nullptr) {
-      OutputAttribute_Typed<bool> selection =
-          mesh_component.attribute_try_get_for_output_only<bool>(selection_name, ATTR_DOMAIN_FACE);
-      if (selection) {
-        select_mesh_by_material(*mesh, material, selection.as_span());
-        selection.save();
-      }
+      mesh_component.attribute_try_create_anonymous(
+          *id, ATTR_DOMAIN_FACE, CD_PROP_BOOL, AttributeInitDefault());
+      WriteAttributeLookup attribute = mesh_component.attribute_try_get_anonymous_for_write(*id);
+      MutableSpan<bool> selection = attribute.varray->get_internal_span().typed<bool>();
+
+      select_mesh_by_material(*mesh, material, selection);
     }
   }
 
   params.set_output("Geometry", std::move(geometry_set));
+  params.set_output(
+      "Selection",
+      bke::FieldRef<bool>(new bke::AnonymousAttributeField(*id, CPPType::get<bool>())));
 }
 
 }  // namespace blender::nodes
