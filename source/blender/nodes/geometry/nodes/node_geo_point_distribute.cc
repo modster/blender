@@ -42,8 +42,7 @@ using blender::bke::GeometryInstanceGroup;
 static bNodeSocketTemplate geo_node_point_distribute_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Distance Min"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Density Max"), 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
-    {SOCK_FLOAT, N_("Density Factor"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
+    {SOCK_FLOAT, N_("Density"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
     {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000},
     {-1, ""},
 };
@@ -586,8 +585,8 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       static_cast<GeometryNodePointDistributeMode>(params.node().custom1);
 
   const int seed = params.get_input<int>("Seed") * 5383843;
-  const float density_max = params.extract_input<float>("Density Max");
-  bke::FieldRef<float> density_field = params.get_input_field<float>("Density Factor");
+  const float density_max = 1.0f;
+  bke::FieldRef<float> density_field = params.get_input_field<float>("Density");
 
   if (density_max <= 0.0f) {
     params.set_output("Geometry", GeometrySet());
