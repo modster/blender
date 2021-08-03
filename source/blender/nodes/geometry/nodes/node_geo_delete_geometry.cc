@@ -24,6 +24,9 @@
 #include "BKE_pointcloud.h"
 #include "BKE_spline.hh"
 
+#include "UI_interface.h"
+#include "UI_resources.h"
+
 #include "node_geometry_util.hh"
 
 using blender::bke::CustomDataAttributes;
@@ -45,8 +48,7 @@ extern void copy_masked_polys_to_new_mesh(const Mesh &src_mesh,
 
 static bNodeSocketTemplate geo_node_delete_geometry_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Selection")},
-    {SOCK_BOOLEAN, N_("Invert")},
+    {SOCK_BOOLEAN, N_("Selection"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 
@@ -54,6 +56,18 @@ static bNodeSocketTemplate geo_node_delete_geometry_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };
+
+static void geo_node_delete_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "domain", 0, "", ICON_NONE);
+}
+
+static void geo_node_delete_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  node->custom1 = ATTR_DOMAIN_POINT;
+}
 
 namespace blender::nodes {
 
@@ -130,7 +144,8 @@ static SplinePtr spline_delete(const Spline &spline, const IndexMask mask)
 }
 
 static std::unique_ptr<CurveEval> curve_delete(const CurveEval &input_curve,
-                                               const StringRef name,
+                                               const AttributeDomain domain,
+                                               const Span<bool> selection,
                                                const bool invert)
 {
   Span<SplinePtr> input_splines = input_curve.splines();
@@ -139,8 +154,7 @@ static std::unique_ptr<CurveEval> curve_delete(const CurveEval &input_curve,
   /* Keep track of which splines were copied to the result to copy spline domain attributes. */
   Vector<int64_t> copied_splines;
 
-  if (input_curve.attributes.get_for_read(name)) {
-    GVArray_Typed<bool> selection = input_curve.attributes.get_for_read<bool>(name, false);
+  if (domain == ATTR_DOMAIN_CURVE) {
     for (const int i : input_splines.index_range()) {
       if (selection[i] == invert) {
         output_curve->add_spline(input_splines[i]->copy());
@@ -148,17 +162,18 @@ static std::unique_ptr<CurveEval> curve_delete(const CurveEval &input_curve,
       }
     }
   }
-  else {
+  else if (domain == ATTR_DOMAIN_POINT) {
     /* Reuse index vector for each spline. */
     Vector<int64_t> indices_to_copy;
 
+    Array<int> offsets = input_curve.control_point_offsets();
+
     for (const int i : input_splines.index_range()) {
       const Spline &spline = *input_splines[i];
-      GVArray_Typed<bool> selection = spline.attributes.get_for_read<bool>(name, false);
 
       indices_to_copy.clear();
       for (const int i_point : IndexRange(spline.size())) {
-        if (selection[i_point] == invert) {
+        if (selection[offsets[i] + i_point] == invert) {
           indices_to_copy.append(i_point);
         }
       }
@@ -187,11 +202,24 @@ static std::unique_ptr<CurveEval> curve_delete(const CurveEval &input_curve,
 
 static void delete_curve_selection(const CurveComponent &in_component,
                                    CurveComponent &r_component,
-                                   const StringRef selection_name,
+                                   const GeoNodeExecParams &params,
                                    const bool invert)
 {
+  const AttributeDomain selection_domain = static_cast<AttributeDomain>(params.node().custom1);
+
+  bke::FieldRef<bool> field = params.get_input_field<bool>("Selection");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, in_component, selection_domain, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(in_component.attribute_domain_size(selection_domain)), field_inputs);
+
+  GVArray_Typed<bool> selection_gvarray{field_output.varray_ref()};
+  VArray_Span<bool> selection{selection_gvarray};
+
   std::unique_ptr<CurveEval> r_curve = curve_delete(
-      *in_component.get_for_read(), selection_name, invert);
+      *in_component.get_for_read(), selection_domain, selection, invert);
+
   if (r_curve) {
     r_component.replace(r_curve.release());
   }
@@ -202,12 +230,20 @@ static void delete_curve_selection(const CurveComponent &in_component,
 
 static void delete_point_cloud_selection(const PointCloudComponent &in_component,
                                          PointCloudComponent &out_component,
-                                         const StringRef selection_name,
+                                         const GeoNodeExecParams &params,
                                          const bool invert)
 {
-  const GVArray_Typed<bool> selection_attribute = in_component.attribute_get_for_read<bool>(
-      selection_name, ATTR_DOMAIN_POINT, false);
-  VArray_Span<bool> selection{selection_attribute};
+  const AttributeDomain selection_domain = static_cast<AttributeDomain>(params.node().custom1);
+
+  bke::FieldRef<bool> field = params.get_input_field<bool>("Selection");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, in_component, selection_domain, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(in_component.attribute_domain_size(selection_domain)), field_inputs);
+
+  GVArray_Typed<bool> selection_gvarray{field_output.varray_ref()};
+  VArray_Span<bool> selection{selection_gvarray};
 
   const int total = selection.count(invert);
   if (total == 0) {
@@ -567,34 +603,21 @@ static Mesh *delete_mesh_selection(const Mesh &mesh_in,
   return result;
 }
 
-static AttributeDomain get_mesh_selection_domain(MeshComponent &component, const StringRef name)
-{
-  std::optional<AttributeMetaData> selection_attribute = component.attribute_get_meta_data(name);
-  if (!selection_attribute) {
-    /* The node will not do anything in this case, but this function must return something. */
-    return ATTR_DOMAIN_POINT;
-  }
-
-  /* Corners can't be deleted separately, so interpolate corner attributes
-   * to the face domain. Note that this choice is somewhat arbitrary. */
-  if (selection_attribute->domain == ATTR_DOMAIN_CORNER) {
-    return ATTR_DOMAIN_FACE;
-  }
-
-  return selection_attribute->domain;
-}
-
 static void delete_mesh_selection(MeshComponent &component,
                                   const Mesh &mesh_in,
-                                  const StringRef selection_name,
+                                  const GeoNodeExecParams &params,
                                   const bool invert)
 {
-  /* Figure out the best domain to use. */
-  const AttributeDomain selection_domain = get_mesh_selection_domain(component, selection_name);
+  const AttributeDomain selection_domain = static_cast<AttributeDomain>(params.node().custom1);
 
-  /* This already checks if the attribute exists, and displays a warning in that case. */
-  GVArray_Typed<bool> selection = component.attribute_get_for_read<bool>(
-      selection_name, selection_domain, false);
+  bke::FieldRef<bool> field = params.get_input_field<bool>("Selection");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, component, selection_domain, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(component.attribute_domain_size(selection_domain)), field_inputs);
+
+  GVArray_Typed<bool> selection{field_output.varray_ref()};
 
   /* Check if there is anything to delete. */
   bool delete_nothing = true;
@@ -635,30 +658,25 @@ static void geo_node_delete_geometry_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
 
-  const bool invert = params.extract_input<bool>("Invert");
-  const std::string selection_name = params.extract_input<std::string>("Selection");
-  if (selection_name.empty()) {
-    params.set_output("Geometry", std::move(geometry_set));
-    return;
-  }
+  const bool invert = false;
 
   GeometrySet out_set(geometry_set);
   if (geometry_set.has<PointCloudComponent>()) {
     delete_point_cloud_selection(*geometry_set.get_component_for_read<PointCloudComponent>(),
                                  out_set.get_component_for_write<PointCloudComponent>(),
-                                 selection_name,
+                                 params,
                                  invert);
   }
   if (geometry_set.has<MeshComponent>()) {
     delete_mesh_selection(out_set.get_component_for_write<MeshComponent>(),
                           *geometry_set.get_mesh_for_read(),
-                          selection_name,
+                          params,
                           invert);
   }
   if (geometry_set.has<CurveComponent>()) {
     delete_curve_selection(*geometry_set.get_component_for_read<CurveComponent>(),
                            out_set.get_component_for_write<CurveComponent>(),
-                           selection_name,
+                           params,
                            invert);
   }
 
@@ -674,5 +692,7 @@ void register_node_type_geo_delete_geometry()
   geo_node_type_base(&ntype, GEO_NODE_DELETE_GEOMETRY, "Delete Geometry", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_delete_geometry_in, geo_node_delete_geometry_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_delete_geometry_exec;
+  ntype.draw_buttons = geo_node_delete_layout;
+  node_type_init(&ntype, geo_node_delete_init);
   nodeRegisterType(&ntype);
 }
