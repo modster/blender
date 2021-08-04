@@ -163,8 +163,9 @@ void RotateOperation::get_area_of_interest(const int input_idx,
                                            const rcti &output_area,
                                            rcti &r_input_area)
 {
-  if (input_idx != 0) {
-    r_input_area = output_area;
+  if (input_idx == 1) {
+    /* Degrees input is always used as constant. */
+    r_input_area = COM_SINGLE_ELEM_AREA;
     return;
   }
 

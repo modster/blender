@@ -81,21 +81,34 @@ void TransformOperation::get_area_of_interest(const int input_idx,
                                               const rcti &output_area,
                                               rcti &r_input_area)
 {
-  r_input_area = output_area;
-  if (input_idx != 0) {
-    return;
+  switch (input_idx) {
+    case 0: {
+      r_input_area = output_area;
+      BLI_rcti_translate(&r_input_area, translate_x_, translate_y_);
+      ScaleOperation::scale_area(
+          r_input_area, scale_center_x_, scale_center_y_, constant_scale_, constant_scale_);
+      RotateOperation::get_area_rotation_bounds(r_input_area,
+                                                rotate_center_x_,
+                                                rotate_center_y_,
+                                                rotate_sine_,
+                                                rotate_cosine_,
+                                                r_input_area);
+      expand_area_for_sampler(r_input_area, sampler_);
+      return;
+    }
+    case 1:
+    case 2:
+    case 3: {
+      /* Translation x/y and rotation degrees are always constant. */
+      r_input_area = COM_SINGLE_ELEM_AREA;
+      return;
+    }
+    case 4: {
+      /* Scaling can be variable. */
+      r_input_area = output_area;
+      return;
+    }
   }
-
-  BLI_rcti_translate(&r_input_area, translate_x_, translate_y_);
-  ScaleOperation::scale_area(
-      r_input_area, scale_center_x_, scale_center_y_, constant_scale_, constant_scale_);
-  RotateOperation::get_area_rotation_bounds(r_input_area,
-                                            rotate_center_x_,
-                                            rotate_center_y_,
-                                            rotate_sine_,
-                                            rotate_cosine_,
-                                            r_input_area);
-  expand_area_for_sampler(r_input_area, sampler_);
 }
 
 void TransformOperation::update_memory_buffer_partial(MemoryBuffer *output,

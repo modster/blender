@@ -220,6 +220,14 @@ void PlaneCornerPinMaskOperation::determineResolution(unsigned int resolution[2]
   resolution[1] = preferredResolution[1];
 }
 
+void PlaneCornerPinMaskOperation::get_area_of_interest(const int input_idx,
+                                                       const rcti &output_area,
+                                                       rcti &r_input_area)
+{
+  /* All corner inputs are used as constants. */
+  r_input_area = COM_SINGLE_ELEM_AREA;
+}
+
 /* ******** PlaneCornerPinWarpImageOperation ******** */
 
 PlaneCornerPinWarpImageOperation::PlaneCornerPinWarpImageOperation() : m_corners_ready(false)
@@ -303,6 +311,19 @@ bool PlaneCornerPinWarpImageOperation::determineDependingAreaOfInterest(
   return PlaneDistortWarpImageOperation::determineDependingAreaOfInterest(
       input, readOperation, output);
 #endif
+}
+
+void PlaneCornerPinWarpImageOperation::get_area_of_interest(const int input_idx,
+                                                            const rcti &output_area,
+                                                            rcti &r_input_area)
+{
+  if (input_idx == 0) {
+    PlaneDistortWarpImageOperation::get_area_of_interest(input_idx, output_area, r_input_area);
+  }
+  else {
+    /* Corner inputs are used as constants. */
+    r_input_area = COM_SINGLE_ELEM_AREA;
+  }
 }
 
 }  // namespace blender::compositor

@@ -388,10 +388,7 @@ void ScreenLensDistortionOperation::get_area_of_interest(const int input_idx,
 {
   if (input_idx != 0) {
     /* Dispersion and distorsion inputs are used as constants only. */
-    r_input_area.xmin = output_area.xmin;
-    r_input_area.ymin = output_area.ymin;
-    r_input_area.xmax = output_area.xmin + 1;
-    r_input_area.ymax = output_area.ymin + 1;
+    r_input_area = COM_SINGLE_ELEM_AREA;
   }
 
   /* XXX the original method of estimating the area-of-interest does not work

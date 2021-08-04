@@ -45,6 +45,8 @@ class PlaneCornerPinMaskOperation : public PlaneDistortMaskOperation {
 
   void determineResolution(unsigned int resolution[2],
                            unsigned int preferredResolution[2]) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
 };
 
 class PlaneCornerPinWarpImageOperation : public PlaneDistortWarpImageOperation {
@@ -63,6 +65,8 @@ class PlaneCornerPinWarpImageOperation : public PlaneDistortWarpImageOperation {
   bool determineDependingAreaOfInterest(rcti *input,
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
 };
 
 }  // namespace blender::compositor
