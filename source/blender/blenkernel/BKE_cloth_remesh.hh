@@ -1796,6 +1796,52 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
                     std::move(deleted_faces));
   }
 
+  bool is_edge_collapseable(EdgeIndex edge_index, bool verts_swapped, bool across_seams)
+  {
+    /* The edge is always collapseable if across seams is false */
+    if (across_seams == false) {
+      return true;
+    }
+
+    auto &e_a = this->get_checked_edge(edge_index);
+    auto [v1_a, v2_a] = this->get_checked_verts_of_edge(e_a, verts_swapped);
+    auto &n1_a = this->get_checked_node_of_vert(v1_a);
+    auto &n2_a = this->get_checked_node_of_vert(v2_a);
+    auto n1_index = n1_a.self_index;
+    auto edge_indices = this->get_connecting_edge_indices(n1_a, n2_a);
+
+    /* The collapse edge function doesn't support collapsing one v1 into
+     * multiple v2 as of right now, so if we find such a case tell
+     * user that edge is not collapseable */
+    {
+      auto get_v1_v2_indices = [this, &n1_index, &verts_swapped](const Edge<EED> &e) {
+        auto [v1, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
+        auto v1_index = v1.self_index;
+        auto v2_index = v2.self_index;
+        /* Need to swap the verts if v1 does not point to n1 */
+        if (v1.node.value() != n1_index) {
+          std::swap(v1_index, v2_index);
+        }
+        BLI_assert(this->get_checked_vert(v1_index).node.value() == n1_index);
+        return std::make_tuple(v1_index, v2_index);
+      };
+
+      blender::Vector<VertIndex> v1_list;
+      for (const auto &edge_index : edge_indices) {
+        auto &e = this->get_checked_edge(edge_index);
+        auto [v1_index, v2_index] = get_v1_v2_indices(e);
+
+        if (v1_list.contains(v1_index)) {
+          return false;
+        }
+
+        v1_list.append(v1_index);
+      }
+    }
+
+    return true;
+  }
+
   /**
    * Collapses the edge from edge v1 to v2 unless `verts_swapped` is set
    * to true and keeps the triangulation of the Mesh
@@ -1813,6 +1859,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
    * Note, the caller must ensure the adjacent faces to the edge are
    * triangulated. In debug mode, it will assert, in release mode, it
    * is undefined behaviour.
+   *
+   * Caller must ensure that the edge is collapseable by calling `is_edge_collapseable()`
    **/
   MeshDiff<END, EVD, EED, EFD> collapse_edge_triangulate(EdgeIndex edge_index,
                                                          bool verts_swapped,
@@ -1842,6 +1890,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
     FilenameGen filename_gen(
         "/tmp/adaptive_cloth/" + std::to_string(std::get<0>(edge_index.get_raw())), ".mesh");
+
+    BLI_assert(this->is_edge_collapseable(edge_index, verts_swapped, across_seams));
 
     blender::Vector<NodeIndex> added_nodes;
     blender::Vector<VertIndex> added_verts;

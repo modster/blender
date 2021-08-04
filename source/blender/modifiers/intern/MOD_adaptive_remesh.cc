@@ -96,6 +96,9 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     std::cout << "is_on_boundary: " << is_on_boundary << std::endl;
     auto flippable = internal_mesh.is_edge_flippable(edge_index, across_seams);
     std::cout << "flippable: " << flippable << std::endl;
+    auto collapseable = internal_mesh.is_edge_collapseable(
+        edge_index, verts_swapped, across_seams);
+    std::cout << "collapseable: " << collapseable << std::endl;
     if (mode == ADAPTIVE_REMESH_SPLIT_EDGE) {
       auto pre_split_msgpack = internal_mesh.serialize();
       auto pre_split_filename = split_edge_name_gen.get_curr(filename_pre_suffix + "_pre");
