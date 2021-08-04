@@ -113,17 +113,20 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
       internal::dump_file(post_split_filename, post_split_msgpack);
     }
     else if (mode == ADAPTIVE_REMESH_COLLAPSE_EDGE) {
-      auto pre_collapse_msgpack = internal_mesh.serialize();
-      auto pre_collapse_filename = collapse_edge_name_gen.get_curr(filename_pre_suffix + "_pre");
+      if (collapseable) {
+        auto pre_collapse_msgpack = internal_mesh.serialize();
+        auto pre_collapse_filename = collapse_edge_name_gen.get_curr(filename_pre_suffix + "_pre");
 
-      internal_mesh.collapse_edge_triangulate(edge_index, verts_swapped, across_seams);
+        internal_mesh.collapse_edge_triangulate(edge_index, verts_swapped, across_seams);
 
-      auto post_collapse_msgpack = internal_mesh.serialize();
-      auto post_collapse_filename = collapse_edge_name_gen.get_curr(filename_pre_suffix + "_post");
-      /* collapse_edge_name_gen.gen_next(); */
+        auto post_collapse_msgpack = internal_mesh.serialize();
+        auto post_collapse_filename = collapse_edge_name_gen.get_curr(filename_pre_suffix +
+                                                                      "_post");
+        /* collapse_edge_name_gen.gen_next(); */
 
-      internal::dump_file(pre_collapse_filename, pre_collapse_msgpack);
-      internal::dump_file(post_collapse_filename, post_collapse_msgpack);
+        internal::dump_file(pre_collapse_filename, pre_collapse_msgpack);
+        internal::dump_file(post_collapse_filename, post_collapse_msgpack);
+      }
     }
     else if (mode == ADAPTIVE_REMESH_FLIP_EDGE) {
       if (flippable) {
