@@ -2859,6 +2859,11 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
   bool is_face_edges_linked(const Face<EFD> &face) const
   {
+    if (face.verts.size() == 0) {
+      /* No verts available, so no links possible */
+      return false;
+    }
+
     auto vert_1_index = face.verts[0];
     auto vert_2_index = face.verts[0];
     for (auto i = 1; i <= face.verts.size(); i++) {
@@ -2899,6 +2904,13 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   void delink_face_edges(FaceIndex face_index)
   {
     auto &face = this->get_checked_face(face_index);
+
+    /* An earlier call to delete_edge and now this call can lead to
+     * problems, so early exit if the verts were already removed from
+     * the face. */
+    if (face.verts.size() == 0) {
+      return;
+    }
 
     /* Would want to use `get_edges_of_face()` but that can lead to 2
      * loops, so duplicating that code here. (note: this needs to be
