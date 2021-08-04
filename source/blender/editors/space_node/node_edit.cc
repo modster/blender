@@ -33,6 +33,7 @@
 #include "DNA_world_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_function_ref.hh"
 #include "BLI_math.h"
 
 #include "BKE_context.h"
@@ -78,6 +79,8 @@
 #include "NOD_shader.h"
 #include "NOD_texture.h"
 #include "node_intern.h" /* own include */
+
+using blender::FunctionRef;
 
 #define USE_ESC_COMPO
 
@@ -2981,18 +2984,62 @@ void NODE_OT_cryptomatte_layer_remove(wmOperatorType *ot)
 
 /* ****************** Geometry Expander Add Output  ******************* */
 
-static const EnumPropertyItem *node_geometry_expander_output_add_items(bContext *UNUSED(C),
-                                                                       PointerRNA *UNUSED(ptr),
+namespace {
+struct AvailableAttribute {
+  /* Can be empty of the attribute comes from a group input. */
+  bNode *source_node;
+  /* Can be a socket of a node or a node tree input. */
+  bNodeSocket *source_socket;
+};
+}  // namespace
+
+static void foreach_available_attribute(
+    bNodeTree *ntree,
+    bNode *UNUSED(current_node),
+    FunctionRef<void(const AvailableAttribute &attribute)> callback)
+{
+  LISTBASE_FOREACH (bNodeSocket *, group_input, &ntree->inputs) {
+    if (ELEM(group_input->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN)) {
+      AvailableAttribute attribute{nullptr, group_input};
+      callback(attribute);
+    }
+  }
+  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+    bool has_seen_geometry = false;
+    LISTBASE_FOREACH (bNodeSocket *, node_output, &node->outputs) {
+      has_seen_geometry |= node_output->type == SOCK_GEOMETRY;
+      if (has_seen_geometry && node->type != NODE_GROUP_INPUT &&
+          ELEM(node_output->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN)) {
+        AvailableAttribute attribute{node, node_output};
+        callback(attribute);
+      }
+    }
+  }
+}
+
+static const EnumPropertyItem *node_geometry_expander_output_add_items(bContext *C,
+                                                                       PointerRNA *ptr,
                                                                        PropertyRNA *UNUSED(prop),
                                                                        bool *r_free)
 {
   EnumPropertyItem *items = nullptr;
   int totitem = 0;
-  EnumPropertyItem item = {0};
-  item.identifier = "HELLO";
-  item.name = "Hello";
 
-  RNA_enum_item_add(&items, &totitem, &item);
+  SpaceNode *snode = CTX_wm_space_node(C);
+  bNodeTree *ntree = snode->edittree;
+  char *node_name = RNA_string_get_alloc(ptr, "node_name", nullptr, 0);
+  bNode *node = nodeFindNodebyName(ntree, node_name);
+  MEM_freeN(node_name);
+
+  int index = 0;
+  foreach_available_attribute(ntree, node, [&](const AvailableAttribute &attribute) {
+    EnumPropertyItem item = {0};
+    item.value = index++;
+    item.name = attribute.source_socket->name;
+    item.identifier = "test";
+    RNA_enum_item_add(&items, &totitem, &item);
+  });
+
   RNA_enum_item_end(&items, &totitem);
   *r_free = true;
   return items;
