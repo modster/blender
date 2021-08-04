@@ -1031,6 +1031,16 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
       .correct_aspect = true,
   };
 
+  uint objects_len = 0;
+  Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data_with_uvs(
+      view_layer, CTX_wm_view3d(C), &objects_len);
+
+  /* Early exit in case no UVs are selected */
+  if (!uvedit_have_selection_multi(scene, objects, objects_len, &options)) {
+    MEM_freeN(objects);
+    return OPERATOR_CANCELLED;
+  }
+
   bool rotate = RNA_boolean_get(op->ptr, "rotate");
 
   /* Check if specified UDIM is valid - specified tile exists in the udim grid or tiled image */
@@ -1080,15 +1090,6 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
     use_target = false;
   }
 
-  uint objects_len = 0;
-  Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data_with_uvs(
-      view_layer, CTX_wm_view3d(C), &objects_len);
-
-  if (!uvedit_have_selection_multi(scene, objects, objects_len, &options)) {
-    MEM_freeN(objects);
-    return OPERATOR_CANCELLED;
-  }
-
   if (RNA_struct_property_is_set(op->ptr, "margin")) {
     scene->toolsettings->uvcalc_margin = RNA_float_get(op->ptr, "margin");
   }
@@ -1123,7 +1124,7 @@ static void pack_islands_draw(bContext *C, wmOperator *op)
 
   col = uiLayoutColumn(layout, false);
 
-  /* Expose target UDIM prop only if packing target is specified UDIM */
+  /* Expose target UDIM property only if packing target is specified UDIM */
   uiItemR(col, op->ptr, "packTo", 0, NULL, 0);
   if (RNA_enum_get(op->ptr, "packTo") == SPECIFIED_UDIM) {
     uiItemR(col, op->ptr, "target_udim", 0, NULL, 0);
