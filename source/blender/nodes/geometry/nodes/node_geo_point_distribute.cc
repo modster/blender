@@ -50,6 +50,7 @@ static bNodeSocketTemplate geo_node_point_distribute_in[] = {
 
 static bNodeSocketTemplate geo_node_point_distribute_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_VECTOR, N_("Rotation")},
     {-1, ""},
 };
 
@@ -342,18 +343,16 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
                                                     Span<int> instance_start_offsets,
                                                     GeometryComponent &component,
                                                     Span<Vector<float3>> bary_coords_array,
-                                                    Span<Vector<int>> looptri_indices_array)
+                                                    Span<Vector<int>> looptri_indices_array,
+                                                    Vector<float3> &r_rotations)
 {
   OutputAttribute_Typed<int> id_attribute = component.attribute_try_get_for_output_only<int>(
       "id", ATTR_DOMAIN_POINT);
   OutputAttribute_Typed<float3> normal_attribute =
       component.attribute_try_get_for_output_only<float3>("normal", ATTR_DOMAIN_POINT);
-  OutputAttribute_Typed<float3> rotation_attribute =
-      component.attribute_try_get_for_output_only<float3>("rotation", ATTR_DOMAIN_POINT);
 
   MutableSpan<int> result_ids = id_attribute.as_span();
   MutableSpan<float3> result_normals = normal_attribute.as_span();
-  MutableSpan<float3> result_rotations = rotation_attribute.as_span();
 
   int i_instance = 0;
   for (const GeometryInstanceGroup &set_group : sets) {
@@ -370,7 +369,6 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
       Span<int> looptri_indices = looptri_indices_array[i_instance];
       MutableSpan<int> ids = result_ids.slice(offset, bary_coords.size());
       MutableSpan<float3> normals = result_normals.slice(offset, bary_coords.size());
-      MutableSpan<float3> rotations = result_rotations.slice(offset, bary_coords.size());
 
       /* Use one matrix multiplication per point instead of three (for each triangle corner). */
       float rotation_matrix[3][3];
@@ -391,7 +389,7 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
         ids[i] = (int)(bary_coord.hash() + (uint64_t)looptri_index);
         normal_tri_v3(normals[i], v0_pos, v1_pos, v2_pos);
         mul_m3_v3(rotation_matrix, normals[i]);
-        rotations[i] = normal_to_euler_rotation(normals[i]);
+        r_rotations.append(normal_to_euler_rotation(normals[i]));
       }
 
       i_instance++;
@@ -400,7 +398,6 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
 
   id_attribute.save();
   normal_attribute.save();
-  rotation_attribute.save();
 }
 
 BLI_NOINLINE static void add_remaining_point_attributes(
@@ -409,7 +406,8 @@ BLI_NOINLINE static void add_remaining_point_attributes(
     const Map<std::string, AttributeKind> &attributes,
     GeometryComponent &component,
     Span<Vector<float3>> bary_coords_array,
-    Span<Vector<int>> looptri_indices_array)
+    Span<Vector<int>> looptri_indices_array,
+    Vector<float3> &r_rotations)
 {
   interpolate_existing_attributes(set_groups,
                                   instance_start_offsets,
@@ -417,8 +415,12 @@ BLI_NOINLINE static void add_remaining_point_attributes(
                                   component,
                                   bary_coords_array,
                                   looptri_indices_array);
-  compute_special_attributes(
-      set_groups, instance_start_offsets, component, bary_coords_array, looptri_indices_array);
+  compute_special_attributes(set_groups,
+                             instance_start_offsets,
+                             component,
+                             bary_coords_array,
+                             looptri_indices_array,
+                             r_rotations);
 }
 
 static void distribute_points_random(Span<GeometryInstanceGroup> set_groups,
@@ -632,14 +634,17 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   Map<std::string, AttributeKind> attributes;
   bke::geometry_set_gather_instances_attribute_info(
       set_groups, {GEO_COMPONENT_TYPE_MESH}, {"position", "normal", "id"}, attributes);
+  Vector<float3> rotations;
   add_remaining_point_attributes(set_groups,
                                  instance_start_offsets,
                                  attributes,
                                  point_component,
                                  bary_coords_all,
-                                 looptri_indices_all);
+                                 looptri_indices_all,
+                                 rotations);
 
   params.set_output("Geometry", std::move(geometry_set_out));
+  params.set_output("Rotation", Array<float3>(rotations.as_span()));
 }
 
 }  // namespace blender::nodes
