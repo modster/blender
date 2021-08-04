@@ -1857,6 +1857,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     auto &n1_a = this->get_checked_node_of_vert(v1_a);
     auto &n2_a = this->get_checked_node_of_vert(v2_a);
     auto n1_index = n1_a.self_index;
+    auto n2_index = n2_a.self_index;
 
     blender::Vector<EdgeIndex> edge_indices = {edge_index};
     if (across_seams) {
@@ -1940,6 +1941,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
+    dump_file(filename_gen.gen_next("done_with_edge_indices"), this->serialize());
+
     /* There can be multiple v2, so cannot delete the all edges or
      * faces around v1 in the previous loop */
     {
@@ -1987,9 +1990,31 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
+    dump_file(filename_gen.gen_next("done_deleting_faces_edges_of_v1_and_v1"), this->serialize());
+
     /* delete the Node n1 */
     {
-      const auto &n1 = this->get_checked_node(n1_index);
+      auto &n1 = this->get_checked_node(n1_index);
+
+      /* It is possible to have v1 which doesn't have a
+       * corresponding v2 for this 3d edge but v1 should be entirely
+       * removed if across seams is active, so make v1 as v2 by
+       * making v1.node refer to n2 and removing the reference to v1
+       * in n1 */
+      if (across_seams) {
+        const auto n1_verts = n1.get_verts();
+        for (const auto &v1_index : n1_verts) {
+          dump_file(filename_gen.gen_next("extra_v1_processing"), this->serialize());
+
+          /* TODO(ish): might want to delete the faces and recreate
+           * them so MeshDiff gets updated */
+
+          auto &v1 = this->get_checked_vert(v1_index);
+          v1.node = n2_index;
+
+          n1.verts.remove_first_occurrence_and_reorder(v1_index);
+        }
+      }
 
       if (n1.get_verts().is_empty()) {
         const auto n1 = this->delete_node(n1_index);
