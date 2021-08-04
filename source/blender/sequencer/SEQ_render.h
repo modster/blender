@@ -72,7 +72,8 @@ void SEQ_render_thumbnails(struct SeqRenderData *context,
                            struct Sequence *seq_orig,
                            float start_frame,
                            float frame_step,
-                           rctf *view_area);
+                           rctf *view_area,
+                           short *stop);
 struct ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
                                 struct Sequence *seq,
                                 float timeline_frame,

@@ -103,7 +103,6 @@
 #define MUTE_ALPHA 120
 #define OVERLAP_ALPHA 180
 
-struct GHash *thumb_data_hash;
 static Sequence *special_seq_update = NULL;
 
 void color3ubv_from_seq(Scene *curscene, Sequence *seq, uchar col[3])
@@ -1111,7 +1110,7 @@ static void thumbnail_hash_data_free(void *val)
 static void thumbnail_freejob(void *data)
 {
   ThumbnailDrawJob *tj = data;
-  // BLI_ghash_free(tj->seqs, NULL, thumbnail_hash_data_free);
+  BLI_ghash_free(tj->seqs, NULL, thumbnail_hash_data_free);
   MEM_freeN(tj->view_area);
   MEM_freeN(tj);
 }
@@ -1199,11 +1198,9 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
   Sequence *seq_orig;
   float start_frame, frame_step, temp_dummy = 0;
 
-  *do_update = true;
-
   GHashIterator gh_iter;
   BLI_ghashIterator_init(&gh_iter, tj->seqs);
-  while (!BLI_ghashIterator_done(&gh_iter)) {
+  while (!BLI_ghashIterator_done(&gh_iter) & !*stop) {
     seq_orig = BLI_ghashIterator_getKey(&gh_iter);
     val = BLI_ghash_lookup(tj->seqs, seq_orig);
 
@@ -1217,11 +1214,11 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
                                    tj->pixely);
       seq_thumbnail_get_start_frame(seq_orig, frame_step, &start_frame, tj->view_area);
       SEQ_render_thumbnails(
-          &tj->context, val->seq_dupli, seq_orig, start_frame, frame_step, tj->view_area);
+          &tj->context, val->seq_dupli, seq_orig, start_frame, frame_step, tj->view_area, stop);
     }
     BLI_ghashIterator_step(&gh_iter);
   }
-  UNUSED_VARS(stop, progress);
+  UNUSED_VARS(do_update, progress);
 }
 
 static void sequencer_thumbnail_get_job(const bContext *C,
@@ -1263,7 +1260,7 @@ static void sequencer_thumbnail_get_job(const bContext *C,
   }
   else {
     /* Free the hash input */
-    // BLI_ghash_free(seqs, NULL, thumbnail_hash_data_free);
+    BLI_ghash_free(seqs, NULL, thumbnail_hash_data_free);
   }
 
   if (!WM_jobs_is_running(wm_job)) {
@@ -1285,8 +1282,8 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   SpaceSeq *sseq = CTX_wm_space_seq(C);
 
   /* Set the data for thumbnail caching job */
-  if (thumb_data_hash == NULL)
-    thumb_data_hash = BLI_ghash_ptr_new("seq_duplicates_and_origs");
+  GHash *thumb_data_hash;
+
   ThumbDataItem *val_need_update;
   // leftover is set to true if missing image in strip. false when normal call to all strips done
   if (v2d->cur.xmax != sseq->check_view_area.xmax || v2d->cur.ymax != sseq->check_view_area.ymax ||
@@ -1296,6 +1293,8 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
         v2d->cur.ymax != sseq->check_view_area.ymax) {
       WM_jobs_stop(CTX_wm_manager(C), NULL, thumbnail_startjob);
     }
+
+    thumb_data_hash = BLI_ghash_ptr_new("seq_duplicates_and_origs");
 
     LISTBASE_FOREACH (Sequence *, seq, ed->seqbasep) {
       if ((val_need_update = BLI_ghash_lookup(thumb_data_hash, seq)) == NULL &&

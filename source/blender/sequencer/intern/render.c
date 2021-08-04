@@ -2107,15 +2107,17 @@ void SEQ_render_thumbnails(SeqRenderData *context,
                            Sequence *seq_orig,
                            float start_frame,
                            float frame_step,
-                           rctf *view_area)
+                           rctf *view_area,
+                           short *stop)
 {
   ImBuf *ibuf = NULL;
   SeqRenderState state;
   seq_render_state_init(&state);
 
   start_frame = start_frame - 5 * frame_step;
-  float upper_limit = view_area->xmax + 5 * frame_step;
-  while (start_frame < upper_limit) {
+  float upper_limit = (seq->endstill) ? (seq->start + seq->len) : seq->enddisp;
+  upper_limit = (upper_limit > view_area->xmax) ? view_area->xmax + 3 * frame_step : upper_limit;
+  while ((start_frame < upper_limit) & !*stop) {
     ibuf = seq_cache_get(context, seq_orig, roundf(start_frame), SEQ_CACHE_STORE_THUMBNAIL);
     if (ibuf) {
       IMB_freeImBuf(ibuf);
