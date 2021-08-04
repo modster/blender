@@ -2456,6 +2456,26 @@ static void rna_Node_name_set(PointerRNA *ptr, const char *value)
 
   nodeUniqueName(ntree, node);
 
+  LISTBASE_FOREACH (bNode *, other_node, &ntree->nodes) {
+    if (other_node->type != GEO_NODE_GEOMETRY_EXPANDER) {
+      continue;
+    }
+    NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)other_node->storage;
+    LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
+      if (expander_output->type != GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL) {
+        continue;
+      }
+      if (STREQ(expander_output->local_node_name, oldname)) {
+        STRNCPY(expander_output->local_node_name, node->name);
+        BLI_snprintf(expander_output->socket_name,
+                     sizeof(expander_output->socket_name),
+                     "%s ▶ %s",
+                     node->name,
+                     expander_output->local_socket_identifier);
+      }
+    }
+  }
+
   /* fix all the animation data which may link to this */
   BKE_animdata_fix_paths_rename_all(NULL, "nodes", oldname, node->name);
 }

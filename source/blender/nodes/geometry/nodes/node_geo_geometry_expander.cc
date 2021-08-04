@@ -61,7 +61,7 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
 
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayout *split = uiLayoutSplit(row, 0.7, false);
-  uiItemL(split, socket->name, ICON_NONE);
+  uiItemL(split, expander_output->socket_name, ICON_NONE);
   uiItemR(split, &expander_output_ptr, "domain", 0, "", ICON_NONE);
 
   return true;
@@ -154,6 +154,9 @@ static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
 static void geo_node_geometry_expander_storage_free(bNode *node)
 {
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
+  LISTBASE_FOREACH_MUTABLE (GeometryExpanderOutput *, output, &storage->outputs) {
+    MEM_freeN(output);
+  }
   MEM_freeN(storage);
 }
 
