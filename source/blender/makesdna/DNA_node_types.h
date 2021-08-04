@@ -1425,17 +1425,40 @@ typedef struct NodeGeometryRaycast {
   char _pad[1];
 } NodeGeometryRaycast;
 
+typedef enum eGeometryExpanderOutputType {
+  GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL,
+  GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT,
+  GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN,
+} eGeometryExpanderOutputType;
+
 typedef struct GeometryExpanderOutput {
   struct GeometryExpanderOutput *next, *prev;
+
+  /* eGeometryExpanderOutputType. */
+  int type;
+  char _pad[4];
+
+  /* Identifier of the corresponding socket in the geometry expander. */
+  char socket_identifier[64];
+  char socket_name[64];
+
   /* AttributeDomain. */
   int8_t domain;
   /* GeometryComponentType. */
   int8_t component_type;
   /* eNodeSocketDatatype. */
   int8_t socket_type;
-  char _pad[5];
-  char *data_identifier;
-  char *socket_identifier;
+  char _pad2[5];
+
+  /* Local attribute data. */
+  char local_node_name[64];
+  char local_socket_identifier[64];
+
+  /* Input attribute data. */
+  char input_identifier[64];
+
+  /* Builtin attribute data. */
+  char builtin_identifier[64];
 } GeometryExpanderOutput;
 
 typedef struct NodeGeometryGeometryExpander {

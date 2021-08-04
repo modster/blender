@@ -35,6 +35,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_function_ref.hh"
 #include "BLI_math.h"
+#include "BLI_string_ref.hh"
 
 #include "BKE_context.h"
 #include "BKE_geometry_set.hh"
@@ -81,6 +82,10 @@
 #include "node_intern.h" /* own include */
 
 using blender::FunctionRef;
+using blender::Span;
+using blender::StringRef;
+using blender::StringRefNull;
+using blender::Vector;
 
 #define USE_ESC_COMPO
 
@@ -2986,10 +2991,17 @@ void NODE_OT_cryptomatte_layer_remove(wmOperatorType *ot)
 
 namespace {
 struct AvailableAttribute {
-  /* Can be empty of the attribute comes from a group input. */
-  bNode *source_node;
-  /* Can be a socket of a node or a node tree input. */
-  bNodeSocket *source_socket;
+  eGeometryExpanderOutputType type;
+  eNodeSocketDatatype socket_type = SOCK_FLOAT;
+  std::string socket_name;
+
+  std::string local_node_name;
+  std::string local_socket_identifier;
+
+  std::string input_identifier;
+  std::string input_name;
+
+  std::string builtin_identifier;
 };
 }  // namespace
 
@@ -3000,7 +3012,12 @@ static void foreach_available_attribute(
 {
   LISTBASE_FOREACH (bNodeSocket *, group_input, &ntree->inputs) {
     if (ELEM(group_input->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN)) {
-      AvailableAttribute attribute{nullptr, group_input};
+      AvailableAttribute attribute;
+      attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT;
+      attribute.input_identifier = group_input->identifier;
+      attribute.input_name = group_input->name;
+      attribute.socket_type = (eNodeSocketDatatype)group_input->type;
+      attribute.socket_name = StringRef("Input ▶ ") + group_input->name;
       callback(attribute);
     }
   }
@@ -3008,11 +3025,27 @@ static void foreach_available_attribute(
     LISTBASE_FOREACH (bNodeSocket *, node_output, &node->outputs) {
       if ((node_output->flag & SOCK_ADD_ATTRIBUTE_TO_GEOMETRY) &&
           ELEM(node_output->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN)) {
-        AvailableAttribute attribute{node, node_output};
+        AvailableAttribute attribute;
+        attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL;
+        attribute.local_node_name = node->name;
+        attribute.local_socket_identifier = node_output->identifier;
+        attribute.socket_type = (eNodeSocketDatatype)node_output->type;
+        attribute.socket_name = node->name + StringRef(" ▶ ") + node_output->name;
         callback(attribute);
       }
     }
   }
+}
+
+static Span<AvailableAttribute> get_updated_cached_available_attributes(bNodeTree *ntree,
+                                                                        bNode *node)
+{
+  static Vector<AvailableAttribute> cached_available_attributes;
+  cached_available_attributes.clear();
+  foreach_available_attribute(ntree, node, [&](const AvailableAttribute &attribute) {
+    cached_available_attributes.append(attribute);
+  });
+  return cached_available_attributes;
 }
 
 static const EnumPropertyItem *node_geometry_expander_output_add_items(bContext *C,
@@ -3029,14 +3062,16 @@ static const EnumPropertyItem *node_geometry_expander_output_add_items(bContext 
   bNode *node = nodeFindNodebyName(ntree, node_name);
   MEM_freeN(node_name);
 
-  int index = 0;
-  foreach_available_attribute(ntree, node, [&](const AvailableAttribute &attribute) {
+  Span<AvailableAttribute> attributes = get_updated_cached_available_attributes(ntree, node);
+
+  for (const int i : attributes.index_range()) {
+    const AvailableAttribute &attribute = attributes[i];
     EnumPropertyItem item = {0};
-    item.value = index++;
-    item.name = attribute.source_socket->name;
+    item.value = i;
+    item.name = attribute.socket_name.c_str();
     item.identifier = "test";
     RNA_enum_item_add(&items, &totitem, &item);
-  });
+  }
 
   RNA_enum_item_end(&items, &totitem);
   *r_free = true;
@@ -3056,13 +3091,8 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
 
   const int item_value = RNA_enum_get(op->ptr, "item");
-  AvailableAttribute used_attribute;
-  int index = 0;
-  foreach_available_attribute(ntree, node, [&](const AvailableAttribute &attribute) {
-    if (index++ == item_value) {
-      used_attribute = attribute;
-    }
-  });
+  Span<AvailableAttribute> attributes = get_updated_cached_available_attributes(ntree, node);
+  const AvailableAttribute &attribute = attributes[item_value];
 
   auto to_identifier = [](int id) { return "out_" + std::to_string(id); };
 
@@ -3074,11 +3104,18 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
 
   GeometryExpanderOutput *expander_output = (GeometryExpanderOutput *)MEM_callocN(
       sizeof(GeometryExpanderOutput), __func__);
-  expander_output->data_identifier = BLI_strdup(used_attribute.source_socket->identifier);
-  expander_output->socket_identifier = BLI_strdup(identifier.c_str());
-  expander_output->socket_type = used_attribute.source_socket->type;
-  expander_output->component_type = (int)GEO_COMPONENT_TYPE_MESH;
+
+  expander_output->type = attribute.type;
   expander_output->domain = ATTR_DOMAIN_POINT;
+  expander_output->component_type = (int)GEO_COMPONENT_TYPE_MESH;
+  expander_output->socket_type = (int)attribute.socket_type;
+
+  STRNCPY(expander_output->socket_name, attribute.socket_name.c_str());
+  STRNCPY(expander_output->local_node_name, attribute.local_node_name.c_str());
+  STRNCPY(expander_output->local_socket_identifier, attribute.local_socket_identifier.c_str());
+  STRNCPY(expander_output->input_identifier, attribute.input_identifier.c_str());
+  STRNCPY(expander_output->builtin_identifier, attribute.builtin_identifier.c_str());
+
   BLI_addtail(&storage->outputs, expander_output);
 
   nodeUpdate(ntree, node);

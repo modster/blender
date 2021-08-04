@@ -60,8 +60,9 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
       &ntree->id, &RNA_GeometryExpanderOutput, expander_output, &expander_output_ptr);
 
   uiLayout *row = uiLayoutRow(layout, true);
-  uiItemL(row, socket->name, ICON_NONE);
-  uiItemR(row, &expander_output_ptr, "domain", 0, "", ICON_NONE);
+  uiLayout *split = uiLayoutSplit(row, 0.7, false);
+  uiItemL(split, socket->name, ICON_NONE);
+  uiItemR(split, &expander_output_ptr, "domain", 0, "", ICON_NONE);
 
   return true;
 }
@@ -72,20 +73,41 @@ static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
   const NodeGeometryGeometryExpander *storage = (const NodeGeometryGeometryExpander *)
                                                     bnode.storage;
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
-    const GeometryComponent *component = geometry_set.get_component_for_read(
-        (GeometryComponentType)expander_output->component_type);
-    if (component == nullptr) {
-      params.set_output(expander_output->socket_identifier, Array<float>());
-      continue;
-    }
+  // LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
+  //   const GeometryComponent *component = geometry_set.get_component_for_read(
+  //       (GeometryComponentType)expander_output->component_type);
+  //   if (component == nullptr) {
+  //     switch (expander_output->socket_type) {
+  //       case SOCK_FLOAT: {
+  //         params.set_output(expander_output->socket_identifier, Array<float>());
+  //         break;
+  //       }
+  //       case SOCK_VECTOR: {
+  //         params.set_output(expander_output->socket_identifier, Array<float3>());
+  //         break;
+  //       }
+  //       case SOCK_BOOLEAN: {
+  //         params.set_output(expander_output->socket_identifier, Array<bool>());
+  //         break;
+  //       }
+  //       case SOCK_RGBA: {
+  //         params.set_output(expander_output->socket_identifier, Array<ColorGeometry4f>());
+  //         break;
+  //       }
+  //       case SOCK_INT: {
+  //         params.set_output(expander_output->socket_identifier, Array<int>());
+  //         break;
+  //       }
+  //     }
+  //     continue;
+  //   }
 
-    GVArray_Typed<float> attribute = component->attribute_get_for_read<float>(
-        expander_output->data_identifier, (AttributeDomain)expander_output->domain, 0.0f);
-    Array<float> values(attribute.size());
-    attribute->materialize(values);
-    params.set_output(expander_output->socket_identifier, std::move(values));
-  }
+  //   GVArray_Typed<float> attribute = component->attribute_get_for_read<float>(
+  //       expander_output->data_identifier, (AttributeDomain)expander_output->domain, 0.0f);
+  //   Array<float> values(attribute.size());
+  //   attribute->materialize(values);
+  //   params.set_output(expander_output->socket_identifier, std::move(values));
+  // }
 }
 
 static void geo_node_geometry_expander_init(bNodeTree *UNUSED(ntree), bNode *node)
@@ -114,7 +136,7 @@ static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
                              SOCK_OUT,
                              idname,
                              expander_output->socket_identifier,
-                             expander_output->data_identifier);
+                             expander_output->socket_name);
     }
     new_sockets.add_new(socket);
   }
@@ -132,11 +154,6 @@ static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
 static void geo_node_geometry_expander_storage_free(bNode *node)
 {
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
-  LISTBASE_FOREACH_MUTABLE (GeometryExpanderOutput *, expander_output, &storage->outputs) {
-    MEM_freeN(expander_output->data_identifier);
-    MEM_freeN(expander_output->socket_identifier);
-    MEM_freeN(expander_output);
-  }
   MEM_freeN(storage);
 }
 
@@ -151,8 +168,6 @@ static void geo_node_geometry_expander_storage_copy(bNodeTree *UNUSED(dest_ntree
     GeometryExpanderOutput *dst_output = (GeometryExpanderOutput *)MEM_callocN(
         sizeof(GeometryExpanderOutput), __func__);
     *dst_output = *src_output;
-    dst_output->data_identifier = (char *)MEM_dupallocN(src_output->data_identifier);
-    dst_output->socket_identifier = (char *)MEM_dupallocN(src_output->socket_identifier);
     BLI_addtail(&dst_storage->outputs, dst_output);
   }
   dst_node->storage = dst_storage;

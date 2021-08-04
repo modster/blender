@@ -576,10 +576,6 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
         NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
         BLO_write_struct(writer, NodeGeometryGeometryExpander, storage);
         BLO_write_struct_list(writer, GeometryExpanderOutput, &storage->outputs);
-        LISTBASE_FOREACH (const GeometryExpanderOutput *, expander_output, &storage->outputs) {
-          BLO_write_string(writer, expander_output->data_identifier);
-          BLO_write_string(writer, expander_output->socket_identifier);
-        }
       }
       else if (node->typeinfo != &NodeTypeUndefined) {
         BLO_write_struct_by_name(writer, node->typeinfo->storagename, node->storage);
@@ -763,10 +759,6 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         case GEO_NODE_GEOMETRY_EXPANDER: {
           NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
           BLO_read_list(reader, &storage->outputs);
-          LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
-            BLO_read_data_address(reader, &expander_output->socket_identifier);
-            BLO_read_data_address(reader, &expander_output->data_identifier);
-          }
           break;
         }
         default:
