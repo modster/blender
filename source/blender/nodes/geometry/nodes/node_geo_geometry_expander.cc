@@ -38,8 +38,11 @@ static void geo_node_geometry_expander_layout(uiLayout *layout,
   uiItemO(layout, "Add", ICON_ADD, "node.geometry_expander_output_add");
 }
 
-static bool geo_node_geometry_expande_socket_layout(
-    const bContext *C, uiLayout *layout, bNodeTree *ntree, bNode *node, bNodeSocket *socket)
+static bool geo_node_geometry_expande_socket_layout(const bContext *UNUSED(C),
+                                                    uiLayout *layout,
+                                                    bNodeTree *ntree,
+                                                    bNode *node,
+                                                    bNodeSocket *socket)
 {
   if (socket->in_out == SOCK_IN) {
     return false;

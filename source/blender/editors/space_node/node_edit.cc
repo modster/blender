@@ -2986,7 +2986,7 @@ static const EnumPropertyItem *node_geometry_expander_output_add_items(bContext 
                                                                        PropertyRNA *UNUSED(prop),
                                                                        bool *r_free)
 {
-  EnumPropertyItem *items = NULL;
+  EnumPropertyItem *items = nullptr;
   int totitem = 0;
   EnumPropertyItem item = {0};
   item.identifier = "HELLO";
