@@ -61,7 +61,7 @@ DefNode(ShaderNode,     SH_NODE_COMBRGB,         0,                      "COMBRG
 DefNode(ShaderNode,     SH_NODE_HUE_SAT,         0,                      "HUE_SAT",        HueSaturation,    "Hue/Saturation",    ""              )
 
 DefNode(ShaderNode,     SH_NODE_OUTPUT_MATERIAL,    def_sh_output,          "OUTPUT_MATERIAL",    OutputMaterial,   "Material Output",   ""       )
-DefNode(ShaderNode,     SH_NODE_EEVEE_SPECULAR,     0,                      "EEVEE_SPECULAR",     EeveeSpecular,    "Specular",          ""       )
+DefNode(ShaderNode,     SH_NODE_EEVEE_SPECULAR,     0,                      "EEVEE_SPECULAR",     EeveeSpecular,    "Specular BSDF",     ""       )
 DefNode(ShaderNode,     SH_NODE_OUTPUT_LIGHT,       def_sh_output,          "OUTPUT_LIGHT",       OutputLight,      "Light Output",      ""       )
 DefNode(ShaderNode,     SH_NODE_OUTPUT_WORLD,       def_sh_output,          "OUTPUT_WORLD",       OutputWorld,      "World Output",      ""       )
 DefNode(ShaderNode,     SH_NODE_OUTPUT_LINESTYLE,   def_sh_output_linestyle,"OUTPUT_LINESTYLE",   OutputLineStyle,  "Line Style Output", ""       )
@@ -272,7 +272,6 @@ DefNode(FunctionNode, FN_NODE_ALIGN_ROTATION_TO_VECTOR, def_fn_align_rotation_to
 
 DefNode(GeometryNode, GEO_NODE_EXTRUDE, 0, "EXTRUDE", Extrude, "Mesh Extrude", "")
 
-DefNode(GeometryNode, GEO_NODE_ATTRIBUTE, def_geo_attribute, "ATTRIBUTE", Attribute, "Attribute", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_CLAMP, def_geo_attribute_clamp, "ATTRIBUTE_CLAMP", AttributeClamp, "Attribute Clamp", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_COLOR_RAMP, def_geo_attribute_color_ramp, "ATTRIBUTE_COLOR_RAMP", AttributeColorRamp, "Attribute Color Ramp", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_COMBINE_XYZ, def_geo_attribute_combine_xyz, "ATTRIBUTE_COMBINE_XYZ", AttributeCombineXYZ, "Attribute Combine XYZ", "")
@@ -291,6 +290,7 @@ DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_SEPARATE_XYZ, def_geo_attribute_separat
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_TRANSFER, def_geo_attribute_transfer, "ATTRIBUTE_TRANSFER", AttributeTransfer, "Attribute Transfer", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_VECTOR_MATH, def_geo_attribute_vector_math, "ATTRIBUTE_VECTOR_MATH", AttributeVectorMath, "Attribute Vector Math", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_VECTOR_ROTATE, def_geo_attribute_vector_rotate, "ATTRIBUTE_VECTOR_ROTATE", AttributeVectorRotate, "Attribute Vector Rotate", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE, def_geo_attribute, "ATTRIBUTE", Attribute, "Attribute", "")
 DefNode(GeometryNode, GEO_NODE_BOOLEAN, def_geo_boolean, "BOOLEAN", Boolean, "Boolean", "")
 DefNode(GeometryNode, GEO_NODE_BOUNDING_BOX, 0, "BOUNDING_BOX", BoundBox, "Bounding Box", "")
 DefNode(GeometryNode, GEO_NODE_COLLECTION_INFO, def_geo_collection_info, "COLLECTION_INFO", CollectionInfo, "Collection Info", "")
@@ -307,6 +307,7 @@ DefNode(GeometryNode, GEO_NODE_CURVE_PRIMITIVE_STAR, 0, "CURVE_PRIMITIVE_STAR", 
 DefNode(GeometryNode, GEO_NODE_CURVE_RESAMPLE, def_geo_curve_resample, "CURVE_RESAMPLE", CurveResample, "Resample Curve", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_REVERSE, 0, "CURVE_REVERSE", CurveReverse, "Curve Reverse", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_SET_HANDLES, def_geo_curve_set_handles, "CURVE_SET_HANDLES", CurveSetHandles, "Set Handle Type", "")
+DefNode(GeometryNode, GEO_NODE_CURVE_SPLINE_TYPE, def_geo_curve_spline_type, "CURVE_SPLINE_TYPE", CurveSplineType, "Set Spline Type", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_SUBDIVIDE, 0, "CURVE_SUBDIVIDE", CurveSubdivide, "Curve Subdivide", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_TO_MESH, 0, "CURVE_TO_MESH", CurveToMesh, "Curve to Mesh", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_TO_POINTS, def_geo_curve_to_points, "CURVE_TO_POINTS", CurveToPoints, "Curve to Points", "")
