@@ -57,6 +57,8 @@
 #include "BKE_screen.h"
 #include "BKE_unit.h"
 
+#include "ED_asset.h"
+
 #include "GPU_matrix.h"
 #include "GPU_state.h"
 
@@ -2650,7 +2652,7 @@ static double ui_get_but_scale_unit(uiBut *but, double value)
   const int unit_type = UI_but_unit_type_get(but);
 
   /* Time unit is a bit special, not handled by BKE_scene_unit_scale() for now. */
-  if (unit_type == PROP_UNIT_TIME) { /* WARNING - using evil_C :| */
+  if (unit_type == PROP_UNIT_TIME) { /* WARNING: using evil_C :| */
     Scene *scene = CTX_data_scene(but->block->evil_C);
     return FRA2TIME(value);
   }
@@ -4015,9 +4017,11 @@ uiBut *ui_but_change_type(uiBut *but, eButType new_type)
       UNUSED_VARS_NDEBUG(found_layout);
       ui_button_group_replace_but_ptr(uiLayoutGetBlock(but->layout), old_but_ptr, but);
     }
+#ifdef WITH_PYTHON
     if (UI_editsource_enable_check()) {
       UI_editsource_but_replace(old_but_ptr, but);
     }
+#endif
   }
 
   return but;
@@ -6176,10 +6180,12 @@ void UI_but_drag_set_id(uiBut *but, ID *id)
   but->dragpoin = (void *)id;
 }
 
+/**
+ * \param asset: May be passed from a temporary variable, drag data only stores a copy of this.
+ */
 void UI_but_drag_set_asset(uiBut *but,
-                           const char *name,
+                           const AssetHandle *asset,
                            const char *path,
-                           int id_type,
                            int import_type,
                            int icon,
                            struct ImBuf *imb,
@@ -6187,9 +6193,9 @@ void UI_but_drag_set_asset(uiBut *but,
 {
   wmDragAsset *asset_drag = MEM_mallocN(sizeof(*asset_drag), "wmDragAsset");
 
-  BLI_strncpy(asset_drag->name, name, sizeof(asset_drag->name));
+  BLI_strncpy(asset_drag->name, ED_asset_handle_get_name(asset), sizeof(asset_drag->name));
   asset_drag->path = path;
-  asset_drag->id_type = id_type;
+  asset_drag->id_type = ED_asset_handle_get_id_type(asset);
   asset_drag->import_type = import_type;
 
   but->dragtype = WM_DRAG_ASSET;

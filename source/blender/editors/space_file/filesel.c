@@ -415,7 +415,7 @@ FileAssetSelectParams *ED_fileselect_get_asset_params(const SpaceFile *sfile)
 
 static void fileselect_refresh_asset_params(FileAssetSelectParams *asset_params)
 {
-  FileSelectAssetLibraryUID *library = &asset_params->asset_library;
+  AssetLibraryReference *library = &asset_params->asset_library;
   FileSelectParams *base_params = &asset_params->base_params;
   bUserAssetLibrary *user_library = NULL;
 
@@ -448,6 +448,11 @@ void fileselect_refresh_params(SpaceFile *sfile)
   if (asset_params) {
     fileselect_refresh_asset_params(asset_params);
   }
+}
+
+bool ED_fileselect_is_file_browser(const SpaceFile *sfile)
+{
+  return (sfile->browse_mode == FILE_BROWSE_MODE_FILES);
 }
 
 bool ED_fileselect_is_asset_browser(const SpaceFile *sfile)

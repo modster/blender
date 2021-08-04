@@ -35,9 +35,11 @@ extern "C" {
 /* Struct Declarations */
 
 struct ARegion;
+struct AssetHandle;
 struct AssetFilterSettings;
 struct AutoComplete;
 struct EnumPropertyItem;
+struct FileDirEntry;
 struct FileSelectParams;
 struct ID;
 struct IDProperty;
@@ -769,9 +771,8 @@ int UI_but_return_value_get(uiBut *but);
 
 void UI_but_drag_set_id(uiBut *but, struct ID *id);
 void UI_but_drag_set_asset(uiBut *but,
-                           const char *name,
+                           const struct AssetHandle *asset,
                            const char *path,
-                           int id_type,
                            int import_type, /* eFileAssetImportType */
                            int icon,
                            struct ImBuf *imb,
@@ -2576,10 +2577,7 @@ void ED_keymap_ui(struct wmKeyConfig *keyconf);
 void ED_uilisttypes_ui(void);
 
 void UI_drop_color_copy(struct wmDrag *drag, struct wmDropBox *drop);
-bool UI_drop_color_poll(struct bContext *C,
-                        struct wmDrag *drag,
-                        const struct wmEvent *event,
-                        const char **r_tooltip);
+bool UI_drop_color_poll(struct bContext *C, struct wmDrag *drag, const struct wmEvent *event);
 
 bool UI_context_copy_to_selected_list(struct bContext *C,
                                       struct PointerRNA *ptr,

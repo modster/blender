@@ -165,7 +165,7 @@ float area_squared_poly_v3(const float verts[][3], unsigned int nr)
 /**
  * Scalar cross product of a 2d polygon.
  *
- * - equivalent to ``area * 2``
+ * - equivalent to `area * 2`
  * - useful for checking polygon winding (a positive value is clockwise).
  */
 float cross_poly_v2(const float verts[][2], unsigned int nr)
@@ -518,7 +518,7 @@ float dist_to_line_v3(const float p[3], const float l1[3], const float l2[3])
 }
 
 /**
- * Check if \a p is inside the 2x planes defined by ``(v1, v2, v3)``
+ * Check if \a p is inside the 2x planes defined by `(v1, v2, v3)`
  * where the 3x points define 2x planes.
  *
  * \param axis_ref: used when v1,v2,v3 form a line and to check if the corner is concave/convex.
@@ -527,7 +527,7 @@ float dist_to_line_v3(const float p[3], const float l1[3], const float l2[3])
  * (it just defines the planes).
  *
  * \return the lowest squared distance to either of the planes.
- * where ``(return < 0.0)`` is outside.
+ * where `(return < 0.0)` is outside.
  *
  * <pre>
  *            v1
@@ -1421,7 +1421,7 @@ int isect_seg_seg_v2_lambda_mu_db(const double v1[2],
  * \return r_p1, r_p2: Intersection coordinates.
  *
  * \note The order of assignment for intersection points (\a r_p1, \a r_p2) is predictable,
- * based on the direction defined by ``l2 - l1``,
+ * based on the direction defined by `l2 - l1`,
  * this direction compared with the normal of each point on the sphere:
  * \a r_p1 always has a >= 0.0 dot product.
  * \a r_p2 always has a <= 0.0 dot product.
@@ -3426,7 +3426,7 @@ float ray_point_factor_v3(const float p[3],
 
 /**
  * A simplified version of #closest_to_line_v3
- * we only need to return the ``lambda``
+ * we only need to return the `lambda`
  *
  * \param epsilon: avoid approaching divide-by-zero.
  * Passing a zero will just check for nonzero division.
@@ -4962,7 +4962,7 @@ void planes_from_projmat(const float mat[4][4],
   }
 }
 
-void projmat_dimensions(const float projmat[4][4],
+void projmat_dimensions(const float winmat[4][4],
                         float *r_left,
                         float *r_right,
                         float *r_bottom,
@@ -4970,27 +4970,27 @@ void projmat_dimensions(const float projmat[4][4],
                         float *r_near,
                         float *r_far)
 {
-  bool is_persp = projmat[3][3] == 0.0f;
-
+  const bool is_persp = winmat[3][3] == 0.0f;
   if (is_persp) {
-    *r_left = (projmat[2][0] - 1.0f) / projmat[0][0];
-    *r_right = (projmat[2][0] + 1.0f) / projmat[0][0];
-    *r_bottom = (projmat[2][1] - 1.0f) / projmat[1][1];
-    *r_top = (projmat[2][1] + 1.0f) / projmat[1][1];
-    *r_near = projmat[3][2] / (projmat[2][2] - 1.0f);
-    *r_far = projmat[3][2] / (projmat[2][2] + 1.0f);
+    const float near = winmat[3][2] / (winmat[2][2] - 1.0f);
+    *r_left = near * ((winmat[2][0] - 1.0f) / winmat[0][0]);
+    *r_right = near * ((winmat[2][0] + 1.0f) / winmat[0][0]);
+    *r_bottom = near * ((winmat[2][1] - 1.0f) / winmat[1][1]);
+    *r_top = near * ((winmat[2][1] + 1.0f) / winmat[1][1]);
+    *r_near = near;
+    *r_far = winmat[3][2] / (winmat[2][2] + 1.0f);
   }
   else {
-    *r_left = (-projmat[3][0] - 1.0f) / projmat[0][0];
-    *r_right = (-projmat[3][0] + 1.0f) / projmat[0][0];
-    *r_bottom = (-projmat[3][1] - 1.0f) / projmat[1][1];
-    *r_top = (-projmat[3][1] + 1.0f) / projmat[1][1];
-    *r_near = (projmat[3][2] + 1.0f) / projmat[2][2];
-    *r_far = (projmat[3][2] - 1.0f) / projmat[2][2];
+    *r_left = (-winmat[3][0] - 1.0f) / winmat[0][0];
+    *r_right = (-winmat[3][0] + 1.0f) / winmat[0][0];
+    *r_bottom = (-winmat[3][1] - 1.0f) / winmat[1][1];
+    *r_top = (-winmat[3][1] + 1.0f) / winmat[1][1];
+    *r_near = (winmat[3][2] + 1.0f) / winmat[2][2];
+    *r_far = (winmat[3][2] - 1.0f) / winmat[2][2];
   }
 }
 
-void projmat_dimensions_db(const float projmat_fl[4][4],
+void projmat_dimensions_db(const float winmat_fl[4][4],
                            double *r_left,
                            double *r_right,
                            double *r_bottom,
@@ -4998,26 +4998,26 @@ void projmat_dimensions_db(const float projmat_fl[4][4],
                            double *r_near,
                            double *r_far)
 {
-  double projmat[4][4];
-  copy_m4d_m4(projmat, projmat_fl);
+  double winmat[4][4];
+  copy_m4d_m4(winmat, winmat_fl);
 
-  bool is_persp = projmat[3][3] == 0.0f;
-
+  const bool is_persp = winmat[3][3] == 0.0f;
   if (is_persp) {
-    *r_left = (projmat[2][0] - 1.0) / projmat[0][0];
-    *r_right = (projmat[2][0] + 1.0) / projmat[0][0];
-    *r_bottom = (projmat[2][1] - 1.0) / projmat[1][1];
-    *r_top = (projmat[2][1] + 1.0) / projmat[1][1];
-    *r_near = projmat[3][2] / (projmat[2][2] - 1.0);
-    *r_far = projmat[3][2] / (projmat[2][2] + 1.0);
+    const double near = winmat[3][2] / (winmat[2][2] - 1.0);
+    *r_left = near * ((winmat[2][0] - 1.0) / winmat[0][0]);
+    *r_right = near * ((winmat[2][0] + 1.0) / winmat[0][0]);
+    *r_bottom = near * ((winmat[2][1] - 1.0) / winmat[1][1]);
+    *r_top = near * ((winmat[2][1] + 1.0) / winmat[1][1]);
+    *r_near = near;
+    *r_far = winmat[3][2] / (winmat[2][2] + 1.0);
   }
   else {
-    *r_left = (-projmat[3][0] - 1.0) / projmat[0][0];
-    *r_right = (-projmat[3][0] + 1.0) / projmat[0][0];
-    *r_bottom = (-projmat[3][1] - 1.0) / projmat[1][1];
-    *r_top = (-projmat[3][1] + 1.0) / projmat[1][1];
-    *r_near = (projmat[3][2] + 1.0) / projmat[2][2];
-    *r_far = (projmat[3][2] - 1.0) / projmat[2][2];
+    *r_left = (-winmat[3][0] - 1.0) / winmat[0][0];
+    *r_right = (-winmat[3][0] + 1.0) / winmat[0][0];
+    *r_bottom = (-winmat[3][1] - 1.0) / winmat[1][1];
+    *r_top = (-winmat[3][1] + 1.0) / winmat[1][1];
+    *r_near = (winmat[3][2] + 1.0) / winmat[2][2];
+    *r_far = (winmat[3][2] - 1.0) / winmat[2][2];
   }
 }
 

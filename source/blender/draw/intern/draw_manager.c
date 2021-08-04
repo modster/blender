@@ -147,7 +147,7 @@ static bool drw_draw_show_annotation(void)
        * the draw manager is only used to draw the background. */
       return false;
     default:
-      BLI_assert("");
+      BLI_assert(0);
       return false;
   }
 }
@@ -2253,7 +2253,7 @@ static void draw_select_framebuffer_depth_only_setup(const int size[2])
 /* Must run after all instance datas have been added. */
 void DRW_render_instance_buffer_finish(void)
 {
-  BLI_assert(!DST.buffer_finish_called && "DRW_render_instance_buffer_finish called twice!");
+  BLI_assert_msg(!DST.buffer_finish_called, "DRW_render_instance_buffer_finish called twice!");
   DST.buffer_finish_called = true;
   DRW_instance_buffer_finish(DST.idatalist);
   drw_resource_buffer_finish(DST.vmempool);
@@ -2682,6 +2682,7 @@ void DRW_draw_select_id(Depsgraph *depsgraph, ARegion *region, View3D *v3d, cons
   drw_viewport_var_init();
 
   /* Update UBO's */
+  UI_SetTheme(SPACE_VIEW3D, RGN_TYPE_WINDOW);
   DRW_globals_update();
 
   /* Init Select Engine */

@@ -5031,7 +5031,7 @@ static char *rna_path_token(const char **path, char *fixedbuf, int fixedlen, int
     }
   }
   else {
-    /* get data until . or [ */
+    /* Get data until `.` or `[`. */
     p = *path;
 
     while (*p && *p != '.' && *p != '[') {
@@ -5998,7 +5998,7 @@ static void rna_path_array_multi_string_from_flat_index(PointerRNA *ptr,
 
 /**
  * \param index_dim: The dimension to show, 0 disables. 1 for 1d array, 2 for 2d. etc.
- * \param index: The *flattened* index to use when \a ``index_dim > 0``,
+ * \param index: The *flattened* index to use when \a `index_dim > 0`,
  * this is expanded when used with multi-dimensional arrays.
  */
 char *RNA_path_from_ID_to_property_index(PointerRNA *ptr,
@@ -6723,7 +6723,7 @@ bool RNA_struct_property_is_set_ex(PointerRNA *ptr, const char *identifier, bool
     return RNA_property_is_set_ex(ptr, prop, use_ghost);
   }
   /* python raises an error */
-  /* printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name); */
+  // printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name);
   return 0;
 }
 
@@ -6735,7 +6735,7 @@ bool RNA_struct_property_is_set(PointerRNA *ptr, const char *identifier)
     return RNA_property_is_set(ptr, prop);
   }
   /* python raises an error */
-  /* printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name); */
+  // printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name);
   return 0;
 }
 
