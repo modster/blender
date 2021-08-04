@@ -412,8 +412,6 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(subrow, true);
   uiItemR(subrow, ptr, "source_camera", 0, "", ICON_OBJECT_DATA);
 
-  uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
-
   uiItemR(layout, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
   uiItemR(layout, ptr, "use_object_instances", 0, NULL, ICON_NONE);
@@ -724,6 +722,9 @@ static void composition_panel_draw(const bContext *UNUSED(C), Panel *panel)
   const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
 
   uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "use_image_boundary_trimming", 0, NULL, ICON_NONE);
 
   if (show_in_front) {
     uiItemL(layout, IFACE_("Object is shown in front"), ICON_ERROR);
