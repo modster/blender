@@ -1888,9 +1888,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
      * None
      */
 
-    FilenameGen filename_gen(
-        "/tmp/adaptive_cloth/" + std::to_string(std::get<0>(edge_index.get_raw())), ".mesh");
-
     BLI_assert(this->is_edge_collapseable(edge_index, verts_swapped, across_seams));
 
     blender::Vector<NodeIndex> added_nodes;
@@ -1927,7 +1924,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     };
 
     for (const auto &edge_index : edge_indices) {
-      dump_file(filename_gen.gen_next("edge_indices"), this->serialize());
       auto &e = this->get_checked_edge(edge_index);
       auto [v1_index, v2_index] = get_v1_v2_indices(e);
 
@@ -1991,8 +1987,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
-    dump_file(filename_gen.gen_next("done_with_edge_indices"), this->serialize());
-
     /* There can be multiple v2, so cannot delete the all edges or
      * faces around v1 in the previous loop */
     {
@@ -2040,8 +2034,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       }
     }
 
-    dump_file(filename_gen.gen_next("done_deleting_faces_edges_of_v1_and_v1"), this->serialize());
-
     /* delete the Node n1 */
     {
       auto &n1 = this->get_checked_node(n1_index);
@@ -2054,7 +2046,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       if (across_seams) {
         const auto n1_verts = n1.get_verts();
         for (const auto &v1_index : n1_verts) {
-          dump_file(filename_gen.gen_next("extra_v1_processing"), this->serialize());
 
           /* TODO(ish): might want to delete the faces and recreate
            * them so MeshDiff gets updated */
