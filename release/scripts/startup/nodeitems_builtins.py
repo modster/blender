@@ -582,6 +582,7 @@ geometry_node_categories = [
         NodeItem("FunctionNodeFloatCompare"),
         NodeItem("FunctionNodeFloatToInt"),
         NodeItem("GeometryNodeSwitch"),
+        NodeItem("ShaderNodeTexNoise"),
     ]),
     GeometryNodeCategory("GEO_VECTOR", "Vector", items=[
         NodeItem("ShaderNodeVectorCurve"),
