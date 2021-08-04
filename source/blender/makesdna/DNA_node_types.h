@@ -214,6 +214,8 @@ typedef enum eNodeSocketFlag {
    * type is obvious and the name takes up too much space.
    */
   SOCK_HIDE_LABEL = (1 << 12),
+  SOCK_ADD_ATTRIBUTE_TO_GEOMETRY = (1 << 13),
+  SOCK_IS_ATTRIBUTE_OUTPUT = (1 << 14),
 } eNodeSocketFlag;
 
 /* TODO: Limit data in bNode to what we want to see saved. */

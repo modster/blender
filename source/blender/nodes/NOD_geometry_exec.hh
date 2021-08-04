@@ -272,6 +272,11 @@ class GeoNodeExecParams {
     return *provider_->dnode->bnode();
   }
 
+  const bNodeTree &ntree() const
+  {
+    return *provider_->dnode->tree().btree();
+  }
+
   const Object *self_object() const
   {
     return provider_->self_object;

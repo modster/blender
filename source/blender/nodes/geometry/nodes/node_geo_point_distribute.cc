@@ -50,7 +50,7 @@ static bNodeSocketTemplate geo_node_point_distribute_in[] = {
 
 static bNodeSocketTemplate geo_node_point_distribute_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_VECTOR, N_("Rotation")},
+    {SOCK_VECTOR, N_("Rotation"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_IS_ATTRIBUTE_OUTPUT},
     {-1, ""},
 };
 
@@ -645,6 +645,16 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
                                  bary_coords_all,
                                  looptri_indices_all,
                                  rotations);
+
+  if (should_add_output_attribute(params.node(), "Rotation")) {
+    const std::string rotation_attribute_name = get_output_attribute_name(
+        params.ntree(), params.node(), "Rotation");
+    fn::GVArray_For_Span rotations_varray{rotations.as_span()};
+    point_component.attribute_try_create(rotation_attribute_name,
+                                         ATTR_DOMAIN_POINT,
+                                         CD_PROP_FLOAT3,
+                                         AttributeInitVArray{&rotations_varray});
+  }
 
   params.set_output("Geometry", std::move(geometry_set_out));
   params.set_output("Rotation", Array<float3>(rotations.as_span()));

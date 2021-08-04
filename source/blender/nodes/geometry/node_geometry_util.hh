@@ -92,4 +92,21 @@ void curve_create_default_rotation_attribute(Span<float3> tangents,
                                              Span<float3> normals,
                                              MutableSpan<float3> rotations);
 
+inline bool should_add_output_attribute(const bNode &node, StringRef output_name)
+{
+  LISTBASE_FOREACH (bNodeSocket *, sock, &node.outputs) {
+    if (sock->name == output_name) {
+      return (sock->flag & SOCK_ADD_ATTRIBUTE_TO_GEOMETRY);
+    }
+  }
+  return false;
+}
+
+inline std::string get_output_attribute_name(const bNodeTree &ntree,
+                                             const bNode &node,
+                                             StringRef output_name)
+{
+  return StringRef("local_") + ntree.id.name + "_" + node.name + "_" + output_name;
+}
+
 }  // namespace blender::nodes

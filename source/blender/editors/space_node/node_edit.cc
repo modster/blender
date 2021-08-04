@@ -3005,10 +3005,8 @@ static void foreach_available_attribute(
     }
   }
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    bool has_seen_geometry = false;
     LISTBASE_FOREACH (bNodeSocket *, node_output, &node->outputs) {
-      has_seen_geometry |= node_output->type == SOCK_GEOMETRY;
-      if (has_seen_geometry && node->type != NODE_GROUP_INPUT &&
+      if ((node_output->flag & SOCK_ADD_ATTRIBUTE_TO_GEOMETRY) &&
           ELEM(node_output->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN)) {
         AvailableAttribute attribute{node, node_output};
         callback(attribute);

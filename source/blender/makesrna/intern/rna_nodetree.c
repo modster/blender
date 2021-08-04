@@ -10383,6 +10383,14 @@ static void rna_def_node_socket(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Hide Value", "Hide the socket input value");
   RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, NULL);
 
+  prop = RNA_def_property(srna, "add_to_geometry", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SOCK_ADD_ATTRIBUTE_TO_GEOMETRY);
+  RNA_def_property_ui_text(
+      prop,
+      "Add to Geometry",
+      "Add attribute output to the geometry so that it can be accessed later");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocket_update");
+
   prop = RNA_def_property(srna, "node", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_funcs(prop, "rna_NodeSocket_node_get", NULL, NULL, NULL);
   RNA_def_property_struct_type(prop, "Node");

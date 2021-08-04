@@ -372,6 +372,10 @@ static void draw_socket_layout(
   RNA_pointer_create(&ntree->id, &RNA_NodeSocket, socket, &sockptr);
   const char *socket_label = nodeSocketLabel(socket);
   socket->typeinfo->draw((bContext *)C, row, &sockptr, &nodeptr, IFACE_(socket_label));
+
+  if (socket->flag & SOCK_IS_ATTRIBUTE_OUTPUT) {
+    uiItemR(row, &sockptr, "add_to_geometry", 0, "", ICON_ADD);
+  }
 }
 
 /**
