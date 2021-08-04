@@ -3057,6 +3057,15 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
   }
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
 
+  const int item_value = RNA_enum_get(op->ptr, "item");
+  AvailableAttribute used_attribute;
+  int index = 0;
+  foreach_available_attribute(ntree, node, [&](const AvailableAttribute &attribute) {
+    if (index++ == item_value) {
+      used_attribute = attribute;
+    }
+  });
+
   auto to_identifier = [](int id) { return "out_" + std::to_string(id); };
 
   int id = 0;
@@ -3067,9 +3076,9 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
 
   GeometryExpanderOutput *expander_output = (GeometryExpanderOutput *)MEM_callocN(
       sizeof(GeometryExpanderOutput), __func__);
-  expander_output->data_identifier = BLI_strdup("position");
+  expander_output->data_identifier = BLI_strdup(used_attribute.source_socket->identifier);
   expander_output->socket_identifier = BLI_strdup(identifier.c_str());
-  expander_output->socket_type = SOCK_FLOAT;
+  expander_output->socket_type = used_attribute.source_socket->type;
   expander_output->component_type = (int)GEO_COMPONENT_TYPE_MESH;
   expander_output->domain = ATTR_DOMAIN_POINT;
   BLI_addtail(&storage->outputs, expander_output);
