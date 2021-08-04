@@ -549,6 +549,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 
   if (density <= 0.0f) {
     params.set_output("Geometry", GeometrySet());
+    params.set_output("Rotation", Array<float3>());
     return;
   }
 
@@ -556,6 +557,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   geometry_set_gather_instances(geometry_set, set_groups);
   if (set_groups.is_empty()) {
     params.set_output("Geometry", GeometrySet());
+    params.set_output("Rotation", Array<float3>());
     return;
   }
 
@@ -570,6 +572,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   if (set_groups.is_empty()) {
     params.error_message_add(NodeWarningType::Error, TIP_("Input geometry must contain a mesh"));
     params.set_output("Geometry", GeometrySet());
+    params.set_output("Rotation", Array<float3>());
     return;
   }
 

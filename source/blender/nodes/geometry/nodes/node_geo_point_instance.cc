@@ -38,6 +38,7 @@ static bNodeSocketTemplate geo_node_point_instance_in[] = {
      PROP_NONE,
      SOCK_HIDE_LABEL},
     {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000},
+    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 0.0f, -10000.0f, 10000.0f, PROP_EULER},
     {-1, ""},
 };
 
@@ -172,8 +173,9 @@ static void add_instances_from_component(InstancesComponent &instances,
 
   GVArray_Typed<float3> positions = src_geometry.attribute_get_for_read<float3>(
       "position", domain, {0, 0, 0});
-  GVArray_Typed<float3> rotations = src_geometry.attribute_get_for_read<float3>(
-      "rotation", domain, {0, 0, 0});
+  Array<float3> rotations_array = params.get_input<Array<float3>>("Rotation");
+  fn::GVArray_For_RepeatedGSpan rotations_repeated{domain_size, rotations_array.as_span()};
+  GVArray_Typed<float3> rotations{rotations_repeated};
   GVArray_Typed<float3> scales = src_geometry.attribute_get_for_read<float3>(
       "scale", domain, {1, 1, 1});
   GVArray_Typed<int> id_attribute = src_geometry.attribute_get_for_read<int>("id", domain, -1);
