@@ -397,38 +397,33 @@ static PyObject *BPy_IDPropertyUIManager_update(BPy_IDPropertyUIManager *self,
   BLI_assert(IDP_ui_data_supported(property));
 
   switch (IDP_ui_data_type(property)) {
-    case IDP_UI_DATA_TYPE_INT: {
+    case IDP_UI_DATA_TYPE_INT:
       IDP_ui_data_ensure(property);
       if (!idprop_ui_data_update_int(property, args, kwargs)) {
         return NULL;
       }
       Py_RETURN_NONE;
-    }
-    case IDP_UI_DATA_TYPE_FLOAT: {
+    case IDP_UI_DATA_TYPE_FLOAT:
       IDP_ui_data_ensure(property);
       if (!idprop_ui_data_update_float(property, args, kwargs)) {
         return NULL;
       }
       Py_RETURN_NONE;
-    }
-    case IDP_UI_DATA_TYPE_STRING: {
+    case IDP_UI_DATA_TYPE_STRING:
       IDP_ui_data_ensure(property);
       if (!idprop_ui_data_update_string(property, args, kwargs)) {
         return NULL;
       }
       Py_RETURN_NONE;
-    }
-    case IDP_UI_DATA_TYPE_ID: {
+    case IDP_UI_DATA_TYPE_ID:
       IDP_ui_data_ensure(property);
       if (!idprop_ui_data_update_id(property, args, kwargs)) {
         return NULL;
       }
       Py_RETURN_NONE;
-    }
-    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+    case IDP_UI_DATA_TYPE_UNSUPPORTED:
       PyErr_Format(PyExc_TypeError, "IDProperty \"%s\" does not support RNA data", property->name);
       return NULL;
-    }
   }
 
   BLI_assert_unreachable();
