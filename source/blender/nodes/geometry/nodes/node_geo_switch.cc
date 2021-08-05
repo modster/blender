@@ -92,6 +92,31 @@ static void geo_node_switch_update(bNodeTree *UNUSED(ntree), bNode *node)
 }
 
 template<typename T>
+static void output_input_field(GeoNodeExecParams &params,
+                               const bool input,
+                               const StringRef input_suffix,
+                               const StringRef output_identifier)
+{
+  const std::string name_a = "False" + input_suffix;
+  const std::string name_b = "True" + input_suffix;
+  if (input) {
+    params.set_input_unused(name_a);
+    if (params.lazy_require_input(name_b)) {
+      return;
+    }
+
+    params.set_output(output_identifier, params.get_input_field<T>(name_b));
+  }
+  else {
+    params.set_input_unused(name_b);
+    if (params.lazy_require_input(name_a)) {
+      return;
+    }
+    params.set_output(output_identifier, params.get_input_field<T>(name_a));
+  }
+}
+
+template<typename T>
 static void output_input(GeoNodeExecParams &params,
                          const bool input,
                          const StringRef input_suffix,
@@ -124,19 +149,19 @@ static void geo_node_switch_exec(GeoNodeExecParams params)
   const bool input = params.get_input<bool>("Switch");
   switch ((eNodeSocketDatatype)storage.input_type) {
     case SOCK_FLOAT: {
-      output_input<float>(params, input, "", "Output");
+      output_input_field<float>(params, input, "", "Output");
       break;
     }
     case SOCK_INT: {
-      output_input<int>(params, input, "_001", "Output_001");
+      output_input_field<int>(params, input, "_001", "Output_001");
       break;
     }
     case SOCK_BOOLEAN: {
-      output_input<bool>(params, input, "_002", "Output_002");
+      output_input_field<bool>(params, input, "_002", "Output_002");
       break;
     }
     case SOCK_VECTOR: {
-      output_input<float3>(params, input, "_003", "Output_003");
+      output_input_field<float3>(params, input, "_003", "Output_003");
       break;
     }
     case SOCK_RGBA: {
