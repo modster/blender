@@ -34,6 +34,8 @@
 #include "RNA_access.h"
 #include "RNA_enum_types.h"
 
+#include "../intern/bpy_rna.h"
+
 #define USE_STRING_COERCE
 
 #ifdef USE_STRING_COERCE
@@ -62,12 +64,12 @@ static bool idprop_ui_data_update_base(IDProperty *idprop,
                                        const char *description)
 {
   if (rna_subtype != NULL) {
-    int result = PROP_NONE;
-    if (!RNA_enum_value_from_id(rna_enum_property_subtype_items, rna_subtype, &result)) {
-      PyErr_SetString(PyExc_KeyError, "RNA subtype not found");
+    if (pyrna_enum_value_from_id(rna_enum_property_subtype_items,
+                                 rna_subtype,
+                                 &idprop->ui_data->rna_subtype,
+                                 "IDPropertyUIManager.update") == -1) {
       return false;
     }
-    idprop->ui_data->rna_subtype = result;
   }
 
   if (description != NULL) {
