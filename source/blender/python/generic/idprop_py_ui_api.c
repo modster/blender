@@ -59,21 +59,21 @@ static bool args_contain_key(PyObject *kwargs, const char *name)
 /**
  * \return False when parsing fails, in which case caller should return NULL.
  */
-static bool idprop_ui_data_update_base(IDProperty *idprop,
+static bool idprop_ui_data_update_base(IDPropertyUIData *ui_data,
                                        const char *rna_subtype,
                                        const char *description)
 {
   if (rna_subtype != NULL) {
     if (pyrna_enum_value_from_id(rna_enum_property_subtype_items,
                                  rna_subtype,
-                                 &idprop->ui_data->rna_subtype,
+                                 &ui_data->rna_subtype,
                                  "IDPropertyUIManager.update") == -1) {
       return false;
     }
   }
 
   if (description != NULL) {
-    idprop->ui_data->description = BLI_strdup(description);
+    ui_data->description = BLI_strdup(description);
   }
 
   return true;
@@ -144,42 +144,45 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
     return false;
   }
 
-  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+  /* Write to a temporary copy of the UI data in case some part of the parsing fails. */
+  IDPropertyUIDataInt ui_data = *(IDPropertyUIDataInt *)idprop->ui_data;
+
+  if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
     return false;
   }
 
-  IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)idprop->ui_data;
-
   if (args_contain_key(kwargs, "min")) {
-    ui_data->min = min;
-    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
-    ui_data->max = MAX2(ui_data->min, ui_data->max);
+    ui_data.min = min;
+    ui_data.soft_min = MAX2(ui_data.soft_min, ui_data.min);
+    ui_data.max = MAX2(ui_data.min, ui_data.max);
   }
   if (args_contain_key(kwargs, "max")) {
-    ui_data->max = max;
-    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
-    ui_data->min = MIN2(ui_data->min, ui_data->max);
+    ui_data.max = max;
+    ui_data.soft_max = MIN2(ui_data.soft_max, ui_data.max);
+    ui_data.min = MIN2(ui_data.min, ui_data.max);
   }
   if (args_contain_key(kwargs, "soft_min")) {
-    ui_data->soft_min = soft_min;
-    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
-    ui_data->soft_max = MAX2(ui_data->soft_min, ui_data->soft_max);
+    ui_data.soft_min = soft_min;
+    ui_data.soft_min = MAX2(ui_data.soft_min, ui_data.min);
+    ui_data.soft_max = MAX2(ui_data.soft_min, ui_data.soft_max);
   }
   if (args_contain_key(kwargs, "soft_max")) {
-    ui_data->soft_max = soft_max;
-    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
-    ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->soft_max);
+    ui_data.soft_max = soft_max;
+    ui_data.soft_max = MIN2(ui_data.soft_max, ui_data.max);
+    ui_data.soft_min = MIN2(ui_data.soft_min, ui_data.soft_max);
   }
   if (args_contain_key(kwargs, "step")) {
-    ui_data->step = step;
+    ui_data.step = step;
   }
 
   if (!ELEM(default_value, NULL, Py_None)) {
-    if (!idprop_ui_data_update_int_default(idprop, ui_data, default_value)) {
+    if (!idprop_ui_data_update_int_default(idprop, &ui_data, default_value)) {
       return false;
     }
   }
 
+  /* Write back to the proeprty's UI data. */
+  *(IDPropertyUIDataInt *)idprop->ui_data = ui_data;
   return true;
 }
 
@@ -257,48 +260,50 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
     return false;
   }
 
-  IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
-  IDPropertyUIDataFloat ui_data_local;
+  /* Write to a temporary copy of the UI data in case some part of the parsing fails. */
+  IDPropertyUIDataFloat ui_data = *(IDPropertyUIDataFloat *)idprop->ui_data;
 
-  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+  if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
     return false;
   }
 
   if (args_contain_key(kwargs, "min")) {
-    ui_data->min = min;
-    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
-    ui_data->max = MAX2(ui_data->min, ui_data->max);
+    ui_data.min = min;
+    ui_data.soft_min = MAX2(ui_data.soft_min, ui_data.min);
+    ui_data.max = MAX2(ui_data.min, ui_data.max);
   }
   if (args_contain_key(kwargs, "max")) {
-    ui_data->max = max;
-    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
-    ui_data->min = MIN2(ui_data->min, ui_data->max);
+    ui_data.max = max;
+    ui_data.soft_max = MIN2(ui_data.soft_max, ui_data.max);
+    ui_data.min = MIN2(ui_data.min, ui_data.max);
   }
   if (args_contain_key(kwargs, "soft_min")) {
-    ui_data->soft_min = soft_min;
-    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
-    ui_data->soft_max = MAX2(ui_data->soft_min, ui_data->soft_max);
+    ui_data.soft_min = soft_min;
+    ui_data.soft_min = MAX2(ui_data.soft_min, ui_data.min);
+    ui_data.soft_max = MAX2(ui_data.soft_min, ui_data.soft_max);
   }
   if (args_contain_key(kwargs, "soft_max")) {
-    ui_data->soft_max = soft_max;
-    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
-    ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->soft_max);
+    ui_data.soft_max = soft_max;
+    ui_data.soft_max = MIN2(ui_data.soft_max, ui_data.max);
+    ui_data.soft_min = MIN2(ui_data.soft_min, ui_data.soft_max);
   }
   if (args_contain_key(kwargs, "step")) {
-    ui_data->step = (float)step;
+    ui_data.step = (float)step;
   }
   if (args_contain_key(kwargs, "precision")) {
-    ui_data->precision = precision;
+    ui_data.precision = precision;
   }
 
   /* The default value needs special handling because for array IDProperties it can be a single
    * value or an array, but for non-array properties it can only be a value. */
   if (!ELEM(default_value, NULL, Py_None)) {
-    if (!idprop_ui_data_update_float_default(idprop, ui_data, default_value)) {
+    if (!idprop_ui_data_update_float_default(idprop, &ui_data, default_value)) {
       return false;
     }
   }
 
+  /* Write back to the proeprty's UI data. */
+  *(IDPropertyUIDataFloat *)idprop->ui_data = ui_data;
   return true;
 }
 
@@ -321,17 +326,20 @@ static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyO
     return false;
   }
 
-  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+  /* Write to a temporary copy of the UI data in case some part of the parsing fails. */
+  IDPropertyUIDataString ui_data = *(IDPropertyUIDataString *)idprop->ui_data;
+
+  if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
     return false;
   }
 
-  IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
-
   if (default_value != NULL) {
-    MEM_SAFE_FREE(ui_data->default_value);
-    ui_data->default_value = BLI_strdup(default_value);
+    MEM_SAFE_FREE(ui_data.default_value);
+    ui_data.default_value = BLI_strdup(default_value);
   }
 
+  /* Write back to the proeprty's UI data. */
+  *(IDPropertyUIDataString *)idprop->ui_data = ui_data;
   return true;
 }
 
@@ -348,10 +356,15 @@ static bool idprop_ui_data_update_id(IDProperty *idprop, PyObject *args, PyObjec
     return false;
   }
 
-  if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
+  /* Write to a temporary copy of the UI data in case some part of the parsing fails. */
+  IDPropertyUIDataID ui_data = *(IDPropertyUIDataID *)idprop->ui_data;
+
+  if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
     return false;
   }
 
+  /* Write back to the proeprty's UI data. */
+  *(IDPropertyUIDataID *)idprop->ui_data = ui_data;
   return true;
 }
 
