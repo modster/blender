@@ -408,7 +408,7 @@ static void init_socket_cpp_value_from_property(const IDProperty &property,
                                                 void *r_value)
 {
   switch (socket_value_type) {
-    case SOCK_FLOAT:
+    case SOCK_FLOAT: {
       if (property.type == IDP_FLOAT) {
         *(float *)r_value = IDP_Float(&property);
       }
@@ -416,41 +416,51 @@ static void init_socket_cpp_value_from_property(const IDProperty &property,
         *(float *)r_value = (float)IDP_Double(&property);
       }
       break;
-    case SOCK_INT:
+    }
+    case SOCK_INT: {
       *(int *)r_value = IDP_Int(&property);
       break;
-    case SOCK_VECTOR:
+    }
+    case SOCK_VECTOR: {
       copy_v3_v3((float *)r_value, (const float *)IDP_Array(&property));
       break;
-    case SOCK_BOOLEAN:
+    }
+    case SOCK_BOOLEAN: {
       *(bool *)r_value = IDP_Int(&property) != 0;
       break;
-    case SOCK_STRING:
+    }
+    case SOCK_STRING: {
       new (r_value) std::string(IDP_String(&property));
       break;
-    case SOCK_OBJECT:
+    }
+    case SOCK_OBJECT: {
       ID *id = IDP_Id(&property);
       Object *object = (id && GS(id->name) == ID_OB) ? (Object *)id : nullptr;
       *(Object **)r_value = object;
       break;
-    case SOCK_COLLECTION:
+    }
+    case SOCK_COLLECTION: {
       ID *id = IDP_Id(&property);
       Collection *collection = (id && GS(id->name) == ID_GR) ? (Collection *)id : nullptr;
       *(Collection **)r_value = collection;
       break;
-    case SOCK_TEXTURE:
+    }
+    case SOCK_TEXTURE: {
       ID *id = IDP_Id(&property);
       Tex *texture = (id && GS(id->name) == ID_TE) ? (Tex *)id : nullptr;
       *(Tex **)r_value = texture;
       break;
-    case SOCK_MATERIAL:
+    }
+    case SOCK_MATERIAL: {
       ID *id = IDP_Id(&property);
       Material *material = (id && GS(id->name) == ID_MA) ? (Material *)id : nullptr;
       *(Material **)r_value = material;
       break;
-    default:
+    }
+    default: {
       BLI_assert_unreachable();
       break;
+    }
   }
 }
 
