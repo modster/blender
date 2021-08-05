@@ -530,7 +530,7 @@ void SMAABlendingWeightCalculationOperation::update_memory_buffer_started(
 }
 
 void SMAABlendingWeightCalculationOperation::update_memory_buffer_partial(
-    MemoryBuffer *output, const rcti &out_area, Span<MemoryBuffer *> inputs)
+    MemoryBuffer *output, const rcti &out_area, Span<MemoryBuffer *> UNUSED(inputs))
 {
   for (BuffersIterator<float> it = output->iterate_with({}, out_area); !it.is_end(); ++it) {
     const int x = it.x;
@@ -649,7 +649,7 @@ bool SMAABlendingWeightCalculationOperation::determineDependingAreaOfInterest(
   return NodeOperation::determineDependingAreaOfInterest(&newInput, readOperation, output);
 }
 
-void SMAABlendingWeightCalculationOperation::get_area_of_interest(const int input_idx,
+void SMAABlendingWeightCalculationOperation::get_area_of_interest(const int UNUSED(input_idx),
                                                                   const rcti &output_area,
                                                                   rcti &r_input_area)
 {
@@ -1147,7 +1147,7 @@ bool SMAANeighborhoodBlendingOperation::determineDependingAreaOfInterest(
   return NodeOperation::determineDependingAreaOfInterest(&newInput, readOperation, output);
 }
 
-void SMAANeighborhoodBlendingOperation::get_area_of_interest(const int input_idx,
+void SMAANeighborhoodBlendingOperation::get_area_of_interest(const int UNUSED(input_idx),
                                                              const rcti &output_area,
                                                              rcti &r_input_area)
 {

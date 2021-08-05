@@ -383,7 +383,7 @@ void ScreenLensDistortionOperation::updateVariables(float distortion, float disp
 }
 
 void ScreenLensDistortionOperation::get_area_of_interest(const int input_idx,
-                                                         const rcti &output_area,
+                                                         const rcti &UNUSED(output_area),
                                                          rcti &r_input_area)
 {
   if (input_idx != 0) {
