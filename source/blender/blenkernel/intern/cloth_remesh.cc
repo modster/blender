@@ -36,6 +36,7 @@
 #include "BKE_cloth.h"
 #include "BKE_cloth_remesh.hh"
 
+#include <algorithm>
 #include <cstddef>
 #include <functional>
 #include <limits>
@@ -377,6 +378,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     auto splittable_edges_set = this->get_splittable_edge_indices_set();
     do {
       for (const auto &edge_index : splittable_edges_set) {
+        auto op_edge = this->get_edges().get(edge_index);
+        if (!op_edge) {
+          continue;
+        }
         auto &edge = this->get_checked_edge(edge_index);
         auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
 
@@ -440,22 +445,45 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    */
   blender::Vector<EdgeIndex> get_splittable_edge_indices_set()
   {
+    /* TODO(ish): Reference [1] says that the splittable edges should
+     * be a set so this is done by checking if the verts are already
+     * selected or not.
+     *
+     * This can lead to non symmetrical remeshing which wouldn't be
+     * valid. So don't consider this at least for now. Will check
+     * later again to see if it makes sense.
+     *
+     * An example of why selected verts may not work.
+     *             v1__v2
+     *              |  /
+     *              | /
+     *              |/
+     *             /|v3
+     *            / |
+     *           /__|
+     *          v5   v4
+     *
+     * Splitting (v1, v3) (v3, v4) can be done without it affecting
+     * each other but one of the edges wouldn't be selected because v3
+     * was already selected. This can lead to non symmetrical
+     * splitting of the edges.
+     */
     /* Deselect all verts */
-    for (auto &vert : this->get_verts_mut()) {
-      auto &vert_data = vert.get_checked_extra_data_mut();
-      auto &flag = vert_data.get_flag_mut();
-      flag &= ~VERT_SELECTED_FOR_SPLIT;
-    }
+    /* for (auto &vert : this->get_verts_mut()) { */
+    /*   auto &vert_data = vert.get_checked_extra_data_mut(); */
+    /*   auto &flag = vert_data.get_flag_mut(); */
+    /*   flag &= ~VERT_SELECTED_FOR_SPLIT; */
+    /* } */
 
     blender::Vector<EdgeIndex> splittable_edge_indices;
     /* It is assumed that the edges sizes have been computed earlier
      * and stored in the extra data of the edges */
     for (const auto &edge : this->get_edges()) {
       auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
-      if (v1.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT ||
-          v2.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT) {
-        continue;
-      }
+      /* if (v1.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT || */
+      /*     v2.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT) { */
+      /*   continue; */
+      /* } */
       const auto &edge_data = edge.get_checked_extra_data();
       auto edge_size = edge_data.get_size();
       if (edge_size > 1.0) {
@@ -468,6 +496,18 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         v2_flag |= VERT_SELECTED_FOR_SPLIT;
       }
     }
+
+    /* Sort all the splittable edges based on their edge size,
+     * largest to smallest. */
+    std::sort(splittable_edge_indices.begin(),
+              splittable_edge_indices.end(),
+              [this](const auto &edge_index_1, const auto &edge_index_2) {
+                const auto &edge_1 = this->get_checked_edge(edge_index_1);
+                const auto &edge_2 = this->get_checked_edge(edge_index_2);
+
+                return edge_1.get_checked_extra_data().get_size() >
+                       edge_2.get_checked_extra_data().get_size();
+              });
 
     return splittable_edge_indices;
   }
