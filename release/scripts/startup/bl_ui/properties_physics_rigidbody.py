@@ -319,7 +319,7 @@ class PHYSICS_PT_rigid_body_display_options(PHYSICS_PT_rigidbody_panel, Panel):
             rigid_body_warning(layout, "Object does not have a Rigid Body")
             return
 
-        if rbo.type == ACTIVE
+        if rbo.type == 'ACTIVE':
           col = layout.column()
           col.prop(rbo, "display_data_text")
           col.prop(rbo, "display_acceleration")
