@@ -660,7 +660,6 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   else {
     bezt2 = bezt1 + 1;
   }
-  bezt1->f1 = bezt1->f2 = bezt1->f3 = bezt2->f1 = bezt2->f2 = bezt2->f3 = 1;
 
   float mouse_3d[3];
   mouse_location_to_worldspace(event->mval, bezt1->vec[1], vc, mouse_3d);
@@ -707,8 +706,8 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   }
 }
 
-/* Close the spline if endpoints are selected consecutively. */
-static void close_loop_if_endpoints(
+/* Close the spline if endpoints are selected consecutively. Return true if loop was closed. */
+static bool close_loop_if_endpoints(
     Nurb *sel_nu, BezTriple *sel_bezt, BPoint *sel_bp, ViewContext *vc, bContext *C)
 {
   if (sel_bezt || sel_bp) {
@@ -717,7 +716,7 @@ static void close_loop_if_endpoints(
     bool is_bp_endpoint = (sel_nu->bp &&
                            (sel_bp == sel_nu->bp || sel_bp == sel_nu->bp + sel_nu->pntsu - 1));
     if (!(is_bezt_endpoint || is_bp_endpoint)) {
-      return;
+      return false;
     }
 
     short hand;
@@ -727,13 +726,16 @@ static void close_loop_if_endpoints(
     Base *basact = NULL;
     ED_curve_pick_vert(vc, 1, &nu, &bezt, &bp, &hand, &basact);
 
-    if (nu == sel_nu && bezt != sel_bezt &&
-        ((nu->bezt && (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
-         (nu->bp && (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
+    if (nu == sel_nu &&
+        ((nu->bezt && bezt != sel_bezt &&
+          (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
+         (nu->bp && bp != sel_bp && (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
       View3D *v3d = CTX_wm_view3d(C);
       ListBase *editnurb = object_editcurve_get(vc->obedit);
       curve_toggle_cyclic(v3d, editnurb, 0);
+      return true;
     }
+    return false;
   }
 }
 
@@ -893,10 +895,10 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         else {
           copy_v2_v2_int(vc.mval, event->mval);
           if (nu && !(nu->flagu & CU_NURB_CYCLIC)) {
-            close_loop_if_endpoints(nu, bezt, bp, &vc, C);
+            bool closed = close_loop_if_endpoints(nu, bezt, bp, &vc, C);
 
             /* Set "new" to true to be able to click and drag to control handles when added. */
-            RNA_boolean_set(op->ptr, "new", true);
+            RNA_boolean_set(op->ptr, "new", closed);
           }
         }
       }
