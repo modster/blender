@@ -475,20 +475,10 @@ texture_node_categories = [
 geometry_node_categories = [
     # Geometry Nodes
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
-        NodeItem("GeometryNodeAttributeRandomize"),
-        NodeItem("GeometryNodeAttributeMath"),
-        NodeItem("GeometryNodeAttributeClamp"),
-        NodeItem("GeometryNodeAttributeCompare"),
-        NodeItem("GeometryNodeAttributeConvert"),
         NodeItem("GeometryNodeAttributeCurveMap"),
         NodeItem("GeometryNodeAttributeFill"),
         NodeItem("GeometryNodeAttributeMix"),
-        NodeItem("GeometryNodeAttributeColorRamp"),
-        NodeItem("GeometryNodeAttributeVectorMath"),
-        NodeItem("GeometryNodeAttributeVectorRotate"),
         NodeItem("GeometryNodeAttributeSampleTexture"),
-        NodeItem("GeometryNodeAttributeCombineXYZ"),
-        NodeItem("GeometryNodeAttributeSeparateXYZ"),
         NodeItem("GeometryNodeAttributeRemove"),
         NodeItem("GeometryNodeAttributeMapRange"),
         NodeItem("GeometryNodeAttributeTransfer"),
