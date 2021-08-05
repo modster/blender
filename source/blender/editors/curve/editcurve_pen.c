@@ -619,7 +619,6 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
 {
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
-  float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
 
   CutBeztData data = {.bezt_index = 0,
                       .min_dist = 10000,
@@ -676,7 +675,6 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   }
   bezt1->f1 = bezt1->f2 = bezt1->f3 = bezt2->f1 = bezt2->f2 = bezt2->f3 = 1;
 
-  float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
   float mouse_3d[3];
   mouse_location_to_worldspace(event->mval, bezt1->vec[1], vc, mouse_3d);
 
@@ -722,8 +720,8 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   }
 }
 
-/* Close the spline if endpoints are selected consecutively. Returns true if endpoints selected. */
-static bool close_loop_if_endpoints(
+/* Close the spline if endpoints are selected consecutively. */
+static void close_loop_if_endpoints(
     Nurb *sel_nu, BezTriple *sel_bezt, BPoint *sel_bp, ViewContext *vc, bContext *C)
 {
   if (sel_bezt || sel_bp) {
@@ -908,7 +906,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         else {
           copy_v2_v2_int(vc.mval, event->mval);
           if (nu && !(nu->flagu & CU_NURB_CYCLIC)) {
-            bool is_endpoints = close_loop_if_endpoints(nu, bezt, bp, &vc, C);
+            close_loop_if_endpoints(nu, bezt, bp, &vc, C);
 
             /* Set "new" to true to be able to click and drag to control handles when added. */
             RNA_boolean_set(op->ptr, "new", true);
