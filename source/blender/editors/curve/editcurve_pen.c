@@ -46,7 +46,7 @@
 /* Data structure to keep track of details about the cut location */
 typedef struct CutBeztData {
   /* Index of the last bez triple before the cut. */
-  int bezt_index;
+  int bezt_index, bp_index;
   /* Nurb to which the cut belongs to. */
   Nurb *nurb;
   /* Minimum distance to curve from mouse location. */
@@ -59,7 +59,7 @@ typedef struct CutBeztData {
   float prev_loc[3], cut_loc[3], next_loc[3];
   /* Mouse location as floats. */
   float mval[2];
-} CutBeztData;
+} CutData;
 
 /* Data required segment altering functionality. */
 typedef struct MoveSegmentData {
@@ -220,7 +220,8 @@ static float get_view_zoom(const float depth[3], const ViewContext *vc)
   return 15.0f / len_v2v2(p1_3d, p2_3d);
 }
 
-/* Get the closest point on an edge to a given point based on perpendicular distance. */
+/* Get the closest point on an edge to a given point based on perpendicular distance. Return true
+ * if closest point on curve.  */
 static bool get_closest_point_on_edge(float point[3],
                                       const float pos[2],
                                       const float pos1[3],
@@ -344,7 +345,7 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
                                                     void *op_data)
 {
 
-  CutBeztData *data = op_data;
+  CutData *data = op_data;
 
   float resolu = nu->resolu;
   float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), "makeCut_bezier");
@@ -396,7 +397,7 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
 /* Update the closest point in the data structure. */
 static void update_closest_point_in_data(void *op_data, int resolution, ViewContext *vc)
 {
-  CutBeztData *data = op_data;
+  CutData *data = op_data;
   bool found_min = false;
   float point[3];
   float factor;
@@ -467,10 +468,10 @@ static void calculate_new_bezier_point(const float point_prev[3],
 /* Update the nearest point data for all nurbs. */
 static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op_data)
 {
-  CutBeztData *data = op_data;
+  CutData *data = op_data;
 
   for (Nurb *nu = nurbs->first; nu; nu = nu->next) {
-    if (nu->type == CU_BEZIER) {
+    if (nu->bezt) {
       float screen_co[2];
       if (data->nurb == NULL) {
         ED_view3d_project_float_object(
@@ -493,6 +494,36 @@ static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op
         update_data_if_nearest_point_in_segment(bezt + 1, nu->bezt, nu, i, vc, screen_co, data);
       }
     }
+    else if (nu->bp) {
+      float screen_co[2];
+      ED_view3d_project_float_object(
+          vc->region, nu->bp->vec, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+      if (data->nurb == NULL) {
+        data->nurb = nu;
+        data->bp_index = 0;
+        data->min_dist = len_manhattan_v2v2(screen_co, data->mval);
+        copy_v3_v3(data->cut_loc, nu->bp->vec);
+      }
+
+      for (int i = 0; i < nu->pntsu - 1; i++) {
+        float point[3], factor;
+        bool found_min = get_closest_point_on_edge(
+            point, data->mval, (nu->bp + i)->vec, (nu->bp + i + 1)->vec, vc, &factor);
+        if (found_min) {
+          float point_2d[2];
+          ED_view3d_project_float_object(
+              vc->region, point, point_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+          float dist = len_manhattan_v2v2(point_2d, data->mval);
+          if (dist < data->min_dist) {
+            data->min_dist = dist;
+            data->nurb = nu;
+            data->bp_index = i;
+            data->parameter = factor;
+            copy_v3_v3(data->cut_loc, point);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -500,7 +531,7 @@ static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op
 static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
-  CutBeztData *data = op_data;
+  CutData *data = op_data;
 
   BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
                                               "new_bezt_nurb");
@@ -553,16 +584,60 @@ static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
   new_bezt->f1 = new_bezt->f2 = new_bezt->f3 = 1;
 }
 
+/* Insert a bezt to a nurb at the location specified by op_data. */
+static void add_bp_to_nurb(Nurb *nu, void *op_data, Curve *cu)
+{
+  EditNurb *editnurb = cu->editnurb;
+  CutData *data = op_data;
+
+  BPoint *bp1 = (BPoint *)MEM_mallocN((nu->pntsu + 1) * sizeof(BPoint), "new_bp_nurb");
+  int index = data->bp_index + 1;
+  /* Copy all control points before the cut to the new memory. */
+  memcpy(bp1, nu->bp, index * sizeof(BPoint));
+  BPoint *new_bp = bp1 + index;
+
+  /* Duplicate control point after the cut. */
+  memcpy(new_bp, new_bp - 1, sizeof(BPoint));
+  copy_v3_v3(new_bp->vec, data->cut_loc);
+
+  if (index < nu->pntsu) {
+    /* Copy all control points after the cut to the new memory. */
+    memcpy(bp1 + index + 1, nu->bp + index, (nu->pntsu - index) * sizeof(BPoint));
+  }
+
+  nu->pntsu += 1;
+  cu->actvert = CU_ACT_NONE;
+
+  BPoint *next_bp;
+  if ((nu->flagu & CU_NURB_CYCLIC) && (index == nu->pntsu - 1)) {
+    next_bp = bp1;
+  }
+  else {
+    next_bp = new_bp + 1;
+  }
+
+  /* Interpolate radius, tilt, weight */
+  new_bp->tilt = interpf(next_bp->tilt, (new_bp - 1)->tilt, data->parameter);
+  new_bp->radius = interpf(next_bp->radius, (new_bp - 1)->radius, data->parameter);
+  new_bp->weight = interpf(next_bp->weight, (new_bp - 1)->weight, data->parameter);
+
+  MEM_freeN(nu->bp);
+  nu->bp = bp1;
+  ED_curve_deselect_all(editnurb);
+  BKE_nurb_knot_calc_u(nu);
+}
+
 /* Make a cut on the nearest nurb at the closest point. */
 static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *vc)
 {
-  CutBeztData data = {.bezt_index = 0,
-                      .min_dist = 10000,
-                      .parameter = 0.5f,
-                      .has_prev = false,
-                      .has_next = false,
-                      .mval[0] = event->mval[0],
-                      .mval[1] = event->mval[1]};
+  CutData data = {.bezt_index = 0,
+                  .bp_index = 0,
+                  .min_dist = 10000,
+                  .parameter = 0.5f,
+                  .has_prev = false,
+                  .has_next = false,
+                  .mval[0] = event->mval[0],
+                  .mval[1] = event->mval[1]};
 
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
 
@@ -572,10 +647,15 @@ static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *
   /* If the minimum distance found < threshold distance, make cut. */
   if (data.min_dist < threshold_distance) {
     Nurb *nu = data.nurb;
-    if (nu && nu->type == CU_BEZIER) {
-      update_closest_point_in_data(&data, nu->resolu, vc);
-      add_bezt_to_nurb(nu, &data, cu);
-      *r_nu = nu;
+    if (nu) {
+      if (nu->bezt) {
+        update_closest_point_in_data(&data, nu->resolu, vc);
+        add_bezt_to_nurb(nu, &data, cu);
+        *r_nu = nu;
+      }
+      else if (nu->bp) {
+        add_bp_to_nurb(nu, &data, cu);
+      }
     }
   }
 }
@@ -625,13 +705,13 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
 
-  CutBeztData data = {.bezt_index = 0,
-                      .min_dist = 10000,
-                      .parameter = 0.5f,
-                      .has_prev = false,
-                      .has_next = false,
-                      .mval[0] = event->mval[0],
-                      .mval[1] = event->mval[1]};
+  CutData data = {.bezt_index = 0,
+                  .min_dist = 10000,
+                  .parameter = 0.5f,
+                  .has_prev = false,
+                  .has_next = false,
+                  .mval[0] = event->mval[0],
+                  .mval[1] = event->mval[1]};
 
   update_data_for_all_nurbs(nurbs, vc, &data);
 
@@ -870,7 +950,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           make_cut(event, cu, &nu, &vc);
         }
 
-        if (nu) {
+        if (nu && nu->bezt) {
           BKE_nurb_handles_calc(nu);
         }
       }
