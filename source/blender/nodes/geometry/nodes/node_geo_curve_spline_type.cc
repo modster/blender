@@ -25,7 +25,7 @@
 
 static bNodeSocketTemplate geo_node_curve_spline_type_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_STRING, N_("Selection")},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 
@@ -255,12 +255,17 @@ static void geo_node_curve_spline_type_exec(GeoNodeExecParams params)
     return;
   }
 
-  const CurveComponent *curve_component = geometry_set.get_component_for_read<CurveComponent>();
-  const CurveEval &curve = *curve_component->get_for_read();
+  const CurveComponent &curve_component = *geometry_set.get_component_for_read<CurveComponent>();
+  const CurveEval &curve = *curve_component.get_for_read();
 
-  const std::string selection_name = params.extract_input<std::string>("Selection");
-  GVArray_Typed<bool> selection = curve_component->attribute_get_for_read(
-      selection_name, ATTR_DOMAIN_CURVE, true);
+  bke::FieldRef<bool> field = params.get_input_field<bool>("Selection");
+  bke::FieldInputs field_inputs = field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, curve_component, ATTR_DOMAIN_CURVE, field_input_values);
+  bke::FieldOutput field_output = field->evaluate(
+      IndexRange(curve_component.attribute_domain_size(ATTR_DOMAIN_CURVE)), field_inputs);
+
+  GVArray_Typed<bool> selection{field_output.varray_ref()};
 
   std::unique_ptr<CurveEval> new_curve = std::make_unique<CurveEval>();
   for (const int i : curve.splines().index_range()) {
