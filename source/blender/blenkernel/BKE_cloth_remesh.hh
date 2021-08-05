@@ -2242,7 +2242,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
      * when across_seams is true:
      *
      * when across_seams is false:
-     * 2 faces, 1 edge
+     * 2 faces, might add 1 edge if no existing edge exists
      */
 
     /* Let `e` be the edge of `edge_index`
@@ -2285,24 +2285,30 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       auto ov1_index = ov1.self_index;
       auto ov2_index = ov2.self_index;
 
-      auto &new_e = this->add_empty_edge();
-      new_e.verts = {ov1_index, ov2_index};
-      this->add_edge_ref_to_verts(new_e);
+      /* Create the new edge only if there isn't already an edge
+       * between ov1 and ov2 */
+      if (!this->get_connecting_edge_index(ov1_index, ov2_index)) {
+        auto &new_e = this->add_empty_edge();
+        new_e.verts = {ov1_index, ov2_index};
+        this->add_edge_ref_to_verts(new_e);
+        added_edges.append(new_e.self_index);
+      }
 
       auto &new_f1 = this->add_empty_face(f1.normal);
       new_f1.verts = {v1_index, ov2_index, ov1_index};
       added_faces.append(new_f1.self_index);
       this->add_face_ref_to_edges(new_f1);
+      BLI_assert(this->is_face_edges_linked(new_f1));
 
       auto &new_f2 = this->add_empty_face(f2.normal);
       new_f2.verts = {v2_index, ov1_index, ov2_index};
       added_faces.append(new_f2.self_index);
       this->add_face_ref_to_edges(new_f2);
+      BLI_assert(this->is_face_edges_linked(new_f2));
 
       deleted_edges.append(std::move(e));
       deleted_faces.append(std::move(f1));
       deleted_faces.append(std::move(f2));
-      added_edges.append(new_e.self_index);
     }
     else {
       /* Do more expensive operation only if needed */
@@ -2314,6 +2320,15 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
        * seam or boundary */
     }
 
+    BLI_assert(added_nodes.size() == 0);
+    BLI_assert(added_verts.size() == 0);
+    BLI_assert(added_edges.size() == 0 || added_edges.size() == 1);
+    BLI_assert(added_faces.size() == 2);
+
+    BLI_assert(deleted_nodes.size() == 0);
+    BLI_assert(deleted_verts.size() == 0);
+    BLI_assert(deleted_edges.size() == 1);
+    BLI_assert(deleted_faces.size() == 2);
     return MeshDiff(std::move(added_nodes),
                     std::move(added_verts),
                     std::move(added_edges),
