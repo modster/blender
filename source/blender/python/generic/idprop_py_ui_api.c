@@ -80,6 +80,45 @@ static bool idprop_ui_data_update_base(IDProperty *idprop,
 }
 
 /**
+ * \note The default value needs special handling because for array IDProperties it can
+ * be a single value or an array, but for non-array properties it can only be a value.
+ */
+static bool idprop_ui_data_update_int_default(IDProperty *idprop,
+                                              IDPropertyUIDataInt *ui_data,
+                                              PyObject *default_value)
+{
+  if (PySequence_Check(default_value)) {
+    if (idprop->type != IDP_ARRAY) {
+      PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
+      return false;
+    }
+
+    Py_ssize_t len = PySequence_Size(default_value);
+    int *new_default_array = (int *)MEM_malloc_arrayN(len, sizeof(int), __func__);
+    if (PyC_AsArray(
+            new_default_array, sizeof(int), default_value, len, &PyLong_Type, "ui_data_update") ==
+        -1) {
+      MEM_freeN(new_default_array);
+      return false;
+    }
+
+    ui_data->default_array_len = len;
+    MEM_SAFE_FREE(ui_data->default_array);
+    ui_data->default_array = new_default_array;
+  }
+  else {
+    const int value = PyC_Long_AsI32(default_value);
+    if ((value == -1) && PyErr_Occurred()) {
+      PyErr_SetString(PyExc_ValueError, "Error converting \"default\" argument to integer");
+      return false;
+    }
+    ui_data->default_value = value;
+  }
+
+  return true;
+}
+
+/**
  * \return False when parsing fails, in which case caller should return NULL.
  */
 static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObject *kwargs)
@@ -135,39 +174,48 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
     ui_data->step = step;
   }
 
-  /* The default value needs special handling because for array IDProperties it can be a single
-   * value or an array, but for non-array properties it can only be a value. */
   if (!ELEM(default_value, NULL, Py_None)) {
-    if (PySequence_Check(default_value)) {
-      if (idprop->type != IDP_ARRAY) {
-        PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
-        return false;
-      }
-
-      Py_ssize_t len = PySequence_Size(default_value);
-      int *new_default_array = (int *)MEM_malloc_arrayN(len, sizeof(int), __func__);
-      if (PyC_AsArray(new_default_array,
-                      sizeof(int),
-                      default_value,
-                      len,
-                      &PyLong_Type,
-                      "ui_data_update") == -1) {
-        MEM_freeN(new_default_array);
-        return false;
-      }
-
-      ui_data->default_array_len = len;
-      MEM_SAFE_FREE(ui_data->default_array);
-      ui_data->default_array = new_default_array;
+    if (!idprop_ui_data_update_int_default(idprop, ui_data, default_value)) {
+      return false;
     }
-    else {
-      const int value = PyC_Long_AsI32(default_value);
-      if ((value == -1) && PyErr_Occurred()) {
-        PyErr_SetString(PyExc_ValueError, "Error converting \"default\" argument to integer");
-        return false;
-      }
-      ui_data->default_value = value;
+  }
+
+  return true;
+}
+
+static bool idprop_ui_data_update_float_default(IDProperty *idprop,
+                                                IDPropertyUIDataFloat *ui_data,
+                                                PyObject *default_value)
+{
+  if (PySequence_Check(default_value)) {
+    if (idprop->type != IDP_ARRAY) {
+      PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
+      return false;
     }
+
+    Py_ssize_t len = PySequence_Size(default_value);
+    double *new_default_array = (double *)MEM_malloc_arrayN(len, sizeof(double), __func__);
+    if (PyC_AsArray(new_default_array,
+                    sizeof(double),
+                    default_value,
+                    len,
+                    &PyFloat_Type,
+                    "ui_data_update") == -1) {
+      MEM_freeN(new_default_array);
+      return false;
+    }
+
+    ui_data->default_array_len = len;
+    MEM_SAFE_FREE(ui_data->default_array);
+    ui_data->default_array = new_default_array;
+  }
+  else {
+    const double value = PyFloat_AsDouble(default_value);
+    if ((value == -1.0) && PyErr_Occurred()) {
+      PyErr_SetString(PyExc_ValueError, "Error converting \"default\" argument to double");
+      return false;
+    }
+    ui_data->default_value = value;
   }
 
   return true;
@@ -245,35 +293,8 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
   /* The default value needs special handling because for array IDProperties it can be a single
    * value or an array, but for non-array properties it can only be a value. */
   if (!ELEM(default_value, NULL, Py_None)) {
-    if (PySequence_Check(default_value)) {
-      if (idprop->type != IDP_ARRAY) {
-        PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
-        return false;
-      }
-
-      Py_ssize_t len = PySequence_Size(default_value);
-      double *new_default_array = (double *)MEM_malloc_arrayN(len, sizeof(double), __func__);
-      if (PyC_AsArray(new_default_array,
-                      sizeof(double),
-                      default_value,
-                      len,
-                      &PyFloat_Type,
-                      "ui_data_update") == -1) {
-        MEM_freeN(new_default_array);
-        return false;
-      }
-
-      ui_data->default_array_len = len;
-      MEM_SAFE_FREE(ui_data->default_array);
-      ui_data->default_array = new_default_array;
-    }
-    else {
-      const double value = PyFloat_AsDouble(default_value);
-      if ((value == -1.0) && PyErr_Occurred()) {
-        PyErr_SetString(PyExc_ValueError, "Error converting \"default\" argument to double");
-        return false;
-      }
-      ui_data->default_value = value;
+    if (!idprop_ui_data_update_float_default(idprop, ui_data, default_value)) {
+      return false;
     }
   }
 
