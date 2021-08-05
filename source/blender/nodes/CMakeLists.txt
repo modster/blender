@@ -143,6 +143,7 @@ set(SRC
 
   geometry/nodes/node_geo_extrude.cc
 
+  geometry/nodes/node_geo_attribute_store_anonymous.cc
   geometry/nodes/node_geo_attribute.cc
   geometry/nodes/node_geo_attribute_clamp.cc
   geometry/nodes/node_geo_attribute_color_ramp.cc

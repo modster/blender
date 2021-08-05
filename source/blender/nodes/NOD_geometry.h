@@ -31,6 +31,7 @@ void register_node_type_geo_custom_group(bNodeType *ntype);
 
 void register_node_type_geo_extrude(void);
 
+void register_node_type_geo_attribute_store_anonymous(void);
 void register_node_type_geo_attribute(void);
 void register_node_type_geo_attribute_clamp(void);
 void register_node_type_geo_attribute_color_ramp(void);
