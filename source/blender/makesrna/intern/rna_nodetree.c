@@ -2443,6 +2443,9 @@ static void rna_Node_select_set(PointerRNA *ptr, bool value)
   nodeSetSelected(node, value);
 }
 
+void nodeGeometryExpanderUpdateOutputNameCache(GeometryExpanderOutput *expander_output,
+                                               const bNodeTree *ntree);
+
 static void rna_Node_name_set(PointerRNA *ptr, const char *value)
 {
   bNodeTree *ntree = (bNodeTree *)ptr->owner_id;
@@ -2467,11 +2470,7 @@ static void rna_Node_name_set(PointerRNA *ptr, const char *value)
       }
       if (STREQ(expander_output->local_node_name, oldname)) {
         STRNCPY(expander_output->local_node_name, node->name);
-        BLI_snprintf(expander_output->socket_name,
-                     sizeof(expander_output->socket_name),
-                     "%s ▶ %s",
-                     node->name,
-                     expander_output->local_socket_identifier);
+        nodeGeometryExpanderUpdateOutputNameCache(expander_output, ntree);
       }
     }
   }

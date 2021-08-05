@@ -54,6 +54,7 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
 
   GeometryExpanderOutput *expander_output = (GeometryExpanderOutput *)BLI_findlink(
       &storage->outputs, socket_index);
+  nodeGeometryExpanderUpdateOutputNameCache(expander_output, ntree);
 
   PointerRNA expander_output_ptr;
   RNA_pointer_create(
@@ -61,7 +62,7 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
 
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayout *split = uiLayoutSplit(row, 0.7, false);
-  uiItemL(split, expander_output->socket_name, ICON_NONE);
+  uiItemL(split, expander_output->display_name_cache, ICON_NONE);
   uiItemR(split, &expander_output_ptr, "domain", 0, "", ICON_NONE);
 
   return true;
@@ -131,12 +132,8 @@ static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
     bNodeSocket *socket = old_outputs.lookup_default(expander_output->socket_identifier, nullptr);
     if (socket == nullptr) {
       const char *idname = nodeStaticSocketType(expander_output->socket_type, PROP_NONE);
-      socket = nodeAddSocket(ntree,
-                             node,
-                             SOCK_OUT,
-                             idname,
-                             expander_output->socket_identifier,
-                             expander_output->socket_name);
+      socket = nodeAddSocket(
+          ntree, node, SOCK_OUT, idname, expander_output->socket_identifier, "name");
     }
     new_sockets.add_new(socket);
   }

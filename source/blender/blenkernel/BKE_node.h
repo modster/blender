@@ -735,6 +735,9 @@ void nodeSetSocketAvailability(struct bNodeSocket *sock, bool is_available);
 
 int nodeSocketLinkLimit(const struct bNodeSocket *sock);
 
+void nodeGeometryExpanderUpdateOutputNameCache(struct GeometryExpanderOutput *expander_output,
+                                               const bNodeTree *ntree);
+
 /* Node Clipboard */
 void BKE_node_clipboard_init(const struct bNodeTree *ntree);
 void BKE_node_clipboard_clear(void);

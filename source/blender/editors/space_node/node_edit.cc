@@ -82,6 +82,7 @@
 #include "node_intern.h" /* own include */
 
 using blender::FunctionRef;
+using blender::MutableSpan;
 using blender::Span;
 using blender::StringRef;
 using blender::StringRefNull;
@@ -2989,35 +2990,18 @@ void NODE_OT_cryptomatte_layer_remove(wmOperatorType *ot)
 
 /* ****************** Geometry Expander Add Output  ******************* */
 
-namespace {
-struct AvailableAttribute {
-  eGeometryExpanderOutputType type;
-  eNodeSocketDatatype socket_type = SOCK_FLOAT;
-  std::string socket_name;
-
-  std::string local_node_name;
-  std::string local_socket_identifier;
-
-  std::string input_identifier;
-  std::string input_name;
-
-  std::string builtin_identifier;
-};
-}  // namespace
-
 static void foreach_available_attribute(
     bNodeTree *ntree,
     bNode *UNUSED(current_node),
-    FunctionRef<void(const AvailableAttribute &attribute)> callback)
+    FunctionRef<void(const GeometryExpanderOutput &attribute)> callback)
 {
   LISTBASE_FOREACH (bNodeSocket *, group_input, &ntree->inputs) {
     if (ELEM(group_input->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN)) {
-      AvailableAttribute attribute;
+      GeometryExpanderOutput attribute;
       attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT;
-      attribute.input_identifier = group_input->identifier;
-      attribute.input_name = group_input->name;
+      attribute.domain = ATTR_DOMAIN_POINT;
       attribute.socket_type = (eNodeSocketDatatype)group_input->type;
-      attribute.socket_name = StringRef("Input ▶ ") + group_input->name;
+      STRNCPY(attribute.input_identifier, group_input->identifier);
       callback(attribute);
     }
   }
@@ -3025,24 +3009,40 @@ static void foreach_available_attribute(
     LISTBASE_FOREACH (bNodeSocket *, node_output, &node->outputs) {
       if ((node_output->flag & SOCK_ADD_ATTRIBUTE_TO_GEOMETRY) &&
           ELEM(node_output->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN)) {
-        AvailableAttribute attribute;
+        GeometryExpanderOutput attribute;
         attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL;
-        attribute.local_node_name = node->name;
-        attribute.local_socket_identifier = node_output->identifier;
         attribute.socket_type = (eNodeSocketDatatype)node_output->type;
-        attribute.socket_name = node->name + StringRef(" ▶ ") + node_output->name;
+        attribute.domain = ATTR_DOMAIN_POINT;
+        STRNCPY(attribute.local_node_name, node->name);
+        STRNCPY(attribute.local_socket_identifier, node_output->identifier);
         callback(attribute);
       }
     }
   }
+  {
+    GeometryExpanderOutput attribute;
+    attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN;
+    attribute.socket_type = SOCK_VECTOR;
+    attribute.domain = ATTR_DOMAIN_POINT;
+    STRNCPY(attribute.builtin_identifier, "position");
+    callback(attribute);
+  }
+  {
+    GeometryExpanderOutput attribute;
+    attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN;
+    attribute.socket_type = SOCK_INT;
+    attribute.domain = ATTR_DOMAIN_FACE;
+    STRNCPY(attribute.builtin_identifier, "material_index");
+    callback(attribute);
+  }
 }
 
-static Span<AvailableAttribute> get_updated_cached_available_attributes(bNodeTree *ntree,
-                                                                        bNode *node)
+static MutableSpan<GeometryExpanderOutput> get_updated_cached_available_attributes(
+    bNodeTree *ntree, bNode *node)
 {
-  static Vector<AvailableAttribute> cached_available_attributes;
+  static Vector<GeometryExpanderOutput> cached_available_attributes;
   cached_available_attributes.clear();
-  foreach_available_attribute(ntree, node, [&](const AvailableAttribute &attribute) {
+  foreach_available_attribute(ntree, node, [&](const GeometryExpanderOutput &attribute) {
     cached_available_attributes.append(attribute);
   });
   return cached_available_attributes;
@@ -3062,13 +3062,15 @@ static const EnumPropertyItem *node_geometry_expander_output_add_items(bContext 
   bNode *node = nodeFindNodebyName(ntree, node_name);
   MEM_freeN(node_name);
 
-  Span<AvailableAttribute> attributes = get_updated_cached_available_attributes(ntree, node);
+  MutableSpan<GeometryExpanderOutput> attributes = get_updated_cached_available_attributes(ntree,
+                                                                                           node);
 
   for (const int i : attributes.index_range()) {
-    const AvailableAttribute &attribute = attributes[i];
+    GeometryExpanderOutput &attribute = attributes[i];
+    nodeGeometryExpanderUpdateOutputNameCache(&attribute, ntree);
     EnumPropertyItem item = {0};
     item.value = i;
-    item.name = attribute.socket_name.c_str();
+    item.name = attribute.display_name_cache;
     item.identifier = "test";
     RNA_enum_item_add(&items, &totitem, &item);
   }
@@ -3091,8 +3093,8 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
 
   const int item_value = RNA_enum_get(op->ptr, "item");
-  Span<AvailableAttribute> attributes = get_updated_cached_available_attributes(ntree, node);
-  const AvailableAttribute &attribute = attributes[item_value];
+  Span<GeometryExpanderOutput> attributes = get_updated_cached_available_attributes(ntree, node);
+  const GeometryExpanderOutput &attribute = attributes[item_value];
 
   auto to_identifier = [](int id) { return "out_" + std::to_string(id); };
 
@@ -3104,17 +3106,8 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
 
   GeometryExpanderOutput *expander_output = (GeometryExpanderOutput *)MEM_callocN(
       sizeof(GeometryExpanderOutput), __func__);
-
-  expander_output->type = attribute.type;
-  expander_output->domain = ATTR_DOMAIN_POINT;
-  expander_output->component_type = (int)GEO_COMPONENT_TYPE_MESH;
-  expander_output->socket_type = (int)attribute.socket_type;
-
-  STRNCPY(expander_output->socket_name, attribute.socket_name.c_str());
-  STRNCPY(expander_output->local_node_name, attribute.local_node_name.c_str());
-  STRNCPY(expander_output->local_socket_identifier, attribute.local_socket_identifier.c_str());
-  STRNCPY(expander_output->input_identifier, attribute.input_identifier.c_str());
-  STRNCPY(expander_output->builtin_identifier, attribute.builtin_identifier.c_str());
+  *expander_output = attribute;
+  STRNCPY(expander_output->socket_identifier, identifier.c_str());
 
   BLI_addtail(&storage->outputs, expander_output);
 

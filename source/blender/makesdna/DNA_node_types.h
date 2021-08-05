@@ -1440,7 +1440,9 @@ typedef struct GeometryExpanderOutput {
 
   /* Identifier of the corresponding socket in the geometry expander. */
   char socket_identifier[64];
-  char socket_name[64];
+
+  /* Derived from the other data. */
+  char display_name_cache[64];
 
   /* AttributeDomain. */
   int8_t domain;

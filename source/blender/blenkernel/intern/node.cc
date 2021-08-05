@@ -71,7 +71,9 @@
 #include "BKE_node.h"
 
 #include "BLI_ghash.h"
+#include "BLI_string_ref.hh"
 #include "BLI_threads.h"
+
 #include "RNA_access.h"
 #include "RNA_define.h"
 
@@ -89,6 +91,8 @@
 #include "BLO_read_write.h"
 
 #include "MOD_nodes.h"
+
+using blender::StringRef;
 
 #define NODE_DEFAULT_MAX_WIDTH 700
 
@@ -3924,6 +3928,36 @@ int nodeSocketLinkLimit(const bNodeSocket *sock)
   }
 
   return sock->limit;
+}
+
+static std::string expander_output_to_name(const GeometryExpanderOutput &expander_output,
+                                           const bNodeTree &ntree)
+{
+  switch (expander_output.type) {
+    case GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL: {
+      return expander_output.local_node_name + StringRef(" ▶ ") +
+             expander_output.local_socket_identifier;
+    }
+    case GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT: {
+      LISTBASE_FOREACH (const bNodeSocket *, socket, &ntree.inputs) {
+        if (socket->identifier == StringRef(expander_output.input_identifier)) {
+          return StringRef("Input ▶ ") + socket->name;
+        }
+      }
+      return "Unkown input";
+    }
+    case GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN: {
+      return StringRef("Built-in ▶ ") + expander_output.builtin_identifier;
+    }
+  }
+  return "";
+}
+
+void nodeGeometryExpanderUpdateOutputNameCache(struct GeometryExpanderOutput *expander_output,
+                                               const bNodeTree *ntree)
+{
+  const std::string name = expander_output_to_name(*expander_output, *ntree);
+  STRNCPY(expander_output->display_name_cache, name.c_str());
 }
 
 /* ************** Node Clipboard *********** */
