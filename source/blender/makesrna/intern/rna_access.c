@@ -2897,6 +2897,26 @@ static void rna_property_float_fill_default_array_values(
   }
 }
 
+/**
+ * The same logic as #rna_property_float_fill_default_array_values for a double array.
+ */
+static void rna_property_float_fill_default_array_values_double(const double *default_array,
+                                                                const int default_array_len,
+                                                                const double default_value,
+                                                                const int out_length,
+                                                                float *r_values)
+{
+  const int array_copy_len = MIN2(out_length, default_array_len);
+
+  for (int i = 0; i < array_copy_len; i++) {
+    r_values[i] = (float)default_array[i];
+  }
+
+  for (int i = array_copy_len; i < out_length; i++) {
+    r_values[i] = (float)default_value;
+  }
+}
+
 static void rna_property_float_get_default_array_values(PointerRNA *ptr,
                                                         FloatPropertyRNA *fprop,
                                                         float *r_values)
@@ -3139,18 +3159,11 @@ void RNA_property_float_get_default_array(PointerRNA *ptr, PropertyRNA *prop, fl
       BLI_assert(idprop->type == IDP_ARRAY);
       BLI_assert(ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE));
       const IDPropertyUIDataFloat *ui_data = (const IDPropertyUIDataFloat *)idprop->ui_data;
-      if (ui_data->default_array) {
-        /* A version of #rna_property_float_fill_default_array_values for a double array. */
-        const double *default_array = ui_data->default_array;
-        for (int i = 0; i < length; i++) {
-          values[i] = (i < ui_data->default_array_len) ? (float)default_array[i] :
-                                                         (float)ui_data->default_value;
-        }
-      }
-      else {
-        rna_property_float_fill_default_array_values(
-            NULL, 0, (float)ui_data->default_value, length, values);
-      }
+      rna_property_float_fill_default_array_values_double(ui_data->default_array,
+                                                          ui_data->default_array_len,
+                                                          ui_data->default_value,
+                                                          length,
+                                                          values);
     }
   }
   else if (prop->arraydimension == 0) {
