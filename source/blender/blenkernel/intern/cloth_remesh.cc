@@ -478,10 +478,16 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    * Note: this is not the same as `Mesh::is_edge_flippable`, this is
    * specific to `AdaptiveMesh`.
    *
-   * Reference [1]
+   * Reference [1] and [3]
+   *
+   * In this case considering [3] to be higher priority since both are
+   * contradicting each other.
    */
   bool is_edge_flippable_anisotropic_aware(const AdaptiveEdge &edge) const
   {
+    /* TODO(ish): expose alpha to the user */
+    auto alpha = 0.1;
+
     if (this->is_edge_loose_or_on_seam_or_boundary(edge)) {
       return false;
     }
@@ -516,9 +522,18 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     const auto m_avg = (m_i + m_j + m_k + m_l) * 0.25;
 
-    return cross_2d(u_jk, u_ik) * float2::dot(u_il, m_avg * u_jl) +
-               float2::dot(u_jk, m_avg * u_ik) * cross_2d(u_il, u_jl) <
-           0.0;
+    const auto lhs = cross_2d(u_jk, u_ik) * float2::dot(u_il, m_avg * u_jl) +
+                     float2::dot(u_jk, m_avg * u_ik) * cross_2d(u_il, u_jl);
+
+    /* Based on [1], should be flippable if res < 0.
+     *
+     * Based on [3], should be flippable if res >= 0 but then there is
+     * another part that mentions that flippable if res falls some
+     * calculated value. So taking that route as of now.
+     */
+    const auto rhs = -alpha * (cross_2d(u_jk, u_ik) + cross_2d(u_il, u_jl));
+
+    return lhs < rhs;
   }
 
   /**

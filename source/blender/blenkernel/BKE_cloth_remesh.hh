@@ -23,7 +23,7 @@
  * \ingroup bke
  */
 
-/**********************************************************************
+/*********************************************************************************
  * references
  *
  * [1] "Adaptive Anisotropic Remeshing for Cloth Simulation" by Rahul
@@ -34,7 +34,13 @@
  * efficient and fast management of multiresolution meshes" by
  * Frutuoso G. M. Silva and Abel J. P. Gomes (GRAPHITE '03)
  * https://doi.org/10.1145/604471.604503
- * ********************************************************************/
+ *
+ * [3] "Folding and Crumpling Adaptive Sheets" by Rahul Narain, Tobias
+ * Pfaff, James F.O'Brien (SIGGRAPH 2013).
+ * https://dl.acm.org/doi/10.1145/2461912.2462010
+ * http://graphics.berkeley.edu/papers/Narain-FCA-2013-07/Narain-FCA-2013-07.pdf
+ *
+ * *****************************************************************************/
 
 #include "BKE_mesh.h"
 #include "BLI_assert.h"
