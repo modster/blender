@@ -44,7 +44,7 @@
 #include "RNA_define.h"
 
 /* Data structure to keep track of details about the cut location */
-typedef struct CutBeztData {
+typedef struct CutData {
   /* Index of the last bez triple before the cut. */
   int bezt_index, bp_index;
   /* Nurb to which the cut belongs to. */
@@ -706,6 +706,7 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
 
   CutData data = {.bezt_index = 0,
+                  .bp_index = 0,
                   .min_dist = 10000,
                   .parameter = 0.5f,
                   .has_prev = false,
@@ -716,7 +717,7 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
   update_data_for_all_nurbs(nurbs, vc, &data);
 
   float threshold_distance = get_view_zoom(data.cut_loc, vc);
-  if (data.min_dist < threshold_distance) {
+  if (!data.nurb->bp && data.min_dist < threshold_distance) {
     MoveSegmentData *seg_data;
     op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), "MoveSegmentData");
     seg_data->bezt_index = data.bezt_index;
@@ -815,8 +816,8 @@ static bool close_loop_if_endpoints(
       curve_toggle_cyclic(v3d, editnurb, 0);
       return true;
     }
-    return false;
   }
+  return false;
 }
 
 enum {
