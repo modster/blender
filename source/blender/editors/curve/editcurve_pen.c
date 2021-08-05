@@ -61,8 +61,11 @@ typedef struct CutBeztData {
   float mval[2];
 } CutBeztData;
 
+/* Data required segment altering functionality. */
 typedef struct MoveSegmentData {
+  /* Nurb being altered. */
   Nurb *nu;
+  /* Index of the BezTriple before the segment. */
   int bezt_index;
 } MoveSegmentData;
 
@@ -148,6 +151,7 @@ static void free_up_handles_for_movement(BezTriple *bezt, bool f1, bool f3)
   }
 }
 
+/* Move BezTriple to mouse. */
 static void move_selected_bezt_to_mouse(BezTriple *bezt, ViewContext *vc, const wmEvent *event)
 {
   /* Get mouse location in 3D space. */
@@ -170,6 +174,7 @@ static void move_selected_bezt_to_mouse(BezTriple *bezt, ViewContext *vc, const 
   }
 }
 
+/* Move BPoint to mouse. */
 static void move_bp_to_mouse(BPoint *bp, const wmEvent *event, const ViewContext *vc)
 {
   /* Get mouse location in 3D space. */
