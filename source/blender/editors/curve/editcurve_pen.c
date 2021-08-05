@@ -646,24 +646,6 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
   return false;
 }
 
-static void deselect_all(Curve *cu)
-{
-  LISTBASE_FOREACH (Nurb *, nu, &(cu->editnurb->nurbs)) {
-    if (nu->type == CU_BEZIER) {
-      BezTriple *bezt = nu->bezt;
-      for (int i = 0; i < nu->pntsu; i++, bezt++) {
-        bezt->f1 = bezt->f2 = bezt->f3 = 0;
-      }
-    }
-    else {
-      BPoint *bp = nu->bp;
-      for (int i = 0; i < nu->pntsu; i++, bp++) {
-        bp->f1 = 0;
-      }
-    }
-  }
-}
-
 /* Move segment to mouse pointer. */
 static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewContext *vc)
 {
@@ -901,7 +883,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (!retval) {
           if (is_curve_nearby(&vc, op, event)) {
             RNA_boolean_set(op->ptr, "moving_segment", true);
-            deselect_all(obedit->data);
             moving_segment = true;
           }
           else {
