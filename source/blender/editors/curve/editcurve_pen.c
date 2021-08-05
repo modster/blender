@@ -26,6 +26,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_linklist.h"
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_mempool.h"
 
@@ -667,6 +668,24 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
   return false;
 }
 
+static void deselect_all(Curve *cu)
+{
+  LISTBASE_FOREACH (Nurb *, nu, &(cu->editnurb->nurbs)) {
+    if (nu->type == CU_BEZIER) {
+      BezTriple *bezt = nu->bezt;
+      for (int i = 0; i < nu->pntsu; i++, bezt++) {
+        bezt->f1 = bezt->f2 = bezt->f3 = 0;
+      }
+    }
+    else {
+      BPoint *bp = nu->bp;
+      for (int i = 0; i < nu->pntsu; i++, bp++) {
+        bp->f1 = 0;
+      }
+    }
+  }
+}
+
 /* Move segment to mouse pointer. */
 static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewContext *vc)
 {
@@ -681,6 +700,7 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   else {
     bezt2 = bezt1 + 1;
   }
+  bezt1->f1 = bezt1->f2 = bezt1->f3 = bezt2->f1 = bezt2->f2 = bezt2->f3 = 1;
 
   float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
   float mouse_3d[3];
@@ -904,6 +924,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (!retval) {
           if (is_curve_nearby(&vc, op, event)) {
             RNA_boolean_set(op->ptr, "moving_segment", true);
+            deselect_all(obedit->data);
             moving_segment = true;
           }
           else {
