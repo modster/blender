@@ -19,55 +19,29 @@
  */
 
 #include "DNA_curve_types.h"
-#include "DNA_object_types.h"
-#include "DNA_scene_types.h"
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_blenlib.h"
-#include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
-#include "BLI_mempool.h"
 
 #include "BKE_context.h"
 #include "BKE_curve.h"
-#include "BKE_fcurve.h"
-#include "BKE_layer.h"
-#include "BKE_report.h"
 
 #include "DEG_depsgraph.h"
 
 #include "WM_api.h"
-#include "WM_toolsystem.h"
-#include "WM_types.h"
 
 #include "ED_curve.h"
-#include "ED_object.h"
-#include "ED_outliner.h"
 #include "ED_screen.h"
-#include "ED_select_utils.h"
-#include "ED_space_api.h"
 #include "ED_view3d.h"
 
-#include "GPU_batch.h"
-#include "GPU_batch_presets.h"
-#include "GPU_immediate.h"
-#include "GPU_immediate_util.h"
-#include "GPU_matrix.h"
-#include "GPU_state.h"
-
 #include "BKE_object.h"
-#include "BKE_paint.h"
 
 #include "curve_intern.h"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
-
 #include "RNA_access.h"
 #include "RNA_define.h"
-#include "RNA_enum_types.h"
 
 /* Data structure to keep track of details about the cut location */
 typedef struct CutBeztData {
