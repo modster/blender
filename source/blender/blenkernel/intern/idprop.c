@@ -1096,7 +1096,7 @@ IDProperty *IDP_New(const char type, const IDPropertyTemplate *val, const char *
   return prop;
 }
 
-void IDP_free_ui_data(IDProperty *prop)
+void IDP_ui_data_free(IDProperty *prop)
 {
   switch (IDP_ui_data_type(prop)) {
     case IDP_UI_DATA_TYPE_STRING: {
@@ -1154,7 +1154,7 @@ void IDP_FreePropertyContent_ex(IDProperty *prop, const bool do_id_user)
   }
 
   if (prop->ui_data != NULL) {
-    IDP_free_ui_data(prop);
+    IDP_ui_data_free(prop);
   }
 }
 

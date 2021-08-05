@@ -506,7 +506,7 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
         new_prop->ui_data = nullptr;
         IDP_CopyPropertyContent(new_prop, old_prop);
         if (new_prop->ui_data != nullptr) {
-          IDP_free_ui_data(new_prop);
+          IDP_ui_data_free(new_prop);
         }
         new_prop->ui_data = ui_data;
       }

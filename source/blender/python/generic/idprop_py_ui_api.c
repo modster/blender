@@ -257,11 +257,12 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
     return false;
   }
 
+  IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
+  IDPropertyUIDataFloat ui_data_local;
+
   if (!idprop_ui_data_update_base(idprop, rna_subtype, description)) {
     return false;
   }
-
-  IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
 
   if (args_contain_key(kwargs, "min")) {
     ui_data->min = min;
@@ -565,7 +566,7 @@ static PyObject *BPy_IDPropertyUIManager_clear(BPy_IDPropertyUIManager *self)
   }
 
   if (property->ui_data != NULL) {
-    IDP_free_ui_data(property);
+    IDP_ui_data_free(property);
   }
 
   Py_RETURN_NONE;
@@ -596,7 +597,7 @@ static PyObject *BPy_IDPropertyUIManager_update_from(BPy_IDPropertyUIManager *se
   }
 
   if (property->ui_data != NULL) {
-    IDP_free_ui_data(property);
+    IDP_ui_data_free(property);
   }
 
   property->ui_data = IDP_ui_data_copy(ui_manager_src->property);
