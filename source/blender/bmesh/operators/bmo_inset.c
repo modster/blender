@@ -1122,7 +1122,6 @@ void bmo_inset_region_exec(BMesh *bm, BMOperator *op)
 
             /* apply the offset */
             if (use_attributes) {
-              printf("index: %i\n", v_split->head.index);
               madd_v3_v3fl(v_split->co, tvec, thickness_array[v_split->head.index]);
             }
             else {
