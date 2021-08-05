@@ -280,20 +280,31 @@ IDPropertyUIData *IDP_ui_data_copy(const IDProperty *prop)
   IDPropertyUIData *data_new = MEM_dupallocN(prop->ui_data);
 
   /* Copy extra type specific data. */
-  if (prop->type == IDP_STRING) {
-    IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)prop->ui_data;
-    IDPropertyUIDataString *ui_data_new = (IDPropertyUIDataString *)data_new;
-    ui_data_new->default_value = MEM_dupallocN(ui_data->default_value);
-  }
-  else if (prop->type == IDP_ARRAY && prop->subtype == IDP_INT) {
-    IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)prop->ui_data;
-    IDPropertyUIDataInt *ui_data_new = (IDPropertyUIDataInt *)data_new;
-    ui_data_new->default_array = MEM_dupallocN(ui_data->default_array);
-  }
-  else if (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE)) {
-    IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)prop->ui_data;
-    IDPropertyUIDataFloat *ui_data_new = (IDPropertyUIDataFloat *)data_new;
-    ui_data_new->default_array = MEM_dupallocN(ui_data->default_array);
+  switch (IDP_ui_data_type(prop)) {
+    case IDP_UI_DATA_TYPE_STRING: {
+      IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)prop->ui_data;
+      IDPropertyUIDataString *ui_data_new = (IDPropertyUIDataString *)data_new;
+      ui_data_new->default_value = MEM_dupallocN(ui_data->default_value);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
+    case IDP_UI_DATA_TYPE_INT: {
+      IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)prop->ui_data;
+      IDPropertyUIDataInt *ui_data_new = (IDPropertyUIDataInt *)data_new;
+      ui_data_new->default_array = MEM_dupallocN(ui_data->default_array);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)prop->ui_data;
+      IDPropertyUIDataFloat *ui_data_new = (IDPropertyUIDataFloat *)data_new;
+      ui_data_new->default_array = MEM_dupallocN(ui_data->default_array);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      break;
+    }
   }
 
   data_new->description = MEM_dupallocN(prop->ui_data->description);
