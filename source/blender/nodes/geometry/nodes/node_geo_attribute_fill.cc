@@ -171,7 +171,8 @@ void register_node_type_geo_attribute_fill()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_FILL, "Attribute Fill", NODE_CLASS_ATTRIBUTE, 0);
+  geo_node_type_base(
+      &ntype, GEO_NODE_ATTRIBUTE_FILL, "Store Persistent Attribute", NODE_CLASS_ATTRIBUTE, 0);
   node_type_socket_templates(&ntype, geo_node_attribute_fill_in, geo_node_attribute_fill_out);
   node_type_init(&ntype, geo_node_attribute_fill_init);
   node_type_update(&ntype, geo_node_attribute_fill_update);
