@@ -2826,9 +2826,11 @@ static PyObject *pyrna_prop_collection_subscript(BPy_PropertyRNA *self, PyObject
       const Py_ssize_t len = (Py_ssize_t)RNA_property_collection_length(&self->ptr, self->prop);
       if (start < 0) {
         start += len;
+        CLAMP_MIN(start, 0);
       }
       if (stop < 0) {
         stop += len;
+        CLAMP_MIN(stop, 0);
       }
     }
 
@@ -2956,9 +2958,11 @@ static int pyrna_prop_collection_ass_subscript(BPy_PropertyRNA *self,
         Py_ssize_t len = (Py_ssize_t)RNA_property_collection_length(&self->ptr, self->prop);
         if (start < 0) {
           start += len;
+          CLAMP_MIN(start, 0);
         }
         if (stop < 0) {
           stop += len;
+          CLAMP_MIN(stop, 0);
         }
       }
 
