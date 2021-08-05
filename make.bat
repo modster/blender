@@ -68,6 +68,11 @@ if "%ICONS_GEOM%" == "1" (
 	goto EOF
 )
 
+if "%DOC_PY%" == "1" (
+	call "%BLENDER_DIR%\build_files\windows\doc_py.cmd"
+	goto EOF
+)
+
 echo Building blender with VS%BUILD_VS_YEAR% for %BUILD_ARCH% in %BUILD_DIR%
 
 call "%BLENDER_DIR%\build_files\windows\check_libraries.cmd"
