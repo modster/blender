@@ -727,8 +727,9 @@ static void close_loop_if_endpoints(
     Base *basact = NULL;
     ED_curve_pick_vert(vc, 1, &nu, &bezt, &bp, &hand, &basact);
 
-    if (nu == sel_nu && ((nu->bezt && (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
-                         (nu->bp && (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
+    if (nu == sel_nu && bezt != sel_bezt &&
+        ((nu->bezt && (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
+         (nu->bp && (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
       View3D *v3d = CTX_wm_view3d(C);
       ListBase *editnurb = object_editcurve_get(vc->obedit);
       curve_toggle_cyclic(v3d, editnurb, 0);
