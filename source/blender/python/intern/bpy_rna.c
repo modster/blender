@@ -4328,7 +4328,8 @@ static PyObject *pyrna_struct_id_properties_ensure(BPy_StructRNA *self)
 }
 
 PyDoc_STRVAR(pyrna_struct_id_properties_ui_doc,
-             ".. method:: id_properties_ui(key)\n\n"
+             ".. method:: id_properties_ui(key)\n"
+             "\n"
              "   :return: Return an object used to manage an IDProperty's UI data.\n"
              "   :arg key: String name of the property.\n"
              "   :rtype: :class:`bpy.types.IDPropertyUIManager`\n");
