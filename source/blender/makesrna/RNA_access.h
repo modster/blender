@@ -1026,7 +1026,7 @@ char *RNA_property_string_get_alloc(
 void RNA_property_string_set(PointerRNA *ptr, PropertyRNA *prop, const char *value);
 void RNA_property_string_set_bytes(PointerRNA *ptr, PropertyRNA *prop, const char *value, int len);
 int RNA_property_string_length(PointerRNA *ptr, PropertyRNA *prop);
-void RNA_property_string_get_default(PropertyRNA *prop, char *value, const int max_len);
+void RNA_property_string_get_default(PropertyRNA *prop, char *value, int max_len);
 char *RNA_property_string_get_default_alloc(PointerRNA *ptr,
                                             PropertyRNA *prop,
                                             char *fixedbuf,
