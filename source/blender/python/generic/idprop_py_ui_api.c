@@ -148,6 +148,7 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
   IDPropertyUIDataInt ui_data = *(IDPropertyUIDataInt *)idprop->ui_data;
 
   if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
+    IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_INT);
     return false;
   }
 
@@ -177,6 +178,7 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
 
   if (!ELEM(default_value, NULL, Py_None)) {
     if (!idprop_ui_data_update_int_default(idprop, &ui_data, default_value)) {
+      IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_INT);
       return false;
     }
   }
@@ -264,6 +266,7 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
   IDPropertyUIDataFloat ui_data = *(IDPropertyUIDataFloat *)idprop->ui_data;
 
   if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
+    IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_FLOAT);
     return false;
   }
 
@@ -298,6 +301,7 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
    * value or an array, but for non-array properties it can only be a value. */
   if (!ELEM(default_value, NULL, Py_None)) {
     if (!idprop_ui_data_update_float_default(idprop, &ui_data, default_value)) {
+      IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_FLOAT);
       return false;
     }
   }
@@ -330,6 +334,7 @@ static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyO
   IDPropertyUIDataString ui_data = *(IDPropertyUIDataString *)idprop->ui_data;
 
   if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
+    IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_STRING);
     return false;
   }
 
@@ -360,6 +365,7 @@ static bool idprop_ui_data_update_id(IDProperty *idprop, PyObject *args, PyObjec
   IDPropertyUIDataID ui_data = *(IDPropertyUIDataID *)idprop->ui_data;
 
   if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
+    IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_ID);
     return false;
   }
 

@@ -1096,25 +1096,25 @@ IDProperty *IDP_New(const char type, const IDPropertyTemplate *val, const char *
   return prop;
 }
 
-void IDP_ui_data_free(IDProperty *prop)
+void IDP_ui_data_free_contents(IDPropertyUIData *ui_data, const eIDPropertyUIDataType type)
 {
-  switch (IDP_ui_data_type(prop)) {
+  switch (type) {
     case IDP_UI_DATA_TYPE_STRING: {
-      IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)prop->ui_data;
-      MEM_SAFE_FREE(ui_data->default_value);
+      IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)ui_data;
+      MEM_SAFE_FREE(ui_data_string->default_value);
       break;
     }
     case IDP_UI_DATA_TYPE_ID: {
       break;
     }
     case IDP_UI_DATA_TYPE_INT: {
-      IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)prop->ui_data;
-      MEM_SAFE_FREE(ui_data->default_array);
+      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
+      MEM_SAFE_FREE(ui_data_int->default_array);
       break;
     }
     case IDP_UI_DATA_TYPE_FLOAT: {
-      IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)prop->ui_data;
-      MEM_SAFE_FREE(ui_data->default_array);
+      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+      MEM_SAFE_FREE(ui_data_float->default_array);
       break;
     }
     case IDP_UI_DATA_TYPE_UNSUPPORTED: {
@@ -1122,7 +1122,13 @@ void IDP_ui_data_free(IDProperty *prop)
     }
   }
 
-  MEM_SAFE_FREE(prop->ui_data->description);
+  MEM_SAFE_FREE(ui_data->description);
+}
+
+void IDP_ui_data_free(IDProperty *prop)
+{
+  IDP_ui_data_free_contents(prop->ui_data, IDP_ui_data_type(prop));
+
   MEM_freeN(prop->ui_data);
   prop->ui_data = NULL;
 }
