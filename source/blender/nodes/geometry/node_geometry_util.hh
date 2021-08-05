@@ -102,11 +102,17 @@ inline bool should_add_output_attribute(const bNode &node, StringRef output_name
   return false;
 }
 
-inline std::string get_output_attribute_name(const bNodeTree &ntree,
-                                             const bNode &node,
-                                             StringRef output_name)
+inline std::string get_local_attribute_name(const StringRef tree_name,
+                                            const StringRef node_name,
+                                            const StringRef socket_identifier)
 {
-  return StringRef("local_") + ntree.id.name + "_" + node.name + "_" + output_name;
+  return "local_" + tree_name + "_" + node_name + "_" + socket_identifier;
+}
+
+inline std::string get_input_attribute_name(const StringRef tree_name,
+                                            const StringRef input_identifier)
+{
+  return "input_" + tree_name + "_" + input_identifier;
 }
 
 }  // namespace blender::nodes

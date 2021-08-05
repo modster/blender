@@ -67,53 +67,133 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
     uiItemL(split, "", ICON_ERROR);
   }
   else {
-    uiItemR(split, &expander_output_ptr, "domain", 0, "", ICON_NONE);
+    uiItemR(split, &expander_output_ptr, "array_source", 0, "", ICON_NONE);
   }
 
   return true;
 }
 
+static GeometryComponentType array_source_to_component_type(
+    const eGeometryExpanderArraySource array_source)
+{
+  switch (array_source) {
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES:
+      return GEO_COMPONENT_TYPE_MESH;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_EDGES:
+      return GEO_COMPONENT_TYPE_MESH;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACES:
+      return GEO_COMPONENT_TYPE_MESH;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACE_CORNERS:
+      return GEO_COMPONENT_TYPE_MESH;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_POINT_CLOUD_POINTS:
+      return GEO_COMPONENT_TYPE_POINT_CLOUD;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_POINTS:
+      return GEO_COMPONENT_TYPE_CURVE;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_SPLINES:
+      return GEO_COMPONENT_TYPE_CURVE;
+  }
+  BLI_assert_unreachable();
+  return GEO_COMPONENT_TYPE_MESH;
+}
+
+static AttributeDomain array_source_to_domain(const eGeometryExpanderArraySource array_source)
+{
+  switch (array_source) {
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES:
+      return ATTR_DOMAIN_POINT;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_EDGES:
+      return ATTR_DOMAIN_EDGE;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACES:
+      return ATTR_DOMAIN_FACE;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACE_CORNERS:
+      return ATTR_DOMAIN_CORNER;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_POINT_CLOUD_POINTS:
+      return ATTR_DOMAIN_POINT;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_POINTS:
+      return ATTR_DOMAIN_POINT;
+    case GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_SPLINES:
+      return ATTR_DOMAIN_CURVE;
+  }
+  BLI_assert_unreachable();
+  return ATTR_DOMAIN_POINT;
+}
+
 static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
 {
   const bNode &bnode = params.node();
+  const bNodeTree &ntree = params.ntree();
   const NodeGeometryGeometryExpander *storage = (const NodeGeometryGeometryExpander *)
                                                     bnode.storage;
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  // LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
-  //   const GeometryComponent *component = geometry_set.get_component_for_read(
-  //       (GeometryComponentType)expander_output->component_type);
-  //   if (component == nullptr) {
-  //     switch (expander_output->socket_type) {
-  //       case SOCK_FLOAT: {
-  //         params.set_output(expander_output->socket_identifier, Array<float>());
-  //         break;
-  //       }
-  //       case SOCK_VECTOR: {
-  //         params.set_output(expander_output->socket_identifier, Array<float3>());
-  //         break;
-  //       }
-  //       case SOCK_BOOLEAN: {
-  //         params.set_output(expander_output->socket_identifier, Array<bool>());
-  //         break;
-  //       }
-  //       case SOCK_RGBA: {
-  //         params.set_output(expander_output->socket_identifier, Array<ColorGeometry4f>());
-  //         break;
-  //       }
-  //       case SOCK_INT: {
-  //         params.set_output(expander_output->socket_identifier, Array<int>());
-  //         break;
-  //       }
-  //     }
-  //     continue;
-  //   }
+  int socket_index;
+  LISTBASE_FOREACH_INDEX (
+      GeometryExpanderOutput *, expander_output, &storage->outputs, socket_index) {
+    bNodeSocket &socket = *(bNodeSocket *)BLI_findlink(&bnode.outputs, socket_index);
+    const ArrayCPPType *array_cpp_type = dynamic_cast<const ArrayCPPType *>(
+        socket.typeinfo->get_geometry_nodes_cpp_type());
+    BLI_assert(array_cpp_type != nullptr);
+    const CustomDataType data_type = bke::cpp_type_to_custom_data_type(
+        array_cpp_type->element_type());
+    BUFFER_FOR_CPP_TYPE_VALUE(*array_cpp_type, buffer);
+    const eGeometryExpanderArraySource array_source = (eGeometryExpanderArraySource)
+                                                          expander_output->array_source;
+    const GeometryComponentType component_type = array_source_to_component_type(array_source);
+    const AttributeDomain domain = array_source_to_domain(array_source);
 
-  //   GVArray_Typed<float> attribute = component->attribute_get_for_read<float>(
-  //       expander_output->data_identifier, (AttributeDomain)expander_output->domain, 0.0f);
-  //   Array<float> values(attribute.size());
-  //   attribute->materialize(values);
-  //   params.set_output(expander_output->socket_identifier, std::move(values));
-  // }
+    const GeometryComponent *component = geometry_set.get_component_for_read(component_type);
+    if (component == nullptr) {
+      array_cpp_type->default_construct(buffer);
+    }
+    else {
+      const int domain_size = component->attribute_domain_size(domain);
+      switch (expander_output->type) {
+        case GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN: {
+          GVArrayPtr attribute = component->attribute_try_get_for_read(
+              expander_output->builtin_identifier, domain, data_type);
+          if (attribute) {
+            array_cpp_type->array_construct_uninitialized(buffer, domain_size);
+            attribute->materialize_to_uninitialized(array_cpp_type->array_span(buffer).data());
+          }
+          else {
+            array_cpp_type->default_construct(buffer);
+          }
+          break;
+        }
+        case GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT: {
+          const std::string attribute_name = get_input_attribute_name(
+              ntree.id.name, expander_output->input_identifier);
+          GVArrayPtr attribute = component->attribute_try_get_for_read(
+              attribute_name, domain, data_type);
+          if (attribute) {
+            array_cpp_type->array_construct_uninitialized(buffer, domain_size);
+            attribute->materialize_to_uninitialized(array_cpp_type->array_span(buffer).data());
+          }
+          else {
+            array_cpp_type->default_construct(buffer);
+          }
+          break;
+        }
+        case GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL: {
+          const std::string attribute_name = get_local_attribute_name(
+              ntree.id.name,
+              expander_output->local_node_name,
+              expander_output->local_socket_identifier);
+          GVArrayPtr attribute = component->attribute_try_get_for_read(
+              attribute_name, domain, data_type);
+          if (attribute) {
+            array_cpp_type->array_construct_uninitialized(buffer, domain_size);
+            attribute->materialize_to_uninitialized(array_cpp_type->array_span(buffer).data());
+          }
+          else {
+            array_cpp_type->default_construct(buffer);
+          }
+          break;
+        }
+      }
+    }
+
+    params.set_output_by_move(socket.identifier, {array_cpp_type, buffer});
+  }
 }
 
 static void geo_node_geometry_expander_init(bNodeTree *UNUSED(ntree), bNode *node)

@@ -225,6 +225,17 @@ class GeoNodeExecParams {
     }
   }
 
+  void set_output_by_move(StringRef identifier, GMutablePointer value)
+  {
+    const CPPType &type = *value.type();
+#ifdef DEBUG
+    this->check_output_access(identifier, type);
+#endif
+    GMutablePointer stored_value = provider_->alloc_output_value(type);
+    type.move_construct(value.get(), stored_value.get());
+    provider_->set_output(identifier, stored_value);
+  }
+
   /**
    * Tell the evaluator that a specific input won't be used anymore.
    */

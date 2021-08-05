@@ -39,6 +39,7 @@
 #include "BKE_animsys.h"
 #include "BKE_attribute.h"
 #include "BKE_cryptomatte.h"
+#include "BKE_geometry_set.h"
 #include "BKE_image.h"
 #include "BKE_node.h"
 #include "BKE_texture.h"
@@ -10260,13 +10261,35 @@ static void def_geo_geometry_expander_output(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
+  static const EnumPropertyItem array_source_items[] = {
+      {GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES, "MESH_VERTICES", ICON_NONE, "Vertices", ""},
+      {GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_EDGES, "MESH_EDGES", ICON_NONE, "Edges", ""},
+      {GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACES, "MESH_FACES", ICON_NONE, "Faces", ""},
+      {GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACE_CORNERS,
+       "MESH_FACE_CORNERS",
+       ICON_NONE,
+       "Face Corners",
+       ""},
+      {GEOMETRY_EXPANDER_ARRAY_SOURCE_POINT_CLOUD_POINTS,
+       "POINT_CLOUD_POINTS",
+       ICON_NONE,
+       "Points",
+       ""},
+      {GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_POINTS,
+       "CURVE_POINTS",
+       ICON_NONE,
+       "Control Points",
+       ""},
+      {GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_SPLINES, "CURVE_SPLINES", ICON_NONE, "Splines", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "GeometryExpanderOutput", NULL);
 
-  prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, rna_enum_attribute_domain_items);
-  RNA_def_property_ui_text(prop, "Domain", "");
-  /* TODO: Update callback. */
-  RNA_def_property_update(prop, NC_NODE | NA_EDITED, NULL);
+  prop = RNA_def_property(srna, "array_source", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, array_source_items);
+  RNA_def_property_ui_text(prop, "Array Source", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeTree_update");
 }
 
 static void def_geo_geometry_expander(StructRNA *srna)

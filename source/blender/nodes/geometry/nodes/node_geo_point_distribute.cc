@@ -647,8 +647,8 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
                                  rotations);
 
   if (should_add_output_attribute(params.node(), "Rotation")) {
-    const std::string rotation_attribute_name = get_output_attribute_name(
-        params.ntree(), params.node(), "Rotation");
+    const std::string rotation_attribute_name = get_local_attribute_name(
+        params.ntree().id.name, params.node().name, "Rotation");
     fn::GVArray_For_Span rotations_varray{rotations.as_span()};
     point_component.attribute_try_create(rotation_attribute_name,
                                          ATTR_DOMAIN_POINT,

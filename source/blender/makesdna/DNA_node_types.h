@@ -1431,6 +1431,16 @@ typedef enum eGeometryExpanderOutputType {
   GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN,
 } eGeometryExpanderOutputType;
 
+typedef enum eGeometryExpanderArraySource {
+  GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES = 0,
+  GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_EDGES = 1,
+  GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACES = 2,
+  GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACE_CORNERS = 3,
+  GEOMETRY_EXPANDER_ARRAY_SOURCE_POINT_CLOUD_POINTS = 4,
+  GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_POINTS = 5,
+  GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_SPLINES = 6,
+} AttributeArraySource;
+
 typedef struct GeometryExpanderOutput {
   struct GeometryExpanderOutput *next, *prev;
 
@@ -1445,13 +1455,11 @@ typedef struct GeometryExpanderOutput {
   /* Derived from the other data. */
   char display_name_cache[64];
 
-  /* AttributeDomain. */
-  int8_t domain;
-  /* GeometryComponentType. */
-  int8_t component_type;
+  /* eGeometryExpanderAttributeSource. */
+  int8_t array_source;
   /* eNodeSocketDatatype. */
   int8_t socket_type;
-  char _pad2[5];
+  char _pad2[6];
 
   /* Local attribute data. */
   char local_node_name[64];
