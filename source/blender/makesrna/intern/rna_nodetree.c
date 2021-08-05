@@ -2443,9 +2443,6 @@ static void rna_Node_select_set(PointerRNA *ptr, bool value)
   nodeSetSelected(node, value);
 }
 
-void nodeGeometryExpanderUpdateOutputNameCache(GeometryExpanderOutput *expander_output,
-                                               const bNodeTree *ntree);
-
 static void rna_Node_name_set(PointerRNA *ptr, const char *value)
 {
   bNodeTree *ntree = (bNodeTree *)ptr->owner_id;
@@ -2477,6 +2474,36 @@ static void rna_Node_name_set(PointerRNA *ptr, const char *value)
 
   /* fix all the animation data which may link to this */
   BKE_animdata_fix_paths_rename_all(NULL, "nodes", oldname, node->name);
+}
+
+void rna_NodeSocket_add_to_geometry_set(PointerRNA *ptr, const bool value)
+{
+  bNodeTree *ntree = (bNodeTree *)ptr->owner_id;
+  bNodeSocket *socket = (bNodeSocket *)ptr->data;
+  bNode *node;
+  nodeFindNode(ntree, socket, &node, NULL);
+  if (value) {
+    socket->flag |= SOCK_ADD_ATTRIBUTE_TO_GEOMETRY;
+  }
+  else {
+    socket->flag &= ~SOCK_ADD_ATTRIBUTE_TO_GEOMETRY;
+  }
+
+  LISTBASE_FOREACH (bNode *, other_node, &ntree->nodes) {
+    if (other_node->type != GEO_NODE_GEOMETRY_EXPANDER) {
+      continue;
+    }
+    NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)other_node->storage;
+    LISTBASE_FOREACH (GeometryExpanderOutput *, expander_output, &storage->outputs) {
+      if (expander_output->type != GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL) {
+        continue;
+      }
+      if (STREQ(expander_output->local_node_name, node->name) &&
+          STREQ(expander_output->local_socket_identifier, socket->identifier)) {
+        expander_output->is_outdated = !value;
+      }
+    }
+  }
 }
 
 static bNodeSocket *rna_Node_inputs_new(ID *id,
@@ -10404,6 +10431,7 @@ static void rna_def_node_socket(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "add_to_geometry", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SOCK_ADD_ATTRIBUTE_TO_GEOMETRY);
+  RNA_def_property_boolean_funcs(prop, NULL, "rna_NodeSocket_add_to_geometry_set");
   RNA_def_property_ui_text(
       prop,
       "Add to Geometry",

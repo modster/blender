@@ -63,7 +63,12 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayout *split = uiLayoutSplit(row, 0.7, false);
   uiItemL(split, expander_output->display_name_cache, ICON_NONE);
-  uiItemR(split, &expander_output_ptr, "domain", 0, "", ICON_NONE);
+  if (expander_output->is_outdated) {
+    uiItemL(split, "", ICON_ERROR);
+  }
+  else {
+    uiItemR(split, &expander_output_ptr, "domain", 0, "", ICON_NONE);
+  }
 
   return true;
 }

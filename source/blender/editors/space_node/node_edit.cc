@@ -3108,6 +3108,7 @@ static int node_geometry_expander_output_add_exec(bContext *C, wmOperator *op)
       sizeof(GeometryExpanderOutput), __func__);
   *expander_output = attribute;
   STRNCPY(expander_output->socket_identifier, identifier.c_str());
+  expander_output->is_outdated = false;
 
   BLI_addtail(&storage->outputs, expander_output);
 

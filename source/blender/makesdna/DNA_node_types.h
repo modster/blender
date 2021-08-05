@@ -1436,7 +1436,8 @@ typedef struct GeometryExpanderOutput {
 
   /* eGeometryExpanderOutputType. */
   int type;
-  char _pad[4];
+  uint8_t is_outdated;
+  char _pad[3];
 
   /* Identifier of the corresponding socket in the geometry expander. */
   char socket_identifier[64];
