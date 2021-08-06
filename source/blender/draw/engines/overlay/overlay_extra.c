@@ -1779,7 +1779,6 @@ static void OVERLAY_velocity_extra(OVERLAY_Data *data, RigidBodyOb *rbo)
   //}
   //else {
     copy_v3_v3(vel, rbo->vel);
-    printf("vel: %f %f %f\n", vel[0], vel[1], vel[2]);
   //}
   OVERLAY_vector_extra(data, vel, rbo->pos, scale, min_clamp, color, text_flag);
 }
@@ -1798,10 +1797,11 @@ static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
   /* Calculate timestep. */
   const float ctime = DEG_get_ctime(depsgraph);
   const float frame_diff = ctime - scene->rigidbody_world->ltime;
-  const float timestep = 1.0f / (float)FPS * frame_diff * scene->rigidbody_world->time_scale;
+  const float timestep = (1.0f / (float)FPS * scene->rigidbody_world->time_scale)/ scene->rigidbody_world->substeps_per_frame;
 
   float acc[3];
   sub_v3_v3v3(acc, rbo->pvel, rbo->vel);
+ // printf("acc: %f %f %f\ntimestep:%f framedif:%f timescale:%f\n", acc[0], acc[1], acc[2], timestep, frame_diff, scene->rigidbody_world->time_scale);
   mul_v3_fl(acc, 1 / timestep);
   OVERLAY_vector_extra(data, acc, rbo->pos, scale, min_clamp, color, text_flag);
 }
@@ -2026,16 +2026,30 @@ static void OVERLAY_indicate_collision(OVERLAY_Data *data, Object *ob)
         break;
       case RB_SHAPE_CONE:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_CONE, true, mat);
-        OVERLAY_colliding_face_on_cone(
-            data, ob->rigidbody_object->vec_locations[0].vector, mat, dir);
+        for (int i = 0; i < 2; i++) {
+          if (!is_zero_v3(ob->rigidbody_object->norm_forces[i].vector)) {
+             OVERLAY_colliding_face_on_cone(
+                 data, ob->rigidbody_object->vec_locations[i].vector, mat, dir);
+          }
+        }
         break;
       case RB_SHAPE_CYLINDER:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_CYLINDER, true, mat);
-        OVERLAY_colliding_face_on_cylinder(
-            data, ob->rigidbody_object->vec_locations[0].vector, mat, dir);
+        for (int i = 0; i < 2; i++) {
+          if (!is_zero_v3(ob->rigidbody_object->norm_forces[i].vector)) {
+              OVERLAY_colliding_face_on_cylinder(
+                  data, ob->rigidbody_object->vec_locations[i].vector, mat, dir);
+          }
+        }
         break;
       case RB_SHAPE_CAPSULE:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_CAPSULE, true, NULL);
+        break;
+      case RB_SHAPE_CONVEXH:
+        OVERLAY_non_primitive_collision_shape(cb, ob, color);
+        break;
+      case RB_SHAPE_TRIMESH:
+        OVERLAY_non_primitive_collision_shape(cb, ob, color);
         break;
     }
   }
@@ -2080,25 +2094,21 @@ static void OVERLAY_linear_limits_single_object_rod(RigidBodyCon *rbc,
 }
 
 /* Draw walls for ob1 if it lies close to the walls. */
-static void OVERLAY_linear_limits_walls(RigidBodyCon *rbc,
-                                             Object *ob1,
-                                             Object *ob2,
-                                             Object *constraint_ob,
-                                             int axis,
-                                             OVERLAY_Data *data) {
+static void OVERLAY_linear_limits_walls (RigidBodyCon *rbc,
+                                         Object *ob1,
+                                         Object *ob2,
+                                        float upper_wall_pos[3],
+                                        float lower_wall_pos[3],
+                                        Object *constraint_ob,
+                                        int axis,
+                                        OVERLAY_Data *data) {
     float translation_range;
     float color[4];
     copy_v4_v4(color, G_draw.block.colorLibrary);
-    float limit_start[3] = {0.0f};
-    float limit_end[3] = {0.0f};
-    float initial_offset[3];
-    float current_offset[3];
+
     float distance_from_first_wall[3];
     float distance_from_second_wall[3];
     float *wall_pos;
-
-    sub_v3_v3v3(initial_offset, ob1->loc, ob2->loc);
-    sub_v3_v3v3(current_offset, ob1->rigidbody_object->pos, ob2->rigidbody_object->pos);
 
     /* Rotate wall to correct initial orientation */
     float rot1[3][3] = {{0}};
@@ -2111,7 +2121,6 @@ static void OVERLAY_linear_limits_walls(RigidBodyCon *rbc,
 
     /* Get rotation from object matrices. */
     float size[3];
-    float loc[3];
 
     BKE_object_rot_to_mat3(constraint_ob, rot2, false);
     mat4_to_rot(rot3, ob2->obmat);
@@ -2127,22 +2136,16 @@ static void OVERLAY_linear_limits_walls(RigidBodyCon *rbc,
     switch(axis){
        case 0:
         translation_range = (rbc->limit_lin_x_upper - rbc->limit_lin_x_lower);
-        limit_start[0] += rbc->limit_lin_x_lower;
-        limit_end[0] += rbc->limit_lin_x_upper;
         ax[1] = 1.0f;
         axis_angle_to_mat3(rot1, ax, M_PI_2);
         break;
        case 1:
         translation_range = (rbc->limit_lin_y_upper - rbc->limit_lin_y_lower);
-        limit_start[1] += rbc->limit_lin_y_lower;
-        limit_end[1] += rbc->limit_lin_y_upper;
         ax[0] = 1.0f;
         axis_angle_to_mat3(rot1, ax, M_PI_2);
         break;
        case 2:
         translation_range = (rbc->limit_lin_z_upper - rbc->limit_lin_z_lower);
-        limit_start[2] += rbc->limit_lin_z_lower;
-        limit_end[2] += rbc->limit_lin_z_upper;
         /* Artbitrary axis so that the matrix(rot1) doesn't remain empty. */
         ax[0] = 1.0f;
         axis_angle_to_mat3(rot1, ax, 0.0f);
@@ -2156,31 +2159,18 @@ static void OVERLAY_linear_limits_walls(RigidBodyCon *rbc,
     mul_v3_fl(rot1[1], size[1]);
     mul_v3_fl(rot1[2], size[2]);
 
-    mul_m3_v3(rot2, limit_start);
-    mul_m3_v3(rot2, limit_end);
-
-    add_v3_v3(limit_start, initial_offset);
-    add_v3_v3(limit_end, initial_offset);
-    mul_m3_v3(rot3, limit_start);
-    mul_m3_v3(rot3, limit_end);
-//    mul_m3_v3(rot4, limit_start);
-//    mul_m3_v3(rot4, limit_end);
-
-    add_v3_v3(limit_start, ob2->rigidbody_object->pos);
-    add_v3_v3(limit_end, ob2->rigidbody_object->pos);
-
-    sub_v3_v3v3(distance_from_first_wall, ob1->rigidbody_object->pos, limit_start);
-    sub_v3_v3v3(distance_from_second_wall, ob1->rigidbody_object->pos, limit_end);
+    sub_v3_v3v3(distance_from_first_wall, ob1->rigidbody_object->pos, upper_wall_pos);
+    sub_v3_v3v3(distance_from_second_wall, ob1->rigidbody_object->pos, lower_wall_pos);
 
     float d1 = fabsf(len_v3(distance_from_first_wall));
     float d2 = fabsf(len_v3(distance_from_second_wall));
 
-    float draw_range = translation_range < 6.0f ? (translation_range/2.0f)*0.5f : 3.0f;
+    float draw_range = translation_range < 12.0f ? (translation_range/2.0f)*0.5f : 3.0f;
 
     bool draw_wall = (d1 <= draw_range) || (d2 <= draw_range);
 
      if(fabsf(translation_range)>0.0f && draw_wall) {
-         wall_pos = (d1 <= draw_range) ? limit_start : limit_end;
+         wall_pos = (d1 <= draw_range) ? upper_wall_pos : lower_wall_pos;
          float distance = (d1 <= draw_range) ? d1 : d2;
          mul_v4_fl(color, (draw_range - distance)/draw_range);
 
@@ -2189,7 +2179,6 @@ static void OVERLAY_linear_limits_walls(RigidBodyCon *rbc,
          copy_m4_m3(final_mat, rot1);
          mul_m4_m3m4(final_mat, rot2, final_mat);
          mul_m4_m3m4(final_mat, rot3, final_mat);
-         // mul_m4_m3m4(final_mat, rot4, final_mat);
          copy_v3_v3(final_mat[3], wall_pos);
          final_mat[3][3] = 1.0f;
 
@@ -2205,7 +2194,8 @@ static void OVERLAY_linear_limits_rod(RigidBodyCon *rbc,
                                              Object *ob2,
                                              Object *constraint_ob,
                                              int axis,
-                                             OVERLAY_ExtraCallBuffers *cb) {
+                                             OVERLAY_ExtraCallBuffers *cb,
+                                             OVERLAY_Data *data) {
 
     float color[4];
     copy_v4_v4(color, G_draw.block.colorLibrary);
@@ -2214,6 +2204,8 @@ static void OVERLAY_linear_limits_rod(RigidBodyCon *rbc,
     float initial_distance_vec[3];
     float line_start[3] = {0.0f};
     float line_end[3] = {0.0f};
+    float ob1_lower_limit_mark[3] = {0.0f};
+    float ob2_lower_limit_mark[3] = {0.0f};
     float ob1_projection[3] = {0.0f};
     float ob2_projection[3] = {0.0f};
     sub_v3_v3v3(initial_distance_vec, ob1->loc, ob2->loc);
@@ -2231,121 +2223,135 @@ static void OVERLAY_linear_limits_rod(RigidBodyCon *rbc,
     BKE_object_rot_to_mat3(ob1, rot3, false);
     invert_m3(rot3);
     mul_m3_m3m3(rot2, rot2, rot3);
-    /*mul_m3_v3(rot1, constrained_axis);
-    mul_m3_v3(rot2, constrained_axis);
-
-    mul_m3_v3(rot2, initial_distance_vec);
-    sub_v3_v3(distance_vec, initial_distance_vec);
-    //dot_v3v3(distance_vec, constrained_axis); */
 
     float cross_product[3];
     cross_v3_v3v3(cross_product, distance_vec, constrained_axis);
     mul_m3_v3(rot1, constrained_axis);
     normalize_v3(constrained_axis);
 
-    bool draw_rod = true;
+    bool draw_rod = rbc->type == RBC_TYPE_SLIDER;
 
 
-    if(draw_rod) {
 
-        line_start[0] += (rbc->limit_lin_x_upper*0.5f);
-        line_end[0] -= (rbc->limit_lin_x_upper*0.5f);
         float initial_component_along_axis = dot_v3v3(initial_distance_vec, constrained_axis);
+        float sign = initial_component_along_axis > 0.0f? -1.0f : 1.0f;
+
+        line_start[0] += (rbc->limit_lin_x_upper*0.5f*sign);
+        ob2_lower_limit_mark[0] += (rbc->limit_lin_x_lower*0.5f*sign);
+        line_end[0] -= (rbc->limit_lin_x_upper*0.5f*sign);
+        ob1_lower_limit_mark[0] -= (rbc->limit_lin_x_lower*0.5f*sign);
+
         line_start[0] -= (initial_component_along_axis*0.5f);
+        ob2_lower_limit_mark[0] -= (initial_component_along_axis*0.5f);
         line_end[0] += (initial_component_along_axis*0.5f);
+        ob1_lower_limit_mark[0] += (initial_component_along_axis*0.5f);
         mul_m3_v3(rot1, line_start);
+        mul_m3_v3(rot1, ob1_lower_limit_mark);
         mul_m3_v3(rot1, line_end);
+        mul_m3_v3(rot1, ob2_lower_limit_mark);
+
         mul_m3_v3(rot2, line_start);
+        mul_m3_v3(rot2, ob1_lower_limit_mark);
         mul_m3_v3(rot2, line_end);
-        mul_v3_fl(initial_distance_vec, 0.5f);
-      //  sub_v3_v3(line_start, initial_distance_vec);
-      //  add_v3_v3(line_end, initial_distance_vec);
+        mul_m3_v3(rot2, ob2_lower_limit_mark);
+
         float mid_point[3];
         add_v3_v3v3(mid_point, ob1->rigidbody_object->pos, ob2->rigidbody_object->pos);
         mul_v3_fl(mid_point, 0.5f);
         add_v3_v3(line_start, mid_point);
+        add_v3_v3(ob2_lower_limit_mark, mid_point);
         add_v3_v3(line_end, mid_point);
+        add_v3_v3(ob1_lower_limit_mark, mid_point);
 
         closest_to_line_segment_v3(ob1_projection, ob1->rigidbody_object->pos, line_start, line_end);
         closest_to_line_segment_v3(ob2_projection, ob2->rigidbody_object->pos, line_start, line_end);
 
-        OVERLAY_extra_line_dashed(cb, line_start, line_end, color);
-        OVERLAY_extra_line_dashed(cb, ob1->rigidbody_object->pos, ob1_projection, color);
-        OVERLAY_extra_line_dashed(cb, ob2->rigidbody_object->pos, ob2_projection, color);
+        if(draw_rod) {
+          OVERLAY_extra_line_dashed(cb, line_start, line_end, color);
+          OVERLAY_extra_line_dashed(cb, ob1->rigidbody_object->pos, ob1_projection, color);
+          OVERLAY_extra_line_dashed(cb, ob2->rigidbody_object->pos, ob2_projection, color);
+        }
 
-    }
+        float ob1_rod_dist[3];
+        float ob2_rod_dist[3];
+        sub_v3_v3v3(ob1_rod_dist, ob1_projection, ob1->rigidbody_object->pos);
+        sub_v3_v3v3(ob2_rod_dist, ob2_projection, ob2->rigidbody_object->pos);
+
+        float ob1_upper_wall_pos[3];
+        float ob2_upper_wall_pos[3];
+        float ob1_lower_wall_pos[3];
+        float ob2_lower_wall_pos[3];
+
+        sub_v3_v3v3(ob1_upper_wall_pos, line_end, ob1_rod_dist);
+        sub_v3_v3v3(ob2_upper_wall_pos, line_start, ob2_rod_dist);
+        sub_v3_v3v3(ob1_lower_wall_pos, ob1_lower_limit_mark, ob1_rod_dist);
+        sub_v3_v3v3(ob2_lower_wall_pos, ob2_lower_limit_mark, ob2_rod_dist);
+
+        OVERLAY_linear_limits_walls(rbc, ob1,  ob2, ob1_upper_wall_pos, ob1_lower_wall_pos, constraint_ob, axis, data);
+        OVERLAY_linear_limits_walls(rbc, ob2, ob1, ob2_upper_wall_pos, ob2_lower_wall_pos, constraint_ob, axis, data);
+
+
 
 }
 
 static void OVERLAY_angular_limits_rods( OVERLAY_ExtraCallBuffers *cb,
-                                     Object *ob1,
-                                     Object *ob2,
+                                     Object *ob,
                                      const float axis_in_w[3],
+                                     const float pivot[3],
+                                     const float ob1_offset_vec[3],
+                                     const float ob2_offset_vec[3],
                                      const float color[4]) {
     float start[3];
     float end[3];
 
     float point1[3];
-    float point2[3];
-    float point3[3];
-    float point4[3];
 
-    float ob_dist_vec[3];
-    sub_v3_v3v3(ob_dist_vec, ob1->rigidbody_object->pos, ob2->rigidbody_object->pos);
-    float ob_dist_normalized[3];
-    normalize_v3_v3(ob_dist_normalized, ob_dist_vec);
+    float axis[3];
+    copy_v3_v3(axis, axis_in_w);
 
-    copy_v3_v3(start, ob1->rigidbody_object->pos);
-    copy_v3_v3(end, ob2->rigidbody_object->pos);
+    float ob_pivot_dist_vec[3];
+    sub_v3_v3v3(ob_pivot_dist_vec, ob->rigidbody_object->pos, pivot);
+   // printf("ob-pivot:%f %f %f\n", ob_pivot_dist_vec[0], ob_pivot_dist_vec[1], ob_pivot_dist_vec[2]);
 
-    copy_v3_v3(point1, ob1->rigidbody_object->pos);
-    copy_v3_v3(point2, ob1->rigidbody_object->pos);
-    copy_v3_v3(point3, ob2->rigidbody_object->pos);
-    copy_v3_v3(point4, ob2->rigidbody_object->pos);
+    copy_v3_v3(start, ob->rigidbody_object->pos);
+    copy_v3_v3(point1, pivot);
+    copy_v3_v3(end, pivot);
 
-    float offset = dot_v3v3(ob_dist_vec, axis_in_w);
-    float offset_vec[3];
-    copy_v3_v3(offset_vec, axis_in_w);
-
-    float sign = offset > 0.0f ? 1.0f :1 -1.0f;
-    mul_v3_fl(offset_vec, offset*sign*0.5);
-
-    sub_v3_v3(point2, offset_vec);
-    add_v3_v3(point3, offset_vec);
-
-    float angle_rod_vec[3];
-    sub_v3_v3v3(angle_rod_vec, point2, point3);
-    normalize_v3(angle_rod_vec);
-
-    add_v3_v3(start, angle_rod_vec);
-    sub_v3_v3(end, angle_rod_vec);
+    add_v3_v3(point1, ob1_offset_vec);
+    add_v3_v3(end, ob2_offset_vec);
 
     OVERLAY_extra_line_dashed(cb, start, point1, color);
-    OVERLAY_extra_line_dashed(cb, point1, point2, color);
-    OVERLAY_extra_line_dashed(cb, point2, point3, color);
-    OVERLAY_extra_line_dashed(cb, point3, point4, color);
-    OVERLAY_extra_line_dashed(cb, point4, end, color);
-
+    OVERLAY_extra_line_dashed(cb, point1, end, color);
+   // OVERLAY_extra_line_dashed(cb, point2, end, color);
 }
 
 static void OVERLAY_angular_limits_arc(OVERLAY_Data *data,
+                                     RigidBodyCon *rbc,
                                      Object *ob1,
                                      Object *ob2,
+                                     Object *constraint_ob,
                                      const float transform_mat[3][3],
                                      const float angle,
                                      float angular_offset,
                                      const float axis_in_w[3],
+                                     const float offset_vec[3],
+                                     const float real_pivot[3],
                                      const float color[4]) {
     /* Rotate the arc about constrained axis by required amount.
-     * Initialy, arc should lie along the 2 objects' distance vector. */
-    float ob_dist_vec[3];
-    sub_v3_v3v3(ob_dist_vec, ob1->rigidbody_object->pos, ob2->rigidbody_object->pos);
+     * The arc should lie along the object-pivot distance vector. */
+
+    float ob1_pivot_dist_initial[3];
+    sub_v3_v3v3(ob1_pivot_dist_initial, constraint_ob->loc, ob1->loc);
 
     float constrained_axis_rot;
     float arc_start[3] = {cosf((angle/2) + angular_offset), sinf((angle/2) + angular_offset), 0.0f};
     mul_m3_v3(transform_mat, arc_start);
-    constrained_axis_rot = angle_signed_on_axis_v3v3_v3(arc_start, ob_dist_vec, axis_in_w);
-    angular_offset -= ( constrained_axis_rot);
+    constrained_axis_rot = angle_signed_on_axis_v3v3_v3(arc_start, ob1_pivot_dist_initial, axis_in_w);
+    angular_offset += ( M_PI - constrained_axis_rot);
+
+    float disk_pos[3];
+    copy_v3_v3(disk_pos, real_pivot);
+    add_v3_v3(disk_pos, offset_vec);
 
     float final_mat[4][4] = {{0.0f}};
 
@@ -2354,20 +2360,22 @@ static void OVERLAY_angular_limits_arc(OVERLAY_Data *data,
     float ob2_initial_rot_inv[3][3];
     float ob2_transform[4][4];
 
-    copy_m4_m4(ob1_transform_inv, ob1->obmat);
+  /*  copy_m4_m4(ob1_transform_inv, ob2->obmat);
     invert_m4(ob1_transform_inv);
-    BKE_object_rot_to_mat3(ob1, ob1_initial_rot, false);
+    BKE_object_rot_to_mat3(ob2, ob1_initial_rot, false); */
 
     BKE_object_rot_to_mat3(ob2, ob2_initial_rot_inv, false);
     invert_m3(ob2_initial_rot_inv);
     copy_m4_m4(ob2_transform, ob2->obmat);
+    zero_v4(ob2_transform[3]);
 
-    mul_m4_m3m4(final_mat, ob1_initial_rot, ob1_transform_inv);
-    mul_m4_m3m4(final_mat, ob2_initial_rot_inv, final_mat);
-    mul_m4_m4m4(final_mat, ob2_transform, final_mat);
+    mul_m4_m4m3(final_mat, ob2_transform, ob2_initial_rot_inv);
+  //  mul_m4_m4m4(final_mat, final_mat, ob2_transform);
+  //  mul_m4_m4m3(final_mat, final_mat, ob2_initial_rot_inv);
+
     mul_m4_m4m3(final_mat, final_mat, transform_mat);
 
-    copy_v3_v3(final_mat[3], ob1->rigidbody_object->pos);
+    copy_v3_v3(final_mat[3], disk_pos);
     final_mat[3][3] = 1.0f;
 
     normalize_m4(final_mat);
@@ -2378,7 +2386,6 @@ static void OVERLAY_angular_limits_arc(OVERLAY_Data *data,
     GPUShader *sh = OVERLAY_shader_constraint_angular_limits();
     DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
     DRW_shgroup_uniform_vec4_array_copy(grp, "mat_vecs", final_mat, 4);
-    //DRW_shgroup_uniform_vec4_array_copy(grp, "mat_vecs1", ob1_transform, 4);
     DRW_shgroup_uniform_float_copy(grp, "offset", angular_offset);
     DRW_shgroup_uniform_float_copy(grp, "angle", angle);
     DRW_shgroup_uniform_vec3_copy(grp, "color", color);
@@ -2392,11 +2399,21 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
                                      Object *ob2,
                                      Object *constraint_ob,
                                      int axis) {
-    float color[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    float color1[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    float color2[4] = {0.0f, 0.5f, 0.8f, 1.0f};
     float angle;
     float angular_offset;
-    float ob_dist_vec[3];
-    sub_v3_v3v3(ob_dist_vec, ob1->rigidbody_object->pos, ob2->rigidbody_object->pos);
+
+    float ob1_pivot_dist_initial[3];
+    sub_v3_v3v3(ob1_pivot_dist_initial, constraint_ob->loc, ob1->loc);
+    float real_pivot[3];
+    float ob1_initial_rot_inv[3][3];
+    float ob1_rot[3][3];
+    copy_m3_m4(ob1_rot, ob1->obmat);
+    BKE_object_rot_to_mat3(ob1, ob1_initial_rot_inv, false);
+    invert_m3(ob1_initial_rot_inv);
+    mul_v3_m3v3(real_pivot, ob1_initial_rot_inv, ob1_pivot_dist_initial);
+    mul_v3_m4v3(real_pivot, ob1->obmat, real_pivot);
 
     /* Rotate arc to correct initial orientation */
     float rot1[3][3] = {{0}};
@@ -2404,18 +2421,23 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     float rot2[3][3] = {{0}};
 
     float constrained_axis_local[3] = {0.0f};
+    float constrained_axis_w_initial[3] = {0.0f};
     float constrained_axis_w[3] = {0.0f};
 
-    constrained_axis_local[2] = 1.0f;
-    constrained_axis_w[2] = 1.0f;
+    constrained_axis_local[axis] = 1.0f;
+    constrained_axis_w_initial[axis] = 1.0f;
 
     /* Get constrained axis rotation from constraint object. */
     copy_m3_m4(rot2, constraint_ob->obmat);
-    mul_m3_v3(rot2, constrained_axis_w);
+    mul_m3_v3(rot2, constrained_axis_w_initial);
+    copy_v3_v3(constrained_axis_w, constrained_axis_w_initial);
+
+    mul_m3_v3(ob1_initial_rot_inv, constrained_axis_w);
+    mul_m3_v3(ob1_rot, constrained_axis_w);
 
     float rot_axis[3];
-    cross_v3_v3v3(rot_axis, constrained_axis_local, constrained_axis_w);
-    float rot_angle = angle_on_axis_v3v3_v3(constrained_axis_local, constrained_axis_w, rot_axis);
+    cross_v3_v3v3(rot_axis, constrained_axis_local, constrained_axis_w_initial);
+    float rot_angle = angle_on_axis_v3v3_v3(constrained_axis_local, constrained_axis_w_initial, rot_axis);
     axis_angle_to_mat3(rot2, rot_axis, rot_angle);
 
     float ax[3] = {0.0f};
@@ -2439,14 +2461,30 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
         unit_m3(rot1);
         break;
     }
+    mul_m3_m3m3(rot2, rot2, rot1);
 
-    OVERLAY_angular_limits_arc(data, ob1, ob2, rot2, angle, angular_offset, constrained_axis_w, color);
-    OVERLAY_angular_limits_arc(data, ob2, ob1, rot2, angle, angular_offset, constrained_axis_w, color);
+    float ob1_pivot_dist[3];
+    float ob2_pivot_dist[3];
+    sub_v3_v3v3(ob1_pivot_dist, ob1->rigidbody_object->pos, real_pivot);
+    sub_v3_v3v3(ob2_pivot_dist, ob2->rigidbody_object->pos, real_pivot);
+    float ob1_offset = dot_v3v3(ob1_pivot_dist, constrained_axis_w);
+    float ob1_offset_vec[3];
+    float ob2_offset = dot_v3v3(ob2_pivot_dist, constrained_axis_w);
+    float ob2_offset_vec[3];
+    copy_v3_v3(ob1_offset_vec, constrained_axis_w);
+    copy_v3_v3(ob2_offset_vec, constrained_axis_w);
+    mul_v3_fl(ob1_offset_vec, ob1_offset);
+    mul_v3_fl(ob2_offset_vec, ob2_offset);
+
+    OVERLAY_angular_limits_arc(data, rbc, ob1, ob2, constraint_ob, rot2, angle, angular_offset, constrained_axis_w_initial, ob1_offset_vec, real_pivot, color1);
+    OVERLAY_angular_limits_arc(data, rbc, ob2, ob1, constraint_ob, rot2, angle, angular_offset, constrained_axis_w_initial, ob2_offset_vec, real_pivot, color2);
 
     OVERLAY_PrivateData *pd = data->stl->pd;
     cb = &pd->extra_call_buffers[1];
 
-    OVERLAY_angular_limits_rods(cb, ob2, ob1, constrained_axis_w, color);
+    OVERLAY_angular_limits_rods(cb, ob1, constrained_axis_w_initial, real_pivot, ob1_offset_vec, ob2_offset_vec, color2);
+    OVERLAY_angular_limits_rods(cb, ob2, constrained_axis_w_initial, real_pivot, ob2_offset_vec, ob1_offset_vec, color1);
+
 }
 
 static void OVERLAY_rb_constraint_limits(OVERLAY_ExtraCallBuffers *cb, OVERLAY_Data *data, Object *ob){
@@ -2462,10 +2500,6 @@ static void OVERLAY_rb_constraint_limits(OVERLAY_ExtraCallBuffers *cb, OVERLAY_D
                                   (ob2->rigidbody_object->type == RBO_TYPE_PASSIVE && ob2->rigidbody_object->flag != RBO_FLAG_KINEMATIC)) ||
                                   (ob2->rigidbody_object->type == RBO_TYPE_ACTIVE &&
                                   (ob1->rigidbody_object->type == RBO_TYPE_PASSIVE && ob1->rigidbody_object->flag != RBO_FLAG_KINEMATIC));
-
-    //float x_dir_color[4] = {1.0f, 0.0f, 0.0f, 1.0f};
-    //float y_dir_color[4] = {0.0f, 1.0f, 0.0f, 1.0f};
-    //float z_dir_color[4] = {0.0f, 0.0f, 1.0f, 1.0f};
 
     if(is_rod_type_constraint) {
       Object *rb_ob1 = ob1->rigidbody_object->type == RBO_TYPE_ACTIVE ? ob1 : ob2;
@@ -2489,14 +2523,17 @@ static void OVERLAY_rb_constraint_limits(OVERLAY_ExtraCallBuffers *cb, OVERLAY_D
                 OVERLAY_angular_limits(data, cb, rbc, ob1, ob2, ob, 2);
                 break;
               case RBC_TYPE_SLIDER:
-                OVERLAY_linear_limits_walls(rbc, ob1, ob2, ob, 0, data);
-                OVERLAY_linear_limits_walls(rbc, ob2, ob1, ob, 0, data);
-                OVERLAY_linear_limits_rod(rbc, ob1, ob2, ob, 0, cb);
+             //   OVERLAY_linear_limits_walls(rbc, ob1, ob2, ob, 0, data);
+             //   OVERLAY_linear_limits_walls(rbc, ob2, ob1, ob, 0, data);
+                OVERLAY_linear_limits_rod(rbc, ob1, ob2, ob, 0, cb, data);
                 break;
               case RBC_TYPE_6DOF:
                 break;
               case RBC_TYPE_6DOF_SPRING:
                 break;
+              case RBC_TYPE_PISTON:
+                OVERLAY_linear_limits_rod(rbc, ob1, ob2, ob, 0, cb, data);
+                OVERLAY_angular_limits(data, cb, rbc, ob1, ob2, ob, 0);
             }
     }
 }
