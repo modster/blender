@@ -176,10 +176,7 @@ static void file_free(SpaceLink *sl)
   MEM_SAFE_FREE(sfile->asset_params);
   MEM_SAFE_FREE(sfile->runtime);
 
-  if (sfile->layout) {
-    MEM_freeN(sfile->layout);
-    sfile->layout = NULL;
-  }
+  MEM_SAFE_FREE(sfile->layout);
 }
 
 /* spacetype; init callback, area size changes, screen set, etc */
@@ -815,10 +812,7 @@ static void file_ui_region_listener(const wmRegionListenerParams *listener_param
   }
 }
 
-static bool filepath_drop_poll(bContext *C,
-                               wmDrag *drag,
-                               const wmEvent *UNUSED(event),
-                               const char **UNUSED(r_tooltip))
+static bool filepath_drop_poll(bContext *C, wmDrag *drag, const wmEvent *UNUSED(event))
 {
   if (drag->type == WM_DRAG_PATH) {
     SpaceFile *sfile = CTX_wm_space_file(C);
@@ -839,7 +833,7 @@ static void file_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("Window", SPACE_EMPTY, RGN_TYPE_WINDOW);
 
-  WM_dropbox_add(lb, "FILE_OT_filepath_drop", filepath_drop_poll, filepath_drop_copy, NULL);
+  WM_dropbox_add(lb, "FILE_OT_filepath_drop", filepath_drop_poll, filepath_drop_copy, NULL, NULL);
 }
 
 static int file_space_subtype_get(ScrArea *area)

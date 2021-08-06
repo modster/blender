@@ -34,6 +34,7 @@
 #include "BLI_sys_types.h"
 #include "DNA_windowmanager_types.h"
 #include "WM_keymap.h"
+#include "WM_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,11 +71,6 @@ struct wmTabletData;
 
 #ifdef WITH_INPUT_NDOF
 struct wmNDOFMotionData;
-#endif
-
-#ifdef WITH_XR_OPENXR
-struct wmXrActionState;
-struct wmXrPose;
 #endif
 
 typedef struct wmGizmo wmGizmo;
@@ -711,13 +707,13 @@ void WM_event_drag_image(struct wmDrag *, struct ImBuf *, float scale, int sx, i
 void WM_drag_free(struct wmDrag *drag);
 void WM_drag_data_free(int dragtype, void *poin);
 void WM_drag_free_list(struct ListBase *lb);
-
 struct wmDropBox *WM_dropbox_add(
     ListBase *lb,
     const char *idname,
-    bool (*poll)(struct bContext *, struct wmDrag *, const struct wmEvent *event, const char **),
+    bool (*poll)(struct bContext *, struct wmDrag *, const struct wmEvent *event),
     void (*copy)(struct wmDrag *, struct wmDropBox *),
-    void (*cancel)(struct Main *, struct wmDrag *, struct wmDropBox *));
+    void (*cancel)(struct Main *, struct wmDrag *, struct wmDropBox *),
+    WMDropboxTooltipFunc tooltip);
 ListBase *WM_dropboxmap_find(const char *idname, int spaceid, int regionid);
 
 /* ID drag and drop */
@@ -732,6 +728,8 @@ struct ID *WM_drag_get_local_ID_or_import_from_asset(const struct wmDrag *drag, 
 void WM_drag_free_imported_drag_ID(struct Main *bmain,
                                    struct wmDrag *drag,
                                    struct wmDropBox *drop);
+
+const char *WM_drag_get_item_name(struct wmDrag *drag);
 
 /* Set OpenGL viewport and scissor */
 void wmViewport(const struct rcti *winrct);
