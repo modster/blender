@@ -21,7 +21,16 @@
 
 static bNodeSocketTemplate geo_node_point_translate_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_VECTOR, N_("Translation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR,
+     N_("Translation"),
+     0.0f,
+     0.0f,
+     0.0f,
+     1.0f,
+     -FLT_MAX,
+     FLT_MAX,
+     PROP_TRANSLATION,
+     SOCK_IS_FIELD},
     {-1, ""},
 };
 

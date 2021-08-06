@@ -768,14 +768,14 @@ static void node_socket_draw(const bNodeSocket *sock,
   immVertex2f(pos_id, locx, locy);
 }
 
-static void node_socket_draw_multi_input(const float color[4],
-                                         const float color_outline[4],
-                                         const float width,
-                                         const float height,
-                                         const int locx,
-                                         const int locy)
+static void node_socket_draw_rounded_rectangle(const float color[4],
+                                               const float color_outline[4],
+                                               const float width,
+                                               const float height,
+                                               const float locx,
+                                               const float locy,
+                                               const float outline_width)
 {
-  const float outline_width = 1.0f;
   /* UI_draw_roundbox draws the outline on the outer side, so compensate for the outline width. */
   const rctf rect = {
       locx - width + outline_width * 0.5f,
@@ -787,6 +787,36 @@ static void node_socket_draw_multi_input(const float color[4],
   UI_draw_roundbox_corner_set(UI_CNR_ALL);
   UI_draw_roundbox_4fv_ex(
       &rect, color, nullptr, 1.0f, color_outline, outline_width, width - outline_width * 0.5f);
+}
+
+static bool use_special_non_field_socket_drawing(const bNodeTree *node_tree,
+                                                 const bNode *node,
+                                                 const bNodeSocket *socket)
+{
+  if (node_tree->type != NTREE_GEOMETRY) {
+    return false;
+  }
+  if (ELEM(socket->type,
+           SOCK_MATERIAL,
+           SOCK_GEOMETRY,
+           SOCK_TEXTURE,
+           SOCK_COLLECTION,
+           SOCK_OBJECT,
+           SOCK_IMAGE,
+           SOCK_STRING)) {
+    return false;
+  }
+  if (socket->flag & SOCK_IS_FIELD) {
+    return false;
+  }
+  if (socket->in_out == SOCK_OUT) {
+    return false;
+  }
+  if (node->typeinfo->expand_in_mf_network) {
+    /* Wow, that's hacky. Don't use vertical bar for function nodes. */
+    return false;
+  }
+  return true;
 }
 
 static const float virtual_node_socket_outline_color[4] = {0.5, 0.5, 0.5, 1.0};
@@ -1026,24 +1056,27 @@ static void node_socket_draw_nested(const bContext *C,
   node_socket_color_get((bContext *)C, ntree, node_ptr, sock, color);
   node_socket_outline_color_get(selected, sock->type, outline_color);
 
-  node_socket_draw(sock,
-                   color,
-                   outline_color,
-                   size,
-                   sock->locx,
-                   sock->locy,
-                   pos_id,
-                   col_id,
-                   shape_id,
-                   size_id,
-                   outline_col_id);
+  bNode *node = (bNode *)node_ptr->data;
+
+  if (!use_special_non_field_socket_drawing(ntree, node, sock)) {
+    node_socket_draw(sock,
+                     color,
+                     outline_color,
+                     size,
+                     sock->locx,
+                     sock->locy,
+                     pos_id,
+                     col_id,
+                     shape_id,
+                     size_id,
+                     outline_col_id);
+  }
 
   if (ntree->type != NTREE_GEOMETRY) {
     /* Only geometry nodes has socket value tooltips currently. */
     return;
   }
 
-  bNode *node = (bNode *)node_ptr->data;
   uiBlock *block = node->block;
 
   /* Ideally sockets themselves should be buttons, but they aren't currently. So add an invisible
@@ -1403,20 +1436,28 @@ void node_draw_sockets(const View2D *v2d,
     if (nodeSocketIsHidden(socket)) {
       continue;
     }
-    if (!(socket->flag & SOCK_MULTI_INPUT)) {
-      continue;
-    }
-
-    const bool is_node_hidden = (node->flag & NODE_HIDDEN);
-    const float width = NODE_SOCKSIZE;
-    float height = is_node_hidden ? width : node_socket_calculate_height(socket) - width;
-
     float color[4];
     float outline_color[4];
     node_socket_color_get((bContext *)C, ntree, &node_ptr, socket, color);
     node_socket_outline_color_get(selected, socket->type, outline_color);
 
-    node_socket_draw_multi_input(color, outline_color, width, height, socket->locx, socket->locy);
+    if (socket->flag & SOCK_MULTI_INPUT) {
+      const bool is_node_hidden = (node->flag & NODE_HIDDEN);
+      const float width = NODE_SOCKSIZE;
+      float height = is_node_hidden ? width : node_socket_calculate_height(socket) - width;
+
+      node_socket_draw_rounded_rectangle(
+          color, outline_color, width, height, socket->locx, socket->locy, 1.0f);
+    }
+    else if (use_special_non_field_socket_drawing(ntree, node, socket)) {
+      node_socket_draw_rounded_rectangle(color,
+                                         outline_color,
+                                         NODE_SOCKSIZE * 0.6f,
+                                         NODE_SOCKSIZE * 1.3,
+                                         socket->locx - 0.8f,
+                                         socket->locy,
+                                         0.75f);
+    }
   }
 }
 

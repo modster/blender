@@ -31,7 +31,7 @@ using blender::fn::GVArray_Typed;
 
 static bNodeSocketTemplate geo_node_curve_subdivide_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_INT, N_("Cuts"), 1, 0, 0, 0, 0, 1000},
+    {SOCK_INT, N_("Cuts"), 1, 0, 0, 0, 0, 1000, PROP_NONE, SOCK_IS_FIELD},
     {-1, ""},
 };
 
