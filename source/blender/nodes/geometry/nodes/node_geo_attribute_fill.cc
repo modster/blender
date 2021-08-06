@@ -100,28 +100,38 @@ static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams
 
   switch (data_type) {
     case CD_PROP_FLOAT: {
-      const float value = params.get_input<float>("Value_001");
-      attribute->fill(&value);
+      const Array<float> values = params.get_input<Array<float>>("Value_001");
+      fn::GVArray_For_RepeatedGSpan values_repeated{attribute->size(), values.as_span()};
+      fn::GVArray_GSpan values_span{values_repeated};
+      attribute->set_all(values_span.data());
       break;
     }
     case CD_PROP_FLOAT3: {
-      const float3 value = params.get_input<float3>("Value");
-      attribute->fill(&value);
+      const Array<float3> values = params.get_input<Array<float3>>("Value");
+      fn::GVArray_For_RepeatedGSpan values_repeated{attribute->size(), values.as_span()};
+      fn::GVArray_GSpan values_span{values_repeated};
+      attribute->set_all(values_span.data());
       break;
     }
     case CD_PROP_COLOR: {
-      const ColorGeometry4f value = params.get_input<ColorGeometry4f>("Value_002");
-      attribute->fill(&value);
+      const Array<ColorGeometry4f> values = params.get_input<Array<ColorGeometry4f>>("Value_002");
+      fn::GVArray_For_RepeatedGSpan values_repeated{attribute->size(), values.as_span()};
+      fn::GVArray_GSpan values_span{values_repeated};
+      attribute->set_all(values_span.data());
       break;
     }
     case CD_PROP_BOOL: {
-      const bool value = params.get_input<bool>("Value_003");
-      attribute->fill(&value);
+      const Array<bool> values = params.get_input<Array<bool>>("Value_003");
+      fn::GVArray_For_RepeatedGSpan values_repeated{attribute->size(), values.as_span()};
+      fn::GVArray_GSpan values_span{values_repeated};
+      attribute->set_all(values_span.data());
       break;
     }
     case CD_PROP_INT32: {
-      const int value = params.get_input<int>("Value_004");
-      attribute->fill(&value);
+      const Array<int> values = params.get_input<Array<int>>("Value_004");
+      fn::GVArray_For_RepeatedGSpan values_repeated{attribute->size(), values.as_span()};
+      fn::GVArray_GSpan values_span{values_repeated};
+      attribute->set_all(values_span.data());
       break;
     }
     default:
