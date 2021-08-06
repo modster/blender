@@ -149,6 +149,10 @@ typedef struct bNodeSocket {
    * kept for forward compatibility */
   /** Custom data for inputs, only UI writes in this. */
   bNodeStack ns DNA_DEPRECATED;
+
+  /* eGeometryExpanderArraySource. */
+  int output_array_source;
+  char _pad2[4];
 } bNodeSocket;
 
 /* sock->type */
@@ -1446,7 +1450,7 @@ typedef enum eGeometryExpanderArraySource {
   GEOMETRY_EXPANDER_ARRAY_SOURCE_POINT_CLOUD_POINTS = 4,
   GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_POINTS = 5,
   GEOMETRY_EXPANDER_ARRAY_SOURCE_CURVE_SPLINES = 6,
-} AttributeArraySource;
+} eGeometryExpanderArraySource;
 
 typedef struct GeometryExpanderOutput {
   struct GeometryExpanderOutput *next, *prev;

@@ -62,6 +62,15 @@ static void geo_node_point_distribute_layout(uiLayout *layout,
   uiItemR(layout, ptr, "distribute_method", 0, "", ICON_NONE);
 }
 
+static void geo_node_point_distribute_init(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+    if (socket->type != SOCK_GEOMETRY) {
+      socket->output_array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_POINT_CLOUD_POINTS;
+    }
+  }
+}
+
 static void node_point_distribute_update(bNodeTree *UNUSED(ntree), bNode *node)
 {
   bNodeSocket *sock_min_dist = (bNodeSocket *)BLI_findlink(&node->inputs, 1);
@@ -672,6 +681,7 @@ void register_node_type_geo_point_distribute()
       &ntype, GEO_NODE_POINT_DISTRIBUTE, "Point Distribute", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_point_distribute_in, geo_node_point_distribute_out);
   node_type_update(&ntype, node_point_distribute_update);
+  node_type_init(&ntype, geo_node_point_distribute_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_point_distribute_exec;
   ntype.draw_buttons = geo_node_point_distribute_layout;
   nodeRegisterType(&ntype);

@@ -46,6 +46,15 @@ static bNodeSocketTemplate geo_node_extrude_out[] = {
 
 using blender::Span;
 
+static void geo_node_extrude_init(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+    if (socket->type != SOCK_GEOMETRY) {
+      socket->output_array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACES;
+    }
+  }
+}
+
 static Mesh *extrude_mesh(const Mesh *mesh,
                           const Span<bool> selection,
                           const Span<float> distance,
@@ -198,6 +207,7 @@ void register_node_type_geo_extrude()
 
   geo_node_type_base(&ntype, GEO_NODE_EXTRUDE, "Extrude", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_extrude_in, geo_node_extrude_out);
+  node_type_init(&ntype, geo_node_extrude_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_extrude_exec;
   nodeRegisterType(&ntype);
 }

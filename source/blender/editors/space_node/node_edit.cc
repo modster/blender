@@ -2999,7 +2999,7 @@ static void foreach_available_attribute(
     if (group_input->type == SOCK_STRING) {
       GeometryExpanderOutput attribute;
       attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT;
-      attribute.array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES;
+      attribute.array_source = (eGeometryExpanderArraySource)group_input->output_array_source;
       STRNCPY(attribute.input_identifier, group_input->identifier);
       attribute.socket_type = SOCK_FLOAT;
       callback(attribute);
@@ -3012,7 +3012,7 @@ static void foreach_available_attribute(
         GeometryExpanderOutput attribute;
         attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL;
         attribute.socket_type = (eNodeSocketDatatype)node_output->type;
-        attribute.array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES;
+        attribute.array_source = (eGeometryExpanderArraySource)node_output->output_array_source;
         STRNCPY(attribute.local_node_name, node->name);
         STRNCPY(attribute.local_socket_identifier, node_output->identifier);
         callback(attribute);
@@ -3031,7 +3031,7 @@ static void foreach_available_attribute(
     GeometryExpanderOutput attribute;
     attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN;
     attribute.socket_type = SOCK_INT;
-    attribute.array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES;
+    attribute.array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_FACES;
     STRNCPY(attribute.builtin_identifier, "material_index");
     callback(attribute);
   }
