@@ -1031,7 +1031,9 @@ bool WM_xr_action_create(wmXrData *xr,
                          const int64_t *haptic_duration,
                          const float *haptic_frequency,
                          const float *haptic_amplitude,
-                         eXrActionFlag flag);
+                         eXrOpFlag op_flag,
+                         eXrActionFlag action_flag,
+                         eXrHapticFlag haptic_flag);
 void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char *action_name);
 bool WM_xr_action_binding_create(wmXrData *xr,
                                  const char *action_set_name,
@@ -1080,37 +1082,37 @@ void WM_xr_actionconfig_update_tag(XrActionMap *actionmap, XrActionMapItem *ami)
 void WM_xr_actionconfig_update(XrSessionSettings *settings);
 
 XrActionConfig *WM_xr_actionconfig_new(XrSessionSettings *settings,
-                                       const char *idname,
+                                       const char *name,
                                        bool user_defined);
 bool WM_xr_actionconfig_remove(XrSessionSettings *settings, XrActionConfig *actionconf);
 XrActionConfig *WM_xr_actionconfig_active_get(XrSessionSettings *settings);
-void WM_xr_actionconfig_active_set(XrSessionSettings *settings, const char *idname);
+void WM_xr_actionconfig_active_set(XrSessionSettings *settings, const char *name);
 
 XrActionMap *WM_xr_actionmap_new(XrActionConfig *actionconf,
-                                 const char *idname,
+                                 const char *name,
                                  bool replace_existing);
 void WM_xr_actionmap_ensure_unique(XrActionConfig *actionconf, XrActionMap *actionmap);
 XrActionMap *WM_xr_actionmap_add_copy(XrActionConfig *actionconf, XrActionMap *am_src);
 bool WM_xr_actionmap_remove(XrActionConfig *actionconf, XrActionMap *actionmap);
-XrActionMap *WM_xr_actionmap_list_find(ListBase *lb, const char *idname);
+XrActionMap *WM_xr_actionmap_find(XrActionConfig *actionconf, const char *name);
 
 XrActionMapItem *WM_xr_actionmap_item_new(XrActionMap *actionmap,
-                                          const char *idname,
+                                          const char *name,
                                           bool replace_existing);
 void WM_xr_actionmap_item_ensure_unique(XrActionMap *actionmap, XrActionMapItem *ami);
 XrActionMapItem *WM_xr_actionmap_item_add_copy(XrActionMap *actionmap, XrActionMapItem *ami_src);
 bool WM_xr_actionmap_item_remove(XrActionMap *actionmap, XrActionMapItem *ami);
-XrActionMapItem *WM_xr_actionmap_item_list_find(ListBase *lb, const char *idname);
+XrActionMapItem *WM_xr_actionmap_item_find(XrActionMap *actionmap, const char *name);
 void WM_xr_actionmap_item_properties_update_ot(XrActionMapItem *ami);
 
 XrActionMapBinding *WM_xr_actionmap_binding_new(XrActionMapItem *ami,
-                                                const char *idname,
+                                                const char *name,
                                                 bool replace_existing);
 void WM_xr_actionmap_binding_ensure_unique(XrActionMapItem *ami, XrActionMapBinding *amb);
 XrActionMapBinding *WM_xr_actionmap_binding_add_copy(XrActionMapItem *ami,
                                                      XrActionMapBinding *amb_src);
 bool WM_xr_actionmap_binding_remove(XrActionMapItem *ami, XrActionMapBinding *amb);
-XrActionMapBinding *WM_xr_actionmap_binding_list_find(ListBase *lb, const char *idname);
+XrActionMapBinding *WM_xr_actionmap_binding_find(XrActionMapItem *ami, const char *name);
 #endif /* WITH_XR_OPENXR */
 
 /* wm.c */

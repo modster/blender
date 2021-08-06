@@ -1059,13 +1059,14 @@ unsigned int GHOST_XrGetActionCount(GHOST_XrContextHandle xr_contexthandle,
   return 0;
 }
 
-void GHOST_XrGetActionCustomdatas(GHOST_XrContextHandle xr_contexthandle,
-                                  const char *action_set_name,
-                                  void **r_customdatas)
+void GHOST_XrGetActionCustomdataArray(GHOST_XrContextHandle xr_contexthandle,
+                                      const char *action_set_name,
+                                      void **r_customdata_array)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL(xr_session->getActionCustomdatas(action_set_name, r_customdatas), xr_context);
+  GHOST_XR_CAPI_CALL(xr_session->getActionCustomdataArray(action_set_name, r_customdata_array),
+                     xr_context);
 }
 
 int GHOST_XrLoadControllerModel(GHOST_XrContextHandle xr_contexthandle, const char *subaction_path)

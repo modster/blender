@@ -1020,7 +1020,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
                                                   short *r_val,
                                                   bool *r_press_start)
 {
-  const char **haptic_subaction_path = ((action->flag & XR_ACTION_HAPTIC_MATCHUSERPATHS) != 0) ?
+  const char **haptic_subaction_path = ((action->haptic_flag & XR_HAPTIC_MATCHUSERPATHS) != 0) ?
                                            (const char **)&action->subaction_paths[subaction_idx] :
                                            NULL;
   bool curr = false;
@@ -1078,11 +1078,11 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
 
   if (curr) {
     if (!prev) {
-      if (modal || (action->flag & XR_ACTION_PRESS) != 0) {
+      if (modal || (action->op_flag == XR_OP_PRESS)) {
         *r_val = KM_PRESS;
         *r_press_start = true;
       }
-      if (haptic && (action->flag & (XR_ACTION_HAPTIC_PRESS | XR_ACTION_HAPTIC_REPEAT)) != 0) {
+      if (haptic && (action->haptic_flag & (XR_HAPTIC_PRESS | XR_HAPTIC_REPEAT)) != 0) {
         /* Apply haptics. */
         if (WM_xr_haptic_action_apply(xr,
                                       action_set_name,
@@ -1106,7 +1106,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
       /* Add to active modal actions. */
       wm_xr_session_modal_action_test_add(active_modal_actions, action);
     }
-    if (haptic && ((action->flag & XR_ACTION_HAPTIC_REPEAT) != 0)) {
+    if (haptic && ((action->haptic_flag & XR_HAPTIC_REPEAT) != 0)) {
       if (!wm_xr_session_haptic_action_find(
               active_haptic_actions, action, haptic_subaction_path)) {
         /* Apply haptics. */
@@ -1124,7 +1124,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
     }
   }
   else if (prev) {
-    if (modal || (action->flag & XR_ACTION_RELEASE) != 0) {
+    if (modal || (action->op_flag == XR_OP_RELEASE)) {
       *r_val = KM_RELEASE;
       if (modal && (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
         /* Unset active modal path. */
@@ -1134,7 +1134,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
       }
     }
     if (haptic) {
-      if ((action->flag & XR_ACTION_HAPTIC_RELEASE) != 0) {
+      if ((action->haptic_flag & XR_HAPTIC_RELEASE) != 0) {
         /* Apply haptics. */
         if (WM_xr_haptic_action_apply(xr,
                                       action_set_name,
@@ -1147,7 +1147,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
               active_haptic_actions, action, haptic_subaction_path, time_now);
         }
       }
-      else if ((action->flag & XR_ACTION_HAPTIC_REPEAT) != 0) {
+      else if ((action->haptic_flag & XR_HAPTIC_REPEAT) != 0) {
         /* Stop any active haptics. */
         WM_xr_haptic_action_stop(xr, action_set_name, action->haptic_name, haptic_subaction_path);
         wm_xr_session_haptic_action_remove(active_haptic_actions, action);
@@ -1162,7 +1162,7 @@ static bool wm_xr_session_action_test_bimanual(const wmXrSessionState *session_s
                                                unsigned int *r_subaction_idx_other,
                                                const GHOST_XrPose **r_aim_pose_other)
 {
-  if ((action->flag & XR_ACTION_BIMANUAL) == 0) {
+  if ((action->action_flag & XR_ACTION_BIMANUAL) == 0) {
     return false;
   }
 
@@ -1236,7 +1236,7 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
 
   wmXrAction **actions = MEM_calloc_arrayN(count, sizeof(*actions), __func__);
 
-  GHOST_XrGetActionCustomdatas(xr_context, action_set_name, (void **)actions);
+  GHOST_XrGetActionCustomdataArray(xr_context, action_set_name, (void **)actions);
 
   /* Check haptic action timers. */
   wm_xr_session_haptic_timers_check(active_haptic_actions, time_now);

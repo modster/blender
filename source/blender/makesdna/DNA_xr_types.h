@@ -112,25 +112,35 @@ typedef enum eXrActionType {
   XR_VIBRATION_OUTPUT = 100,
 } eXrActionType;
 
+/** Determines how XR action operators are executed. */
+typedef enum eXrOpFlag {
+  XR_OP_PRESS = 0,
+  XR_OP_RELEASE = 1,
+  XR_OP_MODAL = 2,
+} eXrOpFlag;
+
 typedef enum eXrActionFlag {
-  /** Determines how the operator will be executed (mutually exclusive). */
-  XR_ACTION_PRESS = (1 << 0),
-  XR_ACTION_RELEASE = (1 << 1),
-  XR_ACTION_MODAL = (1 << 2),
-  /** Action depends on two subaction paths (i.e. two-handed/bimanual action). */
-  XR_ACTION_BIMANUAL = (1 << 3),
-  /** Whether to apply haptics to matching user paths. */
-  XR_ACTION_HAPTIC_MATCHUSERPATHS = (1 << 4),
-  /** Determines how haptics will be applied ("repeat" is mutually exclusive with
-     "press"/"release"). */
-  XR_ACTION_HAPTIC_PRESS = (1 << 5),
-  XR_ACTION_HAPTIC_RELEASE = (1 << 6),
-  XR_ACTION_HAPTIC_REPEAT = (1 << 7),
+  /** Action depends on two sub-action paths (i.e. two-handed/bi-manual action). */
+  XR_ACTION_BIMANUAL = (1 << 0),
 } eXrActionFlag;
 
+typedef enum eXrHapticFlag {
+  /** Whether to apply haptics to corresponding user paths for an action and its haptic action. */
+  XR_HAPTIC_MATCHUSERPATHS = (1 << 0),
+  /**
+   * Determines how haptics will be applied
+   * ("repeat" is mutually exclusive with "press"/"release").
+   */
+  XR_HAPTIC_PRESS = (1 << 1),
+  XR_HAPTIC_RELEASE = (1 << 2),
+  XR_HAPTIC_REPEAT = (1 << 3),
+} eXrHapticFlag;
+
 typedef enum eXrAxisFlag {
-  /** For axis-based inputs (thumbstick/trackpad/etc). Determines the region for operator execution
-     (mutually exclusive per axis). */
+  /**
+   * For axis-based inputs (thumb-stick/track-pad/etc).
+   * Determines the region for action execution (mutually exclusive per axis).
+   */
   XR_AXIS0_POS = (1 << 0),
   XR_AXIS0_NEG = (1 << 1),
   XR_AXIS1_POS = (1 << 2),
@@ -149,7 +159,7 @@ typedef struct XrActionMapBinding {
   struct XrActionMapBinding *next, *prev;
 
   /** Unique name. */
-  char idname[64];
+  char name[64]; /* MAX_NAME */
 
   /** OpenXR interaction profile path. */
   char profile[256];
@@ -167,15 +177,16 @@ typedef struct XrActionMapBinding {
   float pose_rotation[3];
 } XrActionMapBinding;
 
-#define XR_AMB_MAX_NAME 64
-
 /* -------------------------------------------------------------------- */
 
 typedef struct XrActionMapItem {
   struct XrActionMapItem *next, *prev;
 
   /** Unique name. */
-  char idname[64];
+  char name[64]; /* MAX_NAME */
+  /** Type. */
+  char type; /** eXrActionType */
+  char _pad[7];
 
   /** OpenXR user paths. */
   char user_path0[64];
@@ -188,32 +199,28 @@ typedef struct XrActionMapItem {
   /** RNA pointer to access properties. */
   struct PointerRNA *op_properties_ptr;
 
-  /** Type. */
-  char type; /** eXrActionType */
-  char _pad[3];
-
+  short op_flag;     /* eXrOpFlag */
   short action_flag; /* eXrActionFlag */
+  short haptic_flag; /* eXrHapticFlag */
 
   /** Pose action properties. */
   short pose_flag; /* eXrPoseFlag */
 
   /** Haptic properties. */
-  char haptic_idname[64];
+  char haptic_name[64]; /* MAX_NAME */
   float haptic_duration;
   float haptic_frequency;
   float haptic_amplitude;
 
-  short flag;
   short selbinding;
+  short flag;
   ListBase bindings; /* XrActionMapBinding */
 } XrActionMapItem;
 
 /** #XrActionMapItem.flag */
 enum {
-  XR_AMI_UPDATE = (1 << 0),
+  XR_ACTIONMAP_ITEM_UPDATE = (1 << 0),
 };
-
-#define XR_AMI_MAX_NAME 64
 
 /* -------------------------------------------------------------------- */
 
@@ -221,7 +228,7 @@ typedef struct XrActionMap {
   struct XrActionMap *next, *prev;
 
   /** Unique name. */
-  char idname[64];
+  char name[64]; /* MAX_NAME */
 
   ListBase items; /* XrActionMapItem */
   short selitem;
@@ -234,15 +241,13 @@ enum {
   XR_ACTIONMAP_UPDATE = (1 << 0),
 };
 
-#define XR_ACTIONMAP_MAX_NAME 64
-
 /* -------------------------------------------------------------------- */
 
 typedef struct XrActionConfig {
   struct XrActionConfig *next, *prev;
 
   /** Unique name. */
-  char idname[64];
+  char name[64]; /* MAX_NAME */
 
   ListBase actionmaps; /* XrActionMap */
   short actactionmap;
@@ -255,8 +260,6 @@ typedef struct XrActionConfig {
 enum {
   XR_ACTIONCONF_USER = (1 << 0), /* User action config. */
 };
-
-#define XR_ACTIONCONF_MAX_NAME 64
 
 /* -------------------------------------------------------------------- */
 

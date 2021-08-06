@@ -830,14 +830,15 @@ uint32_t GHOST_XrSession::getActionCount(const char *action_set_name)
   return action_set->getActionCount();
 }
 
-void GHOST_XrSession::getActionCustomdatas(const char *action_set_name, void **r_customdatas)
+void GHOST_XrSession::getActionCustomdataArray(const char *action_set_name,
+                                               void **r_customdata_array)
 {
   GHOST_XrActionSet *action_set = find_action_set(m_oxr.get(), action_set_name);
   if (action_set == nullptr) {
     return;
   }
 
-  action_set->getActionCustomdatas(r_customdatas);
+  action_set->getActionCustomdataArray(r_customdata_array);
 }
 
 /** \} */ /* Actions */

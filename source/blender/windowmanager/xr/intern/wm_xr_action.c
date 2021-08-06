@@ -78,7 +78,9 @@ static wmXrAction *action_create(const char *action_name,
                                  const int64_t *haptic_duration,
                                  const float *haptic_frequency,
                                  const float *haptic_amplitude,
-                                 eXrActionFlag flag)
+                                 eXrOpFlag op_flag,
+                                 eXrActionFlag action_flag,
+                                 eXrHapticFlag haptic_flag)
 {
   wmXrAction *action = MEM_callocN(sizeof(*action), __func__);
   action->name = MEM_mallocN(strlen(action_name) + 1, "XrAction_Name");
@@ -139,7 +141,9 @@ static wmXrAction *action_create(const char *action_name,
     action->haptic_amplitude = *haptic_amplitude;
   }
 
-  action->flag = flag;
+  action->op_flag = op_flag;
+  action->action_flag = action_flag;
+  action->haptic_flag = haptic_flag;
 
   return action;
 }
@@ -232,7 +236,9 @@ bool WM_xr_action_create(wmXrData *xr,
                          const int64_t *haptic_duration,
                          const float *haptic_frequency,
                          const float *haptic_amplitude,
-                         eXrActionFlag flag)
+                         eXrOpFlag op_flag,
+                         eXrActionFlag action_flag,
+                         eXrHapticFlag haptic_flag)
 {
   if (action_find(xr, action_set_name, action_name)) {
     return false;
@@ -248,7 +254,9 @@ bool WM_xr_action_create(wmXrData *xr,
                                      haptic_duration,
                                      haptic_frequency,
                                      haptic_amplitude,
-                                     flag);
+                                     op_flag,
+                                     action_flag,
+                                     haptic_flag);
 
   GHOST_XrActionInfo info = {
       .name = action_name,
@@ -316,15 +324,9 @@ void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char 
     }
   }
 
-  wmXrHapticAction *ha = action_set->active_haptic_actions.first;
-  while (ha) {
+  LISTBASE_FOREACH_MUTABLE (wmXrHapticAction *, ha, &action_set->active_haptic_actions) {
     if (STREQ(ha->action->name, action_name)) {
-      wmXrHapticAction *_ha = ha;
-      ha = ha->next;
-      BLI_freelinkN(&action_set->active_haptic_actions, _ha);
-    }
-    else {
-      ha = ha->next;
+      BLI_freelinkN(&action_set->active_haptic_actions, ha);
     }
   }
 

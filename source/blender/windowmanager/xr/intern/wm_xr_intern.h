@@ -191,8 +191,10 @@ typedef struct wmXrAction {
   float haptic_frequency;
   float haptic_amplitude;
 
-  /** Flag. */
-  eXrActionFlag flag;
+  /** Flags. */
+  eXrOpFlag op_flag;
+  eXrActionFlag action_flag;
+  eXrHapticFlag haptic_flag;
 } wmXrAction;
 
 typedef struct wmXrHapticAction {
@@ -204,9 +206,11 @@ typedef struct wmXrHapticAction {
 
 typedef struct wmXrActionSet {
   char *name;
+
   /** XR pose actions that determine the controller grip/aim transforms. */
   wmXrAction *controller_grip_action;
   wmXrAction *controller_aim_action;
+
   /** Currently active modal actions. */
   ListBase active_modal_actions; /* wmXrAction */
   /** Currently active haptic actions. */

@@ -1136,9 +1136,9 @@ unsigned int GHOST_XrGetActionCount(GHOST_XrContextHandle xr_context, const char
 /**
  * Get custom data for all actions in an action set.
  */
-void GHOST_XrGetActionCustomdatas(GHOST_XrContextHandle xr_context,
-                                  const char *action_set_name,
-                                  void **r_customdatas);
+void GHOST_XrGetActionCustomdataArray(GHOST_XrContextHandle xr_context,
+                                      const char *action_set_name,
+                                      void **r_customdata_array);
 
 /* controller model */
 /**

@@ -44,13 +44,13 @@
  * \{ */
 
 static XrActionMapBinding *rna_XrActionMapBinding_new(XrActionMapItem *ami,
-                                                      const char *idname,
+                                                      const char *name,
                                                       bool replace_existing)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_binding_new(ami, idname, replace_existing);
+  return WM_xr_actionmap_binding_new(ami, name, replace_existing);
 #  else
-  UNUSED_VARS(ami, idname, replace_existing);
+  UNUSED_VARS(ami, name, replace_existing);
   return NULL;
 #  endif
 }
@@ -76,8 +76,8 @@ static void rna_XrActionMapBinding_remove(XrActionMapItem *ami,
     BKE_reportf(reports,
                 RPT_ERROR,
                 "ActionMapBinding '%s' cannot be removed from '%s'",
-                amb->idname,
-                ami->idname);
+                amb->name,
+                ami->name);
     return;
   }
   RNA_POINTER_INVALIDATE(amb_ptr);
@@ -86,17 +86,17 @@ static void rna_XrActionMapBinding_remove(XrActionMapItem *ami,
 #  endif
 }
 
-static XrActionMapBinding *rna_XrActionMapBinding_find(XrActionMapItem *ami, const char *idname)
+static XrActionMapBinding *rna_XrActionMapBinding_find(XrActionMapItem *ami, const char *name)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_binding_list_find(&ami->bindings, idname);
+  return WM_xr_actionmap_binding_find(ami, name);
 #  else
-  UNUSED_VARS(ami, idname);
+  UNUSED_VARS(ami, name);
   return NULL;
 #  endif
 }
 
-static int rna_XrActionMapBinding_axis0_flag_get(PointerRNA *ptr)
+static int rna_XrActionMapBinding_axis0_region_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapBinding *amb = ptr->data;
@@ -112,7 +112,7 @@ static int rna_XrActionMapBinding_axis0_flag_get(PointerRNA *ptr)
   return 0;
 }
 
-static void rna_XrActionMapBinding_axis0_flag_set(PointerRNA *ptr, int value)
+static void rna_XrActionMapBinding_axis0_region_set(PointerRNA *ptr, int value)
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapBinding *amb = ptr->data;
@@ -123,7 +123,7 @@ static void rna_XrActionMapBinding_axis0_flag_set(PointerRNA *ptr, int value)
 #  endif
 }
 
-static int rna_XrActionMapBinding_axis1_flag_get(PointerRNA *ptr)
+static int rna_XrActionMapBinding_axis1_region_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapBinding *amb = ptr->data;
@@ -139,7 +139,7 @@ static int rna_XrActionMapBinding_axis1_flag_get(PointerRNA *ptr)
   return 0;
 }
 
-static void rna_XrActionMapBinding_axis1_flag_set(PointerRNA *ptr, int value)
+static void rna_XrActionMapBinding_axis1_region_set(PointerRNA *ptr, int value)
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapBinding *amb = ptr->data;
@@ -174,13 +174,13 @@ static void rna_XrActionMapBinding_name_update(Main *bmain, Scene *UNUSED(scene)
 }
 
 static XrActionMapItem *rna_XrActionMapItem_new(XrActionMap *am,
-                                                const char *idname,
+                                                const char *name,
                                                 bool replace_existing)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_item_new(am, idname, replace_existing);
+  return WM_xr_actionmap_item_new(am, name, replace_existing);
 #  else
-  UNUSED_VARS(am, idname, replace_existing);
+  UNUSED_VARS(am, name, replace_existing);
   return NULL;
 #  endif
 }
@@ -201,11 +201,8 @@ static void rna_XrActionMapItem_remove(XrActionMap *am, ReportList *reports, Poi
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ami_ptr->data;
   if (WM_xr_actionmap_item_remove(am, ami) == false) {
-    BKE_reportf(reports,
-                RPT_ERROR,
-                "ActionMapItem '%s' cannot be removed from '%s'",
-                ami->idname,
-                am->idname);
+    BKE_reportf(
+        reports, RPT_ERROR, "ActionMapItem '%s' cannot be removed from '%s'", ami->name, am->name);
     return;
   }
   RNA_POINTER_INVALIDATE(ami_ptr);
@@ -214,12 +211,12 @@ static void rna_XrActionMapItem_remove(XrActionMap *am, ReportList *reports, Poi
 #  endif
 }
 
-static XrActionMapItem *rna_XrActionMapItem_find(XrActionMap *am, const char *idname)
+static XrActionMapItem *rna_XrActionMapItem_find(XrActionMap *am, const char *name)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_item_list_find(&am->items, idname);
+  return WM_xr_actionmap_item_find(am, name);
 #  else
-  UNUSED_VARS(am, idname);
+  UNUSED_VARS(am, name);
   return NULL;
 #  endif
 }
@@ -277,33 +274,6 @@ static PointerRNA rna_XrActionMapItem_op_properties_get(PointerRNA *ptr)
   return PointerRNA_NULL;
 }
 
-static int rna_XrActionMapItem_op_flag_get(PointerRNA *ptr)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionMapItem *ami = ptr->data;
-  if ((ami->action_flag & XR_ACTION_RELEASE) != 0) {
-    return XR_ACTION_RELEASE;
-  }
-  if ((ami->action_flag & XR_ACTION_MODAL) != 0) {
-    return XR_ACTION_MODAL;
-  }
-#  else
-  UNUSED_VARS(ptr);
-#  endif
-  return XR_ACTION_PRESS;
-}
-
-static void rna_XrActionMapItem_op_flag_set(PointerRNA *ptr, int value)
-{
-#  ifdef WITH_XR_OPENXR
-  XrActionMapItem *ami = ptr->data;
-  ami->action_flag &= ~(XR_ACTION_PRESS | XR_ACTION_RELEASE | XR_ACTION_MODAL);
-  ami->action_flag |= value;
-#  else
-  UNUSED_VARS(ptr, value);
-#  endif
-}
-
 static bool rna_XrActionMapItem_bimanual_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -331,7 +301,7 @@ static bool rna_XrActionMapItem_haptic_match_user_paths_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ptr->data;
-  if ((ami->action_flag & XR_ACTION_HAPTIC_MATCHUSERPATHS) != 0) {
+  if ((ami->haptic_flag & XR_HAPTIC_MATCHUSERPATHS) != 0) {
     return true;
   }
 #  else
@@ -344,37 +314,35 @@ static void rna_XrActionMapItem_haptic_match_user_paths_set(PointerRNA *ptr, boo
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ptr->data;
-  SET_FLAG_FROM_TEST(ami->action_flag, value, XR_ACTION_HAPTIC_MATCHUSERPATHS);
+  SET_FLAG_FROM_TEST(ami->haptic_flag, value, XR_HAPTIC_MATCHUSERPATHS);
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
 }
 
-static int rna_XrActionMapItem_haptic_flag_get(PointerRNA *ptr)
+static int rna_XrActionMapItem_haptic_mode_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ptr->data;
-  if ((ami->action_flag & XR_ACTION_HAPTIC_RELEASE) != 0) {
-    return ((ami->action_flag & XR_ACTION_HAPTIC_PRESS) != 0) ?
-               (XR_ACTION_HAPTIC_PRESS | XR_ACTION_HAPTIC_RELEASE) :
-               XR_ACTION_HAPTIC_RELEASE;
+  if ((ami->haptic_flag & XR_HAPTIC_RELEASE) != 0) {
+    return ((ami->haptic_flag & XR_HAPTIC_PRESS) != 0) ? (XR_HAPTIC_PRESS | XR_HAPTIC_RELEASE) :
+                                                         XR_HAPTIC_RELEASE;
   }
-  if ((ami->action_flag & XR_ACTION_HAPTIC_REPEAT) != 0) {
-    return XR_ACTION_HAPTIC_REPEAT;
+  if ((ami->haptic_flag & XR_HAPTIC_REPEAT) != 0) {
+    return XR_HAPTIC_REPEAT;
   }
 #  else
   UNUSED_VARS(ptr);
 #  endif
-  return XR_ACTION_HAPTIC_PRESS;
+  return XR_HAPTIC_PRESS;
 }
 
-static void rna_XrActionMapItem_haptic_flag_set(PointerRNA *ptr, int value)
+static void rna_XrActionMapItem_haptic_mode_set(PointerRNA *ptr, int value)
 {
 #  ifdef WITH_XR_OPENXR
   XrActionMapItem *ami = ptr->data;
-  ami->action_flag &= ~(XR_ACTION_HAPTIC_PRESS | XR_ACTION_HAPTIC_RELEASE |
-                        XR_ACTION_HAPTIC_REPEAT);
-  ami->action_flag |= value;
+  ami->haptic_flag &= ~(XR_HAPTIC_PRESS | XR_HAPTIC_RELEASE | XR_HAPTIC_REPEAT);
+  ami->haptic_flag |= value;
 #  else
   UNUSED_VARS(ptr, value);
 #  endif
@@ -457,13 +425,13 @@ static void rna_XrActionMapItem_update(Main *UNUSED(bmain), Scene *UNUSED(scene)
 }
 
 static XrActionMap *rna_XrActionMap_new(XrActionConfig *actionconf,
-                                        const char *idname,
+                                        const char *name,
                                         bool replace_existing)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_new(actionconf, idname, replace_existing);
+  return WM_xr_actionmap_new(actionconf, name, replace_existing);
 #  else
-  UNUSED_VARS(actionconf, idname, replace_existing);
+  UNUSED_VARS(actionconf, name, replace_existing);
   return NULL;
 #  endif
 }
@@ -486,7 +454,7 @@ static void rna_XrActionMap_remove(XrActionConfig *actionconf,
 #  ifdef WITH_XR_OPENXR
   XrActionMap *actionmap = actionmap_ptr->data;
   if (WM_xr_actionmap_remove(actionconf, actionmap) == false) {
-    BKE_reportf(reports, RPT_ERROR, "ActionMap '%s' cannot be removed", actionmap->idname);
+    BKE_reportf(reports, RPT_ERROR, "ActionMap '%s' cannot be removed", actionmap->name);
     return;
   }
   RNA_POINTER_INVALIDATE(actionmap_ptr);
@@ -495,12 +463,12 @@ static void rna_XrActionMap_remove(XrActionConfig *actionconf,
 #  endif
 }
 
-static XrActionMap *rna_XrActionMap_find(XrActionConfig *actionconf, const char *idname)
+static XrActionMap *rna_XrActionMap_find(XrActionConfig *actionconf, const char *name)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_list_find(&actionconf->actionmaps, idname);
+  return WM_xr_actionmap_find(actionconf, name);
 #  else
-  UNUSED_VARS(actionconf, idname);
+  UNUSED_VARS(actionconf, name);
   return NULL;
 #  endif
 }
@@ -539,7 +507,7 @@ static void rna_XrActionConfig_remove(XrSessionSettings *settings,
 #  ifdef WITH_XR_OPENXR
   XrActionConfig *actionconf = actionconf_ptr->data;
   if (WM_xr_actionconfig_remove(settings, actionconf) == false) {
-    BKE_reportf(reports, RPT_ERROR, "ActionConfig '%s' cannot be removed", actionconf->idname);
+    BKE_reportf(reports, RPT_ERROR, "ActionConfig '%s' cannot be removed", actionconf->name);
     return;
   }
   RNA_POINTER_INVALIDATE(actionconf_ptr);
@@ -580,7 +548,7 @@ static void rna_XrSessionSettings_actionconfig_active_set(PointerRNA *ptr,
   XrSessionSettings *settings = ptr->data;
   XrActionConfig *ac = value.data;
   if (ac) {
-    WM_xr_actionconfig_active_set(settings, ac->idname);
+    WM_xr_actionconfig_active_set(settings, ac->name);
   }
 #  else
   UNUSED_VARS(ptr, value);
@@ -920,81 +888,69 @@ static void rna_XrSessionState_reset_navigation(bContext *C)
 #  endif
 }
 
-static bool rna_XrSessionState_action_set_create(bContext *C,
-                                                 XrActionMap *actionmap,
-                                                 bool set_active)
+static bool rna_XrSessionState_action_set_create(bContext *C, XrActionMap *actionmap)
 {
 #  ifdef WITH_XR_OPENXR
-  if (BLI_listbase_count(&actionmap->items) < 1) {
-    return false;
-  }
-
-  /* Create action set. */
   wmWindowManager *wm = CTX_wm_manager(C);
-  wmXrData *xr = &wm->xr;
-  const char *action_set_name = actionmap->idname;
+  return WM_xr_action_set_create(&wm->xr, actionmap->name);
+#  else
+  UNUSED_VARS(C, actionmap);
+  return false;
+#  endif
+}
 
-  if (!WM_xr_action_set_create(xr, action_set_name)) {
-    return false;
-  }
+static bool rna_XrSessionState_action_create(bContext *C,
+                                             XrActionMap *actionmap,
+                                             XrActionMapItem *ami)
+{
+#  ifdef WITH_XR_OPENXR
+  wmWindowManager *wm = CTX_wm_manager(C);
+  unsigned int count_subaction_paths = 0;
+  const char *subaction_paths[2];
 
-  /* Create actions. */
-  const char *controller_grip_name = NULL;
-  const char *controller_aim_name = NULL;
+  if (ami->user_path0[0]) {
+    subaction_paths[0] = ami->user_path0;
+    ++count_subaction_paths;
 
-  LISTBASE_FOREACH (XrActionMapItem *, ami, &actionmap->items) {
-    if (BLI_listbase_count(&ami->bindings) < 1) {
-      continue;
-    }
-
-    unsigned int count_subaction_paths = 0;
-    const char *subaction_paths[2];
-
-    if (ami->user_path0[0]) {
-      subaction_paths[0] = ami->user_path0;
+    if (ami->user_path1[0]) {
+      subaction_paths[1] = ami->user_path1;
       ++count_subaction_paths;
-
-      if (ami->user_path1[0]) {
-        subaction_paths[1] = ami->user_path1;
-        ++count_subaction_paths;
-      }
+    }
+  }
+  else {
+    if (ami->user_path1[0]) {
+      subaction_paths[0] = ami->user_path1;
+      ++count_subaction_paths;
     }
     else {
-      if (ami->user_path1[0]) {
-        subaction_paths[0] = ami->user_path1;
-        ++count_subaction_paths;
-      }
-      else {
-        return false;
+      return false;
+    }
+  }
+
+  const bool is_float_action = (ami->type == XR_FLOAT_INPUT || ami->type == XR_VECTOR2F_INPUT);
+  const bool is_button_action = (is_float_action || ami->type == XR_BOOLEAN_INPUT);
+  wmOperatorType *ot = NULL;
+  IDProperty *op_properties = NULL;
+  const char *haptic_name = NULL;
+  int64_t haptic_duration_msec;
+
+  if (is_button_action) {
+    if (ami->op[0]) {
+      char idname[OP_MAX_TYPENAME];
+      WM_operator_bl_idname(idname, ami->op);
+      ot = WM_operatortype_find(idname, true);
+      if (ot) {
+        op_properties = ami->op_properties;
       }
     }
 
-    const char *action_name = ami->idname;
-    const bool is_float_action = (ami->type == XR_FLOAT_INPUT || ami->type == XR_VECTOR2F_INPUT);
-    const bool is_button_action = (is_float_action || ami->type == XR_BOOLEAN_INPUT);
-    const bool is_pose_action = (ami->type == XR_POSE_INPUT);
-    wmOperatorType *ot = NULL;
-    IDProperty *op_properties = NULL;
-    const char *haptic_name = NULL;
-    int64_t haptic_duration_msec;
+    haptic_name = &ami->haptic_name[0];
+    haptic_duration_msec = (int64_t)(ami->haptic_duration * 1000.0f);
+  }
 
-    if (is_button_action) {
-      if (ami->op[0]) {
-        char idname[OP_MAX_TYPENAME];
-        WM_operator_bl_idname(idname, ami->op);
-        ot = WM_operatortype_find(idname, true);
-        if (ot) {
-          op_properties = ami->op_properties;
-        }
-      }
-
-      haptic_name = &ami->haptic_idname[0];
-      haptic_duration_msec = (int64_t)(ami->haptic_duration * 1000.0f);
-    }
-
-    if (!WM_xr_action_create(xr,
-                             action_set_name,
-                             action_name,
+  return WM_xr_action_create(&wm->xr,
+                             actionmap->name,
+                             ami->name,
                              ami->type,
                              count_subaction_paths,
                              subaction_paths,
@@ -1004,97 +960,80 @@ static bool rna_XrSessionState_action_set_create(bContext *C,
                              is_button_action ? &haptic_duration_msec : NULL,
                              is_button_action ? &ami->haptic_frequency : NULL,
                              is_button_action ? &ami->haptic_amplitude : NULL,
-                             ami->action_flag)) {
-      return false;
-    }
-
-    if ((ami->pose_flag & XR_POSE_GRIP) != 0) {
-      BLI_assert(is_pose_action);
-      controller_grip_name = action_name;
-    }
-    if ((ami->pose_flag & XR_POSE_AIM) != 0) {
-      BLI_assert(is_pose_action);
-      controller_aim_name = action_name;
-    }
-
-    /* Create action bindings. */
-    LISTBASE_FOREACH (XrActionMapBinding *, amb, &ami->bindings) {
-      unsigned int count_component_paths = 0;
-      const char *component_paths[2];
-
-      if (amb->component_path0[0]) {
-        component_paths[0] = amb->component_path0;
-        ++count_component_paths;
-
-        if (amb->component_path1[0]) {
-          component_paths[1] = amb->component_path1;
-          ++count_component_paths;
-        }
-      }
-      else {
-        if (amb->component_path1[0]) {
-          component_paths[0] = amb->component_path1;
-          ++count_component_paths;
-        }
-        else {
-          return false;
-        }
-      }
-
-      if (count_component_paths != count_subaction_paths) {
-        return false;
-      }
-
-      float float_thresholds[2];
-      eXrAxisFlag axis_flags[2];
-      wmXrPose poses[2];
-
-      if (is_float_action) {
-        float_thresholds[0] = float_thresholds[1] = amb->float_threshold;
-      }
-      if (is_button_action) {
-        axis_flags[0] = axis_flags[1] = amb->axis_flag;
-      }
-      if (is_pose_action) {
-        copy_v3_v3(poses[0].position, amb->pose_location);
-        eul_to_quat(poses[0].orientation_quat, amb->pose_rotation);
-        normalize_qt(poses[0].orientation_quat);
-        memcpy(&poses[1], &poses[0], sizeof(poses[1]));
-      }
-
-      if (!WM_xr_action_binding_create(xr,
-                                       action_set_name,
-                                       action_name,
-                                       amb->profile,
-                                       count_subaction_paths,
-                                       subaction_paths,
-                                       component_paths,
-                                       is_float_action ? float_thresholds : NULL,
-                                       is_button_action ? axis_flags : NULL,
-                                       is_pose_action ? poses : NULL)) {
-        return false;
-      }
-    }
-  }
-
-  /* Set controller pose actions. */
-  if (controller_grip_name && controller_aim_name) {
-    if (!WM_xr_controller_pose_actions_set(
-            xr, action_set_name, controller_grip_name, controller_aim_name)) {
-      return false;
-    }
-  }
-
-  /* Set active action set. */
-  if (set_active) {
-    if (!WM_xr_active_action_set_set(xr, action_set_name)) {
-      return false;
-    }
-  }
-
-  return true;
+                             ami->op_flag,
+                             ami->action_flag,
+                             ami->haptic_flag);
 #  else
-  UNUSED_VARS(C, actionmap, set_active);
+  UNUSED_VARS(C, actionmap, ami);
+  return false;
+#  endif
+}
+
+static bool rna_XrSessionState_action_binding_create(bContext *C,
+                                                     XrActionMap *actionmap,
+                                                     XrActionMapItem *ami,
+                                                     XrActionMapBinding *amb)
+{
+#  ifdef WITH_XR_OPENXR
+  wmWindowManager *wm = CTX_wm_manager(C);
+  unsigned int count_subaction_paths = 0;
+  const char *subaction_paths[2];
+  const char *component_paths[2];
+
+  if (ami->user_path0[0]) {
+    subaction_paths[0] = ami->user_path0;
+    component_paths[0] = amb->component_path0;
+    ++count_subaction_paths;
+
+    if (ami->user_path1[0]) {
+      subaction_paths[1] = ami->user_path1;
+      component_paths[1] = amb->component_path1;
+      ++count_subaction_paths;
+    }
+  }
+  else {
+    if (ami->user_path1[0]) {
+      subaction_paths[0] = ami->user_path1;
+      component_paths[0] = amb->component_path1;
+      ++count_subaction_paths;
+    }
+    else {
+      return false;
+    }
+  }
+
+  const bool is_float_action = (ami->type == XR_FLOAT_INPUT || ami->type == XR_VECTOR2F_INPUT);
+  const bool is_button_action = (is_float_action || ami->type == XR_BOOLEAN_INPUT);
+  const bool is_pose_action = (ami->type == XR_POSE_INPUT);
+  float float_thresholds[2];
+  eXrAxisFlag axis_flags[2];
+  wmXrPose poses[2];
+
+  if (is_float_action) {
+    float_thresholds[0] = float_thresholds[1] = amb->float_threshold;
+  }
+  if (is_button_action) {
+    axis_flags[0] = axis_flags[1] = amb->axis_flag;
+  }
+  if (is_pose_action) {
+    copy_v3_v3(poses[0].position, amb->pose_location);
+    eul_to_quat(poses[0].orientation_quat, amb->pose_rotation);
+    normalize_qt(poses[0].orientation_quat);
+    memcpy(&poses[1], &poses[0], sizeof(poses[1]));
+  }
+
+  return WM_xr_action_binding_create(&wm->xr,
+                                     actionmap->name,
+                                     ami->name,
+                                     amb->profile,
+                                     count_subaction_paths,
+                                     subaction_paths,
+                                     component_paths,
+                                     is_float_action ? float_thresholds : NULL,
+                                     is_button_action ? axis_flags : NULL,
+                                     is_pose_action ? poses : NULL);
+#  else
+  UNUSED_VARS(C, actionmap, ami, amb);
   return false;
 #  endif
 }
@@ -1129,7 +1068,7 @@ void rna_XrSessionState_action_state_get(bContext *C,
                                          const char *action_set_name,
                                          const char *action_name,
                                          const char *user_path,
-                                         float r_state[7])
+                                         float r_state[2])
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -1138,26 +1077,25 @@ void rna_XrSessionState_action_state_get(bContext *C,
     switch (state.type) {
       case XR_BOOLEAN_INPUT:
         r_state[0] = (float)state.state_boolean;
+        r_state[1] = 0.0f;
         return;
       case XR_FLOAT_INPUT:
         r_state[0] = state.state_float;
+        r_state[1] = 0.0f;
         return;
       case XR_VECTOR2F_INPUT:
         copy_v2_v2(r_state, state.state_vector2f);
         return;
       case XR_POSE_INPUT:
-        copy_v3_v3(r_state, state.state_pose.position);
-        copy_qt_qt(&r_state[3], state.state_pose.orientation_quat);
-        return;
       case XR_VIBRATION_OUTPUT:
         BLI_assert_unreachable();
-        return;
+        break;
     }
   }
 #  else
   UNUSED_VARS(C, action_set_name, action_name, user_path);
 #  endif
-  memset(r_state, 0, sizeof(float[7]));
+  zero_v2(r_state);
 }
 
 bool rna_XrSessionState_haptic_action_apply(bContext *C,
@@ -1198,6 +1136,58 @@ void rna_XrSessionState_haptic_action_stop(bContext *C,
 #  endif
 }
 
+static void rna_XrSessionState_controller_grip_location_get(bContext *C,
+                                                            int index,
+                                                            float r_values[3])
+{
+#  ifdef WITH_XR_OPENXR
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  WM_xr_session_state_controller_grip_location_get(&wm->xr, index, r_values);
+#  else
+  UNUSED_VARS(C, index);
+  zero_v3(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_controller_grip_rotation_get(bContext *C,
+                                                            int index,
+                                                            float r_values[4])
+{
+#  ifdef WITH_XR_OPENXR
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  WM_xr_session_state_controller_grip_rotation_get(&wm->xr, index, r_values);
+#  else
+  UNUSED_VARS(C, index);
+  unit_qt(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_controller_aim_location_get(bContext *C,
+                                                           int index,
+                                                           float r_values[3])
+{
+#  ifdef WITH_XR_OPENXR
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  WM_xr_session_state_controller_aim_location_get(&wm->xr, index, r_values);
+#  else
+  UNUSED_VARS(C, index);
+  zero_v3(r_values);
+#  endif
+}
+
+static void rna_XrSessionState_controller_aim_rotation_get(bContext *C,
+                                                           int index,
+                                                           float r_values[4])
+{
+#  ifdef WITH_XR_OPENXR
+  const wmWindowManager *wm = CTX_wm_manager(C);
+  WM_xr_session_state_controller_aim_rotation_get(&wm->xr, index, r_values);
+#  else
+  UNUSED_VARS(C, index);
+  unit_qt(r_values);
+#  endif
+}
+
 static void rna_XrSessionState_viewer_pose_location_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
@@ -1214,94 +1204,6 @@ static void rna_XrSessionState_viewer_pose_rotation_get(PointerRNA *ptr, float *
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   WM_xr_session_state_viewer_pose_rotation_get(xr, r_values);
-#  else
-  UNUSED_VARS(ptr);
-  unit_qt(r_values);
-#  endif
-}
-
-static void rna_XrSessionState_controller0_grip_location_get(PointerRNA *ptr, float *r_values)
-{
-#  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_grip_location_get(xr, 0, r_values);
-#  else
-  UNUSED_VARS(ptr);
-  zero_v3(r_values);
-#  endif
-}
-
-static void rna_XrSessionState_controller0_grip_rotation_get(PointerRNA *ptr, float *r_values)
-{
-#  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_grip_rotation_get(xr, 0, r_values);
-#  else
-  UNUSED_VARS(ptr);
-  unit_qt(r_values);
-#  endif
-}
-
-static void rna_XrSessionState_controller0_aim_location_get(PointerRNA *ptr, float *r_values)
-{
-#  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_aim_location_get(xr, 0, r_values);
-#  else
-  UNUSED_VARS(ptr);
-  zero_v3(r_values);
-#  endif
-}
-
-static void rna_XrSessionState_controller0_aim_rotation_get(PointerRNA *ptr, float *r_values)
-{
-#  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_aim_rotation_get(xr, 0, r_values);
-#  else
-  UNUSED_VARS(ptr);
-  unit_qt(r_values);
-#  endif
-}
-
-static void rna_XrSessionState_controller1_grip_location_get(PointerRNA *ptr, float *r_values)
-{
-#  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_grip_location_get(xr, 1, r_values);
-#  else
-  UNUSED_VARS(ptr);
-  zero_v3(r_values);
-#  endif
-}
-
-static void rna_XrSessionState_controller1_grip_rotation_get(PointerRNA *ptr, float *r_values)
-{
-#  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_grip_rotation_get(xr, 1, r_values);
-#  else
-  UNUSED_VARS(ptr);
-  unit_qt(r_values);
-#  endif
-}
-
-static void rna_XrSessionState_controller1_aim_location_get(PointerRNA *ptr, float *r_values)
-{
-#  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_aim_location_get(xr, 1, r_values);
-#  else
-  UNUSED_VARS(ptr);
-  zero_v3(r_values);
-#  endif
-}
-
-static void rna_XrSessionState_controller1_aim_rotation_get(PointerRNA *ptr, float *r_values)
-{
-#  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
-  WM_xr_session_state_controller_aim_rotation_get(xr, 1, r_values);
 #  else
   UNUSED_VARS(ptr);
   unit_qt(r_values);
@@ -1380,37 +1282,53 @@ static void rna_XrSessionState_nav_scale_set(PointerRNA *ptr, float value)
 /* -------------------------------------------------------------------- */
 
 static const EnumPropertyItem rna_enum_xr_action_types[] = {
-    {XR_FLOAT_INPUT, "BUTTON", 0, "Button", "Button action"},
-    {XR_VECTOR2F_INPUT, "AXIS", 0, "Axis", "2D axis action"},
-    {XR_POSE_INPUT, "POSE", 0, "Pose", "3D pose action"},
-    {XR_VIBRATION_OUTPUT, "HAPTIC", 0, "Haptic", "Haptic output action"},
+    {XR_FLOAT_INPUT,
+     "FLOAT",
+     0,
+     "Float",
+     "Float action, representing either a digital or analog button"},
+    {XR_VECTOR2F_INPUT,
+     "VECTOR2D",
+     0,
+     "Vector2D",
+     "2D float vector action, representing a thumbstick or trackpad"},
+    {XR_POSE_INPUT,
+     "POSE",
+     0,
+     "Pose",
+     "3D pose action, representing a controller's location and rotation"},
+    {XR_VIBRATION_OUTPUT,
+     "VIBRATION",
+     0,
+     "Vibration",
+     "Haptic vibration output action, to be applied with a duration, frequency, and amplitude"},
     {0, NULL, 0, NULL, NULL},
 };
 
 static const EnumPropertyItem rna_enum_xr_op_flags[] = {
-    {XR_ACTION_PRESS,
+    {XR_OP_PRESS,
      "PRESS",
      0,
      "Press",
      "Execute operator on button press (non-modal operators only)"},
-    {XR_ACTION_RELEASE,
+    {XR_OP_RELEASE,
      "RELEASE",
      0,
      "Release",
      "Execute operator on button release (non-modal operators only)"},
-    {XR_ACTION_MODAL, "MODAL", 0, "Modal", "Use modal execution (modal operators only)"},
+    {XR_OP_MODAL, "MODAL", 0, "Modal", "Use modal execution (modal operators only)"},
     {0, NULL, 0, NULL, NULL},
 };
 
 static const EnumPropertyItem rna_enum_xr_haptic_flags[] = {
-    {XR_ACTION_HAPTIC_PRESS, "PRESS", 0, "Press", "Apply haptics on button press"},
-    {XR_ACTION_HAPTIC_RELEASE, "RELEASE", 0, "Release", "Apply haptics on button release"},
-    {XR_ACTION_HAPTIC_PRESS | XR_ACTION_HAPTIC_RELEASE,
+    {XR_HAPTIC_PRESS, "PRESS", 0, "Press", "Apply haptics on button press"},
+    {XR_HAPTIC_RELEASE, "RELEASE", 0, "Release", "Apply haptics on button release"},
+    {XR_HAPTIC_PRESS | XR_HAPTIC_RELEASE,
      "PRESS_RELEASE",
      0,
      "Press Release",
      "Apply haptics on button press and release"},
-    {XR_ACTION_HAPTIC_REPEAT,
+    {XR_HAPTIC_REPEAT,
      "REPEAT",
      0,
      "Repeat",
@@ -1455,22 +1373,16 @@ static const EnumPropertyItem rna_enum_xr_axis1_flags[] = {
 static void rna_def_xr_actionmap_bindings(BlenderRNA *brna, PropertyRNA *cprop)
 {
   StructRNA *srna;
+  FunctionRNA *func;
+  PropertyRNA *parm;
 
   RNA_def_property_srna(cprop, "XrActionMapBindings");
   srna = RNA_def_struct(brna, "XrActionMapBindings", NULL);
   RNA_def_struct_sdna(srna, "XrActionMapItem");
   RNA_def_struct_ui_text(srna, "XR Action Map Bindings", "Collection of XR action map bindings");
 
-  RNA_api_xr_actionmapbindings(srna);
-}
-
-void RNA_api_xr_actionmapbindings(StructRNA *srna)
-{
-  FunctionRNA *func;
-  PropertyRNA *parm;
-
   func = RNA_def_function(srna, "new", "rna_XrActionMapBinding_new");
-  parm = RNA_def_string(func, "idname", NULL, 0, "Name of the action map binding", "");
+  parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name of the action map binding", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_boolean(func,
                          "replace_existing",
@@ -1497,32 +1409,29 @@ void RNA_api_xr_actionmapbindings(StructRNA *srna)
   RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 
   func = RNA_def_function(srna, "find", "rna_XrActionMapBinding_find");
-  parm = RNA_def_string(func, "name", NULL, XR_AMB_MAX_NAME, "Name", "");
+  parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_pointer(
-      func, "binding", "XrActionMapBinding", "Binding", "Corresponding action map binding");
+  parm = RNA_def_pointer(func,
+                         "binding",
+                         "XrActionMapBinding",
+                         "Binding",
+                         "The action map binding with the given name");
   RNA_def_function_return(func, parm);
 }
 
 static void rna_def_xr_actionmap_items(BlenderRNA *brna, PropertyRNA *cprop)
 {
   StructRNA *srna;
+  FunctionRNA *func;
+  PropertyRNA *parm;
 
   RNA_def_property_srna(cprop, "XrActionMapItems");
   srna = RNA_def_struct(brna, "XrActionMapItems", NULL);
   RNA_def_struct_sdna(srna, "XrActionMap");
   RNA_def_struct_ui_text(srna, "XR Action Map Items", "Collection of XR action map items");
 
-  RNA_api_xr_actionmapitems(srna);
-}
-
-void RNA_api_xr_actionmapitems(StructRNA *srna)
-{
-  FunctionRNA *func;
-  PropertyRNA *parm;
-
   func = RNA_def_function(srna, "new", "rna_XrActionMapItem_new");
-  parm = RNA_def_string(func, "idname", NULL, 0, "Name of the action map item", "");
+  parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name of the action map item", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_boolean(func,
                          "replace_existing",
@@ -1546,31 +1455,26 @@ void RNA_api_xr_actionmapitems(StructRNA *srna)
   RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 
   func = RNA_def_function(srna, "find", "rna_XrActionMapItem_find");
-  parm = RNA_def_string(func, "name", NULL, XR_AMI_MAX_NAME, "Name", "");
+  parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_pointer(func, "item", "XrActionMapItem", "Item", "Corresponding action map item");
+  parm = RNA_def_pointer(
+      func, "item", "XrActionMapItem", "Item", "The action map item with the given name");
   RNA_def_function_return(func, parm);
 }
 
 static void rna_def_xr_actionmaps(BlenderRNA *brna, PropertyRNA *cprop)
 {
   StructRNA *srna;
+  FunctionRNA *func;
+  PropertyRNA *parm;
 
   RNA_def_property_srna(cprop, "XrActionMaps");
   srna = RNA_def_struct(brna, "XrActionMaps", NULL);
   RNA_def_struct_sdna(srna, "XrActionConfig");
   RNA_def_struct_ui_text(srna, "XR Action Maps", "Collection of XR action maps");
 
-  RNA_api_xr_actionmaps(srna);
-}
-
-void RNA_api_xr_actionmaps(StructRNA *srna)
-{
-  FunctionRNA *func;
-  PropertyRNA *parm;
-
   func = RNA_def_function(srna, "new", "rna_XrActionMap_new");
-  parm = RNA_def_string(func, "name", NULL, XR_ACTIONMAP_MAX_NAME, "Name", "");
+  parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_boolean(func,
                          "replace_existing",
@@ -1595,17 +1499,18 @@ void RNA_api_xr_actionmaps(StructRNA *srna)
   RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 
   func = RNA_def_function(srna, "find", "rna_XrActionMap_find");
-  parm = RNA_def_string(func, "name", NULL, XR_ACTIONMAP_MAX_NAME, "Name", "");
+  parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(
-      func, "actionmap", "XrActionMap", "Action Map", "Corresponding action map");
+      func, "actionmap", "XrActionMap", "Action Map", "The action map with the given name");
   RNA_def_function_return(func, parm);
 }
 
 static void rna_def_xr_actionconfigs(BlenderRNA *brna, PropertyRNA *cprop)
 {
   StructRNA *srna;
-  PropertyRNA *prop;
+  FunctionRNA *func;
+  PropertyRNA *prop, *parm;
 
   RNA_def_property_srna(cprop, "XrActionConfigurations");
   srna = RNA_def_struct(brna, "XrActionConfigurations", NULL);
@@ -1644,16 +1549,8 @@ static void rna_def_xr_actionconfigs(BlenderRNA *brna, PropertyRNA *cprop)
                            "User XR Action Configuration",
                            "XR action configuration that can be extended by users");
 
-  RNA_api_xr_actionconfigs(srna);
-}
-
-void RNA_api_xr_actionconfigs(StructRNA *srna)
-{
-  FunctionRNA *func;
-  PropertyRNA *parm;
-
   func = RNA_def_function(srna, "new", "rna_XrActionConfig_new");
-  parm = RNA_def_string(func, "name", NULL, XR_ACTIONCONF_MAX_NAME, "Name", "");
+  parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func,
                          "actionconfig",
@@ -1683,11 +1580,9 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   /* XrActionConfig */
   srna = RNA_def_struct(brna, "XrActionConfig", NULL);
   RNA_def_struct_sdna(srna, "XrActionConfig");
-  RNA_def_struct_ui_text(
-      srna, "XR Action Configuration", "XR action configuration, including action maps");
+  RNA_def_struct_ui_text(srna, "XR Action Configuration", "");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "idname");
   RNA_def_property_ui_text(prop, "Name", "Name of the action configuration");
   RNA_def_struct_name_property(srna, prop);
 
@@ -1699,11 +1594,11 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "active_actionmap", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "actactionmap");
-  RNA_def_property_ui_text(prop, "Active Action Map", "Currently active action map");
+  RNA_def_property_ui_text(prop, "Active Action Map", "");
 
   prop = RNA_def_property(srna, "selected_actionmap", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "selactionmap");
-  RNA_def_property_ui_text(prop, "Selected Action Map", "Currently selected action map");
+  RNA_def_property_ui_text(prop, "Selected Action Map", "");
 
   prop = RNA_def_property(srna, "is_user_defined", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", KEYCONF_USER);
@@ -1714,10 +1609,9 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   /* XrActionMap */
   srna = RNA_def_struct(brna, "XrActionMap", NULL);
   RNA_def_struct_sdna(srna, "XrActionMap");
-  RNA_def_struct_ui_text(srna, "XR Action Map", "XR action map");
+  RNA_def_struct_ui_text(srna, "XR Action Map", "");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "idname");
   RNA_def_property_ui_text(prop, "Name", "Name of the action map");
   RNA_def_property_update(prop, 0, "rna_XrActionMap_name_update");
   RNA_def_struct_name_property(srna, prop);
@@ -1726,20 +1620,21 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   RNA_def_property_collection_sdna(prop, NULL, "items", NULL);
   RNA_def_property_struct_type(prop, "XrActionMapItem");
   RNA_def_property_ui_text(
-      prop, "Items", "Items in the actionmap, linking an operator to an XR action");
+      prop,
+      "Items",
+      "Items in the action map, mapping an XR event to an operator, pose, or haptic output");
   rna_def_xr_actionmap_items(brna, prop);
 
   prop = RNA_def_property(srna, "selected_item", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "selitem");
-  RNA_def_property_ui_text(prop, "Selected Item", "Currently selected item");
+  RNA_def_property_ui_text(prop, "Selected Item", "");
 
   /* XrActionMapItem */
   srna = RNA_def_struct(brna, "XrActionMapItem", NULL);
   RNA_def_struct_sdna(srna, "XrActionMapItem");
-  RNA_def_struct_ui_text(srna, "XR Action Map Item", "Item in an XR action map");
+  RNA_def_struct_ui_text(srna, "XR Action Map Item", "");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "idname");
   RNA_def_property_ui_text(prop, "Name", "Name of the action map item");
   RNA_def_property_update(prop, 0, "rna_XrActionMapItem_name_update");
   RNA_def_struct_name_property(srna, prop);
@@ -1776,34 +1671,32 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
       prop, "Operator Properties", "Properties to set when the operator is called");
   RNA_def_property_update(prop, 0, "rna_XrActionMapItem_update");
 
-  prop = RNA_def_property(srna, "op_flag", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "op_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "op_flag");
   RNA_def_property_enum_items(prop, rna_enum_xr_op_flags);
-  RNA_def_property_enum_funcs(
-      prop, "rna_XrActionMapItem_op_flag_get", "rna_XrActionMapItem_op_flag_set", NULL);
-  RNA_def_property_ui_text(prop, "Operator Flag", "Operator flag");
+  RNA_def_property_ui_text(prop, "Operator Mode", "Operator execution mode");
 
   prop = RNA_def_property(srna, "bimanual", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_funcs(
       prop, "rna_XrActionMapItem_bimanual_get", "rna_XrActionMapItem_bimanual_set");
   RNA_def_property_ui_text(
-      prop, "Bimanual", "Action depends on the states/poses of both user paths");
+      prop, "Bimanual", "The action depends on the states/poses of both user paths");
 
   prop = RNA_def_property(srna, "pose_is_controller_grip", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_funcs(prop,
                                  "rna_XrActionMapItem_pose_is_controller_grip_get",
                                  "rna_XrActionMapItem_pose_is_controller_grip_set");
   RNA_def_property_ui_text(
-      prop, "Is Controller Grip", "Pose will be used for the VR controller grips");
+      prop, "Is Controller Grip", "The action poses will be used for the VR controller grips");
 
   prop = RNA_def_property(srna, "pose_is_controller_aim", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_funcs(prop,
                                  "rna_XrActionMapItem_pose_is_controller_aim_get",
                                  "rna_XrActionMapItem_pose_is_controller_aim_set");
   RNA_def_property_ui_text(
-      prop, "Is Controller Aim", "Pose will be used for the VR controller aims");
+      prop, "Is Controller Aim", "The action poses will be used for the VR controller aims");
 
   prop = RNA_def_property(srna, "haptic_name", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "haptic_idname");
   RNA_def_property_ui_text(
       prop, "Haptic Name", "Name of the haptic action to apply when executing this action");
 
@@ -1812,26 +1705,33 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
                                  "rna_XrActionMapItem_haptic_match_user_paths_get",
                                  "rna_XrActionMapItem_haptic_match_user_paths_set");
   RNA_def_property_ui_text(
-      prop, "Haptic Match User Paths", "Whether to apply haptics to matching user paths");
+      prop,
+      "Haptic Match User Paths",
+      "Apply haptics to the same user paths for the haptic action and this action");
 
   prop = RNA_def_property(srna, "haptic_duration", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0.0, FLT_MAX);
-  RNA_def_property_ui_text(
-      prop, "Haptic Duration", "Haptic duration in seconds, 0 = minimum supported duration");
+  RNA_def_property_ui_text(prop,
+                           "Haptic Duration",
+                           "Haptic duration in seconds. 0.0 is the minimum supported duration");
 
   prop = RNA_def_property(srna, "haptic_frequency", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0.0, FLT_MAX);
-  RNA_def_property_ui_text(prop, "Haptic Frequency", "Haptic frequency, 0 = default frequency");
+  RNA_def_property_ui_text(prop,
+                           "Haptic Frequency",
+                           "Frequency of the haptic vibration in hertz. 0.0 specifies the OpenXR "
+                           "runtime's default frequency");
 
   prop = RNA_def_property(srna, "haptic_amplitude", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0.0, 1.0);
-  RNA_def_property_ui_text(prop, "Haptic Amplitude", "Haptic amplitude (0 ~ 1)");
+  RNA_def_property_ui_text(
+      prop, "Haptic Amplitude", "Intensity of the haptic vibration, ranging from 0.0 to 1.0");
 
-  prop = RNA_def_property(srna, "haptic_flag", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "haptic_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_xr_haptic_flags);
   RNA_def_property_enum_funcs(
-      prop, "rna_XrActionMapItem_haptic_flag_get", "rna_XrActionMapItem_haptic_flag_set", NULL);
-  RNA_def_property_ui_text(prop, "Haptic Flag", "Haptic flag");
+      prop, "rna_XrActionMapItem_haptic_mode_get", "rna_XrActionMapItem_haptic_mode_set", NULL);
+  RNA_def_property_ui_text(prop, "Haptic mode", "Haptic application mode");
 
   prop = RNA_def_property(srna, "bindings", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "XrActionMapBinding");
@@ -1846,10 +1746,11 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   /* XrActionMapBinding */
   srna = RNA_def_struct(brna, "XrActionMapBinding", NULL);
   RNA_def_struct_sdna(srna, "XrActionMapBinding");
-  RNA_def_struct_ui_text(srna, "XR Action Map Binding", "Binding in an XR action map item");
+  RNA_def_struct_ui_text(srna,
+                         "XR Action Map Binding",
+                         "Bindings for the action map item, mapping the action to an XR input");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "idname");
   RNA_def_property_ui_text(prop, "Name", "Name of the action map binding");
   RNA_def_property_update(prop, 0, "rna_XrActionMapBinding_name_update");
   RNA_def_struct_name_property(srna, prop);
@@ -1871,21 +1772,23 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.0, 1.0);
   RNA_def_property_ui_text(prop, "Input Threshold", "Input threshold for button/axis actions");
 
-  prop = RNA_def_property(srna, "axis0_flag", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "axis0_region", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_xr_axis0_flags);
   RNA_def_property_enum_funcs(prop,
-                              "rna_XrActionMapBinding_axis0_flag_get",
-                              "rna_XrActionMapBinding_axis0_flag_set",
+                              "rna_XrActionMapBinding_axis0_region_get",
+                              "rna_XrActionMapBinding_axis0_region_set",
                               NULL);
-  RNA_def_property_ui_text(prop, "Axis 0 Flag", "Axis 0 flag");
+  RNA_def_property_ui_text(
+      prop, "Axis 0 Region", "Action execution region for the first input axis");
 
-  prop = RNA_def_property(srna, "axis1_flag", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "axis1_region", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_xr_axis1_flags);
   RNA_def_property_enum_funcs(prop,
-                              "rna_XrActionMapBinding_axis1_flag_get",
-                              "rna_XrActionMapBinding_axis1_flag_set",
+                              "rna_XrActionMapBinding_axis1_region_get",
+                              "rna_XrActionMapBinding_axis1_region_set",
                               NULL);
-  RNA_def_property_ui_text(prop, "Axis 1 Flag", "Axis 1 flag");
+  RNA_def_property_ui_text(
+      prop, "Axis 1 Region", "Action execution region for the second input axis");
 
   prop = RNA_def_property(srna, "pose_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_ui_text(prop, "Pose Location Offset", "Pose location offset");
@@ -2190,24 +2093,45 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
 
-  func = RNA_def_function(srna, "create_action_set", "rna_XrSessionState_action_set_create");
+  func = RNA_def_function(srna, "action_set_create", "rna_XrSessionState_action_set_create");
   RNA_def_function_ui_description(func, "Create a VR action set");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_pointer(func, "actionmap", "XrActionMap", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_boolean(func,
-                         "set_active",
-                         false,
-                         "Set Active",
-                         "Set newly created action set as active one for the session");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_boolean(func, "result", 0, "Result", "");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "action_create", "rna_XrSessionState_action_create");
+  RNA_def_function_ui_description(func, "Create a VR action");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "actionmap", "XrActionMap", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "actionmap_item", "XrActionMapItem", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
   func = RNA_def_function(
-      srna, "set_active_action_set", "rna_XrSessionState_active_action_set_set");
+      srna, "action_binding_create", "rna_XrSessionState_action_binding_create");
+  RNA_def_function_ui_description(func, "Create a VR action binding");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "actionmap", "XrActionMap", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "actionmap_item", "XrActionMapItem", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "actionmap_binding", "XrActionMapBinding", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_boolean(func, "result", 0, "Result", "");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(
+      srna, "active_action_set_set", "rna_XrSessionState_active_action_set_set");
   RNA_def_function_ui_description(func, "Set the active VR action set");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
@@ -2218,7 +2142,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_function_return(func, parm);
 
   func = RNA_def_function(
-      srna, "set_controller_pose_actions", "rna_XrSessionState_controller_pose_actions_set");
+      srna, "controller_pose_actions_set", "rna_XrSessionState_controller_pose_actions_set");
   RNA_def_function_ui_description(func, "Set the actions that determine the VR controller poses");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
@@ -2230,19 +2154,19 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                         NULL,
                         64,
                         "Grip Action",
-                        "Action (name) representing the controller grips");
+                        "Name of the action representing the controller grips");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func,
                         "aim_action",
                         NULL,
                         64,
                         "Aim Action",
-                        "Action (name) representing the controller aims");
+                        "Name of the action representing the controller aims");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
-  func = RNA_def_function(srna, "get_action_state", "rna_XrSessionState_action_state_get");
+  func = RNA_def_function(srna, "action_state_get", "rna_XrSessionState_action_state_get");
   RNA_def_function_ui_description(func, "Get the current state of a VR action");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
@@ -2253,19 +2177,20 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path", NULL, 64, "User Path", "OpenXR user path");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_float_array(func,
-                             "state",
-                             7,
-                             NULL,
-                             -FLT_MAX,
-                             FLT_MAX,
-                             "Action state",
-                             "Current state of the VR action",
-                             -FLT_MAX,
-                             FLT_MAX);
+  parm = RNA_def_float_array(
+      func,
+      "state",
+      2,
+      NULL,
+      -FLT_MAX,
+      FLT_MAX,
+      "Action State",
+      "Current state of the VR action. Second float value is only set for 2D vector type actions",
+      -FLT_MAX,
+      FLT_MAX);
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_OUTPUT);
 
-  func = RNA_def_function(srna, "apply_haptic_action", "rna_XrSessionState_haptic_action_apply");
+  func = RNA_def_function(srna, "haptic_action_apply", "rna_XrSessionState_haptic_action_apply");
   RNA_def_function_ui_description(func, "Apply a VR haptic action");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
@@ -2275,7 +2200,12 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(
-      func, "user_path", NULL, 64, "User Path", "OpenXR user path, empty = apply to all paths");
+      func,
+      "user_path",
+      NULL,
+      64,
+      "User Path",
+      "Optional OpenXR user path. If not set, the action will be applied to all paths");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_float(func,
                        "duration",
@@ -2283,7 +2213,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                        0.0f,
                        FLT_MAX,
                        "Duration",
-                       "Haptic duration in seconds, 0 = minimum supported duration",
+                       "Haptic duration in seconds. 0.0 is the minimum supported duration",
                        0.0f,
                        FLT_MAX);
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
@@ -2293,17 +2223,25 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                        0.0f,
                        FLT_MAX,
                        "Frequency",
-                       "Haptic frequency, 0 = default frequency",
+                       "Frequency of the haptic vibration in hertz. 0.0 specifies the OpenXR "
+                       "runtime's default frequency",
                        0.0f,
                        FLT_MAX);
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  parm = RNA_def_float(
-      func, "amplitude", 1.0f, 0.0f, 1.0f, "Amplitude", "Haptic amplitude (0 ~ 1)", 0.0f, 1.0f);
+  parm = RNA_def_float(func,
+                       "amplitude",
+                       1.0f,
+                       0.0f,
+                       1.0f,
+                       "Amplitude",
+                       "Haptic amplitude, ranging from 0.0 to 1.0",
+                       0.0f,
+                       1.0f);
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
-  func = RNA_def_function(srna, "stop_haptic_action", "rna_XrSessionState_haptic_action_stop");
+  func = RNA_def_function(srna, "haptic_action_stop", "rna_XrSessionState_haptic_action_stop");
   RNA_def_function_ui_description(func, "Stop a VR haptic action");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
@@ -2313,8 +2251,101 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(
-      func, "user_path", NULL, 64, "User Path", "OpenXR user path, empty = stop all paths");
+      func,
+      "user_path",
+      NULL,
+      64,
+      "User Path",
+      "Optional OpenXR user path. If not set, the action will be stopped for all paths");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+
+  func = RNA_def_function(
+      srna, "controller_grip_location_get", "rna_XrSessionState_controller_grip_location_get");
+  RNA_def_function_ui_description(func,
+                                  "Get the last known controller grip location in world space");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_int(func, "index", 0, 0, 255, "Index", "Controller index", 0, 255);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float_translation(func,
+                                   "location",
+                                   3,
+                                   NULL,
+                                   -FLT_MAX,
+                                   FLT_MAX,
+                                   "Location",
+                                   "Controller grip location",
+                                   -FLT_MAX,
+                                   FLT_MAX);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_OUTPUT);
+
+  func = RNA_def_function(
+      srna, "controller_grip_rotation_get", "rna_XrSessionState_controller_grip_rotation_get");
+  RNA_def_function_ui_description(
+      func, "Get the last known controller grip rotation (quaternion) in world space");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_int(func, "index", 0, 0, 255, "Index", "Controller index", 0, 255);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float_vector(func,
+                              "rotation",
+                              4,
+                              NULL,
+                              -FLT_MAX,
+                              FLT_MAX,
+                              "Rotation",
+                              "Controller grip quaternion rotation",
+                              -FLT_MAX,
+                              FLT_MAX);
+  parm->subtype = PROP_QUATERNION;
+  RNA_def_property_ui_range(parm, -FLT_MAX, FLT_MAX, 1, 5);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_OUTPUT);
+
+  func = RNA_def_function(
+      srna, "controller_aim_location_get", "rna_XrSessionState_controller_aim_location_get");
+  RNA_def_function_ui_description(func,
+                                  "Get the last known controller aim location in world space");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_int(func, "index", 0, 0, 255, "Index", "Controller index", 0, 255);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float_translation(func,
+                                   "location",
+                                   3,
+                                   NULL,
+                                   -FLT_MAX,
+                                   FLT_MAX,
+                                   "Location",
+                                   "Controller aim location",
+                                   -FLT_MAX,
+                                   FLT_MAX);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_OUTPUT);
+
+  func = RNA_def_function(
+      srna, "controller_aim_rotation_get", "rna_XrSessionState_controller_aim_rotation_get");
+  RNA_def_function_ui_description(
+      func, "Get the last known controller aim rotation (quaternion) in world space");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_int(func, "index", 0, 0, 255, "Index", "Controller index", 0, 255);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float_vector(func,
+                              "rotation",
+                              4,
+                              NULL,
+                              -FLT_MAX,
+                              FLT_MAX,
+                              "Rotation",
+                              "Controller aim quaternion rotation",
+                              -FLT_MAX,
+                              FLT_MAX);
+  parm->subtype = PROP_QUATERNION;
+  RNA_def_property_ui_range(parm, -FLT_MAX, FLT_MAX, 1, 5);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_OUTPUT);
 
   prop = RNA_def_property(srna, "viewer_pose_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);
@@ -2333,78 +2364,6 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
       prop,
       "Viewer Pose Rotation",
       "Last known rotation of the viewer pose (center between the eyes) in world space");
-
-  prop = RNA_def_property(srna, "controller0_grip_location", PROP_FLOAT, PROP_TRANSLATION);
-  RNA_def_property_array(prop, 3);
-  RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller0_grip_location_get", NULL, NULL);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Controller 0 Grip Location",
-                           "Last known location of the first controller grip in world space");
-
-  prop = RNA_def_property(srna, "controller0_grip_rotation", PROP_FLOAT, PROP_QUATERNION);
-  RNA_def_property_array(prop, 4);
-  RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller0_grip_rotation_get", NULL, NULL);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Controller 0 Grip Rotation",
-                           "Last known rotation of the first controller grip in world space");
-
-  prop = RNA_def_property(srna, "controller0_aim_location", PROP_FLOAT, PROP_TRANSLATION);
-  RNA_def_property_array(prop, 3);
-  RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller0_aim_location_get", NULL, NULL);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Controller 0 Aim Location",
-                           "Last known location of the first controller aim in world space");
-
-  prop = RNA_def_property(srna, "controller0_aim_rotation", PROP_FLOAT, PROP_QUATERNION);
-  RNA_def_property_array(prop, 4);
-  RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller0_aim_rotation_get", NULL, NULL);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Controller 0 Aim Rotation",
-                           "Last known rotation of the first controller aim in world space");
-
-  prop = RNA_def_property(srna, "controller1_grip_location", PROP_FLOAT, PROP_TRANSLATION);
-  RNA_def_property_array(prop, 3);
-  RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller1_grip_location_get", NULL, NULL);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Controller 1 Grip Location",
-                           "Last known location of the second controller grip in world space");
-
-  prop = RNA_def_property(srna, "controller1_grip_rotation", PROP_FLOAT, PROP_QUATERNION);
-  RNA_def_property_array(prop, 4);
-  RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller1_grip_rotation_get", NULL, NULL);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Controller 1 Grip Rotation",
-                           "Last known rotation of the second controller grip in world space");
-
-  prop = RNA_def_property(srna, "controller1_aim_location", PROP_FLOAT, PROP_TRANSLATION);
-  RNA_def_property_array(prop, 3);
-  RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller1_aim_location_get", NULL, NULL);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Controller 1 Aim Location",
-                           "Last known location of the second controller aim in world space");
-
-  prop = RNA_def_property(srna, "controller1_aim_rotation", PROP_FLOAT, PROP_QUATERNION);
-  RNA_def_property_array(prop, 4);
-  RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller1_aim_rotation_get", NULL, NULL);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop,
-                           "Controller 1 Aim Rotation",
-                           "Last known rotation of the second controller aim in world space");
 
   prop = RNA_def_property(srna, "navigation_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);

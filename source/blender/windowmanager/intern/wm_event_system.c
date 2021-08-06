@@ -5048,7 +5048,7 @@ void wm_event_add_xrevent(const char *action_set_name,
 
   const bool add_win_event = ((action->ot->modal || action->ot->modal_3d) &&
                               ((val == KM_PRESS && !press_start) || val == KM_RELEASE));
-  const bool bimanual = (((action->flag & XR_ACTION_BIMANUAL) != 0) &&
+  const bool bimanual = (((action->action_flag & XR_ACTION_BIMANUAL) != 0) &&
                          (subaction_idx_other != subaction_idx));
 
   wmEvent _event;

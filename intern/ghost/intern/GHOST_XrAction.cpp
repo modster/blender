@@ -389,7 +389,7 @@ void GHOST_XrAction::applyHapticFeedback(XrSession session,
   haptic_info.action = m_action;
 
   if (subaction_path_str != nullptr) {
-    std::map<std::string, uint32_t>::iterator it = m_subaction_indices.find(*subaction_path_str);
+    SubactionIndexMap::iterator it = m_subaction_indices.find(*subaction_path_str);
     if (it != m_subaction_indices.end()) {
       haptic_info.subactionPath = m_subaction_paths[it->second];
       CHECK_XR(
@@ -415,7 +415,7 @@ void GHOST_XrAction::stopHapticFeedback(XrSession session,
   haptic_info.action = m_action;
 
   if (subaction_path_str != nullptr) {
-    std::map<std::string, uint32_t>::iterator it = m_subaction_indices.find(*subaction_path_str);
+    SubactionIndexMap::iterator it = m_subaction_indices.find(*subaction_path_str);
     if (it != m_subaction_indices.end()) {
       haptic_info.subactionPath = m_subaction_paths[it->second];
       CHECK_XR(xrStopHapticFeedback(session, &haptic_info),
@@ -540,11 +540,11 @@ uint32_t GHOST_XrActionSet::getActionCount() const
   return (uint32_t)m_actions.size();
 }
 
-void GHOST_XrActionSet::getActionCustomdatas(void **r_customdatas)
+void GHOST_XrActionSet::getActionCustomdataArray(void **r_customdata_array)
 {
   uint32_t i = 0;
   for (auto &[name, action] : m_actions) {
-    r_customdatas[i++] = action.getCustomdata();
+    r_customdata_array[i++] = action.getCustomdata();
   }
 }
 

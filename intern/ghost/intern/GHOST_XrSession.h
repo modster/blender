@@ -86,7 +86,7 @@ class GHOST_XrSession {
   void *getActionSetCustomdata(const char *action_set_name);
   void *getActionCustomdata(const char *action_set_name, const char *action_name);
   uint32_t getActionCount(const char *action_set_name);
-  void getActionCustomdatas(const char *action_set_name, void **r_customdatas);
+  void getActionCustomdataArray(const char *action_set_name, void **r_customdata_array);
 
   /** Controller model functions. */
   bool loadControllerModel(const char *subaction_path);

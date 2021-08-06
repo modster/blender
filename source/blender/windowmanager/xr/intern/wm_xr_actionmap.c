@@ -37,10 +37,10 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-#define XR_ACTIONCONF_STR_DEFAULT "blender"
-#define XR_ACTIONMAP_STR_DEFAULT "actionmap"
-#define XR_AMI_STR_DEFAULT "action"
-#define XR_AMB_STR_DEFAULT "binding"
+#define WM_XR_ACTIONCONF_STR_DEFAULT "blender"
+#define WM_XR_ACTIONMAP_STR_DEFAULT "actionmap"
+#define WM_XR_ACTIONMAP_ITEM_STR_DEFAULT "action"
+#define WM_XR_ACTIONMAP_BINDING_STR_DEFAULT "binding"
 
 /* Replacement for U.keyconfigstr for actionconfigs. */
 static char g_xr_actionconfigstr[64];
@@ -65,7 +65,7 @@ void WM_xr_actionconfig_update_tag(XrActionMap *actionmap, XrActionMapItem *ami)
     actionmap->flag |= XR_ACTIONMAP_UPDATE;
   }
   if (ami) {
-    ami->flag |= XR_AMI_UPDATE;
+    ami->flag |= XR_ACTIONMAP_ITEM_UPDATE;
   }
 }
 
@@ -88,23 +88,22 @@ static void wm_xr_actionconfig_update_all(bool ensure)
 #endif
 
 /* -------------------------------------------------------------------- */
-/** \name Actionmap Binding
+/** \name Action Map Binding
  *
- * Binding in a XR actionmap item, that maps an action to an XR input.
+ * Binding in an XR action map item, that maps an action to an XR input.
  * \{ */
 
 XrActionMapBinding *WM_xr_actionmap_binding_new(XrActionMapItem *ami,
                                                 const char *idname,
                                                 bool replace_existing)
 {
-  XrActionMapBinding *amb_prev = WM_xr_actionmap_binding_list_find(&ami->bindings, idname);
+  XrActionMapBinding *amb_prev = WM_xr_actionmap_binding_find(ami, idname);
   if (amb_prev && replace_existing) {
     return amb_prev;
   }
 
-  /* Create new binding. */
   XrActionMapBinding *amb = MEM_callocN(sizeof(XrActionMapBinding), __func__);
-  BLI_strncpy(amb->idname, idname, XR_AMB_MAX_NAME);
+  BLI_strncpy(amb->name, idname, MAX_NAME);
   if (amb_prev) {
     WM_xr_actionmap_binding_ensure_unique(ami, amb);
   }
@@ -117,45 +116,46 @@ XrActionMapBinding *WM_xr_actionmap_binding_new(XrActionMapItem *ami,
   return amb;
 }
 
-static XrActionMapBinding *wm_xr_actionmap_binding_list_find_except(ListBase *lb,
-                                                                    const char *idname,
-                                                                    XrActionMapBinding *ambexcept)
+static XrActionMapBinding *wm_xr_actionmap_binding_find_except(XrActionMapItem *ami,
+                                                               const char *name,
+                                                               XrActionMapBinding *ambexcept)
 {
-  LISTBASE_FOREACH (XrActionMapBinding *, amb, lb) {
-    if (STREQLEN(idname, amb->idname, XR_AMB_MAX_NAME) && (amb != ambexcept)) {
+  LISTBASE_FOREACH (XrActionMapBinding *, amb, &ami->bindings) {
+    if (STREQLEN(name, amb->name, MAX_NAME) && (amb != ambexcept)) {
       return amb;
     }
   }
-
   return NULL;
 }
 
+/**
+ * Ensure unique name among all action map bindings.
+ */
 void WM_xr_actionmap_binding_ensure_unique(XrActionMapItem *ami, XrActionMapBinding *amb)
 {
-  /* Ensure unique name. */
-  char name[XR_AMB_MAX_NAME];
+  char name[MAX_NAME];
   char *suffix;
   size_t baselen;
   size_t idx = 0;
 
-  BLI_strncpy(name, amb->idname, XR_AMB_MAX_NAME);
-  baselen = BLI_strnlen(name, XR_AMB_MAX_NAME);
+  BLI_strncpy(name, amb->name, MAX_NAME);
+  baselen = BLI_strnlen(name, MAX_NAME);
   suffix = &name[baselen];
 
-  while (wm_xr_actionmap_binding_list_find_except(&ami->bindings, name, amb)) {
-    if ((baselen + 1) + (log10(++idx) + 1) > XR_AMB_MAX_NAME) {
+  while (wm_xr_actionmap_binding_find_except(ami, name, amb)) {
+    if ((baselen + 1) + (log10(++idx) + 1) > MAX_NAME) {
       /* Use default base name. */
-      BLI_strncpy(name, XR_AMB_STR_DEFAULT, XR_AMB_MAX_NAME);
-      baselen = BLI_strnlen(name, XR_AMB_MAX_NAME);
+      BLI_strncpy(name, WM_XR_ACTIONMAP_BINDING_STR_DEFAULT, MAX_NAME);
+      baselen = BLI_strnlen(name, MAX_NAME);
       suffix = &name[baselen];
       idx = 0;
     }
     else {
-      BLI_snprintf(suffix, XR_AMB_MAX_NAME, "%zu", idx);
+      BLI_snprintf(suffix, MAX_NAME, "%zu", idx);
     }
   }
 
-  BLI_strncpy(amb->idname, name, XR_AMB_MAX_NAME);
+  BLI_strncpy(amb->name, name, MAX_NAME);
 }
 
 static XrActionMapBinding *wm_xr_actionmap_binding_copy(XrActionMapBinding *amb_src)
@@ -194,26 +194,26 @@ bool WM_xr_actionmap_binding_remove(XrActionMapItem *ami, XrActionMapBinding *am
 
     return true;
   }
+
   return false;
 }
 
-XrActionMapBinding *WM_xr_actionmap_binding_list_find(ListBase *lb, const char *idname)
+XrActionMapBinding *WM_xr_actionmap_binding_find(XrActionMapItem *ami, const char *name)
 {
-  LISTBASE_FOREACH (XrActionMapBinding *, amb, lb) {
-    if (STREQLEN(idname, amb->idname, XR_AMB_MAX_NAME)) {
+  LISTBASE_FOREACH (XrActionMapBinding *, amb, &ami->bindings) {
+    if (STREQLEN(name, amb->name, MAX_NAME)) {
       return amb;
     }
   }
-
   return NULL;
 }
 
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Actionmap Item
+/** \name Action Map Item
  *
- * Item in a XR actionmap, that maps an XR event to an operator, pose, or haptic output.
+ * Item in an XR action map, that maps an XR event to an operator, pose, or haptic output.
  * \{ */
 
 static void wm_xr_actionmap_item_properties_set(XrActionMapItem *ami)
@@ -272,7 +272,7 @@ static void wm_xr_actionmap_item_properties_update_ot_from_list(ListBase *am_lb,
     LISTBASE_FOREACH (XrActionMap *, am, am_lb) {
       LISTBASE_FOREACH (XrActionMapItem *, ami, &am->items) {
         WM_xr_actionmap_item_properties_update_ot(ami);
-        ami->flag &= ~XR_AMI_UPDATE;
+        ami->flag &= ~XR_ACTIONMAP_ITEM_UPDATE;
       }
       am->flag &= ~XR_ACTIONMAP_UPDATE;
     }
@@ -281,9 +281,9 @@ static void wm_xr_actionmap_item_properties_update_ot_from_list(ListBase *am_lb,
     LISTBASE_FOREACH (XrActionMap *, am, am_lb) {
       if ((am->flag & XR_ACTIONMAP_UPDATE) != 0) {
         LISTBASE_FOREACH (XrActionMapItem *, ami, &am->items) {
-          if ((ami->flag & XR_AMI_UPDATE) != 0) {
+          if ((ami->flag & XR_ACTIONMAP_ITEM_UPDATE) != 0) {
             WM_xr_actionmap_item_properties_update_ot(ami);
-            ami->flag &= ~XR_AMI_UPDATE;
+            ami->flag &= ~XR_ACTIONMAP_ITEM_UPDATE;
           }
         }
         am->flag &= ~XR_ACTIONMAP_UPDATE;
@@ -293,18 +293,17 @@ static void wm_xr_actionmap_item_properties_update_ot_from_list(ListBase *am_lb,
 }
 
 XrActionMapItem *WM_xr_actionmap_item_new(XrActionMap *actionmap,
-                                          const char *idname,
+                                          const char *name,
                                           bool replace_existing)
 {
-  XrActionMapItem *ami_prev = WM_xr_actionmap_item_list_find(&actionmap->items, idname);
+  XrActionMapItem *ami_prev = WM_xr_actionmap_item_find(actionmap, name);
   if (ami_prev && replace_existing) {
     WM_xr_actionmap_item_properties_free(ami_prev);
     return ami_prev;
   }
 
-  /* Create new item. */
   XrActionMapItem *ami = MEM_callocN(sizeof(XrActionMapItem), __func__);
-  BLI_strncpy(ami->idname, idname, XR_AMI_MAX_NAME);
+  BLI_strncpy(ami->name, name, MAX_NAME);
   if (ami_prev) {
     WM_xr_actionmap_item_ensure_unique(actionmap, ami);
   }
@@ -319,45 +318,46 @@ XrActionMapItem *WM_xr_actionmap_item_new(XrActionMap *actionmap,
   return ami;
 }
 
-static XrActionMapItem *wm_xr_actionmap_item_list_find_except(ListBase *lb,
-                                                              const char *idname,
-                                                              XrActionMapItem *amiexcept)
+static XrActionMapItem *wm_xr_actionmap_item_find_except(XrActionMap *actionmap,
+                                                         const char *name,
+                                                         XrActionMapItem *amiexcept)
 {
-  LISTBASE_FOREACH (XrActionMapItem *, ami, lb) {
-    if (STREQLEN(idname, ami->idname, XR_AMI_MAX_NAME) && (ami != amiexcept)) {
+  LISTBASE_FOREACH (XrActionMapItem *, ami, &actionmap->items) {
+    if (STREQLEN(name, ami->name, MAX_NAME) && (ami != amiexcept)) {
       return ami;
     }
   }
-
   return NULL;
 }
 
+/**
+ * Ensure unique name among all action map items.
+ */
 void WM_xr_actionmap_item_ensure_unique(XrActionMap *actionmap, XrActionMapItem *ami)
 {
-  /* Ensure unique name. */
-  char name[XR_AMI_MAX_NAME];
+  char name[MAX_NAME];
   char *suffix;
   size_t baselen;
   size_t idx = 0;
 
-  BLI_strncpy(name, ami->idname, XR_AMI_MAX_NAME);
-  baselen = BLI_strnlen(name, XR_AMI_MAX_NAME);
+  BLI_strncpy(name, ami->name, MAX_NAME);
+  baselen = BLI_strnlen(name, MAX_NAME);
   suffix = &name[baselen];
 
-  while (wm_xr_actionmap_item_list_find_except(&actionmap->items, name, ami)) {
-    if ((baselen + 1) + (log10(++idx) + 1) > XR_AMI_MAX_NAME) {
+  while (wm_xr_actionmap_item_find_except(actionmap, name, ami)) {
+    if ((baselen + 1) + (log10(++idx) + 1) > MAX_NAME) {
       /* Use default base name. */
-      BLI_strncpy(name, XR_AMI_STR_DEFAULT, XR_AMI_MAX_NAME);
-      baselen = BLI_strnlen(name, XR_AMI_MAX_NAME);
+      BLI_strncpy(name, WM_XR_ACTIONMAP_ITEM_STR_DEFAULT, MAX_NAME);
+      baselen = BLI_strnlen(name, MAX_NAME);
       suffix = &name[baselen];
       idx = 0;
     }
     else {
-      BLI_snprintf(suffix, XR_AMI_MAX_NAME, "%zu", idx);
+      BLI_snprintf(suffix, MAX_NAME, "%zu", idx);
     }
   }
 
-  BLI_strncpy(ami->idname, name, XR_AMI_MAX_NAME);
+  BLI_strncpy(ami->name, name, MAX_NAME);
 }
 
 static XrActionMapItem *wm_xr_actionmap_item_copy(XrActionMapItem *ami_src)
@@ -366,7 +366,7 @@ static XrActionMapItem *wm_xr_actionmap_item_copy(XrActionMapItem *ami_src)
 
   ami_dst->prev = ami_dst->next = NULL;
   BLI_listbase_clear(&ami_dst->bindings);
-  ami_dst->flag &= ~XR_AMI_UPDATE;
+  ami_dst->flag &= ~XR_ACTIONMAP_ITEM_UPDATE;
 
   LISTBASE_FOREACH (XrActionMapBinding *, amb, &ami_src->bindings) {
     XrActionMapBinding *amb_new = wm_xr_actionmap_binding_copy(amb);
@@ -420,41 +420,40 @@ bool WM_xr_actionmap_item_remove(XrActionMap *actionmap, XrActionMapItem *ami)
 
     return true;
   }
+
   return false;
 }
 
-XrActionMapItem *WM_xr_actionmap_item_list_find(ListBase *lb, const char *idname)
+XrActionMapItem *WM_xr_actionmap_item_find(XrActionMap *actionmap, const char *name)
 {
-  LISTBASE_FOREACH (XrActionMapItem *, ami, lb) {
-    if (STREQLEN(idname, ami->idname, XR_AMI_MAX_NAME)) {
+  LISTBASE_FOREACH (XrActionMapItem *, ami, &actionmap->items) {
+    if (STREQLEN(name, ami->name, MAX_NAME)) {
       return ami;
     }
   }
-
   return NULL;
 }
 
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Actionmap
+/** \name Action Map
  *
- * List of XR actionmap items.
+ * List of XR action map items.
  * \{ */
 
 XrActionMap *WM_xr_actionmap_new(XrActionConfig *actionconf,
-                                 const char *idname,
+                                 const char *name,
                                  bool replace_existing)
 {
-  XrActionMap *am_prev = WM_xr_actionmap_list_find(&actionconf->actionmaps, idname);
+  XrActionMap *am_prev = WM_xr_actionmap_find(actionconf, name);
   if (am_prev && replace_existing) {
     WM_xr_actionmap_clear(am_prev);
     return am_prev;
   }
 
-  /* Create new actionmap. */
   XrActionMap *am = MEM_callocN(sizeof(struct XrActionMap), __func__);
-  BLI_strncpy(am->idname, idname, XR_ACTIONMAP_MAX_NAME);
+  BLI_strncpy(am->name, name, MAX_NAME);
   if (am_prev) {
     WM_xr_actionmap_ensure_unique(actionconf, am);
   }
@@ -466,45 +465,46 @@ XrActionMap *WM_xr_actionmap_new(XrActionConfig *actionconf,
   return am;
 }
 
-static XrActionMap *wm_xr_actionmap_list_find_except(ListBase *lb,
-                                                     const char *idname,
-                                                     XrActionMap *am_except)
+static XrActionMap *wm_xr_actionmap_find_except(XrActionConfig *actionconf,
+                                                const char *name,
+                                                XrActionMap *am_except)
 {
-  LISTBASE_FOREACH (XrActionMap *, am, lb) {
-    if (STREQLEN(idname, am->idname, XR_ACTIONMAP_MAX_NAME) && (am != am_except)) {
+  LISTBASE_FOREACH (XrActionMap *, am, &actionconf->actionmaps) {
+    if (STREQLEN(name, am->name, MAX_NAME) && (am != am_except)) {
       return am;
     }
   }
-
   return NULL;
 }
 
+/**
+ * Ensure unique name among all action maps.
+ */
 void WM_xr_actionmap_ensure_unique(XrActionConfig *actionconf, XrActionMap *actionmap)
 {
-  /* Ensure unique name. */
-  char name[XR_ACTIONMAP_MAX_NAME];
+  char name[MAX_NAME];
   char *suffix;
   size_t baselen;
   size_t idx = 0;
 
-  BLI_strncpy(name, actionmap->idname, XR_ACTIONMAP_MAX_NAME);
-  baselen = BLI_strnlen(name, XR_ACTIONMAP_MAX_NAME);
+  BLI_strncpy(name, actionmap->name, MAX_NAME);
+  baselen = BLI_strnlen(name, MAX_NAME);
   suffix = &name[baselen];
 
-  while (wm_xr_actionmap_list_find_except(&actionconf->actionmaps, name, actionmap)) {
-    if ((baselen + 1) + (log10(++idx) + 1) > XR_ACTIONMAP_MAX_NAME) {
+  while (wm_xr_actionmap_find_except(actionconf, name, actionmap)) {
+    if ((baselen + 1) + (log10(++idx) + 1) > MAX_NAME) {
       /* Use default base name. */
-      BLI_strncpy(name, XR_ACTIONMAP_STR_DEFAULT, XR_ACTIONMAP_MAX_NAME);
-      baselen = BLI_strnlen(name, XR_ACTIONMAP_MAX_NAME);
+      BLI_strncpy(name, WM_XR_ACTIONMAP_STR_DEFAULT, MAX_NAME);
+      baselen = BLI_strnlen(name, MAX_NAME);
       suffix = &name[baselen];
       idx = 0;
     }
     else {
-      BLI_snprintf(suffix, XR_ACTIONMAP_MAX_NAME, "%zu", idx);
+      BLI_snprintf(suffix, MAX_NAME, "%zu", idx);
     }
   }
 
-  BLI_strncpy(actionmap->idname, name, XR_ACTIONMAP_MAX_NAME);
+  BLI_strncpy(actionmap->name, name, MAX_NAME);
 }
 
 static XrActionMap *wm_xr_actionmap_copy(XrActionMap *am_src)
@@ -557,17 +557,17 @@ bool WM_xr_actionmap_remove(XrActionConfig *actionconf, XrActionMap *actionmap)
 
     return true;
   }
+
   return false;
 }
 
-XrActionMap *WM_xr_actionmap_list_find(ListBase *lb, const char *idname)
+XrActionMap *WM_xr_actionmap_find(XrActionConfig *actionconf, const char *name)
 {
-  LISTBASE_FOREACH (XrActionMap *, am, lb) {
-    if (STREQLEN(idname, am->idname, XR_ACTIONMAP_MAX_NAME)) {
+  LISTBASE_FOREACH (XrActionMap *, am, &actionconf->actionmaps) {
+    if (STREQLEN(name, am->name, MAX_NAME)) {
       return am;
     }
   }
-
   return NULL;
 }
 
@@ -576,23 +576,22 @@ XrActionMap *WM_xr_actionmap_list_find(ListBase *lb, const char *idname)
 /* -------------------------------------------------------------------- */
 /** \name Action Configuration
  *
- * List of XR actionmaps.
+ * List of XR action maps.
  * \{ */
 
 XrActionConfig *WM_xr_actionconfig_new(XrSessionSettings *settings,
-                                       const char *idname,
+                                       const char *name,
                                        bool user_defined)
 {
   XrActionConfig *actionconf = BLI_findstring(
-      &settings->actionconfigs, idname, offsetof(XrActionConfig, idname));
+      &settings->actionconfigs, name, offsetof(XrActionConfig, name));
   if (actionconf) {
     WM_xr_actionconfig_clear(actionconf);
     return actionconf;
   }
 
-  /* Create new configuration. */
   actionconf = MEM_callocN(sizeof(XrActionConfig), __func__);
-  BLI_strncpy(actionconf->idname, idname, sizeof(actionconf->idname));
+  BLI_strncpy(actionconf->name, name, sizeof(actionconf->name));
   BLI_addtail(&settings->actionconfigs, actionconf);
 
   if (user_defined) {
@@ -605,9 +604,8 @@ XrActionConfig *WM_xr_actionconfig_new(XrSessionSettings *settings,
 bool WM_xr_actionconfig_remove(XrSessionSettings *settings, XrActionConfig *actionconf)
 {
   if (BLI_findindex(&settings->actionconfigs, actionconf) != -1) {
-    if (STREQLEN(g_xr_actionconfigstr, actionconf->idname, sizeof(g_xr_actionconfigstr))) {
-      BLI_strncpy(
-          g_xr_actionconfigstr, settings->defaultconf->idname, sizeof(g_xr_actionconfigstr));
+    if (STREQLEN(g_xr_actionconfigstr, actionconf->name, sizeof(g_xr_actionconfigstr))) {
+      BLI_strncpy(g_xr_actionconfigstr, settings->defaultconf->name, sizeof(g_xr_actionconfigstr));
       WM_xr_actionconfig_update_tag(NULL, NULL);
     }
 
@@ -616,6 +614,7 @@ bool WM_xr_actionconfig_remove(XrSessionSettings *settings, XrActionConfig *acti
 
     return true;
   }
+
   return false;
 }
 
@@ -625,7 +624,7 @@ XrActionConfig *WM_xr_actionconfig_active_get(XrSessionSettings *settings)
 
   /* First try from preset. */
   actionconf = BLI_findstring(
-      &settings->actionconfigs, g_xr_actionconfigstr, offsetof(XrActionConfig, idname));
+      &settings->actionconfigs, g_xr_actionconfigstr, offsetof(XrActionConfig, name));
   if (actionconf) {
     return actionconf;
   }
@@ -663,15 +662,16 @@ void WM_xr_actionconfig_init(bContext *C)
 
   /* Create standard action configs. */
   if (settings->defaultconf == NULL) {
-    settings->defaultconf = WM_xr_actionconfig_new(settings, XR_ACTIONCONF_STR_DEFAULT, false);
+    settings->defaultconf = WM_xr_actionconfig_new(settings, WM_XR_ACTIONCONF_STR_DEFAULT, false);
   }
   if (settings->addonconf == NULL) {
     settings->addonconf = WM_xr_actionconfig_new(
-        settings, XR_ACTIONCONF_STR_DEFAULT " addon", false);
+        settings, WM_XR_ACTIONCONF_STR_DEFAULT " addon", false);
   }
   if (settings->userconf == NULL) {
     /* Treat user config as user-defined so its actionmaps can be saved to files. */
-    settings->userconf = WM_xr_actionconfig_new(settings, XR_ACTIONCONF_STR_DEFAULT " user", true);
+    settings->userconf = WM_xr_actionconfig_new(
+        settings, WM_XR_ACTIONCONF_STR_DEFAULT " user", true);
   }
 }
 
@@ -714,4 +714,4 @@ void WM_xr_actionconfig_update(XrSessionSettings *settings)
   BLI_assert(g_xr_actionconfig_update_flag == 0);
 }
 
-/** \} */ /* XR-Action Configuration API */
+/** \} */

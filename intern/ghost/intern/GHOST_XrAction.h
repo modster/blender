@@ -18,8 +18,8 @@
  * \ingroup GHOST
  */
 
-/* Note: Requires OpenXR headers to be included before this one for OpenXR types (XrInstance,
- * XrSession, etc.). */
+/* NOTE: Requires OpenXR headers to be included before this one for OpenXR types
+ * (XrSpace, XrPath, etc.). */
 
 #pragma once
 
@@ -79,9 +79,9 @@ class GHOST_XrActionProfile {
  private:
   XrPath m_profile = XR_NULL_PATH;
 
-  /** Subaction data identified by user (subaction) path. */
+  /** Sub-action data identified by user `subaction` path. */
   std::map<std::string, GHOST_XrSubactionData> m_subaction_data;
-  /** Bindings identified by interaction (user (subaction) + component) path. */
+  /** Bindings identified by interaction (user `subaction` + component) path. */
   std::map<std::string, XrPath> m_bindings;
 };
 
@@ -114,9 +114,11 @@ class GHOST_XrAction {
   void getBindings(std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
 
  private:
+  using SubactionIndexMap = std::map<std::string, uint32_t>;
+
   XrAction m_action = XR_NULL_HANDLE;
   GHOST_XrActionType m_type;
-  std::map<std::string, uint32_t> m_subaction_indices;
+  SubactionIndexMap m_subaction_indices;
   std::vector<XrPath> m_subaction_paths;
   /** States for each subaction path. */
   void *m_states;
@@ -149,7 +151,7 @@ class GHOST_XrActionSet {
   XrActionSet getActionSet() const;
   void *getCustomdata();
   uint32_t getActionCount() const;
-  void getActionCustomdatas(void **r_customdatas);
+  void getActionCustomdataArray(void **r_customdata_array);
   void getBindings(std::map<XrPath, std::vector<XrActionSuggestedBinding>> &r_bindings) const;
 
  private:
