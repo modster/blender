@@ -70,7 +70,7 @@ typedef struct IDPropertyUIData {
 
 /* IDP_UI_DATA_TYPE_INT */
 typedef struct IDPropertyUIDataInt {
-  IDPropertyUIData generic_ui_data;
+  IDPropertyUIData base;
   int *default_array; /* Only for array properties. */
   int default_array_len;
   char _pad[4];
@@ -85,7 +85,7 @@ typedef struct IDPropertyUIDataInt {
 
 /* IDP_UI_DATA_TYPE_FLOAT */
 typedef struct IDPropertyUIDataFloat {
-  IDPropertyUIData generic_ui_data;
+  IDPropertyUIData base;
   double *default_array; /* Only for array properties. */
   int default_array_len;
   char _pad[4];
@@ -102,13 +102,13 @@ typedef struct IDPropertyUIDataFloat {
 
 /* IDP_UI_DATA_TYPE_STRING */
 typedef struct IDPropertyUIDataString {
-  IDPropertyUIData generic_ui_data;
+  IDPropertyUIData base;
   char *default_value;
 } IDPropertyUIDataString;
 
 /* IDP_UI_DATA_TYPE_ID */
 typedef struct IDPropertyUIDataID {
-  IDPropertyUIData generic_ui_data;
+  IDPropertyUIData base;
 } IDPropertyUIDataID;
 
 typedef struct IDPropertyData {

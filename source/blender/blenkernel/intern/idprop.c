@@ -1096,11 +1096,58 @@ IDProperty *IDP_New(const char type, const IDPropertyTemplate *val, const char *
   return prop;
 }
 
-void IDP_ui_data_free_contents(IDPropertyUIData *ui_data, const eIDPropertyUIDataType type)
+/**
+ * Free allocated pointers in the UI data that isn't shared with the UI data in the #other
+ * argument. Useful for returning early on failure when updating UI data in place, or when
+ * replacing a subset of the UI data's allocated pointers.
+ */
+void IDP_ui_data_free_unique_contents(IDPropertyUIData *ui_data,
+                                      const eIDPropertyUIDataType type,
+                                      const IDPropertyUIData *other)
 {
+  if (ui_data->description != other->description) {
+    MEM_SAFE_FREE(ui_data->description);
+  }
+
   switch (type) {
     case IDP_UI_DATA_TYPE_STRING: {
+      const IDPropertyUIDataString *other_string = (const IDPropertyUIDataString *)other;
       IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)ui_data;
+      if (ui_data_string->default_value != other_string->default_value) {
+        MEM_SAFE_FREE(ui_data_string->default_value);
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
+    case IDP_UI_DATA_TYPE_INT: {
+      const IDPropertyUIDataInt *other_int = (const IDPropertyUIDataInt *)other;
+      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
+      if (ui_data_int->default_array != other_int->default_array) {
+        MEM_SAFE_FREE(ui_data_int->default_array);
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      const IDPropertyUIDataFloat *other_float = (const IDPropertyUIDataFloat *)other;
+      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+      if (ui_data_float->default_array != other_float->default_array) {
+        MEM_SAFE_FREE(ui_data_float->default_array);
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      break;
+    }
+  }
+}
+
+void IDP_ui_data_free(IDProperty *prop)
+{
+  switch (IDP_ui_data_type(prop)) {
+    case IDP_UI_DATA_TYPE_STRING: {
+      IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)prop->ui_data;
       MEM_SAFE_FREE(ui_data_string->default_value);
       break;
     }
@@ -1108,12 +1155,12 @@ void IDP_ui_data_free_contents(IDPropertyUIData *ui_data, const eIDPropertyUIDat
       break;
     }
     case IDP_UI_DATA_TYPE_INT: {
-      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
+      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)prop->ui_data;
       MEM_SAFE_FREE(ui_data_int->default_array);
       break;
     }
     case IDP_UI_DATA_TYPE_FLOAT: {
-      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)prop->ui_data;
       MEM_SAFE_FREE(ui_data_float->default_array);
       break;
     }
@@ -1122,12 +1169,7 @@ void IDP_ui_data_free_contents(IDPropertyUIData *ui_data, const eIDPropertyUIDat
     }
   }
 
-  MEM_SAFE_FREE(ui_data->description);
-}
-
-void IDP_ui_data_free(IDProperty *prop)
-{
-  IDP_ui_data_free_contents(prop->ui_data, IDP_ui_data_type(prop));
+  MEM_SAFE_FREE(prop->ui_data->description);
 
   MEM_freeN(prop->ui_data);
   prop->ui_data = NULL;

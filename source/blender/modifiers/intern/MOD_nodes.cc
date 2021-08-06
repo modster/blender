@@ -297,7 +297,7 @@ static IDProperty *id_property_create_from_socket(const bNodeSocket &socket)
       idprop.f = value->value;
       IDProperty *property = IDP_New(IDP_FLOAT, &idprop, socket.identifier);
       IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(property);
-      ui_data->generic_ui_data.rna_subtype = value->subtype;
+      ui_data->base.rna_subtype = value->subtype;
       ui_data->min = ui_data->soft_min = (double)value->min;
       ui_data->max = ui_data->soft_max = (double)value->max;
       ui_data->default_value = value->value;
@@ -309,7 +309,7 @@ static IDProperty *id_property_create_from_socket(const bNodeSocket &socket)
       idprop.i = value->value;
       IDProperty *property = IDP_New(IDP_INT, &idprop, socket.identifier);
       IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(property);
-      ui_data->generic_ui_data.rna_subtype = value->subtype;
+      ui_data->base.rna_subtype = value->subtype;
       ui_data->min = ui_data->soft_min = value->min;
       ui_data->max = ui_data->soft_max = value->max;
       ui_data->default_value = value->value;
@@ -323,7 +323,7 @@ static IDProperty *id_property_create_from_socket(const bNodeSocket &socket)
       IDProperty *property = IDP_New(IDP_ARRAY, &idprop, socket.identifier);
       copy_v3_v3((float *)IDP_Array(property), value->value);
       IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(property);
-      ui_data->generic_ui_data.rna_subtype = value->subtype;
+      ui_data->base.rna_subtype = value->subtype;
       ui_data->min = ui_data->soft_min = (double)value->min;
       ui_data->max = ui_data->soft_max = (double)value->max;
       ui_data->default_array = (double *)MEM_mallocN(sizeof(double[3]), "mod_prop_default");

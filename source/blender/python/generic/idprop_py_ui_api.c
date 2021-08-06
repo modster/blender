@@ -103,7 +103,6 @@ static bool idprop_ui_data_update_int_default(IDProperty *idprop,
     }
 
     ui_data->default_array_len = len;
-    MEM_SAFE_FREE(ui_data->default_array);
     ui_data->default_array = new_default_array;
   }
   else {
@@ -145,10 +144,11 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
   }
 
   /* Write to a temporary copy of the UI data in case some part of the parsing fails. */
-  IDPropertyUIDataInt ui_data = *(IDPropertyUIDataInt *)idprop->ui_data;
+  IDPropertyUIDataInt *ui_data_orig = (IDPropertyUIDataInt *)idprop->ui_data;
+  IDPropertyUIDataInt ui_data = *ui_data_orig;
 
-  if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
-    IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_INT);
+  if (!idprop_ui_data_update_base(&ui_data.base, rna_subtype, description)) {
+    IDP_ui_data_free_unique_contents(&ui_data.base, IDP_ui_data_type(idprop), &ui_data_orig->base);
     return false;
   }
 
@@ -178,16 +178,22 @@ static bool idprop_ui_data_update_int(IDProperty *idprop, PyObject *args, PyObje
 
   if (!ELEM(default_value, NULL, Py_None)) {
     if (!idprop_ui_data_update_int_default(idprop, &ui_data, default_value)) {
-      IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_INT);
+      IDP_ui_data_free_unique_contents(
+          &ui_data.base, IDP_ui_data_type(idprop), &ui_data_orig->base);
       return false;
     }
   }
 
   /* Write back to the proeprty's UI data. */
-  *(IDPropertyUIDataInt *)idprop->ui_data = ui_data;
+  IDP_ui_data_free_unique_contents(&ui_data_orig->base, IDP_ui_data_type(idprop), &ui_data.base);
+  *ui_data_orig = ui_data;
   return true;
 }
 
+/**
+ * \note The default value needs special handling because for array IDProperties it can
+ * be a single value or an array, but for non-array properties it can only be a value.
+ */
 static bool idprop_ui_data_update_float_default(IDProperty *idprop,
                                                 IDPropertyUIDataFloat *ui_data,
                                                 PyObject *default_value)
@@ -211,7 +217,6 @@ static bool idprop_ui_data_update_float_default(IDProperty *idprop,
     }
 
     ui_data->default_array_len = len;
-    MEM_SAFE_FREE(ui_data->default_array);
     ui_data->default_array = new_default_array;
   }
   else {
@@ -263,10 +268,11 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
   }
 
   /* Write to a temporary copy of the UI data in case some part of the parsing fails. */
-  IDPropertyUIDataFloat ui_data = *(IDPropertyUIDataFloat *)idprop->ui_data;
+  IDPropertyUIDataFloat *ui_data_orig = (IDPropertyUIDataFloat *)idprop->ui_data;
+  IDPropertyUIDataFloat ui_data = *ui_data_orig;
 
-  if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
-    IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_FLOAT);
+  if (!idprop_ui_data_update_base(&ui_data.base, rna_subtype, description)) {
+    IDP_ui_data_free_unique_contents(&ui_data.base, IDP_ui_data_type(idprop), &ui_data_orig->base);
     return false;
   }
 
@@ -297,17 +303,17 @@ static bool idprop_ui_data_update_float(IDProperty *idprop, PyObject *args, PyOb
     ui_data.precision = precision;
   }
 
-  /* The default value needs special handling because for array IDProperties it can be a single
-   * value or an array, but for non-array properties it can only be a value. */
   if (!ELEM(default_value, NULL, Py_None)) {
     if (!idprop_ui_data_update_float_default(idprop, &ui_data, default_value)) {
-      IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_FLOAT);
+      IDP_ui_data_free_unique_contents(
+          &ui_data.base, IDP_ui_data_type(idprop), &ui_data_orig->base);
       return false;
     }
   }
 
   /* Write back to the proeprty's UI data. */
-  *(IDPropertyUIDataFloat *)idprop->ui_data = ui_data;
+  IDP_ui_data_free_unique_contents(&ui_data_orig->base, IDP_ui_data_type(idprop), &ui_data.base);
+  *ui_data_orig = ui_data;
   return true;
 }
 
@@ -331,20 +337,21 @@ static bool idprop_ui_data_update_string(IDProperty *idprop, PyObject *args, PyO
   }
 
   /* Write to a temporary copy of the UI data in case some part of the parsing fails. */
-  IDPropertyUIDataString ui_data = *(IDPropertyUIDataString *)idprop->ui_data;
+  IDPropertyUIDataString *ui_data_orig = (IDPropertyUIDataString *)idprop->ui_data;
+  IDPropertyUIDataString ui_data = *ui_data_orig;
 
-  if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
-    IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_STRING);
+  if (!idprop_ui_data_update_base(&ui_data.base, rna_subtype, description)) {
+    IDP_ui_data_free_unique_contents(&ui_data.base, IDP_ui_data_type(idprop), &ui_data_orig->base);
     return false;
   }
 
   if (default_value != NULL) {
-    MEM_SAFE_FREE(ui_data.default_value);
     ui_data.default_value = BLI_strdup(default_value);
   }
 
   /* Write back to the proeprty's UI data. */
-  *(IDPropertyUIDataString *)idprop->ui_data = ui_data;
+  IDP_ui_data_free_unique_contents(&ui_data_orig->base, IDP_ui_data_type(idprop), &ui_data.base);
+  *ui_data_orig = ui_data;
   return true;
 }
 
@@ -362,15 +369,17 @@ static bool idprop_ui_data_update_id(IDProperty *idprop, PyObject *args, PyObjec
   }
 
   /* Write to a temporary copy of the UI data in case some part of the parsing fails. */
-  IDPropertyUIDataID ui_data = *(IDPropertyUIDataID *)idprop->ui_data;
+  IDPropertyUIDataID *ui_data_orig = (IDPropertyUIDataID *)idprop->ui_data;
+  IDPropertyUIDataID ui_data = *ui_data_orig;
 
-  if (!idprop_ui_data_update_base((IDPropertyUIData *)&ui_data, rna_subtype, description)) {
-    IDP_ui_data_free_contents((IDPropertyUIData *)&ui_data, IDP_UI_DATA_TYPE_ID);
+  if (!idprop_ui_data_update_base(&ui_data.base, rna_subtype, description)) {
+    IDP_ui_data_free_unique_contents(&ui_data.base, IDP_ui_data_type(idprop), &ui_data_orig->base);
     return false;
   }
 
   /* Write back to the proeprty's UI data. */
-  *(IDPropertyUIDataID *)idprop->ui_data = ui_data;
+  IDP_ui_data_free_unique_contents(&ui_data_orig->base, IDP_ui_data_type(idprop), &ui_data.base);
+  *ui_data_orig = ui_data;
   return true;
 }
 

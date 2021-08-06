@@ -230,7 +230,9 @@ typedef enum eIDPropertyUIDataType {
 bool IDP_ui_data_supported(const struct IDProperty *prop);
 eIDPropertyUIDataType IDP_ui_data_type(const struct IDProperty *prop);
 void IDP_ui_data_free(struct IDProperty *prop);
-void IDP_ui_data_free_contents(struct IDPropertyUIData *ui_data, const eIDPropertyUIDataType type);
+void IDP_ui_data_free_unique_contents(struct IDPropertyUIData *ui_data,
+                                      eIDPropertyUIDataType type,
+                                      const struct IDPropertyUIData *other);
 struct IDPropertyUIData *IDP_ui_data_ensure(struct IDProperty *prop);
 struct IDPropertyUIData *IDP_ui_data_copy(const struct IDProperty *prop);
 
