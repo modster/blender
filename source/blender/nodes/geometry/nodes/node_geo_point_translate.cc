@@ -31,6 +31,7 @@ static bNodeSocketTemplate geo_node_point_translate_in[] = {
      FLT_MAX,
      PROP_TRANSLATION,
      SOCK_FIELD},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
     {-1, ""},
 };
 
@@ -49,6 +50,15 @@ static void execute_on_component(GeoNodeExecParams params, GeometryComponent &co
     return;
   }
 
+  bke::FieldRef<bool> selection_field = params.get_input_field<bool>("Selection");
+  bke::FieldInputs selection_field_inputs = selection_field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> selection_field_input_values;
+  prepare_field_inputs(
+      selection_field_inputs, component, ATTR_DOMAIN_POINT, selection_field_input_values);
+  bke::FieldOutput selection_field_output = selection_field->evaluate(
+      IndexRange(component.attribute_domain_size(ATTR_DOMAIN_POINT)), selection_field_inputs);
+  GVArray_Typed<bool> selection{selection_field_output.varray_ref()};
+
   bke::FieldRef<float3> field = params.get_input_field<float3>("Translation");
   bke::FieldInputs field_inputs = field->prepare_inputs();
   Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
@@ -59,7 +69,9 @@ static void execute_on_component(GeoNodeExecParams params, GeometryComponent &co
   GVArray_Typed<float3> translation{field_output.varray_ref()};
 
   for (const int i : IndexRange(translation.size())) {
-    position_attribute->set(i, position_attribute->get(i) + translation[i]);
+    if (selection[i]) {
+      position_attribute->set(i, position_attribute->get(i) + translation[i]);
+    }
   }
 
   position_attribute.save();
