@@ -144,6 +144,7 @@
 #include "DRW_engine.h"
 
 #include "BLO_read_write.h"
+#include "BLO_readfile.h"
 
 #include "SEQ_sequencer.h"
 
@@ -205,7 +206,8 @@ static void object_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const in
   }
   else if (ob_dst->mat != NULL || ob_dst->matbits != NULL) {
     /* This shall not be needed, but better be safe than sorry. */
-    BLI_assert(!"Object copy: non-NULL material pointers with zero counter, should not happen.");
+    BLI_assert_msg(
+        0, "Object copy: non-NULL material pointers with zero counter, should not happen.");
     ob_dst->mat = NULL;
     ob_dst->matbits = NULL;
   }
@@ -832,7 +834,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
 {
   Object *ob = (Object *)id;
 
-  bool warn = false;
+  BlendFileReadReport *reports = BLO_read_lib_reports(reader);
 
   /* XXX deprecated - old animation system <<< */
   BLO_read_id_address(reader, ob->id.lib, &ob->ipo);
@@ -850,8 +852,8 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
   else {
     if (ob->instance_collection != NULL) {
       ID *new_id = BLO_read_get_new_id_address(reader, ob->id.lib, &ob->instance_collection->id);
-      BLO_reportf_wrap(BLO_read_lib_reports(reader),
-                       RPT_WARNING,
+      BLO_reportf_wrap(reports,
+                       RPT_INFO,
                        TIP_("Non-Empty object '%s' cannot duplicate collection '%s' "
                             "anymore in Blender 2.80, removed instancing"),
                        ob->id.name + 2,
@@ -869,11 +871,17 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
       ob->proxy = NULL;
 
       if (ob->id.lib) {
-        printf("Proxy lost from  object %s lib %s\n", ob->id.name + 2, ob->id.lib->filepath);
+        BLO_reportf_wrap(reports,
+                         RPT_INFO,
+                         TIP_("Proxy lost from  object %s lib %s\n"),
+                         ob->id.name + 2,
+                         ob->id.lib->filepath);
       }
       else {
-        printf("Proxy lost from  object %s lib <NONE>\n", ob->id.name + 2);
+        BLO_reportf_wrap(
+            reports, RPT_INFO, TIP_("Proxy lost from  object %s lib <NONE>\n"), ob->id.name + 2);
       }
+      reports->count.missing_obproxies++;
     }
     else {
       /* this triggers object_update to always use a copy */
@@ -886,15 +894,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
   BLO_read_id_address(reader, ob->id.lib, &ob->data);
 
   if (ob->data == NULL && poin != NULL) {
-    if (ob->id.lib) {
-      printf("Can't find obdata of %s lib %s\n", ob->id.name + 2, ob->id.lib->filepath);
-    }
-    else {
-      printf("Object %s lost data.\n", ob->id.name + 2);
-    }
-
     ob->type = OB_EMPTY;
-    warn = true;
 
     if (ob->pose) {
       /* we can't call #BKE_pose_free() here because of library linking
@@ -910,6 +910,18 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
       ob->pose = NULL;
       ob->mode &= ~OB_MODE_POSE;
     }
+
+    if (ob->id.lib) {
+      BLO_reportf_wrap(reports,
+                       RPT_INFO,
+                       TIP_("Can't find obdata of %s lib %s\n"),
+                       ob->id.name + 2,
+                       ob->id.lib->filepath);
+    }
+    else {
+      BLO_reportf_wrap(reports, RPT_INFO, TIP_("Object %s lost data\n"), ob->id.name + 2);
+    }
+    reports->count.missing_obdata++;
   }
   for (int a = 0; a < ob->totcol; a++) {
     BLO_read_id_address(reader, ob->id.lib, &ob->mat[a]);
@@ -921,7 +933,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
     const short *totcol_data = BKE_object_material_len_p(ob);
     /* Only expand so as not to lose any object materials that might be set. */
     if (totcol_data && (*totcol_data > ob->totcol)) {
-      /* printf("'%s' %d -> %d\n", ob->id.name, ob->totcol, *totcol_data); */
+      // printf("'%s' %d -> %d\n", ob->id.name, ob->totcol, *totcol_data);
       BKE_object_material_resize(BLO_read_lib_get_main(reader), ob, *totcol_data, false);
     }
   }
@@ -990,10 +1002,6 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
   if (ob->rigidbody_constraint) {
     BLO_read_id_address(reader, ob->id.lib, &ob->rigidbody_constraint->ob1);
     BLO_read_id_address(reader, ob->id.lib, &ob->rigidbody_constraint->ob2);
-  }
-
-  if (warn) {
-    BLO_reportf_wrap(BLO_read_lib_reports(reader), RPT_WARNING, "Warning in console");
   }
 }
 
@@ -1532,7 +1540,8 @@ bool BKE_object_modifier_stack_copy(Object *ob_dst,
                                     const int flag_subdata)
 {
   if ((ob_dst->type == OB_GPENCIL) != (ob_src->type == OB_GPENCIL)) {
-    BLI_assert(!"Trying to copy a modifier stack between a GPencil object and another type.");
+    BLI_assert_msg(0,
+                   "Trying to copy a modifier stack between a GPencil object and another type.");
     return false;
   }
 
@@ -1651,7 +1660,7 @@ static void object_update_from_subsurf_ccg(Object *object)
    *
    * All this is defeating all the designs we need to follow to allow safe
    * threaded evaluation, but this is as good as we can make it within the
-   * current sculpt//evaluated mesh design. This is also how we've survived
+   * current sculpt/evaluated mesh design. This is also how we've survived
    * with old DerivedMesh based solutions. So, while this is all wrong and
    * needs reconsideration, doesn't seem to be a big stopper for real
    * production artists.
@@ -2071,6 +2080,12 @@ static void object_init(Object *ob, const short ob_type)
 
   if (ob->type == OB_GPENCIL) {
     ob->dtx |= OB_USE_GPENCIL_LIGHTS;
+  }
+
+  if (ob->type == OB_LAMP) {
+    /* Lights are invisible to camera rays and are assumed to be a
+     * shadow catcher by default. */
+    ob->visibility_flag |= OB_HIDE_CAMERA | OB_SHADOW_CATCHER;
   }
 }
 
@@ -3335,7 +3350,7 @@ static void give_parvert(Object *par, int nr, float vec[3])
           }
           BLI_mutex_unlock(&vparent_lock);
 #else
-          BLI_assert(!"Not safe for threading");
+          BLI_assert_msg(0, "Not safe for threading");
           BM_mesh_elem_table_ensure(em->bm, BM_VERT);
 #endif
         }
@@ -4032,10 +4047,7 @@ void BKE_object_empty_draw_type_set(Object *ob, const int value)
     }
   }
   else {
-    if (ob->iuser) {
-      MEM_freeN(ob->iuser);
-      ob->iuser = NULL;
-    }
+    MEM_SAFE_FREE(ob->iuser);
   }
 }
 

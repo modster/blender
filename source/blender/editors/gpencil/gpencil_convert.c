@@ -1409,7 +1409,7 @@ static void gpencil_layer_to_curve(bContext *C,
                                  gtd);
         break;
       default:
-        BLI_assert(!"invalid mode");
+        BLI_assert_msg(0, "invalid mode");
         break;
     }
     prev_gps = gps;
@@ -1588,14 +1588,8 @@ static int gpencil_convert_layer_exec(bContext *C, wmOperator *op)
       C, op->reports, gpd, gpl, mode, norm_weights, rad_fac, link_strokes, &gtd);
 
   /* free temp memory */
-  if (gtd.dists) {
-    MEM_freeN(gtd.dists);
-    gtd.dists = NULL;
-  }
-  if (gtd.times) {
-    MEM_freeN(gtd.times);
-    gtd.times = NULL;
-  }
+  MEM_SAFE_FREE(gtd.dists);
+  MEM_SAFE_FREE(gtd.times);
 
   /* notifiers */
   DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);

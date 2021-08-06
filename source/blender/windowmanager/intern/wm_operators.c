@@ -604,6 +604,12 @@ void WM_operator_properties_create(PointerRNA *ptr, const char *opstring)
  * used for keymaps and macros */
 void WM_operator_properties_alloc(PointerRNA **ptr, IDProperty **properties, const char *opstring)
 {
+  IDProperty *tmp_properties = NULL;
+  /* Allow passing NULL for properties, just create the properties here then. */
+  if (properties == NULL) {
+    properties = &tmp_properties;
+  }
+
   if (*properties == NULL) {
     IDPropertyTemplate val = {0};
     *properties = IDP_New(IDP_GROUP, &val, "wmOpItemProp");
@@ -2760,10 +2766,7 @@ static void radial_control_cancel(bContext *C, wmOperator *op)
   wmWindowManager *wm = CTX_wm_manager(C);
   ScrArea *area = CTX_wm_area(C);
 
-  if (rc->dial) {
-    MEM_freeN(rc->dial);
-    rc->dial = NULL;
-  }
+  MEM_SAFE_FREE(rc->dial);
 
   ED_area_status_text(area, NULL);
 
@@ -2953,10 +2956,7 @@ static int radial_control_modal(bContext *C, wmOperator *op, const wmEvent *even
       if (event->val == KM_RELEASE) {
         rc->slow_mode = false;
         handled = true;
-        if (rc->dial) {
-          MEM_freeN(rc->dial);
-          rc->dial = NULL;
-        }
+        MEM_SAFE_FREE(rc->dial);
       }
       break;
     }
@@ -3806,7 +3806,7 @@ static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)
       {0, NULL, 0, NULL, NULL},
   };
 
-  /* WARNING - name is incorrect, use for non-3d views */
+  /* WARNING: Name is incorrect, use for non-3d views. */
   wmKeyMap *keymap = WM_modalkeymap_find(keyconf, "View3D Gesture Circle");
 
   /* this function is called for each spacetype, only needs to add map once */

@@ -682,19 +682,13 @@ void BKE_area_region_free(SpaceType *st, ARegion *region)
   BKE_area_region_panels_free(&region->panels);
 
   LISTBASE_FOREACH (uiList *, uilst, &region->ui_lists) {
-    if (uilst->dyn_data) {
-      uiListDyn *dyn_data = uilst->dyn_data;
-      if (dyn_data->items_filter_flags) {
-        MEM_freeN(dyn_data->items_filter_flags);
-      }
-      if (dyn_data->items_filter_neworder) {
-        MEM_freeN(dyn_data->items_filter_neworder);
-      }
-      MEM_freeN(dyn_data);
+    if (uilst->dyn_data && uilst->dyn_data->free_runtime_data_fn) {
+      uilst->dyn_data->free_runtime_data_fn(uilst);
     }
     if (uilst->properties) {
       IDP_FreeProperty(uilst->properties);
     }
+    MEM_SAFE_FREE(uilst->dyn_data);
   }
 
   if (region->gizmo_map != NULL) {
@@ -772,7 +766,7 @@ void BKE_screen_remove_double_scrverts(bScreen *screen)
       while (v1) {
         if (v1->newv == NULL) { /* !?! */
           if (v1->vec.x == verg->vec.x && v1->vec.y == verg->vec.y) {
-            /* printf("doublevert\n"); */
+            // printf("doublevert\n");
             v1->newv = verg;
           }
         }

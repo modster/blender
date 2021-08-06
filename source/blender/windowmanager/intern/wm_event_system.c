@@ -61,6 +61,7 @@
 
 #include "BLT_translation.h"
 
+#include "ED_asset.h"
 #include "ED_fileselect.h"
 #include "ED_info.h"
 #include "ED_screen.h"
@@ -326,6 +327,7 @@ void WM_main_remap_editor_id_reference(ID *old_id, ID *new_id)
       }
     }
   }
+  ED_assetlist_storage_id_remap(old_id, new_id);
 
   wmWindowManager *wm = bmain->wm.first;
   if (wm && wm->message_bus) {
@@ -2849,8 +2851,7 @@ static int wm_handlers_do_intern(bContext *C, wmEvent *event, ListBase *handlers
             if (event->custom == EVT_DATA_DRAGDROP) {
               ListBase *lb = (ListBase *)event->customdata;
               LISTBASE_FOREACH (wmDrag *, drag, lb) {
-                const char *tooltip = NULL;
-                if (drop->poll(C, drag, event, &tooltip)) {
+                if (drop->poll(C, drag, event)) {
                   /* Optionally copy drag information to operator properties. Don't call it if the
                    * operator fails anyway, it might do more than just set properties (e.g.
                    * typically import an asset). */

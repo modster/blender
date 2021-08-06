@@ -114,6 +114,8 @@ struct bContext;
 struct wmEvent;
 struct wmOperator;
 struct wmWindowManager;
+struct wmDrag;
+struct wmDropBox;
 
 #include "BLI_compiler_attrs.h"
 #include "DNA_listBase.h"
@@ -438,6 +440,13 @@ typedef struct wmNotifier {
 #define ND_SPACE_CLIP (20 << 16)
 #define ND_SPACE_FILE_PREVIEW (21 << 16)
 #define ND_SPACE_SPREADSHEET (22 << 16)
+
+/* NC_ASSET */
+/* Denotes that the AssetList is done reading some previews. NOT that the preview generation of
+ * assets is done. */
+#define ND_ASSET_LIST (1 << 16)
+#define ND_ASSET_LIST_PREVIEW (2 << 16)
+#define ND_ASSET_LIST_READING (3 << 16)
 
 /* subtype, 256 entries too */
 #define NOTE_SUBTYPE 0x0000FF00
@@ -917,12 +926,20 @@ typedef struct wmDragID {
 } wmDragID;
 
 typedef struct wmDragAsset {
+  /* Note: Can't store the AssetHandle here, since the FileDirEntry it wraps may be freed while
+   * dragging. So store necessary data here directly. */
+
   char name[64]; /* MAX_NAME */
   /* Always freed. */
   const char *path;
   int id_type;
   int import_type; /* eFileAssetImportType */
 } wmDragAsset;
+
+typedef char *(*WMDropboxTooltipFunc)(struct bContext *,
+                                      struct wmDrag *,
+                                      const struct wmEvent *event,
+                                      struct wmDropBox *drop);
 
 typedef struct wmDrag {
   struct wmDrag *next, *prev;
@@ -939,8 +956,8 @@ typedef struct wmDrag {
   float scale;
   int sx, sy;
 
-  /** If set, draws operator name. */
-  char opname[200];
+  /** If filled, draws operator tooltip/operator name. */
+  char tooltip[200];
   unsigned int flags;
 
   /** List of wmDragIDs, all are guaranteed to have the same ID type. */
@@ -954,8 +971,8 @@ typedef struct wmDrag {
 typedef struct wmDropBox {
   struct wmDropBox *next, *prev;
 
-  /** Test if the dropbox is active, then can print optype name. */
-  bool (*poll)(struct bContext *, struct wmDrag *, const wmEvent *, const char **);
+  /** Test if the dropbox is active. */
+  bool (*poll)(struct bContext *, struct wmDrag *, const wmEvent *);
 
   /** Before exec, this copies drag info to #wmDrop properties. */
   void (*copy)(struct wmDrag *, struct wmDropBox *);
@@ -965,6 +982,9 @@ typedef struct wmDropBox {
    * `copy()` resources.
    */
   void (*cancel)(struct Main *, struct wmDrag *, struct wmDropBox *);
+
+  /** Custom tooltip shown during dragging. */
+  WMDropboxTooltipFunc tooltip;
 
   /**
    * If poll succeeds, operator is called.

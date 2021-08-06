@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software  Foundation,
+ * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * The Original Code is Copyright (C) 2005 by the Blender Foundation.
@@ -721,17 +721,17 @@ static void initialize_group_input(NodesModifierData &nmd,
     return;
   }
   if (nmd.settings.properties == nullptr) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+    socket.typeinfo->get_geometry_nodes_cpp_value(socket, r_value);
     return;
   }
   const IDProperty *property = IDP_GetPropertyFromGroup(nmd.settings.properties,
                                                         socket.identifier);
   if (property == nullptr) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+    socket.typeinfo->get_geometry_nodes_cpp_value(socket, r_value);
     return;
   }
   if (!property_type->is_correct_type(*property)) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+    socket.typeinfo->get_geometry_nodes_cpp_value(socket, r_value);
     return;
   }
   property_type->init_cpp_value(*property, r_value);
@@ -883,7 +883,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
 
     /* Initialize remaining group inputs. */
     for (const OutputSocketRef *socket : remaining_input_sockets) {
-      const CPPType &cpp_type = *blender::nodes::socket_cpp_type_get(*socket->typeinfo());
+      const CPPType &cpp_type = *socket->typeinfo()->get_geometry_nodes_cpp_type();
       void *value_in = allocator.allocate(cpp_type.size(), cpp_type.alignment());
       initialize_group_input(*nmd, *socket->bsocket(), cpp_type, value_in);
       group_inputs.add_new({root_context, socket}, {cpp_type, value_in});
@@ -1131,6 +1131,18 @@ static void panel_draw(const bContext *C, Panel *panel)
     LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->inputs) {
       draw_property_for_socket(layout, &bmain_ptr, ptr, nmd->settings.properties, *socket);
     }
+  }
+
+  /* Draw node warnings. */
+  if (nmd->runtime_eval_log != nullptr) {
+    const geo_log::ModifierLog &log = *static_cast<geo_log::ModifierLog *>(nmd->runtime_eval_log);
+    log.foreach_node_log([layout](const geo_log::NodeLog &node_log) {
+      for (const geo_log::NodeWarning &warning : node_log.warnings()) {
+        if (warning.type != geo_log::NodeWarningType::Info) {
+          uiItemL(layout, warning.message.c_str(), ICON_ERROR);
+        }
+      }
+    });
   }
 
   modifier_panel_end(layout, ptr);

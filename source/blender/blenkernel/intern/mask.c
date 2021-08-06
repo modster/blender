@@ -342,7 +342,7 @@ MaskSplinePoint *BKE_mask_spline_point_array_from_point(MaskSpline *spline,
     return spline->points_deform;
   }
 
-  BLI_assert(!"wrong array");
+  BLI_assert_msg(0, "wrong array");
   return NULL;
 }
 
@@ -429,7 +429,7 @@ MaskLayer *BKE_mask_layer_copy(const MaskLayer *masklay)
   masklay_new->blend_flag = masklay->blend_flag;
   masklay_new->flag = masklay->flag;
   masklay_new->falloff = masklay->falloff;
-  masklay_new->restrictflag = masklay->restrictflag;
+  masklay_new->visibility_flag = masklay->visibility_flag;
 
   for (spline = masklay->splines.first; spline; spline = spline->next) {
     MaskSpline *spline_new = BKE_mask_spline_copy(spline);
@@ -707,7 +707,7 @@ void BKE_mask_point_handle(const MaskSplinePoint *point,
     copy_v2_v2(r_handle, bezt->vec[2]);
   }
   else {
-    BLI_assert(!"Unknown handle passed to BKE_mask_point_handle");
+    BLI_assert_msg(0, "Unknown handle passed to BKE_mask_point_handle");
   }
 }
 
@@ -760,7 +760,7 @@ void BKE_mask_point_set_handle(MaskSplinePoint *point,
     copy_v2_v2(bezt->vec[2], loc);
   }
   else {
-    BLI_assert(!"unknown handle passed to BKE_mask_point_set_handle");
+    BLI_assert_msg(0, "unknown handle passed to BKE_mask_point_set_handle");
   }
 }
 
@@ -1003,7 +1003,7 @@ void BKE_mask_point_select_set_handle(MaskSplinePoint *point,
       point->bezt.f3 |= SELECT;
     }
     else {
-      BLI_assert(!"Wrong which_handle passed to BKE_mask_point_select_set_handle");
+      BLI_assert_msg(0, "Wrong which_handle passed to BKE_mask_point_select_set_handle");
     }
   }
   else {
@@ -1018,7 +1018,7 @@ void BKE_mask_point_select_set_handle(MaskSplinePoint *point,
       point->bezt.f3 &= ~SELECT;
     }
     else {
-      BLI_assert(!"Wrong which_handle passed to BKE_mask_point_select_set_handle");
+      BLI_assert_msg(0, "Wrong which_handle passed to BKE_mask_point_select_set_handle");
     }
   }
 }
@@ -2092,7 +2092,7 @@ void BKE_mask_clipboard_copy_from_layer(MaskLayer *mask_layer)
   MaskSpline *spline;
 
   /* Nothing to do if selection if disabled for the given layer. */
-  if (mask_layer->restrictflag & MASK_RESTRICT_SELECT) {
+  if (mask_layer->visibility_flag & MASK_HIDE_SELECT) {
     return;
   }
 

@@ -335,6 +335,9 @@ static void gpencil_primitive_set_initdata(bContext *C, tGPDprimitive *tgpi)
   gps->uv_scale = 1.0f;
   gps->inittime = 0.0f;
 
+  /* Set stroke caps. */
+  gps->caps[0] = gps->caps[1] = brush->gpencil_settings->caps_type;
+
   /* Apply the vertex color to fill. */
   ED_gpencil_fill_vertex_color_set(ts, brush, gps);
 
@@ -1316,8 +1319,7 @@ static void gpencil_primitive_interaction_end(bContext *C,
   BrushGpencilSettings *brush_settings = brush->gpencil_settings;
 
   const int def_nr = tgpi->gpd->vertex_group_active_index - 1;
-  const ListBase *defbase = BKE_object_defgroup_list(tgpi->ob);
-  const bool have_weight = (bool)BLI_findlink(defbase, def_nr);
+  const bool have_weight = BLI_findlink(&tgpi->gpd->vertex_group_names, def_nr) != NULL;
 
   /* return to normal cursor and header status */
   ED_workspace_status_text(C, NULL);

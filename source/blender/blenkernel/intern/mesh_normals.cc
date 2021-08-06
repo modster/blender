@@ -63,6 +63,12 @@ static CLG_LogRef LOG = {"bke.mesh_normals"};
 /** \name Mesh Normal Calculation
  * \{ */
 
+void BKE_mesh_normals_tag_dirty(Mesh *mesh)
+{
+  mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  mesh->runtime.cd_dirty_poly |= CD_MASK_NORMAL;
+}
+
 /**
  * Call when there are no polygons.
  */
@@ -530,6 +536,36 @@ void BKE_lnor_spacearr_init(MLoopNorSpaceArray *lnors_spacearr,
   lnors_spacearr->data_type = data_type;
 }
 
+/**
+ * Utility for multi-threaded calculation that ensures
+ * `lnors_spacearr_tls` doesn't share memory with `lnors_spacearr`
+ * that would cause it not to be thread safe.
+ *
+ * \note This works as long as threads never operate on the same loops at once.
+ */
+void BKE_lnor_spacearr_tls_init(MLoopNorSpaceArray *lnors_spacearr,
+                                MLoopNorSpaceArray *lnors_spacearr_tls)
+{
+  *lnors_spacearr_tls = *lnors_spacearr;
+  lnors_spacearr_tls->mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
+}
+
+/**
+ * Utility for multi-threaded calculation
+ * that merges `lnors_spacearr_tls` into `lnors_spacearr`.
+ */
+void BKE_lnor_spacearr_tls_join(MLoopNorSpaceArray *lnors_spacearr,
+                                MLoopNorSpaceArray *lnors_spacearr_tls)
+{
+  BLI_assert(lnors_spacearr->data_type == lnors_spacearr_tls->data_type);
+  BLI_assert(lnors_spacearr->mem != lnors_spacearr_tls->mem);
+  lnors_spacearr->num_spaces += lnors_spacearr_tls->num_spaces;
+  BLI_memarena_merge(lnors_spacearr->mem, lnors_spacearr_tls->mem);
+  BLI_memarena_free(lnors_spacearr_tls->mem);
+  lnors_spacearr_tls->mem = nullptr;
+  BKE_lnor_spacearr_clear(lnors_spacearr_tls);
+}
+
 void BKE_lnor_spacearr_clear(MLoopNorSpaceArray *lnors_spacearr)
 {
   lnors_spacearr->num_spaces = 0;
@@ -951,7 +987,7 @@ void BKE_edges_sharp_from_angle_set(const struct MVert *mverts,
   /* Simple mapping from a loop to its polygon index. */
   int *loop_to_poly = (int *)MEM_malloc_arrayN((size_t)numLoops, sizeof(*loop_to_poly), __func__);
 
-  LoopSplitTaskDataCommon common_data;
+  LoopSplitTaskDataCommon common_data = {};
   common_data.mverts = mverts;
   common_data.medges = medges;
   common_data.mloops = mloops;
@@ -1159,7 +1195,7 @@ static void split_loop_nor_fan_do(LoopSplitTaskDataCommon *common_data, LoopSpli
     }
   }
 
-  //  printf("FAN: vert %d, start edge %d\n", mv_pivot_index, ml_curr->e);
+  // printf("FAN: vert %d, start edge %d\n", mv_pivot_index, ml_curr->e);
 
   while (true) {
     const MEdge *me_curr = &medges[mlfan_curr->e];
@@ -1176,7 +1212,7 @@ static void split_loop_nor_fan_do(LoopSplitTaskDataCommon *common_data, LoopSpli
       normalize_v3(vec_curr);
     }
 
-    //      printf("\thandling edge %d / loop %d\n", mlfan_curr->e, mlfan_curr_index);
+    // printf("\thandling edge %d / loop %d\n", mlfan_curr->e, mlfan_curr_index);
 
     {
       /* Code similar to accumulate_vertex_normals_poly_v3. */
@@ -1216,9 +1252,8 @@ static void split_loop_nor_fan_do(LoopSplitTaskDataCommon *common_data, LoopSpli
 
     if (IS_EDGE_SHARP(e2lfan_curr) || (me_curr == me_org)) {
       /* Current edge is sharp and we have finished with this fan of faces around this vert,
-       * or this vert is smooth, and we have completed a full turn around it.
-       */
-      //          printf("FAN: Finished!\n");
+       * or this vert is smooth, and we have completed a full turn around it. */
+      // printf("FAN: Finished!\n");
       break;
     }
 
@@ -1501,12 +1536,12 @@ static void loop_split_generator(TaskPool *pool, LoopSplitTaskDataCommon *common
                                                                                      ml_curr_index,
                                                                                      ml_prev_index,
                                                                                      mp_index))) {
-        //              printf("SKIPPING!\n");
+        // printf("SKIPPING!\n");
       }
       else {
         LoopSplitTaskData *data, data_local;
 
-        //              printf("PROCESSING!\n");
+        // printf("PROCESSING!\n");
 
         if (pool) {
           if (data_idx == 0) {

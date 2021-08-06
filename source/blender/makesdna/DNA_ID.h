@@ -429,7 +429,8 @@ typedef struct PreviewImage {
  * BKE_library_override typically (especially due to the check on LIB_TAG_EXTERN). */
 #define ID_IS_OVERRIDABLE_LIBRARY(_id) \
   (ID_IS_LINKED(_id) && !ID_MISSING(_id) && (((const ID *)(_id))->tag & LIB_TAG_EXTERN) != 0 && \
-   (BKE_idtype_get_info_from_id((const ID *)(_id))->flags & IDTYPE_FLAGS_NO_LIBLINKING) == 0)
+   (BKE_idtype_get_info_from_id((const ID *)(_id))->flags & IDTYPE_FLAGS_NO_LIBLINKING) == 0 && \
+   !ELEM(GS(((ID *)(_id))->name), ID_SCE))
 
 /* NOTE: The three checks below do not take into account whether given ID is linked or not (when
  * chaining overrides over several libraries). User must ensure the ID is not linked itself
@@ -621,9 +622,9 @@ typedef enum IDRecalcFlag {
    * When a collection gets tagged with this flag, all objects depending on the geometry and
    * transforms on any of the objects in the collection are updated. */
   ID_RECALC_GEOMETRY = (1 << 1),
-  /* Same as #ID_RECALC_GEOMETRY, but instead of tagging the batch cache as `dirty_all`, just tags
-     what matches the deform cache. */
-  ID_RECALC_GEOMETRY_DEFORM = (1 << 2),
+
+  /* ** Animation or time changed and animation is to be re-evaluated. ** */
+  ID_RECALC_ANIMATION = (1 << 2),
 
   /* ** Particle system changed. ** */
   /* Only do pathcache etc. */
@@ -682,9 +683,6 @@ typedef enum IDRecalcFlag {
    * this has the advantage that large arrays stored in the idea data don't
    * have to be copied on every update. */
   ID_RECALC_PARAMETERS = (1 << 21),
-
-  /* ** Animation or time changed and animation is to be re-evaluated. ** */
-  ID_RECALC_ANIMATION = (1 << 22),
 
   /* Input has changed and datablock is to be reload from disk.
    * Applies to movie clips to inform that copy-on-written version is to be refreshed for the new

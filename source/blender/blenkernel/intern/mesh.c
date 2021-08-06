@@ -312,7 +312,7 @@ static void mesh_blend_read_data(BlendDataReader *reader, ID *id)
     mesh->totselect = 0;
   }
 
-  if ((BLO_read_requires_endian_switch(reader)) && mesh->tface) {
+  if (BLO_read_requires_endian_switch(reader) && mesh->tface) {
     TFace *tf = mesh->tface;
     for (int i = 0; i < mesh->totface; i++, tf++) {
       BLI_endian_switch_uint32_array(tf->col, 4);
@@ -389,6 +389,7 @@ enum {
   MESHCMP_EDGEUNKNOWN,
   MESHCMP_VERTCOMISMATCH,
   MESHCMP_CDLAYERS_MISMATCH,
+  MESHCMP_ATTRIBUTE_VALUE_MISMATCH,
 };
 
 static const char *cmpcode_to_str(int code)
@@ -416,6 +417,8 @@ static const char *cmpcode_to_str(int code)
       return "Vertex Coordinate Mismatch";
     case MESHCMP_CDLAYERS_MISMATCH:
       return "CustomData Layer Count Mismatch";
+    case MESHCMP_ATTRIBUTE_VALUE_MISMATCH:
+      return "Attribute Value Mismatch";
     default:
       return "Mesh Comparison Code Unknown";
   }
@@ -423,13 +426,13 @@ static const char *cmpcode_to_str(int code)
 
 /** Thresh is threshold for comparing vertices, UV's, vertex colors, weights, etc. */
 static int customdata_compare(
-    CustomData *c1, CustomData *c2, Mesh *m1, Mesh *m2, const float thresh)
+    CustomData *c1, CustomData *c2, const int total_length, Mesh *m1, Mesh *m2, const float thresh)
 {
   const float thresh_sq = thresh * thresh;
   CustomDataLayer *l1, *l2;
-  int i, i1 = 0, i2 = 0, tot, j;
+  int i1 = 0, i2 = 0, tot, j;
 
-  for (i = 0; i < c1->totlayer; i++) {
+  for (int i = 0; i < c1->totlayer; i++) {
     if (ELEM(c1->layers[i].type,
              CD_MVERT,
              CD_MEDGE,
@@ -441,7 +444,7 @@ static int customdata_compare(
     }
   }
 
-  for (i = 0; i < c2->totlayer; i++) {
+  for (int i = 0; i < c2->totlayer; i++) {
     if (ELEM(c2->layers[i].type,
              CD_MVERT,
              CD_MEDGE,
@@ -459,10 +462,84 @@ static int customdata_compare(
 
   l1 = c1->layers;
   l2 = c2->layers;
+
+  for (i1 = 0; i1 < c1->totlayer; i1++) {
+    l1 = c1->layers + i1;
+    if ((CD_TYPE_AS_MASK(l1->type) & CD_MASK_PROP_ALL) == 0) {
+      /* Skip non generic attribute layers. */
+      continue;
+    }
+
+    bool found_corresponding_layer = false;
+    for (i2 = 0; i2 < c2->totlayer; i2++) {
+      l2 = c2->layers + i2;
+      if (l1->type != l2->type || !STREQ(l1->name, l2->name)) {
+        continue;
+      }
+      found_corresponding_layer = true;
+      /* At this point `l1` and `l2` have the same name and type, so they should be compared. */
+
+      switch (l1->type) {
+
+        case CD_PROP_FLOAT: {
+          const float *l1_data = l1->data;
+          const float *l2_data = l2->data;
+
+          for (int i = 0; i < total_length; i++) {
+            if (fabsf(l1_data[i] - l2_data[i]) > thresh) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+          }
+          break;
+        }
+        case CD_PROP_FLOAT2: {
+          const float(*l1_data)[2] = l1->data;
+          const float(*l2_data)[2] = l2->data;
+
+          for (int i = 0; i < total_length; i++) {
+            if (len_squared_v2v2(l1_data[i], l2_data[i]) > thresh_sq) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+          }
+          break;
+        }
+        case CD_PROP_FLOAT3: {
+          const float(*l1_data)[3] = l1->data;
+          const float(*l2_data)[3] = l2->data;
+
+          for (int i = 0; i < total_length; i++) {
+            if (len_squared_v3v3(l1_data[i], l2_data[i]) > thresh_sq) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+          }
+          break;
+        }
+        default: {
+          int element_size = CustomData_sizeof(l1->type);
+          for (int i = 0; i < total_length; i++) {
+            int offset = element_size * i;
+            if (!CustomData_data_equals(l1->type,
+                                        POINTER_OFFSET(l1->data, offset),
+                                        POINTER_OFFSET(l2->data, offset))) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    if (!found_corresponding_layer) {
+      return MESHCMP_CDLAYERS_MISMATCH;
+    }
+  }
+
+  l1 = c1->layers;
+  l2 = c2->layers;
   tot = i1;
   i1 = 0;
   i2 = 0;
-  for (i = 0; i < tot; i++) {
+  for (int i = 0; i < tot; i++) {
     while (
         i1 < c1->totlayer &&
         !ELEM(l1->type, CD_MVERT, CD_MEDGE, CD_MPOLY, CD_MLOOPUV, CD_MLOOPCOL, CD_MDEFORMVERT)) {
@@ -626,19 +703,19 @@ const char *BKE_mesh_cmp(Mesh *me1, Mesh *me2, float thresh)
     return "Number of loops don't match";
   }
 
-  if ((c = customdata_compare(&me1->vdata, &me2->vdata, me1, me2, thresh))) {
+  if ((c = customdata_compare(&me1->vdata, &me2->vdata, me1->totvert, me1, me2, thresh))) {
     return cmpcode_to_str(c);
   }
 
-  if ((c = customdata_compare(&me1->edata, &me2->edata, me1, me2, thresh))) {
+  if ((c = customdata_compare(&me1->edata, &me2->edata, me1->totedge, me1, me2, thresh))) {
     return cmpcode_to_str(c);
   }
 
-  if ((c = customdata_compare(&me1->ldata, &me2->ldata, me1, me2, thresh))) {
+  if ((c = customdata_compare(&me1->ldata, &me2->ldata, me1->totloop, me1, me2, thresh))) {
     return cmpcode_to_str(c);
   }
 
-  if ((c = customdata_compare(&me1->pdata, &me2->pdata, me1, me2, thresh))) {
+  if ((c = customdata_compare(&me1->pdata, &me2->pdata, me1->totpoly, me1, me2, thresh))) {
     return cmpcode_to_str(c);
   }
 
@@ -932,10 +1009,6 @@ void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
   copy_v3_v3(me_dst->loc, me_src->loc);
   copy_v3_v3(me_dst->size, me_src->size);
 
-  /* Some callers call this on existing meshes, so free the existing vertex groups first. */
-  BLI_freelistN(&me_dst->vertex_group_names);
-  BKE_defgroup_copy_list(&me_dst->vertex_group_names, &me_src->vertex_group_names);
-
   me_dst->vertex_group_active_index = me_src->vertex_group_active_index;
 }
 
@@ -951,6 +1024,10 @@ void BKE_mesh_copy_parameters_for_eval(Mesh *me_dst, const Mesh *me_src)
   BLI_assert(me_dst->id.tag & (LIB_TAG_NO_MAIN | LIB_TAG_COPIED_ON_WRITE));
 
   BKE_mesh_copy_parameters(me_dst, me_src);
+
+  /* Copy vertex group names. */
+  BLI_assert(BLI_listbase_is_empty(&me_dst->vertex_group_names));
+  BKE_defgroup_copy_list(&me_dst->vertex_group_names, &me_src->vertex_group_names);
 
   /* Copy materials. */
   if (me_dst->mat != NULL) {
@@ -1621,10 +1698,7 @@ void BKE_mesh_do_versions_cd_flag_init(Mesh *mesh)
 
 void BKE_mesh_mselect_clear(Mesh *me)
 {
-  if (me->mselect) {
-    MEM_freeN(me->mselect);
-    me->mselect = NULL;
-  }
+  MEM_SAFE_FREE(me->mselect);
   me->totselect = 0;
 }
 
@@ -1874,6 +1948,8 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
   }
 
   mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
+  mesh->runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
+  mesh->runtime.cd_dirty_loop &= ~CD_MASK_NORMAL;
 }
 
 void BKE_mesh_calc_normals_split(Mesh *mesh)

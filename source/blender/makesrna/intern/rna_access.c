@@ -36,6 +36,7 @@
 #include "BLI_dynstr.h"
 #include "BLI_ghash.h"
 #include "BLI_math.h"
+#include "BLI_threads.h"
 #include "BLI_utildefines.h"
 
 #include "BLF_api.h"
@@ -3676,6 +3677,8 @@ PointerRNA RNA_property_pointer_get(PointerRNA *ptr, PropertyRNA *prop)
   PointerPropertyRNA *pprop = (PointerPropertyRNA *)prop;
   IDProperty *idprop;
 
+  static ThreadMutex lock = BLI_MUTEX_INITIALIZER;
+
   BLI_assert(RNA_property_type(prop) == PROP_POINTER);
 
   if ((idprop = rna_idproperty_check(&prop, ptr))) {
@@ -3695,9 +3698,14 @@ PointerRNA RNA_property_pointer_get(PointerRNA *ptr, PropertyRNA *prop)
     return pprop->get(ptr);
   }
   if (prop->flag & PROP_IDPROPERTY) {
-    /* XXX temporary hack to add it automatically, reading should
-     * never do any write ops, to ensure thread safety etc. */
+    /* NOTE: While creating/writing data in an accessor is really bad design-wise, this is
+     * currently very difficult to avoid in that case. So a global mutex is used to keep ensuring
+     * thread safety. */
+    BLI_mutex_lock(&lock);
+    /* NOTE: We do not need to check again for existence of the pointer after locking here, since
+     * this is also done in #RNA_property_pointer_add itself. */
     RNA_property_pointer_add(ptr, prop);
+    BLI_mutex_unlock(&lock);
     return RNA_property_pointer_get(ptr, prop);
   }
   return PointerRNA_NULL;
@@ -4972,10 +4980,7 @@ void rna_iterator_array_end(CollectionPropertyIterator *iter)
 {
   ArrayIterator *internal = &iter->internal.array;
 
-  if (internal->free_ptr) {
-    MEM_freeN(internal->free_ptr);
-    internal->free_ptr = NULL;
-  }
+  MEM_SAFE_FREE(internal->free_ptr);
 }
 
 PointerRNA rna_array_lookup_int(
@@ -5031,7 +5036,7 @@ static char *rna_path_token(const char **path, char *fixedbuf, int fixedlen, int
     }
   }
   else {
-    /* get data until . or [ */
+    /* Get data until `.` or `[`. */
     p = *path;
 
     while (*p && *p != '.' && *p != '[') {
@@ -5864,12 +5869,12 @@ ID *RNA_find_real_ID_and_path(Main *bmain, ID *id, const char **r_path)
         *r_path = "collection";
         break;
       default:
-        BLI_assert(!"Missing handling of embedded id type.");
+        BLI_assert_msg(0, "Missing handling of embedded id type.");
     }
   }
 
   if (id_type->owner_get == NULL) {
-    BLI_assert(!"Missing handling of embedded id type.");
+    BLI_assert_msg(0, "Missing handling of embedded id type.");
     return id;
   }
   return id_type->owner_get(bmain, id);
@@ -5998,7 +6003,7 @@ static void rna_path_array_multi_string_from_flat_index(PointerRNA *ptr,
 
 /**
  * \param index_dim: The dimension to show, 0 disables. 1 for 1d array, 2 for 2d. etc.
- * \param index: The *flattened* index to use when \a ``index_dim > 0``,
+ * \param index: The *flattened* index to use when \a `index_dim > 0`,
  * this is expanded when used with multi-dimensional arrays.
  */
 char *RNA_path_from_ID_to_property_index(PointerRNA *ptr,
@@ -6723,7 +6728,7 @@ bool RNA_struct_property_is_set_ex(PointerRNA *ptr, const char *identifier, bool
     return RNA_property_is_set_ex(ptr, prop, use_ghost);
   }
   /* python raises an error */
-  /* printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name); */
+  // printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name);
   return 0;
 }
 
@@ -6735,7 +6740,7 @@ bool RNA_struct_property_is_set(PointerRNA *ptr, const char *identifier)
     return RNA_property_is_set(ptr, prop);
   }
   /* python raises an error */
-  /* printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name); */
+  // printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name);
   return 0;
 }
 

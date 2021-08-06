@@ -29,15 +29,21 @@
 #include "DNA_armature_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_collection_types.h"
+#include "DNA_constraint_types.h"
+#include "DNA_curve_types.h"
 #include "DNA_genfile.h"
 #include "DNA_listBase.h"
+#include "DNA_material_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
+#include "DNA_workspace_types.h"
 
 #include "BKE_action.h"
 #include "BKE_animsys.h"
+#include "BKE_asset.h"
 #include "BKE_collection.h"
 #include "BKE_deform.h"
+#include "BKE_fcurve.h"
 #include "BKE_fcurve_driver.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -46,11 +52,10 @@
 #include "BLO_readfile.h"
 #include "MEM_guardedalloc.h"
 #include "readfile.h"
-#include "versioning_common.h"
 
 #include "SEQ_sequencer.h"
 
-#include "MEM_guardedalloc.h"
+#include "RNA_access.h"
 
 #include "versioning_common.h"
 
@@ -97,11 +102,85 @@ static void move_vertex_group_names_to_object_data(Main *bmain)
     if (ELEM(object->type, OB_MESH, OB_LATTICE, OB_GPENCIL)) {
       ListBase *new_defbase = BKE_object_defgroup_list_mutable(object);
 
-      /* Clear the list in case the it was already assigned from another object. */
-      BLI_freelistN(new_defbase);
-      *new_defbase = object->defbase;
+      /* Choose the longest vertex group name list among all linked duplicates. */
+      if (BLI_listbase_count(&object->defbase) < BLI_listbase_count(new_defbase)) {
+        BLI_freelistN(&object->defbase);
+      }
+      else {
+        /* Clear the list in case the it was already assigned from another object. */
+        BLI_freelistN(new_defbase);
+        *new_defbase = object->defbase;
+      }
     }
   }
+}
+
+static void do_versions_sequencer_speed_effect_recursive(Scene *scene, const ListBase *seqbase)
+{
+  /* Old SpeedControlVars->flags. */
+#define SEQ_SPEED_INTEGRATE (1 << 0)
+#define SEQ_SPEED_COMPRESS_IPO_Y (1 << 2)
+
+  LISTBASE_FOREACH (Sequence *, seq, seqbase) {
+    if (seq->type == SEQ_TYPE_SPEED) {
+      SpeedControlVars *v = (SpeedControlVars *)seq->effectdata;
+      const char *substr = NULL;
+      float globalSpeed = v->globalSpeed;
+      if (seq->flag & SEQ_USE_EFFECT_DEFAULT_FADE) {
+        if (globalSpeed == 1.0f) {
+          v->speed_control_type = SEQ_SPEED_STRETCH;
+        }
+        else {
+          v->speed_control_type = SEQ_SPEED_MULTIPLY;
+          v->speed_fader = globalSpeed *
+                           ((float)seq->seq1->len /
+                            max_ff((float)(seq->seq1->enddisp - seq->seq1->start), 1.0f));
+        }
+      }
+      else if (v->flags & SEQ_SPEED_INTEGRATE) {
+        v->speed_control_type = SEQ_SPEED_MULTIPLY;
+        v->speed_fader = seq->speed_fader * globalSpeed;
+      }
+      else if (v->flags & SEQ_SPEED_COMPRESS_IPO_Y) {
+        globalSpeed *= 100.0f;
+        v->speed_control_type = SEQ_SPEED_LENGTH;
+        v->speed_fader_length = seq->speed_fader * globalSpeed;
+        substr = "speed_length";
+      }
+      else {
+        v->speed_control_type = SEQ_SPEED_FRAME_NUMBER;
+        v->speed_fader_frame_number = (int)(seq->speed_fader * globalSpeed);
+        substr = "speed_frame_number";
+      }
+
+      v->flags &= ~(SEQ_SPEED_INTEGRATE | SEQ_SPEED_COMPRESS_IPO_Y);
+
+      if (substr || globalSpeed != 1.0f) {
+        FCurve *fcu = id_data_find_fcurve(&scene->id, seq, &RNA_Sequence, "speed_factor", 0, NULL);
+        if (fcu) {
+          if (globalSpeed != 1.0f) {
+            for (int i = 0; i < fcu->totvert; i++) {
+              BezTriple *bezt = &fcu->bezt[i];
+              bezt->vec[0][1] *= globalSpeed;
+              bezt->vec[1][1] *= globalSpeed;
+              bezt->vec[2][1] *= globalSpeed;
+            }
+          }
+          if (substr) {
+            char *new_path = BLI_str_replaceN(fcu->rna_path, "speed_factor", substr);
+            MEM_freeN(fcu->rna_path);
+            fcu->rna_path = new_path;
+          }
+        }
+      }
+    }
+    else if (seq->type == SEQ_TYPE_META) {
+      do_versions_sequencer_speed_effect_recursive(scene, &seq->seqbase);
+    }
+  }
+
+#undef SEQ_SPEED_INTEGRATE
+#undef SEQ_SPEED_COMPRESS_IPO_Y
 }
 
 void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
@@ -150,6 +229,14 @@ void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
 
   if (!MAIN_VERSION_ATLEAST(bmain, 300, 11)) {
     move_vertex_group_names_to_object_data(bmain);
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 13)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      if (scene->ed != NULL) {
+        do_versions_sequencer_speed_effect_recursive(scene, &scene->ed->seqbase);
+      }
+    }
   }
 
   /**
@@ -294,6 +381,19 @@ static void do_version_bones_bbone_len_scale(ListBase *lb)
     copy_v3_fl3(bone->scale_out, bone->scale_out_x, 1.0f, bone->scale_out_z);
 
     do_version_bones_bbone_len_scale(&bone->childbase);
+  }
+}
+
+static void do_version_constraints_spline_ik_joint_bindings(ListBase *lb)
+{
+  /* Binding array data could be freed without properly resetting its size data. */
+  LISTBASE_FOREACH (bConstraint *, con, lb) {
+    if (con->type == CONSTRAINT_TYPE_SPLINEIK) {
+      bSplineIKConstraint *data = (bSplineIKConstraint *)con->data;
+      if (data->points == NULL) {
+        data->numpoints = 0;
+      }
+    }
   }
 }
 
@@ -525,6 +625,115 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       if (tool_settings->snap_uv_mode & (1 << 4)) {
         tool_settings->snap_uv_mode |= (1 << 6); /* SCE_SNAP_MODE_INCREMENT */
         tool_settings->snap_uv_mode &= ~(1 << 4);
+      }
+    }
+    LISTBASE_FOREACH (Material *, mat, &bmain->materials) {
+      if (!(mat->lineart.flags & LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) {
+        mat->lineart.mat_occlusion = 1;
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 13)) {
+    /* Convert Surface Deform to sparse-capable bind structure. */
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "SurfaceDeformModifierData", "int", "num_mesh_verts")) {
+      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+        LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
+          if (md->type == eModifierType_SurfaceDeform) {
+            SurfaceDeformModifierData *smd = (SurfaceDeformModifierData *)md;
+            if (smd->num_bind_verts && smd->verts) {
+              smd->num_mesh_verts = smd->num_bind_verts;
+
+              for (unsigned int i = 0; i < smd->num_bind_verts; i++) {
+                smd->verts[i].vertex_idx = i;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "WorkSpace", "AssetLibraryReference", "asset_library")) {
+      LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
+        BKE_asset_library_reference_init_default(&workspace->asset_library);
+      }
+    }
+
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "FileAssetSelectParams", "AssetLibraryReference", "asset_library")) {
+      LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+            if (space->spacetype == SPACE_FILE) {
+              SpaceFile *sfile = (SpaceFile *)space;
+              if (sfile->browse_mode != FILE_BROWSE_MODE_ASSETS) {
+                continue;
+              }
+              BKE_asset_library_reference_init_default(&sfile->asset_params->asset_library);
+            }
+          }
+        }
+      }
+    }
+
+    /* Set default 2D annotation placement. */
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *ts = scene->toolsettings;
+      ts->gpencil_v2d_align = GP_PROJECT_VIEWSPACE | GP_PROJECT_CURSOR;
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 14)) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *tool_settings = scene->toolsettings;
+      tool_settings->snap_flag &= ~SCE_SNAP_SEQ;
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 15)) {
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_SEQ) {
+            SpaceSeq *sseq = (SpaceSeq *)sl;
+            sseq->flag |= SEQ_SHOW_GRID;
+          }
+        }
+      }
+    }
+  }
+
+  /* Font names were copied directly into ID names, see: T90417. */
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 16)) {
+    ListBase *lb = which_libbase(bmain, ID_VF);
+    BKE_main_id_repair_duplicate_names_listbase(lb);
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 17)) {
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "View3DOverlay", "float", "normals_constant_screen_size")) {
+      LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+            if (sl->spacetype == SPACE_VIEW3D) {
+              View3D *v3d = (View3D *)sl;
+              v3d->overlay.normals_constant_screen_size = 7.0f;
+            }
+          }
+        }
+      }
+    }
+
+    /* Fix SplineIK constraint's inconsistency between binding points array and its stored size. */
+    LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+      /* NOTE: Objects should never have SplineIK constraint, so no need to apply this fix on
+       * their constraints. */
+      if (ob->pose) {
+        LISTBASE_FOREACH (bPoseChannel *, pchan, &ob->pose->chanbase) {
+          do_version_constraints_spline_ik_joint_bindings(&pchan->constraints);
+        }
       }
     }
   }

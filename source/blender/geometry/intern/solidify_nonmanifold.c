@@ -67,6 +67,15 @@ static float angle_signed_on_axis_normalized_v3v3_v3(const float n[3],
   return angle;
 }
 
+static float clamp_nonzero(const float value, const float epsilon)
+{
+  BLI_assert(!(epsilon < 0.0f));
+  if (value < 0.0f) {
+    return min_ff(value, -epsilon);
+  }
+  return max_ff(value, epsilon);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
