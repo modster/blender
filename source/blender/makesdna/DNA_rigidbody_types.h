@@ -173,9 +173,8 @@ typedef struct RigidBodyOb {
   struct RigidBodyOb_Shared *shared;
 
   /** Options for debug drawing. */
-  short sim_display_options;
-  short display_force_types;
-  char _pad2[4];
+  int sim_display_options;
+  int display_force_types;
 
   /** Force vectors. */
   sim_data_vec eff_forces[3];

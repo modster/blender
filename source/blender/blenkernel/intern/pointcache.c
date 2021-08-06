@@ -3869,6 +3869,11 @@ static const char *ptcache_data_struct[] = {
     "",          // BPHYS_DATA_SIZE:
     "",          // BPHYS_DATA_TIMES:
     "BoidData",  // case BPHYS_DATA_BOIDS:
+    "sim_data_vec", //BPHYS_DATA_EFF_FORCES:
+    "sim_data_vec", //BPHYS_DATA_NORM_FORCES:
+    "sim_data_vec", //BPHYS_DATA_FRIC_FORCES:
+    "sim_data_vec", //BPHYS_DATA_VEC_LOCATIONS:
+    "",             //BPHYS_DATA_PREV_VELOCITY:
 };
 static const char *ptcache_extra_struct[] = {
     "",
