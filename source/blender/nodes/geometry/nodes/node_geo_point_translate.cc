@@ -30,7 +30,7 @@ static bNodeSocketTemplate geo_node_point_translate_in[] = {
      -FLT_MAX,
      FLT_MAX,
      PROP_TRANSLATION,
-     SOCK_IS_FIELD},
+     SOCK_FIELD},
     {-1, ""},
 };
 

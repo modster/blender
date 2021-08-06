@@ -219,7 +219,7 @@ typedef enum eNodeSocketFlag {
    * For geometry nodes, the result is not a single value, but evaluated as a callback and
    * potentially many different values.
    */
-  SOCK_IS_FIELD = (1 << 13),
+  SOCK_FIELD = (1 << 13),
 } eNodeSocketFlag;
 
 /* TODO: Limit data in bNode to what we want to see saved. */

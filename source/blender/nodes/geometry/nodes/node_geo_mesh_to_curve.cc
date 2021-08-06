@@ -29,7 +29,7 @@ using blender::Array;
 
 static bNodeSocketTemplate geo_node_mesh_to_curve_in[] = {
     {SOCK_GEOMETRY, N_("Mesh")},
-    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_IS_FIELD},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
     {-1, ""},
 };
 

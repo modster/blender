@@ -806,7 +806,7 @@ static bool use_special_non_field_socket_drawing(const bNodeTree *node_tree,
            SOCK_STRING)) {
     return false;
   }
-  if (socket->flag & SOCK_IS_FIELD) {
+  if (socket->flag & SOCK_FIELD) {
     return false;
   }
   if (socket->in_out == SOCK_OUT) {

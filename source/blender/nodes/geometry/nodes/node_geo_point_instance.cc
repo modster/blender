@@ -47,7 +47,7 @@ static bNodeSocketTemplate geo_node_point_instance_in[] = {
      0.0f,
      1.0f,
      PROP_NONE,
-     SOCK_HIDE_VALUE | SOCK_IS_FIELD},
+     SOCK_HIDE_VALUE | SOCK_FIELD},
     {SOCK_VECTOR,
      N_("Rotation"),
      0.0f,
@@ -56,7 +56,7 @@ static bNodeSocketTemplate geo_node_point_instance_in[] = {
      0.0f,
      -10000.0f,
      10000.0f,
-     PROP_EULER | SOCK_IS_FIELD},
+     PROP_EULER | SOCK_FIELD},
     {SOCK_VECTOR,
      N_("Scale"),
      1.0f,
@@ -65,8 +65,8 @@ static bNodeSocketTemplate geo_node_point_instance_in[] = {
      0.0f,
      -10000.0f,
      10000.0f,
-     PROP_NONE | SOCK_IS_FIELD},
-    {SOCK_INT, N_("ID"), -1.0f, 0.0f, 0.0f, 0.0f, -10000.0f, 10000.0f, PROP_NONE | SOCK_IS_FIELD},
+     PROP_NONE | SOCK_FIELD},
+    {SOCK_INT, N_("ID"), -1.0f, 0.0f, 0.0f, 0.0f, -10000.0f, 10000.0f, PROP_NONE | SOCK_FIELD},
     {-1, ""},
 };
 
