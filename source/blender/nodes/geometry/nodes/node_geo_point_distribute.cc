@@ -51,6 +51,8 @@ static bNodeSocketTemplate geo_node_point_distribute_in[] = {
 static bNodeSocketTemplate geo_node_point_distribute_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_VECTOR, N_("Rotation"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_IS_ATTRIBUTE_OUTPUT},
+    {SOCK_VECTOR, N_("Normal"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_IS_ATTRIBUTE_OUTPUT},
+    {SOCK_INT, N_("ID"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_IS_ATTRIBUTE_OUTPUT},
     {-1, ""},
 };
 
@@ -339,21 +341,21 @@ BLI_NOINLINE static void interpolate_existing_attributes(
   }
 }
 
+namespace {
+struct SpecialAttributeOutputs {
+  Vector<float3> rotations;
+  Vector<float3> normals;
+  Vector<int> ids;
+};
+}  // namespace
+
 BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> sets,
                                                     Span<int> instance_start_offsets,
                                                     GeometryComponent &component,
                                                     Span<Vector<float3>> bary_coords_array,
                                                     Span<Vector<int>> looptri_indices_array,
-                                                    Vector<float3> &r_rotations)
+                                                    SpecialAttributeOutputs &r_special_attributes)
 {
-  OutputAttribute_Typed<int> id_attribute = component.attribute_try_get_for_output_only<int>(
-      "id", ATTR_DOMAIN_POINT);
-  OutputAttribute_Typed<float3> normal_attribute =
-      component.attribute_try_get_for_output_only<float3>("normal", ATTR_DOMAIN_POINT);
-
-  MutableSpan<int> result_ids = id_attribute.as_span();
-  MutableSpan<float3> result_normals = normal_attribute.as_span();
-
   int i_instance = 0;
   for (const GeometryInstanceGroup &set_group : sets) {
     const GeometrySet &set = set_group.geometry_set;
@@ -367,8 +369,6 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
 
       Span<float3> bary_coords = bary_coords_array[i_instance];
       Span<int> looptri_indices = looptri_indices_array[i_instance];
-      MutableSpan<int> ids = result_ids.slice(offset, bary_coords.size());
-      MutableSpan<float3> normals = result_normals.slice(offset, bary_coords.size());
 
       /* Use one matrix multiplication per point instead of three (for each triangle corner). */
       float rotation_matrix[3][3];
@@ -386,18 +386,17 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
         const float3 v1_pos = float3(mesh.mvert[v1_index].co);
         const float3 v2_pos = float3(mesh.mvert[v2_index].co);
 
-        ids[i] = (int)(bary_coord.hash() + (uint64_t)looptri_index);
-        normal_tri_v3(normals[i], v0_pos, v1_pos, v2_pos);
-        mul_m3_v3(rotation_matrix, normals[i]);
-        r_rotations.append(normal_to_euler_rotation(normals[i]));
+        r_special_attributes.ids.append((int)(bary_coord.hash() + (uint64_t)looptri_index));
+        float3 normal;
+        normal_tri_v3(normal, v0_pos, v1_pos, v2_pos);
+        mul_m3_v3(rotation_matrix, normal);
+        r_special_attributes.normals.append(normal);
+        r_special_attributes.rotations.append(normal_to_euler_rotation(normal));
       }
 
       i_instance++;
     }
   }
-
-  id_attribute.save();
-  normal_attribute.save();
 }
 
 BLI_NOINLINE static void add_remaining_point_attributes(
@@ -407,7 +406,7 @@ BLI_NOINLINE static void add_remaining_point_attributes(
     GeometryComponent &component,
     Span<Vector<float3>> bary_coords_array,
     Span<Vector<int>> looptri_indices_array,
-    Vector<float3> &r_rotations)
+    SpecialAttributeOutputs &r_special_attributes)
 {
   interpolate_existing_attributes(set_groups,
                                   instance_start_offsets,
@@ -420,7 +419,7 @@ BLI_NOINLINE static void add_remaining_point_attributes(
                              component,
                              bary_coords_array,
                              looptri_indices_array,
-                             r_rotations);
+                             r_special_attributes);
 }
 
 static void distribute_points_random(Span<GeometryInstanceGroup> set_groups,
@@ -535,6 +534,14 @@ static void distribute_points_poisson_disk(Span<GeometryInstanceGroup> set_group
   }
 }
 
+static void set_fallback_output(GeoNodeExecParams &params)
+{
+  params.set_output("Geometry", GeometrySet());
+  params.set_output("Rotation", Array<float3>());
+  params.set_output("Normal", Array<float3>());
+  params.set_output("ID", Array<int>());
+}
+
 static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -548,16 +555,14 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       "Density Attribute");
 
   if (density <= 0.0f) {
-    params.set_output("Geometry", GeometrySet());
-    params.set_output("Rotation", Array<float3>());
+    set_fallback_output(params);
     return;
   }
 
   Vector<GeometryInstanceGroup> set_groups;
   geometry_set_gather_instances(geometry_set, set_groups);
   if (set_groups.is_empty()) {
-    params.set_output("Geometry", GeometrySet());
-    params.set_output("Rotation", Array<float3>());
+    set_fallback_output(params);
     return;
   }
 
@@ -571,8 +576,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 
   if (set_groups.is_empty()) {
     params.error_message_add(NodeWarningType::Error, TIP_("Input geometry must contain a mesh"));
-    params.set_output("Geometry", GeometrySet());
-    params.set_output("Rotation", Array<float3>());
+    set_fallback_output(params);
     return;
   }
 
@@ -637,27 +641,46 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   Map<std::string, AttributeKind> attributes;
   bke::geometry_set_gather_instances_attribute_info(
       set_groups, {GEO_COMPONENT_TYPE_MESH}, {"position", "normal", "id"}, attributes);
-  Vector<float3> rotations;
+
+  SpecialAttributeOutputs special_attributes;
   add_remaining_point_attributes(set_groups,
                                  instance_start_offsets,
                                  attributes,
                                  point_component,
                                  bary_coords_all,
                                  looptri_indices_all,
-                                 rotations);
+                                 special_attributes);
 
   if (should_add_output_attribute(params.node(), "Rotation")) {
     const std::string rotation_attribute_name = get_local_attribute_name(
         params.ntree().id.name, params.node().name, "Rotation");
-    fn::GVArray_For_Span rotations_varray{rotations.as_span()};
+    fn::GVArray_For_Span rotations_varray{special_attributes.rotations.as_span()};
     point_component.attribute_try_create(rotation_attribute_name,
                                          ATTR_DOMAIN_POINT,
                                          CD_PROP_FLOAT3,
                                          AttributeInitVArray{&rotations_varray});
   }
+  if (should_add_output_attribute(params.node(), "Normal")) {
+    const std::string normal_attribute_name = get_local_attribute_name(
+        params.ntree().id.name, params.node().name, "Normal");
+    fn::GVArray_For_Span normals_varray{special_attributes.normals.as_span()};
+    point_component.attribute_try_create(normal_attribute_name,
+                                         ATTR_DOMAIN_POINT,
+                                         CD_PROP_FLOAT3,
+                                         AttributeInitVArray{&normals_varray});
+  }
+  if (should_add_output_attribute(params.node(), "ID")) {
+    const std::string id_attribute_name = get_local_attribute_name(
+        params.ntree().id.name, params.node().name, "ID");
+    fn::GVArray_For_Span ids_varray{special_attributes.ids.as_span()};
+    point_component.attribute_try_create(
+        id_attribute_name, ATTR_DOMAIN_POINT, CD_PROP_INT32, AttributeInitVArray{&ids_varray});
+  }
 
   params.set_output("Geometry", std::move(geometry_set_out));
-  params.set_output("Rotation", Array<float3>(rotations.as_span()));
+  params.set_output("Rotation", Array<float3>(special_attributes.rotations.as_span()));
+  params.set_output("Normal", Array<float3>(special_attributes.normals.as_span()));
+  params.set_output("ID", Array<int>(special_attributes.ids.as_span()));
 }
 
 }  // namespace blender::nodes
