@@ -77,6 +77,10 @@ static void mouse_location_to_worldspace(const int mouse_loc[2],
 {
   mul_v3_m4v3(r_location, vc->obedit->obmat, depth);
   ED_view3d_win_to_3d_int(vc->v3d, vc->region, r_location, mouse_loc, r_location);
+
+  float imat[4][4];
+  invert_m4_m4(imat, vc->obedit->obmat);
+  mul_m4_v3(imat, r_location);
 }
 
 /* Move the handle of BezTriple to mouse based on the previously added point. */
