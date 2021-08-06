@@ -126,6 +126,7 @@ void node_operatortypes(void)
   WM_operatortype_append(NODE_OT_cryptomatte_layer_remove);
 
   WM_operatortype_append(NODE_OT_geometry_expander_output_add);
+  WM_operatortype_append(NODE_OT_geometry_expander_output_remove);
 }
 
 void ED_operatormacros_node(void)

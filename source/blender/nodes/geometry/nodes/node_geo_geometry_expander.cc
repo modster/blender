@@ -63,12 +63,15 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayout *split = uiLayoutSplit(row, 0.7, false);
   uiItemL(split, expander_output->display_name_cache, ICON_NONE);
+  uiLayout *subrow = uiLayoutRow(split, true);
   if (expander_output->is_outdated) {
-    uiItemL(split, "", ICON_ERROR);
+    uiItemL(subrow, "", ICON_ERROR);
   }
   else {
-    uiItemR(split, &expander_output_ptr, "array_source", 0, "", ICON_NONE);
+    uiItemR(subrow, &expander_output_ptr, "array_source", 0, "", ICON_NONE);
   }
+  uiItemIntO(
+      subrow, "", ICON_X, "node.geometry_expander_output_remove", "output_index", socket_index);
 
   return true;
 }

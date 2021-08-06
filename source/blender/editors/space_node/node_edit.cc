@@ -3154,3 +3154,47 @@ void NODE_OT_geometry_expander_output_add(wmOperatorType *ot)
   RNA_def_enum_funcs(prop, node_geometry_expander_output_add_items);
   ot->prop = prop;
 }
+
+static int node_geometry_expander_output_remove_exec(bContext *C, wmOperator *op)
+{
+  SpaceNode *snode = CTX_wm_space_node(C);
+  bNodeTree *ntree = snode->edittree;
+  PointerRNA ptr = CTX_data_pointer_get(C, "node");
+  bNode *node = (bNode *)ptr.data;
+  if (node == nullptr) {
+    return OPERATOR_CANCELLED;
+  }
+  NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)node->storage;
+
+  const int output_index = RNA_int_get(op->ptr, "output_index");
+  GeometryExpanderOutput *expander_output = (GeometryExpanderOutput *)BLI_findlink(
+      &storage->outputs, output_index);
+  BLI_remlink(&storage->outputs, expander_output);
+  MEM_freeN(expander_output);
+
+  nodeUpdate(ntree, node);
+  ntreeUpdateTree(CTX_data_main(C), ntree);
+
+  snode_notify(C, snode);
+  snode_dag_update(C, snode);
+
+  return OPERATOR_FINISHED;
+}
+
+void NODE_OT_geometry_expander_output_remove(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Remove Geometry Expander Output";
+  ot->description = "Remove geometry expander output";
+  ot->idname = "NODE_OT_geometry_expander_output_remove";
+
+  /* callbacks */
+  ot->exec = node_geometry_expander_output_remove_exec;
+  ot->poll = ED_operator_node_editable;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  RNA_def_int(
+      ot->srna, "output_index", 0, 0, 1000, "Output Index", "Output index to remove", 0, 1000);
+}
