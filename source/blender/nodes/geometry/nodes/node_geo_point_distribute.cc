@@ -325,12 +325,6 @@ BLI_NOINLINE static void interpolate_existing_attributes(
 
         i_instance++;
       }
-
-      attribute_math::convert_to_static_type(output_data_type, [&](auto dummy) {
-        using T = decltype(dummy);
-
-        GVArray_Span<T> source_span{*source_attribute};
-      });
     }
 
     attribute_out.save();

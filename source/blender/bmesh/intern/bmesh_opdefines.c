@@ -1946,7 +1946,6 @@ static BMOpDefine bmo_inset_region_def = {
   (BMO_OPTYPE_FLAG_NORMALS_CALC |
    BMO_OPTYPE_FLAG_SELECT_FLUSH),
 };
-
 /*
  * Edge-loop Offset.
  *
