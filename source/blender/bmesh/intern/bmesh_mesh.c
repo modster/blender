@@ -1455,12 +1455,7 @@ void BM_select_vertices(BMesh *bm, const bool *mask)
   BMVert *v;
   int i = 0;
   BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(v, BM_ELEM_SELECT, true);
-    }
-    else {
-      BM_elem_flag_set(v, BM_ELEM_SELECT, false);
-    }
+    BM_elem_flag_set(v, BM_ELEM_SELECT, mask[i]);
     i++;
   }
 }
@@ -1474,12 +1469,7 @@ void BM_select_edges(BMesh *bm, const bool *mask)
   BMEdge *e;
   int i = 0;
   BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(e, BM_ELEM_SELECT, true);
-    }
-    else {
-      BM_elem_flag_set(e, BM_ELEM_SELECT, false);
-    }
+    BM_elem_flag_set(e, BM_ELEM_SELECT, mask[i]);
     i++;
   }
 }
@@ -1493,14 +1483,47 @@ void BM_select_faces(BMesh *bm, const bool *mask)
   BMFace *f;
   int i = 0;
   BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(f, BM_ELEM_SELECT, true);
-    }
-    else {
-      BM_elem_flag_set(f, BM_ELEM_SELECT, false);
-    }
+    BM_elem_flag_set(f, BM_ELEM_SELECT, mask[i]);
     i++;
   }
+}
+
+void BM_get_selected_faces(BMesh *bm, bool **selection)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  *selection = MEM_malloc_arrayN((size_t)bm->totface, sizeof(bool), "bm faces");
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    (*selection)[i] = BM_elem_flag_test(f, BM_ELEM_SELECT);
+    i++;
+  }
+  // BMO_slot_map_elem_get()
+}
+
+void BM_get_tagged_faces(BMesh *bm, bool **selection)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  *selection = MEM_malloc_arrayN((size_t)bm->totface, sizeof(bool), "bm faces");
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    (*selection)[i] = BM_elem_flag_test(f, BM_ELEM_TAG);
+    i++;
+  }
+}
+
+void BM_tag_new_faces(BMesh *bm, BMOperator *b_mesh_operator)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  //*selection = MEM_malloc_arrayN((size_t)bm->totface, sizeof(bool), "bm faces");
+  BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
+  BMO_ITER (f, &iter, b_mesh_operator->slots_out, "faces.out", BM_FACE) {
+    BM_elem_flag_enable(f, BM_ELEM_TAG);
+  }
+  // BMO_slot_map_elem_get()
 }
 
 void BM_tag_vertices(BMesh *bm, const bool *mask)
@@ -1509,12 +1532,7 @@ void BM_tag_vertices(BMesh *bm, const bool *mask)
   BMVert *v;
   int i = 0;
   BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(v, BM_ELEM_TAG, true);
-    }
-    else {
-      BM_elem_flag_set(v, BM_ELEM_TAG, false);
-    }
+    BM_elem_flag_set(v, BM_ELEM_TAG, mask[i]);
     i++;
   }
 }
@@ -1528,12 +1546,7 @@ void BM_tag_edges(BMesh *bm, const bool *mask)
   BMEdge *e;
   int i = 0;
   BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(e, BM_ELEM_TAG, true);
-    }
-    else {
-      BM_elem_flag_set(e, BM_ELEM_TAG, false);
-    }
+    BM_elem_flag_set(e, BM_ELEM_TAG, mask[i]);
     i++;
   }
 }
@@ -1547,12 +1560,7 @@ void BM_tag_faces(BMesh *bm, const bool *mask)
   BMFace *f;
   int i = 0;
   BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(f, BM_ELEM_TAG, true);
-    }
-    else {
-      BM_elem_flag_set(f, BM_ELEM_TAG, false);
-    }
+    BM_elem_flag_set(f, BM_ELEM_TAG, mask[i]);
     i++;
   }
 }

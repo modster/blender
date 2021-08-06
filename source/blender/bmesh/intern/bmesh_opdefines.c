@@ -1898,6 +1898,9 @@ static BMOpDefine bmo_inset_individual_def = {
   {{"faces", BMO_OP_SLOT_ELEMENT_BUF, {BM_FACE}},    /* input faces */
    {"thickness", BMO_OP_SLOT_FLT}, /* thickness */
    {"depth", BMO_OP_SLOT_FLT}, /* depth */
+   {"thickness_array", BMO_OP_SLOT_PTR}, /* thickness */
+   {"depth_array", BMO_OP_SLOT_PTR}, /* depth */
+   {"use_attributes", BMO_OP_SLOT_BOOL}, /* Use spans for thickness and depth */
    {"use_even_offset", BMO_OP_SLOT_BOOL}, /* scale the offset to give more even thickness */
    {"use_interpolate", BMO_OP_SLOT_BOOL}, /* blend face data across the inset */
    {"use_relative_offset", BMO_OP_SLOT_BOOL}, /* scale the offset by surrounding geometry */
@@ -1929,6 +1932,9 @@ static BMOpDefine bmo_inset_region_def = {
    {"use_edge_rail", BMO_OP_SLOT_BOOL}, /* inset the region along existing edges */
    {"thickness", BMO_OP_SLOT_FLT}, /* thickness */
    {"depth", BMO_OP_SLOT_FLT}, /* depth */
+   {"thickness_array", BMO_OP_SLOT_PTR}, /* thickness */
+   {"depth_array", BMO_OP_SLOT_PTR}, /* depth */
+   {"use_attributes", BMO_OP_SLOT_BOOL}, /* Use spans for thickness and depth */
    {"use_outset", BMO_OP_SLOT_BOOL}, /* outset rather than inset */
    {{'\0'}},
   },

@@ -17,9 +17,11 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
-#include "UI_interface.h"
-
 #include "BKE_mesh.h"
+#include "BKE_node.h"
+
+#include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "bmesh.h"
 #include "bmesh_tools.h"
@@ -32,6 +34,8 @@ static bNodeSocketTemplate geo_node_extrude_in[] = {
     {SOCK_FLOAT, N_("Inset"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
     {SOCK_BOOLEAN, N_("Individual")},
     {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
+    //{SOCK_STRING, N_("Top Face")},
+    //{SOCK_STRING, N_("Side Face")},
     {-1, ""},
 };
 
@@ -40,6 +44,31 @@ static bNodeSocketTemplate geo_node_extrude_out[] = {
     {-1, ""},
 };
 
+<<<<<<< HEAD
+=======
+static void geo_node_extrude_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "distance_mode", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "inset_mode", 0, nullptr, ICON_NONE);
+}
+
+static void geo_node_extrude_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  node->custom1 = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
+  node->custom2 = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
+}
+
+static void geo_node_extrude_update(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  blender::nodes::update_attribute_input_socket_availabilities(
+      *node, "Distance", (GeometryNodeAttributeInputMode)node->custom1, true);
+  blender::nodes::update_attribute_input_socket_availabilities(
+      *node, "Inset", (GeometryNodeAttributeInputMode)node->custom2, true);
+}
+
+>>>>>>> soc-2021-porting-modifiers-to-nodes-extrude
 using blender::Span;
 
 static Mesh *extrude_mesh(const Mesh *mesh,
@@ -49,6 +78,12 @@ static Mesh *extrude_mesh(const Mesh *mesh,
                           const bool inset_individual_faces)
 {
   BLI_assert(selection.size() == mesh->totpoly);
+                          const Span<float> distance,
+                          const Span<float> inset,
+                          const bool inset_individual_faces,
+                          bool **selection_top_faces_out,
+                          bool **selection_all_faces_out)
+{
   const BMeshCreateParams bmesh_create_params = {true};
   const BMeshFromMeshParams bmesh_from_mesh_params = {
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
@@ -66,6 +101,15 @@ static Mesh *extrude_mesh(const Mesh *mesh,
                  true,
                  inset,
                  distance);
+                 "inset_individual faces=%hf use_even_offset=%b thickness=%f depth=%f "
+                 "thickness_array=%p depth_array=%p use_attributes=%b",
+                 BM_ELEM_SELECT,
+                 true,
+                 inset[0],
+                 distance[0],
+                 inset.data(),
+                 distance.data(),
+                 true);
   }
   else {
     BMO_op_initf(bm,
@@ -86,6 +130,29 @@ static Mesh *extrude_mesh(const Mesh *mesh,
   BM_mesh_free(bm);
 
   result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+                 "inset_region faces=%hf use_boundary=%b use_even_offset=%b thickness=%f depth=%f "
+                 "thickness_array=%p depth_array=%p use_attributes=%b",
+                 BM_ELEM_SELECT,
+                 true,
+                 true,
+                 inset[0],
+                 distance[0],
+                 inset.data(),
+                 distance.data(),
+                 true);
+  }
+  BM_tag_new_faces(bm, &op);
+  BMO_op_exec(bm, &op);
+
+  CustomData_MeshMasks cd_mask_extra = {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX};
+
+  Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, &cd_mask_extra, mesh);
+  BM_get_selected_faces(bm, selection_top_faces_out);
+  BM_get_tagged_faces(bm, selection_all_faces_out);
+
+  BM_mesh_free(bm);
+
+  BKE_mesh_normals_tag_dirty(result);
 
   return result;
 }

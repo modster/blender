@@ -5115,9 +5115,7 @@ static void registerGeometryNodes()
 {
   register_node_type_geo_group();
 
-  register_node_type_geo_extrude();
-
-  register_node_type_geo_attribute();
+  register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute_clamp();
   register_node_type_geo_attribute_color_ramp();
   register_node_type_geo_attribute_combine_xyz();
@@ -5158,7 +5156,7 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_trim();
   register_node_type_geo_delete_geometry();
   register_node_type_geo_edge_split();
-  register_node_type_geo_index();
+  register_node_type_geo_extrude();
   register_node_type_geo_input_material();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
@@ -5192,7 +5190,6 @@ static void registerGeometryNodes()
   register_node_type_geo_triangulate();
   register_node_type_geo_viewer();
   register_node_type_geo_volume_to_mesh();
-  register_node_type_geo_attribute_store_anonymous();
 }
 
 static void registerFunctionNodes()
@@ -5202,7 +5199,6 @@ static void registerFunctionNodes()
   register_node_type_fn_float_to_int();
   register_node_type_fn_input_string();
   register_node_type_fn_input_vector();
-  register_node_type_fn_align_rotation_to_vector();
   register_node_type_fn_random_float();
 }
 

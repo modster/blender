@@ -138,13 +138,9 @@ set(SRC
   function/nodes/node_fn_input_string.cc
   function/nodes/node_fn_input_vector.cc
   function/nodes/node_fn_random_float.cc
-  function/nodes/node_fn_align_rotation_to_vector.cc
   function/node_function_util.cc
 
-  geometry/nodes/node_geo_extrude.cc
-
-  geometry/nodes/node_geo_attribute_store_anonymous.cc
-  geometry/nodes/node_geo_attribute.cc
+  geometry/nodes/node_geo_align_rotation_to_vector.cc
   geometry/nodes/node_geo_attribute_clamp.cc
   geometry/nodes/node_geo_attribute_color_ramp.cc
   geometry/nodes/node_geo_attribute_combine_xyz.cc
@@ -187,7 +183,7 @@ set(SRC
   geometry/nodes/node_geo_curve_trim.cc
   geometry/nodes/node_geo_delete_geometry.cc
   geometry/nodes/node_geo_edge_split.cc
-  geometry/nodes/node_geo_index.cc
+  geometry/nodes/node_geo_extrude.cc
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
@@ -293,7 +289,7 @@ set(SRC
   shader/nodes/node_shader_tex_image.c
   shader/nodes/node_shader_tex_magic.c
   shader/nodes/node_shader_tex_musgrave.c
-  shader/nodes/node_shader_tex_noise.cc
+  shader/nodes/node_shader_tex_noise.c
   shader/nodes/node_shader_tex_pointdensity.c
   shader/nodes/node_shader_tex_sky.c
   shader/nodes/node_shader_tex_voronoi.c

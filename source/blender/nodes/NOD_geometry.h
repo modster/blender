@@ -29,10 +29,7 @@ void register_node_tree_type_geo(void);
 void register_node_type_geo_group(void);
 void register_node_type_geo_custom_group(bNodeType *ntype);
 
-void register_node_type_geo_extrude(void);
-
-void register_node_type_geo_attribute_store_anonymous(void);
-void register_node_type_geo_attribute(void);
+void register_node_type_geo_align_rotation_to_vector(void);
 void register_node_type_geo_attribute_clamp(void);
 void register_node_type_geo_attribute_color_ramp(void);
 void register_node_type_geo_attribute_combine_xyz(void);
@@ -73,7 +70,7 @@ void register_node_type_geo_curve_to_points(void);
 void register_node_type_geo_curve_trim(void);
 void register_node_type_geo_delete_geometry(void);
 void register_node_type_geo_edge_split(void);
-void register_node_type_geo_index(void);
+void register_node_type_geo_extrude(void);
 void register_node_type_geo_input_material(void);
 void register_node_type_geo_is_viewport(void);
 void register_node_type_geo_join_geometry(void);
