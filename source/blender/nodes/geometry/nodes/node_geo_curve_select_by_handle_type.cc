@@ -25,12 +25,12 @@
 
 static bNodeSocketTemplate geo_node_select_by_handle_type_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Selection")},
     {-1, ""},
 };
 
 static bNodeSocketTemplate geo_node_select_by_handle_type_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_BOOLEAN, N_("Selection")},
     {-1, ""},
 };
 
@@ -112,10 +112,11 @@ static void geo_node_select_by_handle_type_exec(GeoNodeExecParams params)
   CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
   const CurveEval *curve = curve_component.get_for_read();
 
+  AnonymousCustomDataLayerID *id = CustomData_anonymous_id_new("Selection");
+
   if (curve != nullptr) {
-    const std::string selection_name = params.extract_input<std::string>("Selection");
     OutputAttribute_Typed<bool> selection =
-        curve_component.attribute_try_get_for_output_only<bool>(selection_name, ATTR_DOMAIN_POINT);
+        curve_component.attribute_try_get_anonymous_for_output_only<bool>(*id, ATTR_DOMAIN_POINT);
     if (selection) {
       select_curve_by_handle_type(*curve, handle_type, mode, selection.as_span());
       selection.save();
@@ -123,6 +124,9 @@ static void geo_node_select_by_handle_type_exec(GeoNodeExecParams params)
   }
 
   params.set_output("Geometry", std::move(geometry_set));
+  params.set_output(
+      "Selection",
+      bke::FieldRef<bool>(new bke::AnonymousAttributeField(*id, CPPType::get<bool>())));
 }
 
 }  // namespace blender::nodes
