@@ -1447,8 +1447,8 @@ void BM_mesh_vert_coords_apply_with_mat4(BMesh *bm,
 }
 
 /**
-* Use to select  bmesh vertex data based on an array of bool.
-*/
+ * Use to select  bmesh vertex data based on an array of bool.
+ */
 void BM_select_vertices(BMesh *bm, const bool *mask)
 {
   BMIter iter;
@@ -1556,4 +1556,37 @@ void BM_tag_faces(BMesh *bm, const bool *mask)
     i++;
   }
 }
+
+void BM_get_tagged_faces(BMesh *bm, bool *selection)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    selection[i] = BM_elem_flag_test(f, BM_ELEM_TAG);
+    i++;
+  }
+}
+
+void BM_tag_new_faces(BMesh *bm, BMOperator *b_mesh_operator)
+{
+  BMOIter iter;
+  BMFace *f;
+  BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
+  BMO_ITER (f, &iter, b_mesh_operator->slots_out, "faces.out", BM_FACE) {
+    BM_elem_flag_enable(f, BM_ELEM_TAG);
+  }
+}
+
+void BM_get_selected_faces(BMesh *bm, bool *selection)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    selection[i] = BM_elem_flag_test(f, BM_ELEM_SELECT);
+    i++;
+  }
+}
+
 /** \} */
