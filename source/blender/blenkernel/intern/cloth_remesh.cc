@@ -332,12 +332,24 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    */
   void flip_edges(blender::Vector<FaceIndex> active_faces)
   {
+    auto max_loop_cycles = active_faces.size() * 3;
+    auto loop_cycles_until_now = 0;
     auto flippable_edge_indices_set = this->get_flippable_edge_indices_set(active_faces);
     do {
       for (const auto &edge_index : flippable_edge_indices_set) {
         auto &edge = this->get_checked_edge(edge_index);
 
+        if (!this->is_edge_flippable_anisotropic_aware(edge)) {
+          continue;
+        }
+
         auto mesh_diff = this->flip_edge_triangulate(edge.get_self_index(), false);
+
+        /* For each new edge added, set it's sizing */
+        for (const auto &edge_index : mesh_diff.get_added_edges()) {
+          auto &edge = this->get_checked_edge(edge_index);
+          this->edge_set_size(edge);
+        }
 
         auto after_flip_msgpack = this->serialize();
         auto after_flip_filename = static_remesh_name_gen.get_curr("after_flip");
@@ -362,7 +374,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       }
 
       flippable_edge_indices_set = this->get_flippable_edge_indices_set(active_faces);
-    } while (flippable_edge_indices_set.size() != 0);
+      loop_cycles_until_now++;
+    } while (flippable_edge_indices_set.size() != 0 && loop_cycles_until_now != max_loop_cycles);
   }
 
   /**
