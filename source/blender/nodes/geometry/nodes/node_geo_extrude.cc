@@ -31,26 +31,18 @@
 static bNodeSocketTemplate geo_node_extrude_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_BOOLEAN, N_("Individual")},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 1, PROP_NONE, SOCK_HIDE_VALUE},
     {SOCK_FLOAT, N_("Distance"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
     {SOCK_FLOAT, N_("Inset"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
-    {SOCK_BOOLEAN, N_("Selection"), 1},
     {-1, ""},
 };
 
 static bNodeSocketTemplate geo_node_extrude_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_BOOLEAN, N_("Top Face")},
-    {SOCK_BOOLEAN, N_("Side Face")},
+    {SOCK_BOOLEAN, N_("Top Face"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_IS_ATTRIBUTE_OUTPUT},
+    {SOCK_BOOLEAN, N_("Side Face"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_IS_ATTRIBUTE_OUTPUT},
     {-1, ""},
 };
-
-static void geo_node_extrude_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "distance_mode", 0, nullptr, ICON_NONE);
-  uiItemR(layout, ptr, "inset_mode", 0, nullptr, ICON_NONE);
-}
 
 using blender::Span;
 
@@ -101,6 +93,7 @@ static Mesh *extrude_mesh(const Mesh *mesh,
   }
   BM_tag_new_faces(bm, &op);
   BMO_op_exec(bm, &op);
+  BMO_op_finish(bm, &op);
 
   CustomData_MeshMasks cd_mask_extra = {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX};
 
@@ -118,6 +111,8 @@ static Mesh *extrude_mesh(const Mesh *mesh,
 namespace blender::nodes {
 static void geo_node_extrude_exec(GeoNodeExecParams params)
 {
+  const bNode &node = params.node();
+  const bNodeTree &ntree = params.ntree();
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = geometry_set_realize_instances(geometry_set);
@@ -127,7 +122,6 @@ static void geo_node_extrude_exec(GeoNodeExecParams params)
 
   MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
   if (mesh_component.has_mesh()) {
-    const bool default_selection = true;
     const Mesh *input_mesh = mesh_component.get_for_read();
 
     Array<bool> selection_array = params.extract_input<Array<bool>>("Selection");
@@ -162,7 +156,6 @@ static void geo_node_extrude_exec(GeoNodeExecParams params)
                                 &selection_top_faces_out,
                                 &selection_all_faces_out);
 
-    const AttributeDomain result_face_domain = ATTR_DOMAIN_FACE;
     geometry_set.replace_mesh(result);
 
     MeshComponent &result_mesh_component = geometry_set.get_component_for_write<MeshComponent>();
@@ -175,6 +168,19 @@ static void geo_node_extrude_exec(GeoNodeExecParams params)
 
     top_faces = Span(selection_top_faces_out, result->totpoly);
     side_faces = Span(selection_all_faces_out, result->totpoly);
+
+    if (should_add_output_attribute(node, "Top Face")) {
+      std::string attribute_name = get_local_attribute_name(ntree.id.name, node.name, "Top Face");
+      fn::GVArray_For_Span varray{top_faces.as_span()};
+      result_mesh_component.attribute_try_create(
+          attribute_name, ATTR_DOMAIN_FACE, CD_PROP_BOOL, AttributeInitVArray{&varray});
+    }
+    if (should_add_output_attribute(node, "Side Face")) {
+      std::string attribute_name = get_local_attribute_name(ntree.id.name, node.name, "Side Face");
+      fn::GVArray_For_Span varray{side_faces.as_span()};
+      result_mesh_component.attribute_try_create(
+          attribute_name, ATTR_DOMAIN_FACE, CD_PROP_BOOL, AttributeInitVArray{&varray});
+    }
 
     MEM_freeN(selection_top_faces_out);
     MEM_freeN(selection_all_faces_out);
@@ -192,7 +198,6 @@ void register_node_type_geo_extrude()
 
   geo_node_type_base(&ntype, GEO_NODE_EXTRUDE, "Extrude", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_extrude_in, geo_node_extrude_out);
-  ntype.draw_buttons = geo_node_extrude_layout;
   ntype.geometry_node_execute = blender::nodes::geo_node_extrude_exec;
   nodeRegisterType(&ntype);
 }
