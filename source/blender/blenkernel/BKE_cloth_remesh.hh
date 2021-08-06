@@ -2195,7 +2195,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
           }
         }
       }
-      /* ensure only 2 faces exist for the "3D edge" */
+      /* Ensure only 2 faces exist for the "3D edge" */
       if (num_faces != 2) {
         return false;
       }
@@ -2208,10 +2208,22 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       return false;
     }
 
-    /* ensure triangulation */
+    /* Ensure triangulation */
     for (const auto &face_index : edge.faces) {
       const auto &face = this->get_checked_face(face_index);
       if (face.verts.size() != 3) {
+        return false;
+      }
+    }
+
+    /* Make sure there is no connecting edge between ov1 and ov2 */
+    {
+      const auto &f1 = this->get_checked_face(edge.faces[0]);
+      const auto &f2 = this->get_checked_face(edge.faces[1]);
+      const auto &ov1 = this->get_checked_other_vert(edge, f1);
+      const auto &ov2 = this->get_checked_other_vert(edge, f2);
+
+      if (this->get_connecting_edge_index(ov1.self_index, ov2.self_index)) {
         return false;
       }
     }
@@ -2248,7 +2260,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
      * when across_seams is true:
      *
      * when across_seams is false:
-     * 2 faces, might add 1 edge if no existing edge exists
+     * 2 faces, 1 edge
      */
 
     /* Let `e` be the edge of `edge_index`
@@ -2291,14 +2303,13 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       auto ov1_index = ov1.self_index;
       auto ov2_index = ov2.self_index;
 
-      /* Create the new edge only if there isn't already an edge
-       * between ov1 and ov2 */
-      if (!this->get_connecting_edge_index(ov1_index, ov2_index)) {
-        auto &new_e = this->add_empty_edge();
-        new_e.verts = {ov1_index, ov2_index};
-        this->add_edge_ref_to_verts(new_e);
-        added_edges.append(new_e.self_index);
-      }
+      /* Create the new edge only, `is_edge_flippable()` should have
+       * already prevented the case of there being an edge between
+       * ov1 and ov2 */
+      auto &new_e = this->add_empty_edge();
+      new_e.verts = {ov1_index, ov2_index};
+      this->add_edge_ref_to_verts(new_e);
+      added_edges.append(new_e.self_index);
 
       auto &new_f1 = this->add_empty_face(f1.normal);
       new_f1.verts = {v1_index, ov2_index, ov1_index};
@@ -2328,7 +2339,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
     BLI_assert(added_nodes.size() == 0);
     BLI_assert(added_verts.size() == 0);
-    BLI_assert(added_edges.size() == 0 || added_edges.size() == 1);
+    BLI_assert(added_edges.size() == 1);
     BLI_assert(added_faces.size() == 2);
 
     BLI_assert(deleted_nodes.size() == 0);
@@ -2596,6 +2607,29 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
    * Will have undefined behaviour in release mode.
    **/
   inline Vert<EVD> &get_checked_other_vert(const Edge<EED> &edge, const Face<EFD> &face)
+  {
+    BLI_assert(face.verts.size() == 3);
+    BLI_assert(face.has_edge(edge));
+
+    const auto vert_1_index = face.verts[0];
+    const auto vert_2_index = face.verts[1];
+    const auto vert_3_index = face.verts[2];
+
+    if (edge.has_vert(vert_1_index) == false) {
+      return this->get_checked_vert(vert_1_index);
+    }
+    if (edge.has_vert(vert_2_index) == false) {
+      return this->get_checked_vert(vert_2_index);
+    }
+
+    return this->get_checked_vert(vert_3_index);
+  }
+
+  /**
+   * A const version of above
+   */
+  inline const Vert<EVD> &get_checked_other_vert(const Edge<EED> &edge,
+                                                 const Face<EFD> &face) const
   {
     BLI_assert(face.verts.size() == 3);
     BLI_assert(face.has_edge(edge));
