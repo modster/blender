@@ -1446,4 +1446,121 @@ void BM_mesh_vert_coords_apply_with_mat4(BMesh *bm,
   }
 }
 
+/**
+ * Use to select  bmesh vertex data based on an array of bool.
+ */
+void BM_select_vertices(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMVert *v;
+  int i = 0;
+  BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
+    BM_elem_flag_set(v, BM_ELEM_SELECT, mask[i]);
+    i++;
+  }
+}
+
+/**
+ * Use to select bmesh edge data based on an array of bool.
+ */
+void BM_select_edges(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMEdge *e;
+  int i = 0;
+  BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+    BM_elem_flag_set(e, BM_ELEM_SELECT, mask[i]);
+    i++;
+  }
+}
+
+/**
+ * Use to select bmesh face data based on an array of bool.
+ */
+void BM_select_faces(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    BM_elem_flag_set(f, BM_ELEM_SELECT, mask[i]);
+    i++;
+  }
+}
+
+void BM_get_selected_faces(BMesh *bm, bool **selection)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  *selection = MEM_malloc_arrayN((size_t)bm->totface, sizeof(bool), "bm faces");
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    (*selection)[i] = BM_elem_flag_test(f, BM_ELEM_SELECT);
+    i++;
+  }
+  // BMO_slot_map_elem_get()
+}
+
+void BM_get_tagged_faces(BMesh *bm, bool **selection)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  *selection = MEM_malloc_arrayN((size_t)bm->totface, sizeof(bool), "bm faces");
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    (*selection)[i] = BM_elem_flag_test(f, BM_ELEM_TAG);
+    i++;
+  }
+}
+
+void BM_tag_new_faces(BMesh *bm, BMOperator *b_mesh_operator)
+{
+  BMOIter iter;
+  BMFace *f;
+  //*selection = MEM_malloc_arrayN((size_t)bm->totface, sizeof(bool), "bm faces");
+  BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
+  BMO_ITER (f, &iter, b_mesh_operator->slots_out, "faces.out", BM_FACE) {
+    BM_elem_flag_enable(f, BM_ELEM_TAG);
+  }
+  // BMO_slot_map_elem_get()
+}
+
+void BM_tag_vertices(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMVert *v;
+  int i = 0;
+  BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
+    BM_elem_flag_set(v, BM_ELEM_TAG, mask[i]);
+    i++;
+  }
+}
+
+/**
+ * Use to temporary tag bmesh edge data based on an array of bool.
+ */
+void BM_tag_edges(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMEdge *e;
+  int i = 0;
+  BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+    BM_elem_flag_set(e, BM_ELEM_TAG, mask[i]);
+    i++;
+  }
+}
+
+/**
+ * Use to temporary tag bmesh face data based on an array of bool.
+ */
+void BM_tag_faces(BMesh *bm, const bool *mask)
+{
+  BMIter iter;
+  BMFace *f;
+  int i = 0;
+  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+    BM_elem_flag_set(f, BM_ELEM_TAG, mask[i]);
+    i++;
+  }
+}
 /** \} */

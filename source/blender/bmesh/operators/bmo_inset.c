@@ -419,6 +419,9 @@ void bmo_inset_individual_exec(BMesh *bm, BMOperator *op)
   BMOIter oiter;
   MemArena *interp_arena = NULL;
 
+  const bool use_attributes = BMO_slot_bool_get(op->slots_in, "use_attributes");
+  const float *thickness_array = BMO_slot_ptr_get(op->slots_in, "thickness_array");
+  const float *depth_array = BMO_slot_ptr_get(op->slots_in, "depth_array");
   const float thickness = BMO_slot_float_get(op->slots_in, "thickness");
   const float depth = BMO_slot_float_get(op->slots_in, "depth");
   const bool use_even_offset = BMO_slot_bool_get(op->slots_in, "use_even_offset");
@@ -433,19 +436,37 @@ void bmo_inset_individual_exec(BMesh *bm, BMOperator *op)
   if (use_interpolate) {
     interp_arena = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
   }
+  int i = 0;
+  if (use_attributes) {
+    BMO_ITER_INDEX (f, &oiter, op->slots_in, "faces", BM_FACE, i) {
+      bmo_face_inset_individual(bm,
+                                f,
+                                interp_arena,
+                                thickness_array[i],
+                                depth_array[i],
+                                use_even_offset,
+                                use_relative_offset,
+                                use_interpolate);
 
-  BMO_ITER (f, &oiter, op->slots_in, "faces", BM_FACE) {
-    bmo_face_inset_individual(bm,
-                              f,
-                              interp_arena,
-                              thickness,
-                              depth,
-                              use_even_offset,
-                              use_relative_offset,
-                              use_interpolate);
+      if (use_interpolate) {
+        BLI_memarena_clear(interp_arena);
+      }
+    }
+  }
+  else {
+    BMO_ITER (f, &oiter, op->slots_in, "faces", BM_FACE) {
+      bmo_face_inset_individual(bm,
+                                f,
+                                interp_arena,
+                                thickness,
+                                depth,
+                                use_even_offset,
+                                use_relative_offset,
+                                use_interpolate);
 
-    if (use_interpolate) {
-      BLI_memarena_clear(interp_arena);
+      if (use_interpolate) {
+        BLI_memarena_clear(interp_arena);
+      }
     }
   }
 
@@ -677,12 +698,15 @@ void bmo_inset_region_exec(BMesh *bm, BMOperator *op)
   const bool use_outset = BMO_slot_bool_get(op->slots_in, "use_outset");
   const bool use_boundary = BMO_slot_bool_get(op->slots_in, "use_boundary") &&
                             (use_outset == false);
+
   const bool use_even_offset = BMO_slot_bool_get(op->slots_in, "use_even_offset");
   const bool use_even_boundary = use_even_offset; /* could make own option */
   const bool use_relative_offset = BMO_slot_bool_get(op->slots_in, "use_relative_offset");
   const bool use_edge_rail = BMO_slot_bool_get(op->slots_in, "use_edge_rail");
   const bool use_interpolate = BMO_slot_bool_get(op->slots_in, "use_interpolate");
   const float thickness = BMO_slot_float_get(op->slots_in, "thickness");
+  const bool use_attributes = BMO_slot_bool_get(op->slots_in, "use_attributes");
+  const float *thickness_array = BMO_slot_ptr_get(op->slots_in, "thickness_array");
   const float depth = BMO_slot_float_get(op->slots_in, "depth");
 #ifdef USE_LOOP_CUSTOMDATA_MERGE
   const bool has_math_ldata = (use_interpolate && CustomData_has_math(&bm->ldata));
@@ -1096,7 +1120,12 @@ void bmo_inset_region_exec(BMesh *bm, BMOperator *op)
             }
 
             /* apply the offset */
-            madd_v3_v3fl(v_split->co, tvec, thickness);
+            if (use_attributes) {
+              madd_v3_v3fl(v_split->co, tvec, thickness_array[v_split->head.index]);
+            }
+            else {
+              madd_v3_v3fl(v_split->co, tvec, thickness);
+            }
           }
 
           /* this saves expensive/slow glue check for common cases */

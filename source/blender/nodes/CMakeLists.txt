@@ -184,6 +184,7 @@ set(SRC
   geometry/nodes/node_geo_curve_trim.cc
   geometry/nodes/node_geo_delete_geometry.cc
   geometry/nodes/node_geo_edge_split.cc
+  geometry/nodes/node_geo_extrude.cc
   geometry/nodes/node_geo_geometry_expander.cc
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_is_viewport.cc
