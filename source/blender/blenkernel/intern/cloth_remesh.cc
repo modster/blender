@@ -292,15 +292,27 @@ using AdaptiveFace = Face<internal::EmptyExtraData>;
 template<typename END>
 class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::EmptyExtraData> {
  public:
-  void edge_set_size(AdaptiveEdge &edge)
+  float compute_edge_size(const AdaptiveVert &v1, const AdaptiveVert &v2) const
   {
-    const auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
     const auto &v1_uv = v1.get_uv();
     const auto &v2_uv = v2.get_uv();
     const auto v1_sizing = v1.get_checked_extra_data().get_sizing();
     const auto v2_sizing = v2.get_checked_extra_data().get_sizing();
 
-    auto edge_size = v1_sizing.get_edge_size_sq(v2_sizing, v1_uv, v2_uv);
+    return v1_sizing.get_edge_size_sq(v2_sizing, v1_uv, v2_uv);
+  }
+
+  float compute_edge_size(const AdaptiveEdge &edge) const
+  {
+    const auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
+
+    return this->compute_edge_size(v1, v2);
+  }
+
+  void edge_set_size(AdaptiveEdge &edge)
+  {
+    const auto edge_size = this->compute_edge_size(edge);
+
     auto op_edge_data = edge.get_extra_data_mut();
     if (op_edge_data) {
       auto &edge_data = edge.get_checked_extra_data_mut();
@@ -546,6 +558,26 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     }
     if (this->is_edge_flippable(edge.get_self_index(), false) == false) {
       return false;
+    }
+
+    /* Flipping the edge should not cause the edge size metric to
+     * fail.
+     *
+     * This condition is not part of reference [1] but it is important
+     * so that the edges don't flip prematurely.
+     */
+    {
+      const auto &ov1_index = this->get_checked_other_vert_index(edge.get_self_index(),
+                                                                 edge.get_faces()[0]);
+      const auto &ov2_index = this->get_checked_other_vert_index(edge.get_self_index(),
+                                                                 edge.get_faces()[1]);
+
+      const auto &ov1 = this->get_checked_vert(ov1_index);
+      const auto &ov2 = this->get_checked_vert(ov2_index);
+
+      if (this->compute_edge_size(ov1, ov2) > 1.0) {
+        return false;
+      }
     }
 
     const auto cross_2d = [](const float2 &a, const float2 &b) { return a.x * b.y - a.y * b.x; };
