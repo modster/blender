@@ -187,6 +187,49 @@ openvdb::GridBase::Ptr BKE_volume_grid_openvdb_for_write(const struct Volume *vo
 
 VolumeGridType BKE_volume_grid_type_openvdb(const openvdb::GridBase &grid);
 
+namespace blender::bke::volume {
+
+template<typename Func>
+inline void to_static_type(const VolumeGridType data_type, const Func &func)
+{
+  switch (data_type) {
+    case VOLUME_GRID_FLOAT:
+      func(openvdb::FloatGrid());
+      break;
+    case VOLUME_GRID_VECTOR_FLOAT:
+      func(openvdb::Vec3fGrid());
+      break;
+    case VOLUME_GRID_BOOLEAN:
+      func(openvdb::BoolGrid());
+      break;
+    case VOLUME_GRID_DOUBLE:
+      func(openvdb::DoubleGrid());
+      break;
+    case VOLUME_GRID_INT:
+      func(openvdb::Int32Grid());
+      break;
+    case VOLUME_GRID_VECTOR_INT:
+      func(openvdb::Vec3IGrid());
+      break;
+    case VOLUME_GRID_VECTOR_DOUBLE:
+      func(openvdb::Vec3dGrid());
+      break;
+    case VOLUME_GRID_STRING:
+      func(openvdb::StringGrid());
+      break;
+    case VOLUME_GRID_MASK:
+      func(openvdb::MaskGrid());
+      break;
+    case VOLUME_GRID_POINTS:
+      func(openvdb::points::PointDataGrid());
+      break;
+    default:
+      BLI_assert_unreachable();
+      break;
+  }
+}
+}  // namespace blender::bke::volume
+
 template<typename OpType>
 auto BKE_volume_grid_type_operation(const VolumeGridType grid_type, OpType &&op)
 {
