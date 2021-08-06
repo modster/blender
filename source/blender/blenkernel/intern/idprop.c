@@ -277,29 +277,29 @@ void IDP_FreeArray(IDProperty *prop)
 
 IDPropertyUIData *IDP_ui_data_copy(const IDProperty *prop)
 {
-  IDPropertyUIData *data_new = MEM_dupallocN(prop->ui_data);
+  IDPropertyUIData *dst_ui_data = MEM_dupallocN(prop->ui_data);
 
   /* Copy extra type specific data. */
   switch (IDP_ui_data_type(prop)) {
     case IDP_UI_DATA_TYPE_STRING: {
-      IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)prop->ui_data;
-      IDPropertyUIDataString *ui_data_new = (IDPropertyUIDataString *)data_new;
-      ui_data_new->default_value = MEM_dupallocN(ui_data->default_value);
+      const IDPropertyUIDataString *src = (const IDPropertyUIDataString *)prop->ui_data;
+      IDPropertyUIDataString *dst = (IDPropertyUIDataString *)dst_ui_data;
+      dst->default_value = MEM_dupallocN(src->default_value);
       break;
     }
     case IDP_UI_DATA_TYPE_ID: {
       break;
     }
     case IDP_UI_DATA_TYPE_INT: {
-      IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)prop->ui_data;
-      IDPropertyUIDataInt *ui_data_new = (IDPropertyUIDataInt *)data_new;
-      ui_data_new->default_array = MEM_dupallocN(ui_data->default_array);
+      const IDPropertyUIDataInt *src = (const IDPropertyUIDataInt *)prop->ui_data;
+      IDPropertyUIDataInt *dst = (IDPropertyUIDataInt *)dst_ui_data;
+      dst->default_array = MEM_dupallocN(src->default_array);
       break;
     }
     case IDP_UI_DATA_TYPE_FLOAT: {
-      IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)prop->ui_data;
-      IDPropertyUIDataFloat *ui_data_new = (IDPropertyUIDataFloat *)data_new;
-      ui_data_new->default_array = MEM_dupallocN(ui_data->default_array);
+      const IDPropertyUIDataFloat *src = (const IDPropertyUIDataFloat *)prop->ui_data;
+      IDPropertyUIDataFloat *dst = (IDPropertyUIDataFloat *)dst_ui_data;
+      dst->default_array = MEM_dupallocN(src->default_array);
       break;
     }
     case IDP_UI_DATA_TYPE_UNSUPPORTED: {
@@ -307,9 +307,9 @@ IDPropertyUIData *IDP_ui_data_copy(const IDProperty *prop)
     }
   }
 
-  data_new->description = MEM_dupallocN(prop->ui_data->description);
+  dst_ui_data->description = MEM_dupallocN(prop->ui_data->description);
 
-  return data_new;
+  return dst_ui_data;
 }
 
 static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(flag))
