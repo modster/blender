@@ -50,6 +50,7 @@ struct GeometryNodesEvaluationParams {
   Depsgraph *depsgraph;
   Object *self_object;
   geo_log::GeoLogger *geo_logger;
+  Map<std::string, std::string> group_input_attribute_names;
 
   Vector<GMutablePointer> r_output_values;
 };

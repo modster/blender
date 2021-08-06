@@ -723,7 +723,8 @@ void MOD_nodes_init(Main *bmain, NodesModifierData *nmd)
 static void initialize_group_input(NodesModifierData &nmd,
                                    const bNodeSocket &socket,
                                    const CPPType &cpp_type,
-                                   void *r_value)
+                                   void *r_value,
+                                   Map<std::string, std::string> &r_group_input_attribute_names)
 {
   const SocketPropertyType *property_type = get_socket_property_type(socket);
   if (property_type == nullptr) {
@@ -745,6 +746,9 @@ static void initialize_group_input(NodesModifierData &nmd,
     return;
   }
   property_type->init_cpp_value(*property, r_value);
+  if (property->type == IDP_STRING) {
+    r_group_input_attribute_names.add(socket.identifier, IDP_String(property));
+  }
 }
 
 static Vector<SpaceSpreadsheet *> find_spreadsheet_editors(Main *bmain)
@@ -872,6 +876,8 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
 
   Map<DOutputSocket, GMutablePointer> group_inputs;
 
+  Map<std::string, std::string> group_input_attribute_names;
+
   const DTreeContext *root_context = &tree.root_context();
   for (const NodeRef *group_input_node : group_input_nodes) {
     Span<const OutputSocketRef *> group_input_sockets = group_input_node->outputs().drop_back(1);
@@ -895,7 +901,8 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
     for (const OutputSocketRef *socket : remaining_input_sockets) {
       const CPPType &cpp_type = *socket->typeinfo()->get_geometry_nodes_cpp_type();
       void *value_in = allocator.allocate(cpp_type.size(), cpp_type.alignment());
-      initialize_group_input(*nmd, *socket->bsocket(), cpp_type, value_in);
+      initialize_group_input(
+          *nmd, *socket->bsocket(), cpp_type, value_in, group_input_attribute_names);
       group_inputs.add_new({root_context, socket}, {cpp_type, value_in});
     }
   }
@@ -924,6 +931,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   eval_params.depsgraph = ctx->depsgraph;
   eval_params.self_object = ctx->object;
   eval_params.geo_logger = geo_logger.has_value() ? &*geo_logger : nullptr;
+  eval_params.group_input_attribute_names = group_input_attribute_names;
   blender::modifiers::geometry_nodes::evaluate_geometry_nodes(eval_params);
 
   if (geo_logger.has_value()) {

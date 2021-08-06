@@ -67,6 +67,7 @@ class GeoNodeExecParamsProvider {
   const ModifierData *modifier = nullptr;
   Depsgraph *depsgraph = nullptr;
   geometry_nodes_eval_log::GeoLogger *logger = nullptr;
+  const Map<std::string, std::string> *group_attribute_input_names = nullptr;
 
   /**
    * Returns true when the node is allowed to get/extract the input value. The identifier is
@@ -340,9 +341,9 @@ class GeoNodeExecParams {
                                                     const GeometryComponent &component,
                                                     const AttributeDomain default_domain) const;
 
-  std::string get_group_input_attribute_name(const StringRef UNUSED(input_identifier)) const
+  std::string get_group_input_attribute_name(const StringRef input_identifier) const
   {
-    return "Group";
+    return provider_->group_attribute_input_names->lookup_default(input_identifier, "");
   }
 
  private:

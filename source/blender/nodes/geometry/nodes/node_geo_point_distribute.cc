@@ -350,7 +350,7 @@ struct SpecialAttributeOutputs {
 }  // namespace
 
 BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> sets,
-                                                    Span<int> instance_start_offsets,
+                                                    Span<int> UNUSED(instance_start_offsets),
                                                     Span<Vector<float3>> bary_coords_array,
                                                     Span<Vector<int>> looptri_indices_array,
                                                     SpecialAttributeOutputs &r_special_attributes)
