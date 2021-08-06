@@ -17,6 +17,7 @@
 #ifdef WITH_OPENVDB
 #  include <openvdb/openvdb.h>
 #  include <openvdb/tools/Composite.h>
+#  include <openvdb/tools/GridTransformer.h>
 #endif
 
 #include "BKE_volume.h"
@@ -56,70 +57,69 @@ namespace blender::nodes {
 
 #ifdef WITH_OPENVDB
 
-struct BooleanGridOp {
-  openvdb::GridBase &grid_base_a;
-  openvdb::GridBase &grid_base_b;
-
-  GeometryNodeBooleanOperation operation;
-  const GeoNodeExecParams &params;
-
-  template<typename GridType> void operator()()
-  {
-    if constexpr (std::is_scalar<typename GridType::ValueType>::value) {
-      this->csg_operation<GridType>();
-    }
-    else {
-      params.error_message_add(NodeWarningType::Error,
-                               TIP_("Grid type does not support boolean operations"));
-    }
-  }
-
-  template<typename GridType> void csg_operation()
-  {
-    GridType &grid_a = static_cast<GridType &>(grid_base_a);
-    GridType &grid_b = static_cast<GridType &>(grid_base_b);
-
-    switch (operation) {
-      case GEO_NODE_BOOLEAN_INTERSECT:
-        openvdb::tools::csgIntersection(grid_a, grid_b);
-        break;
-      case GEO_NODE_BOOLEAN_UNION:
-        openvdb::tools::csgUnion(grid_a, grid_b);
-        break;
-      case GEO_NODE_BOOLEAN_DIFFERENCE:
-        openvdb::tools::csgDifference(grid_a, grid_b);
-        break;
-    }
-  };
-};
-
 static void level_set_boolean(Volume &volume_a,
-                              Volume &volume_b,
+                              const Volume &volume_b,
                               const GeometryNodeBooleanOperation operation,
                               const GeoNodeExecParams &params)
 {
   VolumeGrid *volume_grid_a = BKE_volume_grid_get_for_write(&volume_a, 0);
-  VolumeGrid *volume_grid_b = BKE_volume_grid_get_for_write(&volume_b, 0);
-  if (volume_grid_a == nullptr) {
-    params.error_message_add(NodeWarningType::Error, TIP_("Volume 1 is empty"));
+  const VolumeGrid *volume_grid_b = BKE_volume_grid_get_for_read(&volume_b, 0);
+  if (ELEM(nullptr, volume_grid_a, volume_grid_b)) {
+    if (volume_grid_a == nullptr) {
+      params.error_message_add(NodeWarningType::Info, TIP_("Volume 1 is empty"));
+    }
+    if (volume_grid_b == nullptr) {
+      params.error_message_add(NodeWarningType::Info, TIP_("Volume 2 is empty"));
+    }
     return;
   }
-  if (volume_grid_b == nullptr) {
-    params.error_message_add(NodeWarningType::Error, TIP_("Volume 2 is empty"));
+  openvdb::GridBase::Ptr grid_base_a = BKE_volume_grid_openvdb_for_write(&volume_a, volume_grid_a);
+  openvdb::GridBase::ConstPtr grid_base_b = BKE_volume_grid_openvdb_for_read(&volume_b,
+                                                                             volume_grid_b);
+  if (grid_base_a->getGridClass() != openvdb::GridClass::GRID_LEVEL_SET ||
+      grid_base_b->getGridClass() != openvdb::GridClass::GRID_LEVEL_SET) {
+    if (grid_base_a->getGridClass() != openvdb::GridClass::GRID_LEVEL_SET) {
+      params.error_message_add(NodeWarningType::Error, TIP_("Volume 1 is not a level set"));
+    }
+    if (grid_base_b->getGridClass() != openvdb::GridClass::GRID_LEVEL_SET) {
+      params.error_message_add(NodeWarningType::Error, TIP_("Volume 2 is not a level set"));
+    }
     return;
   }
-  openvdb::GridBase::Ptr grid_a = BKE_volume_grid_openvdb_for_write(&volume_a, volume_grid_a);
-  openvdb::GridBase::Ptr grid_b = BKE_volume_grid_openvdb_for_write(&volume_b, volume_grid_b);
 
   const VolumeGridType grid_type_a = BKE_volume_grid_type(volume_grid_a);
   const VolumeGridType grid_type_b = BKE_volume_grid_type(volume_grid_b);
   if (grid_type_a != grid_type_b) {
-    params.error_message_add(NodeWarningType::Error, TIP_("Grid types do not match"));
+    params.error_message_add(NodeWarningType::Error, TIP_("Volume grid types do not match"));
     return;
   }
 
-  BooleanGridOp boolean_grid_op{*grid_a, *grid_b, operation, params};
-  BKE_volume_grid_type_operation(grid_type_a, boolean_grid_op);
+  bke::volume::to_static_type(grid_type_a, [&](auto dummy) {
+    using GridType = decltype(dummy);
+    if constexpr (std::is_scalar<typename GridType::ValueType>::value) {
+      GridType &grid_a = static_cast<GridType &>(*grid_base_a);
+      const GridType &grid_b = static_cast<const GridType &>(*grid_base_b);
+
+      openvdb::GridBase::Ptr grid_b_resampled_base = GridType::create();
+      GridType &grid_b_resampled = static_cast<GridType &>(*grid_b_resampled_base);
+      grid_b_resampled.setTransform(grid_base_a->constTransform().copy());
+
+      openvdb::tools::resampleToMatch<openvdb::tools::BoxSampler>(grid_b, grid_b_resampled);
+      openvdb::tools::pruneLevelSet(grid_b_resampled.tree());
+
+      switch (operation) {
+        case GEO_NODE_BOOLEAN_INTERSECT:
+          openvdb::tools::csgIntersection(grid_a, grid_b_resampled);
+          break;
+        case GEO_NODE_BOOLEAN_UNION:
+          openvdb::tools::csgUnion(grid_a, grid_b_resampled);
+          break;
+        case GEO_NODE_BOOLEAN_DIFFERENCE:
+          openvdb::tools::csgDifference(grid_a, grid_b_resampled);
+          break;
+      }
+    }
+  });
 }
 
 #endif /* WITH_OPENVDB */
@@ -135,7 +135,7 @@ static void geo_node_level_set_boolean_exec(GeoNodeExecParams params)
   const GeometryNodeBooleanOperation operation = (GeometryNodeBooleanOperation)storage.operation;
 
   Volume *volume_a = geometry_set_a.get_volume_for_write();
-  Volume *volume_b = geometry_set_b.get_volume_for_write();
+  const Volume *volume_b = geometry_set_b.get_volume_for_read();
   if (volume_a == nullptr || volume_b == nullptr) {
     params.set_output("Level Set", std::move(geometry_set_a));
     return;
