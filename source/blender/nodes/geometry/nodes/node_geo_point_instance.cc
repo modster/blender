@@ -39,6 +39,8 @@ static bNodeSocketTemplate geo_node_point_instance_in[] = {
      SOCK_HIDE_LABEL},
     {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000},
     {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 0.0f, -10000.0f, 10000.0f, PROP_EULER},
+    {SOCK_VECTOR, N_("Scale"), 1.0f, 1.0f, 1.0f, 0.0f, -10000.0f, 10000.0f},
+    {SOCK_INT, N_("ID"), 0.0f, 0.0f, 0.0f, 0.0f, -10000.0f, 10000.0f},
     {-1, ""},
 };
 
@@ -173,12 +175,19 @@ static void add_instances_from_component(InstancesComponent &instances,
 
   GVArray_Typed<float3> positions = src_geometry.attribute_get_for_read<float3>(
       "position", domain, {0, 0, 0});
+
   Array<float3> rotations_array = params.get_input<Array<float3>>("Rotation");
   fn::GVArray_For_RepeatedGSpan rotations_repeated{domain_size, rotations_array.as_span()};
   GVArray_Typed<float3> rotations{rotations_repeated};
-  GVArray_Typed<float3> scales = src_geometry.attribute_get_for_read<float3>(
-      "scale", domain, {1, 1, 1});
-  GVArray_Typed<int> id_attribute = src_geometry.attribute_get_for_read<int>("id", domain, -1);
+
+  Array<float3> scales_array = params.get_input<Array<float3>>("Scale");
+  static float3 ones = {1.0f, 1.0f, 1.0f};
+  fn::GVArray_For_RepeatedGSpan scales_repeated{domain_size, scales_array.as_span(), &ones};
+  GVArray_Typed<float3> scales{scales_repeated};
+
+  Array<int> ids_array = params.get_input<Array<int>>("ID");
+  fn::GVArray_For_RepeatedGSpan ids_repeated{domain_size, ids_array.as_span()};
+  GVArray_Typed<int> ids{ids_repeated};
 
   /* The initial size of the component might be non-zero if there are two component types. */
   const int start_len = instances.instances_amount();
@@ -195,7 +204,7 @@ static void add_instances_from_component(InstancesComponent &instances,
       for (const int i : range) {
         handles[i] = handle;
         transforms[i] = float4x4::from_loc_eul_scale(positions[i], rotations[i], scales[i]);
-        instance_ids[i] = id_attribute[i];
+        instance_ids[i] = ids[i];
       }
     });
   }
@@ -208,7 +217,7 @@ static void add_instances_from_component(InstancesComponent &instances,
         const int handle = possible_handles[index];
         handles[i] = handle;
         transforms[i] = float4x4::from_loc_eul_scale(positions[i], rotations[i], scales[i]);
-        instance_ids[i] = id_attribute[i];
+        instance_ids[i] = ids[i];
       }
     });
   }
