@@ -47,13 +47,17 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
   if (socket->in_out == SOCK_IN) {
     return false;
   }
+  if (socket->type == SOCK_GEOMETRY) {
+    return false;
+  }
 
   const NodeGeometryGeometryExpander *storage = (const NodeGeometryGeometryExpander *)
                                                     node->storage;
   const int socket_index = BLI_findindex(&node->outputs, socket);
+  const int expander_output_index = socket_index - 1;
 
   GeometryExpanderOutput *expander_output = (GeometryExpanderOutput *)BLI_findlink(
-      &storage->outputs, socket_index);
+      &storage->outputs, expander_output_index);
   nodeGeometryExpanderUpdateOutputNameCache(expander_output, ntree);
 
   PointerRNA expander_output_ptr;
@@ -70,8 +74,12 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
   else {
     uiItemR(subrow, &expander_output_ptr, "array_source", 0, "", ICON_NONE);
   }
-  uiItemIntO(
-      subrow, "", ICON_X, "node.geometry_expander_output_remove", "output_index", socket_index);
+  uiItemIntO(subrow,
+             "",
+             ICON_X,
+             "node.geometry_expander_output_remove",
+             "output_index",
+             expander_output_index);
 
   return true;
 }
@@ -128,10 +136,10 @@ static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
   const NodeGeometryGeometryExpander *storage = (const NodeGeometryGeometryExpander *)
                                                     bnode.storage;
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  int socket_index;
+  int expander_output_index;
   LISTBASE_FOREACH_INDEX (
-      GeometryExpanderOutput *, expander_output, &storage->outputs, socket_index) {
-    bNodeSocket &socket = *(bNodeSocket *)BLI_findlink(&bnode.outputs, socket_index);
+      GeometryExpanderOutput *, expander_output, &storage->outputs, expander_output_index) {
+    bNodeSocket &socket = *(bNodeSocket *)BLI_findlink(&bnode.outputs, expander_output_index + 1);
     const ArrayCPPType *array_cpp_type = dynamic_cast<const ArrayCPPType *>(
         socket.typeinfo->get_geometry_nodes_cpp_type());
     BLI_assert(array_cpp_type != nullptr);
@@ -197,13 +205,16 @@ static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
 
     params.set_output_by_move(socket.identifier, {array_cpp_type, buffer});
   }
+
+  params.set_output("Geometry", geometry_set);
 }
 
-static void geo_node_geometry_expander_init(bNodeTree *UNUSED(ntree), bNode *node)
+static void geo_node_geometry_expander_init(bNodeTree *ntree, bNode *node)
 {
   NodeGeometryGeometryExpander *storage = (NodeGeometryGeometryExpander *)MEM_callocN(
       sizeof(NodeGeometryGeometryExpander), __func__);
   node->storage = storage;
+  nodeAddSocket(ntree, node, SOCK_OUT, "NodeSocketGeometry", "Geometry", "Geometry");
 }
 
 static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
@@ -212,7 +223,12 @@ static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
 
   Map<StringRef, bNodeSocket *> old_outputs;
 
+  bNodeSocket *geometry_socket = (bNodeSocket *)node->outputs.first;
+
   LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+    if (socket == geometry_socket) {
+      continue;
+    }
     old_outputs.add(socket->identifier, socket);
   }
   VectorSet<bNodeSocket *> new_sockets;
@@ -226,11 +242,15 @@ static void geo_node_geometry_expander_update(bNodeTree *ntree, bNode *node)
     new_sockets.add_new(socket);
   }
   LISTBASE_FOREACH_MUTABLE (bNodeSocket *, socket, &node->outputs) {
+    if (socket == geometry_socket) {
+      continue;
+    }
     if (!new_sockets.contains(socket)) {
       nodeRemoveSocket(ntree, node, socket);
     }
   }
   BLI_listbase_clear(&node->outputs);
+  BLI_addtail(&node->outputs, geometry_socket);
   for (bNodeSocket *socket : new_sockets) {
     BLI_addtail(&node->outputs, socket);
   }
