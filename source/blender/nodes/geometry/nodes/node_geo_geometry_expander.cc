@@ -65,7 +65,7 @@ static bool geo_node_geometry_expander_socket_layout(const bContext *UNUSED(C),
       &ntree->id, &RNA_GeometryExpanderOutput, expander_output, &expander_output_ptr);
 
   uiLayout *row = uiLayoutRow(layout, true);
-  uiLayout *split = uiLayoutSplit(row, 0.6, false);
+  uiLayout *split = uiLayoutSplit(row, 0.5, false);
   uiItemL(split, expander_output->display_name_cache, ICON_NONE);
   uiLayout *subrow = uiLayoutRow(split, true);
   if (expander_output->is_outdated) {
