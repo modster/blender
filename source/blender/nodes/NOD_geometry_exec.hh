@@ -340,6 +340,11 @@ class GeoNodeExecParams {
                                                     const GeometryComponent &component,
                                                     const AttributeDomain default_domain) const;
 
+  std::string get_group_input_attribute_name(const StringRef UNUSED(input_identifier)) const
+  {
+    return "Group";
+  }
+
  private:
   /* Utilities for detecting common errors at when using this class. */
   void check_input_access(StringRef identifier, const CPPType *requested_type = nullptr) const;

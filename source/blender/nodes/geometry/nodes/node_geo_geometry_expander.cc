@@ -160,8 +160,8 @@ static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
           break;
         }
         case GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT: {
-          const std::string attribute_name = get_input_attribute_name(
-              ntree.id.name, expander_output->input_identifier);
+          const std::string attribute_name = params.get_group_input_attribute_name(
+              expander_output->input_identifier);
           GVArrayPtr attribute = component->attribute_try_get_for_read(
               attribute_name, domain, data_type);
           if (attribute) {

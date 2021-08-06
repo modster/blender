@@ -351,7 +351,6 @@ struct SpecialAttributeOutputs {
 
 BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> sets,
                                                     Span<int> instance_start_offsets,
-                                                    GeometryComponent &component,
                                                     Span<Vector<float3>> bary_coords_array,
                                                     Span<Vector<int>> looptri_indices_array,
                                                     SpecialAttributeOutputs &r_special_attributes)
@@ -365,8 +364,6 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
                                   BKE_mesh_runtime_looptri_len(&mesh)};
 
     for (const float4x4 &transform : set_group.transforms) {
-      const int offset = instance_start_offsets[i_instance];
-
       Span<float3> bary_coords = bary_coords_array[i_instance];
       Span<int> looptri_indices = looptri_indices_array[i_instance];
 
@@ -416,7 +413,6 @@ BLI_NOINLINE static void add_remaining_point_attributes(
                                   looptri_indices_array);
   compute_special_attributes(set_groups,
                              instance_start_offsets,
-                             component,
                              bary_coords_array,
                              looptri_indices_array,
                              r_special_attributes);

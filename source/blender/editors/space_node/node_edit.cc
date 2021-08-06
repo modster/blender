@@ -2996,12 +2996,12 @@ static void foreach_available_attribute(
     FunctionRef<void(const GeometryExpanderOutput &attribute)> callback)
 {
   LISTBASE_FOREACH (bNodeSocket *, group_input, &ntree->inputs) {
-    if (ELEM(group_input->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_BOOLEAN)) {
+    if (group_input->type == SOCK_STRING) {
       GeometryExpanderOutput attribute;
       attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT;
       attribute.array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES;
-      attribute.socket_type = (eNodeSocketDatatype)group_input->type;
       STRNCPY(attribute.input_identifier, group_input->identifier);
+      attribute.socket_type = SOCK_FLOAT;
       callback(attribute);
     }
   }
