@@ -1734,7 +1734,6 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         auto &edge_c = this->get_checked_edge(edge_index);
         auto &other_vert = this->get_checked_other_vert(edge_c, face);
 
-        /* TODO(ish): Ordering of the verts and nodes needs to be found correctly */
         /* Handle new face and new edge creation */
         {
           /* Handle new edge creation between new_vert and other_vert */
@@ -1744,9 +1743,10 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
           this->add_edge_ref_to_verts(new_edge);
 
           auto &new_face_1 = this->add_empty_face(face.normal);
-          new_face_1.verts.append(edge_vert_1_b.self_index);
-          new_face_1.verts.append(other_vert.self_index);
-          new_face_1.verts.append(new_vert.self_index);
+          /* Set correct orientation by swapping ev2 for nv */
+          new_face_1.verts = face.verts;
+          new_face_1.verts[new_face_1.verts.first_index_of(edge_vert_2_b.self_index)] =
+              new_vert.self_index;
           added_faces.append(new_face_1.self_index);
 
           /* link edges with new_face_1 */
@@ -1765,9 +1765,10 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
            * for loop owns `face` */
 
           auto &new_face_2 = this->add_empty_face(face.normal);
-          new_face_2.verts.append(other_vert.self_index);
-          new_face_2.verts.append(edge_vert_2_b.self_index);
-          new_face_2.verts.append(new_vert.self_index);
+          /* Set correct orientation by swapping ev1 for nv */
+          new_face_2.verts = face.verts;
+          new_face_2.verts[new_face_2.verts.first_index_of(edge_vert_1_b.self_index)] =
+              new_vert.self_index;
           added_faces.append(new_face_2.self_index);
 
           /* link edges with new_face_2 */
