@@ -210,7 +210,7 @@ class MemoryBuffer {
       clear_elem(out);
     }
     else {
-      read_elem(floor(x), floor(y), out);
+      read_elem(x, y, out);
     }
   }
 
