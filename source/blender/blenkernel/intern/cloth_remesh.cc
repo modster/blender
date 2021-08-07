@@ -37,6 +37,7 @@
 #include "BKE_cloth_remesh.hh"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <limits>
@@ -555,8 +556,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    *
    * Reference [1] and [3]
    *
-   * In this case considering [3] to be higher priority since both are
-   * contradicting each other.
+   * In this case considering [3] to be higher priority with a small change.
    */
   bool is_edge_flippable_anisotropic_aware(const AdaptiveEdge &edge) const
   {
@@ -622,11 +622,13 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     /* Based on [1], should be flippable if res < 0.
      *
-     * Based on [3], should be flippable if res >= 0 but then there is
-     * another part that mentions that flippable if res falls some
-     * calculated value. So taking that route as of now.
+     * Based on [3], flippable if res falls some calculated value. So
+     * taking that route as of now. But here, consider the absolute
+     * value of the cross_2d values generated because they are just
+     * calculating the area and the assumption is that the orientation
+     * of the triangles shouldn't matter for this test.
      */
-    const auto rhs = -alpha * (cross_2d(u_jk, u_ik) + cross_2d(u_il, u_jl));
+    const auto rhs = -alpha * (std::fabs(cross_2d(u_jk, u_ik)) + std::fabs(cross_2d(u_il, u_jl)));
 
     return lhs < rhs;
   }
