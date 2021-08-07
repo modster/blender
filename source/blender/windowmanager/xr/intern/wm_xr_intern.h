@@ -107,9 +107,6 @@ typedef struct {
   /** Off-screen buffers/viewports for each view. */
   ListBase viewports; /* wmXrViewportPair */
 
-  /** XR events. */
-  ListBase events; /* wmEvent */
-
   /** Dummy region type for controller draw callback. */
   struct ARegionType *controller_art;
   /** Controller draw callback handle. */
@@ -220,8 +217,6 @@ typedef struct wmXrActionSet {
 wmXrRuntimeData *wm_xr_runtime_data_create(void);
 void wm_xr_runtime_data_free(wmXrRuntimeData **runtime);
 
-wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
-                                                    const wmXrRuntimeData *runtime_data);
 void wm_xr_session_draw_data_update(wmXrSessionState *state,
                                     const XrSessionSettings *settings,
                                     const GHOST_XrDrawViewInfo *draw_view,

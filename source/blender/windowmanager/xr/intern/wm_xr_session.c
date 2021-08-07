@@ -275,8 +275,8 @@ static void wm_xr_session_draw_data_populate(wmXrData *xr_data,
       r_draw_data->scene, settings, &r_draw_data->base_pose, &r_draw_data->base_scale);
 }
 
-wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
-                                                    const wmXrRuntimeData *runtime_data)
+static wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
+                                                           const wmXrRuntimeData *runtime_data)
 {
   if (runtime_data->session_root_win &&
       BLI_findindex(&wm->windows, runtime_data->session_root_win) != -1) {
@@ -1017,8 +1017,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
                                                   int64_t time_now,
                                                   bool modal,
                                                   bool haptic,
-                                                  short *r_val,
-                                                  bool *r_press_start)
+                                                  short *r_val)
 {
   const char **haptic_subaction_path = ((action->haptic_flag & XR_HAPTIC_MATCHUSERPATHS) != 0) ?
                                            (const char **)&action->subaction_paths[subaction_idx] :
@@ -1080,7 +1079,6 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
     if (!prev) {
       if (modal || (action->op_flag == XR_OP_PRESS)) {
         *r_val = KM_PRESS;
-        *r_press_start = true;
       }
       if (haptic && (action->haptic_flag & (XR_HAPTIC_PRESS | XR_HAPTIC_REPEAT)) != 0) {
         /* Apply haptics. */
@@ -1102,7 +1100,6 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
     if (modal && !action->active_modal_path) {
       /* Set active modal path. */
       action->active_modal_path = &action->subaction_paths[subaction_idx];
-      *r_press_start = true;
       /* Add to active modal actions. */
       wm_xr_session_modal_action_test_add(active_modal_actions, action);
     }
@@ -1212,13 +1209,83 @@ static bool wm_xr_session_action_test_bimanual(const wmXrSessionState *session_s
   return bimanual;
 }
 
+static wmXrActionData *wm_xr_session_event_create(const char *action_set_name,
+                                                  const wmXrAction *action,
+                                                  const wmXrEye *selection_eye,
+                                                  const GHOST_XrPose *controller_aim_pose,
+                                                  const GHOST_XrPose *controller_aim_pose_other,
+                                                  unsigned int subaction_idx,
+                                                  unsigned int subaction_idx_other,
+                                                  bool bimanual)
+{
+  wmXrActionData *data = MEM_callocN(sizeof(wmXrActionData), __func__);
+  strcpy(data->actionmap, action_set_name);
+  strcpy(data->action, action->name);
+  data->type = action->type;
+
+  switch (action->type) {
+    case XR_BOOLEAN_INPUT:
+      data->state[0] = ((bool *)action->states)[subaction_idx] ? 1.0f : 0.0f;
+      if (bimanual) {
+        data->state_other[0] = ((bool *)action->states)[subaction_idx_other] ? 1.0f : 0.0f;
+      }
+      break;
+    case XR_FLOAT_INPUT:
+      data->state[0] = ((float *)action->states)[subaction_idx];
+      if (bimanual) {
+        data->state_other[0] = ((float *)action->states)[subaction_idx_other];
+      }
+      data->float_threshold = action->float_thresholds[subaction_idx];
+      break;
+    case XR_VECTOR2F_INPUT:
+      copy_v2_v2(data->state, ((float(*)[2])action->states)[subaction_idx]);
+      if (bimanual) {
+        copy_v2_v2(data->state_other, ((float(*)[2])action->states)[subaction_idx_other]);
+      }
+      data->float_threshold = action->float_thresholds[subaction_idx];
+      break;
+    case XR_POSE_INPUT:
+    case XR_VIBRATION_OUTPUT:
+      BLI_assert_unreachable();
+      break;
+  }
+
+  if (controller_aim_pose) {
+    copy_v3_v3(data->controller_loc, controller_aim_pose->position);
+    copy_qt_qt(data->controller_rot, controller_aim_pose->orientation_quat);
+
+    if (bimanual && controller_aim_pose_other) {
+      copy_v3_v3(data->controller_loc_other, controller_aim_pose_other->position);
+      copy_qt_qt(data->controller_rot_other, controller_aim_pose_other->orientation_quat);
+    }
+    else {
+      data->controller_rot_other[0] = 1.0f;
+    }
+  }
+  else {
+    data->controller_rot[0] = 1.0f;
+    data->controller_rot_other[0] = 1.0f;
+  }
+
+  if (selection_eye) {
+    copy_m4_m4(data->eye_viewmat, selection_eye->viewmat);
+    data->eye_lens = selection_eye->focal_len;
+  }
+
+  data->ot = action->ot;
+  data->op_properties = action->op_properties;
+
+  data->bimanual = bimanual;
+
+  return data;
+}
+
 /* Dispatch events to XR surface / window queues. */
 static void wm_xr_session_events_dispatch(wmXrData *xr,
                                           const XrSessionSettings *settings,
                                           GHOST_XrContextHandle xr_context,
                                           wmXrActionSet *action_set,
                                           wmXrSessionState *session_state,
-                                          wmSurface *surface,
                                           wmWindow *win)
 {
   const char *action_set_name = action_set->name;
@@ -1251,7 +1318,6 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
       for (unsigned int subaction_idx = 0; subaction_idx < action->count_subaction_paths;
            ++subaction_idx) {
         short val = KM_NOTHING;
-        bool press_start = false;
 
         /* Interpret action states (update modal/haptic action lists, apply haptics, etc). */
         wm_xr_session_action_states_interpret(xr,
@@ -1263,8 +1329,7 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
                                               time_now,
                                               modal,
                                               haptic,
-                                              &val,
-                                              &press_start);
+                                              &val);
 
         if ((val != KM_NOTHING) &&
             (!modal || (wm_xr_session_modal_action_test(active_modal_actions, action, NULL) &&
@@ -1273,23 +1338,21 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
           const GHOST_XrPose *aim_pose = wm_xr_session_controller_aim_pose_find(
               session_state, action->subaction_paths[subaction_idx]);
           const GHOST_XrPose *aim_pose_other = NULL;
-          unsigned int subaction_idx_other;
+          unsigned int subaction_idx_other = 0;
 
           /* Test for bimanual interaction. */
           const bool bimanual = wm_xr_session_action_test_bimanual(
               session_state, action, subaction_idx, &subaction_idx_other, &aim_pose_other);
 
-          wm_event_add_xrevent(action_set_name,
-                               action,
-                               aim_pose,
-                               aim_pose_other,
-                               selection_eye,
-                               surface,
-                               win,
-                               subaction_idx,
-                               bimanual ? subaction_idx_other : subaction_idx,
-                               val,
-                               press_start);
+          wmXrActionData *actiondata = wm_xr_session_event_create(action_set_name,
+                                                                  action,
+                                                                  selection_eye,
+                                                                  aim_pose,
+                                                                  aim_pose_other,
+                                                                  subaction_idx,
+                                                                  subaction_idx_other,
+                                                                  bimanual);
+          wm_event_add_xrevent(win, actiondata, val);
         }
       }
     }
@@ -1355,8 +1418,6 @@ void wm_xr_session_actions_update(const bContext *C)
     return;
   }
 
-  wmSurface *surface = (g_xr_surface && g_xr_surface->customdata) ? g_xr_surface : NULL;
-
   /* Only update controller data and dispatch events for active action set. */
   if (active_action_set) {
     if (active_action_set->controller_grip_action && active_action_set->controller_aim_action) {
@@ -1369,9 +1430,8 @@ void wm_xr_session_actions_update(const bContext *C)
                                            win);
     }
 
-    if (surface && win) {
-      wm_xr_session_events_dispatch(
-          xr, settings, xr_context, active_action_set, state, surface, win);
+    if (win) {
+      wm_xr_session_events_dispatch(xr, settings, xr_context, active_action_set, state, win);
     }
   }
 }
