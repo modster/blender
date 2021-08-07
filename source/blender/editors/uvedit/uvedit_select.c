@@ -844,10 +844,14 @@ void uvedit_uv_select_disable(const Scene *scene,
   }
 }
 
+/* Returns a radial loop which shares the same UV edge and has a visible UV face.
+ * If more than one such radial loops exist then return NULL */
 static BMLoop *uvedit_loop_find_other_radial_loop_with_visible_face(const Scene *scene,
                                                                     BMLoop *l_src,
                                                                     const int cd_loop_uv_offset)
 {
+  /* This function basically tells if the UV edge associated with this loop is a boundry edge or if
+   * it is shared with another UV face or not */
   BMLoop *l_other = NULL;
   BMLoop *l_iter = l_src->radial_next;
   if (l_iter != l_src) {
@@ -869,11 +873,14 @@ static BMLoop *uvedit_loop_find_other_radial_loop_with_visible_face(const Scene 
   return l_other;
 }
 
+/* Finds the loop belonging to another face that is also a boundry loop (is at the boundry of UV)
+ */
 static BMLoop *uvedit_loop_find_other_boundary_loop_with_visible_face(const Scene *scene,
                                                                       BMLoop *l_edge,
                                                                       BMVert *v_pivot,
                                                                       const int cd_loop_uv_offset)
 {
+  /* This function helps find another loop whose UV edge is also a boundry edge) */
   BLI_assert(uvedit_loop_find_other_radial_loop_with_visible_face(
                  scene, l_edge, cd_loop_uv_offset) == NULL);
 
@@ -3103,8 +3110,8 @@ static int uv_select_split_exec(bContext *C, wmOperator *op)
     const int cd_loop_uv_offset = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
 
     BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
-      bool is_sel = false;
-      bool is_unsel = false;
+      /* Assume UV face is selected */
+      bool uv_face_is_sel = true;
 
       if (!uvedit_face_visible_test(scene, efa)) {
         continue;
@@ -3114,23 +3121,20 @@ static int uv_select_split_exec(bContext *C, wmOperator *op)
       BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
         luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
 
-        if (luv->flag & MLOOPUV_VERTSEL) {
-          is_sel = true;
+        if ((luv->flag & MLOOPUV_VERTSEL) && (luv->flag & MLOOPUV_EDGESEL)) {
+          continue;
         }
         else {
-          is_unsel = true;
-        }
-
-        /* we have mixed selection, bail out */
-        if (is_sel && is_unsel) {
+          uv_face_is_sel = false;
           break;
         }
       }
 
-      if (is_sel && is_unsel) {
+      if (!uv_face_is_sel) {
         BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
           luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
           luv->flag &= ~MLOOPUV_VERTSEL;
+          luv->flag &= ~MLOOPUV_EDGESEL;
         }
 
         changed = true;
@@ -4056,6 +4060,7 @@ static int uv_select_pinned_exec(bContext *C, wmOperator *UNUSED(op))
         luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
 
         if (luv->flag & MLOOPUV_PINNED) {
+          /* Handle cases for edge selection and face selection separately */
           uvedit_uv_select_enable(scene, em, l, false, cd_loop_uv_offset);
           changed = true;
         }
