@@ -5,10 +5,10 @@
 update-code:
     git:
         submodules:
-        -   branch: master
+        -   branch: xr-controller-support
             commit_id: HEAD
             path: release/scripts/addons
-        -   branch: xr-controller-support
+        -   branch: master
             commit_id: HEAD
             path: release/scripts/addons_contrib
         -   branch: master
