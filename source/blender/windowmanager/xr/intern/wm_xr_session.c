@@ -128,7 +128,7 @@ static void wm_xr_session_controller_data_free(wmXrSessionState *state)
   }
 }
 
-static void wm_xr_session_data_free(wmXrSessionState *state)
+void wm_xr_session_data_free(wmXrSessionState *state)
 {
   BLI_freelistN(&state->eyes);
   wm_xr_session_controller_data_free(state);
@@ -137,6 +137,10 @@ static void wm_xr_session_data_free(wmXrSessionState *state)
 static void wm_xr_session_exit_cb(void *customdata)
 {
   wmXrData *xr_data = customdata;
+  if (!xr_data->runtime) {
+    return;
+  }
+
   XrSessionSettings *settings = &xr_data->session_settings;
   wmXrSessionState *state = &xr_data->runtime->session_state;
 
@@ -160,7 +164,6 @@ static void wm_xr_session_exit_cb(void *customdata)
   }
 
   /* Free the entire runtime data (including session state and context), to play safe. */
-  wm_xr_session_data_free(state);
   wm_xr_runtime_data_free(&xr_data->runtime);
 }
 

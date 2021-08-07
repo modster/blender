@@ -168,6 +168,9 @@ void wm_xr_runtime_data_free(wmXrRuntimeData **runtime)
     /* Prevent recursive GHOST_XrContextDestroy() call by NULL'ing the context pointer before the
      * first call, see comment above. */
     (*runtime)->context = NULL;
+
+    wm_xr_session_data_free(&(*runtime)->session_state);
+
     GHOST_XrContextDestroy(context);
   }
   MEM_SAFE_FREE(*runtime);
