@@ -1217,10 +1217,22 @@ static bool uvedit_vert_is_any_other_edge_selected(const Scene *scene,
   do {
     BMLoop *l_radial_iter = e_iter->l;
     do {
-      if ((l_radial_iter->f != l->f) && uvedit_face_visible_test(scene, l_radial_iter->f)) {
+      if (l_radial_iter->v == l->v) {
+        if (BM_loop_uv_share_vert_check(l, l_radial_iter, cd_loop_uv_offset) &&
+            uvedit_face_visible_test(scene, l_radial_iter->f)) {
 
-        if (uvedit_edge_select_test(scene, l_radial_iter, cd_loop_uv_offset)) {
-          return true;
+          if (uvedit_edge_select_test(scene, l_radial_iter, cd_loop_uv_offset)) {
+            return true;
+          }
+        }
+      }
+      else {
+        if (BM_loop_uv_share_vert_check(l, l_radial_iter->next, cd_loop_uv_offset) &&
+            uvedit_face_visible_test(scene, l_radial_iter->f)) {
+
+          if (uvedit_edge_select_test(scene, l_radial_iter, cd_loop_uv_offset)) {
+            return true;
+          }
         }
       }
     } while ((l_radial_iter = l_radial_iter->radial_next) != e_iter->l);
