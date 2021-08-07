@@ -706,7 +706,7 @@ void bmo_inset_region_exec(BMesh *bm, BMOperator *op)
   const float thickness = BMO_slot_float_get(op->slots_in, "thickness");
   const bool use_attributes = BMO_slot_bool_get(op->slots_in, "use_attributes");
   const float *thickness_array = BMO_slot_ptr_get(op->slots_in, "thickness_array");
-  const float *depth_array = BMO_slot_ptr_get(op->slots_in, "depth_array");
+  // const float *depth_array = BMO_slot_ptr_get(op->slots_in, "depth_array");
   const float depth = BMO_slot_float_get(op->slots_in, "depth");
 #ifdef USE_LOOP_CUSTOMDATA_MERGE
   const bool has_math_ldata = (use_interpolate && CustomData_has_math(&bm->ldata));
