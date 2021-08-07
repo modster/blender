@@ -4060,11 +4060,16 @@ static int uv_select_pinned_exec(bContext *C, wmOperator *UNUSED(op))
         luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
 
         if (luv->flag & MLOOPUV_PINNED) {
-          /* Handle cases for edge selection and face selection separately */
           uvedit_uv_select_enable(scene, em, l, false, cd_loop_uv_offset);
           changed = true;
         }
       }
+    }
+
+    /* Flush selection
+     * REASON : uvedit_uv_select_enable() allows edge selection only in vertex select mode */
+    if (ts->uv_selectmode != UV_SELECT_VERTEX) {
+      uv_flush_vert_to_edge(scene, obedit, cd_loop_uv_offset);
     }
 
     if (changed) {
