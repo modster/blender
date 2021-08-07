@@ -41,6 +41,8 @@
 #include <functional>
 #include <limits>
 
+#define SHOULD_REMESH_DUMP_FILE 1
+
 namespace blender::bke::internal {
 static FilenameGen static_remesh_name_gen("/tmp/static_remesh/remesh", ".mesh");
 
@@ -363,10 +365,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
           this->edge_set_size(edge);
         }
 
+#if SHOULD_REMESH_DUMP_FILE
         auto after_flip_msgpack = this->serialize();
         auto after_flip_filename = static_remesh_name_gen.get_curr("after_flip");
         static_remesh_name_gen.gen_next();
         dump_file(after_flip_filename, after_flip_msgpack);
+#endif
 
         /* Update `active_faces` */
         {
@@ -410,10 +414,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         auto &edge = this->get_checked_edge(edge_index);
         auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
 
+#if SHOULD_REMESH_DUMP_FILE
         auto after_split_msgpack = this->serialize();
         auto after_split_filename = static_remesh_name_gen.get_curr("after_split");
         static_remesh_name_gen.gen_next();
         dump_file(after_split_filename, after_split_msgpack);
+#endif
 
         /* For each new edge added, set it's sizing */
         for (const auto &edge_index : mesh_diff.get_added_edges()) {
@@ -432,10 +438,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
   void static_remesh(const Sizing &sizing)
   {
+#if SHOULD_REMESH_DUMP_FILE
     auto static_remesh_start_msgpack = this->serialize();
     auto static_remesh_start_filename = static_remesh_name_gen.get_curr("static_remesh_start");
     static_remesh_name_gen.gen_next();
     dump_file(static_remesh_start_filename, static_remesh_start_msgpack);
+#endif
     /* Set sizing for all verts */
     for (auto &vert : this->get_verts_mut()) {
       auto &op_vert_data = vert.get_extra_data_mut();
@@ -455,10 +463,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     /* Collapse the edges */
 
+#if SHOULD_REMESH_DUMP_FILE
     auto static_remesh_end_msgpack = this->serialize();
     auto static_remesh_end_filename = static_remesh_name_gen.get_curr("static_remesh_end");
     static_remesh_name_gen.gen_next();
     dump_file(static_remesh_end_filename, static_remesh_end_msgpack);
+#endif
   }
 
  private:
