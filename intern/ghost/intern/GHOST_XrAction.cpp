@@ -374,7 +374,7 @@ void GHOST_XrAction::updateState(XrSession session,
 
 void GHOST_XrAction::applyHapticFeedback(XrSession session,
                                          const char *action_name,
-                                         const char **subaction_path_str,
+                                         const char *subaction_path_str,
                                          const int64_t &duration,
                                          const float &frequency,
                                          const float &amplitude)
@@ -389,7 +389,7 @@ void GHOST_XrAction::applyHapticFeedback(XrSession session,
   haptic_info.action = m_action;
 
   if (subaction_path_str != nullptr) {
-    SubactionIndexMap::iterator it = m_subaction_indices.find(*subaction_path_str);
+    SubactionIndexMap::iterator it = m_subaction_indices.find(subaction_path_str);
     if (it != m_subaction_indices.end()) {
       haptic_info.subactionPath = m_subaction_paths[it->second];
       CHECK_XR(
@@ -409,13 +409,13 @@ void GHOST_XrAction::applyHapticFeedback(XrSession session,
 
 void GHOST_XrAction::stopHapticFeedback(XrSession session,
                                         const char *action_name,
-                                        const char **subaction_path_str)
+                                        const char *subaction_path_str)
 {
   XrHapticActionInfo haptic_info{XR_TYPE_HAPTIC_ACTION_INFO};
   haptic_info.action = m_action;
 
   if (subaction_path_str != nullptr) {
-    SubactionIndexMap::iterator it = m_subaction_indices.find(*subaction_path_str);
+    SubactionIndexMap::iterator it = m_subaction_indices.find(subaction_path_str);
     if (it != m_subaction_indices.end()) {
       haptic_info.subactionPath = m_subaction_paths[it->second];
       CHECK_XR(xrStopHapticFeedback(session, &haptic_info),

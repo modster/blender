@@ -951,7 +951,7 @@ static void wm_xr_session_modal_action_remove(ListBase *active_modal_actions,
 
 static wmXrHapticAction *wm_xr_session_haptic_action_find(ListBase *active_haptic_actions,
                                                           const wmXrAction *action,
-                                                          const char **subaction_path)
+                                                          const char *subaction_path)
 {
   LISTBASE_FOREACH (wmXrHapticAction *, ha, active_haptic_actions) {
     if ((action == ha->action) && (subaction_path == ha->subaction_path)) {
@@ -964,7 +964,7 @@ static wmXrHapticAction *wm_xr_session_haptic_action_find(ListBase *active_hapti
 
 static void wm_xr_session_haptic_action_add(ListBase *active_haptic_actions,
                                             const wmXrAction *action,
-                                            const char **subaction_path,
+                                            const char *subaction_path,
                                             int64_t time_now)
 {
   wmXrHapticAction *ha = wm_xr_session_haptic_action_find(
@@ -1019,9 +1019,9 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
                                                   bool haptic,
                                                   short *r_val)
 {
-  const char **haptic_subaction_path = ((action->haptic_flag & XR_HAPTIC_MATCHUSERPATHS) != 0) ?
-                                           (const char **)&action->subaction_paths[subaction_idx] :
-                                           NULL;
+  const char *haptic_subaction_path = ((action->haptic_flag & XR_HAPTIC_MATCHUSERPATHS) != 0) ?
+                                          action->subaction_paths[subaction_idx] :
+                                          NULL;
   bool curr = false;
   bool prev = false;
 
@@ -1099,7 +1099,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
     }
     if (modal && !action->active_modal_path) {
       /* Set active modal path. */
-      action->active_modal_path = &action->subaction_paths[subaction_idx];
+      action->active_modal_path = action->subaction_paths[subaction_idx];
       /* Add to active modal actions. */
       wm_xr_session_modal_action_test_add(active_modal_actions, action);
     }
@@ -1123,7 +1123,7 @@ static void wm_xr_session_action_states_interpret(wmXrData *xr,
   else if (prev) {
     if (modal || (action->op_flag == XR_OP_RELEASE)) {
       *r_val = KM_RELEASE;
-      if (modal && (&action->subaction_paths[subaction_idx] == action->active_modal_path)) {
+      if (modal && (action->subaction_paths[subaction_idx] == action->active_modal_path)) {
         /* Unset active modal path. */
         action->active_modal_path = NULL;
         /* Remove from active modal actions. */
@@ -1333,7 +1333,7 @@ static void wm_xr_session_events_dispatch(wmXrData *xr,
 
         if ((val != KM_NOTHING) &&
             (!modal || (wm_xr_session_modal_action_test(active_modal_actions, action, NULL) &&
-                        (!action->active_modal_path || (&action->subaction_paths[subaction_idx] ==
+                        (!action->active_modal_path || (action->subaction_paths[subaction_idx] ==
                                                         action->active_modal_path))))) {
           const GHOST_XrPose *aim_pose = wm_xr_session_controller_aim_pose_find(
               session_state, action->subaction_paths[subaction_idx]);
