@@ -8,7 +8,7 @@ update-code:
         -   branch: master
             commit_id: HEAD
             path: release/scripts/addons
-        -   branch: master
+        -   branch: xr-controller-support
             commit_id: HEAD
             path: release/scripts/addons_contrib
         -   branch: master
