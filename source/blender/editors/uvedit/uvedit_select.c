@@ -2328,37 +2328,28 @@ static void uv_select_all_perform(Scene *scene, SpaceImage *sima, Object *obedit
           luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
 
           switch (ts->uv_selectmode) {
-            /* Invert MLOOPUV_EDGESEL flag for all uv elements if in edge selection mode.
-             * This will mark all edges that need to be selected */
-            case UV_SELECT_EDGE: {
-              luv->flag ^= MLOOPUV_EDGESEL;
-              luv->flag &= ~MLOOPUV_VERTSEL;
-              break;
-            }
+            /* Invert MLOOPUV_EDGESEL flag state for all uv elements if in edge/face selection
+             * mode. This will mark all edges that need to be selected */
+            case UV_SELECT_EDGE:
             case UV_SELECT_FACE: {
               luv->flag ^= MLOOPUV_EDGESEL;
               luv->flag &= ~MLOOPUV_VERTSEL;
               break;
             }
-            /* Invert MLOOPUV_VERTSEL flag for all uv elements if in vertex selection mode
-             * This will mark all vertices that need to be selected */
+            /* Invert MLOOPUV_VERTSEL flag state for all uv elements if in vertex/island selection
+             * mode This will mark all vertices that need to be selected */
             case UV_SELECT_VERTEX:
-            case UV_SELECT_ISLAND:
-            /* TEMPORARY: Fallback to vertex selection mode logic */
+            case UV_SELECT_ISLAND: /* Fallback to vertex selection mode logic */
             default: {
-              /* Fallback */
               luv->flag ^= MLOOPUV_VERTSEL;
               break;
             }
           }
         }
       }
-      /* Now, Flush selection flags based on UV selection mode */
+      /* Flush based on selection flags and current UV selection mode */
       switch (ts->uv_selectmode) {
-        case UV_SELECT_EDGE: {
-          uv_flush_edge_to_vert(scene, obedit, cd_loop_uv_offset);
-          break;
-        }
+        case UV_SELECT_EDGE:
         case UV_SELECT_FACE: {
           if (sima->sticky == SI_STICKY_DISABLE) {
             uv_flush_edge_to_vert(scene, obedit, cd_loop_uv_offset);
@@ -2369,8 +2360,7 @@ static void uv_select_all_perform(Scene *scene, SpaceImage *sima, Object *obedit
           break;
         }
         case UV_SELECT_VERTEX:
-        case UV_SELECT_ISLAND:
-        /* TEMPORARY: Fallback to vertex selection mode logic */
+        case UV_SELECT_ISLAND: /* Fallback to vertex selection mode logic */
         default: {
           uv_flush_vert_to_edge(scene, obedit, cd_loop_uv_offset);
           break;
