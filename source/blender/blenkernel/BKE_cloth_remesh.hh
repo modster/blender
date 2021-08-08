@@ -1803,26 +1803,26 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
                     std::move(deleted_faces));
   }
 
-  bool is_edge_collapseable(EdgeIndex edge_index, bool verts_swapped, bool across_seams)
+  bool is_edge_collapseable(EdgeIndex edge_index, bool verts_swapped, bool across_seams) const
   {
     /* The edge is always collapseable if across seams is false */
     if (across_seams == false) {
       return true;
     }
 
-    auto &e_a = this->get_checked_edge(edge_index);
-    auto [v1_a, v2_a] = this->get_checked_verts_of_edge(e_a, verts_swapped);
-    auto &n1_a = this->get_checked_node_of_vert(v1_a);
-    auto &n2_a = this->get_checked_node_of_vert(v2_a);
-    auto n1_index = n1_a.self_index;
-    auto edge_indices = this->get_connecting_edge_indices(n1_a, n2_a);
+    const auto &e_a = this->get_checked_edge(edge_index);
+    const auto [v1_a, v2_a] = this->get_checked_verts_of_edge(e_a, verts_swapped);
+    const auto &n1_a = this->get_checked_node_of_vert(v1_a);
+    const auto &n2_a = this->get_checked_node_of_vert(v2_a);
+    const auto n1_index = n1_a.self_index;
+    const auto edge_indices = this->get_connecting_edge_indices(n1_a, n2_a);
 
     /* The collapse edge function doesn't support collapsing one v1 into
      * multiple v2 as of right now, so if we find such a case tell
      * user that edge is not collapseable */
     {
       auto get_v1_v2_indices = [this, &n1_index, &verts_swapped](const Edge<EED> &e) {
-        auto [v1, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
+        const auto [v1, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
         auto v1_index = v1.self_index;
         auto v2_index = v2.self_index;
         /* Need to swap the verts if v1 does not point to n1 */
@@ -1835,8 +1835,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
       blender::Vector<VertIndex> v1_list;
       for (const auto &edge_index : edge_indices) {
-        auto &e = this->get_checked_edge(edge_index);
-        auto [v1_index, v2_index] = get_v1_v2_indices(e);
+        const auto &e = this->get_checked_edge(edge_index);
+        const auto [v1_index, v2_index] = get_v1_v2_indices(e);
 
         if (v1_list.contains(v1_index)) {
           return false;
