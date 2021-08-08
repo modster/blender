@@ -2600,6 +2600,12 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return this->get_checked_node(vert.node.value());
   }
 
+  inline const Node<END> &get_checked_node_of_vert(const Vert<EVD> &vert) const
+  {
+    BLI_assert(vert.node);
+    return this->get_checked_node(vert.node.value());
+  }
+
   /**
    * Gives first vert index of a triangulated face that is not part of edge.
    *
