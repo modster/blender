@@ -41,6 +41,7 @@
 #include <cstddef>
 #include <functional>
 #include <limits>
+#include <optional>
 
 #define SHOULD_REMESH_DUMP_FILE 1
 
@@ -291,6 +292,8 @@ template<typename T> using AdaptiveNode = Node<NodeData<T>>;
 using AdaptiveVert = Vert<VertData>;
 using AdaptiveEdge = Edge<EdgeData>;
 using AdaptiveFace = Face<internal::EmptyExtraData>;
+template<typename T>
+using AdaptiveMeshDiff = MeshDiff<NodeData<T>, VertData, EdgeData, internal::EmptyExtraData>;
 
 template<typename END>
 class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::EmptyExtraData> {
@@ -437,6 +440,72 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     } while (splittable_edges_set.size() != 0);
   }
 
+  /**
+   * Collapses edges whose "size" is less than (1.0 - small value)
+   *
+   * Based on [1]
+   *
+   * Here "size" is determined by `Sizing` stores in `Vert`s of the
+   * `Edge`, using the function `Sizing::get_edge_size_sq()`.
+   */
+  void collapse_edges()
+  {
+    blender::Set<FaceIndex> active_faces;
+    for (const auto &face : this->get_faces()) {
+      active_faces.add_new(face.get_self_index());
+    }
+
+    do {
+      /* It is not possible to iterate over active_faces and also
+       * modify at the same time so store the new active faces in a
+       * new set */
+      blender::Set<FaceIndex> new_active_faces;
+
+      for (const auto &face_index : active_faces) {
+        const auto &op_face = this->get_faces().get(face_index);
+        if (op_face == std::nullopt) {
+          /* A previous edge collapse might have modified the this
+           * face, so just continue onto the next one */
+          continue;
+        }
+        const auto &face = this->get_checked_face(face_index);
+        const auto edge_indices = this->get_edge_indices_of_face(face);
+
+        for (const auto &edge_index : edge_indices) {
+          const auto &op_edge = this->get_edges().get(edge_index);
+          if (op_edge == std::nullopt) {
+            break;
+          }
+          const auto &edge = this->get_checked_edge(edge_index);
+
+          std::optional<AdaptiveMeshDiff<END>> op_mesh_diff = std::nullopt;
+          if (this->is_edge_collapseable_adaptivemesh(edge, false)) {
+            op_mesh_diff = this->collapse_edge_triangulate(edge.get_self_index(), false, true);
+          }
+          else if (this->is_edge_collapseable_adaptivemesh(edge, true)) {
+            op_mesh_diff = this->collapse_edge_triangulate(edge.get_self_index(), true, true);
+          }
+
+          if (op_mesh_diff) {
+#if SHOULD_REMESH_DUMP_FILE
+            auto after_flip_msgpack = this->serialize();
+            auto after_flip_filename = static_remesh_name_gen.get_curr("after_collapse");
+            static_remesh_name_gen.gen_next();
+            dump_file(after_flip_filename, after_flip_msgpack);
+#endif
+            const auto mesh_diff = op_mesh_diff.value();
+            /* TODO(ish): flip edges on newly added faces */
+            for (const auto &added_face : mesh_diff.get_added_faces()) {
+              new_active_faces.add_new(added_face);
+            }
+          }
+        }
+      }
+
+      active_faces = std::move(new_active_faces);
+    } while (active_faces.size() != 0);
+  }
+
   void static_remesh(const Sizing &sizing)
   {
 #if SHOULD_REMESH_DUMP_FILE
@@ -463,6 +532,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     this->split_edges();
 
     /* Collapse the edges */
+    this->collapse_edges();
 
 #if SHOULD_REMESH_DUMP_FILE
     auto static_remesh_end_msgpack = this->serialize();
@@ -686,6 +756,27 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     }
 
     return flippable_edge_indices;
+  }
+
+  bool is_edge_collapseable_adaptivemesh(const AdaptiveEdge &edge, bool verts_swapped) const
+  {
+    if (this->is_edge_collapseable(edge.get_self_index(), verts_swapped, true) == false) {
+      return false;
+    }
+
+    const auto [v1, v2] = this->get_checked_verts_of_edge(edge, verts_swapped);
+
+    /* If v1 is on a seam or boundary, v2 should also be on a seam or boundary */
+    if (this->is_vert_on_seam_or_boundary(v1) == true &&
+        this->is_vert_on_seam_or_boundary(v2) == false) {
+      /* This will modify the panel boundaries which isn't acceptable */
+      return false;
+    }
+
+    /* TODO(ish): aspect ratio test */
+    /* TODO(ish): the newly created edges' size should not be larger
+     * than 1.0 - (small value) */
+    return true;
   }
 };
 
