@@ -30,6 +30,40 @@ namespace blender::nodes {
 
 using bke::GeometryInstanceGroup;
 
+static void update_multi_type_socket_availabilities(ListBase &socket_list,
+                                                    const StringRef name,
+                                                    const CustomDataType type,
+                                                    const bool name_is_available)
+{
+  LISTBASE_FOREACH (bNodeSocket *, socket, &socket_list) {
+    if (name == socket->name) {
+      const bool socket_is_available = name_is_available &&
+                                       ((socket->type == SOCK_STRING && type == CD_PROP_STRING) ||
+                                        (socket->type == SOCK_FLOAT && type == CD_PROP_FLOAT) ||
+                                        (socket->type == SOCK_INT && type == CD_PROP_INT32) ||
+                                        (socket->type == SOCK_VECTOR && type == CD_PROP_FLOAT3) ||
+                                        (socket->type == SOCK_RGBA && type == CD_PROP_COLOR));
+      nodeSetSocketAvailability(socket, socket_is_available);
+    }
+  }
+}
+
+void update_multi_type_input_socket_availabilities(bNode &node,
+                                                   const StringRef name,
+                                                   const CustomDataType type,
+                                                   const bool name_is_available)
+{
+  update_multi_type_socket_availabilities(node.inputs, name, type, name_is_available);
+}
+
+void update_multi_type_output_socket_availabilities(bNode &node,
+                                                    const StringRef name,
+                                                    const CustomDataType type,
+                                                    const bool name_is_available)
+{
+  update_multi_type_socket_availabilities(node.outputs, name, type, name_is_available);
+}
+
 /**
  * Update the availability of a group of input sockets with the same name,
  * used for switching between attribute inputs or single values.

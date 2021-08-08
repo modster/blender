@@ -48,7 +48,7 @@ extern void copy_masked_polys_to_new_mesh(const Mesh &src_mesh,
 
 static bNodeSocketTemplate geo_node_delete_geometry_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_BOOLEAN, N_("Selection"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
+    {SOCK_BOOLEAN, N_("Selection"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
     {-1, ""},
 };
 

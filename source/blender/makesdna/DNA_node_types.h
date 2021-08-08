@@ -178,6 +178,7 @@ typedef enum eNodeSocketDisplayShape {
   SOCK_DISPLAY_SHAPE_CIRCLE_DOT = 3,
   SOCK_DISPLAY_SHAPE_SQUARE_DOT = 4,
   SOCK_DISPLAY_SHAPE_DIAMOND_DOT = 5,
+  SOCK_DISPLAY_SHAPE_TALL_RECTANGLE = 6,
 } eNodeSocketDisplayShape;
 
 /* Socket side (input/output). */
@@ -214,6 +215,11 @@ typedef enum eNodeSocketFlag {
    * type is obvious and the name takes up too much space.
    */
   SOCK_HIDE_LABEL = (1 << 12),
+  /**
+   * For geometry nodes, the result is not a single value, but evaluated as a callback and
+   * potentially many different values.
+   */
+  SOCK_FIELD = (1 << 13),
 } eNodeSocketFlag;
 
 /* TODO: Limit data in bNode to what we want to see saved. */
