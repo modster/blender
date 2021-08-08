@@ -2085,6 +2085,78 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * Seam is the edge in UV space that has only one face.
+   */
+  bool is_vert_on_seam(const Vert<EVD> &vert) const
+  {
+    /* The vert is on a seam if any of it's adjacent edges is on a
+     * seam */
+
+    for (const auto &edge_index : vert.get_edges()) {
+      if (this->is_edge_on_seam(edge_index)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Easy call when only `vert_index` is available.
+   */
+  bool is_vert_on_seam(VertIndex vert_index) const
+  {
+    const auto &vert = this->get_checked_vert(vert_index);
+    return is_vert_on_seam(vert);
+  }
+
+  /**
+   * Boundary is the set of "3D edges" that have only a single
+   * face. Not all meshes will have a boundary.
+   */
+  bool is_vert_on_boundary(const Vert<EVD> &vert) const
+  {
+    /* The vert is on a seam if any of it's adjacent edges is on a
+     * boundary */
+
+    /* TODO(ish): a simpler check might be to see
+     * vert.get_edges().size() != vert.get_faces().size() */
+
+    for (const auto &edge_index : vert.get_edges()) {
+      if (this->is_edge_on_boundary(edge_index)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Easy call when only `vert_index` is available.
+   */
+  bool is_vert_on_boundary(VertIndex vert_index) const
+  {
+    const auto &vert = this->get_checked_vert(vert_index);
+    return is_vert_on_boundary(vert);
+  }
+
+  /**
+   * Check both conditions at once
+   */
+  bool is_vert_on_seam_or_boundary(const Vert<EVD> &vert) const
+  {
+    return this->is_vert_on_seam(vert) || this->is_vert_on_boundary(vert);
+  }
+
+  /**
+   * Easy call when only `vert_index` is available.
+   */
+  bool is_vert_on_seam_or_boundary(VertIndex vert) const
+  {
+    return this->is_vert_on_seam(vert) || this->is_vert_on_boundary(vert);
+  }
+
+  /**
    * An edge is loose when it doesn't have any faces.
    */
   bool is_edge_loose(const Edge<EED> &edge) const
