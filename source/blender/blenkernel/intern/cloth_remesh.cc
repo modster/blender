@@ -346,9 +346,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   /**
    * Flip edges of the `active_faces` if needed.
    *
-   * Might make sense to take `active_faces` by move semantics later.
+   * Updates the active_faces in place
    */
-  void flip_edges(blender::Vector<FaceIndex> active_faces)
+  void flip_edges(blender::Vector<FaceIndex> &active_faces)
   {
     auto max_loop_cycles = active_faces.size() * 3;
     auto loop_cycles_until_now = 0;
@@ -433,7 +433,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
         /* Flip edges of those faces that were created during the
          * split edge operation */
-        this->flip_edges(mesh_diff.get_added_faces());
+        auto added_faces = mesh_diff.get_added_faces();
+        this->flip_edges(added_faces);
       }
 
       splittable_edges_set = this->get_splittable_edge_indices_set();
@@ -494,9 +495,17 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
             dump_file(after_flip_filename, after_flip_msgpack);
 #endif
             const auto mesh_diff = op_mesh_diff.value();
-            /* TODO(ish): flip edges on newly added faces */
-            for (const auto &added_face : mesh_diff.get_added_faces()) {
-              new_active_faces.add_new(added_face);
+
+            /* Must run flip edges on the newly added faces and
+             * together the newly added faces must be added to
+             * new_active_faces */
+            {
+              auto active_faces_from_flip_edges = mesh_diff.get_added_faces();
+              this->flip_edges(active_faces_from_flip_edges);
+
+              for (const auto &added_face : active_faces_from_flip_edges) {
+                new_active_faces.add_new(added_face);
+              }
             }
           }
         }
