@@ -839,7 +839,7 @@ static void wm_xr_session_controller_data_update(const bContext *C,
     }
 
     if (!controller->model) {
-      /* Notify ghost to load/continue loading the controller model data. This can be called more
+      /* Notify GHOST to load/continue loading the controller model data. This can be called more
        * than once since the model may not be available from the runtime yet. The batch itself will
        * be created in wm_xr_draw_controllers(). */
       GHOST_XrLoadControllerModel(xr_context, controller->subaction_path);
@@ -850,12 +850,9 @@ static void wm_xr_session_controller_data_update(const bContext *C,
 static const GHOST_XrPose *wm_xr_session_controller_aim_pose_find(const wmXrSessionState *state,
                                                                   const char *subaction_path)
 {
-  LISTBASE_FOREACH (wmXrController *, controller, &state->controllers) {
-    if (STREQ(controller->subaction_path, subaction_path)) {
-      return &controller->aim_pose;
-    }
-  }
-  return NULL;
+  const wmXrController *controller = BLI_findstring(
+      &state->controllers, subaction_path, offsetof(wmXrController, subaction_path));
+  return controller ? &controller->aim_pose : NULL;
 }
 
 BLI_INLINE bool test_float_state(const float *state, float threshold, eXrAxisFlag flag)
@@ -1222,7 +1219,7 @@ static wmXrActionData *wm_xr_session_event_create(const char *action_set_name,
                                                   bool bimanual)
 {
   wmXrActionData *data = MEM_callocN(sizeof(wmXrActionData), __func__);
-  strcpy(data->actionmap, action_set_name);
+  strcpy(data->action_set, action_set_name);
   strcpy(data->action, action->name);
   data->type = action->type;
 
@@ -1669,7 +1666,6 @@ static wmSurface *wm_xr_session_surface_create(void)
 
   surface->ghost_ctx = DRW_xr_opengl_context_get();
   surface->gpu_ctx = DRW_xr_gpu_context_get();
-  surface->is_xr = true;
 
   data->controller_art->regionid = RGN_TYPE_XR;
   surface->customdata = data;

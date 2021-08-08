@@ -717,8 +717,8 @@ typedef struct wmXrActionState {
 #endif
 
 typedef struct wmXrActionData {
-  /** Action map name. */
-  char actionmap[64];
+  /** Action set name. */
+  char action_set[64];
   /** Action name. */
   char action[64];
   /** Type. */

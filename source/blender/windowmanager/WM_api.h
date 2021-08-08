@@ -912,7 +912,7 @@ int WM_event_absolute_delta_x(const struct wmEvent *event);
 int WM_event_absolute_delta_y(const struct wmEvent *event);
 
 void WM_event_xr_data(const struct wmEvent *event,
-                      char **actionmap,
+                      char **action_set,
                       char **action,
                       char *type,
                       float state[2],
