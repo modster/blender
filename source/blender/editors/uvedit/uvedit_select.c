@@ -844,14 +844,10 @@ void uvedit_uv_select_disable(const Scene *scene,
   }
 }
 
-/* Returns a radial loop which shares the same UV edge and has a visible UV face.
- * If more than one such radial loops exist then return NULL */
 static BMLoop *uvedit_loop_find_other_radial_loop_with_visible_face(const Scene *scene,
                                                                     BMLoop *l_src,
                                                                     const int cd_loop_uv_offset)
 {
-  /* This function basically tells if the UV edge associated with this loop is a boundry edge or if
-   * it is shared with another UV face or not */
   BMLoop *l_other = NULL;
   BMLoop *l_iter = l_src->radial_next;
   if (l_iter != l_src) {
@@ -873,14 +869,11 @@ static BMLoop *uvedit_loop_find_other_radial_loop_with_visible_face(const Scene 
   return l_other;
 }
 
-/* Finds the loop belonging to another face that is also a boundry loop (is at the boundry of UV)
- */
 static BMLoop *uvedit_loop_find_other_boundary_loop_with_visible_face(const Scene *scene,
                                                                       BMLoop *l_edge,
                                                                       BMVert *v_pivot,
                                                                       const int cd_loop_uv_offset)
 {
-  /* This function helps find another loop whose UV edge is also a boundry edge) */
   BLI_assert(uvedit_loop_find_other_radial_loop_with_visible_face(
                  scene, l_edge, cd_loop_uv_offset) == NULL);
 
@@ -1645,7 +1638,7 @@ static int uv_select_edgeloop(
   const int cd_loop_uv_offset = CustomData_get_offset(&em->bm->ldata, CD_MLOOPUV);
 
   if (extend) {
-    select = !(uvedit_uv_select_test(scene, hit->l, cd_loop_uv_offset));
+    select = !(uvedit_edge_select_test(scene, hit->l, cd_loop_uv_offset));
   }
   else {
     select = true;
@@ -1713,6 +1706,70 @@ static int uv_select_edgeloop(
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Face Loop Select
+ * \{ */
+
+static int uv_select_faceloop(
+    const SpaceImage *sima, Scene *scene, Object *obedit, UvNearestHit *hit, const bool extend)
+{
+  BMEditMesh *em = BKE_editmesh_from_object(obedit);
+  bool select;
+
+  const int cd_loop_uv_offset = CustomData_get_offset(&em->bm->ldata, CD_MLOOPUV);
+
+  if (!extend) {
+    uv_select_all_perform(scene, NULL, obedit, SEL_DESELECT);
+  }
+
+  BM_mesh_elem_hflag_disable_all(em->bm, BM_FACE, BM_ELEM_TAG, false);
+
+  if (extend) {
+    select = !(uvedit_face_select_test(scene, hit->l->f, cd_loop_uv_offset));
+  }
+  else {
+    select = true;
+  }
+
+  BMLoop *l_pair[2] = {
+      hit->l,
+      uvedit_loop_find_other_radial_loop_with_visible_face(scene, hit->l, cd_loop_uv_offset),
+  };
+
+  for (int side = 0; side < 2; side++) {
+    BMLoop *l_step = l_pair[side];
+    while (l_step) {
+      if (!uvedit_face_visible_test(scene, l_step->f)) {
+        break;
+      }
+
+      uvedit_face_select_set_with_sticky(
+          sima, scene, em, l_step->f, select, false, cd_loop_uv_offset);
+
+      BM_elem_flag_enable(l_step->f, BM_ELEM_TAG);
+      if (l_step->f->len == 4) {
+        BMLoop *l_step_opposite = l_step->next->next;
+        l_step = uvedit_loop_find_other_radial_loop_with_visible_face(
+            scene, l_step_opposite, cd_loop_uv_offset);
+      }
+      else {
+        l_step = NULL;
+      }
+
+      /* Break iteration when l_step :
+       * - is the first loop where we started from
+       * - tagged using BM_ELEM_TAG(meaning this loop has been visited in this iteration) */
+      if (l_step && BM_elem_flag_test(l_step->f, BM_ELEM_TAG)) {
+        break;
+      }
+    }
+  }
+
+  return (select) ? 1 : -1;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Edge Ring Select
  * \{ */
 
@@ -1724,6 +1781,9 @@ static int uv_select_edgering(
   const bool use_face_select = (ts->uv_flag & UV_SYNC_SELECTION) ?
                                    (ts->selectmode & SCE_SELECT_FACE) :
                                    (ts->uv_selectmode & UV_SELECT_FACE);
+  const bool use_vertex_select = (ts->uv_flag & UV_SYNC_SELECTION) ?
+                                     (ts->selectmode & SCE_SELECT_VERTEX) :
+                                     (ts->uv_selectmode & UV_SELECT_VERTEX);
   bool select;
 
   const int cd_loop_uv_offset = CustomData_get_offset(&em->bm->ldata, CD_MLOOPUV);
@@ -1735,7 +1795,7 @@ static int uv_select_edgering(
   BM_mesh_elem_hflag_disable_all(em->bm, BM_EDGE, BM_ELEM_TAG, false);
 
   if (extend) {
-    select = !(uvedit_uv_select_test(scene, hit->l, cd_loop_uv_offset));
+    select = !(uvedit_edge_select_test(scene, hit->l, cd_loop_uv_offset));
   }
   else {
     select = true;
@@ -1756,10 +1816,20 @@ static int uv_select_edgering(
       }
 
       if (use_face_select) {
+        /* While selecting face loops is now done in a separate function - uv_select_faceloop()
+         * ,this check is still kept for edge ring selection to keep it consistent with how edge
+         * ring selection works in the 3D viewport */
         uvedit_face_select_set_with_sticky(
             sima, scene, em, l_step->f, select, false, cd_loop_uv_offset);
       }
+      else if (use_vertex_select) {
+        uvedit_uv_select_set_with_sticky(
+            sima, scene, em, l_step, select, false, cd_loop_uv_offset);
+        uvedit_uv_select_set_with_sticky(
+            sima, scene, em, l_step->next, select, false, cd_loop_uv_offset);
+      }
       else {
+        /* Edge select mode */
         uvedit_edge_select_set_with_sticky(
             sima, scene, em, l_step, select, false, cd_loop_uv_offset);
       }
@@ -1778,8 +1848,19 @@ static int uv_select_edgering(
         l_step = NULL;
       }
 
+      /* Break iteration when l_step :
+       * - is the first loop where we started from
+       * - tagged using BM_ELEM_TAG (meaning this loop has been visited in this iteration)
+       * - has its corresponding UV edge selected/unselected based on select */
       if (l_step && BM_elem_flag_test(l_step->e, BM_ELEM_TAG)) {
-        break;
+        /* Previously this check was not done and this resulted in the final edge in the edge ring
+         * cycle to be skipped during selection (casued by old sticky selection behavior) */
+        if (select && uvedit_edge_select_test(scene, l_step, cd_loop_uv_offset)) {
+          break;
+        }
+        else if (!select && !uvedit_edge_select_test(scene, l_step, cd_loop_uv_offset)) {
+          break;
+        }
       }
     }
   }
@@ -2752,7 +2833,12 @@ static int uv_mouse_select_loop_generic_multi(bContext *C,
   }
 
   if (loop_type == UV_LOOP_SELECT) {
-    flush = uv_select_edgeloop(sima, scene, obedit, &hit, extend);
+    if (ED_uvedit_select_mode_get(scene) == UV_SELECT_FACE) {
+      flush = uv_select_faceloop(sima, scene, obedit, &hit, extend);
+    }
+    else {
+      flush = uv_select_edgeloop(sima, scene, obedit, &hit, extend);
+    }
   }
   else if (loop_type == UV_RING_SELECT) {
     flush = uv_select_edgering(sima, scene, obedit, &hit, extend);
@@ -2804,15 +2890,7 @@ static int uv_select_loop_exec(bContext *C, wmOperator *op)
   RNA_float_get_array(op->ptr, "location", co);
   const bool extend = RNA_boolean_get(op->ptr, "extend");
 
-  Scene *scene = CTX_data_scene(C);
-  enum eUVLoopGenericType type = UV_LOOP_SELECT;
-  if (ED_uvedit_select_mode_get(scene) == UV_SELECT_FACE) {
-    /* For now ring-select and face-loop is the same thing,
-     * if we support real edge selection this will no longer be the case. */
-    type = UV_RING_SELECT;
-  }
-
-  return uv_mouse_select_loop_generic(C, co, extend, type);
+  return uv_mouse_select_loop_generic(C, co, extend, UV_LOOP_SELECT);
 }
 
 static int uv_select_loop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
