@@ -37,6 +37,7 @@ TransformOperation::TransformOperation()
   translate_factor_y_ = 1.0f;
   convert_degree_to_rad_ = false;
   sampler_ = PixelSampler::Nearest;
+  invert_ = false;
 }
 
 void TransformOperation::init_data()
