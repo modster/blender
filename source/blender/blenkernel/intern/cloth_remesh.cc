@@ -769,6 +769,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
   bool is_edge_collapseable_adaptivemesh(const AdaptiveEdge &edge, bool verts_swapped) const
   {
+    /* TODO(ish): expose small_value to gui */
+    const auto small_value = 0.2;
+
     if (this->is_edge_collapseable(edge.get_self_index(), verts_swapped, true) == false) {
       return false;
     }
@@ -782,9 +785,56 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       return false;
     }
 
+    /* Newly formed edges shouldn't exceed the edge size criterion */
+    {
+      const auto [v1_a, v2_a] = this->get_checked_verts_of_edge(edge, verts_swapped);
+      const auto &n1_a = this->get_checked_node_of_vert(v1_a);
+      const auto &n2_a = this->get_checked_node_of_vert(v2_a);
+      const auto n1_index = n1_a.get_self_index();
+      auto get_v1_v2_indices = [this, &n1_index, &verts_swapped](const AdaptiveEdge &e) {
+        auto [v1, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
+        auto v1_index = v1.get_self_index();
+        auto v2_index = v2.get_self_index();
+        /* Need to swap the verts if v1 does not point to n1 */
+        if (v1.get_node().value() != n1_index) {
+          std::swap(v1_index, v2_index);
+        }
+        BLI_assert(this->get_checked_vert(v1_index).get_node().value() == n1_index);
+        return std::make_tuple(v1_index, v2_index);
+      };
+
+      /* Get all 3D edges */
+      const auto edge_indices = this->get_connecting_edge_indices(n1_a, n2_a);
+
+      for (const auto &edge_index : edge_indices) {
+        /* Get v1 of the 3D edge in correct order */
+        const auto &e = this->get_checked_edge(edge_index);
+        const auto [v1_index, v2_index] = get_v1_v2_indices(e);
+        const auto &v1 = this->get_checked_vert(v1_index);
+        const auto &v2 = this->get_checked_vert(v2_index);
+
+        /* For edge adjacent to v1, check if the edge size is
+         * exceeded if v1 is swapped for v2 */
+        for (const auto &v1_edge_index : v1.get_edges()) {
+          const auto &v1_edge = this->get_checked_edge(v1_edge_index);
+
+          const auto v1_edge_verts = v1_edge.get_verts().value();
+
+          const auto ov_index = std::get<0>(v1_edge_verts) == v1_index ?
+                                    std::get<1>(v1_edge_verts) :
+                                    std::get<0>(v1_edge_verts);
+
+          const auto &ov = this->get_checked_vert(ov_index);
+          const auto edge_size = this->compute_edge_size(v2, ov);
+
+          if (edge_size > (1.0 - small_value)) {
+            return false;
+          }
+        }
+      }
+    }
+
     /* TODO(ish): aspect ratio test */
-    /* TODO(ish): the newly created edges' size should not be larger
-     * than 1.0 - (small value) */
     return true;
   }
 };
