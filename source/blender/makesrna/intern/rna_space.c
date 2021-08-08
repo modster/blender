@@ -2582,13 +2582,13 @@ static int rna_FileAssetSelectParams_asset_library_get(PointerRNA *ptr)
   /* Just an extra sanity check to ensure this isn't somehow called for RNA_FileSelectParams. */
   BLI_assert(ptr->type == &RNA_FileAssetSelectParams);
 
-  return ED_asset_library_reference_to_enum_value(&params->asset_library);
+  return ED_asset_library_reference_to_enum_value(&params->asset_library_ref);
 }
 
 static void rna_FileAssetSelectParams_asset_library_set(PointerRNA *ptr, int value)
 {
   FileAssetSelectParams *params = ptr->data;
-  params->asset_library = ED_asset_library_reference_from_enum_value(value);
+  params->asset_library_ref = ED_asset_library_reference_from_enum_value(value);
 }
 
 static void rna_FileAssetSelectParams_asset_category_set(PointerRNA *ptr, uint64_t value)
@@ -4361,6 +4361,21 @@ static void rna_def_space_view3d_overlay(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.00001, 100000.0);
   RNA_def_property_ui_range(prop, 0.01, 2.0, 1, 2);
   RNA_def_property_float_default(prop, 0.02);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+  prop = RNA_def_property(srna, "normals_constant_screen_size", PROP_FLOAT, PROP_PIXEL);
+  RNA_def_property_float_sdna(prop, NULL, "overlay.normals_constant_screen_size");
+  RNA_def_property_ui_text(prop, "Normal Screen Size", "Screen size for normals in the 3D view");
+  RNA_def_property_range(prop, 0.0, 100000.0);
+  RNA_def_property_ui_range(prop, 1.0, 100.0, 50, 0);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+  prop = RNA_def_property(srna, "use_normals_constant_screen_size", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(
+      prop, NULL, "overlay.edit_flag", V3D_OVERLAY_EDIT_CONSTANT_SCREEN_SIZE_NORMALS);
+  RNA_def_property_ui_text(prop,
+                           "Constant Screen Size Normals",
+                           "Keep size of normals constant in relation to 3D view");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
   prop = RNA_def_property(srna, "backwire_opacity", PROP_FLOAT, PROP_FACTOR);
