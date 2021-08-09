@@ -200,6 +200,32 @@ static void geo_node_geometry_expander_exec(GeoNodeExecParams params)
           }
           break;
         }
+        case GEOMETRY_EXPANDER_OUTPUT_TYPE_DERIVED: {
+          const StringRef identifier = expander_output->derived_identifier;
+          if (identifier == "index") {
+            array_cpp_type->array_construct_uninitialized(buffer, domain_size);
+            MutableSpan<int> indices = array_cpp_type->array_span(buffer).typed<int>();
+            for (int i : indices.index_range()) {
+              indices[i] = i;
+            }
+          }
+          else if (identifier == "normal") {
+            if (component->attribute_exists("normal")) {
+              GVArray_Typed<float3> normals = component->attribute_get_for_read<float3>(
+                  "normal", domain, {0, 0, 0});
+              array_cpp_type->array_construct_uninitialized(buffer, domain_size);
+              normals->materialize_to_uninitialized(
+                  array_cpp_type->array_span(buffer).typed<float3>());
+            }
+            else {
+              array_cpp_type->default_construct(buffer);
+            }
+          }
+          else {
+            array_cpp_type->default_construct(buffer);
+          }
+          break;
+        }
       }
     }
 

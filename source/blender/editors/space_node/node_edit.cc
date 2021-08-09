@@ -3035,6 +3035,22 @@ static void foreach_available_attribute(
     STRNCPY(attribute.builtin_identifier, "material_index");
     callback(attribute);
   }
+  {
+    GeometryExpanderOutput attribute;
+    attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_DERIVED;
+    attribute.socket_type = SOCK_VECTOR;
+    attribute.array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES;
+    STRNCPY(attribute.derived_identifier, "normal");
+    callback(attribute);
+  }
+  {
+    GeometryExpanderOutput attribute;
+    attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_DERIVED;
+    attribute.socket_type = SOCK_INT;
+    attribute.array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES;
+    STRNCPY(attribute.derived_identifier, "index");
+    callback(attribute);
+  }
 }
 
 static MutableSpan<GeometryExpanderOutput> get_updated_cached_available_attributes(

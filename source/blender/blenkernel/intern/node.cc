@@ -3949,6 +3949,9 @@ static std::string expander_output_to_name(const GeometryExpanderOutput &expande
     case GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN: {
       return StringRef("Built-in ▶ ") + expander_output.builtin_identifier;
     }
+    case GEOMETRY_EXPANDER_OUTPUT_TYPE_DERIVED: {
+      return StringRef("Derived ▶ ") + expander_output.derived_identifier;
+    }
   }
   return "";
 }

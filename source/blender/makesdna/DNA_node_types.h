@@ -1440,6 +1440,7 @@ typedef enum eGeometryExpanderOutputType {
   GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL,
   GEOMETRY_EXPANDER_OUTPUT_TYPE_INPUT,
   GEOMETRY_EXPANDER_OUTPUT_TYPE_BUILTIN,
+  GEOMETRY_EXPANDER_OUTPUT_TYPE_DERIVED,
 } eGeometryExpanderOutputType;
 
 typedef enum eGeometryExpanderArraySource {
@@ -1481,6 +1482,9 @@ typedef struct GeometryExpanderOutput {
 
   /* Builtin attribute data. */
   char builtin_identifier[64];
+
+  /* Derived data. */
+  char derived_identifier[64];
 } GeometryExpanderOutput;
 
 typedef struct NodeGeometryGeometryExpander {
