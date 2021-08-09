@@ -144,6 +144,7 @@
 #include "DRW_engine.h"
 
 #include "BLO_read_write.h"
+#include "BLO_readfile.h"
 
 #include "SEQ_sequencer.h"
 
@@ -205,7 +206,8 @@ static void object_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const in
   }
   else if (ob_dst->mat != NULL || ob_dst->matbits != NULL) {
     /* This shall not be needed, but better be safe than sorry. */
-    BLI_assert(!"Object copy: non-NULL material pointers with zero counter, should not happen.");
+    BLI_assert_msg(
+        0, "Object copy: non-NULL material pointers with zero counter, should not happen.");
     ob_dst->mat = NULL;
     ob_dst->matbits = NULL;
   }
@@ -234,7 +236,7 @@ static void object_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const in
       BKE_pose_rebuild(bmain, ob_dst, ob_dst->data, do_pose_id_user);
     }
   }
-  BKE_defgroup_copy_list(&ob_dst->defbase, &ob_src->defbase);
+
   BKE_object_facemap_copy_list(&ob_dst->fmaps, &ob_src->fmaps);
   BKE_constraints_copy_ex(&ob_dst->constraints, &ob_src->constraints, flag_subdata, true);
 
@@ -285,7 +287,6 @@ static void object_free_data(ID *id)
   MEM_SAFE_FREE(ob->iuser);
   MEM_SAFE_FREE(ob->runtime.bb);
 
-  BLI_freelistN(&ob->defbase);
   BLI_freelistN(&ob->fmaps);
   if (ob->pose) {
     BKE_pose_free_ex(ob->pose, false);
@@ -510,13 +511,6 @@ static void object_foreach_id(ID *id, LibraryForeachIDData *data)
   }
 }
 
-static void write_defgroups(BlendWriter *writer, ListBase *defbase)
-{
-  LISTBASE_FOREACH (bDeformGroup *, defgroup, defbase) {
-    BLO_write_struct(writer, bDeformGroup, defgroup);
-  }
-}
-
 static void write_fmaps(BlendWriter *writer, ListBase *fbase)
 {
   LISTBASE_FOREACH (bFaceMap *, fmap, fbase) {
@@ -561,7 +555,6 @@ static void object_blend_write(BlendWriter *writer, ID *id, const void *id_addre
     }
 
     BKE_pose_blend_write(writer, ob->pose, arm);
-    write_defgroups(writer, &ob->defbase);
     write_fmaps(writer, &ob->fmaps);
     BKE_constraint_blend_write(writer, &ob->constraints);
     animviz_motionpath_blend_write(writer, ob->mpath);
@@ -644,7 +637,9 @@ static void object_blend_read_data(BlendDataReader *reader, ID *id)
     animviz_motionpath_blend_read_data(reader, ob->mpath);
   }
 
+  /* Only for versioning, vertex group names are now stored on object data. */
   BLO_read_list(reader, &ob->defbase);
+
   BLO_read_list(reader, &ob->fmaps);
   /* XXX deprecated - old animation system <<< */
   direct_link_nlastrips(reader, &ob->nlastrips);
@@ -839,7 +834,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
 {
   Object *ob = (Object *)id;
 
-  bool warn = false;
+  BlendFileReadReport *reports = BLO_read_lib_reports(reader);
 
   /* XXX deprecated - old animation system <<< */
   BLO_read_id_address(reader, ob->id.lib, &ob->ipo);
@@ -857,8 +852,8 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
   else {
     if (ob->instance_collection != NULL) {
       ID *new_id = BLO_read_get_new_id_address(reader, ob->id.lib, &ob->instance_collection->id);
-      BLO_reportf_wrap(BLO_read_lib_reports(reader),
-                       RPT_WARNING,
+      BLO_reportf_wrap(reports,
+                       RPT_INFO,
                        TIP_("Non-Empty object '%s' cannot duplicate collection '%s' "
                             "anymore in Blender 2.80, removed instancing"),
                        ob->id.name + 2,
@@ -876,11 +871,17 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
       ob->proxy = NULL;
 
       if (ob->id.lib) {
-        printf("Proxy lost from  object %s lib %s\n", ob->id.name + 2, ob->id.lib->filepath);
+        BLO_reportf_wrap(reports,
+                         RPT_INFO,
+                         TIP_("Proxy lost from  object %s lib %s\n"),
+                         ob->id.name + 2,
+                         ob->id.lib->filepath);
       }
       else {
-        printf("Proxy lost from  object %s lib <NONE>\n", ob->id.name + 2);
+        BLO_reportf_wrap(
+            reports, RPT_INFO, TIP_("Proxy lost from  object %s lib <NONE>\n"), ob->id.name + 2);
       }
+      reports->count.missing_obproxies++;
     }
     else {
       /* this triggers object_update to always use a copy */
@@ -893,15 +894,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
   BLO_read_id_address(reader, ob->id.lib, &ob->data);
 
   if (ob->data == NULL && poin != NULL) {
-    if (ob->id.lib) {
-      printf("Can't find obdata of %s lib %s\n", ob->id.name + 2, ob->id.lib->filepath);
-    }
-    else {
-      printf("Object %s lost data.\n", ob->id.name + 2);
-    }
-
     ob->type = OB_EMPTY;
-    warn = true;
 
     if (ob->pose) {
       /* we can't call #BKE_pose_free() here because of library linking
@@ -917,6 +910,18 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
       ob->pose = NULL;
       ob->mode &= ~OB_MODE_POSE;
     }
+
+    if (ob->id.lib) {
+      BLO_reportf_wrap(reports,
+                       RPT_INFO,
+                       TIP_("Can't find obdata of %s lib %s\n"),
+                       ob->id.name + 2,
+                       ob->id.lib->filepath);
+    }
+    else {
+      BLO_reportf_wrap(reports, RPT_INFO, TIP_("Object %s lost data\n"), ob->id.name + 2);
+    }
+    reports->count.missing_obdata++;
   }
   for (int a = 0; a < ob->totcol; a++) {
     BLO_read_id_address(reader, ob->id.lib, &ob->mat[a]);
@@ -928,7 +933,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
     const short *totcol_data = BKE_object_material_len_p(ob);
     /* Only expand so as not to lose any object materials that might be set. */
     if (totcol_data && (*totcol_data > ob->totcol)) {
-      /* printf("'%s' %d -> %d\n", ob->id.name, ob->totcol, *totcol_data); */
+      // printf("'%s' %d -> %d\n", ob->id.name, ob->totcol, *totcol_data);
       BKE_object_material_resize(BLO_read_lib_get_main(reader), ob, *totcol_data, false);
     }
   }
@@ -997,10 +1002,6 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
   if (ob->rigidbody_constraint) {
     BLO_read_id_address(reader, ob->id.lib, &ob->rigidbody_constraint->ob1);
     BLO_read_id_address(reader, ob->id.lib, &ob->rigidbody_constraint->ob2);
-  }
-
-  if (warn) {
-    BLO_reportf_wrap(BLO_read_lib_reports(reader), RPT_WARNING, "Warning in console");
   }
 }
 
@@ -1539,7 +1540,8 @@ bool BKE_object_modifier_stack_copy(Object *ob_dst,
                                     const int flag_subdata)
 {
   if ((ob_dst->type == OB_GPENCIL) != (ob_src->type == OB_GPENCIL)) {
-    BLI_assert(!"Trying to copy a modifier stack between a GPencil object and another type.");
+    BLI_assert_msg(0,
+                   "Trying to copy a modifier stack between a GPencil object and another type.");
     return false;
   }
 
@@ -1658,7 +1660,7 @@ static void object_update_from_subsurf_ccg(Object *object)
    *
    * All this is defeating all the designs we need to follow to allow safe
    * threaded evaluation, but this is as good as we can make it within the
-   * current sculpt//evaluated mesh design. This is also how we've survived
+   * current sculpt/evaluated mesh design. This is also how we've survived
    * with old DerivedMesh based solutions. So, while this is all wrong and
    * needs reconsideration, doesn't seem to be a big stopper for real
    * production artists.
@@ -2078,6 +2080,12 @@ static void object_init(Object *ob, const short ob_type)
 
   if (ob->type == OB_GPENCIL) {
     ob->dtx |= OB_USE_GPENCIL_LIGHTS;
+  }
+
+  if (ob->type == OB_LAMP) {
+    /* Lights are invisible to camera rays and are assumed to be a
+     * shadow catcher by default. */
+    ob->visibility_flag |= OB_HIDE_CAMERA | OB_SHADOW_CATCHER;
   }
 }
 
@@ -2813,7 +2821,7 @@ void BKE_object_copy_proxy_drivers(Object *ob, Object *target)
 
     /* add new animdata block */
     if (!ob->adt) {
-      ob->adt = BKE_animdata_add_id(&ob->id);
+      ob->adt = BKE_animdata_ensure_id(&ob->id);
     }
 
     /* make a copy of all the drivers (for now), then correct any links that need fixing */
@@ -2900,9 +2908,6 @@ void BKE_object_make_proxy(Main *bmain, Object *ob, Object *target, Object *cob)
   ob->type = target->type;
   ob->data = target->data;
   id_us_plus((ID *)ob->data); /* ensures lib data becomes LIB_TAG_EXTERN */
-
-  /* copy vertex groups */
-  BKE_defgroup_copy_list(&ob->defbase, &target->defbase);
 
   /* copy material and index information */
   ob->actcol = ob->totcol = 0;
@@ -3345,7 +3350,7 @@ static void give_parvert(Object *par, int nr, float vec[3])
           }
           BLI_mutex_unlock(&vparent_lock);
 #else
-          BLI_assert(!"Not safe for threading");
+          BLI_assert_msg(0, "Not safe for threading");
           BM_mesh_elem_table_ensure(em->bm, BM_VERT);
 #endif
         }
@@ -4042,10 +4047,7 @@ void BKE_object_empty_draw_type_set(Object *ob, const int value)
     }
   }
   else {
-    if (ob->iuser) {
-      MEM_freeN(ob->iuser);
-      ob->iuser = NULL;
-    }
+    MEM_SAFE_FREE(ob->iuser);
   }
 }
 
@@ -4143,6 +4145,30 @@ bool BKE_object_minmax_dupli(Depsgraph *depsgraph,
   return ok;
 }
 
+struct GPencilStrokePointIterData {
+  const float (*obmat)[4];
+
+  void (*point_func_cb)(const float co[3], void *user_data);
+  void *user_data;
+};
+
+static void foreach_display_point_gpencil_stroke_fn(bGPDlayer *UNUSED(layer),
+                                                    bGPDframe *UNUSED(frame),
+                                                    bGPDstroke *stroke,
+                                                    void *thunk)
+{
+  struct GPencilStrokePointIterData *iter_data = thunk;
+  {
+    bGPDspoint *pt;
+    int i;
+    for (i = 0, pt = stroke->points; i < stroke->totpoints; i++, pt++) {
+      float co[3];
+      mul_v3_m4v3(co, iter_data->obmat, &pt->x);
+      iter_data->point_func_cb(co, iter_data->user_data);
+    }
+  }
+}
+
 void BKE_object_foreach_display_point(Object *ob,
                                       const float obmat[4][4],
                                       void (*func_cb)(const float[3], void *),
@@ -4159,6 +4185,13 @@ void BKE_object_foreach_display_point(Object *ob,
       mul_v3_m4v3(co, obmat, mv->co);
       func_cb(co, user_data);
     }
+  }
+  else if (ob->type == OB_GPENCIL) {
+    struct GPencilStrokePointIterData iter_data = {
+        .obmat = obmat, .point_func_cb = func_cb, .user_data = user_data};
+
+    BKE_gpencil_visible_stroke_iter(
+        ob->data, NULL, foreach_display_point_gpencil_stroke_fn, &iter_data);
   }
   else if (ob->runtime.curve_cache && ob->runtime.curve_cache->disp.first) {
     DispList *dl;

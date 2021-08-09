@@ -844,10 +844,7 @@ static void surfaceGenerateGrid(struct DynamicPaintSurface *surface)
     if (temp_s_num) {
       MEM_freeN(temp_s_num);
     }
-    if (temp_t_index) {
-      MEM_freeN(temp_t_index);
-    }
-    grid->temp_t_index = NULL;
+    MEM_SAFE_FREE(temp_t_index);
 
     if (error || !grid->s_num) {
       setError(surface->canvas, N_("Not enough free memory"));
@@ -988,10 +985,7 @@ void dynamicPaint_freeSurface(const DynamicPaintModifierData *pmd, DynamicPaintS
   }
   surface->pointcache = NULL;
 
-  if (surface->effector_weights) {
-    MEM_freeN(surface->effector_weights);
-  }
-  surface->effector_weights = NULL;
+  MEM_SAFE_FREE(surface->effector_weights);
 
   BLI_remlink(&(surface->canvas->surfaces), surface);
   dynamicPaint_freeSurfaceData(surface);
@@ -3818,7 +3812,7 @@ static void dynamicPaint_brushMeshCalculateVelocity(Depsgraph *depsgraph,
                                       ob,
                                       true,
                                       SUBFRAME_RECURSION,
-                                      BKE_scene_frame_get(scene),
+                                      BKE_scene_ctime_get(scene),
                                       eModifierType_DynamicPaint);
   mesh_p = BKE_mesh_copy_for_eval(dynamicPaint_brush_mesh_get(brush), false);
   numOfVerts_p = mesh_p->totvert;
@@ -3834,7 +3828,7 @@ static void dynamicPaint_brushMeshCalculateVelocity(Depsgraph *depsgraph,
                                       ob,
                                       true,
                                       SUBFRAME_RECURSION,
-                                      BKE_scene_frame_get(scene),
+                                      BKE_scene_ctime_get(scene),
                                       eModifierType_DynamicPaint);
   mesh_c = dynamicPaint_brush_mesh_get(brush);
   numOfVerts_c = mesh_c->totvert;
@@ -3894,7 +3888,7 @@ static void dynamicPaint_brushObjectCalculateVelocity(
                                       ob,
                                       false,
                                       SUBFRAME_RECURSION,
-                                      BKE_scene_frame_get(scene),
+                                      BKE_scene_ctime_get(scene),
                                       eModifierType_DynamicPaint);
   copy_m4_m4(prev_obmat, ob->obmat);
 
@@ -3906,7 +3900,7 @@ static void dynamicPaint_brushObjectCalculateVelocity(
                                       ob,
                                       false,
                                       SUBFRAME_RECURSION,
-                                      BKE_scene_frame_get(scene),
+                                      BKE_scene_ctime_get(scene),
                                       eModifierType_DynamicPaint);
 
   /* calculate speed */
@@ -6271,7 +6265,7 @@ static int dynamicPaint_doStep(Depsgraph *depsgraph,
                                                 brushObj,
                                                 true,
                                                 SUBFRAME_RECURSION,
-                                                BKE_scene_frame_get(scene),
+                                                BKE_scene_ctime_get(scene),
                                                 eModifierType_DynamicPaint);
           }
 
@@ -6312,7 +6306,7 @@ static int dynamicPaint_doStep(Depsgraph *depsgraph,
                                                 brushObj,
                                                 true,
                                                 SUBFRAME_RECURSION,
-                                                BKE_scene_frame_get(scene),
+                                                BKE_scene_ctime_get(scene),
                                                 eModifierType_DynamicPaint);
           }
 

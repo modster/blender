@@ -2753,18 +2753,18 @@ void BKE_ptcache_id_clear(PTCacheID *pid, int mode, unsigned int cfra)
   pid->cache->flag |= PTCACHE_FLAG_INFO_DIRTY;
 }
 
-int BKE_ptcache_id_exist(PTCacheID *pid, int cfra)
+bool BKE_ptcache_id_exist(PTCacheID *pid, int cfra)
 {
   if (!pid->cache) {
-    return 0;
+    return false;
   }
 
   if (cfra < pid->cache->startframe || cfra > pid->cache->endframe) {
-    return 0;
+    return false;
   }
 
   if (pid->cache->cached_frames && pid->cache->cached_frames[cfra - pid->cache->startframe] == 0) {
-    return 0;
+    return false;
   }
 
   if (pid->cache->flag & PTCACHE_DISK_CACHE) {
@@ -2779,10 +2779,10 @@ int BKE_ptcache_id_exist(PTCacheID *pid, int cfra)
 
   for (; pm; pm = pm->next) {
     if (pm->frame == cfra) {
-      return 1;
+      return true;
     }
   }
-  return 0;
+  return false;
 }
 void BKE_ptcache_id_time(
     PTCacheID *pid, Scene *scene, float cfra, int *startframe, int *endframe, float *timescale)
@@ -2807,8 +2807,8 @@ void BKE_ptcache_id_time(
   cache = pid->cache;
 
   if (timescale) {
-    time = BKE_scene_frame_get(scene);
-    nexttime = BKE_scene_frame_to_ctime(scene, CFRA + 1.0f);
+    time = BKE_scene_ctime_get(scene);
+    nexttime = BKE_scene_frame_to_ctime(scene, scene->r.cfra + 1);
 
     *timescale = MAX2(nexttime - time, 0.0f);
   }
@@ -3369,7 +3369,7 @@ void BKE_ptcache_bake(PTCacheBaker *baker)
     }
 
     /* NOTE: breaking baking should leave calculated frames in cache, not clear it */
-    if ((cancel || G.is_break)) {
+    if (cancel || G.is_break) {
       break;
     }
 

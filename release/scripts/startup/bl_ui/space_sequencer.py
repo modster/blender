@@ -148,20 +148,6 @@ class SEQUENCER_HT_header(Header):
 
         layout.separator_spacer()
 
-        if st.view_type in {'PREVIEW', 'SEQUENCER_PREVIEW'}:
-            layout.prop(st, "display_mode", text="", icon_only=True)
-            layout.prop(st, "preview_channels", text="", icon_only=True)
-
-            gpd = context.gpencil_data
-            tool_settings = context.tool_settings
-
-            # Proportional editing
-            if gpd and gpd.use_stroke_edit_mode:
-                row = layout.row(align=True)
-                row.prop(tool_settings, "use_proportional_edit", icon_only=True)
-                if tool_settings.use_proportional_edit:
-                    row.prop(tool_settings, "proportional_edit_falloff", icon_only=True)
-
         if st.view_type in {'SEQUENCER', 'SEQUENCER_PREVIEW'}:
             tool_settings = context.tool_settings
             row = layout.row(align=True)
@@ -169,6 +155,10 @@ class SEQUENCER_HT_header(Header):
             sub = row.row(align=True)
             sub.popover(panel="SEQUENCER_PT_snapping")
             layout.separator_spacer()
+
+        if st.view_type in {'PREVIEW', 'SEQUENCER_PREVIEW'}:
+            layout.prop(st, "display_mode", text="", icon_only=True)
+            layout.prop(st, "preview_channels", text="", icon_only=True)
 
         row = layout.row(align=True)
         row.prop(st, "show_strip_overlay", text="", icon='OVERLAY')
@@ -263,6 +253,7 @@ class SEQUENCER_PT_sequencer_overlay(Panel):
 
         layout.prop(st, "show_strip_offset", text="Offsets")
         layout.prop(st, "show_fcurves", text="F-Curves")
+        layout.prop(st, "show_grid", text="Grid")
 
         layout.separator()
 
@@ -1156,14 +1147,19 @@ class SEQUENCER_PT_effect(SequencerButtonsPanel, Panel):
             flow.prop(strip, "use_only_boost")
 
         elif strip_type == 'SPEED':
-            layout.prop(strip, "use_default_fade", text="Stretch to Input Strip Length")
-            if not strip.use_default_fade:
-                layout.prop(strip, "use_as_speed")
-                if strip.use_as_speed:
-                    layout.prop(strip, "speed_factor")
-                else:
-                    layout.prop(strip, "speed_factor", text="Frame Number")
-                    layout.prop(strip, "use_scale_to_length")
+            col = layout.column(align=True)
+            col.prop(strip, "speed_control", text="Speed Control")
+            if strip.speed_control == "MULTIPLY":
+                col.prop(strip, "speed_factor", text=" ")
+            elif strip.speed_control == "LENGTH":
+                col.prop(strip, "speed_length", text=" ")
+            elif strip.speed_control == "FRAME_NUMBER":
+                col.prop(strip, "speed_frame_number", text=" ")
+
+            row = layout.row(align=True)
+            row.enabled = strip.speed_control != "STRETCH"
+            row = layout.row(align=True, heading="Interpolation")
+            row.prop(strip, "use_frame_interpolate", text="")
 
         elif strip_type == 'TRANSFORM':
             col = layout.column()
@@ -1233,11 +1229,7 @@ class SEQUENCER_PT_effect(SequencerButtonsPanel, Panel):
             layout.prop(strip, "wrap_width", text="Wrap Width")
 
         col = layout.column(align=True)
-        if strip_type == 'SPEED':
-            col.prop(strip, "multiply_speed")
-            col.prop(strip, "use_frame_interpolate")
-
-        elif strip_type in {'CROSS', 'GAMMA_CROSS', 'WIPE', 'ALPHA_OVER', 'ALPHA_UNDER', 'OVER_DROP'}:
+        if strip_type in {'CROSS', 'GAMMA_CROSS', 'WIPE', 'ALPHA_OVER', 'ALPHA_UNDER', 'OVER_DROP'}:
             col.prop(strip, "use_default_fade", text="Default Fade")
             if not strip.use_default_fade:
                 col.prop(strip, "effect_fader", text="Effect Fader")
@@ -2293,8 +2285,8 @@ class SEQUENCER_PT_snapping(Panel):
         col.prop(sequencer_tool_settings, "snap_ignore_muted", text="Muted Strips")
         col.prop(sequencer_tool_settings, "snap_ignore_sound", text="Sound Strips")
 
-        col = layout.column()
-        col.prop(sequencer_tool_settings, "use_snap_current_frame_to_strips")
+        col = layout.column(heading="Current Frame", align=True)
+        col.prop(sequencer_tool_settings, "use_snap_current_frame_to_strips", text="Snap to Strips")
 
 
 classes = (

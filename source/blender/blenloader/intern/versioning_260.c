@@ -2149,7 +2149,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
 
     for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
-      /* NB: scene->nodetree is a local ID block, has been direct_link'ed */
+      /* NOTE: `scene->nodetree` is a local ID block, has been direct_link'ed. */
       if (scene->nodetree) {
         scene->nodetree->active_viewer_key = active_viewer_key;
       }
@@ -2390,7 +2390,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
         for (md = ob->modifiers.first; md; md = md->next) {
           if (md->type == eModifierType_Triangulate) {
             TriangulateModifierData *tmd = (TriangulateModifierData *)md;
-            if ((tmd->flag & MOD_TRIANGULATE_BEAUTY)) {
+            if (tmd->flag & MOD_TRIANGULATE_BEAUTY) {
               tmd->quad_method = MOD_TRIANGULATE_QUAD_BEAUTY;
               tmd->ngon_method = MOD_TRIANGULATE_NGON_BEAUTY;
             }

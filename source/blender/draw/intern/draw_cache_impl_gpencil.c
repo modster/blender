@@ -552,6 +552,9 @@ bGPDstroke *DRW_cache_gpencil_sbuffer_stroke_data_get(Object *ob)
     gps->caps[0] = gps->caps[1] = GP_STROKE_CAP_ROUND;
     gps->runtime.stroke_start = 1; /* Add one for the adjacency index. */
     copy_v4_v4(gps->vert_color_fill, gpd->runtime.vert_color_fill);
+    /* Caps. */
+    gps->caps[0] = gps->caps[1] = (short)brush->gpencil_settings->caps_type;
+
     gpd->runtime.sbuffer_gps = gps;
   }
   return gpd->runtime.sbuffer_gps;
@@ -844,8 +847,8 @@ static void gpencil_edit_batches_ensure(Object *ob, GpencilBatchCache *cache, in
     int vert_len = GPU_vertbuf_get_vertex_len(cache->vbo);
 
     gpEditIterData iter;
-    iter.vgindex = ob->actdef - 1;
-    if (!BLI_findlink(&ob->defbase, iter.vgindex)) {
+    iter.vgindex = gpd->vertex_group_active_index - 1;
+    if (!BLI_findlink(&gpd->vertex_group_names, iter.vgindex)) {
       iter.vgindex = -1;
     }
 

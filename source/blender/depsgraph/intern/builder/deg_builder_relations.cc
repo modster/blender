@@ -327,7 +327,7 @@ void DepsgraphRelationBuilder::add_customdata_mask(Object *object,
     IDNode *id_node = graph_->find_id_node(&object->id);
 
     if (id_node == nullptr) {
-      BLI_assert(!"ID should always be valid");
+      BLI_assert_msg(0, "ID should always be valid");
     }
     else {
       id_node->customdata_masks |= customdata_masks;
@@ -339,7 +339,7 @@ void DepsgraphRelationBuilder::add_special_eval_flag(ID *id, uint32_t flag)
 {
   IDNode *id_node = graph_->find_id_node(id);
   if (id_node == nullptr) {
-    BLI_assert(!"ID should always be valid");
+    BLI_assert_msg(0, "ID should always be valid");
   }
   else {
     id_node->eval_flags |= flag;
@@ -1611,7 +1611,7 @@ void DepsgraphRelationBuilder::build_driver_data(ID *id, FCurve *fcu)
         }
       }
     }
-    if (property_entry_key.prop != nullptr && RNA_property_is_idprop(property_entry_key.prop)) {
+    if (rna_prop_affects_parameters_node(&property_entry_key.ptr, property_entry_key.prop)) {
       RNAPathKey property_exit_key(property_entry_key.id,
                                    property_entry_key.ptr,
                                    property_entry_key.prop,
@@ -1714,7 +1714,7 @@ void DepsgraphRelationBuilder::build_driver_id_property(ID *id, const char *rna_
   if (prop == nullptr) {
     return;
   }
-  if (!RNA_property_is_idprop(prop)) {
+  if (!rna_prop_affects_parameters_node(&ptr, prop)) {
     return;
   }
   const char *prop_identifier = RNA_property_identifier((PropertyRNA *)prop);
@@ -2225,6 +2225,11 @@ void DepsgraphRelationBuilder::build_object_data_geometry_datablock(ID *obdata)
   OperationKey obdata_geom_eval_key(obdata, NodeType::GEOMETRY, OperationCode::GEOMETRY_EVAL);
   OperationKey obdata_geom_done_key(obdata, NodeType::GEOMETRY, OperationCode::GEOMETRY_EVAL_DONE);
   add_relation(obdata_geom_eval_key, obdata_geom_done_key, "ObData Geom Eval Done");
+
+  /* Link object data evaluation to parameter evaluation. */
+  ComponentKey parameters_key(obdata, NodeType::PARAMETERS);
+  add_relation(parameters_key, obdata_geom_eval_key, "ObData Geom Params");
+
   /* Type-specific links. */
   const ID_Type id_type = GS(obdata->name);
   switch (id_type) {
@@ -2315,7 +2320,7 @@ void DepsgraphRelationBuilder::build_object_data_geometry_datablock(ID *obdata)
       break;
     }
     default:
-      BLI_assert(!"Should not happen");
+      BLI_assert_msg(0, "Should not happen");
       break;
   }
 }
@@ -2498,7 +2503,7 @@ void DepsgraphRelationBuilder::build_nodetree(bNodeTree *ntree)
       add_relation(group_shading_key, shading_key, "Group Node");
     }
     else {
-      BLI_assert(!"Unknown ID type used for node");
+      BLI_assert_msg(0, "Unknown ID type used for node");
     }
   }
 

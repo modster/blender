@@ -25,6 +25,7 @@
 extern "C" {
 #endif
 
+struct CacheArchiveHandle;
 struct CacheReader;
 struct ListBase;
 struct Main;
@@ -32,8 +33,6 @@ struct Mesh;
 struct Object;
 struct Scene;
 struct bContext;
-
-typedef struct AbcArchiveHandle AbcArchiveHandle;
 
 int ABC_get_version(void);
 
@@ -103,13 +102,15 @@ bool ABC_import(struct bContext *C,
                 float default_radius,
                 bool as_background_job);
 
-AbcArchiveHandle *ABC_create_handle(struct Main *bmain,
-                                    const char *filename,
-                                    struct ListBase *object_paths);
+struct CacheArchiveHandle *ABC_create_handle(struct Main *bmain,
+                                             const char *filename,
+                                             struct ListBase *object_paths);
 
-bool ABC_get_min_max_time(AbcArchiveHandle *handle, double *r_min_time, double *r_max_time);
+bool ABC_get_min_max_time(struct CacheArchiveHandle *handle,
+                          double *r_min_time,
+                          double *r_max_time);
 
-void ABC_free_handle(AbcArchiveHandle *handle);
+void ABC_free_handle(struct CacheArchiveHandle *handle);
 
 void ABC_get_transform(struct CacheReader *reader,
                        float r_mat_world[4][4],
@@ -130,10 +131,10 @@ bool ABC_mesh_topology_changed(struct CacheReader *reader,
                                const float time,
                                const char **err_str);
 
-void CacheReader_incref(struct CacheReader *reader);
-void CacheReader_free(struct CacheReader *reader);
+void ABC_CacheReader_incref(struct CacheReader *reader);
+void ABC_CacheReader_free(struct CacheReader *reader);
 
-struct CacheReader *CacheReader_open_alembic_object(struct AbcArchiveHandle *handle,
+struct CacheReader *CacheReader_open_alembic_object(struct CacheArchiveHandle *handle,
                                                     struct CacheReader *reader,
                                                     struct Object *object,
                                                     const char *object_path);

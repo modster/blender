@@ -664,7 +664,8 @@ void NODE_OT_select(wmOperatorType *ot)
 
   /* properties */
   WM_operator_properties_generic_select(ot);
-  RNA_def_boolean(ot->srna, "extend", false, "Extend", "");
+  prop = RNA_def_boolean(ot->srna, "extend", false, "Extend", "");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   RNA_def_boolean(ot->srna, "socket_select", false, "Socket Select", "");
   prop = RNA_def_boolean(ot->srna,
                          "deselect_all",
@@ -1196,7 +1197,7 @@ static void node_find_create_label(const bNode *node, char *str, int maxlen)
   }
 }
 
-/* generic  search invoke */
+/* Generic search invoke. */
 static void node_find_update_fn(const struct bContext *C,
                                 void *UNUSED(arg),
                                 const char *str,

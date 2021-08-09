@@ -58,10 +58,17 @@
 #include "MOD_modifiertypes.h"
 #include "MOD_ui_common.h"
 
-#ifdef WITH_ALEMBIC
-#  include "ABC_alembic.h"
+#if defined(WITH_USD) || defined(WITH_ALEMBIC)
 #  include "BKE_global.h"
 #  include "BKE_lib_id.h"
+#endif
+
+#ifdef WITH_ALEMBIC
+#  include "ABC_alembic.h"
+#endif
+
+#ifdef WITH_USD
+#  include "usd.h"
 #endif
 
 static void initData(ModifierData *md)
@@ -69,6 +76,10 @@ static void initData(ModifierData *md)
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
 
   BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(mcmd, modifier));
+
+  mcmd->cache_file = NULL;
+  mcmd->object_path[0] = '\0';
+  mcmd->read_flag = MOD_MESHSEQ_READ_ALL;
 
   MEMCPY_STRUCT_AFTER(mcmd, DNA_struct_default_get(MeshSeqCacheModifierData), modifier);
 }
@@ -150,7 +161,7 @@ static Mesh *generate_bounding_box_mesh(Object *object, Mesh *org_mesh)
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
-#ifdef WITH_ALEMBIC
+#if defined(WITH_USD) || defined(WITH_ALEMBIC)
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
 
   /* Only used to check whether we are operating on org data or not... */
@@ -168,23 +179,38 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
     if (!mcmd->reader) {
       BKE_modifier_set_error(
-          ctx->object, md, "Could not create Alembic reader for file %s", cache_file->filepath);
+          ctx->object, md, "Could not create reader for file %s", cache_file->filepath);
       return mesh;
     }
   }
 
   /* Do not process data if using a render procedural, return a box instead for displaying in the
    * viewport. */
-  if (BKE_cache_file_uses_render_procedural(
-          cache_file, scene, DEG_get_mode(ctx->depsgraph))) {
+  if (BKE_cache_file_uses_render_procedural(cache_file, scene, DEG_get_mode(ctx->depsgraph))) {
     return generate_bounding_box_mesh(ctx->object, org_mesh);
   }
 
-  /* If this invocation is for the ORCO mesh, and the mesh in Alembic hasn't changed topology, we
+  /* If this invocation is for the ORCO mesh, and the mesh hasn't changed topology, we
    * must return the mesh as-is instead of deforming it. */
-  if (ctx->flag & MOD_APPLY_ORCO &&
-      !ABC_mesh_topology_changed(mcmd->reader, ctx->object, mesh, time, &err_str)) {
-    return mesh;
+  if (ctx->flag & MOD_APPLY_ORCO) {
+    switch (cache_file->type) {
+      case CACHEFILE_TYPE_ALEMBIC:
+#  ifdef WITH_ALEMBIC
+        if (!ABC_mesh_topology_changed(mcmd->reader, ctx->object, mesh, time, &err_str)) {
+          return mesh;
+        }
+#  endif
+        break;
+      case CACHEFILE_TYPE_USD:
+#  ifdef WITH_USD
+        if (!USD_mesh_topology_changed(mcmd->reader, ctx->object, mesh, time, &err_str)) {
+          return mesh;
+        }
+#  endif
+        break;
+      case CACHE_FILE_TYPE_INVALID:
+        break;
+    }
   }
 
   if (me != NULL) {
@@ -204,12 +230,23 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     }
   }
 
-  Mesh *result = ABC_read_mesh(mcmd->reader,
-                               ctx->object,
-                               mesh,
-                               time,
-                               &err_str,
-                               mcmd->read_flag);
+  Mesh *result = NULL;
+
+  switch (cache_file->type) {
+    case CACHEFILE_TYPE_ALEMBIC:
+#  ifdef WITH_ALEMBIC
+      result = ABC_read_mesh(mcmd->reader, ctx->object, mesh, time, &err_str, mcmd->read_flag);
+#  endif
+      break;
+    case CACHEFILE_TYPE_USD:
+#  ifdef WITH_USD
+      result = USD_read_mesh(
+          mcmd->reader, ctx->object, mesh, time * FPS, &err_str, mcmd->read_flag);
+#  endif
+      break;
+    case CACHE_FILE_TYPE_INVALID:
+      break;
+  }
 
   mcmd->velocity_delta = 1.0f;
   if (mcmd->cache_file->velocity_unit == CACHEFILE_VELOCITY_UNIT_SECOND) {
@@ -240,7 +277,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
 static bool dependsOnTime(Scene *scene, ModifierData *md, const int dag_eval_mode)
 {
-#ifdef WITH_ALEMBIC
+#if defined(WITH_USD) || defined(WITH_ALEMBIC)
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
   /* Do not evaluate animations if using the render engine procedural. */
   return (mcmd->cache_file != NULL) &&
@@ -294,7 +331,8 @@ static void panel_draw(const bContext *C, Panel *panel)
   uiItemR(layout, ptr, "velocity_scale", 0, NULL, ICON_NONE);
 
   uiLayout *row = uiLayoutRow(layout, false);
-  const bool can_use_render_procedural = has_cache_file && RNA_boolean_get(&cache_file_ptr, "use_render_procedural");
+  const bool can_use_render_procedural = has_cache_file &&
+                                         RNA_boolean_get(&cache_file_ptr, "use_render_procedural");
   uiLayoutSetActive(row, can_use_render_procedural);
   uiItemR(row, ptr, "radius_scale", 0, NULL, ICON_NONE);
 

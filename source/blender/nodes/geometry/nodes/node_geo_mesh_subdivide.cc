@@ -88,10 +88,10 @@ static void geo_node_mesh_subdivide_exec(GeoNodeExecParams params)
   }
 
   Mesh *mesh_out = BKE_subdiv_to_mesh(subdiv, &mesh_settings, mesh_in);
-  BKE_mesh_calc_normals(mesh_out);
+  BKE_mesh_normals_tag_dirty(mesh_out);
 
   MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-  mesh_component.replace_mesh_but_keep_vertex_group_names(mesh_out);
+  mesh_component.replace(mesh_out);
 
   BKE_subdiv_free(subdiv);
 

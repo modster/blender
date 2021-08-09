@@ -2022,7 +2022,7 @@ static void single_obdata_users(
             break;
           default:
             printf("ERROR %s: can't copy %s\n", __func__, id->name);
-            BLI_assert(!"This should never happen.");
+            BLI_assert_msg(0, "This should never happen.");
 
             /* We need to end the FOREACH_OBJECT_FLAG_BEGIN iterator to prevent memory leak. */
             BKE_scene_objects_iterator_end(&iter_macro);
@@ -2056,6 +2056,23 @@ static void single_object_action_users(
     if (!ID_IS_LINKED(ob)) {
       DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
       BKE_animdata_copy_id_action(bmain, &ob->id);
+    }
+  }
+  FOREACH_OBJECT_FLAG_END;
+}
+
+static void single_objectdata_action_users(
+    Main *bmain, Scene *scene, ViewLayer *view_layer, View3D *v3d, const int flag)
+{
+  FOREACH_OBJECT_FLAG_BEGIN (scene, view_layer, v3d, flag, ob) {
+    if (!ID_IS_LINKED(ob) && ob->data != NULL) {
+      ID *id_obdata = (ID *)ob->data;
+      AnimData *adt = BKE_animdata_from_id(id_obdata);
+      ID *id_act = (ID *)adt->action;
+      if (id_act && id_act->us > 1) {
+        DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
+        BKE_animdata_copy_id_action(bmain, id_obdata);
+      }
     }
   }
   FOREACH_OBJECT_FLAG_END;
@@ -2643,6 +2660,10 @@ static int make_single_user_exec(bContext *C, wmOperator *op)
     single_object_action_users(bmain, scene, view_layer, v3d, flag);
   }
 
+  if (RNA_boolean_get(op->ptr, "obdata_animation")) {
+    single_objectdata_action_users(bmain, scene, view_layer, v3d, flag);
+  }
+
   BKE_main_id_newptr_and_tag_clear(bmain);
 
   WM_event_add_notifier(C, NC_WINDOW, NULL);
@@ -2684,8 +2705,16 @@ void OBJECT_OT_make_single_user(wmOperatorType *ot)
   RNA_def_boolean(ot->srna, "object", 0, "Object", "Make single user objects");
   RNA_def_boolean(ot->srna, "obdata", 0, "Object Data", "Make single user object data");
   RNA_def_boolean(ot->srna, "material", 0, "Materials", "Make materials local to each data-block");
-  RNA_def_boolean(
-      ot->srna, "animation", 0, "Object Animation", "Make animation data local to each object");
+  RNA_def_boolean(ot->srna,
+                  "animation",
+                  0,
+                  "Object Animation",
+                  "Make object animation data local to each object");
+  RNA_def_boolean(ot->srna,
+                  "obdata_animation",
+                  0,
+                  "Object Data Animation",
+                  "Make object data (mesh, curve etc.) animation data local to each object");
 }
 
 /** \} */
@@ -2693,6 +2722,35 @@ void OBJECT_OT_make_single_user(wmOperatorType *ot)
 /* ------------------------------------------------------------------- */
 /** \name Drop Named Material on Object Operator
  * \{ */
+
+char *ED_object_ot_drop_named_material_tooltip(bContext *C,
+                                               PointerRNA *properties,
+                                               const wmEvent *event)
+{
+  Base *base = ED_view3d_give_base_under_cursor(C, event->mval);
+
+  char name[MAX_ID_NAME - 2];
+  RNA_string_get(properties, "name", name);
+
+  if (base == NULL) {
+    return BLI_strdup("");
+  }
+
+  Object *ob = base->object;
+  int active_mat_slot = max_ii(ob->actcol, 1);
+  Material *prev_mat = BKE_object_material_get(ob, active_mat_slot);
+
+  char *result;
+  if (prev_mat) {
+    const char *tooltip = TIP_("Drop %s on %s (slot %d, replacing %s).");
+    result = BLI_sprintfN(tooltip, name, ob->id.name + 2, active_mat_slot, prev_mat->id.name + 2);
+  }
+  else {
+    const char *tooltip = TIP_("Drop %s on %s (slot %d).");
+    result = BLI_sprintfN(tooltip, name, ob->id.name + 2, active_mat_slot);
+  }
+  return result;
+}
 
 static int drop_named_material_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
@@ -2707,7 +2765,11 @@ static int drop_named_material_invoke(bContext *C, wmOperator *op, const wmEvent
     return OPERATOR_CANCELLED;
   }
 
-  BKE_object_material_assign(CTX_data_main(C), base->object, ma, 1, BKE_MAT_ASSIGN_USERPREF);
+  Object *ob = base->object;
+  const short active_mat_slot = ob->actcol;
+
+  BKE_object_material_assign(
+      CTX_data_main(C), base->object, ma, active_mat_slot, BKE_MAT_ASSIGN_USERPREF);
 
   DEG_id_tag_update(&base->object->id, ID_RECALC_TRANSFORM);
 

@@ -147,7 +147,7 @@ static bool drw_draw_show_annotation(void)
        * the draw manager is only used to draw the background. */
       return false;
     default:
-      BLI_assert("");
+      BLI_assert(0);
       return false;
   }
 }
@@ -512,7 +512,7 @@ static void drw_context_state_init(void)
   if (DST.draw_ctx.object_mode & OB_MODE_POSE) {
     DST.draw_ctx.object_pose = DST.draw_ctx.obact;
   }
-  else if ((DST.draw_ctx.object_mode & OB_MODE_ALL_WEIGHT_PAINT)) {
+  else if (DST.draw_ctx.object_mode & OB_MODE_ALL_WEIGHT_PAINT) {
     DST.draw_ctx.object_pose = BKE_object_pose_armature_get(DST.draw_ctx.obact);
   }
   else {
@@ -1281,6 +1281,12 @@ static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
     use_drw_engine(&draw_engine_gpencil_type);
   }
   drw_engines_enable_overlays();
+
+#ifdef WITH_DRAW_DEBUG
+  if (G.debug_value == 31) {
+    use_drw_engine(&draw_engine_debug_select_type);
+  }
+#endif
 }
 
 static void drw_engines_disable(void)
@@ -1645,7 +1651,7 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
 
   drw_engines_draw_scene();
 
-  /* Fix 3D view being "laggy" on macos and win+nvidia. (See T56996, T61474) */
+  /* Fix 3D view "lagging" on APPLE and WIN32+NVIDIA. (See T56996, T61474) */
   GPU_flush();
 
   DRW_stats_reset();
@@ -2253,7 +2259,7 @@ static void draw_select_framebuffer_depth_only_setup(const int size[2])
 /* Must run after all instance datas have been added. */
 void DRW_render_instance_buffer_finish(void)
 {
-  BLI_assert(!DST.buffer_finish_called && "DRW_render_instance_buffer_finish called twice!");
+  BLI_assert_msg(!DST.buffer_finish_called, "DRW_render_instance_buffer_finish called twice!");
   DST.buffer_finish_called = true;
   DRW_instance_buffer_finish(DST.idatalist);
   drw_resource_buffer_finish(DST.vmempool);
@@ -2682,6 +2688,7 @@ void DRW_draw_select_id(Depsgraph *depsgraph, ARegion *region, View3D *v3d, cons
   drw_viewport_var_init();
 
   /* Update UBO's */
+  UI_SetTheme(SPACE_VIEW3D, RGN_TYPE_WINDOW);
   DRW_globals_update();
 
   /* Init Select Engine */
@@ -2939,6 +2946,9 @@ void DRW_engines_register(void)
   DRW_engine_register(&draw_engine_overlay_type);
   DRW_engine_register(&draw_engine_select_type);
   DRW_engine_register(&draw_engine_basic_type);
+#ifdef WITH_DRAW_DEBUG
+  DRW_engine_register(&draw_engine_debug_select_type);
+#endif
 
   DRW_engine_register(&draw_engine_image_type);
   DRW_engine_register(DRW_engine_viewport_external_type.draw_engine);

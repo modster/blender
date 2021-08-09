@@ -1854,6 +1854,7 @@ class VIEW3D_MT_select_gpencil(Menu):
 
         layout.operator("gpencil.select_linked", text="Linked")
         layout.operator("gpencil.select_alternate")
+        layout.operator("gpencil.select_random")
         layout.operator_menu_enum("gpencil.select_grouped", "type", text="Grouped")
 
         if context.mode == 'VERTEX_GPENCIL':
@@ -2765,23 +2766,27 @@ class VIEW3D_MT_make_single_user(Menu):
 
         props = layout.operator("object.make_single_user", text="Object")
         props.object = True
-        props.obdata = props.material = props.animation = False
+        props.obdata = props.material = props.animation = props.obdata_animation = False
 
         props = layout.operator("object.make_single_user", text="Object & Data")
         props.object = props.obdata = True
-        props.material = props.animation = False
+        props.material = props.animation = props.obdata_animation = False
 
         props = layout.operator("object.make_single_user", text="Object & Data & Materials")
         props.object = props.obdata = props.material = True
-        props.animation = False
+        props.animation = props.obdata_animation = False
 
         props = layout.operator("object.make_single_user", text="Materials")
         props.material = True
-        props.object = props.obdata = props.animation = False
+        props.object = props.obdata = props.animation = props.obdata_animation = False
 
         props = layout.operator("object.make_single_user", text="Object Animation")
         props.animation = True
-        props.object = props.obdata = props.material = False
+        props.object = props.obdata = props.material = props.obdata_animation = False
+
+        props = layout.operator("object.make_single_user", text="Object Data Animation")
+        props.obdata_animation = props.obdata = True
+        props.object = props.material = props.animation = False
 
 
 class VIEW3D_MT_object_convert(Menu):
@@ -6382,7 +6387,13 @@ class VIEW3D_PT_overlay_edit_mesh_normals(Panel):
 
         sub = row.row(align=True)
         sub.active = overlay.show_vertex_normals or overlay.show_face_normals or overlay.show_split_normals
-        sub.prop(overlay, "normals_length", text="Size")
+        if overlay.use_normals_constant_screen_size:
+            sub.prop(overlay, "normals_constant_screen_size", text="Size")
+        else:
+            sub.prop(overlay, "normals_length", text="Size")
+
+        row.prop(overlay, "use_normals_constant_screen_size", text="", icon='FIXED_SIZE')
+
 
 
 class VIEW3D_PT_overlay_edit_mesh_freestyle(Panel):
