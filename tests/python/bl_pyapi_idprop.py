@@ -252,7 +252,7 @@ class TestRNAData(TestHelper, unittest.TestCase):
         bpy.data.objects.new("test", None)
         test_object = bpy.data.objects["test"]
 
-        # Access default RNA data values
+        # Access default RNA data values.
         test_object.id_properties_clear()
         test_object["test_prop"] = 0.5
         ui_data_test_prop = test_object.id_properties_ui("test_prop")
@@ -263,14 +263,14 @@ class TestRNAData(TestHelper, unittest.TestCase):
         self.assertEqual(rna_data["subtype"], "NONE")
         self.assertGreater(rna_data["soft_max"], 10000.0)
 
-        # Change RNA data values
+        # Change RNA data values.
         ui_data_test_prop.update(subtype="TEMPERATURE", min=0, soft_min=0.1)
         rna_data = ui_data_test_prop.as_dict()
         self.assertEqual(rna_data["min"], 0)
         self.assertEqual(rna_data["soft_min"], 0.1)
         self.assertEqual(rna_data["subtype"], "TEMPERATURE")
 
-        # Copy RNA data values from one property to another
+        # Copy RNA data values from one property to another.
         test_object["test_prop_2"] = 11.7
         ui_data_test_prop_2 = test_object.id_properties_ui("test_prop_2")
         ui_data_test_prop_2.update_from(ui_data_test_prop)
@@ -280,7 +280,7 @@ class TestRNAData(TestHelper, unittest.TestCase):
         self.assertEqual(rna_data["subtype"], "TEMPERATURE")
         self.assertGreater(rna_data["soft_max"], 10000.0)
 
-        # Copy RNA data values to another object's property
+        # Copy RNA data values to another object's property.
         bpy.data.objects.new("test_2", None)
         test_object_2 = bpy.data.objects["test_2"]
         test_object_2["test_prop_3"] = 20.1
@@ -292,7 +292,7 @@ class TestRNAData(TestHelper, unittest.TestCase):
         self.assertEqual(rna_data["subtype"], "TEMPERATURE")
         self.assertGreater(rna_data["soft_max"], 10000.0)
 
-        # Test RNA data for string property
+        # Test RNA data for string property.
         test_object.id_properties_clear()
         test_object["test_string_prop"] = "Hello there!"
         ui_data_test_prop_string = test_object.id_properties_ui("test_string_prop")
@@ -300,7 +300,7 @@ class TestRNAData(TestHelper, unittest.TestCase):
         rna_data = ui_data_test_prop_string.as_dict()
         self.assertEqual(rna_data["default"], "Goodbye where?")
 
-        # Test RNA data for array property
+        # Test RNA data for array property.
         test_object.id_properties_clear()
         test_object["test_array_prop"] = [1, 2, 3]
         ui_data_test_prop_array = test_object.id_properties_ui("test_array_prop")
