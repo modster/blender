@@ -536,6 +536,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttribute"),
         NodeItem("GeometryNodeIndex"),
         NodeItem("GeometryNodeNormal"),
+        NodeItem("GeometryNodeCurveParameter"),
     ]),
     GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
         NodeItem("GeometryNodeMaterialAssign"),
@@ -560,7 +561,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshLine"),
         NodeItem("GeometryNodeMeshUVSphere"),
     ]),
-
     GeometryNodeCategory("GEO_POINT", "Point", items=[
         NodeItem("GeometryNodePointDistribute"),
         NodeItem("GeometryNodePointInstance"),

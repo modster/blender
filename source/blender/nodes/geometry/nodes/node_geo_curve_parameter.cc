@@ -14,32 +14,29 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "UI_interface.h"
-#include "UI_resources.h"
-
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_normal_out[] = {
-    {SOCK_VECTOR, N_("Normal")},
+static bNodeSocketTemplate geo_node_curve_parameter_out[] = {
+    {SOCK_FLOAT, N_("Parameter")},
     {-1, ""},
 };
 
 namespace blender::nodes {
 
-static void geo_node_normal_exec(GeoNodeExecParams params)
+static void geo_node_curve_parameter_exec(GeoNodeExecParams params)
 {
-  FieldPtr normal_field = new bke::PersistentAttributeField("normal", CPPType::get<float3>());
-  params.set_output("Normal", bke::FieldRef<float3>(std::move(normal_field)));
+  FieldPtr curve_parameter_field = new bke::CurveParameterField();
+  params.set_output("Parameter", bke::FieldRef<float>(std::move(curve_parameter_field)));
 }
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_normal()
+void register_node_type_geo_curve_parameter()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_NORMAL, "Face Normal", NODE_CLASS_INPUT, 0);
-  node_type_socket_templates(&ntype, nullptr, geo_node_normal_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_normal_exec;
+  geo_node_type_base(&ntype, GEO_NODE_CURVE_PARAMETER, "Curve Parameter", NODE_CLASS_INPUT, 0);
+  node_type_socket_templates(&ntype, nullptr, geo_node_curve_parameter_out);
+  ntype.geometry_node_execute = blender::nodes::geo_node_curve_parameter_exec;
   nodeRegisterType(&ntype);
 }

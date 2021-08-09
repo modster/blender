@@ -87,6 +87,26 @@ class IndexFieldInputKey : public FieldInputKey {
   }
 };
 
+class CurveParameterFieldInputKey : public FieldInputKey {
+ public:
+  uint64_t hash() const override
+  {
+    /* Arbitrary number. */
+    return 928347504059;
+  }
+
+  const CPPType &type() const override
+  {
+    return CPPType::get<int>();
+  }
+
+ private:
+  bool is_same_as(const FieldInputKey &other) const override
+  {
+    return dynamic_cast<const CurveParameterFieldInputKey *>(&other) != nullptr;
+  }
+};
+
 class AnonymousAttributeFieldInputKey : public FieldInputKey {
  private:
   AnonymousCustomDataLayerID *layer_id_;
@@ -428,6 +448,8 @@ class AnonymousAttributeField : public GVArrayInputField<AnonymousAttributeField
 };
 
 class IndexField : public GVArrayInputField<IndexFieldInputKey> {
+};
+class CurveParameterField : public GVArrayInputField<CurveParameterFieldInputKey> {
 };
 
 class FieldRefBase {

@@ -23,6 +23,7 @@
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
 #include "BKE_pointcloud.h"
+#include "BKE_spline.hh"
 
 #include "NOD_type_conversions.hh"
 
@@ -152,6 +153,60 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
       if (!varray) {
         continue;
       }
+      input_value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(varray));
+    }
+    else if (dynamic_cast<const bke::CurveParameterFieldInputKey *>(&key)) {
+      if (component.type() != GEO_COMPONENT_TYPE_CURVE) {
+        continue;
+      }
+      const CurveComponent &curve_component = static_cast<const CurveComponent &>(component);
+      const CurveEval *curve = curve_component.get_for_read();
+      if (curve == nullptr) {
+        continue;
+      }
+
+      Span<SplinePtr> splines = curve->splines();
+      Array<int> offsets = curve->control_point_offsets();
+
+      Array<float> parameters(offsets.last());
+
+      for (const int i_spline : splines.index_range()) {
+        const int offset = offsets[i_spline];
+        MutableSpan<float> spline_parameters = parameters.as_mutable_span().slice(
+            offset, offsets[i_spline + 1]);
+        spline_parameters.first() = 0.0f;
+
+        const Spline &spline = *splines[i_spline];
+        const Span<float> lengths_eval = spline.evaluated_lengths();
+        const float total_length_inv = spline.length() == 0.0f ? 0.0f : 1.0f / spline.length();
+        switch (spline.type()) {
+          case Spline::Type::Bezier: {
+            const BezierSpline &bezier_spline = static_cast<const BezierSpline &>(spline);
+            const Span<int> control_point_offsets = bezier_spline.control_point_offsets();
+            for (const int i : IndexRange(1, spline.size() - 1)) {
+              spline_parameters[i] = lengths_eval[control_point_offsets[i] - 1];
+            }
+            break;
+          }
+          case Spline::Type::Poly: {
+            spline_parameters.drop_front(1).copy_from(lengths_eval);
+            break;
+          }
+          case Spline::Type::NURBS: {
+            /* Instead of doing something totally arbirary and wrong for the prototype, just do
+             * nothing currently. Consult NURBS experts or something or document this heavily if
+             * it ever makes it to master. */
+            parameters.as_mutable_span().slice(offset, offsets[i_spline + 1]).fill(0.0f);
+            break;
+          }
+        }
+
+        for (float &parameter : spline_parameters) {
+          parameter *= total_length_inv;
+        }
+      }
+      GVArrayPtr varray = std::make_unique<fn::GVArray_For_ArrayContainer<Array<float>>>(
+          std::move(parameters));
       input_value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(varray));
     }
 
