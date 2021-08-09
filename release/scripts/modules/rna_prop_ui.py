@@ -115,13 +115,13 @@ def rna_idprop_ui_create(
 
     rna_idprop_ui_prop_update(item, prop)
 
-    # Update the UI settings    
+    # Update the UI settings.
     ui_data = item.id_properties_ui(prop)
     ui_data.update(
-        subtype=subtype, 
-        min=min, 
-        max=max, 
-        soft_min=soft_min, 
+        subtype=subtype,
+        min=min,
+        max=max,
+        soft_min=soft_min,
         soft_max=soft_max,
         description=description,
         default=default,
