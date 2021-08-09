@@ -25,7 +25,7 @@
 
 static bNodeSocketTemplate geo_node_point_instance_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Mask")},
+    {SOCK_BOOLEAN, N_("Mask"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
     {-1, ""},
 };
 
@@ -99,17 +99,20 @@ static void create_component_points(GeometryComponent &component, const int tota
 
 static void separate_points_from_component(const GeometryComponent &in_component,
                                            GeometryComponent &out_component,
-                                           const StringRef mask_name,
+                                           const bke::FieldRef<bool> mask_field,
                                            const bool invert)
 {
   if (!in_component.attribute_domain_supported(ATTR_DOMAIN_POINT) ||
       in_component.attribute_domain_size(ATTR_DOMAIN_POINT) == 0) {
     return;
   }
+  const int tot_in_points = in_component.attribute_domain_size(ATTR_DOMAIN_POINT);
 
-  const GVArray_Typed<bool> mask_attribute = in_component.attribute_get_for_read<bool>(
-      mask_name, ATTR_DOMAIN_POINT, false);
-  VArray_Span<bool> masks{mask_attribute};
+  bke::FieldInputs field_inputs = mask_field->prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> field_input_values;
+  prepare_field_inputs(field_inputs, in_component, ATTR_DOMAIN_POINT, field_input_values);
+  bke::FieldOutput field_output = mask_field->evaluate(IndexRange(tot_in_points), field_inputs);
+  GVArray_Span<bool> masks{field_output.varray_ref()};
 
   const int total = masks.count(!invert);
   if (total == 0) {
@@ -122,7 +125,7 @@ static void separate_points_from_component(const GeometryComponent &in_component
 }
 
 static GeometrySet separate_geometry_set(const GeometrySet &set_in,
-                                         const StringRef mask_name,
+                                         const bke::FieldRef<bool> mask_field,
                                          const bool invert)
 {
   GeometrySet set_out;
@@ -132,7 +135,7 @@ static GeometrySet separate_geometry_set(const GeometrySet &set_in,
       continue;
     }
     GeometryComponent &out_component = set_out.get_component_for_write(component->type());
-    separate_points_from_component(*component, out_component, mask_name, invert);
+    separate_points_from_component(*component, out_component, mask_field, invert);
   }
   return set_out;
 }
@@ -145,7 +148,7 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
   if (wait_for_inputs) {
     return;
   }
-  const std::string mask_attribute_name = params.get_input<std::string>("Mask");
+  bke::FieldRef<bool> mask_field = params.get_input_field<bool>("Mask");
   GeometrySet geometry_set = params.get_input<GeometrySet>("Geometry");
 
   /* TODO: This is not necessary-- the input geometry set can be read only,
@@ -153,12 +156,10 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
   geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (params.lazy_output_is_required("Geometry 1")) {
-    params.set_output("Geometry 1",
-                      separate_geometry_set(geometry_set, mask_attribute_name, true));
+    params.set_output("Geometry 1", separate_geometry_set(geometry_set, mask_field, true));
   }
   if (params.lazy_output_is_required("Geometry 2")) {
-    params.set_output("Geometry 2",
-                      separate_geometry_set(geometry_set, mask_attribute_name, false));
+    params.set_output("Geometry 2", separate_geometry_set(geometry_set, mask_field, false));
   }
 }
 
