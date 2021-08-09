@@ -205,6 +205,7 @@ set(SRC
   geometry/nodes/node_geo_mesh_primitive_uv_sphere.cc
   geometry/nodes/node_geo_mesh_subdivide.cc
   geometry/nodes/node_geo_mesh_to_curve.cc
+  geometry/nodes/node_geo_normal.cc
   geometry/nodes/node_geo_object_info.cc
   geometry/nodes/node_geo_point_distribute.cc
   geometry/nodes/node_geo_point_instance.cc

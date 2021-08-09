@@ -535,6 +535,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeIsViewport"),
         NodeItem("GeometryNodeAttribute"),
         NodeItem("GeometryNodeIndex"),
+        NodeItem("GeometryNodeNormal"),
     ]),
     GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
         NodeItem("GeometryNodeMaterialAssign"),

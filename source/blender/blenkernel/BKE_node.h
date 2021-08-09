@@ -1482,6 +1482,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_EXTRUDE 1077
 #define GEO_NODE_ATTRIBUTE_STORE_ANONYMOUS 1078
 #define GEO_NODE_ATTRIBUTE_EXTRACT 1079
+#define GEO_NODE_NORMAL 1080
 
 /** \} */
 
