@@ -223,6 +223,7 @@ enum VertFlags {
   VERT_NONE = 0,
   VERT_SELECTED_FOR_SPLIT = 1 << 0,
   VERT_SELECTED_FOR_FLIP = 1 << 1,
+  VERT_PRESERVE = 1 << 2,
 };
 
 class VertData {
@@ -230,6 +231,10 @@ class VertData {
   int flag;
 
  public:
+  VertData() : sizing(float2x2::identity())
+  {
+  }
+
   VertData(Sizing sizing) : sizing(sizing)
   {
     this->flag = VERT_NONE;
@@ -340,6 +345,26 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   {
     for (auto &edge : this->get_edges_mut()) {
       this->edge_set_size(edge);
+    }
+  }
+
+  /**
+   * Marks verts which are on a seam or boundary for preserve
+   */
+  void mark_verts_for_preserve()
+  {
+    for (auto &vert : this->get_verts_mut()) {
+      if (this->is_vert_on_seam_or_boundary(vert)) {
+        auto &op_vert_data = vert.get_extra_data_mut();
+        if (op_vert_data) {
+          auto &vert_data = op_vert_data.value();
+          vert_data.get_flag_mut() |= VERT_PRESERVE;
+        }
+        else {
+          vert.set_extra_data(VertData());
+          vert.get_extra_data_mut().value().get_flag_mut() |= VERT_PRESERVE;
+        }
+      }
     }
   }
 
@@ -778,6 +803,14 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     const auto [v1, v2] = this->get_checked_verts_of_edge(edge, verts_swapped);
 
+    /* If v1 is supposed to be preserved, cannot collapse the edge */
+    {
+      BLI_assert(v1.get_extra_data());
+      if (v1.get_extra_data().value().get_flag() & VERT_PRESERVE) {
+        return false;
+      }
+    }
+
     /* If v1 is on a seam or boundary, v2 should also be on a seam or boundary */
     if (this->is_vert_on_seam_or_boundary(v1) == true &&
         this->is_vert_on_seam_or_boundary(v2) == false) {
@@ -1017,6 +1050,11 @@ Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
 
     params.post_extra_data_to_end(extra_data);
   }
+
+  /* Important to not mess with the panel boundaries so if a vert is
+   * marked for preserve it will not be removed and this takes care of
+   * that. */
+  adaptive_mesh.mark_verts_for_preserve();
 
   /* Actual Remeshing Part */
   {
