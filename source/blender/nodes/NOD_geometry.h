@@ -43,6 +43,7 @@ void register_node_type_geo_attribute_fill(void);
 void register_node_type_geo_attribute_map_range(void);
 void register_node_type_geo_attribute_math(void);
 void register_node_type_geo_attribute_mix(void);
+void register_node_type_geo_attribute_extract(void);
 void register_node_type_geo_attribute_proximity(void);
 void register_node_type_geo_attribute_randomize(void);
 void register_node_type_geo_attribute_remove(void);
