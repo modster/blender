@@ -92,7 +92,8 @@ static void workbench_volume_modifier_cache_populate(WORKBENCH_Data *vedata,
     return;
   }
 
-  const bool use_slice = (fds->axis_slice_method == AXIS_SLICE_SINGLE);
+  const bool use_slice = (fds->axis_slice_method == AXIS_SLICE_SINGLE) ||
+                         (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D);
   const bool show_phi = ELEM(fds->coba_field,
                              FLUID_DOMAIN_FIELD_PHI,
                              FLUID_DOMAIN_FIELD_PHI_IN,

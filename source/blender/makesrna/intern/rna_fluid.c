@@ -220,6 +220,16 @@ static void rna_Fluid_reset_dependency(Main *bmain, Scene *scene, PointerRNA *pt
   rna_Fluid_dependency_update(bmain, scene, ptr);
 }
 
+static void rna_Fluid_slice_axis_reset(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+#  ifdef WITH_FLUID
+  FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
+  if (settings->solver_res == FLUID_DOMAIN_DIMENSION_2D) {
+    rna_Fluid_domain_data_reset(bmain, scene, ptr);
+  }
+#  endif
+}
+
 static void rna_Fluid_parts_create(Main *bmain,
                                    PointerRNA *ptr,
                                    const char *pset_name,
@@ -863,6 +873,60 @@ static const EnumPropertyItem *rna_Fluid_data_depth_itemf(bContext *UNUSED(C),
   return item;
 }
 
+static const EnumPropertyItem *rna_Fluid_slice_axis_itemf(bContext *UNUSED(C),
+                                                          PointerRNA *ptr,
+                                                          PropertyRNA *UNUSED(prop),
+                                                          bool *r_free)
+{
+  FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
+
+  EnumPropertyItem *item = NULL;
+  EnumPropertyItem tmp = {0, "", 0, "", ""};
+  int totitem = 0;
+
+  if (settings->solver_res == FLUID_DOMAIN_DIMENSION_3D) {
+    tmp.value = SLICE_AXIS_AUTO;
+    tmp.identifier = "AUTO";
+    tmp.icon = 0;
+    tmp.name = "Auto";
+    tmp.description = "Adjust slice direction according to the view direction";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+  }
+
+  tmp.value = SLICE_AXIS_X;
+  tmp.identifier = "X";
+  tmp.icon = 0;
+  tmp.name = "X";
+  tmp.description = "Slice along the X axis";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = SLICE_AXIS_Y;
+  tmp.identifier = "Y";
+  tmp.icon = 0;
+  tmp.name = "Y";
+  tmp.description = "Slice along the Y axis";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = SLICE_AXIS_Z;
+  tmp.identifier = "Z";
+  tmp.icon = 0;
+  tmp.name = "Z";
+  tmp.description = "Slice along the Z axis";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  RNA_enum_item_end(&item, &totitem);
+  *r_free = true;
+
+  return item;
+}
+
+static void rna_Fluid_solver_res_set(struct PointerRNA *ptr, int value)
+{
+  FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
+  Object *ob = (Object *)ptr->owner_id;
+  BKE_fluid_domain_solver_res_set(ob, settings, value);
+}
+
 static void rna_Fluid_domaintype_set(struct PointerRNA *ptr, int value)
 {
   FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
@@ -1268,6 +1332,12 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       {FLUID_DOMAIN_TYPE_LIQUID, "LIQUID", 0, "Liquid", "Create domain for liquids"},
       {0, NULL, 0, NULL, NULL}};
 
+  static EnumPropertyItem solver_res_items[] = {
+      {FLUID_DOMAIN_DIMENSION_2D, "2D", 0, "2D", "Create 2D domain"},
+      {FLUID_DOMAIN_DIMENSION_3D, "3D", 0, "3D", "Create 3D domain"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   static const EnumPropertyItem prop_compression_items[] = {
       {VDB_COMPRESSION_ZIP, "ZIP", 0, "Zip", "Effective but slow compression"},
 #  ifdef WITH_OPENVDB_BLOSC
@@ -1351,15 +1421,9 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  /* Axis options are generated dynamically based on domain dimension (2D or 3D). */
   static const EnumPropertyItem axis_slice_position_items[] = {
-      {SLICE_AXIS_AUTO,
-       "AUTO",
-       0,
-       "Auto",
-       "Adjust slice direction according to the view direction"},
-      {SLICE_AXIS_X, "X", 0, "X", "Slice along the X axis"},
-      {SLICE_AXIS_Y, "Y", 0, "Y", "Slice along the Y axis"},
-      {SLICE_AXIS_Z, "Z", 0, "Z", "Slice along the Z axis"},
+      {0, "NONE", 0, "", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -1669,6 +1733,13 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Domain Type", "Change domain type of the simulation");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Fluid_flip_parts_update");
+
+  prop = RNA_def_property(srna, "solver_res", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, solver_res_items);
+  RNA_def_property_enum_funcs(prop, NULL, "rna_Fluid_solver_res_set", NULL);
+  RNA_def_property_ui_text(prop, "Dimension", "Change the solver resolution");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Fluid_datacache_reset");
 
   prop = RNA_def_property(srna, "delete_in_obstacle", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", FLUID_DOMAIN_DELETE_IN_OBSTACLE);
@@ -2518,8 +2589,9 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   prop = RNA_def_property(srna, "slice_axis", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "slice_axis");
   RNA_def_property_enum_items(prop, axis_slice_position_items);
+  RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_Fluid_slice_axis_itemf");
   RNA_def_property_ui_text(prop, "Axis", "");
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Fluid_slice_axis_reset");
 
   prop = RNA_def_property(srna, "slice_per_voxel", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "slice_per_voxel");

@@ -141,7 +141,10 @@ void BKE_fluid_reallocate_copy_fluid(FluidDomainSettings *fds,
                                      int n_shift[3])
 {
   struct MANTA *fluid_old = fds->fluid;
-  const int block_size = fds->noise_scale;
+  int block_size[3] = {fds->noise_scale, fds->noise_scale, fds->noise_scale};
+  if (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D) {
+    block_size[fds->slice_axis - 1] = 1;
+  }
   int new_shift[3] = {0};
   sub_v3_v3v3_int(new_shift, n_shift, o_shift);
 
@@ -254,13 +257,13 @@ void BKE_fluid_reallocate_copy_fluid(FluidDomainSettings *fds,
           if (fds->flags & FLUID_DOMAIN_USE_NOISE) {
             int i, j, k;
             /* old grid index */
-            int xx_o = xo * block_size;
-            int yy_o = yo * block_size;
-            int zz_o = zo * block_size;
+            int xx_o = xo * block_size[0];
+            int yy_o = yo * block_size[1];
+            int zz_o = zo * block_size[2];
             /* new grid index */
-            int xx_n = xn * block_size;
-            int yy_n = yn * block_size;
-            int zz_n = zn * block_size;
+            int xx_n = xn * block_size[0];
+            int yy_n = yn * block_size[1];
+            int zz_n = zn * block_size[2];
 
             /* insert old texture values into new texture grids */
             n_wt_tcu[index_new] = o_wt_tcu[index_old];
@@ -271,9 +274,9 @@ void BKE_fluid_reallocate_copy_fluid(FluidDomainSettings *fds,
             n_wt_tcv2[index_new] = o_wt_tcv2[index_old];
             n_wt_tcw2[index_new] = o_wt_tcw2[index_old];
 
-            for (i = 0; i < block_size; i++) {
-              for (j = 0; j < block_size; j++) {
-                for (k = 0; k < block_size; k++) {
+            for (i = 0; i < block_size[0]; i++) {
+              for (j = 0; j < block_size[1]; j++) {
+                for (k = 0; k < block_size[2]; k++) {
                   int big_index_old = manta_get_index(
                       xx_o + i, res_noise_old[0], yy_o + j, res_noise_old[1], zz_o + k);
                   int big_index_new = manta_get_index(
@@ -452,27 +455,32 @@ static void manta_set_domain_from_mesh(FluidDomainSettings *fds,
     return;
   }
 
+  const bool is_2D = (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D);
+  const bool is_axis_X = (fds->slice_axis == SLICE_AXIS_X);
+  const bool is_axis_Y = (fds->slice_axis == SLICE_AXIS_Y);
+  const bool is_axis_Z = (fds->slice_axis == SLICE_AXIS_Z);
+
   /* Define grid resolutions from longest domain side. */
   if (size[0] >= MAX2(size[1], size[2])) {
     scale = res / size[0];
     fds->scale = size[0] / fabsf(ob->scale[0]);
-    fds->base_res[0] = res;
-    fds->base_res[1] = max_ii((int)(size[1] * scale + 0.5f), 4);
-    fds->base_res[2] = max_ii((int)(size[2] * scale + 0.5f), 4);
+    fds->base_res[0] = (is_2D && is_axis_X) ? 1 : res;
+    fds->base_res[1] = (is_2D && is_axis_Y) ? 1 : max_ii((int)(size[1] * scale + 0.5f), 4);
+    fds->base_res[2] = (is_2D && is_axis_Z) ? 1 : max_ii((int)(size[2] * scale + 0.5f), 4);
   }
   else if (size[1] >= MAX2(size[0], size[2])) {
     scale = res / size[1];
     fds->scale = size[1] / fabsf(ob->scale[1]);
-    fds->base_res[0] = max_ii((int)(size[0] * scale + 0.5f), 4);
-    fds->base_res[1] = res;
-    fds->base_res[2] = max_ii((int)(size[2] * scale + 0.5f), 4);
+    fds->base_res[0] = (is_2D && is_axis_X) ? 1 : max_ii((int)(size[0] * scale + 0.5f), 4);
+    fds->base_res[1] = (is_2D && is_axis_Y) ? 1 : res;
+    fds->base_res[2] = (is_2D && is_axis_Z) ? 1 : max_ii((int)(size[2] * scale + 0.5f), 4);
   }
   else {
     scale = res / size[2];
     fds->scale = size[2] / fabsf(ob->scale[2]);
-    fds->base_res[0] = max_ii((int)(size[0] * scale + 0.5f), 4);
-    fds->base_res[1] = max_ii((int)(size[1] * scale + 0.5f), 4);
-    fds->base_res[2] = res;
+    fds->base_res[0] = (is_2D && is_axis_X) ? 1 : max_ii((int)(size[0] * scale + 0.5f), 4);
+    fds->base_res[1] = (is_2D && is_axis_Y) ? 1 : max_ii((int)(size[1] * scale + 0.5f), 4);
+    fds->base_res[2] = (is_2D && is_axis_Z) ? 1 : res;
   }
 
   /* Set cell size. */
@@ -2267,7 +2275,10 @@ static void adaptive_domain_adjust(
   fds->p1[2] = fds->p0[2] + fds->cell_size[2] * fds->base_res[2];
 
   /* adjust domain resolution */
-  const int block_size = fds->noise_scale;
+  int block_size[3] = {fds->noise_scale, fds->noise_scale, fds->noise_scale};
+  if (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D) {
+    block_size[fds->slice_axis - 1] = 1;
+  }
   int min[3] = {32767, 32767, 32767}, max[3] = {-32767, -32767, -32767}, res[3];
   int total_cells = 1, res_changed = 0, shift_changed = 0;
   float min_vel[3], max_vel[3];
@@ -2314,13 +2325,13 @@ static void adaptive_domain_adjust(
         if (max_den < fds->adapt_threshold && fds->flags & FLUID_DOMAIN_USE_NOISE && fds->fluid) {
           int i, j, k;
           /* high res grid index */
-          int xx = (x - fds->res_min[0]) * block_size;
-          int yy = (y - fds->res_min[1]) * block_size;
-          int zz = (z - fds->res_min[2]) * block_size;
+          int xx = (x - fds->res_min[0]) * block_size[0];
+          int yy = (y - fds->res_min[1]) * block_size[1];
+          int zz = (z - fds->res_min[2]) * block_size[2];
 
-          for (i = 0; i < block_size; i++) {
-            for (j = 0; j < block_size; j++) {
-              for (k = 0; k < block_size; k++) {
+          for (i = 0; i < block_size[0]; i++) {
+            for (j = 0; j < block_size[1]; j++) {
+              for (k = 0; k < block_size[2]; k++) {
                 int big_index = manta_get_index(
                     xx + i, res_noise[0], yy + j, res_noise[1], zz + k);
                 float den = (bigfuel) ? MAX2(bigdensity[big_index], bigfuel[big_index]) :
@@ -4704,6 +4715,16 @@ void BKE_fluid_flow_type_set(Object *object, FluidFlowSettings *settings, int ty
 void BKE_fluid_effector_type_set(Object *UNUSED(object), FluidEffectorSettings *settings, int type)
 {
   settings->type = type;
+}
+
+void BKE_fluid_domain_solver_res_set(Object *UNUSED(object),
+                                     FluidDomainSettings *settings,
+                                     int res)
+{
+  if (res == FLUID_DOMAIN_DIMENSION_2D && settings->slice_axis == SLICE_AXIS_AUTO) {
+    settings->slice_axis = SLICE_AXIS_X;
+  }
+  settings->solver_res = res;
 }
 
 void BKE_fluid_fields_sanitize(FluidDomainSettings *settings)

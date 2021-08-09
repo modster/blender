@@ -1392,15 +1392,20 @@ static void OVERLAY_volume_extra(OVERLAY_ExtraCallBuffers *cb,
   const bool color_range = (fds->gridlines_color_field == FLUID_GRIDLINE_COLOR_TYPE_RANGE &&
                             fds->use_coba && fds->coba_field != FLUID_DOMAIN_FIELD_FLAGS);
 
+  const bool is_2D = (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D);
+  const bool is_axis_X = (fds->slice_axis == SLICE_AXIS_X);
+  const bool is_axis_Y = (fds->slice_axis == SLICE_AXIS_Y);
+  const bool is_axis_Z = (fds->slice_axis == SLICE_AXIS_Z);
+
   /* Small cube showing voxel size. */
   {
     float min[3];
     madd_v3fl_v3fl_v3fl_v3i(min, fds->p0, fds->cell_size, fds->res_min);
     float voxel_cubemat[4][4] = {{0.0f}};
     /* scale small cube to voxel size */
-    voxel_cubemat[0][0] = fds->cell_size[0] / 2.0f;
-    voxel_cubemat[1][1] = fds->cell_size[1] / 2.0f;
-    voxel_cubemat[2][2] = fds->cell_size[2] / 2.0f;
+    voxel_cubemat[0][0] = (is_2D && is_axis_X) ? 0.0f : (fds->cell_size[0] / 2.0f);
+    voxel_cubemat[1][1] = (is_2D && is_axis_Y) ? 0.0f : (fds->cell_size[1] / 2.0f);
+    voxel_cubemat[2][2] = (is_2D && is_axis_Z) ? 0.0f : (fds->cell_size[2] / 2.0f);
     voxel_cubemat[3][3] = 1.0f;
     /* translate small cube to corner */
     copy_v3_v3(voxel_cubemat[3], min);

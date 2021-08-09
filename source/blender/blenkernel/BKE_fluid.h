@@ -89,6 +89,9 @@ void BKE_fluid_particles_set(struct FluidDomainSettings *settings, int value, bo
 void BKE_fluid_domain_type_set(struct Object *object,
                                struct FluidDomainSettings *settings,
                                int type);
+void BKE_fluid_domain_solver_res_set(struct Object *object,
+                                     struct FluidDomainSettings *settings,
+                                     int type);
 void BKE_fluid_flow_type_set(struct Object *object, struct FluidFlowSettings *settings, int type);
 void BKE_fluid_effector_type_set(struct Object *object,
                                  struct FluidEffectorSettings *settings,

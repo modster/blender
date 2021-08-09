@@ -204,6 +204,14 @@ MANTA::MANTA(int *res, FluidModifierData *fmd)
       mResXParticle = mUpresParticle * mResX;
       mResYParticle = mUpresParticle * mResY;
       mResZParticle = mUpresParticle * mResZ;
+      if (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D) {
+        if (fds->slice_axis == SLICE_AXIS_X)
+          mResXParticle = 1;
+        else if (fds->slice_axis == SLICE_AXIS_Y)
+          mResYParticle = 1;
+        else if (fds->slice_axis == SLICE_AXIS_Z)
+          mResZParticle = 1;
+      }
       mTotalCellsParticles = mResXParticle * mResYParticle * mResZParticle;
 
       initSuccess &= initSndParts();
@@ -266,6 +274,14 @@ MANTA::MANTA(int *res, FluidModifierData *fmd)
       mResXNoise = amplify * mResX;
       mResYNoise = amplify * mResY;
       mResZNoise = amplify * mResZ;
+      if (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D) {
+        if (fds->slice_axis == SLICE_AXIS_X)
+          mResXNoise = 1;
+        else if (fds->slice_axis == SLICE_AXIS_Y)
+          mResYNoise = 1;
+        else if (fds->slice_axis == SLICE_AXIS_Z)
+          mResZNoise = 1;
+      }
       mTotalCellsHigh = mResXNoise * mResYNoise * mResZNoise;
 
       /* Initialize Mantaflow variables in Python. */
@@ -785,8 +801,10 @@ void MANTA::initializeRNAMap(FluidModifierData *fmd)
   mRNAMap["BOUND_CONDITIONS"] = borderCollisions;
   mRNAMap["BOUNDARY_WIDTH"] = to_string(fds->boundary_width);
   mRNAMap["RES"] = to_string(mMaxRes);
-  mRNAMap["RESX"] = to_string(mResX);
-  mRNAMap["RESY"] = (is2D) ? to_string(mResZ) : to_string(mResY);
+  mRNAMap["RESX"] = (is2D && fds->slice_axis == SLICE_AXIS_X) ? to_string(mResY) :
+                                                                to_string(mResX);
+  mRNAMap["RESY"] = (is2D && fds->slice_axis != SLICE_AXIS_Z) ? to_string(mResZ) :
+                                                                to_string(mResY);
   mRNAMap["RESZ"] = (is2D) ? to_string(1) : to_string(mResZ);
   mRNAMap["TIME_SCALE"] = to_string(fds->time_scale);
   mRNAMap["FRAME_LENGTH"] = to_string(fds->frame_length);
@@ -801,14 +819,18 @@ void MANTA::initializeRNAMap(FluidModifierData *fmd)
   mRNAMap["NOISE_SCALE"] = to_string(fds->noise_scale);
   mRNAMap["MESH_SCALE"] = to_string(fds->mesh_scale);
   mRNAMap["PARTICLE_SCALE"] = to_string(fds->particle_scale);
-  mRNAMap["NOISE_RESX"] = to_string(mResXNoise);
-  mRNAMap["NOISE_RESY"] = (is2D) ? to_string(mResZNoise) : to_string(mResYNoise);
+  mRNAMap["NOISE_RESX"] = (is2D && fds->slice_axis == SLICE_AXIS_X) ? to_string(mResYNoise) :
+                                                                      to_string(mResXNoise);
+  mRNAMap["NOISE_RESY"] = (is2D && fds->slice_axis != SLICE_AXIS_Z) ? to_string(mResZNoise) :
+                                                                      to_string(mResYNoise);
   mRNAMap["NOISE_RESZ"] = (is2D) ? to_string(1) : to_string(mResZNoise);
   mRNAMap["MESH_RESX"] = to_string(mResXMesh);
   mRNAMap["MESH_RESY"] = (is2D) ? to_string(mResZMesh) : to_string(mResYMesh);
   mRNAMap["MESH_RESZ"] = (is2D) ? to_string(1) : to_string(mResZMesh);
-  mRNAMap["PARTICLE_RESX"] = to_string(mResXParticle);
-  mRNAMap["PARTICLE_RESY"] = (is2D) ? to_string(mResZParticle) : to_string(mResYParticle);
+  mRNAMap["PARTICLE_RESX"] = (is2D && fds->slice_axis == SLICE_AXIS_X) ? to_string(mResYParticle) :
+                                                                         to_string(mResXParticle);
+  mRNAMap["PARTICLE_RESY"] = (is2D && fds->slice_axis != SLICE_AXIS_Z) ? to_string(mResZParticle) :
+                                                                         to_string(mResYParticle);
   mRNAMap["PARTICLE_RESZ"] = (is2D) ? to_string(1) : to_string(mResZParticle);
   mRNAMap["GUIDING_RESX"] = to_string(mResGuiding[0]);
   mRNAMap["GUIDING_RESY"] = (is2D) ? to_string(mResGuiding[2]) : to_string(mResGuiding[1]);

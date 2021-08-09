@@ -197,6 +197,9 @@ class PHYSICS_PT_settings(PhysicButtonsPanel, Panel):
             if PhysicButtonsPanel.poll_gas_domain(context):
                 col.prop(domain, "clipping", text="Empty Space")
             col.prop(domain, "delete_in_obstacle", text="Delete in Obstacle")
+            col.prop(domain, "solver_res", text="Dimension")
+            if domain.solver_res == '2D':
+                col.prop(domain, "slice_axis", text="Axis")
 
             if domain.cache_type == 'MODULAR':
                 col.separator()
@@ -1379,7 +1382,8 @@ class PHYSICS_PT_viewport_display_slicing(PhysicButtonsPanel, Panel):
         layout.active = domain.use_slice
 
         col = layout.column()
-        col.prop(domain, "slice_axis")
+        if domain.solver_res == '3D':
+            col.prop(domain, "slice_axis")
         col.prop(domain, "slice_depth")
 
         sub = col.column()

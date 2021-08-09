@@ -62,22 +62,22 @@ s$ID$ = Solver(name='solver_base$ID$', gridSize=gs_s$ID$, dim=dim_s$ID$)\n";
 const std::string fluid_solver_noise =
     "\n\
 mantaMsg('Solver noise')\n\
-sn$ID$ = Solver(name='solver_noise$ID$', gridSize=gs_sn$ID$)\n";
+sn$ID$ = Solver(name='solver_noise$ID$', gridSize=gs_sn$ID$, dim=dim_s$ID$)\n";
 
 const std::string fluid_solver_mesh =
     "\n\
 mantaMsg('Solver mesh')\n\
-sm$ID$ = Solver(name='solver_mesh$ID$', gridSize=gs_sm$ID$)\n";
+sm$ID$ = Solver(name='solver_mesh$ID$', gridSize=gs_sm$ID$, dim=dim_s$ID$)\n";
 
 const std::string fluid_solver_particles =
     "\n\
 mantaMsg('Solver particles')\n\
-sp$ID$ = Solver(name='solver_particles$ID$', gridSize=gs_sp$ID$)\n";
+sp$ID$ = Solver(name='solver_particles$ID$', gridSize=gs_sp$ID$, dim=dim_s$ID$)\n";
 
 const std::string fluid_solver_guiding =
     "\n\
 mantaMsg('Solver guiding')\n\
-sg$ID$ = Solver(name='solver_guiding$ID$', gridSize=gs_sg$ID$)\n";
+sg$ID$ = Solver(name='solver_guiding$ID$', gridSize=gs_sg$ID$, dim=dim_s$ID$)\n";
 
 const std::string fluid_solver_viscosity =
     "\n\
@@ -95,6 +95,11 @@ dim_s$ID$     = $SOLVER_DIM$\n\
 res_s$ID$     = $RES$\n\
 gravity_s$ID$ = vec3($GRAVITY_X$, $GRAVITY_Y$, $GRAVITY_Z$) # in SI unit (e.g. m/s^2)\n\
 gs_s$ID$      = vec3($RESX$, $RESY$, $RESZ$)\n\
+if dim_s$ID$ == 2:\n\
+    gs_s$ID$.z = 1\n\
+    gravity_s$ID$.y = gravity_s$ID$.z\n\
+    gravity_s$ID$.z = 0\n\
+\n\
 maxVel_s$ID$  = 0\n\
 \n\
 domainClosed_s$ID$     = $DOMAIN_CLOSED$\n\
@@ -178,24 +183,32 @@ const std::string fluid_variables_noise =
     "\n\
 mantaMsg('Fluid variables noise')\n\
 upres_sn$ID$  = $NOISE_SCALE$\n\
-gs_sn$ID$     = vec3(upres_sn$ID$*gs_s$ID$.x, upres_sn$ID$*gs_s$ID$.y, upres_sn$ID$*gs_s$ID$.z)\n";
+gs_sn$ID$     = vec3(upres_sn$ID$*gs_s$ID$.x, upres_sn$ID$*gs_s$ID$.y, upres_sn$ID$*gs_s$ID$.z)\n\
+if dim_s$ID$ == 2:\n\
+    gs_sn$ID$.z = 1\n";
 
 const std::string fluid_variables_mesh =
     "\n\
 mantaMsg('Fluid variables mesh')\n\
 upres_sm$ID$  = $MESH_SCALE$\n\
-gs_sm$ID$     = vec3(upres_sm$ID$*gs_s$ID$.x, upres_sm$ID$*gs_s$ID$.y, upres_sm$ID$*gs_s$ID$.z)\n";
+gs_sm$ID$     = vec3(upres_sm$ID$*gs_s$ID$.x, upres_sm$ID$*gs_s$ID$.y, upres_sm$ID$*gs_s$ID$.z)\n\
+if dim_s$ID$ == 2:\n\
+    gs_sm$ID$.z = 1\n";
 
 const std::string fluid_variables_particles =
     "\n\
 mantaMsg('Fluid variables particles')\n\
 upres_sp$ID$  = $PARTICLE_SCALE$\n\
-gs_sp$ID$     = vec3(upres_sp$ID$*gs_s$ID$.x, upres_sp$ID$*gs_s$ID$.y, upres_sp$ID$*gs_s$ID$.z)\n";
+gs_sp$ID$     = vec3(upres_sp$ID$*gs_s$ID$.x, upres_sp$ID$*gs_s$ID$.y, upres_sp$ID$*gs_s$ID$.z)\n\
+if dim_s$ID$ == 2:\n\
+    gs_sp$ID$.z = 1\n";
 
 const std::string fluid_variables_guiding =
     "\n\
 mantaMsg('Fluid variables guiding')\n\
 gs_sg$ID$   = vec3($GUIDING_RESX$, $GUIDING_RESY$, $GUIDING_RESZ$)\n\
+if dim_s$ID$ == 2:\n\
+    gs_sg$ID$.z = 1\n\
 \n\
 alpha_sg$ID$ = $GUIDING_ALPHA$\n\
 beta_sg$ID$  = $GUIDING_BETA$\n\
@@ -206,7 +219,9 @@ theta_sg$ID$ = 1.0\n";
 
 const std::string fluid_variables_viscosity =
     "\n\
-gs_sv$ID$    = vec3($RESX$*2, $RESY$*2, $RESZ$*2)\n";
+gs_sv$ID$    = vec3($RESX$*2, $RESY$*2, $RESZ$*2)\n\
+if dim_s$ID$ == 2:\n\
+    gs_sv$ID$.z = 1\n";
 
 const std::string fluid_with_obstacle =
     "\n\

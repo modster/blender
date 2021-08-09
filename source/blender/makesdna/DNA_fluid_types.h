@@ -198,6 +198,12 @@ enum {
   FLUID_DOMAIN_TYPE_LIQUID = 1,
 };
 
+/* Fluid domain dimension. */
+enum {
+  FLUID_DOMAIN_DIMENSION_2D = 2,
+  FLUID_DOMAIN_DIMENSION_3D = 3,
+};
+
 /* Mesh levelset generator types. */
 enum {
   FLUID_DOMAIN_MESH_IMPROVED = 0,

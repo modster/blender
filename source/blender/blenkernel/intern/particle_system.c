@@ -4379,6 +4379,21 @@ static void particles_fluid_step(ParticleSimulationData *sim,
           const float posParticle[3] = {posX, posY, posZ};
           copy_v3_v3(pa->state.co, posParticle);
 
+          /* Adjust particle position for 2d representation. */
+          if (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D) {
+            if (fds->slice_axis == SLICE_AXIS_X) {
+              float tmp = pa->state.co[1];
+              pa->state.co[1] = pa->state.co[0];
+              pa->state.co[0] = pa->state.co[2];
+              pa->state.co[2] = tmp;
+            }
+            if (fds->slice_axis == SLICE_AXIS_Y) {
+              float tmp = pa->state.co[1];
+              pa->state.co[1] = pa->state.co[2];
+              pa->state.co[2] = tmp;
+            }
+          }
+
           /* Normalize to unit cube around 0. */
           float resDomain[3] = {resX, resY, resZ};
           mul_v3_fl(resDomain, 0.5f);
@@ -4412,6 +4427,21 @@ static void particles_fluid_step(ParticleSimulationData *sim,
           const float velParticle[3] = {velX, velY, velZ};
           copy_v3_v3(pa->state.vel, velParticle);
           mul_v3_fl(pa->state.vel, fds->dx);
+
+          /* Adjust particle velocity for 2d representation. */
+          if (fds->solver_res == FLUID_DOMAIN_DIMENSION_2D) {
+            if (fds->slice_axis == SLICE_AXIS_X) {
+              float tmp = pa->state.vel[1];
+              pa->state.vel[0] = pa->state.vel[2];
+              pa->state.vel[1] = pa->state.vel[0];
+              pa->state.vel[2] = tmp;
+            }
+            else if (fds->slice_axis == SLICE_AXIS_Y) {
+              float tmp = pa->state.vel[1];
+              pa->state.vel[1] = pa->state.vel[2];
+              pa->state.vel[2] = tmp;
+            }
+          }
 #  if 0
           /* Debugging: Print particle velocity. */
           printf("pa->state.vel[0]: %f, pa->state.vel[1]: %f, pa->state.vel[2]: %f\n",
