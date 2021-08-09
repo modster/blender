@@ -284,6 +284,7 @@ DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_RANDOMIZE, def_geo_attribute_randomize,
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_REMOVE, 0, "ATTRIBUTE_REMOVE", AttributeRemove, "Attribute Remove", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_SAMPLE_TEXTURE, 0, "ATTRIBUTE_SAMPLE_TEXTURE", AttributeSampleTexture, "Attribute Sample Texture", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_SEPARATE_XYZ, def_geo_attribute_separate_xyz, "ATTRIBUTE_SEPARATE_XYZ", AttributeSeparateXYZ, "Attribute Separate XYZ", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_STORE_LOCAL, def_geo_attribute_store_local, "ATTRIBUTE_STORE_LOCAL", AttributeStoreLocal, "Attribute Store Local", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_TRANSFER, def_geo_attribute_transfer, "ATTRIBUTE_TRANSFER", AttributeTransfer, "Attribute Transfer", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_VECTOR_MATH, def_geo_attribute_vector_math, "ATTRIBUTE_VECTOR_MATH", AttributeVectorMath, "Attribute Vector Math", "")
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_VECTOR_ROTATE, def_geo_attribute_vector_rotate, "ATTRIBUTE_VECTOR_ROTATE", AttributeVectorRotate, "Attribute Vector Rotate", "")

@@ -3935,6 +3935,9 @@ static std::string expander_output_to_name(const GeometryExpanderOutput &expande
 {
   switch (expander_output.type) {
     case GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL: {
+      if (expander_output.local_socket_identifier[0] == '\0') {
+        return expander_output.local_node_name;
+      }
       return expander_output.local_node_name + StringRef(" ▶ ") +
              expander_output.local_socket_identifier;
     }
@@ -5177,6 +5180,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_randomize();
   register_node_type_geo_attribute_remove();
   register_node_type_geo_attribute_separate_xyz();
+  register_node_type_geo_attribute_store_local();
   register_node_type_geo_attribute_transfer();
   register_node_type_geo_attribute_vector_math();
   register_node_type_geo_attribute_vector_rotate();

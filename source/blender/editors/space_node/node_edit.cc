@@ -2990,6 +2990,25 @@ void NODE_OT_cryptomatte_layer_remove(wmOperatorType *ot)
 
 /* ****************** Geometry Expander Add Output  ******************* */
 
+static eNodeSocketDatatype custom_data_type_to_socket_type(const CustomDataType type)
+{
+  switch (type) {
+    case CD_PROP_FLOAT:
+      return SOCK_FLOAT;
+    case CD_PROP_FLOAT2:
+    case CD_PROP_FLOAT3:
+      return SOCK_VECTOR;
+    case CD_PROP_COLOR:
+      return SOCK_RGBA;
+    case CD_PROP_INT32:
+      return SOCK_INT;
+    case CD_PROP_BOOL:
+      return SOCK_BOOLEAN;
+    default:
+      return SOCK_FLOAT;
+  }
+}
+
 static void foreach_available_attribute(
     bNodeTree *ntree,
     bNode *UNUSED(current_node),
@@ -3017,6 +3036,15 @@ static void foreach_available_attribute(
         STRNCPY(attribute.local_socket_identifier, node_output->identifier);
         callback(attribute);
       }
+    }
+    if (node->type == GEO_NODE_ATTRIBUTE_STORE_LOCAL) {
+      GeometryExpanderOutput attribute;
+      attribute.type = GEOMETRY_EXPANDER_OUTPUT_TYPE_LOCAL;
+      attribute.socket_type = custom_data_type_to_socket_type((CustomDataType)node->custom1);
+      attribute.array_source = GEOMETRY_EXPANDER_ARRAY_SOURCE_MESH_VERTICES;
+      STRNCPY(attribute.local_node_name, node->name);
+      STRNCPY(attribute.local_socket_identifier, "");
+      callback(attribute);
     }
   }
   {
