@@ -573,9 +573,7 @@ typedef struct FluidDomainSettings {
   float noise_strength;
   float noise_pos_scale;
   float noise_time_anim;
-  int res_noise[3];
   int noise_scale;
-  char _pad3[4]; /* Unused. */
 
   /* Liquid domain options. */
   float particle_randomness;
@@ -589,11 +587,11 @@ typedef struct FluidDomainSettings {
   float flip_ratio;
   int sys_particle_maximum;
   short simulation_method;
-  char _pad4[6];
+  char _pad3[6];
 
   /* Viscosity options. */
   float viscosity_value;
-  char _pad5[4];
+  char _pad4[4];
 
   /* Diffusion options. */
   float surface_tension;
@@ -609,7 +607,7 @@ typedef struct FluidDomainSettings {
   int mesh_scale;
   int totvert;
   short mesh_generator;
-  char _pad6[6]; /* Unused. */
+  char _pad5[6]; /* Unused. */
 
   /* Secondary particle options. */
   int particle_type;
@@ -630,7 +628,7 @@ typedef struct FluidDomainSettings {
   int sndparticle_update_radius;
   char sndparticle_boundary;
   char sndparticle_combined_export;
-  char _pad7[6]; /* Unused. */
+  char _pad6[6]; /* Unused. */
 
   /* Fluid guiding options. */
   float guide_alpha;      /* Guiding weight scalar (determines strength). */
@@ -638,7 +636,7 @@ typedef struct FluidDomainSettings {
   float guide_vel_factor; /* Multiply guiding velocity by this factor. */
   int guide_res[3];       /* Res for velocity guide grids - independent from base res. */
   short guide_source;
-  char _pad8[2]; /* Unused. */
+  char _pad7[2]; /* Unused. */
 
   /* Cache options. */
   int cache_frame_start;
@@ -658,7 +656,7 @@ typedef struct FluidDomainSettings {
   char error[64]; /* Bake error description. */
   short cache_type;
   char cache_id[4]; /* Run-time only */
-  char _pad9[2];    /* Unused. */
+  char _pad8[2];    /* Unused. */
 
   /* Time options. */
   float dt;
@@ -693,19 +691,19 @@ typedef struct FluidDomainSettings {
   char interp_method;
   char gridlines_color_field; /* Simulation field used to color map onto gridlines. */
   char gridlines_cell_filter;
-  char _pad10[7]; /* Unused. */
+  char _pad9[7]; /* Unused. */
 
   /* OpenVDB cache options. */
   int openvdb_compression;
   float clipping;
   char openvdb_data_depth;
-  char _pad11[7]; /* Unused. */
+  char _pad10[7]; /* Unused. */
 
   /* -- Deprecated / unsed options (below). -- */
 
   /* View options. */
   int viewsettings;
-  char _pad12[4]; /* Unused. */
+  char _pad11[4]; /* Unused. */
 
   /* Pointcache options. */
   /* Smoke uses only one cache from now on (index [0]), but keeping the array for now for reading
@@ -715,7 +713,7 @@ typedef struct FluidDomainSettings {
   int cache_comp;
   int cache_high_comp;
   char cache_file_format;
-  char _pad13[7]; /* Unused. */
+  char _pad12[7]; /* Unused. */
 
 } FluidDomainSettings;
 

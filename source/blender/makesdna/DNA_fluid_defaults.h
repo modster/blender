@@ -99,7 +99,6 @@
     .noise_strength = 1.0f, \
     .noise_pos_scale = 2.0f, \
     .noise_time_anim = 0.1f, \
-    .res_noise = {0, 0, 0}, \
     .noise_scale = 2, \
     .particle_randomness = 0.1f, \
     .particle_number = 2, \

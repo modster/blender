@@ -327,7 +327,13 @@ static GPUTexture *create_field_texture(FluidDomainSettings *fds, bool single_pr
 
 static GPUTexture *create_density_texture(FluidDomainSettings *fds, int highres)
 {
-  int *dim = (highres) ? fds->res_noise : fds->res;
+  int res[3];
+  if (highres) {
+    manta_noise_get_res(fds->fluid, res);
+  }
+  else {
+    manta_get_res(fds->fluid, res);
+  }
 
   float *data;
   if (highres) {
@@ -341,7 +347,7 @@ static GPUTexture *create_density_texture(FluidDomainSettings *fds, int highres)
     return NULL;
   }
 
-  GPUTexture *tex = create_volume_texture(dim, GPU_R8, GPU_DATA_FLOAT, data);
+  GPUTexture *tex = create_volume_texture(res, GPU_R8, GPU_DATA_FLOAT, data);
   swizzle_texture_channel_single(tex);
   return tex;
 }
@@ -356,7 +362,15 @@ static GPUTexture *create_color_texture(FluidDomainSettings *fds, int highres)
   }
 
   int cell_count = (highres) ? manta_noise_get_cells(fds->fluid) : fds->total_cells;
-  int *dim = (highres) ? fds->res_noise : fds->res;
+
+  int res[3];
+  if (highres) {
+    manta_noise_get_res(fds->fluid, res);
+  }
+  else {
+    manta_get_res(fds->fluid, res);
+  }
+
   float *data = (float *)MEM_callocN(sizeof(float) * cell_count * 4, "smokeColorTexture");
 
   if (data == NULL) {
@@ -370,7 +384,7 @@ static GPUTexture *create_color_texture(FluidDomainSettings *fds, int highres)
     manta_smoke_get_rgba(fds->fluid, data, 0);
   }
 
-  GPUTexture *tex = create_volume_texture(dim, GPU_RGBA8, GPU_DATA_FLOAT, data);
+  GPUTexture *tex = create_volume_texture(res, GPU_RGBA8, GPU_DATA_FLOAT, data);
 
   MEM_freeN(data);
 
@@ -382,7 +396,14 @@ static GPUTexture *create_flame_texture(FluidDomainSettings *fds, int highres)
   float *source = NULL;
   const bool has_fuel = (highres) ? manta_noise_has_fuel(fds->fluid) :
                                     manta_smoke_has_fuel(fds->fluid);
-  int *dim = (highres) ? fds->res_noise : fds->res;
+
+  int res[3];
+  if (highres) {
+    manta_noise_get_res(fds->fluid, res);
+  }
+  else {
+    manta_get_res(fds->fluid, res);
+  }
 
   if (!has_fuel) {
     return NULL;
@@ -395,7 +416,7 @@ static GPUTexture *create_flame_texture(FluidDomainSettings *fds, int highres)
     source = manta_smoke_get_flame(fds->fluid);
   }
 
-  GPUTexture *tex = create_volume_texture(dim, GPU_R8, GPU_DATA_FLOAT, source);
+  GPUTexture *tex = create_volume_texture(res, GPU_R8, GPU_DATA_FLOAT, source);
   swizzle_texture_channel_single(tex);
   return tex;
 }

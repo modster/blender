@@ -279,6 +279,12 @@ int manta_get_res_z(MANTA *fluid)
 {
   return fluid->getResZ();
 }
+void manta_get_res(MANTA *smoke, int *res)
+{
+  res[0] = smoke->getResX();
+  res[1] = smoke->getResY();
+  res[2] = smoke->getResZ();
+}
 
 float *manta_get_phi_in(MANTA *fluid)
 {

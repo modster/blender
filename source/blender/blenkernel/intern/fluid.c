@@ -126,10 +126,6 @@ bool BKE_fluid_reallocate_fluid(FluidDomainSettings *fds, int res[3], int free_o
   }
   else {
     fds->fluid = manta_init(res, fds->fmd);
-
-    fds->res_noise[0] = res[0] * fds->noise_scale;
-    fds->res_noise[1] = res[1] * fds->noise_scale;
-    fds->res_noise[2] = res[2] * fds->noise_scale;
   }
 
   return (fds->fluid != NULL);
@@ -210,8 +206,9 @@ void BKE_fluid_reallocate_copy_fluid(FluidDomainSettings *fds,
     float *n_wt_tcv2 = manta_noise_get_texture_v2(fds->fluid);
     float *n_wt_tcw2 = manta_noise_get_texture_w2(fds->fluid);
 
-    int wt_res_old[3];
-    manta_noise_get_res(fluid_old, wt_res_old);
+    int res_noise[3], res_noise_old[3];
+    manta_noise_get_res(fds->fluid, res_noise);
+    manta_noise_get_res(fluid_old, res_noise_old);
 
     for (int z = o_min[2]; z < o_max[2]; z++) {
       for (int y = o_min[1]; y < o_max[1]; y++) {
@@ -278,9 +275,9 @@ void BKE_fluid_reallocate_copy_fluid(FluidDomainSettings *fds,
               for (j = 0; j < block_size; j++) {
                 for (k = 0; k < block_size; k++) {
                   int big_index_old = manta_get_index(
-                      xx_o + i, wt_res_old[0], yy_o + j, wt_res_old[1], zz_o + k);
+                      xx_o + i, res_noise_old[0], yy_o + j, res_noise_old[1], zz_o + k);
                   int big_index_new = manta_get_index(
-                      xx_n + i, fds->res_noise[0], yy_n + j, fds->res_noise[1], zz_n + k);
+                      xx_n + i, res_noise[0], yy_n + j, res_noise[1], zz_n + k);
                   /* copy data */
                   n_wt_dens[big_index_new] = o_wt_dens[big_index_old];
                   if (n_wt_flame && o_wt_flame) {
@@ -2282,10 +2279,10 @@ static void adaptive_domain_adjust(
   float *vx = manta_get_velocity_x(fds->fluid);
   float *vy = manta_get_velocity_y(fds->fluid);
   float *vz = manta_get_velocity_z(fds->fluid);
-  int wt_res[3];
 
+  int res_noise[3];
   if (fds->flags & FLUID_DOMAIN_USE_NOISE && fds->fluid) {
-    manta_noise_get_res(fds->fluid, wt_res);
+    manta_noise_get_res(fds->fluid, res_noise);
   }
 
   INIT_MINMAX(min_vel, max_vel);
@@ -2324,7 +2321,8 @@ static void adaptive_domain_adjust(
           for (i = 0; i < block_size; i++) {
             for (j = 0; j < block_size; j++) {
               for (k = 0; k < block_size; k++) {
-                int big_index = manta_get_index(xx + i, wt_res[0], yy + j, wt_res[1], zz + k);
+                int big_index = manta_get_index(
+                    xx + i, res_noise[0], yy + j, res_noise[1], zz + k);
                 float den = (bigfuel) ? MAX2(bigdensity[big_index], bigfuel[big_index]) :
                                         bigdensity[big_index];
                 if (den > max_den) {

@@ -103,6 +103,7 @@ float *manta_get_num_guide(struct MANTA *fluid);
 int manta_get_res_x(struct MANTA *fluid);
 int manta_get_res_y(struct MANTA *fluid);
 int manta_get_res_z(struct MANTA *fluid);
+void manta_get_res(struct MANTA *fluid, int* res);
 float *manta_get_phi_in(struct MANTA *fluid);
 float *manta_get_phistatic_in(struct MANTA *fluid);
 float *manta_get_phiobs_in(struct MANTA *fluid);
